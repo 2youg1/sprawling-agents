@@ -362,6 +362,13 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::consts_external | crates/kernel/src/consts_external.rs | constants that follow the outside world, each with its source | data | S1 | built |
 | kernel::consts_policy | crates/kernel/src/consts_policy.rs | constants that are our choice; changing one needs evidence | data | S1 | built |
 | kernel::gate | crates/kernel/src/gate.rs | the five doors, idempotent dedup, and refusal in three parts | decision | S2 | built |
+| kernel::gate::domain | crates/kernel/src/gate/domain.rs | the Domain door: writes land inside the write domain | decision | S2 | built |
+| kernel::gate::egress | crates/kernel/src/gate/egress.rs | the Egress door and its allowlist | decision | S2 | built |
+| kernel::gate::spend | crates/kernel/src/gate/spend.rs | the Spend door: exhaustion escalates as a budget item | decision | S2 | built |
+| kernel::gate::commitment | crates/kernel/src/gate/commitment.rs | the Commitment door: no decision pre-blocks the run | decision | S2 | built |
+| kernel::gate::govern | crates/kernel/src/gate/govern.rs | the Discard, Delegation and Govern doors | decision | S2 | built |
+| kernel::gate::dedup | crates/kernel/src/gate/dedup.rs | idempotent dedup, judged before any side effect | decision | S2 | built |
+| kernel::gate::item | crates/kernel/src/gate/item.rs | the one Escalate item mint, shared by the doors | decision | S2 | built |
 | kernel::taint | crates/kernel/src/taint.rs | outside content is data: union propagation, no unwrapping surface | value | S2 | built |
 | kernel::write_domain | crates/kernel/src/write_domain.rs | which prefixes a resident may write, and edit-war detection | decision | S2 | built |
 | kernel::budget | crates/kernel/src/budget.rs | money and tokens as integers, three layers of ceiling | decision | S2 | built |

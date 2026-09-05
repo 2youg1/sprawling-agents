@@ -1334,3 +1334,32 @@ derive 出来的那个会把线上任意字符串收下、交回一个从没过�
 两份基线因此同变更集重生，两份 SPEC 各记一行。
 
 1,085 → 958，`[file_length.predating]` 里的那一行随之划掉。
+
+### 8-36 kernel::gate 目录化（card-1.1；形状：裁决簇即目录）
+
+`gate.rs`（875 行）按裁决簇切为 `gate/` 目录：`domain.rs`（73–107）、`egress.rs`（117–289，
+含 `EgressTarget`／`EgressOutcome`／`EgressAllowlist`）、`spend.rs`（294–321）、
+`commitment.rs`（325–362，含 `CommitmentDecision`）、`govern.rs`（366–510，
+`discard`／`delegation`／`govern`／`spawn`＋`PROPOSAL_EXCERPT`）、`dedup.rs`（514–528，
+含 `DedupVerdict`）。共享私有 `item()`（50–68）归 `gate/item.rs`（`pub(crate)`，
+四门 Escalate 的唯一造项点）。`GateContext`／`GateOutcome` 留 `gate.rs`（改索引文件，
+零逻辑）。簇间零调用边（各门只调 `item`＋本簇外模块判定函数）；对外签名逐字节不变。
+完成检查：SPEC 同变更集 → modmap＋apisync 绿 → citysim 同种子字节重放。
+
+### 8-37 kernel::plan／spine 目录化（card-1.2；形状：树／份额／节点／阻塞）
+
+`plan.rs`（958 行）按树（`PlanTree::build`／依赖与分支断言／环检测／`divide`／读序查询）／
+份额（`hand_out`／`Share` 分发）／节点（`PlanNode`／`Held`／`PlanExit`／`StopCause`／
+`claim`／`progress`）／阻塞（`ready`／`needs_of`／`somewhere_else`／`refusal`）四簇切目录；
+`spine.rs`（883 行）按文法（表定位／行解析／状态拼写）／改写（`set_roadmap_status`／
+`insert_children`／`rewrite`／`draw_row`）／备忘（`check_memo_shape`／`MEMO_OUTLINE_FIELDS`／
+`ScopeChange`／`WriteMoment`）／行类型（`RoadmapRow`／`RoadmapStatus`／`EvidenceCell`／
+`RoadmapShape`／`NewChild`）四簇切目录（card-1.2 落地时登记精确文件名）。
+依赖单向：`plan` 用 `spine` 的行类型，`spine` 不反向用 `plan`。对外签名逐字节不变。
+完成检查：同 8-36。
+
+### 8-38 kernel 值簇目录化（card-1.3；形状：值归值，判归判）
+
+`event.rs`（775）按标识／时钟／载荷簇切分；`error.rs`（464）按码／错／拒三簇切分；
+`discard.rs`（561）按请求／裁决／判定表簇切分；`secret.rs`（441）按跨度／扫描／熵簇
+切分。各文件改索引文件零逻辑，对外签名逐字节不变。完成检查：同 8-36。

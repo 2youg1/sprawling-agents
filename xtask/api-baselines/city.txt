@@ -100,7 +100,7 @@ pub fn city::Building::holds(&self, &kernel::address::Address) -> bool
 pub fn city::Building::of(&kernel::address::Address) -> core::result::Result<city::Building, kernel::error::AxError>
 pub fn city::Building::root(&self, &std::path::Path) -> std::path::PathBuf
 pub fn city::BuildingRules::addr(&self) -> &kernel::address::Address
-pub fn city::BuildingRules::egress(&self) -> &kernel::gate::EgressAllowlist
+pub fn city::BuildingRules::egress(&self) -> &kernel::gate::egress::EgressAllowlist
 pub fn city::BuildingRules::model_pool(&self) -> city::ModelPool
 pub fn city::BuildingRules::policy(&self) -> &kernel::model::BuildingPolicy
 pub fn city::BuildingRules::reading_room(&self) -> &[alloc::string::String]

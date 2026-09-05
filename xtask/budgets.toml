@@ -216,8 +216,8 @@ names = [
   "crates/collab/src/inbox.rs::new",               # 7
   "crates/runtime/src/tools/exec.rs::new",         # 7
   "crates/collab/src/signal_tool.rs::new",         # 6
-  "crates/kernel/src/gate.rs::govern",             # 6
-  "crates/kernel/src/gate.rs::item",               # 6
+  "crates/kernel/src/gate/govern.rs::govern",       # 6
+  "crates/kernel/src/gate/item.rs::item",           # 6
   "crates/kernel/src/highlight.rs::scan",          # 6
   "crates/runtime/src/turn.rs::assemble",          # 6
   "crates/sprawling/src/effect.rs::of",            # 6
@@ -226,10 +226,10 @@ names = [
   "crates/city/src/archive.rs::entry",             # 5
   "crates/collab/src/pr_tool.rs::new",             # 5
   "crates/kernel/src/config.rs::freeze",           # 5
-  "crates/kernel/src/gate.rs::commitment",         # 5
-  "crates/kernel/src/gate.rs::delegation",         # 5
-  "crates/kernel/src/gate.rs::discard",            # 5
-  "crates/kernel/src/gate.rs::spend",              # 5
+  "crates/kernel/src/gate/commitment.rs::commitment", # 5
+  "crates/kernel/src/gate/govern.rs::delegation",   # 5
+  "crates/kernel/src/gate/govern.rs::discard",      # 5
+  "crates/kernel/src/gate/spend.rs::spend",         # 5
   "crates/runtime/src/digest.rs::digest_once",     # 5
   "crates/runtime/src/fork.rs::fork_draft",        # 5
   "crates/runtime/src/handoff.rs::new",            # 5
@@ -297,7 +297,6 @@ status = "gated, with a register of the files that predate the rule"
 "crates/collab/src/claim_tool.rs" = 913
 "crates/sprawling/src/main.rs" = 900
 "crates/kernel/src/spine.rs" = 883
-"crates/kernel/src/gate.rs" = 875
 "crates/web/src/live.rs" = 860
 "crates/web/src/sessions.rs" = 857
 "crates/web/src/turn.rs" = 850
