@@ -189,7 +189,11 @@ fn product_features(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     for (name, enables) in features {
         let mut named: Vec<String> = vec![name.clone()];
         if let Some(list) = enables.as_array() {
-            named.extend(list.iter().filter_map(toml::Value::as_str).map(str::to_owned));
+            named.extend(
+                list.iter()
+                    .filter_map(toml::Value::as_str)
+                    .map(str::to_owned),
+            );
         }
         for entry in named {
             if let Some(found) = TEST_FEATURES
@@ -242,9 +246,7 @@ mod tests {
     /// The shape four of the five suites already had.
     #[test]
     fn the_same_suite_behind_a_feature_is_accepted() {
-        assert!(
-            found("#[cfg(feature = \"conformance\")]\npub mod conformance {}\n").is_empty()
-        );
+        assert!(found("#[cfg(feature = \"conformance\")]\npub mod conformance {}\n").is_empty());
     }
 
     /// A re-export puts an item on the public surface as surely as

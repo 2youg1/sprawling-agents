@@ -10,6 +10,7 @@
 use std::process::ExitCode;
 
 /// One gate finding. `location` is a repo-relative path, `path:line`, or a commit id.
+#[derive(Debug)]
 pub(crate) struct Violation {
     pub(crate) gate: &'static str,
     pub(crate) location: String,

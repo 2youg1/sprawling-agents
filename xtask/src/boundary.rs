@@ -70,8 +70,14 @@ const EXEMPT_MARK: &str = "boundary-ok:";
 /// exists, not which side of the boundary it points at, and each of them
 /// is what a test double looks like from the inside.
 const CROSSINGS: [(&str, &str); 5] = [
-    ("CARGO_BIN_EXE", "cargo's own handle on the binary this repository builds"),
-    ("SPRAWLING_BIN", "the path `just adversary` hands the shipped binary over"),
+    (
+        "CARGO_BIN_EXE",
+        "cargo's own handle on the binary this repository builds",
+    ),
+    (
+        "SPRAWLING_BIN",
+        "the path `just adversary` hands the shipped binary over",
+    ),
     (
         "axum::serve",
         "raising this product's own HTTP surface in order to talk to it over a socket",

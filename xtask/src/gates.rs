@@ -16,8 +16,8 @@ use std::process::ExitCode;
 
 use crate::report::{self, Violation, XtaskError};
 use crate::{
-    apisync, artifact, ax, boundary, budget, color, depmap, guard, header, length, lexicon,
-    modmap, release, render, secret, specalign, wiring, wording,
+    apisync, artifact, ax, boundary, budget, color, depmap, guard, header, length, lexicon, modmap,
+    release, render, secret, specalign, wiring, wording,
 };
 
 /// How many gates run. The array below is typed by it, so the number and
