@@ -7,8 +7,8 @@
 
 use std::sync::Arc;
 
+use kernel::Payload;
 use kernel::{AxCode, AxError, EventKind};
-use kernel::{Model, Payload};
 
 use crate::serving::random_token;
 
@@ -58,9 +58,6 @@ pub(super) struct Ceilings {
 /// page, and an endpoint that cannot answer in this time is one they
 /// want to hear about rather than wait for.
 pub(super) const PROBE_TIMEOUT_MS: u64 = 15_000;
-
-/// How long one model call may take.
-pub(super) const CALL_TIMEOUT_MS: u64 = 120_000;
 
 /// The headers a dialect requires beyond the credential.
 pub(super) fn dialect_headers(dialect: kernel::DialectKind) -> Vec<(String, String)> {
@@ -564,51 +561,6 @@ impl RunWorker {
                 max_output_tokens: facts.max_output_tokens,
             },
         )
-    }
-
-    /// The adapter for one chosen model.
-    ///
-    /// A loopback endpoint speaking the OpenAI shape goes through the
-    /// local adapter, which is loopback-only by construction; everything
-    /// else goes through the general one, which refuses to carry a
-    /// confidential building's bytes off this machine.
-    ///
-    /// A credential decides the route too: the local adapter has no
-    /// authentication surface, so a loopback endpoint that was attached
-    /// with a secret (a local proxy, LiteLLM, a corporate gateway) must
-    /// take the general path - before this condition existed, the probe
-    /// carried the person's key and every real call silently dropped it.
-    pub(super) fn adapter_for(
-        &self,
-        chosen: &gateway::Chosen<'_>,
-    ) -> Result<Box<dyn Model + Send>, AxError> {
-        let endpoint = chosen.endpoint;
-        if endpoint.is_local()
-            && matches!(endpoint.dialect, kernel::DialectKind::OpenAi)
-            && matches!(endpoint.auth, gateway::AuthSpec::None)
-        {
-            let native = gateway::Native::new(gateway::NativeConfig {
-                base_url: endpoint.chat_url(),
-                model: chosen.entry.id.clone(),
-                timeout_ms: CALL_TIMEOUT_MS,
-                pricing: Some(chosen.entry.clone()),
-            })?;
-            return Ok(Box::new(native));
-        }
-        let endpoint = gateway::Endpoint::new(
-            gateway::EndpointConfig {
-                base_url: endpoint.chat_url(),
-                dialect: endpoint.dialect,
-                model: chosen.entry.id.clone(),
-                auth: endpoint.auth.clone(),
-                extra_headers: dialect_headers(endpoint.dialect),
-                overrides: Vec::new(),
-                timeout_ms: CALL_TIMEOUT_MS,
-                pricing: Some(chosen.entry.clone()),
-            },
-            self.resolver(),
-        )?;
-        Ok(Box::new(endpoint))
     }
 
     /// Records what the vault turned out to be, and registers the local

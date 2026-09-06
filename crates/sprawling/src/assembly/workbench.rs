@@ -77,7 +77,7 @@ pub(super) struct Site {
     /// the whole run.
     pub(super) config: kernel::FrozenConfig,
     pub(super) model: gateway::ModelEntry,
-    pub(super) adapter: Box<dyn Model + Send>,
+    pub(super) adapter: Option<Box<dyn Model + Send>>,
     pub(super) identity: city::Identity,
     pub(super) who: String,
     pub(super) run_id: RunId,
@@ -305,7 +305,7 @@ impl RunWorker {
             rules,
             config,
             model,
-            adapter,
+            adapter: Some(adapter),
             identity,
             who,
             run_id,

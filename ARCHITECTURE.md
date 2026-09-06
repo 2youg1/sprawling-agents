@@ -482,6 +482,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::endpoint::config | crates/gateway/src/endpoint/config.rs | auth, overrides, construction | adapter | S3 | built |
 | gateway::endpoint::call | crates/gateway/src/endpoint/call.rs | one request, streamed or settled | adapter | S3 | built |
 | gateway::endpoint::model | crates/gateway/src/endpoint/model.rs | the Model face | adapter | S3 | built |
+| gateway::endpoint::adapter | crates/gateway/src/endpoint/adapter.rs | which adapter a chosen model gets, and why | adapter | S3 | built |
 | gateway::oauth_profiles | crates/gateway/src/oauth_profiles.rs | subscription-login intelligence: data only, zero branches | data | S3 | built |
 | gateway::admission | crates/gateway/src/admission.rs | the provider's concurrency limit and a deterministic minimum interval | decision | S3 | built |
 | gateway::market | crates/gateway/src/market.rs | the model catalogue snapshot, pinned so a price cannot move under a run | value | S3 | built |
@@ -662,11 +663,18 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::credentials | crates/sprawling/src/assembly/credentials.rs | what this city can sign in as, and what it may call | adapter | V3 | built |
 | bin::assembly::mcp | crates/sprawling/src/assembly/mcp.rs | reaching the MCP servers a building's configuration names | adapter | V3 | built |
 | bin::assembly::dispatching | crates/sprawling/src/assembly/dispatching.rs | one dispatch, from what a person asked to the run that froze | adapter | V3 | built |
+| bin::assembly::dispatching::agreeing | crates/sprawling/src/assembly/dispatching/agreeing.rs | every refusal a dispatch can owe before it costs anything | adapter | V3 | built |
+| bin::assembly::dispatching::running | crates/sprawling/src/assembly/dispatching/running.rs | one dispatch run to its freeze, and the handback it leaves | adapter | V3 | built |
+| bin::assembly::dispatching::tests | crates/sprawling/src/assembly/dispatching/tests.rs | steers, refusals and handbacks as the rooms see them | adapter | V3 | built |
 | bin::assembly::waking | crates/sprawling/src/assembly/waking.rs | the two ways a resident who is not working is set going | adapter | V3 | built |
 | bin::assembly::waking::tests | crates/sprawling/src/assembly/waking/tests.rs | arrivals and knocks, as the rooms see them | adapter | V3 | built |
 | bin::assembly::workbench | crates/sprawling/src/assembly/workbench.rs | where a run stands, and the bench it is given to work at | adapter | V3 | built |
 | bin::assembly::freezing | crates/sprawling/src/assembly/freezing.rs | what a run is frozen with: its plan, and the handoff that resumes it | adapter | V3 | built |
 | bin::assembly::driving | crates/sprawling/src/assembly/driving.rs | one drive, the three hooks that touch the ledger while it runs, and what it leaves | adapter | V3 | built |
+| bin::assembly::driving::tests | crates/sprawling/src/assembly/driving/tests.rs | the driving fixtures route | adapter | V3 | built |
+| bin::assembly::driving::tests::turns | crates/sprawling/src/assembly/driving/tests/turns.rs | turn loops, cancels and steers | adapter | V3 | built |
+| bin::assembly::driving::tests::confidential | crates/sprawling/src/assembly/driving/tests/confidential.rs | confidential stops before a remote call | adapter | V3 | built |
+| bin::assembly::driving::tests::ledger | crates/sprawling/src/assembly/driving/tests/ledger.rs | lines before the city they announce | adapter | V3 | built |
 | bin::assembly::settling | crates/sprawling/src/assembly/settling.rs | what a drive left, on the ledger before it is made true | adapter | V3 | built |
 | bin::assembly::settling::desks | crates/sprawling/src/assembly/settling/desks.rs | the four desks settled in history order | adapter | V3 | built |
 | bin::assembly::settling::landing | crates/sprawling/src/assembly/settling/landing.rs | one landing made true, and what a drive ended with | adapter | V3 | built |

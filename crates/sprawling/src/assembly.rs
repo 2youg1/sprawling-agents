@@ -222,7 +222,7 @@ impl RunWorker {
         RunWorker::over(city_root, vault, log, ledger)
     }
 
-    /// Builds a worker around a ledger somebody else opened.
+    /// Builds a worker around a ledger somebody else opened (LOADING; UNLOADING: `close_city`).
     ///
     /// Where the history comes from is not this worker's decision to
     /// make, and taking it as a parameter is the same correction

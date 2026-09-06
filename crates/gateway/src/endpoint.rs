@@ -11,8 +11,10 @@
 //! Credentials resolve at the last moment: the `Sealed` value is exposed
 //! only while the auth header is written, then dropped (zeroized).
 
+mod adapter;
 mod call;
 mod config;
 mod model;
 
+pub use adapter::{CALL_TIMEOUT_MS, adapter_for};
 pub use config::{AuthSpec, Endpoint, EndpointConfig, SecretResolver};

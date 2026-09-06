@@ -285,7 +285,6 @@ status = "gated, with a register of the files that predate the rule"
 [file_length.predating]
 "crates/sprawling/src/assembly/workbench.rs" = 1000
 "crates/sprawling/src/views.rs" = 995
-"crates/sprawling/src/assembly/driving.rs" = 993
 "crates/web/src/settings.rs" = 985
 "crates/sprawling/src/assembly/credentials.rs" = 978
 "crates/web/src/app.rs" = 977
@@ -299,7 +298,6 @@ status = "gated, with a register of the files that predate the rule"
 "crates/web/src/socket.rs" = 839
 "crates/sprawling/src/serving.rs" = 830
 "xtask/src/color.rs" = 819
-"crates/sprawling/src/assembly/dispatching.rs" = 787
 "crates/sprawling/src/console.rs" = 781
 "crates/sprawling/src/assembly/freezing.rs" = 778
 "crates/sprawling/src/assembly.rs" = 772

@@ -1453,3 +1453,97 @@ impl Schedule {
 settling::desks／landing、commanding::tests::answering／clockwork、
 settling::tests 已有、waking::tests）；`city-SPEC` 的 schedule 节记
 `due_after` 与 `due` 并存的理由（删 `due` 是 breaking）。
+
+## 8-29 落点三 · Assembly 显式化：接线是一处，判定住 kernel，搬运是值（路线图卡 3-3）
+
+§8-28 给 3-3 留的判据是「凡调用方仍在做区间比较、仍在记 `last_*` 的，皆是
+epoch 机器要收走的东西」。3-3 把它收走，并连带回答卡题的三句话。
+**三句话各是一处代码动作，不多不少**：
+
+### 接线留——`adapter_for` 搬出 `credentials.rs`
+
+今天 `agree_to_work`（`dispatching.rs:252`）与 `name_the_work`
+（`dispatching.rs:497`）各调一次 `self.adapter_for(&chosen)`，而
+`adapter_for` 住在 `credentials.rs:581`——凭据簇里住着一条装配线。
+搬家：`adapter_for(chosen, resolver)` 成为 `gateway` 的自由函数
+（`endpoint/adapter.rs`，与 `Endpoint::new` 同簇），`resolver` 由调用方传入。
+`credentials.rs` 留下 `resolver`（赎回闭包是凭据的形状），`dispatching`
+的两个调用点各多传一个 `self.resolver()`。
+
+**为什么是值参不是方法**：`adapter_for` 读的只有 `chosen` 与 `resolver`，
+`self` 的其余 21 个字段与它无关；挂在 `RunWorker` 上等于说「装配需要整座城」。
+搬出去后 `credentials.rs` 少一个 `impl RunWorker` 方法，多一个跨 crate 调用——
+接线只有一处（`gateway::endpoint::adapter`），这就是「接线留」。
+
+### 判定进 kernel——`halted_by` 的归属不变，调用点收敛
+
+`halted_by` 住在 `commanding/governing.rs:45`（`pub(in crate::assembly)`），
+读的是 `governance` 折叠（`HALTED`／`RELEASED`）。「判定进 kernel」在本卡的
+含义经核对后收窄：停摆判定读的是**本进程的折叠状态**（`self.governance`），
+不是纯函数能回答的问题；硬搬进 kernel 等于把 `Governance` 也搬过去，
+那是 3-4 的题（`folds.rs` 957 行）。本卡只做收敛：`halted_by` 的两个调用点
+（`dispatching.rs:229` 与 gate 面）确认走同一函数——量过，只有一处定义，
+调用点已收敛，**本句的验收是「无代码变更」，理由记在这里而不是被含糊过去**。
+
+### 搬运下沉 adapter——`Driving.adapter` 由 `&mut dyn Model` 改为拥有值
+
+今天 `Driving<'a>`（`driving.rs:28`）的 `adapter` 字段是 `&'a mut dyn Model`，
+由 `dispatching.rs:350` 的 `site.adapter.as_mut()` 出借。`Agreed.adapter`
+与 `Site.adapter` 是 `Box<dyn Model + Send>` 拥有值，`Driving` 是唯一的
+出借点。搬运下沉：`Driving` 改为拥有 `Box<dyn Model + Send>`（调用点 `move`），
+`drive_dispatch` 结束时把 `adapter` 还回——还法是 `Driven` 多一个字段
+`adapter: Box<dyn Model + Send>`，调用方拆开归位（`Site` 字段名不增不减，
+`adapter` 的类型由 `Box` 变为 `Option<Box>`——`Option` 是这次搬运的载具而非新状态，
+跨过调用时两侧皆为 `Some`，`None` 不可观察；`None` 分支以 `E_CONFIG_INVALID` 拒绝告之而非 panic，
+§8-40 的先例）。
+
+**为什么**：`&mut` 出借把「谁拥有 adapter」这个问题悬在一次调用上；
+拥有值随 `Driven` 回来，适配器的来去在类型上闭合——这就是「搬运下沉」，
+与 §8-40 `Standing` 四样东西「拆开归位」的同一条道理。
+
+### epoch 机器——`last_tick` 的区间比较收归一处
+
+§8-28 的判据点名 `last_*`。量过：`last_tick` 是全仓唯一的 `last_*`
+（`grep last_` 全仓仅 `assembly.rs:185` 定义＋`routing.rs` 读写＋测试）。
+收走：`tick` 的「读表→判断→推进 `last_tick`」三步收成
+`RunWorker::tick_after(now)` 仍三步，但 `last_tick` 的读写只在此一函数——
+今天已是如此（`routing.rs` 的 `tick` 是唯一读写点），**本句的验收同样是
+「无代码变更」**：epoch 机器的第一条轨道（到期判断下沉 `city`）已在 3-2
+落定，剩下的 `last_tick` 字段本身是 worker 状态而非散装轮询，
+删它等于把「开机不补跑昨日」这个产品语义（§8-6）一并删掉，不删的理由在此。
+
+### LOADING / UNLOADING 在哪
+
+卡题的 LOADING／UNLOADING 落在 `RunWorker::over`（`assembly.rs:239`）：
+`Standing::fold` 即全量 LOADING（一次验证、三折叠，一句注释已写明），
+而 UNLOADING 是 `close_city` 写 handoff（`assembly.rs:394`）。
+两者皆已有名有主，3-3 不给它们改名——**给已存在的东西改名是第二权威，
+§8-39 的教训**。本卡只在 `over` 的 doc 上加一句：「此即 LOADING；
+UNLOADING 见 `close_city`」，让卡题的词与代码的名在文档里相遇。
+
+### `RunWorker` 立面只减不增
+
+`adapter_for` 搬出后，`impl RunWorker` 方法数减一；`halted_by`／`tick`／
+`last_tick` 零增；`Driving`／`Driven` 的字段变化是 `driving.rs` 内部形状，
+不进立面。验收：`cargo public-api -p sprawling` 基线零漂移（`impl` 块行数
+随文件搬家增减在 2-1 已有口径：同集改写，本卡预计 `commanding/governing`
+与 `commanding/routing` 的 impl 行各一，如 2-1 口径同集处理）。
+
+### 验收
+
+1. `gateway::endpoint::adapter::adapter_for` 新建，`dispatching` 两调用点
+   传 `self.resolver()`；`credentials.rs` 的 `adapter_for` 删除。
+   既有测试 `a_loopback_endpoint_with_a_credential_sends_it_on_every_call`
+   与 `a_dispatch_without_a_provider_fails_saying_what_to_configure`
+   逐字绿（它们咬的正是这条装配线）。
+2. `Driving` 拥有 adapter，`Driven` 带回 adapter；`dispatching.rs:350`
+   处拆开归位。`sprawling` 全绿。
+3. `over` 的 doc 增 LOADING／`close_city` 互指一句；`halted_by`／`tick`／
+   `last_tick` 零代码变更（本节即其理由）。
+4. `just check` 绿；`sprawling` 基线按口径同集改写（只增减 impl 行）。
+
+### 文档同步
+
+本节；`ARCHITECTURE.md` §6（`gateway::endpoint::adapter` 新行；
+`commanding::governing` 职责减一句）；`gateway-SPEC` 的 endpoint 节记
+`adapter_for` 的归属理由（装配线住适配器簇，凭据只出 `resolver`）。

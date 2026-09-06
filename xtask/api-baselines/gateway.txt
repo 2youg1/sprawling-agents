@@ -14,6 +14,7 @@ impl gateway::MarketSnapshot
 impl gateway::Native
 impl kernel::model::Model for gateway::Endpoint
 impl kernel::model::Model for gateway::Native
+pub const gateway::CALL_TIMEOUT_MS: u64
 pub const gateway::OAUTH_PROFILES: [gateway::OauthProfile; 2]
 pub enum gateway::AdmissionVerdict
 pub fn gateway::AdmissionState::admit(&self, kernel::event::identity::TimeMs) -> gateway::AdmissionVerdict
@@ -54,6 +55,7 @@ pub fn gateway::MarketSnapshot::version(&self) -> u32
 pub fn gateway::Native::call(&mut self, &kernel::model::ModelRequest) -> core::result::Result<kernel::model::ModelReturn, kernel::error::shape::AxError>
 pub fn gateway::Native::new(gateway::NativeConfig) -> core::result::Result<gateway::Native, kernel::error::shape::AxError>
 pub fn gateway::OauthTokens::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn gateway::adapter_for(&gateway::Chosen<'_>, gateway::SecretResolver, alloc::vec::Vec<(alloc::string::String, alloc::string::String)>) -> core::result::Result<alloc::boxed::Box<(dyn kernel::model::Model + core::marker::Send)>, kernel::error::shape::AxError>
 pub fn gateway::attached_payload(&gateway::AttachedEndpoint) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn gateway::increment_of(kernel::model::DialectKind, &serde_json::value::Value) -> core::option::Option<alloc::string::String>
 pub fn gateway::oauth_begin(&gateway::OauthProfile, alloc::string::String, alloc::string::String) -> core::result::Result<gateway::OauthPending, kernel::error::shape::AxError>
