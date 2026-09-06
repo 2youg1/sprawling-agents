@@ -215,6 +215,7 @@ impl Schedule {
     pub fn parse(text: &str) -> Result<Schedule, AxError>;
     pub fn load(city_root: &Path) -> Result<Schedule, AxError>;
     pub fn due(&self, after: TimeMs, now: TimeMs) -> Vec<&Entry>;     // 时间只入参
+    pub fn due_after(&self, after: TimeMs, now: TimeMs) -> Vec<(Address, String, String)>;
 }
 ```
 
@@ -222,6 +223,7 @@ impl Schedule {
 - **恒 UTC**：节奏按 epoch 分钟数整数运算，无历法依赖。关切时区是呈现面的事（ClockStamp），而一份依赖会动的时区库的日程会在重放时换一个时刻发车。
 - **日历形状（day-of-month／month）明拒**：它们需要一部历法，而历法需要一个权威，城里还没有；拒词写明这一点，而不是近似成「每 30 天」。
 - **一个 job 只许一个节奏**：写了两个即拒——排名它们等于替用户做一个他没做的决定。
+- **`due` 与 `due_after` 并存（card-3.2）**：前者是本模块自己的公共面（返回引用，调用方自组装），删它是 breaking；后者是运行级依赖快照的最小形态（返回可直接 dispatch 的三元组，调用方只剩循环）。区间判断一处定义（`due`），`due_after` 只做拥有权转换，不复述窗口语义。
 
 ### 8-7 city::watch（P4.08；形状 6 数据面＋形状 1 判定）
 

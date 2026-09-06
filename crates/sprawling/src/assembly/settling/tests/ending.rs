@@ -18,6 +18,7 @@ use super::super::*;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
 
+#[test]
 fn an_allowed_item_carries_the_work_on_instead_of_asking_for_the_command_again() {
     let dir = tempfile::tempdir().unwrap();
     let report = init_city(dir.path()).unwrap();

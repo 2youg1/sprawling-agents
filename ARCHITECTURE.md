@@ -558,6 +558,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | city::policy | crates/city/src/policy.rs | `BUILDING.md` evaluated into rules a machine can hold | decision | P1 | built |
 | city::rules_tool | crates/city/src/rules_tool.rs | the face a building's rules show a model: read them, propose the whole of them | adapter | P2 | built |
 | city::schedule | crates/city/src/schedule.rs | work that starts by itself, counted in whole minutes | decision | P2 | built |
+| city::schedule::tests | crates/city/src/schedule/tests.rs | windows return each entry at most once | decision | P2 | built |
 | city::room | crates/city/src/room.rs | which room a named session works in, and how a new one comes into being | decision | F2 | built |
 | city::watch | crates/city/src/watch.rs | what the city is listening to, and which building answers | value | P4 | built |
 | city::wizard | crates/city/src/wizard.rs | starting a city, and moving a resident inside one | decision | P4 | built |
@@ -662,16 +663,24 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::mcp | crates/sprawling/src/assembly/mcp.rs | reaching the MCP servers a building's configuration names | adapter | V3 | built |
 | bin::assembly::dispatching | crates/sprawling/src/assembly/dispatching.rs | one dispatch, from what a person asked to the run that froze | adapter | V3 | built |
 | bin::assembly::waking | crates/sprawling/src/assembly/waking.rs | the two ways a resident who is not working is set going | adapter | V3 | built |
+| bin::assembly::waking::tests | crates/sprawling/src/assembly/waking/tests.rs | arrivals and knocks, as the rooms see them | adapter | V3 | built |
 | bin::assembly::workbench | crates/sprawling/src/assembly/workbench.rs | where a run stands, and the bench it is given to work at | adapter | V3 | built |
 | bin::assembly::freezing | crates/sprawling/src/assembly/freezing.rs | what a run is frozen with: its plan, and the handoff that resumes it | adapter | V3 | built |
 | bin::assembly::driving | crates/sprawling/src/assembly/driving.rs | one drive, the three hooks that touch the ledger while it runs, and what it leaves | adapter | V3 | built |
 | bin::assembly::settling | crates/sprawling/src/assembly/settling.rs | what a drive left, on the ledger before it is made true | adapter | V3 | built |
+| bin::assembly::settling::desks | crates/sprawling/src/assembly/settling/desks.rs | the four desks settled in history order | adapter | V3 | built |
+| bin::assembly::settling::landing | crates/sprawling/src/assembly/settling/landing.rs | one landing made true, and what a drive ended with | adapter | V3 | built |
 | bin::assembly::settling::tests | crates/sprawling/src/assembly/settling/tests.rs | the settling fixtures route | adapter | V3 | built |
 | bin::assembly::settling::tests::ending | crates/sprawling/src/assembly/settling/tests/ending.rs | endings and hand-downs | adapter | V3 | built |
 | bin::assembly::settling::tests::landing | crates/sprawling/src/assembly/settling/tests/landing.rs | half-settled landings leave nothing torn | adapter | V3 | built |
 | bin::assembly::reviewing | crates/sprawling/src/assembly/reviewing.rs | what a run offers a building it may not write in, and what merging it costs | adapter | V3 | built |
 | bin::assembly::plans | crates/sprawling/src/assembly/plans.rs | one building's plan: who holds what, what is ready, and how far red reaches | adapter | V3 | built |
 | bin::assembly::commanding | crates/sprawling/src/assembly/commanding.rs | the verbs a person sends, and what each one does to the city | adapter | V3 | built |
+| bin::assembly::commanding::routing | crates/sprawling/src/assembly/commanding/routing.rs | one verb in, one dispatch or refusal out, plus the schedule tick | adapter | V3 | built |
+| bin::assembly::commanding::governing | crates/sprawling/src/assembly/commanding/governing.rs | halts, autonomy, approvals, forks: the standing answers | adapter | V3 | built |
+| bin::assembly::commanding::tests | crates/sprawling/src/assembly/commanding/tests.rs | the commanding fixtures route | adapter | V3 | built |
+| bin::assembly::commanding::tests::answering | crates/sprawling/src/assembly/commanding/tests/answering.rs | answers, refusals and the approval queue | adapter | V3 | built |
+| bin::assembly::commanding::tests::clockwork | crates/sprawling/src/assembly/commanding/tests/clockwork.rs | the schedule fires and repeats do not | adapter | V3 | built |
 | bin::serving | crates/sprawling/src/serving.rs | how a city is stood up and served: the key at the door, the desk, the one writer thread | adapter | V3 | built |
 | bin::mcp_stdio | crates/sprawling/src/mcp_stdio.rs | an MCP server as a child process, one line per message | adapter | R1 | built |
 | bin::mcp_http | crates/sprawling/src/mcp_http.rs | an MCP server over HTTP: one request, one message, no session | adapter | R1 | built |

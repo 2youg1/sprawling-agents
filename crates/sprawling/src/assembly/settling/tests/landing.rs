@@ -14,7 +14,6 @@
     reason = "test code"
 )]
 
-use super::super::*;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
 

@@ -1378,3 +1378,78 @@ knocks 长度与进入时相等，账本三行都在（行不受牵连）。`She
 
 **影面**：`sprawling` 公开面不变（`effect` 不是 `pub mod`）。`settle` 签名不变，
 行为变（失败时回滚），红钉住它。
+
+## 8-28 落点二 · epoch 机器：「依赖快照」回答、「轮询」不回答（路线图卡 3-2）
+
+哲学一句话的后半句是「每个依赖驱动其激活」。本卡先回答它的一半：
+**快照是依赖的形状，轮询是依赖的反形状。**「散装 notify 轮询」不是指某一个
+timer——`SCHEDULE_TICK`（20s，`serving.rs`）本身留着——而是说：今天「什么该醒」
+这个问题的答案散在五处，每处各读一遍磁盘，各用各的「上次」：
+
+| 谁问 | 在哪 | 读什么 | 记住什么 |
+|---|---|---|---|
+| `tick` | `commanding/routing.rs` | `Schedule::load` 全表 | `last_tick`（worker 字段） |
+| `wake` | `waking.rs` | `Watch::load` 全表＋`buildings` 全量 | 无（每次全算） |
+| `knock` | `waking.rs` | `Identity::load`（逐 room） | 无 |
+| `answer_knocks` | `waking.rs` | 无（只 drain） | `knocks`（worker 字段） |
+| `dispatch_in` | `dispatching.rs` | `halted_by`（治理折叠） | 无 |
+
+**三处可量**：`wake` 一次读两遍磁盘（watch 表＋全部楼目录）而只为投递一个 arrival；
+`tick` 一次读全表而只为问「自上次以来谁到期」；`Watch::listening` 的「楼还在」
+每次现算，而楼的生死是账本里变化最慢的事实之一。
+
+### 本卡动的与不动的
+
+**动的只有一处**：`commanding/routing.rs` 的 `tick` 不再读全表，而是读
+`city::Schedule::due_after(path, last_tick, now)`——到期判断（`last_firing`
+区间比较）下沉到 `city`，`assembly` 只剩 dispatch 循环。`Schedule::due`
+（返回 `Vec<&Entry>` 全量引用）保留：它是 `city` 自己的公共面，删它是
+`city` 的 breaking，本卡不碰。
+
+**不动的三处，理由各写一条**：
+
+- `SCHEDULE_TICK` 不动：tick 间隔是 serve 面的节奏（§8-38），到期判断是 city
+  面的语义，两者不在同一层，换一处不动另一处。
+- `wake` 的双读不动：watch 表是人的文件（`listening` 语义含「楼已拆即失聪」），
+  到达即读即算正是「文件是人的」这个归属的形状；快照它等于替人记住，归属错。
+- `knocks` 不动：它是 3-1 逆携带的截回点（§8-27），形状已钉，动它等于重开 3-1。
+
+### 接口
+
+```rust
+impl Schedule {
+    /// 自 `after` 以来到 `now` 之间到期的条目。`due` 的区间判断原样下沉，
+    /// 返回拥有权的 `(Address, String, String)` 三元组：调用方只剩 dispatch。
+    pub fn due_after(&self, after: TimeMs, now: TimeMs) -> Vec<(Address, String, String)>;
+}
+```
+
+`tick` 此后三行：`load` → `due_after(last_tick, now)` → 逐条 `dispatch`。
+`last_tick = now` 的位置不变（先推进再跑：到期判断的输入是读到的那一刻）。
+
+### epoch / LOADING / UNLOADING 在哪
+
+路线图卡题里的 epoch／LOADING／UNLOADING 是**下一卡（3-3 Assembly 显式化）的
+主题**，不是本卡的。本卡只把「到期判断」这一处依赖收成快照的形状
+（`due_after` 即运行级依赖快照的最小形态：调用方拿着「到期了什么」，
+而不是「全表＋上次」），并给 3-3 留下一句判据：**凡调用方仍在做区间比较、
+仍在记 `last_*` 的，皆是 epoch 机器要收走的东西**（`knocks` 除外，它是
+§8-27 的逆携带点）。
+
+### 验收
+
+1. `tick` 的三行与 `due_after` 的区间语义由既有红守着：
+   `a_scheduled_job_starts_by_itself_and_only_once_per_firing`
+   （三调用：到期 1、期内 0、一小时宕机仍 1）逐字绿，不改一字。
+2. `commanding` 一分为二（`routing`：动词路由＋tick；`governing`：halt／
+   autonomy／approval／fork）与 `settling` 一分为二（`desks` 四桌顺序；
+   `landing` 单落点＋结论）只搬家：跨文件调用的可见性收成
+   `pub(in crate::assembly)`，行为零变，`sprawling` 158 全绿。
+3. `just check` 绿；`city` 公开面只增一函数（`api-baselines` 同集改写）。
+
+### 文档同步
+
+本节；`ARCHITECTURE.md` §6 新增六行（commanding::routing／governing、
+settling::desks／landing、commanding::tests::answering／clockwork、
+settling::tests 已有、waking::tests）；`city-SPEC` 的 schedule 节记
+`due_after` 与 `due` 并存的理由（删 `due` 是 breaking）。

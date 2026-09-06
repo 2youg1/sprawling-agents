@@ -153,6 +153,7 @@ pub fn city::RulesTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn city::RulesTool::new(&std::path::Path, kernel::address::Address) -> core::result::Result<city::RulesTool, kernel::error::shape::AxError>
 pub fn city::RunBrief::segment_text(&self) -> &str
 pub fn city::Schedule::due(&self, kernel::event::identity::TimeMs, kernel::event::identity::TimeMs) -> alloc::vec::Vec<&city::Entry>
+pub fn city::Schedule::due_after(&self, kernel::event::identity::TimeMs, kernel::event::identity::TimeMs) -> alloc::vec::Vec<(kernel::address::Address, alloc::string::String, alloc::string::String)>
 pub fn city::Schedule::entries(&self) -> &[city::Entry]
 pub fn city::Schedule::load(&std::path::Path) -> core::result::Result<city::Schedule, kernel::error::shape::AxError>
 pub fn city::Schedule::parse(&str) -> core::result::Result<city::Schedule, kernel::error::shape::AxError>
