@@ -68,20 +68,20 @@ pub fn eval::Disposal::because(&self) -> &str
 pub fn eval::Fault::as_str(self) -> &'static str
 pub fn eval::Grades::wrong_per_mille(&self) -> u32
 pub fn eval::Half::as_str(self) -> &'static str
-pub fn eval::Probe::answered(&self, alloc::vec::Vec<alloc::string::String>) -> core::result::Result<eval::Answers, kernel::error::AxError>
+pub fn eval::Probe::answered(&self, alloc::vec::Vec<alloc::string::String>) -> core::result::Result<eval::Answers, kernel::error::shape::AxError>
 pub fn eval::Probe::id(&self) -> &eval::ProbeId
-pub fn eval::Probe::new(eval::ProbeId, alloc::vec::Vec<alloc::string::String>) -> core::result::Result<eval::Probe, kernel::error::AxError>
+pub fn eval::Probe::new(eval::ProbeId, alloc::vec::Vec<alloc::string::String>) -> core::result::Result<eval::Probe, kernel::error::shape::AxError>
 pub fn eval::Probe::questions(&self) -> &[alloc::string::String]
 pub fn eval::Shape::as_str(self) -> &'static str
 pub fn eval::Suite::half(&self, eval::Half) -> alloc::vec::Vec<&eval::Task>
 pub fn eval::Suite::is_empty(&self) -> bool
 pub fn eval::Suite::len(&self) -> usize
-pub fn eval::Suite::new(alloc::vec::Vec<eval::Task>) -> core::result::Result<eval::Suite, kernel::error::AxError>
+pub fn eval::Suite::new(alloc::vec::Vec<eval::Task>) -> core::result::Result<eval::Suite, kernel::error::shape::AxError>
 pub fn eval::Suite::report(&self, &[eval::Outcome]) -> eval::Report
 pub fn eval::Tally::per_mille(&self) -> u32
-pub fn eval::compare(&eval::Answers, &eval::Answers) -> core::result::Result<eval::Comparison, kernel::error::AxError>
+pub fn eval::compare(&eval::Answers, &eval::Answers) -> core::result::Result<eval::Comparison, kernel::error::shape::AxError>
 pub fn eval::dispose(&eval::AssetUse, eval::Score, bool) -> eval::Disposal
-pub fn eval::grade(&eval::Attempt) -> core::result::Result<eval::Verdict, kernel::error::AxError>
+pub fn eval::grade(&eval::Attempt) -> core::result::Result<eval::Verdict, kernel::error::shape::AxError>
 pub fn eval::recommended(&[eval::Grades]) -> core::option::Option<eval::Shape>
 pub fn eval::score(&eval::AssetUse) -> eval::Score
 pub fn eval::sweep<T: core::clone::Clone>(&[(T, eval::AssetUse, eval::Score, bool)]) -> alloc::vec::Vec<(T, eval::Disposal)>

@@ -356,6 +356,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::locator | crates/kernel/src/locator.rs | the one grammar for referring to content: `cas:` and `file:`, fail-closed | value | S1 | built |
 | kernel::ledger (port) | crates/kernel/src/ledger.rs | the only write entrance to history; owns `seq` and `prev` | port | S1 | built |
 | kernel::event | crates/kernel/src/event.rs | EventRecord, the closed EventKind set, and the unforgeable EventRef | value | S1 | built |
+| kernel::event::identity | crates/kernel/src/event/identity.rs | run, sequence, and time | value | S1 | built |
+| kernel::event::kind | crates/kernel/src/event/kind.rs | the closed kind set and its window classes | value | S1 | built |
+| kernel::event::payload | crates/kernel/src/event/payload.rs | payloads, drafts, records, and refs | value | S1 | built |
 | kernel::error | crates/kernel/src/error.rs | AxError and the closed AxCode set, each with its carrier event | value | S1 | built |
 | kernel::version | crates/kernel/src/version.rs | optimistic concurrency: a write carries the version it read | value | S1 | built |
 | kernel::idem | crates/kernel/src/idem.rs | the deduplication key for outward actions, derived deterministically | value | S1 | built |
@@ -400,7 +403,16 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::tool (port) | crates/kernel/src/tool.rs | what a tool is, in eight fields | port | S2 | built |
 | kernel::model (port) | crates/kernel/src/model.rs | what a model call is, carrying the building's policy with it | port | S2 | built |
 | kernel::secret | crates/kernel/src/secret.rs | secret-shape judgement, the `secret:` grammar, and `Sealed<T>` | decision | S2 | built |
+| kernel::secret::span | crates/kernel/src/secret/span.rs | references and spans: the shapes that name secrets | decision | S2 | built |
+| kernel::secret::scan | crates/kernel/src/secret/scan.rs | shape-table-first, entropy-second, float-free | decision | S2 | built |
+| kernel::secret::sealed | crates/kernel/src/secret/sealed.rs | plaintext that cannot reach any sink | decision | S2 | built |
 | kernel::discard | crates/kernel/src/discard.rs | deletion as an effect class; a Discard without a Restoration cannot exist | decision | S2 | built |
+| kernel::discard::request | crates/kernel/src/discard/request.rs | restoration routes and planned/unplanned shapes | decision | S2 | built |
+| kernel::discard::verdict | crates/kernel/src/discard/verdict.rs | the decision table | decision | S2 | built |
+| kernel::discard::forecast | crates/kernel/src/discard/forecast.rs | reading a command whole before it runs | decision | S2 | built |
+| kernel::error::code | crates/kernel/src/error/code.rs | the closed code set and its carrier events | decision | S1 | built |
+| kernel::error::refusal | crates/kernel/src/error/refusal.rs | the three mandatory parts | decision | S1 | built |
+| kernel::error::shape | crates/kernel/src/error/shape.rs | the one error shape of the whole city | decision | S1 | built |
 | kernel::change | crates/kernel/src/change.rs | what moved between two checkpoints; a binary file cannot be spelled as one that moved nothing | value | R2 | built |
 | kernel::highlight | crates/kernel/src/highlight.rs | a document read as ordered, disjoint spans; it says where things are and never rewrites the text | decision | R2 | built |
 

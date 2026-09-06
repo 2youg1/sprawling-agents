@@ -18,7 +18,7 @@ use crate::walk;
 /// The only files allowed to say `.expose(` under crates/*/src: the
 /// defining module and the two redemption points (gateway lands S3).
 const EXPOSE_WHITELIST: [&str; 5] = [
-    "crates/kernel/src/secret.rs",
+    "crates/kernel/src/secret/sealed.rs",
     "crates/gateway/src/endpoint.rs",
     "crates/gateway/src/native.rs",
     // R1.18: renewing a subscription credential sends the refresh token

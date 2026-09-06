@@ -14,7 +14,7 @@ impl core::fmt::Debug for channels::Reply
 impl serde_core::ser::Serialize for channels::NoSecret
 impl<'de> serde_core::de::Deserialize<'de> for channels::NoSecret
 impl<Secret> channels::Command<Secret>
-pub async fn channels::serve(channels::ServeConfig) -> core::result::Result<(), kernel::error::AxError>
+pub async fn channels::serve(channels::ServeConfig) -> core::result::Result<(), kernel::error::shape::AxError>
 pub channels::AcpBody::addr: alloc::string::String
 pub channels::AcpBody::goal: alloc::string::String
 pub channels::AcpBody::task: alloc::string::String
@@ -51,10 +51,10 @@ pub channels::AssetReply::Found
 pub channels::AssetReply::Found::bytes: alloc::vec::Vec<u8>
 pub channels::AssetReply::Found::content_type: &'static str
 pub channels::AssetReply::Found::gzipped: bool
-pub channels::AssetReply::Miss(kernel::error::AxError)
+pub channels::AssetReply::Miss(kernel::error::shape::AxError)
 pub channels::BindFace::Exposed
 pub channels::BindFace::Loopback
-pub channels::BindVerdict::Refuse(kernel::error::AxError)
+pub channels::BindVerdict::Refuse(kernel::error::shape::AxError)
 pub channels::BindVerdict::Serve(channels::BindFace)
 pub channels::BlockedLine::line: alloc::string::String
 pub channels::BlockedLine::source: kernel::node_id::NodeId
@@ -101,7 +101,7 @@ pub channels::Command::Approve::item: kernel::approval::ApprovalId
 pub channels::Command::Approve::verdict: kernel::approval::PolicyVerdict
 pub channels::Command::Attach
 pub channels::Command::Attach::idem: kernel::idem::IdemKey
-pub channels::Command::Attach::notify: alloc::vec::Vec<kernel::event::RunId>
+pub channels::Command::Attach::notify: alloc::vec::Vec<kernel::event::identity::RunId>
 pub channels::Command::Attach::upload: channels::UploadId
 pub channels::Command::AttachEndpoint
 pub channels::Command::AttachEndpoint::admit: alloc::vec::Vec<alloc::string::String>
@@ -118,7 +118,7 @@ pub channels::Command::BatchByBuilding::addr: kernel::address::Address
 pub channels::Command::BatchByBuilding::idem: kernel::idem::IdemKey
 pub channels::Command::Cancel
 pub channels::Command::Cancel::idem: kernel::idem::IdemKey
-pub channels::Command::Cancel::run: kernel::event::RunId
+pub channels::Command::Cancel::run: kernel::event::identity::RunId
 pub channels::Command::ConfigureBuilding
 pub channels::Command::ConfigureBuilding::addr: kernel::address::Address
 pub channels::Command::ConfigureBuilding::idem: kernel::idem::IdemKey
@@ -142,9 +142,9 @@ pub channels::Command::Dispatch::session: core::option::Option<kernel::address::
 pub channels::Command::Dispatch::task: alloc::string::String
 pub channels::Command::Fork
 pub channels::Command::Fork::addr: core::option::Option<kernel::address::Address>
-pub channels::Command::Fork::at_seq: kernel::event::Seq
+pub channels::Command::Fork::at_seq: kernel::event::identity::Seq
 pub channels::Command::Fork::idem: kernel::idem::IdemKey
-pub channels::Command::Fork::run: kernel::event::RunId
+pub channels::Command::Fork::run: kernel::event::identity::RunId
 pub channels::Command::Halt
 pub channels::Command::Halt::idem: kernel::idem::IdemKey
 pub channels::Command::Halt::scope: channels::HaltScope
@@ -186,11 +186,11 @@ pub channels::Command::SetAutonomy::idem: kernel::idem::IdemKey
 pub channels::Command::SetAutonomy::scope: channels::HaltScope
 pub channels::Command::Steer
 pub channels::Command::Steer::idem: kernel::idem::IdemKey
-pub channels::Command::Steer::run: kernel::event::RunId
+pub channels::Command::Steer::run: kernel::event::identity::RunId
 pub channels::Command::Steer::text: alloc::string::String
 pub channels::Command::Takeover
 pub channels::Command::Takeover::idem: kernel::idem::IdemKey
-pub channels::Command::Takeover::run: kernel::event::RunId
+pub channels::Command::Takeover::run: kernel::event::identity::RunId
 pub channels::Command::Wake
 pub channels::Command::Wake::body: alloc::string::String
 pub channels::Command::Wake::idem: kernel::idem::IdemKey
@@ -198,10 +198,10 @@ pub channels::Command::Wake::source: alloc::string::String
 pub channels::Command::Wake::subject: alloc::string::String
 pub channels::ControlVerdict::Intervene
 pub channels::ControlVerdict::Intervene::must_write_handoff: bool
-pub channels::ControlVerdict::Intervene::run: core::option::Option<kernel::event::RunId>
+pub channels::ControlVerdict::Intervene::run: core::option::Option<kernel::event::identity::RunId>
 pub channels::ControlVerdict::Intervene::verb: channels::Intervention
 pub channels::ControlVerdict::NotAnIntervention
-pub channels::ControlVerdict::Refuse(kernel::error::AxError)
+pub channels::ControlVerdict::Refuse(kernel::error::shape::AxError)
 pub channels::CostAnswer::by_actor: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub channels::CostAnswer::by_run: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub channels::CostAnswer::by_segment: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
@@ -211,12 +211,12 @@ pub channels::CostAnswer::total: kernel::budget::UsdMicros
 pub channels::Delivered::NobodyAsked
 pub channels::Delivered::PeerGone
 pub channels::Delivered::ToThePeer
-pub channels::Delta::run: kernel::event::RunId
+pub channels::Delta::run: kernel::event::identity::RunId
 pub channels::Delta::text: alloc::string::String
 pub channels::DiscardAnswer::rows: alloc::vec::Vec<channels::DiscardLine>
-pub channels::DiscardLine::at: kernel::event::TimeMs
+pub channels::DiscardLine::at: kernel::event::identity::TimeMs
 pub channels::DiscardLine::path: alloc::string::String
-pub channels::DiscardLine::restoration: core::option::Option<kernel::discard::Restoration>
+pub channels::DiscardLine::restoration: core::option::Option<kernel::discard::request::Restoration>
 pub channels::DiscardLine::restored: bool
 pub channels::EmbeddedFile::gz: &'static [u8]
 pub channels::EmbeddedFile::path: &'static str
@@ -234,12 +234,12 @@ pub channels::HaltScope::Building(kernel::address::Address)
 pub channels::HaltScope::City
 pub channels::HaltScope::Workshop(kernel::address::Address)
 pub channels::HandshakeVerdict::Accept
-pub channels::HandshakeVerdict::Reject(kernel::error::AxError)
+pub channels::HandshakeVerdict::Reject(kernel::error::shape::AxError)
 pub channels::Hello::schema: kernel::locator::B3Hash
 pub channels::Hello::token: core::option::Option<alloc::string::String>
 pub channels::Hello::wire_v: u32
-pub channels::HistoryAnswer::earlier: core::option::Option<kernel::event::Seq>
-pub channels::HistoryAnswer::records: alloc::vec::Vec<kernel::event::EventRecord>
+pub channels::HistoryAnswer::earlier: core::option::Option<kernel::event::identity::Seq>
+pub channels::HistoryAnswer::records: alloc::vec::Vec<kernel::event::payload::EventRecord>
 pub channels::InboxAnswer::addr: kernel::address::Address
 pub channels::InboxAnswer::waiting: alloc::vec::Vec<channels::SignalLine>
 pub channels::Intervention::Cancel
@@ -288,43 +288,43 @@ pub channels::Query::CostView
 pub channels::Query::DiscardView
 pub channels::Query::EndpointView
 pub channels::Query::History
-pub channels::Query::History::before: core::option::Option<kernel::event::Seq>
+pub channels::Query::History::before: core::option::Option<kernel::event::identity::Seq>
 pub channels::Query::History::limit: u32
 pub channels::Query::InboxView
 pub channels::Query::InboxView::addr: kernel::address::Address
 pub channels::Query::Metrics
 pub channels::Query::RegistryView
 pub channels::Query::RunHistory
-pub channels::Query::RunHistory::before: core::option::Option<kernel::event::Seq>
+pub channels::Query::RunHistory::before: core::option::Option<kernel::event::identity::Seq>
 pub channels::Query::RunHistory::limit: u32
-pub channels::Query::RunHistory::run: kernel::event::RunId
+pub channels::Query::RunHistory::run: kernel::event::identity::RunId
 pub channels::Query::RunView
-pub channels::Query::RunView::run: kernel::event::RunId
+pub channels::Query::RunView::run: kernel::event::identity::RunId
 pub channels::RegistryAnswer::assets: alloc::vec::Vec<channels::RegistryLine>
 pub channels::RegistryLine::addr: kernel::address::Address
-pub channels::RegistryLine::at: kernel::event::TimeMs
+pub channels::RegistryLine::at: kernel::event::identity::TimeMs
 pub channels::RegistryLine::kind: alloc::string::String
 pub channels::RegistryLine::subject: alloc::string::String
 pub channels::RunSummary::frozen: bool
-pub channels::RunSummary::last_kind: kernel::event::EventKind
-pub channels::RunSummary::last_seq: kernel::event::Seq
-pub channels::RunSummary::run: kernel::event::RunId
+pub channels::RunSummary::last_kind: kernel::event::kind::EventKind
+pub channels::RunSummary::last_seq: kernel::event::identity::Seq
+pub channels::RunSummary::run: kernel::event::identity::RunId
 pub channels::RunSummary::who: alloc::string::String
 pub channels::ServeConfig::acp: channels::AcpSink
 pub channels::ServeConfig::addr: core::net::socket_addr::SocketAddr
 pub channels::ServeConfig::city: core::option::Option<kernel::address::Address>
 pub channels::ServeConfig::client: alloc::sync::Arc<channels::ClientAssets>
-pub channels::ServeConfig::commands: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::WireCommand, channels::Reply) -> core::result::Result<(), kernel::error::AxError> + core::marker::Send + core::marker::Sync)>
+pub channels::ServeConfig::commands: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::WireCommand, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::deltas: tokio::sync::broadcast::Sender<channels::Delta>
-pub channels::ServeConfig::events: tokio::sync::broadcast::Sender<kernel::event::EventRecord>
-pub channels::ServeConfig::queries: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Query) -> core::result::Result<channels::Answer, kernel::error::AxError> + core::marker::Send + core::marker::Sync)>
-pub channels::ServeConfig::secrets: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Command<kernel::secret::Sealed<alloc::string::String>>, channels::Reply) -> core::result::Result<(), kernel::error::AxError> + core::marker::Send + core::marker::Sync)>
+pub channels::ServeConfig::events: tokio::sync::broadcast::Sender<kernel::event::payload::EventRecord>
+pub channels::ServeConfig::queries: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Query) -> core::result::Result<channels::Answer, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
+pub channels::ServeConfig::secrets: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Command<kernel::secret::sealed::Sealed<alloc::string::String>>, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::token_digest: core::option::Option<kernel::locator::B3Hash>
-pub channels::ServeConfig::upload_sink: alloc::sync::Arc<(dyn core::ops::function::Fn(alloc::vec::Vec<u8>) -> core::result::Result<channels::UploadId, kernel::error::AxError> + core::marker::Send + core::marker::Sync)>
+pub channels::ServeConfig::upload_sink: alloc::sync::Arc<(dyn core::ops::function::Fn(alloc::vec::Vec<u8>) -> core::result::Result<channels::UploadId, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServerFrame::Answer(alloc::boxed::Box<channels::Answer>)
 pub channels::ServerFrame::Delta(channels::Delta)
-pub channels::ServerFrame::Event(alloc::boxed::Box<kernel::event::EventRecord>)
-pub channels::ServerFrame::Refusal(alloc::boxed::Box<kernel::error::AxError>)
+pub channels::ServerFrame::Event(alloc::boxed::Box<kernel::event::payload::EventRecord>)
+pub channels::ServerFrame::Refusal(alloc::boxed::Box<kernel::error::shape::AxError>)
 pub channels::ServerFrame::Welcome(channels::Welcome)
 pub channels::SessionState::AwaitingHello
 pub channels::SessionState::Live
@@ -332,11 +332,11 @@ pub channels::SessionStep::Answer(alloc::boxed::Box<channels::Query>)
 pub channels::SessionStep::Deliver(alloc::boxed::Box<channels::WireCommand>)
 pub channels::SessionStep::Refuse
 pub channels::SessionStep::Refuse::close: bool
-pub channels::SessionStep::Refuse::error: alloc::boxed::Box<kernel::error::AxError>
+pub channels::SessionStep::Refuse::error: alloc::boxed::Box<kernel::error::shape::AxError>
 pub channels::SessionStep::Welcome(alloc::boxed::Box<channels::Welcome>)
 pub channels::Sighting::city: channels::CityLabel
-pub channels::Sighting::event: kernel::event::EventRecord
-pub channels::SignalLine::at: kernel::event::TimeMs
+pub channels::Sighting::event: kernel::event::payload::EventRecord
+pub channels::SignalLine::at: kernel::event::identity::TimeMs
 pub channels::SignalLine::from: alloc::string::String
 pub channels::SignalLine::id: alloc::string::String
 pub channels::SignalLine::kind: alloc::string::String
@@ -344,7 +344,7 @@ pub channels::Upstream::address: alloc::string::String
 pub channels::Upstream::label: channels::CityLabel
 pub channels::Upstream::token_digest: core::option::Option<kernel::locator::B3Hash>
 pub channels::Welcome::city: core::option::Option<kernel::address::Address>
-pub channels::Welcome::resume_from: core::option::Option<kernel::event::Seq>
+pub channels::Welcome::resume_from: core::option::Option<kernel::event::identity::Seq>
 pub channels::Welcome::schema: kernel::locator::B3Hash
 pub channels::Welcome::wire_v: u32
 pub const channels::COMMAND_NAMES: [&str; 23]
@@ -370,37 +370,37 @@ pub enum channels::Query
 pub enum channels::ServerFrame
 pub enum channels::SessionState
 pub enum channels::SessionStep
-pub fn channels::Aggregate::ask(&self, &channels::CityLabel, channels::Query) -> core::result::Result<channels::Forwarded, kernel::error::AxError>
+pub fn channels::Aggregate::ask(&self, &channels::CityLabel, channels::Query) -> core::result::Result<channels::Forwarded, kernel::error::shape::AxError>
 pub fn channels::Aggregate::attach(&mut self, channels::Upstream)
 pub fn channels::Aggregate::cities(&self) -> impl core::iter::traits::iterator::Iterator<Item = &channels::Upstream>
 pub fn channels::Aggregate::detach(&mut self, &channels::CityLabel) -> bool
-pub fn channels::Aggregate::merge(alloc::vec::Vec<(channels::CityLabel, alloc::vec::Vec<kernel::event::EventRecord>)>) -> alloc::vec::Vec<channels::Sighting>
+pub fn channels::Aggregate::merge(alloc::vec::Vec<(channels::CityLabel, alloc::vec::Vec<kernel::event::payload::EventRecord>)>) -> alloc::vec::Vec<channels::Sighting>
 pub fn channels::Aggregate::new() -> Self
 pub fn channels::CityLabel::as_str(&self) -> &str
-pub fn channels::CityLabel::parse(&str) -> core::result::Result<Self, kernel::error::AxError>
+pub fn channels::CityLabel::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::ClientAssets::lookup(&self, &str) -> channels::AssetReply
 pub fn channels::Command::from(channels::WireCommand) -> Self
 pub fn channels::Command<Secret>::idem(&self) -> core::option::Option<&kernel::idem::IdemKey>
 pub fn channels::Command<Secret>::name(&self) -> &'static str
 pub fn channels::Intervention::as_str(self) -> &'static str
 pub fn channels::ModeTag::as_str(&self) -> &str
-pub fn channels::ModeTag::parse(&str) -> core::result::Result<Self, kernel::error::AxError>
+pub fn channels::ModeTag::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::NoSecret::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn channels::NoSecret::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
 pub fn channels::PairingToken::digest(&self) -> kernel::locator::B3Hash
-pub fn channels::PairingToken::from_configured(&str) -> core::result::Result<Self, kernel::error::AxError>
+pub fn channels::PairingToken::from_configured(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::PairingToken::mint([u8; 32]) -> (Self, alloc::string::String)
 pub fn channels::ProviderName::as_str(&self) -> &str
-pub fn channels::ProviderName::parse(&str) -> core::result::Result<Self, kernel::error::AxError>
+pub fn channels::ProviderName::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::Query::name(&self) -> &'static str
 pub fn channels::Reply::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn channels::Reply::nowhere() -> channels::Reply
-pub fn channels::Reply::refuse(&self, kernel::error::AxError) -> channels::Delivered
-pub fn channels::Reply::to(impl core::ops::function::Fn(kernel::error::AxError) -> channels::Delivered + core::marker::Send + core::marker::Sync + 'static) -> channels::Reply
+pub fn channels::Reply::refuse(&self, kernel::error::shape::AxError) -> channels::Delivered
+pub fn channels::Reply::to(impl core::ops::function::Fn(kernel::error::shape::AxError) -> channels::Delivered + core::marker::Send + core::marker::Sync + 'static) -> channels::Reply
 pub fn channels::TemplateName::as_str(&self) -> &str
-pub fn channels::TemplateName::parse(&str) -> core::result::Result<Self, kernel::error::AxError>
+pub fn channels::TemplateName::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::UploadId::as_str(&self) -> &str
-pub fn channels::UploadId::parse(&str) -> core::result::Result<Self, kernel::error::AxError>
+pub fn channels::UploadId::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::classify(&channels::Command) -> channels::ControlVerdict
 pub fn channels::decide_bind(&core::net::socket_addr::SocketAddr, bool) -> channels::BindVerdict
 pub fn channels::decide_frame(channels::SessionState, channels::ClientFrame, core::option::Option<&kernel::locator::B3Hash>, core::option::Option<&kernel::address::Address>) -> channels::SessionStep
@@ -452,7 +452,7 @@ pub struct channels::TemplateName(_)
 pub struct channels::UploadId(_)
 pub struct channels::Upstream
 pub struct channels::Welcome
-pub type channels::AcpSink = alloc::sync::Arc<(dyn core::ops::function::Fn(channels::AcpBody, bool) -> core::result::Result<channels::AcpProgress, kernel::error::AxError> + core::marker::Send + core::marker::Sync)>
+pub type channels::AcpSink = alloc::sync::Arc<(dyn core::ops::function::Fn(channels::AcpBody, bool) -> core::result::Result<channels::AcpProgress, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type channels::WireCommand = channels::Command<channels::NoSecret>
 pub use channels::Address
 pub use channels::ApprovalClass

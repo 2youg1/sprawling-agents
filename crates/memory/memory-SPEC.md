@@ -50,6 +50,8 @@
 
 ## 6 命名统一
 
+**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+
 Vfs、RealFs、FaultFs、FaultPlan、power cut、tail-truncation recovery（断尾恢复）、direction-aware refusal（方向感知拒绝）、segment（分段）、group commit（组提交）、CAS、dedup。crate 根错误 `MemoryError`（每 crate 一根，跨界映射 AxError 不透传）。
 
 ## 7 模块边界

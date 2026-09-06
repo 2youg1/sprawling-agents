@@ -49,9 +49,9 @@ pub city::Layer::Building
 pub city::Layer::City
 pub city::Layer::Resident
 pub city::Link::Down
-pub city::Link::Down::since: kernel::event::TimeMs
+pub city::Link::Down::since: kernel::event::identity::TimeMs
 pub city::Link::Live
-pub city::Link::Live::since: kernel::event::TimeMs
+pub city::Link::Live::since: kernel::event::identity::TimeMs
 pub city::ModelPool::Any
 pub city::ModelPool::LocalOnly
 pub city::Neighbour::addr: kernel::address::Address
@@ -94,10 +94,10 @@ pub enum city::ModelPool
 pub enum city::Occupancy
 pub enum city::RunBrief
 pub fn city::ArchiveKind::as_str(self) -> &'static str
-pub fn city::ArchiveKind::parse(&str) -> core::result::Result<city::ArchiveKind, kernel::error::AxError>
+pub fn city::ArchiveKind::parse(&str) -> core::result::Result<city::ArchiveKind, kernel::error::shape::AxError>
 pub fn city::Building::addr(&self) -> &kernel::address::Address
 pub fn city::Building::holds(&self, &kernel::address::Address) -> bool
-pub fn city::Building::of(&kernel::address::Address) -> core::result::Result<city::Building, kernel::error::AxError>
+pub fn city::Building::of(&kernel::address::Address) -> core::result::Result<city::Building, kernel::error::shape::AxError>
 pub fn city::Building::root(&self, &std::path::Path) -> std::path::PathBuf
 pub fn city::BuildingRules::addr(&self) -> &kernel::address::Address
 pub fn city::BuildingRules::egress(&self) -> &kernel::gate::egress::EgressAllowlist
@@ -105,20 +105,20 @@ pub fn city::BuildingRules::model_pool(&self) -> city::ModelPool
 pub fn city::BuildingRules::policy(&self) -> &kernel::model::BuildingPolicy
 pub fn city::BuildingRules::reading_room(&self) -> &[alloc::string::String]
 pub fn city::BuildingRules::review(&self) -> bool
-pub fn city::BuildingRules::write_domain(&self) -> core::result::Result<kernel::write_domain::WriteDomain, kernel::error::AxError>
+pub fn city::BuildingRules::write_domain(&self) -> core::result::Result<kernel::write_domain::WriteDomain, kernel::error::shape::AxError>
 pub fn city::BuildingTemplate::name(self) -> &'static str
-pub fn city::BuildingTemplate::parse(&str) -> core::result::Result<city::BuildingTemplate, kernel::error::AxError>
+pub fn city::BuildingTemplate::parse(&str) -> core::result::Result<city::BuildingTemplate, kernel::error::shape::AxError>
 pub fn city::CityPlan::dirs(&self) -> &[kernel::address::Address]
 pub fn city::CityPlan::first(&self) -> core::option::Option<&(kernel::address::Address, city::BuildingTemplate)>
-pub fn city::CityPlan::new(core::option::Option<(&str, &str)>) -> core::result::Result<city::CityPlan, kernel::error::AxError>
+pub fn city::CityPlan::new(core::option::Option<(&str, &str)>) -> core::result::Result<city::CityPlan, kernel::error::shape::AxError>
 pub fn city::ConfigLayer::effort(&self) -> core::option::Option<kernel::model::Effort>
 pub fn city::ConfigLayer::mcp(&self) -> core::option::Option<&[kernel::config::McpServer]>
-pub fn city::ConfigLayer::parse(&str) -> core::result::Result<city::ConfigLayer, kernel::error::AxError>
+pub fn city::ConfigLayer::parse(&str) -> core::result::Result<city::ConfigLayer, kernel::error::shape::AxError>
 pub fn city::ConfigLayer::sandbox(&self) -> core::option::Option<&kernel::config::SandboxLimits>
-pub fn city::Dossier::apply(&mut self, &str, &kernel::event::EventRecord)
+pub fn city::Dossier::apply(&mut self, &str, &kernel::event::payload::EventRecord)
 pub fn city::Dossier::is_live(&self) -> bool
-pub fn city::Dossier::last_run(&self) -> core::option::Option<kernel::event::RunId>
-pub fn city::Dossier::last_seq(&self) -> core::option::Option<kernel::event::Seq>
+pub fn city::Dossier::last_run(&self) -> core::option::Option<kernel::event::identity::RunId>
+pub fn city::Dossier::last_seq(&self) -> core::option::Option<kernel::event::identity::Seq>
 pub fn city::Dossier::new() -> city::Dossier
 pub fn city::Dossier::runs_frozen(&self) -> u32
 pub fn city::Dossier::runs_started(&self) -> u32
@@ -128,76 +128,76 @@ pub fn city::Entry::goal(&self) -> &str
 pub fn city::Entry::name(&self) -> &str
 pub fn city::Entry::task(&self) -> &str
 pub fn city::Identity::addr(&self) -> &kernel::address::Address
-pub fn city::Identity::load(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::Identity, kernel::error::AxError>
+pub fn city::Identity::load(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::Identity, kernel::error::shape::AxError>
 pub fn city::Identity::segment_bytes(&self) -> alloc::vec::Vec<u8>
 pub fn city::Identity::who(&self) -> alloc::string::String
 pub fn city::Library::all(&self) -> alloc::vec::Vec<&city::Holding>
 pub fn city::Library::missing(&self, &[alloc::string::String]) -> alloc::vec::Vec<alloc::string::String>
 pub fn city::Library::reading_room(&self, &[alloc::string::String]) -> alloc::vec::Vec<&city::Holding>
-pub fn city::Library::scan(&std::path::Path, core::option::Option<&kernel::address::Address>) -> core::result::Result<city::Library, kernel::error::AxError>
+pub fn city::Library::scan(&std::path::Path, core::option::Option<&kernel::address::Address>) -> core::result::Result<city::Library, kernel::error::shape::AxError>
 pub fn city::Library::sections(&self) -> alloc::vec::Vec<&str>
 pub fn city::Link::is_live(&self) -> bool
-pub fn city::Link::since(&self) -> kernel::event::TimeMs
+pub fn city::Link::since(&self) -> kernel::event::identity::TimeMs
 pub fn city::Neighbourhood::building(&self) -> &kernel::address::Address
 pub fn city::Neighbourhood::buildings(&self) -> &[kernel::address::Address]
 pub fn city::Neighbourhood::here(&self) -> &[city::Neighbour]
 pub fn city::Neighbourhood::residents(&self) -> u32
-pub fn city::Neighbourhood::scan(&std::path::Path, &kernel::address::Address, &kernel::address::Address, &dyn core::ops::function::Fn(&kernel::address::Address) -> u32) -> core::result::Result<city::Neighbourhood, kernel::error::AxError>
-pub fn city::NeighboursTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::AxError>
+pub fn city::Neighbourhood::scan(&std::path::Path, &kernel::address::Address, &kernel::address::Address, &dyn core::ops::function::Fn(&kernel::address::Address) -> u32) -> core::result::Result<city::Neighbourhood, kernel::error::shape::AxError>
+pub fn city::NeighboursTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn city::NeighboursTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn city::NeighboursTool::new(city::Neighbourhood) -> core::result::Result<city::NeighboursTool, kernel::error::AxError>
+pub fn city::NeighboursTool::new(city::Neighbourhood) -> core::result::Result<city::NeighboursTool, kernel::error::shape::AxError>
 pub fn city::Resident::addr(&self) -> &kernel::address::Address
 pub fn city::Resident::digest(&self) -> kernel::locator::B3Hash
-pub fn city::RulesTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::AxError>
+pub fn city::RulesTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn city::RulesTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn city::RulesTool::new(&std::path::Path, kernel::address::Address) -> core::result::Result<city::RulesTool, kernel::error::AxError>
+pub fn city::RulesTool::new(&std::path::Path, kernel::address::Address) -> core::result::Result<city::RulesTool, kernel::error::shape::AxError>
 pub fn city::RunBrief::segment_text(&self) -> &str
-pub fn city::Schedule::due(&self, kernel::event::TimeMs, kernel::event::TimeMs) -> alloc::vec::Vec<&city::Entry>
+pub fn city::Schedule::due(&self, kernel::event::identity::TimeMs, kernel::event::identity::TimeMs) -> alloc::vec::Vec<&city::Entry>
 pub fn city::Schedule::entries(&self) -> &[city::Entry]
-pub fn city::Schedule::load(&std::path::Path) -> core::result::Result<city::Schedule, kernel::error::AxError>
-pub fn city::Schedule::parse(&str) -> core::result::Result<city::Schedule, kernel::error::AxError>
+pub fn city::Schedule::load(&std::path::Path) -> core::result::Result<city::Schedule, kernel::error::shape::AxError>
+pub fn city::Schedule::parse(&str) -> core::result::Result<city::Schedule, kernel::error::shape::AxError>
 pub fn city::Source::addr(&self) -> &kernel::address::Address
 pub fn city::Source::building(&self) -> &str
 pub fn city::Source::matches(&self) -> &str
 pub fn city::Source::name(&self) -> &str
 pub fn city::Source::starts_work(&self) -> bool
 pub fn city::Watch::listening(&self, &[kernel::address::Address]) -> alloc::vec::Vec<&city::Source>
-pub fn city::Watch::load(&std::path::Path) -> core::result::Result<city::Watch, kernel::error::AxError>
-pub fn city::Watch::parse(&str) -> core::result::Result<city::Watch, kernel::error::AxError>
+pub fn city::Watch::load(&std::path::Path) -> core::result::Result<city::Watch, kernel::error::shape::AxError>
+pub fn city::Watch::parse(&str) -> core::result::Result<city::Watch, kernel::error::shape::AxError>
 pub fn city::Watch::sources(&self) -> &[city::Source]
-pub fn city::adopt_building(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::Building, kernel::error::AxError>
-pub fn city::archive_entry(&std::path::Path, &kernel::address::Address, city::ArchiveKind, kernel::event::TimeMs, &str) -> core::result::Result<city::ArchiveEntry, kernel::error::AxError>
-pub fn city::archive_index(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<city::ArchiveEntry>, kernel::error::AxError>
-pub fn city::building_adopted_payload(&city::Building) -> core::result::Result<kernel::event::Payload, kernel::error::AxError>
-pub fn city::building_created_payload(&city::Building, city::BuildingTemplate) -> core::result::Result<kernel::event::Payload, kernel::error::AxError>
+pub fn city::adopt_building(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::Building, kernel::error::shape::AxError>
+pub fn city::archive_entry(&std::path::Path, &kernel::address::Address, city::ArchiveKind, kernel::event::identity::TimeMs, &str) -> core::result::Result<city::ArchiveEntry, kernel::error::shape::AxError>
+pub fn city::archive_index(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<city::ArchiveEntry>, kernel::error::shape::AxError>
+pub fn city::building_adopted_payload(&city::Building) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn city::building_created_payload(&city::Building, city::BuildingTemplate) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn city::building_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
-pub fn city::buildings(&std::path::Path) -> core::result::Result<alloc::vec::Vec<kernel::address::Address>, kernel::error::AxError>
-pub fn city::config_path(&std::path::Path, &kernel::address::Address, city::Layer) -> core::result::Result<std::path::PathBuf, kernel::error::AxError>
-pub fn city::create_building(&std::path::Path, &kernel::address::Address, city::BuildingTemplate) -> core::result::Result<city::Building, kernel::error::AxError>
-pub fn city::day_of(kernel::event::TimeMs) -> u64
-pub fn city::evaluate(&kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::AxError>
-pub fn city::file_archive(&city::ArchiveEntry, &str) -> core::result::Result<(), kernel::error::AxError>
-pub fn city::handoff(&std::path::Path, &kernel::address::Address) -> core::result::Result<core::option::Option<alloc::string::String>, kernel::error::AxError>
+pub fn city::buildings(&std::path::Path) -> core::result::Result<alloc::vec::Vec<kernel::address::Address>, kernel::error::shape::AxError>
+pub fn city::config_path(&std::path::Path, &kernel::address::Address, city::Layer) -> core::result::Result<std::path::PathBuf, kernel::error::shape::AxError>
+pub fn city::create_building(&std::path::Path, &kernel::address::Address, city::BuildingTemplate) -> core::result::Result<city::Building, kernel::error::shape::AxError>
+pub fn city::day_of(kernel::event::identity::TimeMs) -> u64
+pub fn city::evaluate(&kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
+pub fn city::file_archive(&city::ArchiveEntry, &str) -> core::result::Result<(), kernel::error::shape::AxError>
+pub fn city::handoff(&std::path::Path, &kernel::address::Address) -> core::result::Result<core::option::Option<alloc::string::String>, kernel::error::shape::AxError>
 pub fn city::handoff_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::job_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
-pub fn city::load(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::BuildingRules, kernel::error::AxError>
-pub fn city::load_config(&std::path::Path, &kernel::address::Address) -> core::result::Result<kernel::config::FrozenConfig, kernel::error::AxError>
-pub fn city::norms(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<std::path::PathBuf>, kernel::error::AxError>
-pub fn city::open_room(&std::path::Path, &kernel::address::Address, &kernel::address::SessionName) -> core::result::Result<kernel::address::Address, kernel::error::AxError>
-pub fn city::relocate(&kernel::address::Address, &kernel::address::Address) -> core::result::Result<city::Relocation, kernel::error::AxError>
-pub fn city::roadmap(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::string::String, kernel::error::AxError>
+pub fn city::load(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
+pub fn city::load_config(&std::path::Path, &kernel::address::Address) -> core::result::Result<kernel::config::FrozenConfig, kernel::error::shape::AxError>
+pub fn city::norms(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<std::path::PathBuf>, kernel::error::shape::AxError>
+pub fn city::open_room(&std::path::Path, &kernel::address::Address, &kernel::address::SessionName) -> core::result::Result<kernel::address::Address, kernel::error::shape::AxError>
+pub fn city::relocate(&kernel::address::Address, &kernel::address::Address) -> core::result::Result<city::Relocation, kernel::error::shape::AxError>
+pub fn city::roadmap(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
 pub fn city::roadmap_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
-pub fn city::rooms(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<kernel::address::Address>, kernel::error::AxError>
+pub fn city::rooms(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<kernel::address::Address>, kernel::error::shape::AxError>
 pub fn city::schedule_path(&std::path::Path) -> std::path::PathBuf
 pub fn city::survey(&[(alloc::string::String, bool)], bool) -> city::Standing
 pub fn city::urbanite_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::watch_path(&std::path::Path) -> std::path::PathBuf
-pub fn city::write_brief(&std::path::Path, &kernel::address::Address, &city::JobBrief<'_>) -> core::result::Result<city::RunBrief, kernel::error::AxError>
-pub fn city::write_effort(&std::path::Path, &kernel::address::Address, kernel::model::Effort) -> core::result::Result<(), kernel::error::AxError>
-pub fn city::write_job(&std::path::Path, &kernel::address::Address, &city::JobBrief<'_>) -> core::result::Result<alloc::string::String, kernel::error::AxError>
-pub fn city::write_mcp(&std::path::Path, &kernel::address::Address, city::Layer, &[kernel::config::McpServer]) -> core::result::Result<(), kernel::error::AxError>
-pub fn city::write_rules(&std::path::Path, &kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::AxError>
-pub fn city::write_sandbox(&std::path::Path, &kernel::address::Address, city::Layer, &kernel::config::SandboxLimits) -> core::result::Result<(), kernel::error::AxError>
+pub fn city::write_brief(&std::path::Path, &kernel::address::Address, &city::JobBrief<'_>) -> core::result::Result<city::RunBrief, kernel::error::shape::AxError>
+pub fn city::write_effort(&std::path::Path, &kernel::address::Address, kernel::model::Effort) -> core::result::Result<(), kernel::error::shape::AxError>
+pub fn city::write_job(&std::path::Path, &kernel::address::Address, &city::JobBrief<'_>) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
+pub fn city::write_mcp(&std::path::Path, &kernel::address::Address, city::Layer, &[kernel::config::McpServer]) -> core::result::Result<(), kernel::error::shape::AxError>
+pub fn city::write_rules(&std::path::Path, &kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
+pub fn city::write_sandbox(&std::path::Path, &kernel::address::Address, city::Layer, &kernel::config::SandboxLimits) -> core::result::Result<(), kernel::error::shape::AxError>
 pub mod city
 pub struct city::ArchiveEntry
 pub struct city::Building

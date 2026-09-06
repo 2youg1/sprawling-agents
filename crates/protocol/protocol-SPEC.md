@@ -38,6 +38,8 @@ P4 之前 `crates/protocol/src/` 只有 `lib.rs`。`kernel::tool` 缝与 taint �
 
 ## 6 命名统一
 
+**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+
 `Connector` 是词汇表里这层的统称；代码里出现的是它的两个具体面 `McpTool` 与 `Incoming`。**恒不**把 MCP server 叫作 endpoint——`Endpoint` 在本库专指 external provider 网关。
 
 **R1.13 改**：`ServerLabel` 迁出本 crate，住 `kernel::tool`（理由与文法见 kernel-SPEC §8-23）。本 crate 继续用它，但不再拥有它：配置层要在**文件边界**解析标签，而 `city` 只见 `kernel`。

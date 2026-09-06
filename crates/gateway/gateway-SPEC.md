@@ -38,6 +38,8 @@
 
 ## 6 命名统一
 
+**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+
 Dialect／Endpoint／Custody／Vault／SecretRef／Sealed／admission／market snapshot／UsdMicros／权威计费额（authoritative billed amount）。概念名英文原词；「兑付」＝resolve+expose 的合称。
 
 ## 7 模块边界

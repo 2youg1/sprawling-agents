@@ -68,6 +68,8 @@ wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）�
 
 ## 6 命名统一
 
+**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+
 Command／Query／Event（三分的原名，不译）；Dispatch／Login／Fork／Attach／CreateBuilding／PutSecret／Steer／Cancel／Takeover／Rollback／Halt／Release／BatchByBuilding／Approve／CreatePolicy／SetAutonomy／Auth／Wake（命令原名，逐字取本 SPEC §8-1 表）；RunView／CityView／ApprovalQueue／InboxView／Metrics／CostView／ArchiveSearch／RegistryView／DiscardView（9 查询原名）；control surface（不译）；配对令牌＝pairing token；握手＝handshake。
 
 ## 7 模块边界

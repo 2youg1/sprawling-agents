@@ -1364,6 +1364,11 @@ derive 出来的那个会把线上任意字符串收下、交回一个从没过�
 
 ### 8-38 kernel 值簇目录化（card-1.3；形状：值归值，判归判）
 
-`event.rs`（775）按标识／时钟／载荷簇切分；`error.rs`（464）按码／错／拒三簇切分；
-`discard.rs`（561）按请求／裁决／判定表簇切分；`secret.rs`（441）按跨度／扫描／熵簇
-切分。各文件改索引文件零逻辑，对外签名逐字节不变。完成检查：同 8-36。
+`event.rs`（775）按标识（`event/identity.rs`：`RunId`／`Seq`／`TimeMs`）／种（`event/kind.rs`）／
+载荷（`event/payload.rs`：`Payload`／`EventDraft`／`EventRecord`／`EventRef`，insta 快照随测搬
+`event/snapshots/` 并改名）切分；`error.rs`（464）按码（`error/code.rs`）／拒（`error/refusal.rs`）／
+形（`error/shape.rs`，避 `module_inception`）切分；`discard.rs`（561）按请求（`discard/request.rs`）／
+裁决（`discard/verdict.rs`，含 kani）／预报（`discard/forecast.rs`，含 proptest）切分；`secret.rs`（441）按
+跨度（`secret/span.rs`）／扫描（`secret/scan.rs`，含 kani＋proptest）／封存（`secret/sealed.rs`）切分。
+各改索引零逻辑，对外签名逐字节不变（下游 11 基线仅规范路径记法，各 SPEC §6 同集一句；
+secret 门白名单随 `sealed.rs` 搬家）。完成检查：同 8-36。
