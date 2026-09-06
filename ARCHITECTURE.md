@@ -379,6 +379,11 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::share | crates/kernel/src/share.rs | how much of the plan one node is; a share exists only by dividing another, so weight cannot be minted | value | V3 | built |
 | kernel::node_id | crates/kernel/src/node_id.rs | a plan node's address: the dotted path that says where it hangs | value | V3 | built |
 | kernel::plan | crates/kernel/src/plan.rs | the plan as a tree: what hangs where, what each is worth, what may be started, and the two exits of a held node | decision | V3 | built |
+| kernel::plan::node | crates/kernel/src/plan/node.rs | the node types: StopCause, Held, PlanExit, PlanNode | decision | V3 | built |
+| kernel::plan::tree | crates/kernel/src/plan/tree.rs | placement, division, queries, claims, and progress | decision | V3 | built |
+| kernel::plan::tree::tests | crates/kernel/src/plan/tree/tests.rs | the tree's test fixtures and refusals | decision | V3 | built |
+| kernel::plan::share | crates/kernel/src/plan/share.rs | giving a level's pot to its rows by weight | decision | V3 | built |
+| kernel::plan::blocking | crates/kernel/src/plan/blocking.rs | what a node waits for, and the circles it waits in | decision | V3 | built |
 | kernel::blockage | crates/kernel/src/blockage.rs | red, and how far it reaches: one cause named rather than every symptom listed | decision | V3 | built |
 | kernel::pursuit | crates/kernel/src/pursuit.rs | a goal the city works towards, and the one condition under which it stops | decision | V3 | built |
 | kernel::completion | crates/kernel/src/completion.rs | done requires evidence; progress has two states and no third | value | S2 | built |

@@ -1348,9 +1348,11 @@ derive 出来的那个会把线上任意字符串收下、交回一个从没过�
 
 ### 8-37 kernel::plan／spine 目录化（card-1.2；形状：树／份额／节点／阻塞）
 
-`plan.rs`（958 行）按树（`PlanTree::build`／依赖与分支断言／环检测／`divide`／读序查询）／
-份额（`hand_out`／`Share` 分发）／节点（`PlanNode`／`Held`／`PlanExit`／`StopCause`／
-`claim`／`progress`）／阻塞（`ready`／`needs_of`／`somewhere_else`／`refusal`）四簇切目录；
+`plan.rs`（958 行）按节点类型（`plan/node.rs`：`StopCause`／`Held`／`PlanExit`／`PlanNode`）／
+树结构（`plan/tree.rs`：`PlanTree` 的安置／断言／除法／查询／`claim`／`progress`，测试住 `plan/tree/tests.rs`）／
+份额分发（`plan/share.rs`：`hand_out` 提为 `pub(crate)` 自由函数，`PlanTree.nodes` 开 `pub(crate)` 可见）／
+阻塞查询（`plan/blocking.rs`：`refusal`／`first_cycle` 提为 `pub(crate)` 自由函数）四簇切目录；
+`Held` 增 `pub(crate) of` 构造器（原元组构造跨文件不可见），`PlanTree` 补回其 `derive(Debug, Clone, PartialEq, Eq)`；
 `spine.rs`（883 行）按文法（表定位／行解析／状态拼写）／改写（`set_roadmap_status`／
 `insert_children`／`rewrite`／`draw_row`）／备忘（`check_memo_shape`／`MEMO_OUTLINE_FIELDS`／
 `ScopeChange`／`WriteMoment`）／行类型（`RoadmapRow`／`RoadmapStatus`／`EvidenceCell`／

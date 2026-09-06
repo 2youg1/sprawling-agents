@@ -290,7 +290,6 @@ status = "gated, with a register of the files that predate the rule"
 "crates/web/src/settings.rs" = 985
 "crates/sprawling/src/assembly/credentials.rs" = 978
 "crates/web/src/app.rs" = 977
-"crates/kernel/src/plan.rs" = 958
 "crates/sprawling/src/assembly/folds.rs" = 957
 "crates/sprawling/src/assembly/commanding.rs" = 953
 "crates/runtime/src/turn.rs" = 919

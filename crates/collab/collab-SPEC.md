@@ -376,7 +376,7 @@ impl Triage {
 ```rust
 pub enum ClaimEffect {
     Claimed { id: NodeId, item: String },
-    /// 一个被放下的节点。携 `PlanExit` 而不是携一个动词：出口是计划门禁
+    /// 一个被放下的节点。携 `PlanExit`（经 `kernel` 重导出，住 `plan::node`，card-1.2 起）而不是携一个动词：出口是计划门禁
     /// 造出来的东西，把它的两个臂抄进第二个枚举，就是对「一个节点可以
     /// 怎么离开」的第二份意见。
     PutDown { id: NodeId, item: String, exit: PlanExit },

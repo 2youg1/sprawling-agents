@@ -65,7 +65,7 @@ pub collab::ClaimEffect::Claimed
 pub collab::ClaimEffect::Claimed::id: kernel::node_id::NodeId
 pub collab::ClaimEffect::Claimed::item: alloc::string::String
 pub collab::ClaimEffect::PutDown
-pub collab::ClaimEffect::PutDown::exit: kernel::plan::PlanExit
+pub collab::ClaimEffect::PutDown::exit: kernel::plan::node::PlanExit
 pub collab::ClaimEffect::PutDown::id: kernel::node_id::NodeId
 pub collab::ClaimEffect::PutDown::item: alloc::string::String
 pub collab::ClaimEffect::Split
