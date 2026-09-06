@@ -25,8 +25,45 @@
 //!
 //! Everything is explicit in [`FaultPlan`]; there is no randomness.
 
-mod fs;
-mod plan;
+//! Fault plans: which write dies, and how.
 
-pub use fs::FaultFs;
-pub use plan::{FaultPlan, TornTail};
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
+
+pub struct FaultPlan {
+    /// 1-based op number that dies with "power lost"; `None` = never.
+    pub cut_at_op: Option<u64>,
+    /// The first append whose bytes contain this needle dies with "power
+    /// lost"; `None` = never. Like `cut_at_op` it fires once and is then
+    /// spent, so the same instance serves the powered reopen.
+    ///
+    /// This exists because an ordinal cannot name a write from outside
+    /// this crate. A caller above the ledger knows *which line* it wants
+    /// to lose, not how many filesystem operations precede it - and that
+    /// count changes whenever anything upstream reads one more file, so
+    /// an ordinal written there is a number that silently stops meaning
+    /// what it meant. Content is the caller's own vocabulary, and it
+    /// stays as explicit and as deterministic as the ordinal is.
+    pub cut_on_write: Option<&'static str>,
+    pub torn_tail: TornTail,
+}
+
+/// How much of each file's unsynced delta the platter kept.
+#[derive(Debug, Clone, Copy)]
+pub enum TornTail {
+    None,
+    KeepBytes(u64),
+}
+
+pub(crate) struct FileState {
+    pub(crate) durable: Vec<u8>,
+    pub(crate) live: Vec<u8>,
+    pub(crate) durable_entry: bool,
+}
+
+pub(crate) struct State {
+    pub(crate) files: BTreeMap<PathBuf, FileState>,
+    pub(crate) dirs: BTreeSet<PathBuf>,
+    pub(crate) op: u64,
+    pub(crate) plan: FaultPlan,
+}

@@ -430,6 +430,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::error | crates/memory/src/error.rs | what persistence says when it refuses, and the one door out to `AxError` | value | V3 | built |
 | memory::cas | crates/memory/src/cas.rs | content-addressed storage under BLAKE3, written through a temporary file | adapter | S1 | built |
 | memory::fault_fs | crates/memory/src/fault_fs.rs | the second filesystem adapter: a deterministic power-loss model | adapter | S1 | built |
+| memory::fault_fs::plan | crates/memory/src/fault_fs/plan.rs | which write dies, and how | adapter | S1 | built |
+| memory::fault_fs::fs | crates/memory/src/fault_fs/fs.rs | power cuts on demand | adapter | S1 | built |
+| memory::fault_fs::fs::tests | crates/memory/src/fault_fs/fs/tests.rs | the power-cut matrix | adapter | S1 | built |
 | memory::index | crates/memory/src/index.rs | seq to byte offset; disposable, rebuilt when damaged | projection | S3 | built |
 | memory::index::ledger | crates/memory/src/index/ledger.rs | the side index map | projection | S3 | built |
 | memory::index::ledger::tests | crates/memory/src/index/ledger/tests.rs | the index fixtures | projection | S3 | built |
@@ -441,6 +444,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::projection::view | crates/memory/src/projection/view.rs | open, apply, read | projection | S3 | built |
 | memory::projection::view::tests | crates/memory/src/projection/view/tests.rs | the view fixtures | projection | S3 | built |
 | memory::attribution | crates/memory/src/attribution.rs | where the money went, in five independent cuts that reconcile | projection | S3 | built |
+| memory::attribution::report | crates/memory/src/attribution/report.rs | reports and buckets | projection | S3 | built |
+| memory::attribution::report::tests | crates/memory/src/attribution/report/tests.rs | the attribution fixtures | projection | S3 | built |
+| memory::attribution::split | crates/memory/src/attribution/split.rs | dividing a bill by weight | projection | S3 | built |
 | memory::checkpoint | crates/memory/src/checkpoint.rs | git fences around a tool wave, and what disappeared between them | adapter | S3 | built |
 | memory::checkpoint::fence | crates/memory/src/checkpoint/fence.rs | base, wave pre/post | adapter | S3 | built |
 | memory::checkpoint::scan | crates/memory/src/checkpoint/scan.rs | staged secrets and scoped commits | adapter | S3 | built |

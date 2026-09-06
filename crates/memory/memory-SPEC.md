@@ -618,3 +618,11 @@ ARCHITECTURE §6 memory 表：jsonl/cas 状态翻转＋fault_fs 新行登记（S
 `files.rs`；`checkpoint.rs`（480）→ `checkpoint/fence.rs`／`scan.rs`。
 跨文件私有项开 `pub(crate)`（字段／`hand_out` 式自由函数／`Stamp` 等），对外签名逐字节不变。
 完成检查：删投影重建字节一致＋吞吐读数记入 budgets（只记录、不设门）。
+
+### 8-15 attribution／fault_fs 目录化（card-2.3；与 8-14 同形）
+
+`attribution.rs`（500）→ `attribution/report.rs`（`Attribution`／`AttributionReport`＋桶常量，
+测试住 `report/tests.rs`）／`split.rs`（`add`／`quantify`／`segment_weights`／`split`）；
+`fault_fs.rs`（516）→ `fault_fs/plan.rs`（`FaultPlan`／`TornTail`／`FileState`／`State`，
+无专属测试故无 tests 模）／`fs.rs`（`FaultFs`＋`Vfs` 实现，测试住 `fs/tests.rs`）。
+跨文件私有项开 `pub(crate)`，对外签名逐字节不变。
