@@ -127,7 +127,7 @@ A seam is a trait declared in the inner layer and implemented outside it. **One 
 | `kernel::model` | crates/kernel/src/model.rs | gateway: native and endpoint | citysim: scripted model |
 | `runtime::sandbox` | crates/runtime/src/sandbox.rs | wasmtime with fuel metering | pass-through and fault doubles |
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | recording and replay adapter |
-| `protocol::mcp` | crates/protocol/src/mcp.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
+| `protocol::mcp` | crates/protocol/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
 
 **Two inner seams** stay `pub(crate)` because nothing outside their crate needs them: `memory`'s `Vfs` (real filesystem / deterministic power-loss model) and `gateway`'s `Vault` (platform credential service / in-session store).
 
@@ -580,11 +580,16 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 |---|---|---|---|---|---|
 | channels::wire | crates/channels/src/wire.rs | the envelope both sides speak: the Queries, the frames, the version and its hash | value | S4 | built |
 | channels::command | crates/channels/src/command.rs | everything a client may ask the city to do, and the one frame it cannot spell | value | V3 | built |
+| channels::command::kind | crates/channels/src/command/kind.rs | names, steps, the wire enum | value | V3 | built |
+| channels::command::wire | crates/channels/src/command/wire.rs | no-secret commands and back | value | V3 | built |
 | channels::answer | crates/channels/src/answer.rs | what a Query comes back as: one shape per view, and the closed set of them | value | V3 | built |
 | channels::carried_name | crates/channels/src/carried_name.rs | names this crate does not own, validated at one construction point | value | V3 | built |
 | channels::reception | crates/channels/src/reception.rs | may we bind, may this peer enrol, may we greet it, and what its frame means now | decision | V3 | built |
 | channels::assets | crates/channels/src/assets.rs | the client the browser downloads, and which bytes answer which path | adapter | V3 | built |
 | channels::server | crates/channels/src/server.rs | the listening end; the judgements are pure and the socket makes none | adapter | S4 | built |
+| channels::server::config | crates/channels/src/server/config.rs | routes and bodies | adapter | S4 | built |
+| channels::server::reply | crates/channels/src/server/reply.rs | deliveries and refusals | adapter | S4 | built |
+| channels::server::socket | crates/channels/src/server/socket.rs | sessions, assets, uploads | adapter | S4 | built |
 | channels::control | crates/channels/src/control.rs | the five verbs a person has, and which of them owe a handoff | decision | S4 | built |
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built |
@@ -643,6 +648,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | browser::devloop | crates/browser/src/devloop.rs | change something, look at it, decide: four outcomes and always an end | decision | P4 | built |
 | browser::profile | crates/browser/src/profile.rs | where a browser keeps what it remembers, and who that belongs to | decision | P4 | built |
 | protocol::mcp | crates/protocol/src/mcp.rs | reaching an MCP server, and the seam its transports sit behind | adapter | P4 | built |
+| protocol::mcp::handshake | crates/protocol/src/mcp/handshake.rs | initialize, initialized, ready | adapter | P4 | built |
+| protocol::mcp::tools | crates/protocol/src/mcp/tools.rs | listing, naming, calling | adapter | P4 | built |
+| protocol::mcp::outbound | crates/protocol/src/mcp/outbound.rs | one line per request | adapter | P4 | built |
 | protocol::acp | crates/protocol/src/acp.rs | the other direction: an outside editor driving this city | decision | P4 | built |
 | bin::main | crates/sprawling/src/main.rs | the command line, each subcommand refused honestly until it exists | adapter | S0 | built |
 | bin::assembly | crates/sprawling/src/assembly.rs | the assembly point: the worker every module below writes methods for, the one clock sample, and the one door a command enters by | adapter | S0 | built |

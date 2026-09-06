@@ -167,3 +167,10 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 ## 18 文档同步
 
 `ARCHITECTURE.md` §3 缝清单（`Outbound` 一行）与 §6 protocol 两行｜`docs/third-party.md` §二（服务外挂的四条边界）｜装配层接线时同步 §6 末接线台账。
+
+### 8-14 protocol 目录化（card-2.4；形状：主类型居索引，方法按簇归文件）
+
+`mcp.rs`（823）→ `mcp/handshake.rs`（`Handshake`／`Rpc`／`handshake`＋`PROTOCOL_VERSION`）／
+`mcp/tools.rs`（`Listed`／`McpTool`／`tools_from`，`float_at` 开 `pub(crate)` 供 handshake 用）／
+`mcp/outbound.rs`（`Outbound`／`ScriptedOutbound`／`digits_for_floats`＋`EXTERNAL_CALL_PATIENCE`）。
+跨文件私有项开 `pub(crate)`，对外签名逐字节不变。

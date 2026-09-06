@@ -221,7 +221,7 @@ pub fn web::building_of(&kernel::address::Address) -> core::option::Option<kerne
 pub fn web::can_dispatch(&channels::answer::EndpointsAnswer) -> bool
 pub fn web::cancel_command(kernel::event::identity::RunId) -> channels::wire::ClientFrame
 pub fn web::cleared_by(&kernel::event::payload::EventRecord) -> core::option::Option<alloc::string::String>
-pub fn web::configure_command(&kernel::address::Address, kernel::config::SandboxLimits, alloc::vec::Vec<kernel::config::McpServer>) -> channels::command::WireCommand
+pub fn web::configure_command(&kernel::address::Address, kernel::config::SandboxLimits, alloc::vec::Vec<kernel::config::McpServer>) -> channels::command::wire::WireCommand
 pub fn web::continuity_order(u16) -> u16
 pub fn web::cost_rows(alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros, kernel::budget::UsdMicros)>, kernel::budget::UsdMicros) -> alloc::vec::Vec<web::CostRow>
 pub fn web::counts_said(web::Lang, &web::Snapshot) -> [alloc::string::String; 3]

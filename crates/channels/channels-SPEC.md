@@ -540,3 +540,15 @@ pub struct Delta { pub run: RunId, pub text: String }
 **这不是一次接口变更**：公开路径仍是 `kernel::NodeId`，字段与签名一字未动，
 变的只是 `cargo public-api` 记录的定义模块——`NodeId` 从 `kernel::plan` 搬进了自己的文件（kernel-SPEC §8-N）。
 记在这里是因为 `apisync` 判的是「基线动了就要有一份 SPEC 同行」，而基线确实动了。
+
+### 8-14 channels 目录化（card-2.4；与 protocol 同形）
+
+`command.rs`（576）→ `command/kind.rs`（`COMMAND_NAMES`／`NoSecret`／`LoginStep`／`HaltScope`／
+`PursuitStep`／`Command`）／`command/wire.rs`（`WireCommand`＋`impl`＋`From`，单测试住此）；
+`server.rs`（652）→ `server/config.rs`（`ServeConfig`／路由／`ShellState` 字段开 `pub(crate)`）／
+`server/reply.rs`（`Delivered`／`Reply`）／`server/socket.rs`（`upgrade` 由 reply 迁入此，
+handlers 开 `pub(crate)` 供 config 挂载，单测试住此）。
+跨文件私有项开 `pub(crate)`，对外签名逐字节不变。
+
+**跨 crate 记法（card-2.4 起）**：下游 `sprawling`／`web` 基线记 `channels` 内定义位簇路径
+（如 `command::kind::Command`、`command::wire::WireCommand`），公共拼写不变。

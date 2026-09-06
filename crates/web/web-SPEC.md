@@ -43,7 +43,7 @@
 
 ## 6 命名统一
 
-**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。（card-2.4 起 `channels::command::WireCommand` 住 `wire` 同例）。
 
 ACCENT／ALERT／G0–G10／PROGRESS_DONE；Approval Inbox／Recycle Bin／Autonomy／Address／CostView／Metrics／Ledger／Locator／Run／Resident／Building（附录 A 概念名英文原词）。**去色**＝desaturation，机制是色度系数置零，不是第二套样式。**五区版面**＝顶栏／左导航／右状态／底 control surface／中央。
 
