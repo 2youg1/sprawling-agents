@@ -1,0 +1,374 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+//! How a city is stood up and served, as opposed to how one piece of
+//! work is run.
+//!
+//! Four things happen here and nothing else: the key this listener will
+//! present at its door is settled before a socket exists, the vault is
+//! opened and asked what it really is, the one writer thread is started
+//! with the ledger inside it, and the socket is handed the four sinks it
+//! may reach the city through.
+//!
+//! **The writer thread is the city's one writer.** The ledger is opened
+//! inside it and never leaves, so the type never has to cross a thread
+//! boundary to prove that a city has one writer (ARCHITECTURE section
+//! 10). Everything a socket does reaches it as a `Command` on a desk,
+//! one at a time.
+//!
+//! Randomness is drawn here rather than in `bin::keying`, which is pure:
+//! this crate draws entropy in one place, and a key a third party can
+//! predict is a door a third party can open.
+
+use std::sync::Arc;
+use std::sync::mpsc;
+
+use kernel::{AxCode, AxError, EventRecord, RunId};
+
+use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK};
+use super::serve::Opening;
+use super::serve::Serving;
+use crate::assembly::{RunWorker, acp_dispatch, ledger_dir, now_ms, rebuild_views};
+use crate::views::Views;
+
+/// A URL-safe random string of `bytes` bytes of OS entropy.
+///
+/// Deliberately not the simulator's seeded randomness: a verifier a
+/// third party can predict is a login a third party can finish. This is
+/// the one place in the binary where reproducibility would be a defect.
+/// Where a worker's work goes, and where it comes from.
+///
+/// The desk is the mouth and the other three are the ears: a record
+/// reaches the fold every query is answered from, the clients watching
+/// the city, and - while a model is still speaking - the watchers of one
+/// run's increments.
+struct Outward {
+    desk: Arc<CommandDesk>,
+    views: Arc<std::sync::Mutex<Views>>,
+    to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+    to_watchers: tokio::sync::broadcast::Sender<channels::Delta>,
+}
+
+fn spawn_worker(
+    opening: Opening,
+    outward: Outward,
+) -> Result<std::thread::JoinHandle<()>, AxError> {
+    let (ready_tx, ready_rx) = mpsc::sync_channel::<Result<(), AxError>>(0);
+    let Opening {
+        city_root: worker_root,
+        vault,
+        notice: vault_notice,
+        log,
+    } = opening;
+    let Outward {
+        desk: worker_desk,
+        views,
+        to_clients,
+        to_watchers,
+    } = outward;
+    // The one sanctioned thread besides the runtime's own. The ledger is
+    // opened *inside* it and never leaves: a city has one writer, and the
+    // type never has to cross a thread boundary to prove it.
+    let worker_thread = std::thread::Builder::new()
+        .name("sprawling-runs".to_owned())
+        .spawn(move || {
+            let mut worker = match RunWorker::new(&worker_root, vault, log) {
+                Ok(mut worker) => {
+                    worker.open_for_service(vault_notice);
+                    let _ = ready_tx.send(Ok(()));
+                    worker
+                }
+                Err(err) => {
+                    let _ = ready_tx.send(Err(err));
+                    return;
+                }
+            };
+            // Somebody is watching, so runs ask their provider to
+            // stream. A worker without this call never installs a sink,
+            // and its runs take the blocking path unchanged.
+            worker.watch(std::sync::Arc::new(move |delta: channels::Delta| {
+                // No subscribers is not a failure: a city with no browser
+                // open is a city doing its work.
+                let _ = to_watchers.send(delta);
+            }));
+            worker.observe(Box::new(move |record: &EventRecord| {
+                if let Ok(mut views) = views.lock() {
+                    // A record the views refuse to fold is reported and
+                    // skipped: the ledger already has it, and a view that
+                    // crashed the writer would make history hostage to a
+                    // projection.
+                    if let Err(err) = views.apply(record) {
+                        eprintln!("view fold refused {}: {err}", record.seq().value());
+                    }
+                }
+                // A send with no subscribers is not a failure: a city with
+                // no browser open is a city doing its work.
+                let _ = to_clients.send(record.clone());
+            }));
+            // A run in progress asks the same desk what arrived, so a
+            // Cancel does not have to wait for the run it cancels.
+            let interrupt_desk = Arc::clone(&worker_desk);
+            worker.attach_interrupts(Box::new(move |run: RunId| {
+                interrupt_desk.interrupt_for(run)
+            }));
+            loop {
+                match worker_desk.wait(SCHEDULE_TICK) {
+                    // `carrying` holds this command's key in flight for
+                    // the length of the arm, so a frame that repeats it
+                    // while the work is going adds no second run.
+                    DeskWait::Command(posted, carrying) => {
+                        worker.serve_one(*posted);
+                        drop(carrying);
+                    }
+                    // The refusal is written inside `tick`; a schedule
+                    // that cannot be read must not stop the city from
+                    // answering the person.
+                    DeskWait::Idle => {
+                        if let Ok(now) = now_ms() {
+                            let _ = worker.tick(now);
+                        }
+                    }
+                    DeskWait::Close => {
+                        if let Err(err) = worker.close_city() {
+                            eprintln!("the city could not write its handoff: {err}");
+                        }
+                        break;
+                    }
+                    DeskWait::Gone => break,
+                }
+            }
+        })
+        .map_err(|source| {
+            AxError::failure(
+                AxCode::StorageFatal,
+                "start the run worker",
+                source.to_string(),
+            )
+            .with_recovery("check process thread limits")
+        })?;
+    match ready_rx.recv() {
+        Ok(Ok(())) => {}
+        Ok(Err(err)) => return Err(err),
+        Err(_) => {
+            return Err(AxError::failure(
+                AxCode::StorageFatal,
+                "start the run worker",
+                "the worker ended before reporting",
+            )
+            .with_recovery("check the city directory and rerun"));
+        }
+    }
+    Ok(worker_thread)
+}
+
+/// Waits for the person to stop the city from the keyboard.
+///
+/// A Windows console delivers two of these - Ctrl-C and Ctrl-Break - and
+/// a city that closed on one and died on the other would be two
+/// behaviours for one gesture, decided by which key a person happened to
+/// press. Elsewhere there is one.
+#[cfg(windows)]
+async fn closed_by_hand() -> std::io::Result<()> {
+    let mut broken = tokio::signal::windows::ctrl_break()?;
+    tokio::select! {
+        result = tokio::signal::ctrl_c() => result,
+        _ = broken.recv() => Ok(()),
+    }
+}
+
+#[cfg(not(windows))]
+async fn closed_by_hand() -> std::io::Result<()> {
+    tokio::signal::ctrl_c().await
+}
+
+/// Serves one city until the person stops it, and returns when the last
+/// worker has finished what it was doing.
+///
+/// The worker runs on its own thread and the socket never touches the
+/// Ledger: a refreshed page cannot kill work, and a command is accepted
+/// in one place and executed in another.
+///
+/// # Errors
+/// Refuses before serving when the city cannot be opened — an unreadable
+/// chain, a store that will not open — and propagates whatever binding
+/// the address reports.
+pub async fn serve(serving: Serving) -> Result<(), AxError> {
+    let Serving {
+        city_root,
+        addr,
+        token,
+        client,
+        vault,
+        vault_notice,
+        log,
+        console,
+    } = serving;
+    let city_root = city_root.as_path();
+    let token = token.as_deref();
+    let cas_root = city_root.join(".sprawling").join("cas");
+    std::fs::create_dir_all(&cas_root).map_err(|source| {
+        AxError::failure(
+            AxCode::StorageFatal,
+            "prepare the upload store",
+            format!("{}: {source}", cas_root.display()),
+        )
+        .with_recovery("check the city directory is writable")
+    })?;
+
+    let token_digest = match token {
+        Some(raw) => Some(channels::PairingToken::from_configured(raw)?.digest()),
+        None => None,
+    };
+
+    // The event fan-out, and the one writer that feeds it. The worker
+    // owns the ledger, so a city has a single writer no matter how many
+    // tabs are open; the socket tasks only read from the broadcast.
+    let (events, _first) = tokio::sync::broadcast::channel(1024);
+    // Increments, on their own channel. Smaller and separate: an
+    // increment nobody received is nothing, and sharing the event
+    // channel would let a talkative model push records out of a slow
+    // reader's window.
+    let (deltas, _watching) = tokio::sync::broadcast::channel(256);
+    // The views the control surface reads. Rebuilt from the ledger here,
+    // folded forward by the write observer inside the worker: one fold
+    // rule, two call sites, no second definition of what a view means.
+    let views = Arc::new(std::sync::Mutex::new(rebuild_views(&ledger_dir(
+        city_root,
+    ))?));
+    let query_views = Arc::clone(&views);
+    // Built once and handed to both surfaces below. The socket and the
+    // terminal are two ways into one city, and this is the read half of
+    // what makes that literally true rather than a claim.
+    let answering: crate::console::Answering = Arc::new(move |query: channels::Query| {
+        let mut views = query_views.lock().map_err(|_| {
+            AxError::failure(
+                AxCode::StorageFatal,
+                "read the city views",
+                "the view lock is poisoned",
+            )
+            .with_recovery("restart the server; its views rebuild from the ledger")
+        })?;
+        Ok(views.answer(&query))
+    });
+    // Read once, at startup, from the views the ledger just rebuilt.
+    let city_name = views.lock().ok().and_then(|views| views.city());
+    // The in-process Command set, not the wire one: the enrolment
+    // route delivers a sealed credential here, and no wire frame can.
+    let desk = Arc::new(CommandDesk::new());
+    let commands_desk = Arc::clone(&desk);
+    let secrets_desk = Arc::clone(&desk);
+    let acp_desk = Arc::clone(&desk);
+    // The one sanctioned thread besides the runtime's own, running by
+    // the time this returns.
+    let worker_thread = spawn_worker(
+        Opening {
+            city_root: city_root.to_path_buf(),
+            vault,
+            notice: vault_notice,
+            log,
+        },
+        Outward {
+            desk: Arc::clone(&desk),
+            views: Arc::clone(&views),
+            to_clients: events.clone(),
+            to_watchers: deltas.clone(),
+        },
+    )?;
+
+    let sink_root = cas_root.clone();
+    let config = channels::ServeConfig {
+        addr,
+        token_digest,
+        client: Arc::new(client),
+        commands: Arc::new(
+            move |command: channels::WireCommand, reply: channels::Reply| {
+                commands_desk.post(command.into(), reply);
+                Ok(())
+            },
+        ),
+        events,
+        deltas,
+        city: city_name,
+        secrets: Arc::new(move |command: channels::Command, reply: channels::Reply| {
+            // The route waits for whichever comes first, so the
+            // reply address is the credential's own request rather
+            // than nowhere: a vault that refuses is a fact the
+            // person typing the key needs, and it used to reach
+            // nobody at all.
+            secrets_desk.post(command, reply);
+            Ok(())
+        }),
+        queries: Arc::clone(&answering),
+        // An outside editor's request becomes an ordinary Dispatch on
+        // the same desk a person's does. It is not a second control
+        // surface: the admission decides what a stranger may learn, and
+        // everything after that is the city's usual path.
+        acp: Arc::new(move |body, authentic| acp_dispatch(&acp_desk, body, authentic)),
+        upload_sink: Arc::new(move |bytes: Vec<u8>| {
+            // Attach bytes reach the content-addressed store, and the handle
+            // a later Command names is the address they landed at. Nothing
+            // enters a work tree here: staging is read-only and outside every
+            // WriteDomain.
+            let digest = kernel::B3Hash::digest(&bytes).to_string();
+            let path = sink_root.join(&digest);
+            std::fs::write(&path, &bytes).map_err(|source| {
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "stage an attachment",
+                    format!("{}: {source}", path.display()),
+                )
+                .with_recovery("check free space under the city directory")
+            })?;
+            channels::UploadId::parse(&digest)
+        }),
+    };
+    // The terminal this city is running in, if it was asked for. It gets
+    // the same desk the socket posts to and the same event stream the
+    // browser reads, so nothing here is a second control surface - it is
+    // the first one, reached from the keyboard that started the city.
+    if let Some(terminal) = console {
+        let console_desk = Arc::clone(&desk);
+        let watching = config.events.subscribe();
+        // The same answering function the socket was given, not a second
+        // one built beside it: a count this terminal prints and a count
+        // a browser draws are one call, so they cannot disagree.
+        crate::console::start(terminal, console_desk, Arc::clone(&answering), watching);
+    }
+    // Ctrl-C used to be a process death: `sprawling resume` recovered
+    // it, and a stop somebody chose and a stop that was a crash left the
+    // same silence in the record. The listener stops accepting first,
+    // then the worker is told - it reads that where it reads its queue,
+    // so whatever command is running finishes and the handoff is the
+    // last line rather than a line in the middle of one.
+    let served = tokio::select! {
+        result = channels::serve(config) => result,
+        signal = closed_by_hand() => {
+            // A signal handler that cannot be installed is worth saying
+            // out loud: the city keeps serving, and the person now knows
+            // that Ctrl-C will be the hard stop it always was.
+            signal.map_err(|source| {
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "listen for an orderly close",
+                    source.to_string(),
+                )
+                .with_recovery("stop the city from the console instead; /quit closes it")
+            })
+        }
+    };
+    desk.close();
+    // Joined rather than left to the process exit: the handoff is
+    // written by that thread, and a main that returned first would end
+    // the process before the line it exists to write.
+    if let Err(panicked) = worker_thread.join() {
+        eprintln!("the run worker ended abnormally: {panicked:?}");
+    }
+    served
+}

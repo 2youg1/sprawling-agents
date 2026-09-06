@@ -655,6 +655,10 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | protocol::mcp::outbound | crates/protocol/src/mcp/outbound.rs | one line per request | adapter | P4 | built |
 | protocol::acp | crates/protocol/src/acp.rs | the other direction: an outside editor driving this city | decision | P4 | built |
 | bin::main | crates/sprawling/src/main.rs | the command line, each subcommand refused honestly until it exists | adapter | S0 | built |
+| bin::main::router | crates/sprawling/src/main/router.rs | one verb in, one subcommand out, plus the flags every verb reads | adapter | S0 | built |
+| bin::main::city | crates/sprawling/src/main/city.rs | the verbs that raise and serve a city | adapter | S0 | built |
+| bin::main::data | crates/sprawling/src/main/data.rs | the verbs that move bytes and ask about history | adapter | S0 | built |
+| bin::main::tests | crates/sprawling/src/main/tests.rs | flags are never paths, and no ledger is never verified | adapter | S0 | built |
 | bin::assembly | crates/sprawling/src/assembly.rs | the assembly point: the worker every module below writes methods for, the one clock sample, and the one door a command enters by | adapter | S0 | built |
 | bin::assembly::genesis | crates/sprawling/src/assembly/genesis.rs | forming a city in a directory, taking a folder in as a building, and what a restart finds | adapter | V3 | built |
 | bin::assembly::naming | crates/sprawling/src/assembly/naming.rs | the wire's words and the kernel's, translated one way each | decision | V3 | built |
@@ -690,16 +694,30 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::commanding::tests::answering | crates/sprawling/src/assembly/commanding/tests/answering.rs | answers, refusals and the approval queue | adapter | V3 | built |
 | bin::assembly::commanding::tests::clockwork | crates/sprawling/src/assembly/commanding/tests/clockwork.rs | the schedule fires and repeats do not | adapter | V3 | built |
 | bin::serving | crates/sprawling/src/serving.rs | how a city is stood up and served: the key at the door, the desk, the one writer thread | adapter | V3 | built |
+| bin::serving::door | crates/sprawling/src/serving/door.rs | the key at the door and the vault behind it | adapter | V3 | built |
+| bin::serving::desk | crates/sprawling/src/serving/desk.rs | where commands wait between the socket and the worker | adapter | V3 | built |
+| bin::serving::serve | crates/sprawling/src/serving/serve.rs | what one served city is made of | adapter | V3 | built |
+| bin::serving::worker | crates/sprawling/src/serving/worker.rs | the one writer thread and the city it serves | adapter | V3 | built |
+| bin::serving::tests | crates/sprawling/src/serving/tests.rs | the key this city mints is the key its own door accepts | adapter | V3 | built |
 | bin::mcp_stdio | crates/sprawling/src/mcp_stdio.rs | an MCP server as a child process, one line per message | adapter | R1 | built |
 | bin::mcp_http | crates/sprawling/src/mcp_http.rs | an MCP server over HTTP: one request, one message, no session | adapter | R1 | built |
 | bin::firstrun | crates/sprawling/src/firstrun.rs | the first screen, where a city goes when nobody said, and handing a URL to the desktop | adapter | P7 | built |
 | bin::install | crates/sprawling/src/install.rs | putting this binary where a shell will find it, and taking it back out | adapter | P0 | built |
 | bin::wire_client | crates/sprawling/src/wire_client.rs | the second client of the wire: one frame out, every frame back, and enrolment from stdin | adapter | P3 | built |
 | bin::console | crates/sprawling/src/console.rs | what a served city says to the terminal it is running in, and what a line typed there means | decision | P1 | built |
+| bin::console::language | crates/sprawling/src/console/language.rs | the words a line may use and what each one asks for | decision | P1 | built |
+| bin::console::terminal | crates/sprawling/src/console/terminal.rs | the listener half no query can answer, and the loop that drives it | decision | P1 | built |
+| bin::console::tests::helpers | crates/sprawling/src/console/tests/helpers.rs | one scripted terminal both faces share | decision | P1 | built |
+| bin::console::tests::parsing | crates/sprawling/src/console/tests/parsing.rs | every typed spelling lands where the wire says | decision | P1 | built |
+| bin::console::tests::terminal | crates/sprawling/src/console/tests/terminal.rs | the listener half, as a person reads it | decision | P1 | built |
 | bin::keying | crates/sprawling/src/keying.rs | what guards the door this serve opens: nothing, what the operator configured, or one minted for this serve alone | decision | R2 | built |
 | bin::effect | crates/sprawling/src/effect.rs | what a run's desks left behind: the lines the history takes, and the change the city may not make before them | value | R2 | built |
 | bin::plan_view | crates/sprawling/src/plan_view.rs | every building's plan, parsed once and re-parsed only when a record says it may have moved | projection | V3 | built |
 | bin::views | crates/sprawling/src/views.rs | the fold every query is answered from, and the lines a page reads off it | projection | V3 | built |
+| bin::views::holding | crates/sprawling/src/views/holding.rs | what the views hold and how one record folds in | projection | V3 | built |
+| bin::views::answering | crates/sprawling/src/views/answering.rs | every question a page may ask, answered from the fold | projection | V3 | built |
+| bin::views::lines | crates/sprawling/src/views/lines.rs | one record rendered as the lines a page reads | projection | V3 | built |
+| bin::views::tests | crates/sprawling/src/views/tests.rs | five views answer from the record, not from unavailable | projection | V3 | built |
 
 ## 13 Changing this document
 

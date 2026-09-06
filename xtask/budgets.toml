@@ -235,7 +235,7 @@ names = [
   "crates/runtime/src/handoff.rs::new",            # 5
   "crates/runtime/src/run.rs::drive",              # 5
   "crates/runtime/src/turn.rs::call",              # 5
-  "crates/sprawling/src/console.rs::drive",        # 5
+  "crates/sprawling/src/console/terminal.rs::drive",  # 5
 ]
 
 # **Re-priced from 1000 to 400 on the person's ruling, 2026-09-05.** The
@@ -284,21 +284,17 @@ status = "gated, with a register of the files that predate the rule"
 # Delete a row by doing the split, never by raising its number.
 [file_length.predating]
 "crates/sprawling/src/assembly/workbench.rs" = 1000
-"crates/sprawling/src/views.rs" = 995
 "crates/web/src/settings.rs" = 985
 "crates/sprawling/src/assembly/credentials.rs" = 978
 "crates/web/src/app.rs" = 977
 "crates/sprawling/src/assembly/folds.rs" = 957
 "crates/runtime/src/turn.rs" = 919
 "crates/collab/src/claim_tool.rs" = 913
-"crates/sprawling/src/main.rs" = 900
 "crates/web/src/live.rs" = 860
 "crates/web/src/sessions.rs" = 857
 "crates/web/src/turn.rs" = 850
 "crates/web/src/socket.rs" = 839
-"crates/sprawling/src/serving.rs" = 830
 "xtask/src/color.rs" = 819
-"crates/sprawling/src/console.rs" = 781
 "crates/sprawling/src/assembly/freezing.rs" = 778
 "crates/sprawling/src/assembly.rs" = 772
 "crates/web/src/building_view.rs" = 747

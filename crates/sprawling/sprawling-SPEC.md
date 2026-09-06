@@ -1547,3 +1547,32 @@ UNLOADING 见 `close_city`」，让卡题的词与代码的名在文档里相遇
 本节；`ARCHITECTURE.md` §6（`gateway::endpoint::adapter` 新行；
 `commanding::governing` 职责减一句）；`gateway-SPEC` 的 endpoint 节记
 `adapter_for` 的归属理由（装配线住适配器簇，凭据只出 `resolver`）。
+
+## 8-30 余部拆净：views／serving／console／main 按缝归位（路线图卡 3-4）
+
+阶段 3 关版卡。`assembly.rs` 经 3-1→3-3 已成树（本卡零动），余下四文件：
+
+- `views.rs` 995→`holding`（持有＋`apply`）／`answering`（`answer` 面）／
+  `lines`（记录→行纯函数）＋`tests.rs`。`Views` 字段改 `pub(super)`
+  （两兄弟读），`lines` 八函数改 `pub(crate)`（`folds.rs` 经
+  `views::pursuit_from` 仍直达）。
+- `serving.rs` 830→`door`（钥匙＋vault）／`desk`（命令台）／`serve`
+  （`Serving`＋`Opening` 值）／`worker`（单写者线程＋`serve`）＋`tests.rs`。
+  `serve` 与 `Serving` 保持 `pub`（binary 经 `sprawling::serving` 直达，
+  公开面零变）；`DeskWait` 改经 `serving::desk::DeskWait` 全路径
+  （`pub(crate) use` 转给只在测试出现的名会被门禁记未用——量过，
+  全路径是诚实的写法）。
+- `console.rs` 781→`language`（`Line`＋`CONTROL`＋解析）／`terminal`
+  （`Terminal`＋`Answering`＋`drive` 循环）＋`tests/helpers|parsing|terminal`。
+  `drive` 提 `pub(super)`（helpers 直达），`Terminal` 保持 `pub`
+  （`Serving.console` 字段,*公开面零变）。
+- `main.rs`（bin 根）900→`router`（分派＋flags）／`city`（起服 verbs）／
+  `data`（搬运＋查询 verbs）＋`tests.rs`。bin 根的子模块需 `#[path]`
+  声明（`mod city` 在 `main.rs` 里指 `src/city.rs`，这是 Rust 的规则不是
+  本卡的发明）。`COMMANDS`／`DEFAULT_AT`／`DEPENDENCIES` 各留一处定义，
+  跨文件用 `super::` 直达。
+
+钉行 4 删（views/serving/console/main），`drive` 豁免键随文件搬家
+（`console.rs::drive`→`console/terminal.rs::drive`），`view_record`
+按 C7 口径标 `#[cfg(test)]` 豁免（门禁认属性不认文件）。
+`sprawling` 158 全绿，18 门绿，`sprawling` 基线零漂移（`pub` 项未动）。
