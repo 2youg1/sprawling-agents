@@ -64,6 +64,10 @@ pub enum AxCode {
     // Privacy and Discard (2).
     SecretEgress,
     DiscardIrreversible,
+    // Backpressure (1). A shed signal is a refused delivery, not a lost
+    // one: the line is on the ledger, the queue never took it, and the
+    // caller learns it here rather than by reading the queue back.
+    BackpressureShed,
     // Unknown outcome (1).
     ToolOutcomeUnknown,
 }
@@ -71,7 +75,7 @@ pub enum AxCode {
 impl AxCode {
     /// Every code, in the order the SPEC table lists them. Data face for tests and
     /// (from S2 on) `xtask specalign`.
-    pub const ALL: [AxCode; 35] = [
+    pub const ALL: [AxCode; 36] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,
         AxCode::ToolUnavailable,
@@ -106,6 +110,7 @@ impl AxCode {
         AxCode::LogVersionUnsupported,
         AxCode::SecretEgress,
         AxCode::DiscardIrreversible,
+        AxCode::BackpressureShed,
         AxCode::ToolOutcomeUnknown,
     ];
 
@@ -145,6 +150,7 @@ impl AxCode {
             AxCode::WireMismatch => "E_WIRE_MISMATCH",
             AxCode::LogVersionUnsupported => "E_LOG_VERSION_UNSUPPORTED",
             AxCode::SecretEgress => "E_SECRET_EGRESS",
+            AxCode::BackpressureShed => "E_BACKPRESSURE_SHED",
             AxCode::DiscardIrreversible => "E_DISCARD_IRREVERSIBLE",
             AxCode::ToolOutcomeUnknown => "E_TOOL_OUTCOME_UNKNOWN",
         }
@@ -196,7 +202,8 @@ impl AxCode {
             | AxCode::CredentialMissing
             | AxCode::WorktreeBusy
             | AxCode::BrowserUnavailable
-            | AxCode::ToolOutcomeUnknown => Carrier::Event(EventKind::ToolResult),
+            | AxCode::ToolOutcomeUnknown
+            | AxCode::BackpressureShed => Carrier::Event(EventKind::ToolResult),
         }
     }
 }
@@ -234,9 +241,9 @@ mod tests {
     use std::collections::BTreeSet;
     #[test]
     fn axcode_is_35_and_spelling_is_bijective() {
-        assert_eq!(AxCode::ALL.len(), 35);
+        assert_eq!(AxCode::ALL.len(), 36);
         let spellings: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
-        assert_eq!(spellings.len(), 35);
+        assert_eq!(spellings.len(), 36);
         for s in &spellings {
             assert!(s.starts_with("E_"));
         }

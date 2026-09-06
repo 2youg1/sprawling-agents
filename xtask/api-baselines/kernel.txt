@@ -127,7 +127,7 @@ pub const fn kernel::Tokens::get(self) -> u64
 pub const fn kernel::Tokens::new(u64) -> kernel::Tokens
 pub const fn kernel::UsdMicros::get(self) -> u64
 pub const fn kernel::UsdMicros::new(u64) -> kernel::UsdMicros
-pub const kernel::AxCode::ALL: [kernel::AxCode; 35]
+pub const kernel::AxCode::ALL: [kernel::AxCode; 36]
 pub const kernel::EventKind::ALL: [kernel::EventKind; 64]
 pub const kernel::GENESIS_PREV: kernel::B3Hash
 pub const kernel::IDEM_DERIVE_V: u8
@@ -500,6 +500,7 @@ pub kernel::Autonomy::Delegate(kernel::ResidentId)
 pub kernel::Autonomy::Owner
 pub kernel::AxCode::ApprovalDenied
 pub kernel::AxCode::ApprovalPending
+pub kernel::AxCode::BackpressureShed
 pub kernel::AxCode::BrowserUnavailable
 pub kernel::AxCode::BudgetExhausted
 pub kernel::AxCode::CasCorrupt

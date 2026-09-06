@@ -304,7 +304,7 @@ mod tests {
         }
         assert_eq!(loadtime, 5, "loadtime whitelist is closed at five");
         assert_eq!(gate, 7);
-        assert_eq!(tool, 17);
+        assert_eq!(tool, 18);
         assert_eq!(
             AxCode::BudgetExhausted.carrier(),
             Carrier::Event(EventKind::BudgetLimit)

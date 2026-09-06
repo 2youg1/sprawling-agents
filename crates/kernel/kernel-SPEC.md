@@ -38,7 +38,7 @@ Stage 2 落地其余 18 个 kernel 模块（§8-10…§8-27）。**施工序＝�
 ## 2 验收标准
 
 - 每模块单测过 workspace lints（非测试代码零 unwrap/expect/panic/索引切片/裸算术/as）。
-- `EventKind` 64 个 variant、`AxCode` 35 个 variant 与本文 §8-4／§8-1 表逐 variant 一致（S2 起 `xtask specalign` 机器断言，本期人工核对入卡备注）。
+- `EventKind` 64 个 variant、`AxCode` 36 个 variant 与本文 §8-4／§8-1 表逐 variant 一致（S2 起 `xtask specalign` 机器断言，本期人工核对入卡备注）。
 - 每个 EventKind 恰属 in-window／record-only 之一；in-window 恰 8 件。
 - 每个 AxCode 恰有一个 carrier 声明；装载期白名单恰 5 码且封闭。
 - golden EventRecord：规范字节入 insta 快照，跨平台逐字节稳定。
@@ -140,7 +140,7 @@ gate ──▶ 上述全部（组合面）＋idem
 
 ```rust
 #[non_exhaustive]                       // C8：对扩展开放
-pub enum AxCode { PathNotFound, /* …35 variant，serde 呈现名见下表 */ }
+pub enum AxCode { PathNotFound, /* …36 variant，serde 呈现名见下表 */ }
 
 pub struct GateRefusal {                // three-part refusal；三段必填
     rule: String, violation: String, alternative: String,
@@ -176,7 +176,7 @@ impl AxError {
 
 「gate 码走 `refusal`」本期是构造纪律＋单测；S2 `kernel::gate` 是全库唯一 gate 码生产者，citysim 不变量 8 号在系统层复验。derive `Serialize/Deserialize`（Ledger 载荷需要）、`Clone/Debug/PartialEq`；`thiserror::Error` 提供 Display（`{code}: {action} on {subject}`）。
 
-**AxCode 35 全集与 carrier 对应（specalign 数据面）**
+**AxCode 36 全集与 carrier 对应（specalign 数据面；card-3.1 起 35→36）**
 
 > P3.01：协作组由六降为五——`E_SIGNAL_UNKNOWN` 已定义掉（三码之一；理由与实测见 `collab-SPEC.md` §8-1）。删除时全仓只有本文件提到它，零生产者。剩下两码（`E_WORKTREE_BUSY`／`E_DIGEST_SUSPECT`）已在各自 SPEC 里答过「能否定义掉」，答案是能保留——它们各自有一个真实的运行期情境。
 
@@ -217,6 +217,7 @@ impl AxError {
 | 治理与设施 | `E_LOG_VERSION_UNSUPPORTED` | 装载期（无 carrier） |
 | 隐私与 Discard | `E_SECRET_EGRESS` | `gate_denied` |
 | 隐私与 Discard | `E_DISCARD_IRREVERSIBLE` | `gate_denied` |
+| 背压 | `E_BACKPRESSURE_SHED` | `tool_result` |
 | 运行未知 | `E_TOOL_OUTCOME_UNKNOWN` | `tool_result` |
 
 装载期五码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED`）＝C9 唯一例外白名单，封闭且不得增长（第 5 码于 S2 期初增补）；`Carrier::Loadtime` 即其类型面。

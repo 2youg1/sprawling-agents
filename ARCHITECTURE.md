@@ -666,6 +666,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::freezing | crates/sprawling/src/assembly/freezing.rs | what a run is frozen with: its plan, and the handoff that resumes it | adapter | V3 | built |
 | bin::assembly::driving | crates/sprawling/src/assembly/driving.rs | one drive, the three hooks that touch the ledger while it runs, and what it leaves | adapter | V3 | built |
 | bin::assembly::settling | crates/sprawling/src/assembly/settling.rs | what a drive left, on the ledger before it is made true | adapter | V3 | built |
+| bin::assembly::settling::tests | crates/sprawling/src/assembly/settling/tests.rs | the settling fixtures route | adapter | V3 | built |
+| bin::assembly::settling::tests::ending | crates/sprawling/src/assembly/settling/tests/ending.rs | endings and hand-downs | adapter | V3 | built |
+| bin::assembly::settling::tests::landing | crates/sprawling/src/assembly/settling/tests/landing.rs | half-settled landings leave nothing torn | adapter | V3 | built |
 | bin::assembly::reviewing | crates/sprawling/src/assembly/reviewing.rs | what a run offers a building it may not write in, and what merging it costs | adapter | V3 | built |
 | bin::assembly::plans | crates/sprawling/src/assembly/plans.rs | one building's plan: who holds what, what is ready, and how far red reaches | adapter | V3 | built |
 | bin::assembly::commanding | crates/sprawling/src/assembly/commanding.rs | the verbs a person sends, and what each one does to the city | adapter | V3 | built |
