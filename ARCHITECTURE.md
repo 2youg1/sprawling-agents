@@ -376,6 +376,11 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::stall | crates/kernel/src/stall.rs | the sole criterion for "this run is going nowhere" | decision | S2 | built |
 | kernel::goal | crates/kernel/src/goal.rs | two goals wanting the same resource | decision | S2 | built |
 | kernel::spine | crates/kernel/src/spine.rs | the Roadmap table's grammar: six columns, a dotted index, and the one editing entrance | decision | S2 | built |
+| kernel::spine::row | crates/kernel/src/spine/row.rs | the row types: status, cells, rows, shapes, children | decision | S2 | built |
+| kernel::spine::grammar | crates/kernel/src/spine/grammar.rs | locating the table and reading its rows | decision | S2 | built |
+| kernel::spine::rewrite | crates/kernel/src/spine/rewrite.rs | status changes and child insertions | decision | S2 | built |
+| kernel::spine::rewrite::tests | crates/kernel/src/spine/rewrite/tests.rs | the rewrite's fixtures and byte-stability | decision | S2 | built |
+| kernel::spine::memo | crates/kernel/src/spine/memo.rs | the six memo fields and their write moments | decision | S2 | built |
 | kernel::share | crates/kernel/src/share.rs | how much of the plan one node is; a share exists only by dividing another, so weight cannot be minted | value | V3 | built |
 | kernel::node_id | crates/kernel/src/node_id.rs | a plan node's address: the dotted path that says where it hangs | value | V3 | built |
 | kernel::plan | crates/kernel/src/plan.rs | the plan as a tree: what hangs where, what each is worth, what may be started, and the two exits of a held node | decision | V3 | built |

@@ -1353,10 +1353,12 @@ derive 出来的那个会把线上任意字符串收下、交回一个从没过�
 份额分发（`plan/share.rs`：`hand_out` 提为 `pub(crate)` 自由函数，`PlanTree.nodes` 开 `pub(crate)` 可见）／
 阻塞查询（`plan/blocking.rs`：`refusal`／`first_cycle` 提为 `pub(crate)` 自由函数）四簇切目录；
 `Held` 增 `pub(crate) of` 构造器（原元组构造跨文件不可见），`PlanTree` 补回其 `derive(Debug, Clone, PartialEq, Eq)`；
-`spine.rs`（883 行）按文法（表定位／行解析／状态拼写）／改写（`set_roadmap_status`／
-`insert_children`／`rewrite`／`draw_row`）／备忘（`check_memo_shape`／`MEMO_OUTLINE_FIELDS`／
-`ScopeChange`／`WriteMoment`）／行类型（`RoadmapRow`／`RoadmapStatus`／`EvidenceCell`／
-`RoadmapShape`／`NewChild`）四簇切目录（card-1.2 落地时登记精确文件名）。
+`spine.rs`（883 行）按行类型（`spine/row.rs`：`RoadmapStatus`／`EvidenceCell`／`RoadmapRow`／
+`RoadmapShape`／`NewChild`／`ROADMAP_COLUMNS`／拼写表）／文法（`spine/grammar.rs`：`parse_status` 移入、
+`locate_table` 等四私有函数开 `pub(crate)`、测试住文件内）／改写（`spine/rewrite.rs`：
+`draw_row`／`set_roadmap_status`／`insert_children`／`well_formed`／`rewrite`，测试住
+`spine/rewrite/tests.rs`）／备忘（`spine/memo.rs`：`MEMO_OUTLINE_FIELDS`／`check_memo_shape`／
+`ScopeChange`／`WriteMoment`）四簇切目录；`spine.rs` 剩 38 行索引。
 依赖单向：`plan` 用 `spine` 的行类型，`spine` 不反向用 `plan`。对外签名逐字节不变。
 完成检查：同 8-36。
 

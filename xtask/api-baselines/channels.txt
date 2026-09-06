@@ -265,7 +265,7 @@ pub channels::PlanRow::needs: alloc::vec::Vec<kernel::node_id::NodeId>
 pub channels::PlanRow::node: kernel::node_id::NodeId
 pub channels::PlanRow::ready: bool
 pub channels::PlanRow::share_ppb: u64
-pub channels::PlanRow::status: kernel::spine::RoadmapStatus
+pub channels::PlanRow::status: kernel::spine::row::RoadmapStatus
 pub channels::PursuitLine::addr: kernel::address::Address
 pub channels::PursuitLine::goal: alloc::string::String
 pub channels::PursuitLine::state: kernel::pursuit::PursuitState

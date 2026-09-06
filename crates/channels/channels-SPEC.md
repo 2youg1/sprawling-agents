@@ -93,6 +93,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 ### 8-0 跨层名字的携带法（先于一切接口的决定）
 
+`PlanRow.status` 携 `kernel::RoadmapStatus`（经 `kernel` 重导出，住 `spine::row`，card-1.2 起，公共拼写不变）。
 `Dispatch` 携 `mode`、`Login` 携 `provider`、`CreateBuilding` 携 `template`——**这三个集合的权威分别住 `runtime::Mode`、`gateway`、`city`，而 channels 只依赖 kernel**（ARCHITECTURE §2 depmap）。
 
 取法：wire 携**无封闭列表的 newtype**（`ModeTag`、`ProviderName`、`TemplateName`），只断言「非空且无控制字符」，**不断言合法值集**。合法值集恒由上游单一权威回答，映射点在装配层（`bin::assembly`），未知值即报错不猜。

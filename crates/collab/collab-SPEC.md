@@ -384,7 +384,7 @@ pub enum ClaimEffect {
 }
 impl ClaimEffect {
     pub fn id(&self) -> &NodeId;
-    pub fn expected_before(&self) -> RoadmapStatus;
+    pub fn expected_before(&self) -> RoadmapStatus;   // 经 `kernel` 重导出，住 `spine::row`（card-1.2 起），公共拼写不变
     pub fn kind(&self) -> EventKind;          // 由出口决定，不由调用方决定
     pub fn payload(&self, who: &str) -> Result<Payload, AxError>;
 }

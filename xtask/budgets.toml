@@ -295,7 +295,6 @@ status = "gated, with a register of the files that predate the rule"
 "crates/runtime/src/turn.rs" = 919
 "crates/collab/src/claim_tool.rs" = 913
 "crates/sprawling/src/main.rs" = 900
-"crates/kernel/src/spine.rs" = 883
 "crates/web/src/live.rs" = 860
 "crates/web/src/sessions.rs" = 857
 "crates/web/src/turn.rs" = 850
