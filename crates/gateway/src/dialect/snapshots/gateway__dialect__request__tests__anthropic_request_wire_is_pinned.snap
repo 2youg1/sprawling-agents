@@ -1,5 +1,6 @@
 ---
-source: crates/gateway/src/dialect.rs
+source: crates/gateway/src/dialect/request.rs
+assertion_line: 119
 expression: "serde_json::to_string_pretty(&wire).unwrap()"
 ---
 {

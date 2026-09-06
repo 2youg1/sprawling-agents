@@ -19,7 +19,7 @@ use crate::walk;
 /// defining module and the two redemption points (gateway lands S3).
 const EXPOSE_WHITELIST: [&str; 5] = [
     "crates/kernel/src/secret/sealed.rs",
-    "crates/gateway/src/endpoint.rs",
+    "crates/gateway/src/endpoint/call.rs",
     "crates/gateway/src/native.rs",
     // R1.18: renewing a subscription credential sends the refresh token
     // to the provider's token endpoint, which is a redemption point of
@@ -27,7 +27,7 @@ const EXPOSE_WHITELIST: [&str; 5] = [
     // wire. Widened here rather than worked around at the call site,
     // because the alternative was the assembly holding plaintext, and
     // that is the thing this list exists to prevent.
-    "crates/gateway/src/credential.rs",
+    "crates/gateway/src/credential/oauth/flow.rs",
     // P5.01: an MCP server's configured header may name a credential
     // instead of carrying one, and the header is set on the request
     // being sent - the same last slot before the wire. Listed rather

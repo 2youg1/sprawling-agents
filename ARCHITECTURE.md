@@ -462,17 +462,32 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | Module | File | What it owns | Shape | Since | Status |
 |---|---|---|---|---|---|
 | gateway::router | crates/gateway/src/router.rs | the book of attached endpoints and the model chosen per tag | projection | P1 | built |
+| gateway::router::attached | crates/gateway/src/router/attached.rs | registration records | projection | P1 | built |
+| gateway::router::book | crates/gateway/src/router/book.rs | choices the city made | projection | P1 | built |
+| gateway::router::payload | crates/gateway/src/router/payload.rs | references on the wire | projection | P1 | built |
 | gateway::dialect | crates/gateway/src/dialect.rs | which dialect answers a question, and the closed set of two | decision | S3 | built |
+| gateway::dialect::request | crates/gateway/src/dialect/request.rs | one ChatRequest, each wire | decision | S3 | built |
+| gateway::dialect::response | crates/gateway/src/dialect/response.rs | frames back to ChatResponse | decision | S3 | built |
 | gateway::anthropic | crates/gateway/src/anthropic.rs | the Anthropic Messages wire, in both directions | decision | V3 | built |
 | gateway::openai | crates/gateway/src/openai.rs | the OpenAI Chat Completions wire, and every loss the translation takes | decision | V3 | built |
 | gateway::mismatch | crates/gateway/src/mismatch.rs | reading a provider's JSON, and the one word for a shape we did not ask for | decision | V3 | built |
 | gateway::native | crates/gateway/src/native.rs | local inference, which never leaves the machine | adapter | S3 | built |
 | gateway::endpoint | crates/gateway/src/endpoint.rs | the external provider: a self-written wire format over one HTTP client | adapter | S3 | built |
+| gateway::endpoint::config | crates/gateway/src/endpoint/config.rs | auth, overrides, construction | adapter | S3 | built |
+| gateway::endpoint::call | crates/gateway/src/endpoint/call.rs | one request, streamed or settled | adapter | S3 | built |
+| gateway::endpoint::model | crates/gateway/src/endpoint/model.rs | the Model face | adapter | S3 | built |
 | gateway::oauth_profiles | crates/gateway/src/oauth_profiles.rs | subscription-login intelligence: data only, zero branches | data | S3 | built |
 | gateway::admission | crates/gateway/src/admission.rs | the provider's concurrency limit and a deterministic minimum interval | decision | S3 | built |
 | gateway::market | crates/gateway/src/market.rs | the model catalogue snapshot, pinned so a price cannot move under a run | value | S3 | built |
 | gateway::cost | crates/gateway/src/cost.rs | per-call settlement, with the provider's own figure preferred | decision | S3 | built |
 | gateway::credential | crates/gateway/src/credential.rs | custody: capture, replace with a reference, redeem at the wire, renew before expiry | adapter | S3 | built |
+| gateway::credential::vault | crates/gateway/src/credential/vault.rs | vaults, backends, persistence | adapter | S3 | built |
+| gateway::credential::custodian | crates/gateway/src/credential/custodian.rs | capture, resolve, rotate | adapter | S3 | built |
+| gateway::credential::oauth | crates/gateway/src/credential/oauth.rs | PKCE, redeem, refresh | adapter | S3 | built |
+| gateway::credential::oauth::codec | crates/gateway/src/credential/oauth/codec.rs | base64url, percent-encoding, randomness | adapter | S3 | built |
+| gateway::credential::oauth::flow | crates/gateway/src/credential/oauth/flow.rs | begin, redeem, refresh | adapter | S3 | built |
+| gateway::credential::oauth::flow::tests | crates/gateway/src/credential/oauth/flow/tests.rs | the oauth fixtures | adapter | S3 | built |
+| gateway::credential::oauth::types | crates/gateway/src/credential/oauth/types.rs | pending, request, tokens | adapter | S3 | built |
 
 ### runtime (23) — one run, from dispatch to freeze
 

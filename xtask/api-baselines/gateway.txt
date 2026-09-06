@@ -8,6 +8,7 @@ impl gateway::AdmissionState
 impl gateway::AttachedEndpoint
 impl gateway::Custodian
 impl gateway::Endpoint
+impl gateway::Endpoint
 impl gateway::EndpointBook
 impl gateway::MarketSnapshot
 impl gateway::Native

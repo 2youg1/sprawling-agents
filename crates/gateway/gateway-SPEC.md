@@ -38,7 +38,7 @@
 
 ## 6 命名统一
 
-**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。**本 crate 同例（card-2.1 起）**：同一类型的 inherent impl 住不同簇文件时基线为每块各记一行 `impl`（`Endpoint` 两行）；下游 `sprawling` 基线记 `gateway` 内定义位簇路径（如 `credential::custodian::Custodian`），公共拼写不变。
 
 Dialect／Endpoint／Custody／Vault／SecretRef／Sealed／admission／market snapshot／UsdMicros／权威计费额（authoritative billed amount）。概念名英文原词；「兑付」＝resolve+expose 的合称。
 
@@ -338,3 +338,16 @@ ARCHITECTURE §6 gateway 表逐卡状态翻转；§6 接线台账登记（endpoi
 **认不出的帧跳过，缺失的结算帧不跳过。** provider 会加新的事件类型，一个人不该因为其中一个是新的就丢掉整次调用；但流在说明「为什么停」的那一帧之前结束，是 `Provider` 失败并且可重试——它和一个被截断的 body 是同一种失败，刻意不允许「保留已收到的增量」来补救：把不完整的回复当成完整的呈现出去，是这里唯一不能有的结局。
 
 **机密楼宇的拒绝写一次。** 两扇门（`call` 与 `call_streaming`）都说同一句话，出自同一个 `confidential_refusal`——一条安全拒绝有两份拷贝，就是两个各自变软的机会。
+
+### 8-14 gateway 目录化（card-2.2；形状：主类型居索引，方法按簇归文件）
+
+`credential.rs`（988）→ `credential/vault.rs`（`Vault` 缝＋双后端＋`Persistence`／`Described`／`EnvReader`）／
+`custodian.rs`（`Custodian`／`Captured`）／`oauth/`（`codec.rs` 编码、`flow.rs` 往返、`types.rs` 类型，
+测试住 `flow/tests.rs`）；`dialect.rs`（512）→ `dialect/request.rs`（`sample_request` 提
+`#[cfg(test)] pub(crate)` 供 response 面复用）／`response.rs`（strategies＋`proptest!` 住此，
+快照搬 `dialect/snapshots/`）；`endpoint.rs`（639）→ `endpoint/config.rs`（类型＋`new`＋
+` SecretResolver`＋loopback helpers 提 `#[cfg(test)] pub(crate)`）／`call.rs`／`model.rs`；
+`router.rs`（559）→ `router/attached.rs`／`book.rs`／`payload.rs`（`Choice` 字段开
+`pub(crate)`，`payload.rs` 无专属测试故无 tests 模）。
+跨文件私有项开 `pub(crate)`，对外签名逐字节不变（`cargo public-api` 基线记定义位簇路径，
+`memory` 卡同例）。
