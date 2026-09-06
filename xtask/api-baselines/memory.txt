@@ -7,9 +7,11 @@ impl memory::Attribution
 impl memory::Bundle
 impl memory::Cas
 impl memory::Checkpoint
+impl memory::Checkpoint
 impl memory::DigestCache
 impl memory::EventQueue
 impl memory::HotView
+impl memory::JsonlLedger
 impl memory::JsonlLedger
 impl memory::LedgerIndex
 impl memory::LineReader<'_>

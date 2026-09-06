@@ -164,7 +164,7 @@ pub fn runtime::bench::ToolBench::meta_of(&self, &str) -> core::option::Option<&
 pub fn runtime::bench::ToolBench::new(kernel::write_domain::WriteDomain) -> runtime::bench::ToolBench
 pub fn runtime::bench::ToolBench::register(&mut self, alloc::boxed::Box<dyn kernel::tool::Tool>) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn runtime::bench::ToolBench::taint_mut(&mut self) -> &mut kernel::taint::TaintSet
-pub fn runtime::bench::ToolBench::with_checkpoint(self, memory::checkpoint::Checkpoint, &str) -> runtime::bench::ToolBench
+pub fn runtime::bench::ToolBench::with_checkpoint(self, memory::checkpoint::fence::Checkpoint, &str) -> runtime::bench::ToolBench
 pub fn runtime::build_prefix(runtime::prefix::PrefixPlan) -> core::result::Result<runtime::prefix::FrozenPrefix, kernel::error::shape::AxError>
 pub fn runtime::catalog::Catalog::admit_skill(&mut self, runtime::catalog::CatalogEntry) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn runtime::catalog::Catalog::admit_skill(&mut self, runtime::catalog::CatalogEntry) -> core::result::Result<(), kernel::error::shape::AxError>

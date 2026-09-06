@@ -50,7 +50,7 @@
 
 ## 6 命名统一
 
-**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。**本 crate 同例（card-2.1 起）**：`memory` 六面切目录后，同一类型的 inherent impl 若住不同簇文件，基线为每个 impl 块各记一行 `impl`（如 `Checkpoint` 两行），公共面不变。
 
 Vfs、RealFs、FaultFs、FaultPlan、power cut、tail-truncation recovery（断尾恢复）、direction-aware refusal（方向感知拒绝）、segment（分段）、group commit（组提交）、CAS、dedup。crate 根错误 `MemoryError`（每 crate 一根，跨界映射 AxError 不透传）。
 
@@ -605,3 +605,16 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 ## 18 文档同步
 
 ARCHITECTURE §6 memory 表：jsonl/cas 状态翻转＋fault_fs 新行登记（S1.08 同 PR 表先行）；kernel-SPEC §12 存储码缺口共享一个 verdict；S3 模块落地时本文增章。
+
+### 8-14 memory 目录化（card-2.1；形状：主类型居索引，方法按簇归文件）
+
+`jsonl.rs`（812）→ `jsonl/ledger.rs`（类型＋段文法）／`open.rs`（打开与恢复，测试住 `open/tests.rs`）／
+`append.rs`（追加与读＋kernel::Ledger trait impl）；`index.rs`（783）→ `index/ledger.rs`
+（`LedgerIndex`，测试住 `index/ledger/tests.rs`）／`reader.rs`（`LineReader`＋`OpenSegment`）／
+`cache.rs`（戳／缓存／重建，`Stamp`／`Located`／`CACHE_*` 归此）；`projection.rs`（650）→
+`projection/tables.rs`（表＋fold）／`view.rs`（视图，测试住 `view/tests.rs`）；
+`worktree.rs`（622）→ `worktree/name.rs`／`lease.rs`／`trees.rs`（测试住 `trees/tests.rs`）；
+`bundle.rs`（532）→ `bundle/manifest.rs`（布局常量归此）／`export.rs`（避 `module_inception`）／
+`files.rs`；`checkpoint.rs`（480）→ `checkpoint/fence.rs`／`scan.rs`。
+跨文件私有项开 `pub(crate)`（字段／`hand_out` 式自由函数／`Stamp` 等），对外签名逐字节不变。
+完成检查：删投影重建字节一致＋吞吐读数记入 budgets（只记录、不设门）。

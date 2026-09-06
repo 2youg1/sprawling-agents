@@ -421,21 +421,41 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | Module | File | What it owns | Shape | Since | Status |
 |---|---|---|---|---|---|
 | memory::jsonl | crates/memory/src/jsonl.rs | the durable Ledger: segments, chain verification, tail recovery, group commit | adapter | S1 | built |
+| memory::jsonl::ledger | crates/memory/src/jsonl/ledger.rs | the ledger types and segment grammar | adapter | S1 | built |
+| memory::jsonl::open | crates/memory/src/jsonl/open.rs | opening, version probes, tail recovery | adapter | S1 | built |
+| memory::jsonl::open::tests | crates/memory/src/jsonl/open/tests.rs | the opening fixtures | adapter | S1 | built |
+| memory::jsonl::append | crates/memory/src/jsonl/append.rs | waves, reads, and the kernel Ledger face | adapter | S1 | built |
 | memory::vfs | crates/memory/src/vfs.rs | the one face this crate touches a filesystem through; inner seam, two adapters | port | V3 | built |
 | memory::real_fs | crates/memory/src/real_fs.rs | std::fs, holding the handle it is appending through | adapter | V3 | built |
 | memory::error | crates/memory/src/error.rs | what persistence says when it refuses, and the one door out to `AxError` | value | V3 | built |
 | memory::cas | crates/memory/src/cas.rs | content-addressed storage under BLAKE3, written through a temporary file | adapter | S1 | built |
 | memory::fault_fs | crates/memory/src/fault_fs.rs | the second filesystem adapter: a deterministic power-loss model | adapter | S1 | built |
 | memory::index | crates/memory/src/index.rs | seq to byte offset; disposable, rebuilt when damaged | projection | S3 | built |
+| memory::index::ledger | crates/memory/src/index/ledger.rs | the side index map | projection | S3 | built |
+| memory::index::ledger::tests | crates/memory/src/index/ledger/tests.rs | the index fixtures | projection | S3 | built |
+| memory::index::reader | crates/memory/src/index/reader.rs | seeking lines without scanning | projection | S3 | built |
+| memory::index::cache | crates/memory/src/index/cache.rs | stamps, caches, rebuilds | projection | S3 | built |
 | memory::hot | crates/memory/src/hot.rs | the in-memory view the interface reads without touching disk | projection | S3 | built |
 | memory::projection | crates/memory/src/projection.rs | the cold view: questions too big for memory, and recovery after restart | projection | S3 | built |
+| memory::projection::tables | crates/memory/src/projection/tables.rs | rows, folds, table grammar | projection | S3 | built |
+| memory::projection::view | crates/memory/src/projection/view.rs | open, apply, read | projection | S3 | built |
+| memory::projection::view::tests | crates/memory/src/projection/view/tests.rs | the view fixtures | projection | S3 | built |
 | memory::attribution | crates/memory/src/attribution.rs | where the money went, in five independent cuts that reconcile | projection | S3 | built |
 | memory::checkpoint | crates/memory/src/checkpoint.rs | git fences around a tool wave, and what disappeared between them | adapter | S3 | built |
+| memory::checkpoint::fence | crates/memory/src/checkpoint/fence.rs | base, wave pre/post | adapter | S3 | built |
+| memory::checkpoint::scan | crates/memory/src/checkpoint/scan.rs | staged secrets and scoped commits | adapter | S3 | built |
 | memory::changes | crates/memory/src/changes.rs | what moved between two checkpoints, as paths and counts and never as patch text | adapter | R2 | built |
 | memory::worktree | crates/memory/src/worktree.rs | one node, one working tree, objects shared and files not | adapter | P2 | built |
+| memory::worktree::name | crates/memory/src/worktree/name.rs | one segment, no escape | adapter | P2 | built |
+| memory::worktree::lease | crates/memory/src/worktree/lease.rs | a held tree and its measure | adapter | P2 | built |
+| memory::worktree::trees | crates/memory/src/worktree/trees.rs | claim, merge, release | adapter | P2 | built |
+| memory::worktree::trees::tests | crates/memory/src/worktree/trees/tests.rs | the worktree fixtures | adapter | P2 | built |
 | memory::queue | crates/memory/src/queue.rs | one queue implementation serving three lanes | value | S3 | built |
 | memory::digest_cache | crates/memory/src/digest_cache.rs | the same bytes summarised once in their lifetime | projection | S3 | built |
 | memory::bundle | crates/memory/src/bundle.rs | export and restore; the manifest is the completeness test | adapter | P1 | built |
+| memory::bundle::manifest | crates/memory/src/bundle/manifest.rs | manifests and layout constants | adapter | P1 | built |
+| memory::bundle::export | crates/memory/src/bundle/export.rs | export, manifest, restore | adapter | P1 | built |
+| memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built |
 
 ### gateway (12) — everything between a decision to call a model and the bytes on the wire
 
