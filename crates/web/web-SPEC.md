@@ -1950,3 +1950,77 @@ REVIEW 那句「`city::neighbourhood` 有查询，`crates/web/src` 没有页面�
 ### C 这两条为什么都躲过了十六道门
 
 `ax` 与 `render` 只读定稿屏，定稿屏里的会话页是空的；`wording` 读的是字面英文，而这两条一个是中文写错了指代、一个是**根本没写**。**没有任何一道门能判「这一页少了什么」**——少掉的东西不留痕迹。第 15、16 道门共同的盲区，在 §8-65 已经记过一次，这里是它的第二个实例。
+## 8-67 屏级拆分：二十个在册文件按屏一切一目录（路线图卡 4-1）
+
+`web` 在册 20 行（`lang`／`theme` 为 `data` 形不在内）。切法延续 §8-61／§8-62：
+**按屏一切一文件天然贴合 400 行**——每个目录的簇名即屏上已有的概念，
+索引文件只做路由。判定仍不在组件里，这是 Humble Object 而非把逻辑搬进界面。
+
+- `app`→`snapshot`（`Snapshot`＋`new`＋`rebuild`＋`Backfill`）／`reading`
+  （读方法）／`fold`（`apply`＋`absorb`＋`absorb_call`）／`rows`（`RunRow`＋
+  `Usage`＋`ProviderHealth`＋`session_named_by`＋`gate_named_by`）＋`tests.rs`
+  （扁平 `#[test]`，`record` 一族住此）。字段 `pub(super)`（三兄弟读，
+  延用 card-3.4 的 `Views` 先例）。
+- `settings`→`forms`（两表单＋两 `ready` 判定＋`url_is_safe`）／`tables`
+  （`endpoint_rows`＋`tag_rows`＋`can_dispatch`＋`enrolment_note`）／
+  `attach`＋`login`＋`choose`＋`listing`（四个子组件，props 传 Signal 句柄）／
+  `page`（`Settings` shell＋`model_count`）＋`tests.rs`。`Dioxus` 禁 `key`
+  作 prop 名，`secret_key` 代之。
+- `live`→`feed`（`Feed`＋`Line`＋`WINDOW`）／`describe`（`describe`＋
+  `describe_in`＋`Changed`＋`how_word`）／`commands`（行措辞＋`short_run`＋
+  三构造子；`line_text`／`steer_command` 仅 `page` 用，`pub(crate)` 不出 index）／
+  `page`（`LiveView`）＋`tests.rs`。
+- `sessions`→`plan`（`Plan`＋`Field`＋`Rung`＋`rung`＋`latest_room`；
+  `chosen` 字段 `pub(super)`，tests 直达）／`listing`（`SeatRow`＋`listing`＋
+  `spent_of`＋`counts_said`）／`composer`（`Composer`＋`Decision`）／`tables`
+  （`Tables`＋`SessionRow`）／`page`（`SessionsView` shell＋`use_callback` 发信）＋
+  `tests.rs`。
+- `turn`→`reading`（全部类型＋载荷函数；`text` 一族仅 `rounds` 用，
+  `pub(crate)` 不出 index）／`rounds`（`opened_at`＋`turns`）＋`tests.rs`。
+  `Turn` 住 `reading`（`notes: Vec<Note>` 单向依赖不断）。
+- `socket`→`link`（`Link`＋三枚举＋`backoff_ms`＋wasm-only `open`／`send`）／
+  `frames`（`read_frame`＋`token_in`＋wasm-only `pairing_token`／`socket_url`）／
+  `enrol`（`Enrolment`＋双 `enrol`＋私有 `enrol_url`）＋`tests.rs`。
+  `read_frame` 在 `link` 的 `open` 回调里用（`cfg(wasm32)` 随项）。
+- `building_view`→`leaf`（`Leaf`＋`room_addr`＋`opening_leaf`）／`room`
+  （`RoomQueue`＋`waiting_in`＋`day_label`）／`text`（`pieces`＋`class_of`）／
+  `faces`（五臂 `match showing`）／`page`（`BuildingView` shell＋拖放 `Over`
+  状态机）＋`tests.rs`。`Over` 住 `page`（拖放状态是页的，不是叶的）；
+  `room_addr` 住 `leaf`（地址组成与 `Leaf::Room` 同处）。
+- `skyline`→`prisms`（`Prism`＋`place`＋`storeys`＋`prisms_of`＋`painter_order`＋
+  `face_tokens`＋`unreadable_rows`；`scale_of`／`done_storeys` 仅 `faces` 与
+  tests 用，`pub(crate)` 不出 index）／`faces`（`DisplayList`＋`faces_of`＋
+  `draw`＋`done_band_of`＋`windows_of`；`labels_of`／`occupied_extent` 仅
+  tests 用，不出 index）＋`tests.rs`。
+- `mount`→`wiring`（`Wiring`）／`address`（`follow_the_address_bar`）／`keys`
+  （`Keyboard`＋`listen_for_keys`＋私 helper）／`outbound`（`send_through`＋
+  `Outbound` 双 `cfg` 版）／`shell`（`connect`＋`start`＋`install_theme`）／
+  `frame`（`FrameWiring`＋`apply_frame`，字段与两项皆 `pub(crate)`）——`shell.rs`
+  444 行仍超，再拆 `outbound`＋`frame` 两簇方合线。
+- `approval`→`inbox`（`Cluster`＋`inbox`＋`policy_admits`＋`answer_command`＋
+  `ApprovalsView`）／`bin`（`ReturnPath`＋`render_locator`＋`BinRow`＋`bin_rows`＋
+  `recycle_bin`＋`RecycleBinView`）＋`tests.rs`（扁平）。
+- `shell`→`root`（`Root`）／`client`（`App`＋私 `KeyMap`）／`nav`
+  （`reachable`＋`busy_buildings`＋`building_of`；`reachable` 仅 `client` 用，
+  `pub(crate)` 不出 index）。施工中删掉 `nav.rs` 里一份无人调用的死 `KeyMap`
+  （与 `client` 内的一致，`cargo check` 零警告故此前无人发现）。
+- `session`→`facts`（`Fact`＋`head_facts`）／`tabs`（`Tab`）／`links`
+  （`building_of`＋`room_for_link`）／`page`（`SessionView`）＋`tests.rs`。
+- `route`→`view`（`View`＋`Lens`）／`fragments`（`to_fragment`＋`from_fragment`＋
+  wasm-only `current`／`go`／`unresolved`）／`places`（`Destination`＋
+  `destinations`＋`showing`＋`opened_building`＋`place_view`）＋`tests.rs`。
+  `current`／`go`／`unresolved` 与 `place_view` 的重导出带 `cfg(wasm32)` 门
+  （host 下无人引，门禁记未用）。
+- `alert`→`judge`（`Refused`＋`refused`＋`AlertKind`＋`Alert`＋`Raise`＋`Alerts`＋
+  `alert_for`＋`cleared_by`＋`absorb`）／`notify`（wasm-only
+  `ask_to_interrupt`＋`interrupt`，三项 import 皆 `cfg(wasm32)`）＋`tests.rs`
+  （扁平）。
+
+`prompt`／`dashboard`／`isometry`／`ledger_view`／`command`／`city_view` 六个
+（全 ≤460 行，拆后簇无意义）维持单文件：400 行线内不拆，未动。
+
+三条施工口径（本卡确立，后续拆分沿用）：一、tests 目录化后内层 `mod tests`
+触发 `module_inception`，一律扁平成文件顶 `#[test]`（前人 `serving/tests.rs`
+先例）；二、`lang::VIEWS` 手写清单与 `attention::RENDERING` 表随码迁移，
+缺一项即红（本卡共补 20＋ 处）；三、行号切片只做初切，凡跨簇引用的项以
+`pub(crate)`＋全路径直达为准，`pub use` 只留对外公开面（`apisync` 基线零漂移）。

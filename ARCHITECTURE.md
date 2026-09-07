@@ -601,40 +601,109 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | Module | File | What it owns | Shape | Since | Status |
 |---|---|---|---|---|---|
 | web::app | crates/web/src/app.rs | what the client believes, folded forward from events; holds no business state | projection | S4 | built |
+| web::app::snapshot | crates/web/src/app/snapshot.rs | what the client believes, folded forward from events | projection | S4 | built |
+| web::app::reading | crates/web/src/app/reading.rs | what a page reads from what the client believes | projection | S4 | built |
+| web::app::fold | crates/web/src/app/fold.rs | one event forward: the fold that advances what the client believes | projection | S4 | built |
+| web::app::rows | crates/web/src/app/rows.rs | one run as a row, and what the model calls consumed | value | S4 | built |
+| web::app::tests | crates/web/src/app/tests.rs | the fold, exercised through its production door | projection | S4 | built |
 | web::readout | crates/web/src/readout.rs | what a page says about a snapshot, in the reader's own language | decision | V3 | built |
 | web::asking | crates/web/src/asking.rs | what this client keeps, what it asks for again, and what it missed | decision | V3 | built |
 | web::shell | crates/web/src/shell.rs | which region shows what, and the client that mounts it | projection | V3 | built |
+| web::shell::root | crates/web/src/shell/root.rs | three regions, and nothing that decides anything | projection | V3 | built |
+| web::shell::client | crates/web/src/shell/client.rs | the live snapshot and mounting it | projection | V3 | built |
+| web::shell::nav | crates/web/src/shell/nav.rs | everything the palette can reach | decision | V3 | built |
 | web::mount | crates/web/src/mount.rs | the four things only a browser has: address bar, keyboard, socket, frame | adapter | V3 | built |
+| web::mount::wiring | crates/web/src/mount/wiring.rs | every signal one page holds | value | V3 | built |
+| web::mount::address | crates/web/src/mount/address.rs | the one reader of the address bar | adapter | V3 | built |
+| web::mount::keys | crates/web/src/mount/keys.rs | the one place a keystroke reaches this client | adapter | V3 | built |
+| web::mount::outbound | crates/web/src/mount/outbound.rs | the one way a component reaches the server | adapter | V3 | built |
+| web::mount::shell | crates/web/src/mount/shell.rs | socket, starting the client, and its theme | adapter | V3 | built |
+| web::mount::frame | crates/web/src/mount/frame.rs | what one painted frame may move | value | V3 | built |
 | web::board | crates/web/src/board.rs | the plan tree laid out by state; five columns, no state of its own, nothing here can move a node | projection | V3 | built |
 | web::command | crates/web/src/command.rs | every command frame this client sends, built in one place | value | V3 | built |
 | web::pursuit | crates/web/src/pursuit.rs | what a building is working towards on its own, and who answers for it | adapter | V3 | built |
 | web::socket | crates/web/src/socket.rs | the only place in this crate that talks to the server | adapter | S4 | built |
+| web::socket::link | crates/web/src/socket/link.rs | the link: state, events, actions, and the backoff ladder | decision | S4 | built |
+| web::socket::frames | crates/web/src/socket/frames.rs | reading frames: text in, link events out | decision | S4 | built |
+| web::socket::enrol | crates/web/src/socket/enrol.rs | the one credential that never becomes a command | decision | S4 | built |
+| web::socket::tests | crates/web/src/socket/tests.rs | the ladder and the handshake, through the production door | decision | S4 | built |
 | web::pace | crates/web/src/pace.rs | how often this page may change, and what a burst of frames folds into | decision | R2 | built |
 | web::keys | crates/web/src/keys.rs | what a keystroke means, and the one sequence that cannot strand a reader | decision | R2 | built |
 | web::palette | crates/web/src/palette.rs | one box that reaches every page, building and session, and how a query ranks them | decision | R2 | built |
 | web::turn | crates/web/src/turn.rs | a session's events folded into the rounds a person reads: what was said, what it cost, what each call came to, and what a door said about it | decision | R2 | built |
+| web::turn::reading | crates/web/src/turn/reading.rs | what was said, what it cost, what each call came to | value | R2 | built |
+| web::turn::rounds | crates/web/src/turn/rounds.rs | turns folded from the session events | decision | R2 | built |
+| web::turn::tests | crates/web/src/turn/tests.rs | the fold, exercised through its production door | decision | R2 | built |
+| web::turn::rounds_tests | crates/web/src/turn/rounds_tests.rs | the rounds through the production door | decision | R2 | built |
+| web::turn::reading_tests | crates/web/src/turn/reading_tests.rs | the reading through the production door | value | R2 | built |
 | web::city_view | crates/web/src/city_view.rs | the city page: the picture, the controls around it, and what a click means | projection | S4 | built |
 | web::isometry | crates/web/src/isometry.rs | where a point on the ground lands on the screen, and the window around what was drawn | decision | V3 | built |
 | web::skyline | crates/web/src/skyline.rs | what a city of buildings looks like: height from assets, a lit band from the plan | decision | V3 | built |
+| web::skyline::prisms | crates/web/src/skyline/prisms.rs | what a city of buildings looks like | decision | V3 | built |
+| web::skyline::faces | crates/web/src/skyline/faces.rs | prisms become geometry, and geometry becomes a list | decision | V3 | built |
+| web::skyline::tests | crates/web/src/skyline/tests.rs | the same city draws the same shapes, through the production door | decision | V3 | built |
 | web::progress | crates/web/src/progress.rs | the one place a progress bar is drawn, for all three of its callers | decision | S4 | built |
 | web::dashboard | crates/web/src/dashboard.rs | cost in five cuts, with shares against the authoritative total | decision | S4 | built |
 | web::live | crates/web/src/live.rs | watching one session as it happens, in a window that says what it dropped | decision | S4 | built |
+| web::live::feed | crates/web/src/live/feed.rs | the bounded window: what the live view keeps | value | S4 | built |
+| web::live::describe | crates/web/src/live/describe.rs | one event, one short line | decision | S4 | built |
+| web::live::commands | crates/web/src/live/commands.rs | the commands a watcher can send | decision | S4 | built |
+| web::live::page | crates/web/src/live/page.rs | watching one session as it happens | decision | S4 | built |
+| web::live::rounds | crates/web/src/live/rounds.rs | one row per turn, what it did inside it | decision | S4 | built |
+| web::live::stream | crates/web/src/live/stream.rs | raw order one click down, and the empty states | decision | S4 | built |
+| web::live::composer | crates/web/src/live/composer.rs | the steer box and the interventions | decision | S4 | built |
+| web::live::tests | crates/web/src/live/tests.rs | the window and the wording, through the production door | decision | S4 | built |
 | web::approval | crates/web/src/approval.rs | two lists that share one shape: what waits for a person, and what was discarded | decision | S4 | built |
+| web::approval::inbox | crates/web/src/approval/inbox.rs | things waiting for a person, grouped by cluster key | decision | S4 | built |
+| web::approval::bin | crates/web/src/approval/bin.rs | what was discarded and how it comes back | decision | S4 | built |
+| web::approval::tests | crates/web/src/approval/tests.rs | the inbox and the bin, through the production door | decision | S4 | built |
 | web::ledger_view | crates/web/src/ledger_view.rs | browsing the one history; a filter always says how much it hid | decision | S4 | built |
 | web::alert | crates/web/src/alert.rs | the only module that may interrupt a person, and only once per fact | decision | S4 | built |
+| web::alert::judge | crates/web/src/alert/judge.rs | what needs a person, and only once per fact | decision | S4 | built |
+| web::alert::notify | crates/web/src/alert/notify.rs | the interruption that reaches another tab | adapter | S4 | built |
+| web::alert::tests | crates/web/src/alert/tests.rs | one fact, one interruption, through the production door | decision | S4 | built |
 | web::lang | crates/web/src/lang.rs | every word this client says, in the two languages it says them in | data | F2 | built |
 | web::theme | crates/web/src/theme.rs | the single-hue language: the only place that produces a colour | data | S4 | built |
 | web::building_view | crates/web/src/building_view.rs | one building, what it has written down, and what waits in each room | decision | R1 | built |
+| web::building_view::leaf | crates/web/src/building_view/leaf.rs | which face of a building opens first | decision | R1 | built |
+| web::building_view::room | crates/web/src/building_view/room.rs | waiting signals in one room | decision | R1 | built |
+| web::building_view::text | crates/web/src/building_view/text.rs | pieces and their classes | decision | R1 | built |
+| web::building_view::faces | crates/web/src/building_view/faces.rs | what each open leaf shows | decision | R1 | built |
+| web::building_view::page | crates/web/src/building_view/page.rs | one building, what it has written down | decision | R1 | built |
+| web::building_view::tests | crates/web/src/building_view/tests.rs | leaves and queues, through the production door | decision | R1 | built |
 | web::reach | crates/web/src/reach.rs | what a building's runs may reach, and the one form that sets it | decision | P3 | built |
 | web::drop | crates/web/src/drop.rs | what a drag means at each of the four places it can land, and what it is refused for | decision | P0 | built |
 | web::vitals | crates/web/src/vitals.rs | the few numbers no other surface states, and the four it refuses to state | decision | F1 | built |
 | web::archive_search | crates/web/src/archive_search.rs | what this city wrote down: the shelves and the record, never merged | decision | F1 | built |
 | web::settings | crates/web/src/settings.rs | turning a URL and a key into a model a run can be given | decision | P1 | built |
+| web::settings::forms | crates/web/src/settings/forms.rs | the two forms and what a complete choice is | decision | P1 | built |
+| web::settings::tables | crates/web/src/settings/tables.rs | what the server answered, read as rows | decision | P1 | built |
+| web::settings::attach | crates/web/src/settings/attach.rs | the attach-provider form | decision | P1 | built |
+| web::settings::login | crates/web/src/settings/login.rs | the subscription login | decision | P1 | built |
+| web::settings::choose | crates/web/src/settings/choose.rs | the model-choice form | decision | P1 | built |
+| web::settings::listing | crates/web/src/settings/listing.rs | what each model is for, and what is attached | decision | P1 | built |
+| web::settings::page | crates/web/src/settings/page.rs | the settings page shell | decision | P1 | built |
+| web::settings::tests | crates/web/src/settings/tests.rs | the forms, read here; the frames they turn into are command’s | decision | P1 | built |
 | web::route | crates/web/src/route.rs | the one translation between a View and the address bar, both ways | decision | F2 | built |
+| web::route::view | crates/web/src/route/view.rs | which page the content region shows, and its lens | decision | F2 | built |
+| web::route::fragments | crates/web/src/route/fragments.rs | one spelling written, every old spelling read | decision | F2 | built |
+| web::route::places | crates/web/src/route/places.rs | nav entries, and what is showing | decision | F2 | built |
+| web::route::tests | crates/web/src/route/tests.rs | fragments both ways, through the production door | decision | F2 | built |
 | web::panel | crates/web/src/panel.rs | the one version of a centre panel: conclusion, scope, body, and where the numbers came from | decision | F2 | built |
 | web::phase | crates/web/src/phase.rs | what a session is doing, in the one vocabulary every surface reads from | data | V3 | built |
 | web::sessions | crates/web/src/sessions.rs | the first screen: the box that starts work, and the table its rows land in | decision | V3 | built |
+| web::sessions::plan | crates/web/src/sessions/plan.rs | guess, choose, and what each field means | decision | V3 | built |
+| web::sessions::listing | crates/web/src/sessions/listing.rs | seats, listing, and readings | decision | V3 | built |
+| web::sessions::composer | crates/web/src/sessions/composer.rs | the ladder and the box that sends work | decision | V3 | built |
+| web::sessions::tables | crates/web/src/sessions/tables.rs | what is moving, what ended, which buildings are busy | decision | V3 | built |
+| web::sessions::page | crates/web/src/sessions/page.rs | the first screen | decision | V3 | built |
+| web::sessions::tests | crates/web/src/sessions/tests.rs | guess versus decision, through the production door | decision | V3 | built |
 | web::session | crates/web/src/session.rs | one session: the four questions a person arrives with, and five readings of what it did | decision | V3 | built |
+| web::session::facts | crates/web/src/session/facts.rs | the four questions a person arrives with | decision | V3 | built |
+| web::session::tabs | crates/web/src/session/tabs.rs | five readings of what a session did | decision | V3 | built |
+| web::session::links | crates/web/src/session/links.rs | building of an address, and old live links | decision | V3 | built |
+| web::session::page | crates/web/src/session/page.rs | one session: questions and readings | decision | V3 | built |
+| web::session::tests | crates/web/src/session/tests.rs | the head through the production door | decision | V3 | built |
 | web::prompt | crates/web/src/prompt.rs | what a run was given: the four frozen blocks of its prompt, and whether an admitted skill's bytes moved since the city last looked | projection | V3 | built |
 | web::waiting | crates/web/src/waiting.rs | everything that cannot move until a person answers, in one place | decision | V3 | built |
 | web::record | crates/web/src/record.rs | one history, in three lenses, at one address | decision | V3 | built |

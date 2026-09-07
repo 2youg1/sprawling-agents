@@ -24,15 +24,23 @@ use std::collections::BTreeSet;
 
 /// Files that render something a person looks at. The rule is about what
 /// reaches a screen, so the modules that only decide are out of scope.
-const RENDERING: [&str; 8] = [
-    "src/alert.rs",
-    "src/approval.rs",
+const RENDERING: [&str; 16] = [
+    "src/alert/judge.rs",
+    "src/approval/bin.rs",
+    "src/approval/inbox.rs",
     "src/city_view.rs",
     "src/dashboard.rs",
     "src/ledger_view.rs",
-    "src/live.rs",
+    "src/live/commands.rs",
+    "src/live/describe.rs",
+    "src/live/page.rs",
     "src/progress.rs",
-    "src/settings.rs",
+    "src/settings/attach.rs",
+    "src/settings/choose.rs",
+    "src/settings/listing.rs",
+    "src/settings/login.rs",
+    "src/sessions/composer.rs",
+    "src/sessions/tables.rs",
 ];
 
 fn source(name: &str) -> String {
@@ -93,7 +101,7 @@ fn the_live_view_has_an_end_and_says_what_it_dropped() {
     // A feed with no bottom is a feed you cannot finish reading. This
     // one has a window, and what fell out of it is reported rather than
     // quietly discarded.
-    let text = source("src/live.rs");
+    let text = source("src/live/feed.rs");
     assert!(
         text.contains("pub const WINDOW"),
         "the window is a named constant, not a number somewhere in a loop"
@@ -125,7 +133,7 @@ fn a_backgrounded_tab_stops_rather_than_slowing_down() {
     // Stopping and slowing look the same for a minute and then diverge:
     // a slowed tab still holds a socket, still wakes a laptop, and still
     // costs the person something they did not ask to spend.
-    let text = source("src/socket.rs");
+    let text = source("src/socket/link.rs");
     assert!(
         text.contains("Backgrounded") && text.contains("CloseSocket"),
         "going out of view closes the link rather than slowing it"

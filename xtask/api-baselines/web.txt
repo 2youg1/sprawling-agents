@@ -25,6 +25,8 @@ impl web::Plan
 impl web::ProviderHealth
 impl web::ReturnPath
 impl web::Snapshot
+impl web::Snapshot
+impl web::Snapshot
 impl web::Tab
 impl web::Trend
 pub const fn web::Camera::tiles() -> Self
@@ -107,14 +109,14 @@ pub fn web::Alerts::clear(&mut self, &str) -> bool
 pub fn web::Alerts::new() -> Self
 pub fn web::Alerts::raise(&mut self, &web::Alert) -> web::Raise
 pub fn web::App() -> dioxus_core::innerlude::Element
-pub fn web::ApprovalsView(web::approval::ApprovalsViewProps) -> dioxus_core::innerlude::Element
+pub fn web::ApprovalsView(web::approval::inbox::ApprovalsViewProps) -> dioxus_core::innerlude::Element
 pub fn web::ArchiveView(web::archive_search::ArchiveViewProps) -> dioxus_core::innerlude::Element
 pub fn web::AttachReadiness::sentence(&self) -> web::Msg
 pub fn web::BarState::as_str(self) -> &'static str
 pub fn web::BarState::desaturated_lightness(self) -> u16
 pub fn web::BarState::fill_token(self) -> &'static str
 pub fn web::BarState::has_end_rule(self) -> bool
-pub fn web::BuildingView(web::building_view::BuildingViewProps) -> dioxus_core::innerlude::Element
+pub fn web::BuildingView(web::building_view::page::BuildingViewProps) -> dioxus_core::innerlude::Element
 pub fn web::Camera::project(&self, i32, i32) -> (i32, i32)
 pub fn web::Cluster::count(&self) -> usize
 pub fn web::Cluster::waiting_since(&self) -> core::option::Option<kernel::event::identity::TimeMs>
@@ -151,7 +153,7 @@ pub fn web::Link::consecutive_failures(&self) -> u32
 pub fn web::Link::is_live(&self) -> bool
 pub fn web::Link::new(core::option::Option<alloc::string::String>) -> Self
 pub fn web::Link::state(&self) -> &web::LinkState
-pub fn web::LiveView(web::live::LiveViewProps) -> dioxus_core::innerlude::Element
+pub fn web::LiveView(web::live::page::LiveViewProps) -> dioxus_core::innerlude::Element
 pub fn web::Note::at(&self) -> kernel::event::identity::Seq
 pub fn web::Outcome::class(self) -> &'static str
 pub fn web::Outcome::word(self) -> web::Msg
@@ -175,12 +177,12 @@ pub fn web::PromptView(web::prompt::PromptViewProps) -> dioxus_core::innerlude::
 pub fn web::ProviderHealth::word(self) -> web::Msg
 pub fn web::ReachForm(web::reach::ReachFormProps) -> dioxus_core::innerlude::Element
 pub fn web::RecordView(web::record::RecordViewProps) -> dioxus_core::innerlude::Element
-pub fn web::RecycleBinView(web::approval::RecycleBinViewProps) -> dioxus_core::innerlude::Element
+pub fn web::RecycleBinView(web::approval::bin::RecycleBinViewProps) -> dioxus_core::innerlude::Element
 pub fn web::ReturnPath::of(&kernel::discard::request::Restoration) -> Self
 pub fn web::ReturnPath::sentence(&self, web::Lang) -> alloc::string::String
-pub fn web::Root(web::shell::RootProps) -> dioxus_core::innerlude::Element
-pub fn web::SessionView(web::session::SessionViewProps) -> dioxus_core::innerlude::Element
-pub fn web::SessionsView(web::sessions::SessionsViewProps) -> dioxus_core::innerlude::Element
+pub fn web::Root(web::shell::root::RootProps) -> dioxus_core::innerlude::Element
+pub fn web::SessionView(web::session::page::SessionViewProps) -> dioxus_core::innerlude::Element
+pub fn web::SessionsView(web::sessions::page::SessionsViewProps) -> dioxus_core::innerlude::Element
 pub fn web::Snapshot::adopt_approvals(&mut self, alloc::vec::Vec<kernel::approval::ApprovalItem>)
 pub fn web::Snapshot::adopt_city(&mut self, kernel::address::Address)
 pub fn web::Snapshot::applied_through(&self) -> core::option::Option<kernel::event::identity::Seq>

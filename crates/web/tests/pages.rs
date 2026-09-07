@@ -738,8 +738,11 @@ fn a_drop_zone_reports_a_drag_through_events_and_not_through_hover() {
     // assertion, and the assertion lived in that file. Moving this suite
     // out of the crate is what made that visible.
     for (name, wired) in [
-        ("live.rs", include_str!("../src/live.rs")),
-        ("building_view.rs", include_str!("../src/building_view.rs")),
+        ("live/composer.rs", include_str!("../src/live/composer.rs")),
+        (
+            "building_view/page.rs",
+            include_str!("../src/building_view/page.rs"),
+        ),
     ] {
         assert!(
             wired.contains("ondragenter") && wired.contains("ondragleave"),
