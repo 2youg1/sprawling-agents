@@ -80,7 +80,11 @@ mod tests {
         std::fs::write(dir.join("lab").join("notes.md"), b"first\n").unwrap();
         let mut checkpoint = Checkpoint::open(dir).unwrap();
         checkpoint
-            .wave_pre("lab", TimeMs::new(1_000), "owner")
+            .ensure_base(
+                "lab",
+                TimeMs::new(1_000),
+                &super::super::trees::tests::owner(),
+            )
             .unwrap();
         Worktrees::open(dir).unwrap()
     }

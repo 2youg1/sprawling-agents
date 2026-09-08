@@ -28,4 +28,4 @@ mod trees;
 
 pub use lease::WorktreeLease;
 pub use name::WorktreeName;
-pub use trees::{PlannedMerge, Worktrees};
+pub use trees::{Landing, PlannedMerge, Worktrees};

@@ -4,15 +4,37 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::super::*;
-use crate::checkpoint::Checkpoint;
-use kernel::TimeMs;
+use crate::checkpoint::{Checkpoint, ModelChoice, Provenance};
+use kernel::{Address, B3Hash, Effort, RunId, TimeMs};
 use std::path::Path;
+
+pub(crate) fn owner() -> Provenance {
+    Provenance::new(
+        RunId::CITY,
+        Address::parse("lab/owner").unwrap(),
+        B3Hash::digest(b"a city"),
+        ModelChoice {
+            id: "test-model".to_owned(),
+            effort: Some(Effort::Low),
+        },
+    )
+}
+
+fn landing(t: u64, of: &Provenance, reviewed_by_person: bool) -> Landing<'_> {
+    Landing {
+        t: TimeMs::new(t),
+        of,
+        subject: "merge: node-1",
+        reviewed_by_person,
+    }
+}
+
 fn city(dir: &Path) -> Worktrees {
     std::fs::create_dir_all(dir.join("lab")).unwrap();
     std::fs::write(dir.join("lab").join("notes.md"), b"first\n").unwrap();
     let mut checkpoint = Checkpoint::open(dir).unwrap();
     checkpoint
-        .wave_pre("lab", TimeMs::new(1_000), "owner")
+        .ensure_base("lab", TimeMs::new(1_000), &owner())
         .unwrap();
     Worktrees::open(dir).unwrap()
 }
@@ -77,7 +99,7 @@ fn a_node_that_comes_back_finds_what_it_committed_and_not_what_it_did_not() {
     std::fs::write(lease.path().join("lab").join("notes.md"), b"committed\n").unwrap();
     Checkpoint::open(lease.path())
         .unwrap()
-        .wave_pre("lab", TimeMs::new(2_000), "node-1")
+        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
         .unwrap();
     std::fs::write(lease.path().join("lab").join("draft.md"), b"uncommitted\n").unwrap();
     trees.release(lease).unwrap();
@@ -121,10 +143,14 @@ fn a_verified_node_lands_in_the_city_and_a_stale_one_is_sent_back() {
     .unwrap();
     Checkpoint::open(lease.path())
         .unwrap()
-        .wave_pre("lab", TimeMs::new(2_000), "node-1")
+        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
         .unwrap();
 
-    trees.plan_merge(lease.name()).unwrap().apply().unwrap();
+    trees
+        .plan_merge(lease.name())
+        .unwrap()
+        .apply(&landing(5_000, &owner(), false))
+        .unwrap();
     assert_eq!(
         std::fs::read_to_string(dir.path().join("lab").join("notes.md")).unwrap(),
         "from the node\n",
@@ -136,12 +162,12 @@ fn a_verified_node_lands_in_the_city_and_a_stale_one_is_sent_back() {
     std::fs::write(dir.path().join("lab").join("other.md"), b"trunk moved\n").unwrap();
     Checkpoint::open(dir.path())
         .unwrap()
-        .wave_pre("lab", TimeMs::new(3_000), "owner")
+        .land(TimeMs::new(3_000), &owner(), "checkpoint: lab")
         .unwrap();
     std::fs::write(stale.path().join("lab").join("notes.md"), b"stale work\n").unwrap();
     Checkpoint::open(stale.path())
         .unwrap()
-        .wave_pre("lab", TimeMs::new(4_000), "node-2")
+        .land(TimeMs::new(4_000), &owner(), "checkpoint: lab")
         .unwrap();
 
     let err = trees.plan_merge(stale.name()).unwrap_err().into_ax();
@@ -159,4 +185,85 @@ fn a_city_with_no_repository_is_refused_rather_than_given_one() {
     let dir = tempfile::tempdir().unwrap();
     let err = Worktrees::open(dir.path()).unwrap_err().into_ax();
     assert_eq!(err.code(), &kernel::AxCode::StorageFatal);
+}
+
+/// A merge is a thing that happened, so it has a commit of its own: two
+/// parents, and the trailers of the run that did the merging.
+#[test]
+fn a_merge_lands_as_a_two_parent_commit_carrying_the_merging_runs_trailers() {
+    let dir = tempfile::tempdir().unwrap();
+    let trees = city(dir.path());
+    let lease = trees.claim(&name("node-1")).unwrap();
+    std::fs::write(lease.path().join("lab").join("notes.md"), b"from node\n").unwrap();
+    Checkpoint::open(lease.path())
+        .unwrap()
+        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
+        .unwrap();
+
+    trees
+        .plan_merge(lease.name())
+        .unwrap()
+        .apply(&landing(5_000, &owner(), false))
+        .unwrap();
+
+    let repo = git2::Repository::open(dir.path()).unwrap();
+    let head = repo.head().unwrap().peel_to_commit().unwrap();
+    assert_eq!(head.parent_count(), 2, "a merge has two parents");
+    let message = head.message().unwrap();
+    assert!(message.starts_with("merge: node-1\n\n"), "{message}");
+    for trailer in [
+        "Sprawling-Run: ",
+        "Sprawling-Actor: lab/owner",
+        "Sprawling-Model: test-model",
+        "Sprawling-Effort: low",
+        "Sprawling-City: ",
+    ] {
+        assert!(
+            message.contains(trailer),
+            "{trailer} missing from {message}"
+        );
+    }
+    assert!(
+        !message.contains("Reviewed-by:"),
+        "nobody claimed to have looked: {message}"
+    );
+}
+
+/// A person's name is the person's. The city writes it only when the
+/// caller says a person looked and this machine's git config says who.
+#[test]
+fn a_person_who_looked_is_named_from_the_repositorys_own_config() {
+    let dir = tempfile::tempdir().unwrap();
+    let trees = city(dir.path());
+    {
+        let repo = git2::Repository::open(dir.path()).unwrap();
+        let mut config = repo.config().unwrap();
+        config.set_str("user.name", "Ada Lovelace").unwrap();
+        config.set_str("user.email", "ada@example.org").unwrap();
+    }
+    let lease = trees.claim(&name("node-1")).unwrap();
+    std::fs::write(lease.path().join("lab").join("notes.md"), b"from node\n").unwrap();
+    Checkpoint::open(lease.path())
+        .unwrap()
+        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
+        .unwrap();
+    trees
+        .plan_merge(lease.name())
+        .unwrap()
+        .apply(&landing(5_000, &owner(), true))
+        .unwrap();
+
+    let repo = git2::Repository::open(dir.path()).unwrap();
+    let message = repo
+        .head()
+        .unwrap()
+        .peel_to_commit()
+        .unwrap()
+        .message()
+        .unwrap()
+        .to_owned();
+    assert!(
+        message.contains("Reviewed-by: Ada Lovelace <ada@example.org>\n"),
+        "{message}"
+    );
 }

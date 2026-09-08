@@ -43,21 +43,23 @@ impl RunWorker {
         // would be a third state for a person to chase.
         let pr_effects = pr.borrow_mut().take_effects();
         if !pr_effects.is_empty() {
+            // What every commit this settlement makes is signed with.
+            // Read once here rather than per effect: the city's genesis
+            // line does not change while a settlement runs.
+            let of = site.provenance(&self.city_root, addr)?;
             let trees =
                 memory::Worktrees::open(&self.city_root).map_err(memory::MemoryError::into_ax)?;
             for effect in pr_effects {
                 match effect {
                     collab::PrEffect::Opened { branch } => {
-                        let commit = memory::Checkpoint::open(write_root)
+                        // Landed rather than fenced: what a verifier
+                        // judges has to be on the run's own branch, and
+                        // a wave fence is a dangling commit nobody can
+                        // merge (memory-SPEC 8-8, card-2.3).
+                        let at = memory::Checkpoint::open(write_root)
                             .map_err(memory::MemoryError::into_ax)?
-                            .wave_pre(fence_scope, now_ms()?, who)
+                            .land(now_ms()?, &of, &format!("offer: {fence_scope}"))
                             .map_err(memory::MemoryError::into_ax)?;
-                        let at = commit
-                            .as_map()
-                            .get("oid")
-                            .and_then(serde_json::Value::as_str)
-                            .unwrap_or_default()
-                            .to_owned();
                         let request = collab::OpenRequest {
                             node: collab::NodeId::parse(&branch)?,
                             implementer: who.to_owned(),
@@ -123,6 +125,11 @@ impl RunWorker {
                             "commit".to_owned(),
                             serde_json::Value::String(planned.commit()),
                         );
+                        // What the merge commit's own trailers carry and
+                        // this record cannot say for itself, so "which
+                        // run wrote this commit" is answered from the
+                        // ledger rather than from git (card-2.4).
+                        data.extend(of.model_fields());
                         self.record_for(
                             run_id,
                             effect::Line {
@@ -132,7 +139,18 @@ impl RunWorker {
                                 data: Payload::new(data)?,
                             },
                         )?;
-                        planned.apply().map_err(memory::MemoryError::into_ax)?;
+                        // A person other than the author verified this,
+                        // which is what `PrEffect::Merged` means; the
+                        // name is taken from the repository's own git
+                        // config or left out entirely.
+                        planned
+                            .apply(&memory::Landing {
+                                t: now_ms()?,
+                                of: &of,
+                                subject: &format!("merge: {}", request.branch),
+                                reviewed_by_person: true,
+                            })
+                            .map_err(memory::MemoryError::into_ax)?;
                         self.requests.retain(|held| held.branch != request.branch);
                     }
                     collab::PrEffect::Rejected { request, by, why } => {

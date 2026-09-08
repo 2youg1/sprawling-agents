@@ -7,17 +7,31 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{ByteLen, consts_policy::WORKTREE_MAX_BYTES};
+use kernel::{ByteLen, TimeMs, consts_policy::WORKTREE_MAX_BYTES};
 
+use crate::checkpoint::Provenance;
 use crate::error::MemoryError;
 
 use super::lease::WorktreeLease;
 use super::name::WorktreeName;
 
+/// What one merge writes down: four values that arrive together and are
+/// meaningless apart - a subject with nobody's provenance under it says
+/// who merged nothing. `reviewed_by_person` adds one `Reviewed-by: Name
+/// <email>` trailer, and only when this repository's git config also
+/// carries `user.name` and `user.email`: the city does not invent a
+/// person's name.
+pub struct Landing<'a> {
+    /// Determinism rule 2: the signature carries the injected instant.
+    pub t: TimeMs,
+    pub of: &'a Provenance,
+    pub subject: &'a str,
+    pub reviewed_by_person: bool,
+}
+
 /// Where the trees live: inside the reserved subtree, because they are
 /// the city's own machinery rather than anybody's writable space. What a
-/// run may write is judged against the tree it works in, not against
-/// where the tree sits.
+/// run may write is judged against the tree it works in.
 const WORKTREE_DIR: &str = "worktrees";
 
 /// The city's trees.
@@ -41,12 +55,11 @@ impl std::fmt::Debug for Worktrees {
 
 /// A merge that has been decided and not yet made.
 ///
-/// The commit the trunk will land on is settled at construction, and
+/// The commit the trunk will land on is settled at construction and
 /// every refusal has already happened, so the line announcing this merge
 /// can be written before the trunk moves. [`PlannedMerge::apply`] is the
-/// only way to move it, and this value has no other source than
-/// [`Worktrees::plan_merge`] - writing the two in the wrong order means
-/// obtaining something that cannot be obtained.
+/// only way to move it, and [`Worktrees::plan_merge`] is this value's
+/// only source.
 pub struct PlannedMerge<'a> {
     trees: &'a Worktrees,
     target: git2::Oid,
@@ -69,14 +82,18 @@ impl PlannedMerge<'_> {
         self.target.to_string()
     }
 
-    /// Brings a node's committed work into the city's own trunk.
+    /// Brings a node's committed work into the city's own trunk, as a
+    /// merge commit carrying the merging run's trailers. The judgement
+    /// stays fast-forward only; what changed in card-2.3 is what the
+    /// history keeps, because a pointer move leaves nothing to read and
+    /// no place to say who verified it.
     ///
     /// # Errors
-    /// Propagates a trunk that cannot be moved or checked out. The
-    /// fast-forward judgement is not repeated: it was made, and refused
-    /// if it had to be, before this value existed.
-    pub fn apply(self) -> Result<(), MemoryError> {
-        self.trees.fast_forward(self.target)
+    /// Propagates a trunk that cannot be read, committed onto or checked
+    /// out. The fast-forward judgement is not repeated: it was made, and
+    /// refused if it had to be, before this value existed.
+    pub fn apply(self, landing: &Landing<'_>) -> Result<(), MemoryError> {
+        self.trees.land_merge(self.target, landing)
     }
 }
 
@@ -215,21 +232,73 @@ impl Worktrees {
         })
     }
 
-    /// Moves the trunk to a commit [`Worktrees::plan_merge`] settled on.
-    fn fast_forward(&self, target: git2::Oid) -> Result<(), MemoryError> {
+    /// Writes the merge commit [`Worktrees::plan_merge`] settled on: two
+    /// parents, the node's tree, and the merging run's trailers.
+    fn land_merge(&self, target: git2::Oid, landing: &Landing<'_>) -> Result<(), MemoryError> {
         let refuse = |op: &'static str, detail: String| MemoryError::Worktree { op, detail };
-        let mut head = self
+        let head = self
             .repo
             .head()
             .map_err(|err| refuse("read the city trunk", err.to_string()))?;
-        head.set_target(target, "sprawling: merge a verified node")
-            .map_err(|err| refuse("move the city trunk", err.to_string()))?;
+        let ours = head
+            .peel_to_commit()
+            .map_err(|err| refuse("read the city trunk", err.to_string()))?;
+        let theirs = self
+            .repo
+            .find_commit(target)
+            .map_err(|err| refuse("read the node commit", err.to_string()))?;
+        // The node's tree: the trunk is an ancestor by the fast-forward
+        // judgement, so it has nothing the node does not carry.
+        let tree = theirs
+            .tree()
+            .map_err(|err| refuse("read the node tree", err.to_string()))?;
+        let seconds = i64::try_from(landing.t.value().saturating_div(1000)).unwrap_or(0);
+        let when = git2::Time::new(seconds, 0);
+        let email = landing.of.email();
+        let signature = git2::Signature::new(landing.of.actor().as_str(), &email, &when)
+            .map_err(|err| refuse("build the merge signature", err.to_string()))?;
+        let message = format!(
+            "{}\n\n{}{}",
+            landing.subject,
+            landing.of.trailers(),
+            self.reviewer(landing.reviewed_by_person)
+        );
+        self.repo
+            .commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                &message,
+                &tree,
+                &[&ours, &theirs],
+            )
+            .map_err(|err| refuse("commit the merge", err.to_string()))?;
         let mut checkout = git2::build::CheckoutBuilder::new();
         checkout.force();
         self.repo
             .checkout_head(Some(&mut checkout))
             .map_err(|err| refuse("check out the merged trunk", err.to_string()))?;
         Ok(())
+    }
+
+    /// The `Reviewed-by:` line, or nothing at all. Both halves have to
+    /// hold: the caller says a person looked, and this machine's git
+    /// config says who that person is. A name the city made up would be
+    /// a false attribution in somebody's own repository.
+    fn reviewer(&self, reviewed_by_person: bool) -> String {
+        if !reviewed_by_person {
+            return String::new();
+        }
+        let Ok(config) = self.repo.config() else {
+            return String::new();
+        };
+        match (
+            config.get_string("user.name"),
+            config.get_string("user.email"),
+        ) {
+            (Ok(name), Ok(email)) => format!("Reviewed-by: {name} <{email}>\n"),
+            _ => String::new(),
+        }
     }
 
     /// Gives a tree back: the files go, then the repository forgets it.
@@ -328,4 +397,4 @@ fn measure(root: &Path) -> Result<ByteLen, MemoryError> {
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests;
+pub(crate) mod tests;
