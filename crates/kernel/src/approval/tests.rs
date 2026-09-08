@@ -153,3 +153,60 @@ fn the_answer_matrix_holds() {
         AnswerVerdict::SelfApprovalBarred
     );
 }
+
+/// The clerk is a delegate like any other: nothing about `hall/clerk`
+/// is a new rule in this module, and that is the point of the card
+/// adding no `Autonomy` variant.
+#[test]
+fn the_clerk_answers_as_the_appointed_delegate_and_no_further() {
+    let clerk = resident(crate::consts_policy::HALL_CLERK);
+    let autonomy = Autonomy::Delegate(clerk.clone());
+    assert_eq!(
+        may_answer(
+            &autonomy,
+            &item(ApprovalClass::AgentQuestion, false, "lab/room1"),
+            &Answerer::Resident(clerk.clone())
+        ),
+        AnswerVerdict::May
+    );
+    // The three must-pass-a-human classes stay the person's.
+    assert_eq!(
+        may_answer(
+            &autonomy,
+            &item(ApprovalClass::BudgetLimit, false, "lab/room1"),
+            &Answerer::Resident(clerk.clone())
+        ),
+        AnswerVerdict::HumanOnly
+    );
+    // A tainted item never reaches the clerk (C15).
+    assert_eq!(
+        may_answer(
+            &autonomy,
+            &item(ApprovalClass::AgentQuestion, true, "lab/room1"),
+            &Answerer::Resident(clerk.clone())
+        ),
+        AnswerVerdict::HumanOnly
+    );
+    // The Mayor is not the clerk, whatever else it may do.
+    assert_eq!(
+        may_answer(
+            &autonomy,
+            &item(ApprovalClass::AgentQuestion, false, "lab/room1"),
+            &Answerer::Resident(resident(crate::consts_policy::HALL_MAYOR))
+        ),
+        AnswerVerdict::NotTheDelegate
+    );
+    // And the clerk does not answer for itself.
+    assert_eq!(
+        may_answer(
+            &autonomy,
+            &item(
+                ApprovalClass::AgentQuestion,
+                false,
+                crate::consts_policy::HALL_CLERK
+            ),
+            &Answerer::Resident(clerk)
+        ),
+        AnswerVerdict::SelfApprovalBarred
+    );
+}

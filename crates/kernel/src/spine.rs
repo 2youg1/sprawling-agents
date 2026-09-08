@@ -33,6 +33,6 @@ pub use grammar::check_roadmap_shape;
 pub use memo::{MEMO_OUTLINE_FIELDS, MemoShape, ScopeChange, WriteMoment, check_memo_shape};
 pub use rewrite::{insert_children, set_roadmap_status};
 pub use row::{
-    EvidenceCell, NewChild, ROADMAP_COLUMNS, ROADMAP_STATUS_SPELLINGS, RoadmapRow, RoadmapShape,
-    RoadmapStatus,
+    EvidenceCell, NewChild, ROADMAP_COLUMNS, ROADMAP_FILE, ROADMAP_STATUS_SPELLINGS, RoadmapRow,
+    RoadmapShape, RoadmapStatus,
 };

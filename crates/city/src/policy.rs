@@ -20,10 +20,15 @@ use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist, WriteDomain};
 
+mod reach;
+
+pub use reach::DomainReach;
+
 /// The file a building's rules live in, at the building root.
 pub const BUILDING_FILE: &str = "BUILDING.md";
 
 const CONFIDENTIAL_KEY: &str = "confidential:";
+const WRITE_KEY: &str = "write:";
 const REVIEW_KEY: &str = "review:";
 const WRITE_HEADING: &str = "write domain";
 const EGRESS_HEADING: &str = "egress";
@@ -44,6 +49,7 @@ pub struct BuildingRules {
     addr: Address,
     policy: BuildingPolicy,
     write_prefixes: Vec<Address>,
+    reach: DomainReach,
     egress: EgressAllowlist,
     review: bool,
     /// The skills this building takes into its catalog, by name. The
@@ -99,6 +105,12 @@ impl BuildingRules {
         &self.reading_room
     }
 
+    /// What this building's residents may write inside their prefixes.
+    #[must_use]
+    pub fn reach(&self) -> DomainReach {
+        self.reach
+    }
+
     #[must_use]
     pub fn model_pool(&self) -> ModelPool {
         if self.policy.confidential {
@@ -132,7 +144,10 @@ impl BuildingRules {
         if prefixes.is_empty() {
             prefixes.push(self.addr.clone());
         }
-        WriteDomain::new(prefixes)
+        match self.reach {
+            DomainReach::Everything => WriteDomain::new(prefixes),
+            DomainReach::Documents => WriteDomain::documents(prefixes),
+        }
     }
 }
 
@@ -197,6 +212,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> 
             addr: addr.clone(),
             policy: BuildingPolicy::default(),
             write_prefixes: Vec::new(),
+            reach: DomainReach::Everything,
             egress: EgressAllowlist::default(),
             review: false,
             reading_room: Vec::new(),
@@ -258,6 +274,7 @@ pub fn write_rules(city_root: &Path, addr: &Address, text: &str) -> Result<Build
 /// must not resolve to the permissive side.
 pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
     let mut confidential: Option<bool> = None;
+    let mut reach = DomainReach::Everything;
     let mut review = false;
     let mut write_prefixes = Vec::new();
     let mut egress_entries: Vec<String> = Vec::new();
@@ -287,6 +304,10 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
             if !entry.is_empty() {
                 egress_entries.push(entry.to_owned());
             }
+            continue;
+        }
+        if let Some(rest) = bare.strip_prefix(WRITE_KEY) {
+            reach = DomainReach::parse(rest.trim().trim_matches('`').trim())?;
             continue;
         }
         if let Some(rest) = bare.strip_prefix(REVIEW_KEY) {
@@ -354,6 +375,7 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
         addr: addr.clone(),
         policy: BuildingPolicy::new(confidential),
         write_prefixes,
+        reach,
         egress: EgressAllowlist::new(egress_entries),
         review,
         reading_room,

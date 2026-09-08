@@ -148,3 +148,50 @@ fn an_ordinary_building_may_declare_prefixes_beyond_itself() {
     .unwrap();
     assert_eq!(rules.write_domain().unwrap().prefixes().count(), 2);
 }
+
+/// City Hall's fixed rules give its residents a documents domain: they
+/// write Markdown, and the plan file has one editing entrance that is
+/// not `edit`.
+#[test]
+fn the_hall_template_writes_documents_and_never_the_plan() {
+    let dir = tempfile::tempdir().unwrap();
+    let hall = Address::parse(kernel::consts_policy::HALL_BUILDING).unwrap();
+    crate::building::create(dir.path(), &hall, crate::BuildingTemplate::Hall).unwrap();
+    let rules = load(dir.path(), &hall).unwrap();
+    assert!(
+        !rules.policy().confidential,
+        "the hall reads every building"
+    );
+    assert_eq!(rules.reach(), crate::DomainReach::Documents);
+
+    let domain = rules.write_domain().unwrap();
+    assert!(matches!(
+        domain.admits(&Address::parse("hall/Memo.md").unwrap()),
+        kernel::DomainVerdict::Within
+    ));
+    assert!(matches!(
+        domain.admits(&Address::parse("hall/build.rs").unwrap()),
+        kernel::DomainVerdict::NotWritable {
+            reason: kernel::DocumentReason::NotMarkdown
+        }
+    ));
+    assert!(matches!(
+        domain.admits(&Address::parse("hall/Roadmap.md").unwrap()),
+        kernel::DomainVerdict::NotWritable {
+            reason: kernel::DocumentReason::ThePlan
+        }
+    ));
+}
+
+/// A `write:` value that is neither spelling is refused rather than read
+/// as the permissive one.
+#[test]
+fn a_write_reach_that_reads_as_a_typo_is_refused() {
+    let addr = Address::parse("lab").unwrap();
+    let err = evaluate(&addr, "`confidential: false`\n\n`write: anything`\n").unwrap_err();
+    assert_eq!(err.code(), &AxCode::ConfigInvalid);
+    // Absent is Everything: every building written before this line
+    // existed writes what it always wrote.
+    let ordinary = evaluate(&addr, "`confidential: false`\n").unwrap();
+    assert_eq!(ordinary.reach(), crate::DomainReach::Everything);
+}

@@ -350,3 +350,26 @@ fn the_startup_scan_closes_dangling_calls_once_and_reports_the_rest() {
     });
     assert!(closed, "the closing result states the unknown outcome");
 }
+
+/// A city is raised with its approvals delegated to the clerk, and the
+/// delegation is a line of history rather than a default value: the
+/// person can change who answers, and a change needs something to
+/// change.
+#[test]
+fn a_new_city_delegates_its_approvals_to_the_clerk_on_the_record() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    assert_eq!(
+        worker.governance.autonomy,
+        kernel::Autonomy::Delegate(
+            kernel::ResidentId::new(kernel::consts_policy::HALL_CLERK).unwrap()
+        ),
+        "the clerk answers from the moment the city exists, folded back from the ledger"
+    );
+}

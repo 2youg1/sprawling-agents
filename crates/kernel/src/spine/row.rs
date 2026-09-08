@@ -20,6 +20,7 @@ use crate::node_id::NodeId;
 /// sentence where the phrase table belongs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum RoadmapStatus {
     NotStarted,
     InProgress,
@@ -43,6 +44,14 @@ pub const ROADMAP_STATUS_SPELLINGS: [(RoadmapStatus, &str); 5] = [
 /// template — and a plan whose columns disagree with its reader has no
 /// denominator at all.
 pub const ROADMAP_COLUMNS: usize = 6;
+
+/// The name of the plan file, in every building at every depth.
+///
+/// Named here beside the table's own grammar because the file and the
+/// table are one fact: `city` spells the path from it, and
+/// `write_domain` refuses it to a documents domain, so a rename moves
+/// one line rather than three.
+pub const ROADMAP_FILE: &str = "Roadmap.md";
 
 impl RoadmapStatus {
     /// The one spelling, for every writer and every message.

@@ -29,6 +29,9 @@ use crate::policy::BUILDING_FILE;
 /// The rules a new building starts with. Instantiated at compile time so
 /// that a moved or renamed template breaks the build rather than a city.
 const TEMPLATE_RULES: &str = include_str!("../../../docs/templates/BUILDING.md");
+/// City Hall's rules, fixed rather than derived: what its two residents
+/// may do serves every other building, so it is a property of the city.
+const HALL_RULES: &str = include_str!("../../../docs/templates/BUILDING-hall.md");
 const NAME_PLACEHOLDER: &str = "<building name>";
 const ORDINARY_LINE: &str = "`confidential: false`";
 const CONFIDENTIAL_LINE: &str = "`confidential: true`";
@@ -43,6 +46,9 @@ pub enum BuildingTemplate {
     /// Data enters and does not leave, the model pool is local, and
     /// writes stop at this building's own subtree.
     Confidential,
+    /// City Hall: raised with the city, writing Markdown documents and
+    /// never a plan file, holding no project of its own.
+    Hall,
 }
 
 impl BuildingTemplate {
@@ -55,12 +61,13 @@ impl BuildingTemplate {
         match name {
             "minimal" => Ok(BuildingTemplate::Minimal),
             "confidential" => Ok(BuildingTemplate::Confidential),
+            "hall" => Ok(BuildingTemplate::Hall),
             other => Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "read a building template name",
                 other.to_owned(),
             )
-            .with_recovery("this version lays out `minimal` and `confidential`")),
+            .with_recovery("this version lays out `minimal`, `confidential` and `hall`")),
         }
     }
 
@@ -69,6 +76,7 @@ impl BuildingTemplate {
         match self {
             BuildingTemplate::Minimal => "minimal",
             BuildingTemplate::Confidential => "confidential",
+            BuildingTemplate::Hall => "hall",
         }
     }
 
@@ -83,6 +91,9 @@ impl BuildingTemplate {
         let named = TEMPLATE_RULES.replace(NAME_PLACEHOLDER, addr.as_str());
         match self {
             BuildingTemplate::Minimal => Ok(named),
+            // Fixed bytes, and the address is not substituted into them:
+            // City Hall is one address in every city.
+            BuildingTemplate::Hall => Ok(HALL_RULES.to_owned()),
             BuildingTemplate::Confidential => {
                 if !named.contains(ORDINARY_LINE) {
                     return Err(AxError::failure(

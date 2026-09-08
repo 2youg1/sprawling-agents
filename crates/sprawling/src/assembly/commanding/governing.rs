@@ -15,16 +15,39 @@ use super::super::{
 impl RunWorker {
     /// Shuts a scope to new work, or opens it again.
     ///
-    /// Halting is admission control and nothing else: what is already
-    /// running keeps running, because stopping a run in flight is
-    /// `Cancel` and one verb that did two things would leave a person
-    /// unable to ask for either alone. The refusal a halted city gives a
-    /// dispatch says which scope refused and how to open it.
+    /// Halting shuts a scope to new work, and stops the background
+    /// commands that scope already started.
+    ///
+    /// It still does not end a run: stopping a run in flight is
+    /// `Cancel`, and one verb that did both would leave a person unable
+    /// to ask for either alone. What changed (runtime-SPEC 8-28) is that
+    /// a background command is not a run. It is a child process nobody
+    /// could reach, because a run waiting on one is inside a system call
+    /// rather than at a phase boundary; leaving it going would make
+    /// "this city is stopped" false in the one case where it matters
+    /// most. The refusal a halted city gives a dispatch says which scope
+    /// refused and how to open it.
     pub(in crate::assembly) fn set_admission(
         &mut self,
         scope: &channels::HaltScope,
         state: &str,
     ) -> Result<(), AxError> {
+        if state == super::super::HALTED {
+            let within = match scope {
+                channels::HaltScope::City => None,
+                channels::HaltScope::Building(addr) | channels::HaltScope::Workshop(addr) => {
+                    Some(addr.clone())
+                }
+            };
+            let reached = self.backlog.halt(within.as_ref())?;
+            if reached > 0 {
+                self.note(
+                    runtime::diagnostics::Level::Effect,
+                    "runtime::backlog",
+                    &format!("{reached} background commands were stopped"),
+                );
+            }
+        }
         let name = scope_name(scope);
         let mut map = serde_json::Map::new();
         map.insert("scope".to_owned(), serde_json::Value::String(name.clone()));

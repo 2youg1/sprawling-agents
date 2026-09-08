@@ -13,7 +13,7 @@ use memory::JsonlLedger;
 
 use crate::serving::open_vault;
 
-use super::{RunWorker, ScanReport, ledger_dir, now_ms};
+use super::{RunWorker, ScanReport, autonomy_name, ledger_dir, now_ms};
 
 /// The city segment of every prefix, and a file the person is meant to
 /// edit: `init` writes it into the city, and every later run reads that
@@ -142,14 +142,46 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
             .with_recovery("check the city directory is writable")
         })?;
     }
+    // Who answers the approval inbox, written down rather than baked
+    // into a default: the person can appoint somebody else, and a
+    // change needs a line to change.
+    let mut delegation = serde_json::Map::new();
+    delegation.insert(
+        "autonomy".to_owned(),
+        serde_json::Value::String(autonomy_name(&kernel::Autonomy::Delegate(
+            kernel::ResidentId::new(kernel::consts_policy::HALL_CLERK).ok_or_else(|| {
+                AxError::failure(
+                    AxCode::ConfigInvalid,
+                    "appoint the clerk",
+                    kernel::consts_policy::HALL_CLERK.to_owned(),
+                )
+                .with_recovery("a resident id is a non-empty address")
+            })?,
+        ))),
+    );
+    ledger.append(EventDraft {
+        run: RunId::CITY,
+        t: now,
+        who: "city".to_owned(),
+        addr: None,
+        kind: EventKind::AutonomyChanged,
+        data: Payload::new(delegation)?,
+        ig: false,
+    })?;
+    // City Hall, and the two identity files its residents are read
+    // from. Both happen after line zero, because a building is recorded
+    // against a city and there is no city before then.
+    let (vault, _notice) = open_vault();
+    let mut worker = RunWorker::new(city_root, vault, runtime::diagnostics::Diagnostics::off())?;
+    let plan = city::CityPlan::new(None)?;
+    let (hall, template) = plan.hall();
+    worker.create_building(hall.clone(), template.name())?;
+    city::lay_out_hall_identities(city_root)?;
     let mut adopted = Vec::new();
     if let (Adopt::EveryFolder, city::Standing::Work { adoptable, .. }) = (adopt, &standing) {
         // Through the same door `sprawling adopt` uses, so a folder
         // taken in at genesis and one taken in a month later end up
         // governed by the same rules.
-        let (vault, _notice) = open_vault();
-        let mut worker =
-            RunWorker::new(city_root, vault, runtime::diagnostics::Diagnostics::off())?;
         for addr in adoptable {
             worker.adopt_building(addr.clone())?;
             adopted.push(addr.clone());
