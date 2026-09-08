@@ -268,7 +268,7 @@ pub fn web::listing(&web::Snapshot) -> (alloc::vec::Vec<web::SeatRow>, alloc::ve
 pub fn web::matching(&str, alloc::vec::Vec<web::Offer>) -> alloc::vec::Vec<web::Offer>
 pub fn web::opened_at(&[web::Turn]) -> core::option::Option<kernel::locator::GitOid>
 pub fn web::opened_building(core::option::Option<&str>) -> core::option::Option<kernel::address::Address>
-pub fn web::opening_leaf(&channels::answer::BuildingAnswer) -> web::Leaf
+pub fn web::opening_leaf(&channels::answer::building::BuildingAnswer) -> web::Leaf
 pub fn web::page<'a>(impl core::iter::traits::collect::IntoIterator<Item = &'a kernel::event::payload::EventRecord>, &web::Filter, usize) -> web::Page
 pub fn web::painter_order(alloc::vec::Vec<web::Prism>) -> alloc::vec::Vec<web::Prism>
 pub fn web::per_mille(u16) -> alloc::string::String
@@ -400,7 +400,9 @@ pub web::Arrived::Event(alloc::boxed::Box<kernel::event::payload::EventRecord>)
 pub web::Arrived::Refusal(alloc::boxed::Box<kernel::error::shape::AxError>)
 pub web::Arrived::Saying(channels::wire::Delta)
 pub web::AttachForm::admit: alloc::vec::Vec<alloc::string::String>
+pub web::AttachForm::auth_header: alloc::string::String
 pub web::AttachForm::base_url: alloc::string::String
+pub web::AttachForm::declared: alloc::string::String
 pub web::AttachForm::dialect: core::option::Option<kernel::model::wire::DialectKind>
 pub web::AttachForm::name: alloc::string::String
 pub web::AttachForm::secret: core::option::Option<alloc::string::String>
@@ -882,10 +884,14 @@ pub web::Msg::SettingsBaseUrl
 pub web::Msg::SettingsCallIt
 pub web::Msg::SettingsChooseModelHeading
 pub web::Msg::SettingsCodeLabel
+pub web::Msg::SettingsDeclare
+pub web::Msg::SettingsDeclareHint
 pub web::Msg::SettingsDigestConsequence
 pub web::Msg::SettingsDispatchable
 pub web::Msg::SettingsFinishLogin
 pub web::Msg::SettingsForWhichJob
+pub web::Msg::SettingsHeaderHint
+pub web::Msg::SettingsHeaderName
 pub web::Msg::SettingsInterfaceContent
 pub web::Msg::SettingsInterfaceFaces
 pub web::Msg::SettingsInterfaceScope

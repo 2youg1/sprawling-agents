@@ -216,9 +216,14 @@ pub fn read_frame(text: &str) -> LinkEvent;                     // 解析不出�
 ### 8-12 web::settings（P1.12；形状 1 判定＋一个组件）
 
 ```rust
-pub struct AttachForm { pub name, pub base_url, pub dialect: Option<DialectKind>, pub secret: Option<String> }
+pub struct AttachForm { pub name, pub base_url, pub dialect: Option<DialectKind>, pub secret: Option<String>,
+                        pub admit: Vec<String>, pub auth_header: String, pub declared: String }
 pub enum AttachReadiness { Ready, NeedsName, NeedsUrl, UrlNotSafe, NeedsDialect }
 pub fn ready(&AttachForm) -> AttachReadiness;           // 「完整表单」的唯一定义
+impl AttachForm {
+    pub(crate) fn header_name(&self) -> Option<String>;  // 去空白；空即 None，让 dialect 决定
+    pub(crate) fn admitted(&self) -> Vec<String>;        // 勾选的 admit ＋ declared 逐行/逗号拆开，去空白、去重、保序
+}
 pub fn url_is_safe(&str) -> bool;                       // https 任处；http 只到本机
 pub fn attach_command(&AttachForm) -> Option<WireCommand>;   // 未就绪即 None，不造半成品
 pub fn endpoint_rows(&EndpointsAnswer) -> Vec<EndpointRow>;
@@ -233,6 +238,7 @@ pub fn enrolment_note(&Enrolment) -> (Option<String>, String);
 - **URL 安全判据在前端再守一次**：https 任处、http 只到本机。服务端同样守（`native::is_loopback`）；前端这一道不是第二个权威，是让人在**把密钥敲进去之前**就看到拒绝。
 - **未选的标签也列出来且说出后果**（`consequence`）：只列已配置项的设置页，恰好藏起了人来这里要修的那一行。
 - **P3.06 补上了两个表单**：`select_ready`／`select_command`（设置页，同 `ready`／`attach_command` 的形状）与 `city_view::create_command`（城市页）。两处都把服务端会给的拒绝提前到人按下去之前：端点没列的模型选不中，带斜杠的地址建不了楼。**不是第二个权威**：服务端同样拒，这一道只是早说一声。上下文窗与输出上限**不在表单里**（传 0）：它们是模型的事实，服务端持目录；一个人在表单里编出来的上限会在日后截断 Run，而那个理由不会出现在账上。
+- **V4 card 1.3 加两个字段**：`auth_header`（空＝让 dialect 决定：Anthropic 走 `x-api-key`，OpenAI 走 bearer；填了就是显式的头名，服务端以它为准）与 `declared`（人手写的 model id，每行一个或逗号分隔）。`admitted` 是勾选表与手写表的**唯一合并处**：勾选在前、手写在后，去重保序，`attach_command` 只读它。手写表的用处是端点列不出自己的模型（没有 `/models`）时仍能注册：wire 上 `admit` 非空即免探针。**不改 `ready`**：就绪从来不依赖探针跑没跑，手写表因此天然让「接上」可按；把「有手写表才可免探针」写进 `ready` 会成为服务端准入规则的第二个权威，故拒绝。两个字段各自的标签与提示走 `web::lang`，四个键：`Msg::SettingsHeaderName`／`SettingsHeaderHint`／`SettingsDeclare`／`SettingsDeclareHint`。表单上的每一个词都从 `web::lang` 取，所以新字段带来的是四个词条而不是四段字面量——漏译因此在编译期就不可表示。
 - **P1.12 未交付**（已由 P3.06 消掉）：`SelectModel` 还没有表单（今天只能由 `AttachEndpoint` 后走服务端或帧发出）；浏览器内往返仍未驱动。两件都记在 ARCHITECTURE §10 卡下。
 - **产物读数**：278,103 B（gz，本卡后），预算 2 MB，余量 7.5 倍；前值 250,079 B（P1.05）。
 - **框架口径**：Dioxus 0.7 默认提交表单，故 `onsubmit` 里显式 `prevent_default()`（官方迁移指南：<https://dioxuslabs.com/learn/0.7/migration/to_07/>）。

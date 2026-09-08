@@ -23,6 +23,45 @@ pub struct AttachForm {
     /// serves. Empty admits everything, which is what somebody who
     /// never asked meant.
     pub admit: Vec<String>,
+    /// The header the credential travels in. Empty leaves the choice
+    /// to the dialect: an Anthropic key goes in `x-api-key`, an OpenAI
+    /// key in a bearer token. A name written here wins over both.
+    pub auth_header: String,
+    /// Model ids the person wrote down, one per line or comma
+    /// separated. This is what registers when the endpoint cannot list
+    /// its own models, so an attachment needs no probe to succeed.
+    pub declared: String,
+}
+
+impl AttachForm {
+    /// The header name the wire carries: what was written, trimmed, or
+    /// `None` when nothing was, which the server reads as "the
+    /// dialect's own".
+    #[must_use]
+    pub(crate) fn header_name(&self) -> Option<String> {
+        let named = self.auth_header.trim();
+        (!named.is_empty()).then(|| named.to_owned())
+    }
+
+    /// The one merge of what was ticked and what was written: ticked
+    /// first, then the declared ids in the order they were typed, each
+    /// name once, blanks left out. Empty on the wire still means
+    /// "everything served".
+    #[must_use]
+    pub(crate) fn admitted(&self) -> Vec<String> {
+        let mut names: Vec<String> = Vec::new();
+        let written = self
+            .declared
+            .split(['\n', ','])
+            .map(str::trim)
+            .filter(|name| !name.is_empty());
+        for name in self.admit.iter().map(String::as_str).chain(written) {
+            if !names.iter().any(|held| held == name) {
+                names.push(name.to_owned());
+            }
+        }
+        names
+    }
 }
 
 /// Why a form cannot be submitted yet, or that it can. Exhaustive, so

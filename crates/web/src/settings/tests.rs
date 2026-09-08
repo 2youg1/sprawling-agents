@@ -126,6 +126,8 @@ fn a_credential_may_not_cross_a_plaintext_link_off_this_machine() {
         dialect: Some(DialectKind::OpenAi),
         secret: Some("secret:house/key".to_owned()),
         admit: Vec::new(),
+        auth_header: String::new(),
+        declared: String::new(),
     };
     assert_eq!(ready(&form), AttachReadiness::UrlNotSafe);
     assert!(
@@ -167,6 +169,8 @@ fn an_unready_form_yields_no_command_at_all() {
         dialect: Some(DialectKind::OpenAi),
         secret: None,
         admit: Vec::new(),
+        auth_header: String::new(),
+        declared: String::new(),
     };
     assert!(
         crate::command::attach_command(&form).is_none(),
@@ -235,5 +239,67 @@ fn the_page_answers_whether_this_city_can_be_dispatched_to() {
             .find(|row| row.tag == ModelTag::Main)
             .is_some_and(|row| crate::lang::phrase(row.consequence).en.contains("refused")),
         "the page states the consequence a person is about to hit"
+    );
+}
+
+#[test]
+fn declared_models_join_the_ticked_ones_once_each_in_the_order_written() {
+    let form = AttachForm {
+        admit: vec!["m-large".to_owned(), "m-small".to_owned()],
+        declared: " m-small, m-vision \n\n m-large \nm-vision,,m-code ".to_owned(),
+        ..AttachForm::default()
+    };
+    assert_eq!(
+        form.admitted(),
+        vec!["m-large", "m-small", "m-vision", "m-code"],
+        "ticked first, then what was written; a name twice is one name; blanks are not names"
+    );
+    assert!(
+        AttachForm::default().admitted().is_empty(),
+        "nothing ticked and nothing written admits everything, which is an empty list on the wire"
+    );
+}
+
+#[test]
+fn an_empty_header_name_leaves_the_choice_to_the_dialect() {
+    let mut form = AttachForm::default();
+    assert_eq!(form.header_name(), None);
+    form.auth_header = "   ".to_owned();
+    assert_eq!(form.header_name(), None, "blank is empty");
+    form.auth_header = " x-goog-api-key ".to_owned();
+    assert_eq!(form.header_name().as_deref(), Some("x-goog-api-key"));
+}
+
+#[test]
+fn a_ready_form_sends_its_header_name_and_its_declared_models_on_both_verbs() {
+    let form = AttachForm {
+        name: "house".to_owned(),
+        base_url: "https://api.example.test/v1".to_owned(),
+        dialect: Some(DialectKind::Anthropic),
+        secret: Some("secret:house/key".to_owned()),
+        admit: Vec::new(),
+        auth_header: " x-api-key ".to_owned(),
+        declared: "claude-a\nclaude-b".to_owned(),
+    };
+    let Some(WireCommand::AttachEndpoint {
+        auth_header, admit, ..
+    }) = crate::command::attach_command(&form)
+    else {
+        panic!("a ready form asks to attach");
+    };
+    assert_eq!(auth_header.as_deref(), Some("x-api-key"));
+    assert_eq!(
+        admit,
+        vec!["claude-a", "claude-b"],
+        "what was written registers when the endpoint cannot list its models"
+    );
+    let Some(WireCommand::ProbeEndpoint { auth_header, .. }) = crate::command::probe_command(&form)
+    else {
+        panic!("a ready form may ask what it serves");
+    };
+    assert_eq!(
+        auth_header.as_deref(),
+        Some("x-api-key"),
+        "the probe asks with the same header the attachment will use"
     );
 }

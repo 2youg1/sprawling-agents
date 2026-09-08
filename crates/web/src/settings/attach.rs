@@ -105,6 +105,19 @@ pub fn AttachFormView(
                         "{word(Msg::SettingsKeyHint)}"
                     }
                 }
+                // Which header the key travels in. Empty is a choice too:
+                // the dialect picks its own, and a provider that takes a
+                // different one is named here rather than guessed at.
+                div { class: "field",
+                    label { r#for: "attach-header", "{word(Msg::SettingsHeaderName)}" }
+                    input {
+                        id: "attach-header",
+                        name: "auth_header",
+                        value: "{form.read().auth_header}",
+                        oninput: move |event| form.write().auth_header = event.value(),
+                    }
+                    span { class: "hint", "{word(Msg::SettingsHeaderHint)}" }
+                }
                 button {
                     r#type: "button",
                     disabled: secret_key.read().trim().is_empty()
@@ -170,6 +183,19 @@ pub fn AttachFormView(
                         }
                         span { class: "hint", "{word(Msg::SettingsAdmitAll)}" }
                     }
+                }
+                // The list a person writes down themselves. An endpoint
+                // that cannot list its models registers exactly this,
+                // with no probe in between.
+                div { class: "field wide",
+                    label { r#for: "attach-declared", "{word(Msg::SettingsDeclare)}" }
+                    textarea {
+                        id: "attach-declared",
+                        name: "declared",
+                        value: "{form.read().declared}",
+                        oninput: move |event| form.write().declared = event.value(),
+                    }
+                    span { class: "hint", "{word(Msg::SettingsDeclareHint)}" }
                 }
                 div { class: "field wide submit",
                     button {

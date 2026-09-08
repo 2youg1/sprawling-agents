@@ -541,6 +541,10 @@ pub enum Msg {
     SettingsAskWhatItServes,
     SettingsServes,
     SettingsAdmitAll,
+    SettingsHeaderName,
+    SettingsHeaderHint,
+    SettingsDeclare,
+    SettingsDeclareHint,
     SettingsSignIn,
     SettingsProvider,
     SettingsStartLogin,
@@ -2177,6 +2181,22 @@ pub fn phrase(msg: Msg) -> Phrase {
             en: "nothing ticked admits everything it serves",
             zh: "一个都不勾即全部准入",
         },
+        Msg::SettingsHeaderName => Phrase {
+            en: "header name (optional)",
+            zh: "请求头名（可不填）",
+        },
+        Msg::SettingsHeaderHint => Phrase {
+            en: "empty lets the wire decide: an Anthropic key goes in x-api-key by itself, an OpenAI key in a bearer token; a name written here wins over both",
+            zh: "留空由线格式决定：Anthropic 的密钥自动走 x-api-key，OpenAI 的走 bearer token；这里写了名字就以它为准",
+        },
+        Msg::SettingsDeclare => Phrase {
+            en: "models to admit",
+            zh: "准入的模型",
+        },
+        Msg::SettingsDeclareHint => Phrase {
+            en: "one per line or comma separated; this is what registers when the endpoint cannot list its own models",
+            zh: "每行一个或用逗号分隔；端点列不出自己的模型时，注册的就是这份",
+        },
         Msg::SettingsSignIn => Phrase {
             en: "Sign in with a subscription",
             zh: "用订阅登录",
@@ -2805,6 +2825,10 @@ mod tests {
             Msg::SettingsAskWhatItServes,
             Msg::SettingsServes,
             Msg::SettingsAdmitAll,
+            Msg::SettingsHeaderName,
+            Msg::SettingsHeaderHint,
+            Msg::SettingsDeclare,
+            Msg::SettingsDeclareHint,
             Msg::SettingsSignIn,
             Msg::SettingsProvider,
             Msg::SettingsStartLogin,
@@ -3234,6 +3258,10 @@ mod tests {
                 | Msg::SettingsAskWhatItServes
                 | Msg::SettingsServes
                 | Msg::SettingsAdmitAll
+                | Msg::SettingsHeaderName
+                | Msg::SettingsHeaderHint
+                | Msg::SettingsDeclare
+                | Msg::SettingsDeclareHint
                 | Msg::SettingsSignIn
                 | Msg::SettingsProvider
                 | Msg::SettingsStartLogin

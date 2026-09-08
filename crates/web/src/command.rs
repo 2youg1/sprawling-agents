@@ -114,8 +114,11 @@ pub fn attach_command(form: &AttachForm) -> Option<WireCommand> {
         base_url,
         dialect: form.dialect?,
         secret: form.secret.clone(),
-        auth_header: None,
-        admit: form.admit.clone(),
+        auth_header: form.header_name(),
+        // Ticked and written, merged once in `admitted`: a list the
+        // person wrote is what registers when the endpoint cannot
+        // list its own models.
+        admit: form.admitted(),
     })
 }
 
@@ -145,7 +148,7 @@ pub fn probe_command(form: &AttachForm) -> Option<WireCommand> {
         base_url,
         dialect: form.dialect?,
         secret: form.secret.clone(),
-        auth_header: None,
+        auth_header: form.header_name(),
     })
 }
 
