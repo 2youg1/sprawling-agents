@@ -11,12 +11,8 @@
 //! Terminal-only watchdogs kill recoverable sessions; that lesson is the
 //! reason this type exists.
 
-use kernel::{AxCode, AxError, Payload, StallVerdict};
+use kernel::{AxCode, AxError, Payload, StallVerdict, TimeMs};
 use serde_json::{Map, Value};
-
-/// Provider retries before the run freezes; a data-plane engineering
-/// constant (changes pass through runtime-SPEC).
-pub(crate) const WATCHDOG_PROVIDER_RETRIES: u32 = 2;
 
 /// One watchdog per run: it holds the correction history, nothing else.
 #[derive(Debug, Default)]
@@ -30,21 +26,30 @@ pub struct Watchdog {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Disposal {
     Proceed,
-    CorrectiveSteer { text: String },
-    Freeze { reason: FreezeReason },
+    CorrectiveSteer {
+        text: String,
+    },
+    /// Try the same call again, not before this moment. The moment is
+    /// the provider's own, carried in from `gateway::admission`.
+    BackOff {
+        until: TimeMs,
+    },
+    Freeze {
+        reason: FreezeReason,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FreezeReason {
     Stall,
-    ProviderExhausted,
+    ProviderRefused,
 }
 
 impl FreezeReason {
     fn as_str(self) -> &'static str {
         match self {
             FreezeReason::Stall => "stall",
-            FreezeReason::ProviderExhausted => "provider_exhausted",
+            FreezeReason::ProviderRefused => "provider_refused",
         }
     }
 }
@@ -77,15 +82,24 @@ impl Watchdog {
         }
     }
 
-    /// Provider failures retry (the retry itself is the run loop's move)
-    /// until the budget is spent, then freeze.
-    pub fn on_provider_failure(&mut self) -> Disposal {
+    /// Classifies one provider failure. The producer of the error
+    /// already decided whether the same call is worth making again, so
+    /// this reads `AxError::is_retriable` rather than guessing a second
+    /// time from a count of attempts.
+    ///
+    /// A non-retriable failure freezes on the first one: repeating a
+    /// request the provider has already rejected on its shape buys the
+    /// same rejection again. A retriable one backs off to `not_before`
+    /// — which the caller takes from `gateway::admission`, where the
+    /// provider's own `retry-after` was folded in — and **never freezes
+    /// on its own**. What stops it is `Halt`, the city's one brake.
+    pub fn on_provider_failure(&mut self, failure: &AxError, not_before: TimeMs) -> Disposal {
         self.provider_failures = self.provider_failures.saturating_add(1);
-        if self.provider_failures <= WATCHDOG_PROVIDER_RETRIES {
-            Disposal::Proceed
+        if failure.is_retriable() {
+            Disposal::BackOff { until: not_before }
         } else {
             Disposal::Freeze {
-                reason: FreezeReason::ProviderExhausted,
+                reason: FreezeReason::ProviderRefused,
             }
         }
     }
@@ -105,6 +119,10 @@ impl Watchdog {
             Disposal::CorrectiveSteer { text } => {
                 map.insert("action".to_owned(), Value::String("steer".to_owned()));
                 map.insert("text".to_owned(), Value::String(text.clone()));
+            }
+            Disposal::BackOff { until } => {
+                map.insert("action".to_owned(), Value::String("back_off".to_owned()));
+                map.insert("until_ms".to_owned(), Value::Number(until.value().into()));
             }
             Disposal::Freeze { reason } => {
                 map.insert("action".to_owned(), Value::String("freeze".to_owned()));
@@ -172,16 +190,43 @@ mod tests {
         assert_eq!(dog.on_stall(&StallVerdict::Ok), Disposal::Proceed);
     }
 
+    fn provider_error(retriable: bool) -> AxError {
+        let err = AxError::failure(AxCode::Provider, "call the model", "the provider said no");
+        if retriable { err.retriable() } else { err }
+    }
+
     #[test]
-    fn provider_failures_retry_then_freeze() {
+    fn a_failure_the_provider_will_repeat_stops_after_one() {
         let mut dog = Watchdog::new();
-        assert_eq!(dog.on_provider_failure(), Disposal::Proceed);
-        assert_eq!(dog.on_provider_failure(), Disposal::Proceed);
         assert_eq!(
-            dog.on_provider_failure(),
+            dog.on_provider_failure(&provider_error(false), TimeMs::new(9_000)),
             Disposal::Freeze {
-                reason: FreezeReason::ProviderExhausted
-            }
+                reason: FreezeReason::ProviderRefused
+            },
+            "a request the provider rejected on its shape buys the same rejection again"
         );
+    }
+
+    #[test]
+    fn a_retriable_failure_backs_off_and_never_freezes_by_itself() {
+        let mut dog = Watchdog::new();
+        for round in 0..64u64 {
+            let until = TimeMs::new(round.saturating_mul(250).saturating_add(1_000));
+            assert_eq!(
+                dog.on_provider_failure(&provider_error(true), until),
+                Disposal::BackOff { until },
+                "only Halt stops a run that is waiting out a provider"
+            );
+        }
+        let payload = serde_json::to_value(
+            dog.fired_payload(&Disposal::BackOff {
+                until: TimeMs::new(1_000),
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(payload["action"], "back_off");
+        assert_eq!(payload["until_ms"], 1_000);
+        assert_eq!(payload["provider_failures"], 64);
     }
 }

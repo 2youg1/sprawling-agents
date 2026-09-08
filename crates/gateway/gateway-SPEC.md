@@ -297,16 +297,20 @@ impl AttachedEndpoint {
     pub fn models_url(&self) -> String;
 }
 pub struct EndpointBook { /* 私有：endpoints、chosen */ }
+pub struct Chosen<'b> { pub endpoint: &'b AttachedEndpoint, pub entry: &'b ModelEntry,
+                        pub fallback: &'b Fallback }   // card-11.9：一次取模型答的是「用哪个」与「不答时怎么办」两问
 impl EndpointBook {
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError>;
     pub fn apply_payload(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError>;
     pub fn select(&self, tag: ModelTag, policy: &BuildingPolicy) -> Result<Chosen<'_>, AxError>;
     pub fn endpoints(&self) -> impl Iterator<Item = &AttachedEndpoint>;
-    pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry)>;
+    pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry, &Fallback)>;
 }
 pub fn attached_payload(&AttachedEndpoint) -> Result<Payload, AxError>;      // endpoint_attached 唯一成形处
-pub fn selected_payload(ModelTag, &str, &ModelEntry) -> Result<Payload, AxError>;  // model_selected 同上
+pub fn selected_payload(ModelTag, &str, &ModelEntry, &Fallback) -> Result<Payload, AxError>;  // model_selected 同上
 ```
+
+- **card-11.9：`Fallback` 随选择入簿，缺键读作 `Fallback::None`。** `selected_payload` 写 `fallback_endpoint` 与 `fallback_model` 两键，且只在 `Then` 时写；`read_choice` 读不到就取 `None`。本键之前写下的每一条 `model_selected` 因此重放不变，而且重放出的是**默认值本身该是的那个**：一份旧历史不会因为这张卡而获得一条谁都没设过的退路。
 
 - **为何不是 duty pool**：多 Agent 功能未成形之前，职责池没有消费者，而没人读的权威只会漂。降为 `ModelTag` 两值枚举（`Main`／`Digest`）：**标签因为有人按它取模型而存在**，新增一个标签的前提是先有调用方。
 - **两个入口一个读者**：`apply`（重建路径，手里是 record）与 `apply_payload`（写入路径，手里是刚要写的 payload）共用同一套载荷读取，于是「写者以为的」与「重建得到的」不可能分岔。
@@ -330,6 +334,37 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<String>, AxEr
 **「路径归兼容格式」现在也管凭证头**：Anthropic 的 API key 走 `x-api-key`（`Authorization: Bearer` 只发给短时联邦令牌），OpenAI 兼容格式走 `Bearer`；人显式填的头名恒优先。见 §8-9 `AuthSpec::for_dialect`。落选的是「让登记页必填头名」：那把一个兼容格式自己就知道的事推给了人，而人填错的代价是一个 401。
 
 **`adapter_for` 住 `endpoint/adapter.rs`（card-3.3）**：装配线（哪个 chosen 走 Native、哪个走 Endpoint）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。`CALL_TIMEOUT_MS` 随它搬家（没人读的数字没人能辩护）。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（兼容格式要的头是兼容格式的事，搬家留待后卡：`dialect_headers` 住凭据是历史位置，本卡只动 adapter 线）。
+
+### 8-11 gateway::fallback（card-11.9；形状 2 值）
+
+```rust
+#[non_exhaustive] pub enum Fallback { None, #[non_exhaustive] Then { endpoint: String, model: String } }
+impl Default for Fallback { fn default() -> Fallback { Fallback::None } }
+impl Fallback {
+    pub fn then(endpoint: &str, model: &str) -> Result<Fallback, AxError>;  // 空串在构造点拒（E_CONFIG_INVALID）
+    pub fn endpoint(&self) -> Option<&str>;
+    pub fn model(&self) -> Option<&str>;
+    pub fn retreat(&self, now: TimeMs, admission: &AdmissionState) -> Retreat;
+}
+#[non_exhaustive] pub enum Retreat {
+    Freeze,                                                     // None：这次 Run 就此冻住，理由入帐
+    #[non_exhaustive] MoveTo { endpoint: String, model: String, not_before: TimeMs },  // Then：退避到此刻之后再动
+}
+pub fn retreat_payload(tag: ModelTag, from: &str, retreat: &Retreat, because: &AxError)
+    -> Result<Payload, AxError>;   // provider_degraded 载荷，两臂各一句
+```
+
+**枚举逐变体（`Fallback`）**：`None` ——标签的 endpoint 不答时不另找人，Run 冻住，理由写进 Ledger；`Then` ——按 `admission` 退避之后把活挪到具名的 endpoint 与 model 上。**默认是 `None`**：在无人过问的情况下替一个人换掉他的模型，是一个默认值最不该做的那个决定——换模型改的是答案的质量、价钱与数据去处三件事，而这三件事恰好都是人自己挑 endpoint 时在挑的东西。
+
+**枚举逐变体（`Retreat`）**：`Freeze` 不带理由，因为理由是调用方手里那个 `AxError`，抄一份就是给同一个事实立第二个权威；`MoveTo` 带 `not_before`，它就是 `AdmissionState::admit` 给出的 `Hold { until }`——退避的算法（AIMD、provider 自己的 retry-after 取大者）已经住在 §8-6，这里不重算一遍。`admit` 答 `Admit` 时 `not_before` 取 `now`。
+
+**挪窝本身是一件事，不是一次静默的重试。** 两臂都产 `provider_degraded` 载荷（`E_PROVIDER` 的 carrier，record-only）：`action` 为 `freeze` 或 `move_to`，`tag`／`from`／`code`／`subject` 恒在，`move_to` 另带 `to_endpoint`／`to_model`／`not_before_ms`。载荷全整数，无浮点。**本 crate 不持 Ledger 句柄**（§7），故成形在此、入帐在装配层——这与 `attached_payload`／`selected_payload` 同一口径。
+
+**为什么是值不是判定**：`Fallback` 的不变量（`Then` 的两个名字都非空）只在一个构造点上守，无 setter，这正是形状 2 的判据；`retreat` 是它身上的一个纯查询，不改自身、不采样时钟、不做 I/O。
+
+**枚举变体的字段没有「私有」这一档。** Rust 里 `Then { endpoint, model }` 的两个字段随枚举一同公开，于是一个结构体字面量就能绕过 `then` 写出两个空串。封住它的是**变体上的 `#[non_exhaustive]`**：crate 之外写不出该字面量，只能走构造函数；`Retreat::MoveTo` 同理。枚举上的 `#[non_exhaustive]` 只管匹配不管构造，两道都要标。
+
+**人还不能设置它。** 设置面在设置页，而设置页归 `crates/web` 与线上的 `AttachEndpoint`／`SelectModel` 帧；本卡不动线（另一位在改），故城内今天写下的每一条 `model_selected` 都带 `Fallback::None`。线上欠的那一个字段记在本卡报告里。
 
 ## 8.5 两个设计（crate 级）
 
@@ -366,7 +401,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 
 ## 14 硬编码声明
 
-admission 三常量（§8-6）；oauth_profiles 表（§8-5，数据面即定义处）；market 内置目录（`builtin()`，S3 收录城内实际使用的模型行，价目随 Stage 复核）。三者全 pub(crate) 数据面，改动须本 SPEC 同集变更。
+admission 三常量（§8-6）；`Fallback` 的默认值 `None`（§8-11，它是一条策略而非一个数字，改它须本 SPEC 同集）；oauth_profiles 表（§8-5，数据面即定义处）；market 内置目录（`builtin()`，S3 收录城内实际使用的模型行，价目随 Stage 复核）。三者全 pub(crate) 数据面，改动须本 SPEC 同集变更。
 
 ## 15 影响面
 

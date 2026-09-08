@@ -22,6 +22,7 @@ use kernel::{AxCode, AxError, DialectKind, ModelTag, Payload, SecretRef, UsdMicr
 use serde_json::{Map, Value};
 
 use crate::endpoint::AuthSpec;
+use crate::fallback::Fallback;
 use crate::market::{InputKinds, ModelEntry};
 
 use super::attached::AttachedEndpoint;
@@ -77,11 +78,22 @@ pub fn selected_payload(
     tag: ModelTag,
     endpoint: &str,
     entry: &ModelEntry,
+    fallback: &Fallback,
 ) -> Result<Payload, AxError> {
     let mut map = Map::new();
     map.insert("tag".to_owned(), Value::String(tag.as_str().to_owned()));
     map.insert("endpoint".to_owned(), Value::String(endpoint.to_owned()));
     map.insert("model".to_owned(), Value::String(entry.id.clone()));
+    // Written only by the retreating arm, so `None` is spelled by the
+    // absence of the keys — which is also how every record written
+    // before this card spells it.
+    if let (Some(name), Some(id)) = (fallback.endpoint(), fallback.model()) {
+        map.insert(
+            "fallback_endpoint".to_owned(),
+            Value::String(name.to_owned()),
+        );
+        map.insert("fallback_model".to_owned(), Value::String(id.to_owned()));
+    }
     map.insert(
         "context_tokens".to_owned(),
         Value::Number(entry.context_tokens.into()),
@@ -203,11 +215,33 @@ pub(crate) fn read_choice(payload: &Payload) -> Result<(ModelTag, Choice), AxErr
         cache_read_price: UsdMicros::new(count(payload, "cache_read_price")?),
         cache_write_price: UsdMicros::new(count(payload, "cache_write_price")?),
     };
+    // Both keys or neither: a half-written retreat names a model with
+    // no endpoint to reach it at, and guessing the missing half is the
+    // silent model switch this whole value exists to forbid.
+    let fallback = match (
+        payload
+            .as_map()
+            .get("fallback_endpoint")
+            .and_then(Value::as_str),
+        payload
+            .as_map()
+            .get("fallback_model")
+            .and_then(Value::as_str),
+    ) {
+        (Some(name), Some(id)) => Fallback::then(name, id)?,
+        (None, None) => Fallback::None,
+        _ => {
+            return Err(invalid(
+                "a fallback names only half of an endpoint and a model",
+            ));
+        }
+    };
     Ok((
         tag,
         Choice {
             endpoint: text(payload, "endpoint")?,
             entry,
+            fallback,
         },
     ))
 }

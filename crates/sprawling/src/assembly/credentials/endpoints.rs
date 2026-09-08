@@ -275,7 +275,11 @@ impl RunWorker {
                 .unwrap_or_default(),
             cache_write_price: priced.map(|row| row.cache_write_price).unwrap_or_default(),
         };
-        let payload = gateway::selected_payload(tag, &endpoint, &entry)?;
+        // `Fallback::None` until a person can say otherwise: the wire
+        // has no field for a retreat yet, and a default that switched
+        // someone's model would be the one decision a default may not
+        // make.
+        let payload = gateway::selected_payload(tag, &endpoint, &entry, &gateway::Fallback::None)?;
         self.record(EventKind::ModelSelected, payload)
     }
 

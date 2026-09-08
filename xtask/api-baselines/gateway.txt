@@ -1,8 +1,12 @@
 #[non_exhaustive] pub enum gateway::AuthSpec
 #[non_exhaustive] pub enum gateway::CostSource
+#[non_exhaustive] pub enum gateway::Fallback
 #[non_exhaustive] pub enum gateway::InputKinds
 #[non_exhaustive] pub enum gateway::Persistence
 #[non_exhaustive] pub enum gateway::ProviderOutcome
+#[non_exhaustive] pub enum gateway::Retreat
+#[non_exhaustive] pub gateway::Fallback::Then
+#[non_exhaustive] pub gateway::Retreat::MoveTo
 impl core::default::Default for gateway::AdmissionState
 impl core::fmt::Debug for gateway::OauthTokens
 impl gateway::AdmissionState
@@ -12,6 +16,7 @@ impl gateway::Custodian
 impl gateway::Endpoint
 impl gateway::Endpoint
 impl gateway::EndpointBook
+impl gateway::Fallback
 impl gateway::ImageBytes
 impl gateway::MarketSnapshot
 impl gateway::Native
@@ -46,11 +51,15 @@ pub fn gateway::Endpoint::list_models(&self, &str) -> core::result::Result<alloc
 pub fn gateway::Endpoint::new(gateway::EndpointConfig, gateway::Redemption) -> core::result::Result<gateway::Endpoint, kernel::error::shape::AxError>
 pub fn gateway::EndpointBook::apply(&mut self, &kernel::event::payload::EventRecord) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn gateway::EndpointBook::apply_payload(&mut self, kernel::event::kind::EventKind, &kernel::event::payload::Payload) -> core::result::Result<(), kernel::error::shape::AxError>
-pub fn gateway::EndpointBook::choices(&self) -> impl core::iter::traits::iterator::Iterator<Item = (kernel::model::wire::ModelTag, &str, &gateway::ModelEntry)>
+pub fn gateway::EndpointBook::choices(&self) -> impl core::iter::traits::iterator::Iterator<Item = (kernel::model::wire::ModelTag, &str, &gateway::ModelEntry, &gateway::Fallback)>
 pub fn gateway::EndpointBook::endpoints(&self) -> impl core::iter::traits::iterator::Iterator<Item = &gateway::AttachedEndpoint>
 pub fn gateway::EndpointBook::is_empty(&self) -> bool
 pub fn gateway::EndpointBook::new() -> gateway::EndpointBook
 pub fn gateway::EndpointBook::select(&self, kernel::model::wire::ModelTag, &kernel::model::wire::BuildingPolicy) -> core::result::Result<gateway::Chosen<'_>, kernel::error::shape::AxError>
+pub fn gateway::Fallback::endpoint(&self) -> core::option::Option<&str>
+pub fn gateway::Fallback::model(&self) -> core::option::Option<&str>
+pub fn gateway::Fallback::retreat(&self, kernel::event::identity::TimeMs, &gateway::AdmissionState) -> gateway::Retreat
+pub fn gateway::Fallback::then(&str, &str) -> core::result::Result<gateway::Fallback, kernel::error::shape::AxError>
 pub fn gateway::ImageBytes::insert(&mut self, &kernel::locator::Locator, alloc::vec::Vec<u8>)
 pub fn gateway::ImageBytes::is_empty(&self) -> bool
 pub fn gateway::ImageBytes::len(&self) -> usize
@@ -77,7 +86,8 @@ pub fn gateway::profile(&str) -> core::option::Option<&'static gateway::OauthPro
 pub fn gateway::request_wire(kernel::model::wire::DialectKind, &kernel::model::wire::ChatRequest, &gateway::ImageBytes) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
 pub fn gateway::response_from_wire(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::result::Result<kernel::model::wire::ChatResponse, kernel::error::shape::AxError>
 pub fn gateway::response_wire(kernel::model::wire::DialectKind, &kernel::model::wire::ChatResponse) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
-pub fn gateway::selected_payload(kernel::model::wire::ModelTag, &str, &gateway::ModelEntry) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn gateway::retreat_payload(kernel::model::wire::ModelTag, &str, &gateway::Retreat, &kernel::error::shape::AxError) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn gateway::selected_payload(kernel::model::wire::ModelTag, &str, &gateway::ModelEntry, &gateway::Fallback) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn gateway::settle(&kernel::model::wire::ModelUsage, core::option::Option<kernel::budget::UsdMicros>, &gateway::ModelEntry) -> core::result::Result<gateway::CallCost, kernel::error::shape::AxError>
 pub fn gateway::settled_from_stream(kernel::model::wire::DialectKind, &[serde_json::value::Value]) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
 pub gateway::AdmissionVerdict::Admit
@@ -101,6 +111,7 @@ pub gateway::Captured::events: alloc::vec::Vec<kernel::event::payload::Payload>
 pub gateway::Captured::replaced: alloc::vec::Vec<u8>
 pub gateway::Chosen::endpoint: &'b gateway::AttachedEndpoint
 pub gateway::Chosen::entry: &'b gateway::ModelEntry
+pub gateway::Chosen::fallback: &'b gateway::Fallback
 pub gateway::CostSource::Authoritative
 pub gateway::CostSource::PriceSheet
 pub gateway::Described::configured: bool
@@ -115,6 +126,9 @@ pub gateway::EndpointConfig::model: alloc::string::String
 pub gateway::EndpointConfig::overrides: alloc::vec::Vec<(alloc::string::String, serde_json::value::Value)>
 pub gateway::EndpointConfig::pricing: core::option::Option<gateway::ModelEntry>
 pub gateway::EndpointConfig::timeout_ms: u64
+pub gateway::Fallback::None
+pub gateway::Fallback::Then::endpoint: alloc::string::String
+pub gateway::Fallback::Then::model: alloc::string::String
 pub gateway::InputKinds::Text
 pub gateway::InputKinds::TextImage
 pub gateway::ModelEntry::cache_read_price: kernel::budget::UsdMicros
@@ -149,6 +163,10 @@ pub gateway::ProviderOutcome::Failed
 pub gateway::ProviderOutcome::Ok
 pub gateway::ProviderOutcome::RateLimited
 pub gateway::ProviderOutcome::RateLimited::retry_after_ms: core::option::Option<u64>
+pub gateway::Retreat::Freeze
+pub gateway::Retreat::MoveTo::endpoint: alloc::string::String
+pub gateway::Retreat::MoveTo::model: alloc::string::String
+pub gateway::Retreat::MoveTo::not_before: kernel::event::identity::TimeMs
 pub gateway::TokenRequest::body: alloc::string::String
 pub gateway::TokenRequest::url: alloc::string::String
 pub mod gateway
