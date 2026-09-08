@@ -1,10 +1,12 @@
 # What ci.yml deliberately does not ask on every push.
 #
-# Two claims live here, and both are about machines rather than about a
-# change. A4/V8 assert byte identity across platforms, so a platform this
-# workflow does not run is a promise rather than a fact. V5 proves eleven
-# kernel properties against real MIR, which is Linux-only upstream and
-# minutes long either way.
+# Three claims live here, and all three are about machines rather than
+# about a change. A4/V8 assert byte identity across platforms, so a
+# platform this workflow does not run is a promise rather than a fact. V5
+# proves eleven kernel properties against real MIR, which is Linux-only
+# upstream and minutes long either way. The flake claims a person on NixOS
+# can build this tree with the Rust version `rust-toolchain.toml` names,
+# and only an evaluation of the flake can say whether that is so.
 #
 # They run on a schedule and on demand instead of on every push because a
 # gate nobody waits for is a gate nobody runs - and a twenty-minute wait
@@ -28,8 +30,10 @@ jobs:
   # before a run is never missed by an off-by-one. Asking by hand always
   # runs: `workflow_dispatch` is itself the answer to "is this worth a
   # runner". The commit date comes from git rather than from an API, so
-  # this job needs nothing but a checkout - it is why ubuntu is legal
-  # here despite P4.02, which ruled the platform out of *builds*.
+  # this job needs nothing but a checkout, so it was legal on ubuntu even
+  # while P4.02 kept Linux out of the builds. P4.02 has since been
+  # re-argued (sprawling-SPEC.md section 8-9): a native Linux runner never
+  # touches a cross toolchain, which was the whole of the original reason.
   moved:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -95,6 +99,36 @@ jobs:
         if: always()
         shell: bash
         run: rm -rf target/tests
+
+  # The flake, judged the only way a flake can be judged: by evaluating it.
+  #
+  # Nightly rather than push, on the same policy as the macOS leg above,
+  # and for a reason particular to Nix: it does not share
+  # `Swatinem/rust-cache`, so without a binary cache one build compiles
+  # the whole dependency graph from zero and far exceeds the push
+  # pipeline's time budget. Nobody waits for this verdict, so it costs a
+  # schedule nothing.
+  #
+  # `nix flake check` is what enforces the load-bearing rule: the flake
+  # derives its Rust version from `rust-toolchain.toml`, and
+  # `checks.toolchain-version-is-derived` turns a flake wanting any other
+  # version red. `nix build` then proves the devshell's toolchain can
+  # actually build the binary on a Linux the release now ships for.
+  nix:
+    needs: moved
+    if: needs.moved.outputs.verdict == 'run'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: the version is derived, not restated
+        run: nix flake check --print-build-logs
+      - name: the binary this flake's toolchain builds
+        run: nix build .#default --print-build-logs
 
   # V5: the four propositions only a proof can hold. Linux-only upstream -
   # the one ubuntu build left in the pipeline, kept because the tool runs
