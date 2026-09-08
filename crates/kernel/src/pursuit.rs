@@ -42,6 +42,7 @@ use crate::node_id::NodeId;
 /// deserialisable is [`Pursuit`] itself — and that still is not.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PursuitState {
     Running,
     Paused,

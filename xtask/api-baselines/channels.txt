@@ -27,6 +27,7 @@ pub channels::Answer::Archive(channels::ArchiveAnswer)
 pub channels::Answer::Building(alloc::boxed::Box<channels::BuildingAnswer>)
 pub channels::Answer::Changes(channels::ChangesAnswer)
 pub channels::Answer::City(channels::CityAnswer)
+pub channels::Answer::Commit(channels::CommitAnswer)
 pub channels::Answer::Cost(alloc::boxed::Box<channels::CostAnswer>)
 pub channels::Answer::Discards(channels::DiscardAnswer)
 pub channels::Answer::Endpoints(channels::EndpointsAnswer)
@@ -196,6 +197,13 @@ pub channels::Command::Wake::body: alloc::string::String
 pub channels::Command::Wake::idem: kernel::idem::IdemKey
 pub channels::Command::Wake::source: alloc::string::String
 pub channels::Command::Wake::subject: alloc::string::String
+pub channels::CommitAnswer::actor: kernel::address::Address
+pub channels::CommitAnswer::effort: core::option::Option<kernel::model::wire::Effort>
+pub channels::CommitAnswer::model: alloc::string::String
+pub channels::CommitAnswer::oid: kernel::locator::GitOid
+pub channels::CommitAnswer::run: kernel::event::identity::RunId
+pub channels::CommitAnswer::seq: kernel::event::identity::Seq
+pub channels::CommitAnswer::session: core::option::Option<kernel::address::SessionName>
 pub channels::ControlVerdict::Intervene
 pub channels::ControlVerdict::Intervene::must_write_handoff: bool
 pub channels::ControlVerdict::Intervene::run: core::option::Option<kernel::event::identity::RunId>
@@ -284,6 +292,8 @@ pub channels::Query::Changes
 pub channels::Query::Changes::base: kernel::locator::GitOid
 pub channels::Query::Changes::head: core::option::Option<kernel::locator::GitOid>
 pub channels::Query::CityView
+pub channels::Query::Commit
+pub channels::Query::Commit::oid: kernel::locator::GitOid
 pub channels::Query::CostView
 pub channels::Query::DiscardView
 pub channels::Query::EndpointView
@@ -349,7 +359,7 @@ pub channels::Welcome::schema: kernel::locator::B3Hash
 pub channels::Welcome::wire_v: u32
 pub const channels::COMMAND_NAMES: [&str; 23]
 pub const channels::HISTORY_MAX: u32
-pub const channels::QUERY_NAMES: [&str; 14]
+pub const channels::QUERY_NAMES: [&str; 15]
 pub const channels::WIRE_V: u32
 pub enum channels::Answer
 pub enum channels::AssetReply
@@ -424,6 +434,7 @@ pub struct channels::ChangesAnswer
 pub struct channels::ChosenSummary
 pub struct channels::CityAnswer
 pub struct channels::CityLabel(_)
+pub struct channels::CommitAnswer
 pub struct channels::CostAnswer
 pub struct channels::Delta
 pub struct channels::DiscardAnswer

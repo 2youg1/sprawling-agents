@@ -33,7 +33,7 @@ pub use answer::RunSummary;
 pub use answer::{Answer, ApprovalsAnswer, ArchiveLine, BlockedLine, BuildingProgress};
 pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
 pub use answer::{BuildingAnswer, BuildingDoc};
-pub use answer::{ChangesAnswer, HISTORY_MAX, HistoryAnswer};
+pub use answer::{ChangesAnswer, CommitAnswer, HISTORY_MAX, HistoryAnswer};
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer, EndpointSummary, EndpointsAnswer};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
 #[cfg(feature = "server")]
@@ -56,6 +56,8 @@ pub use reception::{decide_bind, decide_handshake};
 pub use server::{AcpBody, AcpProgress, AcpSink};
 #[cfg(feature = "server")]
 pub use server::{Delivered, Reply, ServeConfig, router, serve};
+#[cfg(feature = "schema")]
+pub use wire::wire_schema;
 pub use wire::{ClientFrame, Delta, ServerFrame};
 pub use wire::{Hello, Query, Welcome};
 pub use wire::{QUERY_NAMES, WIRE_V, schema_hash};

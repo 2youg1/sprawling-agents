@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 /// was touched and left alone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Lines {
     Counted { added: u32, removed: u32 },
     Binary,
@@ -39,6 +40,7 @@ pub enum Lines {
 /// whether an agent moved code or rewrote it needs the difference.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum How {
     Added,
     Modified,
@@ -48,6 +50,7 @@ pub enum How {
 
 /// One file, as the difference between two trees describes it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FileChange {
     pub path: String,
     pub how: How,

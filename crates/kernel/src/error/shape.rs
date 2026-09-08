@@ -19,6 +19,7 @@ use super::refusal::GateRefusal;
 /// wire shape flat and the field order unchanged.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
 #[error("{code}: cannot {} on {}", detail.action, detail.subject)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AxError {
     code: AxCode,
     #[serde(flatten)]
@@ -26,6 +27,7 @@ pub struct AxError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 struct ErrorDetail {
     action: String,
     subject: String,

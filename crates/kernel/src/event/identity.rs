@@ -13,6 +13,7 @@ use crate::error::{AxCode, AxError};
 /// generation here — the assembly layer (or a seeded simulator) mints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RunId(uuid::Uuid);
 
 impl RunId {
@@ -45,6 +46,7 @@ impl std::fmt::Display for RunId {
 /// Event sequence number; contiguous from [`Seq::FIRST`], checked arithmetic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Seq(u64);
 
 impl Seq {
@@ -71,6 +73,7 @@ impl Seq {
 /// parameter, never sampled inside kernel or memory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TimeMs(u64);
 
 impl TimeMs {

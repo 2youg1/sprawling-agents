@@ -18,6 +18,7 @@ use crate::registry::ResidentId;
 
 /// Non-empty item identity; uuid v7 minting is the effect layer's.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ApprovalId(String);
 
 impl ApprovalId {
@@ -39,6 +40,7 @@ impl ApprovalId {
 /// model's own question (batched, never blocking the current action).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ApprovalSource {
     Gate,
     Agent,
@@ -49,6 +51,7 @@ pub enum ApprovalSource {
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ApprovalClass {
     Commitment,
     BudgetLimit,
@@ -69,12 +72,14 @@ pub enum ApprovalClass {
 /// The clustering key: class + free detail. One human verdict on a key
 /// can become a Policy — for the one class that admits policies.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ClusterKey {
     pub class: ApprovalClass,
     pub detail: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ApprovalItem {
     pub id: ApprovalId,
     pub source: ApprovalSource,
@@ -106,6 +111,7 @@ pub struct PolicyMatcher {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PolicyVerdict {
     Allow,
     Deny,
@@ -197,6 +203,7 @@ pub enum PolicyRevocation {
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Autonomy {
     Owner,
     Delegate(ResidentId),

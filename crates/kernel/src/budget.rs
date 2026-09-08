@@ -13,10 +13,12 @@ use serde::{Deserialize, Serialize};
 /// One micro-USD. Decimal price lists convert at the single accounting
 /// entry point (S3 gateway::cost); decisions never touch floats.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct UsdMicros(u64);
 
 /// Whole tokens.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Tokens(u64);
 
 /// Whole bytes.
@@ -48,12 +50,14 @@ quantity!(Tokens);
 quantity!(ByteLen);
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BudgetCap {
     pub usd: UsdMicros,
     pub tokens: Tokens,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BudgetUse {
     pub usd: UsdMicros,
     pub tokens: Tokens,

@@ -33,6 +33,7 @@ pub const RESERVED_PREFIX: &str = ".sprawling";
 /// Canonical relative path; invariants enforced at the sole constructor.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Address(String);
 
 impl Address {
@@ -127,6 +128,7 @@ const SESSION_NAME_MAX: usize = 64;
 /// a room cannot be spelled, on the wire or anywhere else.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SessionName(String);
 
 impl SessionName {

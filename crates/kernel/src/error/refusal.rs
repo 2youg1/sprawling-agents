@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 /// The three mandatory parts of a gate refusal: rule | violation |
 /// compliant alternative (three-part refusal).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GateRefusal {
     rule: String,
     violation: String,

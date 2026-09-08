@@ -110,6 +110,7 @@ impl Completion {
 /// the difference between work finished and work redistributed, and a
 /// reader seeing one number cannot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PlannedProgress {
     pub done: u32,
     pub blocked: u32,
@@ -140,6 +141,7 @@ impl PlannedProgress {
 /// ratio method exists — the interface cannot paint what it cannot know
 /// (A17's type half).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct UnplannedProgress {
     pub steps: u32,
     pub budget: BudgetUse,
@@ -148,6 +150,7 @@ pub struct UnplannedProgress {
 /// Deliberately exhaustive: both faces must be handled by every renderer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Progress {
     Planned(PlannedProgress),
     Unplanned(UnplannedProgress),

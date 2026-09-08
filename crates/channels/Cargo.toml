@@ -11,6 +11,11 @@ publish.workspace = true
 # wasm32, and a browser has no sockets to listen on anyway.
 default = ["server"]
 server = ["dep:tokio", "dep:axum"]
+# The JSON Schema of the whole envelope, which `cargo xtask wire-ts` turns
+# into the TypeScript client's types (channels-SPEC.md section 8-16). Off
+# for the product binary and for `web`: neither asks what its frames look
+# like, and the answer must not travel to a browser.
+schema = ["dep:schemars", "kernel/schema"]
 
 [dependencies]
 kernel = { path = "../kernel" }
@@ -18,6 +23,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, optional = true }
 axum = { workspace = true, features = ["ws"], optional = true }
+schemars = { workspace = true, optional = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

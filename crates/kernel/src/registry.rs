@@ -21,6 +21,7 @@ use crate::locator::Locator;
 /// Non-empty resident identity; the `role@building.n` grammar tightens
 /// with city::resident (P1).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ResidentId(String);
 
 impl ResidentId {

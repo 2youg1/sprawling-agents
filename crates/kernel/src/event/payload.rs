@@ -20,6 +20,7 @@ use super::kind::EventKind;
 /// (serde_json's default BTreeMap), which is part of the canonical bytes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Payload(serde_json::Map<String, serde_json::Value>);
 
 impl Payload {
@@ -85,6 +86,7 @@ fn ig_is_false(ig: &bool) -> bool {
 /// [`EventRecord::parse_line`] (read side).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EventRecord {
     v: u32,
     run: RunId,

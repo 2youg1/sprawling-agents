@@ -60,6 +60,7 @@ impl std::fmt::Display for ToolName {
 /// in two crates is a rule with two authorities.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ServerLabel(String);
 
 impl ServerLabel {

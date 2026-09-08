@@ -25,6 +25,8 @@ pub use event::{EventDraft, EventKind, EventRecord, EventRef, Payload};
 pub use event::{RunId, Seq, TimeMs, WindowClass};
 
 mod idem;
+#[cfg(feature = "schema")]
+mod schema;
 mod version;
 
 pub use idem::{IDEM_DERIVE_V, IdemKey};
@@ -50,7 +52,8 @@ pub use budget::{BudgetCap, BudgetLadder, BudgetLayer, BudgetLevel, BudgetUse};
 pub use budget::{ByteLen, CtxLock, CtxVerdict, SpendVerdict, Tokens, UsdMicros};
 pub use budget::{admit_spend, observe_ctx};
 pub use stall::{ActionFingerprint, StallVerdict, observe};
-pub use write_domain::{DomainVerdict, EditSample, EditWarVerdict, WriteDomain, observe_edit_war};
+pub use write_domain::{DocumentReason, DomainPrefixes, DomainVerdict, WriteDomain};
+pub use write_domain::{EditSample, EditWarVerdict, observe_edit_war};
 
 mod delegation;
 mod goal;
@@ -83,8 +86,9 @@ pub use plan::{Held, PLAN_WHOLE_PPB, PlanExit, PlanNode};
 pub use plan::{PlanTree, StopCause};
 pub use pursuit::{Pursuit, PursuitState, PursuitVerdict, observe as observe_pursuit};
 pub use share::{Share, WHOLE_PPB, gather as gather_shares};
+pub use spine::RoadmapShape;
 pub use spine::{EvidenceCell, MEMO_OUTLINE_FIELDS, MemoShape, NewChild};
-pub use spine::{ROADMAP_COLUMNS, ROADMAP_STATUS_SPELLINGS, RoadmapRow, RoadmapShape};
+pub use spine::{ROADMAP_COLUMNS, ROADMAP_FILE, ROADMAP_STATUS_SPELLINGS, RoadmapRow};
 pub use spine::{RoadmapStatus, ScopeChange, WriteMoment};
 pub use spine::{check_memo_shape, check_roadmap_shape, insert_children, set_roadmap_status};
 
@@ -101,7 +105,7 @@ mod secret;
 
 pub use discard::{DenyReason, Discard, DiscardForecast, DiscardRequest, DiscardVerdict};
 pub use discard::{EscalateReason, Restoration, decide as decide_discard, forecast};
-pub use secret::{Sealed, SecretRef, SecretSpan, scan};
+pub use secret::{Sealed, SecretRef, SecretSpan, names_a_credential, scan};
 
 mod gate;
 
@@ -113,7 +117,7 @@ pub use gate::{delegation, govern, spawn, spend};
 mod config;
 
 pub use config::{ClockStampGranularity, ClockZone, FrozenConfig, McpServer, McpTransport};
-pub use config::{LayeredValue, LiveConfig, SandboxLimits, freeze};
+pub use config::{EnvVarName, LayeredValue, LiveConfig, SandboxLimits, freeze};
 
 mod tool;
 
@@ -129,5 +133,6 @@ pub use model::SystemBlock;
 pub use model::conformance as model_conformance;
 pub use model::{BuildingPolicy, Increments, Model, ModelRequest, ModelReturn};
 pub use model::{ChatMessage, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort};
+pub use model::{ImageRef, ImageType};
 pub use model::{ModelTag, ModelUsage, Role, StopReason, ToolDef};
 pub use model::{content_from_message, message_payload, value_has_float};

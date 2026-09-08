@@ -18,6 +18,7 @@ use crate::taint::TaintSet;
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Restoration {
     Tracked(Locator),
     Interred(Locator),

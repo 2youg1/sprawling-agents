@@ -13,6 +13,7 @@ uuid.workspace = true
 blake3.workspace = true
 secrecy.workspace = true
 zeroize.workspace = true
+schemars = { workspace = true, optional = true }
 
 [lints]
 workspace = true
@@ -24,3 +25,7 @@ trybuild.workspace = true
 
 [features]
 conformance = []
+# The JSON Schema of every value that crosses the wire, derived from the
+# same declarations serde reads (kernel-SPEC.md section 8-45). Off by
+# default: the product binary never asks what its own frames look like.
+schema = ["dep:schemars"]
