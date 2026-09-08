@@ -40,6 +40,8 @@ pub(super) struct Driving<'a> {
     /// The resident this run works as, as three hooks will name it.
     pub(super) who: &'a str,
     pub(super) run_id: RunId,
+    /// What every fence this drive raises is signed with (card-2.1).
+    pub(super) of: memory::Provenance,
 }
 
 /// What one drive left behind, beside the run it froze.
@@ -95,6 +97,7 @@ impl RunWorker {
             fence_scope,
             who,
             run_id,
+            of,
         } = driving;
         let mut now = || now_ms();
         // Taken before the hooks borrow `self`: the sink outlives one
@@ -103,7 +106,6 @@ impl RunWorker {
         let bench_who = who.to_owned();
         let mut fence_point =
             memory::Checkpoint::open(write_root).map_err(memory::MemoryError::into_ax)?;
-        let fence_who = who.to_owned();
         // What the bench fenced, so the sweep afterwards knows which
         // commit a deleted file can be restored from.
         let fenced: std::rc::Rc<std::cell::RefCell<Vec<String>>> =
@@ -231,7 +233,7 @@ impl RunWorker {
             };
             let mut fence = |t: TimeMs| {
                 let payload = fence_point
-                    .wave_pre(&fence_scope, t, &fence_who)
+                    .wave_pre(&fence_scope, t, &of)
                     .map_err(memory::MemoryError::into_ax)?;
                 if let Some(oid) = payload
                     .as_map()

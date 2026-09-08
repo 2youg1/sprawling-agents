@@ -17,8 +17,21 @@
 use std::path::Path;
 
 use collab::{Claim, NodeId, Pr};
-use kernel::{B3Hash, Locator, TimeMs};
-use memory::{Checkpoint, WorktreeName, Worktrees};
+use kernel::{Address, B3Hash, Locator, RunId, TimeMs};
+use memory::{Checkpoint, Landing, ModelChoice, Provenance, WorktreeName, Worktrees};
+
+/// Who the commits in this scenario are signed as.
+fn of(room: &str) -> Provenance {
+    Provenance::new(
+        RunId::CITY,
+        Address::parse(room).unwrap(),
+        B3Hash::digest(b"a city"),
+        ModelChoice {
+            id: "test-model".to_owned(),
+            effort: None,
+        },
+    )
+}
 
 /// A city with one checkpoint, which is what a node's tree branches from.
 fn city(root: &Path) -> Worktrees {
@@ -26,7 +39,7 @@ fn city(root: &Path) -> Worktrees {
     std::fs::write(root.join("lab").join("notes.md"), b"before\n").unwrap();
     Checkpoint::open(root)
         .unwrap()
-        .wave_pre("lab", TimeMs::new(1_000), "owner")
+        .ensure_base("lab", TimeMs::new(1_000), &of("lab/owner"))
         .unwrap();
     Worktrees::open(root).unwrap()
 }
@@ -46,7 +59,7 @@ fn a_node_reaches_the_building_only_through_someone_elses_verification() {
     std::fs::write(tree.path().join("lab").join("notes.md"), produced).unwrap();
     Checkpoint::open(tree.path())
         .unwrap()
-        .wave_pre("lab", TimeMs::new(2_000), "lab/room1")
+        .land(TimeMs::new(2_000), &of("lab/room1"), "offer: lab")
         .unwrap();
     assert_eq!(
         std::fs::read_to_string(dir.path().join("lab").join("notes.md")).unwrap(),
@@ -78,7 +91,14 @@ fn a_node_reaches_the_building_only_through_someone_elses_verification() {
         .plan_merge(&WorktreeName::parse(verified.branch()).unwrap())
         .unwrap();
     let commit = planned.commit();
-    planned.apply().unwrap();
+    planned
+        .apply(&Landing {
+            t: TimeMs::new(3_000),
+            of: &of("lab/room2"),
+            subject: "merge: node-1",
+            reviewed_by_person: true,
+        })
+        .unwrap();
     let merged = verified.merged(commit);
     assert_eq!(
         std::fs::read_to_string(dir.path().join("lab").join("notes.md")).unwrap(),

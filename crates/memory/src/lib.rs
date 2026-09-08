@@ -72,6 +72,7 @@ pub use digest_cache::DigestCache;
 
 mod worktree;
 
+pub use worktree::Landing;
 pub use worktree::PlannedMerge;
 pub use worktree::WorktreeLease;
 pub use worktree::WorktreeName;
@@ -80,6 +81,10 @@ pub use worktree::Worktrees;
 mod checkpoint;
 
 pub use checkpoint::Checkpoint;
+pub use checkpoint::ModelChoice;
+pub use checkpoint::Provenance;
+pub use checkpoint::effort_word;
+pub use checkpoint::model_choice_of;
 
 mod changes;
 
