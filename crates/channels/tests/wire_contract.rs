@@ -37,20 +37,20 @@ fn exposed() -> SocketAddr {
 
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
-    // Twenty-three commands, fifteen queries. The count is not a style
+    // Twenty-four commands, seventeen queries. The count is not a style
     // choice - it is the wire's closed surface.
-    assert_eq!(COMMAND_NAMES.len(), 23, "command table");
-    assert_eq!(QUERY_NAMES.len(), 15, "query table");
+    assert_eq!(COMMAND_NAMES.len(), 24, "command table");
+    assert_eq!(QUERY_NAMES.len(), 17, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 23, "command names are distinct");
+    assert_eq!(sorted.len(), 24, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 15, "query names are distinct");
+    assert_eq!(sorted.len(), 17, "query names are distinct");
 }
 
 #[test]
@@ -80,14 +80,14 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 14,
+        WIRE_V, 15,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
 
 /// Pinned on the first green of S4.02. It is a function of WIRE_V and the two
 /// name tables, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "730e9d0b5a9042bf710195a065ac0b08da0e460cd8948a1b4ff5d3481b4b8204";
+const WIRE_SCHEMA_GOLDEN: &str = "2d8b7dc2e8f9b35503a1d26c0d3323ff88674bb087fa1ba95e4815a868213880";
 
 // -------------------------------------------------------------- binding face
 
@@ -259,10 +259,6 @@ fn sample_of_every_command() -> Vec<Command> {
             task: "ship it".to_owned(),
             goal: "the tests pass".to_owned(),
             mode: ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap {
-                usd: kernel::UsdMicros::new(1_000_000),
-                tokens: kernel::Tokens::new(200_000),
-            },
             idem,
             session: Some(kernel::SessionName::parse("ship it").unwrap()),
             effort: Some(kernel::Effort::High),
@@ -270,6 +266,13 @@ fn sample_of_every_command() -> Vec<Command> {
         Command::Login {
             provider: ProviderName::parse("anthropic").unwrap(),
             step: channels::LoginStep::Begin,
+            idem,
+        },
+        Command::PutDocument {
+            which: channels::GovernedDocument::Mayor,
+            body: "# who the Mayor is
+"
+            .to_owned(),
             idem,
         },
         Command::ConfigureBuilding {
@@ -425,6 +428,29 @@ fn asking_for_one_session_is_a_different_frame_from_asking_for_the_city() {
     );
 }
 
+/// Nobody can price a piece of work before it runs, so the frame that
+/// starts one carries no ceiling (card-11.7). The one brake is `Halt`,
+/// which shuts a scope and stops what that scope already started.
+#[test]
+fn a_dispatch_frame_carries_no_spend_ceiling() {
+    let addr = Address::parse("acme/floor1").unwrap();
+    let run = kernel::RunId::from_bytes([7u8; 16]);
+    let dispatch: channels::WireCommand = Command::Dispatch {
+        addr,
+        task: "ship it".to_owned(),
+        goal: "the tests pass".to_owned(),
+        mode: ModeTag::parse("plan").unwrap(),
+        idem: kernel::IdemKey::derive(&run, Seq::new(1), b"sample"),
+        session: None,
+        effort: None,
+    };
+    let text = serde_json::to_string(&dispatch).unwrap();
+    assert!(
+        !text.contains("budget"),
+        "a dispatch frame states no ceiling: {text}"
+    );
+}
+
 /// The second step of a login has its own byte form: a page that means
 /// "redeem this code" must not be readable as "start a login".
 #[test]
@@ -453,5 +479,58 @@ fn both_login_steps_survive_the_round_trip_and_stay_distinct() {
     assert_eq!(
         serde_json::from_str::<channels::WireCommand>(&code_text).unwrap(),
         code
+    );
+}
+
+/// The three documents that govern a city are written by one frame, and
+/// what was decided on the person's behalf is one question (card-5.4).
+#[test]
+fn the_governance_frames_are_on_the_wire() {
+    assert!(
+        COMMAND_NAMES.contains(&"PutDocument"),
+        "a person can write the documents that govern their city"
+    );
+    assert!(
+        QUERY_NAMES.contains(&"Governance"),
+        "and read who answers and what was answered for them"
+    );
+    let frame: channels::WireCommand = Command::PutDocument {
+        which: channels::GovernedDocument::Preferences,
+        body: "# how I like this city run\n".to_owned(),
+        idem: kernel::IdemKey::derive(&kernel::RunId::from_bytes([9u8; 16]), Seq::new(1), b"prefs"),
+    };
+    assert_eq!(frame.name(), "PutDocument");
+    let text = serde_json::to_string(&frame).unwrap();
+    let back: channels::WireCommand = serde_json::from_str(&text).unwrap();
+    assert_eq!(back, frame);
+    assert_eq!(Query::Governance.name(), "Governance");
+}
+
+/// A hunk is its own request: one file, both ends named, and a line that
+/// matched a credential shape reported rather than echoed (card-2.6).
+#[test]
+fn one_files_patch_is_a_frame_of_its_own() {
+    assert!(
+        QUERY_NAMES.contains(&"Hunks"),
+        "reviewing a change in a browser needs the patch text of one file"
+    );
+    let query = Query::Hunks {
+        oid_a: kernel::GitOid::from_bytes([1u8; 20]),
+        oid_b: kernel::GitOid::from_bytes([2u8; 20]),
+        path: "lab/lex.rs".to_owned(),
+    };
+    assert_eq!(query.name(), "Hunks");
+    let bytes = serde_json::to_vec(&query).unwrap();
+    let back: Query = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(back, query);
+    // Counts and patch text are two questions with two costs, so they
+    // are two frames.
+    assert_ne!(
+        bytes,
+        serde_json::to_vec(&Query::Changes {
+            base: kernel::GitOid::from_bytes([1u8; 20]),
+            head: Some(kernel::GitOid::from_bytes([2u8; 20])),
+        })
+        .unwrap()
     );
 }

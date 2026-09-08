@@ -85,7 +85,10 @@ pub use checkpoint::ModelChoice;
 pub use checkpoint::Provenance;
 pub use checkpoint::effort_word;
 pub use checkpoint::model_choice_of;
+pub use checkpoint::predecessor_of;
 
 mod changes;
+mod hunks;
 
 pub use changes::{Head, between};
+pub use hunks::{FilePatch, PatchLine, Withheld, of_file};

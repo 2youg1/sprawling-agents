@@ -31,7 +31,9 @@ pub channels::Answer::Commit(channels::CommitAnswer)
 pub channels::Answer::Cost(alloc::boxed::Box<channels::CostAnswer>)
 pub channels::Answer::Discards(channels::DiscardAnswer)
 pub channels::Answer::Endpoints(channels::EndpointsAnswer)
+pub channels::Answer::Governance(channels::GovernanceAnswer)
 pub channels::Answer::History(alloc::boxed::Box<channels::HistoryAnswer>)
+pub channels::Answer::Hunks(alloc::boxed::Box<channels::HunksAnswer>)
 pub channels::Answer::Inbox(channels::InboxAnswer)
 pub channels::Answer::Metrics(alloc::boxed::Box<channels::MetricsAnswer>)
 pub channels::Answer::Registry(channels::RegistryAnswer)
@@ -134,7 +136,6 @@ pub channels::Command::CreatePolicy::from_item: kernel::approval::ApprovalId
 pub channels::Command::CreatePolicy::idem: kernel::idem::IdemKey
 pub channels::Command::Dispatch
 pub channels::Command::Dispatch::addr: kernel::address::Address
-pub channels::Command::Dispatch::budget: kernel::budget::BudgetCap
 pub channels::Command::Dispatch::effort: core::option::Option<kernel::model::wire::Effort>
 pub channels::Command::Dispatch::goal: alloc::string::String
 pub channels::Command::Dispatch::idem: kernel::idem::IdemKey
@@ -164,6 +165,10 @@ pub channels::Command::Pursue
 pub channels::Command::Pursue::addr: kernel::address::Address
 pub channels::Command::Pursue::idem: kernel::idem::IdemKey
 pub channels::Command::Pursue::step: channels::PursuitStep
+pub channels::Command::PutDocument
+pub channels::Command::PutDocument::body: alloc::string::String
+pub channels::Command::PutDocument::idem: kernel::idem::IdemKey
+pub channels::Command::PutDocument::which: channels::GovernedDocument
 pub channels::Command::PutSecret
 pub channels::Command::PutSecret::name: alloc::string::String
 pub channels::Command::PutSecret::realm: alloc::string::String
@@ -199,6 +204,7 @@ pub channels::Command::Wake::source: alloc::string::String
 pub channels::Command::Wake::subject: alloc::string::String
 pub channels::CommitAnswer::actor: kernel::address::Address
 pub channels::CommitAnswer::effort: core::option::Option<kernel::model::wire::Effort>
+pub channels::CommitAnswer::lineage: alloc::vec::Vec<kernel::event::identity::RunId>
 pub channels::CommitAnswer::model: alloc::string::String
 pub channels::CommitAnswer::oid: kernel::locator::GitOid
 pub channels::CommitAnswer::run: kernel::event::identity::RunId
@@ -216,6 +222,10 @@ pub channels::CostAnswer::by_segment: alloc::vec::Vec<(alloc::string::String, ke
 pub channels::CostAnswer::by_skill: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub channels::CostAnswer::by_tool: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub channels::CostAnswer::total: kernel::budget::UsdMicros
+pub channels::Decision::at: kernel::event::identity::TimeMs
+pub channels::Decision::cluster: kernel::approval::ClusterKey
+pub channels::Decision::item: alloc::string::String
+pub channels::Decision::verdict: kernel::approval::PolicyVerdict
 pub channels::Delivered::NobodyAsked
 pub channels::Delivered::PeerGone
 pub channels::Delivered::ToThePeer
@@ -238,6 +248,11 @@ pub channels::EndpointsAnswer::chosen: alloc::vec::Vec<channels::ChosenSummary>
 pub channels::EndpointsAnswer::endpoints: alloc::vec::Vec<channels::EndpointSummary>
 pub channels::Forwarded::address: alloc::string::String
 pub channels::Forwarded::query: channels::Query
+pub channels::GovernanceAnswer::autonomy: kernel::approval::Autonomy
+pub channels::GovernanceAnswer::decided: alloc::vec::Vec<channels::Decision>
+pub channels::GovernedDocument::Clerk
+pub channels::GovernedDocument::Mayor
+pub channels::GovernedDocument::Preferences
 pub channels::HaltScope::Building(kernel::address::Address)
 pub channels::HaltScope::City
 pub channels::HaltScope::Workshop(kernel::address::Address)
@@ -248,6 +263,11 @@ pub channels::Hello::token: core::option::Option<alloc::string::String>
 pub channels::Hello::wire_v: u32
 pub channels::HistoryAnswer::earlier: core::option::Option<kernel::event::identity::Seq>
 pub channels::HistoryAnswer::records: alloc::vec::Vec<kernel::event::payload::EventRecord>
+pub channels::HunksAnswer::lines: alloc::vec::Vec<channels::PatchLine>
+pub channels::HunksAnswer::oid_a: kernel::locator::GitOid
+pub channels::HunksAnswer::oid_b: kernel::locator::GitOid
+pub channels::HunksAnswer::path: alloc::string::String
+pub channels::HunksAnswer::withheld: alloc::vec::Vec<channels::Withheld>
 pub channels::InboxAnswer::addr: kernel::address::Address
 pub channels::InboxAnswer::waiting: alloc::vec::Vec<channels::SignalLine>
 pub channels::Intervention::Cancel
@@ -266,6 +286,8 @@ pub channels::MetricsAnswer::events: u64
 pub channels::MetricsAnswer::runs_active: u64
 pub channels::MetricsAnswer::runs_frozen: u64
 pub channels::MetricsAnswer::signals_waiting: u64
+pub channels::PatchLine::number: u32
+pub channels::PatchLine::text: alloc::string::String
 pub channels::PlanRow::evidence: core::option::Option<alloc::string::String>
 pub channels::PlanRow::item: alloc::string::String
 pub channels::PlanRow::leaf: bool
@@ -297,9 +319,14 @@ pub channels::Query::Commit::oid: kernel::locator::GitOid
 pub channels::Query::CostView
 pub channels::Query::DiscardView
 pub channels::Query::EndpointView
+pub channels::Query::Governance
 pub channels::Query::History
 pub channels::Query::History::before: core::option::Option<kernel::event::identity::Seq>
 pub channels::Query::History::limit: u32
+pub channels::Query::Hunks
+pub channels::Query::Hunks::oid_a: kernel::locator::GitOid
+pub channels::Query::Hunks::oid_b: kernel::locator::GitOid
+pub channels::Query::Hunks::path: alloc::string::String
 pub channels::Query::InboxView
 pub channels::Query::InboxView::addr: kernel::address::Address
 pub channels::Query::Metrics
@@ -357,9 +384,11 @@ pub channels::Welcome::city: core::option::Option<kernel::address::Address>
 pub channels::Welcome::resume_from: core::option::Option<kernel::event::identity::Seq>
 pub channels::Welcome::schema: kernel::locator::B3Hash
 pub channels::Welcome::wire_v: u32
-pub const channels::COMMAND_NAMES: [&str; 23]
+pub channels::Withheld::number: u32
+pub channels::Withheld::reason: alloc::string::String
+pub const channels::COMMAND_NAMES: [&str; 24]
 pub const channels::HISTORY_MAX: u32
-pub const channels::QUERY_NAMES: [&str; 15]
+pub const channels::QUERY_NAMES: [&str; 17]
 pub const channels::WIRE_V: u32
 pub enum channels::Answer
 pub enum channels::AssetReply
@@ -370,6 +399,7 @@ pub enum channels::ClientFrame
 pub enum channels::Command<Secret>
 pub enum channels::ControlVerdict
 pub enum channels::Delivered
+pub enum channels::GovernedDocument
 pub enum channels::HaltScope
 pub enum channels::HandshakeVerdict
 pub enum channels::Intervention
@@ -436,6 +466,7 @@ pub struct channels::CityAnswer
 pub struct channels::CityLabel(_)
 pub struct channels::CommitAnswer
 pub struct channels::CostAnswer
+pub struct channels::Decision
 pub struct channels::Delta
 pub struct channels::DiscardAnswer
 pub struct channels::DiscardLine
@@ -443,12 +474,15 @@ pub struct channels::EmbeddedFile
 pub struct channels::EndpointSummary
 pub struct channels::EndpointsAnswer
 pub struct channels::Forwarded
+pub struct channels::GovernanceAnswer
 pub struct channels::Hello
 pub struct channels::HistoryAnswer
+pub struct channels::HunksAnswer
 pub struct channels::InboxAnswer
 pub struct channels::MetricsAnswer
 pub struct channels::ModeTag(_)
 pub struct channels::PairingToken(_)
+pub struct channels::PatchLine
 pub struct channels::PlanRow
 pub struct channels::ProviderName(_)
 pub struct channels::PursuitLine
@@ -463,6 +497,7 @@ pub struct channels::TemplateName(_)
 pub struct channels::UploadId(_)
 pub struct channels::Upstream
 pub struct channels::Welcome
+pub struct channels::Withheld
 pub type channels::AcpSink = alloc::sync::Arc<(dyn core::ops::function::Fn(channels::AcpBody, bool) -> core::result::Result<channels::AcpProgress, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type channels::WireCommand = channels::Command<channels::NoSecret>
 pub use channels::Address
@@ -474,7 +509,6 @@ pub use channels::Autonomy
 pub use channels::AxCode
 pub use channels::AxError
 pub use channels::B3Hash
-pub use channels::BudgetCap
 pub use channels::BudgetUse
 pub use channels::ClusterKey
 pub use channels::DialectKind

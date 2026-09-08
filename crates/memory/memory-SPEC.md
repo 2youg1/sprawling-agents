@@ -738,3 +738,27 @@ ARCHITECTURE §6 memory 表：jsonl/cas 状态翻转＋fault_fs 新行登记（S
 `fault_fs.rs`（516）→ `fault_fs/plan.rs`（`FaultPlan`／`TornTail`／`FileState`／`State`，
 无专属测试故无 tests 模）／`fs.rs`（`FaultFs`＋`Vfs` 实现，测试住 `fs/tests.rs`）。
 跨文件私有项开 `pub(crate)`，对外签名逐字节不变。
+
+### 8-17 Provenance 的第六条 trailer（card-11.6）
+
+`Provenance` 增私有字段 `predecessor: Option<RunId>`，唯一写入口是消费式的 `succeeding(self, RunId) -> Provenance`（`new` 已到四参数上限，而前任与 run 并不总是同行）。有前任时 `trailers()` 多出第六行 `Sprawling-Predecessor: <run-id>`，`model_fields()` 多出 `predecessor` 键；`predecessor_of(&Map)` 读回它，读不到或读不懂答 `None`——一条缺席的世系比一条编出来的好。五条 trailer 的顺序与拼写一字不动，所以旧提交与旧记录逐字节不变。
+
+### 8-19 memory::hunks：一个文件的补丁文本（card-2.6；形状 4 adapter）
+
+```rust
+pub struct PatchLine { pub number: u32, pub text: String }
+pub struct Withheld  { pub number: u32, pub reason: String }
+pub struct FilePatch { pub lines: Vec<PatchLine>, pub withheld: Vec<Withheld> }
+
+pub fn of_file(city_root: &Path, base: GitOid, head: Head, path: &str)
+    -> Result<FilePatch, MemoryError>;
+```
+
+**这是 `memory::changes` 模块头说的那次独立请求，不是对它的反悔。** 那段头写着「计数，永不补丁文本……一段补丁必须是它自己的一次请求，经同一次扫描作答，而不是这个模块」。本模块就是那次请求，逐字兑现它开出的三个条件：
+
+1. **一次一个文件**，`path` 必填，没有「整批补丁」这个形状。理由是代价：`changes` 的代价与改动文件数同阶，本函数与一个文件的大小同阶，合成一个答会让「这次改了哪些文件」付上整批补丁的钱。
+2. **同一次凭证判定**，不是第二份。`checkpoint::scan_staged` 用 `kernel::scan` 判一个 staged blob，本模块判每一行补丁文本用的是同一个函数。命中的行**不回显**，只报行号与命中原因（provider 名，或熵判定）——理由与 `scan_staged` 对自己的命中说的同一句：把字节打出来以证明泄漏，本身就是泄漏。
+3. **两端都是 commit 时，答可永久缓存**（同 `changes` 的理由）；`Head::WorkingTree` 答的是此刻的工作树，那是一波还没提交完的样子，也正是审阅进行中的改动时人看的那一份。
+
+- **一个两次 fence 之间没动过的文件答空补丁**，而不是报错：「它没动」是一个答案。「这座城没写过这个 oid」是另一个答案，由调用方（`bin::views`）答 `Unavailable`——只有调用方知道人问的是什么。
+- **测试用工作树而不是第二次 fence**：checkpoint 根本不肯提交带凭证的 blob（`scan_staged` 拒），所以那一行只可能存在于盘上的树里。这条约束本身就是本模块的扫描不是多余的一层的证据：字节到不了 commit，但到得了 socket。

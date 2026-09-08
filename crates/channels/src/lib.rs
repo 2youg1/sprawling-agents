@@ -35,6 +35,8 @@ pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
 pub use answer::{BuildingAnswer, BuildingDoc};
 pub use answer::{ChangesAnswer, CommitAnswer, HISTORY_MAX, HistoryAnswer};
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer, EndpointSummary, EndpointsAnswer};
+pub use answer::{Decision, GovernanceAnswer};
+pub use answer::{HunksAnswer, PatchLine, Withheld};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
 #[cfg(feature = "server")]
 pub use assets::{AssetReply, ClientAssets, EmbeddedFile};
@@ -42,7 +44,7 @@ pub use auth::{PairingToken, verify};
 pub use carried_name::{ModeTag, ProviderName, TemplateName, UploadId};
 pub use command::COMMAND_NAMES;
 pub use command::{Command, WireCommand};
-pub use command::{HaltScope, LoginStep, NoSecret, PursuitStep};
+pub use command::{GovernedDocument, HaltScope, LoginStep, NoSecret, PursuitStep};
 pub use control::{ControlVerdict, Intervention, classify};
 pub use kernel::{FileChange, How, Lines};
 pub use kernel::{Span, Token, markdown};
@@ -62,7 +64,7 @@ pub use wire::{ClientFrame, Delta, ServerFrame};
 pub use wire::{Hello, Query, Welcome};
 pub use wire::{QUERY_NAMES, WIRE_V, schema_hash};
 
-pub use kernel::{Address, ApprovalId, Autonomy, AxCode, AxError, B3Hash, BudgetCap};
+pub use kernel::{Address, ApprovalId, Autonomy, AxCode, AxError, B3Hash};
 pub use kernel::{ApprovalClass, ApprovalItem, ApprovalSource, ClusterKey, Restoration};
 pub use kernel::{BudgetUse, Locator, PlannedProgress, Progress, UnplannedProgress};
 pub use kernel::{DialectKind, Effort, ModelTag};

@@ -19,9 +19,9 @@
 
 ## 2 验收标准
 
-- **wire**：Command 恰 18 个 variant（P4.08 增 `Wake`）、Query 恰 15 个（card-2.4 增 `Commit`；计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 恰 24 个 variant（card-5.4 增 `PutDocument`）、Query 恰 17 个（card-2.6 增 `Hunks`、card-5.4 增 `Governance`；计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**（card-2.4 起）：`730e9d0b5a9042bf710195a065ac0b08da0e460cd8948a1b4ff5d3481b4b8204`；**WIRE_V ＝ 14**（新增 `Query::Commit` 与 `Answer::Commit`，见 §8-17）。前值 `f6fdc67b…`（V3.22，WIRE_V 13：新增 `Command::Standing`；`BuildingAnswer` 携计划树 `PlanRow`，`BuildingProgress` 携 `BlockedLine` 与就绪数，`CityAnswer` 携 `StandingLine`）、`4ac1b7b3…`（V3.13，WIRE_V 12：新增 `ServerFrame::Delta`）、`78fdb74d…`（ux-14，WIRE_V 11：新增 `Query::Changes`）、 `1de1a1ae…`（ux-13，WIRE_V 10：新增 `Query::RunHistory`）、`c7b41d50…`（P3.04，WIRE_V 9：新增 `Query::History`）、`0a600659…`（P3.02，WIRE_V 8：新增 `ConfigureBuilding`）、`4bb71c0b…`（P3.01，WIRE_V 7：新增 `ProbeEndpoint`，`AttachEndpoint` 长出 `admit`）、`c059c6e2…`（F2.16–P2.01，WIRE_V 6）、`d825e83a…`（F2.11–F2.15，WIRE_V 5）、 `aa57cb7e…`（F1.01–F2.10，WIRE_V 4）、 `941ede9f…`（R1.16–R1.18，WIRE_V 3）、`defe9a75…`（R1.14–R1.15，WIRE_V 2）、 `85705c03…`（R1.11–R1.13，WIRE_V 1）、`238f11b2…`（P1.11–R1.10）、`692b5f96…`（S4.02–P1.10）。
+  **当前 golden**（本线 card-11.7／5.4／2.6 起）：`2d8b7dc2e8f9b35503a1d26c0d3323ff88674bb087fa1ba95e4815a868213880`；**WIRE_V ＝ 15**（`Dispatch` 去 `budget`，新增 `Command::PutDocument`、`Query::Governance` 与 `Query::Hunks`，见 §8-18 至 §8-20）。前值 `730e9d0b…`（card-2.4，WIRE_V 14：新增 `Query::Commit` 与 `Answer::Commit`，见 §8-17）、`f6fdc67b…`（V3.22，WIRE_V 13：新增 `Command::Standing`；`BuildingAnswer` 携计划树 `PlanRow`，`BuildingProgress` 携 `BlockedLine` 与就绪数，`CityAnswer` 携 `StandingLine`）、`4ac1b7b3…`（V3.13，WIRE_V 12：新增 `ServerFrame::Delta`）、`78fdb74d…`（ux-14，WIRE_V 11：新增 `Query::Changes`）、 `1de1a1ae…`（ux-13，WIRE_V 10：新增 `Query::RunHistory`）、`c7b41d50…`（P3.04，WIRE_V 9：新增 `Query::History`）、`0a600659…`（P3.02，WIRE_V 8：新增 `ConfigureBuilding`）、`4bb71c0b…`（P3.01，WIRE_V 7：新增 `ProbeEndpoint`，`AttachEndpoint` 长出 `admit`）、`c059c6e2…`（F2.16–P2.01，WIRE_V 6）、`d825e83a…`（F2.11–F2.15，WIRE_V 5）、 `aa57cb7e…`（F1.01–F2.10，WIRE_V 4）、 `941ede9f…`（R1.16–R1.18，WIRE_V 3）、`defe9a75…`（R1.14–R1.15，WIRE_V 2）、 `85705c03…`（R1.11–R1.13，WIRE_V 1）、`238f11b2…`（P1.11–R1.10）、`692b5f96…`（S4.02–P1.10）。
   P1.11 增三帧：`AttachEndpoint`／`SelectModel` 两个 Command（十九），`EndpointView` 一个 Query（十）。`PutSecret` 仍无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **ux-13 增：`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -521,6 +521,7 @@ pub struct Delta { pub run: RunId, pub text: String }
 | `Approve` | client | 答一条审批 |
 | `SetAutonomy` | client | 定一栋楼的 Autonomy（三态） |
 | `Pursue` | client | 设一个持续追的目标，以及暂停／恢复／清除 |
+| `PutDocument` | client | 写治理这座城的三份文件之一 |
 | `Attach` | client | 传一份附件 |
 | `Takeover` | client | 人接管一条在跑的线 |
 | `Rollback` | client | 回到一个检查点 |
@@ -608,3 +609,71 @@ pub fn wire_schema() -> serde_json::Value;   // 一份文档：`$defs` 里是信
 **`answer.rs` 随之切出 `answer/building.rs`**：二十六条 `cfg_attr` 派生行把 381 行推到 407 行，越过 400 行预算，故一栋楼说自己的七个读形状（`BuildingProgress`／`BlockedLine`／`PlanRow`／`PursuitLine`／`BuildingDoc`／`ArchiveLine`／`BuildingAnswer`）迁入 `crates/channels/src/answer/building.rs`，`answer.rs` 以 `pub use` 引回，公开拼写不变；文字逐字节照搬，无字段开放。**记法同 §8-14**：下游基线里定义位路径从 `channels::answer::BuildingAnswer` 变为 `channels::answer::building::BuildingAnswer`（`web` 基线一行），那是 `cargo public-api` 记录的定义模块，不是接口变更。
 
 **本卡的公开面变更**：channels 多出 `wire_schema`（仅 feature `schema`，缺省基线不见它）；kernel 在 `--all-features` 下多出四十余条 `JsonSchema` 实现（缺省基线不见）；`web` 基线因上述路径变动重生。
+
+### 8-18 `CommitAnswer.lineage`：一次提交背后的接替链（card-11.6；WIRE_V 14→15）
+
+`CommitAnswer` 增 `lineage: Vec<RunId>`：本跑在前，逐级向前到第一任；没接替过谁的跑是长度 1 的链。名字表没动，语法换了形——正是 `WIRE_V` 存在的那种情形，于是 14→15，golden 由 `730e9d0b…` 变为 `24b7e8ff3727cad505653c951a6733b748cb294f9eec418adefb3c4a7e7223b9`。服务端从 `run_started` 的 `predecessor` 键折出 `predecessors` 表（`bin::views::commits`），答时沿表走链。客户端读它的页尚未画，`crates/web` 只需编译通过；新客户端欠一行「replaced <run>」。
+
+### 8-18 派活帧不再携上限（card-11.7；WIRE_V 的第一笔，随本线一次进位）
+
+```rust
+Dispatch { addr, task, goal, mode, idem, session, effort }   // 删去 budget: BudgetCap
+```
+
+**没有人能在一件事跑之前给它定价**，所以说出「跑这件事」的那条帧不带上限。刹车只留一个：`Halt` 关掉一个范围并终止该范围里已经起来的后台成员（card-11.2 已使这句话为真）。`kernel::BudgetCap` 及其判定面随之删除（kernel-SPEC §8-12），`channels` 的 kernel 再导出列表因此少一项 `BudgetCap`——**这是公开面变更**，`web` 与 `sprawling` 两份基线同变更集重生。
+
+- **`BudgetUse` 留在再导出列表里**：成本页读它，五路归因报它。**报告花了多少**与**事前不许花**是两件事，本卡只删后者。
+- **`Dispatch` 的 reach 不变**（§19-2 仍是 `client`）：删的是一个字段，不是一个动词。
+- **旧客户端**：`WIRE_V` 进位后在握手期被明确拒绝，所以一条仍然写着 `budget` 的帧到不了服务端；服务端也不再有那个字段可读。
+
+### 8-19 治理两帧：写身份文件，读被代答的事（card-5.4；WIRE_V 的第二笔）
+
+```rust
+// Command（第 24 条）
+PutDocument { which: GovernedDocument, body: String, idem: IdemKey }
+pub enum GovernedDocument { Mayor, Clerk, Preferences }
+
+// Query（第 16 条）
+Governance,                       // → Answer::Governance(GovernanceAnswer)
+
+pub struct GovernanceAnswer {
+    pub autonomy: Autonomy,          // 谁来答：Owner／Delegate(resident)／Deferred
+    pub decided: Vec<Decision>,      // 替这个人做掉的事，旧在前
+}
+pub struct Decision {
+    pub item: String,                // ApprovalId
+    pub verdict: PolicyVerdict,
+    pub cluster: ClusterKey,
+    pub at: TimeMs,
+}
+```
+
+- **三份文件一条命令，不是三条**：`MAYOR.md`／`CLERK.md`／`PREFERENCES.md` 都住 `<city>/.sprawling/`（card-5.1 起，那是没有任何写域够得到的地方），三者的写法逐字节相同，差别只在文件名。用穷尽枚举而不是路径串：**路径由城决定，不由发帧的人决定**，否则这条命令就成了往保留子树里写任意文件的入口。
+- **`Preferences` 是第三份**：市长与文书各有身份文件，而「这个人怎么喜欢这座城办事」不属于其中任何一个居民，它属于城。它与前两者同住一处、同一条命令写，因为它们被同一条规则治理：住在保留子树里，居民读得到、改不了。
+- **`decided` 回答的是「你不在的时候，有谁替你答了什么」**：`approval_resolved` 折出来的流，旧在前——与 `HistoryAnswer` 同口径，因为折叠期待这个顺序。它**不筛掉人自己答的那些**：一份只列代答的清单，会让「我答过」与「从没人答」在界面上长得一样。谁答的写在 `autonomy` 里，那是同一次读的另一半。
+- **`PutDocument` 不携版本**：这三份文件没有并发写入者——只有人写，而人一次只按一次保存。`edit` 工具的乐观并发管的是居民之间抢同一个文件，这里没有那回事。
+- **被否**：（a）三条命令 `PutMayor`／`PutClerk`／`PutPreferences`——同一条规则三个入口，加第四份文件要改三处；（b）复用 `edit` 工具——`edit` 走写域，而写域恒不含保留子树，让它开一个例外就是把「居民改不了治自己的东西」这条最老的规矩打穿。
+
+### 8-20 一段补丁是它自己的一次请求（card-2.6；WIRE_V 的第三笔）
+
+```rust
+Hunks { oid_a: GitOid, oid_b: GitOid, path: String },   // → Answer::Hunks(HunksAnswer)
+
+pub struct HunksAnswer {
+    pub oid_a: GitOid,
+    pub oid_b: GitOid,
+    pub path: String,
+    pub lines: Vec<PatchLine>,
+    pub withheld: Vec<Withheld>,
+}
+pub struct PatchLine { pub number: u32, pub text: String }
+pub struct Withheld { pub number: u32, pub reason: String }
+```
+
+**这与 `memory::changes` 的模块头不矛盾，它就是那句话说的那次请求。** 那段头写着「计数，永不补丁文本……一段补丁必须是它自己的一次请求……而不是这个模块」。`Query::Changes` 答的是哪些文件动了、动了多少行；本查询答的是**一个文件**的补丁文本。两者不是同一个答的详略两版：前者的代价与改动文件数同阶，后者与一个文件的大小同阶，把它们并成一个答会让「看看这次改了哪些文件」付上整批补丁的代价。
+
+- **不带这张卡，本版开篇承诺的那件事在浏览器里做不到**：审一个 PR 得开终端敲 `git diff`。
+- **同一次凭证扫描，不是第二份**：补丁文本经 `memory::checkpoint::scan_staged` 的同一个判定过一遍。命中凭证形状的那一行**不回显**，答里只留它的行号与原因（`Withheld`）。第二份扫描器就是同一条规则的第二个权威，而漂掉的那个总是没人读的那个。
+- **一次一个文件**：`path` 是必填的，没有「整批补丁」这个形状。
+- **两个 oid 都不可变，所以这个答任何人都可以永久缓存**（同 `Changes` 的理由）。
+- **这座城没写过的 oid 答 `Unavailable`**，与 `Changes`／`Commit` 同口径。
