@@ -22,7 +22,7 @@ use kernel::{AxCode, AxError, DialectKind, ModelTag, Payload, SecretRef, UsdMicr
 use serde_json::{Map, Value};
 
 use crate::endpoint::AuthSpec;
-use crate::market::ModelEntry;
+use crate::market::{InputKinds, ModelEntry};
 
 use super::attached::AttachedEndpoint;
 use super::book::Choice;
@@ -57,6 +57,7 @@ pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError>
                 .collect(),
         ),
     );
+    map.insert("probed".to_owned(), Value::Bool(endpoint.probed));
     Payload::new(map)
 }
 
@@ -88,6 +89,12 @@ pub fn selected_payload(
     map.insert(
         "max_output_tokens".to_owned(),
         Value::Number(entry.max_output_tokens.into()),
+    );
+    map.insert(
+        "input".to_owned(),
+        serde_json::to_value(entry.input).map_err(|err| {
+            AxError::failure(AxCode::InvalidArgs, "encode input kinds", err.to_string())
+        })?,
     );
     for (key, price) in [
         ("input_price", entry.input_price),
@@ -161,6 +168,14 @@ pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxErr
         dialect,
         auth,
         models,
+        // Absent means true: every record written before this key
+        // existed came from a probe that succeeded, so an old ledger
+        // replays into the same book it always did.
+        probed: payload
+            .as_map()
+            .get("probed")
+            .and_then(Value::as_bool)
+            .unwrap_or(true),
     })
 }
 
@@ -170,10 +185,19 @@ pub(crate) fn read_choice(payload: &Payload) -> Result<(ModelTag, Choice), AxErr
         .into_iter()
         .find(|candidate| candidate.as_str() == raw)
         .ok_or_else(|| invalid(format!("{raw} is not a tag this build knows")))?;
+    // Tolerant on purpose: every `model_selected` written before this
+    // key existed replays as text-only rather than as a broken record.
+    let input = match payload.as_map().get("input") {
+        None => InputKinds::default(),
+        Some(value) => {
+            serde_json::from_value(value.clone()).map_err(|err| invalid(format!("input: {err}")))?
+        }
+    };
     let entry = ModelEntry {
         id: text(payload, "model")?,
         context_tokens: count(payload, "context_tokens")?,
         max_output_tokens: count(payload, "max_output_tokens")?,
+        input,
         input_price: UsdMicros::new(count(payload, "input_price")?),
         output_price: UsdMicros::new(count(payload, "output_price")?),
         cache_read_price: UsdMicros::new(count(payload, "cache_read_price")?),

@@ -28,11 +28,40 @@ pub(super) struct Entered {
     pub(super) name: String,
     pub(super) base_url: String,
     pub(super) dialect: kernel::DialectKind,
-    /// A `secret:realm/name` reference, never plaintext.
-    pub(super) secret: Option<String>,
-    /// The header the credential travels in, when the provider wants one
-    /// that is not `Authorization: Bearer`.
-    pub(super) auth_header: Option<String>,
+    pub(super) credential: Credential,
+}
+
+/// How a credential proves itself to a provider.
+///
+/// Exhaustive rather than a reference beside a header name: a key and
+/// a subscription token do not travel in the same header, and "a
+/// subscription token in the header a key uses" is a 401 nobody can
+/// read off a form.
+pub(super) enum Credential {
+    /// Nothing was enrolled.
+    Absent,
+    /// A key the person entered, as a `secret:realm/name` reference and
+    /// never plaintext. The header is the compatible format's own
+    /// answer unless the person named one.
+    Key {
+        reference: String,
+        header: Option<String>,
+    },
+    /// What a login earned. Always `Authorization: Bearer`, whatever
+    /// the compatible format does with keys: both first parties issue
+    /// their subscription tokens that way.
+    Subscription { reference: String },
+}
+
+impl Credential {
+    /// What a wire command carries. A subscription token is never among
+    /// it: that one is earned by a login inside this process.
+    pub(super) fn entered(reference: Option<String>, header: Option<String>) -> Credential {
+        match reference {
+            None => Credential::Absent,
+            Some(reference) => Credential::Key { reference, header },
+        }
+    }
 }
 
 /// Which model, at which endpoint, for which of the city's roles.

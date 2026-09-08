@@ -15,7 +15,7 @@ use kernel::{AxCode, AxError, EventKind};
 use crate::serving::random_token;
 
 use super::super::{RunWorker, now_ms};
-use super::{Entered, PROBE_TIMEOUT_MS, dialect_of, poisoned_vault};
+use super::{Credential, Entered, PROBE_TIMEOUT_MS, dialect_of, poisoned_vault};
 
 impl RunWorker {
     /// Renews a subscription credential that is about to stop working.
@@ -200,8 +200,9 @@ impl RunWorker {
                         name: provider.to_owned(),
                         base_url: profile.api_base.to_owned(),
                         dialect: dialect_of(provider)?,
-                        secret: Some(access.to_string()),
-                        auth_header: None,
+                        credential: Credential::Subscription {
+                            reference: access.to_string(),
+                        },
                     },
                     &[],
                 )

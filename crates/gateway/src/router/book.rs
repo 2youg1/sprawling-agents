@@ -192,6 +192,7 @@ mod tests {
             dialect: DialectKind::OpenAi,
             auth: AuthSpec::Bearer(SecretRef::parse("secret:provider/key").unwrap()),
             models: vec!["m-small".to_owned(), "m-large".to_owned()],
+            probed: true,
         }
     }
     fn entry(id: &str) -> ModelEntry {
@@ -199,6 +200,7 @@ mod tests {
             id: id.to_owned(),
             context_tokens: 128_000,
             max_output_tokens: 8_192,
+            input: crate::market::InputKinds::Text,
             input_price: UsdMicros::new(1_000_000),
             output_price: UsdMicros::new(2_000_000),
             cache_read_price: UsdMicros::new(0),

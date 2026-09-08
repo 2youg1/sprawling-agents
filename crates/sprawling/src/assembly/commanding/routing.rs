@@ -9,7 +9,8 @@ use kernel::TimeMs;
 use kernel::{AxCode, AxError};
 
 use super::super::{
-    Assignment, Ceilings, Chosen, Entered, HALTED, RELEASED, RunWorker, mode_of, not_built,
+    Assignment, Ceilings, Chosen, Credential, Entered, HALTED, RELEASED, RunWorker, mode_of,
+    not_built,
 };
 
 impl RunWorker {
@@ -85,8 +86,7 @@ impl RunWorker {
                 name: name.as_str().to_owned(),
                 base_url,
                 dialect,
-                secret,
-                auth_header,
+                credential: Credential::entered(secret, auth_header),
             }),
             channels::Command::AttachEndpoint {
                 name,
@@ -101,8 +101,7 @@ impl RunWorker {
                     name: name.as_str().to_owned(),
                     base_url,
                     dialect,
-                    secret,
-                    auth_header,
+                    credential: Credential::entered(secret, auth_header),
                 },
                 &admit,
             ),

@@ -37,6 +37,11 @@ pub struct AttachedEndpoint {
     /// prices or limits from its model list, and a number we invented
     /// would outrank the one the provider actually bills.
     pub models: Vec<String>,
+    /// Where that list came from: `true` when the endpoint answered
+    /// `GET .../models`, `false` when it did not and the person named
+    /// the ids instead. It says how much the city knows about this
+    /// list, never whether the endpoint is healthy.
+    pub probed: bool,
 }
 
 impl AttachedEndpoint {
@@ -127,6 +132,7 @@ mod tests {
             dialect: DialectKind::OpenAi,
             auth: AuthSpec::Bearer(SecretRef::parse("secret:provider/key").unwrap()),
             models: vec!["m-small".to_owned(), "m-large".to_owned()],
+            probed: true,
         }
     }
 
@@ -143,6 +149,18 @@ mod tests {
         assert_eq!(held.name, endpoint.name);
         assert_eq!(held.base_url, endpoint.base_url);
         assert_eq!(held.models, endpoint.models);
+    }
+
+    #[test]
+    fn a_record_written_before_probed_existed_reads_as_probed() {
+        let endpoint = attached("house", "https://api.example.test/v1");
+        let mut map = attached_payload(&endpoint).unwrap().as_map().clone();
+        map.remove("probed");
+        let read = super::super::payload::read_attached(&Payload::new(map).unwrap()).unwrap();
+        assert!(
+            read.probed,
+            "a ledger written before this key existed recorded only probed attachments"
+        );
     }
 
     #[test]

@@ -12,7 +12,7 @@ use kernel::{AxCode, AxError, EventKind};
 
 use super::super::RunWorker;
 use super::{
-    Ceilings, Chosen, ENVIRONMENT_ENDPOINT, Entered, PROBE_TIMEOUT_MS, dialect_headers,
+    Ceilings, Chosen, Credential, ENVIRONMENT_ENDPOINT, Entered, PROBE_TIMEOUT_MS, dialect_headers,
     local_model_facts,
 };
 
@@ -56,20 +56,19 @@ impl RunWorker {
             name,
             base_url,
             dialect,
-            secret,
-            auth_header,
+            credential,
         } = entered;
-        let auth = match secret {
-            None => gateway::AuthSpec::None,
-            Some(raw) => {
-                let reference = kernel::SecretRef::parse(&raw)?;
-                match auth_header {
-                    Some(header) => gateway::AuthSpec::Header {
-                        name: header,
-                        value: reference,
-                    },
-                    None => gateway::AuthSpec::Bearer(reference),
-                }
+        let auth = match credential {
+            Credential::Absent => gateway::AuthSpec::None,
+            // Which header a key travels in is the compatible format's
+            // own answer, so this page does not give a second one.
+            Credential::Key { reference, header } => gateway::AuthSpec::for_dialect(
+                dialect,
+                kernel::SecretRef::parse(&reference)?,
+                header,
+            ),
+            Credential::Subscription { reference } => {
+                gateway::AuthSpec::Bearer(kernel::SecretRef::parse(&reference)?)
             }
         };
         Ok(gateway::AttachedEndpoint {
@@ -78,13 +77,12 @@ impl RunWorker {
             dialect,
             auth,
             models: Vec::new(),
+            probed: false,
         })
     }
 
-    /// Registers what the person entered, after asking the endpoint what
-    /// it serves. The probe happens before the record: an endpoint that
-    /// cannot be reached is not attached, so the book never advertises a
-    /// model nobody can call.
+    /// Registers what the person entered, asking the endpoint what it
+    /// serves first.
     ///
     /// `admit` narrows what is registered to the models the person
     /// ticked. An empty list admits everything the endpoint serves,
@@ -92,30 +90,66 @@ impl RunWorker {
     /// on the list that the endpoint does not serve is left out rather
     /// than promised, the same answer a reading room gives a skill that
     /// is not on the shelves.
+    ///
+    /// A probe that fails does not stop the attachment when the person
+    /// named the ids: most compatible endpoints serve no model list at
+    /// all, so refusing here would keep a working provider out of the
+    /// city over an interface it never promised. What the failure costs
+    /// is `probed`, which records that this list is the person's word
+    /// rather than the endpoint's.
+    ///
+    /// # Errors
+    /// A probe that fails with nothing declared: the city would have no
+    /// model id to call.
     pub(in crate::assembly) fn attach_endpoint(
         &mut self,
         entered: Entered,
         admit: &[String],
     ) -> Result<(), AxError> {
         let mut endpoint = self.endpoint_of(entered)?;
-        let served = self.probe(&endpoint)?;
-        endpoint.models = if admit.is_empty() {
-            served
-        } else {
-            served
-                .into_iter()
-                .filter(|id| admit.iter().any(|wanted| wanted == id))
-                .collect()
+        let unprobed = match self.probe(&endpoint) {
+            Ok(served) => {
+                endpoint.probed = true;
+                endpoint.models = if admit.is_empty() {
+                    served
+                } else {
+                    served
+                        .into_iter()
+                        .filter(|id| admit.iter().any(|wanted| wanted == id))
+                        .collect()
+                };
+                None
+            }
+            Err(err) if admit.is_empty() => {
+                return Err(err.with_recovery("name the model ids to admit, then attach again"));
+            }
+            Err(err) => {
+                endpoint.models = admit.to_vec();
+                Some(err.subject().to_owned())
+            }
         };
+        // One line either way, and it says which of the two happened.
+        // The unprobed attachment is degraded rather than refused - the
+        // registration went through - so it stays at `effect`, where a
+        // `refuse` line would tell the person their endpoint was turned
+        // away.
         self.note(
             runtime::diagnostics::Level::Effect,
             "gateway::router",
-            &format!(
-                "{} at {} serves {} model(s)",
-                endpoint.name,
-                endpoint.base_url,
-                endpoint.models.len()
-            ),
+            &match unprobed {
+                None => format!(
+                    "{} at {} serves {} model(s)",
+                    endpoint.name,
+                    endpoint.base_url,
+                    endpoint.models.len()
+                ),
+                Some(why) => format!(
+                    "{} at {} lists no models ({why}); attached on the {} the person named",
+                    endpoint.name,
+                    endpoint.base_url,
+                    endpoint.models.len()
+                ),
+            },
         );
         let payload = gateway::attached_payload(&endpoint)?;
         self.record(EventKind::EndpointAttached, payload)
@@ -133,9 +167,36 @@ impl RunWorker {
                 timeout_ms: PROBE_TIMEOUT_MS,
                 pricing: None,
             },
-            self.resolver(),
+            // A probe asks which models an endpoint serves. It carries
+            // no conversation, so it carries no picture either.
+            gateway::Redemption::without_images(self.resolver()),
         )?;
         probe.list_models(&endpoint.models_url())
+    }
+
+    /// What an adapter redeems at the wire: the credential this city
+    /// holds, and the pictures its content store holds.
+    ///
+    /// The store is opened per picture rather than shared, because the
+    /// worker's own handle is needed elsewhere while a call is out and a
+    /// content-addressed read is a read of one immutable object.
+    pub(in crate::assembly) fn redemption(&self) -> gateway::Redemption {
+        let cas_dir = self.city_root.join(".sprawling").join("cas");
+        gateway::Redemption::new(
+            self.resolver(),
+            std::sync::Arc::new(move |at: &kernel::Locator| {
+                let kernel::Locator::Cas { hash, .. } = at else {
+                    return Err(AxError::failure(
+                        AxCode::InvalidArgs,
+                        "read a picture",
+                        at.to_string(),
+                    )
+                    .with_recovery("a picture is referred to by a `cas:` locator"));
+                };
+                let store = memory::Cas::open(&cas_dir).map_err(memory::MemoryError::into_ax)?;
+                store.get(hash).map_err(memory::MemoryError::into_ax)
+            }),
+        )
     }
 
     /// Points one tag at one model. The two token counts come from the
@@ -194,6 +255,9 @@ impl RunWorker {
             id: model,
             context_tokens,
             max_output_tokens,
+            // What a model accepts is the catalogue's fact, not a
+            // person's: a form cannot make a text-only model see.
+            input: priced.as_ref().map(|row| row.input).unwrap_or_default(),
             // Prices come from the pinned catalog when it knows the
             // model and are zero when it does not: an unpriced call is
             // reported as unpriced rather than as free-looking guesswork.
@@ -222,8 +286,7 @@ impl RunWorker {
                 name: ENVIRONMENT_ENDPOINT.to_owned(),
                 base_url: base_url.to_owned(),
                 dialect: kernel::DialectKind::OpenAi,
-                secret: None,
-                auth_header: None,
+                credential: Credential::Absent,
             },
             &[],
         )?;

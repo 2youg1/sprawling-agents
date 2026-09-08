@@ -19,6 +19,80 @@ fn a_model_the_endpoint_never_listed_cannot_be_chosen() {
     assert!(err.subject().contains("m-invented"));
 }
 
+/// Most compatible endpoints serve no model list, so the ids the
+/// person declared are the only ids there will ever be. Attaching on
+/// them is what the four reference harnesses do; refusing would keep a
+/// working provider out of the city over an interface it never
+/// promised.
+#[test]
+fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&[], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    worker
+        .handle(channels::Command::AttachEndpoint {
+            name: channels::ProviderName::parse("declared").unwrap(),
+            base_url,
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            admit: vec!["m-1".to_owned()],
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
+        })
+        .unwrap();
+    let held = worker.book.endpoints().next().unwrap().clone();
+    assert_eq!(held.models, vec!["m-1".to_owned()]);
+    assert!(
+        !held.probed,
+        "this list is the person's word, and the book says so"
+    );
+    worker
+        .handle(channels::Command::SelectModel {
+            endpoint: channels::ProviderName::parse("declared").unwrap(),
+            model: "m-1".to_owned(),
+            tag: kernel::ModelTag::Main,
+            context_tokens: 32_768,
+            max_output_tokens: 4_096,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
+        })
+        .unwrap();
+}
+
+#[test]
+fn an_endpoint_with_neither_a_model_list_nor_a_declared_id_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&[], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    let err = worker
+        .handle(channels::Command::AttachEndpoint {
+            name: channels::ProviderName::parse("silent").unwrap(),
+            base_url,
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            admit: Vec::new(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
+        })
+        .unwrap_err();
+    assert!(
+        err.recovery().contains("model"),
+        "a city with no model id to call must ask for one: {}",
+        err.recovery()
+    );
+}
+
 #[test]
 fn an_enrolled_credential_leaves_only_a_reference_in_the_history() {
     let dir = tempfile::tempdir().unwrap();

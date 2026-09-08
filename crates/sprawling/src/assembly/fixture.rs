@@ -49,10 +49,15 @@ impl FakeProvider {
     }
 }
 
+/// An empty `models` list means this provider serves no model list at
+/// all: `GET .../models` answers 404, the way a gateway or an
+/// Anthropic-format third party does. That is the shape a city has to
+/// attach on the ids the person declared.
 #[cfg(test)]
 pub(super) fn fake_openai(models: &[&str], replies: Vec<String>) -> (String, FakeProvider) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
+    let serves_a_list = !models.is_empty();
     let list = serde_json::json!({
         "data": models
             .iter()
@@ -122,19 +127,25 @@ pub(super) fn fake_openai(models: &[&str], replies: Vec<String>) -> (String, Fak
             // The whole exchange, headers included: a test about
             // what went out on the wire needs the headers too.
             recorder.lock().unwrap().push(head.clone());
-            let body = if head.starts_with("GET ") {
-                list.clone()
-            } else {
-                match chats.next() {
-                    Some(reply) => {
-                        last.clone_from(&reply);
-                        reply
-                    }
-                    None => last.clone(),
+            let (status, body) = if head.starts_with("GET ") {
+                if serves_a_list {
+                    (200, list.clone())
+                } else {
+                    (404, "{\"error\":\"no such route\"}".to_owned())
                 }
+            } else {
+                (200, {
+                    match chats.next() {
+                        Some(reply) => {
+                            last.clone_from(&reply);
+                            reply
+                        }
+                        None => last.clone(),
+                    }
+                })
             };
             let response = format!(
-                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                "HTTP/1.1 {status} OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
                 body.len()
             );
             let _ = std::io::Write::write_all(&mut stream, response.as_bytes());
