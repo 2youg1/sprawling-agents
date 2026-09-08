@@ -228,7 +228,6 @@ names = [
   "crates/kernel/src/gate/commitment.rs::commitment", # 5
   "crates/kernel/src/gate/govern.rs::delegation",   # 5
   "crates/kernel/src/gate/govern.rs::discard",      # 5
-  "crates/kernel/src/gate/spend.rs::spend",         # 5
   "crates/runtime/src/digest.rs::digest_once",     # 5
   "crates/runtime/src/fork.rs::fork_draft",        # 5
   "crates/runtime/src/handoff.rs::new",            # 5
