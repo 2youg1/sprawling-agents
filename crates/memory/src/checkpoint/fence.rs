@@ -12,11 +12,46 @@ use serde_json::{Map, Value};
 
 use crate::error::MemoryError;
 
-pub(crate) const IDENTITY_NAME: &str = "sprawling";
-pub(crate) const IDENTITY_EMAIL: &str = "sprawling@local";
+use super::provenance::Provenance;
+use super::scan::CommitPlan;
+
+/// Where a wave fence is filed: under `refs/sprawling/`, which no
+/// branch listing, push or `git log` walks by accident.
+fn fence_ref(of: &Provenance, seq: u64) -> String {
+    format!("refs/sprawling/runs/{}/{seq}", of.run())
+}
+
+/// The `checkpoint_committed` payload, in one place so a fence and a
+/// base commit cannot describe themselves differently.
+///
+/// It carries what the commit's own trailers carry that the record
+/// cannot say for itself: the model and the effort. The run and the
+/// actor are the record's identity and are not repeated here.
+fn committed(
+    oid: git2::Oid,
+    of: &Provenance,
+    scope: &str,
+    files: Vec<String>,
+) -> Result<Payload, MemoryError> {
+    let mut map = of.model_fields();
+    map.insert("oid".to_owned(), Value::String(oid.to_string()));
+    map.insert("scope".to_owned(), Value::String(scope.to_owned()));
+    map.insert(
+        "files".to_owned(),
+        Value::Array(files.into_iter().map(Value::String).collect()),
+    );
+    Payload::new(map).map_err(|source| MemoryError::Draft { source })
+}
 
 pub struct Checkpoint {
     pub(crate) repo: git2::Repository,
+    /// The last commit this handle made, fence or landing. The scan
+    /// compares against it, because a fence no longer moves HEAD.
+    pub(crate) last: Option<git2::Oid>,
+    /// How many fences this handle has raised. The name only has to be
+    /// unique among them: the Ledger's `oid` answers every question
+    /// about a wave, and the reference only keeps the commit reachable.
+    fences: u64,
 }
 
 pub(crate) fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> MemoryError {
@@ -46,16 +81,19 @@ impl Checkpoint {
         repo.config()
             .and_then(|mut config| config.set_bool("core.autocrlf", false))
             .map_err(git_err("pin the repository's line endings"))?;
-        Ok(Checkpoint { repo })
+        Ok(Checkpoint {
+            repo,
+            last: None,
+            fences: 0,
+        })
     }
 
     /// Makes sure the city has one commit, and makes no more than that.
     ///
     /// A worktree branches from a commit, so a city that has never been
     /// fenced cannot lend a tree. Committing on every dispatch would
-    /// instead move the trunk under every request already waiting, and a
-    /// fast-forward merge would then refuse work nobody had touched.
-    /// Returns the commit it made, or `None` when there already was one.
+    /// move the trunk under every request already waiting. Returns the
+    /// commit it made, or `None` when there already was one.
     ///
     /// # Errors
     /// Propagates whatever staging and committing report.
@@ -63,29 +101,58 @@ impl Checkpoint {
         &mut self,
         scope: &str,
         t: TimeMs,
-        who: &str,
+        of: &Provenance,
     ) -> Result<Option<Payload>, MemoryError> {
         if self.repo.head().is_ok() {
             return Ok(None);
         }
-        self.wave_pre(scope, t, who).map(Some)
+        let files = self.stage_scope(scope)?;
+        self.scan_staged()?;
+        // The one fence that moves the branch: a worktree branches from a
+        // commit, and a city that has none can lend no tree.
+        let oid = self.commit(&CommitPlan {
+            t,
+            of,
+            subject: &format!("checkpoint: {scope}"),
+            onto_head: true,
+        })?;
+        committed(oid, of, scope, files).map(Some)
     }
 
     /// The pre-wave fence: stage everything under `scope`, scan it, and
     /// commit at the injected time. Returns the `checkpoint_committed`
     /// payload.
-    pub fn wave_pre(&mut self, scope: &str, t: TimeMs, who: &str) -> Result<Payload, MemoryError> {
+    ///
+    /// **The branch does not move** (card-2.2): the commit is written
+    /// with no reference update and pointed at by
+    /// `refs/sprawling/runs/<run>/<seq>`, so a person whose own folder
+    /// became this city keeps their own history instead of one
+    /// `checkpoint:` line per tool wave. The oid means what it always
+    /// meant - the tree is there and `wave_post` restores from it.
+    ///
+    /// # Errors
+    /// Propagates staging, the staged-secret scan, the commit, and a
+    /// reference the repository will not write.
+    pub fn wave_pre(
+        &mut self,
+        scope: &str,
+        t: TimeMs,
+        of: &Provenance,
+    ) -> Result<Payload, MemoryError> {
         let files = self.stage_scope(scope)?;
         self.scan_staged()?;
-        let oid = self.commit(t, who, &format!("checkpoint: {scope}"))?;
-        let mut map = Map::new();
-        map.insert("oid".to_owned(), Value::String(oid));
-        map.insert("scope".to_owned(), Value::String(scope.to_owned()));
-        map.insert(
-            "files".to_owned(),
-            Value::Array(files.into_iter().map(Value::String).collect()),
-        );
-        Payload::new(map).map_err(|source| MemoryError::Draft { source })
+        let oid = self.commit(&CommitPlan {
+            t,
+            of,
+            subject: &format!("checkpoint: {scope}"),
+            onto_head: false,
+        })?;
+        let seq = self.fences;
+        self.fences = self.fences.saturating_add(1);
+        self.repo
+            .reference(&fence_ref(of, seq), oid, true, "sprawling: a wave fence")
+            .map_err(git_err("file a wave fence"))?;
+        committed(oid, of, scope, files)
     }
 
     /// The post-wave sweep: every path present at `pre_oid` and gone
@@ -139,7 +206,6 @@ impl Checkpoint {
         Ok(payloads)
     }
 }
-
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -148,138 +214,4 @@ impl Checkpoint {
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
-    use super::*;
-    fn write(root: &Path, rel: &str, body: &str) {
-        let path = root.join(rel);
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).unwrap();
-        }
-        std::fs::write(path, body).unwrap();
-    }
-    fn oid_of(payload: &Payload) -> String {
-        serde_json::to_value(payload).unwrap()["oid"]
-            .as_str()
-            .unwrap()
-            .to_owned()
-    }
-
-    #[test]
-    fn a14_the_fence_precedes_the_deletion_it_restores() {
-        let tmp = tempfile::tempdir().unwrap();
-        write(tmp.path(), "work/keep.txt", "kept");
-        write(tmp.path(), "work/doomed.txt", "about to go");
-        let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
-
-        let pre = checkpoint
-            .wave_pre("work", TimeMs::new(1_700_000_000_000), "resident")
-            .unwrap();
-        let pre_oid = oid_of(&pre);
-        let files = serde_json::to_value(&pre).unwrap();
-        assert_eq!(files["files"].as_array().unwrap().len(), 2);
-
-        // The wave deletes a file.
-        std::fs::remove_file(tmp.path().join("work/doomed.txt")).unwrap();
-
-        let discards = checkpoint.wave_post(&pre_oid).unwrap();
-        assert_eq!(discards.len(), 1);
-        let value = serde_json::to_value(&discards[0]).unwrap();
-        assert_eq!(value["paths"][0], "file:work/doomed.txt");
-        assert_eq!(
-            value["restoration"]["tracked"],
-            format!("file:work/doomed.txt@{pre_oid}"),
-            "the restoration names a commit that already exists"
-        );
-    }
-
-    #[test]
-    fn the_scope_is_the_boundary_and_outside_it_nothing_is_staged() {
-        let tmp = tempfile::tempdir().unwrap();
-        write(tmp.path(), "work/mine.txt", "in domain");
-        write(tmp.path(), "elsewhere/theirs.txt", "not mine");
-        let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
-        let pre = checkpoint
-            .wave_pre("work", TimeMs::new(1_700_000_000_000), "resident")
-            .unwrap();
-        let files = serde_json::to_value(&pre).unwrap();
-        let staged: Vec<String> = files["files"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_str().unwrap().to_owned())
-            .collect();
-        assert_eq!(staged, vec!["work/mine.txt".to_owned()]);
-    }
-
-    #[test]
-    fn a_wave_pays_for_what_it_changed_rather_than_for_the_whole_tree() {
-        let tmp = tempfile::tempdir().unwrap();
-        let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
-        write(tmp.path(), "work/smuggled.env", &format!("KEY={token}"));
-        let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
-        checkpoint.stage_scope("work").unwrap();
-        checkpoint
-            .commit(TimeMs::new(1_000), "resident", "past the fence")
-            .unwrap();
-
-        // An ordinary wave that touches a different file. What it pays
-        // for is its own change; the blob it did not touch is not read.
-        write(tmp.path(), "work/ordinary.txt", "nothing to see");
-        checkpoint
-            .wave_pre("work", TimeMs::new(2_000), "resident")
-            .expect("an unchanged blob is not re-examined");
-
-        // And the guard still bites on this wave's own writing, which is
-        // the half of the property the narrowing must not cost.
-        write(tmp.path(), "work/fresh.env", &format!("KEY={token}"));
-        let err = match checkpoint.wave_pre("work", TimeMs::new(3_000), "resident") {
-            Err(err) => err,
-            Ok(_) => panic!("a secret arriving with this wave must refuse the commit"),
-        };
-        let rendered = err.to_string();
-        assert!(rendered.contains("work/fresh.env"), "{rendered}");
-        assert!(
-            !rendered.contains("work/smuggled.env"),
-            "only what this wave staged is reported: {rendered}"
-        );
-    }
-
-    #[test]
-    fn an_unchanged_wave_still_commits_so_the_chain_rebuilds() {
-        let tmp = tempfile::tempdir().unwrap();
-        write(tmp.path(), "work/steady.txt", "unchanged");
-        let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
-        let first = oid_of(
-            &checkpoint
-                .wave_pre("work", TimeMs::new(1_000), "resident")
-                .unwrap(),
-        );
-        let second = oid_of(
-            &checkpoint
-                .wave_pre("work", TimeMs::new(2_000), "resident")
-                .unwrap(),
-        );
-        assert_ne!(first, second, "each fence is its own commit");
-        assert!(checkpoint.wave_post(&second).unwrap().is_empty());
-    }
-
-    #[test]
-    fn the_same_script_at_the_same_time_produces_the_same_commit() {
-        let build = |dir: &Path| -> String {
-            write(dir, "work/a.txt", "alpha");
-            let mut checkpoint = Checkpoint::open(dir).unwrap();
-            oid_of(
-                &checkpoint
-                    .wave_pre("work", TimeMs::new(1_700_000_000_000), "resident")
-                    .unwrap(),
-            )
-        };
-        let one = tempfile::tempdir().unwrap();
-        let two = tempfile::tempdir().unwrap();
-        assert_eq!(
-            build(one.path()),
-            build(two.path()),
-            "time is a parameter, so the oid is reproducible"
-        );
-    }
-}
+mod tests;
