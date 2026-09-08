@@ -1,0 +1,31 @@
+{
+  "name": "sprawling-client",
+  "private": true,
+  "version": "0.0.4",
+  "type": "module",
+  "license": "MPL-2.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "bun node_modules/typescript-native/lib/tsc.js --noEmit",
+    "lint": "eslint --max-warnings 0",
+    "test": "bun test --conditions=browser"
+  },
+  "dependencies": {
+    "effect": "3.22.1",
+    "solid-js": "1.9.15"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/bun": "1.4.2",
+    "eslint": "10.10.0",
+    "eslint-plugin-solid": "0.17.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
+    "typescript-native": "npm:typescript@7.0.2",
+    "vite": "8.2.2",
+    "vite-plugin-solid": "2.11.14"
+  }
+}

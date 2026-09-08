@@ -1,0 +1,110 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* The token tables of crates/web/src/theme.rs, re-expressed as the
+ * Tailwind theme. That file is the authority for every value here: one
+ * hue axis (264), one derived exception hue (84), a grey ramp at chroma
+ * 0.018, and coloured tokens whose chroma is a ratio of the gamut limit
+ * (the resolved per-mille values below are what theme's own test writes
+ * to target/screens/tokens.css). Desaturation is one coefficient,
+ * --chroma, set to zero. This is the only file in the client that may
+ * hold a colour, a size or a family literal. */
+
+@import "tailwindcss";
+
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --font-weight-*: initial;
+  --radius-*: initial;
+  --spacing: initial;
+  --spacing-*: initial;
+  --container-*: initial;
+
+  /* The grey ramp: the information surface, never pure black or white. */
+  --color-g0: oklch(0.145 0.018 264);
+  --color-g1: oklch(0.195 0.018 264);
+  --color-g2: oklch(0.245 0.018 264);
+  --color-g3: oklch(0.300 0.018 264);
+  --color-g4: oklch(0.360 0.018 264);
+  --color-g5: oklch(0.430 0.018 264);
+  --color-g6: oklch(0.520 0.018 264);
+  --color-g7: oklch(0.630 0.018 264);
+  --color-g8: oklch(0.730 0.018 264);
+  --color-g9: oklch(0.830 0.018 264);
+  --color-g10: oklch(0.930 0.018 264);
+
+  /* The coloured tokens: ACCENT at 90% of the gamut, ALERT at 55%; a
+   * hover keeps its base ratio at a higher lightness. */
+  --color-accent: oklch(0.680 calc(0.151 * var(--chroma)) 264);
+  --color-alert: oklch(0.919 calc(0.046 * var(--chroma)) 84);
+  --color-accent-hover: oklch(0.760 calc(0.109 * var(--chroma)) 264);
+  --color-alert-hover: oklch(0.945 calc(0.030 * var(--chroma)) 84);
+  --color-accent-solid: oklch(0.919 calc(0.034 * var(--chroma)) 264);
+
+  /* Text: each lightness reaches one APCA Bronze tier on G2. */
+  --color-text: oklch(0.928 0.018 264);
+  --color-text-quiet: oklch(0.852 0.018 264);
+  --color-text-faint: oklch(0.771 0.018 264);
+  --color-text-disabled: oklch(0.582 0.018 264);
+
+  --background-image-progress-done: linear-gradient(
+    90deg,
+    var(--color-g10),
+    var(--color-accent)
+  );
+
+  /* The faces: no font file ships and none is fetched. */
+  --font-sans:
+    Inter, "IBM Plex Sans", "Source Sans 3", "Public Sans", system-ui,
+    -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas,
+    "DejaVu Sans Mono", monospace;
+
+  /* The type scale: a step is named for its job, not its size. */
+  --text-figure: 28px;
+  --text-title: 20px;
+  --text-heading: 18px;
+  --text-label: 14px;
+  --text-body: 15px;
+  --text-note: 15px;
+  --font-weight-figure: 600;
+  --font-weight-title: 600;
+  --font-weight-heading: 600;
+  --font-weight-label: 600;
+  --font-weight-body: 400;
+  --font-weight-note: 400;
+
+  /* The spacing scale: six steps, every one a multiple of four. */
+  --spacing-tight: 4px;
+  --spacing-snug: 8px;
+  --spacing-base: 12px;
+  --spacing-pane: 16px;
+  --spacing-wide: 24px;
+  --spacing-section: 32px;
+
+  /* The two widths a page is built from. */
+  --container-measure: 520px;
+  --container-page: 1040px;
+
+  /* The corner scales; the shape is the superellipse exponent halved. */
+  --radius-panel: 10px;
+  --radius-card: 7px;
+  --radius-control: 5px;
+  --radius-pill: 999px;
+
+  /* The one duration: the acknowledgement a control owes a hand. */
+  --default-transition-duration: 90ms;
+}
+
+:root {
+  --chroma: 1;
+  --corner-panel-shape: superellipse(2);
+  --corner-card-shape: superellipse(1.5);
+  --corner-control-shape: superellipse(1.5);
+  --corner-pill-shape: superellipse(1);
+}
