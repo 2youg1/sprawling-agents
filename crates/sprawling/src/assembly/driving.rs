@@ -5,15 +5,15 @@
 
 //! One drive, and what it leaves behind.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use kernel::{AxCode, AxError};
+use kernel::{Address, AxCode, AxError};
 use kernel::{RunId, TimeMs};
-use runtime::Interrupt;
 use runtime::bench::{BenchOutcome, ToolBench};
 use runtime::run::{RunHooks, RunPlan, SafePoint, drive};
+use runtime::{Interrupt, SieveSite, package_exec};
 
-use super::{RunWorker, now_ms};
+use super::{RunWorker, Site, now_ms};
 
 /// What one drive is handed: the machinery it runs on, and the run it
 /// runs as.
@@ -31,7 +31,9 @@ pub(super) struct Driving<'a> {
     /// What routes a call the model makes.
     pub(super) bench: &'a mut ToolBench,
     /// Where a steer from a resident lands while the drive is going.
-    pub(super) signals: &'a std::rc::Rc<std::cell::RefCell<collab::SignalDesk>>,
+    /// A handle of its own rather than a loan: the drive may leave the
+    /// thread that opened the desk (sprawling-SPEC 8-44).
+    pub(super) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
     /// The tree the run writes in: its own worktree under review, the
     /// city itself otherwise.
     pub(super) write_root: &'a Path,
@@ -42,6 +44,99 @@ pub(super) struct Driving<'a> {
     pub(super) run_id: RunId,
     /// What every fence this drive raises is signed with (card-2.1).
     pub(super) of: memory::Provenance,
+    /// Where a command's output is pinned before it is cut, and what
+    /// decides the cut (sprawling-SPEC 8-43).
+    pub(super) sieving: Sieving,
+    /// This run's place in the backlog, when it is a run somebody handed
+    /// down: the member a halt on its scope marks (runtime-SPEC 8-28-2).
+    pub(super) member: Option<runtime::BacklogId>,
+}
+
+/// What the sieve needs from the city for one run: a store to pin the
+/// original in, a directory the model can read the rest from, the
+/// filter table frozen with the run, and what this run already saw.
+pub(super) struct Sieving {
+    pub(super) cas: memory::Cas,
+    pub(super) environment: PathBuf,
+    pub(super) table: runtime::FilterTable,
+    pub(super) history: runtime::SieveHistory,
+}
+
+impl Sieving {
+    /// What the model reads of one command's output, decided by the
+    /// pipeline under the command's own key with the original pinned
+    /// first. The stamp is `None` because the turn already stamps a
+    /// result where the frozen configuration asks for one.
+    fn package(
+        &mut self,
+        call: &kernel::ToolCall,
+        outcome: kernel::ToolOutcome,
+    ) -> Result<kernel::ToolOutcome, AxError> {
+        package_exec(
+            call,
+            outcome,
+            SieveSite {
+                offload: runtime::offload::OffloadSite {
+                    cas: &mut self.cas,
+                    environment: &self.environment,
+                },
+                table: &self.table,
+                history: &mut self.history,
+            },
+            None,
+        )
+    }
+}
+
+/// Who may interrupt one drive, in rank order: the halt that reached
+/// its backlog member, the person, then a neighbour's steer.
+///
+/// Two speakers, one landing, and the person outranks the resident.
+/// What keeps them apart where the model reads them is `collab::Steer`:
+/// only the person's entrance can write the `user` prefix, and a
+/// resident's writes `@` and its own address - the address a reply is
+/// sent to. A run that could not tell the two apart would answer the
+/// person by signalling them, and answer a neighbour by talking to
+/// nobody.
+struct Interrupting {
+    run_id: RunId,
+    member: Option<runtime::BacklogId>,
+    backlog: runtime::Backlog,
+    person: Option<Box<dyn FnMut(RunId) -> Interrupt + Send>>,
+    steers: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
+}
+
+impl Interrupting {
+    fn ask(&mut self) -> Interrupt {
+        // A stopped scope outranks anything a person or a neighbour
+        // still has to say to the run.
+        if self
+            .member
+            .is_some_and(|id| self.backlog.stopping(id).unwrap_or(false))
+        {
+            return Interrupt::Cancel;
+        }
+        let from_person = match self.person.as_mut() {
+            Some(ask) => ask(self.run_id),
+            None => Interrupt::None,
+        };
+        if !matches!(from_person, Interrupt::None) {
+            return from_person;
+        }
+        // A desk nobody can take answers nothing rather than refusing:
+        // a safe point is the wrong place to fail over a lock, and the
+        // drive's own end will report it.
+        let Ok(mut desk) = self.steers.lock() else {
+            return Interrupt::None;
+        };
+        match desk.take_steer() {
+            Some(steer) => Interrupt::Steer {
+                source: steer.source().to_owned(),
+                text: steer.text().to_owned(),
+            },
+            None => Interrupt::None,
+        }
+    }
 }
 
 /// What one drive left behind, beside the run it froze.
@@ -64,6 +159,38 @@ pub(super) struct Driven {
 }
 
 impl RunWorker {
+    /// What the sieve needs from this city for one run.
+    ///
+    /// The store is a second handle on the same CAS rather than a loan
+    /// of the worker's: the store is content-addressed and written
+    /// through a temporary file, so two handles are one library, and a
+    /// drive that borrowed the worker's could not leave the thread the
+    /// worker lives on. The rest directory sits inside the room, which
+    /// is the one place a model-chosen path is allowed to read from.
+    ///
+    /// # Errors
+    /// Propagates a store that will not open and a rest directory that
+    /// cannot be made.
+    pub(super) fn sieving_for(&self, site: &Site, addr: &Address) -> Result<Sieving, AxError> {
+        let cas = memory::Cas::open(&self.city_root.join(".sprawling").join("cas"))
+            .map_err(memory::MemoryError::into_ax)?;
+        let environment = site.write_root.join(addr.as_str()).join(".rest");
+        std::fs::create_dir_all(&environment).map_err(|err| {
+            AxError::failure(
+                AxCode::StorageFatal,
+                "make the rest directory",
+                format!("{}: {err}", environment.display()),
+            )
+            .with_recovery("make the room writable")
+        })?;
+        Ok(Sieving {
+            cas,
+            environment,
+            table: site.filters.clone(),
+            history: runtime::SieveHistory::default(),
+        })
+    }
+
     /// Runs the plan, and hands back what the drive left behind.
     ///
     /// The three hooks live here because they are the only code that
@@ -98,6 +225,8 @@ impl RunWorker {
             who,
             run_id,
             of,
+            mut sieving,
+            member,
         } = driving;
         let mut now = || now_ms();
         // Taken before the hooks borrow `self`: the sink outlives one
@@ -114,7 +243,13 @@ impl RunWorker {
         // Taken for the length of the drive and put back after: the
         // hooks cannot borrow the worker, and a source that stayed
         // behind would be a second one.
-        let mut source = self.interrupts.take();
+        let mut asking = Interrupting {
+            run_id,
+            member,
+            backlog: self.backlog.clone(),
+            person: self.interrupts.take(),
+            steers: signals,
+        };
         // What the run's own commands did. It is the only evidence of
         // "the tests passed" the city can observe without being told,
         // and being told is what a mode is supposed to check.
@@ -129,38 +264,7 @@ impl RunWorker {
             let raised = raised_by_bench;
             let fenced = fenced_by_bench;
             let ran = ran_by_bench;
-            // Two speakers, one landing, and the person outranks the
-            // resident. What keeps them apart where the model reads them
-            // is `collab::Steer`: only the person's entrance can write
-            // the `user` prefix, and a resident's writes `@` and its own
-            // address - the address a reply is sent to. A run that could
-            // not tell the two apart would answer the person by
-            // signalling them, and answer a neighbour by talking to
-            // nobody.
-            let steers = std::rc::Rc::clone(signals);
-            let mut interrupt = |_: SafePoint| {
-                let from_person = match source.as_mut() {
-                    Some(ask) => ask(run_id),
-                    None => Interrupt::None,
-                };
-                if !matches!(from_person, Interrupt::None) {
-                    return from_person;
-                }
-                // A desk in use answers nothing rather than refusing:
-                // the interrupt runs between tool calls, so this borrow
-                // is free in practice, and a safe point is the wrong
-                // place to fail over a lock.
-                let Ok(mut desk) = steers.try_borrow_mut() else {
-                    return Interrupt::None;
-                };
-                match desk.take_steer() {
-                    Some(steer) => Interrupt::Steer {
-                        source: steer.source().to_owned(),
-                        text: steer.text().to_owned(),
-                    },
-                    None => Interrupt::None,
-                }
-            };
+            let mut interrupt = |_: SafePoint| asking.ask();
             // Where this call sits in this run. The key used to derive
             // from the turn's millisecond stamp and the tool's name,
             // which broke twice over: it took a clock, which determinism
@@ -193,13 +297,16 @@ impl RunWorker {
                         if let Some(oid) = at {
                             fenced.borrow_mut().push(oid);
                         }
-                        if call.name.as_str() == "exec" {
-                            let failed = outcome
-                                .result
-                                .as_map()
-                                .get("exit_code")
-                                .and_then(serde_json::Value::as_i64)
-                                .is_some_and(|code| code != 0);
+                        if call.name.as_str() != "exec" {
+                            return Ok(outcome);
+                        }
+                        let failed = outcome
+                            .result
+                            .as_map()
+                            .get("exit_code")
+                            .and_then(serde_json::Value::as_i64)
+                            .is_some_and(|code| code != 0);
+                        {
                             let mut counts = ran.borrow_mut();
                             if failed {
                                 counts.1 = counts.1.saturating_add(1);
@@ -207,7 +314,7 @@ impl RunWorker {
                                 counts.0 = counts.0.saturating_add(1);
                             }
                         }
-                        Ok(outcome)
+                        sieving.package(call, outcome)
                     }
                     BenchOutcome::Refused { refusal } => Err(*refusal),
                     BenchOutcome::Pending { item } => {
@@ -272,7 +379,7 @@ impl RunWorker {
                 handoff,
             )
         };
-        self.interrupts = source;
+        self.interrupts = asking.person;
         Ok(Driven {
             outcome: driven,
             adapter,

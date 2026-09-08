@@ -5,18 +5,17 @@
 
 //! The sieve's world in a scenario: a CAS and an environment directory
 //! for the tee, one filter table, and the run's history. An `exec`
-//! result is put through `runtime::pipeline::package` with its command
-//! key, the same door the city will use, and what the model sees is
-//! recorded together with the sieve's own account.
+//! result goes through `runtime::package_exec`, the same door the city
+//! uses, so the window a scenario replays is the window the product
+//! showed.
 
 use std::path::PathBuf;
 
-use kernel::{AxCode, AxError, Payload, ToolCall, ToolOutcome};
+use kernel::{AxCode, AxError, ToolCall, ToolOutcome};
 use memory::Cas;
 use runtime::clock::ClockStamp;
 use runtime::offload::OffloadSite;
-use runtime::{CommandKey, FilterTable, PackContext, SieveHistory, SieveRequest, package};
-use serde_json::{Map, Value};
+use runtime::{FilterTable, SieveHistory, SieveSite};
 
 pub struct SieveWorld {
     pub cas: Cas,
@@ -44,64 +43,24 @@ impl SieveWorld {
     }
 }
 
-fn text_field<'a>(map: &'a Map<String, Value>, name: &str) -> &'a str {
-    map.get(name).and_then(Value::as_str).unwrap_or("")
-}
-
-/// One `exec` outcome, sieved and packaged. The result the model reads
-/// is `{content, exit_code, sieve}`: the window text, the code, and the
-/// `result_offloaded` payloads the pipeline produced.
+/// One `exec` outcome, sieved and packaged through the product's door.
 pub(crate) fn package_exec(
     call: &ToolCall,
     outcome: &ToolOutcome,
     world: &mut SieveWorld,
     stamp: Option<ClockStamp>,
 ) -> Result<ToolOutcome, AxError> {
-    let key = CommandKey::of(&runtime::parse_arm(call.args.as_map())?);
-    let result = outcome.result.as_map();
-    let exit_code = result.get("exit_code").and_then(Value::as_i64);
-    let mut text = text_field(result, "stdout").to_owned();
-    let stderr = text_field(result, "stderr");
-    if !stderr.is_empty() {
-        if !text.is_empty() {
-            text.push('\n');
-        }
-        text.push_str(stderr);
-    }
-    let packaged = package(
-        text.as_bytes(),
-        PackContext {
-            cap_bytes: 16_384,
-            stamp,
-            net_notice: false,
-            steer: None,
-            offload: Some(OffloadSite {
+    runtime::package_exec(
+        call,
+        outcome.clone(),
+        SieveSite {
+            offload: OffloadSite {
                 cas: &mut world.cas,
                 environment: &world.environment,
-            }),
-            sieve: Some(SieveRequest {
-                key,
-                exit_code,
-                table: &world.table,
-                history: &mut world.history,
-            }),
+            },
+            table: &world.table,
+            history: &mut world.history,
         },
-    )?;
-    let mut wrapped = Map::new();
-    wrapped.insert("content".to_owned(), Value::String(packaged.content));
-    if let Some(code) = exit_code {
-        wrapped.insert("exit_code".to_owned(), Value::Number(code.into()));
-    }
-    let accounts = packaged
-        .events
-        .iter()
-        .map(serde_json::to_value)
-        .collect::<Result<Vec<Value>, _>>()
-        .map_err(|err| {
-            AxError::failure(AxCode::InvalidArgs, "encode sieve account", err.to_string())
-        })?;
-    wrapped.insert("sieve".to_owned(), Value::Array(accounts));
-    Ok(ToolOutcome {
-        result: Payload::new(wrapped)?,
-    })
+        stamp,
+    )
 }

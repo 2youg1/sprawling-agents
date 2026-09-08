@@ -120,7 +120,6 @@ fn scenario(root: &std::path::Path) -> Scenario {
         checkpoint: None,
         cancel: None,
         steer: None,
-        budget_turns: 8,
         sieve: Some(SieveWorld::open(root, FilterTable::builtin()).unwrap()),
     }
 }
