@@ -40,6 +40,9 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **resume** | Reopening a city after the process died: the chain is verified, tool calls whose outcome was lost are closed as unknown, and what waits for a person is reported. |
 | **Address** | A path newtype relative to the city root. It sets the write domain, the default context, and who the work reports to. |
 | **reserved prefix** | A `.sprawling/` directory and its subtree, at any depth, always outside every write domain. Each scope keeps what governs it there — the city, and from F2.09 each building. An agent cannot edit its own accounting, its own configuration, or its own building's rules. |
+| **City Hall** | The building `hall`, raised with the city. It holds the city's plan and the two residents who serve every other building; it holds no project of its own. |
+| **Mayor** | The resident `hall/mayor`: the city's planner, writing Markdown only. It turns an idea into `<city>/hall/Roadmap.md`, hands each building its part through `plan`, and raises a building through `city`. Its identity is `<city>/.sprawling/MAYOR.md`. |
+| **clerk** | The resident `hall/clerk`: answers approvals when the person delegated them, in the same three parts a Gate uses, with its reason in the Ledger. Its identity is `<city>/.sprawling/CLERK.md`. |
 
 ## 2 History and content
 
@@ -53,6 +56,12 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **CAS** | Content-addressed store (BLAKE3). Identical content is stored once for its lifetime. |
 | **projection** | A view rebuilt from the event stream. **Disposable**: deleting the table and rebuilding from the Ledger gives byte-identical results. |
 | **Snapshot** | The same idea inside the browser (`web::app`): equally disposable, equally forward-only. |
+| **Provenance** | The five facts a commit the city makes carries as git trailers — `Sprawling-Run`, `Sprawling-Actor`, `Sprawling-Model`, `Sprawling-Effort`, `Sprawling-City`. A projection of the Ledger for readers outside the city; the Ledger stays the authority and the commit id reconciles the two. |
+| **fence** | The commit the city makes before and after a tool wave so a change can be shown and reverted. It lives under `refs/sprawling/runs/`, never on the person's `HEAD`. |
+| **landing commit** | The one commit a reviewing run makes on its worktree branch when it offers a pull request; the merge that follows is the only commit trunk receives. |
+| **accounting thread** | The city's one writer. It alone holds the Ledger, the endpoint book, the plans, the pursuits, the governance fold and the desks, and it alone settles what a run left behind — in the order the results arrive. |
+| **driving pool** | The threads that drive runs. A pool thread holds one run's driving state and nothing else: no Ledger, no book, no desk. Its size is the smaller of the provider's admission ceiling and the configured number; citysim runs a pool of one. |
+| **relay** | The Ledger adapter a driving thread writes through. It carries the EventDraft to the accounting thread and waits for the answer, so `Ok` still means durable and the city still has one writer. |
 
 ## 3 Context and turns
 
@@ -73,7 +82,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **Gate** | Five doors plus idempotent deduplication. A decision returns an exhaustive verdict rather than a bool. |
 | **three-part refusal** | A refusal states what was refused, why, and an alternative that can be acted on. |
 | **Taint** | External content is data. Taint joins on the union, rises through doors, and has no unwrapping surface. |
-| **WriteDomain** | The set of prefixes a resident may write. The decision primitive is `Address::is_within`. |
+| **WriteDomain** | The set of prefixes a resident may write, and what it may write inside them: `Everything`, or `Documents` — Markdown files only, and never a plan file. The decision primitive is `Address::is_within`; a building declares the second half with one `write:` line in its `BUILDING.md`. |
 | **Escalate** | Handing a decision up to a person, as an ApprovalItem, rather than deciding it. |
 | **Sealed\<T\>** | A sealed value: no Debug, no Display, no Serialize, no Clone. |
 | **SecretRef** | `secret:<realm>/<name>`. Configuration holds the reference; plaintext reaches the Vault only. |
@@ -85,20 +94,34 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **Policy** | An exemption rule settled from answered ApprovalItems. It expires. |
 | **Reading Room** | The list of skills a building admits. A name on it that is not on the shelves is left out rather than promised. |
 | **Autonomy** | Who answers: `Owner`, `Delegate`, or `Deferred`. |
+| **Halt** | The brake, and the only one: stop a city, a building, or a workshop; `release` lets it go on. It shuts the scope to new work and terminates the backlog members inside it, so a command nobody can reach is not what a stopped city is still doing. Ending a run that is already going is `Cancel`, which is a different verb. There is no spend ceiling and no turn ceiling behind it — a city that must stop is stopped by somebody saying so. |
+| **Fallback** | What a tag does when its endpoint will not answer: `None` (freeze, and record why) or `Then` (retreat to a named endpoint and model, which is itself an event). The default is `None`, because switching a person's model in silence is the last decision a default value should make. |
 
 ## 5 Tools and the outside
 
 | Name | What it is |
 |---|---|
 | **exec** | The tool that runs a program, a Python artifact, or a shell line, inside the sandbox the frozen configuration allows. |
+| **environment passthrough** | The environment variable names a building declares its `exec` children may inherit, in its `CONFIG.toml` `[sandbox]` section, on top of the four every run gets. A name shaped like a credential is refused where the file is read. It is a declaration rather than a longer built-in list because what a child inherits, it cannot forget. |
 | **edit** | The tool that changes a file, against a base version, inside the write domain. |
 | **status** | The tool that answers what a run's own situation is: turns, budget, what waits for it, and how many neighbours it has. |
 | **neighbours** | The tool that lists the Neighbourhood: this building's addresses with the line each resident's `URBANITE.md` offers about what to bring them, or the city's buildings by name. An address it does not list has no reader. |
-| **read** | The tool that opens one file by its path, or one catalog entry — a skill, a mode, the developer entry — by the name the catalog lists it under. A model-chosen path never reaches a reserved subtree; a catalog name may, because a person admitted it. |
+| **read** | The tool that opens one file by its path, or one catalog entry — a skill, a mode, the developer entry — by the name the catalog lists it under. A model-chosen path never reaches a reserved subtree; a catalog name may, because a person admitted it. It answers by line interval: at most 512 lines, and a truncated answer states the total and the offset to continue from. |
+| **search** | The tool that finds a substring under one address prefix, with the lines around each hit and the line number `read` continues from. A substring, never a regular expression, so a pattern a model wrote wrong cannot become a stall; the same predicate `read` uses keeps it out of a reserved subtree. |
 | **dialect** (兼容格式) | The request and reply format one provider speaks — OpenAI-shaped or Anthropic-shaped. `gateway::dialect` translates between the canonical shape and one of them, in both directions. Chinese prose says 兼容格式; the identifier stays English. |
 | **Endpoint** | One provider's chat URL, dialect, credential and headers. The city reaches an **external provider** only through one. |
 | **Connector** | An external tool server a building configured, reached over MCP. Its tools carry a `Connector` effect, so the egress door knows where they go without a model naming a host. |
 | **subscription login** | Signing in to a provider with a subscription instead of an API key: begin, approve in a browser, bring back the code the provider shows. |
+| **Image** | A content block a model can see: a locator into the CAS, a media type, and integer dimensions. Bytes reach the wire only when the request is sent, never the Ledger. |
+| **browser** | The tool that drives the person's own browser over WebDriver BiDi: open, snapshot, act, screenshot, measure, console, viewport, close. It launches nothing and downloads nothing. |
+| **desktop connector** | `sprawling-desktop`, an out-of-tree MCP server a building may attach: windows, snapshot, act, screenshot, record, clipboard, in the browser tool's vocabulary, inside an allowlist the building wrote in `DESKTOP.toml`. |
+| **doctor** | `sprawling doctor`: what this machine has against what a city needs, in two tiers — enough to use, enough to develop — and, with `--install`, one consented installation at a time. |
+
+| **sieve** | The pass that decides what survives a command's output, by which command produced it. Deterministic and compulsory; so is the tee behind it, so nothing it cuts is unreachable. Distinct from **compaction**, which reads the shape of a text rather than the identity of its author. |
+| **backlog** | The table of work that is running while the run goes on: background commands and delegated runs. Halt reaches into it; `status` reports the part of it that belongs to this run. |
+| **succession** | A run replacing itself: same address, same depth, therefore the same tools — a successor is not a delegate, which is why it may delegate. It carries a handoff and the address of the conversation that produced it, and it needs no person. |
+| **lineage** | The chain of runs a succession leaves behind. `Provenance` names each one's predecessor, so "how many times has this resident replaced itself since I last looked" is one question with one answer. |
+| **transcript** | What one run actually saw, written beside its room as `<run-id>.jsonl` when the run freezes: the messages, the calls, the results as the model received them. Not the Ledger — the Ledger is the city's, this is the run's, and only the second one is a thing a resident may read. |
 
 ## 6 Interface
 
