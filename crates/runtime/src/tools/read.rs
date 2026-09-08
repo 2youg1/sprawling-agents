@@ -19,6 +19,15 @@
 //! over, and every file the prompt asks an agent to consult had to be
 //! reached by writing Python inside `exec` — which a city with no
 //! sandbox and no shell cannot do at all.
+//!
+//! **An answer is an interval, and it says what it is part of.** Whole-
+//! file reading made every long document an all-or-nothing call: the
+//! kernel's own SPEC is fourteen hundred lines, and a read of it either
+//! spent the window or was cut somewhere by the pipeline — usually
+//! through the passage the caller wanted. So a call takes `offset` and
+//! `limit`, at most 512 lines, and a truncated answer carries the total
+//! and the offset to continue from, which is the number `search`
+//! reports for a hit.
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -32,10 +41,107 @@ use serde_json::{Map, Value};
 
 use crate::catalog::{Catalog, Expansion};
 
+/// The most lines one call may bring back, and the default when the
+/// caller says nothing. One number for both: a default below the cap
+/// would make the cap invisible to a caller that never sets `limit`,
+/// which is most of them.
+const LINE_CAP: u64 = 512;
+
 /// Where the answer to one call comes from.
 enum Found {
     File(PathBuf),
     Text(String),
+}
+
+/// The interval of one answer: where it starts and how much of it there
+/// is at most.
+struct Interval {
+    offset: usize,
+    limit: usize,
+}
+
+/// What one interval took out of a document, and what the taking left.
+///
+/// `total_lines` and `next_offset` are present only when they say
+/// something: a whole small file needs neither, and an offset past the
+/// end gets the total without a `next_offset`, because handing one back
+/// would invite a call that reads the same nothing again.
+struct Taken {
+    text: String,
+    total_lines: Option<u64>,
+    next_offset: Option<u64>,
+}
+
+impl Interval {
+    /// # Errors
+    /// `E_INVALID_ARGS` when `offset` or `limit` is not a whole number,
+    /// or when `limit` is zero. A `limit` above the cap is served at the
+    /// cap rather than refused: the answer carries the truth about what
+    /// it left behind, so a refusal would only cost the caller a turn.
+    fn asked_for(call: &ToolCall) -> Result<Interval, AxError> {
+        let args = call.args.as_map();
+        let whole = |field: &'static str| -> Result<Option<u64>, AxError> {
+            match args.get(field) {
+                None => Ok(None),
+                Some(value) => value.as_u64().map(Some).ok_or_else(|| {
+                    AxError::failure(
+                        AxCode::InvalidArgs,
+                        "read",
+                        format!("`{field}` is not a whole number of lines"),
+                    )
+                    .with_recovery(
+                        "pass `offset` and `limit` as non-negative integers, or leave them out \
+                         to read from the start",
+                    )
+                }),
+            }
+        };
+        let offset = whole("offset")?.unwrap_or(0);
+        let limit = whole("limit")?.unwrap_or(LINE_CAP).min(LINE_CAP);
+        if limit == 0 {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "read",
+                "`limit` is zero, which asks for no lines at all",
+            )
+            .with_recovery("pass a `limit` from 1 to 512, or leave it out"));
+        }
+        Ok(Interval {
+            offset: usize::try_from(offset).unwrap_or(usize::MAX),
+            limit: usize::try_from(limit).unwrap_or(usize::MAX),
+        })
+    }
+
+    /// Cuts on line ends rather than on lines: every line travels with
+    /// its own terminator, so reading a whole short file returns the
+    /// bytes the file holds and `bytes` keeps the meaning it had.
+    fn cut(&self, text: &str) -> Taken {
+        let lines: Vec<&str> = text.split_inclusive('\n').collect();
+        let total = lines.len();
+        let counted = u64::try_from(total).unwrap_or(u64::MAX);
+        if self.offset >= total {
+            return Taken {
+                text: String::new(),
+                total_lines: Some(counted),
+                next_offset: None,
+            };
+        }
+        let end = self.offset.saturating_add(self.limit).min(total);
+        let taken = lines.get(self.offset..end).unwrap_or_default().concat();
+        if end < total {
+            Taken {
+                text: taken,
+                total_lines: Some(counted),
+                next_offset: Some(u64::try_from(end).unwrap_or(u64::MAX)),
+            }
+        } else {
+            Taken {
+                text: taken,
+                total_lines: None,
+                next_offset: None,
+            }
+        }
+    }
 }
 
 /// What a read answers with, and what it refuses.
@@ -65,6 +171,24 @@ impl ReadTool {
             ),
         );
         properties.insert("path".to_owned(), Value::Object(spec));
+        for (name, description) in [
+            (
+                "offset",
+                "the first line to return, counted from 0; default 0",
+            ),
+            (
+                "limit",
+                "how many lines to return, at most 512, which is also the default",
+            ),
+        ] {
+            let mut spec = Map::new();
+            spec.insert("type".to_owned(), Value::String("integer".to_owned()));
+            spec.insert(
+                "description".to_owned(),
+                Value::String(description.to_owned()),
+            );
+            properties.insert(name.to_owned(), Value::Object(spec));
+        }
         params.insert("properties".to_owned(), Value::Object(properties));
         params.insert(
             "required".to_owned(),
@@ -75,8 +199,9 @@ impl ReadTool {
             catalog,
             meta: ToolMeta {
                 name: ToolName::parse("read")?,
-                disclosure: "Read a file by its path, or a skill by the name the catalog lists it \
-                             under."
+                disclosure: "Read a file by its path, or a skill by the name the catalog lists \
+                             it under. At most 512 lines per call; a truncated answer states \
+                             the total and the offset to continue from."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,
@@ -118,29 +243,12 @@ impl ReadTool {
                 Expansion::Said { text } => Ok(Found::Text(text)),
             };
         }
-        let addr = kernel::Address::parse(asked).map_err(|err| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "read",
-                format!("{asked}: {}", err.subject()),
-            )
-            .with_recovery(
-                "pass a city-relative path with no `..` and no leading slash, or a name from \
-                     the catalog",
-            )
-        })?;
-        if addr.is_reserved() {
-            return Err(AxError::failure(
-                AxCode::GateDenied,
-                "read",
-                format!("{asked} is inside a reserved subtree"),
-            )
-            .with_recovery(
-                "a `.sprawling` directory holds what governs a scope, and no run reads its own \
-                 governance; ask for a skill by its catalog name instead",
-            ));
-        }
-        Ok(Found::File(self.under_city(&addr)))
+        // The judgement every model-chosen path gets, in the one place
+        // it is written. `search` asks the same function the same
+        // question, so what is reserved has one answer.
+        Ok(Found::File(
+            self.under_city(&super::chosen_path::admit(asked, "read")?),
+        ))
     }
 
     fn under_city(&self, addr: &kernel::Address) -> PathBuf {
@@ -193,10 +301,18 @@ impl Tool for ReadTool {
         };
         let mut out = Map::new();
         out.insert("path".to_owned(), Value::String(asked.to_owned()));
+        let interval = Interval::asked_for(call)?;
+        let taken = interval.cut(&text);
+        if let Some(total) = taken.total_lines {
+            out.insert("total_lines".to_owned(), Value::Number(total.into()));
+        }
+        if let Some(next) = taken.next_offset {
+            out.insert("next_offset".to_owned(), Value::Number(next.into()));
+        }
         // The count the model needs to decide whether it has the whole
         // thing: a result the pipeline shortened says so in its own
         // envelope, and this is what it was shortened from.
-        let bytes = u64::try_from(text.len()).map_err(|_| {
+        let bytes = u64::try_from(taken.text.len()).map_err(|_| {
             AxError::failure(
                 AxCode::StorageFatal,
                 "read",
@@ -204,7 +320,7 @@ impl Tool for ReadTool {
             )
         })?;
         out.insert("bytes".to_owned(), Value::Number(bytes.into()));
-        out.insert("text".to_owned(), Value::String(text));
+        out.insert("text".to_owned(), Value::String(taken.text));
         Ok(ToolOutcome {
             result: Payload::new(out)?,
         })
@@ -219,119 +335,4 @@ impl Tool for ReadTool {
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
-    use super::*;
-    use crate::catalog::CatalogEntry;
-
-    fn tool(root: &Path) -> (ReadTool, Rc<RefCell<Catalog>>) {
-        let catalog = Rc::new(RefCell::new(Catalog::new()));
-        let tool = ReadTool::new(root, Rc::clone(&catalog)).unwrap();
-        (tool, catalog)
-    }
-
-    fn call(path: &str) -> ToolCall {
-        let mut args = Map::new();
-        args.insert("path".to_owned(), Value::String(path.to_owned()));
-        ToolCall {
-            id: "call-1".to_owned(),
-            name: ToolName::parse("read").unwrap(),
-            args: Payload::new(args).unwrap(),
-        }
-    }
-
-    #[test]
-    fn a_file_in_the_city_comes_back_with_its_own_length() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join("lab")).unwrap();
-        std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
-        let (mut tool, _catalog) = tool(dir.path());
-
-        let outcome = tool.invoke(&call("lab/Memo.md")).unwrap();
-        let map = outcome.result.as_map();
-        assert_eq!(map["text"], "one decision\n");
-        assert_eq!(map["bytes"], 13);
-    }
-
-    /// The rule that keeps a run from reading its own governance is the
-    /// same predicate the write side uses, so there is one answer to
-    /// "what is reserved" rather than two.
-    #[test]
-    fn a_model_chosen_path_cannot_reach_a_reserved_subtree() {
-        let dir = tempfile::tempdir().unwrap();
-        let (mut tool, _catalog) = tool(dir.path());
-        for asked in [
-            ".sprawling/ledger/0001.jsonl",
-            "lab/.sprawling/BUILDING.md",
-            ".sprawling/CONFIG.toml",
-        ] {
-            let err = tool.invoke(&call(asked)).unwrap_err();
-            assert_eq!(err.code(), &AxCode::GateDenied, "{asked} was allowed");
-            assert!(
-                !err.recovery().is_empty(),
-                "{asked} refused with no way out"
-            );
-        }
-    }
-
-    /// Admission happened when a person wrote the reading room, so the
-    /// skill it names opens even though it lives where no model-chosen
-    /// path may go.
-    #[test]
-    fn the_reading_room_hands_over_what_a_path_could_not_reach() {
-        let dir = tempfile::tempdir().unwrap();
-        let shelf = dir.path().join(".sprawling").join("library");
-        std::fs::create_dir_all(&shelf).unwrap();
-        std::fs::write(shelf.join("review.md"), "check the diff first\n").unwrap();
-        let (mut tool, catalog) = tool(dir.path());
-        catalog
-            .borrow_mut()
-            .admit_skill(CatalogEntry {
-                name: "review".to_owned(),
-                disclosure: "how this building reviews".to_owned(),
-                expansion: ".sprawling/library/review.md".to_owned(),
-                hash: None,
-            })
-            .unwrap();
-
-        assert!(
-            tool.invoke(&call(".sprawling/library/review.md")).is_err(),
-            "the path is still closed"
-        );
-        let outcome = tool.invoke(&call("review")).unwrap();
-        assert_eq!(outcome.result.as_map()["text"], "check the diff first\n");
-    }
-
-    /// The catalog's own second level: the prompt carries one line per
-    /// entry, and this is the tool that fetches what the line stood for.
-    #[test]
-    fn an_entry_the_catalog_holds_is_handed_over_not_refused() {
-        let dir = tempfile::tempdir().unwrap();
-        let (mut tool, catalog) = tool(dir.path());
-        catalog.borrow_mut().set_mode(crate::mode::Mode::Experiment);
-
-        let mode = tool.invoke(&call("mode:experiment")).unwrap();
-        let said = mode.result.as_map()["text"].as_str().unwrap_or_default();
-        assert!(said.contains("Memo.md"), "the mode's discipline: {said}");
-
-        let dev = tool.invoke(&call("dev")).unwrap();
-        let said = dev.result.as_map()["text"].as_str().unwrap_or_default();
-        assert!(said.contains("-SPEC.md"), "the developer entry: {said}");
-        assert!(said.contains("wait for the person to grant it"));
-    }
-
-    #[test]
-    fn a_missing_file_is_the_callers_mistake_not_the_disks() {
-        let dir = tempfile::tempdir().unwrap();
-        let (mut tool, _catalog) = tool(dir.path());
-        let err = tool.invoke(&call("lab/nowhere.md")).unwrap_err();
-        assert_eq!(err.code(), &AxCode::InvalidArgs);
-    }
-
-    #[cfg(feature = "conformance")]
-    #[test]
-    fn the_tool_refuses_another_tools_call_and_still_answers() {
-        let dir = tempfile::tempdir().unwrap();
-        let (mut tool, _catalog) = tool(dir.path());
-        kernel::tool_conformance::assert_tool_conformance(&mut tool);
-    }
-}
+mod tests;

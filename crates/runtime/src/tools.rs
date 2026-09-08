@@ -5,16 +5,19 @@
 
 //! The L0 three. Index only: no logic lives here.
 
+mod chosen_path;
 mod edit;
 mod exec;
 mod read;
+mod search;
 mod status;
 
 pub use edit::EditTool;
 pub use edit::version_of;
-pub use exec::ExecTool;
 pub use exec::parse_arm;
+pub use exec::{ExecSetup, ExecTool};
 pub use read::ReadTool;
+pub use search::SearchTool;
 pub use status::ChildStatus;
 pub use status::ProviderMode;
 pub use status::StatusSnapshot;
