@@ -13,7 +13,7 @@ use runtime::{EditTool, ExecTool, SearchTool, StatusTool};
 
 use super::super::{Assignment, PYTHON_WASM_ENV, RunWorker, mounts_under};
 use super::engine::{execution_engine, host_shell};
-use super::{Desks, Reach, Site, Situation, Workbench, status_snapshot};
+use super::{Desks, Reach, Site, Situation, Workbench, held, status_snapshot};
 
 impl RunWorker {
     /// Lays out what the model may see and what routes what it calls.
@@ -48,11 +48,11 @@ impl RunWorker {
         // prompt, so a tool admitted mid-run would invalidate the whole
         // conversation's cache. Progressive disclosure is about what a
         // line says, not about when a tool appears.
-        let catalog = std::rc::Rc::new(std::cell::RefCell::new(runtime::Catalog::new()));
+        let catalog = std::sync::Arc::new(std::sync::Mutex::new(runtime::Catalog::new()));
         // The mode a run sits in is a capability like any other: it says
         // what this run admits, and until it was set here the mode's own
         // catalog entry reached no model.
-        catalog.borrow_mut().set_mode(mode);
+        held(&catalog, "lay out the catalog")?.set_mode(mode);
         let edit = EditTool::new(&site.write_root, addr.clone(), site.rules.write_domain()?)?;
         // Who this run can reach, read once at dispatch and frozen with
         // it. Nothing here can move under the run: the assembly is
@@ -67,7 +67,7 @@ impl RunWorker {
         // Where this run stands, carried rather than worked out: a run
         // that inferred its own depth would be one wrong answer away
         // from a delegate that delegates.
-        let delegates = std::rc::Rc::new(std::cell::RefCell::new(collab::DelegateDesk::new(
+        let delegates = std::sync::Arc::new(std::sync::Mutex::new(collab::DelegateDesk::new(
             at.depth(),
             site.building.addr().clone(),
         )));
@@ -80,60 +80,15 @@ impl RunWorker {
                 delegates: &delegates,
             },
         )?;
-        let signal_tool = collab::SignalTool::new(std::rc::Rc::clone(&desks.signals))?;
-        let goal_tool = collab::GoalTool::new(addr.clone(), std::rc::Rc::clone(&desks.goals))?;
-        let pr_tool = collab::PrTool::new(addr.clone(), std::rc::Rc::clone(&desks.pr))?;
-        let claim_tool = collab::ClaimTool::new(std::rc::Rc::clone(&desks.plan))?;
-        let delegate_tool = collab::DelegateTool::new(std::rc::Rc::clone(&delegates))?;
-        // What this room already got back. Copied rather than lent: the
-        // authority is `self.joins`, which is folded from the ledger's
-        // handback lines, and a desk that took it away would leave the
-        // worker unable to answer the same question after the run.
-        let mut held = collab::FanIn::new();
-        if let Some(existing) = self.joins.get(addr) {
-            for artifact in existing.artifacts() {
-                held.accept(artifact.clone());
-            }
-        }
-        let workshop = std::rc::Rc::new(std::cell::RefCell::new(collab::WorkshopDesk::new(
-            site.who.clone(),
-            held,
-        )));
-        let workshop_tool = collab::WorkshopTool::new(
-            std::rc::Rc::clone(&workshop),
-            std::rc::Rc::clone(&delegates),
-        )?;
-        let archive_tool = collab::ArchiveTool::new(std::rc::Rc::clone(&desks.shelf))?;
+        let signal_tool = collab::SignalTool::new(std::sync::Arc::clone(&desks.signals))?;
+        let goal_tool = collab::GoalTool::new(addr.clone(), std::sync::Arc::clone(&desks.goals))?;
+        let pr_tool = collab::PrTool::new(addr.clone(), std::sync::Arc::clone(&desks.pr))?;
+        let claim_tool = collab::ClaimTool::new(std::sync::Arc::clone(&desks.plan))?;
+        let archive_tool = collab::ArchiveTool::new(std::sync::Arc::clone(&desks.shelf))?;
         // The one door into the building's own governance. It reaches
         // the reserved subtree, which no write domain does, so it goes
         // through the person rather than through the write gate.
         let rules_tool = city::RulesTool::new(&self.city_root, site.building.addr().clone())?;
-        // The execution boundary. What the run may reach is the frozen
-        // config's answer; where the engine and the interpreter live is
-        // the machine's, so a city carried elsewhere does not carry this
-        // machine's paths with it.
-        let exec = ExecTool::new(
-            runtime::ExecSetup {
-                workdir: site.write_root.join(addr.as_str()),
-                mounts: mounts_under(&site.write_root, &site.config.sandbox.mounts),
-                python_wasm: std::env::var(PYTHON_WASM_ENV)
-                    .ok()
-                    .map(std::path::PathBuf::from),
-                shell: if site.config.sandbox.shell {
-                    host_shell()
-                } else {
-                    None
-                },
-                fuel: runtime::Fuel(site.config.sandbox.fuel),
-                // What a child may inherit is the building's own
-                // declaration: the four-name floor is enough to run a
-                // program and not enough to link one.
-                env_passthrough: site.config.sandbox.env_passthrough.clone(),
-                domain: addr.clone(),
-            },
-            execution_engine()?,
-            self.backlog.clone(),
-        )?;
         // The one door onto the rest of the city. It is registered
         // beside `signal` rather than behind it because the two answer
         // different questions - who is there, and what to say to them -
@@ -145,7 +100,7 @@ impl RunWorker {
         // could name a skill and never hand it over. It holds the
         // catalog rather than a copy of what is in it, so a skill
         // admitted below this line is still reachable by name.
-        let read = runtime::ReadTool::new(&site.write_root, std::rc::Rc::clone(&catalog))?;
+        let read = runtime::ReadTool::new(&site.write_root, std::sync::Arc::clone(&catalog))?;
         // Reading needs an address, and until this line there was no way
         // to find one: a symbol had to be hunted through `exec`, which
         // means Python this machine may not have or a shell this
@@ -153,6 +108,12 @@ impl RunWorker {
         // because it answers the other half of one question, and it is
         // last in the order for the reason the comment below gives.
         let search = SearchTool::new(&site.write_root)?;
+        // The one door out of a filling window. It stands last because
+        // it is the newest, and it takes no depth and asks no person:
+        // the successor is this same resident, in this same room, with
+        // this same table - which is why `delegate` is still on it.
+        let succession = std::sync::Arc::new(std::sync::Mutex::new(runtime::SuccessionDesk::new()));
+        let succeed = runtime::SucceedTool::new(std::sync::Arc::clone(&succession))?;
         // The net, not the forecast, is the defence (semantic authority
         // 4.4). Two handles on one repository: the bench fences a
         // command its forecast suspects, and the driver fences every
@@ -183,20 +144,43 @@ impl RunWorker {
         // the middle would move every line after it.
         let mut admitted: Vec<Box<dyn kernel::Tool>> = vec![
             Box::new(archive_tool),
-            Box::new(exec),
             Box::new(claim_tool),
             Box::new(edit),
             Box::new(status),
             Box::new(signal_tool),
             Box::new(goal_tool),
             Box::new(pr_tool),
-            Box::new(delegate_tool),
-            Box::new(workshop_tool),
             Box::new(rules_tool),
             Box::new(neighbours_tool),
             Box::new(read),
             Box::new(search),
+            Box::new(succeed),
         ];
+        // What this building's residents are for decides the rest of
+        // the bench. City Hall writes Markdown and plans: it gets no
+        // `exec`, no `delegate` and no `workshop`, and it gets the one
+        // door onto the shape of the city instead. Holding that in the
+        // tool table rather than in the wording of `MAYOR.md` is the
+        // whole point - an invariant a prompt is asked to keep is not
+        // an invariant (city-SPEC.md section 8-22).
+        //
+        // These join at the end of the table for the same reason a new
+        // tool does: the order above is hashed with the resident
+        // segment, and what keeps its position keeps its cache. Two
+        // buildings of different vocations never shared a prefix
+        // anyway, because every address in it starts with the building.
+        match city::vocation_of(site.building.addr()) {
+            city::Vocation::Builds => {
+                admitted.push(Box::new(self.exec_tool(site, addr)?));
+                admitted.push(Box::new(collab::DelegateTool::new(std::sync::Arc::clone(
+                    &delegates,
+                ))?));
+                admitted.push(Box::new(self.workshop_tool(site, addr, &delegates)?));
+            }
+            city::Vocation::Plans => {
+                admitted.push(Box::new(city::CityTool::new(&self.city_root)?));
+            }
+        }
         // External tools, for a building whose configuration names a
         // server. They join the table here, before the catalogue is
         // rendered, because the tool table is frozen with the run: what
@@ -210,7 +194,7 @@ impl RunWorker {
             admitted.push(tool);
         }
         for tool in admitted {
-            catalog.borrow_mut().admit_tool(tool.meta())?;
+            held(&catalog, "lay out the catalog")?.admit_tool(tool.meta())?;
             bench.register(tool)?;
         }
         self.admit_reading_room(&catalog, &site.rules, &site.building, addr)?;
@@ -218,7 +202,72 @@ impl RunWorker {
             catalog,
             bench,
             delegates,
+            succession,
         })
+    }
+
+    /// Builds the execution boundary.
+    ///
+    /// What the run may reach is the frozen configuration's answer;
+    /// where the engine and the interpreter live is the machine's, so a
+    /// city carried elsewhere does not carry this machine's paths with
+    /// it.
+    ///
+    /// # Errors
+    /// Propagates a build with no execution engine and whatever the
+    /// tool says about its own construction.
+    fn exec_tool(&self, site: &Site, addr: &Address) -> Result<ExecTool, AxError> {
+        ExecTool::new(
+            runtime::ExecSetup {
+                workdir: site.write_root.join(addr.as_str()),
+                mounts: mounts_under(&site.write_root, &site.config.sandbox.mounts),
+                python_wasm: std::env::var(PYTHON_WASM_ENV)
+                    .ok()
+                    .map(std::path::PathBuf::from),
+                shell: if site.config.sandbox.shell {
+                    host_shell()
+                } else {
+                    None
+                },
+                fuel: runtime::Fuel(site.config.sandbox.fuel),
+                // What a child may inherit is the building's own
+                // declaration: the four-name floor is enough to run a
+                // program and not enough to link one.
+                env_passthrough: site.config.sandbox.env_passthrough.clone(),
+                domain: addr.clone(),
+            },
+            execution_engine()?,
+            self.backlog.clone(),
+        )
+    }
+
+    /// Builds the build floor's own tool, holding what this room has
+    /// already been handed back.
+    ///
+    /// The held artifacts are copied rather than lent: the authority is
+    /// `self.joins`, folded from the ledger's handback lines, and a desk
+    /// that took it away would leave the worker unable to answer the
+    /// same question after the run.
+    ///
+    /// # Errors
+    /// Propagates whatever the tool says about its own construction.
+    fn workshop_tool(
+        &self,
+        site: &Site,
+        addr: &Address,
+        delegates: &std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
+    ) -> Result<collab::WorkshopTool, AxError> {
+        let mut held = collab::FanIn::new();
+        if let Some(existing) = self.joins.get(addr) {
+            for artifact in existing.artifacts() {
+                held.accept(artifact.clone());
+            }
+        }
+        let workshop = std::sync::Arc::new(std::sync::Mutex::new(collab::WorkshopDesk::new(
+            site.who.clone(),
+            held,
+        )));
+        collab::WorkshopTool::new(workshop, std::sync::Arc::clone(delegates))
     }
 
     /// Builds the one tool that answers what this run is, to itself.
@@ -242,8 +291,8 @@ impl RunWorker {
     ) -> Result<StatusTool, AxError> {
         // What `status.children` reads, and the only part of the answer
         // that is not frozen here.
-        let watched = std::rc::Rc::clone(reach.delegates);
-        StatusTool::watching(
+        let watched = std::sync::Arc::clone(reach.delegates);
+        let tool = StatusTool::watching(
             status_snapshot(Situation {
                 addr: &at.addr,
                 who: &site.who,
@@ -253,7 +302,6 @@ impl RunWorker {
                 worktree: &site.write_root,
                 trust: &self.governance.autonomy,
                 context_tokens: site.model.context_tokens,
-                budget: at.budget,
                 neighbours: reach.seen.residents(),
                 // What this resident already holds, so a model asking
                 // what it may touch is answered from the same list the
@@ -266,7 +314,7 @@ impl RunWorker {
                     .collect(),
             }),
             Box::new(move || {
-                watched.try_borrow().map_or_else(
+                watched.lock().map_or_else(
                     |_| Vec::new(),
                     |desk| {
                         desk.asked()
@@ -279,7 +327,9 @@ impl RunWorker {
                     },
                 )
             }),
-        )
+        )?;
+        // The thirteenth line: what this run started and left running.
+        Ok(tool.reporting(self.backlog.clone()))
     }
 
     /// Admits the skills this building's own file names, and says which
@@ -295,7 +345,7 @@ impl RunWorker {
     /// refuses.
     fn admit_reading_room(
         &mut self,
-        catalog: &std::rc::Rc<std::cell::RefCell<runtime::Catalog>>,
+        catalog: &std::sync::Arc<std::sync::Mutex<runtime::Catalog>>,
         rules: &city::BuildingRules,
         building: &city::Building,
         addr: &Address,
@@ -306,7 +356,7 @@ impl RunWorker {
         // not on the shelves is left out rather than promised.
         let shelves = city::Library::scan(&self.city_root, Some(building.addr()))?;
         for holding in shelves.reading_room(rules.reading_room()) {
-            catalog.borrow_mut().admit_skill(runtime::CatalogEntry {
+            held(catalog, "admit the reading room")?.admit_skill(runtime::CatalogEntry {
                 name: holding.name.clone(),
                 disclosure: holding.disclosure.clone(),
                 expansion: holding.addr.as_str().to_owned(),

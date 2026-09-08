@@ -101,6 +101,32 @@ impl Probe {
     }
 }
 
+/// The handoff probe, edition 1: four questions a successor has to be
+/// able to answer from what it was handed, or the handoff lost it.
+///
+/// Data, not a decision. Changing a question is edition 2, and
+/// [`compare`] refuses to set the two editions against each other.
+///
+/// # Errors
+/// Cannot fail on this fixed list; the `Result` is the constructor's.
+pub fn handoff_probe() -> Result<Probe, AxError> {
+    Probe::new(
+        ProbeId {
+            name: "handoff".to_owned(),
+            version: 1,
+        },
+        [
+            "What is the task, in one line?",
+            "What has been done so far, in one line?",
+            "What is the next step, in one line?",
+            "Which file must be read first? Answer with its path only.",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect(),
+    )
+}
+
 /// One reading.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Answers {
@@ -112,6 +138,13 @@ impl Answers {
     #[must_use]
     pub fn id(&self) -> &ProbeId {
         &self.id
+    }
+
+    /// The answers, in question order. A reader compares two sets by
+    /// eye; `compare` only says which positions differ.
+    #[must_use]
+    pub fn answers(&self) -> &[String] {
+        &self.answers
     }
 }
 
@@ -175,6 +208,14 @@ pub fn compare(before: &Answers, after: &Answers) -> Result<Comparison, AxError>
 )]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_shipped_handoff_probe_asks_four_questions_in_edition_one() {
+        let probe = super::handoff_probe().unwrap();
+        assert_eq!(probe.id().name, "handoff");
+        assert_eq!(probe.id().version, 1);
+        assert_eq!(probe.questions().len(), 4);
+    }
 
     fn handoff_probe(version: u32) -> Probe {
         Probe::new(

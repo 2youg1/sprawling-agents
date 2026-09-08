@@ -11,6 +11,7 @@ mod exec;
 mod read;
 mod search;
 mod status;
+mod succeed;
 
 pub use edit::EditTool;
 pub use edit::version_of;
@@ -22,3 +23,4 @@ pub use status::ChildStatus;
 pub use status::ProviderMode;
 pub use status::StatusSnapshot;
 pub use status::StatusTool;
+pub use succeed::{SucceedTool, Succession, SuccessionDesk};

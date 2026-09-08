@@ -10,7 +10,7 @@ use kernel::{Payload, RunId};
 
 use crate::effect;
 
-use super::super::{Assignment, Dispatched, Ending, RunWorker, Site, new_inbox};
+use super::super::{Assignment, Dispatched, Ending, Handover, RunWorker, Site, held, new_inbox};
 use super::desks::write_plan;
 
 impl RunWorker {
@@ -48,7 +48,7 @@ impl RunWorker {
                         // Somebody was spoken to. Whether that starts a run
                         // is decided in one place, so that the two ways of
                         // reaching a resident stay one decision.
-                        self.knock(signal, &at.addr, at.mode, at.budget)?;
+                        self.knock(signal, &at.addr, at.mode)?;
                     }
                     Ok(())
                 })();
@@ -134,12 +134,14 @@ impl RunWorker {
             driven,
             mut raised,
             delegates,
+            succession,
         } = ending;
         let Site {
             lease,
             who,
             run_id,
             model,
+            mut adapter,
             ..
         } = site;
         let (addr, model) = (at.addr.clone(), model.id.as_str());
@@ -192,6 +194,29 @@ impl RunWorker {
         }
         let frozen = driven?;
         let ending = frozen.completion().clone();
+        // What the model saw, beside the room it worked in. The freeze
+        // is already on the ledger, so a room that will not take the
+        // file is noted rather than turned into a failed run: the
+        // transcript is the run's copy, not its record.
+        match frozen
+            .transcript()
+            .and_then(|transcript| transcript.materialise(&mut self.cas, &self.city_root, &addr))
+        {
+            Ok(record) => self.note(
+                runtime::diagnostics::Level::Effect,
+                "runtime::transcript",
+                &format!(
+                    "{} written, {} spans redacted",
+                    record.address.as_str(),
+                    record.redacted
+                ),
+            ),
+            Err(err) => self.note(
+                runtime::diagnostics::Level::Refuse,
+                "runtime::transcript",
+                &format!("transcript not written: {err}"),
+            ),
+        }
         // What it actually did, for the person reading afterwards. The
         // ledger holds the detail; this line is the pointer into it.
         self.note(
@@ -212,7 +237,7 @@ impl RunWorker {
         // for by a turn nobody wanted started anyway.
         let handed = match ending {
             kernel::Completion::Cancelled => Vec::new(),
-            _ => delegates.borrow_mut().take(),
+            _ => held(delegates, "read the delegate desk")?.take(),
         };
         for work in handed {
             self.note(
@@ -231,13 +256,55 @@ impl RunWorker {
                     session: None,
                     effort: None,
                     mode: at.mode,
-                    budget: at.budget,
                     parent: Some(run_id),
+                    succession: None,
                 },
                 work.task,
                 work.goal,
             )?;
             self.deliver_handback(&addr, &child)?;
+        }
+        // Who this run asked to replace it: itself, next run. Same
+        // address, same work, and the same `parent` - not this run - so
+        // the depth is conserved and the successor's table equals this
+        // one's. A cancelled run is not succeeded, for the reason above.
+        let replaced = match ending {
+            kernel::Completion::Cancelled => None,
+            _ => held(succession, "read the succession desk")?.take(),
+        };
+        if let Some(asked) = replaced {
+            self.note(
+                runtime::diagnostics::Level::Effect,
+                "runtime::succession",
+                &format!("{} hands over: {}", addr.as_str(), asked.reason),
+            );
+            // The quality defence: what this run knows, asked of it
+            // before it goes, so the successor's answers have something
+            // to be compared with. Nobody discovers decay otherwise
+            // until the third succession.
+            let before = self.probe_before(adapter.as_deref_mut(), &frozen, &who)?;
+            let plan = frozen.plan();
+            let successor = self.dispatch_in(
+                Assignment {
+                    addr: addr.clone(),
+                    session: None,
+                    effort: None,
+                    mode: at.mode,
+                    parent: at.parent,
+                    succession: Some(Handover {
+                        predecessor: run_id,
+                        before,
+                    }),
+                },
+                plan.task.clone(),
+                plan.goal.clone(),
+            )?;
+            return Ok(Dispatched {
+                run: successor.run,
+                addr,
+                who,
+                completion: successor.completion,
+            });
         }
         Ok(Dispatched {
             run: run_id,

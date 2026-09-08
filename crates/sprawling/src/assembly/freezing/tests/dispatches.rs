@@ -24,8 +24,8 @@ fn a_handoff_that_cannot_be_read_is_refused_by_name() {
         "lab",
         "# BUILDING.md\n\n`confidential: false`\n",
     );
-    let lab = Address::parse("lab").unwrap();
-    let handoff = city::handoff_path(dir.path(), &lab);
+    let room = Address::parse("lab/room1").unwrap();
+    let handoff = city::handoff_path(dir.path(), &room);
     let _ = std::fs::remove_file(&handoff);
     std::fs::create_dir_all(&handoff).unwrap();
 
@@ -36,7 +36,6 @@ fn a_handoff_that_cannot_be_read_is_refused_by_name() {
         task: "carry on".to_owned(),
         goal: "one turn".to_owned(),
         mode: channels::ModeTag::parse("plan").unwrap(),
-        budget: kernel::BudgetCap::default(),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"handoff"),
         session: None,
         effort: None,
@@ -87,7 +86,6 @@ fn work_offered_in_up_mode_without_a_test_does_not_land() {
             task: "change the note".to_owned(),
             goal: "the note reads after".to_owned(),
             mode: channels::ModeTag::parse("up").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
             effort: None,
@@ -137,7 +135,6 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
             task: "measure the thing".to_owned(),
             goal: "a number with a unit, then stop".to_owned(),
             mode: channels::ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -195,10 +192,15 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
         })
         .unwrap();
     // A handoff the last session actually wrote, as against the blank
-    // form a new building starts with.
+    // form a new room starts with. It is the room's, not the
+    // building's (card-11.6).
+    let handoff = city::handoff_path(dir.path(), &room);
+    if let Some(parent) = handoff.parent() {
+        std::fs::create_dir_all(parent).unwrap();
+    }
     std::fs::write(
-        dir.path().join("lab").join("Handoff.md"),
-        "# Handoff \u{2014} lab\n\nThe meter reads in millivolts.\n",
+        &handoff,
+        "# Handoff \u{2014} lab/room1\n\nThe meter reads in millivolts.\n",
     )
     .unwrap();
     worker
@@ -207,7 +209,6 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
             task: "measure the thing".to_owned(),
             goal: "a number with a unit, then stop".to_owned(),
             mode: channels::ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -249,7 +250,6 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
             task: "mother work".to_owned(),
             goal: "a lineage".to_owned(),
             mode: channels::ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -289,4 +289,89 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
     // Seq 0 is the genesis, a city event: not the mother's node.
     let err = worker.fork(mother, kernel::Seq::FIRST, None).unwrap_err();
     assert!(err.subject().contains("not an event of run"), "{err}");
+}
+
+/// The conversation an old run had has an address, and the handoff
+/// names it.
+///
+/// The address is the room's, never the ledger's: the ledger lives under
+/// the reserved subtree `read` refuses, and it is one chain for the
+/// whole city. What lands beside the room is what this run's model
+/// actually saw, one message per line, so `search` can find a line in
+/// it and `read` can continue from that line.
+#[test]
+fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion("looking", "tu_1", "status", serde_json::json!({})),
+            completion("seen", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "look around".to_owned(),
+            goal: "one status call".to_owned(),
+            mode: channels::ModeTag::parse("plan").unwrap(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+    drop(provider);
+
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let lines: Vec<serde_json::Value> = verified
+        .raw_lines()
+        .iter()
+        .filter_map(|line| serde_json::from_slice(line).ok())
+        .collect();
+    let run = lines
+        .iter()
+        .find(|value| value["kind"] == "run_started")
+        .map(|value| value["run"].as_str().unwrap().to_owned())
+        .expect("a dispatch writes run_started");
+    let handoff = lines
+        .iter()
+        .find(|value| value["kind"] == "handoff_written")
+        .expect("a run that freezes writes its handoff");
+    let expected = format!("lab/room1/{run}.jsonl");
+    let context = handoff["data"]["context"].as_str().unwrap();
+    assert!(
+        context.contains(&format!("transcript at {expected}")),
+        "the handoff carries one line giving the transcript's address: {context}"
+    );
+    assert!(
+        !context.contains(".sprawling"),
+        "the handoff never sends a reader to the ledger: {context}"
+    );
+
+    let transcript = std::fs::read_to_string(dir.path().join(&expected))
+        .expect("the transcript is materialised at the address the handoff gave");
+    let messages: Vec<serde_json::Value> = transcript
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert!(
+        messages
+            .iter()
+            .any(|message| message["role"] == "assistant"),
+        "the model's own words are in it: {transcript}"
+    );
+    assert!(
+        transcript.contains("tu_1"),
+        "the tool call and its result are in it, as the model saw them: {transcript}"
+    );
+    assert!(
+        std::fs::metadata(dir.path().join(&expected))
+            .unwrap()
+            .permissions()
+            .readonly(),
+        "a transcript is history: nobody edits it in place"
+    );
 }

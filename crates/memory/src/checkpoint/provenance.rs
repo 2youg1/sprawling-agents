@@ -54,6 +54,7 @@ pub struct Provenance {
     model: String,
     effort: Option<Effort>,
     city: B3Hash,
+    predecessor: Option<RunId>,
 }
 
 impl Provenance {
@@ -65,7 +66,21 @@ impl Provenance {
             model: chosen.id,
             effort: chosen.effort,
             city,
+            predecessor: None,
         }
+    }
+
+    /// Names the run this one replaced, so a commit can be asked for
+    /// its lineage. A sixth trailer, present only when there is one.
+    #[must_use]
+    pub fn succeeding(mut self, predecessor: RunId) -> Provenance {
+        self.predecessor = Some(predecessor);
+        self
+    }
+
+    /// The run this one replaced, when it is a successor.
+    pub fn predecessor(&self) -> Option<RunId> {
+        self.predecessor
     }
 
     /// The city's identity: the chain hash of its genesis line.
@@ -134,20 +149,31 @@ impl Provenance {
             EFFORT_FIELD.to_owned(),
             Value::String(effort_word(self.effort)),
         );
+        if let Some(predecessor) = self.predecessor {
+            map.insert(
+                PREDECESSOR_FIELD.to_owned(),
+                Value::String(predecessor.to_string()),
+            );
+        }
         map
     }
 
     /// The trailers block, in this order and this spelling, one per line
-    /// and newline-terminated.
+    /// and newline-terminated. The sixth line appears only for a run
+    /// that replaced another.
     pub fn trailers(&self) -> String {
-        format!(
+        let mut out = format!(
             "Sprawling-Run: {}\nSprawling-Actor: {}\nSprawling-Model: {}\nSprawling-Effort: {}\nSprawling-City: {}\n",
             self.run,
             self.actor.as_str(),
             self.model,
             effort_word(self.effort),
             self.city,
-        )
+        );
+        if let Some(predecessor) = self.predecessor {
+            out.push_str(&format!("Sprawling-Predecessor: {predecessor}\n"));
+        }
+        out
     }
 }
 
@@ -161,6 +187,17 @@ const CITY_PREFIX_HEX: usize = 12;
 /// places is a key that will be spelled two ways.
 const MODEL_FIELD: &str = "model";
 const EFFORT_FIELD: &str = "effort";
+const PREDECESSOR_FIELD: &str = "predecessor";
+
+/// Reads back the predecessor [`Provenance::model_fields`] wrote, when
+/// it wrote one. A record with none, or one this build cannot parse,
+/// answers `None`: an absent lineage beats an invented one.
+#[must_use]
+pub fn predecessor_of(data: &Map<String, Value>) -> Option<RunId> {
+    data.get(PREDECESSOR_FIELD)
+        .and_then(Value::as_str)
+        .and_then(|raw| RunId::parse(raw).ok())
+}
 
 /// Reads back what [`Provenance::model_fields`] wrote.
 ///
@@ -244,6 +281,22 @@ mod tests {
                 format!("Sprawling-City: {city}"),
             ]
         );
+    }
+
+    #[test]
+    fn a_successor_signs_a_sixth_trailer_and_a_first_run_signs_five() {
+        assert_eq!(sample().trailers().lines().count(), 5);
+        let predecessor = RunId::from_bytes([3u8; 16]);
+        let successor = sample().succeeding(predecessor);
+        let rendered = successor.trailers();
+        assert_eq!(rendered.lines().count(), 6);
+        assert!(
+            rendered.ends_with(&format!("Sprawling-Predecessor: {predecessor}\n")),
+            "{rendered}"
+        );
+        let fields = successor.model_fields();
+        assert_eq!(predecessor_of(&fields), Some(predecessor));
+        assert_eq!(predecessor_of(&sample().model_fields()), None);
     }
 
     #[test]

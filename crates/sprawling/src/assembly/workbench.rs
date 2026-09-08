@@ -15,7 +15,7 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, Model, RunId};
+use kernel::{Address, AxCode, AxError, Model, RunId};
 use runtime::bench::ToolBench;
 
 use super::autonomy_name;
@@ -51,11 +51,19 @@ pub(super) struct Site {
     pub(super) identity: city::Identity,
     pub(super) who: String,
     pub(super) run_id: RunId,
+    /// The run this one replaces, when a resident succeeded itself.
+    /// Signed into every fence this run raises, so a commit can be
+    /// asked for its lineage.
+    pub(super) predecessor: Option<RunId>,
     /// Some when the building asks for review: the tree this run writes
     /// in, which goes back whether the run finished or failed.
     pub(super) lease: Option<memory::WorktreeLease>,
     pub(super) write_root: PathBuf,
     branch: Option<String>,
+    /// What survives a command's output in this run, resolved from the
+    /// city's and the building's `FILTERS.toml` and frozen with the run
+    /// (sprawling-SPEC 8-43).
+    pub(super) filters: runtime::FilterTable,
 }
 
 /// What the model may see, what routes what it calls, and who it may
@@ -67,9 +75,11 @@ pub(super) struct Site {
 /// rather than the tool definitions it renders, so there is one answer
 /// to what this run admits rather than a list and a copy of it.
 pub(super) struct Workbench {
-    pub(super) catalog: std::rc::Rc<std::cell::RefCell<runtime::Catalog>>,
+    pub(super) catalog: std::sync::Arc<std::sync::Mutex<runtime::Catalog>>,
     pub(super) bench: ToolBench,
-    pub(super) delegates: std::rc::Rc<std::cell::RefCell<collab::DelegateDesk>>,
+    pub(super) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
+    /// Whether this run asked to be replaced, read when it concludes.
+    pub(super) succession: std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
 }
 
 /// Who this run can reach: the residents beside it, and the sub-agents
@@ -80,7 +90,28 @@ pub(super) struct Workbench {
 /// parameters a caller could hand over half of.
 pub(super) struct Reach<'a> {
     pub(super) seen: &'a city::Neighbourhood,
-    pub(super) delegates: &'a std::rc::Rc<std::cell::RefCell<collab::DelegateDesk>>,
+    pub(super) delegates: &'a std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
+}
+
+/// Takes a desk, or says why it cannot be taken.
+///
+/// The one reading of a poisoned lock in this assembly. Under
+/// `panic = "abort"` a thread cannot die holding a desk, so the error
+/// arm is unreachable in the shipped binary and still written, because
+/// a test build unwinds and a desk left locked there is a fact worth a
+/// stable code rather than a second panic (sprawling-SPEC 8-44).
+pub(super) fn held<'a, T>(
+    desk: &'a std::sync::Mutex<T>,
+    what: &'static str,
+) -> Result<std::sync::MutexGuard<'a, T>, AxError> {
+    desk.lock().map_err(|_| {
+        AxError::failure(
+            AxCode::StorageFatal,
+            what,
+            "the desk was left locked by a thread that died",
+        )
+        .with_recovery("restart this city")
+    })
 }
 
 impl Site {
@@ -109,11 +140,11 @@ impl Site {
 /// all the same - what makes them one value is the lending, not the
 /// settling.
 pub(super) struct Desks {
-    pub(super) signals: std::rc::Rc<std::cell::RefCell<collab::SignalDesk>>,
-    pub(super) goals: std::rc::Rc<std::cell::RefCell<collab::GoalDesk>>,
-    pub(super) plan: std::rc::Rc<std::cell::RefCell<collab::ClaimDesk>>,
-    pub(super) shelf: std::rc::Rc<std::cell::RefCell<collab::ArchiveDesk>>,
-    pub(super) pr: std::rc::Rc<std::cell::RefCell<collab::PrDesk>>,
+    pub(super) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
+    pub(super) goals: std::sync::Arc<std::sync::Mutex<collab::GoalDesk>>,
+    pub(super) plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
+    pub(super) shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
+    pub(super) pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
     /// Where the shared plan lives, so the claims that survive are
     /// written back to the file they were checked against.
     pub(super) plan_path: PathBuf,
@@ -145,7 +176,6 @@ pub(super) struct Situation<'a> {
     worktree: &'a Path,
     trust: &'a kernel::Autonomy,
     context_tokens: u64,
-    pub(super) budget: kernel::BudgetCap,
     locks: Vec<String>,
     neighbours: u32,
 }
@@ -157,8 +187,6 @@ pub(super) fn status_snapshot(situation: Situation<'_>) -> runtime::StatusSnapsh
         mode: situation.mode,
         ctx_used: kernel::Tokens::default(),
         ctx_limit: kernel::Tokens::new(situation.context_tokens),
-        budget_usd: situation.budget.usd,
-        budget_tokens: situation.budget.tokens,
         trust: autonomy_name(situation.trust),
         write_domain: situation
             .write_domain

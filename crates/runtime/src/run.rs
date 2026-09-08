@@ -21,6 +21,7 @@ use serde_json::{Map, Value};
 use crate::catalog::SkillPin;
 use crate::handoff::Handoff;
 use crate::prefix::FrozenPrefix;
+use crate::reminder::ContextGauge;
 use crate::turn::{CallShape, Interrupt};
 use crate::window::{Opening, Window};
 
@@ -46,23 +47,20 @@ pub struct RunPlan {
     /// can read, rather than an inference from two lines happening to
     /// be next to each other.
     pub parent: Option<RunId>,
-    pub budget_turns: u32,
-    /// What this run was allowed to spend. Written into `run_started`
-    /// beside `parent` and for the same reason: once the process that
-    /// knew it is gone, the ledger is the only thing that can still say
-    /// what ceiling a run was sent out under - and something as ordinary
-    /// as answering an approval hours later has to send the work on
-    /// under that same ceiling.
-    pub budget: kernel::BudgetCap,
+    /// The run this one replaces, when a resident succeeded itself.
+    /// Written into `run_started` beside `parent`, so a lineage is a
+    /// fact folded from the ledger rather than inferred from two runs
+    /// sharing an address.
+    pub predecessor: Option<RunId>,
     pub shape: CallShape,
     pub prefix: FrozenPrefix,
     pub policy: BuildingPolicy,
     pub tools: Vec<ToolDef>,
     /// The skills this run's reading room admitted, and what each one
     /// hashed to when the shelf was read. Written into `run_started`
-    /// beside `parent` and the budget, and for the same reason: once
-    /// the process that read the shelf is gone, the ledger is the only
-    /// thing that can still say which bytes this run was given.
+    /// beside `parent`, and for the same reason: once the process that
+    /// read the shelf is gone, the ledger is the only thing that can
+    /// still say which bytes this run was given.
     pub skills: Vec<SkillPin>,
 }
 
@@ -133,6 +131,8 @@ pub struct Active {
     window: Window,
     turns: u32,
     last_turn_t: Option<TimeMs>,
+    /// How full the window is, read off each call's reported usage.
+    gauge: ContextGauge,
 }
 
 /// A frozen run. There is no method back to [`Active`]: waking an old run
@@ -141,6 +141,9 @@ pub struct Active {
 pub struct Frozen {
     completion: Completion,
     turns: u32,
+    /// Kept past the freeze for one reader: the transcript written
+    /// beside the room, which is what this run's model actually saw.
+    window: Window,
 }
 
 pub struct Run<S> {
@@ -153,6 +156,20 @@ impl Run<Frozen> {
         &self.state.completion
     }
 
+    /// What this run was dispatched with, for a successor that takes
+    /// the same work on.
+    pub fn plan(&self) -> &RunPlan {
+        &self.plan
+    }
+
+    /// What the model saw, scanned and ready to write beside the room.
+    ///
+    /// # Errors
+    /// Propagates a message that will not serialise.
+    pub fn transcript(&self) -> Result<crate::transcript::Transcript, AxError> {
+        crate::transcript::Transcript::of(self.plan.run, &self.state.window)
+    }
+
     pub fn turns(&self) -> u32 {
         self.state.turns
     }
@@ -163,9 +180,16 @@ impl Run<Frozen> {
 }
 
 /// Dispatch, turn until an ending, freeze. The loop is here rather than in
-/// each caller because the ending rules — an empty wave concludes, an
-/// exhausted budget is a limit, a cancellation is an ending too — are the
-/// part that must not drift between the city and the simulator.
+/// each caller because the ending rules — an empty wave concludes, a
+/// cancellation is an ending too — are the part that must not drift
+/// between the city and the simulator.
+///
+/// **The loop counts no turns.** There is no ceiling to reach, because
+/// nobody can price a piece of work before it runs (card-11.7). What
+/// ends a run is what it did: a turn that concluded, a failure with a
+/// carrier event, or an interruption a safe point delivered — and what
+/// stops one from outside is `Halt`, which shuts the scope and kills the
+/// backlog members inside it.
 ///
 /// # Errors
 /// Propagates ledger and provider failures.
@@ -176,16 +200,11 @@ pub fn drive(
     hooks: &mut RunHooks<'_>,
     handoff: &Handoff,
 ) -> Result<Run<Frozen>, AxError> {
-    let budget = plan.budget_turns;
     let mut run = Run::dispatch(plan, ledger, hooks)?;
-    let mut ending = Completion::Limit;
-    while run.turns_taken() < budget {
+    let ending = loop {
         match run.advance(ledger, model, hooks) {
             Ok(Advance::Turned) => {}
-            Ok(Advance::Concluded(completion)) => {
-                ending = completion;
-                break;
-            }
+            Ok(Advance::Concluded(completion)) => break completion,
             // A run always ends. A mid-turn failure whose code has a
             // carrier event (provider down, budget, watchdog) is written
             // into history under that carrier and the run freezes as
@@ -212,11 +231,10 @@ pub fn drive(
                     data: payload(data)?,
                     ig: false,
                 })?;
-                ending = Completion::Cancelled;
-                break;
+                break Completion::Cancelled;
             }
         }
-    }
+    };
     run.freeze(ledger, handoff, ending, hooks)
 }
 

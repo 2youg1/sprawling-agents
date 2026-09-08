@@ -8,7 +8,10 @@
 
 mod archive;
 mod building;
+mod city_tool;
 mod config_layers;
+mod gitignore;
+mod governed;
 mod library;
 mod neighbourhood;
 mod neighbours_tool;
@@ -18,6 +21,7 @@ mod room;
 mod rules_tool;
 mod schedule;
 mod spine_files;
+mod vocation;
 mod watch;
 mod wizard;
 
@@ -33,9 +37,11 @@ pub use building::adopted_payload as building_adopted_payload;
 pub use building::all as buildings;
 pub use building::created_payload as building_created_payload;
 pub use building::{Building, BuildingTemplate, create as create_building};
+pub use city_tool::CityTool;
 pub use config_layers::path as config_path;
 pub use config_layers::{CONFIG_FILE, ConfigLayer, Layer, load as load_config};
 pub use config_layers::{write_effort, write_mcp, write_sandbox};
+pub use governed::{Governed, PREFERENCES_FILE, write_governed};
 pub use library::{BUILDING_SHELF, Holding, LIBRARY_DIR, Library};
 pub use neighbourhood::{Neighbour, Neighbourhood, Occupancy};
 pub use neighbours_tool::NeighboursTool;
@@ -52,5 +58,6 @@ pub use spine_files::{JobBrief, ROADMAP_FILE, RunBrief};
 pub use spine_files::{hall_identity_path, lay_out_hall_identities};
 pub use spine_files::{handoff, handoff_path};
 pub use spine_files::{job_path, norms, roadmap, roadmap_path, write_brief, write_job};
+pub use vocation::{Vocation, vocation_of};
 pub use watch::{Link, Source, WATCH_FILE, Watch, watch_path};
 pub use wizard::{CityPlan, Relocation, Standing, relocate, survey};

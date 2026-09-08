@@ -13,6 +13,7 @@ use kernel::{
 use serde_json::{Map, Value};
 
 use crate::handoff::Handoff;
+use crate::reminder::ContextGauge;
 use crate::turn::{Interrupt, PhaseOutcome, Turn};
 use crate::window::Window;
 
@@ -64,20 +65,14 @@ impl Run<Active> {
         if let Some(parent) = plan.parent {
             started.insert("parent".to_owned(), Value::String(parent.to_string()));
         }
-        // Integers, like every quantity on the ledger (determinism rule
-        // 6). Unconditional rather than omitted when zero: "no ceiling"
-        // and "a ceiling of nothing" are the same fact here, and a key
-        // that comes and goes is a shape a reader has to guess at.
-        started.insert(
-            "usd_micros".to_owned(),
-            Value::Number(plan.budget.usd.get().into()),
-        );
-        started.insert(
-            "tokens".to_owned(),
-            Value::Number(plan.budget.tokens.get().into()),
-        );
-        // Unconditional for the same reason the budget is: a key that
-        // comes and goes is a shape a reader has to guess at, and "this
+        if let Some(predecessor) = plan.predecessor {
+            started.insert(
+                "predecessor".to_owned(),
+                Value::String(predecessor.to_string()),
+            );
+        }
+        // Unconditional rather than omitted when empty: a key that comes
+        // and goes is a shape a reader has to guess at, and "this
         // building admits nothing" is a fact worth recording rather than
         // an absence to infer.
         started.insert(
@@ -106,12 +101,14 @@ impl Run<Active> {
 
         let mut window = Window::new();
         window.push_task_lines(&plan.task, &plan.goal, plan.opening);
+        let gauge = ContextGauge::new(kernel::Tokens::new(plan.shape.context_tokens));
         Ok(Run {
             plan,
             state: Active {
                 window,
                 turns: 0,
                 last_turn_t: None,
+                gauge,
             },
         })
     }
@@ -199,6 +196,15 @@ impl Run<Active> {
         self.state
             .window
             .push_tool_results(report.wave_results().to_vec());
+        // The provider's count for this call, against the model's
+        // window: a fact against a fact. It lands after the results the
+        // model reads next, by the door a steer takes.
+        if let Some(reminder) = report
+            .usage()
+            .and_then(|usage| self.state.gauge.observe(usage.input_tokens))
+        {
+            self.state.window.push_reminder(&reminder);
+        }
         if report.calls_made() == 0 {
             let evidence = Evidence::new(vec![*report.model_returned()])?;
             return Ok(Advance::Concluded(Completion::Done(evidence)));
@@ -254,7 +260,11 @@ impl Run<Active> {
         let turns = self.state.turns;
         Ok(Run {
             plan: self.plan,
-            state: Frozen { completion, turns },
+            state: Frozen {
+                completion,
+                turns,
+                window: self.state.window,
+            },
         })
     }
 

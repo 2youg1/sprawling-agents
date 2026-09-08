@@ -28,7 +28,6 @@ fn a_building_whose_rules_do_not_parse_stops_the_run_rather_than_guessing() {
             task: "anything".to_owned(),
             goal: "anything".to_owned(),
             mode: channels::ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -80,7 +79,6 @@ fn a_run_is_told_who_shares_its_building_and_what_to_bring_them() {
             task: "find out who else is here".to_owned(),
             goal: "one answer is enough".to_owned(),
             mode: channels::ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -148,7 +146,6 @@ fn a_signal_one_run_sends_is_read_by_the_run_that_pulls_it() {
                 task: "talk to the neighbour".to_owned(),
                 goal: "one message, then stop".to_owned(),
                 mode: channels::ModeTag::parse("plan").unwrap(),
-                budget: kernel::BudgetCap::default(),
                 idem: kernel::IdemKey::derive(
                     &RunId::CITY,
                     kernel::Seq::new(u64::try_from(n).unwrap()),
@@ -229,4 +226,45 @@ fn the_shell_arm_exists_only_where_a_layer_asked_for_it() {
     let opened = city::load_config(dir.path(), &room).unwrap();
     assert!(opened.sandbox.shell);
     assert_eq!(opened.sandbox.fuel, 1000);
+}
+
+/// The Mayor writes Markdown and plans; it does not build. What holds
+/// that is the tool table the run is given, not the wording of
+/// `MAYOR.md`: an invariant a prompt is asked to keep is not one.
+///
+/// The evidence comes through the production path, because what is
+/// being claimed is about the bytes the provider receives.
+#[test]
+fn a_resident_of_the_hall_is_given_no_way_to_build() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, provider) = fake_openai(&["m-local"], vec![completion("noted", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse(kernel::consts_policy::HALL_MAYOR).unwrap(),
+            task: "plan the east wing".to_owned(),
+            goal: "one plan is enough".to_owned(),
+            mode: channels::ModeTag::parse("plan").unwrap(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+
+    let offered = provider.bodies().join("\n");
+    for absent in ["\"exec\"", "\"delegate\"", "\"workshop\""] {
+        assert!(
+            !offered.contains(absent),
+            "the hall was offered {absent}; the Mayor plans, it does not build"
+        );
+    }
+    assert!(
+        offered.contains("\"city\""),
+        "raising a building is the one thing the hall is for, and it needs a door to it"
+    );
+    assert!(
+        offered.contains("\"plan\""),
+        "and the plan tool, which is what the hall writes"
+    );
 }

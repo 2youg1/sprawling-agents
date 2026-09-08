@@ -41,7 +41,7 @@ fn the_documents_name_the_building_they_belong_to() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("lab");
     lay_out(&root, &addr("lab")).unwrap();
-    for file in [ROADMAP_FILE, MEMO_FILE, HANDOFF_FILE] {
+    for file in [ROADMAP_FILE, MEMO_FILE] {
         let text = std::fs::read_to_string(root.join(file)).unwrap();
         assert!(text.contains("lab"), "{file} names its building");
         assert!(
@@ -75,7 +75,6 @@ fn the_job_file_lands_in_the_room_and_says_what_the_run_was_asked_for() {
         &JobBrief {
             task: "measure the thing",
             goal: "a number with a unit, then stop",
-            budget: "24 turns",
         },
     )
     .unwrap();
@@ -85,7 +84,9 @@ fn the_job_file_lands_in_the_room_and_says_what_the_run_was_asked_for() {
     assert!(path.ends_with(JOB_FILE));
     assert!(text.contains("measure the thing"));
     assert!(text.contains("a number with a unit, then stop"));
-    assert!(text.contains("24 turns"));
+    // No ceiling section: the brief states the task and the goal, and
+    // nothing states what the work may cost (card-11.7).
+    assert!(!text.contains("Budget"));
 }
 
 #[test]
@@ -95,7 +96,6 @@ fn a_second_job_replaces_the_first_because_it_is_this_sessions_task() {
     let brief = |task| JobBrief {
         task,
         goal: "stop when done",
-        budget: "",
     };
     write_job(dir.path(), &room, &brief("first")).unwrap();
     let second = write_job(dir.path(), &room, &brief("second")).unwrap();
@@ -119,7 +119,6 @@ fn a_stated_goal_is_what_makes_a_task_a_job() {
         &JobBrief {
             task: "measure the thing",
             goal: "a number with a unit, then stop",
-            budget: "24 turns",
         },
     )
     .unwrap();
@@ -149,7 +148,6 @@ fn a_session_with_no_goal_is_the_person_and_leaves_no_job_file() {
             &JobBrief {
                 task: "what do you make of this",
                 goal: empty,
-                budget: "24 turns",
             },
         )
         .unwrap();
@@ -179,21 +177,32 @@ fn an_unfilled_handoff_is_not_worth_prefix_bytes() {
     );
 
     lay_out(&root, &lab).unwrap();
+    assert!(
+        !root.join(HANDOFF_FILE).exists(),
+        "the handoff is a room's, so a building lays none out"
+    );
+    let room = addr("lab/room1");
+    let room_dir = root.join("room1");
+    std::fs::create_dir_all(&room_dir).unwrap();
+    lay_out_handoff(&room_dir, &room).unwrap();
     assert_eq!(
-        handoff(dir.path(), &lab).unwrap(),
+        handoff(dir.path(), &room).unwrap(),
         None,
         "the blank form is the absence of a handoff, not a handoff"
     );
 
-    let written = "# Handoff — lab\n\n## 1 Must-read list\n\nRead the wire spec first.\n";
-    std::fs::write(root.join(HANDOFF_FILE), written).unwrap();
-    assert_eq!(handoff(dir.path(), &lab).unwrap().as_deref(), Some(written));
+    let written = "# Handoff — lab/room1\n\n## 1 Must-read list\n\nRead the wire spec first.\n";
+    std::fs::write(room_dir.join(HANDOFF_FILE), written).unwrap();
+    assert_eq!(
+        handoff(dir.path(), &room).unwrap().as_deref(),
+        Some(written)
+    );
 
     // A third fact, and it is neither of the two above: the file is
     // there and cannot be read.
     let unreadable = dir.path().join("unreadable");
-    std::fs::create_dir_all(unreadable.join("lab").join(HANDOFF_FILE)).unwrap();
-    let err = handoff(&unreadable, &lab)
+    std::fs::create_dir_all(unreadable.join("lab/room1").join(HANDOFF_FILE)).unwrap();
+    let err = handoff(&unreadable, &room)
         .expect_err("a handoff that cannot be read is not an absent handoff");
     assert!(err.to_string().contains(HANDOFF_FILE), "{err}");
 }

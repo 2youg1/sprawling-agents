@@ -181,3 +181,7 @@ pub fn sweep<T: Clone>(assets: &[(T, AssetUse, Score, bool)]) -> Vec<(T, Disposa
 **无字段开放。** 跨文件只放宽了两个自由函数：`read` 与 `stops_early` 写作 `pub(super) fn`，仍不出 `nesting` 模块；`leaves`／`walk`／`scalar`／`markdown_leaves` 保持私有。
 
 **apisync 未重写基线。** 搬走的全是私有项，`eval` 的公开面逐字节不变。
+
+### 8-6 handoff 探针真的跑（card-11.6）
+
+`eval::handoff_probe() -> Probe`：名 `handoff`、版本 1、固定四问（任务是什么／做到哪了／下一步是什么／先读哪个文件）。它是数据，不是判定：问题改了就是版本 2，`compare` 对两个版本恒拒。谁问：装配层 `bin::assembly::probing`，在每次 succession 前后各问一次（runtime-SPEC §8-33），记 `eval_run`。本 crate 仍恒不在它所测量的回路里。

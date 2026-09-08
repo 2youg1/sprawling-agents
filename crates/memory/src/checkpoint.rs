@@ -35,4 +35,4 @@ mod provenance;
 mod scan;
 
 pub use fence::Checkpoint;
-pub use provenance::{ModelChoice, Provenance, effort_word, model_choice_of};
+pub use provenance::{ModelChoice, Provenance, effort_word, model_choice_of, predecessor_of};

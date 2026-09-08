@@ -69,13 +69,10 @@ Trades in the market as {who}.
     let at = Assignment {
         addr: Address::parse("market/ito").unwrap(),
         parent: None,
+        succession: None,
         session: None,
         effort: None,
         mode: runtime::Mode::Up,
-        budget: kernel::BudgetCap {
-            usd: kernel::UsdMicros::new(u64::MAX),
-            tokens: kernel::Tokens::new(u64::MAX),
-        },
     };
     let effects = vec![
         collab::SignalEffect::Enqueued(speaking_signal("s-1", &room)),
@@ -120,13 +117,10 @@ fn a_half_filed_shelf_is_unwound() {
     let at = Assignment {
         addr: Address::parse("lab").unwrap(),
         parent: None,
+        succession: None,
         session: None,
         effort: None,
         mode: runtime::Mode::Up,
-        budget: kernel::BudgetCap {
-            usd: kernel::UsdMicros::new(u64::MAX),
-            tokens: kernel::Tokens::new(u64::MAX),
-        },
     };
     let effects = vec![
         collab::ArchiveEffect::Recorded {

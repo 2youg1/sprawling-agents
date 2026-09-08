@@ -24,7 +24,7 @@
 //! the mapping point is the assembly layer, and an unknown value is an error
 //! there, never a guess.
 
-use kernel::{Address, AxError, B3Hash, EventRecord, GitOid, RunId, Seq};
+use kernel::{Address, AxError, B3Hash, EventRecord, RunId, Seq};
 use serde::{Deserialize, Serialize};
 
 /// Wire format version. Bumped whenever the frame grammar changes shape in a
@@ -48,146 +48,15 @@ use serde::{Deserialize, Serialize};
 ///    goal it works towards until the work runs out (V3.17-V3.23).
 /// 14: a commit the city made can be asked which run wrote it
 ///    (card-2.4).
-pub const WIRE_V: u32 = 14;
+/// 15: that answer carries the lineage of the run - the successors
+///    a resident replaced itself through (card-11.6).
+pub const WIRE_V: u32 = 15;
+mod query;
+
+pub use query::{QUERY_NAMES, Query};
+
 use crate::answer::Answer;
 use crate::command::{COMMAND_NAMES, WireCommand};
-
-/// The Query surface, in declaration order.
-pub const QUERY_NAMES: [&str; 15] = [
-    "History",
-    "RunHistory",
-    "Changes",
-    "Commit",
-    "RunView",
-    "CityView",
-    "ApprovalQueue",
-    "InboxView",
-    "Metrics",
-    "CostView",
-    "ArchiveSearch",
-    "RegistryView",
-    "DiscardView",
-    "EndpointView",
-    "BuildingView",
-];
-
-/// Queries read state. They are cacheable and free of side effects, so none
-/// carries an `IdemKey` - a Query that needed one would have stopped being a
-/// Query.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum Query {
-    /// A bounded slice of the one history, ending just before `before`
-    /// or at the tail when that is absent.
-    ///
-    /// The server broadcasts what happens next and never what happened,
-    /// so a page opened today saw a city that had been running for a
-    /// month as an empty one. Bounded because the whole ledger is not a
-    /// thing to put on a socket, and paged backwards because what a
-    /// reader wants first is the end.
-    History {
-        before: Option<Seq>,
-        limit: u32,
-    },
-    /// The same slice, narrowed to one session.
-    ///
-    /// [`Query::History`] carries no run, so a client watching four
-    /// sessions divides one bounded slice between them and a session
-    /// that started before the tab did is not in it at all - which is
-    /// the whole of why opening yesterday's session showed a blank
-    /// page. [`Query::RunView`] does not close the gap: five fields say
-    /// whether a run exists and where it got to, not what happened in
-    /// it.
-    ///
-    /// Answered with [`HistoryAnswer`], because "a page of history"
-    /// already has a shape and a second one would be a second answer to
-    /// the same question.
-    RunHistory {
-        run: RunId,
-        before: Option<Seq>,
-        limit: u32,
-    },
-    /// What moved between two checkpoints: paths and counts, never patch
-    /// text.
-    ///
-    /// The caller names both ends because it already knows them - a
-    /// checkpoint's oid is in the `checkpoint_committed` payload the
-    /// client folded - and computing the pair a second time on the
-    /// server would be a second answer to "which fences belong to this
-    /// session". Both oids are immutable, so the answer is cacheable
-    /// forever by anybody who wants to.
-    ///
-    /// `head` absent means the working tree: a wave still running has
-    /// written files no checkpoint holds yet, and a list that ignored
-    /// them would describe the session as it was one fence ago.
-    Changes {
-        base: GitOid,
-        head: Option<GitOid>,
-    },
-    /// Which run wrote one commit the city made.
-    ///
-    /// Every commit this city makes carries five git trailers naming the
-    /// run, the resident, the model, the effort and the city itself.
-    /// Those trailers are a projection for readers outside the city, so
-    /// this query is answered from the Ledger and never from git: a city
-    /// exported and restored elsewhere, with no `.git` beside it, still
-    /// answers.
-    ///
-    /// An oid this city never wrote is [`Answer::Unavailable`], for the
-    /// reason [`Query::Changes`] gives: "I did not write it" and "it
-    /// changed nothing" are different answers.
-    Commit {
-        oid: GitOid,
-    },
-    RunView {
-        run: RunId,
-    },
-    CityView,
-    ApprovalQueue,
-    InboxView {
-        addr: Address,
-    },
-    Metrics,
-    CostView,
-    ArchiveSearch {
-        needle: String,
-    },
-    RegistryView,
-    DiscardView,
-    /// What is attached and what is chosen: the settings page's read.
-    EndpointView,
-    /// One building's own files and its archive - the pages an agent
-    /// writes for the next agent, which are also the pages a person
-    /// reads to know what happened in there.
-    BuildingView {
-        addr: Address,
-    },
-}
-
-impl Query {
-    /// Exhaustive, for the same reason as [`Command::name`].
-    #[must_use]
-    pub fn name(&self) -> &'static str {
-        match *self {
-            Self::History { .. } => "History",
-            Self::RunHistory { .. } => "RunHistory",
-            Self::Changes { .. } => "Changes",
-            Self::Commit { .. } => "Commit",
-            Self::RunView { .. } => "RunView",
-            Self::CityView => "CityView",
-            Self::ApprovalQueue => "ApprovalQueue",
-            Self::InboxView { .. } => "InboxView",
-            Self::Metrics => "Metrics",
-            Self::CostView => "CostView",
-            Self::ArchiveSearch { .. } => "ArchiveSearch",
-            Self::RegistryView => "RegistryView",
-            Self::DiscardView => "DiscardView",
-            Self::EndpointView => "EndpointView",
-            Self::BuildingView { .. } => "BuildingView",
-        }
-    }
-}
 
 /// A digest of the protocol surface, exchanged at connect time.
 ///
@@ -321,6 +190,11 @@ mod tests {
                 base: kernel::GitOid::from_bytes([2u8; 20]),
                 head: None,
             },
+            Query::Hunks {
+                oid_a: kernel::GitOid::from_bytes([4u8; 20]),
+                oid_b: kernel::GitOid::from_bytes([5u8; 20]),
+                path: "lab/lex.rs".to_owned(),
+            },
             Query::Commit {
                 oid: kernel::GitOid::from_bytes([3u8; 20]),
             },
@@ -343,6 +217,7 @@ mod tests {
             Query::BuildingView {
                 addr: Address::parse("acme").unwrap(),
             },
+            Query::Governance,
         ];
         assert_eq!(queries.len(), QUERY_NAMES.len());
         for (query, expected) in queries.iter().zip(QUERY_NAMES) {

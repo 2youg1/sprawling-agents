@@ -14,6 +14,6 @@ mod suite;
 
 pub use metabolism::{ASSET_FLOOR_PER_MILLE, ASSET_IDLE_DAYS, Disposal, dispose, sweep};
 pub use nesting::{Attempt, Fault, Grades, Shape, Verdict, grade, recommended, tally};
-pub use probe::{Answers, Comparison, Probe, ProbeId, compare};
+pub use probe::{Answers, Comparison, Probe, ProbeId, compare, handoff_probe};
 pub use score::{AssetUse, Score, score, worst_first};
 pub use suite::{Half, Outcome, Report, Suite, Tally, Task};

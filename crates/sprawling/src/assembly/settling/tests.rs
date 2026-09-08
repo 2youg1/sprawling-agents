@@ -4,4 +4,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 mod ending;
+mod halting;
 mod landing;
+mod succession;

@@ -100,7 +100,17 @@ pub fn open(city_root: &Path, building: &Address, name: &SessionName) -> Result<
         match std::fs::create_dir_all(dir.parent().unwrap_or(city_root))
             .and_then(|()| std::fs::create_dir(&dir))
         {
-            Ok(()) => return Ok(addr),
+            // What one session works on stays on this machine, and the
+            // room says so itself: at the moment a building is raised
+            // no room exists to be named, so the building's own file
+            // cannot state this rule (city-SPEC.md section 8-21).
+            Ok(()) => {
+                crate::gitignore::seal_room(&dir)?;
+                // The handoff is this room's: what one session leaves
+                // for its own next run, never for the building.
+                crate::spine_files::lay_out_handoff(&dir, &addr)?;
+                return Ok(addr);
+            }
             Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(err) => {
                 return Err(AxError::failure(

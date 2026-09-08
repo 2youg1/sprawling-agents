@@ -35,8 +35,9 @@ pub(super) struct CommitFacts {
 }
 
 impl CommitFacts {
-    /// What a page or a person is handed.
-    pub(super) fn answer(&self, oid: GitOid) -> channels::CommitAnswer {
+    /// What a page or a person is handed. The lineage is this run
+    /// first, then each run it replaced, back to the first.
+    pub(super) fn answer(&self, oid: GitOid, lineage: Vec<RunId>) -> channels::CommitAnswer {
         channels::CommitAnswer {
             oid,
             run: self.run,
@@ -45,6 +46,7 @@ impl CommitFacts {
             effort: self.chosen.effort,
             seq: self.seq,
             session: session_of(&self.actor),
+            lineage,
         }
     }
 }
@@ -61,18 +63,42 @@ impl super::holding::Views {
         }
     }
 
-    /// Which run wrote this commit.
+    /// Files which run a `run_started` says this one replaced, when it
+    /// says so.
+    pub(super) fn fold_predecessor(&mut self, record: &EventRecord) {
+        if let Some(predecessor) = memory::predecessor_of(record.data().as_map()) {
+            self.predecessors.insert(record.run(), predecessor);
+        }
+    }
+
+    /// Which run wrote this commit, and the runs that run succeeded.
     ///
     /// A commit this city never wrote is `Unavailable`, for the reason
     /// `Changes` gives: "I did not write it" and "it changed nothing"
     /// are different answers, and a reader acts differently on each.
     pub(super) fn commit_answer(&self, oid: GitOid) -> channels::Answer {
         match self.commits.get(&oid) {
-            Some(facts) => channels::Answer::Commit(facts.answer(oid)),
+            Some(facts) => channels::Answer::Commit(facts.answer(oid, self.lineage_of(facts.run))),
             None => channels::Answer::Unavailable {
                 query: format!("Commit({oid})"),
             },
         }
+    }
+
+    /// The run and every predecessor behind it, nearest first. A chain
+    /// that loops - which no ledger this city wrote can hold - stops at
+    /// the first repeat rather than walking forever.
+    fn lineage_of(&self, run: RunId) -> Vec<RunId> {
+        let mut chain = vec![run];
+        let mut at = run;
+        while let Some(before) = self.predecessors.get(&at) {
+            if chain.contains(before) {
+                break;
+            }
+            chain.push(*before);
+            at = *before;
+        }
+        chain
     }
 }
 
@@ -162,8 +188,9 @@ mod tests {
         assert_eq!(found.to_string(), oid);
         // A record written before the city put the model on the ledger
         // says nothing about it, and the answer says nothing back.
-        let said = facts.answer(found);
+        let said = facts.answer(found, vec![facts.run]);
         assert_eq!(said.model, String::new());
+        assert_eq!(said.lineage.len(), 1, "a first run is its own lineage");
         assert_eq!(said.effort, None);
         assert_eq!(said.session.unwrap().as_str(), "room1");
     }

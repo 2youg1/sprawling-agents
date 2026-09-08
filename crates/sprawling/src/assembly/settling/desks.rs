@@ -9,7 +9,7 @@ use kernel::{AxCode, AxError};
 
 use crate::effect;
 
-use super::super::{Assignment, Desks, Reporter, RunWorker, Site, Sweep, now_ms};
+use super::super::{Assignment, Desks, Reporter, RunWorker, Site, Sweep, held, now_ms};
 
 /// Writes the plan back, creating nothing that was not there: a
 /// building without a plan is a building whose residents have nothing
@@ -53,7 +53,7 @@ impl RunWorker {
         // The lent queue comes home first, and on both paths: an inbox
         // left in a dropped desk is a queue the city forgot it had.
         let (signal_effects, returned) = {
-            let mut desk = desks.signals.borrow_mut();
+            let mut desk = held(&desks.signals, "settle the signal desk")?;
             (desk.take_effects(), desk.take_inbox())
         };
         self.inboxes.insert(addr.clone(), returned);
@@ -63,7 +63,11 @@ impl RunWorker {
         // its own line cannot be written here.
         let spoken = effect::Landing::signals(signal_effects, addr, who)?;
         self.settle(at, run_id, spoken)?;
-        let ground = effect::Landing::goals(desks.goals.borrow_mut().take_effects(), addr, who)?;
+        let ground = effect::Landing::goals(
+            held(&desks.goals, "settle the goal desk")?.take_effects(),
+            addr,
+            who,
+        )?;
         self.settle(at, run_id, ground)?;
         // The sweep the forecast cannot replace. A command can be
         // obfuscated past a text prediction; what is missing from the
@@ -113,7 +117,7 @@ impl RunWorker {
         }
         // What the run did to the plan.
         let (claim_effects, plan_after) = {
-            let mut desk = desks.plan.borrow_mut();
+            let mut desk = held(&desks.plan, "settle the plan desk")?;
             (desk.take_effects(), desk.roadmap().map(str::to_owned))
         };
         if let Some(text) = plan_after {
@@ -159,7 +163,7 @@ impl RunWorker {
         // kind of thing a later run reads as the building's settled
         // knowledge.
         let remembered = effect::Landing::shelf(
-            desks.shelf.borrow_mut().take_effects(),
+            held(&desks.shelf, "settle the shelf")?.take_effects(),
             write_root,
             building.addr(),
             now_ms()?,

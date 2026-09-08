@@ -32,7 +32,8 @@ pub(super) struct Sweep<'a> {
 pub(super) struct Ending<'a> {
     pub(super) driven: Result<runtime::Run<runtime::run::Frozen>, AxError>,
     pub(super) raised: Vec<kernel::ApprovalItem>,
-    pub(super) delegates: &'a std::rc::Rc<std::cell::RefCell<collab::DelegateDesk>>,
+    pub(super) delegates: &'a std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
+    pub(super) succession: &'a std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
 }
 
 pub(super) mod desks;

@@ -6,10 +6,14 @@
 //! The documents a building keeps its long work in, and the job file a
 //! run starts from.
 //!
-//! Three of the four spine documents are laid out here — `Roadmap.md`,
-//! `Memo.md`, `Handoff.md`. The fourth, `BUILDING.md`, is written where
-//! its meaning lives (`crate::building`, read by `crate::policy`): one
-//! file, one writer.
+//! Three of the four spine documents are laid out here — `Roadmap.md`
+//! and `Memo.md` with the building, `Handoff.md` with each room. The
+//! fourth, `BUILDING.md`, is written where its meaning lives
+//! (`crate::building`, read by `crate::policy`): one file, one writer.
+//!
+//! The handoff is the room's rather than the building's (card-11.6):
+//! two sessions of one building can freeze at once, and one file for
+//! both would be two contents fighting over one name.
 //!
 //! Nothing here overwrites. A building that has been working keeps its
 //! plan, its decisions and its handoff, whatever is run against it
@@ -24,7 +28,7 @@ use kernel::{Address, AxCode, AxError};
 
 use crate::policy::building_path;
 
-mod hall;
+pub(crate) mod hall;
 
 pub use hall::{CLERK_FILE, MAYOR_FILE, hall_identity_path, lay_out_hall_identities};
 
@@ -40,13 +44,23 @@ pub(crate) const MEMO_FILE: &str = "Memo.md";
 pub const HANDOFF_FILE: &str = "Handoff.md";
 /// The task of one session, in the room it is run from.
 pub const JOB_FILE: &str = "JOB.md";
+/// What this building is and the decisions it holds, written before the
+/// code that follows them. The one spine document that is committed:
+/// a promise a clone cannot read is not a promise.
+pub const SPEC_FILE: &str = "SPEC.md";
 /// The city's own instructions, read into every prefix.
 pub const CITY_FILE: &str = "City.md";
 
 const ROADMAP_TEMPLATE: &str = include_str!("../../../docs/templates/Roadmap.md");
 const MEMO_TEMPLATE: &str = include_str!("../../../docs/templates/Memo.md");
 const HANDOFF_TEMPLATE: &str = include_str!("../../../docs/templates/Handoff.md");
+/// The condensed form of the seventeen-section crate SPEC: the same
+/// section order, with the sections that only a crate in this workspace
+/// owes left out. One template, so a building's SPEC and a crate's SPEC
+/// stay one shape rather than two competing ones.
+const SPEC_TEMPLATE: &str = include_str!("../../../docs/templates/SPEC.md");
 const NAME_PLACEHOLDER: &str = "<building name>";
+const PROJECT_PLACEHOLDER: &str = "<project name>";
 
 /// What a dispatch knows about the work when the job file is written.
 pub struct JobBrief<'a> {
@@ -54,8 +68,6 @@ pub struct JobBrief<'a> {
     pub task: &'a str,
     /// What counts as success, what counts as failure, when to stop.
     pub goal: &'a str,
-    /// The ceilings this run works under, in the caller's own words.
-    pub budget: &'a str,
 }
 
 /// What one session was given to work from.
@@ -120,21 +132,32 @@ pub fn write_brief(
     Ok(RunBrief::Job { text })
 }
 
-/// Where a building's handoff lives.
+/// Where a room's handoff lives.
 ///
 /// The one place this path is spelled, for the same reason `job_path`
 /// and `roadmap_path` are.
 #[must_use]
-pub fn handoff_path(city_root: &Path, building_addr: &Address) -> PathBuf {
+pub fn handoff_path(city_root: &Path, room: &Address) -> PathBuf {
     let mut path = city_root.to_path_buf();
-    for segment in building_addr.as_str().split('/') {
+    for segment in room.as_str().split('/') {
         path.push(segment);
     }
     path.push(HANDOFF_FILE);
     path
 }
 
-/// What the last session in this building left for the next one.
+/// Lays the blank handoff form down in a room that was just opened.
+///
+/// # Errors
+/// Propagates a room that cannot be written.
+pub(crate) fn lay_out_handoff(room_dir: &Path, room: &Address) -> Result<(), AxError> {
+    write_new(
+        &room_dir.join(HANDOFF_FILE),
+        &HANDOFF_TEMPLATE.replace(NAME_PLACEHOLDER, room.as_str()),
+    )
+}
+
+/// What the last run in this room left for the next one.
 ///
 /// `None` says one thing only: there is nothing here worth carrying -
 /// either no file, or a form still holding the template's own
@@ -146,15 +169,15 @@ pub fn handoff_path(city_root: &Path, building_addr: &Address) -> PathBuf {
 /// # Errors
 /// `E_STORAGE_FATAL` naming the path, for every failure except a file
 /// that is not there.
-pub fn handoff(city_root: &Path, building_addr: &Address) -> Result<Option<String>, AxError> {
-    let path = handoff_path(city_root, building_addr);
+pub fn handoff(city_root: &Path, room: &Address) -> Result<Option<String>, AxError> {
+    let path = handoff_path(city_root, room);
     let text = match std::fs::read_to_string(&path) {
         Ok(text) => text,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(err) => {
             return Err(AxError::failure(
                 AxCode::StorageFatal,
-                "read a building's handoff",
+                "read a room's handoff",
                 format!("{}: {err}", path.display()),
             )
             .with_recovery(
@@ -204,8 +227,8 @@ pub(crate) fn lay_out(building_root: &Path, addr: &Address) -> Result<(), AxErro
         &MEMO_TEMPLATE.replace(NAME_PLACEHOLDER, name),
     )?;
     write_new(
-        &building_root.join(HANDOFF_FILE),
-        &HANDOFF_TEMPLATE.replace(NAME_PLACEHOLDER, name),
+        &building_root.join(SPEC_FILE),
+        &SPEC_TEMPLATE.replace(PROJECT_PLACEHOLDER, name),
     )?;
     Ok(())
 }
@@ -281,14 +304,11 @@ pub fn write_job(
     if let Some(room) = path.parent() {
         std::fs::create_dir_all(room).map_err(|err| storage(room, &err))?;
     }
-    let mut text = format!(
+    let text = format!(
         "# {JOB_FILE} — {}\n\n> The task for this session. Read it in full and leave it \
          unchanged.\n\n## Task\n\n{}\n\n## Goal\n\n{}\n",
         brief.task, brief.task, brief.goal
     );
-    if !brief.budget.is_empty() {
-        text.push_str(&format!("\n## Budget\n\n{}\n", brief.budget));
-    }
     std::fs::write(&path, text.as_bytes()).map_err(|err| storage(&path, &err))?;
     Ok(text)
 }
@@ -359,7 +379,7 @@ fn write_new(path: &Path, text: &str) -> Result<(), AxError> {
     }
 }
 
-fn storage(path: &Path, err: &std::io::Error) -> AxError {
+pub(crate) fn storage(path: &Path, err: &std::io::Error) -> AxError {
     AxError::failure(
         AxCode::StorageFatal,
         "lay out a building's documents",

@@ -19,10 +19,15 @@
 //! And a child's output goes to files rather than to pipes, because a
 //! pipe buffer that fills stops the child inside a write — which is the
 //! same hang this module exists to remove, wearing another name.
+//!
+//! The table has two kinds of member: a background command, which a
+//! halt kills, and a run a resident handed down, which a halt marks and
+//! which stops itself at its next safe point by asking [`Backlog::stopping`]
+//! (runtime-SPEC 8-28-2). One table, one `halt`, so a stopped scope has
+//! nothing left going in it under either name.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 
 use kernel::{Address, AxCode, AxError};
 
@@ -59,12 +64,30 @@ pub enum Started {
     },
 }
 
+/// Which of the two kinds of member a standing entry is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BacklogKind {
+    Command,
+    Run,
+}
+
+impl BacklogKind {
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BacklogKind::Command => "command",
+            BacklogKind::Run => "run",
+        }
+    }
+}
+
 /// A member that is still running.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Standing {
     pub id: BacklogId,
     pub scope: Address,
     pub what: String,
+    pub kind: BacklogKind,
 }
 
 /// A member that has stopped, collected once and then forgotten.
@@ -89,17 +112,6 @@ pub struct Backlog {
 struct Table {
     next: u64,
     members: BTreeMap<BacklogId, Member>,
-}
-
-struct Member {
-    scope: Address,
-    what: String,
-    child: Child,
-    dir: PathBuf,
-    /// Set once the short window has passed. Only a backgrounded member
-    /// is collected by [`Backlog::harvest`]; one still inside its window
-    /// belongs to the caller that is polling it.
-    backgrounded: bool,
 }
 
 impl Backlog {
@@ -147,9 +159,11 @@ impl Backlog {
             Member {
                 scope: scope.clone(),
                 what: what.clone(),
-                child,
-                dir: dir.clone(),
-                backgrounded: false,
+                body: Body::Command {
+                    child,
+                    dir: dir.clone(),
+                    backgrounded: false,
+                },
             },
         )?;
         for _ in 0..WINDOW_POLLS {
@@ -167,13 +181,58 @@ impl Backlog {
         Ok(Started::Backgrounded { id, what })
     }
 
+    /// Enters a run a resident handed down, so a halt on its scope can
+    /// reach it. The assembly layer calls this before the drive and
+    /// [`Backlog::leave`] after it.
+    ///
+    /// # Errors
+    /// `E_STORAGE_FATAL` when the table cannot be reached.
+    pub fn enrol_run(&self, scope: &Address, what: String) -> Result<BacklogId, AxError> {
+        let id = self.mint()?;
+        self.enrol(
+            id,
+            Member {
+                scope: scope.clone(),
+                what,
+                body: Body::Run(RunState::Going),
+            },
+        )?;
+        Ok(id)
+    }
+
+    /// Whether a halt has reached this member. A run asks at each safe
+    /// point and answers `true` with `Interrupt::Cancel`; a member that
+    /// has already left the table is not stopping, it is gone.
+    ///
+    /// # Errors
+    /// `E_STORAGE_FATAL` when the table cannot be reached.
+    pub fn stopping(&self, id: BacklogId) -> Result<bool, AxError> {
+        let table = self.hold()?;
+        Ok(table
+            .members
+            .get(&id)
+            .is_some_and(|member| matches!(member.body, Body::Run(RunState::Stopping))))
+    }
+
+    /// Takes a run member out once it has frozen. A run that stayed
+    /// would be reported standing after its own `run_frozen` line.
+    ///
+    /// # Errors
+    /// `E_STORAGE_FATAL` when the table cannot be reached.
+    pub fn leave(&self, id: BacklogId) -> Result<(), AxError> {
+        let mut table = self.hold()?;
+        table.members.remove(&id);
+        Ok(())
+    }
+
     /// Stops every member inside a scope, or every member in the city
     /// when no scope is named. Returns how many were reached.
     ///
     /// This is the sentence `runtime::turn` could not previously make
     /// true: a member is stopped where it stands, and the run that
     /// started it comes back to its next boundary rather than staying
-    /// inside a system call.
+    /// inside a system call. A run member is marked rather than killed:
+    /// it comes back to its own next safe point and cancels there.
     ///
     /// # Errors
     /// `E_STORAGE_FATAL` when the table cannot be reached, which means
@@ -183,7 +242,17 @@ impl Backlog {
         let mut reached = 0usize;
         for member in table.members.values_mut() {
             let covered = scope.is_none_or(|within| member.scope.is_within(within));
-            if covered && member.child.kill().is_ok() {
+            if !covered {
+                continue;
+            }
+            let stopped = match &mut member.body {
+                Body::Command { child, .. } => child.kill().is_ok(),
+                Body::Run(state) => {
+                    *state = RunState::Stopping;
+                    true
+                }
+            };
+            if stopped {
                 reached = reached.saturating_add(1);
             }
         }
@@ -203,11 +272,16 @@ impl Backlog {
         let mut done = Vec::new();
         let mut spent = Vec::new();
         for (id, member) in &mut table.members {
-            if !member.backgrounded {
+            let Body::Command {
+                child,
+                dir,
+                backgrounded: true,
+            } = &mut member.body
+            else {
                 continue;
-            }
-            if let Ok(Some(status)) = member.child.try_wait() {
-                let (stdout, stderr) = collect(&member.dir);
+            };
+            if let Ok(Some(status)) = child.try_wait() {
+                let (stdout, stderr) = collect(dir);
                 done.push(Finished {
                     id: *id,
                     what: member.what.clone(),
@@ -238,6 +312,7 @@ impl Backlog {
                 id: *id,
                 scope: member.scope.clone(),
                 what: member.what.clone(),
+                kind: member.body.kind(),
             })
             .collect())
     }
@@ -270,10 +345,14 @@ impl Backlog {
     /// about to return.
     fn settle(&self, id: BacklogId) -> Result<Option<i64>, AxError> {
         let mut table = self.hold()?;
-        let Some(member) = table.members.get_mut(&id) else {
+        let Some(Member {
+            body: Body::Command { child, .. },
+            ..
+        }) = table.members.get_mut(&id)
+        else {
             return Ok(Some(-1));
         };
-        let stopped = match member.child.try_wait() {
+        let stopped = match child.try_wait() {
             Ok(Some(status)) => Some(i64::from(status.code().unwrap_or(-1))),
             Ok(None) => None,
             Err(_) => Some(-1),
@@ -286,36 +365,16 @@ impl Backlog {
 
     fn hand_over(&self, id: BacklogId) -> Result<(), AxError> {
         let mut table = self.hold()?;
-        if let Some(member) = table.members.get_mut(&id) {
-            member.backgrounded = true;
+        if let Some(Member {
+            body: Body::Command { backgrounded, .. },
+            ..
+        }) = table.members.get_mut(&id)
+        {
+            *backgrounded = true;
         }
         Ok(())
     }
 }
 
-/// Reads what a child wrote and takes the place it wrote to away.
-///
-/// Failing to read is answered with what was read so far rather than
-/// with an error: the command's exit code is the fact the caller is
-/// owed, and a temporary file that vanished must not turn a run that
-/// finished into a run that failed.
-fn collect(dir: &std::path::Path) -> (String, String) {
-    let read = |name: &str| {
-        std::fs::read(dir.join(name))
-            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
-            .unwrap_or_default()
-    };
-    let out = read("out");
-    let err = read("err");
-    drop(std::fs::remove_dir_all(dir));
-    (out, err)
-}
-
-fn storage(dir: &std::path::Path, err: &std::io::Error) -> AxError {
-    AxError::failure(
-        AxCode::StorageFatal,
-        "keep a command's output",
-        format!("{}: {err}", dir.display()),
-    )
-    .with_recovery("make the system temporary directory writable")
-}
+mod member;
+use member::{Body, Member, RunState, collect, storage};
