@@ -78,6 +78,19 @@ impl<'de> Deserialize<'de> for NoSecret {
     }
 }
 
+/// The schema half of the same statement: `false` is the schema no value
+/// satisfies, so a client generated from it types the field as `never`.
+#[cfg(feature = "schema")]
+impl schemars::JsonSchema for NoSecret {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("NoSecret")
+    }
+
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::Schema::from(false)
+    }
+}
+
 /// Which step of a subscription login a `Login` frame carries.
 ///
 /// The authorization code arrives by hand: the provider shows it to the
@@ -86,6 +99,7 @@ impl<'de> Deserialize<'de> for NoSecret {
 /// of its own.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum LoginStep {
     /// Mint the authorization URL for a person to open.
     Begin,
@@ -97,6 +111,7 @@ pub enum LoginStep {
 /// providers, this set is the protocol's own and has no upstream owner.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum HaltScope {
     City,
     Building(Address),
@@ -111,6 +126,7 @@ pub enum HaltScope {
 /// command.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PursuitStep {
     /// Declare one, replacing any goal this building already had.
     Set {
@@ -130,6 +146,8 @@ pub enum PursuitStep {
 /// answer the frame behind it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(rename = "Command"))]
 pub enum Command<Secret = Sealed<String>> {
     Dispatch {
         addr: Address,

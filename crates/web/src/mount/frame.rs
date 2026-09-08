@@ -183,7 +183,9 @@ pub(crate) fn apply_frame(
             // these has an answer the server can give and no page that
             // asks for it yet, and a wildcard here would hide the next one
             // that arrives as well.
-            channels::Answer::Run(_) | channels::Answer::Unavailable { .. } => {}
+            channels::Answer::Run(_)
+            | channels::Answer::Commit(_)
+            | channels::Answer::Unavailable { .. } => {}
         }
     }
     // A refusal is not history and must not move the snapshot - but it is

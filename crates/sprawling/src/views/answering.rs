@@ -89,6 +89,7 @@ impl Views {
                     }
                 }
             }
+            EventKind::CheckpointCommitted | EventKind::PrMerged => self.fold_commit(record),
             EventKind::AssetArchived => {
                 if let Some(line) = registry_line(record) {
                     self.assets.push(line);
@@ -301,6 +302,7 @@ impl Views {
                     },
                 }
             }
+            channels::Query::Commit { oid } => self.commit_answer(*oid),
             channels::Query::EndpointView => {
                 channels::Answer::Endpoints(endpoints_answer(&self.book))
             }

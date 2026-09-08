@@ -15,8 +15,28 @@
 )]
 
 use super::data::verified_chain;
-use super::router::named;
+use super::router::{COMMANDS, named};
 use super::{CLIENT_COMPLETE, CLIENT_FILES};
+
+/// Checking is what `doctor` does; touching the machine takes the flag.
+///
+/// A verb that installed by default would act on a person who only
+/// asked what they had, which is the one thing this verb must not do.
+#[test]
+fn doctor_installs_only_when_the_flag_says_so() {
+    let words =
+        |raw: &[&str]| -> Vec<String> { raw.iter().map(|word| (*word).to_owned()).collect() };
+    assert!(!super::doctor::screen::asked(&words(&["doctor"])).install);
+    assert!(super::doctor::screen::asked(&words(&["doctor", "--install"])).install);
+    assert!(
+        !super::doctor::screen::asked(&words(&["doctor", "--installed"])).install,
+        "a flag that only looks like --install is not --install"
+    );
+    assert!(
+        COMMANDS.contains("doctor"),
+        "a verb the binary accepts is on the one screen that lists them"
+    );
+}
 
 /// A place with no ledger in it is not a verified chain.
 ///

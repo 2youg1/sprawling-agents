@@ -304,8 +304,13 @@ fn a_roadmap_counts_only_the_rows_that_carry_evidence() {
     let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
         panic!("CityView answers with a city");
     };
-    assert_eq!(city.buildings.len(), 1);
-    let plan = &city.buildings[0];
+    // Two buildings: City Hall, which every city is raised with, and
+    // the one this test wrote a plan for.
+    let plan = city
+        .buildings
+        .iter()
+        .find(|found| found.addr.as_str() == "lab")
+        .expect("the building this test wrote a plan for");
     assert!(plan.problems.is_empty(), "{:?}", plan.problems);
     let kernel::Progress::Planned(planned) = plan.progress else {
         panic!("a building with a roadmap has a denominator");
@@ -338,7 +343,11 @@ fn a_roadmap_that_cannot_be_parsed_reports_its_rows_rather_than_a_number() {
     let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
         panic!("CityView answers with a city");
     };
-    let plan = &city.buildings[0];
+    let plan = city
+        .buildings
+        .iter()
+        .find(|found| found.addr.as_str() == "lab")
+        .expect("the building this test wrote a plan for");
     assert!(plan.problems.iter().any(|p| p.contains("nearly there")));
     assert!(
         matches!(plan.progress, kernel::Progress::Unplanned(_)),

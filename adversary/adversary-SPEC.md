@@ -74,6 +74,12 @@ the refusal above reached nobody: the peer that asked had closed its socket
 
 **处置**：本目录的 `Door` 因此把静默解成 `Quiet` 而不是 `Accepted`（§8），并用 `exitCodeMeansWhatItSays` 这条性质把它钉住。是否修产品、怎么修（受理即答／退出码分第三档／窗口随动词而定）是 Rust 侧的一次裁定，不由本目录决定。
 
+**已修（card-4.10.1「静默有自己的退出码」）。** Rust 侧选了三档中的第二条：`Spoken` 是一个三支穷尽枚举，
+`Quiet`（帧发出后窗口内一帧未回）退 **3**，而 0 与 1 的含义一个字不改。表写在 `docs/operating.md`
+与 `crates/sprawling/sprawling-SPEC.md` §8-41 里，红转绿的那条测试是
+`a_city_that_says_nothing_inside_the_window_is_not_a_success`——一个脚本化的服务端答完 `Welcome` 后闭口不言。
+本目录的 `Door` 因此可以把 `Quiet` 与退出码 3 对上，而不再需要把它当成一个无法与成功区分的取值。
+
 ### 第二个发现：一次被拒的派活写进了城里
 
 随机轨迹在第 2 个样本上失败，收缩 4 次后得到两步：`Raise "acme"`／`Work "gamma"`（一个从没立过的地址）／`Look`——`Look` 看见 `["acme","gamma"]`，而只有 `acme` 被立过。追下去是同一条缝的两个症状：
@@ -110,6 +116,15 @@ replay               → 账本里两条 city_halted
 
 **处置**：归 Rust 侧裁定，两条路都成立——把 `gate::dedup` 接上去，或者停止在线格式上强制要求这个字段。一把必须带而无人读的钥匙，是门做出而不兑现的承诺。本目录只留 `keyUsedTwice` 一条断言等它变绿，方法是问账本的离线校验器「链走到哪了」，两次读数必须相等：**不预测任何 seq，只谈两次观察之间的关系**。
 
+**已修（card-4.10.1「重放的命令只做一次」）。** Rust 侧选了第一条：`bin::assembly::commanding::entrance`
+持有那个 `seen` 集合，`RunWorker::serve_one`——wire、控制台与 ACP 三条路唯一的汇合点——在任何副作用之前
+向 `kernel::gate::dedup` 问一次，重复的键得到**第一次的答案**（成功即沉默，拒绝即逐字相同的那份拒绝），
+且不再写第二次。钥匙随命令写进它所产生记录的 payload，开城时那一趟已有的账本折叠把它读回来，
+故重启之后同一把键仍然认得。红转绿的证据：同一条 `Dispatch` 送两次，此前留下 `["one", "one-2"]` 两个房间，
+现在只剩一个，`run_started` 只有一条。`keyUsedTwice` 因此可以问了。
+**仍未覆盖的一档**：`run_started` 由 `runtime::run::lifecycle` 直接写账本，装配点碰不到它，
+故一次跑到一半被进程死亡打断的派活，其钥匙不在账本上——那正是重试应当被允许的一档。
+
 `Look` 因此不进随机生成器（`Model.hs` 记了理由）：一条随机轨迹里只要出现一次被拒的派活，其后每一个 `Look` 都会为同一个原因失败，那会把一个缺陷报成许多个，并把下一个缺陷藏在它后面。
 
 ## 5 权威信源
@@ -118,7 +133,7 @@ replay               → 账本里两条 city_halted
 |---|---|
 | `quickcheck-dynamic` 4.0.1，`StateModel` 与 `RunModel` 分属两个类型类，带 dynamic logic | 上游 README、Hackage |
 | 本机 GHC 9.10.3 / cabal 3.16.1.0 | `ghc --version`、`cabal --version` 实测 |
-| `WIRE_V = 13`，23 个 Command、14 个 Query | `crates/channels/src/wire.rs`、`command.rs` |
+| `WIRE_V = 14`，23 个 Command、15 个 Query（card-2.4 增 `Query::Commit`） | `crates/channels/src/wire.rs`、`command.rs` |
 | 35 个稳定错误码 | `crates/kernel/src/error.rs` 的 `AxCode::ALL` |
 | `IdemKey` 形如 `idem1-` 加 32 位小写十六进制 | 门的拒绝原文实测 |
 | 模板只有 `minimal` 与 `confidential` | 门的拒绝原文实测 |

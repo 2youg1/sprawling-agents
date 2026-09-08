@@ -26,13 +26,19 @@ use std::process::ExitCode;
 
 /// Sends one frame over the wire and prints everything that comes back.
 ///
-/// Exits 1 when the city refused something, so an agent driving this
-/// learns the outcome from the exit code rather than by parsing JSON.
+/// An agent driving this learns the outcome from the exit code rather
+/// than by parsing JSON, and the code says exactly what was observed:
+/// 0 the city answered, 1 the city refused, 2 this command line was not
+/// readable, 3 the city said nothing before the quiet window closed.
+/// The last one is its own code because silence is not acceptance - the
+/// city may still be working - and reading it as either of the other
+/// two is how a failure becomes a success (sprawling-SPEC.md 8-41).
 pub(super) fn call(args: &[String]) -> ExitCode {
     let Some(frame) = args.get(1).filter(|a| !a.starts_with("--")) else {
         eprintln!(
             "usage: sprawling call <frame-json|-> [--at host:port] [--token T] [--quiet-ms N]"
         );
+        eprintln!("exit: 0 answered, 1 refused, 2 this command line, 3 nothing came back");
         eprintln!("commands: {}", channels::COMMAND_NAMES.join(", "));
         eprintln!("queries:  {}", channels::QUERY_NAMES.join(", "));
         return ExitCode::from(2);
@@ -70,10 +76,18 @@ pub(super) fn call(args: &[String]) -> ExitCode {
     ) {
         Ok(heard) => {
             eprintln!("{} frame(s), {} refusal(s)", heard.frames, heard.refusals);
-            if heard.refusals > 0 {
-                ExitCode::FAILURE
-            } else {
-                ExitCode::SUCCESS
+            match heard.spoken() {
+                wire_client::Spoken::Refused => ExitCode::FAILURE,
+                wire_client::Spoken::Answered => ExitCode::SUCCESS,
+                wire_client::Spoken::Quiet => {
+                    eprintln!(
+                        "nothing came back inside {quiet}ms: the city may still be working on it"
+                    );
+                    eprintln!(
+                        "recovery: ask again with a longer --quiet-ms, or read the city's own log"
+                    );
+                    ExitCode::from(3)
+                }
             }
         }
         Err(err) => report(err),

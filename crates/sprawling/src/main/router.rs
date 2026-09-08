@@ -47,6 +47,8 @@ pub(super) const COMMANDS: &str = "\
 commands:
   up [dir] [addr]              raise a city here if needed, serve it, open the WebUI
   install [--uninstall]        put this binary on your PATH, or take it back off
+  doctor [--install]           what this machine has against what this city needs
+                               (--install: offer each missing item, one at a time)
   init <dir> [--adopt]         raise a city: writes the genesis record
                                (--adopt: every folder there becomes a building)
   serve <dir> [addr] [--open]  serve a city that already exists
@@ -58,6 +60,7 @@ commands:
   call <frame|-> [--at a]      send one wire frame, print every frame back
   enrol <realm>/<name>         read a credential from stdin, hand it to a city
   replay <ledger-dir>          verify a chain offline, read-only
+  whose <city> <oid>           which run wrote a commit this city made
   export <city> <dest>         pack a whole city
   restore <bundle> <city>      unpack it on another machine";
 
@@ -66,9 +69,11 @@ pub(super) fn main() -> ExitCode {
     match args.first().map(String::as_str) {
         Some("status") => status(&args),
         Some("replay") => replay(named(&args, 1)),
+        Some("whose") => super::whose::verb(named(&args, 1), named(&args, 2)),
         Some("init") => init(&args),
         Some("up") => up(&args),
         Some("install") => install(&args),
+        Some("doctor") => super::doctor::screen::verb(&args),
         Some("call") => call(&args),
         Some("enrol" | "enroll") => enrol(&args),
         Some("serve") => serve(named(&args, 1), named(&args, 2), &args),

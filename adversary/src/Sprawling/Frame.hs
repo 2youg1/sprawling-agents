@@ -13,9 +13,9 @@
 -- `channels::ServerFrame` spells and the shape of a refusal; it does not know
 -- which refusal is owed, which is "Sprawling.Model"'s business.
 --
--- An answer keeps its name and its body as it arrived. Fourteen queries exist
--- and the model drives four, so decoding all fourteen into records would be
--- fourteen restatements of a shape that already has an authority in Rust. The
+-- An answer keeps its name and its body as it arrived. Fifteen queries exist
+-- and the model drives four, so decoding all fifteen into records would be
+-- fifteen restatements of a shape that already has an authority in Rust. The
 -- name is checked because a renamed answer is a wire change; the body is read
 -- only where something asserts on it.
 module Sprawling.Frame

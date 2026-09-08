@@ -247,3 +247,72 @@ fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
     };
     assert!(registry.assets.is_empty());
 }
+#[test]
+fn a_commit_the_city_made_says_which_run_wrote_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![
+            completion("editing", Some(("tu_1", "lab/room1/notes.md"))),
+            completion("done", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "write one note".to_owned(),
+            goal: "one turn is enough".to_owned(),
+            mode: channels::ModeTag::parse("plan").unwrap(),
+            budget: kernel::BudgetCap::default(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"whose"),
+            session: None,
+            effort: Some(kernel::Effort::High),
+        })
+        .unwrap();
+
+    // The line that announced a commit, read out of the one history:
+    // the pin that opens a dispatch names a job and no oid, so the
+    // question asked is whether the record names a commit.
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let announced = verified
+        .raw_lines()
+        .iter()
+        .map(|line| EventRecord::parse_line(line).unwrap())
+        .find(|record| {
+            record.kind() == EventKind::CheckpointCommitted
+                && record.data().as_map().contains_key("oid")
+        })
+        .expect("a tool wave fences a commit");
+    let oid = kernel::GitOid::parse(
+        announced.data().as_map()["oid"]
+            .as_str()
+            .expect("a fence names its commit"),
+    )
+    .expect("the fence oid is forty hex digits");
+
+    let mut views = rebuild_views(&report.ledger_dir).unwrap();
+    let channels::Answer::Commit(said) = views.answer(&channels::Query::Commit { oid }) else {
+        panic!("a commit this city made answers which run wrote it");
+    };
+    assert_eq!(said.oid, oid);
+    assert_eq!(said.run, announced.run(), "the run that fenced it");
+    assert_eq!(said.seq, announced.seq(), "where the history says so");
+    assert_eq!(said.actor.as_str(), "lab/room1");
+    assert_eq!(said.model, "m-local", "the model the trailers carry");
+    assert_eq!(said.effort, Some(kernel::Effort::High));
+    assert_eq!(
+        said.session.map(|name| name.as_str().to_owned()),
+        Some("room1".to_owned()),
+        "the room is what a person called this line of work"
+    );
+
+    // An oid this city never wrote is not an empty answer.
+    assert!(matches!(
+        views.answer(&channels::Query::Commit {
+            oid: kernel::GitOid::from_bytes([9u8; 20]),
+        }),
+        channels::Answer::Unavailable { .. }
+    ));
+}

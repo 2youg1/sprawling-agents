@@ -46,15 +46,18 @@ use serde::{Deserialize, Serialize};
 ///    what each is worth and what is ready; a branch that is stuck says
 ///    so once, at the node it is stuck at; and a city can be given a
 ///    goal it works towards until the work runs out (V3.17-V3.23).
-pub const WIRE_V: u32 = 13;
+/// 14: a commit the city made can be asked which run wrote it
+///    (card-2.4).
+pub const WIRE_V: u32 = 14;
 use crate::answer::Answer;
 use crate::command::{COMMAND_NAMES, WireCommand};
 
 /// The Query surface, in declaration order.
-pub const QUERY_NAMES: [&str; 14] = [
+pub const QUERY_NAMES: [&str; 15] = [
     "History",
     "RunHistory",
     "Changes",
+    "Commit",
     "RunView",
     "CityView",
     "ApprovalQueue",
@@ -73,6 +76,7 @@ pub const QUERY_NAMES: [&str; 14] = [
 /// Query.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Query {
     /// A bounded slice of the one history, ending just before `before`
     /// or at the tail when that is absent.
@@ -121,6 +125,21 @@ pub enum Query {
         base: GitOid,
         head: Option<GitOid>,
     },
+    /// Which run wrote one commit the city made.
+    ///
+    /// Every commit this city makes carries five git trailers naming the
+    /// run, the resident, the model, the effort and the city itself.
+    /// Those trailers are a projection for readers outside the city, so
+    /// this query is answered from the Ledger and never from git: a city
+    /// exported and restored elsewhere, with no `.git` beside it, still
+    /// answers.
+    ///
+    /// An oid this city never wrote is [`Answer::Unavailable`], for the
+    /// reason [`Query::Changes`] gives: "I did not write it" and "it
+    /// changed nothing" are different answers.
+    Commit {
+        oid: GitOid,
+    },
     RunView {
         run: RunId,
     },
@@ -154,6 +173,7 @@ impl Query {
             Self::History { .. } => "History",
             Self::RunHistory { .. } => "RunHistory",
             Self::Changes { .. } => "Changes",
+            Self::Commit { .. } => "Commit",
             Self::RunView { .. } => "RunView",
             Self::CityView => "CityView",
             Self::ApprovalQueue => "ApprovalQueue",
@@ -190,8 +210,31 @@ pub fn schema_hash() -> B3Hash {
     B3Hash::digest(&material)
 }
 
+/// The JSON Schema of the whole envelope: every named type reachable from
+/// [`ClientFrame`] or [`ServerFrame`], under `$defs`, both roots included.
+///
+/// This is what `cargo xtask wire-ts` generates the client from. It is
+/// not what the handshake compares: [`schema_hash`] reads the version and
+/// the two name tables and nothing else, so a doc comment edited here
+/// moves this document and leaves every connected page connected. Pure:
+/// same build, same bytes.
+#[cfg(feature = "schema")]
+#[must_use]
+pub fn wire_schema() -> serde_json::Value {
+    let mut generator = schemars::SchemaGenerator::default();
+    generator.subschema_for::<ClientFrame>();
+    generator.subschema_for::<ServerFrame>();
+    let definitions = generator.take_definitions(true);
+    serde_json::json!({
+        "$schema": schemars::consts::meta_schemas::DRAFT2020_12,
+        "title": "sprawling wire",
+        "$defs": definitions,
+    })
+}
+
 /// The client's opening frame.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Hello {
     pub wire_v: u32,
     pub schema: B3Hash,
@@ -201,6 +244,7 @@ pub struct Hello {
 
 /// The server's answer to a `Hello` it accepted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Welcome {
     pub wire_v: u32,
     pub schema: B3Hash,
@@ -217,6 +261,7 @@ pub struct Welcome {
 /// Everything a client may send.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ClientFrame {
     Hello(Hello),
     Command(Box<WireCommand>),
@@ -234,6 +279,7 @@ pub enum ClientFrame {
 /// become a second, unverifiable history of what the model said.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ServerFrame {
     Welcome(Welcome),
     Event(Box<EventRecord>),
@@ -249,6 +295,7 @@ pub enum ServerFrame {
 
 /// One piece of what a model is saying, on its way to a page.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Delta {
     pub run: RunId,
     pub text: String,
@@ -273,6 +320,9 @@ mod tests {
             Query::Changes {
                 base: kernel::GitOid::from_bytes([2u8; 20]),
                 head: None,
+            },
+            Query::Commit {
+                oid: kernel::GitOid::from_bytes([3u8; 20]),
             },
             Query::RunView {
                 run: RunId::from_bytes([1u8; 16]),
@@ -306,5 +356,37 @@ mod tests {
         let text = serde_json::to_string(&frame).unwrap();
         let back: ClientFrame = serde_json::from_str(&text).unwrap();
         assert_eq!(frame, back);
+    }
+
+    /// The document names both roots, every command by its wire name,
+    /// and the one frame a socket cannot spell as a value nothing
+    /// satisfies — so the client generated from it refuses the same
+    /// bytes the server refuses.
+    #[cfg(feature = "schema")]
+    #[test]
+    fn the_schema_document_holds_both_roots_and_every_command() {
+        let document = wire_schema();
+        let defs = document.get("$defs").and_then(|d| d.as_object()).unwrap();
+        assert!(defs.contains_key("ClientFrame"), "client root");
+        assert!(defs.contains_key("ServerFrame"), "server root");
+        let command = serde_json::to_string(defs.get("Command").unwrap()).unwrap();
+        for name in COMMAND_NAMES {
+            let mut snake = String::new();
+            for (index, ch) in name.chars().enumerate() {
+                if ch.is_ascii_uppercase() && index > 0 {
+                    snake.push('_');
+                }
+                snake.push(ch.to_ascii_lowercase());
+            }
+            assert!(
+                command.contains(&format!("\"{snake}\"")),
+                "{name} on the wire"
+            );
+        }
+        assert!(
+            defs.get("NoSecret") == Some(&serde_json::Value::Bool(false)),
+            "a credential over the wire satisfies nothing"
+        );
+        assert_eq!(wire_schema(), document, "the document is a pure function");
     }
 }

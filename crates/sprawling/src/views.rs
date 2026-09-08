@@ -23,10 +23,12 @@
 //! showed would change the thing it reports on.
 
 pub(super) mod answering;
+pub(super) mod commits;
 pub(super) mod holding;
 pub(super) mod lines;
 #[cfg(test)]
 mod tests;
 
 pub(crate) use holding::Views;
+pub use holding::ask;
 pub(crate) use lines::pursuit_from;

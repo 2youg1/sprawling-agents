@@ -24,13 +24,30 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::Address;
+use kernel::{Address, AxError};
 
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
 use super::lines::{buildings_of, verdict_line};
-use crate::assembly::{city_address, ledger_dir};
+use crate::assembly::{city_address, ledger_dir, rebuild_views};
+
+/// Answers one query out of a city's own history, without serving it.
+///
+/// The views are folded, asked, and thrown away, so this costs one pass
+/// over the ledger and leaves nothing behind. **It is the same
+/// [`Views::answer`] a served city answers from**: a command line that
+/// read the history its own way would be a second answer to one
+/// question, and the one that drifted would be the one nobody was
+/// looking at.
+///
+/// # Errors
+/// Propagates a history that does not verify and a record that will not
+/// parse. A city whose chain is broken is not one whose views should be
+/// handed to anybody.
+pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer, AxError> {
+    Ok(rebuild_views(&ledger_dir(city_root))?.answer(query))
+}
 
 /// The derived views a query reads. They are rebuilt from the ledger at
 /// startup and folded forward by the write observer, so deleting them
@@ -56,6 +73,11 @@ pub(crate) struct Views {
     pub(super) discards: std::collections::BTreeMap<String, channels::DiscardLine>,
     /// What the city archived, newest last.
     pub(super) assets: Vec<channels::RegistryLine>,
+    /// Which run wrote each commit this city made, keyed by the oid the
+    /// record announcing it named. Held here rather than read out of
+    /// git: the trailers on the commit are a projection of these same
+    /// records, and a projection must not be answered from another one.
+    pub(super) commits: std::collections::BTreeMap<kernel::GitOid, super::commits::CommitFacts>,
     /// How many records this view has folded. The one number a page
     /// cannot derive from any other answer.
     pub(super) events: u64,
@@ -89,6 +111,7 @@ impl Views {
             waiting: std::collections::BTreeMap::new(),
             discards: std::collections::BTreeMap::new(),
             assets: Vec::new(),
+            commits: std::collections::BTreeMap::new(),
             events: 0,
             // An unreadable ledger directory is not a reason to refuse to
             // start: the index is disposable, every refresh tries again,

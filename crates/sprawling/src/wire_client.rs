@@ -25,6 +25,40 @@ use tokio_tungstenite::tungstenite::Message;
 pub(crate) struct Heard {
     pub(crate) frames: u32,
     pub(crate) refusals: u32,
+    /// Frames that arrived *after* the frame was sent.
+    ///
+    /// Counted apart from `frames` because the handshake's `Welcome` is
+    /// a frame too, so `frames` is never zero and cannot tell silence
+    /// from an answer. Subtracting one at the caller would copy the
+    /// shape of the handshake into a second place.
+    pub(crate) answers: u32,
+}
+
+/// What the city did about the frame it was sent. Exhaustive: these
+/// three are what a caller can learn inside one quiet window, and the
+/// exit code `sprawling call` returns is one per arm.
+pub(crate) enum Spoken {
+    /// The city refused, inside the window.
+    Refused,
+    /// The city answered, inside the window, and refused nothing.
+    Answered,
+    /// The frame went out and nothing came back before the window
+    /// closed. Whether the city took the work is not knowable here, so
+    /// this is neither of the other two.
+    Quiet,
+}
+
+impl Heard {
+    /// Refusal first, because a refusal that also carried events is
+    /// still a refusal; silence last, because it is only silence when
+    /// nothing at all arrived.
+    pub(crate) fn spoken(&self) -> Spoken {
+        match (self.refusals, self.answers) {
+            (0, 0) => Spoken::Quiet,
+            (0, _) => Spoken::Answered,
+            _ => Spoken::Refused,
+        }
+    }
 }
 
 /// Splits `realm/name` into its two halves.
@@ -76,7 +110,8 @@ fn malformed(what: &str, why: &str) -> AxError {
 /// Fails when the city cannot be reached, when the greeting is refused,
 /// or when the frame is not one this wire can carry. A refusal of the
 /// frame itself is not an error here - it is the answer, and it is
-/// printed like any other - but it does change the exit code.
+/// printed like any other - but it does change the exit code, and so
+/// does hearing nothing at all: see [`Spoken`].
 pub(crate) fn call(
     at: &str,
     frame: &str,
@@ -119,6 +154,7 @@ async fn converse(at: &str, greeting: &str, body: &str, quiet: Duration) -> Resu
     let mut heard = Heard {
         frames: 0,
         refusals: 0,
+        answers: 0,
     };
     // The greeting is answered before anything else is sent: a client
     // that shouted its command at a server which then refused the
@@ -140,6 +176,7 @@ async fn converse(at: &str, greeting: &str, body: &str, quiet: Duration) -> Resu
         .map_err(|err| unreachable_city(at, &err.to_string()))?;
     while let Some(text) = next_frame(&mut socket, quiet).await? {
         report(&text, &mut heard);
+        heard.answers = heard.answers.saturating_add(1);
     }
     // Closing rather than dropping: a city that is told the peer has
     // gone stops holding a session open for it.
@@ -250,7 +287,70 @@ pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<St
     reason = "test code"
 )]
 mod tests {
-    use super::{hello, split_reference};
+    use super::{Duration, Message, SinkExt, Spoken, StreamExt, hello, split_reference};
+
+    /// A city that answers the greeting and then says nothing is the
+    /// third answer, and it must not read as the first.
+    ///
+    /// The defect this pins: `call` exited 0 whenever no refusal
+    /// arrived inside the quiet window, while its own documentation
+    /// promised 1 means "the city refused". An agent branching on the
+    /// exit code read a refusal it never received as a success - which
+    /// the out-of-tree checker measured against a real city
+    /// (`adversary/adversary-SPEC.md` section 4).
+    #[test]
+    fn a_city_that_says_nothing_inside_the_window_is_not_a_success() {
+        let (ready, port) = std::sync::mpsc::channel();
+        let scripted = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async move {
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                ready.send(listener.local_addr().unwrap().port()).unwrap();
+                let (stream, _from) = listener.accept().await.unwrap();
+                // The token's reason is that a WebSocket client can only be
+                // talking to our server. This accepts rather than connects: the
+                // double is the city, the client under test is ours, and the
+                // socket therefore points inward - the direction the gate says
+                // it measures.
+                // boundary-ok: accept_async makes this a city double, not a client of one
+                let mut socket = tokio_tungstenite::accept_async(stream).await.unwrap();
+                // The greeting is answered, because a client that never
+                // got a Welcome reports an unreachable city instead.
+                let _greeting = socket.next().await;
+                let welcome =
+                    serde_json::to_string(&channels::ServerFrame::Welcome(channels::Welcome {
+                        wire_v: channels::WIRE_V,
+                        schema: channels::schema_hash(),
+                        resume_from: None,
+                        city: None,
+                    }))
+                    .unwrap();
+                socket.send(Message::Text(welcome.into())).await.unwrap();
+                // ...and then it says nothing at all about the frame
+                // that follows, which is the whole scenario.
+                tokio::time::sleep(Duration::from_millis(1_500)).await;
+            });
+        });
+
+        let at = format!("127.0.0.1:{}", port.recv().unwrap());
+        let heard = super::call(
+            &at,
+            "{\"query\":\"city_view\"}",
+            None,
+            Duration::from_millis(200),
+        )
+        .unwrap();
+        assert_eq!(heard.answers, 0, "nothing came back after the frame");
+        assert_eq!(heard.refusals, 0, "and nothing was refused either");
+        assert!(
+            matches!(heard.spoken(), Spoken::Quiet),
+            "silence is its own answer, not the answer 'accepted'"
+        );
+        let _joined = scripted.join();
+    }
 
     #[test]
     fn a_reference_is_a_realm_and_a_name() {
