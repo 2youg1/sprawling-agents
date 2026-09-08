@@ -19,15 +19,16 @@
 | render（V3.48 上线） | 定稿屏在真引擎里画出来，量盒子落在哪：一页一条书脊、面板头坐在自己面板的左上角、没有东西宽过装它的区域 |
 | wiring（V3.32 上线） | 城能执行的动词必须从客户端够得到；三个来源零副本（`wire.rs` 的 `enum Command`、`run_command` 的臂、`crates/web/src`），channels-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | spec | 生成 `<crate>-SPEC.md` 骨架（Daily Loop 的 `just spec`） |
-| secret（S2.12 上线） | 全仓＋夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；兼查 `Sealed::expose` 调用点白名单 |
+| secret（S2.12 上线，card-gates 补文件类） | 全仓＋夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
 | specalign（S2.12 上线） | kernel 枚举 ↔ kernel-SPEC §8-1／§8-4 表逐 variant：消费真 enum（AxCode::ALL／EventKind::ALL）对表作证，计数、归属、carrier／窗类逐项同 |
 | apisync（S2.12 上线） | 双断言：①基线新鲜——`cargo public-api` 实时面与已提交基线逐行同；②同集变更——基线文件变即要求同 crate SPEC 同集被触 |
 | badge（P5 上线） | 体积徽章由 `budget` 的读数渲染成 `docs/badges/*.svg`；徽章陈旧＝`budget` 门红（不新增门） |
 | budget | `xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；称不出则沉默（本机没构建产物不是缺陷），壁钟读数只入册不入门 |
-| color（S4 上线） | 颜色只出自 `web::theme`，且以色域上限的比值表达；扫仓库根，文件自豁免 |
+| color（S4 上线，card-gates 改价） | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免 |
 | release（P4.14 上线，P5.05 增第三条断言） | 公开树由过滤生成；三条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径 |
 | length（R2.20 上线，V3.29 加文件面与参数面） | 一个生产函数不得长过 `function_length`（今 200 行）、不得多于 `argument_count` 个参数（今 4 个，不含接收者），一个源文件不得长过 `file_length`（今 400 行，含测试；2026-09-05 自 1000 改价，权威在 budgets.toml）；函数尺寸与签名以 `syn` 量得，文件尺寸即行数 |
 | gates | 顺序跑全部门，聚合报告，任一违规即退出码 1 |
+| wire-ts（card-6.2 上线） | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V` 与 `WIRE_HASH`；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红。命令已就位，进 `gates::run` 那张数组由主线单独一枚提交完成 |
 
 ### 门禁针对的 LLM 失效模式（本 crate 存在的理由）
 
@@ -337,3 +338,52 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 **无字段开放**：`tests` 是 `badge` 的子模块，`use super::*;` 一字未改即可看见父模块的私有项（含 `Palette` 的四个字段），故没有一个项因这次切分而放宽可见性。`budget.rs` 经 `crate::badge::check`、`main.rs` 经 `badge::write` 与 `badge::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
 
 **判据一处未松**：三条纪律（颜色取自 `web::theme` 的灰阶、平台自报、陈旧即红）与拒词三段（rule／violation／alternative）逐字节照搬，只换了测试所在的文件；父文件尾部的 `#[allow(...)]` lint 名不增不减。`[file_length.predating]` 里 `"xtask/src/badge.rs" = 436` 一行按规则划掉。
+
+### 命令 `wire-ts`：线的 TS 面由 Rust 面生成（card-6.2）
+
+**它关掉的门是「手写第二份线」。** `client/` 用 TypeScript 说 `crates/channels` 的语言，而一份手写的 `wire.ts` 就是同一形状的第二个权威，它漂了也要到握手之后才被发现。故 TS 面由 Rust 面生成，且生成物入库、门盯着它：`cargo xtask wire-ts --write` 写 `client/src/wire.ts`，`cargo xtask wire-ts` 只比对——盘上文件与当场生成的文本逐字节不同即红，拒词点名文件与第一处不同的行号并给出 `--write`。与 `apisync`／`badge` 同一口径：生成物由门自己写、由门自己校验。
+
+| 文件 | 它回答什么 |
+|---|---|
+| `xtask/src/wire_ts.rs` | 命令本身：文本从哪来（`render`：`channels::wire_schema()`＋`WIRE_V`＋`schema_hash()`）、写到哪（`TARGET`）、怎么比（`check`、`first_difference`）、怎么写（`write`） |
+| `xtask/src/wire_ts/emit.rs` | 一份 JSON Schema 文档怎么变成一份 `wire.ts`（`emit`）：`$defs` 按名排序后按依赖拓扑输出（`ordered`、`refs_within`）、一个 schema 怎么变成一个 Effect `Schema` 表达式（`expression`、`typed`、`fields`、`union`、`literals`）、以及它认得的子集与拒绝（`Refused`） |
+| `xtask/src/wire_ts/tests.rs` | 具名裸 `string` 打上 brand；外标签枚举成 `Union`；依赖先于引用；子集外关键字被点名拒绝；环被拒绝；真实文档能发出；第一处不同的行被点名 |
+
+**只认 serde 会产出的那个子集，其余点名拒绝。** 对象（`properties`／`required`／`additionalProperties`）、`string`／`integer`／`number`／`boolean`／`null`、`array`（`items`）与元组（`prefixItems`）、`enum` 字符串表、`const`、`oneOf`／`anyOf`（外标签、内标签、邻标签三种 serde 变体形状都落在这一条上，无需分别特判）、`$ref` 指向 `#/$defs/<名>`、`type: [T, "null"]`、`true`／`false`。`description`／`format`／`minimum`／`pattern`／`minItems`／`maxItems`／`default` 读而不译（`description` 只在顶层定义处作为 JSDoc 发出）。`default` 是 `#[serde(default)]` 字段的注解：字段可缺省这件事由 `required` 一处表达，`Schema.optional` 已据它发出，所以再读 `default` 会造出第二个权威。其它任何关键字（`allOf`、`not`、`patternProperties`……）一律 `Refused`，报出所在类型的路径与关键字——**一个会猜的生成器就是一个会静默产出错类型的生成器**。具名的裸 `string`／`integer`／`number`／`boolean` 即 newtype，打上 `Schema.brand("<名>")`。
+
+**为什么依赖拓扑而不是字母序**：Effect 的 `Schema` 是运行期值，`const B = Schema.Struct({ a: A })` 要求 `A` 已定义；字母序会撞 TDZ。拓扑序内按名字母序断平，故输出确定；环（自引用类型）以 `Refused` 拒绝——线上今天没有一个，出现那天再上 `Schema.suspend`，不预留。
+
+**依赖**：`channels = { path, default-features = false, features = ["schema"] }`——不开 `server`，xtask 不为此拖进 tokio 与 axum；`schemars` 经 channels 的 `schema` feature 到达。xtask 是工作区成员而不占产品拓扑（§7 对 kernel 已用过同一条理由）。
+
+**门的注册留给主线**：进 `gates::run` 那张数组即改 `COUNT`，而 `vocabulary` 门对着 `COUNT` 校正文里手写的门数，那是一次跨文档的重新定价，按 AGENTS.md `guard` 行应单独一枚提交。本卡只交付命令。
+
+### 8-8 color：颜色的产地从一处改为一客户端一处（card-gates·改价；形状 6 数据面）
+
+**改价条件已到**。原规则「`web::theme` 是唯一命名颜色的地方」成立的前提是城里只有一个客户端。card-6.1 起 `client/` 是第二个客户端，card-6.3 把 `client/src/theme.css` 定为它的 `@theme` 令牌块，两个客户端并存到 card-6.11 删掉 `crates/web` 为止。此时按字面执行原规则，会把一个客户端的**唯一产地**判成违规——被判红的不是缺陷，是规则的参数变了。
+
+**权威改述为一句**：颜色在每个客户端里恰好被命名一次。产地表因此是一张具名的封闭表，一行一个客户端：
+
+| 客户端 | 颜色产地 |
+|---|---|
+| `crates/web`（Dioxus/wasm） | `crates/web/src/theme.rs` |
+| `client`（Solid/Vite） | `client/src/theme.css` |
+
+- **扫描判据一字未改**：`literal_at`／`hex_colour` 认得的颜色语法、扫的扩展名、拒词三段全部照旧；改的只是「哪些文件是产地」这一张表。豁免面从三项变四项，且新增的那一项是一个客户端仅有的产地——面变宽一个文件，规则本身没有松。
+- **六条令牌断言仍只对 `crates/web/src/theme.rs` 作证**。`client/src/theme.css` 是那张令牌表的**投影**而不是第二个权威：它的每一个值都解算自 `theme.rs`（client-SPEC §3-4 已如此声明），所以给它再写一遍断言就是在两处判同一件事。这也是本次改价没有把 `THEME` 常量拆成两个的原因——`THEME` 是「断言读哪份表」，产地表是「扫描放过谁」，两个问题不是一个。
+- **下一次改价的条件写在这里**：card-6.11 删掉 `crates/web` 之日，产地表回到一行，`THEME` 与那一行合并。
+
+### 8-9 secret：门只看人写的文件，派生文件由它的输入作证（card-gates·改价）
+
+**门的主题是「明文凭证进入工作树」**，不是「任何高熵字节串出现在某个文件里」。card-6.1 带进 `client/bun.lock`、card-4.1 带进两份 insta 快照后，门报出 268 条，其中真凭证零条——一个判据碰上它从未见过的文件类，报的全是假阳性。
+
+**判据补一条文件类，而不是补 268 个字节偏移**。逐条列偏移会把一个可判定的类别问题写成一张会腐烂的坐标表，而且下一次 `bun install` 就让它全错。新判据分两类：
+
+| 文件类 | 成员 | 它为什么不可能是凭证第一次进树的地方 |
+|---|---|---|
+| 生成的锁文件 | `Cargo.lock`、`client/bun.lock` | 每一字节都由包管理器从清单与仓库解算而来，其中的 `sha512-`／`sha256-` 是**已发布产物的完整性摘要**，本就该被任何人读到；人不往锁文件里写东西，写了下一次解算就冲掉 |
+| 记录的快照 | `crates/**/snapshots/*.snap` | insta 快照是测试**输出**的留影，它的输入住在被扫的源文件里；一个凭证要出现在快照里，得先出现在那个源文件里，而那一份仍被扫 |
+
+- **一句话的权威**：门扫**人写的**文件；一份**派生**文件的字节来自门已经扫过的输入，所以它不是凭证第一次进树的地方。两类各是这一句的实例，不是两条独立的例外。
+- **`.expose(` 白名单那一半不动**：它只看 `crates/*/src/**.rs`，锁文件与 `.snap` 本就不在其面上。
+- **已知的限**（写在明处，不静默）：一个从环境变量读真凭证、再把它录进快照的测试，能从这条豁免下走过去。今天树上没有这样的测试，且写出这样的测试本身就是缺陷；真要堵它，堵的地方是「测试不得读真凭证」，那是另一道门的题目，不在本卡范围。
+- **为什么不是内联豁免注释**：门自 S2.12 起就没有内联豁免，理由未变——注释是内容能自己写出来的东西，而一张编译进门里的文件类表不是。

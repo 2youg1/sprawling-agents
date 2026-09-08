@@ -34,6 +34,7 @@ mod spec;
 mod specalign;
 mod vocabulary;
 mod walk;
+mod wire_ts;
 mod wiring;
 mod wording;
 
@@ -100,6 +101,14 @@ fn main() -> ExitCode {
         Some("secret") => report::finish("secret", secret::check(&root)),
         Some("specalign") => report::finish("specalign", specalign::check(&root)),
         Some("wiring") => report::finish("wiring", wiring::check(&root)),
+        Some("wire-ts") if args.iter().any(|a| a == "--write") => match wire_ts::write(&root) {
+            Ok(message) => {
+                print!("{message}");
+                ExitCode::SUCCESS
+            }
+            Err(err) => report::internal_failure(&err),
+        },
+        Some("wire-ts") => report::finish("wire-ts", wire_ts::check(&root)),
         Some("wording") => report::finish("wording", wording::check(&root)),
         Some("apisync") if args.iter().any(|a| a == "--write") => match apisync::write(&root) {
             Ok(()) => ExitCode::SUCCESS,
@@ -162,6 +171,6 @@ fn usage() {
         "usage: cargo xtask <gates|header|lexicon|modmap|depmap|secret|color|ax|render|wiring|specalign|apisync|guard> [--range a..b] [--write]"
     );
     eprintln!(
-        "       cargo xtask spec <crate> | budget | badge [--write] | mem [pid] | sbom | package | repro [--full]"
+        "       cargo xtask spec <crate> | budget | badge [--write] | wire-ts [--write] | mem [pid] | sbom | package | repro [--full]"
     );
 }
