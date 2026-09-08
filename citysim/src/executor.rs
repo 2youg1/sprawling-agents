@@ -67,7 +67,6 @@ pub struct Scenario {
     /// flight, so the scenario asserts the loop carries on rather than
     /// that it stops.
     pub steer: Option<(u32, String)>,
-    pub budget_turns: u32,
     /// The sieve's world, when the scenario puts `exec` results through
     /// it. `None` packages every result the same way, unsieved.
     pub sieve: Option<SieveWorld>,
@@ -142,7 +141,6 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
         mut checkpoint,
         cancel,
         steer,
-        budget_turns,
         mut sieve,
     } = scenario;
     let mut ledger = MemLedger::new();
@@ -184,12 +182,12 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
         opening: runtime::Opening::FromJob,
         job,
         parent: None,
-        budget_turns,
-        budget: kernel::BudgetCap::default(),
+        predecessor: None,
         shape: CallShape {
             model: "script".to_owned(),
             max_tokens: 4096,
             effort: None,
+            context_tokens: 0,
         },
         prefix,
         policy: BuildingPolicy::default(),
@@ -240,6 +238,7 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
                         stamp,
                         net_notice: false,
                         steer: None,
+                        reminder: None,
                         offload: None,
                         sieve: None,
                     },

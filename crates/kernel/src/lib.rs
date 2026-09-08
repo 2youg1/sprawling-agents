@@ -48,9 +48,7 @@ mod stall;
 mod write_domain;
 
 pub use backpressure::{Admission, ItemMeta, QueueStats, ShedReason, admit};
-pub use budget::{BudgetCap, BudgetLadder, BudgetLayer, BudgetLevel, BudgetUse};
-pub use budget::{ByteLen, CtxLock, CtxVerdict, SpendVerdict, Tokens, UsdMicros};
-pub use budget::{admit_spend, observe_ctx};
+pub use budget::{BudgetUse, ByteLen, Tokens, UsdMicros};
 pub use stall::{ActionFingerprint, StallVerdict, observe};
 pub use write_domain::{DocumentReason, DomainPrefixes, DomainVerdict, WriteDomain};
 pub use write_domain::{EditSample, EditWarVerdict, observe_edit_war};
@@ -112,7 +110,7 @@ mod gate;
 pub use gate::{CommitmentDecision, DedupVerdict, EgressAllowlist, EgressOutcome, EgressTarget};
 pub use gate::{GateContext, egress_target};
 pub use gate::{GateOutcome, commitment, dedup, discard as gate_discard, domain, egress};
-pub use gate::{delegation, govern, spawn, spend};
+pub use gate::{delegation, govern, spawn};
 
 mod config;
 

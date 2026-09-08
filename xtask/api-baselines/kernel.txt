@@ -55,7 +55,6 @@ impl kernel::BuildingPolicy
 impl kernel::ByteLen
 impl kernel::ChatRequest
 impl kernel::Completion
-impl kernel::CtxLock
 impl kernel::Delegate
 impl kernel::DelegateKind
 impl kernel::Delegator
@@ -129,14 +128,12 @@ impl<T> kernel::Tainted<T>
 pub const fn kernel::B3Hash::from_bytes([u8; 32]) -> Self
 pub const fn kernel::ByteLen::get(self) -> u64
 pub const fn kernel::ByteLen::new(u64) -> kernel::ByteLen
-pub const fn kernel::CtxLock::limit(self) -> kernel::Tokens
-pub const fn kernel::CtxLock::new(kernel::Tokens) -> kernel::CtxLock
 pub const fn kernel::Tokens::get(self) -> u64
 pub const fn kernel::Tokens::new(u64) -> kernel::Tokens
 pub const fn kernel::UsdMicros::get(self) -> u64
 pub const fn kernel::UsdMicros::new(u64) -> kernel::UsdMicros
 pub const kernel::AxCode::ALL: [kernel::AxCode; 36]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 64]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 65]
 pub const kernel::GENESIS_PREV: kernel::B3Hash
 pub const kernel::IDEM_DERIVE_V: u8
 pub const kernel::MEMO_OUTLINE_FIELDS: [&str; 6]
@@ -179,16 +176,13 @@ pub const kernel::consts_policy::POLICY_IDLE_DAYS: u32
 pub const kernel::consts_policy::SANDBOX_FUEL_DEFAULT: u64
 pub const kernel::consts_policy::SECRET_ENTROPY_MIN: kernel::consts_policy::Ratio
 pub const kernel::consts_policy::STARTUP_BUDGET_TOKENS: u64
-pub const kernel::consts_policy::SUBAGENT_CTX_LOCK_DEFAULT: kernel::CtxLock
 pub const kernel::consts_policy::WORKTREE_MAX_BYTES: u64
 pub enum kernel::Admission
 pub enum kernel::AnswerVerdict
 pub enum kernel::Answerer
 pub enum kernel::ApprovalSource
-pub enum kernel::BudgetLayer
 pub enum kernel::Carrier
 pub enum kernel::CommitmentDecision
-pub enum kernel::CtxVerdict
 pub enum kernel::DedupVerdict
 pub enum kernel::DelegationVerdict
 pub enum kernel::DenyReason
@@ -223,7 +217,6 @@ pub enum kernel::RoadmapShape
 pub enum kernel::RoadmapStatus
 pub enum kernel::ScopeChange
 pub enum kernel::ShedReason
-pub enum kernel::SpendVerdict
 pub enum kernel::StallVerdict
 pub enum kernel::StopCause
 pub enum kernel::Token
@@ -458,7 +451,6 @@ pub fn kernel::WriteDomain::new(alloc::vec::Vec<kernel::Address>) -> core::resul
 pub fn kernel::WriteDomain::prefixes(&self) -> impl core::iter::traits::iterator::Iterator<Item = &kernel::Address>
 pub fn kernel::admit(&kernel::QueueStats, &kernel::ItemMeta) -> kernel::Admission
 pub fn kernel::admit_delegation(kernel::Depth, &kernel::DelegateKind) -> kernel::DelegationVerdict
-pub fn kernel::admit_spend(&kernel::BudgetLadder, &kernel::BudgetUse) -> kernel::SpendVerdict
 pub fn kernel::chain_hash(&[u8]) -> kernel::B3Hash
 pub fn kernel::check_base(kernel::Version, kernel::Version) -> kernel::VersionVerdict
 pub fn kernel::check_memo_shape(&str) -> kernel::MemoShape
@@ -485,7 +477,6 @@ pub fn kernel::message_payload(&[kernel::ContentBlock]) -> core::result::Result<
 pub fn kernel::names_a_credential(&str) -> bool
 pub fn kernel::notices(&[kernel::Blockage], &alloc::collections::btree::map::BTreeMap<kernel::NodeId, alloc::string::String>) -> alloc::vec::Vec<kernel::Notice>
 pub fn kernel::observe(&[kernel::ActionFingerprint]) -> kernel::StallVerdict
-pub fn kernel::observe_ctx(kernel::Tokens, kernel::CtxLock) -> kernel::CtxVerdict
 pub fn kernel::observe_edit_war(&[kernel::EditSample]) -> kernel::EditWarVerdict
 pub fn kernel::observe_pursuit(kernel::PursuitState, &[kernel::NodeId], u32) -> kernel::PursuitVerdict
 pub fn kernel::policy_expiry(&kernel::Policy, kernel::TimeMs) -> kernel::PolicyExpiry
@@ -493,7 +484,6 @@ pub fn kernel::request_repair(&alloc::collections::btree::map::BTreeMap<kernel::
 pub fn kernel::scan(&[u8]) -> alloc::vec::Vec<kernel::SecretSpan>
 pub fn kernel::set_roadmap_status(&str, &kernel::NodeId, kernel::RoadmapStatus, core::option::Option<&kernel::Locator>) -> core::result::Result<alloc::string::String, kernel::AxError>
 pub fn kernel::spawn(kernel::Depth, &kernel::DelegateKind) -> kernel::GateOutcome
-pub fn kernel::spend(&kernel::BudgetLadder, &kernel::BudgetUse, &kernel::TaintSet, &kernel::GateContext, &kernel::Locator) -> kernel::GateOutcome
 pub fn kernel::spread(&kernel::PlanTree, &[kernel::RedNode]) -> alloc::vec::Vec<kernel::Blockage>
 pub fn kernel::value_has_float(&serde_json::value::Value) -> bool
 pub kernel::Admission::Admit
@@ -563,16 +553,6 @@ pub kernel::AxCode::WorktreeBusy
 pub kernel::Blockage::reaches: alloc::vec::Vec<kernel::NodeId>
 pub kernel::Blockage::source: kernel::NodeId
 pub kernel::Blockage::why: kernel::StopCause
-pub kernel::BudgetCap::tokens: kernel::Tokens
-pub kernel::BudgetCap::usd: kernel::UsdMicros
-pub kernel::BudgetLadder::building: kernel::BudgetLevel
-pub kernel::BudgetLadder::city: kernel::BudgetLevel
-pub kernel::BudgetLadder::run: kernel::BudgetLevel
-pub kernel::BudgetLayer::Building
-pub kernel::BudgetLayer::City
-pub kernel::BudgetLayer::Run
-pub kernel::BudgetLevel::cap: kernel::BudgetCap
-pub kernel::BudgetLevel::used: kernel::BudgetUse
 pub kernel::BudgetUse::tokens: kernel::Tokens
 pub kernel::BudgetUse::usd: kernel::UsdMicros
 pub kernel::BuildingPolicy::confidential: bool
@@ -624,8 +604,6 @@ pub kernel::ContentBlock::ToolUse::name: kernel::ToolName
 pub kernel::CostTier::Free
 pub kernel::CostTier::Heavy
 pub kernel::CostTier::Light
-pub kernel::CtxVerdict::Reached
-pub kernel::CtxVerdict::Within
 pub kernel::DedupVerdict::Duplicate
 pub kernel::DedupVerdict::Fresh
 pub kernel::DelegateKind::Ephemeral
@@ -725,6 +703,7 @@ pub kernel::EventKind::GateChecked
 pub kernel::EventKind::GateDenied
 pub kernel::EventKind::GoalConflict
 pub kernel::EventKind::GoalRegistered
+pub kernel::EventKind::GovernedDocumentWritten
 pub kernel::EventKind::HandoffWritten
 pub kernel::EventKind::LogTruncated
 pub kernel::EventKind::LoginStarted
@@ -953,9 +932,6 @@ pub kernel::ShedReason::CapacityExhausted
 pub kernel::Span::len: u32
 pub kernel::Span::start: u32
 pub kernel::Span::token: kernel::Token
-pub kernel::SpendVerdict::Admit
-pub kernel::SpendVerdict::Exhausted
-pub kernel::SpendVerdict::Exhausted::layer: kernel::BudgetLayer
 pub kernel::StallVerdict::Ok
 pub kernel::StallVerdict::Stall
 pub kernel::StallVerdict::Stall::repeats: u32
@@ -1032,9 +1008,6 @@ pub struct kernel::Artifact
 pub struct kernel::AxError
 pub struct kernel::B3Hash(_)
 pub struct kernel::Blockage
-pub struct kernel::BudgetCap
-pub struct kernel::BudgetLadder
-pub struct kernel::BudgetLevel
 pub struct kernel::BudgetUse
 pub struct kernel::ByteLen(_)
 pub struct kernel::ChatMessage
@@ -1043,7 +1016,6 @@ pub struct kernel::ChatResponse
 pub struct kernel::Claim
 pub struct kernel::ClockZone
 pub struct kernel::ClusterKey
-pub struct kernel::CtxLock(_)
 pub struct kernel::Delegate
 pub struct kernel::Delegator(_)
 pub struct kernel::Discard
@@ -1116,7 +1088,7 @@ pub struct kernel::consts_external::SecretShape
 pub struct kernel::consts_policy::Ratio
 pub trait kernel::Ledger
 pub trait kernel::Model
-pub trait kernel::Tool
+pub trait kernel::Tool: core::marker::Send
 pub type kernel::EnvVarName::Error = kernel::AxError
 pub type kernel::Increments<'a> = &'a mut dyn core::ops::function::FnMut(&str)
 pub type kernel::ServerLabel::Error = kernel::AxError

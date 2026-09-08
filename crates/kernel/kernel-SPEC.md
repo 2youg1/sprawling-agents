@@ -14,7 +14,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 | S1.01 | `error` | 2 值类型＋6 数据面 | AxError 七字段；AxCode 35（S2 期初增 `E_STORAGE_FATAL`；P3.01 删 `E_SIGNAL_UNKNOWN`）；carrier 声明位 |
 | S1.02 | `address` | 2 值类型 | 相对 city root 路径 newtype；WriteDomain 原语；reserved prefix 判定 |
 | S1.02 | `locator` | 2 值类型 | `cas:`／`file:` 文法解析与呈现；fail-closed |
-| S1.03 | `event` | 2 值类型 | EventKind 64（S1.03 建 55，P2.09 增 `autonomy_changed`，P4.01 增 roadmap 三件，R1.14 增 `login_started`，P3.01 增 `endpoint_probed`，V3.19 增 `roadmap_split`／`roadmap_blocked`，V3.22 增 `pursuit_changed`）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
+| S1.03 | `event` | 2 值类型 | EventKind 64（S1.03 建 55，P2.09 增 `autonomy_changed`，P4.01 增 roadmap 三件，R1.14 增 `login_started`，P3.01 增 `endpoint_probed`，V3.19 增 `roadmap_split`／`roadmap_blocked`，V3.22 增 `pursuit_changed`，card-5.4 增 `governed_document_written`，共 65）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
 | S1.04 | `version` | 2 值类型 | 乐观并发：Version 单调值＋base 新鲜度判定 |
 | S1.04 | `idem` | 2 值类型 | IdemKey 确定性派生（BLAKE3 XOF 16 字节＋版本字节） |
 | S1.05 | `consts_external` | 6 数据面 | 外部事实常量 5 项 |
@@ -49,7 +49,7 @@ Stage 2 追加：
 
 - 类型加固十项全部有型可指；trybuild 八反例全集编译失败（S2.11）。
 - kani 七 harness 入库（`#[cfg(kani)]`）：本机 Windows 无 kani 宿主支持，每条性质配 proptest 镜像本地可跑，kani 本体入 CI Linux job（CI 恢复时生效）。
-- **CI 只证四条，理由不是成本而是信息（P4.05）**：十一条 harness 里有七条的输入面是具体值——一个 `Address::parse(".sprawling/ledger")`、一个 `TaintSource::new("web:x")`、两个布尔分支——那是单测穿了一层证明的外衣，而同文件的 `#[cfg(test)]` 里已经有同一命题（`write_domain::reserved_target_is_outside_even_for_an_empty_domain`、`gate::the_domain_door_*`、`discard::the_decision_table_holds_in_order`），其中两条的 proptest 输入面比 harness 更宽（`discard::allow_implies_every_guard_passed` 取任意 u64，harness 只固定一个值）。**这七条恰好就是构造 `Vec`／`String`／`BTreeSet` 的那七条**：CBMC 推不出它们内部循环的上界，无界跑了六小时、`--default-unwind 32` 又跑了 45 分钟，两次都卡在 `discard::verification::tainted_never_allows`，两次都没有给出判决——**全局 unwind 界已被实验证伪，不是这个问题的解法**。CI 因此只跑三条：`backpressure`（41s）、`budget`（54s）、`secret::log2_q10_is_total`（53s）——任意 u64 上的全函数性、单调性与定点 log2 的终止性，都是抽样到不了的地方。**不传全局 unwind**：这三条的循环界是常数（`log2_q10` 十次），CBMC 自己推得出来。
+- **CI 只证四条，理由不是成本而是信息（P4.05）**：十一条 harness 里有七条（card-11.7 后为十条）的输入面是具体值——一个 `Address::parse(".sprawling/ledger")`、一个 `TaintSource::new("web:x")`、两个布尔分支——那是单测穿了一层证明的外衣，而同文件的 `#[cfg(test)]` 里已经有同一命题（`write_domain::reserved_target_is_outside_even_for_an_empty_domain`、`gate::the_domain_door_*`、`discard::the_decision_table_holds_in_order`），其中两条的 proptest 输入面比 harness 更宽（`discard::allow_implies_every_guard_passed` 取任意 u64，harness 只固定一个值）。**这七条恰好就是构造 `Vec`／`String`／`BTreeSet` 的那七条**：CBMC 推不出它们内部循环的上界，无界跑了六小时、`--default-unwind 32` 又跑了 45 分钟，两次都卡在 `discard::verification::tainted_never_allows`，两次都没有给出判决——**全局 unwind 界已被实验证伪，不是这个问题的解法**。CI 因此只跑两条：`backpressure`（41s）与 `secret::log2_q10_is_total`（53s）（card-11.7 之前还有第三条 `budget`（54s），它随 `admit_spend` 一并删除）——任意 u64 上的全函数性、单调性与定点 log2 的终止性，都是抽样到不了的地方。**不传全局 unwind**：这两条的循环界是常数（`log2_q10` 十次），CBMC 自己推得出来。
 - **第八条不收敛，原因不同（P4.06）**：`secret::verification::entropy_is_total_on_short_inputs` 的输入域是真的（四字节任意），卡住它的是形状：`entropy_millibits_per_char` 对 256 槽计数表逐槽调 `log2_q10`，而每次调用内部做十轮 u128 平方——交给求解器的是约 **2,560 次符号非线性乘法**，非线性乘法正是 SAT 求解器的死穴，十五分钟不返回。它不在 CI 里，也不靠改 unwind 界救：算术核心已由 `log2_q10_is_total` 单独证了，要证全函数得把 harness 改成**对单一槽**而不是对整张表。剩下七条保留在源码里但不入 CI，它们的权威是旁边的测试；要么改成真正符号化的 harness（不再构造堆集合），要么删掉——两者都需一条单独的裁决。
 - three-part refusal 矩阵：五门每条 Deny 路径的 refusal 三段非空且 alternative 可执行（S2.13）。
 - conformance feature 全量导出：Ledger＋Tool＋Model 三套件（sandbox 随 S3）。
@@ -130,7 +130,7 @@ gate ──▶ 上述全部（组合面）＋idem
 
 ## 8 接口先行（按模块分章）
 
-**`#[non_exhaustive]` 辖谁，不辖谁（整修卡 R2.16 校正本文）**：它辖**冻结面**——会被序列化、跨版本读回、或被城外读者依赖的枚举（`AxCode`、`EventKind`、`Effect`、`DialectKind`、`DelegateKind` 等）。它**不辖判定输出**：`SpendVerdict`／`CtxVerdict`／`StallVerdict`／`GoalVerdict`／`RepairVerdict`／`DelegationVerdict`／`RegisterVerdict`／`Admission` 一律**刻意穷尽**，理由与 runtime-SPEC 对 `PhaseOutcome` 写的同一句：新增一种结论必须逼每个调用方表态，不得掉进 catch-all。`crates/kernel/src/budget.rs` 的行内注释「Deliberately exhaustive verdict enum (verdicts are not wire enums)」是同一条规则的第三处表述。
+**`#[non_exhaustive]` 辖谁，不辖谁（整修卡 R2.16 校正本文）**：它辖**冻结面**——会被序列化、跨版本读回、或被城外读者依赖的枚举（`AxCode`、`EventKind`、`Effect`、`DialectKind`、`DelegateKind` 等）。它**不辖判定输出**：`StallVerdict`／`GoalVerdict`／`RepairVerdict`／`DelegationVerdict`／`RegisterVerdict`／`Admission` 一律**刻意穷尽**，理由与 runtime-SPEC 对 `PhaseOutcome` 写的同一句：新增一种结论必须逼每个调用方表态，不得掉进 catch-all。`crates/kernel/src/stall.rs` 与 `backpressure.rs` 的判定枚举是同一条规则的第二、第三处表述（card-11.7 删去 budget 的两个判定枚举后，原先记在此处的第三处表述随之搬家）。
 
 本节此前在这十一个判定枚举上写了 `#[non_exhaustive]`，**而代码从来没有标过它们**——文档单方面失真，不是实现走样。按 AGENTS.md「现实与三份文件都不符时以现实为准，先改文件并写明理由」，本卡删去那十一处标注。ARCHITECTURE.md §3「nothing here is published」是这条分界成立的前提：工作区之外没有下游，故 `#[non_exhaustive]` 在判定输出上买不到任何兼容性，只卖掉 §7 想要的那个编译期穷尽性。
 
@@ -397,6 +397,7 @@ pub struct EventRef { seq: Seq, kind: EventKind }   // 字段私有；无公开�
 | 隐私与 Discard | `file_discarded` | record-only |
 | 隐私与 Discard | `discard_restored` | record-only |
 | 隐私与 Discard | `autonomy_changed` | record-only |
+| 治理与设施 | `governed_document_written` | record-only（card-5.4；人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
 
 二分判据唯一：该事件载荷是否决定模型请求字节；不存在第三类。
 
@@ -480,7 +481,7 @@ pub const IMAGES_PER_TURN: u32 = 4;           // 一回合最多几张图
 
 `WORKTREE_MAX_BYTES` 是上限而非磁盘余量探测：余量是一台机器当下的事实，上限则是一句拒绝说得出、一个人改得动的数；建树前校，故一座过大的城是被拒而不是被拷到一半（`memory::worktree`）。
 
-16 项中 3 项随类型延后（表先行、值后到，位置恒在本模块）：`AUTONOMY_DEFAULT`（需 `Autonomy`，S2 approval 卡落）；`CLOCK_STAMP_DEFAULT`（需时钟档枚举；该枚举住 kernel 何处属 S2 config 卡决策——kernel 不得依赖 runtime）；`SUBAGENT_CTX_LOCK_DEFAULT`（未给数值，S2 budget 卡携证据定值）。三项落地前，本模块不提供任何替身值。
+16 项中 3 项随类型延后（表先行、值后到，位置恒在本模块）：`AUTONOMY_DEFAULT`（需 `Autonomy`，S2 approval 卡落）；`CLOCK_STAMP_DEFAULT`（需时钟档枚举；该枚举住 kernel 何处属 S2 config 卡决策——kernel 不得依赖 runtime）；`SUBAGENT_CTX_LOCK_DEFAULT`（未给数值；card-11.7 删去子代理上下文锁后**此项永不落地**，从表中划去）。余下两项落地前，本模块不提供任何替身值。
 
 ### 8-9 kernel::ledger（S1.06；缝清单文件，全库五真缝之一）
 
@@ -568,33 +569,24 @@ pub fn observe_edit_war(samples: &[EditSample]) -> EditWarVerdict;
 - **edit war 判据**：同 addr 的样本按序去重相邻同 Run 后得 run 序列 r₁…rₙ；「夺回」＝rᵢ==rᵢ₋₂ 且 rᵢ≠rᵢ₋₁；夺回数 ≥ `EDIT_WAR_FREEZE`(2) → Freeze（A→B→A→B 即两次夺回）。逐 addr 独立计，首个达阈的 addr 入 verdict（BTreeMap 序）。
 - kani：reserved 目标恒不 Within；`admits` 全函数无 panic。
 
-### 8-12 kernel::budget（S2.06）
+### 8-12 kernel::budget（S2.06；card-11.7 收窄为「钱与量的整数化」）
 
 ```rust
 pub struct UsdMicros(u64);  pub struct Tokens(u64);  pub struct ByteLen(u64);   // 15.3-6 钱与量整数化，三新型同家
 // 各：pub const fn new(u64) / pub const fn get() / pub fn checked_add(self, o) -> Option<Self>
-// checked_add 取 Option 而非 Result：溢出的裁决权归调用点（spend 门读作 Exhausted，其余读作 E_INVALID_ARGS），
-// 在原语层预先选一个错误故事会迫使 spend 门反封 AxError。
+// checked_add 取 Option 而非 Result：溢出的裁决权归调用点（读作 E_INVALID_ARGS），
+// 在原语层预先选一个错误故事会迫使调用方反封 AxError。
 
-pub struct BudgetCap { pub usd: UsdMicros, pub tokens: Tokens }
-pub struct BudgetUse { pub usd: UsdMicros, pub tokens: Tokens }    // serde（Progress::Unplanned 载荷）
-pub struct BudgetLevel { pub cap: BudgetCap, pub used: BudgetUse }
-pub struct BudgetLadder { pub city: BudgetLevel, pub building: BudgetLevel, pub run: BudgetLevel }
-#[non_exhaustive] pub enum BudgetLayer { City, Building, Run }
-pub enum SpendVerdict { Admit, Exhausted { layer: BudgetLayer } }
-/// Total function: u64 overflow means the spend exceeds any representable
-/// remainder, hence Exhausted (fail-closed), never a panic or an error path.
-pub fn admit_spend(ladder: &BudgetLadder, cost: &BudgetUse) -> SpendVerdict;
-
-pub struct CtxLock(Tokens);   // pub const fn new
-pub enum CtxVerdict { Within, Reached }
-pub fn observe_ctx(used: Tokens, lock: CtxLock) -> CtxVerdict;     // used ≥ lock → Reached
+pub struct BudgetUse { pub usd: UsdMicros, pub tokens: Tokens }    // serde（Progress::Unplanned 载荷、Evidence.budget）
 ```
 
-- 逐层判 `used + cost ≤ cap`（usd 与 tokens 分别判，任一超即该层 Exhausted）；报最内层先超者（Run→Building→City 序检查，报首个）。
-- 耗尽不是错误是审批：SpendVerdict 不携 AxError；gate::spend 把 Exhausted 塑成 Escalate(BudgetLimit)。
-- kani：任意 u64 输入无 panic、无回绕；`Admit ⇒ 逐层不超`。
-- `SUBAGENT_CTX_LOCK_DEFAULT: Tokens` 随本卡落 consts_policy，取值与证据见 §14。
+**card-11.7 删去花费闸的全部判定面**：`BudgetCap`／`BudgetLevel`／`BudgetLadder`／`BudgetLayer`／`SpendVerdict`／`admit_spend`／`CtxLock`／`CtxVerdict`／`observe_ctx` 连同 `kernel::gate::spend` 一并删除，`SUBAGENT_CTX_LOCK_DEFAULT` 因此永不落地。
+
+- **理由是刹车只留一个**：`Halt` 停一个范围并终止该范围内的后台成员（card-11.2 已使这句话为真，`runtime::backlog::halt` 是承兑点）。一座必须停下的城由人说停，而不是由一个没人能在事前算准的上限替他说停。两套刹车里，花费闸这一套从来没有生产调用方——`gate::spend` 的唯一调用点是它自己的测试，`BudgetCap` 在派活面上一路默认值传到冻结。
+- **留下的是记账而不是闸**：`BudgetUse` 与 `memory::attribution` 的五路归因、成本页原样保留。**报告花了多少**与**事前不许花**是两件事，本卡只删后者。
+- **不在本卡辖内**：`xtask/budgets.toml`（门的价目册，同名异物）与 `Fuel`（wasm 客的停机保证）。
+- `BudgetUse` 保留 serde，因为它是 `Progress::Unplanned` 与 `Completion::Evidence` 的载荷字段，账本里已有历史行读得回去。
+- kani：`admit_spend` 的 harness 随函数删除；`crates/kernel` 剩余 harness 数由 11 降为 10，CI 所证三条中的 `budget` 一条随之消失（ARCHITECTURE §11 的数字同集更新）。
 
 ### 8-13 kernel::backpressure（S2.06）
 
@@ -1141,7 +1133,7 @@ pub fn domain(domain: &WriteDomain, target: &Address, taint: &TaintSet) -> GateO
                                           Connector { label: ServerLabel } }   // 分类由效果层解好址后注入
 #[non_exhaustive] pub enum EgressOutcome { Allow { first_public_egress: bool }, Deny { refusal: Box<AxError> } }
 pub fn egress(spans: &[SecretSpan], target: &EgressTarget, prior_public_egress: bool) -> EgressOutcome;
-pub fn spend(ladder: &BudgetLadder, cost: &BudgetUse, taint: &TaintSet, ctx: &GateContext) -> GateOutcome;
+// card-11.7 删 `spend` 门：它判的 ladder 已不存在，且它从无生产调用方。门由五减四。
 #[non_exhaustive] pub enum CommitmentDecision { Approved, Denied }
 pub fn commitment(decision: Option<&CommitmentDecision>, taint: &TaintSet, ctx: &GateContext,
                   action_desc: &str, artifact: &Locator) -> GateOutcome;
@@ -1155,10 +1147,10 @@ pub fn dedup(seen: &BTreeSet<IdemKey>, key: &IdemKey) -> DedupVerdict;   // 去�
 
 - **`dedup` 的承兑人已经存在（card-4.10.1）**：这个纯函数的 `seen` 集合是调用方的状态，故它成不成立取决于有没有人持有那个集合。今天持有它的有两处：工具面的 `runtime::bench`（一波之内同一把键只调一次），与命令面的 `bin::assembly::commanding::entrance`（`serve_one` 判在任何副作用之前，且重复的键得到第一次的答案）。**本模块的立面不变**——集合仍是调用方的，kernel 仍只回答成员关系；此处记的是「谁在兑现它」，因为一道没有调用方的门与没有门等价（`adversary/adversary-SPEC.md` §4 第三个发现量到的正是这件事）。
 - **gate 是全库唯一 gate 码生产者**：五门 Deny 恒经 `AxError::refusal`（三段必填）；Domain 门 nearby＝domain 前缀表；Discard 门 alternative 恒可执行（分批或 Interred 后重试）；Egress 门 subject 只写位置与跨度数，恒不回显命中字节。
-- **Escalate 的二源归一**：spend 耗尽 → item{class: BudgetLimit}；commitment 无决 → item{class: Commitment}；discard Escalate → item{class: DiscardEscalate}；均 source=Gate、tainted＝taint 非空（C15 标记位）。commitment 携 Denied 决定 → Deny（E_APPROVAL_DENIED，非 gate 码故用 failure 形）。
+- **Escalate 的二源归一**（card-11.7 起只剩两源）：commitment 无决 → item{class: Commitment}；discard Escalate → item{class: DiscardEscalate}；均 source=Gate、tainted＝taint 非空（C15 标记位）。commitment 携 Denied 决定 → Deny（E_APPROVAL_DENIED，非 gate 码故用 failure 形）。
 - **Taint 升档的 S2 实例**：Discard 门 Tainted 恒 Escalate（住 discard::decide）＋Escalate item 的 tainted 标记位（封 Policy/代答）。其余门的升档语义随其审批面出现时实例化（P1/P2），本期不造无消费者的规则。
 - **首次公网出网**：`egress` 对 Public 且 `!prior_public_egress` 置 `first_public_egress`；NetNotice 挂信封属 pipeline（S3）。Loopback/Private 恒不触发（对 localhost 提醒注入只会训练模型忽略提醒）。
-- kani：五门组合 fail-closed——reserved 目标恒不 Allow；spans 非空恒 Deny；超预算恒不 Allow；Unplanned Discard 恒不 Allow；Delegated 再派生恒不 Allow。
+- kani：四门组合 fail-closed——reserved 目标恒不 Allow；spans 非空恒 Deny；Unplanned Discard 恒不 Allow；Delegated 再派生恒不 Allow。
 
 ### 8-29 kernel::address::SessionName（F2.11；形状 2 value）
 

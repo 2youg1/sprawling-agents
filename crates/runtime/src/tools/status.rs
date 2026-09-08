@@ -7,12 +7,15 @@
 //! thirteen frozen fields, in that order.
 //!
 //! The order is not cosmetic. A model reading its status reads the top
-//! first, so identity and mode come before budget, and budget comes
-//! before the long tail of locks and children. Freezing the order means
-//! a Resident's habits transfer across versions instead of being
-//! relearned each time the field list grows - which is why the
-//! thirteenth field went on the end rather than beside the twelfth it
-//! belongs with.
+//! first, so identity and mode come before the context reading, and that
+//! comes before the long tail of locks and children. Freezing the order
+//! means a Resident's habits transfer across versions instead of being
+//! relearned each time the field list grows - which is why the last
+//! field went on the end rather than beside the one it belongs with.
+//!
+//! **No ceiling is reported, because there is none** (card-11.7). What
+//! stands where a spend ceiling used to is the context reading, which is
+//! tokens a run has actually used against the window it was given.
 //!
 //! Nothing here samples. The executor sets the snapshot once per turn
 //! and the tool reports it; a tool that read the clock itself would
@@ -20,10 +23,11 @@
 
 use kernel::{
     Address, AxCode, AxError, ByteLen, CostTier, DelegateKind, Effect, Payload, RenderIntent,
-    Temporal, Tokens, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome, UsdMicros,
+    Temporal, Tokens, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
+use crate::backlog::{Backlog, Standing};
 use crate::clock::ClockStamp;
 use crate::mode::Mode;
 
@@ -61,7 +65,9 @@ pub struct ChildStatus {
     pub kind: DelegateKind,
 }
 
-/// The thirteen fields, in the frozen order.
+/// The twelve frozen fields. The thirteenth, `backlog`, is read live
+/// from the table rather than frozen here, for the reason `children` is
+/// a closure: what is running changes while the run goes on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatusSnapshot {
     pub who: String,
@@ -69,8 +75,6 @@ pub struct StatusSnapshot {
     pub mode: Mode,
     pub ctx_used: Tokens,
     pub ctx_limit: Tokens,
-    pub budget_usd: UsdMicros,
-    pub budget_tokens: Tokens,
     pub trust: String,
     pub write_domain: String,
     pub locks: Vec<String>,
@@ -92,7 +96,11 @@ pub struct StatusSnapshot {
 
 pub struct StatusTool {
     snapshot: StatusSnapshot,
-    children: Box<dyn Fn() -> Vec<ChildStatus>>,
+    children: Box<dyn Fn() -> Vec<ChildStatus> + Send>,
+    /// The table this run's background commands stand in. `None` in a
+    /// tool built without one, which reports `backlog: none` truthfully:
+    /// nothing was started through a table that does not exist.
+    backlog: Option<Backlog>,
     meta: ToolMeta,
 }
 
@@ -118,7 +126,7 @@ impl StatusTool {
     /// Propagates a malformed parameter schema.
     pub fn watching(
         snapshot: StatusSnapshot,
-        children: Box<dyn Fn() -> Vec<ChildStatus>>,
+        children: Box<dyn Fn() -> Vec<ChildStatus> + Send>,
     ) -> Result<StatusTool, AxError> {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
@@ -126,10 +134,11 @@ impl StatusTool {
         Ok(StatusTool {
             snapshot,
             children,
+            backlog: None,
             meta: ToolMeta {
                 name: ToolName::parse("status")?,
                 disclosure:
-                    "Report your current situation: mode, context, budget, domain, children."
+                    "Report your current situation: mode, context, domain, children, backlog."
                         .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,
@@ -146,6 +155,25 @@ impl StatusTool {
     pub fn set_snapshot(&mut self, snapshot: StatusSnapshot) {
         self.snapshot = snapshot;
     }
+
+    /// The table whose members at this run's address the thirteenth
+    /// line reports (runtime-SPEC 8-28-2).
+    #[must_use]
+    pub fn reporting(mut self, backlog: Backlog) -> StatusTool {
+        self.backlog = Some(backlog);
+        self
+    }
+
+    /// What stands in the backlog at this run's address. A table that
+    /// cannot be reached reads as empty: the tool reports the run's
+    /// situation, and a poisoned lock is a fact about the process that
+    /// a model can do nothing with.
+    fn standing(&self) -> Vec<Standing> {
+        self.backlog
+            .as_ref()
+            .and_then(|table| table.standing(&self.snapshot.addr).ok())
+            .unwrap_or_default()
+    }
 }
 
 impl StatusSnapshot {
@@ -156,13 +184,14 @@ impl StatusSnapshot {
     /// sorts its keys, so "the frozen order" would silently become
     /// alphabetical. Order is a property of what the model reads, so it
     /// is expressed where the model reads it.
-    pub fn render(&self, children: &[ChildStatus]) -> String {
+    pub fn render(&self, children: &[ChildStatus], standing: &[Standing]) -> String {
         let locks = if self.locks.is_empty() {
             "none".to_owned()
         } else {
             self.locks.join(", ")
         };
         let children = render_children(children);
+        let backlog = render_standing(standing);
         let now = match &self.now {
             Some(stamp) => stamp.render(),
             None => "not stamped".to_owned(),
@@ -172,11 +201,6 @@ impl StatusSnapshot {
             format!("addr: {}", self.addr),
             format!("mode: {}", self.mode.as_str()),
             format!("ctx: {}/{}", self.ctx_used.get(), self.ctx_limit.get()),
-            format!(
-                "budget: {} usd_micros, {} tokens",
-                self.budget_usd.get(),
-                self.budget_tokens.get()
-            ),
             format!("trust: {}", self.trust),
             format!("write_domain: {} (locks: {locks})", self.write_domain),
             format!(
@@ -189,9 +213,25 @@ impl StatusSnapshot {
             format!("now: {now}"),
             format!("provider_mode: {}", self.provider_mode.as_str()),
             format!("neighbours: {}", self.neighbours),
+            format!("backlog: {backlog}"),
         ]
         .join("\n")
     }
+}
+
+/// What is still running at this run's address, or the word for none.
+/// One line, for the reason `render_children` gives. No duration: this
+/// table samples no clock, and a status that sampled one to say "for
+/// forty seconds" would be a second sampling point.
+fn render_standing(standing: &[Standing]) -> String {
+    if standing.is_empty() {
+        return "none".to_owned();
+    }
+    standing
+        .iter()
+        .map(|member| format!("{} {} ({})", member.id, member.what, member.kind.as_str()))
+        .collect::<Vec<String>>()
+        .join("; ")
 }
 
 /// Where each piece of handed-down work went, or the word for none.
@@ -224,7 +264,7 @@ impl Tool for StatusTool {
         let mut result = Map::new();
         result.insert(
             "text".to_owned(),
-            Value::String(self.snapshot.render(&(self.children)())),
+            Value::String(self.snapshot.render(&(self.children)(), &self.standing())),
         );
         Ok(ToolOutcome {
             result: Payload::new(result)?,
@@ -233,139 +273,4 @@ impl Tool for StatusTool {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    reason = "test code"
-)]
-mod tests {
-    use super::*;
-
-    fn snapshot() -> StatusSnapshot {
-        StatusSnapshot {
-            who: "alice".to_owned(),
-            addr: Address::parse("work").unwrap(),
-            mode: Mode::Up,
-            ctx_used: Tokens::new(1200),
-            ctx_limit: Tokens::new(8000),
-            budget_usd: UsdMicros::new(250_000),
-            budget_tokens: Tokens::new(40_000),
-            trust: "trusted".to_owned(),
-            write_domain: "work".to_owned(),
-            locks: vec!["work/a.txt".to_owned()],
-            worktree_path: "/city/work".to_owned(),
-            worktree_disk: ByteLen::new(4096),
-            signals_pending: 2,
-            now: None,
-            provider_mode: ProviderMode::Normal,
-            neighbours: 3,
-        }
-    }
-
-    fn call() -> ToolCall {
-        ToolCall {
-            id: "s1".to_owned(),
-            name: ToolName::parse("status").unwrap(),
-            args: Payload::new(Map::new()).unwrap(),
-        }
-    }
-
-    #[test]
-    fn the_thirteen_fields_report_in_the_frozen_order() {
-        let mut tool = StatusTool::new(snapshot()).unwrap();
-        let outcome = tool.invoke(&call()).unwrap();
-        let value = serde_json::to_value(&outcome.result).unwrap();
-        let text = value["text"].as_str().unwrap();
-        let order = [
-            "who",
-            "addr",
-            "mode",
-            "ctx",
-            "budget",
-            "trust",
-            "write_domain",
-            "worktree",
-            "signals_pending",
-            "children",
-            "now",
-            "provider_mode",
-            "neighbours",
-        ];
-        let lines: Vec<&str> = text.lines().collect();
-        assert_eq!(
-            lines.len(),
-            13,
-            "the frozen list is thirteen fields: {text}"
-        );
-        for (line, field) in lines.iter().zip(order) {
-            assert!(
-                line.starts_with(&format!("{field}:")),
-                "expected {field}, got {line}"
-            );
-        }
-    }
-
-    /// `children` was a hardcoded empty list, so a run that had just
-    /// handed work down and then asked about its own situation was told
-    /// it had handed nothing down.
-    #[test]
-    fn the_children_line_says_where_the_work_went_and_which_kind_of_delegate() {
-        let handed = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-        let seen = std::rc::Rc::clone(&handed);
-        let mut tool =
-            StatusTool::watching(snapshot(), Box::new(move || seen.borrow().clone())).unwrap();
-
-        let before = serde_json::to_value(&tool.invoke(&call()).unwrap().result).unwrap();
-        assert!(before["text"].as_str().unwrap().contains("children: none"));
-
-        handed.borrow_mut().push(ChildStatus {
-            room: Address::parse("work/helper").unwrap(),
-            kind: DelegateKind::Ephemeral,
-        });
-        let after = serde_json::to_value(&tool.invoke(&call()).unwrap().result).unwrap();
-        assert!(
-            after["text"]
-                .as_str()
-                .unwrap()
-                .contains("children: work/helper (ephemeral)"),
-            "the desk is asked at call time, not frozen with the tool: {after}"
-        );
-    }
-
-    #[test]
-    fn the_tool_reports_what_it_was_given_and_never_samples() {
-        let mut tool = StatusTool::new(snapshot()).unwrap();
-        let first = tool.invoke(&call()).unwrap();
-        let second = tool.invoke(&call()).unwrap();
-        assert_eq!(
-            first.result, second.result,
-            "two calls, one turn, one answer"
-        );
-
-        let mut next = snapshot();
-        next.provider_mode = ProviderMode::Degraded;
-        next.signals_pending = 0;
-        tool.set_snapshot(next);
-        let after = serde_json::to_value(&tool.invoke(&call()).unwrap().result).unwrap();
-        let text = after["text"].as_str().unwrap();
-        assert!(text.contains("provider_mode: degraded"), "{text}");
-        assert!(text.contains("signals_pending: 0"), "{text}");
-    }
-
-    #[test]
-    fn a_call_for_another_tool_is_refused() {
-        let mut tool = StatusTool::new(snapshot()).unwrap();
-        let mut wrong = call();
-        wrong.name = ToolName::parse("edit").unwrap();
-        assert_eq!(
-            *match tool.invoke(&wrong) {
-                Err(err) => err,
-                Ok(_) => panic!("identity is fail-closed"),
-            }
-            .code(),
-            AxCode::InvalidArgs
-        );
-    }
-}
+mod tests;

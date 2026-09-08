@@ -61,7 +61,6 @@ pub(crate) fn acp_dispatch(
             task,
             goal,
             mode: channels::ModeTag::parse("plan")?,
-            budget: kernel::BudgetCap::default(),
             idem,
             // An editor drives an address it already chose.
             session: None,

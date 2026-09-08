@@ -109,7 +109,6 @@ fn scenario(cancel: Option<CancelPoint>) -> Scenario {
         checkpoint: None,
         cancel,
         steer: None,
-        budget_turns: 8,
         sieve: None,
     }
 }
@@ -214,11 +213,13 @@ fn a9_cancel_before_wave_completes_the_model_call_but_runs_no_tool() {
     );
 }
 
+/// A run ends when its own work ends, because there is no ceiling to
+/// reach (card-11.7). A model that asks for another probe sixteen times
+/// takes sixteen turns and then concludes on the empty wave; what stops
+/// a run somebody wants stopped is `Halt`, not a number chosen for them.
 #[test]
-fn exhausting_the_turn_budget_freezes_with_limit() {
+fn a_run_takes_every_turn_its_work_asks_for_and_then_concludes() {
     let mut sc = scenario(None);
-    // A model that always asks for another probe: the executor's turn
-    // budget is the only stop.
     sc.model = ScriptModel::new(
         (0..16)
             .map(|_| ModelReturn {
@@ -240,11 +241,10 @@ fn exhausting_the_turn_budget_freezes_with_limit() {
             })
             .collect(),
     ))]);
-    sc.budget_turns = 3;
     let report = run_scenario(sc).unwrap();
-    assert_eq!(report.completion, "limit");
+    assert_eq!(report.completion, "done");
     let ks = kinds(&report.lines);
-    assert_eq!(ks.iter().filter(|k| *k == "prompt_assembled").count(), 3);
+    assert_eq!(ks.iter().filter(|k| *k == "prompt_assembled").count(), 17);
     assert_eq!(ks.last().unwrap(), "run_frozen");
 }
 
@@ -375,8 +375,6 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
                 mode: runtime::mode::Mode::Up,
                 ctx_used: kernel::Tokens::new(900),
                 ctx_limit: kernel::Tokens::new(8000),
-                budget_usd: kernel::UsdMicros::new(500_000),
-                budget_tokens: kernel::Tokens::new(50_000),
                 trust: "trusted".to_owned(),
                 write_domain: "sim/lobby/room1".to_owned(),
                 locks: Vec::new(),
@@ -448,7 +446,6 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
         )),
         cancel: None,
         steer: None,
-        budget_turns: 8,
         sieve: None,
     };
     let report = run_scenario(scenario).unwrap();

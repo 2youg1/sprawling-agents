@@ -24,14 +24,14 @@
 //! Command kinds: names, steps, the wire enum.
 
 use kernel::{
-    Address, ApprovalId, Autonomy, BudgetCap, DialectKind, Effort, GitOid, IdemKey, McpServer,
-    ModelTag, PolicyVerdict, RunId, SandboxLimits, Sealed, Seq, SessionName,
+    Address, ApprovalId, Autonomy, DialectKind, Effort, GitOid, IdemKey, McpServer, ModelTag,
+    PolicyVerdict, RunId, SandboxLimits, Sealed, Seq, SessionName,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::carried_name::{ModeTag, ProviderName, TemplateName, UploadId};
 
-pub const COMMAND_NAMES: [&str; 23] = [
+pub const COMMAND_NAMES: [&str; 24] = [
     "Dispatch",
     "Wake",
     "Login",
@@ -54,6 +54,7 @@ pub const COMMAND_NAMES: [&str; 23] = [
     "CreatePolicy",
     "SetAutonomy",
     "Pursue",
+    "PutDocument",
     "Auth",
 ];
 
@@ -118,6 +119,28 @@ pub enum HaltScope {
     Workshop(Address),
 }
 
+/// Which of the three documents that govern a city a `PutDocument`
+/// frame carries.
+///
+/// A closed set rather than a path, because where these files live is
+/// the city's answer and not the sender's: all three sit in the city's
+/// own reserved subtree, which no write domain reaches. A frame naming
+/// its own path would be a way to write anywhere inside the one place a
+/// resident may not edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum GovernedDocument {
+    /// Who the Mayor is: `MAYOR.md`.
+    Mayor,
+    /// What the clerk answers by: `CLERK.md`.
+    Clerk,
+    /// How this person wants their city run: `PREFERENCES.md`. It
+    /// belongs to no resident, which is why it sits beside the other two
+    /// rather than at somebody's address.
+    Preferences,
+}
+
 /// What a `Pursue` command does to a pursuit.
 ///
 /// `Clear` and `Pause` are different actions and both exist: pausing
@@ -154,7 +177,6 @@ pub enum Command<Secret = Sealed<String>> {
         task: String,
         goal: String,
         mode: ModeTag,
-        budget: BudgetCap,
         idem: IdemKey,
         /// What this session is called, when it is a new one.
         ///
@@ -330,6 +352,18 @@ pub enum Command<Secret = Sealed<String>> {
     Wake {
         source: String,
         subject: String,
+        body: String,
+        idem: IdemKey,
+    },
+    /// Writes one of the three documents that govern this city.
+    ///
+    /// The body replaces the file whole rather than patching it: these
+    /// are documents a person edits in one box and saves once, and a
+    /// partial write would leave the city governed by half a sentence.
+    /// No version travels with it for the same reason — there is no
+    /// second writer to lose a race against.
+    PutDocument {
+        which: GovernedDocument,
         body: String,
         idem: IdemKey,
     },

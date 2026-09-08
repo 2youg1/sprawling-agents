@@ -24,5 +24,6 @@
 mod kind;
 mod wire;
 
-pub use kind::{COMMAND_NAMES, Command, HaltScope, LoginStep, NoSecret, PursuitStep};
+pub use kind::PursuitStep;
+pub use kind::{COMMAND_NAMES, Command, GovernedDocument, HaltScope, LoginStep, NoSecret};
 pub use wire::WireCommand;

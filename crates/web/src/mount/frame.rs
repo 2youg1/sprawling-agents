@@ -185,6 +185,8 @@ pub(crate) fn apply_frame(
             // that arrives as well.
             channels::Answer::Run(_)
             | channels::Answer::Commit(_)
+            | channels::Answer::Governance(_)
+            | channels::Answer::Hunks(_)
             | channels::Answer::Unavailable { .. } => {}
         }
     }

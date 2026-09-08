@@ -115,7 +115,7 @@ fn call(id: &str) -> ToolCall {
     }
 }
 
-fn plan(budget_turns: u32) -> RunPlan {
+fn plan() -> RunPlan {
     let addr = Address::parse("lab/room1").unwrap();
     RunPlan {
         run: RunId::from_bytes([7; 16]),
@@ -126,12 +126,12 @@ fn plan(budget_turns: u32) -> RunPlan {
         opening: runtime::Opening::FromJob,
         job: Locator::parse(&format!("file:{}/JOB.md@{}", addr.as_str(), "a".repeat(40))).unwrap(),
         parent: None,
-        budget_turns,
-        budget: kernel::BudgetCap::default(),
+        predecessor: None,
         shape: CallShape {
             model: "script".to_owned(),
             max_tokens: 4096,
             effort: None,
+            context_tokens: 0,
         },
         prefix: FrozenPrefix::assemble(
             FrozenSegment::new(SegmentSlot::City, b"city".to_vec()),
@@ -190,7 +190,7 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
         deltas: None,
     };
 
-    let frozen = drive(plan(4), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
 
     assert_eq!(
         ledger.kinds(),
@@ -222,12 +222,18 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
     assert_eq!(stamps[11], 5);
 }
 
+/// There is no ceiling to reach (card-11.7), so a run goes on until its
+/// own work runs out. The script here is longer than the turn ceiling
+/// this driver used to carry, and the run still ends by concluding
+/// rather than by being cut off.
 #[test]
-fn a_budget_that_runs_out_freezes_at_limit_rather_than_running_on() {
+fn a_run_ends_when_its_work_runs_out_rather_than_at_a_ceiling() {
     let mut ledger = RecordingLedger::new();
     let mut model = ScriptedModel {
         seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
-        waves: vec![vec![call("t-1")], vec![call("t-2")]],
+        waves: (0..26)
+            .map(|turn| vec![call(&format!("t-{turn}"))])
+            .collect(),
     };
     let mut now = counter();
     let mut interrupt = |_: SafePoint| Interrupt::None;
@@ -244,10 +250,10 @@ fn a_budget_that_runs_out_freezes_at_limit_rather_than_running_on() {
         deltas: None,
     };
 
-    let frozen = drive(plan(2), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
 
-    assert!(matches!(frozen.completion(), Completion::Limit));
-    assert_eq!(frozen.turns(), 2);
+    assert!(matches!(frozen.completion(), Completion::Done(_)));
+    assert_eq!(frozen.turns(), 27, "twenty-six waves, then the empty one");
     let kinds = ledger.kinds();
     assert_eq!(kinds[kinds.len() - 2], "handoff_written");
     assert_eq!(kinds[kinds.len() - 1], "run_frozen");
@@ -278,7 +284,7 @@ fn a_cancel_at_a_safe_point_freezes_inside_the_interrupted_turn() {
         deltas: None,
     };
 
-    let frozen = drive(plan(4), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
 
     assert!(matches!(frozen.completion(), Completion::Cancelled));
     let kinds = ledger.kinds();
@@ -320,7 +326,7 @@ fn a_fence_runs_before_the_wave_and_carries_the_turns_stamp() {
             invoke: &mut invoke,
             deltas: None,
         };
-        let frozen = drive(plan(4), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+        let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
         assert!(matches!(frozen.completion(), Completion::Done(_)));
     }
     // The fence goes up before *every* wave, including the last turn's
@@ -354,7 +360,7 @@ fn advance_reports_each_turn_so_a_caller_can_stop_between_them() {
         deltas: None,
     };
 
-    let mut run = Run::dispatch(plan(4), &mut ledger, &mut hooks).unwrap();
+    let mut run = Run::dispatch(plan(), &mut ledger, &mut hooks).unwrap();
     assert!(matches!(
         run.advance(&mut ledger, &mut model, &mut hooks).unwrap(),
         Advance::Turned
@@ -400,7 +406,7 @@ fn a_steer_at_a_safe_point_reaches_the_next_window_and_not_only_the_ledger() {
         deltas: None,
     };
 
-    drive(plan(4), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
 
     assert!(
         ledger.kinds().contains(&"steer_received".to_owned()),
@@ -449,7 +455,7 @@ fn a_cancel_after_the_wave_stops_the_run_before_anything_it_handed_down_starts()
         deltas: None,
     };
 
-    let frozen = drive(plan(4), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
 
     assert!(matches!(frozen.completion(), Completion::Cancelled));
     assert_eq!(

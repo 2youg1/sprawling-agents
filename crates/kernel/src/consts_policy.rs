@@ -100,14 +100,6 @@ pub const IMAGES_PER_TURN: u32 = 4;
 pub const CLOCK_STAMP_DEFAULT: crate::config::ClockStampGranularity =
     crate::config::ClockStampGranularity::Off;
 
-/// 64Ki tokens. Constitution names no value; kernel-SPEC 14 carries the
-/// evidence: mainstream windows run 128k-200k, an Ephemeral task profile
-/// bounds near 60k, so 2^16 sits above the task ceiling and below half
-/// the smallest mainstream window — self-justification loops get cut at a
-/// third of the parent's window cost. EVAL re-estimates in P3.
-pub const SUBAGENT_CTX_LOCK_DEFAULT: crate::budget::CtxLock =
-    crate::budget::CtxLock::new(crate::budget::Tokens::new(65_536));
-
 /// The human answers by default; loosening is an explicit command.
 pub const AUTONOMY_DEFAULT: crate::approval::Autonomy = crate::approval::Autonomy::Owner;
 

@@ -59,6 +59,7 @@ impl<Secret> Command<Secret> {
             Self::CreatePolicy { .. } => "CreatePolicy",
             Self::SetAutonomy { .. } => "SetAutonomy",
             Self::Pursue { .. } => "Pursue",
+            Self::PutDocument { .. } => "PutDocument",
             Self::Auth { .. } => "Auth",
         }
     }
@@ -87,6 +88,7 @@ impl<Secret> Command<Secret> {
             | Self::CreatePolicy { ref idem, .. }
             | Self::SetAutonomy { ref idem, .. }
             | Self::Pursue { ref idem, .. }
+            | Self::PutDocument { ref idem, .. }
             | Self::AttachEndpoint { ref idem, .. }
             | Self::SelectModel { ref idem, .. } => Some(idem),
             Self::PutSecret { .. } | Self::Auth { .. } => None,
@@ -115,7 +117,6 @@ impl From<WireCommand> for Command {
                 task,
                 goal,
                 mode,
-                budget,
                 idem,
                 session,
                 effort,
@@ -124,7 +125,6 @@ impl From<WireCommand> for Command {
                 task,
                 goal,
                 mode,
-                budget,
                 idem,
                 session,
                 effort,
@@ -253,6 +253,7 @@ impl From<WireCommand> for Command {
                 autonomy,
                 idem,
             },
+            Command::PutDocument { which, body, idem } => Self::PutDocument { which, body, idem },
             Command::Auth { token } => Self::Auth { token },
         }
     }

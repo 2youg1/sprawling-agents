@@ -2030,3 +2030,9 @@ REVIEW 那句「`city::neighbourhood` 有查询，`crates/web/src` 没有页面�
 先例）；二、`lang::VIEWS` 手写清单与 `attention::RENDERING` 表随码迁移，
 缺一项即红（本卡共补 20＋ 处）；三、行号切片只做初切，凡跨簇引用的项以
 `pub(crate)`＋全路径直达为准，`pub use` 只留对外公开面（`apisync` 基线零漂移）。
+
+### card-11.7／5.4：派活条不再提上限，客户端多一个命令构造点
+
+- **`dispatch_command` 去掉 `budget`**。原文档写着「不从人那里收预算，`BudgetCap::default()` 是线上带的那个值」；现在线上根本没有那个字段，所以那句话改成「这条帧没有上限可带」。派活条的观感一字未改——它本来就既不问也不显示。
+- **新增 `put_document_command(which, body)`**，`web::command` 的第三个构造点。空正文当场退回而不发帧：一条带空正文的帧会让市长没有身份文件，而清空一份文件是删除，这座城没有那个动词。
+- **客户端还欠一个屏（前端冻结，本卡不画）**：设置面需要一个能编辑 `MAYOR.md`／`CLERK.md`／`PREFERENCES.md` 的框，一个读 `Query::Governance` 的读面（谁来答、替你答过什么），以及一个读 `Query::Hunks` 的补丁视图——被扣下的行按行号与原因画一行占位，**恒不隐藏**，与回收站对读不懂的恢复方案的口径同形。三者的措辞须经 `web::lang`，两种语言各一份。

@@ -109,6 +109,11 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // does not reach into a run that is already going, and a verb
         // that owed a Handoff would be claiming it had.
         | Command::Pursue { .. }
+        // Writing a document that governs the city changes what the
+        // next run is given, and reaches into no run that is already
+        // going: the frozen prefix of a live run was assembled before
+        // this frame arrived.
+        | Command::PutDocument { .. }
         | Command::Auth { .. } => ControlVerdict::NotAnIntervention,
     }
 }

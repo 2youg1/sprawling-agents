@@ -25,26 +25,19 @@ pub(super) use collaboration::{Collaboration, artifact_of, new_inbox};
 /// # Errors
 /// Propagates chain verification failures.
 /// The work an answered item was holding up.
-///
-/// The ceiling travels with it because the answer resumes the same piece
-/// of work: a run that stopped to ask and was told yes is not a new run
-/// that happens to be at the same address.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct BlockedJob {
     pub(super) addr: Address,
     pub(super) task: String,
     pub(super) goal: String,
-    pub(super) budget: kernel::BudgetCap,
 }
 
-/// What a run was sent out to do, and what it was allowed to spend
-/// doing it. Read back from `run_started`, which is the only record
-/// that carries all three.
+/// What a run was sent out to do. Read back from `run_started`, which is
+/// the record that carries both halves.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Sent {
     pub(super) task: String,
     pub(super) goal: String,
-    pub(super) budget: kernel::BudgetCap,
 }
 
 /// Who may answer, what is waiting, what has already been allowed, and
@@ -96,13 +89,12 @@ impl Governance {
     /// `RunPlan` out of these very values, and `absorb` reading them back
     /// out of `run_started`. `what_a_worker_holds_is_what_a_restart_rebuilds`
     /// is what holds the two to the same answer.
-    pub(super) fn sent(&mut self, run: RunId, task: &str, goal: &str, budget: kernel::BudgetCap) {
+    pub(super) fn sent(&mut self, run: RunId, task: &str, goal: &str) {
         self.sent.insert(
             run,
             Sent {
                 task: task.to_owned(),
                 goal: goal.to_owned(),
-                budget,
             },
         );
     }
@@ -126,22 +118,9 @@ impl Governance {
                 .unwrap_or_default()
                 .to_owned()
         };
-        let count = |key: &str| {
-            data.get(key)
-                .and_then(serde_json::Value::as_u64)
-                .unwrap_or_default()
-        };
         match kind {
             EventKind::RunStarted => {
-                self.sent(
-                    run,
-                    &text("task"),
-                    &text("goal"),
-                    kernel::BudgetCap {
-                        usd: kernel::UsdMicros::new(count("usd_micros")),
-                        tokens: kernel::Tokens::new(count("tokens")),
-                    },
-                );
+                self.sent(run, &text("task"), &text("goal"));
             }
             EventKind::ApprovalRequested => {
                 let Ok(item) = serde_json::from_value::<kernel::ApprovalItem>(
@@ -160,7 +139,6 @@ impl Governance {
                             addr: addr.clone(),
                             task: sent.task.clone(),
                             goal: sent.goal.clone(),
-                            budget: sent.budget,
                         },
                     );
                 }

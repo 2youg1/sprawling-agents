@@ -50,7 +50,6 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
             task: "ask hana what she charges".to_owned(),
             goal: "a price".to_owned(),
             mode: channels::ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -146,7 +145,6 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
             addr: Address::parse("market/ito").unwrap(),
             task: "ask hana what she charges".to_owned(),
             goal: "a price".to_owned(),
-            budget: kernel::BudgetCap::default(),
         }),
         "and the comparison above is not two empty maps agreeing"
     );
@@ -230,7 +228,6 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
         task: "measure the thing".to_owned(),
         goal: "a number, then stop".to_owned(),
         mode: channels::ModeTag::parse("plan").unwrap(),
-        budget: kernel::BudgetCap::default(),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, tag),
         session: None,
         effort: None,

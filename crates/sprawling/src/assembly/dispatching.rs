@@ -43,12 +43,30 @@ pub(super) struct Assignment {
     /// layer, so it cannot be answered before the room exists.
     pub(super) effort: Option<kernel::Effort>,
     pub(super) mode: runtime::Mode,
-    pub(super) budget: kernel::BudgetCap,
     /// The run that handed this work down, when somebody did.
     pub(super) parent: Option<RunId>,
+    /// The run this one replaces, when it is a successor, and what that
+    /// run answered the handoff probe. Distinct from `parent` on
+    /// purpose: a successor inherits its predecessor's parent and
+    /// therefore its depth, which is what makes succession a different
+    /// verb from delegation.
+    pub(super) succession: Option<Handover>,
+}
+
+/// One succession, as the successor's dispatch receives it: who is
+/// being replaced, and what they answered before handing over. The two
+/// travel together because the probe's second reading is meaningless
+/// without its first.
+pub(super) struct Handover {
+    pub(super) predecessor: RunId,
+    pub(super) before: eval::Answers,
 }
 
 impl Assignment {
+    pub(super) fn predecessor(&self) -> Option<RunId> {
+        self.succession.as_ref().map(|handed| handed.predecessor)
+    }
+
     /// Derived from whether somebody handed this work down, rather than
     /// carried beside it. Two values that must agree are two chances to
     /// disagree, and the one that disagrees here is a grand-delegate.
@@ -94,12 +112,9 @@ pub(super) struct Knock {
     pub(super) addr: Address,
     /// Who spoke, as they will be named in the woken run's own brief.
     pub(super) from: String,
-    /// The mode and the spending ceiling of the run that spoke. Carried
-    /// rather than defaulted: an answer belongs to the same piece of
-    /// work as the question, and a run with no ceiling is the one
-    /// failure with no floor under it.
+    /// The mode of the run that spoke. Carried rather than defaulted: an
+    /// answer belongs to the same piece of work as the question.
     pub(super) mode: runtime::Mode,
-    pub(super) budget: kernel::BudgetCap,
 }
 
 /// What one dispatch left behind. Carried rather than re-derived,
@@ -128,13 +143,9 @@ pub(super) const NAME_THE_WORK: &str = "Name this piece of work in two to four w
 /// costing a person real money for a filename.
 pub(super) const NAME_TOKENS: u64 = 32;
 
-/// How many turns one dispatch may take before it freezes at `Limit`.
-/// A budget the caller cannot set yet is still a budget: an unbounded
-/// loop against a paid provider is the one failure with no ceiling.
-pub(super) const DISPATCH_TURN_BUDGET: u32 = 24;
-
 pub(super) mod agreeing;
 pub(super) mod running;
+pub(super) mod session;
 pub(crate) use agreeing::acp_dispatch;
 pub(super) use agreeing::run_id_for;
 #[cfg(test)]
