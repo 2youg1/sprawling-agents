@@ -61,7 +61,8 @@ fork   ──▶ replay(VerifiedLedger)、kernel
 turn   ──▶ kernel(ledger/event/error/tool/model)、prefix(FrozenPrefix)
 prefix ──▶ kernel(locator::B3Hash/event::Payload/error)
 handoff──▶ kernel(locator/event/error)
-pipeline ──▶ offload、clock、kernel(tool)
+pipeline ──▶ offload、sieve、clock、kernel(tool)
+sieve  ──▶ offload(tee)、memory(cas 读前一次原文)、kernel(tool::ExecArm/locator)
 offload ──▶ memory(cas)、kernel(locator)
 watchdog ──▶ kernel(stall/completion)
 catalog ──▶ kernel(tool)、mode
@@ -537,7 +538,12 @@ impl ToolBench {
     fn crossed(&mut self, outcome: EgressOutcome) -> Option<BenchOutcome>;
     /// S3.14 长入：包信封的调用者要读 `temporal` 才知道时钟行该不该发。
     pub fn meta_of(&self, name: &str) -> Option<&ToolMeta>;
-    pub fn with_checkpoint(self, checkpoint: Checkpoint, scope: &str) -> ToolBench;
+    /// card-2.2：栅栏署名随网一起交给 bench。一个没有 `Provenance` 的栅栏
+    /// 写不出 `Sprawling-Run:`，而预测栅栏恰恰是在一个拿不到运行上下文的
+    /// 闭包里升起的，所以它在装配时就被交下。
+    pub fn with_checkpoint(self, net: CheckpointNet) -> ToolBench;
+    /// 栅栏的三件东西恒同行：仓、它盖住的范围、写它的人。
+    pub struct CheckpointNet { pub checkpoint: Checkpoint, pub scope: String, pub of: Provenance }
     /// P1.04：本 bench 服务的那份活。Spawn 门要铸一个人答得出的条目，
     /// 条目要有 actor（问谁）与 artifact（看什么）；两者都不在一次工具调用里。
     /// 未给即拒（fail-closed）——一个人问不到的派生就是没人批准的派生。
@@ -866,3 +872,337 @@ pub struct RunHooks<'a> {
 **无字段开放。** 测试是子模块，父模块的私有字段与私有方法本就可见。
 
 **api-baseline 未重写。** 公开项 `ExecTool`／`parse_arm` 的定义位置未动，规范路径不变。
+
+### 8-27 runtime::sieve（card-11.4；形状 1 判定＋形状 6 数据面；**本节是压缩器的唯一权威**）
+
+> 裁决 D31。读这一节即可实现，不需要再查别处、不需要再做任何参数选择。方法论取自 Hypabolic/Hypa 的 ADR-0002 与其 `Compression/` 实现；四处刻意背离记在 §8-27-7。
+
+#### 8-27-1 它是什么，以及为什么不是 LLM
+
+`sieve` 按**产生结果的命令**决定留下什么。它与 `compaction` 相邻而不重叠：`compaction` 看文本形状（Prose／Code／Diff／Log／Structured／Table／Unknown），`sieve` 看命令身份（`cargo build` 与 `git status` 的噪声形状完全不同，而两者都是 Log）。
+
+不用模型做压缩，理由是被架构强制的而非偏好：V6 要求同一颗种子重放出逐字节相同的对话，一个会思考的压缩器会让重放不可能。它同时省掉一次调用的钱与延迟。
+
+#### 8-27-2 位置与法则
+
+管线原法则「offload 恒先于 truncation」扩写为：
+
+```
+tee（原文钉进 CAS ＋ 实体化 rest 文件）
+  → sieve（命令感知）
+    → offload / truncation（既有三臂）
+```
+
+**tee 恒在最前**：这是 `offload` 既有的 store-before-cut 不变量上提一层。因为原文一定先落盘，sieve 才敢压得比 Hypa 狠——Hypa 那条「压缩率异常高时拒绝」的护栏存在，是因为它不能保证全文带内可恢复；本城可以。
+
+#### 8-27-3 作用范围
+
+**只作用于 `exec` 结果。** 命令感知的东西对没有命令的工具无可感知：`read` 结果、模型输出、MCP 结果各自走既有的 `compaction`／`redact` 路径，本节不动它们。
+
+#### 8-27-4 七条不变量
+
+1. 输出恒不长于输入。
+2. 输入非空时输出非空。
+3. 任何裁剪之前，原文已钉入 CAS。
+4. 每个被筛过的结果都携带 rest 文件路径与 CAS locator。**压缩是强制的；可恢复也是强制的**——没有落 tee 的压缩不许发生。
+5. 切口落在字符边界上。
+6. **这条路上不用正则表达式**（沿用 `compaction` 模块头的既有裁决；判「重要」的四类模式全部手写线性扫描，见 §8-27-6）。
+7. 账本记的是**模型看到的字节**＋原文 locator。重放复现模型看到的东西，不是命令打印的东西。
+
+#### 8-27-5 阶段顺序与参数（全部已定，实现者不再选择）
+
+| # | 阶段 | 参数 | 取值 |
+|---|---|---|---|
+| 0 | 地板 | `SIEVE_FLOOR` | **2 KiB**。以下原样通过，连 tee 都不做（此时 tee 的一次 CAS 写加一个实体文件，比省下的字节贵） |
+| 1 | 去 ANSI | — | 恒开 |
+| 2 | 空行折叠 | 连续空行 | **≥3 折为 1** |
+| 3 | 模板去重 | 同模板出现次数 | **≥4 折成一行＋计数**；≤3 全留 |
+| 4 | 跨调用差分 | 同 `(arm, path, args)` 本 run 内跑过且原文在 CAS | 只出新增／变化行，未变部分**一行**带过 |
+| 5 | 过滤表 | 见 §8-27-6 | 命中即用，否则走通用路径 |
+| 6 | 长行截断 | 单行长度 | **> 2 KiB 截断并标记** |
+| 7 | 截断 | `MAX_TOTAL_LINES` | **240** |
+| | | `HEAD` / `TAIL` | **40 / 40** |
+| | | 中段保留上限 | **60 条，按优先级排序取前 60** |
+
+每一级只在**不变长**时被接受；**被跳过的级要记进账**（Hypa 是静默跳过的，坏过滤器因而事后不可诊断）。
+
+#### 8-27-6 重要行的优先级与过滤表
+
+优先级序（同级按原始行序，稳定且确定）：
+
+```
+error  >  panicked / fatal / failure / failed  >  assertion  >  warning  >  note / help
+```
+
+判「重要」的四类模式，手写线性扫描：关键词子串加词边界；`路径:行:列` 形状；`大写字母2-4 ＋ 数字3-5` 的诊断编号；`test result:` / `exit code` 这类结果行。
+
+**原样保留、任何阶段不得触碰**：URL、设备码形状的字符串、`secret:realm/name` 引用、带行列的文件路径、退出码。
+
+过滤表住 `<city>/.sprawling/FILTERS.toml`，楼级可覆盖 `<building>/.sprawling/FILTERS.toml`，走既有三层阶梯且**整值解析而非逐字段合并**（直接沿用 kernel-SPEC §8-22 P4.02 给 `[sandbox]` 定的口径①，一条规则一个权威）。**信任问题不存在**：过滤表住保留区，没有任何写域够得着它。
+
+形状（谓词只有 prefix / contains / suffix，无正则）：
+
+```toml
+[[filter]]
+id          = "cargo"
+command     = "cargo"
+subcommands = ["build", "check", "test", "clippy", "nextest"]
+strip_ansi  = true
+drop_prefix = ["   Compiling ", "    Checking ", "    Finished ", "   Updating ", "    Blocking "]
+keep_contains = ["error", "warning:", "panicked at", "test result:", "-->"]
+head = 20
+tail = 40
+on_empty = "cargo {sub}: clean, exit {code}"
+```
+
+**内建编译进去的 reducer 恰三个**：`cargo`（含 rustc 诊断分组）、`git`、`generic`。其余一律走表——ADR-0002 自己把「命令专属 reducer 是持续维护负担」写在负面后果里，Hypa 列了十个，那张清单会长成泥潭。
+
+页脚（**不报 token，不引分词器**——o200k 不是所接模型的分词器；真实 token 由 provider 在账上给）：
+
+```
+[sieve: 1,240 → 78 lines, 31.4 KiB → 2.1 KiB, filter=cargo, rest at ./.rest/rest-a91f.dat]
+```
+
+#### 8-27-7 四处刻意背离 Hypa
+
+1. **重要行排序而非全留。** Hypa 的 `TruncationStage` 把中段所有命中 `ImportantLineClassifier` 的行全部保留；其 `\b[45]\d{2}\b` 会把 `compiled 437 files` 判成重要行，而 cargo 输出里几乎每个依赖都命中一次 `warning`。一次三百条 warning 的构建因此压了等于没压。本实现取前 60 条。
+2. **模板级去重而非相邻去重。** Hypa 的 `DeduplicateStage` 只折叠连续相同的行；构建日志是交错的（`Compiling a` / `Compiling b`），一行都压不掉。归一化数字、哈希与路径后按模板分组，是 cargo 场景下最大的单项收益。
+3. **跨调用差分。** Hypa 每次调用独立压缩，因为它的压缩路径没有会话模型。本城有账本与 CAS：开发循环里 `cargo check` 跑十遍，九遍与上一遍逐字节 90% 相同，只出差分能在压缩之上再降一个数量级——而且给模型的是**更好的信息**（「这个错是新出现的」本来要它读两遍才能得出）。
+4. **无正则。** Hypa 的分类器整个是正则；本城 `compaction` 的模块头已裁决这条路上不用模式引擎。手写扫描约 40 行，更快且无回溯风险。
+
+不抄的三样：它的十个 compiled reducer 清单（维护跑步机）、`Microsoft.ML.Tokenizers`（依赖加谎言）、SQLite 与 `hypa trust`（账本＋CAS＋保留区规则已经更强）。
+
+#### 8-27-8 验收
+
+每张内建过滤器一组 golden；一条性质「输出 ≤ 输入」；一条性质「输入非空则输出非空」；一个 citysim 场景——同一颗种子、同一张过滤表，重放出逐字节相同的窗口。
+
+#### 8-27-9 接口与文件切分（card-11.4 实现记）
+
+> §8-27-1…8 定的参数与不变量一个不改；本小节只把它们落成签名，并记下三处那几节没写明、实现时按下面读法取的口径。
+
+```rust
+// runtime::sieve — 入口（形状 1）
+pub struct CommandKey { arm: String, program: String, args: Vec<String> }   // Ord：BTreeMap 键，跨调用差分按它分组
+impl CommandKey {
+    pub fn of(arm: &ExecArm) -> CommandKey;   // Program→(path,args)；Shell→按空白切 text，首词为 program；Python→("python",[code])
+    pub fn command(&self) -> String;          // program 的文件名去目录、去 .exe、小写：过滤表 `command` 按它匹配
+    pub fn subcommand(&self) -> Option<&str>; // 首个不以 `-` 开头的参数：过滤表 `subcommands` 与 `{sub}` 按它取
+}
+pub struct SieveInput<'a> { pub key: &'a CommandKey, pub exit_code: Option<i64>, pub text: &'a str }
+pub enum Sieved {
+    Passed { text: String, reason: PassReason },   // 地板以下／全部阶段被拒：原文一字不动
+    Cut(SieveRecord),
+}
+pub enum PassReason { BelowFloor, NothingShrank }
+pub struct SieveRecord { pub text: String, pub original: Locator, pub rest_path: PathBuf, pub filter: String,
+                         pub lines_in: u64, pub lines_out: u64, pub bytes_in: u64, pub bytes_out: u64,
+                         pub stages: Vec<StageReport> }
+impl SieveRecord { pub fn payload(&self) -> Result<Payload, AxError>; }   // result_offloaded 载荷：原文 locator＋替代体长度＋逐级账
+pub struct StageReport { pub stage: Stage, pub outcome: StageOutcome }
+pub enum Stage { StripAnsi, FoldBlank, DedupTemplate, DiffPrevious, Filter, CutLongLine, Truncate }
+pub enum StageOutcome { Applied { bytes_before: u64, bytes_after: u64 }, Noop, Rejected { grew_to: u64 }, Unavailable { reason: String } }
+pub fn sieve(input: SieveInput<'_>, table: &FilterTable, site: &mut OffloadSite<'_>, history: &mut SieveHistory)
+    -> Result<Sieved, AxError>;
+// tee 走 offload::tee（pub(crate)；offload() 自身也改经它，store-before-cut 只有一处）；history 无论 Cut／Passed 都记本次原文
+
+// runtime::sieve::filter — 过滤表（形状 6）
+pub struct Filter { id, command, subcommands: Vec<String>, strip_ansi: bool,
+                    drop_prefix / drop_contains / drop_suffix / keep_prefix / keep_contains / keep_suffix: Vec<String>,
+                    group_until_blank: bool,                                    // 命中 keep 的行把其后到空行为止的行一起带上（rustc 诊断分组）
+                    head: Option<u64>, tail: Option<u64>, on_empty: Option<String> }   // 全部字段 serde default；只有 id 与 command 必填；未知字段拒
+pub struct FilterTable { filters: Vec<Filter> }
+impl FilterTable {
+    pub fn builtin() -> FilterTable;                            // 恰三张：cargo、git、generic
+    pub fn parse(toml_text: &str) -> Result<FilterTable, AxError>;   // `[[filter]]` 数组；E_INVALID_ARGS 拒坏表
+    pub fn resolve(city: Option<&str>, building: Option<&str>) -> Result<FilterTable, AxError>;  // 口径①整值覆盖：楼＞城＞内建
+    pub fn lookup(&self, key: &CommandKey) -> &Filter;         // 表内命中＞generic；表内顺序即优先序
+}
+
+// runtime::sieve::diff — 跨调用差分（形状 1）
+pub struct SieveHistory(BTreeMap<CommandKey, Locator>);        // 本 run 内每个键最近一次的原文 locator；调用方持有
+
+// runtime::pipeline — 管线接入
+pub struct SieveRequest<'a> { pub key: CommandKey, pub exit_code: Option<i64>, pub table: &'a FilterTable, pub history: &'a mut SieveHistory }
+pub struct PackContext<'a> { /* 既有五字段 */ pub sieve: Option<SieveRequest<'a>> }
+// package：sieve 为 Some 时 `result` 是命令输出文本而非 JSON；tee 复用 ctx.offload；无 OffloadSite 即无 tee 即不压（不变量 4），记 Unavailable
+```
+
+**文件切分**（一文件一模块，全部 ≤ 400 行）：
+
+| 文件 | 形状 | 持有 |
+|---|---|---|
+| `sieve.rs` | 1 判定 | 阶段定序、逐级「不变长才接受」的裁决（`Draft`：行与账同行）、页脚 |
+| `sieve/key.rs` | 2 值 | `CommandKey`：arm／program／args，Ord |
+| `sieve/record.rs` | 2 值 | `Sieved`／`SieveRecord`／`Stage`／`StageOutcome`／`StageReport` 与 `result_offloaded` 载荷 |
+| `sieve/filter.rs` | 6 数据 | `Filter`／`FilterTable`：TOML 形、三张内建、三层整值覆盖、命中规则 |
+| `sieve/scan.rs` | 1 判定 | 重要行五级优先级的四类手写扫描；受保护片段（URL、设备码、`secret:` 引用、`路径:行:列`、退出码行）的判定 |
+| `sieve/stages.rs` | 1 判定 | 去 ANSI、空行折叠、模板去重、长行截断、head/tail/中段截断 |
+| `sieve/diff.rs` | 1 判定 | `SieveHistory` 与跨调用差分 |
+| `sieve/tests.rs` | — | 三张内建过滤器的 golden、两条 proptest 性质、阶段账 |
+
+**三处读法**（§8-27 未写明处，按此实现；改口径先改这里）：
+
+1. **受保护片段的「不得触碰」**读作：含受保护片段的行不进模板去重、不被长行截断——这两级会**改写**一行；在第 7 级截断里它算最低一级重要行（排在 note/help 之后），与其他重要行一起按序取前 60。把它读成「恒不丢」会让一份三百条 URL 的清单压不动，与不变量 1 的目的相悖。跨调用差分**不豁免**它：把上一次逐字相同的行计入「未变 N 行」不改写任何一行，那行在 rest 文件里原样在，模型上一次也已读过；豁免它的第一版让每个 rustc 诊断块被 `-->` 行切成折不动的短段，差分在它为之而存在的 cargo 场景上恒为 Noop。空行同理计入。
+   第 3 级模板去重另豁免过滤表 keep 命中的行及其分组（否则 `  |` 这样的诊断沟槽行跨块折叠，`10 |     let x0 = 1; [×6 similar lines]` 说的是并不相同的六行）。
+2. **过滤表的 `head`/`tail`** 是第 7 级 HEAD/TAIL 的逐表覆盖，不是第二次截断；`keep_*` 命中的行进第 7 级中段候选，优先级与 §8-27-6 的 warning 同级。这样截断只有一处权威。
+3. **generic 的 `on_empty`** 缺省为 `"(no output kept), exit {code}"`；`{code}` 在无退出码（sandbox trap／fuel 耗尽）时写 `none`。这是不变量 2 在通用路径上的执行体。
+
+**三个 reducer 与表的关系**：cargo 与 git 是两个以代码构造的 `Filter` 值，rustc 诊断分组是 cargo 那张的 `keep_contains` 命中行向后扩到空行为止（同一诊断块整体进中段候选）；generic 是空谓词的 `Filter`。表内条目与内建同形，故楼级表可以整张换掉 cargo 的裁法而不动代码。
+
+**citysim 侧**：`Scenario` 增 `sieve: Option<SieveWorld>`（CAS＋environment＋过滤表＋本 run 的 history）；有它时执行器把名为 `exec` 的工具结果经 `package_exec` 走带 `SieveRequest` 的 `package`，模型看到 `{content, exit_code, sieve:[载荷]}`。`citysim/tests/sieve.rs`：同一目录同一表跑两遍账本逐字节相同；第二次同命令只出新错误与 `[unchanged: N lines…]`。
+
+**已知未接**：生产路径 `bin::assembly::driving` 今天不经 `pipeline::package`（工具结果原样交模型）；本卡把 sieve 接进 `package` 与 citysim 执行器，生产接线随 backlog（§8-28）落表时一并走 `package`。
+
+### 8-28 runtime::backlog（card-11.2；形状 4 适配器＋形状 6 数据面）
+
+> 裁决 D26。它同时补上 D25 的洞。
+
+**问题**：`turn.rs` 首段写明中断只在相位边界被消费，而 `Command::output()` 阻塞在系统调用里、不在边界上，所以一条挂死的命令 `halt` 停不住。删掉花费预算与回合上限（card 11.7）之后，这是全仓唯一一处无界失效。
+
+**设计**：一张表，成员是后台 exec 子进程与 `delegate` 子 run。
+
+- **`exec` 恒经此表**，不设 `background` 参数——两条路径就是两个权威，而有洞的那条永远是没人想起的那条。
+- 先阻塞等一个短窗口（**10 s**），短命令因而感觉上仍是同步的；超时则返回一个句柄并继续在后台跑，结果落**下一次工具结果的尾部**。这正是 `docs/City.md` 已经写给 agent 的那句话（「Do not wait for a long task. Start it, continue with other work, and read the result when it arrives at the end of a later tool result.」），今天对 exec 不成立。
+- `halt {scope}` 遍历该表并终止其成员；工作线程不再进入阻塞系统调用，halt 因而真的停得住。
+- `status` 报告表中属于本 run 的成员：几条在跑、各自跑了多久。
+
+**红测试**：一条不会结束的命令起后，`halt` 使其进程终止且 run 回到边界；十秒内结束的命令不产生句柄；后台结果确实出现在下一次工具结果的尾部。
+
+#### 8-28-1 接口与三处已定的实现选择（card-11.2 落地时补记）
+
+```rust
+pub struct BacklogId(u64);                      // Display；一次 serve 内唯一
+pub enum Started {                              // 短窗口的穷尽结果，恒不是 bool
+    Settled { exit_code: i64, stdout: String, stderr: String },
+    Backgrounded { id: BacklogId, what: String },
+}
+pub struct Standing { pub id: BacklogId, pub scope: Address, pub what: String }
+pub struct Finished { pub id: BacklogId, pub what: String, pub exit_code: i64,
+                      pub stdout: String, pub stderr: String }
+
+#[derive(Clone, Default)]
+pub struct Backlog(/* Arc<Mutex<Table>>，表内是 BTreeMap */);
+impl Backlog {
+    pub fn run(&self, scope: &Address, what: String, command: Command) -> Result<Started, AxError>;
+    pub fn halt(&self, scope: Option<&Address>) -> Result<usize, AxError>;   // None＝整城
+    pub fn harvest(&self) -> Result<Vec<Finished>, AxError>;
+    pub fn standing(&self, scope: &Address) -> Result<Vec<Standing>, AxError>;
+}
+```
+
+三处实现选择，各有理由：
+
+1. **短窗口靠固定次数的轮询走完，不采样时钟。** 10 s ＝ 500 次 × 20 ms，两个数都是常量。理由是本仓那条「时间是入参，唯一采样点是 `bin::assembly`」——一个为了等十秒而调 `Instant::now()` 的模块会把那条规则打穿，而计数不需要时钟。
+2. **子进程的输出写文件，不走管道。** 管道缓冲区填满会让后台子进程停在写系统调用上，于是「后台」变成「挂死」——那正是本卡要修的那个洞的另一种写法。文件住 `std::env::temp_dir()` 下按 `BacklogId` 命名的一层目录，收割时读完即删。
+3. **表是一份共享句柄（`Clone` 的 `Arc<Mutex<_>>`）。** 装配层持一份，每个 `ExecTool` 持一份克隆，于是 `halt` 够得着 `exec` 起的东西而不必让 `halt` 认识 `exec`。表内是 `BTreeMap`，遍历序恒定。
+
+**本卡落地范围（诚实记账）**：成员目前只有后台 `exec` 子进程。`delegate` 子 run 入表是同一张表的第二类成员，接口已按此形状留好（`Standing`／`Finished` 不提进程），但本卡不接线；`status` 报告本 run 那部分同理待接。
+
+### 8-29 runtime::tools::read 区间读（card-11.3）
+
+> 裁决 D30。
+
+`ReadTool` 增 `offset`（0 基行号，缺省 0）与 `limit`（缺省与上限**均为 512 行**）。被截断时结果携 `total_lines` 与 `next_offset`，所以「我拿到的是不是全部」不需要猜。`bytes` 字段的语义不变，仍是本次返回文本的长度。
+
+理由：今天是 `read_to_string` 整读，而 `kernel-SPEC.md` 1483 行、`ARCHITECTURE.md` 112 KB——一次读要么吃掉整个窗口，要么被管线从中间剪掉，而剪掉的往往正是要改的那一段。512 是选定值，不再讨论。
+
+#### 8-29-1 参数与结果（实现照此，不再选择）
+
+```rust
+// args：{path, offset?: u64, limit?: u64}
+// offset 缺省 0；limit 缺省 512，大于 512 者**夹到 512** 而非拒绝——
+// 模型多要一点不该赔掉一个回合，它拿到的截断字段会把真相说清楚。
+// offset／limit 非整数或为负＝E_INVALID_ARGS；limit==0 同。
+const LINE_CAP: u64 = 512;
+```
+
+切行按 `split_inclusive('\n')`：每行连它自己的换行符一起数、一起还，所以 `offset=0, limit>=total` 的返回与整读**逐字节相同**，`bytes` 字段的旧语义因而不动。
+
+| 情形 | `text` | `total_lines` | `next_offset` |
+|---|---|---|---|
+| `offset + 返回行数 < total_lines`（截断） | 该区间 | 有 | 有，＝`offset + 返回行数` |
+| 读到文件末尾 | 该区间 | 无 | 无 |
+| `offset >= total_lines`（越过末尾） | 空串 | 有 | 无——后面没有东西了，给一个 `next_offset` 就是请模型原地打转 |
+
+目录路径与 catalog 条目走同一条切行路：一个条目短到永不触顶，而两条路就是两个权威。
+
+#### 8-29-2 保留区判定移出（同卡）
+
+`resolve` 里「`Address::parse` 后判 `is_reserved`」这一段移进 `runtime::tools::chosen_path`（§8-30-1），`read` 与新的 `search` 同调它。理由是本卡的硬约束：模型选的路径能不能到保留区，全城只允许有一个答案与一组测试。
+
+### 8-30 runtime::tools::search（card-11.3；形状 1 判定＋形状 4 适配器）
+
+> 裁决 D30 的后半。
+
+**问题**：十三件工具里没有一件能找东西。找一个符号只有两条路——写 Python（要可选的 CPython-WASI 构件，很多机器上根本没有），或走 shell（Windows 上是 `findstr`，而 shell 本身是楼级配置可以关掉的）。card 11.5 要给旧对话一个地址，而**没有检索的地址比没有地址更糟**：模型被告知那里有东西，却够不着。
+
+#### 8-30-1 runtime::tools::chosen_path（形状 1；模型选路的唯一判定处）
+
+```rust
+// 无 I/O、无时钟、无全局状态；入一个字符串，出一个地址或一个三段式拒绝。
+pub(crate) fn admit(asked: &str, action: &'static str) -> Result<Address, AxError>;
+// 解析失败＝E_INVALID_ARGS；Address::is_reserved()＝E_GATE_DENIED。
+```
+
+它是 `read` 原有那段判定的搬家，不是它的第二份。`search` 遍历时对每一个候选文件同样只问 `Address::is_reserved()`——kernel 的那个原语——所以「什么是保留区」自始至终一个权威。
+
+#### 8-30-2 参数与结果
+
+```rust
+// args：{text, path?, context?}
+// text：子串，必填且非空。**不是正则**。
+// path：城相对前缀，缺省＝整城。走 chosen_path::admit。
+// context：每侧上下文行数，缺省 0，上限 4（更大者夹到 4）。
+const MATCH_CAP: usize = 64;      // 命中上限；到顶即停走，结果自陈 truncated
+const FILE_BYTE_CAP: u64 = 1 << 20; // 单文件上限 1 MiB，越界跳过
+```
+
+结果：`{matches: [{path, line, text}], count, truncated, unreadable}`。`line` 是 **0 基**，与 `read` 的 `offset` 同一套编号，所以「搜到再读那一段」是把一个数字原样递过去。`unreadable` 是遍历中打不开的目录与文件数：**找不到与看不了是两个答案**，把后者吐成前者就是把一次失败抹掉。按策略跳过的（二进制、超大、保留区）不计入它。
+
+**不用正则表达式**，沿用 `compaction` 模块头的既有裁决并原样引用它的理由：模式引擎会把回溯放在模型和它的下一个回合之间。子串扫描是线性的，且一个模型写错的正则不会变成一次挂死。
+
+#### 8-30-3 遍历跳过什么，以及为什么
+
+| 跳过 | 理由 | 权威 |
+|---|---|---|
+| 保留区子树 | 一跑不读治理自己的东西 | `Address::is_reserved`（kernel） |
+| `.git` 目录 | 它是对象库不是文本，扫它只产出乱码命中 | 本节 |
+| 非 UTF-8 文件 | 二进制里没有可读的行 | 本节 |
+| 大于 1 MiB 的文件 | 把一个大对象读进内存找子串是一次停顿 | 本节 |
+
+#### 8-30-4 红测试
+
+超过 512 行的文件返回恰 512 行、并给出真实 `total_lines` 与可续的 `next_offset`；`search` 找到子串并带上下文；`search` 对保留区前缀以 `E_GATE_DENIED` 拒绝；两者共用的 `chosen_path::admit` 有且只有一组测试。
+
+#### 8-30-5 同集改
+
+ARCHITECTURE.md §12 runtime 表 23→27 行（`chosen_path`、`read::tests`、`search`、`search::tests`）；`docs/glossary.md` §5 增 **search** 一行；装配层 `lay_out_workbench` 的准入清单由十三件变十四件，`search` 排在 `read` 之后——次序是缓存面的一部分，只在末尾追加。
+
+### 8-31 runtime::tools::exec 的环境声明（card-11.1）
+
+> 权威在 kernel-SPEC §8-22 的「11.1 增」段与 city-SPEC §8-4 的「11.1 增」段；本节只说 exec 这一侧怎么用它，以及构造面因此怎么变。
+
+**今天的事实**：`ENV_ALLOWLIST: [&str; 4] = ["PATH", "LANG", "LC_ALL", "TZ"]` 加 `env_clear()`。于是城里的 resident 跑不动 `cargo build`——MSVC 链接器读不到 `%ProgramFiles(x86)%`，退回裸 `link.exe`，撞上 PATH 上 Git 那个 coreutils `link`。本版本承诺的闭环断在第四段。
+
+**改法**：`ENV_ALLOWLIST` 原样留着，它是**每一栋楼无条件继承的地板**；楼在 `[sandbox] env_passthrough` 里逐名声明的是**地板之上加的那几个**。两份清单合并后按名取值，取不到的名字不进（一个没设过的变量不该变成空串——空串与未设置在 Windows 上是两件事）。
+
+**构造面**：`ExecTool::new` 原有七个参数，`argument_count` 的历史册子里记着它。本卡不把它加到第八个，而是把总在一起走的那几个值起个名字：
+
+```rust
+pub struct ExecSetup {                 // 形状 2 值类型
+    pub workdir: PathBuf,
+    pub mounts: Vec<Mount>,
+    pub python_wasm: Option<PathBuf>,
+    pub shell: Option<PathBuf>,
+    pub fuel: Fuel,
+    pub env_passthrough: Vec<EnvVarName>,
+    pub domain: Address,
+}
+pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Result<ExecTool, AxError>;
+```
+
+三个参数，于是 `crates/runtime/src/tools/exec.rs::new` 那一行历史豁免不再被用到。它留在册子里不动：那份册子是 gate 机械面，删行与改被判代码同集会撞上 `guard`，而豁免只被查存在性、留着不放行任何东西。
+
+**账本上留什么**：配置写入时不记事件——`CONFIG.toml` 是「一跑受什么治理」的权威，再记一条同事实的事件就是第二个权威（这条已由 `RunWorker::configure_building` 的注释裁决过，本卡遵守）。账本记的是**一跑拿它做了什么**：`exec` 的结果载荷增 `env` 字段，列出这次真正递给子进程的名字，按名排序。名字不是值——值恒不入账本。
+
+**验收**：声明了名字的楼里，`exec` 的子进程恰好看到那几个（加地板四个）；没声明的楼里只看到地板四个；凭据形状的名字在配置解析处被拒。以及一次真实演示：声明了名字的楼里 `exec` 跑得动 `cargo build`。

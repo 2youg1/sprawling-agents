@@ -71,6 +71,28 @@ fn materialize(bytes: &[u8], path: &Path) -> Result<(), AxError> {
     Ok(())
 }
 
+/// The way back from a cut: the original pinned in the CAS and
+/// materialized as a read-only rest file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tee {
+    pub(crate) original: Locator,
+    pub(crate) rest_path: PathBuf,
+}
+
+/// Pins the full original before anything is cut from it: invariants 1
+/// and 4 in one call, so no cutter can run without the way back
+/// existing first. Repeating it on the same bytes is idempotent.
+pub(crate) fn tee(bytes: &[u8], site: &mut OffloadSite<'_>) -> Result<Tee, AxError> {
+    let hash = site.cas.put(bytes).map_err(memory::MemoryError::into_ax)?;
+    let original = Locator::parse(&format!("cas:b3-{hash}"))?;
+    let rest_path = site.environment.join(rest_file_name(&original));
+    materialize(bytes, &rest_path)?;
+    Ok(Tee {
+        original,
+        rest_path,
+    })
+}
+
 /// Shrinks `bytes` to at most `cap_bytes`. Callers only come here for
 /// lossy cases (`len > cap`); a lossless call is refused — invariant 3
 /// says only lossy transforms may store.
@@ -90,11 +112,11 @@ pub fn offload(
         ));
     }
     // Invariant 1: the full original enters the CAS before any cut.
-    let hash = site.cas.put(bytes).map_err(memory::MemoryError::into_ax)?;
-    let original = Locator::parse(&format!("cas:b3-{hash}"))?;
-    let rest_path = site.environment.join(rest_file_name(&original));
     // Invariant 4: the substitute always points at a readable rest file.
-    materialize(bytes, &rest_path)?;
+    let Tee {
+        original,
+        rest_path,
+    } = tee(bytes, site)?;
     let hint = hint_line(original_len, &rest_path, &original);
     let hint_len = u64::try_from(hint.len())
         .map_err(|_| AxError::failure(AxCode::InvalidArgs, "offload result", "hint exceeds u64"))?;

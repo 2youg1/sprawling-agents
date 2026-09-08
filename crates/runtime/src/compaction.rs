@@ -211,8 +211,8 @@ fn ends(text: &str, limit: usize) -> String {
 }
 
 /// The largest character boundary at or before `at`. Cutting anywhere
-/// else produces bytes that are not text.
-fn boundary_before(text: &str, at: usize) -> usize {
+/// else produces bytes that are not text. `sieve` cuts by the same rule.
+pub(crate) fn boundary_before(text: &str, at: usize) -> usize {
     let mut at = at.min(text.len());
     while at > 0 && !text.is_char_boundary(at) {
         at = at.saturating_sub(1);

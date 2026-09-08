@@ -1,0 +1,50 @@
+---
+source: crates/runtime/src/sieve/tests.rs
+expression: stable(&record.text)
+---
+warning: unused variable: `x0`
+ --> src/lib0.rs:10:9
+  |
+10 |     let x0 = 1;
+  |         ^^ help: if this is intentional, prefix it with an underscore
+  |
+warning: unused variable: `x1`
+ --> src/lib1.rs:11:9
+  |
+11 |     let x1 = 1;
+  |         ^^ help: if this is intentional, prefix it with an underscore
+  |
+warning: unused variable: `x2`
+ --> src/lib2.rs:12:9
+  |
+12 |     let x2 = 1;
+  |         ^^ help: if this is intentional, prefix it with an underscore
+  |
+warning: unused variable: `x3`
+ --> src/lib3.rs:13:9
+  |
+13 |     let x3 = 1;
+  |         ^^ help: if this is intentional, prefix it with an underscore
+  |
+warning: unused variable: `x4`
+ --> src/lib4.rs:14:9
+  |
+14 |     let x4 = 1;
+  |         ^^ help: if this is intentional, prefix it with an underscore
+  |
+warning: unused variable: `x5`
+ --> src/lib5.rs:15:9
+  |
+15 |     let x5 = 1;
+  |         ^^ help: if this is intentional, prefix it with an underscore
+  |
+error[E0308]: mismatched types
+ --> src/main.rs:12:5
+  |
+12 |     1
+  |     ^ expected `&str`, found integer
+
+error: could not compile `app` (bin "app") due to 1 previous error; 6 warnings emitted
+see https://doc.rust-lang.org/error_codes/E0308.html
+
+[sieve: 208 → 45 lines, 7.0 KiB → 1.1 KiB, filter=cargo, rest at <rest>]

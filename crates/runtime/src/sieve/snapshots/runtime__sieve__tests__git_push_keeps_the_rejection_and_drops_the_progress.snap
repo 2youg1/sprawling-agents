@@ -1,0 +1,10 @@
+---
+source: crates/runtime/src/sieve/tests.rs
+expression: stable(&record.text)
+---
+remote: error: GH006: Protected branch update failed for refs/heads/main.
+remote: error: Required status check "ci" is expected.
+To github.com:2youg1/sprawling.git
+ ! [remote rejected] main -> main (protected branch hook declined)
+error: failed to push some refs to 'github.com:2youg1/sprawling.git'
+[sieve: 206 → 5 lines, 19.2 KiB → 299 B, filter=git, rest at <rest>]

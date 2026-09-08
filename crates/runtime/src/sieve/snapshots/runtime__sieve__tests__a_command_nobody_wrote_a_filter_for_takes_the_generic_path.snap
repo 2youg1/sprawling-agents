@@ -1,0 +1,7 @@
+---
+source: crates/runtime/src/sieve/tests.rs
+expression: stable(&record.text)
+---
+-rw-r--r-- 1 user user 0 Jan 1 00:00 file_000.txt [×400 similar lines]
+total 400
+[sieve: 401 → 2 lines, 20.6 KiB → 81 B, filter=generic, rest at <rest>]

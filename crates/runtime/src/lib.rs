@@ -6,6 +6,7 @@
 //! Turn loop and tool surface: frozen prefix, handoff, replay/fork,
 //! result pipeline, sandbox ladder.
 
+pub mod backlog;
 pub mod catalog;
 pub mod clock;
 pub mod compaction;
@@ -20,17 +21,20 @@ pub mod prefix;
 pub mod redact;
 pub mod replay;
 pub mod run;
+pub mod sieve;
 pub mod tools;
 
+pub use backlog::{Backlog, BacklogId, Finished, Standing, Started};
 pub use tools::ChildStatus;
 pub use tools::EditTool;
-pub use tools::ExecTool;
 pub use tools::ProviderMode;
 pub use tools::ReadTool;
+pub use tools::SearchTool;
 pub use tools::StatusSnapshot;
 pub use tools::StatusTool;
 pub use tools::parse_arm;
 pub use tools::version_of;
+pub use tools::{ExecSetup, ExecTool};
 
 pub mod bench;
 mod sandbox;
@@ -62,11 +66,12 @@ pub use digest::{digest_once, structure_of};
 pub use handoff::{Handoff, ResumeSeed, resume};
 pub use mode::{Admission, Mode, Produced, admits};
 pub use offload::{OffloadRecord, OffloadSite, offload, rematerialize};
-pub use pipeline::{PackContext, Packaged, package};
+pub use pipeline::{PackContext, Packaged, SieveRequest, package};
 pub use prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
 pub use prefix::{PrefixPlan, SegmentCaps, SourceDoc, build_prefix};
 pub use replay::{VerifiedLedger, VerifiedLine};
 pub use run::{Advance, Run, RunHooks, RunPlan, SafePoint, drive};
+pub use sieve::{CommandKey, FilterTable, SieveHistory, SieveRecord, Sieved, sieve};
 pub use turn::{Interrupt, PhaseOutcome, Turn, TurnCancelled, TurnReport};
 pub use watchdog::{Disposal, FreezeReason, Watchdog};
 pub use window::Opening;

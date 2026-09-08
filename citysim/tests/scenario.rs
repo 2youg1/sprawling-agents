@@ -110,6 +110,7 @@ fn scenario(cancel: Option<CancelPoint>) -> Scenario {
         cancel,
         steer: None,
         budget_turns: 8,
+        sieve: None,
     }
 }
 
@@ -448,6 +449,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
         cancel: None,
         steer: None,
         budget_turns: 8,
+        sieve: None,
     };
     let report = run_scenario(scenario).unwrap();
 

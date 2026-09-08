@@ -112,6 +112,7 @@ fn two_wave_scenario(cancel: Option<CancelPoint>, steer: Option<(u32, String)>) 
         cancel,
         steer,
         budget_turns: 8,
+        sieve: None,
     }
 }
 

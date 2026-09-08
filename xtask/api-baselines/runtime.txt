@@ -9,6 +9,8 @@
 #[non_exhaustive] pub enum runtime::tools::ProviderMode
 #[non_exhaustive] pub enum runtime::turn::Interrupt
 impl core::fmt::Debug for runtime::diagnostics::Diagnostics
+impl core::fmt::Display for runtime::backlog::BacklogId
+impl core::fmt::Display for runtime::backlog::BacklogId
 impl core::fmt::Display for runtime::diagnostics::Level
 impl kernel::tool::Tool for runtime::EditTool
 impl kernel::tool::Tool for runtime::EditTool
@@ -16,6 +18,8 @@ impl kernel::tool::Tool for runtime::ExecTool
 impl kernel::tool::Tool for runtime::ExecTool
 impl kernel::tool::Tool for runtime::ReadTool
 impl kernel::tool::Tool for runtime::ReadTool
+impl kernel::tool::Tool for runtime::SearchTool
+impl kernel::tool::Tool for runtime::SearchTool
 impl kernel::tool::Tool for runtime::StatusTool
 impl kernel::tool::Tool for runtime::StatusTool
 impl runtime::EchoSandbox
@@ -34,6 +38,8 @@ impl runtime::Sandbox for runtime::EchoSandbox
 impl runtime::Sandbox for runtime::EchoSandbox
 impl runtime::Sandbox for runtime::FaultSandbox
 impl runtime::Sandbox for runtime::FaultSandbox
+impl runtime::SearchTool
+impl runtime::SearchTool
 impl runtime::StatusSnapshot
 impl runtime::StatusSnapshot
 impl runtime::StatusTool
@@ -43,6 +49,8 @@ impl runtime::TurnCancelled
 impl runtime::TurnReport
 impl runtime::TurnReport
 impl runtime::Watchdog
+impl runtime::backlog::Backlog
+impl runtime::backlog::Backlog
 impl runtime::bench::ToolBench
 impl runtime::catalog::Catalog
 impl runtime::catalog::Catalog
@@ -74,6 +82,18 @@ impl runtime::run::Run<runtime::run::Active>
 impl runtime::run::Run<runtime::run::Active>
 impl runtime::run::Run<runtime::run::Frozen>
 impl runtime::run::Run<runtime::run::Frozen>
+impl runtime::sieve::diff::SieveHistory
+impl runtime::sieve::diff::SieveHistory
+impl runtime::sieve::diff::SieveHistory
+impl runtime::sieve::filter::FilterTable
+impl runtime::sieve::filter::FilterTable
+impl runtime::sieve::filter::FilterTable
+impl runtime::sieve::key::CommandKey
+impl runtime::sieve::key::CommandKey
+impl runtime::sieve::key::CommandKey
+impl runtime::sieve::record::SieveRecord
+impl runtime::sieve::record::SieveRecord
+impl runtime::sieve::record::SieveRecord
 impl runtime::turn::Turn<runtime::turn::Assembling>
 impl runtime::turn::Turn<runtime::turn::Assembling>
 impl runtime::turn::Turn<runtime::turn::Calling>
@@ -87,6 +107,11 @@ pub const runtime::diagnostics::Level::ALL: [runtime::diagnostics::Level; 5]
 pub const runtime::diagnostics::Level::DEFAULT: runtime::diagnostics::Level
 pub const runtime::diagnostics::REDACTED: &str
 pub const runtime::mode::DEV_ENTRY: &str
+pub const runtime::sieve::HEAD_LINES: usize
+pub const runtime::sieve::MAX_TOTAL_LINES: usize
+pub const runtime::sieve::MIDDLE_LINES: usize
+pub const runtime::sieve::SIEVE_FLOOR: usize
+pub const runtime::sieve::TAIL_LINES: usize
 pub enum runtime::Admission
 pub enum runtime::Advance
 pub enum runtime::BreakerVerdict
@@ -97,7 +122,10 @@ pub enum runtime::FreezeReason
 pub enum runtime::Opening
 pub enum runtime::PhaseOutcome<Next>
 pub enum runtime::SegmentSlot
+pub enum runtime::Sieved
+pub enum runtime::Started
 pub enum runtime::VerifiedLine
+pub enum runtime::backlog::Started
 pub enum runtime::bench::BenchOutcome
 pub enum runtime::catalog::Expansion
 pub enum runtime::compaction::Content
@@ -108,6 +136,14 @@ pub enum runtime::mode::Admission
 pub enum runtime::prefix::SegmentSlot
 pub enum runtime::replay::VerifiedLine
 pub enum runtime::run::Advance
+pub enum runtime::sieve::PassReason
+pub enum runtime::sieve::Sieved
+pub enum runtime::sieve::Stage
+pub enum runtime::sieve::StageOutcome
+pub enum runtime::sieve::record::PassReason
+pub enum runtime::sieve::record::Sieved
+pub enum runtime::sieve::record::Stage
+pub enum runtime::sieve::record::StageOutcome
 pub enum runtime::turn::PhaseOutcome<Next>
 pub enum runtime::window::Opening
 pub fn runtime::AbsentSandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>
@@ -126,8 +162,8 @@ pub fn runtime::ExecTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::re
 pub fn runtime::ExecTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::ExecTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::ExecTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn runtime::ExecTool::new(std::path::PathBuf, alloc::vec::Vec<runtime::Mount>, core::option::Option<std::path::PathBuf>, alloc::boxed::Box<dyn runtime::Sandbox>, core::option::Option<std::path::PathBuf>, runtime::Fuel, kernel::address::Address) -> core::result::Result<runtime::ExecTool, kernel::error::shape::AxError>
-pub fn runtime::ExecTool::new(std::path::PathBuf, alloc::vec::Vec<runtime::Mount>, core::option::Option<std::path::PathBuf>, alloc::boxed::Box<dyn runtime::Sandbox>, core::option::Option<std::path::PathBuf>, runtime::Fuel, kernel::address::Address) -> core::result::Result<runtime::ExecTool, kernel::error::shape::AxError>
+pub fn runtime::ExecTool::new(runtime::ExecSetup, alloc::boxed::Box<dyn runtime::Sandbox>, runtime::backlog::Backlog) -> core::result::Result<runtime::ExecTool, kernel::error::shape::AxError>
+pub fn runtime::ExecTool::new(runtime::ExecSetup, alloc::boxed::Box<dyn runtime::Sandbox>, runtime::backlog::Backlog) -> core::result::Result<runtime::ExecTool, kernel::error::shape::AxError>
 pub fn runtime::FaultSandbox::new(alloc::vec::Vec<runtime::SandboxExit>) -> runtime::FaultSandbox
 pub fn runtime::FaultSandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>
 pub fn runtime::FaultSandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>
@@ -140,6 +176,12 @@ pub fn runtime::ReadTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::ReadTool::new(&std::path::Path, alloc::rc::Rc<core::cell::RefCell<runtime::catalog::Catalog>>) -> core::result::Result<runtime::ReadTool, kernel::error::shape::AxError>
 pub fn runtime::ReadTool::new(&std::path::Path, alloc::rc::Rc<core::cell::RefCell<runtime::catalog::Catalog>>) -> core::result::Result<runtime::ReadTool, kernel::error::shape::AxError>
 pub fn runtime::Sandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>
+pub fn runtime::SearchTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
+pub fn runtime::SearchTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
+pub fn runtime::SearchTool::meta(&self) -> &kernel::tool::ToolMeta
+pub fn runtime::SearchTool::meta(&self) -> &kernel::tool::ToolMeta
+pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
+pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
 pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus]) -> alloc::string::String
 pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus]) -> alloc::string::String
 pub fn runtime::StatusTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
@@ -169,6 +211,18 @@ pub fn runtime::Watchdog::new() -> runtime::Watchdog
 pub fn runtime::Watchdog::on_provider_failure(&mut self) -> runtime::Disposal
 pub fn runtime::Watchdog::on_stall(&mut self, &kernel::stall::StallVerdict) -> runtime::Disposal
 pub fn runtime::admits(runtime::mode::Mode, &runtime::mode::Produced) -> runtime::mode::Admission
+pub fn runtime::backlog::Backlog::halt(&self, core::option::Option<&kernel::address::Address>) -> core::result::Result<usize, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::halt(&self, core::option::Option<&kernel::address::Address>) -> core::result::Result<usize, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::harvest(&self) -> core::result::Result<alloc::vec::Vec<runtime::backlog::Finished>, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::harvest(&self) -> core::result::Result<alloc::vec::Vec<runtime::backlog::Finished>, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::new() -> runtime::backlog::Backlog
+pub fn runtime::backlog::Backlog::new() -> runtime::backlog::Backlog
+pub fn runtime::backlog::Backlog::run(&self, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::backlog::Started, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::run(&self, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::backlog::Started, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::standing(&self, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<runtime::backlog::Standing>, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::standing(&self, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<runtime::backlog::Standing>, kernel::error::shape::AxError>
+pub fn runtime::backlog::BacklogId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn runtime::backlog::BacklogId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn runtime::bench::ToolBench::for_job(self, kernel::address::Address, kernel::locator::Locator) -> runtime::bench::ToolBench
 pub fn runtime::bench::ToolBench::grant(&mut self, kernel::approval::ClusterKey)
 pub fn runtime::bench::ToolBench::invoke(&mut self, &kernel::tool::ToolCall, &kernel::idem::IdemKey, &kernel::gate::GateContext) -> core::result::Result<runtime::bench::BenchOutcome, kernel::error::shape::AxError>
@@ -176,7 +230,7 @@ pub fn runtime::bench::ToolBench::meta_of(&self, &str) -> core::option::Option<&
 pub fn runtime::bench::ToolBench::new(kernel::write_domain::WriteDomain) -> runtime::bench::ToolBench
 pub fn runtime::bench::ToolBench::register(&mut self, alloc::boxed::Box<dyn kernel::tool::Tool>) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn runtime::bench::ToolBench::taint_mut(&mut self) -> &mut kernel::taint::TaintSet
-pub fn runtime::bench::ToolBench::with_checkpoint(self, memory::checkpoint::fence::Checkpoint, &str) -> runtime::bench::ToolBench
+pub fn runtime::bench::ToolBench::with_checkpoint(self, runtime::bench::CheckpointNet) -> runtime::bench::ToolBench
 pub fn runtime::build_prefix(runtime::prefix::PrefixPlan) -> core::result::Result<runtime::prefix::FrozenPrefix, kernel::error::shape::AxError>
 pub fn runtime::catalog::Catalog::admit_skill(&mut self, runtime::catalog::CatalogEntry) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn runtime::catalog::Catalog::admit_skill(&mut self, runtime::catalog::CatalogEntry) -> core::result::Result<(), kernel::error::shape::AxError>
@@ -326,6 +380,38 @@ pub fn runtime::run::Run<runtime::run::Frozen>::run_id(&self) -> kernel::event::
 pub fn runtime::run::Run<runtime::run::Frozen>::turns(&self) -> u32
 pub fn runtime::run::Run<runtime::run::Frozen>::turns(&self) -> u32
 pub fn runtime::run::drive(runtime::run::RunPlan, &mut dyn kernel::ledger::Ledger, &mut dyn kernel::model::Model, &mut runtime::run::RunHooks<'_>, &runtime::handoff::Handoff) -> core::result::Result<runtime::run::Run<runtime::run::Frozen>, kernel::error::shape::AxError>
+pub fn runtime::sieve(runtime::sieve::SieveInput<'_>, &runtime::sieve::filter::FilterTable, &mut runtime::offload::OffloadSite<'_>, &mut runtime::sieve::diff::SieveHistory) -> core::result::Result<runtime::sieve::record::Sieved, kernel::error::shape::AxError>
+pub fn runtime::sieve::diff::SieveHistory::previous(&self, &runtime::sieve::key::CommandKey) -> core::option::Option<&kernel::locator::Locator>
+pub fn runtime::sieve::diff::SieveHistory::previous(&self, &runtime::sieve::key::CommandKey) -> core::option::Option<&kernel::locator::Locator>
+pub fn runtime::sieve::diff::SieveHistory::previous(&self, &runtime::sieve::key::CommandKey) -> core::option::Option<&kernel::locator::Locator>
+pub fn runtime::sieve::diff::SieveHistory::record(&mut self, runtime::sieve::key::CommandKey, kernel::locator::Locator)
+pub fn runtime::sieve::diff::SieveHistory::record(&mut self, runtime::sieve::key::CommandKey, kernel::locator::Locator)
+pub fn runtime::sieve::diff::SieveHistory::record(&mut self, runtime::sieve::key::CommandKey, kernel::locator::Locator)
+pub fn runtime::sieve::filter::FilterTable::builtin() -> runtime::sieve::filter::FilterTable
+pub fn runtime::sieve::filter::FilterTable::builtin() -> runtime::sieve::filter::FilterTable
+pub fn runtime::sieve::filter::FilterTable::builtin() -> runtime::sieve::filter::FilterTable
+pub fn runtime::sieve::filter::FilterTable::lookup(&self, &runtime::sieve::key::CommandKey) -> &runtime::sieve::filter::Filter
+pub fn runtime::sieve::filter::FilterTable::lookup(&self, &runtime::sieve::key::CommandKey) -> &runtime::sieve::filter::Filter
+pub fn runtime::sieve::filter::FilterTable::lookup(&self, &runtime::sieve::key::CommandKey) -> &runtime::sieve::filter::Filter
+pub fn runtime::sieve::filter::FilterTable::parse(&str) -> core::result::Result<runtime::sieve::filter::FilterTable, kernel::error::shape::AxError>
+pub fn runtime::sieve::filter::FilterTable::parse(&str) -> core::result::Result<runtime::sieve::filter::FilterTable, kernel::error::shape::AxError>
+pub fn runtime::sieve::filter::FilterTable::parse(&str) -> core::result::Result<runtime::sieve::filter::FilterTable, kernel::error::shape::AxError>
+pub fn runtime::sieve::filter::FilterTable::resolve(core::option::Option<&str>, core::option::Option<&str>) -> core::result::Result<runtime::sieve::filter::FilterTable, kernel::error::shape::AxError>
+pub fn runtime::sieve::filter::FilterTable::resolve(core::option::Option<&str>, core::option::Option<&str>) -> core::result::Result<runtime::sieve::filter::FilterTable, kernel::error::shape::AxError>
+pub fn runtime::sieve::filter::FilterTable::resolve(core::option::Option<&str>, core::option::Option<&str>) -> core::result::Result<runtime::sieve::filter::FilterTable, kernel::error::shape::AxError>
+pub fn runtime::sieve::key::CommandKey::command(&self) -> alloc::string::String
+pub fn runtime::sieve::key::CommandKey::command(&self) -> alloc::string::String
+pub fn runtime::sieve::key::CommandKey::command(&self) -> alloc::string::String
+pub fn runtime::sieve::key::CommandKey::of(&kernel::tool::ExecArm) -> runtime::sieve::key::CommandKey
+pub fn runtime::sieve::key::CommandKey::of(&kernel::tool::ExecArm) -> runtime::sieve::key::CommandKey
+pub fn runtime::sieve::key::CommandKey::of(&kernel::tool::ExecArm) -> runtime::sieve::key::CommandKey
+pub fn runtime::sieve::key::CommandKey::subcommand(&self) -> core::option::Option<&str>
+pub fn runtime::sieve::key::CommandKey::subcommand(&self) -> core::option::Option<&str>
+pub fn runtime::sieve::key::CommandKey::subcommand(&self) -> core::option::Option<&str>
+pub fn runtime::sieve::record::SieveRecord::payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn runtime::sieve::record::SieveRecord::payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn runtime::sieve::record::SieveRecord::payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn runtime::sieve::sieve(runtime::sieve::SieveInput<'_>, &runtime::sieve::filter::FilterTable, &mut runtime::offload::OffloadSite<'_>, &mut runtime::sieve::diff::SieveHistory) -> core::result::Result<runtime::sieve::record::Sieved, kernel::error::shape::AxError>
 pub fn runtime::stamp(kernel::event::identity::TimeMs, &[kernel::config::ClockZone]) -> core::result::Result<runtime::clock::ClockStamp, kernel::error::shape::AxError>
 pub fn runtime::structure_of(&str) -> alloc::vec::Vec<runtime::digest::StructureNode>
 pub fn runtime::tools::parse_arm(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> core::result::Result<kernel::tool::ExecArm, kernel::error::shape::AxError>
@@ -348,6 +434,7 @@ pub fn runtime::window::Window::push_steer(&mut self, &str, &str)
 pub fn runtime::window::Window::push_task_lines(&mut self, &str, &str, runtime::window::Opening)
 pub fn runtime::window::Window::push_tool_results(&mut self, alloc::vec::Vec<kernel::model::wire::ContentBlock>)
 pub mod runtime
+pub mod runtime::backlog
 pub mod runtime::bench
 pub mod runtime::catalog
 pub mod runtime::clock
@@ -363,6 +450,11 @@ pub mod runtime::prefix
 pub mod runtime::redact
 pub mod runtime::replay
 pub mod runtime::run
+pub mod runtime::sieve
+pub mod runtime::sieve::diff
+pub mod runtime::sieve::filter
+pub mod runtime::sieve::key
+pub mod runtime::sieve::record
 pub mod runtime::tools
 pub mod runtime::turn
 pub mod runtime::window
@@ -394,10 +486,22 @@ pub runtime::Disposal::Freeze
 pub runtime::Disposal::Freeze::reason: runtime::FreezeReason
 pub runtime::Disposal::Proceed
 pub runtime::EchoSandbox::seen: alloc::vec::Vec<runtime::SandboxJob>
+pub runtime::ExecSetup::domain: kernel::address::Address
+pub runtime::ExecSetup::env_passthrough: alloc::vec::Vec<kernel::config::EnvVarName>
+pub runtime::ExecSetup::fuel: runtime::Fuel
+pub runtime::ExecSetup::mounts: alloc::vec::Vec<runtime::Mount>
+pub runtime::ExecSetup::python_wasm: core::option::Option<std::path::PathBuf>
+pub runtime::ExecSetup::shell: core::option::Option<std::path::PathBuf>
+pub runtime::ExecSetup::workdir: std::path::PathBuf
 pub runtime::Expansion::Said
 pub runtime::Expansion::Said::text: alloc::string::String
 pub runtime::Expansion::Skill
 pub runtime::Expansion::Skill::addr: alloc::string::String
+pub runtime::Finished::exit_code: i64
+pub runtime::Finished::id: runtime::backlog::BacklogId
+pub runtime::Finished::stderr: alloc::string::String
+pub runtime::Finished::stdout: alloc::string::String
+pub runtime::Finished::what: alloc::string::String
 pub runtime::FreezeReason::ProviderExhausted
 pub runtime::FreezeReason::Stall
 pub runtime::Interrupt::Cancel
@@ -424,6 +528,7 @@ pub runtime::Opening::WithPerson
 pub runtime::PackContext::cap_bytes: u64
 pub runtime::PackContext::net_notice: bool
 pub runtime::PackContext::offload: core::option::Option<runtime::offload::OffloadSite<'a>>
+pub runtime::PackContext::sieve: core::option::Option<runtime::pipeline::SieveRequest<'a>>
 pub runtime::PackContext::stamp: core::option::Option<runtime::clock::ClockStamp>
 pub runtime::PackContext::steer: core::option::Option<(alloc::string::String, alloc::string::String)>
 pub runtime::Packaged::content: alloc::string::String
@@ -495,10 +600,37 @@ pub runtime::SegmentSlot::Building
 pub runtime::SegmentSlot::City
 pub runtime::SegmentSlot::Resident
 pub runtime::SegmentSlot::Run
+pub runtime::SieveRecord::bytes_in: u64
+pub runtime::SieveRecord::bytes_out: u64
+pub runtime::SieveRecord::filter: alloc::string::String
+pub runtime::SieveRecord::lines_in: u64
+pub runtime::SieveRecord::lines_out: u64
+pub runtime::SieveRecord::original: kernel::locator::Locator
+pub runtime::SieveRecord::rest_path: std::path::PathBuf
+pub runtime::SieveRecord::stages: alloc::vec::Vec<runtime::sieve::record::StageReport>
+pub runtime::SieveRecord::text: alloc::string::String
+pub runtime::SieveRequest::exit_code: core::option::Option<i64>
+pub runtime::SieveRequest::history: &'a mut runtime::sieve::diff::SieveHistory
+pub runtime::SieveRequest::key: runtime::sieve::key::CommandKey
+pub runtime::SieveRequest::table: &'a runtime::sieve::filter::FilterTable
+pub runtime::Sieved::Cut(runtime::sieve::record::SieveRecord)
+pub runtime::Sieved::Passed
+pub runtime::Sieved::Passed::reason: runtime::sieve::record::PassReason
+pub runtime::Sieved::Passed::text: alloc::string::String
 pub runtime::SkillPin::hash: kernel::locator::B3Hash
 pub runtime::SkillPin::name: alloc::string::String
 pub runtime::SourceDoc::addr: kernel::address::Address
 pub runtime::SourceDoc::bytes: core::option::Option<alloc::vec::Vec<u8>>
+pub runtime::Standing::id: runtime::backlog::BacklogId
+pub runtime::Standing::scope: kernel::address::Address
+pub runtime::Standing::what: alloc::string::String
+pub runtime::Started::Backgrounded
+pub runtime::Started::Backgrounded::id: runtime::backlog::BacklogId
+pub runtime::Started::Backgrounded::what: alloc::string::String
+pub runtime::Started::Settled
+pub runtime::Started::Settled::exit_code: i64
+pub runtime::Started::Settled::stderr: alloc::string::String
+pub runtime::Started::Settled::stdout: alloc::string::String
 pub runtime::StatusSnapshot::addr: kernel::address::Address
 pub runtime::StatusSnapshot::budget_tokens: kernel::budget::Tokens
 pub runtime::StatusSnapshot::budget_usd: kernel::budget::UsdMicros
@@ -527,6 +659,21 @@ pub runtime::VerifiedLine::Known::record: kernel::event::payload::EventRecord
 pub runtime::ZoneEntry::id: alloc::string::String
 pub runtime::ZoneEntry::local: alloc::string::String
 pub runtime::ZoneEntry::offset_min: i32
+pub runtime::backlog::Finished::exit_code: i64
+pub runtime::backlog::Finished::id: runtime::backlog::BacklogId
+pub runtime::backlog::Finished::stderr: alloc::string::String
+pub runtime::backlog::Finished::stdout: alloc::string::String
+pub runtime::backlog::Finished::what: alloc::string::String
+pub runtime::backlog::Standing::id: runtime::backlog::BacklogId
+pub runtime::backlog::Standing::scope: kernel::address::Address
+pub runtime::backlog::Standing::what: alloc::string::String
+pub runtime::backlog::Started::Backgrounded
+pub runtime::backlog::Started::Backgrounded::id: runtime::backlog::BacklogId
+pub runtime::backlog::Started::Backgrounded::what: alloc::string::String
+pub runtime::backlog::Started::Settled
+pub runtime::backlog::Started::Settled::exit_code: i64
+pub runtime::backlog::Started::Settled::stderr: alloc::string::String
+pub runtime::backlog::Started::Settled::stdout: alloc::string::String
 pub runtime::bench::BenchOutcome::Duplicate
 pub runtime::bench::BenchOutcome::Pending
 pub runtime::bench::BenchOutcome::Pending::item: alloc::boxed::Box<kernel::approval::ApprovalItem>
@@ -535,6 +682,9 @@ pub runtime::bench::BenchOutcome::Ran::fenced: core::option::Option<alloc::strin
 pub runtime::bench::BenchOutcome::Ran::outcome: kernel::tool::ToolOutcome
 pub runtime::bench::BenchOutcome::Refused
 pub runtime::bench::BenchOutcome::Refused::refusal: alloc::boxed::Box<kernel::error::shape::AxError>
+pub runtime::bench::CheckpointNet::checkpoint: memory::checkpoint::fence::Checkpoint
+pub runtime::bench::CheckpointNet::of: memory::checkpoint::provenance::Provenance
+pub runtime::bench::CheckpointNet::scope: alloc::string::String
 pub runtime::catalog::CatalogEntry::disclosure: alloc::string::String
 pub runtime::catalog::CatalogEntry::expansion: alloc::string::String
 pub runtime::catalog::CatalogEntry::hash: core::option::Option<kernel::locator::B3Hash>
@@ -606,10 +756,15 @@ pub runtime::offload::OffloadSite::environment: &'a std::path::Path
 pub runtime::pipeline::PackContext::cap_bytes: u64
 pub runtime::pipeline::PackContext::net_notice: bool
 pub runtime::pipeline::PackContext::offload: core::option::Option<runtime::offload::OffloadSite<'a>>
+pub runtime::pipeline::PackContext::sieve: core::option::Option<runtime::pipeline::SieveRequest<'a>>
 pub runtime::pipeline::PackContext::stamp: core::option::Option<runtime::clock::ClockStamp>
 pub runtime::pipeline::PackContext::steer: core::option::Option<(alloc::string::String, alloc::string::String)>
 pub runtime::pipeline::Packaged::content: alloc::string::String
 pub runtime::pipeline::Packaged::events: alloc::vec::Vec<kernel::event::payload::Payload>
+pub runtime::pipeline::SieveRequest::exit_code: core::option::Option<i64>
+pub runtime::pipeline::SieveRequest::history: &'a mut runtime::sieve::diff::SieveHistory
+pub runtime::pipeline::SieveRequest::key: runtime::sieve::key::CommandKey
+pub runtime::pipeline::SieveRequest::table: &'a runtime::sieve::filter::FilterTable
 pub runtime::prefix::PrefixPlan::building: alloc::vec::Vec<runtime::prefix::SourceDoc>
 pub runtime::prefix::PrefixPlan::caps: runtime::prefix::SegmentCaps
 pub runtime::prefix::PrefixPlan::city: alloc::vec::Vec<runtime::prefix::SourceDoc>
@@ -660,8 +815,110 @@ pub runtime::run::SafePoint::BeforeSpawn
 pub runtime::run::SafePoint::BeforeSpawn::turn: u32
 pub runtime::run::SafePoint::BeforeWave
 pub runtime::run::SafePoint::BeforeWave::turn: u32
+pub runtime::sieve::Filter::command: alloc::string::String
+pub runtime::sieve::Filter::drop_contains: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::Filter::drop_prefix: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::Filter::drop_suffix: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::Filter::group_until_blank: bool
+pub runtime::sieve::Filter::head: core::option::Option<u64>
+pub runtime::sieve::Filter::id: alloc::string::String
+pub runtime::sieve::Filter::keep_contains: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::Filter::keep_prefix: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::Filter::keep_suffix: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::Filter::on_empty: core::option::Option<alloc::string::String>
+pub runtime::sieve::Filter::strip_ansi: bool
+pub runtime::sieve::Filter::subcommands: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::Filter::tail: core::option::Option<u64>
+pub runtime::sieve::PassReason::BelowFloor
+pub runtime::sieve::PassReason::NothingShrank
+pub runtime::sieve::SieveInput::exit_code: core::option::Option<i64>
+pub runtime::sieve::SieveInput::key: &'a runtime::sieve::key::CommandKey
+pub runtime::sieve::SieveInput::text: &'a str
+pub runtime::sieve::SieveRecord::bytes_in: u64
+pub runtime::sieve::SieveRecord::bytes_out: u64
+pub runtime::sieve::SieveRecord::filter: alloc::string::String
+pub runtime::sieve::SieveRecord::lines_in: u64
+pub runtime::sieve::SieveRecord::lines_out: u64
+pub runtime::sieve::SieveRecord::original: kernel::locator::Locator
+pub runtime::sieve::SieveRecord::rest_path: std::path::PathBuf
+pub runtime::sieve::SieveRecord::stages: alloc::vec::Vec<runtime::sieve::record::StageReport>
+pub runtime::sieve::SieveRecord::text: alloc::string::String
+pub runtime::sieve::Sieved::Cut(runtime::sieve::record::SieveRecord)
+pub runtime::sieve::Sieved::Passed
+pub runtime::sieve::Sieved::Passed::reason: runtime::sieve::record::PassReason
+pub runtime::sieve::Sieved::Passed::text: alloc::string::String
+pub runtime::sieve::Stage::CutLongLine
+pub runtime::sieve::Stage::DedupTemplate
+pub runtime::sieve::Stage::DiffPrevious
+pub runtime::sieve::Stage::Filter
+pub runtime::sieve::Stage::FoldBlank
+pub runtime::sieve::Stage::StripAnsi
+pub runtime::sieve::Stage::Truncate
+pub runtime::sieve::StageOutcome::Applied
+pub runtime::sieve::StageOutcome::Applied::bytes_after: u64
+pub runtime::sieve::StageOutcome::Applied::bytes_before: u64
+pub runtime::sieve::StageOutcome::Noop
+pub runtime::sieve::StageOutcome::Rejected
+pub runtime::sieve::StageOutcome::Rejected::grew_to: u64
+pub runtime::sieve::StageOutcome::Unavailable
+pub runtime::sieve::StageOutcome::Unavailable::reason: alloc::string::String
+pub runtime::sieve::StageReport::outcome: runtime::sieve::record::StageOutcome
+pub runtime::sieve::StageReport::stage: runtime::sieve::record::Stage
+pub runtime::sieve::filter::Filter::command: alloc::string::String
+pub runtime::sieve::filter::Filter::drop_contains: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::filter::Filter::drop_prefix: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::filter::Filter::drop_suffix: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::filter::Filter::group_until_blank: bool
+pub runtime::sieve::filter::Filter::head: core::option::Option<u64>
+pub runtime::sieve::filter::Filter::id: alloc::string::String
+pub runtime::sieve::filter::Filter::keep_contains: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::filter::Filter::keep_prefix: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::filter::Filter::keep_suffix: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::filter::Filter::on_empty: core::option::Option<alloc::string::String>
+pub runtime::sieve::filter::Filter::strip_ansi: bool
+pub runtime::sieve::filter::Filter::subcommands: alloc::vec::Vec<alloc::string::String>
+pub runtime::sieve::filter::Filter::tail: core::option::Option<u64>
+pub runtime::sieve::record::PassReason::BelowFloor
+pub runtime::sieve::record::PassReason::NothingShrank
+pub runtime::sieve::record::SieveRecord::bytes_in: u64
+pub runtime::sieve::record::SieveRecord::bytes_out: u64
+pub runtime::sieve::record::SieveRecord::filter: alloc::string::String
+pub runtime::sieve::record::SieveRecord::lines_in: u64
+pub runtime::sieve::record::SieveRecord::lines_out: u64
+pub runtime::sieve::record::SieveRecord::original: kernel::locator::Locator
+pub runtime::sieve::record::SieveRecord::rest_path: std::path::PathBuf
+pub runtime::sieve::record::SieveRecord::stages: alloc::vec::Vec<runtime::sieve::record::StageReport>
+pub runtime::sieve::record::SieveRecord::text: alloc::string::String
+pub runtime::sieve::record::Sieved::Cut(runtime::sieve::record::SieveRecord)
+pub runtime::sieve::record::Sieved::Passed
+pub runtime::sieve::record::Sieved::Passed::reason: runtime::sieve::record::PassReason
+pub runtime::sieve::record::Sieved::Passed::text: alloc::string::String
+pub runtime::sieve::record::Stage::CutLongLine
+pub runtime::sieve::record::Stage::DedupTemplate
+pub runtime::sieve::record::Stage::DiffPrevious
+pub runtime::sieve::record::Stage::Filter
+pub runtime::sieve::record::Stage::FoldBlank
+pub runtime::sieve::record::Stage::StripAnsi
+pub runtime::sieve::record::Stage::Truncate
+pub runtime::sieve::record::StageOutcome::Applied
+pub runtime::sieve::record::StageOutcome::Applied::bytes_after: u64
+pub runtime::sieve::record::StageOutcome::Applied::bytes_before: u64
+pub runtime::sieve::record::StageOutcome::Noop
+pub runtime::sieve::record::StageOutcome::Rejected
+pub runtime::sieve::record::StageOutcome::Rejected::grew_to: u64
+pub runtime::sieve::record::StageOutcome::Unavailable
+pub runtime::sieve::record::StageOutcome::Unavailable::reason: alloc::string::String
+pub runtime::sieve::record::StageReport::outcome: runtime::sieve::record::StageOutcome
+pub runtime::sieve::record::StageReport::stage: runtime::sieve::record::Stage
 pub runtime::tools::ChildStatus::kind: kernel::delegation::DelegateKind
 pub runtime::tools::ChildStatus::room: kernel::address::Address
+pub runtime::tools::ExecSetup::domain: kernel::address::Address
+pub runtime::tools::ExecSetup::env_passthrough: alloc::vec::Vec<kernel::config::EnvVarName>
+pub runtime::tools::ExecSetup::fuel: runtime::Fuel
+pub runtime::tools::ExecSetup::mounts: alloc::vec::Vec<runtime::Mount>
+pub runtime::tools::ExecSetup::python_wasm: core::option::Option<std::path::PathBuf>
+pub runtime::tools::ExecSetup::shell: core::option::Option<std::path::PathBuf>
+pub runtime::tools::ExecSetup::workdir: std::path::PathBuf
 pub runtime::tools::ProviderMode::Degraded
 pub runtime::tools::ProviderMode::LocalOnly
 pub runtime::tools::ProviderMode::Normal
@@ -694,16 +951,22 @@ pub runtime::turn::PhaseOutcome::Cancelled(runtime::TurnCancelled)
 pub runtime::window::Opening::FromJob
 pub runtime::window::Opening::WithPerson
 pub struct runtime::AbsentSandbox
+pub struct runtime::Backlog
+pub struct runtime::BacklogId(_)
 pub struct runtime::Breaker
 pub struct runtime::Catalog
 pub struct runtime::CatalogEntry
 pub struct runtime::ChildStatus
 pub struct runtime::ClockStamp
+pub struct runtime::CommandKey
 pub struct runtime::Digest
 pub struct runtime::EchoSandbox
 pub struct runtime::EditTool
+pub struct runtime::ExecSetup
 pub struct runtime::ExecTool
 pub struct runtime::FaultSandbox
+pub struct runtime::FilterTable
+pub struct runtime::Finished
 pub struct runtime::FrozenPrefix
 pub struct runtime::FrozenSegment
 pub struct runtime::Fuel(pub u64)
@@ -722,10 +985,15 @@ pub struct runtime::RunHooks<'a>
 pub struct runtime::RunPlan
 pub struct runtime::SandboxJob
 pub struct runtime::SandboxOutcome
+pub struct runtime::SearchTool
 pub struct runtime::SegmentCaps
+pub struct runtime::SieveHistory(_)
+pub struct runtime::SieveRecord
+pub struct runtime::SieveRequest<'a>
 pub struct runtime::SkillPin
 pub struct runtime::SourceDoc
 pub struct runtime::StampGate
+pub struct runtime::Standing
 pub struct runtime::StatusSnapshot
 pub struct runtime::StatusTool
 pub struct runtime::StructureNode
@@ -735,6 +1003,11 @@ pub struct runtime::TurnReport
 pub struct runtime::VerifiedLedger
 pub struct runtime::Watchdog
 pub struct runtime::ZoneEntry
+pub struct runtime::backlog::Backlog
+pub struct runtime::backlog::BacklogId(_)
+pub struct runtime::backlog::Finished
+pub struct runtime::backlog::Standing
+pub struct runtime::bench::CheckpointNet
 pub struct runtime::bench::ToolBench
 pub struct runtime::catalog::Catalog
 pub struct runtime::catalog::CatalogEntry
@@ -754,6 +1027,7 @@ pub struct runtime::offload::OffloadRecord
 pub struct runtime::offload::OffloadSite<'a>
 pub struct runtime::pipeline::PackContext<'a>
 pub struct runtime::pipeline::Packaged
+pub struct runtime::pipeline::SieveRequest<'a>
 pub struct runtime::prefix::FrozenPrefix
 pub struct runtime::prefix::FrozenSegment
 pub struct runtime::prefix::PrefixPlan
@@ -765,10 +1039,25 @@ pub struct runtime::run::Frozen
 pub struct runtime::run::Run<S>
 pub struct runtime::run::RunHooks<'a>
 pub struct runtime::run::RunPlan
+pub struct runtime::sieve::CommandKey
+pub struct runtime::sieve::Filter
+pub struct runtime::sieve::FilterTable
+pub struct runtime::sieve::SieveHistory(_)
+pub struct runtime::sieve::SieveInput<'a>
+pub struct runtime::sieve::SieveRecord
+pub struct runtime::sieve::StageReport
+pub struct runtime::sieve::diff::SieveHistory(_)
+pub struct runtime::sieve::filter::Filter
+pub struct runtime::sieve::filter::FilterTable
+pub struct runtime::sieve::key::CommandKey
+pub struct runtime::sieve::record::SieveRecord
+pub struct runtime::sieve::record::StageReport
 pub struct runtime::tools::ChildStatus
 pub struct runtime::tools::EditTool
+pub struct runtime::tools::ExecSetup
 pub struct runtime::tools::ExecTool
 pub struct runtime::tools::ReadTool
+pub struct runtime::tools::SearchTool
 pub struct runtime::tools::StatusSnapshot
 pub struct runtime::tools::StatusTool
 pub struct runtime::turn::Assembling(_)

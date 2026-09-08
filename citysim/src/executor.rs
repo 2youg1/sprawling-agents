@@ -31,6 +31,7 @@ use serde_json::{Map, Value};
 
 use crate::mem_ledger::MemLedger;
 use crate::script_model::ScriptModel;
+use crate::sieving::{SieveWorld, package_exec};
 
 /// Where the cancel arrives, in boundary vocabulary. Turns count from 0.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,6 +68,9 @@ pub struct Scenario {
     /// that it stops.
     pub steer: Option<(u32, String)>,
     pub budget_turns: u32,
+    /// The sieve's world, when the scenario puts `exec` results through
+    /// it. `None` packages every result the same way, unsieved.
+    pub sieve: Option<SieveWorld>,
 }
 
 pub struct ScenarioReport {
@@ -139,6 +143,7 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
         cancel,
         steer,
         budget_turns,
+        mut sieve,
     } = scenario;
     let mut ledger = MemLedger::new();
     let mut stamps = StampGate::new(config.clock_stamp);
@@ -219,10 +224,15 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
             BenchOutcome::Ran { outcome, .. } => {
                 // The envelope is the caller's to hang: a clock line when
                 // one is due, inside this result's byte budget.
+                let stamp = stamps.observe(t, temporal, &config.clock_zones)?;
+                if let Some(world) = sieve.as_mut()
+                    && call.name.as_str() == "exec"
+                {
+                    return package_exec(call, &outcome, world, stamp);
+                }
                 let bytes = serde_json::to_vec(&outcome.result).map_err(|err| {
                     AxError::failure(AxCode::InvalidArgs, "encode tool result", err.to_string())
                 })?;
-                let stamp = stamps.observe(t, temporal, &config.clock_zones)?;
                 let packaged = pipeline::package(
                     &bytes,
                     pipeline::PackContext {
@@ -231,6 +241,7 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
                         net_notice: false,
                         steer: None,
                         offload: None,
+                        sieve: None,
                     },
                 )?;
                 let mut wrapped = Map::new();
@@ -258,9 +269,20 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
 
     let frozen = match checkpoint.as_mut() {
         Some((net, scope)) => {
-            let fence_who = who.clone();
+            // card-2.1: a fence is signed by the session that raised
+            // it. The scenario has no endpoint, so the model id is the
+            // scripted one and no effort was asked for.
+            let of = memory::Provenance::new(
+                run,
+                addr.clone(),
+                kernel::B3Hash::digest(who.as_bytes()),
+                memory::ModelChoice {
+                    id: "script".to_owned(),
+                    effort: None,
+                },
+            );
             let mut fence = |t: TimeMs| {
-                net.wave_pre(scope, t, &fence_who)
+                net.wave_pre(scope, t, &of)
                     .map_err(memory::MemoryError::into_ax)
             };
             let mut hooks = RunHooks {
