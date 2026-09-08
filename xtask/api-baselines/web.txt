@@ -238,7 +238,7 @@ pub fn web::distinguishable_without_colour() -> bool
 pub fn web::done_band_of(&web::Camera, &web::Prism) -> alloc::vec::Vec<web::Face>
 pub fn web::draw(&web::Camera, alloc::vec::Vec<web::Prism>, core::option::Option<&str>) -> web::DisplayList
 pub fn web::drawable(usize) -> bool
-pub fn web::effort_named(&str) -> core::option::Option<kernel::model::Effort>
+pub fn web::effort_named(&str) -> core::option::Option<kernel::model::wire::Effort>
 pub fn web::endpoint_rows(&channels::answer::EndpointsAnswer) -> alloc::vec::Vec<web::EndpointRow>
 pub fn web::enrol(&str, &str, &str, impl core::ops::function::FnOnce(web::Enrolment) + 'static)
 pub fn web::export(&web::Page) -> alloc::string::String
@@ -401,7 +401,7 @@ pub web::Arrived::Refusal(alloc::boxed::Box<kernel::error::shape::AxError>)
 pub web::Arrived::Saying(channels::wire::Delta)
 pub web::AttachForm::admit: alloc::vec::Vec<alloc::string::String>
 pub web::AttachForm::base_url: alloc::string::String
-pub web::AttachForm::dialect: core::option::Option<kernel::model::DialectKind>
+pub web::AttachForm::dialect: core::option::Option<kernel::model::wire::DialectKind>
 pub web::AttachForm::name: alloc::string::String
 pub web::AttachForm::secret: core::option::Option<alloc::string::String>
 pub web::AttachReadiness::NeedsDialect
@@ -458,7 +458,7 @@ pub web::Dropped::Text(alloc::string::String)
 pub web::Dropped::Unreadable
 pub web::EndpointRow::base_url: alloc::string::String
 pub web::EndpointRow::credential: web::Msg
-pub web::EndpointRow::dialect: kernel::model::DialectKind
+pub web::EndpointRow::dialect: kernel::model::wire::DialectKind
 pub web::EndpointRow::models: alloc::vec::Vec<alloc::string::String>
 pub web::EndpointRow::name: alloc::string::String
 pub web::EndpointRow::reach: web::Msg
@@ -1056,7 +1056,7 @@ pub web::SeatRow::phase: web::Phase
 pub web::SeatRow::said: core::option::Option<alloc::string::String>
 pub web::SeatRow::spent: core::option::Option<kernel::budget::UsdMicros>
 pub web::SeatRow::turns: u32
-pub web::Sending::effort: core::option::Option<kernel::model::Effort>
+pub web::Sending::effort: core::option::Option<kernel::model::wire::Effort>
 pub web::Sending::mode: &'a str
 pub web::Sending::room: &'a str
 pub web::Shelf::building: kernel::address::Address
@@ -1085,7 +1085,7 @@ pub web::Tab::Prompt
 pub web::Tab::Turns
 pub web::TagRow::chosen: core::option::Option<channels::answer::ChosenSummary>
 pub web::TagRow::consequence: web::Msg
-pub web::TagRow::tag: kernel::model::ModelTag
+pub web::TagRow::tag: kernel::model::wire::ModelTag
 pub web::Target::Composer
 pub web::Target::Nowhere
 pub web::Target::Place(kernel::address::Address)

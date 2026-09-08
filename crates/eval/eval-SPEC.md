@@ -169,3 +169,15 @@ pub fn sweep<T: Clone>(assets: &[(T, AssetUse, Score, bool)]) -> Vec<(T, Disposa
 **它不调用模型。** `Attempt` 是某个模型已经产出的东西。一个自己持有 provider 的 suite 无法离线跑、无法重放，而且量到的一半是网络。**语料自己解析不了时拒绝而不是记分**，否则语料会给自己打分。
 
 三种格式读成同一组叶子（`path -> value`），因为问题问的是文档的叶子而不是它的语法；三条读法各读各的，就变成在比读法而不是在比格式。Markdown 那条**刻意严格**：一个会修复松散缩进的读法，会藏掉这个 suite 正在计数的那种失败。
+
+### 8-5 eval::nesting 目录化（card-5.2）
+
+`nesting.rs` 原有 632 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成三份：
+
+- `nesting.rs`（293 行）——判定本身：`Shape`／`Fault`／`Attempt`／`Verdict`／`Grades` 五个类型，以及 `grade`／`tally`／`recommended`。它同时是索引位置，声明 `mod reading;` 并从中取用 `read` 与 `stops_early`，公开路径 `eval::nesting::*` 一个未变，crate 内其它文件的 `use` 一行未改。
+- `nesting/reading.rs`（154 行）——语法一侧：`read`／`leaves`／`walk`／`scalar`／`markdown_leaves`／`stops_early`。把三种格式怎么读成同一组叶子，与「一次编辑错在哪里」的判定分开读。
+- `nesting/tests.rs`（205 行）——原内联 `mod tests` 原样迁出，断言、名字与 13 个 `#[test]` 一个未动。
+
+**无字段开放。** 跨文件只放宽了两个自由函数：`read` 与 `stops_early` 写作 `pub(super) fn`，仍不出 `nesting` 模块；`leaves`／`walk`／`scalar`／`markdown_leaves` 保持私有。
+
+**apisync 未重写基线。** 搬走的全是私有项，`eval` 的公开面逐字节不变。

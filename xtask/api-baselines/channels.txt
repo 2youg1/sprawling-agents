@@ -84,7 +84,7 @@ pub channels::ChangesAnswer::head: core::option::Option<kernel::locator::GitOid>
 pub channels::ChosenSummary::endpoint: alloc::string::String
 pub channels::ChosenSummary::max_output_tokens: u64
 pub channels::ChosenSummary::model: alloc::string::String
-pub channels::ChosenSummary::tag: kernel::model::ModelTag
+pub channels::ChosenSummary::tag: kernel::model::wire::ModelTag
 pub channels::CityAnswer::active: u64
 pub channels::CityAnswer::buildings: alloc::vec::Vec<channels::BuildingProgress>
 pub channels::CityAnswer::frozen: u64
@@ -107,7 +107,7 @@ pub channels::Command::AttachEndpoint
 pub channels::Command::AttachEndpoint::admit: alloc::vec::Vec<alloc::string::String>
 pub channels::Command::AttachEndpoint::auth_header: core::option::Option<alloc::string::String>
 pub channels::Command::AttachEndpoint::base_url: alloc::string::String
-pub channels::Command::AttachEndpoint::dialect: kernel::model::DialectKind
+pub channels::Command::AttachEndpoint::dialect: kernel::model::wire::DialectKind
 pub channels::Command::AttachEndpoint::idem: kernel::idem::IdemKey
 pub channels::Command::AttachEndpoint::name: channels::ProviderName
 pub channels::Command::AttachEndpoint::secret: core::option::Option<alloc::string::String>
@@ -134,7 +134,7 @@ pub channels::Command::CreatePolicy::idem: kernel::idem::IdemKey
 pub channels::Command::Dispatch
 pub channels::Command::Dispatch::addr: kernel::address::Address
 pub channels::Command::Dispatch::budget: kernel::budget::BudgetCap
-pub channels::Command::Dispatch::effort: core::option::Option<kernel::model::Effort>
+pub channels::Command::Dispatch::effort: core::option::Option<kernel::model::wire::Effort>
 pub channels::Command::Dispatch::goal: alloc::string::String
 pub channels::Command::Dispatch::idem: kernel::idem::IdemKey
 pub channels::Command::Dispatch::mode: channels::ModeTag
@@ -155,7 +155,7 @@ pub channels::Command::Login::step: channels::LoginStep
 pub channels::Command::ProbeEndpoint
 pub channels::Command::ProbeEndpoint::auth_header: core::option::Option<alloc::string::String>
 pub channels::Command::ProbeEndpoint::base_url: alloc::string::String
-pub channels::Command::ProbeEndpoint::dialect: kernel::model::DialectKind
+pub channels::Command::ProbeEndpoint::dialect: kernel::model::wire::DialectKind
 pub channels::Command::ProbeEndpoint::idem: kernel::idem::IdemKey
 pub channels::Command::ProbeEndpoint::name: channels::ProviderName
 pub channels::Command::ProbeEndpoint::secret: core::option::Option<alloc::string::String>
@@ -179,7 +179,7 @@ pub channels::Command::SelectModel::endpoint: channels::ProviderName
 pub channels::Command::SelectModel::idem: kernel::idem::IdemKey
 pub channels::Command::SelectModel::max_output_tokens: u64
 pub channels::Command::SelectModel::model: alloc::string::String
-pub channels::Command::SelectModel::tag: kernel::model::ModelTag
+pub channels::Command::SelectModel::tag: kernel::model::wire::ModelTag
 pub channels::Command::SetAutonomy
 pub channels::Command::SetAutonomy::autonomy: kernel::approval::Autonomy
 pub channels::Command::SetAutonomy::idem: kernel::idem::IdemKey
@@ -221,7 +221,7 @@ pub channels::DiscardLine::restored: bool
 pub channels::EmbeddedFile::gz: &'static [u8]
 pub channels::EmbeddedFile::path: &'static str
 pub channels::EndpointSummary::base_url: alloc::string::String
-pub channels::EndpointSummary::dialect: kernel::model::DialectKind
+pub channels::EndpointSummary::dialect: kernel::model::wire::DialectKind
 pub channels::EndpointSummary::has_credential: bool
 pub channels::EndpointSummary::local: bool
 pub channels::EndpointSummary::models: alloc::vec::Vec<alloc::string::String>

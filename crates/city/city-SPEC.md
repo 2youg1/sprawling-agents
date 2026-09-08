@@ -513,3 +513,49 @@ P3.06 的常驻代价是一件工具的 disclosure 与 schema，名册本身**�
 P2.01 同集四处：§6 模块表两行翻 `已建`；§6 接线台账的 `kernel::config`（freeze 面）与 Effort 两行改成已接线；`xtask/api-baselines/city.txt` 随公开面同集重算；`docs/templates/BUILDING.md` 从此是被实例化的那串字节，改它即改新楼的第一句话。
 
 P3.06 同集五处：ARCHITECTURE.md §12 模块表增 city 两行、`runtime::tools::status` 一行由十二字段改十三；`docs/glossary.md` 增 **Neighbourhood** 与 **neighbours** 两行（一个概念一个名字，且 `directory` 因与文件系统目录同音而被明确弃用）；`crates/runtime/runtime-SPEC.md` §8-14 的 status 接口块；`xtask/api-baselines/` 的 `city.txt` 与 `runtime.txt`；`docs/templates/URBANITE.md` 的 `## Bring them` 从此是被读取的一节，改它即改全城名册显示的那一行。
+
+### 8-16 city::config_layers 目录化（card-5.2）
+
+681 行一份文件切成三份，读面与写面各占一份，测试单独一份：
+
+- `config_layers.rs`（300 行）：`CONFIG_FILE`、`Layer`、`path`，以及读面 `ConfigLayer::parse`／`load`／`read_layer`／`refuse` 与四个 `serde` 段落类型。它回答「哪三份文件、怎么读」，仍是本节开头那份接口块的家。
+- `config_layers/write.rs`（160 行）：`write_effort`、`write_mcp`、`write_sandbox` 与它们私有的 `read_document`／`write_document`／`refuse_file`。写面自成一簇的缝在于它只经 `path` 与 `Layer` 回到读面，不碰 `ConfigLayer` 的任何字段。`config_layers.rs` 以 `pub use write::{write_effort, write_mcp, write_sandbox};` 重导出，`lib.rs` 的三行门面与 crate 内所有 `use` 一字未改。
+- `config_layers/tests.rs`（245 行）：原内联 `mod tests` 整体迁出，11 个 `#[test]` 与其断言逐字不动。
+
+**无字段开放**：没有为跨文件引用把任何私有字段升成 `pub(crate)`／`pub(super)`；`write.rs` 用到的 `path` 与 `Layer` 本来就是公开面。
+
+**apisync 未重写基线**：`cargo public-api -p city` 与基线的差异只有三行，全部是 `kernel::model::Effort` → `kernel::model::wire::Effort` 一类的 kernel 侧规范路径重拼，与本次切分无关（本次切分的公开面逐字节不变）；基线随 kernel 那一侧的改动一并重算。
+
+### 8-17 city::spine_files 目录化（card-5.2）
+
+591 行一份文件切成两份，生产代码与测试各占一份：
+
+- `spine_files.rs`（371 行）：五个文件名常量、三份模板、`JobBrief`／`RunBrief`、`lay_out`、`write_brief`／`write_job`、`job_path`／`roadmap_path`／`handoff_path`、`roadmap`／`handoff`／`norms`，以及私有的 `is_blank_form`／`empty_roadmap`／`is_placeholder_row`／`write_new`／`storage`。它仍是 §8-5 那份接口块的家，公开面逐字节不变。
+- `spine_files/tests.rs`（224 行）：原内联 `mod tests` 整体迁出，10 个 `#[test]` 与其断言、名字逐字不动；`use super::*;` 保持，`super` 仍指 `spine_files`。父文件尾部保留原样的 `#[allow(...)]` 属性列表加一行 `mod tests;`。
+
+**无字段开放**：没有为跨文件引用把任何私有字段升成 `pub(crate)`／`pub(super)`；测试经 `super::*` 看到的私有项与迁出前相同。
+
+**apisync 未重写基线**：公开面不受本次切分影响。
+
+### 8-18 city::policy 目录化（card-5.2）
+
+517 行一份文件切成两份，生产代码与测试各占一份：
+
+- `policy.rs`（371 行）：`BUILDING_FILE` 与四个私有键常量、`ModelPool`、`BuildingRules` 及其全部方法（`policy`／`addr`／`egress`／`review`／`reading_room`／`model_pool`／`write_domain`）、`building_path`／`legacy_building_path`／`scope_path`、`load`／`write_rules`／`evaluate`。它仍是 §8-2 那份接口块的家，公开面逐字节不变。
+- `policy/tests.rs`（150 行）：原内联 `mod tests` 整体迁出，11 个 `#[test]` 与其断言、名字、夹具 `addr` 逐字不动；`use super::*;` 保持，`super` 仍指 `policy`。父文件尾部保留原样的 `#[allow(...)]` 属性列表加一行 `mod tests;`。
+
+**无字段开放**：没有为跨文件引用把任何私有字段升成 `pub(crate)`／`pub(super)`；测试经 `super::*` 看到的私有项（`legacy_building_path`、`BuildingRules` 的字段）与迁出前相同。
+
+**apisync 未重写基线**：公开面不受本次切分影响。
+
+
+### 8-19 city::building 目录化（card-5.2）
+
+502 行一份文件切成两份，生产代码与测试各占一份：
+
+- `building.rs`（339 行）：`TEMPLATE_RULES` 等四个模板常量、`BuildingTemplate`（`parse`／`name`／私有 `rules`）、`Building`（`of`／`addr`／`root`／`holds`）、`all`／`create`／`adopt`、`created_payload`／`adopted_payload`，以及私有的 `storage`。它仍是 §8-3 那份接口块的家，公开面逐字节不变。
+- `building/tests.rs`（167 行）：原内联 `mod tests` 整体迁出，9 个 `#[test]` 与其断言、名字、夹具 `addr` 逐字不动；`use super::*;` 保持，`super` 仍指 `building`。父文件尾部保留原样的 `#[allow(...)]` 属性列表加一行 `mod tests;`。
+
+**无字段开放**：没有为跨文件引用把任何私有字段升成 `pub(crate)`／`pub(super)`；测试经 `super::*` 看到的私有项（`NAME_PLACEHOLDER`、`BuildingTemplate::rules`）与迁出前相同。
+
+**apisync 未重写基线**：公开面不受本次切分影响。

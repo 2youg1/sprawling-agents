@@ -283,57 +283,13 @@ status = "gated, with a register of the files that predate the rule"
 #
 # Delete a row by doing the split, never by raising its number.
 [file_length.predating]
-"crates/sprawling/src/assembly/workbench.rs" = 1000
-"crates/sprawling/src/assembly/credentials.rs" = 978
-"crates/sprawling/src/assembly/folds.rs" = 957
-"crates/runtime/src/turn.rs" = 919
-"crates/collab/src/claim_tool.rs" = 913
 "xtask/src/color.rs" = 819
-"crates/sprawling/src/assembly/freezing.rs" = 778
-"crates/sprawling/src/assembly.rs" = 772
-"crates/sprawling/src/assembly/plans.rs" = 740
-"crates/runtime/src/bench.rs" = 740
 "xtask/src/wording.rs" = 686
-"crates/city/src/config_layers.rs" = 681
-"crates/sprawling/src/assembly/genesis.rs" = 677
-"crates/eval/src/nesting.rs" = 632
-"crates/city/src/spine_files.rs" = 591
 "xtask/src/render.rs" = 581
 "xtask/src/release.rs" = 578
 "xtask/src/length.rs" = 573
-"crates/runtime/src/replay.rs" = 570
-"crates/sprawling/src/assembly/reviewing.rs" = 567
-"crates/collab/src/pr_tool.rs" = 561
-"crates/sprawling/src/install.rs" = 556
-"crates/runtime/src/prefix.rs" = 546
-"crates/sprawling/src/mcp_http.rs" = 543
-"crates/collab/src/inbox.rs" = 543
-"crates/collab/src/workshop_tool.rs" = 539
-"crates/runtime/src/tools/edit.rs" = 522
-"crates/city/src/policy.rs" = 517
-"crates/kernel/src/model.rs" = 516
 "xtask/src/guard.rs" = 508
-"crates/city/src/building.rs" = 502
-"crates/collab/src/signal_tool.rs" = 498
-"crates/kernel/src/locator.rs" = 477
-"crates/runtime/src/run.rs" = 468
-"crates/collab/src/draft.rs" = 466
-"crates/web/src/prompt.rs" = 460
-"crates/runtime/src/digest.rs" = 449
-"crates/collab/src/workshop.rs" = 445
-"crates/kernel/src/highlight.rs" = 437
 "xtask/src/badge.rs" = 436
-"crates/web/src/dashboard.rs" = 430
-"crates/kernel/src/tool.rs" = 430
-"crates/web/src/isometry.rs" = 429
-"crates/web/src/ledger_view.rs" = 426
-"crates/web/src/command.rs" = 424
-"crates/runtime/src/sandbox.rs" = 422
-"crates/kernel/src/config.rs" = 418
-"crates/sprawling/src/plan_view.rs" = 413
-"crates/kernel/src/approval.rs" = 413
-"crates/runtime/src/tools/exec.rs" = 403
-"crates/web/src/city_view.rs" = 402
 
 # White box is Rust, black box is Haskell (the person's ruling,
 # 2026-09-05). `cargo xtask boundary` refuses a Rust check that reaches

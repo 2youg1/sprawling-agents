@@ -1373,3 +1373,72 @@ derive 出来的那个会把线上任意字符串收下、交回一个从没过�
 跨度（`secret/span.rs`）／扫描（`secret/scan.rs`，含 kani＋proptest）／封存（`secret/sealed.rs`）切分。
 各改索引零逻辑，对外签名逐字节不变（下游 11 基线仅规范路径记法，各 SPEC §6 同集一句；
 secret 门白名单随 `sealed.rs` 搬家）。完成检查：同 8-36。
+
+### 8-39 kernel::model 目录化（card-5.2）
+
+`model.rs`（516）切成四文件：`model/wire.rs` 收线上会话的词汇（dialect 无关的规范形）（`BuildingPolicy`／`Role`／
+`StopReason`／`SystemBlock`／`DialectKind`／`ModelTag`／`Effort`／`ContentBlock`／`ChatMessage`／
+`ToolDef`／`ChatRequest` 含 `empty`／`ModelUsage`／`ChatResponse`）；`model/seam.rs` 收一次调用两个方向
+所载之物与内容↔载荷两转换（`ModelRequest`／`ModelReturn` 含 `bare`／`from_response`、`message_payload`／
+`content_from_message`／`value_has_float`）；`model/conformance.rs` 收 feature 门后的一致性断言；
+`model/tests.rs` 收原 `mod tests`（6 个 `#[test]`，断言与名字不动，补 `AxCode`／`Payload`／`B3Hash`／
+`Map` 四行 `use`，因父文件不再直接引它们）。`model.rs` 剩 75 行：`//!` 文档、两 `mod`、两 `pub use`、
+`Increments` 与 `pub trait Model` —— **trait 必须留在原路径**，`xtask depmap` 只准 seam 清单文件
+（ARCHITECTURE §3 记的正是 `crates/kernel/src/model.rs`）声明 `pub trait`。
+无字段开放（子模块间只引 `pub` 类型）。`lib.rs` 的 13 行再导出一字未改，故公共面路径不变、
+apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／`nextest`（205 passed）／
+`xtask modmap`／`length`／`header`／`apisync` 全绿。
+
+### 8-40 kernel::locator 目录化（card-5.2）
+
+`locator.rs`（477）只作一刀：原内联 `mod tests` 整段迁到 `locator/tests.rs`（8 个 `#[test]`
+含 2 条 `proptest!`，断言与名字一字不动，`use super::*` 与 `use crate::error::AxCode` 原样保留），
+父文件尾部改留 `#[cfg(test)] mod tests;` 并原样带上那份 `#[allow(...)]` 列表。`locator.rs` 剩 375 行：
+文法、`B3Hash`／`GitOid`／`Range`／`Locator` 四型与全部解析、呈现、十六进制原语都留在原路径，
+故规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／
+`clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
+
+### 8-41 kernel::highlight 目录化（card-5.2）
+
+`highlight.rs`（437）只作一刀：原内联 `mod tests` 整段迁到 `highlight/tests.rs`（12 个 `#[test]`，
+断言与名字一字不动，`use super::*` 原样保留，两个夹具 `cut`／`tokens` 随测试同迁、不复制），
+父文件尾部改留 `#[cfg(test)] mod tests;` 并原样带上那份含 `clippy::arithmetic_side_effects` 的
+`#[allow(...)]` 列表。`highlight.rs` 剩 304 行：`Token`／`Span` 两型、`markdown` 与全部行内词法
+原语（`read_line`／`marker_len`／`opens_fence`／`fence_len`／`inline`／`scan`／`links`／`claim`／
+`push`）都留在原路径 —— `scan` 带 `argument_count` 豁免，键 `crates/kernel/src/highlight.rs::scan`，
+因此不得搬家。规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：
+`cargo check`／`clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
+
+### 8-42 kernel::tool 目录化（card-5.2）
+
+`tool.rs`（430）只作一刀：原内联 `mod tests` 整段迁到 `tool/tests.rs`（6 个 `#[test]`，断言与名字
+一字不动，`use super::*` 原样保留），父文件尾部改留 `#[cfg(test)] mod tests;` 并原样带上那份
+`#[allow(...)]` 列表。`tool.rs` 剩 332 行：`ToolName`／`ServerLabel`／`TimeoutMs`／`Effect`／
+`Temporal`／`CostTier`／`RenderIntent`／`ToolMeta`／`ToolCall`／`ToolOutcome`／`ExecArm` 与
+`pub trait Tool`、feature 门后的 `conformance` 子模块都留在原路径 —— **trait 必须留在原路径**，
+`xtask depmap` 只准 seam 清单文件（ARCHITECTURE §3 记的正是 `crates/kernel/src/tool.rs`）
+声明 `pub trait`。规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：
+`cargo check`／`clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
+
+### 8-43 kernel::config 目录化（card-5.2）
+
+`config.rs`（418）只作一刀：原内联 `mod tests` 整段迁到 `config/tests.rs`（9 个 `#[test]`，断言与
+名字一字不动，`use super::*` 与 `use std::collections::BTreeSet` 原样保留），父文件尾部改留
+`#[cfg(test)] mod tests;` 并原样带上那份 `#[allow(...)]` 列表。`config.rs` 剩 193 行：
+`ClockStampGranularity`／`LayeredValue`／`ClockZone`／`SandboxLimits`／`McpServer`／
+`McpTransport`／`FrozenConfig`／`LiveConfig` 与 `freeze` 都留在原路径 —— `freeze` 带
+`argument_count` 豁免，键 `crates/kernel/src/config.rs::freeze`，因此不得搬家。规范路径与公共面
+逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／`clippy -D warnings`／
+`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
+
+### 8-44 kernel::approval 目录化（card-5.2）
+
+`approval.rs`（413）只作一刀：原内联 `mod tests` 整段迁到 `approval/tests.rs`（3 个 `#[test]`，
+断言与名字一字不动，`use super::*` 与三个夹具 `item`／`policy`／`resident` 原样保留，缩进整体退
+四格），父文件尾部改留 `#[cfg(test)] mod tests;` 并原样带上那份 `#[allow(...)]` 列表。
+`approval.rs` 剩 262 行：`ApprovalId`／`ApprovalSource`／`ApprovalClass`／`ClusterKey`／
+`ApprovalItem`／`PolicyClass`／`PolicyMatcher`／`PolicyVerdict`／`Policy`／`PolicyApplication`／
+`PolicyExpiry`／`PolicyRevocation`／`Autonomy`／`Answerer`／`AnswerVerdict` 与
+`match_item`／`expiry`／`may_answer` 全部留在原路径，kernel 作为依赖树根，公共面的规范路径
+逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／`clippy -D warnings`／
+`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。

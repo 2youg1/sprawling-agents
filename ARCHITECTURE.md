@@ -354,6 +354,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 |---|---|---|---|---|---|
 | kernel::address | crates/kernel/src/address.rs | canonical relative paths, write-domain primitive, reserved prefix | value | S1 | built |
 | kernel::locator | crates/kernel/src/locator.rs | the one grammar for referring to content: `cas:` and `file:`, fail-closed | value | S1 | built |
+| kernel::locator::tests | crates/kernel/src/locator/tests.rs | the grammar's round-trip and fail-closed cases | value | S1 | built |
 | kernel::ledger (port) | crates/kernel/src/ledger.rs | the only write entrance to history; owns `seq` and `prev` | port | S1 | built |
 | kernel::event | crates/kernel/src/event.rs | EventRecord, the closed EventKind set, and the unforgeable EventRef | value | S1 | built |
 | kernel::event::identity | crates/kernel/src/event/identity.rs | run, sequence, and time | value | S1 | built |
@@ -397,11 +398,18 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::completion | crates/kernel/src/completion.rs | done requires evidence; progress has two states and no third | value | S2 | built |
 | kernel::registry | crates/kernel/src/registry.rs | the three books: artifact, asset, skill | value | S2 | built |
 | kernel::approval | crates/kernel/src/approval.rs | what waits for a person, its cluster key, and a policy that expires | value | S2 | built |
+| kernel::approval::tests | crates/kernel/src/approval/tests.rs | the three rules a caller depends on: policy matching, idle expiry, and who may answer | value | S2 | built |
 | kernel::delegation | crates/kernel/src/delegation.rs | two kinds of delegate, one level deep, no grand-delegate | value | S2 | built |
 | kernel::repair | crates/kernel/src/repair.rs | leases for when the environment itself is broken | decision | S2 | built |
 | kernel::config | crates/kernel/src/config.rs | three-layer resolution, and the frozen/live split with no shared field | decision | S2 | built |
+| kernel::config::tests | crates/kernel/src/config/tests.rs | the ladder rules a caller depends on: lower layers win, whole-list override, and the frozen/live field disjointness | decision | S2 | built |
 | kernel::tool (port) | crates/kernel/src/tool.rs | what a tool is, in eight fields | port | S2 | built |
+| kernel::tool::tests | crates/kernel/src/tool/tests.rs | the grammars a name and a label are held to, and the eight fields on the wire | port | S2 | built |
 | kernel::model (port) | crates/kernel/src/model.rs | what a model call is, carrying the building's policy with it | port | S2 | built |
+| kernel::model::wire | crates/kernel/src/model/wire.rs | the canonical conversation vocabulary a request and a response are made of | port | S2 | built |
+| kernel::model::seam | crates/kernel/src/model/seam.rs | what one call carries each way, and content-to-payload conversion | port | S2 | built |
+| kernel::model::conformance | crates/kernel/src/model/conformance.rs | the assertion suite every model implementation answers | port | S2 | built |
+| kernel::model::tests | crates/kernel/src/model/tests.rs | the model seam fixtures | port | S2 | built |
 | kernel::secret | crates/kernel/src/secret.rs | secret-shape judgement, the `secret:` grammar, and `Sealed<T>` | decision | S2 | built |
 | kernel::secret::span | crates/kernel/src/secret/span.rs | references and spans: the shapes that name secrets | decision | S2 | built |
 | kernel::secret::scan | crates/kernel/src/secret/scan.rs | shape-table-first, entropy-second, float-free | decision | S2 | built |
@@ -415,6 +423,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::error::shape | crates/kernel/src/error/shape.rs | the one error shape of the whole city | decision | S1 | built |
 | kernel::change | crates/kernel/src/change.rs | what moved between two checkpoints; a binary file cannot be spelled as one that moved nothing | value | R2 | built |
 | kernel::highlight | crates/kernel/src/highlight.rs | a document read as ordered, disjoint spans; it says where things are and never rewrites the text | decision | R2 | built |
+| kernel::highlight::tests | crates/kernel/src/highlight/tests.rs | the lexical rules a reader depends on: precedence, fences, and spans that slice without overlapping | decision | R2 | built |
 
 ### memory (16) — persistence, and every view derived from it
 
@@ -501,27 +510,42 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | Module | File | What it owns | Shape | Since | Status |
 |---|---|---|---|---|---|
 | runtime::turn | crates/runtime/src/turn.rs | the turn typestate: four phases, four cancellation-safe points | typestate | S2 | built |
+| runtime::turn::boundary | crates/runtime/src/turn/boundary.rs | what the executor supplies at a phase change, and what a phase change answers | typestate | S2 | built |
+| runtime::turn::report | crates/runtime/src/turn/report.rs | what a completed turn hands the run loop, and the call shape it was given | typestate | S2 | built |
+| runtime::turn::wave | crates/runtime/src/turn/wave.rs | boundary 3: the tool wave, executed in call order | typestate | S2 | built |
+| runtime::turn::tests::helpers | crates/runtime/src/turn/tests/helpers.rs | the ledger, model and prefix fixtures the turn tests share | typestate | S2 | built |
+| runtime::turn::tests::phases | crates/runtime/src/turn/tests/phases.rs | the four boundaries driven against a real ledger chain | typestate | S2 | built |
+| runtime::turn::tests::window | crates/runtime/src/turn/tests/window.rs | what the opening lines and a steer put in the window | typestate | S2 | built |
 | runtime::bench | crates/runtime/src/bench.rs | which door one tool call goes through, in which order, and what a refusal becomes | decision | V3 | built |
+| runtime::bench::admit | crates/runtime/src/bench/admit.rs | which gate one call's declared Effect names, and what that gate's verdict means to the bench | decision | V3 | built |
+| runtime::bench::tests | crates/runtime/src/bench/tests.rs | the bench's ordering, door and dedup fixtures | decision | V3 | built |
 | runtime::window | crates/runtime/src/window.rs | the run's conversation history: the volatile half of a request | value | V3 | built |
 | runtime::prefix | crates/runtime/src/prefix.rs | frozen prefix assembly in four segments, each hashed | decision | S2 | built |
+| runtime::prefix::tests | crates/runtime/src/prefix/tests.rs | what the frozen prefix guarantees: slot order, determinism, dedup, truncation markers, cache breakpoints | decision | S2 | built |
 | runtime::handoff | crates/runtime/src/handoff.rs | freezing and resuming: the five-section artifact and its one construction point | value | S2 | built |
 | runtime::fork | crates/runtime/src/fork.rs | a new run whose in-window history is a byte-identical prefix of another | decision | S1 | built |
 | runtime::compaction | crates/runtime/src/compaction.rs | when to shorten something and what to keep; never larger than its input | decision | P3 | built |
 | runtime::redact | crates/runtime/src/redact.rs | what a model said, scanned on its way into history | decision | P3 | built |
 | runtime::replay | crates/runtime/src/replay.rs | offline replay: re-verify without re-executing | decision | S1 | built |
+| runtime::replay::tests | crates/runtime/src/replay/tests.rs | what offline verification refuses: future versions, unknown kinds, drifted prefix sources, dangling calls | decision | S1 | built |
 | runtime::digest | crates/runtime/src/digest.rs | what a long document looks like from outside, summarised once | decision | P1 | built |
+| runtime::digest::tests | crates/runtime/src/digest/tests.rs | what a digest promises a reader: heading trees that skip code fences, prose that stays suspect, one digest per content hash, and a breaker that reopens | decision | P1 | built |
 | runtime::pipeline | crates/runtime/src/pipeline.rs | the result envelope and the order in which a result is shrunk | decision | S3 | built |
 | runtime::offload | crates/runtime/src/offload.rs | the shared shrink primitive: lossy but restorable, four invariants | decision | S3 | built |
 | runtime::watchdog | crates/runtime/src/watchdog.rs | disposal in order: correct, then stall, then freeze | decision | S3 | built |
 | runtime::sandbox (port) | crates/runtime/src/sandbox.rs | the execution boundary: capabilities in, outcome out | port | S3 | built |
+| runtime::sandbox::tests | crates/runtime/src/sandbox/tests.rs | what the two stand-ins promise a caller: stdin echoed back with the job recorded, and a fault script delivered in order then spent | port | S3 | built |
 | runtime::catalog | crates/runtime/src/catalog.rs | progressive disclosure: which tools and skills a run is told about | decision | S3 | built |
 | runtime::mode | crates/runtime/src/mode.rs | the modes a run may sit in, and what each admits | decision | S3 | built |
 | runtime::clock | crates/runtime/src/clock.rs | formatting an injected instant; it never samples one | value | S3 | built |
 | runtime::tools::exec | crates/runtime/src/tools/exec.rs | the exec tool: three arms, each with its own failure story | adapter | S3 | built |
+| runtime::tools::exec::tests | crates/runtime/src/tools/exec/tests.rs | what each arm promises a caller: a missing component refuses by name, sandbox exits arrive as themselves, an unknown arm is never guessed | adapter | S3 | built |
 | runtime::tools::read | crates/runtime/src/tools/read.rs | the read tool: a path the reserved subtree closes, or a name the reading room opens | adapter | P6 | built |
 | runtime::tools::edit | crates/runtime/src/tools/edit.rs | the edit tool: optimistic concurrency against the version the caller read | adapter | S3 | built |
+| runtime::tools::edit::tests | crates/runtime/src/tools/edit/tests.rs | the edit tool's fixtures: versions, refusals, the create arm | adapter | S3 | built |
 | runtime::tools::status | crates/runtime/src/tools/status.rs | the model's view of its own situation, in thirteen fields | adapter | S3 | built |
 | runtime::run | crates/runtime/src/run.rs | the run driver: dispatch, turns, freeze — one authority for the loop | typestate | P1 | built |
+| runtime::run::lifecycle | crates/runtime/src/run/lifecycle.rs | what an active run does: the dispatch pair, one turn, and the freeze that is its only exit | typestate | P1 | built |
 | runtime::diagnostics | crates/runtime/src/diagnostics.rs | the diagnostic log: write-only, five levels, anchored to a Ledger position | adapter | P1 | built |
 
 ### collab (16) — several residents in one building, without stepping on each other
@@ -529,21 +553,32 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | Module | File | What it owns | Shape | Since | Status |
 |---|---|---|---|---|---|
 | collab::inbox | crates/collab/src/inbox.rs | signals between residents: at-least-once, deduplicated before any effect | decision | P2 | built |
+| collab::inbox::signal_id | crates/collab/src/inbox/signal_id.rs | a signal id: what a duplicate delivery is recognised by | decision | P2 | built |
+| collab::inbox::signal_kind | crates/collab/src/inbox/signal_kind.rs | what kind of communication a signal is, and its wire name | decision | P2 | built |
+| collab::inbox::tests | crates/collab/src/inbox/tests.rs | deduplication, lane order, bandwidth and the two records, through the production door | decision | P2 | built |
 | collab::draft | crates/collab/src/draft.rs | what happens when the room moved while you were writing | typestate | P2 | built |
+| collab::draft::tests | crates/collab/src/draft/tests.rs | holds, hold tokens, the four ways back and escalation, through the production door | typestate | P2 | built |
 | collab::steer | crates/collab/src/steer.rs | speaking into a run that is already working, at its next safe point | decision | P2 | built |
 | collab::workshop | crates/collab/src/workshop.rs | one creation split into nodes, and the order they run in | decision | P2 | built |
+| collab::workshop::tests | crates/collab/src/workshop/tests.rs | deterministic scheduling, the fan-out, and the three graphs construction refuses | decision | P2 | built |
 | collab::fanin | crates/collab/src/fanin.rs | where the branches come back together, verified before they merge | decision | P2 | built |
 | collab::pr | crates/collab/src/pr.rs | an implementer cannot verify their own work — a compile error, not a rule | typestate | P2 | built |
 | collab::arbiter | crates/collab/src/arbiter.rs | who decides when two goals collide, and how far up it goes | decision | P2 | built |
 | collab::signal_tool | crates/collab/src/signal_tool.rs | the face the inbox shows a model: send and pull | adapter | P3 | built |
+| collab::signal_tool::tests | crates/collab/src/signal_tool/tests.rs | what sending queues, what a pull leaves behind, and that the lent inbox comes back | adapter | P3 | built |
 | collab::delegate_tool | crates/collab/src/delegate_tool.rs | the face delegation shows a model: one level down, and the desk that remembers what was asked | adapter | P1 | built |
 | collab::handback | crates/collab/src/handback.rs | what a run is told about work it handed down, and who is allowed to say it finished | decision | P1 | built |
 | collab::goal_tool | crates/collab/src/goal_tool.rs | the face goal detection and arbitration show a model | adapter | P3 | built |
 | collab::pr_tool | crates/collab/src/pr_tool.rs | the face pull requests show a model: open, list, check | adapter | P3 | built |
+| collab::pr_tool::request | crates/collab/src/pr_tool/request.rs | the request a resident offers, and the record a rebuild reads back | adapter | P3 | built |
+| collab::pr_tool::tests | crates/collab/src/pr_tool/tests.rs | the tests of the pull request desk and its tool | adapter | P3 | built |
 | collab::archive_tool | crates/collab/src/archive_tool.rs | writing something down so the next run need not be told twice | adapter | P4 | built |
 | collab::claim_effect | crates/collab/src/claim_effect.rs | what a claim on a plan node left behind, and whether the file still agrees with it | value | V3 | built |
 | collab::claim_tool | crates/collab/src/claim_tool.rs | the face `Roadmap.md` shows a model: one claimed row at a time | adapter | P4 | built |
+| collab::claim_tool::tool | crates/collab/src/claim_tool/tool.rs | the six actions, their schema, and the arguments they are spelled with | adapter | P4 | built |
+| collab::claim_tool::tests | crates/collab/src/claim_tool/tests.rs | the plan-desk fixtures | adapter | P4 | built |
 | collab::workshop_tool | crates/collab/src/workshop_tool.rs | the face a workshop shows a model: lay out, ask the join, judge it | adapter | P1 | built |
+| collab::workshop_tool::tests | crates/collab/src/workshop_tool/tests.rs | what the workshop tool refuses: a cycle, a second graph, a verdict from nobody who read | adapter | P1 | built |
 | collab::triage | crates/collab/src/triage.rs | where something from outside lands, and whether it starts work | decision | P3 | built |
 
 ### city (14) — space, identity, and the documents a building keeps
@@ -551,12 +586,17 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | Module | File | What it owns | Shape | Since | Status |
 |---|---|---|---|---|---|
 | city::building | crates/city/src/building.rs | which building governs an address, and how a new one comes into being | decision | P2 | built |
+| city::building::tests | crates/city/src/building/tests.rs | creation, adoption and refusal, read back through the city's own parser | decision | P2 | built |
 | city::resident | crates/city/src/resident.rs | standing identity: an address plus the file that says who lives there | value | P1 | built |
 | city::spine_files | crates/city/src/spine_files.rs | the documents a building keeps its long work in, and the job file a run reads | adapter | P2 | built |
+| city::spine_files::tests | crates/city/src/spine_files/tests.rs | the laid-out documents, the job file, and the two briefs a session can carry | adapter | P2 | built |
 | city::archive | crates/city/src/archive.rs | what a building remembers between runs, indexed by computing it | projection | P3 | built |
 | city::library | crates/city/src/library.rs | the city's stock of settled work, and the reading room each building admits | decision | P3 | built |
 | city::config_layers | crates/city/src/config_layers.rs | the three configuration files a run is governed by | decision | P2 | built |
+| city::config_layers::write | crates/city/src/config_layers/write.rs | writing a chosen value back into the layer that governs it | decision | P2 | built |
+| city::config_layers::tests | crates/city/src/config_layers/tests.rs | the ladder, the refusals, and the write-back round trip | decision | P2 | built |
 | city::policy | crates/city/src/policy.rs | `BUILDING.md` evaluated into rules a machine can hold | decision | P1 | built |
+| city::policy::tests | crates/city/src/policy/tests.rs | the confidential three, the refusals, and the write domain a file declares | decision | P1 | built |
 | city::rules_tool | crates/city/src/rules_tool.rs | the face a building's rules show a model: read them, propose the whole of them | adapter | P2 | built |
 | city::schedule | crates/city/src/schedule.rs | work that starts by itself, counted in whole minutes | decision | P2 | built |
 | city::schedule::tests | crates/city/src/schedule/tests.rs | windows return each entry at most once | decision | P2 | built |
@@ -574,6 +614,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | eval::probe | crates/eval/src/probe.rs | the same questions asked twice, versioned so two versions never compare | value | P3 | built |
 | eval::score | crates/eval/src/score.rs | what a settled asset is worth, in integer thousandths | decision | P3 | built |
 | eval::nesting | crates/eval/src/nesting.rs | which nested format a model edits with fewest mistakes, and how it fails when it fails | decision | V3 | built |
+| eval::nesting::reading | crates/eval/src/nesting/reading.rs | reading a document of any of the three shapes into the same leaves | decision | V3 | built |
+| eval::nesting::tests | crates/eval/src/nesting/tests.rs | the graded fixtures: worst fault wins, and a tie broken by damage | decision | V3 | built |
 | eval::metabolism | crates/eval/src/metabolism.rs | clearing out: warn first, retire second, delete never | decision | P3 | built |
 
 ### channels (10) — the process boundary
@@ -621,6 +663,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | web::mount::frame | crates/web/src/mount/frame.rs | what one painted frame may move | value | V3 | built |
 | web::board | crates/web/src/board.rs | the plan tree laid out by state; five columns, no state of its own, nothing here can move a node | projection | V3 | built |
 | web::command | crates/web/src/command.rs | every command frame this client sends, built in one place | value | V3 | built |
+| web::command::tests | crates/web/src/command/tests.rs | what a dispatch from the building form names: a room per piece of work, never the building's root | value | V3 | built |
 | web::pursuit | crates/web/src/pursuit.rs | what a building is working towards on its own, and who answers for it | adapter | V3 | built |
 | web::socket | crates/web/src/socket.rs | the only place in this crate that talks to the server | adapter | S4 | built |
 | web::socket::link | crates/web/src/socket/link.rs | the link: state, events, actions, and the backoff ladder | decision | S4 | built |
@@ -637,13 +680,17 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | web::turn::rounds_tests | crates/web/src/turn/rounds_tests.rs | the rounds through the production door | decision | R2 | built |
 | web::turn::reading_tests | crates/web/src/turn/reading_tests.rs | the reading through the production door | value | R2 | built |
 | web::city_view | crates/web/src/city_view.rs | the city page: the picture, the controls around it, and what a click means | projection | S4 | built |
+| web::city_view::page | crates/web/src/city_view/page.rs | the picture, the controls around it, and what a click means | projection | S4 | built |
+| web::city_view::text | crates/web/src/city_view/text.rs | the sentence that names the way into one building's own pages | projection | S4 | built |
 | web::isometry | crates/web/src/isometry.rs | where a point on the ground lands on the screen, and the window around what was drawn | decision | V3 | built |
+| web::isometry::tests | crates/web/src/isometry/tests.rs | the window holds what was drawn, zoom crops, and one shape is spelled one way | decision | V3 | built |
 | web::skyline | crates/web/src/skyline.rs | what a city of buildings looks like: height from assets, a lit band from the plan | decision | V3 | built |
 | web::skyline::prisms | crates/web/src/skyline/prisms.rs | what a city of buildings looks like | decision | V3 | built |
 | web::skyline::faces | crates/web/src/skyline/faces.rs | prisms become geometry, and geometry becomes a list | decision | V3 | built |
 | web::skyline::tests | crates/web/src/skyline/tests.rs | the same city draws the same shapes, through the production door | decision | V3 | built |
 | web::progress | crates/web/src/progress.rs | the one place a progress bar is drawn, for all three of its callers | decision | S4 | built |
 | web::dashboard | crates/web/src/dashboard.rs | cost in five cuts, with shares against the authoritative total | decision | S4 | built |
+| web::dashboard::tests | crates/web/src/dashboard/tests.rs | the cost page orders facts the same way every time | decision | S4 | built |
 | web::live | crates/web/src/live.rs | watching one session as it happens, in a window that says what it dropped | decision | S4 | built |
 | web::live::feed | crates/web/src/live/feed.rs | the bounded window: what the live view keeps | value | S4 | built |
 | web::live::describe | crates/web/src/live/describe.rs | one event, one short line | decision | S4 | built |
@@ -658,6 +705,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | web::approval::bin | crates/web/src/approval/bin.rs | what was discarded and how it comes back | decision | S4 | built |
 | web::approval::tests | crates/web/src/approval/tests.rs | the inbox and the bin, through the production door | decision | S4 | built |
 | web::ledger_view | crates/web/src/ledger_view.rs | browsing the one history; a filter always says how much it hid | decision | S4 | built |
+| web::ledger_view::tests | crates/web/src/ledger_view/tests.rs | the filter, the paging limit, and an export that names itself a view | decision | S4 | built |
 | web::alert | crates/web/src/alert.rs | the only module that may interrupt a person, and only once per fact | decision | S4 | built |
 | web::alert::judge | crates/web/src/alert/judge.rs | what needs a person, and only once per fact | decision | S4 | built |
 | web::alert::notify | crates/web/src/alert/notify.rs | the interruption that reaches another tab | adapter | S4 | built |
@@ -705,6 +753,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | web::session::page | crates/web/src/session/page.rs | one session: questions and readings | decision | V3 | built |
 | web::session::tests | crates/web/src/session/tests.rs | the head through the production door | decision | V3 | built |
 | web::prompt | crates/web/src/prompt.rs | what a run was given: the four frozen blocks of its prompt, and whether an admitted skill's bytes moved since the city last looked | projection | V3 | built |
+| web::prompt::tests | crates/web/src/prompt/tests.rs | what one run was given, through the production door | projection | V3 | built |
 | web::waiting | crates/web/src/waiting.rs | everything that cannot move until a person answers, in one place | decision | V3 | built |
 | web::record | crates/web/src/record.rs | one history, in three lenses, at one address | decision | V3 | built |
 
@@ -729,11 +778,21 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::main::data | crates/sprawling/src/main/data.rs | the verbs that move bytes and ask about history | adapter | S0 | built |
 | bin::main::tests | crates/sprawling/src/main/tests.rs | flags are never paths, and no ledger is never verified | adapter | S0 | built |
 | bin::assembly | crates/sprawling/src/assembly.rs | the assembly point: the worker every module below writes methods for, the one clock sample, and the one door a command enters by | adapter | S0 | built |
+| bin::assembly::lifetime | crates/sprawling/src/assembly/lifetime.rs | a worker opened over a history, and the city closed in the record | adapter | S0 | built |
+| bin::assembly::fixture | crates/sprawling/src/assembly/fixture.rs | the fake provider and the worker every assembly test starts from | adapter | S0 | built |
 | bin::assembly::genesis | crates/sprawling/src/assembly/genesis.rs | forming a city in a directory, taking a folder in as a building, and what a restart finds | adapter | V3 | built |
+| bin::assembly::genesis::tests | crates/sprawling/src/assembly/genesis/tests.rs | genesis happens once, adoption leaves the work alone, and a restart closes what a crash left open | adapter | V3 | built |
 | bin::assembly::naming | crates/sprawling/src/assembly/naming.rs | the wire's words and the kernel's, translated one way each | decision | V3 | built |
 | bin::assembly::folds | crates/sprawling/src/assembly/folds.rs | everything a worker inherits from a history it did not write, in one verified pass | projection | V3 | built |
+| bin::assembly::folds::collaboration | crates/sprawling/src/assembly/folds/collaboration.rs | what is waiting in each room, and what ground is already claimed | projection | V3 | built |
+| bin::assembly::folds::tests | crates/sprawling/src/assembly/folds/tests.rs | the folds tests route | projection | V3 | built |
+| bin::assembly::folds::tests::standing | crates/sprawling/src/assembly/folds/tests/standing.rs | what one verified pass rebuilds: queues, endpoint book, halted scopes | projection | V3 | built |
+| bin::assembly::folds::tests::history | crates/sprawling/src/assembly/folds/tests/history.rs | what a page reads back: the city, one session, and where a slice resumes | projection | V3 | built |
 | bin::assembly::building_page | crates/sprawling/src/assembly/building_page.rs | one building, as the files in it say it is | projection | V3 | built |
 | bin::assembly::credentials | crates/sprawling/src/assembly/credentials.rs | what this city can sign in as, and what it may call | adapter | V3 | built |
+| bin::assembly::credentials::signing | crates/sprawling/src/assembly/credentials/signing.rs | a subscription login in two steps, the renewal before use, and the vault | adapter | V3 | built |
+| bin::assembly::credentials::endpoints | crates/sprawling/src/assembly/credentials/endpoints.rs | an endpoint probed before it is attached, and a model chosen for a tag | adapter | V3 | built |
+| bin::assembly::credentials::tests | crates/sprawling/src/assembly/credentials/tests.rs | logins, enrolments and the endpoint a dispatch needs | adapter | V3 | built |
 | bin::assembly::mcp | crates/sprawling/src/assembly/mcp.rs | reaching the MCP servers a building's configuration names | adapter | V3 | built |
 | bin::assembly::dispatching | crates/sprawling/src/assembly/dispatching.rs | one dispatch, from what a person asked to the run that froze | adapter | V3 | built |
 | bin::assembly::dispatching::agreeing | crates/sprawling/src/assembly/dispatching/agreeing.rs | every refusal a dispatch can owe before it costs anything | adapter | V3 | built |
@@ -742,7 +801,16 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::waking | crates/sprawling/src/assembly/waking.rs | the two ways a resident who is not working is set going | adapter | V3 | built |
 | bin::assembly::waking::tests | crates/sprawling/src/assembly/waking/tests.rs | arrivals and knocks, as the rooms see them | adapter | V3 | built |
 | bin::assembly::workbench | crates/sprawling/src/assembly/workbench.rs | where a run stands, and the bench it is given to work at | adapter | V3 | built |
+| bin::assembly::workbench::standing | crates/sprawling/src/assembly/workbench/standing.rs | where one run stands, settled once the city has agreed to take the work | adapter | V3 | built |
+| bin::assembly::workbench::desks | crates/sprawling/src/assembly/workbench/desks.rs | the desks one dispatch lends out and takes back | adapter | V3 | built |
+| bin::assembly::workbench::tools | crates/sprawling/src/assembly/workbench/tools.rs | one registration feeding the catalogue and the bench, and the status tool | adapter | V3 | built |
+| bin::assembly::workbench::servers | crates/sprawling/src/assembly/workbench/servers.rs | the external tools a building's configuration names | adapter | V3 | built |
+| bin::assembly::workbench::engine | crates/sprawling/src/assembly/workbench/engine.rs | the execution engine this build carries, and the shell a layer may ask for | adapter | V3 | built |
+| bin::assembly::workbench::tests | crates/sprawling/src/assembly/workbench/tests.rs | rules that do not parse, neighbours, signals, and the engine arms | adapter | V3 | built |
 | bin::assembly::freezing | crates/sprawling/src/assembly/freezing.rs | what a run is frozen with: its plan, and the handoff that resumes it | adapter | V3 | built |
+| bin::assembly::freezing::tests | crates/sprawling/src/assembly/freezing/tests.rs | the freezing tests route | adapter | V3 | built |
+| bin::assembly::freezing::tests::dispatches | crates/sprawling/src/assembly/freezing/tests/dispatches.rs | what one dispatch freezes and leaves: the handoff, the job bytes, the prompt, the lineage | adapter | V3 | built |
+| bin::assembly::freezing::tests::ceilings | crates/sprawling/src/assembly/freezing/tests/ceilings.rs | the ceiling and the effort a run is frozen under | adapter | V3 | built |
 | bin::assembly::driving | crates/sprawling/src/assembly/driving.rs | one drive, the three hooks that touch the ledger while it runs, and what it leaves | adapter | V3 | built |
 | bin::assembly::driving::tests | crates/sprawling/src/assembly/driving/tests.rs | the driving fixtures route | adapter | V3 | built |
 | bin::assembly::driving::tests::turns | crates/sprawling/src/assembly/driving/tests/turns.rs | turn loops, cancels and steers | adapter | V3 | built |
@@ -755,7 +823,13 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::settling::tests::ending | crates/sprawling/src/assembly/settling/tests/ending.rs | endings and hand-downs | adapter | V3 | built |
 | bin::assembly::settling::tests::landing | crates/sprawling/src/assembly/settling/tests/landing.rs | half-settled landings leave nothing torn | adapter | V3 | built |
 | bin::assembly::reviewing | crates/sprawling/src/assembly/reviewing.rs | what a run offers a building it may not write in, and what merging it costs | adapter | V3 | built |
+| bin::assembly::reviewing::tests | crates/sprawling/src/assembly/reviewing/tests.rs | the index of the review tests | adapter | V3 | built |
+| bin::assembly::reviewing::tests::landing | crates/sprawling/src/assembly/reviewing/tests/landing.rs | work reaching a review building only after a second resident checks it | adapter | V3 | built |
+| bin::assembly::reviewing::tests::refusal | crates/sprawling/src/assembly/reviewing/tests/refusal.rs | a merge whose announcing line the history refused leaves the building where it was | adapter | V3 | built |
 | bin::assembly::plans | crates/sprawling/src/assembly/plans.rs | one building's plan: who holds what, what is ready, and how far red reaches | adapter | V3 | built |
+| bin::assembly::plans::tests | crates/sprawling/src/assembly/plans/tests.rs | what a plan and a standing goal do to the city, by theme | adapter | V3 | built |
+| bin::assembly::plans::tests::rows | crates/sprawling/src/assembly/plans/tests/rows.rs | a plan's rows read, claimed, closed, and the claim whose line never landed | adapter | V3 | built |
+| bin::assembly::plans::tests::goals | crates/sprawling/src/assembly/plans/tests/goals.rs | a goal that collides with a claimed path, and a graph run room by room | adapter | V3 | built |
 | bin::assembly::commanding | crates/sprawling/src/assembly/commanding.rs | the verbs a person sends, and what each one does to the city | adapter | V3 | built |
 | bin::assembly::commanding::routing | crates/sprawling/src/assembly/commanding/routing.rs | one verb in, one dispatch or refusal out, plus the schedule tick | adapter | V3 | built |
 | bin::assembly::commanding::governing | crates/sprawling/src/assembly/commanding/governing.rs | halts, autonomy, approvals, forks: the standing answers | adapter | V3 | built |
@@ -770,8 +844,12 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::serving::tests | crates/sprawling/src/serving/tests.rs | the key this city mints is the key its own door accepts | adapter | V3 | built |
 | bin::mcp_stdio | crates/sprawling/src/mcp_stdio.rs | an MCP server as a child process, one line per message | adapter | R1 | built |
 | bin::mcp_http | crates/sprawling/src/mcp_http.rs | an MCP server over HTTP: one request, one message, no session | adapter | R1 | built |
+| bin::mcp_http::tests | crates/sprawling/src/mcp_http/tests.rs | what the HTTP transport, its session and its redeemed header are held to | adapter | R1 | built |
 | bin::firstrun | crates/sprawling/src/firstrun.rs | the first screen, where a city goes when nobody said, and handing a URL to the desktop | adapter | P7 | built |
 | bin::install | crates/sprawling/src/install.rs | putting this binary where a shell will find it, and taking it back out | adapter | P0 | built |
+| bin::install::search_path_windows | crates/sprawling/src/install/search_path_windows.rs | editing the user search path in the registry under its own type, and telling the desktop | adapter | P0 | built |
+| bin::install::search_path_elsewhere | crates/sprawling/src/install/search_path_elsewhere.rs | handing back the line a person adds themselves, where no search path is written | adapter | P0 | built |
+| bin::install::tests | crates/sprawling/src/install/tests.rs | installing twice is installing once, and uninstalling returns the original search path | adapter | P0 | built |
 | bin::wire_client | crates/sprawling/src/wire_client.rs | the second client of the wire: one frame out, every frame back, and enrolment from stdin | adapter | P3 | built |
 | bin::console | crates/sprawling/src/console.rs | what a served city says to the terminal it is running in, and what a line typed there means | decision | P1 | built |
 | bin::console::language | crates/sprawling/src/console/language.rs | the words a line may use and what each one asks for | decision | P1 | built |
@@ -782,6 +860,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::keying | crates/sprawling/src/keying.rs | what guards the door this serve opens: nothing, what the operator configured, or one minted for this serve alone | decision | R2 | built |
 | bin::effect | crates/sprawling/src/effect.rs | what a run's desks left behind: the lines the history takes, and the change the city may not make before them | value | R2 | built |
 | bin::plan_view | crates/sprawling/src/plan_view.rs | every building's plan, parsed once and re-parsed only when a record says it may have moved | projection | V3 | built |
+| bin::plan_view::tests | crates/sprawling/src/plan_view/tests.rs | proof that the projection folds records rather than holding a copy of the plan | projection | V3 | built |
 | bin::views | crates/sprawling/src/views.rs | the fold every query is answered from, and the lines a page reads off it | projection | V3 | built |
 | bin::views::holding | crates/sprawling/src/views/holding.rs | what the views hold and how one record folds in | projection | V3 | built |
 | bin::views::answering | crates/sprawling/src/views/answering.rs | every question a page may ask, answered from the fold | projection | V3 | built |

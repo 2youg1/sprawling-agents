@@ -28,7 +28,7 @@ const RENDERING: [&str; 16] = [
     "src/alert/judge.rs",
     "src/approval/bin.rs",
     "src/approval/inbox.rs",
-    "src/city_view.rs",
+    "src/city_view/page.rs",
     "src/dashboard.rs",
     "src/ledger_view.rs",
     "src/live/commands.rs",

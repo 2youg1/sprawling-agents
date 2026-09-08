@@ -460,3 +460,84 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 **这不是一次接口变更**：公开路径仍是 `kernel::NodeId`，字段与签名一字未动，
 变的只是 `cargo public-api` 记录的定义模块——`NodeId` 从 `kernel::plan` 搬进了自己的文件（kernel-SPEC §8-N）。
 记在这里是因为 `apisync` 判的是「基线动了就要有一份 SPEC 同行」，而基线确实动了。
+
+### 8-13 collab::claim_tool 目录化（card-5.2）
+
+`claim_tool.rs` 原有 913 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成三份：
+
+- `claim_tool.rs`（325 行）——`ClaimDesk` 与它的六个动作实现：计划文本、本次 drive 的 `Held`、`effects`，以及 `list`／`claim`／`finish`／`put_down`／`split`／`take_held`。它同时是索引位置，声明 `mod tool;` 并 `pub use tool::ClaimTool;`，因此 crate 内其它文件与 `lib.rs` 的 `use` 一行未改。
+- `claim_tool/tool.rs`（224 行）——`ClaimTool` 本身：工具元数据与参数 schema、`Tool` 实现的动作路由，以及读参数的 `node_of`／`reason_of`／`parts_of` 与 `ACTIONS` 常量。它是 `claim_tool` 的子模块，因此照旧直接调用 `ClaimDesk` 的私有方法与私有字段 `room`，无需放宽任何字段可见性。
+- `claim_tool/tests.rs`（392 行）——原内联 `mod tests` 原样迁出，断言、名字与 16 个 `#[test]` 一个未动。
+
+**无字段开放。** 唯一改动可见性的项是 `ACTIONS`：它由 `tool.rs` 定义、由同目录的 `tests.rs` 断言，故写作 `pub(super) const ACTIONS`，仍不出 `claim_tool` 模块。
+
+**apisync 未重写基线。** `ClaimTool` 的定义模块虽从 `claim_tool` 移到 `claim_tool::tool`，但两者都是私有模块，公开路径仍是 `collab::ClaimTool`，`cargo xtask apisync` 对 collab 无差异。
+
+### 8-14 collab::pr_tool 目录化（card-5.2）
+
+`pr_tool.rs` 原有 561 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成三份：
+
+- `pr_tool.rs`（354 行）——`PrEffect`、`PrDesk` 与它的 `open`／`list`／`check`／`take_effects`、`PrTool` 及其 `Tool` 实现，以及读参数的 `text`。它同时是索引位置，声明 `mod request;` 并 `pub use request::OpenRequest;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。带参数豁免的 `PrDesk::new` 留在本文件。
+- `pr_tool/request.rs`（70 行）——`OpenRequest` 及其 `payload`／`from_payload`：`pr_opened` 记录的形状与回读。
+- `pr_tool/tests.rs`（152 行）——原内联 `mod tests` 原样迁出，断言、名字与 6 个 `#[test]` 一个未动。
+
+**无字段开放。** `OpenRequest` 的四个字段本来就是 `pub`，切分未放宽任何可见性。
+
+**apisync 未重写基线。** `OpenRequest` 的定义模块从 `pr_tool` 移到私有的 `pr_tool::request`，公开路径仍是 `collab::OpenRequest`，`cargo xtask apisync` 对 collab 无差异。
+
+### 8-15 collab::inbox 目录化（card-5.2）
+
+`inbox.rs` 原有 543 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成四份：
+
+- `inbox.rs`（341 行）——`Lane`、`Signal` 及其构造、访问器、`lane`、两条记录 `enqueued_payload`／`consumed_payload`、私有的 `wire`／`from_wire` 与 `broken`，以及接收侧 `Inbox` 的 `new`／`deliver`／`pull`／`take_steer`／`pending`。它同时是索引位置，声明 `mod signal_id;`／`mod signal_kind;` 并 `pub use` 两个类型，因此 `lib.rs` 与 crate 外的 `use` 一行未改。带参数豁免的 `Signal::new` 留在本文件。
+- `inbox/signal_id.rs`（37 行）——`SignalId` 与它的 `parse`／`as_str`：重复投递靠什么被认出。
+- `inbox/signal_kind.rs`（50 行）——`SignalKind` 与它的 `as_str`／`parse`：四种通信各自的线上名字。
+- `inbox/tests.rs`（141 行）——原内联 `mod tests` 原样迁出，断言、名字与 7 个 `#[test]` 一个未动。
+
+**无字段开放。** `SignalId` 的元组字段仍是私有，两个子模块都只暴露原有的公开方法。
+
+**apisync 未重写基线。** `SignalId` 与 `SignalKind` 的定义模块从 `inbox` 移到私有的 `inbox::signal_id`／`inbox::signal_kind`，公开路径仍是 `collab::SignalId`／`collab::SignalKind`，`cargo xtask apisync` 对 collab 无差异。
+
+### 8-16 collab::workshop_tool 目录化（card-5.2）
+
+`workshop_tool.rs` 原有 539 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
+
+- `workshop_tool.rs`（376 行）——`WorkshopDesk` 与它的 `lay_out`／`question`／`judge`／`accept`、`WorkshopTool` 与它的元数据和 `Tool` 实现、动作枚举 `Op`，以及读参数的 `text`／`contract_of`。它同时是子模块的父模块，声明 `mod tests;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。
+- `workshop_tool/tests.rs`（167 行）——原内联 `mod tests` 原样迁出，断言、名字与 5 个 `#[test]` 一个未动；原 `mod tests` 上的 `#[allow(...)]` 列表原样落在父文件的 `mod tests;` 声明上。
+
+**无字段开放。** 测试文件是 `workshop_tool` 的子模块，`use super::*` 之外不需要任何新的可见性。
+
+**apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::WorkshopDesk`／`collab::WorkshopTool`，`cargo xtask apisync` 对 collab 无差异。
+
+### 8-17 collab::signal_tool 目录化（card-5.2）
+
+`signal_tool.rs` 原有 498 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
+
+- `signal_tool.rs`（352 行）——`SignalEffect`、`SignalDesk` 与它的 `pending`／`take_steer`／`take_effects`／`take_inbox`／`mint`／`send`／`pull`、`SignalTool` 与它的元数据和 `Tool` 实现，以及读参数的 `text`。它同时是子模块的父模块，声明 `mod tests;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。带参数豁免的 `SignalDesk::new` 留在本文件。
+- `signal_tool/tests.rs`（150 行）——原内联 `mod tests` 原样迁出，断言、名字与 5 个 `#[test]` 一个未动；原 `mod tests` 上的 `#[allow(...)]` 列表原样落在父文件的 `mod tests;` 声明上。
+
+**无字段开放。** 测试文件是 `signal_tool` 的子模块，`SignalDesk` 的私有字段（含 `inbox`）对它照旧可见，`use super::*` 之外不需要任何新的可见性。
+
+**apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::SignalDesk`／`collab::SignalTool`／`collab::SignalEffect`，`cargo xtask apisync` 对 collab 无差异。
+
+### 8-18 collab::draft 目录化（card-5.2）
+
+`draft.rs` 原有 466 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
+
+- `draft.rs`（339 行）——`Draft`、`Return`、`HoldToken`、`Submission`、`Resolution`、`Drafts` 与它的 `submit`／`resolve`／`holds`／`held_payload`／`resolved_payload` 及私有的 `key`／`token`／`hold`／`clear`。它同时是子模块的父模块，声明 `mod tests;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。
+- `draft/tests.rs`（131 行）——原内联 `mod tests` 原样迁出，断言、名字与 8 个 `#[test]` 一个未动；原 `mod tests` 上的 `#[allow(...)]` 列表原样落在父文件的 `mod tests;` 声明上。
+
+**无字段开放。** 测试文件是 `draft` 的子模块，`Draft` 与 `Drafts` 的私有字段对它照旧可见，`use super::*` 之外不需要任何新的可见性。
+
+**apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::Draft`／`collab::Drafts` 等，`cargo xtask apisync` 对 collab 无差异。
+
+### 8-19 collab::workshop 目录化（card-5.2）
+
+`workshop.rs` 原有 445 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
+
+- `workshop.rs`（330 行）——`NodeId`、`NodeContract` 与它的九个读取器及 `job_text`、`Workshop` 与它的 `schedule`／`ready`／`contract`／`len`／`is_empty` 及私有的 `order`。它同时是子模块的父模块，声明 `mod tests;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。带参数豁免的 `NodeContract::new` 留在本文件。
+- `workshop/tests.rs`（119 行）——原内联 `mod tests` 原样迁出，断言、名字与 7 个 `#[test]` 一个未动；原 `mod tests` 上的 `#[allow(...)]` 列表原样落在父文件的 `mod tests;` 声明上。
+
+**无字段开放。** 测试文件是 `workshop` 的子模块，`NodeId`、`NodeContract` 与 `Workshop` 的私有字段对它照旧可见，`use super::*` 之外不需要任何新的可见性。
+
+**apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::NodeId`／`collab::NodeContract`／`collab::Workshop`，`cargo xtask apisync` 对 collab 无差异。

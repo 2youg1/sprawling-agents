@@ -3341,14 +3341,15 @@ mod tests {
     /// a test that read the directory would be testing the machine it ran
     /// on. A view added without a line here is a view whose English can
     /// escape, which is the failure this table exists to make loud.
-    const VIEWS: [(&str, &str); 60] = [
+    const VIEWS: [(&str, &str); 61] = [
         ("alert.rs", include_str!("alert.rs")),
         ("board.rs", include_str!("board.rs")),
         ("app/rows.rs", include_str!("app/rows.rs")),
         ("approval.rs", include_str!("approval.rs")),
         ("archive_search.rs", include_str!("archive_search.rs")),
         ("building_view.rs", include_str!("building_view.rs")),
-        ("city_view.rs", include_str!("city_view.rs")),
+        ("city_view/page.rs", include_str!("city_view/page.rs")),
+        ("city_view/text.rs", include_str!("city_view/text.rs")),
         ("command.rs", include_str!("command.rs")),
         ("dashboard.rs", include_str!("dashboard.rs")),
         ("drop.rs", include_str!("drop.rs")),

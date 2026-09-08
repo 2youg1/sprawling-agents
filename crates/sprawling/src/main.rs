@@ -26,7 +26,6 @@ include!(concat!(env!("OUT_DIR"), "/client_embed.rs"));
 /// CycloneDX file half).
 const DEPENDENCIES: &str = include_str!(concat!(env!("OUT_DIR"), "/deps.txt"));
 
-/// One line a person can read about what this binary carries.
 #[path = "main/city.rs"]
 mod city;
 #[path = "main/data.rs"]

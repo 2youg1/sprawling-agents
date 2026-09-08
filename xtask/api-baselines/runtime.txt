@@ -38,6 +38,10 @@ impl runtime::StatusSnapshot
 impl runtime::StatusSnapshot
 impl runtime::StatusTool
 impl runtime::StatusTool
+impl runtime::TurnCancelled
+impl runtime::TurnCancelled
+impl runtime::TurnReport
+impl runtime::TurnReport
 impl runtime::Watchdog
 impl runtime::bench::ToolBench
 impl runtime::catalog::Catalog
@@ -78,10 +82,6 @@ impl runtime::turn::Turn<runtime::turn::Recording>
 impl runtime::turn::Turn<runtime::turn::Recording>
 impl runtime::turn::Turn<runtime::turn::ToolWave>
 impl runtime::turn::Turn<runtime::turn::ToolWave>
-impl runtime::turn::TurnCancelled
-impl runtime::turn::TurnCancelled
-impl runtime::turn::TurnReport
-impl runtime::turn::TurnReport
 impl runtime::window::Window
 pub const runtime::diagnostics::Level::ALL: [runtime::diagnostics::Level; 5]
 pub const runtime::diagnostics::Level::DEFAULT: runtime::diagnostics::Level
@@ -152,6 +152,18 @@ pub fn runtime::StatusTool::set_snapshot(&mut self, runtime::StatusSnapshot)
 pub fn runtime::StatusTool::set_snapshot(&mut self, runtime::StatusSnapshot)
 pub fn runtime::StatusTool::watching(runtime::StatusSnapshot, alloc::boxed::Box<dyn core::ops::function::Fn() -> alloc::vec::Vec<runtime::ChildStatus>>) -> core::result::Result<runtime::StatusTool, kernel::error::shape::AxError>
 pub fn runtime::StatusTool::watching(runtime::StatusSnapshot, alloc::boxed::Box<dyn core::ops::function::Fn() -> alloc::vec::Vec<runtime::ChildStatus>>) -> core::result::Result<runtime::StatusTool, kernel::error::shape::AxError>
+pub fn runtime::TurnCancelled::refs(&self) -> &[kernel::event::payload::EventRef]
+pub fn runtime::TurnCancelled::refs(&self) -> &[kernel::event::payload::EventRef]
+pub fn runtime::TurnReport::assistant(&self) -> &[kernel::model::wire::ContentBlock]
+pub fn runtime::TurnReport::assistant(&self) -> &[kernel::model::wire::ContentBlock]
+pub fn runtime::TurnReport::calls_made(&self) -> usize
+pub fn runtime::TurnReport::calls_made(&self) -> usize
+pub fn runtime::TurnReport::model_returned(&self) -> &kernel::event::payload::EventRef
+pub fn runtime::TurnReport::model_returned(&self) -> &kernel::event::payload::EventRef
+pub fn runtime::TurnReport::refs(&self) -> &[kernel::event::payload::EventRef]
+pub fn runtime::TurnReport::refs(&self) -> &[kernel::event::payload::EventRef]
+pub fn runtime::TurnReport::wave_results(&self) -> &[kernel::model::wire::ContentBlock]
+pub fn runtime::TurnReport::wave_results(&self) -> &[kernel::model::wire::ContentBlock]
 pub fn runtime::Watchdog::fired_payload(&self, &runtime::Disposal) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn runtime::Watchdog::new() -> runtime::Watchdog
 pub fn runtime::Watchdog::on_provider_failure(&mut self) -> runtime::Disposal
@@ -180,8 +192,8 @@ pub fn runtime::catalog::Catalog::set_mode(&mut self, runtime::mode::Mode)
 pub fn runtime::catalog::Catalog::set_mode(&mut self, runtime::mode::Mode)
 pub fn runtime::catalog::Catalog::skill_pins(&self) -> alloc::vec::Vec<runtime::catalog::SkillPin>
 pub fn runtime::catalog::Catalog::skill_pins(&self) -> alloc::vec::Vec<runtime::catalog::SkillPin>
-pub fn runtime::catalog::Catalog::tool_defs(&self) -> alloc::vec::Vec<kernel::model::ToolDef>
-pub fn runtime::catalog::Catalog::tool_defs(&self) -> alloc::vec::Vec<kernel::model::ToolDef>
+pub fn runtime::catalog::Catalog::tool_defs(&self) -> alloc::vec::Vec<kernel::model::wire::ToolDef>
+pub fn runtime::catalog::Catalog::tool_defs(&self) -> alloc::vec::Vec<kernel::model::wire::ToolDef>
 pub fn runtime::clock::ClockStamp::render(&self) -> alloc::string::String
 pub fn runtime::clock::ClockStamp::render(&self) -> alloc::string::String
 pub fn runtime::clock::StampGate::new(kernel::config::ClockStampGranularity) -> runtime::clock::StampGate
@@ -271,8 +283,8 @@ pub fn runtime::prefix::FrozenPrefix::segment_hashes(&self) -> [kernel::locator:
 pub fn runtime::prefix::FrozenPrefix::segment_hashes(&self) -> [kernel::locator::B3Hash; 4]
 pub fn runtime::prefix::FrozenPrefix::segments(&self) -> [&runtime::prefix::FrozenSegment; 4]
 pub fn runtime::prefix::FrozenPrefix::segments(&self) -> [&runtime::prefix::FrozenSegment; 4]
-pub fn runtime::prefix::FrozenPrefix::system_blocks(&self) -> core::result::Result<alloc::vec::Vec<kernel::model::SystemBlock>, kernel::error::shape::AxError>
-pub fn runtime::prefix::FrozenPrefix::system_blocks(&self) -> core::result::Result<alloc::vec::Vec<kernel::model::SystemBlock>, kernel::error::shape::AxError>
+pub fn runtime::prefix::FrozenPrefix::system_blocks(&self) -> core::result::Result<alloc::vec::Vec<kernel::model::wire::SystemBlock>, kernel::error::shape::AxError>
+pub fn runtime::prefix::FrozenPrefix::system_blocks(&self) -> core::result::Result<alloc::vec::Vec<kernel::model::wire::SystemBlock>, kernel::error::shape::AxError>
 pub fn runtime::prefix::FrozenSegment::bytes(&self) -> &[u8]
 pub fn runtime::prefix::FrozenSegment::bytes(&self) -> &[u8]
 pub fn runtime::prefix::FrozenSegment::hash(&self) -> &kernel::locator::B3Hash
@@ -318,35 +330,23 @@ pub fn runtime::stamp(kernel::event::identity::TimeMs, &[kernel::config::ClockZo
 pub fn runtime::structure_of(&str) -> alloc::vec::Vec<runtime::digest::StructureNode>
 pub fn runtime::tools::parse_arm(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> core::result::Result<kernel::tool::ExecArm, kernel::error::shape::AxError>
 pub fn runtime::tools::version_of(&[u8]) -> alloc::string::String
-pub fn runtime::turn::Turn<runtime::turn::Assembling>::assemble(self, runtime::turn::Interrupt, &mut dyn kernel::ledger::Ledger, &runtime::prefix::FrozenPrefix, &runtime::window::Window, &[kernel::model::ToolDef], &runtime::turn::CallShape) -> core::result::Result<runtime::turn::PhaseOutcome<runtime::turn::Turn<runtime::turn::Calling>>, kernel::error::shape::AxError>
-pub fn runtime::turn::Turn<runtime::turn::Assembling>::assemble(self, runtime::turn::Interrupt, &mut dyn kernel::ledger::Ledger, &runtime::prefix::FrozenPrefix, &runtime::window::Window, &[kernel::model::ToolDef], &runtime::turn::CallShape) -> core::result::Result<runtime::turn::PhaseOutcome<runtime::turn::Turn<runtime::turn::Calling>>, kernel::error::shape::AxError>
+pub fn runtime::turn::Turn<runtime::turn::Assembling>::assemble(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &runtime::prefix::FrozenPrefix, &runtime::window::Window, &[kernel::model::wire::ToolDef], &runtime::turn::CallShape) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::Calling>>, kernel::error::shape::AxError>
+pub fn runtime::turn::Turn<runtime::turn::Assembling>::assemble(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &runtime::prefix::FrozenPrefix, &runtime::window::Window, &[kernel::model::wire::ToolDef], &runtime::turn::CallShape) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::Calling>>, kernel::error::shape::AxError>
 pub fn runtime::turn::Turn<runtime::turn::Assembling>::begin(kernel::event::identity::RunId, alloc::string::String, kernel::event::identity::TimeMs) -> runtime::turn::Turn<runtime::turn::Assembling>
 pub fn runtime::turn::Turn<runtime::turn::Assembling>::begin(kernel::event::identity::RunId, alloc::string::String, kernel::event::identity::TimeMs) -> runtime::turn::Turn<runtime::turn::Assembling>
-pub fn runtime::turn::Turn<runtime::turn::Calling>::call<'sink>(self, runtime::turn::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn kernel::model::Model, &kernel::model::BuildingPolicy, core::option::Option<&mut (dyn core::ops::function::FnMut(&str) + 'sink)>) -> core::result::Result<runtime::turn::PhaseOutcome<runtime::turn::Turn<runtime::turn::ToolWave>>, kernel::error::shape::AxError>
-pub fn runtime::turn::Turn<runtime::turn::Calling>::call<'sink>(self, runtime::turn::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn kernel::model::Model, &kernel::model::BuildingPolicy, core::option::Option<&mut (dyn core::ops::function::FnMut(&str) + 'sink)>) -> core::result::Result<runtime::turn::PhaseOutcome<runtime::turn::Turn<runtime::turn::ToolWave>>, kernel::error::shape::AxError>
-pub fn runtime::turn::Turn<runtime::turn::Recording>::record(self, runtime::turn::Interrupt, &mut dyn kernel::ledger::Ledger) -> core::result::Result<runtime::turn::PhaseOutcome<runtime::turn::TurnReport>, kernel::error::shape::AxError>
-pub fn runtime::turn::Turn<runtime::turn::Recording>::record(self, runtime::turn::Interrupt, &mut dyn kernel::ledger::Ledger) -> core::result::Result<runtime::turn::PhaseOutcome<runtime::turn::TurnReport>, kernel::error::shape::AxError>
-pub fn runtime::turn::Turn<runtime::turn::ToolWave>::execute(self, runtime::turn::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>) -> core::result::Result<runtime::turn::PhaseOutcome<runtime::turn::Turn<runtime::turn::Recording>>, kernel::error::shape::AxError>
-pub fn runtime::turn::Turn<runtime::turn::ToolWave>::execute(self, runtime::turn::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>) -> core::result::Result<runtime::turn::PhaseOutcome<runtime::turn::Turn<runtime::turn::Recording>>, kernel::error::shape::AxError>
-pub fn runtime::turn::TurnCancelled::refs(&self) -> &[kernel::event::payload::EventRef]
-pub fn runtime::turn::TurnCancelled::refs(&self) -> &[kernel::event::payload::EventRef]
-pub fn runtime::turn::TurnReport::assistant(&self) -> &[kernel::model::ContentBlock]
-pub fn runtime::turn::TurnReport::assistant(&self) -> &[kernel::model::ContentBlock]
-pub fn runtime::turn::TurnReport::calls_made(&self) -> usize
-pub fn runtime::turn::TurnReport::calls_made(&self) -> usize
-pub fn runtime::turn::TurnReport::model_returned(&self) -> &kernel::event::payload::EventRef
-pub fn runtime::turn::TurnReport::model_returned(&self) -> &kernel::event::payload::EventRef
-pub fn runtime::turn::TurnReport::refs(&self) -> &[kernel::event::payload::EventRef]
-pub fn runtime::turn::TurnReport::refs(&self) -> &[kernel::event::payload::EventRef]
-pub fn runtime::turn::TurnReport::wave_results(&self) -> &[kernel::model::ContentBlock]
-pub fn runtime::turn::TurnReport::wave_results(&self) -> &[kernel::model::ContentBlock]
+pub fn runtime::turn::Turn<runtime::turn::Calling>::call<'sink>(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn kernel::model::Model, &kernel::model::wire::BuildingPolicy, core::option::Option<&mut (dyn core::ops::function::FnMut(&str) + 'sink)>) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::ToolWave>>, kernel::error::shape::AxError>
+pub fn runtime::turn::Turn<runtime::turn::Calling>::call<'sink>(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn kernel::model::Model, &kernel::model::wire::BuildingPolicy, core::option::Option<&mut (dyn core::ops::function::FnMut(&str) + 'sink)>) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::ToolWave>>, kernel::error::shape::AxError>
+pub fn runtime::turn::Turn<runtime::turn::Recording>::record(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger) -> core::result::Result<runtime::PhaseOutcome<runtime::TurnReport>, kernel::error::shape::AxError>
+pub fn runtime::turn::Turn<runtime::turn::Recording>::record(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger) -> core::result::Result<runtime::PhaseOutcome<runtime::TurnReport>, kernel::error::shape::AxError>
+pub fn runtime::turn::Turn<runtime::turn::ToolWave>::execute(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::Recording>>, kernel::error::shape::AxError>
+pub fn runtime::turn::Turn<runtime::turn::ToolWave>::execute(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::Recording>>, kernel::error::shape::AxError>
 pub fn runtime::version_of(&[u8]) -> alloc::string::String
-pub fn runtime::window::Window::messages(&self) -> &[kernel::model::ChatMessage]
+pub fn runtime::window::Window::messages(&self) -> &[kernel::model::wire::ChatMessage]
 pub fn runtime::window::Window::new() -> runtime::window::Window
-pub fn runtime::window::Window::push_assistant(&mut self, alloc::vec::Vec<kernel::model::ContentBlock>)
+pub fn runtime::window::Window::push_assistant(&mut self, alloc::vec::Vec<kernel::model::wire::ContentBlock>)
 pub fn runtime::window::Window::push_steer(&mut self, &str, &str)
 pub fn runtime::window::Window::push_task_lines(&mut self, &str, &str, runtime::window::Opening)
-pub fn runtime::window::Window::push_tool_results(&mut self, alloc::vec::Vec<kernel::model::ContentBlock>)
+pub fn runtime::window::Window::push_tool_results(&mut self, alloc::vec::Vec<kernel::model::wire::ContentBlock>)
 pub mod runtime
 pub mod runtime::bench
 pub mod runtime::catalog
@@ -429,7 +429,7 @@ pub runtime::PackContext::steer: core::option::Option<(alloc::string::String, al
 pub runtime::Packaged::content: alloc::string::String
 pub runtime::Packaged::events: alloc::vec::Vec<kernel::event::payload::Payload>
 pub runtime::PhaseOutcome::Advanced(Next)
-pub runtime::PhaseOutcome::Cancelled(runtime::turn::TurnCancelled)
+pub runtime::PhaseOutcome::Cancelled(runtime::TurnCancelled)
 pub runtime::PrefixPlan::building: alloc::vec::Vec<runtime::prefix::SourceDoc>
 pub runtime::PrefixPlan::caps: runtime::prefix::SegmentCaps
 pub runtime::PrefixPlan::city: alloc::vec::Vec<runtime::prefix::SourceDoc>
@@ -446,7 +446,7 @@ pub runtime::ResumeSeed::must_read: alloc::vec::Vec<kernel::locator::Locator>
 pub runtime::ResumeSeed::run: kernel::event::identity::RunId
 pub runtime::RunHooks::deltas: core::option::Option<&'a mut (dyn core::ops::function::FnMut(&str) + 'a)>
 pub runtime::RunHooks::fence: core::option::Option<&'a mut dyn core::ops::function::FnMut(kernel::event::identity::TimeMs) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>>
-pub runtime::RunHooks::interrupt: &'a mut dyn core::ops::function::FnMut(runtime::run::SafePoint) -> runtime::turn::Interrupt
+pub runtime::RunHooks::interrupt: &'a mut dyn core::ops::function::FnMut(runtime::run::SafePoint) -> runtime::Interrupt
 pub runtime::RunHooks::invoke: &'a mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall, kernel::event::identity::TimeMs) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub runtime::RunHooks::now: &'a mut dyn core::ops::function::FnMut() -> core::result::Result<kernel::event::identity::TimeMs, kernel::error::shape::AxError>
 pub runtime::RunPlan::addr: kernel::address::Address
@@ -456,13 +456,13 @@ pub runtime::RunPlan::goal: alloc::string::String
 pub runtime::RunPlan::job: kernel::locator::Locator
 pub runtime::RunPlan::opening: runtime::window::Opening
 pub runtime::RunPlan::parent: core::option::Option<kernel::event::identity::RunId>
-pub runtime::RunPlan::policy: kernel::model::BuildingPolicy
+pub runtime::RunPlan::policy: kernel::model::wire::BuildingPolicy
 pub runtime::RunPlan::prefix: runtime::prefix::FrozenPrefix
 pub runtime::RunPlan::run: kernel::event::identity::RunId
 pub runtime::RunPlan::shape: runtime::turn::CallShape
 pub runtime::RunPlan::skills: alloc::vec::Vec<runtime::catalog::SkillPin>
 pub runtime::RunPlan::task: alloc::string::String
-pub runtime::RunPlan::tools: alloc::vec::Vec<kernel::model::ToolDef>
+pub runtime::RunPlan::tools: alloc::vec::Vec<kernel::model::wire::ToolDef>
 pub runtime::RunPlan::who: alloc::string::String
 pub runtime::SafePoint::BeforeAssemble
 pub runtime::SafePoint::BeforeAssemble::turn: u32
@@ -634,7 +634,7 @@ pub runtime::run::Advance::Concluded(kernel::completion::Completion)
 pub runtime::run::Advance::Turned
 pub runtime::run::RunHooks::deltas: core::option::Option<&'a mut (dyn core::ops::function::FnMut(&str) + 'a)>
 pub runtime::run::RunHooks::fence: core::option::Option<&'a mut dyn core::ops::function::FnMut(kernel::event::identity::TimeMs) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>>
-pub runtime::run::RunHooks::interrupt: &'a mut dyn core::ops::function::FnMut(runtime::run::SafePoint) -> runtime::turn::Interrupt
+pub runtime::run::RunHooks::interrupt: &'a mut dyn core::ops::function::FnMut(runtime::run::SafePoint) -> runtime::Interrupt
 pub runtime::run::RunHooks::invoke: &'a mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall, kernel::event::identity::TimeMs) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub runtime::run::RunHooks::now: &'a mut dyn core::ops::function::FnMut() -> core::result::Result<kernel::event::identity::TimeMs, kernel::error::shape::AxError>
 pub runtime::run::RunPlan::addr: kernel::address::Address
@@ -644,13 +644,13 @@ pub runtime::run::RunPlan::goal: alloc::string::String
 pub runtime::run::RunPlan::job: kernel::locator::Locator
 pub runtime::run::RunPlan::opening: runtime::window::Opening
 pub runtime::run::RunPlan::parent: core::option::Option<kernel::event::identity::RunId>
-pub runtime::run::RunPlan::policy: kernel::model::BuildingPolicy
+pub runtime::run::RunPlan::policy: kernel::model::wire::BuildingPolicy
 pub runtime::run::RunPlan::prefix: runtime::prefix::FrozenPrefix
 pub runtime::run::RunPlan::run: kernel::event::identity::RunId
 pub runtime::run::RunPlan::shape: runtime::turn::CallShape
 pub runtime::run::RunPlan::skills: alloc::vec::Vec<runtime::catalog::SkillPin>
 pub runtime::run::RunPlan::task: alloc::string::String
-pub runtime::run::RunPlan::tools: alloc::vec::Vec<kernel::model::ToolDef>
+pub runtime::run::RunPlan::tools: alloc::vec::Vec<kernel::model::wire::ToolDef>
 pub runtime::run::RunPlan::who: alloc::string::String
 pub runtime::run::SafePoint::BeforeAssemble
 pub runtime::run::SafePoint::BeforeAssemble::turn: u32
@@ -681,7 +681,7 @@ pub runtime::tools::StatusSnapshot::who: alloc::string::String
 pub runtime::tools::StatusSnapshot::worktree_disk: kernel::budget::ByteLen
 pub runtime::tools::StatusSnapshot::worktree_path: alloc::string::String
 pub runtime::tools::StatusSnapshot::write_domain: alloc::string::String
-pub runtime::turn::CallShape::effort: core::option::Option<kernel::model::Effort>
+pub runtime::turn::CallShape::effort: core::option::Option<kernel::model::wire::Effort>
 pub runtime::turn::CallShape::max_tokens: u64
 pub runtime::turn::CallShape::model: alloc::string::String
 pub runtime::turn::Interrupt::Cancel
@@ -690,7 +690,7 @@ pub runtime::turn::Interrupt::Steer
 pub runtime::turn::Interrupt::Steer::source: alloc::string::String
 pub runtime::turn::Interrupt::Steer::text: alloc::string::String
 pub runtime::turn::PhaseOutcome::Advanced(Next)
-pub runtime::turn::PhaseOutcome::Cancelled(runtime::turn::TurnCancelled)
+pub runtime::turn::PhaseOutcome::Cancelled(runtime::TurnCancelled)
 pub runtime::window::Opening::FromJob
 pub runtime::window::Opening::WithPerson
 pub struct runtime::AbsentSandbox

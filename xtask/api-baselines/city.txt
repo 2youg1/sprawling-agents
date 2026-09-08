@@ -102,7 +102,7 @@ pub fn city::Building::root(&self, &std::path::Path) -> std::path::PathBuf
 pub fn city::BuildingRules::addr(&self) -> &kernel::address::Address
 pub fn city::BuildingRules::egress(&self) -> &kernel::gate::egress::EgressAllowlist
 pub fn city::BuildingRules::model_pool(&self) -> city::ModelPool
-pub fn city::BuildingRules::policy(&self) -> &kernel::model::BuildingPolicy
+pub fn city::BuildingRules::policy(&self) -> &kernel::model::wire::BuildingPolicy
 pub fn city::BuildingRules::reading_room(&self) -> &[alloc::string::String]
 pub fn city::BuildingRules::review(&self) -> bool
 pub fn city::BuildingRules::write_domain(&self) -> core::result::Result<kernel::write_domain::WriteDomain, kernel::error::shape::AxError>
@@ -111,7 +111,7 @@ pub fn city::BuildingTemplate::parse(&str) -> core::result::Result<city::Buildin
 pub fn city::CityPlan::dirs(&self) -> &[kernel::address::Address]
 pub fn city::CityPlan::first(&self) -> core::option::Option<&(kernel::address::Address, city::BuildingTemplate)>
 pub fn city::CityPlan::new(core::option::Option<(&str, &str)>) -> core::result::Result<city::CityPlan, kernel::error::shape::AxError>
-pub fn city::ConfigLayer::effort(&self) -> core::option::Option<kernel::model::Effort>
+pub fn city::ConfigLayer::effort(&self) -> core::option::Option<kernel::model::wire::Effort>
 pub fn city::ConfigLayer::mcp(&self) -> core::option::Option<&[kernel::config::McpServer]>
 pub fn city::ConfigLayer::parse(&str) -> core::result::Result<city::ConfigLayer, kernel::error::shape::AxError>
 pub fn city::ConfigLayer::sandbox(&self) -> core::option::Option<&kernel::config::SandboxLimits>
@@ -194,7 +194,7 @@ pub fn city::survey(&[(alloc::string::String, bool)], bool) -> city::Standing
 pub fn city::urbanite_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::watch_path(&std::path::Path) -> std::path::PathBuf
 pub fn city::write_brief(&std::path::Path, &kernel::address::Address, &city::JobBrief<'_>) -> core::result::Result<city::RunBrief, kernel::error::shape::AxError>
-pub fn city::write_effort(&std::path::Path, &kernel::address::Address, kernel::model::Effort) -> core::result::Result<(), kernel::error::shape::AxError>
+pub fn city::write_effort(&std::path::Path, &kernel::address::Address, kernel::model::wire::Effort) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::write_job(&std::path::Path, &kernel::address::Address, &city::JobBrief<'_>) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
 pub fn city::write_mcp(&std::path::Path, &kernel::address::Address, city::Layer, &[kernel::config::McpServer]) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::write_rules(&std::path::Path, &kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>

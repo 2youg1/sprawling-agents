@@ -35,47 +35,47 @@ pub fn gateway::Custodian::probe() -> (gateway::Custodian, core::option::Option<
 pub fn gateway::Custodian::resolve(&self, &kernel::secret::span::SecretRef) -> core::result::Result<kernel::secret::sealed::Sealed<alloc::string::String>, kernel::error::shape::AxError>
 pub fn gateway::Custodian::set(&mut self, &kernel::secret::span::SecretRef, zeroize::Zeroizing<alloc::string::String>) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn gateway::Custodian::with_env_reader(self, gateway::EnvReader) -> gateway::Custodian
-pub fn gateway::Endpoint::call(&mut self, &kernel::model::ModelRequest) -> core::result::Result<kernel::model::ModelReturn, kernel::error::shape::AxError>
-pub fn gateway::Endpoint::call_streaming(&mut self, &kernel::model::ModelRequest, kernel::model::Increments<'_>) -> core::result::Result<kernel::model::ModelReturn, kernel::error::shape::AxError>
+pub fn gateway::Endpoint::call(&mut self, &kernel::model::seam::ModelRequest) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
+pub fn gateway::Endpoint::call_streaming(&mut self, &kernel::model::seam::ModelRequest, kernel::model::Increments<'_>) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
 pub fn gateway::Endpoint::list_models(&self, &str) -> core::result::Result<alloc::vec::Vec<alloc::string::String>, kernel::error::shape::AxError>
 pub fn gateway::Endpoint::new(gateway::EndpointConfig, gateway::SecretResolver) -> core::result::Result<gateway::Endpoint, kernel::error::shape::AxError>
 pub fn gateway::EndpointBook::apply(&mut self, &kernel::event::payload::EventRecord) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn gateway::EndpointBook::apply_payload(&mut self, kernel::event::kind::EventKind, &kernel::event::payload::Payload) -> core::result::Result<(), kernel::error::shape::AxError>
-pub fn gateway::EndpointBook::choices(&self) -> impl core::iter::traits::iterator::Iterator<Item = (kernel::model::ModelTag, &str, &gateway::ModelEntry)>
+pub fn gateway::EndpointBook::choices(&self) -> impl core::iter::traits::iterator::Iterator<Item = (kernel::model::wire::ModelTag, &str, &gateway::ModelEntry)>
 pub fn gateway::EndpointBook::endpoints(&self) -> impl core::iter::traits::iterator::Iterator<Item = &gateway::AttachedEndpoint>
 pub fn gateway::EndpointBook::is_empty(&self) -> bool
 pub fn gateway::EndpointBook::new() -> gateway::EndpointBook
-pub fn gateway::EndpointBook::select(&self, kernel::model::ModelTag, &kernel::model::BuildingPolicy) -> core::result::Result<gateway::Chosen<'_>, kernel::error::shape::AxError>
+pub fn gateway::EndpointBook::select(&self, kernel::model::wire::ModelTag, &kernel::model::wire::BuildingPolicy) -> core::result::Result<gateway::Chosen<'_>, kernel::error::shape::AxError>
 pub fn gateway::MarketSnapshot::builtin() -> gateway::MarketSnapshot
 pub fn gateway::MarketSnapshot::from_entries(u32, alloc::vec::Vec<gateway::ModelEntry>) -> core::result::Result<gateway::MarketSnapshot, kernel::error::shape::AxError>
 pub fn gateway::MarketSnapshot::is_empty(&self) -> bool
 pub fn gateway::MarketSnapshot::len(&self) -> usize
 pub fn gateway::MarketSnapshot::lookup(&self, &str) -> core::option::Option<&gateway::ModelEntry>
 pub fn gateway::MarketSnapshot::version(&self) -> u32
-pub fn gateway::Native::call(&mut self, &kernel::model::ModelRequest) -> core::result::Result<kernel::model::ModelReturn, kernel::error::shape::AxError>
+pub fn gateway::Native::call(&mut self, &kernel::model::seam::ModelRequest) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
 pub fn gateway::Native::new(gateway::NativeConfig) -> core::result::Result<gateway::Native, kernel::error::shape::AxError>
 pub fn gateway::OauthTokens::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn gateway::adapter_for(&gateway::Chosen<'_>, gateway::SecretResolver, alloc::vec::Vec<(alloc::string::String, alloc::string::String)>) -> core::result::Result<alloc::boxed::Box<(dyn kernel::model::Model + core::marker::Send)>, kernel::error::shape::AxError>
 pub fn gateway::attached_payload(&gateway::AttachedEndpoint) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
-pub fn gateway::increment_of(kernel::model::DialectKind, &serde_json::value::Value) -> core::option::Option<alloc::string::String>
+pub fn gateway::increment_of(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::option::Option<alloc::string::String>
 pub fn gateway::oauth_begin(&gateway::OauthProfile, alloc::string::String, alloc::string::String) -> core::result::Result<gateway::OauthPending, kernel::error::shape::AxError>
 pub fn gateway::oauth_random(&[u8]) -> alloc::string::String
 pub fn gateway::oauth_redeem(&gateway::OauthProfile, &gateway::OauthPending, &str, u64) -> core::result::Result<gateway::OauthTokens, kernel::error::shape::AxError>
 pub fn gateway::oauth_redeem_request(&gateway::OauthProfile, &gateway::OauthPending, &str) -> core::result::Result<gateway::TokenRequest, kernel::error::shape::AxError>
 pub fn gateway::oauth_refresh(&gateway::OauthProfile, &kernel::secret::sealed::Sealed<alloc::string::String>, u64) -> core::result::Result<gateway::OauthTokens, kernel::error::shape::AxError>
 pub fn gateway::profile(&str) -> core::option::Option<&'static gateway::OauthProfile>
-pub fn gateway::request_wire(kernel::model::DialectKind, &kernel::model::ChatRequest) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
-pub fn gateway::response_from_wire(kernel::model::DialectKind, &serde_json::value::Value) -> core::result::Result<kernel::model::ChatResponse, kernel::error::shape::AxError>
-pub fn gateway::response_wire(kernel::model::DialectKind, &kernel::model::ChatResponse) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
-pub fn gateway::selected_payload(kernel::model::ModelTag, &str, &gateway::ModelEntry) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
-pub fn gateway::settle(&kernel::model::ModelUsage, core::option::Option<kernel::budget::UsdMicros>, &gateway::ModelEntry) -> core::result::Result<gateway::CallCost, kernel::error::shape::AxError>
-pub fn gateway::settled_from_stream(kernel::model::DialectKind, &[serde_json::value::Value]) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
+pub fn gateway::request_wire(kernel::model::wire::DialectKind, &kernel::model::wire::ChatRequest) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
+pub fn gateway::response_from_wire(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::result::Result<kernel::model::wire::ChatResponse, kernel::error::shape::AxError>
+pub fn gateway::response_wire(kernel::model::wire::DialectKind, &kernel::model::wire::ChatResponse) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
+pub fn gateway::selected_payload(kernel::model::wire::ModelTag, &str, &gateway::ModelEntry) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn gateway::settle(&kernel::model::wire::ModelUsage, core::option::Option<kernel::budget::UsdMicros>, &gateway::ModelEntry) -> core::result::Result<gateway::CallCost, kernel::error::shape::AxError>
+pub fn gateway::settled_from_stream(kernel::model::wire::DialectKind, &[serde_json::value::Value]) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
 pub gateway::AdmissionVerdict::Admit
 pub gateway::AdmissionVerdict::Hold
 pub gateway::AdmissionVerdict::Hold::until: kernel::event::identity::TimeMs
 pub gateway::AttachedEndpoint::auth: gateway::AuthSpec
 pub gateway::AttachedEndpoint::base_url: alloc::string::String
-pub gateway::AttachedEndpoint::dialect: kernel::model::DialectKind
+pub gateway::AttachedEndpoint::dialect: kernel::model::wire::DialectKind
 pub gateway::AttachedEndpoint::models: alloc::vec::Vec<alloc::string::String>
 pub gateway::AttachedEndpoint::name: alloc::string::String
 pub gateway::AuthSpec::Bearer(kernel::secret::span::SecretRef)
@@ -85,7 +85,7 @@ pub gateway::AuthSpec::Header::value: kernel::secret::span::SecretRef
 pub gateway::AuthSpec::None
 pub gateway::CallCost::billed: kernel::budget::UsdMicros
 pub gateway::CallCost::source: gateway::CostSource
-pub gateway::CallCost::usage: kernel::model::ModelUsage
+pub gateway::CallCost::usage: kernel::model::wire::ModelUsage
 pub gateway::Captured::events: alloc::vec::Vec<kernel::event::payload::Payload>
 pub gateway::Captured::replaced: alloc::vec::Vec<u8>
 pub gateway::Chosen::endpoint: &'b gateway::AttachedEndpoint
@@ -98,7 +98,7 @@ pub gateway::Described::source: alloc::string::String
 pub gateway::Described::writable: bool
 pub gateway::EndpointConfig::auth: gateway::AuthSpec
 pub gateway::EndpointConfig::base_url: alloc::string::String
-pub gateway::EndpointConfig::dialect: kernel::model::DialectKind
+pub gateway::EndpointConfig::dialect: kernel::model::wire::DialectKind
 pub gateway::EndpointConfig::extra_headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
 pub gateway::EndpointConfig::model: alloc::string::String
 pub gateway::EndpointConfig::overrides: alloc::vec::Vec<(alloc::string::String, serde_json::value::Value)>

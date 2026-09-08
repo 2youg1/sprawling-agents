@@ -17,6 +17,7 @@
 use crate::assembly::*;
 use crate::serving::CommandDesk;
 use crate::views::Views;
+use kernel::Locator;
 
 #[test]
 fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
