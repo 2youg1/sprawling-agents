@@ -200,7 +200,7 @@ status = "gated, with a register of the signatures that predate the rule"
 # not on this list is refused outright, so the list cannot grow; a
 # signature is struck from it by giving the values that travel together a
 # name, never by widening the budget. Forty-two when the rule was drawn,
-# twenty-four now.
+# twenty-three now.
 #
 # Sixteen of the original forty-two were in `bin::assembly`, and so were
 # the worst six. That was the file rule's finding reached from another
@@ -214,7 +214,6 @@ status = "gated, with a register of the signatures that predate the rule"
 names = [
   "crates/collab/src/workshop.rs::new",            # 9
   "crates/collab/src/inbox.rs::new",               # 7
-  "crates/runtime/src/tools/exec.rs::new",         # 7
   "crates/collab/src/signal_tool.rs::new",         # 6
   "crates/kernel/src/gate/govern.rs::govern",       # 6
   "crates/kernel/src/gate/item.rs::item",           # 6
