@@ -5,6 +5,7 @@
 
 use super::*;
 
+use super::scan;
 use super::scan::literal_at;
 
 /// `Violation` has no `Debug` on purpose (it is rendered, not dumped),
@@ -268,4 +269,42 @@ fn colour_spellings_are_recognised_and_locators_are_not() {
         ),
         None
     );
+}
+
+/// Each client names colour in exactly one file, and only there.
+///
+/// Two clients coexist until `crates/web` is deleted, so the scan is run
+/// over a tree that holds both production points plus one ordinary
+/// stylesheet: the two production points are silent and the third file
+/// is reported.
+#[test]
+fn each_client_may_name_colour_in_its_own_theme_file() {
+    let root = std::env::temp_dir().join(format!("color-theme-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let written = [
+        (
+            super::THEME,
+            "pub const A: &str = \"oklch(0.145 0.018 264)\";",
+        ),
+        (
+            "client/src/theme.css",
+            "  --color-g0: oklch(0.145 0.018 264);",
+        ),
+        ("client/src/panel.css", "  color: oklch(0.145 0.018 264);"),
+    ];
+    for (rel, body) in written {
+        let path = root.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, body).unwrap();
+    }
+
+    let found = scan::scan_for_literals(&root).unwrap();
+    let places: Vec<&str> = found.iter().map(|v| v.location.as_str()).collect();
+    assert_eq!(
+        places,
+        ["client/src/panel.css:1"],
+        "only the file that is no client's production point is a violation; got {}",
+        rules(&found)
+    );
+    std::fs::remove_dir_all(&root).unwrap();
 }

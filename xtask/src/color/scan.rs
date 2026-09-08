@@ -12,12 +12,18 @@ use super::THEME;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// Files that may legitimately contain colour syntax: the production point,
-/// and the two files of this gate that spell colour. The second kind of
-/// exemption has the same shape and the same reason as `xtask/lexicon.toml`
-/// being outside the lexicon scan - a checker has to be able to spell what
-/// it forbids.
-const SCAN_EXEMPT: [&str; 3] = [THEME, "xtask/src/color/scan.rs", "xtask/src/color/tests.rs"];
+/// The colour production points: one per client, and exactly one.
+///
+/// `crates/web/src/theme.rs` is the Dioxus client's token table, and
+/// `client/src/theme.css` is the Solid client's `@theme` block, whose every
+/// value is resolved from that table (client-SPEC.md section 3-4). The
+/// second entry leaves when `crates/web` does.
+const PRODUCTION_POINTS: [&str; 2] = [THEME, "client/src/theme.css"];
+
+/// The two files of this gate that spell colour. Same shape and same reason
+/// as `xtask/lexicon.toml` being outside the lexicon scan - a checker has to
+/// be able to spell what it forbids.
+const SPELLS_COLOUR: [&str; 2] = ["xtask/src/color/scan.rs", "xtask/src/color/tests.rs"];
 
 /// Extensions worth scanning. Rust, and the two file kinds that carry style.
 const SCAN_EXTS: [&str; 3] = ["rs", "css", "html"];
@@ -73,7 +79,10 @@ pub(super) fn scan_for_literals(root: &Path) -> Result<Vec<Violation>, XtaskErro
     let mut violations = Vec::new();
     for path in walk::files_with_ext(root, &SCAN_EXTS)? {
         let rel = walk::rel(root, &path);
-        if walk::in_isolation_zone(&rel) || SCAN_EXEMPT.contains(&rel.as_str()) {
+        if walk::in_isolation_zone(&rel)
+            || PRODUCTION_POINTS.contains(&rel.as_str())
+            || SPELLS_COLOUR.contains(&rel.as_str())
+        {
             continue;
         }
         let style_file = !rel.ends_with(".rs");
@@ -84,9 +93,9 @@ pub(super) fn scan_for_literals(root: &Path) -> Result<Vec<Violation>, XtaskErro
                 violations.push(Violation {
                     gate: "color",
                     location: format!("{rel}:{line_number}"),
-                    rule: "web::theme is the only place that names a colour".to_owned(),
-                    violation: format!("colour literal `{syntax}` outside the theme"),
-                    alternative: "use a token from web::theme through its CSS \
+                    rule: "colour is named once per client, in that client's theme file".to_owned(),
+                    violation: format!("colour literal `{syntax}` outside a theme file"),
+                    alternative: "use a token from the client's theme through its CSS \
                                   custom property"
                         .to_owned(),
                 });

@@ -14,8 +14,22 @@
 //! literals is the half only a gate can do, because it is a statement about
 //! every file rather than about one table.
 //!
-//! `web::theme` is exempt from the scan: it is the production point. Nothing
+//! A theme file is exempt from the scan: it is a production point. Nothing
 //! else may name a colour.
+//!
+//! **Re-priced (card-gates).** The rule read "`web::theme` is the only place
+//! that names a colour" while the city had one client. It now has two:
+//! card-6.1 put a Solid client in `client/`, card-6.3 made
+//! `client/src/theme.css` its `@theme` token block, and both ship until
+//! card-6.11 deletes `crates/web`. Read literally, the old wording called a
+//! client's *sole* production point a violation, so the authority is stated
+//! as what it always meant: **colour is named once per client, in that
+//! client's theme file.** The scan's judgement of what a colour looks like
+//! is unchanged; only the table of production points grew a row, and it
+//! loses that row again when `crates/web` goes. The six token assertions
+//! below still read `crates/web/src/theme.rs` alone, because the CSS block
+//! is a projection of that table rather than a second authority
+//! (xtask-SPEC.md section 8-8).
 
 use std::path::Path;
 
