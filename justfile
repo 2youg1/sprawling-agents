@@ -29,11 +29,26 @@ gates:
     cargo xtask gates
     @command -v cargo-deny >/dev/null 2>&1 && cargo deny check || echo "cargo-deny not installed locally; CI runs it"
 
-# The client, built without `dx` (crates/web/web-SPEC.md section 8.5).
+# The browser client (client/client-SPEC.md): Solid + Effect, driven by
+# bun, bundled into target/web-dist where crates/sprawling/build.rs reads
+# it. Environment prerequisite: bun. `--frozen-lockfile` makes bun.lock
+# the authority, so a build cannot resolve a version nobody committed.
+build-web:
+    cd client && bun install --frozen-lockfile && bun run build
+
+# The client's own gates: lint (no `any`, no `as`, no throw, no try, no
+# non-exhaustive switch), typecheck, and its tests.
+check-client:
+    cd client && bun install --frozen-lockfile && bun run lint && bun run typecheck && bun run test
+
+# The previous client, Dioxus compiled to wasm without `dx`
+# (crates/web/web-SPEC.md section 8.5). Both clients coexist until card
+# 6.11 removes crates/web; until then `dist` still embeds this one,
+# because build.rs judges a bundle complete by web.js + web_bg.wasm.
 # Environment prerequisites: the wasm32-unknown-unknown target, and a
 # wasm-bindgen CLI whose version equals the wasm-bindgen crate version -
 # a mismatch there is the quietest way to break a wasm build.
-build-web:
+build-web-wasm:
     cargo build -p web --target wasm32-unknown-unknown --release --locked
     wasm-bindgen --target web --no-typescript --out-dir target/web-dist \
         target/wasm32-unknown-unknown/release/web.wasm
@@ -90,8 +105,9 @@ repro:
 # The whole deliverable: client bundle first, then the binary that embeds
 # it, then the size badges README shows. The badges are rendered from the
 # artifacts this recipe just produced, so a release cannot ship a size
-# somebody typed.
-dist: build-web
+# somebody typed. `build-web-wasm` rather than `build-web` until card 6.11:
+# see the note on that recipe.
+dist: build-web-wasm
     cargo build --release -p sprawling --locked
     cargo xtask sbom
     cargo xtask badge --write
