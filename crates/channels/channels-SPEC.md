@@ -552,3 +552,7 @@ handlers 开 `pub(crate)` 供 config 挂载，单测试住此）。
 
 **跨 crate 记法（card-2.4 起）**：下游 `sprawling`／`web` 基线记 `channels` 内定义位簇路径
 （如 `command::kind::Command`、`command::wire::WireCommand`），公共拼写不变。
+
+### 8-15 `/enroll` 的三结局测试进程内驱动（card-5.1；`tests/enrolment.rs`）
+
+`tests/enrolment.rs` 原以 `axum::serve` 端起本 crate 的路由、手写 HTTP 字节去问它，因而是 `xtask boundary` 在册的唯一越线文件。它检验的是 §8-2 的三选一（`secret_captured` 相符→201／`Reply` 拒绝→422／有界等待到期→202），三者由测试替身的工人（存／拒／沉默）分出——这是白盒问题：真二进制上 vault 只有一种下场，且 `serve` 经 `Custodian::probe` 写平台凭据服务、线格式无收回凭据的动词，黑盒重写既不可判也不可回收。故改为进程内驱动：`channels::router(&config).layer(MockConnectInfo(peer))` 后 `tower::ServiceExt::oneshot` 一发一收，peer 以 axum 给测试的那条路供给，不起 socket、不写字节。三断言原文不动；`[boundary.predating]` 归空。`tower`（`util`）只作 dev-dependency，已在 axum 之下的依赖图里，锁文件不增包。

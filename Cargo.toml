@@ -64,6 +64,9 @@ zeroize = "1.9"
 # authority, not two.
 tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "signal", "sync", "time"] }
 axum = "0.8"
+# The in-process door to an axum router under test (`oneshot`). Already in
+# the graph beneath axum; naming it adds no package to the lock.
+tower = { version = "0.5", features = ["util"] }
 # P3: the second client of the wire, in a terminal. This is the same
 # crate axum's `ws` feature already carries - a direct dependency adds no
 # package to the lock, and adding a different WebSocket library would put

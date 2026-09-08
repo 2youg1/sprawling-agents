@@ -10,6 +10,14 @@
 //! vault that refused told nobody and a person watched a success message
 //! for a key that was never stored. Three outcomes now, each with its own
 //! status: stored, refused, and neither within a bounded wait.
+//!
+//! The three are told apart by a worker this test stands in for, which
+//! is what makes this a white-box check: it drives the router in
+//! process, through `tower::ServiceExt::oneshot`, with the peer address
+//! supplied the way axum supplies it for tests. Nothing here raises the
+//! product's server or writes an HTTP request by hand - a check that did
+//! would be standing outside, and outside is `adversary/`'s ground
+//! (`xtask boundary`).
 
 #![allow(
     clippy::unwrap_used,
@@ -22,9 +30,12 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use axum::body::Body;
+use axum::extract::connect_info::MockConnectInfo;
+use axum::http::Request;
 use channels::{Answer, AxCode, AxError, Command, Reply, ServeConfig};
 use kernel::{EventDraft, EventKind, EventRecord, GENESIS_PREV, Payload, RunId, Seq, TimeMs};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tower::ServiceExt;
 
 /// What the worker does with the credential this test hands it.
 enum Worker {
@@ -114,32 +125,22 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
         }),
         city: None,
     };
-    let app = channels::router(&config);
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let at = listener.local_addr().unwrap();
-    tokio::spawn(async move {
-        let _ = axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<SocketAddr>(),
-        )
-        .await;
-    });
-
-    let mut stream = tokio::net::TcpStream::connect(at).await.unwrap();
-    let request = format!(
-        "POST /enroll HTTP/1.1\r\nHost: {at}\r\nContent-Type: application/json\r\n\
-         Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
-        body.len()
-    );
-    stream.write_all(request.as_bytes()).await.unwrap();
-    let mut said = String::new();
-    stream.read_to_string(&mut said).await.unwrap();
-    let status = said
-        .split_whitespace()
-        .nth(1)
-        .and_then(|code| code.parse().ok())
-        .unwrap_or(0);
-    (status, said)
+    // The peer is this machine, which is the one peer the route admits;
+    // the address arrives the way axum hands it to a handler under test.
+    let peer: SocketAddr = "127.0.0.1:40000".parse().unwrap();
+    let app = channels::router(&config).layer(MockConnectInfo(peer));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/enroll")
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_owned()))
+        .unwrap();
+    let response = app.oneshot(request).await.unwrap();
+    let status = response.status().as_u16();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    (status, String::from_utf8_lossy(&bytes).into_owned())
 }
 
 /// `Worker` is moved into a `Fn` closure, which may run more than once;

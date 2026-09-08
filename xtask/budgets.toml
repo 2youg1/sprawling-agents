@@ -262,7 +262,9 @@ status = "gated, with a register of the files that predate the rule"
 
 # The files that were already over the line on the day it was re-drawn
 # (2026-09-05), each pinned at the length it had that day, worst first.
-# Ninety-seven of them, and the order is the order to split them in.
+# Ninety-seven of them on that day; the last row was struck on
+# 2026-09-08 (cards 1.1 through 5.2), and the table below is empty by
+# construction - it keeps its three properties over nothing.
 #
 # `crates/web/src/lang.rs` (3,444 lines) and `crates/web/src/theme.rs`
 # (1,019) are not here: their module-map rows state the shape `data`, and
@@ -290,13 +292,17 @@ status = "gated, with a register of the files that predate the rule"
 # check belongs, in a language with none of this repository's vocabulary,
 # so it can testify about a client that shares none of its assumptions.
 #
-# One file predates the rule. `crates/channels/tests/enrolment.rs` stands
-# up the enrolment endpoint on a loopback port and writes the HTTP
-# request out by hand, byte for byte - which is a black-box check wearing
-# a Rust file, and its hand-written request says so. Moving it to
-# `adversary/` is the next version's work; until then it may cross, and
-# it may not grow a second offender, because a file this list does not
-# name is refused outright.
+# Nothing predates the rule any longer. `crates/channels/tests/enrolment.rs`
+# used to stand up the enrolment endpoint on a loopback port and write
+# the HTTP request out by hand; what it checks - three fates of one
+# credential, told apart by a worker the test stands in for - is a
+# white-box question, so it now drives the router in process
+# (`tower::ServiceExt::oneshot` with axum's `MockConnectInfo`) and
+# crosses nothing. The black-box half it could not honestly carry - a
+# real vault on a real machine - stays out of `adversary/` too, because
+# a served city writes to the platform credential service and the wire
+# has no verb that takes a credential back. A file this list does not
+# name is refused outright, so the register stays empty by construction.
 #
 # `crates/sprawling/src/assembly/driving.rs` is deliberately absent. Its
 # sockets reach a fake model provider the test stood up, never this
@@ -309,9 +315,7 @@ measured_by = "cargo xtask boundary"
 status = "gated, with a register of the files that predate the rule"
 
 [boundary.predating]
-files = [
-  "crates/channels/tests/enrolment.rs",
-]
+files = []
 
 [session_resident]
 what = "one session's resident memory, in this platform's own counter"

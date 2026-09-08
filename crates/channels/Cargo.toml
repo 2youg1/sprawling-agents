@@ -22,6 +22,7 @@ axum = { workspace = true, features = ["ws"], optional = true }
 [dev-dependencies]
 proptest = { workspace = true }
 trybuild = { workspace = true }
+tower = { workspace = true }
 
 [lints]
 workspace = true
