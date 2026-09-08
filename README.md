@@ -72,7 +72,7 @@ The directory tree on disk *is* the space: a **City** is a directory tree, a pro
 
 1. Download the archive for your system from the [latest release](../../releases/latest).
 2. Unpack it anywhere.
-3. Run **`sprawling.exe`** (Windows: double-click it) or **`./sprawling`** (macOS). Linux archives are not built in this release. It asks one question before it creates anything.
+3. Run **`sprawling.exe`** (Windows: double-click it) or **`./sprawling`** (macOS). It asks one question before it creates anything.
 
 That is the whole install. Nothing is registered, and nothing outside that folder is written to—delete the folder and it is gone. A console window opens and stays open: **that window is the city**. Your browser opens at `http://127.0.0.1:8787`; if it doesn’t, open the address yourself. `Ctrl-C` in the window stops the city.
 
@@ -111,11 +111,13 @@ Other commands:
 
 ```bash
 sprawling install [--uninstall]     # make `sprawling` a word your shell resolves, or take it back off
+sprawling doctor [--install]        # what this machine has against what this city needs; --install offers each missing item, one at a time
 sprawling enrol <realm>/<name>      # read a credential from stdin into the OS store; it never touches the command line
 sprawling resume <city-dir>         # after a restart: verify the chain, close tool calls whose results are lost, report who is waiting for a human
 sprawling fork <city> <run> <seq>   # branch a lineage from a given step of a Run
 sprawling adopt <city> <dir>        # absorb an existing directory as a building without overwriting any files
 sprawling replay <ledger-dir>       # offline chain verification, read-only
+sprawling whose <city> <oid>        # which run wrote a commit this city made, answered from the Ledger
 sprawling export <city-dir> <file>  # pack a city; the manifest is the integrity criterion
 sprawling restore <file> <city-dir> # unpack it on another machine
 sprawling status [--deps]           # state of this machine; --deps lists the compiled-in dependencies
@@ -125,6 +127,38 @@ sprawling help                      # every command, on one screen
 Launched with no command at all—by double-clicking it, for instance—it shows a single screen, names the folder it would create, and waits for you to agree before creating anything. Founding a city writes the genesis record, and that does not happen because somebody double-clicked a file.
 
 A step-by-step walk from empty directory to first Run lives in [`docs/getting-started.md`](docs/getting-started.md) ([中文](docs/getting-started.zh-CN.md)).
+
+## History
+
+A city works inside a git repository that is usually **yours**, and it leaves two kinds of history behind.
+
+**The Ledger is the city's own history**, and the only one: every effect becomes a line before it becomes anything else, the chain is verifiable offline, and every page you read is a projection of it.
+
+**Git is the restoration authority for files.** Before each wave of tool calls the city commits what is there, so anything that disappears has a commit to come back from. Those fences do not land on your branch: they are commits nobody's `HEAD` points at, kept alive by a reference under `refs/sprawling/runs/`. `git log` therefore does not grow one `checkpoint:` line per tool wave — your own history stays the shape you left it. Only two things reach a branch: the first commit of a repository that had none, and the merge that lands a reviewed piece of work.
+
+**Every commit the city makes says who made it.** The author is the resident's own address at a mailbox derived from the city — `lab/parser@1a2b3c4d5e6f.sprawling`, unroutable on purpose, because it identifies a city rather than promising to deliver mail — and the message carries five git trailers:
+
+```
+Sprawling-Run: 0193f2c1-...
+Sprawling-Actor: lab/parser
+Sprawling-Model: claude-sonnet-4-6
+Sprawling-Effort: high
+Sprawling-City: 8f14e45fceea
+```
+
+They are git's own trailer syntax, so `git interpret-trailers --parse` reads them with no help from us. **They are a projection for readers outside the city, not a second history**: where a trailer and the Ledger disagree, the trailer is the side that is wrong.
+
+**And the question reads backwards too.** Given a commit id, `sprawling whose` answers which run wrote it — out of the Ledger, never out of git, so a city exported and restored somewhere else with no `.git` beside it still answers:
+
+```
+$ sprawling whose ./mycity 3f1c9a...
+run     0193f2c1-6b7a-7c3d-9e10-2f4b6d8a0c11
+actor   lab/parser (session refactor-the-ledger)
+model   claude-sonnet-4-6 (effort high)
+ledger  seq 4127
+```
+
+Exit code 1 means this city has no record of writing that commit — which is a different answer from "nothing changed", and the one an audit needs.
 
 ## Five words
 
