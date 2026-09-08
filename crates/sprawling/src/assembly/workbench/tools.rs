@@ -9,7 +9,7 @@
 
 use kernel::{Address, AxError, Locator};
 use runtime::bench::ToolBench;
-use runtime::{EditTool, ExecTool, StatusTool};
+use runtime::{EditTool, ExecTool, SearchTool, StatusTool};
 
 use super::super::{Assignment, PYTHON_WASM_ENV, RunWorker, mounts_under};
 use super::engine::{execution_engine, host_shell};
@@ -113,19 +113,26 @@ impl RunWorker {
         // the machine's, so a city carried elsewhere does not carry this
         // machine's paths with it.
         let exec = ExecTool::new(
-            site.write_root.join(addr.as_str()),
-            mounts_under(&site.write_root, &site.config.sandbox.mounts),
-            std::env::var(PYTHON_WASM_ENV)
-                .ok()
-                .map(std::path::PathBuf::from),
-            execution_engine()?,
-            if site.config.sandbox.shell {
-                host_shell()
-            } else {
-                None
+            runtime::ExecSetup {
+                workdir: site.write_root.join(addr.as_str()),
+                mounts: mounts_under(&site.write_root, &site.config.sandbox.mounts),
+                python_wasm: std::env::var(PYTHON_WASM_ENV)
+                    .ok()
+                    .map(std::path::PathBuf::from),
+                shell: if site.config.sandbox.shell {
+                    host_shell()
+                } else {
+                    None
+                },
+                fuel: runtime::Fuel(site.config.sandbox.fuel),
+                // What a child may inherit is the building's own
+                // declaration: the four-name floor is enough to run a
+                // program and not enough to link one.
+                env_passthrough: site.config.sandbox.env_passthrough.clone(),
+                domain: addr.clone(),
             },
-            runtime::Fuel(site.config.sandbox.fuel),
-            addr.clone(),
+            execution_engine()?,
+            self.backlog.clone(),
         )?;
         // The one door onto the rest of the city. It is registered
         // beside `signal` rather than behind it because the two answer
@@ -139,6 +146,13 @@ impl RunWorker {
         // catalog rather than a copy of what is in it, so a skill
         // admitted below this line is still reachable by name.
         let read = runtime::ReadTool::new(&site.write_root, std::rc::Rc::clone(&catalog))?;
+        // Reading needs an address, and until this line there was no way
+        // to find one: a symbol had to be hunted through `exec`, which
+        // means Python this machine may not have or a shell this
+        // building may have switched off. It stands beside `read`
+        // because it answers the other half of one question, and it is
+        // last in the order for the reason the comment below gives.
+        let search = SearchTool::new(&site.write_root)?;
         // The net, not the forecast, is the defence (semantic authority
         // 4.4). Two handles on one repository: the bench fences a
         // command its forecast suspects, and the driver fences every
@@ -146,10 +160,12 @@ impl RunWorker {
         // from. Both stand where the run writes, which is its own tree
         // when the building asks for review.
         let mut bench = ToolBench::new(site.rules.write_domain()?)
-            .with_checkpoint(
-                memory::Checkpoint::open(&site.write_root).map_err(memory::MemoryError::into_ax)?,
-                addr.as_str(),
-            )
+            .with_checkpoint(runtime::bench::CheckpointNet {
+                checkpoint: memory::Checkpoint::open(&site.write_root)
+                    .map_err(memory::MemoryError::into_ax)?,
+                scope: addr.as_str().to_owned(),
+                of: site.provenance(&self.city_root, addr)?,
+            })
             .for_job(addr.clone(), job_locator.clone());
         for cluster in &self.governance.granted {
             bench.grant(cluster.clone());
@@ -163,6 +179,8 @@ impl RunWorker {
         // The order is the catalogue's: `render` puts the tools in front
         // of the model in this order and the resident segment is hashed,
         // so this sequence is part of what stays cacheable across a run.
+        // A new tool joins at the end for that reason: inserting one in
+        // the middle would move every line after it.
         let mut admitted: Vec<Box<dyn kernel::Tool>> = vec![
             Box::new(archive_tool),
             Box::new(exec),
@@ -177,6 +195,7 @@ impl RunWorker {
             Box::new(rules_tool),
             Box::new(neighbours_tool),
             Box::new(read),
+            Box::new(search),
         ];
         // External tools, for a building whose configuration names a
         // server. They join the table here, before the catalogue is

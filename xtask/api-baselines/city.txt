@@ -29,10 +29,13 @@ pub city::ArchiveKind::Decision
 pub city::ArchiveKind::Fact
 pub city::ArchiveKind::Preference
 pub city::BuildingTemplate::Confidential
+pub city::BuildingTemplate::Hall
 pub city::BuildingTemplate::Minimal
 pub city::Cadence::DailyAt(u64)
 pub city::Cadence::EveryMinutes(u64)
 pub city::Cadence::WeeklyAt(u64)
+pub city::DomainReach::Documents
+pub city::DomainReach::Everything
 pub city::Holding::addr: kernel::address::Address
 pub city::Holding::disclosure: alloc::string::String
 pub city::Holding::hash: kernel::locator::B3Hash
@@ -76,10 +79,12 @@ pub const city::ARCHIVE_DIR: &str
 pub const city::BUILDING_FILE: &str
 pub const city::BUILDING_SHELF: &str
 pub const city::CITY_FILE: &str
+pub const city::CLERK_FILE: &str
 pub const city::CONFIG_FILE: &str
 pub const city::HANDOFF_FILE: &str
 pub const city::JOB_FILE: &str
 pub const city::LIBRARY_DIR: &str
+pub const city::MAYOR_FILE: &str
 pub const city::ROADMAP_FILE: &str
 pub const city::SCHEDULE_FILE: &str
 pub const city::URBANITE_FILE: &str
@@ -87,6 +92,7 @@ pub const city::WATCH_FILE: &str
 pub enum city::ArchiveKind
 pub enum city::BuildingTemplate
 pub enum city::Cadence
+pub enum city::DomainReach
 pub enum city::Identity
 pub enum city::Layer
 pub enum city::Link
@@ -103,6 +109,7 @@ pub fn city::BuildingRules::addr(&self) -> &kernel::address::Address
 pub fn city::BuildingRules::egress(&self) -> &kernel::gate::egress::EgressAllowlist
 pub fn city::BuildingRules::model_pool(&self) -> city::ModelPool
 pub fn city::BuildingRules::policy(&self) -> &kernel::model::wire::BuildingPolicy
+pub fn city::BuildingRules::reach(&self) -> city::DomainReach
 pub fn city::BuildingRules::reading_room(&self) -> &[alloc::string::String]
 pub fn city::BuildingRules::review(&self) -> bool
 pub fn city::BuildingRules::write_domain(&self) -> core::result::Result<kernel::write_domain::WriteDomain, kernel::error::shape::AxError>
@@ -110,6 +117,7 @@ pub fn city::BuildingTemplate::name(self) -> &'static str
 pub fn city::BuildingTemplate::parse(&str) -> core::result::Result<city::BuildingTemplate, kernel::error::shape::AxError>
 pub fn city::CityPlan::dirs(&self) -> &[kernel::address::Address]
 pub fn city::CityPlan::first(&self) -> core::option::Option<&(kernel::address::Address, city::BuildingTemplate)>
+pub fn city::CityPlan::hall(&self) -> &(kernel::address::Address, city::BuildingTemplate)
 pub fn city::CityPlan::new(core::option::Option<(&str, &str)>) -> core::result::Result<city::CityPlan, kernel::error::shape::AxError>
 pub fn city::ConfigLayer::effort(&self) -> core::option::Option<kernel::model::wire::Effort>
 pub fn city::ConfigLayer::mcp(&self) -> core::option::Option<&[kernel::config::McpServer]>
@@ -178,9 +186,11 @@ pub fn city::create_building(&std::path::Path, &kernel::address::Address, city::
 pub fn city::day_of(kernel::event::identity::TimeMs) -> u64
 pub fn city::evaluate(&kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
 pub fn city::file_archive(&city::ArchiveEntry, &str) -> core::result::Result<(), kernel::error::shape::AxError>
+pub fn city::hall_identity_path(&std::path::Path, &kernel::address::Address) -> core::option::Option<std::path::PathBuf>
 pub fn city::handoff(&std::path::Path, &kernel::address::Address) -> core::result::Result<core::option::Option<alloc::string::String>, kernel::error::shape::AxError>
 pub fn city::handoff_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::job_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
+pub fn city::lay_out_hall_identities(&std::path::Path) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::load(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
 pub fn city::load_config(&std::path::Path, &kernel::address::Address) -> core::result::Result<kernel::config::FrozenConfig, kernel::error::shape::AxError>
 pub fn city::norms(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<std::path::PathBuf>, kernel::error::shape::AxError>

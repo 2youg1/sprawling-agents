@@ -169,6 +169,8 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError>;
 
 **P4.02 增（config_layers）**：`CONFIG.toml` 第二节 `[sandbox]`，字段 `shell`（bool，默认 false）、`fuel`（整数，缺省取 `SANDBOX_FUEL_DEFAULT`）、`mounts`（相对 city root 的路径表，reserved prefix 在解析点即拒）。解析仍是「本版本不读的键即拒」——被写下却什么都不发生是唯一没人能诊断的状态。整节整值上梯，语义住 kernel-SPEC §8-22 的 P4.02 段，此处不复述。
 
+**11.1 增（config_layers）**：`[sandbox]` 第四个字段 `env_passthrough`（字符串表，缺省空表），逐项解成 `kernel::EnvVarName`。与 `mounts` 逐条同形：同一节、同一次整值上梯、同一个解析点拒——`mounts` 在这里拒保留区，`env_passthrough` 在这里拒凭据形状的名字，而“什么叫凭据形状”是 `kernel::secret` 的答案，本模块不重建它。拒绝文字里带着是哪一份文件、哪一个名字，因为一份配置被拒时人手里只有那句话。
+
 ### 8-5 city::spine_files（P2.02；形状 6 数据面＋落盘动作）
 
 ```rust
@@ -559,3 +561,36 @@ P3.06 同集五处：ARCHITECTURE.md §12 模块表增 city 两行、`runtime::t
 **无字段开放**：没有为跨文件引用把任何私有字段升成 `pub(crate)`／`pub(super)`；测试经 `super::*` 看到的私有项（`NAME_PLACEHOLDER`、`BuildingTemplate::rules`）与迁出前相同。
 
 **apisync 未重写基线**：公开面不受本次切分影响。
+
+### 8-20 City Hall：随城市立起的那栋楼，和住在里面的两个人（v0.0.4 card-5.2）
+
+**需求**：城市需要一个规划者和一个代答者。它们服务每一栋楼，因此不属于任何一栋楼；它们写 Markdown 和计划，不建造。
+
+**接口**：
+
+```rust
+// city::building
+pub enum BuildingTemplate { Minimal, Confidential, Hall }   // Hall 的字节是固定的一份模板
+
+// city::policy
+pub enum DomainReach { Everything, Documents }              // BUILDING.md 的 `write:` 一行
+impl BuildingRules { pub fn reach(&self) -> DomainReach; }
+// write_domain()：Everything → WriteDomain::new，Documents → WriteDomain::documents
+
+// city::spine_files
+pub const MAYOR_FILE: &str = "MAYOR.md";
+pub const CLERK_FILE: &str = "CLERK.md";
+/// hall/mayor 与 hall/clerk 的身份文件位置；别的地址返回 None。
+pub fn hall_identity_path(city_root: &Path, addr: &Address) -> Option<PathBuf>;
+/// 把两份模板写进 <city>/.sprawling/，已存在的不覆盖。
+pub fn lay_out_hall_identities(city_root: &Path) -> Result<(), AxError>;
+
+// city::wizard
+impl CityPlan { pub fn hall(&self) -> &(Address, BuildingTemplate); }   // 恒存在，非 Option
+```
+
+- **为什么 `hall` 在 `CityPlan` 里是恒存在的字段而不是 `Option`**：一座没有 City Hall 的城市不是这个版本能形成的东西。可选性会让「城市有没有市政厅」变成调用点每次都要答一遍的问题，而它只有一个答案。
+- **两份身份文件住 `<city>/.sprawling/`**：写域碰不到保留子树，所以 Mayor 改不了自己是谁，clerk 改不了自己按什么答。这是 `URBANITE.md` 住在居民自己地址下时拿不到的性质，也是这两位与普通居民唯一的结构差别。
+- **路径权威仍只有一个**：`city::resident::urbanite_path` 先问 `spine_files::hall_identity_path`，无答再拼 `<addr>/URBANITE.md`。`Identity::load` 一字不改，因此「有身份文件即居民」这条规则对市政厅与对普通房间是同一条。
+- `write: documents` 由 `policy::evaluate` 读成 `DomainReach`；缺这一行读作 `Everything`，因为既有的每一栋楼都没写这一行，而它们的写域没有变。值既不是 `everything` 也不是 `documents` 时拒绝，理由与 `confidential:` 同：读成打字错误的权限设置不能落到宽松那一侧。
+- 被否：给 Mayor 一个覆盖全城的 `Everything` 写域，靠 `MAYOR.md` 的措辞请它别碰代码——把不变量交给提示词，等于没有不变量。
