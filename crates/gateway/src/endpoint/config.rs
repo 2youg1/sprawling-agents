@@ -15,9 +15,10 @@
 
 use std::time::Duration;
 
-use kernel::{AxCode, AxError, DialectKind, Sealed, SecretRef};
+use kernel::{AxCode, AxError, DialectKind, SecretRef};
 use serde_json::Value;
 
+use super::redemption::Redemption;
 use crate::market::ModelEntry;
 
 #[non_exhaustive]
@@ -27,10 +28,6 @@ pub enum AuthSpec {
     Header { name: String, value: SecretRef },
     None,
 }
-
-/// The redemption face `credential` provides (S3.03): resolve a
-/// reference into a sealed value, per operation, never cached.
-pub type SecretResolver = Box<dyn Fn(&SecretRef) -> Result<Sealed<String>, AxError> + Send>;
 
 /// Everything one endpoint needs, field by field — no provider
 /// abstraction layer eats any of it.
@@ -57,7 +54,7 @@ pub struct EndpointConfig {
 pub struct Endpoint {
     pub(crate) config: EndpointConfig,
     pub(crate) client: reqwest::blocking::Client,
-    pub(crate) resolver: SecretResolver,
+    pub(crate) redemption: Redemption,
 }
 
 /// A transport failure as its whole chain states it.
@@ -68,7 +65,7 @@ pub struct Endpoint {
 /// between "the provider is down" and "the provider is slow" for the
 /// person reading the refusal.
 impl Endpoint {
-    pub fn new(config: EndpointConfig, resolver: SecretResolver) -> Result<Endpoint, AxError> {
+    pub fn new(config: EndpointConfig, redemption: Redemption) -> Result<Endpoint, AxError> {
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_millis(config.timeout_ms))
             .build()
@@ -78,7 +75,7 @@ impl Endpoint {
         Ok(Endpoint {
             config,
             client,
-            resolver,
+            redemption,
         })
     }
 }
@@ -297,24 +294,6 @@ pub(crate) fn config(url: &str) -> EndpointConfig {
     clippy::arithmetic_side_effects,
     reason = "test helper"
 )]
-pub(crate) fn resolver() -> SecretResolver {
-    Box::new(|_reference: &SecretRef| {
-        // Runtime-assembled sample: no complete token literal at rest.
-        let token = ["sk-test-", "0123456789"].concat();
-        Ok(Sealed::new(Box::new(token)))
-    })
-}
-#[cfg(test)]
-#[allow(
-    clippy::float_arithmetic,
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    clippy::string_slice,
-    clippy::arithmetic_side_effects,
-    reason = "test helper"
-)]
 pub(crate) fn request() -> ModelRequest {
     ModelRequest {
         policy: BuildingPolicy::default(),
@@ -335,6 +314,7 @@ pub(crate) fn request() -> ModelRequest {
     reason = "test code"
 )]
 mod tests {
+    use super::super::redemption::redemption;
     use super::*;
     use kernel::{AxCode, Model};
     #[test]
@@ -348,7 +328,7 @@ mod tests {
         })
         .to_string();
         let (url, handle) = fake_provider(vec![(200, body)], false);
-        let endpoint = Endpoint::new(config(&url), resolver()).unwrap();
+        let endpoint = Endpoint::new(config(&url), redemption()).unwrap();
         let ids = endpoint.list_models(&url).unwrap();
         assert_eq!(ids, vec!["m-large".to_owned(), "m-small".to_owned()]);
         let seen = handle.join().unwrap();
@@ -359,7 +339,7 @@ mod tests {
     #[test]
     fn a_model_list_without_ids_is_a_provider_error_not_an_empty_city() {
         let (url, handle) = fake_provider(vec![(200, "{\"object\":\"list\"}".to_owned())], false);
-        let endpoint = Endpoint::new(config(&url), resolver()).unwrap();
+        let endpoint = Endpoint::new(config(&url), redemption()).unwrap();
         let err = endpoint.list_models(&url).unwrap_err();
         assert_eq!(err.code(), &AxCode::Provider);
         assert!(err.subject().contains("no data array"));
@@ -374,7 +354,7 @@ mod tests {
                 timeout_ms: 300,
                 ..config(&url)
             },
-            resolver(),
+            redemption(),
         )
         .unwrap();
         let err = endpoint.call(&request()).unwrap_err();
