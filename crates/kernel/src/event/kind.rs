@@ -65,7 +65,7 @@ pub enum EventKind {
     /// thing in the city that starts work without a person asking, and
     /// "who set this running" has to be answerable afterwards.
     PursuitChanged,
-    // Governance and facilities (17).
+    // Governance and facilities (18).
     ApprovalRequested,
     ApprovalResolved,
     PolicyCreated,
@@ -95,6 +95,12 @@ pub enum EventKind {
     FileDiscarded,
     DiscardRestored,
     AutonomyChanged,
+    /// One of the three documents that govern a city was written by a
+    /// person. Recorded because what governs a city decides what every
+    /// later run is given, and "who changed this, and when" has to be
+    /// answerable from the one history rather than from a file's
+    /// modification time.
+    GovernedDocumentWritten,
 }
 
 /// The two-way partition; the sole criterion is "does the payload decide
@@ -108,7 +114,7 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 64] = [
+    pub const ALL: [EventKind; 65] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::RunStarted,
@@ -173,6 +179,7 @@ impl EventKind {
         EventKind::FileDiscarded,
         EventKind::DiscardRestored,
         EventKind::AutonomyChanged,
+        EventKind::GovernedDocumentWritten,
     ];
 
     /// The partition authority. Exhaustive on purpose: adding a variant
@@ -242,7 +249,8 @@ impl EventKind {
             | EventKind::SecretEgressBlocked
             | EventKind::FileDiscarded
             | EventKind::DiscardRestored
-            | EventKind::AutonomyChanged => WindowClass::RecordOnly,
+            | EventKind::AutonomyChanged
+            | EventKind::GovernedDocumentWritten => WindowClass::RecordOnly,
         }
     }
 }
@@ -261,12 +269,12 @@ mod tests {
     use std::collections::BTreeSet;
     #[test]
     fn event_kind_is_61_with_exactly_8_in_window() {
-        assert_eq!(EventKind::ALL.len(), 64);
+        assert_eq!(EventKind::ALL.len(), 65);
         let names: BTreeSet<String> = EventKind::ALL
             .iter()
             .map(|k| serde_json::to_string(k).unwrap())
             .collect();
-        assert_eq!(names.len(), 64, "serde spellings must be unique");
+        assert_eq!(names.len(), 65, "serde spellings must be unique");
         let in_window: Vec<EventKind> = EventKind::ALL
             .into_iter()
             .filter(|k| k.window_class() == WindowClass::InWindow)

@@ -53,6 +53,9 @@ pub(super) fn verb(city: Option<&String>, oid: Option<&String>) -> ExitCode {
                 memory::effort_word(said.effort)
             );
             println!("ledger  seq {}", said.seq.value());
+            for before in said.lineage.iter().skip(1) {
+                println!("replaced {before}");
+            }
             ExitCode::SUCCESS
         }
         Ok(_) => {

@@ -61,7 +61,7 @@ pub use asking::{room_asked_for, started_here, watchable};
 pub use building_view::{BuildingView, Leaf, RoomQueue, day_label, opening_leaf};
 pub use building_view::{room_addr, waiting_in};
 pub use command::{DEFAULT_EFFORT, MODES, Sending, dispatch_command};
-pub use command::{dispatch_to_building, effort_named};
+pub use command::{dispatch_to_building, effort_named, put_document_command};
 pub use dashboard::CostsView;
 pub use dashboard::{CostDimension, CostRow, SavingsRow, Trend, cost_rows, drawable, fold_line};
 pub use dashboard::{SERIES_DASHES, SERIES_PER_CHART_MAX, SERIES_WIDTHS, share_per_mille};

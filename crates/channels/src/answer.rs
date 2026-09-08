@@ -14,8 +14,9 @@
 //! returning an empty result a reader would mistake for an empty city.
 
 use kernel::{
-    Address, ApprovalItem, DialectKind, Effort, EventKind, EventRecord, FileChange, GitOid,
-    ModelTag, Restoration, RunId, Seq, SessionName, TimeMs, UsdMicros,
+    Address, ApprovalItem, Autonomy, ClusterKey, DialectKind, Effort, EventKind, EventRecord,
+    FileChange, GitOid, ModelTag, PolicyVerdict, Restoration, RunId, Seq, SessionName, TimeMs,
+    UsdMicros,
 };
 use serde::{Deserialize, Serialize};
 
@@ -82,6 +83,9 @@ pub struct CommitAnswer {
     /// actor worked in. Absent when the run worked at a building's own
     /// address, which is a run nobody opened a session for.
     pub session: Option<SessionName>,
+    /// This run first, then each run it replaced by succession, back to
+    /// the first. One entry for a run that replaced nobody.
+    pub lineage: Vec<RunId>,
 }
 
 /// The most records one `History` answer may carry. A page asking for
@@ -203,7 +207,81 @@ pub enum Answer {
     Registry(RegistryAnswer),
     Archive(ArchiveAnswer),
     Metrics(Box<MetricsAnswer>),
+    Governance(GovernanceAnswer),
+    Hunks(Box<HunksAnswer>),
     Unavailable { query: String },
+}
+
+/// One file's patch text between two checkpoints, and what could not be
+/// shown.
+///
+/// Both ends travel back with the answer because they are what makes it
+/// cacheable: two commit ids never change, so whoever asked may keep
+/// this for as long as they like.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct HunksAnswer {
+    pub oid_a: GitOid,
+    pub oid_b: GitOid,
+    pub path: String,
+    pub lines: Vec<PatchLine>,
+    /// Lines that matched a credential shape. They are named and not
+    /// echoed, for the reason a staged blob's scan gives about its own
+    /// hits: printing the bytes to prove a leak is the leak.
+    pub withheld: Vec<Withheld>,
+}
+
+/// One line of patch text, numbered from the top of the patch so a
+/// withheld line and the lines around it read as one list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct PatchLine {
+    pub number: u32,
+    pub text: String,
+}
+
+/// One line that was not echoed, and what matched it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Withheld {
+    pub number: u32,
+    /// A provider's own key shape by name, or the entropy judgement when
+    /// no shape claimed it. Never the bytes.
+    pub reason: String,
+}
+
+/// Who answers for this city, and what was answered on the person's
+/// behalf.
+///
+/// One shape for both halves: a list of decisions with nobody named
+/// beside it does not say whether the person delegated them, and a
+/// delegation with nothing under it does not say whether it was ever
+/// used.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct GovernanceAnswer {
+    pub autonomy: Autonomy,
+    /// Every approval this city has answered, oldest first — the order
+    /// the ledger wrote them and the order a fold expects.
+    ///
+    /// The person's own answers are here too. A list holding only what
+    /// somebody else decided would make "I answered this" and "nobody
+    /// ever answered this" look the same, and who may answer is the
+    /// other field of this same answer.
+    pub decided: Vec<Decision>,
+}
+
+/// One approval, as it was answered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Decision {
+    /// The `ApprovalId` that was answered.
+    pub item: String,
+    pub verdict: PolicyVerdict,
+    /// What the person was shown when they answered: the answer covers
+    /// the group, not the one row.
+    pub cluster: ClusterKey,
+    pub at: TimeMs,
 }
 
 /// What waits in one room, without taking it.

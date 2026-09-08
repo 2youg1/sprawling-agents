@@ -24,12 +24,13 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxError};
+use kernel::{Address, AxCode, AxError, EventKind, EventRecord};
 
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
-use super::lines::{buildings_of, verdict_line};
+use super::lines::verdict_line;
+use super::lines::{buildings_of, discard_lines, pursuit_from, registry_line, signal_line};
 use crate::assembly::{city_address, ledger_dir, rebuild_views};
 
 /// Answers one query out of a city's own history, without serving it.
@@ -78,6 +79,10 @@ pub(crate) struct Views {
     /// git: the trailers on the commit are a projection of these same
     /// records, and a projection must not be answered from another one.
     pub(super) commits: std::collections::BTreeMap<kernel::GitOid, super::commits::CommitFacts>,
+    /// Which run each successor replaced, folded from `run_started`. A
+    /// lineage is walked from here rather than stored per commit, so
+    /// the chain is one fact however many commits point into it.
+    pub(super) predecessors: std::collections::BTreeMap<kernel::RunId, kernel::RunId>,
     /// How many records this view has folded. The one number a page
     /// cannot derive from any other answer.
     pub(super) events: u64,
@@ -97,6 +102,15 @@ pub(crate) struct Views {
     /// declaring a pursuit takes the depth-zero position, and a view
     /// that could mint one would be a second door onto the guard.
     pub(super) pursuits: std::collections::BTreeMap<Address, (String, kernel::PursuitState)>,
+    /// Who answers for this city, folded from `autonomy_changed`. Held
+    /// rather than read off a configuration default: the default is
+    /// where a city starts, and what a person changed it to is a line in
+    /// the history.
+    pub(super) autonomy: kernel::Autonomy,
+    /// Every approval this city has answered, oldest first. Appended
+    /// rather than keyed, because an answer is a thing that happened
+    /// once and the order is what makes the list readable.
+    pub(super) decided: Vec<channels::Decision>,
 }
 
 impl Views {
@@ -112,6 +126,7 @@ impl Views {
             discards: std::collections::BTreeMap::new(),
             assets: Vec::new(),
             commits: std::collections::BTreeMap::new(),
+            predecessors: std::collections::BTreeMap::new(),
             events: 0,
             // An unreadable ledger directory is not a reason to refuse to
             // start: the index is disposable, every refresh tries again,
@@ -120,7 +135,133 @@ impl Views {
                 .unwrap_or_else(|_| memory::LedgerIndex::empty()),
             plans: crate::plan_view::PlanView::default(),
             pursuits: std::collections::BTreeMap::new(),
+            autonomy: kernel::consts_policy::AUTONOMY_DEFAULT,
+            decided: Vec::new(),
         }
+    }
+
+    /// Folds one record into every view that cares about it.
+    ///
+    /// # Errors
+    /// Propagates a view's own refusal to fold a malformed record.
+    pub(crate) fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
+        self.hot
+            .apply(record)
+            .map_err(memory::MemoryError::into_ax)?;
+        self.attribution
+            .apply(record)
+            .map_err(memory::MemoryError::into_ax)?;
+        self.book.apply(record)?;
+        self.plans.apply(record);
+        self.events = self.events.saturating_add(1);
+        match record.kind() {
+            EventKind::CityInitialized => {
+                self.city = record.addr().cloned();
+            }
+            EventKind::SignalEnqueued => {
+                if let Some((room, line)) = signal_line(record) {
+                    self.waiting.entry(room).or_default().push(line);
+                }
+            }
+            EventKind::SignalConsumed => {
+                if let Some((room, line)) = signal_line(record)
+                    && let Some(queue) = self.waiting.get_mut(&room)
+                {
+                    queue.retain(|held| held.id != line.id);
+                }
+            }
+            EventKind::PursuitChanged => {
+                if let Some((addr, held)) = pursuit_from(record) {
+                    match held {
+                        Some(entry) => {
+                            self.pursuits.insert(addr, entry);
+                        }
+                        None => {
+                            self.pursuits.remove(&addr);
+                        }
+                    }
+                }
+            }
+            EventKind::FileDiscarded => {
+                for line in discard_lines(record) {
+                    self.discards.insert(line.path.clone(), line);
+                }
+            }
+            EventKind::DiscardRestored => {
+                for line in discard_lines(record) {
+                    if let Some(held) = self.discards.get_mut(&line.path) {
+                        held.restored = true;
+                    }
+                }
+            }
+            EventKind::CheckpointCommitted | EventKind::PrMerged => self.fold_commit(record),
+            EventKind::RunStarted => self.fold_predecessor(record),
+            EventKind::AssetArchived => {
+                if let Some(line) = registry_line(record) {
+                    self.assets.push(line);
+                }
+            }
+            EventKind::ApprovalRequested => {
+                // The payload *is* the item: it was written by serialising
+                // one, so it reads back as one. Rebuilding a lesser shape
+                // out of hand-picked fields is how this view came to show
+                // every waiting item as "(no summary recorded)" - the field
+                // it read had never been written by anybody.
+                let value = serde_json::Value::Object(record.data().as_map().clone());
+                let item: kernel::ApprovalItem = serde_json::from_value(value).map_err(|err| {
+                    AxError::failure(
+                        AxCode::WireMismatch,
+                        "fold an approval into the queue",
+                        format!("seq {}: {err}", record.seq().value()),
+                    )
+                    .with_recovery(
+                        "the record stands; this view skips it and the observer reports it",
+                    )
+                })?;
+                self.approvals.insert(item.id.as_str().to_owned(), item);
+            }
+            EventKind::ApprovalResolved => {
+                let data = record.data().as_map();
+                if let Some(id) = data.get("id").and_then(serde_json::Value::as_str) {
+                    self.approvals.remove(id);
+                    // The cluster travels with the answer because the
+                    // person answered the group they were shown; a row
+                    // whose cluster will not read back is still an
+                    // answer that happened, so it lands with the class
+                    // it was recorded under rather than being dropped.
+                    let cluster = data
+                        .get("cluster")
+                        .cloned()
+                        .and_then(|value| serde_json::from_value(value).ok())
+                        .unwrap_or(kernel::ClusterKey {
+                            class: kernel::ApprovalClass::AgentQuestion,
+                            detail: String::new(),
+                        });
+                    let verdict = match data.get("verdict").and_then(serde_json::Value::as_str) {
+                        Some("deny") => kernel::PolicyVerdict::Deny,
+                        _ => kernel::PolicyVerdict::Allow,
+                    };
+                    self.decided.push(channels::Decision {
+                        item: id.to_owned(),
+                        verdict,
+                        cluster,
+                        at: record.t(),
+                    });
+                }
+            }
+            EventKind::AutonomyChanged => {
+                if let Some(name) = record
+                    .data()
+                    .as_map()
+                    .get("autonomy")
+                    .and_then(serde_json::Value::as_str)
+                {
+                    self.autonomy = crate::assembly::read_autonomy(name);
+                }
+            }
+            _ => {}
+        }
+        Ok(())
     }
 
     /// One entry per building, with its plan as the projection last read

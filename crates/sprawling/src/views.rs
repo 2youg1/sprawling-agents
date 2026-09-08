@@ -24,6 +24,8 @@
 
 pub(super) mod answering;
 pub(super) mod commits;
+#[cfg(test)]
+mod governance_tests;
 pub(super) mod holding;
 pub(super) mod lines;
 #[cfg(test)]

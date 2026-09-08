@@ -14,121 +14,22 @@
 //! adapter - and a file holding two shapes is what section 9 says a split
 //! looks like.
 //!
-//! **What it deliberately does not hold.** The plans are
-//! `crate::plan_view`'s and are read through it; a second parse here
-//! would be a second answer to "what is stuck and why", and only one of
-//! them would be folding the records that say why. What waits in a room
-//! is folded from signal records rather than read off a queue, because a
-//! queue answers by being consumed and a view that consumed what it
-//! showed would change the thing it reports on.
+//! **The fold is not here.** How one record moves the views lives with
+//! the views themselves (`views::holding`), which is the module whose
+//! whole subject is what they hold; this one is the reading side, and
+//! keeping the two apart is what stops a question from quietly changing
+//! the thing it reports on.
 
-use kernel::{AxCode, AxError, EventKind, EventRecord};
+use kernel::EventRecord;
 
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
 use super::holding::Views;
-use super::lines::{
-    buildings_of, discard_lines, endpoints_answer, pursuit_from, registry_line, signal_line,
-    summarize,
-};
+use super::lines::{buildings_of, endpoints_answer, summarize};
 use crate::assembly::{ledger_dir, read_building};
 
 impl Views {
-    /// Folds one record into every view that cares about it.
-    ///
-    /// # Errors
-    /// Propagates a view's own refusal to fold a malformed record.
-    pub(crate) fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
-        self.hot
-            .apply(record)
-            .map_err(memory::MemoryError::into_ax)?;
-        self.attribution
-            .apply(record)
-            .map_err(memory::MemoryError::into_ax)?;
-        self.book.apply(record)?;
-        self.plans.apply(record);
-        self.events = self.events.saturating_add(1);
-        match record.kind() {
-            EventKind::CityInitialized => {
-                self.city = record.addr().cloned();
-            }
-            EventKind::SignalEnqueued => {
-                if let Some((room, line)) = signal_line(record) {
-                    self.waiting.entry(room).or_default().push(line);
-                }
-            }
-            EventKind::SignalConsumed => {
-                if let Some((room, line)) = signal_line(record)
-                    && let Some(queue) = self.waiting.get_mut(&room)
-                {
-                    queue.retain(|held| held.id != line.id);
-                }
-            }
-            EventKind::PursuitChanged => {
-                if let Some((addr, held)) = pursuit_from(record) {
-                    match held {
-                        Some(entry) => {
-                            self.pursuits.insert(addr, entry);
-                        }
-                        None => {
-                            self.pursuits.remove(&addr);
-                        }
-                    }
-                }
-            }
-            EventKind::FileDiscarded => {
-                for line in discard_lines(record) {
-                    self.discards.insert(line.path.clone(), line);
-                }
-            }
-            EventKind::DiscardRestored => {
-                for line in discard_lines(record) {
-                    if let Some(held) = self.discards.get_mut(&line.path) {
-                        held.restored = true;
-                    }
-                }
-            }
-            EventKind::CheckpointCommitted | EventKind::PrMerged => self.fold_commit(record),
-            EventKind::AssetArchived => {
-                if let Some(line) = registry_line(record) {
-                    self.assets.push(line);
-                }
-            }
-            EventKind::ApprovalRequested => {
-                // The payload *is* the item: it was written by serialising
-                // one, so it reads back as one. Rebuilding a lesser shape
-                // out of hand-picked fields is how this view came to show
-                // every waiting item as "(no summary recorded)" - the field
-                // it read had never been written by anybody.
-                let value = serde_json::Value::Object(record.data().as_map().clone());
-                let item: kernel::ApprovalItem = serde_json::from_value(value).map_err(|err| {
-                    AxError::failure(
-                        AxCode::WireMismatch,
-                        "fold an approval into the queue",
-                        format!("seq {}: {err}", record.seq().value()),
-                    )
-                    .with_recovery(
-                        "the record stands; this view skips it and the observer reports it",
-                    )
-                })?;
-                self.approvals.insert(item.id.as_str().to_owned(), item);
-            }
-            EventKind::ApprovalResolved => {
-                if let Some(id) = record
-                    .data()
-                    .as_map()
-                    .get("id")
-                    .and_then(serde_json::Value::as_str)
-                {
-                    self.approvals.remove(id);
-                }
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-
     /// A bounded slice of the one history, ending just before `before`
     /// or at the tail.
     ///
@@ -265,6 +166,12 @@ impl Views {
                     items: self.approvals.values().cloned().collect(),
                 })
             }
+            channels::Query::Governance => {
+                channels::Answer::Governance(channels::GovernanceAnswer {
+                    autonomy: self.autonomy.clone(),
+                    decided: self.decided.clone(),
+                })
+            }
             channels::Query::CostView => {
                 let report = self.attribution.report();
                 channels::Answer::Cost(Box::new(channels::CostAnswer {
@@ -299,6 +206,37 @@ impl Views {
                     }),
                     Err(_) => channels::Answer::Unavailable {
                         query: format!("Changes({base})"),
+                    },
+                }
+            }
+            channels::Query::Hunks { oid_a, oid_b, path } => {
+                match memory::of_file(&self.city_root, *oid_a, memory::Head::Commit(*oid_b), path) {
+                    Ok(patch) => channels::Answer::Hunks(Box::new(channels::HunksAnswer {
+                        oid_a: *oid_a,
+                        oid_b: *oid_b,
+                        path: path.clone(),
+                        lines: patch
+                            .lines
+                            .into_iter()
+                            .map(|line| channels::PatchLine {
+                                number: line.number,
+                                text: line.text,
+                            })
+                            .collect(),
+                        withheld: patch
+                            .withheld
+                            .into_iter()
+                            .map(|held| channels::Withheld {
+                                number: held.number,
+                                reason: held.reason,
+                            })
+                            .collect(),
+                    })),
+                    // An oid this city never wrote, for the reason `Changes`
+                    // gives: "it changed nothing" and "I cannot read it" are
+                    // different answers, and a reader's next move differs.
+                    Err(_) => channels::Answer::Unavailable {
+                        query: format!("Hunks({oid_a}..{oid_b} {path})"),
                     },
                 }
             }

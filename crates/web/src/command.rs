@@ -283,10 +283,10 @@ pub const MODES: [&str; 5] = ["build", "up", "sc", "ud", "experiment"];
 
 /// Builds one Dispatch. The only place in the client that does.
 ///
-/// No budget travels from a person: `BudgetCap::default()` is what the
-/// wire carries, and what a run costs is reported after it runs. This
-/// city has no budget lock, so the composer neither asks for a figure
-/// nor shows one.
+/// No ceiling travels from a person, because the frame has none to
+/// carry: what a run costs is reported after it runs, and the one brake
+/// is `Halt`. The composer therefore neither asks for a figure nor shows
+/// one.
 ///
 /// **`room` is split, not sent whole.** `lab/parser` means the building
 /// `lab` and a session a person is calling `parser`, which is exactly
@@ -345,9 +345,36 @@ pub fn dispatch_command(
             task: task.to_owned(),
             goal: goal.trim().to_owned(),
             mode: channels::ModeTag::parse(mode).ok()?,
-            budget: channels::BudgetCap::default(),
             session,
             effort,
+        },
+    )))
+}
+
+/// Builds one `PutDocument`. The only place in the client that does.
+///
+/// An empty body is refused rather than sent: a frame carrying it would
+/// leave the Mayor with no identity at all, and clearing a document is
+/// deleting it, which is a verb this city does not have. The key is
+/// derived from the document and its bytes, so saving the same text
+/// twice is one write.
+#[must_use]
+pub fn put_document_command(
+    which: channels::GovernedDocument,
+    body: &str,
+) -> Option<channels::ClientFrame> {
+    if body.trim().is_empty() {
+        return None;
+    }
+    Some(channels::ClientFrame::Command(Box::new(
+        channels::WireCommand::PutDocument {
+            idem: channels::IdemKey::derive(
+                &RunId::CITY,
+                Seq::FIRST,
+                format!("{which:?}|{body}").as_bytes(),
+            ),
+            which,
+            body: body.to_owned(),
         },
     )))
 }

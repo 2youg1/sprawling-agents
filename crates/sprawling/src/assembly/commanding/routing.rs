@@ -26,7 +26,6 @@ impl RunWorker {
                 mode,
                 session,
                 effort,
-                budget,
                 ..
             } => {
                 // An empty goal is not a missing field. It already means
@@ -52,8 +51,8 @@ impl RunWorker {
                         session,
                         effort,
                         mode: mode_of(&mode),
-                        budget,
                         parent: None,
+                        succession: None,
                     },
                     task,
                     goal,
@@ -144,6 +143,9 @@ impl RunWorker {
             channels::Command::Fork {
                 run, at_seq, addr, ..
             } => self.fork(run, at_seq, addr).map(|_| ()),
+            channels::Command::PutDocument { which, ref body, .. } => {
+                self.put_document(which, body)
+            }
             channels::Command::Halt { scope, .. } => self.set_admission(&scope, HALTED),
             channels::Command::Release { scope, .. } => self.set_admission(&scope, RELEASED),
             // Cancel and Steer have a second door. `Desk::interrupt_for`

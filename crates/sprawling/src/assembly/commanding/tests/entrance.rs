@@ -75,7 +75,6 @@ fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
         task: "read the plan".to_owned(),
         goal: "one answer".to_owned(),
         mode: channels::ModeTag::parse("plan").unwrap(),
-        budget: kernel::BudgetCap::default(),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lab|read the plan"),
         session: Some(kernel::SessionName::parse("one").unwrap()),
         effort: None,

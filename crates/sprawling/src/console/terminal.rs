@@ -319,7 +319,6 @@ fn dispatch(addr: &Address, task: &str) -> Result<channels::ClientFrame, kernel:
             task: task.to_owned(),
             goal: String::new(),
             mode: channels::ModeTag::parse("plan")?,
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(
                 &kernel::RunId::CITY,
                 kernel::Seq::FIRST,

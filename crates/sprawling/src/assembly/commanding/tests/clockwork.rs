@@ -66,7 +66,6 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
         task: "read the plan".to_owned(),
         goal: "one answer".to_owned(),
         mode: channels::ModeTag::parse("plan").unwrap(),
-        budget: kernel::BudgetCap::default(),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lab/room1|read the plan"),
         session: None,
         effort: None,

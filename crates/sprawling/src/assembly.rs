@@ -18,9 +18,10 @@
 //! reaches the module that declares it and that module's descendants, so
 //! the split cost no field its privacy. What stays here is what every
 //! submodule needs and no submodule owns: the worker itself, the one
-//! clock sample, the record it appends, the two hooks a live control
-//! surface installs, and the door a `Command` enters by. Opening and
-//! closing live in `lifetime`; the test fixtures in `fixture`.
+//! clock sample, the two hooks a live control surface installs, and the
+//! door a `Command` enters by. The lines it appends live in
+//! `recording`; opening and closing in `lifetime`; the test fixtures in
+//! `fixture`.
 //!
 //! The `use` block below is the one place the sixteen submodules see
 //! each other through. A submodule imports from `super`, never from a
@@ -39,6 +40,8 @@ mod lifetime;
 mod mcp;
 mod naming;
 mod plans;
+mod probing;
+mod recording;
 mod reviewing;
 mod settling;
 mod waking;
@@ -47,7 +50,7 @@ mod workbench;
 pub(crate) use building_page::read_building;
 use commanding::entrance::Entrance;
 use credentials::{Ceilings, Chosen, Credential, Entered};
-use dispatching::{Agreed, Assignment, DISPATCH_TURN_BUDGET, Given, Knock, run_id_for};
+use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
 pub(crate) use dispatching::{Dispatched, acp_dispatch};
 use driving::{Driven, Driving};
 use folds::{Governance, HALTED, RELEASED, artifact_of, new_inbox};
@@ -56,20 +59,24 @@ pub(crate) use genesis::city_address;
 use genesis::city_segment;
 pub use genesis::{Adopt, InitReport, form_city, has_history, init_city};
 use mcp::{PYTHON_WASM_ENV, connect_mcp, mounts_under, transport_site};
+pub(crate) use naming::read_autonomy;
 use naming::{
-    autonomy_name, building_of, mode_of, name_of, not_built, plan_node_of, read_autonomy,
-    scope_name,
+    autonomy_name, building_of, governed_of, mode_of, name_of, not_built, plan_node_of, scope_name,
 };
 use plans::Reporter;
 use settling::{Ending, Sweep};
-use workbench::{CITY_VERIFIER, Desks, Site, Workbench};
+use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
 
-use crate::effect;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use kernel::{Address, AxCode, AxError, EventDraft, EventKind};
-use kernel::{EventRecord, Ledger, Payload, RunId, TimeMs};
+use kernel::{Address, AxCode, AxError, EventRecord, RunId, TimeMs};
+// What the test fixtures below reach through `super::*`, now that the
+// lines this worker appends live in `recording`.
+#[cfg(test)]
+use crate::effect;
+#[cfg(test)]
+use kernel::{EventDraft, EventKind, Payload};
 use memory::{Cas, JsonlLedger};
 use runtime::Interrupt;
 
@@ -218,84 +225,6 @@ pub struct RunWorker {
 }
 
 impl RunWorker {
-    /// Writes one diagnostic line, anchored to where the ledger stands.
-    fn note(&mut self, level: runtime::diagnostics::Level, module: &str, message: &str) {
-        let site = runtime::diagnostics::Site {
-            run: RunId::CITY,
-            seq: self.ledger.position(),
-            module,
-        };
-        self.log.write(level, site, message);
-    }
-
-    /// Appends one city record and folds it into the worker's own book.
-    /// The append comes first: the book states what the history says,
-    /// never what the process hoped to write.
-    fn record(&mut self, kind: EventKind, data: Payload) -> Result<(), AxError> {
-        self.record_where(kind, None, data)
-    }
-
-    /// The same, for a record that belongs to one address. A pursuit is
-    /// a building's, and a record with no address would be a fact about
-    /// the city that no view could file under the building it changed.
-    fn record_at(&mut self, kind: EventKind, addr: Address, data: Payload) -> Result<(), AxError> {
-        self.record_where(kind, Some(addr), data)
-    }
-
-    fn record_where(
-        &mut self,
-        kind: EventKind,
-        addr: Option<Address>,
-        data: Payload,
-    ) -> Result<(), AxError> {
-        // The key of the command in flight goes on the record it is
-        // writing, and nowhere else: that is how a restarted city reads
-        // out of its own history what it has already carried out.
-        let data = self.entrance.stamp(data)?;
-        let draft = EventDraft {
-            run: RunId::CITY,
-            t: now_ms()?,
-            who: "owner".to_owned(),
-            addr,
-            kind,
-            data: data.clone(),
-            ig: false,
-        };
-        self.ledger.append(draft)?;
-        self.governance.absorb(kind, RunId::CITY, None, &data);
-        self.book.apply_payload(kind, &data)
-    }
-
-    /// Appends one line attributed to a run rather than to the city.
-    /// Separate from `record` because that one speaks for the city: an
-    /// effect a resident caused must carry the resident's name, or the
-    /// history cannot say who spoke.
-    fn record_for(&mut self, run: RunId, line: effect::Line) -> Result<(), AxError> {
-        let effect::Line {
-            who,
-            addr,
-            kind,
-            data,
-        } = line;
-        let data = self.entrance.stamp(data)?;
-        self.ledger.append(EventDraft {
-            run,
-            t: now_ms()?,
-            who,
-            addr: Some(addr.clone()),
-            kind,
-            data: data.clone(),
-            ig: false,
-        })?;
-        // The book states what the history says, whoever wrote the line.
-        // Without this an approval a run raised was on the ledger and
-        // absent from `pending`, so the person could not answer it until
-        // the process restarted and folded the ledger again. It is the
-        // same fold a restart runs, shown the line this process wrote.
-        self.governance.absorb(kind, run, Some(&addr), &data);
-        Ok(())
-    }
-
     /// Sends every appended record to `sink` once it is durable.
     pub(crate) fn observe(&mut self, sink: Box<dyn FnMut(&EventRecord) + Send>) {
         self.ledger.observe(sink);

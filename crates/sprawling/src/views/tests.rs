@@ -220,7 +220,7 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
 
 /// One record for a view test, carrying a payload and an address.
 #[cfg(test)]
-fn view_record(
+pub(super) fn view_record(
     seq: u64,
     run: RunId,
     kind: EventKind,

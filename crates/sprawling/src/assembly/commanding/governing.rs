@@ -178,9 +178,8 @@ impl RunWorker {
             // The work the person just unblocked carries on without
             // them: an answer that still needed the same command typed
             // again would make the inbox a place to acknowledge things
-            // rather than a place to decide them. Under the ceiling it
-            // was sent with, for the reason `knock` gives beside its own
-            // budget - this is the same piece of work, interrupted.
+            // rather than a place to decide them. This is the same piece
+            // of work, interrupted.
             self.dispatch_in(
                 Assignment {
                     // The room this work was interrupted in already
@@ -190,8 +189,8 @@ impl RunWorker {
                     session: None,
                     effort: None,
                     mode: runtime::Mode::PlanGoal,
-                    budget: job.budget,
                     parent: None,
+                    succession: None,
                 },
                 job.task,
                 job.goal,
@@ -199,6 +198,37 @@ impl RunWorker {
             .map(drop)?;
         }
         Ok(())
+    }
+
+    /// Writes one of the three documents that govern this city, and
+    /// records that it happened.
+    ///
+    /// The bytes go to disk and the line goes to the Ledger. The line
+    /// carries which document and how long it is, never the text: the
+    /// document is on disk and readable, and copying it into history
+    /// would put the same words under two authorities that later
+    /// disagree.
+    ///
+    /// # Errors
+    /// Propagates a reserved subtree that cannot be written, and a
+    /// history that will not take the line announcing it.
+    pub(in crate::assembly) fn put_document(
+        &mut self,
+        which: channels::GovernedDocument,
+        body: &str,
+    ) -> Result<(), AxError> {
+        let which = super::super::governed_of(which);
+        city::write_governed(&self.city_root, which, body)?;
+        let mut map = serde_json::Map::new();
+        map.insert(
+            "which".to_owned(),
+            serde_json::Value::String(which.file().to_owned()),
+        );
+        map.insert(
+            "bytes".to_owned(),
+            serde_json::Value::Number(body.len().into()),
+        );
+        self.record(EventKind::GovernedDocumentWritten, Payload::new(map)?)
     }
 
     /// Records a fork: a new run identity branched from `from` at the
