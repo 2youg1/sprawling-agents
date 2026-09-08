@@ -29,6 +29,17 @@ pub(super) fn mode_of(tag: &channels::ModeTag) -> runtime::Mode {
     }
 }
 
+/// Which governed document a wire frame names. Total: the two sets have
+/// the same three members and neither owns the other, so the translation
+/// is written once here rather than guessed at each call site.
+pub(super) fn governed_of(which: channels::GovernedDocument) -> city::Governed {
+    match which {
+        channels::GovernedDocument::Mayor => city::Governed::Mayor,
+        channels::GovernedDocument::Clerk => city::Governed::Clerk,
+        channels::GovernedDocument::Preferences => city::Governed::Preferences,
+    }
+}
+
 /// The answer to a verb this build spells on the wire and cannot perform.
 ///
 /// One authority for the shape, because the six of them differ only in
@@ -84,7 +95,7 @@ pub(super) fn autonomy_name(autonomy: &kernel::Autonomy) -> String {
     }
 }
 
-pub(super) fn read_autonomy(name: &str) -> kernel::Autonomy {
+pub(crate) fn read_autonomy(name: &str) -> kernel::Autonomy {
     match name.split_once(':') {
         Some(("delegate", resident)) => match kernel::ResidentId::new(resident) {
             Some(resident) => kernel::Autonomy::Delegate(resident),

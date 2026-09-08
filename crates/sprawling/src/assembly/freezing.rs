@@ -8,13 +8,11 @@
 use std::path::Path;
 
 use kernel::Locator;
-use kernel::{Address, AxCode, AxError};
+use kernel::{Address, AxCode, AxError, RunId};
 use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
 use runtime::run::RunPlan;
 
-use super::{
-    Assignment, DISPATCH_TURN_BUDGET, Given, RunWorker, Site, Workbench, city_segment, name_of,
-};
+use super::{Assignment, Given, RunWorker, Site, Workbench, city_segment, held, name_of};
 
 /// One line ending, named once. The prefix joins documents with it, and
 /// a literal `10` at four call sites is four chances to mean something
@@ -39,25 +37,42 @@ pub(super) fn building_segment(city_root: &Path, addr: &Address, building: &Addr
     out
 }
 
-/// The run slot: what the last session left behind, then what this one
-/// was asked for.
+/// What a successor is told about the run it replaces: the room they
+/// share, and the predecessor's id when there is one. The two travel
+/// together because the transcript's address is made of both.
+pub(super) struct Predecessor<'a> {
+    pub(super) room: &'a Address,
+    pub(super) run: Option<RunId>,
+}
+
+/// The run slot: what the last run in this room left behind, where its
+/// conversation is, then what this one was asked for.
 ///
 /// In that order, because the brief is what the agent acts on and the
 /// last thing in a prompt is the thing that is read. A handoff that is
-/// still its blank form contributes nothing and is left out.
+/// still its blank form contributes nothing and is left out. The
+/// transcript line is one address, never the transcript itself: a
+/// successor searches it for what it needs rather than rereading
+/// everything its predecessor saw.
 /// # Errors
 /// Propagates a handoff that exists and cannot be read: a prefix that
 /// left it out would tell the next session there was none.
 pub(super) fn run_segment(
     city_root: &Path,
-    building: &Address,
     brief: &city::RunBrief,
+    before: Predecessor<'_>,
 ) -> Result<Vec<u8>, AxError> {
     let mut out = Vec::new();
-    if let Some(handoff) = city::handoff(city_root, building)? {
+    if let Some(handoff) = city::handoff(city_root, before.room)? {
         out.extend_from_slice(handoff.as_bytes());
         out.push(NEWLINE);
         out.push(NEWLINE);
+    }
+    if let Some(run) = before.run {
+        let transcript = runtime::Transcript::address(before.room, run)?;
+        out.extend_from_slice(
+            format!("Predecessor transcript: {}\n\n", transcript.as_str()).as_bytes(),
+        );
     }
     out.extend_from_slice(brief.segment_text().as_bytes());
     Ok(out)
@@ -108,7 +123,7 @@ impl RunWorker {
             goal,
             job,
         } = given;
-        let tools = workbench.catalog.borrow().tool_defs();
+        let tools = held(&workbench.catalog, "read the catalog")?.tool_defs();
         // The catalog is part of the resident segment, not a fifth slot:
         // what a resident may reach is as much a standing fact about it
         // as who it is, and both are frozen for the whole run so the
@@ -124,7 +139,11 @@ impl RunWorker {
         let mut resident = format!("Your name: {}\n\n", name_of(addr)).into_bytes();
         resident.extend_from_slice(&site.identity.segment_bytes());
         resident.push(NEWLINE);
-        resident.extend_from_slice(workbench.catalog.borrow().render().as_bytes());
+        resident.extend_from_slice(
+            held(&workbench.catalog, "read the catalog")?
+                .render()
+                .as_bytes(),
+        );
         let prefix = FrozenPrefix::assemble(
             FrozenSegment::new(SegmentSlot::City, city_segment(&self.city_root)?),
             FrozenSegment::new(
@@ -134,7 +153,14 @@ impl RunWorker {
             FrozenSegment::new(SegmentSlot::Resident, resident),
             FrozenSegment::new(
                 SegmentSlot::Run,
-                run_segment(&self.city_root, site.building.addr(), &brief)?,
+                run_segment(
+                    &self.city_root,
+                    &brief,
+                    Predecessor {
+                        room: addr,
+                        run: at.predecessor(),
+                    },
+                )?,
             ),
         )?;
 
@@ -152,18 +178,20 @@ impl RunWorker {
             },
             job: job.clone(),
             parent: at.parent,
-            budget_turns: DISPATCH_TURN_BUDGET,
-            budget: at.budget,
+            predecessor: at.predecessor(),
             shape: runtime::turn::CallShape {
                 model: site.model.id.clone(),
                 // The model's own ceiling, not a number chosen here.
-                // With thinking enabled this budget covers reasoning and
-                // answer together, so a hand-picked value truncates runs
-                // for a reason that appears nowhere in the account.
+                // With thinking enabled this covers reasoning and answer
+                // together, so a hand-picked value truncates runs for a
+                // reason that appears nowhere in the account.
                 max_tokens: site.model.max_output_tokens,
                 // Stated in CONFIG.toml, resolved down the three-layer
                 // ladder, and frozen with the run.
                 effort: site.config.effort,
+                // The window the reminder measures against: the book's
+                // figure, which is what `status` already reports.
+                context_tokens: site.model.context_tokens,
             },
             prefix,
             policy: site.rules.policy().clone(),
@@ -172,7 +200,7 @@ impl RunWorker {
             // shelves: the catalog already decided what this run can
             // reach, and reading the shelf again would answer that
             // question a second time at a different instant.
-            skills: workbench.catalog.borrow().skill_pins(),
+            skills: held(&workbench.catalog, "read the catalog")?.skill_pins(),
         };
 
         // The norms are filled by the machine: their addresses are known
@@ -192,11 +220,19 @@ impl RunWorker {
             must_read.push(Locator::parse(&format!("cas:b3-{hash}"))?);
         }
         must_read.push(job);
+        // The address is a pure function of the room and the run, so
+        // the handoff can name the transcript before a turn is taken.
+        // It names the room's file and never the ledger: the ledger is
+        // one chain for the whole city, under a subtree `read` refuses.
+        let transcript = runtime::Transcript::address(addr, site.run_id)?;
         let handoff = runtime::handoff::Handoff::new(
             must_read,
             task_line(&plan),
             "see the city roadmap".to_owned(),
-            "dispatched from the control surface".to_owned(),
+            format!(
+                "dispatched from the control surface; transcript at {}",
+                transcript.as_str()
+            ),
             "resume from the job locator".to_owned(),
         )?;
         Ok((plan, handoff))
