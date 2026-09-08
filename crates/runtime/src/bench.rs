@@ -34,9 +34,22 @@ use kernel::{
 
 use serde_json::Value;
 
-use memory::Checkpoint;
+use memory::{Checkpoint, Provenance};
 
 mod admit;
+
+/// The checkpoint net a run works under: the repository, what a fence
+/// covers, and who is signing it.
+///
+/// Three values that are meaningless apart - a fence with no scope
+/// stages what the run never held, and a fence with no provenance
+/// commits under nobody's name - so they are handed over together
+/// rather than assembled inside the bench.
+pub struct CheckpointNet {
+    pub checkpoint: Checkpoint,
+    pub scope: String,
+    pub of: Provenance,
+}
 
 /// The tool bench: the turn layer's routing of a call through the gate
 /// its own declared Effect names (Handoff verdict 10 — gate routing is
@@ -62,8 +75,7 @@ pub struct ToolBench {
     /// run, so whatever it deletes is restorable. Absent a net, such a
     /// command is refused, because running it unprotected is the one
     /// outcome nobody chose.
-    checkpoint: Option<Checkpoint>,
-    scope: String,
+    net: Option<CheckpointNet>,
     /// Cluster keys the person has already allowed. Held rather than
     /// looked up: the bench runs inside a drive that owns the ledger,
     /// and a gate that read history mid-wave would be a second reader
@@ -107,8 +119,7 @@ impl ToolBench {
             taint: TaintSet::empty(),
             seen: BTreeSet::new(),
             prior_public_egress: false,
-            checkpoint: None,
-            scope: String::new(),
+            net: None,
             granted: Vec::new(),
             job: None,
             asking: None,
@@ -138,9 +149,8 @@ impl ToolBench {
 
     /// Hands the bench its checkpoint net. Without one, a suspected
     /// discard is refused rather than run unprotected.
-    pub fn with_checkpoint(mut self, checkpoint: Checkpoint, scope: &str) -> ToolBench {
-        self.checkpoint = Some(checkpoint);
-        self.scope = scope.to_owned();
+    pub fn with_checkpoint(mut self, net: CheckpointNet) -> ToolBench {
+        self.net = Some(net);
         self
     }
 
@@ -198,7 +208,7 @@ impl ToolBench {
             && let Ok(arm) = crate::tools::parse_arm(call.args.as_map())
             && let DiscardForecast::Suspected { pattern } = kernel::forecast(&arm)
         {
-            let Some(checkpoint) = self.checkpoint.as_mut() else {
+            let Some(net) = self.net.as_mut() else {
                 return Err(AxError::failure(
                     AxCode::ToolUnavailable,
                     "invoke tool",
@@ -208,8 +218,9 @@ impl ToolBench {
                     "configure the checkpoint net, or run a command that does not delete",
                 ));
             };
-            let payload = checkpoint
-                .wave_pre(&self.scope, ctx.now, &ctx.actor)
+            let payload = net
+                .checkpoint
+                .wave_pre(&net.scope, ctx.now, &net.of)
                 .map_err(kernel_error_from_memory)?;
             fenced = payload
                 .as_map()

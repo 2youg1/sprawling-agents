@@ -45,7 +45,8 @@ mod waking;
 mod workbench;
 
 pub(crate) use building_page::read_building;
-use credentials::{Ceilings, Chosen, Entered};
+use commanding::entrance::Entrance;
+use credentials::{Ceilings, Chosen, Credential, Entered};
 use dispatching::{Agreed, Assignment, DISPATCH_TURN_BUDGET, Given, Knock, run_id_for};
 pub(crate) use dispatching::{Dispatched, acp_dispatch};
 use driving::{Driven, Driving};
@@ -206,6 +207,14 @@ pub struct RunWorker {
     /// the run that spoke and the runs that answer, because delivery
     /// happens after the speaker has frozen.
     knocks: Vec<Knock>,
+    /// Every command key this city has answered, and what it answered.
+    /// Folded from the history like the endpoint book beside it, so a
+    /// client retrying across a restart is still asking for one thing.
+    entrance: Entrance,
+    /// What is still running while the runs go on. One table per city,
+    /// and every `exec` gets a handle onto it, so `halt` reaches a
+    /// command without knowing which tool started it.
+    backlog: runtime::Backlog,
 }
 
 impl RunWorker {
@@ -239,6 +248,10 @@ impl RunWorker {
         addr: Option<Address>,
         data: Payload,
     ) -> Result<(), AxError> {
+        // The key of the command in flight goes on the record it is
+        // writing, and nowhere else: that is how a restarted city reads
+        // out of its own history what it has already carried out.
+        let data = self.entrance.stamp(data)?;
         let draft = EventDraft {
             run: RunId::CITY,
             t: now_ms()?,
@@ -264,6 +277,7 @@ impl RunWorker {
             kind,
             data,
         } = line;
+        let data = self.entrance.stamp(data)?;
         self.ledger.append(EventDraft {
             run,
             t: now_ms()?,
@@ -331,9 +345,28 @@ impl RunWorker {
     /// diagnostic log and to whoever asked. Before this existed the
     /// worker loop wrote `let _ = handle(command)`, so every refusal
     /// died in the log and the page that caused it said nothing.
+    /// A repeat under a key this city has already answered is answered
+    /// with that first answer and carried out no second time: this is
+    /// the door that honours the `IdemKey` every state-changing Command
+    /// carries, and it judges before any effect
+    /// (`commanding::entrance`, sprawling-SPEC.md 8-41).
     pub(crate) fn serve_one(&mut self, posted: Posted) {
         let Posted { command, reply } = posted;
-        if let Err(err) = self.handle(command) {
+        let key = command.idem().copied();
+        if let Some(first) = key.and_then(|key| self.entrance.answered(&key)) {
+            let said = commanding::entrance::repeated(command.name());
+            self.note(runtime::diagnostics::Level::Effect, "bin::assembly", &said);
+            if let Err(err) = first {
+                self.hand_back(&reply, err);
+            }
+            return;
+        }
+        if let Some(key) = key {
+            self.entrance.begin(key);
+        }
+        let outcome = self.handle(command);
+        self.entrance.settle(&outcome);
+        if let Err(err) = outcome {
             self.hand_back(&reply, err);
         }
     }

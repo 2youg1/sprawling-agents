@@ -64,6 +64,19 @@ The cost page shows shares against the authoritative total rather than normalisi
 
 **You need more detail than the pages give.** Raise the log level: `sprawling serve <city> --log decide` explains why verdicts came out the way they did, `--log trace` adds phase changes and retries, `--log wire` adds the bytes of frames. Every line carries the Ledger position it happened at, so a surprising log line and a surprising event meet on one integer. See [`logging.md`](logging.md).
 
+## Driving a city from a script
+
+`sprawling call` sends one wire frame and prints every frame that comes back, one JSON object per line, until the city has been quiet for `--quiet-ms` (2000 by default). **The exit code is the answer**, so a script branches on it instead of parsing the JSON.
+
+| Exit | What it says | What to do about it |
+|---|---|---|
+| 0 | the city answered inside the window, and refused nothing | go on |
+| 1 | the city refused; the refusal is the last frame printed, with its recovery line | read the refusal and act on it |
+| 2 | this command line was not readable - a missing frame, a bad `--quiet-ms`, an unknown subcommand | fix the command; the city was never asked |
+| 3 | the frame went out and **nothing came back** before the window closed | the city may still be working: ask again with a longer `--quiet-ms`, or read the city's own log |
+
+**3 is not a failure and not a success.** A refusal that takes longer than the window - a provider probe with a 15 second timeout behind it, for example - used to leave this command exiting 0, so an agent branching on the exit code read a refusal it never received as a success. Silence now has its own code, and 0 and 1 keep meaning exactly what they say.
+
 ## Moving a city
 
 ```bash

@@ -12,7 +12,7 @@ use kernel::{EventRecord, Payload, RunId};
 
 use crate::views::Views;
 
-use super::read_autonomy;
+use super::{Entrance, read_autonomy};
 
 mod collaboration;
 
@@ -214,6 +214,10 @@ pub(crate) struct Standing {
     pub(crate) book: gateway::EndpointBook,
     pub(super) governance: Governance,
     pub(super) collaboration: Collaboration,
+    /// The keys of the commands this history already carried out. On
+    /// the same pass as the other three: recognising a repeat across a
+    /// restart must not cost a second read of the whole history.
+    pub(super) entrance: Entrance,
 }
 
 impl Standing {
@@ -237,6 +241,7 @@ impl Standing {
         let mut book = gateway::EndpointBook::new();
         let mut governance = Governance::empty();
         let mut collaboration = CollaborationFold::default();
+        let mut entrance = Entrance::default();
         if ledger_dir.exists() {
             let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
             for line in verified.raw_lines() {
@@ -244,12 +249,14 @@ impl Standing {
                 book.apply(&record)?;
                 governance.absorb(record.kind(), record.run(), record.addr(), record.data());
                 collaboration.absorb(&record)?;
+                entrance.absorb(record.data());
             }
         }
         Ok(Standing {
             book,
             governance,
             collaboration: collaboration.settle()?,
+            entrance,
         })
     }
 }

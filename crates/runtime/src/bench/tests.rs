@@ -209,13 +209,17 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_fenced() {
     let exec_tool = || {
         Box::new(
             ExecTool::new(
-                tmp.path().to_path_buf(),
-                Vec::new(),
-                None,
+                crate::tools::ExecSetup {
+                    workdir: tmp.path().to_path_buf(),
+                    mounts: Vec::new(),
+                    python_wasm: None,
+                    shell: None,
+                    fuel: Fuel(1000),
+                    env_passthrough: Vec::new(),
+                    domain: Address::parse("work").unwrap(),
+                },
                 Box::new(EchoSandbox::new()),
-                None,
-                Fuel(1000),
-                Address::parse("work").unwrap(),
+                crate::Backlog::new(),
             )
             .unwrap(),
         )
@@ -234,7 +238,11 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_fenced() {
     // With a net: the wave is fenced first, and the outcome carries
     // the commit the sweep will restore from.
     let checkpoint = Checkpoint::open(tmp.path()).unwrap();
-    let mut fenced_bench = ToolBench::new(domain).with_checkpoint(checkpoint, "work");
+    let mut fenced_bench = ToolBench::new(domain).with_checkpoint(crate::bench::CheckpointNet {
+        checkpoint,
+        scope: "work".to_owned(),
+        of: probe_provenance(),
+    });
     fenced_bench.register(exec_tool()).unwrap();
     // The shell arm is unconfigured, so the tool itself refuses —
     // but only after the fence went up, which is what we assert.
@@ -247,7 +255,7 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_fenced() {
     );
     let mut probe = Checkpoint::open(tmp.path()).unwrap();
     let payload = probe
-        .wave_pre("work", TimeMs::new(1_700_000_001_000), "probe")
+        .wave_pre("work", TimeMs::new(1_700_000_001_000), &probe_provenance())
         .unwrap();
     let oid = serde_json::to_value(&payload).unwrap()["oid"]
         .as_str()
@@ -285,4 +293,17 @@ fn a_second_tool_claiming_a_taken_name_is_refused() {
         Ok(()) => panic!("a name collision must refuse, not shadow"),
     };
     assert_eq!(*err.code(), AxCode::InvalidArgs);
+}
+
+/// Who a fence in this test file is signed as.
+fn probe_provenance() -> memory::Provenance {
+    memory::Provenance::new(
+        kernel::RunId::CITY,
+        kernel::Address::parse("work/probe").unwrap(),
+        kernel::B3Hash::digest(b"a city"),
+        memory::ModelChoice {
+            id: "test-model".to_owned(),
+            effort: None,
+        },
+    )
 }
