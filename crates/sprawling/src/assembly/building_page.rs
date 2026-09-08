@@ -275,6 +275,7 @@ addr = \"gone/room1\"
                     shell: true,
                     fuel: 4096,
                     mounts: vec![Address::parse("lab/shared").unwrap()],
+                    env_passthrough: Vec::new(),
                 }),
                 mcp: Some(vec![kernel::McpServer {
                     label: kernel::ServerLabel::parse("docs").unwrap(),

@@ -7,6 +7,8 @@
 #[non_exhaustive] pub enum kernel::CostTier
 #[non_exhaustive] pub enum kernel::DelegateKind
 #[non_exhaustive] pub enum kernel::DialectKind
+#[non_exhaustive] pub enum kernel::DocumentReason
+#[non_exhaustive] pub enum kernel::DomainVerdict
 #[non_exhaustive] pub enum kernel::Effect
 #[non_exhaustive] pub enum kernel::Effort
 #[non_exhaustive] pub enum kernel::EgressTarget
@@ -21,12 +23,15 @@
 #[non_exhaustive] pub enum kernel::StopReason
 #[non_exhaustive] pub enum kernel::Temporal
 #[non_exhaustive] pub struct kernel::BuildingPolicy
+impl core::convert::From<kernel::EnvVarName> for alloc::string::String
 impl core::convert::From<kernel::ServerLabel> for alloc::string::String
+impl core::convert::TryFrom<alloc::string::String> for kernel::EnvVarName
 impl core::convert::TryFrom<alloc::string::String> for kernel::ServerLabel
 impl core::default::Default for kernel::SandboxLimits
 impl core::fmt::Display for kernel::Address
 impl core::fmt::Display for kernel::AxCode
 impl core::fmt::Display for kernel::B3Hash
+impl core::fmt::Display for kernel::EnvVarName
 impl core::fmt::Display for kernel::GitOid
 impl core::fmt::Display for kernel::IdemKey
 impl core::fmt::Display for kernel::Locator
@@ -55,7 +60,9 @@ impl kernel::Delegate
 impl kernel::DelegateKind
 impl kernel::Delegator
 impl kernel::Discard
+impl kernel::DomainPrefixes
 impl kernel::EgressAllowlist
+impl kernel::EnvVarName
 impl kernel::EventKind
 impl kernel::EventRecord
 impl kernel::EventRef
@@ -65,6 +72,7 @@ impl kernel::GitOid
 impl kernel::GoalId
 impl kernel::Held
 impl kernel::IdemKey
+impl kernel::ImageType
 impl kernel::Locator
 impl kernel::ModelReturn
 impl kernel::ModelTag
@@ -137,6 +145,7 @@ pub const kernel::NODE_DEPTH_MAX: usize
 pub const kernel::PLAN_WHOLE_PPB: u64
 pub const kernel::RESERVED_PREFIX: &str
 pub const kernel::ROADMAP_COLUMNS: usize
+pub const kernel::ROADMAP_FILE: &str
 pub const kernel::ROADMAP_STATUS_SPELLINGS: [(kernel::RoadmapStatus, &str); 5]
 pub const kernel::RunId::CITY: kernel::RunId
 pub const kernel::Seq::FIRST: kernel::Seq
@@ -152,12 +161,18 @@ pub const kernel::consts_external::SECRET_SHAPES: [kernel::consts_external::Secr
 pub const kernel::consts_policy::AUTONOMY_DEFAULT: kernel::Autonomy
 pub const kernel::consts_policy::CLOCK_STAMP_DEFAULT: kernel::ClockStampGranularity
 pub const kernel::consts_policy::CLOCK_ZONES_MAX: u32
+pub const kernel::consts_policy::CREDENTIAL_NAME_MARKERS: [&str; 11]
 pub const kernel::consts_policy::CTX_REMINDER_RATIO: kernel::consts_policy::Ratio
 pub const kernel::consts_policy::DISCARD_BYTES_MAX: u64
 pub const kernel::consts_policy::DISCARD_FILES_MAX: u32
 pub const kernel::consts_policy::DISCARD_RETENTION_DAYS: u32
 pub const kernel::consts_policy::DRAFT_HELD_ESCALATE: u32
 pub const kernel::consts_policy::EDIT_WAR_FREEZE: u32
+pub const kernel::consts_policy::HALL_BUILDING: &str
+pub const kernel::consts_policy::HALL_CLERK: &str
+pub const kernel::consts_policy::HALL_MAYOR: &str
+pub const kernel::consts_policy::IMAGES_PER_TURN: u32
+pub const kernel::consts_policy::IMAGE_MAX_BYTES: u64
 pub const kernel::consts_policy::LOOP_REPEAT_THRESHOLD: u32
 pub const kernel::consts_policy::OFFLOAD_MIN_BYTES: u64
 pub const kernel::consts_policy::POLICY_IDLE_DAYS: u32
@@ -181,7 +196,6 @@ pub enum kernel::Depth
 pub enum kernel::DiscardForecast
 pub enum kernel::DiscardRequest
 pub enum kernel::DiscardVerdict
-pub enum kernel::DomainVerdict
 pub enum kernel::EditWarVerdict
 pub enum kernel::EgressOutcome
 pub enum kernel::EscalateReason
@@ -191,6 +205,7 @@ pub enum kernel::GateOutcome
 pub enum kernel::GoalResource
 pub enum kernel::GoalVerdict
 pub enum kernel::How
+pub enum kernel::ImageType
 pub enum kernel::Lines
 pub enum kernel::Locator
 pub enum kernel::MemoShape
@@ -214,8 +229,10 @@ pub enum kernel::StopCause
 pub enum kernel::Token
 pub enum kernel::VersionVerdict
 pub enum kernel::WindowClass
+pub enum kernel::WriteDomain
 pub enum kernel::WriteMoment
 pub enum kernel::consts_external::SecretCharset
+pub fn alloc::string::String::from(kernel::EnvVarName) -> alloc::string::String
 pub fn alloc::string::String::from(kernel::ServerLabel) -> alloc::string::String
 pub fn kernel::ActionFingerprint::derive(&[u8]) -> kernel::ActionFingerprint
 pub fn kernel::Address::as_str(&self) -> &str
@@ -267,10 +284,16 @@ pub fn kernel::Discard::paths(&self) -> &[kernel::Address]
 pub fn kernel::Discard::plan(&self) -> &kernel::Restoration
 pub fn kernel::Discard::taint(&self) -> &kernel::TaintSet
 pub fn kernel::Discard::total_bytes(&self) -> kernel::ByteLen
+pub fn kernel::DomainPrefixes::iter(&self) -> impl core::iter::traits::iterator::Iterator<Item = &kernel::Address>
+pub fn kernel::DomainPrefixes::new(alloc::vec::Vec<kernel::Address>) -> core::result::Result<kernel::DomainPrefixes, kernel::AxError>
 pub fn kernel::EgressAllowlist::admits(&self, &str) -> bool
 pub fn kernel::EgressAllowlist::entries(&self) -> impl core::iter::traits::iterator::Iterator<Item = &str>
 pub fn kernel::EgressAllowlist::is_empty(&self) -> bool
 pub fn kernel::EgressAllowlist::new(alloc::vec::Vec<alloc::string::String>) -> kernel::EgressAllowlist
+pub fn kernel::EnvVarName::as_str(&self) -> &str
+pub fn kernel::EnvVarName::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn kernel::EnvVarName::parse(&str) -> core::result::Result<kernel::EnvVarName, kernel::AxError>
+pub fn kernel::EnvVarName::try_from(alloc::string::String) -> core::result::Result<kernel::EnvVarName, kernel::AxError>
 pub fn kernel::EventKind::window_class(&self) -> kernel::WindowClass
 pub fn kernel::EventRecord::addr(&self) -> core::option::Option<&kernel::Address>
 pub fn kernel::EventRecord::canonical_line(&self) -> core::result::Result<alloc::vec::Vec<u8>, kernel::AxError>
@@ -308,6 +331,7 @@ pub fn kernel::IdemKey::derive(&kernel::RunId, kernel::Seq, &[u8]) -> kernel::Id
 pub fn kernel::IdemKey::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn kernel::IdemKey::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::IdemKey::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+pub fn kernel::ImageType::mime(&self) -> &'static str
 pub fn kernel::LayeredValue<T>::default() -> Self
 pub fn kernel::LayeredValue<T>::resolve(&self) -> core::option::Option<&T>
 pub fn kernel::Ledger::append(&mut self, kernel::EventDraft) -> core::result::Result<kernel::EventRef, kernel::AxError>
@@ -429,6 +453,7 @@ pub fn kernel::Version::new(u64) -> Self
 pub fn kernel::Version::next(self) -> core::result::Result<kernel::Version, kernel::AxError>
 pub fn kernel::Version::value(&self) -> u64
 pub fn kernel::WriteDomain::admits(&self, &kernel::Address) -> kernel::DomainVerdict
+pub fn kernel::WriteDomain::documents(alloc::vec::Vec<kernel::Address>) -> core::result::Result<kernel::WriteDomain, kernel::AxError>
 pub fn kernel::WriteDomain::new(alloc::vec::Vec<kernel::Address>) -> core::result::Result<kernel::WriteDomain, kernel::AxError>
 pub fn kernel::WriteDomain::prefixes(&self) -> impl core::iter::traits::iterator::Iterator<Item = &kernel::Address>
 pub fn kernel::admit(&kernel::QueueStats, &kernel::ItemMeta) -> kernel::Admission
@@ -457,6 +482,7 @@ pub fn kernel::markdown(&str) -> alloc::vec::Vec<kernel::Span>
 pub fn kernel::match_item(&kernel::Policy, &kernel::ApprovalItem) -> kernel::PolicyApplication
 pub fn kernel::may_answer(&kernel::Autonomy, &kernel::ApprovalItem, &kernel::Answerer) -> kernel::AnswerVerdict
 pub fn kernel::message_payload(&[kernel::ContentBlock]) -> core::result::Result<kernel::Payload, kernel::AxError>
+pub fn kernel::names_a_credential(&str) -> bool
 pub fn kernel::notices(&[kernel::Blockage], &alloc::collections::btree::map::BTreeMap<kernel::NodeId, alloc::string::String>) -> alloc::vec::Vec<kernel::Notice>
 pub fn kernel::observe(&[kernel::ActionFingerprint]) -> kernel::StallVerdict
 pub fn kernel::observe_ctx(kernel::Tokens, kernel::CtxLock) -> kernel::CtxVerdict
@@ -578,6 +604,7 @@ pub kernel::CommitmentDecision::Denied
 pub kernel::Completion::Cancelled
 pub kernel::Completion::Done(kernel::Evidence)
 pub kernel::Completion::Limit
+pub kernel::ContentBlock::Image(kernel::ImageRef)
 pub kernel::ContentBlock::RedactedThinking
 pub kernel::ContentBlock::RedactedThinking::data: alloc::string::String
 pub kernel::ContentBlock::Text
@@ -586,6 +613,7 @@ pub kernel::ContentBlock::Thinking
 pub kernel::ContentBlock::Thinking::signature: alloc::string::String
 pub kernel::ContentBlock::Thinking::thinking: alloc::string::String
 pub kernel::ContentBlock::ToolResult
+pub kernel::ContentBlock::ToolResult::attachments: alloc::vec::Vec<kernel::ImageRef>
 pub kernel::ContentBlock::ToolResult::content: alloc::string::String
 pub kernel::ContentBlock::ToolResult::is_error: bool
 pub kernel::ContentBlock::ToolResult::tool_use_id: alloc::string::String
@@ -622,6 +650,10 @@ pub kernel::DiscardVerdict::Deny
 pub kernel::DiscardVerdict::Deny::reason: kernel::DenyReason
 pub kernel::DiscardVerdict::Escalate
 pub kernel::DiscardVerdict::Escalate::reason: kernel::EscalateReason
+pub kernel::DocumentReason::NotMarkdown
+pub kernel::DocumentReason::ThePlan
+pub kernel::DomainVerdict::NotWritable
+pub kernel::DomainVerdict::NotWritable::reason: kernel::DocumentReason
 pub kernel::DomainVerdict::Outside
 pub kernel::DomainVerdict::Outside::prefixes: alloc::vec::Vec<alloc::string::String>
 pub kernel::DomainVerdict::Within
@@ -772,6 +804,14 @@ pub kernel::How::Deleted
 pub kernel::How::Modified
 pub kernel::How::Renamed
 pub kernel::How::Renamed::from: alloc::string::String
+pub kernel::ImageRef::height: u32
+pub kernel::ImageRef::locator: kernel::Locator
+pub kernel::ImageRef::media_type: kernel::ImageType
+pub kernel::ImageRef::width: u32
+pub kernel::ImageType::Gif
+pub kernel::ImageType::Jpeg
+pub kernel::ImageType::Png
+pub kernel::ImageType::Webp
 pub kernel::ItemMeta::cost: u64
 pub kernel::LayeredValue::building: core::option::Option<T>
 pub kernel::LayeredValue::city: core::option::Option<T>
@@ -899,6 +939,7 @@ pub kernel::RoadmapStatus::InProgress
 pub kernel::RoadmapStatus::NotStarted
 pub kernel::Role::Assistant
 pub kernel::Role::User
+pub kernel::SandboxLimits::env_passthrough: alloc::vec::Vec<kernel::EnvVarName>
 pub kernel::SandboxLimits::fuel: u64
 pub kernel::SandboxLimits::mounts: alloc::vec::Vec<kernel::Address>
 pub kernel::SandboxLimits::shell: bool
@@ -965,6 +1006,8 @@ pub kernel::VersionVerdict::Stale
 pub kernel::VersionVerdict::Stale::current: kernel::Version
 pub kernel::WindowClass::InWindow
 pub kernel::WindowClass::RecordOnly
+pub kernel::WriteDomain::Documents(kernel::DomainPrefixes)
+pub kernel::WriteDomain::Everything(kernel::DomainPrefixes)
 pub kernel::WriteMoment::AfterFeedback
 pub kernel::WriteMoment::BeforeReport
 pub kernel::WriteMoment::OnPlanChange
@@ -1004,8 +1047,10 @@ pub struct kernel::CtxLock(_)
 pub struct kernel::Delegate
 pub struct kernel::Delegator(_)
 pub struct kernel::Discard
+pub struct kernel::DomainPrefixes
 pub struct kernel::EditSample
 pub struct kernel::EgressAllowlist
+pub struct kernel::EnvVarName(_)
 pub struct kernel::EventDraft
 pub struct kernel::EventRecord
 pub struct kernel::EventRef
@@ -1019,6 +1064,7 @@ pub struct kernel::GoalEntry
 pub struct kernel::GoalId(_)
 pub struct kernel::Held(_)
 pub struct kernel::IdemKey
+pub struct kernel::ImageRef
 pub struct kernel::ItemMeta
 pub struct kernel::LayeredValue<T>
 pub struct kernel::LiveConfig
@@ -1066,11 +1112,11 @@ pub struct kernel::ToolOutcome
 pub struct kernel::UnplannedProgress
 pub struct kernel::UsdMicros(_)
 pub struct kernel::Version(_)
-pub struct kernel::WriteDomain
 pub struct kernel::consts_external::SecretShape
 pub struct kernel::consts_policy::Ratio
 pub trait kernel::Ledger
 pub trait kernel::Model
 pub trait kernel::Tool
+pub type kernel::EnvVarName::Error = kernel::AxError
 pub type kernel::Increments<'a> = &'a mut dyn core::ops::function::FnMut(&str)
 pub type kernel::ServerLabel::Error = kernel::AxError

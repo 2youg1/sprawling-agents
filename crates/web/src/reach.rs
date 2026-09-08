@@ -203,6 +203,10 @@ pub fn ReachForm(
                     // be a sandbox that refuses every call.
                     fuel: fuel.read().trim().parse().unwrap_or(held.fuel),
                     mounts,
+                    // This form does not yet offer the declared
+                    // environment names, so it hands back what the
+                    // building already declared rather than clearing it.
+                    env_passthrough: held.env_passthrough.clone(),
                 };
                 on_frame.call(ClientFrame::Command(Box::new(
                     configure_command(&of, limits, servers),
@@ -322,6 +326,7 @@ mod tests {
             shell: true,
             fuel: 4096,
             mounts: Vec::new(),
+            env_passthrough: Vec::new(),
         };
         let first = configure_command(&addr, limits.clone(), Vec::new());
         let second = configure_command(&addr, limits, Vec::new());

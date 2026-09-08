@@ -57,12 +57,44 @@ pub const CLOCK_ZONES_MAX: u32 = 4;
 /// machine that gets slow.
 pub const SANDBOX_FUEL_DEFAULT: u64 = 200_000_000;
 
+/// Words that make an environment variable name read as a credential
+/// (11.1). Matched as a case-insensitive substring, so `AWS_SECRET_KEY`
+/// and `npm_password` are both caught.
+///
+/// Deliberately over-inclusive: `KEYBOARD` is refused along with
+/// `API_KEY`, and that is the direction to err in. A refused name comes
+/// back as a three-part refusal a person can act on; an admitted one is
+/// inherited by a child process that cannot be asked to forget it.
+pub const CREDENTIAL_NAME_MARKERS: [&str; 11] = [
+    "secret",
+    "token",
+    "key",
+    "password",
+    "passwd",
+    "credential",
+    "auth",
+    "session",
+    "cookie",
+    "private",
+    "signature",
+];
+
 /// 2 GiB per node's working tree. A ceiling rather than a free-space
 /// probe: free space is a moving fact about one machine, while this is
 /// the number a refusal can state and a person can raise. Checked
 /// before a tree is created, so an over-large city is refused rather
 /// than half-copied (11.4).
 pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;
+
+/// 2 MiB per picture. A ceiling a refusal can state and a person can
+/// raise, sized so a base64 body (4/3 of this) stays inside what both
+/// providers accept (card-4.1).
+pub const IMAGE_MAX_BYTES: u64 = 2_097_152;
+
+/// Four pictures in one turn. Past that the window is being spent on
+/// pixels rather than on the work, and a limit stated once is what a
+/// refusal can name (card-4.1).
+pub const IMAGES_PER_TURN: u32 = 4;
 
 /// Off by default: zero window bytes until a Building opts in (4.3).
 pub const CLOCK_STAMP_DEFAULT: crate::config::ClockStampGranularity =
@@ -78,6 +110,19 @@ pub const SUBAGENT_CTX_LOCK_DEFAULT: crate::budget::CtxLock =
 
 /// The human answers by default; loosening is an explicit command.
 pub const AUTONOMY_DEFAULT: crate::approval::Autonomy = crate::approval::Autonomy::Owner;
+
+/// The building raised with every city, which holds the city's own plan
+/// and the two residents that serve every other building.
+pub const HALL_BUILDING: &str = "hall";
+
+/// The city's planner. It writes Markdown and plans; it does not build.
+pub const HALL_MAYOR: &str = "hall/mayor";
+
+/// Who answers approvals when the person delegated them. Genesis writes
+/// the delegation as an event rather than baking it into
+/// `AUTONOMY_DEFAULT`: who answers is a decision this city made, and a
+/// decision the person can change needs a line of history to change.
+pub const HALL_CLERK: &str = "hall/clerk";
 
 #[cfg(test)]
 #[allow(
@@ -105,6 +150,8 @@ mod tests {
         assert_eq!(POLICY_IDLE_DAYS, 90);
         assert_eq!(CLOCK_ZONES_MAX, 4);
         assert_eq!(SANDBOX_FUEL_DEFAULT, 200_000_000);
+        assert_eq!(IMAGE_MAX_BYTES, 2_097_152);
+        assert_eq!(IMAGES_PER_TURN, 4);
     }
 
     #[test]

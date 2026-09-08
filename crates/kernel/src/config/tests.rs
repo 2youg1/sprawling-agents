@@ -84,6 +84,7 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
         shell: true,
         fuel: 10,
         mounts: vec![Address::parse("lab/docs").unwrap()],
+        env_passthrough: vec![EnvVarName::parse("ProgramFiles").unwrap()],
     };
     let terse = SandboxLimits {
         fuel: 20,
@@ -226,4 +227,56 @@ fn frozen_and_live_share_no_field() {
 fn granularity_serde_is_snake_case() {
     let json = serde_json::to_string(&ClockStampGranularity::FiveMinute).unwrap();
     assert_eq!(json, "\"five_minute\"");
+}
+
+#[test]
+fn a_credential_shaped_variable_name_is_refused_where_the_config_is_read() {
+    // The judgement has to happen here: a name handed to a child process
+    // cannot be taken back, so it is refused at the one construction
+    // point rather than at the point it would have been used.
+    for shaped in [
+        "AWS_SECRET_ACCESS_KEY",
+        "GITHUB_TOKEN",
+        "OPENAI_API_KEY",
+        "npm_password",
+        "SESSION_COOKIE",
+    ] {
+        let err = EnvVarName::parse(shaped).expect_err(shaped);
+        assert_eq!(*err.code(), crate::AxCode::InvalidArgs, "{shaped}");
+        assert!(!err.recovery().is_empty(), "{shaped}");
+    }
+    for spelled in ["", "HAS=EQUALS", "HAS\u{7}CONTROL"] {
+        assert!(EnvVarName::parse(spelled).is_err(), "{spelled:?}");
+    }
+    for plain in ["PATH", "ProgramFiles(x86)", "VSINSTALLDIR", "CARGO_HOME"] {
+        assert_eq!(
+            EnvVarName::parse(plain).expect(plain).as_str(),
+            plain,
+            "a name that names no credential is admitted as written"
+        );
+    }
+}
+
+#[test]
+fn the_declared_environment_names_ride_the_same_whole_value_ladder_as_mounts() {
+    let city_layer = SandboxLimits {
+        env_passthrough: vec![EnvVarName::parse("CARGO_HOME").unwrap()],
+        ..SandboxLimits::default()
+    };
+    let ladder = LayeredValue {
+        city: Some(city_layer),
+        building: Some(SandboxLimits::default()),
+        resident: None,
+    };
+    let frozen = freeze(
+        &LayeredValue::default(),
+        &LayeredValue::default(),
+        &LayeredValue::default(),
+        &ladder,
+        &LayeredValue::default(),
+    );
+    assert!(
+        frozen.sandbox.env_passthrough.is_empty(),
+        "a layer that speaks about the sandbox speaks about all of it"
+    );
 }

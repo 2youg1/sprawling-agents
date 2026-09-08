@@ -98,12 +98,23 @@ impl ConfigLayer {
                     }
                     mounts.push(mount);
                 }
+                // Refused here rather than where a child would be
+                // started: a name that reached a process cannot be
+                // taken back, and the person holding the refusal is
+                // the one editing this file.
+                let mut env_passthrough = Vec::new();
+                for raw in &section.env_passthrough {
+                    let name = kernel::EnvVarName::parse(raw)
+                        .map_err(|err| refuse(format!("{raw}: {}", err.recovery())))?;
+                    env_passthrough.push(name);
+                }
                 Some(SandboxLimits {
                     shell: section.shell,
                     fuel: section
                         .fuel
                         .unwrap_or(kernel::consts_policy::SANDBOX_FUEL_DEFAULT),
                     mounts,
+                    env_passthrough,
                 })
             }
         };
@@ -238,7 +249,8 @@ fn read_layer(path: &Path) -> Result<ConfigLayer, AxError> {
 fn refuse(subject: String) -> AxError {
     AxError::failure(AxCode::ConfigInvalid, "read a configuration layer", subject).with_recovery(
         "this version reads three sections: `[model] effort = \"low|medium|high|xhigh|max\"`, \
-         `[sandbox] shell = <bool>, fuel = <integer>, mounts = [<path>]`, and \
+         `[sandbox] shell = <bool>, fuel = <integer>, mounts = [<path>], \
+         env_passthrough = [<variable name>]`, and \
          `[[mcp]] label = <lowercase>, and either command = <program> with args = [<argument>]          or url = <https url> with an optional header = \"Name: value\"`",
     )
 }
@@ -280,6 +292,8 @@ struct SandboxSection {
     fuel: Option<u64>,
     #[serde(default)]
     mounts: Vec<String>,
+    #[serde(default)]
+    env_passthrough: Vec<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]

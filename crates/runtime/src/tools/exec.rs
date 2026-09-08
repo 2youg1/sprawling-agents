@@ -20,12 +20,15 @@
 
 use std::path::PathBuf;
 
+use std::collections::BTreeMap;
+
 use kernel::{
-    AxCode, AxError, CostTier, Effect, ExecArm, Payload, RenderIntent, Temporal, Tool, ToolCall,
-    ToolMeta, ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, EnvVarName, ExecArm, Payload, RenderIntent, Temporal, Tool,
+    ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
+use crate::backlog::{Backlog, BacklogId, Finished, Started};
 use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 
 /// Environment variables a child may inherit. Everything else is
@@ -33,25 +36,36 @@ use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 /// which a denylist does not.
 const ENV_ALLOWLIST: [&str; 4] = ["PATH", "LANG", "LC_ALL", "TZ"];
 
+/// What one building's execution boundary is made of.
+///
+/// Seven values that always travel together and are never chosen
+/// independently: they are read out of one frozen configuration and one
+/// machine, and they reach this tool as one thing rather than as a
+/// parameter list nobody can call correctly from memory.
+pub struct ExecSetup {
+    pub workdir: PathBuf,
+    pub mounts: Vec<Mount>,
+    pub python_wasm: Option<PathBuf>,
+    pub shell: Option<PathBuf>,
+    pub fuel: Fuel,
+    /// The names this building declared its children may inherit, on top
+    /// of [`ENV_ALLOWLIST`].
+    pub env_passthrough: Vec<EnvVarName>,
+    pub domain: kernel::Address,
+}
+
 pub struct ExecTool {
-    workdir: PathBuf,
-    mounts: Vec<Mount>,
-    python_wasm: Option<PathBuf>,
+    setup: ExecSetup,
     sandbox: Box<dyn Sandbox>,
-    shell: Option<PathBuf>,
-    fuel: Fuel,
+    backlog: Backlog,
     meta: ToolMeta,
 }
 
 impl ExecTool {
     pub fn new(
-        workdir: PathBuf,
-        mounts: Vec<Mount>,
-        python_wasm: Option<PathBuf>,
+        setup: ExecSetup,
         sandbox: Box<dyn Sandbox>,
-        shell: Option<PathBuf>,
-        fuel: Fuel,
-        domain: kernel::Address,
+        backlog: Backlog,
     ) -> Result<ExecTool, AxError> {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
@@ -70,13 +84,11 @@ impl ExecTool {
             "required".to_owned(),
             Value::Array(vec![Value::String("arm".to_owned())]),
         );
+        let domain = setup.domain.clone();
         Ok(ExecTool {
-            workdir,
-            mounts,
-            python_wasm,
+            setup,
             sandbox,
-            shell,
-            fuel,
+            backlog,
             meta: ToolMeta {
                 name: ToolName::parse("exec")?,
                 disclosure: "Run a program, a Python snippet, or a shell line.".to_owned(),
@@ -92,26 +104,69 @@ impl ExecTool {
 
     fn run_program(&self, path: &str, args: &[String]) -> Result<ToolOutcome, AxError> {
         let mut command = std::process::Command::new(path);
-        command.current_dir(&self.workdir).args(args).env_clear();
-        for key in ENV_ALLOWLIST {
+        command.current_dir(&self.setup.workdir).args(args);
+        let what = if args.is_empty() {
+            path.to_owned()
+        } else {
+            format!("{path} {}", args.join(" "))
+        };
+        self.through_the_backlog(command, what, "program")
+    }
+
+    /// Every host command goes through the table, whichever arm asked
+    /// for it.
+    ///
+    /// There is no `background` argument, because two paths would be two
+    /// authorities and the one with the hole in it would always be the
+    /// one nobody remembered.
+    fn through_the_backlog(
+        &self,
+        mut command: std::process::Command,
+        what: String,
+        arm: &str,
+    ) -> Result<ToolOutcome, AxError> {
+        let inherited = self.inherited_environment();
+        command.env_clear();
+        for (key, value) in &inherited {
+            command.env(key, value);
+        }
+        let started = self.backlog.run(&self.setup.domain, what, command)?;
+        let result = match started {
+            Started::Settled {
+                exit_code,
+                stdout,
+                stderr,
+            } => outcome(&stdout, &stderr, exit_code, arm)?,
+            Started::Backgrounded { id, what } => backgrounded(&id, &what, arm)?,
+        };
+        with_environment(result, &inherited)
+    }
+
+    /// The variables this run's children actually get: the floor every
+    /// city grants, plus the names this building declared, minus every
+    /// name this machine does not set.
+    ///
+    /// A name with no value on this machine is left out rather than set
+    /// empty, because an empty variable and an absent one are two
+    /// different things to the programs that read them.
+    fn inherited_environment(&self) -> BTreeMap<String, String> {
+        let mut chosen = BTreeMap::new();
+        let declared = self
+            .setup
+            .env_passthrough
+            .iter()
+            .map(EnvVarName::as_str)
+            .chain(ENV_ALLOWLIST);
+        for key in declared {
             if let Ok(value) = std::env::var(key) {
-                command.env(key, value);
+                chosen.insert(key.to_owned(), value);
             }
         }
-        let output = command.output().map_err(|err| {
-            AxError::failure(
-                AxCode::ToolUnavailable,
-                "run program",
-                format!("{path}: {err}"),
-            )
-            .with_recovery("check the program name, or use the shell arm")
-        })?;
-        let code = output.status.code().unwrap_or(-1);
-        outcome(&output.stdout, &output.stderr, i64::from(code), "program")
+        chosen
     }
 
     fn run_python(&mut self, code: &str) -> Result<ToolOutcome, AxError> {
-        let Some(wasm) = self.python_wasm.clone() else {
+        let Some(wasm) = self.setup.python_wasm.clone() else {
             return Err(AxError::failure(
                 AxCode::ToolUnavailable,
                 "run python",
@@ -124,8 +179,8 @@ impl ExecTool {
             argv: vec!["python".to_owned(), "-c".to_owned(), code.to_owned()],
             env: Vec::new(),
             stdin: Vec::new(),
-            mounts: self.mounts.clone(),
-            fuel: self.fuel,
+            mounts: self.setup.mounts.clone(),
+            fuel: self.setup.fuel,
         };
         let result = self.sandbox.run(&job)?;
         let exit_code = match &result.exit {
@@ -145,11 +200,16 @@ impl ExecTool {
                 );
             }
         };
-        outcome(&result.stdout, &result.stderr, exit_code, "python")
+        outcome(
+            &String::from_utf8_lossy(&result.stdout),
+            &String::from_utf8_lossy(&result.stderr),
+            exit_code,
+            "python",
+        )
     }
 
     fn run_shell(&self, text: &str) -> Result<ToolOutcome, AxError> {
-        let Some(shell) = &self.shell else {
+        let Some(shell) = &self.setup.shell else {
             return Err(AxError::failure(
                 AxCode::ToolUnavailable,
                 "run shell",
@@ -159,45 +219,99 @@ impl ExecTool {
         };
         let flag = if cfg!(windows) { "/C" } else { "-c" };
         let mut command = std::process::Command::new(shell);
-        command
-            .current_dir(&self.workdir)
-            .arg(flag)
-            .arg(text)
-            .env_clear();
-        for key in ENV_ALLOWLIST {
-            if let Ok(value) = std::env::var(key) {
-                command.env(key, value);
-            }
-        }
-        let output = command.output().map_err(|err| {
-            AxError::failure(
-                AxCode::ToolUnavailable,
-                "run shell",
-                format!("{}: {err}", shell.display()),
-            )
-        })?;
-        let code = output.status.code().unwrap_or(-1);
-        outcome(&output.stdout, &output.stderr, i64::from(code), "shell")
+        command.current_dir(&self.setup.workdir).arg(flag).arg(text);
+        self.through_the_backlog(command, text.to_owned(), "shell")
     }
 }
 
-fn outcome(
-    stdout: &[u8],
-    stderr: &[u8],
-    exit_code: i64,
-    arm: &str,
-) -> Result<ToolOutcome, AxError> {
+/// What a caller is told about a command that outlived its window.
+///
+/// The handle and the sentence travel together: an agent that is given
+/// an identifier and no instruction waits for it anyway, which is the
+/// behaviour this whole table exists to stop.
+fn backgrounded(id: &BacklogId, what: &str, arm: &str) -> Result<ToolOutcome, AxError> {
     let mut result = Map::new();
     result.insert("arm".to_owned(), Value::String(arm.to_owned()));
     result.insert(
-        "stdout".to_owned(),
-        Value::String(String::from_utf8_lossy(stdout).into_owned()),
+        "outcome".to_owned(),
+        Value::String("backgrounded".to_owned()),
     );
+    result.insert("handle".to_owned(), Value::String(id.to_string()));
+    result.insert("what".to_owned(), Value::String(what.to_owned()));
     result.insert(
-        "stderr".to_owned(),
-        Value::String(String::from_utf8_lossy(stderr).into_owned()),
+        "detail".to_owned(),
+        Value::String(
+            "still running; do not wait for it - carry on, and its result arrives at the end \
+             of a later tool result"
+                .to_owned(),
+        ),
     );
+    Ok(ToolOutcome {
+        result: Payload::new(result)?,
+    })
+}
+
+/// Adds every background member that has stopped since the last call to
+/// the tail of this result.
+///
+/// It is the tail rather than the head because the answer the caller
+/// asked for is the one it is reading for; what arrived while it was
+/// working comes after.
+fn with_backlog(outcome: ToolOutcome, done: Vec<Finished>) -> Result<ToolOutcome, AxError> {
+    if done.is_empty() {
+        return Ok(outcome);
+    }
+    let mut result = outcome.result.as_map().clone();
+    let rows = done
+        .into_iter()
+        .map(|member| {
+            let mut row = Map::new();
+            row.insert("handle".to_owned(), Value::String(member.id.to_string()));
+            row.insert("what".to_owned(), Value::String(member.what));
+            row.insert(
+                "exit_code".to_owned(),
+                Value::Number(member.exit_code.into()),
+            );
+            row.insert("stdout".to_owned(), Value::String(member.stdout));
+            row.insert("stderr".to_owned(), Value::String(member.stderr));
+            Value::Object(row)
+        })
+        .collect();
+    result.insert("background".to_owned(), Value::Array(rows));
+    Ok(ToolOutcome {
+        result: Payload::new(result)?,
+    })
+}
+
+fn outcome(stdout: &str, stderr: &str, exit_code: i64, arm: &str) -> Result<ToolOutcome, AxError> {
+    let mut result = Map::new();
+    result.insert("arm".to_owned(), Value::String(arm.to_owned()));
+    result.insert("stdout".to_owned(), Value::String(stdout.to_owned()));
+    result.insert("stderr".to_owned(), Value::String(stderr.to_owned()));
     result.insert("exit_code".to_owned(), Value::Number(exit_code.into()));
+    Ok(ToolOutcome {
+        result: Payload::new(result)?,
+    })
+}
+
+/// Adds the names this call's child inherited to its result.
+///
+/// Names only, never values: which names a run inherited is a fact the
+/// ledger keeps, and what those names held is a fact it must not.
+fn with_environment(
+    outcome: ToolOutcome,
+    inherited: &BTreeMap<String, String>,
+) -> Result<ToolOutcome, AxError> {
+    let mut result = outcome.result.as_map().clone();
+    result.insert(
+        "env".to_owned(),
+        Value::Array(
+            inherited
+                .keys()
+                .map(|name| Value::String(name.clone()))
+                .collect(),
+        ),
+    );
     Ok(ToolOutcome {
         result: Payload::new(result)?,
     })
@@ -258,11 +372,12 @@ impl Tool for ExecTool {
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
             ));
         }
-        match parse_arm(call.args.as_map())? {
+        let answer = match parse_arm(call.args.as_map())? {
             ExecArm::Program { path, args } => self.run_program(&path, &args),
             ExecArm::Python { code } => self.run_python(&code),
             ExecArm::Shell { text } => self.run_shell(&text),
-        }
+        }?;
+        with_backlog(answer, self.backlog.harvest()?)
     }
 }
 

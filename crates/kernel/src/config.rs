@@ -10,8 +10,81 @@ use serde::{Deserialize, Serialize};
 
 use crate::address::Address;
 use crate::consts_policy::CLOCK_STAMP_DEFAULT;
+use crate::error::{AxCode, AxError};
 use crate::model::Effort;
 use crate::tool::ServerLabel;
+
+/// One environment variable name a scope declares its runs may inherit.
+///
+/// A `String` would put the judgement in whichever caller remembered it.
+/// This has one constructor, and that constructor is reached where a
+/// configuration file is read — which is the only moment the refusal is
+/// still worth anything, because a name handed to a child process is a
+/// name the child cannot be asked to forget.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct EnvVarName(String);
+
+impl EnvVarName {
+    /// Sole constructor.
+    ///
+    /// # Errors
+    /// Refuses an empty name, a name carrying the `=` that separates a
+    /// name from a value, a name carrying a control character, and a
+    /// name [`crate::secret::names_a_credential`] reads as a credential.
+    pub fn parse(raw: &str) -> Result<EnvVarName, AxError> {
+        let reject = |violation: &str| {
+            Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "declare an environment variable",
+                raw.to_owned(),
+            )
+            .with_recovery(format!(
+                "{violation}; declare only the names a build needs, and keep a credential in \
+                 the vault as a `secret:realm/name` reference"
+            )))
+        };
+        if raw.is_empty() {
+            return reject("the name is empty");
+        }
+        if raw.contains('=') {
+            return reject("the name carries `=`, which separates a name from its value");
+        }
+        if raw.chars().any(char::is_control) {
+            return reject("the name carries a control character");
+        }
+        if crate::secret::names_a_credential(raw) {
+            return reject("the name reads as a credential");
+        }
+        Ok(EnvVarName(raw.to_owned()))
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for EnvVarName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl TryFrom<String> for EnvVarName {
+    type Error = AxError;
+
+    fn try_from(raw: String) -> Result<EnvVarName, AxError> {
+        EnvVarName::parse(&raw)
+    }
+}
+
+impl From<EnvVarName> for String {
+    fn from(name: EnvVarName) -> String {
+        name.0
+    }
+}
 
 /// Clock-stamp cadence for result envelopes. The
 /// granularity rides the enum; `Off` costs zero bytes in the window.
@@ -74,6 +147,7 @@ pub struct ClockZone {
 /// and which shell binary exists belong to the machine, not to the city,
 /// and a city carried to another machine must not carry its paths.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SandboxLimits {
     /// Whether the shell arm may be offered at all. Off by default: a
     /// shell line is the one arm whose reach cannot be read off its
@@ -84,6 +158,15 @@ pub struct SandboxLimits {
     /// Extra readable paths, relative to the city root. The write domain
     /// is decided elsewhere; this only widens what may be read.
     pub mounts: Vec<Address>,
+    /// Environment variable names a child process started by this scope
+    /// may inherit, on top of the four every run gets.
+    ///
+    /// Declared name by name rather than widened once for everybody: a
+    /// build chain that needs to find its linker needs a handful of
+    /// names this machine happens to set, and a longer built-in list
+    /// would hand every run in every city whatever those names hold.
+    #[serde(default)]
+    pub env_passthrough: Vec<EnvVarName>,
 }
 
 impl Default for SandboxLimits {
@@ -92,6 +175,7 @@ impl Default for SandboxLimits {
             shell: false,
             fuel: crate::consts_policy::SANDBOX_FUEL_DEFAULT,
             mounts: Vec::new(),
+            env_passthrough: Vec::new(),
         }
     }
 }
@@ -105,6 +189,7 @@ impl Default for SandboxLimits {
 /// not carry this machine's paths inside its history. They live in
 /// `CONFIG.toml` and never in a ledger payload.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct McpServer {
     pub label: ServerLabel,
     pub transport: McpTransport,
@@ -117,6 +202,7 @@ pub struct McpServer {
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum McpTransport {
     /// A program on this machine, spoken to over its own pipes.
     Stdio { command: String, args: Vec<String> },

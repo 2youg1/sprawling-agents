@@ -17,17 +17,107 @@ fn call(arm: Value) -> ToolCall {
     }
 }
 
-fn tool(python: Option<PathBuf>, sandbox: Box<dyn Sandbox>, shell: Option<PathBuf>) -> ExecTool {
-    ExecTool::new(
-        std::env::temp_dir(),
-        Vec::new(),
-        python,
-        sandbox,
+fn setup(python: Option<PathBuf>, shell: Option<PathBuf>) -> ExecSetup {
+    ExecSetup {
+        workdir: std::env::temp_dir(),
+        mounts: Vec::new(),
+        python_wasm: python,
         shell,
-        Fuel(1_000_000),
-        Address::parse("work").unwrap(),
+        fuel: Fuel(1_000_000),
+        env_passthrough: Vec::new(),
+        domain: Address::parse("work").unwrap(),
+    }
+}
+
+fn tool(python: Option<PathBuf>, sandbox: Box<dyn Sandbox>, shell: Option<PathBuf>) -> ExecTool {
+    ExecTool::new(setup(python, shell), sandbox, Backlog::new()).unwrap()
+}
+
+/// One variable this process really has, which no building declares by
+/// default and which no rule refuses. Picked from the parent environment
+/// rather than written down, so the test does not depend on which
+/// machine it runs on; taken in sorted order so it picks the same one
+/// twice.
+fn a_name_this_machine_sets() -> (String, String) {
+    let mut candidates: std::collections::BTreeMap<String, String> =
+        std::collections::BTreeMap::new();
+    for (name, value) in std::env::vars() {
+        let admissible = !ENV_ALLOWLIST.contains(&name.as_str())
+            && kernel::EnvVarName::parse(&name).is_ok()
+            && !value.is_empty()
+            && value.is_ascii()
+            && !value.contains('%')
+            && !value.contains('"');
+        if admissible {
+            candidates.insert(name, value);
+        }
+    }
+    candidates
+        .into_iter()
+        .next()
+        .expect("every supported host sets at least one ordinary variable")
+}
+
+fn reads_the_variable(name: &str) -> (String, Vec<String>) {
+    if cfg!(windows) {
+        (
+            "cmd".to_owned(),
+            vec!["/C".to_owned(), format!("echo %{name}%")],
+        )
+    } else {
+        (
+            "sh".to_owned(),
+            vec!["-c".to_owned(), format!("printf %s \"${name}\"")],
+        )
+    }
+}
+
+#[test]
+fn a_child_sees_the_names_its_building_declared_and_no_others() {
+    let (name, value) = a_name_this_machine_sets();
+    let (path, args) = reads_the_variable(&name);
+
+    let mut declared = ExecSetup {
+        env_passthrough: vec![kernel::EnvVarName::parse(&name).unwrap()],
+        ..setup(None, None)
+    };
+    declared.workdir = std::env::temp_dir();
+    let mut tool = ExecTool::new(declared, Box::new(EchoSandbox::new()), Backlog::new()).unwrap();
+    let outcome = tool
+        .invoke(&call(serde_json::json!({
+            "program": { "path": path.clone(), "args": args.clone() }
+        })))
+        .unwrap();
+    let result = serde_json::to_value(&outcome.result).unwrap();
+    assert!(
+        result["stdout"].as_str().unwrap().contains(&value),
+        "a declared name reaches the child: {result}"
+    );
+    let listed: Vec<String> = serde_json::from_value(result["env"].clone()).unwrap();
+    assert!(
+        listed.contains(&name),
+        "the ledger says what it inherited: {result}"
+    );
+
+    // The same command in a building that declared nothing sees nothing.
+    let mut bare = ExecTool::new(
+        setup(None, None),
+        Box::new(EchoSandbox::new()),
+        Backlog::new(),
     )
-    .unwrap()
+    .unwrap();
+    let outcome = bare
+        .invoke(&call(serde_json::json!({
+            "program": { "path": path, "args": args }
+        })))
+        .unwrap();
+    let result = serde_json::to_value(&outcome.result).unwrap();
+    assert!(
+        !result["stdout"].as_str().unwrap().contains(&value),
+        "an undeclared name must not reach the child: {result}"
+    );
+    let listed: Vec<String> = serde_json::from_value(result["env"].clone()).unwrap();
+    assert!(!listed.contains(&name), "{result}");
 }
 
 #[test]

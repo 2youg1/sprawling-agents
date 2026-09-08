@@ -469,6 +469,15 @@ pub const CLOCK_ZONES_MAX: u32 = 4;
 pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;                   // 2 GiB（P2.03）
 ```
 
+**card-4.1 增两项（图片政策）**：
+
+```rust
+pub const IMAGE_MAX_BYTES: u64 = 2_097_152;   // 2 MiB：一张图的字节上限
+pub const IMAGES_PER_TURN: u32 = 4;           // 一回合最多几张图
+```
+
+两个数都是「一句拒绝说得出、一个人改得动」的上限，与 `WORKTREE_MAX_BYTES` 同口径。2 MiB 取自两家 provider 都能收下的 base64 体量（base64 膨胀 4/3，2 MiB 上线约 2.7 MiB），4 张取自一回合窗口预算：再多就是把窗口花在像素上而不是任务上。
+
 `WORKTREE_MAX_BYTES` 是上限而非磁盘余量探测：余量是一台机器当下的事实，上限则是一句拒绝说得出、一个人改得动的数；建树前校，故一座过大的城是被拒而不是被拷到一半（`memory::worktree`）。
 
 16 项中 3 项随类型延后（表先行、值后到，位置恒在本模块）：`AUTONOMY_DEFAULT`（需 `Autonomy`，S2 approval 卡落）；`CLOCK_STAMP_DEFAULT`（需时钟档枚举；该枚举住 kernel 何处属 S2 config 卡决策——kernel 不得依赖 runtime）；`SUBAGENT_CTX_LOCK_DEFAULT`（未给数值，S2 budget 卡携证据定值）。三项落地前，本模块不提供任何替身值。
@@ -916,6 +925,14 @@ pub fn freeze(clock_stamp: &LayeredValue<ClockStampGranularity>) -> FrozenConfig
 
 **R1.13 增（config）／R1.17 改**：`McpServer { label: ServerLabel, transport: McpTransport }`，`McpTransport { Stdio { command, args }, Http { url, header } }`——**穷尽枚举而非两个裸字段**：一行既写 command 又写 url 就是一行要读者去猜的配置，故配置层当场拒。原始形（R1.13）是（`ServerLabel` 住 §8-23），`FrozenConfig` 增 `mcp: Vec<McpServer>`，`freeze` 增该梯入参，缺省空表＝这栋楼不接任何外部 server。三条口径：①**整表覆盖**，与 zones／sandbox 同一条理由——一层说到 `[[mcp]]` 就说全部，欠说的层只会收窄而恒不会悄悄接上上层没提过的服务；②**冻结的理由就是工具表本身**——外部工具在 Run 起点入 catalog，而 provider 把工具数组哈希在 system prompt 之前，Run 内变宽的工具表既自毁缓存又没有人审过；③**命令与参数是主机事实**（一个可执行文件在这台机器上的位置），故它们住 `CONFIG.toml` 而恒不入 Ledger 载荷——一座城被搬到另一台机器时不该带着这台机器的路径。
 
+**11.1 增（config）**：`SandboxLimits` 增 `env_passthrough: Vec<EnvVarName>`，缺省空表；`EnvVarName` 是本模块的新值类型（形状 2），唯一构造点 `EnvVarName::parse`。
+
+- **动机是一次实测**：同一条 PATH 下，完整环境的 `cargo build` 成功，而 `env -i PATH="$PATH" cargo build` 在链接处失败——rustc 的 MSVC 链接器要读 `%ProgramFiles(x86)%\...\vswhere.exe` 才找得到 `link.exe`，环境被洗掉之后它退回裸的 `link.exe`，而 PATH 上第一个 `link.exe` 是 Git 附带的 coreutils 那个（报 `link: missing operand`）。于是住在城里的 resident today 跑不动 `just check`。
+- **解法不是加长 `ENV_ALLOWLIST`**：那份常量旁边的注释正是为阻止这件事而写的——**子进程继承到的东西，它忘不掉**。加长它会让每一栋楼、每一次 `exec` 都多继承一份没人审过的东西。改成由**楼自己逐名声明**：说得出名字的那几个才进得去。
+- **口径与 `mounts` 逐条同形**：整值上梯（一层说到 `[sandbox]` 就说全部）、同一条冻结理由（可达范围恒不在 Run 内变宽）、同一个「在解析点拒」的位置。`mounts` 拒保留区，`env_passthrough` 拒凭据形状的名字。
+- **`EnvVarName::parse` 拒四类**：空名；含 `=`（那是赋值号，不是名字的一部分）；含 NUL 或控制字符；以及 `secret::names_a_credential` 判为凭据形状的名字（`consts_policy::CREDENTIAL_NAME_MARKERS`，子串命中即判，大小写不敏感）。**拒在解析点而不在使用点**：一个名字一旦递给子进程就收不回来，所以判定必须发生在配置被读进来的那一刻。
+- **凭据形状的名字为何由 `kernel::secret` 判**：这座城已经有一处「什么东西看起来像凭据」的权威，名字这一面长在同一处而不是第二处。判据是标记词子串（`SECRET`／`TOKEN`／`KEY`／`PASSWORD`／`PASSWD`／`CREDENTIAL`／`AUTH`／`SESSION`／`COOKIE`／`PRIVATE`／`SIGNATURE`），**故意宁滥勿缺**：`KEYBOARD` 一并被拒是可接受的代价，因为拒绝带着三段式的替代路径，而漏掉一个 `AWS_SECRET_ACCESS_KEY` 不带任何提示。
+
 - **为何必须冻结**：provider 官方文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」——强度是缓存前缀的一部分。Run 内可变的强度＝Run 内自毁的缓存，故它落 `FrozenConfig` 而非 `LiveConfig`；设置面改它对**下一个 Run** 生效。这是那句「`[model]` 字段 S3 只加」预留位置的第一个真实居民。
 - `None` 与 `Some(Effort::Off)` 是两件事：前者不写字段（provider 缺省，Anthropic 新模型即 adaptive thinking），后者显式关闭思考。不用 `Effort::Off` 兼任「未声明」，否则「没设过」与「设成关」在类型上不可分辨。
 
@@ -1031,6 +1048,25 @@ pub struct ChatRequest { /* …既有五字段… */ pub effort: Option<Effort> 
 - **不建每模型强度支持表**：任何 provider API 都不返回「本模型支持哪几级」。造一张我们填不满的表，就是给 provider 的真实行为立第二个权威；模型自己拒的原样透出。
 - **`max_tokens` 是模型的事实，不是调用方的偏好**：Anthropic 要求每请求必带 `max_tokens`，且开思考时它是「思考＋回答」的总上限；OpenAI 则可缺席。两家的 `GET /v1/models` 都不返回该上限，所以它探不到，只能随模型登记。权威定在 `gateway::market::ModelEntry.max_output_tokens`，`CallShape.max_tokens` 由选型点从那一行解出；**任何调用处手写数字即错**——截断会发生在一个账上找不到理由的地方。
 
+**card-4.1 增：模型看得见图**（`kernel::model::image`；形状 2 value）
+
+```rust
+#[derive(Serialize, Deserialize)] #[serde(rename_all = "snake_case")]
+pub enum ImageType { Png, Jpeg, Webp, Gif }        // 封闭枚举：城内认得的四种图
+impl ImageType { pub fn mime(&self) -> &'static str; }   // "image/png" 等，两条 wire 共用
+pub struct ImageRef { pub locator: Locator, pub media_type: ImageType,
+                      pub width: u32, pub height: u32 }
+#[non_exhaustive] pub enum ContentBlock { /* …既有五变体… */
+    Image(ImageRef),
+    ToolResult { tool_use_id, content, is_error, #[serde(default)] attachments: Vec<ImageRef> } }
+```
+
+- **账上存 locator 与整数尺寸，恒不存字节**。`ImageRef.locator` 是一条 `cas:` Locator，字节住 `memory::cas`；Ledger 载荷因而仍只有整数与短字符串，浮点禁令与载荷体量规则两条同时成立。宽高用 `u32` 而非比例：像素数是整数事实。
+- **`ImageRef` 只定义一次**。Image 块与 ToolResult 的 `attachments` 是同一个值——四个字段一字不差——所以块写成 `Image(ImageRef)`（serde 内部标签，线上仍是 `{"kind":"image", "locator":…, "media_type":…, "width":…, "height":…}` 的扁平形），而不是把四个字段抄两遍。抄两遍就是一个概念两个权威，日后加一个字段要改两处。
+- **`attachments` 带 `#[serde(default)]`**：既有 Ledger 里每一条 `tool_result` 都没有这个键，缺席即空表，所以每一份历史照旧重放。这是「只加不改」在 wire 面的具体形式。
+- **`ImageType` 封闭而非 `non_exhaustive`**：它不是 provider 送来的开放词汇，而是城内决定收哪几种图；封闭枚举让 `mime()` 的 `match` 穷尽，加一种图必须同时回答「它的 MIME 是什么」。
+- **conformance 增一条**：良性请求之外再发一次「含一个 Image 块」的请求，适配器同样必须返回而不是 panic。剧本模型（citysim）据此照旧通过——它不解释块，只按剧本作答。
+
 ### 8-25 kernel::secret（S2.10）
 
 ```rust
@@ -1117,6 +1153,7 @@ pub fn spawn(parent: Depth, kind: &DelegateKind) -> GateOutcome;      // E_DELEG
 pub fn dedup(seen: &BTreeSet<IdemKey>, key: &IdemKey) -> DedupVerdict;   // 去重恒先于副作用：调用序纪律＋citysim 不变量看守
 ```
 
+- **`dedup` 的承兑人已经存在（card-4.10.1）**：这个纯函数的 `seen` 集合是调用方的状态，故它成不成立取决于有没有人持有那个集合。今天持有它的有两处：工具面的 `runtime::bench`（一波之内同一把键只调一次），与命令面的 `bin::assembly::commanding::entrance`（`serve_one` 判在任何副作用之前，且重复的键得到第一次的答案）。**本模块的立面不变**——集合仍是调用方的，kernel 仍只回答成员关系；此处记的是「谁在兑现它」，因为一道没有调用方的门与没有门等价（`adversary/adversary-SPEC.md` §4 第三个发现量到的正是这件事）。
 - **gate 是全库唯一 gate 码生产者**：五门 Deny 恒经 `AxError::refusal`（三段必填）；Domain 门 nearby＝domain 前缀表；Discard 门 alternative 恒可执行（分批或 Interred 后重试）；Egress 门 subject 只写位置与跨度数，恒不回显命中字节。
 - **Escalate 的二源归一**：spend 耗尽 → item{class: BudgetLimit}；commitment 无决 → item{class: Commitment}；discard Escalate → item{class: DiscardEscalate}；均 source=Gate、tainted＝taint 非空（C15 标记位）。commitment 携 Denied 决定 → Deny（E_APPROVAL_DENIED，非 gate 码故用 failure 形）。
 - **Taint 升档的 S2 实例**：Discard 门 Tainted 恒 Escalate（住 discard::decide）＋Escalate item 的 tainted 标记位（封 Policy/代答）。其余门的升档语义随其审批面出现时实例化（P1/P2），本期不造无消费者的规则。
@@ -1442,3 +1479,73 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 `match_item`／`expiry`／`may_answer` 全部留在原路径，kernel 作为依赖树根，公共面的规范路径
 逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／`clippy -D warnings`／
 `nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
+
+### 8-45 kernel::schema（card-6.2；形状 4 adapter）——线上每个值的 JSON Schema，从 serde 读的那一份声明派生
+
+**需求**：客户端（`client/src/wire.ts`）由 Rust 的 wire 类型生成，而 wire 携带的值大半是 kernel 的（`RunId`／`Seq`／`Address`／`EventRecord`／`AxError`／`ApprovalItem`……）。它们的 JSON 形状必须有且只有一个权威，而那个权威已经存在：类型声明上的 `#[serde(...)]`。
+
+**接口**：feature `schema`（缺省关，`schemars` 为可选依赖）。开启时，每个出现在帧里的类型带 `#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]`——派生宏读的正是 serde 读的那些属性（`rename_all`／`transparent`／`flatten`／`skip_serializing_if`／`deny_unknown_fields`／`try_from`），所以形状不可能与编码漂开。手写 serde 的五个值（`AxCode`／`IdemKey`／`B3Hash`／`GitOid`／`Locator`）在 `crates/kernel/src/schema.rs` 里各写一条 `impl JsonSchema`：一律是带 `pattern` 的 `string`，`AxCode` 的 `enum` 取自 `AxCode::ALL`——同一张表既产 `as_str` 也产 schema。这五条住一个文件而不是各回原文件，因为 `locator.rs` 已有 375 行，三条 impl 会把它推过 400 行预算；文件只装 `impl` 与它们引用的形状字符串，一处判定也没有。
+
+**缺省公开面不变**：feature 关着时 `cargo public-api -p kernel` 逐字节同以前，基线不动；`--all-features` 下多出的只是 `JsonSchema` 实现。产品二进制不开它。
+
+**被否**：（a）在 channels 用 schemars 的 remote derive 镜像这四十个类型——每一个镜像都是同一形状的第二个权威，kernel 改一个字段名，镜像静默不动，客户端在握手通过后误读；（b）不加 feature、无条件派生——把 `schemars` 压进产品二进制，换来的只是省一个 cfg。
+
+### 8-46 kernel::write_domain 增 `WriteDomain::Documents`（card-5.1；形状 1 判定 + 形状 2 value）
+
+**需求**：City Hall 的两位居民（Mayor、clerk）只写 Markdown。给他们一个「整栋楼可写」的写域，再靠提示词请他们别碰代码，是把不变量交给措辞；写域本身要能表达「只写文档」。
+
+**接口**：
+
+```rust
+pub struct DomainPrefixes { /* prefixes: Vec<Address> —— 私有 */ }
+impl DomainPrefixes {
+    /// C17 的唯一构造点：任一 reserved 成员拒整个前缀集。
+    pub fn new(prefixes: Vec<Address>) -> Result<Self, AxError>;      // E_INVALID_ARGS
+    pub fn iter(&self) -> impl Iterator<Item = &Address>;
+}
+
+pub enum WriteDomain {
+    /// 前缀内的一切文件。
+    Everything(DomainPrefixes),
+    /// 前缀内的 Markdown 文档，且永不含任何 `Roadmap.md`。
+    Documents(DomainPrefixes),
+}
+impl WriteDomain {
+    pub fn new(prefixes: Vec<Address>) -> Result<Self, AxError>;      // ＝ Everything，旧调用点逐字不变
+    pub fn documents(prefixes: Vec<Address>) -> Result<Self, AxError>;
+    pub fn admits(&self, target: &Address) -> DomainVerdict;
+    pub fn prefixes(&self) -> impl Iterator<Item = &Address>;
+}
+
+#[non_exhaustive]
+pub enum DomainVerdict {
+    Within,
+    Outside { prefixes: Vec<String> },
+    /// 落在前缀内，但不是这个写域写的那种文件。
+    NotWritable { reason: DocumentReason },
+}
+
+#[non_exhaustive]
+pub enum DocumentReason { NotMarkdown, ThePlan }
+
+pub const ROADMAP_FILE: &str = "Roadmap.md";   // 随 ROADMAP_COLUMNS 住 spine::row
+```
+
+- **变体带私有值而非公开字段**：`WriteDomain::Documents` 可以被外部写出来，但只能拿一个已经过 C17 检查的 `DomainPrefixes` 去写。一个构造点，不因为枚举化而多出第二个。
+- `admits` 判定序（fail-closed，先拒后放）：target `is_reserved()` → `Outside`；不在任一前缀内 → `Outside`；`Everything` → `Within`；`Documents` → 文件名不以 `.md` 结尾 → `NotWritable { NotMarkdown }`；文件名等于 `ROADMAP_FILE`（任意深度、任意楼）→ `NotWritable { ThePlan }`；否则 `Within`。
+- **为什么计划文件在写域这一层就拒**：`Roadmap.md` 的唯一编辑入口是 `plan` 工具（`kernel::spine::rewrite` 的重写），它保证六列表格重写后仍成立。放任 `edit` 直接改，等于给同一条规则第二个权威，而漂掉的那个总是没人读的那个。
+- `gate::domain` 对 `NotWritable` 出 `E_OUTSIDE_WRITE_DOMAIN` 三段式：规则「这个写域只写 Markdown 文档」，违规指出是哪一种，替代给出「改 `.md`」或「用 `plan` 工具」。
+- 被否：给 `WriteDomain` 加一个 `documents: bool` 字段——布尔旗标不是穷尽枚举，且「只写文档」与「什么都写」是两条策略而不是一条策略的一个开关。
+
+### 8-47 kernel::approval：City Hall 的两个常量与 clerk 的默认代答（card-5.1）
+
+```rust
+// consts_policy
+pub const HALL_BUILDING: &str = "hall";
+pub const HALL_MAYOR: &str = "hall/mayor";
+pub const HALL_CLERK: &str = "hall/clerk";
+```
+
+- `Autonomy` **不加变体**：`Owner | Delegate(ResidentId) | Deferred` 已经能说出「clerk 代答」——`Delegate(ResidentId::new(HALL_CLERK))`。新增一个 `Clerk` 变体会让同一件事有两种写法，而 `may_answer` 要为两种都作答。
+- `may_answer` 逻辑一字不改：clerk 之所以能答，是因为它就是被任命的 delegate；三必经人类与 tainted 依旧 `HumanOnly`，clerk 自己发起的条目依旧 `SelfApprovalBarred`。本卡在 kernel 侧只加常量与一条断言 clerk 走通全路的测试。
+- genesis 侧（`bin::assembly`）在 `city_initialized` 之后写一条 `autonomy_changed`，值为 `delegate:hall/clerk`——记录在账上而不是写死在缺省值里，因为「谁来答」是这座城市的一个决定，人可以改它，改动要有一行历史。

@@ -189,6 +189,27 @@ pub fn scan(bytes: &[u8]) -> Vec<SecretSpan> {
     hits
 }
 
+/// Whether a *name* reads as the name of a credential.
+///
+/// The other half of this module judges bytes that might be a secret;
+/// this half judges a label that would sit in front of one, which is
+/// what a configuration file offers when it declares an environment
+/// variable. Both live here so "what looks like a credential" has one
+/// authority rather than two.
+///
+/// Case-insensitive substring match against
+/// [`crate::consts_policy::CREDENTIAL_NAME_MARKERS`]. Over-inclusive on
+/// purpose: the caller refuses with an alternative, and a false refusal
+/// costs a person one line of configuration while a missed one leaks a
+/// key into every child process the run starts.
+#[must_use]
+pub fn names_a_credential(name: &str) -> bool {
+    let folded = name.to_ascii_lowercase();
+    crate::consts_policy::CREDENTIAL_NAME_MARKERS
+        .iter()
+        .any(|marker| folded.contains(marker))
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

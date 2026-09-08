@@ -243,3 +243,45 @@ fn the_reserved_subtree_has_no_configuration_layers() {
     let err = load(dir.path(), &addr(".sprawling/ledger")).unwrap_err();
     assert_eq!(err.code(), &AxCode::InvalidArgs);
 }
+
+/// The names a building declares its runs may inherit are read here, and
+/// a name shaped like a credential is refused here too — at the moment
+/// the configuration enters the city, not at the moment a child process
+/// would have been given it.
+#[test]
+fn declared_environment_names_are_read_and_credential_shaped_ones_refused() {
+    let layer = ConfigLayer::parse(
+        "[sandbox]\nshell = false\nenv_passthrough = [\"ProgramFiles(x86)\", \"VSINSTALLDIR\"]\n",
+    )
+    .unwrap();
+    let names: Vec<&str> = layer
+        .sandbox()
+        .unwrap()
+        .env_passthrough
+        .iter()
+        .map(kernel::EnvVarName::as_str)
+        .collect();
+    assert_eq!(names, vec!["ProgramFiles(x86)", "VSINSTALLDIR"]);
+
+    let err = ConfigLayer::parse("[sandbox]\nenv_passthrough = [\"AWS_SECRET_ACCESS_KEY\"]\n")
+        .unwrap_err();
+    assert_eq!(err.code(), &AxCode::ConfigInvalid);
+    assert!(
+        err.subject().contains("AWS_SECRET_ACCESS_KEY"),
+        "the refusal names which one: {}",
+        err.subject()
+    );
+
+    // A layer that says nothing about the sandbox declares no names.
+    assert!(ConfigLayer::parse("").unwrap().sandbox().is_none());
+}
+
+/// A building that declares nothing inherits nothing beyond the floor,
+/// which is what makes the declaration meaningful.
+#[test]
+fn a_building_that_declares_no_names_resolves_to_an_empty_list() {
+    let dir = tempfile::tempdir().unwrap();
+    let room = addr("lab/room1");
+    let frozen = load(dir.path(), &room).unwrap();
+    assert!(frozen.sandbox.env_passthrough.is_empty());
+}
