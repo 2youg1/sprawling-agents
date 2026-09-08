@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::budget::Tokens;
 use crate::event::Payload;
+use crate::model::image::ImageRef;
 use crate::tool::ToolName;
 /// Building-level constraints riding along the call. S2 carries the one
 /// load-bearing bit; further fields only grow (14.3).
@@ -65,6 +66,7 @@ pub struct SystemBlock {
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DialectKind {
     Anthropic,
     OpenAi,
@@ -77,6 +79,7 @@ pub enum DialectKind {
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ModelTag {
     /// The model a resident thinks with.
     Main,
@@ -119,6 +122,7 @@ impl std::fmt::Display for ModelTag {
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Effort {
     None,
     Low,
@@ -157,10 +161,21 @@ pub enum ContentBlock {
         name: ToolName,
         input: Payload,
     },
+    /// A picture the model can see. Carries the reference and the
+    /// dimensions; the bytes are fetched at the wire by whoever is about
+    /// to send them (`gateway::endpoint`), so this block stays a thing a
+    /// ledger can hold.
+    Image(ImageRef),
     ToolResult {
         tool_use_id: String,
         content: String,
         is_error: bool,
+        /// Pictures the tool produced. Absent from every tool result
+        /// written before this field existed, which is why it reads as
+        /// an empty list rather than as a broken record: an old history
+        /// has to replay.
+        #[serde(default)]
+        attachments: Vec<ImageRef>,
     },
 }
 

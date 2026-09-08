@@ -12,9 +12,12 @@
 //! only while the auth header is written, then dropped (zeroized).
 
 mod adapter;
+mod auth;
 mod call;
 mod config;
 mod model;
+mod redemption;
 
 pub use adapter::{CALL_TIMEOUT_MS, adapter_for};
-pub use config::{AuthSpec, Endpoint, EndpointConfig, SecretResolver};
+pub use config::{AuthSpec, Endpoint, EndpointConfig};
+pub use redemption::{ImageResolver, Redemption, SecretResolver};

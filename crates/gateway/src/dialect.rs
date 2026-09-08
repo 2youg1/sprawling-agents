@@ -17,8 +17,10 @@
 //! No I/O, no state, no clock: byte-for-byte explainable requests are
 //! the whole point of writing the wire format ourselves.
 
+mod images;
 mod request;
 mod response;
 
+pub use images::ImageBytes;
 pub use request::request_wire;
 pub use response::{increment_of, response_from_wire, response_wire, settled_from_stream};

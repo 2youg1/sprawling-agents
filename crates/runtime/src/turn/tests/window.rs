@@ -61,6 +61,7 @@ fn the_window_folds_steer_into_the_open_user_message() {
         tool_use_id: "call-1".to_owned(),
         content: "{}".to_owned(),
         is_error: false,
+        attachments: Vec::new(),
     }]);
     window.push_steer("user", "look again");
     assert_eq!(

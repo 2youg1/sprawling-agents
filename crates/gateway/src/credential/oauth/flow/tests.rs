@@ -170,14 +170,14 @@ fn a13_redeemed_value_reaches_the_wire_verbatim() {
             timeout_ms: 5_000,
             pricing: None,
         },
-        Box::new(move |reference| {
+        crate::endpoint::Redemption::without_images(Box::new(move |reference| {
             resolver_handle
                 .lock()
                 .map_err(|_| {
                     AxError::failure(AxCode::CredentialMissing, "resolve credential", "lock")
                 })?
                 .resolve(reference)
-        }),
+        })),
     )
     .unwrap();
     endpoint

@@ -126,6 +126,7 @@ impl RunWorker {
                 fence_scope: fence_scope.clone(),
                 who: &site.who,
                 run_id: site.run_id,
+                of: site.provenance(&self.city_root, &at.addr)?,
             },
         )?;
         site.adapter = Some(home);
@@ -269,7 +270,7 @@ impl RunWorker {
         let model_id = chosen.entry.id.clone();
         let mut adapter = gateway::adapter_for(
             &chosen,
-            self.resolver(),
+            self.redemption(),
             dialect_headers(chosen.endpoint.dialect),
         )
         .ok()?;

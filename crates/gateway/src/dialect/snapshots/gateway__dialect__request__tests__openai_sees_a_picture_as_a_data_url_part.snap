@@ -1,0 +1,71 @@
+---
+source: crates/gateway/src/dialect/request.rs
+expression: "serde_json::to_string_pretty(&wire).unwrap()"
+---
+{
+  "max_tokens": 4096,
+  "messages": [
+    {
+      "content": "city\n\nbuilding",
+      "role": "system"
+    },
+    {
+      "content": [
+        {
+          "text": "Task: probe",
+          "type": "text"
+        },
+        {
+          "image_url": {
+            "url": "data:image/png;base64,dGhlLWF0dGFjaGVkLWJ5dGVz"
+          },
+          "type": "image_url"
+        }
+      ],
+      "role": "user"
+    },
+    {
+      "content": "reading",
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{\"path\":\"notes.md\"}",
+            "name": "exec"
+          },
+          "id": "tu_1",
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "content": "ok",
+      "role": "tool",
+      "tool_call_id": "tu_1"
+    },
+    {
+      "content": [
+        {
+          "image_url": {
+            "url": "data:image/jpeg;base64,dGhlLXRvb2wtYnl0ZXM="
+          },
+          "type": "image_url"
+        }
+      ],
+      "role": "user"
+    }
+  ],
+  "model": "sonnet",
+  "tools": [
+    {
+      "function": {
+        "description": "run things",
+        "name": "exec",
+        "parameters": {
+          "type": "object"
+        }
+      },
+      "type": "function"
+    }
+  ]
+}

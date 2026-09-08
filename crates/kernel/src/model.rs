@@ -8,9 +8,11 @@
 //! *defined* here (kernel cannot name outer crates) and *evaluated* by
 //! `city::policy` (P1) — dependency inversion, same as the ledger seam.
 
+mod image;
 mod seam;
 mod wire;
 
+pub use image::{ImageRef, ImageType};
 pub use seam::{ModelRequest, ModelReturn, content_from_message, message_payload, value_has_float};
 pub use wire::{
     BuildingPolicy, ChatMessage, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort,

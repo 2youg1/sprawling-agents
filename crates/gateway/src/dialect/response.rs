@@ -154,7 +154,12 @@ mod tests {
                 signature: "WaUjzkyp".to_owned(),
             },
         );
-        let out = request_wire(DialectKind::Anthropic, &req).unwrap();
+        let out = request_wire(
+            DialectKind::Anthropic,
+            &req,
+            &crate::dialect::ImageBytes::default(),
+        )
+        .unwrap();
         assert_eq!(out["messages"][1]["content"][0], wire["content"][0]);
     }
 

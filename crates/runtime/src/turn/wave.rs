@@ -80,6 +80,9 @@ impl Turn<ToolWave> {
                 tool_use_id: call.id.clone(),
                 content,
                 is_error,
+                // Tools state their outcome in text today; a tool that
+                // produces a picture fills this in where it runs.
+                attachments: Vec::new(),
             });
             let echo = ledger.append(self.draft(EventKind::ToolResult, payload(result)?))?;
             self.refs.push(echo);

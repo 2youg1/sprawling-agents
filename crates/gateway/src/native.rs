@@ -12,7 +12,7 @@
 
 use kernel::{AxCode, AxError, DialectKind, Model, ModelRequest, ModelReturn, SecretRef};
 
-use crate::endpoint::{AuthSpec, Endpoint, EndpointConfig};
+use crate::endpoint::{AuthSpec, Endpoint, EndpointConfig, Redemption};
 use crate::market::ModelEntry;
 
 #[derive(Debug, Clone)]
@@ -63,13 +63,15 @@ impl Native {
                 timeout_ms: config.timeout_ms,
                 pricing: config.pricing,
             },
-            Box::new(|_reference: &SecretRef| {
+            // Local inference authenticates with nothing and reads no
+            // content store: both redemptions refuse by construction.
+            Redemption::without_images(Box::new(|_reference: &SecretRef| {
                 Err(AxError::failure(
                     AxCode::CredentialMissing,
                     "resolve credential",
                     "native never authenticates",
                 ))
-            }),
+            })),
         )?;
         Ok(Native { inner })
     }

@@ -18,8 +18,12 @@
 //! **Loss accounting is explicit, because this dialect is not the
 //! canonical shape.** This wire has no explicit cache breakpoints
 //! (provider caching is implicit prefix-matching), so `cache` markers
-//! drop on this path; and it cannot spell a thinking block, so one is
-//! not sent rather than sent as prose. Both are asserted in tests.
+//! drop on this path; it cannot spell a thinking block, so one is not
+//! sent rather than sent as prose; and its `tool` message accepts only
+//! a string, so pictures a tool produced ride in the user message that
+//! immediately follows it — the pictures arrive, and what is lost is
+//! the statement that they came out of that tool call. All three are
+//! asserted in tests.
 
 use kernel::{
     AxCode, AxError, ChatRequest, ChatResponse, ContentBlock, Effort, ModelUsage, Role, StopReason,
@@ -27,23 +31,12 @@ use kernel::{
 };
 use serde_json::{Map, Value, json};
 
-use crate::mismatch::{
-    as_str, mismatch, payload_from, require, stream_cut, tokens_or_zero, unspelled_effort,
-};
+use crate::dialect::ImageBytes;
+use crate::mismatch::{as_str, mismatch, payload_from, require, tokens_or_zero, unspelled_effort};
 
-/// The text one chunk carries, if it carries prose. Absent on the frames
-/// that carry a tool call or a finish reason.
-pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<String> {
-    map.get("choices")?
-        .as_array()?
-        .first()?
-        .as_object()?
-        .get("delta")?
-        .as_object()?
-        .get("content")?
-        .as_str()
-        .map(str::to_owned)
-}
+mod stream;
+
+pub(crate) use stream::{increment_of, settled};
 
 /// The provider took the request, answered 200, and put nothing in it.
 ///
@@ -66,92 +59,6 @@ fn empty_answer() -> AxError {
          answered this way rather than refused - then dispatch again",
     )
     .retriable()
-}
-
-/// OpenAI streams one `choices[0].delta` per chunk and the finish reason
-/// on the last one. Tool calls arrive by index with their arguments split
-/// across chunks, which is why they are joined before being read.
-pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
-    let mut said = String::new();
-    let mut calls: std::collections::BTreeMap<u64, (String, String, String)> =
-        std::collections::BTreeMap::new();
-    let mut finish = None;
-    let mut usage = None;
-    for frame in frames {
-        let Some(map) = frame.as_object() else {
-            continue;
-        };
-        if let Some(held) = map.get("usage")
-            && !held.is_null()
-        {
-            usage = Some(held.clone());
-        }
-        let Some(first) = map
-            .get("choices")
-            .and_then(Value::as_array)
-            .and_then(|choices| choices.first())
-            .and_then(Value::as_object)
-        else {
-            continue;
-        };
-        if let Some(held) = first.get("finish_reason").and_then(Value::as_str) {
-            finish = Some(held.to_owned());
-        }
-        let Some(delta) = first.get("delta").and_then(Value::as_object) else {
-            continue;
-        };
-        if let Some(text) = delta.get("content").and_then(Value::as_str) {
-            said.push_str(text);
-        }
-        for call in delta
-            .get("tool_calls")
-            .and_then(Value::as_array)
-            .unwrap_or(&Vec::new())
-        {
-            let Some(one) = call.as_object() else {
-                continue;
-            };
-            let at = one.get("index").and_then(Value::as_u64).unwrap_or_default();
-            let held = calls.entry(at).or_default();
-            if let Some(id) = one.get("id").and_then(Value::as_str) {
-                held.0 = id.to_owned();
-            }
-            let Some(function) = one.get("function").and_then(Value::as_object) else {
-                continue;
-            };
-            if let Some(name) = function.get("name").and_then(Value::as_str) {
-                held.1 = name.to_owned();
-            }
-            if let Some(part) = function.get("arguments").and_then(Value::as_str) {
-                held.2.push_str(part);
-            }
-        }
-    }
-    let Some(finish) = finish else {
-        return Err(stream_cut(
-            "the stream ended without the chunk that says why the model stopped",
-        ));
-    };
-    let mut message = json!({ "role": "assistant", "content": said });
-    if !calls.is_empty()
-        && let Some(map) = message.as_object_mut()
-    {
-        let wired: Vec<Value> = calls
-            .into_values()
-            .map(|(id, name, arguments)| {
-                json!({
-                    "id": id,
-                    "type": "function",
-                    "function": { "name": name, "arguments": arguments },
-                })
-            })
-            .collect();
-        map.insert("tool_calls".to_owned(), Value::Array(wired));
-    }
-    Ok(json!({
-        "choices": [{ "message": message, "finish_reason": finish }],
-        "usage": usage.unwrap_or_else(|| json!({})),
-    }))
 }
 
 /// This dialect writes every level in one field, `none` included.
@@ -180,7 +87,36 @@ fn joined_text(content: &[ContentBlock]) -> String {
     out
 }
 
-pub(crate) fn request(req: &ChatRequest) -> Result<Value, AxError> {
+/// One picture, as this wire spells it: a data URL inside a content
+/// part, which is the only place this dialect accepts image bytes.
+fn image_part(picture: &kernel::ImageRef, images: &ImageBytes) -> Result<Value, AxError> {
+    let data = images.encoded(&picture.locator)?;
+    Ok(json!({
+        "type": "image_url",
+        "image_url": { "url": format!("data:{};base64,{data}", picture.media_type.mime()) },
+    }))
+}
+
+/// Every picture one user message refers to, in the order the blocks
+/// name them: the message's own `Image` blocks first, then whatever its
+/// tool results attached.
+fn pictures_of(content: &[ContentBlock], images: &ImageBytes) -> Result<Vec<Value>, AxError> {
+    let mut parts = Vec::new();
+    for block in content {
+        match block {
+            ContentBlock::Image(picture) => parts.push(image_part(picture, images)?),
+            ContentBlock::ToolResult { attachments, .. } => {
+                for picture in attachments {
+                    parts.push(image_part(picture, images)?);
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(parts)
+}
+
+pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, AxError> {
     let mut messages = Vec::new();
     if !req.system.is_empty() {
         // Explicit breakpoints have no OpenAI wire slot; the marker drops
@@ -196,6 +132,7 @@ pub(crate) fn request(req: &ChatRequest) -> Result<Value, AxError> {
                         tool_use_id,
                         content,
                         is_error: _,
+                        attachments: _,
                     } = block
                     {
                         messages.push(json!({
@@ -203,9 +140,24 @@ pub(crate) fn request(req: &ChatRequest) -> Result<Value, AxError> {
                         }));
                     }
                 }
+                // Pictures cannot ride a `tool` message on this wire, so
+                // they land in the user message that follows it. The
+                // loss is which tool call produced them, and it is
+                // recorded at the top of this file rather than taken
+                // silently.
                 let text = joined_text(&message.content);
-                if !text.is_empty() {
-                    messages.push(json!({ "role": "user", "content": text }));
+                let pictures = pictures_of(&message.content, images)?;
+                if pictures.is_empty() {
+                    if !text.is_empty() {
+                        messages.push(json!({ "role": "user", "content": text }));
+                    }
+                } else {
+                    let mut parts = Vec::new();
+                    if !text.is_empty() {
+                        parts.push(json!({ "type": "text", "text": text }));
+                    }
+                    parts.extend(pictures);
+                    messages.push(json!({ "role": "user", "content": parts }));
                 }
             }
             Role::Assistant => {

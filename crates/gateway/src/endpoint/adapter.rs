@@ -12,7 +12,7 @@
 
 use kernel::AxError;
 
-use crate::endpoint::{AuthSpec, Endpoint, EndpointConfig};
+use crate::endpoint::{AuthSpec, Endpoint, EndpointConfig, Redemption};
 use crate::router::Chosen;
 
 /// How long one model call may take. Moved with the choice it serves:
@@ -32,7 +32,7 @@ pub const CALL_TIMEOUT_MS: u64 = 120_000;
 /// take the general path.
 pub fn adapter_for(
     chosen: &Chosen<'_>,
-    resolver: crate::endpoint::SecretResolver,
+    redemption: Redemption,
     dialect_headers: Vec<(String, String)>,
 ) -> Result<Box<dyn kernel::Model + Send>, AxError> {
     let endpoint = chosen.endpoint;
@@ -59,7 +59,7 @@ pub fn adapter_for(
             timeout_ms: CALL_TIMEOUT_MS,
             pricing: Some(chosen.entry.clone()),
         },
-        resolver,
+        redemption,
     )?;
     Ok(Box::new(endpoint))
 }

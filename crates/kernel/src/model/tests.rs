@@ -6,8 +6,65 @@
 use super::*;
 use crate::error::AxCode;
 use crate::event::Payload;
-use crate::locator::B3Hash;
+use crate::locator::{B3Hash, Locator};
 use serde_json::Map;
+
+fn one_image() -> ImageRef {
+    ImageRef {
+        locator: Locator::parse(&format!("cas:b3-{}", "ab".repeat(32))).unwrap(),
+        media_type: ImageType::Png,
+        width: 640,
+        height: 480,
+    }
+}
+
+#[test]
+fn a_picture_crosses_the_ledger_as_a_locator_and_four_integers() {
+    let blocks = vec![
+        ContentBlock::Image(one_image()),
+        ContentBlock::ToolResult {
+            tool_use_id: "tu_1".to_owned(),
+            content: "the screenshot".to_owned(),
+            is_error: false,
+            attachments: vec![one_image()],
+        },
+    ];
+    let payload = message_payload(&blocks).unwrap();
+    assert_eq!(content_from_message(&payload).unwrap(), blocks);
+
+    // The block's wire form is flat: the four fields sit beside `kind`,
+    // so a person reading a ledger line sees the same shape in both
+    // places the value is used.
+    let json = serde_json::to_value(&blocks[0]).unwrap();
+    assert_eq!(json["kind"], "image");
+    assert_eq!(json["media_type"], "png");
+    assert_eq!(json["width"], 640);
+    assert_eq!(json["height"], 480);
+    assert_eq!(ImageType::Jpeg.mime(), "image/jpeg");
+}
+
+#[test]
+fn a_tool_result_written_before_attachments_existed_still_replays() {
+    // Every `tool_result` already in a ledger has three keys. A fourth
+    // one that is not optional would end replay for every city that
+    // ever ran a tool.
+    let old = serde_json::json!({
+        "kind": "tool_result",
+        "tool_use_id": "tu_1",
+        "content": "ok",
+        "is_error": false,
+    });
+    let block: ContentBlock = serde_json::from_value(old).unwrap();
+    assert_eq!(
+        block,
+        ContentBlock::ToolResult {
+            tool_use_id: "tu_1".to_owned(),
+            content: "ok".to_owned(),
+            is_error: false,
+            attachments: Vec::new(),
+        }
+    );
+}
 
 #[test]
 fn policy_default_is_not_confidential() {

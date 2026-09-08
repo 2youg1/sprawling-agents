@@ -11,6 +11,22 @@
 use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, UsdMicros};
+use serde::{Deserialize, Serialize};
+
+/// What a model accepts as input.
+///
+/// A closed judgement rather than a set of flags: every row answers it,
+/// and the answer decides whether a picture may be sent at all. The
+/// default is the narrow one, because guessing narrow costs a refusal a
+/// person can act on and guessing wide costs a 400 from the provider.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InputKinds {
+    #[default]
+    Text,
+    TextImage,
+}
 
 /// One catalog row. Prices are USD micros per one million tokens —
 /// integers end to end (decision paths ban floats).
@@ -18,6 +34,9 @@ use kernel::{AxCode, AxError, UsdMicros};
 pub struct ModelEntry {
     pub id: String,
     pub context_tokens: u64,
+    /// What this model may be sent. A picture reaching a `Text` row is
+    /// refused at the endpoint rather than dropped on the wire.
+    pub input: InputKinds,
     /// The most this model may emit in one response, thinking included.
     /// A property of the model rather than a caller's preference: the
     /// request must state it, and stating a number the model does not
@@ -45,6 +64,7 @@ impl MarketSnapshot {
             ModelEntry {
                 id: "claude-sonnet".to_owned(),
                 context_tokens: 200_000,
+                input: InputKinds::TextImage,
                 max_output_tokens: 64_000,
                 input_price: UsdMicros::new(3_000_000),
                 output_price: UsdMicros::new(15_000_000),
@@ -54,6 +74,10 @@ impl MarketSnapshot {
             ModelEntry {
                 id: "local".to_owned(),
                 context_tokens: 32_768,
+                // Local inference here is text-only until a row says
+                // otherwise: what a local server can see is that
+                // server's fact, and this table does not guess it.
+                input: InputKinds::Text,
                 max_output_tokens: 4_096,
                 input_price: UsdMicros::new(0),
                 output_price: UsdMicros::new(0),
@@ -128,6 +152,21 @@ mod tests {
             market.lookup("local").unwrap().clone(),
         ];
         assert!(MarketSnapshot::from_entries(2, dup).is_err());
+    }
+
+    #[test]
+    fn the_catalogue_says_which_rows_can_be_shown_a_picture() {
+        let market = MarketSnapshot::builtin();
+        assert_eq!(
+            market.lookup("claude-sonnet").unwrap().input,
+            InputKinds::TextImage
+        );
+        assert_eq!(market.lookup("local").unwrap().input, InputKinds::Text);
+        assert_eq!(InputKinds::default(), InputKinds::Text);
+        assert_eq!(
+            serde_json::to_string(&InputKinds::TextImage).unwrap(),
+            "\"text_image\""
+        );
     }
 
     #[test]

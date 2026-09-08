@@ -22,12 +22,17 @@
 use kernel::{AxCode, AxError, ChatRequest, DialectKind};
 use serde_json::Value;
 
+use super::images::ImageBytes;
 use crate::{anthropic, openai};
 
-pub fn request_wire(kind: DialectKind, req: &ChatRequest) -> Result<Value, AxError> {
+pub fn request_wire(
+    kind: DialectKind,
+    req: &ChatRequest,
+    images: &ImageBytes,
+) -> Result<Value, AxError> {
     match kind {
-        DialectKind::Anthropic => anthropic::request(req),
-        DialectKind::OpenAi => openai::request(req),
+        DialectKind::Anthropic => anthropic::request(req, images),
+        DialectKind::OpenAi => openai::request(req, images),
         // Fail closed: a dialect this build cannot translate is not
         // approximated with the nearer of the two it knows.
         _ => Err(AxError::failure(
@@ -40,6 +45,44 @@ pub fn request_wire(kind: DialectKind, req: &ChatRequest) -> Result<Value, AxErr
 }
 #[cfg(test)]
 use kernel::{ChatMessage, ContentBlock, Payload, Role, SystemBlock, ToolDef, ToolName};
+#[cfg(test)]
+/// One conversation that carries a picture two ways: as a block a person
+/// attached, and as a picture a tool produced.
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test helper"
+)]
+pub(crate) fn sample_seeing() -> (ChatRequest, ImageBytes) {
+    let seen = kernel::ImageRef {
+        locator: kernel::Locator::parse(&format!("cas:b3-{}", "ab".repeat(32))).unwrap(),
+        media_type: kernel::ImageType::Png,
+        width: 8,
+        height: 8,
+    };
+    let made = kernel::ImageRef {
+        locator: kernel::Locator::parse(&format!("cas:b3-{}", "cd".repeat(32))).unwrap(),
+        media_type: kernel::ImageType::Jpeg,
+        width: 4,
+        height: 4,
+    };
+    let mut chat = sample_request();
+    chat.messages[0]
+        .content
+        .push(ContentBlock::Image(seen.clone()));
+    chat.messages[2].content = vec![ContentBlock::ToolResult {
+        tool_use_id: "tu_1".to_owned(),
+        content: "ok".to_owned(),
+        is_error: false,
+        attachments: vec![made.clone()],
+    }];
+    let mut images = ImageBytes::default();
+    images.insert(&seen.locator, b"the-attached-bytes".to_vec());
+    images.insert(&made.locator, b"the-tool-bytes".to_vec());
+    (chat, images)
+}
 #[cfg(test)]
 use serde_json::Map;
 #[cfg(test)]
@@ -97,6 +140,7 @@ pub(crate) fn sample_request() -> ChatRequest {
                     tool_use_id: "tu_1".to_owned(),
                     content: "ok".to_owned(),
                     is_error: false,
+                    attachments: Vec::new(),
                 }],
             },
         ],
@@ -121,25 +165,82 @@ pub(crate) fn sample_request() -> ChatRequest {
     reason = "test code"
 )]
 mod tests {
-    use super::super::request::sample_request;
+    use super::super::request::{sample_request, sample_seeing};
     use super::*;
     use kernel::{ContentBlock, Effort};
 
     #[test]
+    fn anthropic_sees_a_picture_as_a_base64_source_block() {
+        let (chat, images) = sample_seeing();
+        let wire = request_wire(DialectKind::Anthropic, &chat, &images).unwrap();
+        insta::assert_snapshot!(serde_json::to_string_pretty(&wire).unwrap());
+    }
+
+    #[test]
+    fn openai_sees_a_picture_as_a_data_url_part() {
+        let (chat, images) = sample_seeing();
+        let wire = request_wire(DialectKind::OpenAi, &chat, &images).unwrap();
+        insta::assert_snapshot!(serde_json::to_string_pretty(&wire).unwrap());
+    }
+
+    #[test]
+    fn a_tool_message_cannot_carry_a_picture_so_the_picture_follows_it() {
+        // The loss this dialect takes, asserted rather than described:
+        // the `tool` message stays text, and the attachment lands in the
+        // user message immediately after it.
+        let (chat, images) = sample_seeing();
+        let wire = request_wire(DialectKind::OpenAi, &chat, &images).unwrap();
+        let messages = wire["messages"].as_array().unwrap();
+        let at = messages
+            .iter()
+            .position(|m| m["role"] == "tool")
+            .expect("the tool result crosses as a tool message");
+        assert!(
+            messages[at]["content"].is_string(),
+            "a tool message on this wire is a string, pictures or not"
+        );
+        let following = &messages[at.saturating_add(1)];
+        assert_eq!(following["role"], "user");
+        assert_eq!(following["content"][0]["type"], "image_url");
+    }
+
+    #[test]
+    fn a_picture_whose_bytes_nobody_resolved_is_refused() {
+        let (chat, _) = sample_seeing();
+        let err = request_wire(DialectKind::Anthropic, &chat, &ImageBytes::default()).unwrap_err();
+        assert_eq!(*err.code(), kernel::AxCode::WireMismatch);
+    }
+
+    #[test]
     fn anthropic_request_wire_is_pinned() {
-        let wire = request_wire(DialectKind::Anthropic, &sample_request()).unwrap();
+        let wire = request_wire(
+            DialectKind::Anthropic,
+            &sample_request(),
+            &ImageBytes::default(),
+        )
+        .unwrap();
         insta::assert_snapshot!(serde_json::to_string_pretty(&wire).unwrap());
     }
 
     #[test]
     fn openai_request_wire_is_pinned() {
-        let wire = request_wire(DialectKind::OpenAi, &sample_request()).unwrap();
+        let wire = request_wire(
+            DialectKind::OpenAi,
+            &sample_request(),
+            &ImageBytes::default(),
+        )
+        .unwrap();
         insta::assert_snapshot!(serde_json::to_string_pretty(&wire).unwrap());
     }
 
     #[test]
     fn anthropic_breakpoints_land_on_marked_blocks_only() {
-        let wire = request_wire(DialectKind::Anthropic, &sample_request()).unwrap();
+        let wire = request_wire(
+            DialectKind::Anthropic,
+            &sample_request(),
+            &ImageBytes::default(),
+        )
+        .unwrap();
         let system = wire["system"].as_array().unwrap();
         assert!(
             system
@@ -148,17 +249,17 @@ mod tests {
         );
         let mut unmarked = sample_request();
         unmarked.system[1].cache = false;
-        let wire = request_wire(DialectKind::Anthropic, &unmarked).unwrap();
+        let wire = request_wire(DialectKind::Anthropic, &unmarked, &ImageBytes::default()).unwrap();
         assert!(wire["system"][1].get("cache_control").is_none());
     }
 
     #[test]
     fn tool_shapes_survive_both_request_dialects() {
         let req = sample_request();
-        let anthropic = request_wire(DialectKind::Anthropic, &req).unwrap();
+        let anthropic = request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap();
         assert_eq!(anthropic["tools"][0]["name"], "exec");
         assert_eq!(anthropic["tools"][0]["input_schema"]["type"], "object");
-        let openai = request_wire(DialectKind::OpenAi, &req).unwrap();
+        let openai = request_wire(DialectKind::OpenAi, &req, &ImageBytes::default()).unwrap();
         assert_eq!(openai["tools"][0]["function"]["name"], "exec");
         assert_eq!(
             openai["tools"][0]["function"]["parameters"]["type"],
@@ -188,7 +289,7 @@ mod tests {
                 signature: "WaUjzkyp".to_owned(),
             },
         );
-        let out = request_wire(DialectKind::OpenAi, &req).unwrap();
+        let out = request_wire(DialectKind::OpenAi, &req, &ImageBytes::default()).unwrap();
         assert!(
             !out.to_string().contains("WaUjzkyp"),
             "a signature the other provider cannot verify does not belong on its wire"
@@ -200,7 +301,7 @@ mod tests {
     fn effort_rides_the_wire_each_dialect_spells_it_its_own_way() {
         let mut req = sample_request();
         assert!(
-            request_wire(DialectKind::Anthropic, &req)
+            request_wire(DialectKind::Anthropic, &req, &ImageBytes::default())
                 .unwrap()
                 .get("effort")
                 .is_none(),
@@ -209,22 +310,22 @@ mod tests {
 
         req.effort = Some(Effort::High);
         assert_eq!(
-            request_wire(DialectKind::Anthropic, &req).unwrap()["effort"],
+            request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap()["effort"],
             "high"
         );
         assert_eq!(
-            request_wire(DialectKind::OpenAi, &req).unwrap()["reasoning"]["effort"],
+            request_wire(DialectKind::OpenAi, &req, &ImageBytes::default()).unwrap()["reasoning"]["effort"],
             "high"
         );
 
         // The one place the two dialects part: not thinking is an effort
         // value on one wire and a different field on the other.
         req.effort = Some(Effort::None);
-        let anthropic = request_wire(DialectKind::Anthropic, &req).unwrap();
+        let anthropic = request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap();
         assert_eq!(anthropic["thinking"]["type"], "disabled");
         assert!(anthropic.get("effort").is_none());
         assert_eq!(
-            request_wire(DialectKind::OpenAi, &req).unwrap()["reasoning"]["effort"],
+            request_wire(DialectKind::OpenAi, &req, &ImageBytes::default()).unwrap()["reasoning"]["effort"],
             "none"
         );
     }
@@ -241,11 +342,12 @@ mod tests {
         ] {
             req.effort = Some(level);
             assert_eq!(
-                request_wire(DialectKind::Anthropic, &req).unwrap()["effort"],
+                request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap()["effort"],
                 spelling
             );
             assert_eq!(
-                request_wire(DialectKind::OpenAi, &req).unwrap()["reasoning"]["effort"],
+                request_wire(DialectKind::OpenAi, &req, &ImageBytes::default()).unwrap()["reasoning"]
+                    ["effort"],
                 spelling
             );
         }

@@ -13,14 +13,57 @@
 
 //! Endpoint calls: one request, streamed or settled.
 
-use kernel::{AxError, ModelRequest, ModelReturn, UsdMicros};
+use kernel::consts_policy::{IMAGE_MAX_BYTES, IMAGES_PER_TURN};
+use kernel::{AxCode, AxError, ChatRequest, ContentBlock, ImageRef, ModelRequest, ModelReturn};
+use kernel::{Locator, UsdMicros};
 use serde_json::Value;
 
 use crate::cost;
 use crate::dialect;
-use crate::dialect::request_wire;
+use crate::dialect::{ImageBytes, request_wire};
 
 use super::config::{AuthSpec, Endpoint, apply_override, provider_err, transport_detail};
+
+/// Every picture one conversation refers to, in the order the blocks
+/// name them: the blocks a person attached and the ones a tool produced
+/// are the same value, so they are collected the same way.
+pub(crate) fn pictures_in(chat: &ChatRequest) -> Vec<&ImageRef> {
+    let mut found = Vec::new();
+    for message in &chat.messages {
+        for block in &message.content {
+            match block {
+                ContentBlock::Image(picture) => found.push(picture),
+                ContentBlock::ToolResult { attachments, .. } => found.extend(attachments.iter()),
+                _ => {}
+            }
+        }
+    }
+    found
+}
+
+fn too_many(found: usize) -> AxError {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "put pictures on a provider request",
+        format!("this turn carries {found} pictures"),
+    )
+    .with_recovery(format!(
+        "one turn carries at most {IMAGES_PER_TURN} pictures; \
+         send the rest in a later turn"
+    ))
+}
+
+fn too_large(at: &Locator, size: usize) -> AxError {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "put a picture on a provider request",
+        format!("{at} is {size} bytes"),
+    )
+    .with_recovery(format!(
+        "one picture is at most {IMAGE_MAX_BYTES} bytes; \
+         shrink it before attaching it"
+    ))
+}
 impl Endpoint {
     /// What the far side says it serves.
     ///
@@ -75,21 +118,43 @@ impl Endpoint {
     ) -> Result<reqwest::blocking::RequestBuilder, AxError> {
         Ok(match &self.config.auth {
             AuthSpec::Bearer(reference) => {
-                let sealed = (self.resolver)(reference)?;
+                let sealed = (self.redemption.secrets)(reference)?;
                 request.header("authorization", format!("Bearer {}", sealed.expose()))
             }
             AuthSpec::Header { name, value } => {
-                let sealed = (self.resolver)(value)?;
+                let sealed = (self.redemption.secrets)(value)?;
                 request.header(name, sealed.expose().as_str())
             }
             _ => request,
         })
     }
 
+    /// The bytes for every picture this request refers to.
+    ///
+    /// Both ceilings are answered before a single byte reaches the
+    /// provider, and both refusals name the limit rather than the fact
+    /// that one exists.
+    fn pictures_for(&self, chat: &ChatRequest) -> Result<ImageBytes, AxError> {
+        let found = pictures_in(chat);
+        if u32::try_from(found.len()).unwrap_or(u32::MAX) > IMAGES_PER_TURN {
+            return Err(too_many(found.len()));
+        }
+        let mut images = ImageBytes::default();
+        for picture in found {
+            let bytes = (self.redemption.images)(&picture.locator)?;
+            if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > IMAGE_MAX_BYTES {
+                return Err(too_large(&picture.locator, bytes.len()));
+            }
+            images.insert(&picture.locator, bytes);
+        }
+        Ok(images)
+    }
+
     pub(crate) fn wire_request(&self, req: &ModelRequest) -> Result<Value, AxError> {
         let mut chat = req.chat.clone();
         chat.model = self.config.model.clone();
-        let mut wire = request_wire(self.config.dialect, &chat)?;
+        let images = self.pictures_for(&chat)?;
+        let mut wire = request_wire(self.config.dialect, &chat, &images)?;
         for (pointer, value) in &self.config.overrides {
             apply_override(&mut wire, pointer, value)?;
         }
@@ -191,9 +256,30 @@ impl Endpoint {
     reason = "test code"
 )]
 mod tests {
-    use super::super::config::{config, fake_provider, request, resolver};
+    use super::super::config::{config, fake_provider, request};
+    use super::super::redemption::{Redemption, redemption, resolver};
     use super::*;
     use kernel::{AxCode, Model};
+
+    /// A request carrying `count` pictures in one user message.
+    fn seeing(count: u32) -> ModelRequest {
+        let mut req = request();
+        let mut content = Vec::new();
+        for i in 0..count {
+            let hex = format!("{i:02x}").repeat(32);
+            content.push(kernel::ContentBlock::Image(kernel::ImageRef {
+                locator: kernel::Locator::parse(&format!("cas:b3-{hex}")).unwrap(),
+                media_type: kernel::ImageType::Png,
+                width: 8,
+                height: 8,
+            }));
+        }
+        req.chat.messages.push(kernel::ChatMessage {
+            role: kernel::Role::User,
+            content,
+        });
+        req
+    }
     #[test]
     fn a_success_round_trip_settles_and_maps_the_wave() {
         let body = serde_json::json!({
@@ -206,7 +292,7 @@ mod tests {
         })
         .to_string();
         let (url, server) = fake_provider(vec![(200, body)], false);
-        let mut endpoint = Endpoint::new(config(&url), resolver()).unwrap();
+        let mut endpoint = Endpoint::new(config(&url), redemption()).unwrap();
         let ret = endpoint.call(&request()).unwrap();
         assert_eq!(ret.calls.len(), 1);
         assert_eq!(ret.calls[0].id, "tu_9");
@@ -223,7 +309,7 @@ mod tests {
     #[test]
     fn provider_status_errors_map_to_e_provider_with_status_only() {
         let (url, server) = fake_provider(vec![(429, "{}".to_owned())], false);
-        let mut endpoint = Endpoint::new(config(&url), resolver()).unwrap();
+        let mut endpoint = Endpoint::new(config(&url), redemption()).unwrap();
         let err = endpoint.call(&request()).unwrap_err();
         assert_eq!(*err.code(), AxCode::Provider);
         assert!(err.subject().contains("429"));
@@ -239,10 +325,40 @@ mod tests {
         })
         .to_string();
         let (url, server) = fake_provider(vec![(200, body)], true);
-        let mut endpoint = Endpoint::new(config(&url), resolver()).unwrap();
+        let mut endpoint = Endpoint::new(config(&url), redemption()).unwrap();
         let err = endpoint.call(&request()).unwrap_err();
         assert_eq!(*err.code(), AxCode::Provider);
         drop(server);
+    }
+
+    #[test]
+    fn the_fifth_picture_in_one_turn_is_refused_before_any_byte_is_sent() {
+        let endpoint =
+            Endpoint::new(config("http://127.0.0.1:1/v1/messages"), redemption()).unwrap();
+        let err = endpoint.wire_request(&seeing(5)).unwrap_err();
+        assert_eq!(*err.code(), AxCode::InvalidArgs);
+        assert!(
+            err.recovery().contains("4"),
+            "a refusal that will not say the limit cannot be acted on: {}",
+            err.recovery()
+        );
+        // Four is still a turn this endpoint will carry.
+        assert!(endpoint.wire_request(&seeing(4)).is_ok());
+    }
+
+    #[test]
+    fn a_picture_larger_than_the_ceiling_is_refused_with_the_ceiling_named() {
+        let endpoint = Endpoint::new(
+            config("http://127.0.0.1:1/v1/messages"),
+            Redemption::new(
+                resolver(),
+                std::sync::Arc::new(|_at: &kernel::Locator| Ok(vec![0u8; 3_000_000])),
+            ),
+        )
+        .unwrap();
+        let err = endpoint.wire_request(&seeing(1)).unwrap_err();
+        assert_eq!(*err.code(), AxCode::InvalidArgs);
+        assert!(err.recovery().contains("2097152"), "{}", err.recovery());
     }
 
     #[test]

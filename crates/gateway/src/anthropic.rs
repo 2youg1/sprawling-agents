@@ -21,109 +21,20 @@
 //!   <https://platform.claude.com/docs/en/build-with-claude/prompt-caching>
 //! - The 400 that a modified thinking block earns:
 //!   <https://platform.claude.com/docs/en/agents-and-tools/tool-use/troubleshooting-tool-use>
+//! - Pictures, and the base64 source block:
+//!   <https://platform.claude.com/docs/en/build-with-claude/vision>
 
 use kernel::{
     AxError, ChatRequest, ChatResponse, ContentBlock, Effort, ModelUsage, Role, StopReason,
 };
 use serde_json::{Map, Value, json};
 
-use crate::mismatch::{
-    as_str, mismatch, payload_from, require, stream_cut, tokens_or_zero, unspelled_effort,
-};
+use crate::dialect::ImageBytes;
+use crate::mismatch::{as_str, mismatch, payload_from, require, tokens_or_zero, unspelled_effort};
 
-/// The text one `content_block_delta` carries, if it carries prose.
-///
-/// Reading the delta's own type rather than the presence of a field is
-/// what keeps a tool's arguments out of a person's reading pane: a
-/// partial `input_json_delta` is not a shorter tool argument.
-pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<String> {
-    let delta = map.get("delta")?.as_object()?;
-    (delta.get("type")?.as_str()? == "text_delta")
-        .then(|| delta.get("text")?.as_str().map(str::to_owned))?
-}
+mod stream;
 
-/// Anthropic streams one `content_block_start` per block, then deltas
-/// against it by index, then `message_delta` with the stop reason and the
-/// output count. The blocks are rebuilt in index order so a tool call
-/// that arrived interleaved with text still lands where it was.
-pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
-    let mut blocks: std::collections::BTreeMap<u64, Value> = std::collections::BTreeMap::new();
-    let mut text: std::collections::BTreeMap<u64, String> = std::collections::BTreeMap::new();
-    let mut json: std::collections::BTreeMap<u64, String> = std::collections::BTreeMap::new();
-    let mut usage = json!({});
-    let mut stop = None;
-    for frame in frames {
-        let Some(map) = frame.as_object() else {
-            continue;
-        };
-        let at = map.get("index").and_then(Value::as_u64).unwrap_or_default();
-        match map.get("type").and_then(Value::as_str) {
-            Some("message_start") => {
-                if let Some(held) = map.get("message").and_then(|held| held.get("usage")) {
-                    usage = held.clone();
-                }
-            }
-            Some("content_block_start") => {
-                if let Some(block) = map.get("content_block") {
-                    blocks.insert(at, block.clone());
-                }
-            }
-            Some("content_block_delta") => {
-                let Some(delta) = map.get("delta").and_then(Value::as_object) else {
-                    continue;
-                };
-                if let Some(said) = delta.get("text").and_then(Value::as_str) {
-                    text.entry(at).or_default().push_str(said);
-                }
-                if let Some(said) = delta.get("partial_json").and_then(Value::as_str) {
-                    json.entry(at).or_default().push_str(said);
-                }
-                if let Some(said) = delta.get("thinking").and_then(Value::as_str) {
-                    text.entry(at).or_default().push_str(said);
-                }
-            }
-            Some("message_delta") => {
-                if let Some(held) = map.get("delta").and_then(|held| held.get("stop_reason")) {
-                    stop = held.as_str().map(str::to_owned);
-                }
-                // The output count arrives here rather than at the start,
-                // because it is not known until the model stops.
-                if let Some(held) = map.get("usage").and_then(Value::as_object)
-                    && let Some(counted) = usage.as_object_mut()
-                {
-                    for (name, value) in held {
-                        counted.insert(name.clone(), value.clone());
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    let Some(stop) = stop else {
-        return Err(stream_cut(
-            "the stream ended without the frame that says why the model stopped",
-        ));
-    };
-    let mut content = Vec::new();
-    for (at, mut block) in blocks {
-        if let Some(map) = block.as_object_mut() {
-            if let Some(said) = text.get(&at) {
-                let field = if map.contains_key("thinking") {
-                    "thinking"
-                } else {
-                    "text"
-                };
-                map.insert(field.to_owned(), Value::String(said.clone()));
-            }
-            if let Some(said) = json.get(&at) {
-                let parsed = serde_json::from_str::<Value>(said).unwrap_or_else(|_| json!({}));
-                map.insert("input".to_owned(), parsed);
-            }
-        }
-        content.push(block);
-    }
-    Ok(json!({ "content": content, "stop_reason": stop, "usage": usage }))
-}
+pub(crate) use stream::{increment_of, settled};
 
 fn role_str(role: Role) -> Result<&'static str, AxError> {
     match role {
@@ -133,7 +44,19 @@ fn role_str(role: Role) -> Result<&'static str, AxError> {
     }
 }
 
-fn block_wire(block: &ContentBlock) -> Result<Value, AxError> {
+/// One picture, as this wire spells it.
+fn image_wire(picture: &kernel::ImageRef, images: &ImageBytes) -> Result<Value, AxError> {
+    Ok(json!({
+        "type": "image",
+        "source": {
+            "type": "base64",
+            "media_type": picture.media_type.mime(),
+            "data": images.encoded(&picture.locator)?,
+        },
+    }))
+}
+
+fn block_wire(block: &ContentBlock, images: &ImageBytes) -> Result<Value, AxError> {
     match block {
         ContentBlock::Text { text } => Ok(json!({ "type": "text", "text": text })),
         // Verbatim in both directions: the provider verifies `signature`
@@ -151,19 +74,35 @@ fn block_wire(block: &ContentBlock) -> Result<Value, AxError> {
             "input": serde_json::to_value(input)
                 .map_err(|err| mismatch("tool_use.input", &err.to_string()))?,
         })),
+        ContentBlock::Image(picture) => image_wire(picture, images),
+        // A tool result with pictures spells its content as blocks; one
+        // without keeps the string form, so every request that carried
+        // no picture crosses byte for byte as it did before.
         ContentBlock::ToolResult {
             tool_use_id,
             content,
             is_error,
-        } => Ok(json!({
-            "type": "tool_result", "tool_use_id": tool_use_id,
-            "content": content, "is_error": is_error,
-        })),
+            attachments,
+        } => {
+            let carried = if attachments.is_empty() {
+                Value::String(content.clone())
+            } else {
+                let mut parts = vec![json!({ "type": "text", "text": content })];
+                for picture in attachments {
+                    parts.push(image_wire(picture, images)?);
+                }
+                Value::Array(parts)
+            };
+            Ok(json!({
+                "type": "tool_result", "tool_use_id": tool_use_id,
+                "content": carried, "is_error": is_error,
+            }))
+        }
         _ => Err(mismatch("content.block", "unknown canonical block kind")),
     }
 }
 
-pub(crate) fn request(req: &ChatRequest) -> Result<Value, AxError> {
+pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, AxError> {
     let mut root = Map::new();
     root.insert("model".to_owned(), Value::String(req.model.clone()));
     root.insert(
@@ -189,7 +128,11 @@ pub(crate) fn request(req: &ChatRequest) -> Result<Value, AxError> {
     let mut messages = Vec::new();
     for message in &req.messages {
         let role = role_str(message.role)?;
-        let blocks: Result<Vec<Value>, AxError> = message.content.iter().map(block_wire).collect();
+        let blocks: Result<Vec<Value>, AxError> = message
+            .content
+            .iter()
+            .map(|block| block_wire(block, images))
+            .collect();
         messages.push(json!({ "role": role, "content": blocks? }));
     }
     root.insert("messages".to_owned(), Value::Array(messages));
@@ -257,6 +200,10 @@ fn block_from(value: &Value, path: &str) -> Result<ContentBlock, AxError> {
                 .get("is_error")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            // This provider answers with assistant content, never with
+            // a tool result it produced, so nothing arrives here to
+            // attach; inventing one would be a picture nobody sent.
+            attachments: Vec::new(),
         }),
         other => Err(mismatch(&format!("{path}.type"), other)),
     }
@@ -318,8 +265,15 @@ fn stop_str(stop: StopReason) -> Result<&'static str, AxError> {
     }
 }
 
+/// The response direction carries no pictures: a provider answers with
+/// text, thinking and tool calls, so there is nothing to resolve.
 pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
-    let content: Result<Vec<Value>, AxError> = resp.content.iter().map(block_wire).collect();
+    let empty = ImageBytes::default();
+    let content: Result<Vec<Value>, AxError> = resp
+        .content
+        .iter()
+        .map(|block| block_wire(block, &empty))
+        .collect();
     Ok(json!({
         "content": content?,
         "stop_reason": stop_str(resp.stop)?,

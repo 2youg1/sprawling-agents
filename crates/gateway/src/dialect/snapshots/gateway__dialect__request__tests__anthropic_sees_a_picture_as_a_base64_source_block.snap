@@ -1,0 +1,93 @@
+---
+source: crates/gateway/src/dialect/request.rs
+expression: "serde_json::to_string_pretty(&wire).unwrap()"
+---
+{
+  "max_tokens": 4096,
+  "messages": [
+    {
+      "content": [
+        {
+          "text": "Task: probe",
+          "type": "text"
+        },
+        {
+          "source": {
+            "data": "dGhlLWF0dGFjaGVkLWJ5dGVz",
+            "media_type": "image/png",
+            "type": "base64"
+          },
+          "type": "image"
+        }
+      ],
+      "role": "user"
+    },
+    {
+      "content": [
+        {
+          "text": "reading",
+          "type": "text"
+        },
+        {
+          "id": "tu_1",
+          "input": {
+            "path": "notes.md"
+          },
+          "name": "exec",
+          "type": "tool_use"
+        }
+      ],
+      "role": "assistant"
+    },
+    {
+      "content": [
+        {
+          "content": [
+            {
+              "text": "ok",
+              "type": "text"
+            },
+            {
+              "source": {
+                "data": "dGhlLXRvb2wtYnl0ZXM=",
+                "media_type": "image/jpeg",
+                "type": "base64"
+              },
+              "type": "image"
+            }
+          ],
+          "is_error": false,
+          "tool_use_id": "tu_1",
+          "type": "tool_result"
+        }
+      ],
+      "role": "user"
+    }
+  ],
+  "model": "sonnet",
+  "system": [
+    {
+      "cache_control": {
+        "type": "ephemeral"
+      },
+      "text": "city",
+      "type": "text"
+    },
+    {
+      "cache_control": {
+        "type": "ephemeral"
+      },
+      "text": "building",
+      "type": "text"
+    }
+  ],
+  "tools": [
+    {
+      "description": "run things",
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "exec"
+    }
+  ]
+}

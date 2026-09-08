@@ -42,13 +42,13 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
             timeout_ms: 1_000,
             pricing: None,
         },
-        Box::new(|_reference: &kernel::SecretRef| {
+        gateway::Redemption::without_images(Box::new(|_reference: &kernel::SecretRef| {
             Err(AxError::failure(
                 AxCode::ConfigInvalid,
                 "resolve a credential",
                 "none configured",
             ))
-        }),
+        })),
     )
     .unwrap();
 
