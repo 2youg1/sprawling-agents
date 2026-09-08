@@ -221,3 +221,53 @@ fn the_reserved_subtree_has_no_norms_to_read() {
     let err = norms(dir.path(), &addr(".sprawling/ledger")).unwrap_err();
     assert_eq!(err.code(), &AxCode::InvalidArgs);
 }
+
+/// City Hall's two residents are read from files in the city's own
+/// reserved subtree, which no write domain reaches: neither of them can
+/// edit who it is.
+#[test]
+fn the_hall_reads_its_two_residents_out_of_the_citys_reserved_subtree() {
+    let dir = tempfile::tempdir().unwrap();
+    lay_out_hall_identities(dir.path()).unwrap();
+
+    for (who, file) in [
+        (kernel::consts_policy::HALL_MAYOR, MAYOR_FILE),
+        (kernel::consts_policy::HALL_CLERK, CLERK_FILE),
+    ] {
+        let addr = addr(who);
+        let path = hall_identity_path(dir.path(), &addr).expect("a hall resident has one");
+        assert_eq!(
+            path,
+            dir.path().join(kernel::RESERVED_PREFIX).join(file),
+            "the identity sits where the resident cannot write"
+        );
+        assert!(path.is_file(), "{file} was laid down when the hall rose");
+        // The same file the prefix's resident segment is read from.
+        let identity = crate::resident::Identity::load(dir.path(), &addr).unwrap();
+        assert!(
+            matches!(identity, crate::resident::Identity::Resident(_)),
+            "{who} is a standing identity, not an ephemeral worker"
+        );
+        assert!(identity.segment_bytes().starts_with(b"# "));
+    }
+
+    assert!(
+        hall_identity_path(dir.path(), &addr("lab/room1")).is_none(),
+        "every other resident is described at its own address"
+    );
+}
+
+/// Laying the hall out twice keeps what the person edited.
+#[test]
+fn a_second_raising_does_not_overwrite_an_edited_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    lay_out_hall_identities(dir.path()).unwrap();
+    let mayor = dir.path().join(kernel::RESERVED_PREFIX).join(MAYOR_FILE);
+    std::fs::write(&mayor, "# MAYOR.md\n\nthis city's own Mayor\n").unwrap();
+    lay_out_hall_identities(dir.path()).unwrap();
+    assert!(
+        std::fs::read_to_string(&mayor)
+            .unwrap()
+            .contains("this city's own Mayor")
+    );
+}

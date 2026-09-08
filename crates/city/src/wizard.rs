@@ -98,6 +98,11 @@ pub fn survey(entries: &[(String, bool)], has_history: bool) -> Standing {
 pub struct CityPlan {
     /// Directories to create, city-root relative, in creation order.
     dirs: Vec<Address>,
+    /// City Hall, which every city has. Not an `Option`: a city without
+    /// a hall is not something this version forms, and optionality would
+    /// make "does this city have one" a question every caller answers
+    /// again when it has one answer.
+    hall: (Address, BuildingTemplate),
     /// The first building, if the instruction named one.
     first: Option<(Address, BuildingTemplate)>,
 }
@@ -115,7 +120,9 @@ impl CityPlan {
     /// that names a room rather than a building, and one whose template
     /// this version does not have.
     pub fn new(first: Option<(&str, &str)>) -> Result<CityPlan, AxError> {
-        let mut dirs = vec![Address::parse(RESERVED_PREFIX)?];
+        let hall_addr = Address::parse(kernel::consts_policy::HALL_BUILDING)?;
+        let mut dirs = vec![Address::parse(RESERVED_PREFIX)?, hall_addr.clone()];
+        let hall = (hall_addr, BuildingTemplate::Hall);
         let first = match first {
             None => None,
             Some((name, template)) => {
@@ -143,12 +150,18 @@ impl CityPlan {
                 Some((addr, template))
             }
         };
-        Ok(CityPlan { dirs, first })
+        Ok(CityPlan { dirs, hall, first })
     }
 
     #[must_use]
     pub fn dirs(&self) -> &[Address] {
         &self.dirs
+    }
+
+    /// City Hall, which every plan raises.
+    #[must_use]
+    pub fn hall(&self) -> &(Address, BuildingTemplate) {
+        &self.hall
     }
 
     #[must_use]
@@ -288,7 +301,12 @@ mod tests {
     fn one_instruction_plans_a_city_with_somewhere_to_work_in_it() {
         let plan = CityPlan::new(Some(("lab", "minimal"))).unwrap();
         assert_eq!(plan.dirs()[0].as_str(), RESERVED_PREFIX);
-        assert_eq!(plan.dirs()[1].as_str(), "lab");
+        assert_eq!(
+            plan.dirs()[1].as_str(),
+            kernel::consts_policy::HALL_BUILDING
+        );
+        assert_eq!(plan.dirs()[2].as_str(), "lab");
+        assert_eq!(plan.hall().1, BuildingTemplate::Hall);
         let (first, _) = plan.first().unwrap();
         assert_eq!(first.as_str(), "lab");
     }
@@ -296,7 +314,11 @@ mod tests {
     #[test]
     fn an_empty_city_is_legal_and_is_what_an_empty_directory_becomes() {
         let plan = CityPlan::new(None).unwrap();
-        assert_eq!(plan.dirs().len(), 1);
+        assert_eq!(
+            plan.dirs().len(),
+            2,
+            "the reserved subtree and City Hall; a city always has both"
+        );
         assert!(plan.first().is_none());
     }
 

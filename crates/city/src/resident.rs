@@ -118,8 +118,17 @@ impl Resident {
 }
 
 /// Where a resident's description lives.
+///
+/// City Hall's two residents are described by files in the city's own
+/// reserved subtree rather than at their own address, so that neither of
+/// them can edit who it is. Asked here rather than branched on by
+/// callers: `Identity::load` reads one path, and "an address with a
+/// description is a resident" stays one rule.
 #[must_use]
 pub fn urbanite_path(city_root: &Path, addr: &Address) -> PathBuf {
+    if let Some(hall) = crate::spine_files::hall_identity_path(city_root, addr) {
+        return hall;
+    }
     let mut path = city_root.to_path_buf();
     for segment in addr.as_str().split('/') {
         path.push(segment);

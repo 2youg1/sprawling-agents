@@ -24,8 +24,16 @@ use kernel::{Address, AxCode, AxError};
 
 use crate::policy::building_path;
 
+mod hall;
+
+pub use hall::{CLERK_FILE, MAYOR_FILE, hall_identity_path, lay_out_hall_identities};
+
 /// The plan: the single denominator for progress in a building.
-pub const ROADMAP_FILE: &str = "Roadmap.md";
+///
+/// Named in `kernel` beside the table grammar that reads it, and spelled
+/// here so a caller of this module has one place to look. One authority,
+/// one alias — not two.
+pub const ROADMAP_FILE: &str = kernel::ROADMAP_FILE;
 /// Decisions and corrections.
 pub(crate) const MEMO_FILE: &str = "Memo.md";
 /// What the next agent needs before it starts.
