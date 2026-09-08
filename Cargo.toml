@@ -16,6 +16,10 @@ members = [
     "xtask",
     "citysim",
 ]
+# `desktop` is its own package on purpose (desktop/desktop-SPEC.md §8.5): it sits
+# outside this lint wall so the Win32 boundary may relax `unsafe_code` at one
+# call site rather than everywhere.
+exclude = ["desktop"]
 # `web` compiles to wasm32 from Stage 4 on; keep native `cargo check` off it.
 default-members = [
     "crates/kernel",
@@ -55,6 +59,11 @@ insta = "1"
 tempfile = "3"
 # S2: compile-fail proof that "unrepresentable" holds (V0 trybuild cases).
 trybuild = "1"
+# card-4.1: pictures cross both provider wires base64-encoded. The
+# package is already resolved beneath reqwest, so naming it adds nothing
+# to the lock, and a second hand-written encoder would be a second
+# authority for one transformation.
+base64 = "0.22"
 # S2 pins: Sealed<T> zeroization.
 secrecy = "0.10"
 zeroize = "1.9"
@@ -98,6 +107,11 @@ reqwest = { version = "0.13", default-features = false, features = ["blocking", 
 flate2 = "1"
 web-sys = "0.3"
 js-sys = "0.3"
+# card-6.2: the JSON Schema the TypeScript client is generated from. The
+# derive reads the same serde attributes the wire is encoded with, so both
+# ends of the socket have one authority; optional in kernel and channels
+# (`schema`), turned on by xtask alone, never by the product binary.
+schemars = { version = "1", features = ["uuid1"] }
 
 # C3 hardening: panicking constructs and silent numeric
 # corruption are compile-time errors everywhere; tests relax locally.
