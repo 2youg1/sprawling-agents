@@ -98,7 +98,6 @@ fn a_dispatch_runs_a_whole_turn_loop_and_the_chain_still_verifies() {
             task: "say hello".to_owned(),
             goal: "one turn is enough".to_owned(),
             mode: channels::ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -206,7 +205,6 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
             task: "measure the thing".to_owned(),
             goal: "a number, then stop".to_owned(),
             mode: channels::ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -294,7 +292,6 @@ fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
             task: "anything".to_owned(),
             goal: "an honest ending".to_owned(),
             mode: channels::ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -315,4 +312,14 @@ fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
         kinds.contains(&EventKind::RunFrozen),
         "a run always ends: {kinds:?}"
     );
+}
+
+/// What one drive is handed can leave the thread that built it
+/// (sprawling-SPEC 8-44). A bound rather than a run: the pool of 8-42
+/// needs the type to cross, and a value that cannot be sent is a
+/// compile error here before it is a design error there.
+#[test]
+fn a_drive_can_be_handed_to_another_thread() {
+    fn crosses_threads<T: Send>() {}
+    crosses_threads::<Driving<'static>>();
 }

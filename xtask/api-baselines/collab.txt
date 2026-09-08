@@ -166,7 +166,7 @@ pub fn collab::ArchiveDesk::new(kernel::address::Address, alloc::vec::Vec<collab
 pub fn collab::ArchiveDesk::take_effects(&mut self) -> alloc::vec::Vec<collab::ArchiveEffect>
 pub fn collab::ArchiveTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn collab::ArchiveTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn collab::ArchiveTool::new(alloc::rc::Rc<core::cell::RefCell<collab::ArchiveDesk>>) -> core::result::Result<collab::ArchiveTool, kernel::error::shape::AxError>
+pub fn collab::ArchiveTool::new(alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::ArchiveDesk>>) -> core::result::Result<collab::ArchiveTool, kernel::error::shape::AxError>
 pub fn collab::Artifact::at(&self) -> &kernel::locator::Locator
 pub fn collab::Artifact::by(&self) -> &str
 pub fn collab::Artifact::node(&self) -> &collab::NodeId
@@ -188,14 +188,14 @@ pub fn collab::ClaimEffect::kind(&self) -> kernel::event::kind::EventKind
 pub fn collab::ClaimEffect::payload(&self, &str) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn collab::ClaimTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn collab::ClaimTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn collab::ClaimTool::new(alloc::rc::Rc<core::cell::RefCell<collab::ClaimDesk>>) -> core::result::Result<collab::ClaimTool, kernel::error::shape::AxError>
+pub fn collab::ClaimTool::new(alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::ClaimDesk>>) -> core::result::Result<collab::ClaimTool, kernel::error::shape::AxError>
 pub fn collab::DelegateDesk::ask(&mut self, collab::Delegated) -> core::result::Result<&collab::Delegated, kernel::error::shape::AxError>
 pub fn collab::DelegateDesk::asked(&self) -> &[collab::Delegated]
 pub fn collab::DelegateDesk::new(kernel::delegation::Depth, kernel::address::Address) -> collab::DelegateDesk
 pub fn collab::DelegateDesk::take(&mut self) -> alloc::vec::Vec<collab::Delegated>
 pub fn collab::DelegateTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn collab::DelegateTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn collab::DelegateTool::new(alloc::rc::Rc<core::cell::RefCell<collab::DelegateDesk>>) -> core::result::Result<collab::DelegateTool, kernel::error::shape::AxError>
+pub fn collab::DelegateTool::new(alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::DelegateDesk>>) -> core::result::Result<collab::DelegateTool, kernel::error::shape::AxError>
 pub fn collab::Draft::author(&self) -> &str
 pub fn collab::Draft::body(&self) -> &kernel::event::payload::Payload
 pub fn collab::Draft::new(alloc::string::String, kernel::address::Address, kernel::version::Version, kernel::event::payload::Payload) -> collab::Draft
@@ -219,7 +219,7 @@ pub fn collab::GoalDesk::new(kernel::event::identity::RunId, alloc::string::Stri
 pub fn collab::GoalDesk::take_effects(&mut self) -> alloc::vec::Vec<collab::GoalEffect>
 pub fn collab::GoalTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn collab::GoalTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn collab::GoalTool::new(kernel::address::Address, alloc::rc::Rc<core::cell::RefCell<collab::GoalDesk>>) -> core::result::Result<collab::GoalTool, kernel::error::shape::AxError>
+pub fn collab::GoalTool::new(kernel::address::Address, alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::GoalDesk>>) -> core::result::Result<collab::GoalTool, kernel::error::shape::AxError>
 pub fn collab::Handback::by(&self) -> &str
 pub fn collab::Handback::node(&self) -> &collab::NodeId
 pub fn collab::Handback::of(collab::Claim, bool, &str) -> collab::Handback
@@ -233,13 +233,12 @@ pub fn collab::Inbox::pending(&self) -> u32
 pub fn collab::Inbox::pull(&mut self) -> core::result::Result<alloc::vec::Vec<collab::Signal>, kernel::error::shape::AxError>
 pub fn collab::Inbox::take_steer(&mut self) -> core::option::Option<collab::Signal>
 pub fn collab::Joined::nodes(&self) -> &[collab::NodeId]
-pub fn collab::NodeContract::budget(&self) -> kernel::budget::BudgetCap
 pub fn collab::NodeContract::depends_on(&self) -> impl core::iter::traits::iterator::Iterator<Item = &collab::NodeId>
 pub fn collab::NodeContract::done_check(&self) -> &str
 pub fn collab::NodeContract::goal(&self) -> &str
 pub fn collab::NodeContract::id(&self) -> &collab::NodeId
 pub fn collab::NodeContract::job_text(&self) -> alloc::string::String
-pub fn collab::NodeContract::new(collab::NodeId, alloc::string::String, alloc::collections::btree::set::BTreeSet<collab::NodeId>, alloc::vec::Vec<(kernel::locator::Locator, kernel::version::Version)>, kernel::address::Address, alloc::string::String, alloc::string::String, kernel::budget::BudgetCap, alloc::string::String) -> core::result::Result<collab::NodeContract, kernel::error::shape::AxError>
+pub fn collab::NodeContract::new(collab::NodeId, alloc::string::String, alloc::collections::btree::set::BTreeSet<collab::NodeId>, alloc::vec::Vec<(kernel::locator::Locator, kernel::version::Version)>, kernel::address::Address, alloc::string::String, alloc::string::String, alloc::string::String) -> core::result::Result<collab::NodeContract, kernel::error::shape::AxError>
 pub fn collab::NodeContract::owner(&self) -> &str
 pub fn collab::NodeContract::reads(&self) -> &[(kernel::locator::Locator, kernel::version::Version)]
 pub fn collab::NodeContract::stop(&self) -> &str
@@ -263,7 +262,7 @@ pub fn collab::PrDesk::new(alloc::string::String, kernel::address::Address, core
 pub fn collab::PrDesk::take_effects(&mut self) -> alloc::vec::Vec<collab::PrEffect>
 pub fn collab::PrTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn collab::PrTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn collab::PrTool::new(kernel::address::Address, alloc::rc::Rc<core::cell::RefCell<collab::PrDesk>>) -> core::result::Result<collab::PrTool, kernel::error::shape::AxError>
+pub fn collab::PrTool::new(kernel::address::Address, alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::PrDesk>>) -> core::result::Result<collab::PrTool, kernel::error::shape::AxError>
 pub fn collab::PrivateQuestion::node(&self) -> &collab::NodeId
 pub fn collab::PrivateQuestion::prompt(&self) -> &str
 pub fn collab::Reflex::as_str(self) -> &'static str
@@ -292,7 +291,7 @@ pub fn collab::SignalKind::as_str(self) -> &'static str
 pub fn collab::SignalKind::parse(&str) -> core::result::Result<collab::SignalKind, kernel::error::shape::AxError>
 pub fn collab::SignalTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn collab::SignalTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn collab::SignalTool::new(alloc::rc::Rc<core::cell::RefCell<collab::SignalDesk>>) -> core::result::Result<collab::SignalTool, kernel::error::shape::AxError>
+pub fn collab::SignalTool::new(alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::SignalDesk>>) -> core::result::Result<collab::SignalTool, kernel::error::shape::AxError>
 pub fn collab::Steer::from_person(&str) -> core::result::Result<collab::Steer, kernel::error::shape::AxError>
 pub fn collab::Steer::from_signal(&collab::Signal) -> core::result::Result<collab::Steer, kernel::error::shape::AxError>
 pub fn collab::Steer::source(&self) -> &str
@@ -313,7 +312,7 @@ pub fn collab::WorkshopDesk::question(&self) -> core::result::Result<collab::Pri
 pub fn collab::WorkshopDesk::who(&self) -> &str
 pub fn collab::WorkshopTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn collab::WorkshopTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn collab::WorkshopTool::new(alloc::rc::Rc<core::cell::RefCell<collab::WorkshopDesk>>, alloc::rc::Rc<core::cell::RefCell<collab::DelegateDesk>>) -> core::result::Result<collab::WorkshopTool, kernel::error::shape::AxError>
+pub fn collab::WorkshopTool::new(alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::WorkshopDesk>>, alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::DelegateDesk>>) -> core::result::Result<collab::WorkshopTool, kernel::error::shape::AxError>
 pub fn collab::arbitrate(&[kernel::goal::GoalEntry], &kernel::goal::GoalEntry, collab::Circumstance) -> core::option::Option<collab::Level>
 pub fn collab::conflict_payload(&kernel::goal::GoalEntry, &collab::Level) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn collab::evidence_of(&str, &kernel::node_id::NodeId) -> core::option::Option<kernel::locator::Locator>

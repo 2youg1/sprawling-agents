@@ -5,8 +5,8 @@
 
 use super::*;
 
-fn desk(room: &str, reach: &str) -> Rc<RefCell<SignalDesk>> {
-    Rc::new(RefCell::new(SignalDesk::new(
+fn desk(room: &str, reach: &str) -> Arc<Mutex<SignalDesk>> {
+    Arc::new(Mutex::new(SignalDesk::new(
         RunId::CITY,
         Address::parse(room).unwrap(),
         "potter@lab.1".to_owned(),
@@ -27,14 +27,14 @@ fn call(args: Value) -> ToolCall {
 #[test]
 fn sending_queues_an_effect_and_delivers_nothing_yet() {
     let shared = desk("lab/room1", "lab");
-    let mut tool = SignalTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = SignalTool::new(Arc::clone(&shared)).unwrap();
     tool.invoke(&call(serde_json::json!({
         "action": "send",
         "to": "lab/room2",
         "text": "the kiln is free",
     })))
     .unwrap();
-    let mut borrowed = shared.borrow_mut();
+    let mut borrowed = shared.lock().unwrap();
     assert_eq!(
         borrowed.pending(),
         0,
@@ -58,7 +58,7 @@ fn sending_queues_an_effect_and_delivers_nothing_yet() {
 #[test]
 fn a_signal_addressed_outside_the_building_is_refused_with_somewhere_to_go() {
     let shared = desk("lab/room1", "lab");
-    let mut tool = SignalTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = SignalTool::new(Arc::clone(&shared)).unwrap();
     let refusal = tool
         .invoke(&call(serde_json::json!({
             "action": "send",
@@ -72,7 +72,7 @@ fn a_signal_addressed_outside_the_building_is_refused_with_somewhere_to_go() {
         "the third part of a refusal names where the caller may go instead"
     );
     assert!(
-        shared.borrow_mut().take_effects().is_empty(),
+        shared.lock().unwrap().take_effects().is_empty(),
         "a refused send leaves nothing behind"
     );
 }
@@ -93,9 +93,9 @@ fn pulling_takes_what_is_waiting_and_says_what_is_left() {
             TimeMs::new(10),
         )
         .unwrap();
-        shared.borrow_mut().inbox.deliver(&signal).unwrap();
+        shared.lock().unwrap().inbox.deliver(&signal).unwrap();
     }
-    let mut tool = SignalTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = SignalTool::new(Arc::clone(&shared)).unwrap();
     let outcome = tool
         .invoke(&call(serde_json::json!({ "action": "pull" })))
         .unwrap();
@@ -110,13 +110,13 @@ fn pulling_takes_what_is_waiting_and_says_what_is_left() {
         Some(1),
         "what is left is in the answer, because status only knows the dispatch"
     );
-    assert_eq!(shared.borrow_mut().take_effects().len(), 4);
+    assert_eq!(shared.lock().unwrap().take_effects().len(), 4);
 }
 
 #[test]
 fn an_action_this_tool_does_not_have_is_refused_by_name() {
     let shared = desk("lab/room1", "lab");
-    let mut tool = SignalTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = SignalTool::new(Arc::clone(&shared)).unwrap();
     let refusal = tool
         .invoke(&call(serde_json::json!({ "action": "broadcast_all" })))
         .unwrap_err();
@@ -139,11 +139,11 @@ fn the_lent_inbox_comes_back() {
         TimeMs::new(10),
     )
     .unwrap();
-    shared.borrow_mut().inbox.deliver(&signal).unwrap();
-    let returned = shared.borrow_mut().take_inbox();
+    shared.lock().unwrap().inbox.deliver(&signal).unwrap();
+    let returned = shared.lock().unwrap().take_inbox();
     assert_eq!(returned.pending(), 1);
     assert_eq!(
-        shared.borrow().pending(),
+        shared.lock().unwrap().pending(),
         0,
         "what was handed back is no longer held twice"
     );

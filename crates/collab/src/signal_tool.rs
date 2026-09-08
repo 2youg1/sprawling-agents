@@ -17,8 +17,7 @@
 //! belongs to is `city`'s answer, and this crate cannot name that crate;
 //! what it can do is refuse anything outside the boundary it was given.
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use kernel::{
     Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, RunId, Temporal, TimeMs,
@@ -234,7 +233,7 @@ impl SignalDesk {
 /// nothing can reach into it afterwards.
 pub struct SignalTool {
     meta: ToolMeta,
-    desk: Rc<RefCell<SignalDesk>>,
+    desk: Arc<Mutex<SignalDesk>>,
 }
 
 impl SignalTool {
@@ -242,8 +241,19 @@ impl SignalTool {
     /// Propagates a malformed tool name or parameter schema, neither of
     /// which can happen with the literals below — the fallibility is the
     /// constructors' contract, not a runtime condition.
-    pub fn new(desk: Rc<RefCell<SignalDesk>>) -> Result<SignalTool, AxError> {
-        let room = desk.borrow().room.clone();
+    pub fn new(desk: Arc<Mutex<SignalDesk>>) -> Result<SignalTool, AxError> {
+        let room = desk
+            .lock()
+            .map_err(|_| {
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "reach the signal desk",
+                    "the desk was left locked by a thread that died",
+                )
+                .with_recovery("restart this city")
+            })?
+            .room
+            .clone();
         let mut properties = Map::new();
         for (field, description) in [
             (
@@ -305,13 +315,13 @@ impl Tool for SignalTool {
             ));
         }
         let args = call.args.as_map();
-        let mut desk = self.desk.try_borrow_mut().map_err(|_| {
+        let mut desk = self.desk.lock().map_err(|_| {
             AxError::failure(
-                AxCode::InvalidArgs,
+                AxCode::StorageFatal,
                 "reach the signal desk",
-                "the desk is already in use",
+                "the desk was left locked by a thread that died",
             )
-            .with_recovery("call the tool once at a time")
+            .with_recovery("restart this city")
         })?;
         let result = match text(args, "action", "read a signal action")? {
             "send" => desk.send(args)?,

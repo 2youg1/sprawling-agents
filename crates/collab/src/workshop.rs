@@ -21,7 +21,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use kernel::{Address, AxCode, AxError, BudgetCap, Locator, Version};
+use kernel::{Address, AxCode, AxError, Locator, Version};
 
 /// A node's name within one workshop.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -59,7 +59,6 @@ pub struct NodeContract {
     write_domain: Address,
     owner: String,
     done_check: String,
-    budget: BudgetCap,
     stop: String,
 }
 
@@ -73,7 +72,7 @@ impl NodeContract {
     /// not stop.
     #[allow(
         clippy::too_many_arguments,
-        reason = "the contract is nine fields by design; a builder would hide which are required"
+        reason = "the contract is eight fields by design; a builder would hide which are required"
     )]
     pub fn new(
         id: NodeId,
@@ -83,7 +82,6 @@ impl NodeContract {
         write_domain: Address,
         owner: String,
         done_check: String,
-        budget: BudgetCap,
         stop: String,
     ) -> Result<NodeContract, AxError> {
         for (field, value) in [
@@ -112,7 +110,6 @@ impl NodeContract {
             write_domain,
             owner,
             done_check,
-            budget,
             stop,
         })
     }
@@ -150,11 +147,6 @@ impl NodeContract {
     #[must_use]
     pub fn done_check(&self) -> &str {
         &self.done_check
-    }
-
-    #[must_use]
-    pub fn budget(&self) -> BudgetCap {
-        self.budget
     }
 
     #[must_use]

@@ -17,8 +17,7 @@
 //! and the merge is not a second decision: it is what verification
 //! means. A refusal is the other outcome of the same call.
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use kernel::{
     Address, AxCode, AxError, B3Hash, CostTier, Effect, Locator, Payload, RenderIntent, Temporal,
@@ -236,13 +235,13 @@ impl PrDesk {
 
 pub struct PrTool {
     meta: ToolMeta,
-    desk: Rc<RefCell<PrDesk>>,
+    desk: Arc<Mutex<PrDesk>>,
 }
 
 impl PrTool {
     /// # Errors
     /// Propagates a malformed tool name or parameter schema.
-    pub fn new(room: Address, desk: Rc<RefCell<PrDesk>>) -> Result<PrTool, AxError> {
+    pub fn new(room: Address, desk: Arc<Mutex<PrDesk>>) -> Result<PrTool, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [
             (
@@ -307,13 +306,13 @@ impl Tool for PrTool {
             ));
         }
         let args = call.args.as_map();
-        let mut desk = self.desk.try_borrow_mut().map_err(|_| {
+        let mut desk = self.desk.lock().map_err(|_| {
             AxError::failure(
-                AxCode::InvalidArgs,
+                AxCode::StorageFatal,
                 "reach the request register",
                 "the register is already in use",
             )
-            .with_recovery("call the tool once at a time")
+            .with_recovery("restart this city")
         })?;
         let result = match text(args, "action", "read a pull request action")? {
             "open" => desk.open()?,

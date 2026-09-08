@@ -57,4 +57,4 @@ pub struct protocol::McpTool
 pub struct protocol::Progress
 pub struct protocol::Rpc
 pub struct protocol::ScriptedOutbound
-pub trait protocol::Outbound
+pub trait protocol::Outbound: core::marker::Send

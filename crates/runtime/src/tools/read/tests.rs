@@ -6,9 +6,9 @@
 use super::*;
 use crate::catalog::CatalogEntry;
 
-fn tool(root: &Path) -> (ReadTool, Rc<RefCell<Catalog>>) {
-    let catalog = Rc::new(RefCell::new(Catalog::new()));
-    let tool = ReadTool::new(root, Rc::clone(&catalog)).unwrap();
+fn tool(root: &Path) -> (ReadTool, Arc<Mutex<Catalog>>) {
+    let catalog = Arc::new(Mutex::new(Catalog::new()));
+    let tool = ReadTool::new(root, Arc::clone(&catalog)).unwrap();
     (tool, catalog)
 }
 
@@ -81,7 +81,8 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
     std::fs::write(shelf.join("review.md"), "check the diff first\n").unwrap();
     let (mut tool, catalog) = tool(dir.path());
     catalog
-        .borrow_mut()
+        .lock()
+        .unwrap()
         .admit_skill(CatalogEntry {
             name: "review".to_owned(),
             disclosure: "how this building reviews".to_owned(),
@@ -104,7 +105,10 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
 fn an_entry_the_catalog_holds_is_handed_over_not_refused() {
     let dir = tempfile::tempdir().unwrap();
     let (mut tool, catalog) = tool(dir.path());
-    catalog.borrow_mut().set_mode(crate::mode::Mode::Experiment);
+    catalog
+        .lock()
+        .unwrap()
+        .set_mode(crate::mode::Mode::Experiment);
 
     let mode = tool.invoke(&call("mode:experiment")).unwrap();
     let said = mode.result.as_map()["text"].as_str().unwrap_or_default();

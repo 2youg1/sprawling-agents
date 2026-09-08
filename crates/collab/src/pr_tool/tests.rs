@@ -14,15 +14,15 @@ fn request(branch: &str, implementer: &str) -> OpenRequest {
     }
 }
 
-fn tool(who: &str, branch: Option<&str>, open: Vec<OpenRequest>) -> (PrTool, Rc<RefCell<PrDesk>>) {
-    let desk = Rc::new(RefCell::new(PrDesk::new(
+fn tool(who: &str, branch: Option<&str>, open: Vec<OpenRequest>) -> (PrTool, Arc<Mutex<PrDesk>>) {
+    let desk = Arc::new(Mutex::new(PrDesk::new(
         who.to_owned(),
         Address::parse("lab/room1").unwrap(),
         branch.map(str::to_owned),
         branch.and_then(|b| NodeId::parse(b).ok()),
         open,
     )));
-    let tool = PrTool::new(Address::parse("lab/room1").unwrap(), Rc::clone(&desk)).unwrap();
+    let tool = PrTool::new(Address::parse("lab/room1").unwrap(), Arc::clone(&desk)).unwrap();
     (tool, desk)
 }
 
@@ -51,7 +51,7 @@ fn the_resident_who_wrote_it_cannot_be_the_one_who_checks_it() {
     assert_eq!(refusal.code(), &AxCode::GateDenied);
     assert!(refusal.recovery().contains("another resident"));
     assert!(
-        desk.borrow_mut().take_effects().is_empty(),
+        desk.lock().unwrap().take_effects().is_empty(),
         "a refused check moves nothing"
     );
 }
@@ -74,7 +74,7 @@ fn a_check_that_passes_merges_and_one_that_fails_records_why() {
             .and_then(Value::as_bool),
         Some(true)
     );
-    let effects = desk.borrow_mut().take_effects();
+    let effects = desk.lock().unwrap().take_effects();
     assert!(matches!(effects[0], PrEffect::Merged { .. }));
 
     let (mut second, desk) = tool("lab/tests", None, vec![request("tree-b", "lab/room1")]);
@@ -86,7 +86,7 @@ fn a_check_that_passes_merges_and_one_that_fails_records_why() {
             "why": "the tests do not run",
         })))
         .unwrap();
-    let effects = desk.borrow_mut().take_effects();
+    let effects = desk.lock().unwrap().take_effects();
     match &effects[0] {
         PrEffect::Rejected { why, .. } => assert_eq!(why, "the tests do not run"),
         other => panic!("a failed check rejects, not {other:?}"),

@@ -29,9 +29,8 @@
 //! and the offset to continue from, which is the number `search`
 //! reports for a hit.
 
-use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use kernel::{
     AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
@@ -150,7 +149,7 @@ pub struct ReadTool {
     /// The same catalog the model was shown. Shared rather than copied:
     /// a second list of what this run may open would be a second
     /// authority, and the one that drifts is always the copy.
-    catalog: Rc<RefCell<Catalog>>,
+    catalog: Arc<Mutex<Catalog>>,
     meta: ToolMeta,
 }
 
@@ -158,7 +157,7 @@ impl ReadTool {
     /// # Errors
     /// Propagates a malformed parameter schema, which is a build-time
     /// defect rather than a runtime one.
-    pub fn new(city_root: &Path, catalog: Rc<RefCell<Catalog>>) -> Result<ReadTool, AxError> {
+    pub fn new(city_root: &Path, catalog: Arc<Mutex<Catalog>>) -> Result<ReadTool, AxError> {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
         let mut properties = Map::new();
@@ -219,7 +218,7 @@ impl ReadTool {
     /// called `review` has said what that word means here, and a file
     /// that happens to share the name must not be able to shadow it.
     fn resolve(&self, asked: &str) -> Result<Found, AxError> {
-        if let Ok(catalog) = self.catalog.try_borrow()
+        if let Ok(catalog) = self.catalog.lock()
             && let Some(expansion) = catalog.expand(asked)
         {
             return match expansion {

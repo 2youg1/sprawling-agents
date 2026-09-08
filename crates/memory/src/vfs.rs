@@ -23,8 +23,10 @@ use std::path::{Path, PathBuf};
 
 /// Crate-internal filesystem seam. Two adapters:
 /// [`crate::real_fs::RealFs`] (std) and `FaultFs` (fault injection,
-/// S1.08). Never public: the seam stays inner.
-pub(crate) trait Vfs {
+/// S1.08). Never public: the seam stays inner. `Send`, because a store
+/// built on it is handed to the thread that drives a run
+/// (sprawling-SPEC 8-44).
+pub(crate) trait Vfs: Send {
     fn create_dir_all(&mut self, dir: &Path) -> io::Result<()>;
     /// Files only, sorted by path: deterministic traversal.
     fn list(&self, dir: &Path) -> io::Result<Vec<PathBuf>>;

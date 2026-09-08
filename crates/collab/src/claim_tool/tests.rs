@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use kernel::{Tool, ToolCall, ToolName};
 
@@ -24,8 +23,8 @@ const PLAN: &str = "\
 | 3 | fire the batch | 1 | 2 | Not started |  |
 ";
 
-fn desk() -> Rc<RefCell<ClaimDesk>> {
-    Rc::new(RefCell::new(ClaimDesk::new(
+fn desk() -> Arc<Mutex<ClaimDesk>> {
+    Arc::new(Mutex::new(ClaimDesk::new(
         "potter@lab.1".to_owned(),
         Address::parse("lab/room1").unwrap(),
         PLAN.to_owned(),
@@ -51,7 +50,7 @@ fn node(raw: &str) -> NodeId {
 #[test]
 fn claiming_a_ready_node_marks_it_and_queues_one_effect() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     let outcome = tool
         .invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
         .unwrap();
@@ -59,7 +58,7 @@ fn claiming_a_ready_node_marks_it_and_queues_one_effect() {
         outcome.result.as_map().get("item").and_then(Value::as_str),
         Some("wire the kiln")
     );
-    let mut borrowed = shared.borrow_mut();
+    let mut borrowed = shared.lock().unwrap();
     let text = borrowed.roadmap().expect("the plan changed").to_owned();
     assert!(text.contains("| 1 | wire the kiln | 1 |  | In progress |  |"));
     let effects = borrowed.take_effects();
@@ -75,7 +74,7 @@ fn claiming_a_ready_node_marks_it_and_queues_one_effect() {
 #[test]
 fn a_node_somebody_else_is_working_on_is_refused_with_a_ready_one() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     let refusal = tool
         .invoke(&call(serde_json::json!({ "action": "claim", "node": "2" })))
         .unwrap_err();
@@ -87,7 +86,7 @@ fn a_node_somebody_else_is_working_on_is_refused_with_a_ready_one() {
         refusal.recovery()
     );
     assert!(
-        shared.borrow().roadmap().is_none(),
+        shared.lock().unwrap().roadmap().is_none(),
         "a refusal writes nothing"
     );
 }
@@ -97,7 +96,7 @@ fn a_node_somebody_else_is_working_on_is_refused_with_a_ready_one() {
 #[test]
 fn listing_offers_what_is_ready_rather_than_what_is_merely_unclaimed() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     let outcome = tool
         .invoke(&call(serde_json::json!({ "action": "list" })))
         .unwrap();
@@ -114,7 +113,7 @@ fn listing_offers_what_is_ready_rather_than_what_is_merely_unclaimed() {
     );
     assert_eq!(map.get("nodes_total").and_then(Value::as_u64), Some(3));
     assert!(
-        shared.borrow().roadmap().is_none(),
+        shared.lock().unwrap().roadmap().is_none(),
         "reading the plan does not modify it"
     );
 }
@@ -122,7 +121,7 @@ fn listing_offers_what_is_ready_rather_than_what_is_merely_unclaimed() {
 #[test]
 fn a_run_holds_one_node_at_a_time() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
         .unwrap();
     let refusal = tool
@@ -135,7 +134,7 @@ fn a_run_holds_one_node_at_a_time() {
 #[test]
 fn finishing_requires_evidence_that_parses() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
         .unwrap();
     let missing = tool
@@ -156,7 +155,7 @@ fn finishing_requires_evidence_that_parses() {
         })))
         .unwrap();
     assert!(done.result.as_map().contains_key("evidence"));
-    let text = shared.borrow().roadmap().unwrap().to_owned();
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
     assert_eq!(
         evidence_of(&text, &node("1")).map(|l| l.to_string()),
         Some(locator()),
@@ -169,7 +168,7 @@ fn finishing_requires_evidence_that_parses() {
 #[test]
 fn a_run_can_only_put_down_what_it_took() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     let never = tool
         .invoke(&call(serde_json::json!({
             "action": "finish", "node": "2", "evidence": locator()
@@ -189,7 +188,7 @@ fn a_run_can_only_put_down_what_it_took() {
 #[test]
 fn blocking_paints_the_node_red_and_says_why() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
         .unwrap();
     let outcome = tool
@@ -201,9 +200,9 @@ fn blocking_paints_the_node_red_and_says_why() {
         outcome.result.as_map().get("red").and_then(Value::as_bool),
         Some(true)
     );
-    let text = shared.borrow().roadmap().unwrap().to_owned();
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
     assert!(text.contains("| 1 | wire the kiln | 1 |  | Blocked |  |"));
-    let effects = shared.borrow_mut().take_effects();
+    let effects = shared.lock().unwrap().take_effects();
     assert_eq!(effects[1].kind(), kernel::EventKind::RoadmapBlocked);
     let payload = effects[1].payload("potter@lab.1").unwrap();
     assert_eq!(
@@ -223,7 +222,7 @@ fn blocking_paints_the_node_red_and_says_why() {
 #[test]
 fn releasing_puts_the_node_back_where_another_run_can_take_it() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
         .unwrap();
     let outcome = tool
@@ -236,16 +235,16 @@ fn releasing_puts_the_node_back_where_another_run_can_take_it() {
         Some(false),
         "handing back is not red"
     );
-    let text = shared.borrow().roadmap().unwrap().to_owned();
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
     assert!(text.contains("| 1 | wire the kiln | 1 |  | Not started |  |"));
-    let effects = shared.borrow_mut().take_effects();
+    let effects = shared.lock().unwrap().take_effects();
     assert_eq!(effects[1].kind(), kernel::EventKind::RoadmapReleased);
 }
 
 #[test]
 fn putting_a_node_down_without_a_reason_is_refused() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
         .unwrap();
     let refusal = tool
@@ -257,7 +256,7 @@ fn putting_a_node_down_without_a_reason_is_refused() {
 #[test]
 fn splitting_grows_the_plan_and_the_run_stops_holding_the_branch() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
         .unwrap();
     let outcome = tool
@@ -276,17 +275,17 @@ fn splitting_grows_the_plan_and_the_run_stops_holding_the_branch() {
             .map(Vec::len),
         Some(2)
     );
-    let text = shared.borrow().roadmap().unwrap().to_owned();
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
     assert!(text.contains("| 1.1 | run the cable | 3 |  | Not started |  |"));
     assert!(
         text.contains("| 1.2 | test the element | 1 |  | Not started |  |"),
         "a bare string is a child of weight one"
     );
     assert!(
-        shared.borrow().holding().is_none(),
+        shared.lock().unwrap().holding().is_none(),
         "the work it took is now several pieces; it takes one of them next"
     );
-    let effects = shared.borrow_mut().take_effects();
+    let effects = shared.lock().unwrap().take_effects();
     assert_eq!(effects[1].kind(), kernel::EventKind::RoadmapSplit);
 }
 
@@ -295,16 +294,16 @@ fn splitting_grows_the_plan_and_the_run_stops_holding_the_branch() {
 #[test]
 fn a_run_that_freezes_still_holding_a_node_leaves_it_red() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
         .unwrap();
-    shared.borrow_mut().abandon().unwrap();
-    let text = shared.borrow().roadmap().unwrap().to_owned();
+    shared.lock().unwrap().abandon().unwrap();
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
     assert!(text.contains("| 1 | wire the kiln | 1 |  | Blocked |  |"));
-    let effects = shared.borrow_mut().take_effects();
+    let effects = shared.lock().unwrap().take_effects();
     assert_eq!(effects[1].kind(), kernel::EventKind::RoadmapBlocked);
     assert!(
-        shared.borrow_mut().abandon().is_ok(),
+        shared.lock().unwrap().abandon().is_ok(),
         "a run that put its node down properly abandons nothing"
     );
 }
@@ -312,10 +311,10 @@ fn a_run_that_freezes_still_holding_a_node_leaves_it_red() {
 #[test]
 fn an_effect_whose_node_moved_underneath_it_is_no_longer_true() {
     let shared = desk();
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
         .unwrap();
-    let effects = shared.borrow_mut().take_effects();
+    let effects = shared.lock().unwrap().take_effects();
     assert!(
         still_true(PLAN, &effects[0]),
         "against the file it was decided on, the effect holds"
@@ -329,12 +328,12 @@ fn an_effect_whose_node_moved_underneath_it_is_no_longer_true() {
 
 #[test]
 fn a_plan_that_does_not_parse_refuses_with_the_repair() {
-    let shared = Rc::new(RefCell::new(ClaimDesk::new(
+    let shared = Arc::new(Mutex::new(ClaimDesk::new(
         "potter@lab.1".to_owned(),
         Address::parse("lab/room1").unwrap(),
         "no table here".to_owned(),
     )));
-    let mut tool = ClaimTool::new(Rc::clone(&shared)).unwrap();
+    let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     let refusal = tool
         .invoke(&call(serde_json::json!({ "action": "list" })))
         .unwrap_err();

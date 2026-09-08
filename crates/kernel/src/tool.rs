@@ -251,7 +251,11 @@ pub struct ToolOutcome {
 
 /// The tool port. Adapters: runtime L0 three (S3), browser, protocol;
 /// second adapter: citysim scripted tools (S2.03).
-pub trait Tool {
+///
+/// `Send`, because a bench of tools is driven on a pool thread rather
+/// than on the thread that built it (sprawling-SPEC 8-44). A tool that
+/// holds something a thread cannot give up has no place on a bench.
+pub trait Tool: Send {
     fn meta(&self) -> &ToolMeta;
 
     /// Fail-closed identity: a call whose name differs from `meta().name`

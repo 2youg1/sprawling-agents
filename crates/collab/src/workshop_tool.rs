@@ -26,8 +26,8 @@
 use std::collections::BTreeSet;
 
 use kernel::{
-    Address, AxCode, AxError, BudgetCap, CostTier, DelegateKind, Effect, Payload, RenderIntent,
-    Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    Address, AxCode, AxError, CostTier, DelegateKind, Effect, Payload, RenderIntent, Temporal,
+    Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -137,8 +137,8 @@ impl WorkshopDesk {
 
 /// The tool itself.
 pub struct WorkshopTool {
-    desk: std::rc::Rc<std::cell::RefCell<WorkshopDesk>>,
-    delegates: std::rc::Rc<std::cell::RefCell<DelegateDesk>>,
+    desk: std::sync::Arc<std::sync::Mutex<WorkshopDesk>>,
+    delegates: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
     meta: ToolMeta,
 }
 
@@ -172,8 +172,8 @@ impl WorkshopTool {
     /// Propagates a malformed parameter schema, which is a build-time
     /// defect rather than a runtime one.
     pub fn new(
-        desk: std::rc::Rc<std::cell::RefCell<WorkshopDesk>>,
-        delegates: std::rc::Rc<std::cell::RefCell<DelegateDesk>>,
+        desk: std::sync::Arc<std::sync::Mutex<WorkshopDesk>>,
+        delegates: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
     ) -> Result<WorkshopTool, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [
@@ -274,7 +274,6 @@ fn contract_of(node: &Value, owner: &str) -> Result<NodeContract, AxError> {
         room,
         owner.to_owned(),
         text(map, "done_check")?,
-        BudgetCap::default(),
         text(map, "stop")?,
     )
 }
@@ -293,8 +292,12 @@ impl Tool for WorkshopTool {
             ));
         }
         let args = call.args.as_map();
-        let mut desk = self.desk.try_borrow_mut().map_err(|_| {
-            AxError::failure(AxCode::InvalidArgs, "run a workshop", "the desk is in use")
+        let mut desk = self.desk.lock().map_err(|_| {
+            AxError::failure(
+                AxCode::StorageFatal,
+                "run a workshop",
+                "the desk was left locked by a thread that died",
+            )
         })?;
         let mut out = Map::new();
         match Op::parse(&text(args, "op")?)? {
@@ -316,8 +319,12 @@ impl Tool for WorkshopTool {
                     .iter()
                     .map(|node| contract_of(node, &owner))
                     .collect::<Result<Vec<NodeContract>, AxError>>()?;
-                let mut delegates = self.delegates.try_borrow_mut().map_err(|_| {
-                    AxError::failure(AxCode::InvalidArgs, "run a workshop", "the desk is in use")
+                let mut delegates = self.delegates.lock().map_err(|_| {
+                    AxError::failure(
+                        AxCode::StorageFatal,
+                        "run a workshop",
+                        "the desk was left locked by a thread that died",
+                    )
                 })?;
                 let schedule = desk.lay_out(contracts, &mut delegates)?;
                 out.insert(

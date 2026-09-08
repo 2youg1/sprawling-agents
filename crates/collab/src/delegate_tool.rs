@@ -110,7 +110,7 @@ impl DelegateDesk {
 
 /// The tool itself.
 pub struct DelegateTool {
-    desk: std::rc::Rc<std::cell::RefCell<DelegateDesk>>,
+    desk: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
     meta: ToolMeta,
 }
 
@@ -119,7 +119,7 @@ impl DelegateTool {
     /// Propagates a malformed parameter schema, which is a build-time
     /// defect rather than a runtime one.
     pub fn new(
-        desk: std::rc::Rc<std::cell::RefCell<DelegateDesk>>,
+        desk: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
     ) -> Result<DelegateTool, AxError> {
         let mut properties = Map::new();
         for (field, description) in [
@@ -220,8 +220,12 @@ impl Tool for DelegateTool {
             goal: arg(args, "goal")?.to_owned(),
             kind,
         };
-        let mut desk = self.desk.try_borrow_mut().map_err(|_| {
-            AxError::failure(AxCode::InvalidArgs, "delegate work", "the desk is in use")
+        let mut desk = self.desk.lock().map_err(|_| {
+            AxError::failure(
+                AxCode::StorageFatal,
+                "delegate work",
+                "the desk was left locked by a thread that died",
+            )
         })?;
         let accepted = desk.ask(work)?;
         let mut out = Map::new();
@@ -250,8 +254,8 @@ impl Tool for DelegateTool {
 mod tests {
     use super::*;
 
-    fn desk(depth: Depth) -> std::rc::Rc<std::cell::RefCell<DelegateDesk>> {
-        std::rc::Rc::new(std::cell::RefCell::new(DelegateDesk::new(
+    fn desk(depth: Depth) -> std::sync::Arc<std::sync::Mutex<DelegateDesk>> {
+        std::sync::Arc::new(std::sync::Mutex::new(DelegateDesk::new(
             depth,
             Address::parse("lab").unwrap(),
         )))
@@ -278,19 +282,19 @@ mod tests {
     #[test]
     fn a_root_run_may_hand_work_down_and_is_told_where_it_will_happen() {
         let desk = desk(Depth::Root);
-        let mut tool = DelegateTool::new(std::rc::Rc::clone(&desk)).unwrap();
+        let mut tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
         let outcome = tool.invoke(&call("lab/helper", None)).unwrap();
         assert_eq!(outcome.result.as_map()["room"], "lab/helper");
         assert_eq!(
-            desk.borrow().asked().len(),
+            desk.lock().unwrap().asked().len(),
             1,
             "the desk answers what has been asked for before it is taken"
         );
 
-        let taken = desk.borrow_mut().take();
+        let taken = desk.lock().unwrap().take();
         assert_eq!(taken.len(), 1);
         assert_eq!(taken[0].kind, DelegateKind::Ephemeral);
-        assert!(desk.borrow_mut().take().is_empty(), "taken once");
+        assert!(desk.lock().unwrap().take().is_empty(), "taken once");
     }
 
     /// The rule this whole mechanism exists to hold, now with a caller:
@@ -298,20 +302,20 @@ mod tests {
     #[test]
     fn a_delegate_cannot_delegate_and_the_refusal_says_what_to_do_instead() {
         let desk = desk(Depth::Delegated);
-        let mut tool = DelegateTool::new(std::rc::Rc::clone(&desk)).unwrap();
+        let mut tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
         for kind in [None, Some("ephemeral"), Some("resident")] {
             let err = tool.invoke(&call("lab/helper", kind)).unwrap_err();
             assert_eq!(err.code(), &AxCode::DelegationDepth);
             let refusal = err.gate().expect("a gate refusal has three parts");
             assert!(refusal.alternative().contains("return this subtask"));
         }
-        assert!(desk.borrow_mut().take().is_empty());
+        assert!(desk.lock().unwrap().take().is_empty());
     }
 
     #[test]
     fn a_delegate_stays_inside_the_building_that_asked_for_it() {
         let desk = desk(Depth::Root);
-        let mut tool = DelegateTool::new(std::rc::Rc::clone(&desk)).unwrap();
+        let mut tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
         let err = tool.invoke(&call("shop/helper", None)).unwrap_err();
         assert_eq!(err.code(), &AxCode::CrossBuildingDenied);
         assert!(err.recovery().contains("signal"));
@@ -320,7 +324,7 @@ mod tests {
     #[test]
     fn an_unknown_kind_is_refused_rather_than_rounded_down() {
         let desk = desk(Depth::Root);
-        let mut tool = DelegateTool::new(std::rc::Rc::clone(&desk)).unwrap();
+        let mut tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
         let err = tool
             .invoke(&call("lab/helper", Some("apprentice")))
             .unwrap_err();

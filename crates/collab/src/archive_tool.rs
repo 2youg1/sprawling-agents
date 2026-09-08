@@ -15,8 +15,7 @@
 //! is on the shelf and handed to this desk; nothing here keeps a second
 //! copy, because the file is the one that is true.
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use kernel::{
     Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall,
@@ -121,15 +120,26 @@ impl ArchiveDesk {
 /// The tool: a thin router onto the desk.
 pub struct ArchiveTool {
     meta: ToolMeta,
-    desk: Rc<RefCell<ArchiveDesk>>,
+    desk: Arc<Mutex<ArchiveDesk>>,
 }
 
 impl ArchiveTool {
     /// # Errors
     /// Propagates a malformed tool name or parameter schema, neither of
     /// which the literals below can provoke.
-    pub fn new(desk: Rc<RefCell<ArchiveDesk>>) -> Result<ArchiveTool, AxError> {
-        let room = desk.borrow().room.clone();
+    pub fn new(desk: Arc<Mutex<ArchiveDesk>>) -> Result<ArchiveTool, AxError> {
+        let room = desk
+            .lock()
+            .map_err(|_| {
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "reach the archive desk",
+                    "the desk was left locked by a thread that died",
+                )
+                .with_recovery("restart this city")
+            })?
+            .room
+            .clone();
         let mut properties = Map::new();
         for (field, description) in [
             (
@@ -190,13 +200,13 @@ impl Tool for ArchiveTool {
             ));
         }
         let args = call.args.as_map();
-        let mut desk = self.desk.try_borrow_mut().map_err(|_| {
+        let mut desk = self.desk.lock().map_err(|_| {
             AxError::failure(
-                AxCode::InvalidArgs,
+                AxCode::StorageFatal,
                 "reach the archive desk",
-                "the desk is already in use",
+                "the desk was left locked by a thread that died",
             )
-            .with_recovery("call the tool once at a time")
+            .with_recovery("restart this city")
         })?;
         let action = args.get("action").and_then(Value::as_str).ok_or_else(|| {
             AxError::failure(
@@ -241,8 +251,8 @@ impl Tool for ArchiveTool {
 mod tests {
     use super::*;
 
-    fn desk(held: Vec<Held>) -> Rc<RefCell<ArchiveDesk>> {
-        Rc::new(RefCell::new(ArchiveDesk::new(
+    fn desk(held: Vec<Held>) -> Arc<Mutex<ArchiveDesk>> {
+        Arc::new(Mutex::new(ArchiveDesk::new(
             Address::parse("lab/room1").unwrap(),
             held,
         )))
@@ -259,14 +269,14 @@ mod tests {
     #[test]
     fn recording_queues_one_effect_and_writes_nothing_yet() {
         let shared = desk(Vec::new());
-        let mut tool = ArchiveTool::new(Rc::clone(&shared)).unwrap();
+        let mut tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
         tool.invoke(&call(serde_json::json!({
             "action": "record",
             "kind": "decision",
             "text": "the kiln is fired at 1240 degrees",
         })))
         .unwrap();
-        let mut borrowed = shared.borrow_mut();
+        let mut borrowed = shared.lock().unwrap();
         let effects = borrowed.take_effects();
         assert_eq!(effects.len(), 1);
         assert!(
@@ -278,7 +288,7 @@ mod tests {
     #[test]
     fn a_fifth_kind_is_refused_with_the_four_it_could_be() {
         let shared = desk(Vec::new());
-        let mut tool = ArchiveTool::new(Rc::clone(&shared)).unwrap();
+        let mut tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
         let refusal = tool
             .invoke(&call(serde_json::json!({
                 "action": "record", "kind": "note", "text": "something",
@@ -293,7 +303,7 @@ mod tests {
     #[test]
     fn an_empty_note_is_refused_because_nobody_could_act_on_it() {
         let shared = desk(Vec::new());
-        let mut tool = ArchiveTool::new(Rc::clone(&shared)).unwrap();
+        let mut tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
         assert!(
             tool.invoke(&call(serde_json::json!({
                 "action": "record", "kind": "fact", "text": "   ",
@@ -314,7 +324,7 @@ mod tests {
                 text: "glazes are mixed by weight".to_owned(),
             },
         ]);
-        let mut tool = ArchiveTool::new(Rc::clone(&shared)).unwrap();
+        let mut tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
         let outcome = tool
             .invoke(&call(
                 serde_json::json!({ "action": "recall", "query": "KILN" }),

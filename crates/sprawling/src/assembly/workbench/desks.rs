@@ -30,7 +30,7 @@ impl RunWorker {
         site: &Site,
         addr: &Address,
     ) -> Result<Desks, AxError> {
-        let pr = std::rc::Rc::new(std::cell::RefCell::new(collab::PrDesk::new(
+        let pr = std::sync::Arc::new(std::sync::Mutex::new(collab::PrDesk::new(
             site.who.clone(),
             addr.clone(),
             site.branch.clone(),
@@ -45,7 +45,7 @@ impl RunWorker {
         // times; a copy would be a second answer to "what arrived first".
         let lent = self.inboxes.remove(addr).unwrap_or_else(new_inbox);
         let waiting = lent.pending();
-        let signals = std::rc::Rc::new(std::cell::RefCell::new(collab::SignalDesk::new(
+        let signals = std::sync::Arc::new(std::sync::Mutex::new(collab::SignalDesk::new(
             site.run_id,
             addr.clone(),
             site.who.clone(),
@@ -53,7 +53,7 @@ impl RunWorker {
             now_ms()?,
             lent,
         )));
-        let goals = std::rc::Rc::new(std::cell::RefCell::new(collab::GoalDesk::new(
+        let goals = std::sync::Arc::new(std::sync::Mutex::new(collab::GoalDesk::new(
             site.run_id,
             site.who.clone(),
             self.goals.clone(),
@@ -71,7 +71,7 @@ impl RunWorker {
         // that the compare-and-swap below was always going to drop, and
         // told the person a neighbour had moved their row.
         let plan_text = city::roadmap(&self.city_root, site.building.addr())?;
-        let plan = std::rc::Rc::new(std::cell::RefCell::new(collab::ClaimDesk::new(
+        let plan = std::sync::Arc::new(std::sync::Mutex::new(collab::ClaimDesk::new(
             site.who.clone(),
             addr.clone(),
             plan_text,
@@ -91,7 +91,7 @@ impl RunWorker {
                 text: entry.subject,
             })
             .collect();
-        let shelf = std::rc::Rc::new(std::cell::RefCell::new(collab::ArchiveDesk::new(
+        let shelf = std::sync::Arc::new(std::sync::Mutex::new(collab::ArchiveDesk::new(
             addr.clone(),
             held,
         )));

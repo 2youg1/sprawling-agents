@@ -6,8 +6,7 @@
 //! The tool itself: the six actions, and the arguments they are
 //! spelled with.
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use super::ClaimDesk;
 use kernel::{
@@ -19,15 +18,26 @@ use serde_json::{Map, Value};
 /// The tool itself: a thin router onto the desk.
 pub struct ClaimTool {
     meta: ToolMeta,
-    desk: Rc<RefCell<ClaimDesk>>,
+    desk: Arc<Mutex<ClaimDesk>>,
 }
 
 impl ClaimTool {
     /// # Errors
     /// Propagates a malformed tool name or parameter schema, neither of
     /// which can happen with the literals below.
-    pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, AxError> {
-        let room = desk.borrow().room.clone();
+    pub fn new(desk: Arc<Mutex<ClaimDesk>>) -> Result<ClaimTool, AxError> {
+        let room = desk
+            .lock()
+            .map_err(|_| {
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "reach the plan desk",
+                    "the desk was left locked by a thread that died",
+                )
+                .with_recovery("restart this city")
+            })?
+            .room
+            .clone();
         let mut properties = Map::new();
         for (field, kind, description) in [
             (
@@ -88,13 +98,13 @@ impl Tool for ClaimTool {
             ));
         }
         let args = call.args.as_map();
-        let mut desk = self.desk.try_borrow_mut().map_err(|_| {
+        let mut desk = self.desk.lock().map_err(|_| {
             AxError::failure(
-                AxCode::InvalidArgs,
+                AxCode::StorageFatal,
                 "reach the plan desk",
-                "the desk is already in use",
+                "the desk was left locked by a thread that died",
             )
-            .with_recovery("call the tool once at a time")
+            .with_recovery("restart this city")
         })?;
         let action = args.get("action").and_then(Value::as_str).ok_or_else(|| {
             AxError::failure(

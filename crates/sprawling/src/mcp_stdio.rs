@@ -28,8 +28,8 @@
 
 use std::io::{BufRead, Write};
 use std::path::Path;
-use std::rc::Rc;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use kernel::{AxCode, AxError, TimeoutMs};
@@ -39,7 +39,7 @@ use kernel::{AxCode, AxError, TimeoutMs};
 /// one child, one connection, one place that answers.
 #[derive(Clone)]
 pub(crate) struct StdioServer {
-    inner: Rc<std::cell::RefCell<Connection>>,
+    inner: Arc<Mutex<Connection>>,
 }
 
 /// The process, its pipes, and the name to use when refusing.
@@ -107,7 +107,7 @@ impl StdioServer {
                 .with_recovery("the machine refused a thread to read this server's answers")
             })?;
         Ok(StdioServer {
-            inner: Rc::new(std::cell::RefCell::new(Connection {
+            inner: Arc::new(Mutex::new(Connection {
                 program: command.to_owned(),
                 child,
                 requests,
@@ -119,7 +119,7 @@ impl StdioServer {
 
 impl std::fmt::Debug for StdioServer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.inner.try_borrow() {
+        match self.inner.try_lock() {
             Ok(connection) => write!(f, "StdioServer({})", connection.program),
             Err(_in_flight) => f.write_str("StdioServer(answering)"),
         }
@@ -128,13 +128,13 @@ impl std::fmt::Debug for StdioServer {
 
 impl protocol::Outbound for StdioServer {
     fn call(&mut self, line: &str, patience: TimeoutMs) -> Result<String, AxError> {
-        let mut connection = self.inner.try_borrow_mut().map_err(|_| {
+        let mut connection = self.inner.lock().map_err(|_| {
             AxError::failure(
                 AxCode::ToolUnavailable,
                 "call an mcp server",
-                "a call to this server is already in flight".to_owned(),
+                "the connection was left locked by a thread that died".to_owned(),
             )
-            .with_recovery("one connection answers one question at a time")
+            .with_recovery("restart this city; the server is started again with it")
         })?;
         connection.exchange(line, patience)
     }
@@ -143,13 +143,13 @@ impl protocol::Outbound for StdioServer {
     /// because the far end will not answer it. Writing it is the whole
     /// of the delivery this transport can promise.
     fn notify(&mut self, line: &str, _patience: TimeoutMs) -> Result<(), AxError> {
-        let mut connection = self.inner.try_borrow_mut().map_err(|_| {
+        let mut connection = self.inner.lock().map_err(|_| {
             AxError::failure(
                 AxCode::ToolUnavailable,
                 "tell an mcp server",
-                "a call to this server is already in flight".to_owned(),
+                "the connection was left locked by a thread that died".to_owned(),
             )
-            .with_recovery("one connection answers one question at a time")
+            .with_recovery("restart this city; the server is started again with it")
         })?;
         connection.tell(line)
     }

@@ -16,7 +16,6 @@ fn node(id: &str, deps: &[&str]) -> NodeContract {
         Address::parse(&format!("lab/{id}")).unwrap(),
         "lab/room1".to_owned(),
         "the test suite passes".to_owned(),
-        BudgetCap::default(),
         "stop when the check passes".to_owned(),
     )
     .unwrap()
@@ -100,7 +99,6 @@ fn a_contract_that_leaves_the_stop_condition_to_the_reader_is_refused() {
         Address::parse("lab/a").unwrap(),
         "lab/room1".to_owned(),
         "the suite passes".to_owned(),
-        BudgetCap::default(),
         "   ".to_owned(),
     )
     .unwrap_err();

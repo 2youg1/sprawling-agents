@@ -9,19 +9,22 @@ use kernel::{B3Hash, Depth, Locator};
 
 fn tool() -> (
     WorkshopTool,
-    std::rc::Rc<std::cell::RefCell<WorkshopDesk>>,
-    std::rc::Rc<std::cell::RefCell<DelegateDesk>>,
+    std::sync::Arc<std::sync::Mutex<WorkshopDesk>>,
+    std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
 ) {
-    let desk = std::rc::Rc::new(std::cell::RefCell::new(WorkshopDesk::new(
+    let desk = std::sync::Arc::new(std::sync::Mutex::new(WorkshopDesk::new(
         "lab/room1".to_owned(),
         FanIn::new(),
     )));
-    let delegates = std::rc::Rc::new(std::cell::RefCell::new(DelegateDesk::new(
+    let delegates = std::sync::Arc::new(std::sync::Mutex::new(DelegateDesk::new(
         Depth::Root,
         Address::parse("lab").unwrap(),
     )));
-    let tool =
-        WorkshopTool::new(std::rc::Rc::clone(&desk), std::rc::Rc::clone(&delegates)).unwrap();
+    let tool = WorkshopTool::new(
+        std::sync::Arc::clone(&desk),
+        std::sync::Arc::clone(&delegates),
+    )
+    .unwrap();
     (tool, desk, delegates)
 }
 
@@ -63,7 +66,7 @@ fn a_graph_is_handed_down_in_dependency_order_and_each_node_carries_its_contract
         .collect();
     assert_eq!(schedule, ["lab/reader", "lab/writer"]);
 
-    let handed = delegates.borrow_mut().take();
+    let handed = delegates.lock().unwrap().take();
     assert_eq!(handed.len(), 2);
     assert_eq!(handed[0].room.as_str(), "lab/reader");
     assert!(
@@ -85,7 +88,7 @@ fn a_cycle_is_refused_and_nothing_is_handed_down() {
         ])))
         .unwrap_err();
     assert!(err.recovery().contains("cycle"));
-    assert!(delegates.borrow_mut().take().is_empty());
+    assert!(delegates.lock().unwrap().take().is_empty());
 }
 
 #[test]
@@ -114,7 +117,7 @@ fn the_join_will_not_take_a_verdict_from_somebody_who_read_nothing() {
     )
     .verified(true, "city")
     .unwrap();
-    desk.borrow_mut().accept(artifact);
+    desk.lock().unwrap().accept(artifact);
 
     let mut ask = Map::new();
     ask.insert("op".to_owned(), Value::String("question".to_owned()));

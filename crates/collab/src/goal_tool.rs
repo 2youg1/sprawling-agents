@@ -16,8 +16,7 @@
 //! the clash — wait for the other goal, go and agree with its owner, or
 //! ask the person — and the model can act on exactly one of those.
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use kernel::{
     Address, AxCode, AxError, CostTier, Effect, GoalEntry, GoalId, GoalResource, Payload,
@@ -161,7 +160,7 @@ fn next_move(level: &Level) -> String {
 
 pub struct GoalTool {
     meta: ToolMeta,
-    desk: Rc<RefCell<GoalDesk>>,
+    desk: Arc<Mutex<GoalDesk>>,
 }
 
 impl GoalTool {
@@ -170,7 +169,7 @@ impl GoalTool {
     ///
     /// # Errors
     /// Propagates a malformed tool name or parameter schema.
-    pub fn new(room: Address, desk: Rc<RefCell<GoalDesk>>) -> Result<GoalTool, AxError> {
+    pub fn new(room: Address, desk: Arc<Mutex<GoalDesk>>) -> Result<GoalTool, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [
             (
@@ -241,13 +240,13 @@ impl Tool for GoalTool {
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
             ));
         }
-        let mut desk = self.desk.try_borrow_mut().map_err(|_| {
+        let mut desk = self.desk.lock().map_err(|_| {
             AxError::failure(
-                AxCode::InvalidArgs,
+                AxCode::StorageFatal,
                 "reach the goal register",
                 "the register is already in use",
             )
-            .with_recovery("call the tool once at a time")
+            .with_recovery("restart this city")
         })?;
         let result = desk.register(call.args.as_map())?;
         Ok(ToolOutcome { result })
@@ -289,13 +288,13 @@ fn strings(args: &Map<String, Value>, key: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
-    fn tool(registered: Vec<GoalEntry>) -> (GoalTool, Rc<RefCell<GoalDesk>>) {
-        let desk = Rc::new(RefCell::new(GoalDesk::new(
+    fn tool(registered: Vec<GoalEntry>) -> (GoalTool, Arc<Mutex<GoalDesk>>) {
+        let desk = Arc::new(Mutex::new(GoalDesk::new(
             RunId::CITY,
             "potter@lab.1".to_owned(),
             registered,
         )));
-        let tool = GoalTool::new(Address::parse("lab/room1").unwrap(), Rc::clone(&desk)).unwrap();
+        let tool = GoalTool::new(Address::parse("lab/room1").unwrap(), Arc::clone(&desk)).unwrap();
         (tool, desk)
     }
 
@@ -333,7 +332,7 @@ mod tests {
             second.is_err(),
             "a run that could claim the same ground twice would not be claiming anything"
         );
-        let effects = desk.borrow_mut().take_effects();
+        let effects = desk.lock().unwrap().take_effects();
         assert_eq!(effects.len(), 2);
         assert!(matches!(effects[0], GoalEffect::Registered(_)));
         assert!(matches!(effects[1], GoalEffect::Conflicted { .. }));

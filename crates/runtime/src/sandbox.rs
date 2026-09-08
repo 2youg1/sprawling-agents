@@ -68,7 +68,9 @@ pub enum SandboxExit {
 }
 
 /// The seam. One method: hand it a job, get back what the guest did.
-pub trait Sandbox {
+/// `Send`, because the `exec` tool that holds one is `Send`
+/// (sprawling-SPEC 8-44); every adapter here already was.
+pub trait Sandbox: Send {
     fn run(&mut self, job: &SandboxJob) -> Result<SandboxOutcome, AxError>;
 }
 
