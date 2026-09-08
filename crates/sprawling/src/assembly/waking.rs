@@ -131,11 +131,9 @@ impl RunWorker {
     /// paying for a hundred idle personalities.
     ///
     /// Nothing counts knocks. When a conversation has finished is for
-    /// the residents in it to decide, and what bounds its cost is what
-    /// already bounds every run: the turn budget and the `BudgetCap`
-    /// carried from the run that spoke. A person who wants a resident to
-    /// stop being reachable halts it, and `dispatch_in` already refuses
-    /// a halted scope.
+    /// the residents in it to decide, and a person who wants a resident
+    /// to stop being reachable halts it: `dispatch_in` already refuses a
+    /// halted scope, and `Halt` is the one brake this city has.
     ///
     /// # Errors
     /// Propagates a resident description that exists and cannot be read:
@@ -146,7 +144,6 @@ impl RunWorker {
         signal: &collab::Signal,
         speaker: &Address,
         mode: runtime::Mode,
-        budget: kernel::BudgetCap,
     ) -> Result<(), AxError> {
         let room = signal.room();
         if room == speaker || self.knocks.iter().any(|queued| &queued.addr == room) {
@@ -162,7 +159,6 @@ impl RunWorker {
             addr: room.clone(),
             from: signal.from().to_owned(),
             mode,
-            budget,
         });
         Ok(())
     }
@@ -194,8 +190,8 @@ impl RunWorker {
                         session: None,
                         effort: None,
                         mode: knock.mode,
-                        budget: knock.budget,
                         parent: None,
+                        succession: None,
                     },
                     format!(
                         "@{speaker} signalled you. This run exists because that signal arrived: \

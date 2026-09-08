@@ -3671,6 +3671,7 @@ dependencies = [
  "channels",
  "city",
  "collab",
+ "eval",
  "flate2",
  "futures-util",
  "gateway",

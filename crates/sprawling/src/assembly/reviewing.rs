@@ -9,7 +9,7 @@ use kernel::{AxError, EventKind, Payload};
 
 use crate::effect;
 
-use super::{Assignment, RunWorker, Site, now_ms};
+use super::{Assignment, RunWorker, Site, held, now_ms};
 
 impl RunWorker {
     /// Settles what a run asked of the request register.
@@ -29,7 +29,7 @@ impl RunWorker {
         &mut self,
         site: &Site,
         at: &Assignment,
-        pr: &std::rc::Rc<std::cell::RefCell<collab::PrDesk>>,
+        pr: &std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
         produced: &runtime::Produced,
     ) -> Result<(), AxError> {
         let (addr, who, run_id, mode) = (&at.addr, site.who.as_str(), site.run_id, at.mode);
@@ -41,7 +41,7 @@ impl RunWorker {
         // a verifier will be judging; checking merges, because that is
         // what a passed check means and a verified request nobody merged
         // would be a third state for a person to chase.
-        let pr_effects = pr.borrow_mut().take_effects();
+        let pr_effects = held(pr, "settle the pull request desk")?.take_effects();
         if !pr_effects.is_empty() {
             // What every commit this settlement makes is signed with.
             // Read once here rather than per effect: the city's genesis

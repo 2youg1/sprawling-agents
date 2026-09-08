@@ -316,20 +316,23 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<st
 
 ```rust
 pub struct Watchdog { /* corrections: u32、provider_failures: u32 —— 私有，逐 Run 一实例 */ }
-#[non_exhaustive] pub enum Disposal { Proceed, CorrectiveSteer { text: String }, Freeze { reason: FreezeReason } }
-#[non_exhaustive] pub enum FreezeReason { Stall, ProviderExhausted }
+#[non_exhaustive] pub enum Disposal { Proceed, CorrectiveSteer { text: String },
+                                     BackOff { until: TimeMs }, Freeze { reason: FreezeReason } }
+#[non_exhaustive] pub enum FreezeReason { Stall, ProviderRefused }
 impl Watchdog {
     pub fn new() -> Watchdog;
     /// Consumes kernel::stall's verdict verbatim; never re-derives it.
     pub fn on_stall(&mut self, verdict: &StallVerdict) -> Disposal;      // 首次 Stall→CorrectiveSteer；再次→Freeze{Stall}
-    pub fn on_provider_failure(&mut self) -> Disposal;                   // 前 WATCHDOG_PROVIDER_RETRIES 次→Proceed（重试归调用层）；超→Freeze{ProviderExhausted}
+    pub fn on_provider_failure(&mut self, failure: &AxError, not_before: TimeMs) -> Disposal;
     pub fn fired_payload(&self, disposal: &Disposal) -> Result<Payload, AxError>;   // watchdog_fired 载荷（E_LOOP_SUSPECTED 的 carrier）
 }
 ```
 
 - 处置必分级：纠正 Steer 文本指名重复指纹；只有终局的处置被明拒。子 Run 监控：`Completion::Limit` 的呈现住 status.children（S3 类型已备，派生消费者 P2），本模块不重复存储子态。
-- `WATCHDOG_PROVIDER_RETRIES=2` 为 pub(crate) 数据面（工程参数，改须本 SPEC 同集）。
-- S3.11 落地记录：fired_payload 字段＝{action: steer|freeze, text|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。
+- **card-11.9：provider 失败按 `AxError::is_retriable` 分类，不再数次数。** 不可重试→`Freeze { ProviderRefused }`，一次即止；可重试→`BackOff { until }`，`until` 由调用层从 `AdmissionState::admit` 取得（provider 自己的 retry-after 已在那里取大者）。可重试的失败**永不自行冻住**：停它的是 `Halt`，城里唯一的刹车。
+- **为什么删掉 `WATCHDOG_PROVIDER_RETRIES=2`。** 一个计数器对两种截然不同的失败给同一份预算：`E_WIRE_MISMATCH`（对端不说这个形状）重试三次就是把同一个 400 买三遍，而 429 重试三次就放弃又恰好把一个只需要等待的维护窗口当成了死亡。`retriable` 是产错处已经知道的事实（默认 false，fail-closed），拿它分类比在这里重新猜一遍强。
+- **`ProviderExhausted` 改名 `ProviderRefused`。** 既然没有重试预算了，就没有东西被耗尽；冻住的原因是对端给了一个重试不能修复的答复。载荷里的 `reason` 字串同改为 `provider_refused`。
+- S3.11 落地记录：fired_payload 字段＝{action: steer|back_off|freeze, text|until_ms|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不再是一个阀值。
 
 ### 8-10 runtime::clock（S3.10；形状 1；纯格式化不采样）
 
@@ -479,9 +482,12 @@ pub struct StatusSnapshot { pub who: String, pub addr: Address, pub mode: Mode, 
     pub provider_mode: ProviderMode, pub neighbours: u32 }   // neighbours 在末尾，渲染序与声明序同一
 #[non_exhaustive] pub enum ProviderMode { Normal, Degraded, LocalOnly }
 pub struct ChildStatus { pub room: Address, pub kind: DelegateKind }   // P1.03：重塑
-pub struct StatusTool { /* snapshot＋ children: Box<dyn Fn() -> Vec<ChildStatus>> */ }
-impl StatusTool { pub fn watching(snapshot: StatusSnapshot, children: Box<dyn Fn() -> Vec<ChildStatus>>) -> Result<StatusTool, AxError>; }
-impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timestamped、render=Generic */ }
+pub struct StatusTool { /* snapshot＋ children: Box<dyn Fn() -> Vec<ChildStatus> + Send> ＋ backlog: Option<Backlog> */ }
+impl StatusTool {
+    pub fn watching(snapshot: StatusSnapshot, children: Box<dyn Fn() -> Vec<ChildStatus> + Send>) -> Result<StatusTool, AxError>;
+    pub fn reporting(self, backlog: Backlog) -> StatusTool;   // §8-28-2：末行 `backlog:` 从表里现读，与 children 同一理由
+}
+impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timestamped、render=Generic；渲染序末尾追加 backlog 一行 */ }
 
 // ToolBench 住 turn.rs（S3.13 同卡加入）：按 Effect 过门是回合层职责（Handoff 裁定 10），不另立 bench 模块。
 
@@ -579,15 +585,17 @@ pub struct Active(/* 私有 */);   pub struct Frozen { /* completion、turns */ 
 pub struct RunPlan {                 // 一个 Run 的全部常量，调用方先备齐
     pub run: RunId, pub who: String, pub addr: Address,
     pub task: String, pub goal: String, pub job: Locator,
+    pub opening: Opening,                                 // 这一场是接了写下来的活，还是人在场
     pub parent: Option<RunId>,                            // P1.03：派活给它的那个 Run
-    pub budget_turns: u32, pub budget: BudgetCap,         // R2.11：回合上限，以及花销天花板
+    pub predecessor: Option<RunId>,                       // card-11.6：把这场活交给它的前任，深度守恒
     pub shape: CallShape,
     pub prefix: FrozenPrefix, pub policy: BuildingPolicy, pub tools: Vec<ToolDef>,
     pub skills: Vec<SkillPin>,                            // V3.27：阅览室准进了什么，当时各是什么字节
 }
 ```
 
-- **`skills` 写进 `run_started` 载荷，且无条件写**（空则空数组），理由与 budget 两栏同一条：一个时有时无的 key 是一个读者得猜的形状，而「这栋楼一个都没准进」本身就是一件值得记下的事。进账本而不只留在进程里，是因为「它变了没有」需要一个**早一次的读取**，而进程一走就只剩账本说得出这一轮到底拿到了哪些字节。
+- **`budget_turns` 与 `budget` 两栏已随 card-11.7 删除**：回合上限与花销天花板都不存在了，一跑循环到它自己结束为止；停一件正在跑的事是 `Cancel`，停一片是 `Halt`。
+- **`skills` 写进 `run_started` 载荷，且无条件写**（空则空数组），理由与当年 budget 两栏同一条：一个时有时无的 key 是一个读者得猜的形状，而「这栋楼一个都没准进」本身就是一件值得记下的事。进账本而不只留在进程里，是因为「它变了没有」需要一个**早一次的读取**，而进程一走就只剩账本说得出这一轮到底拿到了哪些字节。
 
 #[non_exhaustive] pub enum SafePoint { BeforeAssemble{turn:u32}, BeforeCall{turn:u32}, BeforeWave{turn:u32}, BeforeSpawn{turn:u32} }
 pub enum Advance { Turned, Concluded(Completion) }        // 穷尽；新结局逼每个调用方表态
@@ -707,7 +715,7 @@ S3 增：`wasmtime = "48"`（feature `wasm` 内藏，钉版理由见 §8-13；wa
 
 无（行号计法与 recovery 文句不构成行为常量）。
 
-S3 增三处 pub(crate) 数据面（改须本 SPEC 同集）：`WATCHDOG_PROVIDER_RETRIES=2`（§8-9）；信封附件封顶 `ENVELOPE_ATTACH_MAX_BYTES=1024`（§8-7：附件与负载分账的断言界）；net_notice／truncation／offload 提示句三定句（ASCII，住 pipeline／offload 实现内，改句＝改入窗字节＝过本 SPEC）。
+S3 增两处 pub(crate) 数据面（改须本 SPEC 同集；`WATCHDOG_PROVIDER_RETRIES=2` 已于 card-11.9 删除，理由见 §8-9）：信封附件封顶 `ENVELOPE_ATTACH_MAX_BYTES=1024`（§8-7：附件与负载分账的断言界）；net_notice／truncation／offload 提示句三定句（ASCII，住 pipeline／offload 实现内，改句＝改入窗字节＝过本 SPEC）。
 
 ## 15 影响面
 
@@ -1096,7 +1104,34 @@ impl Backlog {
 2. **子进程的输出写文件，不走管道。** 管道缓冲区填满会让后台子进程停在写系统调用上，于是「后台」变成「挂死」——那正是本卡要修的那个洞的另一种写法。文件住 `std::env::temp_dir()` 下按 `BacklogId` 命名的一层目录，收割时读完即删。
 3. **表是一份共享句柄（`Clone` 的 `Arc<Mutex<_>>`）。** 装配层持一份，每个 `ExecTool` 持一份克隆，于是 `halt` 够得着 `exec` 起的东西而不必让 `halt` 认识 `exec`。表内是 `BTreeMap`，遍历序恒定。
 
-**本卡落地范围（诚实记账）**：成员目前只有后台 `exec` 子进程。`delegate` 子 run 入表是同一张表的第二类成员，接口已按此形状留好（`Standing`／`Finished` 不提进程），但本卡不接线；`status` 报告本 run 那部分同理待接。
+**本卡落地范围（诚实记账）**：成员目前只有后台 `exec` 子进程。`delegate` 子 run 入表是同一张表的第二类成员，接口已按此形状留好（`Standing`／`Finished` 不提进程），但本卡不接线；`status` 报告本 run 那部分同理待接。**→ 第二类成员与 `status` 那一半由 §8-28-2 接上。**
+
+#### 8-28-2 第二类成员：委派下去的 run（card-11.2 补全；形状不变）
+
+**问题**：§8-28 写明成员有两类，而 §8-28-1 只接了第一类。于是今天 `halt {scope}` 遍历表时看不见任何 run——一轮委派下去的活在它的 scope 被停摆之后照样跑到冻结。
+
+**设计**：表内成员分两种身体，一张表、一个 `halt`：
+
+```rust
+pub enum BacklogKind { Command, Run }              // Standing 携带；恒不是 bool
+pub struct Standing { pub id: BacklogId, pub scope: Address, pub what: String, pub kind: BacklogKind }
+impl Backlog {
+    /// 一轮委派下去的 run 入表。装配层在 drive 之前调，只对 `Depth::Delegated` 的派活调。
+    pub fn enrol_run(&self, scope: &Address, what: String) -> Result<BacklogId, AxError>;
+    /// `halt` 是否已经到过这名成员。run 的中断钩子在每个安全点问它，真即 `Interrupt::Cancel`。
+    pub fn stopping(&self, id: BacklogId) -> Result<bool, AxError>;
+    /// run 冻结后离表。不离表的成员会让 `standing` 报一轮已经结束的活。
+    pub fn leave(&self, id: BacklogId) -> Result<(), AxError>;
+}
+```
+
+- **一个 run 成员没有进程可杀**：`halt` 对它做的是把身体记成 `Stopping`，而 run 在下一个安全点问 `stopping` 并以 `Interrupt::Cancel` 走 `runtime::turn` 既有的取消路——取消因此仍只在相位边界被消费，§8-28 首段那条法则不动。
+- **只有委派下去的 run 入表**。根 run 由 `Cancel` 结束，那是另一个动词（glossary「Halt」行）；把根 run 也入表会让 `halt` 与 `Cancel` 变成同一件事。
+- **`harvest` 与短窗口都跳过 run 成员**：它们收的是进程的退出码，run 的结局在账本上。
+- **`status` 的那一半**：第十四行 `backlog:` 追加在冻结序末尾（追加规则同 `neighbours`），报 `standing(addr)` 里属于本 run 地址的成员——`bg-3 cargo build (command)` 逐条分号相连，没有则 `none`。**不报跑了多久**：本表不采样时钟（§8-28-1 第 1 条），一个为了报时长而采样的 status 会是第二个采样点。
+- **接线在 `bin::assembly::dispatching::running::dispatch_in`**：`at.parent.is_some()` 时先 `enrol_run`，drive 结束后 `leave`；`Driving` 携 `member: Option<BacklogId>`，中断钩子在人的打断与 steer 之前先问 `stopping`。今天的派活是同步的，一条 `halt` 命令在子 run 跑完前到不了记账线程；驾驶池（sprawling-SPEC §8-42）落地后 `halt` 在记账线程上被处理而子 run 在池上跑，这条路才在产品里真正走通——本节先把表接对，红测试用 `attach_interrupts` 在子 run 的安全点上调 `halt`。
+
+**红测试**：一轮委派下去的 run 起后，其 scope 被 `halt`，子 run 以 `cancelled` 冻结且没有再叫过模型；`status` 的第十四行报本 run 起的后台命令。
 
 ### 8-29 runtime::tools::read 区间读（card-11.3）
 
@@ -1206,3 +1241,76 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 **账本上留什么**：配置写入时不记事件——`CONFIG.toml` 是「一跑受什么治理」的权威，再记一条同事实的事件就是第二个权威（这条已由 `RunWorker::configure_building` 的注释裁决过，本卡遵守）。账本记的是**一跑拿它做了什么**：`exec` 的结果载荷增 `env` 字段，列出这次真正递给子进程的名字，按名排序。名字不是值——值恒不入账本。
 
 **验收**：声明了名字的楼里，`exec` 的子进程恰好看到那几个（加地板四个）；没声明的楼里只看到地板四个；凭据形状的名字在配置解析处被拒。以及一次真实演示：声明了名字的楼里 `exec` 跑得动 `cargo build`。
+
+### 8-32 runtime::transcript（card-11.5；形状 2 值类型）
+
+> 裁决 D32。旧对话得到一个地址，于是 §8-30 的 `search` 从「方便」变成「承重」——一个不能检索的地址比没有地址更糟。
+
+**它是什么**：一跑冻结时，把**模型实际看到的消息**——工具调用与其结果、sieve 产出的压缩形、指回被搁置部分的 rest 指针——写成 `<room>/<run-id>.jsonl`，一行一条 `ChatMessage`（`kernel::model::wire` 的 serde 形，原样，所以 `search` 找到的行号就是消息序号）。frozen prefix 不在其中：它是每次请求都相同的那一半，账本的 `prompt_assembled` 已经持有它的哈希。
+
+**它不是账本，这是一条裁决**：账本住 `.sprawling/`，`read` 对那里的每一条路径都拒绝；而且账本是**全城一条链**——把它交给一个 resident 就是把一栋 confidential 楼的事件也交出去。transcript 不加密：同楼的 resident 可以读它，confidential 楼靠它已有的隔离保护自己。
+
+**三步定序，不可颠倒**：①凭据扫描（`redact::redact` 逐消息走一遍，与 `model_returned` 入账本同一把扫描器）；②钉入 CAS（`memory::Cas::put`，内容寻址，同一份 transcript 写两次是一次）；③实体化（写到房间，只读位）。先扫后钉：一个钉进 CAS 的密钥永远删不掉。
+
+```rust
+pub struct Transcript { run: RunId, lines: Vec<String>, redacted: u32 }   // 私有字段，一处构造
+impl Transcript {
+    pub fn of(run: RunId, window: &Window) -> Result<Transcript, AxError>;  // 逐消息序列化、扫描
+    pub fn address(room: &Address, run: RunId) -> Result<Address, AxError>; // `<room>/<run-id>.jsonl`，纯函数：路径在跑之前就已知
+    pub fn materialise(&self, cas: &mut Cas, city_root: &Path, room: &Address) -> Result<TranscriptRecord, AxError>;
+    pub fn lines(&self) -> &[String];  pub fn redacted(&self) -> u32;
+}
+pub struct TranscriptRecord { pub address: Address, pub original: Locator, pub redacted: u32 }
+impl Run<Frozen> { pub fn transcript(&self) -> Result<Transcript, AxError>; pub fn plan(&self) -> &RunPlan; }
+```
+
+`Frozen` 状态因此保留 `Window`：冻结后唯一还需要它的读者就是这一处。地址是纯函数，所以 `freeze_plan` 在 drive 之前就能把它写进 Handoff 的 `context` 段——`handoff_written` 载荷携一行 `transcript at <room>/<run-id>.jsonl`，一条测试钉住这一行的存在。实体化发生在 drive 归来之后的 `conclude`（装配层持 CAS），失败记 diagnostics 而不让一次已冻结的跑变成 `Err`：冻结已在账本上，transcript 是它的副本。
+
+**接线**：`RunPlan::predecessor` 为 `Some` 时，run segment 增一行 `Predecessor transcript: <address>`——继任者从 prefix 就知道去哪里 `search`。
+
+### 8-33 runtime::tools::succeed 与 succession（card-11.6；形状 4 适配器）
+
+> 裁决 D33。三件事一起落地，缺一件就是一个洞。
+
+**动词**：`succeed {reason}`。一跑请求由继任者接替自己：**同地址、同深度、同工具表**，无需人在环内。它答的是「继任者将在你冻结后于 `<addr>` 启动；先把 `Handoff.md` 写在你的房间里」，而不是一个结果——与 `delegate` 同理，工具不能从一个 run 的工具台里驱动另一个 run。桌面 `SuccessionDesk` 至多持一份请求（第二次调用覆盖第一次，理由随之更新）；装配层在 `conclude` 里读它，**被取消的跑不接替**（与 delegate 的第四安全点同一条规则）。
+
+**深度守恒**：succession 与 `delegate` 是两个动词。`delegate` 让深度加一；succession 不加。`Assignment::depth()` 从 `parent` 推出，继任者**继承前任的 `parent`**（而不是以前任为 parent），所以深度按构造守恒，工具表因而与前任逐名相同——`delegate` 在内。红测试：继任者的工具表与前任逐名相等。
+
+**账本**：`Assignment`／`RunPlan` 增 `predecessor: Option<RunId>`，写进 `run_started` 的 `predecessor` 键；`Provenance` 增同一指针（memory-SPEC §8-17：第六条 trailer `Sprawling-Predecessor`，仅在有前任时出现；`model_fields` 同时写 `predecessor`）。`bin::views` 从 `run_started` 折出 `predecessors: BTreeMap<RunId, RunId>`，`Query::Commit` 的答 `CommitAnswer` 增 `lineage: Vec<RunId>`——本跑在前，逐级向前到第一任（WIRE_V 14→15，channels-SPEC §8-18）。红测试：三次接替后 lineage 有四个 run。
+
+**Handoff 从楼搬到房间**：`city::handoff(city_root, room)`／`handoff_path(city_root, room)` 读写 `<city>/<room>/Handoff.md`；模板在 `city::open_room` 打开房间时铺下，楼级 `lay_out` 不再铺它。理由是 card 3.5 的同楼并发：一栋楼一份 Handoff，两个房间同时冻结就是两份内容抢一个文件。
+
+**质量防线（不可选）**：`eval::probe` 的 handoff 探针在每次 succession 真的跑。`eval::handoff_probe()` 给出固定四问（版本 1）；装配层 `bin::assembly::probing` 在 `conclude` 读到接替请求时，用前任的 adapter 对前任的 transcript 问一遍（before），在继任者 `freeze_plan` 之后、第一回合之前，用继任者的 prefix 问一遍（after），`eval::compare` 后记一条 `eval_run`（`probe`／`version`／`kept`／`lost`／两份答案）。探针答案不是判定，`lost` 报的是位置，人自己去读两份答案——这正是 eval-SPEC §8-2 定的口径。每次 succession 两次模型调用，这是这道防线的价钱，写在明处。
+
+### 8-34 runtime::reminder（card-11.8；形状 1 判定）
+
+> 裁决 D34。
+
+**两道阈值**，以 provider 报回的 `input_tokens`（事实）对模型的 `context_tokens`（`CallShape::context_tokens`，来自 endpoint 簿）计算；**恒不用窗口字节数**（那是估计）。
+
+| 阈值 | 说的话 |
+|---|---|
+| 25% | 只报用量：`[context] 25% of the window used (N of M input tokens).` |
+| 65% | 报用量，并说明剩余预算仍够写 handoff 并 `succeed`，过了这一点就不够了 |
+
+**每道阈值一跑恰响一次**。状态是穷尽枚举 `Sounded { Nothing, Quarter, TwoThirds }` 而不是两个布尔；一跳越过两道（0→70%）时只响高的那一道，低的一并作废——两句话叠在一起是噪声。
+
+```rust
+pub struct ContextGauge { window: Tokens, sounded: Sounded }
+impl ContextGauge { pub fn new(window: Tokens) -> ContextGauge; pub fn observe(&mut self, used: Tokens) -> Option<ContextReminder>; }
+pub enum ContextReminder { Usage { used: Tokens, window: Tokens }, HandoverWindow { used: Tokens, window: Tokens } }
+impl ContextReminder { pub fn render(&self) -> String; }
+```
+
+`window == 0`（簿上没写）恒不响：没有分母就没有百分比，与 `UnplannedProgress` 同一条理。整数算术：`used * 100 / window` 用 checked 乘法。
+
+**接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Window::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
+
+### 8-29 回合不再有上限（card-11.7）
+
+`RunPlan` 去掉 `budget_turns` 与 `budget`，`drive` 的 `while turns < budget` 变成 `loop`。一次跑的结束只有三种来路：一回合作出结论、一次带 carrier 事件的失败（写进历史后冻结为 cancelled）、或一个安全点送到的中断。
+
+- **理由是刹车只留一个**：没有人能在一件事跑之前给它定价，而一个替人说停的数字，停的时刻恰好是人最不希望它停的那一刻。要停一片就 `Halt`——card-11.2 之后它真的会终止那片里的后台成员；要停一条就 `Cancel`。
+- **`Completion::Limit` 保留**：它是账本词汇，旧历史里读得回去；本 crate 不再产出它。
+- **`StatusTool` 十三字段变十二**：`budget_usd`／`budget_tokens` 删除，那两个数报的是上限而不是花销。留在原地的是 `ctx`——已用 token 对着这次跑拿到的窗口，那是**报告花了多少**而不是**事前不许花**。
+- **citysim**：`ScenarioSpec.budget_turns` 随之删除；原先靠上限收尾的那条 scenario 改为「跑满它自己要的每一回合再作出结论」（十六波之后是空的那一波）。

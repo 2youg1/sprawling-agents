@@ -76,7 +76,6 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
             task: "ask hana what she charges".to_owned(),
             goal: "a price".to_owned(),
             mode: channels::ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,

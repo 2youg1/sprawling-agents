@@ -51,10 +51,6 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
             task: "say something".to_owned(),
             goal: "an answer".to_owned(),
             mode: channels::ModeTag::parse("build").unwrap(),
-            budget: kernel::BudgetCap {
-                usd: kernel::UsdMicros::new(1_000),
-                tokens: kernel::Tokens::new(1_000),
-            },
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"step2"),
             session: Some(kernel::SessionName::parse("one").unwrap()),
             effort: None,
@@ -78,10 +74,6 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
             task: "say something".to_owned(),
             goal: "an answer".to_owned(),
             mode: channels::ModeTag::parse("build").unwrap(),
-            budget: kernel::BudgetCap {
-                usd: kernel::UsdMicros::new(1_000),
-                tokens: kernel::Tokens::new(1_000),
-            },
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"step4"),
             session: Some(kernel::SessionName::parse("two").unwrap()),
             effort: None,

@@ -59,7 +59,7 @@ pub(crate) async fn serve(city_root, addr, token, index_html, model) -> Result<(
 - **无 provider 时仍然能起服务**：`UnconfiguredModel` 把「没配模型」变成一条三段式拒绝，而不是拒绝启动。一座城在没有推理服务时仍然可读（重放、浏览）。配置面：`SPRAWLING_MODEL_URL`（回环）＋`SPRAWLING_MODEL`。
 - **工具名录与工具台同源**：`Catalog::admit_tool` 产 `ToolDef`（模型看到的），`ToolBench::register` 负责路由（实际跑的），一次登记喂两边——否则“模型以为存在的工具”与“真能跑的工具”会成为两份名单。本期只挂 `edit` 与 `status`：`exec` 需要一个真 sandbox 与 Python WASI 配置，随出网与 sandbox 那张卡一并接。
 - **RunId 是推导而非抽取**：`b3(job|addr|now)` 前 16 字节。同一毫秒对同一地址派同一件活就是同一个 Run，且标识符里不进随机数（确定性第 7 条的同一条理由）。
-- **预算不可缺**：`DISPATCH_TURN_BUDGET = 24`。调用方还不能设它，但无上限地向付费 provider 循环是唯一没有天花板的失败模式。
+- **预算不可缺**：`DISPATCH_TURN_BUDGET = 24`。调用方还不能设它，但无上限地向付费 provider 循环是唯一没有天花板的失败模式。——**此条已被 card-11.7 推翻（见 §8-40）**：常量删除，一跑不再有回合上限，刹车只剩 `Cancel` 与 `Halt`。
 - **`init` 写 `City.md` 入城**：二进制携默认本，城里那份是用户可改的权威；每次组装 prefix 读城里的那一份，代码里恒不长第二份副本。
 
 ## 8-2b CLI 补齐（整修卡 R1.03）
@@ -337,7 +337,7 @@ impl RunWorker {
 - **属名不是装饰，是回信地址**：另一个 agent 的话氒不得以人的身份进窗口。类型已经把它变成判定（只有 `Steer::from_person` 写得出 `user`）；本卡把同一条规则延到敲门路上——被叫醒的一跑，其 brief 第一句就是「@X signalled you. This run exists because that signal arrived: nobody else asked for it.」。一份读起来像人写的 brief 会让每一封回信寄错地方。
 - **敲门敲的是 Resident，不是一段已封存的对话**：冻结的 Run 是历史，历史只读而不叫醒；被开出来的是那个地址上住户的**一跑新的 Run**，它靠 `Handoff.md` 接住上一场——那正是为穿过一次冻结而造的那件东西。没有 `URBANITE.md` 的地址因此不敲：它是一间房而不是一个人，信就在那儿等到人派个住户过去。
 - **不设叫醒预算（人的定谳）**：什么时候该停下来是对话里那几位居民的事，城市的活是把话送到。人要让某个居民不再被打扰，用的是已有的 Halt，`dispatch_in` 当场拒一个被 halt 的 scope。
-- **一次对话只有一道底，而它数的不是钱**：每一跑受 `DISPATCH_TURN_BUDGET`（24 回合）约束。`kernel::gate` 的 spend 门至今零调用方——**这座城没有金额上限**，那是定谳而不是遗漏：什么时候停下来归对话里的居民，花了多少事后从 Ledger 报出来。
+- **一次对话一道底都没有**：**这座城没有金额上限，也没有回合上限**，那是定谳而不是遗漏：什么时候停下来归对话里的居民，花了多少事后从 Ledger 报出来。card-11.7 把从无调用方的 spend 门连同它判的 ladder 、以及 `DISPATCH_TURN_BUDGET` 一并删除（kernel-SPEC §11-7、本文 §8-40），刹车此后只剩 `Cancel`（停一件）与 `Halt`（停一片）。
 - **一个敲不成不连坐发件人**：叫不醒的人进诊断日志，不把发件那一跑的 dispatch 弄成失败。
 
 **本章测试**：一位居民向另一位发信，无人再派活而收信人自己跑了一跑，且其 brief 里带着发件人的地址；向一个无 `URBANITE.md` 的房间发信不开任何 Run，信仍在队里。
@@ -575,7 +575,9 @@ pub fn key_for(bind: SocketAddr, configured: Option<String>) -> Result<Keyed, Ax
 
 **红（三条，每条咬住一段）**：`Keying::decide` 对四格（回环／暴露 × 配置过／没有）给出的枚举——本卡之前 `keying` 不存在，是编译红；`token_in` 对 `?token=abc`、`?a=1&token=abc`、`?token=`、空串的四个答案；以及 `web::socket` 那条握手测试，断言 `Link::new(token_in(...))` 发出的 `Hello.token` 非空——本卡之前 `Link::new(None)` 使它恒 `None`。端到端那一段（真浏览器对真暴露端口）落在 V9，是人跑的命令而非门禁，如 ARCHITECTURE.md §11 所记。
 
-## 8-23 委派下去的活带着派它的那份预算（整修卡 R2.09）
+## 8-23 委派下去的活带着派它的那份预算（整修卡 R2.09；card-11.7 后已作废）
+
+**本节记的是历史，不是现状**：card-11.7 删去 `BudgetCap`／`SpendVerdict`／`admit_spend` 与 `kernel::gate::spend`，`Dispatch` 不再携 `budget`，本节修的那条传递路径连同被传的值一起不存在了。留下它是因为它记着一件仍然成立的事——**危害的形状是「对模型说假话」**——那正是 card-11.7 选择删而不是补执行者的理由。以下按当时的时态读。
 
 **病灶**：`knock` 携父 run 的 `budget`，其注释明写「Carried rather than defaulted: an answer belongs to the same piece of work as the question, and a run with no ceiling is the one failure with no floor under it」；而同一个文件里 `dispatch_in` 的**委派**分支写 `kernel::BudgetCap::default()`。委派比敲门更是同一件活——一个 delegate 就是替父 run 做事的——却是唯一被清零的那条路。
 
@@ -1923,6 +1925,25 @@ protocol／browser 六个 crate 的工具立面，不是 `bin` 里的一次改�
 **在它落地之前把池写出来，只能写成一个泛型的、没有第二个实现的空壳**——
 那正是 AGENTS.md「一个只有一种实现的接口是装饰」要挡住的东西，所以本会话不写它。
 
+### 8-42-8 C 波的进展，与 3.3／3.4 仍未动的原因（如实记录）
+
+**落地的**：§8-44——`kernel::Tool: Send`、`runtime::Sandbox: Send`、`protocol::Outbound: Send`、`memory::vfs::Vfs: Send`，
+七张 collab 桌子、`ReadTool` 的 catalog、`SucceedTool` 的桌子、`mcp_stdio` 的连接、装配层的 `Desks`／`Workbench`／`Reach` 全部换成 `Arc<Mutex<_>>`；
+`Driving` 现在拥有自己的 `signals` 句柄、一份 `Cas` 第二句柄（§8-43）与 backlog 成员号（runtime-SPEC §8-28-2）。
+`driving/tests/turns::a_drive_can_be_handed_to_another_thread` 由编译失败转绿：`Driving<'static>: Send` 成立。
+
+**仍未动的**：卡 3.3 的池与卡 3.4 的 `dispatch_in` 拆分。
+挡住它们的这次不是类型，是**同一波里另一条线正在重写同一段代码**：card-11.5（succession）把「后继 run 的 `dispatch_in`」放进了 `conclude`，
+与 `delegate` 子 run 的递归派活并列；3.4 要把「drive 之后的一切」（`settle_desks`／`settle_requests`／`conclude`）从 `dispatch_in` 的尾部搬到「`Driven` 到达」那张嘴，
+恰恰是那一段。两条线同时改一个函数体，谁后写谁赢，那比没有池更糟。
+
+**下一会话的第一刀，已经量好**：`drive_dispatch` 今天还是 `&mut self` 的方法，用到工人的四样东西——
+`self.ledger`（改经 `Relay`）、`self.watching`（`Arc<dyn Fn + Send + Sync>`，可克隆）、`self.interrupts`（改为按 run 注册，§8-42-1）、`self.backlog`（`Clone`）。
+把这四样收成一个 `DriveContext { ledger: Relay, watching, person, backlog }` 值，`drive_dispatch` 变成 `Driving` 上的自由函数 `drive(driving, context) -> Driven`；
+这一刀不改任何账本字节，落地后池就是「N 条线程各拿一份 `DriveContext`」，而 3.4 只剩把 `dispatch_in` 在交出 `Driving` 之后 `return Dispatched::Started`，
+并把尾部搬进一个 `fn land(&mut self, Continuation, Driven)`——`Continuation` 就是今天 `dispatch_in` 尾部用到的那几个局部：`site`、`at`、`desks`、`workbench`、`job_locator`、`fence_scope`。
+`serving/relay.rs` 的四处 `#[cfg_attr(not(test), expect(dead_code, …))]` 因此还在：池仍无生产调用方，它们仍在期待。
+
 ## 8-41 一次提交出自哪次运行，从账本回答（card-2.4；`bin::views::commits`、`sprawling whose`）
 
 card-2.1–2.3 让这座城作出的每一个提交都带上五条 git trailers 与一个
@@ -2014,3 +2035,95 @@ pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer
 **影响面（一处真实回归，已改）**：从此每座城市至少有两栋楼。`views::tests` 里两处按 `buildings[0]` 取楼的断言改成按地址找 `lab`——它们原本靠「城里只有一栋楼」这个此后不再成立的前提。改的是测试对现实的假设，不是把判据放宽。
 
 **留给后续卡**：`hall` 的居民目前拿到的仍是 `workbench::tools` 给所有人的同一套工具表，`exec`／`delegate`／`workshop` 都在里面。card-5.3 才按地址裁这张表；在那之前，市政厅「不建造」只由写域挡住（`Documents` 拒非 `.md`），不由工具表挡住。
+
+## 8-43 筛子接进产品：`driving` 把 `exec` 结果经 `pipeline::package` 交给模型（card-11.4 收尾；`bin::assembly::driving`、`runtime::pipeline::exec`）
+
+**量出来的现状**：runtime-SPEC §8-27 的筛子完整落地，`pipeline::package` 也已带 `SieveRequest` 臂，但它在产品里没有调用方——`bin::assembly::driving` 的 `invoke` 钩子把 `BenchOutcome::Ran` 的结果原样交回 `runtime::turn`，于是压缩器只在 citysim 跑，城里的模型读的是 `cargo check` 的一千两百行原文。§8-27-9 末尾的「已知未接」说的就是这一处。
+
+### 一个门，两个调用方
+
+citysim 的 `citysim::sieving::package_exec` 是「一份 `exec` 结果怎样变成模型读到的东西」的第二份定义，产品接线若再写一份就是第三份。本卡把它搬进 runtime，一个权威、两个调用方：
+
+```rust
+// runtime::pipeline::exec（形状 1 判定；文件 crates/runtime/src/pipeline/exec.rs）
+pub struct SieveSite<'a> { pub offload: OffloadSite<'a>, pub table: &'a FilterTable, pub history: &'a mut SieveHistory }
+/// 一份 exec 结果：stdout＋stderr 合成一段文本，按命令键过 package；
+/// 结果里 stdout／stderr 换成 content，其余字段（arm、exit_code、env、background、handle……）原样留着，
+/// 再加 sieve:[result_offloaded 载荷]。没有 stdout 也没有 stderr 的结果（backgrounded 形）原样返回。
+pub fn package_exec(call: &ToolCall, outcome: ToolOutcome, site: SieveSite<'_>, stamp: Option<ClockStamp>) -> Result<ToolOutcome, AxError>;
+pub const EXEC_CAP_BYTES: u64 = 16_384;   // citysim 一直用的那个值，现在只写一次
+```
+
+citysim 的 `sieving.rs` 改为调它；旧函数删除（迁移做完，不留适配层）。
+
+### 装配层持有的三样东西
+
+| 东西 | 谁持有 | 何时定 |
+|---|---|---|
+| `FilterTable` | `Site.filters` | `stand_up` 读 `<city>/.sprawling/FILTERS.toml` 与 `<building>/.sprawling/FILTERS.toml`，走 `FilterTable::resolve`（楼＞城＞内建，整值覆盖）。文件不存在＝`None`；读不到＝错误（§8-26：读不到不等于写错） |
+| `SieveHistory` | 一次 `drive_dispatch` 内的局部 | 每跑一份；跨调用差分只在本 run 内成立 |
+| `OffloadSite` | `Driving.sieving`：一份 `Cas` 第二句柄＋rest 目录 | rest 目录是 `<write_root>/<addr>/.rest`——`read` 只放行模型选的非保留路径，rest 文件放在保留区里就是给模型一个它够不着的地址 |
+
+`Cas` 开第二个句柄而不借工人的：CAS 按内容寻址、经临时文件写入，同一目录开两次是同一个库；而 §8-42 的池线程不能借工人的任何东西，这一份句柄正是它以后要带走的。
+
+**`stamp` 传 `None`**：时钟戳由 `runtime::turn` 既有路径打在结果尾部（`FrozenConfig.clock_stamp`），本卡不在第二处打。
+
+### 验收
+
+1. **红转绿（`driving/tests/sieving`）**：一次真实派活，`exec` 打印一份超过 2 KiB 的输出；模型收到的工具结果含 `[sieve:` 页脚且短于原文；账本 `tool_result` 载荷的 `sieve[0].original` 是 `cas:b3-` 且能从 CAS 读回原文，`rest_path` 在磁盘上。
+2. `citysim::sieve::the_window_holds_the_diagnostics_and_the_way_back_and_only_the_news_the_second_time` 绿。
+3. 同种子 citysim 逐字节重放不变（`the_same_seed_and_table_replay_a_byte_identical_window`）。
+
+**留给 gitignore 的一句**：`.rest/` 住房间里，楼的 `.gitignore`（city-SPEC §8-21）应忽略它，否则围栏提交会把一份 rest 文件收进历史。本卡不改那份文件，它归 card-5.x 的作者。
+
+## 8-44 `Driving` 跨过线程：`kernel::Tool` 加 `Send`，五张桌子从 `Rc<RefCell<_>>` 到 `Arc<Mutex<_>>`（§8-42-7 量出来的那张前置卡）
+
+**问题**：§8-42-7 逐字段量过——`Driving` 今天跨不过线程边界，卡住它的是两件不在 `bin` 里的事实：
+`kernel::Tool` 没有 `Send` 上界，于是 `ToolBench.tools: BTreeMap<String, Box<dyn Tool>>` 不是 `Send`；
+五张桌子（signals／goals／plan／shelf／pr，加 delegates 与 workshop 两张只在 workbench 里的）全是 `Rc<RefCell<_>>`，工具持有它们的克隆。
+没有这一刀，卡 3.3 的池只能写成没有第二实现的空壳。
+
+### 判据：什么要变、什么不变
+
+| 东西 | 今天 | 本卡后 | 理由 |
+|---|---|---|---|
+| `kernel::Tool` | `pub trait Tool` | `pub trait Tool: Send` | `Box<dyn Tool>` 由此自动 `Send`；一个不能跨线程的工具在这座城里没有位置——它会被池线程调用 |
+| `protocol::mcp::Outbound` | 无上界 | `: Send` | `McpTool` 持 `Box<dyn Outbound>`；两个适配器（stdio 子进程、HTTP 客户端）本来都是 `Send` |
+| collab 七张桌子的句柄 | `Rc<RefCell<Desk>>` | `Arc<Mutex<Desk>>` | 桌子本身没有 `Rc`，换句柄不换桌子 |
+| `runtime::ReadTool.catalog` | `Rc<RefCell<Catalog>>` | `Arc<Mutex<Catalog>>` | 同上 |
+| `runtime::StatusTool.children` | `Box<dyn Fn() -> Vec<ChildStatus>>` | `+ Send` | 闭包持派生台句柄 |
+| `bin::mcp_stdio` 连接 | `Rc<RefCell<Connection>>` | `Arc<Mutex<Connection>>` | 同上 |
+| `bin::assembly::workbench::{Desks, Workbench, Reach}` | `Rc<RefCell<_>>` | `Arc<Mutex<_>>` | 出借与收回的地方 |
+| `Driving.signals` | `&Rc<RefCell<SignalDesk>>` | `Arc<Mutex<SignalDesk>>`（拥有） | 池线程不借工人的东西 |
+| `memory::vfs::Vfs`（内缝） | 无上界 | `: Send` | 红测试量出的第七处：`Cas` 持 `Box<dyn Vfs>`，而 §8-43 让 `Driving` 带一份 `Cas`；`RealFs` 本来就是 `Send`，`FaultFs` 的 `Rc<RefCell<State>>` 换 `Arc<Mutex<State>>` |
+
+**`try_borrow_mut` 失败 → 锁中毒**：`RefCell` 的「桌子在用」拒绝换成 `Mutex::lock` 的阻塞——那正是要的语义：两条线程同时到一张桌子前，后到的等，不是被拒。
+`lock()` 的 `Err` 只有一种含义——持锁线程 panic 了——而发布档 `panic = "abort"` 下它不会发生；映射成 `E_STORAGE_FATAL`「桌子被一条死掉的线程留在锁里」，与 `runtime::backlog::hold` 同一句话。
+
+**不变的**：桌子的内容、每张桌子的 `take_effects`／`take` 语义、`settle_desks` 的顺序、账本上的每一个字节。
+这是一次句柄类型的迁移，不是一次行为变更；citysim 六个场景逐字节重放不变是它的验收。
+
+**红测试**：`bin::assembly::driving::tests::turns::a_drive_can_be_handed_to_another_thread`——
+`fn crosses_threads<T: Send>()` 对 `Driving<'static>`；今天这一行不编译（`Rc<RefCell<SignalDesk>>` cannot be sent between threads safely），本卡后编译并通过。
+类型层面的红转绿正是 ARCH §9「unrepresentable 本身是需要测试的断言」那一条的用法。
+
+**迁移一次做完**（AGENTS.md「完成每一次迁移」）：每个读者与写者一起搬，旧形状删除，不留 `Rc` 版本的构造函数。
+
+### 8-40 花费闸删除后的装配面（card-11.7）
+
+`Assignment`／`Given`／`Knock`／`Sent`／`BlockedJob` 五个结构各去掉一个 `budget` 字段，`DISPATCH_TURN_BUDGET` 与 `RunPlan.budget_turns`／`RunPlan.budget` 一并删除，`run_started` 载荷不再写 `usd_micros` 与 `tokens`，`JobBrief` 不再有 `budget` 一节，`StatusTool` 的十三字段变十二。
+
+- **一条派活不再有回合上限**，`runtime::run::drive` 循环到这次跑自己结束为止：一回合作出结论、一次带 carrier 的失败、或一个安全点送到的中断。停一件正在跑的事仍是 `Cancel`，停一片仍是 `Halt`——后者现在真的会终止那片里的后台成员（card-11.2）。
+- **`assembly/freezing/tests/ceilings.rs` 删去两条断言**（派下去的活与被批准接着跑的活各自「在派它的上限下」跑）。它们检验的性质不存在了，留着就是在检验一个没有主语的句子；文件保留 effort 那一条，模块头写明删了什么、为什么。
+- **golden-p0 账本随之重生**（`GOLDEN_WRITE=1`）：`run_started` 少两个整数键。V8 跨版本字节夹具本来就为这种形状变更而存在。
+- **未做（本卡之外，交给关波的 agent）**：`xtask/api-baselines/` 下 kernel／channels／web／sprawling 四份基线需 `just api-baseline` 重生——kernel 去掉 `BudgetCap` 一族、增 `GovernedDocumentWritten`，channels 去掉 `BudgetCap` 再导出、增本线三帧与三个答面类型，web 增 `put_document_command`。
+
+### 8-41 治理两帧的执行与答（card-5.4）
+
+- `RunWorker::put_document` 写 `<city>/.sprawling/` 下三份文件之一（经 `city::write_governed`，路径由 `city::Governed` 决定而不由帧决定），随后记一行 `governed_document_written`，载荷携文件名与字节数、**恒不携正文**——正文在盘上可读，抄进账本就是同一段话有了两个权威。
+- `Views` 新增两个字段：`autonomy`（折自 `autonomy_changed`）与 `decided`（折自 `approval_resolved`，旧在前）。两者一起答 `Query::Governance`。`decided` 收下每一条被答过的审批，包括人自己答的——只列代答的清单会让「我答过」与「从没人答」在界面上长得一样。
+- **`views::apply` 迁入 `views::holding`**：`answering.rs` 加上本卡与 card-2.6 的两臂后越过 400 行，而折叠本来就是 `holding` 自称拥有的东西（「what the views hold and how one record folds in」）。切完 `holding` 318、`answering` 335，无新模块行。
+
+### 8-42 `Query::Hunks` 的答（card-2.6）
+
+`views::answer` 的新臂调 `memory::of_file`，把 `memory::PatchLine`／`Withheld` 逐字段搬成线上的同名形状。这座城没写过的 oid 答 `Unavailable`，与 `Changes`／`Commit` 同口径：「没有变化」与「我看不了」是两个答案，读的人对它们的下一步不同。

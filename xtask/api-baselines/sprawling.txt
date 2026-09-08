@@ -8,7 +8,7 @@ pub async fn sprawling::serving::serve(sprawling::serving::Serving) -> core::res
 pub enum sprawling::assembly::Adopt
 pub enum sprawling::firstrun::FirstScreen
 pub enum sprawling::serving::Keyed
-pub fn sprawling::ask(&std::path::Path, &channels::wire::Query) -> core::result::Result<channels::answer::Answer, kernel::error::shape::AxError>
+pub fn sprawling::ask(&std::path::Path, &channels::wire::query::Query) -> core::result::Result<channels::answer::Answer, kernel::error::shape::AxError>
 pub fn sprawling::assembly::RunWorker::adopt_building(&mut self, kernel::address::Address) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn sprawling::assembly::RunWorker::fork(&mut self, kernel::event::identity::RunId, kernel::event::identity::Seq, core::option::Option<kernel::address::Address>) -> core::result::Result<kernel::event::identity::RunId, kernel::error::shape::AxError>
 pub fn sprawling::assembly::RunWorker::handle(&mut self, channels::command::kind::Command) -> core::result::Result<(), kernel::error::shape::AxError>

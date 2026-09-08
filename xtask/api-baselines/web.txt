@@ -259,7 +259,7 @@ pub fn web::glimpse(&str) -> &str
 pub fn web::head_facts(web::Lang, &web::RunRow) -> [web::Fact; 4]
 pub fn web::hold(&mut alloc::vec::Vec<kernel::event::payload::EventRecord>, impl core::iter::traits::collect::IntoIterator<Item = kernel::event::payload::EventRecord>, core::option::Option<kernel::event::identity::RunId>)
 pub fn web::inbox(alloc::vec::Vec<kernel::approval::ApprovalItem>) -> alloc::vec::Vec<web::Cluster>
-pub fn web::invalidated_by(kernel::event::kind::EventKind) -> core::option::Option<channels::wire::Query>
+pub fn web::invalidated_by(kernel::event::kind::EventKind) -> core::option::Option<channels::wire::query::Query>
 pub fn web::kind_name(kernel::event::kind::EventKind) -> alloc::string::String
 pub fn web::kind_named(&str) -> core::option::Option<kernel::event::kind::EventKind>
 pub fn web::latest_room(&web::Snapshot) -> core::option::Option<alloc::string::String>
@@ -278,6 +278,7 @@ pub fn web::place(&str, u32) -> (i32, i32)
 pub fn web::points_attr(&[(i32, i32); 4]) -> alloc::string::String
 pub fn web::policy_admits(&kernel::approval::ApprovalItem) -> bool
 pub fn web::press(web::Chord, &web::Stroke<'_>) -> (web::Chord, web::Act)
+pub fn web::put_document_command(channels::command::kind::GovernedDocument, &str) -> core::option::Option<channels::wire::ClientFrame>
 pub fn web::read(&web::Target, &web::Dropped) -> web::Meaning
 pub fn web::read_frame(&str) -> web::LinkEvent
 pub fn web::read_mounts(&str) -> (alloc::vec::Vec<kernel::address::Address>, alloc::vec::Vec<alloc::string::String>)

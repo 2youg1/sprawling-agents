@@ -33,7 +33,6 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
                 task: "claim the notes".to_owned(),
                 goal: "register a goal, then stop".to_owned(),
                 mode: channels::ModeTag::parse("plan").unwrap(),
-                budget: kernel::BudgetCap::default(),
                 idem: kernel::IdemKey::derive(
                     &RunId::CITY,
                     kernel::Seq::new(u64::try_from(n).unwrap()),
@@ -121,7 +120,6 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             task: "get it measured and written up".to_owned(),
             goal: "a page with a number in it, then stop".to_owned(),
             mode: channels::ModeTag::parse("plan").unwrap(),
-            budget: kernel::BudgetCap::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,

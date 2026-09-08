@@ -344,7 +344,6 @@ addr = \"gone/room1\"
                 task: "this building's work needs checking before it lands".to_owned(),
                 goal: "the rules say so, then stop".to_owned(),
                 mode: channels::ModeTag::parse("plan").unwrap(),
-                budget: kernel::BudgetCap::default(),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
                 session: None,
                 effort: None,
