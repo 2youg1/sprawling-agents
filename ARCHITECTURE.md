@@ -189,12 +189,12 @@ A run's write domain is what its building's `BUILDING.md` declares, and **the wh
 
 ## 7 The wire
 
-One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is 13.
+One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is 14.
 
 | Frame | Count | What it is |
 |---|---|---|
 | `Command` | 23 | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards |
-| `Query` | 14 | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes |
+| `Query` | 15 | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit |
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |
 
@@ -407,6 +407,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::tool::tests | crates/kernel/src/tool/tests.rs | the grammars a name and a label are held to, and the eight fields on the wire | port | S2 | built |
 | kernel::model (port) | crates/kernel/src/model.rs | what a model call is, carrying the building's policy with it | port | S2 | built |
 | kernel::model::wire | crates/kernel/src/model/wire.rs | the canonical conversation vocabulary a request and a response are made of | port | S2 | built |
+| kernel::model::image | crates/kernel/src/model/image.rs | what a picture is on the canonical conversation: a `cas:` locator, its media type, and integer dimensions | value | V4 | built |
 | kernel::model::seam | crates/kernel/src/model/seam.rs | what one call carries each way, and content-to-payload conversion | port | S2 | built |
 | kernel::model::conformance | crates/kernel/src/model/conformance.rs | the assertion suite every model implementation answers | port | S2 | built |
 | kernel::model::tests | crates/kernel/src/model/tests.rs | the model seam fixtures | port | S2 | built |
@@ -424,6 +425,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::change | crates/kernel/src/change.rs | what moved between two checkpoints; a binary file cannot be spelled as one that moved nothing | value | R2 | built |
 | kernel::highlight | crates/kernel/src/highlight.rs | a document read as ordered, disjoint spans; it says where things are and never rewrites the text | decision | R2 | built |
 | kernel::highlight::tests | crates/kernel/src/highlight/tests.rs | the lexical rules a reader depends on: precedence, fences, and spans that slice without overlapping | decision | R2 | built |
+| kernel::schema | crates/kernel/src/schema.rs | the JSON Schema of the five values whose serde is hand-written, so the client generated from the wire reads their strings the way the parser does | adapter | V4 | built |
 
 ### memory (16) — persistence, and every view derived from it
 
@@ -458,7 +460,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::attribution::split | crates/memory/src/attribution/split.rs | dividing a bill by weight | projection | S3 | built |
 | memory::checkpoint | crates/memory/src/checkpoint.rs | git fences around a tool wave, and what disappeared between them | adapter | S3 | built |
 | memory::checkpoint::fence | crates/memory/src/checkpoint/fence.rs | base, wave pre/post | adapter | S3 | built |
+| memory::checkpoint::fence::tests | crates/memory/src/checkpoint/fence/tests.rs | the fence fixtures | adapter | V4 | built |
 | memory::checkpoint::scan | crates/memory/src/checkpoint/scan.rs | staged secrets and scoped commits | adapter | S3 | built |
+| memory::checkpoint::provenance | crates/memory/src/checkpoint/provenance.rs | which session a commit came out of, as five git trailers | value | V4 | built |
 | memory::changes | crates/memory/src/changes.rs | what moved between two checkpoints, as paths and counts and never as patch text | adapter | R2 | built |
 | memory::worktree | crates/memory/src/worktree.rs | one node, one working tree, objects shared and files not | adapter | P2 | built |
 | memory::worktree::name | crates/memory/src/worktree/name.rs | one segment, no escape | adapter | P2 | built |
@@ -483,13 +487,18 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::dialect | crates/gateway/src/dialect.rs | which dialect answers a question, and the closed set of two | decision | S3 | built |
 | gateway::dialect::request | crates/gateway/src/dialect/request.rs | one ChatRequest, each wire | decision | S3 | built |
 | gateway::dialect::response | crates/gateway/src/dialect/response.rs | frames back to ChatResponse | decision | S3 | built |
+| gateway::dialect::images | crates/gateway/src/dialect/images.rs | the bytes behind the pictures one request refers to, and their base64 form | value | V4 | built |
 | gateway::anthropic | crates/gateway/src/anthropic.rs | the Anthropic Messages wire, in both directions | decision | V3 | built |
+| gateway::anthropic::stream | crates/gateway/src/anthropic/stream.rs | what one Anthropic stream settles into | decision | V4 | built |
 | gateway::openai | crates/gateway/src/openai.rs | the OpenAI Chat Completions wire, and every loss the translation takes | decision | V3 | built |
+| gateway::openai::stream | crates/gateway/src/openai/stream.rs | what one OpenAI stream settles into | decision | V4 | built |
 | gateway::mismatch | crates/gateway/src/mismatch.rs | reading a provider's JSON, and the one word for a shape we did not ask for | decision | V3 | built |
 | gateway::native | crates/gateway/src/native.rs | local inference, which never leaves the machine | adapter | S3 | built |
 | gateway::endpoint | crates/gateway/src/endpoint.rs | the external provider: a self-written wire format over one HTTP client | adapter | S3 | built |
 | gateway::endpoint::config | crates/gateway/src/endpoint/config.rs | auth, overrides, construction | adapter | S3 | built |
+| gateway::endpoint::auth | crates/gateway/src/endpoint/auth.rs | which header a credential travels in, chosen by the compatible format | decision | V4 | built |
 | gateway::endpoint::call | crates/gateway/src/endpoint/call.rs | one request, streamed or settled | adapter | S3 | built |
+| gateway::endpoint::redemption | crates/gateway/src/endpoint/redemption.rs | what one endpoint redeems at the wire: the credential and the pictures | adapter | V4 | built |
 | gateway::endpoint::model | crates/gateway/src/endpoint/model.rs | the Model face | adapter | S3 | built |
 | gateway::endpoint::adapter | crates/gateway/src/endpoint/adapter.rs | which adapter a chosen model gets, and why | adapter | S3 | built |
 | gateway::oauth_profiles | crates/gateway/src/oauth_profiles.rs | subscription-login intelligence: data only, zero branches | data | S3 | built |
@@ -505,7 +514,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::credential::oauth::flow::tests | crates/gateway/src/credential/oauth/flow/tests.rs | the oauth fixtures | adapter | S3 | built |
 | gateway::credential::oauth::types | crates/gateway/src/credential/oauth/types.rs | pending, request, tokens | adapter | S3 | built |
 
-### runtime (23) — one run, from dispatch to freeze
+### runtime (27) — one run, from dispatch to freeze
 
 | Module | File | What it owns | Shape | Since | Status |
 |---|---|---|---|---|---|
@@ -526,6 +535,14 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::fork | crates/runtime/src/fork.rs | a new run whose in-window history is a byte-identical prefix of another | decision | S1 | built |
 | runtime::compaction | crates/runtime/src/compaction.rs | when to shorten something and what to keep; never larger than its input | decision | P3 | built |
 | runtime::redact | crates/runtime/src/redact.rs | what a model said, scanned on its way into history | decision | P3 | built |
+| runtime::sieve | crates/runtime/src/sieve.rs | what survives a command's output, by which command produced it: seven stages in a fixed order, each accepted only when it shrinks, and a tee in front so nothing cut is unreachable | decision | V4 | built |
+| runtime::sieve::key | crates/runtime/src/sieve/key.rs | which command produced an output: arm, program, arguments, ordered so it can key a `BTreeMap` | value | V4 | built |
+| runtime::sieve::record | crates/runtime/src/sieve/record.rs | what the sieve answers with: the text the model sees, the way back, and the account of every stage | value | V4 | built |
+| runtime::sieve::filter | crates/runtime/src/sieve/filter.rs | the filter table: its TOML shape, the three built-in reducers, whole-value override across the ladder, and which filter a command key hits | data | V4 | built |
+| runtime::sieve::scan | crates/runtime/src/sieve/scan.rs | which lines matter and how much, by four hand-written scans; and the spans no stage may touch | decision | V4 | built |
+| runtime::sieve::stages | crates/runtime/src/sieve/stages.rs | the line-level passes: ANSI stripped, blank runs folded, templates counted, long lines cut, the middle kept by priority | decision | V4 | built |
+| runtime::sieve::diff | crates/runtime/src/sieve/diff.rs | what this run already saw from the same command, and only what changed since | decision | V4 | built |
+| runtime::sieve::tests | crates/runtime/src/sieve/tests.rs | one golden per built-in filter, the two properties, and the stage account | decision | V4 | built |
 | runtime::replay | crates/runtime/src/replay.rs | offline replay: re-verify without re-executing | decision | S1 | built |
 | runtime::replay::tests | crates/runtime/src/replay/tests.rs | what offline verification refuses: future versions, unknown kinds, drifted prefix sources, dangling calls | decision | S1 | built |
 | runtime::digest | crates/runtime/src/digest.rs | what a long document looks like from outside, summarised once | decision | P1 | built |
@@ -533,6 +550,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::pipeline | crates/runtime/src/pipeline.rs | the result envelope and the order in which a result is shrunk | decision | S3 | built |
 | runtime::offload | crates/runtime/src/offload.rs | the shared shrink primitive: lossy but restorable, four invariants | decision | S3 | built |
 | runtime::watchdog | crates/runtime/src/watchdog.rs | disposal in order: correct, then stall, then freeze | decision | S3 | built |
+| runtime::backlog | crates/runtime/src/backlog.rs | the work still running while a run goes on: background children, the ten-second window that decides which of them go there, and the one place they are stopped | adapter | V4 | built |
 | runtime::sandbox (port) | crates/runtime/src/sandbox.rs | the execution boundary: capabilities in, outcome out | port | S3 | built |
 | runtime::sandbox::tests | crates/runtime/src/sandbox/tests.rs | what the two stand-ins promise a caller: stdin echoed back with the job recorded, and a fault script delivered in order then spent | port | S3 | built |
 | runtime::catalog | crates/runtime/src/catalog.rs | progressive disclosure: which tools and skills a run is told about | decision | S3 | built |
@@ -540,7 +558,11 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::clock | crates/runtime/src/clock.rs | formatting an injected instant; it never samples one | value | S3 | built |
 | runtime::tools::exec | crates/runtime/src/tools/exec.rs | the exec tool: three arms, each with its own failure story | adapter | S3 | built |
 | runtime::tools::exec::tests | crates/runtime/src/tools/exec/tests.rs | what each arm promises a caller: a missing component refuses by name, sandbox exits arrive as themselves, an unknown arm is never guessed | adapter | S3 | built |
-| runtime::tools::read | crates/runtime/src/tools/read.rs | the read tool: a path the reserved subtree closes, or a name the reading room opens | adapter | P6 | built |
+| runtime::tools::chosen_path | crates/runtime/src/tools/chosen_path.rs | the one judgement a model-chosen path gets: it parses as an address, and it does not reach a reserved subtree | decision | V4 | built |
+| runtime::tools::read | crates/runtime/src/tools/read.rs | the read tool: a path the reserved subtree closes, or a name the reading room opens, by the line interval the caller asked for | adapter | P6 | built |
+| runtime::tools::read::tests | crates/runtime/src/tools/read/tests.rs | what a read promises a caller: the two doors, the reserved refusal, and a truthful total beside a truncated interval | adapter | V4 | built |
+| runtime::tools::search | crates/runtime/src/tools/search.rs | the search tool: one substring over a bounded subtree, with context lines and no pattern engine | adapter | V4 | built |
+| runtime::tools::search::tests | crates/runtime/src/tools/search/tests.rs | what a search promises a caller: a hit with its context and its line number, a reserved prefix refused, a binary file passed over | adapter | V4 | built |
 | runtime::tools::edit | crates/runtime/src/tools/edit.rs | the edit tool: optimistic concurrency against the version the caller read | adapter | S3 | built |
 | runtime::tools::edit::tests | crates/runtime/src/tools/edit/tests.rs | the edit tool's fixtures: versions, refusals, the create arm | adapter | S3 | built |
 | runtime::tools::status | crates/runtime/src/tools/status.rs | the model's view of its own situation, in thirteen fields | adapter | S3 | built |
@@ -589,6 +611,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | city::building::tests | crates/city/src/building/tests.rs | creation, adoption and refusal, read back through the city's own parser | decision | P2 | built |
 | city::resident | crates/city/src/resident.rs | standing identity: an address plus the file that says who lives there | value | P1 | built |
 | city::spine_files | crates/city/src/spine_files.rs | the documents a building keeps its long work in, and the job file a run reads | adapter | P2 | built |
+| city::spine_files::hall | crates/city/src/spine_files/hall.rs | the two identity files City Hall's residents are read from, in the city's own reserved subtree | adapter | V4 | built |
 | city::spine_files::tests | crates/city/src/spine_files/tests.rs | the laid-out documents, the job file, and the two briefs a session can carry | adapter | P2 | built |
 | city::archive | crates/city/src/archive.rs | what a building remembers between runs, indexed by computing it | projection | P3 | built |
 | city::library | crates/city/src/library.rs | the city's stock of settled work, and the reading room each building admits | decision | P3 | built |
@@ -596,6 +619,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | city::config_layers::write | crates/city/src/config_layers/write.rs | writing a chosen value back into the layer that governs it | decision | P2 | built |
 | city::config_layers::tests | crates/city/src/config_layers/tests.rs | the ladder, the refusals, and the write-back round trip | decision | P2 | built |
 | city::policy | crates/city/src/policy.rs | `BUILDING.md` evaluated into rules a machine can hold | decision | P1 | built |
+| city::policy::reach | crates/city/src/policy/reach.rs | what a building's residents may write inside their prefixes: everything, or documents | decision | V4 | built |
 | city::policy::tests | crates/city/src/policy/tests.rs | the confidential three, the refusals, and the write domain a file declares | decision | P1 | built |
 | city::rules_tool | crates/city/src/rules_tool.rs | the face a building's rules show a model: read them, propose the whole of them | adapter | P2 | built |
 | city::schedule | crates/city/src/schedule.rs | work that starts by itself, counted in whole minutes | decision | P2 | built |
@@ -627,6 +651,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::command::kind | crates/channels/src/command/kind.rs | names, steps, the wire enum | value | V3 | built |
 | channels::command::wire | crates/channels/src/command/wire.rs | no-secret commands and back | value | V3 | built |
 | channels::answer | crates/channels/src/answer.rs | what a Query comes back as: one shape per view, and the closed set of them | value | V3 | built |
+| channels::answer::building | crates/channels/src/answer/building.rs | what one building says about itself: its plan rows, what is stuck, its goal, its documents and its archive | value | V4 | built |
 | channels::carried_name | crates/channels/src/carried_name.rs | names this crate does not own, validated at one construction point | value | V3 | built |
 | channels::reception | crates/channels/src/reception.rs | may we bind, may this peer enrol, may we greet it, and what its frame means now | decision | V3 | built |
 | channels::assets | crates/channels/src/assets.rs | the client the browser downloads, and which bytes answer which path | adapter | V3 | built |
@@ -776,6 +801,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::main::router | crates/sprawling/src/main/router.rs | one verb in, one subcommand out, plus the flags every verb reads | adapter | S0 | built |
 | bin::main::city | crates/sprawling/src/main/city.rs | the verbs that raise and serve a city | adapter | S0 | built |
 | bin::main::data | crates/sprawling/src/main/data.rs | the verbs that move bytes and ask about history | adapter | S0 | built |
+| bin::main::whose | crates/sprawling/src/main/whose.rs | the verb that asks a commit which run wrote it | adapter | V4 | built |
 | bin::main::tests | crates/sprawling/src/main/tests.rs | flags are never paths, and no ledger is never verified | adapter | S0 | built |
 | bin::assembly | crates/sprawling/src/assembly.rs | the assembly point: the worker every module below writes methods for, the one clock sample, and the one door a command enters by | adapter | S0 | built |
 | bin::assembly::lifetime | crates/sprawling/src/assembly/lifetime.rs | a worker opened over a history, and the city closed in the record | adapter | S0 | built |
@@ -833,12 +859,15 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::commanding | crates/sprawling/src/assembly/commanding.rs | the verbs a person sends, and what each one does to the city | adapter | V3 | built |
 | bin::assembly::commanding::routing | crates/sprawling/src/assembly/commanding/routing.rs | one verb in, one dispatch or refusal out, plus the schedule tick | adapter | V3 | built |
 | bin::assembly::commanding::governing | crates/sprawling/src/assembly/commanding/governing.rs | halts, autonomy, approvals, forks: the standing answers | adapter | V3 | built |
+| bin::assembly::commanding::entrance | crates/sprawling/src/assembly/commanding/entrance.rs | the key every command carries, read before anything is done about it | decision | V4 | built |
 | bin::assembly::commanding::tests | crates/sprawling/src/assembly/commanding/tests.rs | the commanding fixtures route | adapter | V3 | built |
 | bin::assembly::commanding::tests::answering | crates/sprawling/src/assembly/commanding/tests/answering.rs | answers, refusals and the approval queue | adapter | V3 | built |
 | bin::assembly::commanding::tests::clockwork | crates/sprawling/src/assembly/commanding/tests/clockwork.rs | the schedule fires and repeats do not | adapter | V3 | built |
+| bin::assembly::commanding::tests::entrance | crates/sprawling/src/assembly/commanding/tests/entrance.rs | one ask under one key is one effect, across a restart too | decision | V4 | built |
 | bin::serving | crates/sprawling/src/serving.rs | how a city is stood up and served: the key at the door, the desk, the one writer thread | adapter | V3 | built |
 | bin::serving::door | crates/sprawling/src/serving/door.rs | the key at the door and the vault behind it | adapter | V3 | built |
 | bin::serving::desk | crates/sprawling/src/serving/desk.rs | where commands wait between the socket and the worker | adapter | V3 | built |
+| bin::serving::relay | crates/sprawling/src/serving/relay.rs | the third Ledger adapter: a write from a driving thread, carried to the accounting thread and waited for | adapter | V4 | built |
 | bin::serving::serve | crates/sprawling/src/serving/serve.rs | what one served city is made of | adapter | V3 | built |
 | bin::serving::worker | crates/sprawling/src/serving/worker.rs | the one writer thread and the city it serves | adapter | V3 | built |
 | bin::serving::tests | crates/sprawling/src/serving/tests.rs | the key this city mints is the key its own door accepts | adapter | V3 | built |
@@ -850,6 +879,11 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::install::search_path_windows | crates/sprawling/src/install/search_path_windows.rs | editing the user search path in the registry under its own type, and telling the desktop | adapter | P0 | built |
 | bin::install::search_path_elsewhere | crates/sprawling/src/install/search_path_elsewhere.rs | handing back the line a person adds themselves, where no search path is written | adapter | P0 | built |
 | bin::install::tests | crates/sprawling/src/install/tests.rs | installing twice is installing once, and uninstalling returns the original search path | adapter | P0 | built |
+| bin::doctor | crates/sprawling/src/doctor.rs | what this machine has against what the city needs, and the verdict for each tier | decision | V4 | built |
+| bin::doctor::table | crates/sprawling/src/doctor/table.rs | the two tiers item by item: how each one is detected, and how each one is installed here | data | V4 | built |
+| bin::doctor::screen | crates/sprawling/src/doctor/screen.rs | the report a person reads, and the one question asked per absent item | adapter | V4 | built |
+| bin::doctor::probe | crates/sprawling/src/doctor/probe.rs | this machine answering: a program on the search path, its version under a deadline, one consented install | adapter | V4 | built |
+| bin::doctor::tests | crates/sprawling/src/doctor/tests.rs | every row is detectable and either installable or manual, and consent is asked one item at a time | decision | V4 | built |
 | bin::wire_client | crates/sprawling/src/wire_client.rs | the second client of the wire: one frame out, every frame back, and enrolment from stdin | adapter | P3 | built |
 | bin::console | crates/sprawling/src/console.rs | what a served city says to the terminal it is running in, and what a line typed there means | decision | P1 | built |
 | bin::console::language | crates/sprawling/src/console/language.rs | the words a line may use and what each one asks for | decision | P1 | built |
@@ -864,8 +898,28 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::views | crates/sprawling/src/views.rs | the fold every query is answered from, and the lines a page reads off it | projection | V3 | built |
 | bin::views::holding | crates/sprawling/src/views/holding.rs | what the views hold and how one record folds in | projection | V3 | built |
 | bin::views::answering | crates/sprawling/src/views/answering.rs | every question a page may ask, answered from the fold | projection | V3 | built |
+| bin::views::commits | crates/sprawling/src/views/commits.rs | which run wrote a commit, folded from the records that announced it | projection | V4 | built |
 | bin::views::lines | crates/sprawling/src/views/lines.rs | one record rendered as the lines a page reads | projection | V3 | built |
 | bin::views::tests | crates/sprawling/src/views/tests.rs | five views answer from the record, not from unavailable | projection | V3 | built |
+
+### desktop (12) — out of tree: this Windows desktop, offered as an MCP server
+
+Not a workspace member, and excluded in the root manifest on purpose: `unsafe_code` is `deny` here rather than `forbid`, so the Win32 boundary of card 7.2 can relax it at one call site instead of opening a hole in the wall twelve crates stand behind. The seam it arrives through is the one section 8 already describes — an outside application is reached over MCP, not linked in. Card 7.1 settles the protocol, the tool table, the scope file and the refusals; it carries out nothing and writes no `unsafe`. `cargo xtask modmap` does not read these rows, because it parses `crates/*/src`; they are here so that one table still lists every file.
+
+| Module | File | What it owns | Shape | Since | Status |
+|---|---|---|---|---|---|
+| desktop::main | desktop/src/main.rs | where this server is started from: one argument, one environment variable, one pair of pipes | adapter | V4 | built |
+| desktop::refusal | desktop/src/refusal.rs | what this server says when it will not do something: a stable code and three parts | value | V4 | built |
+| desktop::rpc | desktop/src/rpc.rs | one JSON-RPC 2.0 message per line, read and written | adapter | V4 | built |
+| desktop::tools | desktop/src/tools.rs | the six tools, their schemas, and what each one does not do | data | V4 | built |
+| desktop::scope | desktop/src/scope.rs | what DESKTOP.toml permits, and the three ways it closes | decision | V4 | built |
+| desktop::scope::pattern | desktop/src/scope/pattern.rs | one allowlist line, and what it matches | value | V4 | built |
+| desktop::session | desktop/src/session.rs | one connection: the handshake order, and one reply per request | adapter | V4 | built |
+| desktop::session::tests | desktop/src/session/tests.rs | the handshake, the six names, and a refusal for everything this build cannot do | adapter | V4 | built |
+| desktop::platform | desktop/src/platform.rs | which machine this build is standing on | adapter | V4 | built |
+| desktop::platform::windows | desktop/src/platform/windows.rs | the Windows arm, which in card 7.1 refuses honestly | adapter | V4 | built |
+| desktop::platform::elsewhere | desktop/src/platform/elsewhere.rs | every machine that is not Windows, named in its own refusal | adapter | V4 | built |
+| desktop::smoke | desktop/tests/smoke.rs | the real binary answering the exchange the city's own client sends | adapter | V4 | built |
 
 ## 13 Changing this document
 
