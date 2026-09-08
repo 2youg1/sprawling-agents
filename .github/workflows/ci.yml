@@ -26,8 +26,16 @@
 # Windows, and only Windows, is deliberate and unchanged: it is the
 # platform the project is developed on, so a red job is a red local run
 # the person can reproduce. macOS byte-identity is `platforms.yml`,
-# nightly. Linux stays out of the push pipeline for the reason recorded
-# there, and nothing in this release ships a Linux artifact.
+# nightly, and so is the Nix leg. Linux stays out of the *push* pipeline
+# because nobody here can reproduce a Linux failure at their desk; the
+# release does ship a static Linux archive, built natively by
+# `release.yml` (sprawling-SPEC.md section 8-9, P4.02 改判).
+#
+# Every job carries `timeout-minutes: 20`. GitHub's default is six hours,
+# so a hung job used to burn a runner for a working day while the person
+# waited on a verdict that was never coming. Twenty minutes sits a little
+# above the cold-cache floor - a warm run is minutes - which turns
+# "fifteen minutes" from a wish into a promise a machine checks.
 #
 # Not done, because it was measured and did not pay: forcing debuginfo
 # off in CI. Dependencies already carry `debug = false` (root
@@ -68,6 +76,7 @@ jobs:
   # queue wait to save two seconds is not speed.
   clippy:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - name: install pinned toolchain
@@ -95,6 +104,7 @@ jobs:
 
   test:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - name: install pinned toolchain
@@ -151,6 +161,7 @@ jobs:
 
   gates:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       # `guard` and `apisync` judge every commit in a range, and the range
       # is the whole change-set under review. This step used to take
@@ -218,6 +229,7 @@ jobs:
   # channels built without its server feature.
   web:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - name: install pinned toolchain
@@ -240,6 +252,7 @@ jobs:
   # ignore a red build. It runs nightly, where red means "go and look".
   supply:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: taiki-e/install-action@v2
