@@ -97,6 +97,7 @@ impl Turn<ToolWave> {
                 calls_made: calls.len(),
                 assistant: self.state.assistant,
                 wave_results,
+                usage: self.state.usage,
             },
         }))
     }

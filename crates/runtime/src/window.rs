@@ -69,6 +69,13 @@ impl Window {
         self.push_user_text(format!("{source}: {text}"));
     }
 
+    /// The context reminder takes the same door as a steer, so it lands
+    /// where a steer lands: at the end of the tool results the model
+    /// reads next.
+    pub fn push_reminder(&mut self, reminder: &crate::reminder::ContextReminder) {
+        self.push_user_text(reminder.render());
+    }
+
     pub fn push_assistant(&mut self, content: Vec<ContentBlock>) {
         if !content.is_empty() {
             self.messages.push(ChatMessage {

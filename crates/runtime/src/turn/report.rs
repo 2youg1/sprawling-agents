@@ -6,7 +6,7 @@
 //! What a completed turn hands the run loop, and the frozen `[model]`
 //! section the call is shaped by.
 
-use kernel::{ContentBlock, EventRef};
+use kernel::{ContentBlock, EventRef, ModelUsage};
 
 /// What a completed turn hands the run loop. `assistant` and
 /// `wave_results` are the window-folding material — the same content the
@@ -19,9 +19,16 @@ pub struct TurnReport {
     pub(super) calls_made: usize,
     pub(super) assistant: Vec<ContentBlock>,
     pub(super) wave_results: Vec<ContentBlock>,
+    pub(super) usage: Option<ModelUsage>,
 }
 
 impl TurnReport {
+    /// What the provider counted for this call, when it said. The
+    /// context gauge reads `input_tokens` from here and nowhere else.
+    pub fn usage(&self) -> Option<&ModelUsage> {
+        self.usage.as_ref()
+    }
+
     pub fn refs(&self) -> &[EventRef] {
         &self.refs
     }
@@ -53,4 +60,7 @@ pub struct CallShape {
     pub model: String,
     pub max_tokens: u64,
     pub effort: Option<kernel::Effort>,
+    /// The model's window, from the endpoint book. Zero when the book
+    /// does not say, in which case the context reminder stays silent.
+    pub context_tokens: u64,
 }

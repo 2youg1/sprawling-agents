@@ -90,6 +90,7 @@ pub(super) fn shape() -> CallShape {
         model: "script".to_owned(),
         max_tokens: 512,
         effort: None,
+        context_tokens: 0,
     }
 }
 
