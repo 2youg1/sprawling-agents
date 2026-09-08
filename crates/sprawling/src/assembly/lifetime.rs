@@ -13,6 +13,7 @@
 //! leave" is asking one question from two ends.
 
 use super::{RunWorker, Standing, city_segment, ledger_dir, now_ms};
+use crate::serving::relay::RelayGate;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -20,6 +21,18 @@ use kernel::{AxError, EventKind, Locator};
 use memory::{Cas, JsonlLedger};
 
 impl RunWorker {
+    /// Writes every relay request already waiting, and returns how many.
+    ///
+    /// The accounting thread calls this before it looks at the command
+    /// desk: a run that has already been paid for must not queue behind
+    /// a command that has not started (sprawling-SPEC.md 8-42-2). It is
+    /// here rather than in `bin::serving` because the ledger never
+    /// leaves the worker - which is the whole of what "one city, one
+    /// writer" means.
+    pub(crate) fn serve_relay(&mut self, gate: &RelayGate) -> usize {
+        gate.serve_waiting(&mut self.ledger)
+    }
+
     /// # Errors
     /// Propagates whatever opening the ledger or the store reports, and
     /// whatever the ledger says about its own chain: a worker that
@@ -61,6 +74,7 @@ impl RunWorker {
             book,
             governance,
             collaboration,
+            entrance,
         } = Standing::fold(&dir)?;
         let cas = Cas::open(&city_root.join(".sprawling").join("cas"))
             .map_err(memory::MemoryError::into_ax)?;
@@ -91,6 +105,8 @@ impl RunWorker {
             logins: std::collections::BTreeMap::new(),
             log,
             knocks: Vec::new(),
+            entrance,
+            backlog: runtime::Backlog::new(),
         })
     }
 

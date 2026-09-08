@@ -37,6 +37,9 @@ tempfile.workspace = true
 # one named line and assert the city did not move. Kept to dev only: a
 # release build of this binary never carries FaultFs.
 memory = { path = "../memory", features = ["fault"] }
+# The Ledger port's own assertion suite, so the relay adapter is held to
+# the same six assertions as the two adapters that own a medium.
+kernel = { path = "../kernel", features = ["conformance"] }
 
 [lints]
 workspace = true

@@ -29,6 +29,7 @@
 /// the one place in the binary where reproducibility would be a defect.
 pub(crate) mod desk;
 pub(super) mod door;
+pub(crate) mod relay;
 pub(super) mod serve;
 #[cfg(test)]
 mod tests;

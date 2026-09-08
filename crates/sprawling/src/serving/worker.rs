@@ -33,6 +33,7 @@ use std::sync::mpsc;
 use kernel::{AxCode, AxError, EventRecord, RunId};
 
 use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK};
+use super::relay::RelayGate;
 use super::serve::Opening;
 use super::serve::Serving;
 use crate::assembly::{RunWorker, acp_dispatch, ledger_dir, now_ms, rebuild_views};
@@ -118,7 +119,15 @@ fn spawn_worker(
             worker.attach_interrupts(Box::new(move |run: RunId| {
                 interrupt_desk.interrupt_for(run)
             }));
+            // The crossing a driving thread writes history through
+            // (sprawling-SPEC.md 8-42-2). It is opened here because the
+            // pool that clones its handle is started from this same
+            // point; until then it serves nothing, and what that costs
+            // is one `try_recv` per pass of the loop.
+            let relay = RelayGate::open();
             loop {
+                // Relay requests first, desk commands second.
+                worker.serve_relay(&relay);
                 match worker_desk.wait(SCHEDULE_TICK) {
                     // `carrying` holds this command's key in flight for
                     // the length of the arm, so a frame that repeats it
