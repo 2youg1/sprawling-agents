@@ -69,6 +69,8 @@ admission／market／cost：纯判定与数据面，被 endpoint 与 S3 回合�
 切缝不是行数而是**变化的理由**：一家 provider 改了它的形状，只有它那一个文件动；而本模块顶上那句「改之前先读 provider 自己的文档」只有跟它指的那堆字段同居一处才真的被读到，所以两张文档链接表各自跟着它的 dialect 走。
 - `dialect` 剩五个入口，每个一条 `match kind`，封闭集为二；不认得的 dialect 恒拒而不拿较近的那一家近似。跨 dialect 的断言（两向往返、两种强度拼写、float 拒收）留在这里，因为它们测的就是路由的契约。
 - `mismatch` 是两家共用的四个读取器（`require`／`as_str`／`tokens_or_zero`／`payload_from`）与三句拒词（`mismatch`／`stream_cut`／`unspelled_effort`）。**依赖是单向的**：dialect → 两家 → mismatch，谁都不回头指。
+**card-4.1：两家各自再切一刀，把流的拼接搬出去。** 图的翻译把 `openai.rs` 顶到 443 行、`anthropic.rs` 顶到 398 行，而文件上限是 400。切的仍是变化的理由：`increment_of`／`settled` 回答的是「一串 SSE 帧如何合成一份完整答案」，与「一个请求如何写上线」是两件事，且两家的流帧形状各自变。归 `anthropic/stream.rs`（110）与 `openai/stream.rs`（116），父文件各以一行 `pub(crate) use stream::{increment_of, settled};` 保住路径，`dialect` 一字未改。
+
 - 只属一家的东西跟着它：`empty_answer`（空答案）、`joined_text`与 `effort_field` 入 openai；`role_str`、`stop_from`／`stop_str`、`block_wire`／`block_from`、`effort_fields` 入 anthropic。
 
 **P6.01 改：每一条形状不匹配都带出路，而空答案不再被当成形状不匹配**。真机派活时拿到 `E_WIRE_MISMATCH: translate wire on response.choices: expected array`，**`recovery` 为空串**——一条让人无从下手的拒绝，而 `AxError` 的契约写着 `recovery` 必须是可直接执行的信息。两处修正：
@@ -107,6 +109,29 @@ OpenAI 侧无对应物：出向翻译**记录性丢弃**思考块（同断点位
 
 **缓存后果写在这里，因为它是选型理由**：官方排错文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」。故强度住 `FrozenConfig`（kernel-SPEC §8-22），Run 内不可变；本模块只负责把已冻结的值翻上线。
 
+**card-4.1 增：两条 wire 上的图**
+
+```rust
+// gateway::dialect::images（新文件；形状 2 value）
+pub struct ImageBytes(BTreeMap<String, Vec<u8>>);   // 键＝Locator 的规范拼写
+impl ImageBytes {
+    pub fn insert(&mut self, at: &Locator, bytes: Vec<u8>);
+    pub fn len(&self) -> usize;  pub fn is_empty(&self) -> bool;
+    pub(crate) fn encoded(&self, at: &Locator) -> Result<String, AxError>;  // 标准 base64
+}
+pub fn request_wire(kind: DialectKind, req: &ChatRequest, images: &ImageBytes)
+    -> Result<serde_json::Value, AxError>;
+```
+
+- **dialect 仍是数据的纯函数**。字节不在这里取：`ImageBytes` 是参数，不是一个 store 句柄。同一份 `(ChatRequest, ImageBytes)` 永远翻出同一串字节，重放因此仍能重推当时实发的请求。
+- **为何不是 `BTreeMap<Locator, Vec<u8>>`**：`Locator` 不实现 `Ord`（它内含的 `Range` 也不），而给 `kernel::locator` 加一对 derive 是在另一张卡的文件上改公共面。改成以规范拼写为键的 newtype：接口更窄（三个方法），排序仍然只取决于内容，且「解不出字节」这条失败路径归值本身拿着，而不是散在两家 dialect 里。
+- **位置**：`dialect/images.rs` 与 `mismatch` 同层——两家都读、谁都不回头指，所以依赖仍是单向的。
+- **locator 解不出字节即 `E_WIRE_MISMATCH`**（fail-closed）：一张描述存在、字节不在的图，发上线就是一个模型看不见的空位。
+- **Anthropic 侧**：Image 块→`{type:"image", source:{type:"base64", media_type:…, data:…}}`；带 `attachments` 的 tool_result 的 `content` 由字符串改写为块数组 `[{type:"text",text},{type:"image",…}…]`（无附件时仍写字符串，既有 golden 字节不变）。两处形状都是 provider 自己的：<https://platform.claude.com/docs/en/build-with-claude/vision>。
+- **OpenAI 侧**：user 消息的 `content` 由字符串改写为部件数组 `[{type:"text",text},{type:"image_url",image_url:{url:"data:<mime>;base64,…"}}]`。
+- **本兼容格式多一项记录性丢失：tool 消息拿不了图**。Chat Completions 的 `role:"tool"` 只收字符串 `content`，所以 tool_result 的 `attachments` 不随它走，而是落到紧跟其后的一条 user 消息里。图没丢，丢的是「这张图是那次工具调用的结果」这层归属；同断点位与思考块的现行口径，**文档声明，不静默**，写在 `openai.rs` 顶上那张丢失清单里并由测试钉住。
+- **base64 依赖**：`base64 0.22` 本就在 `Cargo.lock` 的图里（reqwest／git2 一系已携），直接命名不向锁里添包；自己写一份编码器才是新权威。
+
 ### 8-2 gateway::endpoint（S3.02；形状 4 适配器）
 
 ```rust
@@ -131,6 +156,24 @@ impl kernel::Model for Endpoint { /* call：ChatRequest（req.chat）→dialect�
 - **无暗重试**：重试／转移是 watchdog 与 admission 的决策，endpoint 一次调用恰一次 HTTP 往返；幂等由调用方 IdemKey dedup 看守。
 - S3.02 落地记录：base_url＝完整端点 URL（逐字段哲学，不拼路径）；EndpointConfig 增 pricing: Option<ModelEntry>（结算在适配器内以便 ModelReturn 携 billed 入账；权威额线上无标准槽位，现行恒 PriceSheet 源）；reqwest 0.13 的 rustls feature 名＝`rustls`（非 0.12 的 rustls-tls）；非流式先行，半流中断以截断 body 实测（E_PROVIDER，恒不产部分 ModelReturn）；kernel::ModelReturn 增 usage/stop/billed 三字段＋bare()/from_response() 两构造面（kernel-SPEC §8-24 同集）。
 - `.expose(` 白名单（xtask secret）：本文件与 native.rs 是 gateway 侧仅有的两个合法出现点。
+
+**card-4.1 增：图的兑付面与两句拒绝**
+
+两型一构造面住新文件 `endpoint/redemption.rs`（`config.rs` 加完为 457 行，越了 400 行上限；切的理由不是行数而是职责：「一个端点在线上兑什么」与「一个端点配成什么样」各自变化）：
+
+```rust
+pub type ImageResolver = Arc<dyn Fn(&Locator) -> Result<Vec<u8>, AxError> + Send + Sync>;
+pub struct Redemption { /* secrets: SecretResolver、images: ImageResolver —— 私有 */ }
+impl Redemption {
+    pub fn new(secrets: SecretResolver, images: ImageResolver) -> Redemption;
+    pub fn without_images(secrets: SecretResolver) -> Redemption;   // 探针用：每一张图都拒
+}
+impl Endpoint { pub fn new(config: EndpointConfig, redemption: Redemption) -> Result<Endpoint, AxError>; }
+```
+
+- **两个兑付闭包总是同行，所以它们是一个值**（`Redemption`），而不是构造子上多出来的第二个参数；`adapter_for` 的参数个数因此不变。探针用 `without_images`：一个只问「你服务哪些模型」的调用本就不该有图，它拿到图就是一个 bug，而不是一张要传的图。
+- **`wire_request` 三件事**：收齐本次请求的 Image 块与 tool_result 附件 → 数量超 `IMAGES_PER_TURN` 即 `E_INVALID_ARGS`（三段式，recovery 报出上限数）→ 逐张 `images(locator)` 取字节，单张超 `IMAGE_MAX_BYTES` 同样 `E_INVALID_ARGS`，然后交给 `request_wire`。上限住 `kernel::consts_policy`，不在这里手写。
+- **看不见图的模型恒拒而不静默丢图**：`config.pricing`（即选型点定下的 `ModelEntry`）的 `input` 为 `Text` 而请求带图，则 `E_INVALID_ARGS`，recovery 指名 `text_image` 这个口径。拒绝住 `endpoint/model.rs`（`call` 与 `call_streaming` 两扇门共用一句），与 confidential 那句拒词同位同形：拒绝写在泄漏会发生的那一格，才能活过一次路由失误。
 
 ### 8-3 gateway::native（S3.02；形状 4 适配器）
 
@@ -215,7 +258,9 @@ pub fn on_outcome(state: &mut AdmissionState, outcome: ProviderOutcome, now: Tim
 ### 8-7 gateway::market（S3.04；形状 6 数据面＋快照）
 
 ```rust
-pub struct ModelEntry { pub id: String, pub context_tokens: u64,
+#[non_exhaustive] #[derive(Default)] #[serde(rename_all = "snake_case")]
+pub enum InputKinds { #[default] Text, TextImage }      // card-4.1：这个模型收得下什么
+pub struct ModelEntry { pub id: String, pub context_tokens: u64, pub input: InputKinds,
                         pub input_price: UsdMicros /* per 1M tokens */, pub output_price: UsdMicros,
                         pub cache_read_price: UsdMicros, pub cache_write_price: UsdMicros }
 pub struct MarketSnapshot { /* version: u32、entries: BTreeMap<String, ModelEntry> —— 私有 */ }
@@ -226,6 +271,7 @@ impl MarketSnapshot {
 }
 ```
 
+- **card-4.1：`input` 默认 `Text`，宽容读。** `selected_payload` 写 `input` 键，`read_choice` 读不到就当 `Text`——旧 Ledger 里的 `model_selected` 没有这个键，而重放一份旧历史不应该报错；默认取「只收文字」而非「收图」，因为猜错方向的代价不同：猜小了是一句拒绝，猜大了是 provider 的 400。内置目录里收图的行（现为 `claude-sonnet`）标 `TextImage`，`local` 保持 `Text`。
 - 钉版回滚＝持前一快照即回滚（值语义，无 I/O）；快照落盘属 projection／config 面，本模块只管形与查询。价目恒整数微美元（判定路径禁浮点）。
 
 ### 8-8 gateway::cost（S3.04；形状 1 判定函数）
@@ -242,7 +288,8 @@ pub fn settle(usage: &ModelUsage, authoritative: Option<UsdMicros>, entry: &Mode
 
 ```rust
 pub struct AttachedEndpoint { pub name, pub base_url, pub dialect: DialectKind,
-                              pub auth: AuthSpec, pub models: Vec<String> }
+                              pub auth: AuthSpec, pub models: Vec<String>,
+                              pub probed: bool }   // 这份 models 是问出来的（true）还是人报的（false）
 impl AttachedEndpoint {
     pub fn is_local(&self) -> bool;          // 与本地适配器同一判据（native::is_loopback）
     pub fn has_credential(&self) -> bool;    // 关于凭证，金库外只能回答这一问
@@ -265,14 +312,22 @@ pub fn selected_payload(ModelTag, &str, &ModelEntry) -> Result<Payload, AxError>
 - **两个入口一个读者**：`apply`（重建路径，手里是 record）与 `apply_payload`（写入路径，手里是刚要写的 payload）共用同一套载荷读取，于是「写者以为的」与「重建得到的」不可能分岔。
 - **confidential 在选型点再守一次**：非本机 endpoint 对 confidential 楼恒拒（`E_GATE_DENIED`）。`gateway::endpoint` 的兜底拒同期改为**按本地性判定**（而非一律拒）：规则是「字节不出本机」，不是「不准用这个类型」；否则一个回环的 Anthropic 服务器会被误拒。
 - **路径归兼容格式**：人输入 base URL（provider 文档就是那么印的），`messages`／`chat/completions`／`models` 由兼容格式拼。这与 `EndpointConfig.base_url`「完整端点 URL、不拼路径」并不矛盾：适配器保持字面，拼路径的是上层登记面。
+- **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的 id 是对端自己说的；`false` ＝ 探测失败而人自己报了型号，城照登。载荷里缺 `probed` 键读作 `true`，于是本键之前写下的每一条 `endpoint_attached` 重放不变——**旧记录的含义没有改，改的是新记录能多说一句**。
+- **`AuthSpec::for_dialect` 是凭证头的唯一产地（card-1.1）**：`AuthSpec::for_dialect(dialect: DialectKind, reference: SecretRef, header: Option<String>) -> AuthSpec`，纯函数，住 `endpoint/auth.rs`。人显式填的头名恒胜（`Header`）；否则 Anthropic → `Header{name:"x-api-key"}`，OpenAI 及其余 → `Bearer`。**它不住 `endpoint/config.rs`，因为 config.rs 已 397 行、行数门限 400**：为了过门而把测试删短是拿门当对手，而「凭证头归兼容格式」本来就是一个可以自己站着的概念；`AuthSpec` 类型本体留在 config.rs，因为搬它会让同一个名字在 crate 内多出一条 `pub(crate) use` 路径。登记面（`bin::assembly::credentials::endpoints::endpoint_of`）不再自己在 Bearer 与具名头之间选，否则「Anthropic 用哪个头」在城里有两个权威，而漂开的总是没人看的那个。
 
-### 8-10 gateway::endpoint 探测面（P1.11）
+### 8-10 gateway::endpoint 探测面（P1.11；探测降级 card-1.2）
 
 ```rust
 impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<String>, AxError>; }
 ```
 
-两家都在 `GET .../models` 返回 `{"data":[{"id":..}]}`，**都不返回价目与 token 上限**——所以探测只取 id，两个 token 数字由人在登记时确认。探测与正式调用共用同一个兑付路径（`authorize`）：两套认证拼法就是两个权威，而漂开的总是没人看的那个。
+两家一方都在 `GET .../models` 返回 `{"data":[{"id":..}]}`，**都不返回价目与 token 上限**——所以探测只取 id，两个 token 数字由人在登记时确认。探测与正式调用共用同一个兑付路径（`authorize`）：两套认证拼法就是两个权威，而漂开的总是没人看的那个。
+
+**探测不再是登记的前提（card-1.2，改写此前「探测不通就不登记」那一条）**。上一段的「两家都返回」只对那两家为真：网关与 Anthropic 兼容格式的第三方多半根本不服务 `/models`，于是一条本可用的线路被一个它从未承诺过的接口挡在城外。新规则三行：探测成功→按对端报的 id 收窄（旧行为不动，`probed=true`）；探测失败且人报了型号→按人报的登记（`probed=false`，并按 `effect` 级写一条诊断，点名探测的错——**登记确实发生了，被拒的只是探测**，用 `refuse` 级会说成这次登记被门拒了，那是假话）；探测失败且人没报型号→仍然拒绝，恢复语改为「把要用的 model id 报上来，再登记一次」，因为此时城手里一个可调用的名字都没有。
+
+**四个参照实现一致**：pi、codex、opencode、Claude Code 都让人**声明**模型清单，发现是可选的（Claude Code 默认关闭、3 秒超时、失败静默）。把可选的发现当成必选的准入，是本仓自己加的限制，不是外部事实。
+
+**「路径归兼容格式」现在也管凭证头**：Anthropic 的 API key 走 `x-api-key`（`Authorization: Bearer` 只发给短时联邦令牌），OpenAI 兼容格式走 `Bearer`；人显式填的头名恒优先。见 §8-9 `AuthSpec::for_dialect`。落选的是「让登记页必填头名」：那把一个兼容格式自己就知道的事推给了人，而人填错的代价是一个 401。
 
 **`adapter_for` 住 `endpoint/adapter.rs`（card-3.3）**：装配线（哪个 chosen 走 Native、哪个走 Endpoint）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。`CALL_TIMEOUT_MS` 随它搬家（没人读的数字没人能辩护）。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（兼容格式要的头是兼容格式的事，搬家留待后卡：`dialect_headers` 住凭据是历史位置，本卡只动 adapter 线）。
 
