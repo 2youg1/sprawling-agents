@@ -283,13 +283,6 @@ status = "gated, with a register of the files that predate the rule"
 #
 # Delete a row by doing the split, never by raising its number.
 [file_length.predating]
-"xtask/src/color.rs" = 819
-"xtask/src/wording.rs" = 686
-"xtask/src/render.rs" = 581
-"xtask/src/release.rs" = 578
-"xtask/src/length.rs" = 573
-"xtask/src/guard.rs" = 508
-"xtask/src/badge.rs" = 436
 
 # White box is Rust, black box is Haskell (the person's ruling,
 # 2026-09-05). `cargo xtask boundary` refuses a Rust check that reaches

@@ -26,7 +26,7 @@
 | budget | `xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；称不出则沉默（本机没构建产物不是缺陷），壁钟读数只入册不入门 |
 | color（S4 上线） | 颜色只出自 `web::theme`，且以色域上限的比值表达；扫仓库根，文件自豁免 |
 | release（P4.14 上线，P5.05 增第三条断言） | 公开树由过滤生成；三条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径 |
-| length（R2.20 上线，V3.29 加文件面与参数面） | 一个生产函数不得长过 `function_length`（今 200 行）、不得多于 `argument_count` 个参数（今 4 个，不含接收者），一个源文件不得长过 `file_length`（今 1000 行，含测试）；函数尺寸与签名以 `syn` 量得，文件尺寸即行数 |
+| length（R2.20 上线，V3.29 加文件面与参数面） | 一个生产函数不得长过 `function_length`（今 200 行）、不得多于 `argument_count` 个参数（今 4 个，不含接收者），一个源文件不得长过 `file_length`（今 400 行，含测试；2026-09-05 自 1000 改价，权威在 budgets.toml）；函数尺寸与签名以 `syn` 量得，文件尺寸即行数 |
 | gates | 顺序跑全部门，聚合报告，任一违规即退出码 1 |
 
 ### 门禁针对的 LLM 失效模式（本 crate 存在的理由）
@@ -238,3 +238,102 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 **专名进不了短语表，所以它必须有一扇门。** `web::lang` 自己的断言 `assert_ne!(said.zh, said.en)` 拒绝一条两种语言相同的短语，而 `openai` 在两种语言里就是 `openai`。这五处用 `wording-ok: <理由>` 写在本行或上一行——**同一个拼法、同一条两行规则、同一笔交易，照搬 `lexicon-ok:`**。一个可见的、带理由的现场标记，比一张没人会去读的 toml 名单诚实。
 
 **它自己的消融实验就是它存在的理由**：把 V3.50 那三句英文原样写回 `dashboard.rs`，本门变红并点名行号，而 `web::lang` 那两条断言全程全绿；改回译文，本门变绿。单测 `the_three_sentences_that_escaped_both_of_langs_assertions_are_caught` 把这次实验固定下来。
+### 8-1 xtask::color 目录化（card-5.2）
+
+`color.rs` 一文件 819 行，切成一个目录，五个文件各答一个问题：
+
+| 文件 | 它回答什么 |
+|---|---|
+| `xtask/src/color.rs` | 六条令牌断言与可读性断言本身（`check`、`judge_tokens`、`judge_readability`、`token_violation`），以及色轴、灰阶与明度上下界这几个常量 |
+| `xtask/src/color/tables.rs` | 怎么从 `web::theme` 的源文件读出四张表（`GRAY_RAMP`、`COLOUR_TOKENS`、`TEXT_TOKENS`、`TYPE_SCALE`）与 `TEXT_SURFACE_CEILING` |
+| `xtask/src/color/contrast.rs` | 一对令牌的 APCA 对比度是多少（`apca_lc` 及其 OKLCH→sRGB 链路），以及 Bronze Simple Mode 允许某个字号使用哪一层（`bronze_tier`） |
+| `xtask/src/color/scan.rs` | 全仓扫描：什么算一个颜色字面量（`literal_at`、`hex_colour`），扫哪些文件（`scan_for_literals`） |
+| `xtask/src/color/tests.rs` | 原内联 `mod tests` 原样迁出，14 个测试一个不少 |
+
+**无字段开放**：跨文件引用只用 `pub(super)` 函数；`grey_ramp` 因 `badge` 门经 `color::grey_ramp` 调用而在索引位置以 `pub(crate) use` 重导出，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
+
+**`SCAN_EXEMPT` 随文件而动，判据未放宽**：自豁免的理由一直是「检测器必须拼得出它所禁的东西」，而现在拼出颜色语法的是 `color/scan.rs`（拼法表）与 `color/tests.rs`（用例），故豁免名单改点这两个文件；不再拼颜色的 `color.rs` 本身则回到被扫范围内——豁免面因此变窄而不是变宽。
+
+### 8-2 xtask::wording 目录化（card-5.2）
+
+`wording.rs` 一文件 686 行，切成一个目录，四个文件各答一个问题：
+
+| 文件 | 它回答什么 |
+|---|---|
+| `xtask/src/wording.rs` | 门本身：扫哪里（`CLIENT`）、什么算豁免（`EXEMPT_MARK`、`waived`）、哪些属性会被读出来（`SPOKEN`）、报告怎么写（`check`、`clipped`、`Said`）、以及判据「去掉城自己的值之后还剩不剩两个相邻字母」（`words_the_view_wrote`）；测试模块的切口 `drawn` 也在这里 |
+| `xtask/src/wording/lex.rs` | 一段 Rust 源码切成哪些词（`Kind`、`Lexeme`、`lex` 及其字符串、原始字符串、字符字面量与注释的读法） |
+| `xtask/src/wording/rsx.rs` | 花括号栈怎么走，一个字面量坐在哪里（`Frame`、`handed_to_a_reader`、`seat_of`、`step`、`opens_an_element_body`） |
+| `xtask/src/wording/tests.rs` | 原内联 `mod tests` 原样迁出，7 个测试一个不少 |
+
+**无字段开放**：跨文件只开了 `lex.rs` 的 `Kind`／`Lexeme`（含三个字段）／`lex` 与 `rsx.rs` 的 `handed_to_a_reader`，一律 `pub(super)`；`Said` 与 `SPOKEN` 留在索引位置，子模块按父模块私有项直接引用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
+
+**判据未放宽**：位置规则、豁免的两行范围与相邻两字母的门槛逐字节照搬，只换了它们所在的文件。
+
+### 8-3 xtask::render 目录化（card-5.2）
+
+`render.rs` 一文件 581 行，切成一个目录，三个文件各答一个问题：
+
+| 文件 | 它回答什么 |
+|---|---|
+| `xtask/src/render.rs` | 门本身：扫哪里（`SCREENS`、`TOKENS`）、对齐容差（`SLACK`）、一个被量出来的盒子是什么（`Box` 及 `right`／`name`／`drawn`）、跳过与判断的次序（`check`），以及三条性质的判据（`judge`、`one_left_edge`、`heads_lead_their_panels`、`head_leads`、`nothing_overflows`） |
+| `xtask/src/render/engine.rs` | 怎么把一张屏真的画出来并把盒子读回来：找引擎（`browser`、`on_path`）、工作目录与视窗（`WORK`、`VIEWPORT`、`SINK`）、渲染一张屏（`Engine`、`Engine::new`、`Engine::measure`）、改写样式表链接并附上探针（`instrument`、`url_of`、`PROBE`）、把探针写下的记录读回来（`sink`、`parse_box`） |
+| `xtask/src/render/tests.rs` | 原内联 `mod tests` 原样迁出，5 个测试一个不少 |
+
+**无字段开放**：`Box` 及其三个方法留在索引位置按父模块私有项定义，`engine.rs` 作为子模块直接引用；跨文件只把 `Engine`／`Engine::new`／`Engine::measure`／`browser`／`sink`／`parse_box` 提到 `pub(super)`。`main.rs` 经 `render::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
+
+**判据未放宽**：三条性质的文字、`SLACK` 的 1 像素、找不到浏览器与缺 `tokens.css` 时的 skip 逐字节照搬，只换了它们所在的文件。
+
+### 8-4 xtask::release 目录化（card-5.2）
+
+`release.rs` 一文件 578 行，切成一个目录，三个文件各答一个问题：
+
+| 文件 | 它回答什么 |
+|---|---|
+| `xtask/src/release.rs` | 门本身：什么留在机器上（`SCAFFOLDING`、`is_scaffolding`、`published`）、什么形状算家目录（`HOME_SHAPES`、`machine_path`）、哪些文件自豁免（`DETECTORS`）、什么算一处引文（`CITED_EXTENSIONS`、`path_tokens`、`directory_names`、`outside_the_tree`、`is_prose`），以及四条断言的编排（`check`） |
+| `xtask/src/release/link.rs` | 一份文档叫读者去开哪些路径，那些路径落在树的哪里（`link_targets`、`resolve`），二者一律 `pub(super)` |
+| `xtask/src/release/tests.rs` | 原内联 `mod tests` 原样迁出，9 个测试一个不少 |
+
+**无字段开放**：跨文件只把 `link_targets` 与 `resolve` 提到 `pub(super)`，索引位置以私有 `use link::{link_targets, resolve};` 引回，`check` 与测试的调用点一字未改；`main.rs` 经 `release::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
+
+**`DETECTORS` 随文件而动，判据未放宽**：自豁免的理由一直是「检测器必须拼得出它所禁的东西」，而写出家目录形状用例的现在是 `release/tests.rs`（三条「绝对路径被拒」的断言必须各写出一个），故名单从两条增到三条，新增的正是那份迁出的测试文件。被扫面因此少了一份测试文件而已，`HOME_SHAPES`、`CITED_EXTENSIONS`、`SCAFFOLDING` 与四条断言的文字逐字节照搬。
+
+### 8-5 xtask::length 目录化（card-5.2）
+
+`length.rs` 一文件 573 行，切成一个目录，三个文件各答一个问题：
+
+| 文件 | 它回答什么 |
+|---|---|
+| `xtask/src/length.rs` | 门本身：预算行名（`ROW`、`FILE_ROW`、`ARG_ROW`、`PREDATING`）、被量的源目录（`SOURCE_DIRS`、`sources`）、登记表的读法（`limit`、`predating`、`excused`、`key`）、五种违规的措辞（`too_long`、`grew`、`no_longer_an_exception`、`too_many_arguments`、`over`），以及编排（`check`） |
+| `xtask/src/length/measurement.rs` | 一个函数有多长、带几个参数，从解析出的项读得而不是从它周围的文本读得（`Found`、`measure`、`found`、`skipped`） |
+| `xtask/src/length/tests.rs` | 原内联 `mod tests` 原样迁出，8 个测试一个不少 |
+
+**无字段开放**：`Found` 及其四个字段保持原有的 `pub(crate)`，跨文件只把 `measure` 提到 `pub(super)`，索引位置以私有 `use measurement::{Found, measure};` 引回；`found` 与 `skipped` 仍是 `measurement` 内的私有项。`check` 与全部测试的调用点一字未改，`main.rs` 经 `length::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
+
+**判据一处未松**：三种豁免（`#[cfg(test)]`、`#[component]`、模块表 shape `data`）、`grew`／`no_longer_an_exception`／陈旧钉子三条自清理断言、以及两个预算仍只从 `xtask/budgets.toml` 读来，文字逐字节照搬。`[file_length.predating]` 里 `"xtask/src/length.rs" = 573` 一行按规则划掉——切分做完，钉子即失效；`length.rs` 现在与其他所有文件同受 400 行预算约束。**登记表上方那段注释仍写着「`xtask/src/length.rs` 在表上，这是对的：立规的门不豁免于规」，我没有动它**：guard 门把该注释的改动视为门面改动，而它所说的道理未变——立规的门仍受这条规约束，只是它现在直接受预算约束而非受钉子约束。
+
+### 8-6 xtask::guard 目录化（card-5.2）
+
+`guard.rs` 一文件 508 行，其中 151 行是内联 `mod tests`。按刀法第一条只做测试迁出，切成两个文件：
+
+| 文件 | 它回答什么 |
+|---|---|
+| `xtask/src/guard.rs` | 门本身：保护面（`PROTECTED_PREFIXES`、`PROTECTED_FILES`、`PRODUCED_PREFIXES`、`REGISTER`、`is_protected`）、被判面（`JUDGED_PREFIXES`、`is_judged`）、两边的纯函数（`gate_faces`、`judged_faces`）、登记表划行的 diff 形状（`Row`、`exemption_row`、`strikes_only_exemptions`）、模块行移除的路径级判定（`deletes_module_row`、`row_path`），以及区间编排（`check`）与 `apisync` 共用的 git 读法（`changed_paths`、`changed_paths_with_status`、`git_text`、`git_lines`） |
+| `xtask/src/guard/tests.rs` | 原内联 `mod tests` 原样迁出，9 个测试一个不少 |
+
+**无字段开放**：`tests` 是 `guard` 的子模块，`use super::{gate_faces, is_protected, judged_faces, row_path, strikes_only_exemptions};` 一字未改即可看见父模块的私有项，故没有一个项因这次切分而放宽可见性。`main.rs` 与 `gates.rs` 经 `guard::check`、`apisync.rs` 经 `guard::git_lines` 与 `guard::changed_paths_with_status` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
+
+**判据一处未松**：`TRAILER`、两张保护表、被判前缀表、`strikes_only_exemptions` 的两种缩小形状与 `deletes_module_row` 的删增判定逐字节照搬，拒词三段（rule／violation／alternative）同样逐字节照搬；父文件尾部只多出 `#[cfg(test)]` 与原有的 `#[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]` 加一行 `mod tests;`，lint 名不增不减。`[file_length.predating]` 里 `"xtask/src/guard.rs" = 508` 一行按规则划掉——这道门判的正是这种划行，而 `strikes_only_exemptions` 认它为「只做除名」的缩小形状，故这次改动本身无需 `Verdict:` 尾注。
+
+
+### 8-7 xtask::badge 目录化（card-5.2）
+
+`badge.rs` 一文件 436 行，测试迁出后成为一个目录，两个文件各答一个问题：
+
+| 文件 | 它回答什么 |
+|---|---|
+| `xtask/src/badge.rs` | 徽章本身：登记册里哪些行要徽章（`Plan`、`plans`、`planned`、`platform`）、写与判（`write`、`check`）、调色板与字号（`Palette`、`palette`、`human`、`text_width`、`render`）、以及 OKLCH→sRGB 的一次换算（`srgb_hex`、`srgb_channels`、`channel`） |
+| `xtask/src/badge/tests.rs` | 原内联 `mod tests` 原样迁出，7 个测试一个不少 |
+
+**无字段开放**：`tests` 是 `badge` 的子模块，`use super::*;` 一字未改即可看见父模块的私有项（含 `Palette` 的四个字段），故没有一个项因这次切分而放宽可见性。`budget.rs` 经 `crate::badge::check`、`main.rs` 经 `badge::write` 与 `badge::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
+
+**判据一处未松**：三条纪律（颜色取自 `web::theme` 的灰阶、平台自报、陈旧即红）与拒词三段（rule／violation／alternative）逐字节照搬，只换了测试所在的文件；父文件尾部的 `#[allow(...)]` lint 名不增不减。`[file_length.predating]` 里 `"xtask/src/badge.rs" = 436` 一行按规则划掉。
