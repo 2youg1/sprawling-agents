@@ -594,3 +594,81 @@ impl CityPlan { pub fn hall(&self) -> &(Address, BuildingTemplate); }   // 恒�
 - **路径权威仍只有一个**：`city::resident::urbanite_path` 先问 `spine_files::hall_identity_path`，无答再拼 `<addr>/URBANITE.md`。`Identity::load` 一字不改，因此「有身份文件即居民」这条规则对市政厅与对普通房间是同一条。
 - `write: documents` 由 `policy::evaluate` 读成 `DomainReach`；缺这一行读作 `Everything`，因为既有的每一栋楼都没写这一行，而它们的写域没有变。值既不是 `everything` 也不是 `documents` 时拒绝，理由与 `confidential:` 同：读成打字错误的权限设置不能落到宽松那一侧。
 - 被否：给 Mayor 一个覆盖全城的 `Everything` 写域，靠 `MAYOR.md` 的措辞请它别碰代码——把不变量交给提示词，等于没有不变量。
+
+### 8-21 city::gitignore：一栋楼承诺的东西进历史，一次会话在想的东西不进（v0.0.4 card-5.5）
+
+**需求**：`building::create`（raise）与 `building::adopt` 立起一栋楼时，同时放下两样东西：一份 `SPEC.md`，和一份 `.gitignore`。
+
+**接口**：
+
+```rust
+// city::gitignore（形状 6 数据面＋一个幂等落盘动作）
+pub const GITIGNORE_FILE: &str = ".gitignore";
+/// 把本城的忽略规则补进这栋楼的 .gitignore。已有的字节一行不删，
+/// 缺哪行补哪行；文件不存在则整份写出。
+pub(crate) fn place(building_root: &Path) -> Result<(), AxError>;
+
+// city::spine_files
+pub const SPEC_FILE: &str = "SPEC.md";   // 字节来自 docs/templates/SPEC.md（include_str!）
+```
+
+- **不对称本身就是这张卡的全部内容**：`SPEC.md` 与 `.sprawling/` 进版本库，`Roadmap.md`、`Memo.md`、`Handoff.md` 与各个房间不进。一栋楼向外承诺的东西必须在历史里，任何一次克隆都读得到；一次会话当时在想什么不是承诺，它留在这台机器上。
+- **`SPEC.md` 是十七节 crate SPEC 的压缩式，不是第二种形状**：`docs/templates/SPEC.md` 的十二节逐节对应 crate SPEC 的节次（需求／验收／假设／权威／命名／边界／接口／错误／依赖／硬编码／测试／决策），只是把「现状分析、工作流程、实现逻辑、影响面、模型体验、文档同步」这几节留给 crate 自己。它压缩，不另起。
+- **`place` 只追加，从不重写**：被收编的目录往往已经有一份 `.gitignore`，里面写着这个项目自己的东西。整份覆盖会把它们冲掉，而那正是 adopt 承诺不会碰的字节。判据是逐行比对（去空白后相等即视为已有），因此重复 raise 不会把同一段追加两次。
+- **显式的两行反忽略**：`!SPEC.md` 与 `!.sprawling/` 写进块里，而不是靠「没人忽略它们」这个默认。被收编的仓库可能已经忽略了 `*.md` 或一切点开头的目录；那时「这栋楼的承诺在历史里」就是假的，而没有人会发现。
+- **房间由房间自己忽略**：`room::open` 在新开的房间里放一份只有 `*` 一行的 `.gitignore`。楼这一层的 `.gitignore` 写不出「房间」——房间是人当场命名的普通子目录，立楼时它们还不存在，而在被收编的仓库里按通配符去猜哪个子目录是房间会误伤源码目录。
+- 被否：在楼的 `.gitignore` 里写 `*/JOB.md`、`*/URBANITE.md` 一类通配。它只忽略房间里的某几个文件名，会让一次会话的其余产物照样进历史，等于把这条规则写成一半。
+
+### 8-22 city::vocation：一个地址上的居民是来建造的还是来规划的（v0.0.4 card-5.3）
+
+**接口**：
+
+```rust
+// city::vocation（形状 1 判定；无 I/O、无时钟）
+pub enum Vocation { Builds, Plans }   // 穷尽；第三种职分＝第三个臂
+pub fn vocation_of(building: &Address) -> Vocation;
+```
+
+- **按地址判，不按提示词判**：City Hall 的居民写 Markdown 和计划，不建造。装配层据此为它组工具台：没有 `exec`、没有 `delegate`、没有 `workshop`。把这件事交给 `MAYOR.md` 的措辞，就是把不变量交给提示词。
+- **返回穷尽枚举而不是 bool**：`is_hall()` 只答得出「是不是市政厅」，而调用点要问的是「这个地址上的人是干什么的」。第三种职分出现时，缺臂是编译错误，不是一个悄悄落到 `else` 里的新楼。
+- **判据是首段等于 `kernel::consts_policy::HALL_BUILDING`**：`hall` 这个名字只有一处权威，本模块不重抄字面量。
+
+### 8-23 city::city_tool：市政厅对城市本身的那一扇门（v0.0.4 card-5.3）
+
+**接口**：
+
+```rust
+// city::city_tool（形状 4 适配器）
+pub struct CityTool { /* city_root —— 私有 */ }
+impl CityTool { pub fn new(city_root: &Path) -> Result<CityTool, AxError>; }
+// 工具名 `city`；action ∈ { raise, adopt, list }
+// raise:  { name, template }  —— template 缺省 `minimal`
+// adopt:  { name }
+// list:   —— 无参，答本城的楼与每栋楼是否已有 BUILDING.md
+```
+
+- **`Effect::Govern`，不是 `Effect::Write`**：立一栋楼是在城根下造目录，任何写域都够不到那里，理由与 `rules_tool` 同——这个决定是人的。门本身把它交给人，而不是靠写域的拒绝去兜。
+- **三个动作一条目录行**：`list` 是 `raise` 与 `adopt` 的前提（叫什么名字、哪个目录已经在那儿），拆成第二个工具只会多一行给模型读。
+- **动作不认即拒并报出已知集**：猜错这里意味着把「收编一个已有目录」执行成「新建一栋空楼」，而后者会在人的工作目录旁边多出一份不属于它的模板。
+- **本工具只装给市政厅的居民**（见 8-22）。别的楼要新增一栋楼，走人的控制面。
+
+### 8-24 Handoff 从楼搬到房间（card-11.6）
+
+> 权威在 runtime-SPEC §8-33；本节只记 city 这一侧怎么变。
+
+`handoff_path(city_root, room)` 与 `handoff(city_root, room)` 的第二个参数从楼地址改为**房间地址**：`<city>/<room>/Handoff.md`。签名一字不变，变的是调用方递什么——装配层的 `run_segment` 递本跑的地址。模板由 `room::open` 在打开房间时经 `spine_files::lay_out_handoff` 铺下；楼级 `lay_out` 不再铺 `Handoff.md`。理由是 card 3.5 的同楼并发：两个房间同时冻结，一份楼级文件就是两份内容抢一个名字。没有房间的地址（直接派到楼根的跑）读到 `None`，与从前空表单的读法一致。
+
+### 8-24 city::governed：治理这座城的三份文件（card-5.4；形状 4 adapter）
+
+```rust
+pub const PREFERENCES_FILE: &str = "PREFERENCES.md";
+pub enum Governed { Mayor, Clerk, Preferences }
+impl Governed { pub fn file(self) -> &'static str; pub fn path(self, city_root: &Path) -> PathBuf; }
+pub fn write_governed(city_root: &Path, which: Governed, body: &str) -> Result<PathBuf, AxError>;
+```
+
+三份文件都住 `<city>/.sprawling/`——没有任何写域够得到的地方（card-5.1 已把前两份放在那里）。**本模块之所以是一扇门而不是三个调用方各自拼一条路径**：能自己拼路径的调用方就能拼出一条走出保留子树的路径，那样「居民改不了治自己的东西」就成了靠习惯成立而不是靠构造成立。
+
+- **`Preferences` 是第三份而不是第三个居民**：市长与文书各有身份文件，而「这个人怎么喜欢这座城办事」不属于任何一个居民，它属于城；它与前两者被同一条规矩治理，所以住同一处、走同一扇门。
+- **整份覆写**：这是人在一个框里编辑、按一次保存的文件，写一半会让这座城被半句话治理。上一版不留在这里——账本上那行 `governed_document_written` 才是回头看的地方。
+- **枚举而不是文件名字符串**：文件名是城的答案，不是发帧的人的答案（channels-SPEC §8-19 同一条理由，两侧各说一次）。

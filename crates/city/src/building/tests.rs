@@ -165,3 +165,59 @@ fn adopting_an_existing_directory_keeps_every_file_it_found() {
         Some(&serde_json::Value::Bool(true))
     );
 }
+
+/// The asymmetry card 5.5 exists for: what a building promises is in
+/// history, what one session was thinking is not.
+#[test]
+fn a_raised_building_ignores_its_roadmap_and_tracks_its_spec() {
+    let dir = tempfile::tempdir().unwrap();
+    let building = create(dir.path(), &addr("lab"), BuildingTemplate::Minimal).unwrap();
+    let root = building.root(dir.path());
+    assert!(
+        root.join(crate::spine_files::SPEC_FILE).is_file(),
+        "a raised building starts with the SPEC form it is built from"
+    );
+    let ignored = std::fs::read_to_string(root.join(crate::gitignore::GITIGNORE_FILE)).unwrap();
+    for line in [
+        crate::spine_files::ROADMAP_FILE,
+        "Memo.md",
+        crate::spine_files::HANDOFF_FILE,
+    ] {
+        assert!(
+            ignored.lines().any(|row| row.trim() == line),
+            "{line} is one session's thinking and does not belong in history"
+        );
+    }
+    for kept in ["!SPEC.md", "!.sprawling/"] {
+        assert!(
+            ignored.lines().any(|row| row.trim() == kept),
+            "{kept} is what the building promises and must survive an outer ignore rule"
+        );
+    }
+}
+
+/// Adoption draws the same line over a directory that already had one
+/// of its own, and takes nothing away from it.
+#[test]
+fn an_adopted_directory_keeps_what_it_already_ignored() {
+    let city = tempfile::tempdir().unwrap();
+    let repo = city.path().join("imported");
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join(".gitignore"), "target/\n*.log\n").unwrap();
+
+    adopt(city.path(), &addr("imported")).unwrap();
+    let ignored = std::fs::read_to_string(repo.join(".gitignore")).unwrap();
+    for kept in ["target/", "*.log"] {
+        assert!(
+            ignored.lines().any(|row| row.trim() == kept),
+            "adoption overwrote what the directory already ignored"
+        );
+    }
+    assert!(ignored.lines().any(|row| row.trim() == "Roadmap.md"));
+    assert!(ignored.lines().any(|row| row.trim() == "!SPEC.md"));
+
+    // Placing it twice appends nothing: the block is already there.
+    let again = crate::gitignore::place(&repo)
+        .map(|()| std::fs::read_to_string(repo.join(".gitignore")).unwrap_or_default());
+    assert_eq!(again.unwrap(), ignored, "the block was appended twice");
+}

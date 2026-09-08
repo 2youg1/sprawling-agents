@@ -248,6 +248,10 @@ pub fn create(
             // After the refusal point, not before it: a building that
             // was refused leaves nothing of itself behind.
             crate::spine_files::lay_out(&root, addr)?;
+            // Last, and appending rather than writing: a directory being
+            // adopted usually has ignore rules of its own, and those are
+            // the bytes adoption promises not to touch.
+            crate::gitignore::place(&root)?;
             Ok(building)
         }
         Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Err(AxError::failure(

@@ -4,9 +4,11 @@ impl city::Building
 impl city::BuildingRules
 impl city::BuildingTemplate
 impl city::CityPlan
+impl city::CityTool
 impl city::ConfigLayer
 impl city::Dossier
 impl city::Entry
+impl city::Governed
 impl city::Identity
 impl city::Library
 impl city::Link
@@ -18,6 +20,7 @@ impl city::RunBrief
 impl city::Schedule
 impl city::Source
 impl city::Watch
+impl kernel::tool::Tool for city::CityTool
 impl kernel::tool::Tool for city::NeighboursTool
 impl kernel::tool::Tool for city::RulesTool
 pub city::ArchiveEntry::at: std::path::PathBuf
@@ -36,6 +39,9 @@ pub city::Cadence::EveryMinutes(u64)
 pub city::Cadence::WeeklyAt(u64)
 pub city::DomainReach::Documents
 pub city::DomainReach::Everything
+pub city::Governed::Clerk
+pub city::Governed::Mayor
+pub city::Governed::Preferences
 pub city::Holding::addr: kernel::address::Address
 pub city::Holding::disclosure: alloc::string::String
 pub city::Holding::hash: kernel::locator::B3Hash
@@ -45,7 +51,6 @@ pub city::Holding::section: alloc::string::String
 pub city::Identity::Ephemeral
 pub city::Identity::Ephemeral::addr: kernel::address::Address
 pub city::Identity::Resident(city::Resident)
-pub city::JobBrief::budget: &'a str
 pub city::JobBrief::goal: &'a str
 pub city::JobBrief::task: &'a str
 pub city::Layer::Building
@@ -75,6 +80,8 @@ pub city::Standing::Empty
 pub city::Standing::Work
 pub city::Standing::Work::adoptable: alloc::vec::Vec<kernel::address::Address>
 pub city::Standing::Work::loose: usize
+pub city::Vocation::Builds
+pub city::Vocation::Plans
 pub const city::ARCHIVE_DIR: &str
 pub const city::BUILDING_FILE: &str
 pub const city::BUILDING_SHELF: &str
@@ -85,6 +92,7 @@ pub const city::HANDOFF_FILE: &str
 pub const city::JOB_FILE: &str
 pub const city::LIBRARY_DIR: &str
 pub const city::MAYOR_FILE: &str
+pub const city::PREFERENCES_FILE: &str
 pub const city::ROADMAP_FILE: &str
 pub const city::SCHEDULE_FILE: &str
 pub const city::URBANITE_FILE: &str
@@ -93,12 +101,14 @@ pub enum city::ArchiveKind
 pub enum city::BuildingTemplate
 pub enum city::Cadence
 pub enum city::DomainReach
+pub enum city::Governed
 pub enum city::Identity
 pub enum city::Layer
 pub enum city::Link
 pub enum city::ModelPool
 pub enum city::Occupancy
 pub enum city::RunBrief
+pub enum city::Vocation
 pub fn city::ArchiveKind::as_str(self) -> &'static str
 pub fn city::ArchiveKind::parse(&str) -> core::result::Result<city::ArchiveKind, kernel::error::shape::AxError>
 pub fn city::Building::addr(&self) -> &kernel::address::Address
@@ -119,6 +129,9 @@ pub fn city::CityPlan::dirs(&self) -> &[kernel::address::Address]
 pub fn city::CityPlan::first(&self) -> core::option::Option<&(kernel::address::Address, city::BuildingTemplate)>
 pub fn city::CityPlan::hall(&self) -> &(kernel::address::Address, city::BuildingTemplate)
 pub fn city::CityPlan::new(core::option::Option<(&str, &str)>) -> core::result::Result<city::CityPlan, kernel::error::shape::AxError>
+pub fn city::CityTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
+pub fn city::CityTool::meta(&self) -> &kernel::tool::ToolMeta
+pub fn city::CityTool::new(&std::path::Path) -> core::result::Result<city::CityTool, kernel::error::shape::AxError>
 pub fn city::ConfigLayer::effort(&self) -> core::option::Option<kernel::model::wire::Effort>
 pub fn city::ConfigLayer::mcp(&self) -> core::option::Option<&[kernel::config::McpServer]>
 pub fn city::ConfigLayer::parse(&str) -> core::result::Result<city::ConfigLayer, kernel::error::shape::AxError>
@@ -135,6 +148,8 @@ pub fn city::Entry::cadence(&self) -> city::Cadence
 pub fn city::Entry::goal(&self) -> &str
 pub fn city::Entry::name(&self) -> &str
 pub fn city::Entry::task(&self) -> &str
+pub fn city::Governed::file(self) -> &'static str
+pub fn city::Governed::path(self, &std::path::Path) -> std::path::PathBuf
 pub fn city::Identity::addr(&self) -> &kernel::address::Address
 pub fn city::Identity::load(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::Identity, kernel::error::shape::AxError>
 pub fn city::Identity::segment_bytes(&self) -> alloc::vec::Vec<u8>
@@ -202,9 +217,11 @@ pub fn city::rooms(&std::path::Path, &kernel::address::Address) -> core::result:
 pub fn city::schedule_path(&std::path::Path) -> std::path::PathBuf
 pub fn city::survey(&[(alloc::string::String, bool)], bool) -> city::Standing
 pub fn city::urbanite_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
+pub fn city::vocation_of(&kernel::address::Address) -> city::Vocation
 pub fn city::watch_path(&std::path::Path) -> std::path::PathBuf
 pub fn city::write_brief(&std::path::Path, &kernel::address::Address, &city::JobBrief<'_>) -> core::result::Result<city::RunBrief, kernel::error::shape::AxError>
 pub fn city::write_effort(&std::path::Path, &kernel::address::Address, kernel::model::wire::Effort) -> core::result::Result<(), kernel::error::shape::AxError>
+pub fn city::write_governed(&std::path::Path, city::Governed, &str) -> core::result::Result<std::path::PathBuf, kernel::error::shape::AxError>
 pub fn city::write_job(&std::path::Path, &kernel::address::Address, &city::JobBrief<'_>) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
 pub fn city::write_mcp(&std::path::Path, &kernel::address::Address, city::Layer, &[kernel::config::McpServer]) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::write_rules(&std::path::Path, &kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
@@ -214,6 +231,7 @@ pub struct city::ArchiveEntry
 pub struct city::Building
 pub struct city::BuildingRules
 pub struct city::CityPlan
+pub struct city::CityTool
 pub struct city::ConfigLayer
 pub struct city::Dossier
 pub struct city::Entry
