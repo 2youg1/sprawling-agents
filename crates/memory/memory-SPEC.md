@@ -329,29 +329,120 @@ pub struct AttributionReport { pub total: UsdMicros, pub by_run: Vec<(String, Us
 - S3.06 落地记录：读取契约定死三条——`prompt_assembled` 携 `segments:[{slot,len}]`（两种载荷形均有此二字段）与可选 `window_bytes`（缺即不设 window 桶）；`tool_result` 携 `name` 与 `bytes`；`model_returned` 携 `billed_usd_micros`。**无权威计费额即归因零**（估算等于臆造钱，宁不报）；无权重基础即入诚实桶 `unattributed`／`no_tool`（不静默丢）。工具权重只属一波：结算即清，下一调用不继承上波。A20 除四断言外另以 256 例 proptest 钉（任意金额×权重组合均恒等）。
 - 取材：`model_returned.data.billed_usd_micros`（权威计费额，S3.01 起入账）；`prompt_assembled` 逐段 len；`tool_result` 的 name。每维度独立分割同一总额：by_run/by_actor 按事件归属；by_segment 按最近一条 prompt_assembled 的段 len 最大余额法分割（四段＋window 桶：入窗历史份额）；by_tool 按前一波 tool_result 字节最大余额法（无波则 no_tool 桶）。最大余额法使每维度和恒精确＝total（A20 的整数保证）。
 
+### 8-17 memory::checkpoint::provenance（card-2.1；形状 2 值）
+
+```rust
+/// 一次运行选定的模型，两者恒同行：模型 id 与它被要求的思考档位。
+pub struct ModelChoice { pub id: String, pub effort: Option<kernel::Effort> }
+
+/// 一次提交出自谁：唯一构造点在 `Provenance::new`，字段私有。
+pub struct Provenance { /* run、actor、model、effort、city —— 私有 */ }
+impl Provenance {
+    pub fn new(run: RunId, actor: Address, city: B3Hash, chosen: ModelChoice) -> Provenance;
+    /// 城的身份＝创世行的链哈希，从账本首段的第一行读出（只读一行）。
+    pub fn city_of(ledger_dir: &Path) -> Result<B3Hash, MemoryError>;
+    /// git trailers 块，顺序与拼写恒为下列五行，末尾带换行。
+    pub fn trailers(&self) -> String;
+    pub fn actor(&self) -> &Address;
+    pub fn run(&self) -> RunId;
+}
+```
+
+```
+Sprawling-Run: <run>
+Sprawling-Actor: <actor>
+Sprawling-Model: <model>
+Sprawling-Effort: <effort or none>
+Sprawling-City: <hex>
+```
+
+- **决定（D13）：每一个由城作出的提交都带上作出它的会话。** 提交署名从固定身份
+  `sprawling <sprawling@local>` 改为 `<actor> <<actor>@<city 前 12 位 hex>.sprawling>`，
+  正文改为 `<subject>\n\n<trailers>\n`。一个人 `git log` 一眼看得出这一行出自哪个居民、
+  哪次运行、哪个模型；`git interpret-trailers --parse` 读得出结构。
+- **被否的另一条路：把这些事实塞进 subject。** subject 是给人读的一行，塞五个字段就没人读它了；
+  trailers 是 git 自己就有的机制（`interpret-trailers`），复用它比发明一种前缀语法更省。
+- **账本仍是权威。** trailers 是**给城外读者的投影**，不是第二个事实来源：谁做了什么由 Ledger
+  回答，两边靠 oid 对上（`checkpoint_committed.oid` 与 `file_discarded.restoration`）。
+  trailers 与账本不一致时以账本为准，trailers 是要修的那一侧。
+- **effort 的字面来自 serde 的名字**（`kernel::Effort` 是 `#[non_exhaustive]` 的
+  `snake_case`），所以「档位怎么拼」在这个仓库里只有一处权威；缺档位写 `none`。
+  模型 id 未知时写空串——写一个假的 id 比写空更糟。
+- **`city_of` 只读第一行**：整本账本可以有几十兆，而创世行是第一段文件的第一行。
+
+### 8-18 trailers 的账本一侧（card-2.4；随 8-17）
+
+```rust
+impl Provenance {
+    /// 一条账本记录要携的两个事实：模型与档位。run 与 actor 已经是记录自己的身份
+    /// （`EventRecord::run` 与 `addr`），在载荷里重复它们等于给同一个事实立第二个权威。
+    pub fn model_fields(&self) -> serde_json::Map<String, serde_json::Value>;
+}
+
+/// 读回 `model_fields` 写下的东西。键缺失或读不成即空 id 与无档位。
+pub fn model_choice_of(data: &serde_json::Map<String, serde_json::Value>) -> ModelChoice;
+
+/// 档位怎么拼的唯一权威（取自 `kernel::Effort` 的 serde 名，缺即 `none`）。
+pub fn effort_word(effort: Option<kernel::Effort>) -> String;
+```
+
+- **决定（D17）：`checkpoint_committed` 与 `pr_merged` 的载荷各多两个键 `model` 与 `effort`。**
+  8-17 写着「trailers 是投影，账本是权威」；在 card-2.4 之前这句话对 model 与 effort 并不成立——
+  这两个事实只存在于 git 提交上，账本里一个字都没有。补上这个缺口，`sprawling whose` 才能
+  只读账本作答（`bin::views`，sprawling-SPEC §8-41）。
+- **写与读住同一个文件**：`model_fields` 与 `model_choice_of` 相邻而居；档位的拼写仍取自
+  `kernel::Effort` 自己的 serde 名字，与 trailers 同一处，于是「档位怎么拼」全仓仍只有一个权威。
+  `effort_word` 因此转为公开：现在有三个读者把这个词给人看——trailers、账本载荷、
+  以及 `sprawling whose`，而同一个档位三种拼法会让读的人三份都不敢信。
+- **旧记录读得回**：card-2.4 之前写下的 `checkpoint_committed` 没有这两个键，`model_choice_of`
+  对它答空 id 与 `None`——**投影说不知道，好过投影猜一个**。
+- **被否的另一条路：让 `sprawling whose` 去读 git trailers。** 那是把投影当成权威，正是 8-17
+  明确拒绝的方向；而且一座导出后在别处恢复、`.git` 并不在身边的城将答不出自己的历史。
+
 ### 8-8 memory::checkpoint（S3.07；形状 4；git2）
 
 ```rust
-pub struct Checkpoint { /* repo: git2::Repository、scope: 相对路径前缀 —— 私有 */ }
+pub struct Checkpoint { /* repo: git2::Repository、fences: u64 —— 私有 */ }
 impl Checkpoint {
-    pub fn open(city_root: &Path) -> Result<Checkpoint, MemoryError>;      // 无仓即 init（创世提交由首次 wave_pre 产）
+    pub fn open(city_root: &Path) -> Result<Checkpoint, MemoryError>;      // 无仓即 init（创世提交由 ensure_base 产）
     /// Commits once when the repository has no HEAD, and never otherwise.
     /// P3.02: a worktree branches from a commit, so a city that was never
     /// fenced cannot lend a tree; committing on every dispatch instead
     /// would move the trunk under every request already waiting.
-    pub fn ensure_base(&mut self, scope: &str, t: TimeMs, who: &str) -> Result<Option<Payload>, MemoryError>;
-    /// Pre-wave fence: add -A within scope + commit at injected time.
-    /// Returns the checkpoint_committed payload {oid, files}.
-    pub fn wave_pre(&mut self, scope: &str, t: TimeMs, who: &str) -> Result<Payload, MemoryError>;
+    pub fn ensure_base(&mut self, scope: &str, t: TimeMs, of: &Provenance) -> Result<Option<Payload>, MemoryError>;
+    /// Pre-wave fence: add -A within scope, then a **dangling** commit
+    /// pointed at by refs/sprawling/runs/<run>/<seq>. HEAD does not move.
+    /// Returns the checkpoint_committed payload
+    /// {oid, scope, files, model, effort} (the last two: card-2.4, §8-18).
+    pub fn wave_pre(&mut self, scope: &str, t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
     pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, MemoryError>;
+    /// card-2.3：把工作树提交到**当前分支**（HEAD 移动），供一次评审运行
+    /// 在自己的 worktree 里献出成果时使用。返回落地的 oid。
+    pub fn land(&mut self, t: TimeMs, of: &Provenance, subject: &str) -> Result<String, MemoryError>;
     /// Staged-diff secret scan; a hit refuses the commit (E_SECRET_EGRESS,
     /// positions only, never the bytes). V3.05: 只扫这一次会新提交进去的
     /// blob——基线那一次仍然全扫。
     pub fn scan_staged(&mut self) -> Result<(), MemoryError>;
 }
 ```
+
+- **决定（D16）：工具波的栅栏离开 HEAD。** 8-13 结尾那条「尚未裁定的事」在此裁定：
+  城是围绕人已有的文件夹形成的，而每一次工具波都往人自己的分支历史里写一个
+  `checkpoint:` 提交——一个被采纳的仓库于是每波长一格。`wave_pre` 改为写一个
+  **dangling commit**（`update_ref = None`，父为当前 HEAD 提交，无 HEAD 时无父），
+  再把引用 `refs/sprawling/runs/<run>/<seq>` 指向它。`git log HEAD` 从此跨波不增长，
+  而 oid 照旧可 checkout、`wave_post` 与 `memory::changes` 照旧从 oid 工作。
+- **被否的另一条路：把栅栏留在 HEAD。** 它让人的历史被机器的簿记淹没——一天的工作里
+  几百个 `checkpoint:` 行，人自己的提交夹在中间找不到。留在 HEAD 唯一买到的是
+  「不用写引用」，而写一个引用是一行。
+- **`<seq>` 用 Checkpoint 自己每次 open 起算的计数器，不用账本 seq。** 理由是简单：
+  栅栏是在一个拿不到账本位置的闭包里升起的（`runtime::bench` 的预测栅栏尤其如此），
+  把账本位置穿到那里要多一个参数与一条新的耦合。引用只是**给人找路用的**，
+  权威是账本里的 oid；两个 open 的计数器撞名时后写的引用覆盖前一个，而被覆盖的
+  提交仍由账本里的 oid 指得到。
+- **`ensure_base` 仍然移动 HEAD**：worktree 从一个提交分枝，城必须先有第一个提交。
 
 - V3.05 落地记录（**扫改动过的 blob，不扫整棵树**，携 `Verdict:`）：原实现遍历 git index 里的**每一个** blob，对**整份内容**跑 `kernel::secret::scan`，**每一次工具波都跑一遍**。实测 4.89 MB／350 文件的树：纯 CPU **212 ms** 每波，另加从 git 对象库 zlib 解压每一个 blob 的开销。**改了一个文件的波，付整棵树的钱。**
   - 改成 `diff_tree_to_index(HEAD 树, index)`：git 自己报出这一次提交会新写进去的条目，只有它们被读出内容并扫描。与 V3.06 的 `wave_post` 同一个动作——**问 git 什么变了，而不是自己逐文件推**——于是这两处的「什么算改动」由同一个机制回答。
@@ -364,7 +455,7 @@ impl Checkpoint {
   - `Checkpoint::root` 随之删除——它存在的唯一理由就是拿来 stat，clippy 在改完当场报了它。
 - S3.07 落地记录（checkpoint）：`open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存用 `add_all`＋`update_all` 两步（后者含删除），glob 限于 `<scope>/*`。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `MemoryError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`，**此码由此获得首个消费者，待消解清单可划去一条**）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
 - P2.03 补：`open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而这台机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置（P2.03 的 worktree 检出抳出此事）。
-- 提交身份固定 `sprawling <sprawling@local>`；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
+- 提交身份见 8-17（card-2.1 之前是固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
 
 ### 8-13 memory::changes（ux-14；形状 4 适配器；git2）
 
@@ -395,10 +486,9 @@ pub fn between(city_root: &Path, base: GitOid, head: Head)
 **不缓存。** 两个 oid 都不可变，所以结果可以永久缓存（`digest_cache` 是现成先例）；
 但先测再调，未测到慢之前多一张表就是多一份要同步的状态。
 
-**一件尚未裁定的事（不阻本卡）**：`Checkpoint::commit` 写的是城仓库的 `HEAD`，而城是围绕
-人已有的文件夹形成的（`web::drop` 的文档明写）。即每一次工具浪都在往人自己的分支历史里写 commit。
-Conductor 与 Kilo Code 都明确拒绝了这条路，改用独立快照仓库。本卡只读不写，结论不受影响；
-但**在把这些 commit 摆进界面给人看之后，这个问题会变得更难改**。
+**那件尚未裁定的事，已由 card-2.1／D16 裁定**：`wave_pre` 不再写 `HEAD`，而是写一个
+dangling commit 并由 `refs/sprawling/runs/<run>/<seq>` 指住（见 8-8）。本模块只读不写，
+从 oid 工作，结论逐字不变。
 
 ### 8-9 memory::worktree（P2.03；形状 4 适配器＋形状 2 值类型；git2）
 
@@ -412,7 +502,20 @@ impl Worktrees {
     pub fn release(&self, lease: WorktreeLease) -> Result<(), MemoryError>;
     pub fn live(&self) -> Result<Vec<WorktreeName>, MemoryError>;
     /// P2.07：把一个节点已提交的活带进城的 trunk，返回落地的 commit。
-    pub fn merge(&self, name: &WorktreeName) -> Result<String, MemoryError>;
+    pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, MemoryError>;
+}
+/// card-2.3：一次合并要写下的东西，四个恒同行的值合成一个。
+pub struct Landing<'a> {
+    pub t: TimeMs,
+    pub of: &'a Provenance,
+    pub subject: &'a str,
+    /// 人亲自看过。真且仓库 git config 里有 user.name 与 user.email 时，
+    /// 消息多一行 `Reviewed-by: Name <email>`。
+    pub reviewed_by_person: bool,
+}
+impl PlannedMerge<'_> {
+    pub fn commit(&self) -> String;
+    pub fn apply(self, landing: &Landing<'_>) -> Result<(), MemoryError>;
 }
 impl WorktreeLease {
     pub fn name(&self) -> &WorktreeName;  pub fn path(&self) -> &Path;  pub fn disk(&self) -> ByteLen;
@@ -425,6 +528,15 @@ impl WorktreeLease {
 - **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但不在本卡——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。
 - **路径不入历史**：`worktree_opened` 载荷只携 name 与字节数。绝对路径是本机事实，写进账本会使一本能搬到另一台机器的历史带上搬不走的东西。
 - **merge 只走 fast-forward**（P2.07）：trunk 在节点分枝之后动过即 `MergeStale`（→`E_VERSION_CONFLICT`），不由机器把一份活重放到别人的活上面——能说出「这份活是否仍然适用」的是做它的人。拒后城内文件逐字节不变（一条断言）。
+- **落地的形状改成真合并提交**（card-2.3）：`apply` 不再只把 trunk 的指针挪过去，而是造一个
+  **双亲**提交（trunk 当前提交在前、节点提交在后），树取节点的树，消息为
+  `<subject>\n\n<trailers>`。**判定不变**——仍然只在 fast-forward 时才允许，
+  refusal 仍在 `plan_merge` 里发生；变的只是历史里留下什么：一次合并从此在
+  `git log` 里是一件事，而不是一次无声的指针移动。被否的另一条路是继续做指针移动：
+  那样合并没有自己的消息，也就没有地方挂 trailers 与 `Reviewed-by:`。
+- **`Reviewed-by:` 只在两件事同时成立时出现**：调用方传了 `reviewed_by_person: true`，
+  且这台机器的仓库 git config 里同时有 `user.name` 与 `user.email`。人的名字是人的，
+  城不替人编一个。
 - **空仓即拒并说出原因**：worktree 从一个提交分枝，而新城在首次 checkpoint 之前没有提交；本模块恒不自建创世提交（那是 `checkpoint` 的职责，两个写入者就是两个权威）。
 
 ### 8-10 memory::queue（S3.07；形状 7）
