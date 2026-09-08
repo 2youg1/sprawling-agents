@@ -10,6 +10,9 @@ kernel = { path = "../kernel" }
 memory = { path = "../memory" }
 serde.workspace = true
 serde_json.workspace = true
+# card-11.4: the sieve's filter table is a TOML file in the reserved
+# subtree, and its shape has one reader.
+toml.workspace = true
 # Execution boundary. Pinned at 48: carries the
 # path_open TRUNCATE bypass fix (GHSA-2r75-cxrj-cmph) and the
 # hard-link/rename FilePerms bypass fix (CVE-2026-58494). wasip1 only —
@@ -23,6 +26,8 @@ wasm = ["dep:wasmtime", "dep:wasmtime-wasi"]
 conformance = ["kernel/conformance"]
 
 [dev-dependencies]
+insta.workspace = true
+proptest.workspace = true
 tempfile.workspace = true
 trybuild.workspace = true
 # A10's three assertions are pinned with hand-written WAT so the gate
