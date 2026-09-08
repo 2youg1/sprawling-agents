@@ -9,6 +9,23 @@
 //! There is no inline waiver: a waiver comment would be a hole injected
 //! content could drive through. Also enforces the `Sealed::expose` call
 //! site whitelist ('s redemption points).
+//!
+//! **The subject is plaintext credentials reaching the tree**, not
+//! high-entropy bytes existing somewhere. So the gate scans **authored**
+//! files. A **derived** file - one whose bytes a tool computed from inputs
+//! this same gate already scans - is not a place where a credential can
+//! first arrive, and judging it re-judges its inputs through a lossy copy.
+//! `is_derived` names the two classes the tree holds, each with the input
+//! that is scanned in its place.
+//!
+//! Priced this way after card-6.1 and card-4.1: `client/bun.lock` and two
+//! insta snapshots produced 268 findings and zero credentials. The
+//! alternative was a table of 268 byte offsets, which the next
+//! `bun install` invalidates in full - a category question written down as
+//! coordinates. The known limit is recorded in xtask-SPEC.md section 8-9:
+//! a test that read a live credential from the environment and recorded it
+//! into a snapshot would pass here, and the defect in that case is the
+//! test.
 
 use std::path::Path;
 
@@ -55,7 +72,13 @@ const EXPOSE_WHITELIST: [&str; 5] = [
 ///   `crates/web/Cargo.toml` as a feature and in `web::city_view` as the
 ///   type the isometric city is painted through. Twenty-four bytes with
 ///   a digit in it, which is what trips the mixed-alphabet rule.
-const NOT_CREDENTIALS: [&str; 1] = ["CanvasRenderingContext2d"];
+/// - `CC_x86_64_unknown_linux_musl` — Cargo's per-target C compiler
+///   variable, set to `musl-gcc` by the `release.yml` musl job and
+///   quoted in `sprawling-SPEC.md` where that job is argued. It is the
+///   *name* of an environment variable and so can never itself hold a
+///   value; the target triple's digits and underscores are what trip
+///   the mixed-alphabet rule.
+const NOT_CREDENTIALS: [&str; 2] = ["CanvasRenderingContext2d", "CC_x86_64_unknown_linux_musl"];
 
 /// Whether these exact bytes are one of the reviewed identifiers.
 ///
@@ -66,6 +89,22 @@ fn is_reviewed_identifier(found: &[u8]) -> bool {
     NOT_CREDENTIALS
         .iter()
         .any(|known| known.as_bytes() == found)
+}
+
+/// Lockfiles: a package manager writes every byte from a manifest and a
+/// registry, and the `sha512-`/`sha256-` runs in them are integrity
+/// digests of published artifacts, meant for anybody to read. A hand
+/// edit here does not survive the next resolution.
+const LOCKFILES: [&str; 2] = ["Cargo.lock", "bun.lock"];
+
+/// Whether a tool wrote this file rather than a person.
+///
+/// Two classes, and each is scanned at its input instead: a resolved
+/// lockfile, and an insta snapshot - which records what a test produced
+/// from inputs that live in a source file this gate scans.
+fn is_derived(rel: &str) -> bool {
+    let name = rel.rsplit('/').next().unwrap_or(rel);
+    LOCKFILES.contains(&name) || (rel.contains("/snapshots/") && rel.ends_with(".snap"))
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
@@ -79,6 +118,11 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             path: rel.clone(),
             source,
         })?;
+        // Neither class carries a `.rs` name, so the expose whitelist
+        // below loses nothing by this skip.
+        if is_derived(&rel) {
+            continue;
+        }
         for span in kernel::scan(&bytes) {
             let end = span.start.saturating_add(span.len);
             if bytes
@@ -162,6 +206,36 @@ mod tests {
             "a piece of a reviewed name is not the reviewed name"
         );
         assert!(!is_reviewed_identifier(key_shaped().as_bytes()));
+    }
+
+    /// A derived file is not where a credential first reaches the tree.
+    ///
+    /// The lockfile and the snapshot below carry the same key-shaped run
+    /// as the source file; only the source file is authored, so only it
+    /// is reported.
+    #[test]
+    fn a_derived_file_is_judged_by_the_inputs_that_produced_it() {
+        let root = std::env::temp_dir().join(format!("secret-derived-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let body = key_shaped();
+        for rel in [
+            "client/bun.lock",
+            "crates/gateway/src/dialect/snapshots/pinned.snap",
+            "crates/gateway/src/dialect/request.rs",
+        ] {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, &body).unwrap();
+        }
+
+        let found = check(&root).unwrap();
+        let places: Vec<&str> = found.iter().map(|v| v.location.as_str()).collect();
+        assert_eq!(
+            places,
+            ["crates/gateway/src/dialect/request.rs:byte 0"],
+            "only the authored file is a place a credential can enter"
+        );
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
