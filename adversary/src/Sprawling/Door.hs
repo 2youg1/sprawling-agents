@@ -389,7 +389,6 @@ frameOf = \case
       , "task" .= ("say something" :: Text)
       , "goal" .= ("an answer" :: Text)
       , "mode" .= ("build" :: Text)
-      , "budget" .= object ["usd" .= (1000 :: Word64), "tokens" .= (1000 :: Word64)]
       , "idem" .= idem
       , "session" .= session
       , "effort" .= Aeson.Null

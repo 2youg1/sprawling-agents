@@ -137,7 +137,7 @@ A seam is a trait declared in the inner layer and implemented outside it. **One 
 
 This is the path everything else supports. Following it once explains more than any diagram of boxes.
 
-1. **The page sends a Command.** A person fills in the control surface — address, what to produce, what counts as done — and `web::socket` sends `Command::Dispatch` over the WebSocket. The frame carries no budget: nobody can price a piece of work before it runs.
+1. **The page sends a Command.** A person fills in the control surface — address, what to produce, what counts as done — and `web::socket` sends `Command::Dispatch` over the WebSocket. The frame carries no ceiling of any kind: nobody can price a piece of work before it runs, and the one brake is `Halt`.
 2. **`channels::server` decides whether to accept it.** Two pure judgements — may this address be bound, may this peer be accepted — with the socket code that surrounds them making no judgement at all.
 3. **`bin::assembly` turns it into work.** This is the only place that samples the clock, so the timestamp enters as a parameter from here on. A worker takes the dispatch, and answers every refusal it can owe before it writes anything: the reserved subtree, a halted scope, rules that will not load, and a tag with no model behind it are all decided by `agree_to_work`, which reads and writes nothing. **Opening the room is the first thing this city puts on disk for a dispatch**, so work nobody could take leaves no room behind for a person to find.
 4. **The city writes `run_started` before anything happens.** Every effect becomes an event first; that ordering is the design's load-bearing rule, not a logging preference.
@@ -189,12 +189,12 @@ A run's write domain is what its building's `BUILDING.md` declares, and **the wh
 
 ## 7 The wire
 
-One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is 14.
+One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is 15.
 
 | Frame | Count | What it is |
 |---|---|---|
-| `Command` | 23 | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards |
-| `Query` | 15 | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit |
+| `Command` | 24 | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
+| `Query` | 17 | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |
 
@@ -303,7 +303,7 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 | V2 unit and property | a function wrong across a class of inputs | 1,085 tests, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port |
 | V4 fuzz | parsers meeting hostile bytes | three targets: address, locator, truncated ledger tail |
-| V5 formal | termination, absence of overflow, monotonicity | 3 of 11 kani harnesses, Linux CI — those with an unbounded domain and a solvable one |
+| V5 formal | termination, absence of overflow, monotonicity | 2 of 10 kani harnesses, Linux CI — those with an unbounded domain and a solvable one |
 | V6 deterministic simulation | components each correct and wrong together | citysim, six scenario files, failures reproduced from a seed |
 | V7 mutation | tests that do not bite | `cargo-mutants`, by `just mutants` |
 | V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `fixtures/` |
@@ -312,7 +312,7 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 
 **V10 is not a gate, and the difference is load-bearing.** Section 8 says the wire is the whole API and that a second client writes against it; `adversary/` exercises that permission by writing a third one outside the workspace, in another language, to attack rather than to use. It is reached by `just adversary` and by a schedule, never by `just check` — on a machine with no Haskell toolchain, `just check` behaves byte for byte as it does where the directory is absent, and `just adversary` prints one line and succeeds. What it buys that V2 cannot is quantification over traces: V2 proves that the paths we thought of hold, and V10 asks whether the door's stable error codes survive any prefix, one halt, and any suffix. It has already found three things a specific trace would not have — an exit code that means "no refusal arrived in time" where its own documentation promises "the city refused", a dispatch that writes a job file to disk before the guard that refuses it runs, and an `IdemKey` the wire makes every state-changing command carry that `kernel::gate::dedup` checks and nothing calls. All three are recorded in `adversary/adversary-SPEC.md` section 4; the second is fixed here (card V3.51), the other two are open.
 
-**Four gaps, named rather than hidden.** CI has no browser driver, so V9 is a command a developer runs rather than a gate. The isometric city compares display lists rather than bitmaps: the preconditions for bitmap comparison are paid for — placement is a pure function of the id, painter order is total, projection and its inverse are exact — but there is no rasteriser. And V6 stops below `bin::assembly` (§3): a seeded scenario reproduces a run, not a dispatch, because `RunWorker` builds its model adapter instead of receiving one. What holds the dispatch policy is that module's own tests, plus the integration tests the lib target makes possible. And eight of the eleven kani harnesses are written but not proved, for two different reasons. Seven take concrete input, so each states what the `#[test]` beside it already states — twice over a wider domain — and those same seven build the `Vec`, `String` or `BTreeSet` whose loops CBMC cannot bound: they burned six hours, then forty-five minutes under a bounded unwind, and returned nothing either time. The eighth, `secret::entropy_is_total_on_short_inputs`, has a real domain but an unsolvable shape: some 2,560 symbolic non-linear multiplications, one per slot of a 256-slot count table times ten squarings inside `log2_q10`. CI proves the three that have both an unbounded domain and a tractable one, in under a minute each; closing either gap means rewriting a harness — symbolic without a heap collection, or over one slot rather than the table — rather than waiting longer (P4.05, P4.06).
+**Four gaps, named rather than hidden.** CI has no browser driver, so V9 is a command a developer runs rather than a gate. The isometric city compares display lists rather than bitmaps: the preconditions for bitmap comparison are paid for — placement is a pure function of the id, painter order is total, projection and its inverse are exact — but there is no rasteriser. And V6 stops below `bin::assembly` (§3): a seeded scenario reproduces a run, not a dispatch, because `RunWorker` builds its model adapter instead of receiving one. What holds the dispatch policy is that module's own tests, plus the integration tests the lib target makes possible. And eight of the ten kani harnesses are written but not proved, for two different reasons. Seven take concrete input, so each states what the `#[test]` beside it already states — twice over a wider domain — and those same seven build the `Vec`, `String` or `BTreeSet` whose loops CBMC cannot bound: they burned six hours, then forty-five minutes under a bounded unwind, and returned nothing either time. The eighth, `secret::entropy_is_total_on_short_inputs`, has a real domain but an unsolvable shape: some 2,560 symbolic non-linear multiplications, one per slot of a 256-slot count table times ten squarings inside `log2_q10`. CI proves the two that have both an unbounded domain and a tractable one, in under a minute each (card-11.7 deleted the third, `budget::admit_spend`, along with the ceiling it decided); closing either gap means rewriting a harness — symbolic without a heap collection, or over one slot rather than the table — rather than waiting longer (P4.05, P4.06).
 
 ### Four times a gate changed the design
 
@@ -348,7 +348,7 @@ The machine's data face, parsed by `cargo xtask modmap`: a `.rs` file under `cra
 
 Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (the construction stage that introduced it: S0–S5 skeleton, P1–P4 product, R1 repair, F1 front end, P5–P7 documents, measurement and delivery) **| Status** (`planned`, `building`, `built`, `frozen`).
 
-### kernel (33) — every decision in the city, and nothing that touches a disk
+### kernel (32) — every decision in the city, and nothing that touches a disk
 
 | Module | File | What it owns | Shape | Since | Status |
 |---|---|---|---|---|---|
@@ -368,14 +368,13 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::gate | crates/kernel/src/gate.rs | the five doors, idempotent dedup, and refusal in three parts | decision | S2 | built |
 | kernel::gate::domain | crates/kernel/src/gate/domain.rs | the Domain door: writes land inside the write domain | decision | S2 | built |
 | kernel::gate::egress | crates/kernel/src/gate/egress.rs | the Egress door and its allowlist | decision | S2 | built |
-| kernel::gate::spend | crates/kernel/src/gate/spend.rs | the Spend door: exhaustion escalates as a budget item | decision | S2 | built |
 | kernel::gate::commitment | crates/kernel/src/gate/commitment.rs | the Commitment door: no decision pre-blocks the run | decision | S2 | built |
 | kernel::gate::govern | crates/kernel/src/gate/govern.rs | the Discard, Delegation and Govern doors | decision | S2 | built |
 | kernel::gate::dedup | crates/kernel/src/gate/dedup.rs | idempotent dedup, judged before any side effect | decision | S2 | built |
 | kernel::gate::item | crates/kernel/src/gate/item.rs | the one Escalate item mint, shared by the doors | decision | S2 | built |
 | kernel::taint | crates/kernel/src/taint.rs | outside content is data: union propagation, no unwrapping surface | value | S2 | built |
 | kernel::write_domain | crates/kernel/src/write_domain.rs | which prefixes a resident may write, and edit-war detection | decision | S2 | built |
-| kernel::budget | crates/kernel/src/budget.rs | money and tokens as integers, three layers of ceiling | decision | S2 | built |
+| kernel::budget | crates/kernel/src/budget.rs | money and tokens as integers, and what a run turned out to cost | value | S2 | built |
 | kernel::backpressure | crates/kernel/src/backpressure.rs | the city-wide shedding posture: admit or shed, with a reason | decision | S2 | built |
 | kernel::stall | crates/kernel/src/stall.rs | the sole criterion for "this run is going nowhere" | decision | S2 | built |
 | kernel::goal | crates/kernel/src/goal.rs | two goals wanting the same resource | decision | S2 | built |
@@ -464,6 +463,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::checkpoint::scan | crates/memory/src/checkpoint/scan.rs | staged secrets and scoped commits | adapter | S3 | built |
 | memory::checkpoint::provenance | crates/memory/src/checkpoint/provenance.rs | which session a commit came out of, as five git trailers | value | V4 | built |
 | memory::changes | crates/memory/src/changes.rs | what moved between two checkpoints, as paths and counts and never as patch text | adapter | R2 | built |
+| memory::hunks | crates/memory/src/hunks.rs | one file's patch text between two checkpoints, with every line a credential shape matched withheld and named | adapter | V4 | built |
 | memory::worktree | crates/memory/src/worktree.rs | one node, one working tree, objects shared and files not | adapter | P2 | built |
 | memory::worktree::name | crates/memory/src/worktree/name.rs | one segment, no escape | adapter | P2 | built |
 | memory::worktree::lease | crates/memory/src/worktree/lease.rs | a held tree and its measure | adapter | P2 | built |
@@ -503,6 +503,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::endpoint::adapter | crates/gateway/src/endpoint/adapter.rs | which adapter a chosen model gets, and why | adapter | S3 | built |
 | gateway::oauth_profiles | crates/gateway/src/oauth_profiles.rs | subscription-login intelligence: data only, zero branches | data | S3 | built |
 | gateway::admission | crates/gateway/src/admission.rs | the provider's concurrency limit and a deterministic minimum interval | decision | S3 | built |
+| gateway::fallback | crates/gateway/src/fallback.rs | what a tag does when its endpoint will not answer, and the payload the retreat itself is | value | V4 | built |
 | gateway::market | crates/gateway/src/market.rs | the model catalogue snapshot, pinned so a price cannot move under a run | value | S3 | built |
 | gateway::cost | crates/gateway/src/cost.rs | per-call settlement, with the provider's own figure preferred | decision | S3 | built |
 | gateway::credential | crates/gateway/src/credential.rs | custody: capture, replace with a reference, redeem at the wire, renew before expiry | adapter | S3 | built |
@@ -532,6 +533,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::prefix | crates/runtime/src/prefix.rs | frozen prefix assembly in four segments, each hashed | decision | S2 | built |
 | runtime::prefix::tests | crates/runtime/src/prefix/tests.rs | what the frozen prefix guarantees: slot order, determinism, dedup, truncation markers, cache breakpoints | decision | S2 | built |
 | runtime::handoff | crates/runtime/src/handoff.rs | freezing and resuming: the five-section artifact and its one construction point | value | S2 | built |
+| runtime::transcript | crates/runtime/src/transcript.rs | what one run actually saw, scanned, pinned and written beside its room as `<run-id>.jsonl` | value | V4 | built |
+| runtime::reminder | crates/runtime/src/reminder.rs | how full the window is, from the provider's own count: two thresholds, each sounding once per run | decision | V4 | built |
 | runtime::fork | crates/runtime/src/fork.rs | a new run whose in-window history is a byte-identical prefix of another | decision | S1 | built |
 | runtime::compaction | crates/runtime/src/compaction.rs | when to shorten something and what to keep; never larger than its input | decision | P3 | built |
 | runtime::redact | crates/runtime/src/redact.rs | what a model said, scanned on its way into history | decision | P3 | built |
@@ -548,9 +551,12 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::digest | crates/runtime/src/digest.rs | what a long document looks like from outside, summarised once | decision | P1 | built |
 | runtime::digest::tests | crates/runtime/src/digest/tests.rs | what a digest promises a reader: heading trees that skip code fences, prose that stays suspect, one digest per content hash, and a breaker that reopens | decision | P1 | built |
 | runtime::pipeline | crates/runtime/src/pipeline.rs | the result envelope and the order in which a result is shrunk | decision | S3 | built |
+| runtime::pipeline::exec | crates/runtime/src/pipeline/exec.rs | one `exec` result as the model reads it: stdout and stderr sieved under their command key, the way back beside them, every other field untouched | decision | V4 | built |
+| runtime::pipeline::tests | crates/runtime/src/pipeline/tests.rs | the shrink order and the three attachments, through the pipeline's own door | decision | V4 | built |
 | runtime::offload | crates/runtime/src/offload.rs | the shared shrink primitive: lossy but restorable, four invariants | decision | S3 | built |
 | runtime::watchdog | crates/runtime/src/watchdog.rs | disposal in order: correct, then stall, then freeze | decision | S3 | built |
 | runtime::backlog | crates/runtime/src/backlog.rs | the work still running while a run goes on: background children, the ten-second window that decides which of them go there, and the one place they are stopped | adapter | V4 | built |
+| runtime::backlog::member | crates/runtime/src/backlog/member.rs | what one member is made of: a child process with its output on disk, or a run that a halt marks and that stops itself | adapter | V4 | built |
 | runtime::sandbox (port) | crates/runtime/src/sandbox.rs | the execution boundary: capabilities in, outcome out | port | S3 | built |
 | runtime::sandbox::tests | crates/runtime/src/sandbox/tests.rs | what the two stand-ins promise a caller: stdin echoed back with the job recorded, and a fault script delivered in order then spent | port | S3 | built |
 | runtime::catalog | crates/runtime/src/catalog.rs | progressive disclosure: which tools and skills a run is told about | decision | S3 | built |
@@ -566,6 +572,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::tools::edit | crates/runtime/src/tools/edit.rs | the edit tool: optimistic concurrency against the version the caller read | adapter | S3 | built |
 | runtime::tools::edit::tests | crates/runtime/src/tools/edit/tests.rs | the edit tool's fixtures: versions, refusals, the create arm | adapter | S3 | built |
 | runtime::tools::status | crates/runtime/src/tools/status.rs | the model's view of its own situation, in thirteen fields | adapter | S3 | built |
+| runtime::tools::status::tests | crates/runtime/src/tools/status/tests.rs | the frozen order, the children line, and the backlog line, through the tool's own door | adapter | V4 | built |
+| runtime::tools::succeed | crates/runtime/src/tools/succeed.rs | the face succession shows a model: ask to be replaced at the same address and depth, and the desk that holds the ask | adapter | V4 | built |
 | runtime::run | crates/runtime/src/run.rs | the run driver: dispatch, turns, freeze — one authority for the loop | typestate | P1 | built |
 | runtime::run::lifecycle | crates/runtime/src/run/lifecycle.rs | what an active run does: the dispatch pair, one turn, and the freeze that is its only exit | typestate | P1 | built |
 | runtime::diagnostics | crates/runtime/src/diagnostics.rs | the diagnostic log: write-only, five levels, anchored to a Ledger position | adapter | P1 | built |
@@ -612,6 +620,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | city::resident | crates/city/src/resident.rs | standing identity: an address plus the file that says who lives there | value | P1 | built |
 | city::spine_files | crates/city/src/spine_files.rs | the documents a building keeps its long work in, and the job file a run reads | adapter | P2 | built |
 | city::spine_files::hall | crates/city/src/spine_files/hall.rs | the two identity files City Hall's residents are read from, in the city's own reserved subtree | adapter | V4 | built |
+| city::governed | crates/city/src/governed.rs | the three documents that govern a city, where each one lives, and the one point they are written through | adapter | V4 | built |
 | city::spine_files::tests | crates/city/src/spine_files/tests.rs | the laid-out documents, the job file, and the two briefs a session can carry | adapter | P2 | built |
 | city::archive | crates/city/src/archive.rs | what a building remembers between runs, indexed by computing it | projection | P3 | built |
 | city::library | crates/city/src/library.rs | the city's stock of settled work, and the reading room each building admits | decision | P3 | built |
@@ -629,6 +638,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | city::wizard | crates/city/src/wizard.rs | starting a city, and moving a resident inside one | decision | P4 | built |
 | city::neighbourhood | crates/city/src/neighbourhood.rs | which addresses a run can reach and who stands at them, in less detail the further away they are | decision | P3 | built |
 | city::neighbours_tool | crates/city/src/neighbours_tool.rs | the face the neighbourhood shows a model: this building's addresses, or the city's buildings by name | adapter | P3 | built |
+| city::gitignore | crates/city/src/gitignore.rs | what a building promises is tracked, what one session was thinking is not | data | V4 | built |
+| city::vocation | crates/city/src/vocation.rs | whether the residents at an address build or plan | decision | V4 | built |
+| city::city_tool | crates/city/src/city_tool.rs | the face the city itself shows a model: raise, adopt, list | adapter | V4 | built |
 
 ### eval (4) — whether a change made the city better
 
@@ -646,7 +658,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 
 | Module | File | What it owns | Shape | Since | Status |
 |---|---|---|---|---|---|
-| channels::wire | crates/channels/src/wire.rs | the envelope both sides speak: the Queries, the frames, the version and its hash | value | S4 | built |
+| channels::wire | crates/channels/src/wire.rs | the envelope both sides speak: the frames, the version and its hash | value | S4 | built |
+| channels::wire::query | crates/channels/src/wire/query.rs | everything a page may ask, and the name table the schema hash is built from | value | V4 | built |
 | channels::command | crates/channels/src/command.rs | everything a client may ask the city to do, and the one frame it cannot spell | value | V3 | built |
 | channels::command::kind | crates/channels/src/command/kind.rs | names, steps, the wire enum | value | V3 | built |
 | channels::command::wire | crates/channels/src/command/wire.rs | no-secret commands and back | value | V3 | built |
@@ -806,6 +819,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly | crates/sprawling/src/assembly.rs | the assembly point: the worker every module below writes methods for, the one clock sample, and the one door a command enters by | adapter | S0 | built |
 | bin::assembly::lifetime | crates/sprawling/src/assembly/lifetime.rs | a worker opened over a history, and the city closed in the record | adapter | S0 | built |
 | bin::assembly::fixture | crates/sprawling/src/assembly/fixture.rs | the fake provider and the worker every assembly test starts from | adapter | S0 | built |
+| bin::assembly::recording | crates/sprawling/src/assembly/recording.rs | the lines this worker appends: one for the city, one for a run, and the diagnostic note beside them | adapter | V4 | built |
 | bin::assembly::genesis | crates/sprawling/src/assembly/genesis.rs | forming a city in a directory, taking a folder in as a building, and what a restart finds | adapter | V3 | built |
 | bin::assembly::genesis::tests | crates/sprawling/src/assembly/genesis/tests.rs | genesis happens once, adoption leaves the work alone, and a restart closes what a crash left open | adapter | V3 | built |
 | bin::assembly::naming | crates/sprawling/src/assembly/naming.rs | the wire's words and the kernel's, translated one way each | decision | V3 | built |
@@ -823,6 +837,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::dispatching | crates/sprawling/src/assembly/dispatching.rs | one dispatch, from what a person asked to the run that froze | adapter | V3 | built |
 | bin::assembly::dispatching::agreeing | crates/sprawling/src/assembly/dispatching/agreeing.rs | every refusal a dispatch can owe before it costs anything | adapter | V3 | built |
 | bin::assembly::dispatching::running | crates/sprawling/src/assembly/dispatching/running.rs | one dispatch run to its freeze, and the handback it leaves | adapter | V3 | built |
+| bin::assembly::dispatching::session | crates/sprawling/src/assembly/dispatching/session.rs | which room a dispatch works in: the session a person named, or the name the digest model gives the work | adapter | V4 | built |
 | bin::assembly::dispatching::tests | crates/sprawling/src/assembly/dispatching/tests.rs | steers, refusals and handbacks as the rooms see them | adapter | V3 | built |
 | bin::assembly::waking | crates/sprawling/src/assembly/waking.rs | the two ways a resident who is not working is set going | adapter | V3 | built |
 | bin::assembly::waking::tests | crates/sprawling/src/assembly/waking/tests.rs | arrivals and knocks, as the rooms see them | adapter | V3 | built |
@@ -842,13 +857,17 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::driving::tests::turns | crates/sprawling/src/assembly/driving/tests/turns.rs | turn loops, cancels and steers | adapter | V3 | built |
 | bin::assembly::driving::tests::confidential | crates/sprawling/src/assembly/driving/tests/confidential.rs | confidential stops before a remote call | adapter | V3 | built |
 | bin::assembly::driving::tests::ledger | crates/sprawling/src/assembly/driving/tests/ledger.rs | lines before the city they announce | adapter | V3 | built |
+| bin::assembly::driving::tests::sieving | crates/sprawling/src/assembly/driving/tests/sieving.rs | a command's output over the floor reaches the model sieved, and the way back resolves | adapter | V4 | built |
 | bin::assembly::settling | crates/sprawling/src/assembly/settling.rs | what a drive left, on the ledger before it is made true | adapter | V3 | built |
 | bin::assembly::settling::desks | crates/sprawling/src/assembly/settling/desks.rs | the four desks settled in history order | adapter | V3 | built |
 | bin::assembly::settling::landing | crates/sprawling/src/assembly/settling/landing.rs | one landing made true, and what a drive ended with | adapter | V3 | built |
 | bin::assembly::settling::tests | crates/sprawling/src/assembly/settling/tests.rs | the settling fixtures route | adapter | V3 | built |
 | bin::assembly::settling::tests::ending | crates/sprawling/src/assembly/settling/tests/ending.rs | endings and hand-downs | adapter | V3 | built |
 | bin::assembly::settling::tests::landing | crates/sprawling/src/assembly/settling/tests/landing.rs | half-settled landings leave nothing torn | adapter | V3 | built |
+| bin::assembly::settling::tests::succession | crates/sprawling/src/assembly/settling/tests/succession.rs | a resident replacing itself: same tools, conserved depth, a lineage of four, and the room's own handoff | adapter | V4 | built |
+| bin::assembly::settling::tests::halting | crates/sprawling/src/assembly/settling/tests/halting.rs | a halt on a scope reaches the run a resident handed down inside it | adapter | V4 | built |
 | bin::assembly::reviewing | crates/sprawling/src/assembly/reviewing.rs | what a run offers a building it may not write in, and what merging it costs | adapter | V3 | built |
+| bin::assembly::probing | crates/sprawling/src/assembly/probing.rs | the handoff probe asked of a predecessor and of its successor, and the line that records what survived | adapter | V4 | built |
 | bin::assembly::reviewing::tests | crates/sprawling/src/assembly/reviewing/tests.rs | the index of the review tests | adapter | V3 | built |
 | bin::assembly::reviewing::tests::landing | crates/sprawling/src/assembly/reviewing/tests/landing.rs | work reaching a review building only after a second resident checks it | adapter | V3 | built |
 | bin::assembly::reviewing::tests::refusal | crates/sprawling/src/assembly/reviewing/tests/refusal.rs | a merge whose announcing line the history refused leaves the building where it was | adapter | V3 | built |
@@ -901,6 +920,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::views::commits | crates/sprawling/src/views/commits.rs | which run wrote a commit, folded from the records that announced it | projection | V4 | built |
 | bin::views::lines | crates/sprawling/src/views/lines.rs | one record rendered as the lines a page reads | projection | V3 | built |
 | bin::views::tests | crates/sprawling/src/views/tests.rs | five views answer from the record, not from unavailable | projection | V3 | built |
+| bin::views::governance_tests | crates/sprawling/src/views/governance_tests.rs | who answers and what was answered for the person, and a patch of a commit this city never wrote | projection | V4 | built |
 
 ### desktop (12) — out of tree: this Windows desktop, offered as an MCP server
 

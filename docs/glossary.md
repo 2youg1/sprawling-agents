@@ -43,6 +43,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **City Hall** | The building `hall`, raised with the city. It holds the city's plan and the two residents who serve every other building; it holds no project of its own. |
 | **Mayor** | The resident `hall/mayor`: the city's planner, writing Markdown only. It turns an idea into `<city>/hall/Roadmap.md`, hands each building its part through `plan`, and raises a building through `city`. Its identity is `<city>/.sprawling/MAYOR.md`. |
 | **clerk** | The resident `hall/clerk`: answers approvals when the person delegated them, in the same three parts a Gate uses, with its reason in the Ledger. Its identity is `<city>/.sprawling/CLERK.md`. |
+| **Vocation** | What the residents at an address are there to do: `Builds`, or `Plans`. It is read off the building, and it decides the tool set a run is given — a resident of City Hall gets no `exec`, no `delegate` and no `workshop`, and gets `city` instead. |
 
 ## 2 History and content
 
@@ -56,7 +57,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **CAS** | Content-addressed store (BLAKE3). Identical content is stored once for its lifetime. |
 | **projection** | A view rebuilt from the event stream. **Disposable**: deleting the table and rebuilding from the Ledger gives byte-identical results. |
 | **Snapshot** | The same idea inside the browser (`web::app`): equally disposable, equally forward-only. |
-| **Provenance** | The five facts a commit the city makes carries as git trailers — `Sprawling-Run`, `Sprawling-Actor`, `Sprawling-Model`, `Sprawling-Effort`, `Sprawling-City`. A projection of the Ledger for readers outside the city; the Ledger stays the authority and the commit id reconciles the two. |
+| **Provenance** | The five facts a commit the city makes carries as git trailers — `Sprawling-Run`, `Sprawling-Actor`, `Sprawling-Model`, `Sprawling-Effort`, `Sprawling-City` — and a sixth, `Sprawling-Predecessor`, when the run replaced another. A projection of the Ledger for readers outside the city; the Ledger stays the authority and the commit id reconciles the two. |
 | **fence** | The commit the city makes before and after a tool wave so a change can be shown and reverted. It lives under `refs/sprawling/runs/`, never on the person's `HEAD`. |
 | **landing commit** | The one commit a reviewing run makes on its worktree branch when it offers a pull request; the merge that follows is the only commit trunk receives. |
 | **accounting thread** | The city's one writer. It alone holds the Ledger, the endpoint book, the plans, the pursuits, the governance fold and the desks, and it alone settles what a run left behind — in the order the results arrive. |
@@ -74,6 +75,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **Cancel** | Stop this run. When Cancel and Steer meet on the same boundary, Cancel wins. |
 | **result envelope** | The envelope around a tool result, carrying three attachments: clock stamp, network reminder, and Steer. |
 | **ClockStamp** | The clock stamp. With the feature off, output is byte-identical to a build that never had it. |
+| **context reminder** | The line that says how full the window is, computed from the provider's reported `input_tokens` against the model's `context_tokens` and never from a byte count. Two thresholds, 25% and 65%; each sounds once per run, and the second says the budget left is still enough to write a handoff and `succeed`. |
 
 ## 4 Decisions and safety
 
@@ -104,7 +106,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **exec** | The tool that runs a program, a Python artifact, or a shell line, inside the sandbox the frozen configuration allows. |
 | **environment passthrough** | The environment variable names a building declares its `exec` children may inherit, in its `CONFIG.toml` `[sandbox]` section, on top of the four every run gets. A name shaped like a credential is refused where the file is read. It is a declaration rather than a longer built-in list because what a child inherits, it cannot forget. |
 | **edit** | The tool that changes a file, against a base version, inside the write domain. |
-| **status** | The tool that answers what a run's own situation is: turns, budget, what waits for it, and how many neighbours it has. |
+| **status** | The tool that answers what a run's own situation is: mode, context used against the window it was given, what waits for it, and how many neighbours it has. It states no spend ceiling, because there is none. |
 | **neighbours** | The tool that lists the Neighbourhood: this building's addresses with the line each resident's `URBANITE.md` offers about what to bring them, or the city's buildings by name. An address it does not list has no reader. |
 | **read** | The tool that opens one file by its path, or one catalog entry — a skill, a mode, the developer entry — by the name the catalog lists it under. A model-chosen path never reaches a reserved subtree; a catalog name may, because a person admitted it. It answers by line interval: at most 512 lines, and a truncated answer states the total and the offset to continue from. |
 | **search** | The tool that finds a substring under one address prefix, with the lines around each hit and the line number `read` continues from. A substring, never a regular expression, so a pattern a model wrote wrong cannot become a stall; the same predicate `read` uses keeps it out of a reserved subtree. |

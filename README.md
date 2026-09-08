@@ -105,7 +105,7 @@ Four steps on the page, roughly ten seconds:
 1. **settings** — enter the provider’s base URL, dialect (OpenAI or Anthropic), and key. The key goes straight into the OS credential store; thereafter the page only ever sees a reference of the form `secret:realm/name`.
 2. On the same page, pick models by role: `main` does the thinking, `digest` reads long documents for it.
 3. **city** — raise a building.
-4. The control surface at the bottom — address, what should be produced, what counts as done. **It never asks for a budget**: nobody can price a job before it runs, and subscriptions have no unit price anyway. Actual spend is reported from the record afterwards. **Nothing rations a conversation either** — when agents wake each other, how long they go on is theirs to decide. What bounds a single run is its turn limit.
+4. The control surface at the bottom — address, what should be produced, what counts as done. **It never asks for a budget**: nobody can price a job before it runs, and subscriptions have no unit price anyway. Actual spend is reported from the record afterwards. **Nothing rations a conversation either** — when agents wake each other, how long they go on is theirs to decide. A single run has no turn ceiling either: it runs until it concludes, and what stops one that should not go on is `Cancel`, or `Halt` for a whole scope.
 
 Other commands:
 

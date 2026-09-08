@@ -133,7 +133,7 @@ replay               → 账本里两条 city_halted
 |---|---|
 | `quickcheck-dynamic` 4.0.1，`StateModel` 与 `RunModel` 分属两个类型类，带 dynamic logic | 上游 README、Hackage |
 | 本机 GHC 9.10.3 / cabal 3.16.1.0 | `ghc --version`、`cabal --version` 实测 |
-| `WIRE_V = 14`，23 个 Command、15 个 Query（card-2.4 增 `Query::Commit`） | `crates/channels/src/wire.rs`、`command.rs` |
+| `WIRE_V = 15`，24 个 Command、17 个 Query（card-11.7 使 `Dispatch` 不再携 `budget`，card-5.4 增 `Command::PutDocument` 与 `Query::Governance`，card-2.6 增 `Query::Hunks`） | `crates/channels/src/wire.rs`、`wire/query.rs`、`command/kind.rs` |
 | 35 个稳定错误码 | `crates/kernel/src/error.rs` 的 `AxCode::ALL` |
 | `IdemKey` 形如 `idem1-` 加 32 位小写十六进制 | 门的拒绝原文实测 |
 | 模板只有 `minimal` 与 `confidential` | 门的拒绝原文实测 |

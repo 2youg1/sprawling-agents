@@ -128,10 +128,12 @@ What follows, and where to watch it:
    `Sprawling-Effort`, `Sprawling-City`, so `git log` answers who made what
    and `sprawling whose <city> <commit>` answers it from the Ledger.
 
-Halting is the brake: `halt {scope: "city"}` stops every run, nothing new
-starts, and `release` lets it go on. Spend ceilings are the other brake: a
-`budget` on a dispatch is a hard cap, and a run that reaches it freezes and
-says so.
+Halting is the brake, and the only one: `halt {scope: "city"}` stops every
+run, nothing new starts, and `release` lets it go on. A dispatch carries no
+ceiling on money and no ceiling on tokens, because nobody can price a piece
+of work before it runs; what a run cost is reported from the Ledger
+afterwards, and one run has no turn ceiling either: it runs until it
+concludes. What stops one run that should not go on is `cancel`.
 
 ## The one rule about what you read
 

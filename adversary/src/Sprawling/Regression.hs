@@ -277,10 +277,6 @@ fields index = \case
     , "task: \"say something\".to_owned(),"
     , "goal: \"an answer\".to_owned(),"
     , "mode: channels::ModeTag::parse(\"build\").unwrap(),"
-    , "budget: kernel::BudgetCap {"
-    , "    usd: kernel::UsdMicros::new(1_000),"
-    , "    tokens: kernel::Tokens::new(1_000),"
-    , "},"
     , idem index
     , "session: Some(kernel::SessionName::parse(" <> quoted session <> ").unwrap()),"
     , "effort: None,"
