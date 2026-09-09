@@ -7,14 +7,6 @@
 
 use kernel::{Address, AxCode, AxError};
 
-/// Where a CPython-WASI component lives on this machine, if one does.
-/// An environment variable rather than a config key: the artifact is a
-/// fact about the host, and a city that carried it would carry a path
-/// that means nothing on the next machine.
-pub(super) const PYTHON_WASM_ENV: &str = "SPRAWLING_PYTHON_WASM";
-
-/// The interpreter this platform calls a shell, when the building's
-/// configuration allows the arm at all.
 /// Starts one server and turns what it offers into tools.
 ///
 /// The connection opens with the lifecycle the specification defines -
@@ -111,7 +103,6 @@ impl protocol::Outbound for McpLink {
     }
 }
 
-/// The engine `exec` runs a program in.
 /// Turns the configured mount list into paths under the run's write
 /// root. Read-only by construction: the sandbox job carries them as
 /// readable, and what may be written is the write domain's answer.

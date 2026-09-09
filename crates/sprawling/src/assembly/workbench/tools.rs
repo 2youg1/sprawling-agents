@@ -11,8 +11,8 @@ use kernel::{Address, AxError, Locator};
 use runtime::bench::ToolBench;
 use runtime::{EditTool, ExecTool, SearchTool, StatusTool};
 
-use super::super::{Assignment, PYTHON_WASM_ENV, RunWorker, mounts_under};
-use super::engine::{execution_engine, host_shell};
+use super::super::{Assignment, RunWorker, mounts_under};
+use super::engine::machine_half;
 use super::{Desks, Reach, Site, Situation, Workbench, held, status_snapshot};
 
 impl RunWorker {
@@ -230,18 +230,13 @@ impl RunWorker {
     /// Propagates a build with no execution engine and whatever the
     /// tool says about its own construction.
     fn exec_tool(&self, site: &Site, addr: &Address) -> Result<ExecTool, AxError> {
+        let machine = machine_half(&site.config.sandbox)?;
         ExecTool::new(
             runtime::ExecSetup {
                 workdir: site.write_root.join(addr.as_str()),
                 mounts: mounts_under(&site.write_root, &site.config.sandbox.mounts),
-                python_wasm: std::env::var(PYTHON_WASM_ENV)
-                    .ok()
-                    .map(std::path::PathBuf::from),
-                shell: if site.config.sandbox.shell {
-                    host_shell()
-                } else {
-                    None
-                },
+                python_wasm: machine.python_wasm,
+                shell: machine.shell,
                 fuel: runtime::Fuel(site.config.sandbox.fuel),
                 // What a child may inherit is the building's own
                 // declaration: the four-name floor is enough to run a
@@ -249,7 +244,7 @@ impl RunWorker {
                 env_passthrough: site.config.sandbox.env_passthrough.clone(),
                 domain: addr.clone(),
             },
-            execution_engine()?,
+            machine.engine,
             self.backlog.clone(),
         )
     }

@@ -3,6 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+mod city;
+mod faults;
+
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 
@@ -15,13 +18,13 @@ use super::*;
 /// It is the second implementation of `Machine`, which is what makes
 /// that trait a seam rather than a hypothetical one: a verdict is judged
 /// here without the machine this test runs on being asked anything.
-struct ScriptedMachine {
+pub(super) struct ScriptedMachine {
     absent: BTreeSet<&'static str>,
     asked: RefCell<Vec<String>>,
 }
 
 impl ScriptedMachine {
-    fn missing(absent: &[&'static str]) -> ScriptedMachine {
+    pub(super) fn missing(absent: &[&'static str]) -> ScriptedMachine {
         ScriptedMachine {
             absent: absent.iter().copied().collect(),
             asked: RefCell::new(Vec::new()),
@@ -32,9 +35,12 @@ impl ScriptedMachine {
 impl Machine for ScriptedMachine {
     fn look(&self, requirement: &Requirement) -> Presence {
         if self.absent.contains(requirement.name) {
-            Presence::Absent
+            Presence::Absent(Absence::NotOnSearchPath)
         } else {
-            Presence::Present("9.9.9".to_owned())
+            Presence::Present {
+                at: std::path::PathBuf::from(format!("/bin/{}", requirement.name)),
+                version: Version::Said("9.9.9".to_owned()),
+            }
         }
     }
 
@@ -83,9 +89,23 @@ fn every_row_is_detectable_and_per_platform_installable_or_manual() {
                     "{name} asks its version with {version_arg}"
                 );
             }
-            Detection::Environment { variable } => {
+            Detection::Component { variable, file } => {
                 assert!(!variable.is_empty(), "{name} names no environment variable");
+                assert!(!file.is_empty(), "{name} names no component file");
             }
+            Detection::Interpreter { variable, fallback } => {
+                for platform in Platform::ALL {
+                    assert!(
+                        !variable.at(platform).is_empty(),
+                        "{name} names no variable"
+                    );
+                    assert!(
+                        !fallback.at(platform).is_empty(),
+                        "{name} names no fallback"
+                    );
+                }
+            }
+            Detection::Built { .. } => {}
         }
         for platform in Platform::ALL {
             let spelled = requirement.recipe.at(platform).spelled();
@@ -116,6 +136,10 @@ fn the_table_names_what_this_repository_actually_asks_for() {
         "chromedriver",
         "git",
         "python-wasi",
+        "sandbox-engine",
+        "shell",
+        "sprawling-desktop",
+        "ffmpeg",
     ] {
         assert!(named.contains(needed), "the table does not carry {needed}");
     }
@@ -124,10 +148,19 @@ fn the_table_names_what_this_repository_actually_asks_for() {
         .filter(|item| item.tier == Tier::Use)
         .map(|item| item.name)
         .collect();
+    let use_required: Vec<&str> = REQUIREMENTS
+        .iter()
+        .filter(|item| item.tier == Tier::Use && item.need == Need::Required)
+        .map(|item| item.name)
+        .collect();
     assert_eq!(
-        use_tier,
+        use_required,
         vec!["firefox"],
-        "the use tier is what a person needs to run a city, and nothing else"
+        "the use tier requires what a person needs to run a city, and nothing else"
+    );
+    assert!(
+        use_tier.contains(&"python-wasi") && use_tier.contains(&"shell"),
+        "what a run's tools reach for is a use-tier fact: {use_tier:?}"
     );
     let pinned = REQUIREMENTS
         .iter()
@@ -156,25 +189,43 @@ fn the_pinned_wasm_bindgen_version_is_the_one_the_workspace_carries() {
     );
 }
 
-/// The variable this table watches is the one the exec tool reads.
+/// The variable the python component is looked for under is spelled
+/// once in this crate, in the doctor's table, and the exec tool asks
+/// the doctor rather than reading it a second time.
 ///
-/// `PYTHON_WASM_ENV` is private to `assembly::mcp`, so the table spells
-/// the name a second time. This assertion is what keeps the second
-/// spelling from drifting away from the first one.
+/// Wave A left two spellings and a test pinning them equal; two pinned
+/// spellings are still two authorities. Every source file under this
+/// crate is read here, so a third spelling anywhere turns this red.
 #[test]
-fn the_python_component_is_looked_for_where_the_exec_tool_reads_it() {
-    let assembly = include_str!("../assembly/mcp.rs");
+fn the_python_variable_is_spelled_once() {
     let variable = REQUIREMENTS
         .iter()
         .find(|item| item.name == "python-wasi")
-        .map(|item| match &item.detect {
-            Detection::Environment { variable } => *variable,
-            Detection::Program { program, .. } => program,
+        .and_then(|item| match &item.detect {
+            Detection::Component { variable, .. } => Some(*variable),
+            _ => None,
         })
-        .expect("the table carries the python component");
-    assert!(
-        assembly.contains(&format!("PYTHON_WASM_ENV: &str = \"{variable}\"")),
-        "the exec tool does not read {variable}"
+        .expect("the table carries the python component as a Component");
+    let literal = format!("\"{variable}\"");
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut spelled_in = Vec::new();
+    let mut pending = vec![src];
+    while let Some(dir) = pending.pop() {
+        for entry in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|ext| ext == "rs")
+                && std::fs::read_to_string(&path).unwrap().contains(&literal)
+            {
+                spelled_in.push(path);
+            }
+        }
+    }
+    assert_eq!(
+        spelled_in.len(),
+        1,
+        "{variable} is spelled in {spelled_in:?}; the table is its one home"
     );
 }
 
@@ -214,10 +265,14 @@ fn a_verdict_counts_the_required_items_of_its_own_tier_only() {
 #[test]
 fn one_line_per_item_says_present_absent_or_optional_absent() {
     let present = finding_for("git", &[]);
-    assert!(finding_line(&present).contains("present 9.9.9"));
+    assert!(finding_line(&present).contains("present /bin/git (9.9.9)"));
 
     let absent = finding_for("git", &["git"]);
-    assert!(finding_line(&absent).trim().ends_with("absent"));
+    assert!(
+        finding_line(&absent)
+            .trim()
+            .ends_with("absent: not on the search path")
+    );
 
     let optional = finding_for("chromedriver", &["chromedriver"]);
     let line = finding_line(&optional);
@@ -238,7 +293,11 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
     let mut refused = std::io::Cursor::new(b"n\n".to_vec());
     let mut screen: Vec<u8> = Vec::new();
     let ready = run(
-        &Asked { install: true },
+        &Asked {
+            install: true,
+            city: None,
+            explain: None,
+        },
         &machine,
         &mut refused,
         &mut screen,
@@ -265,7 +324,17 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
     let machine = ScriptedMachine::missing(&["just", "git"]);
     let mut agreed = std::io::Cursor::new(b"y\nn\n".to_vec());
     let mut screen: Vec<u8> = Vec::new();
-    run(&Asked { install: true }, &machine, &mut agreed, &mut screen).unwrap();
+    run(
+        &Asked {
+            install: true,
+            city: None,
+            explain: None,
+        },
+        &machine,
+        &mut agreed,
+        &mut screen,
+    )
+    .unwrap();
     assert_eq!(
         machine.asked.borrow().as_slice(),
         ["just".to_owned()],
@@ -280,7 +349,11 @@ fn the_default_checks_and_installs_nothing() {
     let mut nobody = std::io::Cursor::new(Vec::new());
     let mut screen: Vec<u8> = Vec::new();
     run(
-        &Asked { install: false },
+        &Asked {
+            install: false,
+            city: None,
+            explain: None,
+        },
         &machine,
         &mut nobody,
         &mut screen,

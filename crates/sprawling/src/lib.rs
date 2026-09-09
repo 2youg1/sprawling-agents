@@ -20,6 +20,7 @@
 
 pub mod assembly;
 pub mod console;
+pub mod doctor;
 pub mod firstrun;
 pub mod serving;
 

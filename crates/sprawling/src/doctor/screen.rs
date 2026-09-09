@@ -6,17 +6,23 @@
 //! What a person reads, and what they are asked (sprawling-SPEC.md
 //! section 8-40).
 //!
-//! The report is one line per item and one verdict per tier. `--install`
-//! adds one question per absent item, in table order, each with the
-//! command it would run printed above it: nobody agrees to a command
-//! they were not shown, and nothing this city was not asked about runs.
+//! The report is one line per item and one verdict per tier. A city
+//! named on the line adds one line per building that asked for what
+//! this machine lacks; `--explain <code>` answers one code instead.
+//! `--install` adds one question per absent item, in table order, each
+//! with the command it would run printed above it: nobody agrees to a
+//! command they were not shown, and nothing this city was not asked
+//! about runs.
 
 use std::io::{BufRead, Write};
+use std::path::PathBuf;
 use std::process::ExitCode;
-use std::time::Duration;
 
+use super::explain::{Explanation, explain, explanation_lines};
+use super::needs::{lack_line, lacks};
+use super::visit::{Visited, unreadable_line, visit};
 use super::{
-    Finding, Machine, Platform, Presence, ThisMachine, Tier, Verdict, examine, finding_line,
+    Finding, Machine, PATIENCE, Platform, ThisMachine, Tier, Verdict, examine, finding_line,
     verdict, verdict_line,
 };
 
@@ -24,25 +30,40 @@ use super::{
 /// nothing.
 pub(crate) struct Asked {
     pub(crate) install: bool,
+    /// A city to judge building by building.
+    pub(crate) city: Option<PathBuf>,
+    /// A refusal code to connect to this machine, instead of a report.
+    pub(crate) explain: Option<String>,
 }
 
-/// How long one `--version` call may take before this city stops
-/// waiting for it. Generous enough for a cold start on a slow disk,
-/// short enough that nine of them never feel like a hang.
-const PATIENCE: Duration = Duration::from_secs(5);
-
 /// What the command line asked of this verb. Checking is the default;
-/// touching the machine takes the flag.
+/// touching the machine takes the flag; the one word that is not a flag
+/// and not a flag's value is the city.
 pub(crate) fn asked(args: &[String]) -> Asked {
+    let mut install = false;
+    let mut city = None;
+    let mut explain = None;
+    let mut words = args.iter().skip(1);
+    while let Some(word) = words.next() {
+        match word.as_str() {
+            "--install" => install = true,
+            "--explain" => explain = words.next().cloned(),
+            flag if flag.starts_with("--") => {}
+            path => city = Some(PathBuf::from(path)),
+        }
+    }
     Asked {
-        install: args.iter().any(|arg| arg == "--install"),
+        install,
+        city,
+        explain,
     }
 }
 
 /// The `doctor` verb. Exits with failure when a required item is
-/// missing, so a script driving this learns the outcome from the exit
-/// code rather than by reading the report.
-pub(crate) fn verb(args: &[String]) -> ExitCode {
+/// missing, or when a building of the named city lacks what it asked
+/// for, so a script driving this learns the outcome from the exit code
+/// rather than by reading the report.
+pub fn verb(args: &[String]) -> ExitCode {
     let asked = asked(args);
     let machine = ThisMachine::new(Platform::current(), PATIENCE);
     let answered = run(
@@ -62,8 +83,10 @@ pub(crate) fn verb(args: &[String]) -> ExitCode {
 }
 
 /// Reports this machine, and - when asked - offers each absent item one
-/// at a time. Answers whether every required item is present at the end,
-/// which is what the caller turns into an exit code.
+/// at a time. Answers whether every required item is present at the
+/// end, and every named building has what it asked for, which is what
+/// the caller turns into an exit code. An explanation always answers
+/// true: it is an explanation, not a verdict.
 ///
 /// # Errors
 /// Propagates what the terminal reports: a report nobody can be shown,
@@ -75,10 +98,21 @@ pub(crate) fn run<R: BufRead, W: Write>(
     out: &mut W,
 ) -> std::io::Result<bool> {
     let findings = examine(machine);
+    if let Some(code) = &asked.explain {
+        let explanation = explain(code, &findings, Platform::current());
+        writeln!(out)?;
+        for line in explanation_lines(code, &explanation) {
+            writeln!(out, "{line}")?;
+        }
+        writeln!(out)?;
+        return Ok(!matches!(explanation, Explanation::NoSuchCode(_)));
+    }
     let platform = Platform::current().map_or("this platform", Platform::as_str);
     writeln!(
         out,
-        "\n  this machine ({platform}), against what this city needs:\n"
+        "
+  this machine ({platform}), against what this city needs:
+"
     )?;
     for finding in &findings {
         writeln!(out, "{}", finding_line(finding))?;
@@ -90,11 +124,58 @@ pub(crate) fn run<R: BufRead, W: Write>(
         ready = ready && verdict == Verdict::Ready;
         writeln!(out, "{}", verdict_line(tier, &verdict))?;
     }
+    if let Some(city) = &asked.city {
+        ready = report_city(city, &findings, out)? && ready;
+    }
     if asked.install {
         offer(&findings, machine, input, out)?;
     }
     writeln!(out)?;
     Ok(ready)
+}
+
+/// One line per building that asked for what this machine lacks, and
+/// one per building whose rules will not read. Answers whether every
+/// building has what it asked for.
+fn report_city<W: Write>(
+    city: &std::path::Path,
+    findings: &[Finding],
+    out: &mut W,
+) -> std::io::Result<bool> {
+    writeln!(
+        out,
+        "
+  the city at {}, building by building:
+",
+        city.display()
+    )?;
+    let visited = match visit(city) {
+        Ok(visited) => visited,
+        Err(err) => {
+            writeln!(out, "  {err}")?;
+            writeln!(out, "  recovery: {}", err.recovery())?;
+            return Ok(false);
+        }
+    };
+    let mut whole = true;
+    for seen in &visited {
+        match seen {
+            Visited::Bits { building, bits } => {
+                for lack in lacks(building, bits, findings) {
+                    whole = false;
+                    writeln!(out, "{}", lack_line(&lack))?;
+                }
+            }
+            Visited::Unreadable { building, err } => {
+                whole = false;
+                writeln!(out, "{}", unreadable_line(building, err))?;
+            }
+        }
+    }
+    if whole {
+        writeln!(out, "  every building has what it asked for")?;
+    }
+    Ok(whole)
 }
 
 /// Offers every absent item, one question at a time, and reports what
@@ -115,7 +196,7 @@ fn offer<R: BufRead, W: Write>(
     };
     let mut installed: Vec<&'static str> = Vec::new();
     for finding in findings {
-        if finding.presence != Presence::Absent {
+        if finding.presence.usable() {
             continue;
         }
         let name = finding.requirement.name;

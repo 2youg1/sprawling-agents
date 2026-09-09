@@ -47,8 +47,10 @@ pub(super) const COMMANDS: &str = "\
 commands:
   up [dir] [addr]              raise a city here if needed, serve it, open the WebUI
   install [--uninstall]        put this binary on your PATH, or take it back off
-  doctor [--install]           what this machine has against what this city needs
-                               (--install: offer each missing item, one at a time)
+  doctor [<city>] [--install]  what this machine has against what a city needs
+                               (<city>: judge each building's bits; --install: offer
+                               each missing item, one at a time; --explain <code>:
+                               connect a refusal code to this machine)
   init <dir> [--adopt]         raise a city: writes the genesis record
                                (--adopt: every folder there becomes a building)
   serve <dir> [addr] [--open]  serve a city that already exists
@@ -73,7 +75,7 @@ pub(super) fn main() -> ExitCode {
         Some("init") => init(&args),
         Some("up") => up(&args),
         Some("install") => install(&args),
-        Some("doctor") => super::doctor::screen::verb(&args),
+        Some("doctor") => sprawling::doctor::verb(&args),
         Some("call") => call(&args),
         Some("enrol" | "enroll") => enrol(&args),
         Some("serve") => serve(named(&args, 1), named(&args, 2), &args),

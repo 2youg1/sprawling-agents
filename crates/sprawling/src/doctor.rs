@@ -16,13 +16,31 @@
 //! between them: what one line about one item says, and what the
 //! verdict for a tier is. Nothing in this file starts a process, reads
 //! the clock, or writes to a terminal.
+//!
+//! **This module is the one authority on what this machine has.** The
+//! exec tool, the browser engine and the report all ask it through
+//! `host` (section 8-47); nothing else in this binary reads the search
+//! path, an environment variable naming a program, or a feature flag
+//! naming an engine.
 
-pub(crate) mod probe;
-pub(crate) mod screen;
+mod explain;
+pub(crate) mod host;
+mod needs;
+mod presence;
+mod probe;
+mod screen;
 mod table;
+mod visit;
 
+pub(crate) use presence::{Absence, Fault, Presence, Version};
 pub(crate) use probe::{Machine, ThisMachine};
+pub use screen::verb;
 pub(crate) use table::REQUIREMENTS;
+
+/// How long one `--version` call may take before this city stops
+/// waiting for it. Generous enough for a cold start on a slow disk,
+/// short enough that a dozen of them never feel like a hang.
+pub(crate) const PATIENCE: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Who needs this item. A tier is answered on its own, so an item one
 /// tier needs never appears in the other tier's verdict.
@@ -120,10 +138,23 @@ pub(crate) enum Detection {
         version_arg: &'static str,
         places: PerPlatform<&'static [&'static str]>,
     },
-    /// A file an environment variable points at. The component behind
-    /// `PYTHON_WASM_ENV` arrives this way: no package manager ships it,
-    /// so the question is where this machine put it.
-    Environment { variable: &'static str },
+    /// A file this city keeps at machine level. The variable wins when
+    /// it is set, and a set variable that names nothing is reported
+    /// rather than fallen through; otherwise the file is looked for
+    /// under `~/.sprawling/components/<item>/`.
+    Component {
+        variable: &'static str,
+        file: &'static str,
+    },
+    /// The interpreter a platform's variable names, or the one it has
+    /// when the variable is unset.
+    Interpreter {
+        variable: PerPlatform<&'static str>,
+        fallback: PerPlatform<&'static str>,
+    },
+    /// A part of this binary rather than of this machine: present when
+    /// the build carries it and it starts.
+    Built { carried: bool },
 }
 
 /// What installing this item costs on one platform.
@@ -175,14 +206,6 @@ pub(crate) struct Requirement {
     pub(crate) recipe: PerPlatform<Recipe>,
 }
 
-/// What this machine answered about one item.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) enum Presence {
-    /// Here, with whatever it said about its own version.
-    Present(String),
-    Absent,
-}
-
 /// One item, and this machine's answer about it.
 pub(crate) struct Finding {
     pub(crate) requirement: &'static Requirement,
@@ -203,11 +226,14 @@ pub(crate) fn examine(machine: &dyn Machine) -> Vec<Finding> {
 /// The one line a person reads about one item.
 pub(crate) fn finding_line(finding: &Finding) -> String {
     let name = finding.requirement.name;
+    let said = finding.presence.describe();
     match (&finding.presence, finding.requirement.need) {
-        (Presence::Present(version), _) => format!("  {name:<14} present {version}"),
-        (Presence::Absent, Need::Required) => format!("  {name:<14} absent"),
-        (Presence::Absent, Need::Optional) => format!(
-            "  {name:<14} optional-absent - it enables {}",
+        (Presence::Present { .. } | Presence::Broken { .. }, _) => {
+            format!("  {name:<18} {said}")
+        }
+        (Presence::Absent(_), Need::Required) => format!("  {name:<18} {said}"),
+        (Presence::Absent(_), Need::Optional) => format!(
+            "  {name:<18} optional-{said} - it enables {}",
             finding.requirement.enables
         ),
     }
@@ -223,13 +249,15 @@ pub(crate) enum Verdict {
 
 /// The verdict for one tier. An optional item that is absent never
 /// stands between a person and a tier: it is reported and not counted.
+/// A broken item counts as missing: a browser that will not start is
+/// not a browser a city can use.
 pub(crate) fn verdict(findings: &[Finding], tier: Tier) -> Verdict {
     let missing: Vec<&'static str> = findings
         .iter()
         .filter(|finding| {
             finding.requirement.tier == tier
                 && finding.requirement.need == Need::Required
-                && finding.presence == Presence::Absent
+                && !finding.presence.usable()
         })
         .map(|finding| finding.requirement.name)
         .collect();

@@ -4,7 +4,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 #[cfg(feature = "sandbox")]
-use super::engine::execution_engine;
 use super::*;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
@@ -192,7 +191,8 @@ fn a_signal_one_run_sends_is_read_by_the_run_that_pulls_it() {
 #[cfg(feature = "sandbox")]
 #[test]
 fn a_build_with_the_engine_feature_carries_one() {
-    let mut engine = execution_engine().expect("a build with the feature starts its engine");
+    let mut engine = crate::doctor::host::execution_engine()
+        .expect("a build with the feature starts its engine");
     // A module that is not there: whatever this reports, it is the
     // engine reporting it rather than the absence of one.
     let job = runtime::SandboxJob {
@@ -267,4 +267,26 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
         offered.contains("\"plan\""),
         "and the plan tool, which is what the hall writes"
     );
+}
+
+/// The city's genesis hash is read from the ledger once and remembered:
+/// it is the one fact about a city that cannot change without the city
+/// being a different one, and every fence, landing and merge used to
+/// re-read the front of the history to learn it (sprawling-SPEC.md 8-51).
+#[test]
+fn the_citys_genesis_hash_is_read_once_and_survives_the_ledger_going_away() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+
+    let first = worker.city_hash().unwrap();
+    // Nothing can read it now. An answer that still comes back is an
+    // answer that was remembered rather than re-read.
+    std::fs::remove_dir_all(&report.ledger_dir).unwrap();
+    assert_eq!(worker.city_hash().unwrap(), first);
 }

@@ -18,6 +18,7 @@ pub fn sprawling::assembly::ScanReport::summary(&self) -> alloc::string::String
 pub fn sprawling::assembly::form_city(&std::path::Path, sprawling::assembly::Adopt) -> core::result::Result<sprawling::assembly::InitReport, kernel::error::shape::AxError>
 pub fn sprawling::assembly::has_history(&std::path::Path) -> bool
 pub fn sprawling::assembly::init_city(&std::path::Path) -> core::result::Result<sprawling::assembly::InitReport, kernel::error::shape::AxError>
+pub fn sprawling::doctor::verb(&[alloc::string::String]) -> std::process::ExitCode
 pub fn sprawling::firstrun::ask<R: alloc::io::buf_read::BufRead, W: core::io::write::Write>(&std::path::Path, &mut R, &mut W) -> core::io::error::Result<sprawling::firstrun::FirstScreen>
 pub fn sprawling::firstrun::default_city(&std::path::Path, core::option::Option<&std::path::Path>, bool) -> std::path::PathBuf
 pub fn sprawling::firstrun::is_writable(&std::path::Path) -> bool
@@ -29,6 +30,7 @@ pub fn sprawling::serving::open_vault() -> (gateway::credential::custodian::Cust
 pub mod sprawling
 pub mod sprawling::assembly
 pub mod sprawling::console
+pub mod sprawling::doctor
 pub mod sprawling::firstrun
 pub mod sprawling::serving
 pub sprawling::assembly::Adopt::EveryFolder

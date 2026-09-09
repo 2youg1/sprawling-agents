@@ -18,10 +18,26 @@ use super::{Detection, Need, PerPlatform, Recipe, Requirement, Tier};
 /// quietly, so this is the one place the installer spells it.
 pub(crate) const WASM_BINDGEN_VERSION: &str = "0.2.127";
 
-/// The environment variable the exec tool's python arm reads its
-/// component from (`bin::assembly::mcp::PYTHON_WASM_ENV`, which is
-/// private to that module; the tests hold the two spellings equal).
+/// The environment variable a person may point at a CPython-WASI
+/// component with. Spelled here and nowhere else: the exec tool asks
+/// `doctor::host`, which reads this table. It is the compatibility
+/// path for a machine that set it before the component directory
+/// existed, and it wins over the directory when set.
 const PYTHON_WASM_VARIABLE: &str = "SPRAWLING_PYTHON_WASM";
+
+/// The file a CPython-WASI component is kept as, under
+/// `~/.sprawling/components/python-wasi/`.
+const PYTHON_WASM_FILE: &str = "python.wasm";
+
+/// The names other modules of this binary ask `doctor::host` by. A name
+/// here that is not a row below is caught by the tests.
+pub(crate) const FIREFOX: &str = "firefox";
+pub(crate) const CHROMEDRIVER: &str = "chromedriver";
+pub(crate) const PYTHON_WASI: &str = "python-wasi";
+pub(crate) const SHELL: &str = "shell";
+pub(crate) const SANDBOX_ENGINE: &str = "sandbox-engine";
+pub(crate) const SPRAWLING_DESKTOP: &str = "sprawling-desktop";
+pub(crate) const FFMPEG: &str = "ffmpeg";
 
 /// A program nobody installs outside the search path.
 const NOWHERE: PerPlatform<&[&str]> = PerPlatform {
@@ -44,7 +60,7 @@ const FIREFOX_PLACES: PerPlatform<&[&str]> = PerPlatform {
 /// Everything this city asks of the machine it runs on.
 pub(crate) const REQUIREMENTS: &[Requirement] = &[
     Requirement {
-        name: "firefox",
+        name: FIREFOX,
         tier: Tier::Use,
         need: Need::Required,
         enables: "the WebUI, and the browser tool a resident drives",
@@ -157,7 +173,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         },
     },
     Requirement {
-        name: "chromedriver",
+        name: CHROMEDRIVER,
         tier: Tier::Develop,
         need: Need::Optional,
         enables: "the browser tool against Chromium; Firefox needs no driver",
@@ -201,17 +217,93 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         },
     },
     Requirement {
-        name: "python-wasi",
-        tier: Tier::Develop,
+        name: SANDBOX_ENGINE,
+        tier: Tier::Use,
+        need: Need::Optional,
+        enables: "the exec tool's program and python arms, fuel-metered and with no socket",
+        detect: Detection::Built {
+            carried: super::host::ENGINE_CARRIED,
+        },
+        recipe: PerPlatform {
+            windows: ENGINE_BY_BUILD,
+            macos: ENGINE_BY_BUILD,
+            linux: ENGINE_BY_BUILD,
+        },
+    },
+    Requirement {
+        name: PYTHON_WASI,
+        tier: Tier::Use,
         need: Need::Optional,
         enables: "the exec tool's python arm, which runs in the sandbox with no socket",
-        detect: Detection::Environment {
+        detect: Detection::Component {
             variable: PYTHON_WASM_VARIABLE,
+            file: PYTHON_WASM_FILE,
         },
         recipe: PerPlatform {
             windows: PYTHON_WASI_BY_HAND,
             macos: PYTHON_WASI_BY_HAND,
             linux: PYTHON_WASI_BY_HAND,
+        },
+    },
+    Requirement {
+        name: SHELL,
+        tier: Tier::Use,
+        need: Need::Optional,
+        enables: "the exec tool's shell arm, where a building's CONFIG.toml asks for it",
+        detect: Detection::Interpreter {
+            variable: PerPlatform {
+                windows: "COMSPEC",
+                macos: "SHELL",
+                linux: "SHELL",
+            },
+            fallback: PerPlatform {
+                windows: "cmd.exe",
+                macos: "/bin/sh",
+                linux: "/bin/sh",
+            },
+        },
+        recipe: PerPlatform {
+            windows: Recipe::Manual("set COMSPEC to a command interpreter"),
+            macos: Recipe::Manual("set SHELL to a shell, or restore /bin/sh"),
+            linux: Recipe::Manual("set SHELL to a shell, or restore /bin/sh"),
+        },
+    },
+    Requirement {
+        name: SPRAWLING_DESKTOP,
+        tier: Tier::Use,
+        need: Need::Optional,
+        enables: "the desktop connector, for a building whose rules say `desktop: true`",
+        detect: Detection::Program {
+            program: "sprawling-desktop",
+            version_arg: "--version",
+            places: NOWHERE,
+        },
+        recipe: PerPlatform {
+            windows: DESKTOP_BY_HAND,
+            macos: DESKTOP_BY_HAND,
+            linux: DESKTOP_BY_HAND,
+        },
+    },
+    Requirement {
+        name: FFMPEG,
+        tier: Tier::Use,
+        need: Need::Optional,
+        enables: "an mp4 from the desktop connector's recorder; without it, a frame sequence",
+        detect: Detection::Program {
+            program: "ffmpeg",
+            version_arg: "-version",
+            places: NOWHERE,
+        },
+        recipe: PerPlatform {
+            windows: Recipe::Command {
+                program: "winget",
+                args: &["install", "--id", "Gyan.FFmpeg", "-e"],
+            },
+            macos: Recipe::Command {
+                program: "brew",
+                args: &["install", "ffmpeg"],
+            },
+            linux: Recipe::Print("sudo apt install ffmpeg"),
         },
     },
 ];
@@ -237,7 +329,18 @@ const CARGO_INSTALL_BINDGEN: Recipe = Recipe::Command {
     ],
 };
 
-/// No package manager ships the component, so the honest answer names
-/// the variable rather than a command that does not exist.
+/// No package manager ships the component and python.org publishes no
+/// wasi binary, so the honest answer names the place this city looks
+/// rather than a download nothing here can verify.
 const PYTHON_WASI_BY_HAND: Recipe =
-    Recipe::Manual("put a CPython wasi build on this disk and point SPRAWLING_PYTHON_WASM at it");
+    Recipe::Manual("put a CPython wasi build at ~/.sprawling/components/python-wasi/python.wasm");
+
+/// The engine is a feature of this binary, not a package on this
+/// machine.
+const ENGINE_BY_BUILD: Recipe =
+    Recipe::Manual("install a build of sprawling with the `sandbox` feature");
+
+/// The connector is built from this repository's `desktop/` package.
+const DESKTOP_BY_HAND: Recipe = Recipe::Manual(
+    "build `desktop/` from this repository and put sprawling-desktop on the search path",
+);

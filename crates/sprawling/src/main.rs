@@ -12,7 +12,6 @@
 // these two are the binary's own. `install` puts this executable where a
 // shell will find it, and `wire_client` talks to a served city from a
 // terminal - both are about the command line rather than about a city.
-mod doctor;
 mod install;
 mod wire_client;
 

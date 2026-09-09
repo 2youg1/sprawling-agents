@@ -60,7 +60,7 @@ pub(crate) use folds::{Standing, rebuild_views};
 pub(crate) use genesis::city_address;
 use genesis::city_segment;
 pub use genesis::{Adopt, InitReport, form_city, has_history, init_city};
-use mcp::{PYTHON_WASM_ENV, connect_mcp, mounts_under, transport_site};
+use mcp::{connect_mcp, mounts_under, transport_site};
 pub(crate) use naming::read_autonomy;
 use naming::{
     autonomy_name, building_of, governed_of, mode_of, name_of, not_built, plan_node_of, scope_name,

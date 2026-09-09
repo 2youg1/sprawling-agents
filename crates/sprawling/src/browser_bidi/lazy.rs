@@ -16,6 +16,7 @@ use kernel::{AxCode, AxError};
 
 use super::engine::{Engaged, Engine};
 use super::socket::BidiSocket;
+use crate::doctor::host;
 
 /// Derived from the city's own directory rather than drawn at random:
 /// two cities on one machine need two ports, and a value derived from
@@ -67,41 +68,17 @@ impl LazyEngine {
 
     /// Starts an engine and connects to it.
     ///
-    /// Firefox first, by name, so the operating system resolves it the
-    /// way it resolves every other program: this is one mechanism rather
-    /// than a second copy of the search `bin::doctor` already owns. When
-    /// neither engine starts, the refusal is the one `Engine::choose`
-    /// words, so a person reads the same sentence wherever they meet it.
+    /// Which engine is here is `bin::doctor`'s answer, so a person who
+    /// read the doctor's report and a run that meets this refusal are
+    /// told the same thing about the same machine.
     ///
     /// # Errors
-    /// Reports a machine with no engine, and an engine that came up and
-    /// would not answer.
+    /// Reports a machine with no engine, an engine that is here and
+    /// will not start, and one that came up and would not answer.
     fn start(&mut self) -> Result<(), AxError> {
-        let mut engaged = None;
-        for engine in [
-            Engine::Firefox {
-                program: PathBuf::from("firefox"),
-            },
-            Engine::Chromium {
-                driver: PathBuf::from("chromedriver"),
-            },
-        ] {
-            let plan = engine.plan(&self.profile, self.port, self.headless);
-            if let Ok(started) = Engine::launch(&plan) {
-                engaged = Some((started, plan));
-                break;
-            }
-        }
-        let Some((started, plan)) = engaged else {
-            return Err(Engine::choose(None, None).err().unwrap_or_else(|| {
-                AxError::failure(
-                    AxCode::BrowserUnavailable,
-                    "start a browser",
-                    "no engine started",
-                )
-                .with_recovery("install Firefox; `sprawling doctor` installs it")
-            }));
-        };
+        let engine = Engine::choose(&host::firefox(), &host::chromedriver())?;
+        let plan = engine.plan(&self.profile, self.port, self.headless);
+        let started = Engine::launch(&plan)?;
         let url = plan.socket_url();
         let mut last = None;
         for knock in 0..STARTUP_KNOCKS {

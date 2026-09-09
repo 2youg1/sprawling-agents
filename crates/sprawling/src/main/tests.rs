@@ -18,20 +18,10 @@ use super::data::verified_chain;
 use super::router::{COMMANDS, named};
 use super::{CLIENT_COMPLETE, CLIENT_FILES};
 
-/// Checking is what `doctor` does; touching the machine takes the flag.
-///
-/// A verb that installed by default would act on a person who only
-/// asked what they had, which is the one thing this verb must not do.
+/// A verb the binary accepts is on the one screen that lists them. What
+/// `doctor` reads off its own line is judged beside it, in the library.
 #[test]
-fn doctor_installs_only_when_the_flag_says_so() {
-    let words =
-        |raw: &[&str]| -> Vec<String> { raw.iter().map(|word| (*word).to_owned()).collect() };
-    assert!(!super::doctor::screen::asked(&words(&["doctor"])).install);
-    assert!(super::doctor::screen::asked(&words(&["doctor", "--install"])).install);
-    assert!(
-        !super::doctor::screen::asked(&words(&["doctor", "--installed"])).install,
-        "a flag that only looks like --install is not --install"
-    );
+fn doctor_is_on_the_command_screen() {
     assert!(
         COMMANDS.contains("doctor"),
         "a verb the binary accepts is on the one screen that lists them"

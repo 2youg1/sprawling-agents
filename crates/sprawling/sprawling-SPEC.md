@@ -1656,7 +1656,7 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 
 **本章验收**：本机 `cargo run -p sprawling -- doctor`，输出逐项与两句判定，必需项有缺则退 1。
 
-**本章未做且已知**：`PYTHON_WASM_ENV` 是 `assembly::mcp` 的私有常量，bin 的别处够不着，故表里第二次拼出了 `SPRAWLING_PYTHON_WASM` 这个名字。**两处拼写由一条测试钉住**（读 `assembly/mcp.rs` 的那一行），但两份权威仍是两份：把它提成 `sprawling` lib 的 `pub` 常量、让 doctor 直接引用，是本卡不动 `assembly/*` 的边界之外的下一刀。
+**本章未做且已知（已由 §8-47 清账）**：`PYTHON_WASM_ENV` 曾是 `assembly::mcp` 的私有常量，bin 的别处够不着，故表里第二次拼出了 `SPRAWLING_PYTHON_WASM` 这个名字。卡 9.4 把 doctor 搬进 lib、让装配层反过来问 doctor，那个名字于是只拼一次（`bin::doctor::table::PYTHON_WASM_VARIABLE`），钉住两处拼写的那条测试随之删除。
 
 ## 8-41 门说的话与门做的事：静默有自己的退出码，重放的命令只做一次（card-4.10.1；`bin::wire_client`、`bin::assembly::commanding::entrance`）
 
@@ -2365,3 +2365,134 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 - `views::rounds::tests` 与 `views::rounds::reading_tests` 把 `web::turn` 的两份测试逐字搬来，跑在服务端的折叠上：**服务端算出来的回合等于视图层对同一批记录算出来的**。红是在真账本上取的——`Query::Rounds` 先答 `Unavailable`，`asking_for_rounds_answers_the_fold_the_view_layer_ran` 在 `init_city` 铺出的城上写三条记录再问，失败于「Rounds answers with rounds」。
 - `views::evidence::tests`：一张截图与一条完成证据各成一行，读不回定位符的载荷不成行。
 - `views::cost_of::tests`：认领过的节点报出那次跑的钱；没人认领过的节点报 0 与空明细，而不是 `Unavailable`。
+
+## 8-47 六处探测收成一处：doctor 是「这台机器有什么」的唯一权威（card-9.4；`bin::doctor::host`、`bin::doctor::presence`）
+
+**病灶**：这台机器被问了六次，每次一套读法——`SPRAWLING_PYTHON_WASM` 在 `assembly::mcp` 与 `doctor::table` 各拼一次（§8-40 记下的债）；`host_shell()` 与 `execution_engine()` 住 `assembly::workbench::engine`；Firefox 与 `chromedriver` 由 `bin::browser_bidi::lazy` 按名字盲起（Windows 上 Firefox 不在 PATH，于是 doctor 说「有」而浏览器工具说「没有」）；`ffmpeg` 在 `desktop/` 里按名字起。六个答案各自漂，一个人看到的「缺什么」与 run 撞上的「缺什么」不是同一份。
+
+**裁定（沿 kernel-SPEC §8-22 P4.02「主机事实不入城」）**：主机事实住机器层。doctor 装的东西落 `~/.sprawling/components/<item>/`，**恒不落进任何一座城**——一座城搬到另一台机器时不该带着这台机器的组件。城里 `CONFIG.toml` 仍只说能力位（`sandbox.shell`）与限额，不说路径。
+
+```rust
+// lib.rs：doctor 从二进制半边搬进 lib，装配层与浏览器层才够得着它
+pub mod doctor;                                   // 公开面唯一新增：`pub use screen::verb`
+
+// bin::doctor::presence（形状 2 value）：这台机器对一项东西的回答，三态而非两态
+pub(crate) enum Presence {
+    Present { at: PathBuf, version: Version },     // 在，且起得来
+    Broken  { at: PathBuf, fault: Fault },         // 在，但用不了——对判定等于缺，对人必须说出为什么
+    Absent(Absence),                               // 不在，且说出是哪一种不在
+}
+pub(crate) enum Version { Said(String), Silent, Unreadable, Late }
+pub(crate) enum Fault   { WillNotStart(String), HalfWritten, Unreadable(String) }
+pub(crate) enum Absence { NotOnSearchPath, VariableNamesNothing { variable, path },
+                          NoComponent { dir }, NoHome, NotInThisBuild }
+impl Presence { fn usable(&self) -> bool; fn at(&self) -> Option<&Path>; fn describe(&self) -> String; }
+
+// bin::doctor（Detection 增三臂；表因此能说出四种「怎么找」）
+pub(crate) enum Detection {
+    Program     { program, version_arg, places },
+    Component   { variable, file },                // 变量优先；否则 ~/.sprawling/components/<name>/<file>
+    Interpreter { variable: PerPlatform<&str>, fallback: PerPlatform<&str> },   // COMSPEC／SHELL
+    Built       { carried: bool },                 // 这份构建带不带（sandbox 引擎）
+}
+
+// bin::doctor::host（形状 4 adapter）：二进制里其他模块问这台机器的那一扇门
+pub(crate) fn firefox() -> Presence;
+pub(crate) fn chromedriver() -> Presence;
+pub(crate) fn python_wasm() -> Presence;
+pub(crate) fn shell() -> Presence;
+pub(crate) fn execution_engine() -> Result<Box<dyn runtime::Sandbox>, AxError>;   // 从 workbench::engine 搬来
+pub(crate) const ENGINE_CARRIED: bool;                                             // cfg!(feature = "sandbox") 的唯一拼写
+pub(crate) fn components_dir() -> Option<PathBuf>;                                 // ~/.sprawling/components
+
+// bin::assembly::workbench::engine（仍是 adapter，但不再自己探测）
+pub(super) struct MachineHalf { python_wasm: Option<PathBuf>, shell: Option<PathBuf>, engine: Box<dyn Sandbox> }
+pub(super) fn machine_half(limits: &kernel::SandboxLimits) -> Result<MachineHalf, AxError>;
+
+// bin::browser_bidi::engine（decision）：吃 doctor 的三态答案，拒绝时说出是哪一种
+pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Result<Engine, AxError>;
+```
+
+- **谁问谁**：`workbench::engine::machine_half` 问 `doctor::host` 三次（组件、shell、引擎），它自己只留一条判定——shell 只在冻结配置说 `shell = true` 时才递给 bench，组件缺席不拦派活（python 臂在被调用时才拒），引擎起不来则拒派活。`browser_bidi::lazy::start` 不再按名字盲起，改为 `Engine::choose(&host::firefox(), &host::chromedriver())` 后按路径起。`assembly::mcp::PYTHON_WASM_ENV` 删除。
+- **`SPRAWLING_PYTHON_WASM` 只拼一次，且保留为兼容读法**：拼写唯一处是 `doctor::table::PYTHON_WASM_VARIABLE`。**选的是「变量优先、组件目录次之」**：一个人显式指了一处，就该用那一处；指错了（变量设了但文件不在）报 `Absent(VariableNamesNothing)` 而**不悄悄落到组件目录**——被否决的备选是「目录优先、变量兜底」，它会让一个设错的变量永远没人发现。没设变量时看 `~/.sprawling/components/python-wasi/python.wasm`。测试遍历本 crate 的 `src/`，断言含该字面量的文件恰好一个。
+- **`Broken` 是第三态，不是 `Absent` 的别名**：一个在 PATH 上却起不来的二进制（权限、坏文件、架构不符）、一个存在却没有那份文件的组件目录（下载中断）、一个读不了的目录（权限），三者对 verdict 都算缺，但每一个都带着自己的原因进报告行——**绝不以「absent」一词吞掉一个可以说清的故障**。`Version` 的四态同理：说了、没说、说的不是文本、超时没说；后三者仍算 Present（§8-40 已定：不说话的工具仍是装了的工具）。
+- **`Detection::Built` 的探测是真起一次引擎**，而不是读一个 cfg：一份声称带引擎却起不来的构建，doctor 必须报 `Broken { WillNotStart }`；`ENGINE_CARRIED` 是那个 cfg 的唯一拼写，表引用它。
+- **`ffmpeg` 进表但 doctor 管不到 `desktop/`**：`desktop/` 在墙外、是独立进程，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`desktop/` 不改——这是本卡的边界，如实记。`sprawling-desktop` 同样进表（`desktop: true` 的楼要它在 PATH 上；Manual：从 `desktop/` 构建后放上 PATH）。
+- **`browser::profile` 没有探测可搬**：卡面列了它，读完卡 4.2（browser-SPEC §19-1）确认 profile 是「楼的登录态住城的保留区」这条纯判定，浏览器探测住 `bin::browser_bidi::lazy`，故本卡不改 `crates/browser`。
+- **doctor 进 lib 的公开面只多一行**：`pub use screen::verb`，二进制半边 `main/router.rs` 改调 `sprawling::doctor::verb`；`Machine` 仍是 `pub(crate) trait`，不上缝清单。`xtask/api-baselines/sprawling.txt` 随本卡重算。
+
+**探测可失败的路径，逐条**（本卡与 §8-48 共用，测试点名「丑的那几条」）：
+
+| 路径 | 答案 | 报告行 |
+|---|---|---|
+| 程序在 PATH 上却起不来 | `Broken { WillNotStart(err) }` | `firefox  broken at <path>: will not start: <err>` |
+| 起来了但一行也不说／说的不是文本／超时 | `Present { version: Silent／Unreadable／Late }` | `present <path> (said nothing／unreadable version／no version within the deadline)` |
+| 变量设了却指向不存在的文件 | `Absent(VariableNamesNothing)` | `absent: SPRAWLING_PYTHON_WASM names <path>, which is not there` |
+| 组件目录在、文件不在（半写） | `Broken { HalfWritten }` | `broken at <dir>: half-written; delete it and install again` |
+| 组件目录或文件读不了 | `Broken { Unreadable(err) }` | `broken at <dir>: <err>` |
+| 找不到 home | `Absent(NoHome)` | `absent: neither USERPROFILE nor HOME is set` |
+| 构建带引擎却起不来 | `Broken { WillNotStart }` | `sandbox-engine  broken at <exe>: will not start: <err>` |
+| `--install` 的网络超时 | 包管理器自己的退出码 → `E_TOOL_UNAVAILABLE`，recovery「run the printed line yourself」 | doctor 自己不上网、不重试、不静默 |
+
+**本章测试**：`the_python_variable_is_spelled_once`（红：今天两处）；`a_program_that_will_not_start_is_broken_not_absent`（临时目录里放一个不是可执行文件的 `broken.exe`／`broken`）；`a_variable_that_names_nothing_is_said_so`；`a_half_written_component_directory_is_broken`；`a_present_tool_that_says_nothing_is_still_present`；`a_broken_firefox_is_refused_by_its_fault_not_as_absent`（`Engine::choose`）。
+
+**本章验收**：`cargo clippy -p sprawling --all-targets --all-features --locked -- -D warnings`、`cargo nextest run -p sprawling --locked --all-features` 绿；`cargo xtask modmap`／`length`／`header`／`specalign` 绿；本机 `cargo run -p sprawling -- doctor` 仍报 Firefox 那一行。
+
+## 8-48 doctor 按城回答，按错误码解释（card-9.5；`bin::doctor::needs`、`bin::doctor::visit`、`bin::doctor::explain`）
+
+**病灶**：§8-40 的 doctor 回答的是「这台机器对这个仓库」，而一个人真正的问题是「我这座城跑得起来吗」：一栋写了 `browser: true` 的楼在没有 Firefox 的机器上，今天要等到 run 撞上 `E_BROWSER_UNAVAILABLE` 才知道。而那条拒绝的 `recovery` 是一句通用话，没有接到这台机器的事实上。
+
+```rust
+// bin::doctor::needs（形状 1 decision）：一栋楼的能力位要什么，这台机器给不给
+pub(crate) struct Bits { pub browser: bool, pub desktop: bool, pub shell: bool }
+pub(crate) enum Capability { Browser, Desktop, Shell }
+impl Capability { pub(crate) fn any_of(self) -> &'static [&'static str]; pub(crate) fn as_str(self) -> &'static str; }
+pub(crate) struct Lack { building: Address, capability: Capability, tried: Vec<(&'static str, Presence)> }
+pub(crate) fn lacks(building: &Address, bits: &Bits, findings: &[Finding]) -> Vec<Lack>;
+pub(crate) fn lack_line(lack: &Lack) -> String;
+
+// bin::doctor::visit（形状 4 adapter）：走一遍城里的楼，读每一栋的位
+pub(crate) enum Visited { Bits { building: Address, bits: Bits }, Unreadable { building: Address, err: AxError } }
+pub(crate) fn visit(city_root: &Path) -> Result<Vec<Visited>, AxError>;
+
+// bin::doctor::explain（形状 1 decision）：一个错误码接到这台机器
+pub(crate) enum Explanation { NoSuchCode(String), NotAboutThisMachine(AxCode), Lines(Vec<String>) }
+pub(crate) fn explain(code: &str, findings: &[Finding], platform: Option<Platform>) -> Explanation;
+
+// bin::doctor::screen：`doctor [<city>] [--install] [--explain <code>]`
+pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<String> }
+```
+
+- **能力位 → 项目，是一张穷尽表**：`Browser → [firefox, chromedriver]`（任一即可，Firefox 在前）；`Desktop → [sprawling-desktop]`；`Shell → [shell]`。`browser`／`desktop` 读自 `BUILDING.md`（`city::load`），`shell` 读自该楼冻结配置的 `sandbox.shell`（`city::load_config`）——卡面把三者合称「BUILDING.md 的能力位」，实际住两份文件，这里如实记。一栋楼的一个位缺时，报告行点名**那栋楼**与它试过的每一项及各自的三态答案：`lab: browser: true, and this machine has no firefox (not on the search path) and no chromedriver (not on the search path)`。
+- **读不了的楼是一行，不是沉默**：`BUILDING.md` 解析失败或 `CONFIG.toml` 无效，那一栋报 `Visited::Unreadable`，屏幕上是 `lab: its rules will not read: <err>`；楼列表本身读不到（不是城）才是 `Err`。**doctor 永不静默**（卡面裁定）。
+- **`--explain <code>` 是「错误码 → 主机项目」的一张表**：`E_TOOL_UNAVAILABLE → [sandbox-engine, python-wasi, shell, sprawling-desktop, ffmpeg]`，`E_BROWSER_UNAVAILABLE → [firefox, chromedriver]`。其它已知码答 `NotAboutThisMachine`（它由城里的判定决定，不由这台机器决定）；不认识的码答 `NoSuchCode`。每一行是**那一项的三态答案加这平台上的下一步**：`python-wasi  absent: no component at ~/.sprawling/components/python-wasi/python.wasm -> manual: put a CPython wasi build there`——一个人读完那一行就能动手。
+- **边界（裁定，不是偏好）**：doctor 不从源码构建、不 vendor、不静默。它探测一切，只安装有官方可验证来源的东西，并逐项先问。CPython-WASI 今天没有 python.org 发布的二进制，故它仍是 `Manual`，指向组件目录；本卡不下载任何东西。`~/.sprawling/components/` 因此暂时只是 doctor 探测、人填入的约定——记在这里，免得下一张卡以为那里有个下载器。
+- **退出码**：`doctor <city>` 在该城任一楼缺任一位时退 1，与 §8-40 的「必需项有缺退 1」同一口径；`--explain` 退 0（它是解释，不是判定），只有码本身不存在时退 1——一个拼错的码是一次问错，脚本该知道。
+
+**本章测试**：`a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none`（红：`lacks` 不存在）；`a_building_whose_rules_will_not_read_is_reported_not_skipped`（`visit` 在真目录上）；`explain_connects_a_refusal_code_to_what_this_machine_has`（`E_TOOL_UNAVAILABLE` 给出一行每项、含 recipe；未知码与无关码各自的答案）；`doctor_with_a_city_names_the_building_on_the_screen`（`run` 经 `ScriptedMachine`）。
+
+**本章验收**：同 §8-47；另加本机 `cargo run -p sprawling -- doctor --explain E_TOOL_UNAVAILABLE` 一行一项。
+
+## 8-49 `Reviewed-by:` 说的是真话：这次合并没有人看过（card-F4.1；`bin::assembly::reviewing`）
+
+card-2.3 让合并落成一个真正的合并提交后，`settle_requests` 给 `memory::Landing` 传的是写死的 `reviewed_by_person: true`。**那是一句写进永久历史的假话**：`PrEffect::Merged` 里的 `by` 是 `PrDesk::who`，也就是跑这次检查的那个 resident 的地址；评审楼的全部意思正是「另一个 resident 检查它」，而不是「一个人看过它」。这台机器的 git config 里若有 `user.name`／`user.email`，那句写死的 `true` 就会把仓库主人的名字挂到一份他从未读过的改动上。
+
+**改为 `false`，并写下它为什么恒为假**：今天这条路径上不存在人的复核——`pr` 工具由模型调用，`who` 恒是城里的一个地址。`memory::Landing` 的这个字段不因此作废：它的两个取值在 `memory` 那侧各有一条断言（`a_person_who_looked_is_named_from_the_repositorys_own_config` 判真，`a_merge_lands_as_a_two_parent_commit_carrying_the_merging_runs_trailers` 判假），本卡在 `bin` 这侧加第三条，从城外读回 trunk 的提交消息作证。**翻案条件**：当合并这一步真的经过一个人（例如合并成为一件需要 Approval 的事，由 `kernel::Answerer::Human` 答复），这里的取值就由那次答复得出，而不是再写一个字面量。
+
+## 8-50 一次回合一个内容库句柄（card-F4.4；`bin::assembly::credentials::endpoints`）
+
+`redemption()` 造的取图闭包里写着 `memory::Cas::open(&cas_dir)`：**每张图开一次库**。一次带四张图的回合就开四次，每次都要建目录、探路径；而内容库是按内容寻址的只读读取，一个句柄答得了整场对话。card-4.1 记下了这件事而没有改。
+
+**改法**：`redemption` 在造闭包之前开一次库，把它放进 `Arc<Mutex<memory::Cas>>` 让闭包捕获。`Mutex` 不是为了并发而是为了类型：`ImageResolver` 要求 `Send + Sync`，而 `memory::Cas` 的 `Vfs` 缝只承诺 `Send`——`Mutex<Cas>` 在 `Cas: Send` 时即是 `Sync`，这比把 `Vfs: Send + Sync` 拓宽给所有适配器要窄。
+
+**签名随之带上失败**：`redemption(&self) -> Result<gateway::Redemption, AxError>`，因为开库会失败，而失败的时刻从「第一张图到达时」提前到「装配适配器时」——这正是想要的：一个读不了自己内容库的城，应当在造适配器时说出来，而不是在模型已经开口之后。两个调用点各改一处（`dispatching::agreeing` 用 `?`，`dispatching::session::name_the_work` 在 Option 语境里用 `.ok()?`）。
+
+**本节的断言把 `credentials/tests.rs` 顶过 400 行，故它按责任一分为二**（`length` 门在本卡里报的红，修的是因而不是门）：`credentials/tests/endpoints.rs`（一座城够得着哪些模型，以及适配器在线上兑现什么）与 `credentials/tests/signing.rs`（凭证怎么进城：录入与订阅登录），`tests.rs` 只剩两行 `mod`。切分对着源文件的两半（`endpoints.rs`／`signing.rs`）而不是对着行数切。
+
+**未由机器作证的那一半，写在明处**：「只开一次」本身没有断言，因为 `memory::Cas` 不数自己被开过几次；加一个计数缝只为这一条断言，代价大于它买到的东西。作证的是行为面——一次 `redemption` 解得开对话里的每一张图。
+
+## 8-51 城的创世哈希一座城读一次（card-F4.5；`bin::assembly` 与 `bin::assembly::workbench::standing`）
+
+`memory::Provenance::city_of` 读的是账本首段的第一行，而 `provenance()` 每造一次署名就读一次：一次波里的每道围栏、每次落地、每次合并各读一次盘。**这个事实在一座城的一生里恒定不变**——创世行写下就不再改，改了那也不是同一座城。
+
+**记在 `RunWorker` 上，用 `OnceLock` 惰性读一次**：不在 `over()` 里急读，因为一个刚被造出来、账本还空着的 worker 是合法状态（`RunWorker::new` 在一座尚未 init 的城上就是这样被测试用的），急读会把「还没有创世行」变成造不出 worker。

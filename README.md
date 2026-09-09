@@ -111,7 +111,8 @@ Other commands:
 
 ```bash
 sprawling install [--uninstall]     # make `sprawling` a word your shell resolves, or take it back off
-sprawling doctor [--install]        # what this machine has against what this city needs; --install offers each missing item, one at a time
+sprawling doctor [<city>] [--install] [--explain <code>]
+                                    # what this machine has against what a city needs, building by building; --install offers each missing item, one at a time; --explain connects a refusal code to this machine
 sprawling enrol <realm>/<name>      # read a credential from stdin into the OS store; it never touches the command line
 sprawling resume <city-dir>         # after a restart: verify the chain, close tool calls whose results are lost, report who is waiting for a human
 sprawling fork <city> <run> <seq>   # branch a lineage from a given step of a Run

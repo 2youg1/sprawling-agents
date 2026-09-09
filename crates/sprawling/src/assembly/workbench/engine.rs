@@ -3,45 +3,56 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The execution engine this build carries, and the shell a layer may
-//! ask for: the two things about `exec` that are the machine's rather
-//! than the city's.
+//! The machine half of the exec tool: the three things about `exec`
+//! that are this machine's rather than the city's, asked of
+//! `bin::doctor` and shaped by what the frozen configuration allows
+//! (sprawling-SPEC.md section 8-47).
+//!
+//! Nothing here reads the search path, a variable or a feature flag.
+//! What it holds is the judgement between the doctor's answer and the
+//! bench: a shell reaches the bench only where a layer asked for one, a
+//! component that is not here leaves the python arm to refuse at the
+//! call, and an engine that will not start refuses the dispatch.
 
-use kernel::AxError;
+use std::path::PathBuf;
 
-/// The sandbox this build carries, if it carries one.
-///
-/// # Errors
-/// Propagates what starting the engine reports. A build that says it
-/// carries one and cannot start it refuses the dispatch rather than
-/// falling back: falling back is how a run that a person believed was
-/// sandboxed turns out not to have been.
-#[cfg(feature = "sandbox")]
-pub(super) fn execution_engine() -> Result<Box<dyn runtime::Sandbox>, AxError> {
-    Ok(Box::new(runtime::WasmtimeSandbox::new()?))
+use kernel::{AxError, SandboxLimits};
+
+use crate::doctor::host;
+
+/// What the exec tool takes from this machine.
+pub(super) struct MachineHalf {
+    pub(super) python_wasm: Option<PathBuf>,
+    pub(super) shell: Option<PathBuf>,
+    pub(super) engine: Box<dyn runtime::Sandbox>,
 }
 
-/// The engine `exec` runs a program in: none, in a build without one.
+/// Asks the doctor for the component, the shell and the engine.
+///
+/// A broken component or shell arrives here as `None`: the exec tool's
+/// own refusal names the arm, and `sprawling doctor --explain
+/// E_TOOL_UNAVAILABLE` names the fault.
 ///
 /// # Errors
-/// None today; the signature matches the arm that can fail so the call
-/// site does not change shape with the feature.
-#[cfg(not(feature = "sandbox"))]
-pub(super) fn execution_engine() -> Result<Box<dyn runtime::Sandbox>, AxError> {
-    Ok(Box::new(runtime::AbsentSandbox))
-}
-
-pub(super) fn host_shell() -> Option<std::path::PathBuf> {
-    let named = if cfg!(windows) { "COMSPEC" } else { "SHELL" };
-    if let Ok(path) = std::env::var(named)
-        && !path.is_empty()
-    {
-        return Some(std::path::PathBuf::from(path));
-    }
-    let fallback = if cfg!(windows) {
-        std::path::PathBuf::from("cmd.exe")
+/// Propagates an engine this build claims to carry and cannot start.
+pub(super) fn machine_half(limits: &SandboxLimits) -> Result<MachineHalf, AxError> {
+    let shell = if limits.shell {
+        usable_path(&host::shell())
     } else {
-        std::path::PathBuf::from("/bin/sh")
+        None
     };
-    Some(fallback)
+    Ok(MachineHalf {
+        python_wasm: usable_path(&host::python_wasm()),
+        shell,
+        engine: host::execution_engine()?,
+    })
+}
+
+/// The path of an item a run may be handed: a present one, and never a
+/// broken one, which the exec tool could not tell from a working one.
+fn usable_path(presence: &crate::doctor::Presence) -> Option<PathBuf> {
+    if !presence.usable() {
+        return None;
+    }
+    presence.at().map(std::path::Path::to_path_buf)
 }

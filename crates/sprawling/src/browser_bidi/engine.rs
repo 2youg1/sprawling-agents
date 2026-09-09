@@ -14,13 +14,15 @@
 //! back quietly to something the person did not ask for.
 //!
 //! Which programs exist on this machine is not decided here. The caller
-//! passes what it found, because `bin::doctor` already owns that
+//! passes what `bin::doctor` found, because the doctor owns that
 //! question and a second answer to it would drift.
 
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
 use kernel::{AxCode, AxError};
+
+use crate::doctor::Presence;
 
 /// The engine a session will be held with.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,34 +50,38 @@ impl LaunchPlan {
 }
 
 impl Engine {
-    /// Picks the engine this machine can hold a session with.
+    /// Picks the engine this machine can hold a session with, from what
+    /// `bin::doctor` answered about each.
     ///
     /// # Errors
-    /// Refuses a machine with neither, naming both roads: installing
-    /// Firefox is one step and needs no driver, which is why it is
-    /// stated first.
-    pub(crate) fn choose(
-        firefox: Option<&Path>,
-        chromedriver: Option<&Path>,
-    ) -> Result<Engine, AxError> {
-        if let Some(program) = firefox {
+    /// Refuses a machine with neither, and says of each road why it is
+    /// closed: a Firefox that is here and will not start is a different
+    /// fact from no Firefox, and the recovery for it is not "install
+    /// Firefox".
+    pub(crate) fn choose(firefox: &Presence, chromedriver: &Presence) -> Result<Engine, AxError> {
+        if let Presence::Present { at, .. } = firefox {
             return Ok(Engine::Firefox {
-                program: program.to_path_buf(),
+                program: at.clone(),
             });
         }
-        if let Some(driver) = chromedriver {
-            return Ok(Engine::Chromium {
-                driver: driver.to_path_buf(),
-            });
+        if let Presence::Present { at, .. } = chromedriver {
+            return Ok(Engine::Chromium { driver: at.clone() });
         }
+        let recovery = if matches!(firefox, Presence::Broken { .. }) {
+            "run Firefox by hand once to see what it reports; `sprawling doctor` names the fault"
+        } else {
+            "install Firefox, which speaks this protocol itself; `sprawling doctor --install` offers it"
+        };
         Err(AxError::failure(
             AxCode::BrowserUnavailable,
             "start a browser",
-            "neither firefox nor chromedriver is on this machine",
+            format!(
+                "firefox {}; chromedriver {}",
+                firefox.describe(),
+                chromedriver.describe()
+            ),
         )
-        .with_recovery(
-            "install Firefox, which speaks this protocol itself; `sprawling doctor` installs it",
-        ))
+        .with_recovery(recovery))
     }
 
     /// The command line, spelled out.
@@ -168,16 +174,27 @@ impl Drop for Engaged {
 mod tests {
     use super::*;
 
+    fn present(at: &str) -> Presence {
+        Presence::Present {
+            at: PathBuf::from(at),
+            version: crate::doctor::Version::Silent,
+        }
+    }
+
+    fn absent() -> Presence {
+        Presence::Absent(crate::doctor::Absence::NotOnSearchPath)
+    }
+
     fn firefox() -> Engine {
-        Engine::choose(Some(Path::new("/usr/bin/firefox")), None).unwrap()
+        Engine::choose(&present("/usr/bin/firefox"), &absent()).unwrap()
     }
 
     #[test]
     fn firefox_is_the_first_engine_and_needs_no_driver() {
         assert_eq!(
             Engine::choose(
-                Some(Path::new("/usr/bin/firefox")),
-                Some(Path::new("/usr/bin/chromedriver")),
+                &present("/usr/bin/firefox"),
+                &present("/usr/bin/chromedriver"),
             )
             .unwrap(),
             Engine::Firefox {
@@ -188,12 +205,33 @@ mod tests {
 
     #[test]
     fn chromium_is_reachable_only_through_its_driver() {
-        let engine = Engine::choose(None, Some(Path::new("/usr/bin/chromedriver"))).unwrap();
+        let engine = Engine::choose(&absent(), &present("/usr/bin/chromedriver")).unwrap();
         let plan = engine.plan(Path::new("/city/lab/profile"), 41235, false);
         assert_eq!(plan.args, vec!["--port=41235".to_owned()]);
-        let err = Engine::choose(None, None).unwrap_err();
+        let err = Engine::choose(&absent(), &absent()).unwrap_err();
         assert_eq!(err.code(), &AxCode::BrowserUnavailable);
         assert!(err.recovery().contains("Firefox"));
+    }
+
+    /// A Firefox that is on this machine and will not start is refused
+    /// for that fault, in the refusal's own words, and the recovery does
+    /// not say "install Firefox" to somebody who has it.
+    #[test]
+    fn a_broken_firefox_is_refused_by_its_fault_not_as_absent() {
+        let broken = Presence::Broken {
+            at: PathBuf::from("/usr/bin/firefox"),
+            fault: crate::doctor::Fault::WillNotStart("permission denied".to_owned()),
+        };
+        let err = Engine::choose(&broken, &absent()).unwrap_err();
+        assert_eq!(err.code(), &AxCode::BrowserUnavailable);
+        let said = err.to_string();
+        assert!(said.contains("permission denied"), "{said}");
+        assert!(said.contains("not on the search path"), "{said}");
+        assert!(
+            !err.recovery().contains("install Firefox"),
+            "{}",
+            err.recovery()
+        );
     }
 
     #[test]
