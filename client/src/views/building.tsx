@@ -94,6 +94,25 @@ function Plan(props: { readonly answer: BuildingAnswer }) {
   );
 }
 
+function Lines(props: { readonly text: string }) {
+  const lines = createMemo(() => props.text.split("\n"));
+  const width = () => `${String(String(lines().length).length + 1)}ch`;
+  return (
+    <ol class="overflow-x-auto font-mono text-note leading-relaxed text-text-quiet">
+      <For each={lines()}>
+        {(line, index) => (
+          <li class="flex whitespace-pre">
+            <span class="shrink-0 select-none pr-base text-right text-text-disabled" style={{ width: width() }}>
+              {index() + 1}
+            </span>
+            <span>{line}</span>
+          </li>
+        )}
+      </For>
+    </ol>
+  );
+}
+
 function FileView(props: { readonly at: Address }) {
   const ui = useUi();
   const say = useSay();
@@ -104,26 +123,43 @@ function FileView(props: { readonly at: Address }) {
     return "document" in answer ? answer.document : null;
   });
   const markdown = () => props.at.endsWith(".md");
+  const [raw, setRaw] = createSignal(false);
   return (
-    <Show when={doc()} fallback={<p class="text-text-disabled">{doc() === null ? say("file_missing") : "…"}</p>}>
-      {(held) => (
-        <div>
-          <Show when={held().binary}>
-            <p class="text-text-faint">{say("file_binary", { kib: kib(held().bytes) })}</p>
-          </Show>
-          <Show when={held().truncated}>
-            <p class="mb-base text-note text-alert">
-              {say("file_truncated", { kib: kib(held().text.length), total: kib(held().bytes) })}
-            </p>
-          </Show>
-          <Show when={!held().binary}>
-            <Show when={markdown()} fallback={<pre class="overflow-x-auto font-mono text-note leading-relaxed text-text-quiet">{held().text}</pre>}>
-              <Prose text={held().text} />
+    <div class="flex min-h-0 flex-1 flex-col">
+      <div class="flex items-center gap-base pb-snug font-mono text-note text-text-faint">
+        <span class="truncate">{roomOf(props.at)}</span>
+        <Show when={doc()}>{(held) => <span class="text-text-disabled">{kib(held().bytes)}</span>}</Show>
+        <span class="flex-1" />
+        <Show when={markdown() && doc()?.binary === false}>
+          <button
+            type="button"
+            class={`rounded-pill px-snug text-note ${raw() ? "bg-g2 text-text" : "text-text-disabled hover:text-text-quiet"}`}
+            onClick={() => setRaw((held) => !held)}
+          >
+            .md
+          </button>
+        </Show>
+      </div>
+      <Show when={doc()} fallback={<p class="text-text-disabled">{doc() === null ? say("file_missing") : "…"}</p>}>
+        {(held) => (
+          <div class="min-h-0 flex-1 overflow-auto rounded-panel bg-g1/60 p-pane">
+            <Show when={held().binary}>
+              <p class="text-text-faint">{say("file_binary", { kib: kib(held().bytes) })}</p>
             </Show>
-          </Show>
-        </div>
-      )}
-    </Show>
+            <Show when={held().truncated}>
+              <p class="mb-base text-note text-alert">
+                {say("file_truncated", { kib: kib(held().text.length), total: kib(held().bytes) })}
+              </p>
+            </Show>
+            <Show when={!held().binary}>
+              <Show when={markdown() && !raw()} fallback={<Lines text={held().text} />}>
+                <Prose text={held().text} />
+              </Show>
+            </Show>
+          </div>
+        )}
+      </Show>
+    </div>
   );
 }
 
@@ -182,13 +218,17 @@ export function Building(props: BuildingProps) {
   const halted = () => ui.conn.belief.halted.includes(props.address);
   const done = createMemo(() => {
     const held = building();
-    if (held === undefined || !("planned" in held.progress)) return null;
+    if (held === undefined || !("planned" in held.progress) || held.progress.planned.total === 0) return null;
     return held.progress.planned;
   });
+  const setGoalNow = () => {
+    const words = goal().trim();
+    if (words !== "" && command(pursue(props.address, { set: { goal: words } }))) setGoal("");
+  };
 
   return (
     <div class="mx-auto flex min-h-0 w-full max-w-page flex-1 flex-col px-pane pt-wide">
-      <div class="flex flex-wrap items-center gap-base pb-base">
+      <div class="flex flex-wrap items-baseline gap-base pb-base">
         <a href={toFragment({ kind: "city" })} class="text-note text-text-faint">
           {say("nav_city")}
         </a>
@@ -196,7 +236,7 @@ export function Building(props: BuildingProps) {
         <h1 class="text-title font-title">{props.address}</h1>
         <Show when={done()}>
           {(p) => (
-            <span class="text-note text-text-faint">
+            <span class="font-mono text-note text-text-faint">
               {say("bld_progress", { done: String(p().done), total: String(p().total) })}
             </span>
           )}
@@ -204,44 +244,47 @@ export function Building(props: BuildingProps) {
         <span class="flex-1" />
         <button
           type="button"
-          class={`rounded-control px-base py-tight text-label hover:bg-g1 ${halted() ? "text-accent" : "text-text-quiet hover:text-alert"}`}
+          class={`rounded-control px-base py-tight font-mono text-label hover:bg-g1 ${halted() ? "text-accent" : "text-text-quiet hover:text-alert"}`}
           onClick={() => command(halted() ? release({ building: props.address }) : halt({ building: props.address }))}
         >
-          {halted() ? say("bld_release") : say("bld_halt")}
+          {halted() ? say("bld_release", { addr: props.address }) : say("bld_halt", { addr: props.address })}
         </button>
       </div>
 
-      <div class="mb-base flex flex-wrap items-center gap-snug rounded-card bg-g1 px-base py-snug text-note">
+      <div class="mb-base flex items-center gap-snug border-b border-g1 pb-snug text-note">
+        <span class="text-text-disabled" aria-hidden="true">
+          ⚑
+        </span>
         <Show
           when={pursuit()}
           fallback={
             <>
               <input
-                class="min-w-measure flex-1 rounded-control bg-g2 px-base py-tight text-note outline-none placeholder:text-text-disabled"
+                class="min-w-0 flex-1 bg-transparent py-tight text-note outline-none placeholder:text-text-disabled"
                 placeholder={say("bld_goal_placeholder")}
                 value={goal()}
                 onInput={(event) => setGoal(event.currentTarget.value)}
-              />
-              <button
-                type="button"
-                class="rounded-control bg-accent px-base py-tight text-label text-g0 hover:bg-accent-hover disabled:bg-g3 disabled:text-text-disabled"
-                disabled={goal().trim() === ""}
-                onClick={() => {
-                  if (command(pursue(props.address, { set: { goal: goal().trim() } }))) setGoal("");
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") setGoalNow();
                 }}
-              >
-                {say("bld_pursue")}
-              </button>
+              />
+              <Show when={goal().trim() !== ""}>
+                <button
+                  type="button"
+                  class="rounded-control bg-accent px-base py-tight text-label text-g0 hover:bg-accent-hover"
+                  onClick={setGoalNow}
+                >
+                  {say("bld_pursue")}
+                </button>
+              </Show>
             </>
           }
         >
           {(line) => (
             <>
-              <span class={line().state === "running" ? "text-accent" : "text-text-faint"}>
-                {line().state === "running" ? say("bld_pursuing") : say("bld_paused")}
-              </span>
+              <span class={`inline-block size-dot rounded-pill ${line().state === "running" ? "bg-accent" : "bg-g4"}`} />
               <span class="flex-1 truncate text-text-quiet">{line().goal}</span>
-              <span class="text-text-disabled">{line().verdict}</span>
+              <span class="font-mono text-text-disabled">{line().verdict}</span>
               <button
                 type="button"
                 class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2"
@@ -262,17 +305,18 @@ export function Building(props: BuildingProps) {
       </div>
 
       <div class="flex min-h-0 flex-1 gap-wide pb-wide">
-        <aside class="w-tree shrink-0 overflow-y-auto rounded-panel bg-g1/60 p-snug">
+        <aside class="w-tree shrink-0 overflow-y-auto pr-snug">
           <button
             type="button"
-            class={`mb-tight w-full rounded-control px-snug py-tight text-left text-note ${picked() === null ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
+            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${picked() === null ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
             onClick={() => setPicked(null)}
           >
-            {say("bld_plan")}
+            <span class="flex w-base shrink-0 justify-center text-text-disabled">≡</span>
+            <span class="ml-tight">{say("bld_plan")}</span>
           </button>
           <Tree root={props.address} picked={picked()} onPick={setPicked} />
         </aside>
-        <section class="min-w-0 flex-1 overflow-y-auto">
+        <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
           <Switch>
             <Match when={picked() === null}>
               <Show when={building()} fallback={<p class="text-text-disabled">…</p>}>
@@ -280,12 +324,7 @@ export function Building(props: BuildingProps) {
               </Show>
             </Match>
             <Match when={picked()?.kind === "file" ? picked() : undefined}>
-              {(file) => (
-                <div>
-                  <p class="mb-base font-mono text-note text-text-faint">{file().at}</p>
-                  <FileView at={file().at} />
-                </div>
-              )}
+              {(file) => <FileView at={file().at} />}
             </Match>
             <Match when={picked()?.kind === "directory" ? picked() : undefined}>{(dir) => <RoomView at={dir().at} />}</Match>
           </Switch>

@@ -5,7 +5,9 @@
 
 // The tree itself, one directory per question, opened the way a person
 // opens folders. A room with a run still going carries a lit dot; a
-// transcript is named for the run that wrote it and opens that run.
+// transcript is named for the run that wrote it and opens that run. A
+// row shows a name and nothing else until a hand is on it, when the
+// size appears.
 
 import { For, Show, createMemo, createSignal, untrack } from "solid-js";
 
@@ -15,7 +17,7 @@ import { RunId } from "../../core/run_id";
 import { kib } from "../../core/time";
 import type { Address, Entry } from "../../wire";
 import { Address as AddressSchema } from "../../wire";
-import { useSay, useUi } from "../../ui";
+import { useGo, useSay, useUi } from "../../ui";
 
 export interface Picked {
   readonly at: Address;
@@ -32,6 +34,22 @@ function join(at: Address, name: string): Address {
   return AddressSchema.make(`${at}/${name}`);
 }
 
+function Chevron(props: { readonly open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 10 10"
+      class={`size-dot shrink-0 text-text-disabled transition-transform ${props.open ? "rotate-90" : ""}`}
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.4"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M3.5 2l3 3-3 3" />
+    </svg>
+  );
+}
+
 function Node(props: {
   readonly at: Address;
   readonly entry: Entry;
@@ -42,58 +60,68 @@ function Node(props: {
 }) {
   const ui = useUi();
   const say = useSay();
+  const go = useGo();
   const [open, setOpen] = createSignal(untrack(() => props.openAtStart));
   const here = () => join(props.at, props.entry.name);
   const isDir = () => props.entry.kind === "directory";
   const chosen = () => props.picked?.at === here();
+  const hidden = () => props.entry.name.startsWith(".");
   const transcriptRun = createMemo(() => {
     const stem = props.entry.name.replace(/\.jsonl$/, "");
     if (stem === props.entry.name) return null;
     return Option.getOrNull(RunId.option(stem));
   });
+  const run = createMemo(() => {
+    const id = transcriptRun();
+    return id === null ? undefined : ui.conn.belief.runs[id];
+  });
   const live = createMemo(() =>
     isDir()
       ? Object.values(ui.conn.belief.runs).some(
-          (run) => run.doing.kind !== "frozen" && run.addr !== null && (run.addr === here() || run.addr.startsWith(`${here()}/`)),
+          (r) => r.doing.kind !== "frozen" && r.addr !== null && (r.addr === here() || r.addr.startsWith(`${here()}/`)),
         )
-      : false,
+      : run()?.doing.kind !== undefined && run()?.doing.kind !== "frozen",
   );
-  const pad = () => `${String(props.depth * 14 + 8)}px`;
+  const shown = () => {
+    const id = transcriptRun();
+    return id === null ? props.entry.name : (run()?.task ?? id.slice(0, 8));
+  };
+  const pick = () => {
+    const id = transcriptRun();
+    if (id !== null) {
+      go({ kind: "run", run: id });
+      return;
+    }
+    if (isDir()) setOpen((held) => !held);
+    props.onPick({ at: here(), kind: isDir() ? "directory" : "file" });
+  };
 
   return (
     <li>
       <button
         type="button"
-        class={`flex w-full items-center gap-snug rounded-control py-tight pr-snug text-left text-note hover:bg-g1 ${chosen() ? "bg-g2 text-text" : "text-text-quiet"}`}
-        style={{ "padding-left": pad() }}
-        onClick={() => {
-          if (isDir()) setOpen((held) => !held);
-          props.onPick({ at: here(), kind: isDir() ? "directory" : "file" });
-        }}
+        class={`group/row flex h-step w-full items-center gap-tight rounded-control pl-tight pr-snug text-left text-note leading-none hover:bg-g1 ${
+          chosen() ? "bg-g2 text-text" : hidden() ? "text-text-disabled" : "text-text-quiet"
+        }`}
+        onClick={pick}
         aria-expanded={isDir() ? open() : undefined}
+        title={transcriptRun() === null ? undefined : say("tree_transcript")}
       >
-        <span class="inline-block w-base text-text-disabled">{isDir() ? (open() ? "▾" : "▸") : ""}</span>
-        <span class={`truncate ${props.entry.name.startsWith(".") ? "text-text-faint" : ""}`}>
-          {props.entry.name}
+        <span class="flex w-base shrink-0 justify-center">
+          <Show when={isDir()} fallback={<Show when={transcriptRun()}><span class="text-text-disabled">↗</span></Show>}>
+            <Chevron open={open()} />
+          </Show>
         </span>
+        <span class={`truncate ${transcriptRun() === null ? "" : "font-mono text-text-faint"}`}>{shown()}</span>
         <Show when={live()}>
-          <span class="inline-block size-dot rounded-pill bg-accent" title={say("tree_live")} />
+          <span class="ml-tight inline-block size-dot shrink-0 rounded-pill bg-accent" title={say("tree_live")} />
         </Show>
         <span class="flex-1" />
         <Show when={props.entry.kind !== "directory" ? props.entry.kind : undefined}>
-          {(kind) => <span class="shrink-0 whitespace-nowrap text-text-disabled">{kib(kind().file.bytes)}</span>}
-        </Show>
-        <Show when={transcriptRun()}>
-          {(run) => (
-              <a
-                href={`#/run/${run()}`}
-                class="shrink-0 whitespace-nowrap rounded-pill bg-g2 px-snug text-text-quiet hover:bg-g3"
-                onClick={(event) => {
-                  event.stopPropagation();
-                }}
-              >
-                {say("tree_transcript")}
-              </a>
+          {(kind) => (
+            <span class="hidden shrink-0 whitespace-nowrap font-mono text-text-disabled group-hover/row:inline">
+              {kib(kind().file.bytes)}
+            </span>
           )}
         </Show>
       </button>
@@ -115,13 +143,17 @@ function Branch(props: {
   const listing = createMemo(() => ui.conn.asking.ask({ listing: { at: props.at } }));
   const entries = createMemo(() => {
     const answer = listing()();
-    return answer !== undefined && "listing" in answer ? answer.listing.entries : undefined;
+    if (answer === undefined || !("listing" in answer)) return undefined;
+    // Folders first, hidden last within each, the way a person's eye
+    // reads a directory: rooms and plans before the machinery.
+    const rank = (entry: Entry) => (entry.kind === "directory" ? 0 : 2) + (entry.name.startsWith(".") ? 1 : 0);
+    return [...answer.listing.entries].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
   });
   return (
-    <ul>
-      <Show when={entries()} fallback={<li class="py-tight pl-wide text-note text-text-disabled">…</li>}>
+    <ul class={props.depth === 0 ? "" : "ml-base border-l border-g2 pl-tight"}>
+      <Show when={entries()} fallback={<li class="h-step pl-wide text-note leading-none text-text-disabled">…</li>}>
         {(held) => (
-          <Show when={held().length > 0} fallback={<li class="py-tight pl-wide text-note text-text-disabled">{say("tree_empty")}</li>}>
+          <Show when={held().length > 0} fallback={<li class="h-step pl-wide text-note leading-none text-text-disabled">{say("tree_empty")}</li>}>
             <For each={held()}>
               {(entry) => (
                 <Node

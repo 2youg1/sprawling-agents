@@ -152,8 +152,9 @@
   corner-shape: var(--corner-pill-shape);
 }
 
-/* The two motions the city drawing makes, both on the compositor: a
- * figure bobs, a window or a thought blinks. Nothing else moves. */
+/* The three motions the city drawing makes, all on the compositor: a
+ * figure bobs, a window or a thought blinks, a flag waves. Nothing
+ * else moves. */
 @keyframes bob {
   from {
     transform: translateY(0);
@@ -170,15 +171,30 @@
     opacity: 0.35;
   }
 }
+@keyframes wave {
+  from {
+    transform: skewY(-6deg);
+  }
+  to {
+    transform: skewY(6deg);
+  }
+}
 .bob {
   animation: bob 1.4s ease-in-out infinite alternate;
+  will-change: transform;
+}
+.wave {
+  animation: wave 1.8s ease-in-out infinite alternate;
+  will-change: transform;
 }
 .blink {
   animation: blink 1.1s ease-in-out infinite alternate;
+  will-change: opacity;
 }
 @media (prefers-reduced-motion: reduce) {
   .bob,
   .blink,
+  .wave,
   .animate-pulse {
     animation: none;
   }
@@ -216,12 +232,72 @@
   ::selection {
     background: var(--color-g4);
   }
+  /* One scrollbar everywhere: thin, the g3 grey, on a transparent
+   * track, and a gutter that is reserved before it is needed so a page
+   * never shifts when it grows past the fold. A scrolling region also
+   * keeps its scroll to itself rather than handing it to the page. */
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--color-g3) transparent;
+  }
+  main,
+  .overflow-auto,
+  .overflow-y-auto {
+    scrollbar-gutter: stable;
+    overscroll-behavior: contain;
   }
   *:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
+  /* Text is shaped for the screen it lands on, not the one it was
+   * drawn on: legibility over speed, optical sizing where the face has
+   * it, and no synthetic weights. */
+  html {
+    text-rendering: optimizeLegibility;
+    font-optical-sizing: auto;
+    font-synthesis: none;
+  }
+  button,
+  a {
+    touch-action: manipulation;
+  }
+}
+
+/* A dense screen draws a hairline where a coarse one draws a pixel:
+ * every rule line, and the caret, thins to half a device pixel's
+ * worth at two or more device pixels per CSS pixel. */
+@layer utilities {
+  @media (min-resolution: 2dppx) {
+    .border,
+    .border-t,
+    .border-b,
+    .border-l,
+    .border-r {
+      border-width: 0.5px;
+    }
+    .border-t {
+      border-width: 0 0 0 0;
+      border-top-width: 0.5px;
+    }
+    .border-b {
+      border-width: 0;
+      border-bottom-width: 0.5px;
+    }
+    .border-l {
+      border-width: 0;
+      border-left-width: 0.5px;
+    }
+    .border-r {
+      border-width: 0;
+      border-right-width: 0.5px;
+    }
+  }
+}
+
+/* A frozen stretch of conversation out of view is not laid out until
+ * it scrolls in; the reserved height keeps the scrollbar honest. */
+.settled {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
 }

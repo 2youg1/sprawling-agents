@@ -216,7 +216,7 @@ export function Thread(props: ThreadProps) {
   const streaming = createMemo(() => !frozen() && props.run.saying.length > 0);
 
   return (
-    <section aria-label={props.run.run}>
+    <section aria-label={props.run.run} class={frozen() ? "settled" : undefined}>
       <Show when={task()}>
         {(text) => <Person text={text()} label={say("talk_you")} at={props.run.started ?? undefined} />}
       </Show>

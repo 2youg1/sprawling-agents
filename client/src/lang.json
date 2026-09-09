@@ -43,6 +43,10 @@
     "en": "settings",
     "zh": "设置"
   },
+  "nav_mcp": {
+    "en": "MCP",
+    "zh": "MCP"
+  },
   "nav_mayor": {
     "en": "the Mayor",
     "zh": "Mayor"
@@ -58,10 +62,6 @@
   "nav_everything": {
     "en": "everything",
     "zh": "全部去处"
-  },
-  "rail_hint": {
-    "en": "g + letter · [ pin · ? keys",
-    "zh": "g 加字母 · [ 钉住 · ? 快捷键"
   },
   "nav_the_record": {
     "en": "the record",
@@ -80,12 +80,12 @@
     "zh": "房间"
   },
   "talk_placeholder_mayor": {
-    "en": "Tell the Mayor what you want done",
-    "zh": "告诉 Mayor 你想做什么"
+    "en": "to the Mayor…",
+    "zh": "对 Mayor 说…"
   },
   "talk_placeholder_room": {
-    "en": "Say something to {room}",
-    "zh": "对 {room} 说点什么"
+    "en": "to {room}…",
+    "zh": "对 {room} 说…"
   },
   "talk_empty_mayor": {
     "en": "the Mayor",
@@ -94,10 +94,6 @@
   "talk_empty_room": {
     "en": "room {room}",
     "zh": "房间 {room}"
-  },
-  "talk_empty_hint": {
-    "en": "one sentence is enough",
-    "zh": "一句话就够"
   },
   "talk_goal": {
     "en": "read the city, answer, and plan where planning is needed",
@@ -112,8 +108,8 @@
     "zh": "说给它"
   },
   "talk_stop": {
-    "en": "stop",
-    "zh": "停下"
+    "en": "/stop",
+    "zh": "/stop"
   },
   "talk_effort": {
     "en": "thinking",
@@ -152,8 +148,8 @@
     "zh": "城已停"
   },
   "talk_release": {
-    "en": "release",
-    "zh": "放开"
+    "en": "/release --all",
+    "zh": "/release --all"
   },
   "outcome_done": {
     "en": "done",
@@ -220,20 +216,20 @@
     "zh": "安静"
   },
   "city_no_buildings": {
-    "en": "no building has been raised yet",
-    "zh": "还没有立起一栋楼"
+    "en": "no buildings",
+    "zh": "没有楼"
   },
   "city_drawing": {
     "en": "the city, one block per building",
     "zh": "城市，一栋楼一块"
   },
   "city_stop": {
-    "en": "stop the city",
-    "zh": "停下这座城"
+    "en": "/stop --all",
+    "zh": "/stop --all"
   },
   "city_release": {
-    "en": "let the city go on",
-    "zh": "让城继续"
+    "en": "/release --all",
+    "zh": "/release --all"
   },
   "city_stopped": {
     "en": "stopped",
@@ -252,16 +248,16 @@
     "zh": "计划"
   },
   "bld_progress": {
-    "en": "{done} of {total} done",
-    "zh": "{total} 件做完 {done}"
+    "en": "{done}/{total}",
+    "zh": "{done}/{total}"
   },
   "bld_open_talk": {
-    "en": "talk to this room",
-    "zh": "对这个房间说话"
+    "en": "talk",
+    "zh": "对话"
   },
   "bld_pursue": {
-    "en": "pursue this",
-    "zh": "去追这个"
+    "en": "pursue",
+    "zh": "追"
   },
   "bld_pursuing": {
     "en": "pursuing",
@@ -280,20 +276,20 @@
     "zh": "继续"
   },
   "bld_clear": {
-    "en": "clear the goal",
-    "zh": "清掉目标"
+    "en": "clear",
+    "zh": "清掉"
   },
   "bld_goal_placeholder": {
-    "en": "a standing goal",
-    "zh": "常设目标"
+    "en": "standing goal…",
+    "zh": "常设目标…"
   },
   "bld_halt": {
-    "en": "stop this building",
-    "zh": "停下这栋楼"
+    "en": "/stop {addr}",
+    "zh": "/stop {addr}"
   },
   "bld_release": {
-    "en": "release this building",
-    "zh": "放开这栋楼"
+    "en": "/release {addr}",
+    "zh": "/release {addr}"
   },
   "plan_empty": {
     "en": "no plan yet",
@@ -345,7 +341,7 @@
   },
   "tree_transcript": {
     "en": "run",
-    "zh": "这次跑"
+    "zh": "跑"
   },
   "tree_no_runs": {
     "en": "no runs",
@@ -376,8 +372,8 @@
     "zh": "做到什么算完"
   },
   "run_cancel": {
-    "en": "stop this run",
-    "zh": "停下这次跑"
+    "en": "/stop",
+    "zh": "/stop"
   },
   "run_window": {
     "en": "tokens per turn",
@@ -692,8 +688,8 @@
     "zh": "跳过"
   },
   "welcome_done": {
-    "en": "talk to the Mayor",
-    "zh": "去和 Mayor 说话"
+    "en": "the Mayor",
+    "zh": "找 Mayor"
   },
   "welcome_later": {
     "en": "later",
@@ -778,5 +774,81 @@
   "cost_by_skill": {
     "en": "by skill",
     "zh": "按 skill"
+  },
+  "mcp_title": {
+    "en": "MCP",
+    "zh": "MCP"
+  },
+  "mcp_building": {
+    "en": "building",
+    "zh": "楼"
+  },
+  "mcp_servers": {
+    "en": "servers",
+    "zh": "服务器"
+  },
+  "mcp_none": {
+    "en": "none",
+    "zh": "无"
+  },
+  "mcp_add": {
+    "en": "add",
+    "zh": "加上"
+  },
+  "mcp_composio": {
+    "en": "Composio",
+    "zh": "Composio"
+  },
+  "mcp_custom": {
+    "en": "custom",
+    "zh": "自定义"
+  },
+  "mcp_kind_http": {
+    "en": "http",
+    "zh": "http"
+  },
+  "mcp_kind_stdio": {
+    "en": "stdio",
+    "zh": "stdio"
+  },
+  "mcp_label": {
+    "en": "label",
+    "zh": "名字"
+  },
+  "mcp_url": {
+    "en": "url",
+    "zh": "地址"
+  },
+  "mcp_header": {
+    "en": "header",
+    "zh": "请求头"
+  },
+  "mcp_command": {
+    "en": "command",
+    "zh": "命令"
+  },
+  "mcp_server_id": {
+    "en": "server id",
+    "zh": "服务器 id"
+  },
+  "mcp_user_id": {
+    "en": "user id",
+    "zh": "用户 id"
+  },
+  "mcp_api_key": {
+    "en": "api key",
+    "zh": "密钥"
+  },
+  "mcp_key_kept": {
+    "en": "key kept",
+    "zh": "key 已存"
+  },
+  "mcp_open_composio": {
+    "en": "composio.dev",
+    "zh": "composio.dev"
+  },
+  "mcp_transport": {
+    "en": "transport",
+    "zh": "传输"
   }
 }
