@@ -17,6 +17,7 @@ Templates land in the building root with `CreateBuilding`; the two hall files la
 | `URBANITE.md` | with the resident | person | no | Who this resident is and how they work. |
 | `MAYOR.md` | `<city>/.sprawling/` | person | — | Who the Mayor is: the city's planner, writing Markdown only. |
 | `CLERK.md` | `<city>/.sprawling/` | person | — | Who answers approvals when the person does not: what it allows, refuses, and leaves to the person. |
+| `BUILDING-hall.md` | `<city>/hall/.sprawling/BUILDING.md` | the city | — | The rules City Hall is raised with. The one `BUILDING.md` a person does not write, because what the two residents serving every building may do is a property of the city. |
 
 The three files in the building root and the rules beside them are together called the **Spine**. Long-running work stays continuous through these files rather than through session memory — this is what "no continuous self" looks like at the file layer.
 
