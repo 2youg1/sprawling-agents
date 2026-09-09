@@ -21,8 +21,10 @@
 | vite / vite-plugin-solid / @tailwindcss/vite / tailwindcss | 8.2.2 / 2.11.14 / 4.3.3 / 4.3.3 | 构建 |
 | typescript（名下） | 6.0.3 | typescript-eslint 的 JS 编译器 API（见裁决 4-1） |
 | typescript-native（别名 `npm:typescript@7.0.2`） | 7.0.2 | `bun run typecheck`（Go 版编译器） |
-| eslint / @eslint/js / typescript-eslint / eslint-plugin-solid | 10.10.0 / 10.0.1 / 8.70.0 / 0.17.0 | lint |
+| eslint / @eslint/js / typescript-eslint / eslint-plugin-solid | 10.10.0 / 10.0.1 / 8.70.0 / 0.18.0 | lint |
 | @types/bun | 1.4.2 | `bun:test` 的类型，仅测试文件用 |
+
+**card-9.3 的一次依赖刷新**：`bun outdated` 只报两处落后。`eslint-plugin-solid` 0.17.0 → **0.18.0** 已取，`typecheck`／`lint`／`bun test`（29 条）三样全绿，裁决 4-5 的那条带理由的 `eslint-disable-next-line` 仍然被用到（未用即红，故这是实测而非推断），说明那道缝还在。**`typescript` 名下不动，留在 6.0.3**：7.0.2 是本机能装到的最新，但裁决 4-1 已经写明 typescript-eslint 8.70.0 的 peer 范围是 `>=4.8.4 <6.1.0` 且 7.0.2 不带 JS 编译器 API——把这个名升到 7.0.2 就是拿掉全部类型感知 lint。要升它，先改裁决 4-1，不是先改版本号。
 
 脚本：`dev`、`build`（Vite，`base: './'`）、`typecheck`、`lint`（`eslint --max-warnings 0`：警告即红）、`test`（`bun test --conditions=browser`，见裁决 4-2；因此 justfile 的 `check-client` 写 `bun run test` 而不是 `bun test`）。`src/vite-env.d.ts` 只引 `vite/client` 的类型，让 `import "./theme.css"` 过 TS 7 的副作用导入检查。
 

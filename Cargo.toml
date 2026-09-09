@@ -64,6 +64,13 @@ trybuild = "1"
 # to the lock, and a second hand-written encoder would be a second
 # authority for one transformation.
 base64 = "0.22"
+# card-4.3: a screenshot is evidence only if its size is read from its own
+# bytes and two of them can be compared. Decoding only - nothing here
+# writes a png - and the licence is MIT OR Apache-2.0, both already on
+# `deny.toml`'s allow list. A hand-written IHDR reader would measure a
+# picture without being able to compare two, so the second half of the
+# work would have needed this crate anyway.
+png = "0.18"
 # S2 pins: Sealed<T> zeroization.
 secrecy = "0.10"
 zeroize = "1.9"
