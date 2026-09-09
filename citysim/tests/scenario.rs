@@ -103,6 +103,7 @@ fn scenario(cancel: Option<CancelPoint>) -> Scenario {
             probe_meta(),
             vec![Ok(ToolOutcome {
                 result: Payload::empty(),
+                attachments: Vec::new(),
             })],
         ))]),
         config: quiet_config(),
@@ -237,6 +238,7 @@ fn a_run_takes_every_turn_its_work_asks_for_and_then_concludes() {
             .map(|_| {
                 Ok(ToolOutcome {
                     result: Payload::empty(),
+                    attachments: Vec::new(),
                 })
             })
             .collect(),
@@ -287,6 +289,7 @@ fn the_domain_door_bites_an_out_of_domain_write_inside_the_loop() {
         write_meta,
         vec![Ok(ToolOutcome {
             result: Payload::empty(),
+            attachments: Vec::new(),
         })],
     ))]);
     let report = run_scenario(sc).unwrap();
@@ -556,9 +559,11 @@ fn two_reads_in_one_wave_are_two_calls() {
             vec![
                 Ok(ToolOutcome {
                     result: args("first"),
+                    attachments: Vec::new(),
                 }),
                 Ok(ToolOutcome {
                     result: args("second"),
+                    attachments: Vec::new(),
                 }),
             ],
         ))]),
@@ -584,4 +589,56 @@ fn two_reads_in_one_wave_are_two_calls() {
             "call {n} came back without a result: {result}"
         );
     }
+}
+
+/// **Card 3.6.** Two runs' entries interleaved on one ledger replay
+/// byte for byte.
+///
+/// The city drives runs in parallel and accounts for them in series
+/// (ARCHITECTURE section 10, rule 5), so what the simulator has to hold
+/// is the second half: one chain, two runs' lines in it, and the same
+/// bytes both times. The simulator itself stays sequential — a pool of
+/// one is what keeps a scenario reproducible from its seed
+/// (sprawling-SPEC 8-42-3), so the interleaving here is expressed as
+/// what the accounting thread would have written, not as two threads
+/// racing for it.
+#[test]
+fn two_runs_interleaved_on_one_ledger_replay_byte_identically() {
+    fn other_room() -> Scenario {
+        let mut second = scenario(None);
+        second.run = RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000100").unwrap();
+        second.who = "worker@sim.2".into();
+        second.task = "close the minimal loop again".into();
+        second
+    }
+    fn both() -> Vec<Vec<u8>> {
+        let mut ledger = citysim::MemLedger::new();
+        citysim::run_scenario_on(&mut ledger, scenario(None)).unwrap();
+        let report = citysim::run_scenario_on(&mut ledger, other_room()).unwrap();
+        report.lines
+    }
+
+    let once = both();
+    let twice = both();
+    assert_eq!(once, twice, "one ledger, two runs, the same bytes");
+
+    let runs: std::collections::BTreeSet<String> = once
+        .iter()
+        .map(|line| {
+            let value: serde_json::Value = serde_json::from_slice(line).unwrap();
+            value["run"].as_str().unwrap().to_owned()
+        })
+        .collect();
+    for run in [
+        "0198f6a2-7c4a-7bbb-9d1e-0000000000ff",
+        "0198f6a2-7c4a-7bbb-9d1e-000000000100",
+    ] {
+        assert!(
+            runs.contains(run),
+            "both runs wrote into the one history: {runs:?}"
+        );
+    }
+    // The chain is what orders them: seq and prev are the ledger's, so
+    // two runs sharing one make one sequence rather than two.
+    citysim::check_chain(once).unwrap();
 }

@@ -11,17 +11,48 @@ use kernel::{Address, AxCode, AxError, EventKind};
 use crate::effect;
 
 use super::super::{
-    CITY_VERIFIER, Driven, Driving, Ending, RunWorker, Sweep, artifact_of, new_inbox, now_ms,
+    CITY_VERIFIER, Desks, Driven, Driving, Ending, RunWorker, Site, Sweep, Workbench, artifact_of,
+    new_inbox, now_ms,
 };
 use super::{Assignment, Dispatched, Given};
 
+/// What the city built for a dispatch before the drive, and needs
+/// again once the drive is home.
+///
+/// It exists because a drive may happen somewhere else. Where the
+/// dispatch runs on this thread it is a local living across one call;
+/// where a lane runs it, it waits in the pursuit that started it until
+/// that run comes home (sprawling-SPEC.md 8-46-2). Either way there is
+/// one per run, and nothing in it is shared.
+pub(in crate::assembly) struct Continuation {
+    at: Assignment,
+    site: Site,
+    desks: Desks,
+    workbench: Workbench,
+    job_locator: Locator,
+    /// This run's place in the backlog, given back where the run ends.
+    member: Option<runtime::BacklogId>,
+}
+
 impl RunWorker {
-    pub(in crate::assembly) fn dispatch_in(
+    /// Everything the city does for a dispatch before anything is
+    /// driven: agreeing to the work, opening the room, writing the
+    /// brief, standing the run up, laying out its bench, freezing its
+    /// plan.
+    ///
+    /// It hands back the drive and what that drive will need afterwards.
+    /// Every line it writes goes through this worker on this thread,
+    /// before any lane exists.
+    ///
+    /// # Errors
+    /// Propagates every refusal a dispatch can owe before it costs
+    /// anything, and the failures of the phases that follow it.
+    pub(in crate::assembly) fn prepare_dispatch(
         &mut self,
         mut at: Assignment,
         task: String,
         goal: String,
-    ) -> Result<Dispatched, AxError> {
+    ) -> Result<(Driving, Continuation), AxError> {
         // Nothing is written before the city agrees to take the work:
         // a halted city that laid a job file down would leave a task in
         // a room no run ever opened.
@@ -124,22 +155,55 @@ impl RunWorker {
             )?),
             None => None,
         };
-        let driven = self.drive_dispatch(
+        let driving = Driving {
+            adapter,
+            bench: workbench.take_bench()?,
+            signals: std::sync::Arc::clone(&desks.signals),
+            write_root: site.write_root.clone(),
+            fence_scope,
+            who: site.who.clone(),
+            run_id: site.run_id,
+            of: site.provenance(&self.city_root, &at.addr)?,
+            sieving: self.sieving_for(&site, &at.addr)?,
+            member,
             plan,
-            &handoff,
-            Driving {
-                adapter,
-                bench: &mut workbench.bench,
-                signals: std::sync::Arc::clone(&desks.signals),
-                write_root: &site.write_root,
-                fence_scope: fence_scope.clone(),
-                who: &site.who,
-                run_id: site.run_id,
-                of: site.provenance(&self.city_root, &at.addr)?,
-                sieving: self.sieving_for(&site, &at.addr)?,
+            handoff,
+        };
+        Ok((
+            driving,
+            Continuation {
+                at,
+                site,
+                desks,
+                workbench,
+                job_locator,
                 member,
             },
-        );
+        ))
+    }
+
+    /// Puts what a drive left onto the history, and concludes the run.
+    ///
+    /// Everything here happens on the accounting thread, whichever
+    /// thread drove: settling is where a run's last lines are written,
+    /// and a city has one writer.
+    ///
+    /// # Errors
+    /// Propagates the drive's own failure to open a checkpoint, and
+    /// every failure of settling the desks, the requests and the ending.
+    pub(in crate::assembly) fn land(
+        &mut self,
+        continuation: Continuation,
+        driven: Result<Driven, AxError>,
+    ) -> Result<Dispatched, AxError> {
+        let Continuation {
+            at,
+            mut site,
+            desks,
+            workbench,
+            job_locator,
+            member,
+        } = continuation;
         if let Some(id) = member {
             self.backlog.leave(id)?;
         }
@@ -191,6 +255,26 @@ impl RunWorker {
                 succession: &workbench.succession,
             },
         )
+    }
+
+    /// One dispatch: prepared, driven on this thread, landed.
+    ///
+    /// Every caller a person can reach comes through here, and for them
+    /// nothing about the split above is visible: the work is finished
+    /// when the call returns, exactly as it was before a lane existed.
+    ///
+    /// # Errors
+    /// Propagates whatever the three phases refuse.
+    pub(in crate::assembly) fn dispatch_in(
+        &mut self,
+        at: Assignment,
+        task: String,
+        goal: String,
+    ) -> Result<Dispatched, AxError> {
+        let (driving, continuation) = self.prepare_dispatch(at, task, goal)?;
+        let context = self.drive_context();
+        let driven = super::super::driving::lane::drive_run(driving, &mut self.ledger, context);
+        self.land(continuation, driven)
     }
 
     /// Where a building keeps the plan its residents claim rows from.

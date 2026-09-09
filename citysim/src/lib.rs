@@ -15,7 +15,7 @@ mod script_tools;
 mod sieving;
 
 pub use checker::check_chain;
-pub use executor::{CancelPoint, Scenario, ScenarioReport, run_scenario};
+pub use executor::{CancelPoint, Scenario, ScenarioReport, run_scenario, run_scenario_on};
 pub use mem_ledger::MemLedger;
 pub use script_model::ScriptModel;
 pub use script_tools::{ScriptTool, ScriptToolSet};

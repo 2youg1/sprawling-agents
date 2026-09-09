@@ -219,72 +219,9 @@ impl RunWorker {
         self.record_at(EventKind::PursuitChanged, addr.clone(), Payload::new(map)?)?;
         self.pursue(addr)
     }
-
-    /// Takes ready work for as long as a pursuit says to.
-    ///
-    /// **It terminates because every dispatch takes a node out of the
-    /// ready set.** Claiming moves a node to `In progress`, and a run
-    /// that ends still holding one leaves it blocked, so the set this
-    /// reads from strictly shrinks — except when a run splits a branch,
-    /// which is the city finding more work rather than looping.
-    ///
-    /// The verdict is `kernel::pursuit`'s and is not re-derived here:
-    /// what "there is nothing left to do" means has one authority.
-    fn pursue(&mut self, addr: &Address) -> Result<(), AxError> {
-        loop {
-            let Some(state) = self.pursuits.get(addr).map(kernel::Pursuit::state) else {
-                return Ok(());
-            };
-            let ready = self.ready_in(addr);
-            let goal = self
-                .pursuits
-                .get(addr)
-                .map(|held| held.goal().to_owned())
-                .unwrap_or_default();
-            match kernel::observe_pursuit(state, &ready, 0) {
-                kernel::PursuitVerdict::Work { next } => {
-                    let Some(node) = self.plan_item(addr, &next) else {
-                        return Ok(());
-                    };
-                    self.note(
-                        runtime::diagnostics::Level::Effect,
-                        "kernel::pursuit",
-                        &format!("{} takes {next}: {node}", addr.as_str()),
-                    );
-                    self.dispatch_in(
-                        Assignment {
-                            addr: addr.clone(),
-                            session: None,
-                            effort: None,
-                            mode: runtime::Mode::PlanGoal,
-                            parent: None,
-                            succession: None,
-                        },
-                        format!("Plan node {next}: {node}"),
-                        goal,
-                    )?;
-                    // A dispatch that did not move the node would loop
-                    // for ever, so the check is on the ready set itself
-                    // rather than on a counter.
-                    if self.ready_in(addr).contains(&next) {
-                        self.note(
-                            runtime::diagnostics::Level::Refuse,
-                            "kernel::pursuit",
-                            &format!(
-                                "{next} is still ready after a run took it; the pursuit stops \
-                                 rather than dispatching it again"
-                            ),
-                        );
-                        return Ok(());
-                    }
-                }
-                kernel::PursuitVerdict::Waiting { .. }
-                | kernel::PursuitVerdict::Paused
-                | kernel::PursuitVerdict::Finished => return Ok(()),
-            }
-        }
-    }
 }
+
+mod pursuing;
 
 #[cfg(test)]
 #[allow(

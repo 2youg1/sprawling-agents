@@ -116,7 +116,7 @@ fn spawn_worker(
             // A run in progress asks the same desk what arrived, so a
             // Cancel does not have to wait for the run it cancels.
             let interrupt_desk = Arc::clone(&worker_desk);
-            worker.attach_interrupts(Box::new(move |run: RunId| {
+            worker.attach_interrupts(Arc::new(move |run: RunId| {
                 interrupt_desk.interrupt_for(run)
             }));
             // The crossing a driving thread writes history through

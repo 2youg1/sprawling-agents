@@ -188,10 +188,19 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     // One steer, delivered at the first safe point that asks.
-    let mut left = 1;
-    worker.attach_interrupts(Box::new(move |_| {
-        if left > 0 {
-            left -= 1;
+    // A count the source can spend without owning it: N runs may ask
+    // this one source at once, so it answers by `Fn` rather than by
+    // `FnMut` (sprawling-SPEC 8-46-1).
+    let left = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(1));
+    worker.attach_interrupts(std::sync::Arc::new(move |_| {
+        if left
+            .fetch_update(
+                std::sync::atomic::Ordering::SeqCst,
+                std::sync::atomic::Ordering::SeqCst,
+                |held| held.checked_sub(1),
+            )
+            .is_ok()
+        {
             return Interrupt::Steer {
                 source: "user".to_owned(),
                 text: "measure it in metres".to_owned(),
@@ -315,11 +324,12 @@ fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
 }
 
 /// What one drive is handed can leave the thread that built it
-/// (sprawling-SPEC 8-44). A bound rather than a run: the pool of 8-42
-/// needs the type to cross, and a value that cannot be sent is a
-/// compile error here before it is a design error there.
+/// (sprawling-SPEC 8-44), and owns everything it runs on, so a lane can
+/// be handed one (sprawling-SPEC 8-46-1). A bound rather than a run: a
+/// value that cannot be sent is a compile error here before it is a
+/// design error in the pool.
 #[test]
 fn a_drive_can_be_handed_to_another_thread() {
-    fn crosses_threads<T: Send>() {}
-    crosses_threads::<Driving<'static>>();
+    fn crosses_threads<T: Send + 'static>() {}
+    crosses_threads::<Driving>();
 }

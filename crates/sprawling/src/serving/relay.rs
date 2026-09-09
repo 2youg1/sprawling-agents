@@ -34,13 +34,6 @@ struct RelayRequest {
 /// Cloned per driving thread. Nothing here decides anything: seq, prev
 /// and the bytes stay with the adapter on the accounting side, which is
 /// what keeps one city to one writer.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the driving pool of card 3.3 is the only production caller, and this expectation is unfulfilled the moment that pool lands"
-    )
-)]
 #[derive(Clone)]
 pub(crate) struct Relay {
     asking: mpsc::Sender<RelayRequest>,
@@ -77,13 +70,6 @@ impl Ledger for Relay {
 /// "nobody is writing" as "the writer is gone".
 pub(crate) struct RelayGate {
     asks: mpsc::Receiver<RelayRequest>,
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the driving pool of card 3.3 is the only production caller, and this expectation is unfulfilled the moment that pool lands"
-        )
-    )]
     issuing: mpsc::Sender<RelayRequest>,
 }
 
@@ -94,13 +80,6 @@ impl RelayGate {
     }
 
     /// One handle for one driving thread.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the driving pool of card 3.3 is the only production caller, and this expectation is unfulfilled the moment that pool lands"
-        )
-    )]
     pub(crate) fn issue(&self) -> Relay {
         Relay {
             asking: self.issuing.clone(),
@@ -129,13 +108,6 @@ impl RelayGate {
 
 /// The one refusal this crossing owns, in the three parts every refusal
 /// here is made of.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the driving pool of card 3.3 is the only production caller, and this expectation is unfulfilled the moment that pool lands"
-    )
-)]
 fn gone(why: &str) -> AxError {
     AxError::failure(AxCode::StorageFatal, "append through the relay", why)
         .with_recovery("the city is closing; resume it and the run replays from its last line")

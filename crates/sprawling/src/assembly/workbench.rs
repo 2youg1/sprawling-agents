@@ -76,7 +76,11 @@ pub(super) struct Site {
 /// to what this run admits rather than a list and a copy of it.
 pub(super) struct Workbench {
     pub(super) catalog: std::sync::Arc<std::sync::Mutex<runtime::Catalog>>,
-    pub(super) bench: ToolBench,
+    /// The bench, until the drive takes it. `Option` is the vehicle of
+    /// that move and not a second state - the same handling `Site`
+    /// gives its adapter - because a drive owns everything it runs on
+    /// and may leave this thread with it (sprawling-SPEC.md 8-46-1).
+    bench: Option<ToolBench>,
     pub(super) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     /// Whether this run asked to be replaced, read when it concludes.
     pub(super) succession: std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
@@ -112,6 +116,24 @@ pub(super) fn held<'a, T>(
         )
         .with_recovery("restart this city")
     })
+}
+
+impl Workbench {
+    /// Hands the bench to the drive, once.
+    ///
+    /// # Errors
+    /// Refuses a second ask, which is a defect in the caller rather
+    /// than a state a run can be in: one dispatch drives once.
+    pub(super) fn take_bench(&mut self) -> Result<ToolBench, AxError> {
+        self.bench.take().ok_or_else(|| {
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "carry the bench into the drive",
+                "this workbench has already been driven",
+            )
+            .with_recovery("report this: one dispatch lays out one bench and drives it once")
+        })
+    }
 }
 
 impl Site {

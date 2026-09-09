@@ -2127,3 +2127,217 @@ citysim 的 `sieving.rs` 改为调它；旧函数删除（迁移做完，不留�
 ### 8-42 `Query::Hunks` 的答（card-2.6）
 
 `views::answer` 的新臂调 `memory::of_file`，把 `memory::PatchLine`／`Withheld` 逐字段搬成线上的同名形状。这座城没写过的 oid 答 `Unavailable`，与 `Changes`／`Commit` 同口径：「没有变化」与「我看不了」是两个答案，读的人对它们的下一步不同。
+
+## 8-45 一个能看见自己造出来的东西的居民（card-4.2／4.3／4.4；`bin::browser_bidi`、`bin::browser_tool`）
+
+### 8-45-1 谁按启动键
+
+`browser` crate 是纯的：帧进帧出，无套接字、无进程、无异步。启动一个引擎与端着一条 WebSocket 因此落在装配层，这正是 ARCHITECTURE §3 的「装配边」——运行期存在、只在 `bin` 里存在的那一类边。
+
+**Firefox 是第一引擎**：它原生说 BiDi，不需要任何驱动，所以一台只装了 Firefox 的机器就是一台能用的机器。命令行三件：`--remote-debugging-port <随机端口>`、`-profile <这栋楼的 profile 目录>`、按需 `-headless`。端口随机是因为同一台机器上可能有第二座城在开着第二个浏览器，而一个固定端口会让第二座城静默连到第一座城的浏览器上。
+
+**Chromium 是第二条路**，且只在 `chromedriver` 已在 PATH 上时存在。这不是并列的两个后端：Chromium 的 BiDi 要经 `chromedriver` 转，驱动不在就是不在，此时回一句点名的拒绝而不是沉默降级。
+
+```rust
+pub(crate) enum Engine { Firefox { program: String }, Chromium { driver: String } }
+pub(crate) struct LaunchPlan { pub(crate) program: String, pub(crate) args: Vec<String>, pub(crate) port: u16 }
+impl Engine {
+    pub(crate) fn plan(&self, profile: &Path, port: u16, headless: bool) -> LaunchPlan;
+}
+```
+
+**本模块是三个文件**（400 行的价目表逼出来的一刀，切在三件事之间而不是切在行数上）：`engine.rs` 判「哪个引擎、命令行长什么样」，`lazy.rs` 持「还没起的那个引擎」与端口推导，`socket.rs` 只运字节。`browser_bidi.rs` 因此是索引，一行逻辑也没有。
+
+`plan` 是纯函数，端口由调用方给，于是「参数长什么样」这件事在没有浏览器的机器上也逐字可断言；`launch` 只是 `Command::spawn` 加一个「进程死了就报出来」。**时间与随机都不在这里取**（ARCHITECTURE §10 第 2、4 条）：端口由 `port_for(city_root)` 从城目录的 BLAKE3 摘要推出，落在 40000–59999。这既不采时钟也不取熵，而同一台机器上的两座城本来就在不同目录里——用已经把它们区分开的那件事去区分端口，比再引入一个随机源更少一处不确定性。等待浏览器起来靠**敲门次数**而不是截止时刻，因为读时钟的地方只有 `bin::assembly` 一处。
+
+### 8-45-2 `bin::browser_tool`——八个动作，一个会话
+
+工具住这里而不是 `browser` crate，理由是卡 4.3：截图要落 `memory::cas`，而 `browser` 依赖图里没有 `memory`，也不该有。把 CAS 塞进 browser 会多一条本可不存在的依赖边；把工具放在装配层，`browser::verb` 的判定与 `memory::cas` 的字节各自留在自己那侧，中间只有一个 `Shot` 值。
+
+工具持有：一个 `Box<dyn BrowserPort>`、一个 `Session`、当前 `ContextId`、上一次 `PageSnapshot`（快照的 generation 由它递增）、一个 CAS 句柄。八个动作即 `browser::verb::Verb` 的八个变体，一个不多一个不少。
+
+`effect` 是 `Effect::Egress`：浏览器打开的每个 URL 都离开这台机器，所以它过出网门，confidential 楼因此天然拿不到它。
+
+### 8-45-3 截图成为证据（卡 4.3）
+
+一次 `screenshot` 的落点有三处，缺一处这张图就不是证据：
+
+1. 字节进 `memory::cas`，得到一个 `cas:b3-…` 定位符——历史里恒不出现图片字节；
+2. 结果载荷带上定位符与两个整数尺寸，于是模型即使不看图也知道它有多大；
+3. `ToolOutcome.attachments` 带上 `ImageRef`，`runtime::turn::wave` 把它原样放进 `ContentBlock::ToolResult.attachments`，于是这张图真的到得了模型眼前。
+
+**`kernel::ToolOutcome` 因此加一个字段** `attachments: Vec<ImageRef>`，`#[serde(default)]`，旧历史读成空列表。这是本卡唯一一处跨 crate 的形状变更，波及每一个构造 `ToolOutcome` 的工具（全部改为显式空列表），不改任何一个的行为。卡 4.1 已经把 `ContentBlock::ToolResult.attachments` 与两条 dialect 备好，`wave.rs` 里那句「a tool that produces a picture fills this in where it runs」等的就是这一步。
+
+### 8-45-4 `BUILDING.md` 的 `browser: true|false`（卡 4.2、4.4）
+
+`city::policy` 多读一个键。默认 **false**：一栋楼不写这行，它的居民就没有浏览器。这与 `confidential` 的「不写即报错」不同，理由是两者的失败方向相反——隐私设置读成宽松的一侧是事故，而工具没给到只是少一件工具。confidential 楼恒为 false，写了 `browser: true` 即拒，因为一个能开任意 URL 的浏览器就是一条出网路径，而「数据不出去」是那栋楼的全部意思。
+
+### 8-45-5 验收
+
+| 单元 | 完成的定义 |
+|---|---|
+| browser_bidi | Firefox 与 Chromium 的参数各自逐字断言；驱动不在即点名拒绝；两次 plan 的端口来自参数而非采样 |
+| browser_tool | 录制适配器上重放 open→snapshot→act→screenshot 一整条；截图后 CAS 里有字节、载荷里有定位符与尺寸、attachments 里有一个 `ImageRef` |
+| BUILDING.md | 不写 `browser:` 即没有；confidential 楼写 `browser: true` 即拒 |
+
+## 8-46 同一栋楼里的并发：驾驶池、`dispatch_in` 一分为二，与拿走整个 ready set 的 `pursue`（v0.0.4 轨道 3，卡 3.3／3.5）
+
+**开工时量出来的现状，与卡面不符，如实记在最前面**：卡 3.3（池）与卡 3.4（`dispatch_in` 一分为二）在 C 波**没有落地**——
+`crates/sprawling/src/serving/` 下没有 `pool.rs`，`dispatch_in` 仍是「城答应 → 冻结 → 驾驶 → 归位 → conclude」一条直路，
+`serving/relay.rs` 里那四处 `#[cfg_attr(not(test), expect(dead_code, …))]` 仍然挂着。§8-42-8 自己写下了这件事。
+C 波真正落地的是 §8-44 的 `Send` 迁移，也就是这张卡的前置条件。**本节因此把 3.3 与 3.5 一起做完，并把 3.4 做窄**，
+窄在哪里、为什么，写在 8-46-2。
+
+### 8-46-1 `Driving` 拥有它驾驶所需的一切，`drive_dispatch` 变成自由函数
+
+§8-44 让 `Driving<'static>: Send` 成立，但今天构造出来的 `Driving<'a>` 仍借着三样东西：
+`&mut workbench.bench`、`&site.write_root`、`&site.who`，而 `drive_dispatch` 还是 `&mut self` 的方法，
+用着工人的 `ledger`／`watching`／`interrupts`／`backlog`。一个借着调用栈上局部变量的值送不进线程。
+
+| 字段 | 今天 | 本卡后 | 理由 |
+|---|---|---|---|
+| `bench` | `&'a mut ToolBench` | `ToolBench`（拥有） | `Workbench.bench` 改为 `Option<ToolBench>`，由 `take_bench` 取走一次。与 `Site.adapter` 同一手法：`Option` 是搬运的车，不是新状态 |
+| `write_root` | `&'a Path` | `PathBuf` | 一次 clone，一次驾驶 |
+| `who` | `&'a str` | `String` | 同上 |
+| `plan`／`handoff` | `drive_dispatch` 的两个参数 | `Driving` 的两个字段 | 驾驶要的东西在一个值里，池的入口才是一个值 |
+
+`drive_dispatch` 拆成两半：
+
+```rust
+/// 一次驾驶从工人那里拿走的四样东西，克隆而不借。
+pub(super) struct DriveContext {
+    watching: Option<Arc<dyn Fn(channels::Delta) + Send + Sync>>,
+    person: Option<Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>>,
+    backlog: runtime::Backlog,
+}
+
+/// 一次驾驶，泛型于它写进哪个账本：记账线程上是 `JsonlLedger`，
+/// 车道线程上是 `Relay`，而两条路上跑的是同一段代码。
+pub(super) fn drive_run<L: Ledger>(driving: Driving, ledger: &mut L, context: DriveContext) -> Result<Driven, AxError>;
+```
+
+**`interrupts` 从「借走一个」变成「每轮活各持一份」**：`RunWorker.interrupts` 由
+`Option<Box<dyn FnMut(RunId) -> Interrupt + Send>>` 改为 `Option<Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>>`。
+`CommandDesk::interrupt_for` 本来就取 `&self` 并按 `RunId` 挑命令，所以 N 份克隆指向同一张桌子，
+`steer` 与 `cancel` 各自走自己那一轮活的 `Interrupt`，这是 §8-42-1 早就写下的形状。
+`take()`／放回那一对动作随之删除：一个被借走的钩子在 N 轮活同时跑时只有一个借用人。
+
+### 8-46-2 `dispatch_in` 一分为二，但续段留在调用者手里（卡 3.4 的窄形）
+
+```rust
+/// 驾驶之前城已经做完的一切，与驾驶之后要用到的一切。
+pub(super) struct Continuation { at: Assignment, site: Site, desks: Desks, workbench: Workbench, job_locator: Locator, member: Option<runtime::BacklogId> }
+
+fn prepare_dispatch(&mut self, at: Assignment, task: String, goal: String) -> Result<(Driving, Continuation), AxError>;
+fn land(&mut self, continuation: Continuation, driven: Result<Driven, AxError>) -> Result<Dispatched, AxError>;
+```
+
+`dispatch_in` 于是等于 `prepare_dispatch` ＋ 在本线程 `drive_run` ＋ `land`，**行为一个字节不变**，
+所以它今天的每一个调用方（人的 `Dispatch`、敲门、排程、`delegate` 的递归派活、succession 的后继）都不必知道这次切割。
+
+**窄在哪里**：卡 3.4 要把 `Continuation` 交给工人，让记账线程的主循环长出第三张嘴（`Driven` 到达）。
+本卡不做那件事，续段是 `pursue` 的一个局部 `BTreeMap<RunId, Continuation>`。
+**理由是可以说清的一条**：主循环长出第三张嘴，意味着 `serve_one` 之后一条命令可能还没做完，
+而 `commanding::entrance` 的幂等门是在 `serve_one` 里「开始—落定」一次答完的（§8-41）——
+一个还在跑的 `Dispatch` 要怎样落定它的键，是一张属于那张门的卡，不是这张卡顺手能改对的东西。
+把并发先给 `pursue`，是因为 `pursue` 是这座城里唯一一处**自己就是一个循环**的派活点：
+它已经在等，等的时候顺手服务 relay 与 `Driven`，不需要任何一张门改变它的语义。
+
+### 8-46-3 `bin::serving::pool`（卡 3.3）
+
+形状：**adapter**（ARCH §9 第 4 种）。文件 `crates/sprawling/src/serving/pool.rs`。
+
+```rust
+/// 一轮跑完的活回到记账线程时带的两样东西。它们成对，因为
+/// 一个 `Driven` 不说自己属于哪一轮，一个 run id 也不说要归位什么。
+pub(crate) struct Arrival { run: RunId, driven: Result<Driven, AxError> }
+
+pub(crate) struct DrivingPool { /* lanes、一个 mpsc 的两头、每条车道的 JoinHandle */ }
+impl DrivingPool {
+    pub(crate) fn open(lanes: u32) -> DrivingPool;
+    pub(crate) fn full(&self) -> bool;
+    pub(crate) fn in_flight(&self) -> u32;
+    /// 交出一次驾驶：起一条车道。run id 取自 `driving` 自己，不另传一份——
+    /// 两处说同一件事就有两处说错的机会。
+    pub(crate) fn start(&mut self, driving: Driving, ledger: Relay, context: DriveContext) -> Result<(), AxError>;
+    /// 取回下一轮跑完的活；`wait` 内没有就返回 `None`，让调用者去服务 relay。
+    pub(crate) fn arrived(&mut self, wait: Duration) -> Option<Result<Arrival, AxError>>;
+}
+```
+
+**一条车道就是一条只活一轮活那么久的线程**，而不是常驻的 N 条。理由：一条常驻线程在没活时持有的东西是零，
+而它要活着就得有一个入口通道与一次关闭协议；一轮活一条线程把「这条线程的一生就是这轮活的一生」写成事实，
+`JoinHandle` 于是同时是「这轮活还在跑」的凭据。spawn 点仍在 `bin`（ARCH §10 规则 3）。
+
+**线程 panic 不是一种情况**：发布档 `panic = "abort"`（ARCH §2）。车道把 `Result<Driven, AxError>` 送回来，
+送不回来（`join` 报错）在测试档下也只是一次 `E_STORAGE_FATAL`，而不是一个 `Box<dyn Any>` 的分支。
+
+**车道数 `DRIVING_LANES = 4`，写在本模块里，并且如实说明它不是 provider 天花板的第二个权威**：
+`gateway::admission` 的 `ADMISSION_MAX_IN_FLIGHT` 是 `pub(crate)`，`bin` 读不到它。
+两个数字今天相等是刻意的，而把 provider 的天花板变成一个可读的公开值会改动 `gateway` 的公开面、
+需要重算 api-baseline，那是一次独立的卡，不该塞进这一张。**在它落地之前，比天花板大的车道数只会让线程停在
+admission 上排队**——§8-42-3 早就写下这句话，本卡把它从设计变成一个带理由的常量。
+
+### 8-46-4 `pursue` 拿走整个 ready set（卡 3.5；`bin::assembly::plans::pursuing`）
+
+今天的 `pursue` 是「取一个 → 跑完 → 再取一个」，一次只有一轮活。本卡把它搬进 `plans` 下的一个自己的模块
+（`plans.rs` 留 `set_pursuit` 与读计划的那几个私有方法；子模块看得见父模块的私有项，所以这一刀没有把任何字段变公开），
+并改成：
+
+1. 读整个 ready set；对其中每一个节点，只要车道没满就 `prepare_dispatch` 并交给池。
+2. 车道满了就不再取：`kernel::observe(state, &ready, in_flight)` 的 `in_flight` 参数**第一次有真值**，
+   于是「没什么可取但有人在跑」如实答 `Waiting { in_flight }`，而不是像今天那样恒传 0。
+   **已经在别人手上的节点不在问它的那个 ready set 里**：ready 的意思是「现在可以有人接手」，
+   而一个已经被接手的节点不能被接手两次。过滤在调用点做，判据仍然是 `kernel::pursuit` 的。
+3. 等：先 `gate.serve_waiting(&mut self.ledger)`（relay 请求排在一切之前，§8-42-2），再看有没有 `Driven` 到达。
+4. 到达即 `land`，**按到达顺序**（§8-42-1），落完账再回到第 1 步——一轮活结束可能让新的节点变 ready。
+   一轮活回来时它那个节点仍然 ready，说明这一轮什么也没认领：记一条 `Refuse` 诊断，并停止再取新活
+   （在跑的活照样等回来落账），这与本卡之前那条「不再派它一次」的规矩是同一条。
+5. ready 空且没有人在跑 ＝ `Finished`，退出。
+
+**账本上的写者仍然只有一个**：车道线程手上唯一的 `kernel::Ledger` 是 `Relay`，`JsonlLedger` 一步不离记账线程。
+`RelayGate` 由 `pursue` 自己开一扇，发出去的 `Relay` 与它一一对应；`serving/worker.rs` 主循环里那一扇仍在，
+仍然一件不服务——它属于卡 3.4，而不属于这一张。`relay.rs` 里四处 `#[expect(dead_code)]` 随本卡删除，
+正如 §8-42-8 所预言的：它们是会自己清掉的期待。
+
+**评审楼一轮活一个 worktree 是既有事实，本卡只验证不重做**：`stand_up` 用 `WorktreeName::parse(&run_id.to_string())`
+认领工作树，名字是 run id，所以三轮活就是三棵树。同理，卡 11.6 已把 Handoff 从楼搬进房间，
+三轮活分属三个房间时各写各的 `Handoff.md`；这也是本卡只读不改的东西。
+
+### 8-46-5 citysim：一条账本、两轮活、逐字节重放（卡 3.6）
+
+池大小 1 是模拟器的确定性条件（§8-42-3），所以 citysim 不跑池。它要证的是另一半：
+**两轮活的记录交错在同一条账本上时，同一批脚本重放出同样的字节**。
+`run_scenario` 今天每次自己造一个 `MemLedger`，于是「两轮活一条账本」在 citysim 里根本拼不出来。
+本卡加一个入口：
+
+```rust
+pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<ScenarioReport, AxError>;
+```
+
+`run_scenario` 变成「造一条账本，调它」——一个权威，两个调用方。新场景
+`two_runs_interleaved_on_one_ledger_replay_byte_identically`：两个 run id、两个房间、各自的脚本模型，
+跑在同一条 `MemLedger` 上，`seq` 单调、`prev` 成链（`check_chain`），再跑一次逐字节相同。
+
+### 8-46-6 文档停止过度承诺（卡 3.7）
+
+`README.md` 两处写着「多个 agent 同时工作」。本卡之前这句话在产品里没有主语：`pursue` 一次只跑一轮活。
+本卡之后它成立，但只在一个位置成立，文档必须把那个位置说出来，而不是继续说一句听上去更大的话。
+`ARCHITECTURE.md` §11 的性能记录增一行**并发墙**：一座城同时驾驶的轮数由车道数决定，
+而车道之外的第一堵墙是 provider 的 admission 天花板；账本仍然是串行的，那是 §10 规则 5 的价钱。
+
+### 8-46-7 验收
+
+1. **红转绿（卡 3.5）**：`bin::assembly::plans::tests::goals::three_ready_nodes_drive_three_runs_at_once`——
+   三个 ready 节点、一个 pursuit，假 provider 记下同时在飞的请求峰值。串行时峰值为 1，红就红在这里。
+2. **红转绿（卡 3.6）**：`citysim::scenario::two_runs_interleaved_on_one_ledger_replay_byte_identically`。
+3. `cargo clippy -p sprawling --all-targets --all-features --locked -- -D warnings`、
+   `cargo nextest run -p sprawling --locked --all-features`、`cargo nextest run -p citysim --locked --all-features` 绿。
+4. `cargo xtask modmap`、`length`、`header` 绿。
+
+### 8-46-8 本卡之外仍然欠着的（如实记录）
+
+- **卡 3.4 的完整形**：记账线程主循环的第三张嘴，与 `commanding::entrance` 幂等门在「一条命令还没做完」时的落定语义。
+  在它落地之前，人从界面派的活仍然是一次一轮，只有 `pursue` 是并发的。
+- **provider 天花板的可读形**：`gateway` 增一个公开的读法，`bin` 于是可以取 `min(天花板, 配置)`，
+  而不是像本卡这样让两个数字碰巧相等。这张卡要重算 api-baseline。

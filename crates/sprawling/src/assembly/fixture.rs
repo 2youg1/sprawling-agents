@@ -276,6 +276,17 @@ pub(super) const PLAN_TWO_FREE_ROWS: &str = concat!(
     "| 2 | glaze tests | 1 |  | Not started |  |\n",
 );
 
+/// Three rows nothing blocks, which is a ready set of three: what a
+/// pursuit takes the whole of rather than one node at a time
+/// (sprawling-SPEC 8-46-4).
+pub(super) const PLAN_THREE_FREE_ROWS: &str = concat!(
+    "| # | Item | Weight | Needs | Status | Evidence |\n",
+    "|---|---|---|---|---|---|\n",
+    "| 1 | wire the kiln | 1 |  | Not started |  |\n",
+    "| 2 | glaze tests | 1 |  | Not started |  |\n",
+    "| 3 | stack the shelves | 1 |  | Not started |  |\n",
+);
+
 pub(super) const PLAN_ONE_FREE_ROW: &str = concat!(
     "| # | Item | Weight | Needs | Status | Evidence |\n",
     "|---|---|---|---|---|---|\n",

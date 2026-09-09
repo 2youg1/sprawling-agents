@@ -70,6 +70,7 @@ fn cargo_output(extra: &str) -> ToolOutcome {
     result.insert("exit_code".to_owned(), Value::Number(0.into()));
     ToolOutcome {
         result: Payload::new(result).unwrap(),
+        attachments: Vec::new(),
     }
 }
 

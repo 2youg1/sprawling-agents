@@ -50,9 +50,11 @@ mod workbench;
 pub(crate) use building_page::read_building;
 use commanding::entrance::Entrance;
 use credentials::{Ceilings, Chosen, Credential, Entered};
+use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
 pub(crate) use dispatching::{Dispatched, acp_dispatch};
-use driving::{Driven, Driving};
+pub(crate) use driving::lane::{DriveContext, drive_run};
+pub(crate) use driving::{Driven, Driving};
 use folds::{Governance, HALTED, RELEASED, artifact_of, new_inbox};
 pub(crate) use folds::{Standing, rebuild_views};
 pub(crate) use genesis::city_address;
@@ -151,7 +153,10 @@ pub struct RunWorker {
     /// What a running dispatch asks at its safe points. `None` in a
     /// worker driven one command at a time, which is every worker except
     /// the one behind a live control surface.
-    interrupts: Option<Box<dyn FnMut(RunId) -> Interrupt + Send>>,
+    /// One handle per drive rather than one hook lent out and taken
+    /// back: N runs may be asking at once, and each asks about itself
+    /// (sprawling-SPEC.md 8-46-1).
+    interrupts: Option<Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>>,
     /// Where a model's text goes while it is still arriving. `None` in
     /// every worker but the one behind a live control surface, and that
     /// is the switch: a run whose city has nobody watching asks its
@@ -245,7 +250,10 @@ impl RunWorker {
     /// Where a running dispatch asks what arrived. Attached by the serve
     /// wiring, absent in a worker driven command by command: a source
     /// nobody set means a run that nothing interrupts.
-    pub(crate) fn attach_interrupts(&mut self, source: Box<dyn FnMut(RunId) -> Interrupt + Send>) {
+    pub(crate) fn attach_interrupts(
+        &mut self,
+        source: Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>,
+    ) {
         self.interrupts = Some(source);
     }
 

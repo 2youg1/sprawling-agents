@@ -95,9 +95,11 @@ fn two_wave_scenario(cancel: Option<CancelPoint>, steer: Option<(u32, String)>) 
             vec![
                 Ok(ToolOutcome {
                     result: Payload::empty(),
+                    attachments: Vec::new(),
                 }),
                 Ok(ToolOutcome {
                     result: Payload::empty(),
+                    attachments: Vec::new(),
                 }),
             ],
         ))]),

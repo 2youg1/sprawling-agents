@@ -67,7 +67,7 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
     let table = worker.backlog.clone();
     let halted = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let counted = std::sync::Arc::clone(&halted);
-    worker.attach_interrupts(Box::new(move |_run| {
+    worker.attach_interrupts(std::sync::Arc::new(move |_run| {
         let standing = table.standing(&lab).unwrap();
         if standing
             .iter()

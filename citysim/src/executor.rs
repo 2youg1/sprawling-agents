@@ -125,9 +125,30 @@ fn clock_overflow() -> AxError {
     )
 }
 
-/// Runs one scenario to its frozen end. Every path out of here has passed
-/// through handoff_written + run_frozen; the report names which ending.
+/// Runs one scenario to its frozen end, on a ledger of its own. Every
+/// path out of here has passed through handoff_written + run_frozen;
+/// the report names which ending.
+///
+/// # Errors
+/// Propagates whatever the drive refuses.
 pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
+    let mut ledger = MemLedger::new();
+    run_scenario_on(&mut ledger, scenario)
+}
+
+/// Runs one scenario on a ledger that may already hold history.
+///
+/// This is what makes two runs on one ledger expressible: the second
+/// run continues the first one's chain, so the report carries both
+/// runs' lines and `seq` orders them the way one city would have
+/// written them (sprawling-SPEC.md 8-46-5).
+///
+/// # Errors
+/// Propagates whatever the drive refuses.
+pub fn run_scenario_on(
+    ledger: &mut MemLedger,
+    scenario: Scenario,
+) -> Result<ScenarioReport, AxError> {
     let Scenario {
         run,
         who,
@@ -143,7 +164,6 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
         steer,
         mut sieve,
     } = scenario;
-    let mut ledger = MemLedger::new();
     let mut stamps = StampGate::new(config.clock_stamp);
     let job = job_locator(&addr, &job_md)?;
 
@@ -247,6 +267,7 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
                 wrapped.insert("content".to_owned(), Value::String(packaged.content));
                 Ok(kernel::ToolOutcome {
                     result: payload(wrapped)?,
+                    attachments: Vec::new(),
                 })
             }
             // A refusal reaches the model as this call's error, which the
@@ -291,7 +312,7 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
                 invoke: &mut invoke,
                 deltas: None,
             };
-            drive(plan, &mut ledger, &mut model, &mut hooks, &handoff)?
+            drive(plan, ledger, &mut model, &mut hooks, &handoff)?
         }
         None => {
             let mut hooks = RunHooks {
@@ -301,7 +322,7 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
                 invoke: &mut invoke,
                 deltas: None,
             };
-            drive(plan, &mut ledger, &mut model, &mut hooks, &handoff)?
+            drive(plan, ledger, &mut model, &mut hooks, &handoff)?
         }
     };
 
