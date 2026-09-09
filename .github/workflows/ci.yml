@@ -78,7 +78,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
       # Without this every run compiles 494 packages from zero - including
@@ -106,7 +106,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
       - uses: Swatinem/rust-cache@v2
@@ -127,7 +127,7 @@ jobs:
       # the order is the whole point: save has to happen after the tests
       # that fill the scratch and before the step that empties it, and a
       # post-step cannot be placed between two ordinary ones.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         id: trybuild-scratch
         with:
           path: target/tests
@@ -142,7 +142,7 @@ jobs:
       # Only the branch everyone builds on writes, for the reason the
       # rust-cache blocks above give: a pull request that saved its own
       # would evict the shared entry it was restored from.
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v6
         if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:
           path: target/tests
@@ -171,7 +171,7 @@ jobs:
       # middle and still go green, while xtask-SPEC.md section 3 had
       # promised the range all along. No fixed depth replaces this, because
       # a base branch can sit any distance back.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: install pinned toolchain
@@ -231,7 +231,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
       - name: the client target
@@ -254,7 +254,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny

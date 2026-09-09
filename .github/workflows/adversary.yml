@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # `sprawling` reaches `keyring`, whose Linux backend is secret-service and
       # whose build wants dbus headers this runner does not carry. nightly.yml
@@ -50,7 +50,7 @@ jobs:
       # Keyed on the .cabal file rather than on a lock file, because there is
       # none: restoring a plan is a convenience here, and resolving a fresh one
       # is half of why this job runs at all.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cabal/store
           key: adversary-${{ runner.os }}-ghc9.10.3-${{ hashFiles('adversary/adversary.cabal') }}
