@@ -19,7 +19,12 @@
 mod pattern;
 
 use crate::refusal::{Refusal, RefusalCode};
-use pattern::Pattern;
+// Re-exported rather than kept private: `platform::windows::target`
+// matches a caller's window name with the same rule this allowlist is
+// matched with. Two rules over window titles would be two places to
+// answer "what did I actually allow", and the one that is not the
+// allowlist's is the one nobody would read.
+pub(crate) use pattern::Pattern;
 use serde::Deserialize;
 use std::path::Path;
 

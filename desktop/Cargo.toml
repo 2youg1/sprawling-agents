@@ -19,6 +19,32 @@ path = "src/main.rs"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1.1"
+# card-7.2: an image crosses this wire base64-encoded, as it does on both
+# provider wires in the workspace. Same version line as the workspace's own.
+base64 = "0.22"
+# card-7.2: the three encoders `desktop.screenshot` names, and nothing
+# else — no decoders, no other formats. `webp` here is the lossless
+# encoder, which is why `quality` does not reach it (desktop-SPEC.md §14).
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+
+# card-7.2: the Win32 and UI Automation bindings. Only the namespaces the
+# six tools reach are switched on, so a call this package never makes is
+# not even nameable here.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Storage_Xps",
+    "Win32_System_Com",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+    "Win32_UI_Accessibility",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [dev-dependencies]
 tempfile = "3"

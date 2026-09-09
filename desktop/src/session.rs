@@ -34,10 +34,18 @@ pub(crate) enum Phase {
     Ready,
 }
 
-/// One connection, and the scope it is bounded by.
+/// One connection: the scope it is bounded by, and the desk it works
+/// at.
+///
+/// The desk is the connection's, not the process's. Two things live on
+/// it between calls — the snapshot generations and the recordings — and
+/// both are answers to "what did *this* caller do a moment ago", which
+/// a second caller under a second scope file must not be able to reach.
+/// Dropping the server therefore stops what the server started.
 pub(crate) struct Server {
     scope: Scope,
     phase: Phase,
+    desk: platform::Desk,
 }
 
 /// Serves one connection over this process's own pipes, under the scope
@@ -61,6 +69,7 @@ impl Server {
         Server {
             scope,
             phase: Phase::Fresh,
+            desk: platform::Desk::new(),
         }
     }
 
@@ -156,7 +165,7 @@ impl Server {
     }
 
     /// One `tools/call`: named, admitted, then carried out.
-    fn call(&self, params: &Value) -> Result<Value, Refusal> {
+    fn call(&mut self, params: &Value) -> Result<Value, Refusal> {
         let name = params.get("name").and_then(Value::as_str).ok_or_else(|| {
             Refusal::new(
                 RefusalCode::InvalidArgs,
@@ -182,7 +191,10 @@ impl Server {
             title: arguments.get("title").and_then(Value::as_str),
             process: arguments.get("process").and_then(Value::as_str),
         })?;
-        platform::perform(name, &arguments)
+        // The scope is judged before the desk is reached, and that
+        // order is the whole of the server-side enforcement: a window
+        // this file does not list is refused with no Win32 call made.
+        self.desk.perform(name, &arguments)
     }
 }
 

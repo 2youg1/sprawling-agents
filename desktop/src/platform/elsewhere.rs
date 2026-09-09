@@ -14,19 +14,35 @@
 use crate::refusal::{Refusal, RefusalCode};
 use serde_json::Value;
 
-/// Carries out one admitted call.
+/// What one connection remembers between calls — which here is
+/// nothing, because nothing happens.
 ///
-/// # Errors
-/// Refuses every call, naming this platform and the tool that was asked
-/// for.
-pub(crate) fn perform(tool: &str, _arguments: &Value) -> Result<Value, Refusal> {
-    let platform = std::env::consts::OS;
-    Err(Refusal::new(
-        RefusalCode::ToolUnavailable,
-        "use the desktop",
-        format!("`{tool}` reaches the Windows desktop, and this build runs on {platform}"),
-        "run this server on the Windows machine whose desktop is to be driven",
-    ))
+/// It exists so that `crate::session` holds one type on every platform.
+/// The alternative is a `cfg` in the session, which would put "is this
+/// Windows" in two files and make the read loop something a reader has
+/// to assemble mentally per platform.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Desk;
+
+impl Desk {
+    pub(crate) fn new() -> Desk {
+        Desk
+    }
+
+    /// Carries out one admitted call.
+    ///
+    /// # Errors
+    /// Refuses every call, naming this platform and the tool that was
+    /// asked for.
+    pub(crate) fn perform(&mut self, tool: &str, _arguments: &Value) -> Result<Value, Refusal> {
+        let platform = std::env::consts::OS;
+        Err(Refusal::new(
+            RefusalCode::ToolUnavailable,
+            "use the desktop",
+            format!("`{tool}` reaches the Windows desktop, and this build runs on {platform}"),
+            "run this server on the Windows machine whose desktop is to be driven",
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -43,8 +59,9 @@ mod tests {
 
     #[test]
     fn a_platform_without_this_desktop_is_named_in_the_refusal() {
-        let refusal =
-            perform("desktop.windows", &json!({})).expect_err("this platform carries out nothing");
+        let refusal = Desk::new()
+            .perform("desktop.windows", &json!({}))
+            .expect_err("this platform carries out nothing");
         let error = refusal.as_error();
         assert_eq!(error["data"]["code"], "E_TOOL_UNAVAILABLE");
         assert!(

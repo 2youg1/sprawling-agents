@@ -104,11 +104,11 @@ fn the_list_carries_the_six_names_with_a_description_and_a_schema_each() {
     }
 }
 
-/// The shape is final and the refusal is honest: an admitted call
-/// reaches the platform, and the platform says this build carries out
-/// nothing.
+/// On a machine that is not this desktop, an admitted call still gets an
+/// answer rather than a crash, and the answer names the platform.
+#[cfg(not(windows))]
 #[test]
-fn an_admitted_call_is_refused_by_the_platform_rather_than_answered_falsely() {
+fn elsewhere_an_admitted_call_is_refused_by_the_platform_rather_than_answered_falsely() {
     let mut server = opened("windows = [\"*Notepad*\"]\n");
     let answered = answer(
         &mut server,
@@ -120,6 +120,61 @@ fn an_admitted_call_is_refused_by_the_platform_rather_than_answered_falsely() {
         "{answered}"
     );
     assert!(answered["result"].is_null());
+}
+
+/// card-7.2: the claim this card is about. On Windows an admitted
+/// `desktop.windows` reaches the desktop and answers with the windows
+/// this scope lists — an array, possibly empty on a machine with nothing
+/// open, and never `E_TOOL_UNAVAILABLE`.
+#[cfg(windows)]
+#[test]
+fn listing_windows_reaches_this_desktop_rather_than_a_refusal() {
+    let mut server = opened("windows = [\"*\"]\n");
+    let answered = answer(
+        &mut server,
+        "tools/call",
+        json!({ "name": "desktop.windows" }),
+    );
+    assert!(
+        answered["error"].is_null(),
+        "this build carries the desktop out: {answered}"
+    );
+    assert!(
+        answered["result"]["windows"].is_array(),
+        "the listing is an array: {answered}"
+    );
+}
+
+/// card-7.2: a window nobody has open is a refusal that says how to find
+/// out what is open — never a crash, and never an action landing on
+/// whatever else was there.
+#[cfg(windows)]
+#[test]
+fn a_window_this_machine_does_not_have_is_refused_with_the_way_to_find_out() {
+    let mut server = opened("windows = [\"*\"]\n");
+    let answered = answer(
+        &mut server,
+        "tools/call",
+        json!({
+            "name": "desktop.act",
+            "arguments": {
+                "title": "no window on this machine is called this — sprawling test",
+                "action": "click",
+                "generation": 0,
+            },
+        }),
+    );
+    assert_eq!(
+        answered["error"]["data"]["code"], "E_INVALID_ARGS",
+        "{answered}"
+    );
+    assert!(
+        answered["error"]["data"]["recovery"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("desktop.windows"),
+        "{answered}"
+    );
 }
 
 /// The scope is judged before the platform is reached, so a window
