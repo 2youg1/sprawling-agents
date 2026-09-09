@@ -94,3 +94,43 @@ export function resourceFromEffect<A, E>(effect: Effect<A, E>): Resource<Exit<A,
 - `lang.json` 是复制件，`lang.rs` 仍在被其他卡改动；6.3 前重跑一次抽取或改由 xtask 生成。
 - `build.rs` 的「完整」判据与 `crates/web/assets/index.html` 的注入在 6.11 改指新产物（不在本卡范围，`crates/` 未触）。
 - `xtask npm` 门（锁文件、运行时依赖白名单、许可证清单）Roadmap 6.1 列有，属 xtask，本卡未做。
+
+## 6 重建后的形状（card-6.3／6.4／6.6／6.7，2026-09-10；本节起为权威，§1 的「冻在脚手架」与 §3-3 的 `bridge.ts` 作废）
+
+### 6-1 裁决（接 Memo D40–D47）
+
+- **D40 Effect 只做 wire 解码。** `core/frames.ts` 用生成的 `Schema` 读每一帧（`Schema.parseJson(ServerFrame)`），这是 Effect 在运行时唯一出现的地方；socket 阶梯、asking、belief 都是纯 TS 状态机加 Solid signal／store。`bridge.ts` 删除。D9「两种范式不叠」的原意保住：视图只见 Solid。理由：`Link` 本是 392 行的纯状态机，用 Stream/Fiber 包它买不到任何东西，却让每个视图多一层范式。
+- **D41 首屏即对话**：`#/` = 与 `hall/mayor` 的对话；同一房间的每次 dispatch 是一段线程；live 时 Enter 是 `steer`，冻结后 Enter 是新的 `dispatch { addr: room, session: null }`（`room_for` 对含 `/` 的地址不再开子房间）。等人的事以卡片插进对话流。
+- **D42 按钮全在左栏**（用户提议）：`views/rail.tsx` 收起时只有字形，展开（hover／`[`／`?`）才出现名字与快捷键——`g m`／`g c`／`g s`／`g w`／`g r`／`g $`、Ctrl-K。页面其余部分没有按钮。
+- **D43 两层可视化**：`#/city` 是 SVG 画的城（一栋楼一块，窗＝run，门口小人＝活动 run 的姿态，旗＝pursuit，牌＝blocked，条＝进度，唯一控件是刹车）；`#/building/<addr>` 是目录树（`Query::Listing` 逐层）＋文件原文（`Query::Document`）＋计划表；`#/run/<id>` 四透镜。
+- **D44 页面上没有句子**（用户裁）：`lang.json` 195 条，全是标签；引导页的说明段、图例、空态提示全部删除。
+- **D45 性能纪律**：帧按动画帧合并（`socket.ts` 的 `queue`＋`requestAnimationFrame`），事件折叠 O(1)，同一查询 250 ms 内合并（`asking.ts` `PACE_MS`），stale-while-revalidate，动画只用 transform／opacity。
+- **D46 视觉**：令牌与 `theme.rs` 同值；四个 `rounded-*` 工具类带 `corner-shape`（面板 `superellipse(2)`＝G3，卡片／控件 1.5＝G2，胶囊真圆）；`--spacing-0` 命名为零，因为 `--spacing` 置 `initial` 后 `min-h-0` 会消失。
+- **D47 Solid 里画 SVG 的一条规则**：组件内部的 SVG 元素只能用编译器按名字认得的标签（`g`／`path`／`rect`／`circle`／`text`／`line`），链接用 `<g role="link">` 加事件，不用 `<a>`——`<a>` 会被建成 HTML 元素，其 SVG 子树不渲染（card-6.6 实测）。
+
+### 6-2 `src/core/`（形状按 ARCHITECTURE §9）
+
+| 文件 | 形状 | 接口 |
+|---|---|---|
+| `link.ts` | 1 判定 | `newLink(token)`, `connect`, `advance(link, LinkEvent) -> [Link, LinkAction]`；`LinkAction` 穷尽（open／send／welcomed／deliver／answered／saying／wait／report／close）；阶梯 `[250,500,1000,2000,5000,10000]` |
+| `frames.ts` | 4 适配器 | `decodeFrame(text) -> ServerFrame \| null`, `encodeFrame(ClientFrame)` |
+| `socket.ts` | 4 适配器 | `openConnection(url, token) -> Connection { state, belief, asking, command, retry, dismissRefusal }`；`tokenIn(search)`, `socketUrl(location)` |
+| `asking.ts` | 1 判定 | `createAsking(send) -> { ask(query) -> Accessor<Answer\|undefined>, refresh, answered, invalidate(record), reconnected }`；答案按内容匹配问题，无名者按到达序；`staleBy` 是事件到查询的失效表 |
+| `belief.ts` | 7 投影 | `createBelief() -> { belief: {runs, halted, refusal, city}, adoptCity, apply, say, refused, named }`；`RunBelief { addr, started, task, doing: thinking\|calling\|waiting\|frozen, saying }` |
+| `commands.ts` | 2 值 | 每个命令帧一个构造函数，自铸 `IdemKey` |
+| `enrol.ts` | 4 适配器 | `enrol(origin, realm, name, value) -> Promise<Enrolment>`；`referenceFor(provider)` |
+| `idem.ts` | 2 值 | `mintIdem()` |
+| `prefs.ts` | 6 数据 | `loadPrefs(storage, browserLang) -> { lang, effort, welcomed }`（localStorage） |
+| `prose.ts` | 1 判定 | `blocks(text) -> Block[]`, `inline(text) -> Inline[]`：Markdown 读成数据，永不 innerHTML |
+| `route.ts` | 1 判定 | `View = talk\|city\|building\|run\|setup\|record\|cost\|welcome`；旧片段全读；`MAYOR`, `buildingOf`, `roomOf` |
+| `time.ts` | 1 判定 | `ago`, `clock`, `count`, `usd`, `kib` |
+
+`src/ui.tsx` 是视图拿到的一切：`UiProvider`／`useUi`（conn、prefs、bar、origin、now）、`useSay`（键→词，填槽）、`useGo`、`useCommand`。
+
+### 6-3 视图（免 SPEC，列出以便定位）
+
+`views/rail.tsx` 左栏；`views/talk.tsx`＋`talk/{thread,composer,waiting}.tsx` 对话；`views/city.tsx`＋`city/shape.ts`（超椭圆路径）；`views/building.tsx`＋`building/tree.tsx`；`views/run.tsx`；`views/setup.tsx`＋`setup/{providers,models}.tsx`；`views/welcome.tsx`；`views/record.tsx`；`views/cost.tsx`；`views/palette.tsx`；`views/refusal.tsx`；`views/prose.tsx`。
+
+### 6-4 验收记录（2026-09-10）
+
+`bun run lint`／`typecheck`／`test`（26 条）绿；`cargo xtask npm`／`wire-ts` 绿。在真城（`sprawling serve --web-dir target/web-dist`）＋假扮 OpenAI 形供应方上实测：连接与握手、引导页触发（无 main 时）、从 composer 派活、`read` 调用折叠、Markdown 回复、结局分隔线、城市绘图、目录树与 transcript 链接、面板。**未实测**：流式增量（服务端界面派活路径不请求 stream，见 Handoff）、设置页表单、四透镜的后三个、记录与成本页、等人卡片、Firefox。
