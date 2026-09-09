@@ -78,7 +78,26 @@ const EXPOSE_WHITELIST: [&str; 5] = [
 ///   *name* of an environment variable and so can never itself hold a
 ///   value; the target triple's digits and underscores are what trip
 ///   the mixed-alphabet rule.
-const NOT_CREDENTIALS: [&str; 2] = ["CanvasRenderingContext2d", "CC_x86_64_unknown_linux_musl"];
+/// - The six `Win32_*` names — Cargo features of the `windows` crate,
+///   listed in `desktop/Cargo.toml` to select the API surfaces the
+///   Windows arm calls: data exchange for the clipboard, threading and
+///   variant for COM, accessibility for the UI Automation tree, HiDPI
+///   for per-monitor scaling, keyboard and mouse for `SendInput`, and
+///   windows-and-messaging for enumeration. A Cargo feature name is
+///   read by the resolver and can never hold a value; the digits in
+///   `Win32` beside the underscores are what trip the mixed-alphabet
+///   rule. Only the six names of twenty bytes or more are listed, since
+///   a shorter one never reaches the entropy detector.
+const NOT_CREDENTIALS: [&str; 8] = [
+    "CanvasRenderingContext2d",
+    "CC_x86_64_unknown_linux_musl",
+    "Win32_System_DataExchange",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+    "Win32_UI_Accessibility",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+];
 
 /// Whether these exact bytes are one of the reviewed identifiers.
 ///
