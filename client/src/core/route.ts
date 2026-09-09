@@ -29,6 +29,7 @@ export type View =
   | { readonly kind: "building"; readonly address: Address }
   | { readonly kind: "run"; readonly run: RunId }
   | { readonly kind: "setup" }
+  | { readonly kind: "mcp" }
   | { readonly kind: "record"; readonly lens: Lens }
   | { readonly kind: "cost" }
   | { readonly kind: "welcome" };
@@ -51,6 +52,8 @@ export function toFragment(view: View): string {
       return `#/run/${view.run}`;
     case "setup":
       return "#/setup";
+    case "mcp":
+      return "#/mcp";
     case "record":
       return recordFragment(view.lens);
     case "cost":
@@ -79,6 +82,7 @@ const BARE: Readonly<Record<string, View>> = {
   talk: DEFAULT_VIEW,
   city: { kind: "city" },
   setup: { kind: "setup" },
+  mcp: { kind: "mcp" },
   record: { kind: "record", lens: "ledger" },
   cost: { kind: "cost" },
   welcome: { kind: "welcome" },

@@ -10,9 +10,10 @@
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
-import { MAYOR, toFragment } from "../core/route";
+import { MAYOR, buildingOf, toFragment } from "../core/route";
 import { useGo, useSay, useUi } from "../ui";
-import { McpForm, SkillsNote } from "./setup";
+import { McpForm } from "./mcp";
+import { SkillsNote } from "./setup";
 import { EffortChoice, ModelChoice } from "./setup/models";
 import { AttachForm, EndpointList, LoginForm } from "./setup/providers";
 
@@ -100,7 +101,7 @@ export function Welcome() {
             </Match>
             <Match when={step() === "optional"}>
               <h2 class="mb-base text-label font-label text-text-quiet">{say("setup_mcp")}</h2>
-              <McpForm />
+              <McpForm addr={buildingOf(MAYOR)} />
               <h2 class="mt-wide mb-base text-label font-label text-text-quiet">{say("setup_skills_title")}</h2>
               <SkillsNote />
             </Match>

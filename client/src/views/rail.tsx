@@ -25,7 +25,7 @@ export interface RailProps {
 }
 
 interface Item {
-  readonly key: "talk" | "city" | "setup";
+  readonly key: "talk" | "city" | "mcp" | "record" | "cost" | "setup";
   readonly view: View;
   readonly label: string;
   readonly keys: string;
@@ -65,6 +65,27 @@ function HandGlyph() {
     </svg>
   );
 }
+function PlugGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" class="size-glyph" {...stroke}>
+      <path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0zM10 15v3" />
+    </svg>
+  );
+}
+function RecordGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" class="size-glyph" {...stroke}>
+      <path d="M5 3h10v14H5zM8 7h4M8 10h4M8 13h2" />
+    </svg>
+  );
+}
+function CostGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" class="size-glyph" {...stroke}>
+      <path d="M3 16l4-6 3 3 4-7 3 4M3 17h14" />
+    </svg>
+  );
+}
 function PaletteGlyph() {
   return (
     <svg viewBox="0 0 20 20" class="size-glyph" {...stroke}>
@@ -93,6 +114,9 @@ export function Rail(props: RailProps) {
   const items = createMemo<Item[]>(() => [
     { key: "talk", view: { kind: "talk", address: MAYOR }, label: say("nav_mayor"), keys: "g m", glyph: <TalkGlyph /> },
     { key: "city", view: { kind: "city" }, label: say("nav_city"), keys: "g c", glyph: <CityGlyph />, badge: active() },
+    { key: "mcp", view: { kind: "mcp" }, label: say("nav_mcp"), keys: "g x", glyph: <PlugGlyph /> },
+    { key: "record", view: { kind: "record", lens: "ledger" }, label: say("nav_the_record"), keys: "g r", glyph: <RecordGlyph /> },
+    { key: "cost", view: { kind: "cost" }, label: say("cost_title"), keys: "g $", glyph: <CostGlyph /> },
     { key: "setup", view: { kind: "setup" }, label: say("nav_settings"), keys: "g s", glyph: <SetupGlyph /> },
   ]);
   const here = (item: Item) => (props.view.kind === item.key ? "page" : undefined);
@@ -179,9 +203,6 @@ export function Rail(props: RailProps) {
         <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">{say("nav_everything")}</span>
         <kbd class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">⌘K</kbd>
       </button>
-      <p class="hidden px-base pt-snug text-note text-text-disabled group-hover/rail:block group-data-open/rail:block">
-        {say("rail_hint")}
-      </p>
     </nav>
   );
 }

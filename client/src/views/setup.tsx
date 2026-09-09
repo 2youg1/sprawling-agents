@@ -10,11 +10,11 @@
 import { For, Show, createMemo, createSignal } from "solid-js";
 import type { JSX } from "solid-js";
 
-import { configureMcp, setAutonomy } from "../core/commands";
+import { setAutonomy } from "../core/commands";
 import { LANGS, endonym } from "../core/lang";
 import { toFragment } from "../core/route";
-import type { Autonomy, McpServer } from "../wire";
-import { Address as AddressSchema, ResidentId, ServerLabel } from "../wire";
+import type { Autonomy } from "../wire";
+import { ResidentId } from "../wire";
 import { useCommand, useSay, useUi } from "../ui";
 import { EffortChoice, ModelChoice } from "./setup/models";
 import { AttachForm, EndpointList, LoginForm } from "./setup/providers";
@@ -25,91 +25,6 @@ function Section(props: { readonly title: string; readonly children: JSX.Element
       <h2 class="mb-base text-heading font-heading">{props.title}</h2>
       {props.children}
     </section>
-  );
-}
-
-const HALL = AddressSchema.make("hall");
-
-export function McpForm() {
-  const ui = useUi();
-  const say = useSay();
-  const command = useCommand();
-  const [label, setLabel] = createSignal("");
-  const [command_, setCommandLine] = createSignal("");
-  const [url, setUrl] = createSignal("");
-  const hall = ui.conn.asking.ask({ building_view: { addr: HALL } });
-  const servers = createMemo<readonly McpServer[]>(() => {
-    const answer = hall();
-    return answer !== undefined && "building" in answer ? answer.building.mcp : [];
-  });
-  const add = () => {
-    const name = label().trim();
-    if (name === "" || !/^[a-z][a-z0-9-]*$/.test(name)) return;
-    const transport: McpServer["transport"] =
-      url().trim() !== ""
-        ? { http: { url: url().trim(), header: null } }
-        : (() => {
-            const [program, ...args] = command_().trim().split(/\s+/);
-            return { stdio: { command: program ?? "", args } };
-          })();
-    if ("stdio" in transport && transport.stdio.command === "") return;
-    if (command(configureMcp(HALL, [...servers(), { label: ServerLabel.make(name), transport }]))) {
-      setLabel("");
-      setCommandLine("");
-      setUrl("");
-    }
-  };
-  return (
-    <div class="flex flex-col gap-base">
-      <Show when={servers().length > 0}>
-        <ul class="flex flex-col gap-tight text-note">
-          <For each={servers()}>
-            {(server) => (
-              <li class="flex items-center gap-base rounded-card bg-g1 px-base py-snug">
-                <span class="font-label text-text">{server.label}</span>
-                <span class="flex-1 truncate font-mono text-text-faint">
-                  {"stdio" in server.transport
-                    ? [server.transport.stdio.command, ...server.transport.stdio.args].join(" ")
-                    : server.transport.http.url}
-                </span>
-                <button
-                  type="button"
-                  class="rounded-control px-snug py-tight text-text-faint hover:bg-g2 hover:text-alert"
-                  onClick={() => command(configureMcp(HALL, servers().filter((each) => each.label !== server.label)))}
-                >
-                  {say("setup_remove")}
-                </button>
-              </li>
-            )}
-          </For>
-        </ul>
-      </Show>
-      <div class="grid gap-snug md:grid-cols-3">
-        <input
-          class="rounded-control bg-g2 px-base py-snug text-body outline-none placeholder:text-text-disabled"
-          placeholder={say("setup_mcp_label")}
-          value={label()}
-          onInput={(event) => setLabel(event.currentTarget.value)}
-        />
-        <input
-          class="rounded-control bg-g2 px-base py-snug font-mono text-body outline-none placeholder:text-text-disabled"
-          placeholder={say("setup_mcp_command")}
-          value={command_()}
-          onInput={(event) => setCommandLine(event.currentTarget.value)}
-        />
-        <input
-          class="rounded-control bg-g2 px-base py-snug font-mono text-body outline-none placeholder:text-text-disabled"
-          placeholder={say("setup_mcp_url")}
-          value={url()}
-          onInput={(event) => setUrl(event.currentTarget.value)}
-        />
-      </div>
-      <div>
-        <button type="button" class="rounded-control bg-g2 px-base py-snug text-label hover:bg-g3" onClick={add}>
-          {say("setup_mcp_add")}
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -220,7 +135,9 @@ export function Setup() {
       </Section>
 
       <Section title={say("setup_mcp")}>
-        <McpForm />
+        <a href={toFragment({ kind: "mcp" })} class="rounded-control bg-g2 px-base py-snug text-label hover:bg-g3">
+          {say("nav_mcp")} →
+        </a>
       </Section>
 
       <Section title={say("setup_skills_title")}>

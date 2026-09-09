@@ -23,6 +23,7 @@ import { Rail } from "./views/rail";
 import { Record } from "./views/record";
 import { Refusal } from "./views/refusal";
 import { Run } from "./views/run";
+import { Mcp } from "./views/mcp";
 import { Setup } from "./views/setup";
 import { Talk } from "./views/talk";
 import { Welcome } from "./views/welcome";
@@ -33,6 +34,7 @@ const GOES: Readonly<Record<string, View>> = {
   w: { kind: "talk", address: MAYOR },
   c: { kind: "city" },
   s: { kind: "setup" },
+  x: { kind: "mcp" },
   r: { kind: "record", lens: "ledger" },
   $: { kind: "cost" },
 };
@@ -141,7 +143,7 @@ export function App() {
           onPalette={() => setPaletteOpen(true)}
         />
       </Show>
-      <main class="flex min-h-0 min-w-0 flex-1 flex-col" aria-label={say("region_main")}>
+      <main class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto" aria-label={say("region_main")}>
         <Switch>
           <Match keyed when={view().kind === "talk" ? view() : undefined}>
             {(talk) => (talk.kind === "talk" ? <Talk address={talk.address} /> : null)}
@@ -157,6 +159,9 @@ export function App() {
           </Match>
           <Match when={view().kind === "setup"}>
             <Setup />
+          </Match>
+          <Match when={view().kind === "mcp"}>
+            <Mcp />
           </Match>
           <Match keyed when={view().kind === "record" ? view() : undefined}>
             {(record) => (record.kind === "record" ? <Record lens={record.lens} /> : null)}
