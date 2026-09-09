@@ -125,7 +125,7 @@ impl RunWorker {
                 checkpoint: memory::Checkpoint::open(&site.write_root)
                     .map_err(memory::MemoryError::into_ax)?,
                 scope: addr.as_str().to_owned(),
-                of: site.provenance(&self.city_root, addr)?,
+                of: site.provenance(self.city_hash()?, addr),
             })
             .for_job(addr.clone(), job_locator.clone());
         for cluster in &self.governance.granted {

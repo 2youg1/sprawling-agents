@@ -163,7 +163,7 @@ impl RunWorker {
             fence_scope,
             who: site.who.clone(),
             run_id: site.run_id,
-            of: site.provenance(&self.city_root, &at.addr)?,
+            of: site.provenance(self.city_hash()?, &at.addr),
             sieving: self.sieving_for(&site, &at.addr)?,
             member,
             plan,

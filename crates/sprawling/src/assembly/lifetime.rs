@@ -85,6 +85,7 @@ impl RunWorker {
         let pursuits = collaboration.pursuits(&delegator);
         Ok(RunWorker {
             city_root: city_root.to_path_buf(),
+            city: std::sync::OnceLock::new(),
             ledger,
             cas,
             book,

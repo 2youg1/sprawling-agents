@@ -12,28 +12,21 @@ use kernel::{Address, AxError, EventKind, RunId};
 
 use crate::effect;
 
-use super::super::{Agreed, Assignment, Given, RunWorker, ledger_dir, now_ms, run_id_for};
+use super::super::{Agreed, Assignment, Given, RunWorker, now_ms, run_id_for};
 use super::Site;
 
 /// What a commit this run makes is signed with.
 ///
-/// The city hash is read from the genesis line rather than kept on the
-/// worker: it is one line off the front of the first ledger segment,
-/// and a cached copy would be a second authority for the one fact that
-/// says which city this is.
-///
-/// # Errors
-/// Propagates a city whose ledger cannot be read or holds no line at
-/// all - a city with no genesis has no identity to sign with.
+/// The city hash arrives rather than being read here: one read of the
+/// genesis line serves a whole city, and `RunWorker::city_hash` is where
+/// that read happens (sprawling-SPEC.md 8-51).
 pub(in crate::assembly) fn provenance(
-    city_root: &Path,
+    city: kernel::B3Hash,
     addr: &Address,
     run_id: RunId,
     chosen: memory::ModelChoice,
-) -> Result<memory::Provenance, AxError> {
-    let city = memory::Provenance::city_of(&ledger_dir(city_root))
-        .map_err(memory::MemoryError::into_ax)?;
-    Ok(memory::Provenance::new(run_id, addr.clone(), city, chosen))
+) -> memory::Provenance {
+    memory::Provenance::new(run_id, addr.clone(), city, chosen)
 }
 
 /// The filter table that governs this run: the building's file over
@@ -70,26 +63,24 @@ impl Site {
     /// What this run signs its commits with: its id, the room it works
     /// in, the model it was given and the effort it was asked for.
     ///
-    /// # Errors
-    /// Propagates whatever reading the city's genesis line reports.
     pub(in crate::assembly) fn provenance(
         &self,
-        city_root: &Path,
+        city: kernel::B3Hash,
         addr: &Address,
-    ) -> Result<memory::Provenance, AxError> {
+    ) -> memory::Provenance {
         let signed = provenance(
-            city_root,
+            city,
             addr,
             self.run_id,
             memory::ModelChoice {
                 id: self.model.id.clone(),
                 effort: self.config.effort,
             },
-        )?;
-        Ok(match self.predecessor {
+        );
+        match self.predecessor {
             Some(predecessor) => signed.succeeding(predecessor),
             None => signed,
-        })
+        }
     }
 }
 
@@ -165,14 +156,14 @@ impl RunWorker {
             // line of an adopted repository's history already says which
             // session put it there.
             let of = provenance(
-                &self.city_root,
+                self.city_hash()?,
                 addr,
                 run_id,
                 memory::ModelChoice {
                     id: model.id.clone(),
                     effort: config.effort,
                 },
-            )?;
+            );
             memory::Checkpoint::open(&self.city_root)
                 .map_err(memory::MemoryError::into_ax)?
                 .ensure_base(addr.as_str(), now_ms()?, &of)

@@ -140,6 +140,13 @@ impl ScanReport {
 
 pub struct RunWorker {
     city_root: PathBuf,
+    /// Which city this is, as the genesis line hashes. Read from the
+    /// ledger the first time a commit needs signing and remembered:
+    /// every fence, landing and merge used to re-read the front of the
+    /// history for it (sprawling-SPEC.md 8-51). Lazy rather than read on
+    /// open, because a worker over a city with no genesis line yet is a
+    /// legal state.
+    city: std::sync::OnceLock<kernel::B3Hash>,
     ledger: JsonlLedger,
     cas: Cas,
     /// Every endpoint the person attached and every model they chose,
@@ -230,6 +237,28 @@ pub struct RunWorker {
 }
 
 impl RunWorker {
+    /// Which city this is, read from the genesis line once and
+    /// remembered for the life of the worker.
+    ///
+    /// One read serves every commit this city makes. The value cannot
+    /// change without the city being a different city, so remembering it
+    /// removes a re-read rather than creating a second authority - and a
+    /// re-read that answered differently mid-run would be the worse
+    /// failure of the two (sprawling-SPEC.md 8-51).
+    ///
+    /// # Errors
+    /// Propagates a ledger that cannot be read and a city with no
+    /// genesis line: a city with no genesis has no identity to sign
+    /// with.
+    pub(crate) fn city_hash(&self) -> Result<kernel::B3Hash, AxError> {
+        if let Some(known) = self.city.get() {
+            return Ok(*known);
+        }
+        let read = memory::Provenance::city_of(&ledger_dir(&self.city_root))
+            .map_err(memory::MemoryError::into_ax)?;
+        Ok(*self.city.get_or_init(|| read))
+    }
+
     /// Sends every appended record to `sink` once it is durable.
     pub(crate) fn observe(&mut self, sink: Box<dyn FnMut(&EventRecord) + Send>) {
         self.ledger.observe(sink);
