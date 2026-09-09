@@ -79,7 +79,10 @@
   --font-weight-body: 400;
   --font-weight-note: 400;
 
-  /* The spacing scale: six steps, every one a multiple of four. */
+  /* The spacing scale: six steps, every one a multiple of four. Zero is
+   * named too, because a flex column that may shrink needs `min-h-0`,
+   * and with no multiplier the numeral would resolve to nothing. */
+  --spacing-0: 0px;
   --spacing-tight: 4px;
   --spacing-snug: 8px;
   --spacing-base: 12px;
@@ -87,9 +90,28 @@
   --spacing-wide: 24px;
   --spacing-section: 32px;
 
-  /* The two widths a page is built from. */
+  /* The widths a page is built from: prose, a conversation, a page. */
   --container-measure: 520px;
+  --container-talk: 760px;
   --container-page: 1040px;
+
+  /* The few fixed sizes a shell needs: the bar, a status dot, the
+   * building glyphs, and the pane a tree takes beside a file. */
+  --spacing-bar: 44px;
+  --spacing-rail: 44px;
+  --spacing-rail-open: 232px;
+  --spacing-glyph: 18px;
+  --spacing-dot: 8px;
+  --spacing-tree: 300px;
+  --spacing-figure: 72px;
+  --spacing-step: 28px;
+  --spacing-output: 240px;
+  --spacing-palette: 360px;
+  --spacing-caret: 18px;
+  --spacing-hair: 2px;
+
+  /* The one shadow: what lifts the box a person writes in off the page. */
+  --shadow-composer: 0 8px 24px oklch(0.1 0.018 264 / 0.45);
 
   /* The corner scales; the shape is the superellipse exponent halved. */
   --radius-panel: 10px;
@@ -107,4 +129,99 @@
   --corner-card-shape: superellipse(1.5);
   --corner-control-shape: superellipse(1.5);
   --corner-pill-shape: superellipse(1);
+}
+
+/* The corners are continuous-curvature (a squircle), the way the old
+ * client drew them: each radius utility carries its superellipse
+ * exponent, and an engine without `corner-shape` draws a plain arc of
+ * the same radius. */
+@utility rounded-panel {
+  border-radius: var(--radius-panel);
+  corner-shape: var(--corner-panel-shape);
+}
+@utility rounded-card {
+  border-radius: var(--radius-card);
+  corner-shape: var(--corner-card-shape);
+}
+@utility rounded-control {
+  border-radius: var(--radius-control);
+  corner-shape: var(--corner-control-shape);
+}
+@utility rounded-pill {
+  border-radius: var(--radius-pill);
+  corner-shape: var(--corner-pill-shape);
+}
+
+/* The two motions the city drawing makes, both on the compositor: a
+ * figure bobs, a window or a thought blinks. Nothing else moves. */
+@keyframes bob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-3px);
+  }
+}
+@keyframes blink {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+.bob {
+  animation: bob 1.4s ease-in-out infinite alternate;
+}
+.blink {
+  animation: blink 1.1s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bob,
+  .blink,
+  .animate-pulse {
+    animation: none;
+  }
+}
+
+/* Base: a page is dark, text never pure white, links carry no
+ * underline until a hand is on them. */
+@layer base {
+  html {
+    color-scheme: dark;
+    background: var(--color-g0);
+  }
+  body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--color-g6);
+  }
+  button {
+    cursor: pointer;
+  }
+  textarea,
+  input,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+  ::selection {
+    background: var(--color-g4);
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-g3) transparent;
+  }
+  *:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
 }

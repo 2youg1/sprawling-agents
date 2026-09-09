@@ -5,7 +5,8 @@
 
 // The one translation between a View and the address bar, both ways.
 // One spelling is written; every spelling an older build wrote is read.
-// Ported table for table from `crates/web/src/route/fragments.rs`.
+// The old table (`crates/web/src/route/fragments.rs`) is folded in at
+// the bottom, so a bookmark from the Dioxus client still opens.
 
 import { Option } from "effect";
 
@@ -18,41 +19,44 @@ export type Lens = "ledger" | "archive" | "bin";
 
 export const LENSES: readonly Lens[] = ["ledger", "archive", "bin"];
 
+// The room a person talks to when they have named none: the Mayor.
+export const MAYOR: Address = Address("hall/mayor");
+
 // Which page the content region shows.
 export type View =
-  | { readonly kind: "sessions" }
-  | { readonly kind: "session"; readonly address: Address }
-  | { readonly kind: "waiting" }
+  | { readonly kind: "talk"; readonly address: Address }
+  | { readonly kind: "city" }
+  | { readonly kind: "building"; readonly address: Address }
+  | { readonly kind: "run"; readonly run: RunId }
+  | { readonly kind: "setup" }
   | { readonly kind: "record"; readonly lens: Lens }
   | { readonly kind: "cost" }
-  | { readonly kind: "setup" }
-  | { readonly kind: "building"; readonly address: Address }
-  | { readonly kind: "run"; readonly run: RunId };
+  | { readonly kind: "welcome" };
 
-// The list, and the box that starts work: the page a person arrives to.
-export const DEFAULT_VIEW: View = { kind: "sessions" };
+// The conversation with the Mayor: the page a person arrives to.
+export const DEFAULT_VIEW: View = { kind: "talk", address: MAYOR };
 
 // The address-bar form of a view, fragment marker included. Always begins
 // `#/`, so a fragment written by hand and one written here are the same
 // string. Each view has exactly one spelling.
 export function toFragment(view: View): string {
   switch (view.kind) {
-    case "sessions":
-      return "#/";
-    case "session":
-      return `#/s/${view.address}`;
-    case "waiting":
-      return "#/waiting";
+    case "talk":
+      return view.address === MAYOR ? "#/" : `#/talk/${view.address}`;
+    case "city":
+      return "#/city";
+    case "building":
+      return `#/building/${view.address}`;
+    case "run":
+      return `#/run/${view.run}`;
+    case "setup":
+      return "#/setup";
     case "record":
       return recordFragment(view.lens);
     case "cost":
       return "#/cost";
-    case "setup":
-      return "#/setup";
-    case "building":
-      return `#/b/${view.address}`;
-    case "run":
-      return `#/live/${view.run}`;
+    case "welcome":
+      return "#/welcome";
   }
 }
 
@@ -68,20 +72,22 @@ function recordFragment(lens: Lens): string {
 }
 
 // A head with nothing after it. The lower half of the table is every
-// spelling this build no longer writes: each lands on the page that
-// inherited its question, and the three that had a page of their own
-// became one lens each of the record.
+// spelling an older build wrote: each lands on the page that inherited
+// its question.
 const BARE: Readonly<Record<string, View>> = {
   "": DEFAULT_VIEW,
-  waiting: { kind: "waiting" },
+  talk: DEFAULT_VIEW,
+  city: { kind: "city" },
+  setup: { kind: "setup" },
   record: { kind: "record", lens: "ledger" },
   cost: { kind: "cost" },
-  setup: { kind: "setup" },
+  welcome: { kind: "welcome" },
 
-  overview: DEFAULT_VIEW,
-  city: DEFAULT_VIEW,
+  overview: { kind: "city" },
   live: DEFAULT_VIEW,
-  approvals: { kind: "waiting" },
+  sessions: DEFAULT_VIEW,
+  waiting: DEFAULT_VIEW,
+  approvals: DEFAULT_VIEW,
   ledger: { kind: "record", lens: "ledger" },
   archive: { kind: "record", lens: "archive" },
   "recycle-bin": { kind: "record", lens: "bin" },
@@ -106,13 +112,14 @@ export function fromFragment(raw: string): Option.Option<View> {
     return Option.fromNullable(BARE[head]);
   }
   switch (head) {
+    case "talk":
     case "s":
       return Option.map(Address.option(tail), (address) => ({
-        kind: "session",
+        kind: "talk",
         address,
       }));
-    case "b":
     case "building":
+    case "b":
       return Option.map(Address.option(tail), (address) => ({
         kind: "building",
         address,
@@ -123,6 +130,7 @@ export function fromFragment(raw: string): Option.Option<View> {
         : tail === "bin"
           ? Option.some({ kind: "record", lens: "bin" })
           : Option.none();
+    case "run":
     case "live":
       return Option.map(RunId.option(tail), (run) => ({ kind: "run", run }));
     default:
@@ -156,4 +164,16 @@ export function current(bar: Readonly<AddressBar>): Option.Option<View> {
 // signal: a click, an `<a href>` and the back button take one path.
 export function go(bar: AddressBar, view: View): void {
   bar.hash = toFragment(view);
+}
+
+// The building an address belongs to: its first segment.
+export function buildingOf(address: Address): Address {
+  const slash = address.indexOf("/");
+  return slash < 0 ? address : Address(address.slice(0, slash));
+}
+
+// The last segment: what a person called the room.
+export function roomOf(address: Address): string {
+  const slash = address.lastIndexOf("/");
+  return slash < 0 ? address : address.slice(slash + 1);
 }

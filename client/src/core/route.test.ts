@@ -9,6 +9,7 @@ import { Option } from "effect";
 import { Address } from "./address";
 import {
   DEFAULT_VIEW,
+  MAYOR,
   current,
   fromFragment,
   go,
@@ -28,9 +29,10 @@ const seven = Option.getOrThrow(
 // construction: the lint's exhaustiveness check on `toFragment` refuses a
 // variant this list does not spell.
 const EVERY_VIEW: readonly View[] = [
-  { kind: "sessions" },
-  { kind: "session", address: parser },
-  { kind: "waiting" },
+  { kind: "talk", address: MAYOR },
+  { kind: "talk", address: parser },
+  { kind: "city" },
+  { kind: "welcome" },
   { kind: "record", lens: "ledger" },
   { kind: "record", lens: "archive" },
   { kind: "record", lens: "bin" },
@@ -58,30 +60,35 @@ describe("route", () => {
     for (const empty of ["", "#", "#/"]) {
       expect(fromFragment(empty), empty).toEqual(Option.some(DEFAULT_VIEW));
     }
-    expect(DEFAULT_VIEW).toEqual({ kind: "sessions" });
+    expect(DEFAULT_VIEW).toEqual({ kind: "talk", address: MAYOR });
   });
 
-  test("a session is named by its room and not by a number", () => {
-    expect(toFragment({ kind: "session", address: parser })).toBe(
-      "#/s/lab/parser",
+  test("a conversation is named by its room and not by a number", () => {
+    expect(toFragment({ kind: "talk", address: parser })).toBe(
+      "#/talk/lab/parser",
+    );
+    expect(fromFragment("#/talk/lab/parser")).toEqual(
+      Option.some({ kind: "talk", address: parser }),
     );
     expect(fromFragment("#/s/lab/parser")).toEqual(
-      Option.some({ kind: "session", address: parser }),
+      Option.some({ kind: "talk", address: parser }),
     );
+    expect(toFragment({ kind: "talk", address: MAYOR })).toBe("#/");
   });
 
   test("every fragment the old pages wrote still lands", () => {
     const kept: readonly (readonly [string, View])[] = [
-      ["#/overview", { kind: "sessions" }],
-      ["#/city", { kind: "sessions" }],
-      ["#/live", { kind: "sessions" }],
-      ["#/approvals", { kind: "waiting" }],
+      ["#/overview", { kind: "city" }],
+      ["#/sessions", DEFAULT_VIEW],
+      ["#/live", DEFAULT_VIEW],
+      ["#/approvals", DEFAULT_VIEW],
+      ["#/waiting", DEFAULT_VIEW],
       ["#/ledger", { kind: "record", lens: "ledger" }],
       ["#/archive", { kind: "record", lens: "archive" }],
       ["#/recycle-bin", { kind: "record", lens: "bin" }],
       ["#/dashboard", { kind: "cost" }],
       ["#/settings", { kind: "setup" }],
-      ["#/building/lab", { kind: "building", address: lab }],
+      ["#/b/lab", { kind: "building", address: lab }],
       ["#/live/07070707-0707-0707-0707-070707070707", { kind: "run", run: seven }],
     ];
     for (const [fragment, landing] of kept) {
@@ -92,14 +99,16 @@ describe("route", () => {
   test("no view writes a fragment this build no longer uses", () => {
     const retired = [
       "#/overview",
-      "#/city",
+      "#/sessions",
+      "#/waiting",
       "#/approvals",
       "#/ledger",
       "#/archive",
       "#/recycle-bin",
       "#/dashboard",
       "#/settings",
-      "#/building/lab",
+      "#/b/lab",
+      "#/s/lab/parser",
     ];
     for (const view of EVERY_VIEW) {
       expect(retired, toFragment(view)).not.toContain(toFragment(view));
@@ -112,10 +121,11 @@ describe("route", () => {
       "#/s/",
       "#/b/",
       "#/building/",
+      "#/run/not-a-run",
       "#/live/not-a-run",
       "#/city/extra",
       "#/record/nowhere",
-      "#/waiting/extra",
+      "#/welcome/extra",
     ]) {
       expect(fromFragment(wrong), wrong).toEqual(Option.none());
     }

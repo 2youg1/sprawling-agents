@@ -23,10 +23,10 @@ function slotsOf(pattern: string): string[] {
 
 describe("lang", () => {
   test("a phrase is said in the language asked for", () => {
-    expect(say("en", "nav_cost")).toBe("cost");
-    expect(say("zh", "nav_cost")).toBe("成本");
-    expect(say("en", "dispatch_send")).toBe("send it");
-    expect(say("zh", "dispatch_send")).toBe("派出去");
+    expect(say("en", "cost_title")).toBe("cost");
+    expect(say("zh", "cost_title")).toBe("成本");
+    expect(say("en", "talk_send")).toBe("send");
+    expect(say("zh", "talk_send")).toBe("发送");
   });
 
   test("nothing is left untranslated or left as English by accident", () => {
