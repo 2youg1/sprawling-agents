@@ -23,6 +23,7 @@ mod length;
 mod lexicon;
 mod mem;
 mod modmap;
+mod npm;
 mod package;
 mod release;
 mod render;
@@ -124,6 +125,7 @@ fn main() -> ExitCode {
         Some("boundary") => report::finish("boundary", boundary::check(&root)),
         Some("artifact") => report::finish("artifact", artifact::check(&root)),
         Some("modmap") => report::finish("modmap", modmap::check(&root)),
+        Some("npm") => report::finish("npm", npm::check(&root)),
         Some("depmap") => report::finish("depmap", depmap::check(&root)),
         Some("guard") => report::finish("guard", guard::check(&root, range.as_deref())),
         Some("release") => report::finish("release", release::check(&root)),
@@ -173,7 +175,7 @@ fn value_arg(args: &[String], flag: &str) -> Option<String> {
 
 fn usage() {
     eprintln!(
-        "usage: cargo xtask <gates|header|lexicon|modmap|depmap|secret|color|ax|render|wiring|specalign|apisync|guard> [--range a..b] [--write]"
+        "usage: cargo xtask <gates|header|lexicon|modmap|depmap|npm|secret|color|ax|render|wiring|specalign|apisync|guard> [--range a..b] [--write]"
     );
     eprintln!(
         "       cargo xtask spec <crate> | budget | badge [--write] | wire-ts [--write] | mem [pid] | sbom | package [--target <triple>] | repro [--full]"

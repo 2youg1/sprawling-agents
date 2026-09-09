@@ -27,6 +27,7 @@
 | color（S4 上线，card-gates 改价） | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免 |
 | release（P4.14 上线，P5.05 增第三条断言） | 公开树由过滤生成；三条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径 |
 | length（R2.20 上线，V3.29 加文件面与参数面） | 一个生产函数不得长过 `function_length`（今 200 行）、不得多于 `argument_count` 个参数（今 4 个，不含接收者），一个源文件不得长过 `file_length`（今 400 行，含测试；2026-09-05 自 1000 改价，权威在 budgets.toml）；函数尺寸与签名以 `syn` 量得，文件尺寸即行数 |
+| npm（card-F3 上线） | `client/` 的依赖面：锁文件在盘且与 `package.json` 逐条同、运行时依赖恰为 `solid-js` 与 `effect`、树上每个包的许可证都在 `deny.toml` 的准许表内 |
 | gates | 顺序跑全部门，聚合报告，任一违规即退出码 1 |
 | wire-ts（card-6.2 上线） | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V` 与 `WIRE_HASH`；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红。命令已就位，进 `gates::run` 那张数组由主线单独一枚提交完成 |
 
@@ -418,3 +419,45 @@ card-12.1 给发布矩阵加了 `x86_64-unknown-linux-musl` 一行，而 `budget
 - **`--target <triple>` 由 `main` 解析**，与 `--range` 共用一个取值函数：两个旗标两份解析就是两种取值语义。
 - **`release.yml` 的重抄步骤随本节删除**，三行矩阵走同一步 `just package ${{ matrix.target }}`；`just dist` 收下同一个可选参数，并在有三元组时**不写徽章**——README 的徽章描述一个人首先下载的那份产物，由第二个平台改写它会让一个 tag 的两次构建对同一个数字各执一词。
 - **本节属门禁机具，与产品代码分开提交。**
+
+### 8-12 `npm`：`client/` 的依赖面（card-F3；形状 1 判定）
+
+`client/` 于 card-6.1 进树，而看守它的那道门没有跟着进来。工作区那一侧的依赖面由 `cargo-deny` 与 `depmap` 两道门看着，JavaScript 那一侧当时什么都没有：一次 `bun add` 就能把第三个运行时依赖、一个 GPL 的包、或者一份与 `package.json` 已经对不上的锁文件带进来，而全绿的一次 `just check` 一句都不会说。
+
+**三条断言，各修一种真实的漂移**：
+
+1. **锁文件在盘上，且与清单逐条同。** `client/bun.lock` 的 `workspaces` 块记着 bun 上次解算时看见的 `dependencies` 与 `devDependencies`；`package.json` 记着今天要的那份。一处不同就说明有人改了清单而没有重解，于是本机装出来的东西与 CI 装出来的东西不是同一棵树。判据是**两张表逐键逐值相等**，缺、多、值不同各报一条。
+2. **运行时依赖恰为 `solid-js` 与 `effect`。** 这是 client-SPEC §1 已经写下的那条界线的机器面：devDependencies 随工具链自由变动，而进到用户浏览器里的东西是一张封闭的两行表。**恰为**而不是**至少**——一个只查白名单不查缺失的门，会放过「solid-js 被误删」这一半。
+3. **树上每个包的许可证都在准许表内。** 准许表**不是本门新写的**，它就是 `deny.toml` 的 `[licenses] allow`：一个仓库对许可证只应有一个立场，工作区那一侧已经把它写下来了，本门读同一张表。许可证从 `client/node_modules/<包>/package.json` 的 `license` 字段读得——锁文件不带许可证，而已装的树带。
+
+**`node_modules` 不在树上时，第三条 skip 并说出理由，前两条照判。** `node_modules` 是 `.gitignore` 里的名字，一台没有跑过 `bun install` 的机器上它不存在，而**这不是缺陷**；门在自己打印的那一行里说它没看，与 `render` 缺浏览器时同一口径。前两条只读入库文件，故在任何机器上都判得动——**一道会因为环境而整体沉默的门，就是一道在 CI 之外不再存在的门**。
+
+**`client/` 整个不在树上时本门什么也不说**，与 `ax` 见不到定稿屏时同一口径：card-6.11 之后这一段的形状会再变，而一道会因为目录不存在而变红的门必须先被关掉才能开工。
+
+| 文件 | 它回答什么 |
+|---|---|
+| `xtask/src/npm.rs` | 门本身：扫哪里（`MANIFEST`、`LOCKFILE`、`MODULES`、`PERMITTED`）、运行时白名单（`RUNTIME`）、三条断言（`check`、`judge_lockfile`、`judge_runtime`、`judge_licences`）与它们的拒词 |
+| `xtask/src/npm/lockfile.rs` | 两份清单怎么读成同一种形状：`bun.lock` 是带尾逗号与注释的 JSONC，故先归一再交给 `serde_json`（`read_jsonc`、`Manifest`、`manifest_of`、`lock_of`）；`deny.toml` 的准许表怎么读（`permitted`） |
+| `xtask/src/npm/tests.rs` | 尾逗号与注释被归一掉；清单与锁文件不同即报；运行时依赖多一个或少一个各报一条；不在准许表上的许可证被点名；`node_modules` 缺席时第三条不产出违规 |
+
+**`license` 字段的两种形状都认**：一个字符串（`"MIT"`），或一条 SPDX 表达式里的 `OR`／`AND` 分支（`"(MIT OR Apache-2.0)"`）。表达式按 `OR` 拆开，任一分支在准许表内即通过——这与 `cargo-deny` 对同一种表达式的判法一致，故两侧不会对同一个包各执一词。旧包偶尔写 `licenses: [{type: ...}]`，本门**不认**并按「没有说」处理：报出来让人去看，比猜一个字段的历史写法安全。
+
+**它上线第一跑就红了两条，而我没有把它们放过去（card-F3，待人裁）**：`caniuse-lite` 是 `CC-BY-4.0`，`minimatch` 是 `BlueOak-1.0.0`，两者都由 devDependencies 传递带进来，都到不了用户的浏览器。修法在因不在果——要么 `deny.toml` 的 `[licenses] allow` 各加一行并写明理由，要么换掉那两个包。**这一步我不做**：AGENTS.md 的 `guard` 行禁止在一道门变红的那一次改动里放宽这道门，而准许表是这个仓库对许可证的立场，立场归人。已有先例可循——`CDLA-Permissive-2.0` 当初正是为一份证书清单这种**数据**许可证入表的，而 `CC-BY-4.0` 覆盖的 `caniuse-lite` 同样是一张数据表。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-13 `ax`／`wording`／`render` 读画出来的 DOM：本卡未做，堵在哪里（card-F3）
+
+**目标未变**：三道门今天读的是两侧**写下来的**东西，它们应当改为在真引擎里打开 `#/gallery` 这条路由、读**画出来的** DOM——`ax` 比角色、可及名与地标，`wording` 比每个文本节点是否出自 `lang` 表，`render` 比一条左边、面板头在顶、无溢出。画廊不在时是一次**点名理由的 skip**，在时必须真判；一道找不到东西就悄悄变绿的门，正是这里要避免的失效。
+
+**本卡停在一个我无权自己裁的取舍上，故一行未写**，写在这里而不是写成一个半成品：
+
+- 卡片要求**复用 `bin::browser_bidi` 的传输，不得开第二条驱动浏览器的路**。那条传输是 `crates/sprawling/src/browser_bidi/` 里的 `BidiSocket` 与 `LazyEngine`，它们是 `sprawling` 这个 crate 的**私有模块**；`crates/browser` 按 browser-SPEC §19-1 的记录**恒不持套接字、恒不起进程**。
+- 于是 xtask 要够到它，只有两条路，两条都动产品代码：①把 `sprawling::browser_bidi` 提为 `pub` 并让 xtask 依赖 `sprawling`（代价：`cargo xtask` 从此要构建整条产品图，含 tokio 与 axum；且 `sprawling` 的公开面变了，`apisync` 基线与 sprawling-SPEC 须同集更新）；②把套接字迁进 `crates/browser` 的一个非默认 feature（代价：推翻 browser-SPEC §19-1 记下的那条决定，须先改记录）。
+- 而本卡同时声明**门禁机具与产品代码分开提交**。两条要求在此相撞，**这不是我能自己选的一边**。
+
+**请人裁的正是这一件事**：走 ①、走 ②，还是允许 xtask 自己实现一个 `BrowserPort`（那是卡片明文禁止的第三条）。裁定落下之后，剩下的工作是有界的：一个 `xtask::gallery` 模块持「画廊在不在、在哪里被打开」与一次探针，`ax`／`wording`／`render` 各自只多一个读 DOM 的判据。
+
+**另有一件已知的前置**：`#/gallery` 由前端会话构建，且它要被打开就要有一份**构建好的 bundle**（`client/dist/`）与一个静态服务。skip 的理由因此至少有三种，各须点名：没有画廊路由、没有构建产物、这台机器上没有引擎。
+
+**本节属门禁机具，与产品代码分开提交。**
