@@ -253,7 +253,9 @@ fn backgrounded(id: &BacklogId, what: &str, arm: &str) -> Result<ToolOutcome, Ax
 }
 
 /// Adds every background member that has stopped since the last call to
-/// the tail of this result.
+/// the tail of this result. A command that settles inside its window
+/// carries no handle: the caller asked whether it finished, the table
+/// answered, and the entry is already gone.
 ///
 /// It is the tail rather than the head because the answer the caller
 /// asked for is the one it is reading for; what arrived while it was
