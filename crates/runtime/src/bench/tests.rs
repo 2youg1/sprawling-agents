@@ -64,11 +64,19 @@ fn dedup_runs_before_the_side_effect() {
         std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
         "two\n"
     );
-    // The same key again: the tool must not run a second time, and
-    // the file must not change (the second edit would fail on the
-    // stale version anyway — dedup means it is never attempted).
+    // The same key again: the tool must not run a second time, and the
+    // file must not change (the second edit would fail on the stale
+    // version anyway — dedup means it is never attempted).
     let second = bench.invoke(&call, &key(1), &ctx()).unwrap();
-    assert!(matches!(second, BenchOutcome::Duplicate));
+    // What a replay is owed is the answer the first call gave: telling
+    // the model "you already asked" teaches it the call failed when it
+    // succeeded.
+    let (BenchOutcome::Ran { outcome: once, .. }, BenchOutcome::Duplicate { outcome: again }) =
+        (first, second)
+    else {
+        panic!("the second call must answer with the first call's result");
+    };
+    assert_eq!(again, once);
     assert_eq!(
         std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
         "two\n"

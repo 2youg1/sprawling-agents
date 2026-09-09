@@ -1314,3 +1314,19 @@ impl ContextReminder { pub fn render(&self) -> String; }
 - **`Completion::Limit` 保留**：它是账本词汇，旧历史里读得回去；本 crate 不再产出它。
 - **`StatusTool` 十三字段变十二**：`budget_usd`／`budget_tokens` 删除，那两个数报的是上限而不是花销。留在原地的是 `ctx`——已用 token 对着这次跑拿到的窗口，那是**报告花了多少**而不是**事前不许花**。
 - **citysim**：`ScenarioSpec.budget_turns` 随之删除；原先靠上限收尾的那条 scenario 改为「跑满它自己要的每一回合再作出结论」（十六波之后是空的那一波）。
+
+### 8-35 去重答的是第一次的结果，而不是一句「你已经问过了」（card-F4.3；形状 1 判定）
+
+**旧行为**：`ToolBench::invoke` 认得重复的 `IdemKey`，回 `BenchOutcome::Duplicate`，而两个调用方（`bin::assembly::driving::lane`、`citysim::executor`）把它翻成 `E_INVALID_ARGS`。于是「同一次调用做两遍」的正确答案——**第一次的结果**——被换成了一个错误：重试的模型学到的是「这件事失败了」，而它其实成功了。这是幂等只做了一半：副作用被挡住，答案没有被记住。
+
+**改法是把记住的东西从键变成键与答**：
+
+| 之前 | 之后 |
+|---|---|
+| `seen: BTreeSet<IdemKey>` | `seen: BTreeMap<IdemKey, ToolOutcome>` |
+| `BenchOutcome::Duplicate` | `BenchOutcome::Duplicate { outcome: ToolOutcome }` |
+| 调用方回 `E_INVALID_ARGS` | 调用方回第一次的 `ToolOutcome`，`fenced` 为空 |
+
+- **写入点不动**：键仍在过门之后、工具运行之前记下（被门拒的重试不算重放），答在工具返回后补齐。故一次「记了键但工具报错」的调用不会留下一个假答案——那条路径根本不入表。
+- **`Duplicate` 仍是一个独立变体而不是并进 `Ran`**：`fenced` 对重放恒为空，而 `Ran` 的调用方要按 `fenced` 决定波后清扫；把两者合并会让「这一波要不要扫」多出一个恒空的分支。
+- **代价写在明处**：一次运行期间每个成功调用的结果都留在内存里。这与 `seen` 本来就要活到运行结束是同一条寿命，多出来的是 payload 的字节；一次运行的工具调用数以百计而非以百万计。

@@ -66,7 +66,11 @@ pub struct ToolBench {
     tools: BTreeMap<String, Box<dyn Tool>>,
     domain: WriteDomain,
     taint: TaintSet,
-    seen: BTreeSet<IdemKey>,
+    /// What each key already answered, success or failure. A key alone
+    /// would stop the second call's side effect and still owe the model
+    /// an answer; the answer is the first call's own, whichever way it
+    /// went (runtime-SPEC.md 8-35).
+    seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>,
     prior_public_egress: bool,
     /// The checkpoint net. A command the forecast suspects of deleting
     /// things does not get refused — text prediction is obfuscatable, so
@@ -107,8 +111,10 @@ pub enum BenchOutcome {
     /// A gate wants a human. S3 has no answering face, so the caller
     /// sees the pending item's code and the run parks.
     Pending { item: Box<ApprovalItem> },
-    /// The call was already made. Its earlier result stands.
-    Duplicate,
+    /// The call was already made, and this is what it answered. A replay
+    /// is owed the first result: an error here would teach the model a
+    /// call failed when it succeeded.
+    Duplicate { outcome: ToolOutcome },
 }
 
 impl ToolBench {
@@ -117,7 +123,7 @@ impl ToolBench {
             tools: BTreeMap::new(),
             domain,
             taint: TaintSet::empty(),
-            seen: BTreeSet::new(),
+            seen: BTreeMap::new(),
             prior_public_egress: false,
             net: None,
             granted: Vec::new(),
@@ -187,9 +193,19 @@ impl ToolBench {
         key: &IdemKey,
         ctx: &GateContext,
     ) -> Result<BenchOutcome, AxError> {
-        // Before any unreplayable effect (8.2).
-        if kernel::dedup(&self.seen, key) == DedupVerdict::Duplicate {
-            return Ok(BenchOutcome::Duplicate);
+        // Before any unreplayable effect (8.2). The judgement is the
+        // kernel's and reads a set of keys; what this bench keeps beside
+        // each key is the answer it gave.
+        let keys: BTreeSet<IdemKey> = self.seen.keys().copied().collect();
+        if kernel::dedup(&keys, key) == DedupVerdict::Duplicate
+            && let Some(answered) = self.seen.get(key)
+        {
+            return match answered {
+                Ok(outcome) => Ok(BenchOutcome::Duplicate {
+                    outcome: outcome.clone(),
+                }),
+                Err(refused) => Err(refused.clone()),
+            };
         }
         let name = call.name.as_str().to_owned();
         let Some(tool) = self.tools.get(&name) else {
@@ -233,9 +249,6 @@ impl ToolBench {
             return Ok(answered);
         }
 
-        // The key is recorded once the call is committed to, so a retry
-        // after a gate refusal is not treated as a replay.
-        self.seen.insert(*key);
         // Re-borrowed here: the forecast fence needed `self` mutably.
         let Some(tool) = self.tools.get_mut(&name) else {
             return Err(AxError::failure(
@@ -244,7 +257,13 @@ impl ToolBench {
                 format!("no tool named `{name}` is registered"),
             ));
         };
-        let outcome = tool.invoke(call)?;
+        // The key is recorded with the answer it earned, so a retry after
+        // a gate refusal is not a replay, and a call the tool itself
+        // failed answers its replay the same way it answered the first
+        // time rather than running again.
+        let answered = tool.invoke(call);
+        self.seen.insert(*key, answered.clone());
+        let outcome = answered?;
         Ok(BenchOutcome::Ran { outcome, fenced })
     }
 }

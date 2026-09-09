@@ -239,7 +239,9 @@ pub fn run_scenario_on(
             .meta_of(call.name.as_str())
             .map_or(Temporal::Timeless, |meta| meta.temporal);
         match bench.invoke(call, &key, &ctx)? {
-            BenchOutcome::Ran { outcome, .. } => {
+            // A replay carries the first call's own result, and is
+            // packaged exactly as that result was (runtime-SPEC.md 8-35).
+            BenchOutcome::Ran { outcome, .. } | BenchOutcome::Duplicate { outcome } => {
                 // The envelope is the caller's to hang: a clock line when
                 // one is due, inside this result's byte budget.
                 let stamp = stamps.observe(t, temporal, &config.clock_zones)?;
@@ -278,11 +280,6 @@ pub fn run_scenario_on(
                 AxCode::ApprovalPending,
                 "await approval",
                 item.id.as_str().to_owned(),
-            )),
-            BenchOutcome::Duplicate => Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "invoke tool",
-                "this call was already made",
             )),
         }
     };

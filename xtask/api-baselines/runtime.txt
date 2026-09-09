@@ -770,6 +770,7 @@ pub runtime::backlog::Started::Settled::exit_code: i64
 pub runtime::backlog::Started::Settled::stderr: alloc::string::String
 pub runtime::backlog::Started::Settled::stdout: alloc::string::String
 pub runtime::bench::BenchOutcome::Duplicate
+pub runtime::bench::BenchOutcome::Duplicate::outcome: kernel::tool::ToolOutcome
 pub runtime::bench::BenchOutcome::Pending
 pub runtime::bench::BenchOutcome::Pending::item: alloc::boxed::Box<kernel::approval::ApprovalItem>
 pub runtime::bench::BenchOutcome::Ran

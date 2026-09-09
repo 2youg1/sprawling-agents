@@ -236,11 +236,18 @@ pub(crate) fn drive_run<L: Ledger>(
                             .with_recovery("answer the approval in the inbox, then dispatch again"),
                     )
                 }
-                BenchOutcome::Duplicate => Err(AxError::failure(
-                    AxCode::InvalidArgs,
-                    "invoke tool",
-                    "this call was already made",
-                )),
+                // A replay is answered with what the first call
+                // answered, sieved the same way. An error here would tell
+                // the model its call failed when it succeeded
+                // (runtime-SPEC.md 8-35). The command counters are not
+                // touched: nothing ran this time.
+                BenchOutcome::Duplicate { outcome } => {
+                    if call.name.as_str() == "exec" {
+                        sieving.package(call, outcome)
+                    } else {
+                        Ok(outcome)
+                    }
+                }
             }
         };
         let mut fence = |t: TimeMs| {
