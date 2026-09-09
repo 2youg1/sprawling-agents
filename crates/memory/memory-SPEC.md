@@ -762,3 +762,9 @@ pub fn of_file(city_root: &Path, base: GitOid, head: Head, path: &str)
 
 - **一个两次 fence 之间没动过的文件答空补丁**，而不是报错：「它没动」是一个答案。「这座城没写过这个 oid」是另一个答案，由调用方（`bin::views`）答 `Unavailable`——只有调用方知道人问的是什么。
 - **测试用工作树而不是第二次 fence**：checkpoint 根本不肯提交带凭证的 blob（`scan_staged` 拒），所以那一行只可能存在于盘上的树里。这条约束本身就是本模块的扫描不是多余的一层的证据：字节到不了 commit，但到得了 socket。
+
+### 8-20 重启后凭证扫描的比较基准：登记在案的疑点，实测不成立（card-F4.2）
+
+**记在案的说法**：进程重启后 `Checkpoint::last` 为空，`scan_staged` 退回按 HEAD 比较，于是重启之前发生的改动再也不被扫。**实测不成立，且不可能成立**：card-2.2 之后 wave fence 恒不移动 HEAD，故 HEAD 只可能是 `ensure_base` 或 `land` 写下的提交——它必是最后一次 fence 的**祖先**。拿祖先做基准，diff 出来的路径集是拿 fence 做基准那一集的**超集**：读得更多，不会更少。代价是把已经放行过的 blob 再读一遍，安全上一分不让。
+
+**疑点转成一条断言而不是一段说明**：`a_change_made_before_a_restart_is_still_read_after_it`——立城、fence 一次、写入一份带凭证的文件、丢掉 handle、重开 `Checkpoint`、再 fence，第二次 fence 必须以 `SecretEgress` 拒绝并报出路径而不回显字节。**翻案条件**：哪一天有一条路径能在不经扫描的情况下移动 HEAD（今天 `ensure_base`／`land` 都先扫后提交，合并提交用的是节点已扫过的树），这条推理的前提就没了，届时基准必须改回记住的 fence。

@@ -335,4 +335,35 @@ mod tests {
             format!("work/resident@{}.sprawling", city.get(..12).unwrap())
         );
     }
+
+    /// A restart must not open a window a credential can walk through.
+    /// A new process remembers no fence, so the scan compares against
+    /// HEAD - which a wave fence deliberately does not move, and which is
+    /// therefore an ancestor of the last fence. Comparing against an
+    /// ancestor reads more, never less, so what changed before the
+    /// restart is still read.
+    #[test]
+    fn a_change_made_before_a_restart_is_still_read_after_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        write(tmp.path(), "work/clean.md", "nothing here");
+        let mut first = Checkpoint::open(tmp.path()).unwrap();
+        first
+            .ensure_base("work", TimeMs::new(0), &resident())
+            .unwrap();
+        first
+            .wave_pre("work", TimeMs::new(1_000), &resident())
+            .unwrap();
+        let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+        write(tmp.path(), "work/leak.env", &format!("KEY={token}"));
+        drop(first);
+        let mut second = Checkpoint::open(tmp.path()).unwrap();
+        let outcome = second.wave_pre("work", TimeMs::new(2_000), &resident());
+        let err = match outcome {
+            Err(err) => err,
+            Ok(_) => panic!("the restart lost the scan of what changed before it"),
+        };
+        let rendered = err.to_string();
+        assert!(rendered.contains("work/leak.env"), "{rendered}");
+        assert!(!rendered.contains(&token), "positions only: {rendered}");
+    }
 }
