@@ -195,3 +195,116 @@ fn a_write_reach_that_reads_as_a_typo_is_refused() {
     let ordinary = evaluate(&addr, "`confidential: false`\n").unwrap();
     assert_eq!(ordinary.reach(), crate::DomainReach::Everything);
 }
+
+#[test]
+fn a_building_that_says_nothing_about_a_browser_has_none() {
+    let rules = evaluate(&addr("lab"), "confidential: false\n").unwrap();
+    assert!(
+        !rules.browser(),
+        "a tool nobody asked for is a tool nobody gets"
+    );
+    let asked = evaluate(&addr("lab"), "confidential: false\nbrowser: true\n").unwrap();
+    assert!(asked.browser());
+}
+
+#[test]
+fn a_confidential_building_cannot_ask_for_a_browser() {
+    let err = evaluate(&addr("lab"), "confidential: true\nbrowser: true\n").unwrap_err();
+    assert_eq!(err.code(), &AxCode::ConfigInvalid);
+    assert!(err.recovery().contains("does not leave"));
+    assert!(
+        !evaluate(&addr("lab"), "confidential: true\n")
+            .unwrap()
+            .browser()
+    );
+}
+
+#[test]
+fn a_browser_line_that_reads_as_a_typo_is_refused_rather_than_guessed() {
+    let err = evaluate(&addr("lab"), "confidential: false\nbrowser: yes\n").unwrap_err();
+    assert_eq!(err.code(), &AxCode::ConfigInvalid);
+    assert!(err.subject().contains("browser: yes"));
+}
+
+/// card-7.3: a building hands its person's desktop over only by saying
+/// so. Absent the line, no — the same reading `browser:` gets, and for a
+/// stronger reason: a click on somebody's desktop has no way back.
+#[test]
+fn a_building_that_says_nothing_about_the_desktop_has_none() {
+    let silent = evaluate(&addr("lab"), "confidential: false\n").unwrap();
+    assert!(
+        !silent.desktop(),
+        "a building that never mentioned the desktop was given one"
+    );
+    let asked = evaluate(&addr("lab"), "confidential: false\ndesktop: true\n").unwrap();
+    assert!(asked.desktop());
+    // The two switches are independent: one is a browser, the other is
+    // this machine.
+    assert!(!asked.browser());
+}
+
+/// A confidential building never gets the desktop. What is on a desktop
+/// belongs to whoever is sitting at it, not to this building, so
+/// "data enters and does not leave" and "this building may photograph
+/// this machine" cannot both be true.
+#[test]
+fn a_confidential_building_cannot_ask_for_the_desktop() {
+    let err = evaluate(&addr("lab"), "confidential: true\ndesktop: true\n").unwrap_err();
+    assert_eq!(err.code(), &AxCode::ConfigInvalid);
+    assert!(
+        err.recovery().contains("desktop: true"),
+        "the refusal says which line to remove: {}",
+        err.recovery()
+    );
+}
+
+/// A value that reads as a typo does not resolve to the permissive side,
+/// which is the rule every switch in this file is held to.
+#[test]
+fn a_desktop_line_that_reads_as_a_typo_is_refused_rather_than_guessed() {
+    let err = evaluate(&addr("lab"), "confidential: false\ndesktop: yes\n").unwrap_err();
+    assert_eq!(err.code(), &AxCode::ConfigInvalid);
+    assert!(err.subject().contains("desktop: yes"));
+}
+
+/// card-7.3: the desktop allowlist is a governing document, not a
+/// product. It says, window by window, what this building's runs may
+/// touch on somebody's machine — so it lands where no write domain
+/// reaches, and a resident cannot widen its own scope.
+#[test]
+fn the_desktop_allowlist_lands_where_no_write_domain_reaches() {
+    let dir = tempfile::tempdir().unwrap();
+    let lab = addr("lab");
+    let written = write_desktop_scope(dir.path(), &lab, "windows = [\"*Notepad*\"]\n").unwrap();
+    assert_eq!(
+        std::fs::read_to_string(&written).unwrap(),
+        "windows = [\"*Notepad*\"]\n"
+    );
+    assert_eq!(written, desktop_scope_path(dir.path(), &lab));
+
+    let relative = written.strip_prefix(dir.path()).unwrap();
+    let slashed = relative
+        .to_string_lossy()
+        .replace(std::path::MAIN_SEPARATOR, "/");
+    let reached = Address::parse(&slashed).unwrap();
+    assert!(
+        reached.is_reserved(),
+        "{} is somewhere a run could write",
+        relative.display()
+    );
+    // It sits beside the rules it pairs with, in the same subtree.
+    assert_eq!(written.parent(), building_path(dir.path(), &lab).parent());
+}
+
+/// A second save replaces the first: one box, one document. And the
+/// bytes are the person's own — this side parses nothing, because the
+/// server that reads it is the authority on its syntax and fails closed
+/// on a file it cannot read.
+#[test]
+fn the_allowlist_is_written_whole_and_not_parsed_here() {
+    let dir = tempfile::tempdir().unwrap();
+    let lab = addr("lab");
+    write_desktop_scope(dir.path(), &lab, "windows = [\"a\"]\n").unwrap();
+    let second = write_desktop_scope(dir.path(), &lab, "windows = [").unwrap();
+    assert_eq!(std::fs::read_to_string(&second).unwrap(), "windows = [");
+}

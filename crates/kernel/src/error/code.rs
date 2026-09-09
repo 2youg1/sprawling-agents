@@ -239,6 +239,65 @@ impl<'de> Deserialize<'de> for AxCode {
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    /// The `desktop` package spells six of these codes a second time.
+    ///
+    /// It has to: it sits outside the workspace so that its Win32
+    /// boundary may relax `unsafe_code`, and a `use kernel::…` for six
+    /// string constants would give that reason away
+    /// (`desktop/desktop-SPEC.md` §8.5, first pair). **The duplication
+    /// cannot be removed by a shared dependency, so what is removed
+    /// instead is its ability to drift unnoticed**: this table is the
+    /// authority, and the test below reads the other spelling off disk
+    /// and holds it to this one.
+    ///
+    /// The rule that file is held to is the narrow one: it may *quote* a
+    /// code this set already has, and may not mint a new one. A new code
+    /// is minted here first.
+    const DESKTOP_REFUSAL_FILE: &str =
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../../desktop/src/refusal.rs");
+
+    /// Every `E_…` spelling the out-of-tree desktop connector writes is
+    /// one this table already produces.
+    ///
+    /// Reading the file rather than importing it is the point: the two
+    /// definitions sit in two Cargo packages that share no dependency,
+    /// so the only thing that can hold them together is a check which
+    /// crosses that gap. A code renamed here and not there turns this
+    /// test red instead of reaching a caller as a spelling nothing on
+    /// this side answers to.
+    #[test]
+    fn the_desktop_connector_only_ever_quotes_a_code_this_table_already_has() {
+        let source = std::fs::read_to_string(DESKTOP_REFUSAL_FILE).unwrap_or_else(|err| {
+            panic!("{DESKTOP_REFUSAL_FILE} is in this repository and this test reads it: {err}")
+        });
+        let ours: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
+        let quoted: BTreeSet<String> = source
+            .split('"')
+            // `E_` on its own is the prefix that file's own test checks
+            // for, not a code. Every real code has a word after it.
+            .filter(|piece| piece.starts_with("E_") && piece.len() > "E_".len())
+            .filter(|piece| {
+                piece
+                    .chars()
+                    .all(|glyph| glyph.is_ascii_uppercase() || glyph == '_')
+            })
+            .map(str::to_owned)
+            .collect();
+        assert_eq!(
+            quoted.len(),
+            6,
+            "the desktop connector quotes six codes; it quoted {quoted:?}"
+        );
+        for spelling in &quoted {
+            assert!(
+                ours.contains(spelling.as_str()),
+                "the desktop connector spells `{spelling}`, which this table does not produce: \
+                 mint it in AxCode first, or correct the spelling there"
+            );
+        }
+    }
+
     #[test]
     fn axcode_is_35_and_spelling_is_bijective() {
         assert_eq!(AxCode::ALL.len(), 36);

@@ -88,6 +88,7 @@ pub const city::BUILDING_SHELF: &str
 pub const city::CITY_FILE: &str
 pub const city::CLERK_FILE: &str
 pub const city::CONFIG_FILE: &str
+pub const city::DESKTOP_SCOPE_FILE: &str
 pub const city::HANDOFF_FILE: &str
 pub const city::JOB_FILE: &str
 pub const city::LIBRARY_DIR: &str
@@ -116,6 +117,8 @@ pub fn city::Building::holds(&self, &kernel::address::Address) -> bool
 pub fn city::Building::of(&kernel::address::Address) -> core::result::Result<city::Building, kernel::error::shape::AxError>
 pub fn city::Building::root(&self, &std::path::Path) -> std::path::PathBuf
 pub fn city::BuildingRules::addr(&self) -> &kernel::address::Address
+pub fn city::BuildingRules::browser(&self) -> bool
+pub fn city::BuildingRules::desktop(&self) -> bool
 pub fn city::BuildingRules::egress(&self) -> &kernel::gate::egress::EgressAllowlist
 pub fn city::BuildingRules::model_pool(&self) -> city::ModelPool
 pub fn city::BuildingRules::policy(&self) -> &kernel::model::wire::BuildingPolicy
@@ -199,6 +202,7 @@ pub fn city::buildings(&std::path::Path) -> core::result::Result<alloc::vec::Vec
 pub fn city::config_path(&std::path::Path, &kernel::address::Address, city::Layer) -> core::result::Result<std::path::PathBuf, kernel::error::shape::AxError>
 pub fn city::create_building(&std::path::Path, &kernel::address::Address, city::BuildingTemplate) -> core::result::Result<city::Building, kernel::error::shape::AxError>
 pub fn city::day_of(kernel::event::identity::TimeMs) -> u64
+pub fn city::desktop_scope_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::evaluate(&kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
 pub fn city::file_archive(&city::ArchiveEntry, &str) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::hall_identity_path(&std::path::Path, &kernel::address::Address) -> core::option::Option<std::path::PathBuf>
@@ -220,6 +224,7 @@ pub fn city::urbanite_path(&std::path::Path, &kernel::address::Address) -> std::
 pub fn city::vocation_of(&kernel::address::Address) -> city::Vocation
 pub fn city::watch_path(&std::path::Path) -> std::path::PathBuf
 pub fn city::write_brief(&std::path::Path, &kernel::address::Address, &city::JobBrief<'_>) -> core::result::Result<city::RunBrief, kernel::error::shape::AxError>
+pub fn city::write_desktop_scope(&std::path::Path, &kernel::address::Address, &str) -> core::result::Result<std::path::PathBuf, kernel::error::shape::AxError>
 pub fn city::write_effort(&std::path::Path, &kernel::address::Address, kernel::model::wire::Effort) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::write_governed(&std::path::Path, city::Governed, &str) -> core::result::Result<std::path::PathBuf, kernel::error::shape::AxError>
 pub fn city::write_job(&std::path::Path, &kernel::address::Address, &city::JobBrief<'_>) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>

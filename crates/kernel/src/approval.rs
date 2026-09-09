@@ -67,6 +67,12 @@ pub enum ApprovalClass {
     /// expires with the process, because a permanent waiver on
     /// delegation is the one waiver that can spend without asking again.
     Delegation,
+    /// Reaching something outside this city that nothing inside it can
+    /// take back — today, this machine's own desktop. No `PolicyClass`
+    /// variant, for the reason `Delegation` has none: a standing rule
+    /// that waives every future click is the one waiver whose whole
+    /// point was that somebody is watching.
+    Undoable,
 }
 
 /// The clustering key: class + free detail. One human verdict on a key

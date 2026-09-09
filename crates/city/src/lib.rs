@@ -47,6 +47,7 @@ pub use neighbourhood::{Neighbour, Neighbourhood, Occupancy};
 pub use neighbours_tool::NeighboursTool;
 pub use policy::write_rules;
 pub use policy::{BUILDING_FILE, BuildingRules, DomainReach, ModelPool};
+pub use policy::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
 pub use policy::{building_path, evaluate, load};
 pub use resident::{Dossier, Identity, Resident, URBANITE_FILE, urbanite_path};
 pub use room::all as rooms;

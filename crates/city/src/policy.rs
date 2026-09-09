@@ -20,8 +20,10 @@ use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist, WriteDomain};
 
+mod evaluate;
 mod reach;
 
+pub use evaluate::evaluate;
 pub use reach::DomainReach;
 
 /// The file a building's rules live in, at the building root.
@@ -30,6 +32,8 @@ pub const BUILDING_FILE: &str = "BUILDING.md";
 const CONFIDENTIAL_KEY: &str = "confidential:";
 const WRITE_KEY: &str = "write:";
 const REVIEW_KEY: &str = "review:";
+const BROWSER_KEY: &str = "browser:";
+const DESKTOP_KEY: &str = "desktop:";
 const WRITE_HEADING: &str = "write domain";
 const EGRESS_HEADING: &str = "egress";
 const READING_HEADING: &str = "reading room";
@@ -52,6 +56,10 @@ pub struct BuildingRules {
     reach: DomainReach,
     egress: EgressAllowlist,
     review: bool,
+    /// Whether residents here are given the browser tool.
+    browser: bool,
+    /// Whether residents here are given this machine's own desktop.
+    desktop: bool,
     /// The skills this building takes into its catalog, by name. The
     /// city's shelves may hold a thousand; what costs resident bytes is
     /// this list, and a person writes it.
@@ -93,6 +101,41 @@ impl BuildingRules {
     #[must_use]
     pub fn review(&self) -> bool {
         self.review
+    }
+
+    /// Whether a resident of this building may drive a browser.
+    ///
+    /// Absent the line, no. That is the opposite reading from
+    /// `confidential`, and the difference is which way each one fails:
+    /// a privacy setting read as the permissive side is an accident,
+    /// while a tool nobody was given is one tool fewer. A confidential
+    /// building never gets one, because a browser that opens any URL is
+    /// an egress path and "data does not leave" is the whole of what
+    /// that setting means.
+    #[must_use]
+    pub fn browser(&self) -> bool {
+        self.browser
+    }
+
+    /// Whether a resident of this building may reach this machine's own
+    /// desktop, through the connector `sprawling-desktop` offers.
+    ///
+    /// Absent the line, no — the same reading `browser` gets, and for a
+    /// stronger reason: what `desktop.act` presses on somebody's own
+    /// machine carries no way back, so a building that was never asked
+    /// about it has not agreed to it. A confidential building never gets
+    /// one, because a desktop holds other programs, other windows and
+    /// one shared clipboard, none of which are this building's.
+    ///
+    /// **This decides whether the connector may be attached at all, not
+    /// what it may then touch.** That second question is the
+    /// `DESKTOP.toml` allowlist's, window by window, and the two doors
+    /// are deliberately not merged: one asks whether this building does
+    /// this kind of work, the other asks which windows on this machine —
+    /// and one door asking both would leave one of the questions unasked.
+    #[must_use]
+    pub fn desktop(&self) -> bool {
+        self.desktop
     }
 
     /// The names under `## Reading room`, in the order the file lists
@@ -164,6 +207,68 @@ pub fn building_path(city_root: &Path, addr: &Address) -> PathBuf {
         .join(BUILDING_FILE)
 }
 
+/// The allowlist the desktop connector is started under, window by
+/// window. Its syntax belongs to the server that reads it
+/// (`desktop/src/scope.rs`); this side only decides where it lives.
+pub const DESKTOP_SCOPE_FILE: &str = "DESKTOP.toml";
+
+/// Where a building's desktop allowlist lives: beside its rules, in the
+/// building's own reserved subtree.
+///
+/// It is a governing document rather than a product. It states, window
+/// by window, what this building's runs may touch on somebody's own
+/// machine — so by the reading card 5.1's `DomainReach` rests on, the
+/// file that decides what residents may do is never a file residents
+/// write. `is_reserved` is true for any address with `.sprawling` in it,
+/// so no write domain reaches this path, including `Everything`'s.
+#[must_use]
+pub fn desktop_scope_path(city_root: &Path, addr: &Address) -> PathBuf {
+    scope_path(city_root, addr)
+        .join(kernel::RESERVED_PREFIX)
+        .join(DESKTOP_SCOPE_FILE)
+}
+
+/// Replaces a building's desktop allowlist with what a person wrote.
+///
+/// Whole rather than patched, for the reason `city::governed` gives: a
+/// person edits this in one box and saves it once, and a partial write
+/// would leave the connector scoped by half a line.
+///
+/// **Nothing here parses it.** The authority on this file's syntax is
+/// the server that reads it at startup, and that server fails closed —
+/// a file it cannot read permits nothing. A second parser on this side
+/// would be a second authority, and one of two authorities eventually
+/// reads a file as meaning something the other does not.
+///
+/// # Errors
+/// Propagates a reserved subtree that cannot be created or written.
+pub fn write_desktop_scope(
+    city_root: &Path,
+    addr: &Address,
+    text: &str,
+) -> Result<PathBuf, AxError> {
+    let path = desktop_scope_path(city_root, addr);
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|err| {
+            AxError::failure(
+                AxCode::StorageFatal,
+                "write a building's desktop allowlist",
+                format!("{}: {err}", dir.display()),
+            )
+            .with_recovery("fix the directory's permissions")
+        })?;
+    }
+    std::fs::write(&path, text).map_err(|err| {
+        AxError::failure(
+            AxCode::StorageFatal,
+            "write a building's desktop allowlist",
+            format!("{}: {err}", path.display()),
+        )
+        .with_recovery("fix the file's permissions")
+    })?;
+    Ok(path)
+}
+
 /// Where a building's rules used to live, for the one refusal that says
 /// so. Nothing reads the file at this path.
 fn legacy_building_path(city_root: &Path, addr: &Address) -> PathBuf {
@@ -215,6 +320,8 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> 
             reach: DomainReach::Everything,
             egress: EgressAllowlist::default(),
             review: false,
+            browser: false,
+            desktop: false,
             reading_room: Vec::new(),
         }),
         Err(err) => Err(AxError::failure(
@@ -264,122 +371,6 @@ pub fn write_rules(city_root: &Path, addr: &Address, text: &str) -> Result<Build
         .with_recovery("fix the file's permissions")
     })?;
     Ok(rules)
-}
-
-/// Evaluates the text of a `BUILDING.md`.
-///
-/// # Errors
-/// Refuses a file with no confidential declaration, or one whose value is
-/// neither `true` nor `false` — a privacy setting that reads as a typo
-/// must not resolve to the permissive side.
-pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
-    let mut confidential: Option<bool> = None;
-    let mut reach = DomainReach::Everything;
-    let mut review = false;
-    let mut write_prefixes = Vec::new();
-    let mut egress_entries: Vec<String> = Vec::new();
-    let mut in_write_section = false;
-    let mut in_egress_section = false;
-    let mut in_reading_section = false;
-    let mut reading_room: Vec<String> = Vec::new();
-    for line in text.lines() {
-        let trimmed = line.trim();
-        let bare = trimmed.trim_start_matches(['#', '>', '`', '-', '*', ' ']);
-        if trimmed.starts_with('#') {
-            let heading = trimmed.to_ascii_lowercase();
-            in_write_section = heading.contains(WRITE_HEADING);
-            in_egress_section = heading.contains(EGRESS_HEADING);
-            in_reading_section = heading.contains(READING_HEADING);
-            continue;
-        }
-        if in_reading_section && (trimmed.starts_with("- ") || trimmed.starts_with("* ")) {
-            let entry = bare.trim().trim_matches('`').trim();
-            if !entry.is_empty() {
-                reading_room.push(entry.to_owned());
-            }
-            continue;
-        }
-        if in_egress_section && (trimmed.starts_with("- ") || trimmed.starts_with("* ")) {
-            let entry = bare.trim().trim_matches('`').trim();
-            if !entry.is_empty() {
-                egress_entries.push(entry.to_owned());
-            }
-            continue;
-        }
-        if let Some(rest) = bare.strip_prefix(WRITE_KEY) {
-            reach = DomainReach::parse(rest.trim().trim_matches('`').trim())?;
-            continue;
-        }
-        if let Some(rest) = bare.strip_prefix(REVIEW_KEY) {
-            let value = rest.trim().trim_matches('`').trim();
-            review = match value {
-                "true" => true,
-                "false" => false,
-                other => {
-                    return Err(AxError::failure(
-                        AxCode::ConfigInvalid,
-                        "evaluate a building's rules",
-                        format!("`review: {other}` is neither true nor false"),
-                    )
-                    .with_recovery("write `review: true` or `review: false`"));
-                }
-            };
-            continue;
-        }
-        if let Some(rest) = bare.strip_prefix(CONFIDENTIAL_KEY) {
-            let value = rest.trim().trim_matches('`').trim();
-            confidential = match value {
-                "true" => Some(true),
-                "false" => Some(false),
-                other => {
-                    return Err(AxError::failure(
-                        AxCode::ConfigInvalid,
-                        "evaluate a building's rules",
-                        format!("`confidential: {other}` is neither true nor false"),
-                    )
-                    .with_recovery("write `confidential: true` or `confidential: false`"));
-                }
-            };
-            continue;
-        }
-        if in_write_section
-            && (trimmed.starts_with("- ") || trimmed.starts_with("* "))
-            && let Ok(prefix) = Address::parse(bare.trim().trim_matches('`'))
-        {
-            write_prefixes.push(prefix);
-        }
-    }
-    let Some(confidential) = confidential else {
-        return Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "evaluate a building's rules",
-            format!("{BUILDING_FILE} does not say whether this building is confidential"),
-        )
-        .with_recovery("add a `confidential: false` line, or `true` and read what it changes"));
-    };
-    if confidential && !egress_entries.is_empty() {
-        return Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "evaluate a building's rules",
-            format!(
-                "a confidential building lists {} egress domain(s)",
-                egress_entries.len()
-            ),
-        )
-        .with_recovery(
-            "remove the egress list, or drop `confidential: true`; a confidential building's \
-             data does not leave, so a domain list under it contradicts the setting above it",
-        ));
-    }
-    Ok(BuildingRules {
-        addr: addr.clone(),
-        policy: BuildingPolicy::new(confidential),
-        write_prefixes,
-        reach,
-        egress: EgressAllowlist::new(egress_entries),
-        review,
-        reading_room,
-    })
 }
 
 #[cfg(test)]

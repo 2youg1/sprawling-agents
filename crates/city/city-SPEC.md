@@ -672,3 +672,35 @@ pub fn write_governed(city_root: &Path, which: Governed, body: &str) -> Result<P
 - **`Preferences` 是第三份而不是第三个居民**：市长与文书各有身份文件，而「这个人怎么喜欢这座城办事」不属于任何一个居民，它属于城；它与前两者被同一条规矩治理，所以住同一处、走同一扇门。
 - **整份覆写**：这是人在一个框里编辑、按一次保存的文件，写一半会让这座城被半句话治理。上一版不留在这里——账本上那行 `governed_document_written` 才是回头看的地方。
 - **枚举而不是文件名字符串**：文件名是城的答案，不是发帧的人的答案（channels-SPEC §8-19 同一条理由，两侧各说一次）。
+
+### 8-25 `desktop:`：这栋楼把桌面交出去了吗（card-7.3；`policy` 内，形状 1 判定）
+
+`BUILDING.md` 多一位开关，读法与 `browser:` 逐字同形：
+
+```rust
+impl BuildingRules {
+    pub fn desktop(&self) -> bool;   // 缺这一行读作 false
+}
+```
+
+- **缺省是关，与 `browser:` 同、与 `confidential:` 反**。分野是两者各自往哪一侧失手：把隐私设置读成宽松那一侧是一次事故，而少给一件工具只是少一件工具。桌面比浏览器更该守这一条——`desktop.act` 会在这个人自己的机器上按下按键，而按下去的东西没有 restoration。
+- **机密楼恒不给桌面**，理由与 `browser` 那条同构而更强：一台桌面上有别的程序、别的窗口、一整块剪贴板，`desktop.screenshot` 读到的东西没有一样是这栋楼的。「数据可入不可出」与「这栋楼可以截屏这台机器」是同一句话的两半，不能同时为真，故在 `evaluate` 里即拒，`E_CONFIG_INVALID`，拒词指出删哪一行。
+- **它开的是「准不准接」，不是「准不准做」。**准不准做归 `DESKTOP.toml`，那是 server 那一侧、按窗口逐条写的 allowlist（`desktop/desktop-SPEC.md` §8-4）。两道门叠着，且**次序固定**：楼说不，连进程都不起；楼说是，仍要那份 allowlist 逐窗口点头。一道门管「这栋楼是干这个的吗」，另一道管「这台机器上的哪几个窗口」，把它们合成一道都会让其中一个问题没人问。
+
+### 8-26 `DESKTOP.toml` 落在哪（card-7.3；`policy` 内，形状 4 adapter）
+
+```rust
+pub const DESKTOP_SCOPE_FILE: &str = "DESKTOP.toml";
+pub fn desktop_scope_path(city_root: &Path, addr: &Address) -> PathBuf;
+pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Result<PathBuf, AxError>;
+```
+
+**先问 card-5.1 立下的那条读法。**`DomainReach` 把「residents 能写什么」变成了一份可判定的东西，而它成立的前提是：**决定这件事的那份文件，恒不由被它决定的人来写**。`DESKTOP.toml` 恰恰是这一类——它逐窗口地说这栋楼的 runs 能碰这台机器上的什么。故它不是产物，是治理文件。
+
+**落点因此是 `<city>/<building>/.sprawling/DESKTOP.toml`**，与 `BUILDING.md`、`CONFIG.toml` 同处，在 reserved prefix 之下——`is_reserved` 对任何含 `.sprawling` 段的地址为真，故**任何写域都够不到它**，包括 `DomainReach::Everything` 的楼。一个 agent 改不了自己被判的那把尺子，这一条在这里是由构造成立的，不是由记得成立的。
+
+**写它的是一扇门，不是一个能拼路径的调用方**（`city::governed` §8-24 同一条理由，此处第二次适用而不是第二个权威）：设置页递「哪一栋楼」与「整份文本」，路径由本模块算。能自己拼路径的调用方就能拼出一条走出保留子树的路径。
+
+**整份覆写，且恒不在此校验内容**：`DESKTOP.toml` 的语法权威在 server 那一侧（`desktop/src/scope.rs`），且它 fail closed——读不出来的文件关成全拒。城里再抄一份解析器就是第二个权威，而两个权威里迟早有一个会把某份文件读成另一种意思。城这一侧只保证「写进去的字节就是人给的字节」，剩下的由那台 server 在启动时读，读不动就什么都不做。
+
+**恒不复用 `Governed`**：那三份是**城**的文件（`<city>/.sprawling/`），这一份是**楼**的。把楼级路径塞进一个按 city_root 取路径的枚举里，会让那个枚举需要一个只有部分变体用得上的参数。
