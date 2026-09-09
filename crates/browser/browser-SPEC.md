@@ -21,7 +21,7 @@
 
 ## 3 假设与歧义
 
-- **假设**：本机浏览器由用户自己启动（Firefox 内核，本地为 Zen Browser），本库恒不拉起浏览器进程、恒不下载驱动。
+- **假设（已于 §19-1 改写，2026-09-12）**：起进程归 `bin::browser_bidi`；本库仍恒不拉起浏览器进程、恒不持套接字、恒不下载驱动。原文写的是「本机浏览器由用户自己启动」，卡 4.2 推翻了它。
 - **歧义已定**：BiDi 的 `session.new` 能力集合本版本只请求空能力＋按需 `network` 事件；更多能力等到有消费者再加，因为每一项能力都是远端因此获得的一项许可。
 
 ## 4 现状分析
@@ -169,3 +169,75 @@ impl Profile { pub fn of(building: &Address, confidential: bool) -> Result<Profi
 `ARCHITECTURE.md` §6 browser 六行与 §3 缝清单｜`docs/glossary.md` 若新增词汇｜装配层接线时同步 §6 末接线台账。
 
 **`conformance` feature（人的裁决，2026-09-05：test 恒不进构建物）**：`assert_port_conformance` 此前是裸 `pub fn`，并由 `lib.rs` 无条件再导出，因而随发行二进制出厂；它自己的 lint 豁免写着「dev-only by contract」，而无一处机器持有那纸合约。本工作区另外四套 conformance 一直在 `#[cfg(feature = "conformance")]` 之后，本 crate 是唯一的例外，原因只是它此前没有 `[features]` 段。现已补齐，并由 `cargo xtask artifact` 持有此规则；公开接口面随之缩减一行，`xtask/api-baselines/browser.txt` 同集更新。`crates/browser/src/session.rs` 中调用它的那条断言改为 `#[cfg(feature = "conformance")]`，故它在 `--all-features` 下运行——那正是 `just check` 与 `just test` 所用的构建。
+
+## 19 八个动作，与截图成为证据（card-4.2／4.3／4.4）
+
+### 19-1 卡 4.2 推翻的那条假设，以及它被改写成什么
+
+§3 原文写着「本机浏览器由用户自己启动……本库恒不拉起浏览器进程」，`docs/glossary.md` 的 **browser** 行同样写着「It launches nothing」。人的卡 4.2 要求这座城自己起 Firefox：随机远程调试端口、`-profile <这栋楼的 profile>`、按需 `-headless`。**先改记录再改代码**：该假设作废，改写为——
+
+> **假设（2026-09-12 起）**：起进程这件事归 `bin::browser_bidi`，本 crate 仍恒不起进程、恒不持套接字、恒不下载驱动。Firefox 是**第一引擎**（原生 BiDi，无需驱动）；Chromium 只在 `chromedriver` 已在 PATH 上时才走得通，因此是第二条路而非并列的一条。
+
+这条改写不放宽本 crate 的任何约束：纯的那一半仍然纯，变的只是「谁按下启动键」，而那个谁一直住在装配层（§7 第一条）。
+
+### 19-2 `browser::verb`（新模块，形状 1 判定）
+
+工具 `browser` 的八个动作，读成一个穷尽枚举，再变成帧。**一个动作可能要一帧以上**，所以出口是 `Vec<Frame>` 而不是 `Frame`：`open` 要先导航再装上控制台录音器，`screenshot` 带 `scale` 时要先改 devicePixelRatio。
+
+```rust
+pub enum Verb {
+    Open { url: String },
+    Snapshot,
+    Act { generation: u64, action: Action },
+    Screenshot(ShotRequest),
+    Measure { references: Vec<String> },
+    Console,
+    Viewport { width: u32, height: u32 },
+    Close,
+}
+impl Verb {
+    pub fn read(args: &Payload) -> Result<Verb, AxError>;
+    pub fn frames(&self, session: &mut Session, context: &ContextId,
+                  snapshot: Option<&PageSnapshot>) -> Result<Vec<Frame>, AxError>;
+}
+```
+
+三条判定写在这里而不是调用方：`act` 没有快照即拒（对没看过的页面动手不可拼写，§8.5 第二对的直接后果）；`measure` 的每个 ref 都过 `PageSnapshot::resolve`，因此「我编了一个 ref」在出网前就被报出；`console` 读的是 `open` 时装上的录音数组，因为本 crate 的缝只运请求-应答，而 BiDi 的 `log.entryAdded` 是无 id 的事件，归装配层路由——用一个页面内数组换一条事件订阅，是拿已有机制复用而非新开一条通路。
+
+### 19-3 `browser::shot`（新模块，形状 2 值类型）
+
+截图的四个可选项与回来的字节。`quality` 是 **0..=100 的整数**而不是浮点：浮点不进判定路径，而 BiDi 要的 `0.85` 只在最后一刻由 `format!("0.{q:02}")` 解析成 JSON 数，于是本仓库里没有一个 f64 变量。`clip` 是四个整数（x、y、width、height）。`scale` 同样是百分比整数，`100` 表示不改。
+
+```rust
+pub struct ShotRequest { pub clip: Option<Clip>, pub format: ImageType,
+                         pub quality: Option<u8>, pub scale: Option<u32> }
+pub struct Clip { pub x: u32, pub y: u32, pub width: u32, pub height: u32 }
+pub struct Shot { /* bytes、width、height 私有 */ }
+impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError>; }
+```
+
+`Shot::read` 解 base64 并把字节交给 `png` 读出尺寸：**本版本只在 PNG 上给出尺寸**，其他格式回 `E_WIRE_MISMATCH` 而不是猜。理由是 `ImageRef` 的 width／height 是模型看图前唯一的尺度，猜错的尺寸比没有尺寸更坏；而默认格式本就是 PNG，所以这条拒绝挡的是有人显式要了别的格式又要尺寸。
+
+### 19-4 `browser::diff`（新模块，形状 1 判定）
+
+`diff(a, b)` 回答两件事：变了百分之几，以及变的地方在哪几个框里。百分比是**万分比整数**（`changed_ppm`／`ratio_q4`），框是像素坐标的整数矩形，因为这两个数会进账本载荷。尺寸不同的两张图不比较，回 `E_INVALID_ARGS`——把一张缩放到另一张上再比，比出来的差异是缩放算法的，不是页面的。
+
+依赖 `png` 0.18（MIT OR Apache-2.0，`deny.toml` 的 allow 列表已含两者）：产品路径只解码，测试用它的编码器造夹具，于是断言比的是真 PNG 字节而不是一份没人能复核的固定串。
+
+### 19-5 `browser::devloop` 消费 `look` 的裁决（卡 4.4）
+
+`DevLoop::observe` 已经吃 `Observation { text, complained }`。卡 4.4 要的是**接线而非新判定**：`browser` 工具的 `snapshot` 动作产出的那段文本就是 `text`，`console` 里出现过 error 级别的条目就是 `complained`，于是「改一处、看一眼、再决定」在工具层闭合，`Step` 作为工具结果回给模型。判定本身一个字不改——已有机制复用是这里的正解。
+
+### 19-6 验收（追加到 §2）
+
+| 单元 | 完成的定义 |
+|---|---|
+| verb | 八个动作各自的帧可在无浏览器下逐帧断言；`act` 无快照即拒；`measure` 的假 ref 在出网前被拒 |
+| shot | 同一段 PNG 字节两次读出同一尺寸；非 PNG 不猜尺寸；quality 不引入浮点变量 |
+| diff | 尺寸不同即拒；全同两图为 0；一个像素变化的框恰好含那个像素 |
+
+
+### 19-7 本波未做完的部分（如实记录）
+
+- **`bin::browser_bidi::BidiSocket` 没有对着真浏览器跑过**。它在本机没有 Firefox 会话的条件下写成，逐帧逻辑（发一帧、读到 id 相同的那条、跳过无 id 的事件）由阅读 W3C 草案得出而非由一次真实会话验证。工具那一侧的整条 open→snapshot→act→screenshot 由 `Recording` 逐帧断言，缝的另一个适配器因此是可信的；**这一侧不是**。第一次真跑要看的是三件事：`session.new` 的能力集合是否被 Firefox 接受、`script.evaluate` 的返回值是否真是 `result.value` 的字符串形状、`browsingContext.captureScreenshot` 的 `format.type` 是否收 `image/png` 这一拼写。
+- **`-headless` 有开关没有问的人**：`LaunchPlan` 带这一位并逐字断言，但 `for_building` 恒传 `false`。谁来问（楼的 `CONFIG.toml`？派活时的一个字段？）是下一张卡的事，本卡不替人决定。

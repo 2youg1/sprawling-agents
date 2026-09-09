@@ -181,6 +181,19 @@ impl RunWorker {
                 admitted.push(Box::new(city::CityTool::new(&self.city_root)?));
             }
         }
+        // The browser, for a building whose rules ask for one. It is
+        // last of the built-ins for the reason the comment above gives:
+        // what keeps its position keeps its cache. A confidential
+        // building never reaches this line - `city::policy` refuses the
+        // two settings together, because a browser opens whatever
+        // address it is given.
+        if site.rules.browser() {
+            admitted.push(Box::new(crate::browser_tool::for_building(
+                &self.city_root,
+                site.building.addr(),
+                site.rules.policy().confidential,
+            )?));
+        }
         // External tools, for a building whose configuration names a
         // server. They join the table here, before the catalogue is
         // rendered, because the tool table is frozen with the run: what
@@ -200,7 +213,7 @@ impl RunWorker {
         self.admit_reading_room(&catalog, &site.rules, &site.building, addr)?;
         Ok(Workbench {
             catalog,
-            bench,
+            bench: Some(bench),
             delegates,
             succession,
         })

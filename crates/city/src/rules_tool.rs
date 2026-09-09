@@ -164,6 +164,7 @@ impl Tool for RulesTool {
         }
         Ok(ToolOutcome {
             result: Payload::new(out)?,
+            attachments: Vec::new(),
         })
     }
 }

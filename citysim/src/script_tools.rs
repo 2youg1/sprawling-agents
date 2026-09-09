@@ -130,6 +130,7 @@ mod tests {
             meta("probe"),
             vec![Ok(ToolOutcome {
                 result: Payload::empty(),
+                attachments: Vec::new(),
             })],
         )]);
         assert!(set.invoke(&call("probe")).is_ok());
@@ -151,6 +152,7 @@ mod tests {
             meta("probe"),
             vec![Ok(ToolOutcome {
                 result: Payload::empty(),
+                attachments: Vec::new(),
             })],
         );
         kernel::tool_conformance::assert_tool_conformance(&mut tool);

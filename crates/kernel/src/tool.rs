@@ -247,6 +247,15 @@ impl ToolCall {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolOutcome {
     pub result: Payload,
+    /// Pictures this call produced, already in the content store.
+    ///
+    /// They ride here rather than inside `result` because the model has
+    /// to see them: the turn loop puts them into the tool result block's
+    /// own attachments, and a locator buried in a payload would only
+    /// ever be text. Empty for every tool that answers in words, which
+    /// is all of them but one.
+    #[serde(default)]
+    pub attachments: Vec<crate::ImageRef>,
 }
 
 /// The tool port. Adapters: runtime L0 three (S3), browser, protocol;

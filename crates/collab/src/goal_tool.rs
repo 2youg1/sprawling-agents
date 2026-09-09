@@ -249,7 +249,10 @@ impl Tool for GoalTool {
             .with_recovery("restart this city")
         })?;
         let result = desk.register(call.args.as_map())?;
-        Ok(ToolOutcome { result })
+        Ok(ToolOutcome {
+            result,
+            attachments: Vec::new(),
+        })
     }
 }
 

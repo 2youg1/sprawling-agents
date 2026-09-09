@@ -170,6 +170,7 @@ impl Tool for NeighboursTool {
         );
         Ok(ToolOutcome {
             result: Payload::new(out)?,
+            attachments: Vec::new(),
         })
     }
 }

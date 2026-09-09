@@ -368,6 +368,7 @@ impl Tool for WorkshopTool {
         }
         Ok(ToolOutcome {
             result: Payload::new(out)?,
+            attachments: Vec::new(),
         })
     }
 }

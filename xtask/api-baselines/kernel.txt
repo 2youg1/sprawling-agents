@@ -480,11 +480,13 @@ pub fn kernel::observe(&[kernel::ActionFingerprint]) -> kernel::StallVerdict
 pub fn kernel::observe_edit_war(&[kernel::EditSample]) -> kernel::EditWarVerdict
 pub fn kernel::observe_pursuit(kernel::PursuitState, &[kernel::NodeId], u32) -> kernel::PursuitVerdict
 pub fn kernel::policy_expiry(&kernel::Policy, kernel::TimeMs) -> kernel::PolicyExpiry
+pub fn kernel::reaches_the_undoable(&kernel::ConnectorCall<'_>) -> bool
 pub fn kernel::request_repair(&alloc::collections::btree::map::BTreeMap<kernel::Address, kernel::RunId>, &kernel::Address, &kernel::RunId) -> kernel::RepairVerdict
 pub fn kernel::scan(&[u8]) -> alloc::vec::Vec<kernel::SecretSpan>
 pub fn kernel::set_roadmap_status(&str, &kernel::NodeId, kernel::RoadmapStatus, core::option::Option<&kernel::Locator>) -> core::result::Result<alloc::string::String, kernel::AxError>
 pub fn kernel::spawn(kernel::Depth, &kernel::DelegateKind) -> kernel::GateOutcome
 pub fn kernel::spread(&kernel::PlanTree, &[kernel::RedNode]) -> alloc::vec::Vec<kernel::Blockage>
+pub fn kernel::undoable(&kernel::GateContext, &kernel::ConnectorCall<'_>, &kernel::Locator, &kernel::TaintSet) -> kernel::GateOutcome
 pub fn kernel::value_has_float(&serde_json::value::Value) -> bool
 pub kernel::Admission::Admit
 pub kernel::Admission::Shed
@@ -501,6 +503,7 @@ pub kernel::ApprovalClass::Commitment
 pub kernel::ApprovalClass::Delegation
 pub kernel::ApprovalClass::DiscardEscalate
 pub kernel::ApprovalClass::Governance
+pub kernel::ApprovalClass::Undoable
 pub kernel::ApprovalItem::action_desc: alloc::string::String
 pub kernel::ApprovalItem::actor: alloc::string::String
 pub kernel::ApprovalItem::artifact: kernel::Locator
@@ -584,6 +587,8 @@ pub kernel::CommitmentDecision::Denied
 pub kernel::Completion::Cancelled
 pub kernel::Completion::Done(kernel::Evidence)
 pub kernel::Completion::Limit
+pub kernel::ConnectorCall::label: &'a kernel::ServerLabel
+pub kernel::ConnectorCall::tool: &'a kernel::ToolName
 pub kernel::ContentBlock::Image(kernel::ImageRef)
 pub kernel::ContentBlock::RedactedThinking
 pub kernel::ContentBlock::RedactedThinking::data: alloc::string::String
@@ -974,6 +979,7 @@ pub kernel::ToolMeta::params: kernel::Payload
 pub kernel::ToolMeta::render: kernel::RenderIntent
 pub kernel::ToolMeta::temporal: kernel::Temporal
 pub kernel::ToolMeta::timeout: core::option::Option<kernel::TimeoutMs>
+pub kernel::ToolOutcome::attachments: alloc::vec::Vec<kernel::ImageRef>
 pub kernel::ToolOutcome::result: kernel::Payload
 pub kernel::UnplannedProgress::budget: kernel::BudgetUse
 pub kernel::UnplannedProgress::steps: u32
@@ -1016,6 +1022,7 @@ pub struct kernel::ChatResponse
 pub struct kernel::Claim
 pub struct kernel::ClockZone
 pub struct kernel::ClusterKey
+pub struct kernel::ConnectorCall<'a>
 pub struct kernel::Delegate
 pub struct kernel::Delegator(_)
 pub struct kernel::Discard

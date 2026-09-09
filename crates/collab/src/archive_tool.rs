@@ -236,7 +236,10 @@ impl Tool for ArchiveTool {
                 .with_recovery("use `record` or `recall`"));
             }
         };
-        Ok(ToolOutcome { result })
+        Ok(ToolOutcome {
+            result,
+            attachments: Vec::new(),
+        })
     }
 }
 

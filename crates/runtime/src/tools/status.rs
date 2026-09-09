@@ -268,6 +268,7 @@ impl Tool for StatusTool {
         );
         Ok(ToolOutcome {
             result: Payload::new(result)?,
+            attachments: Vec::new(),
         })
     }
 }

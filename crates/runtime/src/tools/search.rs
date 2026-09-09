@@ -343,6 +343,7 @@ impl Tool for SearchTool {
         out.insert("matches".to_owned(), Value::Array(found.hits));
         Ok(ToolOutcome {
             result: Payload::new(out)?,
+            attachments: Vec::new(),
         })
     }
 }

@@ -248,6 +248,7 @@ fn backgrounded(id: &BacklogId, what: &str, arm: &str) -> Result<ToolOutcome, Ax
     );
     Ok(ToolOutcome {
         result: Payload::new(result)?,
+        attachments: Vec::new(),
     })
 }
 
@@ -280,6 +281,7 @@ fn with_backlog(outcome: ToolOutcome, done: Vec<Finished>) -> Result<ToolOutcome
     result.insert("background".to_owned(), Value::Array(rows));
     Ok(ToolOutcome {
         result: Payload::new(result)?,
+        attachments: Vec::new(),
     })
 }
 
@@ -291,6 +293,7 @@ fn outcome(stdout: &str, stderr: &str, exit_code: i64, arm: &str) -> Result<Tool
     result.insert("exit_code".to_owned(), Value::Number(exit_code.into()));
     Ok(ToolOutcome {
         result: Payload::new(result)?,
+        attachments: Vec::new(),
     })
 }
 
@@ -314,6 +317,7 @@ fn with_environment(
     );
     Ok(ToolOutcome {
         result: Payload::new(result)?,
+        attachments: Vec::new(),
     })
 }
 
@@ -339,6 +343,7 @@ fn exceptional(
     }
     Ok(ToolOutcome {
         result: Payload::new(result)?,
+        attachments: Vec::new(),
     })
 }
 

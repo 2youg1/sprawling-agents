@@ -322,6 +322,7 @@ impl Tool for ReadTool {
         out.insert("text".to_owned(), Value::String(taken.text));
         Ok(ToolOutcome {
             result: Payload::new(out)?,
+            attachments: Vec::new(),
         })
     }
 }

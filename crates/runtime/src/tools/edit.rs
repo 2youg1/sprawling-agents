@@ -215,6 +215,7 @@ impl Tool for EditTool {
         );
         Ok(ToolOutcome {
             result: Payload::new(result)?,
+            attachments: Vec::new(),
         })
     }
 }
@@ -258,6 +259,7 @@ impl EditTool {
         result.insert("diff".to_owned(), Value::String(unified_diff(rel, "", new)));
         Ok(ToolOutcome {
             result: Payload::new(result)?,
+            attachments: Vec::new(),
         })
     }
 }

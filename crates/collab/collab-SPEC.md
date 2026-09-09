@@ -541,3 +541,21 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 **无字段开放。** 测试文件是 `workshop` 的子模块，`NodeId`、`NodeContract` 与 `Workshop` 的私有字段对它照旧可见，`use super::*` 之外不需要任何新的可见性。
 
 **apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::NodeId`／`collab::NodeContract`／`collab::Workshop`，`cargo xtask apisync` 对 collab 无差异。
+
+### 8-20 collab::archive_tool（P4.04；形状 4 适配器）——本节由 card-8.2 补写
+
+模块表的 `Spec` 列要求每个在册模块指向定义它的那一节，而这个模块自建成起就没有节。本节按它已落地的形状补记，不追加要求。
+
+`ARCHIVE_KINDS` 是封闭的四类：`preference`／`decision`／`correction`／`fact`。第五类要有理由，而「它不属于前四类」正是让分类腐烂的那个理由，所以拒词点名四类并问这是哪一类。
+
+- **回忆是读，不是记**：索引由 worker 从书架算出后交给这张桌子，桌子不留第二份副本——盘上的文件才是真的。
+- **效应而非副作用**：`ArchiveEffect::Recorded` 是桌子交回的值，落盘与记账都归装配层，故本模块无 I/O。
+
+### 8-21 collab::claim_effect（V3.19；形状 2 值类型）——本节由 card-8.2 补写
+
+同上：本节补记一个已落地却无 SPEC 节的模块。
+
+`ClaimDesk` 判定，`ClaimEffect` 描述并复核，两个形状故两个文件（ARCHITECTURE.md §9）。
+
+- **`PutDown` 携 `PlanExit` 而不是一个动词**：出口是计划闸产出的东西，把它的两条臂抄进第二个枚举，就是对「一个节点可以怎么离开」持第二种意见。
+- **`still_true` 问的是记录本身答不了的那个问题**：盘上的文档现在是否仍然说着这条效应声称它让它说的话。

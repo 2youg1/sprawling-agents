@@ -239,6 +239,7 @@ impl Tool for DelegateTool {
         );
         Ok(ToolOutcome {
             result: Payload::new(out)?,
+            attachments: Vec::new(),
         })
     }
 }

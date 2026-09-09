@@ -335,7 +335,10 @@ impl Tool for SignalTool {
                 .with_recovery("use `send` or `pull`"));
             }
         };
-        Ok(ToolOutcome { result })
+        Ok(ToolOutcome {
+            result,
+            attachments: Vec::new(),
+        })
     }
 }
 

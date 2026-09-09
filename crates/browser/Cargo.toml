@@ -17,6 +17,10 @@ conformance = []
 [dependencies]
 kernel = { path = "../kernel" }
 serde_json = { workspace = true }
+# A screenshot arrives base64-encoded on the protocol and is measured and
+# compared as pixels. Neither is a parser this crate should write itself.
+base64 = { workspace = true }
+png = { workspace = true }
 
 [lints]
 workspace = true

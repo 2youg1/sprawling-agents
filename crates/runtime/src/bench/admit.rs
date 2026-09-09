@@ -53,6 +53,40 @@ impl ToolBench {
                 if let Some(answered) = self.crossed(verdict) {
                     return Ok(Some(answered));
                 }
+                // A second door, behind the first, answering a
+                // different question. The egress door asked whether
+                // these bytes may leave; this one asks whether what
+                // happens at the other end can be taken back. The
+                // desktop connector is the first thing here for which
+                // the answer is no — a key pressed on somebody's own
+                // machine has no restoration — so it goes to the person
+                // rather than being refused, which would make the tool
+                // equivalent to absent.
+                let called = ToolName::parse(name)?;
+                let reaching = kernel::ConnectorCall {
+                    label,
+                    tool: &called,
+                };
+                if kernel::reaches_the_undoable(&reaching) {
+                    let Some(job) = self.job.as_ref() else {
+                        return Err(AxError::failure(
+                            AxCode::ToolUnavailable,
+                            "invoke tool",
+                            format!(
+                                "`{name}` reaches this machine's desktop and this bench was \
+                                 built without a job"
+                            ),
+                        )
+                        .with_recovery(
+                            "build the bench with `for_job`; an action on somebody's own \
+                             machine that they cannot be asked about is one nobody allowed",
+                        ));
+                    };
+                    let verdict = kernel::undoable(ctx, &reaching, job, &self.taint);
+                    if let Some(answered) = self.settled(verdict) {
+                        return Ok(Some(answered));
+                    }
+                }
             }
             Effect::Egress => {
                 let spans = kernel::scan(&scanned(call, "scan egress args")?);

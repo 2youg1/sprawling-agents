@@ -151,7 +151,10 @@ impl Tool for ClaimTool {
                 .with_recovery(ACTIONS));
             }
         };
-        Ok(ToolOutcome { result })
+        Ok(ToolOutcome {
+            result,
+            attachments: Vec::new(),
+        })
     }
 }
 

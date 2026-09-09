@@ -103,6 +103,7 @@ impl Tool for SpawnTool {
     fn invoke(&mut self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
         Ok(ToolOutcome {
             result: Payload::empty(),
+            attachments: Vec::new(),
         })
     }
 }

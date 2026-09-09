@@ -13,16 +13,22 @@
 
 mod act;
 mod devloop;
+mod diff;
 mod port;
 mod profile;
 mod session;
+mod shot;
 mod snapshot;
+mod verb;
 
 pub use act::{Action, frame_for};
 pub use devloop::{DevLoop, LOOKS_MAX, Observation, QUIET_LOOKS, Step};
+pub use diff::{Box2, Difference, diff};
 #[cfg(feature = "conformance")]
 pub use port::assert_port_conformance;
 pub use port::{BrowserPort, Frame, Reply};
 pub use profile::{PROFILES_DIR, Profile};
 pub use session::{ContextId, Recording, Session, SessionRequest};
+pub use shot::{Clip, Shot, ShotRequest};
 pub use snapshot::{Node, PageSnapshot};
+pub use verb::{Verb, complained, read_json};

@@ -226,7 +226,10 @@ impl Tool for CityTool {
                 Payload::new(out)?
             }
         };
-        Ok(ToolOutcome { result })
+        Ok(ToolOutcome {
+            result,
+            attachments: Vec::new(),
+        })
     }
 }
 

@@ -83,16 +83,7 @@ pub fn frame_for(
         )
         .with_recovery("take a fresh snapshot and decide again"));
     }
-    let node = snapshot.resolve(action.reference())?;
-    // The reference is an index into what the snapshot showed, so the
-    // expression re-derives it the same way the snapshot did. Role and
-    // name go into the expression as data, never as code.
-    let selector = format!(
-        "[...document.querySelectorAll('*')].filter(e => (e.getAttribute('role') || \
-         e.tagName.toLowerCase()) === {})[{}]",
-        quote(&node.role),
-        index_of(action.reference())?
-    );
+    let selector = selector_of(snapshot, action.reference())?;
     let expression = match action {
         Action::Click { .. } => format!("{selector}.click()"),
         Action::Type { text, .. } => {
@@ -104,6 +95,34 @@ pub fn frame_for(
         Action::Read { .. } => format!("({selector}).textContent"),
     };
     session.evaluate(context, &expression)
+}
+
+/// The expression that names one node of `snapshot` in the page.
+///
+/// One authority for the whole crate: acting on a node and measuring one
+/// have to reach the same element, and two spellings of "which element"
+/// would drift the moment either was corrected.
+///
+/// The page's own text goes in as data through [`quote`], never as code,
+/// and the position is counted among the nodes sharing this node's role
+/// — which is the list the expression filters, so the two agree.
+///
+/// # Errors
+/// Propagates a reference this snapshot did not mint.
+pub(crate) fn selector_of(snapshot: &PageSnapshot, reference: &str) -> Result<String, AxError> {
+    let node = snapshot.resolve(reference)?;
+    let ordinal = index_of(reference)?;
+    let among = snapshot
+        .nodes()
+        .iter()
+        .take(ordinal)
+        .filter(|earlier| earlier.role == node.role)
+        .count();
+    Ok(format!(
+        "[...document.querySelectorAll('*')].filter(e => (e.getAttribute('role') || \
+         e.tagName.toLowerCase()) === {})[{among}]",
+        quote(&node.role),
+    ))
 }
 
 /// The zero-based position a reference names. References are minted as

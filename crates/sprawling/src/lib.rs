@@ -23,6 +23,8 @@ pub mod console;
 pub mod firstrun;
 pub mod serving;
 
+mod browser_bidi;
+mod browser_tool;
 mod effect;
 mod keying;
 mod mcp_http;

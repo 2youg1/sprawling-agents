@@ -863,9 +863,10 @@ pub struct UnplannedProgress { pub steps: u32, pub budget: BudgetUse }   // 无 
 pub struct ApprovalId(String);               // 非空；uuid v7 由效果层发，kernel 不生成
 #[non_exhaustive] pub enum ApprovalSource { Gate, Agent }
 #[non_exhaustive] pub enum ApprovalClass { Commitment, BudgetLimit, DiscardEscalate, AgentQuestion,
-                                           Delegation, Governance }
+                                           Delegation, Governance, Undoable }
 // Delegation（P1.04）：第一次派生要人点头。Governance（P2.01）：改写一个 scope 的规则要人点头。
-// 两者都无对应 PolicyClass variant——一条「豁免改规则」的常设规则会把自己废掉。
+// Undoable（card-7.3）：伸到城外、且城里没有任何一处收得回来的后果——目下就是这台机器自己的桌面（§8-45）。
+// 三者都无对应 PolicyClass variant——一条「豁免改规则」的常设规则会把自己废掉；同样地，一条豁免掉每一次未来点击的常设规则，豁免掉的正是「有人看着」这件事本身。
 pub struct ClusterKey { pub class: ApprovalClass, pub detail: String }
 pub struct ApprovalItem { pub id: ApprovalId, pub source: ApprovalSource, pub actor: String,
                           pub action_desc: String, pub artifact: Locator, pub cluster_key: ClusterKey,
@@ -958,7 +959,7 @@ impl ToolCall {
     /// the same action.
     pub fn action(&self) -> Result<Vec<u8>, AxError>;    // R2.15 迁入
 }
-pub struct ToolOutcome { pub result: Payload }
+pub struct ToolOutcome { pub result: Payload, #[serde(default)] pub attachments: Vec<ImageRef> }
 
 pub trait Tool {
     fn meta(&self) -> &ToolMeta;
@@ -1349,7 +1350,7 @@ pub trait Model {
 
 **覆盖它的适配器欠同一个 `ModelReturn`，包括同样的失败。** 流被切断是一次读取错误，永远不是一个变短的回答——`ModelReturn` 恒不由增量拼出来。写进账本的那句话只从 `ModelReturn` 来，一次，在调用结算之后。
 
-## 8-N `NodeId` 搬出 `plan`，成为自己的模块（V3.34）
+## 8-48 `kernel::node_id`：`NodeId` 搬出 `plan`，成为自己的模块（V3.34；编号由 `8-N` 补齐于 card-8.2）
 
 `kernel::plan` 的模块表行是 `decision`：树判定什么可以开工、一个枝值多少、一个持有节点走两个出口里的哪一个。
 `NodeId` 不判定任何事——它只说清「一个良构地址长什么样」，并在**唯一的构造点**把别的一律拒掉，
@@ -1541,3 +1542,42 @@ pub const HALL_CLERK: &str = "hall/clerk";
 - `Autonomy` **不加变体**：`Owner | Delegate(ResidentId) | Deferred` 已经能说出「clerk 代答」——`Delegate(ResidentId::new(HALL_CLERK))`。新增一个 `Clerk` 变体会让同一件事有两种写法，而 `may_answer` 要为两种都作答。
 - `may_answer` 逻辑一字不改：clerk 之所以能答，是因为它就是被任命的 delegate；三必经人类与 tainted 依旧 `HumanOnly`，clerk 自己发起的条目依旧 `SelfApprovalBarred`。本卡在 kernel 侧只加常量与一条断言 clerk 走通全路的测试。
 - genesis 侧（`bin::assembly`）在 `city_initialized` 之后写一条 `autonomy_changed`，值为 `delegate:hall/clerk`——记录在账上而不是写死在缺省值里，因为「谁来答」是这座城市的一个决定，人可以改它，改动要有一行历史。
+
+### 8-49 kernel::gate::undoable：拿不回来的那一类外部效应（card-7.3；形状 1 判定）
+
+```rust
+/// 「哪一台 server 上的哪一件工具」——这两样恒同行，故是一个有名字的值。
+pub struct ConnectorCall<'a> { pub label: &'a ServerLabel, pub tool: &'a ToolName }
+
+/// 一件 connector 工具的远端名字，是不是这座城收不回来的那一类。
+pub fn reaches_the_undoable(call: &ConnectorCall<'_>) -> bool;
+
+/// 是就升给人，否就放行。恒不 Deny。
+pub fn undoable(ctx: &GateContext, call: &ConnectorCall<'_>,
+                artifact: &Locator, taint: &TaintSet) -> GateOutcome;
+```
+
+**问题**：城里每一条「会造成后果」的路径都配了一条回头路——`Discard` 没有 `Restoration` 就构造不出来，工具波前后各有一个 git fence，写域外的写会被拒。桌面连接器一条都对不上：`desktop.act` 在这个人自己的机器上按下的键，`desktop.clipboard` 覆盖掉的那段文本，城里没有任何一处存过它们的旧值，也没有任何一处能把它们放回去。
+
+**故它走的是 Escalate，不是 Deny**（与 `delegation`／`govern` 同一形状）。拒绝会让这件工具等于不存在——那样这张卡就白做了；放行则是让一个模型在没人看着的时候按下别人的键盘。中间那一格正是 Gate 存在的理由：**这是人的决定**，且 `GateOutcome` 本来就有这一格。
+
+**判据是远端名字的前缀 `desktop.`，且判得精确而不是猜**：一件 connector 工具在城里的名字是 `{label}_{sanitise(远端名)}`，`label` 就在 `Effect::Connector` 里带着，所以把 `{label}_` 从头上摘掉剩下的就是远端名，无须猜。一栋楼把这台 server 挂成 `desk`，工具叫 `desk_desktop_act`；挂成 `desktop`，工具叫 `desktop_desktop_act`——两种都判得出来，而「名字里含 desktop」这种读法会把一栋楼自己写的 `notes_desktop_layout` 也判进去。
+
+**`ConnectorCall` 是一个值而不是两个参数**：label 与工具名单独拿出来都判不了任何事——判据恰恰是「把 label 从工具名头上摘掉之后剩下什么」，故它们是同一个事实的两半（`xtask length` 的 4 参数尺子把这一点问了出来）。
+
+**cluster key 取 label，不取工具名**：人被问的是「这个连接器可以碰这台机器吗」，一个问题一次。逐工具问会训练人闭着眼点过去，而那正是这道门想防的事。
+
+**这道门与 `BUILDING.md` 的 `desktop:` 是两回事，次序也固定**（city-SPEC §8-25）：楼那一位开关决定这台 server **接不接得上**，这道门决定接上之后**每一次调用要不要问人**。楼说「是」不等于人对每一次点击说「是」。
+
+**恒不为它新增 `Effect` 变体**：`Effect` 是路由字段，`Connector` 已经把这一类调用路由到出网门了；再加一格会让每一处 `match Effect` 都要回答一个与它无关的问题。这道门叠在出网门之后，两道各答各的——出网门答「这些字节能出去吗」，本门答「这个后果收得回来吗」。
+
+
+## 8-52 一次工具调用产出的图（card-4.3）
+
+`ToolOutcome` 多一个字段 `attachments: Vec<ImageRef>`，`#[serde(default)]`，旧历史读成空表。
+
+**为什么不放进 `result` 里**：`result` 是给模型读的文本载荷，一个埋在 JSON 里的 `cas:` 定位符对模型永远只是一串字。要让模型**看见**这张图，它必须成为 `ContentBlock::ToolResult.attachments` 的一员——那是卡 4.1 已经备好的位置，而 `runtime::turn::wave` 是唯一一处把 `ToolOutcome` 变成 `ContentBlock` 的地方，于是这个字段是那条路上唯一缺的一段。
+
+**字节不在这里**：`ImageRef` 携定位符与两个整数边长，字节住 `memory::cas`，出线前的最后一刻才由 `gateway::endpoint` 取出来编码。账本因此仍是一份人能读的文件。
+
+**唯一的生产者是 `browser` 工具的 `screenshot`**（`bin::browser_tool`）；其余每一个工具显式写空表，因为「没有图」是一句要说出口的话，不是一个可以省略的默认。

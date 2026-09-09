@@ -100,5 +100,6 @@ pub fn package_exec(
     result.insert("sieve".to_owned(), Value::Array(accounts));
     Ok(ToolOutcome {
         result: kernel::Payload::new(result)?,
+        attachments: Vec::new(),
     })
 }

@@ -160,6 +160,7 @@ impl Tool for SucceedTool {
         );
         Ok(ToolOutcome {
             result: Payload::new(out)?,
+            attachments: Vec::new(),
         })
     }
 }

@@ -180,6 +180,7 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
     let mut invoke = |_: &ToolCall, _: TimeMs| {
         Ok(ToolOutcome {
             result: Payload::empty(),
+            attachments: Vec::new(),
         })
     };
     let mut hooks = RunHooks {
@@ -240,6 +241,7 @@ fn a_run_ends_when_its_work_runs_out_rather_than_at_a_ceiling() {
     let mut invoke = |_: &ToolCall, _: TimeMs| {
         Ok(ToolOutcome {
             result: Payload::empty(),
+            attachments: Vec::new(),
         })
     };
     let mut hooks = RunHooks {
@@ -274,6 +276,7 @@ fn a_cancel_at_a_safe_point_freezes_inside_the_interrupted_turn() {
     let mut invoke = |_: &ToolCall, _: TimeMs| {
         Ok(ToolOutcome {
             result: Payload::empty(),
+            attachments: Vec::new(),
         })
     };
     let mut hooks = RunHooks {
@@ -311,6 +314,7 @@ fn a_fence_runs_before_the_wave_and_carries_the_turns_stamp() {
     let mut invoke = |_: &ToolCall, _: TimeMs| {
         Ok(ToolOutcome {
             result: Payload::empty(),
+            attachments: Vec::new(),
         })
     };
     let mut fenced: Vec<u64> = Vec::new();
@@ -350,6 +354,7 @@ fn advance_reports_each_turn_so_a_caller_can_stop_between_them() {
     let mut invoke = |_: &ToolCall, _: TimeMs| {
         Ok(ToolOutcome {
             result: Payload::empty(),
+            attachments: Vec::new(),
         })
     };
     let mut hooks = RunHooks {
@@ -396,6 +401,7 @@ fn a_steer_at_a_safe_point_reaches_the_next_window_and_not_only_the_ledger() {
     let mut invoke = |_: &ToolCall, _: TimeMs| {
         Ok(ToolOutcome {
             result: Payload::empty(),
+            attachments: Vec::new(),
         })
     };
     let mut hooks = RunHooks {
@@ -445,6 +451,7 @@ fn a_cancel_after_the_wave_stops_the_run_before_anything_it_handed_down_starts()
     let mut invoke = |_: &ToolCall, _: TimeMs| {
         Ok(ToolOutcome {
             result: Payload::empty(),
+            attachments: Vec::new(),
         })
     };
     let mut hooks = RunHooks {

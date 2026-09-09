@@ -28,7 +28,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::{
     Address, ApprovalItem, AxCode, AxError, DedupVerdict, DiscardForecast, Effect, EgressOutcome,
-    EgressTarget, GateContext, GateOutcome, IdemKey, Locator, TaintSet, Tool, ToolCall,
+    EgressTarget, GateContext, GateOutcome, IdemKey, Locator, TaintSet, Tool, ToolCall, ToolName,
     ToolOutcome, WriteDomain,
 };
 

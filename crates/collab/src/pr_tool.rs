@@ -327,7 +327,10 @@ impl Tool for PrTool {
                 .with_recovery("use `open`, `list` or `check`"));
             }
         };
-        Ok(ToolOutcome { result })
+        Ok(ToolOutcome {
+            result,
+            attachments: Vec::new(),
+        })
     }
 }
 

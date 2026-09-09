@@ -136,6 +136,7 @@ fn windows_for(reported: Vec<u64>) -> Vec<String> {
     let mut invoke = |_: &ToolCall, _: TimeMs| {
         Ok(ToolOutcome {
             result: Payload::empty(),
+            attachments: Vec::new(),
         })
     };
     let mut hooks = RunHooks {
@@ -198,6 +199,7 @@ fn a_model_with_no_stated_window_is_never_reminded() {
     let mut invoke = |_: &ToolCall, _: TimeMs| {
         Ok(ToolOutcome {
             result: Payload::empty(),
+            attachments: Vec::new(),
         })
     };
     let mut hooks = RunHooks {

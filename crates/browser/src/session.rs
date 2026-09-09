@@ -92,6 +92,20 @@ impl Session {
         )
     }
 
+    /// One frame of a command this module has no named builder for,
+    /// numbered by the same counter as every other frame.
+    ///
+    /// The id is what this type owns, and a caller that minted its own
+    /// would renumber a replay — which is why composing params
+    /// elsewhere is allowed and composing ids is not.
+    ///
+    /// # Errors
+    /// Propagates the frame's own refusal: an empty method, or params
+    /// that are not an object.
+    pub fn frame(&mut self, method: &str, params: Value) -> Result<Frame, AxError> {
+        Frame::new(self.mint(), method, params)
+    }
+
     /// `browsingContext.getTree`: which tabs exist.
     ///
     /// # Errors

@@ -1,14 +1,20 @@
 impl browser::Action
+impl browser::Box2
 impl browser::BrowserPort for browser::Recording
 impl browser::BrowserPort for browser::Recording
 impl browser::ContextId
 impl browser::DevLoop
+impl browser::Difference
 impl browser::Frame
 impl browser::PageSnapshot
 impl browser::Profile
 impl browser::Recording
 impl browser::Reply
 impl browser::Session
+impl browser::Shot
+impl browser::ShotRequest
+impl browser::Verb
+impl core::default::Default for browser::ShotRequest
 pub browser::Action::Click
 pub browser::Action::Click::reference: alloc::string::String
 pub browser::Action::Read
@@ -16,6 +22,14 @@ pub browser::Action::Read::reference: alloc::string::String
 pub browser::Action::Type
 pub browser::Action::Type::reference: alloc::string::String
 pub browser::Action::Type::text: alloc::string::String
+pub browser::Box2::height: u32
+pub browser::Box2::width: u32
+pub browser::Box2::x: u32
+pub browser::Box2::y: u32
+pub browser::Clip::height: u32
+pub browser::Clip::width: u32
+pub browser::Clip::x: u32
+pub browser::Clip::y: u32
 pub browser::Node::name: alloc::string::String
 pub browser::Node::reference: alloc::string::String
 pub browser::Node::role: alloc::string::String
@@ -41,6 +55,20 @@ pub browser::Step::LookAgain
 pub browser::Step::LookAgain::looks: u32
 pub browser::Step::Settled
 pub browser::Step::Settled::looks: u32
+pub browser::Verb::Act
+pub browser::Verb::Act::action: browser::Action
+pub browser::Verb::Act::generation: u64
+pub browser::Verb::Close
+pub browser::Verb::Console
+pub browser::Verb::Measure
+pub browser::Verb::Measure::references: alloc::vec::Vec<alloc::string::String>
+pub browser::Verb::Open
+pub browser::Verb::Open::url: alloc::string::String
+pub browser::Verb::Screenshot(browser::ShotRequest)
+pub browser::Verb::Snapshot
+pub browser::Verb::Viewport
+pub browser::Verb::Viewport::height: u32
+pub browser::Verb::Viewport::width: u32
 pub const browser::LOOKS_MAX: u32
 pub const browser::PROFILES_DIR: &str
 pub const browser::QUIET_LOOKS: u32
@@ -48,13 +76,17 @@ pub enum browser::Action
 pub enum browser::Profile
 pub enum browser::Reply
 pub enum browser::Step
+pub enum browser::Verb
 pub fn browser::Action::reference(&self) -> &str
+pub fn browser::Box2::covers(&self, u32, u32) -> bool
 pub fn browser::BrowserPort::send(&mut self, &browser::Frame) -> core::result::Result<browser::Reply, kernel::error::shape::AxError>
 pub fn browser::ContextId::as_str(&self) -> &str
 pub fn browser::ContextId::parse(&str) -> core::result::Result<browser::ContextId, kernel::error::shape::AxError>
 pub fn browser::DevLoop::looks(&self) -> u32
 pub fn browser::DevLoop::new() -> browser::DevLoop
 pub fn browser::DevLoop::observe(&mut self, &browser::Observation) -> core::result::Result<browser::Step, kernel::error::shape::AxError>
+pub fn browser::Difference::boxes(&self) -> &[browser::Box2]
+pub fn browser::Difference::changed_q4(&self) -> u32
 pub fn browser::Frame::id(&self) -> u64
 pub fn browser::Frame::method(&self) -> &str
 pub fn browser::Frame::new(u64, &str, serde_json::value::Value) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
@@ -78,14 +110,31 @@ pub fn browser::Reply::parse(&str) -> core::result::Result<browser::Reply, kerne
 pub fn browser::Session::begin(&mut self, browser::SessionRequest) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
 pub fn browser::Session::end(&mut self) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
 pub fn browser::Session::evaluate(&mut self, &browser::ContextId, &str) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
+pub fn browser::Session::frame(&mut self, &str, serde_json::value::Value) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
 pub fn browser::Session::navigate(&mut self, &browser::ContextId, &str) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
 pub fn browser::Session::new() -> browser::Session
 pub fn browser::Session::read_tree(&serde_json::value::Value) -> core::result::Result<alloc::vec::Vec<browser::ContextId>, kernel::error::shape::AxError>
 pub fn browser::Session::tree(&mut self) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
+pub fn browser::Shot::bytes(&self) -> &[u8]
+pub fn browser::Shot::height(&self) -> u32
+pub fn browser::Shot::media(&self) -> kernel::model::image::ImageType
+pub fn browser::Shot::read(&serde_json::value::Value, kernel::model::image::ImageType) -> core::result::Result<browser::Shot, kernel::error::shape::AxError>
+pub fn browser::Shot::width(&self) -> u32
+pub fn browser::ShotRequest::default() -> browser::ShotRequest
+pub fn browser::ShotRequest::format(&self) -> kernel::model::image::ImageType
+pub fn browser::ShotRequest::read(&kernel::event::payload::Payload) -> core::result::Result<browser::ShotRequest, kernel::error::shape::AxError>
+pub fn browser::Verb::frames(&self, &mut browser::Session, &browser::ContextId, core::option::Option<&browser::PageSnapshot>) -> core::result::Result<alloc::vec::Vec<browser::Frame>, kernel::error::shape::AxError>
+pub fn browser::Verb::read(&kernel::event::payload::Payload) -> core::result::Result<browser::Verb, kernel::error::shape::AxError>
+pub fn browser::complained(&serde_json::value::Value) -> bool
+pub fn browser::diff(&browser::Shot, &browser::Shot) -> core::result::Result<browser::Difference, kernel::error::shape::AxError>
 pub fn browser::frame_for(&mut browser::Session, &browser::ContextId, &browser::PageSnapshot, u64, &browser::Action) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
+pub fn browser::read_json(&serde_json::value::Value) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
 pub mod browser
+pub struct browser::Box2
+pub struct browser::Clip
 pub struct browser::ContextId(_)
 pub struct browser::DevLoop
+pub struct browser::Difference
 pub struct browser::Frame
 pub struct browser::Node
 pub struct browser::Observation
@@ -93,4 +142,6 @@ pub struct browser::PageSnapshot
 pub struct browser::Recording
 pub struct browser::Session
 pub struct browser::SessionRequest
+pub struct browser::Shot
+pub struct browser::ShotRequest
 pub trait browser::BrowserPort

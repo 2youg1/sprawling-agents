@@ -237,6 +237,7 @@ impl Tool for McpTool {
         };
         Ok(ToolOutcome {
             result: Payload::new(map)?,
+            attachments: Vec::new(),
         })
     }
 }

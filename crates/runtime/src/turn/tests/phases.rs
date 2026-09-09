@@ -52,6 +52,7 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
             invoked += 1;
             Ok(ToolOutcome {
                 result: Payload::empty(),
+                attachments: Vec::new(),
             })
         })
         .unwrap(),

@@ -14,6 +14,7 @@ channels = { path = "../channels" }
 city = { path = "../city" }
 collab = { path = "../collab" }
 eval = { path = "../eval" }
+browser = { path = "../browser" }
 protocol = { path = "../protocol" }
 futures-util = { workspace = true }
 getrandom = { workspace = true }

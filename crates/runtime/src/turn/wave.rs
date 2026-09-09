@@ -42,8 +42,13 @@ impl Turn<ToolWave> {
             let mut result = Map::new();
             result.insert("tool_use_id".to_owned(), Value::String(call.id.clone()));
             result.insert("name".to_owned(), Value::String(call.name.to_string()));
+            let mut pictures = Vec::new();
             let (content, is_error) = match invoke(call) {
-                Ok(ToolOutcome { result: outcome }) => {
+                Ok(ToolOutcome {
+                    result: outcome,
+                    attachments,
+                }) => {
+                    pictures = attachments;
                     let value = serde_json::to_value(&outcome).map_err(|err| {
                         AxError::failure(AxCode::InvalidArgs, "encode tool result", err.to_string())
                     })?;
@@ -80,9 +85,10 @@ impl Turn<ToolWave> {
                 tool_use_id: call.id.clone(),
                 content,
                 is_error,
-                // Tools state their outcome in text today; a tool that
-                // produces a picture fills this in where it runs.
-                attachments: Vec::new(),
+                // What the tool produced, carried through unchanged: the
+                // bytes are already in the content store, so this is a
+                // reference and four integers whatever the picture is.
+                attachments: pictures,
             });
             let echo = ledger.append(self.draft(EventKind::ToolResult, payload(result)?))?;
             self.refs.push(echo);
