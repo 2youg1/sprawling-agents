@@ -3757,6 +3757,7 @@ dependencies = [
  "futures-util",
  "gateway",
  "getrandom 0.4.3",
+ "git2",
  "kernel",
  "memory",
  "protocol",

@@ -46,7 +46,7 @@ impl RunWorker {
             // What every commit this settlement makes is signed with.
             // Read once here rather than per effect: the city's genesis
             // line does not change while a settlement runs.
-            let of = site.provenance(&self.city_root, addr)?;
+            let of = site.provenance(self.city_hash()?, addr);
             let trees =
                 memory::Worktrees::open(&self.city_root).map_err(memory::MemoryError::into_ax)?;
             for effect in pr_effects {
@@ -139,16 +139,18 @@ impl RunWorker {
                                 data: Payload::new(data)?,
                             },
                         )?;
-                        // A person other than the author verified this,
-                        // which is what `PrEffect::Merged` means; the
-                        // name is taken from the repository's own git
-                        // config or left out entirely.
+                        // A second resident verified this, which is what
+                        // `PrEffect::Merged` means and what a review
+                        // building is for - not a person. A
+                        // `Reviewed-by:` trailer here would put the name
+                        // in this machine's git config on work that
+                        // person never read (sprawling-SPEC.md 8-49).
                         planned
                             .apply(&memory::Landing {
                                 t: now_ms()?,
                                 of: &of,
                                 subject: &format!("merge: {}", request.branch),
-                                reviewed_by_person: true,
+                                reviewed_by_person: false,
                             })
                             .map_err(memory::MemoryError::into_ax)?;
                         self.requests.retain(|held| held.branch != request.branch);

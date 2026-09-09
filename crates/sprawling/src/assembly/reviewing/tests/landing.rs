@@ -238,3 +238,101 @@ fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
     assert!(history.contains("worktree_opened"));
     assert!(history.contains("pr_merged"));
 }
+
+/// A commit trailer that claims a person reviewed the work is a false
+/// statement in permanent history. The verifier here is a second
+/// resident, which is what a review building means and is not a person,
+/// so the merge this city makes carries no `Reviewed-by:` line even on a
+/// machine whose git config names somebody.
+#[test]
+fn a_merge_no_person_looked_at_names_no_person_as_its_reviewer() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let building = dir.path().join("lab");
+    std::fs::create_dir_all(building.join("room1")).unwrap();
+    std::fs::create_dir_all(building.join("room2")).unwrap();
+    lay_rules(
+        dir.path(),
+        "lab",
+        "# BUILDING.md\n\n`confidential: false`\n\n`review: true`\n",
+    );
+
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "offering",
+                "tu_1",
+                "pr",
+                serde_json::json!({ "action": "open" }),
+            ),
+            completion("offered", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "offer the work".to_owned(),
+            goal: "one offer".to_owned(),
+            mode: channels::ModeTag::parse("plan").unwrap(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"offer"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+
+    // The city's repository exists once a run has committed in it, and a
+    // person's name in its config is what a reviewer trailer would be
+    // built out of if anything asked for one.
+    {
+        let repo = git2::Repository::open(dir.path()).unwrap();
+        let mut config = repo.config().unwrap();
+        config.set_str("user.name", "Ada Lovelace").unwrap();
+        config.set_str("user.email", "ada@example.org").unwrap();
+    }
+
+    let branch = branch_opened(&report.ledger_dir);
+    let (base_url, _second) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "checking",
+                "tu_2",
+                "pr",
+                serde_json::json!({ "action": "check", "branch": branch, "passed": true }),
+            ),
+            completion("checked", None),
+        ],
+    );
+    let mut checker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    checker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room2").unwrap(),
+            task: "check the work".to_owned(),
+            goal: "one check".to_owned(),
+            mode: channels::ModeTag::parse("plan").unwrap(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"check"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+
+    let repo = git2::Repository::open(dir.path()).unwrap();
+    let message = repo
+        .head()
+        .unwrap()
+        .peel_to_commit()
+        .unwrap()
+        .message()
+        .unwrap()
+        .to_owned();
+    assert!(
+        message.starts_with("merge: "),
+        "the trunk does not stand on the merge: {message}"
+    );
+    assert!(
+        !message.contains("Reviewed-by:"),
+        "nobody but a second resident looked, and the commit says a person did: {message}"
+    );
+}

@@ -35,6 +35,10 @@ flate2 = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true
+# Read-only, and tests only: a merge the city makes is judged by opening
+# the repository it landed in and reading the commit message, rather than
+# by trusting the value the caller passed.
+git2 = { version = "0.21", default-features = false }
 # The deterministic power-loss model, so a test above the ledger can lose
 # one named line and assert the city did not move. Kept to dev only: a
 # release build of this binary never carries FaultFs.
