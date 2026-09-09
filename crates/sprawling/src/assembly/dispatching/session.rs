@@ -86,7 +86,7 @@ impl RunWorker {
         let model_id = chosen.entry.id.clone();
         let mut adapter = gateway::adapter_for(
             &chosen,
-            self.redemption(),
+            self.redemption().ok()?,
             dialect_headers(chosen.endpoint.dialect),
         )
         .ok()?;

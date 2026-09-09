@@ -177,12 +177,28 @@ impl RunWorker {
     /// What an adapter redeems at the wire: the credential this city
     /// holds, and the pictures its content store holds.
     ///
-    /// The store is opened per picture rather than shared, because the
-    /// worker's own handle is needed elsewhere while a call is out and a
-    /// content-addressed read is a read of one immutable object.
-    pub(in crate::assembly) fn redemption(&self) -> gateway::Redemption {
+    /// The store is opened once here rather than once per picture: a
+    /// conversation carrying four pictures used to open four handles on
+    /// one immutable directory (sprawling-SPEC.md 8-50). The handle is
+    /// this adapter's own rather than the worker's, because the worker's
+    /// is needed elsewhere while a call is out.
+    ///
+    /// The mutex is for the type rather than for contention: the picture
+    /// face must be `Send + Sync`, and `memory::Cas` is only `Send`.
+    ///
+    /// # Errors
+    /// Refuses a city whose content store will not open. That refusal
+    /// arrives while the adapter is being built rather than half way
+    /// through a conversation.
+    pub(in crate::assembly) fn redemption(&self) -> Result<gateway::Redemption, AxError> {
         let cas_dir = self.city_root.join(".sprawling").join("cas");
-        gateway::Redemption::new(
+        let store = std::sync::Arc::new(std::sync::Mutex::new(
+            memory::Cas::open(&cas_dir).map_err(|err| {
+                AxError::failure(AxCode::InvalidArgs, "read a picture", err.to_string())
+                    .with_recovery("make the city's content store readable, then dispatch again")
+            })?,
+        ));
+        Ok(gateway::Redemption::new(
             self.resolver(),
             std::sync::Arc::new(move |at: &kernel::Locator| {
                 let kernel::Locator::Cas { hash, .. } = at else {
@@ -193,10 +209,17 @@ impl RunWorker {
                     )
                     .with_recovery("a picture is referred to by a `cas:` locator"));
                 };
-                let store = memory::Cas::open(&cas_dir).map_err(memory::MemoryError::into_ax)?;
-                store.get(hash).map_err(memory::MemoryError::into_ax)
+                let held = store.lock().map_err(|_| {
+                    AxError::failure(
+                        AxCode::InvalidArgs,
+                        "read a picture",
+                        "the content store handle was poisoned",
+                    )
+                    .with_recovery("restart the server; nothing in the store was changed")
+                })?;
+                held.get(hash).map_err(memory::MemoryError::into_ax)
             }),
-        )
+        ))
     }
 
     /// Points one tag at one model. The two token counts come from the

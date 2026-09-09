@@ -122,7 +122,7 @@ impl RunWorker {
         let model = chosen.entry.clone();
         let adapter = gateway::adapter_for(
             &chosen,
-            self.redemption(),
+            self.redemption()?,
             dialect_headers(chosen.endpoint.dialect),
         )?;
         Ok(Agreed {
