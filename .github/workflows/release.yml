@@ -29,7 +29,7 @@ jobs:
   verify:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: install pinned toolchain
@@ -52,7 +52,7 @@ jobs:
       # See ci.yml: the four trybuild suites are the whole of the test
       # phase, and they are cold rather than slow. Same cache, same key,
       # so a release reuses whatever the last push to main filled.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: target/tests
           key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'crates/*/tests/**') }}
@@ -100,7 +100,7 @@ jobs:
             target: x86_64-unknown-linux-musl
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
       - name: the client target
@@ -150,7 +150,7 @@ jobs:
         env:
           CC_x86_64_unknown_linux_musl: musl-gcc
         run: just package "${{ matrix.target }}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: archive-${{ matrix.os }}${{ matrix.target && format('-{0}', matrix.target) || '' }}
           path: target/package/*.zip
@@ -162,8 +162,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           path: assets
           merge-multiple: true
