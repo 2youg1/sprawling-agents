@@ -19,6 +19,12 @@
 //! would be standing outside, and outside is `adversary/`'s ground
 //! (`xtask boundary`).
 
+// The route this file drives exists only in a build with the listener.
+// Without it there is no router, no axum and no tokio, and a test file
+// that named them anyway turned `--no-default-features` red for the one
+// build that has no business carrying them (channels-SPEC.md section
+// 8-22).
+#![cfg(feature = "server")]
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

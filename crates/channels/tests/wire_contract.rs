@@ -16,19 +16,28 @@
     reason = "test code"
 )]
 
+#[cfg(feature = "server")]
 use std::net::SocketAddr;
 
+// The binding and handshake decisions belong to the listener, so this
+// file asserts them only in a build that has one.
+#[cfg(feature = "server")]
 use channels::{BindFace, BindVerdict, HandshakeVerdict, decide_bind, decide_handshake};
 use channels::{
-    COMMAND_NAMES, Command, Hello, ModeTag, ProviderName, QUERY_NAMES, Query, WIRE_V, Welcome,
-    schema_hash,
+    COMMAND_NAMES, Command, ModeTag, ProviderName, QUERY_NAMES, Query, WIRE_V, schema_hash,
 };
-use kernel::{Address, AxCode, Sealed, Seq};
+#[cfg(feature = "server")]
+use channels::{Hello, Welcome};
+#[cfg(feature = "server")]
+use kernel::AxCode;
+use kernel::{Address, Sealed, Seq};
 
+#[cfg(feature = "server")]
 fn loopback() -> SocketAddr {
     "127.0.0.1:8787".parse().unwrap()
 }
 
+#[cfg(feature = "server")]
 fn exposed() -> SocketAddr {
     "192.168.1.20:8787".parse().unwrap()
 }
@@ -40,7 +49,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     // Twenty-four commands, seventeen queries. The count is not a style
     // choice - it is the wire's closed surface.
     assert_eq!(COMMAND_NAMES.len(), 24, "command table");
-    assert_eq!(QUERY_NAMES.len(), 17, "query table");
+    assert_eq!(QUERY_NAMES.len(), 20, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
@@ -50,7 +59,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 17, "query names are distinct");
+    assert_eq!(sorted.len(), 20, "query names are distinct");
 }
 
 #[test]
@@ -80,17 +89,18 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 15,
+        WIRE_V, 16,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
 
 /// Pinned on the first green of S4.02. It is a function of WIRE_V and the two
 /// name tables, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "2d8b7dc2e8f9b35503a1d26c0d3323ff88674bb087fa1ba95e4815a868213880";
+const WIRE_SCHEMA_GOLDEN: &str = "f436b34b0830017bf0f6a9baa4bd4439edc5a9eb293731a66c0cfd1ca10b91a1";
 
 // -------------------------------------------------------------- binding face
 
+#[cfg(feature = "server")]
 #[test]
 fn the_binding_face_has_exactly_one_refusing_cell() {
     // Constitution 8.3: loopback by default; exposed requires a pairing token;
@@ -120,6 +130,7 @@ fn the_binding_face_has_exactly_one_refusing_cell() {
 
 // ------------------------------------------------------------------ handshake
 
+#[cfg(feature = "server")]
 #[test]
 fn a_mismatched_schema_hash_is_rejected_before_anything_else() {
     let good = Hello {
@@ -149,6 +160,7 @@ fn a_mismatched_schema_hash_is_rejected_before_anything_else() {
     assert_eq!(*err.code(), AxCode::WireMismatch);
 }
 
+#[cfg(feature = "server")]
 #[test]
 fn an_exposed_server_rejects_a_wrong_token_and_accepts_the_right_one() {
     let expected = Welcome {
