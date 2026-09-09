@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 14 as const;
+export const WIRE_V = 17 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "730e9d0b5a9042bf710195a065ac0b08da0e460cd8948a1b4ff5d3481b4b8204" as const;
+export const WIRE_HASH = "3381773cb0188f201566fbe95c7fd9e66c28d351e6ecfbc1c0cd729f66690a65" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -40,6 +40,7 @@ export const ApprovalClass = Schema.Union(
   Schema.Literal("commitment", "budget_limit", "discard_escalate", "agent_question"),
   Schema.Literal("governance"),
   Schema.Literal("delegation"),
+  Schema.Literal("undoable"),
 ).annotations({ identifier: "ApprovalClass" });
 export type ApprovalClass = typeof ApprovalClass.Type;
 
@@ -480,6 +481,7 @@ export const EventKind = Schema.Union(
   Schema.Literal("roadmap_blocked"),
   Schema.Literal("pursuit_changed"),
   Schema.Literal("endpoint_probed"),
+  Schema.Literal("governed_document_written"),
 ).annotations({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 
@@ -502,10 +504,12 @@ export type Seq = typeof Seq.Type;
  * which is why it carries the position rather than the whole history.
  */
 export const RunSummary = Schema.Struct({
+  addr: Schema.optional(Schema.NullOr(Address)),
   frozen: Schema.Boolean,
   last_kind: EventKind,
   last_seq: Seq,
   run: RunId,
+  started: Schema.optional(Schema.NullOr(TimeMs)),
   who: Schema.String,
 }).annotations({ identifier: "RunSummary" });
 export type RunSummary = typeof RunSummary.Type;
@@ -514,6 +518,7 @@ export const CityAnswer = Schema.Struct({
   active: Schema.Int,
   buildings: Schema.Array(BuildingProgress),
   frozen: Schema.Int,
+  halted: Schema.Array(Schema.String),
   pursuits: Schema.Array(PursuitLine),
   runs: Schema.Array(RunSummary),
 }).annotations({ identifier: "CityAnswer" });
@@ -559,6 +564,7 @@ export type SessionName = typeof SessionName.Type;
 export const CommitAnswer = Schema.Struct({
   actor: Address,
   effort: Schema.optional(Schema.NullOr(Effort)),
+  lineage: Schema.Array(RunId),
   model: Schema.String,
   oid: GitOid,
   run: RunId,
@@ -582,6 +588,16 @@ export const CostAnswer = Schema.Struct({
   total: UsdMicros,
 }).annotations({ identifier: "CostAnswer" });
 export type CostAnswer = typeof CostAnswer.Type;
+
+/**
+ * What one plan node cost, and which runs spent it.
+ */
+export const CostOfAnswer = Schema.Struct({
+  node: NodeId,
+  runs: Schema.Array(Schema.Tuple(RunId, UsdMicros)),
+  spent: UsdMicros,
+}).annotations({ identifier: "CostOfAnswer" });
+export type CostOfAnswer = typeof CostOfAnswer.Type;
 
 /**
  * Tracked rides git (`file:`), Interred rides CAS (`cas:`), Rebuildable
@@ -621,6 +637,18 @@ export const DiscardAnswer = Schema.Struct({
   rows: Schema.Array(DiscardLine),
 }).annotations({ identifier: "DiscardAnswer" });
 export type DiscardAnswer = typeof DiscardAnswer.Type;
+
+/**
+ * One file's head, and what was left out.
+ */
+export const DocumentAnswer = Schema.Struct({
+  at: Address,
+  binary: Schema.Boolean,
+  bytes: Schema.Int,
+  text: Schema.String,
+  truncated: Schema.Boolean,
+}).annotations({ identifier: "DocumentAnswer" });
+export type DocumentAnswer = typeof DocumentAnswer.Type;
 
 /**
  * What a chosen model is for. Exhaustive rather than a free label: a
@@ -680,6 +708,98 @@ export const EndpointsAnswer = Schema.Struct({
 export type EndpointsAnswer = typeof EndpointsAnswer.Type;
 
 /**
+ * Which kind of evidence one row is.
+ * 
+ * Exhaustive and small: a row exists because the Ledger holds a
+ * locator, and there are two records that write one.
+ */
+export const EvidenceKind = Schema.Union(
+  Schema.Literal("screenshot"),
+  Schema.Literal("finished"),
+).annotations({ identifier: "EvidenceKind" });
+export type EvidenceKind = typeof EvidenceKind.Type;
+
+/**
+ * The two sides and the media type of a picture, as the record wrote
+ * them. Absent on a row whose record named a locator and no size,
+ * which is a row worth showing and not a size worth inventing.
+ */
+export const Picture = Schema.Struct({
+  height: Schema.Int,
+  media_type: Schema.String,
+  width: Schema.Int,
+}).annotations({ identifier: "Picture" });
+export type Picture = typeof Picture.Type;
+
+/**
+ * One thing a run wrote down that can be looked at again.
+ */
+export const EvidenceItem = Schema.Struct({
+  at: Seq,
+  kind: EvidenceKind,
+  locator: Locator,
+  picture: Schema.optional(Schema.NullOr(Picture)),
+}).annotations({ identifier: "EvidenceItem" });
+export type EvidenceItem = typeof EvidenceItem.Type;
+
+/**
+ * Everything one run left as evidence, oldest first.
+ */
+export const EvidenceAnswer = Schema.Struct({
+  items: Schema.Array(EvidenceItem),
+  run: RunId,
+}).annotations({ identifier: "EvidenceAnswer" });
+export type EvidenceAnswer = typeof EvidenceAnswer.Type;
+
+/**
+ * Non-empty resident identity; the `role@building.n` grammar tightens
+ * with city::resident (P1).
+ */
+export const ResidentId = Schema.String.pipe(Schema.brand("ResidentId"));
+export type ResidentId = typeof ResidentId.Type;
+
+/**
+ * Who answers the Approval Inbox (9.2). Never touches gate decisions —
+ * C15's byte-identical gate sequences are citysim's to assert (P2).
+ */
+export const Autonomy = Schema.Union(
+  Schema.Literal("owner", "deferred"),
+  Schema.Struct({
+    delegate: ResidentId,
+  }),
+).annotations({ identifier: "Autonomy" });
+export type Autonomy = typeof Autonomy.Type;
+
+export const PolicyVerdict = Schema.Literal("allow", "deny").annotations({ identifier: "PolicyVerdict" });
+export type PolicyVerdict = typeof PolicyVerdict.Type;
+
+/**
+ * One approval, as it was answered.
+ */
+export const Decision = Schema.Struct({
+  at: TimeMs,
+  cluster: ClusterKey,
+  item: Schema.String,
+  verdict: PolicyVerdict,
+}).annotations({ identifier: "Decision" });
+export type Decision = typeof Decision.Type;
+
+/**
+ * Who answers for this city, and what was answered on the person's
+ * behalf.
+ * 
+ * One shape for both halves: a list of decisions with nobody named
+ * beside it does not say whether the person delegated them, and a
+ * delegation with nothing under it does not say whether it was ever
+ * used.
+ */
+export const GovernanceAnswer = Schema.Struct({
+  autonomy: Autonomy,
+  decided: Schema.Array(Decision),
+}).annotations({ identifier: "GovernanceAnswer" });
+export type GovernanceAnswer = typeof GovernanceAnswer.Type;
+
+/**
  * A BLAKE3 digest: exactly 64 lowercase hex digits.
  */
 export const B3Hash = Schema.String.pipe(Schema.brand("B3Hash"));
@@ -726,6 +846,42 @@ export const HistoryAnswer = Schema.Struct({
 }).annotations({ identifier: "HistoryAnswer" });
 export type HistoryAnswer = typeof HistoryAnswer.Type;
 
+/**
+ * One line of patch text, numbered from the top of the patch so a
+ * withheld line and the lines around it read as one list.
+ */
+export const PatchLine = Schema.Struct({
+  number: Schema.Int,
+  text: Schema.String,
+}).annotations({ identifier: "PatchLine" });
+export type PatchLine = typeof PatchLine.Type;
+
+/**
+ * One line that was not echoed, and what matched it.
+ */
+export const Withheld = Schema.Struct({
+  number: Schema.Int,
+  reason: Schema.String,
+}).annotations({ identifier: "Withheld" });
+export type Withheld = typeof Withheld.Type;
+
+/**
+ * One file's patch text between two checkpoints, and what could not be
+ * shown.
+ * 
+ * Both ends travel back with the answer because they are what makes it
+ * cacheable: two commit ids never change, so whoever asked may keep
+ * this for as long as they like.
+ */
+export const HunksAnswer = Schema.Struct({
+  lines: Schema.Array(PatchLine),
+  oid_a: GitOid,
+  oid_b: GitOid,
+  path: Schema.String,
+  withheld: Schema.Array(Withheld),
+}).annotations({ identifier: "HunksAnswer" });
+export type HunksAnswer = typeof HunksAnswer.Type;
+
 export const SignalLine = Schema.Struct({
   at: TimeMs,
   from: Schema.String,
@@ -747,6 +903,41 @@ export const InboxAnswer = Schema.Struct({
   waiting: Schema.Array(SignalLine),
 }).annotations({ identifier: "InboxAnswer" });
 export type InboxAnswer = typeof InboxAnswer.Type;
+
+/**
+ * What one entry is. A directory has no size worth stating: the size
+ * of a directory is a question about everything under it, and this
+ * answer deliberately does not walk that far.
+ */
+export const EntryKind = Schema.Union(
+  Schema.Literal("directory"),
+  Schema.Struct({
+    file: Schema.Struct({
+      bytes: Schema.Int,
+    }),
+  }),
+).annotations({ identifier: "EntryKind" });
+export type EntryKind = typeof EntryKind.Type;
+
+/**
+ * One name inside a directory.
+ */
+export const Entry = Schema.Struct({
+  kind: EntryKind,
+  name: Schema.String,
+}).annotations({ identifier: "Entry" });
+export type Entry = typeof Entry.Type;
+
+/**
+ * One directory, one level deep: directories first, then files, each
+ * group in name order, so a tree drawn from it reads the same way on
+ * every machine.
+ */
+export const ListingAnswer = Schema.Struct({
+  at: Schema.optional(Schema.NullOr(Address)),
+  entries: Schema.Array(Entry),
+}).annotations({ identifier: "ListingAnswer" });
+export type ListingAnswer = typeof ListingAnswer.Type;
 
 /**
  * The city's vital signs: the counts a page would otherwise assemble
@@ -783,6 +974,193 @@ export const RegistryAnswer = Schema.Struct({
   assets: Schema.Array(RegistryLine),
 }).annotations({ identifier: "RegistryAnswer" });
 export type RegistryAnswer = typeof RegistryAnswer.Type;
+
+/**
+ * How a session ended, in the word the run froze with: `done`,
+ * `limit` or `cancelled`.
+ */
+export const Closing = Schema.Struct({
+  at: TimeMs,
+  completion: Schema.String,
+}).annotations({ identifier: "Closing" });
+export type Closing = typeof Closing.Type;
+
+/**
+ * How a session began: what the person asked for, in their words.
+ * 
+ * The rounds start at the first `model_called`, so without this the
+ * first thing said in a conversation - the task - is the one thing the
+ * answer never carried.
+ */
+export const Opening = Schema.Struct({
+  at: TimeMs,
+  goal: Schema.String,
+  task: Schema.String,
+}).annotations({ identifier: "Opening" });
+export type Opening = typeof Opening.Type;
+
+/**
+ * What a tool call has come to so far.
+ * 
+ * Three states rather than a `bool` and an `Option`: a call still
+ * running and a call that failed are different things to a person
+ * deciding whether to step in, and the pair could spell a fourth state
+ * that cannot happen.
+ */
+export const Outcome = Schema.Union(
+  Schema.Literal("waiting"),
+  Schema.Literal("answered"),
+  Schema.Literal("failed"),
+).annotations({ identifier: "Outcome" });
+export type Outcome = typeof Outcome.Type;
+
+/**
+ * What a tool said, bounded so a wave of output cannot become the page.
+ * 
+ * The cut is counted rather than hinted at: a reader who cannot see how
+ * much was withheld is being dumped on slowly. Bytes already too large
+ * were replaced by `runtime::offload` before they reached the Ledger,
+ * and that substitute carries its own line naming the `Locator`.
+ */
+export const Output = Schema.Struct({
+  cut: Schema.Int,
+  head: Schema.String,
+}).annotations({ identifier: "Output" });
+export type Output = typeof Output.Type;
+
+/**
+ * One tool call inside a turn.
+ */
+export const Call = Schema.Struct({
+  at: Seq,
+  outcome: Outcome,
+  output: Schema.optional(Schema.NullOr(Output)),
+  subject: Schema.optional(Schema.NullOr(Schema.String)),
+  tool: Schema.String,
+}).annotations({ identifier: "Call" });
+export type Call = typeof Call.Type;
+
+/**
+ * One of the closed set of error codes, as `AxCode::as_str` spells it.
+ */
+export const AxCode = Schema.Literal("E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN").annotations({ identifier: "AxCode" });
+export type AxCode = typeof AxCode.Type;
+
+/**
+ * The three mandatory parts of a gate refusal: rule | violation |
+ * compliant alternative (three-part refusal).
+ */
+export const GateRefusal = Schema.Struct({
+  alternative: Schema.String,
+  rule: Schema.String,
+  violation: Schema.String,
+}).annotations({ identifier: "GateRefusal" });
+export type GateRefusal = typeof GateRefusal.Type;
+
+/**
+ * The unified error shape: seven wire fields, serialized in declaration
+ * order (determinism rule 6). The model is the recovery subject: `nearby`
+ * and `recovery` must hold directly executable information, not apologies.
+ * 
+ * Everything but `code` sits behind one Box so the type stays cheap in
+ * every seam's return slot (`result_large_err`); serde flatten keeps the
+ * wire shape flat and the field order unchanged.
+ */
+export const AxError = Schema.Struct({
+  action: Schema.String,
+  code: AxCode,
+  gate: Schema.optional(Schema.NullOr(GateRefusal)),
+  nearby: Schema.Array(Schema.String),
+  recovery: Schema.String,
+  retriable: Schema.Boolean,
+  subject: Schema.String,
+}).annotations({ identifier: "AxError" });
+export type AxError = typeof AxError.Type;
+
+/**
+ * What a turn came to besides the calls it made.
+ * 
+ * **The criterion is closed on purpose**: an event earns a `Note` when
+ * it changed what this turn did, or what it is waiting on. Everything
+ * else stays in the event stream, which is the Ledger's shape rather
+ * than a reader's. Without that line this enum would grow to one arm
+ * per event kind and stop meaning anything.
+ */
+export const Note = Schema.Union(
+  Schema.Struct({
+    refused: Schema.Struct({
+      at: Seq,
+      error: AxError,
+    }),
+  }),
+  Schema.Struct({
+    fenced: Schema.Struct({
+      at: Seq,
+      oid: GitOid,
+    }),
+  }),
+  Schema.Struct({
+    waiting: Schema.Struct({
+      at: Seq,
+    }),
+  }),
+  Schema.Struct({
+    arrived: Schema.Struct({
+      at: Seq,
+      from: Schema.String,
+      said: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    discarded: Schema.Struct({
+      at: Seq,
+      count: Schema.Int,
+    }),
+  }),
+).annotations({ identifier: "Note" });
+export type Note = typeof Note.Type;
+
+/**
+ * What one turn cost in tokens.
+ * 
+ * Absolute counts and no ratio: the numerator is on the wire and the
+ * denominator - this model's context window - is not. A percentage with
+ * no denominator is the thing `UnplannedProgress` already refuses to
+ * spell, and it would be no more honest here.
+ */
+export const Used = Schema.Struct({
+  cached: Tokens,
+  input: Tokens,
+  output: Tokens,
+}).annotations({ identifier: "Used" });
+export type Used = typeof Used.Type;
+
+/**
+ * One turn: the model was asked, and this is what came of it.
+ */
+export const Turn = Schema.Struct({
+  calls: Schema.Array(Call),
+  notes: Schema.Array(Note),
+  number: Schema.Int,
+  opened: Seq,
+  said: Schema.optional(Schema.NullOr(Schema.String)),
+  spent: Schema.optional(Schema.NullOr(UsdMicros)),
+  stopped: Schema.optional(Schema.NullOr(Schema.String)),
+  used: Schema.optional(Schema.NullOr(Used)),
+}).annotations({ identifier: "Turn" });
+export type Turn = typeof Turn.Type;
+
+/**
+ * One session's rounds, oldest first.
+ */
+export const RoundsAnswer = Schema.Struct({
+  closing: Schema.optional(Schema.NullOr(Closing)),
+  opened_at: Schema.optional(Schema.NullOr(GitOid)),
+  opening: Schema.optional(Schema.NullOr(Opening)),
+  run: RunId,
+  turns: Schema.Array(Turn),
+}).annotations({ identifier: "RoundsAnswer" });
+export type RoundsAnswer = typeof RoundsAnswer.Type;
 
 /**
  * What a query returns. `Unavailable` is a real answer: a view this
@@ -837,6 +1215,27 @@ export const Answer = Schema.Union(
     metrics: MetricsAnswer,
   }),
   Schema.Struct({
+    governance: GovernanceAnswer,
+  }),
+  Schema.Struct({
+    hunks: HunksAnswer,
+  }),
+  Schema.Struct({
+    rounds: RoundsAnswer,
+  }),
+  Schema.Struct({
+    evidence: EvidenceAnswer,
+  }),
+  Schema.Struct({
+    cost_of: CostOfAnswer,
+  }),
+  Schema.Struct({
+    listing: ListingAnswer,
+  }),
+  Schema.Struct({
+    document: DocumentAnswer,
+  }),
+  Schema.Struct({
     unavailable: Schema.Struct({
       query: Schema.String,
     }),
@@ -845,66 +1244,21 @@ export const Answer = Schema.Union(
 export type Answer = typeof Answer.Type;
 
 /**
- * Non-empty resident identity; the `role@building.n` grammar tightens
- * with city::resident (P1).
- */
-export const ResidentId = Schema.String.pipe(Schema.brand("ResidentId"));
-export type ResidentId = typeof ResidentId.Type;
-
-/**
- * Who answers the Approval Inbox (9.2). Never touches gate decisions —
- * C15's byte-identical gate sequences are citysim's to assert (P2).
- */
-export const Autonomy = Schema.Union(
-  Schema.Literal("owner", "deferred"),
-  Schema.Struct({
-    delegate: ResidentId,
-  }),
-).annotations({ identifier: "Autonomy" });
-export type Autonomy = typeof Autonomy.Type;
-
-/**
- * One of the closed set of error codes, as `AxCode::as_str` spells it.
- */
-export const AxCode = Schema.Literal("E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN").annotations({ identifier: "AxCode" });
-export type AxCode = typeof AxCode.Type;
-
-/**
- * The three mandatory parts of a gate refusal: rule | violation |
- * compliant alternative (three-part refusal).
- */
-export const GateRefusal = Schema.Struct({
-  alternative: Schema.String,
-  rule: Schema.String,
-  violation: Schema.String,
-}).annotations({ identifier: "GateRefusal" });
-export type GateRefusal = typeof GateRefusal.Type;
-
-/**
- * The unified error shape: seven wire fields, serialized in declaration
- * order (determinism rule 6). The model is the recovery subject: `nearby`
- * and `recovery` must hold directly executable information, not apologies.
+ * Which of the three documents that govern a city a `PutDocument`
+ * frame carries.
  * 
- * Everything but `code` sits behind one Box so the type stays cheap in
- * every seam's return slot (`result_large_err`); serde flatten keeps the
- * wire shape flat and the field order unchanged.
+ * A closed set rather than a path, because where these files live is
+ * the city's answer and not the sender's: all three sit in the city's
+ * own reserved subtree, which no write domain reaches. A frame naming
+ * its own path would be a way to write anywhere inside the one place a
+ * resident may not edit.
  */
-export const AxError = Schema.Struct({
-  action: Schema.String,
-  code: AxCode,
-  gate: Schema.optional(Schema.NullOr(GateRefusal)),
-  nearby: Schema.Array(Schema.String),
-  recovery: Schema.String,
-  retriable: Schema.Boolean,
-  subject: Schema.String,
-}).annotations({ identifier: "AxError" });
-export type AxError = typeof AxError.Type;
-
-export const BudgetCap = Schema.Struct({
-  tokens: Tokens,
-  usd: UsdMicros,
-}).annotations({ identifier: "BudgetCap" });
-export type BudgetCap = typeof BudgetCap.Type;
+export const GovernedDocument = Schema.Union(
+  Schema.Literal("mayor"),
+  Schema.Literal("clerk"),
+  Schema.Literal("preferences"),
+).annotations({ identifier: "GovernedDocument" });
+export type GovernedDocument = typeof GovernedDocument.Type;
 
 /**
  * What a Halt, Release or Autonomy change applies to. Unlike modes and
@@ -953,9 +1307,6 @@ export type ModeTag = typeof ModeTag.Type;
 
 export const NoSecret = Schema.Never.annotations({ identifier: "NoSecret" });
 export type NoSecret = typeof NoSecret.Type;
-
-export const PolicyVerdict = Schema.Literal("allow", "deny").annotations({ identifier: "PolicyVerdict" });
-export type PolicyVerdict = typeof PolicyVerdict.Type;
 
 /**
  * A provider name in transit. Authority for the provider set is `gateway`.
@@ -1006,7 +1357,6 @@ export const Command = Schema.Union(
   Schema.Struct({
     dispatch: Schema.Struct({
       addr: Address,
-      budget: BudgetCap,
       effort: Schema.optional(Schema.NullOr(Effort)),
       goal: Schema.String,
       idem: IdemKey,
@@ -1169,6 +1519,13 @@ export const Command = Schema.Union(
     }),
   }),
   Schema.Struct({
+    put_document: Schema.Struct({
+      body: Schema.String,
+      idem: IdemKey,
+      which: GovernedDocument,
+    }),
+  }),
+  Schema.Struct({
     auth: Schema.Struct({
       token: Schema.String,
     }),
@@ -1213,6 +1570,13 @@ export const Query = Schema.Union(
     }),
   }),
   Schema.Struct({
+    hunks: Schema.Struct({
+      oid_a: GitOid,
+      oid_b: GitOid,
+      path: Schema.String,
+    }),
+  }),
+  Schema.Struct({
     commit: Schema.Struct({
       oid: GitOid,
     }),
@@ -1236,6 +1600,32 @@ export const Query = Schema.Union(
   Schema.Struct({
     building_view: Schema.Struct({
       addr: Address,
+    }),
+  }),
+  Schema.Literal("governance"),
+  Schema.Struct({
+    rounds: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    evidence: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    cost_of: Schema.Struct({
+      node: NodeId,
+    }),
+  }),
+  Schema.Struct({
+    listing: Schema.Struct({
+      at: Schema.optional(Schema.NullOr(Address)),
+    }),
+  }),
+  Schema.Struct({
+    document: Schema.Struct({
+      at: Address,
     }),
   }),
 ).annotations({ identifier: "Query" });

@@ -16,7 +16,7 @@ use super::name_of;
 /// These files grow for as long as a building works, and the interface
 /// reads them rather than edits them. A cut is stated on the answer, so
 /// a reader who needs the rest knows there is a rest.
-pub(super) const DOC_BYTES_MAX: usize = 64 * 1024;
+pub(crate) const DOC_BYTES_MAX: usize = 64 * 1024;
 
 /// One building, as the files in it say it is.
 ///

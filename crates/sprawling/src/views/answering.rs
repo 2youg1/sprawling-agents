@@ -156,6 +156,7 @@ impl Views {
                     frozen,
                     buildings: self.spine(),
                     pursuits: self.pursuit_lines(),
+                    halted: self.halted.iter().cloned().collect(),
                 })
             }
             channels::Query::RunView { run } => {
@@ -251,6 +252,18 @@ impl Views {
                 channels::Answer::Evidence(self.evidence_answer(*run))
             }
             channels::Query::CostOf { node } => channels::Answer::CostOf(self.cost_of_answer(node)),
+            // The tree itself, one level and one file at a time (card-6.4).
+            channels::Query::Listing { at } => {
+                channels::Answer::Listing(self.listing_answer(at.as_ref()))
+            }
+            channels::Query::Document { at } => match self.document_answer(at) {
+                Some(answer) => channels::Answer::Document(Box::new(answer)),
+                // A file this city does not hold, for the reason a building
+                // nobody raised is: "I could not look" is its own answer.
+                None => channels::Answer::Unavailable {
+                    query: format!("Document({})", at.as_str()),
+                },
+            },
             channels::Query::EndpointView => {
                 channels::Answer::Endpoints(endpoints_answer(&self.book))
             }

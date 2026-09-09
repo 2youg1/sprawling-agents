@@ -182,10 +182,10 @@ impl Governance {
 }
 
 /// The value of a halt record's `state` field when the scope is shut.
-pub(super) const HALTED: &str = "halted";
+pub(crate) const HALTED: &str = "halted";
 
 /// And when it is open again.
-pub(super) const RELEASED: &str = "released";
+pub(crate) const RELEASED: &str = "released";
 
 /// Everything a worker inherits from a history it did not write.
 pub(crate) struct Standing {

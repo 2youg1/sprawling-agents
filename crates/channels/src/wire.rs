@@ -53,7 +53,11 @@ use serde::{Deserialize, Serialize};
 /// 16: three readings a page used to compute for itself are questions
 ///    the server answers - a session's rounds, what a run left as
 ///    evidence, and what one plan node cost (card-6.5).
-pub const WIRE_V: u32 = 16;
+/// 17: the first client that only asks the wire found four gaps in it -
+///    a run's room and start, a session's opening and closing, the
+///    scopes a halt shut, and the two questions that walk the tree,
+///    `Listing` and `Document` (card-6.4).
+pub const WIRE_V: u32 = 17;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
@@ -229,6 +233,10 @@ mod tests {
             },
             Query::CostOf {
                 node: kernel::NodeId::parse("2.3").unwrap(),
+            },
+            Query::Listing { at: None },
+            Query::Document {
+                at: Address::parse("acme/Roadmap.md").unwrap(),
             },
         ];
         assert_eq!(queries.len(), QUERY_NAMES.len());

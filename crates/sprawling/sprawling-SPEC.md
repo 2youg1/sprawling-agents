@@ -2501,3 +2501,12 @@ card-2.3 让合并落成一个真正的合并提交后，`settle_requests` 给 `
 
 - **接口随之改形**：`workbench::standing::provenance` 与 `Site::provenance` 收 `city: B3Hash` 而不再收 `&Path`，于是「谁去读盘」这件事只剩 `RunWorker::city_hash` 一个答案，四个调用点都从它取。
 - **作证方式**：城的创世哈希被读过一次之后，把账本首段从盘上删掉，`city_hash` 仍答同一个值——记住了才可能如此。
+
+## 8-52 新客户端要问的四件事，服务端怎么答（card-6.4；`bin::views::listing`、`bin::views::document`、`views::rounds`、`views::holding`；channels-SPEC §8-23）
+
+- **`Views.halted: BTreeSet<String>`**，由 `city_halted` 折出：载荷 `state == "halted"` 加进去，`"released"` 拿出来——与 `assembly::folds::Governance` 读同一条记录、同一对常量（`HALTED`／`RELEASED`），但**不共用那张表**：那张表是工作线程的判定面，这张是答查询的读面，两者从同一条流各自折出，重建即相等（`views::tests`）。`CityAnswer.halted` 是它的 `Vec` 形。
+- **`summarize` 把 `RunHot.addr`／`started` 抄进 `RunSummary`**，不读账本。
+- **`rounds_answer` 多读两条记录**：窗口里第一条 `run_started` 成 `Opening { task, goal, at: record.t() }`，第一条 `run_frozen` 成 `Closing { completion, at }`；`turns()` 本身一字不动。
+- **`bin::views::listing`**（新文件）：`at` 为 `None` 读城根，否则读 `city_root/<at>`；`read_dir` 一层，目录在前、文件在后、各按名字 UTF-8 序；读不了的目录答空表而不是拒绝——同 `read_building` 的口径，一个读不了的目录在页面上是一个空目录。符号链接按 `metadata` 判：指向目录的算目录。文件大小 `u64`。
+- **`bin::views::document`**（新文件）：路径同上；`std::fs::read` 失败答 `Unavailable`（同 `BuildingView` 对没立过的楼的口径）；头 8 KiB 含 NUL 判 `binary`；否则取前 `DOC_BYTES_MAX` 字节 `from_utf8_lossy`，`truncated = len > DOC_BYTES_MAX`。**不经密钥扫描**：这是城内的文件给城的主人看，而 `Hunks` 的扫描针对的是把补丁文本挂上线的那条路——但 `.sprawling/CONFIG.toml` 里只有 `secret:` 引用，明文本来就不落盘（`xtask secret` 门保证），所以这里没有可泄露的东西。
+- **验收**：`views::listing::tests`——`init_city` 铺出的城根列出 `.sprawling` 与 `hall` 两个目录；`hall` 下列出 `Roadmap.md` 等文件且目录先于文件；不存在的路径答空表。`views::document::tests`——读 `hall/.sprawling/BUILDING.md` 得到原文、`truncated == false`；一份 NUL 开头的文件判 `binary` 且 `text` 为空；不存在的文件答 `Unavailable`。`views::rounds::tests`——三条记录的会话答出 `opening.task`；冻结后答出 `closing.completion == "done"`。`views::tests`——`city_halted` 后 `city_view.halted == ["city"]`，`released` 后为空。

@@ -334,6 +334,7 @@ fn endpoints_answer() -> channels::EndpointsAnswer {
 fn city_answer() -> channels::CityAnswer {
     channels::CityAnswer {
         pursuits: Vec::new(),
+        halted: Vec::new(),
         runs: Vec::new(),
         active: 0,
         frozen: 0,

@@ -262,6 +262,7 @@ mod tests {
     fn city(active: u64) -> Arrived {
         Arrived::Answer(Box::new(Answer::City(CityAnswer {
             pursuits: Vec::new(),
+            halted: Vec::new(),
             runs: Vec::new(),
             active,
             frozen: 0,

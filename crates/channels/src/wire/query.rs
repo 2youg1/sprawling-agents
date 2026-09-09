@@ -17,7 +17,7 @@ use kernel::{Address, GitOid, NodeId, RunId, Seq};
 use serde::{Deserialize, Serialize};
 
 /// The Query surface, in declaration order.
-pub const QUERY_NAMES: [&str; 20] = [
+pub const QUERY_NAMES: [&str; 22] = [
     "History",
     "RunHistory",
     "Changes",
@@ -38,6 +38,8 @@ pub const QUERY_NAMES: [&str; 20] = [
     "Rounds",
     "Evidence",
     "CostOf",
+    "Listing",
+    "Document",
 ];
 
 /// Queries read state. They are cacheable and free of side effects, so none
@@ -192,6 +194,24 @@ pub enum Query {
     CostOf {
         node: NodeId,
     },
+    /// One directory of the city, one level deep; `None` is the root.
+    ///
+    /// The tree is the product - a building is a directory and a room
+    /// is one inside it - and until this existed nothing on the wire
+    /// could open a room. One level per question, so looking at a room
+    /// never pays for the ledger segments beside it.
+    Listing {
+        at: Option<Address>,
+    },
+    /// One file of the city, bounded, with the cut stated.
+    ///
+    /// The path is an `Address`, so it cannot leave the city root; the
+    /// reserved subtree is readable here on purpose, because what
+    /// governs a building is part of what this view exists to show, and
+    /// this door answers the person and not a resident.
+    Document {
+        at: Address,
+    },
 }
 
 impl Query {
@@ -219,6 +239,8 @@ impl Query {
             Self::Rounds { .. } => "Rounds",
             Self::Evidence { .. } => "Evidence",
             Self::CostOf { .. } => "CostOf",
+            Self::Listing { .. } => "Listing",
+            Self::Document { .. } => "Document",
         }
     }
 }

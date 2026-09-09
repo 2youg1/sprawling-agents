@@ -22,16 +22,20 @@ use serde::{Deserialize, Serialize};
 
 mod building;
 mod cost_of;
+mod document;
 mod evidence;
 mod hunks;
+mod listing;
 mod rounds;
 
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
 pub use cost_of::CostOfAnswer;
+pub use document::DocumentAnswer;
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use hunks::{HunksAnswer, PatchLine, Withheld};
-pub use rounds::{Call, Note, Outcome, Output, RoundsAnswer, Turn, Used};
+pub use listing::{Entry, EntryKind, ListingAnswer};
+pub use rounds::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Turn, Used};
 
 /// A slice of the one history, oldest first.
 ///
@@ -113,6 +117,12 @@ pub struct RunSummary {
     pub frozen: bool,
     pub last_seq: Seq,
     pub last_kind: EventKind,
+    /// The room the run works in, from its `run_started` record. `who`
+    /// cannot say it: that is the author of the first record, which is
+    /// the city. Absent when the view saw no opening for this run.
+    pub addr: Option<Address>,
+    /// When the run began, from the same record.
+    pub started: Option<TimeMs>,
 }
 
 /// What the settings page reads back: what is attached, and what each
@@ -159,6 +169,11 @@ pub struct CityAnswer {
     pub buildings: Vec<BuildingProgress>,
     /// The standing goals this city is working towards, if any.
     pub pursuits: Vec<PursuitLine>,
+    /// The scopes shut by `halt` and not yet released, by the name the
+    /// halt record carries: `city`, or a building's or a workshop's
+    /// address. A page that has just opened has no other way to learn
+    /// that the city is stopped.
+    pub halted: Vec<String>,
 }
 
 /// What is waiting for a person, as the Ledger recorded it.
@@ -220,6 +235,8 @@ pub enum Answer {
     Rounds(Box<RoundsAnswer>),
     Evidence(EvidenceAnswer),
     CostOf(CostOfAnswer),
+    Listing(ListingAnswer),
+    Document(Box<DocumentAnswer>),
     Unavailable { query: String },
 }
 

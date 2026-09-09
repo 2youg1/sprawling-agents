@@ -197,9 +197,11 @@ pub memory::RecycleEntry::restoration: alloc::string::String
 pub memory::RecycleEntry::restored: bool
 pub memory::RecycleEntry::seq: kernel::event::identity::Seq
 pub memory::RecycleEntry::t: kernel::event::identity::TimeMs
+pub memory::RunHot::addr: core::option::Option<kernel::address::Address>
 pub memory::RunHot::last_kind: kernel::event::kind::EventKind
 pub memory::RunHot::last_seq: kernel::event::identity::Seq
 pub memory::RunHot::phase: memory::RunPhase
+pub memory::RunHot::started: core::option::Option<kernel::event::identity::TimeMs>
 pub memory::RunHot::who: alloc::string::String
 pub memory::RunPhase::Active
 pub memory::RunPhase::Frozen

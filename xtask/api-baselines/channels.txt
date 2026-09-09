@@ -32,12 +32,14 @@ pub channels::Answer::Commit(channels::CommitAnswer)
 pub channels::Answer::Cost(alloc::boxed::Box<channels::CostAnswer>)
 pub channels::Answer::CostOf(channels::CostOfAnswer)
 pub channels::Answer::Discards(channels::DiscardAnswer)
+pub channels::Answer::Document(alloc::boxed::Box<channels::DocumentAnswer>)
 pub channels::Answer::Endpoints(channels::EndpointsAnswer)
 pub channels::Answer::Evidence(channels::EvidenceAnswer)
 pub channels::Answer::Governance(channels::GovernanceAnswer)
 pub channels::Answer::History(alloc::boxed::Box<channels::HistoryAnswer>)
 pub channels::Answer::Hunks(alloc::boxed::Box<channels::HunksAnswer>)
 pub channels::Answer::Inbox(channels::InboxAnswer)
+pub channels::Answer::Listing(channels::ListingAnswer)
 pub channels::Answer::Metrics(alloc::boxed::Box<channels::MetricsAnswer>)
 pub channels::Answer::Registry(channels::RegistryAnswer)
 pub channels::Answer::Rounds(alloc::boxed::Box<channels::RoundsAnswer>)
@@ -100,6 +102,7 @@ pub channels::ChosenSummary::tag: kernel::model::wire::ModelTag
 pub channels::CityAnswer::active: u64
 pub channels::CityAnswer::buildings: alloc::vec::Vec<channels::BuildingProgress>
 pub channels::CityAnswer::frozen: u64
+pub channels::CityAnswer::halted: alloc::vec::Vec<alloc::string::String>
 pub channels::CityAnswer::pursuits: alloc::vec::Vec<channels::PursuitLine>
 pub channels::CityAnswer::runs: alloc::vec::Vec<channels::RunSummary>
 pub channels::ClientAssets::Disk(std::path::PathBuf)
@@ -107,6 +110,8 @@ pub channels::ClientAssets::Embedded(&'static [channels::EmbeddedFile])
 pub channels::ClientFrame::Command(alloc::boxed::Box<channels::WireCommand>)
 pub channels::ClientFrame::Hello(channels::Hello)
 pub channels::ClientFrame::Query(channels::Query)
+pub channels::Closing::at: kernel::event::identity::TimeMs
+pub channels::Closing::completion: alloc::string::String
 pub channels::Command::Approve
 pub channels::Command::Approve::idem: kernel::idem::IdemKey
 pub channels::Command::Approve::item: kernel::approval::ApprovalId
@@ -248,6 +253,11 @@ pub channels::DiscardLine::at: kernel::event::identity::TimeMs
 pub channels::DiscardLine::path: alloc::string::String
 pub channels::DiscardLine::restoration: core::option::Option<kernel::discard::request::Restoration>
 pub channels::DiscardLine::restored: bool
+pub channels::DocumentAnswer::at: kernel::address::Address
+pub channels::DocumentAnswer::binary: bool
+pub channels::DocumentAnswer::bytes: u64
+pub channels::DocumentAnswer::text: alloc::string::String
+pub channels::DocumentAnswer::truncated: bool
 pub channels::EmbeddedFile::gz: &'static [u8]
 pub channels::EmbeddedFile::path: &'static str
 pub channels::EndpointSummary::base_url: alloc::string::String
@@ -258,6 +268,11 @@ pub channels::EndpointSummary::models: alloc::vec::Vec<alloc::string::String>
 pub channels::EndpointSummary::name: alloc::string::String
 pub channels::EndpointsAnswer::chosen: alloc::vec::Vec<channels::ChosenSummary>
 pub channels::EndpointsAnswer::endpoints: alloc::vec::Vec<channels::EndpointSummary>
+pub channels::Entry::kind: channels::EntryKind
+pub channels::Entry::name: alloc::string::String
+pub channels::EntryKind::Directory
+pub channels::EntryKind::File
+pub channels::EntryKind::File::bytes: u64
 pub channels::EvidenceAnswer::items: alloc::vec::Vec<channels::EvidenceItem>
 pub channels::EvidenceAnswer::run: kernel::event::identity::RunId
 pub channels::EvidenceItem::at: kernel::event::identity::Seq
@@ -296,6 +311,8 @@ pub channels::Intervention::Release
 pub channels::Intervention::Rollback
 pub channels::Intervention::Steer
 pub channels::Intervention::Takeover
+pub channels::ListingAnswer::at: core::option::Option<kernel::address::Address>
+pub channels::ListingAnswer::entries: alloc::vec::Vec<channels::Entry>
 pub channels::LoginStep::Begin
 pub channels::LoginStep::Code
 pub channels::LoginStep::Code::code: alloc::string::String
@@ -321,6 +338,9 @@ pub channels::Note::Refused::at: kernel::event::identity::Seq
 pub channels::Note::Refused::error: kernel::error::shape::AxError
 pub channels::Note::Waiting
 pub channels::Note::Waiting::at: kernel::event::identity::Seq
+pub channels::Opening::at: kernel::event::identity::TimeMs
+pub channels::Opening::goal: alloc::string::String
+pub channels::Opening::task: alloc::string::String
 pub channels::Outcome::Answered
 pub channels::Outcome::Failed
 pub channels::Outcome::Waiting
@@ -363,6 +383,8 @@ pub channels::Query::CostOf
 pub channels::Query::CostOf::node: kernel::node_id::NodeId
 pub channels::Query::CostView
 pub channels::Query::DiscardView
+pub channels::Query::Document
+pub channels::Query::Document::at: kernel::address::Address
 pub channels::Query::EndpointView
 pub channels::Query::Evidence
 pub channels::Query::Evidence::run: kernel::event::identity::RunId
@@ -376,6 +398,8 @@ pub channels::Query::Hunks::oid_b: kernel::locator::GitOid
 pub channels::Query::Hunks::path: alloc::string::String
 pub channels::Query::InboxView
 pub channels::Query::InboxView::addr: kernel::address::Address
+pub channels::Query::Listing
+pub channels::Query::Listing::at: core::option::Option<kernel::address::Address>
 pub channels::Query::Metrics
 pub channels::Query::RegistryView
 pub channels::Query::Rounds
@@ -391,13 +415,17 @@ pub channels::RegistryLine::addr: kernel::address::Address
 pub channels::RegistryLine::at: kernel::event::identity::TimeMs
 pub channels::RegistryLine::kind: alloc::string::String
 pub channels::RegistryLine::subject: alloc::string::String
+pub channels::RoundsAnswer::closing: core::option::Option<channels::Closing>
 pub channels::RoundsAnswer::opened_at: core::option::Option<kernel::locator::GitOid>
+pub channels::RoundsAnswer::opening: core::option::Option<channels::Opening>
 pub channels::RoundsAnswer::run: kernel::event::identity::RunId
 pub channels::RoundsAnswer::turns: alloc::vec::Vec<channels::Turn>
+pub channels::RunSummary::addr: core::option::Option<kernel::address::Address>
 pub channels::RunSummary::frozen: bool
 pub channels::RunSummary::last_kind: kernel::event::kind::EventKind
 pub channels::RunSummary::last_seq: kernel::event::identity::Seq
 pub channels::RunSummary::run: kernel::event::identity::RunId
+pub channels::RunSummary::started: core::option::Option<kernel::event::identity::TimeMs>
 pub channels::RunSummary::who: alloc::string::String
 pub channels::ServeConfig::acp: channels::AcpSink
 pub channels::ServeConfig::addr: core::net::socket_addr::SocketAddr
@@ -452,7 +480,7 @@ pub channels::Withheld::reason: alloc::string::String
 pub const channels::COMMAND_NAMES: [&str; 24]
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
-pub const channels::QUERY_NAMES: [&str; 20]
+pub const channels::QUERY_NAMES: [&str; 22]
 pub const channels::WIRE_V: u32
 pub enum channels::Answer
 pub enum channels::AssetReply
@@ -463,6 +491,7 @@ pub enum channels::ClientFrame
 pub enum channels::Command<Secret>
 pub enum channels::ControlVerdict
 pub enum channels::Delivered
+pub enum channels::EntryKind
 pub enum channels::EvidenceKind
 pub enum channels::GovernedDocument
 pub enum channels::HaltScope
@@ -539,6 +568,7 @@ pub struct channels::ChangesAnswer
 pub struct channels::ChosenSummary
 pub struct channels::CityAnswer
 pub struct channels::CityLabel(_)
+pub struct channels::Closing
 pub struct channels::CommitAnswer
 pub struct channels::CostAnswer
 pub struct channels::CostOfAnswer
@@ -546,9 +576,11 @@ pub struct channels::Decision
 pub struct channels::Delta
 pub struct channels::DiscardAnswer
 pub struct channels::DiscardLine
+pub struct channels::DocumentAnswer
 pub struct channels::EmbeddedFile
 pub struct channels::EndpointSummary
 pub struct channels::EndpointsAnswer
+pub struct channels::Entry
 pub struct channels::EvidenceAnswer
 pub struct channels::EvidenceItem
 pub struct channels::Forwarded
@@ -557,8 +589,10 @@ pub struct channels::Hello
 pub struct channels::HistoryAnswer
 pub struct channels::HunksAnswer
 pub struct channels::InboxAnswer
+pub struct channels::ListingAnswer
 pub struct channels::MetricsAnswer
 pub struct channels::ModeTag(_)
+pub struct channels::Opening
 pub struct channels::Output
 pub struct channels::PairingToken(_)
 pub struct channels::PatchLine

@@ -117,6 +117,12 @@ pub(crate) struct Views {
     /// `BTreeMap` because this is a path a query is answered from.
     pub(super) claims:
         std::collections::BTreeMap<kernel::NodeId, std::collections::BTreeSet<kernel::RunId>>,
+    /// The scopes a halt shut and no release reopened, by the name the
+    /// record carries. Folded here as well as in the worker's own
+    /// governance, from the same record and the same two words: this is
+    /// the reading side, that is the judging side, and a rebuild makes
+    /// them equal.
+    pub(super) halted: std::collections::BTreeSet<String>,
 }
 
 impl Views {
@@ -144,6 +150,7 @@ impl Views {
             autonomy: kernel::consts_policy::AUTONOMY_DEFAULT,
             decided: Vec::new(),
             claims: std::collections::BTreeMap::new(),
+            halted: std::collections::BTreeSet::new(),
         }
     }
 
@@ -269,6 +276,20 @@ impl Views {
                         cluster,
                         at: record.t(),
                     });
+                }
+            }
+            EventKind::CityHalted => {
+                let data = record.data().as_map();
+                let scope = data.get("scope").and_then(serde_json::Value::as_str);
+                let state = data.get("state").and_then(serde_json::Value::as_str);
+                match (scope, state) {
+                    (Some(scope), Some(crate::assembly::HALTED)) => {
+                        self.halted.insert(scope.to_owned());
+                    }
+                    (Some(scope), Some(crate::assembly::RELEASED)) => {
+                        self.halted.remove(scope);
+                    }
+                    _ => {}
                 }
             }
             EventKind::AutonomyChanged => {

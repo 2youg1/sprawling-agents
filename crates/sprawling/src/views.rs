@@ -25,12 +25,16 @@
 pub(super) mod answering;
 pub(super) mod commits;
 pub(super) mod cost_of;
+pub(super) mod document;
 pub(super) mod evidence;
 #[cfg(test)]
 mod governance_tests;
 pub(super) mod holding;
 pub(super) mod lines;
+pub(super) mod listing;
 pub(super) mod rounds;
+#[cfg(test)]
+mod standing_tests;
 #[cfg(test)]
 mod tests;
 

@@ -14,7 +14,7 @@
 
 use std::collections::BTreeMap;
 
-use kernel::{EventKind, EventRecord, RunId, Seq};
+use kernel::{Address, EventKind, EventRecord, RunId, Seq, TimeMs};
 
 use crate::error::MemoryError;
 
@@ -34,6 +34,12 @@ pub struct RunHot {
     pub last_seq: Seq,
     pub last_kind: EventKind,
     pub who: String,
+    /// The room this run works in, as its `run_started` record named
+    /// it. `None` until that record is seen: a fence can land before
+    /// the opening, and a window may hold only a tail.
+    pub addr: Option<Address>,
+    /// When the run began, from the same record.
+    pub started: Option<TimeMs>,
 }
 
 #[derive(Default)]
@@ -71,6 +77,10 @@ impl HotView {
                 if kind == EventKind::RunFrozen {
                     hot.phase = RunPhase::Frozen;
                 }
+                if kind == EventKind::RunStarted {
+                    hot.addr = record.addr().cloned();
+                    hot.started = Some(record.t());
+                }
             }
             None => {
                 let phase = if kind == EventKind::RunFrozen {
@@ -78,6 +88,7 @@ impl HotView {
                 } else {
                     RunPhase::Active
                 };
+                let opened = kind == EventKind::RunStarted;
                 self.runs.insert(
                     run,
                     RunHot {
@@ -85,6 +96,8 @@ impl HotView {
                         last_seq: seq,
                         last_kind: kind,
                         who: record.who().to_owned(),
+                        addr: opened.then(|| record.addr().cloned()).flatten(),
+                        started: opened.then(|| record.t()),
                     },
                 );
             }
@@ -158,6 +171,60 @@ mod tests {
         assert_eq!(view.active_count(), 1);
         assert_eq!(view.frozen_count(), 1);
         assert_eq!(view.get(&one).unwrap().phase, RunPhase::Frozen);
+    }
+
+    /// A page asking `city_view` needs to know which room a run works
+    /// in and when it began, and `who` says neither: it is the author
+    /// of the first record, which is always the city. Both facts are on
+    /// the `run_started` record and nowhere else, so the fold takes
+    /// them there and leaves them alone afterwards.
+    #[test]
+    fn the_room_and_the_start_come_from_run_started_only() {
+        let mut view = HotView::new();
+        let run = RunId::from_bytes([4u8; 16]);
+        // A fence lands before the opening, and carries no address.
+        view.apply(&record(run, 0, EventKind::CheckpointCommitted))
+            .unwrap();
+        assert_eq!(view.get(&run).unwrap().addr, None);
+        assert_eq!(view.get(&run).unwrap().started, None);
+
+        let room = kernel::Address::parse("hall/mayor").unwrap();
+        let opened = EventDraft {
+            run,
+            t: TimeMs::new(1_700),
+            who: "city".to_owned(),
+            addr: Some(room.clone()),
+            kind: EventKind::RunStarted,
+            data: Payload::new(serde_json::Map::new()).unwrap(),
+            ig: false,
+        };
+        view.apply(&EventRecord::from_draft(
+            opened,
+            Seq::new(1),
+            B3Hash::digest(b""),
+        ))
+        .unwrap();
+        assert_eq!(view.get(&run).unwrap().addr, Some(room.clone()));
+        assert_eq!(view.get(&run).unwrap().started, Some(TimeMs::new(1_700)));
+
+        // Later records, with or without an address, do not move them.
+        let later = EventDraft {
+            run,
+            t: TimeMs::new(1_900),
+            who: "resident".to_owned(),
+            addr: Some(kernel::Address::parse("lab").unwrap()),
+            kind: EventKind::ToolCalled,
+            data: Payload::new(serde_json::Map::new()).unwrap(),
+            ig: false,
+        };
+        view.apply(&EventRecord::from_draft(
+            later,
+            Seq::new(2),
+            B3Hash::digest(b""),
+        ))
+        .unwrap();
+        assert_eq!(view.get(&run).unwrap().addr, Some(room));
+        assert_eq!(view.get(&run).unwrap().started, Some(TimeMs::new(1_700)));
     }
 
     #[test]

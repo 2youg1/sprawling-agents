@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 24 个 variant（card-5.4 增 `PutDocument`）、Query 恰 17 个（card-2.6 增 `Hunks`、card-5.4 增 `Governance`；计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**（card-6.5 起）：`f436b34b0830017bf0f6a9baa4bd4439edc5a9eb293731a66c0cfd1ca10b91a1`；**WIRE_V ＝ 16**（新增 `Query::Rounds`、`Query::Evidence` 与 `Query::CostOf`，查询名表 17→20，见 §8-21）。前值 `2d8b7dc2…`（card-11.7／5.4／2.6，WIRE_V 15：`Dispatch` 去 `budget`，新增 `Command::PutDocument`、`Query::Governance` 与 `Query::Hunks`，见 §8-18 至 §8-20）、`730e9d0b…`（card-2.4，WIRE_V 14：新增 `Query::Commit` 与 `Answer::Commit`，见 §8-17）、`f6fdc67b…`（V3.22，WIRE_V 13：新增 `Command::Standing`；`BuildingAnswer` 携计划树 `PlanRow`，`BuildingProgress` 携 `BlockedLine` 与就绪数，`CityAnswer` 携 `StandingLine`）、`4ac1b7b3…`（V3.13，WIRE_V 12：新增 `ServerFrame::Delta`）、`78fdb74d…`（ux-14，WIRE_V 11：新增 `Query::Changes`）、 `1de1a1ae…`（ux-13，WIRE_V 10：新增 `Query::RunHistory`）、`c7b41d50…`（P3.04，WIRE_V 9：新增 `Query::History`）、`0a600659…`（P3.02，WIRE_V 8：新增 `ConfigureBuilding`）、`4bb71c0b…`（P3.01，WIRE_V 7：新增 `ProbeEndpoint`，`AttachEndpoint` 长出 `admit`）、`c059c6e2…`（F2.16–P2.01，WIRE_V 6）、`d825e83a…`（F2.11–F2.15，WIRE_V 5）、 `aa57cb7e…`（F1.01–F2.10，WIRE_V 4）、 `941ede9f…`（R1.16–R1.18，WIRE_V 3）、`defe9a75…`（R1.14–R1.15，WIRE_V 2）、 `85705c03…`（R1.11–R1.13，WIRE_V 1）、`238f11b2…`（P1.11–R1.10）、`692b5f96…`（S4.02–P1.10）。
+  **当前 golden**（card-6.4 起）：`3381773cb0188f201566fbe95c7fd9e66c28d351e6ecfbc1c0cd729f66690a65`；**WIRE_V ＝ 17**（新增 `Query::Listing` 与 `Query::Document`，查询名表 20→22；`RunSummary`、`CityAnswer`、`RoundsAnswer` 各长出字段，见 §8-23）。前值 `f436b34b…`（card-6.5，WIRE_V 16：新增 `Query::Rounds`、`Query::Evidence` 与 `Query::CostOf`，查询名表 17→20，见 §8-21）、`2d8b7dc2…`（card-11.7／5.4／2.6，WIRE_V 15：`Dispatch` 去 `budget`，新增 `Command::PutDocument`、`Query::Governance` 与 `Query::Hunks`，见 §8-18 至 §8-20）、`730e9d0b…`（card-2.4，WIRE_V 14：新增 `Query::Commit` 与 `Answer::Commit`，见 §8-17）、`f6fdc67b…`（V3.22，WIRE_V 13：新增 `Command::Standing`；`BuildingAnswer` 携计划树 `PlanRow`，`BuildingProgress` 携 `BlockedLine` 与就绪数，`CityAnswer` 携 `StandingLine`）、`4ac1b7b3…`（V3.13，WIRE_V 12：新增 `ServerFrame::Delta`）、`78fdb74d…`（ux-14，WIRE_V 11：新增 `Query::Changes`）、 `1de1a1ae…`（ux-13，WIRE_V 10：新增 `Query::RunHistory`）、`c7b41d50…`（P3.04，WIRE_V 9：新增 `Query::History`）、`0a600659…`（P3.02，WIRE_V 8：新增 `ConfigureBuilding`）、`4bb71c0b…`（P3.01，WIRE_V 7：新增 `ProbeEndpoint`，`AttachEndpoint` 长出 `admit`）、`c059c6e2…`（F2.16–P2.01，WIRE_V 6）、`d825e83a…`（F2.11–F2.15，WIRE_V 5）、 `aa57cb7e…`（F1.01–F2.10，WIRE_V 4）、 `941ede9f…`（R1.16–R1.18，WIRE_V 3）、`defe9a75…`（R1.14–R1.15，WIRE_V 2）、 `85705c03…`（R1.11–R1.13，WIRE_V 1）、`238f11b2…`（P1.11–R1.10）、`692b5f96…`（S4.02–P1.10）。
   P1.11 增三帧：`AttachEndpoint`／`SelectModel` 两个 Command（十九），`EndpointView` 一个 Query（十）。`PutSecret` 仍无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **ux-13 增：`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -732,3 +732,40 @@ pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
 `cargo clippy -p channels --no-default-features --all-targets` 是红的：`tests/enrolment.rs` 整份都在驱动 `channels::router`，`tests/wire_contract.rs` 有三条断言在问 `decide_bind`／`decide_handshake`，而这三样连同 `axum`、`tokio` 都由 feature `server` 带进来。**这份构建正是给 `web` 用的那一份**——它需要本 crate 的词汇而不许把 TCP 栈拖进 WebAssembly；一个在这里名词都拼不出来的测试文件，把它自己的红判在了产品的一条真路径上。
 
 **按测试真正需要的东西设门，而不是把 feature 打开**：`tests/enrolment.rs` 首行 `#![cfg(feature = "server")]`（整份文件都是路由的事）；`tests/wire_contract.rs` 只给那三条断言与它们的两个辅助函数、以及 `Hello`／`Welcome`／`AxCode`／`SocketAddr` 这几个只被它们用到的名字加 `#[cfg(feature = "server")]`——命令表、查询表、schema 哈希与那两个不可拼写的形状**在两份构建里都被判**，因为它们在两份构建里都成立。
+
+### 8-23 新客户端第一次真正用这条线，线上缺的四件事（card-6.4；WIRE_V 16→17）
+
+```rust
+// RunSummary 多两个字段（memory::RunHot 从 run_started 记下，memory-SPEC §8-5）
+pub struct RunSummary { pub run: RunId, pub who: String, pub frozen: bool,
+                        pub last_seq: Seq, pub last_kind: EventKind,
+                        pub addr: Option<Address>, pub started: Option<TimeMs> }
+
+// CityAnswer 多一个字段：被 halt 的 scope 名（`city`、`<building>`、`<workshop>`），BTreeSet 序
+pub struct CityAnswer { ..., pub halted: Vec<String> }
+
+// RoundsAnswer 多开场与收场
+pub struct RoundsAnswer { pub run: RunId, pub turns: Vec<Turn>, pub opened_at: Option<GitOid>,
+                          pub opening: Option<Opening>, pub closing: Option<Closing> }
+pub struct Opening { pub task: String, pub goal: String, pub at: TimeMs }
+pub struct Closing { pub completion: String, pub at: TimeMs }
+
+// Query 第 21、22 条（声明序，QUERY_NAMES 同序追加）
+Listing  { at: Option<Address> },   // → Answer::Listing(ListingAnswer)；None 是城根
+Document { at: Address },           // → Answer::Document(Box<DocumentAnswer>)
+
+pub struct ListingAnswer { pub at: Option<Address>, pub entries: Vec<Entry> }
+pub struct Entry { pub name: String, pub kind: EntryKind }
+pub enum EntryKind { Directory, File { bytes: u64 } }          // 目录在前、文件在后，各按名字序
+pub struct DocumentAnswer { pub at: Address, pub text: String, pub bytes: u64,
+                            pub truncated: bool, pub binary: bool }
+```
+
+**这四件事都是同一个发现**：ARCHITECTURE §8 说「线就是全部 API」，而旧客户端从没把这句话当真——它在浏览器里折叠 `history` 的原始记录，所以从来没问过线「这次跑在哪个房间」。新客户端只问线不折历史，四处空白一次全露出来。
+
+- **`RunSummary.addr`／`started`**：`who` 是这次跑第一条记录的作者，恒为 `city`，不是房间。房间是 `run_started` 记录自己的 `addr`，热视图在那一条上记下它（memory-SPEC §8-5）。没有它，页面无法把 `city_view` 列出的 run 归到 `hall/mayor`，「与 Mayor 的对话」拼不出来。`Option`：热视图可能只看到没有开场的一段尾巴，看不到的事不猜。
+- **`CityAnswer.halted`**：`city_halted` 是记录，`halted_by` 是 `bin::assembly` 工作线程的判定，而页面刷新后两者都够不到——它只收此后的事件。答里带上被 halt 的 scope 名，一个刚打开的页面才知道城是不是停着的，而不是等下一次 dispatch 被拒才发现。名字与 `HaltScope` 的 `scope_name` 同拼法，页面按名字画。
+- **`RoundsAnswer.opening`／`closing`**：回合的折叠从第一条 `model_called` 开始，所以人说的第一句（`run_started.task`）与这次跑怎么结束的（`run_frozen.completion`）都不在答里；一段对话缺开头与结尾就不是对话。两个都是 `Option`，理由同 `addr`：`HISTORY_MAX` 那段窗口可能不含开场。
+- **`Listing`／`Document`**：这座城是一棵目录树，而目录树本身就是产品（glossary：「那个层级就是目录树——不是它的模型，是树本身」）；`building_view` 只回楼根的 `.md` 与房间名，房间里的 `URBANITE.md`／`JOB.md`／`Handoff.md`／`<run>.jsonl` 页面看不到，于是这个设计在界面上是不可见的。两条查询让页面能走完整棵树。**路径经 `Address` 文法把关**（非绝对、无 `..`、无 `\`、无 `:`），所以走不出城根；`.sprawling/` **允许读**——它正是要展示的那部分，且这条线只答本机（或持配对 token 的）人，与工具层对居民的拒绝不是一个门。`Document` 上限 64 KiB 与 `BuildingDoc` 同（`DOC_BYTES_MAX`），截断必说；头 8 KiB 里出现 NUL 字节判 `binary`，`text` 留空——把 redb 或 CAS 的字节当文本喷到页面上是撒谎。文件不存在答 `Unavailable { query: "Document(<at>)" }`，与 `BuildingView`（没人立过的楼）、`Changes`（本城没写过的 oid）同口径：「我读不了」是一个真答案，与空文件不同。
+- **`WIRE_V` 16→17，一次进位管四件事**：本波只有这一次进位，四件事同一提交同一哈希。
+- **被否**：（a）让客户端自己折 `history` 找 `run_started`——那是旧客户端的做法，也是这四处空白存在的原因；（b）`Document` 直接回任意大小——同 §8-20／§8-21 拒绝整批的理由；（c）`Listing` 排除 `.sprawling/`——排除了要展示的东西。

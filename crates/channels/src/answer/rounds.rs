@@ -15,7 +15,7 @@
 //! was `web::turn`, where nothing but the WebAssembly client could reach
 //! it.
 
-use kernel::{AxError, GitOid, RunId, Seq, Tokens, UsdMicros};
+use kernel::{AxError, GitOid, RunId, Seq, TimeMs, Tokens, UsdMicros};
 use serde::{Deserialize, Serialize};
 
 /// What a tool call has come to so far.
@@ -153,6 +153,28 @@ pub struct Turn {
     pub notes: Vec<Note>,
 }
 
+/// How a session began: what the person asked for, in their words.
+///
+/// The rounds start at the first `model_called`, so without this the
+/// first thing said in a conversation - the task - is the one thing the
+/// answer never carried.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Opening {
+    pub task: String,
+    pub goal: String,
+    pub at: TimeMs,
+}
+
+/// How a session ended, in the word the run froze with: `done`,
+/// `limit` or `cancelled`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Closing {
+    pub completion: String,
+    pub at: TimeMs,
+}
+
 /// One session's rounds, oldest first.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -164,4 +186,11 @@ pub struct RoundsAnswer {
     /// Measuring from the latest one would answer "what moved in the
     /// last wave", which is a different question.
     pub opened_at: Option<GitOid>,
+    /// Absent when the window this answer reads did not hold the
+    /// session's `run_started`; what the window does not hold is not
+    /// guessed.
+    pub opening: Option<Opening>,
+    /// Absent while the session is still going, or when the window did
+    /// not reach its `run_frozen`.
+    pub closing: Option<Closing>,
 }

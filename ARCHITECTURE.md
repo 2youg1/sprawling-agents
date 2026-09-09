@@ -669,7 +669,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | eval::ablation::capabilities | crates/eval/src/ablation/capabilities.rs | the corpus: each thing a resident must be able to do, and the phrase in the document that grants it | data | V3 | built | eval-SPEC.md#8-7 |
 | eval::ablation::tests | crates/eval/src/ablation/tests.rs | the graded fixtures, and the on-demand run against the real City.md | decision | V3 | built | eval-SPEC.md#8-7 |
 
-### channels (22) — the process boundary
+### channels (24) — the process boundary
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -683,6 +683,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::answer::rounds | crates/channels/src/answer/rounds.rs | one session read as the rounds a person reads: what was said, what it cost, what each call came to | value | F1 | built | channels-SPEC.md#8-21 |
 | channels::answer::evidence | crates/channels/src/answer/evidence.rs | what a run left as evidence: a screenshot's locator and the completion a plan node was closed with, never the bytes | value | F1 | built | channels-SPEC.md#8-21 |
 | channels::answer::cost_of | crates/channels/src/answer/cost_of.rs | what one plan node has cost, and the runs that spent it | value | F1 | built | channels-SPEC.md#8-21 |
+| channels::answer::listing | crates/channels/src/answer/listing.rs | one directory of the city, one level deep, as a page walks the tree | value | F5 | built | channels-SPEC.md#8-23 |
+| channels::answer::document | crates/channels/src/answer/document.rs | one file of the city, bounded, with the cut and the binary judgement stated | value | F5 | built | channels-SPEC.md#8-23 |
 | channels::answer::hunks | crates/channels/src/answer/hunks.rs | one file's patch text between two checkpoints, and the lines a credential scan would not echo | value | F1 | built | channels-SPEC.md#8-20 |
 | channels::reading | crates/channels/src/reading.rs | reading one ledger payload into the wire's own values, for the two ends that both need it | decision | F1 | built | channels-SPEC.md#8-21 |
 | channels::carried_name | crates/channels/src/carried_name.rs | names this crate does not own, validated at one construction point | value | V3 | built | channels-SPEC.md#8-1 |
@@ -809,7 +811,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | web::waiting | crates/web/src/waiting.rs | everything that cannot move until a person answers, in one place | decision | V3 | built | web-SPEC.md#8-64 |
 | web::record | crates/web/src/record.rs | one history, in three lenses, at one address | decision | V3 | built | web-SPEC.md#8-67 |
 
-### browser (12), protocol (5), bin (133)
+### browser (12), protocol (5), bin (136)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -960,6 +962,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::views::rounds::reading_tests | crates/sprawling/src/views/rounds/reading_tests.rs | what one payload is read as, through the production door | projection | F1 | built | sprawling-SPEC.md#8-50 |
 | bin::views::evidence | crates/sprawling/src/views/evidence.rs | what a run wrote down as evidence: screenshots and closed plan nodes, as locators | projection | F1 | built | sprawling-SPEC.md#8-50 |
 | bin::views::cost_of | crates/sprawling/src/views/cost_of.rs | which runs claimed one plan node, and what they were billed | projection | F1 | built | sprawling-SPEC.md#8-50 |
+| bin::views::listing | crates/sprawling/src/views/listing.rs | one directory of the city read at the moment of asking, directories before files | projection | F5 | built | sprawling-SPEC.md#8-52 |
+| bin::views::document | crates/sprawling/src/views/document.rs | one file of the city, cut to what travels, and whether it is text at all | projection | F5 | built | sprawling-SPEC.md#8-52 |
+| bin::views::standing_tests | crates/sprawling/src/views/standing_tests.rs | what a page that has just opened learns from one city view: rooms, starts, and the scopes a halt shut | projection | F5 | built | sprawling-SPEC.md#8-52 |
 | bin::views::lines | crates/sprawling/src/views/lines.rs | one record rendered as the lines a page reads | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::tests | crates/sprawling/src/views/tests.rs | five views answer from the record, not from unavailable | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::governance_tests | crates/sprawling/src/views/governance_tests.rs | who answers and what was answered for the person, and a patch of a commit this city never wrote | projection | V4 | built | sprawling-SPEC.md#8-37 |

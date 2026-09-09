@@ -257,3 +257,59 @@ fn asking_for_rounds_answers_the_fold_the_view_layer_ran() {
         Some("src/lex.rs")
     );
 }
+
+/// A conversation has a first line and a last line, and neither is a
+/// turn: the task the person gave, and the word the run froze with.
+#[test]
+fn the_rounds_carry_how_the_session_opened_and_closed() {
+    use kernel::Ledger;
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::assembly::init_city(dir.path()).unwrap();
+    let run = RunId::from_bytes([8u8; 16]);
+    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, TimeMs::new(9))
+        .unwrap()
+        .0;
+    let drafts = [
+        (
+            EventKind::RunStarted,
+            serde_json::json!({ "task": "plan the week", "goal": "a roadmap", "job": "j" }),
+            TimeMs::new(10),
+        ),
+        (
+            EventKind::ModelCalled,
+            serde_json::json!({}),
+            TimeMs::new(11),
+        ),
+        (
+            EventKind::RunFrozen,
+            serde_json::json!({ "completion": "done", "evidence": [] }),
+            TimeMs::new(12),
+        ),
+    ];
+    for (kind, data, t) in drafts {
+        ledger
+            .append(EventDraft {
+                run,
+                t,
+                who: "city".to_owned(),
+                addr: Some(kernel::Address::parse("hall/mayor").unwrap()),
+                kind,
+                data: Payload::new(data.as_object().unwrap().clone()).unwrap(),
+                ig: false,
+            })
+            .unwrap();
+    }
+    drop(ledger);
+
+    let mut views = crate::assembly::rebuild_views(&report.ledger_dir).unwrap();
+    let channels::Answer::Rounds(answer) = views.answer(&channels::Query::Rounds { run }) else {
+        panic!("Rounds answers with rounds");
+    };
+    let opening = answer.opening.expect("the window held run_started");
+    assert_eq!(opening.task, "plan the week");
+    assert_eq!(opening.goal, "a roadmap");
+    assert_eq!(opening.at, TimeMs::new(10));
+    let closing = answer.closing.expect("the window held run_frozen");
+    assert_eq!(closing.completion, "done");
+    assert_eq!(closing.at, TimeMs::new(12));
+}

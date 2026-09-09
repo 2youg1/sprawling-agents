@@ -62,6 +62,8 @@ impl Views {
         let turns = turns(records.iter());
         channels::RoundsAnswer {
             opened_at: opened_at(&turns),
+            opening: opening(&records),
+            closing: closing(&records),
             turns,
             run,
         }
@@ -82,6 +84,35 @@ fn opened_at(turns: &[channels::Turn]) -> Option<kernel::GitOid> {
         .find_map(|note| match *note {
             channels::Note::Fenced { oid, .. } => Some(oid),
             _ => None,
+        })
+}
+
+/// How the session opened, from the first `run_started` in the window.
+#[must_use]
+fn opening(records: &[EventRecord]) -> Option<channels::Opening> {
+    records
+        .iter()
+        .find(|record| record.kind() == EventKind::RunStarted)
+        .map(|record| {
+            let map = record.data().as_map();
+            channels::Opening {
+                task: channels::text(map.get("task")).unwrap_or_default(),
+                goal: channels::text(map.get("goal")).unwrap_or_default(),
+                at: record.t(),
+            }
+        })
+}
+
+/// How the session closed, from the first `run_frozen` in the window.
+#[must_use]
+fn closing(records: &[EventRecord]) -> Option<channels::Closing> {
+    records
+        .iter()
+        .find(|record| record.kind() == EventKind::RunFrozen)
+        .map(|record| channels::Closing {
+            completion: channels::text(record.data().as_map().get("completion"))
+                .unwrap_or_default(),
+            at: record.t(),
         })
 }
 

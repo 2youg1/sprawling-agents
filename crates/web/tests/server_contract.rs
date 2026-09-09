@@ -122,6 +122,7 @@ fn an_answer_reaches_the_view_that_asked_for_it() {
 
     let answer = ServerFrame::Answer(Box::new(Answer::City(CityAnswer {
         pursuits: Vec::new(),
+        halted: Vec::new(),
         runs: Vec::new(),
         active: 0,
         frozen: 1,

@@ -192,6 +192,8 @@ pub(crate) fn apply_frame(
             | channels::Answer::Hunks(_)
             | channels::Answer::Evidence(_)
             | channels::Answer::CostOf(_)
+            | channels::Answer::Listing(_)
+            | channels::Answer::Document(_)
             | channels::Answer::Unavailable { .. } => {}
         }
     }

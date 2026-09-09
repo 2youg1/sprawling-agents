@@ -263,7 +263,8 @@ impl LineReader<'_> {
 
 ```rust
 pub struct HotView { /* runs: BTreeMap<RunId, RunHot>、counts —— 私有 */ }
-pub struct RunHot { pub phase: RunPhase, pub last_seq: Seq, pub last_kind: EventKind, pub who: String }
+pub struct RunHot { pub phase: RunPhase, pub last_seq: Seq, pub last_kind: EventKind, pub who: String,
+                    pub addr: Option<Address>, pub started: Option<TimeMs> }   // card-6.4：房间与开始时刻
 #[non_exhaustive] pub enum RunPhase { Active, Frozen }
 impl HotView {
     pub fn new() -> HotView;
@@ -274,6 +275,7 @@ impl HotView {
 ```
 
 - 界面查询在此命中不读盘；run_started→Active，run_frozen→Frozen；其余事件只推进 last_seq/last_kind。S4 界面接线前唯一消费者＝citysim 与测试（台账登记）。
+- **`addr` 与 `started` 从 `run_started` 记下（card-6.4）**：`record.addr()` 是这次跑的房间，`record.t()` 是它开始的时刻；二者只在这一种记录上赋值，其余记录不动它们，所以一次跑的房间不会被后来的城市级记录改写。`Option`，因为热视图可能在 `run_started` 之前先看到同一次跑的 `checkpoint_committed`（栅栏先于开场落账），也可能只看到一段没有开场的尾巴——**看不到的事不猜**。理由：`RunSummary.who` 是首条记录的作者，恒为 `city`，所以此前没有任何查询能把一次跑归到 `hall/mayor` 这个房间，「与 Mayor 的对话」在线上拼不出来。
 - **城市级记录不进 run 表**（F2.04 抳出）：`RunId::CITY`（nil）标记的是属于城而不属于任何 Run 的记录——创世记录、`building_created`。旧实现把它们折进 run 表，于是 `active_count()` 在一座**从未派过活的城**里返回 1。这个缺陷是在界面上被看见的：城市页读服务端的这个数、写「1 run in flight」，而总览页折同一条流写「什么都没在跑」——**一个问题两个答案，而错的那个是服务端的**。
 
 ### 8-6 memory::projection（S3.05；形状 7；redb）

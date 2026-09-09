@@ -181,5 +181,7 @@ pub(crate) fn summarize(run: RunId, hot: &memory::RunHot) -> channels::RunSummar
         frozen: matches!(hot.phase, memory::RunPhase::Frozen),
         last_seq: hot.last_seq,
         last_kind: hot.last_kind,
+        addr: hot.addr.clone(),
+        started: hot.started,
     }
 }
