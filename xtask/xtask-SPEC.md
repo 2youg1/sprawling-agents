@@ -444,6 +444,10 @@ card-12.1 给发布矩阵加了 `x86_64-unknown-linux-musl` 一行，而 `budget
 
 **它上线第一跑就红了两条，而我没有把它们放过去（card-F3，待人裁）**：`caniuse-lite` 是 `CC-BY-4.0`，`minimatch` 是 `BlueOak-1.0.0`，两者都由 devDependencies 传递带进来，都到不了用户的浏览器。修法在因不在果——要么 `deny.toml` 的 `[licenses] allow` 各加一行并写明理由，要么换掉那两个包。**这一步我不做**：AGENTS.md 的 `guard` 行禁止在一道门变红的那一次改动里放宽这道门，而准许表是这个仓库对许可证的立场，立场归人。已有先例可循——`CDLA-Permissive-2.0` 当初正是为一份证书清单这种**数据**许可证入表的，而 `CC-BY-4.0` 覆盖的 `caniuse-lite` 同样是一张数据表。
 
+**裁决已下，两行已入表（deny.toml，独立提交）**：`BlueOak-1.0.0` 与 `CC-BY-4.0` 各加一行并写明理由。依据三条——两者都是 devDependencies，到不了用户的浏览器；`CDLA-Permissive-2.0` 为一份证书清单入表是同一形状的先例，`caniuse-lite` 同样是一张数据表，而 `just dist` 写出的物料清单正是 `CC-BY-4.0` 要求的署名落点；`BlueOak-1.0.0` 于 2022 年 3 月经 OSI 审议通过，宽松，且授予 MIT 未言明的专利权。放宽发生在门自己的提交（card-F3）**之后**的另一条提交里，属 AGENTS.md 准许的「在自己的提交里重新定价一条规则」，而非它禁止的「在门正卡着的那次改动里放宽它」。此裁可推翻：删掉那两行，红的就是本节下面那道门。
+
+**「换掉那两个包」这一条已被走查关闭（repair-F 复核）**：已装树上是 `minimatch 10.2.6` 与 `caniuse-lite 1.0.30001810`，两者各自的来路都无可替换处——`minimatch ^10` 由 `eslint 10.10.0` 自身、`@eslint/config-array 0.23.5` 与 `@typescript-eslint/typescript-estree 8.70.0` 三处同时要求（`10` 之前的 `minimatch` 是 `ISC`，但降版就是降掉 eslint 10）；`caniuse-lite` 由 `browserslist 4.28.9` 要求，而 `browserslist` 由 `@babel/helper-compilation-targets` 经 `vite-plugin-solid` 带进来，即 Solid 的编译链本身。**两条来路都落在冻结的前端工具链上**，换包等于换掉 eslint 与 Solid 的构建路径。于是留给人的只有一件事：`deny.toml` 的 `[licenses] allow` 加不加这两行。
+
 **本节属门禁机具，与产品代码分开提交。**
 
 ### 8-13 `ax`／`wording`／`render` 读画出来的 DOM：本卡未做，堵在哪里（card-F3）

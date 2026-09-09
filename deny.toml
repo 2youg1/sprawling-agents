@@ -18,6 +18,18 @@ allow = [
     # certificate bundle rustls-platform-verifier uses (reqwest's desktop
     # trust store). A data license for a list of public certificates.
     "CDLA-Permissive-2.0",
+    # BlueOak-1.0.0: minimatch, required at version ^10 by eslint itself,
+    # by @eslint/config-array and by @typescript-eslint/typescript-estree.
+    # OSI-approved in March 2022; permissive, and it grants patent rights
+    # that MIT leaves unsaid. A development dependency of the client's
+    # lint step, which reaches no user.
+    "BlueOak-1.0.0",
+    # CC-BY-4.0: caniuse-lite, the browser-support data table browserslist
+    # reads at build time, reached through @babel/helper-compilation-targets
+    # from vite-plugin-solid. Attribution for a data set, the same shape as
+    # CDLA-Permissive-2.0 above, and the bill of materials `just dist`
+    # writes is where that attribution lands.
+    "CC-BY-4.0",
 ]
 
 [bans]
