@@ -77,6 +77,45 @@ The cost page shows shares against the authoritative total rather than normalisi
 
 **3 is not a failure and not a success.** A refusal that takes longer than the window - a provider probe with a 15 second timeout behind it, for example - used to leave this command exiting 0, so an agent branching on the exit code read a refusal it never received as a success. Silence now has its own code, and 0 and 1 keep meaning exactly what they say.
 
+## A second city that watches the first
+
+A building whose `BUILDING.md` says `browser: true` gets the **browser** tool, so a resident can open a page, look at it, click something, and take a screenshot of what it did. The arrangement worth learning is two cities: the first does the work, and the second watches the first one's own WebUI. Every command below was run in this order.
+
+**Raise the two cities.** One port serves one city, so the second one gets 8788.
+
+```bash
+sprawling up ~/cities/first                         # 127.0.0.1:8787, and it opens the page
+sprawling serve ~/cities/watcher 127.0.0.1:8788     # in a second shell
+```
+
+**Give the watcher a building.** The frame comes first and the flags follow it; a frame that arrives after `--at` reads as a missing frame, and the command exits 2 without asking the city anything. The idempotency key is yours to choose, and it is what makes sending the same frame twice one effect rather than two.
+
+```bash
+sprawling call '{"command":{"create_building":{"addr":"watchtower","template":"minimal","idem":"idem1-00000000000000000000000000000001"}}}' --at 127.0.0.1:8788
+```
+
+**Let that building drive a browser.** The line goes in the building's own rules, which live where its own residents cannot write them:
+
+```bash
+echo 'browser: true' >> ~/cities/watcher/watchtower/.sprawling/BUILDING.md
+```
+
+The template already wrote `confidential: false` above it. The two settings are refused together — a browser opens whatever address it is given, so it is a way out of a building whose data does not leave — and a city that reads both says which line to change rather than choosing one of them.
+
+**Send it to look at the first city.**
+
+```bash
+sprawling call '{"command":{"dispatch":{"addr":"watchtower","session":"first-look","task":"open http://127.0.0.1:8787/, take a snapshot, press the button that starts work, screenshot what happened, and write what you saw into Memo.md","goal":"a screenshot of the first city with work running, and a paragraph about what the page does","mode":"build","idem":"idem1-00000000000000000000000000000002","effort":null}}}' --at 127.0.0.1:8788 --quiet-ms 60000
+```
+
+A city with no provider attached answers that in one frame — `E_CONFIG_INVALID`, "no model is chosen for this tag" — so attach one on the second city's settings page first. Otherwise the exit code is the answer, as it is for every `sprawling call` (the table above), and the second city's own live page at `http://127.0.0.1:8788/` shows the eight actions going out one at a time.
+
+**What the resident is holding.** The browser starts on the first action and stops when the run ends. Firefox is preferred because it speaks WebDriver BiDi itself and needs no driver; Chromium works when `chromedriver` is on the search path, and `sprawling doctor` says which of the two this machine has. The profile is `~/cities/watcher/.sprawling/browser-profiles/watchtower`, so a login the watchtower performs belongs to the watchtower and to no other building — and it sits in the reserved subtree, which no write domain reaches, so a run cannot edit its own stored credentials.
+
+**A screenshot is not a picture in a log.** Its bytes go into the content store, the tool result carries the `cas:` locator and the two sides in pixels, and the picture is attached to what the model reads — so the resident that took it can look at it on the next turn, and so can you, from the ledger row, afterwards.
+
+**Stopping.** `Ctrl-C` on either city stops that city and closes the browser it started. The two share nothing but a machine: two directories, two Ledgers, two ports.
+
 ## Moving a city
 
 ```bash
