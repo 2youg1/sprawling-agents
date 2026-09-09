@@ -52,16 +52,16 @@
     "zh": "{n} 件等你"
   },
   "nav_palette": {
-    "en": "everything else (Ctrl-K)",
-    "zh": "其它去处（Ctrl-K）"
+    "en": "everything",
+    "zh": "全部"
   },
   "nav_everything": {
     "en": "everything",
     "zh": "全部去处"
   },
   "rail_hint": {
-    "en": "g then a letter goes; [ pins this; ? shows the keys",
-    "zh": "g 加一个字母就能去；[ 钉住这栏；? 看快捷键"
+    "en": "g + letter · [ pin · ? keys",
+    "zh": "g 加字母 · [ 钉住 · ? 快捷键"
   },
   "nav_the_record": {
     "en": "the record",
@@ -88,16 +88,16 @@
     "zh": "对 {room} 说点什么"
   },
   "talk_empty_mayor": {
-    "en": "Nothing has been said yet.",
-    "zh": "还没有说过话。"
+    "en": "the Mayor",
+    "zh": "市长室"
   },
   "talk_empty_room": {
-    "en": "Nobody has spoken to {room} yet.",
-    "zh": "还没有人对 {room} 说过话。"
+    "en": "room {room}",
+    "zh": "房间 {room}"
   },
   "talk_empty_hint": {
-    "en": "One sentence is enough. The Mayor reads every building before it answers, writes the plan, and hands each building its part.",
-    "zh": "一句话就够。Mayor 会先读遍每栋楼再回答，写下计划，把各自的那份交给各栋楼。"
+    "en": "one sentence is enough",
+    "zh": "一句话就够"
   },
   "talk_goal": {
     "en": "read the city, answer, and plan where planning is needed",
@@ -120,8 +120,8 @@
     "zh": "思考"
   },
   "talk_not_live": {
-    "en": "not connected — nothing was sent, your words are still here",
-    "zh": "没有连接——什么都没发出，你写的话还在"
+    "en": "not connected",
+    "zh": "未连接"
   },
   "talk_you": {
     "en": "you",
@@ -140,16 +140,16 @@
     "zh": "等你回答"
   },
   "talk_discarded": {
-    "en": "{n} files were discarded; the recycle bin has the way back",
-    "zh": "丢弃了 {n} 个文件；回收站里有找回的路"
+    "en": "{n} discarded",
+    "zh": "丢弃 {n} 个"
   },
   "talk_tokens": {
     "en": "{n} tokens",
     "zh": "{n} 个 token"
   },
   "talk_halted": {
-    "en": "the city is stopped — nothing new starts until you release it",
-    "zh": "城停着——放开之前不会开始新的活"
+    "en": "city stopped",
+    "zh": "城已停"
   },
   "talk_release": {
     "en": "release",
@@ -196,12 +196,12 @@
     "zh": "以后都允许"
   },
   "wait_same": {
-    "en": "{n} identical questions — one answer covers them",
-    "zh": "{n} 个相同的问题——回答一次就够"
+    "en": "×{n} alike",
+    "zh": "×{n} 同问"
   },
   "wait_tainted": {
-    "en": "carries content from outside the city",
-    "zh": "带着城外的内容"
+    "en": "outside content",
+    "zh": "城外内容"
   },
   "city_hall": {
     "en": "City Hall",
@@ -227,10 +227,6 @@
     "en": "the city, one block per building",
     "zh": "城市，一栋楼一块"
   },
-  "city_legend": {
-    "en": "a lit window is a run; a figure at the door is one still going; a gold ring is one waiting for you",
-    "zh": "亮着的窗是一次跑；门口的人是还在跑的；金色的圈是在等你"
-  },
   "city_stop": {
     "en": "stop the city",
     "zh": "停下这座城"
@@ -244,8 +240,8 @@
     "zh": "停着"
   },
   "city_stopped_line": {
-    "en": "the city is stopped; nothing new starts",
-    "zh": "城停着；不会开始新的活"
+    "en": "stopped",
+    "zh": "已停"
   },
   "bld_tree": {
     "en": "files",
@@ -288,8 +284,8 @@
     "zh": "清掉目标"
   },
   "bld_goal_placeholder": {
-    "en": "a standing goal: the building keeps taking ready work until it runs out",
-    "zh": "一个常设目标：这栋楼会一直领就绪的活，直到领完"
+    "en": "a standing goal",
+    "zh": "常设目标"
   },
   "bld_halt": {
     "en": "stop this building",
@@ -300,8 +296,8 @@
     "zh": "放开这栋楼"
   },
   "plan_empty": {
-    "en": "no plan yet — the Mayor writes one when it is handed an idea",
-    "zh": "还没有计划——把想法交给 Mayor 它就会写"
+    "en": "no plan yet",
+    "zh": "还没有计划"
   },
   "status_ready": {
     "en": "ready",
@@ -328,32 +324,32 @@
     "zh": "等审批"
   },
   "file_missing": {
-    "en": "this file is not there",
-    "zh": "这个文件不在"
+    "en": "missing",
+    "zh": "不存在"
   },
   "file_binary": {
-    "en": "not a text file ({kib})",
-    "zh": "不是文本文件（{kib}）"
+    "en": "binary · {kib}",
+    "zh": "二进制 · {kib}"
   },
   "file_truncated": {
-    "en": "showing the first {kib} of {total}",
-    "zh": "只显示了前 {kib}，全文 {total}"
+    "en": "first {kib} of {total}",
+    "zh": "前 {kib}，共 {total}"
   },
   "tree_empty": {
     "en": "empty",
     "zh": "空的"
   },
   "tree_live": {
-    "en": "a run is going here",
-    "zh": "这里有一次跑在进行"
+    "en": "live",
+    "zh": "进行中"
   },
   "tree_transcript": {
-    "en": "open the run",
-    "zh": "打开这次跑"
+    "en": "run",
+    "zh": "这次跑"
   },
   "tree_no_runs": {
-    "en": "no run has worked here yet",
-    "zh": "还没有一次跑在这里干过活"
+    "en": "no runs",
+    "zh": "没有跑"
   },
   "run_turns": {
     "en": "turns",
@@ -388,8 +384,8 @@
     "zh": "每回合的 tokens"
   },
   "run_no_usage": {
-    "en": "the provider reported no usage",
-    "zh": "provider 没有报用量"
+    "en": "no usage",
+    "zh": "没有用量"
   },
   "run_turn_n": {
     "en": "turn {n}",
@@ -416,28 +412,28 @@
     "zh": "它读过什么"
   },
   "run_read_nothing": {
-    "en": "it has read nothing yet",
-    "zh": "它还什么都没读"
+    "en": "nothing read",
+    "zh": "没读过"
   },
   "run_no_changes": {
-    "en": "nothing moved on disk",
-    "zh": "磁盘上什么都没动"
+    "en": "no changes",
+    "zh": "没有改动"
   },
   "run_no_fence": {
-    "en": "no checkpoint yet, so nothing to compare against",
-    "zh": "还没有栅栏，无从比较"
+    "en": "no checkpoint",
+    "zh": "没有栅栏"
   },
   "run_patch_needs_fence": {
-    "en": "the patch shows once the run has fenced its work",
-    "zh": "这次跑打过栅栏之后才能看补丁"
+    "en": "after the next fence",
+    "zh": "下一道栅栏后"
   },
   "run_withheld": {
-    "en": "line {n} withheld: {reason}",
-    "zh": "第 {n} 行不回显：{reason}"
+    "en": "line {n} withheld · {reason}",
+    "zh": "第 {n} 行不回显 · {reason}"
   },
   "run_no_evidence": {
-    "en": "nothing was left as evidence",
-    "zh": "没有留下证据"
+    "en": "no evidence",
+    "zh": "没有证据"
   },
   "change_added": {
     "en": "added",
@@ -500,8 +496,8 @@
     "zh": "Anthropic 形"
   },
   "setup_key": {
-    "en": "key — empty for a local server; it goes to your OS vault, never into a frame",
-    "zh": "key——本地服务留空；它进操作系统的凭据库，从不进帧"
+    "en": "key",
+    "zh": "密钥"
   },
   "setup_look": {
     "en": "look at its models",
@@ -519,10 +515,6 @@
     "en": "no key",
     "zh": "没 key"
   },
-  "setup_login_body": {
-    "en": "Start the login, approve it in the browser tab that opens, then paste back the code the provider shows.",
-    "zh": "开始登录，在打开的标签页里批准，再把 provider 给你的码贴回来。"
-  },
   "setup_login_begin": {
     "en": "start the login",
     "zh": "开始登录"
@@ -532,8 +524,8 @@
     "zh": "打开批准页"
   },
   "setup_login_code": {
-    "en": "the code the provider showed",
-    "zh": "provider 给你的码"
+    "en": "code",
+    "zh": "码"
   },
   "setup_login_finish": {
     "en": "finish the login",
@@ -544,24 +536,20 @@
     "zh": "哪个模型来想"
   },
   "setup_main": {
-    "en": "main — the model that thinks; a dispatch is refused without it",
-    "zh": "main——负责思考的模型；没有它就派不了活"
+    "en": "main · thinks",
+    "zh": "main · 思考"
   },
   "setup_digest": {
-    "en": "digest — reads long documents on main's behalf",
-    "zh": "digest——替 main 读长文档"
+    "en": "digest · reads",
+    "zh": "digest · 读长文"
   },
   "setup_no_models": {
-    "en": "no models yet — attach a provider first",
-    "zh": "还没有模型——先接一个 provider"
+    "en": "no models",
+    "zh": "没有模型"
   },
   "setup_effort": {
-    "en": "how hard it thinks by default",
-    "zh": "默认想多用力"
-  },
-  "setup_effort_note": {
-    "en": "remembered by this browser and sent with every message; change it per message from the box",
-    "zh": "记在这个浏览器里，随每条消息发出；也可以在输入框里临时改"
+    "en": "thinking",
+    "zh": "思考"
   },
   "effort_none": {
     "en": "none",
@@ -588,36 +576,36 @@
     "zh": "最高"
   },
   "setup_autonomy": {
-    "en": "who answers approvals",
-    "zh": "谁来答审批"
+    "en": "approvals",
+    "zh": "审批"
   },
   "autonomy_owner": {
     "en": "me",
     "zh": "我"
   },
   "autonomy_clerk": {
-    "en": "the clerk, with its reason in the ledger",
-    "zh": "clerk 来答，理由记进账本"
+    "en": "the clerk",
+    "zh": "clerk 代答"
   },
   "autonomy_deferred": {
-    "en": "nobody — they wait",
-    "zh": "没人——一直等着"
+    "en": "wait",
+    "zh": "等着"
   },
   "setup_mcp": {
-    "en": "tool servers for City Hall (MCP)",
-    "zh": "市政厅的工具服务器（MCP）"
+    "en": "MCP · City Hall",
+    "zh": "MCP · 市政厅"
   },
   "setup_mcp_label": {
-    "en": "label, e.g. github",
-    "zh": "名字，如 github"
+    "en": "label",
+    "zh": "名字"
   },
   "setup_mcp_command": {
-    "en": "command and args, e.g. npx -y @x/server",
-    "zh": "命令与参数，如 npx -y @x/server"
+    "en": "command",
+    "zh": "命令"
   },
   "setup_mcp_url": {
-    "en": "or an http URL",
-    "zh": "或一个 http URL"
+    "en": "http URL",
+    "zh": "http 地址"
   },
   "setup_mcp_add": {
     "en": "add",
@@ -632,12 +620,12 @@
     "zh": "技能（skills）"
   },
   "setup_skills": {
-    "en": "Skills every building may admit live in one folder. Move your old SKILL folders there; each building lists what it admits in its BUILDING.md.",
-    "zh": "每栋楼都可以采用的 skills 住在一个文件夹里。把旧的 SKILL 文件夹搬过去；每栋楼在自己的 BUILDING.md 里写它采用哪些。"
+    "en": "shared folder",
+    "zh": "共享文件夹"
   },
   "setup_skills_note": {
-    "en": "a skill only this building may use goes in <building>/.sprawling/skills/ instead",
-    "zh": "只给一栋楼用的 skill 放在 <building>/.sprawling/skills/"
+    "en": "per building: <building>/.sprawling/skills/",
+    "zh": "单栋楼：<building>/.sprawling/skills/"
   },
   "setup_copy": {
     "en": "copy",
@@ -648,16 +636,16 @@
     "zh": "语言"
   },
   "setup_again": {
-    "en": "the welcome",
-    "zh": "新手引导"
+    "en": "welcome",
+    "zh": "引导"
   },
   "setup_rerun": {
-    "en": "walk through the welcome again",
-    "zh": "再走一遍新手引导"
+    "en": "run again",
+    "zh": "再走一遍"
   },
   "welcome_title": {
-    "en": "welcome to sprawling",
-    "zh": "欢迎来到 sprawling"
+    "en": "welcome",
+    "zh": "欢迎"
   },
   "welcome_steps": {
     "en": "the five steps",
@@ -684,32 +672,12 @@
     "zh": "开始"
   },
   "welcome_machine_body": {
-    "en": "Run this once in a terminal. It looks at what this machine has, tells you what a city needs, and offers to install each missing item one at a time — never silently.",
-    "zh": "在终端里跑一次。它会看这台机器有什么、告诉你一座城需要什么，并逐项征询后安装缺的东西——从不悄悄装。"
-  },
-  "welcome_machine_note": {
-    "en": "Nothing here is required to talk to the Mayor; a browser tool or a shell is needed only by a building that declares it.",
-    "zh": "和 Mayor 说话不需要这里的任何东西；浏览器工具或 shell 只有声明了的楼才需要。"
-  },
-  "welcome_provider_body": {
-    "en": "A city thinks with a model you bring. Give it a key, or sign in with a subscription; the key goes to your operating system's vault and never into a frame.",
-    "zh": "一座城用你带来的模型思考。给它一个 key，或用订阅登录；key 进操作系统的凭据库，从不进帧。"
-  },
-  "welcome_optional_body": {
-    "en": "Two things you can do now or later: connect a tool server to City Hall, and move the skills you already have into the shared folder.",
-    "zh": "两件现在或以后都可以做的事：给市政厅接一个工具服务器，把你已有的 skills 搬进共享文件夹。"
-  },
-  "welcome_model_body": {
-    "en": "Point main at the model that should think, and say how hard it should think when you say nothing.",
-    "zh": "把 main 指向该思考的那个模型，再定一个你不特别说时它想多用力。"
-  },
-  "welcome_go_body": {
-    "en": "That is all. Tell the Mayor what you want; it reads the whole city before it answers.",
-    "zh": "就这些。告诉 Mayor 你想要什么；它会读遍这座城再回答。"
+    "en": "run once in a terminal",
+    "zh": "在终端里跑一次"
   },
   "welcome_no_main": {
-    "en": "no model answers for main yet — go back one step, or a dispatch will be refused",
-    "zh": "main 还没有模型——退回一步，否则派活会被拒"
+    "en": "no main model",
+    "zh": "main 没有模型"
   },
   "welcome_next": {
     "en": "next",
@@ -728,12 +696,8 @@
     "zh": "去和 Mayor 说话"
   },
   "welcome_later": {
-    "en": "later — take me to the Mayor",
-    "zh": "以后再说——先去找 Mayor"
-  },
-  "composer_example": {
-    "en": "measure every read path in the ledger, find the slowest one, and write down the numbers you got",
-    "zh": "把账本的读取路径量一遍，找出最慢的那一处，并写下测出来的数"
+    "en": "later",
+    "zh": "以后再说"
   },
   "rec_ledger": {
     "en": "the ledger",
@@ -760,12 +724,12 @@
     "zh": "搜索归档"
   },
   "rec_nothing": {
-    "en": "nothing matches",
-    "zh": "没有匹配"
+    "en": "nothing",
+    "zh": "没有"
   },
   "bin_empty": {
-    "en": "nothing has been discarded",
-    "zh": "没有丢弃过东西"
+    "en": "empty",
+    "zh": "空"
   },
   "bin_gone": {
     "en": "gone",
@@ -792,8 +756,8 @@
     "zh": "成本"
   },
   "cost_none": {
-    "en": "no price reported — tokens only",
-    "zh": "没有报价——只有 tokens"
+    "en": "no price",
+    "zh": "没有报价"
   },
   "cost_by_run": {
     "en": "by run",

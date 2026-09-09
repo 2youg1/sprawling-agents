@@ -84,7 +84,6 @@ export function EffortChoice() {
           )}
         </For>
       </div>
-      <p class="text-text-disabled">{say("setup_effort_note")}</p>
     </div>
   );
 }

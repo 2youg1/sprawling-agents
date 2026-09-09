@@ -202,7 +202,6 @@ export function LoginForm(props: { readonly onAttached?: () => void }) {
   const url = useLoginUrl(provider);
   return (
     <div class="flex flex-col gap-base">
-      <p class="text-note text-text-quiet">{say("setup_login_body")}</p>
       <div class="flex items-center gap-snug">
         <button
           type="button"

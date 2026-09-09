@@ -62,7 +62,7 @@ export function Welcome() {
         <div>
           <Switch>
             <Match when={step() === "machine"}>
-              <p class="mb-base leading-relaxed text-text-quiet">{say("welcome_machine_body")}</p>
+              <p class="mb-base text-note text-text-faint">{say("welcome_machine_body")}</p>
               <div class="flex items-center gap-snug">
                 <code class="rounded-control bg-g1 px-base py-snug font-mono text-text">{DOCTOR}</code>
                 <button
@@ -75,10 +75,8 @@ export function Welcome() {
                   {say("setup_copy")}
                 </button>
               </div>
-              <p class="mt-base text-note text-text-faint">{say("welcome_machine_note")}</p>
             </Match>
             <Match when={step() === "provider"}>
-              <p class="mb-base leading-relaxed text-text-quiet">{say("welcome_provider_body")}</p>
               <Show when={answer()}>{(held) => <div class="mb-base"><EndpointList answer={held()} /></div>}</Show>
               <div class="mb-base flex gap-snug text-label">
                 <button
@@ -101,25 +99,21 @@ export function Welcome() {
               </Show>
             </Match>
             <Match when={step() === "optional"}>
-              <p class="mb-wide leading-relaxed text-text-quiet">{say("welcome_optional_body")}</p>
               <h2 class="mb-base text-label font-label text-text-quiet">{say("setup_mcp")}</h2>
               <McpForm />
               <h2 class="mt-wide mb-base text-label font-label text-text-quiet">{say("setup_skills_title")}</h2>
               <SkillsNote />
             </Match>
             <Match when={step() === "model"}>
-              <p class="mb-base leading-relaxed text-text-quiet">{say("welcome_model_body")}</p>
               <Show when={answer()}>{(held) => <ModelChoice answer={held()} />}</Show>
               <div class="mt-wide">
                 <EffortChoice />
               </div>
             </Match>
             <Match when={step() === "go"}>
-              <p class="mb-base leading-relaxed text-text-quiet">{say("welcome_go_body")}</p>
               <Show when={!chosen()}>
                 <p class="mb-base text-note text-alert">{say("welcome_no_main")}</p>
               </Show>
-              <p class="rounded-card bg-g1 px-base py-snug text-note text-text-faint">{say("composer_example")}</p>
             </Match>
           </Switch>
         </div>

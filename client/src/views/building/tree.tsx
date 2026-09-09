@@ -81,13 +81,13 @@ function Node(props: {
         </Show>
         <span class="flex-1" />
         <Show when={props.entry.kind !== "directory" ? props.entry.kind : undefined}>
-          {(kind) => <span class="text-text-disabled">{kib(kind().file.bytes)}</span>}
+          {(kind) => <span class="shrink-0 whitespace-nowrap text-text-disabled">{kib(kind().file.bytes)}</span>}
         </Show>
         <Show when={transcriptRun()}>
           {(run) => (
               <a
                 href={`#/run/${run()}`}
-                class="rounded-pill bg-g2 px-snug text-text-quiet hover:bg-g3"
+                class="shrink-0 whitespace-nowrap rounded-pill bg-g2 px-snug text-text-quiet hover:bg-g3"
                 onClick={(event) => {
                   event.stopPropagation();
                 }}

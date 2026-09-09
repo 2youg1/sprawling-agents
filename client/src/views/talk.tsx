@@ -96,10 +96,9 @@ export function Talk(props: TalkProps) {
           </Show>
           <Show when={runs().length === 0}>
             <div class="my-auto py-section text-center">
-              <p class="text-heading font-heading text-text-quiet">
+              <p class="text-heading font-heading text-text-disabled">
                 {isMayor() ? say("talk_empty_mayor") : say("talk_empty_room", { room: roomOf(props.address) })}
               </p>
-              <p class="mt-base text-body text-text-faint">{say("talk_empty_hint")}</p>
             </div>
           </Show>
           <For each={runs()}>{(run) => <Thread run={run} who={roomOf(props.address)} />}</For>

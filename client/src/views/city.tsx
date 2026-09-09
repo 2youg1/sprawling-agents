@@ -14,9 +14,8 @@ import { For, Show, createMemo } from "solid-js";
 
 import type { RunBelief } from "../core/belief";
 import { halt, release } from "../core/commands";
-import { toFragment } from "../core/route";
 import type { BuildingProgress, PursuitLine } from "../wire";
-import { useCommand, useSay, useUi } from "../ui";
+import { useCommand, useGo, useSay, useUi } from "../ui";
 import { squircle } from "./city/shape";
 
 const W = 176;
@@ -50,8 +49,8 @@ function Figure(props: { readonly run: RunBelief; readonly x: number; readonly y
     <g
       class="bob"
       style={{ "animation-delay": `${String(props.delay)}ms`, "transform-origin": `${String(props.x)}px ${String(props.y)}px` }}
+      aria-label={`${props.run.addr ?? ""} · ${posture()}`}
     >
-      <title>{`${props.run.addr ?? ""} · ${posture()}`}</title>
       <path
         d={`M${String(props.x - 6)} ${String(props.y)} q6 -14 12 0 z`}
         class={posture() === "waiting" ? "fill-alert" : "fill-g8"}
@@ -74,8 +73,13 @@ function Figure(props: { readonly run: RunBelief; readonly x: number; readonly y
   );
 }
 
+// The blocks are drawn inside a component, where the compiler cannot
+// see the `<svg>` above them; every element here is one the compiler
+// knows is SVG by name, and the link is a `<g>` with a handler rather
+// than an `<a>`, which it would have created as HTML.
 function Block(props: { readonly placed: Placed; readonly hall: boolean }) {
   const say = useSay();
+  const go = useGo();
   const p = () => props.placed;
   const active = createMemo(() => p().runs.filter((run) => run.doing.kind !== "frozen"));
   const windows = createMemo(() => p().runs.slice(-12));
@@ -83,9 +87,20 @@ function Block(props: { readonly placed: Placed; readonly hall: boolean }) {
   const stuck = () => p().building.blocked.length;
   const inner = () => ({ x: p().x + 12, y: p().y + 30, w: p().w - 24, h: p().h - 30 - 22 });
 
+  const open = () => {
+    go({ kind: "building", address: p().building.addr });
+  };
   return (
-    <a href={toFragment({ kind: "building", address: p().building.addr })} class="group">
-      <title>{`${p().building.addr} · ${String(active().length)} ${say("city_at_work")}`}</title>
+    <g
+      class="group cursor-pointer"
+      role="link"
+      tabindex="0"
+      aria-label={`${p().building.addr} · ${String(active().length)} ${say("city_at_work")}`}
+      onClick={open}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") open();
+      }}
+    >
       <path
         d={squircle({ x: p().x, y: p().y, w: p().w, h: p().h }, props.hall ? 16 : 12, 4)}
         class={`${props.hall ? "fill-g2" : "fill-g1"} stroke-g3 transition-colors group-hover:fill-g3`}
@@ -146,7 +161,7 @@ function Block(props: { readonly placed: Placed; readonly hall: boolean }) {
           <Figure run={run} x={p().x + p().w - 24 - index() * 20} y={p().y + p().h + 14} delay={index() * 400} />
         )}
       </For>
-    </a>
+    </g>
   );
 }
 
@@ -223,7 +238,7 @@ export function City() {
           <svg
             viewBox={`0 0 ${String(bounds().w)} ${String(bounds().h)}`}
             class={`mx-auto block max-w-page transition-opacity ${halted() ? "opacity-40" : ""}`}
-            style={{ width: `${String(bounds().w)}px`, "max-width": "100%" }}
+            style={{ width: `${String(Math.round(bounds().w * 1.5))}px`, "max-width": "100%" }}
             role="img"
             aria-label={say("city_drawing")}
           >
@@ -232,7 +247,7 @@ export function City() {
         </Show>
       </div>
       <div class="mx-auto flex w-full max-w-page items-center justify-between px-pane pb-pane text-note text-text-faint">
-        <Show when={halted()} fallback={<span>{say("city_legend")}</span>}>
+        <Show when={halted()} fallback={<span />}>
           <span class="text-alert">{say("city_stopped_line")}</span>
         </Show>
         <button
