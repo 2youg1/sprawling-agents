@@ -22,6 +22,8 @@
 
 mod export;
 mod files;
+#[cfg(test)]
+mod fixture;
 mod manifest;
 
 pub use export::Bundle;

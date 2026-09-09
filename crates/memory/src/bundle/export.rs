@@ -143,32 +143,9 @@ impl Bundle {
 )]
 mod tests {
     use super::super::files::open_restored;
+    use super::super::fixture::city_with;
     use super::*;
-    use crate::jsonl::JsonlLedger;
-    use kernel::{EventDraft, EventKind, GENESIS_PREV, Ledger, Payload, RunId, TimeMs};
-    /// Walks the chain, which is what proves the records are one history.
-    fn city_with(records: u64, root: &Path) {
-        let dir = root.join(RESERVED).join(LEDGER);
-        let (mut ledger, _report) = JsonlLedger::open(&dir, TimeMs::new(1)).unwrap();
-        for step in 0..records {
-            ledger
-                .append(EventDraft {
-                    run: RunId::CITY,
-                    t: TimeMs::new(step.saturating_add(1)),
-                    who: "owner".to_owned(),
-                    addr: None,
-                    kind: EventKind::CityInitialized,
-                    data: Payload::empty(),
-                    ig: false,
-                })
-                .unwrap();
-        }
-        std::fs::create_dir_all(root.join("lab")).unwrap();
-        std::fs::write(root.join("City.md"), b"# City.md\n").unwrap();
-        std::fs::write(root.join("lab").join("Roadmap.md"), b"# Roadmap\n").unwrap();
-        let cas = crate::Cas::open(&root.join(RESERVED).join(CAS)).unwrap();
-        drop(cas);
-    }
+    use kernel::{GENESIS_PREV, TimeMs};
 
     #[test]
     fn a_city_comes_back_in_an_empty_directory_and_its_chain_verifies() {

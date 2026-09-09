@@ -768,3 +768,9 @@ pub fn of_file(city_root: &Path, base: GitOid, head: Head, path: &str)
 **记在案的说法**：进程重启后 `Checkpoint::last` 为空，`scan_staged` 退回按 HEAD 比较，于是重启之前发生的改动再也不被扫。**实测不成立，且不可能成立**：card-2.2 之后 wave fence 恒不移动 HEAD，故 HEAD 只可能是 `ensure_base` 或 `land` 写下的提交——它必是最后一次 fence 的**祖先**。拿祖先做基准，diff 出来的路径集是拿 fence 做基准那一集的**超集**：读得更多，不会更少。代价是把已经放行过的 blob 再读一遍，安全上一分不让。
 
 **疑点转成一条断言而不是一段说明**：`a_change_made_before_a_restart_is_still_read_after_it`——立城、fence 一次、写入一份带凭证的文件、丢掉 handle、重开 `Checkpoint`、再 fence，第二次 fence 必须以 `SecretEgress` 拒绝并报出路径而不回显字节。**翻案条件**：哪一天有一条路径能在不经扫描的情况下移动 HEAD（今天 `ensure_base`／`land` 都先扫后提交，合并提交用的是节点已扫过的树），这条推理的前提就没了，届时基准必须改回记住的 fence。
+
+### 8-21 `bundle` 的城夹具住一处（card-F4.8；`memory::bundle::fixture`）
+
+`city_with(records, root)`——立一座有 N 条记录的城、写两个文件、开一次 CAS——在 `bundle/export.rs`、`bundle/files.rs`、`bundle/manifest.rs` 的测试模块里**逐字节重复三遍**。三份拷贝就是三个「一座城长什么样」的权威：改其中一份，另外两份的断言仍在对着旧形状作证。
+
+**一个夹具一处**：`crates/memory/src/bundle/fixture.rs`，`#[cfg(test)]` 编译，由 `bundle.rs` 以 `#[cfg(test)] mod fixture;` 挂上，三个测试模块 `use super::super::fixture::city_with;`。形状 4 适配器（它造的是被测代码之外的一个真实环境）。**不放进 `bundle.rs` 自身**：索引文件不持逻辑，而夹具是逻辑。

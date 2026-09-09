@@ -193,32 +193,9 @@ pub fn open_restored(city_root: &Path, now: kernel::TimeMs) -> Result<PathBuf, M
 )]
 mod tests {
     use super::super::export::Bundle;
-    use super::super::manifest::{CAS, CITY};
+    use super::super::fixture::city_with;
+    use super::super::manifest::CITY;
     use super::*;
-    use crate::jsonl::JsonlLedger;
-    use kernel::{EventDraft, EventKind, Ledger, Payload, RunId, TimeMs};
-    fn city_with(records: u64, root: &Path) {
-        let dir = root.join(RESERVED).join(LEDGER);
-        let (mut ledger, _report) = JsonlLedger::open(&dir, TimeMs::new(1)).unwrap();
-        for step in 0..records {
-            ledger
-                .append(EventDraft {
-                    run: RunId::CITY,
-                    t: TimeMs::new(step.saturating_add(1)),
-                    who: "owner".to_owned(),
-                    addr: None,
-                    kind: EventKind::CityInitialized,
-                    data: Payload::empty(),
-                    ig: false,
-                })
-                .unwrap();
-        }
-        std::fs::create_dir_all(root.join("lab")).unwrap();
-        std::fs::write(root.join("City.md"), b"# City.md\n").unwrap();
-        std::fs::write(root.join("lab").join("Roadmap.md"), b"# Roadmap\n").unwrap();
-        let cas = crate::Cas::open(&root.join(RESERVED).join(CAS)).unwrap();
-        drop(cas);
-    }
 
     #[test]
     fn nothing_under_the_reserved_prefix_travels_as_a_city_file() {
