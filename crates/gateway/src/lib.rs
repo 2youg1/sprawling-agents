@@ -20,6 +20,7 @@ mod native;
 mod oauth_profiles;
 mod openai;
 mod router;
+mod transcribe;
 
 pub use admission::{AdmissionState, AdmissionVerdict, ProviderOutcome};
 pub use cost::{CallCost, CostSource, settle};
@@ -37,3 +38,4 @@ pub use market::{InputKinds, MarketSnapshot, ModelEntry};
 pub use native::{Native, NativeConfig};
 pub use oauth_profiles::{OAUTH_PROFILES, OauthProfile, profile};
 pub use router::{AttachedEndpoint, Chosen, EndpointBook, attached_payload, selected_payload};
+pub use transcribe::{AudioType, Recording, Transcriber, TranscriberConfig};

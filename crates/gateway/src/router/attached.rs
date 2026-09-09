@@ -88,7 +88,10 @@ fn chat_path(dialect: DialectKind) -> &'static str {
     }
 }
 
-fn join(base: &str, path: &str) -> String {
+/// A base URL a person entered plus the path a compatible format owns.
+/// One algorithm city-wide: the chat face, the model list and the audio
+/// face all hang paths off a base the same way.
+pub(crate) fn join(base: &str, path: &str) -> String {
     format!("{}/{}", base.trim_end_matches('/'), path)
 }
 

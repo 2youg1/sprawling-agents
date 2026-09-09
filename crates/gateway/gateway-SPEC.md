@@ -366,6 +366,60 @@ pub fn retreat_payload(tag: ModelTag, from: &str, retreat: &Retreat, because: &A
 
 **人还不能设置它。** 设置面在设置页，而设置页归 `crates/web` 与线上的 `AttachEndpoint`／`SelectModel` 帧；本卡不动线（另一位在改），故城内今天写下的每一条 `model_selected` 都带 `Fallback::None`。线上欠的那一个字段记在本卡报告里。
 
+### 8-12 gateway::transcribe（card-6.10 服务端半；`transcriber` 形状 4 适配器，`recording` 形状 2 值，`wire` 形状 1 判定）
+
+把一段录音变成一行字的那个 provider 端点。**它是可选设施**：没配的城照常跑完每一件事，只是在有人开口说话时明说自己听不见，而不是在兑付那一格炸开或回一个空串。
+
+```rust
+// gateway::transcribe（索引，无逻辑）
+pub use recording::{AudioType, Recording};
+pub use transcriber::{Transcriber, TranscriberConfig};
+
+// transcribe/recording.rs（形状 2 值）
+#[non_exhaustive] pub enum AudioType { Webm, Ogg, Mpeg, Mp4, Wav }
+impl AudioType { pub fn media_type(self) -> &'static str; pub fn file_name(self) -> &'static str; }
+pub struct Recording { /* bytes、kind —— 私有 */ }
+impl Recording {
+    pub fn new(bytes: Vec<u8>, kind: AudioType) -> Result<Recording, AxError>;  // 空／越顶＝E_INVALID_ARGS
+    pub fn kind(&self) -> AudioType;   pub fn len(&self) -> usize;
+}
+
+// transcribe/transcriber.rs（形状 4 适配器）
+pub struct TranscriberConfig { pub base_url: String, pub model: String,
+                               pub auth: AuthSpec, pub timeout_ms: u64 }
+pub struct Transcriber { /* attached: Option<Endpoint> —— 私有 */ }
+impl Transcriber {
+    pub fn absent() -> Transcriber;                       // 这座城没有这项设施
+    pub fn attach(config: TranscriberConfig, secrets: SecretResolver) -> Result<Transcriber, AxError>;
+    pub fn is_attached(&self) -> bool;
+    pub fn transcribe(&self, recording: &Recording) -> Result<String, AxError>;
+}
+```
+
+**没配就是一句具名的拒绝，不是一个空串。** `Transcriber::absent()` 上的 `transcribe` 恒返回三段式 `E_TOOL_UNAVAILABLE`：action ＝ `transcribe a recording`，subject ＝ `this city has no transcription endpoint attached`，recovery 指出两条人能立刻做的路（登记一个服务 `audio/transcriptions` 的 endpoint，或者改用打字）。**为何复用 `E_TOOL_UNAVAILABLE` 而不新增一码**：基表里这一码的语义正是「这次部署里没有这项设施」，而 `E_CONFIG_INVALID` 会说成人填错了什么——什么都没填错，这项设施本就是可选的；`E_BROWSER_UNAVAILABLE` 那样的专码属于模型会调用的 tool，转写不是 tool 而是界面设施。码表是 kernel 全城权威且按「能否定义掉」逐码守着，为一件已有码能如实表达的事把它撑大，就是给同一个事实立第二个名字。
+
+**凭据只有一条路。** `Transcriber` 内部持一个真的 `Endpoint`（`DialectKind::OpenAi`、`Redemption::without_images`、`pricing: None`），认证头由 `Endpoint::authorize` 写——与聊天调用、与 `list_models` 探测是同一格兑付。头名由 `AuthSpec::for_dialect` 定（§8-9），登记面不再自己在 Bearer 与具名头之间选。**恒不为转写开第二个持凭据的地方**：两处持凭据就是两处会漏。
+
+**路径归兼容格式。** 人填 base URL（provider 文档就那么印），`audio/transcriptions` 由 `transcribe::wire` 拼，拼法复用 `router::attached::join`（该函数因此升为 `pub(crate)`）——「base URL 加上兼容格式自己的路径」在城里只有一个算法。
+
+**多部分请求体自写，不引 reqwest 的 `multipart` feature。** 本 crate 自写线格式是既定选型（§8.5），而 `multipart/form-data` 只是两个字段加一条分界线；引 feature 要动根清单与 `Cargo.lock` 两个共享权威，换来的代码比自写的还多。分界线是**确定性的**：常量种子起头，只要它作为子串出现在录音里就加一个 `-` 再试，录音有限故必然终止；同一份 `(model, Recording)` 因此永远拼出同一串字节，重放能重推当时实发的请求。
+
+```rust
+// transcribe/wire.rs（形状 1 判定，纯函数）
+pub(crate) struct FormBody { pub(crate) content_type: String, pub(crate) bytes: Vec<u8> }
+pub(crate) fn form_body(model: &str, recording: &Recording) -> FormBody;
+pub(crate) fn transcription_path() -> &'static str;                       // "audio/transcriptions"
+pub(crate) fn transcription_of(wire: &serde_json::Value) -> Result<String, AxError>;
+```
+
+- 请求体两个字段：`model`（纯文本）与 `file`（`filename` 取自 `AudioType`，`Content-Type` 取自同一处——**扩展名与 media type 是同一个事实的两面，故住同一个枚举**，provider 两边都看）。`response_format` 不写：默认就是 `{"text": …}`，而写一个与默认相同的字段是给同一件事立第二个权威。
+- 读答案只认一个键：`text` 缺席或非字符串＝`E_WIRE_MISMATCH`（走 `mismatch::require`／`as_str`，与两家 dialect 同一批读取器）；非 2xx＝`E_PROVIDER`，subject 只写 URL 与状态码，恒不回显对侧正文。
+- **空转写是合法答案**：一段静音本来就该转出空串。空串只在「没有端点」那条路上被禁止，而那条路根本不返回 `Ok`。
+
+**为何 `Recording` 是值而不是一对参数**：字节与它的格式永远同行，且两条不变量（非空、不超 `RECORDING_MAX_BYTES`）只在 `new` 一处守；无 setter。**为何 `wire` 与 `transcriber` 分家**：「这段多部分请求体长什么样」是纯数据的判定、可逐字节断言，「怎么把它发出去并兑付凭据」要一个 socket——两件事变化的理由不同。
+
+**线上还没有这个动词。** 语音输入是前端功能而前端已冻结；本卡只交付服务端半，故 `channels` 无新帧、`Command` 无新变体、wiring 门辖区不变。前端会话要照着建的三件事（端点名、请求形、拒绝码）记在本卡报告里。
+
 ## 8.5 两个设计（crate 级）
 
 **A（选中）：canonical 会话类型住 kernel::model 缝上，dialect 只做翻译**——ScriptModel（citysim）与真适配器消费同一请求形，重放重建的入窗字节有唯一权威；代价是 kernel 公开面变大（约十个纯数据类型）。
@@ -401,7 +455,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 
 ## 14 硬编码声明
 
-admission 三常量（§8-6）；`Fallback` 的默认值 `None`（§8-11，它是一条策略而非一个数字，改它须本 SPEC 同集）；oauth_profiles 表（§8-5，数据面即定义处）；market 内置目录（`builtin()`，S3 收录城内实际使用的模型行，价目随 Stage 复核）。三者全 pub(crate) 数据面，改动须本 SPEC 同集变更。
+`transcribe::recording::RECORDING_MAX_BYTES = 25 MiB`（§8-12：OpenAI 音频面自己印的上限，provider 侧工程参数，非城策口径，不入 `consts_policy`；改须本 SPEC 同集）与 `wire::BOUNDARY_SEED`（同上，分界线种子）；admission 三常量（§8-6）；`Fallback` 的默认值 `None`（§8-11，它是一条策略而非一个数字，改它须本 SPEC 同集）；oauth_profiles 表（§8-5，数据面即定义处）；market 内置目录（`builtin()`，S3 收录城内实际使用的模型行，价目随 Stage 复核）。三者全 pub(crate) 数据面，改动须本 SPEC 同集变更。
 
 ## 15 影响面
 

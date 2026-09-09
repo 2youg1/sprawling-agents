@@ -21,5 +21,6 @@ mod book;
 mod payload;
 
 pub use attached::AttachedEndpoint;
+pub(crate) use attached::join;
 pub use book::{Chosen, EndpointBook};
 pub use payload::{attached_payload, selected_payload};

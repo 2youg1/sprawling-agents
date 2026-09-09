@@ -14,9 +14,9 @@
 mod adapter;
 mod auth;
 mod call;
-mod config;
+pub(crate) mod config;
 mod model;
-mod redemption;
+pub(crate) mod redemption;
 
 pub use adapter::{CALL_TIMEOUT_MS, adapter_for};
 pub use config::{AuthSpec, Endpoint, EndpointConfig};

@@ -1,3 +1,4 @@
+#[non_exhaustive] pub enum gateway::AudioType
 #[non_exhaustive] pub enum gateway::AuthSpec
 #[non_exhaustive] pub enum gateway::CostSource
 #[non_exhaustive] pub enum gateway::Fallback
@@ -11,6 +12,7 @@ impl core::default::Default for gateway::AdmissionState
 impl core::fmt::Debug for gateway::OauthTokens
 impl gateway::AdmissionState
 impl gateway::AttachedEndpoint
+impl gateway::AudioType
 impl gateway::AuthSpec
 impl gateway::Custodian
 impl gateway::Endpoint
@@ -20,7 +22,9 @@ impl gateway::Fallback
 impl gateway::ImageBytes
 impl gateway::MarketSnapshot
 impl gateway::Native
+impl gateway::Recording
 impl gateway::Redemption
+impl gateway::Transcriber
 impl kernel::model::Model for gateway::Endpoint
 impl kernel::model::Model for gateway::Native
 pub const gateway::CALL_TIMEOUT_MS: u64
@@ -36,6 +40,8 @@ pub fn gateway::AttachedEndpoint::chat_url(&self) -> alloc::string::String
 pub fn gateway::AttachedEndpoint::has_credential(&self) -> bool
 pub fn gateway::AttachedEndpoint::is_local(&self) -> bool
 pub fn gateway::AttachedEndpoint::models_url(&self) -> alloc::string::String
+pub fn gateway::AudioType::file_name(self) -> &'static str
+pub fn gateway::AudioType::media_type(self) -> &'static str
 pub fn gateway::AuthSpec::for_dialect(kernel::model::wire::DialectKind, kernel::secret::span::SecretRef, core::option::Option<alloc::string::String>) -> gateway::AuthSpec
 pub fn gateway::Custodian::capture(&mut self, &[u8], &str) -> core::result::Result<gateway::Captured, kernel::error::shape::AxError>
 pub fn gateway::Custodian::describe(&self, &kernel::secret::span::SecretRef) -> gateway::Described
@@ -72,8 +78,16 @@ pub fn gateway::MarketSnapshot::version(&self) -> u32
 pub fn gateway::Native::call(&mut self, &kernel::model::seam::ModelRequest) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
 pub fn gateway::Native::new(gateway::NativeConfig) -> core::result::Result<gateway::Native, kernel::error::shape::AxError>
 pub fn gateway::OauthTokens::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn gateway::Recording::is_empty(&self) -> bool
+pub fn gateway::Recording::kind(&self) -> gateway::AudioType
+pub fn gateway::Recording::len(&self) -> usize
+pub fn gateway::Recording::new(alloc::vec::Vec<u8>, gateway::AudioType) -> core::result::Result<gateway::Recording, kernel::error::shape::AxError>
 pub fn gateway::Redemption::new(gateway::SecretResolver, gateway::ImageResolver) -> gateway::Redemption
 pub fn gateway::Redemption::without_images(gateway::SecretResolver) -> gateway::Redemption
+pub fn gateway::Transcriber::absent() -> gateway::Transcriber
+pub fn gateway::Transcriber::attach(gateway::TranscriberConfig, gateway::SecretResolver) -> core::result::Result<gateway::Transcriber, kernel::error::shape::AxError>
+pub fn gateway::Transcriber::is_attached(&self) -> bool
+pub fn gateway::Transcriber::transcribe(&self, &gateway::Recording) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
 pub fn gateway::adapter_for(&gateway::Chosen<'_>, gateway::Redemption, alloc::vec::Vec<(alloc::string::String, alloc::string::String)>) -> core::result::Result<alloc::boxed::Box<(dyn kernel::model::Model + core::marker::Send)>, kernel::error::shape::AxError>
 pub fn gateway::attached_payload(&gateway::AttachedEndpoint) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn gateway::increment_of(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::option::Option<alloc::string::String>
@@ -99,6 +113,11 @@ pub gateway::AttachedEndpoint::dialect: kernel::model::wire::DialectKind
 pub gateway::AttachedEndpoint::models: alloc::vec::Vec<alloc::string::String>
 pub gateway::AttachedEndpoint::name: alloc::string::String
 pub gateway::AttachedEndpoint::probed: bool
+pub gateway::AudioType::Mp4
+pub gateway::AudioType::Mpeg
+pub gateway::AudioType::Ogg
+pub gateway::AudioType::Wav
+pub gateway::AudioType::Webm
 pub gateway::AuthSpec::Bearer(kernel::secret::span::SecretRef)
 pub gateway::AuthSpec::Header
 pub gateway::AuthSpec::Header::name: alloc::string::String
@@ -169,6 +188,10 @@ pub gateway::Retreat::MoveTo::model: alloc::string::String
 pub gateway::Retreat::MoveTo::not_before: kernel::event::identity::TimeMs
 pub gateway::TokenRequest::body: alloc::string::String
 pub gateway::TokenRequest::url: alloc::string::String
+pub gateway::TranscriberConfig::auth: gateway::AuthSpec
+pub gateway::TranscriberConfig::base_url: alloc::string::String
+pub gateway::TranscriberConfig::model: alloc::string::String
+pub gateway::TranscriberConfig::timeout_ms: u64
 pub mod gateway
 pub struct gateway::AdmissionState
 pub struct gateway::AttachedEndpoint
@@ -188,8 +211,11 @@ pub struct gateway::NativeConfig
 pub struct gateway::OauthPending
 pub struct gateway::OauthProfile
 pub struct gateway::OauthTokens
+pub struct gateway::Recording
 pub struct gateway::Redemption
 pub struct gateway::TokenRequest
+pub struct gateway::Transcriber
+pub struct gateway::TranscriberConfig
 pub type gateway::EnvReader = alloc::boxed::Box<(dyn core::ops::function::Fn(&str) -> core::option::Option<alloc::string::String> + core::marker::Send)>
 pub type gateway::ImageResolver = alloc::sync::Arc<(dyn core::ops::function::Fn(&kernel::locator::Locator) -> core::result::Result<alloc::vec::Vec<u8>, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type gateway::SecretResolver = alloc::boxed::Box<(dyn core::ops::function::Fn(&kernel::secret::span::SecretRef) -> core::result::Result<kernel::secret::sealed::Sealed<alloc::string::String>, kernel::error::shape::AxError> + core::marker::Send)>
