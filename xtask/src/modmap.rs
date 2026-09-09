@@ -37,10 +37,38 @@ const INDEX_PREFIXES: [&str; 8] = [
 ];
 
 struct Row {
+    module: String,
     path: String,
     shape: String,
     status: String,
+    spec: String,
     line: usize,
+}
+
+/// One module's claim about where its interface is specified: the raw
+/// seventh cell, with the row it came from.
+///
+/// Handed to `specalign`, which is the gate that owns "a SPEC says what
+/// the code says". This parser stays the module table's only reader
+/// (xtask-SPEC.md section 8-10), so a column change breaks one place.
+pub(crate) struct Anchor {
+    pub(crate) module: String,
+    pub(crate) spec: String,
+    pub(crate) line: usize,
+}
+
+/// Every registered module's `Spec` cell, in table order.
+pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
+    let text = walk::read_text(&root.join(ARCH))?;
+    let mut ignored = Vec::new();
+    Ok(parse_rows(&text, &mut ignored)
+        .into_iter()
+        .map(|row| Anchor {
+            module: row.module,
+            spec: row.spec,
+            line: row.line,
+        })
+        .collect())
 }
 
 /// The shape each registered module states, by file path.
@@ -109,6 +137,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         }
     }
 
+    check_counts(&text, &rows, &mut violations);
+
     for row in &rows {
         if row.status != STATUS_PLANNED && !on_disk.contains(&row.path) {
             violations.push(Violation {
@@ -126,9 +156,11 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// A module row has exactly six data cells, a `crates/**.rs` path in cell 2,
+/// A module row has exactly seven data cells, a `crates/**.rs` path in cell 2,
 /// `::` in cell 1, and a known status in cell 6. Seam-table rows (four cells)
 /// and card checklists (not pipe rows) never match (xtask-SPEC.md section 10-2).
+/// The seventh cell is `Spec`, added by card-8.2; it sits last so the shape and
+/// status positions did not move.
 fn parse_rows(text: &str, violations: &mut Vec<Violation>) -> Vec<Row> {
     let mut rows = Vec::new();
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
@@ -138,14 +170,19 @@ fn parse_rows(text: &str, violations: &mut Vec<Violation>) -> Vec<Row> {
             continue;
         }
         let cells: Vec<&str> = line.split('|').map(str::trim).collect();
-        if cells.len() != 8 {
+        if cells.len() != 9 {
             continue;
         }
-        let (module, path, shape, status) =
-            match (cells.get(1), cells.get(2), cells.get(4), cells.get(6)) {
-                (Some(m), Some(p), Some(h), Some(s)) => (*m, *p, *h, *s),
-                _ => continue,
-            };
+        let (module, path, shape, status, spec) = match (
+            cells.get(1),
+            cells.get(2),
+            cells.get(4),
+            cells.get(6),
+            cells.get(7),
+        ) {
+            (Some(m), Some(p), Some(h), Some(s), Some(k)) => (*m, *p, *h, *s, *k),
+            _ => continue,
+        };
         if !module.contains("::") || !path.starts_with("crates/") || !path.ends_with(".rs") {
             continue;
         }
@@ -173,13 +210,97 @@ fn parse_rows(text: &str, violations: &mut Vec<Violation>) -> Vec<Row> {
         }
         seen.insert(path.to_owned(), line_no);
         rows.push(Row {
+            module: module.to_owned(),
             path: path.to_owned(),
             shape: shape.to_owned(),
             status: status.to_owned(),
+            spec: spec.to_owned(),
             line: line_no,
         });
     }
     rows
+}
+
+/// The crate names a module-map subheading counts, each with the number it
+/// claims: `### browser (6), protocol (5), bin (111)` yields three pairs.
+///
+/// A word immediately followed by ` (<digits>)` is a claim; anything else in
+/// the heading is prose. Nothing else in this document writes that shape.
+fn counted_crates(heading: &str) -> Vec<(String, usize)> {
+    let mut pairs = Vec::new();
+    let mut rest = heading;
+    while let Some(open) = rest.find(" (") {
+        let (before, after) = rest.split_at(open);
+        let tail = after.get(2..).unwrap_or_default();
+        let Some(close) = tail.find(')') else { break };
+        let inside = tail.get(..close).unwrap_or_default();
+        let name = before.rsplit([' ', ',']).next().unwrap_or_default();
+        if let Ok(count) = inside.parse::<usize>()
+            && !name.is_empty()
+            && name.chars().all(|c| c.is_ascii_lowercase() || c == '_')
+        {
+            pairs.push((name.to_owned(), count));
+        }
+        rest = tail.get(close..).unwrap_or_default();
+    }
+    pairs
+}
+
+/// Every number a module-map subheading states equals the rows under it.
+///
+/// A count a person maintains by hand is a count that has already gone
+/// stale: nine of the thirteen were wrong when this assertion landed
+/// (xtask-SPEC.md section 8-10). `desktop` is out of the parser's reach —
+/// its rows carry `desktop/` paths, which `parse_rows` does not admit —
+/// so its heading is not judged here.
+fn check_counts(text: &str, rows: &[Row], violations: &mut Vec<Violation>) {
+    let mut heading: Option<(usize, String)> = None;
+    let mut in_map = false;
+    let mut sections: Vec<(usize, usize, String)> = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        let line_no = index.saturating_add(1);
+        if line.starts_with("## ") {
+            in_map = line.starts_with("## 12 ");
+            if let Some((at, title)) = heading.take() {
+                sections.push((at, line_no, title));
+            }
+            continue;
+        }
+        if !in_map {
+            continue;
+        }
+        if let Some(title) = line.strip_prefix("### ") {
+            if let Some((at, previous)) = heading.take() {
+                sections.push((at, line_no, previous));
+            }
+            heading = Some((line_no, title.to_owned()));
+        }
+    }
+    if let Some((at, title)) = heading {
+        sections.push((at, usize::MAX, title));
+    }
+
+    for (start, end, title) in sections {
+        for (name, claimed) in counted_crates(&title) {
+            let prefix = format!("{name}::");
+            let actual = rows
+                .iter()
+                .filter(|row| row.line > start && row.line < end && row.module.starts_with(&prefix))
+                .count();
+            if actual == 0 || actual == claimed {
+                continue;
+            }
+            violations.push(Violation {
+                gate: "modmap",
+                location: format!("{ARCH}:{start}"),
+                rule: "a subheading's count equals the rows under it \
+                       (xtask-SPEC.md section 8-10)"
+                    .to_owned(),
+                violation: format!("heading says {name} ({claimed}), the table has {actual}"),
+                alternative: format!("write {name} ({actual})"),
+            });
+        }
+    }
 }
 
 fn is_index_name(rel: &str, index_dirs: &BTreeSet<String>) -> bool {
@@ -221,8 +342,8 @@ fn check_index_content(
 mod tests {
     use super::*;
 
-    const MODULE_ROW: &str =
-        "| kernel::gate | crates/kernel/src/gate.rs | five gates | decision | S2 | planned |";
+    const MODULE_ROW: &str = "| kernel::gate | crates/kernel/src/gate.rs | five gates | \
+         decision | S2 | planned | kernel-SPEC.md#8-27 |";
     const SEAM_ROW: &str =
         "| kernel::ledger | crates/kernel/src/ledger.rs | memory jsonl | citysim |";
 
@@ -237,11 +358,32 @@ mod tests {
 
     #[test]
     fn bad_status_and_duplicate_are_violations() {
-        let bad = "| kernel::gate | crates/kernel/src/gate.rs | x | 8.2 | S2 | done |";
+        let bad = "| kernel::gate | crates/kernel/src/gate.rs | x | 8.2 | S2 | done | s.md#8-1 |";
         let mut v = Vec::new();
         let rows = parse_rows(&format!("{bad}\n{MODULE_ROW}\n{MODULE_ROW}\n"), &mut v);
         assert_eq!(rows.len(), 1);
         assert_eq!(v.len(), 2);
+    }
+
+    #[test]
+    fn a_heading_states_one_count_per_crate_it_lists() {
+        let one = counted_crates("kernel (73) — every decision in the city");
+        assert_eq!(one, vec![("kernel".to_owned(), 73)]);
+        let three = counted_crates("browser (6), protocol (5), bin (111)");
+        assert_eq!(three.len(), 3);
+        assert_eq!(three.get(2), Some(&("bin".to_owned(), 111)));
+        assert!(counted_crates("The performance register").is_empty());
+    }
+
+    #[test]
+    fn a_stale_count_is_a_violation() {
+        let text = format!("## 12 Module map\n\n### kernel (9)\n\n{MODULE_ROW}\n");
+        let mut ignored = Vec::new();
+        let rows = parse_rows(&text, &mut ignored);
+        let mut violations = Vec::new();
+        check_counts(&text, &rows, &mut violations);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].alternative.contains("kernel (1)"));
     }
 
     #[test]

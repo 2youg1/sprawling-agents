@@ -4,21 +4,25 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Gate: kernel enums and the kernel-SPEC tables agree variant by
-//! variant (C8). The gate consumes the real enums — `AxCode::ALL` and
-//! `EventKind::ALL` — and reads the SPEC as data, so "the table drifted"
-//! and "the enum grew silently" are the same red. Asserts: every AxCode
-//! appears exactly once in the 8-1 table with its declared carrier;
-//! every EventKind exactly once in the 8-4 table with its window class.
+//! variant (C8), and every module's `Spec` anchor resolves. The gate
+//! consumes the real enums — `AxCode::ALL` and `EventKind::ALL` — and
+//! reads the SPEC as data, so "the table drifted" and "the enum grew
+//! silently" are the same red. Asserts: every AxCode appears exactly
+//! once in the 8-1 table with its declared carrier; every EventKind
+//! exactly once in the 8-4 table with its window class; and the seventh
+//! module-table column names a SPEC section that is on disk.
 
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use kernel::{AxCode, Carrier, EventKind, WindowClass};
 
+use crate::modmap;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 const SPEC_PATH: &str = "crates/kernel/kernel-SPEC.md";
+const ARCH: &str = "ARCHITECTURE.md";
 
 fn violation(rule: &str, violation: String, alternative: &str) -> Violation {
     Violation {
@@ -65,6 +69,111 @@ fn spec_carrier(cell: &str) -> String {
     } else {
         cell.to_owned()
     }
+}
+
+/// Where a `<crate>-SPEC.md` cell resolves to on disk. `desktop` sits
+/// outside `crates/` on purpose (ARCHITECTURE.md section 12), so its one
+/// exception is spelled here rather than guessed from the name.
+fn spec_file(crate_name: &str) -> PathBuf {
+    if crate_name == "desktop" {
+        PathBuf::from("desktop/desktop-SPEC.md")
+    } else {
+        PathBuf::from(format!("crates/{crate_name}/{crate_name}-SPEC.md"))
+    }
+}
+
+/// True when `section` labels a section of `spec`.
+///
+/// A SPEC's section 8 is written one of two ways, and both are the real
+/// shape of this tree: a `### 8-N …` heading, or a `// 8-N …` line inside
+/// the one interface fence that is section 8 (browser, protocol, desktop
+/// and parts of web and runtime write it that way). Accepting both is not
+/// a widening — accepting only headings would redden six crates for how
+/// their SPEC has always been written.
+pub(crate) fn section_present(spec: &str, section: &str) -> bool {
+    spec.lines().any(|line| {
+        let trimmed = line.trim_start();
+        let body = trimmed
+            .trim_start_matches('#')
+            .strip_prefix(" ")
+            .or_else(|| trimmed.strip_prefix("// "));
+        let Some(body) = body else { return false };
+        if trimmed.starts_with('#') && !trimmed.starts_with("##") {
+            return false;
+        }
+        body.strip_prefix(section)
+            .is_some_and(|tail| !tail.starts_with(|c: char| c.is_ascii_digit()))
+    })
+}
+
+/// Every module row's seventh cell resolves to a SPEC section on disk.
+///
+/// The cell is `<crate>-SPEC.md#8-N`. Existence is asserted, uniqueness is
+/// not: section numbers repeat inside several SPECs because successive
+/// cards numbered independently, and renumbering them is its own work
+/// (xtask-SPEC.md section 8-10 records the condition for tightening this).
+fn check_anchors(root: &Path, violations: &mut Vec<Violation>) -> Result<(), XtaskError> {
+    let mut loaded: BTreeMap<String, Option<String>> = BTreeMap::new();
+    for anchor in modmap::anchors(root)? {
+        let at = format!("{ARCH}:{}", anchor.line);
+        let Some((file, section)) = anchor.spec.split_once('#') else {
+            violations.push(Violation {
+                gate: "specalign",
+                location: at,
+                rule: "the Spec column is `<crate>-SPEC.md#8-N` \
+                       (xtask-SPEC.md section 8-10)"
+                    .to_owned(),
+                violation: format!("{}: {:?} has no section", anchor.module, anchor.spec),
+                alternative: "write the SPEC file and the section it is specified in".to_owned(),
+            });
+            continue;
+        };
+        let Some(crate_name) = file.strip_suffix("-SPEC.md") else {
+            violations.push(Violation {
+                gate: "specalign",
+                location: at,
+                rule: "the Spec column names a crate SPEC (xtask-SPEC.md section 8-10)".to_owned(),
+                violation: format!("{}: {file:?} is not a `<crate>-SPEC.md`", anchor.module),
+                alternative: "name the SPEC of the crate the module lives in".to_owned(),
+            });
+            continue;
+        };
+        let path = spec_file(crate_name);
+        let text = match loaded.get(crate_name) {
+            Some(cached) => cached.clone(),
+            None => {
+                let read = walk::read_text(&root.join(&path)).ok();
+                loaded.insert(crate_name.to_owned(), read.clone());
+                read
+            }
+        };
+        let Some(text) = text else {
+            violations.push(Violation {
+                gate: "specalign",
+                location: at,
+                rule: "the Spec column points at a SPEC that exists \
+                       (xtask-SPEC.md section 8-10)"
+                    .to_owned(),
+                violation: format!("{}: {} is not readable", anchor.module, path.display()),
+                alternative: "correct the crate name, or write that SPEC".to_owned(),
+            });
+            continue;
+        };
+        if !section_present(&text, section) {
+            violations.push(Violation {
+                gate: "specalign",
+                location: at,
+                rule: "the Spec anchor names a section that exists \
+                       (xtask-SPEC.md section 8-10)"
+                    .to_owned(),
+                violation: format!("{}: {file} has no section {section}", anchor.module),
+                alternative: "write that section, or point the row at the section \
+                              that does specify this module"
+                    .to_owned(),
+            });
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
@@ -180,13 +289,15 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         ));
     }
 
+    check_anchors(root, &mut violations)?;
+
     Ok(violations)
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 mod tests {
-    use super::{cells, spec_carrier, unticked};
+    use super::{cells, section_present, spec_carrier, spec_file, unticked};
 
     #[test]
     fn table_rows_split_and_untick() {
@@ -201,5 +312,24 @@ mod tests {
     fn carrier_cells_normalize() {
         assert_eq!(spec_carrier("`gate_denied`"), "gate_denied");
         assert_eq!(spec_carrier("装载期（无 carrier）"), "loadtime");
+    }
+
+    #[test]
+    fn a_section_is_found_as_a_heading_or_as_a_fence_marker() {
+        assert!(section_present("### 8-27 kernel::gate", "8-27"));
+        assert!(section_present("// 8-1 port（形状 3）", "8-1"));
+        assert!(section_present("## 8-48 `kernel::node_id`", "8-48"));
+        assert!(!section_present("### 8-27 kernel::gate", "8-2"));
+        assert!(!section_present("### 8-7 six tools", "8-70"));
+        assert!(!section_present("a paragraph mentioning 8-27", "8-27"));
+    }
+
+    #[test]
+    fn desktop_is_the_one_spec_outside_crates() {
+        assert_eq!(
+            spec_file("desktop").to_string_lossy(),
+            "desktop/desktop-SPEC.md"
+        );
+        assert!(spec_file("web").to_string_lossy().ends_with("web-SPEC.md"));
     }
 }

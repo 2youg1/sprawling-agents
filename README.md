@@ -6,7 +6,7 @@
 
 The binary the badges refer to is attached to the [latest release](../../releases/latest). Both numbers are produced by the same build gate that weighs the artifacts—no one hand-writes sizes into the docs.
 
-> **Status: pre-alpha, research & development.** The main loop works: register a provider in the browser, raise a building, dispatch a job; the model actually calls tools and writes files into that building. Multiple agents can work at the same time, each in its own room.
+> **Status: pre-alpha, research & development.** The main loop works: register a provider in the browser, raise a building, dispatch a job; the model actually calls tools and writes files into that building. Several agents work in one city, each in its own room, and a building working towards a goal drives its whole ready set at once — up to four runs together, while work a person dispatches by hand is still run one piece at a time.
 >
 > What’s still missing is listed under [What works / what doesn’t](#what-works-what-doesnt). Read that section before you hand it real work.
 >
@@ -46,7 +46,7 @@ I don’t sell APIs and I can’t afford a hard drive full of your data, so ever
 
 ## What it is
 
-One binary, one browser page. The client is Rust compiled to WebAssembly and embedded inside that binary, so building this repository needs neither npm nor node. That is a property of the client shipped here rather than a rule imposed on you: **the client is replaceable.** Anything that speaks the WebSocket protocol in `crates/channels` is a client, in whatever language you and your agents write best, and a gate that once forbade JavaScript in this tree was removed for exactly that reason — it was excluding architectures rather than defects.
+One binary, one browser page, and the page is embedded inside the binary at build time. **The client is replaceable, and this repository is currently proving it by carrying two.** `client/` is TypeScript — Solid and Effect, built by [bun](https://bun.sh), never npm and never node — and `crates/web` is the earlier Dioxus client compiled to WebAssembly, which needs no JavaScript toolchain at all. Both are written against the WebSocket protocol in `crates/channels`, both coexist until card 6.11 removes the wasm one, and anything else that speaks that protocol is a client too, in whatever language you and your agents write best. The gate that once forbade JavaScript in this tree was removed for exactly that reason — it was excluding architectures rather than defects.
 
 The directory tree on disk *is* the space: a **City** is a directory tree, a project is a **Building**, an agent’s workspace is a **Room**.
 
@@ -82,7 +82,7 @@ The binaries are not code-signed, so the first run trips a warning. Windows says
 
 ### From a terminal
 
-One binary is enough. No npm, no node, no extra runtime.
+One binary is enough: the page ships inside it, and running it needs no JavaScript runtime. Building `client/` from source needs bun, and nothing else.
 
 From a terminal it is one command, and the same one the launcher runs:
 
@@ -174,7 +174,7 @@ The rest of the vocabulary is in [`docs/glossary.md`](docs/glossary.md).
 
 ## What works / what doesn’t
 
-**Works**, each backed by an end-to-end assertion or a real measurement: register a provider and select models; raise a building and dispatch work; the model actually calls tools and writes files into that building; **residents find each other, speak, and wake each other without a person relaying a single message** — two of them held a price negotiation to a written agreement against a real provider; attach an external MCP server to a building; multiple agents working concurrently, each with its own git worktree, changes only merge back after others have reviewed them (this is a compile error, not a rule); ten pages (city, live, approvals, recycle bin, archive, cost, ledger, building, room mailbox, settings); pause a city and release it; offline chain verification; export a city and restore it on another machine.
+**Works**, each backed by an end-to-end assertion or a real measurement: register a provider and select models; raise a building and dispatch work; the model actually calls tools and writes files into that building; **residents find each other, speak, and wake each other without a person relaying a single message** — two of them held a price negotiation to a written agreement against a real provider; attach an external MCP server to a building; several agents at work in one city, each with its own git worktree, changes merging back only after another resident has reviewed them (this is a compile error, not a rule); a standing goal driving up to four ready plan nodes at the same time, each run writing its history through the one thread that owns it; ten pages (city, live, approvals, recycle bin, archive, cost, ledger, building, room mailbox, settings); pause a city and release it; offline chain verification; export a city and restore it on another machine.
 
 **Not done, and why**:
 
@@ -183,6 +183,7 @@ The rest of the vocabulary is in [`docs/glossary.md`](docs/glossary.md).
 | OS-level sandbox | Requires per-platform work; only one-third can be verified on this machine. Unverified isolation is worse than none, because people will treat it as a defense. Today’s claim is therefore “a deletion can be undone,” not “a deletion cannot happen.” |
 | Browser end-to-end in CI | The loop is a local command, not a gate. **This release's client has been driven in a real browser exactly once** — the sessions behind the claims above went through the wire, which is a debugging door rather than the product. |
 | Reproducible builds | Fixtures are ready; the compiler flags that would make two builds byte-identical are not yet set. |
+| Work a person dispatches by hand, driven at the same instant | A building working towards a goal now drives its whole ready set at once, four runs at a time, each in a lane of its own (`sprawling-SPEC.md` §8-46). A job a person sends is still run one at a time: the command loop answers one command before it takes the next, and giving it a third mouth is the rest of that card. Either way one thread owns the Ledger, so runs are driven in parallel and accounted for in series. |
 | Attributing spend to skills | This is a decision, not a debt: a tool call does not happen “under” a skill—a skill is a disclosure line in the prefix, not call context. Charging by skill would invent a metric. |
 
 ## What you can swap
