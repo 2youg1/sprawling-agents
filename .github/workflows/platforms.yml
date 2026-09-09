@@ -40,7 +40,7 @@ jobs:
     outputs:
       verdict: ${{ steps.head.outputs.verdict }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - id: head
         shell: bash
         run: |
@@ -73,7 +73,7 @@ jobs:
     steps:
       # `guard` and `apisync` read one commit and its parent; ci.yml
       # gives the reasoning.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - name: install pinned toolchain
@@ -120,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
@@ -178,7 +178,7 @@ jobs:
           - budget::verification::admit_spend_is_total_and_admit_means_every_layer_fits
           - secret::verification::log2_q10_is_total
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
       - uses: model-checking/kani-github-action@v1
