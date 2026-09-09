@@ -432,7 +432,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::highlight::tests | crates/kernel/src/highlight/tests.rs | the lexical rules a reader depends on: precedence, fences, and spans that slice without overlapping | decision | R2 | built | kernel-SPEC.md#8-31 |
 | kernel::schema | crates/kernel/src/schema.rs | the JSON Schema of the five values whose serde is hand-written, so the client generated from the wire reads their strings the way the parser does | adapter | V4 | built | kernel-SPEC.md#8-45 |
 
-### memory (45) — persistence, and every view derived from it
+### memory (46) — persistence, and every view derived from it
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -481,8 +481,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::bundle::manifest | crates/memory/src/bundle/manifest.rs | manifests and layout constants | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::export | crates/memory/src/bundle/export.rs | export, manifest, restore | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built | memory-SPEC.md#8-12 |
+| memory::bundle::fixture | crates/memory/src/bundle/fixture.rs | the one city the bundle tests export | adapter | V3 | built | memory-SPEC.md#8-21 |
 
-### gateway (34) — everything between a decision to call a model and the bytes on the wire
+### gateway (38) — everything between a decision to call a model and the bytes on the wire
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -507,6 +508,10 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::endpoint::redemption | crates/gateway/src/endpoint/redemption.rs | what one endpoint redeems at the wire: the credential and the pictures | adapter | V4 | built | gateway-SPEC.md#8-2 |
 | gateway::endpoint::model | crates/gateway/src/endpoint/model.rs | the Model face | adapter | S3 | built | gateway-SPEC.md#8-2 |
 | gateway::endpoint::adapter | crates/gateway/src/endpoint/adapter.rs | which adapter a chosen model gets, and why | adapter | S3 | built | gateway-SPEC.md#8-2 |
+| gateway::transcribe | crates/gateway/src/transcribe.rs | the optional endpoint that turns a recording into a line of text | adapter | F5 | built | gateway-SPEC.md#8-12 |
+| gateway::transcribe::recording | crates/gateway/src/transcribe/recording.rs | the bytes a person spoke and the format they are in | value | F5 | built | gateway-SPEC.md#8-12 |
+| gateway::transcribe::wire | crates/gateway/src/transcribe/wire.rs | the OpenAI audio wire: one multipart body, one key read back | decision | F5 | built | gateway-SPEC.md#8-12 |
+| gateway::transcribe::transcriber | crates/gateway/src/transcribe/transcriber.rs | attached or absent, and the refusal absence answers with | adapter | F5 | built | gateway-SPEC.md#8-12 |
 | gateway::oauth_profiles | crates/gateway/src/oauth_profiles.rs | subscription-login intelligence: data only, zero branches | data | S3 | built | gateway-SPEC.md#8-5 |
 | gateway::admission | crates/gateway/src/admission.rs | the provider's concurrency limit and a deterministic minimum interval | decision | S3 | built | gateway-SPEC.md#8-6 |
 | gateway::fallback | crates/gateway/src/fallback.rs | what a tag does when its endpoint will not answer, and the payload the retreat itself is | value | V4 | built | gateway-SPEC.md#8-11 |
@@ -664,7 +669,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | eval::ablation::capabilities | crates/eval/src/ablation/capabilities.rs | the corpus: each thing a resident must be able to do, and the phrase in the document that grants it | data | V3 | built | eval-SPEC.md#8-7 |
 | eval::ablation::tests | crates/eval/src/ablation/tests.rs | the graded fixtures, and the on-demand run against the real City.md | decision | V3 | built | eval-SPEC.md#8-7 |
 
-### channels (17) — the process boundary
+### channels (22) — the process boundary
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -675,6 +680,11 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::command::wire | crates/channels/src/command/wire.rs | no-secret commands and back | value | V3 | built | channels-SPEC.md#8-1 |
 | channels::answer | crates/channels/src/answer.rs | what a Query comes back as: one shape per view, and the closed set of them | value | V3 | built | channels-SPEC.md#8-1 |
 | channels::answer::building | crates/channels/src/answer/building.rs | what one building says about itself: its plan rows, what is stuck, its goal, its documents and its archive | value | V4 | built | channels-SPEC.md#8-1 |
+| channels::answer::rounds | crates/channels/src/answer/rounds.rs | one session read as the rounds a person reads: what was said, what it cost, what each call came to | value | F1 | built | channels-SPEC.md#8-21 |
+| channels::answer::evidence | crates/channels/src/answer/evidence.rs | what a run left as evidence: a screenshot's locator and the completion a plan node was closed with, never the bytes | value | F1 | built | channels-SPEC.md#8-21 |
+| channels::answer::cost_of | crates/channels/src/answer/cost_of.rs | what one plan node has cost, and the runs that spent it | value | F1 | built | channels-SPEC.md#8-21 |
+| channels::answer::hunks | crates/channels/src/answer/hunks.rs | one file's patch text between two checkpoints, and the lines a credential scan would not echo | value | F1 | built | channels-SPEC.md#8-20 |
+| channels::reading | crates/channels/src/reading.rs | reading one ledger payload into the wire's own values, for the two ends that both need it | decision | F1 | built | channels-SPEC.md#8-21 |
 | channels::carried_name | crates/channels/src/carried_name.rs | names this crate does not own, validated at one construction point | value | V3 | built | channels-SPEC.md#8-1 |
 | channels::reception | crates/channels/src/reception.rs | may we bind, may this peer enrol, may we greet it, and what its frame means now | decision | V3 | built | channels-SPEC.md#8-2 |
 | channels::assets | crates/channels/src/assets.rs | the client the browser downloads, and which bytes answer which path | adapter | V3 | built | channels-SPEC.md#8-2 |
@@ -686,7 +696,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### web (114) — the only client, compiled to WebAssembly
+### web (108) — the only client, compiled to WebAssembly
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -721,12 +731,6 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | web::pace | crates/web/src/pace.rs | how often this page may change, and what a burst of frames folds into | decision | R2 | built | web-SPEC.md#8-41 |
 | web::keys | crates/web/src/keys.rs | what a keystroke means, and the one sequence that cannot strand a reader | decision | R2 | built | web-SPEC.md#8-45 |
 | web::palette | crates/web/src/palette.rs | one box that reaches every page, building and session, and how a query ranks them | decision | R2 | built | web-SPEC.md#8-45 |
-| web::turn | crates/web/src/turn.rs | a session's events folded into the rounds a person reads: what was said, what it cost, what each call came to, and what a door said about it | decision | R2 | built | web-SPEC.md#8-47 |
-| web::turn::reading | crates/web/src/turn/reading.rs | what was said, what it cost, what each call came to | value | R2 | built | web-SPEC.md#8-47 |
-| web::turn::rounds | crates/web/src/turn/rounds.rs | turns folded from the session events | decision | R2 | built | web-SPEC.md#8-47 |
-| web::turn::tests | crates/web/src/turn/tests.rs | the fold, exercised through its production door | decision | R2 | built | web-SPEC.md#8-47 |
-| web::turn::rounds_tests | crates/web/src/turn/rounds_tests.rs | the rounds through the production door | decision | R2 | built | web-SPEC.md#8-47 |
-| web::turn::reading_tests | crates/web/src/turn/reading_tests.rs | the reading through the production door | value | R2 | built | web-SPEC.md#8-47 |
 | web::city_view | crates/web/src/city_view.rs | the city page: the picture, the controls around it, and what a click means | projection | S4 | built | web-SPEC.md#8-13 |
 | web::city_view::page | crates/web/src/city_view/page.rs | the picture, the controls around it, and what a click means | projection | S4 | built | web-SPEC.md#8-13 |
 | web::city_view::text | crates/web/src/city_view/text.rs | the sentence that names the way into one building's own pages | projection | S4 | built | web-SPEC.md#8-13 |
@@ -805,7 +809,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | web::waiting | crates/web/src/waiting.rs | everything that cannot move until a person answers, in one place | decision | V3 | built | web-SPEC.md#8-64 |
 | web::record | crates/web/src/record.rs | one history, in three lenses, at one address | decision | V3 | built | web-SPEC.md#8-67 |
 
-### browser (12), protocol (5), bin (119)
+### browser (12), protocol (5), bin (133)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -848,7 +852,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::credentials | crates/sprawling/src/assembly/credentials.rs | what this city can sign in as, and what it may call | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::credentials::signing | crates/sprawling/src/assembly/credentials/signing.rs | a subscription login in two steps, the renewal before use, and the vault | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::credentials::endpoints | crates/sprawling/src/assembly/credentials/endpoints.rs | an endpoint probed before it is attached, and a model chosen for a tag | adapter | V3 | built | sprawling-SPEC.md#8-39 |
-| bin::assembly::credentials::tests | crates/sprawling/src/assembly/credentials/tests.rs | logins, enrolments and the endpoint a dispatch needs | adapter | V3 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::credentials::tests | crates/sprawling/src/assembly/credentials/tests.rs | the index of the credential tests | adapter | V3 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::credentials::tests::endpoints | crates/sprawling/src/assembly/credentials/tests/endpoints.rs | which models a city may reach, and what an adapter redeems at the wire | adapter | V3 | built | sprawling-SPEC.md#8-50 |
+| bin::assembly::credentials::tests::signing | crates/sprawling/src/assembly/credentials/tests/signing.rs | how a credential enters this city | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::mcp | crates/sprawling/src/assembly/mcp.rs | reaching the MCP servers a building's configuration names | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::dispatching | crates/sprawling/src/assembly/dispatching.rs | one dispatch, from what a person asked to the run that froze | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::dispatching::agreeing | crates/sprawling/src/assembly/dispatching/agreeing.rs | every refusal a dispatch can owe before it costs anything | adapter | V3 | built | sprawling-SPEC.md#8-39 |
@@ -862,7 +868,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::workbench::desks | crates/sprawling/src/assembly/workbench/desks.rs | the desks one dispatch lends out and takes back | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::workbench::tools | crates/sprawling/src/assembly/workbench/tools.rs | one registration feeding the catalogue and the bench, and the status tool | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::workbench::servers | crates/sprawling/src/assembly/workbench/servers.rs | the external tools a building's configuration names | adapter | V3 | built | sprawling-SPEC.md#8-39 |
-| bin::assembly::workbench::engine | crates/sprawling/src/assembly/workbench/engine.rs | the execution engine this build carries, and the shell a layer may ask for | adapter | V3 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::workbench::engine | crates/sprawling/src/assembly/workbench/engine.rs | the machine half of the exec tool, asked of doctor: the engine, the shell a layer asked for, the python component | adapter | V3 | built | sprawling-SPEC.md#8-50 |
 | bin::assembly::workbench::tests | crates/sprawling/src/assembly/workbench/tests.rs | rules that do not parse, neighbours, signals, and the engine arms | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::freezing | crates/sprawling/src/assembly/freezing.rs | what a run is frozen with: its plan, and the handoff that resumes it | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::freezing::tests | crates/sprawling/src/assembly/freezing/tests.rs | the freezing tests route | adapter | V3 | built | sprawling-SPEC.md#8-39 |
@@ -927,6 +933,13 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::doctor::screen | crates/sprawling/src/doctor/screen.rs | the report a person reads, and the one question asked per absent item | adapter | V4 | built | sprawling-SPEC.md#8-40 |
 | bin::doctor::probe | crates/sprawling/src/doctor/probe.rs | this machine answering: a program on the search path, its version under a deadline, one consented install | adapter | V4 | built | sprawling-SPEC.md#8-40 |
 | bin::doctor::tests | crates/sprawling/src/doctor/tests.rs | every row is detectable and either installable or manual, and consent is asked one item at a time | decision | V4 | built | sprawling-SPEC.md#8-40 |
+| bin::doctor::presence | crates/sprawling/src/doctor/presence.rs | this machine's answer about one item, in three states: present, broken with its fault, absent with its kind | value | V4 | built | sprawling-SPEC.md#8-50 |
+| bin::doctor::host | crates/sprawling/src/doctor/host.rs | the one door the rest of this binary asks what this machine has through: the browser engines, the python component, the shell, the execution engine | adapter | V4 | built | sprawling-SPEC.md#8-50 |
+| bin::doctor::needs | crates/sprawling/src/doctor/needs.rs | what one building's capability bits call for, and which of it this machine lacks | decision | V4 | built | sprawling-SPEC.md#8-48 |
+| bin::doctor::visit | crates/sprawling/src/doctor/visit.rs | walking a city's buildings and reading each one's bits, with a building that will not read reported rather than skipped | adapter | V4 | built | sprawling-SPEC.md#8-48 |
+| bin::doctor::explain | crates/sprawling/src/doctor/explain.rs | one refusal code connected to the items on this machine that can raise it, one line a person can act on per item | decision | V4 | built | sprawling-SPEC.md#8-48 |
+| bin::doctor::tests::faults | crates/sprawling/src/doctor/tests/faults.rs | the ugly paths: a binary that will not start, a variable naming nothing, a half-written component, a tool that says nothing | value | V4 | built | sprawling-SPEC.md#8-50 |
+| bin::doctor::tests::city | crates/sprawling/src/doctor/tests/city.rs | a building named for what it asks and this machine lacks, rules that will not read, and a code explained | decision | V4 | built | sprawling-SPEC.md#8-48 |
 | bin::wire_client | crates/sprawling/src/wire_client.rs | the second client of the wire: one frame out, every frame back, and enrolment from stdin | adapter | P3 | built | sprawling-SPEC.md#8-41 |
 | bin::console | crates/sprawling/src/console.rs | what a served city says to the terminal it is running in, and what a line typed there means | decision | P1 | built | sprawling-SPEC.md#8-30 |
 | bin::console::language | crates/sprawling/src/console/language.rs | the words a line may use and what each one asks for | decision | P1 | built | sprawling-SPEC.md#8-30 |
@@ -942,6 +955,11 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::views::holding | crates/sprawling/src/views/holding.rs | what the views hold and how one record folds in | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::answering | crates/sprawling/src/views/answering.rs | every question a page may ask, answered from the fold | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::commits | crates/sprawling/src/views/commits.rs | which run wrote a commit, folded from the records that announced it | projection | V4 | built | sprawling-SPEC.md#8-41 |
+| bin::views::rounds | crates/sprawling/src/views/rounds.rs | one session's records folded into the rounds a page reads | projection | F1 | built | sprawling-SPEC.md#8-50 |
+| bin::views::rounds::tests | crates/sprawling/src/views/rounds/tests.rs | the fold the view layer used to run, asserted here instead | projection | F1 | built | sprawling-SPEC.md#8-50 |
+| bin::views::rounds::reading_tests | crates/sprawling/src/views/rounds/reading_tests.rs | what one payload is read as, through the production door | projection | F1 | built | sprawling-SPEC.md#8-50 |
+| bin::views::evidence | crates/sprawling/src/views/evidence.rs | what a run wrote down as evidence: screenshots and closed plan nodes, as locators | projection | F1 | built | sprawling-SPEC.md#8-50 |
+| bin::views::cost_of | crates/sprawling/src/views/cost_of.rs | which runs claimed one plan node, and what they were billed | projection | F1 | built | sprawling-SPEC.md#8-50 |
 | bin::views::lines | crates/sprawling/src/views/lines.rs | one record rendered as the lines a page reads | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::tests | crates/sprawling/src/views/tests.rs | five views answer from the record, not from unavailable | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::governance_tests | crates/sprawling/src/views/governance_tests.rs | who answers and what was answered for the person, and a patch of a commit this city never wrote | projection | V4 | built | sprawling-SPEC.md#8-37 |

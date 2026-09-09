@@ -57,6 +57,7 @@ Violating any of these turns CI red with a message naming the rule, the violatio
 | One module, one file, semantically named. Register the file in the module map, then create it. Keep `lib.rs` and index files free of logic. | `xtask modmap` |
 | Keep a function inside 200 lines and 4 parameters, and a file inside 400 lines, tests included (re-priced from 1000 on 2026-09-05; the register in `budgets.toml` is the backlog). Values that always travel together are one value: give them a name. What predates a rule is listed in the register, may only shrink, and is struck once it is no longer needed. | `xtask length` with `xtask/budgets.toml` |
 | Default to `pub(crate)`. Declare a `pub` trait only in a file on the seam list. | `xtask depmap` |
+| Keep the client's lockfile in step with its manifest, its runtime dependencies exactly `solid-js` and `effect`, and every licence in its installed tree on the list `deny.toml` permits. | `xtask npm` |
 | Start every `.rs` file with the MPL-2.0 notice, then the copyright line. | `xtask header` |
 | Take the time as a parameter. The single sampling point is `bin::assembly`. | `clippy.toml` disallowed methods |
 | Use `BTreeMap` on kernel decision paths; keep floats out of ledger payloads; start tasks from the one spawn point. | review, plus the citysim determinism scenarios |
