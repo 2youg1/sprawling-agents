@@ -50,7 +50,8 @@ jobs:
               echo "$repo: moved ($head), issue already open"
               continue
             fi
-            body=$'## What moved\n\n`$path` in [$repo](https://github.com/$repo) has a newer commit than `$tracked`, which is what this repository\'s constants have read so far.\n\n- new commit: [`${head:0:12}`](https://github.com/$repo/blob/$head)\n- compare: <https://github.com/$repo/compare/$tracked...$head>\n\n## What to do\n\nThe provider intelligence followed here (docs/third-party.md section 1) needs re-checking against that diff: endpoints, client id, scopes, device-code flow. Realigning the constants and setting the new commit in the `Tracked to` column belong to the same change-set, so the watermark never runs ahead of what the code knows. Where two sources disagree, the provider\'s own documentation decides, not the majority.'
+            body=$(printf '## What moved\n\n\140%s\140 in [%s](https://github.com/%s) has a newer commit than \140%s\140, which is what this repository\047s constants have read so far.\n\n- new commit: [\140%s\140](https://github.com/%s/commit/%s)\n- compare: <https://github.com/%s/compare/%s...%s>\n\n## What to do\n\nThe provider intelligence followed here (docs/third-party.md section 1) needs re-checking against that diff: endpoints, client id, scopes, device-code flow. Realigning the constants and setting the new commit in the \140Tracked to\140 column belong to the same change-set, so the watermark never runs ahead of what the code knows. Where two sources disagree, the provider\047s own documentation decides, not the majority.' \
+              "$path" "$repo" "$repo" "$tracked" "${head:0:12}" "$repo" "$head" "$repo" "$tracked" "$head")
             gh issue create \
               --title "upstream watch: $repo moved" \
               --label upstream-watch \
