@@ -34,6 +34,7 @@ pub(crate) struct FrameWiring {
     pub(crate) filed: Signal<Option<channels::RegistryAnswer>>,
     pub(crate) vitals: Signal<Option<channels::MetricsAnswer>>,
     pub(crate) changes: Signal<Option<channels::ChangesAnswer>>,
+    pub(crate) rounds: Signal<Option<channels::RoundsAnswer>>,
     pub(crate) records: Signal<Vec<channels::EventRecord>>,
     pub(crate) view: Signal<View>,
     pub(crate) expecting: Signal<Option<String>>,
@@ -71,6 +72,7 @@ pub(crate) fn apply_frame(
         mut filed,
         mut vitals,
         mut changes,
+        mut rounds,
         mut records,
         mut view,
         mut expecting,
@@ -158,6 +160,7 @@ pub(crate) fn apply_frame(
             channels::Answer::Registry(held) => filed.set(Some(held)),
             channels::Answer::Metrics(held) => vitals.set(Some(*held)),
             channels::Answer::Changes(held) => changes.set(Some(held)),
+            channels::Answer::Rounds(held) => rounds.set(Some(*held)),
             // What happened before this tab opened. Folded into the
             // snapshot and kept for the pages that read history, in the
             // same bounded store the live stream fills - one answer to
@@ -187,6 +190,8 @@ pub(crate) fn apply_frame(
             | channels::Answer::Commit(_)
             | channels::Answer::Governance(_)
             | channels::Answer::Hunks(_)
+            | channels::Answer::Evidence(_)
+            | channels::Answer::CostOf(_)
             | channels::Answer::Unavailable { .. } => {}
         }
     }

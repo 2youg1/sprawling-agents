@@ -28,6 +28,7 @@ pub(crate) struct Wiring {
     pub(crate) filed: Signal<Option<channels::RegistryAnswer>>,
     pub(crate) vitals: Signal<Option<channels::MetricsAnswer>>,
     pub(crate) changes: Signal<Option<channels::ChangesAnswer>>,
+    pub(crate) rounds: Signal<Option<channels::RoundsAnswer>>,
     pub(crate) records: Signal<Vec<EventRecord>>,
     pub(crate) live: Signal<bool>,
     /// Which page is showing, so the run a person just asked for can be

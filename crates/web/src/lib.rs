@@ -45,7 +45,6 @@ mod shell;
 mod skyline;
 mod socket;
 mod theme;
-mod turn;
 mod vitals;
 mod waiting;
 
@@ -104,6 +103,5 @@ pub use theme::{CORNER_SCALES, continuity_order, superellipse_tenths};
 pub use theme::{INFORMATION_FLOOR, L_CEILING, L_FLOOR, MOTION_QUICK_MS, PROGRESS_DONE};
 pub use theme::{TEXT_SURFACE_CEILING, TEXT_TOKENS, TYPE_SCALE};
 pub use theme::{custom_properties, gamut_chroma_ceiling, per_mille, resolved_chroma};
-pub use turn::{Call, Note, OUTPUT_LINES, Outcome, Output, Turn, Used, opened_at, turns};
 pub use vitals::{Sign, Vitals, signs};
 pub use waiting::{Stalled, WaitingView, stalled};

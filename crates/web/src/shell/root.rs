@@ -58,6 +58,7 @@ pub fn Root(
     vitals: Option<channels::MetricsAnswer>,
     /// What the open session changed on disk, once the server has said.
     changes: Option<channels::ChangesAnswer>,
+    rounds: Option<channels::RoundsAnswer>,
     /// Whether frames are flowing yet.
     ///
     /// A page asks its question when it mounts, and the first mount
@@ -204,6 +205,7 @@ pub fn Root(
                             snapshot: snapshot.clone(),
                             records: records.clone(),
                             changes: changes.clone(),
+                            rounds: rounds.clone(),
                             cost: cost.clone(),
                             building: building.clone(),
                             steered: steered.clone(),

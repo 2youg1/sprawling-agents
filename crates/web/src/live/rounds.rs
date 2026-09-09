@@ -10,9 +10,33 @@ use dioxus::prelude::*;
 
 use super::commands::{cut_line, short_oid, tokens_line};
 
+/// The word for an outcome, as a message rather than a string, so a
+/// state cannot be the one English word left on a Chinese page.
+///
+/// A page's reading and not the wire's: the server answers which of the
+/// three states a call is in, and what that is called in front of a
+/// person is this crate's, taken from `web::lang` like every other word.
+fn outcome_word(outcome: channels::Outcome) -> Msg {
+    match outcome {
+        channels::Outcome::Waiting => Msg::TurnWaiting,
+        channels::Outcome::Answered => Msg::TurnAnswered,
+        channels::Outcome::Failed => Msg::TurnFailed,
+    }
+}
+
+/// The class a row takes, so lightness and a word carry the state
+/// together - colour is a redundant layer here as everywhere.
+fn outcome_class(outcome: channels::Outcome) -> &'static str {
+    match outcome {
+        channels::Outcome::Waiting => "out waiting",
+        channels::Outcome::Answered => "out answered",
+        channels::Outcome::Failed => "out failed",
+    }
+}
+
 /// The turns: one row per turn, what it did inside it.
 #[component]
-pub fn Rounds(turns: Vec<crate::turn::Turn>) -> Element {
+pub fn Rounds(turns: Vec<channels::Turn>) -> Element {
     let lang = use_context::<Signal<crate::lang::Lang>>();
     let word = move |msg: Msg| say(lang(), msg);
     rsx! {
@@ -65,8 +89,8 @@ pub fn Rounds(turns: Vec<crate::turn::Turn>) -> Element {
                                 if let Some(ref on) = call.subject {
                                     span { class: "arg", "{on}" }
                                 }
-                                span { class: "{call.outcome.class()}",
-                                    "{word(call.outcome.word())}"
+                                span { class: "{outcome_class(call.outcome)}",
+                                    "{word(outcome_word(call.outcome))}"
                                 }
                                 // Where the bytes are. The row shows a
                                 // shape; this addresses the rest of it.
@@ -90,7 +114,7 @@ pub fn Rounds(turns: Vec<crate::turn::Turn>) -> Element {
                         for note in round.notes {
                             div { key: "note-{note.at().value()}", class: "note",
                                 match note {
-                                    crate::turn::Note::Refused { ref error, .. } => {
+                                    channels::Note::Refused { ref error, .. } => {
                                         let said = crate::alert::refused(lang(), error);
                                         rsx! {
                                             span { class: "code", "{said.code}" }
@@ -98,15 +122,15 @@ pub fn Rounds(turns: Vec<crate::turn::Turn>) -> Element {
                                             span { class: "recovery", "{said.recovery}" }
                                         }
                                     }
-                                    crate::turn::Note::Fenced { oid, .. } => rsx! {
+                                    channels::Note::Fenced { oid, .. } => rsx! {
                                         span { class: "what",
                                             "{fill(word(Msg::NoteFenced), &[(\"oid\", &short_oid(oid))])}"
                                         }
                                     },
-                                    crate::turn::Note::Waiting { .. } => rsx! {
+                                    channels::Note::Waiting { .. } => rsx! {
                                         span { class: "what", "{word(Msg::NoteWaiting)}" }
                                     },
-                                    crate::turn::Note::Arrived { ref from, ref said, .. } => rsx! {
+                                    channels::Note::Arrived { ref from, ref said, .. } => rsx! {
                                         span { class: "what",
                                             "{fill(word(Msg::NoteArrived), &[(\"from\", from)])}"
                                         }
@@ -114,7 +138,7 @@ pub fn Rounds(turns: Vec<crate::turn::Turn>) -> Element {
                                             span { class: "arg", "{said}" }
                                         }
                                     },
-                                    crate::turn::Note::Discarded { count, .. } => rsx! {
+                                    channels::Note::Discarded { count, .. } => rsx! {
                                         span { class: "what",
                                             "{fill(word(Msg::NoteDiscarded), &[(\"count\", &count.to_string())])}"
                                         }

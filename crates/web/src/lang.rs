@@ -3369,7 +3369,7 @@ mod tests {
     /// a test that read the directory would be testing the machine it ran
     /// on. A view added without a line here is a view whose English can
     /// escape, which is the failure this table exists to make loud.
-    const VIEWS: [(&str, &str); 61] = [
+    const VIEWS: [(&str, &str); 59] = [
         ("alert.rs", include_str!("alert.rs")),
         ("board.rs", include_str!("board.rs")),
         ("app/rows.rs", include_str!("app/rows.rs")),
@@ -3399,7 +3399,6 @@ mod tests {
         ("live/rounds.rs", include_str!("live/rounds.rs")),
         ("live/stream.rs", include_str!("live/stream.rs")),
         ("live/composer.rs", include_str!("live/composer.rs")),
-        ("turn.rs", include_str!("turn.rs")),
         ("palette.rs", include_str!("palette.rs")),
         ("panel.rs", include_str!("panel.rs")),
         ("phase.rs", include_str!("phase.rs")),
@@ -3424,7 +3423,6 @@ mod tests {
         ("sessions/plan.rs", include_str!("sessions/plan.rs")),
         ("sessions/composer.rs", include_str!("sessions/composer.rs")),
         ("sessions/tables.rs", include_str!("sessions/tables.rs")),
-        ("turn/reading.rs", include_str!("turn/reading.rs")),
         (
             "building_view/page.rs",
             include_str!("building_view/page.rs"),

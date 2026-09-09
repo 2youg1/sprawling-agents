@@ -13,11 +13,11 @@
 //! table that drifted from the enum would let two builds agree on a hash
 //! while disagreeing on what a frame means.
 
-use kernel::{Address, GitOid, RunId, Seq};
+use kernel::{Address, GitOid, NodeId, RunId, Seq};
 use serde::{Deserialize, Serialize};
 
 /// The Query surface, in declaration order.
-pub const QUERY_NAMES: [&str; 17] = [
+pub const QUERY_NAMES: [&str; 20] = [
     "History",
     "RunHistory",
     "Changes",
@@ -35,6 +35,9 @@ pub const QUERY_NAMES: [&str; 17] = [
     "EndpointView",
     "BuildingView",
     "Governance",
+    "Rounds",
+    "Evidence",
+    "CostOf",
 ];
 
 /// Queries read state. They are cacheable and free of side effects, so none
@@ -157,6 +160,38 @@ pub enum Query {
     /// with nothing decided under it does not say whether it has ever
     /// been used.
     Governance,
+    /// One session, folded into the rounds a person reads.
+    ///
+    /// Answered server-side since card-6.5. The fold used to be
+    /// `web::turn`, which meant a second client had to reimplement it
+    /// to draw a session at all - and the wire is supposed to be the
+    /// whole API (ARCHITECTURE.md section 8).
+    ///
+    /// Bounded by [`HISTORY_MAX`](crate::HISTORY_MAX) records, which is
+    /// the same slice the client used to ask for with
+    /// [`Query::RunHistory`]: moving the fold must not quietly change
+    /// how much of a session it can see.
+    Rounds {
+        run: RunId,
+    },
+    /// What one run left that somebody can check it by: the screenshots
+    /// it stored and the completions it closed plan nodes with.
+    ///
+    /// Locators, never bytes. Fetching a picture is the asset
+    /// endpoint's, for the reason [`Query::Hunks`] is separate from
+    /// [`Query::Changes`]: one question must not carry the cost of
+    /// every answer somebody might go on to want.
+    Evidence {
+        run: RunId,
+    },
+    /// What one plan node has cost, and which runs spent it.
+    ///
+    /// A node nobody claimed answers zero, not `Unavailable`: "no run
+    /// has held this node" is a true answer. The money comes from
+    /// `memory::attribution` and is priced nowhere but `gateway::cost`.
+    CostOf {
+        node: NodeId,
+    },
 }
 
 impl Query {
@@ -181,6 +216,9 @@ impl Query {
             Self::BuildingView { .. } => "BuildingView",
             Self::Governance => "Governance",
             Self::Hunks { .. } => "Hunks",
+            Self::Rounds { .. } => "Rounds",
+            Self::Evidence { .. } => "Evidence",
+            Self::CostOf { .. } => "CostOf",
         }
     }
 }

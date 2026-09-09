@@ -28,7 +28,7 @@ pub(crate) fn run_id_line(lang: crate::lang::Lang, run: RunId) -> String {
 
 /// What one turn spent in tokens, said. Absolute counts: the wire
 /// carries no context window, so there is no denominator to divide by.
-pub(crate) fn tokens_line(lang: crate::lang::Lang, used: crate::turn::Used) -> String {
+pub(crate) fn tokens_line(lang: crate::lang::Lang, used: channels::Used) -> String {
     fill(
         say(lang, Msg::TurnTokens),
         &[

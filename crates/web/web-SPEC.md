@@ -2036,3 +2036,12 @@ REVIEW 那句「`city::neighbourhood` 有查询，`crates/web/src` 没有页面�
 - **`dispatch_command` 去掉 `budget`**。原文档写着「不从人那里收预算，`BudgetCap::default()` 是线上带的那个值」；现在线上根本没有那个字段，所以那句话改成「这条帧没有上限可带」。派活条的观感一字未改——它本来就既不问也不显示。
 - **新增 `put_document_command(which, body)`**，`web::command` 的第三个构造点。空正文当场退回而不发帧：一条带空正文的帧会让市长没有身份文件，而清空一份文件是删除，这座城没有那个动词。
 - **客户端还欠一个屏（前端冻结，本卡不画）**：设置面需要一个能编辑 `MAYOR.md`／`CLERK.md`／`PREFERENCES.md` 的框，一个读 `Query::Governance` 的读面（谁来答、替你答过什么），以及一个读 `Query::Hunks` 的补丁视图——被扣下的行按行号与原因画一行占位，**恒不隐藏**，与回收站对读不懂的恢复方案的口径同形。三者的措辞须经 `web::lang`，两种语言各一份。
+
+## 8-68 `web::turn` 整个删掉：回合由服务端答（card-6.5）
+
+`web::turn`（`reading`、`rounds` 与三份测试）从本 crate 消失。它折的东西现在是 `Query::Rounds` 的答（channels-SPEC §8-21，服务端在 sprawling-SPEC §8-47），本 crate 只是读它：`web::session::page` 与 `web::live::page` 拿 `Option<channels::RoundsAnswer>`，走的是 `changes`／`cost` 已经走了很久的那条路——`shell::client` 持信号、`mount::frame` 收答、`shell::root` 往下传。
+
+- **搬家不留桥**：本 crate 里没有任何东西再折回合，也没有留一个把答翻成旧类型的适配器。留一个就是两个权威，而漂掉的那个总是没人读的那个。
+- **留在本 crate 的只有措辞**：`Outcome` 的那个词与那个 class 是页面的读法而不是线的，故它们成了 `web::live::rounds` 里的两个私有函数，词仍取自 `web::lang`（`xtask wording` 那一条不动）。
+- **`web::app::fold` 改调 `channels::said_in`**：客户端把推来的 `model_returned` 折进自己的快照仍然要读那句话，而那条读法现在只有一处（`channels::reading`）。
+- **本 crate 是仍在发布的那个客户端**，所以判据是它照编译、页照工作；新客户端读同一个答，欠的只是画法。

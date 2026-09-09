@@ -20,6 +20,7 @@ mod auth;
 mod carried_name;
 mod command;
 mod control;
+mod reading;
 #[cfg(feature = "server")]
 mod reception;
 #[cfg(feature = "server")]
@@ -33,8 +34,10 @@ pub use answer::RunSummary;
 pub use answer::{Answer, ApprovalsAnswer, ArchiveLine, BlockedLine, BuildingProgress};
 pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
 pub use answer::{BuildingAnswer, BuildingDoc};
+pub use answer::{Call, Note, Outcome, Output, RoundsAnswer, Turn, Used};
 pub use answer::{ChangesAnswer, CommitAnswer, HISTORY_MAX, HistoryAnswer};
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer, EndpointSummary, EndpointsAnswer};
+pub use answer::{CostOfAnswer, EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use answer::{Decision, GovernanceAnswer};
 pub use answer::{HunksAnswer, PatchLine, Withheld};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
@@ -48,6 +51,7 @@ pub use command::{GovernedDocument, HaltScope, LoginStep, NoSecret, PursuitStep}
 pub use control::{ControlVerdict, Intervention, classify};
 pub use kernel::{FileChange, How, Lines};
 pub use kernel::{Span, Token, markdown};
+pub use reading::{OUTPUT_LINES, note_of, output_in, said_in, subject_of, text, used_in};
 #[cfg(feature = "server")]
 pub use reception::{BindFace, BindVerdict, HandshakeVerdict};
 #[cfg(feature = "server")]

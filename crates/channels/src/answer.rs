@@ -21,9 +21,17 @@ use kernel::{
 use serde::{Deserialize, Serialize};
 
 mod building;
+mod cost_of;
+mod evidence;
+mod hunks;
+mod rounds;
 
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
+pub use cost_of::CostOfAnswer;
+pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
+pub use hunks::{HunksAnswer, PatchLine, Withheld};
+pub use rounds::{Call, Note, Outcome, Output, RoundsAnswer, Turn, Used};
 
 /// A slice of the one history, oldest first.
 ///
@@ -209,45 +217,10 @@ pub enum Answer {
     Metrics(Box<MetricsAnswer>),
     Governance(GovernanceAnswer),
     Hunks(Box<HunksAnswer>),
+    Rounds(Box<RoundsAnswer>),
+    Evidence(EvidenceAnswer),
+    CostOf(CostOfAnswer),
     Unavailable { query: String },
-}
-
-/// One file's patch text between two checkpoints, and what could not be
-/// shown.
-///
-/// Both ends travel back with the answer because they are what makes it
-/// cacheable: two commit ids never change, so whoever asked may keep
-/// this for as long as they like.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct HunksAnswer {
-    pub oid_a: GitOid,
-    pub oid_b: GitOid,
-    pub path: String,
-    pub lines: Vec<PatchLine>,
-    /// Lines that matched a credential shape. They are named and not
-    /// echoed, for the reason a staged blob's scan gives about its own
-    /// hits: printing the bytes to prove a leak is the leak.
-    pub withheld: Vec<Withheld>,
-}
-
-/// One line of patch text, numbered from the top of the patch so a
-/// withheld line and the lines around it read as one list.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct PatchLine {
-    pub number: u32,
-    pub text: String,
-}
-
-/// One line that was not echoed, and what matched it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct Withheld {
-    pub number: u32,
-    /// A provider's own key shape by name, or the entropy judgement when
-    /// no shape claimed it. Never the bytes.
-    pub reason: String,
 }
 
 /// Who answers for this city, and what was answered on the person's

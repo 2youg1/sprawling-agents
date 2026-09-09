@@ -111,6 +111,12 @@ pub(crate) struct Views {
     /// rather than keyed, because an answer is a thing that happened
     /// once and the order is what makes the list readable.
     pub(super) decided: Vec<channels::Decision>,
+    /// Which runs have held each plan node, folded from
+    /// `roadmap_claimed`. It is what turns "what did node 2.3 cost"
+    /// into a question `memory::attribution` can answer, and it is a
+    /// `BTreeMap` because this is a path a query is answered from.
+    pub(super) claims:
+        std::collections::BTreeMap<kernel::NodeId, std::collections::BTreeSet<kernel::RunId>>,
 }
 
 impl Views {
@@ -137,6 +143,7 @@ impl Views {
             pursuits: std::collections::BTreeMap::new(),
             autonomy: kernel::consts_policy::AUTONOMY_DEFAULT,
             decided: Vec::new(),
+            claims: std::collections::BTreeMap::new(),
         }
     }
 
@@ -192,6 +199,21 @@ impl Views {
                     if let Some(held) = self.discards.get_mut(&line.path) {
                         held.restored = true;
                     }
+                }
+            }
+            EventKind::RoadmapClaimed => {
+                // The claim names the node; the record names the run
+                // that made it. Nothing is removed when the node is put
+                // down: what a node cost is what it cost, and a run that
+                // released it still spent the money.
+                if let Some(node) = record
+                    .data()
+                    .as_map()
+                    .get("node")
+                    .and_then(serde_json::Value::as_str)
+                    .and_then(|held| kernel::NodeId::parse(held).ok())
+                {
+                    self.claims.entry(node).or_default().insert(record.run());
                 }
             }
             EventKind::CheckpointCommitted | EventKind::PrMerged => self.fold_commit(record),

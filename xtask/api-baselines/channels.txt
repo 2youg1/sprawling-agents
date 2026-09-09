@@ -3,6 +3,7 @@ impl channels::CityLabel
 impl channels::ClientAssets
 impl channels::Intervention
 impl channels::ModeTag
+impl channels::Note
 impl channels::PairingToken
 impl channels::ProviderName
 impl channels::Query
@@ -29,14 +30,17 @@ pub channels::Answer::Changes(channels::ChangesAnswer)
 pub channels::Answer::City(channels::CityAnswer)
 pub channels::Answer::Commit(channels::CommitAnswer)
 pub channels::Answer::Cost(alloc::boxed::Box<channels::CostAnswer>)
+pub channels::Answer::CostOf(channels::CostOfAnswer)
 pub channels::Answer::Discards(channels::DiscardAnswer)
 pub channels::Answer::Endpoints(channels::EndpointsAnswer)
+pub channels::Answer::Evidence(channels::EvidenceAnswer)
 pub channels::Answer::Governance(channels::GovernanceAnswer)
 pub channels::Answer::History(alloc::boxed::Box<channels::HistoryAnswer>)
 pub channels::Answer::Hunks(alloc::boxed::Box<channels::HunksAnswer>)
 pub channels::Answer::Inbox(channels::InboxAnswer)
 pub channels::Answer::Metrics(alloc::boxed::Box<channels::MetricsAnswer>)
 pub channels::Answer::Registry(channels::RegistryAnswer)
+pub channels::Answer::Rounds(alloc::boxed::Box<channels::RoundsAnswer>)
 pub channels::Answer::Run(core::option::Option<channels::RunSummary>)
 pub channels::Answer::Unavailable
 pub channels::Answer::Unavailable::query: alloc::string::String
@@ -81,6 +85,11 @@ pub channels::BuildingProgress::blocked: alloc::vec::Vec<channels::BlockedLine>
 pub channels::BuildingProgress::problems: alloc::vec::Vec<alloc::string::String>
 pub channels::BuildingProgress::progress: kernel::completion::Progress
 pub channels::BuildingProgress::ready: u32
+pub channels::Call::at: kernel::event::identity::Seq
+pub channels::Call::outcome: channels::Outcome
+pub channels::Call::output: core::option::Option<channels::Output>
+pub channels::Call::subject: core::option::Option<alloc::string::String>
+pub channels::Call::tool: alloc::string::String
 pub channels::ChangesAnswer::base: kernel::locator::GitOid
 pub channels::ChangesAnswer::files: alloc::vec::Vec<kernel::change::FileChange>
 pub channels::ChangesAnswer::head: core::option::Option<kernel::locator::GitOid>
@@ -222,6 +231,9 @@ pub channels::CostAnswer::by_segment: alloc::vec::Vec<(alloc::string::String, ke
 pub channels::CostAnswer::by_skill: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub channels::CostAnswer::by_tool: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub channels::CostAnswer::total: kernel::budget::UsdMicros
+pub channels::CostOfAnswer::node: kernel::node_id::NodeId
+pub channels::CostOfAnswer::runs: alloc::vec::Vec<(kernel::event::identity::RunId, kernel::budget::UsdMicros)>
+pub channels::CostOfAnswer::spent: kernel::budget::UsdMicros
 pub channels::Decision::at: kernel::event::identity::TimeMs
 pub channels::Decision::cluster: kernel::approval::ClusterKey
 pub channels::Decision::item: alloc::string::String
@@ -246,6 +258,14 @@ pub channels::EndpointSummary::models: alloc::vec::Vec<alloc::string::String>
 pub channels::EndpointSummary::name: alloc::string::String
 pub channels::EndpointsAnswer::chosen: alloc::vec::Vec<channels::ChosenSummary>
 pub channels::EndpointsAnswer::endpoints: alloc::vec::Vec<channels::EndpointSummary>
+pub channels::EvidenceAnswer::items: alloc::vec::Vec<channels::EvidenceItem>
+pub channels::EvidenceAnswer::run: kernel::event::identity::RunId
+pub channels::EvidenceItem::at: kernel::event::identity::Seq
+pub channels::EvidenceItem::kind: channels::EvidenceKind
+pub channels::EvidenceItem::locator: kernel::locator::Locator
+pub channels::EvidenceItem::picture: core::option::Option<channels::Picture>
+pub channels::EvidenceKind::Finished
+pub channels::EvidenceKind::Screenshot
 pub channels::Forwarded::address: alloc::string::String
 pub channels::Forwarded::query: channels::Query
 pub channels::GovernanceAnswer::autonomy: kernel::approval::Autonomy
@@ -286,8 +306,31 @@ pub channels::MetricsAnswer::events: u64
 pub channels::MetricsAnswer::runs_active: u64
 pub channels::MetricsAnswer::runs_frozen: u64
 pub channels::MetricsAnswer::signals_waiting: u64
+pub channels::Note::Arrived
+pub channels::Note::Arrived::at: kernel::event::identity::Seq
+pub channels::Note::Arrived::from: alloc::string::String
+pub channels::Note::Arrived::said: alloc::string::String
+pub channels::Note::Discarded
+pub channels::Note::Discarded::at: kernel::event::identity::Seq
+pub channels::Note::Discarded::count: usize
+pub channels::Note::Fenced
+pub channels::Note::Fenced::at: kernel::event::identity::Seq
+pub channels::Note::Fenced::oid: kernel::locator::GitOid
+pub channels::Note::Refused
+pub channels::Note::Refused::at: kernel::event::identity::Seq
+pub channels::Note::Refused::error: kernel::error::shape::AxError
+pub channels::Note::Waiting
+pub channels::Note::Waiting::at: kernel::event::identity::Seq
+pub channels::Outcome::Answered
+pub channels::Outcome::Failed
+pub channels::Outcome::Waiting
+pub channels::Output::cut: usize
+pub channels::Output::head: alloc::string::String
 pub channels::PatchLine::number: u32
 pub channels::PatchLine::text: alloc::string::String
+pub channels::Picture::height: u32
+pub channels::Picture::media_type: alloc::string::String
+pub channels::Picture::width: u32
 pub channels::PlanRow::evidence: core::option::Option<alloc::string::String>
 pub channels::PlanRow::item: alloc::string::String
 pub channels::PlanRow::leaf: bool
@@ -316,9 +359,13 @@ pub channels::Query::Changes::head: core::option::Option<kernel::locator::GitOid
 pub channels::Query::CityView
 pub channels::Query::Commit
 pub channels::Query::Commit::oid: kernel::locator::GitOid
+pub channels::Query::CostOf
+pub channels::Query::CostOf::node: kernel::node_id::NodeId
 pub channels::Query::CostView
 pub channels::Query::DiscardView
 pub channels::Query::EndpointView
+pub channels::Query::Evidence
+pub channels::Query::Evidence::run: kernel::event::identity::RunId
 pub channels::Query::Governance
 pub channels::Query::History
 pub channels::Query::History::before: core::option::Option<kernel::event::identity::Seq>
@@ -331,6 +378,8 @@ pub channels::Query::InboxView
 pub channels::Query::InboxView::addr: kernel::address::Address
 pub channels::Query::Metrics
 pub channels::Query::RegistryView
+pub channels::Query::Rounds
+pub channels::Query::Rounds::run: kernel::event::identity::RunId
 pub channels::Query::RunHistory
 pub channels::Query::RunHistory::before: core::option::Option<kernel::event::identity::Seq>
 pub channels::Query::RunHistory::limit: u32
@@ -342,6 +391,9 @@ pub channels::RegistryLine::addr: kernel::address::Address
 pub channels::RegistryLine::at: kernel::event::identity::TimeMs
 pub channels::RegistryLine::kind: alloc::string::String
 pub channels::RegistryLine::subject: alloc::string::String
+pub channels::RoundsAnswer::opened_at: core::option::Option<kernel::locator::GitOid>
+pub channels::RoundsAnswer::run: kernel::event::identity::RunId
+pub channels::RoundsAnswer::turns: alloc::vec::Vec<channels::Turn>
 pub channels::RunSummary::frozen: bool
 pub channels::RunSummary::last_kind: kernel::event::kind::EventKind
 pub channels::RunSummary::last_seq: kernel::event::identity::Seq
@@ -377,9 +429,20 @@ pub channels::SignalLine::at: kernel::event::identity::TimeMs
 pub channels::SignalLine::from: alloc::string::String
 pub channels::SignalLine::id: alloc::string::String
 pub channels::SignalLine::kind: alloc::string::String
+pub channels::Turn::calls: alloc::vec::Vec<channels::Call>
+pub channels::Turn::notes: alloc::vec::Vec<channels::Note>
+pub channels::Turn::number: u32
+pub channels::Turn::opened: kernel::event::identity::Seq
+pub channels::Turn::said: core::option::Option<alloc::string::String>
+pub channels::Turn::spent: core::option::Option<kernel::budget::UsdMicros>
+pub channels::Turn::stopped: core::option::Option<alloc::string::String>
+pub channels::Turn::used: core::option::Option<channels::Used>
 pub channels::Upstream::address: alloc::string::String
 pub channels::Upstream::label: channels::CityLabel
 pub channels::Upstream::token_digest: core::option::Option<kernel::locator::B3Hash>
+pub channels::Used::cached: kernel::budget::Tokens
+pub channels::Used::input: kernel::budget::Tokens
+pub channels::Used::output: kernel::budget::Tokens
 pub channels::Welcome::city: core::option::Option<kernel::address::Address>
 pub channels::Welcome::resume_from: core::option::Option<kernel::event::identity::Seq>
 pub channels::Welcome::schema: kernel::locator::B3Hash
@@ -388,7 +451,8 @@ pub channels::Withheld::number: u32
 pub channels::Withheld::reason: alloc::string::String
 pub const channels::COMMAND_NAMES: [&str; 24]
 pub const channels::HISTORY_MAX: u32
-pub const channels::QUERY_NAMES: [&str; 17]
+pub const channels::OUTPUT_LINES: usize
+pub const channels::QUERY_NAMES: [&str; 20]
 pub const channels::WIRE_V: u32
 pub enum channels::Answer
 pub enum channels::AssetReply
@@ -399,12 +463,15 @@ pub enum channels::ClientFrame
 pub enum channels::Command<Secret>
 pub enum channels::ControlVerdict
 pub enum channels::Delivered
+pub enum channels::EvidenceKind
 pub enum channels::GovernedDocument
 pub enum channels::HaltScope
 pub enum channels::HandshakeVerdict
 pub enum channels::Intervention
 pub enum channels::LoginStep
 pub enum channels::NoSecret
+pub enum channels::Note
+pub enum channels::Outcome
 pub enum channels::PursuitStep
 pub enum channels::Query
 pub enum channels::ServerFrame
@@ -427,6 +494,7 @@ pub fn channels::ModeTag::as_str(&self) -> &str
 pub fn channels::ModeTag::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::NoSecret::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn channels::NoSecret::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+pub fn channels::Note::at(&self) -> kernel::event::identity::Seq
 pub fn channels::PairingToken::digest(&self) -> kernel::locator::B3Hash
 pub fn channels::PairingToken::from_configured(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::PairingToken::mint([u8; 32]) -> (Self, alloc::string::String)
@@ -445,8 +513,14 @@ pub fn channels::classify(&channels::Command) -> channels::ControlVerdict
 pub fn channels::decide_bind(&core::net::socket_addr::SocketAddr, bool) -> channels::BindVerdict
 pub fn channels::decide_frame(channels::SessionState, channels::ClientFrame, core::option::Option<&kernel::locator::B3Hash>, core::option::Option<&kernel::address::Address>) -> channels::SessionStep
 pub fn channels::decide_handshake(&channels::Hello, &channels::Welcome, core::option::Option<&kernel::locator::B3Hash>) -> channels::HandshakeVerdict
+pub fn channels::note_of(kernel::event::kind::EventKind, &kernel::event::payload::EventRecord) -> core::option::Option<channels::Note>
+pub fn channels::output_in(&serde_json::value::Value) -> core::option::Option<channels::Output>
 pub fn channels::router(&channels::ServeConfig) -> axum::routing::Router
+pub fn channels::said_in(&serde_json::value::Value) -> core::option::Option<alloc::string::String>
 pub fn channels::schema_hash() -> kernel::locator::B3Hash
+pub fn channels::subject_of(core::option::Option<&serde_json::value::Value>) -> core::option::Option<alloc::string::String>
+pub fn channels::text(core::option::Option<&serde_json::value::Value>) -> core::option::Option<alloc::string::String>
+pub fn channels::used_in(&serde_json::value::Value) -> core::option::Option<channels::Used>
 pub fn channels::verify(core::option::Option<&str>, &kernel::locator::B3Hash) -> bool
 pub mod channels
 pub struct channels::AcpBody
@@ -460,12 +534,14 @@ pub struct channels::BlockedLine
 pub struct channels::BuildingAnswer
 pub struct channels::BuildingDoc
 pub struct channels::BuildingProgress
+pub struct channels::Call
 pub struct channels::ChangesAnswer
 pub struct channels::ChosenSummary
 pub struct channels::CityAnswer
 pub struct channels::CityLabel(_)
 pub struct channels::CommitAnswer
 pub struct channels::CostAnswer
+pub struct channels::CostOfAnswer
 pub struct channels::Decision
 pub struct channels::Delta
 pub struct channels::DiscardAnswer
@@ -473,6 +549,8 @@ pub struct channels::DiscardLine
 pub struct channels::EmbeddedFile
 pub struct channels::EndpointSummary
 pub struct channels::EndpointsAnswer
+pub struct channels::EvidenceAnswer
+pub struct channels::EvidenceItem
 pub struct channels::Forwarded
 pub struct channels::GovernanceAnswer
 pub struct channels::Hello
@@ -481,21 +559,26 @@ pub struct channels::HunksAnswer
 pub struct channels::InboxAnswer
 pub struct channels::MetricsAnswer
 pub struct channels::ModeTag(_)
+pub struct channels::Output
 pub struct channels::PairingToken(_)
 pub struct channels::PatchLine
+pub struct channels::Picture
 pub struct channels::PlanRow
 pub struct channels::ProviderName(_)
 pub struct channels::PursuitLine
 pub struct channels::RegistryAnswer
 pub struct channels::RegistryLine
 pub struct channels::Reply(_)
+pub struct channels::RoundsAnswer
 pub struct channels::RunSummary
 pub struct channels::ServeConfig
 pub struct channels::Sighting
 pub struct channels::SignalLine
 pub struct channels::TemplateName(_)
+pub struct channels::Turn
 pub struct channels::UploadId(_)
 pub struct channels::Upstream
+pub struct channels::Used
 pub struct channels::Welcome
 pub struct channels::Withheld
 pub type channels::AcpSink = alloc::sync::Arc<(dyn core::ops::function::Fn(channels::AcpBody, bool) -> core::result::Result<channels::AcpProgress, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>

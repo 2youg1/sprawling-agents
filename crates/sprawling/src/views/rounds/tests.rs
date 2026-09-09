@@ -11,11 +11,15 @@
     reason = "test code"
 )]
 
-//! The rounds through the production door.
+//! The fold the view layer used to run, asserted here instead.
+//!
+//! Every assertion below was `web::turn::rounds_tests`, unchanged: the
+//! view layer's own tests are the record of what it computed, so a
+//! server-side fold that satisfies them is a server-side fold that
+//! answers what the view layer answered for the same session.
 
-use super::super::reading::Outcome;
-use super::super::rounds::turns;
-use channels::{B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
+use super::{opened_at, turns};
+use channels::{B3Hash, EventDraft, EventKind, EventRecord, Outcome, Payload, RunId, Seq, TimeMs};
 
 fn record(seq: u64, kind: EventKind, data: serde_json::Value) -> EventRecord {
     let map = data.as_object().expect("a payload is an object").clone();
@@ -139,7 +143,7 @@ fn work_before_the_first_turn_belongs_to_no_turn() {
 
 #[test]
 fn a_call_whose_arguments_this_build_cannot_read_still_gets_a_row() {
-    // Fail-open for a view: a client one version behind must show the
+    // Fail-open for a view: a reader one version behind must show the
     // call it cannot parse, not hide it.
     let odd = record(
         2,
@@ -172,4 +176,84 @@ fn a_tool_with_no_preferred_key_is_still_named_by_what_it_acted_on() {
 fn the_bytes_stay_addressable_because_every_call_carries_its_seq() {
     let events = [asked(1), called(9, "a", "read", "x")];
     assert_eq!(turns(&events)[0].calls[0].at, Seq::new(9));
+}
+
+/// The base a change list is addressed by is the session's first fence,
+/// not its latest one - the same reading `web::live::page` used to do
+/// for itself with `crate::turn::opened_at`.
+#[test]
+fn the_change_base_is_the_first_fence_of_the_session() {
+    let fence = |seq: u64, oid: &str| {
+        record(
+            seq,
+            EventKind::CheckpointCommitted,
+            serde_json::json!({ "oid": oid }),
+        )
+    };
+    let first = "a".repeat(40);
+    let second = "b".repeat(40);
+    let events = [asked(1), fence(2, &first), asked(3), fence(4, &second)];
+    let folded = turns(&events);
+    assert_eq!(
+        opened_at(&folded).map(|oid| oid.to_string()),
+        Some(first),
+        "the tree as the work found it"
+    );
+}
+
+/// The whole point of the card, asserted through the production door:
+/// a page that asks `Query::Rounds` is handed exactly what the view
+/// layer used to fold for itself out of the same records.
+#[test]
+fn asking_for_rounds_answers_the_fold_the_view_layer_ran() {
+    use kernel::Ledger;
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::assembly::init_city(dir.path()).unwrap();
+    let run = RunId::from_bytes([7u8; 16]);
+    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, TimeMs::new(9))
+        .unwrap()
+        .0;
+    let drafts = [
+        (EventKind::ModelCalled, serde_json::json!({})),
+        (
+            EventKind::ToolCalled,
+            serde_json::json!({ "id": "a", "name": "read", "args": { "path": "src/lex.rs" } }),
+        ),
+        (
+            EventKind::ToolResult,
+            serde_json::json!({ "tool_use_id": "a", "name": "read", "result": "412 lines" }),
+        ),
+    ];
+    for (kind, data) in drafts {
+        ledger
+            .append(EventDraft {
+                run,
+                t: TimeMs::new(9),
+                who: "lab/parser".to_owned(),
+                addr: None,
+                kind,
+                data: Payload::new(data.as_object().unwrap().clone()).unwrap(),
+                ig: false,
+            })
+            .unwrap();
+    }
+    drop(ledger);
+
+    let mut views = crate::assembly::rebuild_views(&report.ledger_dir).unwrap();
+    let channels::Answer::Rounds(answer) = views.answer(&channels::Query::Rounds { run }) else {
+        panic!("Rounds answers with rounds");
+    };
+    let records = views.records_of(run);
+    assert_eq!(answer.run, run);
+    assert_eq!(
+        answer.turns,
+        turns(records.iter()),
+        "the server's answer is the view layer's fold of the same records"
+    );
+    assert_eq!(answer.turns.len(), 1, "one model call, one round");
+    assert_eq!(answer.turns[0].calls[0].outcome, Outcome::Answered);
+    assert_eq!(
+        answer.turns[0].calls[0].subject.as_deref(),
+        Some("src/lex.rs")
+    );
 }

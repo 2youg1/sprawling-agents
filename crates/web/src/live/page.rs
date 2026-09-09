@@ -21,12 +21,14 @@ use super::stream::Stream;
 #[component]
 pub fn LiveView(
     feed: Feed,
-    /// The same records the feed holds, folded into rounds.
+    /// The rounds the server folded for this session, when it has been
+    /// asked and has answered. `None` is "not asked yet", which is a
+    /// different thing from "this session has no rounds".
     ///
-    /// Passed rather than folded here because `Feed` keeps lines and not
-    /// records: it is the window, and the window's job is to say what it
-    /// dropped. Two readings of one list, never two lists.
-    turns: Vec<crate::turn::Turn>,
+    /// The fold is the server's since card-6.5: a second client must be
+    /// able to draw a session without reimplementing it, so it lives
+    /// where the wire can reach it and not in this crate.
+    rounds: Option<channels::RoundsAnswer>,
     run: Option<RunId>,
     /// Every run the client knows of, newest first, with the word the
     /// page shows for its phase.
@@ -70,6 +72,10 @@ pub fn LiveView(
                 before: None,
                 limit: channels::HISTORY_MAX,
             }));
+            // The same records, folded. Asked in the same breath as the
+            // slice they come from, so a page never shows a stream with
+            // no rounds beside it.
+            on_frame.call(ClientFrame::Query(channels::Query::Rounds { run: id }));
         }
     }));
     // What this session has changed on disk.
@@ -78,7 +84,11 @@ pub fn LiveView(
     // wave still running counts: the tree is what a person is looking
     // at, not the tree git last recorded. Asked once per base, because
     // the base does not move while a session is open.
-    let opened = crate::turn::opened_at(&turns);
+    let turns: Vec<channels::Turn> = rounds
+        .as_ref()
+        .map(|held| held.turns.clone())
+        .unwrap_or_default();
+    let opened = rounds.as_ref().and_then(|held| held.opened_at);
     let fenced = use_signal(|| None::<channels::GitOid>);
     use_effect(use_reactive!(|(opened, live)| {
         let mut fenced = fenced;

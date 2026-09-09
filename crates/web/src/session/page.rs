@@ -27,6 +27,9 @@ pub fn SessionView(
     records: Vec<channels::EventRecord>,
     /// What this session changed on disk, once the server has said.
     changes: Option<channels::ChangesAnswer>,
+    /// This session folded into rounds, once the server has said. The
+    /// fold is `bin::views::rounds`'; this page only draws it.
+    rounds: Option<channels::RoundsAnswer>,
     /// This city's spend, for the one row that belongs to this run.
     cost: Option<channels::CostAnswer>,
     /// The building this room is in, for the documents tab.
@@ -133,7 +136,7 @@ pub fn SessionView(
                 }
                 crate::live::LiveView {
                     feed: crate::live::Feed::replay(mine.iter(), Some(run), true),
-                    turns: crate::turn::turns(mine.iter()),
+                    rounds: rounds.clone(),
                     run: Some(run),
                     runs: Vec::new(),
                     following: following(),

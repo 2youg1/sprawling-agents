@@ -77,7 +77,7 @@ impl Snapshot {
                     .data()
                     .as_map()
                     .get("message")
-                    .and_then(crate::turn::said_in);
+                    .and_then(channels::said_in);
                 let billed = event
                     .data()
                     .as_map()

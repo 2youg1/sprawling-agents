@@ -50,7 +50,10 @@ use serde::{Deserialize, Serialize};
 ///    (card-2.4).
 /// 15: that answer carries the lineage of the run - the successors
 ///    a resident replaced itself through (card-11.6).
-pub const WIRE_V: u32 = 15;
+/// 16: three readings a page used to compute for itself are questions
+///    the server answers - a session's rounds, what a run left as
+///    evidence, and what one plan node cost (card-6.5).
+pub const WIRE_V: u32 = 16;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
@@ -218,6 +221,15 @@ mod tests {
                 addr: Address::parse("acme").unwrap(),
             },
             Query::Governance,
+            Query::Rounds {
+                run: RunId::from_bytes([1u8; 16]),
+            },
+            Query::Evidence {
+                run: RunId::from_bytes([1u8; 16]),
+            },
+            Query::CostOf {
+                node: kernel::NodeId::parse("2.3").unwrap(),
+            },
         ];
         assert_eq!(queries.len(), QUERY_NAMES.len());
         for (query, expected) in queries.iter().zip(QUERY_NAMES) {

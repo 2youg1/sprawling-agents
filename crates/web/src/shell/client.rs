@@ -77,6 +77,10 @@ pub fn App() -> Element {
     // What the open session changed on disk. An answer, so it is held
     // beside the others and a reload asks again rather than trusting it.
     let changes = use_signal(|| None::<channels::ChangesAnswer>);
+    // The same session, folded into rounds by the server. Held beside
+    // the other answers for the same reason they are: a reload asks
+    // again rather than trusting what a tab kept.
+    let rounds = use_signal(|| None::<channels::RoundsAnswer>);
     let live = use_signal(|| false);
     // What the keyboard opened. Held here rather than inside `Root`
     // because the listener that sets them is registered once for the
@@ -111,6 +115,7 @@ pub fn App() -> Element {
         filed,
         vitals,
         changes,
+        rounds,
         records,
         live,
         view,
@@ -139,6 +144,7 @@ pub fn App() -> Element {
             steered: steered(),
             vitals: vitals(),
             changes: changes(),
+            rounds: rounds(),
             live,
             on_frame: move |frame: channels::ClientFrame| {
                 if let Some(room) = room_asked_for(&frame) {

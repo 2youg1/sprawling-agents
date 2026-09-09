@@ -12,14 +12,17 @@
 )]
 
 //! The reading through the production door.
+//!
+//! `web::turn::reading_tests` verbatim, following the reading it tests:
+//! the payload readers are `channels::reading` since card-6.5, and the
+//! fold that calls them is this module.
 
-use super::super::reading::Note;
-use super::super::reading::OUTPUT_LINES;
-use super::super::rounds::turns;
+use super::turns;
 use channels::{
     AxCode, AxError, B3Hash, EventDraft, EventKind, EventRecord, GitOid, Payload, RunId, Seq,
     TimeMs, Tokens, UsdMicros,
 };
+use channels::{Note, OUTPUT_LINES};
 
 fn record(seq: u64, kind: EventKind, data: serde_json::Value) -> EventRecord {
     let map = data.as_object().expect("a payload is an object").clone();

@@ -241,6 +241,16 @@ impl Views {
                 }
             }
             channels::Query::Commit { oid } => self.commit_answer(*oid),
+            // Three readings that used to run in the browser, answered
+            // here since card-6.5 so a second client draws a session
+            // without folding the ledger itself.
+            channels::Query::Rounds { run } => {
+                channels::Answer::Rounds(Box::new(self.rounds_answer(*run)))
+            }
+            channels::Query::Evidence { run } => {
+                channels::Answer::Evidence(self.evidence_answer(*run))
+            }
+            channels::Query::CostOf { node } => channels::Answer::CostOf(self.cost_of_answer(node)),
             channels::Query::EndpointView => {
                 channels::Answer::Endpoints(endpoints_answer(&self.book))
             }

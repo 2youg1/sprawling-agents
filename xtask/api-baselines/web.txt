@@ -16,8 +16,6 @@ impl web::Kind
 impl web::Lang
 impl web::Lens
 impl web::Link
-impl web::Note
-impl web::Outcome
 impl web::Paint
 impl web::Phase
 impl web::Phrase
@@ -55,7 +53,6 @@ pub const web::MARGIN: i32
 pub const web::MODES: [&str; 5]
 pub const web::MOTION_QUICK_MS: u16
 pub const web::NAMED_FILES: usize
-pub const web::OUTPUT_LINES: usize
 pub const web::PAGE_ROWS: usize
 pub const web::PROGRESS_DONE: (&str, &str)
 pub const web::READING_ORDER: [web::Phase; 5]
@@ -89,8 +86,6 @@ pub enum web::LinkEvent
 pub enum web::LinkState
 pub enum web::Meaning
 pub enum web::Msg
-pub enum web::Note
-pub enum web::Outcome
 pub enum web::Phase
 pub enum web::Place
 pub enum web::ProviderHealth
@@ -154,9 +149,6 @@ pub fn web::Link::is_live(&self) -> bool
 pub fn web::Link::new(core::option::Option<alloc::string::String>) -> Self
 pub fn web::Link::state(&self) -> &web::LinkState
 pub fn web::LiveView(web::live::page::LiveViewProps) -> dioxus_core::innerlude::Element
-pub fn web::Note::at(&self) -> kernel::event::identity::Seq
-pub fn web::Outcome::class(self) -> &'static str
-pub fn web::Outcome::word(self) -> web::Msg
 pub fn web::Paint::into_parts(self) -> (alloc::vec::Vec<kernel::event::payload::EventRecord>, alloc::vec::Vec<channels::answer::Answer>, core::option::Option<kernel::error::shape::AxError>, alloc::vec::Vec<channels::wire::Delta>)
 pub fn web::Paint::is_empty(&self) -> bool
 pub fn web::Paint::superseded(&self) -> usize
@@ -266,7 +258,6 @@ pub fn web::latest_room(&web::Snapshot) -> core::option::Option<alloc::string::S
 pub fn web::latest_run(&web::Snapshot) -> core::option::Option<kernel::event::identity::RunId>
 pub fn web::listing(&web::Snapshot) -> (alloc::vec::Vec<web::SeatRow>, alloc::vec::Vec<web::SeatRow>)
 pub fn web::matching(&str, alloc::vec::Vec<web::Offer>) -> alloc::vec::Vec<web::Offer>
-pub fn web::opened_at(&[web::Turn]) -> core::option::Option<kernel::locator::GitOid>
 pub fn web::opened_building(core::option::Option<&str>) -> core::option::Option<kernel::address::Address>
 pub fn web::opening_leaf(&channels::answer::building::BuildingAnswer) -> web::Leaf
 pub fn web::page<'a>(impl core::iter::traits::collect::IntoIterator<Item = &'a kernel::event::payload::EventRecord>, &web::Filter, usize) -> web::Page
@@ -314,7 +305,6 @@ pub fn web::tag_rows(&channels::answer::EndpointsAnswer) -> alloc::vec::Vec<web:
 pub fn web::to_fragment(&web::View) -> alloc::string::String
 pub fn web::token_in(&str) -> core::option::Option<alloc::string::String>
 pub fn web::track_token() -> &'static str
-pub fn web::turns<'a>(impl core::iter::traits::collect::IntoIterator<Item = &'a kernel::event::payload::EventRecord>) -> alloc::vec::Vec<web::Turn>
 pub fn web::url_is_safe(&str) -> bool
 pub fn web::view_box(&web::DisplayList, usize, (i32, i32)) -> web::Frame
 pub fn web::waiting_in(core::option::Option<&channels::answer::InboxAnswer>, &kernel::address::Address, &str) -> web::RoomQueue
@@ -327,7 +317,6 @@ pub struct web::AttachForm
 pub struct web::Bar
 pub struct web::BinRow
 pub struct web::Block
-pub struct web::Call
 pub struct web::Camera
 pub struct web::Cluster
 pub struct web::CostRow
@@ -343,7 +332,6 @@ pub struct web::Given
 pub struct web::Line
 pub struct web::Link
 pub struct web::Offer
-pub struct web::Output
 pub struct web::Page
 pub struct web::Paint
 pub struct web::Phrase
@@ -362,9 +350,7 @@ pub struct web::Snapshot
 pub struct web::Stalled
 pub struct web::Stroke<'a>
 pub struct web::TagRow
-pub struct web::Turn
 pub struct web::Usage
-pub struct web::Used
 pub use web::App
 pub use web::ApprovalsView
 pub use web::ArchiveView
@@ -427,11 +413,6 @@ pub web::BinRow::what: alloc::string::String
 pub web::Block::bytes: u64
 pub web::Block::hash: alloc::string::String
 pub web::Block::slot: alloc::string::String
-pub web::Call::at: kernel::event::identity::Seq
-pub web::Call::outcome: web::Outcome
-pub web::Call::output: core::option::Option<web::Output>
-pub web::Call::subject: core::option::Option<alloc::string::String>
-pub web::Call::tool: alloc::string::String
 pub web::Camera::tile_height: u32
 pub web::Camera::tile_width: u32
 pub web::Chord::Idle
@@ -971,29 +952,9 @@ pub web::Msg::WaitingNothing
 pub web::Msg::WaitingNothingWhat
 pub web::Msg::WaitingScope
 pub web::Msg::WaitingSource
-pub web::Note::Arrived
-pub web::Note::Arrived::at: kernel::event::identity::Seq
-pub web::Note::Arrived::from: alloc::string::String
-pub web::Note::Arrived::said: alloc::string::String
-pub web::Note::Discarded
-pub web::Note::Discarded::at: kernel::event::identity::Seq
-pub web::Note::Discarded::count: usize
-pub web::Note::Fenced
-pub web::Note::Fenced::at: kernel::event::identity::Seq
-pub web::Note::Fenced::oid: kernel::locator::GitOid
-pub web::Note::Refused
-pub web::Note::Refused::at: kernel::event::identity::Seq
-pub web::Note::Refused::error: kernel::error::shape::AxError
-pub web::Note::Waiting
-pub web::Note::Waiting::at: kernel::event::identity::Seq
 pub web::Offer::going: web::View
 pub web::Offer::kind: web::Kind
 pub web::Offer::label: alloc::string::String
-pub web::Outcome::Answered
-pub web::Outcome::Failed
-pub web::Outcome::Waiting
-pub web::Output::cut: usize
-pub web::Output::head: alloc::string::String
 pub web::Page::filtered_out: usize
 pub web::Page::next_from: core::option::Option<kernel::event::identity::Seq>
 pub web::Page::rows: alloc::vec::Vec<web::Row>
@@ -1100,22 +1061,11 @@ pub web::Target::Run(kernel::event::identity::RunId)
 pub web::Trend::Falling
 pub web::Trend::Rising
 pub web::Trend::Steady
-pub web::Turn::calls: alloc::vec::Vec<web::Call>
-pub web::Turn::notes: alloc::vec::Vec<web::Note>
-pub web::Turn::number: u32
-pub web::Turn::opened: kernel::event::identity::Seq
-pub web::Turn::said: core::option::Option<alloc::string::String>
-pub web::Turn::spent: core::option::Option<kernel::budget::UsdMicros>
-pub web::Turn::stopped: core::option::Option<alloc::string::String>
-pub web::Turn::used: core::option::Option<web::Used>
 pub web::Usage::cache_read: kernel::budget::Tokens
 pub web::Usage::input: kernel::budget::Tokens
 pub web::Usage::output: kernel::budget::Tokens
 pub web::Usage::priced_calls: u32
 pub web::Usage::unpriced_calls: u32
-pub web::Used::cached: kernel::budget::Tokens
-pub web::Used::input: kernel::budget::Tokens
-pub web::Used::output: kernel::budget::Tokens
 pub web::View::Building(kernel::address::Address)
 pub web::View::Cost
 pub web::View::Record(web::Lens)

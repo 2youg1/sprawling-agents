@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 24 个 variant（card-5.4 增 `PutDocument`）、Query 恰 17 个（card-2.6 增 `Hunks`、card-5.4 增 `Governance`；计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**（本线 card-11.7／5.4／2.6 起）：`2d8b7dc2e8f9b35503a1d26c0d3323ff88674bb087fa1ba95e4815a868213880`；**WIRE_V ＝ 15**（`Dispatch` 去 `budget`，新增 `Command::PutDocument`、`Query::Governance` 与 `Query::Hunks`，见 §8-18 至 §8-20）。前值 `730e9d0b…`（card-2.4，WIRE_V 14：新增 `Query::Commit` 与 `Answer::Commit`，见 §8-17）、`f6fdc67b…`（V3.22，WIRE_V 13：新增 `Command::Standing`；`BuildingAnswer` 携计划树 `PlanRow`，`BuildingProgress` 携 `BlockedLine` 与就绪数，`CityAnswer` 携 `StandingLine`）、`4ac1b7b3…`（V3.13，WIRE_V 12：新增 `ServerFrame::Delta`）、`78fdb74d…`（ux-14，WIRE_V 11：新增 `Query::Changes`）、 `1de1a1ae…`（ux-13，WIRE_V 10：新增 `Query::RunHistory`）、`c7b41d50…`（P3.04，WIRE_V 9：新增 `Query::History`）、`0a600659…`（P3.02，WIRE_V 8：新增 `ConfigureBuilding`）、`4bb71c0b…`（P3.01，WIRE_V 7：新增 `ProbeEndpoint`，`AttachEndpoint` 长出 `admit`）、`c059c6e2…`（F2.16–P2.01，WIRE_V 6）、`d825e83a…`（F2.11–F2.15，WIRE_V 5）、 `aa57cb7e…`（F1.01–F2.10，WIRE_V 4）、 `941ede9f…`（R1.16–R1.18，WIRE_V 3）、`defe9a75…`（R1.14–R1.15，WIRE_V 2）、 `85705c03…`（R1.11–R1.13，WIRE_V 1）、`238f11b2…`（P1.11–R1.10）、`692b5f96…`（S4.02–P1.10）。
+  **当前 golden**（card-6.5 起）：`f436b34b0830017bf0f6a9baa4bd4439edc5a9eb293731a66c0cfd1ca10b91a1`；**WIRE_V ＝ 16**（新增 `Query::Rounds`、`Query::Evidence` 与 `Query::CostOf`，查询名表 17→20，见 §8-21）。前值 `2d8b7dc2…`（card-11.7／5.4／2.6，WIRE_V 15：`Dispatch` 去 `budget`，新增 `Command::PutDocument`、`Query::Governance` 与 `Query::Hunks`，见 §8-18 至 §8-20）、`730e9d0b…`（card-2.4，WIRE_V 14：新增 `Query::Commit` 与 `Answer::Commit`，见 §8-17）、`f6fdc67b…`（V3.22，WIRE_V 13：新增 `Command::Standing`；`BuildingAnswer` 携计划树 `PlanRow`，`BuildingProgress` 携 `BlockedLine` 与就绪数，`CityAnswer` 携 `StandingLine`）、`4ac1b7b3…`（V3.13，WIRE_V 12：新增 `ServerFrame::Delta`）、`78fdb74d…`（ux-14，WIRE_V 11：新增 `Query::Changes`）、 `1de1a1ae…`（ux-13，WIRE_V 10：新增 `Query::RunHistory`）、`c7b41d50…`（P3.04，WIRE_V 9：新增 `Query::History`）、`0a600659…`（P3.02，WIRE_V 8：新增 `ConfigureBuilding`）、`4bb71c0b…`（P3.01，WIRE_V 7：新增 `ProbeEndpoint`，`AttachEndpoint` 长出 `admit`）、`c059c6e2…`（F2.16–P2.01，WIRE_V 6）、`d825e83a…`（F2.11–F2.15，WIRE_V 5）、 `aa57cb7e…`（F1.01–F2.10，WIRE_V 4）、 `941ede9f…`（R1.16–R1.18，WIRE_V 3）、`defe9a75…`（R1.14–R1.15，WIRE_V 2）、 `85705c03…`（R1.11–R1.13，WIRE_V 1）、`238f11b2…`（P1.11–R1.10）、`692b5f96…`（S4.02–P1.10）。
   P1.11 增三帧：`AttachEndpoint`／`SelectModel` 两个 Command（十九），`EndpointView` 一个 Query（十）。`PutSecret` 仍无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **ux-13 增：`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -677,3 +677,52 @@ pub struct Withheld { pub number: u32, pub reason: String }
 - **一次一个文件**：`path` 是必填的，没有「整批补丁」这个形状。
 - **两个 oid 都不可变，所以这个答任何人都可以永久缓存**（同 `Changes` 的理由）。
 - **这座城没写过的 oid 答 `Unavailable`**，与 `Changes`／`Commit` 同口径。
+
+### 8-21 四种读法回到服务端（card-6.5；WIRE_V 15→16）
+
+```rust
+// Query 第 18、19、20 条（声明序，QUERY_NAMES 同序追加）
+Rounds   { run: RunId },      // → Answer::Rounds(Box<RoundsAnswer>)
+Evidence { run: RunId },      // → Answer::Evidence(EvidenceAnswer)
+CostOf   { node: NodeId },    // → Answer::CostOf(CostOfAnswer)
+
+pub struct RoundsAnswer {
+    pub run: RunId,
+    pub turns: Vec<Turn>,
+    pub opened_at: Option<GitOid>,   // 本会话的第一道栅栏
+}
+pub struct Turn {
+    pub number: u32, pub opened: Seq,
+    pub said: Option<String>, pub spent: Option<UsdMicros>,
+    pub used: Option<Used>, pub stopped: Option<String>,
+    pub calls: Vec<Call>, pub notes: Vec<Note>,
+}
+pub struct Call { pub tool: String, pub subject: Option<String>,
+                  pub outcome: Outcome, pub at: Seq, pub output: Option<Output> }
+pub enum Outcome { Waiting, Answered, Failed }
+pub struct Output { pub head: String, pub cut: usize }
+pub struct Used { pub input: Tokens, pub output: Tokens, pub cached: Tokens }
+pub enum Note { Refused { error: AxError, at: Seq }, Fenced { oid: GitOid, at: Seq },
+                Waiting { at: Seq }, Arrived { from: String, said: String, at: Seq },
+                Discarded { count: usize, at: Seq } }
+
+pub struct EvidenceAnswer { pub run: RunId, pub items: Vec<EvidenceItem> }
+pub struct EvidenceItem { pub at: Seq, pub kind: EvidenceKind,
+                          pub locator: Locator, pub picture: Option<Picture> }
+pub enum EvidenceKind { Screenshot, Finished }
+pub struct Picture { pub media_type: String, pub width: u32, pub height: u32 }
+
+pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
+                          pub runs: Vec<(RunId, UsdMicros)> }
+```
+
+**这一张卡搬的是读法而不是接口。** 一个会话被读成回合、一次跑留下什么证据、一个计划节点花了多少钱——这三件事此前只有 `crates/web` 会算，于是「线就是全部 API」（ARCHITECTURE §8）在这三处是假的：另写一个客户端就得把折叠逻辑照抄一遍，而照抄出来的那一份迟早与这一份不一致。现在三者各是一次查询，答由 `bin::views` 折出（sprawling-SPEC §8-47）。
+
+- **`Rounds` 的值类型住 `channels`，折叠住 `bin::views`。** 值要上线，故必须可序列化；折叠要读账本，故必须在能读账本的那一层。两者一刀切开，正是 ARCHITECTURE §9 的形状 2 与形状 7 的分界。
+- **`channels::reading` 是第三块**：把一条账本载荷读成上面这些值的那些纯函数（`said_in`／`used_in`／`output_in`／`subject_of`／`note_of`）。它住在线这一层而不是服务端，因为**两端都要读**：服务端答 `Rounds` 要它，客户端把推来的 `model_returned` 折进自己的快照也要它（ARCHITECTURE §5 第 12 步：同一个折叠，线的两边）。一份权威，两个调用者。
+- **`Changes` 早已在线上**（§8-20 与 ux-14），`memory::changes` 一直是它唯一的权威；本卡查过之后不动它——把一件已经做完的事再做一遍就是造第二个权威。
+- **`Evidence` 只认写下来的东西**：截图是 `tool_result` 载荷里的 `image` 定位符（`bin::browser_tool::stored` 写的那三项：定位符、两条边、media type），完成证据是 `roadmap_finished` 载荷里的 `evidence` 定位符。**答里恒不携字节**：一张图是一个 `cas:` 定位符，取它是资产端点的事，把 base64 塞进查询答会让「看一眼这次跑干了什么」付上整批像素的代价——与 §8-20 拒绝整批补丁同一条理由。
+- **`CostOf` 的分母不在这里**：答只报这个节点上归到的绝对金额与逐跑明细，不报占比。占比需要一个这一端没有的分母（整城总额是 `CostView` 的），而没有分母的百分比正是 `UnplannedProgress` 拒绝拼出来的那种东西。节点到跑的映射由 `roadmap_claimed` 折出（载荷里的 `node` 与记录的 `addr`），钱由 `memory::attribution` 的 `by_run` 给——**本卡不新增任何计价处**。
+- **一个本城没认领过的节点答 `CostOf { spent: 0, runs: [] }` 而不是 `Unavailable`**：与 `Changes` 那一条相反，因为这里「没人认领过它」是一个真答案而不是「我读不了」；节点地址本身经 `NodeId` 的手写 `Deserialize` 把过关，读不了的形状根本上不了线。
+- **`WIRE_V` 15→16，一次进位管三条查询**：名字表长了三项（17→20），故 schema 哈希无论如何都要变；本波只有这一次进位。旧页面在握手期被明确拒绝，这正是该机制存在的理由。
+- **被否**：（a）把 `Rounds` 并进 `RunHistory` 的答——前者是折叠后的读法，后者是原始记录页，一个答两副形状会让翻页与折叠互相牵制；（b）让 `Evidence` 直接回字节——见上一条；（c）把折叠留在 `channels` 里由客户端调用——那样新客户端仍要自己跑一遍折叠，而这张卡整件事就是不要它这么做。

@@ -2341,3 +2341,27 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
   在它落地之前，人从界面派的活仍然是一次一轮，只有 `pursue` 是并发的。
 - **provider 天花板的可读形**：`gateway` 增一个公开的读法，`bin` 于是可以取 `min(天花板, 配置)`，
   而不是像本卡这样让两个数字碰巧相等。这张卡要重算 api-baseline。
+
+## 8-50 三种读法的答：回合、证据、一个节点的花费（card-6.5；`bin::views::rounds`、`views::evidence`、`views::cost_of`）
+
+`channels` 定形状（channels-SPEC §8-21），这里折出答。三个新模块都是形状 7 投影：把记录折成页要的读法，删掉重折逐字节相同。
+
+### 8-50-1 `bin::views::rounds`——一次会话折成回合
+
+`records_of(run)` 用 `LedgerIndex::run_seqs_before` 取这次跑最新的 `HISTORY_MAX` 条 seq，逐条读行、逐条解析，旧在前。**上界与客户端原来问的那一段等宽**：`web::live::page` 一直是 `RunHistory { limit: HISTORY_MAX }`，所以搬到服务端之后一个会话能被读到的范围一字未变——搬家不该顺手改答案。读不回来的一行**截断而不清空**：读到的那些仍然是真的（同 `Views::history`）。
+
+折叠本身逐字从 `web::turn::rounds` 搬来，一条不改：`model_called` 开一个回合；`tool_called` 挂进当前回合并按 runtime 给的 id 记下等答；`model_returned` 落到最近一个回合上；`tool_result` 按 id 找回它自己的那次调用——**恒不按位置配对**，因为两个调用可以先后发出而后发的先答；其余记录按 `channels::reading::note_of` 判是否成为一条 `Note`。`opened_at` 是本会话第一条 `Fenced` 的 oid：那是这份活开始时的树，取最新的一道栅栏答的是另一个问题（「上一波动了什么」）。
+
+### 8-50-2 `bin::views::evidence`——写下来的证据，不携字节
+
+同一份记录再走一遍，只认两种：`tool_result` 载荷 `result.image` 是 `cas:` 定位符的，成 `EvidenceKind::Screenshot`（连同 `width`／`height`／`media_type` 三项，缺一则 `picture` 为 `None` 而行仍在）；`roadmap_finished` 载荷 `evidence` 能读成定位符的，成 `EvidenceKind::Finished`。定位符读不回来的记录**不成行**——发明一条指不到任何东西的证据比少一行糟。
+
+### 8-50-3 `bin::views::cost_of`——节点到跑，跑到钱
+
+`Views` 多一张 `claims: BTreeMap<NodeId, BTreeSet<RunId>>`，由 `roadmap_claimed` 折出（载荷 `node` 加记录自己的 `run`）。`BTreeMap` 而非 hash：这是答一个查询的路径，顺序必须是确定的。答时把这些跑在 `memory::attribution` 的 `by_run` 里各自的数取出来相加——**这里不计价**，计价是 `gateway::cost` 的，归因是 `memory::attribution` 的，本模块只做一次求和。
+
+### 8-50-4 验收
+
+- `views::rounds::tests` 与 `views::rounds::reading_tests` 把 `web::turn` 的两份测试逐字搬来，跑在服务端的折叠上：**服务端算出来的回合等于视图层对同一批记录算出来的**。红是在真账本上取的——`Query::Rounds` 先答 `Unavailable`，`asking_for_rounds_answers_the_fold_the_view_layer_ran` 在 `init_city` 铺出的城上写三条记录再问，失败于「Rounds answers with rounds」。
+- `views::evidence::tests`：一张截图与一条完成证据各成一行，读不回定位符的载荷不成行。
+- `views::cost_of::tests`：认领过的节点报出那次跑的钱；没人认领过的节点报 0 与空明细，而不是 `Unavailable`。
