@@ -107,16 +107,22 @@ repro:
 # artifacts this recipe just produced, so a release cannot ship a size
 # somebody typed. `build-web-wasm` rather than `build-web` until card 6.11:
 # see the note on that recipe.
-dist: build-web-wasm
-    cargo build --release -p sprawling --locked
+# An optional target triple builds for a platform other than this
+# machine's default; the badges are then left alone, because README's
+# sizes describe the artifact a person downloads first and two builds of
+# one tag must not disagree about one number.
+dist target="": build-web-wasm
+    cargo build --release -p sprawling --locked {{ if target == "" { "" } else { "--target " + target } }}
     cargo xtask sbom
-    cargo xtask badge --write
+    {{ if target == "" { "cargo xtask badge --write" } else { "echo badges are the host build's to write" } }}
 
 # The release archive: the one file a person downloads, unpacks and runs.
 # `dist` first, because the archive is assembled out of its artifacts and
 # never out of whatever happened to be in target/ from an earlier build.
-package: dist
-    cargo xtask package
+# The same optional triple: one recipe packages every row of the release
+# matrix, so a cross-built artifact cannot be assembled by other steps.
+package target="": (dist target)
+    cargo xtask package {{ if target == "" { "" } else { "--target " + target } }}
 
 # Offline chain verification (A2); strictly read-only.
 replay log:

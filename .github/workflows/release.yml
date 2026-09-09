@@ -138,34 +138,18 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just,wasm-bindgen-cli@${{ steps.pin.outputs.version }}
+      # One step for all three rows. `just package` takes the triple the
+      # matrix names and passes it down to `cargo xtask package`, which
+      # reads `target/<triple>/release` and puts the triple in the archive
+      # name (xtask-SPEC.md section 8-11). An empty triple is the host
+      # build, whose two archive names are what they always were. The
+      # recipe leaves the README badges alone for a cross build, so two
+      # builds of one tag cannot disagree about one number.
       - name: build the client, the binary, and the archive
-        if: matrix.target == ''
-        shell: bash
-        run: just package
-      # The static leg cannot call `just package`, because `just dist`
-      # builds for the host and `xtask package` reads `target/release`
-      # literally (xtask/src/budget.rs `binary_path`), while a `--target`
-      # build lands under `target/<triple>/release`. Until `binary_path`
-      # learns a triple, the static binary is staged where the packager
-      # looks and the rest of the recipe is the recipe's own steps in the
-      # recipe's own order. `xtask badge --write` is left out on purpose:
-      # the README badges describe the artifact a person downloads first,
-      # and rewriting them from a second platform would make two builds
-      # of one tag disagree about one number.
-      - name: build the client, the static binary, and the archive
-        if: matrix.target != ''
         shell: bash
         env:
           CC_x86_64_unknown_linux_musl: musl-gcc
-        run: |
-          set -euo pipefail
-          just build-web-wasm
-          cargo build --release -p sprawling --locked --target ${{ matrix.target }}
-          file "target/${{ matrix.target }}/release/sprawling"
-          mkdir -p target/release
-          cp "target/${{ matrix.target }}/release/sprawling" target/release/sprawling
-          cargo xtask sbom
-          cargo xtask package
+        run: just package "${{ matrix.target }}"
       - uses: actions/upload-artifact@v4
         with:
           name: archive-${{ matrix.os }}${{ matrix.target && format('-{0}', matrix.target) || '' }}

@@ -401,3 +401,20 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 **已知的限，写在明处**：节号在同一份 SPEC 里并不唯一（`sprawling` 的 `8-40`／`8-41`／`8-42` 各出现过三次，`web` 的 `8-12`～`8-16` 各两次），因为不同期的卡各自续号而无人对账。故本条只判存在，不判唯一：加一条唯一性断言会把七份未经重编号的 SPEC 一次判红，而重编号是另一件工作。**翻案条件**：任一 SPEC 的 §8 完成一次重编号后，唯一性断言随即上线。
 
 **modmap 增一条断言：§12 每个小节标题里的数，等于该小节的行数。** 标题写作 `### kernel (73) — …`，括号里的数就是这个 crate 在册的模块文件数；一个标题可以带多组（`### browser (6), protocol (5), bin (111)`），每组按模块列的前缀分别计数。这条不是新规矩而是既有规矩的一次落实：xtask-SPEC §10-5 已经写下「能被机器数出来的数不由文档手写」，而这些数当时没有机器数，于是十三个里有九个是错的。
+
+### 8-11 `package` 认目标三元组：一份产物住哪里，叫什么名字（card-F4.0；形状 2 值）
+
+card-12.1 给发布矩阵加了 `x86_64-unknown-linux-musl` 一行，而 `budget::binary_path` 只认 `target/release`，`--target` 构建落在 `target/<triple>/release`。当时的落法是把静态产物拷到打包器看的位置，再把 `just package` 的步骤在 `release.yml` 里重抄一遍——**一条规则两个权威，明知而为并记在案**（sprawling-SPEC §8 P4.02 改判的「另记一处未清的债」）。本节还这笔债。
+
+**一个具名值答两个问题**：这次构建是为谁构建的。`ReleaseTarget` 住 `xtask/src/package.rs`，两个变体穷举：
+
+| 变体 | 产物目录 | 归档名 | 归档里的可执行文件 |
+|---|---|---|---|
+| `Host` | `target/release/` | `sprawling-<version>-<os>-<arch>`（不动） | 由 `cfg!(windows)` 判 |
+| `Triple(t)` | `target/<t>/release/` | `sprawling-<version>-<t>` | 由 `t` 里是否含 `windows` 判 |
+
+- **`binary_path` 从 `budget` 迁到 `package`**。「产物住哪里」与「产物叫什么」是同一个事实的两半，分住两个模块就是两个权威；`budget` 反过来向 `package` 要路径，因为它的活是称重而不是定位。
+- **三元组进名字，是人的裁定而不是本卡的选择**。不进名字的话，musl 归档会叫 `sprawling-<version>-linux-x86_64.zip`，既不说静态也不说 musl，且**在出现第二份 Linux 产物（gnu）的那一天静默相撞**。既有的两个名字一字不动，故这不是重命名而是给新的一类命名。
+- **`--target <triple>` 由 `main` 解析**，与 `--range` 共用一个取值函数：两个旗标两份解析就是两种取值语义。
+- **`release.yml` 的重抄步骤随本节删除**，三行矩阵走同一步 `just package ${{ matrix.target }}`；`just dist` 收下同一个可选参数，并在有三元组时**不写徽章**——README 的徽章描述一个人首先下载的那份产物，由第二个平台改写它会让一个 tag 的两次构建对同一个数字各执一词。
+- **本节属门禁机具，与产品代码分开提交。**

@@ -15,8 +15,9 @@
 //! qualify. Wall-clock figures do not: gating them would turn a busy
 //! runner into a defect report, and the register says so per row.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
+use crate::package::{ReleaseTarget, binary_path};
 use crate::report::{Violation, XtaskError};
 
 /// The register, as the gate reads it.
@@ -49,7 +50,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     // exists must carry the client bundle's file table. The placeholder
     // build (no `just build-web` beforehand) lacks the `web_bg.wasm`
     // entry, and a binary like that must not look shippable.
-    if let Some(binary) = binary_path(root)
+    if let Some(binary) = binary_path(root, &ReleaseTarget::Host)
         && !carries_client(&binary)?
     {
         violations.push(Violation {
@@ -235,7 +236,7 @@ fn gzipped_len(bytes: &[u8]) -> u64 {
 }
 
 fn binary_bytes(root: &Path) -> Option<u64> {
-    let path = binary_path(root)?;
+    let path = binary_path(root, &ReleaseTarget::Host)?;
     std::fs::metadata(path).ok().map(|meta| meta.len())
 }
 
@@ -252,16 +253,6 @@ pub(crate) fn carries_client(binary: &Path) -> Result<bool, XtaskError> {
         source,
     })?;
     Ok(contains(&bytes, b"web_bg.wasm"))
-}
-
-pub(crate) fn binary_path(root: &Path) -> Option<PathBuf> {
-    for name in ["sprawling", "sprawling.exe"] {
-        let path: PathBuf = root.join("target").join("release").join(name);
-        if path.is_file() {
-            return Some(path);
-        }
-    }
-    None
 }
 
 #[cfg(test)]

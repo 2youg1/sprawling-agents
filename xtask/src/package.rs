@@ -19,10 +19,81 @@ use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
 
-pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
-    let binary = crate::budget::binary_path(root).ok_or_else(|| XtaskError::Cmd {
+/// Which build an archive is assembled from. Exhaustive on purpose: the
+/// two questions a packager asks — where the binary landed, and what the
+/// archive is called — have one answer each per variant, and a boolean
+/// would have left the second one to the host it happened to run on.
+pub(crate) enum ReleaseTarget {
+    /// Built for this machine's own default target.
+    Host,
+    /// Built with `--target <triple>`, which lands elsewhere in `target/`.
+    Triple(String),
+}
+
+impl ReleaseTarget {
+    /// The triple named on the command line, or the host's own build.
+    pub(crate) fn from_arg(triple: Option<&str>) -> Self {
+        match triple {
+            Some(named) if !named.is_empty() => Self::Triple(named.to_owned()),
+            _ => Self::Host,
+        }
+    }
+
+    /// What a person recognises in a list of assets. The host's two names
+    /// are what they always were; a build for anything else carries its
+    /// triple, because `linux-x86_64` says neither static nor musl and
+    /// would collide the day a gnu Linux artifact appears.
+    fn label(&self) -> String {
+        match self {
+            Self::Host => format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH),
+            Self::Triple(triple) => triple.clone(),
+        }
+    }
+
+    /// The directory `cargo build --release` puts the binary in.
+    fn release_dir(&self, root: &Path) -> PathBuf {
+        match self {
+            Self::Host => root.join("target").join("release"),
+            Self::Triple(triple) => root.join("target").join(triple).join("release"),
+        }
+    }
+
+    /// What the executable is called on the system it will run on, which
+    /// is the target's question rather than the assembling machine's.
+    fn binary_name(&self) -> &'static str {
+        let windows = match self {
+            Self::Host => cfg!(windows),
+            Self::Triple(triple) => triple.contains("windows"),
+        };
+        if windows {
+            "sprawling.exe"
+        } else {
+            "sprawling"
+        }
+    }
+}
+
+/// Where a release build of this target landed, or nothing when it has
+/// not been built. One statement of that path, because the packager
+/// assembles from it and the budget gate weighs it.
+pub(crate) fn binary_path(root: &Path, target: &ReleaseTarget) -> Option<PathBuf> {
+    let dir = target.release_dir(root);
+    for name in ["sprawling", "sprawling.exe"] {
+        let path = dir.join(name);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    None
+}
+
+pub(crate) fn run(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskError> {
+    let binary = binary_path(root, target).ok_or_else(|| XtaskError::Cmd {
         cmd: "package".to_owned(),
-        msg: "no release binary in target/release; run `just dist` first".to_owned(),
+        msg: format!(
+            "no release binary in {}; run `just dist` first",
+            target.release_dir(root).display()
+        ),
     })?;
     if !crate::budget::carries_client(&binary)? {
         return Err(XtaskError::Cmd {
@@ -33,7 +104,7 @@ pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
         });
     }
 
-    let stem = format!("sprawling-{}-{}", version(root)?, platform());
+    let stem = format!("sprawling-{}-{}", version(root)?, target.label());
     let out_dir = root.join("target").join("package");
     std::fs::create_dir_all(&out_dir).map_err(|source| XtaskError::Io {
         path: out_dir.display().to_string(),
@@ -42,12 +113,7 @@ pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
     let archive = out_dir.join(format!("{stem}.zip"));
 
     let mut entries: Vec<(String, PathBuf)> = Vec::new();
-    let binary_name = if cfg!(windows) {
-        "sprawling.exe"
-    } else {
-        "sprawling"
-    };
-    entries.push((binary_name.to_owned(), binary));
+    entries.push((target.binary_name().to_owned(), binary));
     entries.push((
         "QUICKSTART.md".to_owned(),
         root.join("dist").join("QUICKSTART.md"),
@@ -138,12 +204,6 @@ fn version(root: &Path) -> Result<String, XtaskError> {
         })
 }
 
-/// What a person needs to recognise in a list of assets: the system the
-/// binary runs on, in the words that system is known by.
-fn platform() -> String {
-    format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH)
-}
-
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -152,7 +212,49 @@ fn platform() -> String {
     reason = "test code"
 )]
 mod tests {
-    use super::{platform, write_archive};
+    use super::{ReleaseTarget, binary_path, write_archive};
+
+    /// The two names that already exist must not move; a build for a
+    /// target other than this machine's default earns its triple in the
+    /// name, so a second Linux artifact cannot collide with the first.
+    #[test]
+    fn a_host_archive_keeps_its_name_and_a_target_archive_carries_its_triple() {
+        let host = ReleaseTarget::Host.label();
+        assert!(host.contains('-'), "host label: {host}");
+        assert!(!host.starts_with('-'), "host label: {host}");
+        let musl = ReleaseTarget::Triple("x86_64-unknown-linux-musl".to_owned());
+        assert_eq!(musl.label(), "x86_64-unknown-linux-musl");
+    }
+
+    /// A `--target` build lands under `target/<triple>/release`, and the
+    /// packager must look there rather than at the host's directory.
+    #[test]
+    fn a_target_build_is_looked_for_under_its_own_triple() {
+        let root = std::env::temp_dir().join(format!("sprawling-triple-{}", std::process::id()));
+        let triple = "x86_64-unknown-linux-musl";
+        let dir = root.join("target").join(triple).join("release");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("sprawling"), b"binary").unwrap();
+
+        let target = ReleaseTarget::Triple(triple.to_owned());
+        assert_eq!(binary_path(&root, &target), Some(dir.join("sprawling")));
+        assert_eq!(
+            binary_path(&root, &ReleaseTarget::Host),
+            None,
+            "the host directory holds nothing and must not answer for the triple"
+        );
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// What the archive calls the executable follows the target it was
+    /// built for, never the machine that assembled it.
+    #[test]
+    fn the_executable_name_follows_the_target_rather_than_the_host() {
+        let windows = ReleaseTarget::Triple("x86_64-pc-windows-msvc".to_owned());
+        assert_eq!(windows.binary_name(), "sprawling.exe");
+        let musl = ReleaseTarget::Triple("x86_64-unknown-linux-musl".to_owned());
+        assert_eq!(musl.binary_name(), "sprawling");
+    }
 
     /// The archive nests under one directory: unpacking it into a folder
     /// full of other things must not scatter six files across it.
@@ -196,12 +298,5 @@ mod tests {
             std::fs::read(&first).unwrap(),
             std::fs::read(&second).unwrap()
         );
-    }
-
-    #[test]
-    fn the_platform_names_both_the_system_and_the_architecture() {
-        let named = platform();
-        assert!(named.contains('-'), "platform: {named}");
-        assert!(!named.starts_with('-'), "platform: {named}");
     }
 }

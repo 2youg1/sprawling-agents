@@ -49,7 +49,7 @@ fn main() -> ExitCode {
         Ok(root) => root,
         Err(err) => return report::internal_failure(&err),
     };
-    let range = range_arg(&args);
+    let range = value_arg(&args, "--range");
     match args.first().map(String::as_str) {
         Some("gates") => gates::run(&root, range.as_deref()),
         Some("color") => report::finish("color", color::check(&root)),
@@ -77,7 +77,10 @@ fn main() -> ExitCode {
             }
             Err(err) => report::internal_failure(&err),
         },
-        Some("package") => match package::run(&root) {
+        Some("package") => match package::run(
+            &root,
+            &package::ReleaseTarget::from_arg(value_arg(&args, "--target").as_deref()),
+        ) {
             Ok(message) => {
                 print!("{message}");
                 ExitCode::SUCCESS
@@ -155,11 +158,13 @@ fn repo_root() -> Result<PathBuf, XtaskError> {
     }
 }
 
-/// `--range <spec>` anywhere after the subcommand (used by guard, forwarded by gates).
-fn range_arg(args: &[String]) -> Option<String> {
+/// The value of one named flag anywhere after the subcommand: `--range`
+/// for `guard`, `--target` for `package`. One reader, so two flags cannot
+/// end up with two spellings of what "the value after it" means.
+fn value_arg(args: &[String], flag: &str) -> Option<String> {
     let mut it = args.iter();
     while let Some(arg) = it.next() {
-        if arg == "--range" {
+        if arg == flag {
             return it.next().cloned();
         }
     }
@@ -171,6 +176,6 @@ fn usage() {
         "usage: cargo xtask <gates|header|lexicon|modmap|depmap|secret|color|ax|render|wiring|specalign|apisync|guard> [--range a..b] [--write]"
     );
     eprintln!(
-        "       cargo xtask spec <crate> | budget | badge [--write] | wire-ts [--write] | mem [pid] | sbom | package | repro [--full]"
+        "       cargo xtask spec <crate> | budget | badge [--write] | wire-ts [--write] | mem [pid] | sbom | package [--target <triple>] | repro [--full]"
     );
 }
