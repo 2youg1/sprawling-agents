@@ -6,6 +6,11 @@
 //! Statistical evidence: suites, holdouts, probes, asset scoring,
 //! metabolism. Never a merge gate (C11).
 
+// The City.md ablation instrument answers on demand through its own
+// ignored test and has no product caller; compiling it into the shipped
+// library would ship an instrument, not a capability (eval-SPEC 8-7).
+#[cfg(test)]
+mod ablation;
 mod metabolism;
 mod nesting;
 mod probe;

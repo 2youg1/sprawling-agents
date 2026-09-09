@@ -185,3 +185,56 @@ pub fn sweep<T: Clone>(assets: &[(T, AssetUse, Score, bool)]) -> Vec<(T, Disposa
 ### 8-6 handoff 探针真的跑（card-11.6）
 
 `eval::handoff_probe() -> Probe`：名 `handoff`、版本 1、固定四问（任务是什么／做到哪了／下一步是什么／先读哪个文件）。它是数据，不是判定：问题改了就是版本 2，`compare` 对两个版本恒拒。谁问：装配层 `bin::assembly::probing`，在每次 succession 前后各问一次（runtime-SPEC §8-33），记 `eval_run`。本 crate 仍恒不在它所测量的回路里。
+
+### 8-7 eval::ablation——City.md 有没有挣到它的长度（card-5.7；`ablation.rs` 形状 1 判定，`ablation/capabilities.rs` 形状 6 数据）
+
+`docs/City.md` 由 `bin::assembly::genesis` 以 `include_str!` 编进二进制，是每个居民读到的第一份文本，因而它每多一段就向**每一次** prefix 收一次租。这张卡建的是一把尺：把这份文档按段切开，逐段拿掉，量一个居民因此**做不了什么**。产出是给下一次编辑那份文档的人的证据，不是墙。
+
+**它恒不是门。** 入口是本模块自己的一条 `#[ignore]` 测试，只在有人点名时跑：
+
+```
+cargo nextest run -p eval --run-ignored all -E 'test(city_md)' --no-capture
+```
+
+`just check` 一个字节都不跑它。理由与 §1 同一条：这里量的是一份写给模型的文档，判据随文档而动，把它接成红灯只会让下一个编辑者去改判据。
+
+**它不调用模型**，与 `nesting`（§8-x）同一个理由：一个自持 provider 的 suite 无法离线跑、无法重放，量到的一半是网络。可测量的替身是**能力与凭据**——一条 Capability 是「居民必须能做的一件事」，它的 `cue` 是文中授予这件事的那句逐字短语。段落拿掉之后凭据还在，能力就还在。
+
+```rust
+pub(crate) struct Capability { pub(crate) name: &'static str, pub(crate) cue: &'static str }
+pub(crate) struct Passage { pub(crate) index: u32, pub(crate) opening: String, pub(crate) removed: ByteLen }
+pub(crate) enum Cost {
+    Untouched,                                    // 这一段不授予语料里的任何能力
+    Restated { also_said: Vec<&'static str> },    // 它提到的话别处也说了，居民一件不少
+    Sole { lost: Vec<&'static str> },             // 只有这里说，拿掉即失去
+}
+pub(crate) struct Charge { pub(crate) passage: Passage, pub(crate) cost: Cost }
+pub(crate) struct Ablation { /* 私有：passages、corpus */ }
+impl Ablation {
+    pub(crate) fn new(document: &str, corpus: &'static [Capability]) -> Result<Ablation, AxError>;
+    pub(crate) fn charges(&self) -> Vec<Charge>;
+    pub(crate) fn costliest_first(&self) -> Vec<Charge>;
+}
+```
+
+- **三值而非布尔**：`Restated` 是这套东西真正想看见的一格——一句在两处说了两遍的话，删掉其中一处不花钱。把它折进「有损／无损」两格，就再也看不出文档在哪里重复自己。
+- **语料自己不能给自己打分**：`new` 在**整份**文档里找不到某条 cue 即拒（`E_INVALID_ARGS`，recovery 指向语料而非文档）。凭据漂开之后仍然记分，量到的是语料的陈旧程度。
+- **切段规则**：空行切块，以 `- ` 开头的块并入上一段。City.md 的每张清单都是它上面那句话的展开；分开量，量到的是排版不是意思。
+- **`costliest_first` 先比失去的能力数（降），平手比被删字节数（升）**：同样的损失，越短的段越是在挣它的长度；末位比 `index`，因为排序两次必须一样。
+- **公共面零变化**：全部 `pub(crate)`。这把尺的唯一消费者是它自己的那条 ignored 测试，`eval` 的公开面逐字节不变，apisync 基线不动。
+
+**它编不进产品库。** `lib.rs` 的 `mod ablation;` 携 `#[cfg(test)]`：这把尺唯一的消费者是它自己那条 ignored 测试，把它编进发布出去的库，发出去的是仪器而不是能力。dead_code 因此不是被 `#[allow]` 压掉的，是不存在的。
+
+**一次真实运行**（`cargo nextest run -p eval --run-ignored all -E 'test(city_md)' --no-capture`，本机 windows-msvc，`docs/City.md` 切出 12 段，语料 40 条）：
+
+| 名次 | 段 | 字节 | 拿掉它，居民失去 |
+|---|---|---|---|
+| 1 | `Rules that the system enforces:` | 1266 | **8 条**——外来内容是数据、回收站、上传暂存区、`status` 问时间与待办、他人结果是主张、优先一手材料、`secret:` 引用、提交归城 |
+| 2 | `Work:` | 729 | 7 条 |
+| 3 | `Seeing and acting:` | 891 | 6 条 |
+| 4 | `This building keeps its long work in markdown…` | 1026 | 6 条 |
+| 5 | 协作段／`delegate` 段 | 412／504 | 各 3 条 |
+
+**最贵的一段是 `Rules that the system enforces:`**：它是全文最长的一段，也是失去最多的一段，每 158 字节买回一条能力。**最省的是 `Update the roadmap and the memo…`**：93 字节买一条。**唯一不花钱的是标题行**（23 字节，0 条）。
+
+**这次运行还测出一件没打算测的事：`Restated` 一次都没有出现。** 40 条能力在 City.md 里各只有一处凭据，全文没有一句话说了两遍。这份文档没有可以靠删重复来省的字节——它要短，就得有人决定放弃一条能力。
