@@ -74,13 +74,19 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
             };
             let at = one.get("index").and_then(Value::as_u64).unwrap_or_default();
             let held = calls.entry(at).or_default();
-            if let Some(id) = one.get("id").and_then(Value::as_str) {
+            // A later chunk may repeat the id and the name as the empty
+            // string (vLLM-shaped providers do); the first spelling stands.
+            if let Some(id) = one.get("id").and_then(Value::as_str)
+                && !id.is_empty()
+            {
                 held.0 = id.to_owned();
             }
             let Some(function) = one.get("function").and_then(Value::as_object) else {
                 continue;
             };
-            if let Some(name) = function.get("name").and_then(Value::as_str) {
+            if let Some(name) = function.get("name").and_then(Value::as_str)
+                && !name.is_empty()
+            {
                 held.1 = name.to_owned();
             }
             if let Some(part) = function.get("arguments").and_then(Value::as_str) {
@@ -113,4 +119,29 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
         "choices": [{ "message": message, "finish_reason": finish }],
         "usage": usage.unwrap_or_else(|| json!({})),
     }))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+mod tests {
+    use super::settled;
+    use serde_json::json;
+
+    // What a vLLM-shaped provider (ModelScope serving DeepSeek and GLM,
+    // 2026-09-10) streams: the name and id arrive in the first chunk,
+    // and every later chunk repeats them as the empty string.
+    #[test]
+    fn a_later_chunk_with_an_empty_name_or_id_does_not_erase_the_first() {
+        let frames = vec![
+            json!({"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call_1", "type": "function", "function": {"name": "read", "arguments": ""}}]}}]}),
+            json!({"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "", "type": "function", "function": {"name": "", "arguments": "{\"path\": "}}]}}]}),
+            json!({"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "", "type": "function", "function": {"arguments": "\"a.md\"}"}}]}}]}),
+            json!({"choices": [{"delta": {}, "finish_reason": "tool_calls"}]}),
+        ];
+        let settled = settled(&frames).unwrap();
+        let call = &settled["choices"][0]["message"]["tool_calls"][0];
+        assert_eq!(call["id"], "call_1");
+        assert_eq!(call["function"]["name"], "read");
+        assert_eq!(call["function"]["arguments"], "{\"path\": \"a.md\"}");
+    }
 }
