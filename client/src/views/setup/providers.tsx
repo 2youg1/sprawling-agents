@@ -17,28 +17,6 @@ import type { Enrolment } from "../../core/enrol";
 import type { DialectKind, EndpointsAnswer } from "../../wire";
 import { useCommand, useSay, useUi } from "../../ui";
 
-// The probe's answer arrives as a record; the page reads it off the
-// tail of the history rather than folding it, because it is one fact
-// wanted once.
-function useProbed() {
-  const ui = useUi();
-  const history = ui.conn.asking.ask({ history: { before: null, limit: 40 } });
-  return createMemo<{ name: string; models: string[] } | null>(() => {
-    const answer = history();
-    if (answer === undefined || !("history" in answer)) return null;
-    for (let i = answer.history.records.length - 1; i >= 0; i -= 1) {
-      const record = answer.history.records[i];
-      if (record?.kind !== "endpoint_probed") continue;
-      const name = record.data.name;
-      const models = record.data.models;
-      if (typeof name === "string" && Array.isArray(models)) {
-        return { name, models: models.filter((m): m is string => typeof m === "string") };
-      }
-    }
-    return null;
-  });
-}
-
 function useLoginUrl(provider: () => string) {
   const ui = useUi();
   const history = ui.conn.asking.ask({ history: { before: null, limit: 40 } });
@@ -66,9 +44,8 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
   const [reference, setReference] = createSignal<string | null>(null);
   const [note, setNote] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
-  const probed = useProbed();
   const models = createMemo(() => {
-    const held = probed();
+    const held = ui.conn.belief.probed;
     return held !== null && held.name === name().trim() ? held.models : [];
   });
 

@@ -55,6 +55,10 @@ export interface Belief {
   // once and the person to dismiss.
   refusal: AxError | null;
   city: string | null;
+  // The last probe's answer: which endpoint, and the models it named.
+  // Held here rather than read off the history's tail, where a long
+  // city would push it out of the window.
+  probed: { readonly name: string; readonly models: readonly string[] } | null;
 }
 
 function text(data: Record<string, unknown>, key: string): string | null {
@@ -204,6 +208,7 @@ export function createBelief() {
     halted: [],
     refusal: null,
     city: null,
+    probed: null,
   });
 
   // What a `city_view` answer says about runs this page never saw. A run
@@ -251,6 +256,14 @@ export function createBelief() {
           draft.city = record.addr ?? null;
           return;
         }
+        if (record.kind === "endpoint_probed") {
+          const name = text(record.data, "name");
+          const models = record.data.models;
+          if (name !== null && Array.isArray(models)) {
+            draft.probed = { name, models: models.filter((m): m is string => typeof m === "string") };
+          }
+          return;
+        }
         // The nil run marks a record that belongs to the city itself.
         if (record.run === "00000000-0000-0000-0000-000000000000") {
           return;
@@ -276,8 +289,23 @@ export function createBelief() {
     );
   }
 
+  // A refusal is shown once; one kind also corrects the page: a steer
+  // the city refuses because no run answers to that id means the run
+  // this page still believes live is not, so it is frozen here rather
+  // than left to swallow every further message as a steer.
   function refused(error: AxError | null): void {
-    setBelief("refusal", error);
+    setBelief(
+      produce((draft) => {
+        draft.refusal = error;
+        if (!error?.action.startsWith("steer")) {
+          return;
+        }
+        const held = draft.runs[error.subject];
+        if (held !== undefined && held.doing.kind !== "frozen") {
+          draft.runs[error.subject] = { ...held, doing: { kind: "frozen", completion: null } };
+        }
+      }),
+    );
   }
 
   // The name the welcome carried: a page that only hears what happens

@@ -26,9 +26,11 @@ export function Refusal() {
             class="fixed bottom-wide left-wide z-10 w-full max-w-measure rounded-panel border border-alert/50 bg-g1 px-pane py-base text-note shadow-composer"
           >
             <div class="flex items-start justify-between gap-base">
-              <div>
-                <div class="font-label text-alert">{error().action}</div>
-                <div class="mt-tight text-text">{error().subject}</div>
+              <div class="min-w-0">
+                <div class="font-label text-alert">
+                  {error().action} <span class="font-mono text-note text-text-faint">{error().code}</span>
+                </div>
+                <div class="mt-tight break-all font-mono text-text">{error().subject}</div>
                 <Show when={error().recovery !== ""}>
                   <div class="mt-tight text-text-quiet">{error().recovery}</div>
                 </Show>
@@ -42,7 +44,7 @@ export function Refusal() {
               </div>
               <button
                 type="button"
-                class="rounded-control px-snug py-tight text-text-quiet hover:bg-g2"
+                class="shrink-0 whitespace-nowrap rounded-control px-snug py-tight text-text-quiet hover:bg-g2"
                 onClick={() => {
                   ui.conn.dismissRefusal();
                 }}

@@ -40,7 +40,7 @@ export function useUi(): Ui {
     return {
       conn: {
         state: () => ({ kind: "idle" }),
-        belief: { runs: {}, halted: [], refusal: null, city: null },
+        belief: { runs: {}, halted: [], refusal: null, city: null, probed: null },
         asking: {
           ask: () => () => undefined,
           refresh: () => undefined,
