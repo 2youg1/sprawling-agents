@@ -106,6 +106,9 @@ export function resourceFromEffect<A, E>(effect: Effect<A, E>): Resource<Exit<A,
 - **D44 页面上没有句子**（用户裁）：`lang.json` 195 条，全是标签；引导页的说明段、图例、空态提示全部删除。
 - **D45 性能纪律**：帧按动画帧合并（`socket.ts` 的 `queue`＋`requestAnimationFrame`），事件折叠 O(1)，同一查询 250 ms 内合并（`asking.ts` `PACE_MS`），stale-while-revalidate，动画只用 transform／opacity。
 - **D46 视觉**：令牌与 `theme.rs` 同值；四个 `rounded-*` 工具类带 `corner-shape`（面板 `superellipse(2)`＝G3，卡片／控件 1.5＝G2，胶囊真圆）；`--spacing-0` 命名为零，因为 `--spacing` 置 `initial` 后 `min-h-0` 会消失。
+- **D48 刹车与动词一律拼成命令**（前端会话 2，用户裁「停下这座城」应改成 `/stop` 形）：`city_stop`＝`/stop --all`、`bld_halt`＝`/stop {addr}`、`talk_stop`／`run_cancel`＝`/stop`，`release` 同形；两语同一拼写，`lang.test.ts` 因此承认「术语」可以两语相同（以 `/` 或 `{` 起头，或单 token ≤12 字）。图例、`rail_hint`、`talk_empty_hint` 一类解释句删除：人会从别的软件迁移用法。
+- **D49 城是一条大道上的天际线**：`views/city.tsx` 重画——市政厅居中带穹顶与柱廊，其余楼按名字左右交替；楼高＝2 层＋每 4 次 run 一层（上限 8）；一扇窗一次 run（frozen＝g3、thinking＝accent-solid、calling＝闪、waiting＝alert）；门口小人＝活动 run（≤3）；旗＝pursuit（running 时 `wave`）；门旁灯＝blocked；基座一条进度带；星空由固定散列布点。`<defs>` 只在 `City()` 里写（编译器看得见 `<svg>`），Building 组件内仍守 D47。
+- **D50 `#/mcp` 页与 `belief.probed`**：MCP 按楼管理（`configure_building.mcp`），三扇门：Composio（server id＋user id＋api key→`/enroll` 入库为 `secret:mcp/composio-<label>`，header 写 `x-api-key: <ref>`，url `https://backend.composio.dev/v3/mcp/<id>?user_id=<u>`）、http、stdio；`configure_building` 不落账本事件，页面在命令发出 300 ms 后自问一次 `building_view`。`endpoint_probed` 改由 belief 折叠为 `probed{name,models}`，不再翻历史尾巴。被拒的 `steer`（`action` 以 `steer` 起头）让 belief 把该 run 标 frozen——服务端曾把死在 `model_called` 之后的 run 留成活的。
 - **D47 Solid 里画 SVG 的一条规则**：组件内部的 SVG 元素只能用编译器按名字认得的标签（`g`／`path`／`rect`／`circle`／`text`／`line`），链接用 `<g role="link">` 加事件，不用 `<a>`——`<a>` 会被建成 HTML 元素，其 SVG 子树不渲染（card-6.6 实测）。
 
 ### 6-2 `src/core/`（形状按 ARCHITECTURE §9）
@@ -131,6 +134,6 @@ export function resourceFromEffect<A, E>(effect: Effect<A, E>): Resource<Exit<A,
 
 `views/rail.tsx` 左栏；`views/talk.tsx`＋`talk/{thread,composer,waiting}.tsx` 对话；`views/city.tsx`＋`city/shape.ts`（超椭圆路径）；`views/building.tsx`＋`building/tree.tsx`；`views/run.tsx`；`views/setup.tsx`＋`setup/{providers,models}.tsx`；`views/welcome.tsx`；`views/record.tsx`；`views/cost.tsx`；`views/palette.tsx`；`views/refusal.tsx`；`views/prose.tsx`。
 
-### 6-4 验收记录（2026-09-10）
+### 6-4 验收记录（2026-09-10，前端会话 1＋2）
 
-`bun run lint`／`typecheck`／`test`（26 条）绿；`cargo xtask npm`／`wire-ts` 绿。在真城（`sprawling serve --web-dir target/web-dist`）＋假扮 OpenAI 形供应方上实测：连接与握手、引导页触发（无 main 时）、从 composer 派活、`read` 调用折叠、Markdown 回复、结局分隔线、城市绘图、目录树与 transcript 链接、面板。**未实测**：流式增量（服务端界面派活路径不请求 stream，见 Handoff）、设置页表单、四透镜的后三个、记录与成本页、等人卡片、Firefox。
+`bun run lint`／`typecheck`／`test`（26 条）绿；`cargo xtask npm`／`wire-ts` 绿；`cargo nextest -p gateway`（84）绿。在真城（`sprawling serve --web-dir target/web-dist`）＋假扮 OpenAI 形供应方上实测：连接与握手、引导页触发（无 main 时）、从 composer 派活、`read` 调用折叠、Markdown 回复、结局分隔线、城市绘图、目录树与 transcript 链接、面板。**会话 2 补实测**（Edge headless，CDP 驱动）：引导第 1–5 步在 ModelScope 真供应方上走通（enrol→probe 出 46 个模型→attach→select_model main/digest）；设置页 attach 与 select；对话页派活到 GLM-5.2 出 `E_PROVIDER 400/429` 卡片与结局线（免费 key 额度耗尽，多 Agent 场景未跑）；`#/mcp` 三扇门加／删（CONFIG.toml 实写）；楼页目录树、文件原文（编号行）、transcript 直达 run；run 页四透镜；记录三透镜；成本无价态；左栏展开。**仍未实测**：等人卡片、`Changes`／`Hunks` 有内容时、Firefox／Zen（headless `-screenshot` 不出图，需走 BiDi）。**流式**：远端 endpoint 走 `Endpoint::call_streaming`（`stream: true` 实测），但 delta 帧在 run 结束时一次涌到（`tmpscripts/delta-probe.ts` 计时：全部 delta 同一毫秒到达），归服务端转发路径；本机无 key 的 endpoint 走 `Native` 适配器，无 `call_streaming`。
