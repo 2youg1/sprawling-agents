@@ -107,6 +107,25 @@ impl Model for ScriptedModel {
     }
 }
 
+/// A model whose every call fails with one code.
+///
+/// The two codes this fixture is used with are the two halves of the
+/// carrier table: one that names an event to write, and one the table
+/// calls loadtime. A run has to end under both.
+struct FailingModel {
+    code: kernel::AxCode,
+}
+
+impl Model for FailingModel {
+    fn call(&mut self, _req: &ModelRequest) -> Result<ModelReturn, AxError> {
+        Err(AxError::failure(
+            self.code,
+            "read the model's reply",
+            "not a tool name",
+        ))
+    }
+}
+
 fn call(id: &str) -> ToolCall {
     ToolCall {
         id: id.to_owned(),
@@ -476,4 +495,98 @@ fn a_cancel_after_the_wave_stops_the_run_before_anything_it_handed_down_starts()
     // is on the ledger, and the cancel comes after it rather than
     // pretending the work never happened.
     assert!(kinds.iter().any(|kind| kind == "tool_result"));
+}
+
+/// **The defect this pins shipped and was found by driving a real
+/// provider.** ModelScope's streaming tool calls repeat the tool name as
+/// an empty string in every chunk after the first, so a dispatch died of
+/// `E_WIRE_MISMATCH` on its first tool call. That code's carrier is
+/// `Loadtime`, and the driver's error arm returned it without freezing —
+/// so the run was dropped with only `run_started` behind it, `city_view`
+/// reported it alive after a restart, and the page sent every later
+/// message as a `steer` into a run that was never coming back.
+///
+/// A run always ends. The verdict is written before the diagnosis
+/// travels, and both of them survive.
+#[test]
+fn a_run_that_dies_of_a_loadtime_failure_still_writes_its_verdict() {
+    let mut ledger = RecordingLedger::new();
+    let mut model = FailingModel {
+        code: kernel::AxCode::WireMismatch,
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        invoke: &mut invoke,
+        deltas: None,
+    };
+
+    let outcome = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff());
+
+    let Err(err) = outcome else {
+        panic!("the diagnosis still reaches the caller");
+    };
+    assert_eq!(*err.code(), kernel::AxCode::WireMismatch);
+    let kinds = ledger.kinds();
+    assert_eq!(
+        kinds.last().map(String::as_str),
+        Some("run_frozen"),
+        "a run that started must not be left without a verdict: {kinds:?}"
+    );
+    assert_eq!(
+        kinds[kinds.len() - 2],
+        "handoff_written",
+        "the one exit writes both of its lines: {kinds:?}"
+    );
+    // A loadtime code names no carrier event, so nothing stands between
+    // the last turn and the verdict. `Provider` is the other half of the
+    // table and the test below holds that arm.
+    assert!(
+        !kinds.iter().any(|kind| kind == "provider_degraded"),
+        "a loadtime code invents no carrier: {kinds:?}"
+    );
+}
+
+/// The other half of the carrier table, held here so the two arms are
+/// read side by side: a code that names an event writes that event
+/// first, and the run freezes rather than propagating.
+#[test]
+fn a_provider_failure_writes_its_carrier_and_then_the_verdict() {
+    let mut ledger = RecordingLedger::new();
+    let mut model = FailingModel {
+        code: kernel::AxCode::Provider,
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        invoke: &mut invoke,
+        deltas: None,
+    };
+
+    let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff())
+        .expect("a carrier code ends the run rather than escaping it");
+
+    assert!(matches!(frozen.completion(), Completion::Cancelled));
+    let kinds = ledger.kinds();
+    assert_eq!(kinds[kinds.len() - 3], "provider_degraded");
+    assert_eq!(kinds[kinds.len() - 2], "handoff_written");
+    assert_eq!(kinds.last().map(String::as_str), Some("run_frozen"));
 }

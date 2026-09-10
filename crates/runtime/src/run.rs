@@ -210,11 +210,22 @@ pub fn drive(
             // into history under that carrier and the run freezes as
             // cancelled - before this arm existed, a 401 from a provider
             // left a run permanently "started": no event, no freeze, an
-            // event stream that simply went quiet. Loadtime codes still
-            // propagate: when the ledger itself is the casualty there is
-            // nothing truthful left to write.
+            // event stream that simply went quiet.
+            //
+            // A loadtime code names no carrier, and for a while that
+            // meant it left by a second door. It does not: the verdict
+            // is written first and the diagnosis travels afterwards, so
+            // the two facts do not compete. The old reason - "when the
+            // ledger itself is the casualty there is nothing truthful
+            // left to write" - holds for a corrupt store and not for
+            // `E_WIRE_MISMATCH`, where a provider spelled its dialect
+            // wrong and the ledger is in perfect health. Where the store
+            // really is the casualty, `freeze` fails on its own append
+            // and that failure is what travels, which is more honest
+            // than deciding in advance that nothing can be written.
             Err(err) => {
                 let Carrier::Event(kind) = err.code().carrier() else {
+                    run.freeze(ledger, handoff, Completion::Cancelled, hooks)?;
                     return Err(err);
                 };
                 let t = (hooks.now)()?;
