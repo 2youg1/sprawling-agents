@@ -82,6 +82,18 @@ export function McpForm(props: { readonly addr: Address }) {
     const answer = building()();
     return answer !== undefined && "building" in answer ? answer.building.mcp : [];
   });
+  // Reconfiguring a building leaves no record on the ledger (only a log
+  // line), so nothing tells the asking that this answer went stale; the
+  // page asks again itself, once the command has had a moment to land.
+  const configure = (next: readonly McpServer[]) => {
+    const sent = command(configureMcp(props.addr, next));
+    if (sent) {
+      setTimeout(() => {
+        ui.conn.asking.refresh({ building_view: { addr: props.addr } });
+      }, 300);
+    }
+    return sent;
+  };
   const name = () => label().trim();
   const ready = () => {
     if (!LABEL.test(name()) || servers().some((s) => s.label === name())) return false;
@@ -95,7 +107,7 @@ export function McpForm(props: { readonly addr: Address }) {
     }
   };
   const put = (transport: McpServer["transport"]) => {
-    if (command(configureMcp(props.addr, [...servers(), { label: ServerLabel.make(name()), transport }]))) {
+    if (configure([...servers(), { label: ServerLabel.make(name()), transport }])) {
       setLabel("");
       setServerId("");
       setUserId("");
@@ -151,7 +163,7 @@ export function McpForm(props: { readonly addr: Address }) {
             {(server) => (
               <ServerRow
                 server={server}
-                onRemove={() => command(configureMcp(props.addr, servers().filter((each) => each.label !== server.label)))}
+                onRemove={() => configure(servers().filter((each) => each.label !== server.label))}
               />
             )}
           </For>

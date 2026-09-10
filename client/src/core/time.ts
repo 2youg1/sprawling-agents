@@ -39,6 +39,12 @@ export function clock(lang: Lang, at: number): string {
   });
 }
 
+// The time of day alone, for a column where the day is the same on
+// every row.
+export function hhmmss(at: number): string {
+  return new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
 // Whole numbers with a thin separator, and money from micro-dollars.
 export function count(n: number): string {
   return n.toLocaleString("en-US");

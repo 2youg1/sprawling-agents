@@ -58,6 +58,7 @@ export function Cost() {
       </div>
       <Show when={answer()} fallback={<p class="text-text-disabled">…</p>}>
         {(held) => (
+          <Show when={held().total > 0}>
           <div class="grid gap-wide md:grid-cols-2">
             <For each={CUTS}>
               {(cut) => (
@@ -70,6 +71,7 @@ export function Cost() {
               )}
             </For>
           </div>
+          </Show>
         )}
       </Show>
     </div>

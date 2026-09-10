@@ -12,9 +12,18 @@ import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
 import { LENSES, toFragment } from "../core/route";
 import type { Lens } from "../core/route";
-import { clock } from "../core/time";
+import { clock, hhmmss } from "../core/time";
 import type { Seq } from "../wire";
 import { useLang, useSay, useUi } from "../ui";
+
+// One line of what a record carries: its scalar fields, the way a
+// person skims a log.
+function gist(data: Record<string, unknown>): string {
+  return Object.entries(data)
+    .filter(([, value]) => typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join("  ");
+}
 
 function Ledger() {
   const ui = useUi();
@@ -44,13 +53,15 @@ function Ledger() {
                 <li class="border-b border-g1">
                   <button
                     type="button"
-                    class="flex w-full items-center gap-base py-tight text-left hover:bg-g1"
+                    class="flex h-step w-full items-center gap-base text-left leading-none hover:bg-g1"
                     onClick={() => setOpen((at) => (at === record.seq ? null : record.seq))}
+                    title={clock(lang(), record.t)}
                   >
-                    <span class="w-figure shrink-0 text-text-disabled">{record.seq}</span>
-                    <span class="w-figure shrink-0 text-text-faint">{clock(lang(), record.t)}</span>
-                    <span class="text-text">{record.kind}</span>
-                    <span class="flex-1 truncate text-text-faint">{record.addr ?? record.who}</span>
+                    <span class="w-figure shrink-0 text-right text-text-disabled">{record.seq}</span>
+                    <span class="w-figure shrink-0 whitespace-nowrap text-text-faint">{hhmmss(record.t)}</span>
+                    <span class="shrink-0 text-text">{record.kind}</span>
+                    <span class="shrink-0 text-text-faint">{record.addr ?? record.who}</span>
+                    <span class="min-w-0 flex-1 truncate text-text-disabled">{gist(record.data)}</span>
                   </button>
                   <Show when={open() === record.seq}>
                     <pre class="mb-snug max-h-output overflow-auto rounded-card bg-g1 p-base text-text-quiet">
