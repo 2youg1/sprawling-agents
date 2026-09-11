@@ -229,12 +229,33 @@ jobs:
   # toolchain does not judge: its own linter forbids `any`, `as`, `throw`,
   # `try` and a non-exhaustive switch, and its tests run here rather than
   # inside the Rust job so that a bun install is cached on its own.
+  #
+  # `just` is installed rather than assumed. It is not on the runner
+  # image, and this job is the only one that reached for it without
+  # saying so - release.yml, which runs on the same image, has always
+  # named it. Spelling the four commands out here instead would give
+  # `just check-client` a second authority, free to drift from the one a
+  # person runs at their desk.
   client:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      # The cache the comment above promised and this job did not have:
+      # bun's global download directory, which `bun install` fills from
+      # the registry on every cold run. The lockfile is the key, because
+      # the same lockfile wants the same bytes - so an exact hit skips
+      # the save as well as the fetch, and a changed lockfile still
+      # starts from the last one rather than from nothing.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
       - name: lint, typecheck and test the client
         run: just check-client
 
