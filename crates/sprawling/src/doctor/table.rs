@@ -13,11 +13,6 @@
 
 use super::{Detection, Need, PerPlatform, Recipe, Requirement, Tier};
 
-/// The `wasm-bindgen` CLI version the workspace manifest pins. The CLI
-/// version must equal the crate version or the client build breaks
-/// quietly, so this is the one place the installer spells it.
-pub(crate) const WASM_BINDGEN_VERSION: &str = "0.2.127";
-
 /// The environment variable a person may point at a CPython-WASI
 /// component with. Spelled here and nowhere else: the exec tool asks
 /// `doctor::host`, which reads this table. It is the compatibility
@@ -130,22 +125,6 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             windows: CARGO_INSTALL_NEXTEST,
             macos: CARGO_INSTALL_NEXTEST,
             linux: CARGO_INSTALL_NEXTEST,
-        },
-    },
-    Requirement {
-        name: "wasm-bindgen",
-        tier: Tier::Develop,
-        need: Need::Required,
-        enables: "the client bundle; a CLI older than the crate breaks it quietly",
-        detect: Detection::Program {
-            program: "wasm-bindgen",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        recipe: PerPlatform {
-            windows: CARGO_INSTALL_BINDGEN,
-            macos: CARGO_INSTALL_BINDGEN,
-            linux: CARGO_INSTALL_BINDGEN,
         },
     },
     Requirement {
@@ -316,17 +295,6 @@ const CARGO_INSTALL_JUST: Recipe = Recipe::Command {
 const CARGO_INSTALL_NEXTEST: Recipe = Recipe::Command {
     program: "cargo",
     args: &["install", "cargo-nextest", "--locked"],
-};
-
-const CARGO_INSTALL_BINDGEN: Recipe = Recipe::Command {
-    program: "cargo",
-    args: &[
-        "install",
-        "wasm-bindgen-cli",
-        "--version",
-        WASM_BINDGEN_VERSION,
-        "--locked",
-    ],
 };
 
 /// No package manager ships the component and python.org publishes no

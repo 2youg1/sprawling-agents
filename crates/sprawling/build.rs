@@ -6,13 +6,17 @@
 //! Single embed point: gzips the web client bundle into OUT_DIR and
 //! generates `client_embed.rs`, the file table main.rs includes.
 //!
-//! The bundle is whatever `just build-web` left in `target/web-dist`,
-//! plus the page shell and stylesheet from `crates/web/assets/`. When the
-//! wasm artifacts are absent the binary still builds - it carries the
-//! shell alone, `CLIENT_COMPLETE` is false, and a warning says so -
-//! because `just check` must not demand a wasm toolchain. The release
-//! gate (`xtask budget`) refuses a release binary whose file table has
-//! no `web_bg.wasm`, so an incomplete client cannot ship silently.
+//! The bundle is whatever `just build-web` left in `target/web-dist`:
+//! the client's own `index.html` and the hashed assets Vite wrote beside
+//! it. There is no second shell in this repository, because the one the
+//! client builds is the one the product serves.
+//!
+//! When the bundle is absent the binary still builds - it carries a
+//! placeholder page, `CLIENT_COMPLETE` is false, and a warning says so -
+//! because `just check` must not demand a JavaScript toolchain. The
+//! release gate (`xtask budget`) refuses a release binary whose file
+//! table has no client assets, so an incomplete client cannot ship
+//! silently.
 //!
 //! Gzip is deterministic here: fixed compression level, zeroed mtime.
 //! The same source bytes embed identically on every build, which the
@@ -20,6 +24,16 @@
 
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
+
+/// What a binary built without the client serves.
+///
+/// It says which command was not run rather than showing an empty page,
+/// because the person meeting it is a contributor who built from source
+/// and the answer they need is one line long.
+const PLACEHOLDER: &str = r#"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>sprawling</title></head>
+<body><p>This binary was built without the client bundle. Run <code>just build-web</code> and rebuild.</p></body></html>
+"#;
 
 fn main() {
     if let Err(msg) = embed() {
@@ -32,19 +46,6 @@ fn main() {
 fn embed() -> Result<(), String> {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").map_err(|e| e.to_string())?;
     let out_dir = std::env::var("OUT_DIR").map_err(|e| e.to_string())?;
-    let assets = PathBuf::from(&manifest)
-        .join("..")
-        .join("web")
-        .join("assets");
-    // The page shell and the stylesheet it links. Two files rather than
-    // one: a screen designed in plain HTML links the same bytes the
-    // product ships, which is what stops a prototype and its build from
-    // drifting into two different interfaces.
-    let shell = assets.join("index.html");
-    let stylesheet = assets.join("app.css");
-    println!("cargo::rerun-if-changed={}", shell.display());
-    println!("cargo::rerun-if-changed={}", stylesheet.display());
-
     // target/web-dist, robust to profile dirs: walk up from OUT_DIR to the
     // directory literally named `target`, falling back to ../../target.
     let dist = target_dir(&out_dir, &manifest).join("web-dist");
@@ -52,21 +53,26 @@ fn embed() -> Result<(), String> {
     // placeholder build must trigger a re-embed, not wait for luck.
     println!("cargo::rerun-if-changed={}", dist.display());
 
-    // (request path, source file) - index.html always, the bundle when built.
-    let mut files: Vec<(String, PathBuf)> = vec![
-        ("index.html".to_owned(), shell),
-        ("app.css".to_owned(), stylesheet),
-    ];
-    let mut complete = false;
-    if dist.join("web.js").is_file() && dist.join("web_bg.wasm").is_file() {
-        complete = true;
+    // A bundle is complete when the page exists and something was built
+    // beside it. Both halves are asked for: Vite writes `index.html`
+    // first, so a build interrupted between the two leaves a page whose
+    // every script tag points at nothing.
+    let mut files: Vec<(String, PathBuf)> = Vec::new();
+    let assets = dist.join("assets");
+    let built = dist.join("index.html").is_file()
+        && std::fs::read_dir(&assets).is_ok_and(|mut held| held.next().is_some());
+    let complete = built;
+    if built {
         collect(&dist, &dist, &mut files)?;
     } else {
         println!(
-            "cargo::warning=web client artifacts not found in {}; the binary will carry the \
-             page shell only - run `just build-web`, then rebuild",
+            "cargo::warning=client bundle not found in {}; the binary will carry a placeholder \
+             page only - run `just build-web`, then rebuild",
             dist.display()
         );
+        let placeholder = PathBuf::from(&out_dir).join("placeholder.html");
+        std::fs::write(&placeholder, PLACEHOLDER).map_err(|err| err.to_string())?;
+        files.push(("index.html".to_owned(), placeholder));
     }
     files.sort_by(|a, b| a.0.cmp(&b.0));
 

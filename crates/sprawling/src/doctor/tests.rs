@@ -10,7 +10,6 @@ use std::cell::RefCell;
 use std::collections::BTreeSet;
 
 use super::screen::{Asked, run};
-use super::table::WASM_BINDGEN_VERSION;
 use super::*;
 
 /// A machine that answers from a script and installs nothing.
@@ -119,10 +118,9 @@ fn every_row_is_detectable_and_per_platform_installable_or_manual() {
 }
 
 /// The table is the authority on what this repository needs, so the
-/// items its own documents name are in it - including the two that are
-/// not programs on a path: the pinned `wasm-bindgen` version, and the
-/// component the exec tool's python arm reads from an environment
-/// variable.
+/// items its own documents name are in it - including the one that is
+/// not a program on a path: the component the exec tool's python arm
+/// reads from an environment variable.
 #[test]
 fn the_table_names_what_this_repository_actually_asks_for() {
     let named: BTreeSet<&str> = REQUIREMENTS.iter().map(|item| item.name).collect();
@@ -131,7 +129,6 @@ fn the_table_names_what_this_repository_actually_asks_for() {
         "rustup",
         "just",
         "cargo-nextest",
-        "wasm-bindgen",
         "bun",
         "chromedriver",
         "git",
@@ -161,31 +158,6 @@ fn the_table_names_what_this_repository_actually_asks_for() {
     assert!(
         use_tier.contains(&"python-wasi") && use_tier.contains(&"shell"),
         "what a run's tools reach for is a use-tier fact: {use_tier:?}"
-    );
-    let pinned = REQUIREMENTS
-        .iter()
-        .find(|item| item.name == "wasm-bindgen")
-        .expect("the table carries wasm-bindgen");
-    let spelled = pinned.recipe.at(Platform::Linux).spelled();
-    assert!(
-        spelled.contains(WASM_BINDGEN_VERSION),
-        "the CLI version must equal the crate version: {spelled}"
-    );
-}
-
-/// The version the workspace manifest pins. Read from the manifest at
-/// compile time would be a second parser; this assertion is what keeps
-/// the two equal.
-#[test]
-fn the_pinned_wasm_bindgen_version_is_the_one_the_workspace_carries() {
-    let manifest = include_str!("../../../../Cargo.toml");
-    let pinned = manifest
-        .lines()
-        .find(|line| line.starts_with("wasm-bindgen = "))
-        .expect("the workspace pins wasm-bindgen");
-    assert!(
-        pinned.contains(WASM_BINDGEN_VERSION),
-        "the table says {WASM_BINDGEN_VERSION}, the workspace says {pinned}"
     );
 }
 
