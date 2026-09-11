@@ -239,7 +239,7 @@ pub enum Opening { FromJob, WithPerson }   // 穷尽两臂，城在写 brief 时
     pub fn push_tool_results(&mut self, results: Vec<ContentBlock>); // ToolResult 块（pipeline 产出的成品文本）
     pub fn messages(&self) -> &[ChatMessage]; }
 
-pub struct CallShape { pub model: String, pub max_tokens: u64, pub effort: Option<Effort> }
+pub struct CallShape { pub model: String, pub max_tokens: Option<Ceiling>, pub effort: Option<Effort> }
                     // 三项全部来自选型点，无一项在调用处手写。model 与 max_tokens 解自
                     // 模型目录行（gateway::market::ModelEntry）；effort 解自 kernel::FrozenConfig，
                     // Run 内恒不变——改它就换缓存前缀（理由与出处在 kernel-SPEC §8-22）
@@ -623,7 +623,7 @@ pub fn drive(plan: RunPlan, ledger: &mut dyn Ledger, model: &mut dyn Model,
 - **`run_started.parent`**：只在派生开的 Run 上出现。父子关系先前只存在于「两行相邻」这个巧合里，而相邻不是一个可查询的事实；写进载荷之后，前端折得出树，离线重放也折得出同一棵树。
 - **`run_started.usd_micros` 与 `run_started.tokens`**：一跑被派出去时的花销天花板。写它与写 `parent` 同理——**一个进程死后，「这跑当时允许花多少」只剩账本能回答**。先前它只活在装配层的一个局部变量里，于是一跑因待批而停下、被批准后续上的那一跑天花板归零（sprawling-SPEC §8-23 查出、§8-25 修复）。两个键是 `u64` 整数，符合确定性第六条；`fixtures/golden-p0` 随之重生（`GOLDEN_WRITE=1`），这是它存在的用法。
 - **时间纪律**：dispatch 采两次（checkpoint、run_started），每回合一次；**自然结束与预算耗尽时 freeze 再采一次**，handoff 用它、run_frozen 用它＋1（两行同一件事，不值两次采样）；**取消时 freeze 沿用被打断那个回合的时间戳**，因为这次冻结属于那个回合而不是一件新事。三条合起来使一个计数器闭包（citysim）与一个壁钟闭包（真城）在同一驱动下各自正确。
-- **结束判定**：`calls_made == 0` 即 `Completion::Done(Evidence[model_returned])`；跑满 `budget_turns` 即 `Completion::Limit`；任一安全点命中 Cancel 即 `Completion::Cancelled`。三条均经 `freeze` 出口，故 **handoff_written＋run_frozen 是唯一出口**，无第二条退路。第四点 `BeforeSpawn` 与前三点同权：命中即 `Cancelled`，那个回合的 assistant 与 tool results **不入窗**，因为窗口前推是「回合成立」的后果而不是它的一部分。
+- **结束判定**：`calls_made == 0` 且这一答**说了话**，即 `Completion::Done(Evidence[model_returned])`；`calls_made == 0` 而内容为空、或 `stop == MaxTokens`，即 `Completion::Limit`（§8-37）；任一安全点命中 Cancel 即 `Completion::Cancelled`。三条均经 `freeze` 出口，故 **handoff_written＋run_frozen 是唯一出口**，无第二条退路。第四点 `BeforeSpawn` 与前三点同权：命中即 `Cancelled`，那个回合的 assistant 与 tool results **不入窗**，因为窗口前推是「回合成立」的后果而不是它的一部分。
 - **第四种结束：回合中途的失败。** 上一段那句「无第二条退路」先前在代码里不成立：`drive` 的错误臂只对带 `Carrier::Event` 的码写载体事件并冻结，对 `Carrier::Loadtime` 的五个码直接 `return Err`，**那次 run 被丢掉、账本上只剩 `run_started`**。实测：ModelScope 的流式 tool_call 拼接缺陷令每次派活死于 `E_WIRE_MISMATCH`，重启后 `city_view` 仍报那次 run `frozen: false`，页面于是把每条消息都当 `steer` 发而被拒。**两种 carrier 都经 `freeze` 出口，差别只在冻结之前写不写载体事件。** 理由：`Loadtime` 原先的理由是「账本自身就是受害者时，没有什么真实的东西可写」——这对 `CasCorrupt`／`StorageFatal`／`LogVersionUnsupported` 成立，对 `WireMismatch` 不成立：供应方把兑换格式写错与账本健否无关。而对前三个码，写不进去的后果就是 `freeze` 的 append 自己失败并把那个失败向上抩——这比预先判定「写不进去」更诚实。冻结后**原错误仍然向上抩**：账本得到判决，调用方得到诊断，两件事不互相替代。否决「把 `WireMismatch` 重分类为 `Carrier::Event(ProviderDegraded)`」：该码在握手期也用于 wire 版本不匹配（那时连 run 都不存在），一个码两种含义去改分类表，会让 `kernel::event::kind` 那条「loadtime 白名单封死在五个」的测试变成对一件无关的事作证。
 - **Window 归驱动持有**：入窗内容就是回合报告的前推结果（assistant＋tool results），放在调用方手里等于把一条不变量交给每个调用方自己维护。
 - **四个闭包而非四个 trait**：第二实现尚不存在，而本库的纪律是 trait 只在已有第二实现的缝上引入（同 8-3 的 invoke 闭包）。`RunHooks` 自身只是四个引用的容器，不持策略。
@@ -1313,9 +1313,20 @@ impl ContextReminder { pub fn render(&self) -> String; }
 `RunPlan` 去掉 `budget_turns` 与 `budget`，`drive` 的 `while turns < budget` 变成 `loop`。一次跑的结束只有三种来路：一回合作出结论、一次带 carrier 事件的失败（写进历史后冻结为 cancelled）、或一个安全点送到的中断。
 
 - **理由是刹车只留一个**：没有人能在一件事跑之前给它定价，而一个替人说停的数字，停的时刻恰好是人最不希望它停的那一刻。要停一片就 `Halt`——它会终止那片里的后台成员；要停一条就 `Cancel`。
-- **`Completion::Limit` 保留**：它是账本词汇，旧历史里读得回去；本 crate 不再产出它。
+- **`Completion::Limit` 保留**：回合上限没有了，这个词却仍有一条来路——一条什么都没说的回复（§8-37）。
 - **`StatusTool` 十三字段变十二**：`budget_usd`／`budget_tokens` 删除，那两个数报的是上限而不是花销。留在原地的是 `ctx`——已用 token 对着这次跑拿到的窗口，那是**报告花了多少**而不是**事前不许花**。
 - **citysim**：`ScenarioSpec.budget_turns` 随之删除；原先靠上限收尾的那条 scenario 改为「跑满它自己要的每一回合再作出结论」（十六波之后是空的那一波）。
+
+
+### 8-37 一条什么都没说的回复，不是「做完了」
+
+`Run<Active>::advance` 的收尾判定从「本回合没有工具调用」一条，改为三问：没有工具调用、**答里有内容**、且不是停在上限上——三条同时成立才是 `Completion::Done`，否则是 `Completion::Limit`。
+
+- **理由是证据**：`Completion::Done` 必须引一条 `model_returned` 作证据，而一条 `content` 为空的 `model_returned` 证明不了任何工作完成。判它做完，等于在「什么都没说」的那一刻告诉人「你的活干完了」，并且把那条空记录作为凭据写进账本。
+- **它是怎么被发现的**：目录不认识的模型拿到零上限（kernel-SPEC §8-24 那条 `Ceiling`），请求带 `max_tokens: 0` 上线，供应方生成十六个 token 后截断、`content: null`、流式路径把截断报成 `stop`。三条串起来，界面上就是「思考了三分半，然后说做完了，正文一个字没有」。类型那一半修掉了零上限，判定这一半修掉了「空回复算完成」——**两条独立的路各自足以造出假历史，所以两条都堵**。
+- **`stop` 上抬一层**：`StopReason` 此前只进 `model_returned` 载荷就被丢掉，`ToolWave` 与 `Recording` 两个 typestate 不带它。现在它随两个 typestate 到 `TurnReport::stop()`，判定读它而不是从内容去猜——一条被截断但**有内容**的回复同样不是完成，那件事只有 `stop` 说得清。
+- **否决「只看内容空不空」**：`stop == MaxTokens` 而内容非空的回复是半句话，判它完成同样是假历史；只看内容会把它漏掉。
+- **citysim 随之改口**：靠「脚本用光后那一波空回复」收尾的剧本改为显式说一句话（`citysim::concluding`），因为它们要断言的一直是「跑到工作做完」，而不是「模型不说话了」。`fixtures/golden-p0` 随之重生（`GOLDEN_WRITE=1`）。新增剧本 `a_reply_that_says_nothing_freezes_as_limit_rather_than_done` 用**供应方真实报文**（`content: []`、`stop_reason: max_tokens`）经生产翻译喂进来，钉住这条规则。
 
 ### 8-36 写域的两道闸各问一个问题（kernel-SPEC §8-46 末段）
 

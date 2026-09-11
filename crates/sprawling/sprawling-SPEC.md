@@ -1137,7 +1137,7 @@ invert the model seam，仍未动手。**这里不假装做过它。**
 | `Sweep` | drive 之后要收的东西：围栏、被抬起来的审批、job locator | `settle_desks` 11→4 |
 | `Reach` | 这一轮活够得到谁：邻里与代表 | `status_tool` 7→4 |
 | `Entered` | 一个人为接一个 endpoint 输入了什么：名字、base URL、兼容格式、凭证（`Credential` 枚举，不是「密钥＋鉴权头」两个 `Option`） | `endpoint_of` 5→1、`probe_endpoint` 5→1、`attach_endpoint` 6→2 |
-| `Ceilings` | 一行模型声明的两个上限：上下文与最大输出 | `select_model` 5→4 |
+| `Ceilings` | 一行模型声明的两个上限：上下文与最大输出（后者 `Option<Ceiling>`，人没填就退回目录行，目录也不认识就留空） | `select_model` 5→4 |
 
 `record_for` 的五参消得不需要新类型：`effect::Line` 已经装着 `who`／`addr`／`kind`／`data`，
 调用点原本就在把它拆开再递进去，改成整份递。

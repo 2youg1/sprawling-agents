@@ -15,8 +15,8 @@ mod wire;
 pub use image::{ImageRef, ImageType};
 pub use seam::{ModelRequest, ModelReturn, content_from_message, message_payload, value_has_float};
 pub use wire::{
-    BuildingPolicy, ChatMessage, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort,
-    ModelTag, ModelUsage, Role, StopReason, SystemBlock, ToolDef,
+    BuildingPolicy, Ceiling, ChatMessage, ChatRequest, ChatResponse, ContentBlock, DialectKind,
+    Effort, ModelTag, ModelUsage, Role, StopReason, SystemBlock, ToolDef,
 };
 
 use crate::error::AxError;

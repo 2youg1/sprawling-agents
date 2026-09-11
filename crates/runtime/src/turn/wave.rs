@@ -104,6 +104,7 @@ impl Turn<ToolWave> {
                 assistant: self.state.assistant,
                 wave_results,
                 usage: self.state.usage,
+                stop: self.state.stop,
             },
         }))
     }

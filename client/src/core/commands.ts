@@ -168,9 +168,10 @@ export function attachEndpoint(e: Endpoint, admit: readonly string[]): Command {
   };
 }
 
-// The two ceilings are zero: the city takes the catalogue's figure for
-// the model, and a number typed on a form would outrank the one that
-// bills.
+// Neither ceiling is stated here: the city takes the catalogue's figure
+// for the model, and a number typed on a form would outrank the one that
+// bills. An absent output ceiling is carried as absent — a zero would
+// reach the provider as `max_tokens: 0`, which answers with nothing.
 export function selectModel(endpoint: string, model: string, tag: ModelTag): Command {
   return {
     select_model: {
@@ -178,7 +179,7 @@ export function selectModel(endpoint: string, model: string, tag: ModelTag): Com
       model,
       tag,
       context_tokens: 0,
-      max_output_tokens: 0,
+      max_output_tokens: null,
       idem: mintIdem(),
     },
   };

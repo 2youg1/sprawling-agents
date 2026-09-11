@@ -10,7 +10,7 @@
 
 use std::collections::BTreeMap;
 
-use kernel::{AxCode, AxError, UsdMicros};
+use kernel::{AxCode, AxError, Ceiling, UsdMicros};
 use serde::{Deserialize, Serialize};
 
 /// What a model accepts as input.
@@ -38,10 +38,13 @@ pub struct ModelEntry {
     /// refused at the endpoint rather than dropped on the wire.
     pub input: InputKinds,
     /// The most this model may emit in one response, thinking included.
-    /// A property of the model rather than a caller's preference: the
-    /// request must state it, and stating a number the model does not
-    /// have is how a run gets truncated for a reason nobody wrote down.
-    pub max_output_tokens: u64,
+    /// A property of the model rather than a caller's preference, and
+    /// one no provider's model list answers, so it is registered with
+    /// the model or it is not known at all. `None` says nobody has
+    /// registered it: the OpenAI wire then omits the field and the
+    /// Anthropic wire refuses, which is the whole difference between a
+    /// call that answers and a call that returns nothing.
+    pub max_output_tokens: Option<Ceiling>,
     pub input_price: UsdMicros,
     pub output_price: UsdMicros,
     pub cache_read_price: UsdMicros,
@@ -65,7 +68,7 @@ impl MarketSnapshot {
                 id: "claude-sonnet".to_owned(),
                 context_tokens: 200_000,
                 input: InputKinds::TextImage,
-                max_output_tokens: 64_000,
+                max_output_tokens: Ceiling::new(64_000),
                 input_price: UsdMicros::new(3_000_000),
                 output_price: UsdMicros::new(15_000_000),
                 cache_read_price: UsdMicros::new(300_000),
@@ -78,7 +81,7 @@ impl MarketSnapshot {
                 // otherwise: what a local server can see is that
                 // server's fact, and this table does not guess it.
                 input: InputKinds::Text,
-                max_output_tokens: 4_096,
+                max_output_tokens: Ceiling::new(4_096),
                 input_price: UsdMicros::new(0),
                 output_price: UsdMicros::new(0),
                 cache_read_price: UsdMicros::new(0),

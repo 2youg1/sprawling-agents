@@ -7,14 +7,14 @@
 //! it into existence, one turn, and the freeze that is its only exit.
 
 use kernel::{
-    AxCode, AxError, Completion, EventDraft, EventKind, Evidence, Ledger, Model, RunId, TimeMs,
-    ToolCall,
+    AxCode, AxError, Completion, EventDraft, EventKind, Evidence, Ledger, Model, RunId, StopReason,
+    TimeMs, ToolCall,
 };
 use serde_json::{Map, Value};
 
 use crate::handoff::Handoff;
 use crate::reminder::ContextGauge;
-use crate::turn::{Interrupt, PhaseOutcome, Turn};
+use crate::turn::{Interrupt, PhaseOutcome, Turn, TurnReport};
 use crate::window::Window;
 
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint, payload};
@@ -30,6 +30,26 @@ fn fold_steer(window: &mut Window, interrupt: &Interrupt) {
     if let Interrupt::Steer { source, text } = interrupt {
         window.push_steer(source, text);
     }
+}
+
+/// How a turn that called no tool ends the run.
+///
+/// **A reply with nothing in it is not evidence that work finished.**
+/// Two replies arrive that way: one the provider cut off at the model's
+/// output ceiling, and one that carries no content at all — which is
+/// what a request stating a ceiling of zero earns from a provider that
+/// accepts the number. Freezing either as done tells a person their work
+/// is finished at the moment nothing was said, and cites a
+/// `model_returned` holding no content as the evidence for it. Both are
+/// `Limit`: the run ended against something rather than at the end of
+/// its work, and the account says which.
+fn concluded(report: &TurnReport) -> Result<Completion, AxError> {
+    if report.assistant().is_empty() || report.stop() == Some(StopReason::MaxTokens) {
+        return Ok(Completion::Limit);
+    }
+    Ok(Completion::Done(Evidence::new(vec![
+        *report.model_returned(),
+    ])?))
 }
 
 impl Run<Active> {
@@ -206,8 +226,7 @@ impl Run<Active> {
             self.state.window.push_reminder(&reminder);
         }
         if report.calls_made() == 0 {
-            let evidence = Evidence::new(vec![*report.model_returned()])?;
-            return Ok(Advance::Concluded(Completion::Done(evidence)));
+            return Ok(Advance::Concluded(concluded(&report)?));
         }
         Ok(Advance::Turned)
     }

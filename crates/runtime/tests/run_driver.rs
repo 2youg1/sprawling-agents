@@ -148,7 +148,7 @@ fn plan() -> RunPlan {
         predecessor: None,
         shape: CallShape {
             model: "script".to_owned(),
-            max_tokens: 4096,
+            max_tokens: kernel::Ceiling::new(4096),
             effort: None,
             context_tokens: 0,
         },

@@ -240,6 +240,8 @@ pub fn runtime::TurnReport::model_returned(&self) -> &kernel::event::payload::Ev
 pub fn runtime::TurnReport::model_returned(&self) -> &kernel::event::payload::EventRef
 pub fn runtime::TurnReport::refs(&self) -> &[kernel::event::payload::EventRef]
 pub fn runtime::TurnReport::refs(&self) -> &[kernel::event::payload::EventRef]
+pub fn runtime::TurnReport::stop(&self) -> core::option::Option<kernel::model::wire::StopReason>
+pub fn runtime::TurnReport::stop(&self) -> core::option::Option<kernel::model::wire::StopReason>
 pub fn runtime::TurnReport::usage(&self) -> core::option::Option<&kernel::model::wire::ModelUsage>
 pub fn runtime::TurnReport::usage(&self) -> core::option::Option<&kernel::model::wire::ModelUsage>
 pub fn runtime::TurnReport::wave_results(&self) -> &[kernel::model::wire::ContentBlock]
@@ -1047,7 +1049,7 @@ pub runtime::transcript::TranscriptRecord::original: kernel::locator::Locator
 pub runtime::transcript::TranscriptRecord::redacted: u32
 pub runtime::turn::CallShape::context_tokens: u64
 pub runtime::turn::CallShape::effort: core::option::Option<kernel::model::wire::Effort>
-pub runtime::turn::CallShape::max_tokens: u64
+pub runtime::turn::CallShape::max_tokens: core::option::Option<kernel::model::wire::Ceiling>
 pub runtime::turn::CallShape::model: alloc::string::String
 pub runtime::turn::Interrupt::Cancel
 pub runtime::turn::Interrupt::None

@@ -31,6 +31,7 @@ impl core::default::Default for kernel::SandboxLimits
 impl core::fmt::Display for kernel::Address
 impl core::fmt::Display for kernel::AxCode
 impl core::fmt::Display for kernel::B3Hash
+impl core::fmt::Display for kernel::Ceiling
 impl core::fmt::Display for kernel::EnvVarName
 impl core::fmt::Display for kernel::GitOid
 impl core::fmt::Display for kernel::IdemKey
@@ -53,6 +54,7 @@ impl kernel::B3Hash
 impl kernel::Blockage
 impl kernel::BuildingPolicy
 impl kernel::ByteLen
+impl kernel::Ceiling
 impl kernel::ChatRequest
 impl kernel::Completion
 impl kernel::Delegate
@@ -128,6 +130,8 @@ impl<T> kernel::Tainted<T>
 pub const fn kernel::B3Hash::from_bytes([u8; 32]) -> Self
 pub const fn kernel::ByteLen::get(self) -> u64
 pub const fn kernel::ByteLen::new(u64) -> kernel::ByteLen
+pub const fn kernel::Ceiling::get(self) -> u64
+pub const fn kernel::Ceiling::new(u64) -> core::option::Option<kernel::Ceiling>
 pub const fn kernel::Tokens::get(self) -> u64
 pub const fn kernel::Tokens::new(u64) -> kernel::Tokens
 pub const fn kernel::UsdMicros::get(self) -> u64
@@ -266,7 +270,8 @@ pub fn kernel::B3Hash::serialize<S: serde_core::ser::Serializer>(&self, S) -> co
 pub fn kernel::Blockage::line(&self) -> alloc::string::String
 pub fn kernel::BuildingPolicy::new(bool) -> Self
 pub fn kernel::ByteLen::checked_add(self, kernel::ByteLen) -> core::option::Option<kernel::ByteLen>
-pub fn kernel::ChatRequest::empty(&str, u64) -> kernel::ChatRequest
+pub fn kernel::Ceiling::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn kernel::ChatRequest::empty(&str, kernel::Ceiling) -> kernel::ChatRequest
 pub fn kernel::Completion::extend_payload(&self, &mut serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> core::result::Result<(), kernel::AxError>
 pub fn kernel::Completion::name(&self) -> &'static str
 pub fn kernel::Delegate::kind(&self) -> &kernel::DelegateKind
@@ -567,7 +572,7 @@ pub kernel::Carrier::Loadtime
 pub kernel::ChatMessage::content: alloc::vec::Vec<kernel::ContentBlock>
 pub kernel::ChatMessage::role: kernel::Role
 pub kernel::ChatRequest::effort: core::option::Option<kernel::Effort>
-pub kernel::ChatRequest::max_tokens: u64
+pub kernel::ChatRequest::max_tokens: core::option::Option<kernel::Ceiling>
 pub kernel::ChatRequest::messages: alloc::vec::Vec<kernel::ChatMessage>
 pub kernel::ChatRequest::model: alloc::string::String
 pub kernel::ChatRequest::system: alloc::vec::Vec<kernel::SystemBlock>
@@ -1021,6 +1026,7 @@ pub struct kernel::B3Hash(_)
 pub struct kernel::Blockage
 pub struct kernel::BudgetUse
 pub struct kernel::ByteLen(_)
+pub struct kernel::Ceiling(_)
 pub struct kernel::ChatMessage
 pub struct kernel::ChatRequest
 pub struct kernel::ChatResponse

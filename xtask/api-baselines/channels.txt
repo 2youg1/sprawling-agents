@@ -98,7 +98,7 @@ pub channels::ChangesAnswer::base: kernel::locator::GitOid
 pub channels::ChangesAnswer::files: alloc::vec::Vec<kernel::change::FileChange>
 pub channels::ChangesAnswer::head: core::option::Option<kernel::locator::GitOid>
 pub channels::ChosenSummary::endpoint: alloc::string::String
-pub channels::ChosenSummary::max_output_tokens: u64
+pub channels::ChosenSummary::max_output_tokens: core::option::Option<kernel::model::wire::Ceiling>
 pub channels::ChosenSummary::model: alloc::string::String
 pub channels::ChosenSummary::tag: kernel::model::wire::ModelTag
 pub channels::CityAnswer::active: u64
@@ -200,7 +200,7 @@ pub channels::Command::SelectModel
 pub channels::Command::SelectModel::context_tokens: u64
 pub channels::Command::SelectModel::endpoint: channels::ProviderName
 pub channels::Command::SelectModel::idem: kernel::idem::IdemKey
-pub channels::Command::SelectModel::max_output_tokens: u64
+pub channels::Command::SelectModel::max_output_tokens: core::option::Option<kernel::model::wire::Ceiling>
 pub channels::Command::SelectModel::model: alloc::string::String
 pub channels::Command::SelectModel::tag: kernel::model::wire::ModelTag
 pub channels::Command::SetAutonomy

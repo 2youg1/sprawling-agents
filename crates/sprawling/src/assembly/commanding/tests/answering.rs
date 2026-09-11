@@ -89,7 +89,7 @@ fn a_refused_command_reaches_the_peer_that_sent_it() {
             model: "a-model".to_owned(),
             tag: kernel::ModelTag::Main,
             context_tokens: 200_000,
-            max_output_tokens: 8_192,
+            max_output_tokens: kernel::Ceiling::new(8_192),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
         },
         reply,

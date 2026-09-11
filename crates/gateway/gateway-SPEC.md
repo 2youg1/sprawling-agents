@@ -53,7 +53,7 @@ oauth_profiles（数据面，零分支）◀── credential（流程消费情�
 admission／market／cost：纯判定与数据面，被 endpoint 与 S3 回合层消费
 ```
 
-**market**：`ModelEntry` 增 `max_output_tokens`——一次回答能吐多少字是**模型的事实**，不是调用处的选择；探测接口不返回它，故它随模型登记入目录行。尚未登记的本地模型沿用 `local` 行的保守上限，登记面（§8-9）接管后改为人确认过的行。
+**market**：`ModelEntry.max_output_tokens: Option<Ceiling>`——一次回答能吐多少字是**模型的事实**，不是调用处的选择；探测接口不返回它，故它随模型登记入目录行。没有任何行登记过的模型，这一列是 `None`：`openai` 兼容格式于是不写 `max_tokens`、由供应方取自己的默认，`anthropic` 兼容格式写不出请求于是拒（`E_CONFIG_INVALID`，恢复语指向登记处）。尚未登记的本地模型沿用 `local` 行的保守上限，登记面（§8-9）接管后改为人确认过的行。
 
 **router**：本 crate 持有 Endpoint 簿——它是**值不是库**，从 Ledger 重建（同 `kernel::registry` 的口径）；本 crate 仍不持 Ledger 句柄，写入由装配层做。
 

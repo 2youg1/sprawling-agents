@@ -212,7 +212,7 @@ mod tests {
         ModelEntry {
             id: id.to_owned(),
             context_tokens: 128_000,
-            max_output_tokens: 8_192,
+            max_output_tokens: kernel::Ceiling::new(8_192),
             input: crate::market::InputKinds::Text,
             input_price: UsdMicros::new(1_000_000),
             output_price: UsdMicros::new(2_000_000),

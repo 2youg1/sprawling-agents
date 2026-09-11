@@ -90,7 +90,7 @@ fn plan(window: u64) -> RunPlan {
         predecessor: None,
         shape: CallShape {
             model: "metered".to_owned(),
-            max_tokens: 4096,
+            max_tokens: kernel::Ceiling::new(4096),
             effort: None,
             context_tokens: window,
         },

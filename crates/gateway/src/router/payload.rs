@@ -18,7 +18,7 @@
 
 //! Payload faces: references on the wire, never credentials.
 
-use kernel::{AxCode, AxError, DialectKind, ModelTag, Payload, SecretRef, UsdMicros};
+use kernel::{AxCode, AxError, Ceiling, DialectKind, ModelTag, Payload, SecretRef, UsdMicros};
 use serde_json::{Map, Value};
 
 use crate::endpoint::AuthSpec;
@@ -100,7 +100,10 @@ pub fn selected_payload(
     );
     map.insert(
         "max_output_tokens".to_owned(),
-        Value::Number(entry.max_output_tokens.into()),
+        match entry.max_output_tokens {
+            Some(ceiling) => Value::Number(ceiling.get().into()),
+            None => Value::Null,
+        },
     );
     map.insert(
         "input".to_owned(),
@@ -131,6 +134,22 @@ pub(crate) fn text(payload: &Payload, key: &str) -> Result<String, AxError> {
         .and_then(Value::as_str)
         .map(str::to_owned)
         .ok_or_else(|| invalid(format!("{key} is missing or not a string")))
+}
+
+/// A registered ceiling, or `None` when this record states none.
+///
+/// Tolerant in both directions a record can spell absence: a key that is
+/// missing or null, and the zero that a build writing `u64` wrote when
+/// no catalogue row knew the model. Zero read back as a ceiling is a
+/// request the provider answers with nothing, so it reads as unknown.
+pub(crate) fn ceiling(payload: &Payload, key: &str) -> Result<Option<Ceiling>, AxError> {
+    match payload.as_map().get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => value
+            .as_u64()
+            .map(Ceiling::new)
+            .ok_or_else(|| invalid(format!("{key} is not a count"))),
+    }
 }
 
 pub(crate) fn count(payload: &Payload, key: &str) -> Result<u64, AxError> {
@@ -208,7 +227,7 @@ pub(crate) fn read_choice(payload: &Payload) -> Result<(ModelTag, Choice), AxErr
     let entry = ModelEntry {
         id: text(payload, "model")?,
         context_tokens: count(payload, "context_tokens")?,
-        max_output_tokens: count(payload, "max_output_tokens")?,
+        max_output_tokens: ceiling(payload, "max_output_tokens")?,
         input,
         input_price: UsdMicros::new(count(payload, "input_price")?),
         output_price: UsdMicros::new(count(payload, "output_price")?),

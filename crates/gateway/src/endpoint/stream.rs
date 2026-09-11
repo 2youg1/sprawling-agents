@@ -44,6 +44,18 @@ impl Endpoint {
         let mut wire = self.wire_request(req)?;
         if let Some(map) = wire.as_object_mut() {
             map.insert("stream".to_owned(), Value::Bool(true));
+            // **This wire reports no usage in a stream unless it is
+            // asked to.** Without the flag every streamed call bills
+            // something and accounts for nothing, so the cost page reads
+            // zero for exactly the calls a person watched arrive. The
+            // Anthropic stream carries its counts in `message_delta` and
+            // needs no equivalent.
+            if matches!(self.config.dialect, kernel::DialectKind::OpenAi) {
+                map.insert(
+                    "stream_options".to_owned(),
+                    serde_json::json!({ "include_usage": true }),
+                );
+            }
         }
         let mut request = self
             .client

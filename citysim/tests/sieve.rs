@@ -16,7 +16,7 @@
     reason = "test code"
 )]
 
-use citysim::{Scenario, ScriptModel, ScriptTool, SieveWorld, run_scenario};
+use citysim::{Scenario, ScriptModel, ScriptTool, SieveWorld, concluding, run_scenario};
 use kernel::{
     Address, ClockStampGranularity, CostTier, Effect, FrozenConfig, ModelReturn, Payload,
     RenderIntent, RunId, Temporal, ToolCall, ToolMeta, ToolName, ToolOutcome, WriteDomain,
@@ -108,7 +108,7 @@ fn scenario(root: &std::path::Path) -> Scenario {
         model: ScriptModel::new(vec![
             turn(vec![cargo_call("call-1")]),
             turn(vec![cargo_call("call-2")]),
-            turn(vec![]),
+            concluding("the build is green").unwrap(),
         ]),
         bench,
         config: FrozenConfig {

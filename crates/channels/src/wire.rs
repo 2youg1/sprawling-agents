@@ -57,7 +57,11 @@ use serde::{Deserialize, Serialize};
 /// 18: a building's commits can be listed, newest first, so a page can
 ///    walk from a line of code to the session that wrote it without
 ///    folding the history itself.
-pub const WIRE_V: u32 = 21;
+/// 22: a model's output ceiling is a figure or it is absent. Zero used to
+///    mean "take the catalogue's figure", which for a model no catalogue
+///    knew meant a request carrying `max_tokens: 0` - a reply with
+///    nothing in it, and a run that froze as finished.
+pub const WIRE_V: u32 = 22;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

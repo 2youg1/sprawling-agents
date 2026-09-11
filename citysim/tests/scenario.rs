@@ -16,7 +16,7 @@
     reason = "test code"
 )]
 
-use citysim::{CancelPoint, Scenario, ScriptModel, ScriptTool, run_scenario};
+use citysim::{CancelPoint, Scenario, ScriptModel, ScriptTool, concluding, run_scenario};
 use kernel::{
     Address, ClockStampGranularity, CostTier, Effect, FrozenConfig, ModelReturn, Payload,
     RenderIntent, RunId, Temporal, ToolCall, ToolMeta, ToolName, ToolOutcome, WriteDomain,
@@ -91,13 +91,7 @@ fn scenario(cancel: Option<CancelPoint>) -> Scenario {
                 message: Payload::empty(),
                 calls: vec![probe_call()],
             },
-            ModelReturn {
-                usage: None,
-                stop: None,
-                billed_usd_micros: None,
-                message: Payload::empty(),
-                calls: vec![],
-            },
+            concluding("the probe answered; nothing else to do").unwrap(),
         ]),
         bench: bench_with(vec![Box::new(ScriptTool::new(
             probe_meta(),
@@ -230,6 +224,7 @@ fn a_run_takes_every_turn_its_work_asks_for_and_then_concludes() {
                 message: Payload::empty(),
                 calls: vec![probe_call()],
             })
+            .chain(std::iter::once(concluding("sixteen waves walked").unwrap()))
             .collect(),
     );
     sc.bench = bench_with(vec![Box::new(ScriptTool::new(
@@ -277,13 +272,7 @@ fn the_domain_door_bites_an_out_of_domain_write_inside_the_loop() {
                 args: Payload::empty(),
             }],
         },
-        ModelReturn {
-            usage: None,
-            stop: None,
-            billed_usd_micros: None,
-            message: Payload::empty(),
-            calls: vec![],
-        },
+        concluding("the door answered").unwrap(),
     ]);
     sc.bench = bench_with(vec![Box::new(ScriptTool::new(
         write_meta,
@@ -546,13 +535,7 @@ fn two_reads_in_one_wave_are_two_calls() {
                     probe_at("call-2", "beta.md"),
                 ],
             },
-            ModelReturn {
-                usage: None,
-                stop: None,
-                billed_usd_micros: None,
-                message: Payload::empty(),
-                calls: vec![],
-            },
+            concluding("both probes answered").unwrap(),
         ]),
         bench: bench_with(vec![Box::new(ScriptTool::new(
             probe_meta(),
@@ -641,4 +624,37 @@ fn two_runs_interleaved_on_one_ledger_replay_byte_identically() {
     // The chain is what orders them: seq and prev are the ledger's, so
     // two runs sharing one make one sequence rather than two.
     citysim::check_chain(once).unwrap();
+}
+
+/// **A reply with nothing in it is not evidence that work finished.**
+///
+/// A provider that stops at the model's output ceiling answers with a
+/// truncated message and, when the ceiling is small enough, with no
+/// content at all. Freezing that as `done` tells a person their work is
+/// finished at the moment nothing was said, and cites a `model_returned`
+/// holding no content as the proof. The wire form is the one a provider
+/// actually sends, parsed by the production translation, so this pins
+/// the rule against the reply rather than against a hand-built value.
+#[test]
+fn a_reply_that_says_nothing_freezes_as_limit_rather_than_done() {
+    let mut sc = scenario(None);
+    sc.model = ScriptModel::from_wire(
+        kernel::DialectKind::Anthropic,
+        vec![serde_json::json!({
+            "content": [],
+            "stop_reason": "max_tokens",
+            "usage": { "input_tokens": 5038, "output_tokens": 16 },
+        })],
+    )
+    .unwrap();
+    sc.bench = bench_with(Vec::new());
+    let report = run_scenario(sc).unwrap();
+    assert_eq!(report.completion, "limit");
+    let frozen: serde_json::Value = serde_json::from_slice(report.lines.last().unwrap()).unwrap();
+    assert_eq!(frozen["kind"], "run_frozen");
+    assert_eq!(frozen["data"]["completion"], "limit");
+    assert!(
+        frozen["data"].get("evidence").is_none(),
+        "a run that said nothing cites nothing: {frozen}"
+    );
 }

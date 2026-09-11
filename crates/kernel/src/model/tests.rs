@@ -146,7 +146,7 @@ fn request_carries_four_segment_hashes() {
     let req = ModelRequest {
         policy: BuildingPolicy::default(),
         segments: [B3Hash::digest(b"a"); 4],
-        chat: ChatRequest::empty("m", 64),
+        chat: ChatRequest::empty("m", Ceiling::new(64).unwrap()),
     };
     let json = serde_json::to_value(&req).unwrap();
     assert_eq!(json["segments"].as_array().unwrap().len(), 4);

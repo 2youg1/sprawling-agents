@@ -44,12 +44,33 @@ impl ScriptModel {
         })
     }
 
-    /// An empty-script model: concludes on the first call.
+    /// An empty-script model: says nothing at the first call, which is
+    /// how a run reaches `Completion::Limit` rather than how it reaches
+    /// the end of its work.
     pub fn silent() -> Self {
         ScriptModel {
             script: VecDeque::new(),
         }
     }
+}
+
+/// The last reply of a run that finishes: it says something and calls
+/// nothing.
+///
+/// **A reply with no content freezes as `Completion::Limit`**, because a
+/// run cannot cite an empty `model_returned` as the evidence that its
+/// work is done. A scenario that means to reach the end of its work says
+/// so through this, rather than by letting the script run out.
+///
+/// # Errors
+/// When the content blocks cannot be encoded into a payload.
+pub fn concluding(said: &str) -> Result<ModelReturn, AxError> {
+    Ok(ModelReturn::bare(
+        kernel::message_payload(&[kernel::ContentBlock::Text {
+            text: said.to_owned(),
+        }])?,
+        Vec::new(),
+    ))
 }
 
 impl Model for ScriptModel {
@@ -77,7 +98,7 @@ mod tests {
         ModelRequest {
             policy: BuildingPolicy::default(),
             segments: [B3Hash::digest(b"x"); 4],
-            chat: kernel::ChatRequest::empty("script", 64),
+            chat: kernel::ChatRequest::empty("script", kernel::Ceiling::new(64).unwrap()),
         }
     }
 

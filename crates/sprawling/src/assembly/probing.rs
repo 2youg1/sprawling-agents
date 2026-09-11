@@ -29,7 +29,7 @@ use super::{Handover, RunWorker, Site};
 /// The most a probe answer may cost. Four one-line answers do not need
 /// more, and a ceiling is what stops a model that decided to explain
 /// itself from charging a person for the measurement.
-const PROBE_TOKENS: u64 = 256;
+const PROBE_TOKENS: Option<kernel::Ceiling> = kernel::Ceiling::new(256);
 
 /// How the model is asked to answer, so the two readings are shaped
 /// alike enough to be compared: one line per question, in order.

@@ -73,13 +73,13 @@ pub(super) struct Chosen {
 
 /// The two ceilings a model row states.
 ///
-/// Zero in either field means "take the catalogue's figure": a person
-/// choosing a model on a form has no business typing a context window,
-/// and the pair travels together because a context window without an
-/// output ceiling describes no model that can be called.
+/// The pair travels together because a context window without an output
+/// ceiling describes no model that can be called. A zero window and an
+/// absent ceiling each mean "nobody stated this", and the catalogue's
+/// figure is taken where the catalogue has a row for the model.
 pub(super) struct Ceilings {
     pub(super) context_tokens: u64,
-    pub(super) max_output_tokens: u64,
+    pub(super) max_output_tokens: Option<kernel::Ceiling>,
 }
 
 /// How long a probe may take. Short: a person is watching the settings

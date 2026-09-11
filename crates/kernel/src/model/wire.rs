@@ -6,6 +6,8 @@
 //! The canonical conversation vocabulary: what a request and a response
 //! are made of, in the city dialect every adapter translates from.
 
+use std::num::NonZeroU64;
+
 use serde::{Deserialize, Serialize};
 
 use crate::budget::Tokens;
@@ -46,6 +48,39 @@ pub enum StopReason {
     EndTurn,
     ToolUse,
     MaxTokens,
+}
+
+/// The most a model may emit in one response, thinking included.
+///
+/// **Zero is unrepresentable, and absence is not zero.** A provider
+/// answers a zero ceiling with nothing at all, and a reply with nothing
+/// in it reads downstream as work that finished — so a figure nobody
+/// registered has to be carried as a figure nobody registered, and the
+/// dialect that cannot write the request without one refuses the call
+/// instead of inventing a number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(transparent)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Ceiling(NonZeroU64);
+
+impl Ceiling {
+    /// `None` for zero, which is not a ceiling.
+    pub const fn new(tokens: u64) -> Option<Ceiling> {
+        match NonZeroU64::new(tokens) {
+            Some(tokens) => Some(Ceiling(tokens)),
+            None => None,
+        }
+    }
+
+    pub const fn get(self) -> u64 {
+        self.0.get()
+    }
+}
+
+impl std::fmt::Display for Ceiling {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.get())
+    }
 }
 
 /// One frozen-prefix block on the wire. `cache` marks an explicit prompt
@@ -209,7 +244,10 @@ pub struct ToolDef {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChatRequest {
     pub model: String,
-    pub max_tokens: u64,
+    /// Absent when no catalogue row states this model's ceiling. The
+    /// OpenAI wire then omits the field and takes the provider's own
+    /// default; the Anthropic wire, which requires it, refuses.
+    pub max_tokens: Option<Ceiling>,
     pub system: Vec<SystemBlock>,
     pub messages: Vec<ChatMessage>,
     pub tools: Vec<ToolDef>,
@@ -238,10 +276,10 @@ pub struct ChatResponse {
 impl ChatRequest {
     /// An empty conversation shell for adapters and tests that argue
     /// about hashes, not content.
-    pub fn empty(model: &str, max_tokens: u64) -> ChatRequest {
+    pub fn empty(model: &str, max_tokens: Ceiling) -> ChatRequest {
         ChatRequest {
             model: model.to_owned(),
-            max_tokens,
+            max_tokens: Some(max_tokens),
             system: Vec::new(),
             messages: Vec::new(),
             tools: Vec::new(),

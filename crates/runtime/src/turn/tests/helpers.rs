@@ -88,7 +88,7 @@ pub(super) fn run_id() -> RunId {
 pub(super) fn shape() -> CallShape {
     CallShape {
         model: "script".to_owned(),
-        max_tokens: 512,
+        max_tokens: kernel::Ceiling::new(512),
         effort: None,
         context_tokens: 0,
     }

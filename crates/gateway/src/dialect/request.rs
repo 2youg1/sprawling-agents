@@ -103,7 +103,7 @@ pub(crate) fn sample_request() -> ChatRequest {
     args.insert("path".to_owned(), Value::String("notes.md".to_owned()));
     ChatRequest {
         model: "sonnet".to_owned(),
-        max_tokens: 4096,
+        max_tokens: kernel::Ceiling::new(4096),
         system: vec![
             SystemBlock {
                 text: "city".to_owned(),

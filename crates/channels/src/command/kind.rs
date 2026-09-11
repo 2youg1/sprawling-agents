@@ -24,8 +24,8 @@
 //! Command kinds: names, steps, the wire enum.
 
 use kernel::{
-    Address, ApprovalId, Autonomy, DialectKind, Effort, GitOid, IdemKey, McpServer, ModelTag,
-    PolicyVerdict, RunId, SandboxLimits, Sealed, Seq, SessionName,
+    Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, GitOid, IdemKey, McpServer,
+    ModelTag, PolicyVerdict, RunId, SandboxLimits, Sealed, Seq, SessionName,
 };
 use serde::{Deserialize, Serialize};
 
@@ -269,8 +269,15 @@ pub enum Command<Secret = Sealed<String>> {
         endpoint: ProviderName,
         model: String,
         tag: ModelTag,
+        /// The model's window. Zero states no window, and the context
+        /// reminder then stays silent rather than measuring against a
+        /// number nobody gave it.
         context_tokens: u64,
-        max_output_tokens: u64,
+        /// The model's output ceiling. Absent when the person did not
+        /// state one: the city then takes the catalogue's figure, and
+        /// where the catalogue has no row the model is registered
+        /// without a ceiling rather than with a zero one.
+        max_output_tokens: Option<Ceiling>,
         idem: IdemKey,
     },
     Fork {

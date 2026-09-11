@@ -16,8 +16,8 @@
 
 use kernel::{
     AxCode, AxError, B3Hash, BuildingPolicy, ChatRequest, ContentBlock, EventDraft, EventKind,
-    EventRef, Ledger, Model, ModelRequest, ModelReturn, ModelUsage, Payload, RunId, TimeMs,
-    ToolCall, ToolDef, content_from_message,
+    EventRef, Ledger, Model, ModelRequest, ModelReturn, ModelUsage, Payload, RunId, StopReason,
+    TimeMs, ToolCall, ToolDef, content_from_message,
 };
 use serde_json::{Map, Value};
 
@@ -58,6 +58,7 @@ pub struct ToolWave {
     model_returned: EventRef,
     assistant: Vec<ContentBlock>,
     usage: Option<ModelUsage>,
+    stop: Option<StopReason>,
 }
 
 #[derive(Debug)]
@@ -67,6 +68,7 @@ pub struct Recording {
     assistant: Vec<ContentBlock>,
     wave_results: Vec<ContentBlock>,
     usage: Option<ModelUsage>,
+    stop: Option<StopReason>,
 }
 
 fn payload(map: Map<String, Value>) -> Result<Payload, AxError> {
@@ -251,6 +253,7 @@ impl Turn<Calling> {
                 model_returned,
                 assistant,
                 usage,
+                stop,
             },
         }))
     }
@@ -280,6 +283,7 @@ impl Turn<Recording> {
             assistant: self.state.assistant,
             wave_results: self.state.wave_results,
             usage: self.state.usage,
+            stop: self.state.stop,
         }))
     }
 }

@@ -6,7 +6,7 @@
 //! What a completed turn hands the run loop, and the frozen `[model]`
 //! section the call is shaped by.
 
-use kernel::{ContentBlock, EventRef, ModelUsage};
+use kernel::{Ceiling, ContentBlock, EventRef, ModelUsage, StopReason};
 
 /// What a completed turn hands the run loop. `assistant` and
 /// `wave_results` are the window-folding material — the same content the
@@ -20,6 +20,7 @@ pub struct TurnReport {
     pub(super) assistant: Vec<ContentBlock>,
     pub(super) wave_results: Vec<ContentBlock>,
     pub(super) usage: Option<ModelUsage>,
+    pub(super) stop: Option<StopReason>,
 }
 
 impl TurnReport {
@@ -49,6 +50,13 @@ impl TurnReport {
     pub fn wave_results(&self) -> &[ContentBlock] {
         &self.wave_results
     }
+
+    /// Why the provider stopped, when it said. A reply that stopped at
+    /// the ceiling is a reply that was cut off, and the run loop reads
+    /// that here rather than inferring it from what the reply contains.
+    pub fn stop(&self) -> Option<StopReason> {
+        self.stop
+    }
 }
 
 /// Which model this run calls, how much it may say, and how hard it may
@@ -58,7 +66,10 @@ impl TurnReport {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallShape {
     pub model: String,
-    pub max_tokens: u64,
+    /// The model's own ceiling, from the endpoint book. `None` when no
+    /// catalogue row states one: the request then carries no ceiling and
+    /// the wire that requires one refuses the call.
+    pub max_tokens: Option<Ceiling>,
     pub effort: Option<kernel::Effort>,
     /// The model's window, from the endpoint book. Zero when the book
     /// does not say, in which case the context reminder stays silent.

@@ -1015,7 +1015,8 @@ pub struct SystemBlock { pub text: String, pub cache: bool }             // cach
                                         | ToolResult{tool_use_id, content, is_error} }
 pub struct ChatMessage { pub role: Role, pub content: Vec<ContentBlock> }
 pub struct ToolDef { pub name: ToolName, pub description: String, pub input_schema: Payload }
-pub struct ChatRequest { pub model: String, pub max_tokens: u64, pub system: Vec<SystemBlock>,
+pub struct Ceiling(NonZeroU64);  // 零不可表达：new(0) 即 None
+pub struct ChatRequest { pub model: String, pub max_tokens: Option<Ceiling>, pub system: Vec<SystemBlock>,
                          pub messages: Vec<ChatMessage>, pub tools: Vec<ToolDef> }
 pub struct ModelUsage { pub input_tokens: Tokens, pub output_tokens: Tokens,
                         pub cache_read_tokens: Tokens, pub cache_write_tokens: Tokens }
@@ -1044,6 +1045,7 @@ pub struct ChatRequest { /* …既有五字段… */ pub effort: Option<Effort> 
 - **`Effort` 六级**：两家实际在用的就是 `none/low/medium/high/xhigh/max`，不另列其他方案。一处差别写清楚：**Anthropic 的 `effort` 只收五级**（官方 SDK 类型 `Literal["low","medium","high","xhigh","max"]`），`none` 不是它的取值，关思考在另一个字段 `thinking:{type:"disabled"}`；官方另记「Setting `effort` to `"high"` produces exactly the same behavior as omitting the `effort` parameter entirely」。OpenAI 侧六级同名（其 `minimal` 属 gpt-5 旧拼写，不入城内梯子）。故**两种兼容格式都拼得出全部六级**，否决「兼容格式拼不出就拒」这条路径；dialect 里只留 fail-closed 通配臂，含义改为「日后新增的级别尚未教会写」，恒不夹取到邻级。
 - **不建每模型强度支持表**：任何 provider API 都不返回「本模型支持哪几级」。造一张我们填不满的表，就是给 provider 的真实行为立第二个权威；模型自己拒的原样透出。
 - **`max_tokens` 是模型的事实，不是调用方的偏好**：Anthropic 要求每请求必带 `max_tokens`，且开思考时它是「思考＋回答」的总上限；OpenAI 则可缺席。两家的 `GET /v1/models` 都不返回该上限，所以它探不到，只能随模型登记。权威定在 `gateway::market::ModelEntry.max_output_tokens`，`CallShape.max_tokens` 由选型点从那一行解出；**任何调用处手写数字即错**——截断会发生在一个账上找不到理由的地方。
+- **没人登记过的上限，载为「没人登记过」**：`Ceiling` 包 `NonZeroU64`，`ChatRequest.max_tokens` 是 `Option<Ceiling>`，于是「零」在类型上不存在，「缺席」也不等于零。缺席时 OpenAI 形不写该字段、取供应方自己的默认；Anthropic 形写不出请求，于是**拒**（`E_CONFIG_INVALID`，恢复语指向模型登记处），绝不在兼容格式那一层现编一个数。理由是实测：一个目录不认识的模型曾以 `max_tokens: 0` 上线，供应方答空、`stop` 记 `end_turn`、那次 run 冻结为「做完了」——**一个零上限造出的是一条看起来完成了的假历史**。
 
 **模型看得见图**（`kernel::model::image`；形状 2 value）
 

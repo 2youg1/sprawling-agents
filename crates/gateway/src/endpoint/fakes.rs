@@ -265,6 +265,6 @@ pub(crate) fn request() -> ModelRequest {
     ModelRequest {
         policy: BuildingPolicy::default(),
         segments: [B3Hash::digest(b"seg"); 4],
-        chat: ChatRequest::empty("duty", 128),
+        chat: ChatRequest::empty("duty", kernel::Ceiling::new(128).unwrap()),
     }
 }

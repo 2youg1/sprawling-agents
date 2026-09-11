@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 21 as const;
+export const WIRE_V = 22 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "5f8e6f1e506ae7b10052f0b44828dd529804b4b992a29a0578b58b4c3c0d4ef2" as const;
+export const WIRE_HASH = "b9ba0a46521f3bf9f07127a034b3a5a5bbd6d41a8a9c52d430d671090dbe7041" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -820,6 +820,19 @@ export const DocumentAnswer = Schema.Struct({
 export type DocumentAnswer = typeof DocumentAnswer.Type;
 
 /**
+ * The most a model may emit in one response, thinking included.
+ * 
+ * **Zero is unrepresentable, and absence is not zero.** A provider
+ * answers a zero ceiling with nothing at all, and a reply with nothing
+ * in it reads downstream as work that finished — so a figure nobody
+ * registered has to be carried as a figure nobody registered, and the
+ * dialect that cannot write the request without one refuses the call
+ * instead of inventing a number.
+ */
+export const Ceiling = Schema.Int.pipe(Schema.brand("Ceiling"));
+export type Ceiling = typeof Ceiling.Type;
+
+/**
  * What a chosen model is for. Exhaustive rather than a free label: a
  * tag exists because some code asks for a model by it, so a tag with no
  * asker is a setting the person can fill in and never see used. It
@@ -834,7 +847,7 @@ export type ModelTag = typeof ModelTag.Type;
 
 export const ChosenSummary = Schema.Struct({
   endpoint: Schema.String,
-  max_output_tokens: Schema.Int,
+  max_output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
   model: Schema.String,
   tag: ModelTag,
 }).annotations({ identifier: "ChosenSummary" });
@@ -1583,7 +1596,7 @@ export const Command = Schema.Union(
       context_tokens: Schema.Int,
       endpoint: ProviderName,
       idem: IdemKey,
-      max_output_tokens: Schema.Int,
+      max_output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
       model: Schema.String,
       tag: ModelTag,
     }),

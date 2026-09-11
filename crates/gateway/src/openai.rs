@@ -195,10 +195,13 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
     }
     let mut root = Map::new();
     root.insert("model".to_owned(), Value::String(req.model.clone()));
-    root.insert(
-        "max_tokens".to_owned(),
-        Value::Number(req.max_tokens.into()),
-    );
+    // Absent when no catalogue row states this model's ceiling: this
+    // wire permits the field to be missing, and the provider's own
+    // default is a real number, where a zero is a reply with nothing in
+    // it that reads downstream as work that finished.
+    if let Some(ceiling) = req.max_tokens {
+        root.insert("max_tokens".to_owned(), Value::Number(ceiling.get().into()));
+    }
     root.insert("messages".to_owned(), Value::Array(messages));
     if let Some(effort) = req.effort {
         root.insert(

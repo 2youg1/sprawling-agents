@@ -158,7 +158,7 @@ pub gateway::ModelEntry::context_tokens: u64
 pub gateway::ModelEntry::id: alloc::string::String
 pub gateway::ModelEntry::input: gateway::InputKinds
 pub gateway::ModelEntry::input_price: kernel::budget::UsdMicros
-pub gateway::ModelEntry::max_output_tokens: u64
+pub gateway::ModelEntry::max_output_tokens: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::ModelEntry::output_price: kernel::budget::UsdMicros
 pub gateway::NativeConfig::base_url: alloc::string::String
 pub gateway::NativeConfig::model: alloc::string::String

@@ -107,10 +107,19 @@ fn block_wire(block: &ContentBlock, images: &ImageBytes) -> Result<Value, AxErro
 pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, AxError> {
     let mut root = Map::new();
     root.insert("model".to_owned(), Value::String(req.model.clone()));
-    root.insert(
-        "max_tokens".to_owned(),
-        Value::Number(req.max_tokens.into()),
-    );
+    // This wire requires the field, so a model whose ceiling nobody
+    // registered is refused here rather than sent a number chosen in
+    // this file: a ceiling invented at the call site truncates runs for
+    // a reason that appears nowhere in the account.
+    let ceiling = req.max_tokens.ok_or_else(|| {
+        AxError::failure(
+            kernel::AxCode::ConfigInvalid,
+            "write an Anthropic request",
+            format!("{} states no output ceiling", req.model),
+        )
+        .with_recovery("state this model's max output tokens where the model is registered")
+    })?;
+    root.insert("max_tokens".to_owned(), Value::Number(ceiling.get().into()));
     if !req.system.is_empty() {
         let system: Vec<Value> = req
             .system

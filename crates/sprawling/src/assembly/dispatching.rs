@@ -141,7 +141,7 @@ pub(super) const NAME_THE_WORK: &str = "Name this piece of work in two to four w
 /// How many tokens a name is worth. Four words do not need more, and a
 /// ceiling is what stops a model that decided to explain itself from
 /// costing a person real money for a filename.
-pub(super) const NAME_TOKENS: u64 = 32;
+pub(super) const NAME_TOKENS: Option<kernel::Ceiling> = kernel::Ceiling::new(32);
 
 pub(super) mod agreeing;
 pub(super) mod running;

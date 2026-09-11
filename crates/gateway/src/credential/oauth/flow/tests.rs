@@ -184,7 +184,7 @@ fn a13_redeemed_value_reaches_the_wire_verbatim() {
         .call(&ModelRequest {
             policy: BuildingPolicy::default(),
             segments: [B3Hash::digest(b"s"); 4],
-            chat: ChatRequest::empty("m", 8),
+            chat: ChatRequest::empty("m", kernel::Ceiling::new(8).unwrap()),
         })
         .unwrap();
     let seen = server.join().unwrap();

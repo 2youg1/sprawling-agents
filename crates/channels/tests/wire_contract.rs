@@ -321,7 +321,7 @@ title = \"a window\"
             model: "m-large".to_owned(),
             tag: kernel::ModelTag::Main,
             context_tokens: 128_000,
-            max_output_tokens: 8_192,
+            max_output_tokens: kernel::Ceiling::new(8_192),
             idem,
         },
         Command::Fork {

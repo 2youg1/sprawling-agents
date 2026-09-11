@@ -217,7 +217,7 @@ fn three_ready_nodes_drive_three_runs_at_once() {
             model: "m-local".to_owned(),
             tag: kernel::ModelTag::Digest,
             context_tokens: 32_768,
-            max_output_tokens: 4_096,
+            max_output_tokens: kernel::Ceiling::new(4_096),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"digest"),
         })
         .unwrap();

@@ -14,8 +14,8 @@
 //! returning an empty result a reader would mistake for an empty city.
 
 use kernel::{
-    Address, ApprovalItem, Autonomy, ClusterKey, DialectKind, EventKind, EventRecord, FileChange,
-    GitOid, ModelTag, PolicyVerdict, Restoration, RunId, Seq, TimeMs, UsdMicros,
+    Address, ApprovalItem, Autonomy, Ceiling, ClusterKey, DialectKind, EventKind, EventRecord,
+    FileChange, GitOid, ModelTag, PolicyVerdict, Restoration, RunId, Seq, TimeMs, UsdMicros,
 };
 use serde::{Deserialize, Serialize};
 
@@ -129,7 +129,9 @@ pub struct ChosenSummary {
     pub tag: ModelTag,
     pub endpoint: String,
     pub model: String,
-    pub max_output_tokens: u64,
+    /// Absent when no row states this model's ceiling — which the
+    /// settings page shows as a field to fill rather than as a number.
+    pub max_output_tokens: Option<Ceiling>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

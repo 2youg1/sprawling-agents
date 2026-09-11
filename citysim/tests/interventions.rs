@@ -19,7 +19,7 @@
     reason = "test code"
 )]
 
-use citysim::{CancelPoint, Scenario, ScriptModel, ScriptTool, run_scenario};
+use citysim::{CancelPoint, Scenario, ScriptModel, ScriptTool, concluding, run_scenario};
 use kernel::{
     Address, ClockStampGranularity, CostTier, Effect, FrozenConfig, ModelReturn, Payload,
     RenderIntent, RunId, Temporal, ToolCall, ToolMeta, ToolName, ToolOutcome, WriteDomain,
@@ -88,7 +88,7 @@ fn two_wave_scenario(cancel: Option<CancelPoint>, steer: Option<(u32, String)>) 
         model: ScriptModel::new(vec![
             answer(vec![probe_call("call-1")]),
             answer(vec![probe_call("call-2")]),
-            answer(vec![]),
+            concluding("two waves walked").unwrap(),
         ]),
         bench: bench_with(vec![Box::new(ScriptTool::new(
             probe_meta(),

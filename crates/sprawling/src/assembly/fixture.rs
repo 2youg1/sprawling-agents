@@ -241,7 +241,7 @@ pub(super) fn worker_with_provider(
         model: model.to_owned(),
         tag: kernel::ModelTag::Main,
         context_tokens: 32_768,
-        max_output_tokens: 4_096,
+        max_output_tokens: kernel::Ceiling::new(4_096),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
     })?;
     Ok(worker)

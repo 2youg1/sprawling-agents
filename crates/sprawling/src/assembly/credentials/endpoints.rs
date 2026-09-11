@@ -261,19 +261,18 @@ impl RunWorker {
             .with_nearby(known.models.clone()));
         }
         let priced = gateway::MarketSnapshot::builtin().lookup(&model).cloned();
-        // Zero means "take the catalogue's figure". A person choosing a
-        // model in the settings page has no business typing a context
-        // window: the ceiling is a fact about the model, and a number
-        // invented on a form would end runs for a reason that appears
-        // nowhere in the account.
+        // What the person stated outranks the catalogue, and what
+        // neither states stays unstated. **The old reading of an unknown
+        // model was zero**, which the OpenAI wire wrote out as
+        // `max_tokens: 0` and a provider answered with no content at
+        // all; the run then froze as work that finished. A ceiling this
+        // city cannot name is now carried as one it cannot name.
         let context_tokens = match context_tokens {
             0 => priced.as_ref().map_or(0, |row| row.context_tokens),
             stated => stated,
         };
-        let max_output_tokens = match max_output_tokens {
-            0 => priced.as_ref().map_or(0, |row| row.max_output_tokens),
-            stated => stated,
-        };
+        let max_output_tokens =
+            max_output_tokens.or_else(|| priced.as_ref().and_then(|row| row.max_output_tokens));
         let entry = gateway::ModelEntry {
             id: model,
             context_tokens,
