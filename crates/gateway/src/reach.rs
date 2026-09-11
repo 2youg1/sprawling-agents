@@ -244,12 +244,6 @@ pub fn reach(client: &reqwest::blocking::Client, base_url: &str, elapsed_ms: u64
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    reason = "test code"
-)]
 mod tests {
     use super::*;
 

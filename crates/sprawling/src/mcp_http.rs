@@ -123,7 +123,7 @@ impl HttpServer {
             }
         };
         let mut builder = reqwest::blocking::Client::builder();
-        if gateway::is_local(&url) {
+        if gateway::is_local(url) {
             // A server a person started on this machine is reached by
             // address, and a proxy in front of it answers for something
             // else entirely.

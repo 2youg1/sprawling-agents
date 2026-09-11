@@ -18,7 +18,7 @@
 //! is the city root joined with it. A caller cannot ask this to reveal
 //! something outside the city because there is no way to spell one.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use kernel::{Address, AxCode, AxError};
 
@@ -52,7 +52,7 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError> {
 /// the desktops that do have one spell it differently per file manager,
 /// which is a table this city would then have to keep current.
 #[cfg(target_os = "windows")]
-fn manager(path: &PathBuf) -> std::process::Command {
+fn manager(path: &Path) -> std::process::Command {
     let mut command = std::process::Command::new("explorer");
     // No space after the comma: `explorer` parses `/select,<path>` as one
     // argument and opens the person's home directory when it is two.
@@ -61,26 +61,21 @@ fn manager(path: &PathBuf) -> std::process::Command {
 }
 
 #[cfg(target_os = "macos")]
-fn manager(path: &PathBuf) -> std::process::Command {
+fn manager(path: &Path) -> std::process::Command {
     let mut command = std::process::Command::new("open");
     command.args(["-R", &path.display().to_string()]);
     command
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-fn manager(path: &PathBuf) -> std::process::Command {
+fn manager(path: &Path) -> std::process::Command {
     let mut command = std::process::Command::new("xdg-open");
     command.arg(path.parent().unwrap_or(path).display().to_string());
     command
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    reason = "test code"
-)]
+#[expect(clippy::unwrap_used, reason = "test code")]
 mod tests {
     use super::*;
 
@@ -103,7 +98,7 @@ mod tests {
     /// zero exit status.
     #[test]
     fn the_selected_path_travels_as_one_argument() {
-        let path = PathBuf::from("C:/city/hall/JOB.md");
+        let path = std::path::PathBuf::from("C:/city/hall/JOB.md");
         let command = manager(&path);
         let written: Vec<String> = command
             .get_args()
