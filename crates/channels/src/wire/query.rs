@@ -17,7 +17,7 @@ use kernel::{Address, GitOid, NodeId, RunId, Seq};
 use serde::{Deserialize, Serialize};
 
 /// The Query surface, in declaration order.
-pub const QUERY_NAMES: [&str; 22] = [
+pub const QUERY_NAMES: [&str; 23] = [
     "History",
     "RunHistory",
     "Changes",
@@ -40,6 +40,7 @@ pub const QUERY_NAMES: [&str; 22] = [
     "CostOf",
     "Listing",
     "Document",
+    "Commits",
 ];
 
 /// Queries read state. They are cacheable and free of side effects, so none
@@ -212,6 +213,21 @@ pub enum Query {
     Document {
         at: Address,
     },
+    /// The commits this city made, newest first, a page at a time.
+    ///
+    /// `building` keeps the commits whose actor worked at that address
+    /// or under it - the actor is the authority and a session is its
+    /// projection, so filtering by session would lose the runs nobody
+    /// opened a session for. `before` is exclusive, as in
+    /// [`Query::History`]; the next page asks with the last `seq` it was
+    /// handed. Only commits this city wrote are listed: an oid a person
+    /// rewrote into trunk by hand is not this city's, and it says so by
+    /// leaving it out rather than reading a trailer back.
+    Commits {
+        building: Option<Address>,
+        before: Option<Seq>,
+        limit: u32,
+    },
 }
 
 impl Query {
@@ -241,6 +257,7 @@ impl Query {
             Self::CostOf { .. } => "CostOf",
             Self::Listing { .. } => "Listing",
             Self::Document { .. } => "Document",
+            Self::Commits { .. } => "Commits",
         }
     }
 }

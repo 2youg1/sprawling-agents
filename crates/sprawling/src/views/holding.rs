@@ -79,6 +79,9 @@ pub(crate) struct Views {
     /// git: the trailers on the commit are a projection of these same
     /// records, and a projection must not be answered from another one.
     pub(super) commits: std::collections::BTreeMap<kernel::GitOid, super::commits::CommitFacts>,
+    /// The same commits in the order the history announced them, so a
+    /// page can list them newest first without walking the ledger.
+    pub(super) commit_seqs: std::collections::BTreeMap<kernel::Seq, kernel::GitOid>,
     /// Which run each successor replaced, folded from `run_started`. A
     /// lineage is walked from here rather than stored per commit, so
     /// the chain is one fact however many commits point into it.
@@ -138,6 +141,7 @@ impl Views {
             discards: std::collections::BTreeMap::new(),
             assets: Vec::new(),
             commits: std::collections::BTreeMap::new(),
+            commit_seqs: std::collections::BTreeMap::new(),
             predecessors: std::collections::BTreeMap::new(),
             events: 0,
             // An unreadable ledger directory is not a reason to refuse to

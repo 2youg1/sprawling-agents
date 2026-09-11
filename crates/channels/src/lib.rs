@@ -35,7 +35,7 @@ pub use answer::{Answer, ApprovalsAnswer, ArchiveLine, BlockedLine, BuildingProg
 pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
 pub use answer::{BuildingAnswer, BuildingDoc};
 pub use answer::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Turn, Used};
-pub use answer::{ChangesAnswer, CommitAnswer, HISTORY_MAX, HistoryAnswer};
+pub use answer::{ChangesAnswer, CommitAnswer, CommitsAnswer, HISTORY_MAX, HistoryAnswer};
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer, EndpointSummary, EndpointsAnswer};
 pub use answer::{CostOfAnswer, EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use answer::{Decision, GovernanceAnswer};

@@ -35,6 +35,15 @@ pub(super) struct CommitFacts {
 }
 
 impl CommitFacts {
+    /// Whether this run worked at `building` or in a room under it.
+    fn worked_under(&self, building: &Address) -> bool {
+        let actor = self.actor.as_str();
+        actor == building.as_str()
+            || actor
+                .strip_prefix(building.as_str())
+                .is_some_and(|rest| rest.starts_with('/'))
+    }
+
     /// What a page or a person is handed. The lineage is this run
     /// first, then each run it replaced, back to the first.
     pub(super) fn answer(&self, oid: GitOid, lineage: Vec<RunId>) -> channels::CommitAnswer {
@@ -59,7 +68,41 @@ impl super::holding::Views {
     /// `checkpoint_committed` that fences nothing.
     pub(super) fn fold_commit(&mut self, record: &EventRecord) {
         if let Some((oid, facts)) = commit_facts(record) {
+            self.commit_seqs.insert(facts.seq, oid);
             self.commits.insert(oid, facts);
+        }
+    }
+
+    /// The commits this city made, newest first, one page at a time
+    /// (channels-SPEC section 8-24).
+    ///
+    /// `before` is exclusive; `limit` is clamped to the same ceiling as
+    /// `History`. `more` says whether a further page exists, found by
+    /// walking one commit past the page rather than by counting: the
+    /// filter makes the count meaningless.
+    pub(super) fn commits_answer(
+        &self,
+        building: Option<&Address>,
+        before: Option<Seq>,
+        limit: u32,
+    ) -> channels::CommitsAnswer {
+        let want = usize::try_from(limit.clamp(1, channels::HISTORY_MAX)).unwrap_or(usize::MAX);
+        let mut page = self
+            .commit_seqs
+            .range(..before.unwrap_or(Seq::new(u64::MAX)))
+            .rev()
+            .filter_map(|(_, oid)| self.commits.get(oid).map(|facts| (*oid, facts)))
+            .filter(|(_, facts)| building.is_none_or(|at| facts.worked_under(at)))
+            .take(want.saturating_add(1))
+            .map(|(oid, facts)| facts.answer(oid, self.lineage_of(facts.run)))
+            .collect::<Vec<_>>();
+        let more = page.len() > want;
+        page.truncate(want);
+        channels::CommitsAnswer {
+            building: building.cloned(),
+            before,
+            commits: page,
+            more,
         }
     }
 
@@ -153,16 +196,84 @@ mod tests {
     use kernel::{B3Hash, EventDraft, Payload, TimeMs};
 
     fn record(kind: EventKind, data: serde_json::Map<String, serde_json::Value>) -> EventRecord {
+        record_at(kind, data, 9, "lab/room1")
+    }
+
+    fn record_at(
+        kind: EventKind,
+        data: serde_json::Map<String, serde_json::Value>,
+        seq: u64,
+        addr: &str,
+    ) -> EventRecord {
         let draft = EventDraft {
             run: RunId::from_bytes([4u8; 16]),
             t: TimeMs::new(7),
             who: "resident".to_owned(),
-            addr: Some(Address::parse("lab/room1").unwrap()),
+            addr: Some(Address::parse(addr).unwrap()),
             kind,
             data: Payload::new(data).unwrap(),
             ig: false,
         };
-        EventRecord::from_draft(draft, Seq::new(9), B3Hash::digest(b""))
+        EventRecord::from_draft(draft, Seq::new(seq), B3Hash::digest(b""))
+    }
+
+    fn fenced(seq: u64, addr: &str) -> EventRecord {
+        let mut data = serde_json::Map::new();
+        data.insert(
+            "oid".to_owned(),
+            serde_json::Value::String(format!("{seq:02x}").repeat(20)),
+        );
+        record_at(EventKind::CheckpointCommitted, data, seq, addr)
+    }
+
+    fn addr(text: &str) -> Address {
+        Address::parse(text).unwrap()
+    }
+
+    #[test]
+    fn a_buildings_commits_are_listed_newest_first_and_paged_by_seq() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut views = super::super::holding::Views::new(dir.path());
+        for record in [
+            fenced(3, "lab/room1"),
+            fenced(5, "hall/mayor"),
+            fenced(8, "lab"),
+        ] {
+            views.fold_commit(&record);
+        }
+
+        let lab = views.commits_answer(Some(&addr("lab")), None, 20);
+        let seqs: Vec<u64> = lab.commits.iter().map(|c| c.seq.value()).collect();
+        assert_eq!(
+            seqs,
+            vec![8, 3],
+            "the building root and its room, newest first"
+        );
+        assert!(!lab.more);
+        assert_eq!(lab.building, Some(addr("lab")));
+
+        let first = views.commits_answer(Some(&addr("lab")), None, 1);
+        assert_eq!(first.commits.len(), 1);
+        assert!(first.more, "one page held back is a page");
+        let next = views.commits_answer(Some(&addr("lab")), Some(Seq::new(8)), 1);
+        assert_eq!(next.commits.first().map(|c| c.seq.value()), Some(3));
+        assert!(!next.more);
+        assert_eq!(next.before, Some(Seq::new(8)));
+
+        let hall = views.commits_answer(Some(&addr("hall")), None, 20);
+        assert_eq!(hall.commits.len(), 1);
+        assert_eq!(hall.commits.first().unwrap().actor.as_str(), "hall/mayor");
+
+        // `la` is not a prefix of a building: the filter is by segment.
+        assert!(
+            views
+                .commits_answer(Some(&addr("la")), None, 20)
+                .commits
+                .is_empty()
+        );
+
+        let all = views.commits_answer(None, None, 20);
+        assert_eq!(all.commits.len(), 3);
     }
 
     #[test]

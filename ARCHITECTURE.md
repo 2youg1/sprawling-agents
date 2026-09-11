@@ -958,7 +958,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::views | crates/sprawling/src/views.rs | the fold every query is answered from, and the lines a page reads off it | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::holding | crates/sprawling/src/views/holding.rs | what the views hold and how one record folds in | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::answering | crates/sprawling/src/views/answering.rs | every question a page may ask, answered from the fold | projection | V3 | built | sprawling-SPEC.md#8-37 |
-| bin::views::commits | crates/sprawling/src/views/commits.rs | which run wrote a commit, folded from the records that announced it | projection | V4 | built | sprawling-SPEC.md#8-41 |
+| bin::views::commits | crates/sprawling/src/views/commits.rs | which run wrote a commit, and the commits a building made newest first, folded from the records that announced them | projection | V4 | built | sprawling-SPEC.md#8-53 |
 | bin::views::rounds | crates/sprawling/src/views/rounds.rs | one session's records folded into the rounds a page reads | projection | F1 | built | sprawling-SPEC.md#8-50 |
 | bin::views::rounds::tests | crates/sprawling/src/views/rounds/tests.rs | the fold the view layer used to run, asserted here instead | projection | F1 | built | sprawling-SPEC.md#8-50 |
 | bin::views::rounds::reading_tests | crates/sprawling/src/views/rounds/reading_tests.rs | what one payload is read as, through the production door | projection | F1 | built | sprawling-SPEC.md#8-50 |

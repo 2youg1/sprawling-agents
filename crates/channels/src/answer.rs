@@ -100,6 +100,22 @@ pub struct CommitAnswer {
     pub lineage: Vec<RunId>,
 }
 
+/// One page of the commits a city made, newest first.
+///
+/// `building` and `before` are the question handed back: the wire
+/// carries no request id, so a page matches an answer to what it asked
+/// by content, the way `ChangesAnswer` carries `base` and `head`. `more`
+/// rather than a cursor: the next page begins before the last `seq`
+/// here, which the reader already holds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct CommitsAnswer {
+    pub building: Option<Address>,
+    pub before: Option<Seq>,
+    pub commits: Vec<CommitAnswer>,
+    pub more: bool,
+}
+
 /// The most records one `History` answer may carry. A page asking for
 /// more gets this many; the whole ledger is not a thing to put on a
 /// socket, and a limit the caller cannot exceed is one fewer way for a
@@ -237,6 +253,7 @@ pub enum Answer {
     CostOf(CostOfAnswer),
     Listing(ListingAnswer),
     Document(Box<DocumentAnswer>),
+    Commits(CommitsAnswer),
     Unavailable { query: String },
 }
 

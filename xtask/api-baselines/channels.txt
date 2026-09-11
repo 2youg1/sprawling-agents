@@ -29,6 +29,7 @@ pub channels::Answer::Building(alloc::boxed::Box<channels::BuildingAnswer>)
 pub channels::Answer::Changes(channels::ChangesAnswer)
 pub channels::Answer::City(channels::CityAnswer)
 pub channels::Answer::Commit(channels::CommitAnswer)
+pub channels::Answer::Commits(channels::CommitsAnswer)
 pub channels::Answer::Cost(alloc::boxed::Box<channels::CostAnswer>)
 pub channels::Answer::CostOf(channels::CostOfAnswer)
 pub channels::Answer::Discards(channels::DiscardAnswer)
@@ -224,6 +225,10 @@ pub channels::CommitAnswer::oid: kernel::locator::GitOid
 pub channels::CommitAnswer::run: kernel::event::identity::RunId
 pub channels::CommitAnswer::seq: kernel::event::identity::Seq
 pub channels::CommitAnswer::session: core::option::Option<kernel::address::SessionName>
+pub channels::CommitsAnswer::before: core::option::Option<kernel::event::identity::Seq>
+pub channels::CommitsAnswer::building: core::option::Option<kernel::address::Address>
+pub channels::CommitsAnswer::commits: alloc::vec::Vec<channels::CommitAnswer>
+pub channels::CommitsAnswer::more: bool
 pub channels::ControlVerdict::Intervene
 pub channels::ControlVerdict::Intervene::must_write_handoff: bool
 pub channels::ControlVerdict::Intervene::run: core::option::Option<kernel::event::identity::RunId>
@@ -379,6 +384,10 @@ pub channels::Query::Changes::head: core::option::Option<kernel::locator::GitOid
 pub channels::Query::CityView
 pub channels::Query::Commit
 pub channels::Query::Commit::oid: kernel::locator::GitOid
+pub channels::Query::Commits
+pub channels::Query::Commits::before: core::option::Option<kernel::event::identity::Seq>
+pub channels::Query::Commits::building: core::option::Option<kernel::address::Address>
+pub channels::Query::Commits::limit: u32
 pub channels::Query::CostOf
 pub channels::Query::CostOf::node: kernel::node_id::NodeId
 pub channels::Query::CostView
@@ -480,7 +489,7 @@ pub channels::Withheld::reason: alloc::string::String
 pub const channels::COMMAND_NAMES: [&str; 24]
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
-pub const channels::QUERY_NAMES: [&str; 22]
+pub const channels::QUERY_NAMES: [&str; 23]
 pub const channels::WIRE_V: u32
 pub enum channels::Answer
 pub enum channels::AssetReply
@@ -570,6 +579,7 @@ pub struct channels::CityAnswer
 pub struct channels::CityLabel(_)
 pub struct channels::Closing
 pub struct channels::CommitAnswer
+pub struct channels::CommitsAnswer
 pub struct channels::CostAnswer
 pub struct channels::CostOfAnswer
 pub struct channels::Decision

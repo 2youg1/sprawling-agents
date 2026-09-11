@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 17 as const;
+export const WIRE_V = 18 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "3381773cb0188f201566fbe95c7fd9e66c28d351e6ecfbc1c0cd729f66690a65" as const;
+export const WIRE_HASH = "71ca21170533304e123e609cd6968206cd462c19cb596c1a10cc4f0c9f075b2c" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -573,6 +573,23 @@ export const CommitAnswer = Schema.Struct({
   session: Schema.optional(Schema.NullOr(SessionName)),
 }).annotations({ identifier: "CommitAnswer" });
 export type CommitAnswer = typeof CommitAnswer.Type;
+
+/**
+ * One page of the commits a city made, newest first.
+ * 
+ * `building` and `before` are the question handed back: the wire
+ * carries no request id, so a page matches an answer to what it asked
+ * by content, the way `ChangesAnswer` carries `base` and `head`. `more`
+ * rather than a cursor: the next page begins before the last `seq`
+ * here, which the reader already holds.
+ */
+export const CommitsAnswer = Schema.Struct({
+  before: Schema.optional(Schema.NullOr(Seq)),
+  building: Schema.optional(Schema.NullOr(Address)),
+  commits: Schema.Array(CommitAnswer),
+  more: Schema.Boolean,
+}).annotations({ identifier: "CommitsAnswer" });
+export type CommitsAnswer = typeof CommitsAnswer.Type;
 
 /**
  * The five cuts of one authoritative total. Each dimension sums to
@@ -1237,6 +1254,9 @@ export const Answer = Schema.Union(
     document: DocumentAnswer,
   }),
   Schema.Struct({
+    commits: CommitsAnswer,
+  }),
+  Schema.Struct({
     unavailable: Schema.Struct({
       query: Schema.String,
     }),
@@ -1627,6 +1647,13 @@ export const Query = Schema.Union(
   Schema.Struct({
     document: Schema.Struct({
       at: Address,
+    }),
+  }),
+  Schema.Struct({
+    commits: Schema.Struct({
+      before: Schema.optional(Schema.NullOr(Seq)),
+      building: Schema.optional(Schema.NullOr(Address)),
+      limit: Schema.Int,
     }),
   }),
 ).annotations({ identifier: "Query" });

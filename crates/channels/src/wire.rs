@@ -57,7 +57,10 @@ use serde::{Deserialize, Serialize};
 ///    a run's room and start, a session's opening and closing, the
 ///    scopes a halt shut, and the two questions that walk the tree,
 ///    `Listing` and `Document` (card-6.4).
-pub const WIRE_V: u32 = 17;
+/// 18: a building's commits can be listed, newest first, so a page can
+///    walk from a line of code to the session that wrote it without
+///    folding the history itself (card-2.7).
+pub const WIRE_V: u32 = 18;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
@@ -237,6 +240,11 @@ mod tests {
             Query::Listing { at: None },
             Query::Document {
                 at: Address::parse("acme/Roadmap.md").unwrap(),
+            },
+            Query::Commits {
+                building: None,
+                before: None,
+                limit: 20,
             },
         ];
         assert_eq!(queries.len(), QUERY_NAMES.len());

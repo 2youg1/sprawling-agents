@@ -242,6 +242,11 @@ impl Views {
                 }
             }
             channels::Query::Commit { oid } => self.commit_answer(*oid),
+            channels::Query::Commits {
+                building,
+                before,
+                limit,
+            } => channels::Answer::Commits(self.commits_answer(building.as_ref(), *before, *limit)),
             // Three readings that used to run in the browser, answered
             // here since card-6.5 so a second client draws a session
             // without folding the ledger itself.

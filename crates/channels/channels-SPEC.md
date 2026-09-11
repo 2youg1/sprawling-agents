@@ -19,9 +19,9 @@
 
 ## 2 验收标准
 
-- **wire**：Command 恰 24 个 variant（card-5.4 增 `PutDocument`）、Query 恰 17 个（card-2.6 增 `Hunks`、card-5.4 增 `Governance`；计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 恰 24 个 variant（card-5.4 增 `PutDocument`）、Query 恰 23 个（card-2.6 增 `Hunks`、card-5.4 增 `Governance`、card-6.5 增三、card-6.4 增二、card-2.7 增 `Commits`；计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**（card-6.4 起）：`3381773cb0188f201566fbe95c7fd9e66c28d351e6ecfbc1c0cd729f66690a65`；**WIRE_V ＝ 17**（新增 `Query::Listing` 与 `Query::Document`，查询名表 20→22；`RunSummary`、`CityAnswer`、`RoundsAnswer` 各长出字段，见 §8-23）。前值 `f436b34b…`（card-6.5，WIRE_V 16：新增 `Query::Rounds`、`Query::Evidence` 与 `Query::CostOf`，查询名表 17→20，见 §8-21）、`2d8b7dc2…`（card-11.7／5.4／2.6，WIRE_V 15：`Dispatch` 去 `budget`，新增 `Command::PutDocument`、`Query::Governance` 与 `Query::Hunks`，见 §8-18 至 §8-20）、`730e9d0b…`（card-2.4，WIRE_V 14：新增 `Query::Commit` 与 `Answer::Commit`，见 §8-17）、`f6fdc67b…`（V3.22，WIRE_V 13：新增 `Command::Standing`；`BuildingAnswer` 携计划树 `PlanRow`，`BuildingProgress` 携 `BlockedLine` 与就绪数，`CityAnswer` 携 `StandingLine`）、`4ac1b7b3…`（V3.13，WIRE_V 12：新增 `ServerFrame::Delta`）、`78fdb74d…`（ux-14，WIRE_V 11：新增 `Query::Changes`）、 `1de1a1ae…`（ux-13，WIRE_V 10：新增 `Query::RunHistory`）、`c7b41d50…`（P3.04，WIRE_V 9：新增 `Query::History`）、`0a600659…`（P3.02，WIRE_V 8：新增 `ConfigureBuilding`）、`4bb71c0b…`（P3.01，WIRE_V 7：新增 `ProbeEndpoint`，`AttachEndpoint` 长出 `admit`）、`c059c6e2…`（F2.16–P2.01，WIRE_V 6）、`d825e83a…`（F2.11–F2.15，WIRE_V 5）、 `aa57cb7e…`（F1.01–F2.10，WIRE_V 4）、 `941ede9f…`（R1.16–R1.18，WIRE_V 3）、`defe9a75…`（R1.14–R1.15，WIRE_V 2）、 `85705c03…`（R1.11–R1.13，WIRE_V 1）、`238f11b2…`（P1.11–R1.10）、`692b5f96…`（S4.02–P1.10）。
+  **当前 golden**（card-2.7 起）：`71ca21170533304e123e609cd6968206cd462c19cb596c1a10cc4f0c9f075b2c`；**WIRE_V ＝ 18**（新增 `Query::Commits` 与 `Answer::Commits`，查询名表 22→23，见 §8-24）。前值 `3381773c…`（card-6.4，WIRE_V 17：新增 `Query::Listing` 与 `Query::Document`，查询名表 20→22；`RunSummary`、`CityAnswer`、`RoundsAnswer` 各长出字段，见 §8-23）、`f436b34b…`（card-6.5，WIRE_V 16：新增 `Query::Rounds`、`Query::Evidence` 与 `Query::CostOf`，查询名表 17→20，见 §8-21）、`2d8b7dc2…`（card-11.7／5.4／2.6，WIRE_V 15：`Dispatch` 去 `budget`，新增 `Command::PutDocument`、`Query::Governance` 与 `Query::Hunks`，见 §8-18 至 §8-20）、`730e9d0b…`（card-2.4，WIRE_V 14：新增 `Query::Commit` 与 `Answer::Commit`，见 §8-17）、`f6fdc67b…`（V3.22，WIRE_V 13：新增 `Command::Standing`；`BuildingAnswer` 携计划树 `PlanRow`，`BuildingProgress` 携 `BlockedLine` 与就绪数，`CityAnswer` 携 `StandingLine`）、`4ac1b7b3…`（V3.13，WIRE_V 12：新增 `ServerFrame::Delta`）、`78fdb74d…`（ux-14，WIRE_V 11：新增 `Query::Changes`）、 `1de1a1ae…`（ux-13，WIRE_V 10：新增 `Query::RunHistory`）、`c7b41d50…`（P3.04，WIRE_V 9：新增 `Query::History`）、`0a600659…`（P3.02，WIRE_V 8：新增 `ConfigureBuilding`）、`4bb71c0b…`（P3.01，WIRE_V 7：新增 `ProbeEndpoint`，`AttachEndpoint` 长出 `admit`）、`c059c6e2…`（F2.16–P2.01，WIRE_V 6）、`d825e83a…`（F2.11–F2.15，WIRE_V 5）、 `aa57cb7e…`（F1.01–F2.10，WIRE_V 4）、 `941ede9f…`（R1.16–R1.18，WIRE_V 3）、`defe9a75…`（R1.14–R1.15，WIRE_V 2）、 `85705c03…`（R1.11–R1.13，WIRE_V 1）、`238f11b2…`（P1.11–R1.10）、`692b5f96…`（S4.02–P1.10）。
   P1.11 增三帧：`AttachEndpoint`／`SelectModel` 两个 Command（十九），`EndpointView` 一个 Query（十）。`PutSecret` 仍无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **ux-13 增：`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -732,6 +732,28 @@ pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
 `cargo clippy -p channels --no-default-features --all-targets` 是红的：`tests/enrolment.rs` 整份都在驱动 `channels::router`，`tests/wire_contract.rs` 有三条断言在问 `decide_bind`／`decide_handshake`，而这三样连同 `axum`、`tokio` 都由 feature `server` 带进来。**这份构建正是给 `web` 用的那一份**——它需要本 crate 的词汇而不许把 TCP 栈拖进 WebAssembly；一个在这里名词都拼不出来的测试文件，把它自己的红判在了产品的一条真路径上。
 
 **按测试真正需要的东西设门，而不是把 feature 打开**：`tests/enrolment.rs` 首行 `#![cfg(feature = "server")]`（整份文件都是路由的事）；`tests/wire_contract.rs` 只给那三条断言与它们的两个辅助函数、以及 `Hello`／`Welcome`／`AxCode`／`SocketAddr` 这几个只被它们用到的名字加 `#[cfg(feature = "server")]`——命令表、查询表、schema 哈希与那两个不可拼写的形状**在两份构建里都被判**，因为它们在两份构建里都成立。
+
+### 8-24 `Query::Commits`：一座楼做过的提交，倒序分页（card-2.7；WIRE_V 17→18）
+
+```rust
+// Query 第 23 条（声明序，QUERY_NAMES 同序追加）
+Commits { building: Option<Address>, before: Option<Seq>, limit: u32 },   // → Answer::Commits(CommitsAnswer)
+
+pub struct CommitsAnswer {
+    pub building: Option<Address>,   // 问题里的那个，原样回带
+    pub before: Option<Seq>,         // 同上
+    pub commits: Vec<CommitAnswer>,  // seq 递减
+    pub more: bool,                  // 末条之前还有没有符合条件的提交
+}
+```
+
+- **答案复用 `CommitAnswer`**（Roadmap 2.7 裁定①）：一个提交是什么只有一处权威，列举与反查因而不可能给出两套字段；`lineage` 逐条照答，楼页据此画接替标记。
+- **倒序分页同 `History`**：`before` 是独占上界（`None` 从尾读起），`limit` 夹到 `1..=HISTORY_MAX`。分页游标是 `commits.last().seq`：下一页问 `before: Some(那个 seq)`。`more` 而不是 `earlier: Option<Seq>`——`History` 按 seq 连续扫描，所以「从哪接着读」是它自然算出的量；提交在账本里是稀疏的，下一条在哪只有再走一步才知道，而客户端手里已经有末条的 seq，答一个游标就是把它已有的东西再给一遍。
+- **`building` 按 `actor` 地址前缀过滤，不按 session**（D53）：`actor == building` 或 `actor` 以 `<building>/` 起头；run 的 actor 是权威，session 是它的投影（`session_of`），反过来过滤会丢掉派到楼根、没开过会话的 run。`None` 列全城。
+- **答案回带 `building` 与 `before`**：线上没有请求 id，客户端按内容把答案配回问题（`ChangesAnswer` 回带 `base`／`head` 是同一个理由）；缺了这两个字段，两座楼的两页同时在飞时无法分辨谁是谁的。
+- **失联如实（D51）**：只列城自己写过的提交；人 rebase／squash 之后 trunk 上的 oid 不在其中，`Commit` 对它仍答 `Unavailable`。不读提交体的 trailer 回填——那会让投影成为第二权威（`views/commits.rs` 模块头）。
+- **服务端**：`views::holding` 给按 oid 键的 `commits` 表加一条按 `seq` 的索引（`commit_seqs: BTreeMap<Seq, GitOid>`），`fold_commit` 两表同写；sprawling-SPEC §8-53。
+- **客户端**：`cargo xtask wire-ts --write` 重生；`crates/web` 只把新变体接进 `mount::frame` 那条「有答案而暂无页面问它」的臂（并存期最后一次）。
 
 ### 8-23 新客户端第一次真正用这条线，线上缺的四件事（card-6.4；WIRE_V 16→17）
 

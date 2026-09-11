@@ -194,6 +194,7 @@ pub(crate) fn apply_frame(
             | channels::Answer::CostOf(_)
             | channels::Answer::Listing(_)
             | channels::Answer::Document(_)
+            | channels::Answer::Commits(_)
             | channels::Answer::Unavailable { .. } => {}
         }
     }
