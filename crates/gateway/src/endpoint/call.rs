@@ -13,6 +13,8 @@
 
 //! Endpoint calls: one request, streamed or settled.
 
+use std::io::BufRead as _;
+
 use kernel::consts_policy::{IMAGE_MAX_BYTES, IMAGES_PER_TURN};
 use kernel::{AxCode, AxError, ChatRequest, ContentBlock, ImageRef, ModelRequest, ModelReturn};
 use kernel::{Locator, UsdMicros};
@@ -206,11 +208,16 @@ impl Endpoint {
                 format!("{} answered {}", self.config.base_url, status.as_u16()),
             ));
         }
-        let body = response
-            .text()
-            .map_err(|err| provider_err("read provider response", transport_detail(&err)))?;
+        // Line by line as the body arrives, never `.text()`. Reading the
+        // whole body first and then walking its lines produces every
+        // increment after the model has already stopped - the request
+        // says `stream: true`, the provider answers in parts, and the
+        // one place the parts were supposed to stay parts turned them
+        // back into a document.
         let mut frames = Vec::new();
-        for line in body.lines() {
+        for line in std::io::BufReader::new(response).lines() {
+            let line =
+                line.map_err(|err| provider_err("read provider response", err.to_string()))?;
             let Some(payload) = line.strip_prefix("data:") else {
                 continue;
             };
@@ -256,7 +263,7 @@ impl Endpoint {
     reason = "test code"
 )]
 mod tests {
-    use super::super::config::{config, fake_provider, request};
+    use super::super::config::{config, fake_provider, fake_stream_provider, request};
     use super::super::redemption::{Redemption, redemption, resolver};
     use super::*;
     use kernel::{AxCode, Model};
@@ -304,6 +311,75 @@ mod tests {
         assert!(seen[0].contains("anthropic-version: 2023-06-01"));
         assert!(seen[0].contains("\"user_id\":\"city\""));
         assert!(seen[0].contains("\"model\":\"provider-model\""));
+    }
+
+    /// **A stream nobody forwards is a stream in name only.** The
+    /// request asked for `stream: true`, the provider answered in
+    /// increments, and the reader called `.text()` - which finishes only
+    /// at the end of the body. Every increment then reached the page in
+    /// one burst after the model had already stopped: measured against a
+    /// real provider as `model_called` at 1.9 s, twenty-five deltas in
+    /// one millisecond at 11.9 s, then `model_returned`.
+    ///
+    /// The provider fixture answers the question itself: it will not
+    /// write its closing frames until it hears that the opening ones
+    /// were handed on.
+    #[test]
+    fn increments_reach_the_caller_while_the_body_is_still_arriving() {
+        let opening = vec![
+            serde_json::json!({
+                "type": "message_start",
+                "message": {"usage": {"input_tokens": 1_000_000}}
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {"type": "text", "text": ""}
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "text_delta", "text": "on "}
+            })
+            .to_string(),
+        ];
+        let closing = vec![
+            serde_json::json!({
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "text_delta", "text": "it"}
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "message_delta",
+                "delta": {"stop_reason": "end_turn"},
+                "usage": {"output_tokens": 0}
+            })
+            .to_string(),
+        ];
+        let (saw_opening, waiting) = std::sync::mpsc::channel();
+        let (url, server) = fake_stream_provider(opening, waiting, closing);
+        let mut endpoint = Endpoint::new(config(&url), redemption()).unwrap();
+
+        let said = std::cell::RefCell::new(Vec::new());
+        let mut onto = |text: &str| {
+            said.borrow_mut().push(text.to_owned());
+            // Reported once: the fixture needs to hear that one
+            // increment arrived, and a closed channel afterwards is not
+            // a failure of the thing under test.
+            let _ = saw_opening.send(());
+        };
+        let ret = endpoint.stream(&request(), &mut onto).unwrap();
+
+        assert!(
+            server.join().unwrap(),
+            "the provider was still writing when the first increment should have been \
+             handed on; `.text()` reads to the end of the body before anything is forwarded"
+        );
+        assert_eq!(said.borrow().as_slice(), ["on ", "it"]);
+        assert_eq!(ret.stop, Some(kernel::StopReason::EndTurn));
     }
 
     #[test]

@@ -477,6 +477,8 @@ ARCHITECTURE §6 gateway 表逐卡状态翻转；§6 接线台账登记（endpoi
 
 `Endpoint` 覆盖 `Model::call_streaming`：请求带 `stream: true`，逐行读 `data:`，把每一帧交给 `dialect::increment_of`，最后 `dialect::settled_from_stream` 把收集到的帧重装成**这个 dialect 非流式的那个形状**，再交给同一个 `response_from_wire`。
 
+**「逐行」指的是响应体到达的节奏，而不是一个已经读完的字符串的行（前端会话 3，实测修正）。** 先前的实现先 `response.text()` 把整个 body 读完，再在 `body.lines()` 的循环里逐条 `onto`——于是请求确实带了 `stream: true`、provider 确实分次答，而全部增量在模型已经停下之后的同一毫秒里一起发出。对一个真供应方的计时：`model_called` 在 1.9 s，25 条 delta 在 11.9 s 的同一毫秒，随后 `model_returned`。**改成把 `Response` 当 `std::io::Read` 包进 `BufReader` 逐行读**：一帧到达即交一帧。否决「把转发搬到 socket 任务那一层去查锁」：`to_watchers` 是非阻塞广播，帧压根没有到达那里，往下游找只会找到一个不存在的病灶。**验收形式**：假供应方先写开头几帧并 flush，**然后等调用方回报「第一条增量已转出」才写剩下的**；读完再回放的实现永远回报不了，服务器自己就是断言，测试侧不读时钟。
+
 **结算答案只有一个解析器。** 直接把流读成 `ChatResponse` 会立刻长出第二个权威：同一个回复，流式路径与阻塞路径可能得出两个结论。重装成非流式形状是这条口径的全部实现。
 
 **`increment_of` 只认散文。** 各 dialect 各读各的：Anthropic 读 `delta.type == "text_delta"` 的 `delta.text`；OpenAI 读 `choices[0].delta.content`。**工具参数与 thinking 块一律不报**：半个工具参数不是短一点的工具参数，而 thinking 块是替 provider 转交签名用的、不是拿来发表的。它不返回 `Result`——一个读不出来的增量就是不显示的增量，一个显示细节不得有能力弄失败一次本来正常的调用。
