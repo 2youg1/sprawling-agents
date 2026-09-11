@@ -7,9 +7,9 @@
 //! manager they already use.
 //!
 //! **A path printed on a page is a fact a person cannot act on.** They
-//! can read `hall/.sprawling/DESKTOP.toml`, copy it, and then find their
-//! own way to it; every step after the reading is work the city made
-//! them do. This hands the whole path to the desktop's own file manager,
+//! can read the address of a building's own configuration file, copy it,
+//! and then find their own way to it; every step after the reading is
+//! work the city made them do. This hands the whole path to the desktop's own file manager,
 //! selected rather than merely opened, so what they were reading about
 //! is what is highlighted when the window appears.
 //!

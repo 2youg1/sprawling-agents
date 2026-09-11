@@ -1599,3 +1599,19 @@ pub fn undoable(ctx: &GateContext, call: &ConnectorCall<'_>,
 **字节不在这里**：`ImageRef` 携定位符与两个整数边长，字节住 `memory::cas`，出线前的最后一刻才由 `gateway::endpoint` 取出来编码。账本因此仍是一份人能读的文件。
 
 **唯一的生产者是 `browser` 工具的 `screenshot`**（`bin::browser_tool`）；其余每一个工具显式写空表，因为「没有图」是一句要说出口的话，不是一个可以省略的默认。
+
+### 8-50 `kernel::reach`：一次调用停在哪一段（形状 2 值）
+
+```rust
+pub enum Named { Resolved(u32), NotFound, Refused(String), ProxiedAway }
+pub enum Connected { Open, Refused, Silent, Failed(String), Skipped }
+pub enum Answered { Status(u16), NameNotUsable(String), HandshakeFailed(String), Unreachable(String) }
+pub enum Through { Direct, Environment(String), Excluded }
+pub struct Reach { host, named, connected, answered, through, elapsed_ms }
+```
+
+- **为什么值在 kernel 而读数在 gateway**：这套词汇要同时被 gateway（做测量）与 channels（往线上送）叫出名字，而 channels 不依赖 gateway。与 `DialectKind` 同一条依赖倒置：**定义住在这里，求值住在拿得到套接字的那一层**。
+- **四段各有各的下一步**：名字解不出（检查拼写或代理）、连不上或没人应（防火墙、端口、没起来的代理）、握手失败（主机名不是合法 DNS 名、证书不受信）、供应方答了状态（401 是密钥，404 是 base_url 末尾多了路径）。**一条 `error sending request for url (...): operation timed out` 里这四种全长一个样**，而人对着它无事可做。
+- **`Resolved(0)` 不可表达**：解出零个地址就是 `NotFound`，不是「解出了，零个」。
+- **`ProxiedAway` 是一段诚实的缺席**：有代理时名字与套接字都由代理去做，城自己再解一次名，报的是一条请求不会走的路。
+- **时间是参数**：`elapsed_ms` 由调用方盖戳，因为全城只有 Main 采样时钟。

@@ -509,3 +509,15 @@ ARCHITECTURE §6 gateway 表逐行状态翻转；§6 接线台账登记（endpoi
 `pub(crate)`，`payload.rs` 无专属测试故无 tests 模）。
 跨文件私有项开 `pub(crate)`，对外签名逐字节不变（`cargo public-api` 基线记定义位簇路径，
 `memory` 同例）。
+
+### 8-15 `gateway::reach`：一次分段读数，以及「打到城所在那台机器上的调用不走代理」（形状 4 适配器）
+
+```rust
+pub fn reach(client: &reqwest::blocking::Client, base_url: &str, elapsed_ms: u64) -> kernel::Reach;
+pub fn is_local(base_url: &str) -> bool;
+```
+
+- **分段怎么测**：没有代理适用时，先用 `to_socket_addrs` 解名、再用 `TcpStream::connect_timeout` 开一个套接字，两段各自成一个读数；随后无论如何都发一次真实请求，把它的错误链摊平成一行，按其中出现的字样归到「主机名不能进握手」「握手失败」「压根没到握手」三类之一，或者归到它答的状态码。**分类读的是链而不是 reqwest 的 `is_connect`**：一个被拒的套接字与一张不受信的证书在那个判断下是同一个答案。
+- **`socks` 不花钱**：reqwest 0.13 的 `socks = []` 是空 feature，实现就在它自己的 `connect.rs` 里，锁文件不多一个包。`system-proxy` 只在 Windows 与 macOS 各拉一个读系统设置的包。
+- **打到回环地址的调用恒不走代理**（`is_local`）：跑起来才现形——开了 system-proxy 之后，一台配了代理的机器把回环也送进代理，本地推理服务器由别人的网关代答 502。回环是按地址而不是按名字去够的，代理对它没有任何用处；桌面上每一个别的工具默认就排除它。四处构造 HTTP 客户端的地方共用这一条判断。
+- **5 秒一段**：设置页上有人在等，一个在这个时间里答不出来的主机，人要的是知道，而不是继续等。
