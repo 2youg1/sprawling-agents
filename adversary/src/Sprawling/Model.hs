@@ -146,6 +146,17 @@ instance StateModel World where
     where
       minted next = next {worldMinted = worldMinted world + 1}
 
+  -- A refused command spent its key at the door exactly as an accepted one
+  -- does, so the counter has to move for both. The library's default leaves
+  -- the state untouched after a negative action, and that default is wrong
+  -- here for one reason: the very next command would carry a key the city has
+  -- already answered, the product's deduplication would replay that first
+  -- answer, and the refusal a caller reads would belong to the command before
+  -- the one they sent. Only `Look` is exempt, because a query carries no key.
+  failureNextState world = \case
+    Look -> world
+    _ -> world {worldMinted = worldMinted world + 1}
+
 deriving stock instance Show (Action World a)
 
 deriving stock instance Eq (Action World a)
