@@ -1,3 +1,26 @@
 /target
 /local
 /adversary/dist-newstyle
+
+# Working records never ship. To a contributor and to a model they are
+# noise; to an attacker they are intelligence — they name a machine, a
+# toolchain, an account, a schedule, and the words a decision arrived in.
+# `local/` is where they live, and `xtask release` refuses any published
+# document that sends a reader there.
+#
+# The three city names are root-anchored: a city writes its own Roadmap,
+# Memo and Handoff, and `docs/templates/` ships the empty shells it writes
+# them from. Only a copy left at the root of this repository is a mistake.
+/Roadmap.md
+/Memo.md
+/Handoff.md
+
+# These have no product meaning anywhere in the tree.
+NOTES.md
+TODO.md
+SCRATCH.md
+WORKLOG.md
+JOURNAL.md
+PROGRESS.md
+*.session.md
+*.handoff.md
