@@ -18,6 +18,11 @@ import type { Call, Note, RoundsAnswer, Turn } from "../../wire";
 import { useLang, useSay, useUi } from "../../ui";
 import { Prose } from "../prose";
 
+// How many characters at the growing edge are drawn faint. Wide enough
+// that text emerges instead of appearing, narrow enough that the band a
+// reader's eye sits on is not the shimmering one.
+const EDGE = 10;
+
 export interface ThreadProps {
   readonly run: RunBelief;
   readonly who: string;
@@ -214,6 +219,13 @@ export function Thread(props: ThreadProps) {
   // The turn being said right now is not yet in the rounds; it is the
   // page's own text until the record holds it.
   const streaming = createMemo(() => !frozen() && props.run.saying.length > 0);
+  // The last few characters are drawn faint, so text emerges rather than
+  // appearing. Derived from the text and nothing else: no timer, no
+  // queue, no per-character node. When the call returns, belief clears
+  // `saying` and the settled record takes over, so nothing has to decide
+  // when the edge stops being an edge.
+  const settled = createMemo(() => props.run.saying.slice(0, -EDGE));
+  const edge = createMemo(() => props.run.saying.slice(-EDGE));
 
   return (
     <section aria-label={props.run.run} class={frozen() ? "settled" : undefined}>
@@ -225,7 +237,8 @@ export function Thread(props: ThreadProps) {
         <div class="my-base text-body">
           <div class="mb-tight text-note text-text-disabled">{props.who}</div>
           <div class="whitespace-pre-wrap leading-relaxed">
-            {props.run.saying}
+            {settled()}
+            <span class="text-text-faint">{edge()}</span>
             <span class="ml-tight inline-block h-caret w-hair animate-pulse bg-accent align-text-bottom" />
           </div>
         </div>

@@ -33,6 +33,32 @@ export type Doing =
   | { readonly kind: "waiting" }
   | { readonly kind: "frozen"; readonly completion: string | null };
 
+// Where a message typed right now will land.
+//
+// A steer is consumed at a phase boundary, so "it was sent" and "it was
+// heard" are not one moment: while a tool call is out, the run is inside
+// a system call and the words wait for it to come back. Spelling all
+// three the same way tells a person they are in a conversation when they
+// are in a queue, which is the one thing a streaming page must not say.
+export type Sending = "dispatch" | "steer" | "queued";
+
+// No run, or a frozen one, means the next message opens work rather than
+// interrupting it.
+export function sendingInto(doing: Doing | undefined): Sending {
+  if (doing === undefined) return "dispatch";
+  switch (doing.kind) {
+    case "frozen":
+      return "dispatch";
+    case "thinking":
+      return "steer";
+    // Blocked: inside a tool call, or stopped at an approval nobody has
+    // answered. Neither reaches a safe point until it is over.
+    case "calling":
+    case "waiting":
+      return "queued";
+  }
+}
+
 export interface RunBelief {
   readonly run: RunId;
   readonly addr: Address | null;

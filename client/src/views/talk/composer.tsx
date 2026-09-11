@@ -10,12 +10,23 @@
 
 import { Show, createSignal } from "solid-js";
 
+import type { Sending } from "../../core/belief";
+import type { Key } from "../../core/lang";
 import { EFFORTS } from "../../core/prefs";
 import { useSay, useUi } from "../../ui";
 
+// What the send control is spelled, for each of the three places a
+// message can land. `queued` is the one a streaming page would otherwise
+// hide: the run is inside a tool call, and the words wait for a boundary.
+const SPELLING: Record<Sending, Key> = {
+  dispatch: "talk_send",
+  steer: "talk_steer",
+  queued: "talk_steer_queued",
+};
+
 export interface ComposerProps {
   readonly placeholder: string;
-  readonly busy: boolean;
+  readonly sending: Sending;
   // Both answer whether the frame went out, so the box can keep the
   // words when it did not.
   readonly onSend: (text: string) => boolean;
@@ -93,7 +104,7 @@ export function Composer(props: ComposerProps) {
           </Show>
         </div>
         <div class="flex items-center gap-base">
-          <Show when={props.busy}>
+          <Show when={props.sending !== "dispatch"}>
             <button
               type="button"
               class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2 hover:text-alert"
@@ -107,7 +118,7 @@ export function Composer(props: ComposerProps) {
             class="rounded-control bg-accent px-base py-tight text-label text-g0 hover:bg-accent-hover disabled:bg-g3 disabled:text-text-disabled"
             disabled={text().trim() === ""}
           >
-            {props.busy ? say("talk_steer") : say("talk_send")}
+            {say(SPELLING[props.sending])}
           </button>
         </div>
       </div>

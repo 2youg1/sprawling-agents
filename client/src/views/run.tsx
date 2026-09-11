@@ -11,6 +11,7 @@
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
+import { sendingInto } from "../core/belief";
 import { cancel, steer } from "../core/commands";
 import { buildingOf, roomOf, toFragment } from "../core/route";
 import { count, usd } from "../core/time";
@@ -300,7 +301,7 @@ export function Run(props: RunProps) {
                 <div class="mt-wide">
                   <Composer
                     placeholder={say("talk_placeholder_room", { room: roomWord() })}
-                    busy={true}
+                    sending={sendingInto(belief()?.doing)}
                     onSend={(text) => command(steer(props.run, text))}
                     onStop={() => command(cancel(props.run))}
                   />

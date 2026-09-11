@@ -100,12 +100,16 @@
     "zh": "读完这座城，回答，需要计划的地方写计划"
   },
   "talk_send": {
-    "en": "send",
-    "zh": "发送"
+    "en": "/dispatch",
+    "zh": "/dispatch"
   },
   "talk_steer": {
-    "en": "say it",
-    "zh": "说给它"
+    "en": "/steer",
+    "zh": "/steer"
+  },
+  "talk_steer_queued": {
+    "en": "/steer --queued",
+    "zh": "/steer --queued"
   },
   "talk_stop": {
     "en": "/stop",

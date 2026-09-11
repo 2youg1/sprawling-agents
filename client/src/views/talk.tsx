@@ -12,7 +12,7 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 
 import { cancel, dispatch, release, steer } from "../core/commands";
-import type { RunBelief } from "../core/belief";
+import { sendingInto, type RunBelief } from "../core/belief";
 import { MAYOR, roomOf } from "../core/route";
 import type { Address } from "../wire";
 import { useCommand, useSay, useUi } from "../ui";
@@ -120,7 +120,7 @@ export function Talk(props: TalkProps) {
         </Show>
         <Composer
           placeholder={isMayor() ? say("talk_placeholder_mayor") : say("talk_placeholder_room", { room: roomOf(props.address) })}
-          busy={live() !== undefined}
+          sending={sendingInto(live()?.doing)}
           onSend={send}
           onStop={() => {
             const going = live();

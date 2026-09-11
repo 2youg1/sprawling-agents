@@ -25,8 +25,7 @@ describe("lang", () => {
   test("a phrase is said in the language asked for", () => {
     expect(say("en", "cost_title")).toBe("cost");
     expect(say("zh", "cost_title")).toBe("成本");
-    expect(say("en", "talk_send")).toBe("send");
-    expect(say("zh", "talk_send")).toBe("发送");
+    expect(say("en", "talk_placeholder_mayor")).not.toBe(say("zh", "talk_placeholder_mayor"));
   });
 
   // A phrase may read the same in both languages only when it is a
