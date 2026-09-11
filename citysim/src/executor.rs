@@ -60,7 +60,7 @@ pub struct Scenario {
     /// fence goes up before every wave, so anything a wave deletes has a
     /// commit to come back from. An unchanged wave still commits — a
     /// chain that rebuilds is worth more than a saved object.
-    pub checkpoint: Option<(Checkpoint, String)>,
+    pub checkpoint: Option<(Checkpoint, Vec<String>)>,
     pub cancel: Option<CancelPoint>,
     /// A human Steer, delivered at the wave boundary of the given turn.
     /// It appends to the next result and does not interrupt the action in

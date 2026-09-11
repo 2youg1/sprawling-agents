@@ -269,6 +269,68 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
     );
 }
 
+/// The symptom this pins came out of a live city: the Mayor wrote a
+/// document beside its own room, the file sat in the working tree, and
+/// asking git's whole history for that path answered nothing. Every
+/// fence had staged the room, while the door that admitted the
+/// write judges it against the building. Anything written in that gap
+/// reached no checkpoint, so `Query::Changes` was empty for a city that
+/// had been writing all along, and `file_discarded` had nothing to
+/// restore from.
+///
+/// Through the production path, because the claim is about what the
+/// repository ends up holding rather than about one function's return.
+#[test]
+fn a_fence_carries_what_the_run_may_write_and_not_only_its_room() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![
+            completion("writing the note", Some(("c1", "hall/note.md"))),
+            completion("done", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse(kernel::consts_policy::HALL_MAYOR).unwrap(),
+            task: "leave a note beside the hall".to_owned(),
+            goal: "one note".to_owned(),
+            mode: channels::ModeTag::parse("plan").unwrap(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+
+    // The room is `hall/mayor`; the note is one level up, inside the
+    // building the Mayor's domain covers.
+    assert!(
+        dir.path().join("hall").join("note.md").exists(),
+        "the write has to land before a fence can be asked to carry it"
+    );
+
+    let repo = git2::Repository::open(dir.path()).unwrap();
+    let note = std::path::Path::new("hall/note.md");
+    let carried: Vec<String> = repo
+        .references()
+        .unwrap()
+        .flatten()
+        .filter_map(|reference| {
+            let oid = reference.target()?;
+            let tree = repo.find_commit(oid).ok()?.tree().ok()?;
+            tree.get_path(note).ok()?;
+            Some(reference.name().unwrap_or("?").to_owned())
+        })
+        .collect();
+    assert!(
+        !carried.is_empty(),
+        "no commit in this repository carries hall/note.md, so the city \
+         wrote a file it can neither show in a diff nor restore"
+    );
+}
+
 /// The city's genesis hash is read from the ledger once and remembered:
 /// it is the one fact about a city that cannot change without the city
 /// being a different one, and every fence, landing and merge used to

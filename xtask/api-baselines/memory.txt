@@ -38,12 +38,12 @@ pub fn memory::Cas::get(&self, &kernel::locator::B3Hash) -> core::result::Result
 pub fn memory::Cas::get_range(&self, &kernel::locator::B3Hash, &kernel::locator::Range) -> core::result::Result<alloc::vec::Vec<u8>, memory::MemoryError>
 pub fn memory::Cas::open(&std::path::Path) -> core::result::Result<memory::Cas, memory::MemoryError>
 pub fn memory::Cas::put(&mut self, &[u8]) -> core::result::Result<kernel::locator::B3Hash, memory::MemoryError>
-pub fn memory::Checkpoint::ensure_base(&mut self, &str, kernel::event::identity::TimeMs, &memory::Provenance) -> core::result::Result<core::option::Option<kernel::event::payload::Payload>, memory::MemoryError>
+pub fn memory::Checkpoint::ensure_base(&mut self, &[alloc::string::String], kernel::event::identity::TimeMs, &memory::Provenance) -> core::result::Result<core::option::Option<kernel::event::payload::Payload>, memory::MemoryError>
 pub fn memory::Checkpoint::land(&mut self, kernel::event::identity::TimeMs, &memory::Provenance, &str) -> core::result::Result<alloc::string::String, memory::MemoryError>
 pub fn memory::Checkpoint::open(&std::path::Path) -> core::result::Result<memory::Checkpoint, memory::MemoryError>
 pub fn memory::Checkpoint::scan_staged(&mut self) -> core::result::Result<(), memory::MemoryError>
 pub fn memory::Checkpoint::wave_post(&mut self, &str) -> core::result::Result<alloc::vec::Vec<kernel::event::payload::Payload>, memory::MemoryError>
-pub fn memory::Checkpoint::wave_pre(&mut self, &str, kernel::event::identity::TimeMs, &memory::Provenance) -> core::result::Result<kernel::event::payload::Payload, memory::MemoryError>
+pub fn memory::Checkpoint::wave_pre(&mut self, &[alloc::string::String], kernel::event::identity::TimeMs, &memory::Provenance) -> core::result::Result<kernel::event::payload::Payload, memory::MemoryError>
 pub fn memory::DigestCache::get(&self, &kernel::locator::B3Hash) -> core::result::Result<core::option::Option<alloc::vec::Vec<u8>>, memory::MemoryError>
 pub fn memory::DigestCache::invalidate(&mut self, &kernel::locator::B3Hash, &str) -> core::result::Result<kernel::event::payload::Payload, memory::MemoryError>
 pub fn memory::DigestCache::open(&std::path::Path) -> core::result::Result<memory::DigestCache, memory::MemoryError>

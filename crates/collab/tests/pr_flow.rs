@@ -39,7 +39,7 @@ fn city(root: &Path) -> Worktrees {
     std::fs::write(root.join("lab").join("notes.md"), b"before\n").unwrap();
     Checkpoint::open(root)
         .unwrap()
-        .ensure_base("lab", TimeMs::new(1_000), &of("lab/owner"))
+        .ensure_base(&["lab".to_owned()], TimeMs::new(1_000), &of("lab/owner"))
         .unwrap();
     Worktrees::open(root).unwrap()
 }

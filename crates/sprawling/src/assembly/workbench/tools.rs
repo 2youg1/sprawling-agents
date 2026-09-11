@@ -120,11 +120,17 @@ impl RunWorker {
         // wave, so whatever a wave deletes has a commit to come back
         // from. Both stand where the run writes, which is its own tree
         // when the building asks for review.
-        let mut bench = ToolBench::new(site.rules.write_domain()?)
+        // One reading of the write domain feeds both: what the bench
+        // admits and what its fence stages are the same set by
+        // definition (memory-SPEC section 8-18), and taking them from
+        // one call is what keeps them that way.
+        let domain = site.rules.write_domain()?;
+        let scope: Vec<String> = domain.prefixes().map(|p| p.as_str().to_owned()).collect();
+        let mut bench = ToolBench::new(domain)
             .with_checkpoint(runtime::bench::CheckpointNet {
                 checkpoint: memory::Checkpoint::open(&site.write_root)
                     .map_err(memory::MemoryError::into_ax)?,
-                scope: addr.as_str().to_owned(),
+                scope,
                 of: site.provenance(self.city_hash()?, addr),
             })
             .for_job(addr.clone(), job_locator.clone());

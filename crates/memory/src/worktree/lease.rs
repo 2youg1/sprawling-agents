@@ -81,7 +81,7 @@ mod tests {
         let mut checkpoint = Checkpoint::open(dir).unwrap();
         checkpoint
             .ensure_base(
-                "lab",
+                &["lab".to_owned()],
                 TimeMs::new(1_000),
                 &super::super::trees::tests::owner(),
             )

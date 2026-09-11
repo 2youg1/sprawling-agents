@@ -113,18 +113,15 @@ impl Checkpoint {
     /// Stages every file under `scope`, including deletions. Paths
     /// outside the scope are never touched — the write domain is the
     /// boundary, and a wider `add` would stage what the Run never held.
-    pub(crate) fn stage_scope(&mut self, scope: &str) -> Result<Vec<String>, MemoryError> {
+    pub(crate) fn stage_scopes(&mut self, scopes: &[String]) -> Result<Vec<String>, MemoryError> {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
-        let pattern = if scope.is_empty() || scope == "." {
-            "*".to_owned()
-        } else {
-            format!("{}/*", scope.trim_end_matches('/'))
-        };
+        let patterns = Self::pathspecs(scopes);
+        let specs: Vec<&str> = patterns.iter().map(String::as_str).collect();
         index
-            .add_all([&pattern], git2::IndexAddOption::DEFAULT, None)
+            .add_all(specs.iter(), git2::IndexAddOption::DEFAULT, None)
             .map_err(git_err("stage scope"))?;
         index
-            .update_all([&pattern], None)
+            .update_all(specs.iter(), None)
             .map_err(git_err("stage deletions"))?;
         index.write().map_err(git_err("write index"))?;
         let mut files: Vec<String> = index
@@ -133,6 +130,32 @@ impl Checkpoint {
             .collect();
         files.sort();
         Ok(files)
+    }
+
+    /// One git pathspec per prefix the run may write under.
+    ///
+    /// Several, because a write domain is a set: a building's own
+    /// subtree plus whatever else its `BUILDING.md` declares. Staging
+    /// one of them and judging against all of them is what left files a
+    /// run legitimately wrote outside every checkpoint.
+    ///
+    /// No prefixes at all means the whole tree rather than nothing: the
+    /// caller that passes an empty set is the base fence, which has no
+    /// resident to take a domain from.
+    fn pathspecs(scopes: &[String]) -> Vec<String> {
+        if scopes.is_empty() {
+            return vec!["*".to_owned()];
+        }
+        scopes
+            .iter()
+            .map(|scope| {
+                if scope.is_empty() || scope == "." {
+                    "*".to_owned()
+                } else {
+                    format!("{}/*", scope.trim_end_matches('/'))
+                }
+            })
+            .collect()
     }
 
     /// Stages the whole working tree except the reserved subtree,
@@ -279,7 +302,7 @@ mod tests {
         let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
         write(tmp.path(), "work/leak.env", &format!("KEY={token}"));
         let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
-        let err = match checkpoint.wave_pre("work", TimeMs::new(0), &resident()) {
+        let err = match checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(0), &resident()) {
             Err(err) => err,
             Ok(_) => panic!("a staged secret must refuse the commit"),
         };
@@ -304,7 +327,7 @@ mod tests {
         let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
         let of = resident();
         checkpoint
-            .ensure_base("work", TimeMs::new(1_000), &of)
+            .ensure_base(&["work".to_owned()], TimeMs::new(1_000), &of)
             .unwrap();
 
         let repo = git2::Repository::open(tmp.path()).unwrap();
@@ -348,16 +371,16 @@ mod tests {
         write(tmp.path(), "work/clean.md", "nothing here");
         let mut first = Checkpoint::open(tmp.path()).unwrap();
         first
-            .ensure_base("work", TimeMs::new(0), &resident())
+            .ensure_base(&["work".to_owned()], TimeMs::new(0), &resident())
             .unwrap();
         first
-            .wave_pre("work", TimeMs::new(1_000), &resident())
+            .wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident())
             .unwrap();
         let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
         write(tmp.path(), "work/leak.env", &format!("KEY={token}"));
         drop(first);
         let mut second = Checkpoint::open(tmp.path()).unwrap();
-        let outcome = second.wave_pre("work", TimeMs::new(2_000), &resident());
+        let outcome = second.wave_pre(&["work".to_owned()], TimeMs::new(2_000), &resident());
         let err = match outcome {
             Err(err) => err,
             Ok(_) => panic!("the restart lost the scan of what changed before it"),

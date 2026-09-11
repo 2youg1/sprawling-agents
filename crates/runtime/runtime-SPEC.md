@@ -549,7 +549,9 @@ impl ToolBench {
     /// 闭包里升起的，所以它在装配时就被交下。
     pub fn with_checkpoint(self, net: CheckpointNet) -> ToolBench;
     /// 栅栏的三件东西恒同行：仓、它盖住的范围、写它的人。
-    pub struct CheckpointNet { pub checkpoint: Checkpoint, pub scope: String, pub of: Provenance }
+    pub struct CheckpointNet { pub checkpoint: Checkpoint, pub scope: Vec<String>, pub of: Provenance }
+    // `scope` 是这次 run 的**写域全部前缀**，不是它的房间：栅栏窄于写域，
+    // 两者之间写下的文件就进不了任何检查点（memory-SPEC §8-18）。
     /// P1.04：本 bench 服务的那份活。Spawn 门要铸一个人答得出的条目，
     /// 条目要有 actor（问谁）与 artifact（看什么）；两者都不在一次工具调用里。
     /// 未给即拒（fail-closed）——一个人问不到的派生就是没人批准的派生。

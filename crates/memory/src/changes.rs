@@ -231,7 +231,7 @@ mod tests {
         let mut fence = Checkpoint::open(root).unwrap();
         let base = oid_of(
             &fence
-                .wave_pre("lab", TimeMs::new(1_000), &resident())
+                .wave_pre(&["lab".to_owned()], TimeMs::new(1_000), &resident())
                 .unwrap(),
         );
 
@@ -240,7 +240,7 @@ mod tests {
         std::fs::remove_file(root.join("lab/keep.rs")).unwrap();
         let head = oid_of(
             &fence
-                .wave_pre("lab", TimeMs::new(2_000), &resident())
+                .wave_pre(&["lab".to_owned()], TimeMs::new(2_000), &resident())
                 .unwrap(),
         );
 
@@ -268,8 +268,16 @@ mod tests {
         let root = dir.path();
         write(root, "lab/lex.rs", "one\n");
         let mut fence = Checkpoint::open(root).unwrap();
-        let base = oid_of(&fence.wave_pre("lab", TimeMs::new(1), &resident()).unwrap());
-        let head = oid_of(&fence.wave_pre("lab", TimeMs::new(2), &resident()).unwrap());
+        let base = oid_of(
+            &fence
+                .wave_pre(&["lab".to_owned()], TimeMs::new(1), &resident())
+                .unwrap(),
+        );
+        let head = oid_of(
+            &fence
+                .wave_pre(&["lab".to_owned()], TimeMs::new(2), &resident())
+                .unwrap(),
+        );
         assert!(between(root, base, Head::Commit(head)).unwrap().is_empty());
     }
 
@@ -283,7 +291,11 @@ mod tests {
         let root = dir.path();
         write(root, "lab/lex.rs", "one\n");
         let mut fence = Checkpoint::open(root).unwrap();
-        let base = oid_of(&fence.wave_pre("lab", TimeMs::new(1), &resident()).unwrap());
+        let base = oid_of(
+            &fence
+                .wave_pre(&["lab".to_owned()], TimeMs::new(1), &resident())
+                .unwrap(),
+        );
 
         write(root, "lab/lex.rs", "one\ntwo\n");
         let rows = between(root, base, Head::WorkingTree).unwrap();
@@ -307,7 +319,11 @@ mod tests {
         std::fs::create_dir_all(root.join("lab")).unwrap();
         std::fs::write(root.join("lab/blob.bin"), [0u8, 1, 2, 0, 3]).unwrap();
         let mut fence = Checkpoint::open(root).unwrap();
-        let base = oid_of(&fence.wave_pre("lab", TimeMs::new(1), &resident()).unwrap());
+        let base = oid_of(
+            &fence
+                .wave_pre(&["lab".to_owned()], TimeMs::new(1), &resident())
+                .unwrap(),
+        );
 
         std::fs::write(root.join("lab/blob.bin"), [0u8, 9, 9, 0, 7, 7]).unwrap();
         let rows = between(root, base, Head::WorkingTree).unwrap();
@@ -324,7 +340,11 @@ mod tests {
         let root = dir.path();
         write(root, "lab/lex.rs", "one\n");
         let mut fence = Checkpoint::open(root).unwrap();
-        let base = oid_of(&fence.wave_pre("lab", TimeMs::new(1), &resident()).unwrap());
+        let base = oid_of(
+            &fence
+                .wave_pre(&["lab".to_owned()], TimeMs::new(1), &resident())
+                .unwrap(),
+        );
         let stranger = GitOid::from_bytes([7u8; 20]);
         assert!(between(root, stranger, Head::Commit(base)).is_err());
     }

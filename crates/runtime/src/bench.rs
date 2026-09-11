@@ -47,7 +47,11 @@ mod admit;
 /// rather than assembled inside the bench.
 pub struct CheckpointNet {
     pub checkpoint: Checkpoint,
-    pub scope: String,
+    /// The prefixes a fence stages, which are the run's write domain and
+    /// not its room. A fence narrower than the domain leaves whatever
+    /// the run wrote in between outside every checkpoint, and therefore
+    /// outside `changes` and outside restoration.
+    pub scope: Vec<String>,
     pub of: Provenance,
 }
 

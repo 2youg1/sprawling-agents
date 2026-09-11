@@ -34,7 +34,7 @@ fn city(dir: &Path) -> Worktrees {
     std::fs::write(dir.join("lab").join("notes.md"), b"first\n").unwrap();
     let mut checkpoint = Checkpoint::open(dir).unwrap();
     checkpoint
-        .ensure_base("lab", TimeMs::new(1_000), &owner())
+        .ensure_base(&["lab".to_owned()], TimeMs::new(1_000), &owner())
         .unwrap();
     Worktrees::open(dir).unwrap()
 }

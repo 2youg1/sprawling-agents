@@ -33,6 +33,55 @@ fn oid_of(payload: &Payload) -> String {
         .to_owned()
 }
 
+fn files_of(payload: &Payload) -> Vec<String> {
+    serde_json::to_value(payload).unwrap()["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[test]
+fn a_fence_covers_every_prefix_it_is_given_and_nothing_else() {
+    // The defect this pins: a run's fence used to be its room, while the
+    // write domain it is judged against is the building and whatever
+    // else that building declares. Anything the run was allowed to write
+    // and the fence did not stage was invisible to `changes`, and
+    // `wave_post` could not restore it either.
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/resident/in-room.txt", "a");
+    write(
+        tmp.path(),
+        "work/note.md",
+        "outside the room, inside the domain",
+    );
+    write(tmp.path(), "shared/also-declared.txt", "a second prefix");
+    write(tmp.path(), "other/elsewhere.txt", "outside the domain");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+
+    let pre = checkpoint
+        .wave_pre(
+            &["work".to_owned(), "shared".to_owned()],
+            TimeMs::new(1_700_000_000_000),
+            &resident(),
+        )
+        .unwrap();
+
+    let files = files_of(&pre);
+    for expected in [
+        "work/resident/in-room.txt",
+        "work/note.md",
+        "shared/also-declared.txt",
+    ] {
+        assert!(files.iter().any(|f| f == expected), "{expected}: {files:?}");
+    }
+    assert!(
+        !files.iter().any(|f| f == "other/elsewhere.txt"),
+        "a prefix nobody declared stays out: {files:?}"
+    );
+}
+
 #[test]
 fn a14_the_fence_precedes_the_deletion_it_restores() {
     let tmp = tempfile::tempdir().unwrap();
@@ -41,7 +90,11 @@ fn a14_the_fence_precedes_the_deletion_it_restores() {
     let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
 
     let pre = checkpoint
-        .wave_pre("work", TimeMs::new(1_700_000_000_000), &resident())
+        .wave_pre(
+            &["work".to_owned()],
+            TimeMs::new(1_700_000_000_000),
+            &resident(),
+        )
         .unwrap();
     let pre_oid = oid_of(&pre);
     let files = serde_json::to_value(&pre).unwrap();
@@ -68,7 +121,11 @@ fn the_scope_is_the_boundary_and_outside_it_nothing_is_staged() {
     write(tmp.path(), "elsewhere/theirs.txt", "not mine");
     let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
     let pre = checkpoint
-        .wave_pre("work", TimeMs::new(1_700_000_000_000), &resident())
+        .wave_pre(
+            &["work".to_owned()],
+            TimeMs::new(1_700_000_000_000),
+            &resident(),
+        )
         .unwrap();
     let files = serde_json::to_value(&pre).unwrap();
     let staged: Vec<String> = files["files"]
@@ -86,7 +143,7 @@ fn a_wave_pays_for_what_it_changed_rather_than_for_the_whole_tree() {
     let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
     write(tmp.path(), "work/smuggled.env", &format!("KEY={token}"));
     let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
-    checkpoint.stage_scope("work").unwrap();
+    checkpoint.stage_scopes(&["work".to_owned()]).unwrap();
     checkpoint
         .commit(&crate::checkpoint::scan::CommitPlan {
             t: TimeMs::new(1_000),
@@ -100,13 +157,13 @@ fn a_wave_pays_for_what_it_changed_rather_than_for_the_whole_tree() {
     // for is its own change; the blob it did not touch is not read.
     write(tmp.path(), "work/ordinary.txt", "nothing to see");
     checkpoint
-        .wave_pre("work", TimeMs::new(2_000), &resident())
+        .wave_pre(&["work".to_owned()], TimeMs::new(2_000), &resident())
         .expect("an unchanged blob is not re-examined");
 
     // And the guard still bites on this wave's own writing, which is
     // the half of the property the narrowing must not cost.
     write(tmp.path(), "work/fresh.env", &format!("KEY={token}"));
-    let err = match checkpoint.wave_pre("work", TimeMs::new(3_000), &resident()) {
+    let err = match checkpoint.wave_pre(&["work".to_owned()], TimeMs::new(3_000), &resident()) {
         Err(err) => err,
         Ok(_) => panic!("a secret arriving with this wave must refuse the commit"),
     };
@@ -125,12 +182,12 @@ fn an_unchanged_wave_still_commits_so_the_chain_rebuilds() {
     let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
     let first = oid_of(
         &checkpoint
-            .wave_pre("work", TimeMs::new(1_000), &resident())
+            .wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident())
             .unwrap(),
     );
     let second = oid_of(
         &checkpoint
-            .wave_pre("work", TimeMs::new(2_000), &resident())
+            .wave_pre(&["work".to_owned()], TimeMs::new(2_000), &resident())
             .unwrap(),
     );
     assert_ne!(first, second, "each fence is its own commit");
@@ -144,7 +201,11 @@ fn the_same_script_at_the_same_time_produces_the_same_commit() {
         let mut checkpoint = Checkpoint::open(dir).unwrap();
         oid_of(
             &checkpoint
-                .wave_pre("work", TimeMs::new(1_700_000_000_000), &resident())
+                .wave_pre(
+                    &["work".to_owned()],
+                    TimeMs::new(1_700_000_000_000),
+                    &resident(),
+                )
                 .unwrap(),
         )
     };
@@ -166,7 +227,7 @@ fn three_waves_leave_three_fences_and_a_history_that_did_not_grow() {
     let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
     let of = resident();
     checkpoint
-        .ensure_base("work", TimeMs::new(1_000), &of)
+        .ensure_base(&["work".to_owned()], TimeMs::new(1_000), &of)
         .unwrap();
     let before = head_len(tmp.path());
 
@@ -174,7 +235,7 @@ fn three_waves_leave_three_fences_and_a_history_that_did_not_grow() {
     for step in 0..3u64 {
         write(tmp.path(), "work/steady.txt", &format!("wave {step}"));
         let payload = checkpoint
-            .wave_pre("work", TimeMs::new(2_000 + step), &of)
+            .wave_pre(&["work".to_owned()], TimeMs::new(2_000 + step), &of)
             .unwrap();
         fences.push(oid_of(&payload));
     }

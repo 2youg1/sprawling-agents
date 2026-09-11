@@ -34,7 +34,7 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let (addr, who, run_id, mode) = (&at.addr, site.who.as_str(), site.run_id, at.mode);
         let write_root = site.write_root.as_path();
-        let fence_scope = site.fence_scope(addr);
+        let fence_scope = site.fence_scope()?.join(" ");
         let fence_scope = fence_scope.as_str();
         // What the run asked of the request register. Opening commits
         // the run's own tree first, because the record names the commit

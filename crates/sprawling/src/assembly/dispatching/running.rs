@@ -129,7 +129,7 @@ impl RunWorker {
             self.probe_after(&mut site, &plan, handed)?;
         }
 
-        let fence_scope = site.fence_scope(&at.addr);
+        let fence_scope = site.fence_scope()?;
         // The adapter moves into the drive and comes home in `Driven`:
         // `Site` gains and loses no field over one dispatch. `Option`
         // is the move's vehicle, not a new state: it is `Some` on both

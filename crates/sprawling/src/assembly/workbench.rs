@@ -142,14 +142,32 @@ impl Site {
     /// Under review the worktree is this run's alone, so everything that
     /// changed inside it is this run's to offer - the shelf entries it
     /// filed included, which sit at the building rather than in the
-    /// room. Without a lease the fence stays on the room, which is the
-    /// only place a run may write in the city itself.
-    pub(super) fn fence_scope(&self, addr: &Address) -> String {
+    /// room.
+    ///
+    /// Without a lease the fence is **the run's write domain**, which is
+    /// the building's own subtree plus whatever else its `BUILDING.md`
+    /// declares. It used to be the room, on the belief that a room is
+    /// the only place a run may write in the city itself - and the gate
+    /// never agreed: `city::policy::write_domain` defaults to the whole
+    /// building, and City Hall's residents reach every document under
+    /// theirs. Everything a run wrote in between was staged by no fence,
+    /// so it reached no `changes` answer and no `file_discarded` record
+    /// could restore it. memory-SPEC section 8-18 already said the fence
+    /// is the write domain; this is the code agreeing with it.
+    ///
+    /// # Errors
+    /// Propagates a building whose declared prefixes its own rules
+    /// refuse.
+    pub(super) fn fence_scope(&self) -> Result<Vec<String>, AxError> {
         if self.lease.is_some() {
-            self.building.addr().as_str().to_owned()
-        } else {
-            addr.as_str().to_owned()
+            return Ok(vec![self.building.addr().as_str().to_owned()]);
         }
+        Ok(self
+            .rules
+            .write_domain()?
+            .prefixes()
+            .map(|prefix| prefix.as_str().to_owned())
+            .collect())
     }
 }
 

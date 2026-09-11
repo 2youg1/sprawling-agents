@@ -196,7 +196,7 @@ mod tests {
         let mut fence = Checkpoint::open(root).unwrap();
         let base = oid_of(
             &fence
-                .wave_pre("lab", TimeMs::new(1_000), &resident())
+                .wave_pre(&["lab".to_owned()], TimeMs::new(1_000), &resident())
                 .unwrap(),
         );
 
@@ -245,13 +245,13 @@ mod tests {
         let mut fence = Checkpoint::open(root).unwrap();
         let base = oid_of(
             &fence
-                .wave_pre("lab", TimeMs::new(1_000), &resident())
+                .wave_pre(&["lab".to_owned()], TimeMs::new(1_000), &resident())
                 .unwrap(),
         );
         write(root, "lab/moved.rs", "new\n");
         let head = oid_of(
             &fence
-                .wave_pre("lab", TimeMs::new(2_000), &resident())
+                .wave_pre(&["lab".to_owned()], TimeMs::new(2_000), &resident())
                 .unwrap(),
         );
 

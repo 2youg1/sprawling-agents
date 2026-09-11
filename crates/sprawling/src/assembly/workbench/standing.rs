@@ -166,7 +166,7 @@ impl RunWorker {
             );
             memory::Checkpoint::open(&self.city_root)
                 .map_err(memory::MemoryError::into_ax)?
-                .ensure_base(addr.as_str(), now_ms()?, &of)
+                .ensure_base(&[addr.as_str().to_owned()], now_ms()?, &of)
                 .map_err(memory::MemoryError::into_ax)?;
             let trees =
                 memory::Worktrees::open(&self.city_root).map_err(memory::MemoryError::into_ax)?;

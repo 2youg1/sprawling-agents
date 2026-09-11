@@ -416,7 +416,7 @@ impl Checkpoint {
     /// pointed at by refs/sprawling/runs/<run>/<seq>. HEAD does not move.
     /// Returns the checkpoint_committed payload
     /// {oid, scope, files, model, effort} (the last two: card-2.4, §8-18).
-    pub fn wave_pre(&mut self, scope: &str, t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
+    pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
     pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, MemoryError>;
@@ -457,7 +457,7 @@ impl Checkpoint {
   - `Checkpoint::root` 随之删除——它存在的唯一理由就是拿来 stat，clippy 在改完当场报了它。
 - S3.07 落地记录（checkpoint）：`open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存用 `add_all`＋`update_all` 两步（后者含删除），glob 限于 `<scope>/*`。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `MemoryError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`，**此码由此获得首个消费者，待消解清单可划去一条**）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
 - P2.03 补：`open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而这台机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置（P2.03 的 worktree 检出抳出此事）。
-- 提交身份见 8-17（card-2.1 之前是固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
+- 提交身份见 8-17（card-2.1 之前是固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `BUILDING.md` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何栅栏——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节，代码曾与它不符。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
 
 ### 8-13 memory::changes（ux-14；形状 4 适配器；git2）
 
@@ -474,7 +474,7 @@ pub fn between(city_root: &Path, base: GitOid, head: Head)
 而仓库里没有任何一处读得出两个 commit 之间变了什么。人要的是「这个 agent 动过哪些文件」，
 而那个事实已经在盘上。
 
-**它天然只含写域。** `stage_scope` 只暂存 `<scope>/*`，所以两个检查点之间的差异不可能包含
+**它天然只含写域。** `stage_scopes` 为写域的**每一个**前缀各暂存 `<prefix>/*`，所以两个检查点之间的差异不可能包含
 会话只读过的文件——其他 harness 正在为这件事头痛（一个会话的 diff 把读过的文件也算进去），
 而这个设计因为栅栏就是写域而白得。
 

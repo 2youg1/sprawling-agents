@@ -445,7 +445,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
         // The real net over the real tree: A14's leading half.
         checkpoint: Some((
             memory::Checkpoint::open(city.path()).unwrap(),
-            "sim/lobby/room1".to_owned(),
+            vec!["sim/lobby/room1".to_owned()],
         )),
         cancel: None,
         steer: None,

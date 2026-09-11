@@ -780,7 +780,7 @@ pub runtime::bench::BenchOutcome::Refused
 pub runtime::bench::BenchOutcome::Refused::refusal: alloc::boxed::Box<kernel::error::shape::AxError>
 pub runtime::bench::CheckpointNet::checkpoint: memory::checkpoint::fence::Checkpoint
 pub runtime::bench::CheckpointNet::of: memory::checkpoint::provenance::Provenance
-pub runtime::bench::CheckpointNet::scope: alloc::string::String
+pub runtime::bench::CheckpointNet::scope: alloc::vec::Vec<alloc::string::String>
 pub runtime::catalog::CatalogEntry::disclosure: alloc::string::String
 pub runtime::catalog::CatalogEntry::expansion: alloc::string::String
 pub runtime::catalog::CatalogEntry::hash: core::option::Option<kernel::locator::B3Hash>

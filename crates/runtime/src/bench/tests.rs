@@ -249,7 +249,7 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_fenced() {
     let checkpoint = Checkpoint::open(tmp.path()).unwrap();
     let mut fenced_bench = ToolBench::new(domain).with_checkpoint(crate::bench::CheckpointNet {
         checkpoint,
-        scope: "work".to_owned(),
+        scope: vec!["work".to_owned()],
         of: probe_provenance(),
     });
     fenced_bench.register(exec_tool()).unwrap();
@@ -264,7 +264,11 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_fenced() {
     );
     let mut probe = Checkpoint::open(tmp.path()).unwrap();
     let payload = probe
-        .wave_pre("work", TimeMs::new(1_700_000_001_000), &probe_provenance())
+        .wave_pre(
+            &["work".to_owned()],
+            TimeMs::new(1_700_000_001_000),
+            &probe_provenance(),
+        )
         .unwrap();
     let oid = serde_json::to_value(&payload).unwrap()["oid"]
         .as_str()

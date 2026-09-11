@@ -15,6 +15,16 @@ use crate::error::MemoryError;
 use super::provenance::Provenance;
 use super::scan::CommitPlan;
 
+/// How a fence names itself in a commit subject. The whole set, because
+/// a fence that showed one of several prefixes would read like a fence
+/// that staged one of them.
+fn subject_of(scopes: &[String]) -> String {
+    if scopes.is_empty() {
+        return "checkpoint: .".to_owned();
+    }
+    format!("checkpoint: {}", scopes.join(" "))
+}
+
 /// Where a wave fence is filed: under `refs/sprawling/`, which no
 /// branch listing, push or `git log` walks by accident.
 fn fence_ref(of: &Provenance, seq: u64) -> String {
@@ -30,12 +40,15 @@ fn fence_ref(of: &Provenance, seq: u64) -> String {
 fn committed(
     oid: git2::Oid,
     of: &Provenance,
-    scope: &str,
+    scopes: &[String],
     files: Vec<String>,
 ) -> Result<Payload, MemoryError> {
     let mut map = of.model_fields();
     map.insert("oid".to_owned(), Value::String(oid.to_string()));
-    map.insert("scope".to_owned(), Value::String(scope.to_owned()));
+    map.insert(
+        "scope".to_owned(),
+        Value::Array(scopes.iter().cloned().map(Value::String).collect()),
+    );
     map.insert(
         "files".to_owned(),
         Value::Array(files.into_iter().map(Value::String).collect()),
@@ -99,29 +112,35 @@ impl Checkpoint {
     /// Propagates whatever staging and committing report.
     pub fn ensure_base(
         &mut self,
-        scope: &str,
+        scopes: &[String],
         t: TimeMs,
         of: &Provenance,
     ) -> Result<Option<Payload>, MemoryError> {
         if self.repo.head().is_ok() {
             return Ok(None);
         }
-        let files = self.stage_scope(scope)?;
+        let files = self.stage_scopes(scopes)?;
         self.scan_staged()?;
         // The one fence that moves the branch: a worktree branches from a
         // commit, and a city that has none can lend no tree.
         let oid = self.commit(&CommitPlan {
             t,
             of,
-            subject: &format!("checkpoint: {scope}"),
+            subject: &subject_of(scopes),
             onto_head: true,
         })?;
-        committed(oid, of, scope, files).map(Some)
+        committed(oid, of, scopes, files).map(Some)
     }
 
-    /// The pre-wave fence: stage everything under `scope`, scan it, and
+    /// The pre-wave fence: stage everything under `scopes`, scan it, and
     /// commit at the injected time. Returns the `checkpoint_committed`
     /// payload.
+    ///
+    /// **`scopes` is the run's write domain, not its room** (memory-SPEC
+    /// section 8-18). The two were allowed to differ once, and every
+    /// file a resident wrote between them - a building's own documents,
+    /// a second declared prefix - was staged by no fence, reported by no
+    /// `changes` query, and restorable from no `file_discarded` record.
     ///
     /// **The branch does not move** (card-2.2): the commit is written
     /// with no reference update and pointed at by
@@ -135,16 +154,16 @@ impl Checkpoint {
     /// reference the repository will not write.
     pub fn wave_pre(
         &mut self,
-        scope: &str,
+        scopes: &[String],
         t: TimeMs,
         of: &Provenance,
     ) -> Result<Payload, MemoryError> {
-        let files = self.stage_scope(scope)?;
+        let files = self.stage_scopes(scopes)?;
         self.scan_staged()?;
         let oid = self.commit(&CommitPlan {
             t,
             of,
-            subject: &format!("checkpoint: {scope}"),
+            subject: &subject_of(scopes),
             onto_head: false,
         })?;
         let seq = self.fences;
@@ -152,7 +171,7 @@ impl Checkpoint {
         self.repo
             .reference(&fence_ref(of, seq), oid, true, "sprawling: a wave fence")
             .map_err(git_err("file a wave fence"))?;
-        committed(oid, of, scope, files)
+        committed(oid, of, scopes, files)
     }
 
     /// The post-wave sweep: every path present at `pre_oid` and gone

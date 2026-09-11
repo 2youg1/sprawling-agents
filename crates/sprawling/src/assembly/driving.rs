@@ -46,8 +46,9 @@ pub(crate) struct Driving {
     /// The tree the run writes in: its own worktree under review, the
     /// city itself otherwise.
     pub(crate) write_root: PathBuf,
-    /// What a checkpoint fence covers, from [`Site::fence_scope`].
-    pub(crate) fence_scope: String,
+    /// What a checkpoint fence covers, from [`Site::fence_scope`]:
+    /// every prefix of the run's write domain, not just its room.
+    pub(crate) fence_scope: Vec<String>,
     /// The resident this run works as, as three hooks will name it.
     pub(crate) who: String,
     pub(crate) run_id: RunId,
