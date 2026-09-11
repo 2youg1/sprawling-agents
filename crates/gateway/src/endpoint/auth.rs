@@ -105,7 +105,8 @@ fn key_only_provider() -> (String, std::thread::JoinHandle<Vec<String>>) {
 )]
 mod tests {
     use super::*;
-    use crate::endpoint::config::{Endpoint, EndpointConfig, config};
+    use crate::endpoint::config::{Endpoint, EndpointConfig};
+    use crate::endpoint::fakes::config;
     use crate::endpoint::redemption::redemption;
 
     fn reference() -> SecretRef {

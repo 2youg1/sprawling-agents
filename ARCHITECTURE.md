@@ -483,7 +483,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::fixture | crates/memory/src/bundle/fixture.rs | the one city the bundle tests export | adapter | V3 | built | memory-SPEC.md#8-21 |
 
-### gateway (38) — everything between a decision to call a model and the bytes on the wire
+### gateway (40) — everything between a decision to call a model and the bytes on the wire
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -504,7 +504,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::endpoint | crates/gateway/src/endpoint.rs | the external provider: a self-written wire format over one HTTP client | adapter | S3 | built | gateway-SPEC.md#8-2 |
 | gateway::endpoint::config | crates/gateway/src/endpoint/config.rs | auth, overrides, construction | adapter | S3 | built | gateway-SPEC.md#8-2 |
 | gateway::endpoint::auth | crates/gateway/src/endpoint/auth.rs | which header a credential travels in, chosen by the compatible format | decision | V4 | built | gateway-SPEC.md#8-2 |
-| gateway::endpoint::call | crates/gateway/src/endpoint/call.rs | one request, streamed or settled | adapter | S3 | built | gateway-SPEC.md#8-2 |
+| gateway::endpoint::call | crates/gateway/src/endpoint/call.rs | one request written on the wire, and the settled answer read back | adapter | S3 | built | gateway-SPEC.md#8-2 |
+| gateway::endpoint::stream | crates/gateway/src/endpoint/stream.rs | one call whose body is read as it arrives | adapter | S3 | built | gateway-SPEC.md#8-2 |
+| gateway::endpoint::fakes | crates/gateway/src/endpoint/fakes.rs | the loopback providers the endpoint tests stand up | adapter | S3 | built | gateway-SPEC.md#8-2 |
 | gateway::endpoint::redemption | crates/gateway/src/endpoint/redemption.rs | what one endpoint redeems at the wire: the credential and the pictures | adapter | V4 | built | gateway-SPEC.md#8-2 |
 | gateway::endpoint::model | crates/gateway/src/endpoint/model.rs | the Model face | adapter | S3 | built | gateway-SPEC.md#8-2 |
 | gateway::endpoint::adapter | crates/gateway/src/endpoint/adapter.rs | which adapter a chosen model gets, and why | adapter | S3 | built | gateway-SPEC.md#8-2 |

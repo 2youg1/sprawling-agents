@@ -167,7 +167,7 @@ fn provider_refusal(url: &str, detail: &str) -> AxError {
 mod tests {
     use super::super::recording::AudioType;
     use super::*;
-    use crate::endpoint::config::fake_provider;
+    use crate::endpoint::fakes::fake_provider;
     use crate::endpoint::redemption::resolver;
     use kernel::SecretRef;
 

@@ -133,7 +133,7 @@ impl Endpoint {
     reason = "test code"
 )]
 mod tests {
-    use super::super::config::{config, request};
+    use super::super::fakes::{config, request};
     use super::super::redemption::redemption;
     use super::*;
     use kernel::BuildingPolicy;

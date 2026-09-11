@@ -15,8 +15,11 @@ mod adapter;
 mod auth;
 mod call;
 pub(crate) mod config;
+#[cfg(test)]
+pub(crate) mod fakes;
 mod model;
 pub(crate) mod redemption;
+mod stream;
 
 pub use adapter::{CALL_TIMEOUT_MS, adapter_for};
 pub use config::{AuthSpec, Endpoint, EndpointConfig};
