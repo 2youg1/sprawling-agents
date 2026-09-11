@@ -18,44 +18,69 @@ fn rules(found: &[Violation]) -> String {
         .join(" | ")
 }
 
-const GOOD: &str = r#"
-pub const GRAY_CHROMA: u16 = 18;
-pub const GRAY_RAMP: [(&str, u16); 11] = [
-    ("G0", 145),
-    ("G1", 195),
-    ("G2", 245),
-    ("G3", 300),
-    ("G4", 360),
-    ("G5", 430),
-    ("G6", 520),
-    ("G7", 630),
-    ("G8", 730),
-    ("G9", 830),
-    ("G10", 930),
-];
-pub const COLOUR_TOKENS: [(&str, u16, u16, u16); 5] = [
-    ("ACCENT", 680, HUE_AXIS, ACCENT_CHROMA_PERCENT),
-    ("ALERT", 919, HUE_ALERT, ALERT_CHROMA_PERCENT),
-    ("ACCENT_HOVER", 760, HUE_AXIS, ACCENT_CHROMA_PERCENT),
-    ("ALERT_HOVER", 945, HUE_ALERT, ALERT_CHROMA_PERCENT),
-    ("ACCENT_SOLID", 919, HUE_AXIS, ACCENT_CHROMA_PERCENT),
-];
-pub const TEXT_SURFACE_CEILING: &str = "G2";
-pub const TEXT_TOKENS: [(&str, u16, u16); 4] = [
-    ("TEXT", 928, 90),
-    ("TEXT_QUIET", 852, 75),
-    ("TEXT_FAINT", 771, 60),
-    ("TEXT_DISABLED", 582, 30),
-];
-pub const TYPE_SCALE: [(&str, u16, u16, u16); 6] = [
-    ("figure", 28, 600, 60),
-    ("title", 20, 600, 60),
-    ("heading", 18, 600, 60),
-    ("label", 14, 600, 90),
-    ("body", 14, 400, 90),
-    ("note", 15, 400, 75),
-];
-"#;
+/// The shape the client ships: the `@theme` token block, and beside it the
+/// three inputs the proof needs that an `oklch()` call cannot carry.
+const GOOD: &str = r"
+@theme {
+  --color-*: initial;
+  --color-g0: oklch(0.145 0.018 264);
+  --color-g1: oklch(0.195 0.018 264);
+  --color-g2: oklch(0.245 0.018 264);
+  --color-g3: oklch(0.300 0.018 264);
+  --color-g4: oklch(0.360 0.018 264);
+  --color-g5: oklch(0.430 0.018 264);
+  --color-g6: oklch(0.520 0.018 264);
+  --color-g7: oklch(0.630 0.018 264);
+  --color-g8: oklch(0.730 0.018 264);
+  --color-g9: oklch(0.830 0.018 264);
+  --color-g10: oklch(0.930 0.018 264);
+
+  --color-accent: oklch(0.680 calc(0.151 * var(--chroma)) 264);
+  --color-alert: oklch(0.919 calc(0.046 * var(--chroma)) 84);
+  --color-accent-hover: oklch(0.760 calc(0.109 * var(--chroma)) 264);
+  --color-alert-hover: oklch(0.945 calc(0.030 * var(--chroma)) 84);
+  --color-accent-solid: oklch(0.919 calc(0.034 * var(--chroma)) 264);
+
+  --color-text: oklch(0.928 0.018 264);
+  --color-text-quiet: oklch(0.852 0.018 264);
+  --color-text-faint: oklch(0.771 0.018 264);
+  --color-text-disabled: oklch(0.582 0.018 264);
+
+  --text-figure: 28px;
+  --text-title: 20px;
+  --text-heading: 18px;
+  --text-label: 14px;
+  --text-body: 15px;
+  --text-note: 15px;
+  --font-weight-figure: 600;
+  --font-weight-title: 600;
+  --font-weight-heading: 600;
+  --font-weight-label: 600;
+  --font-weight-body: 400;
+  --font-weight-note: 400;
+}
+
+:root {
+  --ratio-accent: 90;
+  --ratio-alert: 55;
+  --ratio-accent-hover: 90;
+  --ratio-alert-hover: 55;
+  --ratio-accent-solid: 90;
+
+  --tier-text: 90;
+  --tier-text-quiet: 75;
+  --tier-text-faint: 60;
+  --tier-text-disabled: 30;
+  --tier-figure: 60;
+  --tier-title: 60;
+  --tier-heading: 60;
+  --tier-label: 90;
+  --tier-body: 90;
+  --tier-note: 75;
+
+  --surface-ceiling: g2;
+}
+";
 
 #[test]
 fn the_real_shape_passes() {
@@ -65,6 +90,41 @@ fn the_real_shape_passes() {
     assert_eq!(parse_colour_tokens(GOOD).len(), 5);
     assert_eq!(parse_text_tokens(GOOD).len(), 4);
     assert_eq!(parse_type_scale(GOOD).len(), 6);
+}
+
+/// The names the rest of the repository uses, which are not the names CSS
+/// spells. `badge` asks the ramp for `G1`; the stylesheet declares
+/// `--color-g1`, and the reader who goes looking for either finds one
+/// thing.
+#[test]
+fn a_token_is_reported_by_the_name_the_repository_uses() {
+    let rungs = grey_ramp(GOOD);
+    assert_eq!(
+        rungs.first().map(|(name, l)| (name.as_str(), *l)),
+        Some(("G0", 145))
+    );
+    assert_eq!(
+        rungs.last().map(|(name, l)| (name.as_str(), *l)),
+        Some(("G10", 930))
+    );
+    let coloured: Vec<String> = parse_colour_tokens(GOOD)
+        .into_iter()
+        .map(|(name, _, _, _)| name)
+        .collect();
+    assert!(
+        coloured.iter().any(|name| name == "ACCENT_HOVER"),
+        "got {coloured:?}"
+    );
+    assert_eq!(text_surface_ceiling(GOOD).as_deref(), Some("G2"));
+}
+
+/// Tailwind's reset lines declare no token and must not become one.
+#[test]
+fn a_reset_declaration_is_not_a_token() {
+    assert!(
+        !grey_ramp(GOOD).iter().any(|(name, _)| name.contains('*')),
+        "the `--color-*: initial` reset was read as a rung"
+    );
 }
 
 /// The reading this gate exists to make mechanical: these are the
@@ -94,8 +154,8 @@ fn the_measurement_reproduces_the_readings_the_design_was_solved_against() {
 #[test]
 fn a_text_token_that_does_not_reach_its_tier_is_caught() {
     // G9 is the rung a designer would reach for when "a bit quieter"
-    // is wanted. It reaches Lc 73.8 on a card, and body needs 90.
-    let broken = GOOD.replace("(\"TEXT\", 928, 90)", "(\"TEXT\", 830, 90)");
+    // is wanted. It reaches Lc 70.4 on a card, and body needs 90.
+    let broken = GOOD.replace("--color-text: oklch(0.928", "--color-text: oklch(0.830");
     let found = judge_tokens(&broken);
     assert!(
         found
@@ -108,7 +168,7 @@ fn a_text_token_that_does_not_reach_its_tier_is_caught() {
 
 #[test]
 fn a_type_step_claiming_the_wrong_tier_is_caught() {
-    let broken = GOOD.replace("(\"note\", 15, 400, 75)", "(\"note\", 15, 400, 60)");
+    let broken = GOOD.replace("--tier-note: 75", "--tier-note: 60");
     let found = judge_tokens(&broken);
     assert!(
         found
@@ -124,7 +184,7 @@ fn a_type_step_claiming_the_wrong_tier_is_caught() {
 /// was to the type scale and not to the greys.
 #[test]
 fn a_step_too_small_for_any_tier_is_caught() {
-    let broken = GOOD.replace("(\"label\", 14, 600, 90)", "(\"label\", 11, 600, 90)");
+    let broken = GOOD.replace("--text-label: 14px", "--text-label: 11px");
     let found = judge_tokens(&broken);
     assert!(
         found
@@ -145,18 +205,14 @@ fn a_step_too_small_for_any_tier_is_caught() {
 fn a_twelve_pixel_step_is_legal_and_still_cannot_be_quiet() {
     assert_eq!(bronze_tier(12, 400, false), Some(90));
     assert_eq!(bronze_tier(15, 400, false), Some(75));
-    let quiet_enough: Vec<&str> = parse_text_tokens(GOOD)
+    let quiet_enough: Vec<String> = parse_text_tokens(GOOD)
         .into_iter()
         .filter(|(_, _, tier)| *tier < 90)
-        .map(|(name, _, _)| match name.as_str() {
-            "TEXT_QUIET" => "TEXT_QUIET",
-            "TEXT_FAINT" => "TEXT_FAINT",
-            _ => "other",
-        })
+        .map(|(name, _, _)| name)
         .collect();
     assert!(
-        !quiet_enough.is_empty(),
-        "there is a quieter token; it is 12px that cannot use it"
+        quiet_enough.iter().any(|name| name == "TEXT_QUIET"),
+        "there is a quieter token; it is 12px that cannot use it: {quiet_enough:?}"
     );
 }
 
@@ -164,10 +220,7 @@ fn a_twelve_pixel_step_is_legal_and_still_cannot_be_quiet() {
 fn text_on_a_surface_the_ladder_may_not_reach_is_caught() {
     // G3 is where the ladder stops carrying text. Pointing the ceiling
     // at it must make the body token illegal, because it is.
-    let broken = GOOD.replace(
-        "pub const TEXT_SURFACE_CEILING: &str = \"G2\"",
-        "pub const TEXT_SURFACE_CEILING: &str = \"G3\"",
-    );
+    let broken = GOOD.replace("--surface-ceiling: g2", "--surface-ceiling: g3");
     let found = judge_tokens(&broken);
     assert!(
         found.iter().any(|v| v.violation.starts_with("TEXT claims")),
@@ -178,7 +231,10 @@ fn text_on_a_surface_the_ladder_may_not_reach_is_caught() {
 
 #[test]
 fn a_third_hue_is_caught() {
-    let broken = GOOD.replace("(\"ALERT\", 919, HUE_ALERT", "(\"ALERT\", 919, 12");
+    let broken = GOOD.replace(
+        "--color-alert: oklch(0.919 calc(0.046 * var(--chroma)) 84)",
+        "--color-alert: oklch(0.919 calc(0.046 * var(--chroma)) 12)",
+    );
     let found = judge_tokens(&broken);
     assert!(
         found.iter().any(|v| v.violation.contains("hue 12")),
@@ -189,7 +245,7 @@ fn a_third_hue_is_caught() {
 
 #[test]
 fn pure_white_is_caught() {
-    let broken = GOOD.replace("(\"G10\", 930)", "(\"G10\", 1000)");
+    let broken = GOOD.replace("--color-g10: oklch(0.930", "--color-g10: oklch(1.000");
     let found = judge_tokens(&broken);
     assert!(
         found.iter().any(|v| v.violation.contains("1000 per mille")),
@@ -200,7 +256,7 @@ fn pure_white_is_caught() {
 
 #[test]
 fn a_ramp_that_stops_short_of_the_ceiling_is_caught() {
-    let broken = GOOD.replace("(\"G10\", 930)", "(\"G10\", 900)");
+    let broken = GOOD.replace("--color-g10: oklch(0.930", "--color-g10: oklch(0.900");
     let found = judge_tokens(&broken);
     assert!(
         found.iter().any(|v| v.violation.contains("145 to 900")),
@@ -219,10 +275,7 @@ fn an_interaction_variant_may_sit_above_the_ramp_ceiling() {
 
 #[test]
 fn a_third_ratio_is_caught() {
-    let broken = GOOD.replace(
-        "(\"ACCENT_HOVER\", 760, HUE_AXIS, ACCENT_CHROMA_PERCENT)",
-        "(\"ACCENT_HOVER\", 760, HUE_AXIS, 71)",
-    );
+    let broken = GOOD.replace("--ratio-accent-hover: 90", "--ratio-accent-hover: 71");
     let found = judge_tokens(&broken);
     assert!(
         found.iter().any(|v| v.violation.contains("3 distinct")),
@@ -231,9 +284,45 @@ fn a_third_ratio_is_caught() {
     );
 }
 
+/// A resolved chroma with no share beside it is the failure this gate
+/// would otherwise pass silently: `oklch()` keeps the product and throws
+/// away the multiplier, so a token that stops declaring its ratio simply
+/// leaves the table it is judged by.
+#[test]
+fn a_coloured_token_that_declares_no_ratio_is_named() {
+    let broken = GOOD.replace("--ratio-alert-hover: 55", "--ratio-nothing: 55");
+    let found = judge_tokens(&broken);
+    assert!(
+        found
+            .iter()
+            .any(|v| v.violation.contains("ALERT_HOVER") && v.violation.contains("no `--ratio-`")),
+        "{}",
+        rules(&found)
+    );
+}
+
+/// The axis chroma is a property of every rung, not of a constant that
+/// says so. A stylesheet can declare the right number and then write a
+/// rung that departs from it.
+#[test]
+fn a_rung_off_the_axis_chroma_is_caught() {
+    let broken = GOOD.replace(
+        "--color-g4: oklch(0.360 0.018",
+        "--color-g4: oklch(0.360 0.040",
+    );
+    let found = judge_tokens(&broken);
+    assert!(
+        found
+            .iter()
+            .any(|v| v.violation.contains("G4 is at chroma 40 per mille")),
+        "{}",
+        rules(&found)
+    );
+}
+
 #[test]
 fn a_shortened_ramp_is_caught() {
-    let broken = GOOD.replace("    (\"G5\", 430),\n", "");
+    let broken = GOOD.replace("  --color-g5: oklch(0.430 0.018 264);\n", "");
     let found = judge_tokens(&broken);
     assert!(found.iter().any(|v| v.violation.contains("found 10")));
 }
@@ -271,25 +360,17 @@ fn colour_spellings_are_recognised_and_locators_are_not() {
     );
 }
 
-/// Each client names colour in exactly one file, and only there.
+/// The client names colour in exactly one file, and only there.
 ///
-/// Two clients coexist until `crates/web` is deleted, so the scan is run
-/// over a tree that holds both production points plus one ordinary
-/// stylesheet: the two production points are silent and the third file
-/// is reported.
+/// The scan runs over a tree holding the production point and one ordinary
+/// stylesheet: the production point is silent and the other file is
+/// reported, which is the whole rule.
 #[test]
-fn each_client_may_name_colour_in_its_own_theme_file() {
+fn the_client_names_colour_in_one_file() {
     let root = std::env::temp_dir().join(format!("color-theme-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     let written = [
-        (
-            super::THEME,
-            "pub const A: &str = \"oklch(0.145 0.018 264)\";",
-        ),
-        (
-            "client/src/theme.css",
-            "  --color-g0: oklch(0.145 0.018 264);",
-        ),
+        (super::THEME, "  --color-g0: oklch(0.145 0.018 264);"),
         ("client/src/panel.css", "  color: oklch(0.145 0.018 264);"),
     ];
     for (rel, body) in written {
@@ -303,7 +384,7 @@ fn each_client_may_name_colour_in_its_own_theme_file() {
     assert_eq!(
         places,
         ["client/src/panel.css:1"],
-        "only the file that is no client's production point is a violation; got {}",
+        "only the file that is not the production point is a violation; got {}",
         rules(&found)
     );
     std::fs::remove_dir_all(&root).unwrap();

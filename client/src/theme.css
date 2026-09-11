@@ -123,6 +123,50 @@
   --default-transition-duration: 90ms;
 }
 
+/* What `cargo xtask color` proves, stated where the values it judges are.
+ *
+ * `oklch()` keeps only a resolved number, and three of the gate's seven
+ * assertions ask what the number was resolved *from*: which share of the
+ * displayable chroma a coloured token takes, which APCA tier a text token
+ * claims to reach, and the brightest surface text is allowed to sit on.
+ * None of the three is a colour component, so none of them survives into
+ * an `oklch()` call, and a gate that cannot read its own inputs is a gate
+ * that silently passes.
+ *
+ * Nothing in the cascade refers to these: they are declarations a browser
+ * reads and ignores. They live here, rather than in a table beside the
+ * stylesheet, so that somebody changing a colour sees in one screen both
+ * the value and the ratio that value has to honour. */
+:root {
+  /* Share of the displayable chroma each coloured token takes, in percent.
+   * Exactly two across the whole library: a hover variant is the same role
+   * at a higher lightness, not a different amount of colour. */
+  --ratio-accent: 90;
+  --ratio-alert: 55;
+  --ratio-accent-hover: 90;
+  --ratio-alert-hover: 55;
+  --ratio-accent-solid: 90;
+
+  /* The APCA Lc each text token reaches, and each type step demands. On a
+   * dark surface APCA charges heavily for small text, so a quieter line is
+   * bought with a larger step and never with a darker grey. */
+  --tier-text: 90;
+  --tier-text-quiet: 75;
+  --tier-text-faint: 60;
+  --tier-text-disabled: 30;
+  --tier-figure: 60;
+  --tier-title: 60;
+  --tier-heading: 60;
+  --tier-label: 90;
+  --tier-body: 90;
+  --tier-note: 75;
+
+  /* The brightest surface that may carry text. G3 reaches only Lc 88.1
+   * against the ramp ceiling while body text needs 90, so G3 stays a
+   * border and a fill that carries nothing. */
+  --surface-ceiling: g2;
+}
+
 :root {
   --chroma: 1;
   --corner-panel-shape: superellipse(2);

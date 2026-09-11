@@ -12,18 +12,23 @@ use super::THEME;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The colour production points: one per client, and exactly one.
-///
-/// `crates/web/src/theme.rs` is the Dioxus client's token table, and
-/// `client/src/theme.css` is the Solid client's `@theme` block, whose every
-/// value is resolved from that table (client-SPEC.md section 3-4). The
-/// second entry leaves when `crates/web` does.
-const PRODUCTION_POINTS: [&str; 2] = [THEME, "client/src/theme.css"];
+/// The colour production point: the client names colour once, and this is
+/// where. A table with one row rather than a bare constant, because the
+/// question it answers - which files the scan walks past - is not the
+/// question `THEME` answers, and a second client would add a row here
+/// without touching which file the token assertions read.
+const PRODUCTION_POINTS: [&str; 1] = [THEME];
 
-/// The two files of this gate that spell colour. Same shape and same reason
-/// as `xtask/lexicon.toml` being outside the lexicon scan - a checker has to
-/// be able to spell what it forbids.
-const SPELLS_COLOUR: [&str; 2] = ["xtask/src/color/scan.rs", "xtask/src/color/tests.rs"];
+/// The files of this gate that spell colour. Same shape and same reason as
+/// `xtask/lexicon.toml` being outside the lexicon scan - a checker has to be
+/// able to spell what it forbids. `tables.rs` joined them when the token
+/// tables moved into the stylesheet: reading an `oklch()` value means naming
+/// the function that holds it.
+const SPELLS_COLOUR: [&str; 3] = [
+    "xtask/src/color/scan.rs",
+    "xtask/src/color/tables.rs",
+    "xtask/src/color/tests.rs",
+];
 
 /// Extensions worth scanning. Rust, and the two file kinds that carry style.
 const SCAN_EXTS: [&str; 3] = ["rs", "css", "html"];

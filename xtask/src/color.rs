@@ -44,9 +44,12 @@ pub(crate) use tables::grey_ramp;
 
 use contrast::{apca_lc, bronze_tier};
 use scan::scan_for_literals;
-use tables::{parse_colour_tokens, parse_text_tokens, parse_type_scale, text_surface_ceiling};
+use tables::{
+    colour_tokens_without_ratio, grey_chromas, parse_colour_tokens, parse_text_tokens,
+    parse_type_scale, text_surface_ceiling,
+};
 
-pub(crate) const THEME: &str = "crates/web/src/theme.rs";
+pub(crate) const THEME: &str = "client/src/theme.css";
 pub(crate) const HUE_AXIS: u16 = 264;
 const HUE_ALERT: u16 = 84;
 pub(crate) const GRAY_CHROMA: u16 = 18;
@@ -60,9 +63,9 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         violations.push(Violation {
             gate: "color",
             location: THEME.to_owned(),
-            rule: "web::theme is the sole production point for colour".to_owned(),
-            violation: "the theme module is missing".to_owned(),
-            alternative: "restore crates/web/src/theme.rs".to_owned(),
+            rule: "the client's theme file is the sole production point for colour".to_owned(),
+            violation: "the theme file is missing".to_owned(),
+            alternative: format!("restore {THEME}"),
         });
         return Ok(violations);
     }
@@ -150,12 +153,18 @@ fn judge_tokens(source: &str) -> Vec<Violation> {
         ));
     }
 
-    // 5. The grey ramp's chroma is the single axis value.
-    if !source.contains(&format!("GRAY_CHROMA: u16 = {GRAY_CHROMA}")) {
-        violations.push(token_violation(
-            "the grey ramp carries the axis chroma",
-            format!("GRAY_CHROMA is not {GRAY_CHROMA} per mille"),
-        ));
+    // 5. The grey ramp's chroma is the single axis value, rung by rung.
+    //    Read off the rungs rather than off a constant's spelling: what the
+    //    rule is about is the colour the client ships, and a stylesheet can
+    //    state the constant correctly and then write a rung that departs
+    //    from it.
+    for (name, chroma) in grey_chromas(source) {
+        if chroma != GRAY_CHROMA {
+            violations.push(token_violation(
+                "the grey ramp carries the axis chroma",
+                format!("{name} is at chroma {chroma} per mille, not {GRAY_CHROMA}"),
+            ));
+        }
     }
 
     // 6. Coloured tokens take a ratio, never a written chroma, and there are
@@ -169,10 +178,16 @@ fn judge_tokens(source: &str) -> Vec<Violation> {
             format!("found {} distinct ratios", ratios.len()),
         ));
     }
+    for name in colour_tokens_without_ratio(source) {
+        violations.push(token_violation(
+            "a coloured token states the share of the gamut it takes",
+            format!("{name} resolves a chroma and declares no `--ratio-` beside it"),
+        ));
+    }
     if colours.is_empty() {
         violations.push(token_violation(
             "the coloured token table is readable",
-            "COLOUR_TOKENS parsed to nothing".to_owned(),
+            "no coloured token parsed out of the theme file".to_owned(),
         ));
     }
 
@@ -264,8 +279,8 @@ fn token_violation(rule: &str, violation: String) -> Violation {
         location: THEME.to_owned(),
         rule: rule.to_owned(),
         violation,
-        alternative: "adjust web::theme, and record the reason in web-SPEC.md \
-                      section 8; colour rules are mechanical by design"
+        alternative: "adjust the client's theme file, and record the reason in \
+                      xtask-SPEC.md section 8-8; colour rules are mechanical by design"
             .to_owned(),
     }
 }
