@@ -24,6 +24,8 @@ fn el(tag: &str, name: &str, at: [i64; 4], nesting: (i64, i64)) -> Drawn {
     Drawn {
         scrolls_across: false,
         scrolls_down: false,
+        first_mark: -1,
+        underlined: false,
         tag: tag.to_owned(),
         role: "-".to_owned(),
         name: name.to_owned(),
@@ -50,6 +52,23 @@ fn good() -> Vec<Drawn> {
     ]
 }
 
+/// One clickable row of the rail: where it was drawn, and the centre of
+/// the first mark inside it - the dot, or the glyph.
+fn row(name: &str, top: i64, mark: i64) -> Drawn {
+    let mut held = el("A", name, [0, top, 44, 44], (5, 0));
+    held.first_mark = mark;
+    held
+}
+
+/// The rail as it stands: every row's first mark on one x.
+fn railed() -> Vec<Drawn> {
+    let mut drawn = good();
+    drawn.push(row("城", 8, 21));
+    drawn.push(row("市长室", 52, 21));
+    drawn.push(row("城市", 96, 21));
+    drawn
+}
+
 fn judge(drawn: &[Drawn]) -> Vec<Violation> {
     let mut out = Vec::new();
     every_control_is_announceable(drawn, &mut out);
@@ -57,7 +76,82 @@ fn judge(drawn: &[Drawn]) -> Vec<Violation> {
     one_first_heading(drawn, &mut out);
     one_left_edge(drawn, &mut out);
     nothing_escapes_what_holds_it(drawn, &mut out);
+    rows_share_a_first_mark(drawn, &mut out);
+    no_key_is_underlined(drawn, &mut out);
     out
+}
+
+#[test]
+fn the_rail_the_client_draws_passes() {
+    let found = judge(&railed());
+    assert!(found.is_empty(), "{}", rules(&found));
+}
+
+/// The defect §5.1 names: the status dot centred in its own 8 px box
+/// sits five pixels left of every glyph under it.
+#[test]
+fn a_dot_five_pixels_left_of_the_glyphs_is_caught() {
+    let mut drawn = railed();
+    if let Some(first) = drawn.get_mut(7) {
+        first.first_mark = 16;
+    }
+    let found = judge(&drawn);
+    assert!(
+        found.iter().any(|v| v.rule.contains("first mark")),
+        "{}",
+        rules(&found)
+    );
+}
+
+/// A bar of tabs is not a column, and rows that share one top cannot
+/// share one x without sitting on top of one another.
+#[test]
+fn a_row_of_tabs_is_not_asked_to_share_an_x() {
+    let mut drawn = good();
+    drawn.push(el("NAV", "组", [44, 0, 1372, 44], (4, 1)));
+    for (at, mark) in [(0_i64, 66_i64), (1, 156), (2, 246)] {
+        let mut tab = row("组", 0, mark);
+        tab.left = at.saturating_mul(90).saturating_add(44);
+        tab.parent = 7;
+        tab.depth = 6;
+        drawn.push(tab);
+    }
+    let found = judge(&drawn);
+    assert!(found.is_empty(), "{}", rules(&found));
+}
+
+/// A row whose first mark the probe could not find is not compared
+/// against the rows whose mark it did.
+#[test]
+fn a_row_with_no_mark_inside_it_is_left_alone() {
+    let mut drawn = railed();
+    drawn.push(el("A", "没有图形", [0, 140, 44, 44], (5, 0)));
+    let found = judge(&drawn);
+    assert!(found.is_empty(), "{}", rules(&found));
+}
+
+/// The other half of §5.2: the stylesheet underlined a link under the
+/// pointer and took the key drawn inside it along.
+#[test]
+fn an_underlined_key_is_caught() {
+    let mut drawn = railed();
+    let mut key = el("KBD", "g c", [10, 60, 20, 16], (7, 8));
+    key.underlined = true;
+    drawn.push(key);
+    let found = judge(&drawn);
+    assert!(
+        found.iter().any(|v| v.rule.contains("line under it")),
+        "{}",
+        rules(&found)
+    );
+}
+
+#[test]
+fn a_key_with_no_line_under_it_passes() {
+    let mut drawn = railed();
+    drawn.push(el("KBD", "g c", [10, 60, 20, 16], (7, 8)));
+    let found = judge(&drawn);
+    assert!(found.is_empty(), "{}", rules(&found));
 }
 
 #[test]

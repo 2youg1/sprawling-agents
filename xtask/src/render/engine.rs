@@ -172,9 +172,10 @@ fn sink(dom: &str) -> Option<&str> {
     rest.get(..end)
 }
 
-/// `tag role name left top width height depth parent scrolls-x scrolls-y`,
-/// as the probe writes it. The name is percent-encoded, because it is the
-/// one field that holds a person's words and those contain spaces.
+/// `tag role name left top width height depth parent scrolls-x scrolls-y
+/// first-mark underlined`, as the probe writes it. The name is
+/// percent-encoded, because it is the one field that holds a person's
+/// words and those contain spaces.
 fn parse(record: &str) -> Option<Drawn> {
     let mut field = record.split_whitespace();
     let tag = field.next()?.to_owned();
@@ -192,6 +193,8 @@ fn parse(record: &str) -> Option<Drawn> {
         parent: field.next()?.parse().ok()?,
         scrolls_across: field.next()? == "1",
         scrolls_down: field.next()? == "1",
+        first_mark: field.next()?.parse().ok()?,
+        underlined: field.next()? == "1",
     })
 }
 
@@ -236,9 +239,16 @@ fn instrument(body: &str) -> String {
 ///
 /// The accessible name is taken the way a reader gets it — an explicit
 /// `aria-label`, the element a `aria-labelledby` points at, a `title`, an
-/// `alt`, or the text the element actually contains. It is not a computed
-/// accessibility tree and does not claim to be; it is what the four
-/// authoring mistakes this gate exists for all show up in.
+/// `alt`, the `<label>` a box is wrapped in or pointed at by, or the text
+/// the element actually contains. It is not a computed accessibility tree
+/// and does not claim to be; it is what the four authoring mistakes this
+/// gate exists for all show up in.
+///
+/// Two more readings travel with each element: the centre of the first
+/// painted box inside it, and whether a line is drawn under its text.
+/// A decoration reaches every in-flow descendant, so the second is a
+/// walk upwards that stops at the first box nothing propagates into —
+/// an atomic inline, a float, or a box taken out of flow.
 fn probe() -> String {
     format!(
         r#"<pre id="{SINK}"></pre>
@@ -258,10 +268,38 @@ setTimeout(function () {{
     if (title) return title;
     var alt = node.getAttribute('alt');
     if (alt) return alt;
-    return (node.textContent || '').trim();
+    var own = (node.textContent || '').trim();
+    if (own) return own;
+    var wrapping = node.closest('label');
+    if (wrapping) return (wrapping.textContent || '').trim();
+    if (node.id) {{
+      var pointed = document.querySelector('label[for="' + node.id + '"]');
+      if (pointed) return (pointed.textContent || '').trim();
+    }}
+    return '';
+  }}
+  function firstMark(node) {{
+    var inside = node.querySelectorAll('*');
+    for (var m = 0; m < inside.length; m++) {{
+      var mark = inside[m].getBoundingClientRect();
+      if (mark.width > 0 && mark.height > 0) return Math.round(mark.left + mark.width / 2);
+    }}
+    return -1;
+  }}
+  function atomic(style) {{
+    return style.display.indexOf('inline-') === 0 || style.display === 'inline-block'
+      || style.position === 'absolute' || style.position === 'fixed' || style.cssFloat !== 'none';
+  }}
+  function underlined(node) {{
+    for (var up = node; up; up = up.parentElement) {{
+      var style = getComputedStyle(up);
+      if ((style.textDecorationLine || '').indexOf('underline') >= 0) return 1;
+      if (up !== node && atomic(style)) return 0;
+    }}
+    return 0;
   }}
   var all = document.querySelectorAll(
-    'main, nav, aside, header, footer, section, h1, h2, h3, button, a, input, textarea, select, [role]'
+    'main, nav, aside, header, footer, section, h1, h2, h3, button, a, input, textarea, select, kbd, [role]'
   );
   function scrolling(value) {{ return value === 'auto' || value === 'scroll' ? 1 : 0; }}
   for (var i = 0; i < all.length; i++) {{
@@ -280,7 +318,8 @@ setTimeout(function () {{
       Math.round(rect.left), Math.round(rect.top),
       Math.round(rect.width), Math.round(rect.height),
       depth, parent,
-      scrolling(style.overflowX), scrolling(style.overflowY)
+      scrolling(style.overflowX), scrolling(style.overflowY),
+      firstMark(node), underlined(node)
     ].join(' '));
   }}
   document.getElementById('{SINK}').textContent = out.join(' ; ');

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Render gate: the client's own gallery is opened in a real engine, and
-//! what it drew is measured (xtask-SPEC.md section 8-13).
+//! what it drew is measured (xtask-SPEC.md sections 8-13 and 8-14).
 //!
 //! **This is the step the method never had.** A stylesheet's rules do not
 //! collide in either source file — they collide in the cascade. Two rules
@@ -36,8 +36,10 @@ use std::path::Path;
 use crate::report::{Violation, XtaskError};
 
 mod engine;
+mod marks;
 
 use engine::{browser, measure};
+use marks::{no_key_is_underlined, rows_share_a_first_mark};
 
 /// The client bundle this gate opens: the same one `just dist` embeds.
 const BUNDLE: &str = "target/web-dist";
@@ -74,6 +76,13 @@ pub(super) struct Drawn {
     /// page this product has.
     pub(super) scrolls_across: bool,
     pub(super) scrolls_down: bool,
+    /// The centre x of the first painted element inside this one, or
+    /// `-1` when it holds none. What a person's eye lands on first in a
+    /// row: the dot, the glyph, the tick.
+    pub(super) first_mark: i64,
+    /// Whether a line is drawn under this element's text, by its own
+    /// rule or by one it inherits from a box that holds it.
+    pub(super) underlined: bool,
 }
 
 impl Drawn {
@@ -155,10 +164,12 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     one_first_heading(&drawn, &mut violations);
     one_left_edge(&drawn, &mut violations);
     nothing_escapes_what_holds_it(&drawn, &mut violations);
+    rows_share_a_first_mark(&drawn, &mut violations);
+    no_key_is_underlined(&drawn, &mut violations);
     Ok(violations)
 }
 
-fn violation(rule: &str, subject: String, alternative: &str) -> Violation {
+pub(super) fn violation(rule: &str, subject: String, alternative: &str) -> Violation {
     Violation {
         gate: "render",
         location: format!("{BUNDLE} {GALLERY}"),

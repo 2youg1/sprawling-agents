@@ -16,7 +16,7 @@
 | guard | 改动门自身、又同时改动门所判源码的提交，必须携 `Verdict:` 尾注 |
 | ax | 定稿屏（`crates/web/screens/*.html`）写下的角色、可及名、当前页标记与地标元素，客户端（`crates/web/src`）也提供 |
 | wording | 读者拿到的词出自 `web::lang`：`crates/web/src` 里 RSX 文本节点与朗读型属性的字面量，去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名 |
-| render | 定稿屏在真引擎里画出来，量盒子落在哪：一页一条书脊、面板头坐在自己面板的左上角、没有东西宽过装它的区域 |
+| render | `#/gallery` 在真引擎里画出来，量盒子落在哪：七条性质见 §8-13 与 §8-14 |
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（`wire.rs` 的 `enum Command`、`run_command` 的臂、`crates/web/src`），channels-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | spec | 生成 `<crate>-SPEC.md` 骨架（Daily Loop 的 `just spec`） |
 | secret | 全仓＋夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
@@ -288,6 +288,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 |---|---|
 | `xtask/src/render.rs` | 门本身：扫哪里（`SCREENS`、`TOKENS`）、对齐容差（`SLACK`）、一个被量出来的盒子是什么（`Box` 及 `right`／`name`／`drawn`）、跳过与判断的次序（`check`），以及三条性质的依据（`judge`、`one_left_edge`、`heads_lead_their_panels`、`head_leads`、`nothing_overflows`） |
 | `xtask/src/render/engine.rs` | 怎么把一张屏真的画出来并把盒子读回来：找引擎（`browser`、`on_path`）、工作目录与视窗（`WORK`、`VIEWPORT`、`SINK`）、渲染一张屏（`Engine`、`Engine::new`、`Engine::measure`）、改写样式表链接并附上探针（`instrument`、`url_of`、`PROBE`）、把探针写下的记录读回来（`sink`、`parse_box`） |
+| `xtask/src/render/marks.rs` | 一行内部的两条读数各自的判定（§8-14）：`rows_share_a_first_mark`、`no_key_is_underlined`、`descends` |
 | `xtask/src/render/tests.rs` | 原内联 `mod tests` 原样迁出，5 个测试一个不少 |
 
 **无字段开放**：`Box` 及其三个方法留在索引位置按父模块私有项定义，`engine.rs` 作为子模块直接引用；跨文件只把 `Engine`／`Engine::new`／`Engine::measure`／`browser`／`sink`／`parse_box` 提到 `pub(super)`。`main.rs` 经 `render::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
@@ -463,7 +464,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 ### 8-13 `render` 读画出来的 DOM，`wording` 读写下来的位置
 
-**`ax` 不再是一道门**，它的三条断言住在 `render` 里，从画出来的 DOM 上读。`render` 开 `#/gallery`，共五条性质：每个可操作控件有可及名、每个地标有名、一页恰一个首标题、主栏里每个区域同一条左边线、没有盒子画到容器外。前三条是 `ax` 的，后两条是 `render` 原有三条的存留形——旧的第二条讲 `.panel` 的头位，而面板这个概念随旧客户端一同消失；它要阻的缺陷（一个盒子漂到了不属于它的位置）由容纳性那一条接住，且不依赖任何 class 文法。
+**`ax` 不再是一道门**，它的三条断言住在 `render` 里，从画出来的 DOM 上读。`render` 开 `#/gallery`，共七条性质（后两条见 §8-14）：每个可操作控件有可及名、每个地标有名、一页恰一个首标题、主栏里每个区域同一条左边线、没有盒子画到容器外。前三条是 `ax` 的，后两条是 `render` 原有三条的存留形——旧的第二条讲 `.panel` 的头位，而面板这个概念随旧客户端一同消失；它要阻的缺陷（一个盒子漂到了不属于它的位置）由容纳性那一条接住，且不依赖任何 class 文法。
 
 composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它是整个页面存在的理由，对屏幕阅读器是一个无名编辑框。`placeholder` 不是名字——一打字就没了。
 
@@ -484,5 +485,21 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 **为什么 `ax` 不再是单独的一道门。** 它存在的全部理由写在自己的模块头里——「这不是一棵计算出来的可及性树，也不自称是；一棵计算树需要浏览器，而一道离线跑不了的门就是一道不会再跑的门」。现在门能进浏览器了，那条妥协就到期了：比两侧**写下的**东西是在没有浏览器时的替代品，而不是一件値得单独保留的事。角色、可及名与地标改从画出来的 DOM 上读，并入 `render`。同时消失的还有 `crates/web/screens` 这个概念本身：全部屏幕已被重写，`dx translate` 不再存在，「定稿屏幕」没有左手边可比。
 
 **skip 的理由仍须各自点名**：没有画廊路由、没有构建产物（`target/web-dist/`）、测试机上没有引擎——三种各说各的。一道找不到东西就悄悄变绿的门，仍然是这里要避的失效。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-14 `render` 的第六、第七条性质：一行的第一个标记，与键面上的下划线
+
+**两条都是量出来的，不是读源码读出来的。** 第六条：左栏里每个可点行的第一个被画出来的盒子，中心 x 相同。它挡的缺陷是状态点 8 px、图标 18 px，各自在同一段 12 px 内边距里居中，于是点的中心比它下面每个图标左 5 px。第七条：任何 `<kbd>` 不带下划线；键面是一张脸，不是一个链接，而样式表给指针下的链接画的那条线会一并画进它里面的标记。
+
+**「列」与「条」分开判。** 第六条只判行与行上下堆叠的那种 nav：一排共用同一个 top 的标签页是一条横条，要求它们同一个 x 等于要求它们叠在一起，故 nav 内所有可点行的 top 相同时本条不判。
+
+**探针因此多量两件事**，随每个元素一起写下：它内部第一个有面积的元素的中心 x（没有则 `-1`），以及它的文字上是否有下划线。下划线按 CSS 的传播规则上溯——装饰会落到每一个在流内的后代身上，后代自己写 `text-decoration: none` 并不能把它取消——上溯在第一个不接收传播的盒子处停止：原子行内盒（`inline-block`／`inline-*`）、浮动、脱离文档流者。`Kbd` 的外层是 `inline-flex`，这正是今天键面不被链接的下划线波及的原因。
+
+**已知的限，写在明处：只有 hover 才画的那条线，量不到。** `--dump-dom` 交出的是没有人碰的那一页，`a:hover` 的规则在那页上不生效。这是漏报而非误报：本条判的是页面静止时的键面。
+
+**可及名多认一处：包住控件的 `<label>`。** 模型表的勾选框把词写在 `<label>` 里而不写 `aria-label`，而屏幕阅读器正是从那里取名字；探针原先只读元素自身的文本，会把这种控件报成无名。改后先读 `aria-label`／`aria-labelledby`／`title`／`alt`／自身文本，再读包住它的 `<label>` 与 `label[for]`。
+
+**两条性质住在 `xtask/src/render/marks.rs`**（`rows_share_a_first_mark`、`no_key_is_underlined`、`descends`）：它们要的是探针关于「一行内部」的读数，别的性质都不问这件事；`render.rs` 仍是唯一的次序与 `violation` 产地，`SLACK` 的 1 像素两处共用。
 
 **本节属门禁机具，与产品代码分开提交。**
