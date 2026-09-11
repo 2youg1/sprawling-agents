@@ -32,6 +32,35 @@ pub(crate) fn mismatch(path: &str, detail: &str) -> AxError {
     )
 }
 
+/// The most characters of a provider's value a refusal will repeat.
+///
+/// A refusal is a sentence a person reads; a provider can answer with a
+/// megabyte, and a sentence that long is one nobody finishes.
+const FOUND_MAX: usize = 40;
+
+/// A mismatch that repeats the value it could not read.
+///
+/// The module note above argues that a path without the expectation
+/// sends a person to read a whole response body. This is the same
+/// argument one step further: `tool_calls[0].name: not a tool name` is
+/// true and does not distinguish an empty name from one with a space in
+/// it, and finding out which took a request written by hand against the
+/// endpoint.
+pub(crate) fn mismatch_found(path: &str, detail: &str, found: &str) -> AxError {
+    mismatch(path, &format!("{detail}: {}", quoted(found)))
+}
+
+/// The value as a reader meets it: quoted, so an empty one is visible,
+/// and marked when there was more of it than a sentence holds.
+fn quoted(found: &str) -> String {
+    let head: String = found.chars().take(FOUND_MAX).collect();
+    if head.chars().count() < found.chars().count() {
+        format!("{head:?}\u{2026}")
+    } else {
+        format!("{head:?}")
+    }
+}
+
 pub(crate) fn stream_cut(detail: &str) -> AxError {
     AxError::failure(
         AxCode::Provider,

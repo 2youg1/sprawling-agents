@@ -237,9 +237,34 @@ mod tests {
             refused.recovery()
         );
     }
-    /// Every shape mismatch carries a way out. An empty `recovery` is
-    /// the contract `AxError` states being broken in the one place a
-    /// person meets it.
+    /// **A path without the value sends a person to curl the provider.**
+    /// ModelScope repeats a streaming tool call's name as an empty
+    /// string in every chunk after the first, and the refusal read
+    /// `tool_calls[0].name: not a tool name` - true, and not enough to
+    /// tell an empty name from a name with a space in it. Finding out
+    /// which took a hand-written request to the endpoint.
+    #[test]
+    fn a_name_this_dialect_cannot_read_is_quoted_in_the_refusal() {
+        for (found, quoted) in [("", "\"\""), ("two words", "\"two words\"")] {
+            let wire = serde_json::json!({
+                "choices": [{"message": {"role": "assistant", "tool_calls": [{
+                    "id": "call-1",
+                    "type": "function",
+                    "function": {"name": found, "arguments": "{}"}
+                }]}}],
+                "usage": {}
+            });
+            let refused =
+                super::super::response::response_from_wire(kernel::DialectKind::OpenAi, &wire)
+                    .expect_err("a name the tool grammar refuses is not a call");
+            assert!(
+                refused.subject().contains(quoted),
+                "the refusal has to name what arrived, not only where: {}",
+                refused.subject()
+            );
+        }
+    }
+
     /// Every shape mismatch carries a way out. An empty `recovery` is
     /// the contract `AxError` states being broken in the one place a
     /// person meets it.

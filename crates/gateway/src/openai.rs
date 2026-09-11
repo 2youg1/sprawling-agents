@@ -32,7 +32,9 @@ use kernel::{
 use serde_json::{Map, Value, json};
 
 use crate::dialect::ImageBytes;
-use crate::mismatch::{as_str, mismatch, payload_from, require, tokens_or_zero, unspelled_effort};
+use crate::mismatch::{
+    as_str, mismatch, mismatch_found, payload_from, require, tokens_or_zero, unspelled_effort,
+};
 
 mod stream;
 
@@ -252,8 +254,9 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
             let path = format!("response.choices[0].message.tool_calls[{i}]");
             let function = require(call, &path, "function")?;
             let name_raw = as_str(require(function, &path, "name")?, &format!("{path}.name"))?;
-            let name = kernel::ToolName::parse(name_raw)
-                .map_err(|_| mismatch(&format!("{path}.name"), "not a tool name"))?;
+            let name = kernel::ToolName::parse(name_raw).map_err(|_| {
+                mismatch_found(&format!("{path}.name"), "not a tool name", name_raw)
+            })?;
             let arguments = as_str(
                 require(function, &path, "arguments")?,
                 &format!("{path}.arguments"),
