@@ -15,18 +15,29 @@
 # The reading is the bundle a browser downloads, gzipped, walked
 # recursively so every chunk the page loads is on the scale.
 #
-# 107,623 is the first reading of the TypeScript client. Every earlier
-# reading on this row weighed a WebAssembly client that has since left the
-# tree, so none of them is comparable and none is kept. What the number
-# buys: nine pages, a city drawn as shapes in the document, the four lenses
-# a run is read through, and an interface that says every one of its
-# strings in two languages. Microcopy is most of the weight and is the
-# product's voice rather than padding. Headroom against the 2 MB budget is
-# 19.5x, so the next reading to spend attention on is not this one.
+# 288,972 is this version's reading, and it is two changes rather than a
+# drift. **Half of it is two faces**: Geist Sans and Geist Mono ship as
+# variable woff2 (145,724 B of the reading, already compressed, so gzip
+# takes nothing more off them), because a client whose type stack begins
+# with whatever the machine happens to have is a different product on
+# every machine. The other half is the screens: one implementation per
+# control instead of a class string per view, a model table that can state
+# an output ceiling, a keyboard whose chords are data, an MCP page built
+# around what a person already knows from another tool, and a city page
+# that says what it is showing.
+#
+# The row's `what` lost its "fonts excluded" clause in the same pass: a
+# browser downloads the faces, so a reading that leaves them out reports
+# on something nobody receives. The slack is unchanged at 20 KB, and the
+# headroom against the 2 MB budget is 7.3x - which is still not where the
+# next reading deserves attention.
+#
+# The earlier readings on this row weighed a WebAssembly client that has
+# since left the tree, so none of them is comparable and none is kept.
 [frontend_artifact]
-what = "the client the browser downloads, gzipped, fonts excluded"
+what = "the client the browser downloads, gzipped, the two shipped faces included"
 budget_bytes = 2097152
-best_bytes = 107623
+best_bytes = 288972
 slack_bytes = 20480
 measured_by = "just build-web, then just gates (the whole dist directory, recursive)"
 status = "gated"
