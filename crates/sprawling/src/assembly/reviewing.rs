@@ -55,7 +55,7 @@ impl RunWorker {
                         // Landed rather than fenced: what a verifier
                         // judges has to be on the run's own branch, and
                         // a wave fence is a dangling commit nobody can
-                        // merge (memory-SPEC 8-8, card-2.3).
+                        // merge (memory-SPEC 8-8).
                         let at = memory::Checkpoint::open(write_root)
                             .map_err(memory::MemoryError::into_ax)?
                             .land(now_ms()?, &of, &format!("offer: {fence_scope}"))
@@ -128,7 +128,7 @@ impl RunWorker {
                         // What the merge commit's own trailers carry and
                         // this record cannot say for itself, so "which
                         // run wrote this commit" is answered from the
-                        // ledger rather than from git (card-2.4).
+                        // ledger rather than from git.
                         data.extend(of.model_fields());
                         self.record_for(
                             run_id,

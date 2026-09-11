@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! This machine's answer, in the shape a page reads (card-9.2).
+//! This machine's answer, in the shape a page reads.
 //!
 //! The terminal report and this one fold the same findings: `screen`
 //! turns them into one machine's prose, and this turns them into

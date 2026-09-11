@@ -109,8 +109,8 @@ fn the_reason_a_node_is_red_comes_from_the_record_and_the_status_from_the_table(
     );
 }
 
-/// V3.20's closing condition: the projection holds nothing of its
-/// own, so throwing it away and folding the same records again
+/// The projection holds nothing of its own, so throwing it away
+/// and folding the same records again
 /// produces the same reading.
 #[test]
 fn deleting_the_projection_and_folding_again_gives_the_same_reading() {

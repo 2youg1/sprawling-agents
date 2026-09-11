@@ -6,7 +6,7 @@
 //! What a frozen run runs under.
 //!
 //! **Two spend ceilings used to be asserted here and are gone**
-//! (card-11.7): work handed down and work an answer carried on were each
+//!: work handed down and work an answer carried on were each
 //! checked against the `BudgetCap` that sent them. There is no such
 //! ceiling to carry now — nobody can price a piece of work before it
 //! runs, and the one brake is `Halt`. What a run is still frozen under

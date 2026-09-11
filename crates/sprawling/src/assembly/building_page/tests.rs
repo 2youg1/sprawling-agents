@@ -42,7 +42,7 @@ fn a_building_page_still_shows_the_rules_that_govern_it() {
 /// Reading the file as empty runs it through `check_roadmap_shape`,
 /// which finds no header row and answers `no six-column table
 /// found`. That sends a person to edit a table when what they have
-/// to fix is a file that will not open - the same misreport R2.06
+/// to fix is a file that will not open - the same misreport already
 /// removed from the dispatch path, still standing on the page.
 #[test]
 fn a_building_page_says_the_plan_cannot_be_read_rather_than_that_it_is_malformed() {
@@ -161,7 +161,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
 
 /// The desktop allowlist travels on the same frame as the rest of
 /// what a building's runs may reach, and lands where no write domain
-/// goes (card-7.3; city-SPEC.md 8-26).
+/// goes (city-SPEC.md 8-26).
 ///
 /// The bytes a person wrote are the bytes on disk: this side never
 /// parses the file, because the connector that reads it at start-up

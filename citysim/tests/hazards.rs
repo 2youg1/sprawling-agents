@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! S4.09, second half: the three hazards a control surface can hand a city,
-//! driven through the same modules the city runs.
+//! The three hazards a control surface can hand a city, driven through
+//! the same modules the city runs.
 //!
 //! A person pastes a credential into a field. A command arrives that would
 //! delete something. A machine is restarted and the work resumes. Each one
@@ -129,7 +129,7 @@ fn a_delete_with_a_checkpoint_behind_it_is_allowed() {
 
 #[test]
 fn the_forecaster_is_advisory_and_the_checkpoint_is_the_defence() {
-    // The correction recorded at S3.13: a forecast hit routes conservatively
+    // A forecast hit routes conservatively
     // - it forces the checkpoint fence up first - rather than refusing every
     // command containing `rm`. Refusing outright would break the tool for
     // honest use and still not stop a determined one.

@@ -152,7 +152,7 @@ impl RunWorker {
         let mut lease = None;
         if rules.review() {
             // The base commit carries the same trailers every other
-            // commit the city makes carries (card-2.1), so the first
+            // commit the city makes carries, so the first
             // line of an adopted repository's history already says which
             // session put it there.
             let of = provenance(

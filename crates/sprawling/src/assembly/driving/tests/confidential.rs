@@ -63,7 +63,7 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
             .push((record.kind(), serde_json::to_string(record.data()).unwrap()));
     }));
     // The keystroke is accepted; the refusal belongs to the run's own
-    // account (drive backstop, card R1.05). What must never happen is
+    // account (drive backstop). What must never happen is
     // a chat POST reaching the endpoint.
     worker
         .handle(channels::Command::Dispatch {

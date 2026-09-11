@@ -242,7 +242,7 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
     assert_eq!(stamps[11], 5);
 }
 
-/// There is no ceiling to reach (card-11.7), so a run goes on until its
+/// There is no ceiling to reach, so a run goes on until its
 /// own work runs out. The script here is longer than the turn ceiling
 /// this driver used to carry, and the run still ends by concluding
 /// rather than by being cut off.

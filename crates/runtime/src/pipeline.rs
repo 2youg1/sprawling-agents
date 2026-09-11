@@ -10,7 +10,7 @@
 //! defined here once — changing them changes window bytes and passes
 //! through the SPEC.
 //!
-//! Since card-11.4 the law reads tee → sieve → offload / truncation:
+//! The law reads tee → sieve → offload / truncation:
 //! an `exec` result arrives with its command key, is pinned and sieved
 //! by `sieve` through the same site the offload uses, and what the
 //! sieve left enters the three arms below as the result.

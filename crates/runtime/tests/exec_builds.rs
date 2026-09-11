@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The thing card 11.1 exists for: a resident inside the city can build
+//! What this asserts: a resident inside the city can build
 //! a Rust program.
 //!
 //! Before the declaration existed this failed on Windows and nowhere

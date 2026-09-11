@@ -22,7 +22,7 @@
 //! the commit and reports positions only; echoing the matched bytes to
 //! prove a secret leaked would be the leak.
 //!
-//! **A wave fence leaves HEAD alone** (card-2.2). The city forms around
+//! **A wave fence leaves HEAD alone**. The city forms around
 //! a person's own folder, so a commit per tool wave on their branch
 //! buries their history under the machine's bookkeeping. The fence is a
 //! dangling commit, filed under `refs/sprawling/runs/<run>/<seq>`, and

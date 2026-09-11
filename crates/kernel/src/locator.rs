@@ -119,7 +119,7 @@ impl<'de> Deserialize<'de> for GitOid {
     /// Same shape discipline as `B3Hash` above: the hex spelling is the only
     /// accepted form, and a wrong length is a refusal rather than a padded
     /// guess. Needed once a checkpoint identity has to cross the process
-    /// boundary (`channels::wire`, S4.02); the shape authority stays here so
+    /// boundary (`channels::wire`); the shape authority stays here so
     /// the wire does not grow a second definition of what an oid looks like.
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let raw = String::deserialize(deserializer)?;

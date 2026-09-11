@@ -87,9 +87,9 @@ mod tests {
     fn memo_outline_names_what_is_missing() {
         let memo = "\
 ## Current goal
-ship S2
+ship the second stage
 ## current stage
-S2.08
+the second stage
 ## Next action
 approval
 ## Blocked by

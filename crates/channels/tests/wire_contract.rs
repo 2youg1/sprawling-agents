@@ -94,8 +94,8 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
     );
 }
 
-/// Pinned on the first green of S4.02. It is a function of WIRE_V and the two
-/// name tables, so any change to the protocol surface lands here first.
+/// A function of WIRE_V and the two name tables, so any change to the
+/// protocol surface lands here first.
 const WIRE_SCHEMA_GOLDEN: &str = "5f8e6f1e506ae7b10052f0b44828dd529804b4b992a29a0578b58b4c3c0d4ef2";
 
 // -------------------------------------------------------------- binding face
@@ -447,7 +447,7 @@ fn asking_for_one_session_is_a_different_frame_from_asking_for_the_city() {
 }
 
 /// Nobody can price a piece of work before it runs, so the frame that
-/// starts one carries no ceiling (card-11.7). The one brake is `Halt`,
+/// starts one carries no ceiling. The one brake is `Halt`,
 /// which shuts a scope and stops what that scope already started.
 #[test]
 fn a_dispatch_frame_carries_no_spend_ceiling() {
@@ -501,7 +501,7 @@ fn both_login_steps_survive_the_round_trip_and_stay_distinct() {
 }
 
 /// The three documents that govern a city are written by one frame, and
-/// what was decided on the person's behalf is one question (card-5.4).
+/// what was decided on the person's behalf is one question.
 #[test]
 fn the_governance_frames_are_on_the_wire() {
     assert!(
@@ -525,7 +525,7 @@ fn the_governance_frames_are_on_the_wire() {
 }
 
 /// A hunk is its own request: one file, both ends named, and a line that
-/// matched a credential shape reported rather than echoed (card-2.6).
+/// matched a credential shape reported rather than echoed.
 #[test]
 fn one_files_patch_is_a_frame_of_its_own() {
     assert!(

@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use kernel::{AxCode, AxError, Locator, Sealed, SecretRef};
 
-/// The redemption face `credential` provides (S3.03): resolve a
+/// The redemption face `credential` provides: resolve a
 /// reference into a sealed value, per operation, never cached.
 pub type SecretResolver = Box<dyn Fn(&SecretRef) -> Result<Sealed<String>, AxError> + Send>;
 

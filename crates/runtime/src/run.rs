@@ -185,7 +185,7 @@ impl Run<Frozen> {
 /// between the city and the simulator.
 ///
 /// **The loop counts no turns.** There is no ceiling to reach, because
-/// nobody can price a piece of work before it runs (card-11.7). What
+/// nobody can price a piece of work before it runs. What
 /// ends a run is what it did: a turn that concluded, a failure with a
 /// carrier event, or an interruption a safe point delivered — and what
 /// stops one from outside is `Halt`, which shuts the scope and kills the

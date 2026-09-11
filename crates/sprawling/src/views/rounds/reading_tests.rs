@@ -13,9 +13,8 @@
 
 //! The reading through the production door.
 //!
-//! `web::turn::reading_tests` verbatim, following the reading it tests:
-//! the payload readers are `channels::reading` since card-6.5, and the
-//! fold that calls them is this module.
+//! Following the reading it tests: the payload readers are
+//! `channels::reading`, and the fold that calls them is this module.
 
 use super::turns;
 use channels::{

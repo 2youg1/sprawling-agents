@@ -10,7 +10,7 @@ kernel = { path = "../kernel" }
 memory = { path = "../memory" }
 serde.workspace = true
 serde_json.workspace = true
-# card-11.4: the sieve's filter table is a TOML file in the reserved
+# The sieve's filter table is a TOML file in the reserved
 # subtree, and its shape has one reader.
 toml.workspace = true
 # Execution boundary. Pinned at 48: carries the

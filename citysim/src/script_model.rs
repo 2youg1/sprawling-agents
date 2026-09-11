@@ -7,7 +7,7 @@
 //! construction — the script is the entire behavior; an exhausted script
 //! answers with an empty wave, which the executor reads as conclusion.
 //!
-//! S3.14 puts the translation face into the loop. A scripted turn is
+//! The translation face is inside the loop. A scripted turn is
 //! written as provider wire JSON and parsed by `gateway::dialect`, the
 //! same function the real endpoint uses, so the simulator exercises the
 //! translation rather than stepping around it. What stays out is the

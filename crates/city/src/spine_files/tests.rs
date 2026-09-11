@@ -85,7 +85,7 @@ fn the_job_file_lands_in_the_room_and_says_what_the_run_was_asked_for() {
     assert!(text.contains("measure the thing"));
     assert!(text.contains("a number with a unit, then stop"));
     // No ceiling section: the brief states the task and the goal, and
-    // nothing states what the work may cost (card-11.7).
+    // nothing states what the work may cost.
     assert!(!text.contains("Budget"));
 }
 

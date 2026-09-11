@@ -58,7 +58,7 @@ fn policies_match_class_and_prefix_but_never_tainted_items() {
         PolicyApplication::NotApplicable
     );
     // Commitment/BudgetLimit/DiscardEscalate: no PolicyClass variant
-    // exists to even write such a matcher — pinned by S2.11 trybuild.
+    // exists to even write such a matcher — pinned by a trybuild case.
     assert_eq!(
         match_item(&p, &item(ApprovalClass::Commitment, false, "a")),
         PolicyApplication::NotApplicable
@@ -155,8 +155,8 @@ fn the_answer_matrix_holds() {
 }
 
 /// The clerk is a delegate like any other: nothing about `hall/clerk`
-/// is a new rule in this module, and that is the point of the card
-/// adding no `Autonomy` variant.
+/// is a new rule in this module, which is why no `Autonomy` variant
+/// exists for it.
 #[test]
 fn the_clerk_answers_as_the_appointed_delegate_and_no_further() {
     let clerk = resident(crate::consts_policy::HALL_CLERK);

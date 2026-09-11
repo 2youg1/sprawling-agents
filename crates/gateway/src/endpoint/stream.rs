@@ -5,8 +5,7 @@
 
 //! One call whose body is read as it arrives.
 //!
-//! **Separated from `call` for the reason card-4.1 separated the stream
-//! readers from the request writers: they change for different
+//! **Separated from `call` because they change for different
 //! reasons.** Writing a request on the wire moves when a provider grows
 //! a field; reading a body in parts moves when what "in parts" has to
 //! mean changes - and it did, once, from "read it all, then walk the

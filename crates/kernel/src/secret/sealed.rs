@@ -55,6 +55,6 @@ mod tests {
         let sealed = Sealed::new(Box::new("hunter2".to_owned()));
         assert_eq!(sealed.expose(), "hunter2");
         // No Debug/Display/Serialize/Clone impls exist — pinned by the
-        // S2.11 trybuild case (formatting a Sealed does not compile).
+        // trybuild case (formatting a Sealed does not compile).
     }
 }

@@ -25,7 +25,7 @@ fn charset_admits(charset: SecretCharset, byte: u8) -> bool {
 /// `=` is deliberately absent: as base64 padding it only trails (the
 /// pre-padding run still crosses the length floor), while as an
 /// assignment sign it welds two identifiers into one fake token
-/// (`NAME=value` — the S2.12 false-positive class).
+/// (`NAME=value` — a false-positive class).
 fn token_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'+' | b'/')
 }

@@ -11,9 +11,7 @@
 //! (ARCHITECTURE.md section 9): a value, a projection, and a decision.
 //!
 //! They live on the wire because a second client must be able to draw a
-//! session without folding the ledger itself. Until card-6.5 the fold
-//! was `web::turn`, where nothing but the WebAssembly client could reach
-//! it.
+//! session without folding the ledger itself.
 
 use kernel::{AxError, GitOid, RunId, Seq, TimeMs, Tokens, UsdMicros};
 use serde::{Deserialize, Serialize};

@@ -21,7 +21,7 @@ zeroize.workspace = true
 # fact, not a second internal hash authority (blake3 stays sole for
 # content addressing).
 sha2 = "0.11"
-# card-4.1: the one base64 encoder both provider wires take pictures in.
+# The one base64 encoder both provider wires take pictures in.
 base64.workspace = true
 
 [dev-dependencies]

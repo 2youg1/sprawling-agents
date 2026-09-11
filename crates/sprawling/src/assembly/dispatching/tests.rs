@@ -21,8 +21,8 @@ use crate::assembly::*;
 /// The other half of the same rule: a steer-kind signal slips under
 /// the door of the run it reaches, landing at that run's next safe
 /// point with the sender's address in front of it. `collab::steer`
-/// has held both entrances since P2.04 and the resident's one had no
-/// caller until now.
+/// holds both entrances, and the resident's one had no caller until
+/// now.
 #[test]
 fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
     let dir = tempfile::tempdir().unwrap();

@@ -53,8 +53,8 @@ fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbo
     );
 }
 
-/// R2.10's other half: not only "the line comes before the change",
-/// but "no line, no change".
+/// The other half of the rule: not only "the line comes before the
+/// change", but "no line, no change".
 ///
 /// The ledger here is the real `JsonlLedger` over the deterministic
 /// power-loss model, told to lose exactly the write carrying

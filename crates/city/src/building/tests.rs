@@ -166,7 +166,7 @@ fn adopting_an_existing_directory_keeps_every_file_it_found() {
     );
 }
 
-/// The asymmetry card 5.5 exists for: what a building promises is in
+/// The asymmetry: what a building promises is in
 /// history, what one session was thinking is not.
 #[test]
 fn a_raised_building_ignores_its_roadmap_and_tracks_its_spec() {

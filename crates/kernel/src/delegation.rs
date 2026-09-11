@@ -53,7 +53,7 @@ impl Delegator {
 }
 
 /// A delegated position. No delegate method — the compile error is the
-/// design (trybuild counterexample, S2.11).
+/// design (trybuild counterexample).
 #[derive(Debug)]
 pub struct Delegate {
     kind: DelegateKind,
@@ -130,7 +130,7 @@ mod tests {
         let root = Delegator::root();
         let child = root.delegate(DelegateKind::Ephemeral);
         assert_eq!(child.kind(), &DelegateKind::Ephemeral);
-        // `child.delegate(...)` does not compile — pinned by the S2.11
+        // `child.delegate(...)` does not compile — pinned by the
         // trybuild case; this test documents the runtime-visible half.
     }
 }

@@ -6,8 +6,7 @@
 //! The loopback providers the endpoint tests stand up, and the one
 //! configuration and request they all start from.
 //!
-//! **Separated from `config` for the reason card-4.1 separated the
-//! stream readers from the request writers: they change for different
+//! **Separated from `config` because they change for different
 //! reasons.** What an endpoint is configured with moves when a provider
 //! grows a field; what a test has to fake moves when a new failure is
 //! worth reproducing - a truncated body, a silent socket, a stream

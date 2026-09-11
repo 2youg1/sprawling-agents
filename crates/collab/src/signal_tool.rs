@@ -170,8 +170,8 @@ impl SignalDesk {
             kind,
             self.who.clone(),
             to.clone(),
-            // No room carries a version until drafts have a writer
-            // (P3.02): the sender saw a room nobody has revised.
+            // No room carries a version until drafts have a writer: the
+            // sender saw a room nobody has revised.
             Version::FIRST,
             Payload::new(payload)?,
             self.at,

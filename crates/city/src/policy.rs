@@ -229,7 +229,7 @@ pub const DESKTOP_SCOPE_FILE: &str = "DESKTOP.toml";
 ///
 /// It is a governing document rather than a product. It states, window
 /// by window, what this building's runs may touch on somebody's own
-/// machine — so by the reading card 5.1's `DomainReach` rests on, the
+/// machine — so by the reading `DomainReach` rests on, the
 /// file that decides what residents may do is never a file residents
 /// write. `is_reserved` is true for any address with `.sprawling` in it,
 /// so no write domain reaches this path, including `Everything`'s.

@@ -237,7 +237,7 @@ mod tests {
         let probe = handoff_probe(1);
         let answers = vec![
             "wire the pr tool".to_owned(),
-            "P3.02".to_owned(),
+            "the checkpoint before the merge".to_owned(),
             "the trunk moved under a waiting request".to_owned(),
         ];
         let before = probe.answered(answers.clone()).unwrap();
@@ -253,14 +253,14 @@ mod tests {
         let before = probe
             .answered(vec![
                 "wire the pr tool".to_owned(),
-                "P3.02".to_owned(),
+                "the checkpoint before the merge".to_owned(),
                 "the trunk moved".to_owned(),
             ])
             .unwrap();
         let after = probe
             .answered(vec![
                 "wire the pr tool".to_owned(),
-                "P3.02".to_owned(),
+                "the checkpoint before the merge".to_owned(),
                 String::new(),
             ])
             .unwrap();

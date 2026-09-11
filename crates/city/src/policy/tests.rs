@@ -226,7 +226,7 @@ fn a_browser_line_that_reads_as_a_typo_is_refused_rather_than_guessed() {
     assert!(err.subject().contains("browser: yes"));
 }
 
-/// card-7.3: a building hands its person's desktop over only by saying
+/// A building hands its person's desktop over only by saying
 /// so. Absent the line, no — the same reading `browser:` gets, and for a
 /// stronger reason: a click on somebody's desktop has no way back.
 #[test]
@@ -267,7 +267,7 @@ fn a_desktop_line_that_reads_as_a_typo_is_refused_rather_than_guessed() {
     assert!(err.subject().contains("desktop: yes"));
 }
 
-/// card-7.3: the desktop allowlist is a governing document, not a
+/// The desktop allowlist is a governing document, not a
 /// product. It says, window by window, what this building's runs may
 /// touch on somebody's machine — so it lands where no write domain
 /// reaches, and a resident cannot widen its own scope.

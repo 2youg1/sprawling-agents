@@ -367,8 +367,7 @@ fn the_tool_refuses_a_call_bearing_another_tools_name() {
     );
 }
 
-/// V3.19's closing condition: six actions cost no more catalog bytes
-/// than four did. The catalog is what every turn pays for, so a
+/// Six actions cost no more catalog bytes than four did. The catalog is what every turn pays for, so a
 /// verb that grows it is a verb charged to every run in the city
 /// whether or not it is ever called.
 #[test]

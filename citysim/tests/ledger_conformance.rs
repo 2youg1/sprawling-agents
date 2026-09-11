@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! S1.11 closing card: the in-memory Ledger is the second adapter of the
+//! The in-memory Ledger is the second adapter of the
 //! kernel port (V3 made real), the chain checker is invariant 1, and the
 //! golden fixture pins cross-OS byte identity (V8 seed).
 

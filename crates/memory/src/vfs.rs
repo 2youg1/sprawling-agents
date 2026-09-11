@@ -6,7 +6,7 @@
 //! The filesystem seam this crate reaches disk through, and nothing else.
 //!
 //! One trait, two adapters: [`crate::real_fs::RealFs`] over `std::fs` in
-//! production, and `FaultFs` (S1.08) over a deterministic power-loss
+//! production, and `FaultFs` over a deterministic power-loss
 //! model. The second adapter is what makes this a seam rather than a
 //! layer of indirection — a power cut is a property of filesystem
 //! semantics, so it is injected here and every module above stays free
@@ -22,8 +22,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 /// Crate-internal filesystem seam. Two adapters:
-/// [`crate::real_fs::RealFs`] (std) and `FaultFs` (fault injection,
-/// S1.08). Never public: the seam stays inner. `Send`, because a store
+/// [`crate::real_fs::RealFs`] (std) and `FaultFs` (fault injection).
+/// Never public: the seam stays inner. `Send`, because a store
 /// built on it is handed to the thread that drives a run
 /// (sprawling-SPEC 8-44).
 pub(crate) trait Vfs: Send {

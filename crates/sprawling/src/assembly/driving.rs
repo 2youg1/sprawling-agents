@@ -53,7 +53,7 @@ pub(crate) struct Driving {
     /// The resident this run works as, as three hooks will name it.
     pub(crate) who: String,
     pub(crate) run_id: RunId,
-    /// What every fence this drive raises is signed with (card-2.1).
+    /// What every fence this drive raises is signed with.
     pub(crate) of: memory::Provenance,
     /// Where a command's output is pinned before it is cut, and what
     /// decides the cut (sprawling-SPEC 8-43).

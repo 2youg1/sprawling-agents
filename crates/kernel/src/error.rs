@@ -15,8 +15,8 @@
 //! - `retriable` defaults to false; a caller must opt in explicitly
 //!   (fail-closed).
 //!
-//! The carrier-event declaration (`AxCode::carrier`) lands together with
-//! `kernel::event` (card S1.03) because it names `EventKind`.
+//! The carrier-event declaration (`AxCode::carrier`) lives together with
+//! `kernel::event` because it names `EventKind`.
 
 mod code;
 mod refusal;

@@ -9,8 +9,7 @@ use crate::secret::SecretSpan;
 /// address resolution; kernel never resolves names.
 ///
 /// Non-exhaustive as the specification has always said it is: the kinds
-/// of destination a city can distinguish grow, and R1.13 added the
-/// fourth.
+/// of destination a city can distinguish grow.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EgressTarget {

@@ -223,7 +223,7 @@ mod tests {
              figures are not the same reading"
         );
         // UnplannedProgress has no ratio method — nothing to assert at
-        // runtime; the S2.11 trybuild case pins the absence.
+        // runtime; the trybuild case pins the absence.
         let unplanned = UnplannedProgress {
             steps: 12,
             budget: BudgetUse::default(),

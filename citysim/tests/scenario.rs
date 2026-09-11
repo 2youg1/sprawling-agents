@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! S2.03: the living skeleton. Dispatch -> four-phase turns -> run_frozen,
+//! The living skeleton. Dispatch -> four-phase turns -> run_frozen,
 //! all through scripted adapters, chain-verified, byte-deterministic.
 //! A9's first standing assertions live here: cancel takes effect at phase
 //! boundaries, never inside a phase.
@@ -23,7 +23,7 @@ use kernel::{
 };
 use runtime::bench::ToolBench;
 
-/// The bench the scenarios drive: the real one (S3.14), carrying
+/// The bench the scenarios drive: the real one, carrying
 /// whichever tools a scenario wants registered.
 fn bench_with(tools: Vec<Box<dyn kernel::Tool>>) -> ToolBench {
     let domain = WriteDomain::new(vec![Address::parse("sim/lobby/room1").unwrap()]).unwrap();
@@ -215,7 +215,7 @@ fn a9_cancel_before_wave_completes_the_model_call_but_runs_no_tool() {
 }
 
 /// A run ends when its own work ends, because there is no ceiling to
-/// reach (card-11.7). A model that asks for another probe sixteen times
+/// reach. A model that asks for another probe sixteen times
 /// takes sixteen turns and then concludes on the empty wave; what stops
 /// a run somebody wants stopped is `Halt`, not a number chosen for them.
 #[test]
@@ -338,7 +338,7 @@ fn a_scenario_ledger_forks_into_a_byte_identical_prefix() {
     assert!(runtime::fork::prefix(&verified, over).is_err());
 }
 
-/// S3.14 — the closing card: one Resident, the real adapters, end to end.
+/// One Resident, the real adapters, end to end.
 ///
 /// The scripted model now speaks provider wire JSON and reaches the seam
 /// through `gateway::dialect`, the same translation the endpoint uses.
@@ -510,7 +510,7 @@ fn s3_14_the_run_is_byte_identical_when_replayed() {
     assert_eq!(first.lines, second.lines);
 }
 
-/// R2.15: two calls of one tool inside one wave are two calls.
+/// Two calls of one tool inside one wave are two calls.
 ///
 /// The driver gives every call in a wave the same `t` on purpose — a wave
 /// is one instant. A key derived from that `t` is therefore constant

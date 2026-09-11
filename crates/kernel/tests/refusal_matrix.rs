@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! S2.13: the refusal conformance matrix. Every Deny the doors can
+//! The refusal conformance matrix. Every Deny the doors can
 //! produce carries the three mandatory parts, each non-empty, and the
 //! alternative is directive prose (names a next action), because the
 //! model is the recovery subject.

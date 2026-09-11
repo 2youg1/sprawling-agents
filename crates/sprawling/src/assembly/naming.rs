@@ -9,8 +9,8 @@ use kernel::EventRecord;
 use kernel::{Address, AxCode, AxError};
 
 /// What this agent is called: the last segment of its address, which is
-/// the word a person typed into `call it` when they started the session
-/// (F2.11). Never the whole address — an agent addressed as its own
+/// the word a person typed into `call it` when they started the
+/// session. Never the whole address — an agent addressed as its own
 /// name reads more like somebody than like a path.
 pub(super) fn name_of(addr: &Address) -> &str {
     addr.as_str().rsplit('/').next().unwrap_or(addr.as_str())

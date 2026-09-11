@@ -11,7 +11,7 @@
 //! fourth, `BUILDING.md`, is written where its meaning lives
 //! (`crate::building`, read by `crate::policy`): one file, one writer.
 //!
-//! The handoff is the room's rather than the building's (card-11.6):
+//! The handoff is the room's rather than the building's:
 //! two sessions of one building can freeze at once, and one file for
 //! both would be two contents fighting over one name.
 //!

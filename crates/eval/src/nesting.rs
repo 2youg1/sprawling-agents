@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which nested format a model edits with fewest mistakes, and how it
-//! fails when it fails (v0.0.3 card V3.16).
+//! fails when it fails.
 //!
 //! **The product of this module is a number, not a preference.** The
 //! plan tree has to live in a file a model edits every day, and three

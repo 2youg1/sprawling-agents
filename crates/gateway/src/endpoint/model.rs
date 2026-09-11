@@ -38,7 +38,7 @@ impl Model for Endpoint {
         // A confidential building's bytes do not leave the machine, and
         // this type is the way off it. The refusal is here rather than
         // only at the routing layer because a backstop that lives where
-        // the leak would happen survives a routing mistake (P1.08).
+        // the leak would happen survives a routing mistake.
         if req.policy.confidential {
             return Err(self.confidential_refusal());
         }

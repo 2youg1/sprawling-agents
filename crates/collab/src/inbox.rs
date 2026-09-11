@@ -102,7 +102,7 @@ impl Signal {
     }
 
     /// The room version the sender saw when speaking. A held draft is
-    /// judged against it (P2.05).
+    /// judged against it.
     #[must_use]
     pub fn room_version(&self) -> Version {
         self.room_version

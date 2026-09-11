@@ -247,9 +247,8 @@ impl Views {
                 before,
                 limit,
             } => channels::Answer::Commits(self.commits_answer(building.as_ref(), *before, *limit)),
-            // Three readings that used to run in the browser, answered
-            // here since card-6.5 so a second client draws a session
-            // without folding the ledger itself.
+            // Three readings answered here so a second client draws a
+            // session without folding the ledger itself.
             channels::Query::Rounds { run } => {
                 channels::Answer::Rounds(Box::new(self.rounds_answer(*run)))
             }
@@ -257,7 +256,7 @@ impl Views {
                 channels::Answer::Evidence(self.evidence_answer(*run))
             }
             channels::Query::CostOf { node } => channels::Answer::CostOf(self.cost_of_answer(node)),
-            // The tree itself, one level and one file at a time (card-6.4).
+            // The tree itself, one level and one file at a time.
             channels::Query::Listing { at } => {
                 channels::Answer::Listing(self.listing_answer(at.as_ref()))
             }

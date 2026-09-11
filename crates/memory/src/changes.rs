@@ -5,8 +5,8 @@
 
 //! What changed between two checkpoints, as paths and counts.
 //!
-//! The write side of this city has been git-native since S3.07 — every
-//! tool wave is fenced by a real commit — and nothing anywhere could read
+//! The write side of this city is git-native — every tool wave is
+//! fenced by a real commit — and nothing anywhere could read
 //! two of those commits back and say what moved between them. This is
 //! that read.
 //!

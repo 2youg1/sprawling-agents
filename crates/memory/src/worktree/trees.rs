@@ -84,8 +84,8 @@ impl PlannedMerge<'_> {
 
     /// Brings a node's committed work into the city's own trunk, as a
     /// merge commit carrying the merging run's trailers. The judgement
-    /// stays fast-forward only; what changed in card-2.3 is what the
-    /// history keeps, because a pointer move leaves nothing to read and
+    /// stays fast-forward only; what the history keeps is the merge
+    /// commit, because a pointer move leaves nothing to read and
     /// no place to say who verified it.
     ///
     /// # Errors

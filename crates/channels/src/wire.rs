@@ -30,36 +30,33 @@ use serde::{Deserialize, Serialize};
 /// Wire format version. Bumped whenever the frame grammar changes shape in a
 /// way the schema hash alone would not explain to a human reading a log.
 ///
-/// 5: `Dispatch` carries the name of the session it starts (F2.11).
-/// 6: and how hard that session thinks (F2.16).
+/// 5: `Dispatch` carries the name of the session it starts.
+/// 6: and how hard that session thinks.
 /// 7: a provider can be asked what it serves before it is attached, and
-///    an attachment names which of those models it admits (P3.01).
-/// 8: a building's sandbox limits and external servers have a surface
-///    (P3.02).
-/// 9: a page can ask for the history that happened before it opened
-///    (P3.04).
+///    an attachment names which of those models it admits.
+/// 8: a building's sandbox limits and external servers have a surface.
+/// 9: a page can ask for the history that happened before it opened.
 /// 12: a third class of frame carries what a model is saying while it is
-///    still saying it (V3.13). It is not an event: it has no sequence
+///    still saying it. It is not an event: it has no sequence
 ///    number, it is never written down, and a client that missed one has
 ///    lost nothing.
 /// 13: the plan is a tree, so a building's answer carries its nodes,
 ///    what each is worth and what is ready; a branch that is stuck says
 ///    so once, at the node it is stuck at; and a city can be given a
-///    goal it works towards until the work runs out (V3.17-V3.23).
-/// 14: a commit the city made can be asked which run wrote it
-///    (card-2.4).
+///    goal it works towards until the work runs out.
+/// 14: a commit the city made can be asked which run wrote it.
 /// 15: that answer carries the lineage of the run - the successors
-///    a resident replaced itself through (card-11.6).
+///    a resident replaced itself through.
 /// 16: three readings a page used to compute for itself are questions
 ///    the server answers - a session's rounds, what a run left as
-///    evidence, and what one plan node cost (card-6.5).
+///    evidence, and what one plan node cost.
 /// 17: the first client that only asks the wire found four gaps in it -
 ///    a run's room and start, a session's opening and closing, the
 ///    scopes a halt shut, and the two questions that walk the tree,
-///    `Listing` and `Document` (card-6.4).
+///    `Listing` and `Document`.
 /// 18: a building's commits can be listed, newest first, so a page can
 ///    walk from a line of code to the session that wrote it without
-///    folding the history itself (card-2.7).
+///    folding the history itself.
 pub const WIRE_V: u32 = 21;
 mod query;
 

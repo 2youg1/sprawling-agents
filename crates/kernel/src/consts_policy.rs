@@ -7,10 +7,9 @@
 //! changes behavior and therefore requires EVAL evidence or an
 //! explicit ruling. Data only — zero branches by charter.
 //!
-//! All fifteen policy entries are landed; the three type-bearing
-//! ones arrived with their defining cards (kernel-SPEC 8-8):
-//! AUTONOMY_DEFAULT (S2.08), CLOCK_STAMP_DEFAULT (S2.09),
-//! SUBAGENT_CTX_LOCK_DEFAULT (S2.06).
+//! All fifteen policy entries are landed; three of them carry a type
+//! rather than a plain number (kernel-SPEC 8-8): AUTONOMY_DEFAULT,
+//! CLOCK_STAMP_DEFAULT, SUBAGENT_CTX_LOCK_DEFAULT.
 
 /// Exact ratio as an integer pair: kernel decision paths never touch
 /// floats (determinism rule 6). Kept unreduced so the spelling mirrors the
@@ -72,9 +71,9 @@ pub const POLICY_IDLE_DAYS: u32 = 90;
 
 pub const CLOCK_ZONES_MAX: u32 = 4;
 
-/// Instruction budget for one sandboxed call when no layer states one
-/// (P4.02). Large enough that ordinary work finishes, small enough that
-/// a loop stops rather than runs until somebody notices: the point of
+/// Instruction budget for one sandboxed call when no layer states one.
+/// Large enough that ordinary work finishes, small enough that a loop
+/// stops rather than runs until somebody notices: the point of
 /// fuel is that exhaustion is a verdict the city writes down, not a
 /// machine that gets slow.
 pub const SANDBOX_FUEL_DEFAULT: u64 = 200_000_000;
@@ -110,12 +109,12 @@ pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;
 
 /// 2 MiB per picture. A ceiling a refusal can state and a person can
 /// raise, sized so a base64 body (4/3 of this) stays inside what both
-/// providers accept (card-4.1).
+/// providers accept.
 pub const IMAGE_MAX_BYTES: u64 = 2_097_152;
 
 /// Four pictures in one turn. Past that the window is being spent on
 /// pixels rather than on the work, and a limit stated once is what a
-/// refusal can name (card-4.1).
+/// refusal can name.
 pub const IMAGES_PER_TURN: u32 = 4;
 
 /// Off by default: zero window bytes until a Building opts in (4.3).

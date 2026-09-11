@@ -166,10 +166,9 @@ pub enum Query {
     Governance,
     /// One session, folded into the rounds a person reads.
     ///
-    /// Answered server-side since card-6.5. The fold used to be
-    /// `web::turn`, which meant a second client had to reimplement it
-    /// to draw a session at all - and the wire is supposed to be the
-    /// whole API (ARCHITECTURE.md section 8).
+    /// Answered server-side, because the wire is the whole API
+    /// (ARCHITECTURE.md section 8): a second client must be able to
+    /// draw a session without reimplementing the fold.
     ///
     /// Bounded by [`HISTORY_MAX`](crate::HISTORY_MAX) records, which is
     /// the same slice the client used to ask for with

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a resident stops being able to do when one passage of the city
-//! document is taken away (v0.0.3 card-5.7).
+//! document is taken away.
 //!
 //! **`docs/City.md` is compiled into the binary and read by every
 //! resident before anything else, so each passage of it charges rent on

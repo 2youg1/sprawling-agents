@@ -45,7 +45,7 @@ pub(super) struct Sent {
 ///
 /// One fold, two readers. `Standing::fold` shows it every line of a
 /// history it did not write; `RunWorker::govern` shows it every line the
-/// running city writes. Until R2.11 those were two implementations that
+/// running city writes. These were once two implementations that
 /// happened to agree, and `set_admission` and `answer_approval` each
 /// held a third by writing a field directly.
 pub(super) struct Governance {

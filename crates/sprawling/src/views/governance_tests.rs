@@ -20,7 +20,7 @@ use kernel::{Address, EventKind, RunId};
 use super::tests::view_record;
 
 /// Who answers for this city, and what was answered on the person's
-/// behalf, are one question with one answer (card-5.4).
+/// behalf, are one question with one answer.
 #[test]
 fn the_governance_view_reports_who_answers_and_what_was_answered() {
     let dir = tempfile::tempdir().unwrap();
@@ -86,7 +86,7 @@ fn the_governance_view_reports_who_answers_and_what_was_answered() {
 
 /// A commit this city never wrote is unavailable rather than empty: "it
 /// changed nothing" and "I cannot read it" are different answers, and a
-/// reader's next move differs (card-2.6).
+/// reader's next move differs.
 #[test]
 fn a_hunk_of_a_commit_this_city_never_wrote_is_unavailable() {
     let dir = tempfile::tempdir().unwrap();

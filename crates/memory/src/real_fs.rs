@@ -9,7 +9,7 @@
 //! one thing this adapter remembers — the handle on the file it is
 //! appending to — exists because opening a file costs a syscall per
 //! call rather than per byte, and a ledger appends to one segment over
-//! and over (V3.07).
+//! and over.
 
 use std::io;
 use std::path::{Path, PathBuf};

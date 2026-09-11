@@ -31,7 +31,7 @@ pub(crate) const ENGINE_CARRIED: bool = cfg!(feature = "sandbox");
 
 /// The machine-level directory this city keeps components in. Never
 /// inside a city: a city carried to another machine must not carry this
-/// machine's components with it (kernel-SPEC.md section 8-22, P4.02).
+/// machine's components with it (kernel-SPEC.md section 8-22).
 pub(crate) fn components_dir() -> Option<PathBuf> {
     std::env::var_os("USERPROFILE")
         .or_else(|| std::env::var_os("HOME"))

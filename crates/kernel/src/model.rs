@@ -36,9 +36,9 @@ use crate::error::AxError;
 /// by `web::app`.
 pub type Increments<'a> = &'a mut dyn FnMut(&str);
 
-/// The model port. Production adapters: gateway::native, gateway::endpoint
-/// (S3); second adapter: citysim scripted model (S2.03). Implementations
-/// never sample clocks or read global state.
+/// The model port. Production adapters: gateway::native, gateway::endpoint;
+/// second adapter: citysim scripted model. Implementations never sample
+/// clocks or read global state.
 pub trait Model {
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError>;
 

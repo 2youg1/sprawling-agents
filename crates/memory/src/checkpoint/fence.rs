@@ -142,7 +142,7 @@ impl Checkpoint {
     /// a second declared prefix - was staged by no fence, reported by no
     /// `changes` query, and restorable from no `file_discarded` record.
     ///
-    /// **The branch does not move** (card-2.2): the commit is written
+    /// **The branch does not move**: the commit is written
     /// with no reference update and pointed at by
     /// `refs/sprawling/runs/<run>/<seq>`, so a person whose own folder
     /// became this city keeps their own history instead of one

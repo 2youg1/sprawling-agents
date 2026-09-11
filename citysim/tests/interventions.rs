@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! S4.09: the scenarios a control surface makes possible.
+//! The scenarios a control surface makes possible.
 //!
 //! Steer and Cancel from a person, a pasted credential, an injected
 //! Discard, a resume that stays idempotent, and the fault surface exercised
@@ -199,7 +199,7 @@ fn the_chain_still_verifies_after_every_intervention() {
     }
 }
 
-/// S4.11: the first golden Ledger of a *full* loop enters the fixture
+/// The first golden Ledger of a *full* loop enters the fixture
 /// library. `golden-s1` pins a synthetic script; this one pins a Run that
 /// went through the real turn machine, the real bench and a real
 /// intervention - which is the thing a future version has to stay

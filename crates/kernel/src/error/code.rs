@@ -37,9 +37,9 @@ pub enum AxCode {
     LoopSuspected,
     LocatorInvalid,
     SandboxDenied,
-    // Collaboration (5). A sixth, `SignalUnknown`, was defined away in
-    // P3.01: signal payloads are written and read by one module, the
-    // kind is an exhaustive enum, and a kind this version does not know
+    // Collaboration (5). A sixth, `SignalUnknown`, was defined away:
+    // signal payloads are written and read by one module, the kind is
+    // an exhaustive enum, and a kind this version does not know
     // can only come from a newer binary's ledger — which the version
     // door already refuses.
     DraftStale,

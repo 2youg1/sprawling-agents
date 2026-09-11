@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The thin executor, second Main. Since P1.01 the loop itself lives in
+//! The thin executor, second Main. The loop itself lives in
 //! `runtime::run`: this file supplies the simulated world — a counter
 //! clock, scripted interruptions, the checkpoint net and the tool bench —
 //! and the city runs the same driver against real ones.
@@ -49,7 +49,7 @@ pub struct Scenario {
     pub goal: String,
     pub job_md: String,
     pub model: ScriptModel,
-    /// The real bench (S3.14): gate routing is the turn layer's, and the
+    /// The real bench: gate routing is the turn layer's, and the
     /// simulator drives the same code the city runs.
     pub bench: ToolBench,
     /// Frozen configuration, evaluated once per run: the stamp gate reads
@@ -286,8 +286,8 @@ pub fn run_scenario_on(
 
     let frozen = match checkpoint.as_mut() {
         Some((net, scope)) => {
-            // card-2.1: a fence is signed by the session that raised
-            // it. The scenario has no endpoint, so the model id is the
+            // A fence is signed by the session that raised it. The
+            // scenario has no endpoint, so the model id is the
             // scripted one and no effort was asked for.
             let of = memory::Provenance::new(
                 run,

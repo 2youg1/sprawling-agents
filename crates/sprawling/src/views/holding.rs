@@ -127,7 +127,7 @@ pub(crate) struct Views {
     /// them equal.
     pub(super) halted: std::collections::BTreeSet<String>,
     /// What this machine had when the city was served, from the one
-    /// look the doctor takes at start-up (card-9.2).
+    /// look the doctor takes at start-up.
     ///
     /// Not folded from anything: this is the one answer here that is
     /// about the machine rather than about the history, which is why it

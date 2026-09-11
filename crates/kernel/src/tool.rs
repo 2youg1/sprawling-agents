@@ -258,8 +258,8 @@ pub struct ToolOutcome {
     pub attachments: Vec<crate::ImageRef>,
 }
 
-/// The tool port. Adapters: runtime L0 three (S3), browser, protocol;
-/// second adapter: citysim scripted tools (S2.03).
+/// The tool port. Adapters: runtime L0 three, browser, protocol;
+/// second adapter: citysim scripted tools.
 ///
 /// `Send`, because a bench of tools is driven on a pool thread rather
 /// than on the thread that built it (sprawling-SPEC 8-44). A tool that

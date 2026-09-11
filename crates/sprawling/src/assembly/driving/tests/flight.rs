@@ -39,8 +39,8 @@ fn history(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
         .collect()
 }
 
-/// **The property card 3.4 exists for.** Two pieces of work a person
-/// sent go into two lanes, and the accounting thread lands both.
+/// **Two pieces of work a person sent go into two lanes**, and the
+/// accounting thread lands both.
 ///
 /// The assertion that bites is the last one: driven one at a time, the
 /// second run's first line comes after the first run has frozen, so the

@@ -230,7 +230,7 @@ mod conformance_self_test {
     use crate::event::{EventDraft, EventRecord, EventRef, Seq};
 
     /// Minimal reference implementation: proves the suite runs against any
-    /// implementation before citysim provides the second one (S1.11).
+    /// implementation before citysim provides the second one.
     struct VecLedger {
         lines: Vec<Vec<u8>>,
         next_seq: Seq,

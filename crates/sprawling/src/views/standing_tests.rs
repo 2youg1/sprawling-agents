@@ -5,7 +5,7 @@
 
 //! What a page that has just opened must be able to learn from one
 //! `city_view`: which room each run works in, and whether the city is
-//! stopped (card-6.4; sprawling-SPEC section 8-52).
+//! stopped (sprawling-SPEC section 8-52).
 
 #![allow(
     clippy::unwrap_used,

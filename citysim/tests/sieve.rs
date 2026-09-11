@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! card-11.4: the sieve under the scenario driver. The same seed and
+//! The sieve under the scenario driver. The same seed and
 //! the same filter table replay a byte-identical window, the second
 //! call of one command shows only what changed, and every sieved
 //! result carries the way back to its original.

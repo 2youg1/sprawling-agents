@@ -24,7 +24,7 @@ pub(crate) struct CommitPlan<'a> {
     pub(crate) subject: &'a str,
     /// Whether the branch follows this commit. A wave fence says no: it
     /// is filed under its own reference so a person's `git log` does not
-    /// grow a line per tool wave (card-2.2). A base commit and a landing
+    /// grow a line per tool wave. A base commit and a landing
     /// say yes, because a worktree branches from a branch and offered
     /// work has to be on one.
     pub(crate) onto_head: bool,
@@ -86,7 +86,7 @@ impl Checkpoint {
     /// has never been fenced. An unborn HEAD is a state, not a failure -
     /// it is what an empty repository looks like.
     ///
-    /// Since card-2.2 a wave fence does not move HEAD, so the last
+    /// A wave fence does not move HEAD, so the last
     /// checkpoint is remembered here rather than read off the branch. A
     /// process that has just opened this repository remembers nothing
     /// and falls back to HEAD, which is older: the scan then re-reads

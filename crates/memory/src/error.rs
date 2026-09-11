@@ -6,7 +6,7 @@
 //! What this crate's twelve modules say when persistence refuses, and
 //! the one door that turns it into an `AxError`.
 //!
-//! **Why this is a module of its own (V3.35).** memory-SPEC 7 recorded
+//! **Why this is a module of its own.** memory-SPEC 7 recorded
 //! the condition when the type was born: it lived beside the ledger
 //! while fewer than three modules aggregated here, and moved out at
 //! three. Twelve modules import it today, and nine of its twenty

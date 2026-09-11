@@ -111,7 +111,7 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
         .unwrap();
     // A handoff the last session actually wrote, as against the blank
     // form a new room starts with. It is the room's, not the
-    // building's (card-11.6).
+    // building's.
     let handoff = city::handoff_path(dir.path(), &room);
     if let Some(parent) = handoff.parent() {
         std::fs::create_dir_all(parent).unwrap();
