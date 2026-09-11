@@ -46,6 +46,19 @@ need() {
 }
 
 # The system and the architecture, in the words the release archives use.
+#
+# One machine can be spelled more than one way, and Linux is. An archive
+# built for the runner it ran on is named after that runner - `macos-
+# aarch64`, `windows-x86_64` - while an archive built for a target named
+# on the command line carries that target's whole triple, so the static
+# Linux one is `x86_64-unknown-linux-musl`. The triple is in that name on
+# purpose: a gnu build may join it later, and two archives differing only
+# in their libc would otherwise claim one name.
+#
+# So a platform names every suffix its release may carry, most specific
+# first, and the first one actually present wins. A list rather than a
+# rule, because the naming is a fact about how each row is built rather
+# than something a reader could derive.
 platform() {
     system=$(uname -s)
     machine=$(uname -m)
@@ -58,6 +71,10 @@ platform() {
         x86_64 | amd64) arch=x86_64 ;;
         arm64 | aarch64) arch=aarch64 ;;
         *) die "no archive is built for $machine; build from source with \`just dist\`" ;;
+    esac
+    case "${os}-${arch}" in
+        linux-x86_64) suffixes="-x86_64-unknown-linux-musl.zip -linux-x86_64.zip" ;;
+        *) suffixes="-${os}-${arch}.zip" ;;
     esac
 }
 
@@ -141,10 +158,13 @@ json=$(release_json)
 tag=$(field "$json" 'tag_name' '\([^"]*\)')
 [ -n "$tag" ] || die "the release list came back without a tag; see ${RELEASES}"
 
-suffix="-${os}-${arch}.zip"
-chunk=$(asset_chunk "$json" "$suffix" || true)
+chunk=""
+for suffix in $suffixes; do
+    chunk=$(asset_chunk "$json" "$suffix" || true)
+    [ -n "$chunk" ] && break
+done
 if [ -z "$chunk" ]; then
-    say "sprawling: ${tag} carries no archive ending ${suffix}. What it does carry:"
+    say "sprawling: ${tag} carries no archive ending ${suffixes}. What it does carry:"
     offered "$json"
     die "download one of those from ${RELEASES}, or build from source with \`just dist\`"
 fi
