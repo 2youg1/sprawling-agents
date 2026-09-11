@@ -119,9 +119,16 @@ hand over to its successor when the window runs out.
 - `sprawling doctor` is the single authority on what this machine has. The first
   screen shows its answer, each item a state rather than a sentence, and a city
   that has never been probed says so instead of guessing.
-- A static `x86_64-unknown-linux-musl` archive joins the release matrix, so one
-  artefact covers NixOS, Alpine, old distributions and containers. A flake
-  derives its toolchain from `rust-toolchain.toml` rather than restating it.
+- A static `x86_64-unknown-linux-musl` archive was built for the release matrix
+  and is **not** in this release. Its first real build found the reason: the
+  Linux credential store is D-Bus secret-service, and a static binary cannot
+  link one. What that build needs settled is where a Linux install keeps a
+  person's API key, which is not a decision a release workflow makes on its way
+  past. Windows and macOS archives are what this tag carries, as before.
+  Everything else the row needs is built and stays — `just package` takes a
+  triple, the archive name carries it, and `install.sh` knows that name.
+- A flake derives its toolchain from `rust-toolchain.toml` rather than
+  restating it.
 - Every CI job declares how long it may take, so "fifteen minutes" is a
   checkable promise rather than a wish.
 

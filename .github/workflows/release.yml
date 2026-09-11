@@ -118,17 +118,34 @@ jobs:
         shell: bash
         run: rm -rf target/tests
 
-  # Three platforms. Linux was once out of this release because
-  # *cross-compiling* to Linux from the Windows machine this project is
-  # developed on does not work - not because a Linux build is impossible.
-  # A GitHub Linux runner builds natively and never touches a cross
-  # toolchain, so that premise is gone and the row is back
-  # (sprawling-SPEC.md section 8-9).
+  # Two platforms, and the third is held back rather than shipped broken.
   #
-  # musl rather than gnu, and static: NixOS has no
-  # `/lib64/ld-linux-x86-64.so.2`, so a dynamically linked ubuntu artifact
-  # does not start there at all, while one static binary covers NixOS,
-  # Alpine, old distributions and containers at once.
+  # The static Linux row was added on a premise that still holds: NixOS
+  # has no `/lib64/ld-linux-x86-64.so.2`, so a dynamically linked ubuntu
+  # artifact does not start there at all, while one static binary would
+  # cover NixOS, Alpine, old distributions and containers at once. Its
+  # first real build is what removed it, and the reason is not a missing
+  # package.
+  #
+  # `keyring`'s Linux backend is secret-service, which talks D-Bus, so the
+  # tree reaches `libdbus-sys`; its build script asks pkg-config for a
+  # library built for the target and pkg-config refuses to answer across
+  # a target boundary. Installing `libdbus-1-dev` does not fix that - it
+  # would offer the host's glibc D-Bus to a static musl link, which is a
+  # contradiction rather than a configuration. **A static Linux binary and
+  # a D-Bus credential store cannot both be true**, so what this row needs
+  # settled first is where the Linux build keeps a credential: the
+  # kernel's own keyring (`Persistence::ThisBoot`, which `Vault` already
+  # names) or something else. That is a decision about a person's API key,
+  # and it is not one a release workflow gets to make on its way past.
+  #
+  # Everything else the row needs is already built and stays: `just
+  # package` takes a triple, `cargo xtask package` reads
+  # `target/<triple>/release` and puts the triple in the archive name, and
+  # `install.sh` knows that name. Restoring the row is this list plus the
+  # musl toolchain steps, once the credential question has an answer that
+  # was tested on Linux.
+  #
   # Archive does not wait for verify: the two are independent, publish
   # waits for both, and the wall clock is the slower one instead of the sum.
   archive:
@@ -141,28 +158,11 @@ jobs:
             target: ""
           - os: macos-latest
             target: ""
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
-      # `aws-lc-sys` reaches this tree through reqwest's rustls feature
-      # (reqwest -> hyper-rustls -> rustls -> aws-lc-rs -> aws-lc-sys) and
-      # it ships pre-generated bindings for `x86_64_unknown_linux_musl`,
-      # so nothing here needs bindgen and the rustls backend stays
-      # aws-lc-rs. What it does need is a musl C compiler and cmake for
-      # the AWS-LC sources; `musl-tools` provides `musl-gcc`, and cmake is
-      # already on the runner image.
-      - name: the C toolchain aws-lc-sys builds AWS-LC with
-        if: matrix.target != ''
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y musl-tools
-      - name: the static target
-        if: matrix.target != ''
-        run: rustup target add ${{ matrix.target }}
       # The client is built by bun, which `just build-web` drives; the
       # release recipe depends on it, so the archive cannot be assembled
       # without the bundle inside the binary.
@@ -179,8 +179,6 @@ jobs:
       # builds of one tag cannot disagree about one number.
       - name: build the client, the binary, and the archive
         shell: bash
-        env:
-          CC_x86_64_unknown_linux_musl: musl-gcc
         run: just package "${{ matrix.target }}"
       - uses: actions/upload-artifact@v7
         with:

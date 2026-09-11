@@ -69,11 +69,14 @@ const EXPOSE_WHITELIST: [&str; 5] = [
 /// since this path is inside the guard's protected face.
 ///
 /// - `CC_x86_64_unknown_linux_musl` — Cargo's per-target C compiler
-///   variable, set to `musl-gcc` by the `release.yml` musl job and
-///   quoted in `sprawling-SPEC.md` where that job is argued. It is the
-///   *name* of an environment variable and so can never itself hold a
-///   value; the target triple's digits and underscores are what trip
-///   the mixed-alphabet rule.
+///   variable, quoted in `sprawling-SPEC.md` where the static Linux
+///   archive is argued. No workflow sets it today: that archive is held
+///   back until it is settled where a Linux install keeps a credential,
+///   and `release.yml` says so where the row used to be. The entry stays
+///   because the row is coming back and the name is not a credential
+///   either way — it is the *name* of an environment variable and so can
+///   never itself hold a value; the target triple's digits and
+///   underscores are what trip the mixed-alphabet rule.
 /// - The six `Win32_*` names — Cargo features of the `windows` crate,
 ///   listed in `desktop/Cargo.toml` to select the API surfaces the
 ///   Windows arm calls: data exchange for the clipboard, threading and
