@@ -9,7 +9,6 @@ members = [
     "crates/city",
     "crates/eval",
     "crates/channels",
-    "crates/web",
     "crates/browser",
     "crates/protocol",
     "crates/sprawling",
@@ -20,7 +19,6 @@ members = [
 # outside this lint wall so the Win32 boundary may relax `unsafe_code` at one
 # call site rather than everywhere.
 exclude = ["desktop"]
-# `web` compiles to wasm32 from Stage 4 on; keep native `cargo check` off it.
 default-members = [
     "crates/kernel",
     "crates/memory",
@@ -91,14 +89,6 @@ tower = { version = "0.5", features = ["util"] }
 # reachable over TLS is a city behind something that terminates it.
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "handshake"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
-# S4.01 conclusion book (crates/web/web-SPEC.md section 8.5): Dioxus, built
-# without `dx`. default-features off is load-bearing - it drops `asset` and
-# `devtools`, both of which need the CLI we deliberately do not use, and it
-# makes the banned `asset!` macro non-existent rather than merely forbidden.
-dioxus = { version = "0.7.10", default-features = false, features = ["minimal"] }
-# Pinned to the installed wasm-bindgen CLI; a mismatch here is the quietest
-# way to break a wasm build.
-wasm-bindgen = "0.2.127"
 # R1.14: OS entropy for the PKCE verifier and the login state. It is not
 # the seeded RNG the simulator uses and must not become it - a verifier a
 # third party can predict is a login a third party can finish. Already in
@@ -112,8 +102,6 @@ reqwest = { version = "0.13", default-features = false, features = ["blocking", 
 # The bin's build script gzips the client bundle it embeds; xtask weighs
 # the same artifacts. One version authority for both.
 flate2 = "1"
-web-sys = "0.3"
-js-sys = "0.3"
 # card-6.2: the JSON Schema the TypeScript client is generated from. The
 # derive reads the same serde attributes the wire is encoded with, so both
 # ends of the socket have one authority; optional in kernel and channels

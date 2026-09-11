@@ -8,7 +8,7 @@
 # reaches a person as an empty browser window.
 #
 # C1 note: no step here invokes the node toolchain family; the client is
-# WebAssembly built by cargo and wasm-bindgen.
+# The browser client, built by bun.
 name: release
 on:
   push:
@@ -103,8 +103,6 @@ jobs:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
-      - name: the client target
-        run: rustup target add wasm32-unknown-unknown
       # `aws-lc-sys` reaches this tree through reqwest's rustls feature
       # (reqwest -> hyper-rustls -> rustls -> aws-lc-rs -> aws-lc-sys) and
       # it ships pre-generated bindings for `x86_64_unknown_linux_musl`,
@@ -120,24 +118,13 @@ jobs:
       - name: the static target
         if: matrix.target != ''
         run: rustup target add ${{ matrix.target }}
-      # The CLI version must equal the crate version; a mismatch there is
-      # the quietest way to break a wasm build. It used to be held by a
-      # copy of the version plus an assertion that watched the copy - one
-      # version with three authorities, and the assertion is what failed
-      # the macOS job in release #5. The manifest is now read directly, so
-      # there is nothing left to fall behind and nothing left to assert.
-      - name: the version the workspace pins
-        id: pin
-        shell: bash
-        run: |
-          set -euo pipefail
-          version=$(sed -n 's/^wasm-bindgen = "\(.*\)"$/\1/p' Cargo.toml)
-          test -n "$version"
-          echo "the workspace pins wasm-bindgen $version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+      # The client is built by bun, which `just build-web` drives; the
+      # release recipe depends on it, so the archive cannot be assembled
+      # without the bundle inside the binary.
+      - uses: oven-sh/setup-bun@v2
       - uses: taiki-e/install-action@v2
         with:
-          tool: just,wasm-bindgen-cli@${{ steps.pin.outputs.version }}
+          tool: just
       # One step for all three rows. `just package` takes the triple the
       # matrix names and passes it down to `cargo xtask package`, which
       # reads `target/<triple>/release` and puts the triple in the archive

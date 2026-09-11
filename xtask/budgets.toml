@@ -116,14 +116,14 @@ measured_by = "just build-web, then just gates (the whole dist directory, recurs
 status = "gated"
 # The badge in README.md. Rendered from the reading above by
 # `cargo xtask badge --write`, which `just dist` ends with, so nobody
-# edits a size by hand. No platform row: the bundle is one wasm target
-# and weighs the same wherever it is built.
+# edits a size by hand. No platform row: the bundle is the same bytes
+# wherever bun builds it.
 badge_label = "client"
 
 # The remediation pass found the single-binary promise was hollow: build.rs
 # embedded a 1,306-byte placeholder and the real client never shipped. The
 # binary now carries the whole gzipped bundle (about +330 KB), and the gate
-# refuses a release binary whose file table lacks web_bg.wasm, so this
+# refuses a release binary whose file table lacks the client assets, so this
 # cannot regress silently. The ratchet holds the line from the first honest
 # reading.
 # P3.06 records 8,620,032, freshly linked rather than read off a stale

@@ -44,7 +44,7 @@ fn a_re_pricing_that_travels_alone_needs_no_ruling() {
 /// whatever it does to the code.
 #[test]
 fn ordinary_source_work_is_not_a_gate_change() {
-    let work = paths(&["crates/web/src/board.rs", "crates/web/screens/board.html"]);
+    let work = paths(&["crates/city/src/building.rs", "docs/templates/BUILDING.md"]);
     assert!(gate_faces(&work, false, false).is_empty());
 }
 
@@ -72,7 +72,7 @@ fn striking_an_exemption_beside_the_split_that_earned_it_is_not_a_gate_change() 
                 @@ -246,7 +246,6 @@\n\
                  [file_length.predating]\n\
                 -\"crates/memory/src/jsonl.rs\" = 1194\n\
-                 \"crates/web/src/app.rs\" = 3916\n";
+                 \"crates/city/src/building.rs\" = 3916\n";
     assert!(strikes_only_exemptions(diff));
     let pair = paths(&["xtask/budgets.toml", "crates/memory/src/jsonl.rs"]);
     assert!(gate_faces(&pair, false, true).is_empty());
@@ -91,7 +91,7 @@ fn striking_an_exemption_beside_the_split_that_earned_it_is_not_a_gate_change() 
 fn a_widened_budget_or_a_new_exemption_is_still_a_gate_change() {
     let widened = "@@\n-budget_lines = 1000\n+budget_lines = 2000\n";
     assert!(!strikes_only_exemptions(widened));
-    let added = "@@\n+\"crates/web/src/app.rs\" = 3916\n";
+    let added = "@@\n+\"crates/city/src/building.rs\" = 3916\n";
     assert!(!strikes_only_exemptions(added));
     let moved = "@@\n\
                  -\"crates/sprawling/src/assembly.rs::conclude\", # 10\n\

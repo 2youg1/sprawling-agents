@@ -48,8 +48,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = crate::badge::check(root)?;
     // The single-binary promise, checked as bytes: a release binary that
     // exists must carry the client bundle's file table. The placeholder
-    // build (no `just build-web` beforehand) lacks the `web_bg.wasm`
-    // entry, and a binary like that must not look shippable.
+    // build (no `just build-web` beforehand) lacks the assets entry, and
+    // a binary like that must not look shippable.
     if let Some(binary) = binary_path(root, &ReleaseTarget::Host)
         && !carries_client(&binary)?
     {
@@ -57,9 +57,10 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             gate: "budget",
             location: binary.display().to_string(),
             rule: "a release binary carries the web client inside itself".to_owned(),
-            violation: "the embedded file table has no web_bg.wasm: this binary would serve an \
-                        empty page"
-                .to_owned(),
+            violation: format!(
+                "the embedded file table has no {CLIENT_MARK}: this binary would serve the \
+                 placeholder page"
+            ),
             alternative: "run `just build-web`, then rebuild the release binary".to_owned(),
         });
     }
@@ -252,8 +253,15 @@ pub(crate) fn carries_client(binary: &Path) -> Result<bool, XtaskError> {
         path: binary.display().to_string(),
         source,
     })?;
-    Ok(contains(&bytes, b"web_bg.wasm"))
+    Ok(contains(&bytes, CLIENT_MARK.as_bytes()))
 }
+
+/// The request path that only a built bundle produces.
+///
+/// Vite writes every hashed chunk under `assets/`, and the placeholder
+/// page has no such path in its table. One entry rather than a file name:
+/// the file names carry a content hash and change on every build.
+const CLIENT_MARK: &str = "assets/index-";
 
 #[cfg(test)]
 #[allow(
@@ -346,7 +354,10 @@ mod tests {
 
     #[test]
     fn a_binary_without_the_client_table_is_named_by_the_gate() {
-        assert!(contains(b"...web_bg.wasm...", b"web_bg.wasm"));
-        assert!(!contains(b"a placeholder build", b"web_bg.wasm"));
+        assert!(contains(
+            b"...assets/index-DXu22Oug.js...",
+            CLIENT_MARK.as_bytes()
+        ));
+        assert!(!contains(b"a placeholder build", CLIENT_MARK.as_bytes()));
     }
 }

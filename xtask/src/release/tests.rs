@@ -29,7 +29,7 @@ fn one_machine_stays_behind_and_everything_that_explains_the_code_goes_out() {
     }
     // `localise.rs` is not the isolation zone, and a prefix rule
     // written without care would say it is.
-    assert!(!is_scaffolding("crates/web/src/localise.rs"));
+    assert!(!is_scaffolding("crates/city/src/building.rs"));
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn a_document_anchored_outside_the_repository_is_caught_and_shorthand_is_not() {
     // never wrong.
     assert!(outside_the_tree("// tools/exec.rs", &dirs).is_none());
     assert!(outside_the_tree("`read src/lex.rs` differs by", &dirs).is_none());
-    assert!(outside_the_tree("crates/web/src/board.rs", &dirs).is_none());
+    assert!(outside_the_tree("crates/city/src/building.rs", &dirs).is_none());
     assert!(outside_the_tree("see local/Handoff.md", &dirs).is_none());
 
     // A URL is somebody else's tree. The colon ends the token, so
@@ -137,11 +137,8 @@ fn only_prose_is_read_for_citations() {
         "crates/city/src/building.rs",
         "//! see docs/glossary.md"
     ));
-    assert!(is_prose("crates/web/web-SPEC.md", "anything at all"));
-    assert!(is_prose(
-        "crates/web/screens/board.html",
-        "<!-- a comment -->"
-    ));
+    assert!(is_prose("crates/city/city-SPEC.md", "anything at all"));
+    assert!(is_prose("docs/templates/BUILDING.md", "<!-- a comment -->"));
 }
 
 #[test]

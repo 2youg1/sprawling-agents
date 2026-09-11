@@ -4,7 +4,7 @@ set shell := ["bash", "-uc"]
 default: check
 
 # Every card closes on this being green.
-check: fmt-check clippy test gates
+check: fmt-check clippy test gates check-client
 
 fmt:
     cargo fmt --all
@@ -41,28 +41,11 @@ build-web:
 check-client:
     cd client && bun install --frozen-lockfile && bun run lint && bun run typecheck && bun run test
 
-# The previous client, Dioxus compiled to wasm without `dx`
-# (crates/web/web-SPEC.md section 8.5). Both clients coexist until card
-# 6.11 removes crates/web; until then `dist` still embeds this one,
-# because build.rs judges a bundle complete by web.js + web_bg.wasm.
-# Environment prerequisites: the wasm32-unknown-unknown target, and a
-# wasm-bindgen CLI whose version equals the wasm-bindgen crate version -
-# a mismatch there is the quietest way to break a wasm build.
-build-web-wasm:
-    cargo build -p web --target wasm32-unknown-unknown --release --locked
-    wasm-bindgen --target web --no-typescript --out-dir target/web-dist \
-        target/wasm32-unknown-unknown/release/web.wasm
-
 # The gate that opens the gallery in a real engine, on its own: roles,
 # accessible names, landmarks, one left edge, nothing outside its box.
 # Needs `just build-web` first, and says so when the bundle is absent.
 render:
     cargo xtask render
-
-# The gate `just check` cannot reach: web's wasm-only paths, and channels
-# built without its server feature. Cheap, so it runs on its own.
-check-web:
-    cargo clippy -p web --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
 
 # citysim scenarios land from S2; the crate's test suite is the entry point.
 sim seed="":
@@ -105,13 +88,12 @@ repro:
 # The whole deliverable: client bundle first, then the binary that embeds
 # it, then the size badges README shows. The badges are rendered from the
 # artifacts this recipe just produced, so a release cannot ship a size
-# somebody typed. `build-web-wasm` rather than `build-web` until card 6.11:
-# see the note on that recipe.
+# somebody typed.
 # An optional target triple builds for a platform other than this
 # machine's default; the badges are then left alone, because README's
 # sizes describe the artifact a person downloads first and two builds of
 # one tag must not disagree about one number.
-dist target="": build-web-wasm
+dist target="": build-web
     cargo build --release -p sprawling --locked {{ if target == "" { "" } else { "--target " + target } }}
     cargo xtask sbom
     {{ if target == "" { "cargo xtask badge --write" } else { "echo badges are the host build's to write" } }}

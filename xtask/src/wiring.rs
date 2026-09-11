@@ -28,7 +28,7 @@
 //! **Three sources, no copies.** The variants come from the real `enum
 //! Command` parsed out of whichever `channels` module declares it; whether the city
 //! can perform one comes from the arms of `assembly::run_command`;
-//! whether a person can ask for one comes from `crates/web/src`. The SPEC
+//! whether a person can ask for one comes from `client/src`. The SPEC
 //! contributes the one fact none of the three can state - which side is
 //! *supposed* to reach it - and the gate reads it as data, so "the table
 //! drifted" and "the enum grew silently" are the same red.

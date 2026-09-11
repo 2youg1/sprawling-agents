@@ -11,7 +11,7 @@
 # the slower of the two.
 #
 # Five jobs, none waiting on another. Together they are exactly `just
-# check` plus `just check-web` plus the supply-chain read, and CI must
+# check` plus the supply-chain read, and CI must
 # never be weaker than the local command: a green CI that implies less
 # than a green `just check` is worse than no CI.
 #
@@ -20,7 +20,7 @@
 #   gates    the sixteen machine gates, and the nightly rustdoc apisync
 #            needs (27s of a 27.5s gate run locally - it is why the other
 #            twelve no longer queue behind a compile)
-#   web      the two places `just check` cannot reach
+#   client   the client's own linter, typecheck and tests
 #   supply   licences, bans and sources; compiles nothing
 #
 # Windows, and only Windows, is deliberate and unchanged: it is the
@@ -225,23 +225,18 @@ jobs:
             cargo xtask gates
           fi
 
-  # The two places `just check` cannot reach: web's wasm-only paths, and
-  # channels built without its server feature.
-  web:
-    runs-on: windows-latest
+  # The client, which is the one part of this repository the Rust
+  # toolchain does not judge: its own linter forbids `any`, `as`, `throw`,
+  # `try` and a non-exhaustive switch, and its tests run here rather than
+  # inside the Rust job so that a bun install is cached on its own.
+  client:
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - name: install pinned toolchain
-        run: rustup show
-      - name: the client target
-        run: rustup target add wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: web
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: clippy on the target that has a browser
-        run: cargo clippy -p web --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
+      - uses: oven-sh/setup-bun@v2
+      - name: lint, typecheck and test the client
+        run: just check-client
 
   # Licences, banned crates and where they came from. It compiles nothing
   # - it reads `Cargo.lock` - so it is the verdict that arrives first.
