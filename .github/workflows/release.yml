@@ -18,6 +18,32 @@ on:
 permissions:
   contents: read
 
+# Word for word what ci.yml sets, and it has to be: `Swatinem/rust-cache`
+# hashes every `CARGO*` and `RUST*` variable into its key, so a release
+# that left these unset could not restore what a push to main saved, no
+# matter how well the rest of the key matched.
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+# Least privilege on the Actions cache, declared rather than inherited.
+#
+# A tag push is a trusted trigger, so by default every job here may write
+# into the *default branch's* cache scope - the entries ci.yml fills on
+# main and restores on every push. This workflow needs none of that, and
+# saying so is a speed change rather than only a safety one.
+#
+# Nothing here has a save worth keeping. A cache written under a tag ref
+# is restorable by that tag alone, and a tag is cut once, so the save was
+# always pure cost: compressing and uploading a Windows target directory
+# that no later run can read. Read-only deletes that work outright.
+#
+# And because the save is now impossible, `verify` can take the key the
+# `test` job fills on main and start warm instead of compiling 494
+# packages from zero - safely, since read-only is enforced by the cache
+# service rather than by each step remembering to ask for less.
+cache-mode: read
+
 jobs:
   # Nothing is built for release out of a tree that has not passed.
   #
@@ -26,17 +52,36 @@ jobs:
   # reproduced exactly. It is the gate on the tree, not a per-platform
   # build - the three archives the matrix below produces (Windows, macOS
   # and static Linux) all come out of the tree this job passed.
+  # The ceilings in this file are backstops against a hung runner, not
+  # budgets: ci.yml's twenty minutes measures jobs that split the work
+  # three ways and start warm, while this job runs their union and the
+  # matrix below links a fat-LTO binary with one codegen unit. A release
+  # that takes an hour is slow; a release still going at six hours has
+  # stopped.
   verify:
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: install pinned toolchain
         run: rustup show
-      # The first run after a workflow change is cold: 494 packages compiled
-      # from zero. Every run after that reuses the cache instead.
+      # `test` rather than a key of its own, and that is the whole of the
+      # change: this job used to have a key no other run could fill, so
+      # every tag compiled 494 packages from zero. The `test` entry holds
+      # real rlibs, which is what the slower half of this job needs -
+      # rust-cache prunes the workspace's own artefacts before saving, so
+      # what arrives is the dependency graph and nothing that could be
+      # stale about this tree.
+      #
+      # `save-if: false` states in the action what `cache-mode: read`
+      # enforces at the service. The mode alone would deny the upload,
+      # but only after the archive had been built; this skips the work.
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test
+          save-if: false
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest,cargo-deny,cargo-public-api
@@ -87,6 +132,7 @@ jobs:
   # Archive does not wait for verify: the two are independent, publish
   # waits for both, and the wall clock is the slower one instead of the sum.
   archive:
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -145,6 +191,7 @@ jobs:
   publish:
     needs: [verify, archive]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:

@@ -86,10 +86,13 @@ jobs:
       # difference between a five-minute run and a twenty-minute one.
       # A key per job, because check-mode metadata and real rlibs are
       # different artifacts and one key would make two jobs overwrite each
-      # other's cache all day. Only the branch everyone builds on writes:
-      # a pull request that saved its own would evict the shared one it
-      # was restored from, and the next unrelated push would pay for a
-      # cold build.
+      # other's cache all day. Only the branch everyone builds on writes,
+      # and the reason is the repository's cache budget rather than this
+      # one entry: a pull request's save is scoped to its own merge ref,
+      # so it cannot overwrite what it restored - but it spends minutes
+      # writing bytes that only that pull request's re-runs can read, and
+      # those bytes push the shared entry out by age once the budget is
+      # full.
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: clippy
@@ -140,8 +143,9 @@ jobs:
         run: cargo nextest run --workspace --locked --all-features
 
       # Only the branch everyone builds on writes, for the reason the
-      # rust-cache blocks above give: a pull request that saved its own
-      # would evict the shared entry it was restored from.
+      # rust-cache block above gives: a pull request's save is readable
+      # only by that same pull request, and it crowds the shared entry out
+      # of the repository's cache budget by age.
       - uses: actions/cache/save@v6
         if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:
