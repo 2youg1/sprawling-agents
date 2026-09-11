@@ -78,8 +78,8 @@ error ◀──使用── 全部十二个模块（MemoryError 与 into_ax 的�
   - **剩下那 562 µs 是 fsync 本身**，要再压就必须跨记录合屏障，而那是契约问题不是实现问题（下两段）。
   - 否决「跨会话组提交：一个序列化写入者收集同一时间窗内各会话的 drafts」，它的依据是一份探针测到的 p99（4 会话 29 ms → 32 会话 319 ms，锁车队）。**这座城没有那个形状可优化**：
   - `bin::assembly::spawn_worker` 开唯一一条写入线程，账本在它里打开且从不离开（源注：「a city has one writer, and the type never has to cross a thread boundary to prove it」），`worker_desk.wait()` 逐条取命令串行 `serve_one`。ARCHITECTURE §10 同词：「The whole city runs as real code, single-threaded」。全仓除测试夹具外再无第二个 spawn 碰账本。探针量的是 32 线程共享一个 `Mutex<JsonlLedger>`，**那是本仓刻意不采用的架构**。
-  - 真正的缺陷在另一根轴上，且更大：**`kernel::Ledger` 只有 `append(draft) -> EventRef` 一个方法**，于是 `runtime` 写的每一条记录都是一批一条，各付一道屏障；`append_all` 在生产代码里**没有任何调用方**。实测（`durability_barrier`，windows-x86_64 NVMe）：一条一屏障 **1100.3 µs／条**，十条 103.3，五十条 **22.4**。**49 倍就压在每一条事件下面。**
-  - 批量面尚未提上端口，两条路各有代价：要么把批量面提上 `kernel::Ledger` 端口（改 kernel 公开面与 ARCHITECTURE 记过的缝），让 `runtime::turn` 攒满一波再交；要么给端口加一个显式屏障动作，`append` 只写不同步。**后者会改掉本模块的一条必要前提**：今天 `Ok` 即已落盘，观察者也只在落盘后才听到一条——「架上不会有历史里没有的东西」靠的就是这个，而 `EventRef` 一旦在同步前发出去，它就不再是一条已存在的历史的引用。
+  - 真正的缺陷在另一根轴上，且更大，现已修掉：**`kernel::Ledger` 曾经只有 `append(draft) -> EventRef` 一个方法**，于是每一条记录都是一批一条、各付一道屏障，而本模块早就能一波一屏障的 `append_all` 在生产代码里没有任何调用方。实测（`durability_barrier`，windows-x86_64 NVMe 一档机器）：一条一屏障 **585.2 µs／条**，十条 58.6，五十条 **13.2**——**44 倍压在每一条事件下面**。端口现在有 `append_all`（默认实现逐条 append，本模块覆写为一波一屏障），`bin::serving::relay` 把已经在等的那一批一次交下来。
+  - 两条路各有代价，取的是第一条：把批量面提上 `kernel::Ledger` 端口（改 kernel 公开面与 ARCHITECTURE 记过的缝）；否决的是给端口加一个显式屏障动作、让 `append` 只写不同步。**后者会改掉本模块的一条必要前提**：今天 `Ok` 即已落盘，观察者也只在落盘后才听到一条——「架上不会有历史里没有的东西」靠的就是这个，而 `EventRef` 一旦在同步前发出去，它就不再是一条已存在的历史的引用。
 - 不判定任何语义——kind 二分、载荷校验、规范字节全部来自 kernel；jsonl 只定 seq/prev 与介质。
 - 不采样时钟（clippy disallowed 已看守）——`log_truncated` 的 `t` 由 open 的调用方注入；checkpoint 的提交时间同规入参。
 - 不向调用方暴露分段——segment 边界、滚动阈值、文件名全为内部事务；对外只有目录（index 的 seq 寻址经 jsonl 的 pub(crate) 读面，不破此墙）。

@@ -35,6 +35,33 @@ pub fn chain_hash(raw_line: &[u8]) -> B3Hash {
 /// The only write entrance to history.
 pub trait Ledger {
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError>;
+
+    /// Every draft in one wave, answered positionally.
+    ///
+    /// **A durable write costs one disk barrier, and a barrier costs the
+    /// same whether one record or fifty ride on it.** Measured on one
+    /// windows-x86_64 NVMe machine: 585 µs per record at one record per
+    /// barrier against 13 µs at fifty, of which the write itself is
+    /// about 2.5 µs. A caller that already holds a wave therefore pays
+    /// forty times what the disk asks by handing it over one at a time.
+    ///
+    /// The contract of [`Ledger::append`] holds for every element: when
+    /// this answers `Ok`, every record in it is durable, and the refs
+    /// come back in the order the drafts were given. The default
+    /// implementation appends one at a time, which is correct and is
+    /// what a store with no batch of its own can honestly offer.
+    ///
+    /// # Errors
+    /// The first refusal ends the wave. Records before it may already be
+    /// durable, which is the same promise a single append makes when the
+    /// one after it fails.
+    fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
+        let mut refs = Vec::with_capacity(drafts.len());
+        for draft in drafts {
+            refs.push(self.append(draft)?);
+        }
+        Ok(refs)
+    }
 }
 
 #[cfg(feature = "conformance")]

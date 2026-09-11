@@ -1615,3 +1615,17 @@ pub struct Reach { host, named, connected, answered, through, elapsed_ms }
 - **`Resolved(0)` 不可表达**：解出零个地址就是 `NotFound`，不是「解出了，零个」。
 - **`ProxiedAway` 是一段诚实的缺席**：有代理时名字与套接字都由代理去做，城自己再解一次名，报的是一条请求不会走的路。
 - **时间是参数**：`elapsed_ms` 由调用方盖戳，因为全城只有 Main 采样时钟。
+
+### 8-51 `Ledger` 端口的第二个方法：一波一屏障
+
+```rust
+pub trait Ledger {
+    fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError>;
+    fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError>;  // 默认逐条 append
+}
+```
+
+- **为什么端口要长这一只手**：一次持久写的代价是一道磁盘屏障，而屏障的价钱与骑在它上面的记录条数无关。实测（windows-x86_64 NVMe 一档机器）一条一屏障 585.2 µs／条，五十条一屏障 13.2 µs／条，其中真正的写约 2.5 µs。手上已经攥着一波的调用方按条交付，付的就是四十倍于磁盘所要的价钱。`memory::JsonlLedger` 从一开始就能一波一屏障，端口却没有一句话让它做——于是它在生产代码里没有调用方。
+- **默认实现是诚实的**：逐条 `append`，任何没有批量能力的存储照此就是正确的，不必为了满足端口去假装合并。
+- **契约逐元素成立**：答 `Ok` 即整波已落盘，refs 按给入顺序回来。第一条拒绝结束整波，其前的记录可能已经落盘——这与单条 `append` 在它后面那条失败时给出的承诺完全一样。
+- **否决「显式屏障动作」**：让 `append` 只写不同步、另给一个 flush 动作，会让一条已经发出的 `EventRef` 指向一条可能还不存在的历史，而那正是这个类型存在的全部意义。

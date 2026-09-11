@@ -339,6 +339,7 @@ pub fn kernel::ImageType::mime(&self) -> &'static str
 pub fn kernel::LayeredValue<T>::default() -> Self
 pub fn kernel::LayeredValue<T>::resolve(&self) -> core::option::Option<&T>
 pub fn kernel::Ledger::append(&mut self, kernel::EventDraft) -> core::result::Result<kernel::EventRef, kernel::AxError>
+pub fn kernel::Ledger::append_all(&mut self, alloc::vec::Vec<kernel::EventDraft>) -> core::result::Result<alloc::vec::Vec<kernel::EventRef>, kernel::AxError>
 pub fn kernel::Locator::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn kernel::Locator::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::Locator::parse(&str) -> core::result::Result<Self, kernel::AxError>

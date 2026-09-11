@@ -64,6 +64,7 @@ pub fn memory::HotView::get(&self, &kernel::event::identity::RunId) -> core::opt
 pub fn memory::HotView::new() -> memory::HotView
 pub fn memory::HotView::runs(&self) -> impl core::iter::traits::iterator::Iterator<Item = (&kernel::event::identity::RunId, &memory::RunHot)>
 pub fn memory::JsonlLedger::append(&mut self, kernel::event::payload::EventDraft) -> core::result::Result<kernel::event::payload::EventRef, kernel::error::shape::AxError>
+pub fn memory::JsonlLedger::append_all(&mut self, alloc::vec::Vec<kernel::event::payload::EventDraft>) -> core::result::Result<alloc::vec::Vec<kernel::event::payload::EventRef>, kernel::error::shape::AxError>
 pub fn memory::JsonlLedger::append_all(&mut self, alloc::vec::Vec<kernel::event::payload::EventDraft>) -> core::result::Result<alloc::vec::Vec<kernel::event::payload::EventRef>, memory::MemoryError>
 pub fn memory::JsonlLedger::observe(&mut self, memory::WriteObserver)
 pub fn memory::JsonlLedger::open(&std::path::Path, kernel::event::identity::TimeMs) -> core::result::Result<(Self, memory::OpenReport), memory::MemoryError>

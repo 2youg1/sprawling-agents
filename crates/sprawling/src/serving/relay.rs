@@ -92,15 +92,45 @@ impl RelayGate {
     /// before it looks at the command desk, so a run that has already
     /// been paid for does not queue behind a command that has not
     /// started (sprawling-SPEC.md 8-42-2).
+    ///
+    /// **Everything already waiting rides one disk barrier.** Four lanes
+    /// drive at once and every line they write crosses to this one
+    /// thread, so a drain routinely holds several drafts; handing them
+    /// over one at a time paid one barrier each, and a barrier costs the
+    /// same for fifty records as for one. What each caller waits for is
+    /// unchanged: the answer still goes back only after the write is
+    /// durable, because that is what makes an `EventRef` a reference to
+    /// a history that exists.
     pub(crate) fn serve_waiting(&self, ledger: &mut impl Ledger) -> usize {
-        let mut served = 0usize;
+        let mut drafts = Vec::new();
+        let mut senders = Vec::new();
         while let Ok(RelayRequest { draft, back }) = self.asks.try_recv() {
-            let echo = ledger.append(draft);
-            // A driving thread that stopped listening does not undo the
-            // line: the history is what the city believes, and it was
-            // written before this send was tried.
-            let _ = back.send(echo);
-            served = served.saturating_add(1);
+            drafts.push(draft);
+            senders.push(back);
+        }
+        let served = senders.len();
+        if served == 0 {
+            return 0;
+        }
+        match ledger.append_all(drafts) {
+            Ok(echoes) => {
+                // Positional, which is the port's own promise. A sender
+                // with no echo cannot happen; if it ever did, it would
+                // be a caller left waiting rather than a caller told
+                // something untrue.
+                for (back, echo) in senders.into_iter().zip(echoes) {
+                    // A driving thread that stopped listening does not
+                    // undo the line: the history is what the city
+                    // believes, and it was written before this send was
+                    // tried.
+                    let _ = back.send(Ok(echo));
+                }
+            }
+            Err(refused) => {
+                for back in senders {
+                    let _ = back.send(Err(refused.clone()));
+                }
+            }
         }
         served
     }
@@ -222,5 +252,84 @@ mod tests {
             ig: false,
         });
         assert!(refused.is_err(), "a writer that is gone is not a success");
+    }
+
+    /// **The measurement this batching exists for, expressed as a
+    /// count.** A drain that holds four drafts must reach the store
+    /// once: a disk barrier costs the same for four records as for one,
+    /// and four barriers is what the old shape paid. The counting store
+    /// is the second adapter the port already allows for.
+    #[test]
+    fn everything_already_waiting_reaches_the_store_in_one_wave() {
+        struct Counting {
+            waves: usize,
+            records: usize,
+            seq: u64,
+        }
+        impl Ledger for Counting {
+            fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
+                self.append_all(vec![draft])?
+                    .into_iter()
+                    .next()
+                    .ok_or_else(|| super::gone("a wave of one answered with nothing"))
+            }
+
+            fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
+                self.waves = self.waves.saturating_add(1);
+                self.records = self.records.saturating_add(drafts.len());
+                let mut refs = Vec::new();
+                for draft in drafts {
+                    self.seq = self.seq.saturating_add(1);
+                    refs.push(
+                        kernel::EventRecord::from_draft(
+                            draft,
+                            kernel::Seq::new(self.seq),
+                            kernel::GENESIS_PREV,
+                        )
+                        .to_ref(),
+                    );
+                }
+                Ok(refs)
+            }
+        }
+
+        let gate = RelayGate::open();
+        let waiting = 4;
+        let mut writers = Vec::new();
+        for stamp in 1..=waiting {
+            let mut relay = gate.issue();
+            writers.push(std::thread::spawn(move || {
+                relay.append(EventDraft {
+                    run: kernel::RunId::CITY,
+                    t: kernel::TimeMs::new(stamp),
+                    who: "city".to_owned(),
+                    addr: None,
+                    kind: kernel::EventKind::CityInitialized,
+                    data: kernel::Payload::empty(),
+                    ig: false,
+                })
+            }));
+        }
+        let mut store = Counting {
+            waves: 0,
+            records: 0,
+            seq: 0,
+        };
+        // Serve until every writer has been answered, which is the same
+        // loop the accounting thread runs.
+        let mut served = 0usize;
+        while served < usize::try_from(waiting).unwrap_or(0) {
+            served = served.saturating_add(gate.serve_waiting(&mut store));
+        }
+        for writer in writers {
+            let echo = writer.join().expect("a writing thread ends");
+            assert!(echo.is_ok(), "every waiting draft is answered");
+        }
+        assert_eq!(store.records, 4, "every draft reached the store");
+        assert!(
+            store.waves < 4,
+            "four drafts arriving together must not cost four waves: {} waves",
+            store.waves
+        );
     }
 }

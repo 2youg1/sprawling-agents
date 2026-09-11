@@ -1786,7 +1786,7 @@ pub(crate) struct RelayGate { /* Receiver ＋ 一个用来发牌的 Sender */ }
 impl RelayGate {
     pub(crate) fn open() -> RelayGate;
     pub(crate) fn issue(&self) -> Relay;
-    /// 把此刻已经在等的请求全部服务掉，一件不留。返回服务了几件。
+    /// 把此刻已经在等的请求全部服务掉，一件不留，**且合成一道屏障**。返回服务了几件。
     pub(crate) fn serve_waiting(&self, ledger: &mut impl kernel::Ledger) -> usize;
 }
 ```
@@ -2606,3 +2606,12 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError>;
 - **Linux 只开父目录**：`xdg-open` 没有选中参数，而各文件管理器的选中写法互不相同——那会是一张这座城得跟着上游改的表。父目录是所有桌面都能兑现的承诺。
 
 **本章测试**：`a_path_this_city_does_not_hold_is_refused_rather_than_opened`、`the_selected_path_travels_as_one_argument`。
+
+### 8-61 已经在等的那一批，合成一道屏障
+
+`RelayGate::serve_waiting` 先把此刻等着的请求**全部取空**，再一次 `Ledger::append_all` 交下去，按位回信。
+
+- **理由是屏障的价钱与记录条数无关**：实测（`durability_barrier`，windows-x86_64 NVMe 一档机器）一条一屏障 585.2 µs／条，五十条一屏障 13.2 µs／条，而其中真正的写只有约 2.5 µs。四条车道同时在跑、每一行都要越到这一条记账线程上来，所以一次排空手里常常不止一件；一件一件交下去，交的是同样的字节，付的是四倍的屏障。
+- **等待的语义一个字没改**：回信仍然在落盘之后才发出，因为「`Ok` 即已落盘」正是 `EventRef` 之所以是一条已存在历史的引用（memory-SPEC §8-1）。否决「给端口加一个显式屏障动作、`append` 只写不同步」：那会让一条已经发出的 `EventRef` 指向一条可能还不存在的历史。
+- **整波失败即整波拒**：`append_all` 的第一条拒绝结束整波，每个在等的调用方都收到同一条拒绝——与单条 `append` 在它后面那条失败时给出的承诺相同。
+- **计数店是证据**：`everything_already_waiting_reaches_the_store_in_one_wave` 用一家数波数的店断言四条同时到达的 draft 不花四次波，这是端口早就允许的第二实现，而不是为这条断言新开的洞。
