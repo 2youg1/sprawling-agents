@@ -13,6 +13,7 @@ mod artifact;
 mod badge;
 mod boundary;
 mod budget;
+mod channel;
 mod color;
 mod depmap;
 mod gates;
@@ -38,7 +39,7 @@ mod wire_ts;
 mod wiring;
 mod wording;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use report::XtaskError;
@@ -82,6 +83,21 @@ fn main() -> ExitCode {
         ) {
             Ok(message) => {
                 print!("{message}");
+                ExitCode::SUCCESS
+            }
+            Err(err) => report::internal_failure(&err),
+        },
+        // The npm channel is assembled out of a tag's own archives, so
+        // it takes the tag and where they were downloaded to rather
+        // than discovering either.
+        Some("channel") => match channel::run(
+            &root,
+            &value_arg(&args, "--tag").unwrap_or_default(),
+            Path::new(&value_arg(&args, "--assets").unwrap_or_default()),
+            Path::new(&value_arg(&args, "--out").unwrap_or_default()),
+        ) {
+            Ok(message) => {
+                println!("{message}");
                 ExitCode::SUCCESS
             }
             Err(err) => report::internal_failure(&err),

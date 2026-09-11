@@ -225,3 +225,69 @@ jobs:
             --title "sprawling ${GITHUB_REF_NAME}" \
             --prerelease \
             --notes-file .github/release-notes.md
+
+  # The same binaries, reachable by `bunx sprawling` instead of by
+  # downloading a zip. `cargo xtask channel` takes this tag's own
+  # archives apart and writes one package per platform plus a root that
+  # depends on them optionally, so npm and bun fetch exactly one binary.
+  #
+  # **It builds on every release and publishes only when it can.** The
+  # token is a repository secret this project does not have yet, and a
+  # release must not go red because a channel nobody has enabled is not
+  # enabled. So the packing runs always - a release that quietly stopped
+  # being packageable is worth knowing about on the day it happens - and
+  # the publish step is skipped with its reason printed when `NPM_TOKEN`
+  # is absent. Add the secret and the next tag publishes; nothing else
+  # here changes.
+  #
+  # After publish, never during: it takes the archives from the release
+  # this run just made, so a failure here leaves the download channel
+  # already standing rather than half a release.
+  channel:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: actions/download-artifact@v8
+        with:
+          path: assets
+          merge-multiple: true
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+      - name: assemble the packages from this tag's archives
+        run: |
+          cargo xtask channel --tag "${GITHUB_REF_NAME}" \
+            --assets assets --out target/npm
+      # The shim is the one piece of this channel that runs on a person's
+      # machine, so it is executed here rather than only read: a syntax
+      # error in it would otherwise be found by the first person to type
+      # `bunx sprawling`.
+      - name: the shim parses and refuses honestly
+        run: node --check target/npm/sprawling/bin/sprawling.js
+      - name: publish, or say why not
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "::notice::NPM_TOKEN is not set, so nothing was published."
+            echo "The packages below were assembled and discarded. Add the"
+            echo "secret and the next tag publishes them."
+            find target/npm -name package.json -print
+            exit 0
+          fi
+          # Platform packages first: the root package names them as
+          # optional dependencies at an exact version, and a root that
+          # reaches npm before they do is a root nobody can install.
+          for dir in target/npm/@sprawling/*; do
+            npm publish "$dir" --access public --tag pre
+          done
+          npm publish target/npm/sprawling --access public --tag pre
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
