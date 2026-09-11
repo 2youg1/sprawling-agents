@@ -244,6 +244,9 @@ jobs:
   # first version under each name is published by a person and every
   # version after it by this job. A name that reaches a release without
   # that first publish stops here rather than inventing a way through.
+  # The three platform packages moved into the `@sprawling` scope, which
+  # made each of them a new name: each needs that one publish by a person
+  # and its own trusted publisher before this job can carry it.
   #
   # After publish, never during: it takes the archives from the release
   # this run just made, so a failure here leaves the download channel
@@ -299,11 +302,14 @@ jobs:
           # these packages with no `latest` at all, and `bunx sprawling`
           # would fail to resolve rather than install a pre-alpha -
           # install.sh carries the same lesson about the download
-          # channel. The version string says `0.0.4-pre.260911` and the
+          # channel. The version string carries `-pre.<YYMMDD>` and the
           # release notes say not to use it; the dist-tag is not where
           # that warning belongs.
-          for dir in target/npm/*/; do
-            [ "$(basename "$dir")" = sprawling ] && continue
+          #
+          # The platform packages are scoped, so they sit one directory
+          # deeper than the root package and this enumerates that level
+          # rather than every child of `target/npm`.
+          for dir in target/npm/@sprawling/*/; do
             npm publish "$dir" --access public --tag latest
           done
           npm publish target/npm/sprawling --access public --tag latest

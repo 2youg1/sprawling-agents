@@ -1,6 +1,6 @@
 [package]
 name = "sprawling-desktop"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2024"
 license = "MPL-2.0"
 rust-version = "1.97"

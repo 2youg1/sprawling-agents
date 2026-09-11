@@ -60,36 +60,34 @@ struct Row {
 /// this table does not know is an error, which is the asymmetry that
 /// keeps a new platform from being dropped in silence.
 ///
-/// **These names move under `@sprawling` at the next version, and not
-/// before.** They are bare because the organisation did not exist when
-/// they were chosen, and npm answers a publish into an unowned scope
-/// with a 404 that reads as a missing package rather than as a missing
-/// scope. The organisation exists now, so that reason has expired - but
-/// the version these names already carry is on the registry, and npm
-/// never reuses a `name@version`, so the rename cannot reach backwards.
-/// The root package keeps its bare name whatever happens to these:
-/// `bunx sprawling` is the whole reason this channel exists, and a
-/// scoped root would spell it `bunx @sprawling/sprawling`. The test
-/// beside this table is what carries the decision to the version that
-/// can honour it.
+/// **These names carry the `@sprawling` scope, and the versions at or
+/// below `UNSCOPED_THROUGH` do not.** npm never reuses a `name@version`,
+/// so the rename cannot reach backwards: everything already on the
+/// registry under a bare name stays there and is deprecated in place,
+/// pointing at the scoped name that succeeds it. The root package keeps
+/// its bare name whatever happens to these: `bunx sprawling` is the
+/// whole reason this channel exists, and a scoped root would spell it
+/// `bunx @sprawling/sprawling`. A scoped name writes one directory level
+/// more than a bare one, which is why the publish step enumerates
+/// `target/npm/@sprawling/*/` rather than every child of `target/npm`.
 const ROWS: [Row; 3] = [
     Row {
         suffix: "-windows-x86_64.zip",
-        package: "sprawling-windows-x64",
+        package: "@sprawling/sprawling-windows-x64",
         os: "win32",
         cpu: "x64",
         binary: "sprawling.exe",
     },
     Row {
         suffix: "-macos-aarch64.zip",
-        package: "sprawling-darwin-arm64",
+        package: "@sprawling/sprawling-darwin-arm64",
         os: "darwin",
         cpu: "arm64",
         binary: "sprawling",
     },
     Row {
         suffix: "-x86_64-unknown-linux-musl.zip",
-        package: "sprawling-linux-x64-musl",
+        package: "@sprawling/sprawling-linux-x64-musl",
         os: "linux",
         cpu: "x64",
         binary: "sprawling",

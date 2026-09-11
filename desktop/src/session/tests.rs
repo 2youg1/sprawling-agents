@@ -20,7 +20,7 @@ use super::*;
 /// `protocol::Rpc::initialize` and `protocol::Rpc::initialized`.
 const OPENING: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":\
      {\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":\
-     {\"name\":\"sprawling\",\"version\":\"0.0.4\"}}}";
+     {\"name\":\"sprawling\",\"version\":\"0.0.5\"}}}";
 const READY: &str = "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\",\"params\":{}}";
 
 fn opened(scope: &str) -> Server {
