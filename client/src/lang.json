@@ -3,10 +3,6 @@
     "en": "the page",
     "zh": "页面"
   },
-  "region_bar": {
-    "en": "the bar",
-    "zh": "顶栏"
-  },
   "region_nav": {
     "en": "where to go",
     "zh": "去处"
@@ -282,14 +278,6 @@
   "bld_pursue": {
     "en": "pursue",
     "zh": "追"
-  },
-  "bld_pursuing": {
-    "en": "pursuing",
-    "zh": "在追"
-  },
-  "bld_paused": {
-    "en": "paused",
-    "zh": "暂停了"
   },
   "bld_pause": {
     "en": "pause",
@@ -807,10 +795,6 @@
     "en": "building",
     "zh": "楼"
   },
-  "mcp_servers": {
-    "en": "servers",
-    "zh": "服务器"
-  },
   "mcp_none": {
     "en": "none",
     "zh": "无"
@@ -822,10 +806,6 @@
   "mcp_composio": {
     "en": "Composio",
     "zh": "Composio"
-  },
-  "mcp_custom": {
-    "en": "custom",
-    "zh": "自定义"
   },
   "mcp_kind_http": {
     "en": "http",
@@ -863,17 +843,9 @@
     "en": "api key",
     "zh": "密钥"
   },
-  "mcp_key_kept": {
-    "en": "key kept",
-    "zh": "key 已存"
-  },
   "mcp_open_composio": {
     "en": "composio.dev",
     "zh": "composio.dev"
-  },
-  "mcp_transport": {
-    "en": "transport",
-    "zh": "传输"
   },
   "gallery_title": {
     "en": "gallery",
