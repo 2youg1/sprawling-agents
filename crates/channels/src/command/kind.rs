@@ -224,18 +224,26 @@ pub enum Command<Secret = Sealed<String>> {
         auth_header: Option<String>,
         idem: IdemKey,
     },
-    /// What a building's runs may reach: the sandbox's limits, and the
-    /// external servers its tools come from.
+    /// What a building's runs may reach: the sandbox's limits, the
+    /// external servers its tools come from, and the windows on this
+    /// person's own machine its desktop connector may touch.
     ///
-    /// Both resolve city -> building -> room and neither had a surface,
-    /// so a person could read what they were governed by and not change
-    /// it. Each field is optional and an absent one leaves that section
-    /// alone; an empty `mcp` list is a building that reaches no server,
-    /// which is a different statement from not saying.
+    /// None of the three had a surface, so a person could read what they
+    /// were governed by and not change it. Each field is optional and an
+    /// absent one leaves that section alone; an empty `mcp` list is a
+    /// building that reaches no server, which is a different statement
+    /// from not saying.
+    ///
+    /// `desktop` is the allowlist's text and not a parsed value, and
+    /// that is deliberate: the authority on that file's syntax is the
+    /// connector that reads it at start-up, and that connector fails
+    /// closed. A second parser on this side would be a second authority
+    /// (city-SPEC.md 8-26).
     ConfigureBuilding {
         addr: Address,
         sandbox: Option<SandboxLimits>,
         mcp: Option<Vec<McpServer>>,
+        desktop: Option<String>,
         idem: IdemKey,
     },
     AttachEndpoint {

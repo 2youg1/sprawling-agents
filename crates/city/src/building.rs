@@ -334,6 +334,20 @@ pub fn adopted_payload(building: &Building) -> Result<Payload, AxError> {
     Payload::new(map)
 }
 
+/// Which faces of a building's own layer one reconfiguration wrote.
+///
+/// One value rather than three parameters: they are decided together,
+/// recorded together, and a call site spelling `(true, false, true)`
+/// says nothing about which face is which.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Written {
+    pub sandbox: bool,
+    pub mcp: bool,
+    /// The desktop allowlist, which lives in the building's reserved
+    /// subtree rather than in `CONFIG.toml`.
+    pub desktop: bool,
+}
+
 /// The ledger record for a reconfiguration: which faces of a building's
 /// own layer were written.
 ///
@@ -346,18 +360,15 @@ pub fn adopted_payload(building: &Building) -> Result<Payload, AxError> {
 ///
 /// # Errors
 /// Propagates the payload's own refusal to hold what it was given.
-pub fn configured_payload(
-    building: &Building,
-    sandbox: bool,
-    mcp: bool,
-) -> Result<Payload, AxError> {
+pub fn configured_payload(building: &Building, wrote: Written) -> Result<Payload, AxError> {
     let mut map = serde_json::Map::new();
     map.insert(
         "addr".to_owned(),
         serde_json::Value::String(building.addr().as_str().to_owned()),
     );
-    map.insert("sandbox".to_owned(), serde_json::Value::Bool(sandbox));
-    map.insert("mcp".to_owned(), serde_json::Value::Bool(mcp));
+    map.insert("sandbox".to_owned(), serde_json::Value::Bool(wrote.sandbox));
+    map.insert("mcp".to_owned(), serde_json::Value::Bool(wrote.mcp));
+    map.insert("desktop".to_owned(), serde_json::Value::Bool(wrote.desktop));
     Payload::new(map)
 }
 

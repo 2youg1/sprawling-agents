@@ -82,6 +82,9 @@ pub city::Standing::Work::adoptable: alloc::vec::Vec<kernel::address::Address>
 pub city::Standing::Work::loose: usize
 pub city::Vocation::Builds
 pub city::Vocation::Plans
+pub city::Written::desktop: bool
+pub city::Written::mcp: bool
+pub city::Written::sandbox: bool
 pub const city::AGENTS_FILE: &str
 pub const city::ARCHIVE_DIR: &str
 pub const city::BUILDING_FILE: &str
@@ -198,7 +201,7 @@ pub fn city::agents_path(&std::path::Path, &kernel::address::Address) -> std::pa
 pub fn city::archive_entry(&std::path::Path, &kernel::address::Address, city::ArchiveKind, kernel::event::identity::TimeMs, &str) -> core::result::Result<city::ArchiveEntry, kernel::error::shape::AxError>
 pub fn city::archive_index(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<city::ArchiveEntry>, kernel::error::shape::AxError>
 pub fn city::building_adopted_payload(&city::Building) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
-pub fn city::building_configured_payload(&city::Building, bool, bool) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn city::building_configured_payload(&city::Building, city::Written) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn city::building_created_payload(&city::Building, city::BuildingTemplate) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn city::building_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::buildings(&std::path::Path) -> core::result::Result<alloc::vec::Vec<kernel::address::Address>, kernel::error::shape::AxError>
@@ -255,3 +258,4 @@ pub struct city::RulesTool
 pub struct city::Schedule
 pub struct city::Source
 pub struct city::Watch
+pub struct city::Written

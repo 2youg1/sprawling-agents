@@ -36,31 +36,18 @@ impl RunWorker {
                 effort,
                 ..
             } => {
-                // An empty goal is not a missing field. It already means
-                // something here, and the meaning is better than the one
-                // a filled-in copy of the task would carry: no job file
-                // is written and the prefix tells the model a person is
-                // at the other end. That is exactly the shape a single
-                // sentence typed into the composer has, so the composer
-                // sends the goal empty and this reads it as it always
-                // did.
+                // An empty goal is not a missing field: no job file is
+                // written and the prefix tells the model a person is at
+                // the other end, which is exactly the shape a single
+                // sentence typed into the composer has.
                 //
                 // The session and the effort travel into the dispatch
                 // rather than being spent here, because opening a room
                 // and writing its configuration are the first two things
-                // this city puts on disk for a dispatch, and nothing may
-                // be written until the city has agreed to take the work.
-                // Doing either here would put that rule in a second
-                // place, and leave the entrances that dispatch without a
-                // person holding the older, wrong one.
-                //
-                // The drive goes into a lane of its own, so the desk is
-                // free again before the run has finished: a person who
-                // sends two pieces of work gets two runs going at once,
-                // and a Cancel does not queue behind the run it
-                // cancels. What the person asked for is finished when
-                // the run has started; the conversation it goes on to
-                // have is answered where it lands.
+                // this city puts on disk, and nothing may be written
+                // until the city has agreed to take the work. Doing
+                // either here would leave the entrances that dispatch
+                // without a person holding an older, wrong rule.
                 self.dispatch_into_lane(
                     Assignment {
                         addr,
@@ -83,8 +70,12 @@ impl RunWorker {
                 ..
             } => self.wake(&source, &subject, &body),
             channels::Command::ConfigureBuilding {
-                addr, sandbox, mcp, ..
-            } => self.configure_building(&addr, sandbox.as_ref(), mcp.as_deref()),
+                addr,
+                sandbox,
+                mcp,
+                desktop,
+                ..
+            } => self.configure_building(&addr, sandbox.as_ref(), mcp.as_deref(), desktop.as_deref()),
             channels::Command::ProbeEndpoint {
                 name,
                 base_url,

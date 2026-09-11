@@ -132,7 +132,7 @@ pub fn created_payload(building: &Building, template: BuildingTemplate)
     -> Result<Payload, AxError>;
 pub fn adopt(city_root: &Path, addr: &Address) -> Result<Building, AxError>;      // 整修卡 R1.03
 pub fn adopted_payload(building: &Building) -> Result<Payload, AxError>;          // adopted: true
-pub fn configured_payload(building: &Building, sandbox: bool, mcp: bool)
+pub fn configured_payload(building: &Building, wrote: Written)
     -> Result<Payload, AxError>;                              // building_configured
 ```
 
@@ -708,3 +708,5 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 **整份覆写，且恒不在此校验内容**：`DESKTOP.toml` 的语法权威在 server 那一侧（`desktop/src/scope.rs`），且它 fail closed——读不出来的文件关成全拒。城里再抄一份解析器就是第二个权威，而两个权威里迟早有一个会把某份文件读成另一种意思。城这一侧只保证「写进去的字节就是人给的字节」，剩下的由那台 server 在启动时读，读不动就什么都不做。
 
 **恒不复用 `Governed`**：那三份是**城**的文件（`<city>/.sprawling/`），这一份是**楼**的。把楼级路径塞进一个按 city_root 取路径的枚举里，会让那个枚举需要一个只有部分变体用得上的参数。
+
+**线上它走 `ConfigureBuilding` 的第三个可选字段**（channels-SPEC §8-26）：那条帧问的就是「这栋楼的 runs 够得到什么」，沙箱、外部服务器与这台机器上的窗口是同一个问题的三面。`configured_payload` 因此收一个 `Written { sandbox, mcp, desktop }` 而不是三个裸布尔——一个调用点写 `(true, false, true)` 说不出哪一位是哪一面。

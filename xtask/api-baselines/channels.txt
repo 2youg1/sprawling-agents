@@ -140,6 +140,7 @@ pub channels::Command::Cancel::idem: kernel::idem::IdemKey
 pub channels::Command::Cancel::run: kernel::event::identity::RunId
 pub channels::Command::ConfigureBuilding
 pub channels::Command::ConfigureBuilding::addr: kernel::address::Address
+pub channels::Command::ConfigureBuilding::desktop: core::option::Option<alloc::string::String>
 pub channels::Command::ConfigureBuilding::idem: kernel::idem::IdemKey
 pub channels::Command::ConfigureBuilding::mcp: core::option::Option<alloc::vec::Vec<kernel::config::McpServer>>
 pub channels::Command::ConfigureBuilding::sandbox: core::option::Option<kernel::config::SandboxLimits>

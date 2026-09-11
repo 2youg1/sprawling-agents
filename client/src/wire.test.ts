@@ -36,7 +36,7 @@ const refused = <A>(result: Either.Either<A, ParseResult.ParseError>): string =>
 
 describe("the wire constants", () => {
   test("carry the version and the hash the server checks", () => {
-    expect(WIRE_V).toBe(19);
+    expect(WIRE_V).toBe(20);
     expect(WIRE_HASH).toMatch(/^[0-9a-f]{64}$/);
   });
 });

@@ -843,6 +843,26 @@
     "en": "none",
     "zh": "无"
   },
+  "desktop_title": {
+    "en": "desktop",
+    "zh": "桌面"
+  },
+  "desktop_allowlist": {
+    "en": "windows this building may touch",
+    "zh": "这栋楼能碰的窗口"
+  },
+  "desktop_empty": {
+    "en": "no windows listed",
+    "zh": "没有列出窗口"
+  },
+  "desktop_none": {
+    "en": "nothing permitted",
+    "zh": "什么都不许"
+  },
+  "desktop_save": {
+    "en": "save",
+    "zh": "保存"
+  },
   "mcp_add": {
     "en": "add",
     "zh": "加上"

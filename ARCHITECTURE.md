@@ -701,7 +701,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (141)
+### browser (12), protocol (5), bin (142)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -741,6 +741,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::folds::tests::standing | crates/sprawling/src/assembly/folds/tests/standing.rs | what one verified pass rebuilds: queues, endpoint book, halted scopes | projection | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::folds::tests::history | crates/sprawling/src/assembly/folds/tests/history.rs | what a page reads back: the city, one session, and where a slice resumes | projection | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::building_page | crates/sprawling/src/assembly/building_page.rs | one building, as the files in it say it is | projection | V3 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::building_page::tests | crates/sprawling/src/assembly/building_page/tests.rs | the page reads the rules the city obeys, and a desktop allowlist lands where no resident reaches it | projection | V5 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::credentials | crates/sprawling/src/assembly/credentials.rs | what this city can sign in as, and what it may call | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::credentials::signing | crates/sprawling/src/assembly/credentials/signing.rs | a subscription login in two steps, the renewal before use, and the vault | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::credentials::endpoints | crates/sprawling/src/assembly/credentials/endpoints.rs | an endpoint probed before it is attached, and a model chosen for a tag | adapter | V3 | built | sprawling-SPEC.md#8-39 |

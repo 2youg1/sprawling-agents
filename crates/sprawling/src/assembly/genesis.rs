@@ -257,6 +257,7 @@ impl RunWorker {
         addr: &Address,
         sandbox: Option<&kernel::SandboxLimits>,
         mcp: Option<&[kernel::McpServer]>,
+        desktop: Option<&str>,
     ) -> Result<(), AxError> {
         let building = city::Building::of(addr)?;
         if let Some(limits) = sandbox {
@@ -275,13 +276,26 @@ impl RunWorker {
                 servers,
             )?;
         }
+        // Written whole and never parsed here: the connector that reads
+        // it at start-up is the authority on its syntax and fails closed,
+        // so a second reading on this side would be a second authority
+        // (city-SPEC.md 8-26).
+        if let Some(allowlist) = desktop {
+            city::write_desktop_scope(&self.city_root, building.addr(), allowlist)?;
+        }
         self.note(
             runtime::diagnostics::Level::Effect,
             "city::config_layers",
             &format!("{} was reconfigured", building.addr().as_str()),
         );
-        let payload =
-            city::building_configured_payload(&building, sandbox.is_some(), mcp.is_some())?;
+        let payload = city::building_configured_payload(
+            &building,
+            city::Written {
+                sandbox: sandbox.is_some(),
+                mcp: mcp.is_some(),
+                desktop: desktop.is_some(),
+            },
+        )?;
         self.record(EventKind::BuildingConfigured, payload)
     }
 

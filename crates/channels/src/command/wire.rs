@@ -142,11 +142,13 @@ impl From<WireCommand> for Command {
                 addr,
                 sandbox,
                 mcp,
+                desktop,
                 idem,
             } => Self::ConfigureBuilding {
                 addr,
                 sandbox,
                 mcp,
+                desktop,
                 idem,
             },
             Command::ProbeEndpoint {

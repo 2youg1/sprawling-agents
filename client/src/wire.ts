@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 19 as const;
+export const WIRE_V = 20 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "8df2858c92e8a77b4fe7c0eb38436834bd224b619f3e82dfe53c8e1baa98b286" as const;
+export const WIRE_HASH = "a249f589f1b45771bb1f08e2b36e32e26be3cbfc1e1011fe34f88a614001c0b1" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -1560,6 +1560,7 @@ export const Command = Schema.Union(
   Schema.Struct({
     configure_building: Schema.Struct({
       addr: Address,
+      desktop: Schema.optional(Schema.NullOr(Schema.String)),
       idem: IdemKey,
       mcp: Schema.optional(Schema.NullOr(Schema.Array(McpServer))),
       sandbox: Schema.optional(Schema.NullOr(SandboxLimits)),

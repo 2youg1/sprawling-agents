@@ -2515,3 +2515,13 @@ card-2.3 让合并落成一个真正的合并提交后，`settle_requests` 给 `
 - **客户端**：`client/src/views/machine.tsx` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
 - **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。
 - **验收**：`doctor::report::tests`——缺 firefox 的假机器答出 `Absent { NotOnSearchPath }`、`use` 档 `missing == ["firefox"]` 而 `develop` 档为空；平台不明时每一项的 `install` 都是 `UnknownPlatform`。
+
+## 8-55 一栋楼的桌面白名单，走配置那条帧（card-7.3；`bin::assembly::genesis::configure_building`；channels-SPEC §8-26、city-SPEC §8-26）
+
+城这一侧的两件事（楼级 `desktop:` 与 `kernel::gate::undoable`）早已落地，缺的是**把那份 allowlist 从人手里送到盘上的那一段**。
+
+- **不新起一条命令**：`ConfigureBuilding` 问的就是「这栋楼的 runs 够得到什么」，沙箱、外部服务器与这台机器上的窗口是同一个问题的三面，各自可缺省。
+- **不解析**：`city::write_desktop_scope` 整份覆写，字节即人给的字节。语法的权威是读它的那台 server，且它 fail closed。
+- **载荷第三位**：`city::Written { sandbox, mcp, desktop }` 取代三个裸布尔——调用点写 `(true, false, true)` 说不出哪一位是哪一面。
+- **页面**：`client/src/views/desktop.tsx` 一个框装整份文件，读用 `Query::Document`（`<building>/.sprawling/DESKTOP.toml`），写用 `configure_building`。一个「每个窗口一行」的表单会是这一侧对那份语法的第二次解读。
+- **验收**：`assembly::building_page::tests::the_desktop_allowlist_is_written_where_no_resident_reaches_it`——人写的字节落在 `desktop_scope_path` 上，且那条地址 `is_reserved` 为真（任何写域都够不到）。

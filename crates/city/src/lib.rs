@@ -32,6 +32,7 @@ pub use archive::day_of;
 pub use archive::entry as archive_entry;
 pub use archive::file as file_archive;
 pub use archive::index as archive_index;
+pub use building::Written;
 pub use building::adopt as adopt_building;
 pub use building::adopted_payload as building_adopted_payload;
 pub use building::all as buildings;

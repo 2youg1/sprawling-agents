@@ -12,6 +12,7 @@
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
 import { configureMcp } from "../core/commands";
+import { DesktopForm } from "./desktop";
 import { MAYOR, buildingOf } from "../core/route";
 import { enrol } from "../core/enrol";
 import type { Enrolment } from "../core/enrol";
@@ -265,7 +266,10 @@ export function Mcp() {
           </ul>
         </nav>
         <section class="min-w-0 flex-1">
+          <h2 class="mb-base text-label font-label text-text-quiet">{say("setup_mcp")}</h2>
           <McpForm addr={chosen()} />
+          <h2 class="mb-base mt-wide text-label font-label text-text-quiet">{say("desktop_title")}</h2>
+          <DesktopForm addr={chosen()} />
         </section>
       </div>
     </div>

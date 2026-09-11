@@ -195,7 +195,30 @@ export function loginCode(provider: string, code: string): Command {
 }
 
 export function configureMcp(addr: Address, mcp: readonly McpServer[]): Command {
-  return { configure_building: { addr, mcp: [...mcp], sandbox: null, idem: mintIdem() } };
+  return {
+    configure_building: {
+      addr,
+      mcp: [...mcp],
+      sandbox: null,
+      desktop: null,
+      idem: mintIdem(),
+    },
+  };
+}
+
+// The windows on this person's own machine a building's connector may
+// touch. Sent as text, because the connector that reads the file is the
+// authority on its syntax and this page must not become a second one.
+export function configureDesktop(addr: Address, allowlist: string): Command {
+  return {
+    configure_building: {
+      addr,
+      mcp: null,
+      sandbox: null,
+      desktop: allowlist,
+      idem: mintIdem(),
+    },
+  };
 }
 
 export function putDocument(which: GovernedDocument, body: string): Command {
