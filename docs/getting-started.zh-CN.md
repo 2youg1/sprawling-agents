@@ -26,9 +26,17 @@ irm https://raw.githubusercontent.com/2youg1/sprawling/main/install.ps1 | iex
 
 脚本取回适配你这个平台的最新发布包并解压；二进制最终装在哪、`PATH` 怎么改，由脚本最后调用的 `sprawling install` 决定，而这条命令你以后随时可以再跑一次。发布流水线没有构建的平台，它会连同已构建平台的清单一起报出来，而不是猜一个。
 
+这两样运行时都不是必需品；但你若已经装了 [bun](https://bun.sh) 或 node，一条命令就能取到同一个二进制：
+
+```sh
+bunx sprawling help      # 或者：npx sprawling help
+```
+
+npm 包里装的就是发布归档里那一份二进制，逐字节相同。npm 与 bun 只取与你的系统和架构相符的那一个平台包，其余的跳过；包目录之外一字不写，`PATH` 保持原样，直到你自己跑 `sprawling install`。
+
 这些二进制没有代码签名，所以第一次运行会触发警告：Windows 说「Windows protected your PC」，走 *More info*、再 *Run anyway*；macOS 会拒绝第一次启动，在 Finder 里右键打开一次即可。
 
-**不要用 `cargo install` 装它。** 客户端是 WebAssembly，先构建、再嵌进二进制；只跑一次 cargo build 得到的二进制，页面是空白的。要自己构建就读 [`CONTRIBUTING.md`](CONTRIBUTING.md)，并用 `just dist`。
+**不要用 `cargo install` 装它。** 客户端由 [bun](https://bun.sh) 先构建、再嵌进二进制；只跑一次 cargo build 得到的二进制，页面是空白的。要自己构建就读 [`CONTRIBUTING.md`](CONTRIBUTING.md)，并用 `just dist`。
 
 ## 2 建一座城，并把它打开
 

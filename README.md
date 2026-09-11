@@ -82,6 +82,8 @@ The binaries are not code-signed, so the first run trips a warning. Windows says
 
 One binary is enough: the page ships inside it, and running it needs no JavaScript runtime. Building `client/` from source needs bun, and nothing else.
 
+If you already have bun or node, `bunx sprawling up` — or `npx sprawling up` — fetches that same binary from npm and runs it. The runtime does the fetching, not the running.
+
 From a terminal it is one command, and the same one the launcher runs:
 
 ```bash

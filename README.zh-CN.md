@@ -80,7 +80,11 @@ sprawling 面向配置一般的机器设计，所以我不会放任多Agent产�
 
 ### 从终端
 
-拿到那一个二进制就够了：页面就在里面，跑它不需要任何 JavaScript 运行时。从源码构建 `client/` 需要 bun，且只需要 bun。启动器跑的就是下面这一条：
+拿到那一个二进制就够了：页面就在里面，跑它不需要任何 JavaScript 运行时。从源码构建 `client/` 需要 bun，且只需要 bun。
+
+已经装了 bun 或 node 的话，`bunx sprawling up`（或 `npx sprawling up`）从 npm 取到的就是同一个二进制。运行时负责取，不负责跑。
+
+启动器跑的就是下面这一条：
 
 ```bash
 sprawling up [city-dir] [addr]      # 城不在就先建，然后起服，然后开 WebUI

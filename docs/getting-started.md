@@ -26,6 +26,14 @@ irm https://raw.githubusercontent.com/2youg1/sprawling/main/install.ps1 | iex
 
 The script fetches the newest release archive for your platform and unpacks it; where the binary finally lives, and what happens to `PATH`, is decided by `sprawling install`, which the script runs at the end and which you can run again later. A platform the release workflow does not build is reported with the list of platforms it does build, rather than guessed at.
 
+Neither runtime is needed to run this, but if you already have [bun](https://bun.sh) or node, one command fetches the same binary:
+
+```sh
+bunx sprawling help      # or: npx sprawling help
+```
+
+The npm packages carry the archives' own binaries, so what arrives is byte for byte what a download gives you. One platform package is fetched and the rest are skipped, and nothing is written outside the package directory: `PATH` stays as it was until you run `sprawling install` yourself.
+
 The binaries are not code-signed, so a first run trips a warning: Windows says "Windows protected your PC", where the way through is *More info*, then *Run anyway*; macOS refuses the first launch, so open the binary once from Finder's right-click menu.
 
 Do not `cargo install` this. The client is built by [bun](https://bun.sh) before the binary and embedded into it, and a plain cargo build produces a binary whose page is blank. To build it yourself, read [`CONTRIBUTING.md`](CONTRIBUTING.md) and use `just dist`.
