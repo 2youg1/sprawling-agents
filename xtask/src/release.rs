@@ -12,12 +12,13 @@
 //! `local/` holds one machine's handoffs, rulings and probes, it is
 //! gitignored, and nothing published may depend on it.
 //!
-//! Four assertions, all about honesty rather than tidiness. Nothing in
+//! Five assertions, all about honesty rather than tidiness. Nothing in
 //! the published tree may be an isolation-zone path, nothing in it may
 //! link to one - a link that is dead for every reader but one is a
 //! sentence written for a reader who does not exist - nothing in it may
-//! carry a path off the machine that built it, and nothing in it may
-//! cite a document this tree does not contain.
+//! carry a path off the machine that built it, nothing in it may cite a
+//! document this tree does not contain, and nothing in it may write one
+//! machine's working record into a product document.
 //!
 //! The fourth assertion exists because the third one missed a real case.
 //! Six files - two settled screens, two SPECs and a gate's own rustdoc -
@@ -44,8 +45,10 @@ use std::path::Path;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
+mod context;
 mod link;
 
+use context::working_record;
 use link::{link_targets, resolve};
 
 /// Path prefixes that stay behind when the tree is published. Closed,
@@ -81,10 +84,16 @@ const HOME_SHAPES: [&str; 7] = [
 /// it detects. The specification is on the list for the second reason,
 /// and the test file for the first: the cases that prove a home path is
 /// refused have to write one.
-const DETECTORS: [&str; 3] = [
+const DETECTORS: [&str; 5] = [
     "xtask/src/release.rs",
+    "xtask/src/release/context.rs",
     "xtask/src/release/tests.rs",
     "xtask/xtask-SPEC.md",
+    // AGENTS.md teaches the rule, and a document that teaches a rule
+    // has to be able to name what it forbids. The two lines in it that
+    // could have spelled a shape describe it instead, and say why in
+    // the same sentence.
+    "AGENTS.md",
 ];
 
 /// The extensions that mark a token as a document a reader is told to
@@ -276,6 +285,22 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                     violation: format!("names `{found}`"),
                     alternative: "write the path relative to the city or the repository, or \
                                   use a placeholder a reader can substitute"
+                        .to_owned(),
+                });
+            }
+            if let Some(shape) = working_record(line) {
+                violations.push(Violation {
+                    gate: "release",
+                    location: format!("{rel}:{}", number.saturating_add(1)),
+                    rule: "a published file states the decision, never the occasion: not one \
+                           machine, not one sitting, not a message to a person"
+                        .to_owned(),
+                    violation: format!("says `{shape}`"),
+                    alternative: "report a measurement against the machine class it came \
+                                  from; give a ruling and its reason without the sitting \
+                                  that produced it; and where a question is open, say what \
+                                  about the interface is undecided rather than who is to \
+                                  decide it"
                         .to_owned(),
                 });
             }
