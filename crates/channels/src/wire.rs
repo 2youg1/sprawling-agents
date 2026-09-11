@@ -61,7 +61,10 @@ use serde::{Deserialize, Serialize};
 ///    mean "take the catalogue's figure", which for a model no catalogue
 ///    knew meant a request carrying `max_tokens: 0` - a reply with
 ///    nothing in it, and a run that froze as finished.
-pub const WIRE_V: u32 = 22;
+/// 23: a path a page prints can be opened where a person keeps their
+///    files. The address grammar is the guard: there is no way to spell
+///    a request for something outside the city.
+pub const WIRE_V: u32 = 23;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

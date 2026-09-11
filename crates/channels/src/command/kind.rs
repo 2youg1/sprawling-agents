@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::carried_name::{ModeTag, ProviderName, TemplateName, UploadId};
 
-pub const COMMAND_NAMES: [&str; 24] = [
+pub const COMMAND_NAMES: [&str; 25] = [
     "Dispatch",
     "Wake",
     "Login",
@@ -56,6 +56,7 @@ pub const COMMAND_NAMES: [&str; 24] = [
     "Pursue",
     "PutDocument",
     "Auth",
+    "Reveal",
 ];
 
 /// Uninhabited on purpose. A value of this type cannot be produced, so
@@ -322,6 +323,13 @@ pub enum Command<Secret = Sealed<String>> {
     },
     Halt {
         scope: HaltScope,
+        idem: IdemKey,
+    },
+    /// Show a person this address in their own file manager. The
+    /// grammar is the guard: an `Address` cannot climb out of the city,
+    /// so there is no way to spell a request for anything else.
+    Reveal {
+        at: Address,
         idem: IdemKey,
     },
     Release {

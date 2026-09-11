@@ -1028,8 +1028,8 @@
     "zh": "在文件管理器里显示"
   },
   "path_reveal_inert": {
-    "en": "this build cannot open a file manager: the wire carries no Reveal command",
-    "zh": "这个版本打不开文件管理器：wire 上还没有 Reveal 命令"
+    "en": "this build cannot open a path outside the city",
+    "zh": "城外的路径打不开"
   },
   "plan_empty": {
     "en": "no plan yet",

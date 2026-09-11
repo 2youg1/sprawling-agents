@@ -704,7 +704,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (153)
+### browser (12), protocol (5), bin (154)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -825,6 +825,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::mcp_http | crates/sprawling/src/mcp_http.rs | an MCP server over HTTP: one request, one message, no session | adapter | R1 | built | sprawling-SPEC.md#8-15 |
 | bin::mcp_http::tests | crates/sprawling/src/mcp_http/tests.rs | what the HTTP transport, its session and its redeemed header are held to | adapter | R1 | built | sprawling-SPEC.md#8-15 |
 | bin::firstrun | crates/sprawling/src/firstrun.rs | the first screen, where a city goes when nobody said, and handing a URL to the desktop | adapter | P7 | built | sprawling-SPEC.md#8-8 |
+| bin::revealing | crates/sprawling/src/revealing.rs | showing a person an address in their own file manager, selected rather than merely opened | adapter | V5 | built | sprawling-SPEC.md#8-60 |
 | bin::install | crates/sprawling/src/install.rs | putting this binary where a shell will find it, and taking it back out | adapter | P0 | built | sprawling-SPEC.md#8-9 |
 | bin::install::search_path_windows | crates/sprawling/src/install/search_path_windows.rs | editing the user search path in the registry under its own type, and telling the desktop | adapter | P0 | built | sprawling-SPEC.md#8-9 |
 | bin::install::search_path_elsewhere | crates/sprawling/src/install/search_path_elsewhere.rs | handing back the line a person adds themselves, where no search path is written | adapter | P0 | built | sprawling-SPEC.md#8-9 |

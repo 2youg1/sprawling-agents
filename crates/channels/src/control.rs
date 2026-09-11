@@ -101,6 +101,8 @@ pub fn classify(command: &Command) -> ControlVerdict {
         | Command::Attach { .. }
         | Command::CreateBuilding { .. }
         | Command::PutSecret { .. }
+        // Opening a file manager reaches nothing a run is doing.
+        | Command::Reveal { .. }
         | Command::BatchByBuilding { .. }
         | Command::Approve { .. }
         | Command::CreatePolicy { .. }

@@ -95,6 +95,12 @@ export function release(scope: HaltScope): Command {
   return { release: { scope, idem: mintIdem() } };
 }
 
+// Show a path where the person keeps their files. The address grammar is
+// the guard on the other side: nothing outside the city can be spelled.
+export function reveal(at: Address): Command {
+  return { reveal: { at, idem: mintIdem() } };
+}
+
 export function approve(item: ApprovalId, verdict: "allow" | "deny"): Command {
   return { approve: { item, verdict, idem: mintIdem() } };
 }

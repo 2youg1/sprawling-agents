@@ -2592,3 +2592,17 @@ pub(crate) fn asked(args: &[String], no_color: Option<OsString>) -> Asked;   // 
 - **总结与下一步**：两段各一行 `n / m ready`（一组算一件），末行是从这里往下的那一条命令——必备齐了是 `sprawling up`，不齐是 `sprawling doctor --install`。
 
 **本章测试**：`one_row_per_item_carries_one_of_four_status_words`、`no_color_is_honoured_from_the_environment_and_from_the_flag`、`a_version_is_the_number_out_of_whatever_the_tool_printed`、`the_report_is_grouped_into_required_and_recommended`、`a_family_of_browsers_counts_once_in_the_summary`。
+
+### 8-60 `bin::revealing`：把一条路径交给人自己的文件管理器（形状 4 适配器）
+
+```rust
+pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError>;
+```
+
+- **为什么是一条命令而不是一个链接**：浏览器打不开 `file://` 之外的东西，而 `file://` 打开的是一个目录列表而不是人平时用的那个窗口。城代为执行，于是「在文件管理器里指出来」这件事在三个平台上各自用它们自己的办法完成：Windows `explorer /select,<路径>`、macOS `open -R <路径>`、其余 `xdg-open <父目录>`。
+- **文法即闸**：入参是 `Address`，它在语法上爬不出城，所以「请求城外的一个路径」这句话在线上拼不出来。此处不再加第二道路径检查——那会是同一条规则的第二个权威。
+- **`/select,` 后面没有空格**：有空格时 `explorer` 把它解析成两个参数，打开的是人的主目录，退出码是 0。这条只有跑起来才会现形，所以钉在测试里。
+- **两种拒绝各说各的**：地址在盘上不存在是 `E_PATH_NOT_FOUND`（页面比树旧）；文件管理器起不来是 `E_TOOL_UNAVAILABLE`（这台桌面没有处理程序）。两者都不是「城坏了」，所以都带可执行的恢复语。
+- **Linux 只开父目录**：`xdg-open` 没有选中参数，而各文件管理器的选中写法互不相同——那会是一张这座城得跟着上游改的表。父目录是所有桌面都能兑现的承诺。
+
+**本章测试**：`a_path_this_city_does_not_hold_is_refused_rather_than_opened`、`the_selected_path_travels_as_one_argument`。

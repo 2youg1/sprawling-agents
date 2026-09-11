@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 22 as const;
+export const WIRE_V = 23 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "b9ba0a46521f3bf9f07127a034b3a5a5bbd6d41a8a9c52d430d671090dbe7041" as const;
+export const WIRE_HASH = "e6d814839ad03bca17dc5f10940c625b55d8d6a73898536e28c26c2b87396d45" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -781,6 +781,7 @@ export type DoctorTier = typeof DoctorTier.Type;
  */
 export const DoctorItem = Schema.Struct({
   enables: Schema.String,
+  homepage: Schema.optional(Schema.NullOr(Schema.String)),
   install: DoctorInstall,
   name: Schema.String,
   need: DoctorNeed,
@@ -1659,6 +1660,12 @@ export const Command = Schema.Union(
     halt: Schema.Struct({
       idem: IdemKey,
       scope: HaltScope,
+    }),
+  }),
+  Schema.Struct({
+    reveal: Schema.Struct({
+      at: Address,
+      idem: IdemKey,
     }),
   }),
   Schema.Struct({

@@ -8,13 +8,17 @@
 // under the pointer, the left button opens it inside the page, and a
 // second control offers to show it in the file manager.
 //
-// That second control is inert in this build and says so: the wire has
-// no `Reveal` command, and a control whose only possible answer is
-// silence owes the person the sentence saying why.
+// The second control asks the city to hand the path to the desktop's own
+// file manager. A path this build cannot turn into an address stays text
+// with the control saying why, because a button whose only possible
+// answer is silence owes the person that sentence.
 
+import { Option } from "effect";
 import { Show, createMemo } from "solid-js";
 
-import { useSay } from "../../ui";
+import { Address } from "../../core/address";
+import { reveal } from "../../core/commands";
+import { useCommand, useSay } from "../../ui";
 
 export interface PathProps {
   // As the city spells it: relative to the city, never to a disk.
@@ -29,6 +33,8 @@ export interface PathProps {
 
 export function Path(props: PathProps) {
   const say = useSay();
+  const send = useCommand();
+  const address = createMemo(() => Address.option(props.path));
   const shown = createMemo(() => {
     const base = props.base;
     if (base === undefined || !props.path.startsWith(`${base}/`)) return props.path;
@@ -59,10 +65,13 @@ export function Path(props: PathProps) {
       </Show>
       <button
         type="button"
-        class="shrink-0 rounded-control text-text-disabled"
-        aria-disabled="true"
+        class="shrink-0 rounded-control text-text-disabled hover:text-text-quiet"
+        aria-disabled={Option.isNone(address()) ? "true" : undefined}
         aria-label={say("path_reveal")}
-        title={say("path_reveal_inert")}
+        title={Option.isNone(address()) ? say("path_reveal_inert") : props.path}
+        onClick={() => {
+          Option.map(address(), (at) => send(reveal(at)));
+        }}
       >
         <svg viewBox="0 0 16 16" class="size-glyph" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
           <path d="M1.5 12.5v-9h4l1.4 1.8h7.6v7.2z" stroke-linejoin="round" />

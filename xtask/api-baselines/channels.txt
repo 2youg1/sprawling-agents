@@ -193,6 +193,9 @@ pub channels::Command::PutSecret::value: Secret
 pub channels::Command::Release
 pub channels::Command::Release::idem: kernel::idem::IdemKey
 pub channels::Command::Release::scope: channels::HaltScope
+pub channels::Command::Reveal
+pub channels::Command::Reveal::at: kernel::address::Address
+pub channels::Command::Reveal::idem: kernel::idem::IdemKey
 pub channels::Command::Rollback
 pub channels::Command::Rollback::checkpoint: kernel::locator::GitOid
 pub channels::Command::Rollback::idem: kernel::idem::IdemKey
@@ -539,7 +542,7 @@ pub channels::Welcome::schema: kernel::locator::B3Hash
 pub channels::Welcome::wire_v: u32
 pub channels::Withheld::number: u32
 pub channels::Withheld::reason: alloc::string::String
-pub const channels::COMMAND_NAMES: [&str; 24]
+pub const channels::COMMAND_NAMES: [&str; 25]
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
 pub const channels::QUERY_NAMES: [&str; 24]

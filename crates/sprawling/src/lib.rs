@@ -22,6 +22,7 @@ pub mod assembly;
 pub mod console;
 pub mod doctor;
 pub mod firstrun;
+mod revealing;
 pub mod serving;
 
 mod browser_bidi;

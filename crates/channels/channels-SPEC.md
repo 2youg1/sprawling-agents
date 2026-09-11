@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 24 个 variant、Query 恰 24 个（计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`b9ba0a46521f3bf9f07127a034b3a5a5bbd6d41a8a9c52d430d671090dbe7041`；**WIRE_V ＝ 22**（`SelectModel.max_output_tokens` 由 `u64` 变 `Option<Ceiling>`：零在类型上不再可表达，而零正是一个没人登记过上限的模型曾经发上线的那个数）。
+  **当前 golden**：`e6d814839ad03bca17dc5f10940c625b55d8d6a73898536e28c26c2b87396d45`；**WIRE_V ＝ 23**（`SelectModel.max_output_tokens` 由 `u64` 变 `Option<Ceiling>`，零在类型上不再可表达；新增 `Reveal`，把一个地址交给人自己的文件管理器）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -507,6 +507,7 @@ pub struct Delta { pub run: RunId, pub text: String }
 | `AttachEndpoint` | client | 把一个端点挂上 |
 | `SelectModel` | client | 选一个模型 |
 | `Fork` | client | 从一条线上分出第二条 |
+| `Reveal` | client | 在人自己的文件管理器里指出一个地址 |
 | `CreateBuilding` | client | 起一栋楼 |
 | `Steer` | client | 中途换方向 |
 | `Cancel` | client | 停下这一个 |

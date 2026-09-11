@@ -74,9 +74,7 @@ fn no_color_is_honoured_from_the_environment_and_from_the_flag() {
 fn a_version_is_the_number_out_of_whatever_the_tool_printed() {
     let said = |text: &str| Version::Said(text.to_owned()).number();
     assert_eq!(
-        said(
-            "ffmpeg version N-125649-g8d3942 Copyright (c) 2000-2026 the FFmpeg developers"
-        ),
+        said("ffmpeg version N-125649-g8d3942 Copyright (c) 2000-2026 the FFmpeg developers"),
         "N-125649-g8d"
     );
     assert_eq!(said("Mozilla Firefox 133.0.3"), "133.0.3");

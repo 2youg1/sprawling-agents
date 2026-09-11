@@ -53,6 +53,7 @@ impl<Secret> Command<Secret> {
             Self::Takeover { .. } => "Takeover",
             Self::Rollback { .. } => "Rollback",
             Self::Halt { .. } => "Halt",
+            Self::Reveal { .. } => "Reveal",
             Self::Release { .. } => "Release",
             Self::BatchByBuilding { .. } => "BatchByBuilding",
             Self::Approve { .. } => "Approve",
@@ -90,7 +91,8 @@ impl<Secret> Command<Secret> {
             | Self::Pursue { ref idem, .. }
             | Self::PutDocument { ref idem, .. }
             | Self::AttachEndpoint { ref idem, .. }
-            | Self::SelectModel { ref idem, .. } => Some(idem),
+            | Self::SelectModel { ref idem, .. }
+            | Self::Reveal { ref idem, .. } => Some(idem),
             Self::PutSecret { .. } | Self::Auth { .. } => None,
         }
     }
@@ -233,6 +235,7 @@ impl From<WireCommand> for Command {
             Command::Takeover { run, idem } => Self::Takeover { run, idem },
             Command::Rollback { checkpoint, idem } => Self::Rollback { checkpoint, idem },
             Command::Halt { scope, idem } => Self::Halt { scope, idem },
+            Command::Reveal { at, idem } => Self::Reveal { at, idem },
             Command::Release { scope, idem } => Self::Release { scope, idem },
             Command::BatchByBuilding { addr, idem } => Self::BatchByBuilding { addr, idem },
             Command::Approve {

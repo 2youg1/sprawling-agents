@@ -149,6 +149,9 @@ impl RunWorker {
                 self.put_document(which, body)
             }
             channels::Command::Halt { scope, .. } => self.set_admission(&scope, HALTED),
+            channels::Command::Reveal { at, .. } => {
+                crate::revealing::reveal(&self.city_root, &at)
+            }
             channels::Command::Release { scope, .. } => self.set_admission(&scope, RELEASED),
             // Cancel and Steer have a second door. `Desk::interrupt_for`
             // lifts them off the queue at the next safe point of the run
