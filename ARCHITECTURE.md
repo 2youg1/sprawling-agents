@@ -671,7 +671,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | eval::ablation::capabilities | crates/eval/src/ablation/capabilities.rs | the corpus: each thing a resident must be able to do, and the phrase in the document that grants it | data | V3 | built | eval-SPEC.md#8-7 |
 | eval::ablation::tests | crates/eval/src/ablation/tests.rs | the graded fixtures, and the on-demand run against the real City.md | decision | V3 | built | eval-SPEC.md#8-7 |
 
-### channels (24) — the process boundary
+### channels (25) — the process boundary
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -687,6 +687,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::answer::cost_of | crates/channels/src/answer/cost_of.rs | what one plan node has cost, and the runs that spent it | value | F1 | built | channels-SPEC.md#8-21 |
 | channels::answer::listing | crates/channels/src/answer/listing.rs | one directory of the city, one level deep, as a page walks the tree | value | F5 | built | channels-SPEC.md#8-23 |
 | channels::answer::document | crates/channels/src/answer/document.rs | one file of the city, bounded, with the cut and the binary judgement stated | value | F5 | built | channels-SPEC.md#8-23 |
+| channels::answer::commits | crates/channels/src/answer/commits.rs | what the city says about a commit it made, one by oid or a page newest first | value | V4 | built | channels-SPEC.md#8-24 |
 | channels::answer::hunks | crates/channels/src/answer/hunks.rs | one file's patch text between two checkpoints, and the lines a credential scan would not echo | value | F1 | built | channels-SPEC.md#8-20 |
 | channels::reading | crates/channels/src/reading.rs | reading one ledger payload into the wire's own values, for the two ends that both need it | decision | F1 | built | channels-SPEC.md#8-21 |
 | channels::carried_name | crates/channels/src/carried_name.rs | names this crate does not own, validated at one construction point | value | V3 | built | channels-SPEC.md#8-1 |
