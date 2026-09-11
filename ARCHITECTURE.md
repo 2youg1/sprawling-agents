@@ -10,7 +10,7 @@
 
 ## 1 What runs
 
-One process, one page, and the page is embedded in the binary at build time. **Two clients are in the tree at once**, which is the seam in `crates/channels` being exercised rather than argued: `client/` is TypeScript built by bun — npm and node appear nowhere — and `crates/web` is the earlier Dioxus client compiled to WebAssembly, which needs no JavaScript toolchain at all. They coexist until card 6.11 removes the wasm one; until then `just dist` embeds `crates/web`, because `build.rs` judges a bundle complete by `web.js` and `web_bg.wasm`. A third client written against the same wire in any language is a supported thing to build. The gate that once forbade JavaScript source in this tree was removed because it excluded architectures rather than defects.
+One process, one page, and the page is embedded in the binary at build time. The page is `client/`, TypeScript built by bun — npm and node appear nowhere. **The wire is the seam, not the language**: a second client written against it in any language is a supported thing to build, and one was, in Rust compiled to WebAssembly, until the TypeScript one replaced it. The gate that once forbade JavaScript source in this tree was removed because it excluded architectures rather than defects.
 
 ```
                       one machine
@@ -33,7 +33,7 @@ One process, one page, and the page is embedded in the binary at build time. **T
 │                 │                                            │
 │                 │  ws://127.0.0.1:8787/ws                    │
 │                 ▼                                            │
-│          web (wasm, served from inside the binary)           │
+│       client (TypeScript, served from inside the binary)     │
 └──────────────────────────────────────────────────────────────┘
         │                                    │
         ▼                                    ▼
@@ -47,11 +47,11 @@ The pinned versions live in `Cargo.toml`; this table says why each is there. Whe
 
 | Concern | Choice | Why it, and what it costs |
 |---|---|---|
-| Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, MSRV 1.97 | The invariants this design cares about are expressible as types, and `#![forbid(unsafe_code)]` holds workspace-wide. Cost: compile times, and a wasm client that has to be built before the binary that embeds it. |
+| Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, MSRV 1.97 | The invariants this design cares about are expressible as types, and `#![forbid(unsafe_code)]` holds workspace-wide. Cost: compile times, and a client that has to be built before the binary that embeds it. |
 | Async runtime | `tokio` 1, only in `channels` and the binary | The turn loop is synchronous on purpose — a decision that awaits is a decision that interleaves. Async stops at the process boundary. Cost: one blocking HTTP call per model request, paid inside a worker rather than a reactor. |
 | HTTP server | `axum` 0.8 with its `ws` feature | It carries the WebSocket implementation itself, so the protocol has one version authority rather than two. |
 | HTTP client | `reqwest` 0.13, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. |
-| Client | `dioxus` 0.7.10, `default-features = false`, `minimal` + `web`, built **without** `dx` | Rust to `wasm32-unknown-unknown` plus a pinned `wasm-bindgen` CLI. Dropping default features removes the `asset!` macro and devtools, both of which need the CLI we deliberately do not use. Cost: no hot reload; the CLI version must equal the crate version or the build breaks quietly. |
+| Client | Solid 1.9 and Effect 3.22, bundled by Vite, driven by bun | Two runtime dependencies and no framework runtime beyond them: Solid compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
 | Cold views | `redb` 4.2 | Embedded, transactional, crash-safe. The projection is derived, so its file is disposable and never a second authority. |
 | Content store | BLAKE3 (`blake3` 1.8) | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
@@ -80,8 +80,7 @@ sprawling (bin: init/serve/resume/replay/fork/adopt/export/restore/status)
    ├─ protocol──→ kernel                    MCP outbound, ACP inbound
    ├─ memory  ──→ kernel                    Ledger, CAS, projections, attribution, git
    ├─ gateway ──→ kernel                    routing, dialects, market, cost, credentials
-   ├─ channels──→ kernel                    Command/Query/Event, WebSocket server, auth
-   └─ web     ──→ channels                  the one client, in a browser (wasm)
+   └─ channels──→ kernel                    Command/Query/Event, WebSocket server, auth
 kernel: no internal dependencies.
 ```
 
@@ -98,7 +97,6 @@ eval: kernel, memory
 browser: kernel
 protocol: kernel
 channels: kernel
-web: channels
 sprawling: kernel, memory, gateway, runtime, collab, city, eval, browser, protocol, channels
 ```
 
@@ -137,7 +135,7 @@ A seam is a trait declared in the inner layer and implemented outside it. **One 
 
 This is the path everything else supports. Following it once explains more than any diagram of boxes.
 
-1. **The page sends a Command.** A person fills in the control surface — address, what to produce, what counts as done — and `web::socket` sends `Command::Dispatch` over the WebSocket. The frame carries no ceiling of any kind: nobody can price a piece of work before it runs, and the one brake is `Halt`.
+1. **The page sends a Command.** A person fills in the control surface — address, what to produce, what counts as done — and the client's socket sends `Command::Dispatch` over the WebSocket. The frame carries no ceiling of any kind: nobody can price a piece of work before it runs, and the one brake is `Halt`.
 2. **`channels::server` decides whether to accept it.** Two pure judgements — may this address be bound, may this peer be accepted — with the socket code that surrounds them making no judgement at all.
 3. **`bin::assembly` turns it into work.** This is the only place that samples the clock, so the timestamp enters as a parameter from here on. A worker takes the dispatch, and answers every refusal it can owe before it writes anything: the reserved subtree, a halted scope, rules that will not load, and a tag with no model behind it are all decided by `agree_to_work`, which reads and writes nothing. **Opening the room is the first thing this city puts on disk for a dispatch**, so work nobody could take leaves no room behind for a person to find.
 4. **The city writes `run_started` before anything happens.** Every effect becomes an event first; that ordering is the design's load-bearing rule, not a logging preference.
@@ -148,7 +146,7 @@ This is the path everything else supports. Following it once explains more than 
 9. **The reply is scanned before it is recorded.** `runtime::redact` puts model output through the same secret scan as everything else, so a key a model repeated does not become permanent.
 10. **Tools run behind gates.** `kernel::gate` answers with an exhaustive verdict — allowed, refused in three parts, or escalated to a person. `memory::checkpoint` puts a git fence before the wave and scans the worktree after it, so anything that disappeared becomes a `file_discarded` event carrying the way back.
 11. **The result comes back shaped.** `runtime::pipeline` builds the result envelope — clock stamp, network reminder, any steer a person sent — and `runtime::compaction` shortens what is too long, always reporting how much it dropped.
-12. **Everything lands in the Ledger, and the views follow.** `memory::hot`, `memory::projection` and `memory::attribution` fold the same event stream into what the pages ask for. The server pushes each event; `web::app` folds it into a `Snapshot`. The same fold, on both sides of the wire.
+12. **Everything lands in the Ledger, and the views follow.** `memory::hot`, `memory::projection` and `memory::attribution` fold the same event stream into what the pages ask for. The server pushes each event; the client folds it into what it believes. The same fold, on both sides of the wire.
 
 13. **A signal reaches whoever it names, working or not.** After the run freezes, each signal it sent is recorded and then delivered. A steer-kind signal slips under the door of a run that is already going, landing at that run's next safe point with `@` and the sender's address in front of it; anyone else who was spoken to is *knocked* — `bin::assembly` starts a run for them, whose brief names the resident who spoke. Only the person's own entrance can render as `user`, which is what makes an answer go to the right place. A knock addresses a resident, never a frozen run: history is read, not woken.
 
@@ -254,7 +252,7 @@ Every module instantiates exactly one of these. The classification earns its pla
 | 6 | data | data only, no branches. Editing it is editing behaviour |
 | 7 | projection | folds the event stream into a view; deleting it and rebuilding gives the same bytes |
 
-**The Humble Object is the recurring move**: the hard-to-test end is stripped to nothing and the thick end stays pure. `web::app`, `runtime::watchdog`, `gateway::endpoint`, `memory::projection` and the sandbox adapters are all instances of it.
+**The Humble Object is the recurring move**: the hard-to-test end is stripped to nothing and the thick end stays pure. `runtime::watchdog`, `gateway::endpoint`, `memory::projection` and the sandbox adapters are all instances of it.
 
 ### Making illegal states unrepresentable
 
@@ -701,119 +699,6 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::control | crates/channels/src/control.rs | the five verbs a person has, and which of them owe a handoff | decision | S4 | built | channels-SPEC.md#8-4 |
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
-
-### web (108) — the only client, compiled to WebAssembly
-
-| Module | File | What it owns | Shape | Since | Status | Spec |
-|---|---|---|---|---|---|---|
-| web::app | crates/web/src/app.rs | what the client believes, folded forward from events; holds no business state | projection | S4 | built | web-SPEC.md#8-1 |
-| web::app::snapshot | crates/web/src/app/snapshot.rs | what the client believes, folded forward from events | projection | S4 | built | web-SPEC.md#8-1 |
-| web::app::reading | crates/web/src/app/reading.rs | what a page reads from what the client believes | projection | S4 | built | web-SPEC.md#8-1 |
-| web::app::fold | crates/web/src/app/fold.rs | one event forward: the fold that advances what the client believes | projection | S4 | built | web-SPEC.md#8-1 |
-| web::app::rows | crates/web/src/app/rows.rs | one run as a row, and what the model calls consumed | value | S4 | built | web-SPEC.md#8-1 |
-| web::app::tests | crates/web/src/app/tests.rs | the fold, exercised through its production door | projection | S4 | built | web-SPEC.md#8-1 |
-| web::readout | crates/web/src/readout.rs | what a page says about a snapshot, in the reader's own language | decision | V3 | built | web-SPEC.md#8-62 |
-| web::asking | crates/web/src/asking.rs | what this client keeps, what it asks for again, and what it missed | decision | V3 | built | web-SPEC.md#8-62 |
-| web::shell | crates/web/src/shell.rs | which region shows what, and the client that mounts it | projection | V3 | built | web-SPEC.md#8-62 |
-| web::shell::root | crates/web/src/shell/root.rs | three regions, and nothing that decides anything | projection | V3 | built | web-SPEC.md#8-62 |
-| web::shell::client | crates/web/src/shell/client.rs | the live snapshot and mounting it | projection | V3 | built | web-SPEC.md#8-62 |
-| web::shell::nav | crates/web/src/shell/nav.rs | everything the palette can reach | decision | V3 | built | web-SPEC.md#8-62 |
-| web::mount | crates/web/src/mount.rs | the four things only a browser has: address bar, keyboard, socket, frame | adapter | V3 | built | web-SPEC.md#8-62 |
-| web::mount::wiring | crates/web/src/mount/wiring.rs | every signal one page holds | value | V3 | built | web-SPEC.md#8-62 |
-| web::mount::address | crates/web/src/mount/address.rs | the one reader of the address bar | adapter | V3 | built | web-SPEC.md#8-62 |
-| web::mount::keys | crates/web/src/mount/keys.rs | the one place a keystroke reaches this client | adapter | V3 | built | web-SPEC.md#8-62 |
-| web::mount::outbound | crates/web/src/mount/outbound.rs | the one way a component reaches the server | adapter | V3 | built | web-SPEC.md#8-62 |
-| web::mount::shell | crates/web/src/mount/shell.rs | socket, starting the client, and its theme | adapter | V3 | built | web-SPEC.md#8-62 |
-| web::mount::frame | crates/web/src/mount/frame.rs | what one painted frame may move | value | V3 | built | web-SPEC.md#8-62 |
-| web::board | crates/web/src/board.rs | the plan tree laid out by state; five columns, no state of its own, nothing here can move a node | projection | V3 | built | web-SPEC.md#8-58 |
-| web::command | crates/web/src/command.rs | every command frame this client sends, built in one place | value | V3 | built | web-SPEC.md#8-60 |
-| web::command::tests | crates/web/src/command/tests.rs | what a dispatch from the building form names: a room per piece of work, never the building's root | value | V3 | built | web-SPEC.md#8-60 |
-| web::pursuit | crates/web/src/pursuit.rs | what a building is working towards on its own, and who answers for it | adapter | V3 | built | web-SPEC.md#8-60 |
-| web::socket | crates/web/src/socket.rs | the only place in this crate that talks to the server | adapter | S4 | built | web-SPEC.md#8-2 |
-| web::socket::link | crates/web/src/socket/link.rs | the link: state, events, actions, and the backoff ladder | decision | S4 | built | web-SPEC.md#8-2 |
-| web::socket::frames | crates/web/src/socket/frames.rs | reading frames: text in, link events out | decision | S4 | built | web-SPEC.md#8-2 |
-| web::socket::enrol | crates/web/src/socket/enrol.rs | the one credential that never becomes a command | decision | S4 | built | web-SPEC.md#8-2 |
-| web::socket::tests | crates/web/src/socket/tests.rs | the ladder and the handshake, through the production door | decision | S4 | built | web-SPEC.md#8-2 |
-| web::pace | crates/web/src/pace.rs | how often this page may change, and what a burst of frames folds into | decision | R2 | built | web-SPEC.md#8-41 |
-| web::keys | crates/web/src/keys.rs | what a keystroke means, and the one sequence that cannot strand a reader | decision | R2 | built | web-SPEC.md#8-45 |
-| web::palette | crates/web/src/palette.rs | one box that reaches every page, building and session, and how a query ranks them | decision | R2 | built | web-SPEC.md#8-45 |
-| web::city_view | crates/web/src/city_view.rs | the city page: the picture, the controls around it, and what a click means | projection | S4 | built | web-SPEC.md#8-13 |
-| web::city_view::page | crates/web/src/city_view/page.rs | the picture, the controls around it, and what a click means | projection | S4 | built | web-SPEC.md#8-13 |
-| web::city_view::text | crates/web/src/city_view/text.rs | the sentence that names the way into one building's own pages | projection | S4 | built | web-SPEC.md#8-13 |
-| web::isometry | crates/web/src/isometry.rs | where a point on the ground lands on the screen, and the window around what was drawn | decision | V3 | built | web-SPEC.md#8-61 |
-| web::isometry::tests | crates/web/src/isometry/tests.rs | the window holds what was drawn, zoom crops, and one shape is spelled one way | decision | V3 | built | web-SPEC.md#8-61 |
-| web::skyline | crates/web/src/skyline.rs | what a city of buildings looks like: height from assets, a lit band from the plan | decision | V3 | built | web-SPEC.md#8-61 |
-| web::skyline::prisms | crates/web/src/skyline/prisms.rs | what a city of buildings looks like | decision | V3 | built | web-SPEC.md#8-61 |
-| web::skyline::faces | crates/web/src/skyline/faces.rs | prisms become geometry, and geometry becomes a list | decision | V3 | built | web-SPEC.md#8-61 |
-| web::skyline::tests | crates/web/src/skyline/tests.rs | the same city draws the same shapes, through the production door | decision | V3 | built | web-SPEC.md#8-61 |
-| web::progress | crates/web/src/progress.rs | the one place a progress bar is drawn, for all three of its callers | decision | S4 | built | web-SPEC.md#8-5 |
-| web::dashboard | crates/web/src/dashboard.rs | cost in five cuts, with shares against the authoritative total | decision | S4 | built | web-SPEC.md#8-6 |
-| web::dashboard::tests | crates/web/src/dashboard/tests.rs | the cost page orders facts the same way every time | decision | S4 | built | web-SPEC.md#8-6 |
-| web::live | crates/web/src/live.rs | watching one session as it happens, in a window that says what it dropped | decision | S4 | built | web-SPEC.md#8-6 |
-| web::live::feed | crates/web/src/live/feed.rs | the bounded window: what the live view keeps | value | S4 | built | web-SPEC.md#8-6 |
-| web::live::describe | crates/web/src/live/describe.rs | one event, one short line | decision | S4 | built | web-SPEC.md#8-6 |
-| web::live::commands | crates/web/src/live/commands.rs | the commands a watcher can send | decision | S4 | built | web-SPEC.md#8-6 |
-| web::live::page | crates/web/src/live/page.rs | watching one session as it happens | decision | S4 | built | web-SPEC.md#8-6 |
-| web::live::rounds | crates/web/src/live/rounds.rs | one row per turn, what it did inside it | decision | S4 | built | web-SPEC.md#8-6 |
-| web::live::stream | crates/web/src/live/stream.rs | raw order one click down, and the empty states | decision | S4 | built | web-SPEC.md#8-6 |
-| web::live::composer | crates/web/src/live/composer.rs | the steer box and the interventions | decision | S4 | built | web-SPEC.md#8-6 |
-| web::live::tests | crates/web/src/live/tests.rs | the window and the wording, through the production door | decision | S4 | built | web-SPEC.md#8-6 |
-| web::approval | crates/web/src/approval.rs | two lists that share one shape: what waits for a person, and what was discarded | decision | S4 | built | web-SPEC.md#8-5 |
-| web::approval::inbox | crates/web/src/approval/inbox.rs | things waiting for a person, grouped by cluster key | decision | S4 | built | web-SPEC.md#8-5 |
-| web::approval::bin | crates/web/src/approval/bin.rs | what was discarded and how it comes back | decision | S4 | built | web-SPEC.md#8-5 |
-| web::approval::tests | crates/web/src/approval/tests.rs | the inbox and the bin, through the production door | decision | S4 | built | web-SPEC.md#8-5 |
-| web::ledger_view | crates/web/src/ledger_view.rs | browsing the one history; a filter always says how much it hid | decision | S4 | built | web-SPEC.md#8-6 |
-| web::ledger_view::tests | crates/web/src/ledger_view/tests.rs | the filter, the paging limit, and an export that names itself a view | decision | S4 | built | web-SPEC.md#8-6 |
-| web::alert | crates/web/src/alert.rs | the only module that may interrupt a person, and only once per fact | decision | S4 | built | web-SPEC.md#8-6 |
-| web::alert::judge | crates/web/src/alert/judge.rs | what needs a person, and only once per fact | decision | S4 | built | web-SPEC.md#8-6 |
-| web::alert::notify | crates/web/src/alert/notify.rs | the interruption that reaches another tab | adapter | S4 | built | web-SPEC.md#8-6 |
-| web::alert::tests | crates/web/src/alert/tests.rs | one fact, one interruption, through the production door | decision | S4 | built | web-SPEC.md#8-6 |
-| web::lang | crates/web/src/lang.rs | every word this client says, in the two languages it says them in | data | F2 | built | web-SPEC.md#8-39 |
-| web::theme | crates/web/src/theme.rs | the single-hue language: the only place that produces a colour | data | S4 | built | web-SPEC.md#8-4 |
-| web::building_view | crates/web/src/building_view.rs | one building, what it has written down, and what waits in each room | decision | R1 | built | web-SPEC.md#8-36 |
-| web::building_view::leaf | crates/web/src/building_view/leaf.rs | which face of a building opens first | decision | R1 | built | web-SPEC.md#8-36 |
-| web::building_view::room | crates/web/src/building_view/room.rs | waiting signals in one room | decision | R1 | built | web-SPEC.md#8-36 |
-| web::building_view::text | crates/web/src/building_view/text.rs | pieces and their classes | decision | R1 | built | web-SPEC.md#8-36 |
-| web::building_view::faces | crates/web/src/building_view/faces.rs | what each open leaf shows | decision | R1 | built | web-SPEC.md#8-36 |
-| web::building_view::page | crates/web/src/building_view/page.rs | one building, what it has written down | decision | R1 | built | web-SPEC.md#8-36 |
-| web::building_view::tests | crates/web/src/building_view/tests.rs | leaves and queues, through the production door | decision | R1 | built | web-SPEC.md#8-36 |
-| web::reach | crates/web/src/reach.rs | what a building's runs may reach, and the one form that sets it | decision | P3 | built | web-SPEC.md#8-53 |
-| web::drop | crates/web/src/drop.rs | what a drag means at each of the four places it can land, and what it is refused for | decision | P0 | built | web-SPEC.md#8-49 |
-| web::vitals | crates/web/src/vitals.rs | the few numbers no other surface states, and the four it refuses to state | decision | F1 | built | web-SPEC.md#8-25 |
-| web::archive_search | crates/web/src/archive_search.rs | what this city wrote down: the shelves and the record, never merged | decision | F1 | built | web-SPEC.md#8-24 |
-| web::settings | crates/web/src/settings.rs | turning a URL and a key into a model a run can be given | decision | P1 | built | web-SPEC.md#8-12 |
-| web::settings::forms | crates/web/src/settings/forms.rs | the two forms and what a complete choice is | decision | P1 | built | web-SPEC.md#8-12 |
-| web::settings::tables | crates/web/src/settings/tables.rs | what the server answered, read as rows | decision | P1 | built | web-SPEC.md#8-12 |
-| web::settings::attach | crates/web/src/settings/attach.rs | the attach-provider form | decision | P1 | built | web-SPEC.md#8-12 |
-| web::settings::login | crates/web/src/settings/login.rs | the subscription login | decision | P1 | built | web-SPEC.md#8-12 |
-| web::settings::choose | crates/web/src/settings/choose.rs | the model-choice form | decision | P1 | built | web-SPEC.md#8-12 |
-| web::settings::listing | crates/web/src/settings/listing.rs | what each model is for, and what is attached | decision | P1 | built | web-SPEC.md#8-12 |
-| web::settings::page | crates/web/src/settings/page.rs | the settings page shell | decision | P1 | built | web-SPEC.md#8-12 |
-| web::settings::tests | crates/web/src/settings/tests.rs | the forms, read here; the frames they turn into are command’s | decision | P1 | built | web-SPEC.md#8-12 |
-| web::route | crates/web/src/route.rs | the one translation between a View and the address bar, both ways | decision | F2 | built | web-SPEC.md#8-14 |
-| web::route::view | crates/web/src/route/view.rs | which page the content region shows, and its lens | decision | F2 | built | web-SPEC.md#8-14 |
-| web::route::fragments | crates/web/src/route/fragments.rs | one spelling written, every old spelling read | decision | F2 | built | web-SPEC.md#8-14 |
-| web::route::places | crates/web/src/route/places.rs | nav entries, and what is showing | decision | F2 | built | web-SPEC.md#8-14 |
-| web::route::tests | crates/web/src/route/tests.rs | fragments both ways, through the production door | decision | F2 | built | web-SPEC.md#8-14 |
-| web::panel | crates/web/src/panel.rs | the one version of a centre panel: conclusion, scope, body, and where the numbers came from | decision | F2 | built | web-SPEC.md#8-29 |
-| web::phase | crates/web/src/phase.rs | what a session is doing, in the one vocabulary every surface reads from | data | V3 | built | web-SPEC.md#8-53 |
-| web::sessions | crates/web/src/sessions.rs | the first screen: the box that starts work, and the table its rows land in | decision | V3 | built | web-SPEC.md#8-67 |
-| web::sessions::plan | crates/web/src/sessions/plan.rs | guess, choose, and what each field means | decision | V3 | built | web-SPEC.md#8-67 |
-| web::sessions::listing | crates/web/src/sessions/listing.rs | seats, listing, and readings | decision | V3 | built | web-SPEC.md#8-67 |
-| web::sessions::composer | crates/web/src/sessions/composer.rs | the ladder and the box that sends work | decision | V3 | built | web-SPEC.md#8-67 |
-| web::sessions::tables | crates/web/src/sessions/tables.rs | what is moving, what ended, which buildings are busy | decision | V3 | built | web-SPEC.md#8-67 |
-| web::sessions::page | crates/web/src/sessions/page.rs | the first screen | decision | V3 | built | web-SPEC.md#8-67 |
-| web::sessions::tests | crates/web/src/sessions/tests.rs | guess versus decision, through the production door | decision | V3 | built | web-SPEC.md#8-67 |
-| web::session | crates/web/src/session.rs | one session: the four questions a person arrives with, and five readings of what it did | decision | V3 | built | web-SPEC.md#8-35 |
-| web::session::facts | crates/web/src/session/facts.rs | the four questions a person arrives with | decision | V3 | built | web-SPEC.md#8-35 |
-| web::session::tabs | crates/web/src/session/tabs.rs | five readings of what a session did | decision | V3 | built | web-SPEC.md#8-35 |
-| web::session::links | crates/web/src/session/links.rs | building of an address, and old live links | decision | V3 | built | web-SPEC.md#8-35 |
-| web::session::page | crates/web/src/session/page.rs | one session: questions and readings | decision | V3 | built | web-SPEC.md#8-35 |
-| web::session::tests | crates/web/src/session/tests.rs | the head through the production door | decision | V3 | built | web-SPEC.md#8-35 |
-| web::prompt | crates/web/src/prompt.rs | what a run was given: the four frozen blocks of its prompt, and whether an admitted skill's bytes moved since the city last looked | projection | V3 | built | web-SPEC.md#8-67 |
-| web::prompt::tests | crates/web/src/prompt/tests.rs | what one run was given, through the production door | projection | V3 | built | web-SPEC.md#8-67 |
-| web::waiting | crates/web/src/waiting.rs | everything that cannot move until a person answers, in one place | decision | V3 | built | web-SPEC.md#8-64 |
-| web::record | crates/web/src/record.rs | one history, in three lenses, at one address | decision | V3 | built | web-SPEC.md#8-67 |
 
 ### browser (12), protocol (5), bin (137)
 
