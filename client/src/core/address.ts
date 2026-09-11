@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // A canonical relative path inside the city, ported grammar for grammar
-// from `kernel::address::Address::parse`. Until card 6.2 generates the
+// from `kernel::address::Address::parse`. Until the generator emits the
 // wire schema, this is the client's one authority for what an address is.
 
 import { Brand } from "effect";

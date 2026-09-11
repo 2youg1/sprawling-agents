@@ -10,8 +10,8 @@
 //! 4), and the two arms are never both present to be swapped.
 //!
 //! Both arms present the same one type, [`Desk`], and a desk belongs to
-//! one connection. That is what card 7.2 changed and it is not
-//! cosmetic: two things now live between calls — which generation a
+//! one connection. That is not cosmetic: two things live between
+//! calls — which generation a
 //! window's refs belong to, and which recordings are running — and
 //! process-wide state would let a second connection, under a second
 //! scope file, stop the first one's recording.

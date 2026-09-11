@@ -9,7 +9,7 @@
 //! done instead — and all three travel to the caller. The stable code is
 //! spelled exactly as the city spells it in `kernel::error::code`, but it
 //! is defined here rather than imported: this package sits outside the
-//! workspace so that the Win32 boundary of card 7.2 may relax
+//! workspace so that the Win32 boundary may relax
 //! `unsafe_code` at one call site, and importing a workspace crate to
 //! obtain six string constants would give that reason away
 //! (desktop-SPEC.md section 8.5, first pair). The rule that keeps the two

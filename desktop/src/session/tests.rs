@@ -20,7 +20,7 @@ use super::*;
 /// `protocol::Rpc::initialize` and `protocol::Rpc::initialized`.
 const OPENING: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":\
      {\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":\
-     {\"name\":\"sprawling\",\"version\":\"0.0.3\"}}}";
+     {\"name\":\"sprawling\",\"version\":\"0.0.4\"}}}";
 const READY: &str = "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\",\"params\":{}}";
 
 fn opened(scope: &str) -> Server {
@@ -122,7 +122,7 @@ fn elsewhere_an_admitted_call_is_refused_by_the_platform_rather_than_answered_fa
     assert!(answered["result"].is_null());
 }
 
-/// card-7.2: the claim this card is about. On Windows an admitted
+/// On Windows an admitted
 /// `desktop.windows` reaches the desktop and answers with the windows
 /// this scope lists — an array, possibly empty on a machine with nothing
 /// open, and never `E_TOOL_UNAVAILABLE`.
@@ -145,7 +145,7 @@ fn listing_windows_reaches_this_desktop_rather_than_a_refusal() {
     );
 }
 
-/// card-7.2: a window nobody has open is a refusal that says how to find
+/// A window nobody has open is a refusal that says how to find
 /// out what is open — never a crash, and never an action landing on
 /// whatever else was there.
 #[cfg(windows)]

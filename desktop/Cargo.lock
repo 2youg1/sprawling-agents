@@ -339,7 +339,7 @@ checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
 
 [[package]]
 name = "sprawling-desktop"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "base64",
  "image",

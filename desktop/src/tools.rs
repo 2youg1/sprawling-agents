@@ -11,8 +11,7 @@
 //! expensive mistake a model makes with a tool table is taking one tool
 //! for the one beside it.
 //!
-//! The shapes are final in card 7.1 and carried out on Windows in card
-//! 7.2. Until then every call is refused with `E_TOOL_UNAVAILABLE`
+//! Outside Windows every call is refused with `E_TOOL_UNAVAILABLE`
 //! (`crate::platform`), which is honest in a way that a fabricated
 //! success would not be.
 

@@ -36,7 +36,7 @@ fn the_binary_answers_an_initialize_and_a_tools_list_over_its_own_pipes() {
         for line in [
             "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":\
              {\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":\
-             {\"name\":\"sprawling\",\"version\":\"0.0.3\"}}}",
+             {\"name\":\"sprawling\",\"version\":\"0.0.4\"}}}",
             "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\",\"params\":{}}",
             "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}",
         ] {
