@@ -144,3 +144,13 @@ export function resourceFromEffect<A, E>(effect: Effect<A, E>): Resource<Exit<A,
 ### 6-4 验收记录（2026-09-10，前端会话 1＋2）
 
 `bun run lint`／`typecheck`／`test`（26 条）绿；`cargo xtask npm`／`wire-ts` 绿；`cargo nextest -p gateway`（84）绿。在真城（`sprawling serve --web-dir target/web-dist`）＋假扮 OpenAI 形供应方上实测：连接与握手、引导页触发（无 main 时）、从 composer 派活、`read` 调用折叠、Markdown 回复、结局分隔线、城市绘图、目录树与 transcript 链接、面板。**会话 2 补实测**（Edge headless，CDP 驱动）：引导第 1–5 步在 ModelScope 真供应方上走通（enrol→probe 出 46 个模型→attach→select_model main/digest）；设置页 attach 与 select；对话页派活到 GLM-5.2 出 `E_PROVIDER 400/429` 卡片与结局线（免费 key 额度耗尽，多 Agent 场景未跑）；`#/mcp` 三扇门加／删（CONFIG.toml 实写）；楼页目录树、文件原文（编号行）、transcript 直达 run；run 页四透镜；记录三透镜；成本无价态；左栏展开。**仍未实测**：等人卡片、`Changes`／`Hunks` 有内容时、Firefox／Zen（headless `-screenshot` 不出图，需走 BiDi）。**流式**：远端 endpoint 走 `Endpoint::call_streaming`（`stream: true` 实测），但 delta 帧在 run 结束时一次涌到（`tmpscripts/delta-probe.ts` 计时：全部 delta 同一毫秒到达），归服务端转发路径；本机无 key 的 endpoint 走 `Native` 适配器，无 `call_streaming`。
+
+### 6-6 会话 4（2026-09-11）：git 透镜、三处手感
+
+- **D59 提交列表按页问、按页存。** `core/asking.ts` 新增 `COMMITS_PAGE = 40` 与 `commitsQuery(building, before)`——问题只有一种拼写，因为 `CommitsAnswer` 回带 `building` 与 `before` 而不带 `limit`，键若拼法不一，答案永远落不回槽里。每页是一个独立的问题：只有 `before: null` 的首页会因 `checkpoint_committed`／`pr_merged` 失效重问（`staleBy`），旧页上界是已写下的 seq、且 `lineage` 从写提交的 run 向前走，后来的接替者改不了它。
+- **`views/building/commits.tsx`**：楼页第四块（`Shown = plan | commits | Picked`）。行＝居民地址（左）· oid 前 7 位 · 模型与档位 · 时钟 · session 名（右，链接到 `#/talk/<actor>`，D52：不加「继续」）；`lineage > 1` 时行尾出 `×{n} 接替`，展开列出被替代的 run。展开一行＝`Changes{base: 下一行（更旧）, head: 本行}`；最旧一行展开会先要下一页；到头（`more == false`）的末行显示「第一次提交」。滑到底部的哨兵 `<li>` 经 `IntersectionObserver` 要下一页。
+- **`views/changes.tsx`**：`Changes`／`Hunks` 从 `run.tsx` 抽出，run 页与楼页共用一份 diff 读法。
+- **左栏 hover 改为覆盖**：外层 `<div>` 只在钉开（`[`）时取 `w-rail-open`，`<nav>` 绝对定位、hover 时自宽并加投影；正文的左边从此不随指针越过左缘而重排（实测 `main.left` 恒 44）。
+- **草稿留存**：`Prefs` 增 `draft(at)`／`setDraft(at, text)`（localStorage，键 `sprawling.draft.<房间或 run>`）；`Composer` 增 `draft?: string`，输入即写、发出即删，挂载时读回并 `grow()`。实测切页与刷新后草稿与两行高度都在。
+- **活的标签图标**（`core/mark.ts`）：`paintMark(document, quiet | live | waiting)` 用一个探针元素把 `--color-g2` 与 `--color-g5`／`--color-accent`／`--color-alert` 解算成引擎实际会画的颜色，再拼成 SVG data URL 写进 `<link rel="icon">`。零颜色字面量；`app.tsx` 的效果按「有事等人 > 有 run 在跑 > 空闲」选色。
+- **`lang.json` 220 → 213**：七个无人再说的键删除（按视图对表反查，含模板字符串 `say(` 前缀_${…} `)` 的动态前缀）。**更正 Handoff 一处误判**：`core/address.ts`／`run_id.ts` 不是与 `wire.ts` 重复的死代码——生成物的 `Address`／`RunId` 是无精炼的 brand，这两个文件是地址栏那道缝的文法解析器，`route.ts`／`palette.tsx`／`tree.tsx` 都依赖它们的 `.option()`。
