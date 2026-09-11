@@ -12,6 +12,7 @@
 import { Option } from "effect";
 import { Match, Show, Switch, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 
+import { paintMark } from "./core/mark";
 import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
 import type { View } from "./core/route";
 import { useGo, useSay, useUi } from "./ui";
@@ -124,14 +125,22 @@ export function App() {
     }
   });
 
-  // The document title carries what a hidden tab most needs to say.
+  // The document title and the tab's icon carry what a hidden tab most
+  // needs to say: how many things wait for the person, and whether the
+  // city is working at all.
   const approvals = ui.conn.asking.ask("approval_queue");
-  createEffect(() => {
+  const waiting = createMemo(() => {
     const answer = approvals();
-    const waiting = answer !== undefined && "approvals" in answer ? answer.approvals.items.length : 0;
+    return answer !== undefined && "approvals" in answer ? answer.approvals.items.length : 0;
+  });
+  const working = createMemo(() => Object.values(ui.conn.belief.runs).some((run) => run.doing.kind !== "frozen"));
+  createEffect(() => {
     const name = ui.conn.belief.city ?? "sprawling";
-    document.title = waiting > 0 ? `(${String(waiting)}) ${name}` : name;
+    document.title = waiting() > 0 ? `(${String(waiting())}) ${name}` : name;
     document.documentElement.lang = ui.prefs.lang();
+  });
+  createEffect(() => {
+    paintMark(document, waiting() > 0 ? "waiting" : working() ? "live" : "quiet");
   });
 
   return (
