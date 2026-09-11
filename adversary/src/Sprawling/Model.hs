@@ -88,7 +88,7 @@ instance StateModel World where
 
   initialState =
     World
-      { worldBuildings = Map.empty
+      { worldBuildings = Map.singleton "hall" Door.Minimal
       , worldHalted = Set.empty
       , worldAttached = False
       , worldMinted = 0

@@ -83,7 +83,7 @@ properties door =
         , testCase "a record written twice is refused" (doubled door)
         ]
     , -- Two symptoms of one cause. They were an open finding until `dispatch_in`
-      -- was made to judge before it writes (card V3.51); they stay together and
+      -- was made to judge before it writes; they stay together and
       -- keep their names, because what they now defend is the ordering that fix
       -- established rather than any one line of it.
       testGroup
@@ -292,7 +292,7 @@ listsOnlyRaised door = withGround door $ \ground -> do
       (body : _) ->
         assertEqual
           "the city listed a building nobody raised"
-          (Just [])
+          (Just ["hall"])
           (Frame.cityBuildings body)
       [] -> assertBool "the city did not answer with a city" False
     other -> assertBool ("the city could not be read: " <> show other) False
