@@ -110,7 +110,7 @@ mod gate;
 pub use gate::{CommitmentDecision, DedupVerdict, EgressAllowlist, EgressOutcome, EgressTarget};
 pub use gate::{ConnectorCall, reaches_the_undoable, undoable};
 pub use gate::{GateContext, egress_target};
-pub use gate::{GateOutcome, commitment, dedup, discard as gate_discard, domain, egress};
+pub use gate::{GateOutcome, commitment, dedup, discard as gate_discard, domain, egress, reach};
 pub use gate::{delegation, govern, spawn};
 
 mod config;

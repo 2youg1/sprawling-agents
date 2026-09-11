@@ -1130,7 +1130,8 @@ pub fn forecast(arm: &ExecArm) -> DiscardForecast;
 pub struct GateContext { pub actor: String, pub now: TimeMs, pub item_id: ApprovalId }   // Escalate 造 item 所需；全由调用方注入
 #[non_exhaustive] pub enum GateOutcome { Allow, Escalate { item: ApprovalItem }, Deny { refusal: Box<AxError> } }
 
-pub fn domain(domain: &WriteDomain, target: &Address, taint: &TaintSet) -> GateOutcome;
+pub fn domain(domain: &WriteDomain, target: &Address, taint: &TaintSet) -> GateOutcome;   // 判一个文件
+pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutcome;    // 判一块声明的区域（§8-46 末段）
 #[non_exhaustive] pub enum EgressTarget { Loopback, Private, Public { host: String },
                                           Connector { label: ServerLabel } }   // 分类由效果层解好址后注入
 #[non_exhaustive] pub enum EgressOutcome { Allow { first_public_egress: bool }, Deny { refusal: Box<AxError> } }
@@ -1530,6 +1531,17 @@ pub const ROADMAP_FILE: &str = "Roadmap.md";   // 随 ROADMAP_COLUMNS 住 spine:
 - **为什么计划文件在写域这一层就拒**：`Roadmap.md` 的唯一编辑入口是 `plan` 工具（`kernel::spine::rewrite` 的重写），它保证六列表格重写后仍成立。放任 `edit` 直接改，等于给同一条规则第二个权威，而漂掉的那个总是没人读的那个。
 - `gate::domain` 对 `NotWritable` 出 `E_OUTSIDE_WRITE_DOMAIN` 三段式：规则「这个写域只写 Markdown 文档」，违规指出是哪一种，替代给出「改 `.md`」或「用 `plan` 工具」。
 - 被否：给 `WriteDomain` 加一个 `documents: bool` 字段——布尔旗标不是穷尽枚举，且「只写文档」与「什么都写」是两条策略而不是一条策略的一个开关。
+
+**一个区域不是一个文件（前端会话 4 实测修，2026-09-11）。** `Effect::Write { domain }` 是工具在建造时**声明**的区域（`hall/mayor`），不是某次调用要写的文件；`bench::admit` 却把这块区域交给 `gate::domain` 判，于是 `Documents` 域对着 `hall/mayor` 答「不是 Markdown 文档」——**Mayor 从建城起就写不了任何一份文档**，而这正是 D10 唯一交给它的事。假供应方回一次 `edit hall/note.md` 即复现（`E_OUTSIDE_WRITE_DOMAIN`，主语是居民地址）。修法是让两个问题各有一个权威：
+
+```rust
+impl WriteDomain { pub fn reaches(&self, area: &Address) -> bool; }   // admits 的前缀半段：非保留区、且在某个前缀内
+pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutcome;   // 区域：只问够不够得到
+```
+
+- `gate::reach` 判声明的区域：`reaches` 为假出与 `domain` 同一段 `Outside` 三段式（同一处产出，`outside` 提为二者共用），为真 `Allow`；它永不问文件名，因为区域没有文件名。
+- `gate::domain` 判文件，一字不改；它的调用方从 bench 挪到 **`runtime::tools::edit`** 拿到路径的那一刻（runtime-SPEC §8-36）——从前 edit 自己用 `admits` 只处理 `Outside`、漏掉 `NotWritable`，于是 `Documents` 域内的 `hall/foo.rs` 在工具这一层是放行的，只是被门口那条错判挡住了而已；现在门口只判区域，工具这一层必须判全，而它判全的方式是调同一个门。
+- 被否：让 bench 读 `call.args["path"]`——那把 bench 和一个工具的参数名绑在一起，而 `exec` 同样声明 `Write` 却没有路径。
 
 ### 8-47 kernel::approval：City Hall 的两个常量与 clerk 的默认代答（card-5.1）
 

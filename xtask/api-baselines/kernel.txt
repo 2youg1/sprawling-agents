@@ -449,6 +449,7 @@ pub fn kernel::WriteDomain::admits(&self, &kernel::Address) -> kernel::DomainVer
 pub fn kernel::WriteDomain::documents(alloc::vec::Vec<kernel::Address>) -> core::result::Result<kernel::WriteDomain, kernel::AxError>
 pub fn kernel::WriteDomain::new(alloc::vec::Vec<kernel::Address>) -> core::result::Result<kernel::WriteDomain, kernel::AxError>
 pub fn kernel::WriteDomain::prefixes(&self) -> impl core::iter::traits::iterator::Iterator<Item = &kernel::Address>
+pub fn kernel::WriteDomain::reaches(&self, &kernel::Address) -> bool
 pub fn kernel::admit(&kernel::QueueStats, &kernel::ItemMeta) -> kernel::Admission
 pub fn kernel::admit_delegation(kernel::Depth, &kernel::DelegateKind) -> kernel::DelegationVerdict
 pub fn kernel::chain_hash(&[u8]) -> kernel::B3Hash
@@ -480,6 +481,7 @@ pub fn kernel::observe(&[kernel::ActionFingerprint]) -> kernel::StallVerdict
 pub fn kernel::observe_edit_war(&[kernel::EditSample]) -> kernel::EditWarVerdict
 pub fn kernel::observe_pursuit(kernel::PursuitState, &[kernel::NodeId], u32) -> kernel::PursuitVerdict
 pub fn kernel::policy_expiry(&kernel::Policy, kernel::TimeMs) -> kernel::PolicyExpiry
+pub fn kernel::reach(&kernel::WriteDomain, &kernel::Address, &kernel::TaintSet) -> kernel::GateOutcome
 pub fn kernel::reaches_the_undoable(&kernel::ConnectorCall<'_>) -> bool
 pub fn kernel::request_repair(&alloc::collections::btree::map::BTreeMap<kernel::Address, kernel::RunId>, &kernel::Address, &kernel::RunId) -> kernel::RepairVerdict
 pub fn kernel::scan(&[u8]) -> alloc::vec::Vec<kernel::SecretSpan>

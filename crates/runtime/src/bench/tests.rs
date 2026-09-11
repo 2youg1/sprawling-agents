@@ -316,3 +316,38 @@ fn probe_provenance() -> memory::Provenance {
         },
     )
 }
+
+#[test]
+fn a_documents_bench_lets_its_own_room_through_the_door() {
+    // The tool declares the room it works in, not a file; a documents
+    // domain must not judge the declaration as if it were one. Before
+    // the fix this refused every write with "hall/mayor is not a
+    // Markdown document", and the Mayor could write nothing at all.
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(tmp.path().join("hall")).unwrap();
+    let domain = WriteDomain::documents(vec![Address::parse("hall").unwrap()]).unwrap();
+    let mut bench = ToolBench::new(domain.clone());
+    bench
+        .register(Box::new(
+            EditTool::new(tmp.path(), Address::parse("hall/mayor").unwrap(), domain).unwrap(),
+        ))
+        .unwrap();
+    let outcome = bench
+        .invoke(
+            &edit_call(
+                "hall/note.md",
+                "new",
+                "",
+                "# note
+",
+            ),
+            &key(9),
+            &ctx(),
+        )
+        .unwrap();
+    match outcome {
+        BenchOutcome::Ran { .. } => {}
+        other => panic!("expected the note to land, got {other:?}"),
+    }
+    assert!(tmp.path().join("hall/note.md").is_file());
+}

@@ -31,8 +31,10 @@ impl ToolBench {
     ) -> Result<Option<BenchOutcome>, AxError> {
         match effect {
             Effect::Read => {}
-            Effect::Write { domain: target } => {
-                let verdict = kernel::domain(&self.domain, target, &self.taint);
+            // The tool declares an area, not a file; the file is judged
+            // by the tool itself once a call names one.
+            Effect::Write { domain: area } => {
+                let verdict = kernel::reach(&self.domain, area, &self.taint);
                 if let Some(answered) = self.settled(verdict) {
                     return Ok(Some(answered));
                 }

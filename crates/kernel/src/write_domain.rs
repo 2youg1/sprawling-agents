@@ -94,8 +94,17 @@ impl WriteDomain {
     /// The domain door's primitive. Reserved targets are Outside no
     /// matter what the set says, and a documents domain answers a third
     /// way: inside the prefixes, and still not a file it writes.
+    /// Whether a declared area lies inside this domain at all: the
+    /// prefix half of [`admits`](Self::admits), for the subject that
+    /// has no file name. A tool declares the room it works in, and a
+    /// room is neither Markdown nor code.
+    #[must_use]
+    pub fn reaches(&self, area: &Address) -> bool {
+        !area.is_reserved() && self.prefixes().any(|p| area.is_within(p))
+    }
+
     pub fn admits(&self, target: &Address) -> DomainVerdict {
-        if target.is_reserved() || !self.prefixes().any(|p| target.is_within(p)) {
+        if !self.reaches(target) {
             return DomainVerdict::Outside {
                 prefixes: self.prefix_strings(),
             };

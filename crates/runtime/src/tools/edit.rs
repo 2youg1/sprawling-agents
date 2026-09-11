@@ -139,10 +139,10 @@ impl Tool for EditTool {
 
         // The path is judged before the filesystem is touched, and by the
         // same two authorities everything else uses: Address::parse kills
-        // traversal, WriteDomain::admits kills everything outside the
-        // run's declared prefixes (reserved space included). Without this
-        // the write gate only ever saw the tool's own declaration, and a
-        // model-chosen path went wherever it pointed.
+        // traversal, and the write-domain gate judges the file the way
+        // the bench judged the declared area. The bench only ever sees
+        // the tool's own declaration; a model-chosen path is judged
+        // here, and by the same door.
         let target = kernel::Address::parse(rel).map_err(|err| {
             AxError::failure(
                 AxCode::InvalidArgs,
@@ -151,13 +151,19 @@ impl Tool for EditTool {
             )
             .with_recovery("pass a city-relative path with no `..` and no leading slash")
         })?;
-        if let kernel::DomainVerdict::Outside { prefixes } = self.writable.admits(&target) {
-            return Err(AxError::failure(
-                AxCode::OutsideWriteDomain,
-                "edit file",
-                format!("{rel} is outside this run's write domain"),
-            )
-            .with_recovery(format!("write under: {}", prefixes.join(", "))));
+        match kernel::domain(&self.writable, &target, &kernel::TaintSet::empty()) {
+            kernel::GateOutcome::Allow => {}
+            kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
+            // A write domain answers allow or deny; the outcome is
+            // exhaustive on purpose, so this arm states the invariant
+            // instead of assuming it.
+            kernel::GateOutcome::Escalate { .. } => {
+                return Err(AxError::failure(
+                    AxCode::InvalidArgs,
+                    "edit file",
+                    "the write domain asked for an approval, which no write domain does",
+                ));
+            }
         }
 
         let path = self.city_root.join(rel);

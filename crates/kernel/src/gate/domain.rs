@@ -10,40 +10,61 @@ use crate::write_domain::{DocumentReason, DomainVerdict, WriteDomain};
 
 use super::GateOutcome;
 
+/// Whether one file may be written: inside the prefixes, and the kind
+/// of file this domain writes.
 pub fn domain(domain: &WriteDomain, target: &Address, taint: &TaintSet) -> GateOutcome {
     match domain.admits(target) {
         DomainVerdict::Within => GateOutcome::Allow,
         DomainVerdict::NotWritable { reason } => not_writable(target, reason),
-        DomainVerdict::Outside { prefixes } => {
-            let mut violation = format!("target {} is outside the write domain", target.as_str());
-            if !taint.is_empty() {
-                violation.push_str(&format!(
-                    "; the action derives from {} external source(s)",
-                    taint.len()
-                ));
-            }
-            let alternative = if prefixes.is_empty() {
-                "this actor writes nowhere; read, or hand the change to an actor with a domain"
-                    .to_owned()
-            } else {
-                format!("write under one of: {}", prefixes.join(", "))
-            };
-            GateOutcome::Deny {
-                refusal: Box::new(
-                    AxError::refusal(
-                        AxCode::OutsideWriteDomain,
-                        "write file",
-                        target.as_str(),
-                        GateRefusal::new(
-                            "writes land inside the write domain",
-                            violation,
-                            alternative,
-                        ),
-                    )
-                    .with_nearby(prefixes),
+        DomainVerdict::Outside { prefixes } => outside(target, prefixes, taint),
+    }
+}
+
+/// Whether a declared area is reachable at all. A tool declares the
+/// room it works in, not a file, so this asks only the prefix question:
+/// a documents domain asked whether `hall/mayor` is Markdown would say
+/// no, and the Mayor could write nothing.
+pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutcome {
+    if domain.reaches(area) {
+        GateOutcome::Allow
+    } else {
+        outside(
+            area,
+            domain.prefixes().map(|p| p.as_str().to_owned()).collect(),
+            taint,
+        )
+    }
+}
+
+/// The one refusal for a target beyond the prefixes, whether it is a
+/// file or an area.
+fn outside(target: &Address, prefixes: Vec<String>, taint: &TaintSet) -> GateOutcome {
+    let mut violation = format!("target {} is outside the write domain", target.as_str());
+    if !taint.is_empty() {
+        violation.push_str(&format!(
+            "; the action derives from {} external source(s)",
+            taint.len()
+        ));
+    }
+    let alternative = if prefixes.is_empty() {
+        "this actor writes nowhere; read, or hand the change to an actor with a domain".to_owned()
+    } else {
+        format!("write under one of: {}", prefixes.join(", "))
+    };
+    GateOutcome::Deny {
+        refusal: Box::new(
+            AxError::refusal(
+                AxCode::OutsideWriteDomain,
+                "write file",
+                target.as_str(),
+                GateRefusal::new(
+                    "writes land inside the write domain",
+                    violation,
+                    alternative,
                 ),
-            }
-        }
+            )
+            .with_nearby(prefixes),
+        ),
     }
 }
 

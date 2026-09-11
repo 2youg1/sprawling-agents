@@ -130,7 +130,13 @@ fn a_path_outside_the_write_domain_is_refused_before_the_disk_is_touched() {
             Ok(_) => panic!("{hostile} must be refused"),
         };
         assert_eq!(*err.code(), AxCode::OutsideWriteDomain, "{hostile}");
-        assert!(err.recovery().contains("work"), "{hostile}: {err}");
+        // The three-part refusal comes from the kernel gate now, so the
+        // way out is in its alternative rather than in a recovery line.
+        let alternative = err
+            .gate()
+            .map(|gate| gate.alternative().to_owned())
+            .unwrap_or_default();
+        assert!(alternative.contains("work"), "{hostile}: {err}");
     }
     for illegal in ["../evil.txt", "/abs.txt", "work//x"] {
         let err = match tool.invoke(&call(illegal, "new", "", "y")) {
@@ -188,4 +194,35 @@ fn a_call_for_another_tool_is_refused_not_routed() {
         Ok(_) => panic!("identity is fail-closed"),
     };
     assert_eq!(*err.code(), AxCode::InvalidArgs);
+}
+
+#[test]
+fn a_documents_tool_writes_markdown_and_refuses_code_by_name() {
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(tmp.path().join("hall")).unwrap();
+    let hall = Address::parse("hall").unwrap();
+    let domain = kernel::WriteDomain::documents(vec![hall.clone()]).unwrap();
+    let mut tool =
+        EditTool::new(tmp.path(), Address::parse("hall/mayor").unwrap(), domain).unwrap();
+    tool.invoke(&call(
+        "hall/note.md",
+        "new",
+        "",
+        "# note
+",
+    ))
+    .unwrap();
+    assert!(tmp.path().join("hall/note.md").is_file());
+    let refused = tool
+        .invoke(&call("hall/lex.rs", "new", "", "fn main() {}"))
+        .unwrap_err();
+    assert_eq!(*refused.code(), AxCode::OutsideWriteDomain);
+    assert!(
+        refused.subject().contains("hall/lex.rs"),
+        "the refusal names the file, not the room"
+    );
+    let plan = tool
+        .invoke(&call("hall/Roadmap.md", "new", "", "| 0 |"))
+        .unwrap_err();
+    assert_eq!(*plan.code(), AxCode::OutsideWriteDomain);
 }

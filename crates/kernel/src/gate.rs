@@ -27,7 +27,7 @@ mod undoable;
 
 pub use commitment::{CommitmentDecision, commitment};
 pub use dedup::{DedupVerdict, dedup};
-pub use domain::domain;
+pub use domain::{domain, reach};
 pub use egress::{EgressAllowlist, EgressOutcome, EgressTarget, egress, egress_target};
 pub use govern::{delegation, discard, govern, spawn};
 pub(crate) use item::item;

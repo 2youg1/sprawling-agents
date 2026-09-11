@@ -1316,6 +1316,12 @@ impl ContextReminder { pub fn render(&self) -> String; }
 - **`StatusTool` 十三字段变十二**：`budget_usd`／`budget_tokens` 删除，那两个数报的是上限而不是花销。留在原地的是 `ctx`——已用 token 对着这次跑拿到的窗口，那是**报告花了多少**而不是**事前不许花**。
 - **citysim**：`ScenarioSpec.budget_turns` 随之删除；原先靠上限收尾的那条 scenario 改为「跑满它自己要的每一回合再作出结论」（十六波之后是空的那一波）。
 
+### 8-36 写域的两道闸各问一个问题（前端会话 4，2026-09-11；kernel-SPEC §8-46 末段）
+
+- **`bench::admit`** 对 `Effect::Write { domain: area }` 改调 `kernel::reach(&self.domain, area, &self.taint)`：工具声明的是一块区域，门口只问这块区域够不够得到。
+- **`tools::edit::invoke`** 解析出 `target` 后改调 `kernel::domain(&self.writable, &target, &TaintSet::empty())`：`Allow` 继续，`Deny { refusal }` 原样作 `Err`（三段式因此由 kernel 一处产出，工具不再自拼 `Outside` 的话术），`Escalate` 在写域门上不可能出现——`GateOutcome` 刻意穷尽，这一臂如实答一条 `E_INVALID_ARGS` 说明该不变量，而不是 `unreachable!`。空 `TaintSet`：taint 是 bench 的事实，工具这一层没有它，拒词因此少一句「派生自 N 个外部来源」——那句话仍由门口那道 `reach` 说。
+- **红→绿**：`tools/edit/tests.rs` 新增「Documents 域的工具创建 `hall/note.md` 成功、创建 `hall/note.rs` 被拒（`E_OUTSIDE_WRITE_DOMAIN`，主语是文件）」；`bench/tests.rs` 新增「Documents 域、声明区域为 `hall/mayor` 的 `Write` 效果在门口放行」——改前后者红在 `NotMarkdown`。
+
 ### 8-35 去重答的是第一次的结果，而不是一句「你已经问过了」（card-F4.3；形状 1 判定）
 
 **旧行为**：`ToolBench::invoke` 认得重复的 `IdemKey`，回 `BenchOutcome::Duplicate`，而两个调用方（`bin::assembly::driving::lane`、`citysim::executor`）把它翻成 `E_INVALID_ARGS`。于是「同一次调用做两遍」的正确答案——**第一次的结果**——被换成了一个错误：重试的模型学到的是「这件事失败了」，而它其实成功了。这是幂等只做了一半：副作用被挡住，答案没有被记住。
