@@ -329,12 +329,13 @@ pub struct EventRef { seq: Seq, kind: EventKind }   // 字段私有；无公开�
 - 铸造纪律（15.3-1）：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（S2.11 trybuild 反例）。
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
-**EventKind 64 全集与二分（specalign 数据面；「入窗」＝InWindow，共 8）**：
+**EventKind 66 全集与二分（specalign 数据面；「入窗」＝InWindow，共 8）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
 | 创世与空间 | `city_initialized` | record-only（创世行，prev＝64 个 0） |
 | 创世与空间 | `building_created` | record-only |
+| 创世与空间 | `building_configured` | record-only |
 | 基集 | `run_started` | record-only |
 | 基集 | `run_forked` | record-only |
 | 基集 | `prompt_assembled` | **in-window** |

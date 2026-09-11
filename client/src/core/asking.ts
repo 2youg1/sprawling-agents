@@ -145,6 +145,7 @@ function staleBy(record: EventRecord, key: string, query: Query): boolean {
     case "archive_search":
       return (
         kind === "building_created" ||
+        kind === "building_configured" ||
         kind === "roadmap_claimed" ||
         kind === "roadmap_finished" ||
         kind === "roadmap_released" ||

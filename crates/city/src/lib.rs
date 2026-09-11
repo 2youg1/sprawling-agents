@@ -35,6 +35,7 @@ pub use archive::index as archive_index;
 pub use building::adopt as adopt_building;
 pub use building::adopted_payload as building_adopted_payload;
 pub use building::all as buildings;
+pub use building::configured_payload as building_configured_payload;
 pub use building::created_payload as building_created_payload;
 pub use building::{Building, BuildingTemplate, create as create_building};
 pub use city_tool::CityTool;

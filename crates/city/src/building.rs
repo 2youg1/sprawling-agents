@@ -334,6 +334,33 @@ pub fn adopted_payload(building: &Building) -> Result<Payload, AxError> {
     Payload::new(map)
 }
 
+/// The ledger record for a reconfiguration: which faces of a building's
+/// own layer were written.
+///
+/// **What it deliberately does not carry is the configuration.**
+/// `CONFIG.toml` is the authority for what a run is governed by, and a
+/// copy of its contents on the ledger would be a second one. The fact
+/// the file cannot hold is that somebody changed it, and that is what
+/// this is for: a reader watching the city learns the building moved and
+/// goes back to the file to see how.
+///
+/// # Errors
+/// Propagates the payload's own refusal to hold what it was given.
+pub fn configured_payload(
+    building: &Building,
+    sandbox: bool,
+    mcp: bool,
+) -> Result<Payload, AxError> {
+    let mut map = serde_json::Map::new();
+    map.insert(
+        "addr".to_owned(),
+        serde_json::Value::String(building.addr().as_str().to_owned()),
+    );
+    map.insert("sandbox".to_owned(), serde_json::Value::Bool(sandbox));
+    map.insert("mcp".to_owned(), serde_json::Value::Bool(mcp));
+    Payload::new(map)
+}
+
 fn storage(path: &Path, err: &std::io::Error) -> AxError {
     AxError::failure(
         AxCode::StorageFatal,

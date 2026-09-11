@@ -13,9 +13,17 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum EventKind {
-    // Genesis and space (2).
+    // Genesis and space (3).
     CityInitialized,
     BuildingCreated,
+    /// A person changed what one building's runs may reach.
+    ///
+    /// The payload says which faces were written, never what they now
+    /// hold: `CONFIG.toml` is the authority for what a run is governed
+    /// by, and a copy of it here would be a second one. What this adds
+    /// is the fact the file cannot carry - that the change happened,
+    /// when, and to which building.
+    BuildingConfigured,
     // Base set (18).
     RunStarted,
     RunForked,
@@ -114,9 +122,10 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 65] = [
+    pub const ALL: [EventKind; 66] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
+        EventKind::BuildingConfigured,
         EventKind::RunStarted,
         EventKind::RunForked,
         EventKind::PromptAssembled,
@@ -196,6 +205,7 @@ impl EventKind {
             | EventKind::SignalConsumed => WindowClass::InWindow,
             EventKind::CityInitialized
             | EventKind::BuildingCreated
+            | EventKind::BuildingConfigured
             | EventKind::RunStarted
             | EventKind::RunForked
             | EventKind::GateChecked
@@ -268,13 +278,16 @@ mod tests {
     use crate::error::{AxCode, Carrier};
     use std::collections::BTreeSet;
     #[test]
-    fn event_kind_is_61_with_exactly_8_in_window() {
-        assert_eq!(EventKind::ALL.len(), 65);
+    fn every_kind_spells_itself_once_and_exactly_eight_reach_the_window() {
         let names: BTreeSet<String> = EventKind::ALL
             .iter()
             .map(|k| serde_json::to_string(k).unwrap())
             .collect();
-        assert_eq!(names.len(), 65, "serde spellings must be unique");
+        assert_eq!(
+            names.len(),
+            EventKind::ALL.len(),
+            "serde spellings must be unique"
+        );
         let in_window: Vec<EventKind> = EventKind::ALL
             .into_iter()
             .filter(|k| k.window_class() == WindowClass::InWindow)

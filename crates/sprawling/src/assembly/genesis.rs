@@ -242,9 +242,16 @@ impl RunWorker {
     /// Writes what a building's runs may reach into that building's own
     /// configuration layer.
     ///
-    /// Nothing is recorded: `CONFIG.toml` is the authority for what a
-    /// run is governed by, and an event carrying the same fact would be
-    /// a second one. What the ledger keeps is what the run did with it.
+    /// **The contents are not recorded; the change is.** `CONFIG.toml`
+    /// is the authority for what a run is governed by, and an event
+    /// carrying the same fact would be a second one - that part of the
+    /// original ruling stands. What it missed is that "somebody
+    /// reconfigured this building" is not in `CONFIG.toml` at all: it is
+    /// an effect the city carried out, and the Ledger is the only
+    /// history of those. For a whole stage this wrote a diagnostic line
+    /// and nothing else, so a page had no way to learn that a building
+    /// it was showing had moved, and the MCP screen guessed with a timer
+    /// three hundred milliseconds after it sent the command.
     pub(super) fn configure_building(
         &mut self,
         addr: &Address,
@@ -273,7 +280,9 @@ impl RunWorker {
             "city::config_layers",
             &format!("{} was reconfigured", building.addr().as_str()),
         );
-        Ok(())
+        let payload =
+            city::building_configured_payload(&building, sandbox.is_some(), mcp.is_some())?;
+        self.record(EventKind::BuildingConfigured, payload)
     }
 
     /// Lays out a building, then records that it exists.

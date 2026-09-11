@@ -132,6 +132,8 @@ pub fn created_payload(building: &Building, template: BuildingTemplate)
     -> Result<Payload, AxError>;
 pub fn adopt(city_root: &Path, addr: &Address) -> Result<Building, AxError>;      // 整修卡 R1.03
 pub fn adopted_payload(building: &Building) -> Result<Payload, AxError>;          // adopted: true
+pub fn configured_payload(building: &Building, sandbox: bool, mcp: bool)
+    -> Result<Payload, AxError>;                              // building_configured
 ```
 
 - **楼是顶层地址，房间不是楼**：`create` 拒多段地址（`lab/room1` 是 `lab` 里的一个房间）。嵌套楼会使「这个地址归谁管」多出一个答案，而 `Building::of` 取首段这件事今天已被写域、配置与上报对象三处消费。

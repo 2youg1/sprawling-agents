@@ -82,18 +82,11 @@ export function McpForm(props: { readonly addr: Address }) {
     const answer = building()();
     return answer !== undefined && "building" in answer ? answer.building.mcp : [];
   });
-  // Reconfiguring a building leaves no record on the ledger (only a log
-  // line), so nothing tells the asking that this answer went stale; the
-  // page asks again itself, once the command has had a moment to land.
-  const configure = (next: readonly McpServer[]) => {
-    const sent = command(configureMcp(props.addr, next));
-    if (sent) {
-      setTimeout(() => {
-        ui.conn.asking.refresh({ building_view: { addr: props.addr } });
-      }, 300);
-    }
-    return sent;
-  };
+  // Reconfiguring writes `building_configured`, and `staleBy` turns that
+  // record into an invalidation of this very answer. The page used to
+  // guess instead, asking again three hundred milliseconds after it sent
+  // the command.
+  const configure = (next: readonly McpServer[]) => command(configureMcp(props.addr, next));
   const name = () => label().trim();
   const ready = () => {
     if (!LABEL.test(name()) || servers().some((s) => s.label === name())) return false;

@@ -477,6 +477,7 @@ export type PursuitLine = typeof PursuitLine.Type;
  */
 export const EventKind = Schema.Union(
   Schema.Literal("city_initialized", "building_created", "run_started", "run_forked", "prompt_assembled", "model_called", "model_returned", "tool_called", "tool_result", "result_offloaded", "gate_checked", "gate_denied", "checkpoint_committed", "handoff_written", "steer_received", "cancel_received", "watchdog_fired", "budget_limit", "run_frozen", "log_truncated", "signal_enqueued", "signal_consumed", "draft_held", "draft_resolved", "goal_registered", "goal_conflict", "arbitration_verdict", "repair_started", "repair_reused", "worktree_opened", "pr_opened", "pr_merged", "pr_rejected", "roadmap_claimed", "roadmap_finished", "roadmap_released", "approval_requested", "approval_resolved", "policy_created", "policy_revoked", "taint_promoted", "cross_building_transfer", "takeover_started", "rollback_applied", "city_halted", "backpressure_shed", "digest_invalidated", "endpoint_attached", "endpoint_lost", "model_selected", "provider_degraded", "login_started", "eval_run", "asset_archived", "credential_lent", "secret_captured", "secret_egress_blocked", "file_discarded", "discard_restored", "autonomy_changed"),
+  Schema.Literal("building_configured"),
   Schema.Literal("roadmap_split"),
   Schema.Literal("roadmap_blocked"),
   Schema.Literal("pursuit_changed"),

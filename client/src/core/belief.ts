@@ -142,6 +142,7 @@ function fold(held: RunBelief, record: EventRecord): RunBelief {
     // defaulted so a new kind is a decision here, not a silence.
     case "city_initialized":
     case "building_created":
+    case "building_configured":
     case "run_forked":
     case "prompt_assembled":
     case "result_offloaded":

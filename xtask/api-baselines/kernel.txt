@@ -133,7 +133,7 @@ pub const fn kernel::Tokens::new(u64) -> kernel::Tokens
 pub const fn kernel::UsdMicros::get(self) -> u64
 pub const fn kernel::UsdMicros::new(u64) -> kernel::UsdMicros
 pub const kernel::AxCode::ALL: [kernel::AxCode; 36]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 65]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 66]
 pub const kernel::GENESIS_PREV: kernel::B3Hash
 pub const kernel::IDEM_DERIVE_V: u8
 pub const kernel::MEMO_OUTLINE_FIELDS: [&str; 6]
@@ -688,6 +688,7 @@ pub kernel::EventKind::AssetArchived
 pub kernel::EventKind::AutonomyChanged
 pub kernel::EventKind::BackpressureShed
 pub kernel::EventKind::BudgetLimit
+pub kernel::EventKind::BuildingConfigured
 pub kernel::EventKind::BuildingCreated
 pub kernel::EventKind::CancelReceived
 pub kernel::EventKind::CheckpointCommitted

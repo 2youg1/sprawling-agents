@@ -196,6 +196,7 @@ pub fn city::adopt_building(&std::path::Path, &kernel::address::Address) -> core
 pub fn city::archive_entry(&std::path::Path, &kernel::address::Address, city::ArchiveKind, kernel::event::identity::TimeMs, &str) -> core::result::Result<city::ArchiveEntry, kernel::error::shape::AxError>
 pub fn city::archive_index(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<city::ArchiveEntry>, kernel::error::shape::AxError>
 pub fn city::building_adopted_payload(&city::Building) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn city::building_configured_payload(&city::Building, bool, bool) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn city::building_created_payload(&city::Building, city::BuildingTemplate) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn city::building_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::buildings(&std::path::Path) -> core::result::Result<alloc::vec::Vec<kernel::address::Address>, kernel::error::shape::AxError>
