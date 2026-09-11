@@ -305,7 +305,7 @@ impl Desk {
 
 1. `channels` 上一条命令帧，携「哪一栋楼」与「整份文本」——形状与 `Govern` 那一类同，因为它改的是治理文件。
 2. `bin::assembly` 上接这条帧的一格，写之前先上账本一行（每一次效果先成为事件）。
-3. `crates/web` 设置页上的那个框。
+3. 设置页上的那个框。
 
 **它们没有做，不是忘了，是本轮没做**：加一条命令帧会同时动 `channels::command`、`WIRE_V` 的 schema hash 与 `xtask wiring` 认的那张表，而前端此刻是冻结的。下一位接手的人从第 1 条起，第 3 条欠客户端一个整份文本的编辑框加一次保存——没有分段编辑，理由与 `city::governed` 同：写一半会让这台 server 被半行 allowlist 约束。
 

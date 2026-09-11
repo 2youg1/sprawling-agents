@@ -439,7 +439,6 @@ pub struct SessionName(String);                // 形状 2；一个构造点，�
 - `crates/sprawling/assembly.rs`：`serve` 装配点——gateway 的 Custodian 生产装配、memory 三视图的界面查询、`runtime::replay` 补写面的启动扫描都在此接线（ARCHITECTURE §6 接线台账 S4 到期项）。
 - `xtask/api-baselines/channels.txt`：本期起算。
 - ARCHITECTURE §6 模块表 channels 五行：随各卡从「未建」翻「已建」。
-- `crates/web/web-SPEC.md`：wire 的 Command／Query／Event 表是 web 的唯一上游，两份 SPEC 必须一致。
 
 ## 16 测试与约束
 
@@ -497,7 +496,7 @@ pub struct Delta { pub run: RunId, pub text: String }
 
 | 取值 | 含义 | 门要求什么 |
 |---|---|---|
-| `client` | 人用的动词，客户端必须画得出 | `crates/web/src` 里有发出点，且 `run_command` 不以 `not_built` 作答 |
+| `client` | 人用的动词，客户端必须画得出 | `client/src` 里有发出点，且 `run_command` 不以 `not_built` 作答 |
 | `push` | 由外部服务推进来，不是人点的 | 只要求 `run_command` 能执行；客户端有没有它都不看 |
 | `handshake` | 在握手层被吃掉，进不到 `run_command` | 两侧都不要求 |
 | `sealed` | 线上不可拼写 | 两侧都不要求；客户端**若**出现即为红 |
@@ -585,7 +584,7 @@ pub struct CommitAnswer {
 - **答案从账本来，不从 git 来**（memory-SPEC §8-18）。一座导出后在别处恢复、
   `.git` 不在身边的城，照样答得出自己的历史。
 - **客户端欠的（前端冻结，本卡不画界面）**：`client/src/wire.ts` 需重新生成
-  （`cargo xtask wire-ts --write`）；`crates/web` 本卡只把新变体接进
+  （`cargo xtask wire-ts --write`）；本卡只把新变体接进
   `mount::frame` 那条「有答案而暂无页面问它」的臂，使其仍能编译。
 
 ### 8-16 线的另一端由这一端生成（`wire_schema`，feature `schema`）
@@ -804,7 +803,7 @@ pub struct CommitsAnswer {
 - **失联如实（D51）**：只列城自己写过的提交；人 rebase／squash 之后 trunk 上的 oid 不在其中，`Commit` 对它仍答 `Unavailable`。不读提交体的 trailer 回填——那会让投影成为第二权威（`views/commits.rs` 模块头）。
 - **服务端**：`views::holding` 给按 oid 键的 `commits` 表加一条按 `seq` 的索引（`commit_seqs: BTreeMap<Seq, GitOid>`），`fold_commit` 两表同写；sprawling-SPEC §8-53。
 - **`CommitAnswer` 长出 `at: TimeMs`**（同版内，第二条提交）：宣告这次提交的那条记录自己的 `t`。理由来自第一张截图——一列 seq 没法扫读，而一列时间可以。与 `Opening.at`／`Closing.at` 同源、同型。
-- **客户端**：`cargo xtask wire-ts --write` 重生；`crates/web` 只把新变体接进 `mount::frame` 那条「有答案而暂无页面问它」的臂（并存期最后一次）。
+- **客户端**：`cargo xtask wire-ts --write` 重生。
 
 ### 8-23 新客户端第一次真正用这条线，线上缺的四件事（WIRE_V 16→17）
 

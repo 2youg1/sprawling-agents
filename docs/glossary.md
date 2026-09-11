@@ -134,7 +134,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 
 | Name | What it is |
 |---|---|
-| **WebUI** | One page in a desktop browser, embedded in the binary and served from inside it. Two of them exist while v0.0.4 is in flight — `client/`, TypeScript built by bun, and `crates/web`, Dioxus compiled to WebAssembly — and they speak the same wire, which is the point: the wire is the whole API, so the number of clients is a fact about this tree rather than a limit of the design. |
+| **WebUI** | One page in a desktop browser, embedded in the binary and served from inside it. The one this tree carries is `client/`, TypeScript built by bun; the wire is the whole API, so how many clients exist is a fact about this tree rather than a limit of the design. |
 | **Lens** | Which reading of one history a page is showing: `Ledger`, `Archive`, or `Bin`. The three used to be three nav entries, which asked a person to choose before the question was formed. The lens lives in the address, so a link to the archive is still a link to the archive. |
 | **control surface** | The intervention surface at the bottom: five verbs plus the steer input. |
 | **Approval Inbox** | The queue of pending answers, grouped by cluster key. A tainted item is never grouped. |

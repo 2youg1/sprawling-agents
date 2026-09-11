@@ -4,8 +4,7 @@ The page a person opens against one running `sprawling` binary. It is
 TypeScript, built by [bun](https://bun.sh) and Vite, and it lives outside
 the cargo workspace on purpose: the wire in `crates/channels` is the whole
 API, and a client written against it in another language is a supported
-thing to build. This one replaces the Dioxus wasm client over v0.0.4; both
-coexist until card 6.11 removes `crates/web`. Decisions and interfaces
+thing to build. Decisions and interfaces
 are recorded in [`client-SPEC.md`](client-SPEC.md).
 
 ## Two runtime dependencies, and why only two
@@ -18,8 +17,7 @@ are recorded in [`client-SPEC.md`](client-SPEC.md).
 No router library: the hash routes are hand-written in `src/core/route.ts`,
 which reads every fragment the previous client wrote and writes one
 spelling. No UI kit: colour, type, spacing and shape come from
-`src/theme.css`, which re-expresses the token tables of
-`crates/web/src/theme.rs`, and that file is the only place a colour, size
+`src/theme.css`, and that file is the only place a colour, size
 or family literal may appear.
 
 ## The boundary: Effect for the effectful core, Solid for views
@@ -41,8 +39,7 @@ possible at all.
 - unused variables, and `eslint-plugin-solid`'s reactivity rules, which turn
   Solid's one silent failure (destructured props) into a red build.
 
-Every word a person reads comes from `src/lang.json`, in both languages,
-keyed by the `snake_case` name of the `Msg` variant in `crates/web/src/lang.rs`.
+Every word a person reads comes from `src/lang.json`, in both languages.
 
 ## Firefox first
 

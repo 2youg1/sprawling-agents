@@ -190,7 +190,7 @@ Issue [#1](https://github.com/2youg1/sprawling-agents/issues/1) stays open. The
 front end is better and it is not yet worth a working day.
 
 Three defects found by opening the client in a real browser against a real
-provider are recorded in `crates/web/web-SPEC.md` sections 8-65 and 8-66 and are
+provider are recorded in the client's own SPEC and are
 not all fixed: a turn panel whose heading denied the eight turns listed
 underneath it, a fold labelled with the wrong speaker, and a page that showed
 every part of the answer except the question the person typed. **None of the

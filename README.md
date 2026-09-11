@@ -46,7 +46,7 @@ I don’t sell APIs and I can’t afford a hard drive full of your data, so ever
 
 ## What it is
 
-One binary, one browser page, and the page is embedded inside the binary at build time. **The client is replaceable, and this repository is currently proving it by carrying two.** `client/` is TypeScript — Solid and Effect, built by [bun](https://bun.sh), never npm and never node — and `crates/web` is the earlier Dioxus client compiled to WebAssembly, which needs no JavaScript toolchain at all. Both are written against the WebSocket protocol in `crates/channels`, both coexist until card 6.11 removes the wasm one, and anything else that speaks that protocol is a client too, in whatever language you and your agents write best. The gate that once forbade JavaScript in this tree was removed for exactly that reason — it was excluding architectures rather than defects.
+One binary, one browser page, and the page is embedded inside the binary at build time. **The client is replaceable**: `client/` is TypeScript — Solid and Effect, built by [bun](https://bun.sh), never npm and never node — and anything that speaks the WebSocket protocol in `crates/channels` is a client. It is written against the WebSocket protocol in `crates/channels`, both coexist until card 6.11 removes the wasm one, and anything else that speaks that protocol is a client too, in whatever language you and your agents write best. The gate that once forbade JavaScript in this tree was removed for exactly that reason — it was excluding architectures rather than defects.
 
 The directory tree on disk *is* the space: a **City** is a directory tree, a project is a **Building**, an agent’s workspace is a **Room**.
 

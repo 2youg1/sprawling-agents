@@ -364,7 +364,7 @@ pub fn retreat_payload(tag: ModelTag, from: &str, retreat: &Retreat, because: &A
 
 **枚举变体的字段没有「私有」这一档。** Rust 里 `Then { endpoint, model }` 的两个字段随枚举一同公开，于是一个结构体字面量就能绕过 `then` 写出两个空串。封住它的是**变体上的 `#[non_exhaustive]`**：crate 之外写不出该字面量，只能走构造函数；`Retreat::MoveTo` 同理。枚举上的 `#[non_exhaustive]` 只管匹配不管构造，两道都要标。
 
-**人还不能设置它。** 设置面在设置页，而设置页归 `crates/web` 与线上的 `AttachEndpoint`／`SelectModel` 帧；本卡不动线（另一位在改），故城内今天写下的每一条 `model_selected` 都带 `Fallback::None`。线上欠的那一个字段记在本卡报告里。
+**线上还没有设它的字段。** 设置面在设置页，经 `AttachEndpoint`／`SelectModel` 两帧；在那个字段上线之前，城里写下的每一条 `model_selected` 都带 `Fallback::None`。
 
 ### 8-12 gateway::transcribe（`transcriber` 形状 4 适配器，`recording` 形状 2 值，`wire` 形状 1 判定）
 

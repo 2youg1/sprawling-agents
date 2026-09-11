@@ -18,7 +18,7 @@
 - `MemLedger` 过 kernel conformance 六断言（与 JsonlLedger 同一套——V3 兑现「缝」）。
 - 同一 draft 序列灌 MemLedger 与 JsonlLedger，raw 行逐字节相同（规范字节住 kernel 的实证）。
 - checker 对合法序列静默通过；对篡改序列报出首个断点行。
-- 跨 OS 字节夹具：`fixtures/golden-s1/` 的脚本化序列在本机重建后与夹具逐字节相同（CI 三平台恒跑同一断言）。
+- 跨 OS 字节夹具：`fixtures/golden-s1/` 的脚本化序列重建后与夹具逐字节相同（CI 三平台恒跑同一断言）。
 
 ## 3 假设与歧义
 

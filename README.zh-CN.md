@@ -46,7 +46,7 @@ Agent记忆的确是实现RSI很重要的途径，但不是依靠Harness做注�
 
 ## 它是什么
 
-一个二进制，一页浏览器界面，页面在构建时嵌进这个二进制。**树上现在同时有两个客户端**，这是在把「客户端可以换」跑一遍而不是说一遍：`client/` 是 TypeScript，由 bun 构建，npm 与 node 一个不用；`crates/web` 是先前那个 Dioxus 编译成 WebAssembly 的客户端，它连 JavaScript 工具链都不需要。两者共存到 card 6.11 删掉 wasm 那一个为止。凡能说 `crates/channels` 那套 WebSocket 协议的都是客户端，用你与你的 Agent 写得最好的语言写即可。本仓库曾经有一道禁 JavaScript 的门，它被删掉正是因为这个理由——它排除的是架构，而不是缺陷。
+一个二进制，一页浏览器界面，页面在构建时嵌进这个二进制。**客户端可以换**：`client/` 是 TypeScript，由 bun 构建，npm 与 node 一个不用。凡能说 `crates/channels` 那套 WebSocket 协议的都是客户端，用你与你的 Agent 写得最好的语言写即可。本仓库曾经有一道禁 JavaScript 的门，它被删掉正是因为这个理由——它排除的是架构，而不是缺陷。
 
 磁盘上的目录树就是空间：一座 **City** 是一棵目录树，一个项目是一栋 **Building**，一个 Agent 的工位是一个 **Room**。
 

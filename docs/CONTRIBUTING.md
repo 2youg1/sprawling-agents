@@ -25,8 +25,7 @@ Two places where this is a hard requirement, because both have moved recently:
 
 | Area | Read first |
 |---|---|
-| Front-end code (`crates/web`) | The framework's own agent guide and its `llms.txt` before touching a component. The framework in force is **Dioxus**, built without `dx`: `cargo build --target wasm32-unknown-unknown` plus a pinned `wasm-bindgen` CLI. Read <https://dioxuslabs.com/learn/0.7/> first; when the framework changes, this row changes with it. |
-| `wasm-bindgen` and the wasm build | `https://wasm-bindgen.github.io/wasm-bindgen/`. The CLI version must equal the `wasm-bindgen` crate version. |
+| Front-end code (`client/`) | The framework's own agent guide before touching a component. The framework in force is **Solid**, built by bun through Vite; read <https://docs.solidjs.com/> first, and [`docs/frontend-method.md`](frontend-method.md) for how a screen is accepted here. |
 
 Then read, in order: this file, `ARCHITECTURE.md` (what the code is made of and why it has this shape), `crates/<crate>/<crate>-SPEC.md` for the crate you are touching (its interfaces and decisions, written before its code), `docs/glossary.md` (the vocabulary; the lexicon gate enforces it), and the tests next to the code you are about to touch.
 
@@ -72,7 +71,7 @@ The `guard` row is the load-bearing one: it closes the single universal escape h
 
 ## 3.1 Continuous integration
 
-**`ci` runs on every push to `main` and on every pull request**; its five jobs together are exactly `just check` plus `just check-web` plus the supply-chain read, and nothing else - a green CI implies at least what a green `just check` implies. `platforms` and `nightly` answer questions no one waits for (macOS/kani, fuzz, advisories) and run on a schedule; `upstream-watch` asks the two provider-intelligence upstreams whether they moved, daily.
+**`ci` runs on every push to `main` and on every pull request**; its five jobs together are exactly `just check` plus the supply-chain read, and nothing else - a green CI implies at least what a green `just check` implies. `platforms` and `nightly` answer questions no one waits for (macOS/kani, fuzz, advisories) and run on a schedule; `upstream-watch` asks the two provider-intelligence upstreams whether they moved, daily.
 
 Three things run there and not here: `cargo-deny` when it is not installed locally, the formal-verification job (Linux only, mirrored locally by properties), and the nightly fuzz and mutation batches. Everything else is `just check`.
 
@@ -118,7 +117,6 @@ The repository pins the toolchain and leaves the environment to you. `rust-toolc
 | `just`, `cargo-nextest` | the daily command surface | always |
 | `cargo-deny` | dependency audit | optional locally, always in CI |
 | `wasm32-unknown-unknown` target | front-end build | when touching `web` |
-| `wasm-bindgen-cli` | front-end bundling | same; **its version must equal the `wasm-bindgen` crate version** |
 | `cargo-public-api` + nightly | recomputing the public-surface baselines | when changing a public surface |
 
 ## 8 Command surface
@@ -127,7 +125,6 @@ The repository pins the toolchain and leaves the environment to you. `rust-toolc
 |---|---|
 | `just check` | the closing condition: fmt + clippy + nextest + every machine gate |
 | `just gates` | the gates alone |
-| `just check-web` | clippy on the wasm32 target, covering what `just check` cannot reach |
 | `just build-web` | build the front-end artifact, without `dx` |
 | `just dist` | the whole deliverable: client, binary, bill of materials, and the size badges |
 | `just budget` / `just bench` | every budget with what it costs today; the three wall-clock measurements |
