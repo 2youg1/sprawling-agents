@@ -3,7 +3,7 @@
 # Three claims live here, and all three are about machines rather than
 # about a change. A4/V8 assert byte identity across platforms, so a
 # platform this workflow does not run is a promise rather than a fact. V5
-# proves eleven kernel properties against real MIR, which is Linux-only
+# proves nine kernel properties against real MIR, which is Linux-only
 # upstream and minutes long either way. The flake claims a person on NixOS
 # can build this tree with the Rust version `rust-toolchain.toml` names,
 # and only an evaluation of the flake can say whether that is so.
@@ -130,11 +130,11 @@ jobs:
       - name: the binary this flake's toolchain builds
         run: nix build .#default --print-build-logs
 
-  # V5: the four propositions only a proof can hold. Linux-only upstream -
+  # V5: the propositions only a proof can hold. Linux-only upstream -
   # the one ubuntu build left in the pipeline, kept because the tool runs
   # nowhere else.
   #
-  # Four, not eleven, and the two facts line up exactly. Seven harnesses
+  # Two, not nine, and the two facts line up exactly. Six harnesses
   # assert something about one concrete address and one concrete taint
   # source - `Address::parse(".sprawling/ledger")`, `TaintSource::new(
   # "web:x")` - which is a unit test wearing a proof's clothing, and the
@@ -146,12 +146,19 @@ jobs:
   # then forty-five minutes under `--default-unwind 32`, and returned
   # nothing either time.
   #
-  # These three carry a domain sampling cannot reach - every u64, every
+  # These two carry a domain sampling cannot reach - every u64, every
   # four-byte input - and their loops are constant-bounded, so no global
   # unwind is passed: CBMC derives the bounds (`log2_q10` iterates ten
-  # times). They returned in 41, 53 and 54 seconds on 2026-08-29.
+  # times). Both returned inside a minute when they were last timed, on
+  # 2026-08-29.
   #
-  # A fourth, `secret::entropy_is_total_on_short_inputs`, is left out and
+  # A third leg is gone rather than repaired: it named
+  # `budget::verification::admit_spend_…`, and the spending ceiling that
+  # proposition was about no longer exists anywhere in this tree. A
+  # matrix leg that names nothing cannot go green, and there is nothing
+  # left to prove about a rule that was deleted.
+  #
+  # A third harness, `secret::entropy_is_total_on_short_inputs`, is left out and
   # not forgotten: `entropy_millibits_per_char` calls `log2_q10` once per
   # slot of a 256-slot count table, and each call squares a u128 ten
   # times, so the harness hands the solver some 2,560 symbolic non-linear
@@ -175,8 +182,10 @@ jobs:
       matrix:
         harness:
           - backpressure::verification::admit_is_total_and_monotone_in_depth
-          - budget::verification::admit_spend_is_total_and_admit_means_every_layer_fits
-          - secret::verification::log2_q10_is_total
+          # `secret::scan::`, not `secret::`: the entropy judgment moved
+          # into a module of its own, and this filter is matched against
+          # the harness's fully qualified name.
+          - secret::scan::verification::log2_q10_is_total
     steps:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
