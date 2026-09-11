@@ -22,9 +22,15 @@ import type {
   ProviderName,
   PursuitStep,
   RunId,
+  Seq,
   SessionName,
 } from "../wire";
-import { ModeTag, ProviderName as ProviderNameSchema, SessionName as SessionNameSchema } from "../wire";
+import {
+  ModeTag,
+  ProviderName as ProviderNameSchema,
+  SessionName as SessionNameSchema,
+  TemplateName as TemplateNameSchema,
+} from "../wire";
 
 // The one mode a conversation runs in: plan first, then work. The city
 // reads any tag it does not know as this one, so the spelling here is
@@ -91,12 +97,32 @@ export function approve(item: ApprovalId, verdict: "allow" | "deny"): Command {
   return { approve: { item, verdict, idem: mintIdem() } };
 }
 
-export function createPolicy(from: ApprovalId): Command {
-  return { create_policy: { from_item: from, idem: mintIdem() } };
-}
-
 export function pursue(addr: Address, step: PursuitStep): Command {
   return { pursue: { addr, step, idem: mintIdem() } };
+}
+
+// The three layouts a new building can start with; the city refuses any
+// other name and says these three back, so the list is here only to keep
+// a typo out of a round trip.
+export const TEMPLATES = ["minimal", "confidential", "hall"] as const;
+export type Template = (typeof TEMPLATES)[number];
+
+export function createBuilding(addr: Address, template: Template): Command {
+  return {
+    create_building: {
+      addr,
+      template: TemplateNameSchema.make(template),
+      idem: mintIdem(),
+    },
+  };
+}
+
+// A second line from a point on an existing one. `addr` is null for a
+// fork that stays in the room it came from, which is the only form the
+// palette offers: forking somewhere else is a move, and a move is the
+// dispatch form's business.
+export function fork(run: RunId, atSeq: Seq, addr: Address | null): Command {
+  return { fork: { run, at_seq: atSeq, addr, idem: mintIdem() } };
 }
 
 export function setAutonomy(scope: HaltScope, autonomy: Autonomy): Command {

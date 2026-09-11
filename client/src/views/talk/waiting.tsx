@@ -11,7 +11,7 @@
 
 import { For, Show, createMemo } from "solid-js";
 
-import { approve, createPolicy } from "../../core/commands";
+import { approve } from "../../core/commands";
 import { ago } from "../../core/time";
 import type { ApprovalItem } from "../../wire";
 import { useCommand, useLang, useSay, useUi } from "../../ui";
@@ -81,15 +81,6 @@ export function Waiting() {
                   >
                     {say("wait_deny")}
                   </button>
-                  <Show when={!item().tainted && item().cluster_key.class === "commitment"}>
-                    <button
-                      type="button"
-                      class="rounded-control px-base py-tight text-label text-text-quiet hover:bg-g2"
-                      onClick={() => command(createPolicy(item().id))}
-                    >
-                      {say("wait_always")}
-                    </button>
-                  </Show>
                   <button
                     type="button"
                     class="rounded-control bg-accent px-base py-tight text-label text-g0 hover:bg-accent-hover"

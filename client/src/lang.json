@@ -187,9 +187,13 @@
     "en": "deny",
     "zh": "拒绝"
   },
-  "wait_always": {
-    "en": "always allow this",
-    "zh": "以后都允许"
+  "palette_raise": {
+    "en": "raise {addr}",
+    "zh": "新建 {addr}"
+  },
+  "palette_fork": {
+    "en": "fork {addr}",
+    "zh": "分出 {addr}"
   },
   "wait_same": {
     "en": "×{n} alike",

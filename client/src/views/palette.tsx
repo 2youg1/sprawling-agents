@@ -10,7 +10,8 @@
 
 import { For, createMemo, createSignal, onMount } from "solid-js";
 
-import { halt, release } from "../core/commands";
+import { TEMPLATES, createBuilding, fork, halt, release } from "../core/commands";
+import type { Template } from "../core/commands";
 import { LANGS, endonym } from "../core/lang";
 import { MAYOR, toFragment } from "../core/route";
 import type { View } from "../core/route";
@@ -89,12 +90,57 @@ export function Palette(props: { readonly onClose: () => void }) {
     }
     return out;
   });
+  // A verb typed with its argument. The box is already a text box, so a
+  // verb that needs a name takes it here instead of growing a form of its
+  // own somewhere else - which is also why neither of these two appears
+  // as a button on a page that has decided how many controls it has.
+  const typed = createMemo<Entry[]>(() => {
+    const words = query().trim().split(/\s+/);
+    const verb = words.at(0);
+    const subject = words.at(1);
+    if (verb === undefined || subject === undefined || subject === "") return [];
+    if (verb === "raise") {
+      const addr = Address.option(subject);
+      const asked = words.at(2) ?? "minimal";
+      const template = TEMPLATES.find((known): known is Template => known === asked);
+      if (addr._tag === "None" || template === undefined) return [];
+      const at = addr.value;
+      return [
+        {
+          label: say("palette_raise", { addr: subject }),
+          hint: `raise ${template}`,
+          act: () => {
+            command(createBuilding(at, template));
+          },
+        },
+      ];
+    }
+    if (verb === "fork") {
+      const newest = Object.values(ui.conn.belief.runs)
+        .filter((run) => run.addr === subject)
+        .sort((a, b) => (b.started ?? 0) - (a.started ?? 0))
+        .at(0);
+      if (newest === undefined) return [];
+      return [
+        {
+          label: say("palette_fork", { addr: subject }),
+          hint: `fork ${String(newest.lastSeq)}`,
+          act: () => {
+            command(fork(newest.run, newest.lastSeq, null));
+          },
+        },
+      ];
+    }
+    return [];
+  });
   const shown = createMemo(() => {
     const needle = query().trim().toLowerCase();
     const all = entries();
-    return needle === ""
-      ? all
-      : all.filter((entry) => `${entry.label} ${entry.hint}`.toLowerCase().includes(needle));
+    const matched =
+      needle === ""
+        ? all
+        : all.filter((entry) => `${entry.label} ${entry.hint}`.toLowerCase().includes(needle));
+    return [...typed(), ...matched];
   });
   const pick = (entry: Entry | undefined) => {
     if (entry === undefined) return;

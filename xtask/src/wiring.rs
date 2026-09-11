@@ -46,7 +46,10 @@ const WIRE_DIR: &str = "crates/channels/src";
 /// pinning the address meant that splitting the assembly point moved the
 /// arms out from under the gate while leaving the gate green about it.
 const WORKER_DIR: &str = "crates/sprawling/src";
-const CLIENT: &str = "crates/web/src";
+/// Where the client's controls live. A directory for the same reason
+/// `WORKER_DIR` is one, and the command builders sit in `core/commands.ts`
+/// today only by the client's own convention.
+const CLIENT: &str = "client/src";
 
 /// Which side is supposed to reach a verb.
 ///
@@ -181,7 +184,7 @@ fn performed(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError
     let mut out = BTreeSet::new();
     for name in all {
         let arm = format!("channels::Command::{name}");
-        let Some(at) = body.find(&arm) else {
+        let Some(at) = arm_start(body, &arm) else {
             continue;
         };
         // The arm runs to the next one; `not_built` inside that slice is
@@ -197,17 +200,82 @@ fn performed(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError
     Ok(out)
 }
 
+/// The tag a variant travels under on the wire, which is the key the
+/// client writes: `PutDocument` is `put_document`.
+///
+/// Computed rather than tabulated. A table mapping variants to keys would
+/// be a second statement of what `channels` already decides with
+/// `rename_all = "snake_case"`, and the two would drift the first time a
+/// verb was renamed.
+fn wire_tag(variant: &str) -> String {
+    let mut tag = String::new();
+    for (index, character) in variant.char_indices() {
+        if character.is_ascii_uppercase() {
+            if index != 0 {
+                tag.push('_');
+            }
+            tag.extend(character.to_lowercase());
+        } else {
+            tag.push(character);
+        }
+    }
+    tag
+}
+
+/// Where an arm for exactly this verb begins.
+///
+/// A plain `find` matches a longer variant that starts with the same
+/// letters, and the gate then reads a neighbour's arm as this verb's. That
+/// is not hypothetical: `Attach` is a prefix of `AttachEndpoint`, so the
+/// gate read the endpoint's arm and called an unimplemented verb built.
+/// The error was invisible while the client side had the same flaw and the
+/// two cancelled out.
+fn arm_start(body: &str, arm: &str) -> Option<usize> {
+    let mut from: usize = 0;
+    loop {
+        let found = body.get(from..)?.find(arm)?;
+        let at = from.checked_add(found)?;
+        let after = at.checked_add(arm.len())?;
+        let follows_on = body
+            .get(after..)
+            .and_then(|rest| rest.chars().next())
+            .is_some_and(|next| next.is_alphanumeric() || next == '_');
+        if !follows_on {
+            return Some(at);
+        }
+        from = after;
+    }
+}
+
 /// The verbs a person can ask for, read from the client that draws them.
+///
+/// A command frame is an object keyed by the verb, so the shape looked for
+/// is `<tag>: {` - the spelling that builds one. A bare mention is not
+/// enough: `import { halt }` names the verb and draws nothing, and reading
+/// it as a control was the first thing this gate got wrong against a
+/// TypeScript client.
+///
+/// Test files are not controls. A test may spell any frame it likes,
+/// including one no person may send, and counting it would make the sealed
+/// verbs unspellable in their own tests.
 fn emitted(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError> {
     let mut seen = BTreeSet::new();
     let base = root.join(CLIENT);
     if !base.exists() {
         return Ok(seen);
     }
-    for file in walk::files_with_ext(&base, &["rs"])? {
+    let tags: Vec<(String, String)> = all
+        .iter()
+        .map(|name| (name.clone(), format!("{}: {{", wire_tag(name))))
+        .collect();
+    for file in walk::files_with_ext(&base, &["ts", "tsx"])? {
+        let rel = walk::rel(root, &file);
+        if rel.contains(".test.") {
+            continue;
+        }
         let text = walk::read_text(&file)?;
-        for name in all {
-            if text.contains(&format!("Command::{name}")) {
+        for (name, spelling) in &tags {
+            if text.contains(spelling) {
                 seen.insert(name.clone());
             }
         }
