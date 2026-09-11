@@ -18,8 +18,8 @@
 //! `is_derived` names the two classes the tree holds, each with the input
 //! that is scanned in its place.
 //!
-//! Priced this way after card-6.1 and card-4.1: `client/bun.lock` and two
-//! insta snapshots produced 268 findings and zero credentials. The
+//! Priced this way because `client/bun.lock` and two insta snapshots
+//! produced 268 findings and zero credentials. The
 //! alternative was a table of 268 byte offsets, which the next
 //! `bun install` invalidates in full - a category question written down as
 //! coordinates. The known limit is recorded in xtask-SPEC.md section 8-9:
@@ -33,19 +33,19 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 /// The only files allowed to say `.expose(` under crates/*/src: the
-/// defining module and the two redemption points (gateway lands S3).
+/// defining module and the two redemption points in gateway.
 const EXPOSE_WHITELIST: [&str; 5] = [
     "crates/kernel/src/secret/sealed.rs",
     "crates/gateway/src/endpoint/call.rs",
     "crates/gateway/src/native.rs",
-    // R1.18: renewing a subscription credential sends the refresh token
+    // Renewing a subscription credential sends the refresh token
     // to the provider's token endpoint, which is a redemption point of
     // exactly the same kind as the two above - the last slot before the
     // wire. Widened here rather than worked around at the call site,
     // because the alternative was the assembly holding plaintext, and
     // that is the thing this list exists to prevent.
     "crates/gateway/src/credential/oauth/flow.rs",
-    // P5.01: an MCP server's configured header may name a credential
+    // An MCP server's configured header may name a credential
     // instead of carrying one, and the header is set on the request
     // being sent - the same last slot before the wire. Listed rather
     // than redeemed one layer up, for the reason the entry above

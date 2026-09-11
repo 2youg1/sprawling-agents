@@ -3,18 +3,27 @@
 #
 # Three entries, split by importance rather than by ecosystem. What the
 # repository pins deliberately is its direct dependencies, and a change to
-# one matters the way an upstream change does - so those are checked daily,
-# and a bump lands within a day of the release. Dependabot's finest
-# interval is daily and there is no event trigger, so "immediately" means
-# "on the next daily run"; a webhook-fired updater would be a second
-# mechanism with a second state, and this repository does not keep two
-# authorities for one thing.
+# one matters the way an upstream change does - so those are checked daily.
+# A version update still waits out the platform's three-day cooldown, left
+# at its default because being the first machine to compile a fresh release
+# buys one day of freshness and carries the whole risk of a compromised
+# one; security updates ignore the cooldown, so a vulnerability fix is
+# never delayed by it. Dependabot's finest interval is daily and there is
+# no event trigger; a webhook-fired updater would be a second mechanism
+# with a second state, and this repository does not keep two authorities
+# for one thing.
 #
 # Transitive dependencies ride the weekly cadence: nobody designed them in,
 # and a weekly grouped PR is cheap to review while a daily transitive bump
-# would be noise. npm is absent by construction (the zerojs gate holds that
-# there is no package.json), so listing it would produce a
-# manifest-not-found error every run.
+# would be noise.
+#
+# The JavaScript side of the tree is `client/`, whose dependencies bun
+# resolves into `client/bun.lock`. No entry covers it yet: Dependabot's bun
+# updater reads lockfile version 1, while bun writes version 2 from 1.4
+# onward, so an entry would fail on every run instead of opening pull
+# requests. It goes in once the updater reads version 2. Until then the two
+# runtime dependencies are pinned to exact versions and the npm gate
+# refuses a third.
 version: 2
 
 updates:

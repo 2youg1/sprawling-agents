@@ -7,7 +7,7 @@
 # of the commit, so running it tonight against the commit it judged last
 # night spends a runner to recompute an answer already on record.
 #
-# Gone by that rule (P4.05): the thousand-session freeze-leak job. It ran
+# Gone by that rule: the thousand-session freeze-leak job. It ran
 # citysim's `freeze_leak` binary, which `cargo nextest run --workspace
 # --all-features` in ci.yml already runs on every push - the same test,
 # the same commit, one platform apart. It was also the only job here that

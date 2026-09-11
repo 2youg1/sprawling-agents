@@ -73,7 +73,7 @@ pub(super) fn browser() -> Option<PathBuf> {
 }
 
 /// What `doctor` installed, read as the filesystem convention it is
-/// (kernel-SPEC.md section 8-22, P4.02) rather than as a second probe for
+/// (kernel-SPEC.md section 8-22) rather than as a second probe for
 /// where a browser lives on this machine.
 fn in_components() -> Option<PathBuf> {
     let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;

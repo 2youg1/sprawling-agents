@@ -6,8 +6,7 @@
 //! The npm gate: the dependency face of `client/` (xtask-SPEC.md
 //! section 8-12).
 //!
-//! `client/` arrived in card 6.1 without the gate that guards it. The
-//! workspace side of the tree has `cargo-deny` and `depmap` watching
+//! The workspace side of the tree has `cargo-deny` and `depmap` watching
 //! what it may depend on; the JavaScript side had nothing, so one
 //! `bun add` could bring in a third runtime dependency, a package under
 //! a licence this repository refuses, or a lockfile that no longer

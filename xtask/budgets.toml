@@ -12,101 +12,17 @@
 # would make a busy runner look like a defect. Each such row says what it
 # needs, so nobody has to guess why it is not enforced.
 
-# P3.05 moved this reading from 278,829 to 302,038: the city page stopped
-# being an empty div and became a painted canvas, which brings in two
-# web-sys canvas bindings and the first real drawing code the client has
-# had. A deliberate 8% for the product's centrepiece, recorded here so the
-# ratchet keeps holding the line from the new number rather than being
-# widened. Headroom against the budget is still about 6.9x. P3.15 records
-# 307,861 after the two forms landed: within the slack, and written down
-# so the line moves with what is actually shipped.
-# The remediation pass corrected the scale itself: the weight now walks the
-# bundle recursively, so the wasm-bindgen snippets the page actually loads
-# are finally on it (+10.5 KB that were always being downloaded).
-# R1.06 records 384,018: four views that had been rendering as empty divs
-# are now mounted, and their markup, microcopy and event handlers are the
-# 65.6 KB. The old figure was the weight of a client that could only show
-# one page - cheaper, and not a client. Headroom is still 5.5x.
-# R1.11 records 416,116: the building page (a building's own documents and
-# its archive) and the city's building index. Headroom 5.0x.
-# F1.06 records 461,921 for the front-end stage as a whole: the five views
-# that had answers and no page (recycle bin, room mailbox, archive search,
-# the vital signs strip) plus the progress bar's one rendering point and
-# the grouped nav. 45.8 KB for the half of the product that was reachable
-# only by reading the source. Headroom 4.5x, and the ratchet holds from
-# the new number rather than being widened.
-# F2.02-F2.05 records 490,594. The isometric city moved from a canvas to
-# shapes in the document, which was close to weight-neutral - the canvas
-# drawing code it deleted paid for the markup it added. The 28.7 KB is the
-# rest of the front-end rebuild: a four-part panel grammar on nine pages, a
-# three-part empty state wherever a container can be empty, the overview
-# page, and the interventions that had no way to be sent. Microcopy is most
-# of it, and it is the product's voice rather than padding: a page that
-# states a figure now says what produced it. Headroom is still 4.3x against
-# a budget of 2 MB, and the ratchet holds from the new number.
-# P3.06 records 558,419 after the person ruled on the drift the P4 row had
-# been holding open. The 67.8 KB since F2.05 is two things that were asked
-# for: `web::lang`'s second language, which is a table of every string the
-# interface says rather than a mechanism (F2.14, F2.18), and the four
-# client modules the same stage added. Neither is slack that accumulated -
-# each is a feature somebody uses - so the reading is recorded rather than
-# recovered, and the ratchet holds the line from here. Headroom against the
-# 2 MB budget is 3.8x, which is why this is not the size to spend attention
-# on today.
-# ux-6 records 580,157. The 21.2 KB since P3.06 is the keyboard: `web::keys`
-# and `web::palette`, the key map the `?` key opens, and the thirteen phrases
-# the two of them say in both languages. It is what makes every page and
-# every building reachable without a pointer, in a client whose readers work
-# a keyboard all day - a feature somebody uses rather than slack that
-# accumulated, so the reading is recorded and the ratchet holds from here.
-# Headroom against the 2 MB budget is 3.6x.
-# ux-11..ux-14 records 614,807 on the person's ruling. The 34.6 KB since
-# ux-6 was weighed one card at a time, each figure from its own release
-# build: ux-11 +8.3 KB, ux-12 +4.9 KB, ux-13 +4.1 KB, ux-14 +11.9 KB, and
-# 5.4 KB of drift from ux-7..ux-10 that stayed inside the slack and was
-# never re-recorded. What it bought is the session, which is where
-# everything this product does differently actually happens and where all
-# of it used to render as the same grey line: a turn that says what the
-# model said, what it cost in tokens and dollars, what each tool
-# answered, and what a door refused in three parts; a drop that reaches
-# the box work is written in and lights up while a drag is over it; a
-# query that can ask for one session, without which yesterday's session
-# opened blank; and the change list a person reads to find what an agent
-# touched, with the counts taken from git between two real checkpoints.
-# Microcopy in two languages is most of the weight, as it was at F2.05
-# and P3.06 - it is the product's voice rather than padding. Headroom
-# against the 2 MB budget is 3.4x, and the ratchet holds from here.
-# V3.44-V3.50 records 672,246, and the gap it closes is not a regression:
-# it is the first reading taken since the client was last built. The
-# 57.4 KB above the ux-14 line is v0.0.3's own front-end work - the
-# session page, the board, the plan tree, the record and waiting pages,
-# the pursuit panel, `web::phase` and `web::prompt` - none of which had
-# ever been weighed, because nothing in `just check` builds the wasm and
-# nobody had run `just build-web` through the whole stage. The badge said
-# so all along and was not read either.
+# The reading is the bundle a browser downloads, gzipped, walked
+# recursively so every chunk the page loads is on the scale.
 #
-# This session's own share is 317 B, measured rather than estimated:
-# the client was built once from this tree and once from 506145c with
-# only `app.css`, `theme.rs`, `lang.rs` and `dashboard.rs` reverted, and
-# both dist directories were weighed the same way (670,483 against
-# 670,166). Two font stacks, three phrases and the comments that record
-# why they exist.
-#
-# The line therefore moves to what the product actually weighs today, and
-# the ratchet holds from here. Headroom against the 2 MB budget is 3.1x.
-#
-# V3.51-V3.52 records 673,488 on the person's ruling, which also settled
-# the 672,246 above: the gap was accepted rather than recovered, because
-# every byte of it is a feature and none of it is slack. The 1.2 KB since
-# is this stage's own, and it is eleven phrases in two languages - the
-# approval page's count and its two verbs, the four column heads of the
-# record table, a document's size, the cost page's unpriced cell, the
-# filter line, and the accessible name of the button that dismisses a
-# refusal. Each one replaced an English literal that a Chinese page was
-# rendering as English, which is the defect `xtask wording` now refuses;
-# the stylesheet and the font stack changed in the same stage and weigh
-# nothing next to microcopy, as they have at every reading since F2.05.
-# Headroom against the 2 MB budget is 3.1x, and the ratchet holds.
+# 107,623 is the first reading of the TypeScript client. Every earlier
+# reading on this row weighed a WebAssembly client that has since left the
+# tree, so none of them is comparable and none is kept. What the number
+# buys: nine pages, a city drawn as shapes in the document, the four lenses
+# a run is read through, and an interface that says every one of its
+# strings in two languages. Microcopy is most of the weight and is the
+# product's voice rather than padding. Headroom against the 2 MB budget is
+# 19.5x, so the next reading to spend attention on is not this one.
 [frontend_artifact]
 what = "the client the browser downloads, gzipped, fonts excluded"
 budget_bytes = 2097152
@@ -126,19 +42,25 @@ badge_label = "client"
 # refuses a release binary whose file table lacks the client assets, so this
 # cannot regress silently. The ratchet holds the line from the first honest
 # reading.
-# P3.06 records 8,620,032, freshly linked rather than read off a stale
-# artifact. Of the 1.37 MB since the first honest reading, the largest
-# single cause is tokio's `signal` feature, which is what lets a Windows
+# The reading is taken from a freshly linked binary rather than off a stale
+# artifact. Two earlier growths are on record and both were bought rather
+# than drifted: tokio's `signal` feature, which is what lets a Windows
 # console deliver both of its stop signals to a city that must close its
-# ledger cleanly (P3.05b) - a binary that exits without that is smaller and
-# wrong. This card's own two modules measure 12,800 B of it, taken by
-# building the binary before and after. Recorded on the person's ruling:
-# the growth is bought, not drifted, and 15.6x headroom against the 128 MB
+# ledger cleanly - a binary that exits without that is smaller and wrong -
+# and the client bundle itself, once build.rs stopped embedding a
+# placeholder.
+#
+# 9,937,920 is this version's reading, 1.26 MB above the last one. What the
+# binary gained: a browser it drives over BiDi and the image handling that
+# carries a screenshot back as evidence, a doctor that answers what the
+# running machine has, a search tool beside `read`, and the compressor that
+# fits a tool result into a window. Each is a capability a resident calls,
+# not a dependency that arrived unasked. 13.5x headroom against the 128 MB
 # budget says the next reading to spend attention on is not this one.
 [release_binary]
 what = "the single binary a person installs, before fonts, wasmtime and CPython are embedded"
 budget_bytes = 134217728
-best_bytes = 8620032
+best_bytes = 9937920
 slack_bytes = 1048576
 measured_by = "just build-web, cargo build --release, then just gates"
 status = "gated"
@@ -206,7 +128,7 @@ status = "gated, with a register of the signatures that predate the rule"
 # direction: the module is declared `adapter` - "thin, no policy" - and
 # held the city's dispatch policy instead, and an eleven-parameter
 # private method is what policy looks like when it has no object to live
-# in. V3.43 spent fifteen of them, because splitting that file into
+# in. Fifteen of them were spent splitting that file, because putting it
 # `assembly/` would otherwise have carried each excuse to a new address -
 # which is the one budgets.toml edit `guard` will not treat as a strike.
 [argument_count.predating]
@@ -260,7 +182,7 @@ status = "gated, with a register of the files that predate the rule"
 # The files that were already over the line on the day it was re-drawn
 # (2026-09-05), each pinned at the length it had that day, worst first.
 # Ninety-seven of them on that day; the last row was struck on
-# 2026-09-08 (cards 1.1 through 5.2), and the table below is empty by
+# 2026-09-08, and the table below is empty by
 # construction - it keeps its three properties over nothing.
 #
 # `crates/web/src/lang.rs` (3,444 lines) and `crates/web/src/theme.rs`
@@ -333,9 +255,9 @@ what = "append plus fsync, p50 and p99"
 budget_p50_ms = 5
 budget_p99_ms = 20
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 0.562 ms / p99 0.838 ms on windows-x86_64 NVMe (2026-09-02, after V3.07 stopped reopening the segment per write; 1.047 / 1.879 ms before it); batched append_all moves about 335k records/s. A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: p50 0.562 ms / p99 0.838 ms on windows-x86_64 NVMe (2026-09-02, after the segment stopped being reopened per write; 1.047 / 1.879 ms before it); batched append_all moves about 335k records/s. A wall-clock figure is the machine's, so it is recorded, never gated"
 
-# V3.08. What one durability barrier costs per record as the batch under
+# What one durability barrier costs per record as the batch under
 # it grows. The absolute figures are this machine's disk; the ratio
 # between the rows is a fact about the design, and it is the reason
 # `append_all` exists: a barrier is a fixed cost, so a wave of fifty
@@ -346,7 +268,7 @@ status = "measured, not gated: p50 0.562 ms / p99 0.838 ms on windows-x86_64 NVM
 # so every record `runtime` writes is a batch of one and pays a whole
 # barrier. `append_all` has no caller outside this crate and the bench.
 #
-# V3.07 halved every row without touching that: `RealFs` reopened the
+# Every row halved without touching that: `RealFs` reopened the
 # segment for the append and again for the sync, so two `CreateFile` calls
 # sat under every record. It holds the handle now, the way `LineReader`
 # does on the read side. First reading 1100.3 / 103.3 / 22.4 us.
@@ -355,7 +277,7 @@ what = "one fsync barrier, amortised over the records under it"
 measured_by = "just bench (citysim bench bin, release)"
 status = "measured, not gated: 562.4 us/record at one record per barrier, 57.3 at ten, 17.0 at fifty (windows-x86_64 NVMe, 2026-09-02, 200 waves per row). Of the 562 us, 2.5 us is the write and the rest is the barrier itself. A wall-clock figure is the machine's, so it is recorded, never gated"
 
-# V3.08. Opening yesterday's session: the whole of what `bin::assembly`'s
+# Opening yesterday's session: the whole of what `bin::assembly`'s
 # `run_history` does, over the same public faces it calls - refresh the
 # resident index, name the newest `limit` sequences that session wrote,
 # read those lines, parse them. The socket and the JSON frame are left
@@ -364,7 +286,7 @@ status = "measured, not gated: 562.4 us/record at one record per barrier, 57.3 a
 #
 # The fixture is a city that has been working: fifty thousand records,
 # eight interleaved sessions, and the question asked about the oldest of
-# them. Before V3.03 the same question on the same fixture in the same
+# them. Before the index existed, the same question on the same fixture in the same
 # process measured 27.6 ms, because the answer was found by reading every
 # line back from the tail and discarding what belonged to somebody else.
 # What is left is almost entirely the cost of parsing the 500 records that
@@ -372,7 +294,7 @@ status = "measured, not gated: 562.4 us/record at one record per barrier, 57.3 a
 [run_history]
 what = "one session's newest 500 records, out of a ledger holding eight sessions"
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 3.311 ms against 27.6 ms before V3.03 (windows-x86_64 NVMe, 2026-09-02, 50,000 records, 50 rounds). A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: p50 3.311 ms against 27.6 ms before the index (windows-x86_64 NVMe, 2026-09-02, 50,000 records, 50 rounds). A wall-clock figure is the machine's, so it is recorded, never gated"
 
 [prefix_assembly]
 what = "assembling one frozen prefix"

@@ -36,7 +36,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.0.3"
+version = "0.0.4"
 edition = "2024"
 license = "MPL-2.0"
 rust-version = "1.97"
@@ -57,12 +57,12 @@ insta = "1"
 tempfile = "3"
 # S2: compile-fail proof that "unrepresentable" holds (V0 trybuild cases).
 trybuild = "1"
-# card-4.1: pictures cross both provider wires base64-encoded. The
+# Pictures cross both provider wires base64-encoded. The
 # package is already resolved beneath reqwest, so naming it adds nothing
 # to the lock, and a second hand-written encoder would be a second
 # authority for one transformation.
 base64 = "0.22"
-# card-4.3: a screenshot is evidence only if its size is read from its own
+# A screenshot is evidence only if its size is read from its own
 # bytes and two of them can be compared. Decoding only - nothing here
 # writes a png - and the licence is MIT OR Apache-2.0, both already on
 # `deny.toml`'s allow list. A hand-written IHDR reader would measure a
@@ -89,7 +89,7 @@ tower = { version = "0.5", features = ["util"] }
 # reachable over TLS is a city behind something that terminates it.
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "handshake"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
-# R1.14: OS entropy for the PKCE verifier and the login state. It is not
+# OS entropy for the PKCE verifier and the login state. It is not
 # the seeded RNG the simulator uses and must not become it - a verifier a
 # third party can predict is a login a third party can finish. Already in
 # the tree as a transitive dependency, so this adds a name rather than a
@@ -102,7 +102,7 @@ reqwest = { version = "0.13", default-features = false, features = ["blocking", 
 # The bin's build script gzips the client bundle it embeds; xtask weighs
 # the same artifacts. One version authority for both.
 flate2 = "1"
-# card-6.2: the JSON Schema the TypeScript client is generated from. The
+# The JSON Schema the TypeScript client is generated from. The
 # derive reads the same serde attributes the wire is encoded with, so both
 # ends of the socket have one authority; optional in kernel and channels
 # (`schema`), turned on by xtask alone, never by the product binary.

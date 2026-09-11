@@ -3,7 +3,7 @@
 > crate：`xtask`（工作区成员，不占产品拓扑）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
 > 章节骨架：十七节（「两个设计」置于接口先行后，「模型体验」置于测试与约束后）。
 
-## 1 需求拆解
+## 1 需求分解
 
 把 ARCHITECTURE.md 的冻结面变成机器检查，每一件可独立完成、独立验收：
 
@@ -15,21 +15,21 @@
 | depmap | crate 依赖边 ⊆ §2 depmap 块；`pub trait` 仅现于 §3 缝清单文件 |
 | guard | 改动门自身、又同时改动门所判源码的提交，必须携 `Verdict:` 尾注 |
 | ax | 定稿屏（`crates/web/screens/*.html`）写下的角色、可及名、当前页标记与地标元素，客户端（`crates/web/src`）也提供 |
-| wording（V3.51 上线） | 读者拿到的词出自 `web::lang`：`crates/web/src` 里 RSX 文本节点与朗读型属性的字面量，去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名 |
-| render（V3.48 上线） | 定稿屏在真引擎里画出来，量盒子落在哪：一页一条书脊、面板头坐在自己面板的左上角、没有东西宽过装它的区域 |
-| wiring（V3.32 上线） | 城能执行的动词必须从客户端够得到；三个来源零副本（`wire.rs` 的 `enum Command`、`run_command` 的臂、`crates/web/src`），channels-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
+| wording | 读者拿到的词出自 `web::lang`：`crates/web/src` 里 RSX 文本节点与朗读型属性的字面量，去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名 |
+| render | 定稿屏在真引擎里画出来，量盒子落在哪：一页一条书脊、面板头坐在自己面板的左上角、没有东西宽过装它的区域 |
+| wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（`wire.rs` 的 `enum Command`、`run_command` 的臂、`crates/web/src`），channels-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | spec | 生成 `<crate>-SPEC.md` 骨架（Daily Loop 的 `just spec`） |
-| secret（S2.12 上线） | 全仓＋夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
-| specalign（S2.12 上线） | kernel 枚举 ↔ kernel-SPEC §8-1／§8-4 表逐 variant：消费真 enum（AxCode::ALL／EventKind::ALL）对表作证，计数、归属、carrier／窗类逐项同 |
-| apisync（S2.12 上线） | 双断言：①基线新鲜——`cargo public-api` 实时面与已提交基线逐行同；②同集变更——基线文件变即要求同 crate SPEC 同集被触 |
-| badge（P5 上线） | 体积徽章由 `budget` 的读数渲染成 `docs/badges/*.svg`；徽章陈旧＝`budget` 门红（不新增门） |
-| budget | `xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；称不出则沉默（这台机器上没有构建产物不是缺陷），壁钟读数只入册不入门 |
-| color（S4 上线） | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免 |
-| release（P4.14 上线） | 公开树由过滤生成；五条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径、不得引用树里没有的文件、不得把一台机器的工作记录写进产品文档 |
-| length（R2.20 上线，V3.29 加文件面与参数面） | 一个生产函数不得长过 `function_length`（今 200 行）、不得多于 `argument_count` 个参数（今 4 个，不含接收者），一个源文件不得长过 `file_length`（今 400 行，含测试；权威在 budgets.toml）；函数尺寸与签名以 `syn` 量得，文件尺寸即行数 |
+| secret | 全仓＋夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
+| specalign | kernel 枚举 ↔ kernel-SPEC §8-1／§8-4 表逐 variant：消费真 enum（AxCode::ALL／EventKind::ALL）对表作证，计数、归属、carrier／窗类逐项同 |
+| apisync | 双断言：①基线新鲜——`cargo public-api` 实时面与已提交基线逐行同；②同集变更——基线文件变即要求同 crate SPEC 同集被触 |
+| badge | 体积徽章由 `budget` 的读数渲染成 `docs/badges/*.svg`；徽章陈旧＝`budget` 门红（不新增门） |
+| budget | `xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；称不出则沉默（测试机上没有构建产物不是缺陷），壁钟读数只入册不入门 |
+| color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免 |
+| release | 公开树由过滤生成；五条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径、不得引用树里没有的文件、不得把一台机器的工作记录写进产品文档 |
+| length | 一个生产函数不得长过 `function_length`（今 200 行）、不得多于 `argument_count` 个参数（今 4 个，不含接收者），一个源文件不得长过 `file_length`（今 400 行，含测试；权威在 budgets.toml）；函数尺寸与签名以 `syn` 量得，文件尺寸即行数 |
 | npm | `client/` 的依赖面：锁文件在盘且与 `package.json` 逐条同、运行时依赖恰为 `solid-js` 与 `effect`、树上每个包的许可证都在 `deny.toml` 的准许表内 |
 | gates | 顺序跑全部门，聚合报告，任一违规即退出码 1 |
-| wire-ts | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V` 与 `WIRE_HASH`；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红。命令已就位，进 `gates::run` 那张数组由主线单独一枚提交完成 |
+| wire-ts | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V` 与 `WIRE_HASH`；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
 
 ### 门禁针对的 LLM 失效模式（本 crate 存在的理由）
 
@@ -59,9 +59,9 @@
 
 - 「注释与标识符扫描」简化为整行子串扫描：中文禁用词只会出现在注释与文档，英文禁用词不构成合法标识符片段。误伤由 `lexicon-ok:` 行内豁免兜住。
 - guard 本地默认只查 HEAD 一枚提交（工作树未提交的改动不查——门只对可判定对象作证）；CI 以 `--range` 查整个变更集：pull request 取 `base..head`，push 取 `before..after`。**只判 tip 一枚是一个洞**：一个 PR 可以把放宽门的那枚提交夹在中间，再用一枚干净的 tip 过关。区间两端解不出来时（改写过历史的 push、首次 push）回落到 HEAD 并明说回落了，不得让一个解不开的区间读起来像一个干净的区间。
-- **guard 只对「门变更与被判源码同处一枚提交」索裁定（V3.25）**。被判源码是一张封闭前缀表：`crates/`／`citysim/`／`fuzz/`。两边都在一枚提交里，就是这道门要关的那条捷径：活在提交里，本该拒绝它的规则也在同一枚提交里，一次绿的运行同时报掉两者。**全部改动都在门自身的那一枚提交是重新定价，属日常工作**（AGENTS.md `guard` 行原文如此）：它的 diff 除了「这条规则现在标价不同了」什么都不说，而那正是评审人要看的东西，一个签名反而把它遮住。旧口径（凡触及 `xtask/` 即索裁定）把重新定价收得与破规一样贵，而那正是禁 JavaScript 一条比它的论据多活一年的机制性原因（`docs/frontend-method.md` §4）。**留下的洞是故意的并记在此**：先一枚放松、再一枚过门，两枚都不被索裁定。堵它就得为每一次重新定价收一次裁定，而那个价钱正是本条要取消的。
-- **guard 区分「门怎么判」与「门产出了什么」（P3.01，用户裁定）**。`xtask/api-baselines/` 不在保护面内，而 `xtask/src/apisync.rs` 仍在。理由是两道门曾经互相矛盾：`apisync` 命令公开面一变就跑 `cargo xtask apisync --write`，而那就是写进 `xtask/`；两条同时遵守，等于**每一次公开面变更都要一次裁定**，而一个次次都要签的字会贬值成仪式。重生一份 baseline 放松不了任何东西：`apisync` 仍然拿它与实时 API 逐行比，且 diff 就在提交里给评审人看。**这条不得推广到其它目录**：判据是「该文件由门自己生成且被门自己校验」，不是「改起来麻烦」。
-- **guard 同样区分「放松」与「收紧」，判据是 diff 的形状而不是目录（V3.35）**。`length` 门自己命令：一个回到预算之内的文件**必须**从 `[file_length.predating]` 划掉，否则它报「不再是例外」。于是拆分与划掉天然同住一枚提交，而旧口径会为每一次拆分收一次裁定。**划掉一行豁免放松不了任何东西**：那个文件从「只受自己那颗钉子约束」变成「与其他所有文件同受预算约束」。**登记表只许变小，而变小有两种形状**：删掉一行（那个文件从「只受自己那颗钉子约束」变成「与其他所有文件同受预算约束」），或把一颗钉子换成更小的钉子（同一个文件被约束到更短的长度——文件缩了但还没回到预算之内时，`length` 门本来就要求同一次改动里把钉子降下来）。因此 `xtask/budgets.toml` 在整份 diff 只做这两件事时不算门面，其余一律照旧。**仍然会重新武装这道门的**：新增一行、钉子变大、预算被改、注释被动，以及把一条超长签名的豁免搬到它移去的新地址——一条签名要么被修好要么原地不动，不得带着免死金牌搬家。
+- **guard 只对「门变更与被判源码同处一枚提交」索 `Verdict:` 尾注**。被判源码是一张封闭前缀表：`crates/`／`citysim/`／`fuzz/`。两边都在一枚提交里，就是这道门要关的那条捷径：活在提交里，本该拒绝它的规则也在同一枚提交里，一次绿的运行同时报掉两者。**全部改动都在门自身的那一枚提交是重新定价，属日常工作**（AGENTS.md `guard` 行原文如此）：它的 diff 除了「这条规则现在标价不同了」什么都不说，而那正是评审人要看的东西，一个签名反而把它遮住。旧口径（凡触及 `xtask/` 即索 `Verdict:` 尾注）把重新定价收得与破规一样贵，而那正是禁 JavaScript 一条比它的论据多活一年的机制性原因（`docs/frontend-method.md` §4）。**留下的洞是故意的并记在此**：先一枚放松、再一枚过门，两枚都不被索 `Verdict:` 尾注。堵它就得为每一次重新定价收一次 `Verdict:` 尾注，而那个价钱正是本条要取消的。
+- **guard 区分「门怎么判」与「门产出了什么」**。`xtask/api-baselines/` 不在保护面内，而 `xtask/src/apisync.rs` 仍在。理由是两道门曾经互相矛盾：`apisync` 命令公开面一变就跑 `cargo xtask apisync --write`，而那就是写进 `xtask/`；两条同时遵守，等于**每一次公开面变更都要一次 `Verdict:` 尾注**，而一个次次都要签的字会贬值成仪式。重生一份 baseline 放松不了任何东西：`apisync` 仍然拿它与实时 API 逐行比，且 diff 就在提交里给评审人看。**这条不得推广到其它目录**：依据是「该文件由门自己生成且被门自己校验」，不是「改起来麻烦」。
+- **guard 同样区分「放松」与「收紧」，依据是 diff 的形状而不是目录**。`length` 门自己命令：一个回到预算之内的文件**必须**从 `[file_length.predating]` 划掉，否则它报「不再是例外」。于是拆分与划掉天然同住一枚提交，而旧口径会为每一次拆分收一次 `Verdict:` 尾注。**划掉一行豁免放松不了任何东西**：那个文件从「只受自己那颗钉子约束」变成「与其他所有文件同受预算约束」。**登记表只许变小，而变小有两种形状**：删掉一行（那个文件从「只受自己那颗钉子约束」变成「与其他所有文件同受预算约束」），或把一颗钉子换成更小的钉子（同一个文件被约束到更短的长度——文件缩了但还没回到预算之内时，`length` 门本来就要求同一次改动里把钉子降下来）。因此 `xtask/budgets.toml` 在整份 diff 只做这两件事时不算门面，其余一律照旧。**仍然会重新武装这道门的**：新增一行、钉子变大、预算被改、注释被动，以及把一条超长签名的豁免搬到它移去的新地址——一条签名要么被修好要么原地不动，不得带着免死金牌搬家。
 - 附录 A 中语境依赖的禁用词（如 session 指本城运行时、建筑指项目时）不入机器数据面，由评审执行；lexicon.toml 内以注释记录此边界。
 
 ## 4 现状分析
@@ -83,13 +83,12 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——列格式一变，只有一处要改。
 
 **本模块不做什么（否定式两条）**：不修改任何被检文件（门只判不改；唯二例外＝spec 只新建不覆盖、`apisync --write` 只重写基线文件）；不缓存扫描结果（每次全量重扫——确定性优于速度）。
-原第三条「不做 color（S4 随 `web::theme` 启用，届时增列）」已到期：`color` 已是一道门，故划掉。
 
-**secret 门细则**（S2.12）：扫描面＝仓内全部文件（含 fixtures／语料），排除隔离区 local/、.git、target；判定器＝`kernel::secret::scan`（xtask 依赖 kernel，工作区成员不占产品拓扑，合法）；命中只报文件＋偏移＋长度，恒不回显字节；无内联豁免（豁免口会被注入内容利用）。兼查：`crates/*/src/**` 内 `.expose(` 调用点白名单＝kernel/src/secret.rs（定义处）、gateway/src/endpoint.rs、gateway/src/native.rs；命中即红。自测纪律：扫描器自身测试的高熵样本在源码中必须拆段拼接，不留可扫描的完整字面量。
+**secret 门细则**：扫描面＝仓内全部文件（含 fixtures／语料），排除隔离区 local/、.git、target；判定器＝`kernel::secret::scan`（xtask 依赖 kernel，工作区成员不占产品拓扑，合法）；命中只报文件＋偏移＋长度，恒不回显字节；无内联豁免（豁免口会被注入内容利用）。兼查：`crates/*/src/**` 内 `.expose(` 调用点白名单＝kernel/src/secret.rs（定义处）、gateway/src/endpoint.rs、gateway/src/native.rs；命中即红。自测纪律：扫描器自身测试的高熵样本在源码中必须拆段拼接，不留可扫描的完整字面量。
 
-**已复核字面量表（P3.05 增）**：判定器恒不改——它的活是在入口捕获一切像钥匙的东西，那里误报不要钱；**本门问的是另一个问题**「这里是不是提交了一份凭证」，那里误报要一次构建。故门内持一张 `NOT_CREDENTIALS` 精确字面量表，逐条写明它是谁、为什么不可能是凭证。三条纪律：①**整串精确匹配**——带前缀或后缀的更长 token 仍是命中，故没人能靠戴一个已复核的名字混过去（一条断言钉这件事）；②**表住门里而不是站点上**——注释式豁免是注入内容能写的洞，这张表不是；③表在 guard 保护面内，增一条即须 `Verdict:` 尾注。首条：`CC_x86_64_unknown_linux_musl`（Cargo 的分目标 C 编译器变量名，`release.yml` 的 musl job 设它）；以及 `windows` crate 的六个 feature 名 `Win32_System_DataExchange`／`Win32_System_Threading`／`Win32_System_Variant`／`Win32_UI_Accessibility`／`Win32_UI_Input_KeyboardAndMouse`／`Win32_UI_WindowsAndMessaging`——`desktop/Cargo.toml` 用它们选出 Windows 臂要调的 API 面，feature 名由 resolver 读取、自身恒不持值，`Win32` 里的数字与下划线并置才是触发混合字母表规则的原因；只列长度 ≥20 字节的六个，更短的名字够不着熵侦测器。
+**已复核字面量表**：判定器恒不改——它的活是在入口捕获一切像钥匙的东西，那里误报不要钱；**本门问的是另一个问题**「这里是不是提交了一份凭证」，那里误报要一次构建。故门内持一张 `NOT_CREDENTIALS` 精确字面量表，逐条写明它是谁、为什么不可能是凭证。三条纪律：①**整串精确匹配**——带前缀或后缀的更长 token 仍是命中，故没人能靠戴一个已复核的名字混过去（一条断言钉这件事）；②**表住门里而不是站点上**——注释式豁免是注入内容能写的洞，这张表不是；③表在 guard 保护面内，增一条即须 `Verdict:` 尾注。首条：`CC_x86_64_unknown_linux_musl`（Cargo 的分目标 C 编译器变量名，`release.yml` 的 musl job 设它）；以及 `windows` crate 的六个 feature 名 `Win32_System_DataExchange`／`Win32_System_Threading`／`Win32_System_Variant`／`Win32_UI_Accessibility`／`Win32_UI_Input_KeyboardAndMouse`／`Win32_UI_WindowsAndMessaging`——`desktop/Cargo.toml` 用它们选出 Windows 臂要调的 API 面，feature 名由 resolver 读取、自身恒不持值，`Win32` 里的数字与下划线并置才是触发混合字母表规则的原因；只列长度 ≥20 字节的六个，更短的名字够不着熵侦测器。
 
-**apisync 门细则**（S2.12）：基线集＝存在 `<crate>-SPEC.md` 的产品 crate（SPEC-first 即同步契约面；现在＝kernel/memory/runtime）；基线住 `xtask/api-baselines/<crate>.txt`，由 `cargo xtask apisync --write` 生成（`cargo public-api -p <crate> --simplified`，缺省 feature＝dev-only feature 面不入基线，台账已豁免）；断言①实时重算与基线逐行同（工具链缺失＝fail-closed 报装机指引，不静默跳）；断言②提交区间内基线文件变 ⇒ 同 crate SPEC 同集被触（git 面，复用 guard 的区间语义：本地缺省 HEAD，CI --range）。两断言合成链：API 变→①逼基线更新→②逼 SPEC 同集。cargo-public-api＋nightly 为环境前置（已装，2026-08）。
+**apisync 门细则**：基线集＝存在 `<crate>-SPEC.md` 的产品 crate（SPEC-first 即同步契约面；现在＝kernel/memory/runtime）；基线住 `xtask/api-baselines/<crate>.txt`，由 `cargo xtask apisync --write` 生成（`cargo public-api -p <crate> --simplified`，缺省 feature＝dev-only feature 面不入基线，台账已豁免）；断言①实时重算与基线逐行同（工具链缺失＝fail-closed 报装机指引，不静默跳）；断言②提交区间内基线文件变 ⇒ 同 crate SPEC 同集被触（git 面，复用 guard 的区间语义：本地缺省 HEAD，CI --range）。两断言合成链：API 变→①逼基线更新→②逼 SPEC 同集。cargo-public-api＋nightly 为环境前置。
 
 ## 8 接口先行
 
@@ -122,32 +121,32 @@ pub(crate) struct Violation {
 
 ## 9 工作流程
 
-`cargo xtask <gate>` → 定位仓库根（`CARGO_MANIFEST_DIR` 的父目录）→ 读数据面（ARCHITECTURE.md／lexicon.toml／git）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 依序跑全部机器门，聚合后统一渲染。**门数与门序都只住 `gates::run` 里的那张数组**：`COUNT` 就是它的长度类型参数，数目与清单相隔一个 token，故不可能各说各话。本节此前另抄了一份门名清单，它漏掉 `length` 而没有任何机器发现——要知道跑了哪几道门、按什么次序，读那张数组，不要在文档里再养一份。
+`cargo xtask <gate>` → 定位仓库根（`CARGO_MANIFEST_DIR` 的父目录）→ 读数据面（ARCHITECTURE.md／lexicon.toml／git）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 依序跑全部机器门，聚合后统一渲染。**门数与门序都只住 `gates::run` 里的那张数组**：`COUNT` 就是它的长度类型参数，数目与清单相隔一个 token，故不可能各说各话。要知道跑了哪几道门、按什么次序，读那张数组，不要在文档里再养一份。
 
 ## 10 实现逻辑
 
-1. **walk**：手写递归（不引 walkdir），跳过 `.git`／`target`／`node_modules`，输出按路径字符串排序——报告顺序确定，diff 可比。路径统一正斜杠（Windows 反斜杠归一），因为模块表以正斜杠书写。**隔离区**：仓库根 `local/`（gitignore，恒不入库）存 Handoff 与一台机器自己的工作记录；从仓库根扫描的四门（header／lexicon／secret／color）排除它——门只对入库对象作证，非入库物可引用历史词汇与一台机器上的路径。modmap／depmap 只扫 `crates/`，嵌套的 `crates/**/local` 仍被封闭清单咬住，无洞。
-2. **modmap**：模块行判据＝竖线表行、第 2 列以 `crates/` 开头以 `.rs` 结尾、第 1 列含 `::`、恰七列（第七列是 `Spec`，见 8-10）、第 6 列 ∈ 状态枚举——这组条件把 §3 缝表（四列）与 §10 卡（清单行）天然排除。双向对账：表有文件无（状态≠未建 才要求在盘）；盘有表无（lib.rs 与索引文件豁免）；盘有且状态＝未建 → 「状态未翻转」。索引文件判据：文件名去 `.rs` 后与同目录某子目录同名，且该子目录内有表内文件。
+1. **walk**：手写递归（不引 walkdir），跳过 `.git`／`target`／`node_modules`，输出按路径字符串排序——报告顺序确定，diff 可比。路径统一正斜杠（Windows 反斜杠归一），因为模块表以正斜杠书写。**隔离区**：仓库根 `local/`（gitignore，恒不入库）存一台机器自己的工作记录；从仓库根扫描的四门（header／lexicon／secret／color）排除它——门只对入库对象作证，非入库物可引用历史词汇与一台机器上的路径。modmap／depmap 只扫 `crates/`，嵌套的 `crates/**/local` 仍被封闭清单咬住，无洞。
+2. **modmap**：模块行的依据＝竖线表行、第 2 列以 `crates/` 开头以 `.rs` 结尾、第 1 列含 `::`、恰七列（第七列是 `Spec`，见 8-10）、第 6 列 ∈ 状态枚举——这组条件把 §3 缝表（四列）与别处的清单行天然排除。双向对账：表有文件无（状态≠未建 才要求在盘）；盘有表无（lib.rs 与索引文件豁免）；盘有且状态＝未建 → 「状态未翻转」。索引文件的依据：文件名去 `.rs` 后与同目录某子目录同名，且该子目录内有表内文件。
 3. **depmap**：§2 围栏块 ```` ```depmap ```` 为机器权威；`cargo metadata --format-version 1 --no-deps` 输出经 serde_json::Value 读取；只查 normal＋build 依赖（dev 依赖留给测试自由）。子集断言而非相等断言——空壳期合法。
 4. **guard**：`git rev-list` 取区间（缺省 HEAD 单枚；无提交则跳过并说明），`git diff-tree --root` 取动过的文件，`git show -s --format=%B` 取信息；一枚提交**两边各非空**且信息无 `Verdict:` 行首 → 红。一边是门面（保护路径命中，或 ARCHITECTURE 模块行被**移除**），另一边是被判源码（`crates/`／`citysim/`／`fuzz/`）。两边各自由一个纯函数从文件列表算出（`gate_faces`／`judged_faces`），**于是规则能对着一份路径列表断言而不需要一个带提交的仓库**；拒词只点名前三条被判路径，一份列了八十条路径的拒词没人读。移除的定义是路径级的：某 `crates/**.rs` 路径出现在删除行（`-|`）且不出现在任何新增行（`+|`）——状态翻转在 diff 里是「删一行加一行」，它是最高频的合法编辑，若被误判为删行索 verdict，门就在训练绕门习惯。
-5. **vocabulary（R1.15，挂在 lexicon 门下）**：两条断言，各修一种第二权威。①**退役词必须指向被定义过的词**——`lexicon.toml` 说哪种说法作废，`docs/glossary.md` 说该用哪个词，此前无人让二者对账，于是一条退役词可以指向一个词汇表从未定义的名字，而照门的建议改词的人会落到一个没有释义的词上。判据宽一格：replacement 命中任一词汇表**粗体词**或含 `.md`（指向一份文件也是一种定义）。②**能被机器数出来的数不由文档手写**——产品面文档里每一处手写门数都至少陈旧过一次（四份文档写「ten gates」而实际跑十二道）。故读 `gates::COUNT` 与文档对账，中英两种写法（`ten gates`／`十二门`）各认一组，且**刻意只认已经烂过的那几种形状**：一条会猜的规则就是一条会在别的正文上乱咬的规则。
-6. **release（P4.14 上线，P5.05 增第三条断言）**：公开树**由过滤生成**而不由手工挑选，分类是一条**封闭的前缀规则**（`is_scaffolding`）；未被规则点名的一律归产品面——**失败方向是故意的**：未分类的文件出现在产物里会被人看见，反过来则悤声消失。三条断言：①公开树上零脚手架路径；②产品文档不得链向或在正文里点名脚手架（无链的「去看 SPEC」最好写也最难发现，故扫全文而不只扫链接）；③**任何发布文件不得携家目录路径**（`machine_path`）。第三条的口径是**隐私而非整洁**：`/tmp`、`/etc`、`C:/windows` 是关于一类机器的事实，而且「绝对路径被拒」那三条测试必须写出一个绝对路径——典型反例先咬住的正是它们，故规则收窄到家目录形状（`:\users\`／`:/users/`／`/home/`／`/root/` 等七种，大小写不计）。扫描面是**全部可读成文本的发布文件**，不只 `.md`：源码与清单里的硬编码家目录更坏而不是更好。报告只截二十字符，因为把整行引进 CI 日志就是把它再公开一次；文件自豁免（同 secret／color 两门的先例：写不出不包含待检形状的检测器）。
+5. **vocabulary（挂在 lexicon 门下）**：两条断言，各修一种第二权威。①**退役词必须指向被定义过的词**——`lexicon.toml` 说哪种说法作废，`docs/glossary.md` 说该用哪个词，此前无人让二者对账，于是一条退役词可以指向一个词汇表从未定义的名字，而照门的建议改词的人会落到一个没有释义的词上。依据宽一格：replacement 命中任一词汇表**粗体词**或含 `.md`（指向一份文件也是一种定义）。②**能被机器数出来的数不由文档手写**——产品面文档里每一处手写门数都至少陈旧过一次（四份文档写「ten gates」而实际跑十二道）。故读 `gates::COUNT` 与文档对账，中英两种写法（`ten gates`／`十二门`）各认一组，且**刻意只认已经烂过的那几种形状**：一条会猜的规则就是一条会在别的正文上乱咬的规则。
+6. **release**：公开树**由过滤生成**而不由手工挑选，分类是一条**封闭的前缀规则**（`is_scaffolding`）；未被规则点名的一律归产品面——**失败方向是故意的**：未分类的文件出现在产物里会被人看见，反过来则悤声消失。三条断言：①公开树上零脚手架路径；②产品文档不得链向或在正文里点名脚手架（无链的「去看 SPEC」最好写也最难发现，故扫全文而不只扫链接）；③**任何发布文件不得携家目录路径**（`machine_path`）。第三条的口径是**隐私而非整洁**：`/tmp`、`/etc`、`C:/windows` 是关于一类机器的事实，而且「绝对路径被拒」那三条测试必须写出一个绝对路径——典型反例先咬住的正是它们，故规则收窄到家目录形状（`:\users\`／`:/users/`／`/home/`／`/root/` 等七种，大小写不计）。扫描面是**全部可读成文本的发布文件**，不只 `.md`：源码与清单里的硬编码家目录更坏而不是更好。报告只截二十字符，因为把整行引进 CI 日志就是把它再公开一次；文件自豁免（同 secret／color 两门的先例：写不出不包含待检形状的检测器）。
 
-**第五条断言：发裁决，不发场合。** 一份产品文档说的是决定，不是决定发生的场合。这一条与第三条同性质而更宽一类——家目录有形状，而「这台机器验不了什么」写成散文时没有形状。能查的部分收成两张封闭的字面表：
+**第五条断言：发决定，不发场合。** 一份产品文档说的是决定，不是决定发生的场合。这一条与第三条同性质而更宽一类——家目录有形状，而「这台机器验不了什么」写成散文时没有形状。能查的部分收成两张封闭的字面表：
 
 - `WORKING_SHAPES`：`本机`（意思是**我的**那台机器；本地那台在这座城里叫 `回环` 或 `这台机器`，两者说的都是「正在跑的那台」而不是作者的那台）、`前端会话`。
-- `ADDRESSEE_SHAPES`：`待人裁`、`立场归人`、`这一步我不做`——把一句话变成一个读者不在场的对话回合，且裁定一落地它就过期，那比从没写过更坏。
+- `ADDRESSEE_SHAPES`：`待人裁`、`立场归人`、`这一步我不做`——把一句话变成一个读者不在场的对话回合，且决定一落地它就过期，那比从没写过更坏。
 - 另加一条带数字规则的形状：`会话` 接**一位**数字。第二位数字即不算，因为 `会话` 也是产品自己的词，而量它的探针会数它（`4 会话 29 ms`）。一次会话从没被编号到十以上，而一个计数很少停在一位数，界就划在数字结束的地方。
 
-**`裁`／`判` 本身不是病**：`判据` 是这个项目对验收标准的称呼，一条拒词里的「请人裁」说的是**系统升级给人**这一产品行为，权威阶梯点名那个人是刻意的。只有文档用自己的声音指定收信人才是缺陷。
+**`裁`／`判` 本身不是病**：`判定`／`判断` 是这个项目的常用词，一条拒词里的「请人裁」说的是**系统升级给人**这一产品行为，权威阶梯点名那个人是刻意的。只有文档用自己的声音指定收信人才是缺陷。
 
 **中文不写词界，所以一张字面表要配一张「吞掉形状的词」表**：`版本机制` 是这套词汇里唯一的一个。两个词的封闭名单查得动，一个分词器查不动。
 
 **这一条抓不住的部分写在明处**：写成普通散文的工作语境没有形状——「只验得了三分之一」、一句对话的逐字引用、一个账号的额度状态，门读到的都是句子。那一半由评审持，`xtask secret` 的模块头为同一理由写着同一句话。`AGENTS.md` 进 `DETECTORS` 表：一份教这条规矩的文档必须说得出它禁的是什么，而它那两行改为**描述形状而不拼出形状**，并在同一句里说明为什么。
-7. **badge（P5）**：读数与 `budget` 同源（同一 `measure()`），故不存在第二个数字权威。每个可称重的 gated 行若在 `budgets.toml` 里带 `badge_label`，即渲染一张 `docs/badges/<行名>.svg`。三条纪律：①**颜色不自选**——灰阶取自 `crates/web/src/theme.rs` 的 `GRAY_RAMP`（复用 color 门已有的解析器），OKLCH→sRGB 的换算在此一次算清，因为 SVG 要被任意浏览器渲染，而 `oklch()` 的支持面不覆盖旧版；墨色恒不低于 `INFORMATION_FLOOR`，一条断言钉住。②**平台自报**——二进制体积逐平台不同，故 `badge_platform` 指名哪台机器有权刷新它，别的平台既不写也不判，否则三个平台会互相覆盖同一个文件。③**陈旧即红**——`budget` 门在能称重时比对已提交的 SVG 与当场渲染的 SVG，不同即红并给出 `cargo xtask badge --write`；称不出（这台机器上没有构建产物）则沉默，与该门既有的沉默口径一致。`just dist` 末尾调用它，于是发一次 release 就刷新一次，没有人需要去改一个数字。
-9. **length（R2.20；文件面 V3.29）**：尺寸有**两个单位**，因为两者的失效方式不同——长函数藏起一条控制流，长文件藏起「东西在哪」。
-**文件面是一次重新定价，动的参数写在这里**：R2.20 当时的判断是「按文件计的任何诚实阀值会在四个 crate 里同时点燃八处，那是一个工程而不是一道门」，那个读数当时为真。**人裁**：要做这个工程，理由是最大的一个文件已经 12,078 行，在它上面迭代的代价已经超过拆分一次的代价。于是阀值带着一张**先于规则存在的文件登记表**上线（`[file_length.predating]`），每个文件钉在划线当天的行数上。**这张表只会变短**：表上没有的文件直接按预算拒绝，所以它不会变长；表上的文件不得超过自己的钉子，所以没有一个欠债会长大；而一个回到预算之内的文件必须从表上划掉，所以豁免会自己消失，不需要谁记得它。**删一行的办法是把文件拆了，不是把数字改大。**
-   **参数面（V3.29）**：一条参数表长过 4 就是一个 data clump——总是一起走的那几个值，是一个还没被命名的值。
+7. **badge（P5）**：读数与 `budget` 同源（同一 `measure()`），故不存在第二个数字权威。每个可称重的 gated 行若在 `budgets.toml` 里带 `badge_label`，即渲染一张 `docs/badges/<行名>.svg`。三条纪律：①**颜色不自选**——灰阶取自 `crates/web/src/theme.rs` 的 `GRAY_RAMP`（复用 color 门已有的解析器），OKLCH→sRGB 的换算在此一次算清，因为 SVG 要被任意浏览器渲染，而 `oklch()` 的支持面不覆盖旧版；墨色恒不低于 `INFORMATION_FLOOR`，一条断言钉住。②**平台自报**——二进制体积逐平台不同，故 `badge_platform` 指名哪台机器有权刷新它，别的平台既不写也不判，否则三个平台会互相覆盖同一个文件。③**陈旧即红**——`budget` 门在能称重时比对已提交的 SVG 与当场渲染的 SVG，不同即红并给出 `cargo xtask badge --write`；称不出（测试机上没有构建产物）则沉默，与该门既有的沉默口径一致。`just dist` 末尾调用它，于是发一次 release 就刷新一次，没有人需要去改一个数字。
+9. **length**：尺寸有**两个单位**，因为两者的失效方式不同——长函数藏起一条控制流，长文件藏起「东西在哪」。
+**文件面是一次重新定价，动的参数写在这里**：早先的判断是「按文件计的任何诚实阀值会在四个 crate 里同时点燃八处，那是一个工程而不是一道门」，那个读数当时为真。要做这个工程，理由是最大的一个文件已经 12,078 行，在它上面迭代的代价已经超过拆分一次的代价。于是阀值带着一张**先于规则存在的文件登记表**上线（`[file_length.predating]`），每个文件钉在划线当天的行数上。**这张表只会变短**：表上没有的文件直接按预算拒绝，所以它不会变长；表上的文件不得超过自己的钉子，所以没有一个欠债会长大；而一个回到预算之内的文件必须从表上划掉，所以豁免会自己消失，不需要谁记得它。**删一行的办法是把文件拆了，不是把数字改大。**
+   **参数面**：一条参数表长过 4 就是一个 data clump——总是一起走的那几个值，是一个还没被命名的值。
 本仓库已经写下过这个修法：`Reporter` 的 doc 说「四个值总是一起走、从不被单独选择，所以它们作为一个走」。
 预算取 4 而不是 Clean Code 的 3，因为三字段值的构造函数正当地需要三个，门不该跟它们吵。
 接收者不算：`&self` 是这个函数之所以是方法的原因，不是谁决定要穿过去的值。
@@ -167,15 +166,15 @@ pub(crate) struct Violation {
 
 `XtaskError`（thiserror）：`Io{path}`｜`Doc{file,msg}`（数据面不可解析）｜`Cmd{cmd,msg}`（git/cargo 调用失败）｜`Usage`。数据面坏＝退出码 2（门自身故障），不伪装成 0 或 1——门坏了必须显性，静默通过是门的最坏失效。
 
-**一门判不动，不得连累其余各门的结论**（issue #5）。`gates` 的那张数组是急切求值的，十六门在第一行输出之前就已全部跑完；此前的循环一遇 `Err` 即 `return`，于是排在它后面的 `release` 与 `guard` 结论已在手里却从未被打印。缺 `cargo-public-api` 是 `docs/CONTRIBUTING.md` §7 明列的预期状态，而在那种机器上，一次带违规的运行与一次干净的运行输出逐字相同，承重的 `guard` 恰在被吞掉的那两道里。故聚合运行遍历到底，逐门报出 `ok`／`N violation(s)`／`could not judge` 三态之一，再统一渲染全部违规。**退出码取最重的一态**：任一门判不动＝2，否则有违规＝1，否则 0——判不动压过判有罪，因为「没判」与「判过且干净」同形正是本条要拆开的东西。
+**一门判不动，不得连累其余各门的结论**（issue #5）。`gates` 的那张数组是急切求值的，十六门在第一行输出之前就已全部跑完；此前的循环一遇 `Err` 即 `return`，于是排在它后面的 `release` 与 `guard` 结论已在手里却从未被打印。缺 `cargo-public-api` 是 `docs/CONTRIBUTING.md` §7 明列的预期状态，而在那种机器上，一次带违规的运行与一次干净的运行输出逐字相同，作为必要前提的 `guard` 恰在被吞掉的那两道里。故聚合运行遍历到底，逐门报出 `ok`／`N violation(s)`／`could not judge` 三态之一，再统一渲染全部违规。**退出码取最重的一态**：任一门判不动＝2，否则有违规＝1，否则 0——判不动压过判有罪，因为「没判」与「判过且干净」同形正是本条要拆开的东西。
 
 ## 13 依赖选型
 
-serde＋serde_json（cargo metadata 解析；工作区已钉）；toml（lexicon 数据面；xtask 独用，不入产品面）；thiserror（工作区已钉）；kernel（S2.12 起：secret 门复用 `kernel::secret::scan`，一个判定一个家）。不引 walkdir/regex/clap：手写遍历十几行；判定用子串与前缀即可（C12 对 regex 的敏感面在 kernel，此处一并回避）；子命令分发一个 match 足矣。
+serde＋serde_json（cargo metadata 解析；工作区已钉）；toml（lexicon 数据面；xtask 独用，不入产品面）；thiserror（工作区已钉）；kernel（secret 门复用 `kernel::secret::scan`，一个判定一个家）。不引 walkdir/regex/clap：手写遍历十几行；判定用子串与前缀即可（C12 对 regex 的敏感面在 kernel，此处一并回避）；子命令分发一个 match 足矣。
 
-**syn 与 proc-macro2**（R2.20，`syn` 开 `full`，`proc-macro2` 开 `span-locations`）：**量一个 Rust 函数从哪行到哪行是一个解析问题，不是一个数括号问题**。本卡先写了一个按行数括号的探针，一小时内撞上三个计数错误，**每一个都产出了一张错的违规名单**：① `#[cfg(test)]` 被当成文件截断点，于是 `assembly.rs` 第 5046 行一个测试助手以下的函数全部隐形（`pub async fn serve` 就在里面）；② `'{'` 这样的字符字面量被当成开括号，`detect` 于是从 43 行变成 266 行；③ 跨行字符串（`"… \` 换行 `…"`）同理，`malformed` 从 6 行变成 230 行。一道量错的门比没有门更坏：它会把人送去拆一个不需要拆的函数。替代方案是手写一个状态扫描器（行注释、可嵌套块注释、转义与跨行字符串、raw string 的 `#` 计数、以及 `'a` 生命期与 `'x'` 字符的区分）——八十行代码养一个第四个计数错误的地方。`syn` 是编译器旁的那个解析器，且已因每一个 derive 宏而在 `Cargo.lock` 里。维护成本：仅工作区工具链，恒不入产品二进制（同 flate2／zip 先例）。
+**syn 与 proc-macro2**（`syn` 开 `full`，`proc-macro2` 开 `span-locations`）：**量一个 Rust 函数从哪行到哪行是一个解析问题，不是一个数括号问题**。一个按行数括号的探针撞上过三个计数错误，**每一个都产出了一张错的违规名单**：① `#[cfg(test)]` 被当成文件截断点，于是 `assembly.rs` 第 5046 行一个测试助手以下的函数全部隐形（`pub async fn serve` 就在里面）；② `'{'` 这样的字符字面量被当成开括号，`detect` 于是从 43 行变成 266 行；③ 跨行字符串（`"… \` 换行 `…"`）同理，`malformed` 从 6 行变成 230 行。一道量错的门比没有门更坏：它会把人送去拆一个不需要拆的函数。替代方案是手写一个状态扫描器（行注释、可嵌套块注释、转义与跨行字符串、raw string 的 `#` 计数、以及 `'a` 生命期与 `'x'` 字符的区分）——八十行代码养一个第四个计数错误的地方。`syn` 是编译器旁的那个解析器，且已因每一个 derive 宏而在 `Cargo.lock` 里。维护成本：仅工作区工具链，恒不入产品二进制（同 flate2／zip 先例）。
 
-**zip**（P7.02，`default-features = false, features = ["deflate-flate2"]`，净增两个包）：复用 xtask 已有的 flate2 做压缩后端。替代方案是在 justfile 与 CI 里按平台分支调 `Compress-Archive`／`zip`／`tar`，已验证否决：git-bash 携的是 GNU tar，不产 zip，三个平台因此需三段 shell，且一台开发机与 CI 的产物不同源——那正是本轮要关掉的那类差异。维护成本：仅工作区工具链，恒不入产品二进制。
+**zip**（`default-features = false, features = ["deflate-flate2"]`，净增两个包）：复用 xtask 已有的 flate2 做压缩后端。替代方案是在 justfile 与 CI 里按平台分支调 `Compress-Archive`／`zip`／`tar`，已验证否决：git-bash 携的是 GNU tar，不产 zip，三个平台因此需三段 shell，且一台开发机与 CI 的产物不同源——那正是这里要关掉的那类差异。维护成本：仅工作区工具链，恒不入产品二进制。
 
 ## 14 硬编码声明
 
@@ -189,7 +188,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 ## 16 测试与约束
 
-单测：modmap 行解析（正例/六列不齐/状态非法/缝表不误伤）；索引文件判定；lexicon 命中与 `lexicon-ok:` 豁免；depmap 块解析；ax 可及面取出（HTML 与 RSX 两种写法归一）；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；guard 两边判定（混合提交索裁定、单独重新定价不索、基线同步不误伤）。约束：全门无网络、无写盘（spec 子命令除外——它只新建不覆盖）；输出顺序确定。
+单测：modmap 行解析（正例/六列不齐/状态非法/缝表不误伤）；索引文件判定；lexicon 命中与 `lexicon-ok:` 豁免；depmap 块解析；ax 可及面取出（HTML 与 RSX 两种写法归一）；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；guard 两边判定（混合提交索 `Verdict:` 尾注、单独重新定价不索、基线同步不误伤）。约束：全门无网络、无写盘（spec 子命令除外——它只新建不覆盖）；输出顺序确定。
 
 ## 17 模型体验
 
@@ -199,7 +198,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 新增门或改保护路径时：AGENTS.md 的规则表、`docs/CONTRIBUTING.md` §3 同集更新。
 
-### 第十三道门：`ax`（V3.15）
+### 第十三道门：`ax`
 
 **它抓的是真发生过的那种漂移。** 四步法在 HTML 里定稿、翻译、只补绑定——而第三步丢掉一个 `role`、一个 `aria-label` 或一个 `aria-current` 是隐形的：页面照样渲染，像素照样对，丢掉的只是「一个看不见像素的人本来会被告知的东西」。这个仓库里没有任何别的东西会注意到。
 
@@ -209,7 +208,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 `crates/web/screens/` 不存在时这道门什么也不说：那是写第一张定稿屏之前仓库的样子，一道会因此变红的门必须先被关掉才能开工。
 
-### 第十五道门：`render`（V3.48）
+### 第十五道门：`render`
 
 **它补的是四步法从来没有的那一步：真的把屏画出来。** 上一节那句“计算树是一个人开着浏览器的活”在实践里的含义是：没有人干过。于是一整类缺陷无人看管——**层叠里的冲突在两份源码里都不存在**。两条各自读起来都对的规则把派活框排成一行，又给每一页添了第二条左边，而十四道门与 1,338 条测试全绿。
 
@@ -223,7 +222,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 **它自己的消融实验已经做过**：把 `.panel { display: block }` 删掉，两张屏报“面板头不在顶部”；把脊线那一列换回逐孩子居中，`session.html` 报“两条左边”。两次都变红，恢复后都变绿。
 
-### 扫描面：构建目录不在里面（V3.53，带人的裁定）
+### 扫描面：构建目录不在里面
 
 `walk::SKIP_DIRS` 从三个名字变成四个，新的那个是 `dist-newstyle`。
 **一道门为已提交的对象作证**，而构建目录里一个都没有；`.gitignore` 逐个点过它们的名。
@@ -234,13 +233,11 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 这张表是「树里有什么」的第二个权威，git 是第一个；它继续做一张表而不去读 `.gitignore`，是因为四个名字值四个 token 而一个解析器值一个解析器。
 **这就是它的重新定价参数：哪天这张表需要第五行而那一行不是构建目录，就去读忽略文件，不要再添一行。**
 
-本改动动的是门自身，故它与被判源码同处一枚提交时携 `Verdict:` 尾注（AGENTS.md guard 行）。
-
-### 第十六道门：`wording`（V3.51）
+### 第十六道门：`wording`
 
 **它读的方向与 `web::lang` 那两条断言相反。** 那两条读的都是「视图向表要了什么」：一条要求每一条短语都有视图叫得出名字，另一条禁止视图把表里已有的句子再拄一遍。**一句从不调用 `say` 的字面量不在它们任何一条的视野里**：表不知道它存在，也就没有东西可比。成本页上三句英文就这样活过一整段（web-SPEC §8-61），而发现它们的是一张截图。
 
-**判据是位置，不是词表。** 扫全部字符串字面量的那个版本会去判类名、线上取值、事件名与格式键，而同一形状的错误曾经一次性报出 79 条全是地址的命中（V3.28）。所以它走一遍 RSX 的花括号结构，只留两个位置，而那两个位置各自都是「读者被递了一个词」：
+**依据是位置，不是词表。** 扫全部字符串字面量的那个版本会去判类名、线上取值、事件名与格式键，而同一形状的错误曾经一次性报出 79 条全是地址的命中。所以它走一遍 RSX 的花括号结构，只留两个位置，而那两个位置各自都是「读者被递了一个词」：
 
 1. **文本节点**——单独站在元素体里的字面量，浏览器把它画出来；
 2. **朗读型属性的值**——`placeholder`、`title`、`alt` 与值为作者文本的那几个 `aria-*`，屏幕阅读器把它念出来。
@@ -251,7 +248,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 **专名进不了短语表，所以它必须有一扇门。** `web::lang` 自己的断言 `assert_ne!(said.zh, said.en)` 拒绝一条两种语言相同的短语，而 `openai` 在两种语言里就是 `openai`。这五处用 `wording-ok: <理由>` 写在本行或上一行——**同一个拼法、同一条两行规则、同一笔交易，照搬 `lexicon-ok:`**。一个可见的、带理由的现场标记，比一张没人会去读的 toml 名单诚实。
 
-**它自己的消融实验就是它存在的理由**：把 V3.50 那三句英文原样写回 `dashboard.rs`，本门变红并点名行号，而 `web::lang` 那两条断言全程全绿；改回译文，本门变绿。单测 `the_three_sentences_that_escaped_both_of_langs_assertions_are_caught` 把这次实验固定下来。
+**它自己的消融实验就是它存在的理由**：把那三句英文原样写回 `dashboard.rs`，本门变红并点名行号，而 `web::lang` 那两条断言全程全绿；改回译文，本门变绿。单测 `the_three_sentences_that_escaped_both_of_langs_assertions_are_caught` 把这次实验固定下来。
 ### 8-1 xtask::color 目录化
 
 `color.rs` 一文件 819 行，切成一个目录，五个文件各答一个问题：
@@ -266,7 +263,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 **无字段开放**：跨文件引用只用 `pub(super)` 函数；`grey_ramp` 因 `badge` 门经 `color::grey_ramp` 调用而在索引位置以 `pub(crate) use` 重导出，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
 
-**`SCAN_EXEMPT` 随文件而动，判据未放宽**：自豁免的理由一直是「检测器必须拼得出它所禁的东西」，而现在拼出颜色语法的是 `color/scan.rs`（拼法表）与 `color/tests.rs`（用例），故豁免名单改点这两个文件；不再拼颜色的 `color.rs` 本身则回到被扫范围内——豁免面因此变窄而不是变宽。
+**`SCAN_EXEMPT` 随文件而动，依据未放宽**：自豁免的理由一直是「检测器必须拼得出它所禁的东西」，而现在拼出颜色语法的是 `color/scan.rs`（拼法表）与 `color/tests.rs`（用例），故豁免名单改点这两个文件；不再拼颜色的 `color.rs` 本身则回到被扫范围内——豁免面因此变窄而不是变宽。
 
 ### 8-2 xtask::wording 目录化
 
@@ -274,14 +271,14 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 | 文件 | 它回答什么 |
 |---|---|
-| `xtask/src/wording.rs` | 门本身：扫哪里（`CLIENT`）、什么算豁免（`EXEMPT_MARK`、`waived`）、哪些属性会被读出来（`SPOKEN`）、报告怎么写（`check`、`clipped`、`Said`）、以及判据「去掉城自己的值之后还剩不剩两个相邻字母」（`words_the_view_wrote`）；测试模块的切口 `drawn` 也在这里 |
+| `xtask/src/wording.rs` | 门本身：扫哪里（`CLIENT`）、什么算豁免（`EXEMPT_MARK`、`waived`）、哪些属性会被读出来（`SPOKEN`）、报告怎么写（`check`、`clipped`、`Said`）、以及依据「去掉城自己的值之后还剩不剩两个相邻字母」（`words_the_view_wrote`）；测试模块的切口 `drawn` 也在这里 |
 | `xtask/src/wording/lex.rs` | 一段 Rust 源码切成哪些词（`Kind`、`Lexeme`、`lex` 及其字符串、原始字符串、字符字面量与注释的读法） |
 | `xtask/src/wording/rsx.rs` | 花括号栈怎么走，一个字面量坐在哪里（`Frame`、`handed_to_a_reader`、`seat_of`、`step`、`opens_an_element_body`） |
 | `xtask/src/wording/tests.rs` | 原内联 `mod tests` 原样迁出，7 个测试一个不少 |
 
 **无字段开放**：跨文件只开了 `lex.rs` 的 `Kind`／`Lexeme`（含三个字段）／`lex` 与 `rsx.rs` 的 `handed_to_a_reader`，一律 `pub(super)`；`Said` 与 `SPOKEN` 留在索引位置，子模块按父模块私有项直接引用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
 
-**判据未放宽**：位置规则、豁免的两行范围与相邻两字母的门槛逐字节照搬，只换了它们所在的文件。
+**依据未放宽**：位置规则、豁免的两行范围与相邻两字母的门槛逐字节照搬，只换了它们所在的文件。
 
 ### 8-3 xtask::render 目录化
 
@@ -289,13 +286,13 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 | 文件 | 它回答什么 |
 |---|---|
-| `xtask/src/render.rs` | 门本身：扫哪里（`SCREENS`、`TOKENS`）、对齐容差（`SLACK`）、一个被量出来的盒子是什么（`Box` 及 `right`／`name`／`drawn`）、跳过与判断的次序（`check`），以及三条性质的判据（`judge`、`one_left_edge`、`heads_lead_their_panels`、`head_leads`、`nothing_overflows`） |
+| `xtask/src/render.rs` | 门本身：扫哪里（`SCREENS`、`TOKENS`）、对齐容差（`SLACK`）、一个被量出来的盒子是什么（`Box` 及 `right`／`name`／`drawn`）、跳过与判断的次序（`check`），以及三条性质的依据（`judge`、`one_left_edge`、`heads_lead_their_panels`、`head_leads`、`nothing_overflows`） |
 | `xtask/src/render/engine.rs` | 怎么把一张屏真的画出来并把盒子读回来：找引擎（`browser`、`on_path`）、工作目录与视窗（`WORK`、`VIEWPORT`、`SINK`）、渲染一张屏（`Engine`、`Engine::new`、`Engine::measure`）、改写样式表链接并附上探针（`instrument`、`url_of`、`PROBE`）、把探针写下的记录读回来（`sink`、`parse_box`） |
 | `xtask/src/render/tests.rs` | 原内联 `mod tests` 原样迁出，5 个测试一个不少 |
 
 **无字段开放**：`Box` 及其三个方法留在索引位置按父模块私有项定义，`engine.rs` 作为子模块直接引用；跨文件只把 `Engine`／`Engine::new`／`Engine::measure`／`browser`／`sink`／`parse_box` 提到 `pub(super)`。`main.rs` 经 `render::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
 
-**判据未放宽**：三条性质的文字、`SLACK` 的 1 像素、找不到浏览器与缺 `tokens.css` 时的 skip 逐字节照搬，只换了它们所在的文件。
+**依据未放宽**：三条性质的文字、`SLACK` 的 1 像素、找不到浏览器与缺 `tokens.css` 时的 skip 逐字节照搬，只换了它们所在的文件。
 
 ### 8-4 xtask::release 目录化
 
@@ -309,7 +306,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 **无字段开放**：跨文件只把 `link_targets` 与 `resolve` 提到 `pub(super)`，索引位置以私有 `use link::{link_targets, resolve};` 引回，`check` 与测试的调用点一字未改；`main.rs` 经 `release::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
 
-**`DETECTORS` 随文件而动，判据未放宽**：自豁免的理由一直是「检测器必须拼得出它所禁的东西」，而写出家目录形状用例的现在是 `release/tests.rs`（三条「绝对路径被拒」的断言必须各写出一个），故名单从两条增到三条，新增的正是那份迁出的测试文件。被扫面因此少了一份测试文件而已，`HOME_SHAPES`、`CITED_EXTENSIONS`、`SCAFFOLDING` 与四条断言的文字逐字节照搬。
+**`DETECTORS` 随文件而动，依据未放宽**：自豁免的理由一直是「检测器必须拼得出它所禁的东西」，而写出家目录形状用例的现在是 `release/tests.rs`（三条「绝对路径被拒」的断言必须各写出一个），故名单从两条增到三条，新增的正是那份迁出的测试文件。被扫面因此少了一份测试文件而已，`HOME_SHAPES`、`CITED_EXTENSIONS`、`SCAFFOLDING` 与四条断言的文字逐字节照搬。
 
 ### 8-5 xtask::length 目录化
 
@@ -323,11 +320,11 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 **无字段开放**：`Found` 及其四个字段保持原有的 `pub(crate)`，跨文件只把 `measure` 提到 `pub(super)`，索引位置以私有 `use measurement::{Found, measure};` 引回；`found` 与 `skipped` 仍是 `measurement` 内的私有项。`check` 与全部测试的调用点一字未改，`main.rs` 经 `length::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
 
-**判据一处未松**：两种豁免（`#[cfg(test)]`、模块表 shape `data`）、`grew`／`no_longer_an_exception`／陈旧钉子三条自清理断言、以及两个预算仍只从 `xtask/budgets.toml` 读来，文字逐字节照搬。`[file_length.predating]` 里 `"xtask/src/length.rs" = 573` 一行按规则划掉——切分做完，钉子即失效；`length.rs` 现在与其他所有文件同受 400 行预算约束。**登记表上方那段注释仍写着「`xtask/src/length.rs` 在表上，这是对的：立规的门不豁免于规」，我没有动它**：guard 门把该注释的改动视为门面改动，而它所说的道理未变——立规的门仍受这条规约束，只是它现在直接受预算约束而非受钉子约束。
+**依据一处未松**：两种豁免（`#[cfg(test)]`、模块表 shape `data`）、`grew`／`no_longer_an_exception`／陈旧钉子三条自清理断言、以及两个预算仍只从 `xtask/budgets.toml` 读来，文字逐字节照搬。`[file_length.predating]` 里 `"xtask/src/length.rs" = 573` 一行按规则划掉——切分做完，钉子即失效；`length.rs` 现在与其他所有文件同受 400 行预算约束。**登记表上方那段注释仍写着「`xtask/src/length.rs` 在表上，这是对的：立规的门不豁免于规」**：guard 门把该注释的改动视为门面改动，而它所说的道理未变——立规的门仍受这条规约束，只是它现在直接受预算约束而非受钉子约束。
 
 ### 8-6 xtask::guard 目录化
 
-`guard.rs` 一文件 508 行，其中 151 行是内联 `mod tests`。按刀法第一条只做测试迁出，切成两个文件：
+`guard.rs` 一文件 508 行，其中 151 行是内联 `mod tests`。按拆分法第一条只做测试迁出，切成两个文件：
 
 | 文件 | 它回答什么 |
 |---|---|
@@ -336,7 +333,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 **无字段开放**：`tests` 是 `guard` 的子模块，`use super::{gate_faces, is_protected, judged_faces, row_path, strikes_only_exemptions};` 一字未改即可看见父模块的私有项，故没有一个项因这次切分而放宽可见性。`main.rs` 与 `gates.rs` 经 `guard::check`、`apisync.rs` 经 `guard::git_lines` 与 `guard::changed_paths_with_status` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
 
-**判据一处未松**：`TRAILER`、两张保护表、被判前缀表、`strikes_only_exemptions` 的两种缩小形状与 `deletes_module_row` 的删增判定逐字节照搬，拒词三段（rule／violation／alternative）同样逐字节照搬；父文件尾部只多出 `#[cfg(test)]` 与原有的 `#[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]` 加一行 `mod tests;`，lint 名不增不减。`[file_length.predating]` 里 `"xtask/src/guard.rs" = 508` 一行按规则划掉——这道门判的正是这种划行，而 `strikes_only_exemptions` 认它为「只做除名」的缩小形状，故这次改动本身无需 `Verdict:` 尾注。
+**依据一处未松**：`TRAILER`、两张保护表、被判前缀表、`strikes_only_exemptions` 的两种缩小形状与 `deletes_module_row` 的删增判定逐字节照搬，拒词三段（rule／violation／alternative）同样逐字节照搬；父文件尾部只多出 `#[cfg(test)]` 与原有的 `#[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]` 加一行 `mod tests;`，lint 名不增不减。`[file_length.predating]` 里 `"xtask/src/guard.rs" = 508` 一行按规则划掉——这道门判的正是这种划行，而 `strikes_only_exemptions` 认它为「只做除名」的缩小形状，故这次改动本身无需 `Verdict:` 尾注。
 
 
 ### 8-7 xtask::badge 目录化
@@ -350,7 +347,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 **无字段开放**：`tests` 是 `badge` 的子模块，`use super::*;` 一字未改即可看见父模块的私有项（含 `Palette` 的四个字段），故没有一个项因这次切分而放宽可见性。`budget.rs` 经 `crate::badge::check`、`main.rs` 经 `badge::write` 与 `badge::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
 
-**判据一处未松**：三条纪律（颜色取自 `web::theme` 的灰阶、平台自报、陈旧即红）与拒词三段（rule／violation／alternative）逐字节照搬，只换了测试所在的文件；父文件尾部的 `#[allow(...)]` lint 名不增不减。`[file_length.predating]` 里 `"xtask/src/badge.rs" = 436` 一行按规则划掉。
+**依据一处未松**：三条纪律（颜色取自 `web::theme` 的灰阶、平台自报、陈旧即红）与拒词三段（rule／violation／alternative）逐字节照搬，只换了测试所在的文件；父文件尾部的 `#[allow(...)]` lint 名不增不减。`[file_length.predating]` 里 `"xtask/src/badge.rs" = 436` 一行按规则划掉。
 
 ### 命令 `wire-ts`：线的 TS 面由 Rust 面生成
 
@@ -368,8 +365,6 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 **依赖**：`channels = { path, default-features = false, features = ["schema"] }`——不开 `server`，xtask 不为此拖进 tokio 与 axum；`schemars` 经 channels 的 `schema` feature 到达。xtask 是工作区成员而不占产品拓扑（§7 对 kernel 已用过同一条理由）。
 
-**门的注册留给主线**：进 `gates::run` 那张数组即改 `COUNT`，而 `vocabulary` 门对着 `COUNT` 校正文里手写的门数，那是一次跨文档的重新定价，按 AGENTS.md `guard` 行应单独一枚提交。本卡只交付命令。
-
 ### 8-8 color：一个客户端，一处颜色产地（形状 6 数据面）
 
 **权威是一句话**：颜色在客户端里恰好被命名一次，那一处是 `client/src/theme.css` 的 `@theme` 块。产地表一行，`THEME` 常量即那一行——「断言读哪份表」与「扫描放过谁」在一个客户端下是同一个答案。
@@ -386,14 +381,14 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 这三组属性不参与层叠——没有任何规则引用它们，浏览器读到即忽略。它们在这里，是因为**一份投影删掉它的原件之后就是原件**：`theme.rs` 不再存在，若不同时把这三件事迁进来，门会剩下四条能判的断言和三条无从判起的断言，而一道找不到输入就变绿的门，正是 §8-13 点名要避的失效。写进 CSS 而非另起一份 TOML，是为了让一个改颜色的人在同一屏里看见他改的值和那个值必须守的比值。
 
-- **扫描判据一字未改**：`literal_at`／`hex_colour` 认得的颜色语法、扫的扩展名、拒词三段全部照旧。
+- **扫描的依据一字未改**：`literal_at`／`hex_colour` 认得的颜色语法、扫的扩展名、拒词三段全部照旧。
 - **改价条件**：若将来出现第二个客户端，产地表回到多行，`THEME` 与产地表重新分开。
 
 ### 8-9 secret：门只看人写的文件，派生文件由它的输入作证
 
-**门的主题是「明文凭证进入工作树」**，不是「任何高熵字节串出现在某个文件里」。`client/bun.lock` 与两份 insta 快照进树后，门报出 268 条，其中真凭证零条——一个判据碰上它从未见过的文件类，报的全是假阳性。
+**门的主题是「明文凭证进入工作树」**，不是「任何高熵字节串出现在某个文件里」。`client/bun.lock` 与两份 insta 快照进树后，门报出 268 条，其中真凭证零条——一个依据碰上它从未见过的文件类，报的全是假阳性。
 
-**判据补一条文件类，而不是补 268 个字节偏移**。逐条列偏移会把一个可判定的类别问题写成一张会腐烂的坐标表，而且下一次 `bun install` 就让它全错。新判据分两类：
+**依据补一条文件类，而不是补 268 个字节偏移**。逐条列偏移会把一个可判定的类别问题写成一张会腐烂的坐标表，而且下一次 `bun install` 就让它全错。新的依据分两类：
 
 | 文件类 | 成员 | 它为什么不可能是凭证第一次进树的地方 |
 |---|---|---|
@@ -402,26 +397,26 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 - **一句话的权威**：门扫**人写的**文件；一份**派生**文件的字节来自门已经扫过的输入，所以它不是凭证第一次进树的地方。两类各是这一句的实例，不是两条独立的例外。
 - **`.expose(` 白名单那一半不动**：它只看 `crates/*/src/**.rs`，锁文件与 `.snap` 本就不在其面上。
-- **已知的限**（写在明处，不静默）：一个从环境变量读真凭证、再把它录进快照的测试，能从这条豁免下走过去。今天树上没有这样的测试，且写出这样的测试本身就是缺陷；真要堵它，堵的地方是「测试不得读真凭证」，那是另一道门的题目，不在本卡范围。
-- **为什么不是内联豁免注释**：门自 S2.12 起就没有内联豁免，理由未变——注释是内容能自己写出来的东西，而一张编译进门里的文件类表不是。
+- **已知的限**（写在明处，不静默）：一个从环境变量读真凭证、再把它录进快照的测试，能从这条豁免下走过去。今天树上没有这样的测试，且写出这样的测试本身就是缺陷；真要堵它，堵的地方是「测试不得读真凭证」，那是另一道门的题目。
+- **为什么不是内联豁免注释**：门没有内联豁免，理由未变——注释是内容能自己写出来的东西，而一张编译进门里的文件类表不是。
 
 ### 8-10 模块表的第七列 `Spec`，与数出来的每 crate 计数（形状 1 判定）
 
 模块表回答「这个文件是什么」，却从不回答「它的接口写在哪」。读者要从 `web::live::feed` 走到定义它的那一节，得先猜 crate、再翻 SPEC 的 §8。第七列把这一步写成数据。
 
-**列约定**：`Module | File | What it owns | Shape | Since | Status | Spec`，第七列的值形如 `<crate>-SPEC.md#8-N`，相对该 crate 的 SPEC 目录解析（`bin::*` 的 crate 是 `sprawling`，`desktop::*` 的是 `desktop/desktop-SPEC.md`）。列在末尾，于是形状列与状态列的下标不动，只有单元格数从八变九。**这是模块表列约定的一次变更，按 ARCHITECTURE.md §13 需要人的裁定；裁定已落。**
+**列约定**：`Module | File | What it owns | Shape | Since | Status | Spec`，第七列的值形如 `<crate>-SPEC.md#8-N`，相对该 crate 的 SPEC 目录解析（`bin::*` 的 crate 是 `sprawling`，`desktop::*` 的是 `desktop/desktop-SPEC.md`）。列在末尾，于是形状列与状态列的下标不动，只有单元格数从八变九。
 
 **一节可以答多个模块，一个模块只能答一节。** 子模块跟随它的父模块所在的节，除非某节的标题点名了子模块的全路径（`runtime::tools::read` 有自己的 8-29，故它不跟 `runtime::tools`）。理由是 SPEC 的 §8 按接口分节而模块表按文件分行，两者本就不是一一对应；把子文件各钉到一个不存在的节上，只会造出一列指向虚无的链接。
 
-**specalign 增第三条断言：锚点在盘上存在。** 第七列的每个值都被解析成「SPEC 路径 ＋ 节号」，路径必须可读，节号必须在那份 SPEC 里作为一个节的标号出现。SPEC 的 §8 有两种写法，两种都算：`### 8-N …` 标题（多数 crate），以及 §8 的接口围栏里那一行 `// 8-N …` 注释（`browser`／`protocol`／`desktop`／部分 `web`／`runtime` 的写法）。**认两种不是放宽，而是照着树上真有的形状判**——只认标题会把六个 crate 判红，而它们的 §8 本来就是一整块围栏。
+**specalign 增第三条断言：锚点在盘上存在。** 第七列的每个值都被解析成「SPEC 路径 ＋ 节号」，路径必须可读，节号必须在那份 SPEC 里作为一个节的标号出现。SPEC 的 §8 有两种写法，两种都算：`### 8-N …` 标题（多数 crate），以及 §8 的接口围栏里那一行 `// 8-N …` 注释（`browser`／`protocol`／`desktop`／部分 `web`／`runtime` 的写法）。**认两种不是放宽，而是照着树上真有的形状判**——只认标题会对六个 crate 报错，而它们的 §8 本来就是一整块围栏。
 
-**已知的限，写在明处**：节号在同一份 SPEC 里并不唯一（`sprawling` 的 `8-40`／`8-41`／`8-42` 各出现过三次，`web` 的 `8-12`～`8-16` 各两次），因为不同期的卡各自续号而无人对账。故本条只判存在，不判唯一：加一条唯一性断言会把七份未经重编号的 SPEC 一次判红，而重编号是另一件工作。**翻案条件**：任一 SPEC 的 §8 完成一次重编号后，唯一性断言随即上线。
+**已知的限，写在明处**：节号在同一份 SPEC 里并不唯一（`sprawling` 的 `8-40`／`8-41`／`8-42` 各出现过三次，`web` 的 `8-12`～`8-16` 各两次），因为各节各自续号而无人对账。故本条只判存在，不判唯一：加一条唯一性断言会对七份未经重编号的 SPEC 一次报错，而重编号是另一件工作。**翻案条件**：任一 SPEC 的 §8 完成一次重编号后，唯一性断言随即上线。
 
 **modmap 增一条断言：§12 每个小节标题里的数，等于该小节的行数。** 标题写作 `### kernel (73) — …`，括号里的数就是这个 crate 在册的模块文件数；一个标题可以带多组（`### browser (6), protocol (5), bin (111)`），每组按模块列的前缀分别计数。这条不是新规矩而是既有规矩的一次落实：xtask-SPEC §10-5 已经写下「能被机器数出来的数不由文档手写」，而这些数当时没有机器数，于是十三个里有九个是错的。
 
 ### 8-11 `package` 认目标三元组：一份产物住哪里，叫什么名字（形状 2 值）
 
-发布矩阵有一行 `x86_64-unknown-linux-musl` 一行，而 `budget::binary_path` 只认 `target/release`，`--target` 构建落在 `target/<triple>/release`。当时的落法是把静态产物拷到打包器看的位置，再把 `just package` 的步骤在 `release.yml` 里重抄一遍——**一条规则两个权威，明知而为并记在案**（sprawling-SPEC §8 P4.02 改判的「另记一处未清的债」）。本节还这笔债。
+发布矩阵有一行 `x86_64-unknown-linux-musl` 一行，而 `budget::binary_path` 只认 `target/release`，`--target` 构建落在 `target/<triple>/release`。当时的落法是把静态产物拷到打包器看的位置，再把 `just package` 的步骤在 `release.yml` 里重抄一遍——**一条规则两个权威，明知而为并记在案**。本节还这笔债。
 
 **一个具名值答两个问题**：这次构建是为谁构建的。`ReleaseTarget` 住 `xtask/src/package.rs`，两个变体穷举：
 
@@ -431,7 +426,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 | `Triple(t)` | `target/<t>/release/` | `sprawling-<version>-<t>` | 由 `t` 里是否含 `windows` 判 |
 
 - **`binary_path` 从 `budget` 迁到 `package`**。「产物住哪里」与「产物叫什么」是同一个事实的两半，分住两个模块就是两个权威；`budget` 反过来向 `package` 要路径，因为它的活是称重而不是定位。
-- **三元组进名字，是人的裁定而不是本卡的选择**。不进名字的话，musl 归档会叫 `sprawling-<version>-linux-x86_64.zip`，既不说静态也不说 musl，且**在出现第二份 Linux 产物（gnu）的那一天静默相撞**。既有的两个名字一字不动，故这不是重命名而是给新的一类命名。
+- **三元组进名字**。不进名字的话，musl 归档会叫 `sprawling-<version>-linux-x86_64.zip`，既不说静态也不说 musl，且**在出现第二份 Linux 产物（gnu）的那一天静默相撞**。既有的两个名字一字不动，故这不是重命名而是给新的一类命名。
 - **`--target <triple>` 由 `main` 解析**，与 `--range` 共用一个取值函数：两个旗标两份解析就是两种取值语义。
 - **`release.yml` 的重抄步骤随本节删除**，三行矩阵走同一步 `just package ${{ matrix.target }}`；`just dist` 收下同一个可选参数，并在有三元组时**不写徽章**——README 的徽章描述一个人首先下载的那份产物，由第二个平台改写它会让一个 tag 的两次构建对同一个数字各执一词。
 - **本节属门禁机具，与产品代码分开提交。**
@@ -442,7 +437,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 **三条断言，各修一种真实的漂移**：
 
-1. **锁文件在盘上，且与清单逐条同。** `client/bun.lock` 的 `workspaces` 块记着 bun 上次解算时看见的 `dependencies` 与 `devDependencies`；`package.json` 记着今天要的那份。一处不同就说明有人改了清单而没有重解，于是一台开发机装出来的东西与 CI 装出来的东西不是同一棵树。判据是**两张表逐键逐值相等**，缺、多、值不同各报一条。
+1. **锁文件在盘上，且与清单逐条同。** `client/bun.lock` 的 `workspaces` 块记着 bun 上次解算时看见的 `dependencies` 与 `devDependencies`；`package.json` 记着今天要的那份。一处不同就说明有人改了清单而没有重解，于是一台开发机装出来的东西与 CI 装出来的东西不是同一棵树。依据是**两张表逐键逐值相等**，缺、多、值不同各报一条。
 2. **运行时依赖恰为 `solid-js` 与 `effect`。** 这是 client-SPEC §1 已经写下的那条界线的机器面：devDependencies 随工具链自由变动，而进到用户浏览器里的东西是一张封闭的两行表。**恰为**而不是**至少**——一个只查白名单不查缺失的门，会放过「solid-js 被误删」这一半。
 3. **树上每个包的许可证都在准许表内。** 准许表**不是本门新写的**，它就是 `deny.toml` 的 `[licenses] allow`：一个仓库对许可证只应有一个立场，工作区那一侧已经把它写下来了，本门读同一张表。许可证从 `client/node_modules/<包>/package.json` 的 `license` 字段读得——锁文件不带许可证，而已装的树带。
 
@@ -470,11 +465,11 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 **`ax` 不再是一道门**，它的三条断言住在 `render` 里，从画出来的 DOM 上读。`render` 开 `#/gallery`，共五条性质：每个可操作控件有可及名、每个地标有名、一页恰一个首标题、主栏里每个区域同一条左边线、没有盒子画到容器外。前三条是 `ax` 的，后两条是 `render` 原有三条的存留形——旧的第二条讲 `.panel` 的头位，而面板这个概念随旧客户端一同消失；它要阻的缺陷（一个盒子漂到了不属于它的位置）由容纳性那一条接住，且不依赖任何 class 文法。
 
-**第一次真跑抱回来四条**：composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它是整个页面存在的理由，对屏幕阅读器是一个无名编辑框。`placeholder` 不是名字——一打字就没了。
+composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它是整个页面存在的理由，对屏幕阅读器是一个无名编辑框。`placeholder` 不是名字——一打字就没了。
 
-**会滚动的容器装得下比它显示的更多**，故容纳性那一条按轴放行：探针连同每个元素的 `overflow-x`／`overflow-y` 一起量，父元素在某一轴上是 `auto` 或 `scroll` 时，那一轴不判。理由是这条规则要阻的缺陷是「一个盒子画在了别的东西上面」，而折线以下的内容什么都没画在上面——它靠滚动够到。不放行的话，一页内容多过一屏即判红，而这个产品的每一页都多过一屏。
+**会滚动的容器装得下比它显示的更多**，故容纳性那一条按轴放行：探针连同每个元素的 `overflow-x`／`overflow-y` 一起量，父元素在某一轴上是 `auto` 或 `scroll` 时，那一轴不判。理由是这条规则要阻的缺陷是「一个盒子画在了别的东西上面」，而折线以下的内容什么都没画在上面——它靠滚动够到。不放行的话，一页内容多过一屏即报错，而这个产品的每一页都多过一屏。
 
-**`wording` 不读 DOM，理由是它读不出那个区分**。渲染后的页面上，「视图写死的词」与「城供给的值」是同一种字节；旧门能分开它们，靠的恰好是源码里的**位置**。所以该门仍按位置判，只是位置从 RSX 换成 JSX：文本节点与可诵读属性两处，与原来同一张属性表。**它是一个扰器而非解析器**：客户端自己的工具链里已有一份正确的 TSX 解析器，在这里再写一份只会是它更差的副本。两条已知的限写在明处：跨行的文本节点看不到；只读 `.tsx`。两条都是**漏报而非误报**，这是本门赔得起的那一面——视图画的词同时也画在 `#/gallery` 上，`render` 从页上读得到。**判据必须以 `<` 收尾**：`>` 也是泛型参数表的结束符，第一版扫描器因此报了十条类型。
+**`wording` 不读 DOM，理由是它读不出那个区分**。渲染后的页面上，「视图写死的词」与「城供给的值」是同一种字节；旧门能分开它们，靠的恰好是源码里的**位置**。所以该门仍按位置判，只是位置从 RSX 换成 JSX：文本节点与可诵读属性两处，与原来同一张属性表。**它是一个扰器而非解析器**：客户端自己的工具链里已有一份正确的 TSX 解析器，在这里再写一份只会是它更差的副本。两条已知的限写在明处：跨行的文本节点看不到；只读 `.tsx`。两条都是**漏报而非误报**，这是本门赔得起的那一面——视图画的词同时也画在 `#/gallery` 上，`render` 从页上读得到。**依据必须以 `<` 收尾**：`>` 也是泛型参数表的结束符，第一版扫描器因此报了十条类型。
 
 下面这些是 `render` 的读法。
 
@@ -483,11 +478,11 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 **引擎按三级取，每一级都是一条已有的权威，不新立第二份名单**：
 
 1. `SPRAWLING_BROWSER` 点名的那一个（不变）；
-2. **doctor 装到 `~/.sprawling/components/firefox/` 的那一个**——读的是 `components_dir()` 这条**文件系统约定**（kernel-SPEC §8-22 P4.02 已记），与 `xtask budget` 读 `target/` 同性质，不是对「这台机器上 Firefox 在哪」再写一份探测；
+2. **doctor 装到 `~/.sprawling/components/firefox/` 的那一个**——读的是 `components_dir()` 这条**文件系统约定**（kernel-SPEC.md §8-22 已记），与 `xtask budget` 读 `target/` 同性质，不是对「运行中的机器上 Firefox 在哪」再写一份探测；
 3. 三个桌面自带浏览器的固定路径（不变）。
 
-**为什么 `ax` 不再是单独的一道门。** 它存在的全部理由写在自己的模块头里——「这不是一棵计算出来的可及性树，也不自称是；一棵计算树需要浏览器，而一道离线跑不了的门就是一道不会再跑的门」。现在门能进浏览器了，那条妥协就到期了：比两侧**写下的**东西是在没有浏览器时的替代品，而不是一件値得单独保留的事。角色、可及名与地标改从画出来的 DOM 上读，并入 `render`。同时消失的还有 `crates/web/screens` 这个概念本身：D43／D44 重写了全部屏幕，`dx translate` 不再存在，「定稿屏幕」没有左手边可比。
+**为什么 `ax` 不再是单独的一道门。** 它存在的全部理由写在自己的模块头里——「这不是一棵计算出来的可及性树，也不自称是；一棵计算树需要浏览器，而一道离线跑不了的门就是一道不会再跑的门」。现在门能进浏览器了，那条妥协就到期了：比两侧**写下的**东西是在没有浏览器时的替代品，而不是一件値得单独保留的事。角色、可及名与地标改从画出来的 DOM 上读，并入 `render`。同时消失的还有 `crates/web/screens` 这个概念本身：全部屏幕已被重写，`dx translate` 不再存在，「定稿屏幕」没有左手边可比。
 
-**skip 的理由仍须各自点名**：没有画廊路由、没有构建产物（`target/web-dist/`）、这台机器上没有引擎——三种各说各的。一道找不到东西就悄悄变绿的门，仍然是这里要避的失效。
+**skip 的理由仍须各自点名**：没有画廊路由、没有构建产物（`target/web-dist/`）、测试机上没有引擎——三种各说各的。一道找不到东西就悄悄变绿的门，仍然是这里要避的失效。
 
 **本节属门禁机具，与产品代码分开提交。**

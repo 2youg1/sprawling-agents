@@ -356,7 +356,7 @@ mod tests {
     /// A whole file under `crates/*/tests/` is test code by its address,
     /// with no attribute to find - and raising this product's own server
     /// to speak HTTP at it is the crossing `enrolment.rs` made before it
-    /// drove the router in process (card 5.1).
+    /// drove the router in process.
     #[test]
     fn a_file_under_tests_is_test_code_by_where_it_lives() {
         let source = "fn helper() {\n    let _ = axum::serve(listener, app);\n}\n";

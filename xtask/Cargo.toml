@@ -7,7 +7,7 @@ publish.workspace = true
 
 [dependencies]
 kernel = { path = "../crates/kernel" }
-# card-6.2: `wire-ts` reads the JSON Schema of the wire and writes the
+# `wire-ts` reads the JSON Schema of the wire and writes the
 # TypeScript client's types from it. Without `server`, so this crate does
 # not pull tokio and axum in to ask what a frame looks like.
 channels = { path = "../crates/channels", default-features = false, features = ["schema"] }

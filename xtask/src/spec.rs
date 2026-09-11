@@ -13,7 +13,7 @@ use std::path::Path;
 use crate::report::XtaskError;
 
 const SECTIONS: [&str; 19] = [
-    "## 1 需求拆解",
+    "## 1 需求分解",
     "## 2 验收标准",
     "## 3 假设与歧义",
     "## 4 现状分析",

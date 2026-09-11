@@ -139,8 +139,7 @@ fn the_permitted_licences_are_this_repositorys_own_and_not_a_second_copy() {
     assert!(permitted("[bans]\ndeny = []\n").is_err());
 }
 
-/// The gate against the tree it guards. This is the assertion that would
-/// have caught card 6.1's omission on the day it happened.
+/// The gate against the tree it guards.
 #[test]
 fn this_repository_passes_its_own_npm_gate() {
     let violations = check(&root()).unwrap();

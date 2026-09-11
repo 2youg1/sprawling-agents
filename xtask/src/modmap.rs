@@ -159,8 +159,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 /// A module row has exactly seven data cells, a `crates/**.rs` path in cell 2,
 /// `::` in cell 1, and a known status in cell 6. Seam-table rows (four cells)
 /// and card checklists (not pipe rows) never match (xtask-SPEC.md section 10-2).
-/// The seventh cell is `Spec`, added by card-8.2; it sits last so the shape and
-/// status positions did not move.
+/// The seventh cell is `Spec`; it sits last so the shape and status
+/// positions do not move.
 fn parse_rows(text: &str, violations: &mut Vec<Violation>) -> Vec<Row> {
     let mut rows = Vec::new();
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();

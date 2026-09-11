@@ -18,7 +18,7 @@
 #   clippy   fmt, then the zero-warning build of every target and feature
 #   test     the suite; the only job that produces trybuild scratch
 #   gates    the sixteen machine gates, and the nightly rustdoc apisync
-#            needs (27s of a 27.5s gate run locally - it is why the other
+#            needs (27s of a 27.5s gate run - it is why the other
 #            twelve no longer queue behind a compile)
 #   client   the client's own linter, typecheck and tests
 #   supply   licences, bans and sources; compiles nothing
@@ -29,7 +29,7 @@
 # nightly, and so is the Nix leg. Linux stays out of the *push* pipeline
 # because nobody here can reproduce a Linux failure at their desk; the
 # release does ship a static Linux archive, built natively by
-# `release.yml` (sprawling-SPEC.md section 8-9, P4.02 改判).
+# `release.yml` (sprawling-SPEC.md section 8-9).
 #
 # Every job carries `timeout-minutes: 20`. GitHub's default is six hours,
 # so a hung job used to burn a runner for a working day while the person
@@ -45,8 +45,8 @@
 # A second of noise is not a lever; leave the backtraces alone.
 #
 # C1 note: GitHub Actions infrastructure is not part of the artifact build
-# chain. The zero-js gate that asserted this was deleted at V3.25: it
-# excluded an architecture rather than a defect.
+# chain. The zero-js gate that asserted this was deleted: it excluded an
+# architecture rather than a defect.
 name: ci
 on:
   push:
@@ -117,9 +117,9 @@ jobs:
         with:
           tool: cargo-nextest
       # The four trybuild suites were the whole of this job's test phase:
-      # 369s of a 370s run. They are not slow, they were cold - measured
-      # on the developer machine, one suite is 21.4s against an empty
-      # scratch and 0.9s against a warm one. The scratch is deleted below
+      # 369s of a 370s run. They are not slow, they were cold - one suite
+      # is 21.4s against an empty scratch and 0.9s against a warm one.
+      # The scratch is deleted below
       # so that rust-cache can save, so it was cold on every run by
       # construction, and this job paid the first build of it forever.
       #

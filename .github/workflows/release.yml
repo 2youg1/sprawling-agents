@@ -65,21 +65,20 @@ jobs:
         run: cargo xtask gates
       # See ci.yml: the cache's save step cannot walk trybuild's scratch,
       # and a job whose every gate was green reported failure because of
-      # it. This is the whole of release #5's `verify` failure, and it
-      # bites again whenever the step runs in PowerShell, where `rm -rf`
-      # is not a legal invocation - so the shell is named, as it already
-      # is in platforms.yml.
+      # it. It bites again whenever the step runs in PowerShell, where
+      # `rm -rf` is not a legal invocation - so the shell is named, as it
+      # already is in platforms.yml.
       - name: clear the trybuild scratch before the cache is saved
         if: always()
         shell: bash
         run: rm -rf target/tests
 
-  # Three platforms. Linux was out of this release under P4.02, and that
-  # ruling's premise was that *cross-compiling* to Linux from the Windows
-  # machine this project is developed on does not work - not that a Linux
-  # build is impossible. A GitHub Linux runner builds natively and never
-  # touches a cross toolchain, so the premise is gone and the row is back
-  # (sprawling-SPEC.md section 8-9, P4.02 改判).
+  # Three platforms. Linux was once out of this release because
+  # *cross-compiling* to Linux from the Windows machine this project is
+  # developed on does not work - not because a Linux build is impossible.
+  # A GitHub Linux runner builds natively and never touches a cross
+  # toolchain, so that premise is gone and the row is back
+  # (sprawling-SPEC.md section 8-9).
   #
   # musl rather than gnu, and static: NixOS has no
   # `/lib64/ld-linux-x86-64.so.2`, so a dynamically linked ubuntu artifact

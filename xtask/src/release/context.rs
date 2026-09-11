@@ -23,12 +23,13 @@
 /// meaning would be a rule nobody could predict. These four are what the
 /// leak is made of when it has a shape at all.
 ///
-/// **`本机` means *my* machine.** Not the local one - that is `回环`
-/// for a socket and `这台机器` for the doctor, and both of those name
-/// whichever machine is running rather than the author's. What `本机`
-/// carries is a toolchain version, a measurement, or a capability one
-/// person's laptop happens not to have, and every one of those is a fact
-/// about somebody rather than about this code.
+/// **`本机` and `这台机器` both point at a machine only the author can
+/// see.** What they carry is a toolchain version, a measurement, or a
+/// capability one person's laptop happens not to have, and every one of
+/// those is a fact about somebody rather than about this code. A
+/// measurement names the class of machine it came from; a running
+/// machine is named by what it is, `运行中的机器`, and a machine under
+/// test is `测试机`. The socket's own word, `回环`, is unaffected.
 ///
 /// **What this table cannot catch is said out loud** rather than left
 /// for somebody to discover: working context written as ordinary prose
@@ -36,7 +37,7 @@
 /// conversation, an account that ran out of quota - the gate reads each
 /// of those as a sentence. That half is held by review, and the same
 /// admission is in `xtask secret`'s own rustdoc for the same reason.
-const WORKING_SHAPES: [&str; 2] = ["本机", "前端会话"];
+const WORKING_SHAPES: [&str; 4] = ["本机", "前端会话", "这台机器", "落地记录"];
 
 /// The compounds that contain a shape and are not one.
 ///
@@ -44,8 +45,10 @@ const WORKING_SHAPES: [&str; 2] = ["本机", "前端会话"];
 /// needs a table of the words that swallow one. `版本机制` - a
 /// versioning mechanism - is the one this project's vocabulary has, and
 /// it is here rather than in a cleverer matcher because a closed list of
-/// two words is checkable and a word segmenter is not.
-const SWALLOWED: [&str; 1] = ["版本机"];
+/// two words is checkable and a word segmenter is not. `请人裁` is the
+/// second: it contains `人裁` and is a product behaviour, the system
+/// escalating to the person inside a refusal's own text.
+const SWALLOWED: [&str; 2] = ["版本机", "请人裁"];
 
 /// The spellings that carry a ruling's occasion rather than a ruling.
 ///
@@ -56,12 +59,30 @@ const SWALLOWED: [&str; 1] = ["版本机"];
 /// been written, because it tells every later reader that a settled
 /// matter is still open.
 ///
-/// **`裁` and `判` are not themselves the defect.** `判据` is this
-/// project's word for an acceptance criterion, `请人裁` inside a
-/// refusal's own text is a *product behaviour* - the system escalating
-/// to the person - and an authority ladder names the person on purpose.
-/// Only an addressee in a document's own voice is the failure.
-const ADDRESSEE_SHAPES: [&str; 3] = ["待人裁", "立场归人", "这一步我不做"];
+/// **One author's habitual wording is itself a working record.** A rule
+/// is fixed by the SPEC, the code and the comments around it, so a
+/// sentence that also says who settled it, when, or against which
+/// earlier wording adds nothing a reader can use - while the habit it is
+/// written in identifies the person who wrote it. So the markers go and
+/// the rule stays: an acceptance criterion is `验收标准`, a decision is
+/// `决定`, and a superseded wording is simply absent.
+///
+/// **`裁` and `判` alone are not the defect.** `仲裁` is the domain word
+/// for arbitration, `裁剪` is truncation, `判定` is a verdict a function
+/// returns, and an authority ladder names the person on purpose. Only
+/// these spellings are.
+const ADDRESSEE_SHAPES: [&str; 10] = [
+    "待人裁",
+    "立场归人",
+    "这一步我不做",
+    "裁决",
+    "裁定",
+    "人裁",
+    "自裁",
+    "改判",
+    "原判",
+    "判据",
+];
 
 /// Whether a line writes one machine's working record into a product
 /// document, or hands a ruling to somebody by name.
@@ -122,21 +143,23 @@ mod tests {
         assert_eq!(working_record("（会话 4，2026-09-11）"), Some("会话 <n>"));
         assert_eq!(working_record("这件事待人裁"), Some("待人裁"));
         assert_eq!(working_record("立场归人"), Some("立场归人"));
+        assert_eq!(working_record("这台机器实测 22 秒"), Some("这台机器"));
+        assert_eq!(working_record("（用户裁定）本地恒不轮询"), Some("裁定"));
+        assert_eq!(working_record("判据：`cargo xtask gates` 绿"), Some("判据"));
     }
 
     /// The four families the rule must not eat, each of which is either a
     /// product concept or a word that swallows a shape.
     #[test]
     fn the_product_vocabulary_is_not_a_working_record() {
-        // The doctor's own subject, and the socket's: both name whichever
-        // machine is running rather than the author's.
-        assert_eq!(working_record("这台机器有什么"), None);
+        // The socket's own word for the local caller.
         assert_eq!(working_record("只认回环调用方"), None);
         // A count of the product's own sessions, off a probe.
         assert_eq!(working_record("4 会话 29 ms → 32 会话 319 ms"), None);
-        // The word for an acceptance criterion, and the product behaviour of
-        // escalating to the person.
-        assert_eq!(working_record("判据：`cargo xtask gates` 绿"), None);
+        // The domain words that contain a banned glyph without being one.
+        assert_eq!(working_record("`collab::arbitrate` 答谁来仲裁"), None);
+        assert_eq!(working_record("越界前缀＝拒而不裁剪"), None);
+        // The product behaviour of escalating to the person.
         assert_eq!(working_record("指出路径请人裁"), None);
         // A compound that contains a shape and is not one.
         assert_eq!(working_record("它们的版本机制是 schema 哈希"), None);

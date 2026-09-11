@@ -14,7 +14,7 @@
 #
 # Both are functions of the commit: judged twice, one commit gives one
 # verdict. So the schedule asks first whether main has moved, and a night
-# that changed nothing costs one checkout instead of two runners (P4.05).
+# that changed nothing costs one checkout instead of two runners.
 name: platforms
 on:
   schedule:
@@ -31,7 +31,7 @@ jobs:
   # runs: `workflow_dispatch` is itself the answer to "is this worth a
   # runner". The commit date comes from git rather than from an API, so
   # this job needs nothing but a checkout, so it was legal on ubuntu even
-  # while P4.02 kept Linux out of the builds. P4.02 has since been
+  # while Linux was kept out of the builds. That has since been
   # re-argued (sprawling-SPEC.md section 8-9): a native Linux runner never
   # touches a cross toolchain, which was the whole of the original reason.
   moved:

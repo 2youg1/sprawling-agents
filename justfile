@@ -13,7 +13,7 @@ fmt-check:
     cargo fmt --all --check
 
 # --all-features is load-bearing: code behind a feature (runtime/wasm, */conformance)
-# escapes the zero-warning gate without it (found at S3.12).
+# escapes the zero-warning gate without it.
 clippy:
     cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
