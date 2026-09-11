@@ -16,6 +16,7 @@ import { roomOf, toFragment } from "../core/route";
 import { clock, kib } from "../core/time";
 import type { Address, BuildingAnswer, PlanRow } from "../wire";
 import { useCommand, useLang, useSay, useUi } from "../ui";
+import { Commits } from "./building/commits";
 import { Tree } from "./building/tree";
 import type { Picked } from "./building/tree";
 import { Prose } from "./prose";
@@ -23,6 +24,13 @@ import { Prose } from "./prose";
 export interface BuildingProps {
   readonly address: Address;
 }
+
+// What the right-hand pane shows: the plan, the commits, or what the
+// tree picked.
+type Shown = { readonly kind: "plan" } | { readonly kind: "commits" } | Picked;
+
+const PLAN: Shown = { kind: "plan" };
+const COMMITS: Shown = { kind: "commits" };
 
 function statusWord(say: ReturnType<typeof useSay>, row: PlanRow): string {
   if (row.status === "not_started" && row.ready) return say("status_ready");
@@ -203,7 +211,11 @@ export function Building(props: BuildingProps) {
   const ui = useUi();
   const say = useSay();
   const command = useCommand();
-  const [picked, setPicked] = createSignal<Picked | null>(null);
+  const [shown, setShown] = createSignal<Shown>(PLAN);
+  const picked = (): Picked | null => {
+    const held = shown();
+    return held.kind === "file" || held.kind === "directory" ? held : null;
+  };
   const [goal, setGoal] = createSignal("");
   const answer = createMemo(() => ui.conn.asking.ask({ building_view: { addr: props.address } }));
   const building = createMemo(() => {
@@ -308,20 +320,33 @@ export function Building(props: BuildingProps) {
         <aside class="w-tree shrink-0 overflow-y-auto pr-snug">
           <button
             type="button"
-            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${picked() === null ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
-            onClick={() => setPicked(null)}
+            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "plan" ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
+            aria-current={shown().kind === "plan" ? "true" : undefined}
+            onClick={() => setShown(PLAN)}
           >
             <span class="flex w-base shrink-0 justify-center text-text-disabled">≡</span>
             <span class="ml-tight">{say("bld_plan")}</span>
           </button>
-          <Tree root={props.address} picked={picked()} onPick={setPicked} />
+          <button
+            type="button"
+            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "commits" ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
+            aria-current={shown().kind === "commits" ? "true" : undefined}
+            onClick={() => setShown(COMMITS)}
+          >
+            <span class="flex w-base shrink-0 justify-center font-mono text-text-disabled">⎇</span>
+            <span class="ml-tight">{say("bld_commits")}</span>
+          </button>
+          <Tree root={props.address} picked={picked()} onPick={setShown} />
         </aside>
         <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
           <Switch>
-            <Match when={picked() === null}>
+            <Match when={shown().kind === "plan"}>
               <Show when={building()} fallback={<p class="text-text-disabled">…</p>}>
                 {(held) => <Plan answer={held()} />}
               </Show>
+            </Match>
+            <Match when={shown().kind === "commits"}>
+              <Commits building={props.address} />
             </Match>
             <Match when={picked()?.kind === "file" ? picked() : undefined}>
               {(file) => <FileView at={file().at} />}

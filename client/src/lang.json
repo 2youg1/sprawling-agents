@@ -251,6 +251,26 @@
     "en": "the plan",
     "zh": "计划"
   },
+  "bld_commits": {
+    "en": "commits",
+    "zh": "提交"
+  },
+  "commits_empty": {
+    "en": "no commits",
+    "zh": "没有提交"
+  },
+  "commits_first": {
+    "en": "the first commit",
+    "zh": "第一次提交"
+  },
+  "commits_lineage": {
+    "en": "replaced",
+    "zh": "接替了"
+  },
+  "commits_succeeded": {
+    "en": "×{n} handoff",
+    "zh": "×{n} 接替"
+  },
   "bld_progress": {
     "en": "{done}/{total}",
     "zh": "{done}/{total}"

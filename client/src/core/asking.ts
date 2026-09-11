@@ -19,9 +19,20 @@
 import { createSignal, getOwner, onCleanup } from "solid-js";
 import type { Accessor } from "solid-js";
 
-import type { Answer, EventRecord, Query } from "../wire";
+import type { Address, Answer, EventRecord, Query, Seq } from "../wire";
 
 const PACE_MS = 250;
+
+// One page of a building's commits. The answer carries the building
+// and the bound back but not the page size, so every page asks for
+// the same size and the answer is matched by the other two.
+export const COMMITS_PAGE = 40;
+
+// The one spelling of the commits question, so the key a page asks
+// under and the key its answer is filed under cannot differ.
+export function commitsQuery(building: Address | null, before: Seq | null): Query {
+  return { commits: { building, before, limit: COMMITS_PAGE } };
+}
 
 interface Held {
   readonly value: Accessor<Answer | undefined>;
@@ -78,6 +89,9 @@ function keyOfAnswer(answer: Answer): string | null {
   if ("changes" in answer) {
     const { base, head } = answer.changes;
     return keyOf({ changes: { base, head: head ?? null } });
+  }
+  if ("commits" in answer) {
+    return keyOf(commitsQuery(answer.commits.building ?? null, answer.commits.before ?? null));
   }
   return null;
 }
@@ -139,6 +153,11 @@ function staleBy(record: EventRecord, key: string, query: Query): boolean {
     case "cost_view":
     case "cost_of":
       return kind === "model_returned" || kind === "roadmap_claimed";
+    // Only the newest page can grow: an older page is bounded above by
+    // a seq already written, and a commit's lineage walks backwards
+    // from the run that made it, so a later successor never changes it.
+    case "commits":
+      return (kind === "checkpoint_committed" || kind === "pr_merged") && key.includes("\"before\":null");
     case "building_view":
     case "listing":
     case "document":
