@@ -10,11 +10,14 @@ body:
         本仓库的既定形状是 **现象 / 定位 / 影响 / 可能的方向 / 环境**（CONTRIBUTING §2、§6）。
         语言自由（CONTRIBUTING §4），但概念名用仓库词汇（docs/glossary.md）。
 
+        **贴之前先删。** 没有任何门扫得到 issue 正文——key、token、绝对家目录路径、机器名与账号名要由你自己删掉（AGENTS.md *Privacy*）。
+        Nothing scans an issue body: strip keys, tokens, home paths, machine and account names yourself before pasting.
+
   - type: textarea
     id: behavior
     attributes:
       label: 现象 — what happened
-      description: 你运行了什么、输出了什么、你期望什么。粘贴精确的命令与输出；确定性失败请给 seed。
+      description: 你运行了什么、输出了什么、你期望什么。粘贴精确的命令与输出；确定性失败请给 seed。贴之前把 key、token 与绝对家目录路径替换掉——路径写成仓库相对路径或 `<city>/…`，如下例。
       placeholder: |
         $ sprawling replay "D:/.../city"
         chain verified: 0 line(s), tail seq none      # 期望：报 E_PATH_NOT_FOUND
@@ -62,6 +65,6 @@ body:
     id: fixtures
     attributes:
       label: 复现夹具 (optional)
-      description: 能单独复现的最小输入：seed、日志文件、目录布局。一个夹具胜过三段描述。
+      description: 能单独复现的最小输入：seed、日志文件、目录布局。一个夹具胜过三段描述。账本与日志里可能带着端点配置与凭据形状的值——先读一遍再贴，或只给 seed。
     validations:
       required: false

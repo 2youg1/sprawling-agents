@@ -18,6 +18,7 @@
 - [ ] **SPEC in step with the code** — the crate's `<crate>-SPEC.md` updated in the same change-set, and in the same **commit** as any public-surface change (`xtask apisync`).
 - [ ] **Module map in step** — a new file registered in `ARCHITECTURE.md` before or with it (`xtask modmap`).
 - [ ] **Red-to-green visible** — for a defect fix, the failing test sits in the history before the fix (CONTRIBUTING §2 steps 3–4).
+- [ ] **Nothing private in this description or in the commit bodies** — no credential, no absolute home path, no pasted terminal dump, no conversation or tool-call log, no personal or machine name, no uncropped screenshot. Reread once before opening: **no gate scans these** (AGENTS.md *Privacy*), and a later force-push does not remove what was already fetched.
 
 ## Notes
 
