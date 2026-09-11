@@ -442,19 +442,19 @@ card-12.1 给发布矩阵加了 `x86_64-unknown-linux-musl` 一行，而 `budget
 
 **`license` 字段的两种形状都认**：一个字符串（`"MIT"`），或一条 SPDX 表达式里的 `OR`／`AND` 分支（`"(MIT OR Apache-2.0)"`）。表达式按 `OR` 拆开，任一分支在准许表内即通过——这与 `cargo-deny` 对同一种表达式的判法一致，故两侧不会对同一个包各执一词。旧包偶尔写 `licenses: [{type: ...}]`，本门**不认**并按「没有说」处理：报出来让人去看，比猜一个字段的历史写法安全。
 
-**它上线第一跑就红了两条，而我没有把它们放过去（card-F3，待人裁）**：`caniuse-lite` 是 `CC-BY-4.0`，`minimatch` 是 `BlueOak-1.0.0`，两者都由 devDependencies 传递带进来，都到不了用户的浏览器。修法在因不在果——要么 `deny.toml` 的 `[licenses] allow` 各加一行并写明理由，要么换掉那两个包。**这一步我不做**：AGENTS.md 的 `guard` 行禁止在一道门变红的那一次改动里放宽这道门，而准许表是这个仓库对许可证的立场，立场归人。已有先例可循——`CDLA-Permissive-2.0` 当初正是为一份证书清单这种**数据**许可证入表的，而 `CC-BY-4.0` 覆盖的 `caniuse-lite` 同样是一张数据表。
+**两条传递进来的许可证在准许表上**：`caniuse-lite` 的 `CC-BY-4.0` 与 `minimatch` 的 `BlueOak-1.0.0`，各一行写在 `deny.toml` 的 `[licenses] allow` 里，理由跟在行旁。依据三条：两者都由 devDependencies 传递带入，到不了用户的浏览器；`CDLA-Permissive-2.0` 为一份证书清单入表是同一形状的先例，`caniuse-lite` 同样是一张数据表，而 `just dist` 写出的物料清单正是 `CC-BY-4.0` 要求的署名落点；`BlueOak-1.0.0` 经 OSI 审议通过，宽松，且授予 MIT 未言明的专利权。
 
-**裁决已下，两行已入表（deny.toml，独立提交）**：`BlueOak-1.0.0` 与 `CC-BY-4.0` 各加一行并写明理由。依据三条——两者都是 devDependencies，到不了用户的浏览器；`CDLA-Permissive-2.0` 为一份证书清单入表是同一形状的先例，`caniuse-lite` 同样是一张数据表，而 `just dist` 写出的物料清单正是 `CC-BY-4.0` 要求的署名落点；`BlueOak-1.0.0` 于 2022 年 3 月经 OSI 审议通过，宽松，且授予 MIT 未言明的专利权。放宽发生在门自己的提交（card-F3）**之后**的另一条提交里，属 AGENTS.md 准许的「在自己的提交里重新定价一条规则」，而非它禁止的「在门正卡着的那次改动里放宽它」。此裁可推翻：删掉那两行，红的就是本节下面那道门。
+**另一条路——换掉那两个包——走不通，已逐条走查**：`minimatch ^10` 由 `eslint` 自身、`@eslint/config-array` 与 `@typescript-eslint/typescript-estree` 三处同时要求（`10` 之前的 `minimatch` 是 `ISC`，但降版就是降掉 eslint 10）；`caniuse-lite` 由 `browserslist` 要求，而 `browserslist` 经 `@babel/helper-compilation-targets` 由 `vite-plugin-solid` 带入，即 Solid 的编译链本身。两条来路都落在冻结的前端工具链上。
 
-**「换掉那两个包」这一条已被走查关闭（repair-F 复核）**：已装树上是 `minimatch 10.2.6` 与 `caniuse-lite 1.0.30001810`，两者各自的来路都无可替换处——`minimatch ^10` 由 `eslint 10.10.0` 自身、`@eslint/config-array 0.23.5` 与 `@typescript-eslint/typescript-estree 8.70.0` 三处同时要求（`10` 之前的 `minimatch` 是 `ISC`，但降版就是降掉 eslint 10）；`caniuse-lite` 由 `browserslist 4.28.9` 要求，而 `browserslist` 由 `@babel/helper-compilation-targets` 经 `vite-plugin-solid` 带进来，即 Solid 的编译链本身。**两条来路都落在冻结的前端工具链上**，换包等于换掉 eslint 与 Solid 的构建路径。于是留给人的只有一件事：`deny.toml` 的 `[licenses] allow` 加不加这两行。
+**翻案条件**：删掉 `deny.toml` 那两行，红的就是本节这道门——放宽写在它自己的提交里，不在门正卡着的那一次改动里，这是 AGENTS.md 的 `guard` 行区分的两件事。
 
 **本节属门禁机具，与产品代码分开提交。**
 
 ### 8-13 `ax`／`wording`／`render` 读画出来的 DOM
 
-**裁定已下（D54，2026-09-11），下文“堵在哪里”一节作废，保留作为记录。** 用户原话：「够到真实浏览器直接拉起默认浏览器就行，或者用 doctor 里面安装的 firefox」。
+三道门读**画出来的** DOM，而不是两侧写下来的东西。
 
-这句话推翻的不是三条路里的哪一条，而是它们共同的**前提**——卡片要求「复用 `bin::browser_bidi` 的传输，不得开第二条驱动浏览器的路」。拉起一个无头浏览器并让它吐出 DOM **不需要 BiDi**：`render` 今天已经在这么做（`--headless=new --dump-dom`），无套接字、无子进程会话、无产品代码依赖。三条路各自的代价因此都不用付。
+**它们不经 BiDi。** 复用 `bin::browser_bidi` 的传输够不到：那条传输是 `sprawling` 的私有模块，而够到它的两条路——提为 `pub` 并让 xtask 依赖整条产品图（含 tokio 与 axum），或把套接字迁进 `crates/browser` 的非默认 feature（推翻 browser-SPEC §19-1）——各自都要动产品代码，而本节属门禁机具。**出路在于前提本身不成立**：拉起一个无头浏览器让它吐出 DOM 不需要 BiDi。`render` 用的是 `--headless=new --dump-dom`，无套接字、无会话、无产品依赖，两条路的代价都不用付。
 
 **引擎按三级取，每一级都是一条已有的权威，不新立第二份名单**：
 
@@ -465,19 +465,5 @@ card-12.1 给发布矩阵加了 `x86_64-unknown-linux-musl` 一行，而 `budget
 **另一条改判：`ax` 不再是单独的一道门。** 它存在的全部理由写在自己的模块头里——「这不是一棵计算出来的可及性树，也不自称是；一棵计算树需要浏览器，而一道离线跑不了的门就是一道不会再跑的门」。现在门能进浏览器了，那条妥协就到期了：比两侧**写下的**东西是在没有浏览器时的替代品，而不是一件値得单独保留的事。角色、可及名与地标改从画出来的 DOM 上读，并入 `render`。同时消失的还有 `crates/web/screens` 这个概念本身：D43／D44 重写了全部屏幕，`dx translate` 不再存在，「定稿屏幕」没有左手边可比。
 
 **skip 的理由仍须各自点名**：没有画廊路由、没有构建产物（`target/web-dist/`）、这台机器上没有引擎——三种各说各的。一道找不到东西就悄悄变绿的门，仍然是这里要避的失效。
-
-### 8-13-1 （已作废）当时堵在哪里（card-F3）
-
-**目标未变**：三道门今天读的是两侧**写下来的**东西，它们应当改为在真引擎里打开 `#/gallery` 这条路由、读**画出来的** DOM——`ax` 比角色、可及名与地标，`wording` 比每个文本节点是否出自 `lang` 表，`render` 比一条左边、面板头在顶、无溢出。画廊不在时是一次**点名理由的 skip**，在时必须真判；一道找不到东西就悄悄变绿的门，正是这里要避免的失效。
-
-**本卡停在一个我无权自己裁的取舍上，故一行未写**，写在这里而不是写成一个半成品：
-
-- 卡片要求**复用 `bin::browser_bidi` 的传输，不得开第二条驱动浏览器的路**。那条传输是 `crates/sprawling/src/browser_bidi/` 里的 `BidiSocket` 与 `LazyEngine`，它们是 `sprawling` 这个 crate 的**私有模块**；`crates/browser` 按 browser-SPEC §19-1 的记录**恒不持套接字、恒不起进程**。
-- 于是 xtask 要够到它，只有两条路，两条都动产品代码：①把 `sprawling::browser_bidi` 提为 `pub` 并让 xtask 依赖 `sprawling`（代价：`cargo xtask` 从此要构建整条产品图，含 tokio 与 axum；且 `sprawling` 的公开面变了，`apisync` 基线与 sprawling-SPEC 须同集更新）；②把套接字迁进 `crates/browser` 的一个非默认 feature（代价：推翻 browser-SPEC §19-1 记下的那条决定，须先改记录）。
-- 而本卡同时声明**门禁机具与产品代码分开提交**。两条要求在此相撞，**这不是我能自己选的一边**。
-
-**请人裁的正是这一件事**：走 ①、走 ②，还是允许 xtask 自己实现一个 `BrowserPort`（那是卡片明文禁止的第三条）。裁定落下之后，剩下的工作是有界的：一个 `xtask::gallery` 模块持「画廊在不在、在哪里被打开」与一次探针，`ax`／`wording`／`render` 各自只多一个读 DOM 的判据。
-
-**另有一件已知的前置**：`#/gallery` 由前端会话构建，且它要被打开就要有一份**构建好的 bundle**（`client/dist/`）与一个静态服务。skip 的理由因此至少有三种，各须点名：没有画廊路由、没有构建产物、这台机器上没有引擎。
 
 **本节属门禁机具，与产品代码分开提交。**
