@@ -59,6 +59,14 @@ need() {
 # first, and the first one actually present wins. A list rather than a
 # rule, because the naming is a fact about how each row is built rather
 # than something a reader could derive.
+#
+# **No release carries a Linux archive yet.** That row is held back until
+# it is settled where a Linux install keeps a credential, and
+# `.github/workflows/release.yml` says so where the row used to be. The
+# Linux entry below is what this script will match the day the row
+# returns; until then a Linux run falls through both suffixes and is told
+# what the release does carry, which is the same answer it would give for
+# any platform nobody builds for.
 platform() {
     system=$(uname -s)
     machine=$(uname -m)
