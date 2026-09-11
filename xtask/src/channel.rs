@@ -59,24 +59,33 @@ struct Row {
 /// that asset simply publishes two packages; a release *with* an asset
 /// this table does not know is an error, which is the asymmetry that
 /// keeps a new platform from being dropped in silence.
+///
+/// **Unscoped names, and that was decided by the registry.** A scope
+/// belongs to a user or an organisation, and publishing into one nobody
+/// owns is answered with a 404 that reads as if the package were
+/// missing rather than as if the scope were. `sprawling-windows-x64`
+/// needs no organisation to exist first, and it keeps the platform
+/// packages sorted next to the root package they belong to. Moving to a
+/// scope later is a change to this table and to the shim's, which one
+/// test already holds together.
 const ROWS: [Row; 3] = [
     Row {
         suffix: "-windows-x86_64.zip",
-        package: "@sprawling/windows-x64",
+        package: "sprawling-windows-x64",
         os: "win32",
         cpu: "x64",
         binary: "sprawling.exe",
     },
     Row {
         suffix: "-macos-aarch64.zip",
-        package: "@sprawling/darwin-arm64",
+        package: "sprawling-darwin-arm64",
         os: "darwin",
         cpu: "arm64",
         binary: "sprawling",
     },
     Row {
         suffix: "-x86_64-unknown-linux-musl.zip",
-        package: "@sprawling/linux-x64-musl",
+        package: "sprawling-linux-x64-musl",
         os: "linux",
         cpu: "x64",
         binary: "sprawling",

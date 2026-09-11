@@ -285,9 +285,19 @@ jobs:
           # Platform packages first: the root package names them as
           # optional dependencies at an exact version, and a root that
           # reaches npm before they do is a root nobody can install.
-          for dir in target/npm/@sprawling/*; do
-            npm publish "$dir" --access public --tag pre
+          #
+          # No `--tag pre`. install.sh carries the same lesson about the
+          # download channel: every release of this project is a
+          # pre-release, and asking for "the latest stable one" finds
+          # nothing at all. A package whose only versions sit under a
+          # `pre` tag has no `latest`, and `bunx sprawling` then fails to
+          # resolve rather than installing a pre-alpha. The version
+          # string says `0.0.4-pre.260911` and the release notes say not
+          # to use it; the dist-tag is not where that warning belongs.
+          for dir in target/npm/*/; do
+            [ "$(basename "$dir")" = sprawling ] && continue
+            npm publish "$dir" --access public
           done
-          npm publish target/npm/sprawling --access public --tag pre
+          npm publish target/npm/sprawling --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

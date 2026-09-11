@@ -33,9 +33,9 @@ const { spawnSync } = require("node:child_process");
 // a binary that cannot run, and the answer names the download page,
 // which carries every archive whether or not npm has a package for it.
 const PLATFORMS = {
-  "win32 x64": { package: "@sprawling/windows-x64", binary: "sprawling.exe" },
-  "darwin arm64": { package: "@sprawling/darwin-arm64", binary: "sprawling" },
-  "linux x64": { package: "@sprawling/linux-x64-musl", binary: "sprawling" },
+  "win32 x64": { package: "sprawling-windows-x64", binary: "sprawling.exe" },
+  "darwin arm64": { package: "sprawling-darwin-arm64", binary: "sprawling" },
+  "linux x64": { package: "sprawling-linux-x64-musl", binary: "sprawling" },
 };
 
 const RELEASES = "https://github.com/2youg1/sprawling-agents/releases";
