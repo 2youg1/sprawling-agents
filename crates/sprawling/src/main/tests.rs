@@ -77,11 +77,20 @@ fn embedded_client_table_is_present_and_marked() {
         .expect("the page shell is always embedded");
     assert!(!index.gz.is_empty());
     if CLIENT_COMPLETE {
-        for needed in ["web.js", "web_bg.wasm"] {
-            assert!(
-                CLIENT_FILES.iter().any(|f| f.path == needed),
-                "a complete client carries {needed}"
-            );
-        }
+        // Named by their directory rather than by file name: every chunk
+        // the bundler writes carries a content hash, so the names change
+        // on every build and only the shape of the path is stable.
+        assert!(
+            CLIENT_FILES
+                .iter()
+                .any(|f| f.path.starts_with("assets/") && f.path.ends_with(".js")),
+            "a complete client carries a script"
+        );
+        assert!(
+            CLIENT_FILES
+                .iter()
+                .any(|f| f.path.starts_with("assets/") && f.path.ends_with(".css")),
+            "a complete client carries a stylesheet"
+        );
     }
 }

@@ -1171,7 +1171,7 @@ invert the model seam，仍然没有卡，仍然要人先裁一次。**本卡不
 ### 测试跟着它咬的那个模块，一份夹具留在父模块
 
 `mod tests` 5,576 行，一百个测试函数。**先量后放**：3,490 行只用这个 crate 已经公开的面，
-本来可以按 `assembly_door.rs` 与 `web/tests/pages.rs` 的先例去 `crates/sprawling/tests/`。**没有那样做，理由是夹具。**
+本来可以按 `assembly_door.rs` 的先例去 `crates/sprawling/tests/`。**没有那样做，理由是夹具。**
 `fake_openai`（一台按脚本作答的 OpenAI 服务器）、`worker_with_provider`、`completion` 这一簇 443 行，
 被两边同时需要：`what_a_worker_holds_is_what_a_restart_rebuilds` 要用它造一段历史再去核 `Standing::fold`，
 而 `tests/` 里的验收测试也要用它。**`#[cfg(test)]` 的东西到不了 `tests/`，`tests/` 的东西到不了 `src/`**——
@@ -2496,7 +2496,7 @@ card-2.3 让合并落成一个真正的合并提交后，`settle_requests` 给 `
 - **`rounds_answer` 多读两条记录**：窗口里第一条 `run_started` 成 `Opening { task, goal, at: record.t() }`，第一条 `run_frozen` 成 `Closing { completion, at }`；`turns()` 本身一字不动。
 - **`bin::views::listing`**（新文件）：`at` 为 `None` 读城根，否则读 `city_root/<at>`；`read_dir` 一层，目录在前、文件在后、各按名字 UTF-8 序；读不了的目录答空表而不是拒绝——同 `read_building` 的口径，一个读不了的目录在页面上是一个空目录。符号链接按 `metadata` 判：指向目录的算目录。文件大小 `u64`。
 - **`bin::views::document`**（新文件）：路径同上；`std::fs::read` 失败答 `Unavailable`（同 `BuildingView` 对没立过的楼的口径）；头 8 KiB 含 NUL 判 `binary`；否则取前 `DOC_BYTES_MAX` 字节 `from_utf8_lossy`，`truncated = len > DOC_BYTES_MAX`。**不经密钥扫描**：这是城内的文件给城的主人看，而 `Hunks` 的扫描针对的是把补丁文本挂上线的那条路——但 `.sprawling/CONFIG.toml` 里只有 `secret:` 引用，明文本来就不落盘（`xtask secret` 门保证），所以这里没有可泄露的东西。
-- **验收**：`views::listing::tests`——`init_city` 铺出的城根列出 `.sprawling` 与 `hall` 两个目录；`hall` 下列出 `Roadmap.md` 等文件且目录先于文件；不存在的路径答空表。`views::document::tests`——读 `hall/.sprawling/BUILDING.md` 得到原文、`truncated == false`；一份 NUL 开头的文件判 `binary` 且 `text` 为空；不存在的文件答 `Unavailable`。`views::rounds::tests`——三条记录的会话答出 `opening.task`；冻结后答出 `closing.completion == "done"`。`views::tests`——`city_halted` 后 `city_view.halted == ["city"]`，`released` 后为空。
+- **验收**：`views::listing::tests`——`init_city` 铺出的城根列出 `.sprawling` 与 `hall` 两个目录；`hall` 下列出 `Roadmap.md` 等文件且目录先于文件；不存在的路径答空表。`views::document::tests`——读城里 `hall` 楼自己的 `BUILDING.md` 得到原文、`truncated == false`；一份 NUL 开头的文件判 `binary` 且 `text` 为空；不存在的文件答 `Unavailable`。`views::rounds::tests`——三条记录的会话答出 `opening.task`；冻结后答出 `closing.completion == "done"`。`views::tests`——`city_halted` 后 `city_view.halted == ["city"]`，`released` 后为空。
 
 ## 8-53 一座楼做过的提交，倒序分页（card-2.7；`bin::views::commits`、`views::holding`；channels-SPEC §8-24）
 
