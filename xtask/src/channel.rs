@@ -60,14 +60,18 @@ struct Row {
 /// this table does not know is an error, which is the asymmetry that
 /// keeps a new platform from being dropped in silence.
 ///
-/// **Unscoped names, and that was decided by the registry.** A scope
-/// belongs to a user or an organisation, and publishing into one nobody
-/// owns is answered with a 404 that reads as if the package were
-/// missing rather than as if the scope were. `sprawling-windows-x64`
-/// needs no organisation to exist first, and it keeps the platform
-/// packages sorted next to the root package they belong to. Moving to a
-/// scope later is a change to this table and to the shim's, which one
-/// test already holds together.
+/// **These names move under `@sprawling` at the next version, and not
+/// before.** They are bare because the organisation did not exist when
+/// they were chosen, and npm answers a publish into an unowned scope
+/// with a 404 that reads as a missing package rather than as a missing
+/// scope. The organisation exists now, so that reason has expired - but
+/// the version these names already carry is on the registry, and npm
+/// never reuses a `name@version`, so the rename cannot reach backwards.
+/// The root package keeps its bare name whatever happens to these:
+/// `bunx sprawling` is the whole reason this channel exists, and a
+/// scoped root would spell it `bunx @sprawling/sprawling`. The test
+/// beside this table is what carries the decision to the version that
+/// can honour it.
 const ROWS: [Row; 3] = [
     Row {
         suffix: "-windows-x86_64.zip",
@@ -304,76 +308,4 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
-    use super::{ROWS, npm_version};
-
-    #[test]
-    fn a_release_tag_becomes_the_semver_npm_accepts() {
-        assert_eq!(
-            npm_version("v0.0.4-Pre-alpha-260911", "0.0.4").unwrap(),
-            "0.0.4-pre.260911"
-        );
-    }
-
-    /// The check that keeps one release from having two version numbers.
-    #[test]
-    fn a_tag_disagreeing_with_the_workspace_is_refused() {
-        let err = npm_version("v0.0.3-Pre-alpha-260911", "0.0.4").unwrap_err();
-        assert!(err.to_string().contains("two version numbers"), "{err}");
-    }
-
-    #[test]
-    fn a_tag_of_another_shape_is_refused_rather_than_guessed_at() {
-        assert!(npm_version("0.0.4", "0.0.4").is_err());
-        assert!(npm_version("v0.0.4", "0.0.4").is_err());
-        assert!(npm_version("v0.0.4-Pre-alpha-26091", "0.0.4").is_err());
-        assert!(npm_version("v0.0.4-Pre-alpha-2609xx", "0.0.4").is_err());
-    }
-
-    /// Two packages claiming one platform would make which binary a
-    /// person gets depend on the order the assets were read in.
-    #[test]
-    fn no_two_rows_claim_one_platform_or_one_suffix() {
-        for (index, row) in ROWS.iter().enumerate() {
-            for other in ROWS.iter().skip(index + 1) {
-                assert_ne!((row.os, row.cpu), (other.os, other.cpu));
-                assert_ne!(row.suffix, other.suffix);
-                assert_ne!(row.package, other.package);
-            }
-        }
-    }
-
-    /// Found by running it rather than by reading it: npm's generated
-    /// wrapper reads the shebang to decide what interprets the file, and
-    /// without one Windows ran the JavaScript as a shell script, printed
-    /// nothing, and exited 0. A `bunx sprawling` that reports success
-    /// and does nothing is the worst shape this channel can fail in, so
-    /// the first line is held here.
-    #[test]
-    fn the_shim_begins_with_a_shebang() {
-        assert!(
-            super::SHIM.starts_with("#!/usr/bin/env node\n"),
-            "without a shebang npm's wrapper runs this as a shell script"
-        );
-    }
-
-    /// The shim is what every root package carries, so its own contract
-    /// is worth holding: it resolves a platform package and never
-    /// installs anything.
-    #[test]
-    fn the_shim_execs_rather_than_installs() {
-        let shim = super::SHIM;
-        assert!(shim.contains("require.resolve"), "the shim must resolve");
-        assert!(
-            !shim.contains("sprawling install"),
-            "PATH belongs to whoever installed; the shim must not install"
-        );
-        for row in ROWS {
-            assert!(
-                shim.contains(row.package),
-                "the shim does not know {}",
-                row.package
-            );
-        }
-    }
-}
+mod tests;
