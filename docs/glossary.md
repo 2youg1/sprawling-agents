@@ -39,7 +39,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **Fork** | A new run branched from a point in another run's history. It records a lineage; it does not start driving by itself. |
 | **resume** | Reopening a city after the process died: the chain is verified, tool calls whose outcome was lost are closed as unknown, and what waits for a person is reported. |
 | **Address** | A path newtype relative to the city root. It sets the write domain, the default context, and who the work reports to. |
-| **reserved prefix** | A `.sprawling/` directory and its subtree, at any depth, always outside every write domain. Each scope keeps what governs it there — the city, and from F2.09 each building. An agent cannot edit its own accounting, its own configuration, or its own building's rules. |
+| **reserved prefix** | A `.sprawling/` directory and its subtree, at any depth, always outside every write domain. Each scope keeps what governs it there — the city, and each building. An agent cannot edit its own accounting, its own configuration, or its own building's rules. |
 | **City Hall** | The building `hall`, raised with the city. It holds the city's plan and the two residents who serve every other building; it holds no project of its own. |
 | **Mayor** | The resident `hall/mayor`: the city's planner, writing Markdown only. It turns an idea into `<city>/hall/Roadmap.md`, hands each building its part through `plan`, and raises a building through `city`. Its identity is `<city>/.sprawling/MAYOR.md`. |
 | **clerk** | The resident `hall/clerk`: answers approvals when the person delegated them, in the same three parts a Gate uses, with its reason in the Ledger. Its identity is `<city>/.sprawling/CLERK.md`. |
@@ -135,7 +135,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | Name | What it is |
 |---|---|
 | **WebUI** | One page in a desktop browser, embedded in the binary and served from inside it. The one this tree carries is `client/`, TypeScript built by bun; the wire is the whole API, so how many clients exist is a fact about this tree rather than a limit of the design. |
-| **Lens** | Which reading of one history a page is showing: `Ledger`, `Archive`, or `Bin`. The three used to be three nav entries, which asked a person to choose before the question was formed. The lens lives in the address, so a link to the archive is still a link to the archive. |
+| **Lens** | Which reading of one history a page is showing: `Ledger`, `Archive`, or `Bin`. Three separate nav entries would ask a person to choose before the question was formed. The lens lives in the address, so a link to the archive is still a link to the archive. |
 | **control surface** | The intervention surface at the bottom: five verbs plus the steer input. |
 | **Approval Inbox** | The queue of pending answers, grouped by cluster key. A tainted item is never grouped. |
 | **progress bar** | The progress bar. |

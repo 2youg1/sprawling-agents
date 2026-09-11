@@ -4,9 +4,9 @@
 > 骨架：apostle-sdd 十七节；按模块分章、每章自足（ARCHITECTURE.md §5）。
 > 动手前先读所用工具与依赖的**官方文档或官方 agent 指南**，再写本文的接口节。
 
-## 1 需求拆解
+## 1 需求分解
 
-一个 Agent 要能驱动这台机器上的浏览器：看一个页面、点一个按钮、填一个输入框、改完代码再看一眼、并且下次还认得同一个账号。拆成六个可独立验收的单元，与模块一一对应：缝（port）、会话（session）、可见面（snapshot）、动作（act）、开发回路（devloop）、登录态（profile）。
+一个 Agent 要能驱动运行中的机器上的浏览器：看一个页面、点一个按钮、填一个输入框、改完代码再看一眼、并且下次还认得同一个账号。拆成六个可独立验收的单元，与模块一一对应：缝（port）、会话（session）、可见面（snapshot）、动作（act）、开发回路（devloop）、登录态（profile）。
 
 ## 2 验收标准
 
@@ -168,7 +168,7 @@ impl Profile { pub fn of(building: &Address, confidential: bool) -> Result<Profi
 
 `ARCHITECTURE.md` §6 browser 六行与 §3 缝清单｜`docs/glossary.md` 若新增词汇｜装配层接线时同步 §6 末接线台账。
 
-**`conformance` feature（人的裁决，2026-09-05：test 恒不进构建物）**：`assert_port_conformance` 此前是裸 `pub fn`，并由 `lib.rs` 无条件再导出，因而随发行二进制出厂；它自己的 lint 豁免写着「dev-only by contract」，而无一处机器持有那纸合约。本工作区另外四套 conformance 一直在 `#[cfg(feature = "conformance")]` 之后，本 crate 是唯一的例外，原因只是它此前没有 `[features]` 段。现已补齐，并由 `cargo xtask artifact` 持有此规则；公开接口面随之缩减一行，`xtask/api-baselines/browser.txt` 同集更新。`crates/browser/src/session.rs` 中调用它的那条断言改为 `#[cfg(feature = "conformance")]`，故它在 `--all-features` 下运行——那正是 `just check` 与 `just test` 所用的构建。
+**`conformance` feature（test 恒不进构建物）**：`assert_port_conformance` 住 `#[cfg(feature = "conformance")]` 之后，否则它随发行二进制出厂，而「dev-only by contract」这句话没有任何机器持有。本工作区另外四套 conformance 同形，此规则由 `cargo xtask artifact` 持有；`crates/browser/src/session.rs` 中调用它的那条断言同样带 `#[cfg(feature = "conformance")]`，故它在 `--all-features` 下运行——那正是 `just check` 与 `just test` 所用的构建。
 
 ## 19 八个动作，与截图成为证据
 
@@ -176,9 +176,9 @@ impl Profile { pub fn of(building: &Address, confidential: bool) -> Result<Profi
 
 这座城自己起 Firefox：随机远程调试端口、`-profile <这栋楼的 profile>`、按需 `-headless`。本库与 `docs/glossary.md` 的 **browser** 行一致——
 
-> **假设（2026-09-12 起）**：起进程这件事归 `bin::browser_bidi`，本 crate 仍恒不起进程、恒不持套接字、恒不下载驱动。Firefox 是**第一引擎**（原生 BiDi，无需驱动）；Chromium 只在 `chromedriver` 已在 PATH 上时才走得通，因此是第二条路而非并列的一条。
+> **假设**：起进程这件事归 `bin::browser_bidi`，本 crate 仍恒不起进程、恒不持套接字、恒不下载驱动。Firefox 是**第一引擎**（原生 BiDi，无需驱动）；Chromium 只在 `chromedriver` 已在 PATH 上时才走得通，因此是第二条路而非并列的一条。
 
-这条改写不放宽本 crate 的任何约束：纯的那一半仍然纯，变的只是「谁按下启动键」，而那个谁一直住在装配层（§7 第一条）。
+这不放宽本 crate 的任何约束：纯的那一半仍然纯，「谁按下启动键」住在装配层（§7 第一条）。
 
 ### 19-2 `browser::verb`（新模块，形状 1 判定）
 
@@ -224,7 +224,7 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 
 依赖 `png` 0.18（MIT OR Apache-2.0，`deny.toml` 的 allow 列表已含两者）：产品路径只解码，测试用它的编码器造夹具，于是断言比的是真 PNG 字节而不是一份没人能复核的固定串。
 
-### 19-5 `browser::devloop` 消费 `look` 的裁决
+### 19-5 `browser::devloop` 消费 `look` 的判定
 
 `DevLoop::observe` 已经吃 `Observation { text, complained }`；要的是**接线而非新判定**：`browser` 工具的 `snapshot` 动作产出的那段文本就是 `text`，`console` 里出现过 error 级别的条目就是 `complained`，于是「改一处、看一眼、再决定」在工具层闭合，`Step` 作为工具结果回给模型。判定本身一个字不改——已有机制复用是这里的正解。
 
@@ -237,7 +237,7 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 | diff | 尺寸不同即拒；全同两图为 0；一个像素变化的框恰好含那个像素 |
 
 
-### 19-7 本波未做完的部分（如实记录）
+### 19-7 尚未验证的部分
 
 - **`bin::browser_bidi::BidiSocket` 没有对着真浏览器跑过**。逐帧逻辑（发一帧、读到 id 相同的那条、跳过无 id 的事件）由阅读 W3C 草案得出而非由一次真实会话验证。工具那一侧的整条 open→snapshot→act→screenshot 由 `Recording` 逐帧断言，缝的另一个适配器因此是可信的；**这一侧不是**。第一次真跑要看的是三件事：`session.new` 的能力集合是否被 Firefox 接受、`script.evaluate` 的返回值是否真是 `result.value` 的字符串形状、`browsingContext.captureScreenshot` 的 `format.type` 是否收 `image/png` 这一拼写。
-- **`-headless` 有开关没有问的人**：`LaunchPlan` 带这一位并逐字断言，但 `for_building` 恒传 `false`。谁来问（楼的 `CONFIG.toml`？派活时的一个字段？）是下一张卡的事，本卡不替人决定。
+- **`-headless` 有开关没有问的人**：`LaunchPlan` 带这一位并逐字断言，但 `for_building` 恒传 `false`。这一位由哪一面提供尚未定：候选是楼的 `CONFIG.toml` 与派活帧的一个字段。

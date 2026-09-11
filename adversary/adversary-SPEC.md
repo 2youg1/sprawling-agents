@@ -2,9 +2,9 @@
 
 > `adversary/` —— 仓外的对抗性性质检验器。它不是 crate，不进 workspace，不进发布物，不进 `just check`。
 >
-> 权威顺序：用户裁决 → `ARCHITECTURE.md` §8「the wire is the whole API; a second client writes against it」→ 本文 → 代码与测试。本文先于代码改动。
+> 权威顺序：人的决定 → `ARCHITECTURE.md` §8「the wire is the whole API; a second client writes against it」→ 本文 → 代码与测试。本文先于代码改动。
 
-## 1 需求拆解
+## 1 需求分解
 
 `ARCHITECTURE.md` §8 把线格式定为整个 API，并明说「用任何语言写第二个客户端都是支持的」。本目录行使这一条：它是**第三个**客户端，写在仓外，用来攻击而不是使用。拆成六个可独立验收的最小单元：
 
@@ -12,7 +12,7 @@
 |---|---|---|
 | U1 门 | `Door`：以子进程驱动已构建的二进制，把 stdout 的每一行解成 `Frame` | 一条 init→serve→create_building→city_view 的轨迹被解析成结构化值；未知的帧类当场报错而不是被忽略 |
 | U2 场地 | `Ground`：一次性城目录、一个被端起来的进程、一个端口，以及磁盘上的敌意动作 | 场地退出后不留文件也不留进程；`stored` 看到的正是账本目录里的字节 |
-| U3 模型 | `StateModel` / `RunModel`：动作集合与后置条件 | 随机轨迹全通过；把 `Halt` 变成 no-op 则立即判红 |
+| U3 模型 | `StateModel` / `RunModel`：动作集合与后置条件 | 随机轨迹全通过；把 `Halt` 变成 no-op 则立即报错 |
 | U4 定向对抗 | dynamic logic：任意前缀 ＋ 一次 `Halt` ＋ 任意后缀 | 该性质在随机轨迹上成立，且停摆后每一次派活都被拒 |
 | U5 回归 | 反例最小化后渲染成 Rust `#[test]` | 渲染结果与仓内那个 Rust 文件逐字节相同，而该文件由 `cargo test` 编译运行 |
 | U6 历史 | 任意轨迹之后，账本离线自证；改一个字节则不能自证 | `replay` 在干净轨迹上恒绿、在翻过一位的轨迹上恒红 |
@@ -29,18 +29,18 @@
 4. U5 渲染出的 Rust 源码与 `crates/sprawling/tests/from_adversary.rs` 逐字节相同。
 5. **咬得动的证据**：`Model.hs` 的 `haltIsHonoured` 在把 `Stop` 从模型里摘掉后必须失败。一个永远为真的性质与没有性质等价。
 
-   **已演示。** 把 `refusal` 里 `Work` 那条 `not (standing world addr) -> Just (Code "E_GATE_DENIED")` 删掉后，`halting` 判红并给出 `refused with Code "E_GATE_DENIED" where Just (Code "E_CONFIG_INVALID") was owed`；恢复后 6.08 s 转绿。它咬得动的是**守序**，而不只是「停摆时派活会失败」。
+   **已演示。** 把 `refusal` 里 `Work` 那条 `not (standing world addr) -> Just (Code "E_GATE_DENIED")` 删掉后，`halting` 报错并给出 `refused with Code "E_GATE_DENIED" where Just (Code "E_CONFIG_INVALID") was owed`；恢复后 6.08 s 转绿。它咬得动的是**守序**，而不只是「停摆时派活会失败」。
 
 ## 3 假设与歧义
 
 | 歧义 | 假设 | 何时失效 |
 |---|---|---|
 | 门的形状 | `sprawling call <frame> --at <addr> --quiet-ms <n>`：stdout 每行一枚 JSON 帧，stderr 一行计数，退出码 0／1／2 | 线格式换传输时门变成它的 schema，改 `Door.hs` 一处 |
-| 城是什么 | 一个本地目录，`init` 造它，`serve` 端起来，账本在 `.sprawling/ledger/` 下按段分文件 | 布局改变时 `Ground.hs` 的敌意动作判红，属预期 |
+| 城是什么 | 一个本地目录，`init` 造它，`serve` 端起来，账本在 `.sprawling/ledger/` 下按段分文件 | 布局改变时 `Ground.hs` 的敌意动作报错，属预期 |
 | 静默 | 门的第三种回答。**不是接受**——见 §10「静默不是接受」 | 若将来 `call` 改为「命令被受理才返回」，`Quiet` 这一支变成异常而不是取值 |
 | provider | 一个都不挂。于是每一次 `Dispatch` 在配置这道门上被拒，而模型知道这一点 | 挂上任何真 endpoint 后本目录会把 `E_CONFIG_INVALID` 报成失配，届时模型要学会第二种世界 |
 | 时钟 | 只用于超时，从不被预测 | —— |
-| 端口 | 从 47100 起向上探，第一个能答 `city_view` 的即用 | 机器上有别的东西占着整段时判红并说明 |
+| 端口 | 从 47100 起向上探，第一个能答 `city_view` 的即用 | 机器上有别的东西占着整段时报错并说明 |
 
 ## 4 现状分析
 
@@ -50,7 +50,7 @@ Rust 侧的验收测试全部是**具体轨迹**：`crates/sprawling/tests/assem
 2. **敌意的磁盘不是被 mock 的磁盘。** `memory::fault_fs` 是一个确定性掉电模型，它回答「我们设想的坏」；本目录直接翻掉账本里的一位，回答「随便一位坏了会怎样」。
 3. **任意前缀与任意后缀。** 只会均匀随机生成的东西是 fuzzer；把攻击命名出来再对它前后做全称量化，才是对手。
 
-### 第一个发现（首次探门，尚未由随机轨迹重现）
+### 第一个发现
 
 **`sprawling call` 在拒绝没赶上静默窗口时退出 0。** 实测：`AttachEndpoint` 指向一个连不上的 base URL，产品侧 15 s 探测超时，而客户端默认静默窗口 2 s。
 
@@ -72,7 +72,7 @@ the refusal above reached nobody: the peer that asked had closed its socket
 
 **诊断**：城是诚实的——它知道拒绝没送到，并且说了出来。缺陷在门：`main.rs` 的 rustdoc 写着 *"Exits 1 when the city refused something, so an agent driving this learns the outcome from the exit code rather than by parsing JSON"*，而实际语义是「**在静默窗口内没有拒绝到达**」。对一个拿退出码做分支的 agent，这两者的差别是把一次失败读成一次成功。
 
-**处置**：本目录的 `Door` 因此把静默解成 `Quiet` 而不是 `Accepted`（§8），并用 `exitCodeMeansWhatItSays` 这条性质把它钉住。是否修产品、怎么修（受理即答／退出码分第三档／窗口随动词而定）是 Rust 侧的一次裁定，不由本目录决定。
+**处置**：本目录的 `Door` 因此把静默解成 `Quiet` 而不是 `Accepted`（§8），并用 `exitCodeMeansWhatItSays` 这条性质把它钉住。
 
 **已修（「静默有自己的退出码」）。** Rust 侧选了三档中的第二条：`Spoken` 是一个三支穷尽枚举，
 `Quiet`（帧发出后窗口内一帧未回）退 **3**，而 0 与 1 的含义一个字不改。表写在 `docs/operating.md`
@@ -94,11 +94,11 @@ the refusal above reached nobody: the peer that asked had closed its socket
 
 于是：任何调用方派活到任意地址，都会在城根下造出目录树，而这次派活以失败告终、账本一字未记。这与 `ARCHITECTURE.md` §5 第 4 条（*every effect becomes an event first*）直接冲突——磁盘上有人看得见、而城的历史无法交代的文件。
 
-**边界已量过，不夸大**：保留子树是守住的。`Work ".sprawling/evil"` 得到 `E_INVALID_ARGS` 且一个字节都没落地，所以这不是写域逃逸，而是「判据晚于副作用」。
+**边界已量过，不夸大**：保留子树是守住的。`Work ".sprawling/evil"` 得到 `E_INVALID_ARGS` 且一个字节都没落地，所以这不是写域逃逸，而是「判定晚于副作用」。
 
 **处置**：修法归 Rust 侧——把能拒绝的判断全部提到第一次写之前。本目录不猜该怎么改，只把两条断言留在那里等它变绿：`nothingBehind`（磁盘）与 `listsOnlyRaised`（`city_view`），**因为一次红应当说出是哪个缺陷，而不是说出它碰了几个测试**。
 
-**已修（card V3.51「a dispatch the city will not take leaves no room behind」）。** 直接量过：向没立过的 `gamma` 派活，城答 `E_CONFIG_INVALID`，城根下仍然只有 `City.md`。两条断言随之转绿，改入 `a refusal costs nothing` 一组留着——它们此后守的是那次修复确立的**判据先于副作用**这个次序，而不是当时那一行代码。
+**已修。** 直接量过：向没立过的 `gamma` 派活，城答 `E_CONFIG_INVALID`，城根下仍然只有 `City.md`。两条断言随之转绿，改入 `a refusal costs nothing` 一组留着——它们此后守的是那次修复确立的**判定先于副作用**这个次序，而不是当时那一行代码。
 
 ### 第三个发现：一把每条命令都必须带、而没有人读的钥匙
 
@@ -114,7 +114,7 @@ replay               → 账本里两条 city_halted
 
 **诊断**：`IdemKey` 存在的理由是让**重试无害**——客户端发出命令、连接断了、再发一次，不应当因此做了两次。今天这条保证没有承兑人。`gate::dedup` 自身没有错，错在它没有被接到 `assembly` 的命令路径上。
 
-**处置**：归 Rust 侧裁定，两条路都成立——把 `gate::dedup` 接上去，或者停止在线格式上强制要求这个字段。一把必须带而无人读的钥匙，是门做出而不兑现的承诺。本目录只留 `keyUsedTwice` 一条断言等它变绿，方法是问账本的离线校验器「链走到哪了」，两次读数必须相等：**不预测任何 seq，只谈两次观察之间的关系**。
+**处置**：两条路都成立——把 `gate::dedup` 接上去，或者停止在线格式上强制要求这个字段。一把必须带而无人读的钥匙，是门做出而不兑现的承诺。本目录只留 `keyUsedTwice` 一条断言等它变绿，方法是问账本的离线校验器「链走到哪了」，两次读数必须相等：**不预测任何 seq，只谈两次观察之间的关系**。
 
 **已修（「重放的命令只做一次」）。** Rust 侧选了第一条：`bin::assembly::commanding::entrance`
 持有那个 `seen` 集合，`RunWorker::serve_one`——wire、控制台与 ACP 三条路唯一的汇合点——在任何副作用之前
@@ -132,7 +132,6 @@ replay               → 账本里两条 city_halted
 | 事实 | 来源 |
 |---|---|
 | `quickcheck-dynamic` 4.0.1，`StateModel` 与 `RunModel` 分属两个类型类，带 dynamic logic | 上游 README、Hackage |
-| GHC 与 cabal 的版本取自这台机器 | `ghc --version`、`cabal --version` 实测 |
 | `WIRE_V = 18`，24 个 Command、24 个 Query | `crates/channels/src/wire.rs`、`wire/query.rs`、`command/kind.rs` |
 | 35 个稳定错误码 | `crates/kernel/src/error.rs` 的 `AxCode::ALL` |
 | `IdemKey` 形如 `idem1-` 加 32 位小写十六进制 | 门的拒绝原文实测 |
@@ -244,7 +243,7 @@ render    :: Text -> Actions World -> Text
 
 **三条守序（guard order）被显式钉住**，因为它们是用户看得见的差别：停摆压过配置（`E_GATE_DENIED` 而不是 `E_CONFIG_INVALID`），地址良构压过占用，以及——**对派活而言**——停摆压过地址良构。一个把前两条调换了的实现会在城停摆时叫人去挂 provider——恢复建议指向一件与真实原因无关的事，而恢复建议正是 `AxError` 三段式承诺里的第三段。
 
-第三条是**量出来的，不是想出来的**，而且它纠正的是模型而不是产品。第一版 `refusal` 把 `Work` 的地址判据排在停摆之前，定向对抗随即拿出 `Stop City` 后 `Work ".sprawling/books"` 这条反例。四次直接测量说明产品是自洽的：
+第三条是**量出来的，不是想出来的**，而且它纠正的是模型而不是产品。第一版 `refusal` 把 `Work` 的地址判定排在停摆之前，定向对抗随即拿出 `Stop City` 后 `Work ".sprawling/books"` 这条反例。四次直接测量说明产品是自洽的：
 
 | 条件 | 码 |
 |---|---|
@@ -253,7 +252,7 @@ render    :: Text -> Actions World -> Text
 | 派活，已停摆，保留地址 | `E_GATE_DENIED` |
 | 立楼，已停摆，保留地址 | `E_INVALID_ARGS` |
 
-停摆是**派活**这件事最外层的那道门，而立楼不是派活，所以停摆盖不住它。两个次序都有道理，产品选了其中一个并且到处一致；模型断言一个它从未量过的次序，那是模型在发明规则。现在这个次序被钉住了，谁把它调换都会当场判红。
+停摆是**派活**这件事最外层的那道门，而立楼不是派活，所以停摆盖不住它。两个次序都有道理，产品选了其中一个并且到处一致；模型断言一个它从未量过的次序，那是模型在发明规则。现在这个次序被钉住了，谁把它调换都会当场报错。
 
 **定向对抗**（U4）：先用两个具体动作把世界推到「有一栋楼」，再 `anyActions_` 生成任意前缀，`action (Stop City)` 插入那一次停摆，`anyActions_` 生成任意后缀，最后以 `failingAction (Work …)` 收口——那一步必须失败，且必须以 `E_GATE_DENIED` 失败。后缀里可能出现 `Resume`，所以收口前先读模型状态，只在仍然停摆时才断言。这是本目录存在的核心理由。
 
@@ -292,7 +291,7 @@ render    :: Text -> Actions World -> Text
 
 | 硬编码 | 意图 | 后续影响 |
 |---|---|---|
-| 账本布局 `.sprawling/ledger/*.jsonl` | 敌意动作要按它找到文件 | 该布局改变时本目录判红，属预期 |
+| 账本布局 `.sprawling/ledger/*.jsonl` | 敌意动作要按它找到文件 | 该布局改变时本目录报错，属预期 |
 | 端口 47100–47115 | 避开常用段，又不需要 `network` 依赖；组串行跑，十六个是给外部占用留的余地 | 冲突时报环境问题 |
 | 静默窗口 250 ms | 模型驱动的每个动词都答在 1 ms 内（实测），250 ms 是三个数量级的余量；30 s 那版让每个动作各付满一个窗口，全套跑不完 | 模型开始走慢路径（挂 endpoint）时必须同步改 |
 | 三个地址 `acme` / `beta` / `gamma` | 固定的演员表，让反例可读 | 加人时同步改 `Regression.render` 的模板 |
@@ -303,7 +302,7 @@ render    :: Text -> Actions World -> Text
 
 对 Rust 侧的影响**必须**恰好为零：不改 `Cargo.toml` 的 members，不进 `cargo deny` 的依赖图，不参与 `xtask length` 的行数，不进 `xtask modmap` 的模块表。唯一的交汇点是 `crates/sprawling/tests/from_adversary.rs`——它由本目录渲染、由 `cargo test` 编译，两侧任何一方漂移都会让某一侧变红。
 
-**一处需要确认的**：`xtask release` 拒绝「引用了一台机器自己的文件的文件」，`xtask header` 要求每个 `.rs` 带 MPL 抬头。本目录不含 `.rs`，且只引用仓内相对路径与环境变量名，两道门都不适用。
+`xtask release` 拒绝「引用了一台机器自己的文件的文件」，`xtask header` 要求每个 `.rs` 带 MPL 抬头。本目录不含 `.rs`，且只引用仓内相对路径与环境变量名，两道门都不适用。
 
 ## 16 测试与约束
 
@@ -314,11 +313,11 @@ render    :: Text -> Actions World -> Text
 ## 17 文档同步
 
 1. 本文。
-2. `ARCHITECTURE.md` §11 的验证层表——本目录是 V9 之外的一层，记为 V10，并写明它不是门。已做。
-3. `AGENTS.md` 的命令表（`just adversary` 一行）。已做。
-4. `justfile` 的 `adversary` 配方。已做。
-5. `.gitignore` 的 `adversary/dist-newstyle/`。已做。
-6. `.github/workflows/adversary.yml`——定时任务，永远不进 `check`。已做。
+2. `ARCHITECTURE.md` §11 的验证层表——本目录是 V9 之外的一层，记为 V10，并写明它不是门。
+3. `AGENTS.md` 的命令表（`just adversary` 一行）。
+4. `justfile` 的 `adversary` 配方。
+5. `.gitignore` 的 `adversary/dist-newstyle/`。
+6. `.github/workflows/adversary.yml`——定时任务，永远不进 `check`。
 
 ---
 

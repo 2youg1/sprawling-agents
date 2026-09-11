@@ -116,7 +116,7 @@ The repository pins the toolchain and leaves the environment to you. `rust-toolc
 |---|---|---|
 | `just`, `cargo-nextest` | the daily command surface | always |
 | `cargo-deny` | dependency audit | optional locally, always in CI |
-| `wasm32-unknown-unknown` target | front-end build | when touching `web` |
+| `bun` | the client's build and checks | when touching `client/` |
 | `cargo-public-api` + nightly | recomputing the public-surface baselines | when changing a public surface |
 
 ## 8 Command surface

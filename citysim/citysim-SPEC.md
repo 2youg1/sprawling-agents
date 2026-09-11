@@ -1,28 +1,28 @@
 # citysim-SPEC.md
 
 > 工作区成员：`citysim`（dev-only，第二个 Main，不占产品拓扑）。本 SPEC 先于代码存在。
-> Stage 1 两件（内存 Ledger＋链检查器）＋Stage 2 三件（剧本模型／脚本工具／薄执行器，§8-2）＋Stage 3 真适配器换入（§8-3）。
+> 两件基底（内存 Ledger＋链检查器）、三件剧本设施（剧本模型／脚本工具／薄执行器，§8-2）与真适配器换入（§8-3）。
 
-## 1 需求拆解
+## 1 需求分解
 
-| 卡 | 件 | 一句话 |
-|---|---|---|
-| S1.11 | `mem_ledger` | kernel Ledger 的第二适配器：全内存、确定性、conformance 的对照实现 |
-| S1.11 | `checker` | 不变量检查器首条：链完整且 seq 连续 |
-| S2.03 | `script_model` | kernel Model 的第二适配器：脚本驱动的 ModelReturn 序列，确定性 |
-| S2.03 | `script_tools` | kernel Tool 的第二适配器：脚本工具＋按名分发闭包，全失败模式可注入 |
-| S2.03 | `executor` | 薄执行器：Dispatch→四相回合×N→run_frozen；取消注入点＝A9 先行 |
+| 件 | 一句话 |
+|---|---|
+| `mem_ledger` | kernel Ledger 的第二适配器：全内存、确定性、conformance 的对照实现 |
+| `checker` | 不变量检查器首条：链完整且 seq 连续 |
+| `script_model` | kernel Model 的第二适配器：脚本驱动的 ModelReturn 序列，确定性 |
+| `script_tools` | kernel Tool 的第二适配器：脚本工具＋按名分发闭包，全失败模式可注入 |
+| `executor` | 薄执行器：Dispatch→四相回合×N→run_frozen；取消注入点＝A9 先行 |
 
 ## 2 验收标准
 
-- `MemLedger` 过 kernel conformance 六断言（与 JsonlLedger 同一套——V3 兑现「缝」）。
+- `MemLedger` 过 kernel conformance 六断言（与 JsonlLedger 同一套——这就是「缝」的兑现）。
 - 同一 draft 序列灌 MemLedger 与 JsonlLedger，raw 行逐字节相同（规范字节住 kernel 的实证）。
 - checker 对合法序列静默通过；对篡改序列报出首个断点行。
 - 跨 OS 字节夹具：`fixtures/golden-s1/` 的脚本化序列重建后与夹具逐字节相同（CI 三平台恒跑同一断言）。
 
 ## 3 假设与歧义
 
-citysim 不受 ARCHITECTURE §6 模块表约束（表只辖 crates/**），但 MPL 头、lexicon、lints 全库同规。S2 起 `just sim` 的入口仍是本 crate 测试（固定剧本＝测试用例）；种子驱动的随机剧本批随 S4 故障面落地。Dispatch 的「先落 JOB.md 再产事件」在 sim 里以 `checkpoint_committed`（确定性假 oid＝B3Hash 派生前 20 字节 hex）代文件面——模拟适配器的职责即伪造外部世界，事件序与真城同形。
+citysim 不受 ARCHITECTURE §6 模块表约束（表只辖 crates/**），但 MPL 头、lexicon、lints 全库同规。`just sim` 的入口是本 crate 测试（固定剧本＝测试用例）；种子驱动的随机剧本批随故障面落地。Dispatch 的「先落 JOB.md 再产事件」在 sim 里以 `checkpoint_committed`（确定性假 oid＝B3Hash 派生前 20 字节 hex）代文件面——模拟适配器的职责即伪造外部世界，事件序与真城同形。
 
 ## 4 现状分析
 
@@ -43,7 +43,7 @@ mem_ledger ──▶ kernel（Ledger trait＋event＋conformance feature）
 checker    ──▶ runtime::replay（verify_lines 复用，不建第二验证权威）
 ```
 
-**不做什么**：不落盘；不采时钟（t 由剧本注入）；不实现除 Ledger 外的三件模拟适配器（剧本模型/脚本工具属 S2.03，FaultFs 已住 memory）。
+**不做什么**：不落盘；不采时钟（t 由剧本注入）；不实现除 Ledger 外的三件模拟适配器（剧本模型与脚本工具见 §8-2，FaultFs 已住 memory）。
 
 ## 8 接口先行
 
@@ -57,7 +57,7 @@ impl kernel::conformance::LedgerInspect for MemLedger { … }   // citysim 恒�
 pub fn check_chain(lines: Vec<Vec<u8>>) -> Result<(), AxError>;   // replay::verify_lines 薄封
 ```
 
-### 8-2 S2.03：剧本适配器与薄执行器
+### 8-2 剧本适配器与薄执行器
 
 ```rust
 pub struct ScriptModel { /* VecDeque<ModelReturn> */ }
@@ -84,24 +84,24 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError>;
 
 - 事件序（无取消正常收束）：`checkpoint_committed`（JOB.md 先落）→ `run_started` → 每回合 `prompt_assembled→model_called→model_returned[→tool_called→tool_result]*` → 空 calls 回合后 `handoff_written` → `run_frozen{completion:done, evidence:[末 model_returned]}`。
 - 取消在指定边界注入 `Interrupt::Cancel`：事件序断言＝cancel_received 后无新 model_called/tool_called，恒有 handoff_written 先于 run_frozen（A9 先行，逐边界三剧本）。
-- `budget_turns` 是执行器的回合上限（到限即 `run_frozen{completion:limit}`）：真预算梯接入随 gate 挂剧本（S2.04+）。
+- `budget_turns` 是执行器的回合上限（到限即 `run_frozen{completion:limit}`）：真预算梯随 gate 挂剧本接入。
 
-### 8-3 S3.14：真适配器换入（单 Resident 全链闭环）
+### 8-3 真适配器换入（单 Resident 全链走完一条回路）
 
-Stage 2 骨架的四个替换点逐一换真，剧本仍确定性（无时钟采样、无网络、无随机）：
+骨架的四个替换点逐一换真，剧本仍确定性（无时钟采样、无网络、无随机）：
 
-| 替换点 | S2 骨架 | S3 换入 |
+| 替换点 | 原骨架 | 换入 |
 |---|---|---|
 | Ledger | MemLedger | 仍 MemLedger（真 jsonl 对拍已在 conformance；换盘不增新证据） |
 | 工具面 | ScriptToolSet 闭包 | 真 ToolBench（edit＋status＋exec Program 臂）对 tempdir 城根；门路由在回合层 |
 | 模型 | ScriptModel 直造 ModelReturn | ScriptModel 登录 wire 形：剧本写 Anthropic wire JSON，经 gateway::dialect::response_from_wire 解成 canonical 再出 ModelReturn（翻译面进链路） |
 | 时钟／配置 | 逐步 +1ms | 同＋FrozenConfig 求值（clock_stamp 三层覆盖）接入 StampGate |
 
-**S3.14 落地记录**：`Scenario` 的 `write_domain` 字段撤销——门路由归 ToolBench（Handoff 裁定 10），域住 bench 内，executor 不再手写 domain 门。`ScriptToolSet` 未删：它仍是 `kernel::tool` 缝的第二适配器（S2.03 登记的 conformance 证据），改为**注册进真 ToolBench**，于是脚本工具与真 L0 工具走同一条门路由。波前围栏是**每波一次**而非只在 exec forecast 命中时：A14 的先行半链管的是波，`ToolBench` 内的 forecast 围栏是它在 exec 臂上的加强，两者不互相替代。空波仍提交（同树 oid），因为链可重建优于省一次提交。tool_result 的信封由 executor 挂（`pipeline::package`＋`StampGate`），与 S4 serve 同位。
+`Scenario` 的 `write_domain` 字段撤销——门路由归 ToolBench，域住 bench 内，executor 不再手写 domain 门。`ScriptToolSet` 未删：它仍是 `kernel::tool` 缝的第二适配器（已登记的 conformance 证据），改为**注册进真 ToolBench**，于是脚本工具与真 L0 工具走同一条门路由。波前围栏是**每波一次**而非只在 exec forecast 命中时：A14 的先行半链管的是波，`ToolBench` 内的 forecast 围栏是它在 exec 臂上的加强，两者不互相替代。空波仍提交（同树 oid），因为链可重建优于省一次提交。tool_result 的信封由 executor 挂（`pipeline::package`＋`StampGate`），与 serve 同位。
 
 事件序新增断言：edit 成功波携 checkpoint_committed（波前，断言形＝每个 tool_called 之前最近的 checkpoint_committed 晚于最近的 model_returned）；tool_result 信封可携 ClockStamp（非 Off 时）；越域写被 domain 门拒且 refusal 以 tool_result 回流；链恒可验；双跑字节对拍。“真 gateway 适配器换入”的取义：dialect 翻译面入链（纯函数，确定性保持）；endpoint 的 HTTP 面不入 sim（网络即非确定），其验证住 gateway 自身的回环假服务测试（gateway-SPEC §2）。
 
-### 8-4 一波里的两次调用不再被当成同一次（整修卡 R2.15）
+### 8-4 一波里的两次调用不再被当成同一次
 
 ```rust
 // citysim::executor——驱动块内
@@ -109,15 +109,15 @@ let placed = Cell::new(0u64);              // 位次：每跑一个计数器，�
 let key = IdemKey::derive(&run, Seq::new(at), &call.action()?);   // 动作字节：kernel::tool 唯一一份
 ```
 
-**病灶**：`IdemKey::derive(&run, Seq::new(t.value()), call.name.as_str().as_bytes())` ——位次处塞的是**钟读数**，动作字节里**只有工具名**。两处各自都不致命，合起来致命：`runtime::run` 每回合采一次 `t`，再把同一个 `t` 发给一波里的每次调用（那是驱动器故意的：一波是一个瞬间）。于是一波之内两次同名调用拿到**完全相同的 `IdemKey`**，`ToolBench::invoke` 的 dedup 当场判 `Duplicate`，第二次以 `E_INVALID_ARGS`／「this call was already made」回流给模型，且 `recovery` 为空串——一条无路可走的拒绝。参数不同不救（参数不进键），call id 不同也不救。跨回合不撞：本 crate 的 `tick` 每次 `now()` 加一。
+**缺陷所在**：`IdemKey::derive(&run, Seq::new(t.value()), call.name.as_str().as_bytes())` ——位次处塞的是**钟读数**，动作字节里**只有工具名**。两处各自都不致命，合起来致命：`runtime::run` 每回合采一次 `t`，再把同一个 `t` 发给一波里的每次调用（那是驱动器故意的：一波是一个瞬间）。于是一波之内两次同名调用拿到**完全相同的 `IdemKey`**，`ToolBench::invoke` 的 dedup 当场判 `Duplicate`，第二次以 `E_INVALID_ARGS`／「this call was already made」回流给模型，且 `recovery` 为空串——一条无路可走的拒绝。参数不同不救（参数不进键），call id 不同也不救。跨回合不撞：本 crate 的 `tick` 每次 `now()` 加一。
 
-**它是潜伏的，不是在燃的**：本卡之前全部场景皆绿，因为没有一条现有剧本在一波里发两次同名调用。它咬的是下一个写这种剧本的人，而那个人会去查自己的剧本——因为错误说的是「这次调用已经发生过」。
+**它是潜伏的，不是在燃的**：在此之前全部场景皆绿，因为没有一条现有剧本在一波里发两次同名调用。它咬的是下一个写这种剧本的人，而那个人会去查自己的剧本——因为错误说的是「这次调用已经发生过」。
 
 **为何是本 crate 的错而不是驱动器的**：一波共用一个 `t` 是 `runtime::run` 已记录的设计（一波是一个瞬间，而时间参数化是确定性第 2 条）。把一个“同一波内恒相等”的量当作位次，是本 crate 单方面的读法，并且逐字违反确定性第 7 条（「never from a clock」）——那个 `Seq` 是钟读数换了个类型。
 
-**现形**：动作字节改调 `ToolCall::action`（kernel-SPEC §8-23，本卡新增，全库唯一一份）；位次改用每跑一个的计数器，与 `bin::assembly` 同形。两个驱动器于是对「一次工具调用的键怎么算」只有一份读法。
+**现形**：动作字节改调 `ToolCall::action`（kernel-SPEC §8-23，全库唯一一份）；位次改用每跑一个的计数器，与 `bin::assembly` 同形。两个驱动器于是对「一次工具调用的键怎么算」只有一份读法。
 
-**红**：`two_reads_in_one_wave_are_two_calls`——一个回合携两次同名、参数不同的调用，断言两条 `tool_result` 都带结果、都不带 `error`。本卡之前第二条是 `this call was already made`。
+**红**：`two_reads_in_one_wave_are_two_calls`——一个回合携两次同名、参数不同的调用，断言两条 `tool_result` 都带结果、都不带 `error`。
 
 **不变的东西**：`IdemKey` 不进任何 payload，故账本字节不变，`golden-p0`（由 `run_scenario` 现跑重生）不需重生——这是带原型跑完全套验过的，不是读一个 payload 推的。
 
@@ -128,13 +128,13 @@ let key = IdemKey::derive(&run, Seq::new(at), &call.action()?);   // 动作字�
 
 ## 9–16 工作流程／实现／边界／错误／依赖／硬编码／影响面／测试
 
-- 流程：测试构造 drafts→MemLedger append→checker／conformance／对拍 JsonlLedger；S2 起另有 Scenario→run_scenario→check_chain＋事件序断言。
+- 流程：测试构造 drafts→MemLedger append→checker／conformance／对拍 JsonlLedger；另有 Scenario→run_scenario→check_chain＋事件序断言。
 - 实现：append＝from_draft→canonical_line→chain_hash 推进；无别的逻辑。
 - 边界：空 Ledger check 通过；单创世行通过。
 - 错误：透传 kernel/replay 的 AxError，不新增码。
 - 依赖：kernel（features=["conformance"]）、memory（对拍＋夹具）、runtime（复用 verify）；dev：tempfile。
 - 硬编码：无。
-- 影响面：S2.03 剧本执行器建于本 crate 之上；夹具脚本是 V8 起点。
+- 影响面：剧本执行器建于本 crate 之上；夹具脚本是后续验证工作的起点。
 - 测试：conformance 双实现、字节对拍、夹具对拍、篡改检出。
 
 ## 17 模型体验
@@ -143,4 +143,4 @@ let key = IdemKey::derive(&run, Seq::new(at), &call.action()?);   // 动作字�
 
 ## 18 文档同步
 
-S2.03 落剧本执行器时增章；夹具更新须与 memory/kernel 的字节规范同一变更集。
+落剧本执行器时增章；夹具更新须与 memory/kernel 的字节规范同一变更集。

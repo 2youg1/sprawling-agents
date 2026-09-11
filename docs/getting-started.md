@@ -28,7 +28,7 @@ The script fetches the newest release archive for your platform and unpacks it; 
 
 The binaries are not code-signed, so a first run trips a warning: Windows says "Windows protected your PC", where the way through is *More info*, then *Run anyway*; macOS refuses the first launch, so open the binary once from Finder's right-click menu.
 
-Do not `cargo install` this. The client is WebAssembly, built before the binary and embedded into it, and a plain cargo build produces a binary whose page is blank. To build it yourself, read [`CONTRIBUTING.md`](CONTRIBUTING.md) and use `just dist`.
+Do not `cargo install` this. The client is built by [bun](https://bun.sh) before the binary and embedded into it, and a plain cargo build produces a binary whose page is blank. To build it yourself, read [`CONTRIBUTING.md`](CONTRIBUTING.md) and use `just dist`.
 
 ## 2 Raise a city, and open it
 

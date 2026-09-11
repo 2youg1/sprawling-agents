@@ -20,8 +20,6 @@
 
 ## 为什么做它
 
-我不想24/7守在电脑面前，直到5h额度撞墙再去睡觉，你也不想。
-
 我换过很多Harness，有些理念落后，有些超出实际：就以RSI来说，在LLM本身脱离无状态之前，Harness能做的只是不断地针对最新的模型做适配和学习公司的现有业务流程并更高速地运行，前者的趋势是消融实验，后者则需要隐私。
 
 越来越多的小规模公司正在出现，它们是有着大量Agent开发在线服务的小型团队，其中99%就是Markdown集+几个天才。
@@ -38,7 +36,7 @@ Agent记忆的确是实现RSI很重要的途径，但不是依靠Harness做注�
 
 除了迁移必要的业务skill/MCP/ACP之外，推荐暂时保持精简，在使用中遇到问题时再手动追加内容，即使是相同的模型搭配不同的Harness都会有完全不同的行为。
 
-我用的电脑不好，所以我不会放任多Agent产生性能开销指数增长的问题，也适合部署在你的旧电脑或云电脑上。
+sprawling 面向配置一般的机器设计，所以我不会放任多Agent产生性能开销指数增长的问题，也适合部署在你的旧电脑或云电脑上。
 
 我不卖API也买不起装你信息的硬盘，因而数据都留在本地，我设计了专门的保密楼，配上本地模型完全可以用于处理隐私数据，但这也意味着我没法运行巨大规模的测试。
 
@@ -96,7 +94,7 @@ sprawling serve <city-dir> [addr]   # 起控制面；默认只听回环
 # 然后打开 http://127.0.0.1:8787
 ```
 
-> **不要用 `cargo install` 装它。**客户端是先编好再嵌进二进制的 WebAssembly；单跑 cargo build 跑不了那一步，装出来的二进制页面是空白的。要么拿 release 压缩包，要么用 `just dist` 自己构。
+> **不要用 `cargo install` 装它。**客户端由 [bun](https://bun.sh) 先编好再嵌进二进制；单跑 cargo build 跑不了那一步，装出来的二进制页面是空白的。要么拿 release 压缩包，要么用 `just dist` 自己构。
 
 页面上四步，大约十秒：
 
@@ -112,9 +110,9 @@ sprawling resume <city-dir>         # 重启之后：验链、关掉结果已丢
 sprawling fork <city> <run> <seq>   # 从某个 Run 的某一步分叉出一条谱系
 sprawling adopt <city> <dir>        # 把一个已有目录收编成楼，不覆盖任何文件
 sprawling replay <ledger-dir>       # 离线验链，只读
-sprawling export <city-dir> <file>  # 打包一座城；清单就是完整性判据
+sprawling export <city-dir> <file>  # 打包一座城；清单就是完整性依据
 sprawling restore <file> <city-dir> # 在另一台机器上解开
-sprawling status [--deps]           # 这台机器的情况；--deps 列出编进来的依赖
+sprawling status [--deps]           # 运行中的机器的情况；--deps 列出编进来的依赖
 sprawling help                      # 所有命令，一屏列完
 ```
 
@@ -145,7 +143,7 @@ sprawling help                      # 所有命令，一屏列完
 | OS 级 sandbox | 要逐平台实现，三个平台只验过一个。没验证过的隔离比没有隔离更坏，因为它会被当成防线。所以今天的说法是「一次删除可以被撤回」，不是「一次删除不会发生」 |
 | CI 里的浏览器端到端 | 回路是一条本地命令，不是一道门 |
 | 可复现构建 | 夹具写好了，让两次构建字节一致的编译开关还没设 |
-| 人手派的活在同一瞬间开跑 | 一栋楼朝着目标干活时，现在会把整个 ready set 一次全部拿走，同时最多四轮，各在自己的车道上（`sprawling-SPEC.md` §8-45）。人手派的一份活仍是一次一轮：命令循环答完一条才取下一条，给它开第三张嘴是那张卡剩下的部分。两种情形下账本都只有一个写者——并行驾驶，串行记账 |
+| 人手派的活在同一瞬间开跑 | 一栋楼朝着目标干活时，现在会把整个 ready set 一次全部拿走，同时最多四轮，各在自己的车道上（`sprawling-SPEC.md` §8-46）。人手派的一份活仍是一次一轮：命令循环答完一条才取下一条。两种情形下账本都只有一个写者——并行驾驶，串行记账 |
 | 把花费摊到 skill 上 | 这是决定不是欠账：一次 tool 调用不发生在某个 skill「之下」——skill 是 prefix 里的一行披露，不是调用上下文，按调用摊钱等于发明一个基准 |
 
 ## 你可以换掉哪些零件
@@ -154,7 +152,7 @@ sprawling help                      # 所有命令，一屏列完
 
 | 零件 | 住在哪 | 怎么换 |
 |---|---|---|
-| 订阅登录情报（跟随 openai/codex 与 earendil-works/pi） | `gateway::oauth_profiles`（只有数据零分支）、`gateway::credential`（流程与续期） | 加一行 profile。**凭证保管恒不外包**：明文只到这台机器的凭证服务 |
+| 订阅登录情报（跟随 openai/codex 与 earendil-works/pi） | `gateway::oauth_profiles`（只有数据零分支）、`gateway::credential`（流程与续期） | 加一行 profile。**凭证保管恒不外包**：明文只到运行中的机器的凭证服务 |
 | 模型 endpoint 与 dialect | `gateway::endpoint`、`gateway::dialect`；本地推理走 `gateway::native` | 设置页里填 base URL 与 dialect；本地模型直连，不过网关 |
 | SaaS 与外部工具（[Composio](https://composio.dev) 是其中一个 MCP server） | `protocol::mcp` 的 `Outbound` seam、`bin::mcp_stdio` 与 `bin::mcp_http`、楼的 `CONFIG.toml` | 改一个 URL 或一条命令就换了 server；保密楼一个都不起 |
 | sandbox | `runtime::sandbox` seam（今天的适配器是 wasmtime fuel） | 实现这道 seam，过它的 conformance 断言套件 |
@@ -184,7 +182,7 @@ sprawling help                      # 所有命令，一屏列完
 - 要用它干活：[`docs/getting-started.zh-CN.md`](docs/getting-started.zh-CN.md) → [`docs/operating.md`](docs/operating.md)。
 - 要改它：[`ARCHITECTURE.md`](ARCHITECTURE.md) → [`AGENTS.md`](AGENTS.md) → 相邻模块的代码与测试。
 
-另有 [`CHANGELOG.md`](CHANGELOG.md)（每一版改了什么，以及它声称的那些数字出自哪台机器）、[`docs/logging.md`](docs/logging.md)（日志为什么不是历史）、[`docs/third-party.md`](docs/third-party.md)（站在谁的肩上、许可义务）。[`docs/City.md`](docs/City.md) 与 [`docs/templates/`](docs/templates/) 是城写进楼里的那几份文档——Agent 读它们，你也可以读。
+另有 [`CHANGELOG.md`](CHANGELOG.md)（每一版改了什么）、[`docs/logging.md`](docs/logging.md)（日志为什么不是历史）、[`docs/third-party.md`](docs/third-party.md)（站在谁的肩上、许可义务）。[`docs/City.md`](docs/City.md) 与 [`docs/templates/`](docs/templates/) 是城写进楼里的那几份文档——Agent 读它们，你也可以读。
 
 ## 参与
 

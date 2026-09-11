@@ -669,7 +669,7 @@
   },
   "welcome_step_machine": {
     "en": "this machine",
-    "zh": "这台机器"
+    "zh": "运行中的机器"
   },
   "welcome_step_provider": {
     "en": "a provider",
@@ -721,7 +721,7 @@
   },
   "machine_items": {
     "en": "this machine",
-    "zh": "这台机器"
+    "zh": "运行中的机器"
   },
   "machine_verdicts": {
     "en": "what is missing",

@@ -1,6 +1,6 @@
 # 上手——从一条安装命令，到落在你自己分支上的一次合并
 
-> **给第一次安装它的人。** 这一份把一整个闭环走完，一步不跳：装二进制、建一座城、接一个 provider、把想法交给 Mayor、看着各栋楼干活、读改动，最后读落在你分支上的那次合并。
+> **给第一次安装它的人。** 这一份把一条回路完整走完，一步不跳：装二进制、建一座城、接一个 provider、把想法交给 Mayor、看着各栋楼干活、读改动，最后读落在你分支上的那次合并。
 >
 > 它不解释词汇（[`glossary.md`](glossary.md)），不讲日常操作（[`operating.md`](operating.md)），也不讲设计（[`../ARCHITECTURE.md`](../ARCHITECTURE.md)）。英文版是 [`getting-started.md`](getting-started.md)。
 

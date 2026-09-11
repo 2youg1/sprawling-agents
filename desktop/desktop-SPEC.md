@@ -3,7 +3,7 @@
 > package：`sprawling-desktop`（out-of-tree，**不是** workspace member）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
 > 骨架：apostle-sdd 十七节；按模块分章、每章自足（ARCHITECTURE.md §5）。
 
-## 1 需求拆解
+## 1 需求分解
 
 一件事：**给 agent 一双眼睛和一双手，落在这台 Windows 桌面上**，并且这双手从第一天起就受一份 allowlist 约束。
 
@@ -33,8 +33,8 @@
 
 ## 3 假设与歧义
 
-- **假设**：这台机器上的桌面是操作者自己的桌面。本 package 不做远程桌面、不做跨机器、不做无人值守的持续录制。
-- **歧义已定**：card 只给了 allowlist（window title patterns ＋ process names）与 `record`／`clipboard` 两位开关，**没有**给「允许整屏」的表达。故**整屏截取在本版恒被拒**（见 §8.5 第三对），而不是被默许——一张全屏图会显示 allowlist 没有列出的一切。
+- **假设**：运行中的机器上的桌面是操作者自己的桌面。本 package 不做远程桌面、不做跨机器、不做无人值守的持续录制。
+- **歧义已定**：scope 文件只能表达 allowlist（window title patterns ＋ process names）与 `record`／`clipboard` 两位开关，**没有**「允许整屏」这一项。故**整屏截取在本版恒被拒**（见 §8.5 第三对），而不是被默许——一张全屏图会显示 allowlist 没有列出的一切。
 
 ## 4 现状分析
 
@@ -178,7 +178,7 @@ impl Desk {
 | `windows::capture` | `PrintWindow`：一个窗口变成一片 BGRA 像素 | 4 适配器 | **是** |
 | `windows::encode` | 像素按 `scale` 缩、按 `format` 编码、按 base64 出门 | 1 判定 | 否 |
 | `windows::record` | start／stop：PATH 上有 ffmpeg 则 mp4，否则一个 PNG 序列目录 | 4 适配器 | 间接 |
-| `windows::clipboard` | 这台机器的剪贴板，作为文本 | 4 适配器 | **是** |
+| `windows::clipboard` | 运行中的机器的剪贴板，作为文本 | 4 适配器 | **是** |
 
 **这张表的分法就是 Humble Object**（ARCHITECTURE §9）：难测的那一端（`enumerate`／`tree`／`act`／`capture`／`clipboard`）薄到几乎没有判断，判断都搬进了 `target`／`views`／`encode`／`keys`／`geometry` 五个纯模块——它们一行 Win32 都不跑，因而可以被逐条证明。一台没有桌面的机器上，本 package 仍然能证明「哪个窗口被选中」「过期的动作被拒」「一张图缩成什么尺寸」这四件最容易错的事。
 
@@ -192,7 +192,7 @@ impl Desk {
 
 ### 8-10 `main` 与 `smoke`：进程的两端
 
-模块表的 `Spec` 列要求每个在册模块指向定义它的那一节，而这两个文件一直没有节。本节按它们已落地的形状补记，不追加要求。
+模块表的 `Spec` 列要求每个在册模块指向定义它的那一节。
 
 - **`desktop::main`（形状 4 适配器）**：这个服务器从哪里被启动——一个参数（`DESKTOP.toml` 的路径）、一个环境变量、一对管道。它不判定任何事：作用域归 `scope`，应答归 `session`。
 - **`desktop::smoke`（形状 4 适配器；`desktop/tests/smoke.rs`）**：唯一一处真的把二进制拉起来的测试（§16 已记其理由）——从管道灌一次 `initialize` 加一次 `tools/list`，断言六个名字。其余测试只证明库里的判断。
@@ -213,9 +213,9 @@ impl Desk {
 
 **第二对（快照的 ref 拿什么撑住）**：跨调用持有 `IUIAutomationElement` 这个 COM 指针（落选）vs 只留下快照当时的**屏幕矩形**（选中）。前者让 COM 对象的生存期缠上连接的生存期，而一次 `desktop.act` 需要的其实只有「点哪里」。选中方案让 COM 完整地关在 `tree` 一次调用之内，`act` 只面对整数坐标；generation 这一条也因此有了确切含义——**这一代的 ref 指的是那一刻它在屏幕上的位置**，窗口一动，重新快照，旧的一代作废。
 
-**第三对（`desktop.windows` 报的 ref 是什么）**：让它成为 `snapshot`／`act` 也接受的第二种指名方式（落选）vs 只作为这条连接内一个窗口的**稳定叫法**（选中）。scope 判定读的是 `title` 与 `process`（`Reach`），一个绕过它们的 ref 就是同一份许可的第二道门——而两道门里一定有一道最后没人看。工具表是定死的，`snapshot`／`act` 的 schema 里本来也没有窗口 ref 这一项；本节记下的是**为什么不去加它**。ref 里恒不含 `HWND` 的数值：句柄是这台机器的内部事实，模型没有一处用得上它。
+**第三对（`desktop.windows` 报的 ref 是什么）**：让它成为 `snapshot`／`act` 也接受的第二种指名方式（落选）vs 只作为这条连接内一个窗口的**稳定叫法**（选中）。scope 判定读的是 `title` 与 `process`（`Reach`），一个绕过它们的 ref 就是同一份许可的第二道门——而两道门里一定有一道最后没人看。工具表是定死的，`snapshot`／`act` 的 schema 里本来也没有窗口 ref 这一项；本节记下的是**为什么不去加它**。ref 里恒不含 `HWND` 的数值：句柄是运行中的机器的内部事实，模型没有一处用得上它。
 
-**第四对（没有 ffmpeg 时录什么）**：宣告录制不可用（落选）vs 自己抓一列 PNG 帧（选中）。card 明写了「有 ffmpeg 出 mp4，没有则出帧序列」，而帧序列要一个**在读循环之外**跑的东西——本 package 因此有且只有一个 `std::thread::spawn`，就在 `record::start`，由一个 `AtomicBool` 停下，`stop` 恒 join 它。这是本 package 唯一一处并发，写在这里是为了下一个读者不必去找第二处。声音（`audio: true`）恒被拒：选一个录音设备要知道这台机器上它叫什么，而这台 server 没有任何一处知道；假装录了而没录，比拒绝贵。
+**第四对（没有 ffmpeg 时录什么）**：宣告录制不可用（落选）vs 自己抓一列 PNG 帧（选中）。工具卡片明写了「有 ffmpeg 出 mp4，没有则出帧序列」，而帧序列要一个**在读循环之外**跑的东西——本 package 因此有且只有一个 `std::thread::spawn`，就在 `record::start`，由一个 `AtomicBool` 停下，`stop` 恒 join 它。这是本 package 唯一一处并发，写在这里是为了下一个读者不必去找第二处。声音（`audio: true`）恒被拒：选一个录音设备要知道运行中的机器上它叫什么，而这台 server 没有任何一处知道；假装录了而没录，比拒绝贵。
 
 **第五对（错误码的第二份拼写怎么收）**：§8.5 第一对接受了「同一拼写、两处定义」，而这里**收成一处可检查的引用**：`refusal.rs` 里每个 `E_` 码旁写明它引自 `kernel::error::code` 的哪一个，并在城里那一侧加一条测试，逐字比对两张表——测试住在 workspace 内（它可以 `use kernel`），比对的对象是本 package 的 `README.md` 与 SPEC 记下的那六个字符串。**结论是不能靠共享依赖消除这份重复**：让 `desktop` 依赖 `kernel`，就把它拉回墙内，而它坐在墙外的唯一理由是 Win32 要 `unsafe`；六个字符串常量换掉这个理由是本末倒置。能做到的是让漂移**可见**——两处定义，一处权威，一条测试在城里那侧盯着。
 
@@ -250,7 +250,7 @@ impl Desk {
 | `E_INVALID_ARGS` | `params` 形状读不出、`tools/call` 无 `name` | 部分能：schema 已给出，拒词指到那一处 |
 | `E_GATE_DENIED` | 越界、`record`／`clipboard` 未开、整屏截取、握手未完成 | **能**（对 scope 而言）：缺文件即 `Closed`，于是「默许」这件事不成立 |
 | `E_CONFIG_INVALID` | scope 文件语法坏 | 不能：文件是人写的。坏文件恒关成全拒，恒不退回默认允许 |
-| `E_TOOL_UNAVAILABLE` | 非 Windows 平台；Windows 但本 build 未实现 | 不能：这是这台机器与这个 build 的事实 |
+| `E_TOOL_UNAVAILABLE` | 非 Windows 平台；Windows 但本 build 未实现 | 不能：这是运行中的机器与这个 build 的事实 |
 
 拒词恒是三段（three-part refusal）：拒了什么（action）、为什么（subject）、还能做什么（recovery），装进 JSON-RPC error 的 `data` 里；`message` 是人读的一句摘要。
 
@@ -283,11 +283,11 @@ impl Desk {
 | 帧序列的抓帧间隔 | 100 ms（10 fps） | 我们的选择：`PrintWindow` 一帧的代价决定了上限，而 10 fps 足够看清一次交互 |
 | 录制落盘的去处 | `std::env::temp_dir()/sprawling-desktop/<窗口名安全化>-<序号>` | 我们的选择：scope 文件说的是「可以碰哪些窗口」，没说「可以往哪写文件」，故恒不写进城里，也恒不写进操作者的家目录 |
 | ffmpeg 的收尾 | 向其 stdin 写一个 `q`，再等它自己退出 | 外面的事实：这是 ffmpeg 写完 mp4 尾部索引的办法；直接杀掉会留下一个播放不了的文件 |
-| 全黑像素判为失败 | —— | 外面的事实：`PrintWindow` 对某些独立合成的窗口回全黑。判据是「每一个像素的 RGB 三通道皆为 0」 |
+| 全黑像素判为失败 | —— | 外面的事实：`PrintWindow` 对某些独立合成的窗口回全黑。依据是「每一个像素的 RGB 三通道皆为 0」 |
 
 ## 15 影响面
 
-新增 out-of-tree package，无既有调用方。波及两处：根 `Cargo.toml` 的 `[workspace]` 增一行 `exclude = ["desktop"]`（属 gate machinery，单独提交）；`ARCHITECTURE.md` §12 增一节十一行。城里接上它时只需一栋楼的 `CONFIG.toml` 写一条 `[[mcp]]` ＋ `command`，装配层**零改动**——这正是本 card 要验的那一条。
+新增 out-of-tree package，无既有调用方。波及两处：根 `Cargo.toml` 的 `[workspace]` 增一行 `exclude = ["desktop"]`（属 gate machinery，单独提交）；`ARCHITECTURE.md` §12 增一节十一行。城里接上它时只需一栋楼的 `CONFIG.toml` 写一条 `[[mcp]]` ＋ `command`，装配层**零改动**——这正是要验的那一条。
 
 ## 15.2 城里那一侧欠的东西
 
@@ -307,7 +307,7 @@ impl Desk {
 2. `bin::assembly` 上接这条帧的一格，写之前先上账本一行（每一次效果先成为事件）。
 3. 设置页上的那个框。
 
-**它们没有做，不是忘了，是本轮没做**：加一条命令帧会同时动 `channels::command`、`WIRE_V` 的 schema hash 与 `xtask wiring` 认的那张表，而前端此刻是冻结的。下一位接手的人从第 1 条起，第 3 条欠客户端一个整份文本的编辑框加一次保存——没有分段编辑，理由与 `city::governed` 同：写一半会让这台 server 被半行 allowlist 约束。
+**它们尚未做**：加一条命令帧会同时动 `channels::command`、`WIRE_V` 的 schema hash 与 `xtask wiring` 认的那张表，而前端此刻是冻结的。第 3 条欠客户端一个整份文本的编辑框加一次保存——没有分段编辑，理由与 `city::governed` 同：写一半会让这台 server 被半行 allowlist 约束。
 
 
 ## 16 测试与约束
@@ -335,4 +335,3 @@ impl Desk {
 
 `ARCHITECTURE.md` §12 新增 desktop 一节｜`desktop/README.md`（英文，讲清它为什么住在 workspace 外）｜同步本 SPEC §13 与 §8-7 的实现状态。
 
-同步：`ARCHITECTURE.md` §12 的 desktop 一节增十二行并改掉「carries out nothing」那段引言｜`desktop/README.md` 改掉「This build carries none of it out」一段｜本 SPEC 的 §2、§8-8、§8-9、§8.6、§13、§14、§15.2、§16.2。

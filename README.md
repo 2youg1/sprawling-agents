@@ -20,8 +20,6 @@ The binary the badges refer to is attached to the [latest release](../../release
 
 ## Why this exists
 
-I don’t want to sit in front of a computer 24/7 until the 5-hour quota wall hits and I finally go to sleep. Neither do you.
-
 I’ve tried a lot of harnesses. Some feel conceptually outdated; others overshoot what’s actually useful. Take RSI: until the LLM itself leaves the stateless regime, a harness can only keep adapting to the newest models and learning a company’s existing workflows so it can run them faster. The first trend looks like an ablation study; the second needs privacy.
 
 More and more small companies are appearing—tiny teams shipping online services with a large number of agents. Ninety-nine percent of them are a pile of Markdown plus a few talented people.
@@ -38,7 +36,7 @@ If you prefer a harness you already like, try RefRain. sprawling is aimed at per
 
 Apart from migrating the necessary business skills / MCP / ACP pieces, I recommend staying lean for now and only adding things manually when you hit a concrete problem. Even the same model behaves completely differently under different harnesses.
 
-My own machine is modest, so I refuse to let multi-agent workloads explode in performance cost. That also makes it suitable for old laptops or cheap cloud boxes.
+sprawling is designed for modest hardware, so I refuse to let multi-agent workloads explode in performance cost. That also makes it suitable for old laptops or cheap cloud boxes.
 
 I don’t sell APIs and I can’t afford a hard drive full of your data, so everything stays local. There is a dedicated confidential building; paired with a local model it is fully usable for private data. The trade-off is that I cannot run enormous-scale tests myself.
 
@@ -46,7 +44,7 @@ I don’t sell APIs and I can’t afford a hard drive full of your data, so ever
 
 ## What it is
 
-One binary, one browser page, and the page is embedded inside the binary at build time. **The client is replaceable**: `client/` is TypeScript — Solid and Effect, built by [bun](https://bun.sh), never npm and never node — and anything that speaks the WebSocket protocol in `crates/channels` is a client. It is written against the WebSocket protocol in `crates/channels`, both coexist until card 6.11 removes the wasm one, and anything else that speaks that protocol is a client too, in whatever language you and your agents write best. The gate that once forbade JavaScript in this tree was removed for exactly that reason — it was excluding architectures rather than defects.
+One binary, one browser page, and the page is embedded inside the binary at build time. **The client is replaceable**: `client/` is TypeScript — Solid and Effect, built by [bun](https://bun.sh), never npm and never node — and anything that speaks the WebSocket protocol in `crates/channels` is a client. It is written against the WebSocket protocol in `crates/channels`, and anything else that speaks that protocol is a client too, in whatever language you and your agents write best. The gate that once forbade JavaScript in this tree was removed for exactly that reason — it was excluding architectures rather than defects.
 
 The directory tree on disk *is* the space: a **City** is a directory tree, a project is a **Building**, an agent’s workspace is a **Room**.
 
@@ -98,7 +96,7 @@ sprawling serve <city-dir> [addr]   # start the control plane; defaults to loopb
 # then open http://127.0.0.1:8787
 ```
 
-> **Don’t `cargo install` this.** The client is WebAssembly, built before the binary and embedded into it. A plain cargo build cannot run that step, and yields a binary whose page is blank. Take a release archive, or build it with `just dist`.
+> **Don’t `cargo install` this.** The client is built by [bun](https://bun.sh) before the binary and embedded into it. A plain cargo build cannot run that step, and yields a binary whose page is blank. Take a release archive, or build it with `just dist`.
 
 Four steps on the page, roughly ten seconds:
 
@@ -184,7 +182,7 @@ The rest of the vocabulary is in [`docs/glossary.md`](docs/glossary.md).
 | OS-level sandbox | Requires per-platform work; only one-third can be verified on this machine. Unverified isolation is worse than none, because people will treat it as a defense. Today’s claim is therefore “a deletion can be undone,” not “a deletion cannot happen.” |
 | Browser end-to-end in CI | The loop is a local command, not a gate. **This release's client has been driven in a real browser exactly once** — the sessions behind the claims above went through the wire, which is a debugging door rather than the product. |
 | Reproducible builds | Fixtures are ready; the compiler flags that would make two builds byte-identical are not yet set. |
-| Work a person dispatches by hand, driven at the same instant | A building working towards a goal now drives its whole ready set at once, four runs at a time, each in a lane of its own (`sprawling-SPEC.md` §8-46). A job a person sends is still run one at a time: the command loop answers one command before it takes the next, and giving it a third mouth is the rest of that card. Either way one thread owns the Ledger, so runs are driven in parallel and accounted for in series. |
+| Work a person dispatches by hand, driven at the same instant | A building working towards a goal now drives its whole ready set at once, four runs at a time, each in a lane of its own (`sprawling-SPEC.md` §8-46). A job a person sends is still run one at a time: the command loop answers one command before it takes the next. Either way one thread owns the Ledger, so runs are driven in parallel and accounted for in series. |
 | Attributing spend to skills | This is a decision, not a debt: a tool call does not happen “under” a skill—a skill is a disclosure line in the prefix, not call context. Charging by skill would invent a metric. |
 
 ## What you can swap
