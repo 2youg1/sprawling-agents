@@ -624,7 +624,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | collab::workshop_tool::tests | crates/collab/src/workshop_tool/tests.rs | what the workshop tool refuses: a cycle, a second graph, a verdict from nobody who read | adapter | P1 | built | collab-SPEC.md#8-16 |
 | collab::triage | crates/collab/src/triage.rs | where something from outside lands, and whether it starts work | decision | P3 | built | collab-SPEC.md#8-11 |
 
-### city (27) — space, identity, and the documents a building keeps
+### city (28) — space, identity, and the documents a building keeps
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -632,6 +632,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | city::building::tests | crates/city/src/building/tests.rs | creation, adoption and refusal, read back through the city's own parser | decision | P2 | built | city-SPEC.md#8-3 |
 | city::resident | crates/city/src/resident.rs | standing identity: an address plus the file that says who lives there | value | P1 | built | city-SPEC.md#8-4 |
 | city::spine_files | crates/city/src/spine_files.rs | the documents a building keeps its long work in, and the job file a run reads | adapter | P2 | built | city-SPEC.md#8-5 |
+| city::spine_files::blank | crates/city/src/spine_files/blank.rs | whether a spine document is still the form it was laid out as, and which of a plan's rows are still placeholders | decision | V4 | built | city-SPEC.md#8-5 |
 | city::spine_files::hall | crates/city/src/spine_files/hall.rs | the two identity files City Hall's residents are read from, in the city's own reserved subtree | adapter | V4 | built | city-SPEC.md#8-5 |
 | city::governed | crates/city/src/governed.rs | the three documents that govern a city, where each one lives, and the one point they are written through | adapter | V4 | built | city-SPEC.md#8-24 |
 | city::spine_files::tests | crates/city/src/spine_files/tests.rs | the laid-out documents, the job file, and the two briefs a session can carry | adapter | P2 | built | city-SPEC.md#8-5 |
@@ -814,7 +815,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | web::waiting | crates/web/src/waiting.rs | everything that cannot move until a person answers, in one place | decision | V3 | built | web-SPEC.md#8-64 |
 | web::record | crates/web/src/record.rs | one history, in three lenses, at one address | decision | V3 | built | web-SPEC.md#8-67 |
 
-### browser (12), protocol (5), bin (136)
+### browser (12), protocol (5), bin (137)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -877,6 +878,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::workbench::tests | crates/sprawling/src/assembly/workbench/tests.rs | rules that do not parse, neighbours, signals, and the engine arms | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::freezing | crates/sprawling/src/assembly/freezing.rs | what a run is frozen with: its plan, and the handoff that resumes it | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::freezing::tests | crates/sprawling/src/assembly/freezing/tests.rs | the freezing tests route | adapter | V3 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::freezing::tests::prefix | crates/sprawling/src/assembly/freezing/tests/prefix.rs | what the frozen prefix carries as bytes: the building's rules, the project's own conventions, the task | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::freezing::tests::dispatches | crates/sprawling/src/assembly/freezing/tests/dispatches.rs | what one dispatch freezes and leaves: the handoff, the job bytes, the prompt, the lineage | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::freezing::tests::ceilings | crates/sprawling/src/assembly/freezing/tests/ceilings.rs | the ceiling and the effort a run is frozen under | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::driving | crates/sprawling/src/assembly/driving.rs | what one drive is handed, what it leaves, and the handles it takes from the worker | adapter | V3 | built | sprawling-SPEC.md#8-43 |

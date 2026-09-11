@@ -30,6 +30,9 @@ use crate::policy::building_path;
 
 pub(crate) mod hall;
 
+mod blank;
+use blank::{empty_roadmap, is_blank_form};
+
 pub use hall::{CLERK_FILE, MAYOR_FILE, hall_identity_path, lay_out_hall_identities};
 
 /// The plan: the single denominator for progress in a building.
@@ -50,6 +53,11 @@ pub const JOB_FILE: &str = "JOB.md";
 pub const SPEC_FILE: &str = "SPEC.md";
 /// The city's own instructions, read into every prefix.
 pub const CITY_FILE: &str = "City.md";
+/// The conventions a project brings with it. **The city neither writes
+/// this file nor owns it**; it is listed here because a resident is
+/// given it rather than sent to fetch it. How it is matched and where
+/// it lands in the prompt is `bin::assembly::freezing::building_segment`.
+pub const AGENTS_FILE: &str = "AGENTS.md";
 
 const ROADMAP_TEMPLATE: &str = include_str!("../../../docs/templates/Roadmap.md");
 const MEMO_TEMPLATE: &str = include_str!("../../../docs/templates/Memo.md");
@@ -192,25 +200,6 @@ pub fn handoff(city_root: &Path, room: &Address) -> Result<Option<String>, AxErr
     Ok(Some(text))
 }
 
-/// Whether a handoff is still the form it was laid out as.
-///
-/// The test is the form's own parenthetical guidance: every section of
-/// the template carries one, and a session that wrote the file replaced
-/// them with what it found.
-fn is_blank_form(text: &str) -> bool {
-    let filled = text
-        .lines()
-        .filter(|line| {
-            let trimmed = line.trim();
-            !trimmed.is_empty()
-                && !trimmed.starts_with('#')
-                && !trimmed.starts_with('>')
-                && !(trimmed.starts_with('(') && trimmed.ends_with(')'))
-        })
-        .count();
-    filled == 0
-}
-
 /// Lays out the spine documents a building starts with.
 ///
 /// # Errors
@@ -331,38 +320,6 @@ pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError> 
         out.push(rules);
     }
     Ok(out)
-}
-
-/// The template's example rows are for a person reading the template. A
-/// building that starts with them starts with tasks nobody asked for,
-/// and they would count in the denominator.
-fn empty_roadmap(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for line in text.lines() {
-        if !is_placeholder_row(line) {
-            out.push_str(line);
-            out.push('\n');
-        }
-    }
-    out
-}
-
-fn is_placeholder_row(line: &str) -> bool {
-    let trimmed = line.trim();
-    if !trimmed.starts_with('|') {
-        return false;
-    }
-    let cells: Vec<&str> = trimmed
-        .trim_matches('|')
-        .split('|')
-        .map(str::trim)
-        .collect();
-    match (cells.len(), cells.first(), cells.get(1)) {
-        (kernel::ROADMAP_COLUMNS, Some(index), Some(item)) => {
-            kernel::NodeId::parse(index).is_ok() && item.is_empty()
-        }
-        _ => false,
-    }
 }
 
 fn write_new(path: &Path, text: &str) -> Result<(), AxError> {

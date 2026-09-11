@@ -207,6 +207,18 @@ pub fn building_path(city_root: &Path, addr: &Address) -> PathBuf {
         .join(BUILDING_FILE)
 }
 
+/// Where a project keeps the conventions it came with.
+///
+/// The building's own root rather than its reserved subtree, and that
+/// placement is the point: the file belongs to the project, a person
+/// edits it, and the tools a resident already has can reach it. The
+/// reserved subtree is where the *city* keeps what it owns, and this is
+/// not that.
+#[must_use]
+pub fn agents_path(city_root: &Path, addr: &Address) -> PathBuf {
+    scope_path(city_root, addr).join(crate::spine_files::AGENTS_FILE)
+}
+
 /// The allowlist the desktop connector is started under, window by
 /// window. Its syntax belongs to the server that reads it
 /// (`desktop/src/scope.rs`); this side only decides where it lives.

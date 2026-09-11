@@ -82,6 +82,7 @@ pub city::Standing::Work::adoptable: alloc::vec::Vec<kernel::address::Address>
 pub city::Standing::Work::loose: usize
 pub city::Vocation::Builds
 pub city::Vocation::Plans
+pub const city::AGENTS_FILE: &str
 pub const city::ARCHIVE_DIR: &str
 pub const city::BUILDING_FILE: &str
 pub const city::BUILDING_SHELF: &str
@@ -193,6 +194,7 @@ pub fn city::Watch::load(&std::path::Path) -> core::result::Result<city::Watch, 
 pub fn city::Watch::parse(&str) -> core::result::Result<city::Watch, kernel::error::shape::AxError>
 pub fn city::Watch::sources(&self) -> &[city::Source]
 pub fn city::adopt_building(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::Building, kernel::error::shape::AxError>
+pub fn city::agents_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::archive_entry(&std::path::Path, &kernel::address::Address, city::ArchiveKind, kernel::event::identity::TimeMs, &str) -> core::result::Result<city::ArchiveEntry, kernel::error::shape::AxError>
 pub fn city::archive_index(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<city::ArchiveEntry>, kernel::error::shape::AxError>
 pub fn city::building_adopted_payload(&city::Building) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>

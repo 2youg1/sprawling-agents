@@ -295,6 +295,13 @@ pub(crate) fn snake(camel: &str) -> String;
 ```rust
 // bin::assembly（形状 4 适配器；四个段的填充点）
 fn building_segment(city_root: &Path, addr: &Address, building: &Address) -> Vec<u8>;
+// Building 段 = 地址 + `BUILDING.md` + （若在）`<building>/AGENTS.md`。后者是**被收编的
+// 项目自带的约定**，按同一句理由直接给而不让居民去取：要先 fetch 才能遵守的规则，
+// 要么晚一回合遵守，要么不遵守。**严格按名匹配**且只看楼自己的根：不向上找父目录、
+// 不认其它拼法、不做搜索——一个读者无法从规则推出来的地址，没人核得了。它排在
+// `BUILDING.md` **之后**并自述位次：二者会冲突（一份叫你跑测试的 AGENTS.md 遇上一栋
+// 没有 `exec` 的楼），而城执行的是楼规。文件不在就不写标题：空标题会让居民去
+// 遵守一份不存在的约定。
 fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> Vec<u8>;
 ```
 

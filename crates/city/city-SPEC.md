@@ -181,6 +181,7 @@ pub const JOB_FILE: &str = "JOB.md";
 pub const CITY_FILE: &str = "City.md";
 pub(crate) const MEMO_FILE: &str = "Memo.md";      // 尚无外部读者
 pub const HANDOFF_FILE: &str = "Handoff.md";                      // R2.05：红测要点名它
+pub const AGENTS_FILE: &str = "AGENTS.md";                        // 项目自带的约定；城不写也不拥有
 
 pub struct JobBrief<'a> { pub task: &'a str, pub goal: &'a str, pub budget: &'a str }
 pub enum RunBrief { Job { text: String }, Principal }          // P6.03：穷尽两臂
@@ -437,6 +438,7 @@ pub struct Holding { …, pub hash: B3Hash }   // 整份文档的 BLAKE3，扫�
 
 ```rust
 pub fn building_path(city_root, addr) -> PathBuf;   // <building>/.sprawling/BUILDING.md
+pub fn agents_path(city_root, addr) -> PathBuf;     // <building>/AGENTS.md（项目的，故在保留区之外）
 pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 // 三层统一为 <scope>/.sprawling/CONFIG.toml；city 层因此不再是特例
 ```

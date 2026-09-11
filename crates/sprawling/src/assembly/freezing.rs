@@ -27,12 +27,43 @@ pub(super) const NEWLINE: u8 = 10;
 /// it, no run may write it, and it does not move for the length of a
 /// session. A rule an agent has to fetch before it can obey it is a rule
 /// that gets obeyed one turn late, or not at all.
+///
+/// **`AGENTS.md` is here for that same sentence.** A building that was
+/// adopted rather than raised arrives with conventions its authors wrote
+/// for whoever works on that project, and a resident sent to fetch them
+/// reads them after its first edit or never. Matched by exact name in
+/// the building's own root: no parent's copy, no other spelling, nothing
+/// resolved by search — an address a reader cannot predict from the rule
+/// is an address nobody can check.
+///
+/// It follows the rules rather than leading them, and says so, because
+/// the two can disagree: `BUILDING.md` is what this city enforces, while
+/// the project's file was written for whatever harness its authors had.
+/// A resident told to run a test suite by a building with no `exec` has
+/// to know which of the two to believe.
 pub(super) fn building_segment(city_root: &Path, addr: &Address, building: &Address) -> Vec<u8> {
     let mut out = addr.as_str().as_bytes().to_vec();
     if let Ok(rules) = std::fs::read(city::building_path(city_root, building)) {
         out.push(NEWLINE);
         out.push(NEWLINE);
         out.extend_from_slice(&rules);
+    }
+    // Written only when the file is: a heading over nothing would tell a
+    // resident to follow conventions that do not exist.
+    if let Ok(conventions) = std::fs::read(city::agents_path(city_root, building)) {
+        out.push(NEWLINE);
+        out.push(NEWLINE);
+        out.extend_from_slice(
+            format!(
+                "## {}/{}\n\nHow work is done in this project, from the project itself. Where \
+                 this and the building's rules above disagree, the rules decide: they are what \
+                 the city enforces.\n\n",
+                building.as_str(),
+                city::AGENTS_FILE,
+            )
+            .as_bytes(),
+        );
+        out.extend_from_slice(&conventions);
     }
     out
 }
