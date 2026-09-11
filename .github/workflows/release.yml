@@ -231,14 +231,19 @@ jobs:
   # archives apart and writes one package per platform plus a root that
   # depends on them optionally, so npm and bun fetch exactly one binary.
   #
-  # **It builds on every release and publishes only when it can.** The
-  # token is a repository secret this project does not have yet, and a
-  # release must not go red because a channel nobody has enabled is not
-  # enabled. So the packing runs always - a release that quietly stopped
-  # being packageable is worth knowing about on the day it happens - and
-  # the publish step is skipped with its reason printed when `NPM_TOKEN`
-  # is absent. Add the secret and the next tag publishes; nothing else
-  # here changes.
+  # **No token lives here.** The registry is told once per package that
+  # this repository's `release.yml` may publish it, and the job then asks
+  # GitHub for a short-lived OIDC token that npm exchanges at publish
+  # time. A long-lived token would have to be rotated on npm's schedule
+  # rather than on this project's - a write-enabled granular token
+  # expires within ninety days at the outside - so the release that
+  # breaks would always be the one nobody was watching.
+  #
+  # **What this cannot do is create a package.** npm requires a package
+  # to exist before a trusted publisher can be configured for it, so the
+  # first version under each name is published by a person and every
+  # version after it by this job. A name that reaches a release without
+  # that first publish stops here rather than inventing a way through.
   #
   # After publish, never during: it takes the archives from the release
   # this run just made, so a failure here leaves the download channel
@@ -247,8 +252,13 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    # A job that declares permissions declares all of them, so the
+    # workflow's own `contents: read` is restated rather than inherited.
+    # `id-token: write` is what lets this job mint the OIDC token, and
+    # npm answers ENEEDAUTH without it.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
@@ -261,6 +271,10 @@ jobs:
         with:
           node-version: "22"
           registry-url: https://registry.npmjs.org
+      # Node 22 ships npm 10, which cannot exchange an OIDC token at all:
+      # trusted publishing arrived in npm 11.5.1.
+      - name: npm new enough to exchange an OIDC token
+        run: npm install -g npm@latest
       - name: assemble the packages from this tag's archives
         run: |
           cargo xtask channel --tag "${GITHUB_REF_NAME}" \
@@ -271,33 +285,25 @@ jobs:
       # `bunx sprawling`.
       - name: the shim parses and refuses honestly
         run: node --check target/npm/sprawling/bin/sprawling.js
-      - name: publish, or say why not
+      - name: publish
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${NPM_TOKEN}" ]; then
-            echo "::notice::NPM_TOKEN is not set, so nothing was published."
-            echo "The packages below were assembled and discarded. Add the"
-            echo "secret and the next tag publishes them."
-            find target/npm -name package.json -print
-            exit 0
-          fi
           # Platform packages first: the root package names them as
           # optional dependencies at an exact version, and a root that
           # reaches npm before they do is a root nobody can install.
           #
-          # No `--tag pre`. install.sh carries the same lesson about the
-          # download channel: every release of this project is a
-          # pre-release, and asking for "the latest stable one" finds
-          # nothing at all. A package whose only versions sit under a
-          # `pre` tag has no `latest`, and `bunx sprawling` then fails to
-          # resolve rather than installing a pre-alpha. The version
-          # string says `0.0.4-pre.260911` and the release notes say not
-          # to use it; the dist-tag is not where that warning belongs.
+          # `--tag latest`, and npm leaves no third choice: it refuses a
+          # prerelease version carrying no dist-tag. Every release of
+          # this project is a pre-release, so `--tag pre` would leave
+          # these packages with no `latest` at all, and `bunx sprawling`
+          # would fail to resolve rather than install a pre-alpha -
+          # install.sh carries the same lesson about the download
+          # channel. The version string says `0.0.4-pre.260911` and the
+          # release notes say not to use it; the dist-tag is not where
+          # that warning belongs.
           for dir in target/npm/*/; do
             [ "$(basename "$dir")" = sprawling ] && continue
-            npm publish "$dir" --access public
+            npm publish "$dir" --access public --tag latest
           done
-          npm publish target/npm/sprawling --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish target/npm/sprawling --access public --tag latest
