@@ -38,14 +38,23 @@ function grouped(items: readonly ApprovalItem[]): Group[] {
 
 export function Waiting() {
   const ui = useUi();
+  const answer = ui.conn.asking.ask("approval_queue");
+  const items = createMemo<readonly ApprovalItem[]>(() => {
+    const held = answer();
+    return held !== undefined && "approvals" in held ? held.approvals.items : [];
+  });
+  return <WaitingCards items={items()} />;
+}
+
+// The cards themselves. Separate from the ask so the gallery can show
+// what a person waiting on a run sees without a run being blocked
+// (docs/frontend-method.md).
+export function WaitingCards(props: { readonly items: readonly ApprovalItem[] }) {
+  const ui = useUi();
   const say = useSay();
   const lang = useLang();
   const command = useCommand();
-  const answer = ui.conn.asking.ask("approval_queue");
-  const groups = createMemo(() => {
-    const held = answer();
-    return held !== undefined && "approvals" in held ? grouped(held.approvals.items) : [];
-  });
+  const groups = createMemo(() => grouped(props.items));
 
   return (
     <For each={groups()}>

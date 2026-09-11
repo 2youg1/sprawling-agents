@@ -13,10 +13,45 @@
 import { For, type JSX } from "solid-js";
 
 import { sendingInto, type Doing, type Sending } from "../core/belief";
-import type { DoctorAnswer } from "../wire";
+import type { ApprovalClass, ApprovalItem, DoctorAnswer } from "../wire";
+import { ApprovalId, Locator, TimeMs } from "../wire";
 import { useSay } from "../ui";
 import { MachineReport } from "./machine";
 import { Composer } from "./talk/composer";
+import { WaitingCards } from "./talk/waiting";
+
+// Three things a person can be asked, in the three shapes the cards
+// take: one on its own, several identical ones answered together, and
+// one raised by a run that began with somebody else's words - which is
+// never grouped with anything.
+const waiting = (
+  id: string,
+  actor: string,
+  what: string,
+  key: readonly [ApprovalClass, string],
+  at: number,
+  tainted: boolean,
+): ApprovalItem => ({
+  id: ApprovalId.make(id),
+  actor,
+  action_desc: what,
+  artifact: Locator.make("cas:b3-0000000000000000000000000000000000000000000000000000000000000000"),
+  cluster_key: { class: key[0], detail: key[1] },
+  created: TimeMs.make(at),
+  source: "gate",
+  tainted,
+});
+
+// Three things a person can be asked, in the three shapes the cards
+// take: one on its own, several identical ones answered together, and
+// one raised by a run that began with somebody else's words - which is
+// never grouped with anything.
+const WAITING: readonly ApprovalItem[] = [
+  waiting("ai_1", "lab/east", "exec: rm -rf target", ["undoable", "rm"], 1, false),
+  waiting("ai_2", "lab/west", "edit: the building's own rules", ["governance", "rules"], 2, false),
+  waiting("ai_3", "lab/west", "edit: the building's own rules", ["governance", "rules"], 3, false),
+  waiting("ai_4", "hall/mayor", "browser: open a page somebody linked", ["agent_question", "open"], 4, true),
+];
 
 // One machine, with an item in each of the three states a person acts
 // differently on: here, missing and required, missing and optional.
@@ -119,6 +154,10 @@ export function Gallery() {
 
       <Case label="machine">
         <MachineReport answer={MACHINE} />
+      </Case>
+
+      <Case label="waiting">
+        <WaitingCards items={WAITING} />
       </Case>
     </div>
   );
