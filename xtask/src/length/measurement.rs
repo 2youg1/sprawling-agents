@@ -97,12 +97,9 @@ fn found(signature: &syn::Signature, body: proc_macro2::Span) -> Found {
     }
 }
 
-/// Whether this item is one of the two the gate does not measure.
+/// Whether this item is the one kind the gate does not measure.
 fn skipped(attrs: &[syn::Attribute]) -> bool {
     attrs.iter().any(|attr| {
-        if attr.path().is_ident("component") {
-            return true;
-        }
         if !attr.path().is_ident("cfg") {
             return false;
         }

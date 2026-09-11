@@ -68,10 +68,6 @@ const EXPOSE_WHITELIST: [&str; 5] = [
 /// an exact match, is reviewed, and lands with a `Verdict:` trailer,
 /// since this path is inside the guard's protected face.
 ///
-/// - `CanvasRenderingContext2d` — `web_sys`'s 2D canvas type, named in
-///   `crates/web/Cargo.toml` as a feature and in `web::city_view` as the
-///   type the isometric city is painted through. Twenty-four bytes with
-///   a digit in it, which is what trips the mixed-alphabet rule.
 /// - `CC_x86_64_unknown_linux_musl` — Cargo's per-target C compiler
 ///   variable, set to `musl-gcc` by the `release.yml` musl job and
 ///   quoted in `sprawling-SPEC.md` where that job is argued. It is the
@@ -88,8 +84,7 @@ const EXPOSE_WHITELIST: [&str; 5] = [
 ///   `Win32` beside the underscores are what trip the mixed-alphabet
 ///   rule. Only the six names of twenty bytes or more are listed, since
 ///   a shorter one never reaches the entropy detector.
-const NOT_CREDENTIALS: [&str; 8] = [
-    "CanvasRenderingContext2d",
+const NOT_CREDENTIALS: [&str; 7] = [
     "CC_x86_64_unknown_linux_musl",
     "Win32_System_DataExchange",
     "Win32_System_Threading",

@@ -87,7 +87,7 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 
 **secret 门细则**（S2.12）：扫描面＝仓内全部文件（含 fixtures／语料），排除隔离区 local/、.git、target；判定器＝`kernel::secret::scan`（xtask 依赖 kernel，工作区成员不占产品拓扑，合法）；命中只报文件＋偏移＋长度，恒不回显字节；无内联豁免（豁免口会被注入内容利用）。兼查：`crates/*/src/**` 内 `.expose(` 调用点白名单＝kernel/src/secret.rs（定义处）、gateway/src/endpoint.rs、gateway/src/native.rs；命中即红。自测纪律：扫描器自身测试的高熵样本在源码中必须拆段拼接，不留可扫描的完整字面量。
 
-**已复核字面量表（P3.05 增）**：判定器恒不改——它的活是在入口捕获一切像钥匙的东西，那里误报不要钱；**本门问的是另一个问题**「这里是不是提交了一份凭证」，那里误报要一次构建。故门内持一张 `NOT_CREDENTIALS` 精确字面量表，逐条写明它是谁、为什么不可能是凭证。三条纪律：①**整串精确匹配**——带前缀或后缀的更长 token 仍是命中，故没人能靠戴一个已复核的名字混过去（一条断言钉这件事）；②**表住门里而不是站点上**——注释式豁免是注入内容能写的洞，这张表不是；③表在 guard 保护面内，增一条即须 `Verdict:` 尾注。首条：`CanvasRenderingContext2d`（`web_sys` 的 2D 画布类型，24 字节且含数字，故触发混合字母表规则；`crates/web/Cargo.toml` 的 feature 与 `web::city_view` 的绘制侧各出现一次）。其后：`CC_x86_64_unknown_linux_musl`（Cargo 的分目标 C 编译器变量名，`release.yml` 的 musl job 设它）；以及 `windows` crate 的六个 feature 名 `Win32_System_DataExchange`／`Win32_System_Threading`／`Win32_System_Variant`／`Win32_UI_Accessibility`／`Win32_UI_Input_KeyboardAndMouse`／`Win32_UI_WindowsAndMessaging`——`desktop/Cargo.toml` 用它们选出 Windows 臂要调的 API 面，feature 名由 resolver 读取、自身恒不持值，`Win32` 里的数字与下划线并置才是触发混合字母表规则的原因；只列长度 ≥20 字节的六个，更短的名字够不着熵侦测器。
+**已复核字面量表（P3.05 增）**：判定器恒不改——它的活是在入口捕获一切像钥匙的东西，那里误报不要钱；**本门问的是另一个问题**「这里是不是提交了一份凭证」，那里误报要一次构建。故门内持一张 `NOT_CREDENTIALS` 精确字面量表，逐条写明它是谁、为什么不可能是凭证。三条纪律：①**整串精确匹配**——带前缀或后缀的更长 token 仍是命中，故没人能靠戴一个已复核的名字混过去（一条断言钉这件事）；②**表住门里而不是站点上**——注释式豁免是注入内容能写的洞，这张表不是；③表在 guard 保护面内，增一条即须 `Verdict:` 尾注。首条：`CC_x86_64_unknown_linux_musl`（Cargo 的分目标 C 编译器变量名，`release.yml` 的 musl job 设它）；以及 `windows` crate 的六个 feature 名 `Win32_System_DataExchange`／`Win32_System_Threading`／`Win32_System_Variant`／`Win32_UI_Accessibility`／`Win32_UI_Input_KeyboardAndMouse`／`Win32_UI_WindowsAndMessaging`——`desktop/Cargo.toml` 用它们选出 Windows 臂要调的 API 面，feature 名由 resolver 读取、自身恒不持值，`Win32` 里的数字与下划线并置才是触发混合字母表规则的原因；只列长度 ≥20 字节的六个，更短的名字够不着熵侦测器。
 
 **apisync 门细则**（S2.12）：基线集＝存在 `<crate>-SPEC.md` 的产品 crate（SPEC-first 即同步契约面；现在＝kernel/memory/runtime）；基线住 `xtask/api-baselines/<crate>.txt`，由 `cargo xtask apisync --write` 生成（`cargo public-api -p <crate> --simplified`，缺省 feature＝dev-only feature 面不入基线，台账已豁免）；断言①实时重算与基线逐行同（工具链缺失＝fail-closed 报装机指引，不静默跳）；断言②提交区间内基线文件变 ⇒ 同 crate SPEC 同集被触（git 面，复用 guard 的区间语义：本地缺省 HEAD，CI --range）。两断言合成链：API 变→①逼基线更新→②逼 SPEC 同集。cargo-public-api＋nightly 为环境前置（已装，2026-08）。
 
@@ -156,7 +156,7 @@ pub(crate) struct Violation {
    **四十二条里有十六条在同一个文件，最长的六条全在它**——这与文件面从另一个方向得到的是同一个发现：
 `bin::assembly` 的模块表行写着 `adapter`（§9：薄、无策略），而它装着这座城的派活策略。
 **一个十一参数的私有方法，就是策略没有对象可住时的样子。**
-   **文件面数测试**，函数面不数：一个长测试与一个长函数体是两个问题，但一个来找东西的读者要为它上面的每一行付钱——引出这条规则的那个文件里，6,133 行是测试。**扫描面**：`crates/*/src`、`xtask/src`、`citysim/src`；`tests/` 与 `benches/` 不在内，因为测试代码本就允许放松约束（AGENTS.md）。**三类不量**：① 带 `#[cfg(test)]` 的项（它标的是**一个项**而不是文件剩下的部分）；② 带 `#[component]` 的函数（Dioxus 组件，函数体即标记，没有可跟的步骤）；③ 模块表形状列为 `data` 的文件（ARCH §9 形状 6：数据而无分支）。**三类豁免都取自已有权威**（属性、模块表），而不是新建一张名单——一张名单就是一个可以您您变长的豁免口。形状列由 `modmap::shapes` 交出，与 modmap 共用同一个表解析器。
+   **文件面数测试**，函数面不数：一个长测试与一个长函数体是两个问题，但一个来找东西的读者要为它上面的每一行付钱——引出这条规则的那个文件里，6,133 行是测试。**扫描面**：`crates/*/src`、`xtask/src`、`citysim/src`；`tests/` 与 `benches/` 不在内，因为测试代码本就允许放松约束（AGENTS.md）。**两类不量**：① 带 `#[cfg(test)]` 的项（它标的是**一个项**而不是文件剩下的部分）；② 模块表形状列为 `data` 的文件（ARCH §9 形状 6：数据而无分支）。**两类豁免都取自已有权威**（属性、模块表），而不是新建一张名单——一张名单就是一个可以您您变长的豁免口。形状列由 `modmap::shapes` 交出，与 modmap 共用同一个表解析器。
 10. **报告**：three-part 渲染，与产品的 Gate 拒绝同构——施工者被拒时拿到的也是「规则｜违反点｜替代」，不是一句 fail。
 
 ## 11 边界枚举
@@ -323,7 +323,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 **无字段开放**：`Found` 及其四个字段保持原有的 `pub(crate)`，跨文件只把 `measure` 提到 `pub(super)`，索引位置以私有 `use measurement::{Found, measure};` 引回；`found` 与 `skipped` 仍是 `measurement` 内的私有项。`check` 与全部测试的调用点一字未改，`main.rs` 经 `length::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
 
-**判据一处未松**：三种豁免（`#[cfg(test)]`、`#[component]`、模块表 shape `data`）、`grew`／`no_longer_an_exception`／陈旧钉子三条自清理断言、以及两个预算仍只从 `xtask/budgets.toml` 读来，文字逐字节照搬。`[file_length.predating]` 里 `"xtask/src/length.rs" = 573` 一行按规则划掉——切分做完，钉子即失效；`length.rs` 现在与其他所有文件同受 400 行预算约束。**登记表上方那段注释仍写着「`xtask/src/length.rs` 在表上，这是对的：立规的门不豁免于规」，我没有动它**：guard 门把该注释的改动视为门面改动，而它所说的道理未变——立规的门仍受这条规约束，只是它现在直接受预算约束而非受钉子约束。
+**判据一处未松**：两种豁免（`#[cfg(test)]`、模块表 shape `data`）、`grew`／`no_longer_an_exception`／陈旧钉子三条自清理断言、以及两个预算仍只从 `xtask/budgets.toml` 读来，文字逐字节照搬。`[file_length.predating]` 里 `"xtask/src/length.rs" = 573` 一行按规则划掉——切分做完，钉子即失效；`length.rs` 现在与其他所有文件同受 400 行预算约束。**登记表上方那段注释仍写着「`xtask/src/length.rs` 在表上，这是对的：立规的门不豁免于规」，我没有动它**：guard 门把该注释的改动视为门面改动，而它所说的道理未变——立规的门仍受这条规约束，只是它现在直接受预算约束而非受钉子约束。
 
 ### 8-6 xtask::guard 目录化
 

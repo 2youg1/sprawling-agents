@@ -41,12 +41,11 @@
 //! compiler's own macro ecosystem uses; it lands in workspace tooling
 //! and never in the product binary.
 //!
-//! Three kinds are not measured, and every exemption is read from an
+//! Two kinds are not measured, and each exemption is read from an
 //! authority that already exists rather than from a list kept here:
-//! an item marked `#[cfg(test)]`, a function marked `#[component]`
-//! (a Dioxus component's body is markup, with no steps to follow), and
-//! any file whose module-map row states the shape `data`
-//! (ARCHITECTURE.md section 9, shape 6: data with no branches).
+//! an item marked `#[cfg(test)]`, and any file whose module-map row
+//! states the shape `data` (ARCHITECTURE.md section 9, shape 6: data
+//! with no branches).
 //!
 //! The `data` exemption covers the file rule as well as the function
 //! rule, for the reason that granted it: a table is looked things up in

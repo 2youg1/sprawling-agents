@@ -141,14 +141,6 @@ fn cfg_test_marks_an_item_and_not_the_rest_of_the_file() {
 }
 
 #[test]
-fn a_component_is_markup_and_a_plain_function_is_not() {
-    let found = lengths(
-        "#[component]\nfn Page() -> Element {\n    rsx! { div {} }\n}\nfn plain() -> u8 {\n    1\n}\n",
-    );
-    assert_eq!(found, vec![("plain".to_owned(), 3)]);
-}
-
-#[test]
 fn methods_inside_an_impl_are_measured_one_by_one() {
     let found = lengths(
         "struct S;\nimpl S {\n    fn a(&self) {}\n    #[cfg(test)]\n    fn b(&self) {}\n}\n",

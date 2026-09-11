@@ -159,7 +159,6 @@ badge_platform = "windows-x86_64"
 #
 # Not measured, each read from an authority that already exists rather
 # than from a list kept beside the gate: an item marked `#[cfg(test)]`,
-# a function marked `#[component]` (a Dioxus component's body is markup),
 # and a file whose module-map row states the shape `data`.
 [function_length]
 what = "one production function, from its `fn` to its closing brace"
