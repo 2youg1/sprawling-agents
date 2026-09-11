@@ -123,86 +123,92 @@ export function Rail(props: RailProps) {
   const halted = () => ui.conn.belief.halted.includes("city");
 
   return (
-    <nav
-      class={`group/rail flex h-full shrink-0 flex-col gap-tight border-r border-g1 bg-g0 py-snug transition-[width] ${props.open ? "w-rail-open" : "w-rail"} hover:w-rail-open`}
-      aria-label={say("region_nav")}
-      data-open={props.open ? "" : undefined}
-    >
-      <button
-        type="button"
-        class="flex h-rail items-center gap-base px-base text-label text-text-quiet hover:text-text"
-        onClick={() => {
-          props.onToggle();
-        }}
-        aria-expanded={props.open}
-        title={linkWord()}
+    // The column the page lays out beside is the collapsed width unless
+    // the rail is pinned open; a hover widens the nav over the page
+    // rather than pushing it, so reading is never disturbed by the
+    // pointer passing the edge.
+    <div class={`relative h-full shrink-0 transition-[width] ${props.open ? "w-rail-open" : "w-rail"}`}>
+      <nav
+        class={`group/rail absolute inset-y-0 left-0 z-10 flex flex-col gap-tight border-r border-g1 bg-g0 py-snug transition-[width] ${props.open ? "w-rail-open" : "w-rail"} hover:w-rail-open hover:shadow-composer`}
+        aria-label={say("region_nav")}
+        data-open={props.open ? "" : undefined}
       >
-        <span class={`inline-block size-dot shrink-0 rounded-pill ${dotClass()}`} />
-        <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">
-          {ui.conn.belief.city ?? "sprawling"}
-        </span>
-        <span class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">[</span>
-      </button>
-      <Show when={halted()}>
-        <div class="mx-snug rounded-pill bg-alert px-tight py-tight text-center text-note text-g0" title={say("city_stopped_line")}>
-          <span class="hidden group-hover/rail:inline group-data-open/rail:inline">{say("city_stopped")}</span>
-          <span class="group-hover/rail:hidden group-data-open/rail:hidden">!</span>
-        </div>
-      </Show>
-      <For each={items()}>
-        {(item) => (
+        <button
+          type="button"
+          class="flex h-rail items-center gap-base px-base text-label text-text-quiet hover:text-text"
+          onClick={() => {
+            props.onToggle();
+          }}
+          aria-expanded={props.open}
+          title={linkWord()}
+        >
+          <span class={`inline-block size-dot shrink-0 rounded-pill ${dotClass()}`} />
+          <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">
+            {ui.conn.belief.city ?? "sprawling"}
+          </span>
+          <span class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">[</span>
+        </button>
+        <Show when={halted()}>
+          <div class="mx-snug rounded-pill bg-alert px-tight py-tight text-center text-note text-g0" title={say("city_stopped_line")}>
+            <span class="hidden group-hover/rail:inline group-data-open/rail:inline">{say("city_stopped")}</span>
+            <span class="group-hover/rail:hidden group-data-open/rail:hidden">!</span>
+          </div>
+        </Show>
+        <For each={items()}>
+          {(item) => (
+            <a
+              href={toFragment(item.view)}
+              aria-current={here(item)}
+              class="relative flex h-rail items-center gap-base px-base text-label text-text-faint hover:bg-g1 hover:text-text aria-[current=page]:text-text"
+              title={item.label}
+            >
+              <span class="relative shrink-0">
+                {item.glyph}
+                <Show when={(item.badge ?? 0) > 0}>
+                  <span class="absolute -top-tight -right-tight rounded-pill bg-accent px-tight text-note leading-none text-g0">
+                    {item.badge}
+                  </span>
+                </Show>
+              </span>
+              <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">{item.label}</span>
+              <kbd class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">
+                {item.keys}
+              </kbd>
+            </a>
+          )}
+        </For>
+        <Show when={waiting() > 0}>
           <a
-            href={toFragment(item.view)}
-            aria-current={here(item)}
-            class="relative flex h-rail items-center gap-base px-base text-label text-text-faint hover:bg-g1 hover:text-text aria-[current=page]:text-text"
-            title={item.label}
+            href={toFragment({ kind: "talk", address: MAYOR })}
+            class="flex h-rail items-center gap-base px-base text-label text-alert hover:bg-g1"
+            title={say("nav_waiting", { n: String(waiting()) })}
           >
             <span class="relative shrink-0">
-              {item.glyph}
-              <Show when={(item.badge ?? 0) > 0}>
-                <span class="absolute -top-tight -right-tight rounded-pill bg-accent px-tight text-note leading-none text-g0">
-                  {item.badge}
-                </span>
-              </Show>
+              <HandGlyph />
+              <span class="absolute -top-tight -right-tight rounded-pill bg-alert px-tight text-note leading-none text-g0">
+                {waiting()}
+              </span>
             </span>
-            <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">{item.label}</span>
-            <kbd class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">
-              {item.keys}
-            </kbd>
+            <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">
+              {say("nav_waiting", { n: String(waiting()) })}
+            </span>
+            <kbd class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">g w</kbd>
           </a>
-        )}
-      </For>
-      <Show when={waiting() > 0}>
-        <a
-          href={toFragment({ kind: "talk", address: MAYOR })}
-          class="flex h-rail items-center gap-base px-base text-label text-alert hover:bg-g1"
-          title={say("nav_waiting", { n: String(waiting()) })}
+        </Show>
+        <span class="flex-1" />
+        <button
+          type="button"
+          class="flex h-rail items-center gap-base px-base text-label text-text-faint hover:bg-g1 hover:text-text"
+          onClick={() => {
+            props.onPalette();
+          }}
+          title={say("nav_palette")}
         >
-          <span class="relative shrink-0">
-            <HandGlyph />
-            <span class="absolute -top-tight -right-tight rounded-pill bg-alert px-tight text-note leading-none text-g0">
-              {waiting()}
-            </span>
-          </span>
-          <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">
-            {say("nav_waiting", { n: String(waiting()) })}
-          </span>
-          <kbd class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">g w</kbd>
-        </a>
-      </Show>
-      <span class="flex-1" />
-      <button
-        type="button"
-        class="flex h-rail items-center gap-base px-base text-label text-text-faint hover:bg-g1 hover:text-text"
-        onClick={() => {
-          props.onPalette();
-        }}
-        title={say("nav_palette")}
-      >
-        <PaletteGlyph />
-        <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">{say("nav_everything")}</span>
-        <kbd class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">⌘K</kbd>
-      </button>
-    </nav>
+          <PaletteGlyph />
+          <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">{say("nav_everything")}</span>
+          <kbd class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">⌘K</kbd>
+        </button>
+      </nav>
+    </div>
   );
 }

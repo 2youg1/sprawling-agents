@@ -8,7 +8,7 @@
 // thinks, and - while a run is going - the way to stop it. Nothing
 // here decides where a message goes; the page does.
 
-import { Show, createSignal } from "solid-js";
+import { Show, createSignal, untrack } from "solid-js";
 
 import type { Sending } from "../../core/belief";
 import type { Key } from "../../core/lang";
@@ -27,6 +27,9 @@ const SPELLING: Record<Sending, Key> = {
 export interface ComposerProps {
   readonly placeholder: string;
   readonly sending: Sending;
+  // Where the unsent words are kept, when they are kept at all: the
+  // room or the run this box speaks to.
+  readonly draft?: string | undefined;
   // Both answer whether the frame went out, so the box can keep the
   // words when it did not.
   readonly onSend: (text: string) => boolean;
@@ -36,9 +39,12 @@ export interface ComposerProps {
 export function Composer(props: ComposerProps) {
   const ui = useUi();
   const say = useSay();
-  const [text, setText] = createSignal("");
+  const [text, setText] = createSignal(untrack(() => (props.draft === undefined ? "" : ui.prefs.draft(props.draft))));
   const [kept, setKept] = createSignal(false);
   const [box, setBox] = createSignal<HTMLTextAreaElement>();
+  const keep = (words: string) => {
+    if (props.draft !== undefined) ui.prefs.setDraft(props.draft, words);
+  };
 
   const grow = () => {
     const area = box();
@@ -51,6 +57,7 @@ export function Composer(props: ComposerProps) {
     if (words === "") return;
     if (props.onSend(words)) {
       setText("");
+      keep("");
       setKept(false);
       requestAnimationFrame(grow);
     } else {
@@ -72,7 +79,11 @@ export function Composer(props: ComposerProps) {
       aria-label={say("region_composer")}
     >
       <textarea
-        ref={setBox}
+        ref={(area) => {
+          setBox(area);
+          // A draft restored on mount is taller than one row.
+          requestAnimationFrame(grow);
+        }}
         class="block w-full resize-none bg-transparent text-body leading-relaxed text-text outline-none placeholder:text-text-disabled"
         rows={1}
         placeholder={props.placeholder}
@@ -80,6 +91,7 @@ export function Composer(props: ComposerProps) {
         autofocus
         onInput={(event) => {
           setText(event.currentTarget.value);
+          keep(event.currentTarget.value);
           grow();
         }}
         onKeyDown={(event) => {

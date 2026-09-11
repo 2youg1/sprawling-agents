@@ -59,6 +59,8 @@ export function useUi(): Ui {
         setEffort: () => undefined,
         welcomed: () => false,
         setWelcomed: () => undefined,
+        draft: () => "",
+        setDraft: () => undefined,
       },
       bar: { hash: "" },
       origin: "",

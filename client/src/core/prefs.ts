@@ -18,6 +18,9 @@ import type { Effort } from "../wire";
 const LANG_KEY = "sprawling.lang";
 const EFFORT_KEY = "sprawling.effort";
 const WELCOMED_KEY = "sprawling.welcomed";
+// One unsent message per place a person writes, kept across a reload
+// or a page change; the key is the room or the run.
+const DRAFT_PREFIX = "sprawling.draft.";
 
 export const EFFORTS: readonly Effort[] = [
   "none",
@@ -46,6 +49,10 @@ export interface Prefs {
   // person who skipped it is nagged again.
   readonly welcomed: Accessor<boolean>;
   readonly setWelcomed: (done: boolean) => void;
+  // What was typed and not sent, by where it was typed. Not a signal:
+  // the box that owns it reads it once when it mounts.
+  readonly draft: (at: string) => string;
+  readonly setDraft: (at: string, text: string) => void;
 }
 
 export function loadPrefs(store: Storage, browserLang: string): Prefs {
@@ -73,6 +80,16 @@ export function loadPrefs(store: Storage, browserLang: string): Prefs {
     setWelcomed(done) {
       store.setItem(WELCOMED_KEY, done ? "yes" : "no");
       setWelcomedSignal(done);
+    },
+    draft(at) {
+      return store.getItem(DRAFT_PREFIX + at) ?? "";
+    },
+    setDraft(at, text) {
+      if (text === "") {
+        store.removeItem(DRAFT_PREFIX + at);
+      } else {
+        store.setItem(DRAFT_PREFIX + at, text);
+      }
     },
   };
 }

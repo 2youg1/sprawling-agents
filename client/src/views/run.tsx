@@ -223,6 +223,7 @@ export function Run(props: RunProps) {
                   <Composer
                     placeholder={say("talk_placeholder_room", { room: roomWord() })}
                     sending={sendingInto(belief()?.doing)}
+                    draft={props.run}
                     onSend={(text) => command(steer(props.run, text))}
                     onStop={() => command(cancel(props.run))}
                   />

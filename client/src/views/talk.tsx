@@ -121,6 +121,7 @@ export function Talk(props: TalkProps) {
         <Composer
           placeholder={isMayor() ? say("talk_placeholder_mayor") : say("talk_placeholder_room", { room: roomOf(props.address) })}
           sending={sendingInto(live()?.doing)}
+          draft={props.address}
           onSend={send}
           onStop={() => {
             const going = live();
