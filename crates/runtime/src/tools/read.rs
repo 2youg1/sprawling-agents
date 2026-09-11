@@ -114,6 +114,17 @@ impl Interval {
     /// Cuts on line ends rather than on lines: every line travels with
     /// its own terminator, so reading a whole short file returns the
     /// bytes the file holds and `bytes` keeps the meaning it had.
+    ///
+    /// **Two ceilings, and the tighter one decides.** 512 lines bounds
+    /// how much structure an answer carries;
+    /// [`INTERVAL_CAP_BYTES`](kernel::consts_policy::INTERVAL_CAP_BYTES)
+    /// bounds how much of the window it spends, because a line is about
+    /// forty bytes in ordinary source and a whole minified bundle in a
+    /// generated one. The byte ceiling is applied here rather than
+    /// downstream for one reason: `next_offset` is how a caller
+    /// continues, so a cut made after this function had already reported
+    /// one would leave that number pointing past lines nobody delivered,
+    /// and the gap would be silent.
     fn cut(&self, text: &str) -> Taken {
         let lines: Vec<&str> = text.split_inclusive('\n').collect();
         let total = lines.len();
@@ -125,7 +136,23 @@ impl Interval {
                 next_offset: None,
             };
         }
-        let end = self.offset.saturating_add(self.limit).min(total);
+        let ceiling = self.offset.saturating_add(self.limit).min(total);
+        let budget =
+            usize::try_from(kernel::consts_policy::INTERVAL_CAP_BYTES).unwrap_or(usize::MAX);
+        let mut end = self.offset;
+        let mut spent = 0usize;
+        while end < ceiling {
+            let Some(line) = lines.get(end) else { break };
+            let after = spent.saturating_add(line.len());
+            // The first line travels however long it is. A call that
+            // returned nothing would hand back the offset it was given,
+            // and the caller would ask the same question forever.
+            if after > budget && end > self.offset {
+                break;
+            }
+            spent = after;
+            end = end.saturating_add(1);
+        }
         let taken = lines.get(self.offset..end).unwrap_or_default().concat();
         if end < total {
             Taken {

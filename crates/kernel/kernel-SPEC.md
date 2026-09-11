@@ -460,6 +460,7 @@ pub const STARTUP_BUDGET_TOKENS: u64 = 2000;
 pub const CTX_REMINDER_RATIO: Ratio = Ratio { num: 1, den: 2 };      // 0.5
 pub const LOOP_REPEAT_THRESHOLD: u32 = 3;
 pub const OFFLOAD_MIN_BYTES: u64 = 16_384;
+pub const INTERVAL_CAP_BYTES: u64 = 65_536;                          // 一次区间读／检索的窗口预算
 pub const DRAFT_HELD_ESCALATE: u32 = 3;
 pub const EDIT_WAR_FREEZE: u32 = 2;
 pub const SECRET_ENTROPY_MIN: Ratio = Ratio { num: 7, den: 2 };      // 3.5 bits/char

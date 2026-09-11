@@ -128,6 +128,72 @@ fn a_missing_file_is_the_callers_mistake_not_the_disks() {
     assert_eq!(err.code(), &AxCode::InvalidArgs);
 }
 
+/// 512 lines is a bound on structure, not on size. A line is about 40
+/// bytes in this repository's source and can be a whole minified bundle
+/// elsewhere, so the line cap alone let one call carry an unbounded
+/// number of bytes into a context window.
+///
+/// The byte budget cuts on a line end, never inside one: `next_offset`
+/// is the only way a caller continues, and a cut that left it pointing
+/// past undelivered lines would skip them in silence.
+#[test]
+fn a_wide_file_is_cut_on_a_line_end_and_continues_without_a_gap() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    // 400 lines of 1 KiB: inside the line cap, far past the byte budget.
+    let wide: String = (0..400)
+        .map(|n| format!("{n:04}{}\n", "x".repeat(1_019)))
+        .collect();
+    std::fs::write(dir.path().join("lab").join("Wide.md"), &wide).unwrap();
+    let (mut tool, _catalog) = tool(dir.path());
+
+    let first = tool.invoke(&call("lab/Wide.md")).unwrap();
+    let map = first.result.as_map();
+    let text = map["text"].as_str().unwrap();
+    let cap = usize::try_from(kernel::consts_policy::INTERVAL_CAP_BYTES).unwrap();
+    assert!(text.len() <= cap, "{} bytes came back", text.len());
+    assert!(
+        text.lines().count() < 400,
+        "the byte budget has to bind before the line cap does"
+    );
+    assert!(text.ends_with('\n'), "the cut lands on a line end");
+
+    // The offset it hands back is the first line it did not deliver, so
+    // reading from there loses nothing.
+    let delivered = text.lines().count();
+    assert_eq!(map["next_offset"], serde_json::json!(delivered));
+    let rest = tool
+        .invoke(&interval(
+            "lab/Wide.md",
+            u64::try_from(delivered).unwrap(),
+            None,
+        ))
+        .unwrap();
+    let next = rest.result.as_map()["text"].as_str().unwrap();
+    assert!(
+        next.starts_with(&format!("{delivered:04}")),
+        "continuation starts at the first line the cut withheld"
+    );
+}
+
+/// One line larger than the whole budget still travels, because a call
+/// that returned nothing would hand back the offset it was given and the
+/// caller would ask the same question forever.
+#[test]
+fn a_single_line_past_the_budget_still_makes_progress() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    let cap = usize::try_from(kernel::consts_policy::INTERVAL_CAP_BYTES).unwrap();
+    let body = format!("{}\nsecond\n", "y".repeat(cap.saturating_mul(2)));
+    std::fs::write(dir.path().join("lab").join("OneLine.md"), &body).unwrap();
+    let (mut tool, _catalog) = tool(dir.path());
+
+    let answer = tool.invoke(&call("lab/OneLine.md")).unwrap();
+    let map = answer.result.as_map();
+    assert_eq!(map["text"].as_str().unwrap().lines().count(), 1);
+    assert_eq!(map["next_offset"], 1, "the caller can always move on");
+}
+
 /// A file longer than the cap comes back one cap's worth at a time, and
 /// the answer says what it is part of: the total, and the offset the
 /// next call continues from. Without those two numbers a reader has to

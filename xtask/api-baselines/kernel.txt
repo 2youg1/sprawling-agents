@@ -170,6 +170,7 @@ pub const kernel::consts_policy::HALL_CLERK: &str
 pub const kernel::consts_policy::HALL_MAYOR: &str
 pub const kernel::consts_policy::IMAGES_PER_TURN: u32
 pub const kernel::consts_policy::IMAGE_MAX_BYTES: u64
+pub const kernel::consts_policy::INTERVAL_CAP_BYTES: u64
 pub const kernel::consts_policy::LOOP_REPEAT_THRESHOLD: u32
 pub const kernel::consts_policy::OFFLOAD_MIN_BYTES: u64
 pub const kernel::consts_policy::POLICY_IDLE_DAYS: u32

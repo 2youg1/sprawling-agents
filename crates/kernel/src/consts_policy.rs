@@ -32,6 +32,28 @@ pub const LOOP_REPEAT_THRESHOLD: u32 = 3;
 /// `pipeline` from window headroom (4.4).
 pub const OFFLOAD_MIN_BYTES: u64 = 16_384;
 
+/// What one interval of a document may carry into the window: 64 KiB,
+/// cut on a line end, continued by the offset the answer reports.
+///
+/// A different subject from a command's cap, which is why it is a
+/// different number. `exec` output cannot be continued, so its ceiling
+/// is where loss becomes acceptable and the remainder goes to CAS.
+/// `read` and `search` hand back an interval of something the caller can
+/// ask for again, so their ceiling only paces delivery.
+///
+/// Derived, not chosen: the context reminders fire at 25% and 65%, and a
+/// ladder means nothing if one step can clear a rung unseen - skipping
+/// the first needs a jump over 40%, the second over 35%, so one result
+/// stays under 35% of the window. At 2.5 bytes per token, the worst
+/// realistic ratio (base64, hash-dense text), 64 KiB is 26.2K tokens:
+/// 20.5% of a 128K window, with 1.7x to spare. 128 KiB would be 41% and
+/// out. Measured against this repository's 928 tracked text files, the
+/// bytes in their first 512 lines run p50 6,275 / p95 16,055 / p99
+/// 49,373 / max 73,978, so 64 KiB binds on one of them: it is a guard
+/// against input that is not line-structured - a minified bundle, a
+/// lockfile, a generated table - and not a tax on ordinary reading.
+pub const INTERVAL_CAP_BYTES: u64 = 65_536;
+
 pub const DRAFT_HELD_ESCALATE: u32 = 3;
 
 pub const EDIT_WAR_FREEZE: u32 = 2;

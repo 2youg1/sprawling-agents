@@ -56,6 +56,10 @@ struct Predicate {
 /// What the walk has found so far, and what it could not open.
 struct Findings {
     hits: Vec<Value>,
+    /// Bytes of hit text handed back so far, against
+    /// `INTERVAL_CAP_BYTES`. Counted rather than measured at the end,
+    /// because the answer has to stop before it is over budget.
+    spent: usize,
     unreadable: u64,
     truncated: bool,
 }
@@ -198,6 +202,7 @@ impl SearchTool {
     fn walk(&self, from: (PathBuf, String), looking: &Predicate) -> Findings {
         let mut found = Findings {
             hits: Vec::new(),
+            spent: 0,
             unreadable: 0,
             truncated: false,
         };
@@ -256,13 +261,24 @@ impl SearchTool {
                 found.unreadable = found.unreadable.saturating_add(1);
                 return;
             };
+            // Sixty-four hits is a bound on how many answers travel, not
+            // on how large they are: nine context lines out of a
+            // generated file are nine lines of whatever that file puts
+            // on a line. The byte budget is the same ceiling `read`
+            // keeps, and for the same reason - one result may not spend
+            // the window a caller still has to think in.
+            let block = context_block(&lines, at, looking.context);
+            let budget =
+                usize::try_from(kernel::consts_policy::INTERVAL_CAP_BYTES).unwrap_or(usize::MAX);
+            if found.spent.saturating_add(block.len()) > budget && !found.hits.is_empty() {
+                found.truncated = true;
+                return;
+            }
+            found.spent = found.spent.saturating_add(block.len());
             let mut hit = Map::new();
             hit.insert("path".to_owned(), Value::String(rel.to_owned()));
             hit.insert("line".to_owned(), Value::Number(number.into()));
-            hit.insert(
-                "text".to_owned(),
-                Value::String(context_block(&lines, at, looking.context)),
-            );
+            hit.insert("text".to_owned(), Value::String(block));
             found.hits.push(Value::Object(hit));
         }
     }
