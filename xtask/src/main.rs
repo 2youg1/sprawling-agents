@@ -10,7 +10,6 @@
 
 mod apisync;
 mod artifact;
-mod ax;
 mod badge;
 mod boundary;
 mod budget;
@@ -54,7 +53,6 @@ fn main() -> ExitCode {
     match args.first().map(String::as_str) {
         Some("gates") => gates::run(&root, range.as_deref()),
         Some("color") => report::finish("color", color::check(&root)),
-        Some("ax") => report::finish("ax", ax::check(&root)),
         Some("render") => report::finish("render", render::check(&root)),
         Some("budget") => match budget::report(&root) {
             Ok(text) => {
@@ -175,7 +173,7 @@ fn value_arg(args: &[String], flag: &str) -> Option<String> {
 
 fn usage() {
     eprintln!(
-        "usage: cargo xtask <gates|header|lexicon|modmap|depmap|npm|secret|color|ax|render|wiring|specalign|apisync|guard> [--range a..b] [--write]"
+        "usage: cargo xtask <gates|header|lexicon|modmap|depmap|npm|secret|color|render|wiring|specalign|apisync|guard> [--range a..b] [--write]"
     );
     eprintln!(
         "       cargo xtask spec <crate> | budget | badge [--write] | wire-ts [--write] | mem [pid] | sbom | package [--target <triple>] | repro [--full]"

@@ -87,6 +87,10 @@ export function Composer(props: ComposerProps) {
         class="block w-full resize-none bg-transparent text-body leading-relaxed text-text outline-none placeholder:text-text-disabled"
         rows={1}
         placeholder={props.placeholder}
+        // A placeholder is not a name: it is gone as soon as somebody
+        // types, and this is the control the page exists for. Same
+        // words, so the two never disagree.
+        aria-label={props.placeholder}
         value={text()}
         autofocus
         onInput={(event) => {

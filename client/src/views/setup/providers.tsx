@@ -94,6 +94,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
         <input
           class="rounded-control bg-g2 px-base py-snug text-body text-text outline-none"
           value={name()}
+          // wording-ok: a provider's own name, the same word in both languages
           placeholder="openai"
           onInput={(event) => setName(event.currentTarget.value)}
         />
@@ -103,6 +104,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
         <input
           class="rounded-control bg-g2 px-base py-snug font-mono text-body text-text outline-none"
           value={baseUrl()}
+          // wording-ok: an address, which no language translates
           placeholder="https://api.openai.com/v1"
           onInput={(event) => setBaseUrl(event.currentTarget.value)}
         />

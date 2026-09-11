@@ -56,7 +56,7 @@ use crate::walk;
 
 /// Where the client a reader reads lives. Nothing else in the tree
 /// draws, and English in a wire value or an error code is correct.
-const CLIENT: &str = "crates/web/src";
+const CLIENT: &str = "client/src";
 
 /// The waiver, spelled as `lexicon`'s is.
 const EXEMPT_MARK: &str = "wording-ok:";
@@ -82,8 +82,13 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         return Ok(Vec::new());
     }
     let mut violations = Vec::new();
-    for path in walk::files_with_ext(&dir, &["rs"])? {
+    for path in walk::files_with_ext(&dir, &["tsx"])? {
         let location = walk::rel(root, &path);
+        // A test may quote a sentence to assert that a page says it.
+        // That is evidence, not a second authority for the wording.
+        if location.contains(".test.") {
+            continue;
+        }
         let text = walk::read_text(&path)?;
         let lines: Vec<&str> = text.lines().collect();
         for said in handed_to_a_reader(drawn(&text)) {
@@ -93,7 +98,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             violations.push(Violation {
                 gate: "wording",
                 location: format!("{location}:{}", said.line),
-                rule: "a word a reader is given comes from web::lang, not from the view".to_owned(),
+                rule: "a word a reader is given comes from lang.json, not from the view".to_owned(),
                 violation: format!(
                     "{} carries {:?}, which no phrase produced",
                     said.seat,
@@ -147,10 +152,9 @@ struct Said {
     left: String,
 }
 
-mod lex;
-mod rsx;
+mod jsx;
 
-use rsx::handed_to_a_reader;
+use jsx::handed_to_a_reader;
 
 // -------------------------------------------------------- the predicate
 

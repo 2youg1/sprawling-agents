@@ -3,54 +3,47 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Render gate: a settled screen is opened in a real engine and measured
-//! (v0.0.3 card V3.48).
+//! Render gate: the client's own gallery is opened in a real engine, and
+//! what it drew is measured (xtask-SPEC.md section 8-13).
 //!
-//! **This is the step the four-step method never had.** `ax` compares the
-//! affordances both sides *wrote down*, and it says so itself: it is not a
-//! computed tree, and looking at pixels is a person's job. That left one
-//! whole class of defect with nothing watching it, because a stylesheet's
-//! rules do not collide in either source file — they collide in the
-//! cascade. Two rules that each read correctly where they are written laid
-//! the composer out as a row and put a second left edge on every page, and
-//! the tree was green through all of it: fourteen gates, 1,338 tests, and
-//! a home page whose task box had floated into the top right corner.
+//! **This is the step the method never had.** A stylesheet's rules do not
+//! collide in either source file — they collide in the cascade. Two rules
+//! that each read correctly where they are written laid the composer out
+//! as a row and put a second left edge on every page, and the tree was
+//! green through all of it: fourteen gates, 1,338 tests, and a home page
+//! whose task box had floated into the top right corner.
+//!
+//! **The accessibility half used to be its own gate and is now these
+//! three properties.** `ax` compared the affordances both sides *wrote
+//! down*, and said in its own header why: a computed tree needs a
+//! browser, and a gate that cannot run offline stops running. That
+//! trade expired when the gate learnt to open a browser. Roles,
+//! accessible names and landmarks are read off the page as drawn, which
+//! is what a person using a screen reader actually meets.
 //!
 //! **What it asserts is a property, never a picture.** A screenshot
-//! comparison fails on a font hint and passes on a page that is wrong in a
-//! way nobody photographed. These three are the shape of a page rather
-//! than its appearance, and each one is the generalisation of a defect
-//! that shipped:
+//! comparison fails on a font hint and passes on a page that is wrong in
+//! a way nobody photographed.
 //!
-//! 1. A page has one left edge. Every region in the centre column starts
-//!    at the same x, so a heading and the panel under it cannot disagree.
-//! 2. A panel's head is the top of its own panel, and starts at its left
-//!    edge. A panel laid out as a row puts its title beside its body
-//!    instead, which is exactly what a `form` did to the composer.
-//! 3. Nothing is wider than the region that holds it.
-//!
-//! **A missing browser is a skip, not a red.** The engine is not in this
-//! repository and cannot be: the gate says so on the line it prints and
-//! judges nothing, because a gate that fails where it cannot look is a
-//! gate somebody disables. `SPRAWLING_BROWSER` names one explicitly.
+//! **A missing browser, a missing bundle or a missing route is a skip,
+//! and each says which.** A gate that goes quiet when it cannot find its
+//! subject is a gate that is green for the wrong reason, so the three
+//! are never collapsed into one message.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
-use crate::walk;
 
 mod engine;
 
-use engine::{Engine, browser};
+use engine::{browser, measure};
 
-/// Where the settled screens live.
-const SCREENS: &str = "crates/web/screens";
+/// The client bundle this gate opens: the same one `just dist` embeds.
+const BUNDLE: &str = "target/web-dist";
 
-/// The design tokens `web::theme`'s own test writes out for the screens to
-/// link. Without it a screen renders at browser defaults, which would make
-/// every measurement below a measurement of nothing.
-const TOKENS: &str = "target/screens/tokens.css";
+/// The route that draws every state worth looking at, on fixtures.
+const GALLERY: &str = "#/gallery";
 
 /// Two boxes may differ by this many pixels and still count as aligned.
 ///
@@ -59,193 +52,260 @@ const TOKENS: &str = "target/screens/tokens.css";
 /// twice.
 const SLACK: i64 = 1;
 
-/// One measured box, in the page's own coordinates.
-struct Box {
-    kind: String,
-    tag: String,
-    class: String,
-    left: i64,
-    top: i64,
-    width: i64,
-    height: i64,
+/// One element as the engine drew it.
+pub(super) struct Drawn {
+    pub(super) tag: String,
+    pub(super) role: String,
+    pub(super) name: String,
+    pub(super) left: i64,
+    pub(super) top: i64,
+    pub(super) width: i64,
+    pub(super) height: i64,
+    pub(super) depth: i64,
+    /// Index of the nearest measured ancestor, or `-1` at the top.
+    pub(super) parent: i64,
 }
 
-impl Box {
-    /// The x this box ends at.
+impl Drawn {
     fn right(&self) -> i64 {
         self.left.saturating_add(self.width)
     }
 
-    /// What a violation calls this box.
-    fn name(&self) -> String {
-        format!("{}.{}", self.tag.to_lowercase(), self.class)
+    fn bottom(&self) -> i64 {
+        self.top.saturating_add(self.height)
     }
 
-    /// A box with no area is a container that holds nothing on this
-    /// screen, and it has no position worth comparing.
+    /// What a violation calls this element.
+    fn called(&self) -> String {
+        let tag = self.tag.to_lowercase();
+        if self.name.is_empty() || self.name == "-" {
+            return tag;
+        }
+        format!("{tag} `{}`", self.name)
+    }
+
+    /// An element with no area holds nothing on this page, and has no
+    /// position worth comparing.
     fn drawn(&self) -> bool {
         self.width > 0 && self.height > 0
+    }
+
+    /// Controls a person operates, which are the ones that must be
+    /// announceable.
+    ///
+    /// By role as well as by tag: this client draws a building as a `<g>`
+    /// with `role="link"`, and an element that says it is a control is
+    /// one, whatever it is made of.
+    fn operable(&self) -> bool {
+        matches!(
+            self.tag.as_str(),
+            "BUTTON" | "A" | "INPUT" | "TEXTAREA" | "SELECT"
+        ) || matches!(
+            self.role.as_str(),
+            "button" | "link" | "textbox" | "checkbox" | "radio" | "tab" | "menuitem" | "switch"
+        )
+    }
+
+    /// The regions a screen reader offers as a way to jump.
+    fn landmark(&self) -> bool {
+        matches!(
+            self.tag.as_str(),
+            "MAIN" | "NAV" | "ASIDE" | "HEADER" | "FOOTER"
+        ) || matches!(
+            self.role.as_str(),
+            "navigation" | "main" | "complementary" | "banner" | "contentinfo" | "dialog"
+        )
+    }
+
+    fn anonymous(&self) -> bool {
+        self.name.is_empty() || self.name == "-"
     }
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let screens = root.join(SCREENS);
-    if !screens.is_dir() {
-        return Ok(Vec::new());
-    }
-    if !root.join(TOKENS).is_file() {
-        println!("gate render: {TOKENS} is not written; run `cargo test -p web` first (skipped)");
+    let bundle = root.join(BUNDLE);
+    if !bundle.join("index.html").is_file() {
+        println!(
+            "gate render: {BUNDLE}/index.html is not built; run `just build-web` first (skipped)"
+        );
         return Ok(Vec::new());
     }
     let Some(browser) = browser() else {
         println!("gate render: no headless browser found; set SPRAWLING_BROWSER to one (skipped)");
         return Ok(Vec::new());
     };
-    let engine = Engine::new(root, browser)?;
-    let mut violations = Vec::new();
-    for path in walk::files_with_ext(&screens, &["html"])? {
-        let rel = walk::rel(root, &path);
-        let boxes = engine.measure(&path, &rel)?;
-        judge(&rel, &boxes, &mut violations);
+    let drawn = measure(root, &browser, &bundle, GALLERY)?;
+    if drawn.is_empty() {
+        println!("gate render: {GALLERY} drew nothing measurable (skipped)");
+        return Ok(Vec::new());
     }
+    let mut violations = Vec::new();
+    every_control_is_announceable(&drawn, &mut violations);
+    every_landmark_is_named(&drawn, &mut violations);
+    one_first_heading(&drawn, &mut violations);
+    one_left_edge(&drawn, &mut violations);
+    nothing_escapes_what_holds_it(&drawn, &mut violations);
     Ok(violations)
 }
 
-/// The three properties, in the order a reader meets them on the page.
-fn judge(rel: &str, boxes: &[Box], out: &mut Vec<Violation>) {
-    let centre = boxes.iter().find(|held| held.kind == "centre");
-    one_left_edge(rel, boxes, out);
-    heads_lead_their_panels(rel, boxes, out);
-    if let Some(centre) = centre {
-        nothing_overflows(rel, centre, boxes, out);
+fn violation(rule: &str, subject: String, alternative: &str) -> Violation {
+    Violation {
+        gate: "render",
+        location: format!("{BUNDLE} {GALLERY}"),
+        rule: rule.to_owned(),
+        violation: subject,
+        alternative: alternative.to_owned(),
     }
 }
 
-/// Every region in the centre column starts at the same x.
-fn one_left_edge(rel: &str, boxes: &[Box], out: &mut Vec<Violation>) {
-    let mut edges: BTreeMap<i64, String> = BTreeMap::new();
-    for region in boxes
+/// Every control a person can operate says what it is.
+///
+/// The first run of this property found four: the composer's own text
+/// box, on every fixture that draws one. It is the control the whole page
+/// exists for, and to a screen reader it was an unlabelled edit field.
+fn every_control_is_announceable(drawn: &[Drawn], out: &mut Vec<Violation>) {
+    for held in drawn
         .iter()
-        .filter(|held| held.kind == "region" && held.drawn())
+        .filter(|held| held.operable() && held.drawn() && held.anonymous())
     {
-        edges.entry(region.left).or_insert_with(|| region.name());
+        let what = if held.role == "-" {
+            held.tag.to_lowercase()
+        } else {
+            format!("{} as {}", held.tag.to_lowercase(), held.role)
+        };
+        out.push(violation(
+            "every control a person can operate has an accessible name",
+            format!(
+                "a {what} at x={} y={} is announced as nothing",
+                held.left, held.top
+            ),
+            "give it an `aria-label` from the phrase table, or let it contain the words it \
+             already shows. A control with no name is a control a screen reader can only \
+             call `button`",
+        ));
+    }
+}
+
+fn every_landmark_is_named(drawn: &[Drawn], out: &mut Vec<Violation>) {
+    for held in drawn
+        .iter()
+        .filter(|held| held.landmark() && held.drawn() && held.anonymous())
+    {
+        out.push(violation(
+            "every landmark says which region it is",
+            format!("a <{}> offers no name to jump to", held.tag.to_lowercase()),
+            "give the landmark an `aria-label` from the phrase table: two unnamed regions are \
+             two entries that read the same in the jump list",
+        ));
+    }
+}
+
+/// One first heading, so a reader arriving by keyboard lands somewhere.
+fn one_first_heading(drawn: &[Drawn], out: &mut Vec<Violation>) {
+    let headings: Vec<&Drawn> = drawn
+        .iter()
+        .filter(|held| held.tag == "H1" && held.drawn())
+        .collect();
+    if headings.len() == 1 {
+        return;
+    }
+    let named: Vec<String> = headings.iter().map(|held| held.called()).collect();
+    out.push(violation(
+        "a page has exactly one first heading",
+        format!("this page has {}: {}", headings.len(), named.join(", ")),
+        "one <h1> names the page; the parts under it are <h2>. A page with none gives a reader \
+         nothing to land on, and a page with two disagrees with itself about what it is",
+    ));
+}
+
+/// Every region in the main column starts at the same x.
+fn one_left_edge(drawn: &[Drawn], out: &mut Vec<Violation>) {
+    let Some(main) = drawn.iter().position(|held| held.tag == "MAIN") else {
+        return;
+    };
+    let Ok(main_index) = i64::try_from(main) else {
+        return;
+    };
+    let mut edges: BTreeMap<i64, String> = BTreeMap::new();
+    for region in drawn
+        .iter()
+        .filter(|held| held.tag == "SECTION" && held.parent == main_index && held.drawn())
+    {
+        edges.entry(region.left).or_insert_with(|| region.called());
     }
     if edges.len() < 2 {
+        return;
+    }
+    if let (Some(first), Some(last)) = (edges.keys().next(), edges.keys().next_back())
+        && last.saturating_sub(*first) <= SLACK
+    {
         return;
     }
     let listed: Vec<String> = edges
         .iter()
         .map(|(left, name)| format!("{name} at x={left}"))
         .collect();
-    if let (Some(first), Some(last)) = (edges.keys().next(), edges.keys().next_back())
-        && last.saturating_sub(*first) <= SLACK
-    {
-        return;
-    }
-    out.push(Violation {
-        gate: "render",
-        location: rel.to_owned(),
-        rule: "a page has one left edge: every region in the centre column starts at the same x"
-            .to_owned(),
-        violation: format!("this page has {}: {}", edges.len(), listed.join(", ")),
-        alternative: "let one authority set the inline margins - a panel states its vertical \
-                      rhythm, the region states the spine"
-            .to_owned(),
-    });
+    out.push(violation(
+        "a page has one left edge: every region in the main column starts at the same x",
+        format!("this page has {}: {}", edges.len(), listed.join(", ")),
+        "let one authority set the inline margins - a region states its vertical rhythm, the \
+         column states the spine",
+    ));
 }
 
-/// A panel's head is the topmost of its parts and starts at its left edge.
-fn heads_lead_their_panels(rel: &str, boxes: &[Box], out: &mut Vec<Violation>) {
-    let mut panel: Option<&Box> = None;
-    let mut parts: Vec<&Box> = Vec::new();
-    for held in boxes {
-        match held.kind.as_str() {
-            "panel" => {
-                if let Some(open) = panel.take() {
-                    head_leads(rel, open, &parts, out);
-                }
-                parts.clear();
-                panel = Some(held);
-            }
-            "part" => parts.push(held),
-            _ => {}
+/// Nothing is drawn outside the box that holds it.
+///
+/// This is the generalisation of the defect the gate was written for: a
+/// box that has floated out of its container is still painted, still
+/// passes every test, and is the one thing a person sees immediately.
+fn nothing_escapes_what_holds_it(drawn: &[Drawn], out: &mut Vec<Violation>) {
+    for held in drawn.iter().filter(|held| held.drawn()) {
+        let Some(parent) = parent_of(drawn, held) else {
+            continue;
+        };
+        if !parent.drawn() || parent.depth >= held.depth {
+            continue;
         }
-    }
-    if let Some(open) = panel {
-        head_leads(rel, open, &parts, out);
-    }
-}
-
-/// One panel's own judgement.
-fn head_leads(rel: &str, panel: &Box, parts: &[&Box], out: &mut Vec<Violation>) {
-    let drawn: Vec<&&Box> = parts.iter().filter(|held| held.drawn()).collect();
-    let Some(head) = drawn
-        .iter()
-        .find(|held| held.class.split('.').any(|word| word == "panel-head"))
-    else {
-        return;
-    };
-    if let Some(above) = drawn
-        .iter()
-        .find(|held| head.top.saturating_sub(held.top) > SLACK)
-    {
-        out.push(Violation {
-            gate: "render",
-            location: rel.to_owned(),
-            rule: "a panel's head is the top of its own panel".to_owned(),
-            violation: format!(
-                "{} sits at y={} while {} is at y={} inside {}",
-                head.name(),
-                head.top,
-                above.name(),
-                above.top,
-                panel.name()
-            ),
-            alternative: "the panel grammar stacks: state the panel's own display so an \
-                          element rule cannot lay its parts out in a row"
-                .to_owned(),
-        });
-    }
-    if head.left.saturating_sub(panel.left).abs() > SLACK {
-        out.push(Violation {
-            gate: "render",
-            location: rel.to_owned(),
-            rule: "a panel's head starts at its panel's left edge".to_owned(),
-            violation: format!(
-                "{} starts at x={} inside {} at x={}",
-                head.name(),
-                head.left,
-                panel.name(),
-                panel.left
-            ),
-            alternative: "give the head no inline offset of its own".to_owned(),
-        });
-    }
-}
-
-/// Nothing measured reaches past the region that holds it.
-fn nothing_overflows(rel: &str, centre: &Box, boxes: &[Box], out: &mut Vec<Violation>) {
-    for held in boxes
-        .iter()
-        .filter(|held| held.kind != "centre" && held.drawn())
-    {
-        if held.right() > centre.right().saturating_add(SLACK) {
-            out.push(Violation {
-                gate: "render",
-                location: rel.to_owned(),
-                rule: "nothing is wider than the region that holds it".to_owned(),
-                violation: format!(
-                    "{} ends at x={} and its region ends at x={}",
-                    held.name(),
-                    held.right(),
-                    centre.right()
+        let escapes = held.left.saturating_add(SLACK) < parent.left
+            || held.right() > parent.right().saturating_add(SLACK)
+            || held.top.saturating_add(SLACK) < parent.top
+            || held.bottom() > parent.bottom().saturating_add(SLACK);
+        if escapes {
+            out.push(violation(
+                "nothing is drawn outside the box that holds it",
+                format!(
+                    "{} ({},{} {}x{}) leaves {} ({},{} {}x{})",
+                    held.called(),
+                    held.left,
+                    held.top,
+                    held.width,
+                    held.height,
+                    parent.called(),
+                    parent.left,
+                    parent.top,
+                    parent.width,
+                    parent.height
                 ),
-                alternative: "bound it with the page width token rather than the window".to_owned(),
-            });
+                "size the container to its contents, or let the contents scroll inside it. A box \
+                 that overflows is painted over whatever is next to it",
+            ));
         }
     }
+}
+
+fn parent_of<'a>(drawn: &'a [Drawn], held: &Drawn) -> Option<&'a Drawn> {
+    usize::try_from(held.parent)
+        .ok()
+        .and_then(|at| drawn.get(at))
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
+    reason = "test code"
+)]
 mod tests;

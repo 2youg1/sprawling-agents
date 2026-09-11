@@ -8,116 +8,93 @@ use super::*;
 fn found(src: &str) -> Vec<String> {
     handed_to_a_reader(src)
         .into_iter()
-        .map(|said| said.left)
+        .map(|said| format!("{}: {}", said.seat, said.left))
         .collect()
 }
 
-/// The ablation this gate exists for: the three sentences V3.50
-/// took off the cost page, put back the way they were written.
+/// The failure the gate exists for: a sentence that never calls `say`,
+/// so neither of the phrase table's own assertions can see it. Three
+/// lived on the cost page for a whole stage, and what found them was a
+/// photograph of the running client.
 #[test]
-fn the_three_sentences_that_escaped_both_of_langs_assertions_are_caught() {
-    let src = r##"
-        fn view() -> Element {
-            rsx! {
-                p { class: "consumed",
-                    "{render_tokens(usage.input)} in, {render_tokens(usage.output)} out"
-                }
-                p { class: "unpriced",
-                    "{usage.unpriced_calls} call(s) came back with no price."
-                }
-                p { class: "spent-line",
-                    "{render_usd(spent)} of that arrived through this page's own stream"
-                }
-            }
-        }
-    "##;
-    let hits = found(src);
-    assert_eq!(hits.len(), 3, "{hits:?}");
-    assert!(hits[0].contains("in,"), "{hits:?}");
-    assert!(hits[1].contains("came back with no price"), "{hits:?}");
-    assert!(hits[2].contains("arrived through"), "{hits:?}");
+fn a_sentence_that_never_asked_the_table_is_caught() {
+    let src = r#"
+      <section>
+        <p>nothing has cost anything yet</p>
+        <span>{say("cost_total")}</span>
+      </section>
+    "#;
+    assert_eq!(found(src), ["a text node: nothing has cost anything yet"]);
 }
 
-/// The first cut hit 79 addresses. Each of these is the shape that
-/// made it wrong, and the position rule refuses all of them without
-/// naming a single one.
+/// The shape that produced 79 findings when the predicate was a
+/// vocabulary instead of a position: every one of them was an address,
+/// a class list or a wire value.
 #[test]
-fn class_names_wire_values_and_arguments_are_not_words_a_reader_was_given() {
+fn class_lists_routes_and_wire_values_are_not_words_a_reader_was_given() {
     let src = r##"
-        fn view() -> Element {
-            let mode = pick("build the parser");
-            rsx! {
-                div { class: "panel composer", id: "compose",
-                    span { class: if hot { "phase alert" } else { "phase" } }
-                    button { onclick: move |_| send(Command::Dispatch { goal: "ship it" }) }
-                    input { r#type: "text", value: "{addr}", name: "room" }
-                    "{word(Msg::DispatchSend)}"
-                    "{percent(row.share)}%"
-                    "+{added}"
-                    "\u{2212}{removed}"
-                    "{room}/"
-                }
-            }
-        }
+      <a class="flex items-center gap-base text-label" href="#/city" role="link">
+        {say("nav_city")}
+      </a>
+      <span data-kind="model_called">{run.addr}</span>
     "##;
     assert!(found(src).is_empty(), "{:?}", found(src));
 }
 
+/// A type argument list ends with the same character an element does.
+/// The first run of this scanner reported ten of these.
 #[test]
-fn a_word_in_a_text_node_or_spoken_attribute_is_caught_either_way() {
-    let text = r##"fn v() { rsx! { span { class: "count", "{n} waiting" } } }"##;
-    assert_eq!(found(text), vec!["waiting".to_owned()]);
-    let spoken = r##"fn v() { rsx! { button { "aria-label": "dismiss" } } }"##;
-    assert_eq!(found(spoken), vec!["dismiss".to_owned()]);
-    let obeyed = r##"fn v() { rsx! { button { "aria-current": "true" } } }"##;
-    assert!(found(obeyed).is_empty());
+fn a_generic_is_not_an_element() {
+    let src = r"
+      const [view, setView] = createSignal<View>(DEFAULT_VIEW);
+      const held: Record<string, Held> | null = null;
+      const draw = (entry: Entry) => entry.label;
+    ";
+    assert!(found(src).is_empty(), "{:?}", found(src));
 }
 
-/// A match on strings sits in the middle of RSX all over this
-/// client. Its arms are patterns; `rsx!` is how one gets back to
-/// being content, and the walk has to tell those apart.
 #[test]
-fn match_arms_are_patterns_until_rsx_says_otherwise() {
-    let src = r##"
-        fn v() -> Element {
-            rsx! {
-                div {
-                    match dialect {
-                        "anthropic messages" => rsx! { span { "the wire spoke" } },
-                        _ => rsx! { span { "{word(Msg::Unknown)}" } },
-                    }
-                }
-            }
-        }
-    "##;
-    assert_eq!(found(src), vec!["the wire spoke".to_owned()]);
+fn both_seats_are_read() {
+    let text = r"<span>12 waiting</span>";
+    assert_eq!(found(text), ["a text node: 12 waiting"]);
+    let spoken = r#"<button aria-label="dismiss" />"#;
+    assert_eq!(found(spoken), ["a spoken attribute: dismiss"]);
+    // `aria-current` is not a spoken attribute: its value is a state a
+    // reader never hears as a word.
+    let obeyed = r#"<button aria-current="true" />"#;
+    assert!(found(obeyed).is_empty(), "{:?}", found(obeyed));
+}
+
+/// What the city supplies is not what the view wrote. A run of slots
+/// with punctuation between them hands a reader nothing.
+#[test]
+fn the_citys_own_values_are_not_the_views_words() {
+    let src = r"<span>{percent}%</span><span>{room}/</span><span>+{added}</span>";
+    assert!(found(src).is_empty(), "{:?}", found(src));
+}
+
+/// A comment addresses a contributor, not somebody using the client.
+#[test]
+fn a_comment_is_not_a_page() {
+    let src = r"// the composer grows to fit what somebody typed
+      <span>{say('talk_send')}</span>";
+    assert!(found(src).is_empty(), "{:?}", found(src));
 }
 
 #[test]
 fn a_waiver_on_the_line_or_the_line_above_is_honoured() {
-    let lines = [
-        "a",
-        "option { value: \"openai\", \"openai\" } // wording-ok: a name",
+    let lines = vec![
+        "// wording-ok: a provider's own name",
+        r#"<input placeholder="openai" />"#,
+        r#"<input placeholder="claude" />"#,
+        r#"<input placeholder="groq" /> // wording-ok: a provider's own name"#,
     ];
-    assert!(waived(&lines, 2));
-    let above = [
-        "// wording-ok: the two dialects name themselves",
-        "option {}",
-    ];
-    assert!(waived(&above, 2));
-    assert!(!waived(&["plain", "plain"], 2));
-}
-
-/// Everything below a module's own `#[cfg(test)]` is evidence a
-/// test wrote down, not a page.
-#[test]
-fn a_sentence_a_test_quotes_is_not_a_sentence_a_page_says() {
-    let src = "fn v() { rsx! { p { \"live text\" } } }\n#[cfg(test)]\nmod t { const S: &str = \"quoted evidence\"; }";
-    assert_eq!(found(drawn(src)), vec!["live text".to_owned()]);
-}
-
-#[test]
-fn a_raw_identifier_is_not_a_raw_string() {
-    let src = r##"fn v() { rsx! { input { r#type: "text", "a word here" } } }"##;
-    assert_eq!(found(src), vec!["a word here".to_owned()]);
+    assert!(waived(&lines, 2), "the line above did not waive");
+    assert!(waived(&lines, 4), "the line itself did not waive");
+    // The reach is two lines, not the rest of the file: line 3 sits
+    // under a line that carries no mark.
+    assert!(
+        !waived(&lines, 3),
+        "the waiver reached further than one line"
+    );
 }

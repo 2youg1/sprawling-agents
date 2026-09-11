@@ -3,89 +3,192 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use super::{Box, judge};
+use super::*;
 
-use super::engine::{parse_box, sink};
+/// `Violation` has no `Debug` on purpose (it is rendered, not dumped),
+/// so failures report the rules that fired.
+fn rules(found: &[Violation]) -> String {
+    found
+        .iter()
+        .map(|v| format!("{} :: {}", v.rule, v.violation))
+        .collect::<Vec<_>>()
+        .join(" | ")
+}
 
-#[cfg(test)]
-fn boxed(kind: &str, class: &str, left: i64, top: i64, width: i64) -> Box {
-    Box {
-        kind: kind.to_owned(),
-        tag: "DIV".to_owned(),
-        class: class.to_owned(),
+/// One element, in the shape the probe writes.
+#[expect(clippy::too_many_arguments, reason = "a drawn box has this many sides")]
+fn el(
+    tag: &str,
+    name: &str,
+    left: i64,
+    top: i64,
+    width: i64,
+    height: i64,
+    depth: i64,
+    parent: i64,
+) -> Drawn {
+    Drawn {
+        tag: tag.to_owned(),
+        role: "-".to_owned(),
+        name: name.to_owned(),
         left,
         top,
         width,
-        height: 40,
+        height,
+        depth,
+        parent,
     }
 }
 
-#[test]
-fn a_second_left_edge_is_caught() {
-    // The defect this pins: `.panel`'s shorthand margin reset the
-    // inline auto margins the centre column had set, so a page's
-    // heading was centred and the panels under it were not.
-    let boxes = vec![
-        boxed("centre", "centre", 200, 0, 1146),
-        boxed("region", "record-head", 284, 60, 1040),
-        boxed("region", "panel", 253, 160, 1040),
-    ];
+/// The gallery as it stands: a rail, a main column, a heading, and three
+/// sections that share one left edge.
+fn good() -> Vec<Drawn> {
+    vec![
+        el("NAV", "去处", 0, 0, 44, 1061, 3, -1),
+        el("MAIN", "页面", 44, 0, 1372, 1061, 3, -1),
+        el("H1", "画廊", 361, 16, 728, 27, 5, 1),
+        el("SECTION", "thinking", 361, 67, 728, 113, 5, 1),
+        el("SECTION", "calling", 361, 204, 728, 113, 5, 1),
+        el("SECTION", "waiting", 361, 341, 728, 113, 5, 1),
+        el("BUTTON", "/stop", 951, 138, 51, 29, 8, 3),
+    ]
+}
+
+fn judge(drawn: &[Drawn]) -> Vec<Violation> {
     let mut out = Vec::new();
-    judge("record.html", &boxes, &mut out);
-    assert_eq!(out.len(), 1, "one page, one edge");
-    assert!(out.iter().any(|v| v.violation.contains("x=284")));
+    every_control_is_announceable(drawn, &mut out);
+    every_landmark_is_named(drawn, &mut out);
+    one_first_heading(drawn, &mut out);
+    one_left_edge(drawn, &mut out);
+    nothing_escapes_what_holds_it(drawn, &mut out);
+    out
 }
 
 #[test]
-fn a_head_laid_out_beside_its_body_is_caught() {
-    // The defect this pins: `form { display: flex }` captured the
-    // composer, so its head sat beside the box instead of above it.
-    let boxes = vec![
-        boxed("centre", "centre", 200, 0, 1146),
-        boxed("region", "panel.composer", 253, 60, 1040),
-        boxed("panel", "panel.composer", 253, 60, 1040),
-        boxed("part", "panel-body", 755, 60, 400),
-        boxed("part", "panel-head", 253, 205, 400),
-    ];
-    let mut out = Vec::new();
-    judge("sessions.html", &boxes, &mut out);
+fn the_shape_the_client_draws_passes() {
+    let found = judge(&good());
+    assert!(found.is_empty(), "{}", rules(&found));
+}
+
+/// The finding the first real run made: the composer's text box is the
+/// control the page exists for, and it was announced as nothing.
+#[test]
+fn a_control_with_no_accessible_name_is_caught() {
+    let mut drawn = good();
+    drawn.push(el("TEXTAREA", "", 373, 106, 704, 24, 8, 3));
+    let found = judge(&drawn);
     assert!(
-        out.iter()
-            .any(|v| v.rule.contains("the top of its own panel")),
-        "a head below its own body is the row layout"
+        found
+            .iter()
+            .any(|v| v.violation.contains("textarea")
+                && v.violation.contains("announced as nothing")),
+        "{}",
+        rules(&found)
+    );
+}
+
+/// A control that is not drawn is not a control a person can reach, and
+/// naming it would be a rule about markup rather than about a reader.
+#[test]
+fn a_control_with_no_area_is_not_asked_for_a_name() {
+    let mut drawn = good();
+    drawn.push(el("BUTTON", "", 0, 0, 0, 0, 8, 3));
+    let found = judge(&drawn);
+    assert!(found.is_empty(), "{}", rules(&found));
+}
+
+#[test]
+fn an_unnamed_landmark_is_caught() {
+    let mut drawn = good();
+    drawn.push(el("ASIDE", "", 1200, 0, 216, 1061, 3, -1));
+    let found = judge(&drawn);
+    assert!(
+        found.iter().any(|v| v.violation.contains("<aside>")),
+        "{}",
+        rules(&found)
     );
 }
 
 #[test]
-fn a_page_whose_regions_agree_is_clean() {
-    let boxes = vec![
-        boxed("centre", "centre", 200, 0, 1146),
-        boxed("region", "record-head", 253, 60, 1040),
-        boxed("region", "panel", 253, 160, 1040),
-        boxed("panel", "panel", 253, 160, 1040),
-        boxed("part", "panel-head", 253, 160, 400),
-        boxed("part", "panel-body", 253, 200, 400),
-    ];
-    let mut out = Vec::new();
-    judge("record.html", &boxes, &mut out);
-    assert!(out.is_empty(), "{:?}", out.first().map(|v| &v.violation));
+fn a_page_with_two_first_headings_is_caught() {
+    let mut drawn = good();
+    drawn.push(el("H1", "第二个", 361, 900, 728, 27, 5, 1));
+    let found = judge(&drawn);
+    assert!(
+        found
+            .iter()
+            .any(|v| v.violation.starts_with("this page has 2")),
+        "{}",
+        rules(&found)
+    );
 }
 
 #[test]
-fn a_box_wider_than_its_region_is_caught() {
-    let boxes = vec![
-        boxed("centre", "centre", 200, 0, 1000),
-        boxed("region", "panel", 200, 60, 2376),
-    ];
-    let mut out = Vec::new();
-    judge("sessions.html", &boxes, &mut out);
-    assert!(out.iter().any(|v| v.rule.contains("wider than the region")));
+fn a_page_with_no_first_heading_is_caught() {
+    let drawn: Vec<Drawn> = good().into_iter().filter(|held| held.tag != "H1").collect();
+    let found = judge(&drawn);
+    assert!(
+        found
+            .iter()
+            .any(|v| v.violation.starts_with("this page has 0")),
+        "{}",
+        rules(&found)
+    );
 }
 
+/// The defect this gate was written for: one region indented past the
+/// others, so the page grows a second left edge.
 #[test]
-fn the_probe_writes_where_the_gate_reads() {
-    let dom = "<html><body><pre id=\"sprawling-render\">region DIV a 1 2 3 4</pre></body>";
-    let records = sink(dom).expect("the sink is found");
-    let held = parse_box(records).expect("one record parses");
-    assert_eq!((held.left, held.top, held.width, held.height), (1, 2, 3, 4));
+fn a_second_left_edge_is_caught() {
+    let mut drawn = good();
+    if let Some(region) = drawn.get_mut(4) {
+        region.left = 393;
+    }
+    let found = judge(&drawn);
+    assert!(
+        found.iter().any(|v| v.rule.contains("one left edge")),
+        "{}",
+        rules(&found)
+    );
+}
+
+/// A pixel of rounding is not a decision somebody made twice.
+#[test]
+fn a_single_pixel_of_rounding_is_not_a_second_edge() {
+    let mut drawn = good();
+    if let Some(region) = drawn.get_mut(4) {
+        region.left = 362;
+    }
+    let found = judge(&drawn);
+    assert!(found.is_empty(), "{}", rules(&found));
+}
+
+/// The home page whose task box floated into the top right corner: the
+/// box is still painted, every test still passes, and it is the first
+/// thing a person sees.
+#[test]
+fn a_box_that_has_left_its_container_is_caught() {
+    let mut drawn = good();
+    drawn.push(el("BUTTON", "escaped", 1300, 12, 200, 40, 8, 3));
+    let found = judge(&drawn);
+    assert!(
+        found
+            .iter()
+            .any(|v| v.violation.contains("escaped") && v.violation.contains("leaves")),
+        "{}",
+        rules(&found)
+    );
+}
+
+/// Containment is judged against the nearest measured ancestor, so an
+/// element at the top of the page is not compared with nothing.
+#[test]
+fn an_element_with_no_measured_parent_is_left_alone() {
+    let drawn = vec![el("MAIN", "页面", 44, 0, 1372, 1061, 3, -1)];
+    let found = judge(&drawn);
+    assert!(
+        found.iter().all(|v| !v.rule.contains("outside the box")),
+        "{}",
+        rules(&found)
+    );
 }
