@@ -84,6 +84,13 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
         token_digest: None,
         client: Arc::new(channels::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),
+        transcribe_sink: Arc::new(|_, _| {
+            Err(AxError::failure(
+                AxCode::ToolUnavailable,
+                "transcribe a recording",
+                "this test city has no transcription endpoint",
+            ))
+        }),
         events: events.clone(),
         queries: Arc::new(|_| {
             Ok(Answer::Unavailable {

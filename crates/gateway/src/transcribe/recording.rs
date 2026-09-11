@@ -38,6 +38,33 @@ impl AudioType {
         }
     }
 
+    /// The container a media type names, or a refusal saying which
+    /// containers exist.
+    ///
+    /// Fail closed, and the refusal lists them: a browser that recorded
+    /// into something else has to be told what to record into instead,
+    /// and a person cannot act on "unsupported".
+    ///
+    /// # Errors
+    /// `E_INVALID_ARGS` for a media type this build cannot send.
+    pub fn of_media_type(media: &str) -> Result<AudioType, AxError> {
+        match media.trim().to_ascii_lowercase().as_str() {
+            "audio/webm" | "video/webm" => Ok(AudioType::Webm),
+            "audio/ogg" => Ok(AudioType::Ogg),
+            "audio/mpeg" | "audio/mp3" => Ok(AudioType::Mpeg),
+            "audio/mp4" => Ok(AudioType::Mp4),
+            "audio/wav" | "audio/x-wav" | "audio/wave" => Ok(AudioType::Wav),
+            other => Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "read a recording's container",
+                other.to_owned(),
+            )
+            .with_recovery(
+                "record into audio/webm, audio/ogg, audio/mpeg, audio/mp4 or audio/wav",
+            )),
+        }
+    }
+
     /// The `filename` of the file part. Providers route on the
     /// extension as well as on the media type, and one that disagreed
     /// with the other is answered 400.
@@ -166,5 +193,40 @@ mod tests {
                 kind.media_type()
             );
         }
+    }
+
+    /// What a browser declares is what this city reads back, and a
+    /// container it cannot send is refused with the list of the ones it
+    /// can. "Unsupported" is not something a person can act on.
+    #[test]
+    fn a_container_this_city_cannot_send_is_refused_with_the_ones_it_can() {
+        for kind in [
+            AudioType::Webm,
+            AudioType::Ogg,
+            AudioType::Mpeg,
+            AudioType::Mp4,
+            AudioType::Wav,
+        ] {
+            assert_eq!(
+                AudioType::of_media_type(kind.media_type()).unwrap(),
+                kind,
+                "{kind:?} is read back from the type it declares"
+            );
+        }
+        // What a browser actually sends: the container, then the codec
+        // inside it. The parameter belongs to the caller to strip, so
+        // this door sees the container alone.
+        assert_eq!(
+            AudioType::of_media_type("AUDIO/WEBM").unwrap(),
+            AudioType::Webm,
+            "a media type is not case-sensitive"
+        );
+        let refused = AudioType::of_media_type("audio/flac").unwrap_err();
+        assert_eq!(*refused.code(), AxCode::InvalidArgs);
+        assert!(
+            refused.recovery().contains("audio/webm"),
+            "the refusal names what to record into instead: {}",
+            refused.recovery()
+        );
     }
 }

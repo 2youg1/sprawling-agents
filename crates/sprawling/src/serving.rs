@@ -27,6 +27,7 @@
 /// Deliberately not the simulator's seeded randomness: a verifier a
 /// third party can predict is a login a third party can finish. This is
 /// the one place in the binary where reproducibility would be a defect.
+pub(super) mod attending;
 pub(crate) mod desk;
 pub(super) mod door;
 pub(crate) mod pool;

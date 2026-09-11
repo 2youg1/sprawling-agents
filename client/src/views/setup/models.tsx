@@ -5,7 +5,9 @@
 
 // Which model does the thinking, and how hard by default. `main` is the
 // one a dispatch is refused without; `digest` reads long documents on
-// its behalf and follows `main` unless it is pointed elsewhere.
+// its behalf and follows `main` unless it is pointed elsewhere;
+// `transcribe` turns a recording into a line of text, and a city with
+// none draws no microphone.
 
 import { For, Show, createMemo } from "solid-js";
 
@@ -17,7 +19,7 @@ import { useCommand, useSay, useUi } from "../../ui";
 export function ModelChoice(props: { readonly answer: EndpointsAnswer; readonly tags?: readonly ModelTag[] }) {
   const say = useSay();
   const command = useCommand();
-  const tags = () => props.tags ?? ["main", "digest"];
+  const tags = () => props.tags ?? (["main", "digest", "transcribe"] as const);
   const options = createMemo(() =>
     props.answer.endpoints.flatMap((endpoint) => endpoint.models.map((model) => ({ endpoint: endpoint.name, model }))),
   );

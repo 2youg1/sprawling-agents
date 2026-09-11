@@ -16,7 +16,7 @@ import { cancel, steer } from "../core/commands";
 import { buildingOf, roomOf, toFragment } from "../core/route";
 import { count, usd } from "../core/time";
 import type { GitOid, RoundsAnswer, RunId, Turn } from "../wire";
-import { useCommand, useSay, useUi } from "../ui";
+import { useCommand, useHearing, useSay, useUi } from "../ui";
 import { Changes } from "./changes";
 import { Composer } from "./talk/composer";
 import { Thread } from "./talk/thread";
@@ -142,6 +142,7 @@ export function Run(props: RunProps) {
   const ui = useUi();
   const say = useSay();
   const command = useCommand();
+  const hearing = useHearing();
   const [lens, setLens] = createSignal<Lens>("turns");
   const belief = () => ui.conn.belief.runs[props.run];
   const rounds = createMemo(() => ui.conn.asking.ask({ rounds: { run: props.run } }));
@@ -224,6 +225,7 @@ export function Run(props: RunProps) {
                     placeholder={say("talk_placeholder_room", { room: roomWord() })}
                     sending={sendingInto(belief()?.doing)}
                     draft={props.run}
+                    hearing={hearing()}
                     onSend={(text) => command(steer(props.run, text))}
                     onStop={() => command(cancel(props.run))}
                   />

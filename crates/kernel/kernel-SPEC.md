@@ -1007,6 +1007,7 @@ pub fn assert_model_conformance<M: Model>(model: &mut M);
 ```rust
 #[non_exhaustive] pub enum Role { User, Assistant }                      // wire 枚举，开放
 #[non_exhaustive] pub enum StopReason { EndTurn, ToolUse, MaxTokens }
+#[non_exhaustive] pub enum ModelTag { Main, Digest, Transcribe }         // ALL: [ModelTag; 3]
 pub struct SystemBlock { pub text: String, pub cache: bool }             // cache＝显式断点标记
 #[non_exhaustive] pub enum ContentBlock { Text{text} | Thinking{thinking, signature}
                                         | RedactedThinking{data}
@@ -1026,6 +1027,7 @@ pub fn value_has_float(value: &serde_json::Value) -> bool;               // wire
 - 工具入参／schema 用 Payload：浮点禁令在缝上即成立（这些字节逐字进 Ledger 载荷）；provider 送浮点工具入参＝E_WIRE_MISMATCH（fail-closed，城规优先）。
 - ModelRequest 增 chat 字段已随 S3.08 落地（turn 的 Assembling 相组 ChatRequest 入请求）；ModelReturn 增 usage/stop/billed 三字段已随 S3.02 落地，携 `bare()`（脚本最小构造）与 `from_response(resp, billed)`（tool_use 块→波，全量入账）两构造面；turn 的 model_returned 载荷随之增 usage／stop／billed_usd_micros（在场才写）。
 - BuildingPolicy 住本缝而非 city：kernel 不能依赖外层，city::policy（P1）是它的**求值器**不是定义处（依赖反转，同 ledger 缝）。
+- **一种活一个标签，不是一种活一个存储**：`ModelTag` 答的是「哪个端点、哪个模型接这类活」，而这件事已有一套机制——人登记一个 endpoint，再为一个标签选一个模型。因此转写进的是 `Transcribe` 这个 variant，而不是第二张表单与第二个凭据入口；多一个存储就是给同一个问题立第二个答案。`ALL` 是界面枚举标签时走的那条路，新增一个 variant 即改它的长度。
 - conformance 两断言：①良性请求得 Ok 且 message/calls 形状合法（类型已保大半）；②Err 后适配器不中毒（再调仍得应答）。确定性不入 conformance（真 model 非确定），剑本适配器的确定性由 citysim 自证。
 
 **P1.10 增：思考记录与思考强度**（思考记录原样保留，消息往返恒按 provider 官方规定处理）

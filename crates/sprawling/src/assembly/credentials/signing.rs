@@ -238,10 +238,28 @@ impl RunWorker {
     /// The redemption closure the adapters take: one resolve per call,
     /// nothing cached, the lock held only while the vault is read.
     pub(in crate::assembly) fn resolver(&self) -> gateway::SecretResolver {
-        let vault = Arc::clone(&self.vault);
-        Box::new(move |reference: &kernel::SecretRef| {
-            let held = vault.lock().map_err(|_| poisoned_vault())?;
-            held.resolve(reference)
-        })
+        resolving(Arc::clone(&self.vault))
     }
+
+    /// The vault this city resolves credentials through.
+    ///
+    /// Shared rather than lent, because one route resolves a credential
+    /// off this thread: the transcription door runs on a socket task and
+    /// must reach the same vault, so that "a credential is resolved at
+    /// the last moment and exposed only while a header is written" stays
+    /// one path rather than two.
+    pub(crate) fn vault_handle(&self) -> Arc<std::sync::Mutex<gateway::Custodian>> {
+        Arc::clone(&self.vault)
+    }
+}
+
+/// One resolver over one vault. A fresh one per operation, because
+/// `SecretResolver` is spent by the endpoint it is handed to.
+pub(crate) fn resolving(
+    vault: Arc<std::sync::Mutex<gateway::Custodian>>,
+) -> gateway::SecretResolver {
+    Box::new(move |reference: &kernel::SecretRef| {
+        let held = vault.lock().map_err(|_| poisoned_vault())?;
+        held.resolve(reference)
+    })
 }

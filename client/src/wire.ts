@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 20 as const;
+export const WIRE_V = 21 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "a249f589f1b45771bb1f08e2b36e32e26be3cbfc1e1011fe34f88a614001c0b1" as const;
+export const WIRE_HASH = "5f8e6f1e506ae7b10052f0b44828dd529804b4b992a29a0578b58b4c3c0d4ef2" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -828,6 +828,7 @@ export type DocumentAnswer = typeof DocumentAnswer.Type;
 export const ModelTag = Schema.Union(
   Schema.Literal("main"),
   Schema.Literal("digest"),
+  Schema.Literal("transcribe"),
 ).annotations({ identifier: "ModelTag" });
 export type ModelTag = typeof ModelTag.Type;
 

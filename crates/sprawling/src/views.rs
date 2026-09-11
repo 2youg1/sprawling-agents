@@ -29,6 +29,7 @@ pub(super) mod document;
 pub(super) mod evidence;
 #[cfg(test)]
 mod governance_tests;
+pub(super) mod hearing;
 pub(super) mod holding;
 pub(super) mod lines;
 pub(super) mod listing;

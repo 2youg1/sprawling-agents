@@ -30,7 +30,7 @@ use axum::Json;
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::http::{StatusCode, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use kernel::{AxCode, AxError};
 use tokio::sync::broadcast;
@@ -250,6 +250,37 @@ pub(crate) async fn accept_acp(State(state): State<Arc<ShellState>>, body: Bytes
     match (state.acp)(request, authentic) {
         Ok(progress) => (StatusCode::ACCEPTED, Json(progress)).into_response(),
         Err(err) => (StatusCode::FORBIDDEN, refusal_text(&err)).into_response(),
+    }
+}
+
+/// One recording in, one line of text back.
+///
+/// The media type is read off the request rather than guessed from the
+/// bytes: a browser records into whatever container it has, and it is
+/// the only party that knows which. A request with none is refused by
+/// name, because a container nobody declared cannot be sent on.
+pub(crate) async fn accept_recording(
+    State(state): State<Arc<ShellState>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let Some(media) = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+    else {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "send the recording with the content-type it was recorded in",
+        )
+            .into_response();
+    };
+    // The parameters a browser appends (`; codecs=opus`) name the codec
+    // inside the container, and what the audio wire routes on is the
+    // container.
+    let media = media.split(';').next().unwrap_or(media).trim().to_owned();
+    match (state.transcribe_sink)(body.to_vec(), media) {
+        Ok(text) => (StatusCode::OK, text).into_response(),
+        Err(err) => (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response(),
     }
 }
 

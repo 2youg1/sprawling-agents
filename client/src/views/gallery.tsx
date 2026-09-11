@@ -97,6 +97,7 @@ export function Gallery() {
             <Composer
               placeholder={say("talk_placeholder_mayor")}
               sending={sendingInto(doing) satisfies Sending}
+              hearing={doing.kind === "thinking"}
               onSend={() => false}
               onStop={() => false}
             />

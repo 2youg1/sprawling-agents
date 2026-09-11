@@ -497,6 +497,7 @@ pub channels::ServeConfig::events: tokio::sync::broadcast::Sender<kernel::event:
 pub channels::ServeConfig::queries: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Query) -> core::result::Result<channels::Answer, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::secrets: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Command<kernel::secret::sealed::Sealed<alloc::string::String>>, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::token_digest: core::option::Option<kernel::locator::B3Hash>
+pub channels::ServeConfig::transcribe_sink: channels::TranscribeSink
 pub channels::ServeConfig::upload_sink: alloc::sync::Arc<(dyn core::ops::function::Fn(alloc::vec::Vec<u8>) -> core::result::Result<channels::UploadId, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServerFrame::Answer(alloc::boxed::Box<channels::Answer>)
 pub channels::ServerFrame::Delta(channels::Delta)
@@ -687,6 +688,7 @@ pub struct channels::Used
 pub struct channels::Welcome
 pub struct channels::Withheld
 pub type channels::AcpSink = alloc::sync::Arc<(dyn core::ops::function::Fn(channels::AcpBody, bool) -> core::result::Result<channels::AcpProgress, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
+pub type channels::TranscribeSink = alloc::sync::Arc<(dyn core::ops::function::Fn(alloc::vec::Vec<u8>, alloc::string::String) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type channels::WireCommand = channels::Command<channels::NoSecret>
 pub use channels::Address
 pub use channels::ApprovalClass

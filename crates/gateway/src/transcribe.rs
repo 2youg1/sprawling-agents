@@ -10,9 +10,11 @@
 //! everything else it does; what it cannot do, it says by name, with a
 //! code and a recovery, at the moment it is asked.
 
+mod chosen;
 mod recording;
 mod transcriber;
 mod wire;
 
+pub use chosen::transcriber_for;
 pub use recording::{AudioType, Recording};
 pub use transcriber::{Transcriber, TranscriberConfig};

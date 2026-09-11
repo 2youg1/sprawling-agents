@@ -11,7 +11,7 @@
 use kernel::{AxCode, AxError};
 
 mod endpoints;
-mod signing;
+pub(super) mod signing;
 
 /// The name the environment-configured endpoint is attached under, so a
 /// person reading the settings page can see where it came from.

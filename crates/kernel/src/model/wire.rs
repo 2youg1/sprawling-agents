@@ -86,17 +86,27 @@ pub enum ModelTag {
     /// The small model that reads long documents so the main one does
     /// not have to: summaries, structure trees, search results.
     Digest,
+    /// The model that turns a recording into text.
+    ///
+    /// A tag rather than a store of its own, because "which endpoint and
+    /// which model answer this kind of job" already has a mechanism: a
+    /// person attaches an endpoint and chooses a model for a tag. A
+    /// second form and a second file would be a second answer to one
+    /// question, and the credential would need a second way into the
+    /// vault.
+    Transcribe,
 }
 
 impl ModelTag {
     /// Every tag, in the order a settings page should offer them.
-    pub const ALL: [ModelTag; 2] = [ModelTag::Main, ModelTag::Digest];
+    pub const ALL: [ModelTag; 3] = [ModelTag::Main, ModelTag::Digest, ModelTag::Transcribe];
 
     #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ModelTag::Main => "main",
             ModelTag::Digest => "digest",
+            ModelTag::Transcribe => "transcribe",
         }
     }
 }

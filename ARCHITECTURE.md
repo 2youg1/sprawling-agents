@@ -481,7 +481,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::fixture | crates/memory/src/bundle/fixture.rs | the one city the bundle tests export | adapter | V3 | built | memory-SPEC.md#8-21 |
 
-### gateway (40) — everything between a decision to call a model and the bytes on the wire
+### gateway (41) — everything between a decision to call a model and the bytes on the wire
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -509,6 +509,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::endpoint::model | crates/gateway/src/endpoint/model.rs | the Model face | adapter | S3 | built | gateway-SPEC.md#8-2 |
 | gateway::endpoint::adapter | crates/gateway/src/endpoint/adapter.rs | which adapter a chosen model gets, and why | adapter | S3 | built | gateway-SPEC.md#8-2 |
 | gateway::transcribe | crates/gateway/src/transcribe.rs | the optional endpoint that turns a recording into a line of text | adapter | F5 | built | gateway-SPEC.md#8-12 |
+| gateway::transcribe::chosen | crates/gateway/src/transcribe/chosen.rs | from a chosen endpoint to a facility that transcribes | adapter | V5 | built | gateway-SPEC.md#8-1 |
 | gateway::transcribe::recording | crates/gateway/src/transcribe/recording.rs | the bytes a person spoke and the format they are in | value | F5 | built | gateway-SPEC.md#8-12 |
 | gateway::transcribe::wire | crates/gateway/src/transcribe/wire.rs | the OpenAI audio wire: one multipart body, one key read back | decision | F5 | built | gateway-SPEC.md#8-12 |
 | gateway::transcribe::transcriber | crates/gateway/src/transcribe/transcriber.rs | attached or absent, and the refusal absence answers with | adapter | F5 | built | gateway-SPEC.md#8-12 |
@@ -701,7 +702,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (142)
+### browser (12), protocol (5), bin (144)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -806,6 +807,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::commanding::tests::entrance | crates/sprawling/src/assembly/commanding/tests/entrance.rs | one ask under one key is one effect, across a restart too | decision | V4 | built | sprawling-SPEC.md#8-39 |
 | bin::serving | crates/sprawling/src/serving.rs | how a city is stood up and served: the key at the door, the desk, the one writer thread | adapter | V3 | built | sprawling-SPEC.md#8-38 |
 | bin::serving::door | crates/sprawling/src/serving/door.rs | the key at the door and the vault behind it | adapter | V3 | built | sprawling-SPEC.md#8-38 |
+| bin::serving::attending | crates/sprawling/src/serving/attending.rs | the one writer thread: what it opens, and the three mouths it serves | adapter | V5 | built | sprawling-SPEC.md#8-42 |
 | bin::serving::desk | crates/sprawling/src/serving/desk.rs | where commands wait between the socket and the worker | adapter | V3 | built | sprawling-SPEC.md#8-38 |
 | bin::serving::relay | crates/sprawling/src/serving/relay.rs | the third Ledger adapter: a write from a driving thread, carried to the accounting thread and waited for | adapter | V4 | built | sprawling-SPEC.md#8-42 |
 | bin::serving::pool | crates/sprawling/src/serving/pool.rs | the driving lanes: one thread per run in flight, entered with a drive and left with what it left behind | adapter | V4 | built | sprawling-SPEC.md#8-46 |
@@ -850,6 +852,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::plan_view | crates/sprawling/src/plan_view.rs | every building's plan, parsed once and re-parsed only when a record says it may have moved | projection | V3 | built | sprawling-SPEC.md#8-34 |
 | bin::plan_view::tests | crates/sprawling/src/plan_view/tests.rs | proof that the projection folds records rather than holding a copy of the plan | projection | V3 | built | sprawling-SPEC.md#8-34 |
 | bin::views | crates/sprawling/src/views.rs | the fold every query is answered from, and the lines a page reads off it | projection | V3 | built | sprawling-SPEC.md#8-37 |
+| bin::views::hearing | crates/sprawling/src/views/hearing.rs | the facility that turns a recording into text, as this city's own choice describes it | adapter | V5 | built | sprawling-SPEC.md#8-56 |
 | bin::views::holding | crates/sprawling/src/views/holding.rs | what the views hold and how one record folds in | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::answering | crates/sprawling/src/views/answering.rs | every question a page may ask, answered from the fold | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::commits | crates/sprawling/src/views/commits.rs | which run wrote a commit, and the commits a building made newest first, folded from the records that announced them | projection | V4 | built | sprawling-SPEC.md#8-53 |

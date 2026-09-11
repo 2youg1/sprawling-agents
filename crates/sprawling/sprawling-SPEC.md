@@ -2525,3 +2525,14 @@ card-2.3 让合并落成一个真正的合并提交后，`settle_requests` 给 `
 - **载荷第三位**：`city::Written { sandbox, mcp, desktop }` 取代三个裸布尔——调用点写 `(true, false, true)` 说不出哪一位是哪一面。
 - **页面**：`client/src/views/desktop.tsx` 一个框装整份文件，读用 `Query::Document`（`<building>/.sprawling/DESKTOP.toml`），写用 `configure_building`。一个「每个窗口一行」的表单会是这一侧对那份语法的第二次解读。
 - **验收**：`assembly::building_page::tests::the_desktop_allowlist_is_written_where_no_resident_reaches_it`——人写的字节落在 `desktop_scope_path` 上，且那条地址 `is_reserved` 为真（任何写域都够不到）。
+
+## 8-56 说出来的那句话：录音进城，一行字出来（card-6.10；`bin::views::hearing`、`bin::serving::worker::hearing`；channels-SPEC §8-27）
+
+服务端此前只有 `gateway::transcribe` 这个适配器：一件没有任何路可以走到的东西。本节把路修通。
+
+- **人填 URL 与 key 走既有的 attach 表单**。「哪个 endpoint、哪个 model 答这一类活」已有机制——`ModelTag`。第三个 tag `Transcribe` 因此是全部的新增面：第二张表单加第二份存储会是同一个问题的第二个答案，而那把 key 还要有第二条进金库的路。
+- **`Views::transcriber`**（`views::hearing`）：锁内读出选择、造出 `Transcriber`，锁外发请求。一次转写是数秒，而那把锁是全部读的答案所在。
+- **`serving::worker::hearing`**：把 views 与金库收成一条 `TranscribeSink`。金库是**工人开的那一把**，经启动握手那条通道交出来（`Started.vault`）——第二个 `Custodian` 会是同一批机密的第二扇门。
+- **容器从请求头读**：`AudioType::of_media_type` fail closed，拒词列出这座城发得出去的五种。浏览器录进它手上有的容器，而只有它知道是哪一个。
+- **页面**：`core/speaking.ts` 管录音与上传，composer 多一个按钮，**转写结果落进输入框而不是直接发出去**——机器听错的那一句必须能改，否则它会花掉一次 run。没有 `transcribe` 选择的城不画这个按钮（`useHearing`）。
+- **验收**：`channels` 的 `/transcribe` 路由在没有 content-type 时按名拒绝；`gateway::transcribe::recording` 的 `of_media_type` 认得五种容器、拒第六种并列出前五种。

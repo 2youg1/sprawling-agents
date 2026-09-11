@@ -15,7 +15,7 @@ import { cancel, dispatch, release, steer } from "../core/commands";
 import { sendingInto, type RunBelief } from "../core/belief";
 import { MAYOR, roomOf } from "../core/route";
 import type { Address } from "../wire";
-import { useCommand, useSay, useUi } from "../ui";
+import { useCommand, useHearing, useSay, useUi } from "../ui";
 import { Composer } from "./talk/composer";
 import { Thread } from "./talk/thread";
 import { Waiting } from "./talk/waiting";
@@ -28,6 +28,7 @@ export function Talk(props: TalkProps) {
   const ui = useUi();
   const say = useSay();
   const command = useCommand();
+  const hearing = useHearing();
 
   // The runs of this room, oldest first. A run whose room is not yet
   // known is not shown here rather than shown in the wrong room.
@@ -122,6 +123,7 @@ export function Talk(props: TalkProps) {
           placeholder={isMayor() ? say("talk_placeholder_mayor") : say("talk_placeholder_room", { room: roomOf(props.address) })}
           sending={sendingInto(live()?.doing)}
           draft={props.address}
+          hearing={hearing()}
           onSend={send}
           onStop={() => {
             const going = live();

@@ -42,6 +42,7 @@ pub fn gateway::AttachedEndpoint::is_local(&self) -> bool
 pub fn gateway::AttachedEndpoint::models_url(&self) -> alloc::string::String
 pub fn gateway::AudioType::file_name(self) -> &'static str
 pub fn gateway::AudioType::media_type(self) -> &'static str
+pub fn gateway::AudioType::of_media_type(&str) -> core::result::Result<gateway::AudioType, kernel::error::shape::AxError>
 pub fn gateway::AuthSpec::for_dialect(kernel::model::wire::DialectKind, kernel::secret::span::SecretRef, core::option::Option<alloc::string::String>) -> gateway::AuthSpec
 pub fn gateway::Custodian::capture(&mut self, &[u8], &str) -> core::result::Result<gateway::Captured, kernel::error::shape::AxError>
 pub fn gateway::Custodian::describe(&self, &kernel::secret::span::SecretRef) -> gateway::Described
@@ -104,6 +105,7 @@ pub fn gateway::retreat_payload(kernel::model::wire::ModelTag, &str, &gateway::R
 pub fn gateway::selected_payload(kernel::model::wire::ModelTag, &str, &gateway::ModelEntry, &gateway::Fallback) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn gateway::settle(&kernel::model::wire::ModelUsage, core::option::Option<kernel::budget::UsdMicros>, &gateway::ModelEntry) -> core::result::Result<gateway::CallCost, kernel::error::shape::AxError>
 pub fn gateway::settled_from_stream(kernel::model::wire::DialectKind, &[serde_json::value::Value]) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
+pub fn gateway::transcriber_for(&gateway::Chosen<'_>, gateway::SecretResolver) -> core::result::Result<gateway::Transcriber, kernel::error::shape::AxError>
 pub gateway::AdmissionVerdict::Admit
 pub gateway::AdmissionVerdict::Hold
 pub gateway::AdmissionVerdict::Hold::until: kernel::event::identity::TimeMs

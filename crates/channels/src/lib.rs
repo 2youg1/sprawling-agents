@@ -62,7 +62,7 @@ pub use reception::{SessionState, SessionStep, decide_frame};
 #[cfg(feature = "server")]
 pub use reception::{decide_bind, decide_handshake};
 #[cfg(feature = "server")]
-pub use server::{AcpBody, AcpProgress, AcpSink};
+pub use server::{AcpBody, AcpProgress, AcpSink, TranscribeSink};
 #[cfg(feature = "server")]
 pub use server::{Delivered, Reply, ServeConfig, router, serve};
 #[cfg(feature = "schema")]

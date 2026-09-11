@@ -60,7 +60,7 @@ use serde::{Deserialize, Serialize};
 /// 18: a building's commits can be listed, newest first, so a page can
 ///    walk from a line of code to the session that wrote it without
 ///    folding the history itself (card-2.7).
-pub const WIRE_V: u32 = 20;
+pub const WIRE_V: u32 = 21;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

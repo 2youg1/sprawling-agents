@@ -372,12 +372,20 @@ pub fn retreat_payload(tag: ModelTag, from: &str, retreat: &Retreat, because: &A
 
 ```rust
 // gateway::transcribe（索引，无逻辑）
+pub use chosen::transcriber_for;
 pub use recording::{AudioType, Recording};
 pub use transcriber::{Transcriber, TranscriberConfig};
 
+// transcribe/chosen.rs（形状 1 装配，`adapter_for` 的孪生）
+pub fn transcriber_for(chosen: &Chosen<'_>, secrets: SecretResolver)
+    -> Result<Transcriber, AxError>;    // TRANSCRIBE_TIMEOUT_MS = 120_000
+
 // transcribe/recording.rs（形状 2 值）
 #[non_exhaustive] pub enum AudioType { Webm, Ogg, Mpeg, Mp4, Wav }
-impl AudioType { pub fn media_type(self) -> &'static str; pub fn file_name(self) -> &'static str; }
+impl AudioType {
+    pub fn media_type(self) -> &'static str;   pub fn file_name(self) -> &'static str;
+    pub fn of_media_type(raw: &str) -> Result<AudioType, AxError>;  // 认不得的容器＝E_INVALID_ARGS
+}
 pub struct Recording { /* bytes、kind —— 私有 */ }
 impl Recording {
     pub fn new(bytes: Vec<u8>, kind: AudioType) -> Result<Recording, AxError>;  // 空／越顶＝E_INVALID_ARGS
@@ -399,6 +407,8 @@ impl Transcriber {
 **没配就是一句具名的拒绝，不是一个空串。** `Transcriber::absent()` 上的 `transcribe` 恒返回三段式 `E_TOOL_UNAVAILABLE`：action ＝ `transcribe a recording`，subject ＝ `this city has no transcription endpoint attached`，recovery 指出两条人能立刻做的路（登记一个服务 `audio/transcriptions` 的 endpoint，或者改用打字）。**为何复用 `E_TOOL_UNAVAILABLE` 而不新增一码**：基表里这一码的语义正是「这次部署里没有这项设施」，而 `E_CONFIG_INVALID` 会说成人填错了什么——什么都没填错，这项设施本就是可选的；`E_BROWSER_UNAVAILABLE` 那样的专码属于模型会调用的 tool，转写不是 tool 而是界面设施。码表是 kernel 全城权威且按「能否定义掉」逐码守着，为一件已有码能如实表达的事把它撑大，就是给同一个事实立第二个名字。
 
 **凭据只有一条路。** `Transcriber` 内部持一个真的 `Endpoint`（`DialectKind::OpenAi`、`Redemption::without_images`、`pricing: None`），认证头由 `Endpoint::authorize` 写——与聊天调用、与 `list_models` 探测是同一格兑付。头名由 `AuthSpec::for_dialect` 定（§8-9），登记面不再自己在 Bearer 与具名头之间选。**恒不为转写开第二个持凭据的地方**：两处持凭据就是两处会漏。
+
+**哪个端点答这类活，由账本说了算，装配只有一处。** `transcriber_for` 与 `adapter_for` 是同一句话的两半：`EndpointBook::select` 给出 `Chosen`，这两个自由函数各自把那个选择变成一件可调用的设施。调用方自己拼一个 `TranscriberConfig`，就是给「base URL 与凭据在哪里合流」立第二个地点。**容器从 content-type 读而不从文件名猜**：`AudioType::of_media_type` 是那一步的唯一入口，认不得的容器当场拒，因为一段送错了容器的字节在 provider 那侧才炸开时，错误说的是别人的事。
 
 **路径归兼容格式。** 人填 base URL（provider 文档就那么印），`audio/transcriptions` 由 `transcribe::wire` 拼，拼法复用 `router::attached::join`（该函数因此升为 `pub(crate)`）——「base URL 加上兼容格式自己的路径」在城里只有一个算法。
 

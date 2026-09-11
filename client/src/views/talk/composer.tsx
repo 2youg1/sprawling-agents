@@ -13,6 +13,7 @@ import { Show, createSignal, untrack } from "solid-js";
 import type { Sending } from "../../core/belief";
 import type { Key } from "../../core/lang";
 import { EFFORTS } from "../../core/prefs";
+import { canRecord, record, type Heard, type Recording } from "../../core/speaking";
 import { useSay, useUi } from "../../ui";
 
 // What the send control is spelled, for each of the three places a
@@ -34,6 +35,9 @@ export interface ComposerProps {
   // words when it did not.
   readonly onSend: (text: string) => boolean;
   readonly onStop: () => boolean;
+  // Whether this city has an endpoint that transcribes. A microphone
+  // on a city with none is a button whose only answer is a refusal.
+  readonly hearing?: boolean;
 }
 
 export function Composer(props: ComposerProps) {
@@ -67,6 +71,41 @@ export function Composer(props: ComposerProps) {
   const cycleEffort = () => {
     const at = EFFORTS.indexOf(ui.prefs.effort());
     ui.prefs.setEffort(EFFORTS[(at + 1) % EFFORTS.length] ?? "medium");
+  };
+
+  const [taking, setTaking] = createSignal<Recording | null>(null);
+  const [hearing, setHearing] = createSignal(false);
+  const [refused, setRefused] = createSignal(false);
+  // The words land in the box rather than being sent: what somebody
+  // said is a draft like any other, and a machine that heard it wrongly
+  // must be correctable before it costs a run.
+  const speak = () => {
+    const going = taking();
+    if (going === null) {
+      setRefused(false);
+      void record(ui.origin).then((started) => {
+        setTaking(() => started);
+        setRefused(started === null);
+      });
+      return;
+    }
+    setTaking(null);
+    setHearing(true);
+    // The words are appended to whatever is in the box at the moment
+    // the city answers, which is why the read happens inside the
+    // updater rather than beside it: somebody goes on typing while a
+    // recording is being transcribed.
+    const settle = (answer: Heard) => {
+      setHearing(false);
+      setRefused(answer.kind === "refused");
+      if (answer.kind !== "text") {
+        return;
+      }
+      setText((before) => (before === "" ? answer.text : `${before} ${answer.text}`));
+      keep(untrack(text));
+      requestAnimationFrame(grow);
+    };
+    void going.stop().then(settle);
   };
 
   return (
@@ -115,8 +154,21 @@ export function Composer(props: ComposerProps) {
           >
             {say("talk_effort")} · {say(`effort_${ui.prefs.effort()}`)}
           </button>
+          <Show when={props.hearing === true && canRecord()}>
+            <button
+              type="button"
+              class={`rounded-pill px-base py-tight text-note ${taking() === null ? "bg-g2 text-text-quiet hover:bg-g3" : "bg-alert text-g0"}`}
+              disabled={hearing()}
+              onClick={speak}
+            >
+              {hearing() ? say("talk_hearing") : taking() === null ? say("talk_record") : say("talk_recording")}
+            </button>
+          </Show>
           <Show when={kept()}>
             <span class="text-alert">{say("talk_not_live")}</span>
+          </Show>
+          <Show when={refused()}>
+            <span class="text-alert">{say("link_refused")}</span>
           </Show>
         </div>
         <div class="flex items-center gap-base">

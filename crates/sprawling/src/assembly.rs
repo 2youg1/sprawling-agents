@@ -49,6 +49,7 @@ mod workbench;
 
 pub(crate) use building_page::{DOC_BYTES_MAX, read_building};
 use commanding::entrance::Entrance;
+pub(crate) use credentials::signing::resolving;
 use credentials::{Ceilings, Chosen, Credential, Entered};
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};

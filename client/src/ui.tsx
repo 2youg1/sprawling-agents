@@ -95,3 +95,19 @@ export function useCommand(): (command: Command) => boolean {
   const ui = useUi();
   return (command) => ui.conn.command(command);
 }
+
+// Whether this city has a model chosen to turn speech into text.
+//
+// The composer draws no microphone without one: a control whose only
+// possible answer is a refusal is a control nobody should meet. It is a
+// hook rather than a prop threaded through the pages because two
+// composers ask the same question of the same answer.
+export function useHearing(): () => boolean {
+  const ui = useUi();
+  const endpoints = ui.conn.asking.ask("endpoint_view");
+  return () => {
+    const held = endpoints();
+    if (held === undefined || !("endpoints" in held)) return false;
+    return held.endpoints.chosen.some((each) => each.tag === "transcribe");
+  };
+}

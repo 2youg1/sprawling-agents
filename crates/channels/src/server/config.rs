@@ -38,7 +38,9 @@ use crate::reception::{EnrollVerdict, decide_enroll};
 use crate::wire::Query;
 
 use super::reply::{Delivered, Reply, refusal_text};
-use super::socket::{accept_acp, accept_upload, serve_asset, serve_index, upgrade};
+use super::socket::{
+    accept_acp, accept_recording, accept_upload, serve_asset, serve_index, upgrade,
+};
 pub type SecretSink =
     Arc<dyn Fn(Command<Sealed<String>>, Reply) -> Result<(), AxError> + Send + Sync>;
 
@@ -73,6 +75,19 @@ pub struct ServeConfig {
     /// public signature that leaks the HTTP library would make replacing it
     /// a breaking change for every caller.
     pub upload_sink: Arc<dyn Fn(Vec<u8>) -> Result<UploadId, AxError> + Send + Sync>,
+    /// Where a recording goes, and the line of text that comes back.
+    ///
+    /// A route of its own rather than a Command, for the reason
+    /// enrolment has one: a Command is accepted and answered later
+    /// through the event stream, and the text of what somebody just said
+    /// has to come back to the tab that recorded it. A Query is the
+    /// other shape that answers, and a query that spent seconds on a
+    /// provider would be a command pretending to be a read.
+    ///
+    /// The media type travels beside the bytes because a container the
+    /// city cannot name has no media type to send, and the judgement of
+    /// which containers exist belongs to whoever speaks the audio wire.
+    pub transcribe_sink: TranscribeSink,
     /// Where a request from an outside editor goes. Separate from
     /// `commands` because it arrives over its own route, carries its own
     /// authentication, and gets an answer rather than an event stream.
@@ -121,6 +136,7 @@ pub(crate) struct ShellState {
     pub(crate) queries: Arc<dyn Fn(Query) -> Result<Answer, AxError> + Send + Sync>,
     pub(crate) secrets: SecretSink,
     pub(crate) acp: AcpSink,
+    pub(crate) transcribe_sink: TranscribeSink,
     pub(crate) token_digest: Option<B3Hash>,
     pub(crate) city: Option<Address>,
 }
@@ -155,6 +171,10 @@ pub struct AcpProgress {
 /// it so that a stranger learns exactly one bit.
 pub type AcpSink = Arc<dyn Fn(AcpBody, bool) -> Result<AcpProgress, AxError> + Send + Sync>;
 
+/// Where a recording goes: the bytes, the media type the browser
+/// recorded into, and the line of text that comes back.
+pub type TranscribeSink = Arc<dyn Fn(Vec<u8>, String) -> Result<String, AxError> + Send + Sync>;
+
 /// The enrolment body: a realm, a name, and the value that will never be
 /// seen again outside the vault.
 #[derive(Debug, Deserialize)]
@@ -176,6 +196,7 @@ pub fn router(config: &ServeConfig) -> Router {
         queries: Arc::clone(&config.queries),
         secrets: Arc::clone(&config.secrets),
         acp: Arc::clone(&config.acp),
+        transcribe_sink: Arc::clone(&config.transcribe_sink),
         token_digest: config.token_digest,
         city: config.city.clone(),
     });
@@ -183,6 +204,7 @@ pub fn router(config: &ServeConfig) -> Router {
         .route("/", get(serve_index))
         .route("/ws", get(upgrade))
         .route("/upload", post(accept_upload))
+        .route("/transcribe", post(accept_recording))
         .route("/enroll", post(accept_enrolment))
         .route("/acp", post(accept_acp))
         .route("/{*asset}", get(serve_asset))

@@ -555,6 +555,10 @@
     "en": "digest · reads",
     "zh": "digest · 读长文"
   },
+  "setup_transcribe": {
+    "en": "transcribe · hears",
+    "zh": "transcribe · 听写"
+  },
   "setup_no_models": {
     "en": "no models",
     "zh": "没有模型"
@@ -914,5 +918,17 @@
   "gallery_title": {
     "en": "gallery",
     "zh": "画廊"
+  },
+  "talk_record": {
+    "en": "speak",
+    "zh": "说"
+  },
+  "talk_recording": {
+    "en": "stop",
+    "zh": "停"
+  },
+  "talk_hearing": {
+    "en": "hearing…",
+    "zh": "听写中…"
   }
 }
