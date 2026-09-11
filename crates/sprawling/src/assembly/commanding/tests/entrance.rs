@@ -24,6 +24,7 @@
 
 use crate::assembly::fixture::*;
 use crate::assembly::*;
+use crate::serving::Posted;
 
 /// Every room that has been opened under one building.
 fn rooms_under(city_root: &Path, building: &str) -> Vec<String> {
@@ -85,6 +86,8 @@ fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
             reply: channels::Reply::nowhere(),
         });
     }
+    // The desk starts a run and the loop lands it; this is that loop.
+    worker.land_the_rest().unwrap();
 
     assert_eq!(
         rooms_under(dir.path(), "lab"),

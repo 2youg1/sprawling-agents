@@ -15,6 +15,7 @@ use runtime::{SieveSite, package_exec};
 
 use super::{RunWorker, Site};
 
+pub(crate) mod flight;
 pub(crate) mod lane;
 
 /// What one drive is handed: the machinery it runs on, and the run it

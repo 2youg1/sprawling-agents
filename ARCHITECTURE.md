@@ -700,7 +700,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (137)
+### browser (12), protocol (5), bin (140)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -767,12 +767,14 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::freezing::tests::dispatches | crates/sprawling/src/assembly/freezing/tests/dispatches.rs | what one dispatch freezes and leaves: the handoff, the job bytes, the prompt, the lineage | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::freezing::tests::ceilings | crates/sprawling/src/assembly/freezing/tests/ceilings.rs | the ceiling and the effort a run is frozen under | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::driving | crates/sprawling/src/assembly/driving.rs | what one drive is handed, what it leaves, and the handles it takes from the worker | adapter | V3 | built | sprawling-SPEC.md#8-43 |
+| bin::assembly::driving::flight | crates/sprawling/src/assembly/driving/flight.rs | every run in a lane right now, and what the city owes each one when it comes home | adapter | V4 | built | sprawling-SPEC.md#8-46 |
 | bin::assembly::driving::lane | crates/sprawling/src/assembly/driving/lane.rs | one drive as a lane runs it: the ledger it writes through, the three hooks, and who may interrupt it | adapter | V4 | built | sprawling-SPEC.md#8-46 |
 | bin::assembly::driving::tests | crates/sprawling/src/assembly/driving/tests.rs | the driving fixtures route | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::driving::tests::turns | crates/sprawling/src/assembly/driving/tests/turns.rs | turn loops, cancels and steers | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::driving::tests::confidential | crates/sprawling/src/assembly/driving/tests/confidential.rs | confidential stops before a remote call | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::driving::tests::ledger | crates/sprawling/src/assembly/driving/tests/ledger.rs | lines before the city they announce | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::driving::tests::sieving | crates/sprawling/src/assembly/driving/tests/sieving.rs | a command's output over the floor reaches the model sieved, and the way back resolves | adapter | V4 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::driving::tests::flight | crates/sprawling/src/assembly/driving/tests/flight.rs | two lanes at once, one ledger, and a closing city that waits for them | adapter | V4 | built | sprawling-SPEC.md#8-46 |
 | bin::assembly::settling | crates/sprawling/src/assembly/settling.rs | what a drive left, on the ledger before it is made true | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::settling::desks | crates/sprawling/src/assembly/settling/desks.rs | the four desks settled in history order | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::settling::landing | crates/sprawling/src/assembly/settling/landing.rs | one landing made true, and what a drive ended with | adapter | V3 | built | sprawling-SPEC.md#8-39 |
@@ -794,6 +796,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::commanding | crates/sprawling/src/assembly/commanding.rs | the verbs a person sends, and what each one does to the city | adapter | V3 | built | sprawling-SPEC.md#8-41 |
 | bin::assembly::commanding::routing | crates/sprawling/src/assembly/commanding/routing.rs | one verb in, one dispatch or refusal out, plus the schedule tick | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::commanding::governing | crates/sprawling/src/assembly/commanding/governing.rs | halts, autonomy, approvals, forks: the standing answers | adapter | V3 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::commanding::door | crates/sprawling/src/assembly/commanding/door.rs | the door a Command enters by, and where its refusal goes | adapter | V4 | built | sprawling-SPEC.md#8-41 |
 | bin::assembly::commanding::entrance | crates/sprawling/src/assembly/commanding/entrance.rs | the key every command carries, read before anything is done about it | decision | V4 | built | sprawling-SPEC.md#8-41 |
 | bin::assembly::commanding::tests | crates/sprawling/src/assembly/commanding/tests.rs | the commanding fixtures route | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::commanding::tests::answering | crates/sprawling/src/assembly/commanding/tests/answering.rs | answers, refusals and the approval queue | adapter | V3 | built | sprawling-SPEC.md#8-39 |

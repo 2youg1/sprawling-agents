@@ -3,47 +3,33 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
-
 //! How a city is stood up and served, as opposed to how one piece of
 //! work is run.
 //!
-//! Four things happen here and nothing else: the key this listener will
-//! present at its door is settled before a socket exists, the vault is
-//! opened and asked what it really is, the one writer thread is started
-//! with the ledger inside it, and the socket is handed the four sinks it
-//! may reach the city through.
+//! Four things happen here and nothing else: the vault is opened and
+//! asked what it really is, the one writer thread is started with the
+//! ledger inside it, the socket is handed the sinks it may reach the
+//! city through, and the whole of it is stopped when the person stops
+//! it.
 //!
 //! **The writer thread is the city's one writer.** The ledger is opened
 //! inside it and never leaves, so the type never has to cross a thread
 //! boundary to prove that a city has one writer (ARCHITECTURE section
 //! 10). Everything a socket does reaches it as a `Command` on a desk,
-//! one at a time.
-//!
-//! Randomness is drawn here rather than in `bin::keying`, which is pure:
-//! this crate draws entropy in one place, and a key a third party can
-//! predict is a door a third party can open.
+//! one at a time; what that thread then does with its desk, its
+//! crossing and its lanes is `serving::attending`.
 
 use std::sync::Arc;
 use std::sync::mpsc;
 
 use kernel::{AxCode, AxError, EventRecord, RunId};
 
-use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK};
-use super::relay::RelayGate;
+use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK, SCHEDULE_TICK_MS};
 use super::serve::Opening;
 use super::serve::Serving;
-use crate::assembly::{RunWorker, acp_dispatch, ledger_dir, now_ms, rebuild_views};
+use crate::assembly::{LOOK_AGAIN, RunWorker, acp_dispatch, ledger_dir, now_ms, rebuild_views};
 use crate::views::Views;
 
-/// A URL-safe random string of `bytes` bytes of OS entropy.
-///
-/// Deliberately not the simulator's seeded randomness: a verifier a
-/// third party can predict is a login a third party can finish. This is
-/// the one place in the binary where reproducibility would be a defect.
 /// Where a worker's work goes, and where it comes from.
 ///
 /// The desk is the mouth and the other three are the ears: a record
@@ -119,16 +105,30 @@ fn spawn_worker(
             worker.attach_interrupts(Arc::new(move |run: RunId| {
                 interrupt_desk.interrupt_for(run)
             }));
-            // The crossing a driving thread writes history through
-            // (sprawling-SPEC.md 8-42-2). It is opened here because the
-            // pool that clones its handle is started from this same
-            // point; until then it serves nothing, and what that costs
-            // is one `try_recv` per pass of the loop.
-            let relay = RelayGate::open();
+            // When the schedule was last read against. Kept by the
+            // loop rather than measured from it, because a city with
+            // lanes driving comes back here every millisecond and one
+            // that opened its schedule file that often would spend its
+            // time opening a file (sprawling-SPEC.md 8-46-2).
+            let mut read_schedule_at = kernel::TimeMs::new(0);
             loop {
-                // Relay requests first, desk commands second.
-                worker.serve_relay(&relay);
-                match worker_desk.wait(SCHEDULE_TICK) {
+                // The first two of the three mouths: every relay request
+                // already waiting, then at most one run home. The
+                // crossing is served first, because a run that has
+                // already been paid for must not queue behind one that
+                // has not started.
+                if let Err(err) = worker.serve_flight(LOOK_AGAIN) {
+                    eprintln!("a run could not be landed: {err}");
+                }
+                // The third mouth. A city with lanes driving looks at
+                // the desk in short steps, because a lane makes progress
+                // only while this thread is serving the crossing.
+                let patience = if worker.driving() {
+                    LOOK_AGAIN
+                } else {
+                    SCHEDULE_TICK
+                };
+                match worker_desk.wait(patience) {
                     // `carrying` holds this command's key in flight for
                     // the length of the arm, so a frame that repeats it
                     // while the work is going adds no second run.
@@ -140,11 +140,22 @@ fn spawn_worker(
                     // that cannot be read must not stop the city from
                     // answering the person.
                     DeskWait::Idle => {
-                        if let Ok(now) = now_ms() {
+                        if let Ok(now) = now_ms()
+                            && now.value().saturating_sub(read_schedule_at.value())
+                                >= SCHEDULE_TICK_MS
+                        {
+                            read_schedule_at = now;
                             let _ = worker.tick(now);
                         }
                     }
                     DeskWait::Close => {
+                        // The lanes are waited for rather than
+                        // abandoned: a lane left blocked on an append
+                        // loses lines this city had already told it
+                        // were durable.
+                        if let Err(err) = worker.land_the_rest() {
+                            eprintln!("a run could not be landed as the city closed: {err}");
+                        }
                         if let Err(err) = worker.close_city() {
                             eprintln!("the city could not write its handoff: {err}");
                         }

@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 mod confidential;
+mod flight;
 mod ledger;
 mod sieving;
 mod turns;

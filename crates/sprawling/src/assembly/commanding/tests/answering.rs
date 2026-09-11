@@ -15,7 +15,7 @@
 )]
 
 use crate::assembly::*;
-use crate::serving::CommandDesk;
+use crate::serving::{CommandDesk, Posted};
 use crate::views::Views;
 use kernel::Locator;
 

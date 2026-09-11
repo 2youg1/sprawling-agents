@@ -53,6 +53,8 @@ use credentials::{Ceilings, Chosen, Credential, Entered};
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
 pub(crate) use dispatching::{Dispatched, acp_dispatch};
+pub(crate) use driving::flight::LOOK_AGAIN;
+use driving::flight::{Flight, Landed};
 pub(crate) use driving::lane::{DriveContext, drive_run};
 pub(crate) use driving::{Driven, Driving};
 use folds::{Governance, artifact_of, new_inbox};
@@ -81,8 +83,6 @@ use crate::effect;
 use kernel::{EventDraft, EventKind, Payload};
 use memory::{Cas, JsonlLedger};
 use runtime::Interrupt;
-
-use crate::serving::Posted;
 
 /// The single sanctioned sampling point (clippy.toml disallowed-methods). Everything below this call takes `TimeMs` as a
 /// parameter.
@@ -113,9 +113,6 @@ pub(crate) fn ledger_dir(city_root: &Path) -> PathBuf {
     city_root.join(".sprawling").join("ledger")
 }
 
-/// Runs the work a Command asks for. It owns the ledger, so the city has
-/// one writer; commands reach it through a channel, and the socket task
-/// that accepted them is free again immediately.
 /// What the startup scan found and repaired.
 pub struct ScanReport {
     pub(crate) lines: usize,
@@ -138,6 +135,9 @@ impl ScanReport {
     }
 }
 
+/// Runs the work a Command asks for. It owns the ledger, so the city has
+/// one writer; commands reach it through a desk, and the socket task
+/// that accepted them is free again immediately.
 pub struct RunWorker {
     city_root: PathBuf,
     /// Which city this is, as the genesis line hashes. Read from the
@@ -234,6 +234,11 @@ pub struct RunWorker {
     /// and every `exec` gets a handle onto it, so `halt` reaches a
     /// command without knowing which tool started it.
     backlog: runtime::Backlog,
+    /// Every run in a lane right now, the crossing those lanes write
+    /// history through, and what the city owes each one when it comes
+    /// home. One per city, so the number of runs a city drives at once
+    /// has one answer (sprawling-SPEC.md 8-46-2).
+    flight: Flight,
 }
 
 impl RunWorker {
@@ -284,74 +289,6 @@ impl RunWorker {
         source: Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>,
     ) {
         self.interrupts = Some(source);
-    }
-
-    /// # Errors
-    /// Refuses a command this stage does not run yet, naming what does.
-    pub fn handle(&mut self, command: channels::Command) -> Result<(), AxError> {
-        let name = command.name();
-        let outcome = self.run_command(command);
-        if let Err(err) = &outcome {
-            // A refused command is the first thing a person asks about,
-            // so it is written at the default floor. It is written here
-            // rather than at the caller, because every caller wants it.
-            self.note(
-                runtime::diagnostics::Level::Refuse,
-                "bin::assembly",
-                &format!("{name} refused: {err}; {}", err.recovery()),
-            );
-        }
-        outcome
-    }
-
-    /// Runs one command from the desk, refusal included.
-    ///
-    /// The one authority for what becomes of a command a person sent:
-    /// it runs, and if it is refused the refusal goes both to the
-    /// diagnostic log and to whoever asked. Before this existed the
-    /// worker loop wrote `let _ = handle(command)`, so every refusal
-    /// died in the log and the page that caused it said nothing.
-    /// A repeat under a key this city has already answered is answered
-    /// with that first answer and carried out no second time: this is
-    /// the door that honours the `IdemKey` every state-changing Command
-    /// carries, and it judges before any effect
-    /// (`commanding::entrance`, sprawling-SPEC.md 8-41).
-    pub(crate) fn serve_one(&mut self, posted: Posted) {
-        let Posted { command, reply } = posted;
-        let key = command.idem().copied();
-        if let Some(first) = key.and_then(|key| self.entrance.answered(&key)) {
-            let said = commanding::entrance::repeated(command.name());
-            self.note(runtime::diagnostics::Level::Effect, "bin::assembly", &said);
-            if let Err(err) = first {
-                self.hand_back(&reply, err);
-            }
-            return;
-        }
-        if let Some(key) = key {
-            self.entrance.begin(key);
-        }
-        let outcome = self.handle(command);
-        self.entrance.settle(&outcome);
-        if let Err(err) = outcome {
-            self.hand_back(&reply, err);
-        }
-    }
-
-    /// Hands a refusal to whoever asked for the command.
-    ///
-    /// `handle` has already written it to the diagnostic log, so the
-    /// only case that earns a second line is the one a reader would
-    /// otherwise misread: somebody did ask, and the answer arrived at a
-    /// socket that had already closed.
-    fn hand_back(&mut self, reply: &channels::Reply, error: AxError) {
-        match reply.refuse(error) {
-            channels::Delivered::ToThePeer | channels::Delivered::NobodyAsked => {}
-            channels::Delivered::PeerGone => self.note(
-                runtime::diagnostics::Level::Refuse,
-                "bin::assembly",
-                "the refusal above reached nobody: the peer that asked had closed its socket",
-            ),
-        }
     }
 }
 

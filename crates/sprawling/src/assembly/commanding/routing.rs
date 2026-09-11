@@ -14,9 +14,17 @@ use super::super::{
 };
 
 impl RunWorker {
+    /// Carries out one command, with the address its refusal goes back
+    /// to.
+    ///
+    /// The reply is a parameter rather than something the caller holds
+    /// onto, because one verb outlives this call: a `Dispatch` starts a
+    /// run in a lane and returns, so a refusal that arrives after the
+    /// drive has to know where to go (sprawling-SPEC.md 8-46-2).
     pub(in crate::assembly) fn run_command(
         &mut self,
         command: channels::Command,
+        reply: channels::Reply,
     ) -> Result<(), AxError> {
         match command {
             channels::Command::Dispatch {
@@ -45,7 +53,15 @@ impl RunWorker {
                 // Doing either here would put that rule in a second
                 // place, and leave the entrances that dispatch without a
                 // person holding the older, wrong one.
-                self.dispatch_in(
+                //
+                // The drive goes into a lane of its own, so the desk is
+                // free again before the run has finished: a person who
+                // sends two pieces of work gets two runs going at once,
+                // and a Cancel does not queue behind the run it
+                // cancels. What the person asked for is finished when
+                // the run has started; the conversation it goes on to
+                // have is answered where it lands.
+                self.dispatch_into_lane(
                     Assignment {
                         addr,
                         session,
@@ -56,14 +72,9 @@ impl RunWorker {
                     },
                     task,
                     goal,
+                    reply,
                 )
-                .map(drop)?;
-                // Whoever this run spoke to answers next, and whoever
-                // they speak to after that. The person asked for one
-                // dispatch; what returns to them is the conversation it
-                // started, finished.
-                self.answer_knocks();
-                Ok(())
+                .map(drop)
             }
             channels::Command::Wake {
                 source,

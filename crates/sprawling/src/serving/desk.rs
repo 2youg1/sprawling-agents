@@ -3,38 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
-
-//! How a city is stood up and served, as opposed to how one piece of
-//! work is run.
-//!
-//! Four things happen here and nothing else: the key this listener will
-//! present at its door is settled before a socket exists, the vault is
-//! opened and asked what it really is, the one writer thread is started
-//! with the ledger inside it, and the socket is handed the four sinks it
-//! may reach the city through.
-//!
-//! **The writer thread is the city's one writer.** The ledger is opened
-//! inside it and never leaves, so the type never has to cross a thread
-//! boundary to prove that a city has one writer (ARCHITECTURE section
-//! 10). Everything a socket does reaches it as a `Command` on a desk,
-//! one at a time.
-//!
-//! Randomness is drawn here rather than in `bin::keying`, which is pure:
-//! this crate draws entropy in one place, and a key a third party can
-//! predict is a door a third party can open.
+//! Where commands wait between the socket and the worker, and the two
+//! verbs a run reads off that queue at its own safe points.
 
 use kernel::RunId;
 use runtime::Interrupt;
 
-/// A URL-safe random string of `bytes` bytes of OS entropy.
-///
-/// Deliberately not the simulator's seeded randomness: a verifier a
-/// third party can predict is a login a third party can finish. This is
-/// the one place in the binary where reproducibility would be a defect.
 /// Where commands wait between the socket and the worker.
 ///
 /// A desk rather than a channel, because a channel hands an item to
@@ -130,7 +104,13 @@ pub(crate) enum DeskWait<'desk> {
 /// How long the worker waits before looking at the schedule. Short
 /// enough that a job stated to the minute starts within the minute,
 /// long enough that an idle city is idle.
-pub(super) const SCHEDULE_TICK: std::time::Duration = std::time::Duration::from_secs(20);
+///
+/// In milliseconds because the loop compares it against the clock it
+/// samples, and a rhythm stated twice is a rhythm that can disagree
+/// with itself.
+pub(super) const SCHEDULE_TICK_MS: u64 = 20_000;
+pub(super) const SCHEDULE_TICK: std::time::Duration =
+    std::time::Duration::from_millis(SCHEDULE_TICK_MS);
 
 impl CommandDesk {
     /// Visible to the crate so the console loop can be driven in a test
