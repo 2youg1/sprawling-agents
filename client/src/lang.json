@@ -687,6 +687,46 @@
     "en": "run once in a terminal",
     "zh": "在终端里跑一次"
   },
+  "machine_present": {
+    "en": "ok",
+    "zh": "有"
+  },
+  "machine_absent": {
+    "en": "no",
+    "zh": "无"
+  },
+  "machine_broken": {
+    "en": "bad",
+    "zh": "坏"
+  },
+  "machine_optional": {
+    "en": "optional",
+    "zh": "可选"
+  },
+  "machine_ready": {
+    "en": "ready",
+    "zh": "齐备"
+  },
+  "machine_tier_use": {
+    "en": "to run",
+    "zh": "运行"
+  },
+  "machine_tier_develop": {
+    "en": "to change",
+    "zh": "开发"
+  },
+  "machine_items": {
+    "en": "this machine",
+    "zh": "这台机器"
+  },
+  "machine_verdicts": {
+    "en": "what is missing",
+    "zh": "缺什么"
+  },
+  "machine_unasked": {
+    "en": "not looked at",
+    "zh": "未查看"
+  },
   "welcome_no_main": {
     "en": "no main model",
     "zh": "main 没有模型"

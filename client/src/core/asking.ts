@@ -90,6 +90,7 @@ function keyOfAnswer(answer: Answer): string | null {
     const { base, head } = answer.changes;
     return keyOf({ changes: { base, head: head ?? null } });
   }
+  if ("doctor" in answer) return keyOf("doctor");
   if ("commits" in answer) {
     return keyOf(commitsQuery(answer.commits.building ?? null, answer.commits.before ?? null));
   }

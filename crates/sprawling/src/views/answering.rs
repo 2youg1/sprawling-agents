@@ -272,6 +272,17 @@ impl Views {
             channels::Query::EndpointView => {
                 channels::Answer::Endpoints(endpoints_answer(&self.book))
             }
+            // What this machine had when the city started. A city that
+            // never looked says so, for the reason a building nobody
+            // raised does: "I did not look" is its own answer, and a
+            // page that got an empty machine instead would tell a
+            // person every tool they have is missing.
+            channels::Query::Doctor => match &self.machine {
+                Some(found) => channels::Answer::Doctor(Box::new(found.clone())),
+                None => channels::Answer::Unavailable {
+                    query: "Doctor".to_owned(),
+                },
+            },
             channels::Query::BuildingView { addr } => {
                 let root = self.city_root.clone();
                 let plan = self.plans.of(&root, addr);

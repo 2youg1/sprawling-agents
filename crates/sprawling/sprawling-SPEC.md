@@ -2504,3 +2504,14 @@ card-2.3 让合并落成一个真正的合并提交后，`settle_requests` 给 `
 - **`Views.commit_seqs: BTreeMap<Seq, GitOid>`**，与按 oid 键的 `commits` 表由 `fold_commit` 同一处写入：一条记录若宣告了提交，两张表各得一行。按 oid 的表答 `Commit`，按 seq 的表答 `Commits`；两表从同一条流折出，重建即相等。
 - **`commits_answer(building, before, limit)`**：在 `commit_seqs` 上从 `before` 的独占上界（`None` 即尾）向前走，按 `actor` 地址前缀过滤（`actor == building` 或以 `<building>/` 起头；`None` 不过滤），取 `limit.clamp(1, HISTORY_MAX)` 条；再多走一步得 `more`。每条经 `CommitFacts::answer` 与 `lineage_of` 成 `CommitAnswer`，故列举与反查答同一形状。
 - **验收**（`views::commits::tests`）：三条不同 seq 的 `checkpoint_committed`（两条在 `lab/room1`、一条在 `hall/mayor`）折入后，按 `lab` 列举答两条且 seq 递减、`more == false`；`limit: 1` 答一条且 `more == true`；以那条的 seq 作 `before` 再问答下一条；按 `hall` 列举不含 `lab` 的提交；`None` 答三条。
+
+## 8-54 这台机器有什么，页面从城那里问（card-9.2；`bin::doctor::report`、`bin::views::holding`；channels-SPEC §8-25）
+
+首跑屏的第一步原本只是一条可以复制的命令，没有任何办法知道它跑过没有、跑成了没有。本节让那一步答得出来。
+
+- **`bin::doctor::report`**（新文件）：`report()` 问一次这台机器并折成 `channels::DoctorAnswer`；`fold(&[Finding], Option<Platform>)` 是可测的那一半，于是一个测试说出机器答了什么而不必有那样一台机器。**它不判断任何事**——哪一项在这里、一个档次缺什么，权威在 `doctor` 与 `table`；这里只换一种说法。`screen` 把同一批 findings 折成一台机器的散文，两者从同一处折出。
+- **`Views.machine: Option<channels::DoctorAnswer>`**，由 `found_on_this_machine` 从外面放进来，**不由任何记录折出**：这是本文件里唯一一个关于机器而非关于历史的答案，所以重建账本不碰它。`None` 答 `Unavailable`。
+- **探测在开门之前跑一次**，`serving::worker::serve` 里，在 `rebuild_views` 之后、`ServeConfig` 之前。**代价量过**：本机 12 项、冷启动约 2 秒，全部花在起进程问版本上。放进查询里会把答一切读的那条线程按住数秒；放进后台线程要多一条「还没答上来」的状态，而页面第一屏正是要那个答案。
+- **客户端**：`client/src/views/machine.tsx` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
+- **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。
+- **验收**：`doctor::report::tests`——缺 firefox 的假机器答出 `Absent { NotOnSearchPath }`、`use` 档 `missing == ["firefox"]` 而 `develop` 档为空；平台不明时每一项的 `install` 都是 `UnknownPlatform`。

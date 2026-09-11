@@ -13,8 +13,50 @@
 import { For, type JSX } from "solid-js";
 
 import { sendingInto, type Doing, type Sending } from "../core/belief";
+import type { DoctorAnswer } from "../wire";
 import { useSay } from "../ui";
+import { MachineReport } from "./machine";
 import { Composer } from "./talk/composer";
+
+// One machine, with an item in each of the three states a person acts
+// differently on: here, missing and required, missing and optional.
+const MACHINE: DoctorAnswer = {
+  items: [
+    {
+      name: "firefox",
+      tier: "use",
+      need: "required",
+      enables: "the browser a city serves its pages to",
+      state: { absent: { absence: "not_on_search_path" } },
+      install: { command: { spelled: "winget install --id Mozilla.Firefox" } },
+    },
+    {
+      name: "git",
+      tier: "use",
+      need: "required",
+      enables: "the history every run is fenced against",
+      state: {
+        present: {
+          at: "/usr/bin/git",
+          version: { said: { text: "git version 2.55.0" } },
+        },
+      },
+      install: { command: { spelled: "winget install --id Git.Git" } },
+    },
+    {
+      name: "chromedriver",
+      tier: "use",
+      need: "optional",
+      enables: "the browser tool against Chromium",
+      state: { absent: { absence: "not_on_search_path" } },
+      install: "unknown_platform",
+    },
+  ],
+  tiers: [
+    { tier: "use", missing: ["firefox"] },
+    { tier: "develop", missing: [] },
+  ],
+};
 
 // The postures a run can be in, in the order a dispatch meets them.
 const POSTURES: readonly Doing[] = [
@@ -73,6 +115,10 @@ export function Gallery() {
           </Case>
         )}
       </For>
+
+      <Case label="machine">
+        <MachineReport answer={MACHINE} />
+      </Case>
     </div>
   );
 }

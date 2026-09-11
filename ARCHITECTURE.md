@@ -670,7 +670,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | eval::ablation::capabilities | crates/eval/src/ablation/capabilities.rs | the corpus: each thing a resident must be able to do, and the phrase in the document that grants it | data | V3 | built | eval-SPEC.md#8-7 |
 | eval::ablation::tests | crates/eval/src/ablation/tests.rs | the graded fixtures, and the on-demand run against the real City.md | decision | V3 | built | eval-SPEC.md#8-7 |
 
-### channels (25) — the process boundary
+### channels (26) — the process boundary
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -685,6 +685,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::answer::evidence | crates/channels/src/answer/evidence.rs | what a run left as evidence: a screenshot's locator and the completion a plan node was closed with, never the bytes | value | F1 | built | channels-SPEC.md#8-21 |
 | channels::answer::cost_of | crates/channels/src/answer/cost_of.rs | what one plan node has cost, and the runs that spent it | value | F1 | built | channels-SPEC.md#8-21 |
 | channels::answer::listing | crates/channels/src/answer/listing.rs | one directory of the city, one level deep, as a page walks the tree | value | F5 | built | channels-SPEC.md#8-23 |
+| channels::answer::doctor | crates/channels/src/answer/doctor.rs | what this machine has, item by item, in values a page labels rather than sentences | value | V5 | built | channels-SPEC.md#8-25 |
 | channels::answer::document | crates/channels/src/answer/document.rs | one file of the city, bounded, with the cut and the binary judgement stated | value | F5 | built | channels-SPEC.md#8-23 |
 | channels::answer::commits | crates/channels/src/answer/commits.rs | what the city says about a commit it made, one by oid or a page newest first | value | V4 | built | channels-SPEC.md#8-24 |
 | channels::answer::hunks | crates/channels/src/answer/hunks.rs | one file's patch text between two checkpoints, and the lines a credential scan would not echo | value | F1 | built | channels-SPEC.md#8-20 |
@@ -700,7 +701,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (140)
+### browser (12), protocol (5), bin (141)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -828,6 +829,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::doctor::screen | crates/sprawling/src/doctor/screen.rs | the report a person reads, and the one question asked per absent item | adapter | V4 | built | sprawling-SPEC.md#8-40 |
 | bin::doctor::probe | crates/sprawling/src/doctor/probe.rs | this machine answering: a program on the search path, its version under a deadline, one consented install | adapter | V4 | built | sprawling-SPEC.md#8-40 |
 | bin::doctor::tests | crates/sprawling/src/doctor/tests.rs | every row is detectable and either installable or manual, and consent is asked one item at a time | decision | V4 | built | sprawling-SPEC.md#8-40 |
+| bin::doctor::report | crates/sprawling/src/doctor/report.rs | this machine's answer, in the shape a page reads | projection | V5 | built | sprawling-SPEC.md#8-54 |
 | bin::doctor::presence | crates/sprawling/src/doctor/presence.rs | this machine's answer about one item, in three states: present, broken with its fault, absent with its kind | value | V4 | built | sprawling-SPEC.md#8-50 |
 | bin::doctor::host | crates/sprawling/src/doctor/host.rs | the one door the rest of this binary asks what this machine has through: the browser engines, the python component, the shell, the execution engine | adapter | V4 | built | sprawling-SPEC.md#8-50 |
 | bin::doctor::needs | crates/sprawling/src/doctor/needs.rs | what one building's capability bits call for, and which of it this machine lacks | decision | V4 | built | sprawling-SPEC.md#8-48 |

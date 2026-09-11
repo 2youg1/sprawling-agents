@@ -259,9 +259,13 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
     // The views the control surface reads. Rebuilt from the ledger here,
     // folded forward by the write observer inside the worker: one fold
     // rule, two call sites, no second definition of what a view means.
-    let views = Arc::new(std::sync::Mutex::new(rebuild_views(&ledger_dir(
-        city_root,
-    ))?));
+    let mut rebuilt = rebuild_views(&ledger_dir(city_root))?;
+    // One look at this machine, before the socket exists. Every item is
+    // a program started and asked its version - seconds rather than
+    // milliseconds - so a page asks what the city found rather than
+    // making the city look again (sprawling-SPEC.md 8-53).
+    rebuilt.found_on_this_machine(crate::doctor::report());
+    let views = Arc::new(std::sync::Mutex::new(rebuilt));
     let query_views = Arc::clone(&views);
     // Built once and handed to both surfaces below. The socket and the
     // terminal are two ways into one city, and this is the read half of

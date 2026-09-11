@@ -33,6 +33,7 @@ pub channels::Answer::Commits(channels::CommitsAnswer)
 pub channels::Answer::Cost(alloc::boxed::Box<channels::CostAnswer>)
 pub channels::Answer::CostOf(channels::CostOfAnswer)
 pub channels::Answer::Discards(channels::DiscardAnswer)
+pub channels::Answer::Doctor(alloc::boxed::Box<channels::DoctorAnswer>)
 pub channels::Answer::Document(alloc::boxed::Box<channels::DocumentAnswer>)
 pub channels::Answer::Endpoints(channels::EndpointsAnswer)
 pub channels::Answer::Evidence(channels::EvidenceAnswer)
@@ -259,6 +260,53 @@ pub channels::DiscardLine::at: kernel::event::identity::TimeMs
 pub channels::DiscardLine::path: alloc::string::String
 pub channels::DiscardLine::restoration: core::option::Option<kernel::discard::request::Restoration>
 pub channels::DiscardLine::restored: bool
+pub channels::DoctorAbsence::NoComponent
+pub channels::DoctorAbsence::NoComponent::dir: alloc::string::String
+pub channels::DoctorAbsence::NoHome
+pub channels::DoctorAbsence::NotInThisBuild
+pub channels::DoctorAbsence::NotOnSearchPath
+pub channels::DoctorAbsence::VariableNamesNothing
+pub channels::DoctorAbsence::VariableNamesNothing::path: alloc::string::String
+pub channels::DoctorAbsence::VariableNamesNothing::variable: alloc::string::String
+pub channels::DoctorAnswer::items: alloc::vec::Vec<channels::DoctorItem>
+pub channels::DoctorAnswer::tiers: alloc::vec::Vec<channels::DoctorVerdict>
+pub channels::DoctorFault::HalfWritten
+pub channels::DoctorFault::Unreadable
+pub channels::DoctorFault::Unreadable::said: alloc::string::String
+pub channels::DoctorFault::WillNotStart
+pub channels::DoctorFault::WillNotStart::said: alloc::string::String
+pub channels::DoctorInstall::Command
+pub channels::DoctorInstall::Command::spelled: alloc::string::String
+pub channels::DoctorInstall::Manual
+pub channels::DoctorInstall::Manual::how: alloc::string::String
+pub channels::DoctorInstall::Print
+pub channels::DoctorInstall::Print::spelled: alloc::string::String
+pub channels::DoctorInstall::UnknownPlatform
+pub channels::DoctorItem::enables: alloc::string::String
+pub channels::DoctorItem::install: channels::DoctorInstall
+pub channels::DoctorItem::name: alloc::string::String
+pub channels::DoctorItem::need: channels::DoctorNeed
+pub channels::DoctorItem::state: channels::DoctorState
+pub channels::DoctorItem::tier: channels::DoctorTier
+pub channels::DoctorNeed::Optional
+pub channels::DoctorNeed::Required
+pub channels::DoctorState::Absent
+pub channels::DoctorState::Absent::absence: channels::DoctorAbsence
+pub channels::DoctorState::Broken
+pub channels::DoctorState::Broken::at: alloc::string::String
+pub channels::DoctorState::Broken::fault: channels::DoctorFault
+pub channels::DoctorState::Present
+pub channels::DoctorState::Present::at: alloc::string::String
+pub channels::DoctorState::Present::version: channels::DoctorVersion
+pub channels::DoctorTier::Develop
+pub channels::DoctorTier::Use
+pub channels::DoctorVerdict::missing: alloc::vec::Vec<alloc::string::String>
+pub channels::DoctorVerdict::tier: channels::DoctorTier
+pub channels::DoctorVersion::Late
+pub channels::DoctorVersion::Said
+pub channels::DoctorVersion::Said::text: alloc::string::String
+pub channels::DoctorVersion::Silent
+pub channels::DoctorVersion::Unreadable
 pub channels::DocumentAnswer::at: kernel::address::Address
 pub channels::DocumentAnswer::binary: bool
 pub channels::DocumentAnswer::bytes: u64
@@ -393,6 +441,7 @@ pub channels::Query::CostOf
 pub channels::Query::CostOf::node: kernel::node_id::NodeId
 pub channels::Query::CostView
 pub channels::Query::DiscardView
+pub channels::Query::Doctor
 pub channels::Query::Document
 pub channels::Query::Document::at: kernel::address::Address
 pub channels::Query::EndpointView
@@ -490,7 +539,7 @@ pub channels::Withheld::reason: alloc::string::String
 pub const channels::COMMAND_NAMES: [&str; 24]
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
-pub const channels::QUERY_NAMES: [&str; 23]
+pub const channels::QUERY_NAMES: [&str; 24]
 pub const channels::WIRE_V: u32
 pub enum channels::Answer
 pub enum channels::AssetReply
@@ -501,6 +550,13 @@ pub enum channels::ClientFrame
 pub enum channels::Command<Secret>
 pub enum channels::ControlVerdict
 pub enum channels::Delivered
+pub enum channels::DoctorAbsence
+pub enum channels::DoctorFault
+pub enum channels::DoctorInstall
+pub enum channels::DoctorNeed
+pub enum channels::DoctorState
+pub enum channels::DoctorTier
+pub enum channels::DoctorVersion
 pub enum channels::EntryKind
 pub enum channels::EvidenceKind
 pub enum channels::GovernedDocument
@@ -587,6 +643,9 @@ pub struct channels::Decision
 pub struct channels::Delta
 pub struct channels::DiscardAnswer
 pub struct channels::DiscardLine
+pub struct channels::DoctorAnswer
+pub struct channels::DoctorItem
+pub struct channels::DoctorVerdict
 pub struct channels::DocumentAnswer
 pub struct channels::EmbeddedFile
 pub struct channels::EndpointSummary

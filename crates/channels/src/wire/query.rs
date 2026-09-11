@@ -17,7 +17,7 @@ use kernel::{Address, GitOid, NodeId, RunId, Seq};
 use serde::{Deserialize, Serialize};
 
 /// The Query surface, in declaration order.
-pub const QUERY_NAMES: [&str; 23] = [
+pub const QUERY_NAMES: [&str; 24] = [
     "History",
     "RunHistory",
     "Changes",
@@ -41,6 +41,7 @@ pub const QUERY_NAMES: [&str; 23] = [
     "Listing",
     "Document",
     "Commits",
+    "Doctor",
 ];
 
 /// Queries read state. They are cacheable and free of side effects, so none
@@ -228,6 +229,15 @@ pub enum Query {
         before: Option<Seq>,
         limit: u32,
     },
+    /// What this machine has, and what this city still needs of it.
+    ///
+    /// Answered from what the city found when it started, not from a
+    /// fresh look: every item is a program asked its version, and a
+    /// query that started a dozen processes would hold the one thread
+    /// that answers every other read. A city that has not looked
+    /// answers [`Answer::Unavailable`], which is what a worker driven
+    /// one command at a time is.
+    Doctor,
 }
 
 impl Query {
@@ -258,6 +268,7 @@ impl Query {
             Self::Listing { .. } => "Listing",
             Self::Document { .. } => "Document",
             Self::Commits { .. } => "Commits",
+            Self::Doctor => "Doctor",
         }
     }
 }

@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 mod building;
 mod commits;
 mod cost_of;
+mod doctor;
 mod document;
 mod evidence;
 mod hunks;
@@ -32,6 +33,8 @@ pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
 pub use commits::{CommitAnswer, CommitsAnswer};
 pub use cost_of::CostOfAnswer;
+pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
+pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use document::DocumentAnswer;
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use hunks::{HunksAnswer, PatchLine, Withheld};
@@ -208,6 +211,7 @@ pub enum Answer {
     Listing(ListingAnswer),
     Document(Box<DocumentAnswer>),
     Commits(CommitsAnswer),
+    Doctor(Box<DoctorAnswer>),
     Unavailable { query: String },
 }
 

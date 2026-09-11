@@ -12,6 +12,7 @@ import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
 import { MAYOR, buildingOf, toFragment } from "../core/route";
 import { useGo, useSay, useUi } from "../ui";
+import { Machine } from "./machine";
 import { McpForm } from "./mcp";
 import { SkillsNote } from "./setup";
 import { EffortChoice, ModelChoice } from "./setup/models";
@@ -19,8 +20,6 @@ import { AttachForm, EndpointList, LoginForm } from "./setup/providers";
 
 const STEPS = ["machine", "provider", "optional", "model", "go"] as const;
 type Step = (typeof STEPS)[number];
-
-const DOCTOR = "sprawling doctor --install";
 
 export function Welcome() {
   const ui = useUi();
@@ -63,19 +62,7 @@ export function Welcome() {
         <div>
           <Switch>
             <Match when={step() === "machine"}>
-              <p class="mb-base text-note text-text-faint">{say("welcome_machine_body")}</p>
-              <div class="flex items-center gap-snug">
-                <code class="rounded-control bg-g1 px-base py-snug font-mono text-text">{DOCTOR}</code>
-                <button
-                  type="button"
-                  class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g1"
-                  onClick={() => {
-                    void navigator.clipboard.writeText(DOCTOR);
-                  }}
-                >
-                  {say("setup_copy")}
-                </button>
-              </div>
+              <Machine />
             </Match>
             <Match when={step() === "provider"}>
               <Show when={answer()}>{(held) => <div class="mb-base"><EndpointList answer={held()} /></div>}</Show>

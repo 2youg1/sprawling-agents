@@ -28,12 +28,14 @@ pub(crate) mod host;
 mod needs;
 mod presence;
 mod probe;
+mod report;
 mod screen;
 mod table;
 mod visit;
 
 pub(crate) use presence::{Absence, Fault, Presence, Version};
 pub(crate) use probe::{Machine, ThisMachine};
+pub(crate) use report::report;
 pub use screen::verb;
 pub(crate) use table::REQUIREMENTS;
 

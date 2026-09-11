@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 24 个 variant（card-5.4 增 `PutDocument`）、Query 恰 23 个（card-2.6 增 `Hunks`、card-5.4 增 `Governance`、card-6.5 增三、card-6.4 增二、card-2.7 增 `Commits`；计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**（card-2.7 起）：`71ca21170533304e123e609cd6968206cd462c19cb596c1a10cc4f0c9f075b2c`；**WIRE_V ＝ 18**（新增 `Query::Commits` 与 `Answer::Commits`，查询名表 22→23，见 §8-24）。前值 `3381773c…`（card-6.4，WIRE_V 17：新增 `Query::Listing` 与 `Query::Document`，查询名表 20→22；`RunSummary`、`CityAnswer`、`RoundsAnswer` 各长出字段，见 §8-23）、`f436b34b…`（card-6.5，WIRE_V 16：新增 `Query::Rounds`、`Query::Evidence` 与 `Query::CostOf`，查询名表 17→20，见 §8-21）、`2d8b7dc2…`（card-11.7／5.4／2.6，WIRE_V 15：`Dispatch` 去 `budget`，新增 `Command::PutDocument`、`Query::Governance` 与 `Query::Hunks`，见 §8-18 至 §8-20）、`730e9d0b…`（card-2.4，WIRE_V 14：新增 `Query::Commit` 与 `Answer::Commit`，见 §8-17）、`f6fdc67b…`（V3.22，WIRE_V 13：新增 `Command::Standing`；`BuildingAnswer` 携计划树 `PlanRow`，`BuildingProgress` 携 `BlockedLine` 与就绪数，`CityAnswer` 携 `StandingLine`）、`4ac1b7b3…`（V3.13，WIRE_V 12：新增 `ServerFrame::Delta`）、`78fdb74d…`（ux-14，WIRE_V 11：新增 `Query::Changes`）、 `1de1a1ae…`（ux-13，WIRE_V 10：新增 `Query::RunHistory`）、`c7b41d50…`（P3.04，WIRE_V 9：新增 `Query::History`）、`0a600659…`（P3.02，WIRE_V 8：新增 `ConfigureBuilding`）、`4bb71c0b…`（P3.01，WIRE_V 7：新增 `ProbeEndpoint`，`AttachEndpoint` 长出 `admit`）、`c059c6e2…`（F2.16–P2.01，WIRE_V 6）、`d825e83a…`（F2.11–F2.15，WIRE_V 5）、 `aa57cb7e…`（F1.01–F2.10，WIRE_V 4）、 `941ede9f…`（R1.16–R1.18，WIRE_V 3）、`defe9a75…`（R1.14–R1.15，WIRE_V 2）、 `85705c03…`（R1.11–R1.13，WIRE_V 1）、`238f11b2…`（P1.11–R1.10）、`692b5f96…`（S4.02–P1.10）。
+  **当前 golden**（card-9.2 起）：`8df2858c92e8a77b4fe7c0eb38436834bd224b619f3e82dfe53c8e1baa98b286`；**WIRE_V ＝ 19**（新增 `Query::Doctor` 与 `Answer::Doctor`，查询名表 23→24，见 §8-25）。前值 `71ca2117…`（card-2.7，WIRE_V 18：新增 `Query::Commits` 与 `Answer::Commits`，查询名表 22→23，见 §8-24）、`3381773c…`（card-6.4，WIRE_V 17：新增 `Query::Listing` 与 `Query::Document`，查询名表 20→22；`RunSummary`、`CityAnswer`、`RoundsAnswer` 各长出字段，见 §8-23）、`f436b34b…`（card-6.5，WIRE_V 16：新增 `Query::Rounds`、`Query::Evidence` 与 `Query::CostOf`，查询名表 17→20，见 §8-21）、`2d8b7dc2…`（card-11.7／5.4／2.6，WIRE_V 15：`Dispatch` 去 `budget`，新增 `Command::PutDocument`、`Query::Governance` 与 `Query::Hunks`，见 §8-18 至 §8-20）、`730e9d0b…`（card-2.4，WIRE_V 14：新增 `Query::Commit` 与 `Answer::Commit`，见 §8-17）、`f6fdc67b…`（V3.22，WIRE_V 13：新增 `Command::Standing`；`BuildingAnswer` 携计划树 `PlanRow`，`BuildingProgress` 携 `BlockedLine` 与就绪数，`CityAnswer` 携 `StandingLine`）、`4ac1b7b3…`（V3.13，WIRE_V 12：新增 `ServerFrame::Delta`）、`78fdb74d…`（ux-14，WIRE_V 11：新增 `Query::Changes`）、 `1de1a1ae…`（ux-13，WIRE_V 10：新增 `Query::RunHistory`）、`c7b41d50…`（P3.04，WIRE_V 9：新增 `Query::History`）、`0a600659…`（P3.02，WIRE_V 8：新增 `ConfigureBuilding`）、`4bb71c0b…`（P3.01，WIRE_V 7：新增 `ProbeEndpoint`，`AttachEndpoint` 长出 `admit`）、`c059c6e2…`（F2.16–P2.01，WIRE_V 6）、`d825e83a…`（F2.11–F2.15，WIRE_V 5）、 `aa57cb7e…`（F1.01–F2.10，WIRE_V 4）、 `941ede9f…`（R1.16–R1.18，WIRE_V 3）、`defe9a75…`（R1.14–R1.15，WIRE_V 2）、 `85705c03…`（R1.11–R1.13，WIRE_V 1）、`238f11b2…`（P1.11–R1.10）、`692b5f96…`（S4.02–P1.10）。
   P1.11 增三帧：`AttachEndpoint`／`SelectModel` 两个 Command（十九），`EndpointView` 一个 Query（十）。`PutSecret` 仍无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **ux-13 增：`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -531,7 +531,7 @@ pub struct Delta { pub run: RunId, pub text: String }
 | `Auth` | handshake | 出示配对令牌，`server::decide_handshake` 吃掉它 |
 | `PutSecret` | sealed | 唯一没有字节形式的 Command；`Sealed<String>` 在线上不可居留 |
 
-**`client` 而尚未落地的四个**（`Attach`／`Takeover`／`Rollback`／`CreatePolicy`／`BatchByBuilding`）今天由 `not_built` 作答，
+**`client` 而尚未落地的五个**（`Attach`／`Takeover`／`Rollback`／`CreatePolicy`／`BatchByBuilding`）今天由 `not_built` 作答，
 所以门对它们要求的是**客户端不画**——`not_built` 的 rustdoc 说的就是这件事，现在有机器看着了。
 它们的 reach 仍写 `client`，因为那是它们做完之后该去的地方；写成别的取值等于把「还没做」记成「不该做」。
 
@@ -733,6 +733,31 @@ pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
 `cargo clippy -p channels --no-default-features --all-targets` 是红的：`tests/enrolment.rs` 整份都在驱动 `channels::router`，`tests/wire_contract.rs` 有三条断言在问 `decide_bind`／`decide_handshake`，而这三样连同 `axum`、`tokio` 都由 feature `server` 带进来。**这份构建正是给 `web` 用的那一份**——它需要本 crate 的词汇而不许把 TCP 栈拖进 WebAssembly；一个在这里名词都拼不出来的测试文件，把它自己的红判在了产品的一条真路径上。
 
 **按测试真正需要的东西设门，而不是把 feature 打开**：`tests/enrolment.rs` 首行 `#![cfg(feature = "server")]`（整份文件都是路由的事）；`tests/wire_contract.rs` 只给那三条断言与它们的两个辅助函数、以及 `Hello`／`Welcome`／`AxCode`／`SocketAddr` 这几个只被它们用到的名字加 `#[cfg(feature = "server")]`——命令表、查询表、schema 哈希与那两个不可拼写的形状**在两份构建里都被判**，因为它们在两份构建里都成立。
+
+### 8-25 `Query::Doctor`：这台机器有什么（card-9.2；WIRE_V 18→19）
+
+```rust
+// Query 第 24 条（声明序，QUERY_NAMES 同序追加）
+Doctor,                                   // → Answer::Doctor(Box<DoctorAnswer>)
+
+pub struct DoctorAnswer { pub items: Vec<DoctorItem>, pub tiers: Vec<DoctorVerdict> }
+pub struct DoctorItem { pub name: String, pub tier: DoctorTier, pub need: DoctorNeed,
+                        pub enables: String, pub state: DoctorState, pub install: DoctorInstall }
+pub enum DoctorTier { Use, Develop }
+pub enum DoctorNeed { Required, Optional }
+pub enum DoctorState { Present { at, version }, Broken { at, fault }, Absent { absence } }
+pub enum DoctorVersion { Said { text }, Silent, Unreadable, Late }
+pub enum DoctorFault { WillNotStart { said }, HalfWritten, Unreadable { said } }
+pub enum DoctorAbsence { NotOnSearchPath, VariableNamesNothing { variable, path },
+                         NoComponent { dir }, NoHome, NotInThisBuild }
+pub enum DoctorInstall { Command { spelled }, Print { spelled }, Manual { how }, UnknownPlatform }
+pub struct DoctorVerdict { pub tier: DoctorTier, pub missing: Vec<String> }
+```
+
+- **每一种状态都是枚举，不是句子**。终端那份报告是一台机器的散文，而浏览器说两种语言；线上若携措辞，页面的用词就成了服务端的选择。唯一的例外是 `enables`——那是需求表自己关于「有了它能做什么」的一句话，读者推不出来，这条答案里也没有别的字段装得下它。
+- **答的是城启动时看到的那一眼，不是现问现看**。每一项都是起一个进程问版本；一次查询若这么做，会把答一切读的那条线程按住数秒。城若没看过（一次一条命令驱动的工人就是），答 `Unavailable`——与「一栋没人盖过的楼」同口径：**「我没看」是它自己的答案**，而一台空机器会让页面告诉人他手上每件工具都缺。
+- **`install` 把平台不明单列一支**。三个平台之外的机器上，本项目没有任何配方；此时拼一条别的平台的命令是错的，沉默也是错的。
+- **服务端**：`bin::doctor::report` 把 findings 折成本形状，`Views` 存一份（sprawling-SPEC §8-54）。
 
 ### 8-24 `Query::Commits`：一座楼做过的提交，倒序分页（card-2.7；WIRE_V 17→18）
 

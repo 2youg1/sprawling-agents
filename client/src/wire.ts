@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 18 as const;
+export const WIRE_V = 19 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "71ca21170533304e123e609cd6968206cd462c19cb596c1a10cc4f0c9f075b2c" as const;
+export const WIRE_HASH = "8df2858c92e8a77b4fe7c0eb38436834bd224b619f3e82dfe53c8e1baa98b286" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -658,6 +658,156 @@ export const DiscardAnswer = Schema.Struct({
 export type DiscardAnswer = typeof DiscardAnswer.Type;
 
 /**
+ * What getting the item would cost on this machine.
+ */
+export const DoctorInstall = Schema.Union(
+  Schema.Struct({
+    command: Schema.Struct({
+      spelled: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    print: Schema.Struct({
+      spelled: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    manual: Schema.Struct({
+      how: Schema.String,
+    }),
+  }),
+  Schema.Literal("unknown_platform"),
+).annotations({ identifier: "DoctorInstall" });
+export type DoctorInstall = typeof DoctorInstall.Type;
+
+/**
+ * Whether a tier can be reached without the item.
+ */
+export const DoctorNeed = Schema.Union(
+  Schema.Literal("required"),
+  Schema.Literal("optional"),
+).annotations({ identifier: "DoctorNeed" });
+export type DoctorNeed = typeof DoctorNeed.Type;
+
+/**
+ * Which kind of not being here.
+ */
+export const DoctorAbsence = Schema.Union(
+  Schema.Literal("not_on_search_path", "no_home", "not_in_this_build"),
+  Schema.Struct({
+    variable_names_nothing: Schema.Struct({
+      path: Schema.String,
+      variable: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    no_component: Schema.Struct({
+      dir: Schema.String,
+    }),
+  }),
+).annotations({ identifier: "DoctorAbsence" });
+export type DoctorAbsence = typeof DoctorAbsence.Type;
+
+/**
+ * Why a thing that is here cannot be used.
+ */
+export const DoctorFault = Schema.Union(
+  Schema.Struct({
+    will_not_start: Schema.Struct({
+      said: Schema.String,
+    }),
+  }),
+  Schema.Literal("half_written"),
+  Schema.Struct({
+    unreadable: Schema.Struct({
+      said: Schema.String,
+    }),
+  }),
+).annotations({ identifier: "DoctorFault" });
+export type DoctorFault = typeof DoctorFault.Type;
+
+/**
+ * What a present program said when asked its version. Only the first
+ * arm carries text; the other three are facts about how it did not
+ * answer, and none of them makes the program absent.
+ */
+export const DoctorVersion = Schema.Union(
+  Schema.Struct({
+    said: Schema.Struct({
+      text: Schema.String,
+    }),
+  }),
+  Schema.Literal("silent"),
+  Schema.Literal("unreadable"),
+  Schema.Literal("late"),
+).annotations({ identifier: "DoctorVersion" });
+export type DoctorVersion = typeof DoctorVersion.Type;
+
+/**
+ * Whether the item is here, and in what condition.
+ */
+export const DoctorState = Schema.Union(
+  Schema.Struct({
+    present: Schema.Struct({
+      at: Schema.String,
+      version: DoctorVersion,
+    }),
+  }),
+  Schema.Struct({
+    broken: Schema.Struct({
+      at: Schema.String,
+      fault: DoctorFault,
+    }),
+  }),
+  Schema.Struct({
+    absent: Schema.Struct({
+      absence: DoctorAbsence,
+    }),
+  }),
+).annotations({ identifier: "DoctorState" });
+export type DoctorState = typeof DoctorState.Type;
+
+/**
+ * Who needs an item, and therefore which verdict it counts towards.
+ */
+export const DoctorTier = Schema.Union(
+  Schema.Literal("use"),
+  Schema.Literal("develop"),
+).annotations({ identifier: "DoctorTier" });
+export type DoctorTier = typeof DoctorTier.Type;
+
+/**
+ * One item, and this machine's answer about it.
+ */
+export const DoctorItem = Schema.Struct({
+  enables: Schema.String,
+  install: DoctorInstall,
+  name: Schema.String,
+  need: DoctorNeed,
+  state: DoctorState,
+  tier: DoctorTier,
+}).annotations({ identifier: "DoctorItem" });
+export type DoctorItem = typeof DoctorItem.Type;
+
+/**
+ * Whether one tier is reachable on this machine.
+ */
+export const DoctorVerdict = Schema.Struct({
+  missing: Schema.Array(Schema.String),
+  tier: DoctorTier,
+}).annotations({ identifier: "DoctorVerdict" });
+export type DoctorVerdict = typeof DoctorVerdict.Type;
+
+/**
+ * This machine, item by item, with a verdict for each tier.
+ */
+export const DoctorAnswer = Schema.Struct({
+  items: Schema.Array(DoctorItem),
+  tiers: Schema.Array(DoctorVerdict),
+}).annotations({ identifier: "DoctorAnswer" });
+export type DoctorAnswer = typeof DoctorAnswer.Type;
+
+/**
  * One file's head, and what was left out.
  */
 export const DocumentAnswer = Schema.Struct({
@@ -1258,6 +1408,9 @@ export const Answer = Schema.Union(
     commits: CommitsAnswer,
   }),
   Schema.Struct({
+    doctor: DoctorAnswer,
+  }),
+  Schema.Struct({
     unavailable: Schema.Struct({
       query: Schema.String,
     }),
@@ -1657,6 +1810,7 @@ export const Query = Schema.Union(
       limit: Schema.Int,
     }),
   }),
+  Schema.Literal("doctor"),
 ).annotations({ identifier: "Query" });
 export type Query = typeof Query.Type;
 

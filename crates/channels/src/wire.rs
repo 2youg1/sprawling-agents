@@ -60,7 +60,7 @@ use serde::{Deserialize, Serialize};
 /// 18: a building's commits can be listed, newest first, so a page can
 ///    walk from a line of code to the session that wrote it without
 ///    folding the history itself (card-2.7).
-pub const WIRE_V: u32 = 18;
+pub const WIRE_V: u32 = 19;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
@@ -246,6 +246,7 @@ mod tests {
                 before: None,
                 limit: 20,
             },
+            Query::Doctor,
         ];
         assert_eq!(queries.len(), QUERY_NAMES.len());
         for (query, expected) in queries.iter().zip(QUERY_NAMES) {

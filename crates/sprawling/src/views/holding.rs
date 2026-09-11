@@ -126,6 +126,15 @@ pub(crate) struct Views {
     /// the reading side, that is the judging side, and a rebuild makes
     /// them equal.
     pub(super) halted: std::collections::BTreeSet<String>,
+    /// What this machine had when the city was served, from the one
+    /// look the doctor takes at start-up (card-9.2).
+    ///
+    /// Not folded from anything: this is the one answer here that is
+    /// about the machine rather than about the history, which is why it
+    /// is set from outside and why a rebuild leaves it alone. `None` is
+    /// a city that never looked - a worker driven one command at a time
+    /// - and it answers `Unavailable` rather than an empty machine.
+    pub(super) machine: Option<channels::DoctorAnswer>,
 }
 
 impl Views {
@@ -155,7 +164,18 @@ impl Views {
             decided: Vec::new(),
             claims: std::collections::BTreeMap::new(),
             halted: std::collections::BTreeSet::new(),
+            machine: None,
         }
+    }
+
+    /// Takes what the doctor found, so a page can be told what this
+    /// machine is missing.
+    ///
+    /// Once, where a city is served. Probing is seconds of starting
+    /// programs, and a read that did it would hold the one thread every
+    /// other read is answered on.
+    pub(crate) fn found_on_this_machine(&mut self, report: channels::DoctorAnswer) {
+        self.machine = Some(report);
     }
 
     /// Folds one record into every view that cares about it.
