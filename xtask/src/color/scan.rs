@@ -24,7 +24,8 @@ const PRODUCTION_POINTS: [&str; 1] = [THEME];
 /// able to spell what it forbids. `tables.rs` joined them when the token
 /// tables moved into the stylesheet: reading an `oklch()` value means naming
 /// the function that holds it.
-const SPELLS_COLOUR: [&str; 3] = [
+const SPELLS_COLOUR: [&str; 4] = [
+    "xtask/src/color.rs",
     "xtask/src/color/scan.rs",
     "xtask/src/color/tables.rs",
     "xtask/src/color/tests.rs",

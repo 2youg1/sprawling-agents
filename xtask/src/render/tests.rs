@@ -15,18 +15,12 @@ fn rules(found: &[Violation]) -> String {
         .join(" | ")
 }
 
-/// One element, in the shape the probe writes.
-#[expect(clippy::too_many_arguments, reason = "a drawn box has this many sides")]
-fn el(
-    tag: &str,
-    name: &str,
-    left: i64,
-    top: i64,
-    width: i64,
-    height: i64,
-    depth: i64,
-    parent: i64,
-) -> Drawn {
+/// One element, in the shape the probe writes: what it is, where it was
+/// drawn (`[left, top, width, height]`), and where it sits in the tree
+/// (`(depth, nearest measured ancestor)`).
+fn el(tag: &str, name: &str, at: [i64; 4], nesting: (i64, i64)) -> Drawn {
+    let [left, top, width, height] = at;
+    let (depth, parent) = nesting;
     Drawn {
         tag: tag.to_owned(),
         role: "-".to_owned(),
@@ -44,13 +38,13 @@ fn el(
 /// sections that share one left edge.
 fn good() -> Vec<Drawn> {
     vec![
-        el("NAV", "去处", 0, 0, 44, 1061, 3, -1),
-        el("MAIN", "页面", 44, 0, 1372, 1061, 3, -1),
-        el("H1", "画廊", 361, 16, 728, 27, 5, 1),
-        el("SECTION", "thinking", 361, 67, 728, 113, 5, 1),
-        el("SECTION", "calling", 361, 204, 728, 113, 5, 1),
-        el("SECTION", "waiting", 361, 341, 728, 113, 5, 1),
-        el("BUTTON", "/stop", 951, 138, 51, 29, 8, 3),
+        el("NAV", "去处", [0, 0, 44, 1061], (3, -1)),
+        el("MAIN", "页面", [44, 0, 1372, 1061], (3, -1)),
+        el("H1", "画廊", [361, 16, 728, 27], (5, 1)),
+        el("SECTION", "thinking", [361, 67, 728, 113], (5, 1)),
+        el("SECTION", "calling", [361, 204, 728, 113], (5, 1)),
+        el("SECTION", "waiting", [361, 341, 728, 113], (5, 1)),
+        el("BUTTON", "/stop", [951, 138, 51, 29], (8, 3)),
     ]
 }
 
@@ -75,7 +69,7 @@ fn the_shape_the_client_draws_passes() {
 #[test]
 fn a_control_with_no_accessible_name_is_caught() {
     let mut drawn = good();
-    drawn.push(el("TEXTAREA", "", 373, 106, 704, 24, 8, 3));
+    drawn.push(el("TEXTAREA", "", [373, 106, 704, 24], (8, 3)));
     let found = judge(&drawn);
     assert!(
         found
@@ -92,7 +86,7 @@ fn a_control_with_no_accessible_name_is_caught() {
 #[test]
 fn a_control_with_no_area_is_not_asked_for_a_name() {
     let mut drawn = good();
-    drawn.push(el("BUTTON", "", 0, 0, 0, 0, 8, 3));
+    drawn.push(el("BUTTON", "", [0, 0, 0, 0], (8, 3)));
     let found = judge(&drawn);
     assert!(found.is_empty(), "{}", rules(&found));
 }
@@ -100,7 +94,7 @@ fn a_control_with_no_area_is_not_asked_for_a_name() {
 #[test]
 fn an_unnamed_landmark_is_caught() {
     let mut drawn = good();
-    drawn.push(el("ASIDE", "", 1200, 0, 216, 1061, 3, -1));
+    drawn.push(el("ASIDE", "", [1200, 0, 216, 1061], (3, -1)));
     let found = judge(&drawn);
     assert!(
         found.iter().any(|v| v.violation.contains("<aside>")),
@@ -112,7 +106,7 @@ fn an_unnamed_landmark_is_caught() {
 #[test]
 fn a_page_with_two_first_headings_is_caught() {
     let mut drawn = good();
-    drawn.push(el("H1", "第二个", 361, 900, 728, 27, 5, 1));
+    drawn.push(el("H1", "第二个", [361, 900, 728, 27], (5, 1)));
     let found = judge(&drawn);
     assert!(
         found
@@ -169,7 +163,7 @@ fn a_single_pixel_of_rounding_is_not_a_second_edge() {
 #[test]
 fn a_box_that_has_left_its_container_is_caught() {
     let mut drawn = good();
-    drawn.push(el("BUTTON", "escaped", 1300, 12, 200, 40, 8, 3));
+    drawn.push(el("BUTTON", "escaped", [1300, 12, 200, 40], (8, 3)));
     let found = judge(&drawn);
     assert!(
         found
@@ -184,7 +178,7 @@ fn a_box_that_has_left_its_container_is_caught() {
 /// element at the top of the page is not compared with nothing.
 #[test]
 fn an_element_with_no_measured_parent_is_left_alone() {
-    let drawn = vec![el("MAIN", "页面", 44, 0, 1372, 1061, 3, -1)];
+    let drawn = vec![el("MAIN", "页面", [44, 0, 1372, 1061], (3, -1))];
     let found = judge(&drawn);
     assert!(
         found.iter().all(|v| !v.rule.contains("outside the box")),

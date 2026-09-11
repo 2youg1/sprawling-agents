@@ -354,8 +354,10 @@ mod tests {
 
     #[test]
     fn a_binary_without_the_client_table_is_named_by_the_gate() {
+        // A short stand-in rather than a real chunk name: a content hash
+        // is exactly the shape `xtask secret` is built to notice.
         assert!(contains(
-            b"...assets/index-DXu22Oug.js...",
+            b"...assets/index-x1.js...",
             CLIENT_MARK.as_bytes()
         ));
         assert!(!contains(b"a placeholder build", CLIENT_MARK.as_bytes()));

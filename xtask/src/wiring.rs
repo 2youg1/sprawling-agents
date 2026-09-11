@@ -26,8 +26,8 @@
 //! on.
 //!
 //! **Three sources, no copies.** The variants come from the real `enum
-//! Command` parsed out of whichever `channels` module declares it; whether the city
-//! can perform one comes from the arms of `assembly::run_command`;
+//! Command` parsed out of whichever `channels` module declares it; whether
+//! the city can perform one comes from `assembly::run_command`'s arms;
 //! whether a person can ask for one comes from `client/src`. The SPEC
 //! contributes the one fact none of the three can state - which side is
 //! *supposed* to reach it - and the gate reads it as data, so "the table
@@ -47,8 +47,7 @@ const WIRE_DIR: &str = "crates/channels/src";
 /// arms out from under the gate while leaving the gate green about it.
 const WORKER_DIR: &str = "crates/sprawling/src";
 /// Where the client's controls live. A directory for the same reason
-/// `WORKER_DIR` is one, and the command builders sit in `core/commands.ts`
-/// today only by the client's own convention.
+/// `WORKER_DIR` is one.
 const CLIENT: &str = "client/src";
 
 /// Which side is supposed to reach a verb.
@@ -201,35 +200,24 @@ fn performed(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError
 }
 
 /// The tag a variant travels under on the wire, which is the key the
-/// client writes: `PutDocument` is `put_document`.
-///
-/// Computed rather than tabulated. A table mapping variants to keys would
-/// be a second statement of what `channels` already decides with
-/// `rename_all = "snake_case"`, and the two would drift the first time a
-/// verb was renamed.
+/// client writes: `PutDocument` is `put_document`. Computed rather than
+/// tabulated, because a table would restate what `channels` already
+/// decides with `rename_all = "snake_case"`.
 fn wire_tag(variant: &str) -> String {
     let mut tag = String::new();
     for (index, character) in variant.char_indices() {
-        if character.is_ascii_uppercase() {
-            if index != 0 {
-                tag.push('_');
-            }
-            tag.extend(character.to_lowercase());
-        } else {
-            tag.push(character);
+        if character.is_ascii_uppercase() && index != 0 {
+            tag.push('_');
         }
+        tag.extend(character.to_lowercase());
     }
     tag
 }
 
-/// Where an arm for exactly this verb begins.
-///
-/// A plain `find` matches a longer variant that starts with the same
-/// letters, and the gate then reads a neighbour's arm as this verb's. That
-/// is not hypothetical: `Attach` is a prefix of `AttachEndpoint`, so the
-/// gate read the endpoint's arm and called an unimplemented verb built.
-/// The error was invisible while the client side had the same flaw and the
-/// two cancelled out.
+/// Where an arm for exactly this verb begins. A plain `find` matches a
+/// longer variant starting with the same letters: `Attach` is a prefix of
+/// `AttachEndpoint`, so the gate read the endpoint's arm and called an
+/// unimplemented verb built, invisibly, while the client side shared it.
 fn arm_start(body: &str, arm: &str) -> Option<usize> {
     let mut from: usize = 0;
     loop {
@@ -248,15 +236,10 @@ fn arm_start(body: &str, arm: &str) -> Option<usize> {
 }
 
 /// The verbs a person can ask for, read from the client that draws them.
-///
 /// A command frame is an object keyed by the verb, so the shape looked for
-/// is `<tag>: {` - the spelling that builds one. A bare mention is not
-/// enough: `import { halt }` names the verb and draws nothing, and reading
-/// it as a control was the first thing this gate got wrong against a
-/// TypeScript client.
-///
-/// Test files are not controls. A test may spell any frame it likes,
-/// including one no person may send, and counting it would make the sealed
+/// is `<tag>: {`. A bare mention is not enough: `import { halt }` names the
+/// verb and draws nothing. Test files are not controls either - a test may
+/// spell a frame no person may send, and counting it would make the sealed
 /// verbs unspellable in their own tests.
 fn emitted(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError> {
     let mut seen = BTreeSet::new();
@@ -269,8 +252,7 @@ fn emitted(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError> 
         .map(|name| (name.clone(), format!("{}: {{", wire_tag(name))))
         .collect();
     for file in walk::files_with_ext(&base, &["ts", "tsx"])? {
-        let rel = walk::rel(root, &file);
-        if rel.contains(".test.") {
+        if walk::rel(root, &file).contains(".test.") {
             continue;
         }
         let text = walk::read_text(&file)?;
