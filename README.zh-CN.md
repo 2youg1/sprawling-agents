@@ -142,8 +142,8 @@ sprawling help                      # 所有命令，一屏列完
 
 | 没做的事 | 理由 |
 |---|---|
-| OS 级 sandbox | 要逐平台实现，本机只验得了三分之一。没验证过的隔离比没有隔离更坏，因为它会被当成防线。所以今天的说法是「一次删除可以被撤回」，不是「一次删除不会发生」 |
-| CI 里的浏览器端到端 | 回路是本机的一条命令，不是一道门 |
+| OS 级 sandbox | 要逐平台实现，三个平台只验过一个。没验证过的隔离比没有隔离更坏，因为它会被当成防线。所以今天的说法是「一次删除可以被撤回」，不是「一次删除不会发生」 |
+| CI 里的浏览器端到端 | 回路是一条本地命令，不是一道门 |
 | 可复现构建 | 夹具写好了，让两次构建字节一致的编译开关还没设 |
 | 人手派的活在同一瞬间开跑 | 一栋楼朝着目标干活时，现在会把整个 ready set 一次全部拿走，同时最多四轮，各在自己的车道上（`sprawling-SPEC.md` §8-45）。人手派的一份活仍是一次一轮：命令循环答完一条才取下一条，给它开第三张嘴是那张卡剩下的部分。两种情形下账本都只有一个写者——并行驾驶，串行记账 |
 | 把花费摊到 skill 上 | 这是决定不是欠账：一次 tool 调用不发生在某个 skill「之下」——skill 是 prefix 里的一行披露，不是调用上下文，按调用摊钱等于发明一个基准 |
@@ -154,7 +154,7 @@ sprawling help                      # 所有命令，一屏列完
 
 | 零件 | 住在哪 | 怎么换 |
 |---|---|---|
-| 订阅登录情报（跟随 openai/codex 与 earendil-works/pi） | `gateway::oauth_profiles`（只有数据零分支）、`gateway::credential`（流程与续期） | 加一行 profile。**凭证保管恒不外包**：明文只到本机凭证服务 |
+| 订阅登录情报（跟随 openai/codex 与 earendil-works/pi） | `gateway::oauth_profiles`（只有数据零分支）、`gateway::credential`（流程与续期） | 加一行 profile。**凭证保管恒不外包**：明文只到这台机器的凭证服务 |
 | 模型 endpoint 与 dialect | `gateway::endpoint`、`gateway::dialect`；本地推理走 `gateway::native` | 设置页里填 base URL 与 dialect；本地模型直连，不过网关 |
 | SaaS 与外部工具（[Composio](https://composio.dev) 是其中一个 MCP server） | `protocol::mcp` 的 `Outbound` seam、`bin::mcp_stdio` 与 `bin::mcp_http`、楼的 `CONFIG.toml` | 改一个 URL 或一条命令就换了 server；保密楼一个都不起 |
 | sandbox | `runtime::sandbox` seam（今天的适配器是 wasmtime fuel） | 实现这道 seam，过它的 conformance 断言套件 |

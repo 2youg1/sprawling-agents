@@ -14,7 +14,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 | S1.01 | `error` | 2 值类型＋6 数据面 | AxError 七字段；AxCode 35（S2 期初增 `E_STORAGE_FATAL`；P3.01 删 `E_SIGNAL_UNKNOWN`）；carrier 声明位 |
 | S1.02 | `address` | 2 值类型 | 相对 city root 路径 newtype；WriteDomain 原语；reserved prefix 判定 |
 | S1.02 | `locator` | 2 值类型 | `cas:`／`file:` 文法解析与呈现；fail-closed |
-| S1.03 | `event` | 2 值类型 | EventKind 64（S1.03 建 55，P2.09 增 `autonomy_changed`，P4.01 增 roadmap 三件，R1.14 增 `login_started`，P3.01 增 `endpoint_probed`，V3.19 增 `roadmap_split`／`roadmap_blocked`，V3.22 增 `pursuit_changed`，card-5.4 增 `governed_document_written`，共 65）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
+| S1.03 | `event` | 2 值类型 | EventKind 64（S1.03 建 55，P2.09 增 `autonomy_changed`，P4.01 增 roadmap 三件，R1.14 增 `login_started`，P3.01 增 `endpoint_probed`，V3.19 增 `roadmap_split`／`roadmap_blocked`，V3.22 增 `pursuit_changed`，增 `governed_document_written`，共 65）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
 | S1.04 | `version` | 2 值类型 | 乐观并发：Version 单调值＋base 新鲜度判定 |
 | S1.04 | `idem` | 2 值类型 | IdemKey 确定性派生（BLAKE3 XOF 16 字节＋版本字节） |
 | S1.05 | `consts_external` | 6 数据面 | 外部事实常量 5 项 |
@@ -48,8 +48,8 @@ Stage 2 落地其余 18 个 kernel 模块（§8-10…§8-27）。**施工序＝�
 Stage 2 追加：
 
 - 类型加固十项全部有型可指；trybuild 八反例全集编译失败（S2.11）。
-- kani 七 harness 入库（`#[cfg(kani)]`）：本机 Windows 无 kani 宿主支持，每条性质配 proptest 镜像本地可跑，kani 本体入 CI Linux job（CI 恢复时生效）。
-- **CI 只证四条，理由不是成本而是信息（P4.05）**：十一条 harness 里有七条（card-11.7 后为十条）的输入面是具体值——一个 `Address::parse(".sprawling/ledger")`、一个 `TaintSource::new("web:x")`、两个布尔分支——那是单测穿了一层证明的外衣，而同文件的 `#[cfg(test)]` 里已经有同一命题（`write_domain::reserved_target_is_outside_even_for_an_empty_domain`、`gate::the_domain_door_*`、`discard::the_decision_table_holds_in_order`），其中两条的 proptest 输入面比 harness 更宽（`discard::allow_implies_every_guard_passed` 取任意 u64，harness 只固定一个值）。**这七条恰好就是构造 `Vec`／`String`／`BTreeSet` 的那七条**：CBMC 推不出它们内部循环的上界，无界跑了六小时、`--default-unwind 32` 又跑了 45 分钟，两次都卡在 `discard::verification::tainted_never_allows`，两次都没有给出判决——**全局 unwind 界已被实验证伪，不是这个问题的解法**。CI 因此只跑两条：`backpressure`（41s）与 `secret::log2_q10_is_total`（53s）（card-11.7 之前还有第三条 `budget`（54s），它随 `admit_spend` 一并删除）——任意 u64 上的全函数性、单调性与定点 log2 的终止性，都是抽样到不了的地方。**不传全局 unwind**：这两条的循环界是常数（`log2_q10` 十次），CBMC 自己推得出来。
+- kani 七 harness 入库（`#[cfg(kani)]`）：kani 没有 Windows 宿主，每条性质配 proptest 镜像本地可跑，kani 本体入 CI Linux job（CI 恢复时生效）。
+- **CI 只证四条，理由不是成本而是信息（P4.05）**：十条 harness 里有七条的输入面是具体值——一个 `Address::parse(".sprawling/ledger")`、一个 `TaintSource::new("web:x")`、两个布尔分支——那是单测穿了一层证明的外衣，而同文件的 `#[cfg(test)]` 里已经有同一命题（`write_domain::reserved_target_is_outside_even_for_an_empty_domain`、`gate::the_domain_door_*`、`discard::the_decision_table_holds_in_order`），其中两条的 proptest 输入面比 harness 更宽（`discard::allow_implies_every_guard_passed` 取任意 u64，harness 只固定一个值）。**这七条恰好就是构造 `Vec`／`String`／`BTreeSet` 的那七条**：CBMC 推不出它们内部循环的上界，无界跑了六小时、`--default-unwind 32` 又跑了 45 分钟，两次都卡在 `discard::verification::tainted_never_allows`，两次都没有给出判决——**全局 unwind 界已被实验证伪，不是这个问题的解法**。CI 因此只跑两条：`backpressure`（41s）与 `secret::log2_q10_is_total`（53s）——任意 u64 上的全函数性、单调性与定点 log2 的终止性，都是抽样到不了的地方。**不传全局 unwind**：这两条的循环界是常数（`log2_q10` 十次），CBMC 自己推得出来。
 - **第八条不收敛，原因不同（P4.06）**：`secret::verification::entropy_is_total_on_short_inputs` 的输入域是真的（四字节任意），卡住它的是形状：`entropy_millibits_per_char` 对 256 槽计数表逐槽调 `log2_q10`，而每次调用内部做十轮 u128 平方——交给求解器的是约 **2,560 次符号非线性乘法**，非线性乘法正是 SAT 求解器的死穴，十五分钟不返回。它不在 CI 里，也不靠改 unwind 界救：算术核心已由 `log2_q10_is_total` 单独证了，要证全函数得把 harness 改成**对单一槽**而不是对整张表。剩下七条保留在源码里但不入 CI，它们的权威是旁边的测试；要么改成真正符号化的 harness（不再构造堆集合），要么删掉——两者都需一条单独的裁决。
 - three-part refusal 矩阵：五门每条 Deny 路径的 refusal 三段非空且 alternative 可执行（S2.13）。
 - conformance feature 全量导出：Ledger＋Tool＋Model 三套件（sandbox 随 S3）。
@@ -130,7 +130,7 @@ gate ──▶ 上述全部（组合面）＋idem
 
 ## 8 接口先行（按模块分章）
 
-**`#[non_exhaustive]` 辖谁，不辖谁（整修卡 R2.16 校正本文）**：它辖**冻结面**——会被序列化、跨版本读回、或被城外读者依赖的枚举（`AxCode`、`EventKind`、`Effect`、`DialectKind`、`DelegateKind` 等）。它**不辖判定输出**：`StallVerdict`／`GoalVerdict`／`RepairVerdict`／`DelegationVerdict`／`RegisterVerdict`／`Admission` 一律**刻意穷尽**，理由与 runtime-SPEC 对 `PhaseOutcome` 写的同一句：新增一种结论必须逼每个调用方表态，不得掉进 catch-all。`crates/kernel/src/stall.rs` 与 `backpressure.rs` 的判定枚举是同一条规则的第二、第三处表述（card-11.7 删去 budget 的两个判定枚举后，原先记在此处的第三处表述随之搬家）。
+**`#[non_exhaustive]` 辖谁，不辖谁（整修卡 R2.16 校正本文）**：它辖**冻结面**——会被序列化、跨版本读回、或被城外读者依赖的枚举（`AxCode`、`EventKind`、`Effect`、`DialectKind`、`DelegateKind` 等）。它**不辖判定输出**：`StallVerdict`／`GoalVerdict`／`RepairVerdict`／`DelegationVerdict`／`RegisterVerdict`／`Admission` 一律**刻意穷尽**，理由与 runtime-SPEC 对 `PhaseOutcome` 写的同一句：新增一种结论必须逼每个调用方表态，不得掉进 catch-all。`crates/kernel/src/stall.rs` 与 `backpressure.rs` 的判定枚举是同一条规则的第二、第三处表述。
 
 本节此前在这十一个判定枚举上写了 `#[non_exhaustive]`，**而代码从来没有标过它们**——文档单方面失真，不是实现走样。按 AGENTS.md「现实与三份文件都不符时以现实为准，先改文件并写明理由」，本卡删去那十一处标注。ARCHITECTURE.md §3「nothing here is published」是这条分界成立的前提：工作区之外没有下游，故 `#[non_exhaustive]` 在判定输出上买不到任何兼容性，只卖掉 §7 想要的那个编译期穷尽性。
 
@@ -176,7 +176,7 @@ impl AxError {
 
 「gate 码走 `refusal`」本期是构造纪律＋单测；S2 `kernel::gate` 是全库唯一 gate 码生产者，citysim 不变量 8 号在系统层复验。derive `Serialize/Deserialize`（Ledger 载荷需要）、`Clone/Debug/PartialEq`；`thiserror::Error` 提供 Display（`{code}: {action} on {subject}`）。
 
-**AxCode 36 全集与 carrier 对应（specalign 数据面；card-3.1 起 35→36）**
+**AxCode 36 全集与 carrier 对应（specalign 数据面）**
 
 > P3.01：协作组由六降为五——`E_SIGNAL_UNKNOWN` 已定义掉（三码之一；理由与实测见 `collab-SPEC.md` §8-1）。删除时全仓只有本文件提到它，零生产者。剩下两码（`E_WORKTREE_BUSY`／`E_DIGEST_SUSPECT`）已在各自 SPEC 里答过「能否定义掉」，答案是能保留——它们各自有一个真实的运行期情境。
 
@@ -398,7 +398,7 @@ pub struct EventRef { seq: Seq, kind: EventKind }   // 字段私有；无公开�
 | 隐私与 Discard | `file_discarded` | record-only |
 | 隐私与 Discard | `discard_restored` | record-only |
 | 隐私与 Discard | `autonomy_changed` | record-only |
-| 治理与设施 | `governed_document_written` | record-only（card-5.4；人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
+| 治理与设施 | `governed_document_written` | record-only（人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
 
 二分判据唯一：该事件载荷是否决定模型请求字节；不存在第三类。
 
@@ -472,7 +472,7 @@ pub const CLOCK_ZONES_MAX: u32 = 4;
 pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;                   // 2 GiB（P2.03）
 ```
 
-**card-4.1 增两项（图片政策）**：
+**两项图片政策**：
 
 ```rust
 pub const IMAGE_MAX_BYTES: u64 = 2_097_152;   // 2 MiB：一张图的字节上限
@@ -483,7 +483,7 @@ pub const IMAGES_PER_TURN: u32 = 4;           // 一回合最多几张图
 
 `WORKTREE_MAX_BYTES` 是上限而非磁盘余量探测：余量是一台机器当下的事实，上限则是一句拒绝说得出、一个人改得动的数；建树前校，故一座过大的城是被拒而不是被拷到一半（`memory::worktree`）。
 
-16 项中 3 项随类型延后（表先行、值后到，位置恒在本模块）：`AUTONOMY_DEFAULT`（需 `Autonomy`，S2 approval 卡落）；`CLOCK_STAMP_DEFAULT`（需时钟档枚举；该枚举住 kernel 何处属 S2 config 卡决策——kernel 不得依赖 runtime）；`SUBAGENT_CTX_LOCK_DEFAULT`（未给数值；card-11.7 删去子代理上下文锁后**此项永不落地**，从表中划去）。余下两项落地前，本模块不提供任何替身值。
+16 项中 3 项随类型延后（表先行、值后到，位置恒在本模块）：`AUTONOMY_DEFAULT`（需 `Autonomy`，S2 approval 卡落）；`CLOCK_STAMP_DEFAULT`（需时钟档枚举；该枚举住 kernel 何处属 S2 config 卡决策——kernel 不得依赖 runtime）；`SUBAGENT_CTX_LOCK_DEFAULT`（子代理上下文锁不存在，**此项永不落地**）。余下两项落地前，本模块不提供任何替身值。
 
 ### 8-9 kernel::ledger（S1.06；缝清单文件，全库五真缝之一）
 
@@ -545,7 +545,7 @@ impl<T> Tainted<T> {
 
 - **无解包面**：无 `into_inner`、无 `Deref`、字段私有——「摘干净再传下游」编译不过（trybuild 反例，S2.11）。`map` 取 `FnOnce(&T)`（借用入参），闭包无法把所有权搬出环外。
 - **Tainted 恒不 serde**：`Deserialize` 即第二构造入口，伪造空 Taint 即洗白；`TaintSet` 可 serde（事件载荷需要来源清单）。
-- kani：`join` 输出 taint ⊇ 两入参（并集单调不丢）；proptest 镜像同性质（本机无 kani 宿主支持，CI Linux 跑）。
+- kani：`join` 输出 taint ⊇ 两入参（并集单调不丢）；proptest 镜像同性质（kani 没有 Windows 宿主，CI Linux 跑）。
 - 上游错误文本、摘要继承、动作构造器强制并集：均在消费方模块（discard/approval/gate 本期；pipeline/digest S3）逐处落实，本模块只供类型。
 
 ### 8-11 kernel::write_domain（S2.06）
@@ -571,7 +571,7 @@ pub fn observe_edit_war(samples: &[EditSample]) -> EditWarVerdict;
 - **edit war 判据**：同 addr 的样本按序去重相邻同 Run 后得 run 序列 r₁…rₙ；「夺回」＝rᵢ==rᵢ₋₂ 且 rᵢ≠rᵢ₋₁；夺回数 ≥ `EDIT_WAR_FREEZE`(2) → Freeze（A→B→A→B 即两次夺回）。逐 addr 独立计，首个达阈的 addr 入 verdict（BTreeMap 序）。
 - kani：reserved 目标恒不 Within；`admits` 全函数无 panic。
 
-### 8-12 kernel::budget（S2.06；card-11.7 收窄为「钱与量的整数化」）
+### 8-12 kernel::budget（S2.06；钱与量的整数化）
 
 ```rust
 pub struct UsdMicros(u64);  pub struct Tokens(u64);  pub struct ByteLen(u64);   // 15.3-6 钱与量整数化，三新型同家
@@ -582,9 +582,9 @@ pub struct UsdMicros(u64);  pub struct Tokens(u64);  pub struct ByteLen(u64);   
 pub struct BudgetUse { pub usd: UsdMicros, pub tokens: Tokens }    // serde（Progress::Unplanned 载荷、Evidence.budget）
 ```
 
-**card-11.7 删去花费闸的全部判定面**：`BudgetCap`／`BudgetLevel`／`BudgetLadder`／`BudgetLayer`／`SpendVerdict`／`admit_spend`／`CtxLock`／`CtxVerdict`／`observe_ctx` 连同 `kernel::gate::spend` 一并删除，`SUBAGENT_CTX_LOCK_DEFAULT` 因此永不落地。
+**花费闸的判定面不存在**：`BudgetCap`／`BudgetLevel`／`BudgetLadder`／`BudgetLayer`／`SpendVerdict`／`admit_spend`／`CtxLock`／`CtxVerdict`／`observe_ctx` 连同 `kernel::gate::spend` 一并删除，`SUBAGENT_CTX_LOCK_DEFAULT` 因此永不落地。
 
-- **理由是刹车只留一个**：`Halt` 停一个范围并终止该范围内的后台成员（card-11.2 已使这句话为真，`runtime::backlog::halt` 是承兑点）。一座必须停下的城由人说停，而不是由一个没人能在事前算准的上限替他说停。两套刹车里，花费闸这一套从来没有生产调用方——`gate::spend` 的唯一调用点是它自己的测试，`BudgetCap` 在派活面上一路默认值传到冻结。
+- **理由是刹车只留一个**：`Halt` 停一个范围并终止该范围内的后台成员（`runtime::backlog::halt` 是承兑点）。一座必须停下的城由人说停，而不是由一个没人能在事前算准的上限替他说停。两套刹车里，花费闸这一套从来没有生产调用方——`gate::spend` 的唯一调用点是它自己的测试，`BudgetCap` 在派活面上一路默认值传到冻结。
 - **留下的是记账而不是闸**：`BudgetUse` 与 `memory::attribution` 的五路归因、成本页原样保留。**报告花了多少**与**事前不许花**是两件事，本卡只删后者。
 - **不在本卡辖内**：`xtask/budgets.toml`（门的价目册，同名异物）与 `Fuel`（wasm 客的停机保证）。
 - `BudgetUse` 保留 serde，因为它是 `Progress::Unplanned` 与 `Completion::Evidence` 的载荷字段，账本里已有历史行读得回去。
@@ -867,7 +867,7 @@ pub struct ApprovalId(String);               // 非空；uuid v7 由效果层发
 #[non_exhaustive] pub enum ApprovalClass { Commitment, BudgetLimit, DiscardEscalate, AgentQuestion,
                                            Delegation, Governance, Undoable }
 // Delegation（P1.04）：第一次派生要人点头。Governance（P2.01）：改写一个 scope 的规则要人点头。
-// Undoable（card-7.3）：伸到城外、且城里没有任何一处收得回来的后果——目下就是这台机器自己的桌面（§8-45）。
+// Undoable：伸到城外、且城里没有任何一处收得回来的后果——目下就是这台机器自己的桌面（§8-45）。
 // 三者都无对应 PolicyClass variant——一条「豁免改规则」的常设规则会把自己废掉；同样地，一条豁免掉每一次未来点击的常设规则，豁免掉的正是「有人看着」这件事本身。
 pub struct ClusterKey { pub class: ApprovalClass, pub detail: String }
 pub struct ApprovalItem { pub id: ApprovalId, pub source: ApprovalSource, pub actor: String,
@@ -1045,7 +1045,7 @@ pub struct ChatRequest { /* …既有五字段… */ pub effort: Option<Effort> 
 - **不建每模型强度支持表**：任何 provider API 都不返回「本模型支持哪几级」。造一张我们填不满的表，就是给 provider 的真实行为立第二个权威；模型自己拒的原样透出。
 - **`max_tokens` 是模型的事实，不是调用方的偏好**：Anthropic 要求每请求必带 `max_tokens`，且开思考时它是「思考＋回答」的总上限；OpenAI 则可缺席。两家的 `GET /v1/models` 都不返回该上限，所以它探不到，只能随模型登记。权威定在 `gateway::market::ModelEntry.max_output_tokens`，`CallShape.max_tokens` 由选型点从那一行解出；**任何调用处手写数字即错**——截断会发生在一个账上找不到理由的地方。
 
-**card-4.1 增：模型看得见图**（`kernel::model::image`；形状 2 value）
+**模型看得见图**（`kernel::model::image`；形状 2 value）
 
 ```rust
 #[derive(Serialize, Deserialize)] #[serde(rename_all = "snake_case")]
@@ -1139,7 +1139,7 @@ pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutc
                                           Connector { label: ServerLabel } }   // 分类由效果层解好址后注入
 #[non_exhaustive] pub enum EgressOutcome { Allow { first_public_egress: bool }, Deny { refusal: Box<AxError> } }
 pub fn egress(spans: &[SecretSpan], target: &EgressTarget, prior_public_egress: bool) -> EgressOutcome;
-// card-11.7 删 `spend` 门：它判的 ladder 已不存在，且它从无生产调用方。门由五减四。
+// 没有 `spend` 门：它会判的 ladder 不存在，且它从无生产调用方。门由五减四。
 #[non_exhaustive] pub enum CommitmentDecision { Approved, Denied }
 pub fn commitment(decision: Option<&CommitmentDecision>, taint: &TaintSet, ctx: &GateContext,
                   action_desc: &str, artifact: &Locator) -> GateOutcome;
@@ -1151,9 +1151,9 @@ pub fn spawn(parent: Depth, kind: &DelegateKind) -> GateOutcome;      // E_DELEG
 pub fn dedup(seen: &BTreeSet<IdemKey>, key: &IdemKey) -> DedupVerdict;   // 去重恒先于副作用：调用序纪律＋citysim 不变量看守
 ```
 
-- **`dedup` 的承兑人已经存在（card-4.10.1）**：这个纯函数的 `seen` 集合是调用方的状态，故它成不成立取决于有没有人持有那个集合。今天持有它的有两处：工具面的 `runtime::bench`（一波之内同一把键只调一次），与命令面的 `bin::assembly::commanding::entrance`（`serve_one` 判在任何副作用之前，且重复的键得到第一次的答案）。**本模块的立面不变**——集合仍是调用方的，kernel 仍只回答成员关系；此处记的是「谁在兑现它」，因为一道没有调用方的门与没有门等价（`adversary/adversary-SPEC.md` §4 第三个发现量到的正是这件事）。
+- **`dedup` 的承兑人已经存在**：这个纯函数的 `seen` 集合是调用方的状态，故它成不成立取决于有没有人持有那个集合。今天持有它的有两处：工具面的 `runtime::bench`（一波之内同一把键只调一次），与命令面的 `bin::assembly::commanding::entrance`（`serve_one` 判在任何副作用之前，且重复的键得到第一次的答案）。**本模块的立面不变**——集合仍是调用方的，kernel 仍只回答成员关系；此处记的是「谁在兑现它」，因为一道没有调用方的门与没有门等价（`adversary/adversary-SPEC.md` §4 第三个发现量到的正是这件事）。
 - **gate 是全库唯一 gate 码生产者**：五门 Deny 恒经 `AxError::refusal`（三段必填）；Domain 门 nearby＝domain 前缀表；Discard 门 alternative 恒可执行（分批或 Interred 后重试）；Egress 门 subject 只写位置与跨度数，恒不回显命中字节。
-- **Escalate 的二源归一**（card-11.7 起只剩两源）：commitment 无决 → item{class: Commitment}；discard Escalate → item{class: DiscardEscalate}；均 source=Gate、tainted＝taint 非空（C15 标记位）。commitment 携 Denied 决定 → Deny（E_APPROVAL_DENIED，非 gate 码故用 failure 形）。
+- **Escalate 的二源归一**（只有两源）：commitment 无决 → item{class: Commitment}；discard Escalate → item{class: DiscardEscalate}；均 source=Gate、tainted＝taint 非空（C15 标记位）。commitment 携 Denied 决定 → Deny（E_APPROVAL_DENIED，非 gate 码故用 failure 形）。
 - **Taint 升档的 S2 实例**：Discard 门 Tainted 恒 Escalate（住 discard::decide）＋Escalate item 的 tainted 标记位（封 Policy/代答）。其余门的升档语义随其审批面出现时实例化（P1/P2），本期不造无消费者的规则。
 - **首次公网出网**：`egress` 对 Public 且 `!prior_public_egress` 置 `first_public_egress`；NetNotice 挂信封属 pipeline（S3）。Loopback/Private 恒不触发（对 localhost 提醒注入只会训练模型忽略提醒）。
 - kani：四门组合 fail-closed——reserved 目标恒不 Allow；spans 非空恒 Deny；Unplanned Discard 恒不 Allow；Delegated 再派生恒不 Allow。
@@ -1356,7 +1356,7 @@ pub trait Model {
 
 **覆盖它的适配器欠同一个 `ModelReturn`，包括同样的失败。** 流被切断是一次读取错误，永远不是一个变短的回答——`ModelReturn` 恒不由增量拼出来。写进账本的那句话只从 `ModelReturn` 来，一次，在调用结算之后。
 
-## 8-48 `kernel::node_id`：`NodeId` 搬出 `plan`，成为自己的模块（V3.34；编号由 `8-N` 补齐于 card-8.2）
+## 8-48 `kernel::node_id`：`NodeId` 搬出 `plan`，成为自己的模块（V3.34）
 
 `kernel::plan` 的模块表行是 `decision`：树判定什么可以开工、一个枝值多少、一个持有节点走两个出口里的哪一个。
 `NodeId` 不判定任何事——它只说清「一个良构地址长什么样」，并在**唯一的构造点**把别的一律拒掉，
@@ -1372,7 +1372,7 @@ derive 出来的那个会把线上任意字符串收下、交回一个从没过�
 
 1,085 → 958，`[file_length.predating]` 里的那一行随之划掉。
 
-### 8-36 kernel::gate 目录化（card-1.1；形状：裁决簇即目录）
+### 8-36 kernel::gate 目录化（形状：裁决簇即目录）
 
 `gate.rs`（875 行）按裁决簇切为 `gate/` 目录：`domain.rs`（73–107）、`egress.rs`（117–289，
 含 `EgressTarget`／`EgressOutcome`／`EgressAllowlist`）、`spend.rs`（294–321）、
@@ -1383,7 +1383,7 @@ derive 出来的那个会把线上任意字符串收下、交回一个从没过�
 零逻辑）。簇间零调用边（各门只调 `item`＋本簇外模块判定函数）；对外签名逐字节不变。
 完成检查：SPEC 同变更集 → modmap＋apisync 绿 → citysim 同种子字节重放。
 
-### 8-37 kernel::plan／spine 目录化（card-1.2；形状：树／份额／节点／阻塞）
+### 8-37 kernel::plan／spine 目录化（形状：树／份额／节点／阻塞）
 
 `plan.rs`（958 行）按节点类型（`plan/node.rs`：`StopCause`／`Held`／`PlanExit`／`PlanNode`）／
 树结构（`plan/tree.rs`：`PlanTree` 的安置／断言／除法／查询／`claim`／`progress`，测试住 `plan/tree/tests.rs`）／
@@ -1399,7 +1399,7 @@ derive 出来的那个会把线上任意字符串收下、交回一个从没过�
 依赖单向：`plan` 用 `spine` 的行类型，`spine` 不反向用 `plan`。对外签名逐字节不变。
 完成检查：同 8-36。
 
-### 8-38 kernel 值簇目录化（card-1.3；形状：值归值，判归判）
+### 8-38 kernel 值簇目录化（形状：值归值，判归判）
 
 `event.rs`（775）按标识（`event/identity.rs`：`RunId`／`Seq`／`TimeMs`）／种（`event/kind.rs`）／
 载荷（`event/payload.rs`：`Payload`／`EventDraft`／`EventRecord`／`EventRef`，insta 快照随测搬
@@ -1410,7 +1410,7 @@ derive 出来的那个会把线上任意字符串收下、交回一个从没过�
 各改索引零逻辑，对外签名逐字节不变（下游 11 基线仅规范路径记法，各 SPEC §6 同集一句；
 secret 门白名单随 `sealed.rs` 搬家）。完成检查：同 8-36。
 
-### 8-39 kernel::model 目录化（card-5.2）
+### 8-39 kernel::model 目录化
 
 `model.rs`（516）切成四文件：`model/wire.rs` 收线上会话的词汇（dialect 无关的规范形）（`BuildingPolicy`／`Role`／
 `StopReason`／`SystemBlock`／`DialectKind`／`ModelTag`／`Effort`／`ContentBlock`／`ChatMessage`／
@@ -1425,7 +1425,7 @@ secret 门白名单随 `sealed.rs` 搬家）。完成检查：同 8-36。
 apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／`nextest`（205 passed）／
 `xtask modmap`／`length`／`header`／`apisync` 全绿。
 
-### 8-40 kernel::locator 目录化（card-5.2）
+### 8-40 kernel::locator 目录化
 
 `locator.rs`（477）只作一刀：原内联 `mod tests` 整段迁到 `locator/tests.rs`（8 个 `#[test]`
 含 2 条 `proptest!`，断言与名字一字不动，`use super::*` 与 `use crate::error::AxCode` 原样保留），
@@ -1434,7 +1434,7 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 故规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／
 `clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
 
-### 8-41 kernel::highlight 目录化（card-5.2）
+### 8-41 kernel::highlight 目录化
 
 `highlight.rs`（437）只作一刀：原内联 `mod tests` 整段迁到 `highlight/tests.rs`（12 个 `#[test]`，
 断言与名字一字不动，`use super::*` 原样保留，两个夹具 `cut`／`tokens` 随测试同迁、不复制），
@@ -1445,7 +1445,7 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 因此不得搬家。规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：
 `cargo check`／`clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
 
-### 8-42 kernel::tool 目录化（card-5.2）
+### 8-42 kernel::tool 目录化
 
 `tool.rs`（430）只作一刀：原内联 `mod tests` 整段迁到 `tool/tests.rs`（6 个 `#[test]`，断言与名字
 一字不动，`use super::*` 原样保留），父文件尾部改留 `#[cfg(test)] mod tests;` 并原样带上那份
@@ -1456,7 +1456,7 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 声明 `pub trait`。规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：
 `cargo check`／`clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
 
-### 8-43 kernel::config 目录化（card-5.2）
+### 8-43 kernel::config 目录化
 
 `config.rs`（418）只作一刀：原内联 `mod tests` 整段迁到 `config/tests.rs`（9 个 `#[test]`，断言与
 名字一字不动，`use super::*` 与 `use std::collections::BTreeSet` 原样保留），父文件尾部改留
@@ -1467,7 +1467,7 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／`clippy -D warnings`／
 `nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
 
-### 8-44 kernel::approval 目录化（card-5.2）
+### 8-44 kernel::approval 目录化
 
 `approval.rs`（413）只作一刀：原内联 `mod tests` 整段迁到 `approval/tests.rs`（3 个 `#[test]`，
 断言与名字一字不动，`use super::*` 与三个夹具 `item`／`policy`／`resident` 原样保留，缩进整体退
@@ -1479,7 +1479,7 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／`clippy -D warnings`／
 `nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
 
-### 8-45 kernel::schema（card-6.2；形状 4 adapter）——线上每个值的 JSON Schema，从 serde 读的那一份声明派生
+### 8-45 kernel::schema（形状 4 adapter）——线上每个值的 JSON Schema，从 serde 读的那一份声明派生
 
 **需求**：客户端（`client/src/wire.ts`）由 Rust 的 wire 类型生成，而 wire 携带的值大半是 kernel 的（`RunId`／`Seq`／`Address`／`EventRecord`／`AxError`／`ApprovalItem`……）。它们的 JSON 形状必须有且只有一个权威，而那个权威已经存在：类型声明上的 `#[serde(...)]`。
 
@@ -1489,7 +1489,7 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 
 **被否**：（a）在 channels 用 schemars 的 remote derive 镜像这四十个类型——每一个镜像都是同一形状的第二个权威，kernel 改一个字段名，镜像静默不动，客户端在握手通过后误读；（b）不加 feature、无条件派生——把 `schemars` 压进产品二进制，换来的只是省一个 cfg。
 
-### 8-46 kernel::write_domain 增 `WriteDomain::Documents`（card-5.1；形状 1 判定 + 形状 2 value）
+### 8-46 kernel::write_domain 增 `WriteDomain::Documents`（形状 1 判定 + 形状 2 value）
 
 **需求**：City Hall 的两位居民（Mayor、clerk）只写 Markdown。给他们一个「整栋楼可写」的写域，再靠提示词请他们别碰代码，是把不变量交给措辞；写域本身要能表达「只写文档」。
 
@@ -1536,7 +1536,7 @@ pub const ROADMAP_FILE: &str = "Roadmap.md";   // 随 ROADMAP_COLUMNS 住 spine:
 - `gate::domain` 对 `NotWritable` 出 `E_OUTSIDE_WRITE_DOMAIN` 三段式：规则「这个写域只写 Markdown 文档」，违规指出是哪一种，替代给出「改 `.md`」或「用 `plan` 工具」。
 - 被否：给 `WriteDomain` 加一个 `documents: bool` 字段——布尔旗标不是穷尽枚举，且「只写文档」与「什么都写」是两条策略而不是一条策略的一个开关。
 
-**一个区域不是一个文件（前端会话 4 实测修，2026-09-11）。** `Effect::Write { domain }` 是工具在建造时**声明**的区域（`hall/mayor`），不是某次调用要写的文件；`bench::admit` 却把这块区域交给 `gate::domain` 判，于是 `Documents` 域对着 `hall/mayor` 答「不是 Markdown 文档」——**Mayor 从建城起就写不了任何一份文档**，而这正是 D10 唯一交给它的事。假供应方回一次 `edit <city>/hall/note.md` 即复现（`E_OUTSIDE_WRITE_DOMAIN`，主语是居民地址）。修法是让两个问题各有一个权威：
+**一个区域不是一个文件。** `Effect::Write { domain }` 是工具在建造时**声明**的区域（`hall/mayor`），不是某次调用要写的文件；`bench::admit` 却把这块区域交给 `gate::domain` 判，于是 `Documents` 域对着 `hall/mayor` 答「不是 Markdown 文档」——**Mayor 从建城起就写不了任何一份文档**，而这正是 D10 唯一交给它的事。假供应方回一次 `edit <city>/hall/note.md` 即复现（`E_OUTSIDE_WRITE_DOMAIN`，主语是居民地址）。修法是让两个问题各有一个权威：
 
 ```rust
 impl WriteDomain { pub fn reaches(&self, area: &Address) -> bool; }   // admits 的前缀半段：非保留区、且在某个前缀内
@@ -1547,7 +1547,7 @@ pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutc
 - `gate::domain` 判文件，一字不改；它的调用方从 bench 挪到 **`runtime::tools::edit`** 拿到路径的那一刻（runtime-SPEC §8-36）——从前 edit 自己用 `admits` 只处理 `Outside`、漏掉 `NotWritable`，于是 `Documents` 域内的 `<city>/hall/foo.rs` 在工具这一层是放行的，只是被门口那条错判挡住了而已；现在门口只判区域，工具这一层必须判全，而它判全的方式是调同一个门。
 - 被否：让 bench 读 `call.args["path"]`——那把 bench 和一个工具的参数名绑在一起，而 `exec` 同样声明 `Write` 却没有路径。
 
-### 8-47 kernel::approval：City Hall 的两个常量与 clerk 的默认代答（card-5.1）
+### 8-47 kernel::approval：City Hall 的两个常量与 clerk 的默认代答
 
 ```rust
 // consts_policy
@@ -1560,7 +1560,7 @@ pub const HALL_CLERK: &str = "hall/clerk";
 - `may_answer` 逻辑一字不改：clerk 之所以能答，是因为它就是被任命的 delegate；三必经人类与 tainted 依旧 `HumanOnly`，clerk 自己发起的条目依旧 `SelfApprovalBarred`。本卡在 kernel 侧只加常量与一条断言 clerk 走通全路的测试。
 - genesis 侧（`bin::assembly`）在 `city_initialized` 之后写一条 `autonomy_changed`，值为 `delegate:hall/clerk`——记录在账上而不是写死在缺省值里，因为「谁来答」是这座城市的一个决定，人可以改它，改动要有一行历史。
 
-### 8-49 kernel::gate::undoable：拿不回来的那一类外部效应（card-7.3；形状 1 判定）
+### 8-49 kernel::gate::undoable：拿不回来的那一类外部效应（形状 1 判定）
 
 ```rust
 /// 「哪一台 server 上的哪一件工具」——这两样恒同行，故是一个有名字的值。
@@ -1589,11 +1589,11 @@ pub fn undoable(ctx: &GateContext, call: &ConnectorCall<'_>,
 **恒不为它新增 `Effect` 变体**：`Effect` 是路由字段，`Connector` 已经把这一类调用路由到出网门了；再加一格会让每一处 `match Effect` 都要回答一个与它无关的问题。这道门叠在出网门之后，两道各答各的——出网门答「这些字节能出去吗」，本门答「这个后果收得回来吗」。
 
 
-## 8-52 一次工具调用产出的图（card-4.3）
+## 8-52 一次工具调用产出的图
 
 `ToolOutcome` 多一个字段 `attachments: Vec<ImageRef>`，`#[serde(default)]`，旧历史读成空表。
 
-**为什么不放进 `result` 里**：`result` 是给模型读的文本载荷，一个埋在 JSON 里的 `cas:` 定位符对模型永远只是一串字。要让模型**看见**这张图，它必须成为 `ContentBlock::ToolResult.attachments` 的一员——那是卡 4.1 已经备好的位置，而 `runtime::turn::wave` 是唯一一处把 `ToolOutcome` 变成 `ContentBlock` 的地方，于是这个字段是那条路上唯一缺的一段。
+**为什么不放进 `result` 里**：`result` 是给模型读的文本载荷，一个埋在 JSON 里的 `cas:` 定位符对模型永远只是一串字。要让模型**看见**这张图，它必须成为 `ContentBlock::ToolResult.attachments` 的一员——那是 `ContentBlock::Image` 备好的位置，而 `runtime::turn::wave` 是唯一一处把 `ToolOutcome` 变成 `ContentBlock` 的地方，于是这个字段是那条路上唯一缺的一段。
 
 **字节不在这里**：`ImageRef` 携定位符与两个整数边长，字节住 `memory::cas`，出线前的最后一刻才由 `gateway::endpoint` 取出来编码。账本因此仍是一份人能读的文件。
 

@@ -38,7 +38,7 @@
 
 ## 6 命名统一
 
-**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
 
 Identity（两态）｜Resident｜Ephemeral｜Dossier｜URBANITE.md。**不引入「persona」「角色」「档案」**——概念名一律英文原词，一个概念一个名字。
 
@@ -95,7 +95,7 @@ pub fn building_path(city_root: &Path, addr: &Address) -> PathBuf;
 - **confidential 楼声明越界前缀＝拒而不裁剪**：静默裁剪会让文件说一套、城做另一套；拒绝会指出该改哪一行。
 - **无声明写域时默认只写本楼**：一栋楼至少能写自己，且不多。
 - **`review: true` 是楼级开关（P3.02）**：开则每个 Run 得一棵自己的 worktree，写的东西在别人检查并 merge 之前对楼不可见。**默认关**，与 confidential 的「不声明即错」相反——隐私的默认值不得惄悄取宽，而审查纪律的默认值不得惄悄取严：一个人派一个 Agent 去改一行字并盯着看，应当看得到文件变化。拼写不是 `true`／`false` 同样拒。
-- **`## Egress` 列可达域名（P1.09）**：`BuildingRules::egress()` 交 `kernel::egress_target` 判定。类型经 `kernel::EgressAllowlist` 重导出，住哪一簇文件是 kernel 内政（card-1.1 起住 `gate::egress`，公共拼写不变）。**confidential 楼同时列域名＝矛盾，拒**——「数据可入不可出」是那个设置的含义，域名表写在它下面会逼读者自己去调和两句话。
+- **`## Egress` 列可达域名（P1.09）**：`BuildingRules::egress()` 交 `kernel::egress_target` 判定。类型经 `kernel::EgressAllowlist` 重导出，住哪一簇文件是 kernel 内政（`gate::egress`，公共拼写不变）。**confidential 楼同时列域名＝矛盾，拒**——「数据可入不可出」是那个设置的含义，域名表写在它下面会逼读者自己去调和两句话。
 - **今天的执行点与仍缺的执行点要分清**：provider 路径已被 `endpoint` 的 confidential 拒守住；Agent 自己发起的出网（exec 的 Program／Shell 臂、P4 浏览器）**没有可拦截处**，因为拦截需要 OS sandbox。判定已就位，拦截随 P4 落地——在那之前不要说「出网已管住」。
 - **`write_rules` 先求值再落盘（P2.01）**：一份写到一半就不再求值的治理文档会把它那栋楼一起带走。且**整份文档才是单位**：confidential 楼不得列域名，故两行可以各自合法而合在一起非法。
 
@@ -228,7 +228,7 @@ impl Schedule {
 - **恒 UTC**：节奏按 epoch 分钟数整数运算，无历法依赖。关切时区是呈现面的事（ClockStamp），而一份依赖会动的时区库的日程会在重放时换一个时刻发车。
 - **日历形状（day-of-month／month）明拒**：它们需要一部历法，而历法需要一个权威，城里还没有；拒词写明这一点，而不是近似成「每 30 天」。
 - **一个 job 只许一个节奏**：写了两个即拒——排名它们等于替用户做一个他没做的决定。
-- **`due` 与 `due_after` 并存（card-3.2）**：前者是本模块自己的公共面（返回引用，调用方自组装），删它是 breaking；后者是运行级依赖快照的最小形态（返回可直接 dispatch 的三元组，调用方只剩循环）。区间判断一处定义（`due`），`due_after` 只做拥有权转换，不复述窗口语义。
+- **`due` 与 `due_after` 并存**：前者是本模块自己的公共面（返回引用，调用方自组装），删它是 breaking；后者是运行级依赖快照的最小形态（返回可直接 dispatch 的三元组，调用方只剩循环）。区间判断一处定义（`due`），`due_after` 只做拥有权转换，不复述窗口语义。
 
 ### 8-7 city::watch（P4.08；形状 6 数据面＋形状 1 判定）
 
@@ -388,7 +388,7 @@ pub fn write_mcp(city_root: &Path, addr: &Address, layer: Layer, servers: &[McpS
 pub fn write_effort(city_root: &Path, addr: &Address, effort: Effort) -> Result<(), AxError>;
 ```
 
-用户裁定（2026-08-24）：思考强度放在派活按钮旁边，因为**一次会话反正只选一次**。
+**人裁**：思考强度放在派活按钮旁边，因为一次会话反正只选一次。
 
 - **写进那一层，而不是另存一份**：选择落到会话自己房间的 `CONFIG.toml`，由已有的 city → building → room 阶梯解析。第二个存处就是第二个答案。
 - **只改 `[model] effort` 一个键**：文件里其它键是人写的，读出来、改一个值、写回去。文件读不动或解析不了就**拒绝**，不覆盖——一份本构建看不懂的配置不是可以随手盖掉的配置。
@@ -520,7 +520,7 @@ P2.01 同集四处：§6 模块表两行翻 `已建`；§6 接线台账的 `kern
 
 P3.06 同集五处：ARCHITECTURE.md §12 模块表增 city 两行、`runtime::tools::status` 一行由十二字段改十三；`docs/glossary.md` 增 **Neighbourhood** 与 **neighbours** 两行（一个概念一个名字，且 `directory` 因与文件系统目录同音而被明确弃用）；`crates/runtime/runtime-SPEC.md` §8-14 的 status 接口块；`xtask/api-baselines/` 的 `city.txt` 与 `runtime.txt`；`docs/templates/URBANITE.md` 的 `## Bring them` 从此是被读取的一节，改它即改全城名册显示的那一行。
 
-### 8-16 city::config_layers 目录化（card-5.2）
+### 8-16 city::config_layers 目录化
 
 681 行一份文件切成三份，读面与写面各占一份，测试单独一份：
 
@@ -532,7 +532,7 @@ P3.06 同集五处：ARCHITECTURE.md §12 模块表增 city 两行、`runtime::t
 
 **apisync 未重写基线**：`cargo public-api -p city` 与基线的差异只有三行，全部是 `kernel::model::Effort` → `kernel::model::wire::Effort` 一类的 kernel 侧规范路径重拼，与本次切分无关（本次切分的公开面逐字节不变）；基线随 kernel 那一侧的改动一并重算。
 
-### 8-17 city::spine_files 目录化（card-5.2）
+### 8-17 city::spine_files 目录化
 
 591 行一份文件切成两份，生产代码与测试各占一份：
 
@@ -543,7 +543,7 @@ P3.06 同集五处：ARCHITECTURE.md §12 模块表增 city 两行、`runtime::t
 
 **apisync 未重写基线**：公开面不受本次切分影响。
 
-### 8-18 city::policy 目录化（card-5.2）
+### 8-18 city::policy 目录化
 
 517 行一份文件切成两份，生产代码与测试各占一份：
 
@@ -555,7 +555,7 @@ P3.06 同集五处：ARCHITECTURE.md §12 模块表增 city 两行、`runtime::t
 **apisync 未重写基线**：公开面不受本次切分影响。
 
 
-### 8-19 city::building 目录化（card-5.2）
+### 8-19 city::building 目录化
 
 502 行一份文件切成两份，生产代码与测试各占一份：
 
@@ -566,7 +566,7 @@ P3.06 同集五处：ARCHITECTURE.md §12 模块表增 city 两行、`runtime::t
 
 **apisync 未重写基线**：公开面不受本次切分影响。
 
-### 8-20 City Hall：随城市立起的那栋楼，和住在里面的两个人（v0.0.4 card-5.2）
+### 8-20 City Hall：随城市立起的那栋楼，和住在里面的两个人
 
 **需求**：城市需要一个规划者和一个代答者。它们服务每一栋楼，因此不属于任何一栋楼；它们写 Markdown 和计划，不建造。
 
@@ -599,7 +599,7 @@ impl CityPlan { pub fn hall(&self) -> &(Address, BuildingTemplate); }   // 恒�
 - `write: documents` 由 `policy::evaluate` 读成 `DomainReach`；缺这一行读作 `Everything`，因为既有的每一栋楼都没写这一行，而它们的写域没有变。值既不是 `everything` 也不是 `documents` 时拒绝，理由与 `confidential:` 同：读成打字错误的权限设置不能落到宽松那一侧。
 - 被否：给 Mayor 一个覆盖全城的 `Everything` 写域，靠 `MAYOR.md` 的措辞请它别碰代码——把不变量交给提示词，等于没有不变量。
 
-### 8-21 city::gitignore：一栋楼承诺的东西进历史，一次会话在想的东西不进（v0.0.4 card-5.5）
+### 8-21 city::gitignore：一栋楼承诺的东西进历史，一次会话在想的东西不进
 
 **需求**：`building::create`（raise）与 `building::adopt` 立起一栋楼时，同时放下两样东西：一份 `SPEC.md`，和一份 `.gitignore`。
 
@@ -623,7 +623,7 @@ pub const SPEC_FILE: &str = "SPEC.md";   // 字节来自 docs/templates/SPEC.md�
 - **房间由房间自己忽略**：`room::open` 在新开的房间里放一份只有 `*` 一行的 `.gitignore`。楼这一层的 `.gitignore` 写不出「房间」——房间是人当场命名的普通子目录，立楼时它们还不存在，而在被收编的仓库里按通配符去猜哪个子目录是房间会误伤源码目录。
 - 被否：在楼的 `.gitignore` 里写 `*/JOB.md`、`*/URBANITE.md` 一类通配。它只忽略房间里的某几个文件名，会让一次会话的其余产物照样进历史，等于把这条规则写成一半。
 
-### 8-22 city::vocation：一个地址上的居民是来建造的还是来规划的（v0.0.4 card-5.3）
+### 8-22 city::vocation：一个地址上的居民是来建造的还是来规划的
 
 **接口**：
 
@@ -637,7 +637,7 @@ pub fn vocation_of(building: &Address) -> Vocation;
 - **返回穷尽枚举而不是 bool**：`is_hall()` 只答得出「是不是市政厅」，而调用点要问的是「这个地址上的人是干什么的」。第三种职分出现时，缺臂是编译错误，不是一个悄悄落到 `else` 里的新楼。
 - **判据是首段等于 `kernel::consts_policy::HALL_BUILDING`**：`hall` 这个名字只有一处权威，本模块不重抄字面量。
 
-### 8-23 city::city_tool：市政厅对城市本身的那一扇门（v0.0.4 card-5.3）
+### 8-23 city::city_tool：市政厅对城市本身的那一扇门
 
 **接口**：
 
@@ -656,13 +656,13 @@ impl CityTool { pub fn new(city_root: &Path) -> Result<CityTool, AxError>; }
 - **动作不认即拒并报出已知集**：猜错这里意味着把「收编一个已有目录」执行成「新建一栋空楼」，而后者会在人的工作目录旁边多出一份不属于它的模板。
 - **本工具只装给市政厅的居民**（见 8-22）。别的楼要新增一栋楼，走人的控制面。
 
-### 8-24 Handoff 从楼搬到房间（card-11.6）
+### 8-24 Handoff 从楼搬到房间
 
 > 权威在 runtime-SPEC §8-33；本节只记 city 这一侧怎么变。
 
 `handoff_path(city_root, room)` 与 `handoff(city_root, room)` 的第二个参数从楼地址改为**房间地址**：`<city>/<room>/Handoff.md`。签名一字不变，变的是调用方递什么——装配层的 `run_segment` 递本跑的地址。模板由 `room::open` 在打开房间时经 `spine_files::lay_out_handoff` 铺下；楼级 `lay_out` 不再铺 `Handoff.md`。理由是 card 3.5 的同楼并发：两个房间同时冻结，一份楼级文件就是两份内容抢一个名字。没有房间的地址（直接派到楼根的跑）读到 `None`，与从前空表单的读法一致。
 
-### 8-24 city::governed：治理这座城的三份文件（card-5.4；形状 4 adapter）
+### 8-24 city::governed：治理这座城的三份文件（形状 4 adapter）
 
 ```rust
 pub const PREFERENCES_FILE: &str = "PREFERENCES.md";
@@ -671,13 +671,13 @@ impl Governed { pub fn file(self) -> &'static str; pub fn path(self, city_root: 
 pub fn write_governed(city_root: &Path, which: Governed, body: &str) -> Result<PathBuf, AxError>;
 ```
 
-三份文件都住 `<city>/.sprawling/`——没有任何写域够得到的地方（card-5.1 已把前两份放在那里）。**本模块之所以是一扇门而不是三个调用方各自拼一条路径**：能自己拼路径的调用方就能拼出一条走出保留子树的路径，那样「居民改不了治自己的东西」就成了靠习惯成立而不是靠构造成立。
+三份文件都住 `<city>/.sprawling/`——没有任何写域够得到的地方（前两份也在那里）。**本模块之所以是一扇门而不是三个调用方各自拼一条路径**：能自己拼路径的调用方就能拼出一条走出保留子树的路径，那样「居民改不了治自己的东西」就成了靠习惯成立而不是靠构造成立。
 
 - **`Preferences` 是第三份而不是第三个居民**：市长与文书各有身份文件，而「这个人怎么喜欢这座城办事」不属于任何一个居民，它属于城；它与前两者被同一条规矩治理，所以住同一处、走同一扇门。
-- **整份覆写**：这是人在一个框里编辑、按一次保存的文件，写一半会让这座城被半句话治理。上一版不留在这里——账本上那行 `governed_document_written` 才是回头看的地方。
+- **整份覆写**：这是人在一个框里编辑、按一次保存的文件，写一半会让这座城被半句话治理。旧内容不留在这里——账本上那行 `governed_document_written` 才是回头看的地方。
 - **枚举而不是文件名字符串**：文件名是城的答案，不是发帧的人的答案（channels-SPEC §8-19 同一条理由，两侧各说一次）。
 
-### 8-25 `desktop:`：这栋楼把桌面交出去了吗（card-7.3；`policy` 内，形状 1 判定）
+### 8-25 `desktop:`：这栋楼把桌面交出去了吗（`policy` 内，形状 1 判定）
 
 `BUILDING.md` 多一位开关，读法与 `browser:` 逐字同形：
 
@@ -691,7 +691,7 @@ impl BuildingRules {
 - **机密楼恒不给桌面**，理由与 `browser` 那条同构而更强：一台桌面上有别的程序、别的窗口、一整块剪贴板，`desktop.screenshot` 读到的东西没有一样是这栋楼的。「数据可入不可出」与「这栋楼可以截屏这台机器」是同一句话的两半，不能同时为真，故在 `evaluate` 里即拒，`E_CONFIG_INVALID`，拒词指出删哪一行。
 - **它开的是「准不准接」，不是「准不准做」。**准不准做归 `DESKTOP.toml`，那是 server 那一侧、按窗口逐条写的 allowlist（`desktop/desktop-SPEC.md` §8-4）。两道门叠着，且**次序固定**：楼说不，连进程都不起；楼说是，仍要那份 allowlist 逐窗口点头。一道门管「这栋楼是干这个的吗」，另一道管「这台机器上的哪几个窗口」，把它们合成一道都会让其中一个问题没人问。
 
-### 8-26 `DESKTOP.toml` 落在哪（card-7.3；`policy` 内，形状 4 adapter）
+### 8-26 `DESKTOP.toml` 落在哪（`policy` 内，形状 4 adapter）
 
 ```rust
 pub const DESKTOP_SCOPE_FILE: &str = "DESKTOP.toml";
@@ -699,7 +699,7 @@ pub fn desktop_scope_path(city_root: &Path, addr: &Address) -> PathBuf;
 pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Result<PathBuf, AxError>;
 ```
 
-**先问 card-5.1 立下的那条读法。**`DomainReach` 把「residents 能写什么」变成了一份可判定的东西，而它成立的前提是：**决定这件事的那份文件，恒不由被它决定的人来写**。`DESKTOP.toml` 恰恰是这一类——它逐窗口地说这栋楼的 runs 能碰这台机器上的什么。故它不是产物，是治理文件。
+**先问 `DomainReach` 立下的那条读法。**`DomainReach` 把「residents 能写什么」变成了一份可判定的东西，而它成立的前提是：**决定这件事的那份文件，恒不由被它决定的人来写**。`DESKTOP.toml` 恰恰是这一类——它逐窗口地说这栋楼的 runs 能碰这台机器上的什么。故它不是产物，是治理文件。
 
 **落点因此是 `<city>/<building>/.sprawling/DESKTOP.toml`**，与 `BUILDING.md`、`CONFIG.toml` 同处，在 reserved prefix 之下——`is_reserved` 对任何含 `.sprawling` 段的地址为真，故**任何写域都够不到它**，包括 `DomainReach::Everything` 的楼。一个 agent 改不了自己被判的那把尺子，这一条在这里是由构造成立的，不是由记得成立的。
 

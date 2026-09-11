@@ -60,7 +60,7 @@ SPRAWLING_PAIRING_TOKEN=<你自己定的令牌> sprawling serve ~/cities/first 0
 | 字段 | 它要什么 |
 |---|---|
 | **叫它** | 你以后一眼能认出的名字 |
-| **base URL（接口地址）** | provider 自己文档里给的 base URL。`https` 到哪都行，`http` 只能到本机 |
+| **base URL（接口地址）** | provider 自己文档里给的 base URL。`https` 到哪都行，`http` 只能到回环地址 |
 | **它说哪种线格式** | OpenAI 兼容格式，还是 Anthropic 兼容格式 |
 | **密钥** | provider 的 key；本地服务留空 |
 

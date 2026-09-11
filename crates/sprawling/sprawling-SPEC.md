@@ -24,7 +24,7 @@ bin 子命令面；装配层是 Main；ARCHITECTURE.md §2（客户端嵌入链�
 
 ## 6 命名统一
 
-**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。（card-2.2 起 `gateway::credential::Custodian` 住 `custodian` 同例，公共拼写不变）。（card-2.4 起 `channels::command::Command` 住 `kind` 同例）。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。（`gateway::credential::Custodian` 住 `custodian` 同例，公共拼写不变）。（`channels::command::Command` 住 `kind` 同例）。
 
 Assembly／assemble；WEB_INDEX（嵌入资产常量）。
 
@@ -59,7 +59,7 @@ pub(crate) async fn serve(city_root, addr, token, index_html, model) -> Result<(
 - **无 provider 时仍然能起服务**：`UnconfiguredModel` 把「没配模型」变成一条三段式拒绝，而不是拒绝启动。一座城在没有推理服务时仍然可读（重放、浏览）。配置面：`SPRAWLING_MODEL_URL`（回环）＋`SPRAWLING_MODEL`。
 - **工具名录与工具台同源**：`Catalog::admit_tool` 产 `ToolDef`（模型看到的），`ToolBench::register` 负责路由（实际跑的），一次登记喂两边——否则“模型以为存在的工具”与“真能跑的工具”会成为两份名单。本期只挂 `edit` 与 `status`：`exec` 需要一个真 sandbox 与 Python WASI 配置，随出网与 sandbox 那张卡一并接。
 - **RunId 是推导而非抽取**：`b3(job|addr|now)` 前 16 字节。同一毫秒对同一地址派同一件活就是同一个 Run，且标识符里不进随机数（确定性第 7 条的同一条理由）。
-- **预算不可缺**：`DISPATCH_TURN_BUDGET = 24`。调用方还不能设它，但无上限地向付费 provider 循环是唯一没有天花板的失败模式。——**此条已被 card-11.7 推翻（见 §8-40）**：常量删除，一跑不再有回合上限，刹车只剩 `Cancel` 与 `Halt`。
+- **预算不可缺**：`DISPATCH_TURN_BUDGET = 24`。调用方还不能设它，但无上限地向付费 provider 循环是唯一没有天花板的失败模式。——**此条不再成立（见 §8-40）**：常量删除，一跑不再有回合上限，刹车只剩 `Cancel` 与 `Halt`。
 - **`init` 写 `City.md` 入城**：二进制携默认本，城里那份是用户可改的权威；每次组装 prefix 读城里的那一份，代码里恒不长第二份副本。
 
 ## 8-2b CLI 补齐（整修卡 R1.03）
@@ -188,7 +188,7 @@ pub(crate) fn local_url(bind: SocketAddr) -> String;
 - **非交互 stdin 无此问**：`read_line` 得 EOF（管道、CI、无人值守）即 `Quit`，主流程打印命令表退 2。这条让该路径在没有 TTY 的地方也可测。
 - **默认位置取 exe 同级 `city/`**：整座城随文件夹可拷、可备、可删，与「一座城市就是一个目录」同构。`is_writable` 探到不可写（解压进 Program Files）就回退 `home/sprawling/city`；回退可见而非暗中，因为路径印在第一屏上。
 - **开浏览器恒非致命**：`open_in_browser` 失败只记一行，`serve` 照跑——URL 在这之前已经打印。命名不取 `browser`：`crates/browser` 已占住「Agent 驱动真实浏览器」这个概念，一名一义。
-- **横幅给人读**：city 目录、WebUI 的完整 URL、客户端完整与否、`Ctrl-C` 停城，四行。bind 是未指定地址（`0.0.0.0`）时 URL 仍给回环形，因为那才是本机打得开的那一个。
+- **横幅给人读**：city 目录、WebUI 的完整 URL、客户端完整与否、`Ctrl-C` 停城，四行。bind 是未指定地址（`0.0.0.0`）时 URL 仍给回环形，因为那才是这台机器打得开的那一个。
 
 **交付形态**：`just package` 产 `sprawling-<version>-<target>.zip`＝二进制＋`start.cmd`／`start.sh`＋`QUICKSTART.md`；裸 exe 不再单独作附件，双击的目标因此永远是启动器。`release.yml` 由 tag 触发，三平台各跑 `just dist`，`xtask budget` 在打包前拦下页壳客户端（`CLIENT_COMPLETE=false` 的二进制），通过后才附件。手工上传的产物来历不明，是本次全部症状的链头，这条把它关掉。
 
@@ -216,17 +216,17 @@ pub(crate) fn install(uninstall: bool) -> Result<Report, AxError>;
 - **装进去的名字是推导的，不是抄来的**：`installed_name()` 恒给 `sprawling` 加平台后缀，不取当前 exe 的文件名。归档里的文件被改过名字，敲出来的那个词也仍然是 `sprawling`——否则「让它成为一个词」这件事取决于谁解压的。
 - **搜索路径的判定住 Rust，落地住 PowerShell**：`plan_append`／`plan_remove` 是两个纯函数，输入是那条字符串本身，输出是穷尽枚举。适配器只负责取回原值、写回新值、广播。**幂等因此是一条可单测的判定**，而不是一次要在真注册表上观察的行为。
 - **判定的编译面等于它的调用面（P4.05 修正）**：这四项与 `PathOutcome::Rewritten` 原本无条件编译，而只有 Windows 那一支调用它们，故 macOS 的 clippy 以五条 `dead_code` 判红——推送门只跑 Windows，这条错误在四次夜间 `platforms` 里红了四次而没有人看见。修法是让平台条件跟着调用方走（`#[cfg(target_os = "windows")]`），而不是加一条 `allow`：**平台不同不是要压制的告警，是要写进类型里的事实**。`PathOutcome::Rewritten` 是枚举变体、两平台共用同一枚举，故取同文件已有的先例——`#[cfg_attr(not(target_os = "windows"), expect(dead_code, …))]`，与 `SelfService` 对称。
-- **Windows 必须直接改注册表，且必须保住值类型**。`[Environment]::SetEnvironmentVariable(..., 'User')` 是所有教程里的写法，也是错的：它**恒写 REG_SZ**，把本机 `HKCU\Environment\Path` 的 `REG_EXPAND_SZ` 降级，其中的 `%VAR%` 从此不再展开（dotnet/runtime#1442、chocolatey/choco#699）。本机实测该值确为 `ExpandString`，故适配器读原值时用 `DoNotExpandEnvironmentNames`、写回时用读到的那个 `RegistryValueKind`——**读到什么类型就写回什么类型**，键不存在时才取 `ExpandString`（Path 在 Windows 上的默认类型）。
-- **值经临时文件进出，不经命令行**：用户名含非 ASCII 字符时，命令行要穿过控制台代码页（本机 936），而 `PATH` 的整条值也可能逼近命令行长度上限。故 Rust 与 PowerShell 之间用一个 UTF-8 临时文件传值，文件路径经环境变量交接，两侧都不需要引号规则。
+- **Windows 必须直接改注册表，且必须保住值类型**。`[Environment]::SetEnvironmentVariable(..., 'User')` 是所有教程里的写法，也是错的：它**恒写 REG_SZ**，把 `HKCU\Environment\Path` 的 `REG_EXPAND_SZ` 降级，其中的 `%VAR%` 从此不再展开（dotnet/runtime#1442、chocolatey/choco#699）。实测该值确为 `ExpandString`，故适配器读原值时用 `DoNotExpandEnvironmentNames`、写回时用读到的那个 `RegistryValueKind`——**读到什么类型就写回什么类型**，键不存在时才取 `ExpandString`（Path 在 Windows 上的默认类型）。
+- **值经临时文件进出，不经命令行**：用户名含非 ASCII 字符时，命令行要穿过控制台代码页（例如 936），而 `PATH` 的整条值也可能逼近命令行长度上限。故 Rust 与 PowerShell 之间用一个 UTF-8 临时文件传值，文件路径经环境变量交接，两侧都不需要引号规则。
 - **改完必须广播 `WM_SETTINGCHANGE`，否则新窗口也读不到**：Explorer 缓存环境块，从它启动的新控制台继承的是缓存。`#![forbid(unsafe_code)]` 关掉了在 Rust 里调 `SendMessageTimeout` 这条路，故广播由 PowerShell 的 `Add-Type` P/Invoke 完成（`HWND_BROADCAST=0xffff`、`WM_SETTINGCHANGE=0x1A`、`SMTO_ABORTIFHUNG=2`、5 秒上限）。实测一次约 1.1 秒。**广播失败不致命**：路径已经写下了，报一行提示说「注销后生效」，而不是把已经成功的一半说成失败。
-- **非 Windows 拷贝照做，改 shell rc 不做**：装进 `~/.local` 下的 `bin`（该目录在现代发行版上默认已在 PATH 上）。**不写 shell rc**，理由记在这里而不是留一个静默的空分支：rc 文件有 bash／zsh／fish 三套语法与 `.profile`／`.bashrc`／`.zshrc` 多个候选，选错就是往人的登录脚本里写一行没有作用却要人自己删的东西；而本机无 Linux/macOS，交叉编译到 Linux 已知走不通（`aws-lc-sys` 需 C 交叉工具链），故这一支只能由 CI 编译与 lint，不能由我运行验收——**该 job 自 P4.02 起是 `platforms.yml` 的 macOS job，不再是 ubuntu**（ubuntu 已被裁出流水线）。**没有跑过的写入动作不写**。目录不在 PATH 上时，报告里给出该加的那一行，人自己贴。
+- **非 Windows 拷贝照做，改 shell rc 不做**：装进 `~/.local` 下的 `bin`（该目录在现代发行版上默认已在 PATH 上）。**不写 shell rc**，理由记在这里而不是留一个静默的空分支：rc 文件有 bash／zsh／fish 三套语法与 `.profile`／`.bashrc`／`.zshrc` 多个候选，选错就是往人的登录脚本里写一行没有作用却要人自己删的东西；而从 Windows 交叉编译到 Linux 已知走不通（`aws-lc-sys` 需 C 交叉工具链），故这一支只能由 CI 编译与 lint，不能由我运行验收——**该 job 自 P4.02 起是 `platforms.yml` 的 macOS job，不再是 ubuntu**（ubuntu 已被裁出流水线）。**没有跑过的写入动作不写**。目录不在 PATH 上时，报告里给出该加的那一行，人自己贴。
 
-  **P4.02 改判（card-12.1，裁决 D33）**：Linux 重新进流水线。改判的理由是原判的**前提消失**而非原判错误：上段论证的是「从这台无 Linux 的开发机器**交叉编译**走不通（`aws-lc-sys` 需 C 交叉工具链）」，不是「Linux 构建不成立」；GitHub 的原生 runner 在 Linux 上原生构建，根本不碰交叉工具链。落法两件，分开决策：①`release.yml` 矩阵加 `x86_64-unknown-linux-musl` **静态**一行——NixOS 没有 `/lib64/ld-linux-x86-64.so.2`，一份动态链接的 ubuntu 产物在 NixOS 上起不来，而静态一份同时覆盖 NixOS／Alpine／老发行版／容器。**待探项已探明，后端不换**：`aws-lc-sys` 由 `reqwest → hyper-rustls → rustls → aws-lc-rs` 引入（`cargo tree -i aws-lc-sys`，2026 年本机实测），而 aws-lc-sys 0.44.0 的 crate 源码内自带 `src/x86_64_unknown_linux_musl_crypto.rs` 且 README 的 Pregenerated Bindings 表列出该三元组——**该目标在预生成绑定名单上**，故不需要 bindgen，rustls 后端保持 `aws-lc-rs`，不切 `ring`（少一个 crypto 后端就少一处与 Windows／macOS 产物不同的实现）。它仍需一套 musl 的 C 工具链编译 AWS-LC 源码，故该 job 装 `musl-tools` 并令 `CC_x86_64_unknown_linux_musl=musl-gcc`；cmake 已在 runner 镜像上。**这一条只在 CI 上成立而未在本机跑过**（本机无 Linux 亦无 musl 工具链），证据是依赖树与 crate 自带文件，不是一次绿色构建。**那一处债已清（card-F4.0）**：`binary_path` 认了三元组并迁进 `xtask::package`，`just package <triple>` 一条配方打三行矩阵，`release.yml` 里重抄的步骤随之删除，musl 归档的名字带三元组（xtask-SPEC.md §8-11）；②`flake.nix` 只管 devshell 与 `nix run`，版本从 `rust-toolchain.toml` **派生而不复述**（需要额外版本即红），不接管 Windows／macOS 发布路径，CI 上进 `platforms.yml` 的 nightly 而非 push 流水线。本条改判后，本节「只能由 CI 编译与 lint、不能由我运行验收」仍然成立（本机仍无 Linux），变的只是那个 job 不再只有 macOS。
+  **P4.02 改判（裁决 D33）**：Linux 重新进流水线。改判的理由是**前提消失**而非判错：上段论证的是「从这台无 Linux 的开发机器**交叉编译**走不通（`aws-lc-sys` 需 C 交叉工具链）」，不是「Linux 构建不成立」；GitHub 的原生 runner 在 Linux 上原生构建，根本不碰交叉工具链。落法两件，分开决策：①`release.yml` 矩阵加 `x86_64-unknown-linux-musl` **静态**一行——NixOS 没有 `/lib64/ld-linux-x86-64.so.2`，一份动态链接的 ubuntu 产物在 NixOS 上起不来，而静态一份同时覆盖 NixOS／Alpine／老发行版／容器。**待探项已探明，后端不换**：`aws-lc-sys` 由 `reqwest → hyper-rustls → rustls → aws-lc-rs` 引入（`cargo tree -i aws-lc-sys`，实测），而 aws-lc-sys 0.44.0 的 crate 源码内自带 `src/x86_64_unknown_linux_musl_crypto.rs` 且 README 的 Pregenerated Bindings 表列出该三元组——**该目标在预生成绑定名单上**，故不需要 bindgen，rustls 后端保持 `aws-lc-rs`，不切 `ring`（少一个 crypto 后端就少一处与 Windows／macOS 产物不同的实现）。它仍需一套 musl 的 C 工具链编译 AWS-LC 源码，故该 job 装 `musl-tools` 并令 `CC_x86_64_unknown_linux_musl=musl-gcc`；cmake 已在 runner 镜像上。**这一条只在 CI 上成立**（一台 Windows 开发机上没有 Linux，也没有 musl 工具链），证据是依赖树与 crate 自带文件，不是一次绿色构建。**那一处债已清**：`binary_path` 认了三元组并迁进 `xtask::package`，`just package <triple>` 一条配方打三行矩阵，`release.yml` 里重抄的步骤随之删除，musl 归档的名字带三元组（xtask-SPEC.md §8-11）；②`flake.nix` 只管 devshell 与 `nix run`，版本从 `rust-toolchain.toml` **派生而不复述**（需要额外版本即红），不接管 Windows／macOS 发布路径，CI 上进 `platforms.yml` 的 nightly 而非 push 流水线。本条改判后，本节「只能由 CI 编译与 lint、不能由我运行验收」仍然成立（一台 Windows 开发机上没有 Linux），变的只是那个 job 不再只有 macOS。
 - **`Report` 说的是已经发生的事**：拷到哪、搜索路径改没改（`AlreadyPresent` 与 `Append` 是两句不同的话）、广播成不成、以及「PATH 变更不会进已经开着的窗口」。**恒不说「安装成功」四个字**——人要知道的是下一步该开一个新窗口。
 
 **本章测试**：`program_dir` 在两个平台各取本平台约定；`plan_append` 对空串、已含该目录（含大小写不同与带尾分隔符两形）、含其它目录三类输入分别给出正确的穷尽枚举；`plan_remove` 删得干净且保住其余段（含空段）；`plan_append` 之后 `plan_remove` 回到原值——**幂等与可逆是一对性质测试，不是一次手工观察**。判定既然只在 Windows 编译，这组测试也只在 Windows 编译：**测一个在本平台不存在的函数，测的是空**；推送门跑的正是 Windows，故这组测试每次推送都跑。
 
-**本章验收（必须真做）**：本机 `install` 之后**开一个新的 PowerShell 窗口**敲 `sprawling`；随后 `--uninstall`，再开新窗口确认 `Get-Command sprawling` 为空。
+**本章验收（必须真做）**：`install` 之后**开一个新的 PowerShell 窗口**敲 `sprawling`；随后 `--uninstall`，再开新窗口确认 `Get-Command sprawling` 为空。
 
 ## 8-10 第二个 wire 客户端（P3）
 
@@ -344,7 +344,7 @@ impl RunWorker {
 - **属名不是装饰，是回信地址**：另一个 agent 的话氒不得以人的身份进窗口。类型已经把它变成判定（只有 `Steer::from_person` 写得出 `user`）；本卡把同一条规则延到敲门路上——被叫醒的一跑，其 brief 第一句就是「@X signalled you. This run exists because that signal arrived: nobody else asked for it.」。一份读起来像人写的 brief 会让每一封回信寄错地方。
 - **敲门敲的是 Resident，不是一段已封存的对话**：冻结的 Run 是历史，历史只读而不叫醒；被开出来的是那个地址上住户的**一跑新的 Run**，它靠 `Handoff.md` 接住上一场——那正是为穿过一次冻结而造的那件东西。没有 `URBANITE.md` 的地址因此不敲：它是一间房而不是一个人，信就在那儿等到人派个住户过去。
 - **不设叫醒预算（人的定谳）**：什么时候该停下来是对话里那几位居民的事，城市的活是把话送到。人要让某个居民不再被打扰，用的是已有的 Halt，`dispatch_in` 当场拒一个被 halt 的 scope。
-- **一次对话一道底都没有**：**这座城没有金额上限，也没有回合上限**，那是定谳而不是遗漏：什么时候停下来归对话里的居民，花了多少事后从 Ledger 报出来。card-11.7 把从无调用方的 spend 门连同它判的 ladder 、以及 `DISPATCH_TURN_BUDGET` 一并删除（kernel-SPEC §11-7、本文 §8-40），刹车此后只剩 `Cancel`（停一件）与 `Halt`（停一片）。
+- **一次对话一道底都没有**：**这座城没有金额上限，也没有回合上限**，那是定谳而不是遗漏：什么时候停下来归对话里的居民，花了多少事后从 Ledger 报出来。从无调用方的 spend 门连同它判的 ladder 、以及 `DISPATCH_TURN_BUDGET` 一并删除（kernel-SPEC §11-7、本文 §8-40），刹车此后只剩 `Cancel`（停一件）与 `Halt`（停一片）。
 - **一个敲不成不连坐发件人**：叫不醒的人进诊断日志，不把发件那一跑的 dispatch 弄成失败。
 
 **本章测试**：一位居民向另一位发信，无人再派活而收信人自己跑了一跑，且其 brief 里带着发件人的地址；向一个无 `URBANITE.md` 的房间发信不开任何 Run，信仍在队里。
@@ -451,7 +451,7 @@ struct CollaborationFold { … }   // 暂存 enqueued／consumed，`settle` 产 
 `rebuild_book`／`rebuild_governance`／`rebuild_collaboration` 三个函数删除。
 
 - **这张卡不是缺陷修复，我测过了**。我原本怀疑三处实现会漂移（`rebuild_governance` 管 `granted` 与 `CityHalted`，`govern` 不管，`answer_approval`／`set_admission` 各自直改字段）。新测试 `what_a_worker_holds_is_what_a_restart_rebuilds` 实验否定了它：派一次活、发一条信号之后，活 worker 与重建结果逐项相等。那条测试因此不是本卡的红，而是让合并安全的护栏；它同时把一条四处代码都依赖、却从未被断言过的形状-7 性质变成了可红的。
-- **本卡以测量收口而非以红转绿收口**，理由写在上一条：没有可咬的红，因为没有缺陷。本机实测（windows-x86_64, 16 core，release，外部探针经 `sprawling` 的 lib 门驱动 `RunWorker::new`）：
+- **本卡以测量收口而非以红转绿收口**，理由写在上一条：没有可咬的红，因为没有缺陷。实测（windows-x86_64、16 核，release，外部探针经 `sprawling` 的 lib 门驱动 `RunWorker::new`）：
 
   | 记录数 | 改前 | 改后 |
   |---:|---:|---:|
@@ -477,7 +477,7 @@ struct CollaborationFold { … }   // 暂存 enqueued／consumed，`settle` 产 
 
 **与计划的不对称是故意的**：`Roadmap.md` 恒写回城里，因为它是共享地面且带着对当前文件的 compare-and-swap（那段注释自述了理由）。档案没有这样的声明，也没有守卫，所以它是漏而不是决定。
 
-**card-2.2**：四处检查点调用点（`workbench/standing.rs` 的 `ensure_base`、`workbench/tools.rs` 的 `with_checkpoint`、`driving.rs` 的逐波围栏、`reviewing.rs` 的 `PrEffect::Opened`）都从 `Site` 与 `RunWorker` 手上凑齐一个 `memory::Provenance`（run id、resident 地址、选中的模型 id 与思考档位、城的创世哈希）交给 memory；城的创世哈希由 `memory::Provenance::city_of(ledger_dir)` 只读账本首段第一行得出。
+**四处检查点调用点**：（`workbench/standing.rs` 的 `ensure_base`、`workbench/tools.rs` 的 `with_checkpoint`、`driving.rs` 的逐波围栏、`reviewing.rs` 的 `PrEffect::Opened`）都从 `Site` 与 `RunWorker` 手上凑齐一个 `memory::Provenance`（run id、resident 地址、选中的模型 id 与思考档位、城的创世哈希）交给 memory；城的创世哈希由 `memory::Provenance::city_of(ledger_dir)` 只读账本首段第一行得出。
 
 **红**：在 `review: true` 的楼里派一次带 `archive` 工具调用的活，断言书架仍空。本卡之前它拿到 `[Entry { kind: Decision, … lab\Archive\decision\… }]`。同一条测试接着让第二位居民检查并合入，断言书架变为 1 条——**两半同一条测试**，因为只测前半的修法可以是「干脆不写」。
 
@@ -660,7 +660,7 @@ struct BlockedJob { addr: Address, task: String, goal: String, budget: BudgetCap
 
 **三个病灶，一个改动**（交接件第 4 项与§8-23 留下的那一半）：
 
-1. **`blocked_job` 扫全史**。每次审批应答都 `verify_ledger_dir` 一遍再解析两遍，只为找 `(addr, task, goal)`，随历史线性增长。（量级取自 R2.02 在本机留下的同类读数：`verify_ledger_dir` 约 215k 记录/秒，于是 50k 的历史光验链就是百毫秒量级；本卡没有重测。）
+1. **`blocked_job` 扫全史**。每次审批应答都 `verify_ledger_dir` 一遍再解析两遍，只为找 `(addr, task, goal)`，随历史线性增长。（量级取自 R2.02 留下的同类读数：`verify_ledger_dir` 约 215k 记录/秒，于是 50k 的历史光验链就是百毫秒量级；本卡没有重测。）
 2. **天花板归零**。`fn dispatch` 写死 `BudgetCap::default()`，而它正是审批应答后续活走的那条路。一跑带着天花板派出、因待批停下、被批准后续上的那一跑，向模型报 `0 usd_micros, 0 tokens`。
 3. **`self.pending.remove(item)` 先于落账**，与 `set_admission` 相反，且是冗余的——`record → govern(ApprovalResolved)` 本就移除它。`self.granted.push(…)` 同理。
 
@@ -857,7 +857,7 @@ fn freeze_plan(&mut self, site, workbench, addr, brief, task, goal, job, parent,
 
 **它以什么收口**：纯结构，无可咬的红。prefix 四段的装配顺序、must-read 的入列顺序（先 norms 后 job）均逐字不变；两者一变即有多条盯 prefix 字节与交接件内容的测试发作。143 条全绿。
 
-**剩下四刀**（目标 <200，预计落在 ~160）。上一版此处写「三刀」而表里四行，是笔误：四个相位都还在 `dispatch_in` 里，四刀都要切。
+**剩下四刀**（目标 <200，预计落在 ~160）：四个相位都还在 `dispatch_in` 里，四刀都要切。
 
 | 刀 | 相位（§5 步） | 长度 | 归位值 |
 |---|---|---|---|
@@ -885,7 +885,7 @@ impl RunWorker {
 
 **一个值而不是三个，理由是时钟而不是口味**。这一相位读上去是三件事（规则与选型、身份与登记、围栏与租约），而它们在代码里互相咀合：租约要 `run_id` 与 `who`，而 `run_id` 在 `renew_if_stale`（一次可能走网的凭证续期）**之后**采钟。拆成三个方法就得把身份块提到选型之前，那会把 `run_id` 的时间戳提前一次网络往返——而本卡是纯结构卡，行为需逐字不变。**一个采钟点的先后不是重构可以顺手改的东西**（ARCH §10：全库只有一个采样点，它采到的值进了账本）。于是相位按原序整体搬迁，归位值一个。
 
-**`Site` 不收 `addr`**：`Address` 是 `dispatch_in` 的形参，它在相位之前就在，放进去就是同一个值的第二份。上一版草案把 `addr` 列在字段里，按这条删。
+**`Site` 不收 `addr`**：`Address` 是 `dispatch_in` 的形参，它在相位之前就在，放进去就是同一个值的第二份，故它不在字段里。
 
 **归位值先在调用点拆开，下一卡改回整值——记在这里以免重走**。本卡初版写的是 `let Site { building, rules, … } = self.stand_up(…)?;`，理由是 diff 最小（搬走七十行、接替十七行、其余四百行逐字未动）。R2.19f 将它改成 `let mut site = …`，理由是量出来的：拆开之后，剩下三个相位要从调用点接过去的名字共 **102 处引用、十一个名字**（`building` 23、`model` 18、`who` 17、`write_root` 11 …），即每个相位方法都得排一列十五个形参——而那正是归位值要消掉的东西。`Driven` 可以拆，因为它四个字段只在驱动之后被读一次；`Site` 不行，因为它要穿过剩下每一个相位。
 
@@ -1150,7 +1150,7 @@ invert the model seam，仍然没有卡，仍然要人先裁一次。**本卡不
 | `Ending` | 一次 drive 以什么结束：结局、被抬起来的审批、代表桌 | `conclude` 10→3 |
 | `Sweep` | drive 之后要收的东西：围栏、被抬起来的审批、job locator | `settle_desks` 11→4 |
 | `Reach` | 这一轮活够得到谁：邻里与代表 | `status_tool` 7→4 |
-| `Entered` | 一个人为接一个 endpoint 输入了什么：名字、base URL、兼容格式、凭证（card-1.1 后为 `Credential` 枚举，不再是「密钥＋鉴权头」两个 `Option`） | `endpoint_of` 5→1、`probe_endpoint` 5→1、`attach_endpoint` 6→2 |
+| `Entered` | 一个人为接一个 endpoint 输入了什么：名字、base URL、兼容格式、凭证（`Credential` 枚举，不是「密钥＋鉴权头」两个 `Option`） | `endpoint_of` 5→1、`probe_endpoint` 5→1、`attach_endpoint` 6→2 |
 | `Ceilings` | 一行模型声明的两个上限：上下文与最大输出 | `select_model` 5→4 |
 
 `record_for` 的五参消得不需要新类型：`effect::Line` 已经装着 `who`／`addr`／`kind`／`data`，
@@ -1188,7 +1188,7 @@ invert the model seam，仍然没有卡，仍然要人先裁一次。**本卡不
 两者都是纯删除，所以 `guard::strikes_only_exemptions` 放行，不需要 `Verdict:` trailer；
 budgets.toml 里那两段已经失真的注释单独一枚提交改，因为改注释会让豁免形状判定失效。
 
-## 8-40 判据先于副作用：一次派活在城答应之前不写任何东西（轨道一卡 1）
+## 8-40 判据先于副作用：一次派活在城答应之前不写任何东西
 
 `dispatch_in` 的开篇注释一字不差地写着这条规矩——「Nothing is written before the city agrees to take
 the work: a halted city that laid a job file down would leave a task in a room no run ever opened」——
@@ -1209,7 +1209,7 @@ the work: a halted city that laid a job file down would leave a task in a room n
 | 7 | `workbench::stand_up` | `Building::of`／`city::load`／`load_config`／`Router::select`／`renew_if_stale`／`adapter_for`／`Identity::load` | `E_INVALID_ARGS`／`E_CONFIG_INVALID`／`E_GATE_DENIED` | 否 |
 | 8 | 同上 | `run_id_for`／`governance.sent`／worktree 租约 | 存储错 | 写 |
 
-本机实测（`sprawling call` 打到一座刚 init 的城）：派活到从没立过的楼 `gamma`，得到
+实测（`sprawling call` 打到一座刚 init 的城）：派活到从没立过的楼 `gamma`，得到
 `E_CONFIG_INVALID「no model is chosen for this tag」`——**来自第 7 段的 `Router::select`**——
 而磁盘上留下 `<city>/gamma/one/JOB.md`，账本只有 `seq 0 city_initialized`。
 **第 2 段与第 5 段跑在第 7 段之前，这就是全部的病因。** 不是写域逃逸：`Work ".sprawling/evil"`
@@ -1284,7 +1284,7 @@ pub(super) struct Assignment {
 ```
 
 `session` 与 `effort` 只活到序幕结束，而 `addr`／`mode`／`budget`／`parent` 穿过每一个相位——
-一个值里两种寿命，这是本卡自认的代价。**换来的是这条规矩只有一处能被违反**，而上一版的形状是
+一个值里两种寿命，这是本卡自认的代价。**换来的是这条规矩只有一处能被违反**，而另一种形状是
 它有两处、且其中一处没人看着。四个已有字段的语义逐字不变；三个不开房间的调用点写 `session: None,
 effort: None`，那正是 `session_for`／`room_for` 对它们本来就有的答案。
 
@@ -1343,7 +1343,7 @@ let mut site = self.stand_up(agreed, &at, &given)?;
 `crates/sprawling/sprawling-SPEC.md` §8-31 的相位表（`stand_up` 多收一个归位值）。
 `city` 与 `channels` 的公开面不变，故 `api-baselines` 不动。
 
-## 8-27 落点一 · 逆携带：变化带着它的撤销值来（路线图卡 3-1）
+## 8-27 落点一 · 逆携带：变化带着它的撤销值来
 
 §8-24 把「行在变化之前」变成了类型的性质（`Then` 只能从 `Landing::record` 里拿到）。
 本卡问的是下一句：**变化落到一半失败，城是什么形状**。今天 `settle` 里五个臂都是
@@ -1372,7 +1372,7 @@ knocks 长度与进入时相等，账本三行都在（行不受牵连）。`She
 **影面**：`sprawling` 公开面不变（`effect` 不是 `pub mod`）。`settle` 签名不变，
 行为变（失败时回滚），红钉住它。
 
-## 8-28 落点二 · epoch 机器：「依赖快照」回答、「轮询」不回答（路线图卡 3-2）
+## 8-28 落点二 · epoch 机器：「依赖快照」回答、「轮询」不回答
 
 哲学一句话的后半句是「每个依赖驱动其激活」。本卡先回答它的一半：
 **快照是依赖的形状，轮询是依赖的反形状。**「散装 notify 轮询」不是指某一个
@@ -1447,7 +1447,7 @@ settling::desks／landing、commanding::tests::answering／clockwork、
 settling::tests 已有、waking::tests）；`city-SPEC` 的 schedule 节记
 `due_after` 与 `due` 并存的理由（删 `due` 是 breaking）。
 
-## 8-29 落点三 · Assembly 显式化：接线是一处，判定住 kernel，搬运是值（路线图卡 3-3）
+## 8-29 落点三 · Assembly 显式化：接线是一处，判定住 kernel，搬运是值
 
 §8-28 给 3-3 留的判据是「凡调用方仍在做区间比较、仍在记 `last_*` 的，皆是
 epoch 机器要收走的东西」。3-3 把它收走，并连带回答卡题的三句话。
@@ -1541,7 +1541,7 @@ UNLOADING 见 `close_city`」，让卡题的词与代码的名在文档里相遇
 `commanding::governing` 职责减一句）；`gateway-SPEC` 的 endpoint 节记
 `adapter_for` 的归属理由（装配线住适配器簇，凭据只出 `resolver`）。
 
-## 8-30 余部拆净：views／serving／console／main 按缝归位（路线图卡 3-4）
+## 8-30 余部拆净：views／serving／console／main 按缝归位
 
 阶段 3 关版卡。`assembly.rs` 经 3-1→3-3 已成树（本卡零动），余下四文件：
 
@@ -1570,15 +1570,15 @@ UNLOADING 见 `close_city`」，让卡题的词与代码的名在文档里相遇
 按 C7 口径标 `#[cfg(test)]` 豁免（门禁认属性不认文件）。
 `sprawling` 158 全绿，18 门绿，`sprawling` 基线零漂移（`pub` 项未动）。
 
-## 8-31 装配簇归零：在册的最后十一文件（路线图卡 5-2b）
+## 8-31 装配簇归零：在册的最后十一文件
 
 关版卡的 `sprawling` 部分。刀法沿 D7：先迁测试，再按缝切，字段不为跨文件而开；带参数豁免的函数不搬家。逐文件：
 
 - `assembly.rs` 772→365：`fixture`（302 行的 `pub(super) mod fixture`）搬 `assembly/fixture.rs`，路径 `assembly::fixture` 不变，故十六个子模块的测试 `use` 一行未改；`new`／`over`／`close_city` 搬 `assembly/lifetime.rs`（LOADING 与 UNLOADING 是一个生命周期的两端，`over` 的 rustdoc 本就这样写）。子模块读父模块私有字段是 Rust 的规则，`RunWorker` 二十二个字段**无一开放**。`Locator` 的引入随 `close_city` 走，`commanding/tests/answering.rs` 原经 `assembly::*` 借到它，现自引 `kernel::Locator`。
 - `workbench.rs` 1000→188：值留父文件（`Site`／`Workbench`／`Reach`／`Desks`／`Situation`＋`status_snapshot`＋`fence_scope`），方法按阶段归子文件：`standing`（`stand_up`）／`desks`（`open_desks`）／`tools`（`lay_out_workbench`＋`status_tool`＋`admit_reading_room`）／`servers`（`mcp_tools`）／`engine`（`execution_engine` 两臂＋`host_shell`）＋`tests.rs`。四个跨 `assembly` 调用的方法由 `pub(super)` 改 `pub(in crate::assembly)`——同一可见范围的精确拼写，不是放宽；子模块读 `Site.branch`／`Desks.waiting`／`Situation` 私有字段走"子读父"规则，**无字段开放**。`engine` 两函数只有 `tools` 与 `tests` 用，不再经父文件转出口。
 - `credentials.rs` 930→130：值与读法留父文件（`Entered`／`Chosen`／`Ceilings`＋四常量＋`dialect_headers`／`poisoned_vault`／`dialect_of`／`local_model_facts`），方法按"签入"与"可调用"归 `signing`（`renew_if_stale`／`login`／`login_with`／`put_secret`／`resolver`）与 `endpoints`（`probe_endpoint`／`endpoint_of`／`attach_endpoint`／`probe`／`select_model`／`seed_from_environment`／`open_for_service`）＋`tests.rs`。八个跨 `assembly` 调用的方法改 `pub(in crate::assembly)`；**无字段开放**。
-- **`attach_endpoint` 不再以探测为准入条件（card-1.2；gateway-SPEC §8-10 是权威，这里只记装配侧的落地）**：`endpoint_of` 的鉴权头改由 `gateway::AuthSpec::for_dialect` 产出（`Entered.auth_header` 仍恒优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`；`attach_endpoint` 在探测失败时，若 `admit` 非空则按人报的型号登记（`probed=false`，另写一条 `effect` 级诊断点名探测的错），若 `admit` 为空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
-- **`Entered.secret`＋`Entered.auth_header` 合并为 `Credential` 枚举（card-1.1 的必然后果）**：`Absent`／`Key{reference, header}`／`Subscription{reference}`。因为「按兼容格式选头」只对 **API key** 成立：登录挣来的订阅令牌在 Anthropic 那里恒走 `Authorization: Bearer`，若也拿 `x-api-key` 发就是 401。两个 `Option` 拼不出这个区别，于是把它写成穷举枚举：**「订阅令牌装在 key 的头里」现在拼不出来**。`Credential::entered` 是线上命令的唯一入口（线上从不携订阅令牌），`signing` 自己造 `Subscription`。改动面：`credentials.rs` 加类型、`commanding/routing.rs` 两个构造点、`credentials/signing.rs` 一个、`assembly.rs` 一行 `use`。
+- **`attach_endpoint` 不再以探测为准入条件（gateway-SPEC §8-10 是权威，这里只记装配侧的落地）**：`endpoint_of` 的鉴权头改由 `gateway::AuthSpec::for_dialect` 产出（`Entered.auth_header` 仍恒优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`；`attach_endpoint` 在探测失败时，若 `admit` 非空则按人报的型号登记（`probed=false`，另写一条 `effect` 级诊断点名探测的错），若 `admit` 为空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
+- **`Entered.secret`＋`Entered.auth_header` 合并为 `Credential` 枚举**：`Absent`／`Key{reference, header}`／`Subscription{reference}`。因为「按兼容格式选头」只对 **API key** 成立：登录挣来的订阅令牌在 Anthropic 那里恒走 `Authorization: Bearer`，若也拿 `x-api-key` 发就是 401。两个 `Option` 拼不出这个区别，于是把它写成穷举枚举：**「订阅令牌装在 key 的头里」现在拼不出来**。`Credential::entered` 是线上命令的唯一入口（线上从不携订阅令牌），`signing` 自己造 `Subscription`。改动面：`credentials.rs` 加类型、`commanding/routing.rs` 两个构造点、`credentials/signing.rs` 一个、`assembly.rs` 一行 `use`。
 - **`assembly/folds.rs`**（子代理切，主 agent 复核）：`folds.rs` 957→286。刀法沿 §8-31：先迁测试，再按缝切一簇，字段不为跨文件而开。六条测试按「问的是哪一次折叠」分两份：`folds/tests/standing.rs` 收 `Standing::fold` 的三条（活城与重启折出同一份 governance／collaboration、探针填出的 endpoint book、停摆与放行经账本活过重启），`folds/tests/history.rs` 收 `rebuild_views` 的三条（整城回翻、单会话自取、停在上限的那一页说从哪续）；两份不共用夹具，故无 `helpers.rs`，`folds/tests.rs` 只留 `mod history; mod standing;`。`history.rs` 不再 `use crate::assembly::fixture::*`——那三条测试从未用过夹具，内联 `mod tests` 时它被另外三条借着。迁测后仍 495 行，再切一簇：`Collaboration`／`CollaborationFold`／`artifact_of`／`new_inbox`／`INBOX_CAPACITY`／`SIGNAL_BANDWIDTH` 归 `folds/collaboration.rs`（房间里等着什么、哪块地已被认领），`BlockedJob`／`Sent`／`Governance`／`HALTED`／`RELEASED`／`Standing`／`rebuild_views` 留父文件。原先误挂在 `BlockedJob` 上的两段文档（讲「两个投影」与「筛法重建信号」）随它们描述的类型迁为 `collaboration` 的模块文档，`BlockedJob` 自己那段逐字未动。可见性：`assembly::lifetime` 读 `Collaboration` 的 `inboxes`／`joins`／`goals`／`requests`／`plan_holders` 并调 `pursuits`，`assembly.rs`／`dispatching::running`／`settling::landing`／`workbench::desks` 用 `artifact_of`／`new_inbox`，这七项由 `pub(super)` 改 `pub(in crate::assembly)`——同一可见范围的精确拼写，不是放宽；`CollaborationFold` 与其 `absorb`／`settle` 只有父文件用，`pub(super)` 现指 `folds`。`Collaboration.pursuits`（私有字段）与 `CollaborationFold` 的五个私有字段随 `settle` 同迁，**无字段开放**。父文件因此卸下 `Locator`／`effect`／`pursuit_from`／`building_of`／`plan_node_of` 五个 import，`standing.rs` 自引 `kernel::Locator`。`sprawling` 158 全绿（切前切后同为 6 条 `#[test]`），apisync 基线零漂移，未重写。
 - **`assembly/freezing.rs`**（子代理切，主 agent 复核）：`freezing.rs` 778→214：非测试部分（`NEWLINE`／`building_segment`／`run_segment`／`task_line`＋`RunWorker::freeze_plan`）一行未动地留在原文件，573 行的内联 `mod tests` 整体迁到 `freezing/tests.rs`，父文件尾部只余原样保留的 `#[cfg(test)] #[allow(unwrap_used, expect_used, panic, indexing_slicing, reason = "test code")] mod tests;`。测试自身超 400，故 `tests.rs` 退为纯路由（`mod ceilings; mod dispatches;`），八条测试按"问的是什么"分两处：`tests/dispatches.rs` 收一次 dispatch 冻下什么、留下什么——读不动的 handoff 必须点名拒绝、up 模式无自测的改动不落地、job 字节与 must-read 三项进历史、prefix 直接携带楼规与任务而非指路、fork 记血缘并拒非母亲的节点；`tests/ceilings.rs` 收一次 run 在什么之下跑——转派下去的活沿用发它的 ceiling、审批答复续上的活沿用同一 ceiling、config 层解析出的 effort 就是上线的那个，二者共用的夹具 `ceiling_read_by` 只被 `ceilings` 里两条用，随它们同住一文件，故**不设 `helpers.rs`**。两个主题文件按仓内先例用 `use super::super::*;` 回到 `freezing`，再补 `use crate::assembly::fixture::*;` 与 `use crate::assembly::*;`。**无字段开放**，无可见性改动（迁出的只有测试，`freeze_plan` 等仍是 `pub(super)`），函数签名与公共面逐字节不变，apisync 未重写基线。`sprawling` 158 条测试全绿，测试计数切前切后同为 8。
 - **`assembly/plans.rs`**（子代理切，主 agent 复核）：`plans.rs` 740→297：一刀即够，只迁测试，生产代码一行未动。`Reporter`／`tell_whoever_is_behind`／`holders_in`／`ready_in`／`plan_item`／`plan_of`／`set_pursuit`／`pursue` 全部留在父文件——它们回答的是同一个问题（一栋楼的计划树：谁占着哪个节点、什么现在可开工、红色能传到哪个房间），拆开只会把「读计划」与「按计划派活」隔到两个文件里，而后者每一步都要问前者。452 行的 `mod tests` 迁至 `plans/tests.rs`，因其自身逾 400 而按主题扁平化为两份：`plans/tests/rows.rs`（计划的行：读不出来的计划按名字拒绝而不赖给邻居、账本拒了那一行则磁盘上的计划分毫不动、一行只能被一次 run 占住、Done 带得回证据）与 `plans/tests/goals.rs`（撞上已占路径的常驻目标按判定它的层级被拒、workshop 图按依赖次序逐房间跑完且结果回汇）。`tests.rs` 只剩 `mod goals; mod rows;`，沿用 `console/tests.rs` 的先例；两份测试各自写 `use super::super::*;` 直取父模块，夹具仍走 `crate::assembly::fixture::*`，**无夹具复制，故无 `helpers.rs`**。原 `mod tests` 上的四条 `#[allow]` 原样搬到父文件的 `mod tests;` 声明上，lint 沿模块树下传覆盖两份子文件。**无字段开放**，无可见性变更（父文件里 `pub(super)` 的两项本就只被 `assembly` 内同级调用，位置未动）；6 条测试切前切后相等，`sprawling` 158 全绿，基线零漂移，apisync 未重写。钉行 1 删（`crates/sprawling/src/assembly/plans.rs`）。
@@ -1634,18 +1634,18 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 - **curl 脚本只印不跑（被否决的备选：`curl | sh` 自动安装）**：bun 在没有包管理器的平台上的官方装法是把一段脚本管进 shell。跑它意味着这座城代替人接受了一份它没读过、也无法在此刻校验的远端代码——**被否决**。那一支是 `Recipe::Print`：命令印在屏幕上，人自己决定。
 - **探测是「在不在 PATH 上」加「`--version` 说什么」，且带时限**：一个装坏了的工具会挂在启动上，而 doctor 挂住等于比不装还糟。子进程的读法沿用 `bin::mcp_stdio` 的形状——读在一个线程里，等在一个带 deadline 的 channel 上，超时就杀掉子进程；`patience` 是参数，**不在这里采时钟**。Firefox 另加平台标准安装路径，因为 Windows 与 macOS 上它常常不在 PATH 上。
 - **四个文件而不是两个，理由是尺寸与形状**：`doctor.rs` 只留判定（表的形状、`finding_line`、`verdict`），表落 `table.rs`，屏幕与那一问落 `screen.rs`，跑子进程的落 `probe.rs`。判定与驱动同住一个文件时 `doctor.rs` 是 399 行——`xtask length` 的 400 之下一行，即下一次编辑必红。**这不是把文件切碎，是把「判断」与「跟人说话」分开**，两者本就不是一件事。
-- **Windows 上先找带扩展名的那个文件**：`bun` 在本机由 npm 装出来，同一目录下既有无扩展名的 shell 脚本 `bun`（Windows 起不动）又有 `bun.cmd`。先取无扩展名的那个，报出来的是「装了但不说版本」——一个装好的工具被报成半坏的。故 `names_of` 在 Windows 上按 `.exe`／`.cmd`／`.bat`／无扩展名的次序找，这条次序有它自己的测试。
+- **Windows 上先找带扩展名的那个文件**：`bun` 若由 npm 装出来，同一目录下既有无扩展名的 shell 脚本 `bun`（Windows 起不动）又有 `bun.cmd`。先取无扩展名的那个，报出来的是「装了但不说版本」——一个装好的工具被报成半坏的。故 `names_of` 在 Windows 上按 `.exe`／`.cmd`／`.bat`／无扩展名的次序找，这条次序有它自己的测试。
 - **一项是环境变量而不是程序**：exec 工具 python 臂要的 CPython-WASI 组件由 `PYTHON_WASM_ENV` 指路（`bin::assembly::workbench::tools`），故它的探测是「那个变量指的文件在不在」，安装那一栏是 `Manual`——没有包管理器发它。它是 `Optional`，行尾说明它开启的是什么。
 - **终端里的词是英文，这不违反 wording 门**：AGENTS.md 的语言表把 `web::lang` 的管辖写在客户端上，`xtask wording` 扫的目录是 `crates/web/src`（见 `xtask/src/wording.rs` 的 `CLIENT` 常量）。控制台是操作者的，与 `install`／`console`／`firstrun` 同一口径。
 - **机器面是一条缝，而不是一个假想缝**：`Machine` 有两个实现——`ThisMachine`（真跑子进程）与测试里的 `ScriptedMachine`（一张 name→Presence 的表，外加它记下的安装请求）。判定因此不需要这台机器上真装着什么就能被咬。
 
 **本章测试**：表的完整性（每一项都有探测方法，且三个平台各自要么给出命令要么明说 `manual`；每一个 `Optional` 项都说出它开启什么）；`verdict` 对「全在」「缺一个必需项」「只缺一个可选项」三类输入给出正确的穷尽枚举（可选项缺失不拖垮该层）；`finding_line` 的三种写法；`--install` 在答 `n` 时**一件也不装**、答 `y` 时只装被问的那一件（由 `ScriptedMachine` 记账）。
 
-**本章验收**：本机 `cargo run -p sprawling -- doctor`，输出逐项与两句判定，必需项有缺则退 1。
+**本章验收**：`cargo run -p sprawling -- doctor`，输出逐项与两句判定，必需项有缺则退 1。
 
-**本章未做且已知（已由 §8-47 清账）**：`PYTHON_WASM_ENV` 曾是 `assembly::mcp` 的私有常量，bin 的别处够不着，故表里第二次拼出了 `SPRAWLING_PYTHON_WASM` 这个名字。卡 9.4 把 doctor 搬进 lib、让装配层反过来问 doctor，那个名字于是只拼一次（`bin::doctor::table::PYTHON_WASM_VARIABLE`），钉住两处拼写的那条测试随之删除。
+**本章未做且已知（已由 §8-47 清账）**：`PYTHON_WASM_ENV` 曾是 `assembly::mcp` 的私有常量，bin 的别处够不着，故表里第二次拼出了 `SPRAWLING_PYTHON_WASM` 这个名字。doctor 住 lib，装配层反过来问 doctor，那个名字于是只拼一次（`bin::doctor::table::PYTHON_WASM_VARIABLE`），钉住两处拼写的那条测试随之删除。
 
-## 8-41 门说的话与门做的事：静默有自己的退出码，重放的命令只做一次（card-4.10.1；`bin::wire_client`、`bin::assembly::commanding::entrance`）
+## 8-41 门说的话与门做的事：静默有自己的退出码，重放的命令只做一次（`bin::wire_client`、`bin::assembly::commanding::entrance`）
 
 仓外的对抗性检验器（`adversary/adversary-SPEC.md` §4）留了两条未修的发现。两条都只在**门外**可观测，
 两条都伤同一类调用方——一个拿退出码分支、拿重试兜底的 agent。本节一次答完，因为它们是同一个承诺的两半：
@@ -1744,7 +1744,7 @@ pub(in crate::assembly) const IDEM_FIELD: &str = "idem";
 `docs/operating.md` 增退出码表。公开面：`bin::wire_client` 与 `bin::assembly` 都是二进制内部（`pub(crate)`
 以下），`RunWorker::handle` 的签名不变，故 `api-baselines` 不动。
 
-## 8-42 并发地板：一条记账线程，一个驾驶池（v0.0.4 轨道 3，卡 3.1–3.4）
+## 8-42 并发地板：一条记账线程，一个驾驶池
 
 这一节回答一个问题：**这座城怎样同时跑两轮活，而账本上的字节仍然逐字节可重放。**
 答案是把今天那一条 `sprawling-runs` 线程一分为二，两半各自持有互不相交的东西。
@@ -1779,7 +1779,7 @@ pub(in crate::assembly) const IDEM_FIELD: &str = "idem";
 「有人打断我吗」，于是这个钩子从「借走一个」变成「每轮活各注册一份」：`CommandDesk::interrupt_for`
 本来就按 `RunId` 挑命令，本卡只是让 N 份 `Relay` 各自带一份指向同一张桌子的注册。
 
-### 8-42-2 `bin::serving::relay`——`kernel::Ledger` 的第三个适配器（卡 3.2）
+### 8-42-2 `bin::serving::relay`——`kernel::Ledger` 的第三个适配器
 
 形状：**adapter**（ARCH §9 第 4 种）。它不做任何判断，判断全在记账线程那一侧。
 
@@ -1814,7 +1814,7 @@ impl RelayGate {
 **回信通道是 `sync_channel(0)`**（会合信道）：一次 `append` 一个回信地址，不留缓冲，
 所以「记账线程写完了」与「池线程知道写完了」之间没有第三种状态。
 
-**签名与卡面的一处出入，如实记在这里**：卡 3.2 的说法是「阻塞等 `Result<EventRecord>`」，
+**签名的一处出入，如实记在这里**：另一种说法是「阻塞等 `Result<EventRecord>`」，
 而 `kernel::Ledger::append` 的返回类型是 `Result<EventRef, AxError>`。**以端口为准**——
 一致性套件是契约（卡面自己这么说），而 `EventRef` 是那个套件检验的东西。
 `EventRecord` 会把整条记录复制过河，`EventRef` 不会，且 `EventRef` 无法伪造（ARCH §9）。
@@ -1827,7 +1827,7 @@ impl RelayGate {
 **服务顺序：relay 请求排在 desk 命令之前**。理由是一个已经在跑、已经花了钱的活，不该排在一条还没开始的命令后面；
 反过来排会让一次 `Dispatch` 命令挡住三轮正在写 `tool_result` 的活。
 
-### 8-42-3 `bin::serving::pool`（卡 3.3）
+### 8-42-3 `bin::serving::pool`
 
 形状：**adapter**。N 条 `std::thread`，从 `bin` 里那唯一的 spawn 点起（ARCH §10 规则 3）。
 入口 `(RunId, Driving)`，出口 `(RunId, Driven)`。
@@ -1841,7 +1841,7 @@ provider 的并发上限），配置值是人写的。取小的那个：比天�
 六个场景必须逐字节重放同样的账本，而池大小 1 时 `Driven` 的到达顺序就是发起顺序，
 于是确定性不依赖调度器。
 
-### 8-42-4 记账线程的三张嘴（卡 3.4）
+### 8-42-4 记账线程的三张嘴
 
 人从界面派的活在把 `Driving` 交给一条车道之后就回到主循环，于是记账线程有三张嘴，按这个次序：
 
@@ -1880,10 +1880,10 @@ provider 的并发上限），配置值是人写的。取小的那个：比天�
 
 ### 8-42-6 验收
 
-1. **红转绿（卡 3.2）**：`the_relay_passes_the_ledger_conformance_suite`——
+1. **红转绿**：`the_relay_passes_the_ledger_conformance_suite`——
    `kernel::ledger::conformance::assert_ledger_conformance` 原样跑在 relay 上，
    记账那一侧是另一条线程持有的账本。
-2. **红转绿（卡 3.4）**：`driving/tests` 里两次派活交错——账本 `seq` 保持单调，
+2. **红转绿**：`driving/tests` 里两次派活交错——账本 `seq` 保持单调，
    每一轮活的 `run_started` 排在它自己的 `model_called` 之前。
 3. citysim 六个场景在池大小 1 下逐字节重放同样的账本。
 4. `cargo clippy -p sprawling --all-targets --all-features --locked -- -D warnings` 与
@@ -1898,9 +1898,9 @@ provider 的并发上限），配置值是人写的。取小的那个：比天�
 `Driving` 于是拥有自己的 signals 句柄、一份 `Cas` 第二句柄（§8-43）与 backlog 成员号（runtime-SPEC §8-28-2）。
 `driving/tests/turns::a_drive_can_be_handed_to_another_thread` 钉住这条性质：`Driving: Send` 是编译期事实。
 
-## 8-41 一次提交出自哪次运行，从账本回答（card-2.4；`bin::views::commits`、`sprawling whose`）
+## 8-41 一次提交出自哪次运行，从账本回答（`bin::views::commits`、`sprawling whose`）
 
-card-2.1–2.3 让这座城作出的每一个提交都带上五条 git trailers 与一个
+这座城作出的每一个提交都带上五条 git trailers 与一个
 `<actor>@<city 前 12 位>.sprawling` 的署名。那是**给城外读者的投影**：拿着 `git log`
 的人看得见谁写了这一行。反方向还欠着——**手里只有一个 oid 的人，问不出它出自哪次会话**，
 而这正是一个人在 `git blame` 之后会问的下一句话。
@@ -1975,10 +1975,10 @@ pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer
 于是「relay 请求排在 desk 命令之前」这条规矩现在由代码持有而不是由一段文字持有。
 池那一侧还没有生产调用方，于是 `Relay`、`RelayGate::issuing`、`RelayGate::issue` 与 `gone` 在非测试构建里是死代码。
 本卡的处理是四处 `#[cfg_attr(not(test), expect(dead_code, reason = …))]`——
-**用 `expect` 而不是 `allow`，正是因为它会自己清掉**：卡 3.3 一落地，这四条期待就变成「未兑现的期待」而编译失败，
+**用 `expect` 而不是 `allow`，正是因为它会自己清掉**：池一落地，这四条期待就变成「未兑现的期待」而编译失败，
 删掉它们是那张卡必须做的事，而不是某个人必须记得的事。这是本会话唯一一处压制，也是我请人过目的那一处。
 
-### 城市立起来时就有市政厅，和一条写下来的代答（v0.0.4 card-5.1／5.2）
+### 城市立起来时就有市政厅，和一条写下来的代答
 
 **`form_city` 在 line zero 之后多做三件事**，顺序固定：
 
@@ -1988,9 +1988,9 @@ pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer
 
 **影响面（一处真实回归，已改）**：从此每座城市至少有两栋楼。`views::tests` 里两处按 `buildings[0]` 取楼的断言改成按地址找 `lab`——它们原本靠「城里只有一栋楼」这个此后不再成立的前提。改的是测试对现实的假设，不是把判据放宽。
 
-**留给后续卡**：`hall` 的居民目前拿到的仍是 `workbench::tools` 给所有人的同一套工具表，`exec`／`delegate`／`workshop` 都在里面。card-5.3 才按地址裁这张表；在那之前，市政厅「不建造」只由写域挡住（`Documents` 拒非 `.md`），不由工具表挡住。
+**留给后续卡**：`hall` 的居民目前拿到的仍是 `workbench::tools` 给所有人的同一套工具表，`exec`／`delegate`／`workshop` 都在里面；这张表按地址裁，而不是只由写域挡住（`Documents` 拒非 `.md`），不由工具表挡住。
 
-## 8-43 筛子接进产品：`driving` 把 `exec` 结果经 `pipeline::package` 交给模型（card-11.4 收尾；`bin::assembly::driving`、`runtime::pipeline::exec`）
+## 8-43 筛子接进产品：`driving` 把 `exec` 结果经 `pipeline::package` 交给模型（`bin::assembly::driving`、`runtime::pipeline::exec`）
 
 **量出来的现状**：runtime-SPEC §8-27 的筛子完整落地，`pipeline::package` 也已带 `SieveRequest` 臂，但它在产品里没有调用方——`bin::assembly::driving` 的 `invoke` 钩子把 `BenchOutcome::Ran` 的结果原样交回 `runtime::turn`，于是压缩器只在 citysim 跑，城里的模型读的是 `cargo check` 的一千两百行原文。§8-27-9 末尾的「已知未接」说的就是这一处。
 
@@ -2028,14 +2028,14 @@ citysim 的 `sieving.rs` 改为调它；旧函数删除（迁移做完，不留�
 2. `citysim::sieve::the_window_holds_the_diagnostics_and_the_way_back_and_only_the_news_the_second_time` 绿。
 3. 同种子 citysim 逐字节重放不变（`the_same_seed_and_table_replay_a_byte_identical_window`）。
 
-**留给 gitignore 的一句**：`.rest/` 住房间里，楼的 `.gitignore`（city-SPEC §8-21）应忽略它，否则围栏提交会把一份 rest 文件收进历史。本卡不改那份文件，它归 card-5.x 的作者。
+**留给 gitignore 的一句**：`.rest/` 住房间里，楼的 `.gitignore`（city-SPEC §8-21）应忽略它，否则围栏提交会把一份 rest 文件收进历史。那份文件不在本节范围内。
 
 ## 8-44 `Driving` 跨过线程：`kernel::Tool` 加 `Send`，五张桌子从 `Rc<RefCell<_>>` 到 `Arc<Mutex<_>>`（§8-42-7 量出来的那张前置卡）
 
 **问题**：§8-42-7 逐字段量过——`Driving` 今天跨不过线程边界，卡住它的是两件不在 `bin` 里的事实：
 `kernel::Tool` 没有 `Send` 上界，于是 `ToolBench.tools: BTreeMap<String, Box<dyn Tool>>` 不是 `Send`；
 五张桌子（signals／goals／plan／shelf／pr，加 delegates 与 workshop 两张只在 workbench 里的）全是 `Rc<RefCell<_>>`，工具持有它们的克隆。
-没有这一刀，卡 3.3 的池只能写成没有第二实现的空壳。
+没有这一刀，池只能写成没有第二实现的空壳。
 
 ### 判据：什么要变、什么不变
 
@@ -2063,26 +2063,26 @@ citysim 的 `sieving.rs` 改为调它；旧函数删除（迁移做完，不留�
 
 **迁移一次做完**（AGENTS.md「完成每一次迁移」）：每个读者与写者一起搬，旧形状删除，不留 `Rc` 版本的构造函数。
 
-### 8-40 花费闸删除后的装配面（card-11.7）
+### 8-40 花费闸删除后的装配面
 
 `Assignment`／`Given`／`Knock`／`Sent`／`BlockedJob` 五个结构各去掉一个 `budget` 字段，`DISPATCH_TURN_BUDGET` 与 `RunPlan.budget_turns`／`RunPlan.budget` 一并删除，`run_started` 载荷不再写 `usd_micros` 与 `tokens`，`JobBrief` 不再有 `budget` 一节，`StatusTool` 的十三字段变十二。
 
-- **一条派活不再有回合上限**，`runtime::run::drive` 循环到这次跑自己结束为止：一回合作出结论、一次带 carrier 的失败、或一个安全点送到的中断。停一件正在跑的事仍是 `Cancel`，停一片仍是 `Halt`——后者现在真的会终止那片里的后台成员（card-11.2）。
+- **一条派活不再有回合上限**，`runtime::run::drive` 循环到这次跑自己结束为止：一回合作出结论、一次带 carrier 的失败、或一个安全点送到的中断。停一件正在跑的事仍是 `Cancel`，停一片仍是 `Halt`——后者现在真的会终止那片里的后台成员。
 - **`assembly/freezing/tests/ceilings.rs` 删去两条断言**（派下去的活与被批准接着跑的活各自「在派它的上限下」跑）。它们检验的性质不存在了，留着就是在检验一个没有主语的句子；文件保留 effort 那一条，模块头写明删了什么、为什么。
 - **golden-p0 账本随之重生**（`GOLDEN_WRITE=1`）：`run_started` 少两个整数键。V8 跨版本字节夹具本来就为这种形状变更而存在。
 - **未做（本卡之外，交给关波的 agent）**：`xtask/api-baselines/` 下 kernel／channels／web／sprawling 四份基线需 `just api-baseline` 重生——kernel 去掉 `BudgetCap` 一族、增 `GovernedDocumentWritten`，channels 去掉 `BudgetCap` 再导出、增本线三帧与三个答面类型，web 增 `put_document_command`。
 
-### 8-41 治理两帧的执行与答（card-5.4）
+### 8-41 治理两帧的执行与答
 
 - `RunWorker::put_document` 写 `<city>/.sprawling/` 下三份文件之一（经 `city::write_governed`，路径由 `city::Governed` 决定而不由帧决定），随后记一行 `governed_document_written`，载荷携文件名与字节数、**恒不携正文**——正文在盘上可读，抄进账本就是同一段话有了两个权威。
 - `Views` 新增两个字段：`autonomy`（折自 `autonomy_changed`）与 `decided`（折自 `approval_resolved`，旧在前）。两者一起答 `Query::Governance`。`decided` 收下每一条被答过的审批，包括人自己答的——只列代答的清单会让「我答过」与「从没人答」在界面上长得一样。
-- **`views::apply` 迁入 `views::holding`**：`answering.rs` 加上本卡与 card-2.6 的两臂后越过 400 行，而折叠本来就是 `holding` 自称拥有的东西（「what the views hold and how one record folds in」）。切完 `holding` 318、`answering` 335，无新模块行。
+- **`views::apply` 迁入 `views::holding`**：`answering.rs` 加上这两臂后越过 400 行，而折叠本来就是 `holding` 自称拥有的东西（「what the views hold and how one record folds in」）。切完 `holding` 318、`answering` 335，无新模块行。
 
-### 8-42 `Query::Hunks` 的答（card-2.6）
+### 8-42 `Query::Hunks` 的答
 
 `views::answer` 的新臂调 `memory::of_file`，把 `memory::PatchLine`／`Withheld` 逐字段搬成线上的同名形状。这座城没写过的 oid 答 `Unavailable`，与 `Changes`／`Commit` 同口径：「没有变化」与「我看不了」是两个答案，读的人对它们的下一步不同。
 
-## 8-45 一个能看见自己造出来的东西的居民（card-4.2／4.3／4.4；`bin::browser_bidi`、`bin::browser_tool`）
+## 8-45 一个能看见自己造出来的东西的居民（`bin::browser_bidi`、`bin::browser_tool`）
 
 ### 8-45-1 谁按启动键
 
@@ -2106,13 +2106,13 @@ impl Engine {
 
 ### 8-45-2 `bin::browser_tool`——八个动作，一个会话
 
-工具住这里而不是 `browser` crate，理由是卡 4.3：截图要落 `memory::cas`，而 `browser` 依赖图里没有 `memory`，也不该有。把 CAS 塞进 browser 会多一条本可不存在的依赖边；把工具放在装配层，`browser::verb` 的判定与 `memory::cas` 的字节各自留在自己那侧，中间只有一个 `Shot` 值。
+工具住这里而不是 `browser` crate，理由是截图要落 `memory::cas`，而 `browser` 依赖图里没有 `memory`，也不该有。把 CAS 塞进 browser 会多一条本可不存在的依赖边；把工具放在装配层，`browser::verb` 的判定与 `memory::cas` 的字节各自留在自己那侧，中间只有一个 `Shot` 值。
 
 工具持有：一个 `Box<dyn BrowserPort>`、一个 `Session`、当前 `ContextId`、上一次 `PageSnapshot`（快照的 generation 由它递增）、一个 CAS 句柄。八个动作即 `browser::verb::Verb` 的八个变体，一个不多一个不少。
 
 `effect` 是 `Effect::Egress`：浏览器打开的每个 URL 都离开这台机器，所以它过出网门，confidential 楼因此天然拿不到它。
 
-### 8-45-3 截图成为证据（卡 4.3）
+### 8-45-3 截图成为证据
 
 一次 `screenshot` 的落点有三处，缺一处这张图就不是证据：
 
@@ -2120,9 +2120,9 @@ impl Engine {
 2. 结果载荷带上定位符与两个整数尺寸，于是模型即使不看图也知道它有多大；
 3. `ToolOutcome.attachments` 带上 `ImageRef`，`runtime::turn::wave` 把它原样放进 `ContentBlock::ToolResult.attachments`，于是这张图真的到得了模型眼前。
 
-**`kernel::ToolOutcome` 因此加一个字段** `attachments: Vec<ImageRef>`，`#[serde(default)]`，旧历史读成空列表。这是本卡唯一一处跨 crate 的形状变更，波及每一个构造 `ToolOutcome` 的工具（全部改为显式空列表），不改任何一个的行为。卡 4.1 已经把 `ContentBlock::ToolResult.attachments` 与两条 dialect 备好，`wave.rs` 里那句「a tool that produces a picture fills this in where it runs」等的就是这一步。
+**`kernel::ToolOutcome` 因此加一个字段** `attachments: Vec<ImageRef>`，`#[serde(default)]`，旧历史读成空列表。这是本卡唯一一处跨 crate 的形状变更，波及每一个构造 `ToolOutcome` 的工具（全部改为显式空列表），不改任何一个的行为。`ContentBlock::ToolResult.attachments` 与两条 dialect 备好，`wave.rs` 里那句「a tool that produces a picture fills this in where it runs」等的就是这一步。
 
-### 8-45-4 `BUILDING.md` 的 `browser: true|false`（卡 4.2、4.4）
+### 8-45-4 `BUILDING.md` 的 `browser: true|false`
 
 `city::policy` 多读一个键。默认 **false**：一栋楼不写这行，它的居民就没有浏览器。这与 `confidential` 的「不写即报错」不同，理由是两者的失败方向相反——隐私设置读成宽松的一侧是事故，而工具没给到只是少一件工具。confidential 楼恒为 false，写了 `browser: true` 即拒，因为一个能开任意 URL 的浏览器就是一条出网路径，而「数据不出去」是那栋楼的全部意思。
 
@@ -2134,7 +2134,7 @@ impl Engine {
 | browser_tool | 录制适配器上重放 open→snapshot→act→screenshot 一整条；截图后 CAS 里有字节、载荷里有定位符与尺寸、attachments 里有一个 `ImageRef` |
 | BUILDING.md | 不写 `browser:` 即没有；confidential 楼写 `browser: true` 即拒 |
 
-## 8-46 同一栋楼里的并发：驾驶池、一次派活切成三段，与拿走整个 ready set 的 `pursue`（v0.0.4 轨道 3，卡 3.3／3.4／3.5）
+## 8-46 同一栋楼里的并发：驾驶池、一次派活切成三段，与拿走整个 ready set 的 `pursue`
 
 这一节把 §8-42 的设计落成类型：一条车道是什么（8-46-3）、一次派活怎么切（8-46-2）、
 一个追求怎样拿走整个 ready set（8-46-4）。前置是 §8-44：`Driving` 要能跨过线程边界。
@@ -2173,7 +2173,7 @@ pub(super) fn drive_run<L: Ledger>(driving: Driving, ledger: &mut L, context: Dr
 `steer` 与 `cancel` 各自走自己那一轮活的 `Interrupt`，这是 §8-42-1 早就写下的形状。
 `take()`／放回那一对动作随之删除：一个被借走的钩子在 N 轮活同时跑时只有一个借用人。
 
-### 8-46-2 一次派活切成三段，在飞的那些收成一张表（卡 3.4）
+### 8-46-2 一次派活切成三段，在飞的那些收成一张表
 
 ```rust
 /// 驾驶之前城已经做完的一切，与驾驶之后要用到的一切。
@@ -2227,7 +2227,7 @@ fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 而它跑的时候车道停在各自的 append 上等这条线程回到循环。**这是有界的等待，不是死锁**——
 记账线程从不等车道。把这三个入口也搬上车道，要先回答「谁在等它」，那是另一张卡。
 
-### 8-46-3 `bin::serving::pool`（卡 3.3）
+### 8-46-3 `bin::serving::pool`
 
 形状：**adapter**（ARCH §9 第 4 种）。文件 `crates/sprawling/src/serving/pool.rs`。
 
@@ -2262,7 +2262,7 @@ impl DrivingPool {
 需要重算 api-baseline，那是一次独立的卡，不该塞进这一张。**在它落地之前，比天花板大的车道数只会让线程停在
 admission 上排队**——§8-42-3 早就写下这句话，本卡把它从设计变成一个带理由的常量。
 
-### 8-46-4 `pursue` 拿走整个 ready set（卡 3.5；`bin::assembly::plans::pursuing`）
+### 8-46-4 `pursue` 拿走整个 ready set（`bin::assembly::plans::pursuing`）
 
 今天的 `pursue` 是「取一个 → 跑完 → 再取一个」，一次只有一轮活。本卡把它搬进 `plans` 下的一个自己的模块
 （`plans.rs` 留 `set_pursuit` 与读计划的那几个私有方法；子模块看得见父模块的私有项，所以这一刀没有把任何字段变公开），
@@ -2285,10 +2285,10 @@ admission 上排队**——§8-42-3 早就写下这句话，本卡把它从设�
 属于同一张 `Flight`（8-46-2），于是 desk 派的活与追求派的活在同一批车道里排队。
 
 **评审楼一轮活一个 worktree 是既有事实，本卡只验证不重做**：`stand_up` 用 `WorktreeName::parse(&run_id.to_string())`
-认领工作树，名字是 run id，所以三轮活就是三棵树。同理，卡 11.6 已把 Handoff 从楼搬进房间，
+认领工作树，名字是 run id，所以三轮活就是三棵树。同理，Handoff 住房间而不住楼，
 三轮活分属三个房间时各写各的 `Handoff.md`；这也是本卡只读不改的东西。
 
-### 8-46-5 citysim：一条账本、两轮活、逐字节重放（卡 3.6）
+### 8-46-5 citysim：一条账本、两轮活、逐字节重放
 
 池大小 1 是模拟器的确定性条件（§8-42-3），所以 citysim 不跑池。它要证的是另一半：
 **两轮活的记录交错在同一条账本上时，同一批脚本重放出同样的字节**。
@@ -2303,7 +2303,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 `two_runs_interleaved_on_one_ledger_replay_byte_identically`：两个 run id、两个房间、各自的脚本模型，
 跑在同一条 `MemLedger` 上，`seq` 单调、`prev` 成链（`check_chain`），再跑一次逐字节相同。
 
-### 8-46-6 文档停止过度承诺（卡 3.7）
+### 8-46-6 文档停止过度承诺
 
 `README.md` 两处写着「多个 agent 同时工作」。本卡之前这句话在产品里没有主语：`pursue` 一次只跑一轮活。
 本卡之后它成立，但只在一个位置成立，文档必须把那个位置说出来，而不是继续说一句听上去更大的话。
@@ -2312,10 +2312,10 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 
 ### 8-46-7 验收
 
-1. **红转绿（卡 3.5）**：`bin::assembly::plans::tests::goals::three_ready_nodes_drive_three_runs_at_once`——
+1. **红转绿**：`bin::assembly::plans::tests::goals::three_ready_nodes_drive_three_runs_at_once`——
    三个 ready 节点、一个 pursuit，假 provider 记下同时在飞的请求峰值。串行时峰值为 1，红就红在这里。
-2. **红转绿（卡 3.6）**：`citysim::scenario::two_runs_interleaved_on_one_ledger_replay_byte_identically`。
-3. **红转绿（卡 3.4）**：`bin::assembly::driving::tests::flight::two_dispatches_from_the_desk_drive_at_once`——
+2. **红转绿**：`citysim::scenario::two_runs_interleaved_on_one_ledger_replay_byte_identically`。
+3. **红转绿**：`bin::assembly::driving::tests::flight::two_dispatches_from_the_desk_drive_at_once`——
    两次派活各自进一条车道，主循环接它们回家；账本 `seq` 单调、`prev` 成链，
    每一轮活的 `run_started` 排在它自己的 `model_called` 之前，且第一轮冻结之前两轮都已开始。
    串行时红在最后那条：第二轮要等第一轮冻结之后才开始。
@@ -2330,7 +2330,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 要连带重算 api-baseline。在那之前，比天花板大的车道数只会让线程停在 admission 上排队——
 把队列从一个会算数的地方搬到一个不会算数的地方。
 
-## 8-50 三种读法的答：回合、证据、一个节点的花费（card-6.5；`bin::views::rounds`、`views::evidence`、`views::cost_of`）
+## 8-50 三种读法的答：回合、证据、一个节点的花费（`bin::views::rounds`、`views::evidence`、`views::cost_of`）
 
 `channels` 定形状（channels-SPEC §8-21），这里折出答。三个新模块都是形状 7 投影：把记录折成页要的读法，删掉重折逐字节相同。
 
@@ -2354,7 +2354,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 - `views::evidence::tests`：一张截图与一条完成证据各成一行，读不回定位符的载荷不成行。
 - `views::cost_of::tests`：认领过的节点报出那次跑的钱；没人认领过的节点报 0 与空明细，而不是 `Unavailable`。
 
-## 8-47 六处探测收成一处：doctor 是「这台机器有什么」的唯一权威（card-9.4；`bin::doctor::host`、`bin::doctor::presence`）
+## 8-47 六处探测收成一处：doctor 是「这台机器有什么」的唯一权威（`bin::doctor::host`、`bin::doctor::presence`）
 
 **病灶**：这台机器被问了六次，每次一套读法——`SPRAWLING_PYTHON_WASM` 在 `assembly::mcp` 与 `doctor::table` 各拼一次（§8-40 记下的债）；`host_shell()` 与 `execution_engine()` 住 `assembly::workbench::engine`；Firefox 与 `chromedriver` 由 `bin::browser_bidi::lazy` 按名字盲起（Windows 上 Firefox 不在 PATH，于是 doctor 说「有」而浏览器工具说「没有」）；`ffmpeg` 在 `desktop/` 里按名字起。六个答案各自漂，一个人看到的「缺什么」与 run 撞上的「缺什么」不是同一份。
 
@@ -2406,7 +2406,7 @@ pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Res
 - **`Broken` 是第三态，不是 `Absent` 的别名**：一个在 PATH 上却起不来的二进制（权限、坏文件、架构不符）、一个存在却没有那份文件的组件目录（下载中断）、一个读不了的目录（权限），三者对 verdict 都算缺，但每一个都带着自己的原因进报告行——**绝不以「absent」一词吞掉一个可以说清的故障**。`Version` 的四态同理：说了、没说、说的不是文本、超时没说；后三者仍算 Present（§8-40 已定：不说话的工具仍是装了的工具）。
 - **`Detection::Built` 的探测是真起一次引擎**，而不是读一个 cfg：一份声称带引擎却起不来的构建，doctor 必须报 `Broken { WillNotStart }`；`ENGINE_CARRIED` 是那个 cfg 的唯一拼写，表引用它。
 - **`ffmpeg` 进表但 doctor 管不到 `desktop/`**：`desktop/` 在墙外、是独立进程，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`desktop/` 不改——这是本卡的边界，如实记。`sprawling-desktop` 同样进表（`desktop: true` 的楼要它在 PATH 上；Manual：从 `desktop/` 构建后放上 PATH）。
-- **`browser::profile` 没有探测可搬**：卡面列了它，读完卡 4.2（browser-SPEC §19-1）确认 profile 是「楼的登录态住城的保留区」这条纯判定，浏览器探测住 `bin::browser_bidi::lazy`，故本卡不改 `crates/browser`。
+- **`browser::profile` 没有探测可搬**：读 browser-SPEC §19-1 确认 profile 是「楼的登录态住城的保留区」这条纯判定，浏览器探测住 `bin::browser_bidi::lazy`，故本卡不改 `crates/browser`。
 - **doctor 进 lib 的公开面只多一行**：`pub use screen::verb`，二进制半边 `main/router.rs` 改调 `sprawling::doctor::verb`；`Machine` 仍是 `pub(crate) trait`，不上缝清单。`xtask/api-baselines/sprawling.txt` 随本卡重算。
 
 **探测可失败的路径，逐条**（本卡与 §8-48 共用，测试点名「丑的那几条」）：
@@ -2424,9 +2424,9 @@ pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Res
 
 **本章测试**：`the_python_variable_is_spelled_once`（红：今天两处）；`a_program_that_will_not_start_is_broken_not_absent`（临时目录里放一个不是可执行文件的 `broken.exe`／`broken`）；`a_variable_that_names_nothing_is_said_so`；`a_half_written_component_directory_is_broken`；`a_present_tool_that_says_nothing_is_still_present`；`a_broken_firefox_is_refused_by_its_fault_not_as_absent`（`Engine::choose`）。
 
-**本章验收**：`cargo clippy -p sprawling --all-targets --all-features --locked -- -D warnings`、`cargo nextest run -p sprawling --locked --all-features` 绿；`cargo xtask modmap`／`length`／`header`／`specalign` 绿；本机 `cargo run -p sprawling -- doctor` 仍报 Firefox 那一行。
+**本章验收**：`cargo clippy -p sprawling --all-targets --all-features --locked -- -D warnings`、`cargo nextest run -p sprawling --locked --all-features` 绿；`cargo xtask modmap`／`length`／`header`／`specalign` 绿；`cargo run -p sprawling -- doctor` 仍报 Firefox 那一行。
 
-## 8-48 doctor 按城回答，按错误码解释（card-9.5；`bin::doctor::needs`、`bin::doctor::visit`、`bin::doctor::explain`）
+## 8-48 doctor 按城回答，按错误码解释（`bin::doctor::needs`、`bin::doctor::visit`、`bin::doctor::explain`）
 
 **病灶**：§8-40 的 doctor 回答的是「这台机器对这个仓库」，而一个人真正的问题是「我这座城跑得起来吗」：一栋写了 `browser: true` 的楼在没有 Firefox 的机器上，今天要等到 run 撞上 `E_BROWSER_UNAVAILABLE` 才知道。而那条拒绝的 `recovery` 是一句通用话，没有接到这台机器的事实上。
 
@@ -2459,17 +2459,17 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 
 **本章测试**：`a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none`（红：`lacks` 不存在）；`a_building_whose_rules_will_not_read_is_reported_not_skipped`（`visit` 在真目录上）；`explain_connects_a_refusal_code_to_what_this_machine_has`（`E_TOOL_UNAVAILABLE` 给出一行每项、含 recipe；未知码与无关码各自的答案）；`doctor_with_a_city_names_the_building_on_the_screen`（`run` 经 `ScriptedMachine`）。
 
-**本章验收**：同 §8-47；另加本机 `cargo run -p sprawling -- doctor --explain E_TOOL_UNAVAILABLE` 一行一项。
+**本章验收**：同 §8-47；另加 `cargo run -p sprawling -- doctor --explain E_TOOL_UNAVAILABLE` 一行一项。
 
-## 8-49 `Reviewed-by:` 说的是真话：这次合并没有人看过（card-F4.1；`bin::assembly::reviewing`）
+## 8-49 `Reviewed-by:` 说的是真话：这次合并没有人看过（`bin::assembly::reviewing`）
 
-card-2.3 让合并落成一个真正的合并提交后，`settle_requests` 给 `memory::Landing` 传的是写死的 `reviewed_by_person: true`。**那是一句写进永久历史的假话**：`PrEffect::Merged` 里的 `by` 是 `PrDesk::who`，也就是跑这次检查的那个 resident 的地址；评审楼的全部意思正是「另一个 resident 检查它」，而不是「一个人看过它」。这台机器的 git config 里若有 `user.name`／`user.email`，那句写死的 `true` 就会把仓库主人的名字挂到一份他从未读过的改动上。
+合并落成一个真正的合并提交，于是 `settle_requests` 给 `memory::Landing` 传的是写死的 `reviewed_by_person: true`。**那是一句写进永久历史的假话**：`PrEffect::Merged` 里的 `by` 是 `PrDesk::who`，也就是跑这次检查的那个 resident 的地址；评审楼的全部意思正是「另一个 resident 检查它」，而不是「一个人看过它」。这台机器的 git config 里若有 `user.name`／`user.email`，那句写死的 `true` 就会把仓库主人的名字挂到一份他从未读过的改动上。
 
 **改为 `false`，并写下它为什么恒为假**：今天这条路径上不存在人的复核——`pr` 工具由模型调用，`who` 恒是城里的一个地址。`memory::Landing` 的这个字段不因此作废：它的两个取值在 `memory` 那侧各有一条断言（`a_person_who_looked_is_named_from_the_repositorys_own_config` 判真，`a_merge_lands_as_a_two_parent_commit_carrying_the_merging_runs_trailers` 判假），本卡在 `bin` 这侧加第三条，从城外读回 trunk 的提交消息作证。**翻案条件**：当合并这一步真的经过一个人（例如合并成为一件需要 Approval 的事，由 `kernel::Answerer::Human` 答复），这里的取值就由那次答复得出，而不是再写一个字面量。
 
-## 8-50 一次回合一个内容库句柄（card-F4.4；`bin::assembly::credentials::endpoints`）
+## 8-50 一次回合一个内容库句柄（`bin::assembly::credentials::endpoints`）
 
-`redemption()` 造的取图闭包里写着 `memory::Cas::open(&cas_dir)`：**每张图开一次库**。一次带四张图的回合就开四次，每次都要建目录、探路径；而内容库是按内容寻址的只读读取，一个句柄答得了整场对话。card-4.1 记下了这件事而没有改。
+`redemption()` 造的取图闭包里写着 `memory::Cas::open(&cas_dir)`：**每张图开一次库**。一次带四张图的回合就开四次，每次都要建目录、探路径；而内容库是按内容寻址的只读读取，一个句柄答得了整场对话。
 
 **改法**：`redemption` 在造闭包之前开一次库，把它放进 `Arc<Mutex<memory::Cas>>` 让闭包捕获。`Mutex` 不是为了并发而是为了类型：`ImageResolver` 要求 `Send + Sync`，而 `memory::Cas` 的 `Vfs` 缝只承诺 `Send`——`Mutex<Cas>` 在 `Cas: Send` 时即是 `Sync`，这比把 `Vfs: Send + Sync` 拓宽给所有适配器要窄。
 
@@ -2479,7 +2479,7 @@ card-2.3 让合并落成一个真正的合并提交后，`settle_requests` 给 `
 
 **未由机器作证的那一半，写在明处**：「只开一次」本身没有断言，因为 `memory::Cas` 不数自己被开过几次；加一个计数缝只为这一条断言，代价大于它买到的东西。作证的是行为面——一次 `redemption` 解得开对话里的每一张图。
 
-## 8-51 城的创世哈希一座城读一次（card-F4.5；`bin::assembly` 与 `bin::assembly::workbench::standing`）
+## 8-51 城的创世哈希一座城读一次（`bin::assembly` 与 `bin::assembly::workbench::standing`）
 
 `memory::Provenance::city_of` 读的是账本首段的第一行，而 `provenance()` 每造一次署名就读一次：一次波里的每道围栏、每次落地、每次合并各读一次盘。**这个事实在一座城的一生里恒定不变**——创世行写下就不再改，改了那也不是同一座城。
 
@@ -2490,7 +2490,7 @@ card-2.3 让合并落成一个真正的合并提交后，`settle_requests` 给 `
 - **接口随之改形**：`workbench::standing::provenance` 与 `Site::provenance` 收 `city: B3Hash` 而不再收 `&Path`，于是「谁去读盘」这件事只剩 `RunWorker::city_hash` 一个答案，四个调用点都从它取。
 - **作证方式**：城的创世哈希被读过一次之后，把账本首段从盘上删掉，`city_hash` 仍答同一个值——记住了才可能如此。
 
-## 8-52 新客户端要问的四件事，服务端怎么答（card-6.4；`bin::views::listing`、`bin::views::document`、`views::rounds`、`views::holding`；channels-SPEC §8-23）
+## 8-52 新客户端要问的四件事，服务端怎么答（`bin::views::listing`、`bin::views::document`、`views::rounds`、`views::holding`；channels-SPEC §8-23）
 
 - **`Views.halted: BTreeSet<String>`**，由 `city_halted` 折出：载荷 `state == "halted"` 加进去，`"released"` 拿出来——与 `assembly::folds::Governance` 读同一条记录、同一对常量（`HALTED`／`RELEASED`），但**不共用那张表**：那张表是工作线程的判定面，这张是答查询的读面，两者从同一条流各自折出，重建即相等（`views::tests`）。`CityAnswer.halted` 是它的 `Vec` 形。
 - **`summarize` 把 `RunHot.addr`／`started` 抄进 `RunSummary`**，不读账本。
@@ -2499,24 +2499,24 @@ card-2.3 让合并落成一个真正的合并提交后，`settle_requests` 给 `
 - **`bin::views::document`**（新文件）：路径同上；`std::fs::read` 失败答 `Unavailable`（同 `BuildingView` 对没立过的楼的口径）；头 8 KiB 含 NUL 判 `binary`；否则取前 `DOC_BYTES_MAX` 字节 `from_utf8_lossy`，`truncated = len > DOC_BYTES_MAX`。**不经密钥扫描**：这是城内的文件给城的主人看，而 `Hunks` 的扫描针对的是把补丁文本挂上线的那条路——但 `.sprawling/CONFIG.toml` 里只有 `secret:` 引用，明文本来就不落盘（`xtask secret` 门保证），所以这里没有可泄露的东西。
 - **验收**：`views::listing::tests`——`init_city` 铺出的城根列出 `.sprawling` 与 `hall` 两个目录；`hall` 下列出 `Roadmap.md` 等文件且目录先于文件；不存在的路径答空表。`views::document::tests`——读城里 `hall` 楼自己的 `BUILDING.md` 得到原文、`truncated == false`；一份 NUL 开头的文件判 `binary` 且 `text` 为空；不存在的文件答 `Unavailable`。`views::rounds::tests`——三条记录的会话答出 `opening.task`；冻结后答出 `closing.completion == "done"`。`views::tests`——`city_halted` 后 `city_view.halted == ["city"]`，`released` 后为空。
 
-## 8-53 一座楼做过的提交，倒序分页（card-2.7；`bin::views::commits`、`views::holding`；channels-SPEC §8-24）
+## 8-53 一座楼做过的提交，倒序分页（`bin::views::commits`、`views::holding`；channels-SPEC §8-24）
 
 - **`Views.commit_seqs: BTreeMap<Seq, GitOid>`**，与按 oid 键的 `commits` 表由 `fold_commit` 同一处写入：一条记录若宣告了提交，两张表各得一行。按 oid 的表答 `Commit`，按 seq 的表答 `Commits`；两表从同一条流折出，重建即相等。
 - **`commits_answer(building, before, limit)`**：在 `commit_seqs` 上从 `before` 的独占上界（`None` 即尾）向前走，按 `actor` 地址前缀过滤（`actor == building` 或以 `<building>/` 起头；`None` 不过滤），取 `limit.clamp(1, HISTORY_MAX)` 条；再多走一步得 `more`。每条经 `CommitFacts::answer` 与 `lineage_of` 成 `CommitAnswer`，故列举与反查答同一形状。
 - **验收**（`views::commits::tests`）：三条不同 seq 的 `checkpoint_committed`（两条在 `lab/room1`、一条在 `hall/mayor`）折入后，按 `lab` 列举答两条且 seq 递减、`more == false`；`limit: 1` 答一条且 `more == true`；以那条的 seq 作 `before` 再问答下一条；按 `hall` 列举不含 `lab` 的提交；`None` 答三条。
 
-## 8-54 这台机器有什么，页面从城那里问（card-9.2；`bin::doctor::report`、`bin::views::holding`；channels-SPEC §8-25）
+## 8-54 这台机器有什么，页面从城那里问（`bin::doctor::report`、`bin::views::holding`；channels-SPEC §8-25）
 
 首跑屏的第一步原本只是一条可以复制的命令，没有任何办法知道它跑过没有、跑成了没有。本节让那一步答得出来。
 
 - **`bin::doctor::report`**（新文件）：`report()` 问一次这台机器并折成 `channels::DoctorAnswer`；`fold(&[Finding], Option<Platform>)` 是可测的那一半，于是一个测试说出机器答了什么而不必有那样一台机器。**它不判断任何事**——哪一项在这里、一个档次缺什么，权威在 `doctor` 与 `table`；这里只换一种说法。`screen` 把同一批 findings 折成一台机器的散文，两者从同一处折出。
 - **`Views.machine: Option<channels::DoctorAnswer>`**，由 `found_on_this_machine` 从外面放进来，**不由任何记录折出**：这是本文件里唯一一个关于机器而非关于历史的答案，所以重建账本不碰它。`None` 答 `Unavailable`。
-- **探测在开门之前跑一次**，`serving::worker::serve` 里，在 `rebuild_views` 之后、`ServeConfig` 之前。**代价量过**：本机 12 项、冷启动约 2 秒，全部花在起进程问版本上。放进查询里会把答一切读的那条线程按住数秒；放进后台线程要多一条「还没答上来」的状态，而页面第一屏正是要那个答案。
+- **探测在开门之前跑一次**，`serving::worker::serve` 里，在 `rebuild_views` 之后、`ServeConfig` 之前。**代价量过**：12 项、冷缓存四核约 2 秒，全部花在起进程问版本上。放进查询里会把答一切读的那条线程按住数秒；放进后台线程要多一条「还没答上来」的状态，而页面第一屏正是要那个答案。
 - **客户端**：`client/src/views/machine.tsx` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
 - **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。
 - **验收**：`doctor::report::tests`——缺 firefox 的假机器答出 `Absent { NotOnSearchPath }`、`use` 档 `missing == ["firefox"]` 而 `develop` 档为空；平台不明时每一项的 `install` 都是 `UnknownPlatform`。
 
-## 8-55 一栋楼的桌面白名单，走配置那条帧（card-7.3；`bin::assembly::genesis::configure_building`；channels-SPEC §8-26、city-SPEC §8-26）
+## 8-55 一栋楼的桌面白名单，走配置那条帧（`bin::assembly::genesis::configure_building`；channels-SPEC §8-26、city-SPEC §8-26）
 
 城这一侧的两件事（楼级 `desktop:` 与 `kernel::gate::undoable`）早已落地，缺的是**把那份 allowlist 从人手里送到盘上的那一段**。
 
@@ -2526,7 +2526,7 @@ card-2.3 让合并落成一个真正的合并提交后，`settle_requests` 给 `
 - **页面**：`client/src/views/desktop.tsx` 一个框装整份文件，读用 `Query::Document`（`<building>/.sprawling/DESKTOP.toml`），写用 `configure_building`。一个「每个窗口一行」的表单会是这一侧对那份语法的第二次解读。
 - **验收**：`assembly::building_page::tests::the_desktop_allowlist_is_written_where_no_resident_reaches_it`——人写的字节落在 `desktop_scope_path` 上，且那条地址 `is_reserved` 为真（任何写域都够不到）。
 
-## 8-56 说出来的那句话：录音进城，一行字出来（card-6.10；`bin::views::hearing`、`bin::serving::worker::hearing`；channels-SPEC §8-27）
+## 8-56 说出来的那句话：录音进城，一行字出来（`bin::views::hearing`、`bin::serving::worker::hearing`；channels-SPEC §8-27）
 
 服务端此前只有 `gateway::transcribe` 这个适配器：一件没有任何路可以走到的东西。本节把路修通。
 

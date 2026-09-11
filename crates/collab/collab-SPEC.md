@@ -37,7 +37,7 @@
 
 ## 6 命名统一
 
-**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
 
 Signal｜Inbox｜Steer｜HeldDraft｜hold token｜four-way return｜Workshop｜NodeContract｜fan-in｜Artifact｜arbitration｜Triage。概念名一律英文原词；该用什么词见 `docs/glossary.md`，不该用什么词见 `xtask/lexicon.toml`。
 
@@ -378,7 +378,7 @@ impl Triage {
 ```rust
 pub enum ClaimEffect {
     Claimed { id: NodeId, item: String },
-    /// 一个被放下的节点。携 `PlanExit`（经 `kernel` 重导出，住 `plan::node`，card-1.2 起）而不是携一个动词：出口是计划门禁
+    /// 一个被放下的节点。携 `PlanExit`（经 `kernel` 重导出，住 `plan::node`）而不是携一个动词：出口是计划门禁
     /// 造出来的东西，把它的两个臂抄进第二个枚举，就是对「一个节点可以
     /// 怎么离开」的第二份意见。
     PutDown { id: NodeId, item: String, exit: PlanExit },
@@ -386,7 +386,7 @@ pub enum ClaimEffect {
 }
 impl ClaimEffect {
     pub fn id(&self) -> &NodeId;
-    pub fn expected_before(&self) -> RoadmapStatus;   // 经 `kernel` 重导出，住 `spine::row`（card-1.2 起），公共拼写不变
+    pub fn expected_before(&self) -> RoadmapStatus;   // 经 `kernel` 重导出，住 `spine::row`，公共拼写不变
     pub fn kind(&self) -> EventKind;          // 由出口决定，不由调用方决定
     pub fn payload(&self, who: &str) -> Result<Payload, AxError>;
 }
@@ -461,7 +461,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 变的只是 `cargo public-api` 记录的定义模块——`NodeId` 从 `kernel::plan` 搬进了自己的文件（kernel-SPEC §8-N）。
 记在这里是因为 `apisync` 判的是「基线动了就要有一份 SPEC 同行」，而基线确实动了。
 
-### 8-13 collab::claim_tool 目录化（card-5.2）
+### 8-13 collab::claim_tool 目录化
 
 `claim_tool.rs` 原有 913 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成三份：
 
@@ -473,7 +473,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 **apisync 未重写基线。** `ClaimTool` 的定义模块虽从 `claim_tool` 移到 `claim_tool::tool`，但两者都是私有模块，公开路径仍是 `collab::ClaimTool`，`cargo xtask apisync` 对 collab 无差异。
 
-### 8-14 collab::pr_tool 目录化（card-5.2）
+### 8-14 collab::pr_tool 目录化
 
 `pr_tool.rs` 原有 561 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成三份：
 
@@ -485,7 +485,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 **apisync 未重写基线。** `OpenRequest` 的定义模块从 `pr_tool` 移到私有的 `pr_tool::request`，公开路径仍是 `collab::OpenRequest`，`cargo xtask apisync` 对 collab 无差异。
 
-### 8-15 collab::inbox 目录化（card-5.2）
+### 8-15 collab::inbox 目录化
 
 `inbox.rs` 原有 543 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成四份：
 
@@ -498,7 +498,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 **apisync 未重写基线。** `SignalId` 与 `SignalKind` 的定义模块从 `inbox` 移到私有的 `inbox::signal_id`／`inbox::signal_kind`，公开路径仍是 `collab::SignalId`／`collab::SignalKind`，`cargo xtask apisync` 对 collab 无差异。
 
-### 8-16 collab::workshop_tool 目录化（card-5.2）
+### 8-16 collab::workshop_tool 目录化
 
 `workshop_tool.rs` 原有 539 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
 
@@ -509,7 +509,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 **apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::WorkshopDesk`／`collab::WorkshopTool`，`cargo xtask apisync` 对 collab 无差异。
 
-### 8-17 collab::signal_tool 目录化（card-5.2）
+### 8-17 collab::signal_tool 目录化
 
 `signal_tool.rs` 原有 498 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
 
@@ -520,7 +520,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 **apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::SignalDesk`／`collab::SignalTool`／`collab::SignalEffect`，`cargo xtask apisync` 对 collab 无差异。
 
-### 8-18 collab::draft 目录化（card-5.2）
+### 8-18 collab::draft 目录化
 
 `draft.rs` 原有 466 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
 
@@ -531,7 +531,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 **apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::Draft`／`collab::Drafts` 等，`cargo xtask apisync` 对 collab 无差异。
 
-### 8-19 collab::workshop 目录化（card-5.2）
+### 8-19 collab::workshop 目录化
 
 `workshop.rs` 原有 445 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
 
@@ -542,7 +542,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 **apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::NodeId`／`collab::NodeContract`／`collab::Workshop`，`cargo xtask apisync` 对 collab 无差异。
 
-### 8-20 collab::archive_tool（P4.04；形状 4 适配器）——本节由 card-8.2 补写
+### 8-20 collab::archive_tool（P4.04；形状 4 适配器）
 
 模块表的 `Spec` 列要求每个在册模块指向定义它的那一节，而这个模块自建成起就没有节。本节按它已落地的形状补记，不追加要求。
 
@@ -551,7 +551,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 - **回忆是读，不是记**：索引由 worker 从书架算出后交给这张桌子，桌子不留第二份副本——盘上的文件才是真的。
 - **效应而非副作用**：`ArchiveEffect::Recorded` 是桌子交回的值，落盘与记账都归装配层，故本模块无 I/O。
 
-### 8-21 collab::claim_effect（V3.19；形状 2 值类型）——本节由 card-8.2 补写
+### 8-21 collab::claim_effect（V3.19；形状 2 值类型）
 
 同上：本节补记一个已落地却无 SPEC 节的模块。
 

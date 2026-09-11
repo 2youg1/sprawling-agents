@@ -38,7 +38,7 @@
 
 ## 6 命名统一
 
-**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
 
 Suite｜held-in／held-out｜probe｜Asset｜asset scoring｜metabolism｜debt scan｜weakness clustering｜floor-area ratio｜promotion。概念名一律英文原词；该用什么词见 `docs/glossary.md`，不该用什么词见 `xtask/lexicon.toml`。
 
@@ -170,7 +170,7 @@ pub fn sweep<T: Clone>(assets: &[(T, AssetUse, Score, bool)]) -> Vec<(T, Disposa
 
 三种格式读成同一组叶子（`path -> value`），因为问题问的是文档的叶子而不是它的语法；三条读法各读各的，就变成在比读法而不是在比格式。Markdown 那条**刻意严格**：一个会修复松散缩进的读法，会藏掉这个 suite 正在计数的那种失败。
 
-### 8-5 eval::nesting 目录化（card-5.2）
+### 8-5 eval::nesting 目录化
 
 `nesting.rs` 原有 632 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成三份：
 
@@ -182,11 +182,11 @@ pub fn sweep<T: Clone>(assets: &[(T, AssetUse, Score, bool)]) -> Vec<(T, Disposa
 
 **apisync 未重写基线。** 搬走的全是私有项，`eval` 的公开面逐字节不变。
 
-### 8-6 handoff 探针真的跑（card-11.6）
+### 8-6 handoff 探针真的跑
 
 `eval::handoff_probe() -> Probe`：名 `handoff`、版本 1、固定四问（任务是什么／做到哪了／下一步是什么／先读哪个文件）。它是数据，不是判定：问题改了就是版本 2，`compare` 对两个版本恒拒。谁问：装配层 `bin::assembly::probing`，在每次 succession 前后各问一次（runtime-SPEC §8-33），记 `eval_run`。本 crate 仍恒不在它所测量的回路里。
 
-### 8-7 eval::ablation——City.md 有没有挣到它的长度（card-5.7；`ablation.rs` 形状 1 判定，`ablation/capabilities.rs` 形状 6 数据）
+### 8-7 eval::ablation——City.md 有没有挣到它的长度（`ablation.rs` 形状 1 判定，`ablation/capabilities.rs` 形状 6 数据）
 
 `docs/City.md` 由 `bin::assembly::genesis` 以 `include_str!` 编进二进制，是每个居民读到的第一份文本，因而它每多一段就向**每一次** prefix 收一次租。这张卡建的是一把尺：把这份文档按段切开，逐段拿掉，量一个居民因此**做不了什么**。产出是给下一次编辑那份文档的人的证据，不是墙。
 
@@ -225,7 +225,7 @@ impl Ablation {
 
 **它编不进产品库。** `lib.rs` 的 `mod ablation;` 携 `#[cfg(test)]`：这把尺唯一的消费者是它自己那条 ignored 测试，把它编进发布出去的库，发出去的是仪器而不是能力。dead_code 因此不是被 `#[allow]` 压掉的，是不存在的。
 
-**一次真实运行**（`cargo nextest run -p eval --run-ignored all -E 'test(city_md)' --no-capture`，本机 windows-msvc，`docs/City.md` 切出 12 段，语料 40 条）：
+**一次真实运行**（`cargo nextest run -p eval --run-ignored all -E 'test(city_md)' --no-capture`，windows-msvc，`docs/City.md` 切出 12 段，语料 40 条）：
 
 | 名次 | 段 | 字节 | 拿掉它，居民失去 |
 |---|---|---|---|

@@ -6,7 +6,7 @@
 
 ## 1 需求拆解
 
-一个 Agent 要能驱动本机浏览器：看一个页面、点一个按钮、填一个输入框、改完代码再看一眼、并且下次还认得同一个账号。拆成六个可独立验收的单元，与模块一一对应：缝（port）、会话（session）、可见面（snapshot）、动作（act）、开发回路（devloop）、登录态（profile）。
+一个 Agent 要能驱动这台机器上的浏览器：看一个页面、点一个按钮、填一个输入框、改完代码再看一眼、并且下次还认得同一个账号。拆成六个可独立验收的单元，与模块一一对应：缝（port）、会话（session）、可见面（snapshot）、动作（act）、开发回路（devloop）、登录态（profile）。
 
 ## 2 验收标准
 
@@ -21,7 +21,7 @@
 
 ## 3 假设与歧义
 
-- **假设（已于 §19-1 改写，2026-09-12）**：起进程归 `bin::browser_bidi`；本库仍恒不拉起浏览器进程、恒不持套接字、恒不下载驱动。原文写的是「本机浏览器由用户自己启动」，卡 4.2 推翻了它。
+- **假设**：起进程归 `bin::browser_bidi`；本库恒不拉起浏览器进程、恒不持套接字、恒不下载驱动。
 - **歧义已定**：BiDi 的 `session.new` 能力集合本版本只请求空能力＋按需 `network` 事件；更多能力等到有消费者再加，因为每一项能力都是远端因此获得的一项许可。
 
 ## 4 现状分析
@@ -40,7 +40,7 @@ P4 之前 `crates/browser/src/` 只有 `lib.rs` 一行文档。无既有代码�
 
 ## 6 命名统一
 
-**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
 
 `BrowserPort`｜`PageSnapshot`｜login state per Building——三者均取自词汇表，恒不自造同义词。「快照」在本 crate 恒指 `PageSnapshot`，与 `web::Snapshot`（界面前进式 fold）不同物，故跨 crate 引用时写全名。
 
@@ -115,7 +115,7 @@ impl Profile { pub fn of(building: &Address, confidential: bool) -> Result<Profi
 
 ## 8.5 两个设计
 
-**第一对（缝画在哪）**：把 WebSocket 会话整体放进本 crate（落选）vs 缝只运帧、套接字归装配层（选中）。前者读起来更像「一个浏览器客户端」，但它把异步运行时拖进一个本可纯的 crate，于是所有断言都要一个 runtime，而「第二适配器」只能是一个假服务器。后者让整段会话在无浏览器、无异步的条件下逐帧断言，录制回放因此是**真的第二适配器**而不是测试替身——本机没有 WebDriver 这件事，反而由此不再是缺口。代价：装配层多一段连接管理，且帧的 id 必须由 `Session` 铸而不能由传输层铸（否则重放会重新编号）。
+**第一对（缝画在哪）**：把 WebSocket 会话整体放进本 crate（落选）vs 缝只运帧、套接字归装配层（选中）。前者读起来更像「一个浏览器客户端」，但它把异步运行时拖进一个本可纯的 crate，于是所有断言都要一个 runtime，而「第二适配器」只能是一个假服务器。后者让整段会话在无浏览器、无异步的条件下逐帧断言，录制回放因此是**真的第二适配器**而不是测试替身——一台没有 WebDriver 的机器因此不再是缺口。代价：装配层多一段连接管理，且帧的 id 必须由 `Session` 铸而不能由传输层铸（否则重放会重新编号）。
 
 **第二对（ref 是什么）**：ref ＝ 页面里的稳定标识（落选）vs ref ＝ 本次快照里的位置（选中）。前者要求页面配合（`id` 属性、`data-testid`），而页面是别人写的；后者把「页面动过了」变成一个可判定事实——ref 携 generation，陈旧即拒。代价：每次动作前必须先看一眼，这正是我们要的顺序。
 
@@ -170,11 +170,11 @@ impl Profile { pub fn of(building: &Address, confidential: bool) -> Result<Profi
 
 **`conformance` feature（人的裁决，2026-09-05：test 恒不进构建物）**：`assert_port_conformance` 此前是裸 `pub fn`，并由 `lib.rs` 无条件再导出，因而随发行二进制出厂；它自己的 lint 豁免写着「dev-only by contract」，而无一处机器持有那纸合约。本工作区另外四套 conformance 一直在 `#[cfg(feature = "conformance")]` 之后，本 crate 是唯一的例外，原因只是它此前没有 `[features]` 段。现已补齐，并由 `cargo xtask artifact` 持有此规则；公开接口面随之缩减一行，`xtask/api-baselines/browser.txt` 同集更新。`crates/browser/src/session.rs` 中调用它的那条断言改为 `#[cfg(feature = "conformance")]`，故它在 `--all-features` 下运行——那正是 `just check` 与 `just test` 所用的构建。
 
-## 19 八个动作，与截图成为证据（card-4.2／4.3／4.4）
+## 19 八个动作，与截图成为证据
 
-### 19-1 卡 4.2 推翻的那条假设，以及它被改写成什么
+### 19-1 谁起浏览器进程
 
-§3 原文写着「本机浏览器由用户自己启动……本库恒不拉起浏览器进程」，`docs/glossary.md` 的 **browser** 行同样写着「It launches nothing」。人的卡 4.2 要求这座城自己起 Firefox：随机远程调试端口、`-profile <这栋楼的 profile>`、按需 `-headless`。**先改记录再改代码**：该假设作废，改写为——
+这座城自己起 Firefox：随机远程调试端口、`-profile <这栋楼的 profile>`、按需 `-headless`。本库与 `docs/glossary.md` 的 **browser** 行一致——
 
 > **假设（2026-09-12 起）**：起进程这件事归 `bin::browser_bidi`，本 crate 仍恒不起进程、恒不持套接字、恒不下载驱动。Firefox 是**第一引擎**（原生 BiDi，无需驱动）；Chromium 只在 `chromedriver` 已在 PATH 上时才走得通，因此是第二条路而非并列的一条。
 
@@ -224,9 +224,9 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 
 依赖 `png` 0.18（MIT OR Apache-2.0，`deny.toml` 的 allow 列表已含两者）：产品路径只解码，测试用它的编码器造夹具，于是断言比的是真 PNG 字节而不是一份没人能复核的固定串。
 
-### 19-5 `browser::devloop` 消费 `look` 的裁决（卡 4.4）
+### 19-5 `browser::devloop` 消费 `look` 的裁决
 
-`DevLoop::observe` 已经吃 `Observation { text, complained }`。卡 4.4 要的是**接线而非新判定**：`browser` 工具的 `snapshot` 动作产出的那段文本就是 `text`，`console` 里出现过 error 级别的条目就是 `complained`，于是「改一处、看一眼、再决定」在工具层闭合，`Step` 作为工具结果回给模型。判定本身一个字不改——已有机制复用是这里的正解。
+`DevLoop::observe` 已经吃 `Observation { text, complained }`；要的是**接线而非新判定**：`browser` 工具的 `snapshot` 动作产出的那段文本就是 `text`，`console` 里出现过 error 级别的条目就是 `complained`，于是「改一处、看一眼、再决定」在工具层闭合，`Step` 作为工具结果回给模型。判定本身一个字不改——已有机制复用是这里的正解。
 
 ### 19-6 验收（追加到 §2）
 
@@ -239,5 +239,5 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 
 ### 19-7 本波未做完的部分（如实记录）
 
-- **`bin::browser_bidi::BidiSocket` 没有对着真浏览器跑过**。它在本机没有 Firefox 会话的条件下写成，逐帧逻辑（发一帧、读到 id 相同的那条、跳过无 id 的事件）由阅读 W3C 草案得出而非由一次真实会话验证。工具那一侧的整条 open→snapshot→act→screenshot 由 `Recording` 逐帧断言，缝的另一个适配器因此是可信的；**这一侧不是**。第一次真跑要看的是三件事：`session.new` 的能力集合是否被 Firefox 接受、`script.evaluate` 的返回值是否真是 `result.value` 的字符串形状、`browsingContext.captureScreenshot` 的 `format.type` 是否收 `image/png` 这一拼写。
+- **`bin::browser_bidi::BidiSocket` 没有对着真浏览器跑过**。逐帧逻辑（发一帧、读到 id 相同的那条、跳过无 id 的事件）由阅读 W3C 草案得出而非由一次真实会话验证。工具那一侧的整条 open→snapshot→act→screenshot 由 `Recording` 逐帧断言，缝的另一个适配器因此是可信的；**这一侧不是**。第一次真跑要看的是三件事：`session.new` 的能力集合是否被 Firefox 接受、`script.evaluate` 的返回值是否真是 `result.value` 的字符串形状、`browsingContext.captureScreenshot` 的 `format.type` 是否收 `image/png` 这一拼写。
 - **`-headless` 有开关没有问的人**：`LaunchPlan` 带这一位并逐字断言，但 `for_building` 恒传 `false`。谁来问（楼的 `CONFIG.toml`？派活时的一个字段？）是下一张卡的事，本卡不替人决定。

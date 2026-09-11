@@ -21,7 +21,7 @@
 ## 3 假设与歧义
 
 - **假设**：用户自己拥有外部服务的账号。本库不内置任何一家的 key、不代付、不做代理。
-- **歧义已定（2026-08-22 复核）**：当前 MCP 修订版**删除了协议级 session**，`tools/list` 恒不因连接而异。因此工具表随 Run 冻结与它的规则同向，本库不实现任何会话恢复；需要跨调用状态的 server 自铸句柄，当普通入参传。
+- **歧义已定**：当前 MCP 修订版**删除了协议级 session**，`tools/list` 恒不因连接而异。因此工具表随 Run 冻结与它的规则同向，本库不实现任何会话恢复；需要跨调用状态的 server 自铸句柄，当普通入参传。
 
 ## 4 现状分析
 
@@ -38,7 +38,7 @@ P4 之前 `crates/protocol/src/` 只有 `lib.rs`。`kernel::tool` 缝与 taint �
 
 ## 6 命名统一
 
-**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
 
 `Connector` 是词汇表里这层的统称；代码里出现的是它的两个具体面 `McpTool` 与 `Incoming`。**恒不**把 MCP server 叫作 endpoint——`Endpoint` 在本库专指 external provider 网关。
 
@@ -119,7 +119,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 **出站**：装配层拉起 server 子进程 → `Rpc::discover` → `Rpc::list_tools` → `tools_from` → catalog 与 bench 各注册一次（工具表随 Run 冻结）→ 模型调用 → `McpTool::invoke` → `call_tool`（浮点检查）→ `Outbound::call` → `Rpc::read` → `ToolOutcome`（污染态）→ 装配层落 `tool_called`／`tool_result`。
 
-**入站**：装配层收 HTTP／stdio 请求 → `Incoming::parse` → 与本机配对令牌常数时间比对（`channels::auth`）→ `admit` → `Admitted::Dispatch` → 走与人相同的 `Command::Dispatch` 路径 → 期间回 `Progress`。
+**入站**：装配层收 HTTP／stdio 请求 → `Incoming::parse` → 与这座城的配对令牌常数时间比对（`channels::auth`）→ `admit` → `Admitted::Dispatch` → 走与人相同的 `Command::Dispatch` 路径 → 期间回 `Progress`。
 
 ## 10 实现逻辑
 
@@ -168,7 +168,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 `ARCHITECTURE.md` §3 缝清单（`Outbound` 一行）与 §6 protocol 两行｜`docs/third-party.md` §二（服务外挂的四条边界）｜装配层接线时同步 §6 末接线台账。
 
-### 8-14 protocol 目录化（card-2.4；形状：主类型居索引，方法按簇归文件）
+### 8-14 protocol 目录化（形状：主类型居索引，方法按簇归文件）
 
 `mcp.rs`（823）→ `mcp/handshake.rs`（`Handshake`／`Rpc`／`handshake`＋`PROTOCOL_VERSION`）／
 `mcp/tools.rs`（`Listed`／`McpTool`／`tools_from`，`float_at` 开 `pub(crate)` 供 handshake 用）／

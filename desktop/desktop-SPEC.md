@@ -2,8 +2,6 @@
 
 > package：`sprawling-desktop`（out-of-tree，**不是** workspace member）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
 > 骨架：apostle-sdd 十七节；按模块分章、每章自足（ARCHITECTURE.md §5）。
-> card-7.1 只造壳、协议、拒绝故事与 scope 文件；Windows 实现属 card-7.2。
-> card-7.2 换掉 `platform` 的身体，别处一概不动：工具表、scope 判定、wire 形状在 card-7.1 已定死。
 
 ## 1 需求拆解
 
@@ -12,10 +10,10 @@
 拆成三件可独立验收的事：
 
 - **协议壳（`rpc` ＋ `session`）**：一台按行说话的 MCP server，握手与 `tools/call` 的形状与 `crates/protocol/src/mcp/*` 所写的客户端逐字对齐，于是城里一栋楼的 `CONFIG.toml` 用一条普通 `command` 就能接上它，装配层无需为它开任何特例。
-- **工具表（`tools`）**：六件工具的名字、说明与入参 schema **此刻定死**，实现留给 card-7.2。每条说明都写明这件工具**不做**什么。
+- **工具表（`tools`）**：六件工具的名字、说明与入参 schema **定死**。每条说明都写明这件工具**不做**什么。
 - **拒绝故事（`scope` ＋ `platform`）**：越界与未实现都回一个带稳定错误码与恢复句的 JSON-RPC error。没有 scope 文件＝全拒。
 
-card-7.2 只做第三件事的后半句：把「未实现」换成**真的实现**，且换掉的只有 `platform` 一个模块。前两件事（协议壳、工具表）在 card-7.1 已经验收，card-7.2 一行不改它们——这正是 card-7.1 把形状定死所买到的东西。
+第三件事的后半句是**真的实现**，且它换掉的只有 `platform` 一个模块：协议壳与工具表一行不改，这正是把形状定死所买到的东西。
 
 ## 2 验收标准
 
@@ -149,12 +147,12 @@ pub(crate) fn perform(tool: &str, arguments: &Value) -> Result<Value, Refusal>;
 
 `desktop.act` 携 generation 是照抄 `browser::act` 的那一条：**对着一份快照做的决定，恒不落到另一份快照上**——过期就拒，而不是打到那时挪过去的东西上。
 
-### 8-8 card-7.2：Windows 这条胳膊的内部
+### 8-8 Windows 这条胳膊的内部
 
-`platform::perform` 这个自由函数在 card-7.2 变成一张**桌子**：
+`platform::perform` 这个自由函数是一张**桌子**：
 
 ```rust
-// 8-6（card-7.2 改写）platform（形状 4 适配器；cfg 二选一，无 trait）
+// 8-6 platform（形状 4 适配器；cfg 二选一，无 trait）
 pub(crate) struct Desk { /* 私有：views／recordings */ }
 impl Desk {
     pub(crate) fn new() -> Desk;
@@ -184,7 +182,7 @@ impl Desk {
 
 **这张表的分法就是 Humble Object**（ARCHITECTURE §9）：难测的那一端（`enumerate`／`tree`／`act`／`capture`／`clipboard`）薄到几乎没有判断，判断都搬进了 `target`／`views`／`encode`／`keys`／`geometry` 五个纯模块——它们一行 Win32 都不跑，因而可以被逐条证明。一台没有桌面的机器上，本 package 仍然能证明「哪个窗口被选中」「过期的动作被拒」「一张图缩成什么尺寸」这四件最容易错的事。
 
-### 8-9 card-7.2：`unsafe` 的那一条规矩
+### 8-9 `unsafe` 的那一条规矩
 
 本 package 坐在 workspace 之外，**理由只有一个**：Win32 边界要写 `unsafe`（§8.5 第二对）。既然是花了代价换来的，代价就要花在明处：
 
@@ -192,7 +190,7 @@ impl Desk {
 
 `unsafe` 恒只出现在 `platform/windows/` 之下，且恒只包住 FFI 调用本身——不包住随后的判断，因为把安全代码收进 `unsafe` 块只会让下一个读者多审几行。
 
-### 8-10 `main` 与 `smoke`：进程的两端（本节由 card-8.2 补写）
+### 8-10 `main` 与 `smoke`：进程的两端
 
 模块表的 `Spec` 列要求每个在册模块指向定义它的那一节，而这两个文件一直没有节。本节按它们已落地的形状补记，不追加要求。
 
@@ -201,25 +199,25 @@ impl Desk {
 
 ## 8.5 四个设计
 
-**第一对（错误码住哪）**：`use kernel::AxCode`（落选）vs 在本 package 重新定义同拼写的一小组（选中）。前者把这个 package 拉回 workspace 的墙内，而它坐在墙外的**理由**就是 card-7.2 要在 Win32 边界上写 `unsafe`；为了六个字符串常量把这个理由作废是本末倒置。选中方案付的代价是同一拼写有两处定义，边界是：本 package 恒只**引用**已有拼写，恒不铸造新的 `E_` 码——新码要先进 `kernel::error::code`。
+**第一对（错误码住哪）**：`use kernel::AxCode`（落选）vs 在本 package 重新定义同拼写的一小组（选中）。前者把这个 package 拉回 workspace 的墙内，而它坐在墙外的**理由**就是要在 Win32 边界上写 `unsafe`；为了六个字符串常量把这个理由作废是本末倒置。选中方案付的代价是同一拼写有两处定义，边界是：本 package 恒只**引用**已有拼写，恒不铸造新的 `E_` 码——新码要先进 `kernel::error::code`。
 
-**第二对（unsafe 怎么关）**：照抄 workspace 的 `unsafe_code = "forbid"`（落选）vs 本 package 用 `deny`（选中）。`forbid` 在文件内无法就地放开，而 card-7.2 要在 Win32 调用点上就地放开、并在那一处写明理由；`deny` 让放开成为**一个带理由的、看得见的、最窄作用域的例外**，而不是把整堵墙推倒。clippy 那张表逐行照抄，一条不减。card-7.1 本身**一行 unsafe 也不写**。
+**第二对（unsafe 怎么关）**：照抄 workspace 的 `unsafe_code = "forbid"`（落选）vs 本 package 用 `deny`（选中）。`forbid` 在文件内无法就地放开，而 Win32 调用点要就地放开、并在那一处写明理由；`deny` 让放开成为**一个带理由的、看得见的、最窄作用域的例外**，而不是把整堵墙推倒。clippy 那张表逐行照抄，一条不减。协议壳**一行 unsafe 也不写**。
 
 **第三对（整屏怎么办）**：默许整屏截取（落选）vs 无表达即拒（选中）。scope 文件能表达的只有「哪些窗口」，一张全屏图会显示 allowlist 没有列出的一切；把没写下来的东西当成允许，正是 fail closed 要防的那件事。拒词里给的替代是「指名一个窗口」，可执行。等 scope 文件长出一位 `screen` 开关，这条再改，改时先改本节。
 
-**第四对（未实现怎么回答）**：先回一个假的成功形状让上游先接线（落选）vs 回 `E_TOOL_UNAVAILABLE` 并说明这个 build 里没有它（选中）。一个假的成功会让模型据此往下推理，而错误的答案比没有答案贵得多；card-7.1 的全部价值就是**形状已经定死、拒绝是诚实的**。card-7.2 兑现了这句话的后半：形状一个字没改，身体换掉了。
+**第四对（未实现怎么回答）**：先回一个假的成功形状让上游先接线（落选）vs 回 `E_TOOL_UNAVAILABLE` 并说明这个 build 里没有它（选中）。一个假的成功会让模型据此往下推理，而错误的答案比没有答案贵得多；全部价值就是**形状已经定死、拒绝是诚实的**。
 
-## 8.6 card-7.2 的五个设计
+## 8.6 五个设计
 
 **第一对（截图怎么取）**：DXGI Desktop Duplication（落选）vs `PrintWindow`（选中）。DXGI 复制的是**整个输出**，而这台 server 的 scope 文件说的是「哪些窗口」；用一个整屏机制去实现一件按窗口授权的事，等于把 §8.5 第三对刚关上的门从背面打开。`PrintWindow` 带 `PW_RENDERFULLCONTENT` 直接向一个 `HWND` 要它自己的像素，授权单位与机制单位因此是同一个。代价写在明处：某些用 DirectComposition 独立合成的窗口会回一片黑，那时的答案是**拒绝并说出来**（`E_TOOL_UNAVAILABLE`，全黑像素是可判的），恒不把一片黑当成截图交出去。
 
 **第二对（快照的 ref 拿什么撑住）**：跨调用持有 `IUIAutomationElement` 这个 COM 指针（落选）vs 只留下快照当时的**屏幕矩形**（选中）。前者让 COM 对象的生存期缠上连接的生存期，而一次 `desktop.act` 需要的其实只有「点哪里」。选中方案让 COM 完整地关在 `tree` 一次调用之内，`act` 只面对整数坐标；generation 这一条也因此有了确切含义——**这一代的 ref 指的是那一刻它在屏幕上的位置**，窗口一动，重新快照，旧的一代作废。
 
-**第三对（`desktop.windows` 报的 ref 是什么）**：让它成为 `snapshot`／`act` 也接受的第二种指名方式（落选）vs 只作为这条连接内一个窗口的**稳定叫法**（选中）。scope 判定读的是 `title` 与 `process`（`Reach`），一个绕过它们的 ref 就是同一份许可的第二道门——而两道门里一定有一道最后没人看。工具表是 card-7.1 定死的，`snapshot`／`act` 的 schema 里本来也没有窗口 ref 这一项；本节记下的是**为什么不去加它**。ref 里恒不含 `HWND` 的数值：句柄是这台机器的内部事实，模型没有一处用得上它。
+**第三对（`desktop.windows` 报的 ref 是什么）**：让它成为 `snapshot`／`act` 也接受的第二种指名方式（落选）vs 只作为这条连接内一个窗口的**稳定叫法**（选中）。scope 判定读的是 `title` 与 `process`（`Reach`），一个绕过它们的 ref 就是同一份许可的第二道门——而两道门里一定有一道最后没人看。工具表是定死的，`snapshot`／`act` 的 schema 里本来也没有窗口 ref 这一项；本节记下的是**为什么不去加它**。ref 里恒不含 `HWND` 的数值：句柄是这台机器的内部事实，模型没有一处用得上它。
 
 **第四对（没有 ffmpeg 时录什么）**：宣告录制不可用（落选）vs 自己抓一列 PNG 帧（选中）。card 明写了「有 ffmpeg 出 mp4，没有则出帧序列」，而帧序列要一个**在读循环之外**跑的东西——本 package 因此有且只有一个 `std::thread::spawn`，就在 `record::start`，由一个 `AtomicBool` 停下，`stop` 恒 join 它。这是本 package 唯一一处并发，写在这里是为了下一个读者不必去找第二处。声音（`audio: true`）恒被拒：选一个录音设备要知道这台机器上它叫什么，而这台 server 没有任何一处知道；假装录了而没录，比拒绝贵。
 
-**第五对（错误码的第二份拼写怎么收）**：card-7.1 在 §8.5 第一对里接受了「同一拼写、两处定义」。card-7.2 把它**收成一处可检查的引用**：`refusal.rs` 里每个 `E_` 码旁写明它引自 `kernel::error::code` 的哪一个，并在城里那一侧加一条测试，逐字比对两张表——测试住在 workspace 内（它可以 `use kernel`），比对的对象是本 package 的 `README.md` 与 SPEC 记下的那六个字符串。**结论是不能靠共享依赖消除这份重复**：让 `desktop` 依赖 `kernel`，就把它拉回墙内，而它坐在墙外的唯一理由是 Win32 要 `unsafe`；六个字符串常量换掉这个理由是本末倒置。能做到的是让漂移**可见**——两处定义，一处权威，一条测试在城里那侧盯着。
+**第五对（错误码的第二份拼写怎么收）**：§8.5 第一对接受了「同一拼写、两处定义」，而这里**收成一处可检查的引用**：`refusal.rs` 里每个 `E_` 码旁写明它引自 `kernel::error::code` 的哪一个，并在城里那一侧加一条测试，逐字比对两张表——测试住在 workspace 内（它可以 `use kernel`），比对的对象是本 package 的 `README.md` 与 SPEC 记下的那六个字符串。**结论是不能靠共享依赖消除这份重复**：让 `desktop` 依赖 `kernel`，就把它拉回墙内，而它坐在墙外的唯一理由是 Win32 要 `unsafe`；六个字符串常量换掉这个理由是本末倒置。能做到的是让漂移**可见**——两处定义，一处权威，一条测试在城里那侧盯着。
 
 ## 9 工作流程
 
@@ -260,7 +258,7 @@ impl Desk {
 
 `serde`＋`serde_json`＋`toml` 三个，与 workspace 同版本线。**恒不引入**：workspace 内任何 crate（理由见 §8.5 第一对）、async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
 
-card-7.2 增三个，各自买到什么写在这里：
+三个依赖，各自买到什么写在这里：
 
 | crate | 买到什么 | 为什么不是别的 |
 |---|---|---|
@@ -274,7 +272,7 @@ card-7.2 增三个，各自买到什么写在这里：
 
 `PROTOCOL_VERSION = "2025-06-18"`：与 `protocol::PROTOCOL_VERSION` 同值，理由是两端要谈得拢；它变了，本 package 要在同一次改动里跟着变，故本节是它的第二处台账。服务器自称 `sprawling-desktop`，版本取 `CARGO_PKG_VERSION`。
 
-card-7.2 立下的常数，每条都写清它是谁的事实：
+常数，每条都写清它是谁的事实：
 
 | 常数 | 值 | 谁的事实 |
 |---|---|---|
@@ -291,15 +289,15 @@ card-7.2 立下的常数，每条都写清它是谁的事实：
 
 新增 out-of-tree package，无既有调用方。波及两处：根 `Cargo.toml` 的 `[workspace]` 增一行 `exclude = ["desktop"]`（属 gate machinery，单独提交）；`ARCHITECTURE.md` §12 增一节十一行。城里接上它时只需一栋楼的 `CONFIG.toml` 写一条 `[[mcp]]` ＋ `command`，装配层**零改动**——这正是本 card 要验的那一条。
 
-## 15.2 card-7.3：城里那一侧欠的东西
+## 15.2 城里那一侧欠的东西
 
-card-7.2 只让这台 server 站住了。城里要认它，还欠三件，各自的落点写在这里，实现属 card-7.3：
+城里要认这台 server，三件事的落点写在这里：
 
 1. **`BUILDING.md` 增一位 `desktop:`**：住在 `city::policy`，与 `confidential:`／`write:`／`review:` 同一处解析。缺省是**关**——一栋楼默认不把桌面交出去，理由与 `record`／`clipboard` 默认关是同一条。
 2. **`desktop.` 前缀的 MCP 工具归到「撤不回」那道门**：一次点击没有 restoration，`kernel::discard` 那套「拿得回来才准删」在这里无从谈起，故它该走的是**升给人**（Escalate），不是 Deny。落点是 `runtime::bench::admit` 里 `Effect::Connector` 那一支。
-3. **设置页写 `DESKTOP.toml`**：它是**治理文件**，不是产物——它说的是这栋楼的 runs 能碰什么。故它落在这栋楼的 reserved subtree（`<building>/.sprawling/DESKTOP.toml`），与 `BUILDING.md`／`CONFIG.toml` 同处，**任何 write domain 都够不着**；写它的那一点照 `city::governed` 的形状办（一道门、整份写、不拼路径），而不是让设置页自己拼一个路径出来。这就是 card-5.1 的 `DomainReach` 立下的那条读法：一份决定「residents 能写什么」的文件，恒不由 resident 写。
+3. **设置页写 `DESKTOP.toml`**：它是**治理文件**，不是产物——它说的是这栋楼的 runs 能碰什么。故它落在这栋楼的 reserved subtree（`<building>/.sprawling/DESKTOP.toml`），与 `BUILDING.md`／`CONFIG.toml` 同处，**任何 write domain 都够不着**；写它的那一点照 `city::governed` 的形状办（一道门、整份写、不拼路径），而不是让设置页自己拼一个路径出来。这就是 `DomainReach` 立下的那条读法：一份决定「residents 能写什么」的文件，恒不由 resident 写。
 
-#### card-7.3 落到哪一步，还欠什么
+#### 落到哪一步，还欠什么
 
 前两件已落地并各自有测试：`city::policy` 读 `desktop:`（缺省关、机密楼即拒、打字错误即拒），`kernel::gate::undoable` 判「远端名前缀 `desktop.`」并升给人，`runtime::bench::admit` 在出网门之后叫它。
 
@@ -320,7 +318,7 @@ card-7.2 只让这台 server 站住了。城里要认它，还欠三件，各自
 
 验收命令（在 `desktop/` 内）：`cargo fmt`／`cargo clippy --all-targets -- -D warnings`／`cargo nextest run`。根目录的 `just check` 够不到本 package，因为它不是 workspace member。
 
-### 16.2 card-7.2 怎么测一件需要桌面的事
+### 16.2 怎么测一件需要桌面的事
 
 本 card 的测试分两层，分界线就是 §8-8 那张表的最后一列：
 
@@ -335,6 +333,6 @@ card-7.2 只让这台 server 站住了。城里要认它，还欠三件，各自
 
 ## 18 文档同步
 
-`ARCHITECTURE.md` §12 新增 desktop 一节｜`desktop/README.md`（英文，讲清它为什么住在 workspace 外）｜card-7.2 落地时同步本 SPEC §13 与 §8-7 的实现状态。
+`ARCHITECTURE.md` §12 新增 desktop 一节｜`desktop/README.md`（英文，讲清它为什么住在 workspace 外）｜同步本 SPEC §13 与 §8-7 的实现状态。
 
-card-7.2 同步：`ARCHITECTURE.md` §12 的 desktop 一节增十二行并改掉「carries out nothing」那段引言｜`desktop/README.md` 改掉「This build carries none of it out」一段｜本 SPEC 的 §2、§8-8、§8-9、§8.6、§13、§14、§15.2、§16.2。
+同步：`ARCHITECTURE.md` §12 的 desktop 一节增十二行并改掉「carries out nothing」那段引言｜`desktop/README.md` 改掉「This build carries none of it out」一段｜本 SPEC 的 §2、§8-8、§8-9、§8.6、§13、§14、§15.2、§16.2。

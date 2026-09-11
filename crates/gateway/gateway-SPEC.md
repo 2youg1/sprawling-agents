@@ -38,7 +38,7 @@
 
 ## 6 命名统一
 
-**跨 crate 类型住处（card-1.1–1.3 起）**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。**本 crate 同例（card-2.1 起）**：同一类型的 inherent impl 住不同簇文件时基线为每块各记一行 `impl`（`Endpoint` 两行）；下游 `sprawling` 基线记 `gateway` 内定义位簇路径（如 `credential::custodian::Custodian`），公共拼写不变。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。**本 crate 同例**：同一类型的 inherent impl 住不同簇文件时基线为每块各记一行 `impl`（`Endpoint` 两行）；下游 `sprawling` 基线记 `gateway` 内定义位簇路径（如 `credential::custodian::Custodian`），公共拼写不变。
 
 Dialect／Endpoint／Custody／Vault／SecretRef／Sealed／admission／market snapshot／UsdMicros／权威计费额（authoritative billed amount）。概念名英文原词；「兑付」＝resolve+expose 的合称。
 
@@ -69,7 +69,7 @@ admission／market／cost：纯判定与数据面，被 endpoint 与 S3 回合�
 切缝不是行数而是**变化的理由**：一家 provider 改了它的形状，只有它那一个文件动；而本模块顶上那句「改之前先读 provider 自己的文档」只有跟它指的那堆字段同居一处才真的被读到，所以两张文档链接表各自跟着它的 dialect 走。
 - `dialect` 剩五个入口，每个一条 `match kind`，封闭集为二；不认得的 dialect 恒拒而不拿较近的那一家近似。跨 dialect 的断言（两向往返、两种强度拼写、float 拒收）留在这里，因为它们测的就是路由的契约。
 - `mismatch` 是两家共用的四个读取器（`require`／`as_str`／`tokens_or_zero`／`payload_from`）与三句拒词（`mismatch`／`stream_cut`／`unspelled_effort`）。**依赖是单向的**：dialect → 两家 → mismatch，谁都不回头指。
-**card-4.1：两家各自再切一刀，把流的拼接搬出去。** 图的翻译把 `openai.rs` 顶到 443 行、`anthropic.rs` 顶到 398 行，而文件上限是 400。切的仍是变化的理由：`increment_of`／`settled` 回答的是「一串 SSE 帧如何合成一份完整答案」，与「一个请求如何写上线」是两件事，且两家的流帧形状各自变。归 `anthropic/stream.rs`（110）与 `openai/stream.rs`（116），父文件各以一行 `pub(crate) use stream::{increment_of, settled};` 保住路径，`dialect` 一字未改。
+**两家各自再切一刀，把流的拼接搬出去。** 图的翻译把 `openai.rs` 顶到 443 行、`anthropic.rs` 顶到 398 行，而文件上限是 400。切的仍是变化的理由：`increment_of`／`settled` 回答的是「一串 SSE 帧如何合成一份完整答案」，与「一个请求如何写上线」是两件事，且两家的流帧形状各自变。归 `anthropic/stream.rs`（110）与 `openai/stream.rs`（116），父文件各以一行 `pub(crate) use stream::{increment_of, settled};` 保住路径，`dialect` 一字未改。
 
 - 只属一家的东西跟着它：`empty_answer`（空答案）、`joined_text`与 `effort_field` 入 openai；`role_str`、`stop_from`／`stop_str`、`block_wire`／`block_from`、`effort_fields` 入 anthropic。
 
@@ -109,7 +109,7 @@ OpenAI 侧无对应物：出向翻译**记录性丢弃**思考块（同断点位
 
 **缓存后果写在这里，因为它是选型理由**：官方排错文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」。故强度住 `FrozenConfig`（kernel-SPEC §8-22），Run 内不可变；本模块只负责把已冻结的值翻上线。
 
-**card-4.1 增：两条 wire 上的图**
+**两条 wire 上的图**
 
 ```rust
 // gateway::dialect::images（新文件；形状 2 value）
@@ -157,7 +157,7 @@ impl kernel::Model for Endpoint { /* call：ChatRequest（req.chat）→dialect�
 - S3.02 落地记录：base_url＝完整端点 URL（逐字段哲学，不拼路径）；EndpointConfig 增 pricing: Option<ModelEntry>（结算在适配器内以便 ModelReturn 携 billed 入账；权威额线上无标准槽位，现行恒 PriceSheet 源）；reqwest 0.13 的 rustls feature 名＝`rustls`（非 0.12 的 rustls-tls）；非流式先行，半流中断以截断 body 实测（E_PROVIDER，恒不产部分 ModelReturn）；kernel::ModelReturn 增 usage/stop/billed 三字段＋bare()/from_response() 两构造面（kernel-SPEC §8-24 同集）。
 - `.expose(` 白名单（xtask secret）：本文件与 native.rs 是 gateway 侧仅有的两个合法出现点。
 
-**card-4.1 增：图的兑付面与两句拒绝**
+**图的兑付面与两句拒绝**
 
 两型一构造面住新文件 `endpoint/redemption.rs`（`config.rs` 加完为 457 行，越了 400 行上限；切的理由不是行数而是职责：「一个端点在线上兑什么」与「一个端点配成什么样」各自变化）：
 
@@ -259,7 +259,7 @@ pub fn on_outcome(state: &mut AdmissionState, outcome: ProviderOutcome, now: Tim
 
 ```rust
 #[non_exhaustive] #[derive(Default)] #[serde(rename_all = "snake_case")]
-pub enum InputKinds { #[default] Text, TextImage }      // card-4.1：这个模型收得下什么
+pub enum InputKinds { #[default] Text, TextImage }      // 这个模型收得下什么
 pub struct ModelEntry { pub id: String, pub context_tokens: u64, pub input: InputKinds,
                         pub input_price: UsdMicros /* per 1M tokens */, pub output_price: UsdMicros,
                         pub cache_read_price: UsdMicros, pub cache_write_price: UsdMicros }
@@ -271,7 +271,7 @@ impl MarketSnapshot {
 }
 ```
 
-- **card-4.1：`input` 默认 `Text`，宽容读。** `selected_payload` 写 `input` 键，`read_choice` 读不到就当 `Text`——旧 Ledger 里的 `model_selected` 没有这个键，而重放一份旧历史不应该报错；默认取「只收文字」而非「收图」，因为猜错方向的代价不同：猜小了是一句拒绝，猜大了是 provider 的 400。内置目录里收图的行（现为 `claude-sonnet`）标 `TextImage`，`local` 保持 `Text`。
+- **`input` 默认 `Text`，宽容读。** `selected_payload` 写 `input` 键，`read_choice` 读不到就当 `Text`——旧 Ledger 里的 `model_selected` 没有这个键，而重放一份旧历史不应该报错；默认取「只收文字」而非「收图」，因为猜错方向的代价不同：猜小了是一句拒绝，猜大了是 provider 的 400。内置目录里收图的行（现为 `claude-sonnet`）标 `TextImage`，`local` 保持 `Text`。
 - 钉版回滚＝持前一快照即回滚（值语义，无 I/O）；快照落盘属 projection／config 面，本模块只管形与查询。价目恒整数微美元（判定路径禁浮点）。
 
 ### 8-8 gateway::cost（S3.04；形状 1 判定函数）
@@ -298,7 +298,7 @@ impl AttachedEndpoint {
 }
 pub struct EndpointBook { /* 私有：endpoints、chosen */ }
 pub struct Chosen<'b> { pub endpoint: &'b AttachedEndpoint, pub entry: &'b ModelEntry,
-                        pub fallback: &'b Fallback }   // card-11.9：一次取模型答的是「用哪个」与「不答时怎么办」两问
+                        pub fallback: &'b Fallback }   // 一次取模型答的是「用哪个」与「不答时怎么办」两问
 impl EndpointBook {
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError>;
     pub fn apply_payload(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError>;
@@ -310,16 +310,16 @@ pub fn attached_payload(&AttachedEndpoint) -> Result<Payload, AxError>;      // 
 pub fn selected_payload(ModelTag, &str, &ModelEntry, &Fallback) -> Result<Payload, AxError>;  // model_selected 同上
 ```
 
-- **card-11.9：`Fallback` 随选择入簿，缺键读作 `Fallback::None`。** `selected_payload` 写 `fallback_endpoint` 与 `fallback_model` 两键，且只在 `Then` 时写；`read_choice` 读不到就取 `None`。本键之前写下的每一条 `model_selected` 因此重放不变，而且重放出的是**默认值本身该是的那个**：一份旧历史不会因为这张卡而获得一条谁都没设过的退路。
+- **`Fallback` 随选择入簿，缺键读作 `Fallback::None`。** `selected_payload` 写 `fallback_endpoint` 与 `fallback_model` 两键，且只在 `Then` 时写；`read_choice` 读不到就取 `None`。本键之前写下的每一条 `model_selected` 因此重放不变，而且重放出的是**默认值本身该是的那个**：一份旧历史不会因为这张卡而获得一条谁都没设过的退路。
 
 - **为何不是 duty pool**：多 Agent 功能未成形之前，职责池没有消费者，而没人读的权威只会漂。降为 `ModelTag` 两值枚举（`Main`／`Digest`）：**标签因为有人按它取模型而存在**，新增一个标签的前提是先有调用方。
 - **两个入口一个读者**：`apply`（重建路径，手里是 record）与 `apply_payload`（写入路径，手里是刚要写的 payload）共用同一套载荷读取，于是「写者以为的」与「重建得到的」不可能分岔。
-- **confidential 在选型点再守一次**：非本机 endpoint 对 confidential 楼恒拒（`E_GATE_DENIED`）。`gateway::endpoint` 的兜底拒同期改为**按本地性判定**（而非一律拒）：规则是「字节不出本机」，不是「不准用这个类型」；否则一个回环的 Anthropic 服务器会被误拒。
+- **confidential 在选型点再守一次**：非回环 endpoint 对 confidential 楼恒拒（`E_GATE_DENIED`）。`gateway::endpoint` 的兜底拒同期改为**按本地性判定**（而非一律拒）：规则是「字节不出这台机器」，不是「不准用这个类型」；否则一个回环的 Anthropic 服务器会被误拒。
 - **路径归兼容格式**：人输入 base URL（provider 文档就是那么印的），`messages`／`chat/completions`／`models` 由兼容格式拼。这与 `EndpointConfig.base_url`「完整端点 URL、不拼路径」并不矛盾：适配器保持字面，拼路径的是上层登记面。
 - **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的 id 是对端自己说的；`false` ＝ 探测失败而人自己报了型号，城照登。载荷里缺 `probed` 键读作 `true`，于是本键之前写下的每一条 `endpoint_attached` 重放不变——**旧记录的含义没有改，改的是新记录能多说一句**。
-- **`AuthSpec::for_dialect` 是凭证头的唯一产地（card-1.1）**：`AuthSpec::for_dialect(dialect: DialectKind, reference: SecretRef, header: Option<String>) -> AuthSpec`，纯函数，住 `endpoint/auth.rs`。人显式填的头名恒胜（`Header`）；否则 Anthropic → `Header{name:"x-api-key"}`，OpenAI 及其余 → `Bearer`。**它不住 `endpoint/config.rs`，因为 config.rs 已 397 行、行数门限 400**：为了过门而把测试删短是拿门当对手，而「凭证头归兼容格式」本来就是一个可以自己站着的概念；`AuthSpec` 类型本体留在 config.rs，因为搬它会让同一个名字在 crate 内多出一条 `pub(crate) use` 路径。登记面（`bin::assembly::credentials::endpoints::endpoint_of`）不再自己在 Bearer 与具名头之间选，否则「Anthropic 用哪个头」在城里有两个权威，而漂开的总是没人看的那个。
+- **`AuthSpec::for_dialect` 是凭证头的唯一产地**：`AuthSpec::for_dialect(dialect: DialectKind, reference: SecretRef, header: Option<String>) -> AuthSpec`，纯函数，住 `endpoint/auth.rs`。人显式填的头名恒胜（`Header`）；否则 Anthropic → `Header{name:"x-api-key"}`，OpenAI 及其余 → `Bearer`。**它不住 `endpoint/config.rs`，因为 config.rs 已 397 行、行数门限 400**：为了过门而把测试删短是拿门当对手，而「凭证头归兼容格式」本来就是一个可以自己站着的概念；`AuthSpec` 类型本体留在 config.rs，因为搬它会让同一个名字在 crate 内多出一条 `pub(crate) use` 路径。登记面（`bin::assembly::credentials::endpoints::endpoint_of`）不再自己在 Bearer 与具名头之间选，否则「Anthropic 用哪个头」在城里有两个权威，而漂开的总是没人看的那个。
 
-### 8-10 gateway::endpoint 探测面（P1.11；探测降级 card-1.2）
+### 8-10 gateway::endpoint 探测面（P1.11）
 
 ```rust
 impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<String>, AxError>; }
@@ -327,15 +327,15 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<String>, AxEr
 
 两家一方都在 `GET .../models` 返回 `{"data":[{"id":..}]}`，**都不返回价目与 token 上限**——所以探测只取 id，两个 token 数字由人在登记时确认。探测与正式调用共用同一个兑付路径（`authorize`）：两套认证拼法就是两个权威，而漂开的总是没人看的那个。
 
-**探测不再是登记的前提（card-1.2，改写此前「探测不通就不登记」那一条）**。上一段的「两家都返回」只对那两家为真：网关与 Anthropic 兼容格式的第三方多半根本不服务 `/models`，于是一条本可用的线路被一个它从未承诺过的接口挡在城外。新规则三行：探测成功→按对端报的 id 收窄（旧行为不动，`probed=true`）；探测失败且人报了型号→按人报的登记（`probed=false`，并按 `effect` 级写一条诊断，点名探测的错——**登记确实发生了，被拒的只是探测**，用 `refuse` 级会说成这次登记被门拒了，那是假话）；探测失败且人没报型号→仍然拒绝，恢复语改为「把要用的 model id 报上来，再登记一次」，因为此时城手里一个可调用的名字都没有。
+**探测不再是登记的前提（改写此前「探测不通就不登记」那一条）**。上一段的「两家都返回」只对那两家为真：网关与 Anthropic 兼容格式的第三方多半根本不服务 `/models`，于是一条本可用的线路被一个它从未承诺过的接口挡在城外。新规则三行：探测成功→按对端报的 id 收窄（旧行为不动，`probed=true`）；探测失败且人报了型号→按人报的登记（`probed=false`，并按 `effect` 级写一条诊断，点名探测的错——**登记确实发生了，被拒的只是探测**，用 `refuse` 级会说成这次登记被门拒了，那是假话）；探测失败且人没报型号→仍然拒绝，恢复语改为「把要用的 model id 报上来，再登记一次」，因为此时城手里一个可调用的名字都没有。
 
 **四个参照实现一致**：pi、codex、opencode、Claude Code 都让人**声明**模型清单，发现是可选的（Claude Code 默认关闭、3 秒超时、失败静默）。把可选的发现当成必选的准入，是本仓自己加的限制，不是外部事实。
 
 **「路径归兼容格式」现在也管凭证头**：Anthropic 的 API key 走 `x-api-key`（`Authorization: Bearer` 只发给短时联邦令牌），OpenAI 兼容格式走 `Bearer`；人显式填的头名恒优先。见 §8-9 `AuthSpec::for_dialect`。落选的是「让登记页必填头名」：那把一个兼容格式自己就知道的事推给了人，而人填错的代价是一个 401。
 
-**`adapter_for` 住 `endpoint/adapter.rs`（card-3.3）**：装配线（哪个 chosen 走 Native、哪个走 Endpoint）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。`CALL_TIMEOUT_MS` 随它搬家（没人读的数字没人能辩护）。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（兼容格式要的头是兼容格式的事，搬家留待后卡：`dialect_headers` 住凭据是历史位置，本卡只动 adapter 线）。
+**`adapter_for` 住 `endpoint/adapter.rs`**：装配线（哪个 chosen 走 Native、哪个走 Endpoint）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。`CALL_TIMEOUT_MS` 随它搬家（没人读的数字没人能辩护）。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（兼容格式要的头是兼容格式的事，搬家留待后卡：`dialect_headers` 住凭据是历史位置，本卡只动 adapter 线）。
 
-### 8-11 gateway::fallback（card-11.9；形状 2 值）
+### 8-11 gateway::fallback（形状 2 值）
 
 ```rust
 #[non_exhaustive] pub enum Fallback { None, #[non_exhaustive] Then { endpoint: String, model: String } }
@@ -366,7 +366,7 @@ pub fn retreat_payload(tag: ModelTag, from: &str, retreat: &Retreat, because: &A
 
 **人还不能设置它。** 设置面在设置页，而设置页归 `crates/web` 与线上的 `AttachEndpoint`／`SelectModel` 帧；本卡不动线（另一位在改），故城内今天写下的每一条 `model_selected` 都带 `Fallback::None`。线上欠的那一个字段记在本卡报告里。
 
-### 8-12 gateway::transcribe（card-6.10 服务端半；`transcriber` 形状 4 适配器，`recording` 形状 2 值，`wire` 形状 1 判定）
+### 8-12 gateway::transcribe（`transcriber` 形状 4 适配器，`recording` 形状 2 值，`wire` 形状 1 判定）
 
 把一段录音变成一行字的那个 provider 端点。**它是可选设施**：没配的城照常跑完每一件事，只是在有人开口说话时明说自己听不见，而不是在兑付那一格炸开或回一个空串。
 
@@ -428,7 +428,7 @@ pub(crate) fn transcription_of(wire: &serde_json::Value) -> Result<String, AxErr
 
 **为何 `Recording` 是值而不是一对参数**：字节与它的格式永远同行，且两条不变量（非空、不超 `RECORDING_MAX_BYTES`）只在 `new` 一处守；无 setter。**为何 `wire` 与 `transcriber` 分家**：「这段多部分请求体长什么样」是纯数据的判定、可逐字节断言，「怎么把它发出去并兑付凭据」要一个 socket——两件事变化的理由不同。
 
-**线上还没有这个动词。** 语音输入是前端功能而前端已冻结；本卡只交付服务端半，故 `channels` 无新帧、`Command` 无新变体、wiring 门辖区不变。前端会话要照着建的三件事（端点名、请求形、拒绝码）记在本卡报告里。
+**线上还没有这个动词。** 语音输入是前端功能而前端已冻结；本卡只交付服务端半，故 `channels` 无新帧、`Command` 无新变体、wiring 门辖区不变。客户端要照着建的三件事是端点名、请求形与拒绝码。
 
 ## 8.5 两个设计（crate 级）
 
@@ -487,7 +487,7 @@ ARCHITECTURE §6 gateway 表逐卡状态翻转；§6 接线台账登记（endpoi
 
 `Endpoint` 覆盖 `Model::call_streaming`：请求带 `stream: true`，逐行读 `data:`，把每一帧交给 `dialect::increment_of`，最后 `dialect::settled_from_stream` 把收集到的帧重装成**这个 dialect 非流式的那个形状**，再交给同一个 `response_from_wire`。
 
-**「逐行」指的是响应体到达的节奏，而不是一个已经读完的字符串的行（前端会话 3，实测修正）。** 先前的实现先 `response.text()` 把整个 body 读完，再在 `body.lines()` 的循环里逐条 `onto`——于是请求确实带了 `stream: true`、provider 确实分次答，而全部增量在模型已经停下之后的同一毫秒里一起发出。对一个真供应方的计时：`model_called` 在 1.9 s，25 条 delta 在 11.9 s 的同一毫秒，随后 `model_returned`。**改成把 `Response` 当 `std::io::Read` 包进 `BufReader` 逐行读**：一帧到达即交一帧。否决「把转发搬到 socket 任务那一层去查锁」：`to_watchers` 是非阻塞广播，帧压根没有到达那里，往下游找只会找到一个不存在的病灶。**验收形式**：假供应方先写开头几帧并 flush，**然后等调用方回报「第一条增量已转出」才写剩下的**；读完再回放的实现永远回报不了，服务器自己就是断言，测试侧不读时钟。
+**「逐行」指的是响应体到达的节奏，而不是一个已经读完的字符串的行。** 先前的实现先 `response.text()` 把整个 body 读完，再在 `body.lines()` 的循环里逐条 `onto`——于是请求确实带了 `stream: true`、provider 确实分次答，而全部增量在模型已经停下之后的同一毫秒里一起发出。对一个真供应方的计时：`model_called` 在 1.9 s，25 条 delta 在 11.9 s 的同一毫秒，随后 `model_returned`。**改成把 `Response` 当 `std::io::Read` 包进 `BufReader` 逐行读**：一帧到达即交一帧。否决「把转发搬到 socket 任务那一层去查锁」：`to_watchers` 是非阻塞广播，帧压根没有到达那里，往下游找只会找到一个不存在的病灶。**验收形式**：假供应方先写开头几帧并 flush，**然后等调用方回报「第一条增量已转出」才写剩下的**；读完再回放的实现永远回报不了，服务器自己就是断言，测试侧不读时钟。
 
 **结算答案只有一个解析器。** 直接把流读成 `ChatResponse` 会立刻长出第二个权威：同一个回复，流式路径与阻塞路径可能得出两个结论。重装成非流式形状是这条口径的全部实现。
 
@@ -497,7 +497,7 @@ ARCHITECTURE §6 gateway 表逐卡状态翻转；§6 接线台账登记（endpoi
 
 **机密楼宇的拒绝写一次。** 两扇门（`call` 与 `call_streaming`）都说同一句话，出自同一个 `confidential_refusal`——一条安全拒绝有两份拷贝，就是两个各自变软的机会。
 
-### 8-14 gateway 目录化（card-2.2；形状：主类型居索引，方法按簇归文件）
+### 8-14 gateway 目录化（形状：主类型居索引，方法按簇归文件）
 
 `credential.rs`（988）→ `credential/vault.rs`（`Vault` 缝＋双后端＋`Persistence`／`Described`／`EnvReader`）／
 `custodian.rs`（`Custodian`／`Captured`）／`oauth/`（`codec.rs` 编码、`flow.rs` 往返、`types.rs` 类型，

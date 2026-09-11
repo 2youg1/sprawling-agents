@@ -74,7 +74,7 @@ the refusal above reached nobody: the peer that asked had closed its socket
 
 **处置**：本目录的 `Door` 因此把静默解成 `Quiet` 而不是 `Accepted`（§8），并用 `exitCodeMeansWhatItSays` 这条性质把它钉住。是否修产品、怎么修（受理即答／退出码分第三档／窗口随动词而定）是 Rust 侧的一次裁定，不由本目录决定。
 
-**已修（card-4.10.1「静默有自己的退出码」）。** Rust 侧选了三档中的第二条：`Spoken` 是一个三支穷尽枚举，
+**已修（「静默有自己的退出码」）。** Rust 侧选了三档中的第二条：`Spoken` 是一个三支穷尽枚举，
 `Quiet`（帧发出后窗口内一帧未回）退 **3**，而 0 与 1 的含义一个字不改。表写在 `docs/operating.md`
 与 `crates/sprawling/sprawling-SPEC.md` §8-41 里，红转绿的那条测试是
 `a_city_that_says_nothing_inside_the_window_is_not_a_success`——一个脚本化的服务端答完 `Welcome` 后闭口不言。
@@ -116,7 +116,7 @@ replay               → 账本里两条 city_halted
 
 **处置**：归 Rust 侧裁定，两条路都成立——把 `gate::dedup` 接上去，或者停止在线格式上强制要求这个字段。一把必须带而无人读的钥匙，是门做出而不兑现的承诺。本目录只留 `keyUsedTwice` 一条断言等它变绿，方法是问账本的离线校验器「链走到哪了」，两次读数必须相等：**不预测任何 seq，只谈两次观察之间的关系**。
 
-**已修（card-4.10.1「重放的命令只做一次」）。** Rust 侧选了第一条：`bin::assembly::commanding::entrance`
+**已修（「重放的命令只做一次」）。** Rust 侧选了第一条：`bin::assembly::commanding::entrance`
 持有那个 `seen` 集合，`RunWorker::serve_one`——wire、控制台与 ACP 三条路唯一的汇合点——在任何副作用之前
 向 `kernel::gate::dedup` 问一次，重复的键得到**第一次的答案**（成功即沉默，拒绝即逐字相同的那份拒绝），
 且不再写第二次。钥匙随命令写进它所产生记录的 payload，开城时那一趟已有的账本折叠把它读回来，
@@ -132,8 +132,8 @@ replay               → 账本里两条 city_halted
 | 事实 | 来源 |
 |---|---|
 | `quickcheck-dynamic` 4.0.1，`StateModel` 与 `RunModel` 分属两个类型类，带 dynamic logic | 上游 README、Hackage |
-| 本机 GHC 9.10.3 / cabal 3.16.1.0 | `ghc --version`、`cabal --version` 实测 |
-| `WIRE_V = 18`，24 个 Command、23 个 Query（card-11.7 使 `Dispatch` 不再携 `budget`，card-5.4 增 `Command::PutDocument` 与 `Query::Governance`，card-2.6 增 `Query::Hunks`，card-6.5 增 `Query::Rounds`／`Evidence`／`CostOf`，card-6.4 增 `Listing`／`Document`，card-2.7 增 `Commits`） | `crates/channels/src/wire.rs`、`wire/query.rs`、`command/kind.rs` |
+| GHC 与 cabal 的版本取自这台机器 | `ghc --version`、`cabal --version` 实测 |
+| `WIRE_V = 18`，24 个 Command、24 个 Query | `crates/channels/src/wire.rs`、`wire/query.rs`、`command/kind.rs` |
 | 35 个稳定错误码 | `crates/kernel/src/error.rs` 的 `AxCode::ALL` |
 | `IdemKey` 形如 `idem1-` 加 32 位小写十六进制 | 门的拒绝原文实测 |
 | 模板只有 `minimal` 与 `confidential` | 门的拒绝原文实测 |
@@ -303,11 +303,11 @@ render    :: Text -> Actions World -> Text
 
 对 Rust 侧的影响**必须**恰好为零：不改 `Cargo.toml` 的 members，不进 `cargo deny` 的依赖图，不参与 `xtask length` 的行数，不进 `xtask modmap` 的模块表。唯一的交汇点是 `crates/sprawling/tests/from_adversary.rs`——它由本目录渲染、由 `cargo test` 编译，两侧任何一方漂移都会让某一侧变红。
 
-**一处需要确认的**：`xtask release` 拒绝「引用了本机文件的文件」，`xtask header` 要求每个 `.rs` 带 MPL 抬头。本目录不含 `.rs`，且只引用仓内相对路径与环境变量名，两道门都不适用。
+**一处需要确认的**：`xtask release` 拒绝「引用了一台机器自己的文件的文件」，`xtask header` 要求每个 `.rs` 带 MPL 抬头。本目录不含 `.rs`，且只引用仓内相对路径与环境变量名，两道门都不适用。
 
 ## 16 测试与约束
 
-按「坏得越早越省时间」排序：渲染对拍（U5，毫秒级）、门的契约（U1，含 §4 那条退出码性质）、随机轨迹（U3）、定向停摆（U4）、账本自洽（U6）、磁盘的三句谎话（U2），最后是两个按缺陷命名的组。共 13 条，一整套 22 秒（实测，本机）。约束是 §2 第 5 条——**咬得动**必须被演示过，而不是被相信。
+按「坏得越早越省时间」排序：渲染对拍（U5，毫秒级）、门的契约（U1，含 §4 那条退出码性质）、随机轨迹（U3）、定向停摆（U4）、账本自洽（U6）、磁盘的三句谎话（U2），最后是两个按缺陷命名的组。共 13 条，一整套 22 秒（实测，热缓存、四核）。约束是 §2 第 5 条——**咬得动**必须被演示过，而不是被相信。
 
 **整棵树串行跑（`NumThreads 1`）。** 一座被端起来的城占着一个端口、一个目录与一条历史，两组同时跑就三样都争。实测过的后果不是变慢而是**换城**：输的那一边城绑不上端口退了出去，它自己的探活却在同一个口上接到了赢的那一边的城，于是一整条轨迹跑在别人的历史上。它把当时还开着的那个缺陷测成了绿的——一个答案取决于哪个线程赢了的对手，比没有对手更坏。
 
