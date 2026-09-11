@@ -1300,7 +1300,8 @@ S2 激活的码（逐码答「能否定义掉」）：
 - `GENESIS_PREV = [0u8; 32]`（「创世行 prev＝64 个 0」）。
 - `IDEM_DERIVE_V = 1` 与派生框架 `run(16B)||seq(8B LE)||action`（换框架＝升版本字节，旧键不撞新键）。
 - Locator 文法字面（`cas:`、`file:`、`b3-`、`#L`/`#B`）：本 SPEC 的文法节即权威。
-- `SECRET_SHAPES` 初版条目（公开 provider 令牌前缀，随外界增补）：`sk-ant-`（Anthropic）、`ghp_`/`gho_`/`ghs_`（GitHub）、`AKIA`（AWS AccessKeyId）、`glpat-`（GitLab）、`xoxb-`/`xoxp-`（Slack）、`AIza`（Google API key）。字符集与长度按各 provider 公开文档；条目形状见 §8-7。
+- `SECRET_SHAPES` 条目（公开 provider 令牌前缀，随外界增补）：`sk-ant-`（Anthropic）、`sk-proj-`（OpenAI）、`ghp_`/`gho_`（GitHub）、`AKIA`（AWS AccessKeyId）、`glpat-`（GitLab）、`xoxb-`（Slack）、`AIza`（Google API key）、`sk-or-v1-`（OpenRouter）、`sk-ai-v1-`（zenmux）、`gsk_`（Groq）。字符集与长度按各 provider 公开文档；条目形状见 §8-7。
+- **聚合型转发商的令牌体是纯小写十六进制，故它们必须有形状条目而不能依赖熵侦测器**。熵侦测器的 `mixed_alphabet` 要求同时出现大写、小写与数字，这一条件本身是对的（城自己的 blake3 十六进制与 uuid 均单一大小写，否则每一行账本都会亮），但它使 `sk-or-v1-` 与 `sk-ai-v1-` 这类 64 位小写十六进制令牌两道侦测器都不响——形状表是它们唯一的网。S2 模块头早已写明「全小写的密钥避开本侦测器」，本条是那句话的具体后果。
 
 Stage 2 追加：
 

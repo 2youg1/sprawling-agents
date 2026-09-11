@@ -27,7 +27,10 @@ pub struct SecretShape {
     pub provider: &'static str,
     pub prefix: &'static str,
     pub charset: SecretCharset,
-    /// Closed interval over the length of the part after the prefix.
+    /// Closed interval over the length of the whole token, prefix
+    /// included. `scan` measures from the first byte of the prefix to
+    /// the last byte the charset admits, so a window written against the
+    /// body alone is short by `prefix.len()`.
     pub len: (u16, u16),
 }
 
@@ -45,7 +48,7 @@ pub enum SecretCharset {
 }
 
 /// Public provider token shapes, per each provider's published format.
-pub const SECRET_SHAPES: [SecretShape; 8] = [
+pub const SECRET_SHAPES: [SecretShape; 11] = [
     SecretShape {
         provider: "anthropic",
         prefix: "sk-ant-",
@@ -94,6 +97,30 @@ pub const SECRET_SHAPES: [SecretShape; 8] = [
         charset: SecretCharset::Base64Url,
         len: (35, 35),
     },
+    // The three below are aggregators, and they share one property that
+    // decides they must be listed: their bodies are all-lowercase hex or
+    // single-case base62, so `secret::scan`'s entropy detector - which
+    // fires only on mixed upper/lower/digit runs, so that the city's own
+    // blake3 hashes stay quiet - cannot reach them. For these, the shape
+    // table is not the primary net; it is the only one.
+    SecretShape {
+        provider: "openrouter",
+        prefix: "sk-or-v1-",
+        charset: SecretCharset::HexLower,
+        len: (40, 80),
+    },
+    SecretShape {
+        provider: "zenmux",
+        prefix: "sk-ai-v1-",
+        charset: SecretCharset::HexLower,
+        len: (40, 80),
+    },
+    SecretShape {
+        provider: "groq",
+        prefix: "gsk_",
+        charset: SecretCharset::Base62,
+        len: (32, 96),
+    },
 ];
 
 #[cfg(test)]
@@ -114,7 +141,7 @@ mod tests {
         assert_eq!(PROMPT_CACHE_TTL_SECS, 300);
         assert_eq!(EVENT_LOG_V, 1);
         assert_eq!(L0_TOOLS, ["exec", "edit", "status"]);
-        assert_eq!(SECRET_SHAPES.len(), 8);
+        assert_eq!(SECRET_SHAPES.len(), 11);
     }
 
     #[test]

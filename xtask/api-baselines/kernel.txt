@@ -154,7 +154,7 @@ pub const kernel::consts_external::CACHE_BREAKPOINTS_MAX: u32
 pub const kernel::consts_external::EVENT_LOG_V: u32
 pub const kernel::consts_external::L0_TOOLS: [&str; 3]
 pub const kernel::consts_external::PROMPT_CACHE_TTL_SECS: u64
-pub const kernel::consts_external::SECRET_SHAPES: [kernel::consts_external::SecretShape; 8]
+pub const kernel::consts_external::SECRET_SHAPES: [kernel::consts_external::SecretShape; 11]
 pub const kernel::consts_policy::AUTONOMY_DEFAULT: kernel::Autonomy
 pub const kernel::consts_policy::CLOCK_STAMP_DEFAULT: kernel::ClockStampGranularity
 pub const kernel::consts_policy::CLOCK_ZONES_MAX: u32

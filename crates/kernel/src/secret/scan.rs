@@ -268,6 +268,36 @@ mod tests {
     }
 
     #[test]
+    fn aggregator_tokens_with_lowercase_hex_bodies_are_found() {
+        // Every probe is assembled at runtime: `xtask secret` scans this
+        // file, and a literal token here would be a finding in itself.
+        //
+        // These three matter because the entropy detector cannot reach
+        // them. Their bodies are all-lowercase hex, so `mixed_alphabet`
+        // is false and the second detector never fires - the shape table
+        // is the only net, which is what S2's module header predicted.
+        let hex64 = "0f1e2d3c".repeat(8);
+        for (prefix, provider) in [("sk-or-v1-", "openrouter"), ("sk-ai-v1-", "zenmux")] {
+            let text = format!("KEY={prefix}{hex64}");
+            let found: Vec<_> = scan(text.as_bytes()).iter().map(|h| h.provider).collect();
+            assert_eq!(found, vec![Some(provider)], "{prefix} is one shape hit");
+        }
+        let groq = format!("KEY=gsk_{}", "a1B2c3D4e5".repeat(5));
+        assert_eq!(
+            scan(groq.as_bytes()).first().and_then(|h| h.provider),
+            Some("groq")
+        );
+    }
+
+    #[test]
+    fn a_bare_hex_run_still_does_not_hit_without_its_prefix() {
+        // The guard on the entry above: these shapes must not turn every
+        // blake3 hash in the ledger into a finding.
+        let hex64 = "0f1e2d3c".repeat(8);
+        assert!(scan(format!("prev: {hex64}").as_bytes()).is_empty());
+    }
+
+    #[test]
     fn log2_q10_matches_known_points() {
         assert_eq!(log2_q10(1), 0);
         assert_eq!(log2_q10(2), 1 << 10);
