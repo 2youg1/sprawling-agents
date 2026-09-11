@@ -19,6 +19,20 @@ use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
 
+/// What rides in the archive beside the binary: the name a person finds
+/// after unpacking, and where it is read from, relative to the root.
+///
+/// One table rather than a literal at each push, because the packer and
+/// the test that proves these files exist have to name the same paths.
+/// `QUICKSTART.md` moved into `docs/` and this, its only reader, kept
+/// asking for the old path - so every archive after that move failed to
+/// assemble, on a release runner, which is the one place nobody watches
+/// until a tag is already cut.
+const PACKAGED_DOCUMENTS: [(&str, &str); 2] = [
+    ("QUICKSTART.md", "docs/dist/QUICKSTART.md"),
+    ("LICENSE", "LICENSE"),
+];
+
 /// Which build an archive is assembled from. Exhaustive on purpose: the
 /// two questions a packager asks — where the binary landed, and what the
 /// archive is called — have one answer each per variant, and a boolean
@@ -104,7 +118,7 @@ pub(crate) fn run(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskEr
         });
     }
 
-    let stem = format!("sprawling-{}-{}", version(root)?, target.label());
+    let stem = format!("sprawling-{}-{}", workspace_version(root)?, target.label());
     let out_dir = root.join("target").join("package");
     std::fs::create_dir_all(&out_dir).map_err(|source| XtaskError::Io {
         path: out_dir.display().to_string(),
@@ -114,11 +128,9 @@ pub(crate) fn run(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskEr
 
     let mut entries: Vec<(String, PathBuf)> = Vec::new();
     entries.push((target.binary_name().to_owned(), binary));
-    entries.push((
-        "QUICKSTART.md".to_owned(),
-        root.join("dist").join("QUICKSTART.md"),
-    ));
-    entries.push(("LICENSE".to_owned(), root.join("LICENSE")));
+    for (name, source) in PACKAGED_DOCUMENTS {
+        entries.push(((*name).to_owned(), root.join(source)));
+    }
     // The bill of materials when `just dist` produced one; a person who
     // wants to know what is inside the binary should not have to build it.
     let sbom = root.join("target").join("sbom.cdx.json");
@@ -182,7 +194,7 @@ fn write_archive(
 
 /// The workspace version, read from the manifest that defines it rather
 /// than from this tool's own compiled-in copy.
-fn version(root: &Path) -> Result<String, XtaskError> {
+pub(crate) fn workspace_version(root: &Path) -> Result<String, XtaskError> {
     let path = root.join("Cargo.toml");
     let text = std::fs::read_to_string(&path).map_err(|source| XtaskError::Io {
         path: path.display().to_string(),
@@ -212,7 +224,25 @@ fn version(root: &Path) -> Result<String, XtaskError> {
     reason = "test code"
 )]
 mod tests {
-    use super::{ReleaseTarget, binary_path, write_archive};
+    use super::{PACKAGED_DOCUMENTS, ReleaseTarget, binary_path, write_archive};
+
+    /// The check that was missing: a document the archive is assembled
+    /// from has to be in the tree the archive is assembled out of. This
+    /// fails at `cargo nextest`, on every push, rather than on a release
+    /// runner after a tag has been cut.
+    #[test]
+    fn every_packaged_document_is_in_the_tree() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("xtask sits one level under the repository root");
+        for (name, source) in PACKAGED_DOCUMENTS {
+            let path = root.join(source);
+            assert!(
+                path.is_file(),
+                "the archive packages {name} from {source}, which is not in this tree"
+            );
+        }
+    }
 
     /// The two names that already exist must not move; a build for a
     /// target other than this machine's default earns its triple in the
