@@ -85,6 +85,7 @@ impl kernel::PlanTree
 impl kernel::PlannedProgress
 impl kernel::Pursuit
 impl kernel::Range
+impl kernel::Reach
 impl kernel::Registry
 impl kernel::ResidentId
 impl kernel::RoadmapStatus
@@ -184,10 +185,12 @@ pub const kernel::consts_policy::STARTUP_BUDGET_TOKENS: u64
 pub const kernel::consts_policy::WORKTREE_MAX_BYTES: u64
 pub enum kernel::Admission
 pub enum kernel::AnswerVerdict
+pub enum kernel::Answered
 pub enum kernel::Answerer
 pub enum kernel::ApprovalSource
 pub enum kernel::Carrier
 pub enum kernel::CommitmentDecision
+pub enum kernel::Connected
 pub enum kernel::DedupVerdict
 pub enum kernel::DelegationVerdict
 pub enum kernel::DenyReason
@@ -208,6 +211,7 @@ pub enum kernel::ImageType
 pub enum kernel::Lines
 pub enum kernel::Locator
 pub enum kernel::MemoShape
+pub enum kernel::Named
 pub enum kernel::PlanExit
 pub enum kernel::PolicyApplication
 pub enum kernel::PolicyExpiry
@@ -224,6 +228,7 @@ pub enum kernel::ScopeChange
 pub enum kernel::ShedReason
 pub enum kernel::StallVerdict
 pub enum kernel::StopCause
+pub enum kernel::Through
 pub enum kernel::Token
 pub enum kernel::VersionVerdict
 pub enum kernel::WindowClass
@@ -381,6 +386,7 @@ pub fn kernel::Pursuit::state(&self) -> kernel::PursuitState
 pub fn kernel::Range::bytes(u64, u64) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::Range::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::Range::lines(u64, u64) -> core::result::Result<Self, kernel::AxError>
+pub fn kernel::Reach::answered_at_all(&self) -> bool
 pub fn kernel::Registry::artifact(&self, &kernel::Locator) -> core::option::Option<&kernel::Artifact>
 pub fn kernel::Registry::is_asset(&self, &kernel::Locator) -> bool
 pub fn kernel::Registry::is_asset_at(&self, &kernel::Address) -> bool
@@ -503,6 +509,10 @@ pub kernel::AnswerVerdict::HumanOnly
 pub kernel::AnswerVerdict::May
 pub kernel::AnswerVerdict::NotTheDelegate
 pub kernel::AnswerVerdict::SelfApprovalBarred
+pub kernel::Answered::HandshakeFailed(alloc::string::String)
+pub kernel::Answered::NameNotUsable(alloc::string::String)
+pub kernel::Answered::Status(u16)
+pub kernel::Answered::Unreachable(alloc::string::String)
 pub kernel::Answerer::Human
 pub kernel::Answerer::Resident(kernel::ResidentId)
 pub kernel::ApprovalClass::AgentQuestion
@@ -595,6 +605,11 @@ pub kernel::CommitmentDecision::Denied
 pub kernel::Completion::Cancelled
 pub kernel::Completion::Done(kernel::Evidence)
 pub kernel::Completion::Limit
+pub kernel::Connected::Failed(alloc::string::String)
+pub kernel::Connected::Open
+pub kernel::Connected::Refused
+pub kernel::Connected::Silent
+pub kernel::Connected::Skipped
 pub kernel::ConnectorCall::label: &'a kernel::ServerLabel
 pub kernel::ConnectorCall::tool: &'a kernel::ToolName
 pub kernel::ContentBlock::Image(kernel::ImageRef)
@@ -846,6 +861,10 @@ pub kernel::ModelUsage::cache_read_tokens: kernel::Tokens
 pub kernel::ModelUsage::cache_write_tokens: kernel::Tokens
 pub kernel::ModelUsage::input_tokens: kernel::Tokens
 pub kernel::ModelUsage::output_tokens: kernel::Tokens
+pub kernel::Named::NotFound
+pub kernel::Named::ProxiedAway
+pub kernel::Named::Refused(alloc::string::String)
+pub kernel::Named::Resolved(u32)
 pub kernel::NewChild::item: alloc::string::String
 pub kernel::NewChild::weight: u32
 pub kernel::Notice::about: kernel::NodeId
@@ -901,6 +920,12 @@ pub kernel::Range::Bytes::to: u64
 pub kernel::Range::Lines
 pub kernel::Range::Lines::from: u64
 pub kernel::Range::Lines::to: u64
+pub kernel::Reach::answered: kernel::Answered
+pub kernel::Reach::connected: kernel::Connected
+pub kernel::Reach::elapsed_ms: u64
+pub kernel::Reach::host: alloc::string::String
+pub kernel::Reach::named: kernel::Named
+pub kernel::Reach::through: kernel::Through
 pub kernel::RedNode::at: kernel::NodeId
 pub kernel::RedNode::why: kernel::StopCause
 pub kernel::RegisterVerdict::AlreadyRegistered
@@ -966,6 +991,9 @@ pub kernel::SystemBlock::cache: bool
 pub kernel::SystemBlock::text: alloc::string::String
 pub kernel::Temporal::Timeless
 pub kernel::Temporal::Timestamped
+pub kernel::Through::Direct
+pub kernel::Through::Environment(alloc::string::String)
+pub kernel::Through::Excluded
 pub kernel::Token::Code
 pub kernel::Token::Emphasis
 pub kernel::Token::Fence
@@ -1073,6 +1101,7 @@ pub struct kernel::Policy
 pub struct kernel::PolicyMatcher
 pub struct kernel::Pursuit
 pub struct kernel::QueueStats
+pub struct kernel::Reach
 pub struct kernel::RedNode
 pub struct kernel::Registry
 pub struct kernel::ResidentId(_)

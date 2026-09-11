@@ -15,6 +15,7 @@ mod locator;
 
 pub use address::{Address, RESERVED_PREFIX, SessionName};
 pub use locator::{B3Hash, GitOid, Locator, Range};
+pub use reach::{Answered, Connected, Named, Reach, Through};
 
 pub mod consts_external;
 pub mod consts_policy;
@@ -70,6 +71,7 @@ mod completion;
 mod node_id;
 mod plan;
 mod pursuit;
+mod reach;
 mod share;
 mod spine;
 

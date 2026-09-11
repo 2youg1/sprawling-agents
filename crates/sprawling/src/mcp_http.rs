@@ -122,7 +122,14 @@ impl HttpServer {
                 Some((name.trim().to_owned(), held))
             }
         };
-        let client = reqwest::blocking::Client::builder()
+        let mut builder = reqwest::blocking::Client::builder();
+        if gateway::is_local(&url) {
+            // A server a person started on this machine is reached by
+            // address, and a proxy in front of it answers for something
+            // else entirely.
+            builder = builder.no_proxy();
+        }
+        let client = builder
             // Named, because a hosted server sitting behind a content
             // delivery network refuses a client that will not say what
             // it is: reaching Exa's endpoint without this answers 403

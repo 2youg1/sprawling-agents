@@ -284,6 +284,7 @@ pub channels::DoctorInstall::Print
 pub channels::DoctorInstall::Print::spelled: alloc::string::String
 pub channels::DoctorInstall::UnknownPlatform
 pub channels::DoctorItem::enables: alloc::string::String
+pub channels::DoctorItem::homepage: core::option::Option<alloc::string::String>
 pub channels::DoctorItem::install: channels::DoctorInstall
 pub channels::DoctorItem::name: alloc::string::String
 pub channels::DoctorItem::need: channels::DoctorNeed

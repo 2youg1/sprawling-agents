@@ -21,8 +21,9 @@ use std::path::PathBuf;
 
 use kernel::AxError;
 
-use super::table::{CHROMEDRIVER, FIREFOX, PYTHON_WASI, REQUIREMENTS, SHELL};
-use super::{Machine, PATIENCE, Platform, Presence, ThisMachine};
+use super::family::GECKO;
+use super::table::{CHROMEDRIVER, MSEDGEDRIVER, PYTHON_WASI, REQUIREMENTS, SHELL};
+use super::{Absence, Machine, PATIENCE, Platform, Presence, ThisMachine};
 
 /// Whether this binary was built with the `sandbox` feature. The one
 /// spelling of that fact; the table reads it and the engine below
@@ -38,14 +39,29 @@ pub(crate) fn components_dir() -> Option<PathBuf> {
         .map(|home| PathBuf::from(home).join(".sprawling").join("components"))
 }
 
-/// Where Firefox is on this machine, and whether it starts.
+/// The Gecko browser this machine has, whichever brand it is: Firefox,
+/// Zen, LibreWolf, Waterfox, Floorp or another fork (`doctor::family`).
+/// `SPRAWLING_BROWSER` names one over all of them.
+///
+/// The engine takes the path out of this answer, so the browser a
+/// person was told about and the browser a run starts are one program.
 pub(crate) fn firefox() -> Presence {
-    look(FIREFOX)
+    look(GECKO)
 }
 
-/// Where chromedriver is on this machine, and whether it starts.
+/// The Chromium driver this machine has - `chromedriver` for Chrome,
+/// Brave, Chromium and Vivaldi, `msedgedriver` for Edge - and whether
+/// it starts. Either one is a way into a Chromium session, so the first
+/// that answers is the answer.
 pub(crate) fn chromedriver() -> Presence {
-    look(CHROMEDRIVER)
+    let driver = look(CHROMEDRIVER);
+    match driver.usable() {
+        true => driver,
+        false => match look(MSEDGEDRIVER) {
+            second if second.usable() => second,
+            _ => driver,
+        },
+    }
 }
 
 /// Where the CPython-WASI component is, by the variable or the
@@ -91,8 +107,7 @@ fn look(name: &str) -> Presence {
     REQUIREMENTS
         .iter()
         .find(|requirement| requirement.name == name)
-        .map_or(
-            Presence::Absent(super::Absence::NotOnSearchPath),
-            |requirement| machine.look(requirement),
-        )
+        .map_or(Presence::Absent(Absence::NotOnSearchPath), |requirement| {
+            machine.look(requirement)
+        })
 }

@@ -101,6 +101,29 @@ impl Presence {
 }
 
 impl Version {
+    /// The version alone, out of whatever the program printed.
+    ///
+    /// A tool's first line is often a banner - `ffmpeg version
+    /// N-125649-g8d3942 Copyright (c) 2000-2026 the FFmpeg
+    /// developers` - and a report that pastes the whole line pushes
+    /// every other column off the screen. The dotted run is what a
+    /// person compares against a requirement; a build that has none
+    /// falls back to its first token carrying a digit, cut short,
+    /// because that token is the build identifier.
+    pub(crate) fn number(&self) -> String {
+        let Version::Said(text) = self else {
+            return self.describe();
+        };
+        text.split_whitespace()
+            .find_map(dotted)
+            .or_else(|| {
+                text.split_whitespace()
+                    .find(|token| token.chars().any(|glyph| glyph.is_ascii_digit()))
+                    .map(|token| token.chars().take(BUILD_ID).collect())
+            })
+            .unwrap_or_else(|| text.clone())
+    }
+
     pub(crate) fn describe(&self) -> String {
         match self {
             Version::Said(text) => text.clone(),
@@ -109,6 +132,23 @@ impl Version {
             Version::Late => "no version within the deadline".to_owned(),
         }
     }
+}
+
+/// How much of a build identifier the report keeps when a tool prints
+/// no dotted version.
+const BUILD_ID: usize = 12;
+
+/// The dotted decimal run inside one token, when it has one: `133.0.3`
+/// out of `133.0.3`, and nothing out of `2000-2026`.
+fn dotted(token: &str) -> Option<String> {
+    let run: String = token
+        .trim_start_matches('v')
+        .chars()
+        .take_while(|glyph| glyph.is_ascii_digit() || *glyph == '.')
+        .collect();
+    let numbered = run.split('.').filter(|part| !part.is_empty()).count();
+    (numbered > 1 && run.starts_with(|glyph: char| glyph.is_ascii_digit()))
+        .then(|| run.trim_end_matches('.').to_owned())
 }
 
 impl Fault {

@@ -18,12 +18,15 @@ use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use std::ffi::OsString;
+
 use super::explain::{Explanation, explain, explanation_lines};
 use super::needs::{lack_line, lacks};
+use super::paint::{Ink, Part, row, summary};
 use super::visit::{Visited, unreadable_line, visit};
 use super::{
-    Finding, Machine, PATIENCE, Platform, ThisMachine, Tier, Verdict, examine, finding_line,
-    verdict, verdict_line,
+    Finding, Machine, PATIENCE, Platform, ThisMachine, Tier, Verdict, examine, verdict,
+    verdict_line,
 };
 
 /// What the command line asked for. The default checks and changes
@@ -34,20 +37,25 @@ pub(crate) struct Asked {
     pub(crate) city: Option<PathBuf>,
     /// A refusal code to connect to this machine, instead of a report.
     pub(crate) explain: Option<String>,
+    /// Whether this report may use colour.
+    pub(crate) ink: Ink,
 }
 
-/// What the command line asked of this verb. Checking is the default;
+/// What the command line asked of this verb, with the one environment
+/// variable a terminal answers about colour. Checking is the default;
 /// touching the machine takes the flag; the one word that is not a flag
 /// and not a flag's value is the city.
-pub(crate) fn asked(args: &[String]) -> Asked {
+pub(crate) fn asked(args: &[String], no_color: Option<OsString>) -> Asked {
     let mut install = false;
     let mut city = None;
     let mut explain = None;
+    let mut ink = Ink::Colour;
     let mut words = args.iter().skip(1);
     while let Some(word) = words.next() {
         match word.as_str() {
             "--install" => install = true,
             "--explain" => explain = words.next().cloned(),
+            "--no-color" => ink = Ink::Plain,
             flag if flag.starts_with("--") => {}
             path => city = Some(PathBuf::from(path)),
         }
@@ -56,6 +64,7 @@ pub(crate) fn asked(args: &[String]) -> Asked {
         install,
         city,
         explain,
+        ink: ink.or_plain(no_color),
     }
 }
 
@@ -64,7 +73,7 @@ pub(crate) fn asked(args: &[String]) -> Asked {
 /// for, so a script driving this learns the outcome from the exit code
 /// rather than by reading the report.
 pub fn verb(args: &[String]) -> ExitCode {
-    let asked = asked(args);
+    let asked = asked(args, std::env::var_os("NO_COLOR"));
     let machine = ThisMachine::new(Platform::current(), PATIENCE);
     let answered = run(
         &asked,
@@ -114,15 +123,21 @@ pub(crate) fn run<R: BufRead, W: Write>(
   this machine ({platform}), against what this city needs:
 "
     )?;
-    for finding in &findings {
-        writeln!(out, "{}", finding_line(finding))?;
+    for part in Part::ALL {
+        writeln!(out, "{}\n", part.heading())?;
+        for finding in findings.iter().filter(|found| Part::of(found) == part) {
+            writeln!(out, "{}", row(finding, asked.ink))?;
+        }
+        writeln!(out)?;
     }
-    writeln!(out)?;
     let mut ready = true;
     for tier in Tier::ALL {
         let verdict = verdict(&findings, tier);
         ready = ready && verdict == Verdict::Ready;
         writeln!(out, "{}", verdict_line(tier, &verdict))?;
+    }
+    for line in summary(&findings, asked.ink) {
+        writeln!(out, "{line}")?;
     }
     if let Some(city) = &asked.city {
         ready = report_city(city, &findings, out)? && ready;

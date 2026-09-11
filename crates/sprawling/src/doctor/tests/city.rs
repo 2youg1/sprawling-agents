@@ -11,6 +11,7 @@ use kernel::Address;
 use super::ScriptedMachine;
 use crate::doctor::explain::{Explanation, explain};
 use crate::doctor::needs::{Bits, Capability, lack_line, lacks};
+use crate::doctor::paint::Ink;
 use crate::doctor::screen::{Asked, asked, run};
 use crate::doctor::visit::{Visited, visit};
 use crate::doctor::{Platform, examine};
@@ -23,7 +24,12 @@ fn lab() -> Address {
 /// engine is named, with both roads it tried and why each is closed.
 #[test]
 fn a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none() {
-    let findings = examine(&ScriptedMachine::missing(&["firefox", "chromedriver"]));
+    let findings = examine(&ScriptedMachine::missing(&[
+        "gecko",
+        "chromedriver",
+        "msedgedriver",
+        "webkit",
+    ]));
     let bits = Bits {
         browser: true,
         desktop: false,
@@ -35,14 +41,18 @@ fn a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none() {
     let line = lack_line(&lacking[0]);
     assert!(line.contains("lab"), "{line}");
     assert!(line.contains("browser: true"), "{line}");
-    assert!(line.contains("firefox"), "{line}");
+    assert!(line.contains("gecko"), "{line}");
     assert!(line.contains("chromedriver"), "{line}");
     assert!(line.contains("not on the search path"), "{line}");
 
-    let one_road = examine(&ScriptedMachine::missing(&["firefox"]));
+    let one_road = examine(&ScriptedMachine::missing(&[
+        "chromedriver",
+        "msedgedriver",
+        "webkit",
+    ]));
     assert!(
         lacks(&lab(), &bits, &one_road).is_empty(),
-        "chromedriver alone is a road, so the building lacks nothing"
+        "a Gecko browser alone is a road, so the building lacks nothing"
     );
     let nothing_asked = Bits {
         browser: false,
@@ -151,7 +161,7 @@ fn explain_connects_a_refusal_code_to_what_this_machine_has() {
     else {
         panic!("E_BROWSER_UNAVAILABLE is about this machine");
     };
-    assert!(browser.iter().any(|line| line.contains("firefox")));
+    assert!(browser.iter().any(|line| line.contains("gecko")));
 
     assert!(matches!(
         explain("E_GATE_DENIED", &findings, Platform::current()),
@@ -172,20 +182,20 @@ fn explain_connects_a_refusal_code_to_what_this_machine_has() {
 fn the_line_is_read_as_flag_city_and_code() {
     let words =
         |raw: &[&str]| -> Vec<String> { raw.iter().map(|word| (*word).to_owned()).collect() };
-    let plain = asked(&words(&["doctor"]));
+    let plain = asked(&words(&["doctor"]), None);
     assert!(!plain.install && plain.city.is_none() && plain.explain.is_none());
-    assert!(asked(&words(&["doctor", "--install"])).install);
+    assert!(asked(&words(&["doctor", "--install"]), None).install);
     assert!(
-        !asked(&words(&["doctor", "--installed"])).install,
+        !asked(&words(&["doctor", "--installed"]), None).install,
         "a flag that only looks like --install is not --install"
     );
-    let with_city = asked(&words(&["doctor", "C:/cities/one", "--install"]));
+    let with_city = asked(&words(&["doctor", "C:/cities/one", "--install"]), None);
     assert_eq!(
         with_city.city.as_deref(),
         Some(std::path::Path::new("C:/cities/one"))
     );
     assert!(with_city.install);
-    let explained = asked(&words(&["doctor", "--explain", "E_TOOL_UNAVAILABLE"]));
+    let explained = asked(&words(&["doctor", "--explain", "E_TOOL_UNAVAILABLE"]), None);
     assert_eq!(explained.explain.as_deref(), Some("E_TOOL_UNAVAILABLE"));
     assert!(
         explained.city.is_none(),
@@ -202,19 +212,20 @@ fn doctor_with_a_city_names_the_building_on_the_screen() {
     city::create_building(dir.path(), &lab(), city::BuildingTemplate::Minimal).unwrap();
     city::write_rules(dir.path(), &lab(), "confidential: false\nbrowser: true\n").unwrap();
 
-    let machine = ScriptedMachine::missing(&["firefox", "chromedriver"]);
+    let machine = ScriptedMachine::missing(&["gecko", "chromedriver", "msedgedriver", "webkit"]);
     let mut nobody = std::io::Cursor::new(Vec::new());
     let mut screen: Vec<u8> = Vec::new();
     let asked = Asked {
         install: false,
         city: Some(dir.path().to_path_buf()),
         explain: None,
+        ink: Ink::Plain,
     };
     let ready = run(&asked, &machine, &mut nobody, &mut screen).unwrap();
     assert!(!ready);
     let shown = String::from_utf8(screen).unwrap();
     assert!(shown.contains("lab: browser: true"), "{shown}");
-    assert!(shown.contains("no firefox"), "{shown}");
+    assert!(shown.contains("no gecko"), "{shown}");
 
     let machine = ScriptedMachine::missing(&[]);
     let mut screen: Vec<u8> = Vec::new();
@@ -233,6 +244,7 @@ fn explain_on_the_screen_is_one_line_per_item_and_never_a_failure() {
         install: false,
         city: None,
         explain: Some("E_TOOL_UNAVAILABLE".to_owned()),
+        ink: Ink::Plain,
     };
     let ready = run(&asked, &machine, &mut nobody, &mut screen).unwrap();
     assert!(ready);

@@ -151,3 +151,21 @@ fn a_present_tool_that_says_nothing_is_still_present() {
     assert!(answered.usable());
     assert!(answered.describe().contains("said nothing"));
 }
+
+/// A program is looked for under the names this platform gives it.
+///
+/// On Windows the extensionless file comes last: a directory holding
+/// both `bun` and `bun.cmd` holds one file this operating system can
+/// start and one it cannot, and taking them in the wrong order reports
+/// an installed tool as a silent one.
+#[test]
+fn a_program_is_looked_for_under_every_name_this_platform_gives_it() {
+    let names = crate::doctor::probe::names_of("bun");
+    assert_eq!(names.last().map(String::as_str), Some("bun"));
+    if cfg!(target_os = "windows") {
+        assert_eq!(names.first().map(String::as_str), Some("bun.exe"));
+        assert!(names.iter().any(|name| name == "bun.cmd"));
+    } else {
+        assert_eq!(names.len(), 1);
+    }
+}

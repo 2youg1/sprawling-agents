@@ -245,6 +245,9 @@ pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<St
     let body = serde_json::json!({ "realm": realm, "name": name, "value": value });
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(20))
+        // The city is on this machine, and a proxy in front of loopback
+        // answers for something else.
+        .no_proxy()
         .build()
         .map_err(|err| {
             AxError::failure(AxCode::Provider, "build an http client", err.to_string())

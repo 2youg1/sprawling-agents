@@ -50,17 +50,38 @@ fn item(found: &Finding, platform: Option<Platform>) -> channels::DoctorItem {
     channels::DoctorItem {
         name: found.requirement.name.to_owned(),
         tier: named(found.requirement.tier),
+        // A family carries `OneOf`, and the page is told `Required`:
+        // the wire says whether an item stands between a person and a
+        // running city, and the tier's `missing` says whether the group
+        // as a whole is satisfied. A third word here would be a word no
+        // reader could act on without also reading the verdict.
         need: match found.requirement.need {
-            Need::Required => channels::DoctorNeed::Required,
+            Need::Required | Need::OneOf(_) => channels::DoctorNeed::Required,
             Need::Optional => channels::DoctorNeed::Optional,
         },
         enables: found.requirement.enables.to_owned(),
+        homepage: homepage(found),
         state: state(&found.presence),
         install: match platform {
             None => channels::DoctorInstall::UnknownPlatform,
             Some(platform) => install(found.requirement.recipe.at(platform)),
         },
     }
+}
+
+/// The site a page links the item's name to: the brand's own when this
+/// machine answered with a member of a browser family, so a person who
+/// runs Zen is not sent to Mozilla, and the row's otherwise.
+fn homepage(found: &Finding) -> Option<String> {
+    if let super::Detection::Family(family) = &found.requirement.detect
+        && let Some(member) = found
+            .presence
+            .at()
+            .and_then(|at| super::family::member_at(*family, at))
+    {
+        return Some(member.homepage.to_owned());
+    }
+    found.requirement.homepage.map(str::to_owned)
 }
 
 fn named(tier: Tier) -> channels::DoctorTier {
@@ -134,16 +155,17 @@ mod tests {
     /// and only one of them is this one.
     #[test]
     fn the_answer_says_what_is_missing_and_what_would_get_it() {
-        let machine = ScriptedMachine::missing(&["firefox"]);
+        let machine =
+            ScriptedMachine::missing(&["gecko", "webkit", "chromedriver", "msedgedriver"]);
         let answer = fold(&examine(&machine), Some(Platform::Windows));
 
-        let firefox = answer
+        let gecko = answer
             .items
             .iter()
-            .find(|item| item.name == "firefox")
-            .expect("the table carries firefox");
+            .find(|item| item.name == "gecko")
+            .expect("the table carries the Gecko family");
         assert_eq!(
-            firefox.state,
+            gecko.state,
             channels::DoctorState::Absent {
                 absence: channels::DoctorAbsence::NotOnSearchPath,
             },
@@ -151,11 +173,11 @@ mod tests {
         );
         assert!(
             matches!(
-                firefox.install,
+                gecko.install,
                 channels::DoctorInstall::Command { .. } | channels::DoctorInstall::Print { .. }
             ),
             "a missing item says what would get it: {:?}",
-            firefox.install
+            gecko.install
         );
 
         let using = answer
@@ -165,7 +187,7 @@ mod tests {
             .expect("every tier answers");
         assert_eq!(
             using.missing,
-            vec!["firefox".to_owned()],
+            vec!["a browser engine".to_owned()],
             "the tier a person needs names what stands between them and it"
         );
         let developing = answer
@@ -184,7 +206,8 @@ mod tests {
     /// spelling a command from another platform.
     #[test]
     fn a_platform_with_no_recipes_offers_none() {
-        let machine = ScriptedMachine::missing(&["firefox"]);
+        let machine =
+            ScriptedMachine::missing(&["gecko", "webkit", "chromedriver", "msedgedriver"]);
         let answer = fold(&examine(&machine), None);
         assert!(
             answer

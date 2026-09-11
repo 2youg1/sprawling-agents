@@ -13,10 +13,18 @@
 import { For, createSignal, type JSX } from "solid-js";
 
 import { sendingInto, type Doing, type Sending } from "../core/belief";
-import type { ApprovalClass, ApprovalItem, DoctorAnswer } from "../wire";
+import { EFFORTS } from "../core/prefs";
+import { offered } from "../core/slash";
+import type { ApprovalClass, ApprovalItem, DoctorAnswer, EndpointsAnswer } from "../wire";
 import { ApprovalId, Locator, TimeMs } from "../wire";
 import { useSay } from "../ui";
-import { MachineReport } from "./machine";
+import { MachineReport, MachineSkeleton, MachineUnchecked } from "./machine";
+import { SkillsNote } from "./setup";
+import { KeysSection } from "./setup/keys";
+import { EffortChoice, ModelTable } from "./setup/models";
+import { AttachForm, EndpointList } from "./setup/providers";
+import { Cheatsheet } from "./parts/kbd";
+import { Popover } from "./parts/popover";
 import { Badge } from "./parts/badge";
 import { Banner } from "./parts/banner";
 import { Button } from "./parts/button";
@@ -47,6 +55,39 @@ const MODELS: readonly ModelRow[] = [
   { id: "anthropic/claude-fable-5.1", context: "204800", ceiling: "64000" },
   { id: "openai/gpt-nucleus-6", context: "400000", ceiling: "" },
 ];
+
+// What one provider's probe answered, as a person meets it: three text
+// models across three vendors, and one the text-only switch hides.
+const PROBED: readonly string[] = [
+  "anthropic/claude-fable-5.1",
+  "openai/gpt-nucleus-6",
+  "openai/sora-2",
+  "meta/muse-spark-1.3-contributor",
+];
+
+// Two attached providers, one with a key filed for it and one without,
+// which is the difference the endpoint list exists to show.
+const ENDPOINTS: EndpointsAnswer = {
+  chosen: [{ endpoint: "zenmux", model: "anthropic/claude-fable-5.1", tag: "main" }],
+  endpoints: [
+    {
+      base_url: "https://api.zenmux.ai/v1",
+      dialect: "open_ai",
+      has_credential: true,
+      local: false,
+      models: ["anthropic/claude-fable-5.1", "openai/gpt-nucleus-6"],
+      name: "zenmux",
+    },
+    {
+      base_url: "http://127.0.0.1:11434/v1",
+      dialect: "open_ai",
+      has_credential: false,
+      local: true,
+      models: ["local/qwen3"],
+      name: "local",
+    },
+  ],
+};
 
 // The four readings of one run, which is what the lens switcher is for.
 const LENSES = ["run_turns", "run_context", "run_changes", "run_evidence"] as const;
@@ -191,8 +232,169 @@ export function Gallery() {
         <WaitingCards items={WAITING} />
       </Case>
 
+      <Screens />
       <Parts />
     </div>
+  );
+}
+
+// Whole screens, in the states §13.1 of the roadmap asks each of them
+// for. Every one mounts the component the page mounts and hands it the
+// props the page hands it; nothing here is a drawing of a screen.
+//
+// Two of them need room the page gives them and a fixture does not. The
+// list that opens over the composer opens *upward*, so the padding above
+// it is the room the foot of a page has; the sheet `?` opens covers the
+// window it is opened over, so the box below carries a transform, which
+// is what makes a fixed box treat that box as its window.
+function Screens() {
+  const say = useSay();
+  return (
+    <>
+      <Case label="composer · an empty room opens in the middle">
+        <div class="flex flex-col items-center gap-base py-section text-center">
+          <p class="text-heading font-heading text-text-disabled">{say("talk_empty_mayor")}</p>
+          <p class="text-note text-text-faint">{say("talk_opening_mayor")}</p>
+          <div class="w-full">
+            <Composer
+              placeholder={say("talk_placeholder_mayor")}
+              sending="dispatch"
+              onSend={() => false}
+              onStop={() => false}
+            />
+          </div>
+        </div>
+      </Case>
+
+      <Case label="composer · docked once the room has a thread">
+        <div class="px-pane pb-pane">
+          <Composer
+            placeholder={say("talk_placeholder_mayor")}
+            sending="dispatch"
+            hearing
+            onSend={() => false}
+            onStop={() => false}
+          />
+        </div>
+      </Case>
+
+      <Case label="menu · a line that begins with a slash">
+        <div class="pt-palette">
+          <div class="pt-output">
+            <div class="relative">
+              <Popover
+                label={say("talk_commands")}
+                columns={[
+                  {
+                    id: "commands",
+                    label: say("talk_commands"),
+                    items: offered("/").map((each) => ({
+                      id: each.spelling,
+                      label: each.spelling,
+                      hint: each.grammar === "" ? say(each.about) : `${each.grammar} · ${say(each.about)}`,
+                    })),
+                  },
+                ]}
+                onApply={() => undefined}
+                onClose={() => undefined}
+                bind={() => undefined}
+              />
+            </div>
+          </div>
+        </div>
+      </Case>
+
+      <Case label="selector · model, workspace and effort in one list">
+        <div class="pt-palette">
+          <div class="pt-output">
+            <div class="relative">
+              <Popover
+                label={say("talk_choose")}
+                columns={[
+                  {
+                    id: "model",
+                    label: say("talk_column_model"),
+                    items: MODELS.map((each) => ({
+                      id: each.id,
+                      label: each.id,
+                      hint: "zenmux",
+                      chosen: each.id === MODELS[1]?.id,
+                    })),
+                  },
+                  {
+                    id: "workspace",
+                    label: say("talk_column_workspace"),
+                    items: [
+                      { id: "hall/mayor", label: "hall/mayor", chosen: true },
+                      { id: "lab/east", label: "lab/east" },
+                    ],
+                  },
+                  {
+                    id: "effort",
+                    label: say("talk_column_effort"),
+                    items: EFFORTS.map((effort) => ({
+                      id: effort,
+                      label: say(`effort_${effort}`),
+                      chosen: effort === "medium",
+                    })),
+                  },
+                ]}
+                onApply={() => undefined}
+                onClose={() => undefined}
+                bind={() => undefined}
+              />
+            </div>
+          </div>
+        </div>
+      </Case>
+
+      <Case label="banner · the city is halted">
+        <Banner
+          text={say("halt_title")}
+          detail={say("halt_frozen", { n: "3" })}
+          weight="alert"
+          action={<Button label={say("city_release")} tone="secondary" />}
+        />
+      </Case>
+
+      <Case label="keys · the sheet every chord is read on">
+        <div class="relative h-screen transform-gpu overflow-hidden">
+          <Cheatsheet onClose={() => undefined} />
+        </div>
+      </Case>
+
+      <Case label="keys · one row per action, rebound where it stands">
+        <KeysSection />
+      </Case>
+
+      <Case label="machine · being checked">
+        <MachineSkeleton />
+      </Case>
+
+      <Case label="machine · not checked yet">
+        <MachineUnchecked onRecheck={() => undefined} />
+      </Case>
+
+      <Case label="provider · what is attached, keyed and unkeyed">
+        <EndpointList answer={ENDPOINTS} />
+      </Case>
+
+      <Case label="provider · the form a key is filed through">
+        <AttachForm />
+      </Case>
+
+      <Case label="models · the rows a probe answered">
+        <ModelTable served={PROBED} onChosen={() => undefined} />
+      </Case>
+
+      <Case label="settings · how hard the city thinks by default">
+        <EffortChoice />
+      </Case>
+
+      <Case label="settings · where this city keeps its skills">
+        <SkillsNote />
+      </Case>
+    </>
   );
 }
 

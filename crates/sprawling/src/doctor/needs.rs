@@ -12,7 +12,8 @@
 
 use kernel::Address;
 
-use super::table::{CHROMEDRIVER, FIREFOX, SHELL, SPRAWLING_DESKTOP};
+use super::family::{GECKO, WEBKIT};
+use super::table::{CHROMEDRIVER, MSEDGEDRIVER, SHELL, SPRAWLING_DESKTOP};
 use super::{Finding, Presence};
 
 /// The bits a building declares. Two live in `BUILDING.md`, one in the
@@ -38,10 +39,12 @@ impl Capability {
         [Capability::Browser, Capability::Desktop, Capability::Shell];
 
     /// The items of which any one satisfies this capability, first
-    /// choice first. Firefox leads because it needs no driver.
+    /// choice first. The Gecko family leads because it needs no driver;
+    /// a Chromium browser is reached only through the driver beside it,
+    /// so the driver rather than the browser is what is tried here.
     pub(crate) fn any_of(self) -> &'static [&'static str] {
         match self {
-            Capability::Browser => &[FIREFOX, CHROMEDRIVER],
+            Capability::Browser => &[GECKO, CHROMEDRIVER, MSEDGEDRIVER, WEBKIT],
             Capability::Desktop => &[SPRAWLING_DESKTOP],
             Capability::Shell => &[SHELL],
         }

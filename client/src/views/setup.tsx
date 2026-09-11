@@ -31,6 +31,7 @@ import { useCommand, useSay, useUi } from "../ui";
 import { Machine } from "./machine";
 import { Button } from "./parts/button";
 import { KeysSection } from "./setup/keys";
+import { AppearanceSection } from "./setup/appearance";
 import { EffortChoice, ModelChoice } from "./setup/models";
 import { AttachForm, EndpointList, LoginForm } from "./setup/providers";
 
@@ -290,6 +291,7 @@ export function Setup() {
                 <SkillsNote />
               </Match>
               <Match when={group() === "appearance"}>
+                <AppearanceSection />
                 <div class="flex flex-col gap-tight text-note text-text-quiet">
                   {say("setup_language")}
                   <div class="flex gap-tight">

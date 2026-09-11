@@ -104,7 +104,23 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 **How to regenerate this table.** `cargo metadata --format-version 1 --locked`, take the packages named as a dependency by a workspace member, and read each one's `license` field. A version here that disagrees with `Cargo.lock` is this table being stale, and the lockfile wins.
 
-## 4 A future bolt-on crate
+## 4 The faces the client ships
+
+The client draws itself in **Geist Sans** and **Geist Mono** ([vercel/geist-font](https://github.com/vercel/geist-font)), one variable-weight `woff2` each, under **SIL Open Font License 1.1**. They are the only binary assets in this repository that are somebody else's work.
+
+| File | Family | Licence |
+|---|---|---|
+| `client/src/fonts/Geist-Variable.woff2` | Geist | OFL-1.1 |
+| `client/src/fonts/GeistMono-Variable.woff2` | Geist Mono | OFL-1.1 |
+| `client/src/fonts/OFL.txt` | the licence text, copied verbatim from upstream `LICENSE.TXT` | OFL-1.1 |
+
+**The licence travels with the font, not with this document.** OFL-1.1 §2 requires the copyright notice and the licence text to accompany every copy of the font, including one embedded in a program, so `OFL.txt` sits in the same directory as the two `woff2` files and `client/vite.config.ts` emits it into the bundle as `fonts/OFL.txt`. The binary embeds the bundle, so the obligation is discharged wherever the binary goes. A build whose `client/src/fonts/` is missing any of the three names says so once per file and produces a bundle that draws in the fallback stack.
+
+**Three things OFL-1.1 asks that this repository must keep honouring**: the font files are not sold on their own, they are not renamed while still carrying a reserved name, and a modified copy would have to drop the name *Geist*. This code does none of the three — the files travel unmodified, under their own names.
+
+The font is not fetched from a font host at run time. The reason is in `client/src/theme.css` beside the declaration: a request to an outside host would tell that host a city was opened, and would draw nothing on a machine with no route out.
+
+## 5 A future bolt-on crate
 
 The provider intelligence table is planned to move out into a crate of its own under its own licence (MIT or Apache-2.0), outside this repository's MPL notice, because it is not part of this work.
 
@@ -117,7 +133,7 @@ The acknowledgement in `README.md` does not discharge either. **An acknowledgeme
 
 The same measure governs something not yet started: **upstream synchronisation**. When an upstream publishes a new version - usually because a new model appeared - realigning the bolt-on crate should be **one run opening one pull request**, rather than a person periodically reading two repositories' diffs. It is work the city can do itself, so no separate mechanism is built for it: a schedule entry and a building that owns the bolt-on are enough.
 
-## 5 What will not be done
+## 6 What will not be done
 
 **Upstream code is not vendored in.** Every `.rs` file here carries the MPL-2.0 notice, and a file pasted from an MIT or Apache-2.0 project cannot wear one. Note that the machine only checks whether a notice is present, not whether it is the right one - **so this rule is held by people, not by a gate.**
 

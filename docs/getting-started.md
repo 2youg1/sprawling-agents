@@ -26,6 +26,10 @@ irm https://raw.githubusercontent.com/2youg1/sprawling/main/install.ps1 | iex
 
 The script fetches the newest release archive for your platform and unpacks it; where the binary finally lives, and what happens to `PATH`, is decided by `sprawling install`, which the script runs at the end and which you can run again later. A platform the release workflow does not build is reported with the list of platforms it does build, rather than guessed at.
 
+While it runs it tells you four things: the release tag, the platform it matched, the download as it arrives — megabytes and percent, on one line that rewrites itself — and the result of checking the archive against the sha256 the release publishes. An archive that does not match is not unpacked and nothing is installed. Last, before it hands over to `sprawling install`, it prints the version the binary itself reports, which is what you can compare against the tag you asked for.
+
+Set `SPRAWLING_VERSION` to a release tag to install that release rather than the newest one.
+
 Neither runtime is needed to run this, but if you already have [bun](https://bun.sh) or node, one command fetches the same binary:
 
 ```sh

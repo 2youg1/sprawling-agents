@@ -1585,12 +1585,12 @@ UNLOADING 见 `close_city`」，让设计里的词与代码的名在文档里相
 ```rust
 // bin::doctor（形状 1 decision：表与判定；驱动只读写它拿到的那两个句柄）
 pub(crate) enum Tier { Use, Develop }                  // 两层：用得起来，改得动
-pub(crate) enum Need { Required, Optional }
+pub(crate) enum Need { Required, OneOf(Group), Optional }   // 一组任一即可，见 §8-57
 pub(crate) enum Platform { Windows, MacOs, Linux }
 pub(crate) struct PerPlatform<T> { windows: T, macos: T, linux: T }
 pub(crate) enum Detection { Program { program, version_arg, places }, Environment { variable } }
 pub(crate) enum Recipe { Command { program, args }, Print(&'static str), Manual(&'static str) }
-pub(crate) struct Requirement { name, tier, need, enables, detect, recipe }
+pub(crate) struct Requirement { name, tier, need, enables, detect, homepage, recipe }
 pub(crate) enum Presence { Present(String), Absent }
 pub(crate) struct Finding { requirement: &'static Requirement, presence: Presence }
 pub(crate) fn examine(machine: &dyn Machine) -> Vec<Finding>;
@@ -1618,7 +1618,7 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 - **逐项征求同意，而不是一次总同意**：`--install` 对每一个缺项先印出**运行中的机器上要跑的那条命令**，再在 stdin 上问 `y/N`，默认是 N。一次总同意会让人对一串他没读过的命令点头，而这些命令改的是他自己的机器。**没被问到的东西恒不安装**。
 - **恒不提权**：这里的每条命令都是用户级的（`winget`／`brew`／`cargo install`／`rustup`），`sudo`／`apt` 那一支落在 `Recipe::Print`，人自己贴。一个默认会请求管理员权限的 doctor，是把「检查」变成了「让我动你的系统」，与 §8-9 的 install 同一条理由：**只碰这个人 profile 里的东西**。
 - **curl 脚本只印不跑（被否决的备选：`curl | sh` 自动安装）**：bun 在没有包管理器的平台上的官方装法是把一段脚本管进 shell。跑它意味着这座城代替人接受了一份它没读过、也无法在此刻校验的远端代码——**被否决**。那一支是 `Recipe::Print`：命令印在屏幕上，人自己决定。
-- **探测是「在不在 PATH 上」加「`--version` 说什么」，且带时限**：一个装坏了的工具会挂在启动上，而 doctor 挂住等于比不装还糟。子进程的读法沿用 `bin::mcp_stdio` 的形状——读在一个线程里，等在一个带 deadline 的 channel 上，超时就杀掉子进程；`patience` 是参数，**不在这里采时钟**。Firefox 另加平台标准安装路径，因为 Windows 与 macOS 上它常常不在 PATH 上。
+- **探测是「在不在 PATH 上」加「`--version` 说什么」，且带时限**：一个装坏了的工具会挂在启动上，而 doctor 挂住等于比不装还糟。子进程的读法沿用 `bin::mcp_stdio` 的形状——读在一个线程里，等在一个带 deadline 的 channel 上，超时就杀掉子进程；`patience` 是参数，**不在这里采时钟**。浏览器另加平台标准安装路径与 Windows 的两个注册表键，因为 Windows 与 macOS 上它常常不在 PATH 上（§8-57）。
 - **四个文件而不是两个，理由是尺寸与形状**：`doctor.rs` 只留判定（表的形状、`finding_line`、`verdict`），表落 `table.rs`，屏幕与那一问落 `screen.rs`，跑子进程的落 `probe.rs`。判定与驱动同住一个文件时 `doctor.rs` 是 399 行——`xtask length` 的 400 之下一行，即下一次编辑必红。**这不是把文件切碎，是把「判断」与「跟人说话」分开**，两者本就不是一件事。
 - **Windows 上先找带扩展名的那个文件**：`bun` 若由 npm 装出来，同一目录下既有无扩展名的 shell 脚本 `bun`（Windows 起不动）又有 `bun.cmd`。先取无扩展名的那个，报出来的是「装了但不说版本」——一个装好的工具被报成半坏的。故 `names_of` 在 Windows 上按 `.exe`／`.cmd`／`.bat`／无扩展名的次序找，这条次序有它自己的测试。
 - **一项是环境变量而不是程序**：exec 工具 python 臂要的 CPython-WASI 组件由 `PYTHON_WASM_ENV` 指路（`bin::assembly::workbench::tools`），故它的探测是「那个变量指的文件在不在」，安装那一栏是 `Manual`——没有包管理器发它。它是 `Optional`，行尾说明它开启的是什么。
@@ -2369,8 +2369,8 @@ pub(crate) enum Detection {
 }
 
 // bin::doctor::host（形状 4 adapter）：二进制里其他模块问运行中的机器的那一扇门
-pub(crate) fn firefox() -> Presence;
-pub(crate) fn chromedriver() -> Presence;
+pub(crate) fn firefox() -> Presence;        // Gecko 族里运行中的机器有的那个牌子（§8-57）
+pub(crate) fn chromedriver() -> Presence;   // chromedriver 或 msedgedriver，先答上来的那个
 pub(crate) fn python_wasm() -> Presence;
 pub(crate) fn shell() -> Presence;
 pub(crate) fn execution_engine() -> Result<Box<dyn runtime::Sandbox>, AxError>;   // 从 workbench::engine 搬来
@@ -2435,9 +2435,9 @@ pub(crate) fn explain(code: &str, findings: &[Finding], platform: Option<Platfor
 pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<String> }
 ```
 
-- **能力位 → 项目，是一张穷尽表**：`Browser → [firefox, chromedriver]`（任一即可，Firefox 在前）；`Desktop → [sprawling-desktop]`；`Shell → [shell]`。`browser`／`desktop` 读自 `BUILDING.md`（`city::load`），`shell` 读自该楼冻结配置的 `sandbox.shell`（`city::load_config`）——三者合称「BUILDING.md 的能力位」，实际住两份文件，这里如实记。一栋楼的一个位缺时，报告行点名**那栋楼**与它试过的每一项及各自的三态答案：`lab: browser: true, and this machine has no firefox (not on the search path) and no chromedriver (not on the search path)`。
+- **能力位 → 项目，是一张穷尽表**：`Browser → [gecko, chromedriver, msedgedriver, webkit]`（任一即可，Gecko 在前，因为它不要驱动；见 §8-57）；`Desktop → [sprawling-desktop]`；`Shell → [shell]`。`browser`／`desktop` 读自 `BUILDING.md`（`city::load`），`shell` 读自该楼冻结配置的 `sandbox.shell`（`city::load_config`）——三者合称「BUILDING.md 的能力位」，实际住两份文件，这里如实记。一栋楼的一个位缺时，报告行点名**那栋楼**与它试过的每一项及各自的三态答案：`lab: browser: true, and this machine has no firefox (not on the search path) and no chromedriver (not on the search path)`。
 - **读不了的楼是一行，不是沉默**：`BUILDING.md` 解析失败或 `CONFIG.toml` 无效，那一栋报 `Visited::Unreadable`，屏幕上是 `lab: its rules will not read: <err>`；楼列表本身读不到（不是城）才是 `Err`。**doctor 永不静默**。
-- **`--explain <code>` 是「错误码 → 主机项目」的一张表**：`E_TOOL_UNAVAILABLE → [sandbox-engine, python-wasi, shell, sprawling-desktop, ffmpeg]`，`E_BROWSER_UNAVAILABLE → [firefox, chromedriver]`。其它已知码答 `NotAboutThisMachine`（它由城里的判定决定，不由运行中的机器决定）；不认识的码答 `NoSuchCode`。每一行是**那一项的三态答案加这平台上的下一步**：`python-wasi  absent: no component at ~/.sprawling/components/python-wasi/python.wasm -> manual: put a CPython wasi build there`——一个人读完那一行就能动手。
+- **`--explain <code>` 是「错误码 → 主机项目」的一张表**：`E_TOOL_UNAVAILABLE → [sandbox-engine, python-wasi, shell, sprawling-desktop, ffmpeg]`，`E_BROWSER_UNAVAILABLE → [gecko, chromium, chromedriver, msedgedriver, webkit]`。其它已知码答 `NotAboutThisMachine`（它由城里的判定决定，不由运行中的机器决定）；不认识的码答 `NoSuchCode`。每一行是**那一项的三态答案加这平台上的下一步**：`python-wasi  absent: no component at ~/.sprawling/components/python-wasi/python.wasm -> manual: put a CPython wasi build there`——一个人读完那一行就能动手。
 - **边界**：doctor 不从源码构建、不 vendor、不静默。它探测一切，只安装有官方可验证来源的东西，并逐项先问。CPython-WASI 今天没有 python.org 发布的二进制，故它仍是 `Manual`，指向组件目录；这里不下载任何东西。`~/.sprawling/components/` 因此暂时只是 doctor 探测、人填入的约定——记在这里，免得下一步以为那里有个下载器。
 - **退出码**：`doctor <city>` 在该城任一楼缺任一位时退 1，与 §8-40 的「必需项有缺退 1」同一口径；`--explain` 退 0（它是解释，不是判定），只有码本身不存在时退 1——一个拼错的码是一次问错，脚本该知道。
 
@@ -2498,7 +2498,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **探测在开门之前跑一次**，`serving::worker::serve` 里，在 `rebuild_views` 之后、`ServeConfig` 之前。**代价量过**：12 项、冷缓存四核约 2 秒，全部花在起进程问版本上。放进查询里会把答一切读的那条线程按住数秒；放进后台线程要多一条「还没答上来」的状态，而页面第一屏正是要那个答案。
 - **客户端**：`client/src/views/machine.tsx` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
 - **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。
-- **验收**：`doctor::report::tests`——缺 firefox 的假机器答出 `Absent { NotOnSearchPath }`、`use` 档 `missing == ["firefox"]` 而 `develop` 档为空；平台不明时每一项的 `install` 都是 `UnknownPlatform`。
+- **验收**：`doctor::report::tests`——没有任何浏览器引擎的假机器答出 `Absent { NotOnSearchPath }`、`use` 档 `missing == ["a browser engine"]` 而 `develop` 档为空；平台不明时每一项的 `install` 都是 `UnknownPlatform`。
 
 ## 8-55 一栋楼的桌面白名单，走配置那条帧（`bin::assembly::genesis::configure_building`；channels-SPEC §8-26、city-SPEC §8-26）
 
@@ -2520,3 +2520,75 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **容器从请求头读**：`AudioType::of_media_type` fail closed，拒词列出这座城发得出去的五种。浏览器录进它手上有的容器，而只有它知道是哪一个。
 - **页面**：`core/speaking.ts` 管录音与上传，composer 多一个按钮，**转写结果落进输入框而不是直接发出去**——机器听错的那一句必须能改，否则它会花掉一次 run。没有 `transcribe` 选择的城不画这个按钮（`useHearing`）。
 - **验收**：`channels` 的 `/transcribe` 路由在没有 content-type 时按名拒绝；`gateway::transcribe::recording` 的 `of_media_type` 认得五种容器、拒第六种并列出前五种。
+
+## 8-57 浏览器是一族引擎，不是一个牌子（`bin::doctor::family`、`family::gecko`／`chromium`／`webkit`、`bin::doctor::registry`）
+
+**原因**：doctor 的 `firefox` 一行只认 PATH 上的 `firefox` 与两条固定路径，于是一台装了 Zen 的机器被判「运行层缺 firefox」，而 `browser_bidi::engine` 起浏览器只用 `--remote-debugging-port`、`-profile`、`--no-remote`、`-headless` 四个参数——**任何 Gecko 内核的浏览器都接受这四个参数**。表按牌子问，引擎按内核跑，两者本来就不是同一个问题；Chromium 一侧更反了一层：列的是 `chromedriver`，而人装的是浏览器。
+
+```rust
+// bin::doctor::family（形状 1 decision）：三族引擎，一族一行
+pub(crate) enum Family { Gecko, Chromium, WebKit }
+pub(crate) enum Confidence { Tried, NeedsConfirmation, Experimental }
+pub(crate) struct Member { name, program, homepage, confidence, places: PerPlatform<&[&str]>, start_menu }
+pub(crate) const BROWSER_VARIABLE: &str = "SPRAWLING_BROWSER";   // 本 crate 唯一拼写
+pub(crate) const GECKO_ROW / CHROMIUM_ROW / WEBKIT_ROW: Requirement;
+pub(crate) fn member_at(family: Family, at: &Path) -> Option<&'static Member>;
+pub(super) fn look(family, platform, patience, search_path) -> Presence;
+
+// bin::doctor（表因此能说出「任一即可」与「点进它自己的站」）
+pub(crate) enum Need { Required, OneOf(Group), Optional }
+pub(crate) enum Group { BrowserEngine }
+pub(crate) enum Detection { …, Family(Family) }
+pub(crate) struct Requirement { …, homepage: Option<&'static str>, … }
+
+// bin::doctor::registry（形状 4 adapter）：Windows 记下的那两把钥匙
+pub(super) fn installed_at(program: &str, start_menu: &str) -> Option<PathBuf>;
+```
+
+- **三族，而不是三个牌子**：Gecko（firefox、zen、librewolf、waterfox、floorp、firefox-developer、firefox-nightly、tor-browser）、Chromium（chrome、edge、brave、chromium、vivaldi）、WebKit（safari，经 `safaridriver`）。每个成员给出三平台的安装路径；一族的答案是**第一个答得上来的成员**。
+- **驱动是另一行，不是这一行**：一个 Chromium 浏览器自己开不出会话，进得去的是它旁边那个主版本号相符的驱动。故 `chromium` 一行是 `Optional`（它回答的是「运行中的机器上有哪个 Chromium」），而 `chromedriver` 与 `msedgedriver` 各自成行并进 `BrowserEngine` 组——这与 `Engine::choose` 吃的两件东西一一对上，**不制造第二份「怎样才算有浏览器」的权威**。被否决的备选：让 `chromium` 一行在找到浏览器却没有驱动时报 `Broken`，那要借用 `Fault::HalfWritten` 的措辞（「删掉重装」），而它对一个装好的浏览器是假话。
+- **`OneOf(Group)` 而不是四行各自 `Required`**：四条进得去的路，三条关着一条开着，对一个人是「有一个浏览器引擎」而不是「缺三样」。`verdict` 因此把一组折成一个名字（`a browser engine`），排在逐项点名的那些之后；`paint::count` 用同一条规则数总结行，于是总结行与判定行**恒不互相矛盾**。
+- **`Need::OneOf` 在线上说 `Required`**：`channels::DoctorNeed` 只有两个词，而页面要的是「它挡不挡路」；「这一组满足没有」由该档次的 `missing` 回答。第三个词会让页面必须同时读两处才能给一行上色，而 `DoctorNeed` 加一个变体会让今天在跑的客户端解不出整份答案。
+- **`SPRAWLING_BROWSER` 只拼一次，且是引擎读的同一处**：变量压过一切探测。路径按文件名主干认族；**认不出的归 Gecko**，因为无驱动的那条起法是任何分支都接受的那一条，而 xtask render 正是这样设它。被否决的备选是「认不出就当没有」：那会对着一个人正看着的文件报「不在 PATH 上」。
+- **Windows 的两把钥匙经 `reg.exe` 读，不引新依赖**：per-user 安装落在带账户名的目录里，表里的字面路径找不到它；`App Paths\<程序>.exe` 与 `StartMenuInternet\<牌子>\shell\open\command` 两个键说得出。只 `reg query`，不写；找不到就换下一个成员。被否决的备选是加一个 registry crate——一个平台、一个问题，换一份人要下载的二进制里的第三方代码。
+- **`enables` 不再说 WebUI 要某个浏览器**：WebUI 任何浏览器都打得开，要 Gecko／Chromium／WebKit 的只有 browser tool。
+- **`Tried` 之外的成员排在最后并带一句说明**：Tor Browser 的启动器与代理会挡在会话前面（`, confirm it by hand once`），Safari 的 BiDi 支持是局部的（`, experimental`）。`member_at` 把找到的路径认回牌子，于是报告说 `zen` 而不只是 `gecko`，`DoctorItem.homepage` 给的也是**那个牌子自己的站**。
+
+**本章测试**：`every_family_is_a_row_and_every_member_says_where_it_is_installed`；`a_found_browser_is_reported_by_the_brand_it_is`（Developer Edition 的程序文件也叫 `firefox`，只有目录分得开）；`a_member_that_needs_confirming_is_never_the_first_answer`；`a_verdict_counts_the_required_items_of_its_own_tier_only` 的三段——只有 Zen、只有 Edge 加驱动、四条路全关。
+
+**本章验收**：只装 Zen 的 Windows 机器上 `cargo run -p sprawling -- doctor` 报 `gecko present … (zen)` 且 `ready to use`。
+
+## 8-58 justfile 真正用到的那几件 Rust 工具（`bin::doctor::table::toolchain`）
+
+**原因**：Develop 档只列 `rustup`、`just`、`cargo-nextest`、`bun`、`git`，而 `just check` 还要 `cargo fmt` 与 `cargo clippy`，`just gates` 要 `cargo deny`，`just mutants`、`just fuzz` 各要一件。一个人按 doctor 装齐了，第一次 `just check` 仍然红。
+
+- **八行**：`rustfmt`、`clippy`（rustup component，探测的是 rustup 放在 PATH 上的 `rustfmt` 与 `cargo-clippy`，装法 `rustup component add`）、`cargo-deny`、`cargo-audit`、`cargo-mutants`、`cargo-fuzz`（还要 nightly）、`cargo-llvm-cov`、`kani`（只在 Linux 有构建，另两个平台如实说明）。
+- **只有 `rustfmt` 与 `clippy` 是 `Required`**：它们在 `just check` 里跑，缺了改动就合不上。其余每一件由一条人主动跑的 recipe 调用，故是 `Optional`，`enables` 指名是哪一条 recipe——`just gates` 在 cargo-deny 缺席时明说「CI 会跑」，doctor 把它报成必需就与 justfile 说了两套话。
+- **`same_command` 一处拼写三平台**：这些工具三平台装法相同，三列各抄一遍只会让其中一列悄悄落后。
+
+## 8-59 CLI 自己的样子：一张表，四个状态词，一句下一步（`bin::doctor::paint`、`bin::doctor::screen`）
+
+**原因**：`doctor` 的输出是左对齐的散文，版本整行贴出（`ffmpeg version N-125649-g8d3942 Copyright (c) 2000-2026 …`），没有分组也没有总结，一个人要逐行读完才找得到红的那一行。
+
+```rust
+// bin::doctor::paint（形状 3 projection：findings → 人读的行，不问机器、不读环境）
+pub(crate) enum Ink { Colour, Plain }
+impl Ink { pub(crate) fn or_plain(self, no_color: Option<OsString>) -> Ink; }
+pub(crate) enum Status { Present, Missing, Broken, Optional }
+pub(crate) enum Part { Required, Recommended }
+pub(crate) fn row(finding: &Finding, ink: Ink) -> String;
+pub(crate) fn count(findings: &[Finding], part: Part) -> Counted;   // 一组算一件
+pub(crate) fn summary(findings: &[Finding], ink: Ink) -> Vec<String>;
+
+// bin::doctor::screen
+pub(crate) struct Asked { install, city, explain, ink }
+pub(crate) fn asked(args: &[String], no_color: Option<OsString>) -> Asked;   // --no-color 与 NO_COLOR
+```
+
+- **定宽两列加一句细节**：名字列 18、状态列 9，状态是四个词之一——有／无／坏／可选。人读的是一列词，而不是一句句子。
+- **版本只取第一段数字**：先找带点的十进制串（`133.0.3`、`2.43.0`），没有的话取第一个含数字的词并截到 12 个字符（ffmpeg 的 `N-125649-g8d`）。整行贴出会把其它列挤出屏幕，而 `Copyright … 2000-2026` 里的年份正是「取第一个数字」这条更笨的规则会取到的东西。
+- **必备／推荐两段**：必备 = Use 档里挡路的项（`Required` 与 `OneOf`），其余全是推荐（Use 档的可选项加整个 Develop 档）。`Part::of` 是这条划分的唯一权威，页面的两栏读的是同一批字段。
+- **颜色是一份终端可以拒绝的提议**：`NO_COLOR`（无论它设成什么）与 `--no-color` 任一即可，且 `paint` 自己不读环境——ink 是 `screen` 决定后传进来的值，于是测试不必动运行中的机器上的变量就能要到两种答案。
+- **总结与下一步**：两段各一行 `n / m ready`（一组算一件），末行是从这里往下的那一条命令——必备齐了是 `sprawling up`，不齐是 `sprawling doctor --install`。
+
+**本章测试**：`one_row_per_item_carries_one_of_four_status_words`、`no_color_is_honoured_from_the_environment_and_from_the_flag`、`a_version_is_the_number_out_of_whatever_the_tool_printed`、`the_report_is_grouped_into_required_and_recommended`、`a_family_of_browsers_counts_once_in_the_summary`。

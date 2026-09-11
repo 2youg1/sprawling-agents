@@ -113,12 +113,14 @@ pub fn oauth_redeem(
 /// The one exchange with a token endpoint: send, read, refuse without
 /// quoting. Both grants use it, so neither can drift.
 fn send_token_request(url: &str, body: String, timeout_ms: u64) -> Result<OauthTokens, AxError> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_millis(timeout_ms))
-        .build()
-        .map_err(|err| {
-            AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
-        })?;
+    let mut builder =
+        reqwest::blocking::Client::builder().timeout(std::time::Duration::from_millis(timeout_ms));
+    if crate::is_local(url) {
+        builder = builder.no_proxy();
+    }
+    let client = builder.build().map_err(|err| {
+        AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
+    })?;
     let response = client
         .post(url)
         .header("content-type", "application/json")

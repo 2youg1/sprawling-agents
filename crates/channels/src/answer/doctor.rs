@@ -58,6 +58,10 @@ pub struct DoctorItem {
     /// What having it lets a person do, in one clause, in the
     /// requirement table's own words.
     pub enables: String,
+    /// The item's own site, so a page can link a name to the people who
+    /// publish it. `None` where there is no one site: a platform's
+    /// shell, and this project's own connector.
+    pub homepage: Option<String>,
     pub state: DoctorState,
     pub install: DoctorInstall,
 }

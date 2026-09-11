@@ -3,23 +3,29 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One building, one click below the city: the directory tree on the
-// left - the rules, the plan, the rooms and what each room wrote - and
-// on the right whatever was picked: the plan as rows, a file as it is
-// on disk, or a room as the runs that worked in it. The building's
-// standing goal and its own brake sit in the head.
+// One building, one click below the city: one information bar, the
+// directory tree, whatever the tree picked, and - where the screen
+// affords a third column - the rooms of this building with whoever is
+// working in them.
+//
+// The tree is a column from 1024 px up and a panel a button opens below
+// that, so a narrow screen keeps one column without losing the way in.
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
 import { halt, pursue, release } from "../core/commands";
 import { roomOf, toFragment } from "../core/route";
-import { clock, kib } from "../core/time";
-import type { Address, BuildingAnswer, PlanRow } from "../wire";
-import { useCommand, useLang, useSay, useUi } from "../ui";
+import type { Address, BuildingAnswer } from "../wire";
+import { Address as AddressSchema } from "../wire";
+import { useCommand, useSay, useUi } from "../ui";
 import { Commits } from "./building/commits";
+import { Directory } from "./building/directory";
+import { FileView } from "./building/file";
+import { Plan } from "./building/plan";
 import { Tree } from "./building/tree";
 import type { Picked } from "./building/tree";
-import { Prose } from "./prose";
+import { Badge } from "./parts/badge";
+import { Button } from "./parts/button";
 
 export interface BuildingProps {
   readonly address: Address;
@@ -32,174 +38,38 @@ type Shown = { readonly kind: "plan" } | { readonly kind: "commits" } | Picked;
 const PLAN: Shown = { kind: "plan" };
 const COMMITS: Shown = { kind: "commits" };
 
-function statusWord(say: ReturnType<typeof useSay>, row: PlanRow): string {
-  if (row.status === "not_started" && row.ready) return say("status_ready");
-  return say(`status_${row.status}`);
-}
-
-function Plan(props: { readonly answer: BuildingAnswer }) {
-  const say = useSay();
-  return (
-    <div>
-      <Show when={props.answer.problems.length > 0}>
-        <ul class="mb-base rounded-card border border-alert/40 px-base py-snug text-note text-text-quiet">
-          <For each={props.answer.problems}>{(problem) => <li>{problem}</li>}</For>
-        </ul>
-      </Show>
-      <Show when={props.answer.plan.length > 0} fallback={<p class="text-text-faint">{say("plan_empty")}</p>}>
-        <table class="w-full border-collapse text-note">
-          <tbody>
-            <For each={props.answer.plan}>
-              {(row) => {
-                const depth = () => row.node.split(".").length - 1;
-                return (
-                  <tr class="border-b border-g1">
-                    <td class="w-figure py-snug pr-snug font-mono text-text-faint" style={{ "padding-left": `${String(depth() * 16)}px` }}>
-                      {row.node}
-                    </td>
-                    <td class={`py-snug pr-snug ${row.status === "done" ? "text-text-faint" : "text-text"}`}>
-                      {row.item}
-                      <Show when={row.needs.length > 0}>
-                        <span class="ml-snug text-text-disabled">← {row.needs.join(", ")}</span>
-                      </Show>
-                    </td>
-                    <td class="py-snug text-right whitespace-nowrap">
-                      <span
-                        class={`rounded-pill px-snug py-tight ${
-                          row.status === "done"
-                            ? "bg-g2 text-text-faint"
-                            : row.status === "blocked"
-                              ? "bg-alert text-g0"
-                              : row.status === "in_progress"
-                                ? "bg-accent text-g0"
-                                : row.ready
-                                  ? "bg-g3 text-text"
-                                  : "text-text-disabled"
-                        }`}
-                      >
-                        {statusWord(say, row)}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              }}
-            </For>
-          </tbody>
-        </table>
-      </Show>
-      <Show when={props.answer.blocked.length > 0}>
-        <ul class="mt-base text-note text-text-quiet">
-          <For each={props.answer.blocked}>
-            {(line) => (
-              <li class="my-tight">
-                <span class="text-alert">{line.source}</span> · {line.line}
-              </li>
-            )}
-          </For>
-        </ul>
-      </Show>
-    </div>
-  );
-}
-
-function Lines(props: { readonly text: string }) {
-  const lines = createMemo(() => props.text.split("\n"));
-  const width = () => `${String(String(lines().length).length + 1)}ch`;
-  return (
-    <ol class="overflow-x-auto font-mono text-note leading-relaxed text-text-quiet">
-      <For each={lines()}>
-        {(line, index) => (
-          <li class="flex whitespace-pre">
-            <span class="shrink-0 select-none pr-base text-right text-text-disabled" style={{ width: width() }}>
-              {index() + 1}
-            </span>
-            <span>{line}</span>
-          </li>
-        )}
-      </For>
-    </ol>
-  );
-}
-
-function FileView(props: { readonly at: Address }) {
+function Rooms(props: { readonly answer: BuildingAnswer; readonly onPick: (picked: Picked) => void }) {
   const ui = useUi();
   const say = useSay();
-  const document = createMemo(() => ui.conn.asking.ask({ document: { at: props.at } }));
-  const doc = createMemo(() => {
-    const answer = document()();
-    if (answer === undefined) return undefined;
-    return "document" in answer ? answer.document : null;
-  });
-  const markdown = () => props.at.endsWith(".md");
-  const [raw, setRaw] = createSignal(false);
-  return (
-    <div class="flex min-h-0 flex-1 flex-col">
-      <div class="flex items-center gap-base pb-snug font-mono text-note text-text-faint">
-        <span class="truncate">{roomOf(props.at)}</span>
-        <Show when={doc()}>{(held) => <span class="text-text-disabled">{kib(held().bytes)}</span>}</Show>
-        <span class="flex-1" />
-        <Show when={markdown() && doc()?.binary === false}>
-          <button
-            type="button"
-            class={`rounded-pill px-snug text-note ${raw() ? "bg-g2 text-text" : "text-text-disabled hover:text-text-quiet"}`}
-            onClick={() => setRaw((held) => !held)}
-          >
-            .md
-          </button>
-        </Show>
-      </div>
-      <Show when={doc()} fallback={<p class="text-text-disabled">{doc() === null ? say("file_missing") : "…"}</p>}>
-        {(held) => (
-          <div class="min-h-0 flex-1 overflow-auto rounded-panel bg-g1/60 p-pane">
-            <Show when={held().binary}>
-              <p class="text-text-faint">{say("file_binary", { kib: kib(held().bytes) })}</p>
-            </Show>
-            <Show when={held().truncated}>
-              <p class="mb-base text-note text-alert">
-                {say("file_truncated", { kib: kib(held().text.length), total: kib(held().bytes) })}
-              </p>
-            </Show>
-            <Show when={!held().binary}>
-              <Show when={markdown() && !raw()} fallback={<Lines text={held().text} />}>
-                <Prose text={held().text} />
-              </Show>
-            </Show>
-          </div>
-        )}
-      </Show>
-    </div>
-  );
-}
-
-function RoomView(props: { readonly at: Address }) {
-  const ui = useUi();
-  const say = useSay();
-  const lang = useLang();
-  const runs = createMemo(() =>
-    Object.values(ui.conn.belief.runs)
-      .filter((run) => run.addr === props.at)
-      .sort((a, b) => (b.started ?? 0) - (a.started ?? 0)),
-  );
+  const livingIn = (room: Address) =>
+    Object.values(ui.conn.belief.runs).filter(
+      (run) => run.doing.kind !== "frozen" && run.addr !== null && (run.addr === room || run.addr.startsWith(`${room}/`)),
+    ).length;
   return (
     <div>
-      <div class="mb-base flex items-center justify-between">
-        <h2 class="text-heading font-heading">{roomOf(props.at)}</h2>
-        <a href={toFragment({ kind: "talk", address: props.at })} class="rounded-control bg-g2 px-base py-tight text-label hover:bg-g3">
-          {say("bld_open_talk")}
-        </a>
-      </div>
-      <Show when={runs().length > 0} fallback={<p class="text-text-faint">{say("tree_no_runs")}</p>}>
-        <ul>
-          <For each={runs()}>
-            {(run) => (
-              <li class="border-b border-g1 py-snug text-note">
-                <a href={toFragment({ kind: "run", run: run.run })} class="flex items-center gap-base hover:text-text">
-                  <span class={`inline-block size-dot rounded-pill ${run.doing.kind === "frozen" ? "bg-g4" : "bg-accent"}`} />
-                  <span class="flex-1 truncate text-text-quiet">{run.task ?? run.run}</span>
-                  <Show when={run.started}>{(at) => <span class="text-text-disabled">{clock(lang(), at())}</span>}</Show>
-                </a>
-              </li>
-            )}
+      <h2 class="mb-base text-label font-label text-text-quiet">{say("bld_rooms")}</h2>
+      <Show when={props.answer.rooms.length > 0} fallback={<p class="text-note text-text-faint">{say("bld_no_rooms")}</p>}>
+        <ul class="text-note">
+          <For each={props.answer.rooms}>
+            {(name) => {
+              const at = () => AddressSchema.make(`${props.answer.addr}/${name}`);
+              return (
+                <li>
+                  <button
+                    type="button"
+                    class="flex h-step w-full items-center gap-snug rounded-control px-snug text-left leading-none text-text-quiet hover:bg-g1"
+                    onClick={() => {
+                      props.onPick({ at: at(), kind: "directory" });
+                    }}
+                  >
+                    <span class="min-w-0 flex-1 truncate">{roomOf(at())}</span>
+                    <Show when={livingIn(at())}>
+                      {(n) => <Badge text={say("city_active", { n: String(n()) })} weight="live" dot />}
+                    </Show>
+                  </button>
+                </li>
+              );
+            }}
           </For>
         </ul>
       </Show>
@@ -212,9 +82,14 @@ export function Building(props: BuildingProps) {
   const say = useSay();
   const command = useCommand();
   const [shown, setShown] = createSignal<Shown>(PLAN);
+  const [treeOpen, setTreeOpen] = createSignal(false);
   const picked = (): Picked | null => {
     const held = shown();
     return held.kind === "file" || held.kind === "directory" ? held : null;
+  };
+  const pick = (next: Shown) => {
+    setShown(next);
+    setTreeOpen(false);
   };
   const [goal, setGoal] = createSignal("");
   const answer = createMemo(() => ui.conn.asking.ask({ building_view: { addr: props.address } }));
@@ -239,31 +114,18 @@ export function Building(props: BuildingProps) {
   };
 
   return (
-    <div class="mx-auto flex min-h-0 w-full max-w-page flex-1 flex-col px-pane pt-wide">
-      <div class="flex flex-wrap items-baseline gap-base pb-base">
-        <a href={toFragment({ kind: "city" })} class="text-note text-text-faint">
+    <div class="flex min-h-0 w-full flex-1 flex-col">
+      <header class="flex flex-wrap items-center gap-base border-b border-g2 px-pane py-snug" aria-label={say("bld_bar")}>
+        <a href={toFragment({ kind: "city" })} class="text-note text-text-faint hover:text-text-quiet">
           {say("nav_city")}
         </a>
-        <span class="text-text-disabled">/</span>
+        <span class="text-text-disabled" aria-hidden="true">
+          /
+        </span>
         <h1 class="text-title font-title">{props.address}</h1>
         <Show when={done()}>
-          {(p) => (
-            <span class="font-mono text-note text-text-faint">
-              {say("bld_progress", { done: String(p().done), total: String(p().total) })}
-            </span>
-          )}
+          {(p) => <Badge text={say("bld_progress", { done: String(p().done), total: String(p().total) })} />}
         </Show>
-        <span class="flex-1" />
-        <button
-          type="button"
-          class={`rounded-control px-base py-tight font-mono text-label hover:bg-g1 ${halted() ? "text-accent" : "text-text-quiet hover:text-alert"}`}
-          onClick={() => command(halted() ? release({ building: props.address }) : halt({ building: props.address }))}
-        >
-          {halted() ? say("bld_release", { addr: props.address }) : say("bld_halt", { addr: props.address })}
-        </button>
-      </div>
-
-      <div class="mb-base flex items-center gap-snug border-b border-g1 pb-snug text-note">
         <span class="text-text-disabled" aria-hidden="true">
           ⚑
         </span>
@@ -281,13 +143,7 @@ export function Building(props: BuildingProps) {
                 }}
               />
               <Show when={goal().trim() !== ""}>
-                <button
-                  type="button"
-                  class="rounded-control bg-accent px-base py-tight text-label text-g0 hover:bg-accent-hover"
-                  onClick={setGoalNow}
-                >
-                  {say("bld_pursue")}
-                </button>
+                <Button label={say("bld_pursue")} tone="primary" onPress={setGoalNow} />
               </Show>
             </>
           }
@@ -295,34 +151,38 @@ export function Building(props: BuildingProps) {
           {(line) => (
             <>
               <span class={`inline-block size-dot rounded-pill ${line().state === "running" ? "bg-accent" : "bg-g4"}`} />
-              <span class="flex-1 truncate text-text-quiet">{line().goal}</span>
-              <span class="font-mono text-text-disabled">{line().verdict}</span>
-              <button
-                type="button"
-                class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2"
-                onClick={() => command(pursue(props.address, line().state === "running" ? "pause" : "resume"))}
-              >
-                {line().state === "running" ? say("bld_pause") : say("bld_resume")}
-              </button>
-              <button
-                type="button"
-                class="rounded-control px-snug py-tight text-label text-text-faint hover:bg-g2 hover:text-alert"
-                onClick={() => command(pursue(props.address, "clear"))}
-              >
-                {say("bld_clear")}
-              </button>
+              <span class="min-w-0 flex-1 truncate text-note text-text-quiet">{line().goal}</span>
+              <span class="font-mono text-note text-text-disabled">{line().verdict}</span>
+              <Button
+                label={line().state === "running" ? say("bld_pause") : say("bld_resume")}
+                tone="quiet"
+                onPress={() => command(pursue(props.address, line().state === "running" ? "pause" : "resume"))}
+              />
+              <Button label={say("bld_clear")} tone="quiet" onPress={() => command(pursue(props.address, "clear"))} />
             </>
           )}
         </Show>
-      </div>
+        <Button
+          label={halted() ? say("bld_release", { addr: props.address }) : say("bld_halt", { addr: props.address })}
+          tone={halted() ? "secondary" : "quiet"}
+          onPress={() => command(halted() ? release({ building: props.address }) : halt({ building: props.address }))}
+        />
+        <span class="lg:hidden">
+          <Button label={say("bld_tree")} tone="quiet" onPress={() => setTreeOpen((held) => !held)} />
+        </span>
+      </header>
 
-      <div class="flex min-h-0 flex-1 gap-wide pb-wide">
-        <aside class="w-tree shrink-0 overflow-y-auto pr-snug">
+      <div class="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <aside
+          class={`shrink-0 overflow-y-auto border-g2 px-snug py-base lg:block lg:w-tree lg:border-r ${treeOpen() ? "block border-b" : "hidden"}`}
+        >
           <button
             type="button"
             class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "plan" ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
             aria-current={shown().kind === "plan" ? "true" : undefined}
-            onClick={() => setShown(PLAN)}
+            onClick={() => {
+              pick(PLAN);
+            }}
           >
             <span class="flex w-base shrink-0 justify-center text-text-disabled">≡</span>
             <span class="ml-tight">{say("bld_plan")}</span>
@@ -331,14 +191,16 @@ export function Building(props: BuildingProps) {
             type="button"
             class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "commits" ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
             aria-current={shown().kind === "commits" ? "true" : undefined}
-            onClick={() => setShown(COMMITS)}
+            onClick={() => {
+              pick(COMMITS);
+            }}
           >
             <span class="flex w-base shrink-0 justify-center font-mono text-text-disabled">⎇</span>
             <span class="ml-tight">{say("bld_commits")}</span>
           </button>
-          <Tree root={props.address} picked={picked()} onPick={setShown} />
+          <Tree root={props.address} picked={picked()} onPick={pick} />
         </aside>
-        <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+        <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-pane py-base">
           <Switch>
             <Match when={shown().kind === "plan"}>
               <Show when={building()} fallback={<p class="text-text-disabled">…</p>}>
@@ -349,11 +211,16 @@ export function Building(props: BuildingProps) {
               <Commits building={props.address} />
             </Match>
             <Match when={picked()?.kind === "file" ? picked() : undefined}>
-              {(file) => <FileView at={file().at} />}
+              {(file) => <FileView at={file().at} root={props.address} />}
             </Match>
-            <Match when={picked()?.kind === "directory" ? picked() : undefined}>{(dir) => <RoomView at={dir().at} />}</Match>
+            <Match when={picked()?.kind === "directory" ? picked() : undefined}>
+              {(dir) => <Directory at={dir().at} root={props.address} onPick={pick} />}
+            </Match>
           </Switch>
         </section>
+        <aside class="hidden shrink-0 overflow-y-auto border-l border-g2 px-pane py-base wide:block wide:w-tree" aria-label={say("bld_rooms")}>
+          <Show when={building()}>{(held) => <Rooms answer={held()} onPick={pick} />}</Show>
+        </aside>
       </div>
     </div>
   );

@@ -13,8 +13,9 @@
 
 use kernel::AxCode;
 
+use super::family::{CHROMIUM, GECKO, WEBKIT};
 use super::table::{
-    CHROMEDRIVER, FFMPEG, FIREFOX, PYTHON_WASI, SANDBOX_ENGINE, SHELL, SPRAWLING_DESKTOP,
+    CHROMEDRIVER, FFMPEG, MSEDGEDRIVER, PYTHON_WASI, SANDBOX_ENGINE, SHELL, SPRAWLING_DESKTOP,
 };
 use super::{Finding, Platform};
 
@@ -42,7 +43,7 @@ fn items_behind(code: AxCode) -> Option<&'static [&'static str]> {
             SPRAWLING_DESKTOP,
             FFMPEG,
         ]),
-        AxCode::BrowserUnavailable => Some(&[FIREFOX, CHROMEDRIVER]),
+        AxCode::BrowserUnavailable => Some(&[GECKO, CHROMIUM, CHROMEDRIVER, MSEDGEDRIVER, WEBKIT]),
         _ => None,
     }
 }

@@ -3,12 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+mod browsers;
 mod city;
 mod faults;
+mod reading;
 
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 
+use super::paint::Ink;
 use super::screen::{Asked, run};
 use super::*;
 
@@ -49,7 +52,7 @@ impl Machine for ScriptedMachine {
     }
 }
 
-fn finding_for(name: &str, absent: &[&'static str]) -> Finding {
+pub(super) fn finding_for(name: &str, absent: &[&'static str]) -> Finding {
     let machine = ScriptedMachine::missing(absent);
     examine(&machine)
         .into_iter()
@@ -105,6 +108,19 @@ fn every_row_is_detectable_and_per_platform_installable_or_manual() {
                 }
             }
             Detection::Built { .. } => {}
+            Detection::Family(family) => {
+                assert!(
+                    !family.members().is_empty(),
+                    "{name} is a family with no members"
+                );
+                for member in family.members() {
+                    assert!(
+                        member.homepage.starts_with("https://"),
+                        "{} names no site",
+                        member.name
+                    );
+                }
+            }
         }
         for platform in Platform::ALL {
             let spelled = requirement.recipe.at(platform).spelled();
@@ -125,12 +141,23 @@ fn every_row_is_detectable_and_per_platform_installable_or_manual() {
 fn the_table_names_what_this_repository_actually_asks_for() {
     let named: BTreeSet<&str> = REQUIREMENTS.iter().map(|item| item.name).collect();
     for needed in [
-        "firefox",
+        "gecko",
+        "chromium",
+        "webkit",
         "rustup",
+        "rustfmt",
+        "clippy",
         "just",
         "cargo-nextest",
+        "cargo-deny",
+        "cargo-audit",
+        "cargo-mutants",
+        "cargo-fuzz",
+        "cargo-llvm-cov",
+        "kani",
         "bun",
         "chromedriver",
+        "msedgedriver",
         "git",
         "python-wasi",
         "sandbox-engine",
@@ -147,13 +174,15 @@ fn the_table_names_what_this_repository_actually_asks_for() {
         .collect();
     let use_required: Vec<&str> = REQUIREMENTS
         .iter()
-        .filter(|item| item.tier == Tier::Use && item.need == Need::Required)
+        .filter(|item| {
+            item.tier == Tier::Use && matches!(item.need, Need::Required | Need::OneOf(_))
+        })
         .map(|item| item.name)
         .collect();
     assert_eq!(
         use_required,
-        vec!["firefox"],
-        "the use tier requires what a person needs to run a city, and nothing else"
+        vec!["gecko", "webkit", "chromedriver", "msedgedriver"],
+        "a browser engine is what the use tier asks for, by family rather than by brand"
     );
     assert!(
         use_tier.contains(&"python-wasi") && use_tier.contains(&"shell"),
@@ -209,20 +238,48 @@ fn a_verdict_counts_the_required_items_of_its_own_tier_only() {
     assert_eq!(verdict(&all_here, Tier::Use), Verdict::Ready);
     assert_eq!(verdict(&all_here, Tier::Develop), Verdict::Ready);
 
-    let no_browser = examine(&ScriptedMachine::missing(&["firefox"]));
+    let no_engine = examine(&ScriptedMachine::missing(&[
+        "gecko",
+        "webkit",
+        "chromedriver",
+        "msedgedriver",
+    ]));
     assert_eq!(
-        verdict(&no_browser, Tier::Use),
-        Verdict::Missing(vec!["firefox"])
+        verdict(&no_engine, Tier::Use),
+        Verdict::Missing(vec!["a browser engine"]),
+        "four ways in that are all closed is one thing missing, not four"
     );
     assert_eq!(
-        verdict(&no_browser, Tier::Develop),
+        verdict(&no_engine, Tier::Develop),
         Verdict::Ready,
         "a browser is not what stands between a person and this code"
     );
 
-    let no_driver = examine(&ScriptedMachine::missing(&["chromedriver"]));
+    let only_zen = examine(&ScriptedMachine::missing(&[
+        "webkit",
+        "chromedriver",
+        "msedgedriver",
+    ]));
     assert_eq!(
-        verdict(&no_driver, Tier::Develop),
+        verdict(&only_zen, Tier::Use),
+        Verdict::Ready,
+        "one Gecko browser is a browser engine; no brand is asked for by name"
+    );
+
+    let only_edge = examine(&ScriptedMachine::missing(&[
+        "gecko",
+        "webkit",
+        "chromedriver",
+    ]));
+    assert_eq!(
+        verdict(&only_edge, Tier::Use),
+        Verdict::Ready,
+        "Edge with its own driver is a way in, and Windows ships both"
+    );
+
+    let no_coverage = examine(&ScriptedMachine::missing(&["cargo-llvm-cov"]));
+    assert_eq!(
+        verdict(&no_coverage, Tier::Develop),
         Verdict::Ready,
         "an optional item is reported, not counted"
     );
@@ -230,26 +287,6 @@ fn a_verdict_counts_the_required_items_of_its_own_tier_only() {
         verdict_line(Tier::Develop, &Verdict::Missing(vec!["just"])),
         "  not ready to develop: missing just"
     );
-}
-
-/// Three shapes of line, so absent and optional-absent are never read as
-/// the same fact.
-#[test]
-fn one_line_per_item_says_present_absent_or_optional_absent() {
-    let present = finding_for("git", &[]);
-    assert!(finding_line(&present).contains("present /bin/git (9.9.9)"));
-
-    let absent = finding_for("git", &["git"]);
-    assert!(
-        finding_line(&absent)
-            .trim()
-            .ends_with("absent: not on the search path")
-    );
-
-    let optional = finding_for("chromedriver", &["chromedriver"]);
-    let line = finding_line(&optional);
-    assert!(line.contains("optional-absent"), "{line}");
-    assert!(line.contains("it enables"), "{line}");
 }
 
 /// Consent is asked item by item, and a no installs nothing.
@@ -269,6 +306,7 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
             install: true,
             city: None,
             explain: None,
+            ink: Ink::Plain,
         },
         &machine,
         &mut refused,
@@ -301,6 +339,7 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
             install: true,
             city: None,
             explain: None,
+            ink: Ink::Plain,
         },
         &machine,
         &mut agreed,
@@ -317,7 +356,8 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
 /// Checking is what the default does, and it changes nothing.
 #[test]
 fn the_default_checks_and_installs_nothing() {
-    let machine = ScriptedMachine::missing(&["just", "firefox"]);
+    let machine =
+        ScriptedMachine::missing(&["just", "gecko", "webkit", "chromedriver", "msedgedriver"]);
     let mut nobody = std::io::Cursor::new(Vec::new());
     let mut screen: Vec<u8> = Vec::new();
     run(
@@ -325,6 +365,7 @@ fn the_default_checks_and_installs_nothing() {
             install: false,
             city: None,
             explain: None,
+            ink: Ink::Plain,
         },
         &machine,
         &mut nobody,
@@ -334,29 +375,11 @@ fn the_default_checks_and_installs_nothing() {
     assert!(machine.asked.borrow().is_empty());
     let shown = String::from_utf8(screen).unwrap();
     assert!(
-        shown.contains("not ready to use: missing firefox"),
+        shown.contains("not ready to use: missing a browser engine"),
         "{shown}"
     );
     assert!(
         !shown.contains("[y/N]"),
         "the default asks nothing: {shown}"
     );
-}
-
-/// A program is looked for under the names this platform gives it.
-///
-/// On Windows the extensionless file comes last: a directory holding
-/// both `bun` and `bun.cmd` holds one file this operating system can
-/// start and one it cannot, and taking them in the wrong order reports
-/// an installed tool as a silent one.
-#[test]
-fn a_program_is_looked_for_under_every_name_this_platform_gives_it() {
-    let names = super::probe::names_of("bun");
-    assert_eq!(names.last().map(String::as_str), Some("bun"));
-    if cfg!(target_os = "windows") {
-        assert_eq!(names.first().map(String::as_str), Some("bun.exe"));
-        assert!(names.iter().any(|name| name == "bun.cmd"));
-    } else {
-        assert_eq!(names.len(), 1);
-    }
 }

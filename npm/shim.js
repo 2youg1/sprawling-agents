@@ -45,11 +45,27 @@ function die(message) {
   process.exit(1);
 }
 
+// A package named at the version this run resolves it to, as npm spells
+// that pair. npm pins every optional dependency to the root package's
+// own version, so the root manifest is the one authority for which
+// release is being looked for; in the published package it sits one
+// directory above `bin/sprawling.js`. Where it cannot be read the name
+// is given alone, so a failure still reports everything it knows.
+function spec(name) {
+  try {
+    const manifest = require("../package.json");
+    return typeof manifest.version === "string" ? `${name}@${manifest.version}` : name;
+  } catch {
+    return name;
+  }
+}
+
 const key = `${process.platform} ${process.arch}`;
 const row = PLATFORMS[key];
 if (row === undefined) {
   die(
-    `no binary is published for ${key}. What is published: ` +
+    `no binary is published for ${key}, so ${spec("sprawling")} has ` +
+      `nothing to run here. What is published: ` +
       `${Object.keys(PLATFORMS).join(", ")}. ` +
       `Build from source, or see ${RELEASES}.`,
   );
@@ -64,8 +80,9 @@ try {
   // platform, and both are fixed the same way, so the message says the
   // fix rather than guessing which one happened.
   die(
-    `${row.package} is not installed, so there is no binary for ${key}. ` +
-      `Reinstall without omitting optional dependencies, or see ${RELEASES}.`,
+    `${spec(row.package)} is not installed, so there is no binary for ` +
+      `${key}. Reinstall without omitting optional dependencies, ` +
+      `or see ${RELEASES}.`,
   );
 }
 

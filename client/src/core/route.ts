@@ -15,9 +15,9 @@ import { RunId } from "./run_id";
 
 // Which lens the record is read through: the whole history, then what was
 // kept, then what was thrown away.
-export type Lens = "ledger" | "archive" | "bin";
+export type Lens = "ledger" | "archive" | "bin" | "log";
 
-export const LENSES: readonly Lens[] = ["ledger", "archive", "bin"];
+export const LENSES: readonly Lens[] = ["ledger", "archive", "bin", "log"];
 
 // The room a person talks to when they have named none: the Mayor.
 export const MAYOR: Address = Address("hall/mayor");
@@ -77,6 +77,8 @@ function recordFragment(lens: Lens): string {
       return "#/record/archive";
     case "bin":
       return "#/record/bin";
+    case "log":
+      return "#/record/log";
   }
 }
 
@@ -135,12 +137,10 @@ export function fromFragment(raw: string): Option.Option<View> {
         kind: "building",
         address,
       }));
-    case "record":
-      return tail === "archive"
-        ? Option.some({ kind: "record", lens: "archive" })
-        : tail === "bin"
-          ? Option.some({ kind: "record", lens: "bin" })
-          : Option.none();
+    case "record": {
+      const lens = LENSES.find((named) => named === tail && named !== "ledger");
+      return lens === undefined ? Option.none() : Option.some({ kind: "record", lens });
+    }
     case "run":
     case "live":
       return Option.map(RunId.option(tail), (run) => ({ kind: "run", run }));

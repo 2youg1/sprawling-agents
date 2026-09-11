@@ -1,4 +1,88 @@
 {
+  "appearance_body": {
+    "en": "body size",
+    "zh": "正文字号"
+  },
+  "appearance_chroma": {
+    "en": "colour",
+    "zh": "色彩"
+  },
+  "appearance_chroma_full": {
+    "en": "as drawn",
+    "zh": "照设计"
+  },
+  "appearance_chroma_none": {
+    "en": "grey only",
+    "zh": "只留灰阶"
+  },
+  "appearance_face": {
+    "en": "the reading face",
+    "zh": "正文字体"
+  },
+  "appearance_face_custom": {
+    "en": "a stack I write",
+    "zh": "自己写字体栈"
+  },
+  "appearance_face_geist": {
+    "en": "Geist",
+    "zh": "Geist"
+  },
+  "appearance_face_system": {
+    "en": "the system face",
+    "zh": "系统自带的字体"
+  },
+  "appearance_local": {
+    "en": "list the installed faces",
+    "zh": "列出已安装的字体"
+  },
+  "appearance_local_denied": {
+    "en": "the browser did not hand over the list; write the stack instead",
+    "zh": "浏览器没有交出字体列表，请改为手写字体栈"
+  },
+  "appearance_local_none": {
+    "en": "this browser does not offer its installed faces; write the stack instead",
+    "zh": "这个浏览器不提供已装字体列表，请改为手写字体栈"
+  },
+  "appearance_mono": {
+    "en": "the mono face",
+    "zh": "等宽字体"
+  },
+  "appearance_motion": {
+    "en": "motion",
+    "zh": "动效"
+  },
+  "appearance_motion_full": {
+    "en": "keep it",
+    "zh": "保留"
+  },
+  "appearance_motion_off": {
+    "en": "reduce it",
+    "zh": "减少"
+  },
+  "appearance_motion_system": {
+    "en": "follow this machine",
+    "zh": "跟随系统设置"
+  },
+  "appearance_preview": {
+    "en": "preview",
+    "zh": "预览"
+  },
+  "appearance_sample": {
+    "en": "The city keeps 1 ledger, and reads both 中文 and English from it.",
+    "zh": "这座城只有 1 本 ledger，中文与 English 都从那里读出来。"
+  },
+  "appearance_stack": {
+    "en": "font-family stack",
+    "zh": "font-family 字体栈"
+  },
+  "appearance_stack_help": {
+    "en": "family names separated by commas; the first one that is installed is used",
+    "zh": "用逗号分隔的字体名，取其中第一个装了的"
+  },
+  "appearance_stack_refused": {
+    "en": "only letters, digits, spaces, commas and quotes belong in a stack",
+    "zh": "字体栈里只能有字母、数字、空格、逗号和引号"
+  },
   "autonomy_clerk": {
     "en": "the clerk",
     "zh": "clerk 代答"
@@ -35,6 +119,10 @@
     "en": "in git at",
     "zh": "在 git 里，位于"
   },
+  "bld_bar": {
+    "en": "what this building is doing",
+    "zh": "这栋楼的状态栏"
+  },
   "bld_clear": {
     "en": "clear",
     "zh": "清掉"
@@ -50,6 +138,10 @@
   "bld_halt": {
     "en": "/stop {addr}",
     "zh": "/stop {addr}"
+  },
+  "bld_no_rooms": {
+    "en": "no rooms yet",
+    "zh": "还没有房间"
   },
   "bld_open_talk": {
     "en": "talk",
@@ -78,6 +170,10 @@
   "bld_resume": {
     "en": "resume",
     "zh": "继续"
+  },
+  "bld_rooms": {
+    "en": "rooms",
+    "zh": "房间"
   },
   "bld_tree": {
     "en": "files",
@@ -111,9 +207,25 @@
     "en": "at work",
     "zh": "在干活"
   },
+  "city_bar": {
+    "en": "how the city stands",
+    "zh": "这座城的状态栏"
+  },
+  "city_buildings": {
+    "en": "buildings",
+    "zh": "楼"
+  },
+  "city_done_percent": {
+    "en": "{percent}% done",
+    "zh": "完成 {percent}%"
+  },
   "city_drawing": {
     "en": "the city, one block per building",
     "zh": "城市，一栋楼一块"
+  },
+  "city_enter": {
+    "en": "open the building",
+    "zh": "进这栋楼"
   },
   "city_hall": {
     "en": "City Hall",
@@ -123,13 +235,29 @@
     "en": "no buildings",
     "zh": "没有楼"
   },
+  "city_panel": {
+    "en": "the building that is picked",
+    "zh": "选中的那栋楼"
+  },
   "city_quiet": {
     "en": "quiet",
     "zh": "安静"
   },
+  "city_ready": {
+    "en": "{n} ready to start",
+    "zh": "{n} 件可以开工"
+  },
   "city_release": {
     "en": "/release --all",
     "zh": "/release --all"
+  },
+  "city_runs": {
+    "en": "runs that worked here",
+    "zh": "在这里干过活的 run"
+  },
+  "city_spent": {
+    "en": "spent {usd}",
+    "zh": "已花 {usd}"
   },
   "city_stop": {
     "en": "/stop --all",
@@ -142,6 +270,18 @@
   "city_stopped_line": {
     "en": "stopped",
     "zh": "已停"
+  },
+  "city_stuck": {
+    "en": "{n} stuck",
+    "zh": "{n} 件卡住了"
+  },
+  "city_tower_line": {
+    "en": "{active} of {runs} at work · {percent}% done",
+    "zh": "{runs} 次 run，{active} 在跑 · 完成 {percent}%"
+  },
+  "city_tower_runs": {
+    "en": "{active} of {runs} at work",
+    "zh": "{runs} 次 run，{active} 在跑"
   },
   "commits_empty": {
     "en": "no commits",
@@ -214,6 +354,30 @@
   "dialect_open_ai": {
     "en": "OpenAI-shaped",
     "zh": "OpenAI 形"
+  },
+  "dir_empty": {
+    "en": "this directory is empty",
+    "zh": "这是个空目录"
+  },
+  "dir_governance": {
+    "en": "governance",
+    "zh": "治理目录"
+  },
+  "dir_governance_what": {
+    "en": "the rules and the configuration this building runs under",
+    "zh": "这栋楼依照的规则与配置"
+  },
+  "dir_ordinary": {
+    "en": "directory",
+    "zh": "普通目录"
+  },
+  "dir_room": {
+    "en": "room",
+    "zh": "房间"
+  },
+  "dir_room_empty": {
+    "en": "no run has worked in this room yet",
+    "zh": "还没有 run 在这个房间里干过活"
   },
   "dismiss": {
     "en": "dismiss",
@@ -319,6 +483,26 @@
     "en": "change these in settings",
     "zh": "在设置里可以修改"
   },
+  "legend_figure": {
+    "en": "a figure at the door is a run still moving",
+    "zh": "门口的人影是还在动的 run"
+  },
+  "legend_flag": {
+    "en": "a flag on the roof is a standing goal",
+    "zh": "屋顶的旗子是一条长期目标"
+  },
+  "legend_lamp": {
+    "en": "a lamp by the door is something stuck",
+    "zh": "门边的灯是有东西卡住了"
+  },
+  "legend_plinth": {
+    "en": "the plinth is how much of the plan is done",
+    "zh": "基座是计划完成了多少"
+  },
+  "legend_window": {
+    "en": "a lit window is a run",
+    "zh": "亮着的窗是一次 run"
+  },
   "link_connecting": {
     "en": "connecting…",
     "zh": "连接中…"
@@ -334,6 +518,42 @@
   "link_retry": {
     "en": "try again",
     "zh": "再试一次"
+  },
+  "log_absent": {
+    "en": "the log does not reach this page yet",
+    "zh": "日志还到不了这个页面"
+  },
+  "log_absent_why": {
+    "en": "the process log is written to standard error, and no frame carries a log line to a browser",
+    "zh": "进程日志写在标准错误里，没有哪种帧会把日志行送到浏览器"
+  },
+  "log_decide": {
+    "en": "decide",
+    "zh": "判定"
+  },
+  "log_effect": {
+    "en": "effect",
+    "zh": "效应"
+  },
+  "log_empty": {
+    "en": "no log line has arrived",
+    "zh": "一条日志也没有到"
+  },
+  "log_levels": {
+    "en": "levels",
+    "zh": "级别"
+  },
+  "log_refuse": {
+    "en": "refuse",
+    "zh": "拒绝"
+  },
+  "log_trace": {
+    "en": "trace",
+    "zh": "追踪"
+  },
+  "log_wire": {
+    "en": "wire",
+    "zh": "帧"
   },
   "machine_absent": {
     "en": "no",
@@ -405,7 +625,7 @@
   },
   "machine_unasked": {
     "en": "not checked yet",
-    "zh": "还没有检查这台机器"
+    "zh": "城还没有检查过机器"
   },
   "machine_verdicts": {
     "en": "what is missing",
@@ -415,29 +635,133 @@
     "en": "add",
     "zh": "加上"
   },
+  "mcp_add_all": {
+    "en": "add all",
+    "zh": "全部加上"
+  },
   "mcp_api_key": {
     "en": "api key",
     "zh": "密钥"
+  },
+  "mcp_auth": {
+    "en": "sign-in",
+    "zh": "登录方式"
+  },
+  "mcp_auth_oauth": {
+    "en": "oauth",
+    "zh": "oauth"
   },
   "mcp_building": {
     "en": "building",
     "zh": "楼"
   },
+  "mcp_by_id": {
+    "en": "add by server id",
+    "zh": "用 server id 添加"
+  },
   "mcp_command": {
     "en": "command",
     "zh": "命令"
+  },
+  "mcp_command_help": {
+    "en": "the program and its arguments, as one line",
+    "zh": "程序与参数，写成一行"
   },
   "mcp_composio": {
     "en": "Composio",
     "zh": "Composio"
   },
+  "mcp_connect": {
+    "en": "connect",
+    "zh": "连接"
+  },
+  "mcp_door_command": {
+    "en": "by command",
+    "zh": "用命令行"
+  },
+  "mcp_door_json": {
+    "en": "paste json",
+    "zh": "粘贴 JSON"
+  },
+  "mcp_door_url": {
+    "en": "by url",
+    "zh": "用地址"
+  },
+  "mcp_doors": {
+    "en": "how to add a server",
+    "zh": "怎么添加服务器"
+  },
+  "mcp_env": {
+    "en": "environment",
+    "zh": "环境变量"
+  },
+  "mcp_expand": {
+    "en": "tools and schema",
+    "zh": "工具与 schema"
+  },
+  "mcp_gap_connect": {
+    "en": "connecting opens a browser and waits for the toolkit; the city has no command for that",
+    "zh": "连接要打开浏览器并等这个工具箱回话，城里没有这条命令"
+  },
+  "mcp_gap_env": {
+    "en": "the wire carries a command and its arguments, and no environment",
+    "zh": "wire 只带命令与参数，不带环境变量"
+  },
+  "mcp_gap_headers": {
+    "en": "one header fits on the wire",
+    "zh": "wire 只放得下一个请求头"
+  },
+  "mcp_gap_health": {
+    "en": "the city has no handshake frame, so no state and no tool list arrive",
+    "zh": "城没有握手帧，状态与工具清单都到不了"
+  },
+  "mcp_gap_scope_city": {
+    "en": "the wire writes every server into the building layer",
+    "zh": "wire 把每台服务器都写进楼这一层"
+  },
+  "mcp_gap_scope_machine": {
+    "en": "a server kept out of the repository has nowhere to go on the wire",
+    "zh": "不写进仓库的服务器在 wire 上没有去处"
+  },
+  "mcp_gap_sse": {
+    "en": "the wire spells stdio and http",
+    "zh": "wire 只认 stdio 与 http"
+  },
   "mcp_header": {
-    "en": "header",
+    "en": "headers",
     "zh": "请求头"
+  },
+  "mcp_json_empty": {
+    "en": "this block names no server",
+    "zh": "这段里没有服务器"
+  },
+  "mcp_json_placeholder": {
+    "en": "the mcpServers block from Claude Code or Cursor",
+    "zh": "Claude Code 或 Cursor 的 mcpServers 段"
+  },
+  "mcp_json_unreadable": {
+    "en": "this is not a readable mcpServers block",
+    "zh": "这不是一段能读的 mcpServers"
+  },
+  "mcp_key_first": {
+    "en": "store the key first; the header carries its reference",
+    "zh": "先把密钥入库，请求头带的是它的引用"
+  },
+  "mcp_key_store": {
+    "en": "store",
+    "zh": "入库"
+  },
+  "mcp_key_stored": {
+    "en": "key stored",
+    "zh": "密钥已入库"
   },
   "mcp_kind_http": {
     "en": "http",
     "zh": "http"
+  },
+  "mcp_kind_sse": {
+    "en": "sse",
+    "zh": "sse"
   },
   "mcp_kind_stdio": {
     "en": "stdio",
@@ -447,21 +771,85 @@
     "en": "label",
     "zh": "名字"
   },
+  "mcp_label_help": {
+    "en": "lowercase letters, digits and dashes; it prefixes every tool this server offers",
+    "zh": "小写字母、数字与连字符；它是这台服务器每个工具的前缀"
+  },
   "mcp_none": {
-    "en": "none",
-    "zh": "无"
+    "en": "this building reaches no tool server",
+    "zh": "这栋楼还没有工具服务器"
   },
   "mcp_open_composio": {
     "en": "composio.dev",
     "zh": "composio.dev"
   },
+  "mcp_pair_add": {
+    "en": "add a row",
+    "zh": "加一行"
+  },
+  "mcp_pair_name": {
+    "en": "name",
+    "zh": "名称"
+  },
+  "mcp_pair_remove": {
+    "en": "remove this row",
+    "zh": "删掉这行"
+  },
+  "mcp_pair_value": {
+    "en": "value",
+    "zh": "值"
+  },
+  "mcp_scope": {
+    "en": "scope",
+    "zh": "作用域"
+  },
+  "mcp_scope_building": {
+    "en": "this building",
+    "zh": "这栋楼"
+  },
+  "mcp_scope_city": {
+    "en": "the whole city",
+    "zh": "整座城"
+  },
+  "mcp_scope_machine": {
+    "en": "this machine only",
+    "zh": "只在这台电脑上"
+  },
   "mcp_server_id": {
     "en": "server id",
     "zh": "服务器 id"
   },
+  "mcp_servers": {
+    "en": "servers this building reaches",
+    "zh": "这栋楼能连到的服务器"
+  },
+  "mcp_state_unknown": {
+    "en": "not checked",
+    "zh": "没有检查过"
+  },
+  "mcp_target": {
+    "en": "target",
+    "zh": "目标"
+  },
   "mcp_title": {
     "en": "MCP",
     "zh": "MCP"
+  },
+  "mcp_toolkit": {
+    "en": "toolkit",
+    "zh": "工具箱"
+  },
+  "mcp_toolkits": {
+    "en": "toolkits Composio offers",
+    "zh": "Composio 提供的工具箱"
+  },
+  "mcp_tools": {
+    "en": "tools",
+    "zh": "工具"
+  },
+  "mcp_transport": {
+    "en": "transport",
+    "zh": "传输"
   },
   "mcp_url": {
     "en": "url",
@@ -470,6 +858,26 @@
   "mcp_user_id": {
     "en": "user id",
     "zh": "用户 id"
+  },
+  "mcp_why_command": {
+    "en": "write the command that starts it",
+    "zh": "写出启动它的命令"
+  },
+  "mcp_why_grammar": {
+    "en": "lowercase letters, digits and dashes only",
+    "zh": "只能用小写字母、数字与连字符"
+  },
+  "mcp_why_label": {
+    "en": "give it a name",
+    "zh": "先给它起个名字"
+  },
+  "mcp_why_taken": {
+    "en": "this scope already reaches a server by that name",
+    "zh": "这个作用域已经有同名的服务器"
+  },
+  "mcp_why_url": {
+    "en": "write the url it answers on",
+    "zh": "写出它应答的地址"
   },
   "nav_city": {
     "en": "city",
@@ -538,6 +946,10 @@
   "palette_room": {
     "en": "room",
     "zh": "房间"
+  },
+  "panel_close": {
+    "en": "close",
+    "zh": "收起"
   },
   "part_cancel": {
     "en": "cancel",
@@ -611,6 +1023,14 @@
     "en": "the city is stopped",
     "zh": "城已暂停，改不了"
   },
+  "path_reveal": {
+    "en": "show in the file manager",
+    "zh": "在文件管理器里显示"
+  },
+  "path_reveal_inert": {
+    "en": "this build cannot open a file manager: the wire carries no Reveal command",
+    "zh": "这个版本打不开文件管理器：wire 上还没有 Reveal 命令"
+  },
   "plan_empty": {
     "en": "no plan yet",
     "zh": "还没有计划"
@@ -632,8 +1052,12 @@
     "zh": "账本"
   },
   "rec_lenses": {
-    "en": "three lenses",
-    "zh": "三个透镜"
+    "en": "four lenses",
+    "zh": "四个透镜"
+  },
+  "rec_log": {
+    "en": "the log",
+    "zh": "日志"
   },
   "rec_nothing": {
     "en": "nothing",
@@ -674,6 +1098,14 @@
   "run_cut": {
     "en": "{n} more lines",
     "zh": "还有 {n} 行"
+  },
+  "run_doing_calling": {
+    "en": "using a tool",
+    "zh": "在用工具"
+  },
+  "run_doing_thinking": {
+    "en": "thinking",
+    "zh": "在想"
   },
   "run_evidence": {
     "en": "evidence",
@@ -1149,7 +1581,7 @@
   },
   "slash_doctor": {
     "en": "check this machine again",
-    "zh": "重新检查这台机器"
+    "zh": "重新检查机器"
   },
   "slash_effort": {
     "en": "how hard the model thinks before it answers",

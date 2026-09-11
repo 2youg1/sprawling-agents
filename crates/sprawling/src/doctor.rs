@@ -24,15 +24,19 @@
 //! naming an engine.
 
 mod explain;
+mod family;
 pub(crate) mod host;
 mod needs;
+mod paint;
 mod presence;
 mod probe;
+mod registry;
 mod report;
 mod screen;
 mod table;
 mod visit;
 
+pub(crate) use family::Family;
 pub(crate) use presence::{Absence, Fault, Presence, Version};
 pub(crate) use probe::{Machine, ThisMachine};
 pub(crate) use report::report;
@@ -69,9 +73,32 @@ impl Tier {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Need {
     Required,
+    /// Required as one of a group, any member of which is enough. A
+    /// machine with Zen on it needs no Chrome, and a machine with Edge
+    /// and its driver needs no Gecko browser: the verdict counts the
+    /// group once, by its name, rather than counting each member.
+    OneOf(Group),
     /// Absent is a fact rather than a fault; `enables` says what having
     /// it would add.
     Optional,
+}
+
+/// A set of items any one of which satisfies a tier.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Group {
+    /// A browser the tool can hold a BiDi session with: a Gecko
+    /// browser, a Chromium driver, or `safaridriver`. Opening the WebUI
+    /// is not what this is for - any browser at all opens that.
+    BrowserEngine,
+}
+
+impl Group {
+    /// The name a verdict reports the whole group by.
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Group::BrowserEngine => "a browser engine",
+        }
+    }
 }
 
 /// The three platforms this project is built for. `None` from `current`
@@ -157,6 +184,9 @@ pub(crate) enum Detection {
     /// A part of this binary rather than of this machine: present when
     /// the build carries it and it starts.
     Built { carried: bool },
+    /// Any member of one browser family, the first that answers.
+    /// `SPRAWLING_BROWSER` overrides it (`doctor::family`).
+    Family(Family),
 }
 
 /// What installing this item costs on one platform.
@@ -205,6 +235,10 @@ pub(crate) struct Requirement {
     /// What having it lets a person do, in one clause.
     pub(crate) enables: &'static str,
     pub(crate) detect: Detection,
+    /// The item's own site, for a reader who wants to know what it is
+    /// before installing it. `None` where there is no one site: a
+    /// platform's shell, and this repository's own connector.
+    pub(crate) homepage: Option<&'static str>,
     pub(crate) recipe: PerPlatform<Recipe>,
 }
 
@@ -225,22 +259,6 @@ pub(crate) fn examine(machine: &dyn Machine) -> Vec<Finding> {
         .collect()
 }
 
-/// The one line a person reads about one item.
-pub(crate) fn finding_line(finding: &Finding) -> String {
-    let name = finding.requirement.name;
-    let said = finding.presence.describe();
-    match (&finding.presence, finding.requirement.need) {
-        (Presence::Present { .. } | Presence::Broken { .. }, _) => {
-            format!("  {name:<18} {said}")
-        }
-        (Presence::Absent(_), Need::Required) => format!("  {name:<18} {said}"),
-        (Presence::Absent(_), Need::Optional) => format!(
-            "  {name:<18} optional-{said} - it enables {}",
-            finding.requirement.enables
-        ),
-    }
-}
-
 /// Whether one tier is reachable on this machine.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Verdict {
@@ -252,17 +270,37 @@ pub(crate) enum Verdict {
 /// The verdict for one tier. An optional item that is absent never
 /// stands between a person and a tier: it is reported and not counted.
 /// A broken item counts as missing: a browser that will not start is
-/// not a browser a city can use.
+/// not a browser a city can use. A group is counted once, under its own
+/// name and after the items named one by one, because a person missing
+/// every Gecko browser and every driver is missing one thing rather
+/// than four.
 pub(crate) fn verdict(findings: &[Finding], tier: Tier) -> Verdict {
-    let missing: Vec<&'static str> = findings
+    let mut missing: Vec<&'static str> = Vec::new();
+    let mut groups: Vec<(Group, bool)> = Vec::new();
+    for finding in findings
         .iter()
-        .filter(|finding| {
-            finding.requirement.tier == tier
-                && finding.requirement.need == Need::Required
-                && !finding.presence.usable()
-        })
-        .map(|finding| finding.requirement.name)
-        .collect();
+        .filter(|finding| finding.requirement.tier == tier)
+    {
+        let usable = finding.presence.usable();
+        match finding.requirement.need {
+            Need::Optional => {}
+            Need::Required => {
+                if !usable {
+                    missing.push(finding.requirement.name);
+                }
+            }
+            Need::OneOf(group) => match groups.iter_mut().find(|(seen, _)| *seen == group) {
+                Some(seen) => seen.1 = seen.1 || usable,
+                None => groups.push((group, usable)),
+            },
+        }
+    }
+    missing.extend(
+        groups
+            .into_iter()
+            .filter(|(_, satisfied)| !satisfied)
+            .map(|(group, _)| group.as_str()),
+    );
     if missing.is_empty() {
         Verdict::Ready
     } else {

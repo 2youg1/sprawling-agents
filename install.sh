@@ -123,6 +123,21 @@ field() {
     printf '%s\n' "$1" | tr ',' '\n' | sed -n "s|.*\"$2\": *\"$3\".*|\\1|p" | head -n 1
 }
 
+# The archive's size in bytes, which the release API reports beside the
+# URL. `field` reads quoted values; this one is a bare number.
+asset_size() {
+    printf '%s\n' "$1" | tr ',' '\n' |
+        sed -n 's|.*"size": *\([0-9][0-9]*\).*|\1|p' | head -n 1
+}
+
+# Bytes as megabytes with one decimal, rounded. Shell arithmetic rather
+# than awk or bc, so one printed number adds no tool this script would
+# then have to `need`.
+megabytes() {
+    tenths=$(( ($1 * 10 + 524288) / 1048576 ))
+    printf '%s.%s' "$(( tenths / 10 ))" "$(( tenths % 10 ))"
+}
+
 # Every archive this release carries, for the message a person gets when
 # theirs is not among them.
 offered() {
@@ -188,8 +203,19 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 archive="${tmp}/archive.zip"
 
-say "sprawling: downloading ${tag}"
-curl -fsSL "$url" -o "$archive" || die "download failed: $url"
+size=$(asset_size "$chunk")
+if [ -n "$size" ]; then
+    say "sprawling ${tag} | ${os}-${arch} | $(megabytes "$size") MB"
+else
+    say "sprawling ${tag} | ${os}-${arch}"
+fi
+
+# curl draws its bar on stderr, which is a terminal for the usual
+# `curl ... | sh` run. Where it is not, the bar would fill a log with
+# control characters, so there the download reports only failures.
+if [ -t 2 ]; then meter='--progress-bar'; else meter='-sS'; fi
+# shellcheck disable=SC2086 # one option, deliberately unquoted
+curl -fL $meter "$url" -o "$archive" || die "download failed: $url"
 
 got=$(checksum "$archive")
 [ "$got" = "$digest" ] || die "\
@@ -197,11 +223,19 @@ the archive does not match the sha256 the release publishes.
   expected ${digest}
   received ${got}
 Nothing was installed."
+say "sprawling: verified sha256 ${digest}"
 
 unpack "$archive" "$tmp"
 binary=$(find "$tmp" -type f -name sprawling | head -n 1)
 [ -n "$binary" ] || die "the archive holds no file named sprawling"
 chmod +x "$binary"
+
+# What was installed, said by the thing that was installed: the first
+# line of `status` is the binary's own version.
+reported=$("$binary" status 2>/dev/null | head -n 1 || true)
+if [ -n "$reported" ]; then
+    say "sprawling: ${reported}"
+fi
 
 # The binary places itself. Everything this script knows about
 # directories and PATH ends here, and what it prints below comes from the

@@ -3,10 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The one history in three lenses: the ledger as it was written, the
-// archive as the buildings filed it, and the recycle bin where every
-// row states its own way back. Nothing here is folded: the record is
-// shown as the record.
+// The one history in four lenses: the ledger as it was written, the
+// archive as the buildings filed it, the recycle bin where every row
+// states its own way back, and the process log beside them. Nothing
+// here is folded: the record is shown as the record.
+//
+// The log is the one lens with nothing behind it. No frame on the wire
+// carries a log line, so the lens is drawn, is inert, and says which
+// piece is missing rather than showing an emptiness a reader would read
+// as a quiet city.
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
@@ -14,7 +19,12 @@ import { LENSES, toFragment } from "../core/route";
 import type { Lens } from "../core/route";
 import { clock, hhmmss } from "../core/time";
 import type { Seq } from "../wire";
-import { useLang, useSay, useUi } from "../ui";
+import { useGo, useLang, useSay, useUi } from "../ui";
+import { Button } from "./parts/button";
+import { EmptyState } from "./parts/empty";
+import { Notice } from "./parts/notice";
+import { Path } from "./parts/path";
+import { Tabs } from "./parts/tabs";
 
 // One line of what a record carries: its scalar fields, the way a
 // person skims a log.
@@ -144,7 +154,9 @@ function Bin() {
               {(row) => (
                 <li class="border-b border-g1 py-snug">
                   <div class="flex items-center gap-base">
-                    <span class="flex-1 truncate font-mono text-text">{row.path}</span>
+                    <span class="min-w-0 flex-1">
+                      <Path path={row.path} />
+                    </span>
                     <span class="text-text-faint">{clock(lang(), row.at)}</span>
                     <span class={row.restored ? "text-text-disabled" : "text-alert"}>{row.restored ? say("bin_restored") : say("bin_gone")}</span>
                   </div>
@@ -159,34 +171,63 @@ function Bin() {
   );
 }
 
-export function Record(props: { readonly lens: Lens }) {
+// The five levels `docs/logging.md` names, in the order it names them.
+const LEVELS = ["refuse", "effect", "decide", "trace", "wire"] as const;
+
+function Log() {
   const say = useSay();
   return (
+    <div class="flex flex-col gap-base">
+      <Notice seat="entry" title={say("log_absent")} detail={say("log_absent_why")} />
+      <div class="flex flex-wrap items-center gap-tight" role="group" aria-label={say("log_levels")}>
+        <For each={LEVELS}>{(level) => <Button label={say(`log_${level}`)} tone="quiet" why={say("log_absent_why")} />}</For>
+      </div>
+      <EmptyState text={say("log_empty")} />
+    </div>
+  );
+}
+
+// The log lens is not in the address bar: `core/route` spells three
+// lenses, and a fourth spelling is a change to the one translation
+// between a view and the address bar. Until it is spelled there, the
+// log is reached by the tab and not by a bookmark.
+const LOG = "log";
+
+export function Record(props: { readonly lens: Lens }) {
+  const say = useSay();
+  const go = useGo();
+  const [log, setLog] = createSignal(false);
+  const current = () => (log() ? LOG : props.lens);
+  const lenses = () => [
+    ...LENSES.map((lens) => ({ id: lens, label: say(`rec_${lens}`) })),
+    { id: LOG, label: say("rec_log") },
+  ];
+  const pick = (id: string) => {
+    const lens = LENSES.find((each) => each === id);
+    if (lens === undefined) {
+      setLog(true);
+      return;
+    }
+    setLog(false);
+    go({ kind: "record", lens });
+  };
+  return (
     <div class="mx-auto w-full max-w-page px-pane py-wide">
-      <div class="mb-wide flex items-baseline gap-wide">
+      <div class="mb-wide flex flex-wrap items-baseline gap-wide">
         <h1 class="text-title font-title">{say("nav_the_record")}</h1>
-        <nav class="flex gap-tight text-label" aria-label={say("rec_lenses")}>
-          <For each={LENSES}>
-            {(lens) => (
-              <a
-                href={toFragment({ kind: "record", lens })}
-                aria-current={props.lens === lens ? "page" : undefined}
-                class={`rounded-pill px-base py-tight ${props.lens === lens ? "bg-g3 text-text" : "text-text-faint hover:text-text-quiet"}`}
-              >
-                {say(`rec_${lens}`)}
-              </a>
-            )}
-          </For>
-        </nav>
+        <Tabs label={say("rec_lenses")} lenses={lenses()} current={current()} onPick={pick} />
       </div>
       <Switch>
-        <Match when={props.lens === "ledger"}>
+        <Match when={current() === LOG}>
+          <Log />
+        </Match>
+        <Match when={current() === "ledger"}>
           <Ledger />
         </Match>
-        <Match when={props.lens === "archive"}>
+        <Match when={current() === "archive"}>
           <Archive />
         </Match>
-        <Match when={props.lens === "bin"}>
+        <Match when={current() === "bin"}>
           <Bin />
         </Match>
       </Switch>

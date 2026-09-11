@@ -92,12 +92,14 @@ pub fn gateway::Transcriber::transcribe(&self, &gateway::Recording) -> core::res
 pub fn gateway::adapter_for(&gateway::Chosen<'_>, gateway::Redemption, alloc::vec::Vec<(alloc::string::String, alloc::string::String)>) -> core::result::Result<alloc::boxed::Box<(dyn kernel::model::Model + core::marker::Send)>, kernel::error::shape::AxError>
 pub fn gateway::attached_payload(&gateway::AttachedEndpoint) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn gateway::increment_of(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::option::Option<alloc::string::String>
+pub fn gateway::is_local(&str) -> bool
 pub fn gateway::oauth_begin(&gateway::OauthProfile, alloc::string::String, alloc::string::String) -> core::result::Result<gateway::OauthPending, kernel::error::shape::AxError>
 pub fn gateway::oauth_random(&[u8]) -> alloc::string::String
 pub fn gateway::oauth_redeem(&gateway::OauthProfile, &gateway::OauthPending, &str, u64) -> core::result::Result<gateway::OauthTokens, kernel::error::shape::AxError>
 pub fn gateway::oauth_redeem_request(&gateway::OauthProfile, &gateway::OauthPending, &str) -> core::result::Result<gateway::TokenRequest, kernel::error::shape::AxError>
 pub fn gateway::oauth_refresh(&gateway::OauthProfile, &kernel::secret::sealed::Sealed<alloc::string::String>, u64) -> core::result::Result<gateway::OauthTokens, kernel::error::shape::AxError>
 pub fn gateway::profile(&str) -> core::option::Option<&'static gateway::OauthProfile>
+pub fn gateway::reach(&reqwest::blocking::client::Client, &str, u64) -> kernel::reach::Reach
 pub fn gateway::request_wire(kernel::model::wire::DialectKind, &kernel::model::wire::ChatRequest, &gateway::ImageBytes) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
 pub fn gateway::response_from_wire(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::result::Result<kernel::model::wire::ChatResponse, kernel::error::shape::AxError>
 pub fn gateway::response_wire(kernel::model::wire::DialectKind, &kernel::model::wire::ChatResponse) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>

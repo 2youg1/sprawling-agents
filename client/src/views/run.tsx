@@ -11,13 +11,17 @@
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
+import { Option } from "effect";
+
+import { Address } from "../core/address";
 import { sendingInto } from "../core/belief";
 import { cancel, steer } from "../core/commands";
 import { buildingOf, roomOf, toFragment } from "../core/route";
 import { count, usd } from "../core/time";
 import type { GitOid, RoundsAnswer, RunId, Turn } from "../wire";
-import { useCommand, useHearing, useSay, useUi } from "../ui";
+import { useCommand, useGo, useHearing, useSay, useUi } from "../ui";
 import { Changes } from "./changes";
+import { Path } from "./parts/path";
 import { Composer } from "./talk/composer";
 import { Thread } from "./talk/thread";
 
@@ -30,6 +34,17 @@ const LENSES: readonly Lens[] = ["turns", "context", "changes", "evidence"];
 
 function Context(props: { readonly rounds: RoundsAnswer }) {
   const say = useSay();
+  const go = useGo();
+  // A file the run read is opened where the page can open it: the
+  // building it belongs to. Which file the page then shows is not in
+  // the address bar's vocabulary, so the path stops at the door.
+  const opening = (file: string): (() => void) | undefined => {
+    const at = Option.getOrNull(Address.option(file));
+    if (at === null) return undefined;
+    return () => {
+      go({ kind: "building", address: buildingOf(at) });
+    };
+  };
   const peak = createMemo(() =>
     Math.max(1, ...props.rounds.turns.map((turn) => (turn.used?.input ?? 0) + (turn.used?.output ?? 0))),
   );
@@ -89,9 +104,9 @@ function Context(props: { readonly rounds: RoundsAnswer }) {
           <ul class="text-note">
             <For each={seen()}>
               {([file, n]) => (
-                <li class="my-tight flex justify-between gap-base">
-                  <span class="truncate font-mono text-text-quiet">{file}</span>
-                  <span class="text-text-disabled">{n > 1 ? `×${String(n)}` : ""}</span>
+                <li class="my-tight flex items-center justify-between gap-base">
+                  <Path path={file} onOpen={opening(file)} />
+                  <span class="shrink-0 text-text-disabled">{n > 1 ? `×${String(n)}` : ""}</span>
                 </li>
               )}
             </For>

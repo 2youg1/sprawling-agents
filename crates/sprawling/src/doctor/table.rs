@@ -10,7 +10,16 @@
 //! here installs for one user and none of them asks for elevation; the
 //! two that would need a script piped into a shell are `Print`, so a
 //! person reads them and decides.
+//!
+//! The rows a person meets first are the browser engines, which are
+//! families rather than brands (`doctor::family`), and the Rust tools
+//! this repository's own recipes call (`table::toolchain`). Both live
+//! beside this file because the row count, not the row shape, is what
+//! grows.
 
+mod toolchain;
+
+use super::family::{CHROMIUM_ROW, GECKO_ROW, WEBKIT_ROW};
 use super::{Detection, Need, PerPlatform, Recipe, Requirement, Tier};
 
 /// The environment variable a person may point at a CPython-WASI
@@ -25,9 +34,11 @@ const PYTHON_WASM_VARIABLE: &str = "SPRAWLING_PYTHON_WASM";
 const PYTHON_WASM_FILE: &str = "python.wasm";
 
 /// The names other modules of this binary ask `doctor::host` by. A name
-/// here that is not a row below is caught by the tests.
-pub(crate) const FIREFOX: &str = "firefox";
+/// here that is not a row below is caught by the tests. The three
+/// browser families are named in `doctor::family`, beside their
+/// members.
 pub(crate) const CHROMEDRIVER: &str = "chromedriver";
+pub(crate) const MSEDGEDRIVER: &str = "msedgedriver";
 pub(crate) const PYTHON_WASI: &str = "python-wasi";
 pub(crate) const SHELL: &str = "shell";
 pub(crate) const SANDBOX_ENGINE: &str = "sandbox-engine";
@@ -41,129 +52,25 @@ const NOWHERE: PerPlatform<&[&str]> = PerPlatform {
     linux: &[],
 };
 
-/// Where each platform puts Firefox when it is not on the search path -
-/// which on Windows and macOS is the usual case.
-const FIREFOX_PLACES: PerPlatform<&[&str]> = PerPlatform {
-    windows: &[
-        r"C:\Program Files\Mozilla Firefox\firefox.exe",
-        r"C:\Program Files (x86)\Mozilla Firefox\firefox.exe",
-    ],
-    macos: &["/Applications/Firefox.app/Contents/MacOS/firefox"],
-    linux: &["/usr/bin/firefox", "/snap/bin/firefox"],
-};
-
 /// Everything this city asks of the machine it runs on.
 pub(crate) const REQUIREMENTS: &[Requirement] = &[
-    Requirement {
-        name: FIREFOX,
-        tier: Tier::Use,
-        need: Need::Required,
-        enables: "the WebUI, and the browser tool a resident drives",
-        detect: Detection::Program {
-            program: "firefox",
-            version_arg: "--version",
-            places: FIREFOX_PLACES,
-        },
-        recipe: PerPlatform {
-            windows: Recipe::Command {
-                program: "winget",
-                args: &["install", "--id", "Mozilla.Firefox", "-e"],
-            },
-            macos: Recipe::Command {
-                program: "brew",
-                args: &["install", "--cask", "firefox"],
-            },
-            linux: Recipe::Print("sudo apt install firefox"),
-        },
-    },
-    Requirement {
-        name: "rustup",
-        tier: Tier::Develop,
-        need: Need::Required,
-        enables: "the toolchain rust-toolchain.toml pins, installed on demand",
-        detect: Detection::Program {
-            program: "rustup",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        recipe: PerPlatform {
-            windows: Recipe::Command {
-                program: "winget",
-                args: &["install", "--id", "Rustlang.Rustup", "-e"],
-            },
-            macos: Recipe::Print("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"),
-            linux: Recipe::Print("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"),
-        },
-    },
-    Requirement {
-        name: "just",
-        tier: Tier::Develop,
-        need: Need::Required,
-        enables: "`just check`, the closing condition of every change here",
-        detect: Detection::Program {
-            program: "just",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        recipe: PerPlatform {
-            windows: CARGO_INSTALL_JUST,
-            macos: CARGO_INSTALL_JUST,
-            linux: CARGO_INSTALL_JUST,
-        },
-    },
-    Requirement {
-        name: "cargo-nextest",
-        tier: Tier::Develop,
-        need: Need::Required,
-        enables: "the test runner every gate in this repository calls",
-        detect: Detection::Program {
-            program: "cargo-nextest",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        recipe: PerPlatform {
-            windows: CARGO_INSTALL_NEXTEST,
-            macos: CARGO_INSTALL_NEXTEST,
-            linux: CARGO_INSTALL_NEXTEST,
-        },
-    },
-    Requirement {
-        name: "bun",
-        tier: Tier::Develop,
-        need: Need::Required,
-        enables: "the JavaScript and TypeScript work beside this workspace",
-        detect: Detection::Program {
-            program: "bun",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        recipe: PerPlatform {
-            windows: Recipe::Command {
-                program: "winget",
-                args: &["install", "--id", "Oven-sh.Bun", "-e"],
-            },
-            macos: Recipe::Command {
-                program: "brew",
-                args: &["install", "oven-sh/bun/bun"],
-            },
-            // Printed, never run: a script piped into a shell is code
-            // nobody read, and this city does not read it for anybody.
-            linux: Recipe::Print("curl -fsSL https://bun.sh/install | bash"),
-        },
-    },
+    GECKO_ROW,
+    CHROMIUM_ROW,
+    WEBKIT_ROW,
     Requirement {
         name: CHROMEDRIVER,
-        tier: Tier::Develop,
-        need: Need::Optional,
-        enables: "the browser tool against Chromium; Firefox needs no driver",
+        tier: Tier::Use,
+        need: Need::OneOf(super::Group::BrowserEngine),
+        enables: "the browser tool against Chrome, Brave, Chromium or Vivaldi",
         detect: Detection::Program {
             program: "chromedriver",
             version_arg: "--version",
             places: NOWHERE,
         },
+        homepage: Some("https://googlechromelabs.github.io/chrome-for-testing/"),
         recipe: PerPlatform {
             windows: Recipe::Manual(
-                "take the build matching your Chromium from \
+                "take the build matching your Chromium's major version from \
                  https://googlechromelabs.github.io/chrome-for-testing/",
             ),
             macos: Recipe::Command {
@@ -174,25 +81,29 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         },
     },
     Requirement {
-        name: "git",
-        tier: Tier::Develop,
-        need: Need::Required,
-        enables: "restoration: a discarded file points at a checkpoint commit",
+        name: MSEDGEDRIVER,
+        tier: Tier::Use,
+        need: Need::OneOf(super::Group::BrowserEngine),
+        enables: "the browser tool against Edge, which every Windows machine already has",
         detect: Detection::Program {
-            program: "git",
+            program: "msedgedriver",
             version_arg: "--version",
             places: NOWHERE,
         },
+        homepage: Some("https://developer.microsoft.com/microsoft-edge/tools/webdriver/"),
         recipe: PerPlatform {
-            windows: Recipe::Command {
-                program: "winget",
-                args: &["install", "--id", "Git.Git", "-e"],
-            },
+            windows: Recipe::Manual(
+                "take the build matching your Edge's major version from \
+                 https://developer.microsoft.com/microsoft-edge/tools/webdriver/",
+            ),
             macos: Recipe::Command {
                 program: "brew",
-                args: &["install", "git"],
+                args: &["install", "--cask", "microsoft-edge-driver"],
             },
-            linux: Recipe::Print("sudo apt install git"),
+            linux: Recipe::Manual(
+                "take the build matching your Edge's major version from \
+                 https://developer.microsoft.com/microsoft-edge/tools/webdriver/",
+            ),
         },
     },
     Requirement {
@@ -203,6 +114,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         detect: Detection::Built {
             carried: super::host::ENGINE_CARRIED,
         },
+        homepage: Some("https://wasmtime.dev/"),
         recipe: PerPlatform {
             windows: ENGINE_BY_BUILD,
             macos: ENGINE_BY_BUILD,
@@ -218,6 +130,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             variable: PYTHON_WASM_VARIABLE,
             file: PYTHON_WASM_FILE,
         },
+        homepage: Some("https://github.com/python/cpython/blob/main/Tools/wasm/README.md"),
         recipe: PerPlatform {
             windows: PYTHON_WASI_BY_HAND,
             macos: PYTHON_WASI_BY_HAND,
@@ -241,6 +154,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
                 linux: "/bin/sh",
             },
         },
+        homepage: None,
         recipe: PerPlatform {
             windows: Recipe::Manual("set COMSPEC to a command interpreter"),
             macos: Recipe::Manual("set SHELL to a shell, or restore /bin/sh"),
@@ -257,6 +171,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             version_arg: "--version",
             places: NOWHERE,
         },
+        homepage: None,
         recipe: PerPlatform {
             windows: DESKTOP_BY_HAND,
             macos: DESKTOP_BY_HAND,
@@ -273,6 +188,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             version_arg: "-version",
             places: NOWHERE,
         },
+        homepage: Some("https://ffmpeg.org/"),
         recipe: PerPlatform {
             windows: Recipe::Command {
                 program: "winget",
@@ -285,6 +201,116 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             linux: Recipe::Print("sudo apt install ffmpeg"),
         },
     },
+    Requirement {
+        name: "rustup",
+        tier: Tier::Develop,
+        need: Need::Required,
+        enables: "the toolchain rust-toolchain.toml pins, installed on demand",
+        detect: Detection::Program {
+            program: "rustup",
+            version_arg: "--version",
+            places: NOWHERE,
+        },
+        homepage: Some("https://rustup.rs/"),
+        recipe: PerPlatform {
+            windows: Recipe::Command {
+                program: "winget",
+                args: &["install", "--id", "Rustlang.Rustup", "-e"],
+            },
+            macos: Recipe::Print("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"),
+            linux: Recipe::Print("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"),
+        },
+    },
+    toolchain::RUSTFMT,
+    toolchain::CLIPPY,
+    Requirement {
+        name: "just",
+        tier: Tier::Develop,
+        need: Need::Required,
+        enables: "`just check`, the closing condition of every change here",
+        detect: Detection::Program {
+            program: "just",
+            version_arg: "--version",
+            places: NOWHERE,
+        },
+        homepage: Some("https://just.systems/"),
+        recipe: PerPlatform {
+            windows: CARGO_INSTALL_JUST,
+            macos: CARGO_INSTALL_JUST,
+            linux: CARGO_INSTALL_JUST,
+        },
+    },
+    Requirement {
+        name: "cargo-nextest",
+        tier: Tier::Develop,
+        need: Need::Required,
+        enables: "the test runner every gate in this repository calls",
+        detect: Detection::Program {
+            program: "cargo-nextest",
+            version_arg: "--version",
+            places: NOWHERE,
+        },
+        homepage: Some("https://nexte.st/"),
+        recipe: PerPlatform {
+            windows: CARGO_INSTALL_NEXTEST,
+            macos: CARGO_INSTALL_NEXTEST,
+            linux: CARGO_INSTALL_NEXTEST,
+        },
+    },
+    Requirement {
+        name: "bun",
+        tier: Tier::Develop,
+        need: Need::Required,
+        enables: "the JavaScript and TypeScript work beside this workspace",
+        detect: Detection::Program {
+            program: "bun",
+            version_arg: "--version",
+            places: NOWHERE,
+        },
+        homepage: Some("https://bun.sh/"),
+        recipe: PerPlatform {
+            windows: Recipe::Command {
+                program: "winget",
+                args: &["install", "--id", "Oven-sh.Bun", "-e"],
+            },
+            macos: Recipe::Command {
+                program: "brew",
+                args: &["install", "oven-sh/bun/bun"],
+            },
+            // Printed, never run: a script piped into a shell is code
+            // nobody read, and this city does not read it for anybody.
+            linux: Recipe::Print("curl -fsSL https://bun.sh/install | bash"),
+        },
+    },
+    Requirement {
+        name: "git",
+        tier: Tier::Develop,
+        need: Need::Required,
+        enables: "restoration: a discarded file points at a checkpoint commit",
+        detect: Detection::Program {
+            program: "git",
+            version_arg: "--version",
+            places: NOWHERE,
+        },
+        homepage: Some("https://git-scm.com/"),
+        recipe: PerPlatform {
+            windows: Recipe::Command {
+                program: "winget",
+                args: &["install", "--id", "Git.Git", "-e"],
+            },
+            macos: Recipe::Command {
+                program: "brew",
+                args: &["install", "git"],
+            },
+            linux: Recipe::Print("sudo apt install git"),
+        },
+    },
+    toolchain::CARGO_DENY,
+    toolchain::CARGO_AUDIT,
+    toolchain::CARGO_MUTANTS,
+    toolchain::CARGO_FUZZ,
+    toolchain::CARGO_LLVM_COV,
+    toolchain::KANI,
 ];
 
 const CARGO_INSTALL_JUST: Recipe = Recipe::Command {

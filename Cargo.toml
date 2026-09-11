@@ -98,7 +98,21 @@ getrandom = "0.4"
 # One HTTP client for the whole workspace: gateway speaks to providers,
 # the bin speaks to MCP servers reached over HTTP, and two version
 # authorities for one client is how two TLS stacks end up in one binary.
-reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls", "json", "http2"] }
+reqwest = { version = "0.13", default-features = false, features = [
+    "blocking",
+    "rustls",
+    "json",
+    "http2",
+    # A machine reaches a provider through whatever its owner already
+    # configured, and on Windows and macOS that is a system setting
+    # rather than an environment variable: without this the binary is
+    # the one tool on the machine that cannot see the proxy, and the
+    # symptom a person reports is a fifteen-second timeout.
+    "system-proxy",
+    # `socks = []` in reqwest 0.13: the implementation is in-tree and
+    # this adds no package to the lock.
+    "socks",
+] }
 # The bin's build script gzips the client bundle it embeds; xtask weighs
 # the same artifacts. One version authority for both.
 flate2 = "1"

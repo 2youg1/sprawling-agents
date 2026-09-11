@@ -12,6 +12,7 @@ import { render } from "solid-js/web";
 
 import { App } from "./app";
 import { loadPrefs } from "./core/prefs";
+import { applyStoredAppearance } from "./views/setup/appearance";
 import { openConnection, socketUrl, tokenIn } from "./core/socket";
 import { UiProvider } from "./ui";
 import "./theme.css";
@@ -19,6 +20,10 @@ import "./theme.css";
 const main = document.getElementById("main");
 if (main !== null) {
   const prefs = loadPrefs(window.localStorage, navigator.language);
+  // Before the first paint: a face chosen once is the face the next
+  // window opens with, and applying it after mount is a visible change
+  // of shape a person did not ask for.
+  applyStoredAppearance(document.documentElement, window.localStorage);
   const conn = openConnection(socketUrl(window.location), tokenIn(window.location.search));
   render(
     () => (

@@ -66,12 +66,14 @@ pub struct Endpoint {
 /// person reading the refusal.
 impl Endpoint {
     pub fn new(config: EndpointConfig, redemption: Redemption) -> Result<Endpoint, AxError> {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(Duration::from_millis(config.timeout_ms))
-            .build()
-            .map_err(|err| {
-                AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
-            })?;
+        let mut builder =
+            reqwest::blocking::Client::builder().timeout(Duration::from_millis(config.timeout_ms));
+        if crate::is_local(&config.base_url) {
+            builder = builder.no_proxy();
+        }
+        let client = builder.build().map_err(|err| {
+            AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
+        })?;
         Ok(Endpoint {
             config,
             client,

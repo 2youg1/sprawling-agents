@@ -102,6 +102,9 @@ impl Machine for ThisMachine {
                 }
             }
             Detection::Built { carried } => built(*carried),
+            Detection::Family(family) => {
+                super::family::look(*family, self.platform, self.patience, &search_path)
+            }
         }
     }
 

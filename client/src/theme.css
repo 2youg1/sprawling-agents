@@ -10,9 +10,45 @@
  * (the resolved per-mille values below are what theme's own test writes
  * to target/screens/tokens.css). Desaturation is one coefficient,
  * --chroma, set to zero. This is the only file in the client that may
- * hold a colour, a size or a family literal. */
+ * hold a colour, a size or a family literal.
+ *
+ * Two font files ship inside the binary: Geist Sans and Geist Mono, one
+ * variable woff2 each, in client/src/fonts/, and they are the default
+ * face. The reason is that the client is one screen a person judges the
+ * whole product by, and a stack that starts at whatever the machine
+ * happens to have gives that screen a different shape on every machine,
+ * with metrics nobody here can measure. Two variable files cost about a
+ * tenth of the frontend budget and buy one drawing everywhere. They are
+ * licensed OFL-1.1, whose text travels beside them as
+ * client/src/fonts/OFL.txt; docs/third-party.md carries the obligation.
+ * Nothing is fetched at run time - a client that reached out to a font
+ * host would leak that a city was opened, and would draw nothing on a
+ * machine with no route out. A missing file is not a failure either:
+ * `font-display: swap` and the fallback chain below draw the page with
+ * what the machine has.
+ *
+ * Four things a person may change about how the page is drawn - the
+ * sans face, the mono face, the body size, the amount of colour, and
+ * whether anything moves - are declared here and selected from the root
+ * element, so the stylesheet stays the one authority for what the
+ * choices *are* and the appearance section only says which one holds. */
 
 @import "tailwindcss";
+
+@font-face {
+  font-family: "Geist";
+  src: url("./fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("./fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 @theme {
   --color-*: initial;
@@ -57,13 +93,17 @@
     var(--color-accent)
   );
 
-  /* The faces: no font file ships and none is fetched. */
+  /* The faces: the shipped one first, then what a browser already has,
+   * in the order it is likely to have it. A stack begins with
+   * `--face-sans` or `--face-mono` so that choosing a face moves one
+   * value and keeps the whole fallback chain behind it. */
   --font-sans:
-    Inter, "IBM Plex Sans", "Source Sans 3", "Public Sans", system-ui,
-    -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, Arial, sans-serif;
+    var(--face-sans), Inter, "IBM Plex Sans", "Source Sans 3", "Public Sans",
+    system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, Arial,
+    sans-serif;
   --font-mono:
-    ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas,
-    "DejaVu Sans Mono", monospace;
+    var(--face-mono), ui-monospace, "Cascadia Mono", "SF Mono", Menlo,
+    Consolas, "DejaVu Sans Mono", monospace;
 
   /* The type scale: a step is named for its job, not its size. */
   --text-figure: 28px;
@@ -178,10 +218,45 @@
 
 :root {
   --chroma: 1;
+  /* The face each stack starts with. Geist while the person says
+   * nothing; the appearance section writes a generic family or a stack
+   * they typed. */
+  --face-sans: "Geist";
+  --face-mono: "Geist Mono";
   --corner-panel-shape: superellipse(2);
   --corner-card-shape: superellipse(1.5);
   --corner-control-shape: superellipse(1.5);
   --corner-pill-shape: superellipse(1);
+}
+
+/* The faces a person may choose instead of the shipped one. Geist is
+ * the absent case, so a root element saying nothing is already right.
+ * A stack somebody typed is the one value this file cannot hold, and
+ * arrives as `--face-sans` set on the root element itself. */
+:root[data-sans="system"] {
+  --face-sans: system-ui;
+}
+:root[data-mono="system"] {
+  --face-mono: ui-monospace;
+}
+
+/* The three body sizes a person chooses between, declared here so the
+ * colour gate reads each one and demands the tier it needs: at weight
+ * 400 all three sit at Lc 90, which is what --color-text reaches on the
+ * surface ceiling. Only the body step moves - a note stays at 15px,
+ * because a smaller note would demand a tier its token does not
+ * reach. */
+:root[data-body="14"] {
+  --text-body: 14px;
+}
+:root[data-body="16"] {
+  --text-body: 16px;
+}
+
+/* All the colour, or none of it. The coefficient is already the one
+ * place desaturation is expressed; this only says who may set it. */
+:root[data-chroma="off"] {
+  --chroma: 0;
 }
 
 /* The corners are continuous-curvature (a squircle), the way the old
@@ -273,15 +348,39 @@
 .drop {
   animation: drop 200ms var(--ease-standard) both;
 }
+/* Motion has three states and the root element spells which one holds:
+ * no attribute follows the machine, `off` reduces whatever the machine
+ * says, and `on` keeps the full motion even on a machine that asks for
+ * less. The machine's own answer is therefore scoped to `:not([on])`,
+ * so a person who asked for movement is not overruled by their
+ * operating system. */
 @media (prefers-reduced-motion: reduce) {
-  .bob,
-  .blink,
-  .wave,
-  .rise,
-  .drop,
-  .animate-pulse {
+  :root:not([data-motion="on"]) .bob,
+  :root:not([data-motion="on"]) .blink,
+  :root:not([data-motion="on"]) .wave,
+  :root:not([data-motion="on"]) .rise,
+  :root:not([data-motion="on"]) .drop,
+  :root:not([data-motion="on"]) .animate-pulse {
     animation: none;
   }
+}
+:root[data-motion="off"] .bob,
+:root[data-motion="off"] .blink,
+:root[data-motion="off"] .wave,
+:root[data-motion="off"] .rise,
+:root[data-motion="off"] .drop,
+:root[data-motion="off"] .animate-pulse {
+  animation: none;
+}
+/* A transition is an acknowledgement rather than a decoration, so it is
+ * shortened to a frame rather than removed: the state still changes
+ * where the eye was, and nothing travels. */
+:root[data-motion="off"] *,
+:root[data-motion="off"] *::before,
+:root[data-motion="off"] *::after {
+  transition-duration: 1ms;
+  animation-iteration-count: 1;
+  scroll-behavior: auto;
 }
 
 /* Base: a page is dark, text never pure white, links carry no

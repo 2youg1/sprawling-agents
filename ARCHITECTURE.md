@@ -351,7 +351,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 
 **The number in each subheading is the number of rows under it**, and `cargo xtask modmap` counts them, because every count a person maintained by hand here had already gone stale. The `desktop` heading is the one exception the machine cannot judge: its files sit outside `crates/`, where the parser does not look.
 
-### kernel (74) — every decision in the city, and nothing that touches a disk
+### kernel (75) — every decision in the city, and nothing that touches a disk
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -398,6 +398,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::plan::blocking | crates/kernel/src/plan/blocking.rs | what a node waits for, and the circles it waits in | decision | V3 | built | kernel-SPEC.md#8-33 |
 | kernel::blockage | crates/kernel/src/blockage.rs | red, and how far it reaches: one cause named rather than every symptom listed | decision | V3 | built | kernel-SPEC.md#8-34 |
 | kernel::pursuit | crates/kernel/src/pursuit.rs | a goal the city works towards, and the one condition under which it stops | decision | V3 | built | kernel-SPEC.md#8-35 |
+| kernel::reach | crates/kernel/src/reach.rs | where a call to a provider stops, stage by stage: the name, the socket, the handshake, the status, and what it goes through | value | V5 | built | kernel-SPEC.md#8-50 |
 | kernel::completion | crates/kernel/src/completion.rs | done requires evidence; progress has two states and no third | value | S2 | built | kernel-SPEC.md#8-20 |
 | kernel::registry | crates/kernel/src/registry.rs | the three books: artifact, asset, skill | value | S2 | built | kernel-SPEC.md#8-18 |
 | kernel::approval | crates/kernel/src/approval.rs | what waits for a person, its cluster key, and a policy that expires | value | S2 | built | kernel-SPEC.md#8-21 |
@@ -481,7 +482,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::fixture | crates/memory/src/bundle/fixture.rs | the one city the bundle tests export | adapter | V3 | built | memory-SPEC.md#8-21 |
 
-### gateway (41) — everything between a decision to call a model and the bytes on the wire
+### gateway (42) — everything between a decision to call a model and the bytes on the wire
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -517,6 +518,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::admission | crates/gateway/src/admission.rs | the provider's concurrency limit and a deterministic minimum interval | decision | S3 | built | gateway-SPEC.md#8-6 |
 | gateway::fallback | crates/gateway/src/fallback.rs | what a tag does when its endpoint will not answer, and the payload the retreat itself is | value | V4 | built | gateway-SPEC.md#8-11 |
 | gateway::market | crates/gateway/src/market.rs | the model catalogue snapshot, pinned so a price cannot move under a run | value | S3 | built | gateway-SPEC.md#8-7 |
+| gateway::reach | crates/gateway/src/reach.rs | the staged reading of one base URL, and the rule that a call to this machine never goes through a proxy | adapter | V5 | built | gateway-SPEC.md#8-15 |
 | gateway::cost | crates/gateway/src/cost.rs | per-call settlement, with the provider's own figure preferred | decision | S3 | built | gateway-SPEC.md#8-8 |
 | gateway::credential | crates/gateway/src/credential.rs | custody: capture, replace with a reference, redeem at the wire, renew before expiry | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::vault | crates/gateway/src/credential/vault.rs | vaults, backends, persistence | adapter | S3 | built | gateway-SPEC.md#8-4 |
@@ -702,7 +704,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (144)
+### browser (12), protocol (5), bin (153)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -840,6 +842,15 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::doctor::explain | crates/sprawling/src/doctor/explain.rs | one refusal code connected to the items on this machine that can raise it, one line a person can act on per item | decision | V4 | built | sprawling-SPEC.md#8-48 |
 | bin::doctor::tests::faults | crates/sprawling/src/doctor/tests/faults.rs | the ugly paths: a binary that will not start, a variable naming nothing, a half-written component, a tool that says nothing | value | V4 | built | sprawling-SPEC.md#8-50 |
 | bin::doctor::tests::city | crates/sprawling/src/doctor/tests/city.rs | a building named for what it asks and this machine lacks, rules that will not read, and a code explained | decision | V4 | built | sprawling-SPEC.md#8-48 |
+| bin::doctor::family | crates/sprawling/src/doctor/family.rs | the three engines a session can be held with, the brand of each this machine has, and the one variable that overrides them | decision | V6 | built | sprawling-SPEC.md#8-57 |
+| bin::doctor::family::gecko | crates/sprawling/src/doctor/family/gecko.rs | Firefox and its forks, and where each platform installs them | data | V6 | built | sprawling-SPEC.md#8-57 |
+| bin::doctor::family::chromium | crates/sprawling/src/doctor/family/chromium.rs | Chrome, Edge, Brave, Chromium and Vivaldi, and where each platform installs them | data | V6 | built | sprawling-SPEC.md#8-57 |
+| bin::doctor::family::webkit | crates/sprawling/src/doctor/family/webkit.rs | Safari through the driver macOS ships beside it | data | V6 | built | sprawling-SPEC.md#8-57 |
+| bin::doctor::registry | crates/sprawling/src/doctor/registry.rs | where Windows records a browser no shell resolves: App Paths and StartMenuInternet, read through reg.exe | adapter | V6 | built | sprawling-SPEC.md#8-57 |
+| bin::doctor::table::toolchain | crates/sprawling/src/doctor/table/toolchain.rs | the Rust tools this repository's own recipes call, each with the command that installs it | data | V6 | built | sprawling-SPEC.md#8-58 |
+| bin::doctor::paint | crates/sprawling/src/doctor/paint.rs | the report as a table: four status words, two sections, and colour a terminal may refuse | projection | V6 | built | sprawling-SPEC.md#8-59 |
+| bin::doctor::tests::browsers | crates/sprawling/src/doctor/tests/browsers.rs | every family is a row, every member says where it is installed, and the awkward member is never the first answer | decision | V6 | built | sprawling-SPEC.md#8-57 |
+| bin::doctor::tests::reading | crates/sprawling/src/doctor/tests/reading.rs | what a person reads off the report: four status words, two sections, a version out of a banner, colour refused | decision | V6 | built | sprawling-SPEC.md#8-59 |
 | bin::wire_client | crates/sprawling/src/wire_client.rs | the second client of the wire: one frame out, every frame back, and enrolment from stdin | adapter | P3 | built | sprawling-SPEC.md#8-41 |
 | bin::console | crates/sprawling/src/console.rs | what a served city says to the terminal it is running in, and what a line typed there means | decision | P1 | built | sprawling-SPEC.md#8-30 |
 | bin::console::language | crates/sprawling/src/console/language.rs | the words a line may use and what each one asks for | decision | P1 | built | sprawling-SPEC.md#8-30 |
@@ -852,7 +863,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::plan_view | crates/sprawling/src/plan_view.rs | every building's plan, parsed once and re-parsed only when a record says it may have moved | projection | V3 | built | sprawling-SPEC.md#8-34 |
 | bin::plan_view::tests | crates/sprawling/src/plan_view/tests.rs | proof that the projection folds records rather than holding a copy of the plan | projection | V3 | built | sprawling-SPEC.md#8-34 |
 | bin::views | crates/sprawling/src/views.rs | the fold every query is answered from, and the lines a page reads off it | projection | V3 | built | sprawling-SPEC.md#8-37 |
-| bin::views::hearing | crates/sprawling/src/views/hearing.rs | the facility that turns a recording into text, as this city's own choice describes it | adapter | V5 | built | sprawling-SPEC.md#8-56 |
+| bin::views::hearing | crates/sprawling/src/views/hearing.rs | the facility that turns a recording into text, as this city's own choice describes it | adapter | V5 | built | sprawling-SPEC.md#8-57 |
 | bin::views::holding | crates/sprawling/src/views/holding.rs | what the views hold and how one record folds in | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::answering | crates/sprawling/src/views/answering.rs | every question a page may ask, answered from the fold | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::commits | crates/sprawling/src/views/commits.rs | which run wrote a commit, and the commits a building made newest first, folded from the records that announced them | projection | V4 | built | sprawling-SPEC.md#8-53 |
