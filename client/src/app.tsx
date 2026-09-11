@@ -26,6 +26,7 @@ import { Run } from "./views/run";
 import { Mcp } from "./views/mcp";
 import { Setup } from "./views/setup";
 import { Talk } from "./views/talk";
+import { Gallery } from "./views/gallery";
 import { Welcome } from "./views/welcome";
 
 // Where `g` followed by a letter goes.
@@ -171,6 +172,9 @@ export function App() {
           </Match>
           <Match when={view().kind === "welcome"}>
             <Welcome />
+          </Match>
+          <Match when={view().kind === "gallery"}>
+            <Gallery />
           </Match>
         </Switch>
       </main>

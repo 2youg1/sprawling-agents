@@ -32,7 +32,11 @@ export type View =
   | { readonly kind: "mcp" }
   | { readonly kind: "record"; readonly lens: Lens }
   | { readonly kind: "cost" }
-  | { readonly kind: "welcome" };
+  | { readonly kind: "welcome" }
+  // Every screen at once, on fixtures, reachable without a city. It is
+  // a route rather than a build flag so the gate that measures it opens
+  // the same bundle a person runs.
+  | { readonly kind: "gallery" };
 
 // The conversation with the Mayor: the page a person arrives to.
 export const DEFAULT_VIEW: View = { kind: "talk", address: MAYOR };
@@ -60,6 +64,8 @@ export function toFragment(view: View): string {
       return "#/cost";
     case "welcome":
       return "#/welcome";
+    case "gallery":
+      return "#/gallery";
   }
 }
 
@@ -86,6 +92,7 @@ const BARE: Readonly<Record<string, View>> = {
   record: { kind: "record", lens: "ledger" },
   cost: { kind: "cost" },
   welcome: { kind: "welcome" },
+  gallery: { kind: "gallery" },
 
   overview: { kind: "city" },
   live: DEFAULT_VIEW,

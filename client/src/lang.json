@@ -854,5 +854,9 @@
   "mcp_transport": {
     "en": "transport",
     "zh": "传输"
+  },
+  "gallery_title": {
+    "en": "gallery",
+    "zh": "画廊"
   }
 }
