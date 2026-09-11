@@ -172,9 +172,9 @@ fn sink(dom: &str) -> Option<&str> {
     rest.get(..end)
 }
 
-/// `tag role name left top width height`, as the probe writes it. The name
-/// is percent-encoded, because it is the one field that holds a person's
-/// words and those contain spaces.
+/// `tag role name left top width height depth parent scrolls-x scrolls-y`,
+/// as the probe writes it. The name is percent-encoded, because it is the
+/// one field that holds a person's words and those contain spaces.
 fn parse(record: &str) -> Option<Drawn> {
     let mut field = record.split_whitespace();
     let tag = field.next()?.to_owned();
@@ -190,6 +190,8 @@ fn parse(record: &str) -> Option<Drawn> {
         height: field.next()?.parse().ok()?,
         depth: field.next()?.parse().ok()?,
         parent: field.next()?.parse().ok()?,
+        scrolls_across: field.next()? == "1",
+        scrolls_down: field.next()? == "1",
     })
 }
 
@@ -261,9 +263,11 @@ setTimeout(function () {{
   var all = document.querySelectorAll(
     'main, nav, aside, header, footer, section, h1, h2, h3, button, a, input, textarea, select, [role]'
   );
+  function scrolling(value) {{ return value === 'auto' || value === 'scroll' ? 1 : 0; }}
   for (var i = 0; i < all.length; i++) {{
     var node = all[i];
     var rect = node.getBoundingClientRect();
+    var style = getComputedStyle(node);
     var depth = 0;
     for (var up = node.parentElement; up; up = up.parentElement) depth++;
     var parent = -1;
@@ -275,7 +279,8 @@ setTimeout(function () {{
       encodeURIComponent(named(node).slice(0, 80)) || '-',
       Math.round(rect.left), Math.round(rect.top),
       Math.round(rect.width), Math.round(rect.height),
-      depth, parent
+      depth, parent,
+      scrolling(style.overflowX), scrolling(style.overflowY)
     ].join(' '));
   }}
   document.getElementById('{SINK}').textContent = out.join(' ; ');

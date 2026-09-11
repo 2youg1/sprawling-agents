@@ -64,6 +64,16 @@ pub(super) struct Drawn {
     pub(super) depth: i64,
     /// Index of the nearest measured ancestor, or `-1` at the top.
     pub(super) parent: i64,
+    /// Whether this element's own overflow lets its contents extend past
+    /// its box, across and down.
+    ///
+    /// A scrolling container is the one legitimate way a child is drawn
+    /// outside its parent: the page is longer than the window and the
+    /// person scrolls. Without this the rule below reads every page with
+    /// more content than one screen as a layout defect, which is every
+    /// page this product has.
+    pub(super) scrolls_across: bool,
+    pub(super) scrolls_down: bool,
 }
 
 impl Drawn {
@@ -266,10 +276,15 @@ fn nothing_escapes_what_holds_it(drawn: &[Drawn], out: &mut Vec<Violation>) {
         if !parent.drawn() || parent.depth >= held.depth {
             continue;
         }
-        let escapes = held.left.saturating_add(SLACK) < parent.left
-            || held.right() > parent.right().saturating_add(SLACK)
-            || held.top.saturating_add(SLACK) < parent.top
-            || held.bottom() > parent.bottom().saturating_add(SLACK);
+        // A container that scrolls is allowed to hold more than it
+        // shows, in the axis it scrolls: what is below the fold is not
+        // painted over anything.
+        let escapes = (!parent.scrolls_across
+            && (held.left.saturating_add(SLACK) < parent.left
+                || held.right() > parent.right().saturating_add(SLACK)))
+            || (!parent.scrolls_down
+                && (held.top.saturating_add(SLACK) < parent.top
+                    || held.bottom() > parent.bottom().saturating_add(SLACK)));
         if escapes {
             out.push(violation(
                 "nothing is drawn outside the box that holds it",

@@ -22,6 +22,8 @@ fn el(tag: &str, name: &str, at: [i64; 4], nesting: (i64, i64)) -> Drawn {
     let [left, top, width, height] = at;
     let (depth, parent) = nesting;
     Drawn {
+        scrolls_across: false,
+        scrolls_down: false,
         tag: tag.to_owned(),
         role: "-".to_owned(),
         name: name.to_owned(),
@@ -169,6 +171,44 @@ fn a_box_that_has_left_its_container_is_caught() {
         found
             .iter()
             .any(|v| v.violation.contains("escaped") && v.violation.contains("leaves")),
+        "{}",
+        rules(&found)
+    );
+}
+
+/// A page longer than the window is not a layout defect.
+///
+/// The rule exists for a box painted over whatever is beside it, and a
+/// container that scrolls paints nothing over anything: what is below
+/// the fold is reached by scrolling. Without this the gate reads every
+/// page with more content than one screen as broken, which is every
+/// page this product has.
+#[test]
+fn a_section_below_the_fold_of_a_scrolling_column_is_not_an_escape() {
+    let mut drawn = good();
+    if let Some(column) = drawn.get_mut(1) {
+        column.scrolls_down = true;
+    }
+    drawn.push(el("SECTION", "below", [361, 1041, 728, 412], (5, 1)));
+    let found = judge(&drawn);
+    assert!(
+        found.iter().all(|v| !v.rule.contains("outside the box")),
+        "{}",
+        rules(&found)
+    );
+}
+
+/// And the same section in a column that does not scroll still is one:
+/// the exemption is the container's own overflow, not the direction.
+#[test]
+fn a_section_below_the_fold_of_a_fixed_column_is_still_an_escape() {
+    let mut drawn = good();
+    drawn.push(el("SECTION", "below", [361, 1041, 728, 412], (5, 1)));
+    let found = judge(&drawn);
+    assert!(
+        found
+            .iter()
+            .any(|v| v.violation.contains("below") && v.violation.contains("leaves")),
         "{}",
         rules(&found)
     );
