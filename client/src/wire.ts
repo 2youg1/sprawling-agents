@@ -564,6 +564,7 @@ export type SessionName = typeof SessionName.Type;
  */
 export const CommitAnswer = Schema.Struct({
   actor: Address,
+  at: TimeMs,
   effort: Schema.optional(Schema.NullOr(Effort)),
   lineage: Schema.Array(RunId),
   model: Schema.String,

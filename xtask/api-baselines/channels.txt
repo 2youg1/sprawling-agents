@@ -218,6 +218,7 @@ pub channels::Command::Wake::idem: kernel::idem::IdemKey
 pub channels::Command::Wake::source: alloc::string::String
 pub channels::Command::Wake::subject: alloc::string::String
 pub channels::CommitAnswer::actor: kernel::address::Address
+pub channels::CommitAnswer::at: kernel::event::identity::TimeMs
 pub channels::CommitAnswer::effort: core::option::Option<kernel::model::wire::Effort>
 pub channels::CommitAnswer::lineage: alloc::vec::Vec<kernel::event::identity::RunId>
 pub channels::CommitAnswer::model: alloc::string::String

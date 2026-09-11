@@ -91,6 +91,9 @@ pub struct CommitAnswer {
     pub effort: Option<Effort>,
     /// Where the line announcing this commit sits in the one history.
     pub seq: Seq,
+    /// When that line was written: the record's own clock, so a list
+    /// of commits reads as a day rather than as a column of numbers.
+    pub at: TimeMs,
     /// What a person called this line of work, read off the room the
     /// actor worked in. Absent when the run worked at a building's own
     /// address, which is a run nobody opened a session for.

@@ -30,6 +30,7 @@ use kernel::{Address, EventKind, EventRecord, GitOid, RunId, Seq, SessionName};
 pub(super) struct CommitFacts {
     run: RunId,
     seq: Seq,
+    at: kernel::TimeMs,
     actor: Address,
     chosen: memory::ModelChoice,
 }
@@ -54,6 +55,7 @@ impl CommitFacts {
             model: self.chosen.id.clone(),
             effort: self.chosen.effort,
             seq: self.seq,
+            at: self.at,
             session: session_of(&self.actor),
             lineage,
         }
@@ -166,6 +168,7 @@ pub(super) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)
         CommitFacts {
             run: record.run(),
             seq: record.seq(),
+            at: record.t(),
             actor: record.addr()?.clone(),
             chosen: memory::model_choice_of(map),
         },

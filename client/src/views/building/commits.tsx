@@ -15,8 +15,9 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount }
 
 import { commitsQuery } from "../../core/asking";
 import { toFragment } from "../../core/route";
+import { clock } from "../../core/time";
 import type { Address, CommitAnswer, CommitsAnswer, Seq } from "../../wire";
-import { useSay, useUi } from "../../ui";
+import { useLang, useSay, useUi } from "../../ui";
 import { Changes } from "../changes";
 
 function short(oid: string): string {
@@ -49,6 +50,7 @@ function Row(props: {
   readonly onToggle: () => void;
 }) {
   const say = useSay();
+  const lang = useLang();
   const effort = () => (props.commit.effort === null || props.commit.effort === undefined ? "" : ` · ${props.commit.effort}`);
   return (
     <li class="border-b border-g1">
@@ -80,10 +82,10 @@ function Row(props: {
         </button>
         <a
           href={toFragment({ kind: "run", run: props.commit.run })}
-          class="shrink-0 font-mono text-text-disabled hover:text-text-quiet"
+          class="shrink-0 whitespace-nowrap text-text-disabled hover:text-text-quiet"
           title={say("tree_transcript")}
         >
-          #{String(props.commit.seq)}
+          {clock(lang(), props.commit.at)}
         </a>
         <Show when={props.commit.session}>
           {(session) => (

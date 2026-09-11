@@ -570,6 +570,7 @@ pub struct CommitAnswer {
     pub model: String,                 // Sprawling-Model；空串＝那条记录没说
     pub effort: Option<kernel::Effort>,// Sprawling-Effort
     pub seq: Seq,                      // 宣告这次提交的那一行在账本里的位置
+    pub at: TimeMs,                    // 那一行写下的时刻（card-2.7 增）
     pub session: Option<SessionName>,  // 房间那一段：人给这条活起的名字
 }
 ```
@@ -753,6 +754,7 @@ pub struct CommitsAnswer {
 - **答案回带 `building` 与 `before`**：线上没有请求 id，客户端按内容把答案配回问题（`ChangesAnswer` 回带 `base`／`head` 是同一个理由）；缺了这两个字段，两座楼的两页同时在飞时无法分辨谁是谁的。
 - **失联如实（D51）**：只列城自己写过的提交；人 rebase／squash 之后 trunk 上的 oid 不在其中，`Commit` 对它仍答 `Unavailable`。不读提交体的 trailer 回填——那会让投影成为第二权威（`views/commits.rs` 模块头）。
 - **服务端**：`views::holding` 给按 oid 键的 `commits` 表加一条按 `seq` 的索引（`commit_seqs: BTreeMap<Seq, GitOid>`），`fold_commit` 两表同写；sprawling-SPEC §8-53。
+- **`CommitAnswer` 长出 `at: TimeMs`**（同版内，第二条提交）：宣告这次提交的那条记录自己的 `t`。理由来自第一张截图——一列 seq 没法扫读，而一列时间可以。与 `Opening.at`／`Closing.at` 同源、同型。
 - **客户端**：`cargo xtask wire-ts --write` 重生；`crates/web` 只把新变体接进 `mount::frame` 那条「有答案而暂无页面问它」的臂（并存期最后一次）。
 
 ### 8-23 新客户端第一次真正用这条线，线上缺的四件事（card-6.4；WIRE_V 16→17）
