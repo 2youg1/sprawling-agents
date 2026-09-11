@@ -1,239 +1,139 @@
 {
-  "region_main": {
-    "en": "the page",
-    "zh": "页面"
+  "autonomy_clerk": {
+    "en": "the clerk",
+    "zh": "clerk 代答"
   },
-  "region_nav": {
-    "en": "where to go",
-    "zh": "去处"
+  "autonomy_deferred": {
+    "en": "wait",
+    "zh": "等着"
   },
-  "region_composer": {
-    "en": "what to say",
-    "zh": "要说的话"
+  "autonomy_owner": {
+    "en": "me",
+    "zh": "我"
   },
-  "link_live": {
-    "en": "live",
-    "zh": "已连接"
+  "bin_empty": {
+    "en": "empty",
+    "zh": "空"
   },
-  "link_connecting": {
-    "en": "connecting…",
-    "zh": "连接中…"
+  "bin_gone": {
+    "en": "gone",
+    "zh": "已丢弃"
   },
-  "link_refused": {
-    "en": "refused",
-    "zh": "被拒绝"
+  "bin_interred": {
+    "en": "in the store at",
+    "zh": "在内容库里，位于"
   },
-  "link_retry": {
-    "en": "try again",
-    "zh": "再试一次"
+  "bin_rebuildable": {
+    "en": "rebuildable:",
+    "zh": "可重建："
   },
-  "dismiss": {
-    "en": "dismiss",
-    "zh": "知道了"
+  "bin_restored": {
+    "en": "restored",
+    "zh": "已找回"
   },
-  "nav_city": {
-    "en": "city",
-    "zh": "城市"
+  "bin_tracked": {
+    "en": "in git at",
+    "zh": "在 git 里，位于"
   },
-  "nav_settings": {
-    "en": "settings",
-    "zh": "设置"
+  "bld_clear": {
+    "en": "clear",
+    "zh": "清掉"
   },
-  "nav_mcp": {
-    "en": "MCP",
-    "zh": "MCP"
+  "bld_commits": {
+    "en": "commits",
+    "zh": "提交"
   },
-  "nav_mayor": {
-    "en": "the Mayor",
-    "zh": "Mayor"
+  "bld_goal_placeholder": {
+    "en": "standing goal…",
+    "zh": "常设目标…"
   },
-  "nav_waiting": {
-    "en": "{n} waiting",
-    "zh": "{n} 件等你"
+  "bld_halt": {
+    "en": "/stop {addr}",
+    "zh": "/stop {addr}"
   },
-  "nav_palette": {
-    "en": "everything",
-    "zh": "全部"
+  "bld_open_talk": {
+    "en": "talk",
+    "zh": "对话"
   },
-  "nav_everything": {
-    "en": "everything",
-    "zh": "全部去处"
+  "bld_pause": {
+    "en": "pause",
+    "zh": "暂停"
   },
-  "nav_the_record": {
-    "en": "the record",
-    "zh": "记录"
+  "bld_plan": {
+    "en": "the plan",
+    "zh": "计划"
   },
-  "palette_placeholder": {
-    "en": "go to…",
-    "zh": "去…"
+  "bld_progress": {
+    "en": "{done}/{total}",
+    "zh": "{done}/{total}"
   },
-  "palette_building": {
-    "en": "building",
-    "zh": "楼"
+  "bld_pursue": {
+    "en": "pursue",
+    "zh": "追"
   },
-  "palette_room": {
-    "en": "room",
-    "zh": "房间"
+  "bld_release": {
+    "en": "/release {addr}",
+    "zh": "/release {addr}"
   },
-  "talk_placeholder_mayor": {
-    "en": "to the Mayor…",
-    "zh": "对 Mayor 说…"
+  "bld_resume": {
+    "en": "resume",
+    "zh": "继续"
   },
-  "talk_placeholder_room": {
-    "en": "to {room}…",
-    "zh": "对 {room} 说…"
+  "bld_tree": {
+    "en": "files",
+    "zh": "文件"
   },
-  "talk_empty_mayor": {
-    "en": "the Mayor",
-    "zh": "市长室"
+  "change_added": {
+    "en": "added",
+    "zh": "新增"
   },
-  "talk_empty_room": {
-    "en": "room {room}",
-    "zh": "房间 {room}"
+  "change_binary": {
+    "en": "binary",
+    "zh": "二进制"
   },
-  "talk_goal": {
-    "en": "read the city, answer, and plan where planning is needed",
-    "zh": "读完这座城，回答，需要计划的地方写计划"
+  "change_deleted": {
+    "en": "deleted",
+    "zh": "删了"
   },
-  "talk_send": {
-    "en": "/dispatch",
-    "zh": "/dispatch"
+  "change_modified": {
+    "en": "changed",
+    "zh": "改了"
   },
-  "talk_steer": {
-    "en": "/steer",
-    "zh": "/steer"
-  },
-  "talk_steer_queued": {
-    "en": "/steer --queued",
-    "zh": "/steer --queued"
-  },
-  "talk_stop": {
-    "en": "/stop",
-    "zh": "/stop"
-  },
-  "talk_effort": {
-    "en": "thinking",
-    "zh": "思考"
-  },
-  "talk_not_live": {
-    "en": "not connected",
-    "zh": "未连接"
-  },
-  "talk_you": {
-    "en": "you",
-    "zh": "你"
-  },
-  "talk_resident": {
-    "en": "resident",
-    "zh": "居民"
-  },
-  "talk_thinking": {
-    "en": "{who} is thinking…",
-    "zh": "{who} 在想…"
-  },
-  "talk_waiting_you": {
-    "en": "waiting for you",
-    "zh": "等你回答"
-  },
-  "talk_discarded": {
-    "en": "{n} discarded",
-    "zh": "丢弃 {n} 个"
-  },
-  "talk_tokens": {
-    "en": "{n} tokens",
-    "zh": "{n} 个 token"
-  },
-  "talk_halted": {
-    "en": "city stopped",
-    "zh": "城已停"
-  },
-  "talk_release": {
-    "en": "/release --all",
-    "zh": "/release --all"
-  },
-  "outcome_done": {
-    "en": "done",
-    "zh": "做完了"
-  },
-  "outcome_cancelled": {
-    "en": "stopped",
-    "zh": "停下了"
-  },
-  "outcome_limit": {
-    "en": "hit a limit",
-    "zh": "碰到了上限"
-  },
-  "outcome_frozen": {
-    "en": "ended",
-    "zh": "结束了"
-  },
-  "run_cut": {
-    "en": "{n} more lines",
-    "zh": "还有 {n} 行"
-  },
-  "wait_title": {
-    "en": "waiting on you",
-    "zh": "等你的事"
-  },
-  "wait_from": {
-    "en": "{actor} asks",
-    "zh": "{actor} 在问"
-  },
-  "wait_allow": {
-    "en": "allow",
-    "zh": "允许"
-  },
-  "wait_deny": {
-    "en": "deny",
-    "zh": "拒绝"
-  },
-  "palette_raise": {
-    "en": "raise {addr}",
-    "zh": "新建 {addr}"
-  },
-  "palette_fork": {
-    "en": "fork {addr}",
-    "zh": "分出 {addr}"
-  },
-  "wait_same": {
-    "en": "×{n} alike",
-    "zh": "×{n} 同问"
-  },
-  "wait_tainted": {
-    "en": "outside content",
-    "zh": "城外内容"
-  },
-  "city_hall": {
-    "en": "City Hall",
-    "zh": "市政厅"
-  },
-  "city_at_work": {
-    "en": "at work",
-    "zh": "在干活"
+  "change_renamed": {
+    "en": "renamed from {from}",
+    "zh": "从 {from} 改名"
   },
   "city_active": {
     "en": "{n} at work",
     "zh": "{n} 个在干活"
   },
-  "city_quiet": {
-    "en": "quiet",
-    "zh": "安静"
-  },
-  "city_no_buildings": {
-    "en": "no buildings",
-    "zh": "没有楼"
+  "city_at_work": {
+    "en": "at work",
+    "zh": "在干活"
   },
   "city_drawing": {
     "en": "the city, one block per building",
     "zh": "城市，一栋楼一块"
   },
-  "city_stop": {
-    "en": "/stop --all",
-    "zh": "/stop --all"
+  "city_hall": {
+    "en": "City Hall",
+    "zh": "市政厅"
+  },
+  "city_no_buildings": {
+    "en": "no buildings",
+    "zh": "没有楼"
+  },
+  "city_quiet": {
+    "en": "quiet",
+    "zh": "安静"
   },
   "city_release": {
     "en": "/release --all",
     "zh": "/release --all"
+  },
+  "city_stop": {
+    "en": "/stop --all",
+    "zh": "/stop --all"
   },
   "city_stopped": {
     "en": "stopped",
@@ -242,18 +142,6 @@
   "city_stopped_line": {
     "en": "stopped",
     "zh": "已停"
-  },
-  "bld_tree": {
-    "en": "files",
-    "zh": "文件"
-  },
-  "bld_plan": {
-    "en": "the plan",
-    "zh": "计划"
-  },
-  "bld_commits": {
-    "en": "commits",
-    "zh": "提交"
   },
   "commits_empty": {
     "en": "no commits",
@@ -271,585 +159,33 @@
     "en": "×{n} handoff",
     "zh": "×{n} 接替"
   },
-  "bld_progress": {
-    "en": "{done}/{total}",
-    "zh": "{done}/{total}"
-  },
-  "bld_open_talk": {
-    "en": "talk",
-    "zh": "对话"
-  },
-  "bld_pursue": {
-    "en": "pursue",
-    "zh": "追"
-  },
-  "bld_pause": {
-    "en": "pause",
-    "zh": "暂停"
-  },
-  "bld_resume": {
-    "en": "resume",
-    "zh": "继续"
-  },
-  "bld_clear": {
-    "en": "clear",
-    "zh": "清掉"
-  },
-  "bld_goal_placeholder": {
-    "en": "standing goal…",
-    "zh": "常设目标…"
-  },
-  "bld_halt": {
-    "en": "/stop {addr}",
-    "zh": "/stop {addr}"
-  },
-  "bld_release": {
-    "en": "/release {addr}",
-    "zh": "/release {addr}"
-  },
-  "plan_empty": {
-    "en": "no plan yet",
-    "zh": "还没有计划"
-  },
-  "status_ready": {
-    "en": "ready",
-    "zh": "就绪"
-  },
-  "status_not_started": {
-    "en": "not started",
-    "zh": "未开始"
-  },
-  "status_in_progress": {
-    "en": "working",
-    "zh": "在做"
-  },
-  "status_done": {
-    "en": "done",
-    "zh": "做完"
-  },
-  "status_blocked": {
-    "en": "stuck",
-    "zh": "卡住"
-  },
-  "status_awaiting_approval": {
-    "en": "awaiting approval",
-    "zh": "等审批"
-  },
-  "file_missing": {
-    "en": "missing",
-    "zh": "不存在"
-  },
-  "file_binary": {
-    "en": "binary · {kib}",
-    "zh": "二进制 · {kib}"
-  },
-  "file_truncated": {
-    "en": "first {kib} of {total}",
-    "zh": "前 {kib}，共 {total}"
-  },
-  "tree_empty": {
-    "en": "empty",
-    "zh": "空的"
-  },
-  "tree_live": {
-    "en": "live",
-    "zh": "进行中"
-  },
-  "tree_transcript": {
-    "en": "run",
-    "zh": "跑"
-  },
-  "tree_no_runs": {
-    "en": "no runs",
-    "zh": "没有跑"
-  },
-  "run_turns": {
-    "en": "turns",
-    "zh": "回合"
-  },
-  "run_context": {
-    "en": "context",
-    "zh": "上下文"
-  },
-  "run_changes": {
-    "en": "changes",
-    "zh": "改动"
-  },
-  "run_evidence": {
-    "en": "evidence",
-    "zh": "证据"
-  },
-  "run_lenses": {
-    "en": "four readings of one run",
-    "zh": "一次跑的四种读法"
-  },
-  "run_goal": {
-    "en": "what counts as done",
-    "zh": "做到什么算完"
-  },
-  "run_cancel": {
-    "en": "/stop",
-    "zh": "/stop"
-  },
-  "run_window": {
-    "en": "tokens per turn",
-    "zh": "每回合的 tokens"
-  },
-  "run_no_usage": {
-    "en": "no usage",
-    "zh": "没有用量"
-  },
-  "run_turn_n": {
-    "en": "turn {n}",
-    "zh": "第 {n} 回合"
-  },
-  "run_input": {
-    "en": "input",
-    "zh": "输入"
-  },
-  "run_cached": {
-    "en": "cached",
-    "zh": "缓存命中"
-  },
-  "run_output": {
-    "en": "output",
-    "zh": "输出"
-  },
-  "run_spent": {
-    "en": "spent {usd}",
-    "zh": "花了 {usd}"
-  },
-  "run_read_files": {
-    "en": "what it read",
-    "zh": "它读过什么"
-  },
-  "run_read_nothing": {
-    "en": "nothing read",
-    "zh": "没读过"
-  },
-  "run_no_changes": {
-    "en": "no changes",
-    "zh": "没有改动"
-  },
-  "run_no_fence": {
-    "en": "no checkpoint",
-    "zh": "没有栅栏"
-  },
-  "run_patch_needs_fence": {
-    "en": "after the next fence",
-    "zh": "下一道栅栏后"
-  },
-  "run_withheld": {
-    "en": "line {n} withheld · {reason}",
-    "zh": "第 {n} 行不回显 · {reason}"
-  },
-  "run_no_evidence": {
-    "en": "no evidence",
-    "zh": "没有证据"
-  },
-  "change_added": {
-    "en": "added",
-    "zh": "新增"
-  },
-  "change_modified": {
-    "en": "changed",
-    "zh": "改了"
-  },
-  "change_deleted": {
-    "en": "deleted",
-    "zh": "删了"
-  },
-  "change_renamed": {
-    "en": "renamed from {from}",
-    "zh": "从 {from} 改名"
-  },
-  "change_binary": {
-    "en": "binary",
-    "zh": "二进制"
-  },
-  "evidence_screenshot": {
-    "en": "screenshot",
-    "zh": "截图"
-  },
-  "evidence_finished": {
-    "en": "finished",
-    "zh": "完成"
-  },
-  "setup_providers": {
-    "en": "providers",
-    "zh": "模型供应方"
-  },
-  "setup_attach": {
-    "en": "with a key",
-    "zh": "用 key"
-  },
-  "setup_login": {
-    "en": "with a subscription",
-    "zh": "用订阅"
-  },
-  "setup_name": {
-    "en": "call it",
-    "zh": "叫它"
-  },
-  "setup_base_url": {
-    "en": "base URL",
-    "zh": "基址 URL"
-  },
-  "setup_dialect": {
-    "en": "which wire it speaks",
-    "zh": "它说哪种线"
-  },
-  "dialect_open_ai": {
-    "en": "OpenAI-shaped",
-    "zh": "OpenAI 形"
-  },
-  "dialect_anthropic": {
-    "en": "Anthropic-shaped",
-    "zh": "Anthropic 形"
-  },
-  "setup_key": {
-    "en": "key",
-    "zh": "密钥"
-  },
-  "setup_look": {
-    "en": "look at its models",
-    "zh": "看看它有哪些模型"
-  },
-  "setup_attach_btn": {
-    "en": "attach",
-    "zh": "接上"
-  },
-  "setup_keyed": {
-    "en": "keyed",
-    "zh": "有 key"
-  },
-  "setup_unkeyed": {
-    "en": "no key",
-    "zh": "没 key"
-  },
-  "setup_login_begin": {
-    "en": "start the login",
-    "zh": "开始登录"
-  },
-  "setup_login_open": {
-    "en": "open the approval page",
-    "zh": "打开批准页"
-  },
-  "setup_login_code": {
-    "en": "code",
-    "zh": "码"
-  },
-  "setup_login_finish": {
-    "en": "finish the login",
-    "zh": "完成登录"
-  },
-  "setup_models": {
-    "en": "which model thinks",
-    "zh": "哪个模型来想"
-  },
-  "setup_main": {
-    "en": "main · thinks",
-    "zh": "main · 思考"
-  },
-  "setup_digest": {
-    "en": "digest · reads",
-    "zh": "digest · 读长文"
-  },
-  "setup_transcribe": {
-    "en": "transcribe · hears",
-    "zh": "transcribe · 听写"
-  },
-  "setup_no_models": {
-    "en": "no models",
-    "zh": "没有模型"
-  },
-  "setup_effort": {
-    "en": "thinking",
-    "zh": "思考"
-  },
-  "effort_none": {
-    "en": "none",
-    "zh": "不想"
-  },
-  "effort_low": {
-    "en": "low",
-    "zh": "低"
-  },
-  "effort_medium": {
-    "en": "medium",
-    "zh": "中"
-  },
-  "effort_high": {
-    "en": "high",
-    "zh": "高"
-  },
-  "effort_xhigh": {
-    "en": "very high",
-    "zh": "很高"
-  },
-  "effort_max": {
-    "en": "max",
-    "zh": "最高"
-  },
-  "setup_autonomy": {
-    "en": "approvals",
-    "zh": "审批"
-  },
-  "autonomy_owner": {
-    "en": "me",
-    "zh": "我"
-  },
-  "autonomy_clerk": {
-    "en": "the clerk",
-    "zh": "clerk 代答"
-  },
-  "autonomy_deferred": {
-    "en": "wait",
-    "zh": "等着"
-  },
-  "setup_mcp": {
-    "en": "MCP · City Hall",
-    "zh": "MCP · 市政厅"
-  },
-  "setup_mcp_label": {
-    "en": "label",
-    "zh": "名字"
-  },
-  "setup_mcp_command": {
-    "en": "command",
-    "zh": "命令"
-  },
-  "setup_mcp_url": {
-    "en": "http URL",
-    "zh": "http 地址"
-  },
-  "setup_mcp_add": {
-    "en": "add",
-    "zh": "加上"
-  },
-  "setup_remove": {
-    "en": "remove",
-    "zh": "去掉"
-  },
-  "setup_skills_title": {
-    "en": "skills",
-    "zh": "技能（skills）"
-  },
-  "setup_skills": {
-    "en": "shared folder",
-    "zh": "共享文件夹"
-  },
-  "setup_skills_note": {
-    "en": "per building: <building>/.sprawling/skills/",
-    "zh": "单栋楼：<building>/.sprawling/skills/"
-  },
-  "setup_copy": {
-    "en": "copy",
-    "zh": "复制"
-  },
-  "setup_language": {
-    "en": "language",
-    "zh": "语言"
-  },
-  "setup_again": {
-    "en": "welcome",
-    "zh": "引导"
-  },
-  "setup_rerun": {
-    "en": "run again",
-    "zh": "再走一遍"
-  },
-  "welcome_title": {
-    "en": "welcome",
-    "zh": "欢迎"
-  },
-  "welcome_steps": {
-    "en": "the five steps",
-    "zh": "五步"
-  },
-  "welcome_step_machine": {
-    "en": "this machine",
-    "zh": "运行中的机器"
-  },
-  "welcome_step_provider": {
-    "en": "a provider",
-    "zh": "一个 provider"
-  },
-  "welcome_step_optional": {
-    "en": "optional",
-    "zh": "可选"
-  },
-  "welcome_step_model": {
-    "en": "the model",
-    "zh": "模型"
-  },
-  "welcome_step_go": {
-    "en": "begin",
-    "zh": "开始"
-  },
-  "welcome_machine_body": {
-    "en": "run once in a terminal",
-    "zh": "在终端里跑一次"
-  },
-  "machine_present": {
-    "en": "ok",
-    "zh": "有"
-  },
-  "machine_absent": {
-    "en": "no",
-    "zh": "无"
-  },
-  "machine_broken": {
-    "en": "bad",
-    "zh": "坏"
-  },
-  "machine_optional": {
-    "en": "optional",
-    "zh": "可选"
-  },
-  "machine_ready": {
-    "en": "ready",
-    "zh": "齐备"
-  },
-  "machine_tier_use": {
-    "en": "to run",
-    "zh": "运行"
-  },
-  "machine_tier_develop": {
-    "en": "to change",
-    "zh": "开发"
-  },
-  "machine_items": {
-    "en": "this machine",
-    "zh": "运行中的机器"
-  },
-  "machine_verdicts": {
-    "en": "what is missing",
-    "zh": "缺什么"
-  },
-  "machine_unasked": {
-    "en": "not looked at",
-    "zh": "未查看"
-  },
-  "welcome_no_main": {
-    "en": "no main model",
-    "zh": "main 没有模型"
-  },
-  "welcome_next": {
-    "en": "next",
-    "zh": "下一步"
-  },
-  "welcome_back": {
-    "en": "back",
-    "zh": "上一步"
-  },
-  "welcome_skip": {
-    "en": "skip",
-    "zh": "跳过"
-  },
-  "welcome_done": {
-    "en": "the Mayor",
-    "zh": "找 Mayor"
-  },
-  "welcome_later": {
-    "en": "later",
-    "zh": "以后再说"
-  },
-  "rec_ledger": {
-    "en": "the ledger",
-    "zh": "账本"
-  },
-  "rec_archive": {
-    "en": "the archive",
-    "zh": "归档"
-  },
-  "rec_bin": {
-    "en": "the recycle bin",
-    "zh": "回收站"
-  },
-  "rec_lenses": {
-    "en": "three lenses",
-    "zh": "三个透镜"
-  },
-  "rec_earlier": {
-    "en": "earlier",
-    "zh": "更早"
-  },
-  "rec_search": {
-    "en": "search the archive",
-    "zh": "搜索归档"
-  },
-  "rec_nothing": {
-    "en": "nothing",
-    "zh": "没有"
-  },
-  "bin_empty": {
-    "en": "empty",
-    "zh": "空"
-  },
-  "bin_gone": {
-    "en": "gone",
-    "zh": "已丢弃"
-  },
-  "bin_restored": {
-    "en": "restored",
-    "zh": "已找回"
-  },
-  "bin_tracked": {
-    "en": "in git at",
-    "zh": "在 git 里，位于"
-  },
-  "bin_interred": {
-    "en": "in the store at",
-    "zh": "在内容库里，位于"
-  },
-  "bin_rebuildable": {
-    "en": "rebuildable:",
-    "zh": "可重建："
-  },
-  "cost_title": {
-    "en": "cost",
-    "zh": "成本"
-  },
-  "cost_none": {
-    "en": "no price",
-    "zh": "没有报价"
+  "cost_by_actor": {
+    "en": "by resident",
+    "zh": "按居民"
   },
   "cost_by_run": {
     "en": "by run",
     "zh": "按跑"
   },
-  "cost_by_actor": {
-    "en": "by resident",
-    "zh": "按居民"
-  },
   "cost_by_segment": {
     "en": "by segment",
     "zh": "按段"
-  },
-  "cost_by_tool": {
-    "en": "by tool",
-    "zh": "按工具"
   },
   "cost_by_skill": {
     "en": "by skill",
     "zh": "按 skill"
   },
-  "mcp_title": {
-    "en": "MCP",
-    "zh": "MCP"
+  "cost_by_tool": {
+    "en": "by tool",
+    "zh": "按工具"
   },
-  "mcp_building": {
-    "en": "building",
-    "zh": "楼"
+  "cost_none": {
+    "en": "no price",
+    "zh": "没有报价"
   },
-  "mcp_none": {
-    "en": "none",
-    "zh": "无"
-  },
-  "desktop_title": {
-    "en": "desktop",
-    "zh": "桌面"
+  "cost_title": {
+    "en": "cost",
+    "zh": "成本"
   },
   "desktop_allowlist": {
     "en": "windows this building may touch",
@@ -867,13 +203,237 @@
     "en": "save",
     "zh": "保存"
   },
+  "desktop_title": {
+    "en": "desktop",
+    "zh": "桌面"
+  },
+  "dialect_anthropic": {
+    "en": "Anthropic-shaped",
+    "zh": "Anthropic 形"
+  },
+  "dialect_open_ai": {
+    "en": "OpenAI-shaped",
+    "zh": "OpenAI 形"
+  },
+  "dismiss": {
+    "en": "dismiss",
+    "zh": "知道了"
+  },
+  "effort_high": {
+    "en": "high",
+    "zh": "high"
+  },
+  "effort_low": {
+    "en": "low",
+    "zh": "low"
+  },
+  "effort_max": {
+    "en": "max",
+    "zh": "max"
+  },
+  "effort_medium": {
+    "en": "medium",
+    "zh": "medium"
+  },
+  "effort_none": {
+    "en": "none",
+    "zh": "none"
+  },
+  "effort_xhigh": {
+    "en": "xhigh",
+    "zh": "xhigh"
+  },
+  "evidence_finished": {
+    "en": "finished",
+    "zh": "完成"
+  },
+  "evidence_screenshot": {
+    "en": "screenshot",
+    "zh": "截图"
+  },
+  "file_binary": {
+    "en": "binary · {kib}",
+    "zh": "二进制 · {kib}"
+  },
+  "file_missing": {
+    "en": "missing",
+    "zh": "不存在"
+  },
+  "file_truncated": {
+    "en": "first {kib} of {total}",
+    "zh": "前 {kib}，共 {total}"
+  },
+  "gallery_title": {
+    "en": "gallery",
+    "zh": "画廊"
+  },
+  "halt_frozen": {
+    "en": "{n} runs frozen",
+    "zh": "冻结了 {n} 个 run"
+  },
+  "halt_title": {
+    "en": "the city is stopped",
+    "zh": "城已暂停"
+  },
+  "keys_change": {
+    "en": "change this key",
+    "zh": "修改这个快捷键"
+  },
+  "keys_composer": {
+    "en": "the message box",
+    "zh": "输入框"
+  },
+  "keys_conflict": {
+    "en": "also {name}",
+    "zh": "与 {name} 重复"
+  },
+  "keys_help": {
+    "en": "these keys",
+    "zh": "快捷键速查"
+  },
+  "keys_prefix": {
+    "en": "{key} …",
+    "zh": "{key} …"
+  },
+  "keys_press": {
+    "en": "press keys",
+    "zh": "按下组合键"
+  },
+  "keys_rail": {
+    "en": "the rail",
+    "zh": "左栏"
+  },
+  "keys_reset": {
+    "en": "default",
+    "zh": "默认"
+  },
+  "keys_reset_all": {
+    "en": "all back to default",
+    "zh": "全部恢复默认"
+  },
+  "keys_title": {
+    "en": "keyboard",
+    "zh": "键盘快捷键"
+  },
+  "keys_where": {
+    "en": "change these in settings",
+    "zh": "在设置里可以修改"
+  },
+  "link_connecting": {
+    "en": "connecting…",
+    "zh": "连接中…"
+  },
+  "link_live": {
+    "en": "live",
+    "zh": "已连接"
+  },
+  "link_refused": {
+    "en": "refused",
+    "zh": "被拒绝"
+  },
+  "link_retry": {
+    "en": "try again",
+    "zh": "再试一次"
+  },
+  "machine_absent": {
+    "en": "no",
+    "zh": "无"
+  },
+  "machine_broken": {
+    "en": "bad",
+    "zh": "坏"
+  },
+  "machine_checking": {
+    "en": "checking",
+    "zh": "检查中"
+  },
+  "machine_install": {
+    "en": "install",
+    "zh": "安装"
+  },
+  "machine_install_unwired": {
+    "en": "the city cannot install from here yet; copy the command",
+    "zh": "城还不能从这里安装，请复制命令"
+  },
+  "machine_items": {
+    "en": "this machine",
+    "zh": "运行中的机器"
+  },
+  "machine_no_recipe": {
+    "en": "no recipe on this platform",
+    "zh": "这个平台没有安装配方"
+  },
+  "machine_optional": {
+    "en": "optional",
+    "zh": "可选"
+  },
+  "machine_present": {
+    "en": "ok",
+    "zh": "有"
+  },
+  "machine_progress": {
+    "en": "{done} / {total}",
+    "zh": "{done} / {total}"
+  },
+  "machine_progress_label": {
+    "en": "how many are ready",
+    "zh": "已就绪的数量"
+  },
+  "machine_ready": {
+    "en": "ready",
+    "zh": "齐备"
+  },
+  "machine_recheck": {
+    "en": "check again",
+    "zh": "重新检查"
+  },
+  "machine_recommended": {
+    "en": "recommended",
+    "zh": "推荐"
+  },
+  "machine_required": {
+    "en": "required",
+    "zh": "必备"
+  },
+  "machine_tier_develop": {
+    "en": "to change",
+    "zh": "开发"
+  },
+  "machine_tier_use": {
+    "en": "to run",
+    "zh": "运行"
+  },
+  "machine_unasked": {
+    "en": "not checked yet",
+    "zh": "还没有检查这台机器"
+  },
+  "machine_verdicts": {
+    "en": "what is missing",
+    "zh": "缺什么"
+  },
   "mcp_add": {
     "en": "add",
     "zh": "加上"
   },
+  "mcp_api_key": {
+    "en": "api key",
+    "zh": "密钥"
+  },
+  "mcp_building": {
+    "en": "building",
+    "zh": "楼"
+  },
+  "mcp_command": {
+    "en": "command",
+    "zh": "命令"
+  },
   "mcp_composio": {
     "en": "Composio",
     "zh": "Composio"
+  },
+  "mcp_header": {
+    "en": "header",
+    "zh": "请求头"
   },
   "mcp_kind_http": {
     "en": "http",
@@ -887,37 +447,857 @@
     "en": "label",
     "zh": "名字"
   },
-  "mcp_url": {
-    "en": "url",
-    "zh": "地址"
-  },
-  "mcp_header": {
-    "en": "header",
-    "zh": "请求头"
-  },
-  "mcp_command": {
-    "en": "command",
-    "zh": "命令"
-  },
-  "mcp_server_id": {
-    "en": "server id",
-    "zh": "服务器 id"
-  },
-  "mcp_user_id": {
-    "en": "user id",
-    "zh": "用户 id"
-  },
-  "mcp_api_key": {
-    "en": "api key",
-    "zh": "密钥"
+  "mcp_none": {
+    "en": "none",
+    "zh": "无"
   },
   "mcp_open_composio": {
     "en": "composio.dev",
     "zh": "composio.dev"
   },
-  "gallery_title": {
-    "en": "gallery",
-    "zh": "画廊"
+  "mcp_server_id": {
+    "en": "server id",
+    "zh": "服务器 id"
+  },
+  "mcp_title": {
+    "en": "MCP",
+    "zh": "MCP"
+  },
+  "mcp_url": {
+    "en": "url",
+    "zh": "地址"
+  },
+  "mcp_user_id": {
+    "en": "user id",
+    "zh": "用户 id"
+  },
+  "nav_city": {
+    "en": "city",
+    "zh": "城市"
+  },
+  "nav_everything": {
+    "en": "everything",
+    "zh": "全部去处"
+  },
+  "nav_mayor": {
+    "en": "the Mayor",
+    "zh": "Mayor"
+  },
+  "nav_mcp": {
+    "en": "MCP",
+    "zh": "MCP"
+  },
+  "nav_palette": {
+    "en": "everything",
+    "zh": "全部"
+  },
+  "nav_settings": {
+    "en": "settings",
+    "zh": "设置"
+  },
+  "nav_the_record": {
+    "en": "the record",
+    "zh": "记录"
+  },
+  "nav_waiting": {
+    "en": "{n} waiting",
+    "zh": "{n} 件等你"
+  },
+  "outcome_cancelled": {
+    "en": "stopped",
+    "zh": "停下了"
+  },
+  "outcome_done": {
+    "en": "done",
+    "zh": "做完了"
+  },
+  "outcome_frozen": {
+    "en": "ended",
+    "zh": "结束了"
+  },
+  "outcome_limit": {
+    "en": "hit a limit",
+    "zh": "碰到了上限"
+  },
+  "palette_building": {
+    "en": "building",
+    "zh": "楼"
+  },
+  "palette_fork": {
+    "en": "fork {addr}",
+    "zh": "分出 {addr}"
+  },
+  "palette_placeholder": {
+    "en": "go to…",
+    "zh": "去…"
+  },
+  "palette_raise": {
+    "en": "raise {addr}",
+    "zh": "新建 {addr}"
+  },
+  "palette_room": {
+    "en": "room",
+    "zh": "房间"
+  },
+  "part_cancel": {
+    "en": "cancel",
+    "zh": "取消"
+  },
+  "part_context_window": {
+    "en": "context window",
+    "zh": "上下文窗口"
+  },
+  "part_delete": {
+    "en": "delete",
+    "zh": "删除"
+  },
+  "part_error_host": {
+    "en": "that host is not a valid DNS name",
+    "zh": "这个主机名不是合法的 DNS 名"
+  },
+  "part_help_base_url": {
+    "en": "without a trailing /chat/completions",
+    "zh": "末尾不要带 /chat/completions"
+  },
+  "part_loading": {
+    "en": "loading",
+    "zh": "加载中"
+  },
+  "part_model_id": {
+    "en": "model id",
+    "zh": "模型 id"
+  },
+  "part_new_building": {
+    "en": "new building",
+    "zh": "新建一栋"
+  },
+  "part_no_match": {
+    "en": "no matches",
+    "zh": "没有匹配项"
+  },
+  "part_output_ceiling": {
+    "en": "output ceiling",
+    "zh": "输出上限"
+  },
+  "part_remove_detail": {
+    "en": "its key stays in the credential store",
+    "zh": "它的密钥仍留在凭据库里"
+  },
+  "part_remove_endpoint": {
+    "en": "remove this endpoint?",
+    "zh": "要移除这个 endpoint 吗？"
+  },
+  "part_save": {
+    "en": "save",
+    "zh": "保存"
+  },
+  "part_saved": {
+    "en": "saved",
+    "zh": "已保存"
+  },
+  "part_search": {
+    "en": "search",
+    "zh": "搜索"
+  },
+  "part_select_all": {
+    "en": "select all",
+    "zh": "全选"
+  },
+  "part_undo": {
+    "en": "undo",
+    "zh": "撤销"
+  },
+  "part_why_halted": {
+    "en": "the city is stopped",
+    "zh": "城已暂停，改不了"
+  },
+  "plan_empty": {
+    "en": "no plan yet",
+    "zh": "还没有计划"
+  },
+  "rec_archive": {
+    "en": "the archive",
+    "zh": "归档"
+  },
+  "rec_bin": {
+    "en": "the recycle bin",
+    "zh": "回收站"
+  },
+  "rec_earlier": {
+    "en": "earlier",
+    "zh": "更早"
+  },
+  "rec_ledger": {
+    "en": "the ledger",
+    "zh": "账本"
+  },
+  "rec_lenses": {
+    "en": "three lenses",
+    "zh": "三个透镜"
+  },
+  "rec_nothing": {
+    "en": "nothing",
+    "zh": "没有"
+  },
+  "rec_search": {
+    "en": "search the archive",
+    "zh": "搜索归档"
+  },
+  "region_composer": {
+    "en": "what to say",
+    "zh": "要说的话"
+  },
+  "region_main": {
+    "en": "the page",
+    "zh": "页面"
+  },
+  "region_nav": {
+    "en": "where to go",
+    "zh": "去处"
+  },
+  "run_cached": {
+    "en": "cached",
+    "zh": "缓存命中"
+  },
+  "run_cancel": {
+    "en": "/stop",
+    "zh": "/stop"
+  },
+  "run_changes": {
+    "en": "changes",
+    "zh": "改动"
+  },
+  "run_context": {
+    "en": "context",
+    "zh": "上下文"
+  },
+  "run_cut": {
+    "en": "{n} more lines",
+    "zh": "还有 {n} 行"
+  },
+  "run_evidence": {
+    "en": "evidence",
+    "zh": "证据"
+  },
+  "run_goal": {
+    "en": "what counts as done",
+    "zh": "做到什么算完"
+  },
+  "run_input": {
+    "en": "input",
+    "zh": "输入"
+  },
+  "run_lenses": {
+    "en": "four readings of one run",
+    "zh": "一次跑的四种读法"
+  },
+  "run_no_changes": {
+    "en": "no changes",
+    "zh": "没有改动"
+  },
+  "run_no_evidence": {
+    "en": "no evidence",
+    "zh": "没有证据"
+  },
+  "run_no_fence": {
+    "en": "no checkpoint",
+    "zh": "没有栅栏"
+  },
+  "run_no_usage": {
+    "en": "no usage",
+    "zh": "没有用量"
+  },
+  "run_output": {
+    "en": "output",
+    "zh": "输出"
+  },
+  "run_patch_needs_fence": {
+    "en": "after the next fence",
+    "zh": "下一道栅栏后"
+  },
+  "run_read_files": {
+    "en": "what it read",
+    "zh": "它读过什么"
+  },
+  "run_read_nothing": {
+    "en": "nothing read",
+    "zh": "没读过"
+  },
+  "run_spent": {
+    "en": "spent {usd}",
+    "zh": "花了 {usd}"
+  },
+  "run_turn_n": {
+    "en": "turn {n}",
+    "zh": "第 {n} 回合"
+  },
+  "run_turns": {
+    "en": "turns",
+    "zh": "回合"
+  },
+  "run_window": {
+    "en": "tokens per turn",
+    "zh": "每回合的 tokens"
+  },
+  "run_withheld": {
+    "en": "line {n} withheld · {reason}",
+    "zh": "第 {n} 行不回显 · {reason}"
+  },
+  "setup_add_row": {
+    "en": "add a row",
+    "zh": "加一行"
+  },
+  "setup_advanced": {
+    "en": "advanced",
+    "zh": "高级"
+  },
+  "setup_advanced_inert": {
+    "en": "these four figures and the two tables are not on the wire yet; they are shown so the form is right when they are",
+    "zh": "这四个数字与两张表还没有上线，先摆在这里，等线路能带时表单已经对齐"
+  },
+  "setup_again": {
+    "en": "welcome",
+    "zh": "引导"
+  },
+  "setup_attach": {
+    "en": "with a key",
+    "zh": "用 key"
+  },
+  "setup_attach_btn": {
+    "en": "attach",
+    "zh": "接上"
+  },
+  "setup_autonomy": {
+    "en": "approvals",
+    "zh": "审批"
+  },
+  "setup_base_url": {
+    "en": "base URL",
+    "zh": "基址 URL"
+  },
+  "setup_copy": {
+    "en": "copy",
+    "zh": "复制"
+  },
+  "setup_copy_details": {
+    "en": "copy the details",
+    "zh": "复制细节"
+  },
+  "setup_dialect": {
+    "en": "which wire it speaks",
+    "zh": "它说哪种线"
+  },
+  "setup_digest": {
+    "en": "digest · reads",
+    "zh": "digest · 读长文"
+  },
+  "setup_display_name": {
+    "en": "name",
+    "zh": "显示名"
+  },
+  "setup_effort": {
+    "en": "thinking",
+    "zh": "思考"
+  },
+  "setup_group_accounts": {
+    "en": "accounts and providers",
+    "zh": "账户与供应方"
+  },
+  "setup_group_advanced": {
+    "en": "advanced",
+    "zh": "高级"
+  },
+  "setup_group_appearance": {
+    "en": "appearance",
+    "zh": "外观"
+  },
+  "setup_group_keys": {
+    "en": "keybindings",
+    "zh": "快捷键"
+  },
+  "setup_group_mcp": {
+    "en": "MCP",
+    "zh": "MCP"
+  },
+  "setup_group_network": {
+    "en": "network",
+    "zh": "网络"
+  },
+  "setup_group_run": {
+    "en": "run",
+    "zh": "运行"
+  },
+  "setup_group_skills": {
+    "en": "skills",
+    "zh": "技能"
+  },
+  "setup_group_tools": {
+    "en": "browser and tools",
+    "zh": "浏览器与工具"
+  },
+  "setup_groups": {
+    "en": "settings groups",
+    "zh": "设置分组"
+  },
+  "setup_header_name": {
+    "en": "header name",
+    "zh": "请求头名"
+  },
+  "setup_header_value": {
+    "en": "header value",
+    "zh": "请求头取值"
+  },
+  "setup_headers": {
+    "en": "http_headers",
+    "zh": "请求头"
+  },
+  "setup_id": {
+    "en": "id",
+    "zh": "标识"
+  },
+  "setup_id_help": {
+    "en": "lowercase letters, digits and hyphens; the key reference derives from it",
+    "zh": "小写字母、数字与连字符；密钥引用由它派生"
+  },
+  "setup_key": {
+    "en": "key",
+    "zh": "密钥"
+  },
+  "setup_key_clear": {
+    "en": "clear",
+    "zh": "清除"
+  },
+  "setup_key_replace": {
+    "en": "replace the key",
+    "zh": "换一把密钥"
+  },
+  "setup_key_stored": {
+    "en": "a key is already stored under this name; leave blank to keep it",
+    "zh": "此名下已有密钥，留空则沿用"
+  },
+  "setup_key_vault_note": {
+    "en": "clearing forgets the reference here; the vault keeps the key until it is written over",
+    "zh": "清除只让这一页忘掉引用；密钥库里的密钥要被覆盖才会改变"
+  },
+  "setup_keyed": {
+    "en": "keyed",
+    "zh": "有 key"
+  },
+  "setup_language": {
+    "en": "language",
+    "zh": "语言"
+  },
+  "setup_login": {
+    "en": "with a subscription",
+    "zh": "用订阅"
+  },
+  "setup_login_begin": {
+    "en": "start the login",
+    "zh": "开始登录"
+  },
+  "setup_login_code": {
+    "en": "code",
+    "zh": "码"
+  },
+  "setup_login_finish": {
+    "en": "finish the login",
+    "zh": "完成登录"
+  },
+  "setup_login_open": {
+    "en": "open the approval page",
+    "zh": "打开批准页"
+  },
+  "setup_look": {
+    "en": "look at its models",
+    "zh": "看看它有哪些模型"
+  },
+  "setup_main": {
+    "en": "main · thinks",
+    "zh": "main · 思考"
+  },
+  "setup_manual_ids": {
+    "en": "model ids this endpoint does not list",
+    "zh": "端点没有列出的模型 id"
+  },
+  "setup_mcp": {
+    "en": "MCP · City Hall",
+    "zh": "MCP · 市政厅"
+  },
+  "setup_mcp_add": {
+    "en": "add",
+    "zh": "加上"
+  },
+  "setup_mcp_command": {
+    "en": "command",
+    "zh": "命令"
+  },
+  "setup_mcp_label": {
+    "en": "label",
+    "zh": "名字"
+  },
+  "setup_mcp_url": {
+    "en": "http URL",
+    "zh": "http 地址"
+  },
+  "setup_model_context": {
+    "en": "context window",
+    "zh": "上下文窗口"
+  },
+  "setup_model_id": {
+    "en": "model id",
+    "zh": "模型 id"
+  },
+  "setup_model_modalities": {
+    "en": "input modalities",
+    "zh": "输入模态"
+  },
+  "setup_model_needed": {
+    "en": "a ticked model with no output ceiling is called on the provider's own default",
+    "zh": "勾选了却没填输出上限的模型，按供应方自己的默认值调用"
+  },
+  "setup_model_output": {
+    "en": "output ceiling",
+    "zh": "输出上限"
+  },
+  "setup_model_price": {
+    "en": "price",
+    "zh": "单价"
+  },
+  "setup_model_role": {
+    "en": "role",
+    "zh": "角色"
+  },
+  "setup_model_search": {
+    "en": "search the models",
+    "zh": "搜索模型"
+  },
+  "setup_models": {
+    "en": "which model thinks",
+    "zh": "哪个模型来想"
+  },
+  "setup_name": {
+    "en": "call it",
+    "zh": "叫它"
+  },
+  "setup_next_config": {
+    "en": "one field above is not a shape the city accepts",
+    "zh": "上面某个字段的写法这座城不接受"
+  },
+  "setup_next_credential": {
+    "en": "no key is stored under this id: type one, then look again",
+    "zh": "这个标识下没有密钥：填一把，然后再看一次"
+  },
+  "setup_next_dialect": {
+    "en": "this endpoint does not speak the wire_api chosen above",
+    "zh": "这个端点不说上面选的接口形态"
+  },
+  "setup_next_other": {
+    "en": "nothing on this form can act on this; copy the details",
+    "zh": "这张表单对此无从下手；复制细节"
+  },
+  "setup_next_provider": {
+    "en": "check the base URL and the key, then look again",
+    "zh": "核对基址与密钥，然后再看一次"
+  },
+  "setup_next_timeout": {
+    "en": "nothing came back in time: check the proxy, then the base URL",
+    "zh": "等待期间没有任何回应：先查代理，再查基址"
+  },
+  "setup_no_models": {
+    "en": "no models",
+    "zh": "没有模型"
+  },
+  "setup_not_carried": {
+    "en": "this city does not carry this field yet",
+    "zh": "这座城还不传这个字段"
+  },
+  "setup_override_value": {
+    "en": "JSON value",
+    "zh": "JSON 取值"
+  },
+  "setup_overrides": {
+    "en": "request body overrides",
+    "zh": "请求体覆盖"
+  },
+  "setup_pointer": {
+    "en": "JSON pointer",
+    "zh": "JSON 指针"
+  },
+  "setup_preview_request": {
+    "en": "the request this would send",
+    "zh": "将要发出的请求"
+  },
+  "setup_preview_toml": {
+    "en": "the equivalent config.toml",
+    "zh": "等价的 config.toml"
+  },
+  "setup_probe_busy": {
+    "en": "asking {host} which models it serves…",
+    "zh": "正在问 {host} 提供哪些模型…"
+  },
+  "setup_probe_failed": {
+    "en": "{host} did not answer",
+    "zh": "{host} 没有答复"
+  },
+  "setup_providers": {
+    "en": "providers",
+    "zh": "模型供应方"
+  },
+  "setup_remove": {
+    "en": "remove",
+    "zh": "去掉"
+  },
+  "setup_remove_row": {
+    "en": "remove this row",
+    "zh": "删掉这一行"
+  },
+  "setup_request_retries": {
+    "en": "request_max_retries",
+    "zh": "请求重试上限"
+  },
+  "setup_rerun": {
+    "en": "run again",
+    "zh": "再走一遍"
+  },
+  "setup_select_all": {
+    "en": "choose all",
+    "zh": "全选"
+  },
+  "setup_select_none": {
+    "en": "choose none",
+    "zh": "清空"
+  },
+  "setup_skills": {
+    "en": "shared folder",
+    "zh": "共享文件夹"
+  },
+  "setup_skills_note": {
+    "en": "per building: <building>/.sprawling/skills/",
+    "zh": "单栋楼：<building>/.sprawling/skills/"
+  },
+  "setup_skills_title": {
+    "en": "skills",
+    "zh": "技能（skills）"
+  },
+  "setup_slot_pending": {
+    "en": "{what} is not built yet",
+    "zh": "{what} 还没有建好"
+  },
+  "setup_stream_idle": {
+    "en": "stream_idle_timeout_ms",
+    "zh": "流空闲超时（毫秒）"
+  },
+  "setup_stream_retries": {
+    "en": "stream_max_retries",
+    "zh": "流式重试上限"
+  },
+  "setup_text_only": {
+    "en": "text models only",
+    "zh": "只看文本模型"
+  },
+  "setup_tick_model": {
+    "en": "choose {model}",
+    "zh": "选择 {model}"
+  },
+  "setup_ticked_count": {
+    "en": "{ticked} of {total} chosen",
+    "zh": "已选 {ticked} / {total}"
+  },
+  "setup_timeout_ms": {
+    "en": "timeout_ms",
+    "zh": "调用超时（毫秒）"
+  },
+  "setup_toml": {
+    "en": "the same in config.toml",
+    "zh": "等价的 config.toml"
+  },
+  "setup_toml_none": {
+    "en": "config.toml carries none of this yet",
+    "zh": "config.toml 还没有这一节"
+  },
+  "setup_transcribe": {
+    "en": "transcribe · hears",
+    "zh": "transcribe · 听写"
+  },
+  "setup_unkeyed": {
+    "en": "no key",
+    "zh": "没 key"
+  },
+  "setup_vendor_none": {
+    "en": "no vendor in the id",
+    "zh": "标识里没有厂商"
+  },
+  "setup_wire_api": {
+    "en": "wire_api",
+    "zh": "接口形态"
+  },
+  "setup_wire_api_unsupported": {
+    "en": "this city speaks chat and messages; it cannot call a responses endpoint",
+    "zh": "这座城会说 chat 与 messages，还不能调用 responses 端点"
+  },
+  "skip_main": {
+    "en": "skip to the page",
+    "zh": "跳到页面内容"
+  },
+  "slash_clear": {
+    "en": "empty the box",
+    "zh": "清空输入框"
+  },
+  "slash_dispatch": {
+    "en": "open a run with these words",
+    "zh": "用这些话开一次 run"
+  },
+  "slash_doctor": {
+    "en": "check this machine again",
+    "zh": "重新检查这台机器"
+  },
+  "slash_effort": {
+    "en": "how hard the model thinks before it answers",
+    "zh": "模型作答前想得多用力"
+  },
+  "slash_fork": {
+    "en": "start a second line from the newest run in a room",
+    "zh": "从房间里最新的 run 分出第二条线"
+  },
+  "slash_go": {
+    "en": "open a page by name",
+    "zh": "按名字打开一个页面"
+  },
+  "slash_help": {
+    "en": "list every command",
+    "zh": "列出全部命令"
+  },
+  "slash_mcp": {
+    "en": "open the tool servers page",
+    "zh": "打开工具服务器页"
+  },
+  "slash_model": {
+    "en": "point main at another model",
+    "zh": "把 main 指向另一个模型"
+  },
+  "slash_raise": {
+    "en": "raise a building from a template",
+    "zh": "按模板新建一栋楼"
+  },
+  "slash_release": {
+    "en": "let a stopped building or city work again",
+    "zh": "让停下的楼或城重新开工"
+  },
+  "slash_steer": {
+    "en": "say this into the run that is going",
+    "zh": "把这句话说进正在跑的 run"
+  },
+  "slash_stop": {
+    "en": "stop this run, one building, or the whole city",
+    "zh": "停下这次 run、某栋楼，或整座城"
+  },
+  "status_awaiting_approval": {
+    "en": "awaiting approval",
+    "zh": "等审批"
+  },
+  "status_blocked": {
+    "en": "stuck",
+    "zh": "卡住"
+  },
+  "status_done": {
+    "en": "done",
+    "zh": "做完"
+  },
+  "status_in_progress": {
+    "en": "working",
+    "zh": "在做"
+  },
+  "status_not_started": {
+    "en": "not started",
+    "zh": "未开始"
+  },
+  "status_ready": {
+    "en": "ready",
+    "zh": "就绪"
+  },
+  "talk_call_open": {
+    "en": "read the whole thing on the run page",
+    "zh": "到 run 页看全文"
+  },
+  "talk_calls": {
+    "en": "what it did",
+    "zh": "它做了什么"
+  },
+  "talk_choose": {
+    "en": "model, workspace and effort",
+    "zh": "模型、工作区与 effort"
+  },
+  "talk_column_effort": {
+    "en": "effort",
+    "zh": "effort"
+  },
+  "talk_column_model": {
+    "en": "model",
+    "zh": "模型"
+  },
+  "talk_column_workspace": {
+    "en": "workspace",
+    "zh": "工作区"
+  },
+  "talk_commands": {
+    "en": "commands",
+    "zh": "命令"
+  },
+  "talk_cut_off": {
+    "en": "cut off · {why}",
+    "zh": "被截断 · {why}"
+  },
+  "talk_discarded": {
+    "en": "{n} discarded",
+    "zh": "丢弃 {n} 个"
+  },
+  "talk_effort": {
+    "en": "effort",
+    "zh": "effort"
+  },
+  "talk_empty_mayor": {
+    "en": "the Mayor",
+    "zh": "市长室"
+  },
+  "talk_empty_room": {
+    "en": "room {room}",
+    "zh": "房间 {room}"
+  },
+  "talk_goal": {
+    "en": "read the city, answer, and plan where planning is needed",
+    "zh": "读完这座城，回答，需要计划的地方写计划"
+  },
+  "talk_halted": {
+    "en": "city stopped",
+    "zh": "城已停"
+  },
+  "talk_hearing": {
+    "en": "hearing…",
+    "zh": "听写中…"
+  },
+  "talk_no_model": {
+    "en": "no model chosen",
+    "zh": "还没有选模型"
+  },
+  "talk_not_live": {
+    "en": "not connected",
+    "zh": "未连接"
+  },
+  "talk_opening_mayor": {
+    "en": "plans, work to hand out, and what the city should do next",
+    "zh": "计划、派活，以及这座城接下来做什么"
+  },
+  "talk_opening_room": {
+    "en": "what {room} should work on",
+    "zh": "{room} 接下来做什么"
+  },
+  "talk_placeholder_mayor": {
+    "en": "to the Mayor…",
+    "zh": "对 Mayor 说…"
+  },
+  "talk_placeholder_room": {
+    "en": "to {room}…",
+    "zh": "对 {room} 说…"
   },
   "talk_record": {
     "en": "speak",
@@ -927,8 +1307,148 @@
     "en": "stop",
     "zh": "停"
   },
-  "talk_hearing": {
-    "en": "hearing…",
-    "zh": "听写中…"
+  "talk_release": {
+    "en": "/release --all",
+    "zh": "/release --all"
+  },
+  "talk_resident": {
+    "en": "resident",
+    "zh": "居民"
+  },
+  "talk_said_nothing": {
+    "en": "the model returned nothing",
+    "zh": "模型没有输出"
+  },
+  "talk_said_nothing_capped": {
+    "en": "the model returned nothing (output limit {n})",
+    "zh": "模型没有输出（输出上限 {n}）"
+  },
+  "talk_send": {
+    "en": "/dispatch",
+    "zh": "/dispatch"
+  },
+  "talk_steer": {
+    "en": "/steer",
+    "zh": "/steer"
+  },
+  "talk_steer_queued": {
+    "en": "/steer --queued",
+    "zh": "/steer --queued"
+  },
+  "talk_stop": {
+    "en": "/stop",
+    "zh": "/stop"
+  },
+  "talk_thinking": {
+    "en": "{who} is thinking…",
+    "zh": "{who} 在想…"
+  },
+  "talk_tokens": {
+    "en": "{n} tokens",
+    "zh": "{n} 个 token"
+  },
+  "talk_waiting_you": {
+    "en": "waiting for you",
+    "zh": "等你回答"
+  },
+  "talk_you": {
+    "en": "you",
+    "zh": "你"
+  },
+  "tree_empty": {
+    "en": "empty",
+    "zh": "空的"
+  },
+  "tree_live": {
+    "en": "live",
+    "zh": "进行中"
+  },
+  "tree_no_runs": {
+    "en": "no runs",
+    "zh": "没有跑"
+  },
+  "tree_transcript": {
+    "en": "run",
+    "zh": "跑"
+  },
+  "wait_allow": {
+    "en": "allow",
+    "zh": "允许"
+  },
+  "wait_deny": {
+    "en": "deny",
+    "zh": "拒绝"
+  },
+  "wait_from": {
+    "en": "{actor} asks",
+    "zh": "{actor} 在问"
+  },
+  "wait_same": {
+    "en": "×{n} alike",
+    "zh": "×{n} 同问"
+  },
+  "wait_tainted": {
+    "en": "outside content",
+    "zh": "城外内容"
+  },
+  "wait_title": {
+    "en": "waiting on you",
+    "zh": "等你的事"
+  },
+  "welcome_back": {
+    "en": "back",
+    "zh": "上一步"
+  },
+  "welcome_done": {
+    "en": "the Mayor",
+    "zh": "找 Mayor"
+  },
+  "welcome_later": {
+    "en": "later",
+    "zh": "以后再说"
+  },
+  "welcome_machine_body": {
+    "en": "run once in a terminal",
+    "zh": "在终端里跑一次"
+  },
+  "welcome_next": {
+    "en": "next",
+    "zh": "下一步"
+  },
+  "welcome_no_main": {
+    "en": "no main model",
+    "zh": "main 没有模型"
+  },
+  "welcome_skip": {
+    "en": "skip",
+    "zh": "跳过"
+  },
+  "welcome_step_go": {
+    "en": "begin",
+    "zh": "开始"
+  },
+  "welcome_step_machine": {
+    "en": "this machine",
+    "zh": "运行中的机器"
+  },
+  "welcome_step_model": {
+    "en": "the model",
+    "zh": "模型"
+  },
+  "welcome_step_optional": {
+    "en": "optional",
+    "zh": "可选"
+  },
+  "welcome_step_provider": {
+    "en": "a provider",
+    "zh": "一个 provider"
+  },
+  "welcome_steps": {
+    "en": "the five steps",
+    "zh": "五步"
+  },
+  "welcome_title": {
+    "en": "welcome",
+    "zh": "欢迎"
   }
 }

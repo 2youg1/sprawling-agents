@@ -98,6 +98,9 @@
   /* The few fixed sizes a shell needs: the bar, a status dot, the
    * building glyphs, and the pane a tree takes beside a file. */
   --spacing-bar: 44px;
+  /* The width at which the shell affords a third column: the
+     detail panel stops being a drawer and sits beside the page. */
+  --breakpoint-wide: 1440px;
   --spacing-rail: 44px;
   --spacing-rail-open: 232px;
   --spacing-glyph: 18px;
@@ -119,8 +122,14 @@
   --radius-control: 5px;
   --radius-pill: 999px;
 
-  /* The one duration: the acknowledgement a control owes a hand. */
+  /* The one duration: the acknowledgement a control owes a hand. A
+   * popover and a banner take 200ms and a page-level move 400ms, both
+   * spelled where they are used. */
   --default-transition-duration: 90ms;
+
+  /* The one easing: everything that moves leaves fast and arrives
+   * slow, so a thing entering the page is read before it stops. */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 /* What `cargo xtask color` proves, stated where the values it judges are.
@@ -235,10 +244,41 @@
   animation: blink 1.1s ease-in-out infinite alternate;
   will-change: opacity;
 }
+/* The two entrances: a popover rises into place, a page-level banner
+ * drops from the edge it belongs to. Both 200ms, both only transform
+ * and opacity, so neither costs a layout. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise 200ms var(--ease-standard) both;
+}
+.drop {
+  animation: drop 200ms var(--ease-standard) both;
+}
 @media (prefers-reduced-motion: reduce) {
   .bob,
   .blink,
   .wave,
+  .rise,
+  .drop,
   .animate-pulse {
     animation: none;
   }
@@ -263,6 +303,17 @@
     text-decoration: underline;
     text-underline-offset: 3px;
     text-decoration-color: var(--color-g6);
+  }
+  /* A key is a picture of a key rather than a word in a sentence, so
+   * the underline a link grows under the pointer stops at its edge.
+   * The rail drew `g c` underlined for as long as the underline
+   * existed. */
+  kbd {
+    display: inline-block;
+    text-decoration: none;
+  }
+  a:hover kbd {
+    text-decoration: none;
   }
   button {
     cursor: pointer;

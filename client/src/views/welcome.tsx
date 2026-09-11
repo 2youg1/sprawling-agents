@@ -43,7 +43,7 @@ export function Welcome() {
   };
 
   return (
-    <div class="mx-auto flex w-full max-w-page flex-1 gap-section px-pane py-section">
+    <div class="mx-auto flex w-full max-w-page flex-1 gap-section px-pane py-section wide:max-w-none">
       <ol class="hidden w-tree shrink-0 flex-col gap-base pt-step text-label md:flex" aria-label={say("welcome_steps")}>
         <For each={STEPS}>
           {(each, index) => (
@@ -56,7 +56,7 @@ export function Welcome() {
           )}
         </For>
       </ol>
-      <div class="flex min-w-0 max-w-measure flex-1 flex-col">
+      <div class={`flex min-w-0 flex-1 flex-col ${step() === "machine" ? "" : "max-w-measure"}`}>
         <p class="text-note text-text-faint">{say("welcome_title")}</p>
         <h1 class="mb-wide mt-tight text-title font-title">{say(`welcome_step_${step()}`)}</h1>
         <div>

@@ -335,10 +335,16 @@ export function City() {
           when={towers().length > 0}
           fallback={<p class="mx-auto max-w-measure text-center text-text-faint">{say("city_no_buildings")}</p>}
         >
+          {/* The drawing is a fixed box with a fixed ratio: a width
+              read from the content and a height read from that width
+              let the scrollbar appear, take width away, shorten the
+              drawing, remove the scrollbar and start again. Nothing
+              here says the city is stopped: the shell's banner says it
+              once, in words. */}
           <svg
             viewBox={`0 0 ${String(width())} ${String(height())}`}
-            class={`mx-auto block transition-opacity duration-500 ${halted() ? "opacity-40" : ""}`}
-            style={{ width: `${String(Math.round(width() * 1.2))}px`, "max-width": "100%" }}
+            class="mx-auto block w-full"
+            style={{ "aspect-ratio": `${String(width())} / ${String(height())}`, "max-width": `${String(width())}px` }}
             role="img"
             aria-label={say("city_drawing")}
           >
@@ -363,10 +369,6 @@ export function City() {
                 />
               )}
             </For>
-            <Show when={halted()}>
-              <circle cx={width() - 56} cy={30} r="11" class="fill-g4" />
-              <circle cx={width() - 50} cy={26} r="10" class="fill-g0" />
-            </Show>
             <rect x="0" y={ground()} width={width()} height={GROUND_DEPTH} fill="url(#ground)" />
             <line x1="0" y1={ground()} x2={width()} y2={ground()} class="stroke-g3" stroke-width="1" />
             <For each={towers()}>{(tower) => <Building tower={tower} ground={ground()} />}</For>

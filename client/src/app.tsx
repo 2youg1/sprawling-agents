@@ -3,19 +3,32 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The shell: one rail on the left, one content region, and the two
-// things that may float over them - a refusal, and the palette. Which
-// page shows is the address bar's decision, read on every `hashchange`.
-// The keys: `g` then a letter goes somewhere, `[` opens the rail, `?`
-// opens it to read the keys, Ctrl-K opens the palette.
+// The shell: one rail on the left, one content region, and the three
+// things that may float over them - a refusal, the palette, and the
+// sheet of keys. Which page shows is the address bar's decision, read
+// on every `hashchange`.
+//
+// The keys are not spelled here. `core/keys` holds the action, the
+// chord that reaches it and the person's own chord if they set one;
+// this file asks it which action a press was and does that one thing.
+// A prefix key arms for `PREFIX_MS` and says so on the rail while it
+// waits, so `g` followed by nothing teaches rather than swallows.
+//
+// A stopped city is said once, here, as a banner over every page: the
+// city page used to draw a crescent nobody could read and dim itself to
+// 40%, which is a mood rather than a message.
 
 import { Option } from "effect";
 import { Match, Show, Switch, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 
+import { halt, release } from "./core/commands";
+import { PREFIX_MS, keymap } from "./core/keys";
+import type { Action } from "./core/keys";
 import { paintMark } from "./core/mark";
 import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
 import type { View } from "./core/route";
-import { useGo, useSay, useUi } from "./ui";
+import { useCommand, useGo, useSay, useUi } from "./ui";
+import { Cheatsheet } from "./views/parts/kbd";
 import { Building } from "./views/building";
 import { City } from "./views/city";
 import { Cost } from "./views/cost";
@@ -30,16 +43,27 @@ import { Talk } from "./views/talk";
 import { Gallery } from "./views/gallery";
 import { Welcome } from "./views/welcome";
 
-// Where `g` followed by a letter goes.
+// Where each `go.*` action lands. Every other action moves the shell
+// rather than the address bar, and is answered below.
 const GOES: Readonly<Record<string, View>> = {
-  m: { kind: "talk", address: MAYOR },
-  w: { kind: "talk", address: MAYOR },
-  c: { kind: "city" },
-  s: { kind: "setup" },
-  x: { kind: "mcp" },
-  r: { kind: "record", lens: "ledger" },
-  $: { kind: "cost" },
+  "go.talk": { kind: "talk", address: MAYOR },
+  "go.waiting": { kind: "talk", address: MAYOR },
+  "go.city": { kind: "city" },
+  "go.setup": { kind: "setup" },
+  "go.mcp": { kind: "mcp" },
+  "go.record": { kind: "record", lens: "ledger" },
+  "go.cost": { kind: "cost" },
 };
+
+// The box a person writes in, wherever the page put it. Reached by the
+// element it is rather than by a name this file would have to keep in
+// step with the composer.
+function focusComposer(): void {
+  const box = document.querySelector("main textarea");
+  if (box instanceof HTMLTextAreaElement) {
+    box.focus();
+  }
+}
 
 function typing(target: EventTarget | null): boolean {
   return (
@@ -54,44 +78,101 @@ export function App() {
   const ui = useUi();
   const say = useSay();
   const go = useGo();
+  const command = useCommand();
+  const bindings = keymap();
   const [view, setView] = createSignal<View>(DEFAULT_VIEW);
   const [paletteOpen, setPaletteOpen] = createSignal(false);
+  const [sheetOpen, setSheetOpen] = createSignal(false);
   const [railOpen, setRailOpen] = createSignal(false);
-  let prefix: string | null = null;
+  const [prefix, setPrefix] = createSignal<string | null>(null);
+  let forget: ReturnType<typeof setTimeout> | undefined;
+  // What opened the sheet, so closing it puts the focus back where the
+  // person left it.
+  let opener: HTMLElement | null = null;
 
   const follow = () => {
     setView(Option.getOrElse(current(ui.bar), () => DEFAULT_VIEW));
   };
-  const keys = (event: KeyboardEvent) => {
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-      event.preventDefault();
-      setPaletteOpen((open) => !open);
+  const drop = () => {
+    clearTimeout(forget);
+    setPrefix(null);
+  };
+  const arm = (key: string) => {
+    clearTimeout(forget);
+    setPrefix(key);
+    forget = setTimeout(() => {
+      setPrefix(null);
+    }, PREFIX_MS);
+  };
+  const closeSheet = () => {
+    setSheetOpen(false);
+    opener?.focus();
+    opener = null;
+  };
+  const act = (action: Action) => {
+    const to = GOES[action];
+    if (to !== undefined) {
+      go(to);
       return;
     }
+    switch (action) {
+      case "palette":
+        setPaletteOpen((open) => !open);
+        return;
+      case "rail.toggle":
+        setRailOpen((open) => !open);
+        return;
+      case "help":
+        opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        setSheetOpen(true);
+        return;
+      case "composer.focus":
+        focusComposer();
+        return;
+      case "run.stop":
+        command(halt("city"));
+        return;
+      // Every `go.*` action was answered by the table above; naming them
+      // keeps a new one a decision here rather than a silence.
+      case "go.talk":
+      case "go.city":
+      case "go.mcp":
+      case "go.record":
+      case "go.cost":
+      case "go.setup":
+      case "go.waiting":
+        return;
+    }
+  };
+  const keys = (event: KeyboardEvent) => {
+    const accel = event.ctrlKey || event.metaKey;
     if (event.key === "Escape") {
+      drop();
       if (paletteOpen()) setPaletteOpen(false);
+      else if (sheetOpen()) closeSheet();
       else if (railOpen()) setRailOpen(false);
       return;
     }
-    if (typing(event.target) || paletteOpen() || event.ctrlKey || event.metaKey || event.altKey) {
-      prefix = null;
+    // Inside a text box and inside the palette, only a chord that holds
+    // the accelerator is the shell's; everything else is being typed.
+    if ((typing(event.target) || paletteOpen()) && !accel) {
+      drop();
       return;
     }
-    if (prefix === "g") {
-      prefix = null;
-      const to = GOES[event.key];
-      if (to !== undefined) {
-        event.preventDefault();
-        go(to);
-      }
+    const action = bindings.acting(event, prefix());
+    if (action !== null) {
+      event.preventDefault();
+      drop();
+      act(action);
       return;
     }
-    if (event.key === "g") {
-      prefix = "g";
-    } else if (event.key === "[") {
-      setRailOpen((open) => !open);
-    } else if (event.key === "?") {
-      setRailOpen(true);
+    if (prefix() !== null) {
+      drop();
+      return;
+    }
+    if (!accel && !event.altKey && bindings.prefixes().includes(event.key)) {
+      event.preventDefault();
+      arm(event.key);
     }
   };
   onMount(() => {
@@ -100,6 +181,7 @@ export function App() {
     window.addEventListener("keydown", keys);
   });
   onCleanup(() => {
+    clearTimeout(forget);
     window.removeEventListener("hashchange", follow);
     window.removeEventListener("keydown", keys);
   });
@@ -134,6 +216,16 @@ export function App() {
     return answer !== undefined && "approvals" in answer ? answer.approvals.items.length : 0;
   });
   const working = createMemo(() => Object.values(ui.conn.belief.runs).some((run) => run.doing.kind !== "frozen"));
+  const halted = () => ui.conn.belief.halted.includes("city");
+  // How many runs this city cancelled. The wire carries no count of
+  // what one halt froze, so this counts the runs whose own freeze says
+  // `cancelled`, which is what a halt writes.
+  const frozen = createMemo(
+    () =>
+      Object.values(ui.conn.belief.runs).filter(
+        (run) => run.doing.kind === "frozen" && run.doing.completion === "cancelled",
+      ).length,
+  );
   createEffect(() => {
     const name = ui.conn.belief.city ?? "sprawling";
     document.title = waiting() > 0 ? `(${String(waiting())}) ${name}` : name;
@@ -145,16 +237,43 @@ export function App() {
 
   return (
     <div class="flex h-screen bg-g0 font-sans text-body text-text">
+      <a
+        href="#main"
+        class="sr-only focus:not-sr-only focus:absolute focus:top-snug focus:left-snug focus:z-30 focus:rounded-control focus:bg-g2 focus:px-base focus:py-snug focus:text-label focus:text-text"
+      >
+        {say("skip_main")}
+      </a>
       <Show when={view().kind !== "welcome"}>
         <Rail
           view={view()}
           open={railOpen()}
+          prefix={prefix()}
           onToggle={() => setRailOpen((open) => !open)}
           onPalette={() => setPaletteOpen(true)}
         />
       </Show>
-      <main class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto" aria-label={say("region_main")}>
-        <Switch>
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+        <Show when={halted()}>
+          <div
+            class="drop flex shrink-0 flex-wrap items-center gap-base border-b border-g2 bg-g1 px-pane py-snug text-label"
+            role="status"
+          >
+            <span class="inline-block size-dot shrink-0 rounded-pill bg-alert" />
+            <span class="text-text">{say("halt_title")}</span>
+            <Show when={frozen() > 0}>
+              <span class="text-text-quiet">{say("halt_frozen", { n: String(frozen()) })}</span>
+            </Show>
+            <button
+              type="button"
+              class="ml-auto rounded-control px-base py-tight font-mono text-label text-accent hover:bg-g2"
+              onClick={() => command(release("city"))}
+            >
+              {say("city_release")}
+            </button>
+          </div>
+        </Show>
+        <main id="main" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto" aria-label={say("region_main")}>
+          <Switch>
           <Match keyed when={view().kind === "talk" ? view() : undefined}>
             {(talk) => (talk.kind === "talk" ? <Talk address={talk.address} /> : null)}
           </Match>
@@ -185,11 +304,15 @@ export function App() {
           <Match when={view().kind === "gallery"}>
             <Gallery />
           </Match>
-        </Switch>
-      </main>
+          </Switch>
+        </main>
+      </div>
       <Refusal />
       <Show when={paletteOpen()}>
         <Palette onClose={() => setPaletteOpen(false)} />
+      </Show>
+      <Show when={sheetOpen()}>
+        <Cheatsheet onClose={closeSheet} />
       </Show>
       <span class="sr-only">{toFragment(view())}</span>
     </div>

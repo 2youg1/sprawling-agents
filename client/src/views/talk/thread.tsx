@@ -13,8 +13,8 @@ import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
 import type { RunBelief } from "../../core/belief";
 import { toFragment } from "../../core/route";
-import { clock, count } from "../../core/time";
-import type { Call, Note, RoundsAnswer, Turn } from "../../wire";
+import { clock, count, usd } from "../../core/time";
+import type { Call, Note, RoundsAnswer, RunId, Turn } from "../../wire";
 import { useLang, useSay, useUi } from "../../ui";
 import { Prose } from "../prose";
 
@@ -47,7 +47,12 @@ function callWord(call: Call): string {
   return call.subject === null || call.subject === undefined ? call.tool : `${call.tool} ${call.subject}`;
 }
 
-function Calls(props: { readonly calls: readonly Call[] }) {
+// The provider's own words for a reply that ended the way replies end.
+// Anything else - the ceiling, and whatever a provider adds next - is a
+// reply that was cut off, and a reader is told so.
+const FINISHED: readonly string[] = ["end_turn", "tool_use"];
+
+function Calls(props: { readonly calls: readonly Call[]; readonly run: RunId }) {
   const say = useSay();
   const [open, setOpen] = createSignal(false);
   // Few calls are named one by one; many are counted by tool.
@@ -72,7 +77,7 @@ function Calls(props: { readonly calls: readonly Call[] }) {
         aria-expanded={open()}
       >
         <span class="inline-block w-pane">{open() ? "▾" : "▸"}</span>
-        {summary()}
+        <span class="text-text-disabled">{say("talk_calls")}</span> {summary()}
       </button>
       <Show when={open()}>
         <ul class="mt-tight ml-pane border-l border-g2 pl-base">
@@ -84,13 +89,23 @@ function Calls(props: { readonly calls: readonly Call[] }) {
                 </span>
                 <Show when={call.output}>
                   {(output) => (
-                    <pre class="mt-tight max-h-output overflow-auto rounded-card bg-g1 p-snug font-mono text-note text-text-quiet">
-                      {output().head}
+                    <>
+                      <pre class="mt-tight max-h-output overflow-auto rounded-card bg-g1 p-snug font-mono text-note text-text-quiet">
+                        {output().head}
+                        <Show when={output().cut > 0}>
+                          {"\n"}
+                          <span class="text-text-disabled">{say("run_cut", { n: String(output().cut) })}</span>
+                        </Show>
+                      </pre>
                       <Show when={output().cut > 0}>
-                        {"\n"}
-                        <span class="text-text-disabled">{say("run_cut", { n: String(output().cut) })}</span>
+                        <a
+                          class="text-note text-text-faint hover:text-text-quiet"
+                          href={toFragment({ kind: "run", run: props.run })}
+                        >
+                          {say("talk_call_open")}
+                        </a>
                       </Show>
-                    </pre>
+                    </>
                   )}
                 </Show>
               </li>
@@ -133,11 +148,34 @@ function NoteLine(props: { readonly note: Note; readonly who: string }) {
   );
 }
 
-function TurnView(props: { readonly turn: Turn; readonly who: string }) {
+function TurnView(props: {
+  readonly turn: Turn;
+  readonly who: string;
+  readonly run: RunId;
+  // The `main` model's output ceiling, when the city knows one: the
+  // number a reader needs to read an empty reply as a limit rather
+  // than as silence.
+  readonly ceiling: number | null;
+}) {
   const say = useSay();
   const tokens = createMemo(() => {
     const used = props.turn.used;
     return used === null || used === undefined ? null : used.input + used.output;
+  });
+  const spent = createMemo(() => {
+    const held = props.turn.spent;
+    return held === null || held === undefined || held === 0 ? null : held;
+  });
+  // A turn that said nothing and did nothing is the empty reply: the
+  // run moves on and a reader is shown a blank where an answer was
+  // paid for. A turn that only made tool calls is not that.
+  const empty = createMemo(() => {
+    const said = props.turn.said;
+    return (said === null || said === undefined || said === "") && props.turn.calls.length === 0;
+  });
+  const cut = createMemo(() => {
+    const why = props.turn.stopped;
+    return why === null || why === undefined || FINISHED.includes(why) ? null : why;
   });
   return (
     <div class="my-base">
@@ -145,7 +183,7 @@ function TurnView(props: { readonly turn: Turn; readonly who: string }) {
         {(note) => <NoteLine note={note} who={props.who} />}
       </For>
       <Show when={props.turn.calls.length > 0}>
-        <Calls calls={props.turn.calls} />
+        <Calls calls={props.turn.calls} run={props.run} />
       </Show>
       <Show when={props.turn.said}>
         {(said) => (
@@ -153,10 +191,24 @@ function TurnView(props: { readonly turn: Turn; readonly who: string }) {
             <div class="mb-tight text-note text-text-disabled">
               {props.who}
               <Show when={tokens()}>{(n) => <span> · {say("talk_tokens", { n: count(n()) })}</span>}</Show>
+              <Show when={spent()}>{(micros) => <span> · {usd(micros())}</span>}</Show>
             </div>
             <Prose text={said()} />
           </div>
         )}
+      </Show>
+      <Show when={empty()}>
+        <div class="my-snug rounded-card border border-alert/40 px-base py-snug text-note text-alert">
+          <Show
+            when={props.ceiling}
+            fallback={say("talk_said_nothing")}
+          >
+            {(n) => say("talk_said_nothing_capped", { n: count(n()) })}
+          </Show>
+        </div>
+      </Show>
+      <Show when={cut()}>
+        {(why) => <div class="my-snug text-note text-alert">{say("talk_cut_off", { why: why() })}</div>}
       </Show>
       <For each={props.turn.notes.filter((note) => !("arrived" in note))}>
         {(note) => <NoteLine note={note} who={props.who} />}
@@ -200,6 +252,15 @@ export function Thread(props: ThreadProps) {
     return held !== undefined && "rounds" in held ? held.rounds : undefined;
   });
   const task = createMemo(() => answer()?.opening?.task ?? props.run.task);
+  // What this city told the provider a reply may be at most. Read here
+  // rather than per turn, because it is one fact about the city and not
+  // one fact about a turn.
+  const endpoints = ui.conn.asking.ask("endpoint_view");
+  const ceiling = createMemo<number | null>(() => {
+    const held = endpoints();
+    if (held === undefined || !("endpoints" in held)) return null;
+    return held.endpoints.chosen.find((each) => each.tag === "main")?.max_output_tokens ?? null;
+  });
   const frozen = () => props.run.doing.kind === "frozen";
   const completion = createMemo(() => {
     const word = answer()?.closing?.completion ?? (props.run.doing.kind === "frozen" ? props.run.doing.completion : null);
@@ -232,7 +293,9 @@ export function Thread(props: ThreadProps) {
       <Show when={task()}>
         {(text) => <Person text={text()} label={say("talk_you")} at={props.run.started ?? undefined} />}
       </Show>
-      <For each={answer()?.turns ?? []}>{(turn) => <TurnView turn={turn} who={props.who} />}</For>
+      <For each={answer()?.turns ?? []}>
+        {(turn) => <TurnView turn={turn} who={props.who} run={props.run.run} ceiling={ceiling()} />}
+      </For>
       <Show when={streaming()}>
         <div class="my-base text-body">
           <div class="mb-tight text-note text-text-disabled">{props.who}</div>

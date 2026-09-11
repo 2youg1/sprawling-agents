@@ -12,6 +12,7 @@ import type {
   Address,
   ApprovalId,
   Autonomy,
+  Ceiling,
   Command,
   DialectKind,
   Effort,
@@ -26,6 +27,7 @@ import type {
   SessionName,
 } from "../wire";
 import {
+  Ceiling as CeilingSchema,
   ModeTag,
   ProviderName as ProviderNameSchema,
   SessionName as SessionNameSchema,
@@ -129,8 +131,33 @@ export function setAutonomy(scope: HaltScope, autonomy: Autonomy): Command {
   return { set_autonomy: { scope, autonomy, idem: mintIdem() } };
 }
 
+// The three wire APIs a provider states in Codex's `config.toml`, in
+// that file's own spelling. `DialectKind` stays the internal word: two
+// of the three translate to one, and the third has no translation yet,
+// so the mapping is a total function that answers with absence rather
+// than with a guess.
+export const WIRE_APIS = ["chat", "responses", "messages"] as const;
+export type WireApi = (typeof WIRE_APIS)[number];
+
+export function dialectOf(api: WireApi): DialectKind | null {
+  switch (api) {
+    case "chat":
+      return "open_ai";
+    case "messages":
+      return "anthropic";
+    // The Responses API is a third request shape rather than a second
+    // spelling of Chat Completions; this city's wire cannot carry it,
+    // and a form that sent `open_ai` for it would send the wrong body.
+    case "responses":
+      return null;
+  }
+}
+
 export interface Endpoint {
-  readonly name: string;
+  // `[model_providers.<id>]` in Codex's config.toml: the key the
+  // credential reference is derived from, and the name the city files
+  // the endpoint under.
+  readonly id: string;
   readonly baseUrl: string;
   readonly dialect: DialectKind;
   readonly secret: string | null;
@@ -144,7 +171,7 @@ export function providerName(name: string): ProviderName {
 export function probeEndpoint(e: Endpoint): Command {
   return {
     probe_endpoint: {
-      name: providerName(e.name),
+      name: providerName(e.id),
       base_url: e.baseUrl,
       dialect: e.dialect,
       secret: e.secret,
@@ -157,7 +184,7 @@ export function probeEndpoint(e: Endpoint): Command {
 export function attachEndpoint(e: Endpoint, admit: readonly string[]): Command {
   return {
     attach_endpoint: {
-      name: providerName(e.name),
+      name: providerName(e.id),
       base_url: e.baseUrl,
       dialect: e.dialect,
       secret: e.secret,
@@ -168,18 +195,43 @@ export function attachEndpoint(e: Endpoint, admit: readonly string[]): Command {
   };
 }
 
-// Neither ceiling is stated here: the city takes the catalogue's figure
-// for the model, and a number typed on a form would outrank the one that
-// bills. An absent output ceiling is carried as absent — a zero would
-// reach the provider as `max_tokens: 0`, which answers with nothing.
-export function selectModel(endpoint: string, model: string, tag: ModelTag): Command {
+// The two ceilings one model row states. They travel together because a
+// context window without an output ceiling describes no model that can
+// be called, and both are absent until somebody states them: the
+// catalogue holds two rows, so a provider outside it is only as good as
+// the figures a person read off its own model list.
+export interface Ceilings {
+  readonly contextTokens: number | null;
+  readonly maxOutputTokens: number | null;
+}
+
+export const UNSTATED: Ceilings = { contextTokens: null, maxOutputTokens: null };
+
+// A ceiling reaches the wire only as a whole positive number. Anything
+// else is nobody's figure, and absence is what the city reads as "take
+// the catalogue's": a zero would reach the provider as `max_tokens: 0`,
+// which answers with nothing.
+function ceiling(stated: number | null): Ceiling | null {
+  return stated !== null && Number.isInteger(stated) && stated > 0 ? CeilingSchema.make(stated) : null;
+}
+
+function window(stated: number | null): number {
+  return stated !== null && Number.isInteger(stated) && stated > 0 ? stated : 0;
+}
+
+export function selectModel(
+  endpoint: string,
+  model: string,
+  tag: ModelTag,
+  ceilings: Ceilings = UNSTATED,
+): Command {
   return {
     select_model: {
       endpoint: providerName(endpoint),
       model,
       tag,
-      context_tokens: 0,
-      max_output_tokens: null,
+      context_tokens: window(ceilings.contextTokens),
+      max_output_tokens: ceiling(ceilings.maxOutputTokens),
       idem: mintIdem(),
     },
   };

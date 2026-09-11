@@ -43,3 +43,41 @@ export function enrol(
 export function referenceFor(provider: string): { realm: string; name: string } {
   return { realm: "providers", name: provider };
 }
+
+// What this page knows about a key it sent to the vault: the reference
+// the city answered with, and the provider id it was filed under.
+//
+// **The id travels beside the reference because it is what makes the
+// reference true.** A reference held alone outlived the id it was
+// derived from: renaming the provider left `secret:providers/<old>` in
+// the form, and the second provider a person enrolled inherited the
+// first one's key. Holding the pair lets every reader ask the only
+// question that matters - is this reference the one this id derives -
+// and get `null` the moment the name changes.
+export interface StoredKey {
+  readonly provider: string;
+  readonly reference: string;
+}
+
+// What the key field is for one provider id right now.
+export type KeyField =
+  // Nothing is filed under this id: what is typed here is enrolled.
+  | { readonly kind: "empty" }
+  // A key is filed under this id: leaving the field blank keeps it,
+  // typing into it replaces it.
+  | { readonly kind: "stored"; readonly reference: string };
+
+export function keyField(held: StoredKey | null, provider: string): KeyField {
+  return held !== null && held.provider === provider
+    ? { kind: "stored", reference: held.reference }
+    : { kind: "empty" };
+}
+
+// The reference a command should carry for this provider id: the stored
+// one when it was filed under this very id, and nothing otherwise. A
+// reference derived from a name nobody enrolled names a key that does
+// not exist, which is a 401 a person cannot read off a form.
+export function secretFor(held: StoredKey | null, provider: string): string | null {
+  const field = keyField(held, provider);
+  return field.kind === "stored" ? field.reference : null;
+}

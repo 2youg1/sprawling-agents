@@ -8,18 +8,35 @@
 // column of glyphs; expanded - by hover, by `[`, or by `?` - it shows
 // each glyph's name and, beside it, the keys that reach it. That is how
 // the shortcuts are taught: not up front, but the moment somebody
-// looks.
+// looks. The keys themselves are read from `core/keys`, so a rebind
+// shows here without this file knowing what was pressed.
+//
+// The hover has a threshold on the way in and a delay on the way out. A
+// pointer crossing the 44 px edge used to widen the rail, which moved
+// the edge out from under the pointer, which narrowed it again; a
+// pointer must now rest on the column before it opens, and leaving it
+// for a moment does not close it.
 
-import { For, Show, createMemo } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
 
+import type { Action } from "../core/keys";
 import { MAYOR, toFragment } from "../core/route";
 import type { View } from "../core/route";
 import { useSay, useUi } from "../ui";
+import { Kbd } from "./parts/kbd";
+
+// How long a pointer rests on the collapsed column before it opens, and
+// how long the rail stays open after the pointer leaves.
+const ENTER_MS = 120;
+const LEAVE_MS = 200;
 
 export interface RailProps {
   readonly view: View;
   readonly open: boolean;
+  // The prefix key already pressed, which the rail says out loud so the
+  // second key is not guessed at.
+  readonly prefix: string | null;
   readonly onToggle: () => void;
   readonly onPalette: () => void;
 }
@@ -28,7 +45,7 @@ interface Item {
   readonly key: "talk" | "city" | "mcp" | "record" | "cost" | "setup";
   readonly view: View;
   readonly label: string;
-  readonly keys: string;
+  readonly action: Action;
   readonly glyph: JSX.Element;
   readonly badge?: number | undefined;
 }
@@ -95,9 +112,35 @@ function PaletteGlyph() {
   );
 }
 
+// A dot drawn in the same box a glyph is drawn in, so every row on the
+// rail starts its first mark at the same x. It used to be centred in
+// its own smaller box, five pixels left of every icon under it.
+function Dot(props: { readonly tone: string }) {
+  return (
+    <span class="flex size-glyph shrink-0 items-center justify-center">
+      <span class={`inline-block size-dot rounded-pill ${props.tone}`} />
+    </span>
+  );
+}
+
 export function Rail(props: RailProps) {
   const ui = useUi();
   const say = useSay();
+  const [resting, setResting] = createSignal(false);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const settle = (open: boolean, after: number) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      setResting(open);
+    }, after);
+  };
+  onCleanup(() => {
+    clearTimeout(timer);
+  });
+  // What the rail shows the names in: pinned open, or a pointer that
+  // stayed.
+  const wide = () => props.open || resting();
+
   const active = createMemo(
     () => Object.values(ui.conn.belief.runs).filter((run) => run.doing.kind !== "frozen").length,
   );
@@ -112,12 +155,12 @@ export function Rail(props: RailProps) {
   const linkWord = () =>
     link() === "live" ? say("link_live") : link() === "refused" ? say("link_refused") : say("link_connecting");
   const items = createMemo<Item[]>(() => [
-    { key: "talk", view: { kind: "talk", address: MAYOR }, label: say("nav_mayor"), keys: "g m", glyph: <TalkGlyph /> },
-    { key: "city", view: { kind: "city" }, label: say("nav_city"), keys: "g c", glyph: <CityGlyph />, badge: active() },
-    { key: "mcp", view: { kind: "mcp" }, label: say("nav_mcp"), keys: "g x", glyph: <PlugGlyph /> },
-    { key: "record", view: { kind: "record", lens: "ledger" }, label: say("nav_the_record"), keys: "g r", glyph: <RecordGlyph /> },
-    { key: "cost", view: { kind: "cost" }, label: say("cost_title"), keys: "g $", glyph: <CostGlyph /> },
-    { key: "setup", view: { kind: "setup" }, label: say("nav_settings"), keys: "g s", glyph: <SetupGlyph /> },
+    { key: "talk", view: { kind: "talk", address: MAYOR }, label: say("nav_mayor"), action: "go.talk", glyph: <TalkGlyph /> },
+    { key: "city", view: { kind: "city" }, label: say("nav_city"), action: "go.city", glyph: <CityGlyph />, badge: active() },
+    { key: "mcp", view: { kind: "mcp" }, label: say("nav_mcp"), action: "go.mcp", glyph: <PlugGlyph /> },
+    { key: "record", view: { kind: "record", lens: "ledger" }, label: say("nav_the_record"), action: "go.record", glyph: <RecordGlyph /> },
+    { key: "cost", view: { kind: "cost" }, label: say("cost_title"), action: "go.cost", glyph: <CostGlyph /> },
+    { key: "setup", view: { kind: "setup" }, label: say("nav_settings"), action: "go.setup", glyph: <SetupGlyph /> },
   ]);
   const here = (item: Item) => (props.view.kind === item.key ? "page" : undefined);
   const halted = () => ui.conn.belief.halted.includes("city");
@@ -127,11 +170,16 @@ export function Rail(props: RailProps) {
     // the rail is pinned open; a hover widens the nav over the page
     // rather than pushing it, so reading is never disturbed by the
     // pointer passing the edge.
-    <div class={`relative h-full shrink-0 transition-[width] ${props.open ? "w-rail-open" : "w-rail"}`}>
+    <div class={`relative h-full shrink-0 transition-[width] duration-200 motion-reduce:transition-none ${props.open ? "w-rail-open" : "w-rail"}`}>
       <nav
-        class={`group/rail absolute inset-y-0 left-0 z-10 flex flex-col gap-tight border-r border-g1 bg-g0 py-snug transition-[width] ${props.open ? "w-rail-open" : "w-rail"} hover:w-rail-open hover:shadow-composer`}
+        class={`absolute inset-y-0 left-0 z-10 flex flex-col gap-tight border-r border-g1 bg-g0 py-snug transition-[width] duration-200 motion-reduce:transition-none ${wide() ? "w-rail-open shadow-composer" : "w-rail"}`}
         aria-label={say("region_nav")}
-        data-open={props.open ? "" : undefined}
+        onPointerEnter={() => {
+          settle(true, ENTER_MS);
+        }}
+        onPointerLeave={() => {
+          settle(false, LEAVE_MS);
+        }}
       >
         <button
           type="button"
@@ -142,16 +190,22 @@ export function Rail(props: RailProps) {
           aria-expanded={props.open}
           title={linkWord()}
         >
-          <span class={`inline-block size-dot shrink-0 rounded-pill ${dotClass()}`} />
-          <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">
-            {ui.conn.belief.city ?? "sprawling"}
-          </span>
-          <span class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">[</span>
+          <Dot tone={dotClass()} />
+          <Show when={wide()}>
+            <span class="truncate">{ui.conn.belief.city ?? "sprawling"}</span>
+            <Kbd action="rail.toggle" class="ml-auto" />
+          </Show>
         </button>
         <Show when={halted()}>
-          <div class="mx-snug rounded-pill bg-alert px-tight py-tight text-center text-note text-g0" title={say("city_stopped_line")}>
-            <span class="hidden group-hover/rail:inline group-data-open/rail:inline">{say("city_stopped")}</span>
-            <span class="group-hover/rail:hidden group-data-open/rail:hidden">!</span>
+          <div
+            class="flex h-rail items-center gap-base px-base text-label text-alert"
+            role="status"
+            title={say("halt_title")}
+          >
+            <Dot tone="bg-alert" />
+            <Show when={wide()}>
+              <span class="truncate">{say("halt_title")}</span>
+            </Show>
           </div>
         </Show>
         <For each={items()}>
@@ -170,10 +224,10 @@ export function Rail(props: RailProps) {
                   </span>
                 </Show>
               </span>
-              <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">{item.label}</span>
-              <kbd class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">
-                {item.keys}
-              </kbd>
+              <Show when={wide()}>
+                <span class="truncate">{item.label}</span>
+                <Kbd action={item.action} class="ml-auto" />
+              </Show>
             </a>
           )}
         </For>
@@ -189,13 +243,18 @@ export function Rail(props: RailProps) {
                 {waiting()}
               </span>
             </span>
-            <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">
-              {say("nav_waiting", { n: String(waiting()) })}
-            </span>
-            <kbd class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">g w</kbd>
+            <Show when={wide()}>
+              <span class="truncate">{say("nav_waiting", { n: String(waiting()) })}</span>
+              <Kbd action="go.waiting" class="ml-auto" />
+            </Show>
           </a>
         </Show>
         <span class="flex-1" />
+        <Show when={props.prefix !== null}>
+          <div class="mx-snug rounded-control bg-g2 px-snug py-tight text-center font-mono text-note text-text-quiet" role="status">
+            {say("keys_prefix", { key: props.prefix ?? "" })}
+          </div>
+        </Show>
         <button
           type="button"
           class="flex h-rail items-center gap-base px-base text-label text-text-faint hover:bg-g1 hover:text-text"
@@ -205,8 +264,10 @@ export function Rail(props: RailProps) {
           title={say("nav_palette")}
         >
           <PaletteGlyph />
-          <span class="hidden truncate group-hover/rail:inline group-data-open/rail:inline">{say("nav_everything")}</span>
-          <kbd class="ml-auto hidden font-mono text-note text-text-disabled group-hover/rail:inline group-data-open/rail:inline">⌘K</kbd>
+          <Show when={wide()}>
+            <span class="truncate">{say("nav_everything")}</span>
+            <Kbd action="palette" class="ml-auto" />
+          </Show>
         </button>
       </nav>
     </div>
