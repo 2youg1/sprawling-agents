@@ -33,6 +33,30 @@ impl Persistence {
             Persistence::ThisProcess => "this_process",
         }
     }
+
+    /// What this grade costs the person holding the key, in the words a
+    /// message to them may use.
+    ///
+    /// One authority for one sentence: the same text explains a vault at
+    /// rest and a credential that has gone missing, so a Linux install
+    /// cannot report a store that survives a reboot in one place and a
+    /// bare `not configured` in the other.
+    #[must_use]
+    pub fn consequence(self) -> &'static str {
+        match self {
+            Persistence::AcrossReboots => {
+                "a stored key survives a restart of this computer, so it is entered once"
+            }
+            Persistence::ThisBoot => {
+                "the kernel keyring holds a stored key until this computer reboots, \
+                 and the key has to be entered again after that"
+            }
+            Persistence::ThisProcess => {
+                "a stored key lives in this process only, so it has to be entered again \
+                 the next time sprawling starts"
+            }
+        }
+    }
 }
 
 /// `describe`'s answer: state you can render, value you cannot get.
@@ -46,6 +70,32 @@ pub struct Described {
 
 /// Platform credential service via the keyring crate.
 pub(crate) struct KeyringVault;
+
+impl KeyringVault {
+    /// What this backend is, in the words `describe` renders.
+    ///
+    /// Named per target because it is a different service per target,
+    /// and a person debugging a lost key needs to know which one refused.
+    pub(crate) const SOURCE: &'static str = if cfg!(target_os = "linux") {
+        "kernel-keyring"
+    } else {
+        "platform-credential-service"
+    };
+
+    /// The longest this backend can keep a value on this target.
+    ///
+    /// Windows Credential Manager and the macOS Keychain write to disk.
+    /// The Linux build talks to the kernel's keyring through keyutils,
+    /// which is memory the kernel clears on reboot — the one store that
+    /// stays reachable from a static musl binary with no session bus.
+    /// The grade is therefore a fact about the target rather than about
+    /// the probe, and it is stated here, once.
+    pub(crate) const PERSISTENCE: Persistence = if cfg!(target_os = "linux") {
+        Persistence::ThisBoot
+    } else {
+        Persistence::AcrossReboots
+    };
+}
 
 fn keyring_entry(reference: &SecretRef) -> Result<keyring::Entry, AxError> {
     keyring::Entry::new(
@@ -98,6 +148,11 @@ impl Vault for KeyringVault {
 #[derive(Default)]
 pub(crate) struct MemoryVault {
     values: BTreeMap<String, Zeroizing<String>>,
+}
+
+impl MemoryVault {
+    pub(crate) const SOURCE: &'static str = "session-memory";
+    pub(crate) const PERSISTENCE: Persistence = Persistence::ThisProcess;
 }
 
 impl Vault for MemoryVault {

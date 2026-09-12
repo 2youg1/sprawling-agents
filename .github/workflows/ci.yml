@@ -10,8 +10,8 @@
 # the *sum* of two builds. Split across jobs that start together, it is
 # the slower of the two.
 #
-# Five jobs, none waiting on another. Together they are exactly `just
-# check` plus the supply-chain read, and CI must
+# Six jobs, none waiting on another. Together they are exactly `just
+# check` plus the supply-chain read and the two proofs, and CI must
 # never be weaker than the local command: a green CI that implies less
 # than a green `just check` is worse than no CI.
 #
@@ -21,15 +21,21 @@
 #            needs (27s of a 27.5s gate run - it is why the other
 #            twelve no longer queue behind a compile)
 #   client   the client's own linter, typecheck and tests
+#   proof    the two kernel propositions kani can hold, against real MIR
 #   supply   licences, bans and sources; compiles nothing
 #
-# Windows, and only Windows, is deliberate and unchanged: it is the
-# platform the project is developed on, so a red job is a red local run
-# the person can reproduce. macOS byte-identity is `platforms.yml`,
-# nightly, and so is the Nix leg. Linux stays out of the *push* pipeline
-# because nobody here can reproduce a Linux failure at their desk; the
-# release does ship a static Linux archive, built natively by
+# Windows for everything a person can reproduce at their desk: it is the
+# platform the project is developed on, so a red job is a red local run.
+# macOS byte-identity is `platforms.yml`, nightly, and so is the Nix leg.
+# The release ships a static Linux archive, built natively by
 # `release.yml` (sprawling-SPEC.md section 8-9).
+#
+# The two ubuntu jobs here are the exceptions that rule admits, and both
+# for the same reason: the tool runs nowhere else. `client` drives bun,
+# and `proof` drives kani, which upstream builds for Linux only. A
+# Windows desk cannot reproduce either failure no matter which workflow
+# holds the job, so putting them on the nightly schedule would buy no
+# reproducibility and would cost a day between a merge and its verdict.
 #
 # Every job carries `timeout-minutes: 20`. GitHub's default is six hours,
 # so a hung job used to burn a runner for a working day while the person
@@ -262,6 +268,66 @@ jobs:
           restore-keys: bun-${{ runner.os }}-
       - name: lint, typecheck and test the client
         run: just check-client
+
+  # V5: the propositions only a proof can hold, against real MIR.
+  #
+  # It moved here from `platforms.yml`, and the reason it was nightly is
+  # what dissolved: it was described there as "the one ubuntu build left
+  # in the pipeline", which stopped being true when `client` landed on
+  # ubuntu and `release.yml` grew a native Linux row. A proof that
+  # arrives up to a day after the merge it judges is a proof nobody is
+  # holding a change against, so it now gates the change.
+  #
+  # **Two harnesses, not seven, and the arithmetic is what decides it.**
+  # Five of the seven assert something about one concrete address or one
+  # concrete taint source - `Address::parse(".sprawling/ledger")`,
+  # `TaintSource::new("web:x")` - which is a unit test wearing a proof's
+  # clothing, and the file beside each already holds that proposition as
+  # a `#[test]` or as a proptest over a wider domain than the harness
+  # has. Those same five build a `Vec`, a `String` or a `BTreeSet`, whose
+  # loops CBMC cannot bound: they spent six hours, then forty-five
+  # minutes under `--default-unwind 32`, and returned nothing either
+  # time. `secret::scan::verification::entropy_is_total_on_short_inputs`
+  # is left out for a third reason and not forgotten:
+  # `entropy_millibits_per_char` calls `log2_q10` once per slot of a
+  # 256-slot count table and each call squares a u128 ten times, so the
+  # harness hands the solver some 2,560 symbolic non-linear
+  # multiplications and does not return inside fifteen minutes. Nothing
+  # about a bound fixes that; the arithmetic core is proved on its own by
+  # `log2_q10_is_total`, and proving the whole function needs a harness
+  # over one slot rather than over the table (kernel-SPEC.md section 2).
+  #
+  # The two that are here carry a domain sampling cannot reach - every
+  # u64, every four-byte input - and their loops are constant-bounded, so
+  # no global unwind is passed and CBMC derives the bounds (`log2_q10`
+  # iterates ten times). Both returned inside a minute when they were
+  # last timed, on 2026-08-29.
+  #
+  # One step per harness rather than one matrix leg per harness: a red
+  # step names the proposition that broke just as a red leg did, and one
+  # job installs kani once instead of twice.
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - name: admit is total and monotone in depth
+        uses: model-checking/kani-github-action@v1
+        with:
+          args: >-
+            -p kernel --harness
+            backpressure::verification::admit_is_total_and_monotone_in_depth
+      # `secret::scan::`, not `secret::`: the entropy judgment moved into
+      # a module of its own, and this filter is matched against the
+      # harness's fully qualified name.
+      - name: the fixed-point log2 is total
+        uses: model-checking/kani-github-action@v1
+        with:
+          args: >-
+            -p kernel --harness
+            secret::scan::verification::log2_q10_is_total
 
   # Licences, banned crates and where they came from. It compiles nothing
   # - it reads `Cargo.lock` - so it is the verdict that arrives first.

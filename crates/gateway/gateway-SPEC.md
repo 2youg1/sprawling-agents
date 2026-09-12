@@ -218,7 +218,9 @@ impl Custodian {
 pub struct Captured { pub replaced: Vec<u8>, pub events: Vec<Payload> }   // secret_captured 载荷（入账归调用方）
 ```
 
-- 生产适配器＝keyring crate（Windows Credential Manager／macOS Keychain／Linux secret service）；第二适配器＝会话内存 BTreeMap（探测全败的兜底＋测试面）。**恒不自写加密文件**。
+- 生产适配器＝keyring crate（Windows Credential Manager／macOS Keychain／Linux 内核 keyring）；第二适配器＝会话内存 BTreeMap（探测全败的兜底＋测试面）。**恒不自写加密文件**。
+- **Linux 存在内核 keyring，不存在 secret service，理由是发布产物。** 发布的 Linux 归档是一份静态 musl 二进制（`x86_64-unknown-linux-musl`），而 secret service 走 D-Bus，树因此另到 `libdbus-sys`，那要求链接宿主的 glibc D-Bus——一份静态二进制与一个 D-Bus 凭据库不能同时为真。故 keyring 的 Linux 特性取 `linux-native`（keyutils，纯 syscall，不需要会话总线、不需要动态库、容器里同样成立），不取 `sync-secret-service`。代价写在类型上而不是写在注释里：内核 keyring 是内存，重启即清，故 `KeyringVault::PERSISTENCE` 在 Linux 上恒为 `Persistence::ThisBoot`，`SOURCE` 恒为 `kernel-keyring`。
+- **等级只说一次，两处读它。** `Persistence::consequence()` 是「这个等级让人付出什么」的唯一权威句；`describe` 报状态（`source`＋`persistence`），`resolve` 未命中时把这句接在 recovery 后面——重启吃掉的 key 因此读作「重启清了内核 keyring，请再输一次」，而不是读作「你从来没配过」。探测成功不产 `provider_degraded`：Linux 上那是健康路径，每次启动报一条假警报只会让这个 kind 没人再读。
 - realm/name 派生：capture 时 realm=形状表 provider（无则 "detected"）、name=定长计数器 `cap-<n>`（确定性，无随机）；用户改名属 S4 命令面。
 - OAuth 两流程（PKCE／设备码）＝代码：`pub fn oauth_begin(profile, …) -> OauthPending`＋`pub fn oauth_redeem(pending, …) -> Sealed<String>` 的纯构造（HTTP 往返由调用方经 endpoint 的 Client 执行或 S4 命令面驱动；此处交付构造与校验，不交付活体登录）。续期＝到期前 resolve 触发 refresh 构造。
 - 环境变量是只读来源（键形 `SPRAWLING_SECRET_<REALM>_<NAME>`）：`describe.writable=false`；`set` 撞遮蔽即拒并指名遮蔽者；读取器可注入（edition 2024 的 set_var 不安全，测试恒不改进程环境）。

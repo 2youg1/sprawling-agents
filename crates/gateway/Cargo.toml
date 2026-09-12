@@ -15,7 +15,16 @@ serde_json.workspace = true
 reqwest = { workspace = true }
 # Custody: platform credential service binding + zeroizing storage
 # (never self-written encrypted files).
-keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
+#
+# The Linux feature is `linux-native` (the kernel's own keyring, reached
+# by syscall through keyutils) rather than `sync-secret-service`, and the
+# release artifact is what decides it: a static musl binary and a D-Bus
+# secret service cannot both be true, because `libdbus-sys` links the
+# host's glibc D-Bus. keyutils needs no bus, no dynamic library and no
+# desktop session, so it holds for a container and a login shell alike.
+# What it costs is stated in the type: a value kept there lives for one
+# boot, which is `Persistence::ThisBoot` and nothing longer.
+keyring = { version = "3", features = ["windows-native", "apple-native", "linux-native"] }
 zeroize.workspace = true
 # RFC 7636 mandates SHA-256 for the S256 challenge: an external protocol
 # fact, not a second internal hash authority (blake3 stays sole for

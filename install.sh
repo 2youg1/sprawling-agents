@@ -60,13 +60,12 @@ need() {
 # rule, because the naming is a fact about how each row is built rather
 # than something a reader could derive.
 #
-# **No release carries a Linux archive yet.** That row is held back until
-# it is settled where a Linux install keeps a credential, and
-# `.github/workflows/release.yml` says so where the row used to be. The
-# Linux entry below is what this script will match the day the row
-# returns; until then a Linux run falls through both suffixes and is told
-# what the release does carry, which is the same answer it would give for
-# any platform nobody builds for.
+# The Linux row builds `x86_64-unknown-linux-musl`, so the first suffix
+# below is the one a release carries today; the second is kept for a gnu
+# build that may join it later. A release cut before that row existed
+# matches neither, and a Linux run against one of those is told what the
+# release does carry, which is the same answer it would give for any
+# platform nobody builds for.
 platform() {
     system=$(uname -s)
     machine=$(uname -m)

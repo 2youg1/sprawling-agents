@@ -40,8 +40,8 @@ impl Custodian {
                 return (
                     Custodian::with_backend(
                         Box::new(MemoryVault::default()),
-                        "session-memory",
-                        Persistence::ThisProcess,
+                        MemoryVault::SOURCE,
+                        MemoryVault::PERSISTENCE,
                     ),
                     degraded_payload("probe reference unparsable"),
                 );
@@ -59,24 +59,31 @@ impl Custodian {
             Ok(Some(read)) if read.as_str() == "probe" => (
                 Custodian::with_backend(
                     Box::new(KeyringVault),
-                    "platform-credential-service",
-                    Persistence::AcrossReboots,
+                    KeyringVault::SOURCE,
+                    KeyringVault::PERSISTENCE,
                 ),
+                // No notice: the probe passed and this is the platform
+                // service, on Linux included. A `provider_degraded` event
+                // on every healthy Linux start would be a false alarm
+                // repeated until nobody reads the kind. The grade this
+                // target can honour is carried by `describe`, and the
+                // moment it costs a person anything - a key the reboot
+                // took - is answered by `resolve` below, in words.
                 None,
             ),
             Ok(_) => (
                 Custodian::with_backend(
                     Box::new(MemoryVault::default()),
-                    "session-memory",
-                    Persistence::ThisProcess,
+                    MemoryVault::SOURCE,
+                    MemoryVault::PERSISTENCE,
                 ),
                 degraded_payload("platform service returned a different value"),
             ),
             Err(err) => (
                 Custodian::with_backend(
                     Box::new(MemoryVault::default()),
-                    "session-memory",
-                    Persistence::ThisProcess,
+                    MemoryVault::SOURCE,
+                    MemoryVault::PERSISTENCE,
                 ),
                 degraded_payload(err.subject()),
             ),
@@ -87,8 +94,8 @@ impl Custodian {
     pub fn in_memory() -> Custodian {
         Custodian::with_backend(
             Box::new(MemoryVault::default()),
-            "session-memory",
-            Persistence::ThisProcess,
+            MemoryVault::SOURCE,
+            MemoryVault::PERSISTENCE,
         )
     }
 
@@ -186,12 +193,19 @@ impl Custodian {
             Some(value) if !value.is_empty() => {
                 Ok(Sealed::new(Box::new(value.as_str().to_owned())))
             }
+            // The recovery carries the backend's grade, because the
+            // commonest way to reach this arm on Linux is a reboot that
+            // emptied the kernel keyring, and "store the credential"
+            // alone reads as though the key was never entered.
             _ => Err(AxError::failure(
                 AxCode::CredentialMissing,
                 "resolve credential",
                 reference.to_string(),
             )
-            .with_recovery("store the credential, or set its environment variable")),
+            .with_recovery(format!(
+                "store the credential, or set its environment variable: {}",
+                self.persistence.consequence()
+            ))),
         }
     }
 
@@ -281,6 +295,20 @@ mod tests {
             Ok(_) => panic!("missing credential must not resolve"),
         };
         assert_eq!(*err.code(), AxCode::CredentialMissing);
+        // The recovery says what the backend can keep, so a key the
+        // reboot took is not reported as a key nobody ever entered.
+        // This custodian is session memory; a Linux one says the same
+        // about the boot, out of the same enum.
+        assert!(
+            err.recovery()
+                .ends_with(custodian.persistence().consequence()),
+            "{}",
+            err.recovery()
+        );
+        assert!(
+            Persistence::ThisBoot.consequence().contains("reboots"),
+            "the Linux grade has to name what a reboot does"
+        );
         let err = custodian
             .set(&reference, Zeroizing::new(String::new()))
             .unwrap_err();

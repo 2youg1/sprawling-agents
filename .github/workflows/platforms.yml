@@ -1,12 +1,17 @@
 # What ci.yml deliberately does not ask on every push.
 #
-# Three claims live here, and all three are about machines rather than
-# about a change. A4/V8 assert byte identity across platforms, so a
-# platform this workflow does not run is a promise rather than a fact. V5
-# proves nine kernel properties against real MIR, which is Linux-only
-# upstream and minutes long either way. The flake claims a person on NixOS
-# can build this tree with the Rust version `rust-toolchain.toml` names,
-# and only an evaluation of the flake can say whether that is so.
+# Two claims live here, and both are about machines rather than about a
+# change. A4/V8 assert byte identity across platforms, so a platform this
+# workflow does not run is a promise rather than a fact. The flake claims
+# a person on NixOS can build this tree with the Rust version
+# `rust-toolchain.toml` names, and only an evaluation of the flake can say
+# whether that is so.
+#
+# V5 used to be the third, and it left rather than lapsed. The kani job
+# is in `ci.yml` now: its reason for being nightly was that it was the
+# one ubuntu build in the pipeline, and that stopped being true, so a
+# proof arriving a day after the merge it judges had nothing left
+# defending it.
 #
 # They run on a schedule and on demand instead of on every push because a
 # gate nobody waits for is a gate nobody runs - and a twenty-minute wait
@@ -129,67 +134,3 @@ jobs:
         run: nix flake check --print-build-logs
       - name: the binary this flake's toolchain builds
         run: nix build .#default --print-build-logs
-
-  # V5: the propositions only a proof can hold. Linux-only upstream -
-  # the one ubuntu build left in the pipeline, kept because the tool runs
-  # nowhere else.
-  #
-  # Two, not nine, and the two facts line up exactly. Six harnesses
-  # assert something about one concrete address and one concrete taint
-  # source - `Address::parse(".sprawling/ledger")`, `TaintSource::new(
-  # "web:x")` - which is a unit test wearing a proof's clothing, and the
-  # file beside each one already holds that proposition as a `#[test]` or
-  # as a proptest with a wider domain than the harness has (discard's
-  # `allow_implies_every_guard_passed` takes any u64; the harness fixes
-  # one value). Those same seven are the ones that build a Vec, a String
-  # or a BTreeSet, whose loops CBMC cannot bound: they spent six hours,
-  # then forty-five minutes under `--default-unwind 32`, and returned
-  # nothing either time.
-  #
-  # These two carry a domain sampling cannot reach - every u64, every
-  # four-byte input - and their loops are constant-bounded, so no global
-  # unwind is passed: CBMC derives the bounds (`log2_q10` iterates ten
-  # times). Both returned inside a minute when they were last timed, on
-  # 2026-08-29.
-  #
-  # A third leg is gone rather than repaired: it named
-  # `budget::verification::admit_spend_…`, and the spending ceiling that
-  # proposition was about no longer exists anywhere in this tree. A
-  # matrix leg that names nothing cannot go green, and there is nothing
-  # left to prove about a rule that was deleted.
-  #
-  # A third harness, `secret::entropy_is_total_on_short_inputs`, is left out and
-  # not forgotten: `entropy_millibits_per_char` calls `log2_q10` once per
-  # slot of a 256-slot count table, and each call squares a u128 ten
-  # times, so the harness hands the solver some 2,560 symbolic non-linear
-  # multiplications and does not return inside fifteen minutes. Nothing
-  # about a bound fixes that. The arithmetic core is proved on its own by
-  # `log2_q10_is_total`; proving the whole function needs a harness over
-  # one slot rather than over the table (kernel-SPEC.md section 2).
-  #
-  # One matrix leg per harness, so a red names the proposition that broke
-  # rather than the tool that ran. The ceiling is a backstop rather than
-  # a budget: a leg that takes ten minutes is a leg that stopped
-  # converging, and it cannot be wrapped in `timeout` because the command
-  # belongs to the action.
-  kani:
-    needs: moved
-    if: needs.moved.outputs.verdict == 'run'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        harness:
-          - backpressure::verification::admit_is_total_and_monotone_in_depth
-          # `secret::scan::`, not `secret::`: the entropy judgment moved
-          # into a module of its own, and this filter is matched against
-          # the harness's fully qualified name.
-          - secret::scan::verification::log2_q10_is_total
-    steps:
-      - uses: actions/checkout@v7
-      - name: install pinned toolchain
-        run: rustup show
-      - uses: model-checking/kani-github-action@v1
-        with:
-          args: -p kernel --harness ${{ matrix.harness }}

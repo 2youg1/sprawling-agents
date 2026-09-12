@@ -118,33 +118,26 @@ jobs:
         shell: bash
         run: rm -rf target/tests
 
-  # Two platforms, and the third is held back rather than shipped broken.
+  # Three platforms, and the third is static on purpose.
   #
-  # The static Linux row was added on a premise that still holds: NixOS
-  # has no `/lib64/ld-linux-x86-64.so.2`, so a dynamically linked ubuntu
-  # artifact does not start there at all, while one static binary would
-  # cover NixOS, Alpine, old distributions and containers at once. Its
-  # first real build is what removed it, and the reason is not a missing
-  # package.
+  # The static Linux row rests on a premise that has held throughout:
+  # NixOS has no `/lib64/ld-linux-x86-64.so.2`, so a dynamically linked
+  # ubuntu artifact does not start there at all, while one static binary
+  # covers NixOS, Alpine, old distributions and containers at once.
   #
-  # `keyring`'s Linux backend is secret-service, which talks D-Bus, so the
-  # tree reaches `libdbus-sys`; its build script asks pkg-config for a
-  # library built for the target and pkg-config refuses to answer across
-  # a target boundary. Installing `libdbus-1-dev` does not fix that - it
-  # would offer the host's glibc D-Bus to a static musl link, which is a
-  # contradiction rather than a configuration. **A static Linux binary and
-  # a D-Bus credential store cannot both be true**, so what this row needs
-  # settled first is where the Linux build keeps a credential: the
-  # kernel's own keyring (`Persistence::ThisBoot`, which `Vault` already
-  # names) or something else. That is a decision about a person's API key,
-  # and it is not one a release workflow gets to make on its way past.
-  #
-  # Everything else the row needs is already built and stays: `just
-  # package` takes a triple, `cargo xtask package` reads
-  # `target/<triple>/release` and puts the triple in the archive name, and
-  # `install.sh` knows that name. Restoring the row is this list plus the
-  # musl toolchain steps, once the credential question has an answer that
-  # was tested on Linux.
+  # It was held back once, and by a real contradiction rather than a
+  # missing package: `keyring`'s secret-service backend talks D-Bus, so
+  # the tree reached `libdbus-sys`, whose build script asks pkg-config
+  # for a library built for the target and gets refused across a target
+  # boundary. Installing `libdbus-1-dev` would have offered the host's
+  # glibc D-Bus to a static musl link. **A static Linux binary and a
+  # D-Bus credential store cannot both be true** - so the credential
+  # question was answered before this row returned, and answered in the
+  # code rather than here: the Linux build keeps a key in the kernel's
+  # own keyring through `keyring`'s `linux-native` (keyutils) feature,
+  # which is a syscall and needs no bus, and it reports that key as
+  # `Persistence::ThisBoot` because a reboot empties it (gateway-SPEC
+  # 8-4). `libdbus-sys` is out of the lockfile entirely.
   #
   # Archive does not wait for verify: the two are independent, publish
   # waits for both, and the wall clock is the slower one instead of the sum.
@@ -158,11 +151,36 @@ jobs:
             target: ""
           - os: macos-latest
             target: ""
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
     runs-on: ${{ matrix.os }}
+    # `aws-lc-sys` compiles AWS-LC's own C, and `libgit2-sys` and
+    # `libz-sys` compile theirs, so a musl build needs a C compiler that
+    # targets musl rather than the runner's glibc gcc. `musl-gcc` is what
+    # `musl-tools` installs. Declared for the whole job because only the
+    # row that builds this triple ever reads a `CC_<triple>` variable;
+    # the two host rows never look at it.
+    #
+    # No bindgen is needed: aws-lc-sys 0.44.0 ships
+    # `src/x86_64_unknown_linux_musl_crypto.rs` and lists that triple in
+    # its pregenerated-bindings table, so the rustls backend stays
+    # `aws-lc-rs` and all three archives keep one crypto implementation.
+    env:
+      CC_x86_64_unknown_linux_musl: musl-gcc
     steps:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
+      # The pinned toolchain installs the host target only, and adding
+      # `targets` to `rust-toolchain.toml` would make every job on every
+      # platform download a musl std nothing else compiles against.
+      - name: the musl target and a C compiler that targets musl
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          set -euo pipefail
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends musl-tools
       # The client is built by bun, which `just build-web` drives; the
       # release recipe depends on it, so the archive cannot be assembled
       # without the bundle inside the binary.
