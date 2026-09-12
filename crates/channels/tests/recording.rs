@@ -43,6 +43,7 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
     let (events, _held) = tokio::sync::broadcast::channel(16);
     let config = ServeConfig {
         deltas: tokio::sync::broadcast::channel(16).0,
+        logs: tokio::sync::broadcast::channel(16).0,
         addr: "127.0.0.1:0".parse().unwrap(),
         token_digest: None,
         client: Arc::new(channels::ClientAssets::Embedded(&[])),

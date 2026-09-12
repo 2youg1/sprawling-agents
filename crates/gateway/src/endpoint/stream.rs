@@ -65,6 +65,12 @@ impl Endpoint {
         for (name, value) in &self.config.extra_headers {
             request = request.header(name, value);
         }
+        // A streamed answer is allowed to take longer than a settled
+        // one, because the deadline on a stream has to cover the model
+        // writing rather than the provider thinking.
+        if let Some(ms) = self.config.stream_deadline_ms {
+            request = request.timeout(std::time::Duration::from_millis(ms));
+        }
         request = self.authorize(request)?;
         let response = request
             .json(&wire)

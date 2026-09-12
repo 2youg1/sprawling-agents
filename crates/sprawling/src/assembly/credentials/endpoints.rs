@@ -7,10 +7,10 @@
 //! a model chosen for a tag, and the local server the environment names
 //! when nothing else is registered.
 
-use kernel::Payload;
-use kernel::{AxCode, AxError, EventKind};
+use kernel::{AxCode, AxError, EventKind, Payload};
 
 use super::super::RunWorker;
+use super::probing::{Probing, probed_payload, reach_of};
 use super::{
     Ceilings, Chosen, Credential, ENVIRONMENT_ENDPOINT, Entered, PROBE_TIMEOUT_MS, dialect_headers,
     local_model_facts,
@@ -19,32 +19,31 @@ use super::{
 impl RunWorker {
     /// Asks a base URL what it serves, and attaches nothing.
     ///
-    /// The list is recorded rather than returned: a query would have to
-    /// make this blocking call on the socket's own task, and the answer
-    /// is a fact about what this city can reach - which is the kind of
-    /// thing the ledger holds.
+    /// The reading is recorded rather than returned: a query would have
+    /// to make this blocking call on the socket's own task, and what a
+    /// probe learns is a fact about what this city can reach - which is
+    /// the kind of thing the ledger holds.
+    ///
+    /// **A probe that could not read a model list still answers.** Where
+    /// the call stopped is the finding a person acts on: a name that
+    /// does not resolve, a socket nothing answers and a 401 are three
+    /// different next steps, and a refusal returned instead of a record
+    /// would leave the form with one sentence from a transport library.
+    /// The record carries the stage, and the refusal's own code and
+    /// subject beside it.
+    ///
+    /// # Errors
+    /// A payload the ledger will not take, and a base URL whose
+    /// credential reference cannot be parsed - neither of which a probe
+    /// can report on, because neither got as far as a request.
     pub(in crate::assembly) fn probe_endpoint(&mut self, entered: Entered) -> Result<(), AxError> {
         let endpoint = self.endpoint_of(entered)?;
-        let models = self.probe(&endpoint)?;
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "name".to_owned(),
-            serde_json::Value::String(endpoint.name.clone()),
-        );
-        map.insert(
-            "base_url".to_owned(),
-            serde_json::Value::String(endpoint.base_url.clone()),
-        );
-        map.insert(
-            "models".to_owned(),
-            serde_json::Value::Array(
-                models
-                    .iter()
-                    .map(|id| serde_json::Value::String(id.clone()))
-                    .collect(),
-            ),
-        );
-        self.record(EventKind::EndpointProbed, Payload::new(map)?)
+        let found = Probing {
+            reach: reach_of(&endpoint.base_url)?,
+            served: self.probe(&endpoint),
+        };
+        let payload = probed_payload(&endpoint.name, &endpoint.base_url, &found)?;
+        self.record(EventKind::EndpointProbed, payload)
     }
 
     /// The endpoint a form describes, before anybody has asked it
@@ -57,6 +56,7 @@ impl RunWorker {
             base_url,
             dialect,
             credential,
+            tuning,
         } = entered;
         let auth = match credential {
             Credential::Absent => gateway::AuthSpec::None,
@@ -78,6 +78,7 @@ impl RunWorker {
             auth,
             models: Vec::new(),
             probed: false,
+            tuning,
         })
     }
 
@@ -110,14 +111,11 @@ impl RunWorker {
         let unprobed = match self.probe(&endpoint) {
             Ok(served) => {
                 endpoint.probed = true;
-                endpoint.models = if admit.is_empty() {
-                    served
-                } else {
-                    served
-                        .into_iter()
-                        .filter(|id| admit.iter().any(|wanted| wanted == id))
-                        .collect()
-                };
+                endpoint.models = served
+                    .into_iter()
+                    .map(|row| row.id)
+                    .filter(|id| admit.is_empty() || admit.iter().any(|wanted| wanted == id))
+                    .collect();
                 None
             }
             Err(err) if admit.is_empty() => {
@@ -155,23 +153,54 @@ impl RunWorker {
         self.record(EventKind::EndpointAttached, payload)
     }
 
-    fn probe(&self, endpoint: &gateway::AttachedEndpoint) -> Result<Vec<String>, AxError> {
+    /// What the endpoint says it serves, read for every fact each row
+    /// states.
+    ///
+    /// The request is made the way a call to this endpoint would be -
+    /// same headers, same deadline - because a probe that reached a
+    /// gateway without the header that gateway requires answers 401 for
+    /// a key that is in fact good. A body override is left off: it
+    /// belongs to a chat request, and a model list takes no body.
+    ///
+    /// `request_max_retries` is honoured here, and here only: a model
+    /// call's retries are the watchdog's decision (gateway-SPEC.md
+    /// 8-NN), while a person watching a settings page is waiting on this
+    /// one request and a network that dropped it once is worth asking
+    /// again.
+    fn probe(
+        &self,
+        endpoint: &gateway::AttachedEndpoint,
+    ) -> Result<Vec<gateway::ModelFacts>, AxError> {
+        let tuning = &endpoint.tuning;
+        let mut extra_headers = dialect_headers(endpoint.dialect);
+        extra_headers.extend(tuning.extra_headers.iter().cloned());
         let probe = gateway::Endpoint::new(
             gateway::EndpointConfig {
                 base_url: endpoint.chat_url(),
                 dialect: endpoint.dialect,
                 model: String::new(),
                 auth: endpoint.auth.clone(),
-                extra_headers: dialect_headers(endpoint.dialect),
+                extra_headers,
                 overrides: Vec::new(),
-                timeout_ms: PROBE_TIMEOUT_MS,
+                timeout_ms: tuning.timeout_ms.unwrap_or(PROBE_TIMEOUT_MS),
+                stream_deadline_ms: None,
                 pricing: None,
             },
             // A probe asks which models an endpoint serves. It carries
             // no conversation, so it carries no picture either.
             gateway::Redemption::without_images(self.resolver()),
         )?;
-        probe.list_models(&endpoint.models_url())
+        let url = endpoint.models_url();
+        let mut attempts_left = tuning.request_max_retries.unwrap_or(0);
+        loop {
+            match probe.list_models(&url) {
+                Ok(served) => return Ok(served),
+                Err(err) if attempts_left > 0 && err.is_retriable() => {
+                    attempts_left = attempts_left.saturating_sub(1);
+                }
+                Err(err) => return Err(err),
+            }
+        }
     }
 
     /// What an adapter redeems at the wire: the credential this city
@@ -313,6 +342,7 @@ impl RunWorker {
                 base_url: base_url.to_owned(),
                 dialect: kernel::DialectKind::OpenAi,
                 credential: Credential::Absent,
+                tuning: gateway::EndpointTuning::default(),
             },
             &[],
         )?;

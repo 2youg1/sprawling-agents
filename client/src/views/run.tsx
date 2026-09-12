@@ -3,11 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One run under four lenses: what was said (turns), what it has seen
-// and how full its window is (context), what moved on disk (changes),
-// and what it left to be checked (evidence). The conversation is the
-// same component the first page draws, so a run reads the same from
-// both doors.
+// One run under five lenses: what was said (turns), what it was told
+// before it said anything (prompt), what it has seen and how full its
+// window is (context), what moved on disk (changes), and what it left
+// to be checked (evidence). The conversation is the same component the
+// first page draws, so a run reads the same from both doors.
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
@@ -22,6 +22,7 @@ import type { GitOid, RoundsAnswer, RunId, Turn } from "../wire";
 import { useCommand, useGo, useHearing, useSay, useUi } from "../ui";
 import { Changes } from "./changes";
 import { Path } from "./parts/path";
+import { Prompt } from "./run/prompt";
 import { Composer } from "./talk/composer";
 import { Thread } from "./talk/thread";
 
@@ -29,8 +30,8 @@ export interface RunProps {
   readonly run: RunId;
 }
 
-type Lens = "turns" | "context" | "changes" | "evidence";
-const LENSES: readonly Lens[] = ["turns", "context", "changes", "evidence"];
+type Lens = "turns" | "prompt" | "context" | "changes" | "evidence";
+const LENSES: readonly Lens[] = ["turns", "prompt", "context", "changes", "evidence"];
 
 function Context(props: { readonly rounds: RoundsAnswer }) {
   const say = useSay();
@@ -247,6 +248,9 @@ export function Run(props: RunProps) {
                 </div>
               </Show>
             </div>
+          </Match>
+          <Match when={lens() === "prompt"}>
+            <Prompt run={props.run} />
           </Match>
           <Match when={lens() === "context"}>
             <Show when={answer()} fallback={<p class="text-text-disabled">…</p>}>

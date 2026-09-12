@@ -208,3 +208,100 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
     let err = worker.fork(mother, kernel::Seq::FIRST, None).unwrap_err();
     assert!(err.subject().contains("not an event of run"), "{err}");
 }
+
+/// Two of the four segments used to be nowhere but the prompt: their
+/// hashes were on the ledger and nothing held the bytes, so "what was
+/// this agent told" had no answer. Every segment is interned now, and
+/// `Query::Prefix` is the read that proves it.
+#[test]
+fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::CreateBuilding {
+            addr: Address::parse("lab").unwrap(),
+            template: channels::TemplateName::parse("minimal").unwrap(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
+        })
+        .unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "measure the thing".to_owned(),
+            goal: "a number with a unit, then stop".to_owned(),
+            mode: channels::ModeTag::parse("plan").unwrap(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+
+    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let run = verified
+        .lines()
+        .iter()
+        .find_map(|line| match line {
+            runtime::replay::VerifiedLine::Known { record, .. }
+                if record.kind() == EventKind::PromptAssembled =>
+            {
+                Some(record.run())
+            }
+            _ => None,
+        })
+        .expect("a dispatch assembles a prompt");
+
+    let channels::Answer::Prefix(answer) =
+        crate::views::ask(dir.path(), &channels::Query::Prefix { run }).unwrap()
+    else {
+        panic!("Prefix answers with a prefix");
+    };
+    let slots: Vec<channels::PrefixSlot> = answer.segments.iter().map(|s| s.slot).collect();
+    assert_eq!(
+        slots,
+        vec![
+            channels::PrefixSlot::City,
+            channels::PrefixSlot::Building,
+            channels::PrefixSlot::Resident,
+            channels::PrefixSlot::Run,
+        ]
+    );
+    for segment in &answer.segments {
+        assert!(segment.stored, "{:?} is not in the store", segment.slot);
+        assert_eq!(
+            u64::try_from(segment.text.len()).unwrap(),
+            segment.bytes,
+            "{:?} reads back shorter than it was frozen",
+            segment.slot
+        );
+    }
+    let building = answer
+        .segments
+        .iter()
+        .find(|segment| segment.slot == channels::PrefixSlot::Building)
+        .expect("the building slot is one of the four");
+    assert!(
+        building.text.contains("confidential: false"),
+        "the building's own rules read back: {}",
+        building.text
+    );
+    assert!(
+        building
+            .sources
+            .iter()
+            .any(|source| source.addr.as_str() == "lab/.sprawling/BUILDING.md"),
+        "the segment names the file it was read from: {:?}",
+        building.sources
+    );
+
+    // And the general store read reaches the same bytes by locator.
+    let locator =
+        kernel::Locator::parse(&format!("cas:b3-{}", building.hash)).expect("a stored segment");
+    let channels::Answer::Content(content) =
+        crate::views::ask(dir.path(), &channels::Query::Content { locator }).unwrap()
+    else {
+        panic!("Content answers with content");
+    };
+    assert_eq!(content.text, building.text);
+}

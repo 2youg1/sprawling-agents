@@ -22,8 +22,14 @@
 //! the frame behind it.
 
 mod kind;
+mod no_secret;
+mod step;
+mod tuning;
 mod wire;
 
-pub use kind::PursuitStep;
-pub use kind::{COMMAND_NAMES, Command, GovernedDocument, HaltScope, LoginStep, NoSecret};
+pub use kind::{COMMAND_NAMES, Command};
+pub use no_secret::NoSecret;
+pub use step::PursuitStep;
+pub use step::{GovernedDocument, HaltScope, LoginStep};
+pub use tuning::{BodyOverride, EndpointTuning, HeaderPair};
 pub use wire::WireCommand;

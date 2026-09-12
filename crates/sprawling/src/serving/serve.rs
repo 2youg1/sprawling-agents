@@ -53,6 +53,11 @@ pub struct Serving {
     pub vault: gateway::Custodian,
     pub vault_notice: Option<Payload>,
     pub log: runtime::diagnostics::Diagnostics,
+    /// The other end of the sink `log` was built with. It travels
+    /// beside the log rather than being made here, because the sink has
+    /// to exist before the `Diagnostics` does and a second channel made
+    /// here would carry nothing.
+    pub journal: crate::serving::Journal,
     pub console: Option<crate::console::Terminal>,
 }
 

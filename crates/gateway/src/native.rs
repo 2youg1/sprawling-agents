@@ -61,6 +61,7 @@ impl Native {
                 extra_headers: Vec::new(),
                 overrides: Vec::new(),
                 timeout_ms: config.timeout_ms,
+                stream_deadline_ms: None,
                 pricing: config.pricing,
             },
             // Local inference authenticates with nothing and reads no

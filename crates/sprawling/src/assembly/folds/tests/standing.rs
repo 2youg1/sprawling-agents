@@ -171,6 +171,7 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
+            tuning: channels::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"probe"),
         })
         .unwrap();
@@ -196,6 +197,7 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
             secret: None,
             auth_header: None,
             admit: vec!["m-large".to_owned()],
+            tuning: channels::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();

@@ -22,6 +22,8 @@ import { Commits } from "./building/commits";
 import { Directory } from "./building/directory";
 import { FileView } from "./building/file";
 import { Plan } from "./building/plan";
+import { Skills } from "./building/skills";
+import { Status } from "./building/status";
 import { Tree } from "./building/tree";
 import type { Picked } from "./building/tree";
 import { Badge } from "./parts/badge";
@@ -33,10 +35,17 @@ export interface BuildingProps {
 
 // What the right-hand pane shows: the plan, the commits, or what the
 // tree picked.
-type Shown = { readonly kind: "plan" } | { readonly kind: "commits" } | Picked;
+type Shown =
+  | { readonly kind: "plan" }
+  | { readonly kind: "commits" }
+  | { readonly kind: "changes" }
+  | { readonly kind: "skills" }
+  | Picked;
 
 const PLAN: Shown = { kind: "plan" };
 const COMMITS: Shown = { kind: "commits" };
+const CHANGES: Shown = { kind: "changes" };
+const SKILLS: Shown = { kind: "skills" };
 
 function Rooms(props: { readonly answer: BuildingAnswer; readonly onPick: (picked: Picked) => void }) {
   const ui = useUi();
@@ -198,6 +207,28 @@ export function Building(props: BuildingProps) {
             <span class="flex w-base shrink-0 justify-center font-mono text-text-disabled">⎇</span>
             <span class="ml-tight">{say("bld_commits")}</span>
           </button>
+          <button
+            type="button"
+            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "changes" ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
+            aria-current={shown().kind === "changes" ? "true" : undefined}
+            onClick={() => {
+              pick(CHANGES);
+            }}
+          >
+            <span class="flex w-base shrink-0 justify-center font-mono text-text-disabled">±</span>
+            <span class="ml-tight">{say("bld_changes")}</span>
+          </button>
+          <button
+            type="button"
+            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "skills" ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
+            aria-current={shown().kind === "skills" ? "true" : undefined}
+            onClick={() => {
+              pick(SKILLS);
+            }}
+          >
+            <span class="flex w-base shrink-0 justify-center text-text-disabled">✳</span>
+            <span class="ml-tight">{say("bld_skills")}</span>
+          </button>
           <Tree root={props.address} picked={picked()} onPick={pick} />
         </aside>
         <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-pane py-base">
@@ -209,6 +240,12 @@ export function Building(props: BuildingProps) {
             </Match>
             <Match when={shown().kind === "commits"}>
               <Commits building={props.address} />
+            </Match>
+            <Match when={shown().kind === "changes"}>
+              <Status building={props.address} />
+            </Match>
+            <Match when={shown().kind === "skills"}>
+              <Skills building={props.address} onPick={pick} />
             </Match>
             <Match when={picked()?.kind === "file" ? picked() : undefined}>
               {(file) => <FileView at={file().at} root={props.address} />}

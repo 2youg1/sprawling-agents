@@ -8,7 +8,8 @@
 //
 // The table holds what a person wrote and nothing else. Whether a row
 // can travel is `encode`'s question, so a table that a person fills in
-// and a wire that refuses it stay two separate facts on the screen.
+// and the reason a send is refused stay two separate facts on the
+// screen.
 
 import { For, Show } from "solid-js";
 
@@ -22,8 +23,8 @@ export interface PairTableProps {
   readonly caption: string;
   readonly rows: readonly Pair[];
   readonly onChange: (rows: readonly Pair[]) => void;
-  // What the wire cannot do with these rows, already in the person's
-  // language. Drawn under the table, not in place of it.
+  // What these rows are for, already in the person's language. Drawn
+  // under the table, not in place of it.
   readonly note?: string;
 }
 

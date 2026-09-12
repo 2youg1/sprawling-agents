@@ -11,16 +11,28 @@
 // writes `building_configured`, and `staleBy` turns that record into an
 // invalidation of this very answer: nothing below waits on a timer for
 // the list to catch up.
+//
+// Where each server stands is asked for separately and never folded
+// from a record, because it is a fact about now - a program that starts,
+// a host that answers, an account that is still valid - and one
+// handshake per server costs seconds.
 
 import { createMemo } from "solid-js";
 
-import type { Address, McpServer } from "../../wire";
+import type { Address, McpServer, McpServerHealth } from "../../wire";
 import type { Intake } from "./draft";
 import { configureMcp } from "../../core/commands";
 import { useCommand, useUi } from "../../ui";
 
 export interface Reach {
   readonly servers: () => readonly McpServer[];
+  // Where each of them stands, once somebody has asked. Empty until the
+  // first answer lands, and empty again for a scope nobody asked about.
+  readonly health: () => readonly McpServerHealth[];
+  // Reach every server again and say where each one stands. Explicit
+  // rather than folded into a record's arrival, because one handshake
+  // per server costs seconds and a person is waiting in front of it.
+  readonly check: () => void;
   readonly intake: Intake;
   readonly withdraw: (label: string) => void;
 }
@@ -45,9 +57,26 @@ export function reachOf(scope: Scope): Reach {
     const held = answer()();
     return held !== undefined && "building" in held ? held.building.mcp : [];
   });
-  const configure = (next: readonly McpServer[]) => command(configureMcp(scope.addr, next));
+  const asked = createMemo(() => ui.conn.asking.ask({ mcp_health: { addr: scope.addr } }));
+  const health = createMemo<readonly McpServerHealth[]>(() => {
+    const held = asked()();
+    return held !== undefined && "mcp_health" in held ? held.mcp_health.servers : [];
+  });
+  const check = () => {
+    ui.conn.asking.refresh({ mcp_health: { addr: scope.addr } });
+  };
+  const configure = (next: readonly McpServer[]) => {
+    const sent = command(configureMcp(scope.addr, next));
+    // What a person wants to know next is whether the server they just
+    // named answers, so the list is reached again rather than waiting
+    // for somebody to press anything.
+    if (sent) check();
+    return sent;
+  };
   return {
     servers,
+    health,
+    check,
     intake: {
       taken: () => servers().map((server) => server.label),
       offer: (server) => configure([...servers(), server]),

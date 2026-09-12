@@ -16,6 +16,7 @@ import type {
   Command,
   DialectKind,
   Effort,
+  EndpointTuning,
   GovernedDocument,
   HaltScope,
   McpServer,
@@ -101,6 +102,20 @@ export function reveal(at: Address): Command {
   return { reveal: { at, idem: mintIdem() } };
 }
 
+// Install one thing this machine lacks, by the name the city answered
+// with. Only a recipe the city may run is run; the other two come back
+// as a refusal saying what the person does instead.
+export function doctorInstall(item: string): Command {
+  return { doctor_install: { item, idem: mintIdem() } };
+}
+
+// Look at this machine again. `Query::Doctor` answers the snapshot the
+// city took when it started, which is the wrong answer to give somebody
+// who has just installed something.
+export function doctorRefresh(): Command {
+  return { doctor_refresh: { idem: mintIdem() } };
+}
+
 export function approve(item: ApprovalId, verdict: "allow" | "deny"): Command {
   return { approve: { item, verdict, idem: mintIdem() } };
 }
@@ -168,6 +183,55 @@ export interface Endpoint {
   readonly dialect: DialectKind;
   readonly secret: string | null;
   readonly authHeader: string | null;
+  readonly tuning: Tuning;
+}
+
+// One row of either key-value table the form draws: a header every
+// request carries, or a JSON pointer into the body it sends.
+export interface Pair {
+  readonly name: string;
+  readonly value: string;
+}
+
+// What a person settled about one endpoint besides its address, in the
+// spelling Codex's `[model_providers.<id>]` uses. Every figure is
+// absent until somebody states one, and the city reads an absent figure
+// as its own default rather than as zero.
+export interface Tuning {
+  readonly label: string | null;
+  readonly timeoutMs: number | null;
+  readonly requestMaxRetries: number | null;
+  readonly streamIdleTimeoutMs: number | null;
+  readonly headers: readonly Pair[];
+  readonly overrides: readonly Pair[];
+}
+
+// A figure reaches the wire only as a whole number that is not
+// negative. A retry count of zero is a real answer - "once, then report"
+// - so it travels, while every deadline is refused at zero: no request
+// completes in no time, and a cleared box means "the city's own".
+function count(stated: number | null): number | null {
+  return stated !== null && Number.isInteger(stated) && stated >= 0 ? stated : null;
+}
+
+function span(stated: number | null): number | null {
+  const whole = count(stated);
+  return whole !== null && whole > 0 ? whole : null;
+}
+
+// The tuning as the frame carries it. A row whose name is blank is left
+// out: the form keeps an empty row open while somebody types into it,
+// and a half-written header must not reach a provider.
+function tuningFrame(tuning: Tuning): EndpointTuning {
+  const named = (rows: readonly Pair[]) => rows.filter((row) => row.name.trim() !== "");
+  return {
+    label: tuning.label === null || tuning.label.trim() === "" ? null : tuning.label.trim(),
+    timeout_ms: span(tuning.timeoutMs),
+    request_max_retries: count(tuning.requestMaxRetries),
+    stream_idle_timeout_ms: span(tuning.streamIdleTimeoutMs),
+    headers: named(tuning.headers).map((row) => ({ name: row.name.trim(), value: row.value })),
+    overrides: named(tuning.overrides).map((row) => ({ pointer: row.name.trim(), value: row.value })),
+  };
 }
 
 export function providerName(name: string): ProviderName {
@@ -182,6 +246,7 @@ export function probeEndpoint(e: Endpoint): Command {
       dialect: e.dialect,
       secret: e.secret,
       auth_header: e.authHeader,
+      tuning: tuningFrame(e.tuning),
       idem: mintIdem(),
     },
   };
@@ -196,6 +261,7 @@ export function attachEndpoint(e: Endpoint, admit: readonly string[]): Command {
       secret: e.secret,
       auth_header: e.authHeader,
       admit: [...admit],
+      tuning: tuningFrame(e.tuning),
       idem: mintIdem(),
     },
   };

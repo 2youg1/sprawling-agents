@@ -46,7 +46,12 @@ fn a_hosted_server_answers_and_the_configured_header_travels() {
         200,
         "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[]}}".to_owned(),
     );
-    let mut held = HttpServer::open(&url, Some("X-Desk-Key: opaque-value"), &vault()).unwrap();
+    let mut held = HttpServer::open(
+        &url,
+        &[("X-Desk-Key".to_owned(), "opaque-value".to_owned())],
+        &vault(),
+    )
+    .unwrap();
     let answer = held
         .call(
             &protocol::Rpc::new().list_tools(),
@@ -77,14 +82,31 @@ fn an_answer_that_arrives_as_a_stream_is_read_as_one_message() {
 
 #[test]
 fn a_refusing_server_states_the_status_without_quoting_its_page() {
-    let (url, server) = fake_server(403, "{\"error\":\"account suspended\"}".to_owned());
-    let mut held = HttpServer::open(&url, None, &vault()).unwrap();
+    let (url, server) = fake_server(502, "{\"error\":\"account suspended\"}".to_owned());
+    let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
     let err = held
         .call("{\"id\":1}", protocol::EXTERNAL_CALL_PATIENCE)
         .unwrap_err();
     assert_eq!(err.code(), &AxCode::ToolUnavailable);
-    assert!(err.subject().contains("403"));
+    assert!(err.subject().contains("502"));
     assert!(!err.subject().contains("suspended"));
+    let _ = server.join();
+}
+
+/// A server that answers 401 or 403 is up and understood the request,
+/// and what it wants is an account. That is a different thing for a
+/// person to do than checking the address, so it is a different code -
+/// and the health view reads it as `authenticating` rather than as a
+/// failure.
+#[test]
+fn a_server_wanting_an_account_refuses_with_the_credential_code() {
+    let (url, server) = fake_server(401, "{\"error\":\"sign in\"}".to_owned());
+    let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
+    let err = held
+        .call("{\"id\":1}", protocol::EXTERNAL_CALL_PATIENCE)
+        .unwrap_err();
+    assert_eq!(err.code(), &AxCode::CredentialMissing);
+    assert!(err.recovery().contains("vault"), "{}", err.recovery());
     let _ = server.join();
 }
 
@@ -132,7 +154,7 @@ fn sessioned_server(
 fn a_session_handed_out_at_initialization_travels_on_every_later_request() {
     const OPENED: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-03-26\",\"capabilities\":{},\"serverInfo\":{\"name\":\"hosted\",\"version\":\"1\"},\"tools\":[]}}";
     let (url, server) = sessioned_server(3, "session-abc", OPENED);
-    let mut held = HttpServer::open(&url, None, &vault()).unwrap();
+    let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
     let mut rpc = protocol::Rpc::new();
     let opened =
         protocol::handshake(&mut held, &mut rpc, protocol::EXTERNAL_CALL_PATIENCE).unwrap();
@@ -165,7 +187,7 @@ fn a_session_handed_out_at_initialization_travels_on_every_later_request() {
 #[test]
 fn a_session_the_server_ended_is_forgotten_rather_than_kept() {
     let (url, server) = fake_server(404, "{}".to_owned());
-    let mut held = HttpServer::open(&url, None, &vault()).unwrap();
+    let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
     if let Ok(mut session) = held.session.lock() {
         session.id = Some("stale".to_owned());
     }
@@ -191,7 +213,12 @@ fn a_header_naming_a_credential_carries_the_key_and_never_the_reference() {
         200,
         "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}".to_owned(),
     );
-    let mut held = HttpServer::open(&url, Some("X-Api-Key: secret:exa/api"), &vault()).unwrap();
+    let mut held = HttpServer::open(
+        &url,
+        &[("X-Api-Key".to_owned(), "secret:exa/api".to_owned())],
+        &vault(),
+    )
+    .unwrap();
     held.call("{\"id\":1}", protocol::EXTERNAL_CALL_PATIENCE)
         .unwrap();
     let sent = server.join().unwrap();
@@ -208,7 +235,7 @@ fn a_header_naming_a_credential_carries_the_key_and_never_the_reference() {
 fn the_debug_face_names_the_header_and_never_its_value() {
     let held = HttpServer::open(
         "http://127.0.0.1:1/mcp",
-        Some("X-Api-Key: secret:exa/api"),
+        &[("X-Api-Key".to_owned(), "secret:exa/api".to_owned())],
         &vault(),
     )
     .unwrap();
@@ -217,10 +244,17 @@ fn the_debug_face_names_the_header_and_never_its_value() {
     assert!(!drawn.contains("held-api"));
 }
 
+/// A header with no name is a row somebody started and did not finish,
+/// and it is refused where it is written rather than sent as a header
+/// the far end cannot read.
 #[test]
-fn a_header_that_is_not_a_header_is_refused_before_any_request() {
-    let err =
-        HttpServer::open("http://127.0.0.1:1/mcp", Some("no-colon-here"), &vault()).unwrap_err();
+fn a_header_with_no_name_is_refused_before_any_request() {
+    let err = HttpServer::open(
+        "http://127.0.0.1:1/mcp",
+        &[(" ".to_owned(), "opaque-value".to_owned())],
+        &vault(),
+    )
+    .unwrap_err();
     assert_eq!(err.code(), &AxCode::ConfigInvalid);
-    assert!(err.recovery().contains("Name: value"));
+    assert!(!err.subject().contains("opaque-value"), "{}", err.subject());
 }

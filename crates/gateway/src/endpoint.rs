@@ -18,9 +18,11 @@ pub(crate) mod config;
 #[cfg(test)]
 pub(crate) mod fakes;
 mod model;
+mod models;
 pub(crate) mod redemption;
 mod stream;
 
 pub use adapter::{CALL_TIMEOUT_MS, adapter_for};
 pub use config::{AuthSpec, Endpoint, EndpointConfig};
+pub use models::ModelFacts;
 pub use redemption::{ImageResolver, Redemption, SecretResolver};

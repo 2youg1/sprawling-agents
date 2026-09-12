@@ -91,6 +91,16 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                 // open is a city doing its work.
                 let _ = to_watchers.send(delta);
             }));
+            // Where a fresh look at this machine lands. The same views
+            // the start-up look was written into, so a page asking
+            // what this machine has gets one answer however it was
+            // last taken.
+            let examined = Arc::clone(&views);
+            worker.examine(Arc::new(move |found: channels::DoctorAnswer| {
+                if let Ok(mut views) = examined.lock() {
+                    views.found_on_this_machine(found);
+                }
+            }));
             worker.observe(Box::new(move |record: &EventRecord| {
                 if let Ok(mut views) = views.lock() {
                     // A record the views refuse to fold is reported and

@@ -40,6 +40,7 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
             extra_headers: Vec::new(),
             overrides: Vec::new(),
             timeout_ms: 1_000,
+            stream_deadline_ms: None,
             pricing: None,
         },
         gateway::Redemption::without_images(Box::new(|_reference: &kernel::SecretRef| {

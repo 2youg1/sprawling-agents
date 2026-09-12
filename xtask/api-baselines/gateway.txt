@@ -18,9 +18,11 @@ impl gateway::Custodian
 impl gateway::Endpoint
 impl gateway::Endpoint
 impl gateway::EndpointBook
+impl gateway::EndpointTuning
 impl gateway::Fallback
 impl gateway::ImageBytes
 impl gateway::MarketSnapshot
+impl gateway::ModelFacts
 impl gateway::Native
 impl gateway::Recording
 impl gateway::Redemption
@@ -39,6 +41,7 @@ pub fn gateway::AdmissionState::on_outcome(&mut self, gateway::ProviderOutcome, 
 pub fn gateway::AttachedEndpoint::chat_url(&self) -> alloc::string::String
 pub fn gateway::AttachedEndpoint::has_credential(&self) -> bool
 pub fn gateway::AttachedEndpoint::is_local(&self) -> bool
+pub fn gateway::AttachedEndpoint::label(&self) -> &str
 pub fn gateway::AttachedEndpoint::models_url(&self) -> alloc::string::String
 pub fn gateway::AudioType::file_name(self) -> &'static str
 pub fn gateway::AudioType::media_type(self) -> &'static str
@@ -54,7 +57,7 @@ pub fn gateway::Custodian::set(&mut self, &kernel::secret::span::SecretRef, zero
 pub fn gateway::Custodian::with_env_reader(self, gateway::EnvReader) -> gateway::Custodian
 pub fn gateway::Endpoint::call(&mut self, &kernel::model::seam::ModelRequest) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
 pub fn gateway::Endpoint::call_streaming(&mut self, &kernel::model::seam::ModelRequest, kernel::model::Increments<'_>) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
-pub fn gateway::Endpoint::list_models(&self, &str) -> core::result::Result<alloc::vec::Vec<alloc::string::String>, kernel::error::shape::AxError>
+pub fn gateway::Endpoint::list_models(&self, &str) -> core::result::Result<alloc::vec::Vec<gateway::ModelFacts>, kernel::error::shape::AxError>
 pub fn gateway::Endpoint::new(gateway::EndpointConfig, gateway::Redemption) -> core::result::Result<gateway::Endpoint, kernel::error::shape::AxError>
 pub fn gateway::EndpointBook::apply(&mut self, &kernel::event::payload::EventRecord) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn gateway::EndpointBook::apply_payload(&mut self, kernel::event::kind::EventKind, &kernel::event::payload::Payload) -> core::result::Result<(), kernel::error::shape::AxError>
@@ -63,6 +66,8 @@ pub fn gateway::EndpointBook::endpoints(&self) -> impl core::iter::traits::itera
 pub fn gateway::EndpointBook::is_empty(&self) -> bool
 pub fn gateway::EndpointBook::new() -> gateway::EndpointBook
 pub fn gateway::EndpointBook::select(&self, kernel::model::wire::ModelTag, &kernel::model::wire::BuildingPolicy) -> core::result::Result<gateway::Chosen<'_>, kernel::error::shape::AxError>
+pub fn gateway::EndpointTuning::applied_overrides(&self) -> alloc::vec::Vec<(alloc::string::String, serde_json::value::Value)>
+pub fn gateway::EndpointTuning::is_plain(&self) -> bool
 pub fn gateway::Fallback::endpoint(&self) -> core::option::Option<&str>
 pub fn gateway::Fallback::model(&self) -> core::option::Option<&str>
 pub fn gateway::Fallback::retreat(&self, kernel::event::identity::TimeMs, &gateway::AdmissionState) -> gateway::Retreat
@@ -76,6 +81,7 @@ pub fn gateway::MarketSnapshot::is_empty(&self) -> bool
 pub fn gateway::MarketSnapshot::len(&self) -> usize
 pub fn gateway::MarketSnapshot::lookup(&self, &str) -> core::option::Option<&gateway::ModelEntry>
 pub fn gateway::MarketSnapshot::version(&self) -> u32
+pub fn gateway::ModelFacts::read(&serde_json::value::Value) -> core::option::Option<gateway::ModelFacts>
 pub fn gateway::Native::call(&mut self, &kernel::model::seam::ModelRequest) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
 pub fn gateway::Native::new(gateway::NativeConfig) -> core::result::Result<gateway::Native, kernel::error::shape::AxError>
 pub fn gateway::OauthTokens::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -117,6 +123,7 @@ pub gateway::AttachedEndpoint::dialect: kernel::model::wire::DialectKind
 pub gateway::AttachedEndpoint::models: alloc::vec::Vec<alloc::string::String>
 pub gateway::AttachedEndpoint::name: alloc::string::String
 pub gateway::AttachedEndpoint::probed: bool
+pub gateway::AttachedEndpoint::tuning: gateway::EndpointTuning
 pub gateway::AudioType::Mp4
 pub gateway::AudioType::Mpeg
 pub gateway::AudioType::Ogg
@@ -148,7 +155,14 @@ pub gateway::EndpointConfig::extra_headers: alloc::vec::Vec<(alloc::string::Stri
 pub gateway::EndpointConfig::model: alloc::string::String
 pub gateway::EndpointConfig::overrides: alloc::vec::Vec<(alloc::string::String, serde_json::value::Value)>
 pub gateway::EndpointConfig::pricing: core::option::Option<gateway::ModelEntry>
+pub gateway::EndpointConfig::stream_deadline_ms: core::option::Option<u64>
 pub gateway::EndpointConfig::timeout_ms: u64
+pub gateway::EndpointTuning::extra_headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub gateway::EndpointTuning::label: core::option::Option<alloc::string::String>
+pub gateway::EndpointTuning::overrides: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub gateway::EndpointTuning::request_max_retries: core::option::Option<u32>
+pub gateway::EndpointTuning::stream_deadline_ms: core::option::Option<u64>
+pub gateway::EndpointTuning::timeout_ms: core::option::Option<u64>
 pub gateway::Fallback::None
 pub gateway::Fallback::Then::endpoint: alloc::string::String
 pub gateway::Fallback::Then::model: alloc::string::String
@@ -162,6 +176,12 @@ pub gateway::ModelEntry::input: gateway::InputKinds
 pub gateway::ModelEntry::input_price: kernel::budget::UsdMicros
 pub gateway::ModelEntry::max_output_tokens: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::ModelEntry::output_price: kernel::budget::UsdMicros
+pub gateway::ModelFacts::context_tokens: core::option::Option<u64>
+pub gateway::ModelFacts::id: alloc::string::String
+pub gateway::ModelFacts::input_modalities: alloc::vec::Vec<alloc::string::String>
+pub gateway::ModelFacts::input_price: core::option::Option<alloc::string::String>
+pub gateway::ModelFacts::max_output_tokens: core::option::Option<kernel::model::wire::Ceiling>
+pub gateway::ModelFacts::output_price: core::option::Option<alloc::string::String>
 pub gateway::NativeConfig::base_url: alloc::string::String
 pub gateway::NativeConfig::model: alloc::string::String
 pub gateway::NativeConfig::pricing: core::option::Option<gateway::ModelEntry>
@@ -207,9 +227,11 @@ pub struct gateway::Described
 pub struct gateway::Endpoint
 pub struct gateway::EndpointBook
 pub struct gateway::EndpointConfig
+pub struct gateway::EndpointTuning
 pub struct gateway::ImageBytes(_)
 pub struct gateway::MarketSnapshot
 pub struct gateway::ModelEntry
+pub struct gateway::ModelFacts
 pub struct gateway::Native
 pub struct gateway::NativeConfig
 pub struct gateway::OauthPending

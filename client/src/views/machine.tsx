@@ -13,15 +13,15 @@
 // the name, the version, one action, and the whole command - wrapped,
 // never cut, because a command cut at the right edge cannot be typed.
 //
-// Two things this page would do and the wire cannot yet carry: running
-// an install from here (`Command::DoctorInstall`), and asking the city
-// to probe again rather than re-reading the snapshot it took at start
-// (`Command::DoctorRefresh`). The install control says why it cannot
-// act instead of pretending; `check again` re-asks `Query::Doctor`,
-// which is the honest half that exists.
+// One click installs. `Command::DoctorInstall` runs the recipe this
+// city may run and refuses the other two with what a person does
+// instead, and the install ends by looking at this machine again - so
+// `check again` is the manual half of the same verb rather than a
+// second way of getting the same answer.
 
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, on } from "solid-js";
 
+import { doctorInstall, doctorRefresh } from "../core/commands";
 import type { DoctorAnswer, DoctorInstall, DoctorItem, DoctorState } from "../wire";
 import { useSay, useUi } from "../ui";
 import { Button } from "./parts/button";
@@ -107,14 +107,20 @@ function Progress(props: { readonly done: number; readonly total: number }) {
   );
 }
 
+// Whether this city may run the install itself. The other two recipes
+// are a command the person runs and an instruction they follow, and
+// both stay a copy rather than a button.
+function runnable(install: DoctorInstall): boolean {
+  return typeof install !== "string" && "command" in install;
+}
+
 // One item, and everything a person decides about it from one line: the
 // state, what it is, which version answered, what it enables, and the
 // command that would get it.
 //
-// The name is text rather than a link because `DoctorItem` carries no
-// homepage; the moment the wire does, this is the one place that
-// changes.
-function Row(props: { readonly item: DoctorItem }) {
+// The name links to the item's own site when the city knows one, so a
+// person can read what a thing is before installing it.
+function Row(props: { readonly item: DoctorItem; readonly onInstall: (item: string) => void }) {
   const say = useSay();
   const version = createMemo(() => versionOf(props.item.state));
   const spelled = createMemo(() => spelledOf(props.item.install));
@@ -124,7 +130,22 @@ function Row(props: { readonly item: DoctorItem }) {
         <span class="flex size-glyph shrink-0 items-center justify-center">
           <span class={`inline-block size-dot rounded-pill ${dotOf(props.item)}`} />
         </span>
-        <span class="font-mono text-label text-text">{props.item.name}</span>
+        <Show
+          when={props.item.homepage}
+          fallback={<span class="font-mono text-label text-text">{props.item.name}</span>}
+        >
+          {(site) => (
+            <a
+              class="font-mono text-label text-text underline decoration-g3 underline-offset-2 hover:decoration-accent"
+              href={site()}
+              target="_blank"
+              rel="noreferrer"
+              title={site()}
+            >
+              {props.item.name}
+            </a>
+          )}
+        </Show>
         <span class="text-note text-text-faint">{say(stateKey(props.item.state))}</span>
         <Show when={props.item.need === "optional"}>
           <span class="text-note text-text-disabled">{say("machine_optional")}</span>
@@ -139,11 +160,24 @@ function Row(props: { readonly item: DoctorItem }) {
         >
           {(how) => (
             <div class="flex shrink-0 items-center gap-tight">
-              <Button
-                label={say("machine_install")}
-                tone="primary"
-                why={say("machine_install_unwired")}
-              />
+              <Show
+                when={runnable(props.item.install)}
+                fallback={
+                  <Button
+                    label={say("machine_install")}
+                    tone="primary"
+                    why={say("machine_install_by_hand")}
+                  />
+                }
+              >
+                <Button
+                  label={say("machine_install")}
+                  tone="primary"
+                  onPress={() => {
+                    props.onInstall(props.item.name);
+                  }}
+                />
+              </Show>
               <Button
                 label={say("setup_copy")}
                 tone="quiet"
@@ -167,14 +201,20 @@ function Row(props: { readonly item: DoctorItem }) {
   );
 }
 
-function Column(props: { readonly title: string; readonly items: readonly DoctorItem[] }) {
+function Column(props: {
+  readonly title: string;
+  readonly items: readonly DoctorItem[];
+  readonly onInstall: (item: string) => void;
+}) {
   const done = createMemo(() => ready(props.items));
   return (
     <section class="flex min-w-0 flex-col gap-snug" aria-label={props.title}>
       <h2 class="text-heading font-heading text-text">{props.title}</h2>
       <Progress done={done()} total={props.items.length} />
       <ul class="flex flex-col">
-        <For each={props.items}>{(each) => <Row item={each} />}</For>
+        <For each={props.items}>
+          {(each) => <Row item={each} onInstall={props.onInstall} />}
+        </For>
       </ul>
     </section>
   );
@@ -182,12 +222,22 @@ function Column(props: { readonly title: string; readonly items: readonly Doctor
 
 // One answer, drawn. Separate from the ask so the gallery can show
 // this machine in states nobody's own machine happens to be in.
-export function MachineReport(props: { readonly answer: DoctorAnswer }) {
+export function MachineReport(props: {
+  readonly answer: DoctorAnswer;
+  readonly onInstall?: (item: string) => void;
+}) {
   const say = useSay();
+  const install = (item: string) => {
+    props.onInstall?.(item);
+  };
   return (
     <div class="grid min-w-0 grid-cols-1 gap-wide lg:grid-cols-2">
-      <Column title={say("machine_required")} items={required(props.answer)} />
-      <Column title={say("machine_recommended")} items={recommended(props.answer)} />
+      <Column title={say("machine_required")} items={required(props.answer)} onInstall={install} />
+      <Column
+        title={say("machine_recommended")}
+        items={recommended(props.answer)}
+        onInstall={install}
+      />
     </div>
   );
 }
@@ -244,8 +294,38 @@ export function Machine() {
       setAsking(false);
     }
   });
+  // The city writes one log line when it has looked at this machine
+  // again, and that line is how this page knows the probe is over. A
+  // read sent on the same tick as the command would arrive first and
+  // answer with the machine as it was before, because probing is a
+  // dozen programs started and asked their version.
+  //
+  // A city running with its log off writes no such line. `check again`
+  // is then the whole mechanism, which is why it stays a control the
+  // person can press rather than something the page does for them.
+  const looked = createMemo(
+    () => ui.conn.belief.logs.filter((line) => line.module === "bin::doctor").length,
+  );
+  createEffect(
+    on(
+      looked,
+      () => {
+        ui.conn.asking.refresh("doctor");
+      },
+      { defer: true },
+    ),
+  );
+  // Each of the two asks straight away as well, so the page is never
+  // left waiting on a line that may not come; that first answer is
+  // whatever the city holds now, and the log line brings the second.
   const recheck = () => {
     setAsking(true);
+    ui.conn.command(doctorRefresh());
+    ui.conn.asking.refresh("doctor");
+  };
+  const install = (item: string) => {
+    setAsking(true);
+    ui.conn.command(doctorInstall(item));
     ui.conn.asking.refresh("doctor");
   };
   const reaching = () => {
@@ -278,7 +358,7 @@ export function Machine() {
           </Show>
         }
       >
-        {(found) => <MachineReport answer={found()} />}
+        {(found) => <MachineReport answer={found()} onInstall={install} />}
       </Show>
     </div>
   );

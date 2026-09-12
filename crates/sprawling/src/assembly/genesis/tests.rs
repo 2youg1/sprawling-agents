@@ -71,6 +71,7 @@ fn deleting_every_log_line_leaves_the_history_byte_identical() {
                 secret: None,
                 auth_header: None,
                 admit: Vec::new(),
+                tuning: channels::EndpointTuning::default(),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
             })
             .unwrap();
@@ -117,10 +118,10 @@ fn deleting_every_log_line_leaves_the_history_byte_identical() {
     let sink = std::sync::Arc::clone(&written);
     let noisy = runtime::diagnostics::Diagnostics::new(
         runtime::diagnostics::Level::Wire,
-        Box::new(move |line: &str| {
+        Box::new(move |entry: runtime::diagnostics::Entry<'_>| {
             sink.lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .push(line.to_owned());
+                .push(runtime::diagnostics::render(entry));
         }),
     );
     let with_logs = run_city(noisy);

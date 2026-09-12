@@ -19,8 +19,10 @@
 mod attached;
 mod book;
 mod payload;
+mod tuning;
 
 pub use attached::AttachedEndpoint;
 pub(crate) use attached::join;
 pub use book::{Chosen, EndpointBook};
 pub use payload::{attached_payload, selected_payload};
+pub use tuning::EndpointTuning;

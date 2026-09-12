@@ -99,6 +99,9 @@ export function openConnection(url: string, token: string | null): Connection {
       case "saying":
         store.say(action.delta);
         return;
+      case "logged":
+        store.logged(action.line);
+        return;
       case "wait":
         setTimeout(() => {
           step({ kind: "wait_elapsed" });

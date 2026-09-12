@@ -92,8 +92,11 @@ pub fn between(city_root: &Path, base: GitOid, head: Head) -> Result<Vec<FileCha
 ///
 /// Separate from [`between`] because everything above is git and
 /// everything here is this module's own reading of it: which deltas earn
-/// a row, and what a row says when git has no line count for it.
-fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, MemoryError> {
+/// a row, and what a row says when git has no line count for it. Shared
+/// with `crate::status`, which prepares a different diff and needs the
+/// same reading of it — what a changed file is must have one answer
+/// whether the far end is a checkpoint or the disk.
+pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, MemoryError> {
     let mut rows: Vec<FileChange> = Vec::new();
     let stats: Vec<(u32, u32)> = line_counts(diff)?;
     for (at, delta) in diff.deltas().enumerate() {
@@ -109,7 +112,10 @@ fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, MemoryError> {
             continue;
         };
         let how = match delta.status() {
-            git2::Delta::Added | git2::Delta::Copied => How::Added,
+            // Untracked belongs with Added: a file the working tree
+            // holds and no commit does is a file this wave added,
+            // whether or not anybody staged it.
+            git2::Delta::Added | git2::Delta::Copied | git2::Delta::Untracked => How::Added,
             git2::Delta::Deleted => How::Deleted,
             git2::Delta::Renamed => How::Renamed {
                 from: delta

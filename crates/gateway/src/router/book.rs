@@ -173,6 +173,7 @@ impl EndpointBook {
 )]
 mod tests {
     use super::super::payload::{attached_payload, selected_payload};
+    use super::super::tuning::EndpointTuning;
     use super::*;
     use crate::endpoint::AuthSpec;
     use crate::fallback::Fallback;
@@ -206,6 +207,7 @@ mod tests {
             auth: AuthSpec::Bearer(SecretRef::parse("secret:provider/key").unwrap()),
             models: vec!["m-small".to_owned(), "m-large".to_owned()],
             probed: true,
+            tuning: EndpointTuning::default(),
         }
     }
     fn entry(id: &str) -> ModelEntry {

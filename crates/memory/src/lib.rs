@@ -89,6 +89,8 @@ pub use checkpoint::predecessor_of;
 
 mod changes;
 mod hunks;
+mod status;
 
 pub use changes::{Head, between};
 pub use hunks::{FilePatch, PatchLine, Withheld, of_file};
+pub use status::{Drift, WorkingStatus, working_status};

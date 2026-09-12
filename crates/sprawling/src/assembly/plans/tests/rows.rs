@@ -109,6 +109,7 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
             secret: None,
             auth_header: None,
             admit: Vec::new(),
+            tuning: channels::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();

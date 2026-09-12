@@ -203,6 +203,7 @@ impl RunWorker {
                         credential: Credential::Subscription {
                             reference: access.to_string(),
                         },
+                        tuning: gateway::EndpointTuning::default(),
                     },
                     &[],
                 )

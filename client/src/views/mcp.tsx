@@ -64,7 +64,12 @@ export function McpForm(props: {
 
   return (
     <div class="flex flex-col gap-wide">
-      <Servers servers={reach.servers()} onRemove={reach.withdraw} />
+      <Servers
+        servers={reach.servers()}
+        health={reach.health()}
+        onCheck={reach.check}
+        onRemove={reach.withdraw}
+      />
       <div class="flex flex-col gap-base rounded-panel bg-g1/60 p-base">
         <Tabs
           label={say("mcp_doors")}

@@ -30,8 +30,10 @@ use kernel::{
 use serde::{Deserialize, Serialize};
 
 use crate::carried_name::{ModeTag, ProviderName, TemplateName, UploadId};
+use crate::command::step::{GovernedDocument, HaltScope, LoginStep, PursuitStep};
+use crate::command::tuning::EndpointTuning;
 
-pub const COMMAND_NAMES: [&str; 25] = [
+pub const COMMAND_NAMES: [&str; 27] = [
     "Dispatch",
     "Wake",
     "Login",
@@ -57,109 +59,9 @@ pub const COMMAND_NAMES: [&str; 25] = [
     "PutDocument",
     "Auth",
     "Reveal",
+    "DoctorInstall",
+    "DoctorRefresh",
 ];
-
-/// Uninhabited on purpose. A value of this type cannot be produced, so
-/// `Command<NoSecret>` has no reachable `PutSecret` variant. This is the
-/// compile-time half of "a remote connection cannot spell that frame";
-/// `Deserialize` supplies the runtime half for bytes that try anyway.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NoSecret {}
-
-impl Serialize for NoSecret {
-    fn serialize<S: serde::Serializer>(&self, _serializer: S) -> Result<S::Ok, S::Error> {
-        match *self {}
-    }
-}
-
-impl<'de> Deserialize<'de> for NoSecret {
-    fn deserialize<D: serde::Deserializer<'de>>(_deserializer: D) -> Result<Self, D::Error> {
-        Err(serde::de::Error::custom(
-            "a credential cannot be enrolled over a connection; enrol it on the host",
-        ))
-    }
-}
-
-/// The schema half of the same statement: `false` is the schema no value
-/// satisfies, so a client generated from it types the field as `never`.
-#[cfg(feature = "schema")]
-impl schemars::JsonSchema for NoSecret {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed("NoSecret")
-    }
-
-    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        schemars::Schema::from(false)
-    }
-}
-
-/// Which step of a subscription login a `Login` frame carries.
-///
-/// The authorization code arrives by hand: the provider shows it to the
-/// person after they approve, and the person brings it back. That is
-/// the flow the profile table describes, and it needs no listening port
-/// of its own.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum LoginStep {
-    /// Mint the authorization URL for a person to open.
-    Begin,
-    /// Redeem the code that person brought back.
-    Code { code: String },
-}
-
-/// What a Halt, Release or Autonomy change applies to. Unlike modes and
-/// providers, this set is the protocol's own and has no upstream owner.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum HaltScope {
-    City,
-    Building(Address),
-    Workshop(Address),
-}
-
-/// Which of the three documents that govern a city a `PutDocument`
-/// frame carries.
-///
-/// A closed set rather than a path, because where these files live is
-/// the city's answer and not the sender's: all three sit in the city's
-/// own reserved subtree, which no write domain reaches. A frame naming
-/// its own path would be a way to write anywhere inside the one place a
-/// resident may not edit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum GovernedDocument {
-    /// Who the Mayor is: `MAYOR.md`.
-    Mayor,
-    /// What the clerk answers by: `CLERK.md`.
-    Clerk,
-    /// How this person wants their city run: `PREFERENCES.md`. It
-    /// belongs to no resident, which is why it sits beside the other two
-    /// rather than at somebody's address.
-    Preferences,
-}
-
-/// What a `Pursue` command does to a pursuit.
-///
-/// `Clear` and `Pause` are different actions and both exist: pausing
-/// keeps the goal so it can be taken up again, and clearing throws it
-/// away. Cancelling a *run* is a third thing again, and it has its own
-/// command.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum PursuitStep {
-    /// Declare one, replacing any goal this building already had.
-    Set {
-        goal: String,
-    },
-    Pause,
-    Resume,
-    Clear,
-}
 
 /// Commands change state, require authorization, and are idempotent.
 ///
@@ -206,10 +108,6 @@ pub enum Command<Secret = Sealed<String>> {
         step: LoginStep,
         idem: IdemKey,
     },
-    /// Register a provider the person just entered. The credential is
-    /// already in the vault by the time this frame exists: what travels
-    /// here is the reference to it, which is why this command has a byte
-    /// form and `PutSecret` does not.
     /// Asks a base URL what it serves, and attaches nothing.
     ///
     /// A person cannot choose from a list they have not seen, and the
@@ -217,12 +115,17 @@ pub enum Command<Secret = Sealed<String>> {
     /// looking at what a key buys meant registering it first. The answer
     /// lands as `endpoint_probed`, which the page folds like any other
     /// fact about this city.
+    ///
+    /// It carries the same `tuning` the attachment will, because a
+    /// probe that reached a gateway without the header that gateway
+    /// requires answers 401 for a key that is in fact good.
     ProbeEndpoint {
         name: ProviderName,
         base_url: String,
         dialect: DialectKind,
         secret: Option<String>,
         auth_header: Option<String>,
+        tuning: EndpointTuning,
         idem: IdemKey,
     },
     /// What a building's runs may reach: the sandbox's limits, the
@@ -262,6 +165,11 @@ pub enum Command<Secret = Sealed<String>> {
         /// empty list admits everything it serves, which is what a
         /// person who did not look at the list meant.
         admit: Vec<String>,
+        /// What this endpoint is called, how long it may take, and what
+        /// every request to it carries. The city keeps it beside the
+        /// registration, so a call made a week later is made the way
+        /// the person set it up.
+        tuning: EndpointTuning,
         idem: IdemKey,
     },
     /// Point one tag at one model of an attached endpoint, with the two
@@ -330,6 +238,29 @@ pub enum Command<Secret = Sealed<String>> {
     /// so there is no way to spell a request for anything else.
     Reveal {
         at: Address,
+        idem: IdemKey,
+    },
+    /// Install one thing this machine lacks, named as the doctor's
+    /// answer names it.
+    ///
+    /// Only a recipe this city may run is run. A recipe that has to be
+    /// printed, and one that has no command at all, are refused with
+    /// what the person does instead: a script piped into a shell is
+    /// code nobody read, and that rule does not soften because the
+    /// request arrived from a page rather than from a terminal.
+    DoctorInstall {
+        item: String,
+        idem: IdemKey,
+    },
+    /// Look at this machine again, in place of the snapshot taken when
+    /// the city was served.
+    ///
+    /// [`Query::Doctor`](crate::Query::Doctor) answers that snapshot,
+    /// which is what a page must not be given after it has just
+    /// installed something. Probing is seconds of starting programs, so
+    /// it happens here, where the city already serialises work, rather
+    /// than inside a read.
+    DoctorRefresh {
         idem: IdemKey,
     },
     Release {

@@ -11,7 +11,7 @@
 //! listed, and a second shape for the list would be a second authority
 //! on what a commit is.
 
-use kernel::{Address, Effort, GitOid, RunId, Seq, SessionName, TimeMs};
+use kernel::{Address, Effort, GitOid, RunId, Seq, SessionName, TimeMs, UsdMicros};
 use serde::{Deserialize, Serialize};
 
 /// Which run wrote one commit, in the words the commit's own git
@@ -46,6 +46,13 @@ pub struct CommitAnswer {
     /// This run first, then each run it replaced by succession, back to
     /// the first. One entry for a run that replaced nobody.
     pub lineage: Vec<RunId>,
+    /// What the run that wrote this commit has been billed, whole.
+    ///
+    /// The run's total rather than this commit's share: a commit is a
+    /// fence and nothing prices a fence, so dividing the run's spend
+    /// between its fences would be a number nobody measured. Zero for
+    /// a run no priced call is attributed to.
+    pub spent: UsdMicros,
 }
 
 /// One page of the commits a city made, newest first.

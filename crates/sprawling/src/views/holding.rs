@@ -86,6 +86,11 @@ pub(crate) struct Views {
     /// lineage is walked from here rather than stored per commit, so
     /// the chain is one fact however many commits point into it.
     pub(super) predecessors: std::collections::BTreeMap<kernel::RunId, kernel::RunId>,
+    /// Which runs were frozen with each skill pinned, by name and hash
+    /// together: a skill edited between two runs is two documents under
+    /// one name, and a key of the name alone would claim the older run
+    /// read what the newer one did.
+    pub(super) skill_pins: std::collections::BTreeMap<(String, kernel::B3Hash), Vec<kernel::RunId>>,
     /// How many records this view has folded. The one number a page
     /// cannot derive from any other answer.
     pub(super) events: u64,
@@ -135,6 +140,12 @@ pub(crate) struct Views {
     /// a city that never looked - a worker driven one command at a time
     /// - and it answers `Unavailable` rather than an empty machine.
     pub(super) machine: Option<channels::DoctorAnswer>,
+    /// The vault the worker opened; set by `views::served`. `None` is a
+    /// `Views` nobody served - a rebuild, a test - and a server wanting
+    /// a credential then reports that it could not be redeemed rather
+    /// than reaching out with the reference as though it were the
+    /// value.
+    pub(super) vault: Option<std::sync::Arc<std::sync::Mutex<gateway::Custodian>>>,
 }
 
 impl Views {
@@ -152,6 +163,7 @@ impl Views {
             commits: std::collections::BTreeMap::new(),
             commit_seqs: std::collections::BTreeMap::new(),
             predecessors: std::collections::BTreeMap::new(),
+            skill_pins: std::collections::BTreeMap::new(),
             events: 0,
             // An unreadable ledger directory is not a reason to refuse to
             // start: the index is disposable, every refresh tries again,
@@ -165,17 +177,8 @@ impl Views {
             claims: std::collections::BTreeMap::new(),
             halted: std::collections::BTreeSet::new(),
             machine: None,
+            vault: None,
         }
-    }
-
-    /// Takes what the doctor found, so a page can be told what this
-    /// machine is missing.
-    ///
-    /// Once, where a city is served. Probing is seconds of starting
-    /// programs, and a read that did it would hold the one thread every
-    /// other read is answered on.
-    pub(crate) fn found_on_this_machine(&mut self, report: channels::DoctorAnswer) {
-        self.machine = Some(report);
     }
 
     /// Folds one record into every view that cares about it.
@@ -248,7 +251,10 @@ impl Views {
                 }
             }
             EventKind::CheckpointCommitted | EventKind::PrMerged => self.fold_commit(record),
-            EventKind::RunStarted => self.fold_predecessor(record),
+            EventKind::RunStarted => {
+                self.fold_predecessor(record);
+                self.fold_skill_pins(record);
+            }
             EventKind::AssetArchived => {
                 if let Some(line) = registry_line(record) {
                     self.assets.push(line);

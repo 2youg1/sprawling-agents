@@ -45,13 +45,15 @@ const EXPOSE_WHITELIST: [&str; 5] = [
     // because the alternative was the assembly holding plaintext, and
     // that is the thing this list exists to prevent.
     "crates/gateway/src/credential/oauth/flow.rs",
-    // An MCP server's configured header may name a credential
-    // instead of carrying one, and the header is set on the request
-    // being sent - the same last slot before the wire. Listed rather
-    // than redeemed one layer up, for the reason the entry above
-    // records: the alternative put plaintext in `bin::assembly`, which
-    // is what this list exists to prevent.
-    "crates/sprawling/src/mcp_http.rs",
+    // An MCP server's configured header or environment variable may
+    // name a credential instead of carrying one. This is the one place
+    // the reference is redeemed for all three transports; what travels
+    // onward is a `Redeemed`, which yields plaintext only to whoever
+    // names `Redeemed::plaintext` in the last slot before the wire.
+    // Listed rather than redeemed one layer up, because the
+    // alternative put plaintext in `bin::assembly`, which is what this
+    // list exists to prevent.
+    "crates/sprawling/src/mcp_redeeming.rs",
 ];
 
 /// Exact literals the detector flags that are not credentials.

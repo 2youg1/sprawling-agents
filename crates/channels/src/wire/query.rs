@@ -13,11 +13,11 @@
 //! table that drifted from the enum would let two builds agree on a hash
 //! while disagreeing on what a frame means.
 
-use kernel::{Address, GitOid, NodeId, RunId, Seq};
+use kernel::{Address, GitOid, Locator, NodeId, RunId, Seq};
 use serde::{Deserialize, Serialize};
 
 /// The Query surface, in declaration order.
-pub const QUERY_NAMES: [&str; 24] = [
+pub const QUERY_NAMES: [&str; 29] = [
     "History",
     "RunHistory",
     "Changes",
@@ -42,6 +42,11 @@ pub const QUERY_NAMES: [&str; 24] = [
     "Document",
     "Commits",
     "Doctor",
+    "Prefix",
+    "Content",
+    "Skills",
+    "GitStatus",
+    "McpHealth",
 ];
 
 /// Queries read state. They are cacheable and free of side effects, so none
@@ -237,6 +242,71 @@ pub enum Query {
     /// answers [`Answer::Unavailable`], which is what a worker driven
     /// one command at a time is.
     Doctor,
+    /// The system prompt one run was frozen with: four segments, their
+    /// text, and what each was assembled from.
+    ///
+    /// Answered from the run's own `prompt_assembled` record joined to
+    /// the store, never by assembling a prefix again: what a person
+    /// needs to see is the bytes that were sent, and a second assembly
+    /// taken now would read files that have moved since. A segment the
+    /// store no longer holds says so by name rather than by an empty
+    /// string, because "this segment was empty" and "these bytes are
+    /// gone" are different answers.
+    Prefix {
+        run: RunId,
+    },
+    /// One object of the content store, bounded, with the cut stated.
+    ///
+    /// The general read behind [`Query::Prefix`], and the door every
+    /// other `cas:` reference a page is shown can be opened through -
+    /// an approval's artifact, a discarded file's way back, a norm on a
+    /// handoff's must-read list. Only the `cas:` scheme is answered: a
+    /// `file:` locator names a path in the tree, which is
+    /// [`Query::Document`]'s question and must not have a second answer
+    /// here.
+    Content {
+        locator: Locator,
+    },
+    /// What one building can do, and where each of those came from.
+    ///
+    /// Two shelves in one answer because a reader needs both to make
+    /// sense of either: the city's library is what any building may
+    /// admit, and the building's own shelf is what only it keeps. Which
+    /// runs pinned a skill is folded from `run_started`, so a shelf
+    /// nothing has ever used says so instead of looking unused because
+    /// nobody wrote it down.
+    Skills {
+        building: Address,
+    },
+    /// What is uncommitted in one building right now: the branch, how
+    /// far it has drifted from its upstream, the files that moved, and
+    /// the last checkpoint the city fenced there.
+    ///
+    /// Read from git at the moment of asking, which is the one answer
+    /// here that is about the disk rather than about the history: a
+    /// working tree is what a person is looking at, and the Ledger
+    /// records fences rather than edits. The checkpoint beside it comes
+    /// from the history, for the reason [`Query::Commit`] gives.
+    GitStatus {
+        building: Address,
+    },
+    /// Whether each tool server one address reaches is answering, and
+    /// what it offers.
+    ///
+    /// One handshake per configured server, run at the moment of
+    /// asking: a server's state is a fact about now - a program that
+    /// starts, a host that answers, an account that is still valid -
+    /// and a remembered one would tell a person their server is up an
+    /// hour after it stopped. It is the same handshake a run opens with
+    /// (`protocol::handshake`, then `tools/list`), so what this answers
+    /// and what a model is given cannot disagree.
+    ///
+    /// **This is the one query that costs seconds.** A page asks it
+    /// when a person opens the MCP page or adds a server, never on a
+    /// timer.
+    McpHealth {
+        addr: Address,
+    },
 }
 
 impl Query {
@@ -268,6 +338,11 @@ impl Query {
             Self::Document { .. } => "Document",
             Self::Commits { .. } => "Commits",
             Self::Doctor => "Doctor",
+            Self::Prefix { .. } => "Prefix",
+            Self::Content { .. } => "Content",
+            Self::Skills { .. } => "Skills",
+            Self::GitStatus { .. } => "GitStatus",
+            Self::McpHealth { .. } => "McpHealth",
         }
     }
 }

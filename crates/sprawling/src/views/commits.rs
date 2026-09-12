@@ -20,7 +20,7 @@
 //! than a commit and names no oid at all — so what is asked of a record
 //! is whether it names a commit, never which kind it is.
 
-use kernel::{Address, EventKind, EventRecord, GitOid, RunId, Seq, SessionName};
+use kernel::{Address, EventKind, EventRecord, GitOid, RunId, Seq, SessionName, UsdMicros};
 
 /// What one commit's own record says about the run that made it.
 ///
@@ -46,9 +46,16 @@ impl CommitFacts {
     }
 
     /// What a page or a person is handed. The lineage is this run
-    /// first, then each run it replaced, back to the first.
-    pub(super) fn answer(&self, oid: GitOid, lineage: Vec<RunId>) -> channels::CommitAnswer {
+    /// first, then each run it replaced, back to the first; `spent` is
+    /// what that run has been billed, whole.
+    pub(super) fn answer(
+        &self,
+        oid: GitOid,
+        lineage: Vec<RunId>,
+        spent: UsdMicros,
+    ) -> channels::CommitAnswer {
         channels::CommitAnswer {
+            spent,
             oid,
             run: self.run,
             actor: self.actor.clone(),
@@ -89,6 +96,10 @@ impl super::holding::Views {
         limit: u32,
     ) -> channels::CommitsAnswer {
         let want = usize::try_from(limit.clamp(1, channels::HISTORY_MAX)).unwrap_or(usize::MAX);
+        // One report for the whole page: it is a fold over every billed
+        // call, and asking it per row would walk that fold forty times
+        // to answer forty questions with the same numbers.
+        let billed = self.attribution.report();
         let mut page = self
             .commit_seqs
             .range(..before.unwrap_or(Seq::new(u64::MAX)))
@@ -96,7 +107,13 @@ impl super::holding::Views {
             .filter_map(|(_, oid)| self.commits.get(oid).map(|facts| (*oid, facts)))
             .filter(|(_, facts)| building.is_none_or(|at| facts.worked_under(at)))
             .take(want.saturating_add(1))
-            .map(|(oid, facts)| facts.answer(oid, self.lineage_of(facts.run)))
+            .map(|(oid, facts)| {
+                facts.answer(
+                    oid,
+                    self.lineage_of(facts.run),
+                    spent_by(&billed, facts.run),
+                )
+            })
             .collect::<Vec<_>>();
         let more = page.len() > want;
         page.truncate(want);
@@ -123,7 +140,11 @@ impl super::holding::Views {
     /// are different answers, and a reader acts differently on each.
     pub(super) fn commit_answer(&self, oid: GitOid) -> channels::Answer {
         match self.commits.get(&oid) {
-            Some(facts) => channels::Answer::Commit(facts.answer(oid, self.lineage_of(facts.run))),
+            Some(facts) => channels::Answer::Commit(facts.answer(
+                oid,
+                self.lineage_of(facts.run),
+                spent_by(&self.attribution.report(), facts.run),
+            )),
             None => channels::Answer::Unavailable {
                 query: format!("Commit({oid})"),
             },
@@ -145,6 +166,20 @@ impl super::holding::Views {
         }
         chain
     }
+}
+
+/// What one run has been billed, out of a report already folded.
+///
+/// The attribution keys a run by its own display form, which is the
+/// one spelling the ledger and these records share. A run no priced
+/// call is attributed to has spent nothing, which is an answer.
+fn spent_by(billed: &memory::AttributionReport, run: RunId) -> UsdMicros {
+    let name = run.to_string();
+    billed
+        .by_run
+        .iter()
+        .find_map(|(held, usd)| (held == &name).then_some(*usd))
+        .unwrap_or_default()
 }
 
 /// The commit one record announced, if it announced one.
@@ -302,7 +337,7 @@ mod tests {
         assert_eq!(found.to_string(), oid);
         // A record written before the city put the model on the ledger
         // says nothing about it, and the answer says nothing back.
-        let said = facts.answer(found, vec![facts.run]);
+        let said = facts.answer(found, vec![facts.run], UsdMicros::new(0));
         assert_eq!(said.model, String::new());
         assert_eq!(said.lineage.len(), 1, "a first run is its own lineage");
         assert_eq!(said.effort, None);

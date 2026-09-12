@@ -5,7 +5,7 @@
 
 //! Reaching the MCP servers a building's configuration names.
 
-use kernel::{Address, AxCode, AxError};
+use kernel::{Address, AxError};
 
 /// Starts one server and turns what it offers into tools.
 ///
@@ -45,44 +45,63 @@ pub(super) fn connect_mcp(
 
 /// Which module a reader should open when a server misbehaves.
 pub(super) fn transport_site(transport: &kernel::McpTransport) -> &'static str {
-    match transport {
+    match *transport {
         kernel::McpTransport::Stdio { .. } => "bin::mcp_stdio",
         kernel::McpTransport::Http { .. } => "bin::mcp_http",
-        _ => "bin::assembly",
+        kernel::McpTransport::Sse { .. } => "bin::mcp_sse",
     }
 }
 
 /// One reachable server, whichever way it is reached.
 ///
-/// The two transports differ in where the bytes go and in nothing else,
-/// so the difference is spent here and the wiring above stays one path.
+/// The three transports differ in where the bytes go and in nothing
+/// else, so the difference is spent here and the wiring above stays one
+/// path.
 #[derive(Clone)]
-pub(super) enum McpLink {
+pub(crate) enum McpLink {
     Stdio(crate::mcp_stdio::StdioServer),
     Http(crate::mcp_http::HttpServer),
+    Sse(crate::mcp_sse::SseServer),
 }
 
 impl McpLink {
-    fn open(
+    /// Opens one server as its transport says it is reached.
+    ///
+    /// `write_root` is the run's own root, which exists whether or not
+    /// this building lends its runs a worktree; a child process starts
+    /// there and nowhere else.
+    ///
+    /// # Errors
+    /// Propagates each transport's own refusal to open, every one of
+    /// which names the server and what a person can do about it.
+    pub(crate) fn open(
         transport: &kernel::McpTransport,
         write_root: &std::path::Path,
         resolve: &gateway::SecretResolver,
     ) -> Result<McpLink, AxError> {
-        match transport {
-            // The run's own root, which exists whether or not this
-            // building lends its runs a worktree.
-            kernel::McpTransport::Stdio { command, args } => Ok(McpLink::Stdio(
-                crate::mcp_stdio::StdioServer::start(command, args, write_root)?,
-            )),
-            kernel::McpTransport::Http { url, header } => Ok(McpLink::Http(
-                crate::mcp_http::HttpServer::open(url, header.as_deref(), resolve)?,
-            )),
-            other => Err(AxError::failure(
-                AxCode::ConfigInvalid,
-                "reach an mcp server",
-                format!("{other:?}"),
-            )
-            .with_recovery("this build reaches a server by a command or by a url")),
+        match *transport {
+            kernel::McpTransport::Stdio {
+                ref command,
+                ref args,
+                ref env,
+            } => {
+                let env = crate::mcp_redeeming::redeem(env, resolve, "start an mcp server")?;
+                Ok(McpLink::Stdio(crate::mcp_stdio::StdioServer::start(
+                    command, args, &env, write_root,
+                )?))
+            }
+            kernel::McpTransport::Http {
+                ref url,
+                ref headers,
+            } => Ok(McpLink::Http(crate::mcp_http::HttpServer::open(
+                url, headers, resolve,
+            )?)),
+            kernel::McpTransport::Sse {
+                ref url,
+                ref headers,
+            } => Ok(McpLink::Sse(crate::mcp_sse::SseServer::open(
+                url, headers, resolve,
+            )?)),
         }
     }
 }
@@ -92,6 +111,7 @@ impl protocol::Outbound for McpLink {
         match *self {
             McpLink::Stdio(ref mut held) => held.call(line, patience),
             McpLink::Http(ref mut held) => held.call(line, patience),
+            McpLink::Sse(ref mut held) => held.call(line, patience),
         }
     }
 
@@ -99,6 +119,7 @@ impl protocol::Outbound for McpLink {
         match *self {
             McpLink::Stdio(ref mut held) => held.notify(line, patience),
             McpLink::Http(ref mut held) => held.notify(line, patience),
+            McpLink::Sse(ref mut held) => held.notify(line, patience),
         }
     }
 }

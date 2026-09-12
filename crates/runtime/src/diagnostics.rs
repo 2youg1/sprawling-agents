@@ -19,6 +19,11 @@
 //! also be a second sampling point in a library that is not allowed one.
 //! A sink that wants a clock is free to add one — the assembly layer is
 //! where sampling is sanctioned.
+//!
+//! A sink receives an [`Entry`] rather than a rendered line, because a
+//! sink that had to read the fields back out of the text would be a
+//! second authority on what a line is made of. [`render`] is the one
+//! way text is produced, and a sink that wants text calls it.
 
 use kernel::{RunId, Seq};
 
@@ -98,9 +103,20 @@ pub struct Site<'a> {
     pub module: &'a str,
 }
 
-/// Where rendered lines go. A closure rather than a trait: this crate
-/// opens no files, and one implementation is not a seam.
-pub type Sink = Box<dyn FnMut(&str) + Send>;
+/// One line, before anything has decided what it looks like.
+///
+/// `message` has already passed the secret scan, so a sink may write it
+/// anywhere it writes the rest of the entry.
+#[derive(Debug, Clone, Copy)]
+pub struct Entry<'a> {
+    pub level: Level,
+    pub site: Site<'a>,
+    pub message: &'a str,
+}
+
+/// Where lines go. A closure rather than a trait: this crate opens no
+/// files, and one implementation is not a seam.
+pub type Sink = Box<dyn FnMut(Entry<'_>) + Send>;
 
 /// The write-only logging surface.
 ///
@@ -138,7 +154,7 @@ impl Diagnostics {
     pub fn off() -> Diagnostics {
         Diagnostics {
             floor: None,
-            sink: Box::new(|_line: &str| {}),
+            sink: Box::new(|_entry: Entry<'_>| {}),
         }
     }
 
@@ -166,8 +182,12 @@ impl Diagnostics {
         if !self.admits(level) {
             return;
         }
-        let line = render(level, site, &redact(message));
-        (self.sink)(&line);
+        let scanned = redact(message);
+        (self.sink)(Entry {
+            level,
+            site,
+            message: &scanned,
+        });
     }
 }
 
@@ -210,7 +230,17 @@ pub const REDACTED: &str = "secret:redacted";
 
 /// One JSON object per line, for the same reason the wire format is:
 /// the receiver may be a browser, and a person can still read it.
-fn render(level: Level, site: Site<'_>, message: &str) -> String {
+///
+/// The one place a log line becomes text. A sink that writes to a
+/// terminal calls it; a sink that carries the fields onward does not,
+/// and so cannot disagree with this about what a line holds.
+#[must_use]
+pub fn render(entry: Entry<'_>) -> String {
+    let Entry {
+        level,
+        site,
+        message,
+    } = entry;
     let mut map = serde_json::Map::new();
     map.insert(
         "level".to_owned(),
@@ -256,8 +286,8 @@ mod tests {
         let sink = Arc::clone(&held);
         let log = Diagnostics::new(
             floor,
-            Box::new(move |line: &str| {
-                sink.lock().unwrap().push(line.to_owned());
+            Box::new(move |entry: Entry<'_>| {
+                sink.lock().unwrap().push(render(entry));
             }),
         );
         (log, held)

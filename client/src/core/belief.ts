@@ -13,6 +13,9 @@
 
 import { createStore, produce } from "solid-js/store";
 
+import { readProbed } from "./probed";
+import type { Probed } from "./probed";
+
 import type {
   Address,
   AxError,
@@ -20,6 +23,7 @@ import type {
   Delta,
   EventKind,
   EventRecord,
+  LogLine,
   RunId,
   Seq,
   TimeMs,
@@ -81,11 +85,23 @@ export interface Belief {
   // once and the person to dismiss.
   refusal: AxError | null;
   city: string | null;
-  // The last probe's answer: which endpoint, and the models it named.
-  // Held here rather than read off the history's tail, where a long
-  // city would push it out of the window.
-  probed: { readonly name: string; readonly models: readonly string[] } | null;
+  // The last probe's answer: which endpoint, what it serves, what each
+  // row stated, and where the call stopped. Held here rather than read
+  // off the history's tail, where a long city would push it out of the
+  // window.
+  probed: Probed | null;
+  // The tail of the process log, oldest first. A window rather than an
+  // archive: a log is a diagnostic and not history, so the page keeps
+  // what a person can still act on and drops the rest, which is also
+  // what stops a city at the `wire` floor from filling this tab's
+  // memory.
+  logs: LogLine[];
 }
+
+// How many log lines the page keeps. Wide enough to hold the burst
+// around one thing going wrong, narrow enough that a talkative city
+// never becomes this tab's problem.
+const LOG_WINDOW = 500;
 
 function text(data: Record<string, unknown>, key: string): string | null {
   const held = data[key];
@@ -236,6 +252,7 @@ export function createBelief() {
     refusal: null,
     city: null,
     probed: null,
+    logs: [],
   });
 
   // What a `city_view` answer says about runs this page never saw. A run
@@ -284,11 +301,8 @@ export function createBelief() {
           return;
         }
         if (record.kind === "endpoint_probed") {
-          const name = text(record.data, "name");
-          const models = record.data.models;
-          if (name !== null && Array.isArray(models)) {
-            draft.probed = { name, models: models.filter((m): m is string => typeof m === "string") };
-          }
+          const found = readProbed(record.data);
+          if (found !== null) draft.probed = found;
           return;
         }
         // The nil run marks a record that belongs to the city itself.
@@ -312,6 +326,20 @@ export function createBelief() {
           return;
         }
         held.saying += delta.text;
+      }),
+    );
+  }
+
+  // One line of the process log, appended to the window. The oldest go
+  // first, because what a person is reading a log for is what just
+  // happened.
+  function logged(line: LogLine): void {
+    setBelief(
+      produce((draft) => {
+        draft.logs.push(line);
+        if (draft.logs.length > LOG_WINDOW) {
+          draft.logs.splice(0, draft.logs.length - LOG_WINDOW);
+        }
       }),
     );
   }
@@ -341,7 +369,7 @@ export function createBelief() {
     setBelief("city", city);
   }
 
-  return { belief, adoptCity, apply, say, refused, named };
+  return { belief, adoptCity, apply, say, logged, refused, named };
 }
 
 export type BeliefStore = ReturnType<typeof createBelief>;

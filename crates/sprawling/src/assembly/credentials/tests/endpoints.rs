@@ -46,6 +46,7 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
             secret: None,
             auth_header: None,
             admit: vec!["m-1".to_owned()],
+            tuning: channels::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
@@ -86,6 +87,7 @@ fn an_endpoint_with_neither_a_model_list_nor_a_declared_id_is_refused() {
             secret: None,
             auth_header: None,
             admit: Vec::new(),
+            tuning: channels::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap_err();
@@ -153,6 +155,7 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
             secret: Some("secret:proxy/key".to_owned()),
             auth_header: None,
             admit: Vec::new(),
+            tuning: channels::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
@@ -222,4 +225,92 @@ fn a_store_that_will_not_open_refuses_the_adapter_rather_than_the_first_picture(
         Ok(_) => panic!("the store was opened lazily again: nothing failed here"),
     };
     assert_eq!(err.action(), "read a picture");
+}
+
+/// A probe answers with a reading whether or not a model list came back.
+///
+/// The host here cannot resolve, so the call stops at the first stage.
+/// Before this, the refusal came back as a transport library's sentence
+/// and nothing was written down; now the record says which stage stopped
+/// it, and carries the code beside it.
+#[test]
+fn a_probe_that_reaches_nothing_records_where_it_stopped_rather_than_refusing() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    worker
+        .handle(channels::Command::ProbeEndpoint {
+            name: channels::ProviderName::parse("nowhere").unwrap(),
+            // `.invalid` is reserved and resolves nowhere, on every
+            // machine, which is what makes this reading the same one
+            // twice.
+            base_url: "https://gateway.invalid/v1".to_owned(),
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            tuning: channels::EndpointTuning::default(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"probe"),
+        })
+        .expect("a probe that reaches nothing still answers");
+    let written = ledger_text(&report.ledger_dir);
+    assert!(written.contains("endpoint_probed"), "{written}");
+    assert!(written.contains("gateway.invalid"), "{written}");
+    assert!(
+        written.contains("\"failed\""),
+        "the refusal travels beside the reading: {written}"
+    );
+}
+
+/// What a provider states about its own models reaches the table.
+///
+/// The window, the ceiling, the modalities and the two prices are the
+/// provider's own figures; the city carries them and invents none. The
+/// second row states nothing but an id, and stays that way.
+#[test]
+fn a_probe_carries_the_facts_each_model_row_stated() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["m-small", "m-large"], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    worker
+        .handle(channels::Command::ProbeEndpoint {
+            name: channels::ProviderName::parse("house").unwrap(),
+            base_url,
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            tuning: channels::EndpointTuning::default(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"probe"),
+        })
+        .unwrap();
+    let written = ledger_text(&report.ledger_dir);
+    assert!(written.contains("\"facts\""), "{written}");
+    assert!(written.contains("\"reach\""), "{written}");
+    assert!(
+        !written.contains("\"failed\""),
+        "a list that came back is not a failure: {written}"
+    );
+}
+
+/// Every record this city wrote, as one string. The ledger is the
+/// authority on what a command did, and reading it whole is how a test
+/// asks without a second door into the worker.
+fn ledger_text(ledger_dir: &std::path::Path) -> String {
+    runtime::replay::verify_ledger_dir(ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .collect::<Vec<String>>()
+        .join("\n")
 }

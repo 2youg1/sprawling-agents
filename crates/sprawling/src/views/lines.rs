@@ -35,6 +35,7 @@ pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> channels::Endpoi
         .endpoints()
         .map(|endpoint| channels::EndpointSummary {
             name: endpoint.name.clone(),
+            label: endpoint.label().to_owned(),
             base_url: endpoint.base_url.clone(),
             dialect: endpoint.dialect,
             models: endpoint.models.clone(),

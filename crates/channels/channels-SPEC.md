@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 24 个 variant、Query 恰 24 个（计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`e6d814839ad03bca17dc5f10940c625b55d8d6a73898536e28c26c2b87396d45`；**WIRE_V ＝ 23**（`SelectModel.max_output_tokens` 由 `u64` 变 `Option<Ceiling>`，零在类型上不再可表达；新增 `Reveal`，把一个地址交给人自己的文件管理器）。
+  **当前 golden**：`28af22189f458d801993017a1c63e498380e0e9676c31e092416d58fa8149401`；**WIRE_V ＝ 27**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -136,7 +136,7 @@ pub struct Welcome { pub wire_v: u32, pub schema: B3Hash, pub resume_from: Optio
 
 **三个形状决定及其理由**：
 
-1. **`Command`／`Query` 不标 `#[non_exhaustive]`**。它们的版本机制是 schema 哈希（加一个 variant 即改哈希，旧客户端在握手处被拒），不是通配臂。不标它使装配层必须**穷尽处理 18 条命令**——新增一条而无人处理在编译期即红。这是想要的约束，不是疏漏。
+1. **`Command`／`Query` 不标 `#[non_exhaustive]`**。它们的版城所在的机器制是 schema 哈希（加一个 variant 即改哈希，旧客户端在握手处被拒），不是通配臂。不标它使装配层必须**穷尽处理 18 条命令**——新增一条而无人处理在编译期即红。这是想要的约束，不是疏漏。
 - **`Query::History` 有界且向后翻页**：服务端只广播「接下来发生什么」，于是今天打开的页面把一座运行了一个月的城看成空城。答复恒**旧在前**——那是账本写它们的顺序，也是折叠期待的顺序；要新在前的读者自己倒一下手上的表，而服务端倒序会把折叠变成调用方的问题。上限 `HISTORY_MAX = 500` 由服务端钳，客户端要不到更多：一个调用方钳不动的上限，少一条让服务端做无界工作的路。`Answer` 因此失去 `Eq`（`EventRecord` 的载荷是任意 JSON，JSON 没有全序相等），crate 外无人比较过两个 `Answer`。
 - **`/enroll` 答的是凭据的下场，不是请求的下场**：先前命令一进桌就回 201，于是 vault 拒收谁也不知道，人盯着一条成功消息而密钥根本没存。现在路由**先订阅事件流再投递命令**（顺序是承载的：先投递会让完成得快的 worker 把那一行写进没人在读的流里），然后等三选一——`secret_captured` 且 `ref` 相符即 **201**，`Reply` 回来的拒绝即 **422**，两者都没有即 **202 并在正文里说明为什么是 202**。`SecretSink` 因此长出 `Reply` 参数：worker 在另一条线程上几分钟后拒绝，没有地址的拒绝到不了任何人。
 - **回复通道关闭不等于成功**：worker 成功时不调用 `reply.refuse`，`Reply` 随之析构，于是 `recv()` 立即返回 `None`。若把它读成一个答案，它会与 `secret_captured` 赛跑并经常赢——所以关闭只熄灭那条分支，201 仍然只由事件给出。
@@ -508,6 +508,8 @@ pub struct Delta { pub run: RunId, pub text: String }
 | `SelectModel` | client | 选一个模型 |
 | `Fork` | client | 从一条线上分出第二条 |
 | `Reveal` | client | 在人自己的文件管理器里指出一个地址 |
+| `DoctorInstall` | client | 按需求表里的名字装一件机器缺的东西 |
+| `DoctorRefresh` | client | 重新探一遍机器，取代开城时的快照 |
 | `CreateBuilding` | client | 起一栋楼 |
 | `Steer` | client | 中途换方向 |
 | `Cancel` | client | 停下这一个 |
@@ -729,6 +731,45 @@ pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
 
 **按测试真正需要的东西设门，而不是把 feature 打开**：`tests/enrolment.rs` 首行 `#![cfg(feature = "server")]`（整份文件都是路由的事）；`tests/wire_contract.rs` 只给那三条断言与它们的两个辅助函数、以及 `Hello`／`Welcome`／`AxCode`／`SocketAddr` 这几个只被它们用到的名字加 `#[cfg(feature = "server")]`——命令表、查询表、schema 哈希与那两个不可拼写的形状**在两份构建里都被判**，因为它们在两份构建里都成立。
 
+### 8-29 一个端点带着人给它定的规矩上线（WIRE_V 24→25）
+
+```rust
+pub struct EndpointTuning {
+    pub label: Option<String>,               // 显示名，缺省即 id
+    pub timeout_ms: Option<u64>,             // 一次已结请求的期限
+    pub request_max_retries: Option<u32>,    // 值得再问一次的失败再问几次
+    pub stream_idle_timeout_ms: Option<u64>, // 一次流式请求的期限（命名同 Codex）
+    pub headers: Vec<HeaderPair>,            // { name, value }，value 可为 `secret:` 引用
+    pub overrides: Vec<BodyOverride>,        // { pointer, value }，JSON pointer → 值的文本
+}
+
+ProbeEndpoint  { name, base_url, dialect, secret, auth_header, tuning: EndpointTuning, idem }
+AttachEndpoint { name, base_url, dialect, secret, auth_header, admit, tuning: EndpointTuning, idem }
+EndpointSummary { name, label, base_url, dialect, models, local, has_credential }
+```
+
+- **一个值而不是六个字段**。它们在同一张表单上被填，被同一次调用一起读；分开传就给了 probe 与它之后的 attach 三次机会对「我们在跟什么说话」产生分歧——`Entered` 当初收成一个值正是这个理由。
+- **probe 也带 tuning**。一个需要自定义请求头的网关，在 probe 不带那个头时答 401；人于是读到「密钥无效」，而那把密钥是好的。probe 与 call 因此按同一套头、同一个期限发出。
+- **覆盖的值走文本，不走 `serde_json::Value`**。`Command` 派生 `Eq`，而 JSON 没有全序相等；更要紧的是 `/temperature` → `0.2` 一旦成为值就是一个浮点，而它随 `endpoint_attached` 进账本——这座城把浮点挡在账本之外。文本原样往返，「这段文本作为 JSON 是什么」只有一个权威：`gateway::EndpointTuning::applied_overrides`，规则是「解析得出就是那个 JSON，解析不出就是它看上去的那个字符串」，于是 `/reasoning/effort` → `high` 不必要求人自己加引号。**败给的方案**：帧上直接放 `Value`——那要求 `Command` 放弃 `Eq`，并把浮点写进账本。
+- **零即缺省**。清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成；装配层把零读成「没说」（`bin::assembly::credentials::tuning_of`），于是清空一个框等于回到城自己的值，而不是让此后每一次调用立刻失败。
+- **`stream_idle_timeout_ms` 在线上保留 Codex 的名字，在 gateway 里叫 `stream_deadline_ms`**：阻塞传输交回的是一个没有分块钩子的 body reader，城因此能限定一次应答总共多久，限定不了其中某一次沉默多久。线上用人在自己 `config.toml` 里写熟的那个词，gateway 用它真正做到的那件事命名，装配层是唯一的翻译点。**败给的方案**：在 gateway 里也叫 idle——那会让一个读代码的人以为分块之间有计时器。
+- **`EndpointSummary` 长出 `label`**：缺省即 `name`，所以页面永远不必替一个没写显示名的端点决定显示什么。
+
+### 8-28 `endpoint_probed` 答的是一次读数，不是一次成败
+
+```jsonc
+{ "name": …, "base_url": …,
+  "reach": { "host": …, "named": …, "connected": …, "answered": …, "through": …, "elapsed_ms": … },
+  "models": ["id", …],
+  "facts":  [{ "id", "context_tokens"?, "max_output_tokens"?, "input_modalities", "input_price"?, "output_price"? }, …],
+  "failed": { "code": …, "subject": … }   // 仅当模型表读不出来
+}
+```
+
+- **读不出模型表的 probe 照样作答**。名字解析不了、端口没人应、证书不受信、供应方答 401，对填表的人是四个不同的下一步；作为一次拒绝返回，它们在界面上塌成传输库的一句话。记录带上停在哪一段（`kernel::Reach`，由 `gateway::reach` 量出），再把拒绝自己的 code 与 subject 放在旁边。
+- **`models` 与 `facts` 同时在**。只要 id 的客户端不必读 facts；要显示上下文窗口与输出上限的表格不必第二次发问。读不出来时两者都是空数组而 `failed` 在场，于是「表是空的」与「表读不出来」在形状上可分。
+- **没有被应答说出来的数字，记录里也没有**。`/models` 的一行里有什么由供应方决定；城不替它补零、补默认、补猜测——补出来的数字会盖过真正计费的那个。
+
 ### 8-27 说出来的那句话：`/transcribe` 与 `ModelTag::Transcribe`（WIRE_V 20→21）
 
 ```rust
@@ -837,3 +878,124 @@ pub struct DocumentAnswer { pub at: Address, pub text: String, pub bytes: u64,
 - **`Listing`／`Document`**：这座城是一棵目录树，而目录树本身就是产品（glossary：「那个层级就是目录树——不是它的模型，是树本身」）；`building_view` 只回楼根的 `.md` 与房间名，房间里的 `URBANITE.md`／`JOB.md`／`Handoff.md`／`<run>.jsonl` 页面看不到，于是这个设计在界面上是不可见的。两条查询让页面能走完整棵树。**路径经 `Address` 文法把关**（非绝对、无 `..`、无 `\`、无 `:`），所以走不出城根；`.sprawling/` **允许读**——它正是要展示的那部分，且这条线只答回环（或持配对 token 的）人，与工具层对居民的拒绝不是一个门。`Document` 上限 64 KiB 与 `BuildingDoc` 同（`DOC_BYTES_MAX`），截断必说；头 8 KiB 里出现 NUL 字节判 `binary`，`text` 留空——把 redb 或 CAS 的字节当文本喷到页面上是撒谎。文件不存在答 `Unavailable { query: "Document(<at>)" }`，与 `BuildingView`（没人立过的楼）、`Changes`（本城没写过的 oid）同口径：「我读不了」是一个真答案，与空文件不同。
 - **`WIRE_V` 16→17，一次进位管四件事**：四件事同一提交同一哈希。
 - **被否**：（a）让客户端自己折 `history` 找 `run_started`——那是旧客户端的做法，也是这四处空白存在的原因；（b）`Document` 直接回任意大小——同 §8-20／§8-21 拒绝整批的理由；（c）`Listing` 排除 `.sprawling/`——排除了要展示的东西。
+
+### 8-34 一台工具服务器带着 `claude mcp add` 允许写的东西上线，`McpHealth` 答它站在哪（WIRE_V 26→27）
+
+`McpTransport` 先前只拼得出「命令＋参数」与「地址＋至多一个 header」，于是 MCP 页上环境变量表、多行请求头、`sse` 三样控件各挂一句「线上没有这个字段」。三支取值补齐，且**关掉 `#[non_exhaustive]`**：本枚举的读者全在这一个二进制里，通配臂什么也换不来，却会把下一种 transport 从必须表态的三个模块面前藏起来。
+
+```rust
+pub enum McpTransport {
+    Stdio { command: String, args: Vec<String>, env: Vec<(String, String)> },
+    Http  { url: String, headers: Vec<(String, String)> },
+    Sse   { url: String, headers: Vec<(String, String)> },
+}
+
+// Query 第 29 条（声明序，QUERY_NAMES 同序追加）
+McpHealth { addr: Address },              // → Answer::McpHealth(Box<McpHealthAnswer>)
+
+pub struct McpHealthAnswer { pub addr: Address, pub servers: Vec<McpServerHealth> }
+pub struct McpServerHealth { pub label: ServerLabel, pub transport: String,
+                             pub target: String, pub state: McpState }
+pub enum McpState {
+    Connected { protocol_version: String, server: String, tools: Vec<McpToolLine> },
+    Authenticating { recovery: String },
+    Failed { refusal: Box<AxError> },
+}
+pub struct McpToolLine { pub remote: String, pub name: String,
+                         pub disclosure: String, pub input_schema: Payload }
+```
+
+**五条口径：**
+
+1. **名与值成对而不是一行 `"Name: value"`**。旧写法把「怎么切这一行」留给了读者，而一个值里合法地含冒号；成对之后拆分这件事不存在，写的人与读的人也不必约定同一条切法。值可以是 `secret:realm/name` 引用，兑付点在离线最近的那一格（sprawling-SPEC §8-4／§8-15）。
+2. **`Sse` 是自己的一支而不是 `Http` 的一个开关**。两者开法不同、败法也不同：http 服务器拒绝一次请求，而流式服务器可以接下每一次请求却一次也不答。
+3. **三种状态穷尽，而不是一个标志加一句可选的理由**。「在答」「要登录」「失败了，原因在此」是人接下来要做的三件不同的事；理由可选的形状会让一次失败不带理由地上线。`Authenticating` 的判断只有一个来源——传输层对 401／403 抬的 `E_CREDENTIAL_MISSING`，故这里没有什么要猜。
+4. **失败携整条三段式拒绝**，界面逐字画出：措辞的权威在城里，页面再写一遍就是第二个权威。
+5. **这是唯一一条按秒计的读**，每台服务器一次 `initialize` ＋ `tools/list`，且用的就是 Run 起点那一次握手（`protocol::mcp`）。它恒不由记录触发、也不上定时器——人打开 MCP 页或加完一台服务器时问一次。**被否**：把握手结果写进账本再折出来——一台服务器此刻通不通是关于此刻的事实，记下来的那一份会在它停掉一小时后仍说它在。
+
+### 8-32 第三类之外的第三类：`ServerFrame::Log`（WIRE_V 的一笔）
+
+**日志不是历史，而「不是历史」不等于「不给人看」。** `docs/logging.md` 把账本与日志分得很干净：账本答「发生了什么」、权威、进重放；日志答「当时在想什么」、不权威、随时可丢。记录页的第四个透镜先前是一个空态，理由写在页面上——没有任何帧携得动一行日志。
+
+于是 `ServerFrame` 多一个取值，形状口径与 `Delta`（§8-8）逐条相同：
+
+```rust
+pub enum ServerFrame { Welcome(..), Event(..), Answer(..), Refusal(..), Delta(..), Log(LogLine) }
+pub enum LogLevel { Refuse, Effect, Decide, Trace, Wire }   // 五个名字取自 docs/logging.md，不另起
+pub struct LogLine {
+    pub seq: Seq,             // 写这行时账本站在哪；不是本流自己的序号
+    pub t: Option<TimeMs>,    // 机器写它的时刻；读不到钟即缺席
+    pub level: LogLevel,
+    pub module: String,
+    pub run: Option<RunId>,   // 城自己说话时缺席
+    pub line: String,
+}
+```
+
+**四条口径：**
+
+1. **`seq` 不是序号而是锚**。两行可以共用一个 `seq`，客户端据此把日志摆到账本旁边，而不是据此发现自己漏了一条。漏一条日志什么也没丢——这正是它可以有自己一类帧的理由，与增量同源。
+2. **第三条广播通道**。丢弃语义与事件相反、与增量相同：`wire` 层底的一座城写得比人读得快，共用事件通道会把历史挤出慢读者的窗口。`RecvError::Lagged` 一言不发地略过。
+3. **`t` 可缺席而行不可丢**。采样在装配层（`docs/logging.md` §8 认可的唯一处），而写日志的库不许有第二个时间源。钟读不出来时，锚仍是 `seq`，为了一个时间戳丢掉整条诊断是把代价付错了地方。
+4. **五个等级的名字只有一个权威**。本 crate 依赖图上够不到 `runtime`，所以 `LogLevel` 是第二处拼写而不是第二处**权威**：两者的映射住在装配层（`sprawling::serving::journal`），一条测试把五个 serde 名与 `Level::as_str()` 逐个钉成相等。**被否**：把 `Level` 上移进 `kernel`——那会让 `docs/logging.md` 说的「`runtime::diagnostics` 实现本文」不再成立，为一个枚举搬走一条设计权威。
+
+### 8-33 `DoctorInstall` 与 `DoctorRefresh`：机器上的两个动词（WIRE_V 的同一笔）
+
+`Query::Doctor` 答的是开城那一刻的快照（§8-25），于是机器页只能复制一行命令去终端跑，跑完还得重启城才看得见结果。两条命令补上这段：
+
+```rust
+Command::DoctorInstall { item: String, idem: IdemKey }   // 按需求表里的名字装一件
+Command::DoctorRefresh { idem: IdemKey }                 // 重新探一遍，取代启动快照
+```
+
+- **只跑 `Recipe::Command`**。`Print` 与 `Manual` 各自带着「人自己去做什么」被拒——管道进 shell 的脚本是没人读过的代码，这条纪律不因为请求来自页面而不是终端就松一格。执行走的是终端那条 `Machine::install`，不是第二个安装器。
+- **进度就是日志行**。安装是本城起的一个进程并等它，值得报告的两件事——将要跑什么、怎么结束的——正好是一行日志的形状。第二条进度通道会是同一件事的第二个权威。
+- **`DoctorInstall` 装完自己再探一遍**，而不是让页面记得补一帧：装完仍答启动快照的城，会告诉人他刚装的东西还是没有。
+- **两者都不入账本**。机器有什么不是这座城里发生的事：它在本进程之外被改变，写进历史就是写进一份会错的历史。答案沿 `RunWorker::examine` 交给服务层的 views，与开城那一次的写法同一条。
+- **为什么不是 `Query::Doctor { fresh: true }`**：读要拿着 views 的锁答，而探测是十几个进程各被起一次的几秒钟；那会让一次读把其他每一次读都堵住。命令在写线程上跑，那里本来就是本城把工作排成一列的地方。
+
+### 8-35 四条读：一个 agent 被告知了什么、一栋楼会做什么、它那里还有什么没提交（WIRE_V 23→24）
+
+先前线上没有任何一帧答得出「这个 agent 收到的 system prompt 是什么」。`prompt_assembled` 只记四段的哈希与来源注记，而其中两段根本没有落进内容仓库，于是哈希指向不存在的字节——一个人拿着哈希也读不回原文。技能同理：`Query::RegistryView` 的书里没有 skill，楼页没有一栏画得出「这栋楼会做什么」。工作树同理：`Query::Changes` 比的是两个检查点，而没有一帧答得出分支名、与上游的距离、以及此刻哪些文件还没进检查点。
+
+```rust
+// Query 第 25–28 条（声明序，QUERY_NAMES 同序追加）
+Prefix    { run: RunId },           // → Answer::Prefix(Box<PrefixAnswer>)
+Content   { locator: Locator },     // → Answer::Content(Box<ContentAnswer>)
+Skills    { building: Address },    // → Answer::Skills(Box<SkillsAnswer>)
+GitStatus { building: Address },    // → Answer::GitStatus(Box<GitStatusAnswer>)
+
+pub enum PrefixSlot { City, Building, Resident, Run }
+pub struct PrefixSource  { pub addr: Address, pub kept: u64, pub dropped: u64 }
+pub struct PrefixSegment { pub slot: PrefixSlot, pub hash: B3Hash, pub bytes: u64,
+                           pub text: String, pub stored: bool,
+                           pub sources: Vec<PrefixSource> }
+pub struct PrefixAnswer  { pub run: RunId, pub segments: Vec<PrefixSegment> }
+pub struct ContentAnswer { pub locator: Locator, pub text: String, pub bytes: u64,
+                           pub truncated: bool, pub binary: bool }
+
+pub enum SkillShelf { Library, Building }
+pub struct SkillLine  { pub name: String, pub section: String, pub shelf: SkillShelf,
+                        pub at: Address, pub disclosure: String, pub hash: B3Hash,
+                        pub admitted: bool, pub pinned_by: Vec<RunId> }
+pub struct SkillsAnswer { pub building: Address, pub skills: Vec<SkillLine>,
+                          pub missing: Vec<String> }
+
+pub struct Drift { pub ahead: u64, pub behind: u64 }
+pub struct GitStatusAnswer { pub building: Address, pub branch: Option<String>,
+                             pub drift: Option<Drift>, pub files: Vec<FileChange>,
+                             pub checkpoint: Option<CommitAnswer> }
+```
+
+**六条口径：**
+
+1. **`stored` 与空文本是两件事。** 仓库被清理过与这一段本来就没有内容，读者下一步做的事不同；用空串同时表示两者，会让一次数据丢失看起来像一次正常的装配。
+2. **`Content` 只答 `cas:` 一种方案。** `file:` 指的是树上的一条路径，那是 `Query::Document` 的问题；在这里再答一次就是同一条规则的第二个权威。**被否**：让 `Content` 按方案分流兼收两种——它会把「读一个对象」和「读一个文件」的失败面合成一个，而两者恢复动作不同。
+3. **`PrefixSource.dropped` 恒上线，即使是零。** 「一个字节都没裁」是一次测量，缺省的字段不是。
+4. **技能一行而两个书架**，`shelf` 说它来自哪一格：两张表会让「近的架子压过远的架子」这条既有规则在客户端被重写一遍。`pinned_by` 按**名字加哈希**成对匹配——两次 run 之间被编辑过的 skill 是同一个名字下的两份文档，只按名字匹配会宣称早先那次 run 读到了后来才写的字。
+5. **`Drift` 整个可缺席，而不是两个零。** 没有上游的分支与和上游齐平的分支不是一回事，读成 `0/0` 的页面会告诉人「你的工作已经推上去了」。
+6. **`GitStatusAnswer.checkpoint` 携整条 `CommitAnswer`。** 变更栏旁边那一行要说出 run、房间、模型与花费，而这四样已经有了唯一形状；另造一个摘要类型就是第二个「一次提交是什么」。
+
+**`CommitAnswer` 随本线长出 `spent: UsdMicros`**：一行提交上先前画得出 run、房间与模型，独独没有钱，于是「这次改动花了多少」必须另开一页去查。携的是**那次 run 的总额**而不是这条提交的份额——栅栏不被计价，把一次 run 的钱按栅栏分摊会得到一个没有人测量过的数字。
+
+**被否**：把 skill 与工作树的状态折进 `BuildingView`。楼页的那一帧是在每一次记录之后都会失效的读，而扫书架要走盘、读工作树要开仓库；合成一帧会让这两件慢事按城里的心跳重复发生，而它们各自只在有人打开那一栏时才需要一次。

@@ -30,7 +30,9 @@ import {
   probeEndpoint,
   selectModel,
 } from "../../core/commands";
-import type { Endpoint, WireApi } from "../../core/commands";
+import type { Endpoint, Pair, Tuning, WireApi } from "../../core/commands";
+import { stoppedAt } from "../../core/probed";
+import type { Probed } from "../../core/probed";
 import { enrol, keyField, referenceFor, secretFor } from "../../core/enrol";
 import type { Enrolment, StoredKey } from "../../core/enrol";
 import type { Key } from "../../core/lang";
@@ -42,13 +44,6 @@ import type { ModelRow } from "./models";
 // What a provider id may be spelled with, which is what a TOML table key
 // and a secret reference can both carry unquoted.
 const ID_SHAPE = /^[a-z0-9][a-z0-9-]*$/;
-
-// One row of either key-value table: a header the request carries, or a
-// JSON pointer into the body it sends.
-interface Pair {
-  name: string;
-  value: string;
-}
 
 // Everything the form holds. A store rather than a dozen signals: these
 // values are read together by three previews and two commands, and a
@@ -62,7 +57,6 @@ interface Draft {
   key: string;
   timeoutMs: string;
   requestRetries: string;
-  streamRetries: string;
   streamIdleMs: string;
   headers: Pair[];
   overrides: Pair[];
@@ -76,7 +70,6 @@ const FRESH: Draft = {
   key: "",
   timeoutMs: "60000",
   requestRetries: "4",
-  streamRetries: "4",
   streamIdleMs: "300000",
   headers: [],
   overrides: [],
@@ -101,8 +94,10 @@ function isRecord(held: unknown): held is Record<string, unknown> {
 }
 
 // What a person typed into an override's value box, read as the JSON
-// value it spells. Numbers, the two booleans and null are read as
-// themselves; everything else is the string it looks like, which is what
+// value it spells, for the preview alone. **The city is the authority**:
+// the frame carries the text, and `gateway::EndpointTuning` reads it by
+// the same rule - numbers, the two booleans and null as themselves,
+// everything else as the string it looks like, which is what
 // `/reasoning/effort` wants.
 function jsonValue(text: string): unknown {
   const trimmed = text.trim();
@@ -136,6 +131,13 @@ function pointerPath(pointer: string): readonly string[] {
     .filter((segment) => segment !== "");
 }
 
+// A box of digits, or nothing. An empty box and a box holding letters
+// both mean "the city's own", which is what absence is on the wire.
+function figureIn(text: string): number | null {
+  const trimmed = text.trim();
+  return /^[0-9]+$/.test(trimmed) ? Number.parseInt(trimmed, 10) : null;
+}
+
 function pairs(rows: readonly Pair[]): readonly Pair[] {
   return rows.filter((row) => row.name.trim() !== "");
 }
@@ -150,7 +152,6 @@ function configToml(draft: Draft, reference: string): string {
     `wire_api = ${JSON.stringify(draft.wireApi)}`,
     `env_key = ${JSON.stringify(reference)}`,
     `request_max_retries = ${draft.requestRetries.trim()}`,
-    `stream_max_retries = ${draft.streamRetries.trim()}`,
     `stream_idle_timeout_ms = ${draft.streamIdleMs.trim()}`,
     `timeout_ms = ${draft.timeoutMs.trim()}`,
   ];
@@ -213,7 +214,10 @@ function hostOf(baseUrl: string): string | null {
   return match?.[1] ?? null;
 }
 
-function Reachability(props: { readonly error: AxError; readonly host: string }) {
+// A refusal the city sent back, which is what an attachment that failed
+// produces. A probe answers with a reading instead, and that is the
+// other component below.
+function Refusal(props: { readonly error: AxError; readonly host: string }) {
   const say = useSay();
   return (
     <div role="alert" class="rounded-card border border-alert/50 bg-g1 px-base py-snug text-note">
@@ -234,6 +238,73 @@ function Reachability(props: { readonly error: AxError; readonly host: string })
         </button>
       </div>
     </div>
+  );
+}
+
+// Where the call stopped, stage by stage, as the city measured it.
+//
+// Four stages, each with the word the city wrote for it, and above them
+// the one sentence a person can act on. The stages are shown even when
+// the call went through: a 401 from a host that resolved and answered in
+// 90 ms is a key, and somebody sent to look at a proxy instead has been
+// sent the wrong way.
+function Reachability(props: { readonly probed: Probed }) {
+  const say = useSay();
+  const reach = () => props.probed.reach;
+  const failed = () => props.probed.failure;
+  return (
+    <Show when={reach()}>
+      {(found) => (
+        <div
+          role="status"
+          class={`rounded-card border bg-g1 px-base py-snug text-note ${failed() === null ? "border-g3" : "border-alert/50"}`}
+        >
+          <p class={`font-label ${failed() === null ? "text-text" : "text-alert"}`}>
+            {say("setup_probe_read", { host: found().host })}
+          </p>
+          <p class="mt-tight text-text-quiet">{say(stoppedAt(found()))}</p>
+          <dl class="mt-snug grid grid-cols-2 gap-x-base gap-y-tight text-text-faint">
+            <For
+              each={[
+                ["setup_reach_dns", found().named],
+                ["setup_reach_tcp", found().connected],
+                ["setup_reach_http", found().answered],
+                ["setup_reach_proxy", found().through],
+              ] as const}
+            >
+              {([label, stage]) => (
+                <>
+                  <dt>{say(label)}</dt>
+                  {/* wording-ok: the word the city itself wrote for this stage */}
+                  <dd class="truncate font-mono" title={stage.detail ?? stage.state}>
+                    {stage.figure === null ? stage.state : `${stage.state} ${String(stage.figure)}`}
+                  </dd>
+                </>
+              )}
+            </For>
+          </dl>
+          <div class="mt-snug flex items-center gap-snug text-text-faint">
+            <span>{say("setup_reach_elapsed", { ms: String(found().elapsedMs) })}</span>
+            <Show when={failed()}>
+              {(why) => (
+                <>
+                  <span class="font-mono">{why().code}</span>
+                  <button
+                    type="button"
+                    class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(`${why().code} ${why().subject}`);
+                    }}
+                  >
+                    {say("setup_copy_details")}
+                  </button>
+                </>
+              )}
+            </Show>
+          </div>
+        </div>
+      )}
+    </Show>
   );
 }
 
@@ -328,11 +399,14 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
   const id = () => draft.id.trim();
   const field = () => keyField(held(), id());
   const reference = () => secretFor(held(), id()) ?? referenceOf(id());
-  const answered = () => {
-    const probed = ui.conn.belief.probed;
-    return probed !== null && probed.name === id() ? probed.models : null;
-  };
-  const models = createMemo(() => answered() ?? []);
+  // The probe's answer for the endpoint this form is about. A probe now
+  // answers with a reading whether or not it could read a model list, so
+  // this is also where the reachability report comes from.
+  const answered = createMemo<Probed | null>(() => {
+    const held = ui.conn.belief.probed;
+    return held !== null && held.name === id() ? held : null;
+  });
+  const facts = createMemo(() => answered()?.facts ?? []);
   const dialect = (): DialectKind | null => dialectOf(draft.wireApi);
   const complete = () => ID_SHAPE.test(id()) && hostOf(draft.baseUrl) !== null && dialect() !== null;
 
@@ -360,11 +434,30 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
     setNote(null);
   };
 
+  // What the advanced section settled, as the two commands carry it. A
+  // box holding anything but digits is a box nobody filled in, which is
+  // what absent means on the wire.
+  const tuning = (): Tuning => ({
+    label: draft.label,
+    timeoutMs: figureIn(draft.timeoutMs),
+    requestMaxRetries: figureIn(draft.requestRetries),
+    streamIdleTimeoutMs: figureIn(draft.streamIdleMs),
+    headers: draft.headers,
+    overrides: draft.overrides,
+  });
+
   const endpoint = (secret: string | null): Endpoint | null => {
     const speaks = dialect();
     return speaks === null
       ? null
-      : { id: id(), baseUrl: draft.baseUrl.trim(), dialect: speaks, secret, authHeader: null };
+      : {
+          id: id(),
+          baseUrl: draft.baseUrl.trim(),
+          dialect: speaks,
+          secret,
+          authHeader: null,
+          tuning: tuning(),
+        };
   };
 
   // The key is enrolled on the action that needs it, under the id the
@@ -419,7 +512,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
           value={draft.label}
           onInput={(event) => { edit("label", event.currentTarget.value); }}
         />
-        <span class="text-text-faint">{say("setup_not_carried")}</span>
+        <span class="text-text-faint">{say("setup_display_name_help")}</span>
       </label>
       <label class="flex flex-col gap-tight text-note text-text-quiet">
         {say("setup_base_url")}
@@ -510,11 +603,6 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
                 onInput={(value) => { setDraft("requestRetries", value); }}
               />
               <Figure
-                label={say("setup_stream_retries")}
-                value={draft.streamRetries}
-                onInput={(value) => { setDraft("streamRetries", value); }}
-              />
-              <Figure
                 label={say("setup_stream_idle")}
                 value={draft.streamIdleMs}
                 onInput={(value) => { setDraft("streamIdleMs", value); }}
@@ -534,15 +622,15 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
               rows={draft.overrides}
               onChange={(next) => { setDraft("overrides", [...next]); }}
             />
-            <p class="text-note text-text-faint">{say("setup_advanced_inert")}</p>
           </div>
         </Show>
       </div>
 
       <Show when={note()}>{(text) => <p class="text-note text-alert">{text()}</p>}</Show>
       <Show when={report()}>
-        {(error) => <Reachability error={error()} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />}
+        {(error) => <Refusal error={error()} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />}
       </Show>
+      <Show when={answered()}>{(found) => <Reachability probed={found()} />}</Show>
       <Show when={looking()}>
         <p class="text-note text-text-quiet">{say("setup_probe_busy", { host: hostOf(draft.baseUrl) ?? "" })}</p>
       </Show>
@@ -588,7 +676,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
         </button>
       </div>
 
-      <ModelTable served={models()} onChosen={setRows} />
+      <ModelTable served={facts()} onChosen={setRows} />
 
       <details class="rounded-card bg-g1 px-base py-snug text-note">
         <summary class="cursor-pointer text-text-quiet">{say("setup_preview_toml")}</summary>
@@ -599,7 +687,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
       <details class="rounded-card bg-g1 px-base py-snug text-note">
         <summary class="cursor-pointer text-text-quiet">{say("setup_preview_request")}</summary>
         <pre class="mt-snug overflow-auto whitespace-pre-wrap font-mono text-text-faint">
-          {requestPreview(draft, reference(), rows()[0]?.id ?? models()[0] ?? "<model>")}
+          {requestPreview(draft, reference(), rows()[0]?.id ?? facts()[0]?.id ?? "<model>")}
         </pre>
       </details>
     </form>

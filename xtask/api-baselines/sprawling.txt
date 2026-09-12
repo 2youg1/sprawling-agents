@@ -1,8 +1,10 @@
+impl core::default::Default for sprawling::serving::Journal
 impl sprawling::assembly::RunWorker
 impl sprawling::assembly::RunWorker
 impl sprawling::assembly::RunWorker
 impl sprawling::assembly::RunWorker
 impl sprawling::assembly::ScanReport
+impl sprawling::serving::Journal
 impl sprawling::serving::Keyed
 pub async fn sprawling::serving::serve(sprawling::serving::Serving) -> core::result::Result<(), kernel::error::shape::AxError>
 pub enum sprawling::assembly::Adopt
@@ -24,6 +26,9 @@ pub fn sprawling::firstrun::default_city(&std::path::Path, core::option::Option<
 pub fn sprawling::firstrun::is_writable(&std::path::Path) -> bool
 pub fn sprawling::firstrun::local_url(core::net::socket_addr::SocketAddr) -> alloc::string::String
 pub fn sprawling::firstrun::open_when_ready(core::net::socket_addr::SocketAddr, alloc::string::String)
+pub fn sprawling::serving::Journal::default() -> sprawling::serving::Journal
+pub fn sprawling::serving::Journal::new() -> sprawling::serving::Journal
+pub fn sprawling::serving::Journal::sink(&self) -> runtime::diagnostics::Sink
 pub fn sprawling::serving::Keyed::code(&self) -> core::option::Option<&str>
 pub fn sprawling::serving::key_for(core::net::socket_addr::SocketAddr, core::option::Option<alloc::string::String>) -> core::result::Result<sprawling::serving::Keyed, kernel::error::shape::AxError>
 pub fn sprawling::serving::open_vault() -> (gateway::credential::custodian::Custodian, core::option::Option<kernel::event::payload::Payload>)
@@ -55,6 +60,7 @@ pub sprawling::serving::Serving::addr: core::net::socket_addr::SocketAddr
 pub sprawling::serving::Serving::city_root: std::path::PathBuf
 pub sprawling::serving::Serving::client: channels::assets::ClientAssets
 pub sprawling::serving::Serving::console: core::option::Option<sprawling::console::Terminal>
+pub sprawling::serving::Serving::journal: sprawling::serving::Journal
 pub sprawling::serving::Serving::log: runtime::diagnostics::Diagnostics
 pub sprawling::serving::Serving::token: core::option::Option<alloc::string::String>
 pub sprawling::serving::Serving::vault: gateway::credential::custodian::Custodian
@@ -63,4 +69,5 @@ pub struct sprawling::assembly::InitReport
 pub struct sprawling::assembly::RunWorker
 pub struct sprawling::assembly::ScanReport
 pub struct sprawling::console::Terminal
+pub struct sprawling::serving::Journal
 pub struct sprawling::serving::Serving

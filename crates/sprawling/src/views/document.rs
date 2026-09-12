@@ -31,14 +31,26 @@ impl Views {
     }
 }
 
-/// The wire shape of one file's bytes. Pure, so the judgement is tested
-/// without a disk.
-pub(super) fn read_document(at: Address, bytes: &[u8]) -> channels::DocumentAnswer {
+/// Bytes as a reader may be given them: cut to what travels, with the
+/// cut and the text judgement stated.
+///
+/// Pure, so the judgement is tested without a disk, and shared with
+/// `views::prefix`, which reads bytes out of the store rather than off
+/// the tree - what makes bytes readable does not depend on where they
+/// were kept, and two judgements would disagree about one file that
+/// happens to be in both places.
+pub(super) struct Reading {
+    pub(super) text: String,
+    pub(super) bytes: u64,
+    pub(super) truncated: bool,
+    pub(super) binary: bool,
+}
+
+pub(super) fn read_bytes(bytes: &[u8]) -> Reading {
     let sniffed = bytes.get(..bytes.len().min(SNIFF_BYTES)).unwrap_or(bytes);
     let binary = sniffed.contains(&0);
     let head = bytes.get(..bytes.len().min(DOC_BYTES_MAX)).unwrap_or(bytes);
-    channels::DocumentAnswer {
-        at,
+    Reading {
         text: if binary {
             String::new()
         } else {
@@ -47,6 +59,18 @@ pub(super) fn read_document(at: Address, bytes: &[u8]) -> channels::DocumentAnsw
         bytes: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
         truncated: !binary && bytes.len() > DOC_BYTES_MAX,
         binary,
+    }
+}
+
+/// The wire shape of one file's bytes.
+pub(super) fn read_document(at: Address, bytes: &[u8]) -> channels::DocumentAnswer {
+    let read = read_bytes(bytes);
+    channels::DocumentAnswer {
+        at,
+        text: read.text,
+        bytes: read.bytes,
+        truncated: read.truncated,
+        binary: read.binary,
     }
 }
 

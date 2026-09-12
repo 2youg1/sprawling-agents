@@ -30,6 +30,7 @@
 pub(super) mod attending;
 pub(crate) mod desk;
 pub(super) mod door;
+pub(crate) mod journal;
 pub(crate) mod pool;
 pub(crate) mod relay;
 pub(super) mod serve;
@@ -40,5 +41,6 @@ pub(super) mod worker;
 pub(crate) use desk::{CommandDesk, Posted};
 pub(crate) use door::random_token;
 pub use door::{Keyed, key_for, open_vault};
+pub use journal::Journal;
 pub use serve::Serving;
 pub use worker::serve;

@@ -13,6 +13,7 @@ use memory::JsonlLedger;
 
 use crate::serving::open_vault;
 
+use super::freezing::Assembled;
 use super::{RunWorker, ScanReport, autonomy_name, ledger_dir, now_ms};
 
 /// The city segment of every prefix, and a file the person is meant to
@@ -221,11 +222,16 @@ pub(crate) fn city_address(city_root: &Path) -> Option<Address> {
 /// # Errors
 /// `E_STORAGE_FATAL` naming the path, for every failure except a file
 /// that is not there.
-pub(super) fn city_segment(city_root: &Path) -> Result<Vec<u8>, AxError> {
+pub(super) fn city_segment(city_root: &Path) -> Result<Assembled, AxError> {
     let path = city_root.join(city::CITY_FILE);
     match std::fs::read(&path) {
-        Ok(bytes) => Ok(bytes),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(CITY_MD.as_bytes().to_vec()),
+        Ok(bytes) => Ok(Assembled::of_one(Address::parse(city::CITY_FILE)?, bytes)),
+        // The built-in copy names no document: no file on this disk
+        // holds it, and a source row pointing at one that is not there
+        // would send a reader to open nothing.
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            Ok(Assembled::of_nothing(CITY_MD.as_bytes().to_vec()))
+        }
         Err(err) => Err(AxError::failure(
             AxCode::StorageFatal,
             "read the city's norms",

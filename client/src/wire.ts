@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 23 as const;
+export const WIRE_V = 27 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "e6d814839ad03bca17dc5f10940c625b55d8d6a73898536e28c26c2b87396d45" as const;
+export const WIRE_HASH = "28af22189f458d801993017a1c63e498380e0e9676c31e092416d58fa8149401" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -162,20 +162,32 @@ export type BuildingDoc = typeof BuildingDoc.Type;
 
 /**
  * How this city reaches one server. Exhaustive rather than a URL that
- * might also be a command: the two are different machines to start
+ * might also be a command: the three are different machines to start
  * talking to, they fail differently, and a configuration that leaves it
  * to be guessed is one that guesses wrong on the day it matters.
+ * 
+ * Closed rather than `#[non_exhaustive]`: every reader of this enum is
+ * inside this one binary, so a wildcard arm here would buy nothing and
+ * would hide the next transport from the three modules that must
+ * decide about it.
  */
 export const McpTransport = Schema.Union(
   Schema.Struct({
     stdio: Schema.Struct({
       args: Schema.Array(Schema.String),
       command: Schema.String,
+      env: Schema.Array(Schema.Tuple(Schema.String, Schema.String)),
     }),
   }),
   Schema.Struct({
     http: Schema.Struct({
-      header: Schema.optional(Schema.NullOr(Schema.String)),
+      headers: Schema.Array(Schema.Tuple(Schema.String, Schema.String)),
+      url: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    sse: Schema.Struct({
+      headers: Schema.Array(Schema.Tuple(Schema.String, Schema.String)),
       url: Schema.String,
     }),
   }),
@@ -572,6 +584,7 @@ export const CommitAnswer = Schema.Struct({
   run: RunId,
   seq: Seq,
   session: Schema.optional(Schema.NullOr(SessionName)),
+  spent: UsdMicros,
 }).annotations({ identifier: "CommitAnswer" });
 export type CommitAnswer = typeof CommitAnswer.Type;
 
@@ -591,6 +604,23 @@ export const CommitsAnswer = Schema.Struct({
   more: Schema.Boolean,
 }).annotations({ identifier: "CommitsAnswer" });
 export type CommitsAnswer = typeof CommitsAnswer.Type;
+
+/**
+ * One object of the content store, cut to what travels.
+ * 
+ * The same bound and the same text judgement `Document` puts on a file
+ * in the tree, for the same reasons: bytes with a NUL in the head are
+ * not text, and showing them as text would show a reader something the
+ * object does not say.
+ */
+export const ContentAnswer = Schema.Struct({
+  binary: Schema.Boolean,
+  bytes: Schema.Int,
+  locator: Locator,
+  text: Schema.String,
+  truncated: Schema.Boolean,
+}).annotations({ identifier: "ContentAnswer" });
+export type ContentAnswer = typeof ContentAnswer.Type;
 
 /**
  * The five cuts of one authoritative total. Each dimension sums to
@@ -875,6 +905,7 @@ export const EndpointSummary = Schema.Struct({
   base_url: Schema.String,
   dialect: DialectKind,
   has_credential: Schema.Boolean,
+  label: Schema.String,
   local: Schema.Boolean,
   models: Schema.Array(Schema.String),
   name: Schema.String,
@@ -934,6 +965,32 @@ export const EvidenceAnswer = Schema.Struct({
   run: RunId,
 }).annotations({ identifier: "EvidenceAnswer" });
 export type EvidenceAnswer = typeof EvidenceAnswer.Type;
+
+/**
+ * How far a branch has drifted from the upstream it tracks.
+ * 
+ * Absent as a whole rather than as two zeroes when the branch tracks
+ * nothing: a branch with no upstream is not a branch level with one,
+ * and a page that read `0/0` for both would tell a person their work
+ * is pushed.
+ */
+export const Drift = Schema.Struct({
+  ahead: Schema.Int,
+  behind: Schema.Int,
+}).annotations({ identifier: "Drift" });
+export type Drift = typeof Drift.Type;
+
+/**
+ * The working tree of one building, read at the moment of asking.
+ */
+export const GitStatusAnswer = Schema.Struct({
+  branch: Schema.optional(Schema.NullOr(Schema.String)),
+  building: Address,
+  checkpoint: Schema.optional(Schema.NullOr(CommitAnswer)),
+  drift: Schema.optional(Schema.NullOr(Drift)),
+  files: Schema.Array(FileChange),
+}).annotations({ identifier: "GitStatusAnswer" });
+export type GitStatusAnswer = typeof GitStatusAnswer.Type;
 
 /**
  * Non-empty resident identity; the `role@building.n` grammar tightens
@@ -1124,6 +1181,109 @@ export const ListingAnswer = Schema.Struct({
 export type ListingAnswer = typeof ListingAnswer.Type;
 
 /**
+ * One of the closed set of error codes, as `AxCode::as_str` spells it.
+ */
+export const AxCode = Schema.Literal("E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN").annotations({ identifier: "AxCode" });
+export type AxCode = typeof AxCode.Type;
+
+/**
+ * The three mandatory parts of a gate refusal: rule | violation |
+ * compliant alternative (three-part refusal).
+ */
+export const GateRefusal = Schema.Struct({
+  alternative: Schema.String,
+  rule: Schema.String,
+  violation: Schema.String,
+}).annotations({ identifier: "GateRefusal" });
+export type GateRefusal = typeof GateRefusal.Type;
+
+/**
+ * The unified error shape: seven wire fields, serialized in declaration
+ * order (determinism rule 6). The model is the recovery subject: `nearby`
+ * and `recovery` must hold directly executable information, not apologies.
+ * 
+ * Everything but `code` sits behind one Box so the type stays cheap in
+ * every seam's return slot (`result_large_err`); serde flatten keeps the
+ * wire shape flat and the field order unchanged.
+ */
+export const AxError = Schema.Struct({
+  action: Schema.String,
+  code: AxCode,
+  gate: Schema.optional(Schema.NullOr(GateRefusal)),
+  nearby: Schema.Array(Schema.String),
+  recovery: Schema.String,
+  retriable: Schema.Boolean,
+  subject: Schema.String,
+}).annotations({ identifier: "AxError" });
+export type AxError = typeof AxError.Type;
+
+/**
+ * One tool a server offers, under the name the model sees it by.
+ */
+export const McpToolLine = Schema.Struct({
+  disclosure: Schema.String,
+  input_schema: Payload,
+  name: Schema.String,
+  remote: Schema.String,
+}).annotations({ identifier: "McpToolLine" });
+export type McpToolLine = typeof McpToolLine.Type;
+
+/**
+ * The three answers a handshake can come back with.
+ * 
+ * Exhaustive rather than a flag beside an optional reason: "it is
+ * answering", "it wants an account" and "it failed, and here is why"
+ * are three different things for a person to do next, and a shape that
+ * left the reason optional would let a failure travel without one.
+ */
+export const McpState = Schema.Union(
+  Schema.Struct({
+    connected: Schema.Struct({
+      protocol_version: Schema.String,
+      server: Schema.String,
+      tools: Schema.Array(McpToolLine),
+    }),
+  }),
+  Schema.Struct({
+    authenticating: Schema.Struct({
+      recovery: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    failed: Schema.Struct({
+      refusal: AxError,
+    }),
+  }),
+).annotations({ identifier: "McpState" });
+export type McpState = typeof McpState.Type;
+
+/**
+ * One server, as the handshake found it.
+ */
+export const McpServerHealth = Schema.Struct({
+  label: ServerLabel,
+  state: McpState,
+  target: Schema.String,
+  transport: Schema.String,
+}).annotations({ identifier: "McpServerHealth" });
+export type McpServerHealth = typeof McpServerHealth.Type;
+
+/**
+ * One line per server the address's configuration names, in the order
+ * the configuration names them.
+ * 
+ * Order is the file's rather than best-first: somebody scanning this
+ * list twice finds the same server in the same place, and a list that
+ * reordered itself as servers came and went could not be scanned at
+ * all.
+ */
+export const McpHealthAnswer = Schema.Struct({
+  addr: Address,
+  servers: Schema.Array(McpServerHealth),
+}).annotations({ identifier: "McpHealthAnswer" });
+export type McpHealthAnswer = typeof McpHealthAnswer.Type;
+
+/**
  * The city's vital signs: the counts a page would otherwise assemble
  * by asking four questions and adding up the answers.
  * 
@@ -1142,6 +1302,59 @@ export const MetricsAnswer = Schema.Struct({
   signals_waiting: Schema.Int,
 }).annotations({ identifier: "MetricsAnswer" });
 export type MetricsAnswer = typeof MetricsAnswer.Type;
+
+/**
+ * The four slots of a frozen prefix, in the order they are sent.
+ * 
+ * Exhaustive and closed: the order is the cache economics, and a
+ * spelling a page had to match against a free string would let a
+ * segment arrive under a name nothing draws.
+ */
+export const PrefixSlot = Schema.Literal("city", "building", "resident", "run").annotations({ identifier: "PrefixSlot" });
+export type PrefixSlot = typeof PrefixSlot.Type;
+
+/**
+ * One document a segment was assembled from, as the assembler saw it.
+ * 
+ * `dropped` is what the per-slot budget cut off the end of that
+ * document, so a reader can tell a segment that carries a whole file
+ * from one that carries the first half of it. Zero is the ordinary
+ * case and is still reported, because "nothing was cut" is a fact and
+ * an absent field is not.
+ */
+export const PrefixSource = Schema.Struct({
+  addr: Address,
+  dropped: Schema.Int,
+  kept: Schema.Int,
+}).annotations({ identifier: "PrefixSource" });
+export type PrefixSource = typeof PrefixSource.Type;
+
+/**
+ * One frozen segment, as a reader needs it.
+ * 
+ * `bytes` is what the record says the segment measured and `text` is
+ * what the store still holds, so the two disagreeing is itself the
+ * finding: `stored` false means the object is gone and the text is
+ * empty because nothing could be read, not because the segment was.
+ */
+export const PrefixSegment = Schema.Struct({
+  bytes: Schema.Int,
+  hash: B3Hash,
+  slot: PrefixSlot,
+  sources: Schema.Array(PrefixSource),
+  stored: Schema.Boolean,
+  text: Schema.String,
+}).annotations({ identifier: "PrefixSegment" });
+export type PrefixSegment = typeof PrefixSegment.Type;
+
+/**
+ * What one run was told before it said anything.
+ */
+export const PrefixAnswer = Schema.Struct({
+  run: RunId,
+  segments: Schema.Array(PrefixSegment),
+}).annotations({ identifier: "PrefixAnswer" });
+export type PrefixAnswer = typeof PrefixAnswer.Type;
 
 export const RegistryLine = Schema.Struct({
   addr: Address,
@@ -1223,43 +1436,6 @@ export const Call = Schema.Struct({
   tool: Schema.String,
 }).annotations({ identifier: "Call" });
 export type Call = typeof Call.Type;
-
-/**
- * One of the closed set of error codes, as `AxCode::as_str` spells it.
- */
-export const AxCode = Schema.Literal("E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN").annotations({ identifier: "AxCode" });
-export type AxCode = typeof AxCode.Type;
-
-/**
- * The three mandatory parts of a gate refusal: rule | violation |
- * compliant alternative (three-part refusal).
- */
-export const GateRefusal = Schema.Struct({
-  alternative: Schema.String,
-  rule: Schema.String,
-  violation: Schema.String,
-}).annotations({ identifier: "GateRefusal" });
-export type GateRefusal = typeof GateRefusal.Type;
-
-/**
- * The unified error shape: seven wire fields, serialized in declaration
- * order (determinism rule 6). The model is the recovery subject: `nearby`
- * and `recovery` must hold directly executable information, not apologies.
- * 
- * Everything but `code` sits behind one Box so the type stays cheap in
- * every seam's return slot (`result_large_err`); serde flatten keeps the
- * wire shape flat and the field order unchanged.
- */
-export const AxError = Schema.Struct({
-  action: Schema.String,
-  code: AxCode,
-  gate: Schema.optional(Schema.NullOr(GateRefusal)),
-  nearby: Schema.Array(Schema.String),
-  recovery: Schema.String,
-  retriable: Schema.Boolean,
-  subject: Schema.String,
-}).annotations({ identifier: "AxError" });
-export type AxError = typeof AxError.Type;
 
 /**
  * What a turn came to besides the calls it made.
@@ -1347,6 +1523,45 @@ export const RoundsAnswer = Schema.Struct({
 export type RoundsAnswer = typeof RoundsAnswer.Type;
 
 /**
+ * Which shelf a holding sits on.
+ * 
+ * Named rather than implied by which list it arrived in, so a page
+ * that shows both shelves in one list can still say where a skill
+ * came from - which is the question a person asks when two shelves
+ * hold the same name and the nearer one wins.
+ */
+export const SkillShelf = Schema.Union(
+  Schema.Literal("library"),
+  Schema.Literal("building"),
+).annotations({ identifier: "SkillShelf" });
+export type SkillShelf = typeof SkillShelf.Type;
+
+/**
+ * One shelved skill.
+ */
+export const SkillLine = Schema.Struct({
+  admitted: Schema.Boolean,
+  at: Address,
+  disclosure: Schema.String,
+  hash: B3Hash,
+  name: Schema.String,
+  pinned_by: Schema.Array(RunId),
+  section: Schema.String,
+  shelf: SkillShelf,
+}).annotations({ identifier: "SkillLine" });
+export type SkillLine = typeof SkillLine.Type;
+
+/**
+ * The shelves one building reads from.
+ */
+export const SkillsAnswer = Schema.Struct({
+  building: Address,
+  missing: Schema.Array(Schema.String),
+  skills: Schema.Array(SkillLine),
+}).annotations({ identifier: "SkillsAnswer" });
+export type SkillsAnswer = typeof SkillsAnswer.Type;
+
+/**
  * What a query returns. `Unavailable` is a real answer: a view this
  * build does not evaluate yet says so by name, rather than returning an
  * empty result a reader would mistake for an empty city.
@@ -1426,12 +1641,73 @@ export const Answer = Schema.Union(
     doctor: DoctorAnswer,
   }),
   Schema.Struct({
+    prefix: PrefixAnswer,
+  }),
+  Schema.Struct({
+    content: ContentAnswer,
+  }),
+  Schema.Struct({
+    skills: SkillsAnswer,
+  }),
+  Schema.Struct({
+    git_status: GitStatusAnswer,
+  }),
+  Schema.Struct({
+    mcp_health: McpHealthAnswer,
+  }),
+  Schema.Struct({
     unavailable: Schema.Struct({
       query: Schema.String,
     }),
   }),
 ).annotations({ identifier: "Answer" });
 export type Answer = typeof Answer.Type;
+
+/**
+ * One field written into every request body this endpoint receives.
+ * 
+ * `pointer` is a JSON pointer (`/temperature`, `/reasoning/effort`),
+ * and missing object segments along it are created. `value` is the
+ * text a person typed, never a parsed number: a float in a frame is a
+ * float in the record that frame produces, and this city keeps floats
+ * out of its ledger.
+ */
+export const BodyOverride = Schema.Struct({
+  pointer: Schema.String,
+  value: Schema.String,
+}).annotations({ identifier: "BodyOverride" });
+export type BodyOverride = typeof BodyOverride.Type;
+
+/**
+ * One header every request to this endpoint carries.
+ * 
+ * The value may be a `secret:realm/name` reference, which the vault
+ * redeems at the moment the header is written; anything else is sent
+ * as it stands. Plaintext credentials never reach this type — the
+ * enrolment door is the only way a secret enters the city.
+ */
+export const HeaderPair = Schema.Struct({
+  name: Schema.String,
+  value: Schema.String,
+}).annotations({ identifier: "HeaderPair" });
+export type HeaderPair = typeof HeaderPair.Type;
+
+/**
+ * Everything a person settles about one endpoint beyond its address.
+ * 
+ * `Default` is "nothing was settled", which is what a form that never
+ * opened its advanced section means, and what every caller that has no
+ * opinion sends.
+ */
+export const EndpointTuning = Schema.Struct({
+  headers: Schema.Array(HeaderPair),
+  label: Schema.optional(Schema.NullOr(Schema.String)),
+  overrides: Schema.Array(BodyOverride),
+  request_max_retries: Schema.optional(Schema.NullOr(Schema.Int)),
+  stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),
+  timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),
+}).annotations({ identifier: "EndpointTuning" });
+export type EndpointTuning = typeof EndpointTuning.Type;
 
 /**
  * Which of the three documents that govern a city a `PutDocument`
@@ -1570,6 +1846,7 @@ export const Command = Schema.Union(
       idem: IdemKey,
       name: ProviderName,
       secret: Schema.optional(Schema.NullOr(Schema.String)),
+      tuning: EndpointTuning,
     }),
   }),
   Schema.Struct({
@@ -1590,6 +1867,7 @@ export const Command = Schema.Union(
       idem: IdemKey,
       name: ProviderName,
       secret: Schema.optional(Schema.NullOr(Schema.String)),
+      tuning: EndpointTuning,
     }),
   }),
   Schema.Struct({
@@ -1665,6 +1943,17 @@ export const Command = Schema.Union(
   Schema.Struct({
     reveal: Schema.Struct({
       at: Address,
+      idem: IdemKey,
+    }),
+  }),
+  Schema.Struct({
+    doctor_install: Schema.Struct({
+      idem: IdemKey,
+      item: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    doctor_refresh: Schema.Struct({
       idem: IdemKey,
     }),
   }),
@@ -1833,6 +2122,31 @@ export const Query = Schema.Union(
     }),
   }),
   Schema.Literal("doctor"),
+  Schema.Struct({
+    prefix: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    content: Schema.Struct({
+      locator: Locator,
+    }),
+  }),
+  Schema.Struct({
+    skills: Schema.Struct({
+      building: Address,
+    }),
+  }),
+  Schema.Struct({
+    git_status: Schema.Struct({
+      building: Address,
+    }),
+  }),
+  Schema.Struct({
+    mcp_health: Schema.Struct({
+      addr: Address,
+    }),
+  }),
 ).annotations({ identifier: "Query" });
 export type Query = typeof Query.Type;
 
@@ -1860,6 +2174,31 @@ export const Delta = Schema.Struct({
   text: Schema.String,
 }).annotations({ identifier: "Delta" });
 export type Delta = typeof Delta.Type;
+
+/**
+ * Who reads a log line, and when.
+ * 
+ * The five `docs/logging.md` names, spelled on the wire exactly as
+ * `runtime::diagnostics::Level` spells them on a terminal. This crate
+ * cannot depend on `runtime` — the graph points inward — so the
+ * mapping between the two lives at the assembly layer, where a test
+ * holds the two spellings equal name for name.
+ */
+export const LogLevel = Schema.Literal("refuse", "effect", "decide", "trace", "wire").annotations({ identifier: "LogLevel" });
+export type LogLevel = typeof LogLevel.Type;
+
+/**
+ * One diagnostic line on its way to a page.
+ */
+export const LogLine = Schema.Struct({
+  level: LogLevel,
+  line: Schema.String,
+  module: Schema.String,
+  run: Schema.optional(Schema.NullOr(RunId)),
+  seq: Seq,
+  t: Schema.optional(Schema.NullOr(TimeMs)),
+}).annotations({ identifier: "LogLine" });
+export type LogLine = typeof LogLine.Type;
 
 /**
  * The server's answer to a `Hello` it accepted.
@@ -1898,6 +2237,9 @@ export const ServerFrame = Schema.Union(
   }),
   Schema.Struct({
     delta: Delta,
+  }),
+  Schema.Struct({
+    log: LogLine,
   }),
 ).annotations({ identifier: "ServerFrame" });
 export type ServerFrame = typeof ServerFrame.Type;

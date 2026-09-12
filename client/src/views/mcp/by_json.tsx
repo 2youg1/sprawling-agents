@@ -8,8 +8,8 @@
 // be told about and why the rest cannot.
 //
 // The block is shown row by row rather than accepted whole: a settings
-// file usually holds several servers, and one of them carrying an
-// environment variable must not silently take the other three with it.
+// file usually holds several servers, and one of them a person has to
+// fix must not silently take the other three with it.
 
 import { For, Show, createSignal } from "solid-js";
 

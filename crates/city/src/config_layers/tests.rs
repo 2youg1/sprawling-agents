@@ -185,6 +185,7 @@ fn a_building_states_which_servers_it_reaches_and_replaces_the_citys_table() {
         McpTransport::Stdio {
             command: "mcp-apps".to_owned(),
             args: vec!["--stdio".to_owned()],
+            env: Vec::new(),
         }
     );
 
@@ -284,4 +285,91 @@ fn a_building_that_declares_no_names_resolves_to_an_empty_list() {
     let room = addr("lab/room1");
     let frozen = load(dir.path(), &room).unwrap();
     assert!(frozen.sandbox.env_passthrough.is_empty());
+}
+
+/// The three shapes a `[[mcp]]` row may take, read back whole. The
+/// environment table and the header table are what `claude mcp add -e`
+/// and `--header` write, and `transport` is the only thing that tells a
+/// stream apart from a posted message.
+#[test]
+fn a_server_row_carries_its_environment_its_headers_and_which_way_a_url_answers() {
+    let layer = ConfigLayer::parse(
+        "[[mcp]]\nlabel = \"apps\"\ncommand = \"mcp-apps\"\nargs = [\"--stdio\"]\n\
+         env = { API_KEY = \"secret:mcp/apps\", REGION = \"eu\" }\n\n\
+         [[mcp]]\nlabel = \"hosted\"\nurl = \"https://example.test/mcp\"\n\
+         headers = { Authorization = \"secret:mcp/hosted\", X-Account = \"acme\" }\n\n\
+         [[mcp]]\nlabel = \"streamed\"\nurl = \"https://example.test/sse\"\ntransport = \"sse\"\n",
+    )
+    .unwrap();
+    let servers = layer.mcp().unwrap();
+    assert_eq!(
+        servers.iter().map(|s| &s.transport).collect::<Vec<_>>(),
+        vec![
+            &McpTransport::Stdio {
+                command: "mcp-apps".to_owned(),
+                args: vec!["--stdio".to_owned()],
+                env: vec![
+                    ("API_KEY".to_owned(), "secret:mcp/apps".to_owned()),
+                    ("REGION".to_owned(), "eu".to_owned()),
+                ],
+            },
+            &McpTransport::Http {
+                url: "https://example.test/mcp".to_owned(),
+                headers: vec![
+                    ("Authorization".to_owned(), "secret:mcp/hosted".to_owned()),
+                    ("X-Account".to_owned(), "acme".to_owned()),
+                ],
+            },
+            &McpTransport::Sse {
+                url: "https://example.test/sse".to_owned(),
+                headers: Vec::new(),
+            },
+        ]
+    );
+}
+
+/// A command answers on its own pipes, so naming a stream beside one is
+/// a row stating two transports rather than a row with a spare key.
+#[test]
+fn a_command_row_that_also_names_a_transport_is_refused_where_it_is_written() {
+    let err = ConfigLayer::parse(
+        "[[mcp]]\nlabel = \"apps\"\ncommand = \"mcp-apps\"\ntransport = \"sse\"\n",
+    )
+    .unwrap_err();
+    assert_eq!(err.code(), &AxCode::ConfigInvalid);
+    assert!(err.subject().contains("apps"), "{}", err.subject());
+}
+
+/// What the writer emits is what the reader reads: the file's grammar
+/// has one authority, and a round trip is how that stays true.
+#[test]
+fn every_transport_the_writer_emits_is_read_back_as_the_same_transport() {
+    let dir = tempfile::tempdir().unwrap();
+    let room = addr("lab/room1");
+    let servers = vec![
+        McpServer {
+            label: kernel::ServerLabel::parse("apps").unwrap(),
+            transport: McpTransport::Stdio {
+                command: "mcp-apps".to_owned(),
+                args: vec!["--stdio".to_owned()],
+                env: vec![("API_KEY".to_owned(), "secret:mcp/apps".to_owned())],
+            },
+        },
+        McpServer {
+            label: kernel::ServerLabel::parse("hosted").unwrap(),
+            transport: McpTransport::Http {
+                url: "https://example.test/mcp".to_owned(),
+                headers: vec![("Authorization".to_owned(), "Bearer x".to_owned())],
+            },
+        },
+        McpServer {
+            label: kernel::ServerLabel::parse("streamed").unwrap(),
+            transport: McpTransport::Sse {
+                url: "https://example.test/sse".to_owned(),
+                headers: Vec::new(),
+            },
+        },
+    ];
+    write_mcp(dir.path(), &room, Layer::City, &servers).unwrap();
+    assert_eq!(load(dir.path(), &room).unwrap().mcp, servers);
 }

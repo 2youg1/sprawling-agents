@@ -13,7 +13,6 @@
 #[non_exhaustive] pub enum kernel::Effort
 #[non_exhaustive] pub enum kernel::EgressTarget
 #[non_exhaustive] pub enum kernel::EventKind
-#[non_exhaustive] pub enum kernel::McpTransport
 #[non_exhaustive] pub enum kernel::ModelTag
 #[non_exhaustive] pub enum kernel::PolicyClass
 #[non_exhaustive] pub enum kernel::PolicyRevocation
@@ -210,6 +209,7 @@ pub enum kernel::How
 pub enum kernel::ImageType
 pub enum kernel::Lines
 pub enum kernel::Locator
+pub enum kernel::McpTransport
 pub enum kernel::MemoShape
 pub enum kernel::Named
 pub enum kernel::PlanExit
@@ -839,11 +839,15 @@ pub kernel::Locator::File::range: core::option::Option<kernel::Range>
 pub kernel::McpServer::label: kernel::ServerLabel
 pub kernel::McpServer::transport: kernel::McpTransport
 pub kernel::McpTransport::Http
-pub kernel::McpTransport::Http::header: core::option::Option<alloc::string::String>
+pub kernel::McpTransport::Http::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
 pub kernel::McpTransport::Http::url: alloc::string::String
+pub kernel::McpTransport::Sse
+pub kernel::McpTransport::Sse::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub kernel::McpTransport::Sse::url: alloc::string::String
 pub kernel::McpTransport::Stdio
 pub kernel::McpTransport::Stdio::args: alloc::vec::Vec<alloc::string::String>
 pub kernel::McpTransport::Stdio::command: alloc::string::String
+pub kernel::McpTransport::Stdio::env: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
 pub kernel::MemoShape::Malformed
 pub kernel::MemoShape::Malformed::missing: alloc::vec::Vec<&'static str>
 pub kernel::MemoShape::WellFormed

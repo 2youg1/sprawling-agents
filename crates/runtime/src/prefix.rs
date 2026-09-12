@@ -14,6 +14,10 @@ use kernel::consts_policy::STARTUP_BUDGET_TOKENS;
 use kernel::{Address, AxCode, AxError, B3Hash, Payload, SystemBlock};
 use serde_json::{Map, Value, json};
 
+mod segment;
+
+pub use segment::{FrozenSegment, SegmentSlot, SegmentSource};
+
 /// Documents inside one segment join on this separator; the rebuilder
 /// (replay) reuses it — one authority for the concatenation rule.
 pub(crate) const DOC_JOIN: &str = "\n\n";
@@ -21,56 +25,6 @@ pub(crate) const DOC_JOIN: &str = "\n\n";
 /// The in-place truncation marker. English on purpose — the prefix faces the English window.
 pub(crate) fn truncation_marker(dropped: u64) -> String {
     format!("[truncated: {dropped} bytes]")
-}
-
-/// The four slots in stability order; the order is the cache economics.
-/// Exactly four — deliberately exhaustive.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SegmentSlot {
-    City,
-    Building,
-    Resident,
-    Run,
-}
-
-impl SegmentSlot {
-    fn as_str(self) -> &'static str {
-        match self {
-            SegmentSlot::City => "city",
-            SegmentSlot::Building => "building",
-            SegmentSlot::Resident => "resident",
-            SegmentSlot::Run => "run",
-        }
-    }
-}
-
-/// One frozen segment: static bytes from frozen sources, hashed at
-/// construction. The sole constructor takes bytes, not values — there is
-/// deliberately no `From<TimeMs>` or any other volatile conversion.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FrozenSegment {
-    slot: SegmentSlot,
-    bytes: Vec<u8>,
-    hash: B3Hash,
-}
-
-impl FrozenSegment {
-    pub fn new(slot: SegmentSlot, bytes: Vec<u8>) -> FrozenSegment {
-        let hash = B3Hash::digest(&bytes);
-        FrozenSegment { slot, bytes, hash }
-    }
-
-    pub fn slot(&self) -> SegmentSlot {
-        self.slot
-    }
-
-    pub fn hash(&self) -> &B3Hash {
-        &self.hash
-    }
-
-    pub fn bytes(&self) -> &[u8] {
-        &self.bytes
-    }
 }
 
 /// One prefix source document: address plus its frozen bytes, `None`
@@ -114,12 +68,6 @@ pub struct PrefixPlan {
     pub caps: SegmentCaps,
 }
 
-/// Per-segment build accounting: loaded sources and skipped documents.
-struct SegmentNote {
-    sources: Vec<Value>,
-    skipped: Vec<Value>,
-}
-
 /// Builds the four segments from source documents: UTF-8 only, per-slot
 /// caps with explicit truncation markers, cross-slot dedup by address
 /// (first slot wins), skips accounted in the notes. The notes travel
@@ -127,7 +75,7 @@ struct SegmentNote {
 /// are what makes the prefix offline-rebuildable (A15, C16).
 pub fn build_prefix(plan: PrefixPlan) -> Result<FrozenPrefix, AxError> {
     let mut seen: BTreeSet<String> = BTreeSet::new();
-    let mut notes = Vec::new();
+    let mut skipped = Vec::new();
     let mut built = Vec::new();
     let slots = [
         (SegmentSlot::City, &plan.city, plan.caps.city),
@@ -137,7 +85,7 @@ pub fn build_prefix(plan: PrefixPlan) -> Result<FrozenPrefix, AxError> {
     ];
     for (slot, docs, cap) in slots {
         let (segment, note) = build_segment(slot, docs, cap, &mut seen)?;
-        notes.push(note);
+        skipped.push(note);
         built.push(segment);
     }
     let mut iter = built.into_iter();
@@ -151,24 +99,7 @@ pub fn build_prefix(plan: PrefixPlan) -> Result<FrozenPrefix, AxError> {
         ));
     };
     let mut prefix = FrozenPrefix::assemble(city, building, resident, run)?;
-    let full: Vec<Value> = prefix
-        .segments()
-        .iter()
-        .zip(notes)
-        .map(|(segment, note)| {
-            json!({
-                "slot": segment.slot().as_str(),
-                "hash": segment.hash().to_string(),
-                "len": segment.bytes().len(),
-                "sources": note.sources,
-                "skipped": note.skipped,
-            })
-        })
-        .collect();
-    prefix.notes = Some(json!({
-        "segments": full,
-        "breakpoints": ["city", "building", "resident", "run"],
-    }));
+    prefix.skipped = Some(skipped);
     Ok(prefix)
 }
 
@@ -193,7 +124,7 @@ fn build_segment(
     docs: &[SourceDoc],
     cap: u64,
     seen: &mut BTreeSet<String>,
-) -> Result<(FrozenSegment, SegmentNote), AxError> {
+) -> Result<(FrozenSegment, Vec<Value>), AxError> {
     let cap = usize::try_from(cap).map_err(|_| {
         AxError::failure(
             AxCode::InvalidArgs,
@@ -227,8 +158,10 @@ fn build_segment(
             }
             text.push_str(body);
             seen.insert(addr.clone());
-            sources
-                .push(json!({ "addr": addr, "kept": body.len(), "marker": false, "dropped": 0 }));
+            sources.push(SegmentSource::whole(
+                doc.addr.clone(),
+                u64::try_from(body.len()).unwrap_or(u64::MAX),
+            ));
             continue;
         }
         // Reserve marker room with the worst-case digit count (dropped
@@ -253,11 +186,15 @@ fn build_segment(
         text.push_str(body.get(..kept).unwrap_or_default());
         text.push_str(&truncation_marker(dropped));
         seen.insert(addr.clone());
-        sources.push(json!({ "addr": addr, "kept": kept, "marker": true, "dropped": dropped }));
+        sources.push(SegmentSource {
+            addr: doc.addr.clone(),
+            kept: u64::try_from(kept).unwrap_or(u64::MAX),
+            dropped,
+        });
     }
     Ok((
-        FrozenSegment::new(slot, text.into_bytes()),
-        SegmentNote { sources, skipped },
+        FrozenSegment::assembled(slot, text.into_bytes(), sources),
+        skipped,
     ))
 }
 
@@ -269,7 +206,11 @@ pub struct FrozenPrefix {
     building: FrozenSegment,
     resident: FrozenSegment,
     run: FrozenSegment,
-    notes: Option<Value>,
+    /// What each slot left out, in slot order, as `build_prefix` found
+    /// it. `None` is a prefix assembled from bytes the caller already
+    /// held, which skipped nothing because it was never offered a list
+    /// of documents.
+    skipped: Option<Vec<Vec<Value>>>,
 }
 
 impl FrozenPrefix {
@@ -302,7 +243,7 @@ impl FrozenPrefix {
             building,
             resident,
             run,
-            notes: None,
+            skipped: None,
         })
     }
 
@@ -341,23 +282,23 @@ impl FrozenPrefix {
         ]
     }
 
-    /// The `prompt_assembled` payload. A built prefix carries its full
-    /// source notes (addresses, kept/dropped bytes, skips, breakpoints)
-    /// — the C16 load-bearing part; a hand-assembled prefix reports the
-    /// minimal `{slot, hash, len}` rows.
+    /// The `prompt_assembled` payload: four rows, each naming its slot,
+    /// its hash, its length, the documents it was assembled from and
+    /// what it left out.
+    ///
+    /// One branch, not two. The source rows are read back by an offline
+    /// rebuild (A15, C16) and by the page that shows a person what
+    /// their agent was told, and they come from the segments themselves
+    /// — so a prefix assembled at the city's desk records the same rows
+    /// under the same keys as one built from a plan, and a segment made
+    /// of no documents says so with an empty list.
+    ///
+    /// # Errors
+    /// A segment longer than `u64` can hold, and a payload the Ledger
+    /// refuses.
     pub fn prompt_payload(&self) -> Result<Payload, AxError> {
-        if let Some(notes) = &self.notes {
-            let Value::Object(map) = notes.clone() else {
-                return Err(AxError::failure(
-                    AxCode::InvalidArgs,
-                    "encode prompt payload",
-                    "prefix notes are not an object",
-                ));
-            };
-            return Payload::new(map);
-        }
         let mut segments = Vec::new();
-        for segment in self.segments() {
+        for (index, segment) in self.segments().into_iter().enumerate() {
             let mut entry = Map::new();
             entry.insert(
                 "slot".to_owned(),
@@ -372,10 +313,25 @@ impl FrozenPrefix {
                 )
             })?;
             entry.insert("len".to_owned(), Value::Number(len.into()));
+            entry.insert(
+                "sources".to_owned(),
+                Value::Array(segment.sources().iter().map(SegmentSource::row).collect()),
+            );
+            let left_out = self
+                .skipped
+                .as_ref()
+                .and_then(|all| all.get(index))
+                .cloned()
+                .unwrap_or_default();
+            entry.insert("skipped".to_owned(), Value::Array(left_out));
             segments.push(Value::Object(entry));
         }
         let mut map = Map::new();
         map.insert("segments".to_owned(), Value::Array(segments));
+        map.insert(
+            "breakpoints".to_owned(),
+            json!(["city", "building", "resident", "run"]),
+        );
         Payload::new(map)
     }
 }

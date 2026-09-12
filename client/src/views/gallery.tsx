@@ -14,6 +14,7 @@ import { For, createSignal, type JSX } from "solid-js";
 
 import { sendingInto, type Doing, type Sending } from "../core/belief";
 import { EFFORTS } from "../core/prefs";
+import type { ModelFact } from "../core/probed";
 import { offered } from "../core/slash";
 import type { ApprovalClass, ApprovalItem, DoctorAnswer, EndpointsAnswer } from "../wire";
 import { ApprovalId, Locator, TimeMs } from "../wire";
@@ -58,11 +59,42 @@ const MODELS: readonly ModelRow[] = [
 
 // What one provider's probe answered, as a person meets it: three text
 // models across three vendors, and one the text-only switch hides.
-const PROBED: readonly string[] = [
-  "anthropic/claude-fable-5.1",
-  "openai/gpt-nucleus-6",
-  "openai/sora-2",
-  "meta/muse-spark-1.3-contributor",
+// Two rows state their own ceilings and prices, one states nothing but a
+// name, and one is marked as video by the provider rather than by its
+// spelling - which is the whole range this table has to render.
+const PROBED: readonly ModelFact[] = [
+  {
+    id: "anthropic/claude-fable-5.1",
+    contextTokens: 204_800,
+    maxOutputTokens: 64_000,
+    inputModalities: ["image", "text"],
+    inputPrice: "0.000003",
+    outputPrice: "0.000015",
+  },
+  {
+    id: "openai/gpt-nucleus-6",
+    contextTokens: 400_000,
+    maxOutputTokens: null,
+    inputModalities: ["text"],
+    inputPrice: null,
+    outputPrice: null,
+  },
+  {
+    id: "openai/sora-2",
+    contextTokens: null,
+    maxOutputTokens: null,
+    inputModalities: ["video"],
+    inputPrice: null,
+    outputPrice: null,
+  },
+  {
+    id: "meta/muse-spark-1.3-contributor",
+    contextTokens: null,
+    maxOutputTokens: null,
+    inputModalities: [],
+    inputPrice: null,
+    outputPrice: null,
+  },
 ];
 
 // Two attached providers, one with a key filed for it and one without,
@@ -74,6 +106,7 @@ const ENDPOINTS: EndpointsAnswer = {
       base_url: "https://api.zenmux.ai/v1",
       dialect: "open_ai",
       has_credential: true,
+      label: "ZenMux",
       local: false,
       models: ["anthropic/claude-fable-5.1", "openai/gpt-nucleus-6"],
       name: "zenmux",
@@ -82,6 +115,7 @@ const ENDPOINTS: EndpointsAnswer = {
       base_url: "http://127.0.0.1:11434/v1",
       dialect: "open_ai",
       has_credential: false,
+      label: "local",
       local: true,
       models: ["local/qwen3"],
       name: "local",

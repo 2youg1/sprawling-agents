@@ -1349,3 +1349,44 @@ impl ContextReminder { pub fn render(&self) -> String; }
 - **写入点不动**：键仍在过门之后、工具运行之前记下（被门拒的重试不算重放），答在工具返回后补齐。故一次「记了键但工具报错」的调用不会留下一个假答案——那条路径根本不入表。
 - **`Duplicate` 仍是一个独立变体而不是并进 `Ran`**：`fenced` 对重放恒为空，而 `Ran` 的调用方要按 `fenced` 决定波后清扫；把两者合并会让「这一波要不要扫」多出一个恒空的分支。
 - **代价写在明处**：一次运行期间每个成功调用的结果都留在内存里。这与 `seen` 本来就要活到运行结束是同一条寿命，多出来的是 payload 的字节；一次运行的工具调用数以百计而非以百万计。
+
+### 8-38 sink 收到的是一条 entry，不是一行文本（形状 2 值类型）
+
+**旧接口**：`pub type Sink = Box<dyn FnMut(&str) + Send>`——渲染在库内，sink 只见最终那行 JSON。于是「把日志行推给浏览器」的装配层必须把刚渲染好的那行**再解析回来**才能拿到 `level`／`run`／`seq`／`module`：一条日志行由什么字段构成，从此有了写与读两个权威，而读的那个漂了也没人看得见。
+
+**改法**是把字段本身交给 sink，文本留作其中一种去处：
+
+```rust
+pub struct Entry<'a> { pub level: Level, pub site: Site<'a>, pub message: &'a str }  // message 已过扫描
+pub type Sink = Box<dyn FnMut(Entry<'_>) + Send>;
+pub fn render(entry: Entry<'_>) -> String;   // 一行 JSON：文本的唯一产出点
+```
+
+- **`redact` 的位置不动**：`write` 仍在交给 sink 之前扫一遍，所以任何 sink 拿到的 `message` 都是已脱敏的，不存在「某个 sink 忘了扫」。
+- **`render` 转公开而不是复制一份**：写终端的 sink 调它，携字段上路的 sink 不调它，两者因此不可能对「一行由什么构成」得出两个结论。
+- **无读方法这一条不受影响**：`Entry` 只在写入那一刻存在于 sink 的参数位上，本模块仍不提供任何把已写的行读回来的途径。
+- **被否**：保留 `&str` sink，由装配层 `serde_json::from_str` 回读。它多一次序列化与一次解析，且给「字段名」造了第二个权威——而第二权威失配的表现是浏览器上少一个字段，不是一次编译失败。
+
+### 8-39 一段 prefix 自带它的来源，`prompt_assembled` 因此只有一条分支
+
+`FrozenSegment` 先前只携 slot、字节与哈希，来源注记则由 `build_prefix` 另行拼出；于是同一件事有两个作者——照计划装配出来的 prefix 写一种行，在城里按手边字节装配出来的 prefix 写另一种（其实是不写）。`replay::rebuild_prefix` 只读得懂前者，而页面要读的恰好是后者。
+
+```rust
+pub struct SegmentSource { pub addr: Address, pub kept: u64, pub dropped: u64 }
+impl SegmentSource { pub fn whole(addr: Address, kept: u64) -> SegmentSource; }
+
+impl FrozenSegment {
+    pub fn new(slot: SegmentSlot, bytes: Vec<u8>) -> FrozenSegment;              // 无来源文档
+    pub fn assembled(slot: SegmentSlot, bytes: Vec<u8>,
+                     sources: Vec<SegmentSource>) -> FrozenSegment;
+    pub fn sources(&self) -> &[SegmentSource];
+}
+```
+
+**三条口径：**
+
+1. **来源行只有一个作者。** `prompt_payload` 的两条分支合成一条：每一行的 `slot`／`hash`／`len`／`sources`／`skipped` 都从段本身取，`breakpoints` 恒上线。由此，在城里装配的 prefix 与照计划装配的 prefix 在同样的键下写同样的行，`rebuild_prefix` 读的仍是它一直在读的那四个键（`addr`／`kept`／`marker`／`dropped`）。
+2. **`marker` 由 `dropped > 0` 派生而不是独立字段。** 两个互相蕴含的字段是两个可以互相矛盾的字段。
+3. **没有来源文档的段写空表而不是省略键。** resident 段由身份与目录拼成，不出自任何文件；空表说的是「它不来自文档」，缺席的键说的是「不知道」。
+
+**被否**：让页面在被问的那一刻重新装配一次 prefix 去拿来源。此刻的文件不是当时的文件，那样画出来的是一份没有任何人收到过的提示。

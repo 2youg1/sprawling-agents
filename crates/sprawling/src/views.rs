@@ -23,17 +23,24 @@
 //! showed would change the thing it reports on.
 
 pub(super) mod answering;
+pub(super) mod archives;
 pub(super) mod commits;
 pub(super) mod cost_of;
 pub(super) mod document;
 pub(super) mod evidence;
+pub(super) mod git_status;
 #[cfg(test)]
 mod governance_tests;
 pub(super) mod hearing;
 pub(super) mod holding;
+pub(super) mod hunks;
 pub(super) mod lines;
 pub(super) mod listing;
+pub(super) mod mcp_health;
+pub(super) mod prefix;
 pub(super) mod rounds;
+pub(super) mod served;
+pub(super) mod skills;
 #[cfg(test)]
 mod standing_tests;
 #[cfg(test)]

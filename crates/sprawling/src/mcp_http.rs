@@ -27,23 +27,9 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use kernel::{AxCode, AxError, Sealed, TimeoutMs};
+use kernel::{AxCode, AxError, TimeoutMs};
 
-/// A header a building configured, in the two shapes it may take.
-///
-/// A paid server's key belongs in the vault like any other credential,
-/// so a configured header may name one instead of carrying it. The
-/// reference is redeemed in [`HttpServer::post`] and nowhere earlier -
-/// the last slot before the wire, which is the same rule the provider
-/// endpoint follows.
-enum HeaderValue {
-    /// Written out in the configuration: an account name, a fixed tag,
-    /// anything whose disclosure costs nothing.
-    Plain(String),
-    /// A `secret:realm/name` reference. Shared rather than copied on
-    /// clone, because one server is one credential.
-    Sealed(Arc<Sealed<String>>),
-}
+use crate::mcp_redeeming::{Redeemed, redeem};
 
 /// What the far end told us about itself, and what has to travel back.
 #[derive(Debug, Default)]
@@ -63,65 +49,36 @@ struct Session {
 #[derive(Clone)]
 pub(crate) struct HttpServer {
     url: String,
-    header: Option<(String, HeaderValue)>,
+    headers: Vec<Redeemed>,
     client: reqwest::blocking::Client,
     session: Arc<Mutex<Session>>,
 }
 
-impl Clone for HeaderValue {
-    fn clone(&self) -> HeaderValue {
-        match self {
-            HeaderValue::Plain(text) => HeaderValue::Plain(text.clone()),
-            HeaderValue::Sealed(held) => HeaderValue::Sealed(Arc::clone(held)),
-        }
-    }
-}
-
 impl std::fmt::Debug for HttpServer {
-    /// Names the header but never its value: a configured header may be
-    /// a redeemed credential, and a `Debug` that printed it would be
+    /// Names the headers but never their values: a configured header may
+    /// be a redeemed credential, and a `Debug` that printed it would be
     /// the leak `Sealed` exists to make unspellable.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HttpServer")
             .field("url", &self.url)
-            .field("header", &self.header.as_ref().map(|(name, _)| name))
+            .field("headers", &self.headers)
             .finish_non_exhaustive()
     }
 }
 
 impl HttpServer {
     /// # Errors
-    /// Refuses a header this version cannot split into a name and a
-    /// value, and a client this machine cannot build.
+    /// Refuses a header with no name, a `secret:realm/name` reference
+    /// the vault does not hold, and a client this machine cannot build.
     pub(crate) fn open(
         url: &str,
-        header: Option<&str>,
+        headers: &[(String, String)],
         resolve: &gateway::SecretResolver,
     ) -> Result<HttpServer, AxError> {
-        let header = match header {
-            None => None,
-            Some(raw) => {
-                let (name, value) = raw.split_once(':').ok_or_else(|| {
-                    AxError::failure(
-                        AxCode::ConfigInvalid,
-                        "reach an mcp server",
-                        format!("{raw}: a header is `Name: value`"),
-                    )
-                    .with_recovery("write the header as `Name: value`, or leave it out")
-                })?;
-                let value = value.trim();
-                // A reference is redeemed from the vault; anything else
-                // is what the building wrote. Refused here rather than
-                // at the first call, because a key the vault does not
-                // hold is a configuration error and not a server that
-                // happens to be down.
-                let held = match kernel::SecretRef::parse(value) {
-                    Ok(reference) => HeaderValue::Sealed(Arc::new(resolve(&reference)?)),
-                    Err(_) => HeaderValue::Plain(value.to_owned()),
-                };
-                Some((name.trim().to_owned(), held))
-            }
-        };
+        // Redeemed before the first request rather than at it, because a
+        // key the vault does not hold is a configuration error and not a
+        // server that happens to be down.
+        let headers = redeem(headers, resolve, "reach an mcp server")?;
         let mut builder = reqwest::blocking::Client::builder();
         if gateway::is_local(url) {
             // A server a person started on this machine is reached by
@@ -141,7 +98,7 @@ impl HttpServer {
             })?;
         Ok(HttpServer {
             url: url.to_owned(),
-            header,
+            headers,
             client,
             session: Arc::new(Mutex::new(Session::default())),
         })
@@ -160,14 +117,11 @@ impl HttpServer {
             // server this city would refuse for a reason of its making.
             .header("accept", "application/json, text/event-stream")
             .body(line.to_owned());
-        if let Some((name, value)) = &self.header {
-            // The redemption point: plaintext exists for the length of
+        for header in &self.headers {
+            // The disclosure point: plaintext exists for the length of
             // this call and never in the configuration, in a log, or in
             // this type's `Debug`.
-            request = match value {
-                HeaderValue::Plain(text) => request.header(name, text),
-                HeaderValue::Sealed(held) => request.header(name, held.expose().as_str()),
-            };
+            request = request.header(header.name(), header.plaintext());
         }
         if let Ok(session) = self.session.lock() {
             if let Some(id) = &session.id {
@@ -228,6 +182,22 @@ impl HttpServer {
 
     /// Turns a status the server chose into the refusal a person reads.
     fn refused(&self, status: u16) -> AxError {
+        // The one status a person answers differently: the server is up,
+        // it understood the request, and it wants an account this city
+        // does not yet hold. Carried as its own code so the health view
+        // can say "authenticating" where it would otherwise say "failed"
+        // (sprawling-SPEC.md 8-61).
+        if status == 401 || status == 403 {
+            return AxError::failure(
+                AxCode::CredentialMissing,
+                "call an mcp server",
+                format!("{}: the server answered {status}", self.url),
+            )
+            .with_recovery(
+                "this server wants an account; store its key in the vault and name it in \
+                 `headers`, or sign in to it",
+            );
+        }
         if status == 404 {
             self.forget();
             return AxError::failure(

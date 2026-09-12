@@ -34,6 +34,8 @@ use std::time::Duration;
 
 use kernel::{AxCode, AxError, TimeoutMs};
 
+use crate::mcp_redeeming::Redeemed;
+
 /// A handle on one running server. Cloning gives a second handle on the
 /// same process, which is what a server offering several tools needs:
 /// one child, one connection, one place that answers.
@@ -54,16 +56,24 @@ impl StdioServer {
     /// Starts `command` and keeps it running until the last handle on it
     /// is dropped.
     ///
+    /// `env` is added to what this process already has, name by name, so
+    /// a server still finds the search path and the home directory it
+    /// needs. **A name handed to a child cannot be taken back**, which
+    /// is why a credential arrives here already redeemed and exists as
+    /// plaintext only inside this call.
+    ///
     /// # Errors
     /// Refuses a program this machine cannot start, and a child whose
     /// pipes the operating system did not hand back.
     pub(crate) fn start(
         command: &str,
         args: &[String],
+        env: &[Redeemed],
         cwd: &Path,
     ) -> Result<StdioServer, AxError> {
         let mut child = std::process::Command::new(command)
             .args(args)
+            .envs(env.iter().map(|pair| (pair.name(), pair.plaintext())))
             .current_dir(cwd)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
@@ -296,101 +306,4 @@ pub(crate) fn echoing(answer: &str) -> (String, Vec<String>) {
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
-    use super::*;
-    use protocol::Outbound;
-
-    fn echo_server(answer: &str) -> (String, Vec<String>) {
-        echoing(answer)
-    }
-
-    fn silent_server() -> (String, Vec<String>) {
-        if cfg!(windows) {
-            (
-                "powershell".to_owned(),
-                vec![
-                    "-NoProfile".to_owned(),
-                    "-Command".to_owned(),
-                    "Start-Sleep -Seconds 30".to_owned(),
-                ],
-            )
-        } else {
-            (
-                "sh".to_owned(),
-                vec!["-c".to_owned(), "sleep 30".to_owned()],
-            )
-        }
-    }
-
-    #[test]
-    fn a_real_child_answers_over_the_pipe_and_the_answer_reads_as_a_result() {
-        let dir = tempfile::tempdir().unwrap();
-        let (command, args) =
-            echo_server("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[]}}");
-        let mut server = StdioServer::start(&command, &args, dir.path()).unwrap();
-        let mut rpc = protocol::Rpc::new();
-        let line = rpc.list_tools();
-        let answer = server
-            .call(&line, protocol::EXTERNAL_CALL_PATIENCE)
-            .unwrap();
-        let result = protocol::Rpc::read(&answer).unwrap();
-        assert!(result.get("tools").is_some(), "{result}");
-    }
-
-    #[test]
-    fn a_request_carrying_a_newline_is_refused_before_it_becomes_two_messages() {
-        let dir = tempfile::tempdir().unwrap();
-        let (command, args) = echo_server("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}");
-        let mut server = StdioServer::start(&command, &args, dir.path()).unwrap();
-        let err = server
-            .call("{\"a\":\n\"b\"}", protocol::EXTERNAL_CALL_PATIENCE)
-            .unwrap_err();
-        assert_eq!(err.code(), &AxCode::WireMismatch);
-        assert!(err.subject().contains("newline"));
-    }
-
-    #[test]
-    fn a_server_that_never_answers_is_given_up_on_and_stopped() {
-        let dir = tempfile::tempdir().unwrap();
-        let (command, args) = silent_server();
-        let mut server = StdioServer::start(&command, &args, dir.path()).unwrap();
-        let err = server.call("{\"id\":1}", TimeoutMs(200)).unwrap_err();
-        assert_eq!(err.code(), &AxCode::Timeout);
-        assert!(err.recovery().contains("late answer"));
-        // The child was stopped, so the next call cannot be answered by
-        // the one that never arrived.
-        let second = server.call("{\"id\":2}", TimeoutMs(200)).unwrap_err();
-        assert!(
-            matches!(second.code(), &AxCode::ToolUnavailable | &AxCode::Timeout),
-            "{second}"
-        );
-    }
-
-    #[test]
-    fn a_program_this_machine_cannot_start_refuses_with_the_command_in_it() {
-        let dir = tempfile::tempdir().unwrap();
-        let err = StdioServer::start("sprawling-no-such-server", &[], dir.path()).unwrap_err();
-        assert_eq!(err.code(), &AxCode::ToolUnavailable);
-        assert!(err.subject().contains("sprawling-no-such-server"));
-        assert!(err.recovery().contains("[[mcp]]"));
-    }
-
-    #[test]
-    fn two_handles_are_two_tools_talking_to_one_process() {
-        let dir = tempfile::tempdir().unwrap();
-        let (command, args) = echo_server("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"ok\":1}}");
-        let server = StdioServer::start(&command, &args, dir.path()).unwrap();
-        let mut first = server.clone();
-        let mut second = server.clone();
-        assert!(
-            first
-                .call("{\"id\":1}", protocol::EXTERNAL_CALL_PATIENCE)
-                .is_ok()
-        );
-        assert!(
-            second
-                .call("{\"id\":2}", protocol::EXTERNAL_CALL_PATIENCE)
-                .is_ok()
-        );
-    }
-}
+mod tests;

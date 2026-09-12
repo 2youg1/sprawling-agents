@@ -79,6 +79,7 @@ impl RunWorker {
             vault: Arc::new(std::sync::Mutex::new(vault)),
             interrupts: None,
             watching: None,
+            machine: None,
             governance,
             inboxes: collaboration.inboxes,
             joins: collaboration.joins,
@@ -120,7 +121,7 @@ impl RunWorker {
         // must-read locator point at nothing while the handoff went on
         // saying the next session must read them.
         let mut must_read = Vec::new();
-        let bytes = city_segment(&self.city_root)?;
+        let bytes = city_segment(&self.city_root)?.bytes;
         let hash = self.cas.put(&bytes).map_err(memory::MemoryError::into_ax)?;
         must_read.push(Locator::parse(&format!("cas:b3-{hash}"))?);
         let standing = self.ledger.position();

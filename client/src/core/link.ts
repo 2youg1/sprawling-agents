@@ -14,6 +14,7 @@ import type {
   ClientFrame,
   Delta,
   EventRecord,
+  LogLine,
   ServerFrame,
   Welcome,
 } from "../wire";
@@ -51,6 +52,10 @@ export type LinkAction =
   | { readonly kind: "deliver"; readonly event: EventRecord }
   | { readonly kind: "answered"; readonly answer: Answer }
   | { readonly kind: "saying"; readonly delta: Delta }
+  // One line of the process log. Not history: it has no sequence of
+  // its own, it is never written down, and a page that missed one has
+  // lost nothing.
+  | { readonly kind: "logged"; readonly line: LogLine }
   | { readonly kind: "wait"; readonly ms: number }
   | { readonly kind: "report"; readonly error: AxError }
   | { readonly kind: "close" };
@@ -158,6 +163,9 @@ function received(link: Link, frame: ServerFrame): [Link, LinkAction] {
   }
   if ("delta" in frame) {
     return [link, { kind: "saying", delta: frame.delta }];
+  }
+  if ("log" in frame) {
+    return [link, { kind: "logged", line: frame.log }];
   }
   if ("refusal" in frame) {
     return [link, { kind: "report", error: frame.refusal }];

@@ -8,6 +8,7 @@
 pub(super) mod door;
 pub(super) mod entrance;
 pub(super) mod governing;
+pub(super) mod machine;
 pub(super) mod routing;
 #[cfg(test)]
 mod tests;

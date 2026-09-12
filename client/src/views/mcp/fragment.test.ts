@@ -55,48 +55,61 @@ describe("a pasted mcpServers block", () => {
   });
 });
 
-describe("what today's wire can carry", () => {
-  test("a command becomes a stdio server", () => {
-    expect(encode({ ...EMPTY, label: "docs", command: "npx -y mcp-docs" }, [])).toEqual({
-      kind: "ready",
-      server: {
-        label: ServerLabel.make("docs"),
-        transport: { stdio: { command: "npx", args: ["-y", "mcp-docs"] } },
-      },
-    });
-  });
-
-  test("a url with one header becomes an http server", () => {
+describe("what the wire carries", () => {
+  test("a command carries its arguments and its environment", () => {
     expect(
       encode(
         {
           ...EMPTY,
-          label: "apps",
-          transport: "http",
-          url: "https://example.test/mcp",
-          headers: [{ name: "X-Key", value: "k" }, { name: "", value: "" }],
+          label: "docs",
+          command: "npx -y mcp-docs",
+          env: [{ name: "TOKEN", value: "secret:mcp/docs" }, { name: "", value: "" }],
         },
         [],
       ),
     ).toEqual({
       kind: "ready",
       server: {
-        label: ServerLabel.make("apps"),
-        transport: { http: { url: "https://example.test/mcp", header: "X-Key: k" } },
+        label: ServerLabel.make("docs"),
+        transport: {
+          stdio: {
+            command: "npx",
+            args: ["-y", "mcp-docs"],
+            env: [["TOKEN", "secret:mcp/docs"]],
+          },
+        },
       },
     });
   });
 
-  test("the holes in the wire are refused rather than dropped", () => {
-    const url = { ...EMPTY, label: "apps", transport: "http", url: "https://example.test/mcp" } as const;
-    expect(encode({ ...EMPTY, label: "docs", command: "x", env: [{ name: "TOKEN", value: "t" }] }, [])).toEqual({
-      kind: "blocked",
-      blocker: "env_unsendable",
+  test("a url carries every header, and says which way it answers", () => {
+    const url = {
+      ...EMPTY,
+      label: "apps",
+      url: "https://example.test/mcp",
+      headers: [{ name: "X-Key", value: "k" }, { name: "X-Account", value: "acme" }],
+    } as const;
+    const headers = [["X-Key", "k"], ["X-Account", "acme"]] as const;
+    expect(encode({ ...url, transport: "http" }, [])).toEqual({
+      kind: "ready",
+      server: {
+        label: ServerLabel.make("apps"),
+        transport: { http: { url: "https://example.test/mcp", headers } },
+      },
     });
+    expect(encode({ ...url, transport: "sse" }, [])).toEqual({
+      kind: "ready",
+      server: {
+        label: ServerLabel.make("apps"),
+        transport: { sse: { url: "https://example.test/mcp", headers } },
+      },
+    });
+  });
+
+  test("a value typed beside no name is refused rather than dropped", () => {
     expect(
-      encode({ ...url, headers: [{ name: "A", value: "1" }, { name: "B", value: "2" }] }, []),
-    ).toEqual({ kind: "blocked", blocker: "headers_many" });
-    expect(encode({ ...url, transport: "sse" }, [])).toEqual({ kind: "blocked", blocker: "transport_sse" });
+      encode({ ...EMPTY, label: "docs", command: "x", env: [{ name: " ", value: "t" }] }, []),
+    ).toEqual({ kind: "blocked", blocker: "pair_nameless" });
   });
 
   test("a label is present, spellable and free before anything else is judged", () => {

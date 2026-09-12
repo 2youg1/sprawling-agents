@@ -113,6 +113,13 @@ pub struct ServeConfig {
     /// would let a burst of increments push records out of a reader's
     /// window.
     pub deltas: broadcast::Sender<crate::wire::Delta>,
+    /// The process log, on its way to whoever has the log lens open.
+    ///
+    /// A third channel for the reason there is a second: what it
+    /// carries is discardable, and a slow reader that lost a line has
+    /// lost nothing. Sharing the event channel would let a city running
+    /// at the `wire` floor push history out of that reader's window.
+    pub logs: broadcast::Sender<crate::wire::LogLine>,
     /// Answers a query from the city's derived views. Synchronous: a
     /// query reads a projection, and a projection that needed to block
     /// would be a query pretending to be a command.
@@ -133,6 +140,7 @@ pub(crate) struct ShellState {
     pub(crate) commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Sync>,
     pub(crate) events: broadcast::Sender<EventRecord>,
     pub(crate) deltas: broadcast::Sender<crate::wire::Delta>,
+    pub(crate) logs: broadcast::Sender<crate::wire::LogLine>,
     pub(crate) queries: Arc<dyn Fn(Query) -> Result<Answer, AxError> + Send + Sync>,
     pub(crate) secrets: SecretSink,
     pub(crate) acp: AcpSink,
@@ -193,6 +201,7 @@ pub fn router(config: &ServeConfig) -> Router {
         commands: Arc::clone(&config.commands),
         events: config.events.clone(),
         deltas: config.deltas.clone(),
+        logs: config.logs.clone(),
         queries: Arc::clone(&config.queries),
         secrets: Arc::clone(&config.secrets),
         acp: Arc::clone(&config.acp),

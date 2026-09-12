@@ -89,6 +89,7 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
         vault,
         vault_notice,
         log,
+        journal,
         console,
     } = serving;
     let city_root = city_root.as_path();
@@ -117,6 +118,9 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
     // channel would let a talkative model push records out of a slow
     // reader's window.
     let (deltas, _watching) = tokio::sync::broadcast::channel(256);
+    // The process log, on the third channel. Its sender was made before
+    // the `Diagnostics` was, because the sink is what writes into it.
+    let logs = journal.lines();
     // The views the control surface reads. Rebuilt from the ledger here,
     // folded forward by the write observer inside the worker: one fold
     // rule, two call sites, no second definition of what a view means.
@@ -170,6 +174,13 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
         },
     )?;
 
+    // The vault the worker opened, lent to the reads that need one.
+    // Lent rather than opened a second time: "a credential is redeemed
+    // at the last moment, through one door" stops being true the moment
+    // there are two handles on the same secrets.
+    if let Ok(mut held) = views.lock() {
+        held.lend_the_vault(Arc::clone(&city_vault));
+    }
     let sink_root = cas_root.clone();
     let audio_views = Arc::clone(&views);
     let audio_vault = city_vault;
@@ -185,6 +196,7 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
         ),
         events,
         deltas,
+        logs,
         city: city_name,
         secrets: Arc::new(move |command: channels::Command, reply: channels::Reply| {
             // The route waits for whichever comes first, so the

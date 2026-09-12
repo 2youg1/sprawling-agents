@@ -103,6 +103,11 @@ pub fn classify(command: &Command) -> ControlVerdict {
         | Command::PutSecret { .. }
         // Opening a file manager reaches nothing a run is doing.
         | Command::Reveal { .. }
+        // Installing a tool and looking at this machine again are both
+        // about the machine rather than about the city: neither reaches
+        // a run, and neither leaves a scene for anybody to hand over.
+        | Command::DoctorInstall { .. }
+        | Command::DoctorRefresh { .. }
         | Command::BatchByBuilding { .. }
         | Command::Approve { .. }
         | Command::CreatePolicy { .. }

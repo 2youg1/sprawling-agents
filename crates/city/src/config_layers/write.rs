@@ -105,32 +105,44 @@ pub fn write_mcp(
             toml::Value::String(server.label.as_str().to_owned()),
         );
         match &server.transport {
-            McpTransport::Stdio { command, args } => {
+            McpTransport::Stdio { command, args, env } => {
                 row.insert("command".to_owned(), toml::Value::String(command.clone()));
                 row.insert(
                     "args".to_owned(),
                     toml::Value::Array(args.iter().cloned().map(toml::Value::String).collect()),
                 );
+                row.insert("env".to_owned(), toml::Value::Table(tabled(env)));
             }
-            McpTransport::Http { url, header } => {
+            McpTransport::Http { url, headers } => {
                 row.insert("url".to_owned(), toml::Value::String(url.clone()));
-                if let Some(header) = header {
-                    row.insert("header".to_owned(), toml::Value::String(header.clone()));
-                }
+                row.insert("headers".to_owned(), toml::Value::Table(tabled(headers)));
             }
-            // A transport this build cannot spell is refused rather than
-            // written as a row with no way to reach anything.
-            other => {
-                return Err(refuse_file(
-                    &file,
-                    &format!("{other:?}: this version cannot write that transport"),
-                ));
+            McpTransport::Sse { url, headers } => {
+                row.insert("url".to_owned(), toml::Value::String(url.clone()));
+                // Stated rather than left to the default, because the
+                // default is `http` and a stream written without this
+                // key would be read back as the other transport.
+                row.insert(
+                    "transport".to_owned(),
+                    toml::Value::String("sse".to_owned()),
+                );
+                row.insert("headers".to_owned(), toml::Value::Table(tabled(headers)));
             }
         }
         rows.push(toml::Value::Table(row));
     }
     document.insert("mcp".to_owned(), toml::Value::Array(rows));
     write_document(&file, &document)
+}
+
+/// The reader's shape for a configured table: one name once, which is
+/// what makes the file readable back through `ConfigLayer::parse`.
+fn tabled(pairs: &[(String, String)]) -> toml::Table {
+    let mut table = toml::Table::new();
+    for (name, value) in pairs {
+        table.insert(name.clone(), toml::Value::String(value.clone()));
+    }
+    table
 }
 
 fn read_document(file: &Path) -> Result<toml::Table, AxError> {

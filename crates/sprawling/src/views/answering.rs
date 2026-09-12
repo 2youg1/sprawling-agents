@@ -211,35 +211,7 @@ impl Views {
                 }
             }
             channels::Query::Hunks { oid_a, oid_b, path } => {
-                match memory::of_file(&self.city_root, *oid_a, memory::Head::Commit(*oid_b), path) {
-                    Ok(patch) => channels::Answer::Hunks(Box::new(channels::HunksAnswer {
-                        oid_a: *oid_a,
-                        oid_b: *oid_b,
-                        path: path.clone(),
-                        lines: patch
-                            .lines
-                            .into_iter()
-                            .map(|line| channels::PatchLine {
-                                number: line.number,
-                                text: line.text,
-                            })
-                            .collect(),
-                        withheld: patch
-                            .withheld
-                            .into_iter()
-                            .map(|held| channels::Withheld {
-                                number: held.number,
-                                reason: held.reason,
-                            })
-                            .collect(),
-                    })),
-                    // An oid this city never wrote, for the reason `Changes`
-                    // gives: "it changed nothing" and "I cannot read it" are
-                    // different answers, and a reader's next move differs.
-                    Err(_) => channels::Answer::Unavailable {
-                        query: format!("Hunks({oid_a}..{oid_b} {path})"),
-                    },
-                }
+                self.hunks_answer(*oid_a, *oid_b, path)
             }
             channels::Query::Commit { oid } => self.commit_answer(*oid),
             channels::Query::Commits {
@@ -268,6 +240,33 @@ impl Views {
                     query: format!("Document({})", at.as_str()),
                 },
             },
+            // What an agent was told, and the store read that recovers
+            // it. A run with no prompt yet and an object this city no
+            // longer holds are both "I could not look".
+            channels::Query::Prefix { run } => match self.prefix_answer(*run) {
+                Some(answer) => channels::Answer::Prefix(Box::new(answer)),
+                None => channels::Answer::Unavailable {
+                    query: format!("Prefix({run})"),
+                },
+            },
+            channels::Query::Content { locator } => match self.content_answer(locator) {
+                Some(answer) => channels::Answer::Content(Box::new(answer)),
+                None => channels::Answer::Unavailable {
+                    query: format!("Content({locator})"),
+                },
+            },
+            channels::Query::Skills { building } => match self.skills_answer(building) {
+                Some(answer) => channels::Answer::Skills(Box::new(answer)),
+                None => channels::Answer::Unavailable {
+                    query: format!("Skills({})", building.as_str()),
+                },
+            },
+            channels::Query::GitStatus { building } => match self.git_status_answer(building) {
+                Some(answer) => channels::Answer::GitStatus(Box::new(answer)),
+                None => channels::Answer::Unavailable {
+                    query: format!("GitStatus({})", building.as_str()),
+                },
+            },
             channels::Query::EndpointView => {
                 channels::Answer::Endpoints(endpoints_answer(&self.book))
             }
@@ -282,6 +281,9 @@ impl Views {
                     query: "Doctor".to_owned(),
                 },
             },
+            channels::Query::McpHealth { addr } => {
+                channels::Answer::McpHealth(Box::new(self.mcp_health_answer(addr)))
+            }
             channels::Query::BuildingView { addr } => {
                 let root = self.city_root.clone();
                 let plan = self.plans.of(&root, addr);
@@ -329,33 +331,6 @@ impl Views {
                         .unwrap_or(u64::MAX),
                 }))
             }
-        }
-    }
-
-    /// Every archive entry whose subject contains `needle`, across every
-    /// building, read from the shelves at the moment of asking.
-    fn search_archives(&self, needle: &str) -> channels::ArchiveAnswer {
-        let mut hits = Vec::new();
-        let wanted = needle.to_lowercase();
-        for building in buildings_of(&self.city_root) {
-            let Ok(entries) = city::archive_index(&self.city_root, &building) else {
-                continue;
-            };
-            for entry in entries {
-                if !entry.subject.to_lowercase().contains(&wanted) {
-                    continue;
-                }
-                hits.push(channels::ArchiveHit {
-                    building: building.clone(),
-                    kind: entry.kind.as_str().to_owned(),
-                    day: entry.day,
-                    subject: entry.subject,
-                });
-            }
-        }
-        channels::ArchiveAnswer {
-            needle: needle.to_owned(),
-            hits,
         }
     }
 }

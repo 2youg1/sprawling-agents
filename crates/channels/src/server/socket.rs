@@ -51,6 +51,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     let mut phase = SessionState::AwaitingHello;
     let mut events = state.events.subscribe();
     let mut deltas = state.deltas.subscribe();
+    let mut logs = state.logs.subscribe();
     // This session's own refusals, which the worker posts into long
     // after the command was accepted. Unbounded because a refusal must
     // not be dropped and because its rate is the rate at which one
@@ -164,6 +165,22 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                     Ok(delta) => {
                         if phase == SessionState::Live
                             && send(&mut socket, &ServerFrame::Delta(delta)).await.is_err() {
+                            return;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(broadcast::error::RecvError::Closed) => {}
+                }
+            }
+            // The process log. Lag is ignored for the reason an
+            // increment's is: a log is a diagnostic and not history, so
+            // a reader that missed a line has lost nothing it could
+            // have acted on.
+            written = logs.recv() => {
+                match written {
+                    Ok(line) => {
+                        if phase == SessionState::Live
+                            && send(&mut socket, &ServerFrame::Log(line)).await.is_err() {
                             return;
                         }
                     }

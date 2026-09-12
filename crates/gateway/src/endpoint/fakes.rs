@@ -242,6 +242,7 @@ pub(crate) fn config(url: &str) -> EndpointConfig {
             Value::String("city".to_owned()),
         )],
         timeout_ms: 5_000,
+        stream_deadline_ms: None,
         pricing: Some(
             crate::market::MarketSnapshot::builtin()
                 .lookup("claude-sonnet")

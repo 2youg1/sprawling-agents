@@ -27,6 +27,100 @@ use crate::market::{InputKinds, ModelEntry};
 
 use super::attached::AttachedEndpoint;
 use super::book::Choice;
+use super::tuning::EndpointTuning;
+
+/// The registration's `tuning` object, written only when the person
+/// settled something. An endpoint they left alone writes no key, so a
+/// record says "nothing was settled" by staying silent about it.
+fn tuning_value(tuning: &EndpointTuning) -> Option<Value> {
+    let mut map = Map::new();
+    if let Some(label) = &tuning.label {
+        map.insert("label".to_owned(), Value::String(label.clone()));
+    }
+    for (key, figure) in [
+        ("timeout_ms", tuning.timeout_ms),
+        ("stream_deadline_ms", tuning.stream_deadline_ms),
+    ] {
+        if let Some(ms) = figure {
+            map.insert(key.to_owned(), Value::Number(ms.into()));
+        }
+    }
+    if let Some(retries) = tuning.request_max_retries {
+        map.insert(
+            "request_max_retries".to_owned(),
+            Value::Number(retries.into()),
+        );
+    }
+    for (key, rows) in [
+        ("extra_headers", &tuning.extra_headers),
+        ("overrides", &tuning.overrides),
+    ] {
+        if !rows.is_empty() {
+            map.insert(
+                key.to_owned(),
+                Value::Array(
+                    rows.iter()
+                        .map(|(name, value)| {
+                            Value::Array(vec![
+                                Value::String(name.clone()),
+                                Value::String(value.clone()),
+                            ])
+                        })
+                        .collect(),
+                ),
+            );
+        }
+    }
+    (!map.is_empty()).then_some(Value::Object(map))
+}
+
+/// The pairs a `tuning` object holds under one key, as the record
+/// spells them: a list of two-string arrays. A row that is not two
+/// strings is left out rather than half read.
+fn pairs(tuning: Option<&Value>, key: &str) -> Vec<(String, String)> {
+    let Some(Value::Array(rows)) = tuning.and_then(|held| held.get(key)) else {
+        return Vec::new();
+    };
+    rows.iter()
+        .filter_map(|row| match row {
+            Value::Array(cells) => match (cells.first(), cells.get(1)) {
+                (Some(Value::String(name)), Some(Value::String(value))) => {
+                    Some((name.clone(), value.clone()))
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect()
+}
+
+/// How the person set this endpoint up, as the record kept it.
+///
+/// Tolerant in one direction only: a key that is missing reads as
+/// "nothing was settled", which is what every record written before
+/// this object existed means. A key that is present and unreadable is
+/// left out rather than guessed at, because a deadline this city
+/// invented would be a deadline nobody can explain.
+fn read_tuning(payload: &Payload) -> EndpointTuning {
+    let tuning = payload.as_map().get("tuning");
+    let figure = |key: &str| {
+        tuning
+            .and_then(|held| held.get(key))
+            .and_then(Value::as_u64)
+    };
+    EndpointTuning {
+        label: tuning
+            .and_then(|held| held.get("label"))
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        timeout_ms: figure("timeout_ms"),
+        request_max_retries: figure("request_max_retries")
+            .and_then(|held| u32::try_from(held).ok()),
+        stream_deadline_ms: figure("stream_deadline_ms"),
+        extra_headers: pairs(tuning, "extra_headers"),
+        overrides: pairs(tuning, "overrides"),
+    }
+}
 pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError> {
     let mut map = Map::new();
     map.insert("name".to_owned(), Value::String(endpoint.name.clone()));
@@ -59,6 +153,9 @@ pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError>
         ),
     );
     map.insert("probed".to_owned(), Value::Bool(endpoint.probed));
+    if let Some(tuning) = tuning_value(&endpoint.tuning) {
+        map.insert("tuning".to_owned(), tuning);
+    }
     Payload::new(map)
 }
 
@@ -207,6 +304,7 @@ pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxErr
             .get("probed")
             .and_then(Value::as_bool)
             .unwrap_or(true),
+        tuning: read_tuning(payload),
     })
 }
 

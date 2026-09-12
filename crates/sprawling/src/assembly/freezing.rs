@@ -9,10 +9,64 @@ use std::path::Path;
 
 use kernel::Locator;
 use kernel::{Address, AxCode, AxError, RunId};
-use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
+use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot, SegmentSource};
 use runtime::run::RunPlan;
 
 use super::{Assignment, Given, RunWorker, Site, Workbench, city_segment, held, name_of};
+
+/// Bytes about to be frozen into one slot, and the documents they were
+/// read from.
+///
+/// The two travel together everywhere: a segment whose sources were
+/// computed separately would let the bytes and the account of them
+/// drift, and the account is what a person reads to learn which of
+/// their files their agent was actually given.
+pub(super) struct Assembled {
+    pub(super) bytes: Vec<u8>,
+    pub(super) sources: Vec<SegmentSource>,
+}
+
+impl Assembled {
+    /// Bytes this build carries rather than reads: no document on this
+    /// disk holds them.
+    pub(super) fn of_nothing(bytes: Vec<u8>) -> Assembled {
+        Assembled {
+            bytes,
+            sources: Vec::new(),
+        }
+    }
+
+    /// One document, whole.
+    pub(super) fn of_one(addr: Address, bytes: Vec<u8>) -> Assembled {
+        let kept = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        Assembled {
+            sources: vec![SegmentSource::whole(addr, kept)],
+            bytes,
+        }
+    }
+
+    /// Appends one document's bytes after a blank line, and accounts it.
+    ///
+    /// The separator is written only between documents, so a segment
+    /// that opens with a document does not open with a blank line.
+    fn extend(&mut self, at: Address, bytes: &[u8]) {
+        if !self.bytes.is_empty() {
+            self.bytes.push(NEWLINE);
+            self.bytes.push(NEWLINE);
+        }
+        self.bytes.extend_from_slice(bytes);
+        self.sources.push(SegmentSource::whole(
+            at,
+            u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+        ));
+    }
+
+    /// Freezes these bytes into one slot, keeping the account with
+    /// them.
+    fn freeze(self, slot: SegmentSlot) -> FrozenSegment {
+        FrozenSegment::assembled(slot, self.bytes, self.sources)
+    }
+}
 
 /// One line ending, named once. The prefix joins documents with it, and
 /// a literal `10` at four call sites is four chances to mean something
@@ -41,31 +95,69 @@ pub(super) const NEWLINE: u8 = 10;
 /// the project's file was written for whatever harness its authors had.
 /// A resident told to run a test suite by a building with no `exec` has
 /// to know which of the two to believe.
-pub(super) fn building_segment(city_root: &Path, addr: &Address, building: &Address) -> Vec<u8> {
-    let mut out = addr.as_str().as_bytes().to_vec();
-    if let Ok(rules) = std::fs::read(city::building_path(city_root, building)) {
-        out.push(NEWLINE);
-        out.push(NEWLINE);
-        out.extend_from_slice(&rules);
+/// # Errors
+/// A path inside the city that this platform spells in a way the
+/// address grammar refuses. The bytes would still be right, but the
+/// account of where they came from would name a file nobody can open,
+/// and a source row a reader cannot follow is worse than a refusal.
+pub(super) fn building_segment(
+    city_root: &Path,
+    addr: &Address,
+    building: &Address,
+) -> Result<Assembled, AxError> {
+    // The room's own address opens the slot and is not a document, so
+    // it is accounted to nothing.
+    let mut out = Assembled::of_nothing(addr.as_str().as_bytes().to_vec());
+    let rules_at = city::building_path(city_root, building);
+    if let Ok(rules) = std::fs::read(&rules_at) {
+        out.extend(addressed(city_root, &rules_at)?, &rules);
     }
     // Written only when the file is: a heading over nothing would tell a
     // resident to follow conventions that do not exist.
-    if let Ok(conventions) = std::fs::read(city::agents_path(city_root, building)) {
-        out.push(NEWLINE);
-        out.push(NEWLINE);
-        out.extend_from_slice(
-            format!(
-                "## {}/{}\n\nHow work is done in this project, from the project itself. Where \
-                 this and the building's rules above disagree, the rules decide: they are what \
-                 the city enforces.\n\n",
-                building.as_str(),
-                city::AGENTS_FILE,
-            )
-            .as_bytes(),
-        );
-        out.extend_from_slice(&conventions);
+    let conventions_at = city::agents_path(city_root, building);
+    if let Ok(conventions) = std::fs::read(&conventions_at) {
+        let mut block = format!(
+            "## {}/{}\n\nHow work is done in this project, from the project itself. Where \
+             this and the building's rules above disagree, the rules decide: they are what \
+             the city enforces.\n\n",
+            building.as_str(),
+            city::AGENTS_FILE,
+        )
+        .into_bytes();
+        block.extend_from_slice(&conventions);
+        out.extend(addressed(city_root, &conventions_at)?, &block);
     }
-    out
+    Ok(out)
+}
+
+/// The city's own spelling of a path inside it.
+///
+/// The path comes from `city`, which is the authority for where a
+/// building's files sit; this only turns it back into the address a
+/// reader opens it by, so nothing here repeats that layout.
+///
+/// # Errors
+/// `E_INVALID_ARGS` for a path outside the city root or one the address
+/// grammar refuses.
+fn addressed(city_root: &Path, path: &Path) -> Result<Address, AxError> {
+    let relative = path.strip_prefix(city_root).map_err(|_| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "address a prefix source document",
+            format!("{} is outside the city", path.display()),
+        )
+    })?;
+    let spelled = relative
+        .to_str()
+        .ok_or_else(|| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "address a prefix source document",
+                format!("{} is not utf-8", relative.display()),
+            )
+        })?
+        .replace('\\', "/");
+    Address::parse(&spelled)
 }
 
 /// What a successor is told about the run it replaces: the room they
@@ -140,6 +232,26 @@ impl RunWorker {
     /// Propagates a city or run segment that will not read, a norm on
     /// the must-read list that will not open, a store that will not take
     /// the bytes, and a handoff the runtime refuses.
+    /// Puts every segment of a frozen prefix into the store, so the
+    /// hashes `prompt_assembled` records can be read back as text.
+    ///
+    /// All four, not the two that happen to be pinned elsewhere. A hash
+    /// with nothing behind it is a reference a person cannot follow,
+    /// and "what was this agent told" is answerable only if every
+    /// segment is there. Content addressing pays for it: one building's
+    /// rules are one object however many runs are frozen under them.
+    ///
+    /// # Errors
+    /// Propagates a store that will not take the bytes.
+    fn intern_prefix(&mut self, prefix: &FrozenPrefix) -> Result<(), AxError> {
+        for segment in prefix.segments() {
+            self.cas
+                .put(segment.bytes())
+                .map_err(memory::MemoryError::into_ax)?;
+        }
+        Ok(())
+    }
+
     pub(super) fn freeze_plan(
         &mut self,
         site: &Site,
@@ -176,24 +288,21 @@ impl RunWorker {
                 .as_bytes(),
         );
         let prefix = FrozenPrefix::assemble(
-            FrozenSegment::new(SegmentSlot::City, city_segment(&self.city_root)?),
-            FrozenSegment::new(
-                SegmentSlot::Building,
-                building_segment(&self.city_root, addr, site.building.addr()),
-            ),
-            FrozenSegment::new(SegmentSlot::Resident, resident),
-            FrozenSegment::new(
-                SegmentSlot::Run,
-                run_segment(
-                    &self.city_root,
-                    &brief,
-                    Predecessor {
-                        room: addr,
-                        run: at.predecessor(),
-                    },
-                )?,
-            ),
+            city_segment(&self.city_root)?.freeze(SegmentSlot::City),
+            building_segment(&self.city_root, addr, site.building.addr())?
+                .freeze(SegmentSlot::Building),
+            Assembled::of_nothing(resident).freeze(SegmentSlot::Resident),
+            Assembled::of_nothing(run_segment(
+                &self.city_root,
+                &brief,
+                Predecessor {
+                    room: addr,
+                    run: at.predecessor(),
+                },
+            )?)
+            .freeze(SegmentSlot::Run),
         )?;
+        self.intern_prefix(&prefix)?;
 
         let plan = RunPlan {
             run: site.run_id,

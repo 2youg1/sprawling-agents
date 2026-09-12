@@ -769,3 +769,22 @@ pub fn of_file(city_root: &Path, base: GitOid, head: Head, path: &str)
 `city_with(records, root)`——立一座有 N 条记录的城、写两个文件、开一次 CAS——在 `bundle/export.rs`、`bundle/files.rs`、`bundle/manifest.rs` 的测试模块里**逐字节重复三遍**。三份拷贝就是三个「一座城长什么样」的权威：改其中一份，另外两份的断言仍在对着旧形状作证。
 
 **一个夹具一处**：`crates/memory/src/bundle/fixture.rs`，`#[cfg(test)]` 编译，由 `bundle.rs` 以 `#[cfg(test)] mod fixture;` 挂上，三个测试模块 `use super::super::fixture::city_with;`。形状 4 适配器（它造的是被测代码之外的一个真实环境）。**不放进 `bundle.rs` 自身**：索引文件不持逻辑，而夹具是逻辑。
+
+### 8-22 `memory::status`：还没被栅栏收走的那些改动，以及仓库此刻站在哪
+
+`between` 比的是调用方已经握着的两个点，答不出仓库自己站在哪：哪个分支被检出、它有没有上游、它跑出上游多远——这三件是人在问「哪些文件动了」之前先问的。
+
+```rust
+pub struct Drift { pub ahead: u64, pub behind: u64 }
+pub struct WorkingStatus { pub branch: Option<String>, pub drift: Option<Drift>,
+                           pub files: Vec<FileChange> }
+pub fn working_status(city_root: &Path, scope: Option<&str>, base: Option<GitOid>)
+    -> Result<WorkingStatus, MemoryError>;
+```
+
+**四条口径：**
+
+1. **`base` 由调用方点名，因为栅栏不动 HEAD。** `checkpoint::wave_pre` 把提交挂在 `refs/sprawling/` 之下，HEAD 停在基提交或上一次落地处；照 HEAD 比会把这座城跑过的每一次 wave 都报成「未提交」。`None` 退回 HEAD，那是一座还没立过栅栏的城所拥有的全部。
+2. **未跟踪文件照样成行。** 一个 agent 写下又从未入暂存的文件，恰恰是人要找的那个;只列已跟踪改动的清单会把一个新模块报成什么都没发生。为此 `changes::collect` 的 `Untracked` 归入 `How::Added`——工作树有而没有任何提交有的文件，就是这次加出来的。
+3. **`scope` 是一条 pathspec 而不是事后过滤。** 楼页问的是它自己那些文件，让 git 在走差异时就收窄，比走完全城再筛一遍少一趟盘。
+4. **`drift` 整个可缺席。** 没有上游、上游被删、以及处在游离头上，对读者而言是同一件可做的事（没有可比的对象），而与「和上游齐平」不是一回事。

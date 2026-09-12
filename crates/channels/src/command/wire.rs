@@ -25,7 +25,8 @@
 
 use kernel::IdemKey;
 
-use super::kind::{Command, NoSecret};
+use super::kind::Command;
+use super::no_secret::NoSecret;
 
 /// The Command set a socket can carry. `PutSecret` is unreachable because
 /// `NoSecret` has no values.
@@ -54,6 +55,8 @@ impl<Secret> Command<Secret> {
             Self::Rollback { .. } => "Rollback",
             Self::Halt { .. } => "Halt",
             Self::Reveal { .. } => "Reveal",
+            Self::DoctorInstall { .. } => "DoctorInstall",
+            Self::DoctorRefresh { .. } => "DoctorRefresh",
             Self::Release { .. } => "Release",
             Self::BatchByBuilding { .. } => "BatchByBuilding",
             Self::Approve { .. } => "Approve",
@@ -92,7 +95,9 @@ impl<Secret> Command<Secret> {
             | Self::PutDocument { ref idem, .. }
             | Self::AttachEndpoint { ref idem, .. }
             | Self::SelectModel { ref idem, .. }
-            | Self::Reveal { ref idem, .. } => Some(idem),
+            | Self::Reveal { ref idem, .. }
+            | Self::DoctorInstall { ref idem, .. }
+            | Self::DoctorRefresh { ref idem, .. } => Some(idem),
             Self::PutSecret { .. } | Self::Auth { .. } => None,
         }
     }
@@ -159,6 +164,7 @@ impl From<WireCommand> for Command {
                 dialect,
                 secret,
                 auth_header,
+                tuning,
                 idem,
             } => Self::ProbeEndpoint {
                 name,
@@ -166,6 +172,7 @@ impl From<WireCommand> for Command {
                 dialect,
                 secret,
                 auth_header,
+                tuning,
                 idem,
             },
             Command::AttachEndpoint {
@@ -175,6 +182,7 @@ impl From<WireCommand> for Command {
                 secret,
                 auth_header,
                 admit,
+                tuning,
                 idem,
             } => Self::AttachEndpoint {
                 name,
@@ -183,6 +191,7 @@ impl From<WireCommand> for Command {
                 secret,
                 auth_header,
                 admit,
+                tuning,
                 idem,
             },
             Command::SelectModel {
@@ -236,6 +245,8 @@ impl From<WireCommand> for Command {
             Command::Rollback { checkpoint, idem } => Self::Rollback { checkpoint, idem },
             Command::Halt { scope, idem } => Self::Halt { scope, idem },
             Command::Reveal { at, idem } => Self::Reveal { at, idem },
+            Command::DoctorInstall { item, idem } => Self::DoctorInstall { item, idem },
+            Command::DoctorRefresh { idem } => Self::DoctorRefresh { idem },
             Command::Release { scope, idem } => Self::Release { scope, idem },
             Command::BatchByBuilding { addr, idem } => Self::BatchByBuilding { addr, idem },
             Command::Approve {

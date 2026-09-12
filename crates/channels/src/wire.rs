@@ -24,7 +24,7 @@
 //! the mapping point is the assembly layer, and an unknown value is an error
 //! there, never a guess.
 
-use kernel::{Address, AxError, B3Hash, EventRecord, RunId, Seq};
+use kernel::{Address, AxError, B3Hash, EventRecord, RunId, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
 
 /// Wire format version. Bumped whenever the frame grammar changes shape in a
@@ -64,7 +64,23 @@ use serde::{Deserialize, Serialize};
 /// 23: a path a page prints can be opened where a person keeps their
 ///    files. The address grammar is the guard: there is no way to spell
 ///    a request for something outside the city.
-pub const WIRE_V: u32 = 23;
+/// 24: what an agent was told, what a building can do, and what is
+///    uncommitted in it - `Prefix`, `Content`, `Skills` and
+///    `GitStatus`, and the money beside a commit.
+/// 25: an endpoint carries what a person settled about it - a display
+///    label, its deadlines, how often a failed request is made again,
+///    the headers every call adds and the body fields every call
+///    writes. The probe carries the same, so what a probe reached is
+///    what an attachment calls.
+/// 26: the process log reaches a page. A third class of frame beside
+///    the event and the increment, carrying one diagnostic line; and
+///    this machine can be told to install one thing it lacks and to
+///    look at itself again.
+/// 27: a tool server carries what `claude mcp add` lets somebody write -
+///    a command with environment variables, a url with several headers,
+///    and a third transport that answers on a stream - and `McpHealth`
+///    asks one address's servers where they stand and what they offer.
+pub const WIRE_V: u32 = 27;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
@@ -174,6 +190,15 @@ pub enum ServerFrame {
     /// arrives, and the settled text of that record is what a page
     /// draws. Where the two disagree, the record wins.
     Delta(Delta),
+    /// One line of the process log, as `docs/logging.md` defines it.
+    ///
+    /// **A log is not history**, and this frame is what keeps that
+    /// true while a person still gets to read it: the line has no
+    /// ledger sequence of its own, it is never written down, and a
+    /// client that missed one has lost nothing. It carries the ledger
+    /// position it was written at, which is the integer the two
+    /// timelines line up on.
+    Log(LogLine),
 }
 
 /// One piece of what a model is saying, on its way to a page.
@@ -182,6 +207,44 @@ pub enum ServerFrame {
 pub struct Delta {
     pub run: RunId,
     pub text: String,
+}
+
+/// Who reads a log line, and when.
+///
+/// The five `docs/logging.md` names, spelled on the wire exactly as
+/// `runtime::diagnostics::Level` spells them on a terminal. This crate
+/// cannot depend on `runtime` — the graph points inward — so the
+/// mapping between the two lives at the assembly layer, where a test
+/// holds the two spellings equal name for name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum LogLevel {
+    Refuse,
+    Effect,
+    Decide,
+    Trace,
+    Wire,
+}
+
+/// One diagnostic line on its way to a page.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct LogLine {
+    /// Where the ledger stood when the line was written. Not a sequence
+    /// of this stream's own: two lines can share it, and a reader uses
+    /// it to put the line beside the history rather than to detect a
+    /// gap.
+    pub seq: Seq,
+    /// When this machine wrote it. Absent when the clock could not be
+    /// read, because `seq` is the anchor either way and dropping the
+    /// line would lose the diagnostic to save the timestamp.
+    pub t: Option<TimeMs>,
+    pub level: LogLevel,
+    pub module: String,
+    /// Which run it was written under, and absent for the city itself.
+    pub run: Option<RunId>,
+    pub line: String,
 }
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
@@ -251,6 +314,24 @@ mod tests {
                 limit: 20,
             },
             Query::Doctor,
+            Query::Prefix {
+                run: RunId::from_bytes([1u8; 16]),
+            },
+            Query::Content {
+                locator: kernel::Locator::Cas {
+                    hash: B3Hash::digest(b"a segment"),
+                    range: None,
+                },
+            },
+            Query::Skills {
+                building: Address::parse("acme").unwrap(),
+            },
+            Query::GitStatus {
+                building: Address::parse("acme").unwrap(),
+            },
+            Query::McpHealth {
+                addr: Address::parse("acme").unwrap(),
+            },
         ];
         assert_eq!(queries.len(), QUERY_NAMES.len());
         for (query, expected) in queries.iter().zip(QUERY_NAMES) {

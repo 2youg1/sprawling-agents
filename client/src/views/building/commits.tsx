@@ -15,7 +15,7 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount }
 
 import { commitsQuery } from "../../core/asking";
 import { toFragment } from "../../core/route";
-import { clock } from "../../core/time";
+import { clock, usd } from "../../core/time";
 import type { Address, CommitAnswer, CommitsAnswer, Seq } from "../../wire";
 import { useLang, useSay, useUi } from "../../ui";
 import { Changes } from "../changes";
@@ -72,6 +72,11 @@ function Row(props: {
             <span class="hidden shrink-0 truncate text-text-disabled md:inline">
               {props.commit.model}
               {effort()}
+            </span>
+          </Show>
+          <Show when={props.commit.spent > 0}>
+            <span class="hidden shrink-0 text-text-disabled md:inline">
+              {say("commits_spent", { usd: usd(props.commit.spent) })}
             </span>
           </Show>
           <Show when={props.commit.lineage.length > 1}>

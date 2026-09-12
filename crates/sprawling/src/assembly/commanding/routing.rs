@@ -10,8 +10,18 @@ use kernel::{AxCode, AxError};
 
 use super::super::{
     Assignment, Ceilings, Chosen, Credential, Entered, HALTED, RELEASED, RunWorker, mode_of,
-    not_built,
+    not_built, tuning_of,
 };
+
+/// What a Cancel or a Steer is told when no run answers to the id it
+/// names.
+///
+/// Both reach this file only after `Desk::interrupt_for` failed to lift
+/// them off the queue, so the subject is the id rather than the verb:
+/// the verb is built, and the run is what is missing.
+fn no_run_answers(action: &'static str, run: kernel::RunId, recovery: &'static str) -> AxError {
+    AxError::failure(AxCode::InvalidArgs, action, run.to_string()).with_recovery(recovery)
+}
 
 impl RunWorker {
     /// Carries out one command, with the address its refusal goes back
@@ -75,19 +85,23 @@ impl RunWorker {
                 mcp,
                 desktop,
                 ..
-            } => self.configure_building(&addr, sandbox.as_ref(), mcp.as_deref(), desktop.as_deref()),
+            } => {
+                self.configure_building(&addr, sandbox.as_ref(), mcp.as_deref(), desktop.as_deref())
+            }
             channels::Command::ProbeEndpoint {
                 name,
                 base_url,
                 dialect,
                 secret,
                 auth_header,
+                tuning,
                 ..
             } => self.probe_endpoint(Entered {
                 name: name.as_str().to_owned(),
                 base_url,
                 dialect,
                 credential: Credential::entered(secret, auth_header),
+                tuning: tuning_of(tuning),
             }),
             channels::Command::AttachEndpoint {
                 name,
@@ -96,6 +110,7 @@ impl RunWorker {
                 secret,
                 auth_header,
                 admit,
+                tuning,
                 ..
             } => self.attach_endpoint(
                 Entered {
@@ -103,6 +118,7 @@ impl RunWorker {
                     base_url,
                     dialect,
                     credential: Credential::entered(secret, auth_header),
+                    tuning: tuning_of(tuning),
                 },
                 &admit,
             ),
@@ -145,32 +161,29 @@ impl RunWorker {
             channels::Command::Fork {
                 run, at_seq, addr, ..
             } => self.fork(run, at_seq, addr).map(|_| ()),
-            channels::Command::PutDocument { which, ref body, .. } => {
-                self.put_document(which, body)
-            }
+            channels::Command::PutDocument {
+                which, ref body, ..
+            } => self.put_document(which, body),
             channels::Command::Halt { scope, .. } => self.set_admission(&scope, HALTED),
-            channels::Command::Reveal { at, .. } => {
-                crate::revealing::reveal(&self.city_root, &at)
+            channels::Command::Reveal { at, .. } => crate::revealing::reveal(&self.city_root, &at),
+            channels::Command::DoctorInstall { ref item, .. } => self.doctor_install(item),
+            channels::Command::DoctorRefresh { .. } => {
+                self.look_at_this_machine();
+                Ok(())
             }
             channels::Command::Release { scope, .. } => self.set_admission(&scope, RELEASED),
             // Cancel and Steer have a second door. `Desk::interrupt_for`
             // lifts them off the queue at the next safe point of the run
             // they name, so arriving here means no run answered - which
             // is what the refusal says, instead of naming the verb.
-            channels::Command::Cancel { run, .. } => Err(AxError::failure(
-                AxCode::InvalidArgs,
+            channels::Command::Cancel { run, .. } => Err(no_run_answers(
                 "cancel a run",
-                run.to_string(),
-            )
-            .with_recovery(
+                run,
                 "no run in flight answers to that id: it has already finished, or it never started",
             )),
-            channels::Command::Steer { run, .. } => Err(AxError::failure(
-                AxCode::InvalidArgs,
+            channels::Command::Steer { run, .. } => Err(no_run_answers(
                 "steer a run",
-                run.to_string(),
-            )
-            .with_recovery(
+                run,
                 "no run in flight answers to that id: steer one while it runs, or dispatch a new one",
             )),
             // Six verbs the wire spells and this city cannot perform.

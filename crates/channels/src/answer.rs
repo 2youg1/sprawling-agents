@@ -25,9 +25,13 @@ mod cost_of;
 mod doctor;
 mod document;
 mod evidence;
+mod git_status;
 mod hunks;
 mod listing;
+mod mcp_health;
+mod prefix;
 mod rounds;
+mod skills;
 
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
@@ -37,9 +41,13 @@ pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, Doctor
 pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use document::DocumentAnswer;
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
+pub use git_status::{Drift, GitStatusAnswer};
 pub use hunks::{HunksAnswer, PatchLine, Withheld};
 pub use listing::{Entry, EntryKind, ListingAnswer};
+pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
+pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
 pub use rounds::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Turn, Used};
+pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 
 /// A slice of the one history, oldest first.
 ///
@@ -114,6 +122,10 @@ pub struct EndpointsAnswer {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EndpointSummary {
     pub name: String,
+    /// What to call it on screen. The id it was filed under when the
+    /// person gave it no other name, so a page never has to decide what
+    /// to show when a label is missing.
+    pub label: String,
     pub base_url: String,
     pub dialect: DialectKind,
     pub models: Vec<String>,
@@ -214,6 +226,11 @@ pub enum Answer {
     Document(Box<DocumentAnswer>),
     Commits(CommitsAnswer),
     Doctor(Box<DoctorAnswer>),
+    Prefix(Box<PrefixAnswer>),
+    Content(Box<ContentAnswer>),
+    Skills(Box<SkillsAnswer>),
+    GitStatus(Box<GitStatusAnswer>),
+    McpHealth(Box<McpHealthAnswer>),
     Unavailable { query: String },
 }
 

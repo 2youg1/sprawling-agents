@@ -26,6 +26,7 @@
 mod explain;
 mod family;
 pub(crate) mod host;
+pub(crate) mod installing;
 mod needs;
 mod paint;
 mod presence;

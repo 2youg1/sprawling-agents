@@ -92,7 +92,7 @@ export function ByUrl(props: { readonly intake: Intake; readonly onCommandDoor: 
       </div>
       <PairTable
         caption={say("mcp_header")}
-        note={say("mcp_gap_headers")}
+        note={say("mcp_header_help")}
         rows={draft().headers}
         onChange={(headers) => {
           setDraft({ ...draft(), headers });

@@ -89,8 +89,15 @@ fn read_spine(city_root: &Path) -> Vec<BuildingProgress>;                    // 
 // bin::mcp_stdio（形状 4 适配器；实现 protocol::Outbound）
 pub(crate) struct StdioServer { /* 私有：Rc<RefCell<Inner>>，克隆即同一个子进程的第二个句柄 */ }
 impl StdioServer {
-    pub(crate) fn start(command: &str, args: &[String], cwd: &Path) -> Result<StdioServer, AxError>;
+    pub(crate) fn start(command: &str, args: &[String], env: &[Redeemed], cwd: &Path)
+        -> Result<StdioServer, AxError>;
 }
+
+// bin::mcp_redeeming（形状 2 值类型）：一栋楼写在 server 旁边的成对表，引用已兑付
+pub(crate) struct Redeemed { /* 私有：name，以及 Plain | Sealed 两支 */ }
+impl Redeemed { pub(crate) fn name(&self) -> &str; pub(crate) fn expose(&self) -> &str; }
+pub(crate) fn redeem(pairs: &[(String, String)], resolve: &gateway::SecretResolver,
+                     action: &'static str) -> Result<Vec<Redeemed>, AxError>;
 impl protocol::Outbound for StdioServer {
     fn call(&mut self, line: &str, patience: TimeoutMs) -> Result<String, AxError>;
 }
@@ -100,6 +107,8 @@ fn mcp_tools(&mut self, config: &FrozenConfig, addr: &Address, confidential: boo
     -> Vec<protocol::McpTool>;   // 起不来的 server 缺席并留下诊断，恒不拒整次 dispatch
 ```
 
+- **兑付只有一处，三种 transport 共用**（`bin::mcp_redeeming`）：一个子进程要的环境变量与一台主机要的请求头是同一件事——一个名、一个值、以及一个可能是凭证的值。兑付发生在读配置的那一刻而不是第一次调用时：金库里没有的引用是一个配置错误，而能处理它的人正在编辑那份文件，不是一小时后工具不应答的那个模型。`Redeemed` 的 `Debug` 只报名字，明文的唯一出口是 `expose`。
+- **交给子进程的名字收不回来**，故 `start` 收到的 `env` 已经是兑付好的值，明文只在这一次调用里存在；`env` 是**添加**到本进程已有的环境上，否则一台 server 会找不到 PATH 与 HOME。
 - **一台 server 一个子进程，一次 dispatch 一条命**：工具表随 Run 冻结，子进程的寿命因此就是 Run 的寿命。最后一个 `McpTool` 落地时 `Drop` 杀子进程，于是「谁来回收」不需要第二份名单。
 - **读取线程是句柄的一部分，spawn 点仍在 bin**（确定性七条③的口径：并发归装配层）。同步读一根管道没有期限，而一个不回答的 server 会把整个 Run 挂死。故 `start` 起一条只读 stdout 的线程，`call` 用 `recv_timeout` 等它；超时即杀子进程并三段式拒。**线程恒不泄漏**：杀子进程关掉管道，读到 EOF 即结束。
 - **期限从声明里来，不在适配器里另写一个数**：`ToolMeta.timeout`（`tools_from` 写的 `TimeoutMs(60_000)`）既是对模型的承诺，就应当是真正被执行的那一个；否则该字段只是装饰。故期限随 `Outbound::call` 入参。
@@ -2607,6 +2616,21 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError>;
 
 **本章测试**：`a_path_this_city_does_not_hold_is_refused_rather_than_opened`、`the_selected_path_travels_as_one_argument`。
 
+### 8-62 `bin::assembly::credentials::probing`：一次 probe 答的是读数（形状 4 适配器）
+
+```rust
+pub(super) struct Probing { pub reach: kernel::Reach, pub served: Result<Vec<gateway::ModelFacts>, AxError> }
+pub(super) fn reach_of(base_url: &str) -> Result<kernel::Reach, AxError>;
+pub(super) fn probed_payload(name: &str, base_url: &str, found: &Probing) -> Result<Payload, AxError>;
+pub(super) fn tuning_of(wire: channels::EndpointTuning) -> gateway::EndpointTuning;  // credentials.rs
+```
+
+- **`probe_endpoint` 不再因读不出模型表而拒绝**。它记一条 `endpoint_probed`，里面是分段读数（`gateway::reach` 量出，时间由调用方戳，采样点仍只有 `bin::assembly`）、模型表、以及读不出时那条拒绝自己的 code 与 subject。理由是这四段对填表的人是四个不同的下一步，而作为一次拒绝返回时它们在界面上塌成传输库的一句话。**它仍会拒绝的两件事**：凭据引用拼不出来、载荷账本不收——两者都没走到发请求那一步，因此没有读数可报。
+- **`attach_endpoint` 的拒绝语义一个字没改**：probe 失败而人没点名任何模型，仍然是拒绝，因为那样的城连一个可调用的模型 id 都没有。
+- **probe 按调用时的那套头与期限发出**：一个需要自定义请求头的网关，在 probe 不带那个头时答 401，人于是读到「密钥无效」，而那把密钥是好的。`request_max_retries` 在这里被兑现，且只在这里——模型调用的重试是 watchdog 的判断（gateway-SPEC §8-16），而设置页上有人正在等这一个请求。
+- **`tuning_of` 是线上词汇与 gateway 词汇之间唯一的翻译点**：零读成缺省（清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成），空名字的头与不以 `/` 开头的 pointer 被丢掉（表单在人打字时留着空行），`stream_idle_timeout_ms` 成为 `stream_deadline_ms`。
+- **`EndpointsAnswer` 的每一行带 `label`**，取 `AttachedEndpoint::label()`，缺省即 name。
+
 ### 8-61 已经在等的那一批，合成一道屏障
 
 `RelayGate::serve_waiting` 先把此刻等着的请求**全部取空**，再一次 `Ledger::append_all` 交下去，按位回信。
@@ -2615,3 +2639,100 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError>;
 - **等待的语义一个字没改**：回信仍然在落盘之后才发出，因为「`Ok` 即已落盘」正是 `EventRef` 之所以是一条已存在历史的引用（memory-SPEC §8-1）。否决「给端口加一个显式屏障动作、`append` 只写不同步」：那会让一条已经发出的 `EventRef` 指向一条可能还不存在的历史。
 - **整波失败即整波拒**：`append_all` 的第一条拒绝结束整波，每个在等的调用方都收到同一条拒绝——与单条 `append` 在它后面那条失败时给出的承诺相同。
 - **计数店是证据**：`everything_already_waiting_reaches_the_store_in_one_wave` 用一家数波数的店断言四条同时到达的 draft 不花四次波，这是端口早就允许的第二实现，而不是为这条断言新开的洞。
+
+### 8-63 bin::serving::journal（形状 4 适配器）：一行诊断离开本进程的唯一出口
+
+**日志给人看，而「人」不止坐在终端前。** `docs/logging.md` 把日志与账本分得干净，但没有说日志不许给浏览器看；记录页第四个透镜先前是空的，因为线上没有帧携得动一行。
+
+```rust
+pub struct Journal { /* lines: broadcast::Sender<channels::LogLine> —— 私有 */ }
+impl Journal {
+    pub fn new() -> Journal;
+    pub fn sink(&self) -> runtime::diagnostics::Sink;  // 终端一份，看的人一份
+    pub(super) fn lines(&self) -> broadcast::Sender<channels::LogLine>;
+}
+```
+
+- **一个 sink 两张嘴，不是两份日志**：页面读到的是终端读到的同一条 entry、同一个层底、同一个 sink。本文件不把任何一行读回来，所以「判定与恢复逻辑不读日志」照旧成立。
+- **时钟在这里采样**：`docs/logging.md` §8 认可装配层是唯一可以采样的地方，写 entry 的库不许有第二个时间源。读不到钟即 `t` 缺席，而不是把这一行丢掉——锚是 `seq`，为一个时间戳丢诊断是把代价付错了地方。
+- **`Journal` 先于 `Diagnostics` 存在**：sink 是往通道里写的那一半，所以它必须先有；`Serving` 因此同时携 `log` 与 `journal`，在服务层取出 `lines()` 交给 `ServeConfig::logs`。
+- **窗口 512 行**：比增量通道宽、比事件通道窄。`wire` 层底的一座城写得比人读得快，而这里丢掉的是一条诊断而不是一段历史。
+- **`Level` 五个名字的映射住在这里**：`channels` 依赖图上够不到 `runtime`，一条测试把 `LogLevel` 的五个 serde 名与 `Level::as_str()` 逐个钉成相等。`Level` 是 `#[non_exhaustive]`，所以多出来的一级如实落到人读得最宽的那一级，而不是被丢掉——看不见的一行比归错一档更糟。
+
+### 8-64 机器上的两个动词：`DoctorInstall` 与 `DoctorRefresh`（形状 4 适配器）
+
+`Query::Doctor` 答的是开城那一刻的快照（§8-53）。于是机器页只能把一行命令复制到终端，装完还要重启城才看得见结果。两条命令补上这段，执行点是 `bin::assembly::commanding::machine`，装的那一步是 `bin::doctor::installing`。
+
+```rust
+// bin::doctor::installing
+pub(crate) fn install(item: &str, progress: &mut dyn FnMut(&str)) -> Result<(), AxError>;
+// bin::assembly::commanding::machine
+impl RunWorker {
+    pub(in crate::assembly) fn doctor_install(&mut self, item: &str) -> Result<(), AxError>;
+    pub(in crate::assembly) fn look_at_this_machine(&mut self);
+}
+```
+
+- **只跑 `Recipe::Command`，走的是终端那条 `Machine::install`**，不是第二个安装器。`Print` 与 `Manual` 各自带着「人自己去做什么」被拒：管道进 shell 的脚本是没人读过的代码，这条纪律不因请求来自页面而松一格。需求表里没有的名字在起任何进程之前就被拒，因为页面问的是这份构建不认识的东西。
+- **进度就是日志行**（`bin::doctor` 模块名）。安装是本城起的一个进程并等它，值得报告的两件事——将要跑什么、怎么结束——正好是一行日志的形状；第二条进度通道会是同一件事的第二个权威。
+- **`doctor_install` 装完自己再探一遍**：装完仍答启动快照的城，会告诉人他刚装的东西还是没有。
+- **答案不入账本**：机器有什么不是这座城里发生的事——它在本进程之外被改变，写进历史就是写进一份会错的历史。它沿 `RunWorker::examine` 这个 sink 交给服务层的 views，与开城那一次写进去的是同一处。没有 sink 的 worker（命令行逐条驱动的那种）照样探、照样写那一行日志：一个行为取决于有没有人在看的动词，是两个动词。
+- **跑在写线程上，这就是代价**：探测是十几个程序各被起一次的几秒钟，安装是一个包管理器，两者都占住其他命令排的那条队。但另一条路更糟——让读去起进程，会拿着 views 的锁把其他每一次读都堵住，而且没人要求它这么做。
+
+### 8-65 `bin::mcp_sse`：一台在流上应答的 server（形状 4 适配器；实现 `protocol::Outbound`）
+
+第三种 transport，也是唯一一种「请求与它的答不是同一次交换」的。
+
+```rust
+pub(crate) struct SseServer { /* 私有：消息端点、已兑付的 headers、client、事件接收端 */ }
+impl SseServer {
+    pub(crate) fn open(url: &str, headers: &[(String, String)],
+                       resolve: &gateway::SecretResolver) -> Result<SseServer, AxError>;
+}
+impl protocol::Outbound for SseServer { /* call：先 POST 再等流；notify：只 POST */ }
+```
+
+- **先开流，再说话**：规范让 server 把消息端点作为第一个事件播出来，故在流开口之前无处可投。开流因此自带期限（15 s），一台始终不播端点的 server 被拒，而不是被投到一个猜出来的路径上。播出的多半是一条路径而不是整条地址，故按流自己的地址解析——一台在反向代理后面的 server 只知道它自己那条路径。
+- **读取线程与 `bin::mcp_stdio` 同形、同理由**：读流没有自己的期限，故一条线程把阻塞读变成这一侧可以带期限等的通道；丢掉最后一个句柄即丢掉接收端，下一次发送结束读取线程。
+- **一次 POST 不是一个答**：对侧用 202 收下并一言不发，答随后作为事件到达。故 `call` 先投再等流，`notify` 投完即止。
+- **克隆共用同一条流**：一台 server 是一次对话，无论一次 Run 握着它几件工具；两条流会让一次调用的答落在调用方没有在读的那一条上。
+- **401／403 抬 `E_CREDENTIAL_MISSING`**，与 `bin::mcp_http` 同一条口径：server 在、也听懂了，缺的是一个账号，而人接下来要做的是登录而不是检查地址。健康视图（§8-66）据此把它画成「认证中」而不是「失败」。
+
+### 8-66 `bin::views::mcp_health`：一个地址够得到的每台 server 此刻站在哪（形状 7 投影）
+
+```rust
+impl Views {
+    pub(super) fn mcp_health_answer(&self, addr: &Address) -> channels::McpHealthAnswer;
+}
+```
+
+- **现问现握手，恒不折自账本**。一台 server 通不通是关于此刻的事实——一个起得来的程序、一台应答的主机、一个仍然有效的账号——记下来的那一份会在它停掉一小时后仍说它在。读配置的方式与 `Query::Document`／`Listing` 读这棵树的方式相同。
+- **用的就是 Run 起点那一次握手**（`protocol::handshake` ＋ `tools/list`，经 `McpLink`），故人读到的与模型拿到的不可能不一致。三种状态的判断无一处要猜：`E_CREDENTIAL_MISSING` 即 `Authenticating`，其余拒绝整条上线。
+- **这是唯一一条按秒计的读，代价写在这里**：它拿着 views 的锁，每台 server 一次握手。页面因此只在人打开 MCP 页或加完一台 server 时问一次，恒不上定时器、也恒不由记录触发（`staleBy` 对它答 false）。
+- **金库是借来的，不是这里开的**（`Views::lend_the_vault`，开城时交一次，与 `found_on_this_machine` 同形）：同一批凭证上的第二个句柄就是第二扇门。没有金库的 `Views`（重建、测试）把要凭证的那台 server 报成兑付不了，而不是把引用当成值发出去。
+
+### 8-67 四段全部入库，以及读回它们的三个投影
+
+**装配点。** `freeze_plan` 把四段全部 `intern` 进内容仓库，而不再只落 must-read 名单上那几份。先前 city 段与 JOB 段有对应对象、building 与 resident 两段没有，于是 `prompt_assembled` 里四个哈希有两个在 `cas/` 里找不到——一个人拿着哈希读不回原文。内容寻址天然去重：一栋楼的规则无论被多少次 run 冻结，仓库里都只有一份。
+
+city 段与 building 段同时携上它们的来源文档（`Assembled`：字节与 `Vec<SegmentSource>` 恒同行），地址由 `city::building_path`／`city::agents_path` 反算而来，**不在这里重述一栋楼的文件布局**。resident 段与 run 段不携来源：前者由身份与目录拼成，后者由 brief 与交接文本拼成，都不是可被打开的文档。一条位于城内却拼不成 `Address` 的路径是失败而不是猜测——一行读者点不开的来源，比一次回绝更糟。
+
+**三个投影。**
+
+```rust
+// views::prefix
+fn prefix_answer(&mut self, run: RunId) -> Option<channels::PrefixAnswer>;
+fn content_answer(&self, locator: &Locator) -> Option<channels::ContentAnswer>;
+// views::skills
+fn skills_answer(&self, building: &Address) -> Option<channels::SkillsAnswer>;
+// views::git_status
+fn git_status_answer(&self, building: &Address) -> Option<channels::GitStatusAnswer>;
+```
+
+**五条口径：**
+
+1. **`prefix_answer` 取该 run 最早的一条 `prompt_assembled`。** prefix 一次冻结管一次 run 的一生，之后每一轮记的是同样四个哈希；取最早的那一条，一次没走过第一轮的 run 也仍有答案。
+2. **字节的可读性判定只有一处。** `views::document` 的 `read_bytes` 同时服务树上的文件与仓库里的对象——什么样的字节算文本，不取决于它被存在哪里。
+3. **技能的书架在被问的那一刻扫盘，而 pin 出自历史。** `city::Library` 是书架的权威，旁边再留一份索引就是磁盘说法的第二份副本；而「哪些 run 用过」折自 `run_started` 里那张 `skills` 表（`Views::skill_pins`，键为名字与哈希成对），不是第二次扫盘。
+4. **`git_status_answer` 的比较基准取自历史而不是 HEAD。** 该楼最近一条 `checkpoint_committed`／`pr_merged` 就是基准，它由 `commits_answer(Some(building), None, 1)` 给出——变更栏旁边显示的那一行，正是提交列表打开时的第一行。
+5. **仓库句柄按次打开。** 这是投影里唯一一处伸向它不拥有的目录的读；跨重建留着的句柄会活得比开它的那座城还长。

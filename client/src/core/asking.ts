@@ -81,6 +81,11 @@ function keyOfAnswer(answer: Answer): string | null {
   if ("cost_of" in answer) return keyOf({ cost_of: { node: answer.cost_of.node } });
   if ("listing" in answer) return keyOf({ listing: { at: answer.listing.at ?? null } });
   if ("document" in answer) return keyOf({ document: { at: answer.document.at } });
+  if ("prefix" in answer) return keyOf({ prefix: { run: answer.prefix.run } });
+  if ("content" in answer) return keyOf({ content: { locator: answer.content.locator } });
+  if ("skills" in answer) return keyOf({ skills: { building: answer.skills.building } });
+  if ("git_status" in answer)
+    return keyOf({ git_status: { building: answer.git_status.building } });
   if ("commit" in answer) return keyOf({ commit: { oid: answer.commit.oid } });
   if ("hunks" in answer) {
     const { oid_a, oid_b, path } = answer.hunks;
@@ -154,6 +159,19 @@ function staleBy(record: EventRecord, key: string, query: Query): boolean {
     case "cost_view":
     case "cost_of":
       return kind === "model_returned" || kind === "roadmap_claimed";
+    // A prompt is frozen once for the life of a run and the object
+    // behind a hash never changes, so neither answer can go stale.
+    case "prefix":
+    case "content":
+      return false;
+    // A shelf moves when somebody edits the building's rules, and a
+    // pin appears when a run starts under them.
+    case "skills":
+      return kind === "building_configured" || kind === "run_started";
+    // The working tree moves whenever a wave writes, and every wave
+    // ends in a fence.
+    case "git_status":
+      return kind === "checkpoint_committed" || kind === "pr_merged";
     // Only the newest page can grow: an older page is bounded above by
     // a seq already written, and a commit's lineage walks backwards
     // from the run that made it, so a later successor never changes it.

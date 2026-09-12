@@ -261,16 +261,14 @@ pub(super) fn serve_city(
     if open {
         firstrun::open_when_ready(bind, url);
     }
+    // The one sink a diagnostic line leaves this process through: the
+    // terminal, and the page that has the log lens open. Made before
+    // the `Diagnostics` because the sink is what writes into it.
+    let journal = serving::Journal::new();
     let log = match log_floor(args) {
         Ok(Some(level)) => {
             println!("log: {level}");
-            // The one place a diagnostic line is written out, and the
-            // one place a clock may be sampled: a sink that wants a
-            // timestamp adds it here, never in the library.
-            runtime::diagnostics::Diagnostics::new(
-                level,
-                Box::new(|line: &str| eprintln!("{line}")),
-            )
+            runtime::diagnostics::Diagnostics::new(level, journal.sink())
         }
         Ok(None) => runtime::diagnostics::Diagnostics::off(),
         Err(unknown) => {
@@ -308,6 +306,7 @@ pub(super) fn serve_city(
         vault,
         vault_notice,
         log,
+        journal,
         console,
     })) {
         Ok(()) => ExitCode::SUCCESS,

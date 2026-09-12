@@ -30,6 +30,8 @@ mod browser_tool;
 mod effect;
 mod keying;
 mod mcp_http;
+mod mcp_redeeming;
+mod mcp_sse;
 mod mcp_stdio;
 mod plan_view;
 mod views;

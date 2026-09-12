@@ -30,6 +30,8 @@ impl runtime::EditTool
 impl runtime::ExecTool
 impl runtime::ExecTool
 impl runtime::FaultSandbox
+impl runtime::FrozenSegment
+impl runtime::FrozenSegment
 impl runtime::ProviderMode
 impl runtime::ProviderMode
 impl runtime::ReadTool
@@ -42,6 +44,8 @@ impl runtime::Sandbox for runtime::FaultSandbox
 impl runtime::Sandbox for runtime::FaultSandbox
 impl runtime::SearchTool
 impl runtime::SearchTool
+impl runtime::SegmentSource
+impl runtime::SegmentSource
 impl runtime::StatusSnapshot
 impl runtime::StatusSnapshot
 impl runtime::StatusTool
@@ -80,8 +84,6 @@ impl runtime::mode::Mode
 impl runtime::mode::Mode
 impl runtime::prefix::FrozenPrefix
 impl runtime::prefix::FrozenPrefix
-impl runtime::prefix::FrozenSegment
-impl runtime::prefix::FrozenSegment
 impl runtime::prefix::SegmentCaps
 impl runtime::prefix::SegmentCaps
 impl runtime::reminder::ContextGauge
@@ -187,6 +189,18 @@ pub fn runtime::ExecTool::new(runtime::ExecSetup, alloc::boxed::Box<dyn runtime:
 pub fn runtime::FaultSandbox::new(alloc::vec::Vec<runtime::SandboxExit>) -> runtime::FaultSandbox
 pub fn runtime::FaultSandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>
 pub fn runtime::FaultSandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>
+pub fn runtime::FrozenSegment::assembled(runtime::SegmentSlot, alloc::vec::Vec<u8>, alloc::vec::Vec<runtime::SegmentSource>) -> runtime::FrozenSegment
+pub fn runtime::FrozenSegment::assembled(runtime::SegmentSlot, alloc::vec::Vec<u8>, alloc::vec::Vec<runtime::SegmentSource>) -> runtime::FrozenSegment
+pub fn runtime::FrozenSegment::bytes(&self) -> &[u8]
+pub fn runtime::FrozenSegment::bytes(&self) -> &[u8]
+pub fn runtime::FrozenSegment::hash(&self) -> &kernel::locator::B3Hash
+pub fn runtime::FrozenSegment::hash(&self) -> &kernel::locator::B3Hash
+pub fn runtime::FrozenSegment::new(runtime::SegmentSlot, alloc::vec::Vec<u8>) -> runtime::FrozenSegment
+pub fn runtime::FrozenSegment::new(runtime::SegmentSlot, alloc::vec::Vec<u8>) -> runtime::FrozenSegment
+pub fn runtime::FrozenSegment::slot(&self) -> runtime::SegmentSlot
+pub fn runtime::FrozenSegment::slot(&self) -> runtime::SegmentSlot
+pub fn runtime::FrozenSegment::sources(&self) -> &[runtime::SegmentSource]
+pub fn runtime::FrozenSegment::sources(&self) -> &[runtime::SegmentSource]
 pub fn runtime::ProviderMode::as_str(self) -> &'static str
 pub fn runtime::ProviderMode::as_str(self) -> &'static str
 pub fn runtime::ReadTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
@@ -202,6 +216,8 @@ pub fn runtime::SearchTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::SearchTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
 pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
+pub fn runtime::SegmentSource::whole(kernel::address::Address, u64) -> runtime::SegmentSource
+pub fn runtime::SegmentSource::whole(kernel::address::Address, u64) -> runtime::SegmentSource
 pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus], &[runtime::backlog::Standing]) -> alloc::string::String
 pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus], &[runtime::backlog::Standing]) -> alloc::string::String
 pub fn runtime::StatusTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
@@ -316,6 +332,7 @@ pub fn runtime::diagnostics::Level::as_str(&self) -> &'static str
 pub fn runtime::diagnostics::Level::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn runtime::diagnostics::Level::parse(&str) -> core::option::Option<runtime::diagnostics::Level>
 pub fn runtime::diagnostics::redact(&str) -> alloc::string::String
+pub fn runtime::diagnostics::render(runtime::diagnostics::Entry<'_>) -> alloc::string::String
 pub fn runtime::digest::Breaker::consecutive_failures(&self) -> u32
 pub fn runtime::digest::Breaker::consecutive_failures(&self) -> u32
 pub fn runtime::digest::Breaker::failed(&mut self)
@@ -379,24 +396,16 @@ pub fn runtime::package_exec(&kernel::tool::ToolCall, kernel::tool::ToolOutcome,
 pub fn runtime::parse_arm(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> core::result::Result<kernel::tool::ExecArm, kernel::error::shape::AxError>
 pub fn runtime::pipeline::exec::package_exec(&kernel::tool::ToolCall, kernel::tool::ToolOutcome, runtime::pipeline::exec::SieveSite<'_>, core::option::Option<runtime::clock::ClockStamp>) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::pipeline::package(&[u8], runtime::pipeline::PackContext<'_>) -> core::result::Result<runtime::pipeline::Packaged, kernel::error::shape::AxError>
-pub fn runtime::prefix::FrozenPrefix::assemble(runtime::prefix::FrozenSegment, runtime::prefix::FrozenSegment, runtime::prefix::FrozenSegment, runtime::prefix::FrozenSegment) -> core::result::Result<runtime::prefix::FrozenPrefix, kernel::error::shape::AxError>
-pub fn runtime::prefix::FrozenPrefix::assemble(runtime::prefix::FrozenSegment, runtime::prefix::FrozenSegment, runtime::prefix::FrozenSegment, runtime::prefix::FrozenSegment) -> core::result::Result<runtime::prefix::FrozenPrefix, kernel::error::shape::AxError>
+pub fn runtime::prefix::FrozenPrefix::assemble(runtime::FrozenSegment, runtime::FrozenSegment, runtime::FrozenSegment, runtime::FrozenSegment) -> core::result::Result<runtime::prefix::FrozenPrefix, kernel::error::shape::AxError>
+pub fn runtime::prefix::FrozenPrefix::assemble(runtime::FrozenSegment, runtime::FrozenSegment, runtime::FrozenSegment, runtime::FrozenSegment) -> core::result::Result<runtime::prefix::FrozenPrefix, kernel::error::shape::AxError>
 pub fn runtime::prefix::FrozenPrefix::prompt_payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn runtime::prefix::FrozenPrefix::prompt_payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn runtime::prefix::FrozenPrefix::segment_hashes(&self) -> [kernel::locator::B3Hash; 4]
 pub fn runtime::prefix::FrozenPrefix::segment_hashes(&self) -> [kernel::locator::B3Hash; 4]
-pub fn runtime::prefix::FrozenPrefix::segments(&self) -> [&runtime::prefix::FrozenSegment; 4]
-pub fn runtime::prefix::FrozenPrefix::segments(&self) -> [&runtime::prefix::FrozenSegment; 4]
+pub fn runtime::prefix::FrozenPrefix::segments(&self) -> [&runtime::FrozenSegment; 4]
+pub fn runtime::prefix::FrozenPrefix::segments(&self) -> [&runtime::FrozenSegment; 4]
 pub fn runtime::prefix::FrozenPrefix::system_blocks(&self) -> core::result::Result<alloc::vec::Vec<kernel::model::wire::SystemBlock>, kernel::error::shape::AxError>
 pub fn runtime::prefix::FrozenPrefix::system_blocks(&self) -> core::result::Result<alloc::vec::Vec<kernel::model::wire::SystemBlock>, kernel::error::shape::AxError>
-pub fn runtime::prefix::FrozenSegment::bytes(&self) -> &[u8]
-pub fn runtime::prefix::FrozenSegment::bytes(&self) -> &[u8]
-pub fn runtime::prefix::FrozenSegment::hash(&self) -> &kernel::locator::B3Hash
-pub fn runtime::prefix::FrozenSegment::hash(&self) -> &kernel::locator::B3Hash
-pub fn runtime::prefix::FrozenSegment::new(runtime::prefix::SegmentSlot, alloc::vec::Vec<u8>) -> runtime::prefix::FrozenSegment
-pub fn runtime::prefix::FrozenSegment::new(runtime::prefix::SegmentSlot, alloc::vec::Vec<u8>) -> runtime::prefix::FrozenSegment
-pub fn runtime::prefix::FrozenSegment::slot(&self) -> runtime::prefix::SegmentSlot
-pub fn runtime::prefix::FrozenSegment::slot(&self) -> runtime::prefix::SegmentSlot
 pub fn runtime::prefix::SegmentCaps::startup_default() -> runtime::prefix::SegmentCaps
 pub fn runtime::prefix::SegmentCaps::startup_default() -> runtime::prefix::SegmentCaps
 pub fn runtime::prefix::build_prefix(runtime::prefix::PrefixPlan) -> core::result::Result<runtime::prefix::FrozenPrefix, kernel::error::shape::AxError>
@@ -688,6 +697,9 @@ pub runtime::SegmentSlot::Building
 pub runtime::SegmentSlot::City
 pub runtime::SegmentSlot::Resident
 pub runtime::SegmentSlot::Run
+pub runtime::SegmentSource::addr: kernel::address::Address
+pub runtime::SegmentSource::dropped: u64
+pub runtime::SegmentSource::kept: u64
 pub runtime::SieveRecord::bytes_in: u64
 pub runtime::SieveRecord::bytes_out: u64
 pub runtime::SieveRecord::filter: alloc::string::String
@@ -810,6 +822,9 @@ pub runtime::compaction::Strategy::Head
 pub runtime::compaction::Strategy::Keep
 pub runtime::compaction::Strategy::Offload
 pub runtime::compaction::Strategy::Tail
+pub runtime::diagnostics::Entry::level: runtime::diagnostics::Level
+pub runtime::diagnostics::Entry::message: &'a str
+pub runtime::diagnostics::Entry::site: runtime::diagnostics::Site<'a>
 pub runtime::diagnostics::Level::Decide
 pub runtime::diagnostics::Level::Effect
 pub runtime::diagnostics::Level::Refuse
@@ -880,6 +895,9 @@ pub runtime::prefix::SegmentSlot::Building
 pub runtime::prefix::SegmentSlot::City
 pub runtime::prefix::SegmentSlot::Resident
 pub runtime::prefix::SegmentSlot::Run
+pub runtime::prefix::SegmentSource::addr: kernel::address::Address
+pub runtime::prefix::SegmentSource::dropped: u64
+pub runtime::prefix::SegmentSource::kept: u64
 pub runtime::prefix::SourceDoc::addr: kernel::address::Address
 pub runtime::prefix::SourceDoc::bytes: core::option::Option<alloc::vec::Vec<u8>>
 pub runtime::reminder::ContextReminder::HandoverWindow
@@ -1098,6 +1116,7 @@ pub struct runtime::SandboxJob
 pub struct runtime::SandboxOutcome
 pub struct runtime::SearchTool
 pub struct runtime::SegmentCaps
+pub struct runtime::SegmentSource
 pub struct runtime::SieveHistory(_)
 pub struct runtime::SieveRecord
 pub struct runtime::SieveRequest<'a>
@@ -1133,6 +1152,7 @@ pub struct runtime::clock::ClockStamp
 pub struct runtime::clock::StampGate
 pub struct runtime::clock::ZoneEntry
 pub struct runtime::diagnostics::Diagnostics
+pub struct runtime::diagnostics::Entry<'a>
 pub struct runtime::diagnostics::Site<'a>
 pub struct runtime::digest::Breaker
 pub struct runtime::digest::Digest
@@ -1150,6 +1170,7 @@ pub struct runtime::prefix::FrozenPrefix
 pub struct runtime::prefix::FrozenSegment
 pub struct runtime::prefix::PrefixPlan
 pub struct runtime::prefix::SegmentCaps
+pub struct runtime::prefix::SegmentSource
 pub struct runtime::prefix::SourceDoc
 pub struct runtime::reminder::ContextGauge
 pub struct runtime::replay::VerifiedLedger
@@ -1194,4 +1215,4 @@ pub struct runtime::turn::TurnCancelled
 pub struct runtime::turn::TurnReport
 pub struct runtime::window::Window
 pub trait runtime::Sandbox: core::marker::Send
-pub type runtime::diagnostics::Sink = alloc::boxed::Box<(dyn core::ops::function::FnMut(&str) + core::marker::Send)>
+pub type runtime::diagnostics::Sink = alloc::boxed::Box<(dyn core::ops::function::FnMut(runtime::diagnostics::Entry<'_>) + core::marker::Send)>

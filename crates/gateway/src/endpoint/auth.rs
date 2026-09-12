@@ -124,8 +124,11 @@ mod tests {
             redemption(),
         )
         .unwrap();
-        let ids = endpoint.list_models(&url).unwrap();
-        assert_eq!(ids, vec!["m-1".to_owned()]);
+        let served = endpoint.list_models(&url).unwrap();
+        assert_eq!(
+            served.iter().map(|row| row.id.as_str()).collect::<Vec<_>>(),
+            vec!["m-1"]
+        );
         let seen = handle.join().unwrap();
         assert!(
             seen[0].to_ascii_lowercase().contains("x-api-key: sk-test-"),

@@ -46,20 +46,20 @@ fn exposed() -> SocketAddr {
 
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
-    // Twenty-four commands, twenty-three queries. The count is not a style
+    // Twenty-seven commands, twenty-nine queries. The count is not a style
     // choice - it is the wire's closed surface.
-    assert_eq!(COMMAND_NAMES.len(), 25, "command table");
-    assert_eq!(QUERY_NAMES.len(), 24, "query table");
+    assert_eq!(COMMAND_NAMES.len(), 27, "command table");
+    assert_eq!(QUERY_NAMES.len(), 29, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 25, "command names are distinct");
+    assert_eq!(sorted.len(), 27, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 24, "query names are distinct");
+    assert_eq!(sorted.len(), 29, "query names are distinct");
 }
 
 #[test]
@@ -89,14 +89,14 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 23,
+        WIRE_V, 27,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
 
 /// A function of WIRE_V and the two name tables, so any change to the
 /// protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "e6d814839ad03bca17dc5f10940c625b55d8d6a73898536e28c26c2b87396d45";
+const WIRE_SCHEMA_GOLDEN: &str = "28af22189f458d801993017a1c63e498380e0e9676c31e092416d58fa8149401";
 
 // -------------------------------------------------------------- binding face
 
@@ -305,6 +305,7 @@ title = \"a window\"
             dialect: kernel::DialectKind::OpenAi,
             secret: Some("secret:house/key".to_owned()),
             auth_header: None,
+            tuning: channels::EndpointTuning::default(),
             idem,
         },
         Command::AttachEndpoint {
@@ -314,6 +315,20 @@ title = \"a window\"
             secret: Some("secret:house/key".to_owned()),
             auth_header: None,
             admit: vec!["gpt-x".to_owned()],
+            tuning: channels::EndpointTuning {
+                label: Some("House".to_owned()),
+                timeout_ms: Some(60_000),
+                request_max_retries: Some(4),
+                stream_idle_timeout_ms: Some(300_000),
+                headers: vec![channels::HeaderPair {
+                    name: "x-tenant".to_owned(),
+                    value: "secret:house/tenant".to_owned(),
+                }],
+                overrides: vec![channels::BodyOverride {
+                    pointer: "/reasoning/effort".to_owned(),
+                    value: "high".to_owned(),
+                }],
+            },
             idem,
         },
         Command::SelectModel {
@@ -396,6 +411,11 @@ title = \"a window\"
             at: Address::parse("hall/JOB.md").unwrap(),
             idem,
         },
+        Command::DoctorInstall {
+            item: "cargo-nextest".to_owned(),
+            idem,
+        },
+        Command::DoctorRefresh { idem },
     ]
 }
 

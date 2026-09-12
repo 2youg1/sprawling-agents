@@ -11,6 +11,7 @@
 use kernel::{AxCode, AxError};
 
 mod endpoints;
+mod probing;
 pub(super) mod signing;
 
 /// The name the environment-configured endpoint is attached under, so a
@@ -29,6 +30,46 @@ pub(super) struct Entered {
     pub(super) base_url: String,
     pub(super) dialect: kernel::DialectKind,
     pub(super) credential: Credential,
+    pub(super) tuning: gateway::EndpointTuning,
+}
+
+/// The frame's tuning as the book keeps it.
+///
+/// Two readings happen here and nowhere else. **A zero is absence**: a
+/// deadline no request can meet is what an empty box reaches the wire
+/// as, and reading it as a figure would make every call fail instantly
+/// for somebody who cleared a field. **`stream_idle_timeout_ms` becomes
+/// a deadline for the whole streamed request**, which is what this
+/// city's blocking transport can enforce; the wire keeps the name the
+/// person's own `config.toml` uses, and `gateway` states what it does
+/// with it (gateway-SPEC.md 8-NN).
+///
+/// A row with no name and a pointer with no path are dropped: a form
+/// that keeps an empty row open while somebody types is a form whose
+/// half-written rows must not reach a provider.
+pub(super) fn tuning_of(wire: channels::EndpointTuning) -> gateway::EndpointTuning {
+    let stated = |figure: Option<u64>| figure.filter(|ms| *ms > 0);
+    gateway::EndpointTuning {
+        label: wire
+            .label
+            .map(|given| given.trim().to_owned())
+            .filter(|given| !given.is_empty()),
+        timeout_ms: stated(wire.timeout_ms),
+        request_max_retries: wire.request_max_retries,
+        stream_deadline_ms: stated(wire.stream_idle_timeout_ms),
+        extra_headers: wire
+            .headers
+            .into_iter()
+            .map(|row| (row.name.trim().to_owned(), row.value))
+            .filter(|(name, _)| !name.is_empty())
+            .collect(),
+        overrides: wire
+            .overrides
+            .into_iter()
+            .map(|row| (row.pointer.trim().to_owned(), row.value))
+            .filter(|(pointer, _)| pointer.starts_with('/'))
+            .collect(),
+    }
 }
 
 /// How a credential proves itself to a provider.

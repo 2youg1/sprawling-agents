@@ -24,6 +24,7 @@ use crate::endpoint::AuthSpec;
 use crate::native::is_loopback;
 
 use super::payload::auth_reference;
+use super::tuning::EndpointTuning;
 /// One endpoint the person attached, as the book holds it.
 #[derive(Debug, Clone)]
 pub struct AttachedEndpoint {
@@ -42,6 +43,11 @@ pub struct AttachedEndpoint {
     /// the ids instead. It says how much the city knows about this
     /// list, never whether the endpoint is healthy.
     pub probed: bool,
+    /// How the person set this endpoint up: its label, its deadlines,
+    /// and what every request to it carries. Kept beside the
+    /// registration so a call made a week later is made the way they
+    /// set it up.
+    pub tuning: EndpointTuning,
 }
 
 impl AttachedEndpoint {
@@ -59,6 +65,13 @@ impl AttachedEndpoint {
     #[must_use]
     pub fn has_credential(&self) -> bool {
         auth_reference(&self.auth).is_some()
+    }
+
+    /// What to call this endpoint on screen: the label the person gave
+    /// it, or the name it was filed under.
+    #[must_use]
+    pub fn label(&self) -> &str {
+        self.tuning.label.as_deref().unwrap_or(&self.name)
     }
 
     /// Where a chat request goes for this dialect. The person enters a
@@ -136,6 +149,7 @@ mod tests {
             auth: AuthSpec::Bearer(SecretRef::parse("secret:provider/key").unwrap()),
             models: vec!["m-small".to_owned(), "m-large".to_owned()],
             probed: true,
+            tuning: EndpointTuning::default(),
         }
     }
 

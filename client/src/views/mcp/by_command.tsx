@@ -61,7 +61,7 @@ export function ByCommand(props: { readonly intake: Intake }) {
       </div>
       <PairTable
         caption={say("mcp_env")}
-        note={say("mcp_gap_env")}
+        note={say("mcp_env_help")}
         rows={draft().env}
         onChange={(env) => {
           setDraft({ ...draft(), env });

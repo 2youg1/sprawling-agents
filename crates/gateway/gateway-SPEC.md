@@ -510,6 +510,44 @@ ARCHITECTURE §6 gateway 表逐行状态翻转；§6 接线台账登记（endpoi
 跨文件私有项开 `pub(crate)`，对外签名逐字节不变（`cargo public-api` 基线记定义位簇路径，
 `memory` 同例）。
 
+### 8-16 端点带着人给它定的规矩：`EndpointTuning` 与 `ModelFacts`（形状 7 值 ＋ 形状 4 适配器）
+
+```rust
+pub struct EndpointTuning {
+    pub label: Option<String>,
+    pub timeout_ms: Option<u64>,
+    pub request_max_retries: Option<u32>,
+    pub stream_deadline_ms: Option<u64>,
+    pub extra_headers: Vec<(String, String)>,
+    pub overrides: Vec<(String, String)>,   // JSON pointer → 值的文本
+}
+impl EndpointTuning {
+    pub fn is_plain(&self) -> bool;                            // 无自定义头也无覆盖
+    pub fn applied_overrides(&self) -> Vec<(String, Value)>;   // 文本读成 JSON 的唯一权威
+}
+pub struct AttachedEndpoint { …, pub tuning: EndpointTuning }
+impl AttachedEndpoint { pub fn label(&self) -> &str }          // 缺省即 name
+
+pub struct ModelFacts {
+    pub id: String,
+    pub context_tokens: Option<u64>,
+    pub max_output_tokens: Option<Ceiling>,
+    pub input_modalities: Vec<String>,
+    pub input_price: Option<String>,
+    pub output_price: Option<String>,
+}
+impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, AxError> }
+```
+
+- **`EndpointConfig` 已有 `extra_headers` 与 `overrides`，`apply_override` 已实现并有测试**，所以这一条接的是既有机制而不是第二套：缺的只是「人填的那份设置」与「一周以后发出的那次调用」之间的存放处，它现在在 `AttachedEndpoint` 上，随 `endpoint_attached` 进账本、随重放回到书里。
+- **覆盖以文本入账**：账本不收浮点。`applied_overrides` 是文本变 JSON 的唯一一处，规则为「解析得出即那个 JSON，否则即它看上去的字符串」。
+- **自定义头或覆盖存在时，回环端点也走通用适配器**（`is_plain`）：本地适配器发不出自定义头，也写不进覆盖；悄悄丢掉它们就是用另一种方式去调用那个端点，而表单刚刚给人看的是这一种。
+- **人写的头顶掉兼容格式自己的同名头**（按 ASCII 大小写不敏感比较），不是并列两行：两条 `anthropic-version` 是一条没有供应方承诺按谁的意思读的请求。
+- **`stream_deadline_ms` 是整次流式请求的期限，不是分块之间的空闲计时**。阻塞传输交回的 body reader 没有分块钩子，所以城能限定应答总共多久、限定不了其中某次沉默多久；卡住的流因此在这里结束，比空闲计时晚。线上那个字段沿用 Codex 的 `stream_idle_timeout_ms`，翻译发生在装配层，只此一处。**败给的方案**：在这里也叫 idle，那会让读代码的人以为分块之间有计时器。
+- **重试仍归 watchdog**：`Endpoint::call` 一次调用一个来回，这一条没有变；`request_max_retries` 今天的唯一读者是装配层的 probe（`bin::assembly::credentials::endpoints::probe`），因为设置页上有人正在等这一个请求。
+- **`list_models` 读出每一行真正说了的东西**。OpenAI 形的 `/models` 一行里除 id 之外有什么由供应方决定：`context_length` 与 `max_completion_tokens`、同样两项嵌在 `top_provider` 之下、模态写在 `architecture` 里、绝大多数什么都不写。读法因此是「一组问题，各自由第一个带着它的键作答，没有键带着它就缺席」。**城不补零、不补默认、不补猜测**：补出来的数字会盖过真正计费的那个。
+- **价格按供应方自己的文本原样携带**。单位也是供应方的——按 token 还是按百万 token，按美元还是按美分——而一个没人能拿去对账单的换算值，比供应方印出来的那串字符更糟。
+
 ### 8-15 `gateway::reach`：一次分段读数，以及「打到城所在那台机器上的调用不走代理」（形状 4 适配器）
 
 ```rust

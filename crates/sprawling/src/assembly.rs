@@ -50,7 +50,7 @@ mod workbench;
 pub(crate) use building_page::{DOC_BYTES_MAX, read_building};
 use commanding::entrance::Entrance;
 pub(crate) use credentials::signing::resolving;
-use credentials::{Ceilings, Chosen, Credential, Entered};
+use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
 pub(crate) use dispatching::{Dispatched, acp_dispatch};
@@ -63,6 +63,7 @@ pub(crate) use folds::{HALTED, RELEASED, Standing, rebuild_views};
 pub(crate) use genesis::city_address;
 use genesis::city_segment;
 pub use genesis::{Adopt, InitReport, form_city, has_history, init_city};
+pub(crate) use mcp::McpLink;
 use mcp::{connect_mcp, mounts_under, transport_site};
 pub(crate) use naming::read_autonomy;
 use naming::{
@@ -171,6 +172,11 @@ pub struct RunWorker {
     /// provider for no stream at all, so replay and citysim take the
     /// byte-identical path they always took.
     watching: Option<std::sync::Arc<dyn Fn(channels::Delta) + Send + Sync>>,
+    /// Where a fresh look at this machine goes. `None` in a worker
+    /// driven one command at a time, which has no views to correct;
+    /// where a city is served it is the one place the doctor's answer
+    /// is replaced after the look taken at start-up.
+    machine: Option<std::sync::Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>>,
     /// What waits for a person, who may answer it, what has been
     /// allowed, which scopes are shut, and what each waiting item is
     /// holding up. The worker keeps its own copy for the same reason it
@@ -280,6 +286,19 @@ impl RunWorker {
     /// no stream at all.
     pub(crate) fn watch(&mut self, sink: std::sync::Arc<dyn Fn(channels::Delta) + Send + Sync>) {
         self.watching = Some(sink);
+    }
+
+    /// Sends a fresh look at this machine to `sink`.
+    ///
+    /// Separate from [`Self::observe`] because what travels is not
+    /// history: the doctor's answer is about the machine rather than
+    /// about the city, which is why it is set from outside and why a
+    /// rebuild from the ledger leaves it alone.
+    pub(crate) fn examine(
+        &mut self,
+        sink: std::sync::Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
+    ) {
+        self.machine = Some(sink);
     }
 
     /// Where a running dispatch asks what arrived. Attached by the serve

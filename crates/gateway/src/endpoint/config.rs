@@ -46,6 +46,11 @@ pub struct EndpointConfig {
     /// last, later entries win. Missing object paths are created.
     pub overrides: Vec<(String, Value)>,
     pub timeout_ms: u64,
+    /// How long a *streamed* request may run, when that is not
+    /// `timeout_ms`. A model that is still writing is not a model that
+    /// has stopped answering, so a stream is given its own deadline;
+    /// `None` holds a stream to the same deadline as a settled call.
+    pub stream_deadline_ms: Option<u64>,
     /// Price-sheet row for settlement; `None` settles nothing (billed
     /// stays empty and attribution sees usage only).
     pub pricing: Option<ModelEntry>,
@@ -174,8 +179,11 @@ mod tests {
         .to_string();
         let (url, handle) = fake_provider(vec![(200, body)], false);
         let endpoint = Endpoint::new(config(&url), redemption()).unwrap();
-        let ids = endpoint.list_models(&url).unwrap();
-        assert_eq!(ids, vec!["m-large".to_owned(), "m-small".to_owned()]);
+        let served = endpoint.list_models(&url).unwrap();
+        assert_eq!(
+            served.iter().map(|row| row.id.as_str()).collect::<Vec<_>>(),
+            vec!["m-large", "m-small"]
+        );
         let seen = handle.join().unwrap();
         assert!(seen[0].starts_with("GET "));
         assert!(seen[0].to_ascii_lowercase().contains("x-api-key: sk-test-"));

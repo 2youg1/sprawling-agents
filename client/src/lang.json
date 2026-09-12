@@ -123,6 +123,10 @@
     "en": "what this building is doing",
     "zh": "这栋楼的状态栏"
   },
+  "bld_changes": {
+    "en": "changes",
+    "zh": "变更"
+  },
   "bld_clear": {
     "en": "clear",
     "zh": "清掉"
@@ -174,6 +178,10 @@
   "bld_rooms": {
     "en": "rooms",
     "zh": "房间"
+  },
+  "bld_skills": {
+    "en": "skills",
+    "zh": "技能"
   },
   "bld_tree": {
     "en": "files",
@@ -294,6 +302,10 @@
   "commits_lineage": {
     "en": "replaced",
     "zh": "接替了"
+  },
+  "commits_spent": {
+    "en": "{usd} spent",
+    "zh": "花了 {usd}"
   },
   "commits_succeeded": {
     "en": "×{n} handoff",
@@ -431,6 +443,34 @@
     "en": "gallery",
     "zh": "画廊"
   },
+  "git_branch": {
+    "en": "branch",
+    "zh": "分支"
+  },
+  "git_checkpoint": {
+    "en": "last checkpoint",
+    "zh": "上一个检查点"
+  },
+  "git_clean": {
+    "en": "nothing has changed since the last checkpoint",
+    "zh": "上一个检查点之后没有改动"
+  },
+  "git_detached": {
+    "en": "no branch",
+    "zh": "不在分支上"
+  },
+  "git_drift": {
+    "en": "{ahead} ahead, {behind} behind",
+    "zh": "领先 {ahead}，落后 {behind}"
+  },
+  "git_no_upstream": {
+    "en": "no upstream",
+    "zh": "没有上游"
+  },
+  "git_unavailable": {
+    "en": "this city has no repository to read",
+    "zh": "这座城没有可读的仓库"
+  },
   "halt_frozen": {
     "en": "{n} runs frozen",
     "zh": "冻结了 {n} 个 run"
@@ -519,14 +559,6 @@
     "en": "try again",
     "zh": "再试一次"
   },
-  "log_absent": {
-    "en": "the log does not reach this page yet",
-    "zh": "日志还到不了这个页面"
-  },
-  "log_absent_why": {
-    "en": "the process log is written to standard error, and no frame carries a log line to a browser",
-    "zh": "进程日志写在标准错误里，没有哪种帧会把日志行送到浏览器"
-  },
   "log_decide": {
     "en": "decide",
     "zh": "判定"
@@ -539,17 +571,33 @@
     "en": "no log line has arrived",
     "zh": "一条日志也没有到"
   },
+  "log_every": {
+    "en": "all",
+    "zh": "全部"
+  },
   "log_levels": {
     "en": "levels",
     "zh": "级别"
+  },
+  "log_modules": {
+    "en": "modules",
+    "zh": "模块"
   },
   "log_refuse": {
     "en": "refuse",
     "zh": "拒绝"
   },
+  "log_runs": {
+    "en": "runs",
+    "zh": "运行"
+  },
   "log_trace": {
     "en": "trace",
     "zh": "追踪"
+  },
+  "log_window": {
+    "en": "the last lines this page was sent; a log is not history",
+    "zh": "这页收到的最后几行；日志不是历史"
   },
   "log_wire": {
     "en": "wire",
@@ -571,9 +619,9 @@
     "en": "install",
     "zh": "安装"
   },
-  "machine_install_unwired": {
-    "en": "the city cannot install from here yet; copy the command",
-    "zh": "城还不能从这里安装，请复制命令"
+  "machine_install_by_hand": {
+    "en": "this one is yours to run: a script piped into a shell is code nobody read",
+    "zh": "这一条由你自己跑：管道进 shell 的脚本是没人读过的代码"
   },
   "machine_items": {
     "en": "this machine",
@@ -659,6 +707,10 @@
     "en": "add by server id",
     "zh": "用 server id 添加"
   },
+  "mcp_check": {
+    "en": "check every server",
+    "zh": "逐台检查"
+  },
   "mcp_command": {
     "en": "command",
     "zh": "命令"
@@ -695,6 +747,10 @@
     "en": "environment",
     "zh": "环境变量"
   },
+  "mcp_env_help": {
+    "en": "what the program is started with; a value may be a `secret:realm/name` reference",
+    "zh": "启动这个程序时带上的变量；值可以写成 `secret:realm/name` 引用"
+  },
   "mcp_expand": {
     "en": "tools and schema",
     "zh": "工具与 schema"
@@ -702,18 +758,6 @@
   "mcp_gap_connect": {
     "en": "connecting opens a browser and waits for the toolkit; the city has no command for that",
     "zh": "连接要打开浏览器并等这个工具箱回话，城里没有这条命令"
-  },
-  "mcp_gap_env": {
-    "en": "the wire carries a command and its arguments, and no environment",
-    "zh": "wire 只带命令与参数，不带环境变量"
-  },
-  "mcp_gap_headers": {
-    "en": "one header fits on the wire",
-    "zh": "wire 只放得下一个请求头"
-  },
-  "mcp_gap_health": {
-    "en": "the city has no handshake frame, so no state and no tool list arrive",
-    "zh": "城没有握手帧，状态与工具清单都到不了"
   },
   "mcp_gap_scope_city": {
     "en": "the wire writes every server into the building layer",
@@ -723,13 +767,13 @@
     "en": "a server kept out of the repository has nowhere to go on the wire",
     "zh": "不写进仓库的服务器在 wire 上没有去处"
   },
-  "mcp_gap_sse": {
-    "en": "the wire spells stdio and http",
-    "zh": "wire 只认 stdio 与 http"
-  },
   "mcp_header": {
     "en": "headers",
     "zh": "请求头"
+  },
+  "mcp_header_help": {
+    "en": "sent with every request; a value may be a `secret:realm/name` reference",
+    "zh": "每次请求都会带上；值可以写成 `secret:realm/name` 引用"
   },
   "mcp_json_empty": {
     "en": "this block names no server",
@@ -823,6 +867,18 @@
     "en": "servers this building reaches",
     "zh": "这栋楼能连到的服务器"
   },
+  "mcp_state_auth": {
+    "en": "authenticating",
+    "zh": "认证中"
+  },
+  "mcp_state_connected": {
+    "en": "connected",
+    "zh": "已连接"
+  },
+  "mcp_state_failed": {
+    "en": "failed",
+    "zh": "失败"
+  },
   "mcp_state_unknown": {
     "en": "not checked",
     "zh": "没有检查过"
@@ -870,6 +926,10 @@
   "mcp_why_label": {
     "en": "give it a name",
     "zh": "先给它起个名字"
+  },
+  "mcp_why_pair_name": {
+    "en": "a value needs a name beside it",
+    "zh": "值旁边要有名字"
   },
   "mcp_why_taken": {
     "en": "this scope already reaches a server by that name",
@@ -1135,6 +1195,10 @@
     "en": "no checkpoint",
     "zh": "没有栅栏"
   },
+  "run_no_prompt": {
+    "en": "this run has no prompt on record",
+    "zh": "这次 run 没有留下提示"
+  },
   "run_no_usage": {
     "en": "no usage",
     "zh": "没有用量"
@@ -1146,6 +1210,34 @@
   "run_patch_needs_fence": {
     "en": "after the next fence",
     "zh": "下一道栅栏后"
+  },
+  "run_prompt": {
+    "en": "prompt",
+    "zh": "提示"
+  },
+  "run_prompt_bytes": {
+    "en": "{n} bytes",
+    "zh": "{n} 字节"
+  },
+  "run_prompt_copied": {
+    "en": "copied",
+    "zh": "已复制"
+  },
+  "run_prompt_copy": {
+    "en": "copy",
+    "zh": "复制"
+  },
+  "run_prompt_dropped": {
+    "en": "{n} bytes cut",
+    "zh": "裁掉 {n} 字节"
+  },
+  "run_prompt_gone": {
+    "en": "the store no longer holds these bytes",
+    "zh": "仓库里已经没有这段的字节了"
+  },
+  "run_prompt_sources": {
+    "en": "read from",
+    "zh": "来自"
   },
   "run_read_files": {
     "en": "what it read",
@@ -1182,10 +1274,6 @@
   "setup_advanced": {
     "en": "advanced",
     "zh": "高级"
-  },
-  "setup_advanced_inert": {
-    "en": "these four figures and the two tables are not on the wire yet; they are shown so the form is right when they are",
-    "zh": "这四个数字与两张表还没有上线，先摆在这里，等线路能带时表单已经对齐"
   },
   "setup_again": {
     "en": "welcome",
@@ -1226,6 +1314,10 @@
   "setup_display_name": {
     "en": "name",
     "zh": "显示名"
+  },
+  "setup_display_name_help": {
+    "en": "shown instead of the id; leave blank to use the id",
+    "zh": "界面上显示它而不是标识；留空即用标识"
   },
   "setup_effort": {
     "en": "thinking",
@@ -1439,10 +1531,6 @@
     "en": "no models",
     "zh": "没有模型"
   },
-  "setup_not_carried": {
-    "en": "this city does not carry this field yet",
-    "zh": "这座城还不传这个字段"
-  },
   "setup_override_value": {
     "en": "JSON value",
     "zh": "JSON 取值"
@@ -1471,9 +1559,81 @@
     "en": "{host} did not answer",
     "zh": "{host} 没有答复"
   },
+  "setup_probe_read": {
+    "en": "what the city found at {host}",
+    "zh": "城在 {host} 上读到的"
+  },
   "setup_providers": {
     "en": "providers",
     "zh": "模型供应方"
+  },
+  "setup_reach_dns": {
+    "en": "name",
+    "zh": "主机名"
+  },
+  "setup_reach_elapsed": {
+    "en": "{ms} ms",
+    "zh": "{ms} 毫秒"
+  },
+  "setup_reach_http": {
+    "en": "answer",
+    "zh": "应答"
+  },
+  "setup_reach_key": {
+    "en": "the provider refused the key: check it, then look again",
+    "zh": "供应方拒绝了这把密钥：核对之后再看一次"
+  },
+  "setup_reach_name": {
+    "en": "this host name cannot go into a TLS handshake: an underscore, or a character that is not ASCII",
+    "zh": "这个主机名进不了 TLS 握手：有下划线，或者有非 ASCII 字符"
+  },
+  "setup_reach_ok": {
+    "en": "the provider answered; what it serves is below",
+    "zh": "供应方答了；它供应什么在下面"
+  },
+  "setup_reach_path": {
+    "en": "the provider answered 404: the base URL carries a path it should not",
+    "zh": "供应方答 404：基址 URL 末尾多了一段不该有的路径"
+  },
+  "setup_reach_proxy": {
+    "en": "through",
+    "zh": "经由"
+  },
+  "setup_reach_refused": {
+    "en": "the port refused the connection: check the port, and whether the server is running",
+    "zh": "端口拒绝了连接：核对端口，以及那个服务是否在跑"
+  },
+  "setup_reach_resolver": {
+    "en": "the resolver itself failed: this machine cannot look names up right now",
+    "zh": "解析器自己失败了：机器现在查不了主机名"
+  },
+  "setup_reach_silent": {
+    "en": "nothing answered in time: a firewall or a proxy that is not running",
+    "zh": "等待期间没有任何应答：多半是防火墙，或者一个没跑起来的代理"
+  },
+  "setup_reach_socket": {
+    "en": "the connection could not be opened; the detail beside this line says why",
+    "zh": "连接开不起来；这一行旁边的细节说了原因"
+  },
+  "setup_reach_status": {
+    "en": "the provider answered with a status this form cannot act on; copy the details",
+    "zh": "供应方答了一个这张表单处置不了的状态；复制细节"
+  },
+  "setup_reach_tcp": {
+    "en": "connection",
+    "zh": "连接"
+  },
+  "setup_reach_tls": {
+    "en": "the handshake failed: this machine does not trust the certificate",
+    "zh": "握手失败：机器不信任那张证书"
+  },
+  "setup_reach_unknown_host": {
+    "en": "this name does not resolve: check the spelling, or the proxy",
+    "zh": "这个主机名解析不出来：核对拼写，或者核对代理"
+  },
+  "setup_reach_unreachable": {
+    "en": "the request never reached a handshake",
+    "zh": "请求压根没走到握手"
   },
   "setup_remove": {
     "en": "remove",
@@ -1519,10 +1679,6 @@
     "en": "stream_idle_timeout_ms",
     "zh": "流空闲超时（毫秒）"
   },
-  "setup_stream_retries": {
-    "en": "stream_max_retries",
-    "zh": "流式重试上限"
-  },
   "setup_text_only": {
     "en": "text models only",
     "zh": "只看文本模型"
@@ -1566,6 +1722,38 @@
   "setup_wire_api_unsupported": {
     "en": "this city speaks chat and messages; it cannot call a responses endpoint",
     "zh": "这座城会说 chat 与 messages，还不能调用 responses 端点"
+  },
+  "skills_admitted": {
+    "en": "in the reading room",
+    "zh": "已进阅览室"
+  },
+  "skills_empty": {
+    "en": "no shelf in this city holds anything",
+    "zh": "这座城的书架上还什么都没有"
+  },
+  "skills_library": {
+    "en": "the city's library",
+    "zh": "城的库"
+  },
+  "skills_missing": {
+    "en": "admitted but not on any shelf",
+    "zh": "已准入但书架上没有"
+  },
+  "skills_not_admitted": {
+    "en": "on the shelf only",
+    "zh": "只在架子上"
+  },
+  "skills_shelf": {
+    "en": "this building's shelf",
+    "zh": "这栋楼自己的架子"
+  },
+  "skills_used_by": {
+    "en": "used by {n} runs",
+    "zh": "{n} 次 run 用过"
+  },
+  "skills_used_never": {
+    "en": "never used",
+    "zh": "没人用过"
   },
   "skip_main": {
     "en": "skip to the page",
@@ -1622,6 +1810,22 @@
   "slash_stop": {
     "en": "stop this run, one building, or the whole city",
     "zh": "停下这次 run、某栋楼，或整座城"
+  },
+  "slot_building": {
+    "en": "building",
+    "zh": "楼"
+  },
+  "slot_city": {
+    "en": "city",
+    "zh": "城"
+  },
+  "slot_resident": {
+    "en": "resident",
+    "zh": "居民"
+  },
+  "slot_run": {
+    "en": "run",
+    "zh": "这次 run"
   },
   "status_awaiting_approval": {
     "en": "awaiting approval",

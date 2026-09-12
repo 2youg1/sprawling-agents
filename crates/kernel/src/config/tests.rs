@@ -164,6 +164,7 @@ fn servers_override_as_a_whole_table_and_silence_reaches_nothing() {
         transport: McpTransport::Stdio {
             command: "mcp-server".to_owned(),
             args: Vec::new(),
+            env: Vec::new(),
         },
     };
     let ladder = LayeredValue {

@@ -22,6 +22,7 @@ use serde_json::Value;
 use crate::dialect::{ImageBytes, request_wire};
 
 use super::config::{AuthSpec, Endpoint, apply_override, provider_err, transport_detail};
+use super::models::ModelFacts;
 
 /// Every picture one conversation refers to, in the order the blocks
 /// name them: the blocks a person attached and the ones a tool produced
@@ -64,16 +65,21 @@ fn too_large(at: &Locator, size: usize) -> AxError {
     ))
 }
 impl Endpoint {
-    /// What the far side says it serves.
+    /// What the far side says it serves, and what it says about each.
     ///
-    /// Both dialects answer `GET .../models` with `{"data":[{"id":..}]}`,
-    /// and neither returns prices or token limits there — those are
-    /// facts a person confirms at registration, not numbers to guess.
+    /// Both dialects answer `GET .../models` with `{"data":[{"id":..}]}`.
+    /// What else a row carries is the vendor's own business, so each row
+    /// is read by [`ModelFacts::read`] for everything it states and for
+    /// nothing it does not; a row this city cannot name is left out
+    /// rather than given an invented one.
+    ///
+    /// Rows come back ordered by id and without repeats, so a person
+    /// reading the table twice reads it in the same order.
     ///
     /// # Errors
     /// Transport failure, a non-success status, or a body without a
     /// readable `data` array; each carries the URL that was asked.
-    pub fn list_models(&self, url: &str) -> Result<Vec<String>, AxError> {
+    pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, AxError> {
         let mut request = self.client.get(url);
         for (name, value) in &self.config.extra_headers {
             request = request.header(name, value);
@@ -96,17 +102,16 @@ impl Endpoint {
             .get("data")
             .and_then(Value::as_array)
             .ok_or_else(|| provider_err("read the model list", format!("{url}: no data array")))?;
-        let mut ids = Vec::new();
+        let mut facts = Vec::new();
         for row in rows {
-            let id = row
-                .get("id")
-                .and_then(Value::as_str)
-                .ok_or_else(|| provider_err("read the model list", "a row has no id"))?;
-            ids.push(id.to_owned());
+            facts.push(
+                ModelFacts::read(row)
+                    .ok_or_else(|| provider_err("read the model list", "a row has no id"))?,
+            );
         }
-        ids.sort();
-        ids.dedup();
-        Ok(ids)
+        facts.sort_by(|left, right| left.id.cmp(&right.id));
+        facts.dedup_by(|left, right| left.id == right.id);
+        Ok(facts)
     }
 
     /// Redemption: resolve now, expose only while the header is written,

@@ -65,6 +65,7 @@ impl Transcriber {
                 extra_headers: Vec::new(),
                 overrides: Vec::new(),
                 timeout_ms: config.timeout_ms,
+                stream_deadline_ms: None,
                 pricing: None,
             },
             // A recording is not a picture: this endpoint resolves a

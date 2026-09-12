@@ -19,6 +19,7 @@ import { createStore } from "solid-js/store";
 
 import { selectModel } from "../../core/commands";
 import type { Ceilings } from "../../core/commands";
+import type { ModelFact } from "../../core/probed";
 import { EFFORTS } from "../../core/prefs";
 import type { EndpointsAnswer, ModelTag } from "../../wire";
 import { useCommand, useSay, useUi } from "../../ui";
@@ -32,10 +33,11 @@ export interface ModelRow {
 }
 
 // Word fragments that mark a model as something other than text in,
-// text out. A heuristic over an id, because the probe answers a list of
-// ids and nothing else: the wire carries no modality field, so this is
-// the only reading available. It hides rows rather than refusing them,
-// and the filter is a switch a person can turn off.
+// text out. A heuristic over an id, used only for the rows whose own
+// answer said nothing: a provider that states its input modalities is
+// believed, and a name that looks like a video model is not overruled by
+// a guess. It hides rows rather than refusing them, and the filter is a
+// switch a person can turn off.
 const NOT_TEXT: readonly string[] = [
   "asr",
   "audio",
@@ -54,8 +56,9 @@ const NOT_TEXT: readonly string[] = [
   "whisper",
 ];
 
-function looksTextual(id: string): boolean {
-  const lower = id.toLowerCase();
+function looksTextual(row: ModelFact): boolean {
+  if (row.inputModalities.length > 0) return row.inputModalities.includes("text");
+  const lower = row.id.toLowerCase();
   return !NOT_TEXT.some((mark) => lower.includes(mark));
 }
 
@@ -94,8 +97,22 @@ interface Filled {
   role: Record<string, string>;
 }
 
+// A figure the provider itself stated, as the box shows it. An empty
+// string is what "nobody stated this" looks like in an input, and the
+// person filling it in is the next authority.
+function prefilled(stated: number | null): string {
+  return stated === null ? "" : String(stated);
+}
+
+// The two prices as the provider printed them, in and out. A row that
+// priced neither shows the same dash every unstated figure shows.
+function priceOf(row: ModelFact): string {
+  if (row.inputPrice === null && row.outputPrice === null) return "—";
+  return `${row.inputPrice ?? "—"} / ${row.outputPrice ?? "—"}`;
+}
+
 export function ModelTable(props: {
-  readonly served: readonly string[];
+  readonly served: readonly ModelFact[];
   readonly onChosen: (rows: readonly ModelRow[]) => void;
 }) {
   const say = useSay();
@@ -106,43 +123,55 @@ export function ModelTable(props: {
 
   // The ids the person typed for an endpoint that serves no list, or
   // serves one this city could not read.
-  const named = createMemo(() =>
+  const named = createMemo<readonly ModelFact[]>(() =>
     manual()
       .split(",")
       .map((each) => each.trim())
-      .filter((each) => each !== ""),
+      .filter((each) => each !== "")
+      .map((id) => ({
+        id,
+        contextTokens: null,
+        maxOutputTokens: null,
+        inputModalities: [],
+        inputPrice: null,
+        outputPrice: null,
+      })),
   );
-  const every = createMemo(() => {
+  const every = createMemo<readonly ModelFact[]>(() => {
     const all = [...props.served, ...named()];
-    return all.filter((id, at) => all.indexOf(id) === at);
+    return all.filter((row, at) => all.findIndex((other) => other.id === row.id) === at);
   });
+  const byHand = createMemo(() => named().map((row) => row.id));
   const shown = createMemo(() => {
     const needle = search().trim().toLowerCase();
     return every().filter(
-      (id) =>
-        (needle === "" || id.toLowerCase().includes(needle)) &&
-        (!textOnly() || looksTextual(id) || named().includes(id)),
+      (row) =>
+        (needle === "" || row.id.toLowerCase().includes(needle)) &&
+        (!textOnly() || looksTextual(row) || byHand().includes(row.id)),
     );
   });
   const vendors = createMemo(() => {
-    const groups = new Map<string, string[]>();
-    for (const id of shown()) {
-      const vendor = vendorOf(id) ?? "";
+    const groups = new Map<string, ModelFact[]>();
+    for (const row of shown()) {
+      const vendor = vendorOf(row.id) ?? "";
       const held = groups.get(vendor);
-      if (held === undefined) groups.set(vendor, [id]);
-      else held.push(id);
+      if (held === undefined) groups.set(vendor, [row]);
+      else held.push(row);
     }
     return [...groups.entries()];
   });
-  const ticked = createMemo(() => every().filter((id) => filled.ticked[id] === true));
+  const ticked = createMemo(() => every().filter((row) => filled.ticked[row.id] === true));
+  // What the provider stated, unless the person typed over it. The two
+  // boxes start prefilled from the row's own answer, so a table nobody
+  // touched still carries the figures the provider gave.
   const rows = createMemo<readonly ModelRow[]>(() =>
-    ticked().map((id) => ({
-      id,
+    ticked().map((row) => ({
+      id: row.id,
       ceilings: {
-        contextTokens: stated(filled.context[id] ?? ""),
-        maxOutputTokens: stated(filled.output[id] ?? ""),
+        contextTokens: stated(filled.context[row.id] ?? "") ?? row.contextTokens,
+        maxOutputTokens: stated(filled.output[row.id] ?? "") ?? row.maxOutputTokens,
       },
-      tag: tagOf(filled.role[id] ?? ""),
+      tag: tagOf(filled.role[row.id] ?? ""),
     })),
   );
   createEffect(() => {
@@ -150,7 +179,7 @@ export function ModelTable(props: {
   });
 
   const tickAll = (state: boolean) => {
-    for (const id of shown()) setFilled("ticked", id, state);
+    for (const row of shown()) setFilled("ticked", row.id, state);
   };
 
   return (
@@ -208,45 +237,50 @@ export function ModelTable(props: {
                     </td>
                   </tr>
                   <For each={models}>
-                    {(id) => (
+                    {(row) => (
                       <tr class="align-middle">
                         <td class="py-tight">
                           <input
                             type="checkbox"
-                            checked={filled.ticked[id] === true}
-                            aria-label={say("setup_tick_model", { model: id })}
-                            onChange={(event) => { setFilled("ticked", id, event.currentTarget.checked); }}
+                            checked={filled.ticked[row.id] === true}
+                            aria-label={say("setup_tick_model", { model: row.id })}
+                            onChange={(event) => { setFilled("ticked", row.id, event.currentTarget.checked); }}
                           />
                         </td>
-                        <td class="truncate py-tight font-mono text-text" title={id}>
-                          {id}
+                        <td class="truncate py-tight font-mono text-text" title={row.id}>
+                          {row.id}
                         </td>
                         <td class="py-tight">
                           <input
                             class="w-full rounded-control bg-g2 px-snug py-tight font-mono text-note text-text outline-none"
-                            value={filled.context[id] ?? ""}
+                            value={filled.context[row.id] ?? prefilled(row.contextTokens)}
                             inputmode="numeric"
                             aria-label={say("setup_model_context")}
-                            onInput={(event) => { setFilled("context", id, event.currentTarget.value); }}
+                            onInput={(event) => { setFilled("context", row.id, event.currentTarget.value); }}
                           />
                         </td>
                         <td class="py-tight">
                           <input
                             class="w-full rounded-control bg-g2 px-snug py-tight font-mono text-note text-text outline-none"
-                            value={filled.output[id] ?? ""}
+                            value={filled.output[row.id] ?? prefilled(row.maxOutputTokens)}
                             inputmode="numeric"
                             aria-label={say("setup_model_output")}
-                            onInput={(event) => { setFilled("output", id, event.currentTarget.value); }}
+                            onInput={(event) => { setFilled("output", row.id, event.currentTarget.value); }}
                           />
                         </td>
-                        <td class="py-tight text-text-faint">—</td>
-                        <td class="py-tight text-text-faint">—</td>
+                        {/* wording-ok: the modalities and the prices the provider itself stated */}
+                        <td class="truncate py-tight text-text-faint" title={row.inputModalities.join(" ")}>
+                          {row.inputModalities.length === 0 ? "—" : row.inputModalities.join(" ")}
+                        </td>
+                        <td class="truncate py-tight font-mono text-text-faint">
+                          {priceOf(row)}
+                        </td>
                         <td class="py-tight">
                           <select
                             class="w-full rounded-control bg-g2 px-snug py-tight text-note text-text outline-none"
-                            value={filled.role[id] ?? ""}
+                            value={filled.role[row.id] ?? ""}
                             aria-label={say("setup_model_role")}
-                            onChange={(event) => { setFilled("role", id, event.currentTarget.value); }}
+                            onChange={(event) => { setFilled("role", row.id, event.currentTarget.value); }}
                           >
                             <option value="">—</option>
                             <option value="main">{say("setup_main")}</option>
@@ -263,7 +297,7 @@ export function ModelTable(props: {
           </table>
         </div>
       </Show>
-      <Show when={ticked().some((id) => stated(filled.output[id] ?? "") === null)}>
+      <Show when={ticked().some((row) => (stated(filled.output[row.id] ?? "") ?? row.maxOutputTokens) === null)}>
         <p class="text-alert">{say("setup_model_needed")}</p>
       </Show>
       <label class="flex flex-col gap-tight text-text-quiet">

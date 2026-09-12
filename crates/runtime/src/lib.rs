@@ -72,7 +72,7 @@ pub use offload::{OffloadRecord, OffloadSite, offload, rematerialize};
 pub use pipeline::exec::{EXEC_CAP_BYTES, SieveSite, package_exec};
 pub use pipeline::{PackContext, Packaged, SieveRequest, package};
 pub use prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
-pub use prefix::{PrefixPlan, SegmentCaps, SourceDoc, build_prefix};
+pub use prefix::{PrefixPlan, SegmentCaps, SegmentSource, SourceDoc, build_prefix};
 pub use reminder::{ContextGauge, ContextReminder};
 pub use replay::{VerifiedLedger, VerifiedLine};
 pub use run::{Advance, Run, RunHooks, RunPlan, SafePoint, drive};

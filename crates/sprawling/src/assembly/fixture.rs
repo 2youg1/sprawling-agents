@@ -234,6 +234,7 @@ pub(super) fn worker_with_provider(
         secret: None,
         auth_header: None,
         admit: Vec::new(),
+        tuning: channels::EndpointTuning::default(),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
     })?;
     worker.handle(channels::Command::SelectModel {

@@ -133,7 +133,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
                 label: kernel::ServerLabel::parse("docs").unwrap(),
                 transport: kernel::McpTransport::Http {
                     url: "https://mcp.example/v1".to_owned(),
-                    header: None,
+                    headers: Vec::new(),
                 },
             }]),
             desktop: None,

@@ -196,24 +196,61 @@ pub struct McpServer {
 }
 
 /// How this city reaches one server. Exhaustive rather than a URL that
-/// might also be a command: the two are different machines to start
+/// might also be a command: the three are different machines to start
 /// talking to, they fail differently, and a configuration that leaves it
 /// to be guessed is one that guesses wrong on the day it matters.
-#[non_exhaustive]
+///
+/// Closed rather than `#[non_exhaustive]`: every reader of this enum is
+/// inside this one binary, so a wildcard arm here would buy nothing and
+/// would hide the next transport from the three modules that must
+/// decide about it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum McpTransport {
     /// A program on this machine, spoken to over its own pipes.
-    Stdio { command: String, args: Vec<String> },
+    Stdio {
+        command: String,
+        args: Vec<String>,
+        /// What the child is started with, name before value, in the
+        /// order the configuration lists them.
+        ///
+        /// A value may be a `secret:realm/name` reference, which is
+        /// redeemed at the moment the process is started and never
+        /// written into the configuration: an API key a server needs is
+        /// still a credential, and `claude mcp add -e KEY=value` is the
+        /// place people are used to putting one.
+        env: Vec<(String, String)>,
+    },
     /// A server reached over HTTP, which is how a hosted catalogue is
     /// published. The city holds no account with it: whatever it needs
-    /// travels in the header the configuration names.
+    /// travels in the headers the configuration names.
     Http {
         url: String,
-        /// A header to send, as `name: value`. Absent for a server that
-        /// asks for none.
-        header: Option<String>,
+        /// Headers to send, name before value. A value may be a
+        /// `secret:realm/name` reference, redeemed at the last slot
+        /// before the wire.
+        ///
+        /// A list rather than one header, because a hosted server
+        /// commonly wants an account header beside its key, and a
+        /// configuration that can spell only one of the two describes a
+        /// server nobody can reach.
+        headers: Vec<(String, String)>,
+    },
+    /// A server that answers on a stream of server-sent events: the
+    /// stream is opened first and names where messages are posted, and
+    /// every answer comes back down the stream rather than in the body
+    /// of the request that asked.
+    ///
+    /// Its own variant rather than a flag on [`McpTransport::Http`],
+    /// because the two open differently and fail differently: an HTTP
+    /// server refuses a request, and this one can accept every request
+    /// and answer none.
+    Sse {
+        url: String,
+        /// As [`McpTransport::Http`], and sent on both the stream and
+        /// the posts.
+        headers: Vec<(String, String)>,
     },
 }
 

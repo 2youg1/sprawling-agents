@@ -130,15 +130,34 @@ impl ConfigLayer {
                     // row whose reader has to guess which one was meant.
                     let transport = match (entry.command.as_deref(), entry.url.as_deref()) {
                         (Some(command), None) if !command.trim().is_empty() => {
+                            // A command answers on its own pipes, so a
+                            // row that also names a stream is a row
+                            // stating two transports.
+                            if entry.transport.is_some() {
+                                return Err(refuse(format!(
+                                    "{}: a command is spoken to over its own pipes; `transport` \
+                                     chooses between `http` and `sse` for a url",
+                                    label.as_str()
+                                )));
+                            }
                             McpTransport::Stdio {
                                 command: command.to_owned(),
                                 args: entry.args,
+                                env: listed(entry.env),
                             }
                         }
-                        (None, Some(url)) if !url.trim().is_empty() => McpTransport::Http {
-                            url: url.to_owned(),
-                            header: entry.header,
-                        },
+                        (None, Some(url)) if !url.trim().is_empty() => {
+                            let url = url.to_owned();
+                            let headers = listed(entry.headers);
+                            // Absent means `http`: that is what a url
+                            // reached by posting one message is, and it
+                            // is what every row written before this key
+                            // existed meant.
+                            match entry.transport.unwrap_or(ReachedBy::Http) {
+                                ReachedBy::Http => McpTransport::Http { url, headers },
+                                ReachedBy::Sse => McpTransport::Sse { url, headers },
+                            }
+                        }
                         (Some(_), Some(_)) => {
                             return Err(refuse(format!(
                                 "{}: a server is reached by a command or by a url, not both",
@@ -251,8 +270,18 @@ fn refuse(subject: String) -> AxError {
         "this version reads three sections: `[model] effort = \"low|medium|high|xhigh|max\"`, \
          `[sandbox] shell = <bool>, fuel = <integer>, mounts = [<path>], \
          env_passthrough = [<variable name>]`, and \
-         `[[mcp]] label = <lowercase>, and either command = <program> with args = [<argument>]          or url = <https url> with an optional header = \"Name: value\"`",
+         `[[mcp]] label = <lowercase>, and either command = <program> with args = [<argument>] \
+         and env = { NAME = \"value\" }, or url = <https url> with transport = \"http\"|\"sse\" \
+         and headers = { Name = \"value\" }`; a value on either table may be a \
+         `secret:realm/name` reference",
     )
+}
+
+/// A configured table as the wire carries it: name before value, in the
+/// order a `BTreeMap` reads them, so two runs of the same file hand the
+/// same list to the same server.
+fn listed(table: std::collections::BTreeMap<String, String>) -> Vec<(String, String)> {
+    table.into_iter().collect()
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -277,10 +306,28 @@ struct McpSection {
     command: Option<String>,
     #[serde(default)]
     args: Vec<String>,
+    /// What the child process is started with. A table rather than a
+    /// list of `NAME=value` lines: the file states one name once, and
+    /// nothing here has to split a string a person wrote.
+    #[serde(default)]
+    env: std::collections::BTreeMap<String, String>,
     #[serde(default)]
     url: Option<String>,
     #[serde(default)]
-    header: Option<String>,
+    headers: std::collections::BTreeMap<String, String>,
+    /// Which of the two ways a url is reached. Absent means `http`.
+    #[serde(default)]
+    transport: Option<ReachedBy>,
+}
+
+/// The two ways a url answers. A closed set rather than free text, so a
+/// misspelling is refused where it is written instead of becoming a
+/// server nobody can reach.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ReachedBy {
+    Http,
+    Sse,
 }
 
 #[derive(Debug, Default, Deserialize)]
