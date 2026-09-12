@@ -16,6 +16,11 @@
 # This is not a gate. `just check` never reaches it, no push waits for it, and a
 # red run here blocks nothing: it reports a finding, and the finding is then
 # fixed in Rust, where the rule lives (adversary/adversary-SPEC.md section 2).
+#
+# **Every check this runs is one that must pass, so red here always means news.**
+# Nothing is kept in the tree because it is expected to fail: a job that is red
+# by construction trains everyone who sees it to stop looking, and the next real
+# finding then lands in a run nobody reads.
 name: adversary
 
 on:
@@ -85,30 +90,9 @@ jobs:
         working-directory: adversary
         run: lake build
 
-      # Everything except the open finding. That group asserts a defect this
-      # repository already knows it has, so it is red every night by
-      # construction, and a red that is red every night is how a new red gets
-      # missed. A failure in this step is therefore news.
-      - name: properties that must hold today
+      # The whole tree, in one step. A failure prints the check's name, the seed
+      # and the shrunk trace, which is everything needed to reproduce it with
+      # `just adversary --select "<name>"` and the seed in SPRAWLING_SEED.
+      - name: the properties
         working-directory: adversary
-        run: lake exe adversary --reject "open finding"
-
-      # The open finding, watched rather than gated. Its red is the known state;
-      # its green is the news, and the day it arrives this group stops being an
-      # open finding and moves in with the rest.
-      - name: the open finding, still open
-        id: open-finding
-        continue-on-error: true
-        working-directory: adversary
-        run: lake exe adversary --select "open finding"
-
-      - name: say which of the two happened
-        run: |
-          if [ "${{ steps.open-finding.outcome }}" = "success" ]; then
-            echo "Every key the wire makes a command carry is now read before the work is done."
-            echo "Move that group out of 'open finding' in adversary/test/Main.lean,"
-            echo "and update adversary/adversary-SPEC.md section 4."
-          else
-            echo "The open finding recorded in adversary-SPEC.md section 4 still reproduces:"
-            echo "a run whose start was written past the assembly point keeps no key there."
-          fi
+        run: lake exe adversary
