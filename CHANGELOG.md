@@ -15,6 +15,57 @@ release notes and their commits.
 
 ---
 
+## Unreleased
+
+### A binary knows which release it is, and will say so when asked
+
+`sprawling status` printed `0.0.5`, npm carried the same release as
+`0.0.5-pre.260912`, and semver ranks the first above the second — so the
+naive comparison a person or a script would write reported the newest
+published release as the older one. Neither spelling could be compared
+with the other because nothing decoded both.
+
+- `kernel::Release` is the one authority for how a release is spelled
+  and how two of them order. `xtask channel` converts through it to
+  publish and a running binary converts through it to read the registry
+  back, so the version this project publishes and the version it
+  recognises cannot drift apart. `Ord` is derived over version then
+  date, which is the order npm itself would put the same two strings in.
+- The release workflow passes its tag to the build. A binary built any
+  other way reports itself as built from source rather than guessing at
+  a release it is not, and `status` says which of the two it is.
+- `sprawling version` answers, as do `--version` and `-V`; all three
+  used to land in `unknown subcommand`. The version line now carries the
+  day the release was cut, read from what is compiled in and costing no
+  network.
+
+### Checking for a newer release is manual, and updating is not offered
+
+`sprawling status --check` is the only command in this binary that
+reaches the internet, and `Query::Release` is the only query that does.
+Both run because somebody asked: no timer, no probe on connect, no check
+folded into another command. `QUICKSTART.md` opens by promising that
+nothing was installed and nothing outside the folder was written, and a
+binary that polled a registry on its own schedule would be spending that
+sentence on a question nobody asked.
+
+- The source is npm's `latest` dist-tag, not GitHub. Every release here
+  is a pre-release and `GET /releases/latest` excludes those by design —
+  it answers 404 for this repository — so the endpoint that looks right
+  is the one that would have been wrong.
+- Three answers, not two: where a release stands, that this binary is
+  not a release at all, or that the registry could not be read. The
+  third carries the staged reading `kernel::reach` already defines, so a
+  person behind a proxy is told where the call stopped rather than that
+  it failed. The exit code reports whether the question was answered,
+  never what the answer was.
+- Nothing updates anything. `sprawling install` owns the archive path
+  and npm owns its own, so both the terminal and the **machine** page
+  print the command and stop.
+- WIRE_V 31.
+
+---
+
 ## v0.0.5-Pre-alpha-260912
 
 The shape of the work was: make the first ten minutes work, and make the

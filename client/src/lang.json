@@ -1175,6 +1175,54 @@
     "en": "where to go",
     "zh": "去处"
   },
+  "release_ahead": {
+    "en": "newer than anything on npm ({version}). The packages are published after the release page, so this settles itself.",
+    "zh": "比 npm 上任何一版都新（npm 最新为 {version}）。npm 包在发布页之后才推送，等一会儿就一致了。"
+  },
+  "release_archive": {
+    "en": "or download the archive and run `sprawling install` again",
+    "zh": "或者下载压缩包，再跑一次 `sprawling install`"
+  },
+  "release_behind": {
+    "en": "a newer release is published: {version}, cut {released}.",
+    "zh": "已经有更新的版本：{version}，{released} 切出。"
+  },
+  "release_check": {
+    "en": "check npm",
+    "zh": "去 npm 查"
+  },
+  "release_current": {
+    "en": "this is the newest release published. Nothing to do.",
+    "zh": "这就是已发布的最新版本，不用动。"
+  },
+  "release_manual": {
+    "en": "Nothing was downloaded and nothing was changed. Updating is yours to run.",
+    "zh": "没有下载任何东西，也没有改动任何东西。要不要更新，由你来决定。"
+  },
+  "release_mine": {
+    "en": "this city runs {version}, cut {released}",
+    "zh": "这座城市跑的是 {version}，{released} 切出"
+  },
+  "release_newest": {
+    "en": "newest published: {version}, cut {released}",
+    "zh": "已发布的最新版：{version}，{released} 切出"
+  },
+  "release_never": {
+    "en": "This city asks npm only when you press this, and it never updates itself.",
+    "zh": "只有你按下这个按钮，这座城市才会去问 npm；它从不自行更新。"
+  },
+  "release_refused": {
+    "en": "npm could not be asked, so nothing here was checked.",
+    "zh": "没能问到 npm，所以这里什么都没有核对过。"
+  },
+  "release_source": {
+    "en": "this city was built from source, so it is none of the published releases.",
+    "zh": "这座城市是从源码构建的，因此不属于任何一个已发布版本。"
+  },
+  "release_title": {
+    "en": "which release this is",
+    "zh": "这是哪一版"
+  },
   "run_cached": {
     "en": "cached",
     "zh": "缓存命中"

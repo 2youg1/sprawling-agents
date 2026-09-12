@@ -167,6 +167,13 @@ jobs:
     # `aws-lc-rs` and all three archives keep one crypto implementation.
     env:
       CC_x86_64_unknown_linux_musl: musl-gcc
+      # Which release these binaries are. `build.rs` declares the
+      # variable and `kernel::Release` decodes it, so `sprawling status`
+      # names the release it came from and `status --check` has something
+      # to compare the registry against. A build that does not set it -
+      # every `cargo build` anybody runs - reports itself as built from
+      # source rather than guessing at a version it does not have.
+      SPRAWLING_RELEASE_TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v7
       - name: install pinned toolchain

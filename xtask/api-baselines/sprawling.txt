@@ -9,6 +9,7 @@ impl sprawling::serving::Keyed
 pub async fn sprawling::serving::serve(sprawling::serving::Serving) -> core::result::Result<(), kernel::error::shape::AxError>
 pub enum sprawling::assembly::Adopt
 pub enum sprawling::firstrun::FirstScreen
+pub enum sprawling::release::Built
 pub enum sprawling::serving::Keyed
 pub fn sprawling::ask(&std::path::Path, &channels::wire::query::Query) -> core::result::Result<channels::answer::Answer, kernel::error::shape::AxError>
 pub fn sprawling::assembly::RunWorker::adopt_building(&mut self, kernel::address::Address) -> core::result::Result<(), kernel::error::shape::AxError>
@@ -26,6 +27,9 @@ pub fn sprawling::firstrun::default_city(&std::path::Path, core::option::Option<
 pub fn sprawling::firstrun::is_writable(&std::path::Path) -> bool
 pub fn sprawling::firstrun::local_url(core::net::socket_addr::SocketAddr) -> alloc::string::String
 pub fn sprawling::firstrun::open_when_ready(core::net::socket_addr::SocketAddr, alloc::string::String)
+pub fn sprawling::release::answer() -> channels::answer::release::ReleaseAnswer
+pub fn sprawling::release::built() -> core::result::Result<sprawling::release::Built, kernel::error::shape::AxError>
+pub fn sprawling::release::newest() -> core::result::Result<kernel::release::Release, kernel::error::shape::AxError>
 pub fn sprawling::serving::Journal::default() -> sprawling::serving::Journal
 pub fn sprawling::serving::Journal::new() -> sprawling::serving::Journal
 pub fn sprawling::serving::Journal::sink(&self) -> runtime::diagnostics::Sink
@@ -37,6 +41,7 @@ pub mod sprawling::assembly
 pub mod sprawling::console
 pub mod sprawling::doctor
 pub mod sprawling::firstrun
+pub mod sprawling::release
 pub mod sprawling::serving
 pub sprawling::assembly::Adopt::EveryFolder
 pub sprawling::assembly::Adopt::Nothing
@@ -53,6 +58,8 @@ pub sprawling::console::Terminal::url: alloc::string::String
 pub sprawling::firstrun::FirstScreen::Quit
 pub sprawling::firstrun::FirstScreen::Start(std::path::PathBuf)
 pub sprawling::firstrun::FirstScreen::Use(std::path::PathBuf)
+pub sprawling::release::Built::FromSource
+pub sprawling::release::Built::Released(kernel::release::Release)
 pub sprawling::serving::Keyed::Adopted(alloc::string::String)
 pub sprawling::serving::Keyed::Minted(alloc::string::String)
 pub sprawling::serving::Keyed::NothingToPresent

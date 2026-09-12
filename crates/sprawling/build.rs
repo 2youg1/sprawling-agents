@@ -36,6 +36,11 @@ const PLACEHOLDER: &str = r#"<!DOCTYPE html>
 "#;
 
 fn main() {
+    // Which release this binary is, set by `release.yml` and by nothing
+    // else. Declared here rather than only read through `option_env!`,
+    // because cargo otherwise reuses a binary compiled under the previous
+    // tag and every copy of it would name the wrong release.
+    println!("cargo::rerun-if-env-changed=SPRAWLING_RELEASE_TAG");
     if let Err(msg) = embed() {
         // cargo >= 1.84: `cargo::error` fails the build loudly instead of
         // leaving a stale or missing asset for include_bytes! to trip on.

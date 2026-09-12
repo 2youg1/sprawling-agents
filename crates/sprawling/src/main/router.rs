@@ -56,7 +56,10 @@ commands:
   serve <dir> [addr] [--open]  serve a city that already exists
                                (--console enters it, --no-console does not)
   resume <dir>                 after a restart: verify, close what was lost, report
-  status [--deps]              this binary: version, client, what it is built from
+  version                      which release this binary is, and when it was cut
+  status [--deps] [--check]    this binary: version, client, what it is built from
+                               (--check: ask npm whether a newer release exists;
+                               the only command here that reaches the network)
   fork <dir> <run> <seq>       branch a lineage from one step of a run
   adopt <dir> <addr>           take an existing directory in as a building
   call <frame|-> [--at a]      send one wire frame, print every frame back
@@ -69,7 +72,10 @@ commands:
 pub(super) fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
-        Some("status") => status(&args),
+        // `version` is what a person types first, so it answers rather
+        // than landing in the refusal below. One implementation: the
+        // release a binary names cannot depend on which word asked.
+        Some("status" | "version" | "--version" | "-V") => status(&args),
         Some("replay") => replay(named(&args, 1)),
         Some("whose") => super::whose::verb(named(&args, 1), named(&args, 2)),
         Some("init") => init(&args),

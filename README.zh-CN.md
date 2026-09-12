@@ -84,6 +84,23 @@ sprawling 面向配置一般的机器设计，所以我不会放任多Agent产�
 
 已经装了 bun 或 node 的话，`bunx sprawling up`（或 `npx sprawling up`）从 npm 取到的就是同一个二进制。运行时负责取，不负责跑。
 
+### 怎么知道自己是不是最新版
+
+这里没有任何东西会自己更新，也没有任何东西会在你没开口时去查版本。每一次发布都是 pre-alpha，所以两版之间改了什么，值得在更新前读一遍。
+
+```bash
+sprawling version                   # 这是哪一版，以及它是哪天切出的
+sprawling status --check            # 去 npm 问有没有更新的版本
+```
+
+**machine** 页上有同一个检查，做成了一个按钮。两边都只把该跑的命令印出来就停：更新要替掉一个二进制，而该替哪个取决于你当初怎么装的。
+
+```bash
+bunx sprawling@latest up            # 如果你是用 npm 跑的
+```
+
+用压缩包装的，就下载新的那份，再跑一次 `sprawling install`。两条路都不会动城市的 `city/` 目录。
+
 启动器跑的就是下面这一条：
 
 ```bash

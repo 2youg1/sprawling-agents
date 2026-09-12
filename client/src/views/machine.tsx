@@ -19,14 +19,21 @@
 // `check again` is the manual half of the same verb rather than a
 // second way of getting the same answer.
 
-import { For, Show, createEffect, createMemo, createSignal, on } from "solid-js";
+import type { Accessor } from "solid-js";
+import { For, Match, Show, Switch, createEffect, createMemo, createSignal, on } from "solid-js";
 
 import { doctorInstall, doctorRefresh } from "../core/commands";
-import type { DoctorAnswer, DoctorInstall, DoctorItem, DoctorState } from "../wire";
+import type { Answer, DoctorAnswer, DoctorInstall, DoctorItem, DoctorState } from "../wire";
 import { useSay, useUi } from "../ui";
 import { Button } from "./parts/button";
 
 const DOCTOR = "sprawling doctor --install";
+
+// How a person updates, spelled the two ways they may have installed.
+// Neither is run from here: where this binary lives belongs to whoever
+// put it there, so the page prints the command and stops.
+const UPDATE_NPM = "bunx sprawling@latest up";
+const RELEASES = "https://github.com/2youg1/sprawling-agents/releases";
 
 // The one word a row is labelled by. The state is a value the city
 // sent; every word around it comes from the phrase table.
@@ -278,6 +285,133 @@ export function MachineUnchecked(props: { readonly onRecheck: () => void }) {
   );
 }
 
+// Which release this city is, and - only if asked - which one npm has.
+//
+// **The press is the whole trigger.** `ask` is called from the handler
+// rather than from the component body, where Solid gives it no reactive
+// owner: the answer is therefore watched by nobody, so neither a
+// reconnect nor an event re-asks it, and opening this page costs no
+// request. A city that polled a registry would be spending the promise
+// `QUICKSTART.md` opens with on a question nobody asked.
+//
+// Nothing here updates anything. The two commands are printed for a
+// person to run, because `sprawling install` owns the archive path and
+// npm owns its own, and a third party writing over either would be a
+// second authority for where this binary lives.
+function Release() {
+  const ui = useUi();
+  const say = useSay();
+  const [held, setHeld] = createSignal<Accessor<Answer | undefined>>();
+  const [asking, setAsking] = createSignal(false);
+  const answer = createMemo(() => {
+    const now = held()?.();
+    return now !== undefined && "release" in now ? now.release : undefined;
+  });
+  // One memo per state, because the check and the read have to happen
+  // on one value: asking `"stands" in answer()` and then reading
+  // `answer().stands` are two calls, and the second is not narrowed by
+  // the first.
+  const refused = createMemo(() => {
+    const found = answer();
+    return found !== undefined && "refused" in found ? found.refused : undefined;
+  });
+  const unreleased = createMemo(() => {
+    const found = answer();
+    return found !== undefined && "unreleased" in found ? found.unreleased : undefined;
+  });
+  const stands = createMemo(() => {
+    const found = answer();
+    return found !== undefined && "stands" in found ? found.stands : undefined;
+  });
+  createEffect(() => {
+    if (answer() !== undefined) {
+      setAsking(false);
+    }
+  });
+  const check = () => {
+    setAsking(true);
+    // First press opens the slot and sends; every press after it sends
+    // again, because "check again" means now rather than what was
+    // already answered.
+    const slot = ui.conn.asking.ask("release");
+    setHeld(() => slot);
+    ui.conn.asking.refresh("release");
+  };
+  return (
+    <section class="flex min-w-0 flex-col gap-snug rounded-control bg-g1 p-base">
+      <div class="flex flex-wrap items-center gap-snug">
+        <h2 class="grow text-label text-text">{say("release_title")}</h2>
+        <Button label={say("release_check")} tone="secondary" loading={asking()} onPress={check} />
+      </div>
+      <p class="text-note text-text-soft">{say("release_never")}</p>
+      <Show when={refused()}>
+        {(found) => (
+          <div class="flex flex-col gap-tight">
+            <p class="text-note text-alert">{say("release_refused")}</p>
+            <p class="text-note text-text-soft">{found().refusal.recovery}</p>
+          </div>
+        )}
+      </Show>
+      <Show when={unreleased()}>
+        {(found) => (
+          <div class="flex flex-col gap-tight">
+            <p class="text-note text-text">{say("release_source")}</p>
+            <p class="text-note text-text-soft">
+              {say("release_newest", {
+                version: found().newest.version,
+                released: found().newest.released,
+              })}
+            </p>
+          </div>
+        )}
+      </Show>
+      <Show when={stands()}>
+        {(found) => (
+          <div class="flex flex-col gap-tight">
+            <p class="text-note text-text">
+              {say("release_mine", {
+                version: found().mine.version,
+                released: found().mine.released,
+              })}
+            </p>
+            <Switch>
+              <Match when={found().verdict === "current"}>
+                <p class="text-note text-accent">{say("release_current")}</p>
+              </Match>
+              <Match when={found().verdict === "ahead"}>
+                <p class="text-note text-text-soft">
+                  {say("release_ahead", { version: found().newest.version })}
+                </p>
+              </Match>
+              <Match when={found().verdict === "behind"}>
+                <p class="text-note text-alert">
+                  {say("release_behind", {
+                    version: found().newest.version,
+                    released: found().newest.released,
+                  })}
+                </p>
+                <code class="rounded-control bg-g2 px-base py-snug font-mono text-note text-text">
+                  {UPDATE_NPM}
+                </code>
+                <p class="text-note text-text-soft">{say("release_archive")}</p>
+                <a
+                  class="text-note text-accent underline"
+                  href={RELEASES}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {RELEASES}
+                </a>
+                <p class="text-note text-text-soft">{say("release_manual")}</p>
+              </Match>
+            </Switch>
+          </div>
+        )}
+      </Show>
+    </section>
+  );
+}
+
 // This machine, item by item, with the one command that changes it.
 export function Machine() {
   const ui = useUi();
@@ -334,6 +468,7 @@ export function Machine() {
   };
   return (
     <div class="flex min-w-0 flex-col gap-wide">
+      <Release />
       <div class="flex flex-wrap items-center gap-snug">
         <Button
           label={say("machine_recheck")}

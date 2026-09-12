@@ -84,6 +84,23 @@ One binary is enough: the page ships inside it, and running it needs no JavaScri
 
 If you already have bun or node, `bunx sprawling up` — or `npx sprawling up` — fetches that same binary from npm and runs it. The runtime does the fetching, not the running.
 
+### Staying current
+
+Nothing here updates itself, and nothing checks for a release unless you ask it to. Every release is a pre-alpha, so what changes between two of them is worth reading before you take it.
+
+```bash
+sprawling version                   # which release this is, and the day it was cut
+sprawling status --check            # ask npm whether a newer one is published
+```
+
+The **machine** page has the same check behind a button. Both print what to run and stop there: updating replaces a binary, and which binary you replace depends on how you installed it.
+
+```bash
+bunx sprawling@latest up            # if npm is how you run it
+```
+
+Installed from an archive, download the new one and run `sprawling install` again. A city's `city/` folder is not touched by either route.
+
 From a terminal it is one command, and the same one the launcher runs:
 
 ```bash

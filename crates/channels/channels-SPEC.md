@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 24 个 variant、Query 恰 24 个（计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`d119571e61652ceb96331806355b0a2133e86b8c574423c84b2b0593e19bced2`；**WIRE_V ＝ 30**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35）。
+  **当前 golden**：`a6cbdd95fb92eff20fea162b6962222ef14f86a71595929c0d4bf020fb168dfc`；**WIRE_V ＝ 31**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -1040,3 +1040,24 @@ pub enum Standing {
 6. **全程不轮询。** 页面在三个时刻重读：打开页面、按下连接、以及**从同意页面切回本窗口时**。最后一条是这条流程不需要任何定时器的原因——人离开去授权再回来，「回来」本身就是那个事件。`docs/third-party.md` 边界 2 禁的是「有什么新东西吗」的定时订阅，而带死线的一次握手收尾不是它。
 
 **被否**：让 `ConnectToolkit` 直接把 consent URL 作为命令的答案回去。`Reply` 只运送拒绝（`server::reply`），把一个成功结果塞进 `AxError` 是为一次往返伪造一条错误路径；URL 由随后的 `Query::Toolkits` 从对方这个「此刻」的权威取回，客户端因而只有一条渲染路径而不是两条需要互相对齐的。
+
+### 8-36 这是哪一版，npm 上是哪一版：`Query::Release`（WIRE_V 30→31）
+
+```rust
+pub enum Query { /* … */ Release }
+
+pub struct ReleaseLine { pub version: String, pub released: String }
+pub enum ReleaseAnswer {
+    Stands { mine: ReleaseLine, newest: ReleaseLine, verdict: ReleaseVerdict },
+    Unreleased { newest: ReleaseLine },
+    Refused { refusal: AxError },
+}
+```
+
+**五条口径：**
+
+1. **人按下才发生，此外一律不发生。** 不在连上时问，不在定时器上问，也不搭另一个查询的车。`QUICKSTART.md` 的开场承诺是「什么都没装、没注册服务、删掉文件夹就干净」，一座按自己的时间表去够注册表的城，等于拿那句承诺去换一个没人问过的问题；§8-35 口径 6 对外包目录立的是同一条规矩。客户端因此在**按钮的处理函数里**调 `asking.ask`——Solid 在那里不给响应式 owner，于是这条答复没有 watcher，重连与事件都不会替人重问。
+2. **问 npm，不问 GitHub。** 本项目每一次发布都是 pre-release，而 `GET /repos/{owner}/{repo}/releases/latest` 按设计排除 pre-release——它对本仓库答 404。看上去最像的那个端点恰是错的那个；npm 的 `latest` dist-tag 才是 `bunx sprawling` 真正解析的东西。
+3. **三态穷尽，而第三态携拒绝。** 「你跑的是某个发布版，它站在这里」「你自己从源码构建的，没有可比的对象」「注册表读不到」是人接下来要做的三件不同的事。第三态不走 `Answer::Unavailable`：城是可用的、注册表不可用，页面必须能说清是哪一个，而拒绝里带的是 `kernel::reach` 已经定义的分阶段读数——名字没解析、连不上、握手失败、对方答了什么状态。
+4. **判定在 Rust，页面只画字符串。** `ReleaseLine` 携两个已渲染好的串，谁比谁新由 `kernel::Release` 的 `Ord` 判——版本在前、日期在后，与 npm 对同样两个串的排序一致。客户端因此没有第二套排序规则可以漂掉。**败给的方案**：把六个数字发给页面自己比——那是把一条领域规则复制到另一门语言里。
+5. **什么都不更新。** 归档路径归 `sprawling install`，npm 路径归 npm，第三方去覆写其中任何一条，就是「这个二进制住在哪」有了第二个权威（`npm/shim.js` 已立此规）。因此终端与页面都只把该跑的命令印出来就停。

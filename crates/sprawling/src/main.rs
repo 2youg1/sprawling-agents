@@ -35,6 +35,8 @@ mod router;
 #[cfg(test)]
 #[path = "main/tests.rs"]
 mod tests;
+#[path = "main/version.rs"]
+mod version;
 #[path = "main/whose.rs"]
 mod whose;
 

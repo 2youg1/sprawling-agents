@@ -38,6 +38,8 @@ bunx sprawling help      # or: npx sprawling help
 
 The npm packages carry the archives' own binaries, so what arrives is byte for byte what a download gives you. One platform package is fetched and the rest are skipped, and nothing is written outside the package directory: `PATH` stays as it was until you run `sprawling install` yourself.
 
+Neither channel updates itself, and neither asks about a newer release until you do. `sprawling version` prints which release this binary is and the day it was cut, which is the reading you can take offline; `sprawling status --check` is the one command here that reaches the internet, and it asks npm's `latest` dist-tag what the newest release is. The **machine** page carries the same check behind a button, asked when you press it and at no other time. Both report and stop: an installed binary's path belongs to whoever installed it, so replacing it is `bunx sprawling@latest` or a download plus `sprawling install`, and it stays your command to run.
+
 The binaries are not code-signed, so a first run trips a warning: Windows says "Windows protected your PC", where the way through is *More info*, then *Run anyway*; macOS refuses the first launch, so open the binary once from Finder's right-click menu.
 
 Do not `cargo install` this. The client is built by [bun](https://bun.sh) before the binary and embedded into it, and a plain cargo build produces a binary whose page is blank. To build it yourself, read [`CONTRIBUTING.md`](CONTRIBUTING.md) and use `just dist`.

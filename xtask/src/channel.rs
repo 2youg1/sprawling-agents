@@ -21,6 +21,11 @@
 //! with the workspace's, or this refuses. A hand-written npm version
 //! would be a second answer to "which release is this".
 //!
+//! That conversion lives in `kernel::Release` rather than here, because
+//! the binary being packaged reads it too: `sprawling status --check`
+//! asks the registry which release is newest, and it can only compare
+//! that answer with itself if both ends spell a release the same way.
+//!
 //! *PATH belongs to whoever installed.* `sprawling install` owns the
 //! archive path; npm and bun own theirs. The shim resolves and execs,
 //! and never calls `sprawling install` — see `npm/shim.js`.
@@ -96,44 +101,6 @@ const ROWS: [Row; 3] = [
 
 const REPOSITORY: &str = "https://github.com/2youg1/sprawling-agents";
 
-/// `v0.0.4-Pre-alpha-260911` and `0.0.4` become `0.0.4-pre.260911`.
-///
-/// # Errors
-/// When the tag is not shaped like a release of this project, or when
-/// its version disagrees with the workspace's.
-fn npm_version(tag: &str, workspace: &str) -> Result<String, XtaskError> {
-    let refused = |msg: String| XtaskError::Cmd {
-        cmd: format!("npm version for {tag}"),
-        msg,
-    };
-    let body = tag.strip_prefix('v').ok_or_else(|| {
-        refused(String::from(
-            "a release tag begins with `v`, as in `v0.0.4-Pre-alpha-260911`",
-        ))
-    })?;
-    let (version, rest) = body.split_once("-Pre-alpha-").ok_or_else(|| {
-        refused(String::from(
-            "a release tag reads `v<version>-Pre-alpha-<YYMMDD>`; \
-             a tag of another shape needs this rule written for it",
-        ))
-    })?;
-    if version != workspace {
-        return Err(refused(format!(
-            "the tag says {version} and `workspace.package.version` says {workspace}; \
-             one release cannot have two version numbers"
-        )));
-    }
-    if rest.len() != 6 || !rest.chars().all(|c| c.is_ascii_digit()) {
-        return Err(refused(format!(
-            "the date in the tag reads `{rest}`, which is not six digits"
-        )));
-    }
-    // `-pre.<date>` rather than `-Pre-alpha-<date>`: semver's pre-release
-    // field is dot-separated alphanumerics, and it orders below the
-    // release of the same number, which is what a pre-alpha should do.
-    Ok(format!("{workspace}-pre.{rest}"))
-}
-
 /// One file's bytes, out of a zip that holds it at any depth.
 fn extract(archive: &Path, wanted: &str) -> Result<Vec<u8>, XtaskError> {
     let file = std::fs::File::open(archive).map_err(|source| XtaskError::Io {
@@ -207,7 +174,15 @@ fn manifest(name: &str, version: &str, description: &str, extra: &str) -> String
 /// archive matches no row, or when the output cannot be written.
 pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<String, XtaskError> {
     let workspace = crate::package::workspace_version(root)?;
-    let version = npm_version(tag, &workspace)?;
+    // `kernel::Release` owns both spellings of one release, because the
+    // binary this channel packages has to recognise on the registry the
+    // same release this job publishes there.
+    let version = kernel::Release::from_tag(tag, &workspace)
+        .map_err(|err| XtaskError::Cmd {
+            cmd: format!("npm version for {tag}"),
+            msg: err.recovery().to_owned(),
+        })?
+        .npm_version();
 
     let entries = std::fs::read_dir(assets).map_err(|source| XtaskError::Io {
         path: assets.display().to_string(),

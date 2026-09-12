@@ -20,6 +20,7 @@
 
 use super::city::{DEFAULT_AT, report};
 use super::router::{client_summary, flag_value, log_floor, log_levels};
+use super::version::{check, cut};
 use super::{DEPENDENCIES, install, wire_client};
 use sprawling::{assembly, serving};
 use std::process::ExitCode;
@@ -341,7 +342,11 @@ pub(super) fn status(args: &[String]) -> ExitCode {
         print!("{DEPENDENCIES}");
         return ExitCode::SUCCESS;
     }
-    println!("sprawling {} (pre-alpha)", env!("CARGO_PKG_VERSION"));
+    println!(
+        "sprawling {} (pre-alpha){}",
+        env!("CARGO_PKG_VERSION"),
+        cut()
+    );
     println!("client: {}", client_summary());
     println!(
         "built from {} crate(s); list them with status --deps",
@@ -355,6 +360,9 @@ pub(super) fn status(args: &[String]) -> ExitCode {
             eprintln!("recovery: {}", log_levels());
             return ExitCode::from(2);
         }
+    }
+    if args.iter().any(|a| a == "--check") {
+        return check();
     }
     ExitCode::SUCCESS
 }

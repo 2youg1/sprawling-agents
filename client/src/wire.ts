@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 30 as const;
+export const WIRE_V = 31 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "d119571e61652ceb96331806355b0a2133e86b8c574423c84b2b0593e19bced2" as const;
+export const WIRE_HASH = "a6cbdd95fb92eff20fea162b6962222ef14f86a71595929c0d4bf020fb168dfc" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -1374,6 +1374,64 @@ export const RegistryAnswer = Schema.Struct({
 export type RegistryAnswer = typeof RegistryAnswer.Type;
 
 /**
+ * One release, in the two spellings a person reads.
+ */
+export const ReleaseLine = Schema.Struct({
+  released: Schema.String,
+  version: Schema.String,
+}).annotations({ identifier: "ReleaseLine" });
+export type ReleaseLine = typeof ReleaseLine.Type;
+
+/**
+ * Where one release stands against the newest one published.
+ * 
+ * Three states rather than a bool, because the third is reachable: the
+ * workflow publishes the GitHub release before it publishes the npm
+ * packages, so a binary downloaded from the release page is newer than
+ * the registry for as long as that job takes.
+ * 
+ * Named for what it judges rather than `Standing`, which `channels`
+ * already spends on where a toolkit stands: both cross the same wire,
+ * and the generated client gives one name to one type.
+ */
+export const ReleaseVerdict = Schema.Union(
+  Schema.Literal("current"),
+  Schema.Literal("behind"),
+  Schema.Literal("ahead"),
+).annotations({ identifier: "ReleaseVerdict" });
+export type ReleaseVerdict = typeof ReleaseVerdict.Type;
+
+/**
+ * Where this city stands against the release channel.
+ * 
+ * Exhaustive rather than a pair of optional fields: "you are running a
+ * release and here is where it stands", "you built this yourself, so
+ * there is nothing to compare" and "the registry could not be read"
+ * are three different things for a person to do next, and only the
+ * first of them is a version number.
+ */
+export const ReleaseAnswer = Schema.Union(
+  Schema.Struct({
+    stands: Schema.Struct({
+      mine: ReleaseLine,
+      newest: ReleaseLine,
+      verdict: ReleaseVerdict,
+    }),
+  }),
+  Schema.Struct({
+    unreleased: Schema.Struct({
+      newest: ReleaseLine,
+    }),
+  }),
+  Schema.Struct({
+    refused: Schema.Struct({
+      refusal: AxError,
+    }),
+  }),
+).annotations({ identifier: "ReleaseAnswer" });
+export type ReleaseAnswer = typeof ReleaseAnswer.Type;
+
+/**
  * How a session ended, in the word the run froze with: `done`,
  * `limit` or `cancelled`.
  */
@@ -1731,6 +1789,9 @@ export const Answer = Schema.Union(
   }),
   Schema.Struct({
     toolkits: ToolkitsAnswer,
+  }),
+  Schema.Struct({
+    release: ReleaseAnswer,
   }),
   Schema.Struct({
     unavailable: Schema.Struct({
@@ -2253,6 +2314,7 @@ export const Query = Schema.Union(
     }),
   }),
   Schema.Literal("toolkits"),
+  Schema.Literal("release"),
 ).annotations({ identifier: "Query" });
 export type Query = typeof Query.Type;
 

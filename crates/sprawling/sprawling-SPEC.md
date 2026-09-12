@@ -2736,3 +2736,20 @@ fn git_status_answer(&self, building: &Address) -> Option<channels::GitStatusAns
 3. **技能的书架在被问的那一刻扫盘，而 pin 出自历史。** `city::Library` 是书架的权威，旁边再留一份索引就是磁盘说法的第二份副本；而「哪些 run 用过」折自 `run_started` 里那张 `skills` 表（`Views::skill_pins`，键为名字与哈希成对），不是第二次扫盘。
 4. **`git_status_answer` 的比较基准取自历史而不是 HEAD。** 该楼最近一条 `checkpoint_committed`／`pr_merged` 就是基准，它由 `commits_answer(Some(building), None, 1)` 给出——变更栏旁边显示的那一行，正是提交列表打开时的第一行。
 5. **仓库句柄按次打开。** 这是投影里唯一一处伸向它不拥有的目录的读；跨重建留着的句柄会活得比开它的那座城还长。
+
+### 8-68 `bin::release`：这是哪一版，以及唯一一次去问注册表（形状 4 适配器）
+
+```rust
+pub enum Built { Released(Release), FromSource }
+pub fn built() -> Result<Built, AxError>;      // option_env!("SPRAWLING_RELEASE_TAG")
+pub fn newest() -> Result<Release, AxError>;   // GET registry.npmjs.org/sprawling/latest
+pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
+```
+
+**五条口径：**
+
+1. **人问才发生。** 没有定时器，没有首次运行时的探测，也不搭另一条命令的车：`status` 只读编译进来的东西、一个套接字都不碰，只有 `status --check` 会出网。`QUICKSTART.md` 的开场承诺是「什么都没装、没注册服务、删掉文件夹就干净」，一个按自己时间表去够注册表的二进制，是在拿那句承诺换一个没人问过的问题。
+2. **什么都不更新。** 二进制住在哪，归当初装它的人管——归档路径归 `sprawling install`，npm 路径归 npm（`npm/shim.js` 已立此规）。故本模块只报告然后停下，答案里印的是该跑的命令，选哪条仍由选了安装渠道的那个人决定。
+3. **`Built` 两态而不是 `Option<Release>`。** 缺席不是一个缺失的值，而是关于这次构建的一个事实：从工作树构建出来的二进制没有可比的对象，把它报成「过期」是在回答另一个二进制的问题。tag 由 `release.yml` 经 `SPRAWLING_RELEASE_TAG` 传入，`build.rs` 声明该变量（`cargo::rerun-if-env-changed`），否则 cargo 会拿上一个 tag 编出来的二进制顶数，而它的每一份都会报错版本。
+4. **问 npm，不问 GitHub。** 本项目每一次发布都是 pre-release，而 `GET /repos/{owner}/{repo}/releases/latest` 按设计排除 pre-release，对本仓库答 404。npm 的 `latest` dist-tag 才是 `bunx sprawling` 真正解析的东西，问它才是问人真正有的那个问题。
+5. **失败说清停在哪一阶段。** 只在失败路径上多发一次 `gateway::reach`，把 `kernel::reach` 已定义的分阶段读数——名字没解析、连不上、握手失败、对方答了什么状态——放进 recovery。「它没成功」不是一个人能据以行动的答案，而这条路径上多一次请求换一句能行动的话是划算的。退出码报的是问题有没有被回答，而不是答案是什么：版本过期是消息不是故障，而读不到注册表会让人以为自己查过了。

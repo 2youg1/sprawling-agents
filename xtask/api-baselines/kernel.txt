@@ -86,6 +86,7 @@ impl kernel::Pursuit
 impl kernel::Range
 impl kernel::Reach
 impl kernel::Registry
+impl kernel::Release
 impl kernel::ResidentId
 impl kernel::RoadmapStatus
 impl kernel::RunId
@@ -223,6 +224,7 @@ pub enum kernel::PursuitState
 pub enum kernel::PursuitVerdict
 pub enum kernel::Range
 pub enum kernel::RegisterVerdict
+pub enum kernel::ReleaseVerdict
 pub enum kernel::RepairVerdict
 pub enum kernel::RoadmapShape
 pub enum kernel::RoadmapStatus
@@ -398,6 +400,12 @@ pub fn kernel::Registry::new() -> kernel::Registry
 pub fn kernel::Registry::promote_asset(&mut self, &kernel::Locator) -> core::result::Result<kernel::RegisterVerdict, kernel::AxError>
 pub fn kernel::Registry::register_artifact(&mut self, kernel::Artifact) -> kernel::RegisterVerdict
 pub fn kernel::Registry::register_resident(&mut self, kernel::ResidentId) -> kernel::RegisterVerdict
+pub fn kernel::Release::from_npm_version(&str) -> core::result::Result<kernel::Release, kernel::AxError>
+pub fn kernel::Release::from_tag(&str, &str) -> core::result::Result<kernel::Release, kernel::AxError>
+pub fn kernel::Release::npm_version(&self) -> alloc::string::String
+pub fn kernel::Release::released(&self) -> alloc::string::String
+pub fn kernel::Release::tag(&self) -> alloc::string::String
+pub fn kernel::Release::version(&self) -> alloc::string::String
 pub fn kernel::ResidentId::as_str(&self) -> &str
 pub fn kernel::ResidentId::new(impl core::convert::Into<alloc::string::String>) -> core::option::Option<kernel::ResidentId>
 pub fn kernel::RoadmapStatus::spelling(self) -> &'static str
@@ -503,6 +511,7 @@ pub fn kernel::scan(&[u8]) -> alloc::vec::Vec<kernel::SecretSpan>
 pub fn kernel::set_roadmap_status(&str, &kernel::NodeId, kernel::RoadmapStatus, core::option::Option<&kernel::Locator>) -> core::result::Result<alloc::string::String, kernel::AxError>
 pub fn kernel::spawn(kernel::Depth, &kernel::DelegateKind) -> kernel::GateOutcome
 pub fn kernel::spread(&kernel::PlanTree, &[kernel::RedNode]) -> alloc::vec::Vec<kernel::Blockage>
+pub fn kernel::stands(&kernel::Release, &kernel::Release) -> kernel::ReleaseVerdict
 pub fn kernel::undoable(&kernel::GateContext, &kernel::ConnectorCall<'_>, &kernel::Locator, &kernel::TaintSet) -> kernel::GateOutcome
 pub fn kernel::value_has_float(&serde_json::value::Value) -> bool
 pub kernel::Admission::Admit
@@ -943,6 +952,9 @@ pub kernel::RedNode::at: kernel::NodeId
 pub kernel::RedNode::why: kernel::StopCause
 pub kernel::RegisterVerdict::AlreadyRegistered
 pub kernel::RegisterVerdict::Registered
+pub kernel::ReleaseVerdict::Ahead
+pub kernel::ReleaseVerdict::Behind
+pub kernel::ReleaseVerdict::Current
 pub kernel::RenderIntent::Diff
 pub kernel::RenderIntent::Diff::locations: alloc::vec::Vec<kernel::Address>
 pub kernel::RenderIntent::Generic
@@ -1119,6 +1131,7 @@ pub struct kernel::QueueStats
 pub struct kernel::Reach
 pub struct kernel::RedNode
 pub struct kernel::Registry
+pub struct kernel::Release
 pub struct kernel::ResidentId(_)
 pub struct kernel::RoadmapRow
 pub struct kernel::RunId(_)

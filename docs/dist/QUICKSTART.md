@@ -33,6 +33,10 @@ Then **live** follows the work, **approvals** holds anything that needs you, and
 
 In `city/`, beside this file. One folder holds the whole history, and it can be moved, copied or deleted as a unit. Each session keeps its own folder inside the building it works in, under the name you gave it.
 
+## Is there a newer one?
+
+Nothing here updates itself, and nothing asks npm anything until you do. `sprawling version` says which release this is and the day it was cut; `sprawling status --check` asks whether a newer one is published, and the **machine** page has the same check behind a button. Either way you are told what to run and nothing is replaced for you.
+
 ## Everything else
 
 Run `sprawling help` for the full command list. The complete walkthrough, the vocabulary, and the design are at <https://github.com/2youg1/sprawling-agents>.

@@ -5,34 +5,28 @@
 
 use std::path::Path;
 
-use super::{ROWS, npm_version};
+use super::ROWS;
 
 /// The last version whose platform packages reached the registry under
 /// bare names. npm never reuses a `name@version`, so the scope cannot
 /// be applied to it afterwards.
 const UNSCOPED_THROUGH: &str = "0.0.4";
 
+/// What this channel publishes a release as, held against the spelling
+/// `kernel::Release` decodes - the tag conversion itself is that type's
+/// and is tested there. This is the seam: the job publishes
+/// `npm_version()`, and `status --check` reads the registry back through
+/// `from_npm_version`, so a release only stays findable while those two
+/// agree.
 #[test]
-fn a_release_tag_becomes_the_semver_npm_accepts() {
+fn the_published_version_is_the_one_a_running_binary_decodes() {
+    let cut = kernel::Release::from_tag("v0.0.4-Pre-alpha-260911", "0.0.4")
+        .expect("a release tag of this project");
+    assert_eq!(cut.npm_version(), "0.0.4-pre.260911");
     assert_eq!(
-        npm_version("v0.0.4-Pre-alpha-260911", "0.0.4").unwrap(),
-        "0.0.4-pre.260911"
+        kernel::Release::from_npm_version(&cut.npm_version()).expect("what this channel published"),
+        cut
     );
-}
-
-/// The check that keeps one release from having two version numbers.
-#[test]
-fn a_tag_disagreeing_with_the_workspace_is_refused() {
-    let err = npm_version("v0.0.3-Pre-alpha-260911", "0.0.4").unwrap_err();
-    assert!(err.to_string().contains("two version numbers"), "{err}");
-}
-
-#[test]
-fn a_tag_of_another_shape_is_refused_rather_than_guessed_at() {
-    assert!(npm_version("0.0.4", "0.0.4").is_err());
-    assert!(npm_version("v0.0.4", "0.0.4").is_err());
-    assert!(npm_version("v0.0.4-Pre-alpha-26091", "0.0.4").is_err());
-    assert!(npm_version("v0.0.4-Pre-alpha-2609xx", "0.0.4").is_err());
 }
 
 /// Two packages claiming one platform would make which binary a

@@ -287,6 +287,10 @@ impl Views {
             channels::Query::Toolkits => {
                 channels::Answer::Toolkits(Box::new(self.toolkits_answer()))
             }
+            // Leaves this machine, and only on a press (channels-SPEC 8-36).
+            channels::Query::Release => {
+                channels::Answer::Release(Box::new(crate::release::answer()))
+            }
             channels::Query::BuildingView { addr } => {
                 let root = self.city_root.clone();
                 let plan = self.plans.of(&root, addr);

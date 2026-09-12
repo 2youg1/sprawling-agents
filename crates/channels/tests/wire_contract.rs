@@ -46,10 +46,10 @@ fn exposed() -> SocketAddr {
 
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
-    // Twenty-eight commands, thirty queries. The count is not a style
-    // choice - it is the wire's closed surface.
+    // Twenty-eight commands, thirty-one queries. The count is not a
+    // style choice - it is the wire's closed surface.
     assert_eq!(COMMAND_NAMES.len(), 28, "command table");
-    assert_eq!(QUERY_NAMES.len(), 30, "query table");
+    assert_eq!(QUERY_NAMES.len(), 31, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
@@ -59,7 +59,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 30, "query names are distinct");
+    assert_eq!(sorted.len(), 31, "query names are distinct");
 }
 
 #[test]
@@ -89,14 +89,14 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 30,
+        WIRE_V, 31,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
 
 /// A function of WIRE_V and the two name tables, so any change to the
 /// protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "d119571e61652ceb96331806355b0a2133e86b8c574423c84b2b0593e19bced2";
+const WIRE_SCHEMA_GOLDEN: &str = "a6cbdd95fb92eff20fea162b6962222ef14f86a71595929c0d4bf020fb168dfc";
 
 // -------------------------------------------------------------- binding face
 

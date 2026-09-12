@@ -30,6 +30,7 @@ mod hunks;
 mod listing;
 mod mcp_health;
 mod prefix;
+mod release;
 mod rounds;
 mod skills;
 mod toolkits;
@@ -47,6 +48,7 @@ pub use hunks::{HunksAnswer, PatchLine, Withheld};
 pub use listing::{Entry, EntryKind, ListingAnswer};
 pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
+pub use release::{ReleaseAnswer, ReleaseLine};
 pub use rounds::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Turn, Used};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
@@ -234,6 +236,7 @@ pub enum Answer {
     GitStatus(Box<GitStatusAnswer>),
     McpHealth(Box<McpHealthAnswer>),
     Toolkits(Box<ToolkitsAnswer>),
+    Release(Box<ReleaseAnswer>),
     Unavailable { query: String },
 }
 

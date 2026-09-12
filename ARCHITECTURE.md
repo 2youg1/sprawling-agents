@@ -351,7 +351,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 
 **The number in each subheading is the number of rows under it**, and `cargo xtask modmap` counts them, because every count a person maintained by hand here had already gone stale. The `desktop` heading is the one exception the machine cannot judge: its files sit outside `crates/`, where the parser does not look.
 
-### kernel (75) — every decision in the city, and nothing that touches a disk
+### kernel (76) — every decision in the city, and nothing that touches a disk
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -365,6 +365,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::event::payload | crates/kernel/src/event/payload.rs | payloads, drafts, records, and refs | value | S1 | built | kernel-SPEC.md#8-4 |
 | kernel::error | crates/kernel/src/error.rs | AxError and the closed AxCode set, each with its carrier event | value | S1 | built | kernel-SPEC.md#8-1 |
 | kernel::version | crates/kernel/src/version.rs | optimistic concurrency: a write carries the version it read | value | S1 | built | kernel-SPEC.md#8-5 |
+| kernel::release | crates/kernel/src/release.rs | which release a binary is, in both spellings one release has, and how two of them order | value | S1 | built | kernel-SPEC.md#8-54 |
 | kernel::idem | crates/kernel/src/idem.rs | the deduplication key for outward actions, derived deterministically | value | S1 | built | kernel-SPEC.md#8-6 |
 | kernel::consts_external | crates/kernel/src/consts_external.rs | constants that follow the outside world, each with its source | data | S1 | built | kernel-SPEC.md#8-7 |
 | kernel::consts_policy | crates/kernel/src/consts_policy.rs | constants that are our choice; changing one needs evidence | data | S1 | built | kernel-SPEC.md#8-8 |
@@ -681,7 +682,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | eval::ablation::capabilities | crates/eval/src/ablation/capabilities.rs | the corpus: each thing a resident must be able to do, and the phrase in the document that grants it | data | V3 | built | eval-SPEC.md#8-7 |
 | eval::ablation::tests | crates/eval/src/ablation/tests.rs | the graded fixtures, and the on-demand run against the real City.md | decision | V3 | built | eval-SPEC.md#8-7 |
 
-### channels (34) — the process boundary
+### channels (35) — the process boundary
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -701,6 +702,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::answer::listing | crates/channels/src/answer/listing.rs | one directory of the city, one level deep, as a page walks the tree | value | F5 | built | channels-SPEC.md#8-23 |
 | channels::answer::mcp_health | crates/channels/src/answer/mcp_health.rs | where each tool server one address reaches stands, and what it offers | value | V5 | built | channels-SPEC.md#8-34 |
 | channels::answer::toolkits | crates/channels/src/answer/toolkits.rs | which outside applications the broker offers, and where each one stands for this city | value | V5 | built | channels-SPEC.md#8-35 |
+| channels::answer::release | crates/channels/src/answer/release.rs | which release this city runs and which one npm offers, or why neither could be compared | value | V5 | built | channels-SPEC.md#8-36 |
 | channels::answer::doctor | crates/channels/src/answer/doctor.rs | what this machine has, item by item, in values a page labels rather than sentences | value | V5 | built | channels-SPEC.md#8-25 |
 | channels::answer::document | crates/channels/src/answer/document.rs | one file of the city, bounded, with the cut and the binary judgement stated | value | F5 | built | channels-SPEC.md#8-23 |
 | channels::answer::commits | crates/channels/src/answer/commits.rs | what the city says about a commit it made, one by oid or a page newest first | value | V4 | built | channels-SPEC.md#8-24 |
@@ -720,7 +722,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (171)
+### browser (12), protocol (5), bin (173)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -849,6 +851,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::mcp_stdio::tests | crates/sprawling/src/mcp_stdio/tests.rs | a real child over a real pipe, a deadline that ends the process, and one process behind every handle | adapter | V5 | built | sprawling-SPEC.md#8-4 |
 | bin::mcp_http::tests | crates/sprawling/src/mcp_http/tests.rs | what the HTTP transport, its session and its redeemed header are held to | adapter | R1 | built | sprawling-SPEC.md#8-15 |
 | bin::firstrun | crates/sprawling/src/firstrun.rs | the first screen, where a city goes when nobody said, and handing a URL to the desktop | adapter | P7 | built | sprawling-SPEC.md#8-8 |
+| bin::release | crates/sprawling/src/release.rs | which release this binary is, and the one registry read that says whether a newer one exists | adapter | V5 | built | sprawling-SPEC.md#8-68 |
+| bin::version | crates/sprawling/src/main/version.rs | what `status` prints about which release this is, and the one command that asks the registry | adapter | V5 | built | sprawling-SPEC.md#8-68 |
 | bin::revealing | crates/sprawling/src/revealing.rs | showing a person an address in their own file manager, selected rather than merely opened | adapter | V5 | built | sprawling-SPEC.md#8-60 |
 | bin::install | crates/sprawling/src/install.rs | putting this binary where a shell will find it, and taking it back out | adapter | P0 | built | sprawling-SPEC.md#8-9 |
 | bin::install::search_path_windows | crates/sprawling/src/install/search_path_windows.rs | editing the user search path in the registry under its own type, and telling the desktop | adapter | P0 | built | sprawling-SPEC.md#8-9 |

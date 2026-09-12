@@ -26,11 +26,13 @@ pub use event::{EventDraft, EventKind, EventRecord, EventRef, Payload};
 pub use event::{RunId, Seq, TimeMs, WindowClass};
 
 mod idem;
+mod release;
 #[cfg(feature = "schema")]
 mod schema;
 mod version;
 
 pub use idem::{IDEM_DERIVE_V, IdemKey};
+pub use release::{Release, ReleaseVerdict, stands};
 pub use version::{Version, VersionVerdict, check_base};
 
 mod ledger;

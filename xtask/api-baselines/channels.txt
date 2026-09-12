@@ -49,6 +49,7 @@ pub channels::Answer::McpHealth(alloc::boxed::Box<channels::McpHealthAnswer>)
 pub channels::Answer::Metrics(alloc::boxed::Box<channels::MetricsAnswer>)
 pub channels::Answer::Prefix(alloc::boxed::Box<channels::PrefixAnswer>)
 pub channels::Answer::Registry(channels::RegistryAnswer)
+pub channels::Answer::Release(alloc::boxed::Box<channels::ReleaseAnswer>)
 pub channels::Answer::Rounds(alloc::boxed::Box<channels::RoundsAnswer>)
 pub channels::Answer::Run(core::option::Option<channels::RunSummary>)
 pub channels::Answer::Skills(alloc::boxed::Box<channels::SkillsAnswer>)
@@ -561,6 +562,7 @@ pub channels::Query::Metrics
 pub channels::Query::Prefix
 pub channels::Query::Prefix::run: kernel::event::identity::RunId
 pub channels::Query::RegistryView
+pub channels::Query::Release
 pub channels::Query::Rounds
 pub channels::Query::Rounds::run: kernel::event::identity::RunId
 pub channels::Query::RunHistory
@@ -577,6 +579,16 @@ pub channels::RegistryLine::addr: kernel::address::Address
 pub channels::RegistryLine::at: kernel::event::identity::TimeMs
 pub channels::RegistryLine::kind: alloc::string::String
 pub channels::RegistryLine::subject: alloc::string::String
+pub channels::ReleaseAnswer::Refused
+pub channels::ReleaseAnswer::Refused::refusal: kernel::error::shape::AxError
+pub channels::ReleaseAnswer::Stands
+pub channels::ReleaseAnswer::Stands::mine: channels::ReleaseLine
+pub channels::ReleaseAnswer::Stands::newest: channels::ReleaseLine
+pub channels::ReleaseAnswer::Stands::verdict: kernel::release::ReleaseVerdict
+pub channels::ReleaseAnswer::Unreleased
+pub channels::ReleaseAnswer::Unreleased::newest: channels::ReleaseLine
+pub channels::ReleaseLine::released: alloc::string::String
+pub channels::ReleaseLine::version: alloc::string::String
 pub channels::RoundsAnswer::closing: core::option::Option<channels::Closing>
 pub channels::RoundsAnswer::opened_at: core::option::Option<kernel::locator::GitOid>
 pub channels::RoundsAnswer::opening: core::option::Option<channels::Opening>
@@ -676,7 +688,7 @@ pub channels::Withheld::reason: alloc::string::String
 pub const channels::COMMAND_NAMES: [&str; 28]
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
-pub const channels::QUERY_NAMES: [&str; 30]
+pub const channels::QUERY_NAMES: [&str; 31]
 pub const channels::WIRE_V: u32
 pub enum channels::Answer
 pub enum channels::AssetReply
@@ -709,6 +721,7 @@ pub enum channels::Outcome
 pub enum channels::PrefixSlot
 pub enum channels::PursuitStep
 pub enum channels::Query
+pub enum channels::ReleaseAnswer
 pub enum channels::ServerFrame
 pub enum channels::SessionState
 pub enum channels::SessionStep
@@ -832,6 +845,7 @@ pub struct channels::ProviderName(_)
 pub struct channels::PursuitLine
 pub struct channels::RegistryAnswer
 pub struct channels::RegistryLine
+pub struct channels::ReleaseLine
 pub struct channels::Reply(_)
 pub struct channels::RoundsAnswer
 pub struct channels::RunSummary

@@ -89,7 +89,10 @@ use serde::{Deserialize, Serialize};
 ///    when it opened, and one press connects an outside application -
 ///    `Query::Toolkits` reads the broker's shelf and
 ///    `Command::ConnectToolkit` opens a consent session on it.
-pub const WIRE_V: u32 = 30;
+/// 31: `Query::Release` answers which release this city is and which
+///    one npm offers - the only query that reaches the internet, asked
+///    when somebody presses the button and never on a timer.
+pub const WIRE_V: u32 = 31;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
@@ -346,6 +349,7 @@ mod tests {
                 addr: Address::parse("acme").unwrap(),
             },
             Query::Toolkits,
+            Query::Release,
         ];
         assert_eq!(queries.len(), QUERY_NAMES.len());
         for (query, expected) in queries.iter().zip(QUERY_NAMES) {

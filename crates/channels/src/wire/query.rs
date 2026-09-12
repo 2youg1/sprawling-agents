@@ -17,7 +17,7 @@ use kernel::{Address, GitOid, Locator, NodeId, RunId, Seq};
 use serde::{Deserialize, Serialize};
 
 /// The Query surface, in declaration order.
-pub const QUERY_NAMES: [&str; 30] = [
+pub const QUERY_NAMES: [&str; 31] = [
     "History",
     "RunHistory",
     "Changes",
@@ -48,6 +48,7 @@ pub const QUERY_NAMES: [&str; 30] = [
     "GitStatus",
     "McpHealth",
     "Toolkits",
+    "Release",
 ];
 
 /// Queries read state. They are cacheable and free of side effects, so none
@@ -324,6 +325,27 @@ pub enum Query {
     /// nothing secret and an unenrolled city answers
     /// `ToolkitsAnswer::Unenrolled` rather than failing.
     Toolkits,
+    /// Which release this city is running, and which one npm offers.
+    ///
+    /// **Asked when a person presses the button, and at no other time.**
+    /// Not on connect, not on a timer, and not folded into another
+    /// query: `QUICKSTART.md` opens by promising that nothing was
+    /// installed and nothing outside the folder was written, and a city
+    /// that reached a registry on its own schedule would be spending
+    /// that sentence on a question nobody asked. `docs/third-party.md`
+    /// rules out the same traffic for the broker.
+    ///
+    /// Answering it costs one request to `registry.npmjs.org`, so it is
+    /// the slowest query here and the only one whose cost a person
+    /// chose. A registry that cannot be reached is
+    /// [`ReleaseAnswer::Refused`](crate::ReleaseAnswer::Refused) rather
+    /// than [`Answer::Unavailable`](crate::Answer::Unavailable): the
+    /// city is available, the registry is not, and the page has to be
+    /// able to say which.
+    ///
+    /// Nothing it answers updates anything. Where a binary lives belongs
+    /// to whoever installed it, so this reports and stops.
+    Release,
 }
 
 impl Query {
@@ -361,6 +383,7 @@ impl Query {
             Self::GitStatus { .. } => "GitStatus",
             Self::McpHealth { .. } => "McpHealth",
             Self::Toolkits => "Toolkits",
+            Self::Release => "Release",
         }
     }
 }

@@ -38,6 +38,8 @@ bunx sprawling help      # 或者：npx sprawling help
 
 npm 包里装的就是发布归档里那一份二进制，逐字节相同。npm 与 bun 只取与你的系统和架构相符的那一个平台包，其余的跳过；包目录之外一字不写，`PATH` 保持原样，直到你自己跑 `sprawling install`。
 
+两条渠道都不会自己更新，也都不会在你没开口时去问有没有新版。`sprawling version` 印出这份二进制是哪一版、哪天切出的，这一读数离线就能拿到；`sprawling status --check` 是这里唯一会联网的命令，它去问 npm 的 `latest` dist-tag 最新版是哪一个。**machine** 页上有同一个检查，你按它才发生，其余时候不发生。两边都只报告、不动手：装好的二进制在哪里，归当初装它的人管，所以替掉它是 `bunx sprawling@latest`，或者下载新归档再跑 `sprawling install`，那一下始终是你的命令。
+
 这些二进制没有代码签名，所以第一次运行会触发警告：Windows 说「Windows protected your PC」，走 *More info*、再 *Run anyway*；macOS 会拒绝第一次启动，在 Finder 里右键打开一次即可。
 
 **不要用 `cargo install` 装它。** 客户端由 [bun](https://bun.sh) 先构建、再嵌进二进制；只跑一次 cargo build 得到的二进制，页面是空白的。要自己构建就读 [`CONTRIBUTING.md`](CONTRIBUTING.md)，并用 `just dist`。
