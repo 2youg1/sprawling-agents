@@ -764,8 +764,8 @@
     "zh": "工具与 schema"
   },
   "mcp_gap_connect": {
-    "en": "connecting opens a browser and waits for the toolkit; the city has no command for that",
-    "zh": "连接要打开浏览器并等这个工具箱回话，城里没有这条命令"
+    "en": "sign in on Composio's own pages, then paste the server id it prints",
+    "zh": "在 Composio 自己的页面上登录，然后把它给出的 server id 粘过来"
   },
   "mcp_gap_scope_city": {
     "en": "the wire writes every server into the building layer",

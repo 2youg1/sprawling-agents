@@ -46,6 +46,10 @@ A user may want the city connected to dozens of outside applications - mail, Git
 
 The connection is **MCP**, not their SDK: opening the `mcp` option when a session is created yields an MCP endpoint URL that any MCP client can reach. (The older standalone `composio.mcp` service-management API is deprecated; no new code is written against it.) That choice has a direct consequence: **this code never knows what Composio is.** `protocol::mcp` connects to any MCP server, and Composio is one URL among them. A user who does not trust it points at another, or runs their own, and not one line changes here.
 
+**A one-click connect button belongs to Composio's own pages, not to this one.** Connecting a toolkit from inside the city would mean the city holding the person's project key and speaking Composio's REST API: `POST /api/v3/connected_accounts/link` for the Connect Link, which requires an `auth_config_id` that is created in Composio's dashboard first, and `GET /api/v3/toolkits` for the directory. Three things argue against it, and the third is the one that decides. The city would then know what Composio is, which is the boundary this whole section exists to keep. The step a button would save is not saved: an auth config still has to exist, and making one is a visit to the same dashboard that also prints the server URL this page already accepts. And the endpoint to write against is moving - `POST /api/v3/connected_accounts` is being retired for Composio-managed auth configs on redirectable OAuth schemes, per organisation, on a date the caller does not choose - so code written here breaks on somebody's cutover rather than on a change anybody here can see coming.
+
+**What would re-open it**: a Composio API that needs no dashboard visit for the common case, or a second outsourced service worth the same wiring - two of them would make a seam, where one is a special case.
+
 Four boundaries, each of them part of what the product promises:
 
 1. **The account is the user's.** No key is bundled, nothing is paid on their behalf, nothing is proxied.
