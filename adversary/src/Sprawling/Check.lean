@@ -166,9 +166,10 @@ inductive Tree where
 /-- Whether a path through the tree is one this run was asked for.
 
 Two flags, `--select <text>` and `--reject <text>`, each matched against the
-full path a check is reached by. Two, because there are exactly two questions
-asked of this: run one named group, or run everything but that group. A pattern
-language would be a second thing to learn for no answer it buys. -/
+full path a check is reached by. They exist for the minute after a red: one
+check reruns in seconds where the whole tree costs minutes, and the seed the
+failure printed draws the same trace again. A pattern language would be a second
+thing to learn for no answer it buys. -/
 structure Selection where
   select : Option String := none
   reject : Option String := none

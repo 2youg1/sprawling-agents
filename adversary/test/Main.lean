@@ -6,12 +6,16 @@
 import Sprawling
 
 /-!
-# Six groups, in the order that loses the least time when something breaks.
+# The checks, in the order that loses the least time when something breaks.
 
 The renderer is checked first because it takes milliseconds and because a broken
 deliverable makes every counterexample below it worthless. The door's own
 contract comes next, then random traces, then the directed attack, then what the
 history says about itself, then the disk's simplest lie.
+
+**Every check here is one that must pass.** A check kept because it is expected
+to fail teaches a reader that red is the normal colour, and the next real defect
+then arrives into a run nobody is reading.
 
 With no binary to drive, this exits successfully and says so. A check that could
 not run is not a check that failed, and treating it as one is how a second
@@ -308,10 +312,11 @@ private def properties (door : Door) : Tree :=
     , .group "a refusal costs nothing"
         [ .leaf "a refused dispatch leaves nothing on disk" (nothingBehind door)
         , .leaf "the city lists only what it raised" (listsOnlyRaised door) ]
-      -- Alone, so that a red says which defect it is. Green the day something
-      -- consults the key the wire makes every command carry.
-    , .group "open finding: the idempotency key nothing reads"
-        [ .leaf "a key the city has seen does not do the work again" (keyUsedTwice door) ] ]
+      -- On its own rather than in a group, because one lane still writes past
+      -- the point that holds the keys: a run whose start is recorded by the
+      -- run's own lifecycle leaves no key there, and that is the lane a retry is
+      -- owed. A red here names that lane and nothing else.
+    , .leaf "a key the city has seen does not do the work again" (keyUsedTwice door) ]
 
 private def selectionOf (args : List String) : Selection :=
   { select := valueAfter "--select" args, reject := valueAfter "--reject" args }

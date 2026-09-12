@@ -1325,7 +1325,7 @@ let mut site = self.stand_up(agreed, &at, &given)?;
 1. **红转绿（Rust，本仓）**：`a_dispatch_the_city_will_not_take_leaves_no_room_behind`——
    一座刚 init、没挂任何 provider 的城，派活到 `gamma/one`，必须得到 `E_CONFIG_INVALID`，
    且 `gamma` 目录不存在。今天它红在第二条断言上。
-2. **红转绿（轨道二的检验器，仓外）**：`open finding` 那一组两条转绿——`nothingBehind`
+2. **红转绿（轨道二的检验器，仓外）**：`a refusal costs nothing` 那一组两条转绿——`nothingBehind`
    （被拒的派活不改变城的目录树）与 `listsOnlyRaised`（`city_view` 只列被立起来过的楼）。
    这两条断言是验收标准，不许为了让它绿而改动它们。
 3. **不回归**：`sprawling` 全部单测绿；`a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here`
