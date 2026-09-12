@@ -239,10 +239,33 @@ jobs:
           # forgotten click away from a pre-alpha presenting itself as the
           # release a person should download. The day that stops being
           # true, this flag is what gets deleted, deliberately.
+          # The notice is authored; the line pointing at this tag's
+          # changelog entry is built here, for two reasons that agree.
+          # A repository URL written out in full is an unbroken run of
+          # more than twenty token bytes, which is what `xtask secret`
+          # refuses on sight - correctly, since it cannot know a public
+          # address from a credential. And built from this run's own
+          # context it is one fewer place that has to agree about where
+          # this repository lives.
+          #
+          # Relative links are why this is a full URL rather than a
+          # short one. A release body resolves them against
+          # `<repo>/blob/<tag>/`, so `CHANGELOG.md` renders as a path
+          # inside the tag directory and 404s; v0.0.4 shipped exactly
+          # that broken link. Only an absolute URL survives.
+          #
+          # The fragment is GitHub's own heading slug, which lowercases
+          # and drops punctuation: `v0.0.5-Pre-alpha-260912` addresses
+          # the heading of the same name as `v005-pre-alpha-260912`.
+          anchor=$(printf '%s' "${GITHUB_REF_NAME}" | tr 'A-Z' 'a-z' | tr -d '.')
+          notes="${RUNNER_TEMP}/release-notes.md"
+          cp .github/release-notes.md "${notes}"
+          printf '\n📋 What changed / 本版改动：[CHANGELOG.md](%s/%s/blob/main/CHANGELOG.md#%s)\n' \
+            "${GITHUB_SERVER_URL}" "${GITHUB_REPOSITORY}" "${anchor}" >>"${notes}"
           gh release create "${GITHUB_REF_NAME}" assets/*.zip \
             --title "sprawling ${GITHUB_REF_NAME}" \
             --prerelease \
-            --notes-file .github/release-notes.md
+            --notes-file "${notes}"
 
   # The same binaries, reachable by `bunx sprawling` instead of by
   # downloading a zip. `cargo xtask channel` takes this tag's own
@@ -327,7 +350,19 @@ jobs:
           # The platform packages are scoped, so they sit one directory
           # deeper than the root package and this enumerates that level
           # rather than every child of `target/npm`.
+          #
+          # `--provenance` is stated rather than left to the default.
+          # npm documents provenance as automatic under trusted
+          # publishing, and npm/cli#8730 collects reports of publishes
+          # that fail until the flag is passed. Both readings agree on
+          # what the flag does when provenance is already on: nothing.
+          # They disagree only about the release where this job runs
+          # last, after the GitHub release is already public - so the
+          # flag is carried for the reading where it is load-bearing.
+          # Its own two conditions hold: this repository is public, and
+          # `xtask channel` writes `repository` into every package it
+          # assembles rather than only into the root.
           for dir in target/npm/@sprawling/*/; do
-            npm publish "$dir" --access public --tag latest
+            npm publish "$dir" --access public --tag latest --provenance
           done
-          npm publish target/npm/sprawling --access public --tag latest
+          npm publish target/npm/sprawling --access public --tag latest --provenance

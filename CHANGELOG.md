@@ -15,7 +15,7 @@ release notes and their commits.
 
 ---
 
-## v0.0.5-Pre-alpha
+## v0.0.5-Pre-alpha-260912
 
 The shape of the work was: make the first ten minutes work, and make the
 screen a person judges this product by say what it means.
