@@ -62,6 +62,12 @@ pub struct RunPlan {
     /// read the shelf is gone, the ledger is the only thing that can
     /// still say which bytes this run was given.
     pub skills: Vec<SkillPin>,
+    /// How many times this run may make a failed call again, as the
+    /// person set it on the endpoint it calls. Frozen with the run for
+    /// the reason every other setting here is: a number changed halfway
+    /// through would make the account of what this run did depend on
+    /// when somebody looked at a form.
+    pub retries: crate::Retries,
 }
 
 /// Where the driver stops to ask whether anything arrived. The turn layer
@@ -200,6 +206,7 @@ pub fn drive(
     hooks: &mut RunHooks<'_>,
     handoff: &Handoff,
 ) -> Result<Run<Frozen>, AxError> {
+    let mut watchdog = crate::Watchdog::new(plan.retries);
     let mut run = Run::dispatch(plan, ledger, hooks)?;
     let ending = loop {
         match run.advance(ledger, model, hooks) {
@@ -229,6 +236,26 @@ pub fn drive(
                     return Err(err);
                 };
                 let t = (hooks.now)()?;
+                // A provider that failed for a reason worth retrying is
+                // asked again, and the attempt is recorded rather than
+                // repeated silently: the second `model_called` in the
+                // history is what a person reads the retry off.
+                // Pacing is `gateway::admission`'s, which holds the
+                // provider's own `retry-after` and applies it inside
+                // the next call; the watchdog decides only whether
+                // there is a next call.
+                if let crate::Disposal::BackOff { .. } = watchdog.on_provider_failure(&err, t) {
+                    ledger.append(EventDraft {
+                        run: run.plan.run,
+                        t,
+                        who: run.plan.who.clone(),
+                        addr: Some(run.plan.addr.clone()),
+                        kind: kernel::EventKind::WatchdogFired,
+                        data: payload(retried(&err))?,
+                        ig: false,
+                    })?;
+                    continue;
+                }
                 let mut data = Map::new();
                 if let Ok(Value::Object(fields)) = serde_json::to_value(&err) {
                     data = fields;
@@ -251,4 +278,21 @@ pub fn drive(
 
 fn payload(map: Map<String, Value>) -> Result<Payload, AxError> {
     Payload::new(map)
+}
+
+/// The `watchdog_fired` payload for a call that will be made again. The
+/// failure's own code and subject travel with it, because "backed off"
+/// without what it backed off from is a line nobody can act on.
+fn retried(err: &AxError) -> Map<String, Value> {
+    let mut map = Map::new();
+    map.insert("action".to_owned(), Value::String("back_off".to_owned()));
+    map.insert(
+        "code".to_owned(),
+        Value::String(err.code().as_str().to_owned()),
+    );
+    map.insert(
+        "subject".to_owned(),
+        Value::String(err.subject().to_owned()),
+    );
+    map
 }

@@ -118,6 +118,7 @@ impl RunWorker {
             rules,
             model,
             adapter,
+            retries,
         } = agreed;
         // City, building and resident layers, resolved once and frozen
         // for the whole run: re-reading them mid-run would let the two
@@ -205,6 +206,7 @@ impl RunWorker {
             write_root,
             branch,
             filters,
+            retries,
         })
     }
 }

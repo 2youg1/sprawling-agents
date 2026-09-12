@@ -141,6 +141,7 @@ pub enum runtime::Expansion
 pub enum runtime::FreezeReason
 pub enum runtime::Opening
 pub enum runtime::PhaseOutcome<Next>
+pub enum runtime::Retries
 pub enum runtime::SegmentSlot
 pub enum runtime::Sieved
 pub enum runtime::Started
@@ -263,7 +264,7 @@ pub fn runtime::TurnReport::usage(&self) -> core::option::Option<&kernel::model:
 pub fn runtime::TurnReport::wave_results(&self) -> &[kernel::model::wire::ContentBlock]
 pub fn runtime::TurnReport::wave_results(&self) -> &[kernel::model::wire::ContentBlock]
 pub fn runtime::Watchdog::fired_payload(&self, &runtime::Disposal) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
-pub fn runtime::Watchdog::new() -> runtime::Watchdog
+pub fn runtime::Watchdog::new(runtime::Retries) -> runtime::Watchdog
 pub fn runtime::Watchdog::on_provider_failure(&mut self, &kernel::error::shape::AxError, kernel::event::identity::TimeMs) -> runtime::Disposal
 pub fn runtime::Watchdog::on_stall(&mut self, &kernel::stall::StallVerdict) -> runtime::Disposal
 pub fn runtime::admits(runtime::mode::Mode, &runtime::mode::Produced) -> runtime::mode::Admission
@@ -647,6 +648,8 @@ pub runtime::ProviderMode::LocalOnly
 pub runtime::ProviderMode::Normal
 pub runtime::ResumeSeed::must_read: alloc::vec::Vec<kernel::locator::Locator>
 pub runtime::ResumeSeed::run: kernel::event::identity::RunId
+pub runtime::Retries::AtMost(u32)
+pub runtime::Retries::UntilHalted
 pub runtime::RunHooks::deltas: core::option::Option<&'a mut (dyn core::ops::function::FnMut(&kernel::model::wire::Increment) + 'a)>
 pub runtime::RunHooks::fence: core::option::Option<&'a mut dyn core::ops::function::FnMut(kernel::event::identity::TimeMs) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>>
 pub runtime::RunHooks::interrupt: &'a mut dyn core::ops::function::FnMut(runtime::run::SafePoint) -> runtime::Interrupt
@@ -660,6 +663,7 @@ pub runtime::RunPlan::parent: core::option::Option<kernel::event::identity::RunI
 pub runtime::RunPlan::policy: kernel::model::wire::BuildingPolicy
 pub runtime::RunPlan::predecessor: core::option::Option<kernel::event::identity::RunId>
 pub runtime::RunPlan::prefix: runtime::prefix::FrozenPrefix
+pub runtime::RunPlan::retries: runtime::Retries
 pub runtime::RunPlan::run: kernel::event::identity::RunId
 pub runtime::RunPlan::shape: runtime::turn::CallShape
 pub runtime::RunPlan::skills: alloc::vec::Vec<runtime::catalog::SkillPin>
@@ -926,6 +930,7 @@ pub runtime::run::RunPlan::parent: core::option::Option<kernel::event::identity:
 pub runtime::run::RunPlan::policy: kernel::model::wire::BuildingPolicy
 pub runtime::run::RunPlan::predecessor: core::option::Option<kernel::event::identity::RunId>
 pub runtime::run::RunPlan::prefix: runtime::prefix::FrozenPrefix
+pub runtime::run::RunPlan::retries: runtime::Retries
 pub runtime::run::RunPlan::run: kernel::event::identity::RunId
 pub runtime::run::RunPlan::shape: runtime::turn::CallShape
 pub runtime::run::RunPlan::skills: alloc::vec::Vec<runtime::catalog::SkillPin>

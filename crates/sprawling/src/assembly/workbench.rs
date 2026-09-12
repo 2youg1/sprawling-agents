@@ -64,6 +64,9 @@ pub(super) struct Site {
     /// city's and the building's `FILTERS.toml` and frozen with the run
     /// (sprawling-SPEC 8-43).
     pub(super) filters: runtime::FilterTable,
+    /// Carried from the endpoint this run was given, frozen with
+    /// everything else the run was set up with.
+    pub(super) retries: runtime::Retries,
 }
 
 /// What the model may see, what routes what it calls, and who it may

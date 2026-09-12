@@ -14,11 +14,29 @@
 use kernel::{AxCode, AxError, Payload, StallVerdict, TimeMs};
 use serde_json::{Map, Value};
 
-/// One watchdog per run: it holds the correction history, nothing else.
+/// How many times a run may make a failed call again.
+///
+/// Exhaustive rather than a count with a sentinel: "keep trying until
+/// somebody stops this" and "try four times" are different intentions,
+/// and a number cannot spell the first one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Retries {
+    /// No ceiling. What stops the run is `Halt`, the city's one brake.
+    /// This is what a person who settled nothing asked for.
+    #[default]
+    UntilHalted,
+    /// Freeze once this many retries have been spent. Zero is a real
+    /// answer and means "once, then report".
+    AtMost(u32),
+}
+
+/// One watchdog per run: it holds the correction history and the ceiling
+/// the person set on retries, nothing else.
 #[derive(Debug, Default)]
 pub struct Watchdog {
     corrections: u32,
     provider_failures: u32,
+    retries: Retries,
 }
 
 /// Deliberately exhaustive: a new disposal must force every run loop to
@@ -55,8 +73,12 @@ impl FreezeReason {
 }
 
 impl Watchdog {
-    pub fn new() -> Watchdog {
-        Watchdog::default()
+    #[must_use]
+    pub fn new(retries: Retries) -> Watchdog {
+        Watchdog {
+            retries,
+            ..Watchdog::default()
+        }
     }
 
     /// Consumes the stall verdict verbatim. First hit: a corrective
@@ -91,16 +113,30 @@ impl Watchdog {
     /// request the provider has already rejected on its shape buys the
     /// same rejection again. A retriable one backs off to `not_before`
     /// — which the caller takes from `gateway::admission`, where the
-    /// provider's own `retry-after` was folded in — and **never freezes
-    /// on its own**. What stops it is `Halt`, the city's one brake.
+    /// provider's own `retry-after` was folded in.
+    ///
+    /// **A retriable failure freezes only against a ceiling the person
+    /// set.** Under [`Retries::UntilHalted`] what stops a run that keeps
+    /// failing is `Halt`, the city's one brake; under
+    /// [`Retries::AtMost`] it is the number they entered, because a
+    /// number entered on a form that nothing reads is worse than no
+    /// field at all.
     pub fn on_provider_failure(&mut self, failure: &AxError, not_before: TimeMs) -> Disposal {
         self.provider_failures = self.provider_failures.saturating_add(1);
-        if failure.is_retriable() {
-            Disposal::BackOff { until: not_before }
-        } else {
-            Disposal::Freeze {
-                reason: FreezeReason::ProviderRefused,
+        let refused = Disposal::Freeze {
+            reason: FreezeReason::ProviderRefused,
+        };
+        if !failure.is_retriable() {
+            return refused;
+        }
+        match self.retries {
+            Retries::UntilHalted => Disposal::BackOff { until: not_before },
+            // Counted from the first failure, so `AtMost(0)` spends its
+            // one attempt and reports.
+            Retries::AtMost(ceiling) if self.provider_failures <= ceiling => {
+                Disposal::BackOff { until: not_before }
             }
+            Retries::AtMost(_) => refused,
         }
     }
 
@@ -158,7 +194,7 @@ mod tests {
 
     #[test]
     fn disposal_is_graded_steer_first_freeze_second() {
-        let mut dog = Watchdog::new();
+        let mut dog = Watchdog::new(Retries::UntilHalted);
         let same = ActionFingerprint::derive(b"exec identical");
         let sample = vec![same, same, same];
         let verdict = observe(&sample);
@@ -185,7 +221,7 @@ mod tests {
 
     #[test]
     fn ok_verdicts_never_dispose() {
-        let mut dog = Watchdog::new();
+        let mut dog = Watchdog::new(Retries::UntilHalted);
         assert_eq!(dog.on_stall(&StallVerdict::Ok), Disposal::Proceed);
         assert_eq!(dog.on_stall(&StallVerdict::Ok), Disposal::Proceed);
     }
@@ -197,7 +233,7 @@ mod tests {
 
     #[test]
     fn a_failure_the_provider_will_repeat_stops_after_one() {
-        let mut dog = Watchdog::new();
+        let mut dog = Watchdog::new(Retries::UntilHalted);
         assert_eq!(
             dog.on_provider_failure(&provider_error(false), TimeMs::new(9_000)),
             Disposal::Freeze {
@@ -209,7 +245,7 @@ mod tests {
 
     #[test]
     fn a_retriable_failure_backs_off_and_never_freezes_by_itself() {
-        let mut dog = Watchdog::new();
+        let mut dog = Watchdog::new(Retries::UntilHalted);
         for round in 0..64u64 {
             let until = TimeMs::new(round.saturating_mul(250).saturating_add(1_000));
             assert_eq!(

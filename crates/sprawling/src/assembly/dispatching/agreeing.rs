@@ -125,11 +125,16 @@ impl RunWorker {
             self.redemption()?,
             dialect_headers(chosen.endpoint.dialect),
         )?;
+        let retries = match chosen.endpoint.tuning.request_max_retries {
+            Some(ceiling) => runtime::Retries::AtMost(ceiling),
+            None => runtime::Retries::UntilHalted,
+        };
         Ok(Agreed {
             building,
             rules,
             model,
             adapter,
+            retries,
         })
     }
 }

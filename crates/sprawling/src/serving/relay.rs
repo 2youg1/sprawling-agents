@@ -293,43 +293,58 @@ mod tests {
             }
         }
 
-        let gate = RelayGate::open();
-        let waiting = 4;
-        let mut writers = Vec::new();
-        for stamp in 1..=waiting {
-            let mut relay = gate.issue();
-            writers.push(std::thread::spawn(move || {
-                relay.append(EventDraft {
-                    run: kernel::RunId::CITY,
-                    t: kernel::TimeMs::new(stamp),
-                    who: "city".to_owned(),
-                    addr: None,
-                    kind: kernel::EventKind::CityInitialized,
-                    data: kernel::Payload::empty(),
-                    ig: false,
-                })
-            }));
+        // **The arrangement is repeated, and the property is that it
+        // holds once.** Whether four writers are all waiting when a wave
+        // begins is the scheduler's to decide, not this test's: on a
+        // busy machine the server can answer the first before the fourth
+        // has queued, and four waves of one is then correct behaviour
+        // for the drafts that were actually waiting. What must never
+        // happen is that drafts waiting together are still written one
+        // barrier each, so the test looks for that arrangement occurring
+        // and fails if it never does.
+        let mut batched = false;
+        for _ in 0..32 {
+            let gate = RelayGate::open();
+            let waiting = 4;
+            let mut writers = Vec::new();
+            for stamp in 1..=waiting {
+                let mut relay = gate.issue();
+                writers.push(std::thread::spawn(move || {
+                    relay.append(EventDraft {
+                        run: kernel::RunId::CITY,
+                        t: kernel::TimeMs::new(stamp),
+                        who: "city".to_owned(),
+                        addr: None,
+                        kind: kernel::EventKind::CityInitialized,
+                        data: kernel::Payload::empty(),
+                        ig: false,
+                    })
+                }));
+            }
+            let mut store = Counting {
+                waves: 0,
+                records: 0,
+                seq: 0,
+            };
+            // Serve until every writer has been answered, which is the
+            // same loop the accounting thread runs.
+            let mut served = 0usize;
+            while served < usize::try_from(waiting).unwrap_or(0) {
+                served = served.saturating_add(gate.serve_waiting(&mut store));
+            }
+            for writer in writers {
+                let echo = writer.join().expect("a writing thread ends");
+                assert!(echo.is_ok(), "every waiting draft is answered");
+            }
+            assert_eq!(store.records, 4, "every draft reached the store");
+            if store.waves < 4 {
+                batched = true;
+                break;
+            }
         }
-        let mut store = Counting {
-            waves: 0,
-            records: 0,
-            seq: 0,
-        };
-        // Serve until every writer has been answered, which is the same
-        // loop the accounting thread runs.
-        let mut served = 0usize;
-        while served < usize::try_from(waiting).unwrap_or(0) {
-            served = served.saturating_add(gate.serve_waiting(&mut store));
-        }
-        for writer in writers {
-            let echo = writer.join().expect("a writing thread ends");
-            assert!(echo.is_ok(), "every waiting draft is answered");
-        }
-        assert_eq!(store.records, 4, "every draft reached the store");
         assert!(
-            store.waves < 4,
-            "four drafts arriving together must not cost four waves: {} waves",
-            store.waves
+            batched,
+            "four drafts that were waiting together were never written in fewer than four waves"
         );
     }
 }

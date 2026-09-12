@@ -106,6 +106,10 @@ pub(super) struct Agreed {
     pub(super) rules: city::BuildingRules,
     pub(super) model: gateway::ModelEntry,
     pub(super) adapter: Box<dyn Model + Send>,
+    /// How many times this run may make a failed call again, as the
+    /// person set it on the endpoint that was chosen. Read here, where
+    /// the endpoint is chosen, because nothing downstream sees the book.
+    pub(super) retries: runtime::Retries,
 }
 
 pub(super) struct Knock {

@@ -341,6 +341,7 @@ impl RunWorker {
             // reach, and reading the shelf again would answer that
             // question a second time at a different instant.
             skills: held(&workbench.catalog, "read the catalog")?.skill_pins(),
+            retries: site.retries,
         };
 
         // The norms are filled by the machine: their addresses are known

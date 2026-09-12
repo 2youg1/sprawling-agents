@@ -213,6 +213,7 @@ pub fn run_scenario_on(
         policy: BuildingPolicy::default(),
         tools: Vec::new(),
         skills: Vec::new(),
+        retries: runtime::Retries::UntilHalted,
     };
 
     let bench_who = who.clone();

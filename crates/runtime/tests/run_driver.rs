@@ -126,6 +126,36 @@ impl Model for FailingModel {
     }
 }
 
+/// A model that fails for a reason worth retrying, a stated number of
+/// times, and then answers.
+struct FlakyModel {
+    failures_left: u32,
+    calls: std::rc::Rc<std::cell::RefCell<u32>>,
+}
+
+impl Model for FlakyModel {
+    fn call(&mut self, _req: &ModelRequest) -> Result<ModelReturn, AxError> {
+        let spent = *self.calls.borrow();
+        *self.calls.borrow_mut() = spent.saturating_add(1);
+        if self.failures_left > 0 {
+            self.failures_left = self.failures_left.saturating_sub(1);
+            return Err(AxError::failure(
+                kernel::AxCode::Provider,
+                "call the model",
+                "the provider answered 503",
+            )
+            .retriable());
+        }
+        Ok(ModelReturn::bare(
+            message_payload(&[ContentBlock::Text {
+                text: "working".to_owned(),
+            }])
+            .unwrap(),
+            Vec::new(),
+        ))
+    }
+}
+
 fn call(id: &str) -> ToolCall {
     ToolCall {
         id: id.to_owned(),
@@ -162,6 +192,7 @@ fn plan() -> RunPlan {
         policy: BuildingPolicy::default(),
         tools: Vec::new(),
         skills: Vec::new(),
+        retries: runtime::Retries::UntilHalted,
     }
 }
 
@@ -246,6 +277,89 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
 /// own work runs out. The script here is longer than the turn ceiling
 /// this driver used to carry, and the run still ends by concluding
 /// rather than by being cut off.
+/// The number a person enters on the provider form is what decides how
+/// many times a failed call is made again. Before this, nothing read it:
+/// the watchdog counted provider failures against no ceiling and had no
+/// caller at all, so one 503 ended a run.
+#[test]
+fn a_retriable_failure_is_made_again_up_to_the_number_the_person_set() {
+    let attempts = std::rc::Rc::new(std::cell::RefCell::new(0));
+    let mut ledger = RecordingLedger::new();
+    let mut model = FlakyModel {
+        failures_left: 2,
+        calls: std::rc::Rc::clone(&attempts),
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        invoke: &mut invoke,
+        deltas: None,
+    };
+    let plan = RunPlan {
+        retries: runtime::Retries::AtMost(2),
+        ..plan()
+    };
+
+    let frozen = drive(plan, &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+
+    assert!(matches!(frozen.completion(), Completion::Done(_)));
+    assert_eq!(*attempts.borrow(), 3, "two failures, then the answer");
+    assert_eq!(
+        ledger
+            .kinds()
+            .iter()
+            .filter(|k| *k == "watchdog_fired")
+            .count(),
+        2,
+        "each retry is a record, not a silent repeat"
+    );
+}
+
+/// The other side of the same number: a ceiling that is reached freezes
+/// the run rather than asking a provider that keeps saying no.
+#[test]
+fn a_ceiling_that_is_reached_ends_the_run() {
+    let attempts = std::rc::Rc::new(std::cell::RefCell::new(0));
+    let mut ledger = RecordingLedger::new();
+    let mut model = FlakyModel {
+        failures_left: 9,
+        calls: std::rc::Rc::clone(&attempts),
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        invoke: &mut invoke,
+        deltas: None,
+    };
+    let plan = RunPlan {
+        retries: runtime::Retries::AtMost(1),
+        ..plan()
+    };
+
+    let frozen = drive(plan, &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+
+    assert!(matches!(frozen.completion(), Completion::Cancelled));
+    assert_eq!(*attempts.borrow(), 2, "the first call, then the one retry");
+}
+
 #[test]
 fn a_run_ends_when_its_work_runs_out_rather_than_at_a_ceiling() {
     let mut ledger = RecordingLedger::new();

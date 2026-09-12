@@ -315,12 +315,13 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<st
 ### 8-9 runtime::watchdog（形状 1＋处置历史持有者）
 
 ```rust
-pub struct Watchdog { /* corrections: u32、provider_failures: u32 —— 私有，逐 Run 一实例 */ }
+pub struct Watchdog { /* corrections: u32、provider_failures: u32、retries: Retries —— 私有，逐 Run 一实例 */ }
+#[derive(Default)] pub enum Retries { #[default] UntilHalted, AtMost(u32) }
 #[non_exhaustive] pub enum Disposal { Proceed, CorrectiveSteer { text: String },
                                      BackOff { until: TimeMs }, Freeze { reason: FreezeReason } }
 #[non_exhaustive] pub enum FreezeReason { Stall, ProviderRefused }
 impl Watchdog {
-    pub fn new() -> Watchdog;
+    pub fn new(retries: Retries) -> Watchdog;
     /// Consumes kernel::stall's verdict verbatim; never re-derives it.
     pub fn on_stall(&mut self, verdict: &StallVerdict) -> Disposal;      // 首次 Stall→CorrectiveSteer；再次→Freeze{Stall}
     pub fn on_provider_failure(&mut self, failure: &AxError, not_before: TimeMs) -> Disposal;
@@ -329,7 +330,9 @@ impl Watchdog {
 ```
 
 - 处置必分级：纠正 Steer 文本指名重复指纹；只有终局的处置被明拒。子 Run 监控：`Completion::Limit` 的呈现住 status.children（S3 类型已备，派生消费者 P2），本模块不重复存储子态。
-- **provider 失败按 `AxError::is_retriable` 分类，不再数次数。** 不可重试→`Freeze { ProviderRefused }`，一次即止；可重试→`BackOff { until }`，`until` 由调用层从 `AdmissionState::admit` 取得（provider 自己的 retry-after 已在那里取大者）。可重试的失败**永不自行冻住**：停它的是 `Halt`，城里唯一的刹车。
+- **provider 失败按 `AxError::is_retriable` 分类。** 不可重试→`Freeze { ProviderRefused }`，一次即止；可重试→`BackOff { until }`，`until` 由调用层从 `AdmissionState::admit` 取得（provider 自己的 retry-after 已在那里取大者）。
+- **可重试的失败只对着人设的那个上限冻住**（`Retries`）。`UntilHalted` 下停它的是 `Halt`，城里唯一的刹车；`AtMost(n)` 下停它的是人在端点表单上填的那个数。**这两格是穷尽而不是一个带哨兵值的计数**：「一直试到有人喊停」与「试四次」是两种意图，一个数字拼不出前者。填进表单却没有任何东西去读的数字，比根本不给这个字段更糟——`request_max_retries` 此前正是如此，而 `Watchdog` 本身在生产代码里连一个调用方都没有。
+- **`runtime::run::drive` 是那个调用方**：一次可重试的失败写一条 `watchdog_fired` 再重来，于是历史里第二条 `model_called` 就是人读到的那次重试，而不是一次无声的重复。节奏仍归 `gateway::admission`——它握着 provider 自己的 retry-after，并在下一次调用内部施加；watchdog 只判断还有没有下一次。
 - **为什么删掉 `WATCHDOG_PROVIDER_RETRIES=2`。** 一个计数器对两种截然不同的失败给同一份预算：`E_WIRE_MISMATCH`（对端不说这个形状）重试三次就是把同一个 400 买三遍，而 429 重试三次就放弃又恰好把一个只需要等待的维护窗口当成了死亡。`retriable` 是产错处已经知道的事实（默认 false，fail-closed），拿它分类比在这里重新猜一遍强。
 - **`ProviderExhausted` 改名 `ProviderRefused`。** 既然没有重试预算了，就没有东西被耗尽；冻住的原因是对端给了一个重试不能修复的答复。载荷里的 `reason` 字串同改为 `provider_refused`。
 - fired_payload 字段＝{action: steer|back_off|freeze, text|until_ms|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不再是一个阀值。
