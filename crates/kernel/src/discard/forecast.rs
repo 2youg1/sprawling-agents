@@ -88,50 +88,6 @@ pub fn forecast(arm: &ExecArm) -> DiscardForecast {
     }
 }
 
-#[cfg(kani)]
-mod verification {
-    //! V5: the fifth door fails closed — no plan never allows, taint
-    //! never allows.
-
-    use super::*;
-    use crate::taint::TaintSource;
-
-    #[kani::proof]
-    fn unplanned_never_allows() {
-        let registry = Registry::new();
-        let req = DiscardRequest::Unplanned {
-            paths: vec![Address::parse("b/x").unwrap()],
-            taint: TaintSet::empty(),
-            total_bytes: ByteLen::new(kani::any()),
-        };
-        assert!(matches!(
-            decide(&req, &registry),
-            DiscardVerdict::Deny { .. }
-        ));
-    }
-
-    #[kani::proof]
-    fn tainted_never_allows() {
-        let registry = Registry::new();
-        let source = TaintSource::new("web:x").unwrap();
-        let discard = Discard::new(
-            vec![Address::parse("b/x").unwrap()],
-            Restoration::Rebuildable {
-                reason: "cargo target".to_owned(),
-            },
-            TaintSet::of(source),
-            ByteLen::new(kani::any()),
-        )
-        .unwrap();
-        assert!(matches!(
-            decide(&DiscardRequest::Planned(discard), &registry),
-            DiscardVerdict::Escalate {
-                reason: EscalateReason::Tainted
-            }
-        ));
-    }
-}
-
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

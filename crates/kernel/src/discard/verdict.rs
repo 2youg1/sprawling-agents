@@ -189,8 +189,11 @@ mod verification {
     //! V5: the fifth door fails closed — no plan never allows, taint
     //! never allows.
 
+    use super::super::request::{Discard, DiscardRequest, Restoration};
     use super::*;
-    use crate::taint::TaintSource;
+    use crate::address::Address;
+    use crate::budget::ByteLen;
+    use crate::taint::{TaintSet, TaintSource};
 
     #[kani::proof]
     fn unplanned_never_allows() {
