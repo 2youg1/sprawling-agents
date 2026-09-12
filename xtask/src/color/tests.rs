@@ -84,7 +84,7 @@ const GOOD: &str = r"
 
 #[test]
 fn the_real_shape_passes() {
-    let found = judge_tokens(GOOD);
+    let found = judge_tokens(GOOD, Mode::Dark);
     assert!(found.is_empty(), "{}", rules(&found));
     assert_eq!(grey_ramp(GOOD).len(), 11);
     assert_eq!(parse_colour_tokens(GOOD).len(), 5);
@@ -156,7 +156,7 @@ fn a_text_token_that_does_not_reach_its_tier_is_caught() {
     // G9 is the rung a designer would reach for when "a bit quieter"
     // is wanted. It reaches Lc 70.4 on a card, and body needs 90.
     let broken = GOOD.replace("--color-text: oklch(0.928", "--color-text: oklch(0.830");
-    let found = judge_tokens(&broken);
+    let found = judge_tokens(&broken, Mode::Dark);
     assert!(
         found
             .iter()
@@ -169,7 +169,7 @@ fn a_text_token_that_does_not_reach_its_tier_is_caught() {
 #[test]
 fn a_type_step_claiming_the_wrong_tier_is_caught() {
     let broken = GOOD.replace("--tier-note: 75", "--tier-note: 60");
-    let found = judge_tokens(&broken);
+    let found = judge_tokens(&broken, Mode::Dark);
     assert!(
         found
             .iter()
@@ -185,7 +185,7 @@ fn a_type_step_claiming_the_wrong_tier_is_caught() {
 #[test]
 fn a_step_too_small_for_any_tier_is_caught() {
     let broken = GOOD.replace("--text-label: 14px", "--text-label: 11px");
-    let found = judge_tokens(&broken);
+    let found = judge_tokens(&broken, Mode::Dark);
     assert!(
         found
             .iter()
@@ -221,9 +221,9 @@ fn text_on_a_surface_the_ladder_may_not_reach_is_caught() {
     // G3 is where the ladder stops carrying text. Pointing the ceiling
     // at it must make the body token illegal, because it is.
     let broken = GOOD.replace("--surface-ceiling: g2", "--surface-ceiling: g3");
-    let found = judge_tokens(&broken);
+    let found = judge_tokens(&broken, Mode::Dark);
     assert!(
-        found.iter().any(|v| v.violation.starts_with("TEXT claims")),
+        found.iter().any(|v| v.violation.contains("TEXT claims")),
         "{}",
         rules(&found)
     );
@@ -235,7 +235,7 @@ fn a_third_hue_is_caught() {
         "--color-alert: oklch(0.919 calc(0.046 * var(--chroma)) 84)",
         "--color-alert: oklch(0.919 calc(0.046 * var(--chroma)) 12)",
     );
-    let found = judge_tokens(&broken);
+    let found = judge_tokens(&broken, Mode::Dark);
     assert!(
         found.iter().any(|v| v.violation.contains("hue 12")),
         "{}",
@@ -246,7 +246,7 @@ fn a_third_hue_is_caught() {
 #[test]
 fn pure_white_is_caught() {
     let broken = GOOD.replace("--color-g10: oklch(0.930", "--color-g10: oklch(1.000");
-    let found = judge_tokens(&broken);
+    let found = judge_tokens(&broken, Mode::Dark);
     assert!(
         found.iter().any(|v| v.violation.contains("1000 per mille")),
         "{}",
@@ -257,7 +257,7 @@ fn pure_white_is_caught() {
 #[test]
 fn a_ramp_that_stops_short_of_the_ceiling_is_caught() {
     let broken = GOOD.replace("--color-g10: oklch(0.930", "--color-g10: oklch(0.900");
-    let found = judge_tokens(&broken);
+    let found = judge_tokens(&broken, Mode::Dark);
     assert!(
         found.iter().any(|v| v.violation.contains("145 to 900")),
         "{}",
@@ -269,14 +269,14 @@ fn a_ramp_that_stops_short_of_the_ceiling_is_caught() {
 fn an_interaction_variant_may_sit_above_the_ramp_ceiling() {
     // ALERT_HOVER at 945 is legal and the theme ships it; only
     // pure white is not.
-    let found = judge_tokens(GOOD);
+    let found = judge_tokens(GOOD, Mode::Dark);
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
 #[test]
 fn a_third_ratio_is_caught() {
     let broken = GOOD.replace("--ratio-accent-hover: 90", "--ratio-accent-hover: 71");
-    let found = judge_tokens(&broken);
+    let found = judge_tokens(&broken, Mode::Dark);
     assert!(
         found.iter().any(|v| v.violation.contains("3 distinct")),
         "{}",
@@ -291,7 +291,7 @@ fn a_third_ratio_is_caught() {
 #[test]
 fn a_coloured_token_that_declares_no_ratio_is_named() {
     let broken = GOOD.replace("--ratio-alert-hover: 55", "--ratio-nothing: 55");
-    let found = judge_tokens(&broken);
+    let found = judge_tokens(&broken, Mode::Dark);
     assert!(
         found
             .iter()
@@ -310,7 +310,7 @@ fn a_rung_off_the_axis_chroma_is_caught() {
         "--color-g4: oklch(0.360 0.018",
         "--color-g4: oklch(0.360 0.040",
     );
-    let found = judge_tokens(&broken);
+    let found = judge_tokens(&broken, Mode::Dark);
     assert!(
         found
             .iter()
@@ -323,7 +323,7 @@ fn a_rung_off_the_axis_chroma_is_caught() {
 #[test]
 fn a_shortened_ramp_is_caught() {
     let broken = GOOD.replace("  --color-g5: oklch(0.430 0.018 264);\n", "");
-    let found = judge_tokens(&broken);
+    let found = judge_tokens(&broken, Mode::Dark);
     assert!(found.iter().any(|v| v.violation.contains("found 10")));
 }
 

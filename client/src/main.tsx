@@ -12,7 +12,7 @@ import { render } from "solid-js/web";
 
 import { App } from "./app";
 import { loadPrefs } from "./core/prefs";
-import { applyStoredAppearance } from "./views/setup/appearance";
+import { applyStoredAppearance, watchMachineLighting } from "./views/setup/appearance";
 import { openConnection, socketUrl, tokenIn } from "./core/socket";
 import { UiProvider } from "./ui";
 import "./theme.css";
@@ -24,6 +24,7 @@ if (main !== null) {
   // window opens with, and applying it after mount is a visible change
   // of shape a person did not ask for.
   applyStoredAppearance(document.documentElement, window.localStorage);
+  watchMachineLighting(document.documentElement, window.localStorage);
   const conn = openConnection(socketUrl(window.location), tokenIn(window.location.search));
   render(
     () => (

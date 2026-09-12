@@ -31,6 +31,11 @@ declare global {
   }
 }
 
+// `system` is the absence of an opinion, and it is resolved here rather
+// than in the stylesheet: the light palette is declared once, and a
+// second declaration of it inside a `prefers-color-scheme` block would
+// be a second authority for the same eleven rungs.
+type Lighting = "system" | "dark" | "light";
 type Face = "geist" | "system" | "custom";
 type Body = "14" | "15" | "16";
 type Chroma = "full" | "off";
@@ -39,6 +44,7 @@ type Chroma = "full" | "off";
 type Motion = "system" | "on" | "off";
 
 export interface Appearance {
+  readonly lighting: Lighting;
   readonly sans: Face;
   readonly mono: Face;
   readonly sansStack: string;
@@ -48,6 +54,7 @@ export interface Appearance {
   readonly motion: Motion;
 }
 
+const LIGHTING_KEY = "sprawling.appearance.lighting";
 const SANS_KEY = "sprawling.appearance.sans";
 const MONO_KEY = "sprawling.appearance.mono";
 const SANS_STACK_KEY = "sprawling.appearance.sans_stack";
@@ -56,6 +63,7 @@ const BODY_KEY = "sprawling.appearance.body";
 const CHROMA_KEY = "sprawling.appearance.chroma";
 const MOTION_KEY = "sprawling.appearance.motion";
 
+const LIGHTINGS: readonly Lighting[] = ["system", "dark", "light"];
 const FACES: readonly Face[] = ["geist", "system", "custom"];
 const BODIES: readonly Body[] = ["14", "15", "16"];
 
@@ -79,6 +87,7 @@ function readStack(raw: string | null): string {
 
 export function readAppearance(store: Storage): Appearance {
   return {
+    lighting: LIGHTINGS.find((lit) => lit === store.getItem(LIGHTING_KEY)) ?? "system",
     sans: readFace(store.getItem(SANS_KEY)),
     mono: readFace(store.getItem(MONO_KEY)),
     sansStack: readStack(store.getItem(SANS_STACK_KEY)),
@@ -107,7 +116,27 @@ function wearFace(root: HTMLElement, axis: "sans" | "mono", face: Face, stack: s
   }
 }
 
+// Which way the machine says it is lit. The query is the only one a
+// browser offers, so "not light" is what dark means here.
+const MACHINE_LIGHT = "(prefers-color-scheme: light)";
+
+function machineLighting(): "dark" | "light" {
+  return window.matchMedia(MACHINE_LIGHT).matches ? "light" : "dark";
+}
+
+// Follow the machine while nobody has said otherwise. Called once, from
+// the one place that starts the client: a listener added wherever the
+// settings screen mounts would be a second listener doing the same
+// work, and neither would know about the other.
+export function watchMachineLighting(root: HTMLElement, store: Storage): void {
+  window.matchMedia(MACHINE_LIGHT).addEventListener("change", () => {
+    const held = readAppearance(store);
+    if (held.lighting === "system") applyAppearance(root, held);
+  });
+}
+
 export function applyAppearance(root: HTMLElement, held: Appearance): void {
+  root.dataset.theme = held.lighting === "system" ? machineLighting() : held.lighting;
   wearFace(root, "sans", held.sans, held.sansStack);
   wearFace(root, "mono", held.mono, held.monoStack);
   root.dataset.body = held.body;
@@ -166,6 +195,7 @@ export function AppearanceSection() {
   const [note, setNote] = createSignal<string | undefined>(undefined);
 
   const write = (next: Appearance) => {
+    store.setItem(LIGHTING_KEY, next.lighting);
     store.setItem(SANS_KEY, next.sans);
     store.setItem(MONO_KEY, next.mono);
     store.setItem(SANS_STACK_KEY, next.sansStack);
@@ -218,6 +248,18 @@ export function AppearanceSection() {
 
   return (
     <div class="flex flex-col gap-wide">
+      <Choice
+        label={say("appearance_lighting")}
+        options={[
+          ["system", say("appearance_lighting_system")],
+          ["dark", say("appearance_lighting_dark")],
+          ["light", say("appearance_lighting_light")],
+        ]}
+        held={held().lighting}
+        onPick={(lighting) => {
+          write({ ...held(), lighting });
+        }}
+      />
       <Choice
         label={say("appearance_face")}
         options={faceOptions()}

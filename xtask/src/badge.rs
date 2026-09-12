@@ -167,7 +167,9 @@ struct Palette {
 /// picks values.
 fn palette(root: &Path) -> Result<Palette, XtaskError> {
     let source = walk::read_text(&root.join(color::THEME))?;
-    let ramp = color::grey_ramp(&source);
+    // A badge is drawn on the dark page, which is the one a README
+    // renders against.
+    let ramp = color::grey_ramp(&color::reading(&source, color::Mode::Dark));
     let rung = |name: &str| -> Result<u16, XtaskError> {
         ramp.iter()
             .find(|(row, _)| row == name)

@@ -31,6 +31,22 @@
     "en": "the system face",
     "zh": "系统自带的字体"
   },
+  "appearance_lighting": {
+    "en": "lighting",
+    "zh": "明暗"
+  },
+  "appearance_lighting_dark": {
+    "en": "dark",
+    "zh": "深色"
+  },
+  "appearance_lighting_light": {
+    "en": "light",
+    "zh": "浅色"
+  },
+  "appearance_lighting_system": {
+    "en": "follow the machine",
+    "zh": "跟随系统"
+  },
   "appearance_local": {
     "en": "list the installed faces",
     "zh": "列出已安装的字体"

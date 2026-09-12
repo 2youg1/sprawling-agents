@@ -37,7 +37,7 @@ fn white_and_black_survive_the_colour_conversion() {
 #[test]
 fn the_palette_is_the_products_own_and_stays_above_the_information_floor() {
     let source = std::fs::read_to_string(repo_root().join(color::THEME)).unwrap();
-    let ramp = color::grey_ramp(&source);
+    let ramp = color::grey_ramp(&color::reading(&source, color::Mode::Dark));
     let floor = ramp
         .iter()
         .find(|(name, _)| name == "G7")

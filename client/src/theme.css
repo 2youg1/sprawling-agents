@@ -27,11 +27,19 @@
  * `font-display: swap` and the fallback chain below draw the page with
  * what the machine has.
  *
- * Four things a person may change about how the page is drawn - the
- * sans face, the mono face, the body size, the amount of colour, and
- * whether anything moves - are declared here and selected from the root
- * element, so the stylesheet stays the one authority for what the
- * choices *are* and the appearance section only says which one holds. */
+ * Five things a person may change about how the page is drawn - which
+ * way it is lit, the sans face, the mono face, the body size, the
+ * amount of colour, and whether anything moves - are declared here and
+ * selected from the root element, so the stylesheet stays the one
+ * authority for what the choices *are* and the appearance section only
+ * says which one holds.
+ *
+ * **The ramp is named for the page, never for the ink.** `g0` is the
+ * page and `g10` is the surface furthest from it in both ways of
+ * lighting, so a screen written against the ramp draws correctly in
+ * both without naming either. What the light block below changes is
+ * which end of the lightness range the page sits at, and the four text
+ * tokens and five coloured tokens that have to move with it. */
 
 @import "tailwindcss";
 
@@ -227,6 +235,55 @@
   --corner-card-shape: superellipse(1.5);
   --corner-control-shape: superellipse(1.5);
   --corner-pill-shape: superellipse(1);
+}
+
+/* The page lit from the other side.
+ *
+ * Every token here is one the block above also declares, at the
+ * lightness the same role needs when the page is paper rather than
+ * ink: the ramp runs down instead of up, text runs dark instead of
+ * light, and a hover is a step towards the ink rather than away from
+ * it. The ratios and the tiers are not repeated, because a share of
+ * the gamut and an APCA claim are the same demand whichever way the
+ * page is lit - which is also what makes the gate able to judge both
+ * readings against one table.
+ *
+ * The page stops short of the ceiling for the reason the dark page
+ * stops short of the floor: a full-white page glares, and on an OLED
+ * panel it is the most expensive thing a screen can draw.
+ *
+ * **The three surfaces that carry text sit close together here, and
+ * that is APCA's doing rather than a taste.** Contrast is not symmetric
+ * about the middle of the range: dark ink on a light surface is charged
+ * far more than light ink on a dark one, so a light page that spaced
+ * its first three rungs the way the dark page does could not carry body
+ * text on a card at all - no ink short of black reaches Lc 90 against a
+ * surface at 878. The rungs a card and a control are drawn with
+ * therefore stay within 45 per mille of the page, and the ramp does its
+ * travelling below them, where nothing has to be read. */
+:root[data-theme="light"] {
+  --color-g0: oklch(0.978 0.018 264);
+  --color-g1: oklch(0.956 0.018 264);
+  --color-g2: oklch(0.935 0.018 264);
+  --color-g3: oklch(0.898 0.018 264);
+  --color-g4: oklch(0.852 0.018 264);
+  --color-g5: oklch(0.794 0.018 264);
+  --color-g6: oklch(0.716 0.018 264);
+  --color-g7: oklch(0.620 0.018 264);
+  --color-g8: oklch(0.508 0.018 264);
+  --color-g9: oklch(0.380 0.018 264);
+  --color-g10: oklch(0.250 0.018 264);
+
+  --color-accent: oklch(0.515 calc(0.244 * var(--chroma)) 264);
+  --color-alert: oklch(0.440 calc(0.050 * var(--chroma)) 84);
+  --color-accent-hover: oklch(0.450 calc(0.236 * var(--chroma)) 264);
+  --color-alert-hover: oklch(0.390 calc(0.044 * var(--chroma)) 84);
+  --color-accent-solid: oklch(0.300 calc(0.160 * var(--chroma)) 264);
+
+  --color-text: oklch(0.230 0.018 264);
+  --color-text-quiet: oklch(0.420 0.018 264);
+  --color-text-faint: oklch(0.545 0.018 264);
+  --color-text-disabled: oklch(0.748 0.018 264);
 }
 
 /* The faces a person may choose instead of the shipped one. Geist is

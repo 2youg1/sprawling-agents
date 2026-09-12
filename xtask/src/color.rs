@@ -50,8 +50,84 @@ pub(crate) const THEME: &str = "client/src/theme.css";
 pub(crate) const HUE_AXIS: u16 = 264;
 const HUE_ALERT: u16 = 84;
 pub(crate) const GRAY_CHROMA: u16 = 18;
-const L_FLOOR: u16 = 145;
-const L_CEILING: u16 = 930;
+
+/// Where the light block begins, and what closes it. The gate reads one
+/// stylesheet as two palettes, so it has to know which lines belong to
+/// which reading; a selector is the only marker CSS gives it.
+const LIGHT_SELECTOR: &str = ":root[data-theme=\"light\"] {";
+const BLOCK_END: &str = "\n}";
+
+/// One of the two ways the client draws a page.
+///
+/// **The ramp is named for the page, never for the ink**: `g0` is the
+/// page and `g10` is the surface furthest from it, in both readings.
+/// What a mode fixes is which end of the lightness range the page sits
+/// at, which is why each carries its own pair of ends and why a ramp is
+/// judged for moving away from its page rather than for climbing.
+#[derive(Clone, Copy)]
+pub(crate) enum Mode {
+    Dark,
+    Light,
+}
+
+impl Mode {
+    const ALL: [Mode; 2] = [Mode::Dark, Mode::Light];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Mode::Dark => "the dark page",
+            Mode::Light => "the light page",
+        }
+    }
+
+    /// The lightness of `g0`, which is the page itself.
+    const fn page(self) -> u16 {
+        match self {
+            Mode::Dark => 145,
+            Mode::Light => 978,
+        }
+    }
+
+    /// The lightness of `g10`, the surface furthest from the page.
+    ///
+    /// The light page travels less far than the dark one, and the two
+    /// numbers are not a symmetry that was broken. APCA charges dark ink
+    /// on a light surface far more than the reverse, so the light page
+    /// spends most of its range on the three surfaces that carry text
+    /// and has less left for the fills below them - where a further rung
+    /// would buy separation nothing needs.
+    const fn far(self) -> u16 {
+        match self {
+            Mode::Dark => 930,
+            Mode::Light => 250,
+        }
+    }
+}
+
+/// The stylesheet as one mode reads it: the shared declarations, with
+/// every colour token the light block restates taken from that block.
+///
+/// Built as text rather than as a parsed table because every reader
+/// below already parses text, and a second representation of the same
+/// stylesheet is the second authority this gate exists to prevent.
+pub(crate) fn reading(source: &str, mode: Mode) -> String {
+    let Some((before, rest)) = source.split_once(LIGHT_SELECTOR) else {
+        return source.to_owned();
+    };
+    let (light, after) = rest.split_once(BLOCK_END).unwrap_or((rest, ""));
+    let shared = format!("{before}{after}");
+    match mode {
+        Mode::Dark => shared,
+        Mode::Light => {
+            let without_colour: String = shared
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("--color-"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            format!("{light}\n{without_colour}")
+        }
+    }
+}
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
@@ -67,31 +143,44 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         return Ok(violations);
     }
     let source = walk::read_text(&theme_path)?;
-    violations.extend(judge_tokens(&source));
+    for mode in Mode::ALL {
+        violations.extend(judge_tokens(&reading(&source, mode), mode));
+    }
     violations.extend(scan_for_literals(root)?);
     Ok(violations)
 }
 
-/// The six assertions, in the order the gate table lists them.
-fn judge_tokens(source: &str) -> Vec<Violation> {
+/// The seven assertions, in the order the gate table lists them, against
+/// one mode's reading of the stylesheet.
+fn judge_tokens(source: &str, mode: Mode) -> Vec<Violation> {
     let mut violations = Vec::new();
     let greys = grey_ramp(source);
     let colours = parse_colour_tokens(source);
+    let named = |rule: &str, violation: String| {
+        token_violation(rule, format!("{}: {violation}", mode.name()))
+    };
 
-    // 1. Eleven grey rungs, climbing.
+    // 1. Eleven grey rungs, each further from the page than the last.
     if greys.len() != 11 {
-        violations.push(token_violation(
+        violations.push(named(
             "the grey ramp has eleven rungs",
             format!("found {}", greys.len()),
         ));
     }
+    let away = mode.far() > mode.page();
     if !greys.windows(2).all(|pair| match pair {
-        [(_, low), (_, high)] => high > low,
+        [(_, near), (_, far)] => {
+            if away {
+                far > near
+            } else {
+                far < near
+            }
+        }
         _ => true,
     }) {
-        violations.push(token_violation(
-            "the grey ramp climbs",
-            "a rung is not brighter than the one below it".to_owned(),
+        violations.push(named(
+            "every rung of the grey ramp is further from the page than the one before it",
+            "a rung turns back towards the page".to_owned(),
         ));
     }
 
@@ -107,12 +196,12 @@ fn judge_tokens(source: &str) -> Vec<Violation> {
     //    puts ALERT_HOVER at 945. Both shipped, so the ceiling is a property
     //    of the ramp and the interaction variants sit above it by design;
     //    reading it as a global bound would have made the table illegal.
-    if let (Some(darkest), Some(lightest)) = (greys.first(), greys.last())
-        && (darkest.1 != L_FLOOR || lightest.1 != L_CEILING)
+    if let (Some(page), Some(far)) = (greys.first(), greys.last())
+        && (page.1 != mode.page() || far.1 != mode.far())
     {
-        violations.push(token_violation(
-            "the grey ramp spans exactly the declared floor and ceiling",
-            format!("the ramp runs {} to {}", darkest.1, lightest.1),
+        violations.push(named(
+            "the grey ramp spans exactly the declared page and furthest surface",
+            format!("the ramp runs {} to {}", page.1, far.1),
         ));
     }
     let every_lightness = greys
@@ -125,7 +214,7 @@ fn judge_tokens(source: &str) -> Vec<Violation> {
         );
     for (name, lightness) in every_lightness {
         if lightness == 0 || lightness >= 1000 {
-            violations.push(token_violation(
+            violations.push(named(
                 "no pure black and no pure white (glare, and OLED smear)",
                 format!("{name} is at {lightness} per mille"),
             ));
@@ -135,7 +224,7 @@ fn judge_tokens(source: &str) -> Vec<Violation> {
     // 3. Every coloured token sits on the axis or on its single exception.
     for (name, _, hue, _) in &colours {
         if *hue != HUE_AXIS && *hue != HUE_ALERT {
-            violations.push(token_violation(
+            violations.push(named(
                 "one hue axis and one exception, which is its complement",
                 format!("{name} sits on hue {hue}"),
             ));
@@ -157,7 +246,7 @@ fn judge_tokens(source: &str) -> Vec<Violation> {
     //    from it.
     for (name, chroma) in grey_chromas(source) {
         if chroma != GRAY_CHROMA {
-            violations.push(token_violation(
+            violations.push(named(
                 "the grey ramp carries the axis chroma",
                 format!("{name} is at chroma {chroma} per mille, not {GRAY_CHROMA}"),
             ));
@@ -170,26 +259,26 @@ fn judge_tokens(source: &str) -> Vec<Violation> {
     ratios.sort_unstable();
     ratios.dedup();
     if ratios.len() != 2 {
-        violations.push(token_violation(
+        violations.push(named(
             "exactly two chroma ratios, never merged",
             format!("found {} distinct ratios", ratios.len()),
         ));
     }
     for name in colour_tokens_without_ratio(source) {
-        violations.push(token_violation(
+        violations.push(named(
             "a coloured token states the share of the gamut it takes",
             format!("{name} resolves a chroma and declares no `--ratio-` beside it"),
         ));
     }
     if colours.is_empty() {
-        violations.push(token_violation(
+        violations.push(named(
             "the coloured token table is readable",
             "no coloured token parsed out of the theme file".to_owned(),
         ));
     }
 
     // 7. Text reaches the contrast its own size demands.
-    violations.extend(judge_readability(source, &greys));
+    violations.extend(judge_readability(source, &greys, mode));
     violations
 }
 
@@ -203,12 +292,15 @@ fn judge_tokens(source: &str) -> Vec<Violation> {
 /// table. It is checked against `TEXT_SURFACE_CEILING`, the brightest
 /// surface text may sit on, because a token that passed on the page and
 /// failed on a card would be one rule with two answers.
-fn judge_readability(source: &str, greys: &[(String, u16)]) -> Vec<Violation> {
+fn judge_readability(source: &str, greys: &[(String, u16)], mode: Mode) -> Vec<Violation> {
     let mut violations = Vec::new();
+    let named = |rule: &str, violation: String| {
+        token_violation(rule, format!("{}: {violation}", mode.name()))
+    };
     let tokens = parse_text_tokens(source);
     let steps = parse_type_scale(source);
     if tokens.is_empty() || steps.is_empty() {
-        violations.push(token_violation(
+        violations.push(named(
             "the text token and type tables are readable",
             "TEXT_TOKENS or TYPE_SCALE parsed to nothing".to_owned(),
         ));
@@ -220,8 +312,8 @@ fn judge_readability(source: &str, greys: &[(String, u16)]) -> Vec<Violation> {
             .find(|(rung, _)| *rung == name)
             .map(|(_, l)| *l)
     }) else {
-        violations.push(token_violation(
-            "the brightest surface that carries text is a rung of the ramp",
+        violations.push(named(
+            "the surface furthest from the page that carries text is a rung of the ramp",
             "TEXT_SURFACE_CEILING names no rung of GRAY_RAMP".to_owned(),
         ));
         return violations;
@@ -230,7 +322,7 @@ fn judge_readability(source: &str, greys: &[(String, u16)]) -> Vec<Violation> {
     for (name, lightness, claimed) in &tokens {
         let reached = apca_lc(*lightness, surface);
         if reached + 0.05 < f64::from(*claimed) {
-            violations.push(token_violation(
+            violations.push(named(
                 "a text token reaches the tier it claims",
                 format!("{name} claims Lc {claimed} and reaches {reached:.1}"),
             ));
