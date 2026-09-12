@@ -3,6 +3,51 @@
 The shape of the work was: make the first ten minutes work, and make the
 screen a person judges this product by say what it means.
 
+### One press connects an outside application
+
+The MCP page drew Composio as three identifiers a person had to fetch
+from somebody else's console — a key, a server id, a user id — and the
+connect button said the city had no such command. It has one now, and
+nobody types an id: the city connects under its own name, the directory
+comes from the broker instead of from a hand-written list that went
+stale weekly, and the consent tab opens inside the click so a browser
+cannot mistake it for a popup.
+
+- `Query::Toolkits` reads the shelf and where each application stands;
+  `Command::ConnectToolkit` opens the consent session. Four standings,
+  each a different next action, and every one of them the broker's
+  reading rather than something this city remembered.
+- Nothing polls. The page re-reads when it opens, when the button is
+  pressed, and when the person comes back to the window from the consent
+  page — returning is the event.
+- What reaches the Ledger is the request, never the standing and never
+  the consent url: a standing is a fact about now, and a consent url is a
+  capability nobody should hold by replaying a log.
+- `protocol::mcp` still connects to any tool server and still has never
+  heard of this one. Exactly one module knows which broker holds an
+  application's OAuth, and it brokers OAuth and does nothing else.
+
+### A tool call says what it was asked for, and a turn says when
+
+A row in the thread showed which tool ran and what came back, and
+nothing about what went in — so "the tool failed" and "the tool was
+asked for the wrong path" read identically. `Call` now carries its
+arguments, bounded by the same rule and cut at the same limit as its
+result, and `Turn` carries the moment the Ledger wrote the event that
+opened it, read from that record rather than from a second clock.
+
+### Linux is built, and kani runs
+
+`install.sh` had recognised `x86_64-unknown-linux-musl` for a while and
+nothing ever produced one. The release matrix has a third row, and the
+question that had been blocking it — where a Linux install keeps an API
+key, when a static musl binary and a D-Bus secret service cannot both be
+true — is answered by the kernel keyring reached through keyutils: a
+syscall, needing no bus, no dynamic library and no desktop session. What
+it costs is what `Persistence::ThisBoot` already said it costs, and the
+key that does not survive a reboot now says so where a person reads it.
+kani verification runs on a Linux runner rather than nowhere.
+
 ### A model that was never asked to answer
 
 Every model the built-in catalogue did not know was registered with an
@@ -68,9 +113,4 @@ have is a different product on every machine.
   package keeps its bare name, because `bunx sprawling` is what the
   channel exists for.
 
-## Please do not download this release
-
-**It is published to test the release pipeline, not to be used.** Treat
-anything it produces as scaffolding. If you want to look at the project,
-read the source. If you want to run something, wait for a release that
-does not carry this notice.
+---
