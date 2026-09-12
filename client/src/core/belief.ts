@@ -88,6 +88,11 @@ export interface Belief {
   // The last refusal a command came back with, for the page to show
   // once and the person to dismiss.
   refusal: AxError | null;
+  // Every refusal this session has seen, newest last, bounded. The
+  // dismissed one leaves the corner and stays here: a refusal a person
+  // waved away is still the answer to what they asked, and before this
+  // the only copy of it was the one they had just closed.
+  notices: Notice[];
   city: string | null;
   // The last probe's answer: which endpoint, what it serves, what each
   // row stated, and where the call stopped. Held here rather than read
@@ -106,6 +111,17 @@ export interface Belief {
 // around one thing going wrong, narrow enough that a talkative city
 // never becomes this tab's problem.
 const LOG_WINDOW = 500;
+
+// One refusal, kept after the corner has let go of it.
+export interface Notice {
+  readonly error: AxError;
+  seen: boolean;
+}
+
+// How many refusals the bell keeps. Short on purpose: this is a list a
+// person reads, not a record they audit - the ledger is where a city's
+// history lives.
+const NOTICE_WINDOW = 50;
 
 function text(data: Record<string, unknown>, key: string): string | null {
   const held = data[key];
@@ -256,6 +272,7 @@ export function createBelief() {
     runs: {},
     halted: [],
     refusal: null,
+    notices: [],
     city: null,
     probed: null,
     logs: [],
@@ -363,6 +380,12 @@ export function createBelief() {
     setBelief(
       produce((draft) => {
         draft.refusal = error;
+        if (error !== null) {
+          draft.notices.push({ error, seen: false });
+          if (draft.notices.length > NOTICE_WINDOW) {
+            draft.notices.splice(0, draft.notices.length - NOTICE_WINDOW);
+          }
+        }
         if (!error?.action.startsWith("steer")) {
           return;
         }
@@ -380,7 +403,19 @@ export function createBelief() {
     setBelief("city", city);
   }
 
-  return { belief, adoptCity, apply, say, logged, refused, named };
+  // Reading the bell is what marks it read: an unread count that
+  // survived the panel being open would be a number nobody can clear.
+  function noticesSeen(): void {
+    setBelief(
+      produce((draft) => {
+        for (const notice of draft.notices) {
+          notice.seen = true;
+        }
+      }),
+    );
+  }
+
+  return { belief, adoptCity, apply, say, logged, refused, named, noticesSeen };
 }
 
 export type BeliefStore = ReturnType<typeof createBelief>;

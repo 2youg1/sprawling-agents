@@ -979,6 +979,18 @@
     "en": "{n} waiting",
     "zh": "{n} 件等你"
   },
+  "notices": {
+    "en": "notifications",
+    "zh": "通知"
+  },
+  "notices_none": {
+    "en": "nothing has been refused",
+    "zh": "还没有任何拒绝"
+  },
+  "notices_unread": {
+    "en": "{n} unread",
+    "zh": "{n} 条未读"
+  },
   "outcome_cancelled": {
     "en": "stopped",
     "zh": "停下了"

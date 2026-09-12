@@ -35,6 +35,7 @@ import { Cost } from "./views/cost";
 import { Palette } from "./views/palette";
 import { Rail } from "./views/rail";
 import { Record } from "./views/record";
+import { Notices } from "./views/notices";
 import { Refusal } from "./views/refusal";
 import { Run } from "./views/run";
 import { Mcp } from "./views/mcp";
@@ -236,7 +237,7 @@ export function App() {
   });
 
   return (
-    <div class="flex h-screen bg-g0 font-sans text-body text-text">
+    <div class="relative flex h-screen bg-g0 font-sans text-body text-text">
       <a
         href="#main"
         class="sr-only focus:not-sr-only focus:absolute focus:top-snug focus:left-snug focus:z-30 focus:rounded-control focus:bg-g2 focus:px-base focus:py-snug focus:text-label focus:text-text"
@@ -272,6 +273,11 @@ export function App() {
             </button>
           </div>
         </Show>
+        <div class="pointer-events-none absolute top-snug right-pane z-20 flex justify-end">
+          <div class="pointer-events-auto">
+            <Notices />
+          </div>
+        </div>
         <main id="main" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto" aria-label={say("region_main")}>
           <Switch>
           <Match keyed when={view().kind === "talk" ? view() : undefined}>

@@ -34,6 +34,8 @@ export interface Connection {
   readonly command: (command: Command) => boolean;
   readonly retry: () => void;
   readonly dismissRefusal: () => void;
+  // Everything in the bell has now been looked at.
+  readonly markNoticesSeen: () => void;
 }
 
 // The pairing code the host put on the URL that opened this page. An
@@ -192,6 +194,9 @@ export function openConnection(url: string, token: string | null): Connection {
     },
     dismissRefusal() {
       store.refused(null);
+    },
+    markNoticesSeen() {
+      store.noticesSeen();
     },
   };
 }

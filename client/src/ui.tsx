@@ -40,7 +40,7 @@ export function useUi(): Ui {
     return {
       conn: {
         state: () => ({ kind: "idle" }),
-        belief: { runs: {}, halted: [], refusal: null, city: null, probed: null, logs: [] },
+        belief: { runs: {}, halted: [], refusal: null, notices: [], city: null, probed: null, logs: [] },
         asking: {
           ask: () => () => undefined,
           refresh: () => undefined,
@@ -51,6 +51,7 @@ export function useUi(): Ui {
         command: () => false,
         retry: () => undefined,
         dismissRefusal: () => undefined,
+        markNoticesSeen: () => undefined,
       },
       prefs: {
         lang: () => "en",
