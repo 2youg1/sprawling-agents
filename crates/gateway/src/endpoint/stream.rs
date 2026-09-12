@@ -111,8 +111,8 @@ impl Endpoint {
             let Ok(frame) = serde_json::from_str::<Value>(payload) else {
                 continue;
             };
-            if let Some(text) = dialect::increment_of(self.config.dialect, &frame) {
-                onto(&text);
+            if let Some(held) = dialect::increment_of(self.config.dialect, &frame) {
+                onto(&held);
             }
             frames.push(frame);
         }
@@ -193,8 +193,11 @@ mod tests {
         let mut endpoint = Endpoint::new(config(&url), redemption()).unwrap();
 
         let said = std::cell::RefCell::new(Vec::new());
-        let mut onto = |text: &str| {
-            said.borrow_mut().push(text.to_owned());
+        let mut onto = |held: &kernel::Increment| {
+            let kernel::Increment::Said(text) = held else {
+                return;
+            };
+            said.borrow_mut().push(text.clone());
             // Reported once: the fixture needs to hear that one
             // increment arrived, and a closed channel afterwards is not
             // a failure of the thing under test.

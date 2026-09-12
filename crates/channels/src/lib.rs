@@ -58,7 +58,8 @@ pub use command::{GovernedDocument, HaltScope, LoginStep, NoSecret, PursuitStep}
 pub use control::{ControlVerdict, Intervention, classify};
 pub use kernel::{FileChange, How, Lines};
 pub use kernel::{Span, Token, markdown};
-pub use reading::{OUTPUT_LINES, note_of, output_in, said_in, subject_of, text, used_in};
+pub use reading::{OUTPUT_LINES, note_of, output_in, said_in, subject_of};
+pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
 pub use reception::{BindFace, BindVerdict, HandshakeVerdict};
 #[cfg(feature = "server")]

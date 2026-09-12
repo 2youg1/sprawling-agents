@@ -98,7 +98,7 @@ pub fn gateway::Transcriber::transcribe(&self, &gateway::Recording) -> core::res
 pub fn gateway::adapter_for(&gateway::Chosen<'_>, gateway::Redemption, alloc::vec::Vec<(alloc::string::String, alloc::string::String)>) -> core::result::Result<alloc::boxed::Box<(dyn kernel::model::Model + core::marker::Send)>, kernel::error::shape::AxError>
 pub fn gateway::attached_payload(&gateway::AttachedEndpoint) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn gateway::client_for(kernel::reach::Proxying, &str) -> reqwest::blocking::client::ClientBuilder
-pub fn gateway::increment_of(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::option::Option<alloc::string::String>
+pub fn gateway::increment_of(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::option::Option<kernel::model::wire::Increment>
 pub fn gateway::is_local(&str) -> bool
 pub fn gateway::oauth_begin(&gateway::OauthProfile, alloc::string::String, alloc::string::String) -> core::result::Result<gateway::OauthPending, kernel::error::shape::AxError>
 pub fn gateway::oauth_random(&[u8]) -> alloc::string::String

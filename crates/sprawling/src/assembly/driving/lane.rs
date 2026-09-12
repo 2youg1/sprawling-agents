@@ -268,11 +268,11 @@ pub(crate) fn drive_run<L: Ledger>(
         // running city, nothing at all in citysim and in replay - so a
         // run with nobody watching asks the provider for no stream and
         // behaves exactly as it always did.
-        let mut watched = |said: &str| {
+        let mut watched = |held: &kernel::Increment| {
             if let Some(onto) = watching.as_ref() {
                 onto(channels::Delta {
                     run: run_id,
-                    text: said.to_owned(),
+                    increment: held.clone(),
                 });
             }
         };

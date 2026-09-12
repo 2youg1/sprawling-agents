@@ -19,19 +19,21 @@
 
 //! Response dialects: frames back to ChatResponse.
 
-use kernel::{AxCode, AxError, ChatResponse, DialectKind};
+use kernel::{AxCode, AxError, ChatResponse, DialectKind, Increment};
 use serde_json::Value;
 
 use crate::{anthropic, openai};
 
-pub fn increment_of(kind: DialectKind, frame: &Value) -> Option<String> {
+pub fn increment_of(kind: DialectKind, frame: &Value) -> Option<Increment> {
     let map = frame.as_object()?;
     match kind {
         DialectKind::Anthropic => anthropic::increment_of(map),
         DialectKind::OpenAi => openai::increment_of(map),
         _ => None,
     }
-    .filter(|text| !text.is_empty())
+    .filter(|held| match held {
+        Increment::Said(text) | Increment::Thought(text) => !text.is_empty(),
+    })
 }
 
 /// The settled answer a stream ends with, in the shape a non-streaming

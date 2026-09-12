@@ -123,7 +123,7 @@ pub struct RunHooks<'a> {
     /// It takes no result, because nothing here may fail a call. What
     /// arrives is a thing to look at; the record of what was said is
     /// written from `model_returned`, once, afterwards.
-    pub deltas: Option<&'a mut (dyn FnMut(&str) + 'a)>,
+    pub deltas: Option<&'a mut (dyn FnMut(&kernel::Increment) + 'a)>,
 }
 
 /// An active run: turns may still be taken.

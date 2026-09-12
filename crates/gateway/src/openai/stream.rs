@@ -10,23 +10,48 @@
 //! arguments split across chunks, which is why they are joined before
 //! anything reads them.
 
-use kernel::AxError;
+use kernel::{AxError, Increment};
 use serde_json::{Value, json};
 
 use crate::mismatch::stream_cut;
 
-/// The text one chunk carries, if it carries prose. Absent on the frames
-/// that carry a tool call or a finish reason.
-pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<String> {
-    map.get("choices")?
+/// What one chunk carries, if it carries either stream. Absent on the
+/// frames that carry a tool call or a finish reason.
+///
+/// Prose wins when a chunk holds both, which no provider sends: a chunk
+/// that did would be answering and reasoning at the same instant, and
+/// the answer is the part a person is waiting for.
+pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Increment> {
+    let delta = map
+        .get("choices")?
         .as_array()?
         .first()?
         .as_object()?
         .get("delta")?
-        .as_object()?
-        .get("content")?
-        .as_str()
-        .map(str::to_owned)
+        .as_object()?;
+    if let Some(text) = delta.get("content").and_then(Value::as_str)
+        && !text.is_empty()
+    {
+        return Some(Increment::Said(text.to_owned()));
+    }
+    reasoning_in(delta).map(Increment::Thought)
+}
+
+/// The reasoning a chunk or a settled message carries.
+///
+/// **Two spellings, because the providers disagree and neither is
+/// wrong.** OpenRouter-shaped gateways send `reasoning`; DeepSeek-shaped
+/// ones send `reasoning_content`. Reading both here is what keeps every
+/// other reader from having to know that.
+pub(crate) fn reasoning_in(held: &serde_json::Map<String, Value>) -> Option<String> {
+    for key in ["reasoning", "reasoning_content"] {
+        if let Some(text) = held.get(key).and_then(Value::as_str)
+            && !text.is_empty()
+        {
+            return Some(text.to_owned());
+        }
+    }
+    None
 }
 
 /// OpenAI streams one `choices[0].delta` per chunk and the finish reason
@@ -34,6 +59,7 @@ pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Strin
 /// across chunks, which is why they are joined before being read.
 pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
     let mut said = String::new();
+    let mut thought = String::new();
     let mut calls: std::collections::BTreeMap<u64, (String, String, String)> =
         std::collections::BTreeMap::new();
     let mut finish = None;
@@ -63,6 +89,9 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
         };
         if let Some(text) = delta.get("content").and_then(Value::as_str) {
             said.push_str(text);
+        }
+        if let Some(text) = reasoning_in(delta) {
+            thought.push_str(&text);
         }
         for call in delta
             .get("tool_calls")
@@ -100,6 +129,13 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
         ));
     };
     let mut message = json!({ "role": "assistant", "content": said });
+    // Settled into the one spelling the settled reader takes, so a
+    // stream and a plain call reach that reader the same way.
+    if !thought.is_empty()
+        && let Some(map) = message.as_object_mut()
+    {
+        map.insert("reasoning".to_owned(), Value::String(thought));
+    }
     if !calls.is_empty()
         && let Some(map) = message.as_object_mut()
     {

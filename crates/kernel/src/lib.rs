@@ -130,6 +130,7 @@ pub use tool::{ServerLabel, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome};
 mod model;
 
 pub use model::Effort;
+pub use model::Increment;
 pub use model::SystemBlock;
 #[cfg(feature = "conformance")]
 pub use model::conformance as model_conformance;

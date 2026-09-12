@@ -16,7 +16,7 @@ pub use image::{ImageRef, ImageType};
 pub use seam::{ModelRequest, ModelReturn, content_from_message, message_payload, value_has_float};
 pub use wire::{
     BuildingPolicy, Ceiling, ChatMessage, ChatRequest, ChatResponse, ContentBlock, DialectKind,
-    Effort, ModelTag, ModelUsage, Role, StopReason, SystemBlock, ToolDef,
+    Effort, Increment, ModelTag, ModelUsage, Role, StopReason, SystemBlock, ToolDef,
 };
 
 use crate::error::AxError;
@@ -34,7 +34,7 @@ use crate::error::AxError;
 /// behind that no `ModelReturn` ever confirms. Where they disagree the
 /// settled text wins, and that rule is held on the far side of the wire
 /// by `web::app`.
-pub type Increments<'a> = &'a mut dyn FnMut(&str);
+pub type Increments<'a> = &'a mut dyn FnMut(&Increment);
 
 /// The model port. Production adapters: gateway::native, gateway::endpoint;
 /// second adapter: citysim scripted model. Implementations never sample

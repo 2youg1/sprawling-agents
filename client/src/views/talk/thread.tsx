@@ -52,6 +52,39 @@ function callWord(call: Call): string {
 // reply that was cut off, and a reader is told so.
 const FINISHED: readonly string[] = ["end_turn", "tool_use"];
 
+// How the model got to what it said, folded away.
+//
+// Folded by default and never by exception: reasoning is most of what
+// some models produce, and a thread that opened it would be a thread
+// whose answer a person has to search for. While it is still arriving
+// is the one case worth watching, and `live` is read once, at the
+// moment this section is first drawn, because what it settles is where
+// the fold starts and not where it stays.
+function Reasoning(props: { readonly text: string; readonly live?: true }) {
+  const say = useSay();
+  // eslint-disable-next-line solid/reactivity -- the initial fold, read once by design
+  const [open, setOpen] = createSignal(props.live === true);
+  return (
+    <div class="my-tight text-note text-text-faint">
+      <button
+        type="button"
+        class="rounded-control px-tight hover:bg-g1 hover:text-text-quiet"
+        onClick={() => setOpen((held) => !held)}
+        aria-expanded={open()}
+      >
+        <span class="inline-block w-pane">{open() ? "▾" : "▸"}</span>
+        <span class="text-text-disabled">{say("talk_reasoning")}</span>{" "}
+        {say("talk_reasoning_length", { n: count(props.text.length) })}
+      </button>
+      <Show when={open()}>
+        <div class="mt-tight border-l border-g3 pl-base whitespace-pre-wrap break-words">
+          {props.text}
+        </div>
+      </Show>
+    </div>
+  );
+}
+
 function Calls(props: { readonly calls: readonly Call[]; readonly run: RunId }) {
   const say = useSay();
   const [open, setOpen] = createSignal(false);
@@ -182,6 +215,7 @@ function TurnView(props: {
       <For each={props.turn.notes.filter((note) => "arrived" in note)}>
         {(note) => <NoteLine note={note} who={props.who} />}
       </For>
+      <Show when={props.turn.thought}>{(thought) => <Reasoning text={thought()} />}</Show>
       <Show when={props.turn.calls.length > 0}>
         <Calls calls={props.turn.calls} run={props.run} />
       </Show>
@@ -296,6 +330,9 @@ export function Thread(props: ThreadProps) {
       <For each={answer()?.turns ?? []}>
         {(turn) => <TurnView turn={turn} who={props.who} run={props.run.run} ceiling={ceiling()} />}
       </For>
+      <Show when={!frozen() && props.run.thinking.length > 0}>
+        <Reasoning text={props.run.thinking} live />
+      </Show>
       <Show when={streaming()}>
         <div class="my-base text-body">
           <div class="mb-tight text-note text-text-disabled">{props.who}</div>

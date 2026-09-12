@@ -207,6 +207,7 @@ pub enum kernel::GoalResource
 pub enum kernel::GoalVerdict
 pub enum kernel::How
 pub enum kernel::ImageType
+pub enum kernel::Increment
 pub enum kernel::Lines
 pub enum kernel::Locator
 pub enum kernel::McpTransport
@@ -822,6 +823,8 @@ pub kernel::ImageType::Gif
 pub kernel::ImageType::Jpeg
 pub kernel::ImageType::Png
 pub kernel::ImageType::Webp
+pub kernel::Increment::Said(alloc::string::String)
+pub kernel::Increment::Thought(alloc::string::String)
 pub kernel::ItemMeta::cost: u64
 pub kernel::LayeredValue::building: core::option::Option<T>
 pub kernel::LayeredValue::city: core::option::Option<T>
@@ -1148,5 +1151,5 @@ pub trait kernel::Ledger
 pub trait kernel::Model
 pub trait kernel::Tool: core::marker::Send
 pub type kernel::EnvVarName::Error = kernel::AxError
-pub type kernel::Increments<'a> = &'a mut dyn core::ops::function::FnMut(&str)
+pub type kernel::Increments<'a> = &'a mut dyn core::ops::function::FnMut(&kernel::Increment)
 pub type kernel::ServerLabel::Error = kernel::AxError

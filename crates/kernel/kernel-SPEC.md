@@ -1600,6 +1600,17 @@ pub fn undoable(ctx: &GateContext, call: &ConnectorCall<'_>,
 
 **唯一的生产者是 `browser` 工具的 `screenshot`**（`bin::browser_tool`）；其余每一个工具显式写空表，因为「没有图」是一句要说出口的话，不是一个可以省略的默认。
 
+### 8-53 `kernel::Increment`：模型正在产出的一小块，以及它来自哪一路（形状 2 值）
+
+```rust
+pub enum Increment { Said(String), Thought(String) }
+pub type Increments<'a> = &'a mut dyn FnMut(&Increment);
+```
+
+- **两路而不是一路**：散文是答案，推理是得到答案的过程。把两者并进一个缓冲区，对一个把大部分输出花在推理上的模型，等于把草稿当答案给人看。
+- **哪一路是这一小块自己的一部分**，于是没有任何下游读者需要猜。`ContentBlock::Thinking` 是它结算之后的落点，两处说的是同一件事的两个阶段。
+- **同一块里两路都有时散文优先**：没有供应方这样发；真发了，它是在同一瞬间既回答又推理，而人在等的是答案。
+
 ### 8-50 `kernel::reach`：一次调用停在哪一段（形状 2 值）
 
 ```rust

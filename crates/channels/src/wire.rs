@@ -83,7 +83,9 @@ use serde::{Deserialize, Serialize};
 /// 28: an endpoint says which of its calls go through the machine's
 ///    proxy, and a staged reading says which of the four reasons no
 ///    proxy applied to the call it describes.
-pub const WIRE_V: u32 = 28;
+/// 29: an increment says whether the model was answering or reasoning,
+///    and a settled turn carries the reasoning it did.
+pub const WIRE_V: u32 = 29;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
@@ -204,12 +206,16 @@ pub enum ServerFrame {
     Log(LogLine),
 }
 
-/// One piece of what a model is saying, on its way to a page.
+/// One piece of what a model is producing, on its way to a page.
+///
+/// The piece says which of the two streams it came from, because a page
+/// draws them differently: prose is the answer and reasoning is folded
+/// away beside it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Delta {
     pub run: RunId,
-    pub text: String,
+    pub increment: kernel::Increment,
 }
 
 /// Who reads a log line, and when.

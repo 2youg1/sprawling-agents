@@ -178,6 +178,25 @@ pub enum Effort {
     Max,
 }
 
+/// One piece of what a model is producing, before the call it belongs to
+/// has settled.
+///
+/// **Reasoning and prose are two streams, not one.** A model that spends
+/// most of a call reasoning sends almost nothing on the prose stream,
+/// and a page that appended both to one buffer would either show a
+/// person their own model's scratch work as its answer or show them an
+/// empty thread for three minutes. Which stream a piece came from is
+/// therefore part of the piece, and no reader has to guess.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Increment {
+    /// Prose, which is the answer as it arrives.
+    Said(String),
+    /// Reasoning, which is how the answer was arrived at.
+    Thought(String),
+}
+
 /// Canonical content block. Tool inputs are [`Payload`] — the float ban
 /// holds here because these bytes become ledger payloads verbatim.
 ///

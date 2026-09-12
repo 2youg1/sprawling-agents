@@ -11,19 +11,25 @@
 //! keeps a tool call that arrived interleaved with prose where it was.
 
 use kernel::AxError;
+use kernel::Increment;
 use serde_json::{Value, json};
 
 use crate::mismatch::stream_cut;
 
-/// The text one `content_block_delta` carries, if it carries prose.
+/// What one `content_block_delta` carries, if it carries either stream.
 ///
 /// Reading the delta's own type rather than the presence of a field is
 /// what keeps a tool's arguments out of a person's reading pane: a
 /// partial `input_json_delta` is not a shorter tool argument.
-pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<String> {
+pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Increment> {
     let delta = map.get("delta")?.as_object()?;
-    (delta.get("type")?.as_str()? == "text_delta")
-        .then(|| delta.get("text")?.as_str().map(str::to_owned))?
+    match delta.get("type")?.as_str()? {
+        "text_delta" => Some(Increment::Said(delta.get("text")?.as_str()?.to_owned())),
+        "thinking_delta" => Some(Increment::Thought(
+            delta.get("thinking")?.as_str()?.to_owned(),
+        )),
+        _ => None,
+    }
 }
 
 /// Anthropic streams one `content_block_start` per block, then deltas

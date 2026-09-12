@@ -142,7 +142,7 @@ impl Turn<Calling> {
         ledger: &mut dyn Ledger,
         model: &mut dyn Model,
         policy: &BuildingPolicy,
-        deltas: Option<&mut (dyn FnMut(&str) + 'sink)>,
+        deltas: Option<&mut (dyn FnMut(&kernel::Increment) + 'sink)>,
     ) -> Result<PhaseOutcome<Turn<ToolWave>>, AxError> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));

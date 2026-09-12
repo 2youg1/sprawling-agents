@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 28 as const;
+export const WIRE_V = 29 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "2dfe19d4ec612563bf5a79958d7c06e6b77b95d44d886697f6b9c77719ac28be" as const;
+export const WIRE_HASH = "ce630235cbbe0cf3266e7b054f5e28a1ce467c0bee32e6fd723a59c8a73658eb" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -1506,6 +1506,7 @@ export const Turn = Schema.Struct({
   said: Schema.optional(Schema.NullOr(Schema.String)),
   spent: Schema.optional(Schema.NullOr(UsdMicros)),
   stopped: Schema.optional(Schema.NullOr(Schema.String)),
+  thought: Schema.optional(Schema.NullOr(Schema.String)),
   used: Schema.optional(Schema.NullOr(Used)),
 }).annotations({ identifier: "Turn" });
 export type Turn = typeof Turn.Type;
@@ -2189,11 +2190,36 @@ export const ClientFrame = Schema.Union(
 export type ClientFrame = typeof ClientFrame.Type;
 
 /**
- * One piece of what a model is saying, on its way to a page.
+ * One piece of what a model is producing, before the call it belongs to
+ * has settled.
+ * 
+ * **Reasoning and prose are two streams, not one.** A model that spends
+ * most of a call reasoning sends almost nothing on the prose stream,
+ * and a page that appended both to one buffer would either show a
+ * person their own model's scratch work as its answer or show them an
+ * empty thread for three minutes. Which stream a piece came from is
+ * therefore part of the piece, and no reader has to guess.
+ */
+export const Increment = Schema.Union(
+  Schema.Struct({
+    said: Schema.String,
+  }),
+  Schema.Struct({
+    thought: Schema.String,
+  }),
+).annotations({ identifier: "Increment" });
+export type Increment = typeof Increment.Type;
+
+/**
+ * One piece of what a model is producing, on its way to a page.
+ * 
+ * The piece says which of the two streams it came from, because a page
+ * draws them differently: prose is the answer and reasoning is folded
+ * away beside it.
  */
 export const Delta = Schema.Struct({
+  increment: Increment,
   run: RunId,
-  text: Schema.String,
 }).annotations({ identifier: "Delta" });
 export type Delta = typeof Delta.Type;
 

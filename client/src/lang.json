@@ -1983,6 +1983,14 @@
     "en": "to {room}…",
     "zh": "对 {room} 说…"
   },
+  "talk_reasoning": {
+    "en": "reasoning",
+    "zh": "推理过程"
+  },
+  "talk_reasoning_length": {
+    "en": "{n} characters",
+    "zh": "{n} 字"
+  },
   "talk_record": {
     "en": "speak",
     "zh": "说"

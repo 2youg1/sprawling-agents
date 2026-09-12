@@ -245,6 +245,16 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
         .ok_or_else(|| mismatch("response.choices", "empty"))?;
     let message = require(first, "response.choices[0]", "message")?;
     let mut content = Vec::new();
+    // First, because it is what the model did first, and because a
+    // page that folds it needs it to sit above the answer it produced.
+    // The signature is empty: this wire has none to carry, and an
+    // invented one would be sent back to a provider that checks it.
+    if let Some(thinking) = message.as_object().and_then(stream::reasoning_in) {
+        content.push(ContentBlock::Thinking {
+            thinking,
+            signature: String::new(),
+        });
+    }
     if let Some(text) = message.get("content").and_then(Value::as_str)
         && !text.is_empty()
     {

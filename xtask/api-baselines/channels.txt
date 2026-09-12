@@ -277,8 +277,8 @@ pub channels::Decision::verdict: kernel::approval::PolicyVerdict
 pub channels::Delivered::NobodyAsked
 pub channels::Delivered::PeerGone
 pub channels::Delivered::ToThePeer
+pub channels::Delta::increment: kernel::model::wire::Increment
 pub channels::Delta::run: kernel::event::identity::RunId
-pub channels::Delta::text: alloc::string::String
 pub channels::DiscardAnswer::rows: alloc::vec::Vec<channels::DiscardLine>
 pub channels::DiscardLine::at: kernel::event::identity::TimeMs
 pub channels::DiscardLine::path: alloc::string::String
@@ -635,6 +635,7 @@ pub channels::Turn::opened: kernel::event::identity::Seq
 pub channels::Turn::said: core::option::Option<alloc::string::String>
 pub channels::Turn::spent: core::option::Option<kernel::budget::UsdMicros>
 pub channels::Turn::stopped: core::option::Option<alloc::string::String>
+pub channels::Turn::thought: core::option::Option<alloc::string::String>
 pub channels::Turn::used: core::option::Option<channels::Used>
 pub channels::Upstream::address: alloc::string::String
 pub channels::Upstream::label: channels::CityLabel
@@ -731,6 +732,7 @@ pub fn channels::said_in(&serde_json::value::Value) -> core::option::Option<allo
 pub fn channels::schema_hash() -> kernel::locator::B3Hash
 pub fn channels::subject_of(core::option::Option<&serde_json::value::Value>) -> core::option::Option<alloc::string::String>
 pub fn channels::text(core::option::Option<&serde_json::value::Value>) -> core::option::Option<alloc::string::String>
+pub fn channels::thought_in(&serde_json::value::Value) -> core::option::Option<alloc::string::String>
 pub fn channels::used_in(&serde_json::value::Value) -> core::option::Option<channels::Used>
 pub fn channels::verify(core::option::Option<&str>, &kernel::locator::B3Hash) -> bool
 pub mod channels

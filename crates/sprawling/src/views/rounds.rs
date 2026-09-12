@@ -138,6 +138,7 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                     number,
                     opened: record.seq(),
                     said: None,
+                    thought: None,
                     spent: None,
                     used: None,
                     stopped: None,
@@ -177,6 +178,7 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                 };
                 let map = record.data().as_map();
                 turn.said = map.get("message").and_then(channels::said_in);
+                turn.thought = map.get("message").and_then(channels::thought_in);
                 turn.spent = map
                     .get("billed_usd_micros")
                     .and_then(serde_json::Value::as_u64)

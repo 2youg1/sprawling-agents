@@ -137,10 +137,13 @@ pub struct Turn {
     pub number: u32,
     /// The event that opened it.
     pub opened: Seq,
-    /// What the model said in this turn, thinking blocks left out: they
-    /// are carried end to end for the provider's signature check and are
-    /// not a page's to render.
+    /// What the model said in this turn: its prose, without the
+    /// reasoning that produced it.
     pub said: Option<String>,
+    /// What the model reasoned in this turn, when the provider sent it.
+    /// A field of its own rather than part of `said`, because a page
+    /// folds the two differently and a person asked for an answer.
+    pub thought: Option<String>,
     /// What this one turn was billed.
     pub spent: Option<UsdMicros>,
     pub used: Option<Used>,

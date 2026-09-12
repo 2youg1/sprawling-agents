@@ -74,6 +74,10 @@ export interface RunBelief {
   // What the model has said in the call that is still going. Cleared
   // when the call returns, because the record then holds it.
   saying: string;
+  // What the model has reasoned in that same call, kept apart for the
+  // reason the wire keeps the two increments apart: a page folds one
+  // and reads the other.
+  thinking: string;
 }
 
 // Mutable only through the store's own setter below; readers get the
@@ -140,6 +144,7 @@ function fresh(run: RunId, record: EventRecord): RunBelief {
     lastKind: record.kind,
     doing: { kind: "thinking" },
     saying: "",
+    thinking: "",
   };
 }
 
@@ -158,9 +163,9 @@ function fold(held: RunBelief, record: EventRecord): RunBelief {
         doing: { kind: "thinking" },
       };
     case "model_called":
-      return { ...moved, doing: { kind: "thinking" }, saying: "" };
+      return { ...moved, doing: { kind: "thinking" }, saying: "", thinking: "" };
     case "model_returned":
-      return { ...moved, saying: "" };
+      return { ...moved, saying: "", thinking: "" };
     case "tool_called":
       return {
         ...moved,
@@ -178,6 +183,7 @@ function fold(held: RunBelief, record: EventRecord): RunBelief {
       return {
         ...moved,
         saying: "",
+        thinking: "",
         doing: { kind: "frozen", completion: text(data, "completion") },
       };
     // Every other kind only advances the position. Listed rather than
@@ -278,6 +284,7 @@ export function createBelief() {
               ? { kind: "frozen", completion: null }
               : (held?.doing ?? { kind: "thinking" }),
             saying: held?.saying ?? "",
+            thinking: held?.thinking ?? "",
           };
         }
       }),
@@ -325,7 +332,11 @@ export function createBelief() {
         if (held === undefined) {
           return;
         }
-        held.saying += delta.text;
+        if ("said" in delta.increment) {
+          held.saying += delta.increment.said;
+        } else {
+          held.thinking += delta.increment.thought;
+        }
       }),
     );
   }

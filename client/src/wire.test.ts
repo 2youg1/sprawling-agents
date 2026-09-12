@@ -36,7 +36,7 @@ const refused = <A>(result: Either.Either<A, ParseResult.ParseError>): string =>
 
 describe("the wire constants", () => {
   test("carry the version and the hash the server checks", () => {
-    expect(WIRE_V).toBe(28);
+    expect(WIRE_V).toBe(29);
     expect(WIRE_HASH).toMatch(/^[0-9a-f]{64}$/);
   });
 });
@@ -92,7 +92,7 @@ describe("server frames", () => {
         data: { task: "ship it", nested: { count: 2 } },
       },
     };
-    const delta = { delta: { run, text: "tok" } };
+    const delta = { delta: { run, increment: { said: "tok" } } };
     for (const frame of [answer, event, delta]) {
       expect(accepted(decodeServer(frame))).toEqual(frame);
     }

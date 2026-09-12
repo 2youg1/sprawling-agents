@@ -37,21 +37,40 @@ pub fn text(value: Option<&serde_json::Value>) -> Option<String> {
 }
 
 /// What the model said, out of the message `runtime::turn` recorded.
-///
-/// Text blocks only. `Thinking` and `RedactedThinking` are carried end
-/// to end so the provider can verify the signature it issued; relaying
-/// them is this city's job and publishing them is not.
 #[must_use]
 pub fn said_in(message: &serde_json::Value) -> Option<String> {
+    blocks_of(message, "text", "text")
+}
+
+/// What the model thought, out of the same message.
+///
+/// **This used to be withheld, and the reason it was no longer holds.**
+/// Thinking blocks are carried end to end because the provider verifies
+/// the signature it issued against them, and that made them look like
+/// transport rather than content. For a model that spends most of a
+/// call reasoning, withholding them leaves a person watching an empty
+/// thread for minutes and then reading two sentences - so the reasoning
+/// is answered as its own field, and the page folds it away beside the
+/// prose rather than mixing the two.
+///
+/// `RedactedThinking` stays out: its payload is encrypted, so there is
+/// nothing in it a person could read.
+#[must_use]
+pub fn thought_in(message: &serde_json::Value) -> Option<String> {
+    blocks_of(message, "thinking", "thinking")
+}
+
+/// The blocks of one kind, joined, or nothing when there are none.
+fn blocks_of(message: &serde_json::Value, kind: &str, field: &str) -> Option<String> {
     let blocks = message.as_object()?.get("content")?.as_array()?;
-    let said: Vec<&str> = blocks
+    let found: Vec<&str> = blocks
         .iter()
         .filter_map(|block| {
             let map = block.as_object()?;
-            (map.get("kind")?.as_str()? == "text").then(|| map.get("text")?.as_str())?
+            (map.get("kind")?.as_str()? == kind).then(|| map.get(field)?.as_str())?
         })
         .collect();
-    (!said.is_empty()).then(|| said.join("\n"))
+    (!found.is_empty()).then(|| found.join("\n"))
 }
 
 /// The counters `ModelUsage` carries. Absent when the provider sent no
