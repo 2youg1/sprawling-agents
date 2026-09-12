@@ -145,7 +145,7 @@
   },
   "bld_clear": {
     "en": "clear",
-    "zh": "清掉"
+    "zh": "清除"
   },
   "bld_commits": {
     "en": "commits",
@@ -181,7 +181,7 @@
   },
   "bld_pursue": {
     "en": "pursue",
-    "zh": "追"
+    "zh": "持续推进"
   },
   "bld_release": {
     "en": "/release {addr}",
@@ -374,14 +374,6 @@
   "desktop_title": {
     "en": "desktop",
     "zh": "桌面"
-  },
-  "dialect_anthropic": {
-    "en": "Anthropic-shaped",
-    "zh": "Anthropic 形"
-  },
-  "dialect_open_ai": {
-    "en": "OpenAI-shaped",
-    "zh": "OpenAI 形"
   },
   "dir_empty": {
     "en": "this directory is empty",
@@ -1196,8 +1188,8 @@
     "zh": "输入"
   },
   "run_lenses": {
-    "en": "four readings of one run",
-    "zh": "一次跑的四种读法"
+    "en": "run views",
+    "zh": "run 的四个视图"
   },
   "run_no_changes": {
     "en": "no changes",
@@ -1301,15 +1293,15 @@
   },
   "setup_attach_btn": {
     "en": "attach",
-    "zh": "接上"
+    "zh": "添加"
   },
   "setup_autonomy": {
     "en": "approvals",
     "zh": "审批"
   },
   "setup_base_url": {
-    "en": "base URL",
-    "zh": "基址 URL"
+    "en": "base_url",
+    "zh": "base_url"
   },
   "setup_copy": {
     "en": "copy",
@@ -1318,10 +1310,6 @@
   "setup_copy_details": {
     "en": "copy the details",
     "zh": "复制细节"
-  },
-  "setup_dialect": {
-    "en": "which wire it speaks",
-    "zh": "它说哪种线"
   },
   "setup_digest": {
     "en": "digest · reads",
@@ -1421,7 +1409,7 @@
   },
   "setup_keyed": {
     "en": "keyed",
-    "zh": "有 key"
+    "zh": "已配密钥"
   },
   "setup_language": {
     "en": "language",
@@ -1448,8 +1436,8 @@
     "zh": "打开批准页"
   },
   "setup_look": {
-    "en": "look at its models",
-    "zh": "看看它有哪些模型"
+    "en": "list models",
+    "zh": "获取模型列表"
   },
   "setup_main": {
     "en": "main · thinks",
@@ -1515,10 +1503,6 @@
     "en": "which model thinks",
     "zh": "哪个模型来想"
   },
-  "setup_name": {
-    "en": "call it",
-    "zh": "叫它"
-  },
   "setup_next_config": {
     "en": "one field above is not a shape the city accepts",
     "zh": "上面某个字段的写法这座城不接受"
@@ -1536,12 +1520,12 @@
     "zh": "这张表单对此无从下手；复制细节"
   },
   "setup_next_provider": {
-    "en": "check the base URL and the key, then look again",
-    "zh": "核对基址与密钥，然后再看一次"
+    "en": "check base_url and the key, then list models again",
+    "zh": "核对 base_url 与密钥，然后再取一次模型列表"
   },
   "setup_next_timeout": {
-    "en": "nothing came back in time: check the proxy, then the base URL",
-    "zh": "等待期间没有任何回应：先查代理，再查基址"
+    "en": "nothing came back in time: check the proxy, then base_url",
+    "zh": "等待期间没有任何回应：先查代理，再查 base_url"
   },
   "setup_no_models": {
     "en": "no models",
@@ -1640,8 +1624,8 @@
     "zh": "供应方答了；它供应什么在下面"
   },
   "setup_reach_path": {
-    "en": "the provider answered 404: the base URL carries a path it should not",
-    "zh": "供应方答 404：基址 URL 末尾多了一段不该有的路径"
+    "en": "the provider answered 404: base_url carries a path it should not",
+    "zh": "对方答了 404：base_url 末尾带了一段不该有的路径"
   },
   "setup_reach_proxy": {
     "en": "through",
@@ -1757,7 +1741,7 @@
   },
   "setup_unkeyed": {
     "en": "no key",
-    "zh": "没 key"
+    "zh": "未配密钥"
   },
   "setup_vendor_none": {
     "en": "no vendor in the id",
@@ -1952,8 +1936,8 @@
     "zh": "读完这座城，回答，需要计划的地方写计划"
   },
   "talk_halted": {
-    "en": "city stopped",
-    "zh": "城已停"
+    "en": "city paused",
+    "zh": "城已暂停"
   },
   "talk_hearing": {
     "en": "hearing…",
@@ -2056,8 +2040,8 @@
     "zh": "进行中"
   },
   "tree_no_runs": {
-    "en": "no runs",
-    "zh": "没有跑"
+    "en": "no runs yet in this room",
+    "zh": "这个房间还没有 run"
   },
   "tree_transcript": {
     "en": "run",
@@ -2092,8 +2076,8 @@
     "zh": "上一步"
   },
   "welcome_done": {
-    "en": "the Mayor",
-    "zh": "找 Mayor"
+    "en": "the Mayor's office",
+    "zh": "进入市长室"
   },
   "welcome_later": {
     "en": "later",
