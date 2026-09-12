@@ -17,6 +17,7 @@ import type {
   DialectKind,
   Effort,
   EndpointTuning,
+  Proxying,
   GovernedDocument,
   HaltScope,
   McpServer,
@@ -204,6 +205,10 @@ export interface Tuning {
   readonly streamIdleTimeoutMs: number | null;
   readonly headers: readonly Pair[];
   readonly overrides: readonly Pair[];
+  // Which of this endpoint's calls go through the machine's proxy. The
+  // city's own rule keeps a call to an address on this machine off it,
+  // and that is what `null` asks for.
+  readonly proxying: Proxying | null;
 }
 
 // A figure reaches the wire only as a whole number that is not
@@ -231,6 +236,7 @@ function tuningFrame(tuning: Tuning): EndpointTuning {
     stream_idle_timeout_ms: span(tuning.streamIdleTimeoutMs),
     headers: named(tuning.headers).map((row) => ({ name: row.name.trim(), value: row.value })),
     overrides: named(tuning.overrides).map((row) => ({ pointer: row.name.trim(), value: row.value })),
+    proxying: tuning.proxying,
   };
 }
 

@@ -38,7 +38,7 @@ pub use fallback::{Fallback, Retreat, retreat_payload};
 pub use market::{InputKinds, MarketSnapshot, ModelEntry};
 pub use native::{Native, NativeConfig};
 pub use oauth_profiles::{OAUTH_PROFILES, OauthProfile, profile};
-pub use reach::{is_local, reach};
+pub use reach::{client_for, is_local, reach, through};
 pub use router::{AttachedEndpoint, Chosen, EndpointBook, EndpointTuning};
 pub use router::{attached_payload, selected_payload};
 pub use transcribe::{AudioType, Recording, Transcriber, TranscriberConfig, transcriber_for};

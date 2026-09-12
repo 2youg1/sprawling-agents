@@ -79,14 +79,11 @@ impl HttpServer {
         // key the vault does not hold is a configuration error and not a
         // server that happens to be down.
         let headers = redeem(headers, resolve, "reach an mcp server")?;
-        let mut builder = reqwest::blocking::Client::builder();
-        if gateway::is_local(url) {
-            // A server a person started on this machine is reached by
-            // address, and a proxy in front of it answers for something
-            // else entirely.
-            builder = builder.no_proxy();
-        }
-        let client = builder
+        // The city's own rule: a server a person started on this machine
+        // is reached by address, and a proxy in front of it answers for
+        // something else entirely. A tool server carries no setting of
+        // its own, so the default is what applies here.
+        let client = gateway::client_for(kernel::Proxying::ExceptLocal, url)
             // Named, because a hosted server sitting behind a content
             // delivery network refuses a client that will not say what
             // it is: reaching Exa's endpoint without this answers 403

@@ -21,7 +21,6 @@
 use kernel::DialectKind;
 
 use crate::endpoint::AuthSpec;
-use crate::native::is_loopback;
 
 use super::payload::auth_reference;
 use super::tuning::EndpointTuning;
@@ -52,11 +51,11 @@ pub struct AttachedEndpoint {
 
 impl AttachedEndpoint {
     /// Whether calls to this endpoint stay on this machine. The answer
-    /// comes from the same test the local adapter applies, so "local"
-    /// means one thing city-wide.
+    /// comes from the same test the local adapter applies and the proxy
+    /// decision takes, so "local" means one thing city-wide.
     #[must_use]
     pub fn is_local(&self) -> bool {
-        is_loopback(&self.base_url)
+        crate::is_local(&self.base_url)
     }
 
     /// Whether a credential was enrolled for it. The only question about

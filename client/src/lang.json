@@ -1567,6 +1567,38 @@
     "en": "providers",
     "zh": "模型供应方"
   },
+  "setup_proxying": {
+    "en": "proxy",
+    "zh": "代理"
+  },
+  "setup_proxying_always": {
+    "en": "always",
+    "zh": "一律走"
+  },
+  "setup_proxying_except_local": {
+    "en": "except this machine",
+    "zh": "这台电脑的地址除外"
+  },
+  "setup_proxying_help": {
+    "en": "Which of this endpoint's calls go through the proxy this machine is configured with.",
+    "zh": "这个端点的哪些调用走这台电脑配置的代理。"
+  },
+  "setup_proxying_never": {
+    "en": "never",
+    "zh": "一律不走"
+  },
+  "setup_proxying_note_always": {
+    "en": "Every call follows the proxy, including one to an address on this machine. Choose this when a relay on this machine has to see every request.",
+    "zh": "每一次调用都按代理走，包括打到这台电脑自己的地址。当这台电脑上的中继必须看到每一个请求时选它。"
+  },
+  "setup_proxying_note_except_local": {
+    "en": "An address on this machine is reached directly; everything else follows the proxy variables and the system setting. This is what a person who has not thought about proxies wants.",
+    "zh": "打到这台电脑自己的地址直连，其余按代理变量与系统设置走。没有专门考虑过代理的人要的就是这一档。"
+  },
+  "setup_proxying_note_never": {
+    "en": "No call follows a proxy, whatever this machine is configured with. Choose this when a virtual network adapter already carries every packet.",
+    "zh": "无论这台电脑怎么配置，任何调用都不走代理。当虚拟网卡已经在承载全部流量时选它。"
+  },
   "setup_reach_dns": {
     "en": "name",
     "zh": "主机名"

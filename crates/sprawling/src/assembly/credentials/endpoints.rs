@@ -4,17 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What this city may call: an endpoint probed before it is attached,
-//! a model chosen for a tag, and the local server the environment names
-//! when nothing else is registered.
+//! and a model chosen for a tag.
 
-use kernel::{AxCode, AxError, EventKind, Payload};
+use kernel::{AxCode, AxError, EventKind};
 
 use super::super::RunWorker;
 use super::probing::{Probing, probed_payload, reach_of};
-use super::{
-    Ceilings, Chosen, Credential, ENVIRONMENT_ENDPOINT, Entered, PROBE_TIMEOUT_MS, dialect_headers,
-    local_model_facts,
-};
+use super::{Ceilings, Chosen, Credential, Entered, PROBE_TIMEOUT_MS, dialect_headers};
 
 impl RunWorker {
     /// Asks a base URL what it serves, and attaches nothing.
@@ -39,7 +35,7 @@ impl RunWorker {
     pub(in crate::assembly) fn probe_endpoint(&mut self, entered: Entered) -> Result<(), AxError> {
         let endpoint = self.endpoint_of(entered)?;
         let found = Probing {
-            reach: reach_of(&endpoint.base_url)?,
+            reach: reach_of(&endpoint.base_url, endpoint.tuning.proxying)?,
             served: self.probe(&endpoint),
         };
         let payload = probed_payload(&endpoint.name, &endpoint.base_url, &found)?;
@@ -185,6 +181,7 @@ impl RunWorker {
                 timeout_ms: tuning.timeout_ms.unwrap_or(PROBE_TIMEOUT_MS),
                 stream_deadline_ms: None,
                 pricing: None,
+                proxying: tuning.proxying,
             },
             // A probe asks which models an endpoint serves. It carries
             // no conversation, so it carries no picture either.
@@ -332,69 +329,5 @@ impl RunWorker {
         // make.
         let payload = gateway::selected_payload(tag, &endpoint, &entry, &gateway::Fallback::None)?;
         self.record(EventKind::ModelSelected, payload)
-    }
-
-    fn seed_from_environment(&mut self, base_url: &str, model: &str) -> Result<(), AxError> {
-        let facts = local_model_facts(model)?;
-        self.attach_endpoint(
-            Entered {
-                name: ENVIRONMENT_ENDPOINT.to_owned(),
-                base_url: base_url.to_owned(),
-                dialect: kernel::DialectKind::OpenAi,
-                credential: Credential::Absent,
-                tuning: gateway::EndpointTuning::default(),
-            },
-            &[],
-        )?;
-        self.select_model(
-            Chosen {
-                endpoint: ENVIRONMENT_ENDPOINT.to_owned(),
-                model: model.to_owned(),
-                tag: kernel::ModelTag::Main,
-            },
-            Ceilings {
-                context_tokens: facts.context_tokens,
-                max_output_tokens: facts.max_output_tokens,
-            },
-        )
-    }
-
-    /// Records what the vault turned out to be, and registers the local
-    /// server named in the environment when nothing is registered yet.
-    ///
-    /// The environment path is a convenience, not a second authority:
-    /// it writes the same two records the settings page writes, so the
-    /// book stays the only statement of what this city can call. A
-    /// failure here is reported and not fatal — a city stays readable
-    /// without a provider.
-    pub(crate) fn open_for_service(&mut self, vault_notice: Option<Payload>) {
-        if let Some(notice) = vault_notice
-            && let Err(err) = self.record(EventKind::ProviderDegraded, notice)
-        {
-            self.note(
-                runtime::diagnostics::Level::Refuse,
-                "bin::assembly",
-                &format!("{err}; {}", err.recovery()),
-            );
-        }
-        if !self.book.is_empty() {
-            return;
-        }
-        let (Ok(base_url), Ok(model)) = (
-            std::env::var("SPRAWLING_MODEL_URL"),
-            std::env::var("SPRAWLING_MODEL"),
-        ) else {
-            return;
-        };
-        if let Err(err) = self.seed_from_environment(&base_url, &model) {
-            self.note(
-                runtime::diagnostics::Level::Refuse,
-                "bin::assembly",
-                &format!(
-                    "the model named in the environment is not attached: {err}; {}",
-                    err.recovery()
-                ),
-            );
-        }
     }
 }

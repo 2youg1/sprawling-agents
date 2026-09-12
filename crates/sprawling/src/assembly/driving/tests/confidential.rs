@@ -42,6 +42,7 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
             timeout_ms: 1_000,
             stream_deadline_ms: None,
             pricing: None,
+            proxying: kernel::Proxying::default(),
         },
         gateway::Redemption::without_images(Box::new(|_reference: &kernel::SecretRef| {
             Err(AxError::failure(

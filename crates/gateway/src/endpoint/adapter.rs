@@ -51,6 +51,7 @@ pub fn adapter_for(
             model: chosen.entry.id.clone(),
             timeout_ms,
             pricing: Some(chosen.entry.clone()),
+            proxying: tuning.proxying,
         })?;
         return Ok(Box::new(native));
     }
@@ -79,6 +80,7 @@ pub fn adapter_for(
             timeout_ms,
             stream_deadline_ms: tuning.stream_deadline_ms,
             pricing: Some(chosen.entry.clone()),
+            proxying: tuning.proxying,
         },
         redemption,
     )?;

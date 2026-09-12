@@ -18,7 +18,9 @@
 
 //! Payload faces: references on the wire, never credentials.
 
-use kernel::{AxCode, AxError, Ceiling, DialectKind, ModelTag, Payload, SecretRef, UsdMicros};
+use kernel::{
+    AxCode, AxError, Ceiling, DialectKind, ModelTag, Payload, Proxying, SecretRef, UsdMicros,
+};
 use serde_json::{Map, Value};
 
 use crate::endpoint::AuthSpec;
@@ -32,7 +34,7 @@ use super::tuning::EndpointTuning;
 /// The registration's `tuning` object, written only when the person
 /// settled something. An endpoint they left alone writes no key, so a
 /// record says "nothing was settled" by staying silent about it.
-fn tuning_value(tuning: &EndpointTuning) -> Option<Value> {
+fn tuning_value(tuning: &EndpointTuning) -> Result<Option<Value>, AxError> {
     let mut map = Map::new();
     if let Some(label) = &tuning.label {
         map.insert("label".to_owned(), Value::String(label.clone()));
@@ -50,6 +52,14 @@ fn tuning_value(tuning: &EndpointTuning) -> Option<Value> {
             "request_max_retries".to_owned(),
             Value::Number(retries.into()),
         );
+    }
+    // The default stays silent, so a record says "nothing was settled"
+    // the same way it does for every other figure here.
+    if tuning.proxying != Proxying::default() {
+        let spelled = serde_json::to_value(tuning.proxying).map_err(|err| {
+            AxError::failure(AxCode::InvalidArgs, "encode proxying", err.to_string())
+        })?;
+        map.insert("proxying".to_owned(), spelled);
     }
     for (key, rows) in [
         ("extra_headers", &tuning.extra_headers),
@@ -71,7 +81,7 @@ fn tuning_value(tuning: &EndpointTuning) -> Option<Value> {
             );
         }
     }
-    (!map.is_empty()).then_some(Value::Object(map))
+    Ok((!map.is_empty()).then_some(Value::Object(map)))
 }
 
 /// The pairs a `tuning` object holds under one key, as the record
@@ -119,6 +129,13 @@ fn read_tuning(payload: &Payload) -> EndpointTuning {
         stream_deadline_ms: figure("stream_deadline_ms"),
         extra_headers: pairs(tuning, "extra_headers"),
         overrides: pairs(tuning, "overrides"),
+        // A record written before this key existed, and a record whose
+        // value this build cannot read, both replay as the default:
+        // every such record was written by a build that took it.
+        proxying: tuning
+            .and_then(|held| held.get("proxying"))
+            .and_then(|held| serde_json::from_value(held.clone()).ok())
+            .unwrap_or_default(),
     }
 }
 pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError> {
@@ -153,7 +170,7 @@ pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError>
         ),
     );
     map.insert("probed".to_owned(), Value::Bool(endpoint.probed));
-    if let Some(tuning) = tuning_value(&endpoint.tuning) {
+    if let Some(tuning) = tuning_value(&endpoint.tuning)? {
         map.insert("tuning".to_owned(), tuning);
     }
     Payload::new(map)

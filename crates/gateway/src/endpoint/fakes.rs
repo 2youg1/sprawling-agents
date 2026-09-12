@@ -243,6 +243,7 @@ pub(crate) fn config(url: &str) -> EndpointConfig {
         )],
         timeout_ms: 5_000,
         stream_deadline_ms: None,
+        proxying: kernel::Proxying::default(),
         pricing: Some(
             crate::market::MarketSnapshot::builtin()
                 .lookup("claude-sonnet")

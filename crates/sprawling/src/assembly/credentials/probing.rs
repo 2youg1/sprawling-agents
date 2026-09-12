@@ -18,7 +18,7 @@
 //! find out is `gateway::reach`; what this module owns is the record
 //! the page folds.
 
-use kernel::{AxCode, AxError, Payload, Reach};
+use kernel::{AxCode, AxError, Payload, Proxying, Reach};
 use serde_json::{Map, Value};
 
 use crate::assembly::now_ms;
@@ -41,21 +41,19 @@ pub(super) struct Probing {
 /// # Errors
 /// A transport this machine will not construct, or a clock that reads
 /// before the unix epoch.
-pub(super) fn reach_of(base_url: &str) -> Result<Reach, AxError> {
-    let mut builder = reqwest::blocking::Client::builder();
-    if gateway::is_local(base_url) {
-        builder = builder.no_proxy();
-    }
-    let client = builder.build().map_err(|err| {
-        AxError::failure(
-            AxCode::ConfigInvalid,
-            "measure reachability",
-            err.to_string(),
-        )
-        .with_recovery("restart the server; this machine refused to build an HTTP client")
-    })?;
+pub(super) fn reach_of(base_url: &str, proxying: Proxying) -> Result<Reach, AxError> {
+    let client = gateway::client_for(proxying, base_url)
+        .build()
+        .map_err(|err| {
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "measure reachability",
+                err.to_string(),
+            )
+            .with_recovery("restart the server; this machine refused to build an HTTP client")
+        })?;
     let before = now_ms()?;
-    let reading = gateway::reach(&client, base_url, 0);
+    let reading = gateway::reach(&client, proxying, base_url, 0);
     let after = now_ms()?;
     Ok(Reach {
         elapsed_ms: after.value().saturating_sub(before.value()),

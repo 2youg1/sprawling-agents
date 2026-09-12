@@ -217,6 +217,7 @@ pub enum kernel::PolicyApplication
 pub enum kernel::PolicyExpiry
 pub enum kernel::PolicyVerdict
 pub enum kernel::Progress
+pub enum kernel::Proxying
 pub enum kernel::PursuitState
 pub enum kernel::PursuitVerdict
 pub enum kernel::Range
@@ -909,6 +910,9 @@ pub kernel::PolicyVerdict::Allow
 pub kernel::PolicyVerdict::Deny
 pub kernel::Progress::Planned(kernel::PlannedProgress)
 pub kernel::Progress::Unplanned(kernel::UnplannedProgress)
+pub kernel::Proxying::Always
+pub kernel::Proxying::ExceptLocal
+pub kernel::Proxying::Never
 pub kernel::PursuitState::Paused
 pub kernel::PursuitState::Running
 pub kernel::PursuitVerdict::Finished
@@ -997,8 +1001,10 @@ pub kernel::SystemBlock::text: alloc::string::String
 pub kernel::Temporal::Timeless
 pub kernel::Temporal::Timestamped
 pub kernel::Through::Direct
+pub kernel::Through::Disabled
 pub kernel::Through::Environment(alloc::string::String)
 pub kernel::Through::Excluded
+pub kernel::Through::LocalAddress
 pub kernel::Token::Code
 pub kernel::Token::Emphasis
 pub kernel::Token::Fence

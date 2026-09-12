@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 27 as const;
+export const WIRE_V = 28 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "28af22189f458d801993017a1c63e498380e0e9676c31e092416d58fa8149401" as const;
+export const WIRE_HASH = "2dfe19d4ec612563bf5a79958d7c06e6b77b95d44d886697f6b9c77719ac28be" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -1693,6 +1693,27 @@ export const HeaderPair = Schema.Struct({
 export type HeaderPair = typeof HeaderPair.Type;
 
 /**
+ * Which of this endpoint's calls go through the machine's proxy.
+ * 
+ * A proxy that intercepts loopback answers 502 for a local inference
+ * server, so the city takes an address on its own machine off the
+ * proxy by default — and that default is a rule about the common
+ * machine, not a fact about every machine. Two other settings are real
+ * needs rather than symmetry: a person whose provider sits behind a
+ * relay on loopback that their organisation requires them to audit
+ * needs [`Always`](Proxying::Always), and a person on a virtual network
+ * adapter, whose routes already carry every packet, needs
+ * [`Never`](Proxying::Never) so a stale proxy variable cannot break a
+ * call the machine would otherwise make.
+ */
+export const Proxying = Schema.Union(
+  Schema.Literal("except_local"),
+  Schema.Literal("always"),
+  Schema.Literal("never"),
+).annotations({ identifier: "Proxying" });
+export type Proxying = typeof Proxying.Type;
+
+/**
  * Everything a person settles about one endpoint beyond its address.
  * 
  * `Default` is "nothing was settled", which is what a form that never
@@ -1703,6 +1724,7 @@ export const EndpointTuning = Schema.Struct({
   headers: Schema.Array(HeaderPair),
   label: Schema.optional(Schema.NullOr(Schema.String)),
   overrides: Schema.Array(BodyOverride),
+  proxying: Schema.optional(Schema.NullOr(Proxying)),
   request_max_retries: Schema.optional(Schema.NullOr(Schema.Int)),
   stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),
   timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),

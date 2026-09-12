@@ -11,6 +11,7 @@
 use kernel::{AxCode, AxError};
 
 mod endpoints;
+mod environment;
 mod probing;
 pub(super) mod signing;
 
@@ -69,6 +70,7 @@ pub(super) fn tuning_of(wire: channels::EndpointTuning) -> gateway::EndpointTuni
             .map(|row| (row.pointer.trim().to_owned(), row.value))
             .filter(|(pointer, _)| pointer.starts_with('/'))
             .collect(),
+        proxying: wire.proxying.unwrap_or_default(),
     }
 }
 

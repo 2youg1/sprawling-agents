@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use kernel::{AxCode, AxError, DialectKind, SecretRef};
+use kernel::{AxCode, AxError, DialectKind, Proxying, SecretRef};
 use serde_json::Value;
 
 use super::redemption::Redemption;
@@ -54,6 +54,10 @@ pub struct EndpointConfig {
     /// Price-sheet row for settlement; `None` settles nothing (billed
     /// stays empty and attribution sees usage only).
     pub pricing: Option<ModelEntry>,
+    /// Which of this endpoint's calls go through the machine's proxy.
+    /// Resolved before it gets here: the wire spells absence, and the
+    /// assembly layer turns absence into the city's own default.
+    pub proxying: Proxying,
 }
 
 pub struct Endpoint {
@@ -71,14 +75,12 @@ pub struct Endpoint {
 /// person reading the refusal.
 impl Endpoint {
     pub fn new(config: EndpointConfig, redemption: Redemption) -> Result<Endpoint, AxError> {
-        let mut builder =
-            reqwest::blocking::Client::builder().timeout(Duration::from_millis(config.timeout_ms));
-        if crate::is_local(&config.base_url) {
-            builder = builder.no_proxy();
-        }
-        let client = builder.build().map_err(|err| {
-            AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
-        })?;
+        let client = crate::client_for(config.proxying, &config.base_url)
+            .timeout(Duration::from_millis(config.timeout_ms))
+            .build()
+            .map_err(|err| {
+                AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
+            })?;
         Ok(Endpoint {
             config,
             client,

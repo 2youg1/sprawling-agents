@@ -247,14 +247,10 @@ fn resolved_against(url: &str, announced: &str) -> Result<String, AxError> {
 }
 
 fn client_for(url: &str) -> Result<reqwest::blocking::Client, AxError> {
-    let mut builder = reqwest::blocking::Client::builder();
-    if gateway::is_local(url) {
-        // A server a person started on this machine is reached by
-        // address, and a proxy in front of it answers for something
-        // else entirely.
-        builder = builder.no_proxy();
-    }
-    builder
+    // The city's own rule, for the reason `bin::mcp_http` gives: a tool
+    // server carries no setting of its own, and a proxy in front of a
+    // server on this machine answers for something else entirely.
+    gateway::client_for(kernel::Proxying::ExceptLocal, url)
         // Named for the reason `bin::mcp_http` gives: a hosted server
         // behind a content delivery network refuses a client that will
         // not say what it is.

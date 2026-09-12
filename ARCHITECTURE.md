@@ -483,7 +483,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::fixture | crates/memory/src/bundle/fixture.rs | the one city the bundle tests export | adapter | V3 | built | memory-SPEC.md#8-21 |
 
-### gateway (44) — everything between a decision to call a model and the bytes on the wire
+### gateway (45) — everything between a decision to call a model and the bytes on the wire
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -521,7 +521,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::admission | crates/gateway/src/admission.rs | the provider's concurrency limit and a deterministic minimum interval | decision | S3 | built | gateway-SPEC.md#8-6 |
 | gateway::fallback | crates/gateway/src/fallback.rs | what a tag does when its endpoint will not answer, and the payload the retreat itself is | value | V4 | built | gateway-SPEC.md#8-11 |
 | gateway::market | crates/gateway/src/market.rs | the model catalogue snapshot, pinned so a price cannot move under a run | value | S3 | built | gateway-SPEC.md#8-7 |
-| gateway::reach | crates/gateway/src/reach.rs | the staged reading of one base URL, and the rule that a call to this machine never goes through a proxy | adapter | V5 | built | gateway-SPEC.md#8-15 |
+| gateway::reach | crates/gateway/src/reach.rs | the staged reading of one base URL, stage by stage | adapter | V5 | built | gateway-SPEC.md#8-15 |
+| gateway::reach::proxy | crates/gateway/src/reach/proxy.rs | which calls go through this machine's proxy, and every HTTP client the city builds | adapter | V5 | built | gateway-SPEC.md#8-15 |
 | gateway::cost | crates/gateway/src/cost.rs | per-call settlement, with the provider's own figure preferred | decision | S3 | built | gateway-SPEC.md#8-8 |
 | gateway::credential | crates/gateway/src/credential.rs | custody: capture, replace with a reference, redeem at the wire, renew before expiry | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::vault | crates/gateway/src/credential/vault.rs | vaults, backends, persistence | adapter | S3 | built | gateway-SPEC.md#8-4 |
@@ -715,7 +716,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (168)
+### browser (12), protocol (5), bin (169)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -760,6 +761,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::credentials::signing | crates/sprawling/src/assembly/credentials/signing.rs | a subscription login in two steps, the renewal before use, and the vault | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::credentials::endpoints | crates/sprawling/src/assembly/credentials/endpoints.rs | an endpoint probed before it is attached, and a model chosen for a tag | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::credentials::probing | crates/sprawling/src/assembly/credentials/probing.rs | what a probe found - where the call stopped, and what each model row stated | adapter | F1 | built | sprawling-SPEC.md#8-62 |
+| bin::assembly::credentials::environment | crates/sprawling/src/assembly/credentials/environment.rs | opening for service: what the vault turned out to be, and the local server the environment names | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::credentials::tests | crates/sprawling/src/assembly/credentials/tests.rs | the index of the credential tests | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::credentials::tests::endpoints | crates/sprawling/src/assembly/credentials/tests/endpoints.rs | which models a city may reach, and what an adapter redeems at the wire | adapter | V3 | built | sprawling-SPEC.md#8-50 |
 | bin::assembly::credentials::tests::signing | crates/sprawling/src/assembly/credentials/tests/signing.rs | how a credential enters this city | adapter | V3 | built | sprawling-SPEC.md#8-39 |

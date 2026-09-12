@@ -16,6 +16,7 @@
 //! the text a person typed round-trips exactly, and what it means as
 //! JSON is answered here, once, by [`EndpointTuning::applied_overrides`].
 
+use kernel::Proxying;
 use serde_json::Value;
 
 /// How a person set one endpoint up.
@@ -43,6 +44,11 @@ pub struct EndpointTuning {
     /// Body fields every request writes: a JSON pointer, and the text
     /// of the value to write there.
     pub overrides: Vec<(String, String)>,
+    /// Which of this endpoint's calls go through the machine's proxy.
+    /// A value rather than an `Option`, because every call has to make
+    /// this decision and "nobody settled it" is the default, not a
+    /// third state a caller has to handle.
+    pub proxying: Proxying,
 }
 
 impl EndpointTuning {

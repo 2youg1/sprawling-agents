@@ -72,6 +72,13 @@ pub enum Answered {
 }
 
 /// What the city believes it will send this request through.
+///
+/// Four of the five readings mean "no proxy", and they are kept apart
+/// because the next step differs for each: nothing names one, the
+/// person's own `NO_PROXY` excludes this host, the city's rule takes an
+/// address on this machine off the proxy, or the person settled
+/// [`Proxying::Never`] for this endpoint. A person whose call fails can
+/// act on the reason and cannot act on "direct".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "state", content = "detail")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -82,6 +89,38 @@ pub enum Through {
     Environment(String),
     /// This host is on `NO_PROXY`, so the variables do not apply to it.
     Excluded,
+    /// The address is on the machine the city runs on, and
+    /// [`Proxying::ExceptLocal`] keeps such a call off the proxy.
+    LocalAddress,
+    /// The person settled [`Proxying::Never`] for this endpoint, so no
+    /// proxy applies whatever this machine is configured with.
+    Disabled,
+}
+
+/// Which of this endpoint's calls go through the machine's proxy.
+///
+/// A proxy that intercepts loopback answers 502 for a local inference
+/// server, so the city takes an address on its own machine off the
+/// proxy by default — and that default is a rule about the common
+/// machine, not a fact about every machine. Two other settings are real
+/// needs rather than symmetry: a person whose provider sits behind a
+/// relay on loopback that their organisation requires them to audit
+/// needs [`Always`](Proxying::Always), and a person on a virtual network
+/// adapter, whose routes already carry every packet, needs
+/// [`Never`](Proxying::Never) so a stale proxy variable cannot break a
+/// call the machine would otherwise make.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Proxying {
+    /// The machine's proxy applies, except to an address on this
+    /// machine. What a person who has not thought about proxies wants.
+    #[default]
+    ExceptLocal,
+    /// The machine's proxy applies to every call, loopback included.
+    Always,
+    /// No proxy applies, whatever this machine is configured with.
+    Never,
 }
 
 /// One staged reading of one host.

@@ -89,14 +89,14 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 27,
+        WIRE_V, 28,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
 
 /// A function of WIRE_V and the two name tables, so any change to the
 /// protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "28af22189f458d801993017a1c63e498380e0e9676c31e092416d58fa8149401";
+const WIRE_SCHEMA_GOLDEN: &str = "2dfe19d4ec612563bf5a79958d7c06e6b77b95d44d886697f6b9c77719ac28be";
 
 // -------------------------------------------------------------- binding face
 
@@ -328,6 +328,7 @@ title = \"a window\"
                     pointer: "/reasoning/effort".to_owned(),
                     value: "high".to_owned(),
                 }],
+                proxying: Some(kernel::Proxying::Always),
             },
             idem,
         },

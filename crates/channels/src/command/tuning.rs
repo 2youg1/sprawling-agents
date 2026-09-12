@@ -22,6 +22,7 @@
 //! writes it into a request body; this crate carries the bytes and
 //! decides nothing about them.
 
+use kernel::Proxying;
 use serde::{Deserialize, Serialize};
 
 /// One header every request to this endpoint carries.
@@ -74,4 +75,10 @@ pub struct EndpointTuning {
     pub stream_idle_timeout_ms: Option<u64>,
     pub headers: Vec<HeaderPair>,
     pub overrides: Vec<BodyOverride>,
+    /// Which of this endpoint's calls go through the machine's proxy.
+    /// Absent is the city's own rule, which keeps a call to an address
+    /// on this machine off the proxy; the other two settings exist
+    /// because that rule is right about the common machine and wrong
+    /// about some real ones.
+    pub proxying: Option<Proxying>,
 }

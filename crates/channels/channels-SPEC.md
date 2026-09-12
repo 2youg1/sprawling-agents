@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 24 个 variant、Query 恰 24 个（计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`28af22189f458d801993017a1c63e498380e0e9676c31e092416d58fa8149401`；**WIRE_V ＝ 27**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33）。
+  **当前 golden**：`2dfe19d4ec612563bf5a79958d7c06e6b77b95d44d886697f6b9c77719ac28be`；**WIRE_V ＝ 28**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -741,6 +741,7 @@ pub struct EndpointTuning {
     pub stream_idle_timeout_ms: Option<u64>, // 一次流式请求的期限（命名同 Codex）
     pub headers: Vec<HeaderPair>,            // { name, value }，value 可为 `secret:` 引用
     pub overrides: Vec<BodyOverride>,        // { pointer, value }，JSON pointer → 值的文本
+    pub proxying: Option<Proxying>,          // 这个端点的调用走不走这台电脑的代理，缺席即城自己的规则
 }
 
 ProbeEndpoint  { name, base_url, dialect, secret, auth_header, tuning: EndpointTuning, idem }
@@ -754,6 +755,7 @@ EndpointSummary { name, label, base_url, dialect, models, local, has_credential 
 - **零即缺省**。清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成；装配层把零读成「没说」（`bin::assembly::credentials::tuning_of`），于是清空一个框等于回到城自己的值，而不是让此后每一次调用立刻失败。
 - **`stream_idle_timeout_ms` 在线上保留 Codex 的名字，在 gateway 里叫 `stream_deadline_ms`**：阻塞传输交回的是一个没有分块钩子的 body reader，城因此能限定一次应答总共多久，限定不了其中某一次沉默多久。线上用人在自己 `config.toml` 里写熟的那个词，gateway 用它真正做到的那件事命名，装配层是唯一的翻译点。**败给的方案**：在 gateway 里也叫 idle——那会让一个读代码的人以为分块之间有计时器。
 - **`EndpointSummary` 长出 `label`**：缺省即 `name`，所以页面永远不必替一个没写显示名的端点决定显示什么。
+- **`proxying` 跟着 tuning 走，因而探测与调用恒用同一个决定**（WIRE_V 27→28）。一个只在调用时生效的代理设置，会让表单上那份分段读数描述一条真正的调用不会走的路，而那份读数存在的全部意义就是告诉人调用停在了哪一段。`Option` 而非值：线上的缺席是「没人定过」，装配层把它翻成城的默认值（`ExceptLocal`），于是 `gateway` 一侧拿到的是一个已经定下来的值，没有第三种状态要每一个调用方再答一次。
 
 ### 8-28 `endpoint_probed` 答的是一次读数，不是一次成败
 

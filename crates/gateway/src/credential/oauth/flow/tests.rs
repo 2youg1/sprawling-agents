@@ -170,6 +170,7 @@ fn a13_redeemed_value_reaches_the_wire_verbatim() {
             timeout_ms: 5_000,
             stream_deadline_ms: None,
             pricing: None,
+            proxying: kernel::Proxying::default(),
         },
         crate::endpoint::Redemption::without_images(Box::new(move |reference| {
             resolver_handle

@@ -36,7 +36,7 @@ import type { Probed } from "../../core/probed";
 import { enrol, keyField, referenceFor, secretFor } from "../../core/enrol";
 import type { Enrolment, StoredKey } from "../../core/enrol";
 import type { Key } from "../../core/lang";
-import type { AxCode, AxError, DialectKind, EndpointsAnswer } from "../../wire";
+import type { AxCode, AxError, DialectKind, EndpointsAnswer, Proxying } from "../../wire";
 import { useCommand, useSay, useUi } from "../../ui";
 import { ModelTable } from "./models";
 import type { ModelRow } from "./models";
@@ -58,9 +58,20 @@ interface Draft {
   timeoutMs: string;
   requestRetries: string;
   streamIdleMs: string;
+  proxying: Proxying;
   headers: Pair[];
   overrides: Pair[];
 }
+
+// The three settings, each with the word it is offered under and the
+// sentence that says which machine it is right for. A table rather than
+// three branches: the control draws itself from it, and a fourth
+// setting would be a row.
+const PROXYINGS: readonly (readonly [Proxying, Key, Key])[] = [
+  ["except_local", "setup_proxying_except_local", "setup_proxying_note_except_local"],
+  ["always", "setup_proxying_always", "setup_proxying_note_always"],
+  ["never", "setup_proxying_never", "setup_proxying_note_never"],
+];
 
 const FRESH: Draft = {
   id: "",
@@ -71,6 +82,7 @@ const FRESH: Draft = {
   timeoutMs: "60000",
   requestRetries: "4",
   streamIdleMs: "300000",
+  proxying: "except_local",
   headers: [],
   overrides: [],
 };
@@ -444,6 +456,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
     streamIdleTimeoutMs: figureIn(draft.streamIdleMs),
     headers: draft.headers,
     overrides: draft.overrides,
+    proxying: draft.proxying,
   });
 
   const endpoint = (secret: string | null): Endpoint | null => {
@@ -607,6 +620,27 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
                 value={draft.streamIdleMs}
                 onInput={(value) => { setDraft("streamIdleMs", value); }}
               />
+            </div>
+            <div class="flex flex-col gap-tight text-note text-text-quiet">
+              {say("setup_proxying")}
+              <div class="flex flex-wrap gap-snug">
+                <For each={PROXYINGS}>
+                  {([setting, word]) => (
+                    <button
+                      type="button"
+                      class={`rounded-pill px-base py-tight text-label ${draft.proxying === setting ? "bg-accent text-g0" : "bg-g2 text-text-quiet hover:bg-g3"}`}
+                      aria-pressed={draft.proxying === setting}
+                      onClick={() => { setDraft("proxying", setting); }}
+                    >
+                      {say(word)}
+                    </button>
+                  )}
+                </For>
+              </div>
+              <span class="text-text-faint">{say("setup_proxying_help")}</span>
+              <For each={PROXYINGS.filter(([setting]) => setting === draft.proxying)}>
+                {([, , note]) => <span class="text-text-faint">{say(note)}</span>}
+              </For>
             </div>
             <PairTable
               title={say("setup_headers")}

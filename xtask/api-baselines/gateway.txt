@@ -97,6 +97,7 @@ pub fn gateway::Transcriber::is_attached(&self) -> bool
 pub fn gateway::Transcriber::transcribe(&self, &gateway::Recording) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
 pub fn gateway::adapter_for(&gateway::Chosen<'_>, gateway::Redemption, alloc::vec::Vec<(alloc::string::String, alloc::string::String)>) -> core::result::Result<alloc::boxed::Box<(dyn kernel::model::Model + core::marker::Send)>, kernel::error::shape::AxError>
 pub fn gateway::attached_payload(&gateway::AttachedEndpoint) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn gateway::client_for(kernel::reach::Proxying, &str) -> reqwest::blocking::client::ClientBuilder
 pub fn gateway::increment_of(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::option::Option<alloc::string::String>
 pub fn gateway::is_local(&str) -> bool
 pub fn gateway::oauth_begin(&gateway::OauthProfile, alloc::string::String, alloc::string::String) -> core::result::Result<gateway::OauthPending, kernel::error::shape::AxError>
@@ -105,7 +106,7 @@ pub fn gateway::oauth_redeem(&gateway::OauthProfile, &gateway::OauthPending, &st
 pub fn gateway::oauth_redeem_request(&gateway::OauthProfile, &gateway::OauthPending, &str) -> core::result::Result<gateway::TokenRequest, kernel::error::shape::AxError>
 pub fn gateway::oauth_refresh(&gateway::OauthProfile, &kernel::secret::sealed::Sealed<alloc::string::String>, u64) -> core::result::Result<gateway::OauthTokens, kernel::error::shape::AxError>
 pub fn gateway::profile(&str) -> core::option::Option<&'static gateway::OauthProfile>
-pub fn gateway::reach(&reqwest::blocking::client::Client, &str, u64) -> kernel::reach::Reach
+pub fn gateway::reach(&reqwest::blocking::client::Client, kernel::reach::Proxying, &str, u64) -> kernel::reach::Reach
 pub fn gateway::request_wire(kernel::model::wire::DialectKind, &kernel::model::wire::ChatRequest, &gateway::ImageBytes) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
 pub fn gateway::response_from_wire(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::result::Result<kernel::model::wire::ChatResponse, kernel::error::shape::AxError>
 pub fn gateway::response_wire(kernel::model::wire::DialectKind, &kernel::model::wire::ChatResponse) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
@@ -113,6 +114,7 @@ pub fn gateway::retreat_payload(kernel::model::wire::ModelTag, &str, &gateway::R
 pub fn gateway::selected_payload(kernel::model::wire::ModelTag, &str, &gateway::ModelEntry, &gateway::Fallback) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn gateway::settle(&kernel::model::wire::ModelUsage, core::option::Option<kernel::budget::UsdMicros>, &gateway::ModelEntry) -> core::result::Result<gateway::CallCost, kernel::error::shape::AxError>
 pub fn gateway::settled_from_stream(kernel::model::wire::DialectKind, &[serde_json::value::Value]) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
+pub fn gateway::through(kernel::reach::Proxying, &str) -> kernel::reach::Through
 pub fn gateway::transcriber_for(&gateway::Chosen<'_>, gateway::SecretResolver) -> core::result::Result<gateway::Transcriber, kernel::error::shape::AxError>
 pub gateway::AdmissionVerdict::Admit
 pub gateway::AdmissionVerdict::Hold
@@ -155,11 +157,13 @@ pub gateway::EndpointConfig::extra_headers: alloc::vec::Vec<(alloc::string::Stri
 pub gateway::EndpointConfig::model: alloc::string::String
 pub gateway::EndpointConfig::overrides: alloc::vec::Vec<(alloc::string::String, serde_json::value::Value)>
 pub gateway::EndpointConfig::pricing: core::option::Option<gateway::ModelEntry>
+pub gateway::EndpointConfig::proxying: kernel::reach::Proxying
 pub gateway::EndpointConfig::stream_deadline_ms: core::option::Option<u64>
 pub gateway::EndpointConfig::timeout_ms: u64
 pub gateway::EndpointTuning::extra_headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
 pub gateway::EndpointTuning::label: core::option::Option<alloc::string::String>
 pub gateway::EndpointTuning::overrides: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub gateway::EndpointTuning::proxying: kernel::reach::Proxying
 pub gateway::EndpointTuning::request_max_retries: core::option::Option<u32>
 pub gateway::EndpointTuning::stream_deadline_ms: core::option::Option<u64>
 pub gateway::EndpointTuning::timeout_ms: core::option::Option<u64>
@@ -185,6 +189,7 @@ pub gateway::ModelFacts::output_price: core::option::Option<alloc::string::Strin
 pub gateway::NativeConfig::base_url: alloc::string::String
 pub gateway::NativeConfig::model: alloc::string::String
 pub gateway::NativeConfig::pricing: core::option::Option<gateway::ModelEntry>
+pub gateway::NativeConfig::proxying: kernel::reach::Proxying
 pub gateway::NativeConfig::timeout_ms: u64
 pub gateway::OauthPending::auth_url: alloc::string::String
 pub gateway::OauthPending::state: alloc::string::String
@@ -215,6 +220,7 @@ pub gateway::TokenRequest::url: alloc::string::String
 pub gateway::TranscriberConfig::auth: gateway::AuthSpec
 pub gateway::TranscriberConfig::base_url: alloc::string::String
 pub gateway::TranscriberConfig::model: alloc::string::String
+pub gateway::TranscriberConfig::proxying: kernel::reach::Proxying
 pub gateway::TranscriberConfig::timeout_ms: u64
 pub mod gateway
 pub struct gateway::AdmissionState

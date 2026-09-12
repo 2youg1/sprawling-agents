@@ -15,7 +15,7 @@ mod locator;
 
 pub use address::{Address, RESERVED_PREFIX, SessionName};
 pub use locator::{B3Hash, GitOid, Locator, Range};
-pub use reach::{Answered, Connected, Named, Reach, Through};
+pub use reach::{Answered, Connected, Named, Proxying, Reach, Through};
 
 pub mod consts_external;
 pub mod consts_policy;

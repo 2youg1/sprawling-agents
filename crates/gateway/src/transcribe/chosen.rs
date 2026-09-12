@@ -46,6 +46,7 @@ pub fn transcriber_for(
             model: chosen.entry.id.clone(),
             auth: chosen.endpoint.auth.clone(),
             timeout_ms: TRANSCRIBE_TIMEOUT_MS,
+            proxying: chosen.endpoint.tuning.proxying,
         },
         secrets,
     )

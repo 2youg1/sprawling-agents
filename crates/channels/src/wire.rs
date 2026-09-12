@@ -80,7 +80,10 @@ use serde::{Deserialize, Serialize};
 ///    a command with environment variables, a url with several headers,
 ///    and a third transport that answers on a stream - and `McpHealth`
 ///    asks one address's servers where they stand and what they offer.
-pub const WIRE_V: u32 = 27;
+/// 28: an endpoint says which of its calls go through the machine's
+///    proxy, and a staged reading says which of the four reasons no
+///    proxy applied to the call it describes.
+pub const WIRE_V: u32 = 28;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

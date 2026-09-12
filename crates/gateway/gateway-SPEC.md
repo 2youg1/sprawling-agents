@@ -548,14 +548,19 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 - **`list_models` 读出每一行真正说了的东西**。OpenAI 形的 `/models` 一行里除 id 之外有什么由供应方决定：`context_length` 与 `max_completion_tokens`、同样两项嵌在 `top_provider` 之下、模态写在 `architecture` 里、绝大多数什么都不写。读法因此是「一组问题，各自由第一个带着它的键作答，没有键带着它就缺席」。**城不补零、不补默认、不补猜测**：补出来的数字会盖过真正计费的那个。
 - **价格按供应方自己的文本原样携带**。单位也是供应方的——按 token 还是按百万 token，按美元还是按美分——而一个没人能拿去对账单的换算值，比供应方印出来的那串字符更糟。
 
-### 8-15 `gateway::reach`：一次分段读数，以及「打到城所在那台机器上的调用不走代理」（形状 4 适配器）
+### 8-15 `gateway::reach`：一次分段读数，以及「哪些调用走这台电脑的代理」（形状 4 适配器）
 
 ```rust
-pub fn reach(client: &reqwest::blocking::Client, base_url: &str, elapsed_ms: u64) -> kernel::Reach;
-pub fn is_local(base_url: &str) -> bool;
+pub fn reach(client: &reqwest::blocking::Client, rule: Proxying, base_url: &str, elapsed_ms: u64) -> kernel::Reach;
+pub fn client_for(rule: Proxying, base_url: &str) -> reqwest::blocking::ClientBuilder;   // reach::proxy
+pub fn through(rule: Proxying, base_url: &str) -> kernel::Through;                       // reach::proxy
+pub fn is_local(base_url: &str) -> bool;                                                 // reach::proxy
 ```
 
 - **分段怎么测**：没有代理适用时，先用 `to_socket_addrs` 解名、再用 `TcpStream::connect_timeout` 开一个套接字，两段各自成一个读数；随后无论如何都发一次真实请求，把它的错误链摊平成一行，按其中出现的字样归到「主机名不能进握手」「握手失败」「压根没到握手」三类之一，或者归到它答的状态码。**分类读的是链而不是 reqwest 的 `is_connect`**：一个被拒的套接字与一张不受信的证书在那个判断下是同一个答案。
 - **`socks` 不花钱**：reqwest 0.13 的 `socks = []` 是空 feature，实现就在它自己的 `connect.rs` 里，锁文件不多一个包。`system-proxy` 只在 Windows 与 macOS 各拉一个读系统设置的包。
-- **打到回环地址的调用恒不走代理**（`is_local`）：跑起来才现形——开了 system-proxy 之后，一台配了代理的机器把回环也送进代理，本地推理服务器由别人的网关代答 502。回环是按地址而不是按名字去够的，代理对它没有任何用处；桌面上每一个别的工具默认就排除它。四处构造 HTTP 客户端的地方共用这一条判断。
+- **全城的 HTTP 客户端都在 `reach::proxy` 里造**（`client_for`）。同一条规则写在五处就是五条规则，它们一直一致到其中一处被改为止；更要紧的是，分段读数若自己再判一次，它报出的就是一条请求不会走的路——而那正是看报告的人唯一无法自己核实的东西。**这个缺陷真实存在过**：客户端已经 `no_proxy` 了，而读数还在按环境变量报 `Environment` 并把解名与套接字两段记成 `ProxiedAway`／`Skipped`。
+- **默认把打到这台电脑的调用摘出代理，但那是默认而不是定理**（`Proxying::ExceptLocal`）：跑起来才现形——开了 system-proxy 之后，一台配了代理的机器把回环也送进代理，本地推理服务器由别人的网关代答 502。但把它写死就是替所有人做了一个只对大多数人成立的决定，而这一类决定失效时没有任何一屏能告诉人到底发生了什么。现在它是 `EndpointTuning.proxying` 的默认值，另两个值各自对应一类真实的机器（kernel-SPEC.md 8-50），而无论哪一个，读数都会把结论写在 `through` 那一格里。
+- **工具服务器与订阅登录用默认值，且是显式地用**（`bin::mcp_http`、`bin::mcp_sse`、`credential::oauth::flow`）：两者都没有一份属于自己的设置可携。**会重新打开这一条的参数**：出现一个必须经代理才能够到的回环 MCP 服务器——到那时 `McpServer` 也要长出这一字段，而不是在这里改常量。
+- **`is_local` 是全城唯一的那一条判断**：本地适配器拒一个不属于这台电脑的 URL、代理决定、设置页上那个 `local` 标记，读的是同一个函数。它曾经是两个（`native::is_loopback` 只认 `localhost`／`127.0.0.1`／`::1`，而 `reach::is_local` 按 `IpAddr::is_loopback` 判），于是 `127.0.0.2` 在一处算这台电脑、在另一处不算。
 - **5 秒一段**：设置页上有人在等，一个在这个时间里答不出来的主机，人要的是知道，而不是继续等。

@@ -28,6 +28,10 @@ pub struct TranscriberConfig {
     pub model: String,
     pub auth: AuthSpec,
     pub timeout_ms: u64,
+    /// Settled on the endpoint this facility was chosen from, so a
+    /// recording takes the same path to the provider that a chat call
+    /// to the same endpoint takes.
+    pub proxying: kernel::Proxying,
 }
 
 /// The city's transcription facility, which may not exist.
@@ -67,6 +71,7 @@ impl Transcriber {
                 timeout_ms: config.timeout_ms,
                 stream_deadline_ms: None,
                 pricing: None,
+                proxying: config.proxying,
             },
             // A recording is not a picture: this endpoint resolves a
             // credential and nothing else, and a locator reaching it
@@ -187,6 +192,7 @@ mod tests {
                     None,
                 ),
                 timeout_ms: 5_000,
+                proxying: kernel::Proxying::default(),
             },
             resolver(),
         )

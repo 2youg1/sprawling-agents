@@ -21,7 +21,10 @@
 //! proxies the call.** A proxy does the city's resolving and connecting
 //! for it, so resolving the provider's own name here would report on a
 //! path the request never takes. When a proxy applies, the report says
-//! so and starts at the request itself.
+//! so and starts at the request itself. Which calls a proxy applies to
+//! is `proxy`'s answer, and this module asks it rather than deciding
+//! again - a reading that disagreed with the call it describes is worse
+//! than no reading.
 //!
 //! Time is a parameter. Nothing here samples a clock: the caller stamps
 //! before and after, because the one sampling point is Main.
@@ -32,7 +35,11 @@
 use std::net::{TcpStream, ToSocketAddrs as _};
 use std::time::Duration;
 
-use kernel::{Answered, Connected, Named, Reach, Through};
+use kernel::{Answered, Connected, Named, Proxying, Reach, Through};
+
+mod proxy;
+
+pub use proxy::{client_for, is_local, through};
 
 /// How long one stage may take. Short, because a person is watching a
 /// settings page and a host that cannot answer in this time is one they
@@ -42,7 +49,7 @@ const STAGE_TIMEOUT: Duration = Duration::from_secs(5);
 /// The host and port a base URL points at, without pulling in a URL
 /// parser for four fields: scheme, host, optional port, and whether the
 /// scheme is the TLS one.
-fn split(base_url: &str) -> Option<(String, u16, bool)> {
+pub(crate) fn split(base_url: &str) -> Option<(String, u16, bool)> {
     let (scheme, rest) = base_url.split_once("://")?;
     let tls = match scheme {
         "https" => true,
@@ -71,72 +78,6 @@ fn split(base_url: &str) -> Option<(String, u16, bool)> {
         return None;
     }
     Some((host.to_owned(), port, tls))
-}
-
-/// Which proxy variable, if any, this host's requests will read.
-///
-/// The environment is what a report can state as fact. A system proxy
-/// setting is read by the HTTP client itself and is not visible here, so
-/// a direct reading says only that no variable named one.
-fn through(host: &str, tls: bool) -> Through {
-    let excluded = std::env::var("NO_PROXY")
-        .or_else(|_| std::env::var("no_proxy"))
-        .unwrap_or_default();
-    if excluded_by(host, &excluded) {
-        return Through::Excluded;
-    }
-    let ordered: [&str; 6] = if tls {
-        [
-            "HTTPS_PROXY",
-            "https_proxy",
-            "ALL_PROXY",
-            "all_proxy",
-            "HTTP_PROXY",
-            "http_proxy",
-        ]
-    } else {
-        [
-            "HTTP_PROXY",
-            "http_proxy",
-            "ALL_PROXY",
-            "all_proxy",
-            "HTTPS_PROXY",
-            "https_proxy",
-        ]
-    };
-    for name in ordered {
-        if std::env::var(name).is_ok_and(|value| !value.trim().is_empty()) {
-            return Through::Environment(name.to_owned());
-        }
-    }
-    Through::Direct
-}
-
-/// Whether this base URL points at the machine the city runs on.
-///
-/// **A call to this machine never goes through a proxy.** A proxy that
-/// intercepts loopback answers 502 for a local inference server, for an
-/// MCP server a person started themselves, and for the city's own
-/// enrolment door - all three of which are reached by address rather
-/// than by name, and none of which a proxy can improve. Every other tool
-/// on a machine excludes loopback by default; this is where the city
-/// does.
-pub fn is_local(base_url: &str) -> bool {
-    let Some((host, _, _)) = split(base_url) else {
-        return false;
-    };
-    match host.parse::<std::net::IpAddr>() {
-        Ok(address) => address.is_loopback(),
-        Err(_) => host == "localhost" || host.ends_with(".localhost"),
-    }
-}
-
-/// Whether a `NO_PROXY` list covers this host.
-fn excluded_by(host: &str, list: &str) -> bool {
-    list.split(',')
-        .map(str::trim)
-        .filter(|entry| !entry.is_empty())
-        .any(|entry| entry == "*" || host == entry || host.ends_with(entry))
 }
 
 /// Resolve and connect, when the request will take that path itself.
@@ -209,9 +150,16 @@ fn stopped_at(detail: String) -> Answered {
 /// when it stops at the first stage. `elapsed_ms` is the caller's, and a
 /// base URL this cannot split reports as a name that does not resolve,
 /// which is what a person typing `api.openai.com` without a scheme has
-/// in fact produced.
-pub fn reach(client: &reqwest::blocking::Client, base_url: &str, elapsed_ms: u64) -> Reach {
-    let Some((host, port, tls)) = split(base_url) else {
+/// in fact produced. `rule` is the one the client was built with; a
+/// reading taken under a different rule would describe another city's
+/// call.
+pub fn reach(
+    client: &reqwest::blocking::Client,
+    rule: Proxying,
+    base_url: &str,
+    elapsed_ms: u64,
+) -> Reach {
+    let Some((host, port, _)) = split(base_url) else {
         return Reach {
             host: base_url.to_owned(),
             named: Named::NotFound,
@@ -221,7 +169,7 @@ pub fn reach(client: &reqwest::blocking::Client, base_url: &str, elapsed_ms: u64
             elapsed_ms,
         };
     };
-    let through = through(&host, tls);
+    let through = through(rule, base_url);
     let proxied = matches!(through, Through::Environment(_));
     let (named, connected) = transport(&host, port, proxied);
     let answered = match client
@@ -293,29 +241,5 @@ mod tests {
             stopped_at(String::from("operation timed out")),
             Answered::Unreachable(_)
         ));
-    }
-
-    /// `NO_PROXY` is read as a fact about this host, so a city inside a
-    /// corporate network does not report a proxy for a provider the
-    /// proxy is told to skip. Environment reading is process-wide, so
-    /// this asserts the pure half.
-    #[test]
-    fn a_host_on_no_proxy_reports_that_the_variables_do_not_apply() {
-        assert!(excluded_by("api.openai.com", "localhost, .openai.com"));
-        assert!(!excluded_by("api.openai.com", "localhost"));
-        assert!(excluded_by("anything", "*"));
-    }
-
-    /// Found by running it: with the system proxy compiled in, a machine
-    /// whose owner runs a proxy sent loopback through it and the local
-    /// server answered 502 - through somebody else's gateway, for a
-    /// request that never had to leave the machine.
-    #[test]
-    fn a_call_to_this_machine_is_recognised_whatever_it_is_spelled_as() {
-        assert!(is_local("http://127.0.0.1:11434/v1"));
-        assert!(is_local("http://localhost:8791/enroll"));
-        assert!(is_local("http://[::1]:8791/"));
-        assert!(!is_local("https://api.openai.com/v1"));
-        assert!(!is_local("https://127.0.0.1.nip.io/v1"));
     }
 }

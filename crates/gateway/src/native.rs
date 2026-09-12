@@ -23,28 +23,21 @@ pub struct NativeConfig {
     pub timeout_ms: u64,
     /// Local pricing is normally zero; a metered local pool may price it.
     pub pricing: Option<ModelEntry>,
+    /// Carried rather than assumed: the address is on this machine, and
+    /// the city takes such a call off the proxy by default — but a
+    /// person who settled otherwise for this endpoint settled it for
+    /// every adapter that endpoint is reached through.
+    pub proxying: kernel::Proxying,
 }
 
 pub struct Native {
     inner: Endpoint,
 }
 
-pub(crate) fn is_loopback(url: &str) -> bool {
-    let Some(rest) = url.split("://").nth(1) else {
-        return false;
-    };
-    let host_port = rest.split('/').next().unwrap_or("");
-    let host = host_port
-        .strip_prefix('[')
-        .and_then(|h| h.split(']').next())
-        .unwrap_or_else(|| host_port.split(':').next().unwrap_or(""));
-    matches!(host, "localhost" | "127.0.0.1" | "::1")
-}
-
 impl Native {
     /// Fail-closed: a non-loopback URL is a config error, not a warning.
     pub fn new(config: NativeConfig) -> Result<Native, AxError> {
-        if !is_loopback(&config.base_url) {
+        if !crate::is_local(&config.base_url) {
             return Err(AxError::failure(
                 AxCode::ConfigInvalid,
                 "configure native model",
@@ -63,6 +56,7 @@ impl Native {
                 timeout_ms: config.timeout_ms,
                 stream_deadline_ms: None,
                 pricing: config.pricing,
+                proxying: config.proxying,
             },
             // Local inference authenticates with nothing and reads no
             // content store: both redemptions refuse by construction.
@@ -106,6 +100,7 @@ mod tests {
                 model: "local".to_owned(),
                 timeout_ms: 1_000,
                 pricing: None,
+                proxying: kernel::Proxying::default(),
             }) {
                 Err(err) => err,
                 Ok(_) => panic!("{bad} must be refused"),
@@ -127,6 +122,7 @@ mod tests {
                     model: "local".to_owned(),
                     timeout_ms: 1_000,
                     pricing: None,
+                    proxying: kernel::Proxying::default(),
                 })
                 .is_ok(),
                 "{good}"

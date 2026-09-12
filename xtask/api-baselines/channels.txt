@@ -351,6 +351,7 @@ pub channels::EndpointSummary::name: alloc::string::String
 pub channels::EndpointTuning::headers: alloc::vec::Vec<channels::HeaderPair>
 pub channels::EndpointTuning::label: core::option::Option<alloc::string::String>
 pub channels::EndpointTuning::overrides: alloc::vec::Vec<channels::BodyOverride>
+pub channels::EndpointTuning::proxying: core::option::Option<kernel::reach::Proxying>
 pub channels::EndpointTuning::request_max_retries: core::option::Option<u32>
 pub channels::EndpointTuning::stream_idle_timeout_ms: core::option::Option<u64>
 pub channels::EndpointTuning::timeout_ms: core::option::Option<u64>
