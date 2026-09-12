@@ -34,7 +34,7 @@ use crate::walk;
 
 /// The only files allowed to say `.expose(` under crates/*/src: the
 /// defining module and the two redemption points in gateway.
-const EXPOSE_WHITELIST: [&str; 5] = [
+const EXPOSE_WHITELIST: [&str; 6] = [
     "crates/kernel/src/secret/sealed.rs",
     "crates/gateway/src/endpoint/call.rs",
     "crates/gateway/src/native.rs",
@@ -54,6 +54,12 @@ const EXPOSE_WHITELIST: [&str; 5] = [
     // alternative put plaintext in `bin::assembly`, which is what this
     // list exists to prevent.
     "crates/sprawling/src/mcp_redeeming.rs",
+    // The broker that holds an outside application's OAuth is reached
+    // with a project key in an `x-api-key` header, which is the same
+    // last slot before the wire as the two redemption points above. The
+    // alternative was handing the broker a plaintext key from the
+    // assembly, which is the thing this list exists to prevent.
+    "crates/gateway/src/mcp/broker.rs",
 ];
 
 /// Exact literals the detector flags that are not credentials.

@@ -137,6 +137,7 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                 folded.push(channels::Turn {
                     number,
                     opened: record.seq(),
+                    t: record.t(),
                     said: None,
                     thought: None,
                     spent: None,
@@ -157,6 +158,7 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                 let call = channels::Call {
                     tool: channels::text(map.get("name")).unwrap_or_else(|| "tool".to_owned()),
                     subject: channels::subject_of(map.get("args")),
+                    arguments: map.get("args").and_then(channels::arguments_in),
                     outcome: channels::Outcome::Waiting,
                     at: record.seq(),
                     output: None,

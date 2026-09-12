@@ -29,11 +29,11 @@ use kernel::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::carried_name::{ModeTag, ProviderName, TemplateName, UploadId};
+use crate::carried_name::{ModeTag, ProviderName, TemplateName, ToolkitSlug, UploadId};
 use crate::command::step::{GovernedDocument, HaltScope, LoginStep, PursuitStep};
 use crate::command::tuning::EndpointTuning;
 
-pub const COMMAND_NAMES: [&str; 27] = [
+pub const COMMAND_NAMES: [&str; 28] = [
     "Dispatch",
     "Wake",
     "Login",
@@ -61,6 +61,7 @@ pub const COMMAND_NAMES: [&str; 27] = [
     "Reveal",
     "DoctorInstall",
     "DoctorRefresh",
+    "ConnectToolkit",
 ];
 
 /// Commands change state, require authorization, and are idempotent.
@@ -325,6 +326,29 @@ pub enum Command<Secret = Sealed<String>> {
     /// is plain here because a token that must cross a wire has, by
     /// definition, no secrecy left to protect in transit - it is sealed the
     /// moment it lands (see `server::decide_handshake`).
+    /// Connects one outside application through the broker that holds
+    /// its OAuth.
+    ///
+    /// Answers with the whole shelf rather than with a bare url. The row
+    /// the person pressed comes back as `Standing::Awaiting` carrying
+    /// its consent page, and every other row comes back with it: the
+    /// broker was asked, so the reading is fresh for all of them, and a
+    /// half-refreshed list is a list that disagrees with itself.
+    ///
+    /// **The consent page is opened by the client, never by the city.**
+    /// The person is sitting at the client; the city may be running on
+    /// a machine in another room, and a browser opened there is a
+    /// browser nobody is looking at. This is also why the url keeps
+    /// travelling in the answer instead of being spent once - a blocked
+    /// popup leaves a person who still needs the link.
+    ///
+    /// It carries an `IdemKey` like every other state change, and here
+    /// that key is what stops a second press from opening a second
+    /// account on the same application.
+    ConnectToolkit {
+        toolkit: ToolkitSlug,
+        idem: IdemKey,
+    },
     Auth {
         token: String,
     },

@@ -284,6 +284,9 @@ impl Views {
             channels::Query::McpHealth { addr } => {
                 channels::Answer::McpHealth(Box::new(self.mcp_health_answer(addr)))
             }
+            channels::Query::Toolkits => {
+                channels::Answer::Toolkits(Box::new(self.toolkits_answer()))
+            }
             channels::Query::BuildingView { addr } => {
                 let root = self.city_root.clone();
                 let plan = self.plans.of(&root, addr);

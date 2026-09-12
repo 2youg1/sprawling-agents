@@ -483,7 +483,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::fixture | crates/memory/src/bundle/fixture.rs | the one city the bundle tests export | adapter | V3 | built | memory-SPEC.md#8-21 |
 
-### gateway (45) — everything between a decision to call a model and the bytes on the wire
+### gateway (48) — everything between a decision to call a model and the bytes on the wire
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -522,6 +522,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::fallback | crates/gateway/src/fallback.rs | what a tag does when its endpoint will not answer, and the payload the retreat itself is | value | V4 | built | gateway-SPEC.md#8-11 |
 | gateway::market | crates/gateway/src/market.rs | the model catalogue snapshot, pinned so a price cannot move under a run | value | S3 | built | gateway-SPEC.md#8-7 |
 | gateway::reach | crates/gateway/src/reach.rs | the staged reading of one base URL, stage by stage | adapter | V5 | built | gateway-SPEC.md#8-15 |
+| gateway::mcp | crates/gateway/src/mcp.rs | the index of the one module allowed to know which broker holds an outside application's OAuth | adapter | V5 | built | channels-SPEC.md#8-35 |
+| gateway::mcp::broker | crates/gateway/src/mcp/broker.rs | the directory, an auth config and the consent page, in three calls and nothing else | adapter | V5 | built | channels-SPEC.md#8-35 |
+| gateway::mcp::broker::tests | crates/gateway/src/mcp/broker/tests.rs | what this crate believes the broker sends, stated against a server it controls | adapter | V5 | built | channels-SPEC.md#8-35 |
 | gateway::reach::proxy | crates/gateway/src/reach/proxy.rs | which calls go through this machine's proxy, and every HTTP client the city builds | adapter | V5 | built | gateway-SPEC.md#8-15 |
 | gateway::cost | crates/gateway/src/cost.rs | per-call settlement, with the provider's own figure preferred | decision | S3 | built | gateway-SPEC.md#8-8 |
 | gateway::credential | crates/gateway/src/credential.rs | custody: capture, replace with a reference, redeem at the wire, renew before expiry | adapter | S3 | built | gateway-SPEC.md#8-4 |
@@ -678,7 +681,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | eval::ablation::capabilities | crates/eval/src/ablation/capabilities.rs | the corpus: each thing a resident must be able to do, and the phrase in the document that grants it | data | V3 | built | eval-SPEC.md#8-7 |
 | eval::ablation::tests | crates/eval/src/ablation/tests.rs | the graded fixtures, and the on-demand run against the real City.md | decision | V3 | built | eval-SPEC.md#8-7 |
 
-### channels (33) — the process boundary
+### channels (34) — the process boundary
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -697,6 +700,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::answer::cost_of | crates/channels/src/answer/cost_of.rs | what one plan node has cost, and the runs that spent it | value | F1 | built | channels-SPEC.md#8-21 |
 | channels::answer::listing | crates/channels/src/answer/listing.rs | one directory of the city, one level deep, as a page walks the tree | value | F5 | built | channels-SPEC.md#8-23 |
 | channels::answer::mcp_health | crates/channels/src/answer/mcp_health.rs | where each tool server one address reaches stands, and what it offers | value | V5 | built | channels-SPEC.md#8-34 |
+| channels::answer::toolkits | crates/channels/src/answer/toolkits.rs | which outside applications the broker offers, and where each one stands for this city | value | V5 | built | channels-SPEC.md#8-35 |
 | channels::answer::doctor | crates/channels/src/answer/doctor.rs | what this machine has, item by item, in values a page labels rather than sentences | value | V5 | built | channels-SPEC.md#8-25 |
 | channels::answer::document | crates/channels/src/answer/document.rs | one file of the city, bounded, with the cut and the binary judgement stated | value | F5 | built | channels-SPEC.md#8-23 |
 | channels::answer::commits | crates/channels/src/answer/commits.rs | what the city says about a commit it made, one by oid or a page newest first | value | V4 | built | channels-SPEC.md#8-24 |
@@ -716,7 +720,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (169)
+### browser (12), protocol (5), bin (171)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -771,6 +775,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::dispatching::running | crates/sprawling/src/assembly/dispatching/running.rs | one dispatch run to its freeze, and the handback it leaves | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::dispatching::session | crates/sprawling/src/assembly/dispatching/session.rs | which room a dispatch works in: the session a person named, or the name the digest model gives the work | adapter | V4 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::dispatching::tests | crates/sprawling/src/assembly/dispatching/tests.rs | steers, refusals and handbacks as the rooms see them | adapter | V3 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::toolkits | crates/sprawling/src/assembly/toolkits.rs | where the project key lives, which proxy rule reaches the broker, and who this city is to it | adapter | V5 | built | channels-SPEC.md#8-35 |
 | bin::assembly::waking | crates/sprawling/src/assembly/waking.rs | the two ways a resident who is not working is set going | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::waking::tests | crates/sprawling/src/assembly/waking/tests.rs | arrivals and knocks, as the rooms see them | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::workbench | crates/sprawling/src/assembly/workbench.rs | where a run stands, and the bench it is given to work at | adapter | V3 | built | sprawling-SPEC.md#8-39 |
@@ -898,6 +903,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::views::served | crates/sprawling/src/views/served.rs | what a served city hands its views that the ledger cannot: this machine, and the vault the worker opened | adapter | V5 | built | sprawling-SPEC.md#8-66 |
 | bin::views::hunks | crates/sprawling/src/views/hunks.rs | the patch text of one file between two checkpoints, in the wire's vocabulary rather than the store's | projection | V5 | built | sprawling-SPEC.md#8-52 |
 | bin::views::mcp_health | crates/sprawling/src/views/mcp_health.rs | every tool server one address reaches, handshaked at the moment of asking | projection | V5 | built | sprawling-SPEC.md#8-66 |
+| bin::views::toolkits | crates/sprawling/src/views/toolkits.rs | the broker's shelf, asked at the moment somebody wants to know | projection | V5 | built | channels-SPEC.md#8-35 |
 | bin::views::document | crates/sprawling/src/views/document.rs | one file of the city, cut to what travels, and whether it is text at all | projection | F5 | built | sprawling-SPEC.md#8-52 |
 | bin::views::prefix | crates/sprawling/src/views/prefix.rs | what one run was told, read back out of the record that froze it and the store that kept it | projection | F1 | built | sprawling-SPEC.md#8-67 |
 | bin::views::skills | crates/sprawling/src/views/skills.rs | what one building can do, joined to which of its runs used it | projection | F1 | built | sprawling-SPEC.md#8-67 |

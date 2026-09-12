@@ -109,6 +109,17 @@ pub enum EventKind {
     /// answerable from the one history rather than from a file's
     /// modification time.
     GovernedDocumentWritten,
+    /// A person asked to connect an outside application, and the broker
+    /// that holds its OAuth opened a consent session.
+    ///
+    /// The request is history and belongs here; **where that application
+    /// stands right now is not, and is deliberately absent from the
+    /// payload** (channels-SPEC.md section 8-31): a recorded standing
+    /// would still read "connected" an hour after the person revoked
+    /// it. The consent page's own url is absent for a second reason -
+    /// it is a capability, and anybody replaying this log would be
+    /// holding one.
+    ToolkitLinkOpened,
 }
 
 /// The two-way partition; the sole criterion is "does the payload decide
@@ -122,7 +133,7 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 66] = [
+    pub const ALL: [EventKind; 67] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -189,6 +200,7 @@ impl EventKind {
         EventKind::DiscardRestored,
         EventKind::AutonomyChanged,
         EventKind::GovernedDocumentWritten,
+        EventKind::ToolkitLinkOpened,
     ];
 
     /// The partition authority. Exhaustive on purpose: adding a variant
@@ -260,6 +272,11 @@ impl EventKind {
             | EventKind::FileDiscarded
             | EventKind::DiscardRestored
             | EventKind::AutonomyChanged
+            // Connecting an application changes which tools a later run
+            // is offered, and the tool table is assembled from the
+            // configuration rather than from this line, so nothing here
+            // decides model-request bytes.
+            | EventKind::ToolkitLinkOpened
             | EventKind::GovernedDocumentWritten => WindowClass::RecordOnly,
         }
     }

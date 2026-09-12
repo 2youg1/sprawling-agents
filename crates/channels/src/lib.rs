@@ -47,10 +47,11 @@ pub use answer::{HunksAnswer, PatchLine, Withheld};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
 pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
+pub use answer::{Standing, ToolkitLine, ToolkitsAnswer};
 #[cfg(feature = "server")]
 pub use assets::{AssetReply, ClientAssets, EmbeddedFile};
 pub use auth::{PairingToken, verify};
-pub use carried_name::{ModeTag, ProviderName, TemplateName, UploadId};
+pub use carried_name::{ModeTag, ProviderName, TemplateName, ToolkitSlug, UploadId};
 pub use command::COMMAND_NAMES;
 pub use command::{BodyOverride, EndpointTuning, HeaderPair};
 pub use command::{Command, WireCommand};
@@ -58,7 +59,7 @@ pub use command::{GovernedDocument, HaltScope, LoginStep, NoSecret, PursuitStep}
 pub use control::{ControlVerdict, Intervention, classify};
 pub use kernel::{FileChange, How, Lines};
 pub use kernel::{Span, Token, markdown};
-pub use reading::{OUTPUT_LINES, note_of, output_in, said_in, subject_of};
+pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in, subject_of};
 pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
 pub use reception::{BindFace, BindVerdict, HandshakeVerdict};

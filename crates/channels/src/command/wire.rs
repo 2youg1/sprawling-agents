@@ -64,6 +64,7 @@ impl<Secret> Command<Secret> {
             Self::SetAutonomy { .. } => "SetAutonomy",
             Self::Pursue { .. } => "Pursue",
             Self::PutDocument { .. } => "PutDocument",
+            Self::ConnectToolkit { .. } => "ConnectToolkit",
             Self::Auth { .. } => "Auth",
         }
     }
@@ -97,7 +98,8 @@ impl<Secret> Command<Secret> {
             | Self::SelectModel { ref idem, .. }
             | Self::Reveal { ref idem, .. }
             | Self::DoctorInstall { ref idem, .. }
-            | Self::DoctorRefresh { ref idem, .. } => Some(idem),
+            | Self::DoctorRefresh { ref idem, .. }
+            | Self::ConnectToolkit { ref idem, .. } => Some(idem),
             Self::PutSecret { .. } | Self::Auth { .. } => None,
         }
     }
@@ -247,6 +249,7 @@ impl From<WireCommand> for Command {
             Command::Reveal { at, idem } => Self::Reveal { at, idem },
             Command::DoctorInstall { item, idem } => Self::DoctorInstall { item, idem },
             Command::DoctorRefresh { idem } => Self::DoctorRefresh { idem },
+            Command::ConnectToolkit { toolkit, idem } => Self::ConnectToolkit { toolkit, idem },
             Command::Release { scope, idem } => Self::Release { scope, idem },
             Command::BatchByBuilding { addr, idem } => Self::BatchByBuilding { addr, idem },
             Command::Approve {

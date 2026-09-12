@@ -14,6 +14,7 @@ impl gateway::AdmissionState
 impl gateway::AttachedEndpoint
 impl gateway::AudioType
 impl gateway::AuthSpec
+impl gateway::Broker
 impl gateway::Custodian
 impl gateway::Endpoint
 impl gateway::Endpoint
@@ -24,6 +25,7 @@ impl gateway::ImageBytes
 impl gateway::MarketSnapshot
 impl gateway::ModelFacts
 impl gateway::Native
+impl gateway::Persistence
 impl gateway::Recording
 impl gateway::Redemption
 impl gateway::Transcriber
@@ -32,6 +34,7 @@ impl kernel::model::Model for gateway::Native
 pub const gateway::CALL_TIMEOUT_MS: u64
 pub const gateway::OAUTH_PROFILES: [gateway::OauthProfile; 2]
 pub enum gateway::AdmissionVerdict
+pub enum gateway::Connection
 pub fn gateway::AdmissionState::admit(&self, kernel::event::identity::TimeMs) -> gateway::AdmissionVerdict
 pub fn gateway::AdmissionState::default() -> Self
 pub fn gateway::AdmissionState::interval_ms(&self) -> u64
@@ -47,6 +50,9 @@ pub fn gateway::AudioType::file_name(self) -> &'static str
 pub fn gateway::AudioType::media_type(self) -> &'static str
 pub fn gateway::AudioType::of_media_type(&str) -> core::result::Result<gateway::AudioType, kernel::error::shape::AxError>
 pub fn gateway::AuthSpec::for_dialect(kernel::model::wire::DialectKind, kernel::secret::span::SecretRef, core::option::Option<alloc::string::String>) -> gateway::AuthSpec
+pub fn gateway::Broker::connect(&self, &str, &str) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
+pub fn gateway::Broker::new(kernel::secret::sealed::Sealed<alloc::string::String>, kernel::reach::Proxying) -> core::result::Result<Self, kernel::error::shape::AxError>
+pub fn gateway::Broker::shelf(&self, &str) -> core::result::Result<alloc::vec::Vec<gateway::Toolkit>, kernel::error::shape::AxError>
 pub fn gateway::Custodian::capture(&mut self, &[u8], &str) -> core::result::Result<gateway::Captured, kernel::error::shape::AxError>
 pub fn gateway::Custodian::describe(&self, &kernel::secret::span::SecretRef) -> gateway::Described
 pub fn gateway::Custodian::in_memory() -> gateway::Custodian
@@ -85,6 +91,7 @@ pub fn gateway::ModelFacts::read(&serde_json::value::Value) -> core::option::Opt
 pub fn gateway::Native::call(&mut self, &kernel::model::seam::ModelRequest) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
 pub fn gateway::Native::new(gateway::NativeConfig) -> core::result::Result<gateway::Native, kernel::error::shape::AxError>
 pub fn gateway::OauthTokens::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn gateway::Persistence::consequence(self) -> &'static str
 pub fn gateway::Recording::is_empty(&self) -> bool
 pub fn gateway::Recording::kind(&self) -> gateway::AudioType
 pub fn gateway::Recording::len(&self) -> usize
@@ -144,6 +151,13 @@ pub gateway::Captured::replaced: alloc::vec::Vec<u8>
 pub gateway::Chosen::endpoint: &'b gateway::AttachedEndpoint
 pub gateway::Chosen::entry: &'b gateway::ModelEntry
 pub gateway::Chosen::fallback: &'b gateway::Fallback
+pub gateway::Connection::Absent
+pub gateway::Connection::Awaiting
+pub gateway::Connection::Awaiting::consent_url: alloc::string::String
+pub gateway::Connection::Connected
+pub gateway::Connection::Connected::alias: alloc::string::String
+pub gateway::Connection::Refused
+pub gateway::Connection::Refused::refusal: kernel::error::shape::AxError
 pub gateway::CostSource::Authoritative
 pub gateway::CostSource::PriceSheet
 pub gateway::Described::configured: bool
@@ -217,6 +231,10 @@ pub gateway::Retreat::MoveTo::model: alloc::string::String
 pub gateway::Retreat::MoveTo::not_before: kernel::event::identity::TimeMs
 pub gateway::TokenRequest::body: alloc::string::String
 pub gateway::TokenRequest::url: alloc::string::String
+pub gateway::Toolkit::auth: alloc::string::String
+pub gateway::Toolkit::name: alloc::string::String
+pub gateway::Toolkit::slug: alloc::string::String
+pub gateway::Toolkit::standing: gateway::Connection
 pub gateway::TranscriberConfig::auth: gateway::AuthSpec
 pub gateway::TranscriberConfig::base_url: alloc::string::String
 pub gateway::TranscriberConfig::model: alloc::string::String
@@ -225,6 +243,7 @@ pub gateway::TranscriberConfig::timeout_ms: u64
 pub mod gateway
 pub struct gateway::AdmissionState
 pub struct gateway::AttachedEndpoint
+pub struct gateway::Broker
 pub struct gateway::CallCost
 pub struct gateway::Captured
 pub struct gateway::Chosen<'b>
@@ -246,6 +265,7 @@ pub struct gateway::OauthTokens
 pub struct gateway::Recording
 pub struct gateway::Redemption
 pub struct gateway::TokenRequest
+pub struct gateway::Toolkit
 pub struct gateway::Transcriber
 pub struct gateway::TranscriberConfig
 pub type gateway::EnvReader = alloc::boxed::Box<(dyn core::ops::function::Fn(&str) -> core::option::Option<alloc::string::String> + core::marker::Send)>

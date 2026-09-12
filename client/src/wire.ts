@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 29 as const;
+export const WIRE_V = 30 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "ce630235cbbe0cf3266e7b054f5e28a1ce467c0bee32e6fd723a59c8a73658eb" as const;
+export const WIRE_HASH = "d119571e61652ceb96331806355b0a2133e86b8c574423c84b2b0593e19bced2" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.
@@ -495,6 +495,7 @@ export const EventKind = Schema.Union(
   Schema.Literal("pursuit_changed"),
   Schema.Literal("endpoint_probed"),
   Schema.Literal("governed_document_written"),
+  Schema.Literal("toolkit_link_opened"),
 ).annotations({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 
@@ -1429,6 +1430,7 @@ export type Output = typeof Output.Type;
  * One tool call inside a turn.
  */
 export const Call = Schema.Struct({
+  arguments: Schema.optional(Schema.NullOr(Output)),
   at: Seq,
   outcome: Outcome,
   output: Schema.optional(Schema.NullOr(Output)),
@@ -1506,6 +1508,7 @@ export const Turn = Schema.Struct({
   said: Schema.optional(Schema.NullOr(Schema.String)),
   spent: Schema.optional(Schema.NullOr(UsdMicros)),
   stopped: Schema.optional(Schema.NullOr(Schema.String)),
+  t: TimeMs,
   thought: Schema.optional(Schema.NullOr(Schema.String)),
   used: Schema.optional(Schema.NullOr(Used)),
 }).annotations({ identifier: "Turn" });
@@ -1561,6 +1564,76 @@ export const SkillsAnswer = Schema.Struct({
   skills: Schema.Array(SkillLine),
 }).annotations({ identifier: "SkillsAnswer" });
 export type SkillsAnswer = typeof SkillsAnswer.Type;
+
+/**
+ * Where one application stands for this city.
+ * 
+ * Four states, each a different next action: connect it, finish the
+ * consent page that is already open, nothing, or read why the last
+ * attempt failed. Every one of them is the broker's own reading rather
+ * than something this city remembered - the page a person left open
+ * yesterday is not evidence that they finished with it.
+ */
+export const Standing = Schema.Union(
+  Schema.Literal("absent"),
+  Schema.Struct({
+    awaiting: Schema.Struct({
+      consent_url: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    connected: Schema.Struct({
+      alias: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    refused: Schema.Struct({
+      refusal: AxError,
+    }),
+  }),
+).annotations({ identifier: "Standing" });
+export type Standing = typeof Standing.Type;
+
+/**
+ * An outside application's id at the broker that connects it. Authority for which ids exist is the broker's directory, and percent-encoding it into a request path belongs to whoever builds that path.
+ */
+export const ToolkitSlug = Schema.String.pipe(Schema.brand("ToolkitSlug"));
+export type ToolkitSlug = typeof ToolkitSlug.Type;
+
+/**
+ * One application on the shelf.
+ */
+export const ToolkitLine = Schema.Struct({
+  auth: Schema.String,
+  name: Schema.String,
+  slug: ToolkitSlug,
+  standing: Standing,
+}).annotations({ identifier: "ToolkitLine" });
+export type ToolkitLine = typeof ToolkitLine.Type;
+
+/**
+ * The shelf, or the reason there is no shelf to show.
+ * 
+ * Exhaustive rather than a list that is empty in three different
+ * senses: "you have not given this city a key yet", "the broker is
+ * unreachable" and "the broker has nothing for you" are three
+ * different things for a person to do next, and an empty `Vec` says
+ * all three at once.
+ */
+export const ToolkitsAnswer = Schema.Union(
+  Schema.Literal("unenrolled"),
+  Schema.Struct({
+    shelf: Schema.Struct({
+      toolkits: Schema.Array(ToolkitLine),
+    }),
+  }),
+  Schema.Struct({
+    refused: Schema.Struct({
+      refusal: AxError,
+    }),
+  }),
+).annotations({ identifier: "ToolkitsAnswer" });
+export type ToolkitsAnswer = typeof ToolkitsAnswer.Type;
 
 /**
  * What a query returns. `Unavailable` is a real answer: a view this
@@ -1655,6 +1728,9 @@ export const Answer = Schema.Union(
   }),
   Schema.Struct({
     mcp_health: McpHealthAnswer,
+  }),
+  Schema.Struct({
+    toolkits: ToolkitsAnswer,
   }),
   Schema.Struct({
     unavailable: Schema.Struct({
@@ -2035,6 +2111,12 @@ export const Command = Schema.Union(
     }),
   }),
   Schema.Struct({
+    connect_toolkit: Schema.Struct({
+      idem: IdemKey,
+      toolkit: ToolkitSlug,
+    }),
+  }),
+  Schema.Struct({
     auth: Schema.Struct({
       token: Schema.String,
     }),
@@ -2170,6 +2252,7 @@ export const Query = Schema.Union(
       addr: Address,
     }),
   }),
+  Schema.Literal("toolkits"),
 ).annotations({ identifier: "Query" });
 export type Query = typeof Query.Type;
 

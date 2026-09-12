@@ -79,6 +79,7 @@ impl RunWorker {
                 body,
                 ..
             } => self.wake(&source, &subject, &body),
+            channels::Command::ConnectToolkit { toolkit, .. } => self.connect_toolkit(&toolkit),
             channels::Command::ConfigureBuilding {
                 addr,
                 sandbox,

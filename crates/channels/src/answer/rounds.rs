@@ -120,6 +120,17 @@ pub struct Call {
     /// reading rather than a field: the arguments are free JSON and this
     /// picks the one a person recognises the call by.
     pub subject: Option<String>,
+    /// What it was called with, bounded exactly the way [`Output`] is and
+    /// cut off at the same limit.
+    ///
+    /// A person judging a call needs what went in, not only what came
+    /// back: "the tool failed" and "the tool was asked for the wrong
+    /// path" are read from different halves of the same row. `subject`
+    /// stays one display reading of these rather than a replacement for
+    /// them. `None` when the recorded call carried no arguments this
+    /// build can read as text; the whole of them is in the Ledger at
+    /// `at`, which is where the cut lines went too.
+    pub arguments: Option<Output>,
     pub outcome: Outcome,
     /// Where in the Ledger the bytes are. The row shows a shape; this is
     /// how somebody reads the rest.
@@ -137,6 +148,20 @@ pub struct Turn {
     pub number: u32,
     /// The event that opened it.
     pub opened: Seq,
+    /// When the Ledger wrote the event `opened` names.
+    ///
+    /// Read from that record rather than from a clock consulted here:
+    /// the Ledger is the authority on when a thing happened and this
+    /// field is a projection of it, so a session replayed tomorrow
+    /// reports the times it originally had rather than the times it was
+    /// replayed.
+    ///
+    /// Not optional, unlike [`crate::LogLine::t`]. A log line is written
+    /// beside the Ledger and can find the clock unreadable; a turn is
+    /// folded from an `EventRecord`, which carries a reading in every
+    /// case. An `Option` here would be a state no fold can produce and
+    /// every reader would still have to answer.
+    pub t: TimeMs,
     /// What the model said in this turn: its prose, without the
     /// reasoning that produced it.
     pub said: Option<String>,

@@ -100,10 +100,36 @@ pub fn used_in(usage: &serde_json::Value) -> Option<Used> {
 /// substitute's format has one authority and it is not this module.
 #[must_use]
 pub fn output_in(said: &serde_json::Value) -> Option<Output> {
-    let whole = match said {
-        serde_json::Value::String(text) => text.clone(),
-        other => other.to_string(),
-    };
+    match said {
+        serde_json::Value::String(text) => bounded(text),
+        other => bounded(&other.to_string()),
+    }
+}
+
+/// What a call was asked for, laid out over lines and cut at the same
+/// limit as what it answered.
+///
+/// Laid out rather than compact: the bound is counted in lines, and a
+/// whole argument object printed on one line would satisfy a line limit
+/// while staying unreadable — the window has to cut something a person
+/// would otherwise have read. A value that will not format falls back to
+/// its compact form, because an unreadable argument is still worth more
+/// than an absent one.
+#[must_use]
+pub fn arguments_in(args: &serde_json::Value) -> Option<Output> {
+    if args.is_null() {
+        return None;
+    }
+    let laid_out = serde_json::to_string_pretty(args).unwrap_or_else(|_| args.to_string());
+    bounded(&laid_out)
+}
+
+/// The one place [`OUTPUT_LINES`] is applied.
+///
+/// Shared by what a call was asked for and what it answered, so the two
+/// halves of a row are cut by the same rule and a reader comparing them
+/// is comparing equal windows.
+fn bounded(whole: &str) -> Option<Output> {
     if whole.trim().is_empty() {
         return None;
     }

@@ -137,7 +137,7 @@ pub const fn kernel::Tokens::new(u64) -> kernel::Tokens
 pub const fn kernel::UsdMicros::get(self) -> u64
 pub const fn kernel::UsdMicros::new(u64) -> kernel::UsdMicros
 pub const kernel::AxCode::ALL: [kernel::AxCode; 36]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 66]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 67]
 pub const kernel::GENESIS_PREV: kernel::B3Hash
 pub const kernel::IDEM_DERIVE_V: u8
 pub const kernel::MEMO_OUTLINE_FIELDS: [&str; 6]
@@ -771,6 +771,7 @@ pub kernel::EventKind::TaintPromoted
 pub kernel::EventKind::TakeoverStarted
 pub kernel::EventKind::ToolCalled
 pub kernel::EventKind::ToolResult
+pub kernel::EventKind::ToolkitLinkOpened
 pub kernel::EventKind::WatchdogFired
 pub kernel::EventKind::WorktreeOpened
 pub kernel::EvidenceCell::Empty

@@ -399,6 +399,7 @@ pub struct EventRef { seq: Seq, kind: EventKind }   // 字段私有；无公开�
 | 隐私与 Discard | `discard_restored` | record-only |
 | 隐私与 Discard | `autonomy_changed` | record-only |
 | 治理与设施 | `governed_document_written` | record-only（人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
+| 治理与设施 | `toolkit_link_opened` | record-only（人请求接入一个外部应用，载荷只携 slug。**恒不携站位**——那是关于此刻的事实（channels-SPEC §8-31）；**恒不携 consent URL**——那是一张能力凭证，记进可重放的账本等于发给每一个重放的人） |
 
 二分依据唯一：该事件载荷是否决定模型请求字节；不存在第三类。
 

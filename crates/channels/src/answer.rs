@@ -32,6 +32,7 @@ mod mcp_health;
 mod prefix;
 mod rounds;
 mod skills;
+mod toolkits;
 
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
@@ -48,6 +49,7 @@ pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
 pub use rounds::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Turn, Used};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
+pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
 
 /// A slice of the one history, oldest first.
 ///
@@ -231,6 +233,7 @@ pub enum Answer {
     Skills(Box<SkillsAnswer>),
     GitStatus(Box<GitStatusAnswer>),
     McpHealth(Box<McpHealthAnswer>),
+    Toolkits(Box<ToolkitsAnswer>),
     Unavailable { query: String },
 }
 

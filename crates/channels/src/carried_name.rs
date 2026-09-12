@@ -73,6 +73,10 @@ carried_name!(
     UploadId,
     "Handle for bytes already delivered to the upload endpoint."
 );
+carried_name!(
+    ToolkitSlug,
+    "An outside application's id at the broker that connects it. Authority for which ids exist is the broker's directory, and percent-encoding it into a request path belongs to whoever builds that path."
+);
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 mod tests {

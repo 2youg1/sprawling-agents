@@ -44,6 +44,7 @@ mod probing;
 mod recording;
 mod reviewing;
 mod settling;
+mod toolkits;
 mod waking;
 mod workbench;
 
@@ -71,6 +72,7 @@ use naming::{
 };
 use plans::Reporter;
 use settling::{Ending, Sweep};
+pub(crate) use toolkits::broker_for;
 use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
 
 use std::path::{Path, PathBuf};

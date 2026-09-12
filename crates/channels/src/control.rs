@@ -121,6 +121,11 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // going: the frozen prefix of a live run was assembled before
         // this frame arrived.
         | Command::PutDocument { .. }
+        // Connecting an outside application changes what tools the next
+        // run is offered and reaches nothing a run is already doing: a
+        // live run holds the tool table it was assembled with, and an
+        // application connected halfway through it joins the one after.
+        | Command::ConnectToolkit { .. }
         | Command::Auth { .. } => ControlVerdict::NotAnIntervention,
     }
 }

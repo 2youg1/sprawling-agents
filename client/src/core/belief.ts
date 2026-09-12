@@ -263,6 +263,7 @@ function fold(held: RunBelief, record: EventRecord): RunBelief {
     case "autonomy_changed":
     case "pursuit_changed":
     case "governed_document_written":
+    case "toolkit_link_opened":
       return moved;
   }
 }

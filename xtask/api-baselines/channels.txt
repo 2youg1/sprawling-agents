@@ -9,6 +9,7 @@ impl channels::ProviderName
 impl channels::Query
 impl channels::Reply
 impl channels::TemplateName
+impl channels::ToolkitSlug
 impl channels::UploadId
 impl core::convert::From<channels::Command<channels::NoSecret>> for channels::Command
 impl core::fmt::Debug for channels::Reply
@@ -51,6 +52,7 @@ pub channels::Answer::Registry(channels::RegistryAnswer)
 pub channels::Answer::Rounds(alloc::boxed::Box<channels::RoundsAnswer>)
 pub channels::Answer::Run(core::option::Option<channels::RunSummary>)
 pub channels::Answer::Skills(alloc::boxed::Box<channels::SkillsAnswer>)
+pub channels::Answer::Toolkits(alloc::boxed::Box<channels::ToolkitsAnswer>)
 pub channels::Answer::Unavailable
 pub channels::Answer::Unavailable::query: alloc::string::String
 pub channels::ApprovalsAnswer::items: alloc::vec::Vec<kernel::approval::ApprovalItem>
@@ -96,6 +98,7 @@ pub channels::BuildingProgress::blocked: alloc::vec::Vec<channels::BlockedLine>
 pub channels::BuildingProgress::problems: alloc::vec::Vec<alloc::string::String>
 pub channels::BuildingProgress::progress: kernel::completion::Progress
 pub channels::BuildingProgress::ready: u32
+pub channels::Call::arguments: core::option::Option<channels::Output>
 pub channels::Call::at: kernel::event::identity::Seq
 pub channels::Call::outcome: channels::Outcome
 pub channels::Call::output: core::option::Option<channels::Output>
@@ -152,6 +155,9 @@ pub channels::Command::ConfigureBuilding::desktop: core::option::Option<alloc::s
 pub channels::Command::ConfigureBuilding::idem: kernel::idem::IdemKey
 pub channels::Command::ConfigureBuilding::mcp: core::option::Option<alloc::vec::Vec<kernel::config::McpServer>>
 pub channels::Command::ConfigureBuilding::sandbox: core::option::Option<kernel::config::SandboxLimits>
+pub channels::Command::ConnectToolkit
+pub channels::Command::ConnectToolkit::idem: kernel::idem::IdemKey
+pub channels::Command::ConnectToolkit::toolkit: channels::ToolkitSlug
 pub channels::Command::CreateBuilding
 pub channels::Command::CreateBuilding::addr: kernel::address::Address
 pub channels::Command::CreateBuilding::idem: kernel::idem::IdemKey
@@ -565,6 +571,7 @@ pub channels::Query::RunView
 pub channels::Query::RunView::run: kernel::event::identity::RunId
 pub channels::Query::Skills
 pub channels::Query::Skills::building: kernel::address::Address
+pub channels::Query::Toolkits
 pub channels::RegistryAnswer::assets: alloc::vec::Vec<channels::RegistryLine>
 pub channels::RegistryLine::addr: kernel::address::Address
 pub channels::RegistryLine::at: kernel::event::identity::TimeMs
@@ -628,6 +635,22 @@ pub channels::SkillShelf::Library
 pub channels::SkillsAnswer::building: kernel::address::Address
 pub channels::SkillsAnswer::missing: alloc::vec::Vec<alloc::string::String>
 pub channels::SkillsAnswer::skills: alloc::vec::Vec<channels::SkillLine>
+pub channels::Standing::Absent
+pub channels::Standing::Awaiting
+pub channels::Standing::Awaiting::consent_url: alloc::string::String
+pub channels::Standing::Connected
+pub channels::Standing::Connected::alias: alloc::string::String
+pub channels::Standing::Refused
+pub channels::Standing::Refused::refusal: alloc::boxed::Box<kernel::error::shape::AxError>
+pub channels::ToolkitLine::auth: alloc::string::String
+pub channels::ToolkitLine::name: alloc::string::String
+pub channels::ToolkitLine::slug: channels::ToolkitSlug
+pub channels::ToolkitLine::standing: channels::Standing
+pub channels::ToolkitsAnswer::Refused
+pub channels::ToolkitsAnswer::Refused::refusal: alloc::boxed::Box<kernel::error::shape::AxError>
+pub channels::ToolkitsAnswer::Shelf
+pub channels::ToolkitsAnswer::Shelf::toolkits: alloc::vec::Vec<channels::ToolkitLine>
+pub channels::ToolkitsAnswer::Unenrolled
 pub channels::Turn::calls: alloc::vec::Vec<channels::Call>
 pub channels::Turn::notes: alloc::vec::Vec<channels::Note>
 pub channels::Turn::number: u32
@@ -635,6 +658,7 @@ pub channels::Turn::opened: kernel::event::identity::Seq
 pub channels::Turn::said: core::option::Option<alloc::string::String>
 pub channels::Turn::spent: core::option::Option<kernel::budget::UsdMicros>
 pub channels::Turn::stopped: core::option::Option<alloc::string::String>
+pub channels::Turn::t: kernel::event::identity::TimeMs
 pub channels::Turn::thought: core::option::Option<alloc::string::String>
 pub channels::Turn::used: core::option::Option<channels::Used>
 pub channels::Upstream::address: alloc::string::String
@@ -649,10 +673,10 @@ pub channels::Welcome::schema: kernel::locator::B3Hash
 pub channels::Welcome::wire_v: u32
 pub channels::Withheld::number: u32
 pub channels::Withheld::reason: alloc::string::String
-pub const channels::COMMAND_NAMES: [&str; 27]
+pub const channels::COMMAND_NAMES: [&str; 28]
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
-pub const channels::QUERY_NAMES: [&str; 29]
+pub const channels::QUERY_NAMES: [&str; 30]
 pub const channels::WIRE_V: u32
 pub enum channels::Answer
 pub enum channels::AssetReply
@@ -689,6 +713,8 @@ pub enum channels::ServerFrame
 pub enum channels::SessionState
 pub enum channels::SessionStep
 pub enum channels::SkillShelf
+pub enum channels::Standing
+pub enum channels::ToolkitsAnswer
 pub fn channels::Aggregate::ask(&self, &channels::CityLabel, channels::Query) -> core::result::Result<channels::Forwarded, kernel::error::shape::AxError>
 pub fn channels::Aggregate::attach(&mut self, channels::Upstream)
 pub fn channels::Aggregate::cities(&self) -> impl core::iter::traits::iterator::Iterator<Item = &channels::Upstream>
@@ -719,8 +745,11 @@ pub fn channels::Reply::refuse(&self, kernel::error::shape::AxError) -> channels
 pub fn channels::Reply::to(impl core::ops::function::Fn(kernel::error::shape::AxError) -> channels::Delivered + core::marker::Send + core::marker::Sync + 'static) -> channels::Reply
 pub fn channels::TemplateName::as_str(&self) -> &str
 pub fn channels::TemplateName::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
+pub fn channels::ToolkitSlug::as_str(&self) -> &str
+pub fn channels::ToolkitSlug::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::UploadId::as_str(&self) -> &str
 pub fn channels::UploadId::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
+pub fn channels::arguments_in(&serde_json::value::Value) -> core::option::Option<channels::Output>
 pub fn channels::classify(&channels::Command) -> channels::ControlVerdict
 pub fn channels::decide_bind(&core::net::socket_addr::SocketAddr, bool) -> channels::BindVerdict
 pub fn channels::decide_frame(channels::SessionState, channels::ClientFrame, core::option::Option<&kernel::locator::B3Hash>, core::option::Option<&kernel::address::Address>) -> channels::SessionStep
@@ -812,6 +841,8 @@ pub struct channels::SignalLine
 pub struct channels::SkillLine
 pub struct channels::SkillsAnswer
 pub struct channels::TemplateName(_)
+pub struct channels::ToolkitLine
+pub struct channels::ToolkitSlug(_)
 pub struct channels::Turn
 pub struct channels::UploadId(_)
 pub struct channels::Upstream

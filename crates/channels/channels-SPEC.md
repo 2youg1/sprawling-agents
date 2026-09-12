@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 24 个 variant、Query 恰 24 个（计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`ce630235cbbe0cf3266e7b054f5e28a1ce467c0bee32e6fd723a59c8a73658eb`；**WIRE_V ＝ 29**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33）。
+  **当前 golden**：`d119571e61652ceb96331806355b0a2133e86b8c574423c84b2b0593e19bced2`；**WIRE_V ＝ 30**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -512,6 +512,7 @@ pub struct Delta { pub run: RunId, pub increment: kernel::Increment }
 | `Reveal` | client | 在人自己的文件管理器里指出一个地址 |
 | `DoctorInstall` | client | 按需求表里的名字装一件机器缺的东西 |
 | `DoctorRefresh` | client | 重新探一遍机器，取代开城时的快照 |
+| `ConnectToolkit` | client | 请外包服务开一次同意会话，把一个外部应用接进来 |
 | `CreateBuilding` | client | 起一栋楼 |
 | `Steer` | client | 中途换方向 |
 | `Cancel` | client | 停下这一个 |
@@ -1004,3 +1005,38 @@ pub struct GitStatusAnswer { pub building: Address, pub branch: Option<String>,
 **`CommitAnswer` 随本线长出 `spent: UsdMicros`**：一行提交上先前画得出 run、房间与模型，独独没有钱，于是「这次改动花了多少」必须另开一页去查。携的是**那次 run 的总额**而不是这条提交的份额——栅栏不被计价，把一次 run 的钱按栅栏分摊会得到一个没有人测量过的数字。
 
 **被否**：把 skill 与工作树的状态折进 `BuildingView`。楼页的那一帧是在每一次记录之后都会失效的读，而扫书架要走盘、读工作树要开仓库；合成一帧会让这两件慢事按城里的心跳重复发生，而它们各自只在有人打开那一栏时才需要一次。
+
+### 8-35 外包服务的目录与一键连接：`Query::Toolkits` 与 `Command::ConnectToolkit`（WIRE_V 29→30）
+
+MCP 页先前把 Composio 画成三个标识符——一把 key，加上人自己去对方控制台取回来的 server id 与 user id——连接按钮旁挂着「城里没有这个命令」。`docs/third-party.md` 记过一条拒做的理由，本轮推翻并改写了那条记录：建 auth config 不必访问对方后台（`POST /api/v3/auth_configs` 可建托管配置），而正在退役的是 `initiate` 而非 `link`。
+
+```rust
+Query::Toolkits,                                        // 不带参数，也不带 key
+Command::ConnectToolkit { toolkit: ToolkitSlug, idem: IdemKey },
+Answer::Toolkits(Box<ToolkitsAnswer>),
+
+pub enum ToolkitsAnswer {
+    Unenrolled,                                  // 还没存 key，这是第一步而不是失败
+    Shelf { toolkits: Vec<ToolkitLine> },
+    Refused { refusal: Box<AxError> },
+}
+pub struct ToolkitLine { pub slug: ToolkitSlug, pub name: String,
+                         pub auth: String, pub standing: Standing }
+pub enum Standing {
+    Absent,
+    Awaiting { consent_url: String },
+    Connected { alias: String },
+    Refused { refusal: Box<AxError> },
+}
+```
+
+**六条口径：**
+
+1. **目录不由本仓库持有。** 先前 `client/src/views/mcp/toolkits.ts` 里硬写着一份应用清单，它自己的注释就承认「Composio 每周在变」——那是一份保证会过期的第二权威，本线删除，目录改由 `GET /api/v3/toolkits` 出。
+2. **三态穷尽，而不是一个可能为空的列表。** 「你还没给这座城 key」「问不到对方」「对方确实没有可连的」是人接下来要做的三件不同的事，而一个空 `Vec` 把三句话说成了一句。
+3. **`Standing` 四态，每一态对应一个不同的下一步**，且每一态都是对方此刻的读数，不是城记住的东西——昨天打开过一个同意页面，不构成今天已经连上的证据。
+4. **不进账本的是状态，进账本的是请求。** `EventKind::ToolkitLinkOpened` 只记「谁在何时请求连接哪个应用」；站位属于 §8-31 判过的「关于此刻的事实」，而 consent URL 是一张能力凭证——记进可重放的账本就等于把它发给每一个重放的人。
+5. **同意页面由客户端打开，不由城打开。** 人坐在客户端那一侧；城可能跑在另一个房间的机器上，在那里弹出的浏览器没有人在看。按钮在同一次点击手势里先开一个空白标签页，等答案回来再给它地址——浏览器会拦掉往返之后才发起的弹窗，而按了按钮却什么也没发生的人分不清是弹窗被拦还是城坏了。
+6. **全程不轮询。** 页面在三个时刻重读：打开页面、按下连接、以及**从同意页面切回本窗口时**。最后一条是这条流程不需要任何定时器的原因——人离开去授权再回来，「回来」本身就是那个事件。`docs/third-party.md` 边界 2 禁的是「有什么新东西吗」的定时订阅，而带死线的一次握手收尾不是它。
+
+**被否**：让 `ConnectToolkit` 直接把 consent URL 作为命令的答案回去。`Reply` 只运送拒绝（`server::reply`），把一个成功结果塞进 `AxError` 是为一次往返伪造一条错误路径；URL 由随后的 `Query::Toolkits` 从对方这个「此刻」的权威取回，客户端因而只有一条渲染路径而不是两条需要互相对齐的。

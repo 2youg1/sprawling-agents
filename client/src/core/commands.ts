@@ -27,6 +27,7 @@ import type {
   RunId,
   Seq,
   SessionName,
+  ToolkitSlug,
 } from "../wire";
 import {
   Ceiling as CeilingSchema,
@@ -323,6 +324,14 @@ export function loginCode(provider: string, code: string): Command {
   return {
     login: { provider: providerName(provider), step: { code: { code } }, idem: mintIdem() },
   };
+}
+
+// Connecting one outside application through the broker that holds its
+// OAuth. It names the application and nothing else: who this city is to
+// the broker is the city's own name, which it already knows, and an id
+// a person had to invent would be a step in a path meant to have none.
+export function connectToolkit(toolkit: ToolkitSlug): Command {
+  return { connect_toolkit: { toolkit, idem: mintIdem() } };
 }
 
 export function configureMcp(addr: Address, mcp: readonly McpServer[]): Command {

@@ -735,6 +735,14 @@
     "en": "connect",
     "zh": "连接"
   },
+  "mcp_connect_again": {
+    "en": "connect again",
+    "zh": "重新连接"
+  },
+  "mcp_consent_finish": {
+    "en": "finish on the consent page",
+    "zh": "去同意页面完成"
+  },
   "mcp_door_command": {
     "en": "by command",
     "zh": "用命令行"
@@ -762,10 +770,6 @@
   "mcp_expand": {
     "en": "tools and schema",
     "zh": "工具与 schema"
-  },
-  "mcp_gap_connect": {
-    "en": "sign in on Composio's own pages, then paste the server id it prints",
-    "zh": "在 Composio 自己的页面上登录，然后把它给出的 server id 粘过来"
   },
   "mcp_gap_scope_city": {
     "en": "the wire writes every server into the building layer",
@@ -874,6 +878,18 @@
   "mcp_servers": {
     "en": "servers this building reaches",
     "zh": "这栋楼能连到的服务器"
+  },
+  "mcp_shelf_again": {
+    "en": "ask again",
+    "zh": "再问一次"
+  },
+  "mcp_shelf_asking": {
+    "en": "asking which applications can be connected",
+    "zh": "正在查哪些应用可以连接"
+  },
+  "mcp_shelf_needs_key": {
+    "en": "store a project key above, and the applications it can connect appear here",
+    "zh": "先在上面存入项目密钥，它能连接的应用就会出现在这里"
   },
   "mcp_state_auth": {
     "en": "authenticating",

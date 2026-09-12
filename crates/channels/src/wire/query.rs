@@ -17,7 +17,7 @@ use kernel::{Address, GitOid, Locator, NodeId, RunId, Seq};
 use serde::{Deserialize, Serialize};
 
 /// The Query surface, in declaration order.
-pub const QUERY_NAMES: [&str; 29] = [
+pub const QUERY_NAMES: [&str; 30] = [
     "History",
     "RunHistory",
     "Changes",
@@ -47,6 +47,7 @@ pub const QUERY_NAMES: [&str; 29] = [
     "Skills",
     "GitStatus",
     "McpHealth",
+    "Toolkits",
 ];
 
 /// Queries read state. They are cacheable and free of side effects, so none
@@ -307,6 +308,22 @@ pub enum Query {
     McpHealth {
         addr: Address,
     },
+    /// Which outside applications the broker offers, and where each one
+    /// stands for this city.
+    ///
+    /// **The second query that costs a round trip to somebody else**,
+    /// and it is asked on the same terms as [`Query::McpHealth`]: when
+    /// a person opens the page, and when they come back to it from the
+    /// consent page they were sent to. Never on a timer - a city that
+    /// asked the broker "anything new?" on a schedule would be
+    /// generating traffic nobody reads, which `docs/third-party.md`
+    /// rules out.
+    ///
+    /// Carries no key: the project key is enrolled in the vault and
+    /// redeemed on the host machine, so a frame from a socket names
+    /// nothing secret and an unenrolled city answers
+    /// `ToolkitsAnswer::Unenrolled` rather than failing.
+    Toolkits,
 }
 
 impl Query {
@@ -343,6 +360,7 @@ impl Query {
             Self::Skills { .. } => "Skills",
             Self::GitStatus { .. } => "GitStatus",
             Self::McpHealth { .. } => "McpHealth",
+            Self::Toolkits => "Toolkits",
         }
     }
 }

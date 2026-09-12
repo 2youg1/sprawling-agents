@@ -85,7 +85,11 @@ use serde::{Deserialize, Serialize};
 ///    proxy applied to the call it describes.
 /// 29: an increment says whether the model was answering or reasoning,
 ///    and a settled turn carries the reasoning it did.
-pub const WIRE_V: u32 = 29;
+/// 30: a tool call carries what it was asked for and a turn carries
+///    when it opened, and one press connects an outside application -
+///    `Query::Toolkits` reads the broker's shelf and
+///    `Command::ConnectToolkit` opens a consent session on it.
+pub const WIRE_V: u32 = 30;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
@@ -341,6 +345,7 @@ mod tests {
             Query::McpHealth {
                 addr: Address::parse("acme").unwrap(),
             },
+            Query::Toolkits,
         ];
         assert_eq!(queries.len(), QUERY_NAMES.len());
         for (query, expected) in queries.iter().zip(QUERY_NAMES) {

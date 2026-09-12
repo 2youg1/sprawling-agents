@@ -15,6 +15,7 @@ mod dialect;
 mod endpoint;
 mod fallback;
 mod market;
+mod mcp;
 mod mismatch;
 mod native;
 mod oauth_profiles;
@@ -36,6 +37,7 @@ pub use endpoint::{AuthSpec, CALL_TIMEOUT_MS, Endpoint, EndpointConfig, SecretRe
 pub use endpoint::{ImageResolver, ModelFacts, Redemption};
 pub use fallback::{Fallback, Retreat, retreat_payload};
 pub use market::{InputKinds, MarketSnapshot, ModelEntry};
+pub use mcp::{Broker, Connection, Toolkit};
 pub use native::{Native, NativeConfig};
 pub use oauth_profiles::{OAUTH_PROFILES, OauthProfile, profile};
 pub use reach::{client_for, is_local, reach, through};

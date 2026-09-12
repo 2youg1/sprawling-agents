@@ -45,6 +45,7 @@ pub(super) mod skills;
 mod standing_tests;
 #[cfg(test)]
 mod tests;
+pub(super) mod toolkits;
 
 pub(crate) use holding::Views;
 pub use holding::ask;
