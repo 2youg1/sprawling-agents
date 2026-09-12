@@ -152,7 +152,9 @@ fn gone(why: &str) -> AxError {
     reason = "test code"
 )]
 mod tests {
-    use super::{Relay, RelayGate};
+    use std::sync::mpsc;
+
+    use super::{Relay, RelayGate, RelayRequest};
     use kernel::conformance::{LedgerInspect, assert_ledger_conformance};
     use kernel::{AxError, EventDraft, EventRef, Ledger};
 
@@ -293,24 +295,24 @@ mod tests {
             }
         }
 
-        // **The arrangement is repeated, and the property is that it
-        // holds once.** Whether four writers are all waiting when a wave
-        // begins is the scheduler's to decide, not this test's: on a
-        // busy machine the server can answer the first before the fourth
-        // has queued, and four waves of one is then correct behaviour
-        // for the drafts that were actually waiting. What must never
-        // happen is that drafts waiting together are still written one
-        // barrier each, so the test looks for that arrangement occurring
-        // and fails if it never does.
-        let mut batched = false;
-        for _ in 0..32 {
-            let gate = RelayGate::open();
-            let waiting = 4;
-            let mut writers = Vec::new();
-            for stamp in 1..=waiting {
-                let mut relay = gate.issue();
-                writers.push(std::thread::spawn(move || {
-                    relay.append(EventDraft {
+        // **"Already waiting" is arranged, not waited for.** Four
+        // driving threads racing to queue before a wave begins makes the
+        // scheduler decide what is being measured: on a busy machine the
+        // server answers the first before the fourth has sent, four
+        // waves of one is then correct behaviour, and a test that
+        // retried the arrangement until it saw batching failed on CI for
+        // being unlucky rather than for being wrong. The requests are
+        // therefore put on the channel directly, which is the state the
+        // property is about - `serve_waiting` drains what it finds, and
+        // what it finds here is four.
+        let gate = RelayGate::open();
+        let mut answers = Vec::new();
+        for stamp in 1..=4 {
+            let (back, answer) = mpsc::sync_channel(1);
+            answers.push(answer);
+            gate.issuing
+                .send(RelayRequest {
+                    draft: EventDraft {
                         run: kernel::RunId::CITY,
                         t: kernel::TimeMs::new(stamp),
                         who: "city".to_owned(),
@@ -318,33 +320,32 @@ mod tests {
                         kind: kernel::EventKind::CityInitialized,
                         data: kernel::Payload::empty(),
                         ig: false,
-                    })
-                }));
-            }
-            let mut store = Counting {
-                waves: 0,
-                records: 0,
-                seq: 0,
-            };
-            // Serve until every writer has been answered, which is the
-            // same loop the accounting thread runs.
-            let mut served = 0usize;
-            while served < usize::try_from(waiting).unwrap_or(0) {
-                served = served.saturating_add(gate.serve_waiting(&mut store));
-            }
-            for writer in writers {
-                let echo = writer.join().expect("a writing thread ends");
-                assert!(echo.is_ok(), "every waiting draft is answered");
-            }
-            assert_eq!(store.records, 4, "every draft reached the store");
-            if store.waves < 4 {
-                batched = true;
-                break;
-            }
+                    },
+                    back,
+                })
+                .expect("the gate holds a sender of its own");
         }
-        assert!(
-            batched,
-            "four drafts that were waiting together were never written in fewer than four waves"
+
+        let mut store = Counting {
+            waves: 0,
+            records: 0,
+            seq: 0,
+        };
+        assert_eq!(
+            gate.serve_waiting(&mut store),
+            4,
+            "one drain takes all four"
         );
+        assert_eq!(store.records, 4, "every draft reached the store");
+        assert_eq!(
+            store.waves, 1,
+            "four drafts waiting together must ride one disk barrier, not four"
+        );
+        for answer in answers {
+            let echo = answer
+                .try_recv()
+                .expect("an answer is already there, because the write came first");
+            assert!(echo.is_ok(), "every waiting draft is answered");
+        }
     }
 }

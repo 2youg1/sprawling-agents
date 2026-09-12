@@ -8,6 +8,8 @@
 #[non_exhaustive] pub enum runtime::run::SafePoint
 #[non_exhaustive] pub enum runtime::tools::ProviderMode
 #[non_exhaustive] pub enum runtime::turn::Interrupt
+impl core::default::Default for runtime::backlog::Backlog
+impl core::default::Default for runtime::backlog::Backlog
 impl core::fmt::Debug for runtime::diagnostics::Diagnostics
 impl core::fmt::Display for runtime::backlog::BacklogId
 impl core::fmt::Display for runtime::backlog::BacklogId
@@ -268,6 +270,8 @@ pub fn runtime::Watchdog::new(runtime::Retries) -> runtime::Watchdog
 pub fn runtime::Watchdog::on_provider_failure(&mut self, &kernel::error::shape::AxError, kernel::event::identity::TimeMs) -> runtime::Disposal
 pub fn runtime::Watchdog::on_stall(&mut self, &kernel::stall::StallVerdict) -> runtime::Disposal
 pub fn runtime::admits(runtime::mode::Mode, &runtime::mode::Produced) -> runtime::mode::Admission
+pub fn runtime::backlog::Backlog::default() -> runtime::backlog::Backlog
+pub fn runtime::backlog::Backlog::default() -> runtime::backlog::Backlog
 pub fn runtime::backlog::Backlog::enrol_run(&self, &kernel::address::Address, alloc::string::String) -> core::result::Result<runtime::backlog::BacklogId, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::enrol_run(&self, &kernel::address::Address, alloc::string::String) -> core::result::Result<runtime::backlog::BacklogId, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::halt(&self, core::option::Option<&kernel::address::Address>) -> core::result::Result<usize, kernel::error::shape::AxError>

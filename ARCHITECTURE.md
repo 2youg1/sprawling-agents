@@ -537,7 +537,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::credential::oauth::flow::tests | crates/gateway/src/credential/oauth/flow/tests.rs | the oauth fixtures | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::oauth::types | crates/gateway/src/credential/oauth/types.rs | pending, request, tokens | adapter | S3 | built | gateway-SPEC.md#8-4 |
 
-### runtime (59) — one run, from dispatch to freeze
+### runtime (61) — one run, from dispatch to freeze
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -580,6 +580,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::watchdog | crates/runtime/src/watchdog.rs | disposal in order: correct, then stall, then freeze | decision | S3 | built | runtime-SPEC.md#8-9 |
 | runtime::backlog | crates/runtime/src/backlog.rs | the work still running while a run goes on: background children, the ten-second window that decides which of them go there, and the one place they are stopped | adapter | V4 | built | runtime-SPEC.md#8-28 |
 | runtime::backlog::member | crates/runtime/src/backlog/member.rs | what one member is made of: a child process with its output on disk, or a run that a halt marks and that stops itself | adapter | V4 | built | runtime-SPEC.md#8-28 |
+| runtime::backlog::scratch | crates/runtime/src/backlog/scratch.rs | where one member of one backlog keeps its output, named so that two backlogs of one process never collide | adapter | V4 | built | runtime-SPEC.md#8-40 |
+| runtime::backlog::tests | crates/runtime/src/backlog/tests.rs | what the scratch directory names are held to: one per member, and never one two backlogs could both produce | adapter | V4 | built | runtime-SPEC.md#8-40 |
 | runtime::sandbox (port) | crates/runtime/src/sandbox.rs | the execution boundary: capabilities in, outcome out | port | S3 | built | runtime-SPEC.md#8-13 |
 | runtime::sandbox::tests | crates/runtime/src/sandbox/tests.rs | what the two stand-ins promise a caller: stdin echoed back with the job recorded, and a fault script delivered in order then spent | port | S3 | built | runtime-SPEC.md#8-13 |
 | runtime::catalog | crates/runtime/src/catalog.rs | progressive disclosure: which tools and skills a run is told about | decision | S3 | built | runtime-SPEC.md#8-11 |

@@ -102,10 +102,21 @@ pub struct Finished {
 
 /// The table itself. Cloning gives another handle onto the same table,
 /// which is how the assembly point can stop what a tool started without
-/// either of them knowing about the other.
-#[derive(Clone, Default)]
+/// either of them knowing about the other. A clone carries `scratch`
+/// too, so it keeps naming that backlog's directories.
+#[derive(Clone)]
 pub struct Backlog {
     table: std::sync::Arc<std::sync::Mutex<Table>>,
+    scratch: Scratch,
+}
+
+impl Default for Backlog {
+    fn default() -> Backlog {
+        Backlog {
+            table: std::sync::Arc::default(),
+            scratch: Scratch::open(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -138,7 +149,7 @@ impl Backlog {
         mut command: Command,
     ) -> Result<Started, AxError> {
         let id = self.mint()?;
-        let dir = std::env::temp_dir().join(format!("sprawling-{}-{}", std::process::id(), id.0));
+        let dir = self.scratch.dir(id);
         std::fs::create_dir_all(&dir).map_err(|err| storage(&dir, &err))?;
         let out = std::fs::File::create(dir.join("out")).map_err(|err| storage(&dir, &err))?;
         let errs = std::fs::File::create(dir.join("err")).map_err(|err| storage(&dir, &err))?;
@@ -376,5 +387,11 @@ impl Backlog {
     }
 }
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+mod tests;
+
 mod member;
+mod scratch;
 use member::{Body, Member, RunState, collect, storage};
+use scratch::Scratch;
