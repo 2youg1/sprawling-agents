@@ -96,7 +96,7 @@ repro:
 dist target="": build-web
     cargo build --release -p sprawling --locked {{ if target == "" { "" } else { "--target " + target } }}
     cargo xtask sbom
-    {{ if target == "" { "cargo xtask badge --write" } else { "echo badges are the host build's to write" } }}
+    {{ if target == "" { "cargo xtask badge --write" } else { "echo the badges belong to the host build" } }}
 
 # The release archive: the one file a person downloads, unpacks and runs.
 # `dist` first, because the archive is assembled out of its artifacts and
