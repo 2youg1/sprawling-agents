@@ -1,6 +1,6 @@
 /target
 /local
-/adversary/dist-newstyle
+/adversary/.lake
 
 # Working records never ship. To a contributor and to a model they are
 # noise; to an attacker they are intelligence — they name a machine, a

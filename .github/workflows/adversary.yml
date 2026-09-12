@@ -1,12 +1,17 @@
 # V10, on a schedule, and never on a push.
 #
 # nightly.yml states the rule this file obeys: a scheduled run earns its slot
-# only by answering what a push cannot. This one answers two such questions. A
-# fresh draw of random bytes explores traces last night's draw did not, which is
-# the whole point of a property that quantifies over traces. And `adversary/`
-# has no freeze file, so tonight's run also resolves its Haskell dependencies
-# against Hackage as it stands tonight - the world outside this repository,
-# which is the other input that changes while nobody pushes.
+# only by answering what a push cannot, and names the two inputs that change
+# while nobody pushes - the world outside this repository, and a fresh draw of
+# random bytes. Only the second one applies here, so it carries the whole
+# justification: `adversary/lake-manifest.json` declares no packages, so there
+# is no dependency graph to resolve and nothing outside this repository that
+# tonight's run could disagree with yesterday's about. What moves is the seed,
+# which follows the run number, so tonight walks traces last night did not.
+#
+# A failure prints the seed it drew. Passing that seed back through
+# SPRAWLING_SEED - `just adversary` reads it too - reproduces the run on a
+# developer machine, which is the difference between a finding and a rumour.
 #
 # This is not a gate. `just check` never reaches it, no push waits for it, and a
 # red run here blocks nothing: it reports a finding, and the finding is then
@@ -17,6 +22,11 @@ on:
   schedule:
     - cron: "41 4 * * *"
   workflow_dispatch:
+    inputs:
+      seed:
+        description: "the seed to draw traces from; empty means the run number"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -25,6 +35,9 @@ jobs:
   adversarial-properties:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      SPRAWLING_BIN: ${{ github.workspace }}/target/debug/sprawling
+      SPRAWLING_SEED: ${{ inputs.seed || github.run_number }}
     steps:
       - uses: actions/checkout@v7
 
@@ -42,19 +55,35 @@ jobs:
           rustup show
           cargo build -p sprawling --locked
 
-      - uses: haskell-actions/setup@v2
-        with:
-          ghc-version: "9.10.3"
-          cabal-version: "3.16.1.0"
-
-      # Keyed on the .cabal file rather than on a lock file, because there is
-      # none: restoring a plan is a convenience here, and resolving a fresh one
-      # is half of why this job runs at all.
+      # The toolchain is the only thing downloaded, and `lean-toolchain` pins
+      # which one, so the key is that file and nothing else. Build output is
+      # deliberately not cached: it takes seconds to produce and a stale entry
+      # would be a red nobody could reproduce.
       - uses: actions/cache@v6
         with:
-          path: ~/.cabal/store
-          key: adversary-${{ runner.os }}-ghc9.10.3-${{ hashFiles('adversary/adversary.cabal') }}
-          restore-keys: adversary-${{ runner.os }}-ghc9.10.3-
+          path: ~/.elan
+          key: adversary-${{ runner.os }}-elan-${{ hashFiles('adversary/lean-toolchain') }}
+
+      - name: install the toolchain the checker is written in
+        run: |
+          if [ ! -x "$HOME/.elan/bin/elan" ]; then
+            curl -fsSL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+            sh elan-init.sh -y --default-toolchain none
+          fi
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      # Named rather than left to happen inside the build, so a download that
+      # fails says so where a reader is looking, and so the cache above saves a
+      # toolchain that is already whole.
+      - name: fetch the pinned toolchain
+        working-directory: adversary
+        run: |
+          elan toolchain install "$(cat lean-toolchain)"
+          lake --version
+
+      - name: build the checker
+        working-directory: adversary
+        run: lake build
 
       # Everything except the open finding. That group asserts a defect this
       # repository already knows it has, so it is red every night by
@@ -62,9 +91,7 @@ jobs:
       # missed. A failure in this step is therefore news.
       - name: properties that must hold today
         working-directory: adversary
-        env:
-          SPRAWLING_BIN: ${{ github.workspace }}/target/debug/sprawling
-        run: cabal test --test-options='-p "!/open finding/"'
+        run: lake exe adversary --reject "open finding"
 
       # The open finding, watched rather than gated. Its red is the known state;
       # its green is the news, and the day it arrives this group stops being an
@@ -73,17 +100,15 @@ jobs:
         id: open-finding
         continue-on-error: true
         working-directory: adversary
-        env:
-          SPRAWLING_BIN: ${{ github.workspace }}/target/debug/sprawling
-        run: cabal test --test-options='-p "/open finding/"'
+        run: lake exe adversary --select "open finding"
 
       - name: say which of the two happened
         run: |
           if [ "${{ steps.open-finding.outcome }}" = "success" ]; then
-            echo "Something now reads the IdemKey the wire makes every command carry."
-            echo "Move that group out of 'open finding' in adversary/test/Main.hs,"
+            echo "Every key the wire makes a command carry is now read before the work is done."
+            echo "Move that group out of 'open finding' in adversary/test/Main.lean,"
             echo "and update adversary/adversary-SPEC.md section 4."
           else
             echo "The open finding recorded in adversary-SPEC.md section 4 still reproduces:"
-            echo "kernel::gate::dedup has no caller, so a replayed command happens twice."
+            echo "a run whose start was written past the assembly point keeps no key there."
           fi

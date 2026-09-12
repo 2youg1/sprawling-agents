@@ -216,11 +216,11 @@ status = "gated, with a register of the files that predate the rule"
 # Delete a row by doing the split, never by raising its number.
 [file_length.predating]
 
-# White box is Rust, black box is Haskell (the person's ruling,
-# 2026-09-05). `cargo xtask boundary` refuses a Rust check that reaches
-# this product across a process boundary; `adversary/` is where such a
-# check belongs, in a language with none of this repository's vocabulary,
-# so it can testify about a client that shares none of its assumptions.
+# White box is Rust, black box is Lean (the person's ruling).
+# `cargo xtask boundary` refuses a Rust check that reaches this product
+# across a process boundary; `adversary/` is where such a check belongs,
+# in a language with none of this repository's vocabulary, so it can
+# testify about a client that shares none of its assumptions.
 #
 # Nothing predates the rule any longer. `crates/channels/tests/enrolment.rs`
 # used to stand up the enrolment endpoint on a loopback port and write

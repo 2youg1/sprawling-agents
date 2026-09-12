@@ -418,10 +418,11 @@ being moved is either fixed or left where it is.
 
 ### V10: an adversarial property checker, outside the tree
 
-`adversary/` is a third client — Haskell, outside the workspace, driving the
+`adversary/` is a third client — Lean, outside the workspace, driving the
 shipped binary over the wire, written to attack rather than to use. Thirteen
-properties in 30.8 seconds. It is never a gate: on a machine without GHC,
-`just check` behaves byte for byte as it does where the directory is absent.
+properties in 2 min 36 s, four cores. It is never a gate: on a machine without
+Lean, `just check` behaves byte for byte as it does where the directory is
+absent.
 
 It has found three things a specific trace would not have:
 

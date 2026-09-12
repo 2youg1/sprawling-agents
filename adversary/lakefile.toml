@@ -1,0 +1,31 @@
+name = "sprawling-adversary"
+version = "0.0.1"
+defaultTargets = ["adversary"]
+
+# No `require` line, and that is the decision rather than an omission.
+# Everything below is the toolchain's own: `Lean.Data.Json` reads the wire,
+# `IO.Process` runs the door, `IO.FS` holds the ground, and `mkStdGen` draws the
+# traces. A scheduled checker that resolved a package graph before it could run
+# would go red for reasons belonging to a registry rather than to this product,
+# and a red that means nothing is worse than no run.
+# adversary-SPEC.md section 13 records what that costs.
+
+[leanOptions]
+# A warning left standing is a finding nobody read.
+warningAsError = true
+# A `sorry` is a proof obligation somebody skipped. In a checker it would be an
+# assertion that passes without being true.
+debug.skipKernelTC = false
+
+[[lean_lib]]
+name = "Sprawling"
+srcDir = "src"
+
+[[lean_exe]]
+name = "adversary"
+root = "Main"
+srcDir = "test"
+# The served cities are read by a task each. Lean's IO tasks need real threads
+# behind them: a reader blocked on a pipe would otherwise hold the whole
+# runtime, and the city it was draining fills its buffer and stops answering.
+supportInterpreter = true

@@ -26,7 +26,7 @@ just check                                  # fmt + clippy (-D warnings, --all-f
 | `just replay <log>` | verify a ledger chain offline, read-only |
 | `just mem [pid]` / `just bench` / `just budget` | the measurements, in this platform's own vocabulary |
 | `just fuzz <target>` / `just mutants` | fuzz targets / mutation testing |
-| `just adversary` | the out-of-tree property checker that attacks the binary through the wire; never a gate, and a no-op without GHC |
+| `just adversary` | the out-of-tree property checker that attacks the binary through the wire; never a gate, and a no-op without Lean |
 
 - Scope `cargo nextest` and `cargo build` to the crate you edited and the dependents `cargo tree --workspace -i` reports while iterating; run them whole once before the work is done. `cargo clippy --all-targets` and `cargo fmt --check` stay workspace-wide, because a warm cache answers both in seconds.
 - Be patient with a Rust command and never kill it by PID. The lock makes it slow; that is expected.
@@ -109,10 +109,10 @@ The client (`client/`) is exempt from steps 2 and 3 — see *The view layer* bel
 - Prefer comparing whole objects to comparing fields one at a time.
 - Do not add a test for a statically defined value, or a negative test for logic that was removed.
 - A citysim failure must reproduce from its seed. When it does not, the defect is the determinism, not the scenario.
-- A check that enters through the crates' public faces is Rust, beside the code it judges. A check that enters the way a stranger does — spawning the binary, opening a socket to a served city, speaking the wire from outside — is Haskell under `adversary/`. `xtask boundary` holds the line.
-- `adversary/` shares `docs/glossary.md`. Do not coin a Haskell-side name for something the glossary already names.
-- **When the adversary finds a defect, the knowledge migrates.** A person writes the failing case as a Rust test under `crates/sprawling/tests/`, and the Haskell side does not keep it. `adversary/` quantifies over traces; it is not a second home for a fact.
-- `just check` on a machine without GHC behaves byte for byte as it does where `adversary/` is absent. Never make `just check` depend on it.
+- A check that enters through the crates' public faces is Rust, beside the code it judges. A check that enters the way a stranger does — spawning the binary, opening a socket to a served city, speaking the wire from outside — is Lean under `adversary/`. `xtask boundary` holds the line.
+- `adversary/` shares `docs/glossary.md`. Do not coin a name there for something the glossary already names.
+- **When the adversary finds a defect, the knowledge migrates.** A person writes the failing case as a Rust test under `crates/sprawling/tests/`, and `adversary/` does not keep it. It quantifies over traces; it is not a second home for a fact.
+- `just check` on a machine without Lean behaves byte for byte as it does where `adversary/` is absent. Never make `just check` depend on it.
 
 ## The machine gates
 
@@ -125,7 +125,7 @@ Violating any of these turns CI red with a message naming the rule, the violatio
 | `pub(crate)` by default; `pub` traits only on the seam list. | `xtask depmap` |
 | The client's lockfile in step with its manifest, its runtime dependencies exactly `solid-js` and `effect`, every licence on the list `deny.toml` permits. | `xtask npm` |
 | The MPL-2.0 notice then the copyright line, at the top of every `.rs` file. | `xtask header` |
-| A white-box check written in Rust beside the code it judges; a check that enters the way a stranger does written in Haskell under `adversary/`. | `xtask boundary` |
+| A white-box check written in Rust beside the code it judges; a check that enters the way a stranger does written in Lean under `adversary/`. | `xtask boundary` |
 | Nothing written for a test compiled into the binary a person downloads. | `xtask artifact` |
 | One name per concept, taken from the glossary. | `xtask lexicon` |
 | Each crate's committed baseline equal to its live public surface; the crate's SPEC moved in the same change-set as a baseline edit. | `xtask apisync` |

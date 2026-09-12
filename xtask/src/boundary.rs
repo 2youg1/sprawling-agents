@@ -6,12 +6,12 @@
 //! Boundary gate: which side of the process boundary a check stands on
 //! decides the language it is written in.
 //!
-//! **White box is Rust, black box is Haskell** (the person's ruling,
-//! 2026-09-05). A check that links these crates and enters by their
-//! public faces is written in Rust beside the code it judges. A check
-//! that reaches the product the way a stranger does - spawning the
-//! binary, opening a socket to a served city, speaking the wire from
-//! outside - is written in Haskell under `adversary/`.
+//! **White box is Rust, black box is Lean** (the person's ruling). A
+//! check that links these crates and enters by their public faces is
+//! written in Rust beside the code it judges. A check that reaches the
+//! product the way a stranger does - spawning the binary, opening a
+//! socket to a served city, speaking the wire from outside - is written
+//! in Lean under `adversary/`.
 //!
 //! **The parameter that makes this a rule rather than a preference** is
 //! what the two kinds of check are able to say. A Rust test shares the
@@ -285,7 +285,7 @@ fn crossed(rel: &str, line: usize, token: &str, what: &str) -> Violation {
     Violation {
         gate: "boundary",
         location: format!("{rel}:{line}"),
-        rule: "a check that crosses the process boundary is written in Haskell under \
+        rule: "a check that crosses the process boundary is written in Lean under \
                adversary/; Rust checks link the crates and enter by their public faces"
             .to_owned(),
         violation: format!("`{token}` in test code: {what}"),
@@ -336,7 +336,7 @@ mod tests {
     }
 
     /// Reaching the binary this repository builds is standing outside it,
-    /// and that check belongs to Haskell.
+    /// and that check belongs to `adversary/`.
     #[test]
     fn driving_the_built_binary_is_refused() {
         let source = "\

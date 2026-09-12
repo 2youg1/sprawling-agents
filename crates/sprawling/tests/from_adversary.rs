@@ -5,7 +5,7 @@
 
 //! A trace the adversary found, kept here so this repository remembers it.
 //!
-//! Written by `adversary/src/Sprawling/Regression.hs` and compared against it
+//! Written by `adversary/src/Sprawling/Regression.lean` and compared against it
 //! byte for byte. Change the trace there; changing it here turns the adversary
 //! red, which is exactly what should happen when the two disagree.
 //!

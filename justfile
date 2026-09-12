@@ -118,19 +118,19 @@ mem pid="":
 # V10: the adversarial property checker in `adversary/`, which lives outside the
 # workspace, outside the release, and outside `just check`
 # (adversary/adversary-SPEC.md section 2). It is never a gate: on a machine with
-# no Haskell toolchain this prints one line and succeeds, so `just check` behaves
+# no Lean toolchain this prints one line and succeeds, so `just check` behaves
 # exactly as it does where the directory is absent.
 #
-# This recipe is the only place that knows where the binary is. cabal is told
-# through SPRAWLING_BIN and never searches for one, so an adversary run can
+# This recipe is the only place that knows where the binary is. The checker is
+# told through SPRAWLING_BIN and never searches for one, so an adversary run can
 # never be driven by a stale binary somebody left in target/.
 #
-# V10: attack the built binary through the wire (never a gate; skipped without GHC)
-adversary:
+# V10: attack the built binary through the wire (never a gate; skipped without Lean)
+adversary *args:
     #!/usr/bin/env bash
     set -euo pipefail
-    if ! command -v ghc >/dev/null 2>&1 || ! command -v cabal >/dev/null 2>&1; then
-        echo "skipped: GHC is not installed"
+    if ! command -v lake >/dev/null 2>&1; then
+        echo "skipped: Lean is not installed"
         exit 0
     fi
     cargo build -p sprawling --locked
@@ -141,4 +141,4 @@ adversary:
     # nothing outside that shell resolves; `cygpath -m` turns it back into
     # `C:/...` and is absent everywhere it is not needed.
     ! command -v cygpath >/dev/null 2>&1 || binary="$(cygpath -m "$binary")"
-    cd adversary && SPRAWLING_BIN="$binary" cabal test
+    cd adversary && SPRAWLING_BIN="$binary" lake exe adversary {{args}}
