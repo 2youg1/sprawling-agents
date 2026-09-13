@@ -269,6 +269,15 @@ jobs:
           cp .github/release-notes.md "${notes}"
           printf '\n📋 What changed / 本版改动：[CHANGELOG.md](%s/%s/blob/main/CHANGELOG.md#%s)\n' \
             "${GITHUB_SERVER_URL}" "${GITHUB_REPOSITORY}" "${anchor}" >>"${notes}"
+          # Who this version came from, in GitHub's own words: the pull requests
+          # merged since the previous tag, and the contributors who were new
+          # among them. The changelog says what changed and is written by hand;
+          # this says who, and cannot be. `gh release create --generate-notes`
+          # would replace the authored notice rather than follow it, so the
+          # generated half is fetched and appended.
+          printf '\n' >>"${notes}"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="${GITHUB_REF_NAME}" -q .body >>"${notes}"
           gh release create "${GITHUB_REF_NAME}" assets/*.zip \
             --title "sprawling ${GITHUB_REF_NAME}" \
             --prerelease \
