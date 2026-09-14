@@ -61,7 +61,7 @@ trybuild = "1"
 # package is already resolved beneath reqwest, so naming it adds nothing
 # to the lock, and a second hand-written encoder would be a second
 # authority for one transformation.
-base64 = "0.22"
+base64 = "0.23"
 # A screenshot is evidence only if its size is read from its own
 # bytes and two of them can be compared. Decoding only - nothing here
 # writes a png - and the licence is MIT OR Apache-2.0, both already on

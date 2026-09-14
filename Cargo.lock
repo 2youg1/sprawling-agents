@@ -216,7 +216,7 @@ dependencies = [
 name = "browser"
 version = "0.0.5"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "kernel",
  "png",
  "serde_json",
@@ -907,7 +907,7 @@ dependencies = [
 name = "gateway"
 version = "0.0.5"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "insta",
  "kernel",
  "keyring",
