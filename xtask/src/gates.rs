@@ -17,13 +17,13 @@ use std::process::ExitCode;
 use crate::report::{self, Violation, XtaskError};
 use crate::{
     apisync, artifact, boundary, budget, color, depmap, guard, header, length, lexicon, modmap,
-    npm, release, render, secret, specalign, wiring, wording,
+    npm, proof, release, render, secret, specalign, wire_ts, wiring, wording,
 };
 
 /// How many gates run. The array below is typed by it, so the number and
 /// the list are one token apart and cannot disagree; `vocabulary` reads
 /// it so no document has to hold a copy.
-pub(crate) const COUNT: usize = 18;
+pub(crate) const COUNT: usize = 20;
 
 pub(crate) fn run(root: &Path, range: Option<&str>) -> ExitCode {
     let results: [(&'static str, Result<Vec<Violation>, XtaskError>); COUNT] = [
@@ -40,6 +40,13 @@ pub(crate) fn run(root: &Path, range: Option<&str>) -> ExitCode {
         ("wording", wording::check(root)),
         ("render", render::check(root)),
         ("wiring", wiring::check(root)),
+        // `wire-ts` renders the client's wire types in this process and
+        // compares one file, so it is local and cheap; it sits beside
+        // `wiring` because both judge the same socket seam.
+        ("wire-ts", wire_ts::check(root)),
+        // `proof` reads source and two documents; it proves nothing
+        // here, so it costs what a scan costs and belongs with them.
+        ("proof", proof::check(root)),
         ("budget", budget::check(root)),
         ("specalign", specalign::check(root)),
         ("apisync", apisync::check(root, range)),

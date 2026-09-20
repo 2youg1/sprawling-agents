@@ -54,6 +54,12 @@ const PRODUCED_PREFIXES: [&str; 1] = ["xtask/api-baselines/"];
 const REGISTER: &str = "xtask/budgets.toml";
 /// What the gates judge, as opposed to how the gates decide.
 ///
+/// Every root a gate reads belongs here: `crates/`, `citysim/` and
+/// `fuzz/` are read by the Rust gates, `client/` by `npm`, `render`,
+/// `wording` and `color`, and `desktop/` by the desktop shell's own
+/// lints. A root a gate judges but this table omits is a root where
+/// the shortcut below stays open.
+///
 /// A gate change travelling with the source it judges is the shortcut:
 /// the work is in the commit, the rule that would have refused it is in
 /// the same commit, and one green run reports both. A gate change
@@ -66,7 +72,7 @@ const REGISTER: &str = "xtask/budgets.toml";
 /// loosening and one passing, are not caught. Closing it means charging
 /// a ruling for every re-pricing, and that price is what the rule this
 /// gate serves was changed to stop paying.
-const JUDGED_PREFIXES: [&str; 3] = ["crates/", "citysim/", "fuzz/"];
+const JUDGED_PREFIXES: [&str; 5] = ["crates/", "citysim/", "fuzz/", "client/", "desktop/"];
 const TRAILER: &str = "Verdict:";
 
 pub(crate) fn check(root: &Path, range: Option<&str>) -> Result<Vec<Violation>, XtaskError> {

@@ -188,6 +188,36 @@ fn chinese_counts(line: &str) -> Vec<usize> {
     found
 }
 
+/// Every count a line states immediately before `phrase`.
+///
+/// The second reader of [`SPELLED`], and the reason that table is here
+/// rather than inside `counted`: gate counts and kani harness counts are
+/// two facts, but "how this repository spells a number" is one.
+/// `phrase` is matched as written, so a caller passing `kani harness`
+/// also reads `kani harnesses`; pass the longest unambiguous prefix.
+pub(crate) fn counts_before(line: &str, phrase: &str) -> Vec<usize> {
+    let lowered = line.to_ascii_lowercase();
+    let phrase = phrase.to_ascii_lowercase();
+    let mut found = Vec::new();
+    for (word, value) in SPELLED {
+        if lowered.contains(&format!("{word} {phrase}")) {
+            found.push(value);
+        }
+    }
+    for token in line.split(|c: char| !c.is_ascii_digit()) {
+        if token.is_empty() {
+            continue;
+        }
+        let Ok(value) = token.parse::<usize>() else {
+            continue;
+        };
+        if lowered.contains(&format!("{value} {phrase}")) {
+            found.push(value);
+        }
+    }
+    found
+}
+
 /// Every gate count a line states, in both languages this repository
 /// writes documents in.
 ///

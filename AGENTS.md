@@ -8,8 +8,10 @@ Read this file to the end before the first edit.
 
 ```bash
 cargo install just cargo-nextest --locked   # once; the toolchain installs itself from rust-toolchain.toml
-just check                                  # fmt + clippy (-D warnings, --all-features) + nextest + client + every machine gate
+just check                                  # fmt + clippy (-D warnings, --all-features) + nextest + the client bundle + every machine gate + the client's own checks
 ```
+
+`build-web` is inside `check` and not beside it: two of the gates — `render` and `npm` — judge artifacts rather than sources, and a gate whose artifact is absent used to print one line and return green.
 
 **A change is finished when `just check` is green.** "I finished it" is a claim; a green run is the evidence.
 
@@ -27,6 +29,7 @@ just check                                  # fmt + clippy (-D warnings, --all-f
 | `just mem [pid]` / `just bench` / `just budget` | the measurements, in this platform's own vocabulary |
 | `just fuzz <target>` / `just mutants` | fuzz targets / mutation testing |
 | `just adversary` | the out-of-tree property checker that attacks the binary through the wire; never a gate, and a no-op without Lean |
+| `just proof` | the kernel propositions kani holds against real MIR; never a gate, and a no-op without kani (which has no Windows host). `cargo xtask proof --list` prints the roster it proves |
 
 - Scope `cargo nextest` and `cargo build` to the crate you edited and the dependents `cargo tree --workspace -i` reports while iterating; run them whole once before the work is done. `cargo clippy --all-targets` and `cargo fmt --check` stay workspace-wide, because a warm cache answers both in seconds.
 - Be patient with a Rust command and never kill it by PID. The lock makes it slow; that is expected.
@@ -136,6 +139,7 @@ Violating any of these turns CI red with a message naming the rule, the violatio
 | Every kernel enum described in its SPEC table, variant for variant. | `xtask specalign` |
 | Every verb the city can carry out reached by some control, or classified on the wire seam with the reason a person may not ask for it. | `xtask wiring` |
 | `client/src/wire.ts` regenerated whenever `WIRE_V` moves. | `xtask wire-ts` |
+| The kani harness roster read out of the `#[kani::proof]` attributes: no workflow names a harness, a stated total is the total, and a harness left unproved cites where that was decided. | `xtask proof` |
 | Sizes inside their budget, badges in step with the artifacts. | `xtask budget` |
 | Nothing published that names one machine's home directory, its working notes, or a document this tree does not contain. | `xtask release` |
 | **Fix the cause when a gate goes red.** | `xtask guard` |

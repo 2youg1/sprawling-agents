@@ -103,6 +103,21 @@ fn a_widened_budget_or_a_new_exemption_is_still_a_gate_change() {
     assert!(!strikes_only_exemptions(nothing), "a strike must be there");
 }
 
+/// The client and the desktop shell are judged source too: `npm`,
+/// `render`, `wording` and `color` read `client/`, and the desktop
+/// shell carries its own lints. Loosening one of those gates in the
+/// commit that carries the client work is the same shortcut as
+/// loosening a Rust gate beside a crate.
+#[test]
+fn a_client_gate_loosened_beside_the_client_work_needs_a_ruling() {
+    let pair = paths(&["xtask/src/npm.rs", "client/package.json"]);
+    assert!(!gate_faces(&pair, false, false).is_empty());
+    assert_eq!(judged_faces(&pair), paths(&["client/package.json"]));
+    let shell = paths(&["xtask/src/lints.rs", "desktop/src/main.rs"]);
+    assert!(!gate_faces(&shell, false, false).is_empty());
+    assert_eq!(judged_faces(&shell), paths(&["desktop/src/main.rs"]));
+}
+
 /// A refusal that lists eighty paths is a refusal nobody reads.
 #[test]
 fn the_judged_side_of_a_refusal_is_bounded() {

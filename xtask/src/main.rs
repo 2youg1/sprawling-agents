@@ -25,6 +25,7 @@ mod mem;
 mod modmap;
 mod npm;
 mod package;
+mod proof;
 mod release;
 mod render;
 mod report;
@@ -116,6 +117,23 @@ fn main() -> ExitCode {
             }
             Err(err) => report::internal_failure(&err),
         },
+        // `--list` is the roster CI consumes; bare `proof` proves it.
+        // Both read the same `#[kani::proof]` attributes, so the list a
+        // person reads and the set a machine proves cannot disagree.
+        Some("proof") if args.iter().any(|a| a == "--list") => match proof::list(&root) {
+            Ok(message) => {
+                print!("{message}");
+                ExitCode::SUCCESS
+            }
+            Err(err) => report::internal_failure(&err),
+        },
+        Some("proof") => match proof::run(&root) {
+            Ok(message) => {
+                print!("{message}");
+                ExitCode::SUCCESS
+            }
+            Err(err) => report::internal_failure(&err),
+        },
         Some("secret") => report::finish("secret", secret::check(&root)),
         Some("specalign") => report::finish("specalign", specalign::check(&root)),
         Some("wiring") => report::finish("wiring", wiring::check(&root)),
@@ -189,9 +207,9 @@ fn value_arg(args: &[String], flag: &str) -> Option<String> {
 
 fn usage() {
     eprintln!(
-        "usage: cargo xtask <gates|header|lexicon|modmap|depmap|npm|secret|color|render|wiring|specalign|apisync|guard> [--range a..b] [--write]"
+        "usage: cargo xtask <gates|header|lexicon|modmap|length|boundary|artifact|depmap|npm|secret|color|wording|render|wiring|wire-ts|proof|budget|specalign|apisync|release|guard> [--range a..b] [--write]"
     );
     eprintln!(
-        "       cargo xtask spec <crate> | budget | badge [--write] | wire-ts [--write] | mem [pid] | sbom | package [--target <triple>] | repro [--full]"
+        "       cargo xtask spec <crate> | badge [--write] | wire-ts --write | proof --list | mem [pid] | sbom | package [--target <triple>] | repro [--full] | channel --tag <tag> --assets <dir> --out <dir>"
     );
 }

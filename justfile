@@ -4,7 +4,13 @@ set shell := ["bash", "-uc"]
 default: check
 
 # Every card closes on this being green.
-check: fmt-check clippy test gates check-client
+#
+# `build-web` sits before `gates` because two of the gates - render and
+# npm - judge artifacts rather than sources: they need `target/web-dist`
+# and `client/node_modules` to exist, and they skip when those are
+# absent. Without this dependency `just check` reported green on a
+# machine where neither gate had ever run.
+check: fmt-check clippy test build-web gates check-client
 
 fmt:
     cargo fmt --all
@@ -38,14 +44,29 @@ build-web:
 
 # The client's own gates: lint (no `any`, no `as`, no throw, no try, no
 # non-exhaustive switch), typecheck, and its tests.
-check-client:
-    cd client && bun install --frozen-lockfile && bun run lint && bun run typecheck && bun run test
+#
+# `build-web` owns the dependency install, so this recipe depends on it
+# instead of holding a second `bun install` line that could drift from
+# it. `just` runs a dependency once per invocation, so `just check`
+# installs and bundles exactly once even though both recipes are in it.
+check-client: build-web
+    cd client && bun run lint && bun run typecheck && bun run test
 
 # The gate that opens the gallery in a real engine, on its own: roles,
 # accessible names, landmarks, one left edge, nothing outside its box.
 # Needs `just build-web` first, and says so when the bundle is absent.
 render:
     cargo xtask render
+
+# V5: the kernel propositions kani holds against real MIR. Deliberately
+# not in `just check`, and for the same honesty as `adversary`: kani has
+# no Windows host, this project is developed on Windows, and a gate that
+# always skips on the machine people actually use is the defect this wave
+# exists to remove rather than a gate. Without kani installed it prints
+# one line and succeeds; CI's linux `proof` job is where it must pass.
+# `cargo xtask proof --list` prints the harness names it will run.
+proof:
+    cargo xtask proof
 
 # citysim scenarios land from S2; the crate's test suite is the entry point.
 sim seed="":

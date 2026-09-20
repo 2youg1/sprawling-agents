@@ -25,12 +25,13 @@
 //! position on licences, so this gate reads that same table rather than
 //! keeping a second copy that could drift from it.
 //!
-//! **A missing `node_modules` skips the third assertion and says so.**
-//! It is a gitignored directory, so a machine that has not run
-//! `bun install` does not have one, and that is not a defect. The first
-//! two read committed files only and therefore judge everywhere: a gate
-//! that falls silent as a whole when the environment is bare is a gate
-//! that has stopped existing outside CI.
+//! **A missing `node_modules` is a violation, not a skip.** Licences
+//! are written in the installed tree, so without it the third
+//! assertion judged nothing while the report still said this gate
+//! passed — a green line for a check that never ran. The finding names
+//! the command that supplies the tree: `bun install` in `client/`. The
+//! first two assertions read committed files only and therefore judge
+//! everywhere.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -93,9 +94,13 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         let permitted = lockfile::permitted(&walk::read_text(&root.join(PERMITTED))?)?;
         judge_licences(root, &modules, &permitted, &mut violations)?;
     } else {
-        println!(
-            "gate npm: {MODULES} is not installed; run `bun install` in client/ to judge licences (skipped)"
-        );
+        violations.push(Violation {
+            gate: "npm",
+            location: MODULES.to_owned(),
+            rule: "the installed tree is present, so every licence can be read".to_owned(),
+            violation: format!("{MODULES} is not installed, so no licence was judged"),
+            alternative: "run `bun install` in client/".to_owned(),
+        });
     }
     Ok(violations)
 }

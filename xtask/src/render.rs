@@ -25,10 +25,14 @@
 //! comparison fails on a font hint and passes on a page that is wrong in
 //! a way nobody photographed.
 //!
-//! **A missing browser, a missing bundle or a missing route is a skip,
-//! and each says which.** A gate that goes quiet when it cannot find its
-//! subject is a gate that is green for the wrong reason, so the three
-//! are never collapsed into one message.
+//! **A missing bundle, a missing browser or a gallery that drew
+//! nothing is a violation, and each says which.** A gate that goes
+//! quiet when it cannot find its subject reports green for a page
+//! nobody looked at, which is how a broken instrument reads as a
+//! passing product. The first two name the command that supplies what
+//! is missing — `just build-web`, or a Chromium-family browser at
+//! `SPRAWLING_BROWSER` — and the third names the gallery itself as the
+//! defect, so the three are never collapsed into one message.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -144,19 +148,26 @@ impl Drawn {
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let bundle = root.join(BUNDLE);
     if !bundle.join("index.html").is_file() {
-        println!(
-            "gate render: {BUNDLE}/index.html is not built; run `just build-web` first (skipped)"
-        );
-        return Ok(Vec::new());
+        return Ok(vec![violation(
+            "the client bundle this gate measures is built",
+            format!("{BUNDLE}/index.html is not built, so no page was measured"),
+            "run `just build-web`",
+        )]);
     }
     let Some(browser) = browser() else {
-        println!("gate render: no headless browser found; set SPRAWLING_BROWSER to one (skipped)");
-        return Ok(Vec::new());
+        return Ok(vec![violation(
+            "a real engine draws the page this gate measures",
+            "no headless browser was found, so no page was measured".to_owned(),
+            "install a Chromium-family browser, or point `SPRAWLING_BROWSER` at one",
+        )]);
     };
     let drawn = measure(root, &browser, &bundle, GALLERY)?;
     if drawn.is_empty() {
-        println!("gate render: {GALLERY} drew nothing measurable (skipped)");
-        return Ok(Vec::new());
+        return Ok(vec![violation(
+            "the gallery draws every state this gate measures",
+            format!("{GALLERY} drew nothing measurable"),
+            "repair the gallery route so it renders its fixtures",
+        )]);
     }
     let mut violations = Vec::new();
     every_control_is_announceable(&drawn, &mut violations);
