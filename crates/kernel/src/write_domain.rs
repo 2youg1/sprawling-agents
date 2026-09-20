@@ -221,6 +221,7 @@ mod verification {
 
     use super::*;
 
+    // not-proved: takes one concrete address, so it states what reserved_target_is_outside_even_for_an_empty_domain already states (kernel-SPEC.md section 2)
     #[kani::proof]
     fn reserved_is_never_within() {
         let domain = WriteDomain::new(vec![Address::parse("b").unwrap()]).unwrap();

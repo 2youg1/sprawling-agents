@@ -129,6 +129,7 @@ mod verification {
 
     use super::*;
 
+    // not-proved: takes two concrete sources, so it states what the proptest mirror beside it states over a wider domain (kernel-SPEC.md section 2)
     #[kani::proof]
     fn join_never_drops_a_source() {
         let pick_a: bool = kani::any();

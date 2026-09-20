@@ -334,6 +334,7 @@ mod verification {
 
     use super::*;
 
+    // not-proved: hands the solver some 2,560 symbolic non-linear multiplications, one per slot of a 256-slot table; the arithmetic core is proved by log2_q10_is_total (kernel-SPEC.md section 2)
     #[kani::proof]
     fn entropy_is_total_on_short_inputs() {
         let len: usize = kani::any();

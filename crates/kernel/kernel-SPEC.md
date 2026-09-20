@@ -49,8 +49,9 @@ Stage 2 追加：
 
 - 类型加固十项全部有型可指；trybuild 八反例全集编译失败。
 - kani 七 harness 入库（`#[cfg(kani)]`）：kani 没有 Windows 宿主，每条性质配 proptest 镜像本地可跑，kani 本体入 CI Linux job（CI 恢复时生效）。
-- **CI 只证四条，理由不是成本而是信息**：十条 harness 里有七条的输入面是具体值——一个 `Address::parse(".sprawling/ledger")`、一个 `TaintSource::new("web:x")`、两个布尔分支——那是单测穿了一层证明的外衣，而同文件的 `#[cfg(test)]` 里已经有同一命题（`write_domain::reserved_target_is_outside_even_for_an_empty_domain`、`gate::the_domain_door_*`、`discard::the_decision_table_holds_in_order`），其中两条的 proptest 输入面比 harness 更宽（`discard::allow_implies_every_guard_passed` 取任意 u64，harness 只固定一个值）。**这七条恰好就是构造 `Vec`／`String`／`BTreeSet` 的那七条**：CBMC 推不出它们内部循环的上界，无界跑了六小时、`--default-unwind 32` 又跑了 45 分钟，两次都卡在 `discard::verification::tainted_never_allows`，两次都没有给出判决——**全局 unwind 界已被实验证伪，不是这个问题的解法**。CI 因此只跑两条：`backpressure`（41s）与 `secret::log2_q10_is_total`（53s）——任意 u64 上的全函数性、单调性与定点 log2 的终止性，都是抽样到不了的地方。**不传全局 unwind**：这两条的循环界是常数（`log2_q10` 十次），CBMC 自己推得出来。
-- **第八条不收敛，原因不同**：`secret::verification::entropy_is_total_on_short_inputs` 的输入域是真的（四字节任意），卡住它的是形状：`entropy_millibits_per_char` 对 256 槽计数表逐槽调 `log2_q10`，而每次调用内部做十轮 u128 平方——交给求解器的是约 **2,560 次符号非线性乘法**，非线性乘法正是 SAT 求解器的死穴，十五分钟不返回。它不在 CI 里，也不靠改 unwind 界救：算术核心已由 `log2_q10_is_total` 单独证了，要证全函数得把 harness 改成**对单一槽**而不是对整张表。剩下七条保留在源码里但不入 CI，它们的权威是旁边的测试；要么改成真正符号化的 harness（不再构造堆集合），要么删掉。
+- **七条里 CI 只证两条，理由不是成本而是信息**：被证的是 `backpressure::verification::admit_is_total_and_monotone_in_depth`（41s）与 `secret::scan::verification::log2_q10_is_total`（53s）——任意 u64 上的全函数性、单调性与定点 log2 的终止性，都是抽样到不了的地方。**不传全局 unwind**：这两条的循环界是常数（`log2_q10` 十次），CBMC 自己推得出来。另外五条写了不证，四条是同一类原因：两条的输入面是具体值（一个 `Address::parse(".sprawling/ledger")`、一个 `TaintSource::new("web:x")`），那是单测穿了一层证明的外衣，而同文件的 `#[cfg(test)]` 里已经有同一命题、且 proptest 的输入面更宽（`write_domain::reserved_target_is_outside_even_for_an_empty_domain`、`discard::allow_implies_every_guard_passed` 取任意 u64，harness 只固定一个值）；另两条构造 `Vec`／`BTreeSet`，CBMC 推不出它们内部循环的上界，无界跑了六小时、`--default-unwind 32` 又跑了 45 分钟，两次都卡在 `discard::verification::tainted_never_allows`，两次都没有给出判决——**全局 unwind 界已被实验证伪，不是这个问题的解法**。
+- **纪律在这里，名单不在这里**：每条不证的 harness 上方带一行 `// not-proved: <理由>`，`cargo xtask proof` 读这行来跳过它并打印理由，`cargo xtask proof --list` 打印今天将被证的名单。**源码标记是名单的唯一权威**，本文因此只写「不证要写明理由」这条纪律，不再养第二份清单。
+- **五条里有一条的不可解原因与另外四条不同**：`secret::scan::verification::entropy_is_total_on_short_inputs` 的输入域是真的（四字节任意），卡住它的是形状：`entropy_millibits_per_char` 对 256 槽计数表逐槽调 `log2_q10`，而每次调用内部做十轮 u128 平方——交给求解器的是约 **2,560 次符号非线性乘法**，非线性乘法正是 SAT 求解器的死穴，十五分钟不返回。它不靠改 unwind 界救：算术核心已由 `log2_q10_is_total` 单独证了，要证全函数得把 harness 改成**对单一槽**而不是对整张表。五条的出路一样只有两条：改成真正符号化的 harness（不再构造堆集合、不再整表求值），或者删掉。
 - three-part refusal 矩阵：五门每条 Deny 路径的 refusal 三段非空且 alternative 可执行。
 - conformance feature 全量导出：Ledger＋Tool＋Model 三套件（sandbox 随 S3）。
 
@@ -589,7 +590,7 @@ pub struct BudgetUse { pub usd: UsdMicros, pub tokens: Tokens }    // serde（Pr
 - **留下的是记账而不是闸**：`BudgetUse` 与 `memory::attribution` 的五路归因、成本页原样保留。**报告花了多少**与**事前不许花**是两件事，删去的只是后者。
 - **不在此列**：`xtask/budgets.toml`（门的价目册，同名异物）与 `Fuel`（wasm 客的停机保证）。
 - `BudgetUse` 保留 serde，因为它是 `Progress::Unplanned` 与 `Completion::Evidence` 的载荷字段，账本里已有历史行读得回去。
-- kani：`admit_spend` 的 harness 随函数删除；`crates/kernel` 剩余 harness 数由 11 降为 10，CI 所证三条中的 `budget` 一条随之消失（ARCHITECTURE §11 的数字同集更新）。
+- kani：`admit_spend` 的 harness 随函数删除；`crates/kernel` 的 harness 总数与 CI 所证条数因此各少一条，被证的 `budget` 一条随函数一起消失（ARCHITECTURE §11 的数字同集更新）。**这里记的是那次变更当时的读数，不是今天的基数**；今天树上有几条、CI 证哪几条，以 `cargo xtask proof --list` 为准。
 
 ### 8-13 kernel::backpressure
 

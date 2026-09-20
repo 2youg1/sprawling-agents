@@ -195,6 +195,7 @@ mod verification {
     use crate::budget::ByteLen;
     use crate::taint::{TaintSet, TaintSource};
 
+    // not-proved: builds a Vec and a Registry whose loops CBMC cannot bound; the proposition is held by the #[test] beside it (kernel-SPEC.md section 2)
     #[kani::proof]
     fn unplanned_never_allows() {
         let registry = Registry::new();
@@ -209,6 +210,7 @@ mod verification {
         ));
     }
 
+    // not-proved: builds a BTreeSet whose loops CBMC cannot bound; two runs, six hours and forty-five minutes under a bounded unwind, returned nothing (kernel-SPEC.md section 2)
     #[kani::proof]
     fn tainted_never_allows() {
         let registry = Registry::new();
