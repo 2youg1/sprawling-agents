@@ -37,6 +37,14 @@
 //!
 //! RefRain and kusanagi carry the same four rows with their own project
 //! name. Anyone changing the shape here changes it in all three.
+//!
+//! **The notice appears once, and the gate reads the whole file to say
+//! so.** Comparing only the first four rows let a second copy of the
+//! header live further down and stay green: `main/router.rs` carried
+//! two, and the module documentation between them had been cut in half
+//! and spliced to the documentation of another module. A duplicated
+//! notice is how a file records that it was assembled from two files,
+//! and the paragraph it hides is what the next reader needs.
 
 use std::path::Path;
 
@@ -58,25 +66,53 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             continue;
         }
         let text = walk::read_text(&file)?;
-        let mut lines = text.lines().map(|l| l.trim_end_matches('\r'));
-        let ok = EXPECTED.iter().all(|want| lines.next() == Some(want));
-        if !ok {
+        let rows: Vec<&str> = text.lines().map(|l| l.trim_end_matches('\r')).collect();
+        let opens = EXPECTED
+            .iter()
+            .zip(rows.iter())
+            .all(|(want, found)| want == found);
+        if !opens {
             violations.push(Violation {
                 gate: "header",
-                location: rel,
+                location: rel.clone(),
                 rule: "every .rs file carries the MPL-2.0 notice and the copyright line".to_owned(),
                 violation: "the first four lines differ from the header".to_owned(),
                 alternative: "prepend the exact 4-line header; see any existing module".to_owned(),
+            });
+            continue;
+        }
+        if let Some(again) = repeated(&rows) {
+            violations.push(Violation {
+                gate: "header",
+                location: format!("{rel}:{again}"),
+                rule: "the notice appears once in a file, at the top of it".to_owned(),
+                violation: "a second copy of the header starts here".to_owned(),
+                alternative: "delete this copy, and read what sits around it: a file with two \
+                              headers was assembled from two files, and the documentation \
+                              between them may describe the other one"
+                    .to_owned(),
             });
         }
     }
     Ok(violations)
 }
 
+/// The one-based line where the notice begins a second time, if it
+/// does. The first row is enough to find it: the opening comparison has
+/// already established that this file starts with the whole notice.
+fn repeated(rows: &[&str]) -> Option<usize> {
+    let first = EXPECTED.first()?;
+    rows.iter()
+        .enumerate()
+        .skip(1)
+        .find(|(_, row)| *row == first)
+        .map(|(index, _)| index.saturating_add(1))
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 mod tests {
-    use super::EXPECTED;
+    use super::{EXPECTED, repeated};
 
     #[test]
     fn this_file_carries_the_header() {
@@ -85,5 +121,17 @@ mod tests {
         for want in EXPECTED {
             assert_eq!(lines.next(), Some(want));
         }
+    }
+
+    #[test]
+    fn a_second_copy_is_found_wherever_it_sits() {
+        let once: Vec<&str> = EXPECTED
+            .iter()
+            .copied()
+            .chain(["", "//! a module"])
+            .collect();
+        assert_eq!(repeated(&once), None);
+        let twice: Vec<&str> = once.iter().copied().chain(EXPECTED).collect();
+        assert_eq!(repeated(&twice), Some(7));
     }
 }

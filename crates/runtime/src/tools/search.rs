@@ -164,6 +164,7 @@ impl SearchTool {
                 })?;
                 usize::try_from(asked.min(CONTEXT_CAP)).map_err(|_| {
                     AxError::failure(AxCode::InvalidArgs, "search", "`context` does not fit")
+                        .with_recovery("pass `context` as an integer from 0 to 4, or leave it out")
                 })?
             }
         };
@@ -339,12 +340,19 @@ impl Tool for SearchTool {
                 AxCode::InvalidArgs,
                 "search",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let looking = SearchTool::predicate(call)?;
         let found = self.walk(self.start(call)?, &looking);
         let count = u64::try_from(found.hits.len()).map_err(|_| {
-            AxError::failure(AxCode::StorageFatal, "search", "match count overflow")
+            AxError::failure(AxCode::StorageFatal, "search", "match count overflow").with_recovery(
+                "search a narrower subtree, or use a longer needle: this one \
+                     matched more lines than a count can hold",
+            )
         })?;
         let mut out = Map::new();
         out.insert("count".to_owned(), Value::Number(count.into()));

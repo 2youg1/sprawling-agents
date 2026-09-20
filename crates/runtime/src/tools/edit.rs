@@ -129,7 +129,11 @@ impl Tool for EditTool {
                 AxCode::InvalidArgs,
                 "edit file",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let args = call.args.as_map();
         let rel = arg(args, "path")?;
@@ -162,6 +166,10 @@ impl Tool for EditTool {
                     AxCode::InvalidArgs,
                     "edit file",
                     "the write domain asked for an approval, which no write domain does",
+                )
+                .with_recovery(
+                    "report this against kernel::gate::domain: a write domain answers \
+                     allow or deny and never asks a person",
                 ));
             }
         }
@@ -192,6 +200,10 @@ impl Tool for EditTool {
                 "edit file",
                 format!("{rel} is not valid UTF-8"),
             )
+            .with_recovery(format!(
+                "edit {rel} in a program that reads its bytes; this tool changes text \
+                 files and this one is not text"
+            ))
         })?;
         let hits = text.matches(old).count();
         if hits != 1 {
@@ -205,6 +217,10 @@ impl Tool for EditTool {
         let updated = text.replacen(old, new, 1);
         std::fs::write(&path, updated.as_bytes()).map_err(|err| {
             AxError::failure(AxCode::StorageFatal, "edit file", format!("{rel}: {err}"))
+                .with_recovery(format!(
+                    "free space on the disk holding the city, or clear the read-only \
+                     flag on {rel}, then edit again"
+                ))
         })?;
         let new_version = version_of(updated.as_bytes());
 
@@ -250,10 +266,18 @@ impl EditTool {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|err| {
                 AxError::failure(AxCode::StorageFatal, "edit file", format!("{rel}: {err}"))
+                    .with_recovery(format!(
+                        "free space on the disk holding the city, or remove the file \
+                         standing where {rel}'s parent directory has to go"
+                    ))
             })?;
         }
         std::fs::write(path, new.as_bytes()).map_err(|err| {
             AxError::failure(AxCode::StorageFatal, "edit file", format!("{rel}: {err}"))
+                .with_recovery(format!(
+                    "free space on the disk holding the city, or clear the read-only \
+                     flag on {rel}, then create it again"
+                ))
         })?;
         let mut result = Map::new();
         result.insert("path".to_owned(), Value::String(rel.to_owned()));

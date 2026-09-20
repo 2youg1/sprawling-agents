@@ -236,8 +236,12 @@ impl ToolCall {
             AxError::failure(
                 AxCode::InvalidArgs,
                 "read a tool call's action",
-                err.to_string(),
+                self.name.as_str().to_owned(),
             )
+            .with_recovery(format!(
+                "JSON refused these arguments ({err}); call the tool again with whole \
+                 numbers and strings, which is all this city's payloads carry"
+            ))
         })?;
         action.extend_from_slice(args.as_bytes());
         Ok(action)

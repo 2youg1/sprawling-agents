@@ -3,22 +3,25 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
-
-//! What a line typed into a serving city means (sprawling-SPEC.md
-//! section 8-11).
+//! The console's vocabulary, and the judgement of one typed line into a
+//! [`Line`] (sprawling-SPEC.md section 8-11).
 //!
-//! `sprawling up` used to print four lines and block until Ctrl-C. That
-//! terminal is a surface the product threw away, and on a machine with
-//! no browser it is the only surface there is.
+//! This module owns the console's own verbs — `CONTROL`, the five that
+//! never reach the wire — and owns nothing else about any verb. Every
+//! other verb is a projection of `channels::COMMAND_NAMES` and
+//! `channels::QUERY_NAMES` spelled by [`snake`], so a command renamed on
+//! the wire is renamed here in the same build and a hand-written table
+//! never becomes a second vocabulary.
 //!
-//! Everything here is a pure judgement over one line of text. What the
-//! judgement produces is either a control action the terminal carries
-//! out or a `ClientFrame` that goes to the same desk a browser's frames
-//! go to, so the console decides nothing the server does not.
+//! The judgement is pure and total: no clock, no socket, no ledger, and
+//! no error type. A line nobody can classify comes back as
+//! [`Line::Unknown`] carrying the nearest verbs, because a console that
+//! refused to classify a line would have nothing to print.
+//!
+//! The point a reader most often gets wrong: a line that does not begin
+//! with `/` is work for the selected room rather than an unknown verb,
+//! and the argument of a wire verb is the wire's own JSON — inventing a
+//! second argument grammar here would describe every wire type twice.
 
 use kernel::Address;
 

@@ -92,6 +92,10 @@ impl HttpServer {
             .build()
             .map_err(|err| {
                 AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
+                    .with_recovery(
+                        "check this server's url in the MCP settings and the proxy \
+                         settings this machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
+                    )
             })?;
         Ok(HttpServer {
             url: url.to_owned(),
@@ -202,8 +206,8 @@ impl HttpServer {
                 "call an mcp server",
                 format!("{}: the server ended this session", self.url),
             )
-            .with_recovery("the session was dropped; dispatch again to open a new one")
-            .retriable();
+            .retriable()
+            .with_recovery("the session was dropped; dispatch again to open a new one");
         }
         // The body is not quoted: a server's error page is other
         // people's text and this refusal is read by a person.

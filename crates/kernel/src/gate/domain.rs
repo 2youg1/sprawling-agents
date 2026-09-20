@@ -63,7 +63,11 @@ fn outside(target: &Address, prefixes: Vec<String>, taint: &TaintSet) -> GateOut
                     alternative,
                 ),
             )
-            .with_nearby(prefixes),
+            .with_nearby(prefixes)
+            .with_recovery(
+                "a write domain widens in one place only, the building's \
+                 `.sprawling/BUILDING.md`, and the `rules` tool is how you propose that edit",
+            ),
         ),
     }
 }
@@ -92,16 +96,22 @@ fn not_writable(target: &Address, reason: DocumentReason) -> GateOutcome {
         ),
     };
     GateOutcome::Deny {
-        refusal: Box::new(AxError::refusal(
-            AxCode::OutsideWriteDomain,
-            "write file",
-            target.as_str(),
-            GateRefusal::new(
-                "this write domain writes Markdown documents and never a plan",
-                violation,
-                alternative,
+        refusal: Box::new(
+            AxError::refusal(
+                AxCode::OutsideWriteDomain,
+                "write file",
+                target.as_str(),
+                GateRefusal::new(
+                    "this write domain writes Markdown documents and never a plan",
+                    violation,
+                    alternative,
+                ),
+            )
+            .with_recovery(
+                "the kinds of file this domain takes are declared in the building's \
+                 `.sprawling/BUILDING.md`; propose a change to it through the `rules` tool",
             ),
-        )),
+        ),
     }
 }
 

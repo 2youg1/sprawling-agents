@@ -20,7 +20,7 @@ third one, written outside the repository to attack rather than to use.
 
 namespace Sprawling
 
-open Lean (Json)
+open Lean (Json JsonNumber)
 
 /-- A binary that has already been built. -/
 structure Door where
@@ -76,6 +76,25 @@ def Template.name : Template → String
 instance : ToString Template where
   toString t := t.name
 
+/-- Which request shape an endpoint answers in.
+
+Two values because `kernel::DialectKind` has two, and they travel under that
+type's own spelling rather than under the settings page's: what this adversary
+puts on the wire has to be what the wire reads. -/
+inductive Dialect where
+  /-- Anthropic messages. -/
+  | messages
+  /-- OpenAI-compatible chat completions. -/
+  | chat
+deriving BEq, DecidableEq, Inhabited
+
+def Dialect.name : Dialect → String
+  | .messages => "anthropic"
+  | .chat => "open_ai"
+
+instance : ToString Dialect where
+  toString d := d.name
+
 /-- What a halt or a release applies to. -/
 inductive Scope where
   | city
@@ -96,6 +115,20 @@ inductive Verb where
   | halt (scope : Scope) (idem : IdemKey)
   | release (scope : Scope) (idem : IdemKey)
   | takeover (run : String) (idem : IdemKey)
+  /-- Ask a base URL what it serves, and attach nothing. -/
+  | probeEndpoint (name : String) (baseUrl : String) (dialect : Dialect) (idem : IdemKey)
+  /-- Register a base URL, admitting the model ids named.
+
+  The ids are named rather than left empty because a probe that reached nothing
+  refuses an attachment that declared none: the city would have no model id to
+  call, and this adversary attaches to endpoints nothing answers on. -/
+  | attachEndpoint (name : String) (baseUrl : String) (dialect : Dialect)
+      (admit : List String) (idem : IdemKey)
+  /-- Point the `main` tag at one model of an attached endpoint.
+
+  `ceiling` absent is a person who left the output ceiling box empty, which is
+  the case the whole ladder in `gateway::provider::ceiling` exists to answer. -/
+  | selectModel (endpoint : String) (model : String) (ceiling : Option Nat) (idem : IdemKey)
   /-- A frame this adversary writes by hand, for the cases where the point is
   that the door refuses to encode it at all. -/
   | verbatim (raw : String)
@@ -160,10 +193,49 @@ def Verb.frame : Verb → String
   | .halt scope idem => command "halt" [("scope", scopeValue scope), ("idem", .str idem.value)]
   | .release scope idem => command "release" [("scope", scopeValue scope), ("idem", .str idem.value)]
   | .takeover run idem => command "takeover" [("run", .str run), ("idem", .str idem.value)]
+  | .probeEndpoint name baseUrl dialect idem =>
+    command "probe_endpoint"
+      ([("name", .str name)] ++ entered baseUrl dialect ++ [("idem", .str idem.value)])
+  | .attachEndpoint name baseUrl dialect admit idem =>
+    command "attach_endpoint"
+      ([("name", .str name)] ++ entered baseUrl dialect
+        ++ [("admit", .arr (admit.map Json.str).toArray), ("idem", .str idem.value)])
+  | .selectModel endpoint model ceiling idem =>
+    command "select_model"
+      [ ("endpoint", .str endpoint)
+      , ("model", .str model)
+      , ("tag", .str "main")
+      -- Zero is how the wire spells "nobody stated a window", which is what a
+      -- person who picked a model from a list and typed nothing sends.
+      , ("context_tokens", Json.num (JsonNumber.fromNat 0))
+      , ("max_output_tokens", tokensOrNull ceiling)
+      , ("idem", .str idem.value) ]
   | .verbatim raw => raw
 where
   query name := (Json.mkObj [("query", .str name)]).compress
   command name fields := (Json.mkObj [("command", Json.mkObj [(name, Json.mkObj fields)])]).compress
+  tokensOrNull : Option Nat → Json
+    | some tokens => Json.num (JsonNumber.fromNat tokens)
+    | none => Json.null
+  /-- The five fields a probe and the attachment behind it must agree on.
+
+  Written once because the product reads them into one value for exactly that
+  reason: a probe that carried different fields than the attachment would be
+  asking one endpoint and registering another. Every tuning figure is absent,
+  which is the form nobody opened the advanced section of. -/
+  entered baseUrl dialect :=
+    [ ("base_url", Json.str baseUrl)
+    , ("dialect", Json.str (Dialect.name dialect))
+    , ("secret", Json.null)
+    , ("auth_header", Json.null)
+    , ("tuning", Json.mkObj
+        [ ("label", Json.null)
+        , ("timeout_ms", Json.null)
+        , ("request_max_retries", Json.null)
+        , ("stream_idle_timeout_ms", Json.null)
+        , ("headers", Json.arr #[])
+        , ("overrides", Json.arr #[])
+        , ("proxying", Json.null) ]) ]
   /-- A scope is a bare word or a one-field object, which is how serde renders
   an enum whose variants differ in whether they carry anything. -/
   scopeValue : Scope → Json

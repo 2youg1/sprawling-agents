@@ -11,6 +11,7 @@
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
+import { QUERIES } from "../../core/asking";
 import type { RunBelief } from "../../core/belief";
 import { toFragment } from "../../core/route";
 import { clock, count, usd } from "../../core/time";
@@ -289,7 +290,7 @@ export function Thread(props: ThreadProps) {
   // What this city told the provider a reply may be at most. Read here
   // rather than per turn, because it is one fact about the city and not
   // one fact about a turn.
-  const endpoints = ui.conn.asking.ask("endpoint_view");
+  const endpoints = ui.conn.asking.ask(QUERIES.endpoints);
   const ceiling = createMemo<number | null>(() => {
     const held = endpoints();
     if (held === undefined || !("endpoints" in held)) return null;

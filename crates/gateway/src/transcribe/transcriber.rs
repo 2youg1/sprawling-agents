@@ -156,8 +156,8 @@ fn provider_refusal(url: &str, detail: &str) -> AxError {
         "transcribe a recording",
         format!("{url} {detail}"),
     )
-    .with_recovery("record again, or type the message instead")
     .retriable()
+    .with_recovery("record again, or type the message instead")
 }
 
 #[cfg(test)]

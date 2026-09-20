@@ -16,6 +16,7 @@
 
 import { For, Show, createMemo } from "solid-js";
 
+import { QUERIES } from "../../core/asking";
 import type { Doing } from "../../core/belief";
 import { roomOf, toFragment } from "../../core/route";
 import { clock, kib, usd } from "../../core/time";
@@ -97,7 +98,7 @@ function Runs(props: { readonly at: Address }) {
   const ui = useUi();
   const say = useSay();
   const lang = useLang();
-  const cost = ui.conn.asking.ask("cost_view");
+  const cost = ui.conn.asking.ask(QUERIES.cost);
   const spent = (run: string) => {
     const held = cost();
     if (held === undefined || !("cost" in held)) return null;

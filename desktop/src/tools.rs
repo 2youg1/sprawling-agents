@@ -162,15 +162,14 @@ pub(crate) fn table() -> Vec<ToolCard> {
         ToolCard {
             name: "desktop.record",
             description: "Start or stop recording one named window: an mp4 when ffmpeg is on \
-                 this machine's PATH, otherwise a directory of PNG frames, with sound only when \
-                 `audio` asks for it. The scope file has to switch recording on. It does not \
-                 edit, transcode or upload anything, and it does not stop on its own."
+                 this machine's PATH, otherwise a directory of PNG frames. The scope file has \
+                 to switch recording on. It does not edit, transcode or upload anything, it \
+                 does not stop on its own, and it does not record sound."
                 .to_owned(),
             schema: json!({
                 "type": "object",
                 "properties": properties(json!({
                     "state": { "type": "string", "enum": ["start", "stop"] },
-                    "audio": { "type": "boolean", "description": "record this machine's sound as well" },
                 })),
                 "required": ["state"],
                 "additionalProperties": false,

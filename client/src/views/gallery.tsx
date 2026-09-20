@@ -14,7 +14,7 @@ import { For, createSignal, type JSX } from "solid-js";
 
 import { sendingInto, type Doing, type Sending } from "../core/belief";
 import { WIRE_APIS, type WireApi } from "../core/commands";
-import { EFFORTS } from "../core/prefs";
+import { EFFORTS, type Appearance } from "../core/prefs";
 import type { ModelFact } from "../core/probed";
 import { offered } from "../core/slash";
 import type { ApprovalClass, ApprovalItem, DoctorAnswer, EndpointsAnswer } from "../wire";
@@ -22,10 +22,10 @@ import { ApprovalId, Locator, TimeMs } from "../wire";
 import { useSay } from "../ui";
 import { MachineReport, MachineSkeleton, MachineUnchecked } from "./machine";
 import { SkillsNote } from "./setup";
-import type { Appearance } from "./setup/appearance";
 import { KeysSection } from "./setup/keys";
-import { EffortChoice, ModelTable } from "./setup/models";
+import { ModelTable } from "./setup/models";
 import { AttachForm, EndpointList } from "./setup/providers";
+import { EffortSection } from "./shared/effort";
 import { Cheatsheet } from "./parts/kbd";
 import { Popover } from "./parts/popover";
 import { Badge } from "./parts/badge";
@@ -434,7 +434,7 @@ function Screens() {
       </Case>
 
       <Case label="settings · how hard the city thinks by default">
-        <EffortChoice />
+        <EffortSection />
       </Case>
 
       <Case label="settings · where this city keeps its skills">
@@ -687,14 +687,14 @@ function Parts() {
   );
 }
 
-// The sliding chooser in the five states it can be drawn in: two
+// The sliding chooser in the six states it can be drawn in: two
 // cells, three cells, three cells under two group headings, a cell
-// that cannot be chosen and says why, and the whole control with
-// motion turned off.
+// that cannot be chosen and says why, a control nobody has answered
+// yet, and the whole control with motion turned off.
 //
-// It is a component of its own rather than five more cases inside
+// It is a component of its own rather than six more cases inside
 // `Parts` because each fixture holds the choice a person made in it,
-// and five more signals is what would push that function past reading
+// and six more signals is what would push that function past reading
 // in one screen.
 function Switches() {
   const say = useSay();
@@ -703,6 +703,7 @@ function Switches() {
   const [motion, setMotion] = createSignal<Appearance["motion"]>("off");
   const [wire, setWire] = createSignal<WireApi>("chat");
   const [gated, setGated] = createSignal<WireApi>("chat");
+  const [unchosen, setUnchosen] = createSignal<WireApi | null>(null);
 
   // The dialect list the provider form offers, grouped by the
   // laboratory whose wire it speaks. The words are the literal values
@@ -755,6 +756,20 @@ function Switches() {
 
       <Case label="segmented · a cell that cannot be chosen">
         <Segmented label={say("setup_wire_api")} options={carried()} held={gated()} onPick={setGated} />
+      </Case>
+
+      {/* A caller holding nothing passes `null`, and the track answers
+          by drawing no slider: no cell may report itself chosen when
+          nobody has chosen. The first cell a person can choose is
+          still the one tab stop, so the control is reachable by
+          keyboard before it has an answer. */}
+      <Case label="segmented · nothing chosen yet">
+        <Segmented
+          label={say("setup_wire_api")}
+          options={dialects()}
+          held={unchosen()}
+          onPick={setUnchosen}
+        />
       </Case>
 
       <Case label="segmented · motion off">

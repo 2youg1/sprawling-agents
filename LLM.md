@@ -49,12 +49,18 @@ A frame is one JSON object with exactly one of three keys: `hello`, `command`,
 `query`. A command changes the city and carries an `idem` key; sending the
 same key twice does the thing once and answers twice. A query changes nothing.
 
-Commands (the names are the snake-case variant names of
-`channels::Command`; `sprawling call` lists them all):
+Commands, every one the city accepts, generated from the wire schema by
+`cargo xtask docnum` (`sprawling call` lists them too):
+
+<!-- xtask:begin command_names -->
+`dispatch`, `login`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `fork`, `attach`, `create_building`, `put_secret`, `steer`, `cancel`, `takeover`, `rollback`, `halt`, `reveal`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `create_policy`, `set_autonomy`, `pursue`, `wake`, `put_document`, `connect_toolkit`, `auth`
+<!-- xtask:end -->
+
+The ones whose arguments need saying:
 
 | Command | What it does |
 |---|---|
-| `dispatch {addr, task, goal, mode, budget, idem, session, effort}` | put a room to work. `session: "name"` opens a room of that name under a building; `session: null` continues the room `addr` already names. `mode` is one of `plan_goal`, `up`, `sc`, `ud`, `experiment`; `budget.usd` is in millionths of a dollar |
+| `dispatch {addr, task, goal, mode, idem, session, effort}` | put a room to work. `session: "name"` opens a room of that name under a building; `session: null` continues the room `addr` already names. `mode` is one of `plan_goal`, `up`, `sc`, `ud`, `experiment`. A dispatch carries no spending limit: the city's own configuration holds that |
 | `pursue {addr, step, idem}` | set, pause, resume, or clear a goal the building keeps working towards until the work runs out |
 | `steer {run, text, idem}` | add an instruction to a run without stopping it; it lands after the next tool result |
 | `cancel {run, idem}` | stop one run |
@@ -71,11 +77,14 @@ An `idem` is `idem1-` followed by 32 hexadecimal characters. Mint one per
 intended action and keep it; if your connection drops, send the same frame
 with the same key and read the answer you missed.
 
-Queries: `history`, `run_history`, `run_view`, `city_view`, `building_view`,
-`approval_queue`, `inbox_view`, `changes`, `cost_view`, `metrics`,
-`archive_search`, `endpoint_view`, `registry_view`, `discard_view`. Each
-answers with one `answer` frame whose shape is the query's own; a bounded
-answer says how many rows it left out.
+Queries, every one the city answers:
+
+<!-- xtask:begin query_names -->
+`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `building_view`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `document`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `release`
+<!-- xtask:end -->
+
+Each answers with one `answer` frame whose shape is the query's own; a
+bounded answer says how many rows it left out.
 
 ## The answer contract
 
@@ -106,7 +115,7 @@ task:
 
 ```json
 {"command":{"dispatch":{"addr":"hall/mayor","task":"<your idea, in prose>",
- "goal":"a roadmap, then the work","mode":"plan_goal","budget":{"usd":5000000,"tokens":2000000},
+ "goal":"a roadmap, then the work","mode":"plan_goal",
  "idem":"idem1-<32 hex>","session":"idea-1","effort":null}}}
 ```
 

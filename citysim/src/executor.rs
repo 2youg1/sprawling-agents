@@ -123,6 +123,10 @@ fn clock_overflow() -> AxError {
         "advance scenario clock",
         "u64 overflow",
     )
+    .with_recovery(
+        "shorten this scenario or lower its per-step tick: the clock ran past the \
+         milliseconds a u64 counts",
+    )
 }
 
 /// Runs one scenario to its frozen end, on a ledger of its own. Every
@@ -253,6 +257,10 @@ pub fn run_scenario_on(
                 }
                 let bytes = serde_json::to_vec(&outcome.result).map_err(|err| {
                     AxError::failure(AxCode::InvalidArgs, "encode tool result", err.to_string())
+                        .with_recovery(
+                            "report this against the scripted tool that answered: a \
+                             result payload holds strings and whole numbers only",
+                        )
                 })?;
                 let packaged = pipeline::package(
                     &bytes,
@@ -281,6 +289,10 @@ pub fn run_scenario_on(
                 AxCode::ApprovalPending,
                 "await approval",
                 item.id.as_str().to_owned(),
+            )
+            .with_recovery(
+                "script an answer for this approval in the scenario, or use a tool \
+                 whose effect the scenario's gates allow",
             )),
         }
     };

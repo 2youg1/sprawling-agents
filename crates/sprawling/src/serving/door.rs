@@ -3,29 +3,27 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
-
-//! How a city is stood up and served, as opposed to how one piece of
-//! work is run.
+//! What a listener presents at its door, settled before a socket exists.
 //!
-//! Four things happen here and nothing else: the key this listener will
-//! present at its door is settled before a socket exists, the vault is
-//! opened and asked what it really is, the one writer thread is started
-//! with the ledger inside it, and the socket is handed the four sinks it
-//! may reach the city through.
+//! Two questions are answered here and nothing else: which pairing key
+//! this serve will carry ([`key_for`]), and what the credential vault on
+//! this machine really is ([`open_vault`]). Both are answered while
+//! nothing is bound yet, so there is no moment in which the port is open
+//! and unauthenticated.
 //!
-//! **The writer thread is the city's one writer.** The ledger is opened
-//! inside it and never leaves, so the type never has to cross a thread
-//! boundary to prove that a city has one writer (ARCHITECTURE section
-//! 10). Everything a socket does reaches it as a `Command` on a desk,
-//! one at a time.
+//! [`Keyed`] is an enum rather than an `Option<String>` beside a flag
+//! because its three cases carry different obligations, and only a key
+//! minted for this serve may be shown to a person. Which case applies is
+//! decided by `crate::keying`, which stays pure; this module is where
+//! the entropy behind a minted key and behind [`random_token`] is drawn,
+//! so the binary samples randomness in one place and a key a third party
+//! can predict is a door a third party can open.
 //!
-//! Randomness is drawn here rather than in `bin::keying`, which is pure:
-//! this crate draws entropy in one place, and a key a third party can
-//! predict is a door a third party can open.
+//! The point a reader most often gets wrong: [`open_vault`] reports what
+//! a probe of write, read and delete found, not what configuration
+//! asked for: a vault that silently forgets across a restart is
+//! disclosed in the ledger at startup instead of surfacing much later as
+//! an egress failure.
 
 use kernel::{AxCode, AxError, Payload};
 

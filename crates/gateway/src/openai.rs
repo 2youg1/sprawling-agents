@@ -56,11 +56,11 @@ fn empty_answer() -> AxError {
         "read the provider's answer",
         "the provider accepted the request and returned no answer at all",
     )
+    .retriable()
     .with_recovery(
         "lower this model's max output tokens - a ceiling above what the model allows is \
          answered this way rather than refused - then dispatch again",
     )
-    .retriable()
 }
 
 /// This dialect writes every level in one field, `none` included.

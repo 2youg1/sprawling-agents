@@ -8,7 +8,7 @@
 
 mod error;
 
-pub use error::{AxCode, AxError, Carrier, GateRefusal};
+pub use error::{AxCode, AxError, Carrier, ErrorDraft, GateRefusal};
 
 mod address;
 pub mod layout;

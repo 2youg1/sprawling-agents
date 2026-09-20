@@ -211,6 +211,125 @@ private def listsOnlyRaised (door : Door) : IO Unit :=
       | none => ensure false "the city did not answer with a city"
     | other => ensure false s!"the city could not be read: {other}"
 
+/-! ## What a person entered, and what the city calls -/
+
+/-- A provider's documentation prints one endpoint three ways, and a person
+pastes whichever one they were shown. All of them name the same endpoint, so
+all of them have to reach one registration — otherwise the city appends a path
+to a URL that already carries one, and the first call answers 404.
+
+The class is walked whole rather than sampled, because it is finite: what is
+asserted is that every spelling in it was written down as the same URL, and the
+first spelling's reading is the one the rest are held against. -/
+private def oneUrlHoweverTyped (door : Door) : IO Unit :=
+  withGround door fun ground => do
+    let entered := spellings deadAuthority
+    let written ← probedUrls door ground entered 0
+    match written with
+    | [] => ensure false "the equivalence class is empty, so this check asserts nothing"
+    | canonical :: rest =>
+      for (spelling, url) in (entered.drop 1).zip rest do
+        ensureEq canonical url
+          s!"{spelling} was written down as a different endpoint than the first spelling"
+
+/-- The city's own answer, entered again, has to come back unchanged.
+
+Idempotence is proved inside the repository against the algorithm; what cannot
+be proved there is that the value the city *stored* is a value that survives
+being entered a second time. A person who copies the normalised URL off the
+settings page and pastes it back is doing exactly this, and the spelling picked
+here is the one with the most to rewrite. -/
+private def normalisingTwiceChangesNothing (door : Door) : IO Unit :=
+  withGround door fun ground => do
+    let entered := s!"http://{deadAuthority}/v1/messages"
+    let once ← probedUrls door ground [entered] 0
+    let twice ← probedUrls door ground once 1
+    ensureEq once twice
+      s!"the city's own reading of {entered}, entered again, was written down differently"
+
+/-- A frame this build cannot read is refused, and costs nothing.
+
+The refusal has to name the wire and offer a way forward, and the city has to
+be there afterwards: a decode failure that dropped the connection would send a
+client into its reconnection ladder for a frame it could simply fix.
+
+**What the door can show has a boundary, and it is here.** `sprawling call`
+parses the frame before it opens a socket, so the refusal these three earn is
+the client's own and the city never sees them. What this check therefore pins
+is the promise to whoever is driving the binary — a code, a way forward, a city
+still answering, and a history that did not move — and not the server-side
+decode that `channels::reception` owns. -/
+private def unreadableFramesCostNothing (door : Door) : IO Unit :=
+  withGround door fun ground => do
+    -- Measured after the city has stopped writing on its own account: a city
+    -- that was still finishing its start-up would otherwise be read as a city
+    -- that wrote something because of the frame below.
+    let _ ← ground.stillText 10
+    let before ← door.verify ground.ledger
+    for frame in unreadable do
+      match ← door.askRaw ground.port frame with
+      | .denied complaint =>
+        ensureEq (Code.mk "E_WIRE_MISMATCH") complaint.code
+          s!"a frame this build cannot read was refused for the wrong reason: {frame}"
+        ensure (!complaint.recovery.isEmpty)
+          s!"a frame this build cannot read was refused without a way forward: {frame}"
+      | other => ensure false s!"a frame this build cannot read was taken: {frame} said {other}"
+    match ← door.ask ground.port .cityView with
+    | .accepted _ => pure ()
+    | other => ensure false s!"the city stopped answering after a frame it could not read: {other}"
+    ensureEq before.toOption (← door.verify ground.ledger).toOption
+      "a frame the city could not read moved the history"
+
+/-! ## A city that has been given a provider -/
+
+/-- A model this city registered is a model this city can call.
+
+The Anthropic wire requires `max_tokens` in every request and refuses to write
+one without it, so a registration with no ceiling is a model that cannot be
+called at all — and the person reading that refusal attached an endpoint, saw
+their model in the list and picked it. The ladder in
+`gateway::provider::ceiling` exists to answer for the rungs nobody filled in, so
+the record has to state a figure even when nobody stated one.
+
+A figure the person did state is checked in the same breath, because the two
+readings differ in exactly the rung that answered. -/
+private def aRegisteredModelHasACeiling (door : Door) : IO Unit := do
+  -- Two cities rather than two picks in one: an empty box keeps what this same
+  -- model was registered with, so a second pick would read the first one's
+  -- figure back and this check would pass without asking anything.
+  withGround door fun ground => do
+    let stated ← givenAProvider door ground (some 4096)
+    ensureEq (some 4096) (statedCeiling stated)
+      "the ceiling the person entered is not the ceiling the city registered"
+  withGround door fun ground => do
+    let unstated ← givenAProvider door ground none
+    ensure (statedCeiling unstated).isSome
+      "a model nobody priced was registered with no output ceiling, which the \
+       Anthropic wire cannot write a request from"
+
+/-- Work sent to a messages-compatible endpoint is never refused for want of a
+ceiling.
+
+The sequence is the one a person walks: attach an endpoint, pick a model, send
+work. Whatever else that dispatch runs into — nothing answers on this address,
+so it runs into the socket — the one refusal it must never earn is the one that
+blames a figure the person was never asked for.
+
+Both channels are read, because the refusal can arrive on either: the frames
+this dispatch produced, and the history once the run has stopped writing. -/
+private def messagesWorkIsNeverRefusedForACeiling (door : Door) : IO Unit :=
+  withGround door fun ground => do
+    let _ ← givenAProvider door ground none
+    match ← door.ask ground.port (.createBuilding "acme" .minimal (idemKey 310)) with
+    | .accepted _ => pure ()
+    | other => ensure false s!"a building nobody had raised was not raised: {other}"
+    let answered ← door.ask ground.port (.dispatch "acme" "one" (idemKey 311))
+    ensure (!mentionsNoCeiling (toString answered))
+      s!"a dispatch to an attached messages endpoint was refused for want of a ceiling: {answered}"
+    let written ← ground.stillText 20
+    ensure (!mentionsNoCeiling written)
+      "a run against an attached messages endpoint stopped for want of a ceiling"
+
 /-! ## The disk lies -/
 
 /-- The simplest lie a disk can tell: one changed byte.
@@ -299,6 +418,16 @@ private def properties (door : Door) : Tree :=
         [ .leaf "a credential cannot be spelled onto the wire" (sealed door)
         , .leaf "the exit code says what the frames say" (exitCodeMeansWhatItSays door)
         , .leaf "a verb the city cannot perform still answers" (notBuiltStillAnswers door) ]
+    , .group "what a person entered"
+        [ .leaf "every spelling of one endpoint is one registration" (oneUrlHoweverTyped door)
+        , .leaf "the city's own reading, entered again, is unchanged"
+            (normalisingTwiceChangesNothing door)
+        , .leaf "a frame this build cannot read is refused, not dropped"
+            (unreadableFramesCostNothing door) ]
+    , .group "a city with a provider"
+        [ .leaf "a registered model states an output ceiling" (aRegisteredModelHasACeiling door)
+        , .leaf "work on a messages endpoint is never refused for want of a ceiling"
+            (messagesWorkIsNeverRefusedForACeiling door) ]
     , .leaf "a city admits exactly what its rules admit" (traces door)
     , .leaf "a halted city takes no work until it is released" (halting door)
     , .leaf "history reads back as one unbroken chain" (chained door)

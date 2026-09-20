@@ -31,6 +31,7 @@ import {
   selectModel,
 } from "../../core/commands";
 import type { Endpoint, Pair, Tuning, WireApi } from "../../core/commands";
+import { browserRows, defaultProxying } from "../../core/prefs";
 import { stoppedAt } from "../../core/probed";
 import type { Probed } from "../../core/probed";
 import { enrol, keyField, referenceFor, secretFor } from "../../core/enrol";
@@ -38,7 +39,11 @@ import type { Enrolment, StoredKey } from "../../core/enrol";
 import type { Key } from "../../core/lang";
 import type { AxCode, AxError, DialectKind, EndpointsAnswer, Proxying } from "../../wire";
 import { useCommand, useSay, useUi } from "../../ui";
+import { Badge } from "../parts/badge";
+import { EmptyState } from "../parts/empty";
 import { Field } from "../parts/field";
+import { Segmented } from "../parts/segmented";
+import type { Choice, Group } from "../parts/segmented";
 import { Tip } from "../parts/tip";
 import { ModelTable } from "./models";
 import type { ModelRow } from "./models";
@@ -46,6 +51,23 @@ import type { ModelRow } from "./models";
 // What a provider id may be spelled with, which is what a TOML table key
 // and a secret reference can both carry unquoted.
 const ID_SHAPE = /^[a-z0-9][a-z0-9-]*$/;
+
+// What a base URL must look like, spelled once for its two readers:
+// the box's own `pattern`, which the browser checks while the person
+// is still filling the form in, and `hostOf` below, which is what the
+// look and attach controls are gated on.
+//
+// **`type="url"` is not that rule.** It accepts `mailto:somebody` and
+// every other scheme, so a value this form refuses used to sit in a
+// box the browser had called valid, and the person learnt of it by
+// pressing a control that stayed grey without saying why.
+//
+// A provider states the root of its API and never the full path, so
+// the shape is a scheme, an ASCII host, an optional port, an optional
+// path, and nothing after it. A query string is refused because a
+// root never carries one, and every face hangs its own path off this
+// value.
+const BASE_URL = /^https?:\/\/([a-zA-Z0-9.-]+)(?::[0-9]+)?(?:\/[^\s?#]*)?$/;
 
 // Everything the form holds. A store rather than a dozen signals: these
 // values are read together by three previews and two commands, and a
@@ -69,13 +91,42 @@ interface Draft {
 // sentence that says which machine it is right for. A table rather than
 // three branches: the control draws itself from it, and a fourth
 // setting would be a row.
-const PROXYINGS: readonly (readonly [Proxying, Key, Key])[] = [
+export const PROXYINGS: readonly (readonly [Proxying, Key, Key])[] = [
   ["except_local", "setup_proxying_except_local", "setup_proxying_note_except_local"],
   ["always", "setup_proxying_always", "setup_proxying_note_always"],
   ["never", "setup_proxying_never", "setup_proxying_note_never"],
 ];
 
-const FRESH: Draft = {
+// The sentence that says which machine one rule is right for, which
+// the network screen and this form both draw under the control.
+export function proxyingNote(rule: Proxying): Key | undefined {
+  return PROXYINGS.find(([setting]) => setting === rule)?.[2];
+}
+
+// The two laboratories whose request shapes this form offers, and the
+// token each paints its cells with. The mapping lives here and nowhere
+// else: no other screen colours anything by which laboratory it came
+// from.
+const OPEN_AI: Group = { label: "OpenAI", tone: "accent" };
+const ANTHROPIC: Group = { label: "Anthropic", tone: "alert" };
+
+// The three `wire_api` values as cells of one control, grouped by the
+// laboratory that defined each shape.
+//
+// **`dialectOf` decides which cell can be chosen.** A value this city's
+// wire carries no dialect for is refused under the pointer with the
+// caller's sentence, so the reason arrives before the click instead of
+// as a refusal after it.
+export function wireChoices(unsupported: string): readonly Choice<WireApi>[] {
+  return WIRE_APIS.map((api) => ({
+    value: api,
+    label: wireWord(api),
+    group: api === "messages" ? ANTHROPIC : OPEN_AI,
+    ...(dialectOf(api) === null ? { why: unsupported } : {}),
+  }));
+}
+
+const FRESH: Omit<Draft, "proxying"> = {
   id: "",
   label: "",
   baseUrl: "",
@@ -84,10 +135,15 @@ const FRESH: Draft = {
   timeoutMs: "60000",
   requestRetries: "4",
   streamIdleMs: "300000",
-  proxying: "except_local",
   headers: [],
   overrides: [],
 };
+
+// An empty form, carrying the proxy rule this machine was last told to
+// start new endpoints with.
+function freshDraft(): Draft {
+  return { ...FRESH, proxying: defaultProxying(browserRows()) };
+}
 
 // The path a dialect's call goes to, which is also what the preview
 // shows: the base URL is the root a provider states, never the full
@@ -221,11 +277,10 @@ function nextStep(code: AxCode): Key {
 }
 
 // The host a base URL names, which is what a person reads a reachability
-// report about. An unparseable URL has no host, and the form says so
-// before it lets anybody look.
+// report about. A URL this form would refuse has no host, and the form
+// says so before it lets anybody look.
 function hostOf(baseUrl: string): string | null {
-  const match = /^https?:\/\/([^/:?#]+)/.exec(baseUrl.trim());
-  return match?.[1] ?? null;
+  return BASE_URL.exec(baseUrl.trim())?.[1] ?? null;
 }
 
 // A refusal the city sent back, which is what an attachment that failed
@@ -389,7 +444,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
   const ui = useUi();
   const say = useSay();
   const command = useCommand();
-  const [draft, setDraft] = createStore<Draft>({ ...FRESH });
+  const [draft, setDraft] = createStore<Draft>(freshDraft());
   // The reference the vault answered with, and the id it was filed
   // under. Never one without the other.
   const [held, setHeld] = createSignal<StoredKey | null>(null);
@@ -518,6 +573,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
       <Field
         label={say("setup_base_url")}
         kind="url"
+        pattern={BASE_URL.source}
         mono
         value={draft.baseUrl}
         // wording-ok: an address, which no language translates
@@ -526,22 +582,12 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
       />
       <div class="flex flex-col gap-tight text-note text-text-quiet">
         {say("setup_wire_api")}
-        <div class="flex gap-snug">
-          <For each={WIRE_APIS}>
-            {(each) => (
-              <button
-                type="button"
-                class={`rounded-pill px-base py-tight text-label ${draft.wireApi === each ? "bg-accent text-g0" : "bg-g2 text-text-quiet hover:bg-g3"}`}
-                onClick={() => { setDraft("wireApi", each); }}
-              >
-                {wireWord(each)}
-              </button>
-            )}
-          </For>
-        </div>
-        <Show when={dialect() === null}>
-          <span class="text-alert">{say("setup_wire_api_unsupported")}</span>
-        </Show>
+        <Segmented
+          label={say("setup_wire_api")}
+          options={wireChoices(say("setup_wire_api_unsupported"))}
+          held={draft.wireApi}
+          onPick={(api) => { setDraft("wireApi", api); }}
+        />
       </div>
       <div class="flex flex-col gap-tight text-note text-text-quiet">
         <Field
@@ -618,24 +664,19 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
             </div>
             <div class="flex flex-col gap-tight text-note text-text-quiet">
               {say("setup_proxying")}
-              <div class="flex flex-wrap gap-snug">
-                <For each={PROXYINGS}>
-                  {([setting, word]) => (
-                    <button
-                      type="button"
-                      class={`rounded-pill px-base py-tight text-label ${draft.proxying === setting ? "bg-accent text-g0" : "bg-g2 text-text-quiet hover:bg-g3"}`}
-                      aria-pressed={draft.proxying === setting}
-                      onClick={() => { setDraft("proxying", setting); }}
-                    >
-                      {say(word)}
-                    </button>
-                  )}
-                </For>
-              </div>
+              <Segmented
+                label={say("setup_proxying")}
+                options={PROXYINGS.map(([setting, word]) => ({
+                  value: setting,
+                  label: say(word),
+                }))}
+                held={draft.proxying}
+                onPick={(proxying) => { setDraft("proxying", proxying); }}
+              />
               <span class="text-text-faint">{say("setup_proxying_help")}</span>
-              <For each={PROXYINGS.filter(([setting]) => setting === draft.proxying)}>
-                {([, , note]) => <span class="text-text-faint">{say(note)}</span>}
-              </For>
+              <Show when={proxyingNote(draft.proxying)}>
+                {(note) => <span class="text-text-faint">{say(note())}</span>}
+              </Show>
             </div>
             <PairTable
               title={say("setup_headers")}
@@ -694,7 +735,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
               // registration that went through clears it: a refusal
               // keeps every field, which is the one thing a person
               // filling in a key cannot be asked to do twice.
-              setDraft({ ...FRESH });
+              setDraft(freshDraft());
               setHeld(null);
               setRows([]);
               props.onAttached?.();
@@ -808,25 +849,40 @@ export function LoginForm(props: { readonly onAttached?: () => void }) {
   );
 }
 
+// What is attached, one row each.
+//
+// **The badge says the call never leaves this machine.** The city
+// decides that from the base URL and states it as `local`, and a
+// confidential building is refused every endpoint without it
+// (`gateway::router::book::select`), so it is the one property of a
+// row that changes what a person may do with it.
 export function EndpointList(props: { readonly answer: EndpointsAnswer }) {
   const say = useSay();
   return (
-    <ul class="flex flex-col gap-snug">
-      <For each={props.answer.endpoints}>
-        {(endpoint) => (
-          <li class="rounded-card bg-g1 px-base py-snug text-note">
-            <div class="flex items-center gap-snug">
-              <span class="font-label text-text">{endpoint.name}</span>
-              <span class="text-text-faint">{wireWord(endpoint.dialect === "anthropic" ? "messages" : "chat")}</span>
-              <span class="flex-1 truncate font-mono text-text-disabled">{endpoint.base_url}</span>
-              <span class="text-text-faint">{endpoint.has_credential ? say("setup_keyed") : say("setup_unkeyed")}</span>
-            </div>
-            <div class="mt-tight flex flex-wrap gap-tight text-text-quiet">
-              <For each={endpoint.models}>{(model) => <span class="rounded-pill bg-g2 px-snug">{model}</span>}</For>
-            </div>
-          </li>
-        )}
-      </For>
-    </ul>
+    <Show
+      when={props.answer.endpoints.length > 0}
+      fallback={<EmptyState text={say("setup_no_endpoints")} />}
+    >
+      <ul class="flex flex-col gap-snug">
+        <For each={props.answer.endpoints}>
+          {(endpoint) => (
+            <li class="rounded-card bg-g1 px-base py-snug text-note">
+              <div class="flex items-center gap-snug">
+                <span class="font-label text-text">{endpoint.name}</span>
+                <Show when={endpoint.local}>
+                  <Badge text={say("setup_local")} />
+                </Show>
+                <span class="text-text-faint">{wireWord(endpoint.dialect === "anthropic" ? "messages" : "chat")}</span>
+                <span class="flex-1 truncate font-mono text-text-disabled">{endpoint.base_url}</span>
+                <span class="text-text-faint">{endpoint.has_credential ? say("setup_keyed") : say("setup_unkeyed")}</span>
+              </div>
+              <div class="mt-tight flex flex-wrap gap-tight text-text-quiet">
+                <For each={endpoint.models}>{(model) => <span class="rounded-pill bg-g2 px-snug">{model}</span>}</For>
+              </div>
+            </li>
+          )}
+        </For>
+      </ul>
+    </Show>
   );
 }

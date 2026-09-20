@@ -3,39 +3,54 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The first half hour: five steps, one decision each, in the order a
-// city needs them - this machine, a provider, what is optional, the
-// model and how hard it thinks, then the Mayor. The city decides when
-// setup is needed (no `main` model); this only walks it.
+// The first half hour: four steps, one decision each, in the order a
+// city needs them - this machine, a provider, what is optional, then
+// the model and how hard it thinks. The city decides when setup is
+// needed (no `main` model); this only walks it.
+//
+// There used to be a fifth step. It held one conditional warning and
+// the button into the Mayor's office, so a person who had just chosen
+// a model was made to press `next` to reach a page that told them
+// nothing. The button now finishes the fourth step, and the three
+// sentences about how the city is used open the Mayor's office itself,
+// where they are read while the thing they describe is on screen.
+//
+// The provider screen and the thinking-effort screen are the same two
+// components the settings page mounts (`views/shared/`), so the two
+// pages cannot drift apart again.
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
+import { QUERIES } from "../core/asking";
 import { MAYOR, buildingOf, toFragment } from "../core/route";
 import { useGo, useSay, useUi } from "../ui";
 import { Machine } from "./machine";
 import { McpForm } from "./mcp";
 import { SkillsNote } from "./setup";
-import { EffortChoice, ModelChoice } from "./setup/models";
-import { AttachForm, EndpointList, LoginForm } from "./setup/providers";
+import { ModelChoice } from "./setup/models";
+import { EffortSection } from "./shared/effort";
+import { ProviderDoor } from "./shared/provider";
 
-const STEPS = ["machine", "provider", "optional", "model", "go"] as const;
+const STEPS = ["machine", "provider", "optional", "model"] as const;
 type Step = (typeof STEPS)[number];
+
+// The last step, named once: it carries the button that ends the walk
+// rather than the button that advances it.
+const LAST: Step = "model";
 
 export function Welcome() {
   const ui = useUi();
   const say = useSay();
   const go = useGo();
   const [step, setStep] = createSignal<Step>("machine");
-  const [door, setDoor] = createSignal<"key" | "login">("key");
-  const endpoints = ui.conn.asking.ask("endpoint_view");
+  const endpoints = ui.conn.asking.ask(QUERIES.endpoints);
   const answer = createMemo(() => {
     const held = endpoints();
     return held !== undefined && "endpoints" in held ? held.endpoints : undefined;
   });
   const attached = () => (answer()?.endpoints.length ?? 0) > 0;
-  const chosen = () => answer()?.chosen.some((each) => each.tag === "main") ?? false;
   const at = () => STEPS.indexOf(step());
-  const next = () => setStep(STEPS[Math.min(at() + 1, STEPS.length - 1)] ?? "go");
+  const next = () => setStep(STEPS[Math.min(at() + 1, STEPS.length - 1)] ?? LAST);
   const back = () => setStep(STEPS[Math.max(at() - 1, 0)] ?? "machine");
   const finish = () => {
     ui.prefs.setWelcomed(true);
@@ -65,26 +80,7 @@ export function Welcome() {
               <Machine />
             </Match>
             <Match when={step() === "provider"}>
-              <Show when={answer()}>{(held) => <div class="mb-base"><EndpointList answer={held()} /></div>}</Show>
-              <div class="mb-base flex gap-snug text-label">
-                <button
-                  type="button"
-                  class={`rounded-pill px-base py-tight ${door() === "key" ? "bg-g3 text-text" : "text-text-faint hover:text-text-quiet"}`}
-                  onClick={() => setDoor("key")}
-                >
-                  {say("setup_attach")}
-                </button>
-                <button
-                  type="button"
-                  class={`rounded-pill px-base py-tight ${door() === "login" ? "bg-g3 text-text" : "text-text-faint hover:text-text-quiet"}`}
-                  onClick={() => setDoor("login")}
-                >
-                  {say("setup_login")}
-                </button>
-              </div>
-              <Show when={door() === "key"} fallback={<LoginForm />}>
-                <AttachForm />
-              </Show>
+              <ProviderDoor />
             </Match>
             <Match when={step() === "optional"}>
               <h2 class="mb-base text-label font-label text-text-quiet">{say("setup_mcp")}</h2>
@@ -92,16 +88,11 @@ export function Welcome() {
               <h2 class="mt-wide mb-base text-label font-label text-text-quiet">{say("setup_skills_title")}</h2>
               <SkillsNote />
             </Match>
-            <Match when={step() === "model"}>
+            <Match when={step() === LAST}>
               <Show when={answer()}>{(held) => <ModelChoice answer={held()} />}</Show>
               <div class="mt-wide">
-                <EffortChoice />
+                <EffortSection />
               </div>
-            </Match>
-            <Match when={step() === "go"}>
-              <Show when={!chosen()}>
-                <p class="mb-base text-note text-alert">{say("welcome_no_main")}</p>
-              </Show>
             </Match>
           </Switch>
         </div>
@@ -118,7 +109,7 @@ export function Welcome() {
             </button>
           </Show>
           <Show
-            when={step() !== "go"}
+            when={step() !== LAST}
             fallback={
               <button type="button" class="rounded-control bg-accent px-wide py-snug text-g0 hover:bg-accent-hover" onClick={finish}>
                 {say("welcome_done")}
@@ -145,4 +136,3 @@ export function Welcome() {
     </div>
   );
 }
-

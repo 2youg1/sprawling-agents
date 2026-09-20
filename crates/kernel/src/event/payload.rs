@@ -124,8 +124,16 @@ impl EventRecord {
     /// library-wide; adapters append these bytes verbatim and hash exactly
     /// them for the next line's prev.
     pub fn canonical_line(&self) -> Result<Vec<u8>, AxError> {
-        serde_json::to_vec(self)
-            .map_err(|e| AxError::failure(AxCode::InvalidArgs, "serialize event", e.to_string()))
+        serde_json::to_vec(self).map_err(|e| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "serialize event",
+                format!("{:?} at seq {}", self.kind, self.seq.value()),
+            )
+            .with_recovery(format!(
+                "JSON refused this payload ({e}); give the event's data only string keys and finite numbers"
+            ))
+        })
     }
 
     /// Read-side entrance: full field revalidation, fail-closed. Unknown

@@ -60,6 +60,10 @@ fn materialize(bytes: &[u8], path: &Path) -> Result<(), AxError> {
             "materialize rest file",
             err.to_string(),
         )
+        .with_recovery(
+            "free space on the disk holding the city, or fix the permissions of the \
+             run's environment directory, then ask for the result again",
+        )
     };
     if path.exists() {
         return Ok(());
@@ -102,13 +106,20 @@ pub fn offload(
     site: &mut OffloadSite<'_>,
 ) -> Result<OffloadRecord, AxError> {
     let original_len = u64::try_from(bytes.len()).map_err(|_| {
-        AxError::failure(AxCode::InvalidArgs, "offload result", "length exceeds u64")
+        AxError::failure(AxCode::InvalidArgs, "offload result", "length exceeds u64").with_recovery(
+            "ask the tool for less at a time: this result is larger than a byte \
+                 count this city can hold",
+        )
     })?;
     if original_len <= cap_bytes {
         return Err(AxError::failure(
             AxCode::InvalidArgs,
             "offload result",
             "lossless input: only lossy transforms store (invariant 3)",
+        )
+        .with_recovery(
+            "pass this result through unchanged; it already fits the cap, and offload \
+             stores only what it has to cut",
         ));
     }
     // Invariant 1: the full original enters the CAS before any cut.
@@ -118,8 +129,12 @@ pub fn offload(
         rest_path,
     } = tee(bytes, site)?;
     let hint = hint_line(original_len, &rest_path, &original);
-    let hint_len = u64::try_from(hint.len())
-        .map_err(|_| AxError::failure(AxCode::InvalidArgs, "offload result", "hint exceeds u64"))?;
+    let hint_len = u64::try_from(hint.len()).map_err(|_| {
+        AxError::failure(AxCode::InvalidArgs, "offload result", "hint exceeds u64").with_recovery(
+            "report this against runtime::offload: the hint line names one path \
+                     and two byte counts and cannot reach this length",
+        )
+    })?;
     let head_budget = cap_bytes.checked_sub(hint_len).ok_or_else(|| {
         AxError::failure(
             AxCode::InvalidArgs,
@@ -129,7 +144,10 @@ pub fn offload(
         .with_recovery("raise the cap or skip offload for this result")
     })?;
     let head_len = usize::try_from(head_budget.min(original_len)).map_err(|_| {
-        AxError::failure(AxCode::InvalidArgs, "offload result", "head exceeds usize")
+        AxError::failure(AxCode::InvalidArgs, "offload result", "head exceeds usize").with_recovery(
+            "lower `[tool] result_cap_bytes`: the kept head would be longer than \
+                 this machine can address",
+        )
     })?;
     let mut substitute = bytes.get(..head_len).unwrap_or_default().to_vec();
     substitute.extend_from_slice(hint.as_bytes());
@@ -140,12 +158,20 @@ pub fn offload(
             "offload result",
             "substitute exceeds u64",
         )
+        .with_recovery(
+            "lower `[tool] result_cap_bytes`: the shortened result is longer than a \
+             byte count this city can hold",
+        )
     })?;
     if substitute_len > cap_bytes || substitute_len > original_len {
         return Err(AxError::failure(
             AxCode::InvalidArgs,
             "offload result",
             "substitute outgrew its bounds (invariant 2)",
+        )
+        .with_recovery(
+            "report this against runtime::offload: the shortened result must stay \
+             within both the cap and the original length, and it did not",
         ));
     }
     Ok(OffloadRecord {
@@ -164,6 +190,10 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<Pa
             AxCode::InvalidArgs,
             "rematerialize rest file",
             "locator is not cas-addressed",
+        )
+        .with_recovery(
+            "pass the `cas:` locator the offload record carries under `original`; a \
+             `file:` locator names a path that cleanup already removed",
         ));
     };
     let bytes = site.cas.get(hash).map_err(memory::MemoryError::into_ax)?;

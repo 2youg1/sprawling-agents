@@ -34,6 +34,10 @@ pub fn oauth_begin(
             AxCode::InvalidArgs,
             "begin oauth",
             "code verifier length outside 43..=128",
+        )
+        .with_recovery(
+            "draw the verifier from `getrandom` and encode it base64url, which RFC 7636 \
+             fixes at 43 to 128 characters",
         ));
     }
     // The two values answer different questions: the verifier proves the
@@ -122,6 +126,10 @@ fn send_token_request(url: &str, body: String, timeout_ms: u64) -> Result<OauthT
         .build()
         .map_err(|err| {
             AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
+                .with_recovery(
+                    "check the proxy settings this machine exports (`HTTPS_PROXY`, \
+                     `NO_PROXY`) and the TLS roots this build was given",
+                )
         })?;
     let response = client
         .post(url)

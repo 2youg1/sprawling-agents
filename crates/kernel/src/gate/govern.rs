@@ -45,17 +45,23 @@ pub fn discard(
         DiscardVerdict::Deny { reason } => {
             let DenyReason::NoRestoration = reason;
             GateOutcome::Deny {
-                refusal: Box::new(AxError::refusal(
-                    AxCode::DiscardIrreversible,
-                    "discard files",
-                    action_desc,
-                    GateRefusal::new(
-                        "every discard carries a resolvable restoration (C14)",
-                        "this request names no restoration plan",
-                        "split the batch under the thresholds, or inter the originals \
-                         in CAS (Interred) and retry with that locator",
+                refusal: Box::new(
+                    AxError::refusal(
+                        AxCode::DiscardIrreversible,
+                        "discard files",
+                        action_desc,
+                        GateRefusal::new(
+                            "every discard carries a resolvable restoration (C14)",
+                            "this request names no restoration plan",
+                            "split the batch under the thresholds, or inter the originals \
+                             in CAS (Interred) and retry with that locator",
+                        ),
+                    )
+                    .with_recovery(
+                        "call `discard` again with a restoration: a `file:` locator for a \
+                         tracked file, or a `cas:` locator from interring the originals first",
                     ),
-                )),
+                ),
             }
         }
     }
@@ -146,17 +152,23 @@ pub fn spawn(parent: Depth, kind: &DelegateKind) -> GateOutcome {
     match admit_delegation(parent, kind) {
         DelegationVerdict::Allow => GateOutcome::Allow,
         DelegationVerdict::Deny => GateOutcome::Deny {
-            refusal: Box::new(AxError::refusal(
-                AxCode::DelegationDepth,
-                "spawn delegate",
-                format!("{kind:?}"),
-                GateRefusal::new(
-                    "delegates do not delegate: one level deep",
-                    "a delegated position requested a spawn",
-                    "return this subtask to the resident who spawned you; \
-                     that resident can delegate it",
+            refusal: Box::new(
+                AxError::refusal(
+                    AxCode::DelegationDepth,
+                    "spawn delegate",
+                    format!("{kind:?}"),
+                    GateRefusal::new(
+                        "delegates do not delegate: one level deep",
+                        "a delegated position requested a spawn",
+                        "return this subtask to the resident who spawned you; \
+                         that resident can delegate it",
+                    ),
+                )
+                .with_recovery(
+                    "finish this subtask yourself, or end the turn with what you have so \
+                     the resident who spawned you can delegate the rest",
                 ),
-            )),
+            ),
         },
     }
 }

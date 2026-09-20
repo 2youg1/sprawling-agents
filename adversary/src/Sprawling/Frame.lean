@@ -191,6 +191,14 @@ read while reporting green. -/
 def decodeFrame (raw : String) : Except String Frame := do
   parseFrame (← Json.parse raw)
 
+/-- One line of the history as it sits on disk.
+
+The same reader as the one the `event` frame goes through, because a record
+pushed down a socket and a record written to a ledger are the same value: a
+second reader here would be a second account of what a record is. -/
+def decodeRecord (raw : String) : Except String Record := do
+  parseRecord (← Json.parse raw)
+
 /-- The addresses a `city_view` answer lists, sorted.
 
 Sorted so that a property about which buildings stand does not accidentally

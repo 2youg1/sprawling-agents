@@ -18,9 +18,10 @@ import { sendingInto } from "../core/belief";
 import { cancel, steer } from "../core/commands";
 import { buildingOf, roomOf, toFragment } from "../core/route";
 import { count, usd } from "../core/time";
-import type { GitOid, RoundsAnswer, RunId, Turn } from "../wire";
+import type { GitOid, RoundsAnswer, RunId, RunSummary, Turn } from "../wire";
 import { useCommand, useGo, useHearing, useSay, useUi } from "../ui";
 import { Changes } from "./changes";
+import { EmptyState } from "./parts/empty";
 import { Path } from "./parts/path";
 import { Prompt } from "./run/prompt";
 import { Composer } from "./talk/composer";
@@ -132,7 +133,7 @@ function Evidence(props: { readonly run: RunId }) {
   return (
     <Show when={items()} fallback={<p class="text-text-disabled">…</p>}>
       {(held) => (
-        <Show when={held().length > 0} fallback={<p class="text-text-faint">{say("run_no_evidence")}</p>}>
+        <Show when={held().length > 0} fallback={<EmptyState text={say("run_no_evidence")} />}>
           <ul class="text-note">
             <For each={held()}>
               {(item) => (
@@ -165,6 +166,27 @@ export function Run(props: RunProps) {
   const [lens, setLens] = createSignal<Lens>("turns");
   const belief = () => ui.conn.belief.runs[props.run];
   const rounds = createMemo(() => ui.conn.asking.ask({ rounds: { run: props.run } }));
+  // What the city says this run is, asked of the city rather than
+  // folded out of the record. A page opened on `#/run/<id>` after a
+  // reload has seen none of the records that made this run, and the
+  // city view carries only the runs it still lists - so which room the
+  // run belongs to and whether it is over used to be blank on exactly
+  // the runs a person reaches by a link somebody sent them.
+  const asked = createMemo(() => ui.conn.asking.ask({ run_view: { run: props.run } }));
+  const summary = createMemo<RunSummary | null>(() => {
+    const held = asked()();
+    return held !== undefined && "run" in held ? held.run : null;
+  });
+  // Two readings of one run, and the later one wins. The stream says
+  // what is happening now, the summary says what the city has written
+  // down, and both state a ledger position - so which is newer is a
+  // comparison rather than a preference.
+  const streamed = createMemo(() => {
+    const held = belief();
+    const said = summary();
+    if (held === undefined) return false;
+    return said === null || held.lastSeq >= said.last_seq;
+  });
   const answer = createMemo<RoundsAnswer | undefined>(() => {
     const held = rounds()();
     return held !== undefined && "rounds" in held ? held.rounds : undefined;
@@ -178,8 +200,10 @@ export function Run(props: RunProps) {
     }
     return null;
   });
-  const live = () => belief()?.doing.kind !== "frozen" && belief() !== undefined;
-  const room = () => belief()?.addr ?? null;
+  const over = () => (streamed() ? belief()?.doing.kind === "frozen" : summary()?.frozen === true);
+  const known = () => belief() !== undefined || summary() !== null;
+  const live = () => known() && !over();
+  const room = () => belief()?.addr ?? summary()?.addr ?? null;
   const roomWord = () => {
     const at = room();
     return at === null ? say("talk_resident") : roomOf(at);
@@ -202,6 +226,10 @@ export function Run(props: RunProps) {
             </>
           )}
         </Show>
+        {/* The run's own id when nothing has named the task yet. The
+            summary's `who` is not offered here: it is the resident, and
+            a resident's name standing where the task stands reads as a
+            task somebody set. */}
         <h1 class="truncate text-heading font-heading">{answer()?.opening?.task ?? belief()?.task ?? props.run}</h1>
         <span class="flex-1" />
         <Show when={live()}>
@@ -261,7 +289,7 @@ export function Run(props: RunProps) {
             </Show>
           </Match>
           <Match when={lens() === "changes"}>
-            <Show when={answer()?.opened_at} fallback={<p class="text-text-faint">{say("run_no_fence")}</p>}>
+            <Show when={answer()?.opened_at} fallback={<EmptyState text={say("run_no_fence")} />}>
               {(base) => <Changes base={base()} head={lastFence() === base() ? null : lastFence()} />}
             </Show>
           </Match>

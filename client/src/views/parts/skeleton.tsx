@@ -33,7 +33,7 @@ export function Skeleton(props: SkeletonProps) {
         {(index) => (
           <div
             aria-hidden="true"
-            class={`animate-pulse rounded-control bg-g2 ${props.tall === true ? "h-step" : "h-base"} ${
+            class={`shimmer rounded-control ${props.tall === true ? "h-step" : "h-base"} ${
               WIDTHS[index % WIDTHS.length] ?? "w-full"
             }`}
           />

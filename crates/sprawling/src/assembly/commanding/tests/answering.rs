@@ -110,11 +110,14 @@ fn a_refused_command_reaches_the_peer_that_sent_it() {
 #[test]
 fn a_refusal_with_no_one_behind_it_says_so_rather_than_failing() {
     let nobody = channels::Reply::nowhere();
-    let outcome = nobody.refuse(AxError::failure(
-        AxCode::ConfigInvalid,
-        "read the schedule",
-        "the file is not a schedule",
-    ));
+    let outcome = nobody.refuse(
+        AxError::failure(
+            AxCode::ConfigInvalid,
+            "read the schedule",
+            "the file is not a schedule",
+        )
+        .with_recovery("fix the schedule file, then start the city again"),
+    );
     assert_eq!(outcome, channels::Delivered::NobodyAsked);
 }
 #[test]

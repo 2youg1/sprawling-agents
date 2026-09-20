@@ -23,6 +23,27 @@ import type { Address, Answer, EventRecord, Query, Seq } from "../wire";
 
 const PACE_MS = 250;
 
+// Every question that needs nothing said after its name, under the
+// field its answer arrives in. Two duties, one table: a view asks
+// through it, so a question is spelled once for the whole client, and
+// `keyOfAnswer` walks it, so the pairing between an answer and the
+// question it settles cannot lose a row. The generated `Query` admits
+// only names this build can ask, so a misspelling here fails to
+// compile.
+export const QUERIES = {
+  city: "city_view",
+  approvals: "approval_queue",
+  metrics: "metrics",
+  cost: "cost_view",
+  registry: "registry_view",
+  discards: "discard_view",
+  endpoints: "endpoint_view",
+  governance: "governance",
+  doctor: "doctor",
+  toolkits: "toolkits",
+  release: "release",
+} as const satisfies Readonly<Record<string, Extract<Query, string>>>;
+
 // One page of a building's commits. The answer carries the building
 // and the bound back but not the page size, so every page asks for
 // the same size and the answer is matched by the other two.
@@ -62,14 +83,9 @@ function nameOf(query: Query): string {
 
 // The key an answer would have been asked under, when the answer says.
 function keyOfAnswer(answer: Answer): string | null {
-  if ("city" in answer) return keyOf("city_view");
-  if ("approvals" in answer) return keyOf("approval_queue");
-  if ("metrics" in answer) return keyOf("metrics");
-  if ("cost" in answer) return keyOf("cost_view");
-  if ("registry" in answer) return keyOf("registry_view");
-  if ("discards" in answer) return keyOf("discard_view");
-  if ("endpoints" in answer) return keyOf("endpoint_view");
-  if ("governance" in answer) return keyOf("governance");
+  for (const [field, query] of Object.entries(QUERIES)) {
+    if (field in answer) return keyOf(query);
+  }
   if ("building" in answer)
     return keyOf({ building_view: { addr: answer.building.addr } });
   if ("inbox" in answer) return keyOf({ inbox_view: { addr: answer.inbox.addr } });
@@ -87,6 +103,8 @@ function keyOfAnswer(answer: Answer): string | null {
   if ("git_status" in answer)
     return keyOf({ git_status: { building: answer.git_status.building } });
   if ("commit" in answer) return keyOf({ commit: { oid: answer.commit.oid } });
+  if ("mcp_health" in answer)
+    return keyOf({ mcp_health: { addr: answer.mcp_health.addr } });
   if ("hunks" in answer) {
     const { oid_a, oid_b, path } = answer.hunks;
     return keyOf({ hunks: { oid_a, oid_b, path } });
@@ -95,7 +113,6 @@ function keyOfAnswer(answer: Answer): string | null {
     const { base, head } = answer.changes;
     return keyOf({ changes: { base, head: head ?? null } });
   }
-  if ("doctor" in answer) return keyOf("doctor");
   if ("commits" in answer) {
     return keyOf(commitsQuery(answer.commits.building ?? null, answer.commits.before ?? null));
   }

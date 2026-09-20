@@ -69,12 +69,20 @@ impl Transcript {
                     "render a transcript line",
                     err.to_string(),
                 )
+                .with_recovery(
+                    "report this against runtime::transcript: a window message is text \
+                     and content blocks, and JSON refuses neither",
+                )
             })?;
             let Value::Object(map) = value else {
                 return Err(AxError::failure(
                     AxCode::InvalidArgs,
                     "render a transcript line",
                     "a message is an object",
+                )
+                .with_recovery(
+                    "report this against runtime::transcript: a window message encodes \
+                     as a JSON object and this one encoded as something else",
                 ));
             };
             let (scanned, hits) = redact::redact(&map);
@@ -84,6 +92,10 @@ impl Transcript {
                     AxCode::InvalidArgs,
                     "render a transcript line",
                     err.to_string(),
+                )
+                .with_recovery(
+                    "report this against runtime::transcript: redaction returns the \
+                     same JSON object with some strings replaced",
                 )
             })?;
             lines.push(line);

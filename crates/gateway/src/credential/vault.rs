@@ -108,6 +108,10 @@ fn keyring_entry(reference: &SecretRef) -> Result<keyring::Entry, AxError> {
             "open credential entry",
             err.to_string(),
         )
+        .with_recovery(
+            "start this machine's credential service (Keychain on macOS, Credential \
+             Manager on Windows, a Secret Service daemon on Linux), then try again",
+        )
     })
 }
 
@@ -117,6 +121,10 @@ impl Vault for KeyringVault {
             .set_password(&value)
             .map_err(|err| {
                 AxError::failure(AxCode::ConfigInvalid, "store credential", err.to_string())
+                    .with_recovery(
+                        "unlock this machine's credential service and store the value again; \
+                         sprawling writes plaintext nowhere else",
+                    )
             })
     }
 
@@ -128,6 +136,10 @@ impl Vault for KeyringVault {
                 AxCode::ConfigInvalid,
                 "fetch credential",
                 err.to_string(),
+            )
+            .with_recovery(
+                "unlock this machine's credential service, or store the credential again \
+                 from the settings page",
             )),
         }
     }
@@ -135,11 +147,15 @@ impl Vault for KeyringVault {
     fn delete(&mut self, reference: &SecretRef) -> Result<(), AxError> {
         match keyring_entry(reference)?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(err) => Err(AxError::failure(
-                AxCode::ConfigInvalid,
-                "delete credential",
-                err.to_string(),
-            )),
+            Err(err) => {
+                Err(
+                    AxError::failure(AxCode::ConfigInvalid, "delete credential", err.to_string())
+                        .with_recovery(
+                            "unlock this machine's credential service and delete the entry again, \
+                 or remove it in that service's own window",
+                        ),
+                )
+            }
         }
     }
 }

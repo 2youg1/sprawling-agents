@@ -13,6 +13,12 @@
 // was asked for its model list, narrowed to the rows a person ticked.
 // An endpoint that serves two hundred rows, most of them video and
 // speech, is not a list anybody reads - it is a list somebody filters.
+//
+// The table itself is `parts/table.tsx`: the sticky header, the
+// ordering, the tick column and the scroll box are that component's,
+// and what stays here is what only this page knows - which rows are
+// worth offering, what each column means, and which figure a row is
+// called with when nobody typed one.
 
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
@@ -20,10 +26,10 @@ import { createStore } from "solid-js/store";
 import { selectModel } from "../../core/commands";
 import type { Ceilings } from "../../core/commands";
 import type { ModelFact } from "../../core/probed";
-import { EFFORTS } from "../../core/prefs";
 import type { EndpointsAnswer, ModelTag } from "../../wire";
-import { useCommand, useSay, useUi } from "../../ui";
+import { useCommand, useSay } from "../../ui";
 import { Field } from "../parts/field";
+import { Table, type Column } from "../parts/table";
 
 // One ticked row: the model, the two ceilings a person read off the
 // provider's own documentation, and the role it is to fill if any.
@@ -63,13 +69,6 @@ function looksTextual(row: ModelFact): boolean {
   return !NOT_TEXT.some((mark) => lower.includes(mark));
 }
 
-// The part of a model id before the slash, which every catalogue that
-// carries more than one vendor uses to say whose model this is.
-function vendorOf(id: string): string | null {
-  const cut = id.indexOf("/");
-  return cut > 0 ? id.slice(0, cut) : null;
-}
-
 // A whole positive number, or nothing. An empty box and a box holding
 // letters both mean "nobody stated this", which is what the wire calls
 // absent.
@@ -98,10 +97,11 @@ interface Filled {
   role: Record<string, string>;
 }
 
-// A figure the provider itself stated, as the box shows it. An empty
-// string is what "nobody stated this" looks like in an input, and the
-// person filling it in is the next authority.
-function prefilled(stated: number | null): string {
+// What an untouched box shows: the figure the provider itself stated,
+// drawn as a placeholder rather than as a value, because a placeholder
+// says "this is what will be sent" where a value would claim a person
+// decided it. A provider that stated nothing leaves the box blank.
+function placeholderOf(stated: number | null): string {
   return stated === null ? "" : String(stated);
 }
 
@@ -143,35 +143,32 @@ export function ModelTable(props: {
     return all.filter((row, at) => all.findIndex((other) => other.id === row.id) === at);
   });
   const byHand = createMemo(() => named().map((row) => row.id));
+  // Ordered by id, which stands one vendor's rows together because the
+  // vendor is the part of an id before the slash. Any column that can
+  // be ordered by reorders it from there; this is where it opens.
   const shown = createMemo(() => {
     const needle = search().trim().toLowerCase();
-    return every().filter(
-      (row) =>
-        (needle === "" || row.id.toLowerCase().includes(needle)) &&
-        (!textOnly() || looksTextual(row) || byHand().includes(row.id)),
-    );
-  });
-  const vendors = createMemo(() => {
-    const groups = new Map<string, ModelFact[]>();
-    for (const row of shown()) {
-      const vendor = vendorOf(row.id) ?? "";
-      const held = groups.get(vendor);
-      if (held === undefined) groups.set(vendor, [row]);
-      else held.push(row);
-    }
-    return [...groups.entries()];
+    return every()
+      .filter(
+        (row) =>
+          (needle === "" || row.id.toLowerCase().includes(needle)) &&
+          (!textOnly() || looksTextual(row) || byHand().includes(row.id)),
+      )
+      .sort((a, b) => a.id.localeCompare(b.id));
   });
   const ticked = createMemo(() => every().filter((row) => filled.ticked[row.id] === true));
-  // What the provider stated, unless the person typed over it. The two
-  // boxes start prefilled from the row's own answer, so a table nobody
-  // touched still carries the figures the provider gave.
+  // The figures a row is called with: what the person typed, and
+  // otherwise what the provider stated. An empty box therefore means
+  // "keep what the provider stated" rather than "state nothing", which
+  // is why that figure is drawn as a placeholder and not as a value.
+  const windowOf = (row: ModelFact): number | null =>
+    stated(filled.context[row.id] ?? "") ?? row.contextTokens;
+  const ceilingOf = (row: ModelFact): number | null =>
+    stated(filled.output[row.id] ?? "") ?? row.maxOutputTokens;
   const rows = createMemo<readonly ModelRow[]>(() =>
     ticked().map((row) => ({
       id: row.id,
-      ceilings: {
-        contextTokens: stated(filled.context[row.id] ?? "") ?? row.contextTokens,
-        maxOutputTokens: stated(filled.output[row.id] ?? "") ?? row.maxOutputTokens,
-      },
+      ceilings: { contextTokens: windowOf(row), maxOutputTokens: ceilingOf(row) },
       tag: tagOf(filled.role[row.id] ?? ""),
     })),
   );
@@ -182,6 +179,103 @@ export function ModelTable(props: {
   const tickAll = (state: boolean) => {
     for (const row of shown()) setFilled("ticked", row.id, state);
   };
+
+  // A row that states no figure sorts below every row that does,
+  // because the question this column is ordered to answer is which of
+  // them is the biggest.
+  const bySize = (a: number | null, b: number | null): number => (a ?? 0) - (b ?? 0);
+  // Only the id column grows. It takes whatever width the others
+  // leave and breaks a long id anywhere rather than cutting it off,
+  // because an id a person cannot read whole is an id they cannot tick
+  // with confidence.
+  //
+  // Every other column therefore states a bound, in one of the two
+  // ways this table needs: a control sits in a `w-figure` box, and
+  // text is left free to wrap. A cell that states neither is the cell
+  // that takes the width away from the id column - which is what
+  // `whitespace-nowrap` did in the modalities and price columns, and
+  // what a `<select>` does by being as wide as its longest option
+  // however narrow the table is.
+  const columns = createMemo<readonly Column<ModelFact>[]>(() => [
+    {
+      key: "id",
+      header: say("setup_model_id"),
+      render: (row) => <span class="block min-w-0 font-mono text-note wrap-anywhere text-text">{row.id}</span>,
+      compare: (a, b) => a.id.localeCompare(b.id),
+    },
+    {
+      key: "context",
+      header: say("setup_model_context"),
+      render: (row) => (
+        <div class="w-figure">
+          <Field
+            label={`${say("setup_model_context")} ${row.id}`}
+            labelling="hidden"
+            kind="number"
+            step={1024}
+            mono
+            value={filled.context[row.id] ?? ""}
+            placeholder={placeholderOf(row.contextTokens)}
+            onInput={(value) => { setFilled("context", row.id, value); }}
+          />
+        </div>
+      ),
+      compare: (a, b) => bySize(windowOf(a), windowOf(b)),
+    },
+    {
+      key: "output",
+      header: say("setup_model_output"),
+      render: (row) => (
+        <div class="w-figure">
+          <Field
+            label={`${say("setup_model_output")} ${row.id}`}
+            labelling="hidden"
+            kind="number"
+            step={1024}
+            mono
+            value={filled.output[row.id] ?? ""}
+            placeholder={placeholderOf(row.maxOutputTokens)}
+            onInput={(value) => { setFilled("output", row.id, value); }}
+          />
+        </div>
+      ),
+      compare: (a, b) => bySize(ceilingOf(a), ceilingOf(b)),
+    },
+    {
+      key: "modalities",
+      header: say("setup_model_modalities"),
+      // wording-ok: the modalities and the prices the provider itself stated
+      render: (row) => (
+        <span class="text-note text-text-faint">
+          {row.inputModalities.length === 0 ? "—" : row.inputModalities.join(" ")}
+        </span>
+      ),
+    },
+    {
+      key: "price",
+      header: say("setup_model_price"),
+      render: (row) => <span class="font-mono text-note text-text-faint">{priceOf(row)}</span>,
+    },
+    {
+      key: "role",
+      header: say("setup_model_role"),
+      render: (row) => (
+        <div class="w-figure">
+          <select
+            class="w-full rounded-control bg-g2 px-snug py-tight text-note text-text"
+            value={filled.role[row.id] ?? ""}
+            aria-label={`${say("setup_model_role")} ${row.id}`}
+            onChange={(event) => { setFilled("role", row.id, event.currentTarget.value); }}
+          >
+            <option value="">—</option>
+            <option value="main">{say("setup_main")}</option>
+            <option value="digest">{say("setup_digest")}</option>
+            <option value="transcribe">{say("setup_transcribe")}</option>
+          </select>
+        </div>
+      ),
+    },
+  ]);
 
   return (
     <div class="flex flex-col gap-snug text-note">
@@ -199,110 +293,27 @@ export function ModelTable(props: {
           <input type="checkbox" checked={textOnly()} onChange={(event) => setTextOnly(event.currentTarget.checked)} />
           {say("setup_text_only")}
         </label>
-        <button
-          type="button"
-          class="rounded-control bg-g2 px-base py-tight text-label hover:bg-g3"
-          onClick={() => { tickAll(true); }}
-        >
-          {say("setup_select_all")}
-        </button>
-        <button
-          type="button"
-          class="rounded-control bg-g2 px-base py-tight text-label hover:bg-g3"
-          onClick={() => { tickAll(false); }}
-        >
-          {say("setup_select_none")}
-        </button>
       </div>
       <p class="text-text-faint">
         {say("setup_ticked_count", { ticked: String(ticked().length), total: String(every().length) })}
       </p>
       <Show when={every().length > 0}>
-        <div class="max-h-output overflow-auto rounded-card bg-g1 px-snug py-snug">
-          <table class="w-full table-fixed border-collapse text-left">
-            <thead class="text-text-faint">
-              <tr>
-                <th class="w-glyph" />
-                <th class="py-tight font-label">{say("setup_model_id")}</th>
-                <th class="w-figure py-tight font-label">{say("setup_model_context")}</th>
-                <th class="w-figure py-tight font-label">{say("setup_model_output")}</th>
-                <th class="w-figure py-tight font-label">{say("setup_model_modalities")}</th>
-                <th class="w-figure py-tight font-label">{say("setup_model_price")}</th>
-                <th class="w-figure py-tight font-label">{say("setup_model_role")}</th>
-              </tr>
-            </thead>
-            <For each={vendors()}>
-              {([vendor, models]) => (
-                <tbody>
-                  <tr>
-                    <td colspan="7" class="pt-snug text-text-faint">
-                      {vendor === "" ? say("setup_vendor_none") : vendor}
-                    </td>
-                  </tr>
-                  <For each={models}>
-                    {(row) => (
-                      <tr class="align-middle">
-                        <td class="py-tight">
-                          <input
-                            type="checkbox"
-                            checked={filled.ticked[row.id] === true}
-                            aria-label={say("setup_tick_model", { model: row.id })}
-                            onChange={(event) => { setFilled("ticked", row.id, event.currentTarget.checked); }}
-                          />
-                        </td>
-                        <td class="min-w-0 wrap-anywhere py-tight font-mono text-text">{row.id}</td>
-                        <td class="py-tight">
-                          <Field
-                            label={`${say("setup_model_context")} ${row.id}`}
-                            labelling="hidden"
-                            kind="number"
-                            step={1024}
-                            mono
-                            value={filled.context[row.id] ?? prefilled(row.contextTokens)}
-                            onInput={(value) => { setFilled("context", row.id, value); }}
-                          />
-                        </td>
-                        <td class="py-tight">
-                          <Field
-                            label={`${say("setup_model_output")} ${row.id}`}
-                            labelling="hidden"
-                            kind="number"
-                            step={1024}
-                            mono
-                            value={filled.output[row.id] ?? prefilled(row.maxOutputTokens)}
-                            onInput={(value) => { setFilled("output", row.id, value); }}
-                          />
-                        </td>
-                        {/* wording-ok: the modalities and the prices the provider itself stated */}
-                        <td class="min-w-0 wrap-anywhere py-tight text-text-faint">
-                          {row.inputModalities.length === 0 ? "—" : row.inputModalities.join(" ")}
-                        </td>
-                        <td class="truncate py-tight font-mono text-text-faint">
-                          {priceOf(row)}
-                        </td>
-                        <td class="py-tight">
-                          <select
-                            class="w-full rounded-control bg-g2 px-snug py-tight text-note text-text"
-                            value={filled.role[row.id] ?? ""}
-                            aria-label={say("setup_model_role")}
-                            onChange={(event) => { setFilled("role", row.id, event.currentTarget.value); }}
-                          >
-                            <option value="">—</option>
-                            <option value="main">{say("setup_main")}</option>
-                            <option value="digest">{say("setup_digest")}</option>
-                            <option value="transcribe">{say("setup_transcribe")}</option>
-                          </select>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              )}
-            </For>
-          </table>
-        </div>
+        <Table
+          caption={say("setup_models")}
+          columns={columns()}
+          rows={shown()}
+          keyOf={(row) => row.id}
+          empty={<p class="px-base py-snug text-text-faint">{say("setup_no_models")}</p>}
+          selection={{
+            picked: (row) => filled.ticked[row.id] === true,
+            onPick: (row, on) => { setFilled("ticked", row.id, on); },
+            allLabel: say("setup_select_all"),
+            allPicked: () => shown().length > 0 && shown().every((row) => filled.ticked[row.id] === true),
+            onPickAll: (on) => { tickAll(on); },
+          }}
+        />
       </Show>
-      <Show when={ticked().some((row) => (stated(filled.output[row.id] ?? "") ?? row.maxOutputTokens) === null)}>
+      <Show when={ticked().some((row) => ceilingOf(row) === null)}>
         <p class="text-alert">{say("setup_model_needed")}</p>
       </Show>
       <Field
@@ -362,31 +373,6 @@ export function ModelChoice(props: { readonly answer: EndpointsAnswer; readonly 
           )}
         </For>
       </Show>
-    </div>
-  );
-}
-
-export function EffortChoice() {
-  const ui = useUi();
-  const say = useSay();
-  return (
-    <div class="flex flex-col gap-tight text-note text-text-quiet">
-      {say("setup_effort")}
-      <div class="flex flex-wrap gap-tight">
-        <For each={EFFORTS}>
-          {(effort) => (
-            <button
-              type="button"
-              class={`rounded-pill px-base py-tight text-label ${ui.prefs.effort() === effort ? "bg-accent text-g0" : "bg-g2 text-text-quiet hover:bg-g3"}`}
-              onClick={() => {
-                ui.prefs.setEffort(effort);
-              }}
-            >
-              {say(`effort_${effort}`)}
-            </button>
-          )}
-        </For>
-      </div>
     </div>
   );
 }

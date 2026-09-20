@@ -12,6 +12,9 @@
 //! - a gate refusal always carries the three mandatory parts (rule,
 //!   violation, alternative): [`AxError::refusal`] is the only path that
 //!   sets them and [`AxError::failure`] cannot.
+//! - every constructed error says what to do next: both constructors
+//!   return an [`ErrorDraft`], and [`ErrorDraft::with_recovery`] is the
+//!   only way to obtain an [`AxError`].
 //! - `retriable` defaults to false; a caller must opt in explicitly
 //!   (fail-closed).
 //!
@@ -24,4 +27,4 @@ mod shape;
 
 pub use code::{AxCode, Carrier};
 pub use refusal::GateRefusal;
-pub use shape::AxError;
+pub use shape::{AxError, ErrorDraft};

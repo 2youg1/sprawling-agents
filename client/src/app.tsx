@@ -17,17 +17,23 @@
 // A stopped city is said once, here, as a banner over every page: the
 // city page used to draw a crescent nobody could read and dim itself to
 // 40%, which is a mood rather than a message.
+//
+// What the city has to tell the person is no longer a bell floating
+// over the top right corner; it is the dot at the top of the rail
+// (`views/notices.tsx`), which the rail mounts and this file does not
+// have to place.
 
 import { Option } from "effect";
 import { Match, Show, Switch, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 
+import { QUERIES } from "./core/asking";
 import { halt, release } from "./core/commands";
 import { PREFIX_MS, keymap } from "./core/keys";
 import type { Action } from "./core/keys";
 import { paintMark } from "./core/mark";
 import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
 import type { View } from "./core/route";
-import { useCommand, useGo, useSay, useUi } from "./ui";
+import { useApprovals, useCommand, useGo, useSay, useUi } from "./ui";
 import { Cheatsheet } from "./views/parts/kbd";
 import { Building } from "./views/building";
 import { City } from "./views/city";
@@ -35,7 +41,7 @@ import { Cost } from "./views/cost";
 import { Palette } from "./views/palette";
 import { Rail } from "./views/rail";
 import { Record } from "./views/record";
-import { Notices } from "./views/notices";
+import { motionOff } from "./views/shared/motion";
 import { Refusal } from "./views/refusal";
 import { Run } from "./views/run";
 import { Mcp } from "./views/mcp";
@@ -91,8 +97,28 @@ export function App() {
   // person left it.
   let opener: HTMLElement | null = null;
 
+  // One page replaces another. A swap is a cut; a view transition
+  // carries the rail's current item and the page's title across, so
+  // the eye keeps the thing it was already looking at.
+  //
+  // It wraps the read of the address bar rather than the write of it,
+  // because `hashchange` arrives in a later task: a transition around
+  // `go()` would finish before the page had changed. Doing it here
+  // also covers the back button and every `<a href="#/…">` on the
+  // page, which `go()` never sees.
+  //
+  // Firefox has not shipped the API, and a person who turned movement
+  // off asked for no travel; both take the swap that was here before
+  // (client-SPEC 9.0, rows 4 and 8).
   const follow = () => {
-    setView(Option.getOrElse(current(ui.bar), () => DEFAULT_VIEW));
+    const settle = () => {
+      setView(Option.getOrElse(current(ui.bar), () => DEFAULT_VIEW));
+    };
+    if (!("startViewTransition" in document) || motionOff(document.documentElement)) {
+      settle();
+      return;
+    }
+    document.startViewTransition(settle);
   };
   const drop = () => {
     clearTimeout(forget);
@@ -189,12 +215,12 @@ export function App() {
 
   // The run list is the ground every page stands on: asked here so it
   // is always watched, and folded into what the page believes.
-  ui.conn.asking.ask("city_view");
+  ui.conn.asking.ask(QUERIES.city);
 
   // Whether this city can take a dispatch at all: a `main` model is
   // chosen. Until then the first page is the welcome, unless the person
   // has already walked it and asked to be left alone.
-  const endpoints = ui.conn.asking.ask("endpoint_view");
+  const endpoints = ui.conn.asking.ask(QUERIES.endpoints);
   const ready = createMemo(() => {
     const answer = endpoints();
     if (answer === undefined || !("endpoints" in answer)) {
@@ -211,11 +237,8 @@ export function App() {
   // The document title and the tab's icon carry what a hidden tab most
   // needs to say: how many things wait for the person, and whether the
   // city is working at all.
-  const approvals = ui.conn.asking.ask("approval_queue");
-  const waiting = createMemo(() => {
-    const answer = approvals();
-    return answer !== undefined && "approvals" in answer ? answer.approvals.items.length : 0;
-  });
+  const approvals = useApprovals();
+  const waiting = () => approvals().length;
   const working = createMemo(() => Object.values(ui.conn.belief.runs).some((run) => run.doing.kind !== "frozen"));
   const halted = () => ui.conn.belief.halted.includes("city");
   // How many runs this city cancelled. The wire carries no count of
@@ -273,11 +296,6 @@ export function App() {
             </button>
           </div>
         </Show>
-        <div class="pointer-events-none absolute top-snug right-pane z-20 flex justify-end">
-          <div class="pointer-events-auto">
-            <Notices />
-          </div>
-        </div>
         <main id="main" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto" aria-label={say("region_main")}>
           <Switch>
           <Match keyed when={view().kind === "talk" ? view() : undefined}>

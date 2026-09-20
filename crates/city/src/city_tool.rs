@@ -175,7 +175,11 @@ impl Tool for CityTool {
                 AxCode::InvalidArgs,
                 "read or change the shape of the city",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let args = call.args.as_map();
         let action = args.get("action").and_then(Value::as_str).ok_or_else(|| {

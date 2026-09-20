@@ -259,7 +259,11 @@ impl Tool for StatusTool {
                 AxCode::InvalidArgs,
                 "read status",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let mut result = Map::new();
         result.insert(

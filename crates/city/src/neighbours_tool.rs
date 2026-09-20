@@ -157,7 +157,11 @@ impl Tool for NeighboursTool {
                 AxCode::InvalidArgs,
                 "list the neighbours of this run",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let scope = Scope::parse(call.args.as_map().get("scope").and_then(Value::as_str))?;
         let mut out = Map::new();

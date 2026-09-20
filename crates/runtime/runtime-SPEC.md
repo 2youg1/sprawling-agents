@@ -798,14 +798,15 @@ pub struct RunHooks<'a> {
 
 ### 8-20 runtime::replay 目录化
 
-**570 → 388（`replay.rs`）＋186（`replay/tests.rs`）。** 只做测试迁出：离线验证的生产代码本就在 400 行以内，不需要簇切，逻辑与函数签名一行未改。
+**三份文件，各答一个问题。** 崩溃恢复与链验证是两件事：链验证读的是字节与哈希，崩溃恢复读的是已验证行之间的配对关系（`tool_called` 有没有后继的 `tool_result`）。两者同处一个文件时，`replay.rs` 越过了 400 行上限。
 
 | 文件 | 管什么 |
 |---|---|
-| `replay.rs` | `VerifiedLine`／`VerifiedLedger`／`Envelope`，以及 `verify_lines`／`verify_ledger_dir`／`rebuild_prefix`／`dangling_tool_calls`／`outcome_unknown_draft` |
+| `replay.rs` | `VerifiedLine`／`VerifiedLedger`／`Envelope`，以及 `verify_lines`／`verify_ledger_dir`／`rebuild_prefix`。它同时是子模块的父模块，声明 `mod resume;` 并 `pub use resume::{dangling_tool_calls, outcome_unknown_draft};`，因此 crate 内外的 `use` 一行未改 |
+| `replay/resume.rs` | 崩溃恢复这一条规则的两次读法：`dangling_tool_calls` 认出结果未知的调用，`outcome_unknown_draft` 写下关掉它的那一行（`E_TOOL_OUTCOME_UNKNOWN`）。什么算悬空决定关帐行说什么，故同一个文件 |
 | `replay/tests.rs` | 离线验证拒绝什么：更高的 `v`、无 `ig:true` 的未知 kind、漂移的 prefix 源文档、悬空的 tool_called（5 个 `#[test]`） |
 
-**无字段开放。** 子模块本就能看见父模块的私有项，`mod tests` 上原有的 `#[allow(...)]` 清单原样搬到 `mod tests;` 声明上。
+**无字段开放。** `resume.rs` 经 `use super::{VerifiedLedger, VerifiedLine}` 读父模块的公开类型，`VerifiedLedger` 的私有字段一处也没放宽；`mod tests` 上原有的 `#[allow(...)]` 清单仍落在 `mod tests;` 声明上。
 
 **api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
 
@@ -865,27 +866,29 @@ pub struct RunHooks<'a> {
 
 ### 8-25 runtime::sandbox 目录化
 
-**422 行一个文件 → 374（`sandbox.rs`）＋52（`sandbox/tests.rs`）。** 切法只用了「测试迁出」：非测试部分本就在 400 行以内，逻辑一行未改，函数签名与公开面逐字节不变。
+**缝与唯一一个真适配器分家。** `sandbox.rs` 先前把 wasmtime 适配器整个内联成 `mod engine { … }`，两百余行 wasmtime 专属代码压在缝的定义下面，文件因而越过 400 行上限。现在缝留在父文件，适配器有自己的文件。
 
 | 文件 | 管什么 |
 |---|---|
-| `sandbox.rs` | 执行边界本身：`Fuel`／`Mount`／`SandboxJob`／`SandboxOutcome`／`SandboxExit`／`Sandbox` 缝，缺席判词 `AbsentSandbox`，两个替身 `EchoSandbox`／`FaultSandbox`，feature `wasm` 下的 `engine` 子模块（`WasmtimeSandbox` 与 `classify`），以及 feature `conformance` 下的 `assert_sandbox_conformance` |
+| `sandbox.rs` | 执行边界本身：`Fuel`／`Mount`／`SandboxJob`／`SandboxOutcome`／`SandboxExit`／`Sandbox` 缝，缺席判词 `AbsentSandbox`，两个替身 `EchoSandbox`／`FaultSandbox`，以及 feature `conformance` 下的 `assert_sandbox_conformance`。它声明 `#[cfg(feature = "wasm")] mod engine;` 并原样保留 `pub use engine::WasmtimeSandbox;` |
+| `sandbox/engine.rs` | 唯一会真跑 guest 的适配器：`WasmtimeSandbox`（引擎配置、预开目录、燃料预算、stdio 管道）、host 侧拒词构造 `host_error`，以及把引擎的收场判成 `SandboxExit` 的 `classify` |
 | `sandbox/tests.rs` | 两个替身对调用方的承诺：直通替身回声 stdin 并记下 job、故障替身按序发脚本且发完即止（2 个 `#[test]`，与切前相等） |
 
-**无字段开放。** 子模块本就能看见父模块的私有项，故 `EchoSandbox.scripted` 与 `FaultSandbox.scripted` 的可见性没动。
+**无字段开放。** `engine.rs` 与内联时一样经 `use super::{…}` 取缝的类型，`EchoSandbox.scripted`／`FaultSandbox.scripted` 的可见性没动。
 
 **api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
 
 ### 8-26 runtime::tools::exec 目录化
 
-**403 行一个文件 → 277（`tools/exec.rs`）＋130（`tools/exec/tests.rs`）。** 切法只用了「测试迁出」：非测试部分本就在 400 行以内，逻辑一行未改，函数签名与公开面逐字节不变。`ExecTool::new` 的 7 参豁免键 `crates/runtime/src/tools/exec.rs::new` 因而仍指着它原来的文件。
+**「发生了什么」与「怎么写下来」分家。** 三条臂判定发生了什么，结果载荷的键名（`arm`／`stdout`／`stderr`／`exit_code`／`outcome`／`handle`／`what`／`detail`／`background`／`env`）是另一件事：它们必须一处定义，否则一条臂可以把结果拼得跟邻居不一样。两者同处一个文件时 `exec.rs` 越过了 400 行上限。`ExecTool::new` 的 7 参豁免键 `crates/runtime/src/tools/exec.rs::new` 仍指着它原来的文件。
 
 | 文件 | 管什么 |
 |---|---|
-| `tools/exec.rs` | 三臂本身：`ExecTool`（`new` 与 `run_program`／`run_python`／`run_shell`）、环境白名单 `ENV_ALLOWLIST`、结果打包 `outcome`／`exceptional`、臂解析 `parse_arm`，以及 `impl Tool for ExecTool` 的路由 |
+| `tools/exec.rs` | 三臂本身：`ExecTool`（`new` 与 `run_program`／`run_python`／`run_shell`／`through_the_backlog`／`inherited_environment`）、环境白名单 `ENV_ALLOWLIST`、臂解析 `parse_arm`，以及 `impl Tool for ExecTool` 的路由。它声明 `mod outcome;` 并 `use outcome::{backgrounded, exceptional, settled, with_backlog, with_environment};` |
+| `tools/exec/outcome.rs` | 这把工具能给出的每一种回答的形状：`settled`（原名 `outcome`，模块名占了这个词故改用动词过去式）、`backgrounded`、`exceptional` 三种载荷，以及 `with_backlog`／`with_environment` 两条尾巴。全部 `pub(super)`，不出 `tools::exec` |
 | `tools/exec/tests.rs` | 每条臂对调用方的承诺：缺件时点名替代方案而拒绝、python 臂在沙盒里跑并报自己的退出码、燃料耗尽与 trap 原样抵达、无法识别的臂只拒不猜、program 臂真起子进程且环境被洗（5 个 `#[test]`，与切前相等）|
 
-**无字段开放。** 测试是子模块，父模块的私有字段与私有方法本就可见。
+**无字段开放。** 结果构造函数全部 `pub(super)`；测试是子模块，父模块的私有字段与私有方法本就可见。
 
 **api-baseline 未重写。** 公开项 `ExecTool`／`parse_arm` 的定义位置未动，规范路径不变。
 

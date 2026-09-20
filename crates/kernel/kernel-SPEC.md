@@ -11,7 +11,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 
 | 模块 | 形状（ARCHITECTURE §7） | 一句话 |
 |---|---|---|
-| `error` | 2 值类型＋6 数据面 | AxError 七字段；AxCode 35（S2 期初增 `E_STORAGE_FATAL`，删 `E_SIGNAL_UNKNOWN`）；carrier 声明位 |
+| `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 35（S2 期初增 `E_STORAGE_FATAL`，删 `E_SIGNAL_UNKNOWN`）；carrier 声明位 |
 | `address` | 2 值类型 | 相对 city root 路径 newtype；WriteDomain 原语；reserved prefix 判定 |
 | `locator` | 2 值类型 | `cas:`／`file:` 文法解析与呈现；fail-closed |
 | `event` | 2 值类型 | EventKind 64（基集 55，另有 `autonomy_changed`、roadmap 三件、`login_started`、`endpoint_probed`、`roadmap_split`／`roadmap_blocked`、`pursuit_changed`、`governed_document_written`，共 65）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
@@ -160,20 +160,29 @@ impl AxCode {
 }
 ```
 
-**构造**：字段私有；两个构造子＋组合子，使「Gate 拒绝码 ⇒ gate 三段在场」由构造路径保证：
+**构造**：字段私有；两个构造子都返回 `ErrorDraft`，`ErrorDraft::with_recovery` 是通向 `AxError` 的唯一门。两条不变量因此由构造路径保证：「Gate 拒绝码 ⇒ gate 三段在场」，以及「凡构造出的 AxError 必带一句恢复语」。
 
 ```rust
 impl AxError {
     /// Non-gate failure. `retriable` defaults to false (fail-closed).
-    pub fn failure(code: AxCode, action: impl Into<String>, subject: impl Into<String>) -> Self;
+    pub fn failure(code: AxCode, action: impl Into<String>, subject: impl Into<String>) -> ErrorDraft;
     /// Gate refusal. Sets `gate` to the mandatory three parts.
-    pub fn refusal(code: AxCode, action: impl Into<String>, subject: impl Into<String>, gate: GateRefusal) -> Self;
-    pub fn with_nearby(self, nearby: Vec<String>) -> Self;
-    pub fn with_recovery(self, recovery: impl Into<String>) -> Self;
-    pub fn retriable(self) -> Self;     // 显式声明可重试，默认不可
+    pub fn refusal(code: AxCode, action: impl Into<String>, subject: impl Into<String>, gate: GateRefusal) -> ErrorDraft;
     pub fn code(&self) -> &AxCode;  pub fn gate(&self) -> Option<&GateRefusal>;
+    /// 改写下层抛上来的恢复语；与 `ErrorDraft::with_recovery` 分名，因为它毁掉一句而不是补上第一句。
+    #[must_use] pub fn rewrite_recovery(self, recovery: impl Into<String>) -> Self;
+}
+
+#[must_use = "an ErrorDraft becomes an AxError only through with_recovery"]
+pub struct ErrorDraft { /* 私有：尚未拿到恢复语的那六个字段 */ }
+impl ErrorDraft {
+    pub fn with_nearby(self, nearby: Vec<String>) -> Self;
+    pub fn retriable(self) -> Self;     // 显式声明可重试，默认不可
+    pub fn with_recovery(self, recovery: impl Into<String>) -> AxError;   // 唯一出口
 }
 ```
+
+**H-01 定案：取 typestate，不取四参**。路线图 §13.1 原定 `failure(code, action, subject, recovery)` 四参必填，此处改记为 typestate，理由三条：其一，`refusal` 已占满四参，再塞恢复语就是第五参，越过参数上限；其二，恢复语只剩 `ErrorDraft::with_recovery` 一个设定处，四参方案则要把 `with_recovery` 留作改写器，同一个名字两份职责；其三，四参要重写全部 641 个调用点，typestate 只动缺恢复语的那些，改动面恰好等于缺陷面。关门理由随之由「每处四实参」改为「编译通过」——恢复语必填这条现在由类型系统执行，grep 执行不了它。`AxError` 一经存在即已完工，`with_nearby`／`retriable` 只在 draft 上，故链式调用中 `with_recovery` 恒为最后一环。
 
 「gate 码走 `refusal`」由构造纪律＋单测保证；S2 `kernel::gate` 是全库唯一 gate 码生产者，citysim 不变量 8 号在系统层复验。derive `Serialize/Deserialize`（Ledger 载荷需要）、`Clone/Debug/PartialEq`；`thiserror::Error` 提供 Display（`{code}: {action} on {subject}`）。
 
@@ -447,7 +456,7 @@ pub const EVENT_LOG_V: u32 = 1;                  // EventRecord.v 的唯一来�
 pub const L0_TOOLS: [&str; 3] = ["exec", "edit", "status"];
 pub struct SecretShape { pub provider: &'static str, pub prefix: &'static str,
                          pub charset: SecretCharset, pub len: (u16, u16) }   // 闭区间
-pub enum SecretCharset { Base62, Base64Url, HexLower, Base36Lower }
+pub enum SecretCharset { Base62, Base64Url, HexLower, UpperBase36 }
 pub const SECRET_SHAPES: [SecretShape; N] = [ /* 公开 provider 令牌形状，见 §14 */ ];
 ```
 

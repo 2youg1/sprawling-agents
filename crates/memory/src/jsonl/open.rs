@@ -126,6 +126,10 @@ impl JsonlLedger {
                         AxCode::InvalidArgs,
                         "probe ledger version",
                         "first line is not a version-bearing record",
+                    )
+                    .with_recovery(
+                        "restore this segment from its checkpoint commit, then run \
+                         `sprawling replay <ledger-dir>`: line 1 of every segment carries `v`",
                     ),
                 });
             }
@@ -142,7 +146,11 @@ impl JsonlLedger {
             return Err(MemoryError::Envelope {
                 path: first.clone(),
                 line: 1,
-                source: AxError::failure(AxCode::InvalidArgs, "probe ledger version", "v < 1"),
+                source: AxError::failure(AxCode::InvalidArgs, "probe ledger version", "v < 1")
+                    .with_recovery(
+                        "restore this segment from its checkpoint commit: the ledger \
+                         version starts at 1 and this line declares less",
+                    ),
             });
         }
         Ok(())
@@ -175,7 +183,15 @@ impl JsonlLedger {
             return Err(MemoryError::Envelope {
                 path: prior.clone(),
                 line: 0,
-                source: AxError::failure(AxCode::InvalidArgs, "read prior segment", "empty"),
+                source: AxError::failure(
+                    AxCode::InvalidArgs,
+                    "read prior segment",
+                    "segment holds no complete line",
+                )
+                .with_recovery(
+                    "restore this segment from its checkpoint commit, or move it aside if \
+                     it was never written: a segment that exists holds at least one line",
+                ),
             });
         };
         let record =
@@ -239,6 +255,11 @@ impl JsonlLedger {
                                 AxCode::InvalidArgs,
                                 "verify chain root",
                                 "first line does not continue the chain",
+                            )
+                            .with_recovery(
+                                "run `sprawling replay <ledger-dir>` to see the first line \
+                                 that breaks, then restore that segment from its \
+                                 checkpoint commit",
                             ),
                         });
                     }

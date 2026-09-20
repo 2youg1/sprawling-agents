@@ -84,8 +84,11 @@ export function Combobox(props: ComboboxProps) {
           </Show>
         </span>
       </button>
+      {/* No stacking number: the list is positioned and the form rows
+          under it are not, which is already the order they are painted
+          in. */}
       <Show when={open()}>
-        <div class="absolute top-full left-0 z-10 mt-tight flex w-full flex-col rounded-panel border border-g3 bg-g1 p-tight shadow-composer transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none">
+        <div class="absolute top-full left-0 mt-tight flex w-full flex-col rounded-panel border border-g3 bg-g1 p-tight shadow-composer transition-[opacity,transform] duration-200 ease-standard motion-reduce:transition-none">
           <input
             ref={(input) => {
               requestAnimationFrame(() => {

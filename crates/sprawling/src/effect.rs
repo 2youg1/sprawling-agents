@@ -307,10 +307,17 @@ impl Claims {
 /// # Errors
 /// Refuses an entry that does not serialise to an object.
 pub(crate) fn goal_payload(entry: &kernel::GoalEntry) -> Result<Payload, AxError> {
-    let value = serde_json::to_value(entry)
-        .map_err(|err| AxError::failure(AxCode::InvalidArgs, "record a goal", err.to_string()))?;
+    let value = serde_json::to_value(entry).map_err(|err| {
+        AxError::failure(AxCode::InvalidArgs, "record a goal", err.to_string()).with_recovery(
+            "report this against sprawling::effect: a goal entry is text and whole \
+                 numbers, and JSON refuses neither",
+        )
+    })?;
     let map = value.as_object().cloned().ok_or_else(|| {
-        AxError::failure(AxCode::InvalidArgs, "record a goal", "a goal is an object")
+        AxError::failure(AxCode::InvalidArgs, "record a goal", "a goal is an object").with_recovery(
+            "report this against sprawling::effect: a goal entry encodes as a JSON \
+             object and this one did not",
+        )
     })?;
     Payload::new(map)
 }

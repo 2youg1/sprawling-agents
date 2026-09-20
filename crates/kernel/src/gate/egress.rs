@@ -56,21 +56,28 @@ pub fn egress(
             .map(|s| format!("{}+{}", s.start, s.len))
             .collect();
         return EgressOutcome::Deny {
-            refusal: Box::new(AxError::refusal(
-                AxCode::SecretEgress,
-                "send bytes out",
-                format!(
-                    "{} secret-shaped span(s) at {}",
-                    spans.len(),
-                    offsets.join(", ")
+            refusal: Box::new(
+                AxError::refusal(
+                    AxCode::SecretEgress,
+                    "send bytes out",
+                    format!(
+                        "{} secret-shaped span(s) at {}",
+                        spans.len(),
+                        offsets.join(", ")
+                    ),
+                    GateRefusal::new(
+                        "credentials leave only as secret: references (C13)",
+                        format!("the payload carries {} secret-shaped span(s)", spans.len()),
+                        "replace each span with its secret:<realm>/<name> reference; \
+                         if a real credential already left, rotation is the only remedy",
+                    ),
+                )
+                .with_recovery(
+                    "cut the bytes at the offsets above out of the payload and send the \
+                     secret:<realm>/<name> reference in their place; `sprawling status --secrets` \
+                     lists the references this machine holds",
                 ),
-                GateRefusal::new(
-                    "credentials leave only as secret: references (C13)",
-                    format!("the payload carries {} secret-shaped span(s)", spans.len()),
-                    "replace each span with its secret:<realm>/<name> reference; \
-                     if a real credential already left, rotation is the only remedy",
-                ),
-            )),
+            ),
         };
     }
     // A connector counts as leaving, for the same reason a public host
@@ -173,16 +180,22 @@ pub fn egress_target(list: &EgressAllowlist, target: &EgressTarget) -> EgressOut
         format!("reachable domains here: {}", known.join(", "))
     };
     EgressOutcome::Deny {
-        refusal: Box::new(AxError::refusal(
-            AxCode::GateDenied,
-            "reach a host outside this building's egress list",
-            host.clone(),
-            GateRefusal::new(
-                "a building reaches only the domains it names",
-                format!("{host} is not one of them"),
-                alternative,
-            ),
-        )),
+        refusal: Box::new(
+            AxError::refusal(
+                AxCode::GateDenied,
+                "reach a host outside this building's egress list",
+                host.clone(),
+                GateRefusal::new(
+                    "a building reaches only the domains it names",
+                    format!("{host} is not one of them"),
+                    alternative,
+                ),
+            )
+            .with_recovery(format!(
+                "the egress list lives in the building's `.sprawling/BUILDING.md`; \
+                 propose adding {host} to it through the `rules` tool"
+            )),
+        ),
     }
 }
 

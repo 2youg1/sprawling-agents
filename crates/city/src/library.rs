@@ -197,6 +197,10 @@ fn shelve(
                     "read a library holding",
                     format!("{}: {err}", item.display()),
                 )
+                .with_recovery(
+                    "give this process permission to read the file named above, or \
+                     take it off the shelf, then scan again",
+                )
             })?;
             // The address is read back off the path the layout chose,
             // so a shelf that moves cannot leave the addresses of what
@@ -269,6 +273,10 @@ fn read_dir(path: &Path) -> Result<Vec<PathBuf>, AxError> {
             "read the library",
             format!("{}: {err}", path.display()),
         )
+        .with_recovery(
+            "give this process permission to list the directory named above, then \
+             scan again",
+        )
     })?;
     for entry in entries {
         let entry = entry.map_err(|err| {
@@ -276,6 +284,10 @@ fn read_dir(path: &Path) -> Result<Vec<PathBuf>, AxError> {
                 AxCode::StorageFatal,
                 "read the library",
                 format!("{}: {err}", path.display()),
+            )
+            .with_recovery(
+                "give this process permission to list the directory named above, \
+                 then scan again",
             )
         })?;
         out.push(entry.path());

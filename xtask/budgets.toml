@@ -219,7 +219,7 @@ names = [
 # today is the ratchet - nothing new may be born over 400 lines, and
 # nothing already over it may grow.
 [file_length]
-what = "one source file under a crate's src/, every line of it, tests included"
+what = "one source file under a crate's src/ or under client/src, every line of it, tests included"
 budget_lines = 400
 measured_by = "cargo xtask length"
 status = "gated, with a register of the files that predate the rule"
@@ -227,8 +227,22 @@ status = "gated, with a register of the files that predate the rule"
 # The files that were already over the line on the day it was re-drawn
 # (2026-09-05), each pinned at the length it had that day, worst first.
 # Ninety-seven of them on that day; the last row was struck on
-# 2026-09-08, and the table below is empty by
+# 2026-09-08, and the Rust half of the table below is empty by
 # construction - it keeps its three properties over nothing.
+#
+# **The client arrived on 2026-09-19**, when `xtask length` reached
+# `client/src`. The 400-line rule had been stated for the whole
+# repository and executed on Rust only, so 18,000 lines of TypeScript
+# were read by the same two readers with nothing holding the line - the
+# six rows below are what that cost, and they are pinned at the length
+# each file had on the day the gate reached it. They carry the same
+# three properties every other row does, and they are worked off the
+# same way: by splitting the file, never by raising its number.
+#
+# `client/src/wire.ts` (2,445 lines) is not here and never will be.
+# `cargo xtask wire-ts` writes it from the Rust wire, so its length is a
+# fact about the generator; the gate reads the exemption from the banner
+# the generator puts at the top rather than from a path written here.
 #
 # `crates/web/src/lang.rs` (3,444 lines) and `crates/web/src/theme.rs`
 # (1,019) are not here: their module-map rows state the shape `data`, and
@@ -249,6 +263,11 @@ status = "gated, with a register of the files that predate the rule"
 #
 # Delete a row by doing the split, never by raising its number.
 [file_length.predating]
+"client/src/core/belief.ts" = 422
+"client/src/views/gallery.tsx" = 791
+"client/src/views/machine.tsx" = 563
+"client/src/views/setup/providers.tsx" = 888
+"client/src/views/talk/composer.tsx" = 497
 
 # White box is Rust, black box is Lean (the person's ruling).
 # `cargo xtask boundary` refuses a Rust check that reaches this product

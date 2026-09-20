@@ -96,6 +96,10 @@ pub fn package_exec(
         .collect::<Result<Vec<Value>, _>>()
         .map_err(|err| {
             AxError::failure(AxCode::InvalidArgs, "encode sieve account", err.to_string())
+                .with_recovery(
+                    "report this against runtime::pipeline::exec: a sieve account holds \
+                     names and counts, and JSON refuses neither",
+                )
         })?;
     result.insert("sieve".to_owned(), Value::Array(accounts));
     Ok(ToolOutcome {

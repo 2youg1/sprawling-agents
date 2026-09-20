@@ -76,7 +76,8 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
                 AxCode::InvalidArgs,
                 "stage an attachment",
                 "not in this test",
-            ))
+            )
+            .with_recovery("stage the attachment through a city that carries a workbench"))
         }),
         city: None,
     };

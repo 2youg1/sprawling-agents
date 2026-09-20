@@ -26,8 +26,12 @@ pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError> {
         AxError::failure(
             AxCode::InvalidArgs,
             "encode content blocks",
-            err.to_string(),
+            format!("{} block(s) of assistant content", content.len()),
         )
+        .with_recovery(format!(
+            "JSON refused these blocks ({err}); ask the provider dialect to return text, \
+             tool calls, and thinking blocks only"
+        ))
     })?;
     let mut map = Map::new();
     map.insert("content".to_owned(), blocks);

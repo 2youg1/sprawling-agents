@@ -3,23 +3,48 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The bell: what this session was refused, after the corner has let go
-// of it.
+// One dot, at the top of the rail, for everything the city has to tell
+// this person right now: the link, the questions waiting on them, and
+// what was refused.
+//
+// It used to be two marks in two corners. A blue dot on the rail
+// reported that the socket was live, which is the state a person is in
+// for the whole day and therefore the one state worth no colour at
+// all; a bell floated over the top right corner and counted refusals.
+// Neither could say what the other knew, so a city that was waiting on
+// an answer looked exactly like a city that was idle.
+//
+// **The dot has two states, and the second one is a question.** Grey
+// is nothing to do. Yellow means at least one of three things is true
+// - somebody is waiting on an answer, a refusal has not been read, or
+// the link is not live - and the panel under the dot says which. A
+// link that is still connecting pulses, because that one resolves by
+// itself and the others do not.
 //
 // **A refusal a person waved away is still the answer to what they
-// asked.** Before this, dismissing one destroyed the only copy: the
-// three parts the city wrote were on screen once, for as long as
-// somebody left them there. The corner still carries the newest one,
-// because that is the one they are waiting for; everything that reached
-// the corner is here afterwards, newest first.
-//
-// Opening the panel is what marks it read, so the count is a number a
-// person can clear by doing the thing the count is asking for.
+// asked.** Dismissing one used to destroy the only copy. The corner
+// still carries the newest one, because that is the one they are
+// waiting for; everything that reached the corner is here afterwards,
+// newest first. Opening the panel is what marks it read, so the count
+// is a number a person can clear by doing the thing the count asks
+// for.
 
 import { For, Show, createSignal } from "solid-js";
 
 import type { Notice } from "../core/belief";
-import { useSay, useUi } from "../ui";
+import { useApprovals, useSay, useUi } from "../ui";
+import { WaitingCards } from "./talk/waiting";
+
+// A dot drawn in the same box a glyph is drawn in, so every row on the
+// rail starts its first mark at the same x. It used to be centred in
+// its own smaller box, five pixels left of every icon under it.
+export function Dot(props: { readonly tone: string }) {
+  return (
+    <span class="flex size-glyph shrink-0 items-center justify-center">
+      <span class={`inline-block size-dot rounded-pill ${props.tone}`} />
+    </span>
+  );
+}
 
 function Line(props: { readonly notice: Notice }) {
   const error = () => props.notice.error;
@@ -37,50 +62,113 @@ function Line(props: { readonly notice: Notice }) {
   );
 }
 
-export function Notices() {
+export function Presence() {
   const ui = useUi();
   const say = useSay();
   const [open, setOpen] = createSignal(false);
+  const approvals = useApprovals();
   const held = () => [...ui.conn.belief.notices].reverse();
   const unread = () => ui.conn.belief.notices.filter((notice) => !notice.seen).length;
+  const link = () => ui.conn.state().kind;
+
+  // The word for where the link stands. Four of the six states are one
+  // word to a person: the socket is on its way up.
+  const linkWord = () => {
+    switch (link()) {
+      case "live":
+        return say("link_live");
+      case "refused":
+        return say("link_refused");
+      case "idle":
+      case "opening":
+      case "handshaking":
+      case "backoff":
+        return say("link_connecting");
+    }
+  };
+  // Still on its way, as against arrived or refused: the one state
+  // that resolves without the person doing anything.
+  const settling = () => link() !== "live" && link() !== "refused";
+  const busy = () => approvals().length > 0 || unread() > 0 || link() !== "live";
+  const tone = () => {
+    if (!busy()) return "bg-g5";
+    return settling() ? "bg-alert animate-pulse" : "bg-alert";
+  };
+  // Collapsed, the dot is the only thing on this control, so its name
+  // has to carry the state as well: what it is, then each of the three
+  // reasons it is yellow.
+  const name = () => {
+    const parts = [say("presence_title")];
+    if (link() !== "live") parts.push(linkWord());
+    if (approvals().length > 0) parts.push(say("nav_waiting", { n: String(approvals().length) }));
+    if (unread() > 0) parts.push(say("notices_unread", { n: String(unread()) }));
+    return parts.join(" · ");
+  };
   const show = () => {
     setOpen((was) => !was);
     ui.conn.markNoticesSeen();
   };
 
   return (
-    <div class="relative">
+    <div
+      class="relative shrink-0"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && open()) {
+          event.stopPropagation();
+          setOpen(false);
+        }
+      }}
+    >
+      {/* One dot and nothing beside it: the rail's own width is 44 px
+          when it is collapsed, and what the dot means is in the panel
+          rather than in a second mark next to it. */}
       <button
         type="button"
-        class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2"
+        class="flex h-rail w-rail items-center px-base text-label text-text-quiet hover:text-text"
         aria-expanded={open()}
-        aria-label={
-          unread() === 0 ? say("notices") : `${say("notices")} · ${say("notices_unread", { n: String(unread()) })}`
-        }
+        aria-label={name()}
         onClick={show}
       >
-        {/* wording-ok: a bell, which every language draws the same way */}
-        <span aria-hidden="true">🔔</span>
-        <Show when={unread() > 0}>
-          <span class="ml-tight rounded-pill bg-alert px-tight font-mono text-note text-g0">
-            {String(unread())}
-          </span>
-        </Show>
+        <Dot tone={tone()} />
       </button>
       <Show when={open()}>
         <div
           role="dialog"
-          aria-label={say("notices")}
-          class="absolute top-full right-0 z-20 mt-tight max-h-palette w-palette overflow-y-auto rounded-panel border border-g3 bg-g1 shadow-composer"
+          aria-label={say("presence_title")}
+          class="absolute top-0 left-full z-20 ml-tight max-h-palette w-palette overflow-y-auto rounded-panel border border-g3 bg-g1 shadow-composer"
         >
-          <Show
-            when={held().length > 0}
-            fallback={<p class="px-base py-snug text-note text-text-faint">{say("notices_none")}</p>}
-          >
-            <ul>
-              <For each={held()}>{(notice) => <Line notice={notice} />}</For>
-            </ul>
+          <div class="flex items-center gap-snug border-b border-g2 px-base py-snug text-note">
+            <Dot tone={tone()} />
+            <span class="text-text">{linkWord()}</span>
+            <Show when={link() === "refused"}>
+              <button
+                type="button"
+                class="ml-auto rounded-control px-base py-tight font-mono text-note text-accent hover:bg-g2"
+                onClick={() => {
+                  ui.conn.retry();
+                }}
+              >
+                {say("link_retry")}
+              </button>
+            </Show>
+          </div>
+          <Show when={approvals().length > 0}>
+            <section class="border-b border-g2 px-base py-snug" aria-label={say("wait_title")}>
+              <h2 class="text-label font-label text-alert">{say("wait_title")}</h2>
+              <WaitingCards items={approvals()} />
+            </section>
           </Show>
+          <section aria-label={say("notices")}>
+            <h2 class="px-base pt-snug text-label font-label text-text-quiet">{say("notices")}</h2>
+            <Show
+              when={held().length > 0}
+              fallback={<p class="px-base py-snug text-note text-text-faint">{say("notices_none")}</p>}
+            >
+              <ul>
+                <For each={held()}>{(notice) => <Line notice={notice} />}</For>
+              </ul>
+            </Show>
+          </section>
         </div>
       </Show>
     </div>

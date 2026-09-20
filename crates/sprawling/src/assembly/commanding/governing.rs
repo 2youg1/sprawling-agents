@@ -160,6 +160,10 @@ impl RunWorker {
             "cluster".to_owned(),
             serde_json::to_value(&pending.cluster_key).map_err(|err| {
                 AxError::failure(AxCode::InvalidArgs, "record an answer", err.to_string())
+                    .with_recovery(
+                        "report this against sprawling::assembly::commanding::governing: \
+                         a cluster key is a string and JSON refuses none",
+                    )
             })?,
         );
         // Read before the answer is recorded, because recording it is
@@ -254,6 +258,10 @@ impl RunWorker {
                 AxCode::InvalidArgs,
                 "fork",
                 "at_seq does not fit this platform",
+            )
+            .with_recovery(
+                "fork at a lower seq, or run this city on a 64-bit machine: the seq \
+                 asked for is beyond what this one can index",
             )
         })?;
         let node_owner = verified.lines().get(index).and_then(|line| match line {

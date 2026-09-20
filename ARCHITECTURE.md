@@ -49,20 +49,20 @@ The pinned versions live in `Cargo.toml`; this table says why each is there. Whe
 |---|---|---|
 | Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, MSRV 1.97 | The invariants this design cares about are expressible as types, and `#![forbid(unsafe_code)]` holds workspace-wide. Cost: compile times, and a client that has to be built before the binary that embeds it. |
 | Async runtime | `tokio` 1, only in `channels` and the binary | The turn loop is synchronous on purpose — a decision that awaits is a decision that interleaves. Async stops at the process boundary. Cost: one blocking HTTP call per model request, paid inside a worker rather than a reactor. |
-| HTTP server | `axum` 0.8 with its `ws` feature | It carries the WebSocket implementation itself, so the protocol has one version authority rather than two. |
-| HTTP client | `reqwest` 0.13, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. |
+| HTTP server | `axum` <!-- xtask:begin dep_version:axum -->0.8<!-- xtask:end --> with its `ws` feature | It carries the WebSocket implementation itself, so the protocol has one version authority rather than two. |
+| HTTP client | `reqwest` <!-- xtask:begin dep_version:reqwest -->0.13<!-- xtask:end -->, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. |
 | Client | Solid 1.9 and Effect 3.22, bundled by Vite, driven by bun | Two runtime dependencies and no framework runtime beyond them: Solid compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
-| Cold views | `redb` 4.2 | Embedded, transactional, crash-safe. The projection is derived, so its file is disposable and never a second authority. |
-| Content store | BLAKE3 (`blake3` 1.8) | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
-| Restoration | `git2` 0.21, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
-| Sandbox | `wasmtime` 48 + `wasmtime-wasi`, wasip1 only | Fuel-metered execution with **no socket host implementation** — the Python arm's mechanical proof that it cannot reach the network. Cost: an optional feature; a build without it refuses tool execution in three parts rather than pretending. |
-| Credentials | `keyring` 3 (platform credential service), `secrecy` 0.10, `zeroize` 1.9 | Plaintext lives in the operating system's own vault, never in a file we wrote. `sha2` 0.10 is present for one external protocol fact: PKCE mandates SHA-256. |
-| Entropy | `getrandom` 0.3 | OS entropy for the PKCE verifier and the login state. It is *not* the seeded RNG the simulator uses, and must never become it. |
-| Serialisation | `serde` 1, `serde_json` 1, `toml` 0.8 | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
-| Errors | `thiserror` 2 | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
+| Cold views | `redb` <!-- xtask:begin dep_version:redb -->4.2<!-- xtask:end --> | Embedded, transactional, crash-safe. The projection is derived, so its file is disposable and never a second authority. |
+| Content store | BLAKE3 (`blake3` <!-- xtask:begin dep_version:blake3 -->1.8<!-- xtask:end -->) | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
+| Restoration | `git2` <!-- xtask:begin dep_version:git2 -->0.21<!-- xtask:end -->, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
+| Sandbox | `wasmtime` <!-- xtask:begin dep_version:wasmtime -->48<!-- xtask:end --> + `wasmtime-wasi`, wasip1 only | Fuel-metered execution with **no socket host implementation** — the Python arm's mechanical proof that it cannot reach the network. Cost: an optional feature; a build without it refuses tool execution in three parts rather than pretending. |
+| Credentials | `keyring` <!-- xtask:begin dep_version:keyring -->3<!-- xtask:end --> (platform credential service), `secrecy` <!-- xtask:begin dep_version:secrecy -->0.10<!-- xtask:end -->, `zeroize` <!-- xtask:begin dep_version:zeroize -->1.9<!-- xtask:end --> | Plaintext lives in the operating system's own vault, never in a file we wrote. `sha2` <!-- xtask:begin dep_version:sha2 -->0.11<!-- xtask:end --> is present for one external protocol fact: PKCE mandates SHA-256. |
+| Entropy | `getrandom` <!-- xtask:begin dep_version:getrandom -->0.4<!-- xtask:end --> | OS entropy for the PKCE verifier and the login state. It is *not* the seeded RNG the simulator uses, and must never become it. |
+| Serialisation | `serde` 1, `serde_json` 1, `toml` <!-- xtask:begin dep_version:toml -->1.1<!-- xtask:end --> | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
+| Errors | `thiserror` <!-- xtask:begin dep_version:thiserror -->2<!-- xtask:end --> | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. |
-| Dependency count | 497 packages in `Cargo.lock` | Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->389<!-- xtask:end --> packages in `Cargo.lock` | Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest` (properties before examples), `insta` (golden output), `trybuild` (proof that something cannot be expressed), `kani` (bounded proof, Linux CI), `cargo-mutants` (do the tests bite), `cargo-fuzz` (parsers against hostile bytes).
 
@@ -187,12 +187,12 @@ A run's write domain is what its building's `BUILDING.md` declares, and **the wh
 
 ## 7 The wire
 
-One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is 15.
+One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is <!-- xtask:begin wire_v -->31<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
-| `Command` | 24 | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
-| `Query` | 17 | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
+| `Command` | <!-- xtask:begin command_frames -->28<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
+| `Query` | <!-- xtask:begin query_frames -->31<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |
 
@@ -296,13 +296,13 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 
 | Layer | Catches | Today |
 |---|---|---|
-| V0 unrepresentable | a whole class of error moved out of what can be written | 15 compile-failure counterexamples |
+| V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->16<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | 1,085 tests, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1678<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
-| V4 fuzz | parsers meeting hostile bytes | three targets: address, locator, truncated ledger tail |
+| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->3<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 2 of 7 kani harnesses proved, Linux CI — those with an unbounded domain and a solvable one |
-| V6 deterministic simulation | components each correct and wrong together | citysim, six scenario files, failures replayed from their script |
+| V6 deterministic simulation | components each correct and wrong together | citysim, <!-- xtask:begin citysim_scenarios -->7<!-- xtask:end --> scenario files, failures replayed from their script |
 | V7 mutation | tests that do not bite | `cargo-mutants`, by `just mutants` |
 | V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `fixtures/` |
 | V9 end to end | the thing a person actually wants to do | the real client in a real browser against a real server, on a developer machine |
@@ -327,9 +327,9 @@ Sizes are gated because a byte count does not depend on how busy the machine was
 
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
-| Client bundle, gzipped | ≤2 MB | 558,419 B — 3.8× headroom | yes |
-| The installed binary | ≤128 MB | 8,620,032 B, client included | yes |
-| Resident memory, one session | ≤30 MB | 4.3 MB idle, 7.8 MB running a real run | no: the counter means something different on each platform |
+| Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->288,972 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->7.3×<!-- xtask:end --> headroom | yes |
+| The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->9,937,920 B<!-- xtask:end -->, client included | yes |
+| Resident memory, one session | ≤<!-- xtask:begin budget_bytes:session_resident -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:session_resident -->4,292,608 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
 | Ledger append plus fsync | p50 ≤5 ms, p99 ≤20 ms | 0.97 ms / 1.61 ms on one NVMe machine | no |
 | Projection rebuild | ≥50,000 records/s | about 493,000 records/s on the same machine | no |
 | Prefix assembly | ≤1 ms | 0.022 ms for 16.5 KB over four slots | no |
@@ -544,7 +544,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::credential::oauth::flow::tests | crates/gateway/src/credential/oauth/flow/tests.rs | the oauth fixtures | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::oauth::types | crates/gateway/src/credential/oauth/types.rs | pending, request, tokens | adapter | S3 | built | gateway-SPEC.md#8-4 |
 
-### runtime (63) — one run, from dispatch to freeze
+### runtime (66) — one run, from dispatch to freeze
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -579,6 +579,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::sieve::diff | crates/runtime/src/sieve/diff.rs | what this run already saw from the same command, and only what changed since | decision | V4 | built | runtime-SPEC.md#8-27 |
 | runtime::sieve::tests | crates/runtime/src/sieve/tests.rs | one golden per built-in filter, the two properties, and the stage account | decision | V4 | built | runtime-SPEC.md#8-27 |
 | runtime::replay | crates/runtime/src/replay.rs | offline replay: re-verify without re-executing | decision | S1 | built | runtime-SPEC.md#8-1 |
+| runtime::replay::resume | crates/runtime/src/replay/resume.rs | crash recovery: which tool calls have no outcome, and the line that closes one | decision | S1 | built | runtime-SPEC.md#8-1 |
 | runtime::replay::tests | crates/runtime/src/replay/tests.rs | what offline verification refuses: future versions, unknown kinds, drifted prefix sources, dangling calls | decision | S1 | built | runtime-SPEC.md#8-1 |
 | runtime::digest | crates/runtime/src/digest.rs | what a long document looks like from outside, summarised once | decision | P1 | built | runtime-SPEC.md#8-16 |
 | runtime::digest::tests | crates/runtime/src/digest/tests.rs | what a digest promises a reader: heading trees that skip code fences, prose that stays suspect, one digest per content hash, and a breaker that reopens | decision | P1 | built | runtime-SPEC.md#8-16 |
@@ -592,11 +593,13 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::backlog::scratch | crates/runtime/src/backlog/scratch.rs | where one member of one backlog keeps its output, named so that two backlogs of one process never collide | adapter | V4 | built | runtime-SPEC.md#8-40 |
 | runtime::backlog::tests | crates/runtime/src/backlog/tests.rs | what the scratch directory names are held to: one per member, and never one two backlogs could both produce | adapter | V4 | built | runtime-SPEC.md#8-40 |
 | runtime::sandbox (port) | crates/runtime/src/sandbox.rs | the execution boundary: capabilities in, outcome out | port | S3 | built | runtime-SPEC.md#8-13 |
+| runtime::sandbox::engine | crates/runtime/src/sandbox/engine.rs | the wasmtime adapter: fuel, preopens, and how a guest's ending becomes a SandboxExit | port | S3 | built | runtime-SPEC.md#8-13 |
 | runtime::sandbox::tests | crates/runtime/src/sandbox/tests.rs | what the two stand-ins promise a caller: stdin echoed back with the job recorded, and a fault script delivered in order then spent | port | S3 | built | runtime-SPEC.md#8-13 |
 | runtime::catalog | crates/runtime/src/catalog.rs | progressive disclosure: which tools and skills a run is told about | decision | S3 | built | runtime-SPEC.md#8-11 |
 | runtime::mode | crates/runtime/src/mode.rs | the modes a run may sit in, and what each admits | decision | S3 | built | runtime-SPEC.md#8-12 |
 | runtime::clock | crates/runtime/src/clock.rs | formatting an injected instant; it never samples one | value | S3 | built | runtime-SPEC.md#8-10 |
 | runtime::tools::exec | crates/runtime/src/tools/exec.rs | the exec tool: three arms, each with its own failure story | adapter | S3 | built | runtime-SPEC.md#8-26 |
+| runtime::tools::exec::outcome | crates/runtime/src/tools/exec/outcome.rs | the shape of every answer the exec tool gives, and the key names it writes them under | adapter | S3 | built | runtime-SPEC.md#8-26 |
 | runtime::tools::exec::tests | crates/runtime/src/tools/exec/tests.rs | what each arm promises a caller: a missing component refuses by name, sandbox exits arrive as themselves, an unknown arm is never guessed | adapter | S3 | built | runtime-SPEC.md#8-14 |
 | runtime::tools::chosen_path | crates/runtime/src/tools/chosen_path.rs | the one judgement a model-chosen path gets: it parses as an address, and it does not reach a reserved subtree | decision | V4 | built | runtime-SPEC.md#8-30 |
 | runtime::tools::read | crates/runtime/src/tools/read.rs | the read tool: a path the reserved subtree closes, or a name the reading room opens, by the line interval the caller asked for | adapter | P6 | built | runtime-SPEC.md#8-29 |
@@ -612,7 +615,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::run::lifecycle | crates/runtime/src/run/lifecycle.rs | what an active run does: the dispatch pair, one turn, and the freeze that is its only exit | typestate | P1 | built | runtime-SPEC.md#8-15 |
 | runtime::diagnostics | crates/runtime/src/diagnostics.rs | the diagnostic log: write-only, five levels, anchored to a Ledger position | adapter | P1 | built | runtime-SPEC.md#8-17 |
 
-### collab (26) — several residents in one building, without stepping on each other
+### collab (27) — several residents in one building, without stepping on each other
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -640,6 +643,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | collab::claim_tool::tool | crates/collab/src/claim_tool/tool.rs | the six actions, their schema, and the arguments they are spelled with | adapter | P4 | built | collab-SPEC.md#8-12 |
 | collab::claim_tool::tests | crates/collab/src/claim_tool/tests.rs | the plan-desk fixtures | adapter | P4 | built | collab-SPEC.md#8-12 |
 | collab::workshop_tool | crates/collab/src/workshop_tool.rs | the face a workshop shows a model: lay out, ask the join, judge it | adapter | P1 | built | collab-SPEC.md#8-16 |
+| collab::workshop_tool::op | crates/collab/src/workshop_tool/op.rs | the three verbs a workshop answers to, and the refusal that names them | adapter | P1 | built | collab-SPEC.md#8-16 |
 | collab::workshop_tool::tests | crates/collab/src/workshop_tool/tests.rs | what the workshop tool refuses: a cycle, a second graph, a verdict from nobody who read | adapter | P1 | built | collab-SPEC.md#8-16 |
 | collab::triage | crates/collab/src/triage.rs | where something from outside lands, and whether it starts work | decision | P3 | built | collab-SPEC.md#8-11 |
 
@@ -736,7 +740,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (174)
+### browser (12), protocol (5), bin (175)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -897,6 +901,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::doctor::tests::browsers | crates/sprawling/src/doctor/tests/browsers.rs | every family is a row, every member says where it is installed, and the awkward member is never the first answer | decision | V6 | built | sprawling-SPEC.md#8-57 |
 | bin::doctor::tests::reading | crates/sprawling/src/doctor/tests/reading.rs | what a person reads off the report: four status words, two sections, a version out of a banner, colour refused | decision | V6 | built | sprawling-SPEC.md#8-59 |
 | bin::wire_client | crates/sprawling/src/wire_client.rs | the second client of the wire: one frame out, every frame back, and enrolment from stdin | adapter | P3 | built | sprawling-SPEC.md#8-41 |
+| bin::wire_client::enrolment | crates/sprawling/src/wire_client/enrolment.rs | handing a credential to the local enrolment route, and the reference that replaces it | adapter | P3 | built | sprawling-SPEC.md#8-41 |
 | bin::console | crates/sprawling/src/console.rs | what a served city says to the terminal it is running in, and what a line typed there means | decision | P1 | built | sprawling-SPEC.md#8-30 |
 | bin::console::language | crates/sprawling/src/console/language.rs | the words a line may use and what each one asks for | decision | P1 | built | sprawling-SPEC.md#8-30 |
 | bin::console::terminal | crates/sprawling/src/console/terminal.rs | the listener half no query can answer, and the loop that drives it | decision | P1 | built | sprawling-SPEC.md#8-30 |

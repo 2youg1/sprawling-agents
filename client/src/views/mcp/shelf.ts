@@ -18,6 +18,7 @@
 import { createMemo, onCleanup } from "solid-js";
 
 import type { ToolkitLine, ToolkitSlug, ToolkitsAnswer } from "../../wire";
+import { QUERIES } from "../../core/asking";
 import { connectToolkit } from "../../core/commands";
 import { useCommand, useUi } from "../../ui";
 
@@ -36,13 +37,13 @@ export interface Shelf {
 export function shelfOf(): Shelf {
   const ui = useUi();
   const command = useCommand();
-  const asked = createMemo(() => ui.conn.asking.ask("toolkits"));
+  const asked = createMemo(() => ui.conn.asking.ask(QUERIES.toolkits));
   const answer = (): ToolkitsAnswer | undefined => {
     const held = asked()();
     return held !== undefined && "toolkits" in held ? held.toolkits : undefined;
   };
   const recheck = () => {
-    ui.conn.asking.refresh("toolkits");
+    ui.conn.asking.refresh(QUERIES.toolkits);
   };
 
   // Coming back to this window is the one signal that the consent page

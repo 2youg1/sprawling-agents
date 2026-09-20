@@ -7,6 +7,11 @@
 // sits, what it waits for, and where it stands. What the city could not
 // read is stated above the plan rather than swallowed, and what is stuck
 // is stated below it with the line that said so.
+//
+// The rows are still drawn here rather than by `parts/table.tsx`: that
+// component gives every column a header, and the three words this plan
+// would need - the node number, the item, its state - are not in
+// `lang.json` yet. The move is one edit behind those three entries.
 
 import { For, Show } from "solid-js";
 
@@ -32,10 +37,13 @@ export function Plan(props: { readonly answer: BuildingAnswer }) {
           <tbody>
             <For each={props.answer.plan}>
               {(row) => {
-                const depth = () => row.node.split(".").length - 1;
+                // One pane of indent per level of the node number, so
+                // the plan tightens with the rest of the page instead of
+                // holding a width of its own.
+                const indent = () => `calc(var(--spacing-pane) * ${String(row.node.split(".").length - 1)})`;
                 return (
                   <tr class="border-b border-g1">
-                    <td class="w-figure py-snug pr-snug font-mono text-text-faint" style={{ "padding-left": `${String(depth() * 16)}px` }}>
+                    <td class="w-figure py-snug pr-snug font-mono text-text-faint" style={{ "padding-left": indent() }}>
                       {row.node}
                     </td>
                     <td class={`py-snug pr-snug ${row.status === "done" ? "text-text-faint" : "text-text"}`}>

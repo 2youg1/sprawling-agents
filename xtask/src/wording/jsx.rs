@@ -108,12 +108,20 @@ fn text_nodes(code: &str) -> Vec<String> {
     // element whose text is `(options: `.
     let mut opened: Vec<Opening> = Vec::new();
     while let Some(byte) = bytes.get(index) {
+        let after = bytes.get(index.saturating_add(1));
         if *byte == b'<' {
-            let before = index.checked_sub(1).and_then(|at| bytes.get(at));
-            opened.push(match before {
-                Some(mark) if mark.is_ascii_alphanumeric() || *mark == b'_' => Opening::TypeArgs,
-                _ => Opening::Element,
-            });
+            // `<=` compares; it neither opens an element nor a type
+            // argument list, and pushing it would leave the stack one
+            // deep for the rest of the line.
+            if after != Some(&b'=') {
+                let before = index.checked_sub(1).and_then(|at| bytes.get(at));
+                opened.push(match before {
+                    Some(mark) if mark.is_ascii_alphanumeric() || *mark == b'_' => {
+                        Opening::TypeArgs
+                    }
+                    _ => Opening::Element,
+                });
+            }
             index = index.saturating_add(1);
             continue;
         }
@@ -122,7 +130,9 @@ fn text_nodes(code: &str) -> Vec<String> {
             continue;
         }
         let before = index.checked_sub(1).and_then(|at| bytes.get(at));
-        if before == Some(&b'=') {
+        // `=>` is an arrow and `>=` is a comparison. Neither closes a
+        // tag, and both routinely have words after them.
+        if before == Some(&b'=') || after == Some(&b'=') {
             index = index.saturating_add(1);
             continue;
         }

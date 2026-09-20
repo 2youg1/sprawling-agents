@@ -8,6 +8,13 @@
 // the same thread; what waits for the person is a card in the same
 // thread; and the box at the bottom either steers the run that is
 // going or opens the next one.
+//
+// An empty Mayor's office carries the three sentences the welcome
+// walk used to end on: how work is handed out, where it is watched,
+// and where a question waiting on an answer appears. They are here
+// rather than on a fifth welcome step because each of them names
+// something that is on this screen while it is being read, and
+// because the first run in this room replaces them with itself.
 
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 
@@ -125,6 +132,13 @@ export function Talk(props: TalkProps) {
                 {isMayor() ? say("talk_opening_mayor") : say("talk_opening_room", { room: roomOf(props.address) })}
               </p>
               <div class="w-full">{composer()}</div>
+              <Show when={isMayor()}>
+                <ul class="max-w-measure list-none text-left text-note text-text-faint">
+                  <li>{say("talk_hint_dispatch")}</li>
+                  <li class="mt-tight">{say("talk_hint_progress")}</li>
+                  <li class="mt-tight">{say("talk_hint_waiting")}</li>
+                </ul>
+              </Show>
             </div>
           </Show>
           <For each={runs()}>{(run) => <Thread run={run} who={roomOf(props.address)} />}</For>

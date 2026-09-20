@@ -181,6 +181,7 @@ mod tests {
 
     fn refused() -> AxError {
         AxError::failure(AxCode::Provider, "call the model", "429 from house")
+            .with_recovery("wait out the rate limit, or attach a second endpoint")
     }
 
     #[test]

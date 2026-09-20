@@ -134,9 +134,12 @@ export function Popover(props: PopoverProps) {
     lists().at(column())?.focus();
   });
 
+  // No stacking number on the panel below: a positioned box is painted
+  // after every box that is not positioned, so the list already covers
+  // the text box and the buttons it opens over.
   return (
     <div
-      class="absolute bottom-full left-0 z-10 mb-snug w-full rounded-panel border border-g3 bg-g1 p-snug shadow-composer"
+      class="absolute bottom-full left-0 mb-snug w-full rounded-panel border border-g3 bg-g1 p-snug shadow-composer"
       role="dialog"
       aria-label={props.label}
     >

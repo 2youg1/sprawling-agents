@@ -37,6 +37,11 @@ fn share(tokens: u64, price_per_mtok: UsdMicros, what: &str) -> Result<u64, AxEr
             "settle call cost",
             format!("{what}: token-price product overflows"),
         )
+        .with_recovery(format!(
+            "correct the `{what}` price on this model's row in \
+             `gateway::market::MarketSnapshot::builtin`; the call is settled from the \
+             provider's own billed amount whenever it reports one"
+        ))
     })?;
     Ok(product.div_euclid(TOKENS_PER_PRICE_UNIT))
 }
@@ -76,6 +81,11 @@ pub fn settle(
                 AxCode::InvalidArgs,
                 "settle call cost",
                 format!("{what}: settlement total overflows"),
+            )
+            .with_recovery(
+                "correct this model's price row in \
+                 `gateway::market::MarketSnapshot::builtin`: the four shares of one call \
+                 sum past what a cost can hold",
             )
         })?;
     }

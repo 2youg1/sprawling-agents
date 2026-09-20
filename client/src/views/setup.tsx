@@ -13,27 +13,34 @@
 // because `core/route.ts` is the address bar's one authority and a
 // group is not a page a person bookmarks.
 //
-// A group whose section another view owns mounts that view; a group
-// whose section does not exist yet says so by name rather than drawing
-// an empty screen. Today that is `network`: the proxy the city would
-// use is neither on the wire nor in a view, so the screen names what is
-// missing instead of drawing an empty form.
+// A group whose section another view owns mounts that view.
+//
+// The page is centred and capped at the page width, so a wide window
+// leaves margins rather than a column of text against the left edge,
+// and the reading column is held to a measure only once the window is
+// wide enough to spare it.
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 import type { JSX } from "solid-js";
 
 import { setAutonomy } from "../core/commands";
 import { LANGS, endonym } from "../core/lang";
+import type { Key } from "../core/lang";
+import { QUERIES } from "../core/asking";
+import { browserRows, defaultProxying, setDefaultProxying } from "../core/prefs";
 import { toFragment } from "../core/route";
-import type { Autonomy, EndpointsAnswer } from "../wire";
+import type { Autonomy, Effort, EndpointsAnswer, Proxying } from "../wire";
 import { ResidentId } from "../wire";
 import { useCommand, useSay, useUi } from "../ui";
 import { Machine } from "./machine";
 import { Button } from "./parts/button";
+import { Segmented } from "./parts/segmented";
+import { EffortSection } from "./shared/effort";
+import { ProviderDoor } from "./shared/provider";
 import { KeysSection } from "./setup/keys";
 import { AppearanceSection } from "./setup/appearance";
-import { EffortChoice, ModelChoice } from "./setup/models";
-import { AttachForm, EndpointList, LoginForm } from "./setup/providers";
+import { ModelChoice } from "./setup/models";
+import { PROXYINGS, proxyingNote } from "./setup/providers";
 
 // The nine screens, in the order a city is set up.
 const GROUPS = [
@@ -75,13 +82,47 @@ function providersToml(answer: EndpointsAnswer | undefined): string | null {
     : [...blocks, ["[model]", ...chosen].join("\n")].join("\n\n");
 }
 
-// How hard the city thinks by default, and who answers an approval.
-function runToml(effort: string, autonomy: Autonomy | undefined): string | null {
-  if (autonomy === undefined) {
-    return null;
+// How hard the city thinks by default, in the section the city reads
+// it from: `[model] effort`, which is the only key `ConfigFile` takes
+// under `[model]` (`crates/city/src/config_layers.rs`).
+//
+// A person who has chosen no effort has no line in the file, and so
+// no section either: absence is what lets the provider choose, and a
+// level written here would be a level nobody asked for.
+//
+// Who answers an approval is not in this file. `set_autonomy` is a
+// command the city records in its own governance, and the reader that
+// parses this file refuses a key it does not know - so a fragment
+// naming `[run] approvals` would hand a person a file their city
+// would reject.
+function modelToml(effort: Effort | null): string | null {
+  return effort === null ? null : `[model]\neffort = "${effort}"`;
+}
+
+// Who answers an approval, as the three settings a person picks
+// between. `delegate` carries an address on the wire, and the clerk is
+// the only resident this screen delegates to.
+type AutonomySetting = "owner" | "delegate" | "deferred";
+
+const AUTONOMIES = [
+  ["owner", "autonomy_owner"],
+  ["delegate", "autonomy_clerk"],
+  ["deferred", "autonomy_deferred"],
+] as const satisfies readonly (readonly [AutonomySetting, Key])[];
+
+function autonomySetting(held: Autonomy): AutonomySetting {
+  return typeof held === "string" ? held : "delegate";
+}
+
+function autonomyOf(setting: AutonomySetting): Autonomy {
+  switch (setting) {
+    case "owner":
+      return "owner";
+    case "deferred":
+      return "deferred";
+    case "delegate":
+      return { delegate: ResidentId.make("hall/clerk") };
   }
-  const approvals = typeof autonomy === "string" ? autonomy : `delegate:${autonomy.delegate}`;
-  return ["[run]", `effort = "${effort}"`, `approvals = "${approvals}"`].join("\n");
 }
 
 // The fragment beside a screen, when that screen's settings have a
@@ -108,11 +149,39 @@ function Toml(props: { readonly text: string }) {
   );
 }
 
-// A screen somebody else is building, named so a person knows what is
-// missing rather than meeting a blank column.
-function Slot(props: { readonly what: string }) {
+// How a call leaves this machine: the proxy rule a provider attached
+// from now on starts with.
+//
+// **The rule belongs to the endpoint, not to the city**, because a
+// relay that must see every request and a local inference server that
+// a relay would break can sit on one machine at once. So this screen
+// settles the starting point, the provider form carries it per
+// endpoint, and an endpoint already attached keeps the rule the city
+// recorded for it.
+//
+function Network() {
   const say = useSay();
-  return <p class="text-note text-text-disabled">{say("setup_slot_pending", { what: props.what })}</p>;
+  const store = browserRows();
+  const [rule, setRule] = createSignal<Proxying>(defaultProxying(store));
+  return (
+    <div class="flex flex-col gap-snug text-note text-text-quiet">
+      <span>{say("setup_network_default")}</span>
+      <Segmented
+        label={say("setup_network_default")}
+        options={PROXYINGS.map(([setting, word]) => ({ value: setting, label: say(word) }))}
+        held={rule()}
+        onPick={(next) => {
+          setDefaultProxying(store, next);
+          setRule(next);
+        }}
+      />
+      <span class="text-text-faint">{say("setup_proxying_help")}</span>
+      <Show when={proxyingNote(rule())}>
+        {(note) => <span class="text-text-faint">{say(note())}</span>}
+      </Show>
+      <span class="text-text-faint">{say("setup_network_new_only")}</span>
+    </div>
+  );
 }
 
 export function SkillsNote() {
@@ -137,60 +206,27 @@ export function SkillsNote() {
   );
 }
 
-function Providers(props: { readonly answer: EndpointsAnswer | undefined }) {
-  const say = useSay();
-  const [door, setDoor] = createSignal<"key" | "login">("key");
-  return (
-    <div class="flex flex-col gap-base">
-      <Show when={props.answer}>{(held) => <EndpointList answer={held()} />}</Show>
-      <div class="flex gap-snug text-label">
-        <button
-          type="button"
-          class={`rounded-pill px-base py-tight ${door() === "key" ? "bg-g3 text-text" : "text-text-faint hover:text-text-quiet"}`}
-          onClick={() => setDoor("key")}
-        >
-          {say("setup_attach")}
-        </button>
-        <button
-          type="button"
-          class={`rounded-pill px-base py-tight ${door() === "login" ? "bg-g3 text-text" : "text-text-faint hover:text-text-quiet"}`}
-          onClick={() => setDoor("login")}
-        >
-          {say("setup_login")}
-        </button>
-      </div>
-      <Show when={door() === "key"} fallback={<LoginForm />}>
-        <AttachForm />
-      </Show>
-      <h2 class="text-label font-label text-text-quiet">{say("setup_models")}</h2>
-      <Show when={props.answer}>{(held) => <ModelChoice answer={held()} />}</Show>
-    </div>
-  );
-}
-
 export function Setup() {
   const ui = useUi();
   const say = useSay();
   const command = useCommand();
   const [group, setGroup] = createSignal<Group>("accounts");
-  const endpoints = ui.conn.asking.ask("endpoint_view");
+  const endpoints = ui.conn.asking.ask(QUERIES.endpoints);
   const answer = createMemo<EndpointsAnswer | undefined>(() => {
     const held = endpoints();
     return held !== undefined && "endpoints" in held ? held.endpoints : undefined;
   });
-  const governance = ui.conn.asking.ask("governance");
+  const governance = ui.conn.asking.ask(QUERIES.governance);
   const autonomy = createMemo<Autonomy | undefined>(() => {
     const held = governance();
     return held !== undefined && "governance" in held ? held.governance.autonomy : undefined;
   });
-  const autonomyKey = (a: Autonomy | undefined) =>
-    a === undefined ? "" : typeof a === "string" ? a : "delegate";
   const toml = createMemo<string | null>(() => {
     switch (group()) {
       case "accounts":
         return providersToml(answer());
       case "run":
-        return runToml(ui.prefs.effort(), autonomy());
+        return modelToml(ui.prefs.effort());
       case "network":
       case "tools":
       case "mcp":
@@ -216,7 +252,7 @@ export function Setup() {
   );
 
   return (
-    <div class="flex min-h-0 w-full flex-1 flex-col-reverse gap-wide px-pane py-wide lg:flex-row">
+    <div class="mx-auto flex min-h-0 w-full max-w-page flex-1 flex-col-reverse gap-wide px-pane py-wide lg:flex-row">
       <nav
         class="sticky bottom-0 z-10 -mx-pane flex h-bar shrink-0 items-center gap-tight overflow-x-auto border-t border-g1 bg-g0 px-pane lg:static lg:mx-0 lg:h-auto lg:w-tree lg:flex-col lg:items-stretch lg:overflow-visible lg:border-0 lg:px-0"
         aria-label={say("setup_groups")}
@@ -228,53 +264,40 @@ export function Setup() {
         <div class="flex min-w-0 flex-1 flex-col gap-base">
           <p class="text-note text-text-faint">{say("nav_settings")}</p>
           <h1 class="text-title font-title">{say(`setup_group_${group()}`)}</h1>
-          <div class={group() === "tools" ? "min-w-0" : "min-w-0 max-w-measure"}>
+          <div class={group() === "tools" ? "min-w-0" : "min-w-0 wide:max-w-measure"}>
             <Switch>
               <Match when={group() === "accounts"}>
-                <Providers answer={answer()} />
+                <div class="flex flex-col gap-base">
+                  <ProviderDoor />
+                  <h2 class="text-label font-label text-text-quiet">{say("setup_models")}</h2>
+                  <Show when={answer()}>{(held) => <ModelChoice answer={held()} />}</Show>
+                </div>
               </Match>
               <Match when={group() === "run"}>
                 <div class="flex flex-col gap-wide">
-                  <EffortChoice />
+                  <EffortSection />
                   <div class="flex flex-col gap-tight text-note text-text-quiet">
                     {say("setup_autonomy")}
-                    <div class="flex flex-wrap gap-tight">
-                      <For
-                        each={
-                          [
-                            ["owner", say("autonomy_owner")],
-                            ["delegate", say("autonomy_clerk")],
-                            ["deferred", say("autonomy_deferred")],
-                          ] satisfies [string, string][]
-                        }
-                      >
-                        {([key, label]) => (
-                          <button
-                            type="button"
-                            class={`rounded-pill px-base py-tight text-label ${autonomyKey(autonomy()) === key ? "bg-accent text-g0" : "bg-g2 text-text-quiet hover:bg-g3"}`}
-                            onClick={() =>
-                              command(
-                                setAutonomy(
-                                  "city",
-                                  key === "owner"
-                                    ? "owner"
-                                    : key === "deferred"
-                                      ? "deferred"
-                                      : { delegate: ResidentId.make("hall/clerk") },
-                                ),
-                              )
-                            }
-                          >
-                            {label}
-                          </button>
-                        )}
-                      </For>
-                    </div>
+                    <Show when={autonomy()}>
+                      {(held) => (
+                        <Segmented
+                          label={say("setup_autonomy")}
+                          options={AUTONOMIES.map(([setting, word]) => ({
+                            value: setting,
+                            label: say(word),
+                          }))}
+                          held={autonomySetting(held())}
+                          onPick={(setting) => {
+                            command(setAutonomy("city", autonomyOf(setting)));
+                          }}
+                        />
+                      )}
+                    </Show>
                   </div>
                 </div>
               </Match>
               <Match when={group() === "network"}>
-                <Slot what={say("setup_group_network")} />
+                <Network />
               </Match>
               <Match when={group() === "tools"}>
                 <Machine />
@@ -294,21 +317,14 @@ export function Setup() {
                 <AppearanceSection />
                 <div class="flex flex-col gap-tight text-note text-text-quiet">
                   {say("setup_language")}
-                  <div class="flex gap-tight">
-                    <For each={LANGS}>
-                      {(lang) => (
-                        <button
-                          type="button"
-                          class={`rounded-pill px-base py-tight text-label ${ui.prefs.lang() === lang ? "bg-accent text-g0" : "bg-g2 text-text-quiet hover:bg-g3"}`}
-                          onClick={() => {
-                            ui.prefs.setLang(lang);
-                          }}
-                        >
-                          {endonym(lang)}
-                        </button>
-                      )}
-                    </For>
-                  </div>
+                  <Segmented
+                    label={say("setup_language")}
+                    options={LANGS.map((lang) => ({ value: lang, label: endonym(lang) }))}
+                    held={ui.prefs.lang()}
+                    onPick={(lang) => {
+                      ui.prefs.setLang(lang);
+                    }}
+                  />
                 </div>
               </Match>
               <Match when={group() === "keys"}>

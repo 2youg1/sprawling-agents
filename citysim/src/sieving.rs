@@ -33,6 +33,10 @@ impl SieveWorld {
         let environment = root.join("env");
         std::fs::create_dir_all(&environment).map_err(|err| {
             AxError::failure(AxCode::StorageFatal, "open sieve world", err.to_string())
+                .with_recovery(
+                    "free space on this disk, or point the scenario root at a \
+                     directory this user may write",
+                )
         })?;
         Ok(SieveWorld {
             cas,

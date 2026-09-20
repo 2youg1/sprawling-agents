@@ -11,26 +11,33 @@
 // looks. The keys themselves are read from `core/keys`, so a rebind
 // shows here without this file knowing what was pressed.
 //
-// The hover has a threshold on the way in and a delay on the way out. A
-// pointer crossing the 44 px edge used to widen the rail, which moved
-// the edge out from under the pointer, which narrowed it again; a
-// pointer must now rest on the column before it opens, and leaving it
-// for a moment does not close it.
+// **Opening on hover is the stylesheet's job, not this file's.** Two
+// timers used to hold a 120 ms threshold on the way in and a 200 ms
+// delay on the way out, because a pointer crossing the 44 px edge
+// widened the rail, which moved the edge out from under the pointer,
+// which narrowed it again. `transition-delay` states both numbers
+// where every other duration on the page is stated, and a pointer that
+// only crosses the column never starts the transition at all. This
+// file keeps the pinned state, which is a decision rather than a
+// gesture, and names the two hooks the rule needs:
+//
+//   nav[data-rail]:hover { width: var(--spacing-rail-open); … }
+//   nav[data-rail]:hover .rail-label { display: block }
+//
+// Without those rules the rail still pins open with `[` and still
+// collapses to glyphs, so a stylesheet that has not caught up costs
+// the hover and nothing else.
 
-import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
+import { For, Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 
 import type { Action } from "../core/keys";
 import { MAYOR, toFragment } from "../core/route";
 import type { View } from "../core/route";
-import { useSay, useUi } from "../ui";
+import { useApprovals, useSay, useUi } from "../ui";
+import { Dot, Presence } from "./notices";
 import { Kbd } from "./parts/kbd";
 import { Tip } from "./parts/tip";
-
-// How long a pointer rests on the collapsed column before it opens, and
-// how long the rail stays open after the pointer leaves.
-const ENTER_MS = 120;
-const LEAVE_MS = 200;
 
 export interface RailProps {
   readonly view: View;
@@ -113,48 +120,19 @@ function PaletteGlyph() {
   );
 }
 
-// A dot drawn in the same box a glyph is drawn in, so every row on the
-// rail starts its first mark at the same x. It used to be centred in
-// its own smaller box, five pixels left of every icon under it.
-function Dot(props: { readonly tone: string }) {
-  return (
-    <span class="flex size-glyph shrink-0 items-center justify-center">
-      <span class={`inline-block size-dot rounded-pill ${props.tone}`} />
-    </span>
-  );
-}
-
 export function Rail(props: RailProps) {
   const ui = useUi();
   const say = useSay();
-  const [resting, setResting] = createSignal(false);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const settle = (open: boolean, after: number) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      setResting(open);
-    }, after);
-  };
-  onCleanup(() => {
-    clearTimeout(timer);
-  });
-  // What the rail shows the names in: pinned open, or a pointer that
-  // stayed.
-  const wide = () => props.open || resting();
+  // What a name does while the rail is collapsed. Written on every
+  // name the rail can show, so one stylesheet rule reveals them all on
+  // hover and this file decides only the pinned case.
+  const label = () => `rail-label truncate ${props.open ? "block" : "hidden"}`;
 
   const active = createMemo(
     () => Object.values(ui.conn.belief.runs).filter((run) => run.doing.kind !== "frozen").length,
   );
-  const approvals = ui.conn.asking.ask("approval_queue");
-  const waiting = createMemo(() => {
-    const answer = approvals();
-    return answer !== undefined && "approvals" in answer ? answer.approvals.items.length : 0;
-  });
-  const link = () => ui.conn.state().kind;
-  const dotClass = () =>
-    link() === "live" ? "bg-accent" : link() === "refused" ? "bg-alert" : "bg-g5 animate-pulse";
-  const linkWord = () =>
-    link() === "live" ? say("link_live") : link() === "refused" ? say("link_refused") : say("link_connecting");
+  const approvals = useApprovals();
+  const waiting = () => approvals().length;
   const items = createMemo<Item[]>(() => [
     { key: "talk", view: { kind: "talk", address: MAYOR }, label: say("nav_mayor"), action: "go.talk", glyph: <TalkGlyph /> },
     { key: "city", view: { kind: "city" }, label: say("nav_city"), action: "go.city", glyph: <CityGlyph />, badge: active() },
@@ -173,47 +151,37 @@ export function Rail(props: RailProps) {
     // pointer passing the edge.
     <div class={`relative h-full shrink-0 transition-[width] duration-200 motion-reduce:transition-none ${props.open ? "w-rail-open" : "w-rail"}`}>
       <nav
-        class={`absolute inset-y-0 left-0 z-10 flex flex-col gap-tight border-r border-g1 bg-g0 py-snug transition-[width] duration-200 motion-reduce:transition-none ${wide() ? "w-rail-open shadow-composer" : "w-rail"}`}
+        data-rail=""
+        class={`absolute inset-y-0 left-0 z-10 flex flex-col gap-tight border-r border-g1 bg-g0 py-snug transition-[width] duration-200 motion-reduce:transition-none ${props.open ? "w-rail-open shadow-composer" : "w-rail"}`}
         aria-label={say("region_nav")}
-        onPointerEnter={() => {
-          settle(true, ENTER_MS);
-        }}
-        onPointerLeave={() => {
-          settle(false, LEAVE_MS);
-        }}
       >
-        <Tip text={linkWord()}>
-          {(hint) => (
-            <button
-              type="button"
-              class="flex h-rail w-full items-center gap-base px-base text-label text-text-quiet hover:text-text"
-              onClick={() => {
-                props.onToggle();
-              }}
-              aria-expanded={props.open}
-              // Collapsed, this control shows a status dot and nothing
-              // else, so the hint is the only name it has — the same
-              // reading the `title` it replaced gave a screen reader.
-              aria-labelledby={hint}
-            >
-              <Dot tone={dotClass()} />
-              <Show when={wide()}>
-                <span class="truncate">{ui.conn.belief.city ?? "sprawling"}</span>
-                <Kbd action="rail.toggle" class="ml-auto" />
-              </Show>
-            </button>
-          )}
-        </Tip>
+        {/* The dot is the city's own state and opens its own panel; the
+            name beside it is what pins the rail, so neither control
+            answers for the other. */}
+        <div class="flex h-rail w-full items-center">
+          <Presence />
+          <button
+            type="button"
+            class={`${label()} min-w-0 flex-1 pr-base text-left text-label text-text-quiet hover:text-text`}
+            onClick={() => {
+              props.onToggle();
+            }}
+            aria-expanded={props.open}
+          >
+            <span class="flex items-center gap-base">
+              <span class="truncate">{ui.conn.belief.city ?? "sprawling"}</span>
+              <Kbd action="rail.toggle" class="ml-auto" />
+            </span>
+          </button>
+        </div>
         <Show when={halted()}>
           <div
-            class="flex h-rail items-center gap-base px-base text-label text-alert"
+            class="flex h-rail w-full items-center gap-base px-base text-label text-alert"
             role="status"
             aria-label={say("halt_title")}
           >
             <Dot tone="bg-alert" />
-            <Show when={wide()}>
-              <span class="truncate">{say("halt_title")}</span>
-            </Show>
+            <span class={label()}>{say("halt_title")}</span>
           </div>
         </Show>
         <For each={items()}>
@@ -234,10 +202,10 @@ export function Rail(props: RailProps) {
                       </span>
                     </Show>
                   </span>
-                  <Show when={wide()}>
-                    <span class="truncate">{item.label}</span>
-                    <Kbd action={item.action} class="ml-auto" />
-                  </Show>
+                  <span class={`${label()} flex-1`}>{item.label}</span>
+                  <span class={label()}>
+                    <Kbd action={item.action} />
+                  </span>
                 </a>
               )}
             </Tip>
@@ -257,10 +225,10 @@ export function Rail(props: RailProps) {
                     {waiting()}
                   </span>
                 </span>
-                <Show when={wide()}>
-                  <span class="truncate">{say("nav_waiting", { n: String(waiting()) })}</span>
-                  <Kbd action="go.waiting" class="ml-auto" />
-                </Show>
+                <span class={`${label()} flex-1`}>{say("nav_waiting", { n: String(waiting()) })}</span>
+                <span class={label()}>
+                  <Kbd action="go.waiting" />
+                </span>
               </a>
             )}
           </Tip>
@@ -282,10 +250,10 @@ export function Rail(props: RailProps) {
               aria-labelledby={hint}
             >
               <PaletteGlyph />
-              <Show when={wide()}>
-                <span class="truncate">{say("nav_everything")}</span>
-                <Kbd action="palette" class="ml-auto" />
-              </Show>
+              <span class={`${label()} flex-1`}>{say("nav_everything")}</span>
+              <span class={label()}>
+                <Kbd action="palette" />
+              </span>
             </button>
           )}
         </Tip>

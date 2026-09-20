@@ -3,20 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
-
-//! CLI entry. Subcommands land with their stages and are refused honestly
-//! until then — a refusal that names what is missing beats a stub that
-//! pretends (sprawling-SPEC.md). Live now: status, replay, init, serve,
-//! export, restore, resume, fork.
-
-// The city harness is the library half of this package (`src/lib.rs`);
-// these two are the binary's own. `install` puts this executable where a
-// shell will find it, and `wire_client` talks to a served city from a
-// terminal - both are about the command line rather than about a city.
+//! Where a command line becomes a subcommand: the word a person typed,
+//! the positional arguments behind it, and the screen a launch with no
+//! command gets.
+//!
+//! Nothing here does the work. Every arm hands off to `city` or to
+//! `data`, so this module holds the reading of arguments and the list of
+//! commands, and the commands themselves stay where they belong.
 
 use sprawling::firstrun;
 
@@ -25,8 +18,6 @@ use super::data::{adopt, call, enrol, export, fork, install, replay, restore, st
 use super::{CLIENT_COMPLETE, CLIENT_FILES};
 use std::process::ExitCode;
 
-/// Every crate this binary is built from, `name version` per line -
-/// the embedded half of the bill of materials (`xtask sbom` writes the
 /// One line a person can read about what this binary carries.
 pub(super) fn client_summary() -> String {
     if CLIENT_COMPLETE {
@@ -172,10 +163,6 @@ pub(super) fn default_city_location() -> std::path::PathBuf {
     }
 }
 
-/// The one command that makes a city run: raise it when it is not there,
-/// serve it, and open the WebUI once the port answers. The first screen
-/// and the launcher in the release archive both arrive here, so the
-/// sequence has exactly one definition and `init` and `serve` keep theirs.
 /// The value following a `--flag`, if present.
 pub(super) fn flag_value(args: &[String], flag: &str) -> Option<String> {
     let mut pairs = args.windows(2);

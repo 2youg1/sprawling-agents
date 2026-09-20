@@ -173,7 +173,11 @@ impl ToolBench {
                 AxCode::InvalidArgs,
                 "register tool",
                 format!("`{name}` is already registered"),
-            ));
+            )
+            .with_recovery(format!(
+                "rename one of the two tools declaring the name `{name}` in its \
+                 `ToolMeta`, then register it again"
+            )));
         }
         self.tools.insert(name, tool);
         Ok(())
@@ -259,6 +263,11 @@ impl ToolBench {
                 AxCode::ToolUnavailable,
                 "invoke tool",
                 format!("no tool named `{name}` is registered"),
+            )
+            .with_nearby(self.tools.keys().cloned().collect())
+            .with_recovery(
+                "call one of the tools listed beside this error; those are the tools \
+                 this run holds",
             ));
         };
         // The key is recorded with the answer it earned, so a retry after

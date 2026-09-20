@@ -143,13 +143,22 @@
     var(--face-mono), ui-monospace, "Cascadia Mono", "SF Mono", Menlo,
     Consolas, "DejaVu Sans Mono", monospace;
 
-  /* The type scale: a step is named for its job, not its size. */
+  /* The type scale: a step is named for its job, not its size.
+   *
+   * Four steps are fixed and two follow the body. A note and a label
+   * both qualify the prose beside them, so each is set one pixel under
+   * whatever size the person chose for that prose, and a label is that
+   * same size carrying weight 600. Writing the two as literals froze
+   * them while the body moved: at the default body of 15px a note was
+   * the same size as the prose it is meant to sit under, and at a body
+   * of 14px a note was larger than that prose. One number now moves the
+   * whole ladder. */
   --text-figure: 28px;
   --text-title: 20px;
   --text-heading: 18px;
-  --text-label: 14px;
+  --text-label: calc(var(--text-body) - 1px);
   --text-body: 15px;
-  --text-note: 15px;
+  --text-note: calc(var(--text-body) - 1px);
   --font-weight-figure: 600;
   --font-weight-title: 600;
   --font-weight-heading: 600;
@@ -176,11 +185,33 @@
   --container-talk: 760px;
   --container-page: 1040px;
 
+  /* The two widths at which the main region affords another column,
+   * written as container widths so that `@lg:` and `@wide:` ask what
+   * the columns actually have. The window is the wrong ruler: an open
+   * rail takes 232px of it, so a page that breaks at 1440px of window
+   * lays three columns into 1208px of room and crushes the middle one.
+   *
+   * Each number is the sum of what has to fit - a tree pane beside a
+   * measure of prose is 300 + 520, and a second pane on the far side of
+   * that prose is 300 more. The sum is spelled out rather than added up
+   * from `--spacing-tree` and `--container-measure` because Tailwind
+   * drops any `--container-*` whose declared value contains `var()`:
+   * the variant reads the value before the cascade can resolve it, and
+   * a `@lg:` class whose width did not resolve produces no CSS at all
+   * rather than an error. Moving either part therefore means moving the
+   * sum here, and that is the one place in this file where a number is
+   * written twice. */
+  --container-lg: 820px;
+  --container-wide: 1120px;
+
   /* The few fixed sizes a shell needs: the bar, a status dot, the
    * building glyphs, and the pane a tree takes beside a file. */
   --spacing-bar: 44px;
-  /* The width at which the shell affords a third column: the
-     detail panel stops being a drawer and sits beside the page. */
+  /* The window width the shell still breaks at, kept only while views
+     spell `wide:`. `--container-wide` above is the width that answers
+     the same question against the room the columns have; whoever moves
+     the last `wide:` in `src/views/` to `@wide:` deletes this line in
+     the same change. */
   --breakpoint-wide: 1440px;
   --spacing-rail: 44px;
   --spacing-rail-open: 232px;
@@ -202,10 +233,13 @@
   --shadow-raise: 0 1px 2px oklch(from var(--shadow-ink) l c h / 0.25);
   --shadow-float: 0 8px 24px oklch(from var(--shadow-ink) l c h / 0.45);
   --shadow-modal: 0 24px 64px oklch(from var(--shadow-ink) l c h / 0.6);
-  /* The name every caller still spells for the middle tier, pointing at
-   * that tier rather than repeating it. It goes the day the last
-   * `shadow-composer` in `src/views/` is renamed to the height it
-   * means. */
+  /* A migration shim, and nothing else: it is the name callers spelled
+   * when there was one shadow, pointing at the middle tier rather than
+   * repeating its value, so that the three heights above could land
+   * before any view was touched. Whoever renames the last
+   * `shadow-composer` in `src/views/` to the height it means deletes
+   * this line in the same change; until then it keeps the old spelling
+   * drawing the right shadow. */
   --shadow-composer: var(--shadow-float);
 
   /* The corner scales; the shape is the superellipse exponent halved. */
@@ -260,7 +294,14 @@
   --tier-heading: 60;
   --tier-label: 90;
   --tier-body: 90;
-  --tier-note: 75;
+  /* A note is one pixel under the body, so at every body size this
+   * stylesheet offers it is at most 15px of unemphasised content text,
+   * and APCA Bronze admits that size at Lc 90 and at nothing lower. A
+   * note is therefore drawn in the full text token, and what makes it
+   * quiet is the space around it rather than a paler grey - which is
+   * the rule stated above, now applied to the step that used to be the
+   * exception to it. */
+  --tier-note: 90;
 
   /* The brightest surface that may carry text. G3 reaches only Lc 88.1
    * against the ramp ceiling while body text needs 90, so G3 stays a
@@ -450,6 +491,17 @@
   font-variant-numeric: var(--figures);
 }
 
+/* As many columns of prose as the room holds, and no breakpoint.
+ *
+ * A settings page and a dependency page are lists of cards that read
+ * well at a measure and badly when stretched. Asking for one column
+ * below a breakpoint and two above it answers the question at two
+ * points and guesses in between; `auto-fit` answers it continuously,
+ * from the one width that decides it - how wide a column of prose is. */
+@utility grid-fit {
+  grid-template-columns: repeat(auto-fit, minmax(var(--container-measure), 1fr));
+}
+
 /* The three motions the city drawing makes, all on the compositor: a
  * figure bobs, a window or a thought blinks, a flag waves. Nothing
  * else moves. */
@@ -567,24 +619,106 @@
     animation: none;
   }
 }
-:root[data-motion="off"] .bob,
-:root[data-motion="off"] .blink,
-:root[data-motion="off"] .wave,
-:root[data-motion="off"] .rise,
-:root[data-motion="off"] .drop,
-:root[data-motion="off"] .shimmer,
-:root[data-motion="off"] .animate-pulse {
+/* The person's own answer, which any element may carry rather than only
+ * the root element. The appearance section writes it on `<html>`, so
+ * dropping `:root` from these two selectors changes nothing about the
+ * page a person is looking at; what it buys is a fixture that means what
+ * it says, because `#/gallery` marks one subtree `data-motion="off"` and
+ * expects that subtree to stop moving.
+ *
+ * The machine's own answer above stays bound to `:root`, and that is not
+ * an oversight: an operating system preference is a fact about the whole
+ * window, and a subtree saying `on` has to be able to overrule it. */
+[data-motion="off"] .bob,
+[data-motion="off"] .blink,
+[data-motion="off"] .wave,
+[data-motion="off"] .rise,
+[data-motion="off"] .drop,
+[data-motion="off"] .shimmer,
+[data-motion="off"] .animate-pulse {
   animation: none;
 }
 /* A transition is an acknowledgement rather than a decoration, so it is
  * shortened to a frame rather than removed: the state still changes
  * where the eye was, and nothing travels. */
-:root[data-motion="off"] *,
-:root[data-motion="off"] *::before,
-:root[data-motion="off"] *::after {
+[data-motion="off"] *,
+[data-motion="off"] *::before,
+[data-motion="off"] *::after {
   transition-duration: 1ms;
   animation-iteration-count: 1;
   scroll-behavior: auto;
+}
+
+/* One route replacing another, as one page becoming the next.
+ *
+ * Two things survive a route change and say so: the rail entry the
+ * person is on, and the page's own title. Naming them hands the browser
+ * two pairs of boxes to carry from the old page to the new one, and the
+ * rest of the page cross-fades. The rail entry is named by the attribute
+ * that already says which entry is current, so nothing in the view has
+ * to be marked for this.
+ *
+ * A name has to be unique at the moment the browser captures the page,
+ * or the whole transition is skipped: one rail entry carries
+ * `aria-current="page"` at a time, and the router draws one view inside
+ * `<main>` at a time, so both names are held by one box each.
+ *
+ * The JS side wraps the route change in `document.startViewTransition`
+ * where the engine has it; Firefox does not yet, and there the route
+ * changes the way it does today. Nothing here needs `@supports`, because
+ * an engine that does not know `view-transition-name` drops the
+ * declaration and keeps the rest of the rule.
+ *
+ * Motion off stops the animation rather than the transition, so the two
+ * pages still swap in one frame. The switch is bound to the element
+ * carrying the attribute rather than to its descendants, because the
+ * boxes a transition animates hang off the root element and no
+ * descendant selector can reach them. */
+nav[data-rail] [aria-current="page"] {
+  view-transition-name: rail-current;
+}
+main h1 {
+  view-transition-name: title;
+}
+[data-motion="off"]::view-transition-group(*),
+[data-motion="off"]::view-transition-old(*),
+[data-motion="off"]::view-transition-new(*) {
+  animation: none;
+}
+
+/* The rail opens because a pointer stayed on it, and that is a fact
+ * about the pointer rather than about any state the client holds.
+ *
+ * A threshold on the way in and a delay on the way out are one property
+ * each: the delay is 200ms while the pointer is away, so leaving the
+ * column for a moment does not close it, and 120ms while the pointer is
+ * on it, so crossing the 44px edge by accident does not open it. The
+ * transition itself is what keeps the edge from chasing the pointer -
+ * the width moves over 200ms rather than jumping out from under it.
+ *
+ * `data-rail` and `rail-label` are the two hooks `views/rail.tsx` names
+ * for this rule; every other nav in this client - the file tree, the
+ * lens tabs, the settings groups - is content, and none of them opens.
+ *
+ * Only hover is stated here. Pinning the rail with `[` is a decision
+ * rather than a gesture, so the view keeps it and writes the open width
+ * and the open labels as classes; saying the resting width here as well
+ * would overrule those classes from outside every layer and the pin
+ * would stop working. Hover is the one state the view no longer tracks,
+ * so hover is the one state this rule owns. */
+nav[data-rail] {
+  transition-property: width, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: var(--ease-standard);
+  transition-delay: 200ms;
+}
+nav[data-rail]:hover {
+  width: var(--spacing-rail-open);
+  box-shadow: var(--shadow-float);
+  transition-delay: 120ms;
+}
+nav[data-rail]:hover .rail-label {
+  display: block;
 }
 
 /* Base: a page is dark, text never pure white, links carry no
@@ -689,6 +823,53 @@
    * gutter declared above it. */
   main {
     scrollbar-gutter: stable both-edges;
+  }
+  /* The main region measures itself, so the columns inside it can ask
+   * how much room they have instead of how wide the window is. The two
+   * are not the same number: an open rail takes 232px, and a layout that
+   * asked the window put three columns into a space that holds two.
+   *
+   * Naming the container lets a query say which box it is asking about,
+   * which matters the day a second container appears inside this one.
+   *
+   * `inline-size` also makes this box the containing block for any
+   * `fixed` descendant, which is what a query container costs. Nothing
+   * in the shell pays it - the palette, the refusal, the notice panel
+   * and the key sheet are all drawn outside the main region - but a
+   * hint anchored with `position: fixed` inside it is clipped by this
+   * box rather than escaping it. */
+  main {
+    container-type: inline-size;
+    container-name: page;
+  }
+  /* A fold that opens at a readable speed.
+   *
+   * `interpolate-size` is what lets a height travel to `auto`; without
+   * it the only animatable heights are the ones somebody measured, and
+   * a preview whose height nobody can know in advance is exactly the
+   * case. It is declared on the root element because it inherits, so
+   * one line covers every fold on every page.
+   *
+   * `content-visibility` carries the second half: the contents of a
+   * closed `<details>` are not rendered at all, so without a discrete
+   * transition holding them visible the box would collapse instantly
+   * and the height would have nothing to travel over.
+   *
+   * Safari and Firefox implement neither today and are given no
+   * fallback on purpose: they drop the rules they cannot read, the fold
+   * opens at once, and that is the behaviour those engines have now. */
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  details::details-content {
+    height: 0;
+    overflow: hidden;
+    transition:
+      height 200ms var(--ease-standard),
+      content-visibility 200ms allow-discrete;
+  }
+  details[open]::details-content {
+    height: auto;
   }
   *:focus-visible {
     outline: 2px solid var(--color-accent);
@@ -798,4 +979,68 @@
 .settled-row {
   content-visibility: auto;
   contain-intrinsic-size: auto var(--spacing-step);
+}
+
+/* Paper.
+ *
+ * A sheet takes no input, has no second surface to lift a panel onto,
+ * and charges for every drop of ink. Three rules follow from that, and
+ * each is stated once.
+ *
+ * **Only the main region prints.** The rail, the notice panel, the halt
+ * banner, the refusal, the command palette and the key sheet are all
+ * controls, and all of them are drawn outside `<main>` - so one rule
+ * keeps `<main>`, everything inside it and everything that contains it,
+ * and drops the rest without naming a single screen. A page added next
+ * year needs no line here. The composer is the one input surface inside
+ * the main region, and it is the form a person types a message into.
+ *
+ * **The page is the paper and the text is the ink.** The eleven
+ * surfaces this library draws with mean nothing on a sheet, and the
+ * text tokens of a dark page are pale enough to print as nothing at
+ * all, so every fill drops out and every word takes the ink the medium
+ * names for itself. A rule line keeps 45 per cent of that ink, which is
+ * how a table still reads as a table. Saying `color-scheme: light`
+ * first is what makes `Canvas` and `CanvasText` mean paper and ink
+ * rather than whichever way the screen was lit.
+ *
+ * **A sheet is as long as it needs to be.** The shell is one viewport
+ * tall and scrolls inside itself; on paper that would print the first
+ * screen and lose the rest, so the height comes off and the main region
+ * stops clipping. Rows deferred until they scroll into view are the
+ * same trap - a ledger of a thousand rows would print as a blank page -
+ * so they are laid out unconditionally.
+ *
+ * A link on paper cannot be followed, so it prints where it goes.
+ * Only absolute ones: this client's own routes are page fragments, and
+ * `(#/city)` after every word would be noise. */
+@media print {
+  :root {
+    color-scheme: light;
+  }
+  body *:not(main, main *, :has(main)) {
+    display: none;
+  }
+  main form:has(textarea) {
+    display: none;
+  }
+  * {
+    background: none;
+    color: CanvasText;
+    border-color: color-mix(in oklch, CanvasText 45%, Canvas);
+    box-shadow: none;
+  }
+  .h-screen {
+    height: auto;
+  }
+  main {
+    overflow: visible;
+  }
+  .settled,
+  .settled-row {
+    content-visibility: visible;
+  }
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+  }
 }

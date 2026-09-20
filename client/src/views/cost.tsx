@@ -11,6 +11,7 @@
 
 import { For, Show, createMemo } from "solid-js";
 
+import { QUERIES } from "../core/asking";
 import { usd } from "../core/time";
 import type { CostAnswer, UsdMicros } from "../wire";
 import { useSay, useUi } from "../ui";
@@ -23,7 +24,7 @@ function Table(props: { readonly rows: readonly (readonly [string, UsdMicros])[]
     <ul class="text-note">
       <For each={[...props.rows].sort((a, b) => b[1] - a[1])}>
         {([name, amount]) => (
-          <li class="my-tight">
+          <li class="settled-row my-tight">
             <div class="flex justify-between gap-base">
               <span class="truncate font-mono text-text-quiet">{name}</span>
               <span class="shrink-0 text-text">{usd(amount)}</span>
@@ -41,7 +42,7 @@ function Table(props: { readonly rows: readonly (readonly [string, UsdMicros])[]
 export function Cost() {
   const ui = useUi();
   const say = useSay();
-  const cost = ui.conn.asking.ask("cost_view");
+  const cost = ui.conn.asking.ask(QUERIES.cost);
   const answer = createMemo<CostAnswer | undefined>(() => {
     const held = cost();
     return held !== undefined && "cost" in held ? held.cost : undefined;

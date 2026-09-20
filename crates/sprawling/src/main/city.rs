@@ -3,15 +3,27 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! CLI entry. Subcommands land with their stages and are refused honestly
-//! until then — a refusal that names what is missing beats a stub that
-//! pretends (sprawling-SPEC.md). Live now: status, replay, init, serve,
-//! export, restore, resume, fork.
-
-// The city harness is the library half of this package (`src/lib.rs`);
-// these two are the binary's own. `install` puts this executable where a
-// shell will find it, and `wire_client` talks to a served city from a
-// terminal - both are about the command line rather than about a city.
+//! The subcommands that raise a city and serve it: `up`, `use_folder`,
+//! `init`, `serve` and `resume`.
+//!
+//! [`serve_city`] is the single definition of what serving means, and
+//! every route into a running city passes through it: refuse a
+//! directory that holds no history, settle the pairing key before
+//! anything binds, choose where the client bundle comes from, print the
+//! banner, build the diagnostics sink, attach the console, and hand one
+//! `serving::Serving` to the runtime. `up`, the first screen and `serve`
+//! differ only in what they do before they arrive there and in whether
+//! they open a browser, so none of them re-derives the sequence.
+//!
+//! [`report`] is where an `AxError` becomes an exit: the failure line,
+//! then its recovery line, then `ExitCode::FAILURE`. The verbs in `data`
+//! print their refusals through this same function, so the whole binary
+//! refuses in one voice.
+//!
+//! The point a reader most often gets wrong: `up` raises a city that is
+//! not there and `serve` refuses one. That difference is deliberate, so
+//! that a mistyped path becomes a refusal rather than an empty city at a
+//! location nobody looked at.
 
 use super::router::{
     COMMANDS, client_summary, default_city_location, flag_value, log_floor, log_levels, named,
@@ -91,6 +103,10 @@ pub(super) fn report_standing(report: &assembly::InitReport) {
     }
 }
 
+/// The one command that makes a city run: raise it when it is not there,
+/// serve it, and open the WebUI once the port answers. The first screen
+/// and the launcher in the release archive both arrive here, so the
+/// sequence has exactly one definition and `init` and `serve` keep theirs.
 pub(super) fn up_at(city: &std::path::Path, raw: &str, args: &[String]) -> ExitCode {
     if !assembly::has_history(city) {
         match assembly::init_city(city) {

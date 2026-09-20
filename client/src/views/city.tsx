@@ -13,6 +13,8 @@
 
 import { For, Show, createMemo, createSignal } from "solid-js";
 
+import { QUERIES } from "../core/asking";
+import { MAYOR, toFragment } from "../core/route";
 import type { Address, BuildingProgress } from "../wire";
 import { useSay, useUi } from "../ui";
 import { CityBar, CityLegend } from "./city/bar";
@@ -28,7 +30,7 @@ function share(building: BuildingProgress): string | null {
 export function City() {
   const ui = useUi();
   const say = useSay();
-  const city = ui.conn.asking.ask("city_view");
+  const city = ui.conn.asking.ask(QUERIES.city);
   const answer = createMemo(() => {
     const held = city();
     return held !== undefined && "city" in held ? held.city : undefined;
@@ -38,7 +40,7 @@ export function City() {
 
   return (
     <div class="flex min-h-0 flex-1 flex-col">
-      <CityBar city={answer()} />
+      <CityBar />
       <div class="relative flex min-h-0 flex-1 flex-col lg:flex-row">
         <nav
           class="hidden shrink-0 overflow-y-auto border-r border-g2 px-snug py-base wide:block wide:w-rail-open"
@@ -71,7 +73,27 @@ export function City() {
         <section class="flex min-h-0 min-w-0 flex-1 flex-col justify-center overflow-auto px-pane py-base">
           <Show when={answer()} fallback={<p class="text-center text-text-disabled">…</p>}>
             {(held) => (
-              <Show when={held().buildings.length > 0} fallback={<EmptyState text={say("city_no_buildings")} />}>
+              <Show
+                when={held().buildings.length > 0}
+                fallback={
+                  // A city with no buildings is a city nobody has asked
+                  // for anything yet, and the Mayor is where a person
+                  // asks: raising a building is a sentence in that
+                  // conversation rather than a button this page could
+                  // press.
+                  <EmptyState
+                    text={say("city_no_buildings")}
+                    action={
+                      <a
+                        href={toFragment({ kind: "talk", address: MAYOR })}
+                        class="rounded-control bg-accent px-base py-snug text-label text-g0 hover:bg-accent-hover"
+                      >
+                        {say("city_ask_mayor")}
+                      </a>
+                    }
+                  />
+                }
+              >
                 <Skyline city={held()} picked={picked()} onPick={setPicked} />
                 <CityLegend />
               </Show>

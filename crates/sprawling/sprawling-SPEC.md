@@ -1748,6 +1748,19 @@ pub(in crate::assembly) const IDEM_FIELD: &str = "idem";
 成功的命令重发不被拒也不再落账；`a_key_already_in_the_history_is_recognised_after_a_restart`——
 一座重新打开的城认得账本里那把钥匙。
 
+### `bin::wire_client` 的两件事各有文件
+
+socket 上的一次对话与 HTTP 上的一次托管是两件事，同处一个文件时 `wire_client.rs` 越过了 400 行上限。
+
+| 文件 | 管什么 |
+|---|---|
+| `wire_client.rs` | 与城的一次 WebSocket 对话：`Heard`／`Spoken` 与三支退出码、握手 `hello`、`call`／`converse`／`next_frame`／`report`，以及两处共用的不可达判词 `unreachable_city` |
+| `wire_client/enrolment.rs` | 把一份明文交给同机的 `/enroll` 路由并取回替代它的引用：`split_reference` 与 `enrol`，连同钉住引用形状的 2 个 `#[test]` |
+
+- **`unreachable_city` 仍只有一个家**：它留在父模块，`enrolment.rs` 经 `use super::unreachable_city` 取用，于是「城连不上」这句话不会有第二种说法。
+- 父模块以 `pub(crate) use enrolment::{enrol, split_reference};` 转出，`main/data.rs` 的两处调用路径一字未改。
+- 公开面不涉：两项都在二进制内部，`api-baselines` 不动。
+
 ### 文档同步
 
 本节；`ARCHITECTURE.md` §12 增 `bin::assembly::commanding::entrance` 与两个测试文件的行；

@@ -150,6 +150,10 @@ impl Watchdog {
                     AxCode::InvalidArgs,
                     "encode watchdog_fired",
                     "Proceed does not fire",
+                )
+                .with_recovery(
+                    "report this against runtime::watchdog: `Proceed` is the verdict \
+                     that records nothing, and the caller asked it for a payload",
                 ));
             }
             Disposal::CorrectiveSteer { text } => {
@@ -227,8 +231,9 @@ mod tests {
     }
 
     fn provider_error(retriable: bool) -> AxError {
-        let err = AxError::failure(AxCode::Provider, "call the model", "the provider said no");
-        if retriable { err.retriable() } else { err }
+        let draft = AxError::failure(AxCode::Provider, "call the model", "the provider said no");
+        let draft = if retriable { draft.retriable() } else { draft };
+        draft.with_recovery("dispatch again, or attach a second endpoint")
     }
 
     #[test]

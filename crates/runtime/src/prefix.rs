@@ -96,6 +96,10 @@ pub fn build_prefix(plan: PrefixPlan) -> Result<FrozenPrefix, AxError> {
             AxCode::InvalidArgs,
             "build prefix",
             "segment construction lost a slot",
+        )
+        .with_recovery(
+            "report this against runtime::prefix: a prefix is four segments, city, \
+             building, resident and run, and fewer than four were built",
         ));
     };
     let mut prefix = FrozenPrefix::assemble(city, building, resident, run)?;
@@ -130,6 +134,10 @@ fn build_segment(
             AxCode::InvalidArgs,
             "build prefix segment",
             "cap exceeds usize",
+        )
+        .with_recovery(
+            "lower this slot's byte cap in `[prefix]`: it is larger than this machine \
+             can address",
         )
     })?;
     let mut text = String::new();
@@ -178,6 +186,10 @@ fn build_segment(
                 AxCode::InvalidArgs,
                 "build prefix segment",
                 "length overflow",
+            )
+            .with_recovery(
+                "shorten this source document: the number of bytes cut from it is \
+                 larger than a byte count this city can hold",
             )
         })?;
         if joiner > 0 {
@@ -262,6 +274,11 @@ impl FrozenPrefix {
                             "render system blocks",
                             format!("{} segment is not utf-8", segment.slot().as_str()),
                         )
+                        .with_recovery(format!(
+                            "save the documents feeding the {} slot as UTF-8; a model \
+                             prompt carries text and nothing else",
+                            segment.slot().as_str()
+                        ))
                     })?
                     .to_owned();
                 Ok(SystemBlock { text, cache: true })
@@ -310,6 +327,10 @@ impl FrozenPrefix {
                     AxCode::InvalidArgs,
                     "encode prompt payload",
                     "segment length exceeds u64",
+                )
+                .with_recovery(
+                    "lower the slot byte caps in `[prefix]`: one frozen segment is \
+                     longer than a byte count this city can hold",
                 )
             })?;
             entry.insert("len".to_owned(), Value::Number(len.into()));

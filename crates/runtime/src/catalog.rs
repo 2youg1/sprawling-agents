@@ -81,7 +81,12 @@ impl Catalog {
                 AxCode::InvalidArgs,
                 "admit tool to catalog",
                 format!("{}: empty disclosure", meta.name),
-            ));
+            )
+            .with_recovery(format!(
+                "write one sentence in the `disclosure` field of `{}`'s `ToolMeta` \
+                 saying what the tool does",
+                meta.name
+            )));
         }
         let key = meta.name.as_str().to_owned();
         if self.tools.contains_key(&key) {
@@ -89,7 +94,11 @@ impl Catalog {
                 AxCode::InvalidArgs,
                 "admit tool to catalog",
                 format!("{key}: duplicate name"),
-            ));
+            )
+            .with_recovery(format!(
+                "rename one of the two tools declaring `{key}` in its `ToolMeta`: a \
+                 catalog name points at one tool"
+            )));
         }
         self.tools.insert(
             key,
@@ -109,6 +118,10 @@ impl Catalog {
                 AxCode::InvalidArgs,
                 "admit skill to catalog",
                 "empty name or disclosure",
+            )
+            .with_recovery(
+                "give the SKILL file a title and a one-line description; the catalog \
+                 shows both and a resident picks the skill by them",
             ));
         }
         if self.skills.contains_key(&entry.name) {
@@ -116,7 +129,12 @@ impl Catalog {
                 AxCode::InvalidArgs,
                 "admit skill to catalog",
                 format!("{}: duplicate name", entry.name),
-            ));
+            )
+            .with_recovery(format!(
+                "rename one of the two SKILL files titled `{}`: a catalog name points \
+                 at one skill",
+                entry.name
+            )));
         }
         self.skills.insert(entry.name.clone(), entry);
         Ok(())

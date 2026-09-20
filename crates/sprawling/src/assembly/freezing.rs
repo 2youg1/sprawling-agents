@@ -146,6 +146,10 @@ fn addressed(city_root: &Path, path: &Path) -> Result<Address, AxError> {
             "address a prefix source document",
             format!("{} is outside the city", path.display()),
         )
+        .with_recovery(
+            "move this document under the city root, or drop it from the prefix: an \
+             address is relative to the city and cannot leave it",
+        )
     })?;
     let spelled = relative
         .to_str()
@@ -154,6 +158,10 @@ fn addressed(city_root: &Path, path: &Path) -> Result<Address, AxError> {
                 AxCode::InvalidArgs,
                 "address a prefix source document",
                 format!("{} is not utf-8", relative.display()),
+            )
+            .with_recovery(
+                "rename this document to letters, digits, dashes and slashes: an \
+                 address is UTF-8 text",
             )
         })?
         .replace('\\', "/");

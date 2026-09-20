@@ -210,6 +210,7 @@ fn a13_redeemed_value_reaches_the_wire_verbatim() {
                 .lock()
                 .map_err(|_| {
                     AxError::failure(AxCode::CredentialMissing, "resolve credential", "lock")
+                        .with_recovery("the test resolver's mutex was poisoned by an earlier panic")
                 })?
                 .resolve(reference)
         })),

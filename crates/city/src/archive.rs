@@ -173,6 +173,10 @@ pub fn index(city_root: &Path, building: &kernel::Address) -> Result<Vec<Entry>,
                 "read an archive",
                 format!("{}: {err}", dir.display()),
             )
+            .with_recovery(
+                "give this process permission to list the archive directory named \
+                 above, then ask for the archive again",
+            )
         })?;
         for item in listed {
             let path = item
@@ -181,6 +185,10 @@ pub fn index(city_root: &Path, building: &kernel::Address) -> Result<Vec<Entry>,
                         AxCode::StorageFatal,
                         "read an archive",
                         format!("{}: {err}", dir.display()),
+                    )
+                    .with_recovery(
+                        "give this process permission to list the archive directory \
+                         named above, then ask for the archive again",
                     )
                 })?
                 .path();
@@ -192,6 +200,10 @@ pub fn index(city_root: &Path, building: &kernel::Address) -> Result<Vec<Entry>,
                     AxCode::StorageFatal,
                     "read an archive entry",
                     format!("{}: {err}", path.display()),
+                )
+                .with_recovery(
+                    "give this process permission to read the file named above, or \
+                     move it out of the archive directory",
                 )
             })?;
             let stem = path

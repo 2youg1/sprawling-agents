@@ -238,7 +238,11 @@ impl Tool for GoalTool {
                 AxCode::InvalidArgs,
                 "register a goal",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let mut desk = self.desk.lock().map_err(|_| {
             AxError::failure(

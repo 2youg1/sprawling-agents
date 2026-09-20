@@ -107,6 +107,10 @@ pub(crate) fn now_ms() -> Result<TimeMs, AxError> {
             "sample wall clock",
             "beyond u64 millis",
         )
+        .with_recovery(
+            "set this machine's clock to the present day; it reads more than half a \
+             billion years after the unix epoch",
+        )
     })?;
     Ok(TimeMs::new(millis))
 }

@@ -115,7 +115,7 @@ impl RunWorker {
                 None
             }
             Err(err) if admit.is_empty() => {
-                return Err(err.with_recovery("name the model ids to admit, then attach again"));
+                return Err(err.rewrite_recovery("name the model ids to admit, then attach again"));
             }
             Err(err) => {
                 endpoint.models = admit.to_vec();
@@ -289,8 +289,8 @@ impl RunWorker {
                 "choose a model",
                 format!("{endpoint} does not serve {model}"),
             )
-            .with_recovery("choose one of the models the endpoint listed")
-            .with_nearby(known.models.clone()));
+            .with_nearby(known.models.clone())
+            .with_recovery("choose one of the models the endpoint listed"));
         }
         let priced = gateway::MarketSnapshot::builtin()?.lookup(&model).cloned();
         let registered = super::registered_as(&self.book, tag, &endpoint, &model);

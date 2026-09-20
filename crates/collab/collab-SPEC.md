@@ -487,12 +487,15 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 ### 8-16 collab::workshop_tool 目录化
 
-`workshop_tool.rs` 原有 539 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
+`workshop_tool.rs` 按「一个文件回答一个问题」切成三份：
 
-- `workshop_tool.rs`（376 行）——`WorkshopDesk` 与它的 `lay_out`／`question`／`judge`／`accept`、`WorkshopTool` 与它的元数据和 `Tool` 实现、动作枚举 `Op`，以及读参数的 `text`／`contract_of`。它同时是子模块的父模块，声明 `mod tests;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。
-- `workshop_tool/tests.rs`（167 行）——原内联 `mod tests` 原样迁出，断言、名字与 5 个 `#[test]` 一个未动；原 `mod tests` 上的 `#[allow(...)]` 列表原样落在父文件的 `mod tests;` 声明上。
+- `workshop_tool.rs`——`WorkshopDesk` 与它的 `lay_out`／`question`／`judge`／`accept`、`WorkshopTool` 与它的元数据和 `Tool` 实现、两张桌子共用的中毒拒词 `poisoned`，以及读参数的 `text`／`contract_of`。它同时是子模块的父模块，声明 `mod op;`／`mod tests;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。
+- `workshop_tool/op.rs`——这个工具答应哪几个动词：穷尽枚举 `Op`（`lay_out`／`question`／`judge`）与它的 `parse`。一个本版本不认的动词被拒绝，而不是舍入到无害的那个，因为这里无害的那个会静静丢掉一张有人要跑的图。两项都是 `pub(super)`，不出 `workshop_tool`。
+- `workshop_tool/tests.rs`——断言、名字与 5 个 `#[test]` 一个未动；`#[allow(...)]` 列表在父文件的 `mod tests;` 声明上。
 
-**无字段开放。** 测试文件是 `workshop_tool` 的子模块，`use super::*` 之外不需要任何新的可见性。
+**两张桌子的中毒拒词只写一遍。** `desk` 与 `delegates` 取锁失败时说的是同一句话、只换主语，先前是两处字面重复的构造；现在它们只有 `poisoned(which)` 一个家，对调用方说出的字句逐字节不变。
+
+**无字段开放。** 测试文件是 `workshop_tool` 的子模块，`use super::*` 之外不需要任何新的可见性；`Op` 移出后仍经 `use op::Op;` 在父模块作用域内。
 
 **apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::WorkshopDesk`／`collab::WorkshopTool`，`cargo xtask apisync` 对 collab 无差异。
 

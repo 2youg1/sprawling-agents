@@ -13,6 +13,7 @@
 import { For, Show, createMemo, createSignal, onMount } from "solid-js";
 import { Option } from "effect";
 
+import { QUERIES } from "../core/asking";
 import { halt, release } from "../core/commands";
 import { LANGS, endonym } from "../core/lang";
 import { MAYOR, current, toFragment } from "../core/route";
@@ -43,10 +44,14 @@ export function Palette(props: { readonly onClose: () => void }) {
   const [box, setBox] = createSignal<HTMLInputElement>();
   onMount(() => box()?.focus());
 
-  const city = ui.conn.asking.ask("city_view");
-  const endpoints = ui.conn.asking.ask("endpoint_view");
+  const city = ui.conn.asking.ask(QUERIES.city);
+  const endpoints = ui.conn.asking.ask(QUERIES.endpoints);
   const entries = createMemo<Entry[]>(() => {
-    const goTo = (view: View, label: string, hint: string): Entry => ({
+    // The hint beside a page is the address bar's own spelling of it,
+    // read from the router rather than written again here: a person
+    // who learns it in this list can type it, and it cannot fall out
+    // of step with where the entry goes.
+    const goTo = (view: View, label: string, hint = toFragment(view)): Entry => ({
       label,
       hint,
       act: () => {
@@ -54,15 +59,15 @@ export function Palette(props: { readonly onClose: () => void }) {
       },
     });
     const out: Entry[] = [
-      goTo({ kind: "talk", address: MAYOR }, say("nav_mayor"), toFragment({ kind: "talk", address: MAYOR })),
-      goTo({ kind: "city" }, say("nav_city"), "#/city"),
-      goTo({ kind: "setup" }, say("nav_settings"), "#/setup"),
-      goTo({ kind: "mcp" }, say("nav_mcp"), "#/mcp"),
-      goTo({ kind: "record", lens: "ledger" }, say("rec_ledger"), "#/record"),
-      goTo({ kind: "record", lens: "archive" }, say("rec_archive"), "#/record/archive"),
-      goTo({ kind: "record", lens: "bin" }, say("rec_bin"), "#/record/bin"),
-      goTo({ kind: "cost" }, say("cost_title"), "#/cost"),
-      goTo({ kind: "welcome" }, say("setup_rerun"), "#/welcome"),
+      goTo({ kind: "talk", address: MAYOR }, say("nav_mayor")),
+      goTo({ kind: "city" }, say("nav_city")),
+      goTo({ kind: "setup" }, say("nav_settings")),
+      goTo({ kind: "mcp" }, say("nav_mcp")),
+      goTo({ kind: "record", lens: "ledger" }, say("rec_ledger")),
+      goTo({ kind: "record", lens: "archive" }, say("rec_archive")),
+      goTo({ kind: "record", lens: "bin" }, say("rec_bin")),
+      goTo({ kind: "cost" }, say("cost_title")),
+      goTo({ kind: "welcome" }, say("setup_rerun")),
     ];
     const halted = ui.conn.belief.halted.includes("city");
     out.push({

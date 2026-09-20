@@ -80,6 +80,10 @@ impl Endpoint {
             .build()
             .map_err(|err| {
                 AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
+                    .with_recovery(
+                        "check this endpoint's `base_url` and the proxy settings this \
+                         machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
+                    )
             })?;
         Ok(Endpoint {
             config,
@@ -117,6 +121,10 @@ pub(crate) fn apply_override(
             AxCode::ConfigInvalid,
             "apply request override",
             "empty JSON pointer",
+        )
+        .with_recovery(
+            "give the override a pointer that names a field, for example \
+             `/generation_config/temperature`",
         ));
     }
     let mut cursor = root;
@@ -133,7 +141,12 @@ pub(crate) fn apply_override(
                         AxCode::ConfigInvalid,
                         "apply request override",
                         format!("{pointer}: parent is not an object"),
-                    ));
+                    )
+                    .with_recovery(format!(
+                        "shorten `{pointer}` to the object that holds the field, or drop \
+                         the override: this request body has a value where the pointer \
+                         expects an object"
+                    )));
                 }
             }
         }
@@ -146,7 +159,11 @@ pub(crate) fn apply_override(
                     AxCode::ConfigInvalid,
                     "apply request override",
                     format!("{pointer}: crossed a non-object"),
-                ));
+                )
+                .with_recovery(format!(
+                    "remove the segment of `{pointer}` that lands on a value rather than \
+                     an object; an override only reaches fields of objects"
+                )));
             }
         };
     }

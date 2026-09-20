@@ -21,12 +21,38 @@ import { Tip } from "./tip";
 // cannot be taken back.
 export type Tone = "primary" | "secondary" | "quiet" | "destructive";
 
+// What the control is doing, as one word the stylesheet reads off the
+// element. Every posture the button can take is a value here, so a
+// reader asks the DOM what state it is in rather than deducing it from
+// which classes happen to be on it.
+type State = "idle" | "loading" | "stopped";
+
+// The resting paint of each tone, and the only hover it answers.
+//
+// The hover is written into the idle state rather than beside it: a
+// control that is waiting for an acknowledgement, or one a person may
+// not use, keeps its muted paint under the pointer instead of lighting
+// up as though the press would land.
 const PAINT: Record<Tone, string> = {
-  primary: "bg-accent text-g0 hover:bg-accent-hover",
-  secondary: "bg-g2 text-text hover:bg-g3",
-  quiet: "text-text-quiet hover:bg-g2",
-  destructive: "bg-g2 text-alert hover:bg-alert hover:text-g0",
+  primary: "bg-accent text-g0 data-[state=idle]:hover:bg-accent-hover",
+  secondary: "bg-g2 text-text data-[state=idle]:hover:bg-g3",
+  quiet: "text-text-quiet data-[state=idle]:hover:bg-g2",
+  destructive:
+    "bg-g2 text-alert data-[state=idle]:hover:bg-alert data-[state=idle]:hover:text-g0",
 };
+
+// What every tone looks like once it is no longer idle. One rule for
+// both remaining states, because loading and refused are the same
+// answer to the hand: not now.
+const MUTED = "not-data-[state=idle]:bg-g2 not-data-[state=idle]:text-text-disabled";
+
+// The shape, and the four properties that travel when it changes.
+// Background colour is among them so a hover arrives rather than
+// switching, which is what tells a hand the control heard it.
+const SHAPE =
+  "inline-flex items-center gap-snug rounded-control px-base py-tight text-label " +
+  "transition-[background-color,color,opacity,transform] duration-100 ease-standard " +
+  "active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100";
 
 export interface ButtonProps {
   // Already in the person's language: a `say` key resolved by the page.
@@ -45,22 +71,28 @@ export interface ButtonProps {
 }
 
 export function Button(props: ButtonProps) {
-  const stopped = () => props.why !== undefined || props.loading === true;
-  const paint = () => (stopped() ? "bg-g2 text-text-disabled" : PAINT[props.tone ?? "secondary"]);
+  // The one reading of what the control is doing. The attribute, the two
+  // ARIA properties and the click guard are four readers of this line,
+  // and nothing else decides the question.
+  const state = (): State => {
+    if (props.why !== undefined) return "stopped";
+    return props.loading === true ? "loading" : "idle";
+  };
   // One definition of the control, drawn bare or inside its reason.
   const control = (hint?: string): JSX.Element => (
     <button
       type={props.type ?? "button"}
-      class={`inline-flex items-center gap-snug rounded-control px-base py-tight text-label transition-[opacity,transform] duration-100 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${paint()}`}
-      aria-disabled={stopped()}
-      aria-busy={props.loading === true}
+      data-state={state()}
+      class={`${SHAPE} ${PAINT[props.tone ?? "secondary"]} ${MUTED}`}
+      aria-disabled={state() !== "idle"}
+      aria-busy={state() === "loading"}
       aria-describedby={hint}
       onClick={() => {
-        if (stopped()) return;
+        if (state() !== "idle") return;
         props.onPress?.();
       }}
     >
-      <Show when={props.loading === true}>
+      <Show when={state() === "loading"}>
         <span class="inline-block size-dot animate-pulse rounded-pill bg-current" />
       </Show>
       {props.label}

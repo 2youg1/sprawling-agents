@@ -3,6 +3,14 @@
     "en": "body size",
     "zh": "正文字号"
   },
+  "appearance_body_range": {
+    "en": "a whole number of pixels from {min} to {max}; an empty box takes the size the page is drawn at",
+    "zh": "{min} 到 {max} 之间的整数像素；留空即采用页面本来的字号"
+  },
+  "appearance_body_unit": {
+    "en": "px",
+    "zh": "px"
+  },
   "appearance_chroma": {
     "en": "colour",
     "zh": "色彩"
@@ -14,6 +22,18 @@
   "appearance_chroma_none": {
     "en": "grey only",
     "zh": "只留灰阶"
+  },
+  "appearance_density": {
+    "en": "how tight the page is",
+    "zh": "页面的疏密"
+  },
+  "appearance_density_comfortable": {
+    "en": "roomy",
+    "zh": "宽松"
+  },
+  "appearance_density_compact": {
+    "en": "compact",
+    "zh": "紧凑"
   },
   "appearance_face": {
     "en": "the reading face",
@@ -54,6 +74,10 @@
   "appearance_local_denied": {
     "en": "the browser did not hand over the list; write the stack instead",
     "zh": "浏览器没有交出字体列表，请改为手写字体栈"
+  },
+  "appearance_local_for": {
+    "en": "{face}, from the faces this computer has",
+    "zh": "{face}：从这台电脑装好的字体里选"
   },
   "appearance_local_none": {
     "en": "this browser does not offer its installed faces; write the stack instead",
@@ -226,6 +250,10 @@
   "city_active": {
     "en": "{n} at work",
     "zh": "{n} 个在干活"
+  },
+  "city_ask_mayor": {
+    "en": "talk to the Mayor",
+    "zh": "去跟市长说"
   },
   "city_at_work": {
     "en": "at work",
@@ -422,6 +450,38 @@
   "effort_none": {
     "en": "none",
     "zh": "none"
+  },
+  "effort_note_high": {
+    "en": "deeper reasoning at a higher price per answer, which is what most planning wants.",
+    "zh": "推理更深、单次回答更贵，多数规划工作要的就是这一档。"
+  },
+  "effort_note_low": {
+    "en": "a short look before answering, for work whose steps are already known.",
+    "zh": "答前略作检视，适合步骤已经定下来的活。"
+  },
+  "effort_note_max": {
+    "en": "the most this provider will spend on one answer: slowest, and dearest.",
+    "zh": "这家供应方肯为一次回答花的上限：最慢，也最贵。"
+  },
+  "effort_note_medium": {
+    "en": "the balance between what an answer costs and how far it reasons.",
+    "zh": "在回答的开销与推理的深度之间取平衡。"
+  },
+  "effort_note_none": {
+    "en": "thinking off: the model answers from the prompt without reasoning first.",
+    "zh": "关掉思考：模型不先推理，直接依提示作答。"
+  },
+  "effort_note_unstated": {
+    "en": "nobody has chosen: the field is left out and this provider decides.",
+    "zh": "还没有人选过：请求不写这个字段，由这家供应方自己决定。"
+  },
+  "effort_note_xhigh": {
+    "en": "longer reasoning, for work that has to be right the first time.",
+    "zh": "更长的推理，留给一次就要做对的活。"
+  },
+  "effort_unstated": {
+    "en": "unstated",
+    "zh": "未指定"
   },
   "effort_xhigh": {
     "en": "xhigh",
@@ -631,9 +691,17 @@
     "en": "this one is yours to run: a script piped into a shell is code nobody read",
     "zh": "这一条由你自己跑：管道进 shell 的脚本是没人读过的代码"
   },
+  "machine_installed": {
+    "en": "this machine already has it",
+    "zh": "这台电脑已经有了"
+  },
   "machine_items": {
     "en": "this machine",
     "zh": "运行中的机器"
+  },
+  "machine_missing": {
+    "en": "still missing",
+    "zh": "还差"
   },
   "machine_no_recipe": {
     "en": "no recipe on this platform",
@@ -963,6 +1031,30 @@
     "en": "write the url it answers on",
     "zh": "写出它应答的地址"
   },
+  "metric_approvals": {
+    "en": "waiting for you",
+    "zh": "等你拍板"
+  },
+  "metric_discards": {
+    "en": "in the bin",
+    "zh": "回收站里"
+  },
+  "metric_events": {
+    "en": "events",
+    "zh": "事件"
+  },
+  "metric_runs_active": {
+    "en": "at work",
+    "zh": "在干活"
+  },
+  "metric_runs_frozen": {
+    "en": "wrapped up",
+    "zh": "已收尾"
+  },
+  "metric_signals": {
+    "en": "signals queued",
+    "zh": "排队的信号"
+  },
   "nav_city": {
     "en": "city",
     "zh": "城市"
@@ -982,6 +1074,10 @@
   "nav_palette": {
     "en": "everything",
     "zh": "全部"
+  },
+  "nav_registry": {
+    "en": "the registry",
+    "zh": "登记簿"
   },
   "nav_settings": {
     "en": "settings",
@@ -1131,6 +1227,22 @@
     "en": "no plan yet",
     "zh": "还没有计划"
   },
+  "plan_item": {
+    "en": "item",
+    "zh": "条目"
+  },
+  "plan_node": {
+    "en": "node",
+    "zh": "节点"
+  },
+  "plan_status": {
+    "en": "state",
+    "zh": "状态"
+  },
+  "presence_title": {
+    "en": "what the city is telling you",
+    "zh": "城里的动静"
+  },
   "rec_archive": {
     "en": "the archive",
     "zh": "归档"
@@ -1175,6 +1287,26 @@
     "en": "where to go",
     "zh": "去处"
   },
+  "registry_empty": {
+    "en": "nothing has been filed for keeping",
+    "zh": "还没有东西被登记留存"
+  },
+  "registry_kind": {
+    "en": "kind",
+    "zh": "类别"
+  },
+  "registry_what": {
+    "en": "what it is",
+    "zh": "是什么"
+  },
+  "registry_when": {
+    "en": "filed",
+    "zh": "登记于"
+  },
+  "registry_where": {
+    "en": "building",
+    "zh": "所属楼"
+  },
   "release_ahead": {
     "en": "newer than anything on npm ({version}). The packages are published after the release page, so this settles itself.",
     "zh": "比 npm 上任何一版都新（npm 最新为 {version}）。npm 包在发布页之后才推送，等一会儿就一致了。"
@@ -1203,13 +1335,13 @@
     "en": "this city runs {version}, cut {released}",
     "zh": "这座城市跑的是 {version}，{released} 切出"
   },
-  "release_newest": {
-    "en": "newest published: {version}, cut {released}",
-    "zh": "已发布的最新版：{version}，{released} 切出"
-  },
   "release_never": {
     "en": "This city asks npm only when you press this, and it never updates itself.",
     "zh": "只有你按下这个按钮，这座城市才会去问 npm；它从不自行更新。"
+  },
+  "release_newest": {
+    "en": "newest published: {version}, cut {released}",
+    "zh": "已发布的最新版：{version}，{released} 切出"
   },
   "release_refused": {
     "en": "npm could not be asked, so nothing here was checked.",
@@ -1403,6 +1535,10 @@
     "en": "thinking",
     "zh": "思考"
   },
+  "setup_effort_essay": {
+    "en": "A run freezes its effort when it starts, so a change made now reaches the next run and never the one already going, and each change invalidates the prompt cache the provider built for this conversation. The two wire formats spell the six levels alike but put none in different places: Anthropic disables thinking through a field of its own, OpenAI passes none as the effort itself. Choosing nothing is not the same as choosing none - an unstated effort leaves the decision to the provider, and none turns thinking off.",
+    "zh": "一次 run 在起点冻结它的强度，此刻的改动因此只到下一次 run，永远到不了正在跑的那一次；每改一次，供应方为这段对话建好的 prompt 缓存都会作废。两种兼容格式的六档拼写一致，none 的位置却不同：Anthropic 用一个自己的字段关掉思考，OpenAI 把 none 当作强度本身传过去。不选与选 none 是两件事——不选是把决定权留给供应方，选 none 是把思考关掉。"
+  },
   "setup_group_accounts": {
     "en": "accounts and providers",
     "zh": "账户与供应方"
@@ -1436,8 +1572,8 @@
     "zh": "技能"
   },
   "setup_group_tools": {
-    "en": "browser and tools",
-    "zh": "浏览器与工具"
+    "en": "dependencies",
+    "zh": "依赖项安装"
   },
   "setup_groups": {
     "en": "settings groups",
@@ -1490,6 +1626,10 @@
   "setup_language": {
     "en": "language",
     "zh": "语言"
+  },
+  "setup_local": {
+    "en": "on this computer",
+    "zh": "就在这台电脑上"
   },
   "setup_login": {
     "en": "with a subscription",
@@ -1579,6 +1719,14 @@
     "en": "which model thinks",
     "zh": "哪个模型来想"
   },
+  "setup_network_default": {
+    "en": "the rule a new endpoint starts with",
+    "zh": "新端点默认走哪一档"
+  },
+  "setup_network_new_only": {
+    "en": "An endpoint attached from now on starts with this rule. One already attached keeps the rule it was attached with, and changing that means attaching it again.",
+    "zh": "从现在起加入的端点以这一档开始。已经加入的端点保持它当初那一档，要改就得重新加一次。"
+  },
   "setup_next_config": {
     "en": "one field above is not a shape the city accepts",
     "zh": "上面某个字段的写法这座城不接受"
@@ -1602,6 +1750,10 @@
   "setup_next_timeout": {
     "en": "nothing came back in time: check the proxy, then base_url",
     "zh": "等待期间没有任何回应：先查代理，再查 base_url"
+  },
+  "setup_no_endpoints": {
+    "en": "no provider attached",
+    "zh": "还没接上供应方"
   },
   "setup_no_models": {
     "en": "no models",
@@ -1812,8 +1964,8 @@
     "zh": "config.toml 还没有这一节"
   },
   "setup_transcribe": {
-    "en": "transcribe · hears",
-    "zh": "transcribe · 听写"
+    "en": "transcribe · hears (needs an ASR model such as whisper; a text model cannot go here)",
+    "zh": "transcribe · 听写（需要 ASR 模型，如 whisper；文本模型不能填这里）"
   },
   "setup_unkeyed": {
     "en": "no key",
@@ -2019,6 +2171,18 @@
     "en": "hearing…",
     "zh": "听写中…"
   },
+  "talk_hint_dispatch": {
+    "en": "Say what needs doing in the box below; Enter hands it to this room.",
+    "zh": "在下面的框里说要做什么，按 Enter 就把它交给这个房间。"
+  },
+  "talk_hint_progress": {
+    "en": "The city page draws every building, and every run going on in it.",
+    "zh": "城市页画着每一栋楼，以及楼里正在跑的每一次 run。"
+  },
+  "talk_hint_waiting": {
+    "en": "A question that stops a run arrives here, in this conversation.",
+    "zh": "卡住一次 run 的问题会出现在这里，就在这段对话里。"
+  },
   "talk_no_model": {
     "en": "no model chosen",
     "zh": "还没有选模型"
@@ -2180,8 +2344,8 @@
     "zh": "开始"
   },
   "welcome_step_machine": {
-    "en": "this machine",
-    "zh": "运行中的机器"
+    "en": "dependencies",
+    "zh": "依赖项安装"
   },
   "welcome_step_model": {
     "en": "the model",
@@ -2196,8 +2360,8 @@
     "zh": "一个 provider"
   },
   "welcome_steps": {
-    "en": "the five steps",
-    "zh": "五步"
+    "en": "the steps",
+    "zh": "步骤"
   },
   "welcome_title": {
     "en": "welcome",

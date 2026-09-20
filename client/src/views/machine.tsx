@@ -22,10 +22,21 @@
 import type { Accessor } from "solid-js";
 import { For, Match, Show, Switch, createEffect, createMemo, createSignal, on } from "solid-js";
 
+import { QUERIES } from "../core/asking";
 import { doctorInstall, doctorRefresh } from "../core/commands";
-import type { Answer, DoctorAnswer, DoctorInstall, DoctorItem, DoctorState } from "../wire";
+import type { Key } from "../core/lang";
+import type {
+  Answer,
+  DoctorAnswer,
+  DoctorInstall,
+  DoctorItem,
+  DoctorState,
+  DoctorTier,
+} from "../wire";
 import { useSay, useUi } from "../ui";
 import { Button } from "./parts/button";
+import type { ButtonProps, Tone } from "./parts/button";
+import { Progress } from "./parts/progress";
 import { Tip } from "./parts/tip";
 
 const DOCTOR = "sprawling doctor --install";
@@ -83,36 +94,41 @@ function recommended(answer: DoctorAnswer): readonly DoctorItem[] {
   return answer.items.filter((each) => each.tier !== "use" || each.need !== "required");
 }
 
-function ready(items: readonly DoctorItem[]): number {
-  return items.filter((each) => "present" in each.state).length;
+// What the city still names as missing for one tier, or nothing when
+// it has answered about no such tier.
+//
+// The names rather than the count of them: the column states both, and
+// a count taken here and a list taken somewhere else would be two
+// readings of one verdict.
+function outstanding(answer: DoctorAnswer, tier: DoctorTier): readonly string[] | null {
+  return answer.tiers.find((each) => each.tier === tier)?.missing ?? null;
 }
 
-// How far a column has got, as a bar and as the two numbers. The bar
-// moves on the compositor - a scale, never a width - and holds still
-// for anybody who asked for less motion.
-function Progress(props: { readonly done: number; readonly total: number }) {
-  const say = useSay();
-  const ratio = () => (props.total === 0 ? 0 : props.done / props.total);
-  return (
-    <div class="flex items-center gap-snug">
-      <div
-        class="h-tight min-w-0 flex-1 overflow-hidden rounded-pill bg-g2"
-        role="progressbar"
-        aria-label={say("machine_progress_label")}
-        aria-valuemin={0}
-        aria-valuemax={props.total}
-        aria-valuenow={props.done}
-      >
-        <span
-          class="block h-full w-full origin-left bg-progress-done transition-transform duration-100 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none"
-          style={{ transform: `scaleX(${String(ratio())})` }}
-        />
-      </div>
-      <span class="shrink-0 font-mono text-note text-text-faint">
-        {say("machine_progress", { done: String(props.done), total: String(props.total) })}
-      </span>
-    </div>
-  );
+// How far a column has got, counted the way the city counts it.
+//
+// **The rows are not the authority for what is missing.** A tier's
+// verdict collapses a run of interchangeable items - any one browser
+// engine will do - into the single thing a person is still missing, so
+// a machine with Firefox on it is missing no browser however many of
+// the other rows stay empty; counting rows was what kept that column
+// short of full for somebody who had everything.
+//
+// The denominator is therefore what this machine has, plus what the
+// city still names for the tier, plus the optional rows it does not
+// have: an optional item counts against no tier, and is still a row a
+// person can act on. The bar fills exactly when nothing on the column
+// is left to do.
+//
+// A tier the city said nothing about leaves the end unknown, and
+// `Progress` draws that as busy rather than as a fraction.
+function standing(
+  items: readonly DoctorItem[],
+  missing: number | null,
+): { readonly done: number; readonly total: number } {
+  const has = (item: DoctorItem) => "present" in item.state;
+  const done = items.filter(has).length;
+  const wanted = items.filter((each) => !has(each) && each.need === "optional").length;
+  return { done, total: missing === null ? 0 : done + missing + wanted };
 }
 
 // Whether this city may run the install itself. The other two recipes
@@ -121,6 +137,27 @@ function Progress(props: { readonly done: number; readonly total: number }) {
 function runnable(install: DoctorInstall): boolean {
   return typeof install !== "string" && "command" in install;
 }
+
+// What the install control offers for one item.
+//
+// One reading of the item, so the colour, the reason and the press can
+// never disagree: what this machine already has is not offered in the
+// colour reserved for the one action a screen is for.
+type Offer = "press" | "by_hand" | "held";
+
+function offerOf(item: DoctorItem): Offer {
+  if ("present" in item.state) return "held";
+  return runnable(item.install) ? "press" : "by_hand";
+}
+
+// The paint each offer carries, and the reason it carries when a press
+// does nothing. A reason is what makes the control grey - `Button`
+// owns that rule - so this table states the reason and never the grey.
+const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = {
+  press: { tone: "primary", why: null },
+  by_hand: { tone: "quiet", why: "machine_install_by_hand" },
+  held: { tone: "quiet", why: "machine_installed" },
+};
 
 // One item, and everything a person decides about it from one line: the
 // state, what it is, which version answered, what it enables, and the
@@ -132,6 +169,13 @@ function Row(props: { readonly item: DoctorItem; readonly onInstall: (item: stri
   const say = useSay();
   const version = createMemo(() => versionOf(props.item.state));
   const spelled = createMemo(() => spelledOf(props.item.install));
+  const offer = createMemo(() => OFFER[offerOf(props.item)]);
+  // An absent reason and a reason that is nothing are different
+  // states, and only the first one leaves the control pressable.
+  const because = (): Pick<ButtonProps, "why"> => {
+    const word = offer().why;
+    return word === null ? {} : { why: say(word) };
+  };
   return (
     <li class="flex flex-col gap-tight border-t border-g1 py-snug">
       <div class="flex flex-wrap items-center gap-snug">
@@ -172,24 +216,14 @@ function Row(props: { readonly item: DoctorItem; readonly onInstall: (item: stri
         >
           {(how) => (
             <div class="flex shrink-0 items-center gap-tight">
-              <Show
-                when={runnable(props.item.install)}
-                fallback={
-                  <Button
-                    label={say("machine_install")}
-                    tone="primary"
-                    why={say("machine_install_by_hand")}
-                  />
-                }
-              >
-                <Button
-                  label={say("machine_install")}
-                  tone="primary"
-                  onPress={() => {
-                    props.onInstall(props.item.name);
-                  }}
-                />
-              </Show>
+              <Button
+                label={say("machine_install")}
+                tone={offer().tone}
+                {...because()}
+                onPress={() => {
+                  props.onInstall(props.item.name);
+                }}
+              />
               <Button
                 label={say("setup_copy")}
                 tone="quiet"
@@ -215,14 +249,32 @@ function Row(props: { readonly item: DoctorItem; readonly onInstall: (item: stri
 
 function Column(props: {
   readonly title: string;
+  // What the city still names as missing for this column's tier, and
+  // `null` when it has answered about no such tier.
+  readonly missing: readonly string[] | null;
   readonly items: readonly DoctorItem[];
   readonly onInstall: (item: string) => void;
 }) {
-  const done = createMemo(() => ready(props.items));
+  const say = useSay();
+  const far = createMemo(() => standing(props.items, props.missing?.length ?? null));
+  const named = createMemo<readonly string[]>(() => props.missing ?? []);
   return (
     <section class="flex min-w-0 flex-col gap-snug" aria-label={props.title}>
       <h2 class="text-heading font-heading text-text">{props.title}</h2>
-      <Progress done={done()} total={props.items.length} />
+      <Progress label={say("machine_progress_label")} done={far().done} total={far().total} />
+      {/* The city's own verdict on this tier, which is not the rows
+          below it: a run of interchangeable items collapses into the
+          one thing a person is still missing, so a column of empty
+          rows can be a column with nothing left to do. The names are
+          set apart by the gap between them rather than joined by a
+          word, because a conjunction would be a second authority on
+          how a list reads in each language. */}
+      <Show when={named().length > 0}>
+        <p class="flex flex-wrap items-baseline gap-tight text-note">
+          <span class="text-text-quiet">{say("machine_missing")}</span>
+          <For each={named()}>{(name) => <span class="font-mono text-alert">{name}</span>}</For>
+        </p>
+      </Show>
       <ul class="flex flex-col">
         <For each={props.items}>
           {(each) => <Row item={each} onInstall={props.onInstall} />}
@@ -244,10 +296,16 @@ export function MachineReport(props: {
   };
   return (
     <div class="grid min-w-0 grid-cols-1 gap-wide lg:grid-cols-2">
-      <Column title={say("machine_required")} items={required(props.answer)} onInstall={install} />
+      <Column
+        title={say("machine_required")}
+        items={required(props.answer)}
+        missing={outstanding(props.answer, "use")}
+        onInstall={install}
+      />
       <Column
         title={say("machine_recommended")}
         items={recommended(props.answer)}
+        missing={outstanding(props.answer, "develop")}
         onInstall={install}
       />
     </div>
@@ -338,9 +396,9 @@ function Release() {
     // First press opens the slot and sends; every press after it sends
     // again, because "check again" means now rather than what was
     // already answered.
-    const slot = ui.conn.asking.ask("release");
+    const slot = ui.conn.asking.ask(QUERIES.release);
     setHeld(() => slot);
-    ui.conn.asking.refresh("release");
+    ui.conn.asking.refresh(QUERIES.release);
   };
   return (
     <section class="flex min-w-0 flex-col gap-snug rounded-control bg-g1 p-base">
@@ -421,7 +479,7 @@ function Release() {
 export function Machine() {
   const ui = useUi();
   const say = useSay();
-  const held = ui.conn.asking.ask("doctor");
+  const held = ui.conn.asking.ask(QUERIES.doctor);
   const answer = createMemo(() => {
     const now = held();
     return now !== undefined && "doctor" in now ? now.doctor : undefined;
@@ -449,7 +507,7 @@ export function Machine() {
     on(
       looked,
       () => {
-        ui.conn.asking.refresh("doctor");
+        ui.conn.asking.refresh(QUERIES.doctor);
       },
       { defer: true },
     ),
@@ -460,12 +518,12 @@ export function Machine() {
   const recheck = () => {
     setAsking(true);
     ui.conn.command(doctorRefresh());
-    ui.conn.asking.refresh("doctor");
+    ui.conn.asking.refresh(QUERIES.doctor);
   };
   const install = (item: string) => {
     setAsking(true);
     ui.conn.command(doctorInstall(item));
-    ui.conn.asking.refresh("doctor");
+    ui.conn.asking.refresh(QUERIES.doctor);
   };
   const reaching = () => {
     const kind = ui.conn.state().kind;

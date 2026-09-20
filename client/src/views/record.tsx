@@ -17,6 +17,7 @@
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
+import { QUERIES } from "../core/asking";
 import { LENSES, toFragment } from "../core/route";
 import type { Lens } from "../core/route";
 import { clock, hhmmss } from "../core/time";
@@ -61,7 +62,7 @@ function Ledger() {
           <ul class="font-mono text-note">
             <For each={[...held().records].reverse()}>
               {(record) => (
-                <li class="border-b border-g1">
+                <li class="settled-row border-b border-g1">
                   <Tip text={clock(lang(), record.t)}>
                     {(hint) => (
                       <button
@@ -116,7 +117,7 @@ function Archive() {
             <ul class="text-note">
               <For each={held()}>
                 {(hit) => (
-                  <li class="flex gap-base border-b border-g1 py-snug">
+                  <li class="settled-row flex gap-base border-b border-g1 py-snug">
                     <span class="w-figure shrink-0 text-text-disabled">{hit.day}</span>
                     <span class="w-figure shrink-0 text-text-faint">{hit.kind}</span>
                     <a href={toFragment({ kind: "building", address: hit.building })} class="shrink-0 text-text-quiet">
@@ -138,7 +139,7 @@ function Bin() {
   const ui = useUi();
   const say = useSay();
   const lang = useLang();
-  const discards = ui.conn.asking.ask("discard_view");
+  const discards = ui.conn.asking.ask(QUERIES.discards);
   const rows = createMemo(() => {
     const held = discards();
     return held !== undefined && "discards" in held ? held.discards.rows : undefined;
@@ -157,7 +158,7 @@ function Bin() {
           <ul class="text-note">
             <For each={held()}>
               {(row) => (
-                <li class="border-b border-g1 py-snug">
+                <li class="settled-row border-b border-g1 py-snug">
                   <div class="flex items-center gap-base">
                     <span class="min-w-0 flex-1">
                       <Path path={row.path} />
@@ -275,7 +276,7 @@ function Log() {
         <ul class="font-mono text-note">
           <For each={[...shown()].reverse()}>
             {(line) => (
-              <li class="flex gap-base border-b border-g1 py-tight">
+              <li class="settled-row flex gap-base border-b border-g1 py-tight">
                 <span class="w-figure shrink-0 text-right text-text-disabled">{line.seq}</span>
                 <span class="w-figure shrink-0 whitespace-nowrap text-text-faint">
                   <Show when={wroteAt(line)}>

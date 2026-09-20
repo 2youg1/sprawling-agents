@@ -320,7 +320,7 @@ mod conformance_self_test {
     #[test]
     fn suite_error_paths_use_invalid_args() {
         // Anchors the AxCode used when a draft cannot even serialize.
-        let err = AxError::failure(AxCode::InvalidArgs, "x", "y");
+        let err = AxError::failure(AxCode::InvalidArgs, "x", "y").with_recovery("z");
         assert_eq!(err.code(), &AxCode::InvalidArgs);
     }
 }

@@ -101,7 +101,7 @@ impl RunWorker {
                         if rollback_failed.is_empty() {
                             Err(err)
                         } else {
-                            Err(err.with_recovery(format!(
+                            Err(err.rewrite_recovery(format!(
                                 "rollback also failed for: {}",
                                 rollback_failed.join(", ")
                             )))
@@ -174,12 +174,20 @@ impl RunWorker {
                     "record a waiting item",
                     err.to_string(),
                 )
+                .with_recovery(
+                    "report this against sprawling::assembly::settling::landing: an \
+                     approval item is text, flags and one address",
+                )
             })?;
             let map = value.as_object().cloned().ok_or_else(|| {
                 AxError::failure(
                     AxCode::InvalidArgs,
                     "record a waiting item",
                     "an approval item is an object",
+                )
+                .with_recovery(
+                    "report this against sprawling::assembly::settling::landing: an \
+                     approval item encodes as a JSON object and this one did not",
                 )
             })?;
             self.record_for(

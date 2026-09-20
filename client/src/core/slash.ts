@@ -32,7 +32,7 @@ import {
 import type { Template } from "./commands";
 import type { Key } from "./lang";
 import { EFFORTS } from "./prefs";
-import { fromFragment } from "./route";
+import { PAGES, page } from "./route";
 import type { View } from "./route";
 import type { Command, Effort, RunId, Seq } from "../wire";
 
@@ -63,11 +63,12 @@ export interface SlashHands {
   // The newest run in a room somebody named by hand.
   readonly newest: (room: string) => Reached | null;
   readonly models: readonly Offered[];
-  // How hard a run this verb opens should think. It comes from the
-  // selector beside the box rather than from the line, because that is
-  // where the person set it.
-  readonly effort: Effort;
-  readonly setEffort: (effort: Effort) => void;
+  // How hard a run this verb opens should think, or `null` when the
+  // person has chosen no level and the provider decides. It comes from
+  // the selector beside the box rather than from the line, because
+  // that is where the person set it.
+  readonly effort: Effort | null;
+  readonly setEffort: (effort: Effort | null) => void;
   // What a new run is told to aim at, already in the person's language.
   readonly goal: string;
   // The line in the box: emptied by `/clear`, refilled by `/help`.
@@ -93,20 +94,6 @@ export interface Slash {
   readonly run: (hands: SlashHands, call: SlashCall) => void;
 }
 
-// The pages `/go` offers, as the fragment heads `route` already reads.
-// The names are the table; the meaning of each name stays where every
-// other spelling of a route is resolved.
-export const PAGES: readonly string[] = [
-  "talk",
-  "city",
-  "setup",
-  "mcp",
-  "record",
-  "cost",
-  "welcome",
-  "gallery",
-];
-
 const ALL = "--all";
 const QUEUED = "--queued";
 
@@ -117,11 +104,13 @@ function addressed(raw: string | undefined): Address | null {
   return Option.getOrNull(Address.option(raw));
 }
 
+// Only what `/go` advertises, resolved by the router: a page this
+// build cannot name is not a page this verb opens.
 function paged(name: string | undefined): View | null {
   if (name === undefined || !PAGES.includes(name)) {
     return null;
   }
-  return Option.getOrNull(fromFragment(`#/${name}`));
+  return Option.getOrNull(page(name));
 }
 
 // `/stop` and `/release` take the same three shapes, and the pair would
@@ -230,10 +219,19 @@ export const SLASH: readonly Slash[] = [
   },
   {
     spelling: "/effort",
-    grammar: EFFORTS.join("|"),
+    grammar: `[${EFFORTS.join("|")}]`,
     about: "slash_effort",
     run: (hands, call) => {
       const asked = call.words.at(0);
+      // Bare `/effort` is how a person takes the choice back off the
+      // table and leaves it to the provider, which is what an unset
+      // selector means and what `"none"` - think as little as possible
+      // - does not. A level nobody offers changes nothing.
+      if (asked === undefined) {
+        hands.setEffort(null);
+        hands.write("");
+        return;
+      }
       const level = EFFORTS.find((known) => known === asked);
       if (level === undefined) return;
       hands.setEffort(level);

@@ -51,7 +51,8 @@ impl Discard {
                 AxCode::InvalidArgs,
                 "construct discard",
                 "empty path list",
-            ));
+            )
+            .with_recovery("name at least one path in the `paths` argument of the call"));
         }
         let plan_ok = match &plan {
             Restoration::Tracked(locator) => matches!(locator, Locator::File { .. }),

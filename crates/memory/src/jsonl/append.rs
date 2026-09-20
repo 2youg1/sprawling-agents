@@ -201,9 +201,12 @@ pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, MemoryError> {
 impl kernel::Ledger for JsonlLedger {
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
         let refs = self.append_all(vec![draft]).map_err(MemoryError::into_ax)?;
-        refs.into_iter()
-            .next()
-            .ok_or_else(|| AxError::failure(AxCode::InvalidArgs, "append event", "empty wave echo"))
+        refs.into_iter().next().ok_or_else(|| {
+            AxError::failure(AxCode::InvalidArgs, "append event", "empty wave echo").with_recovery(
+                "report this against memory::jsonl::append with the city path: \
+                         append_all owes one echo per draft and returned none",
+            )
+        })
     }
 
     /// One buffer, one write and one barrier for the whole wave, which

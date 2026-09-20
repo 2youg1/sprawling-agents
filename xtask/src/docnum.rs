@@ -20,17 +20,24 @@
 //! written around a value on one line keep it on one line, so a table
 //! cell and a paragraph can both hold a managed span.
 //!
-//! [`FACTS`] is the authority for which facts a document may quote.
-//! Every entry names the code it recounts from, so a number in a
+//! A key may carry one argument after a colon — `dep_version:toml`,
+//! `budget_reading:frontend_artifact` — so one generator serves a family
+//! of facts.
+//!
+//! The `facts` module is the authority for which facts a document may
+//! quote. Every entry names the code it recounts from, so a number in a
 //! document has the same home as the number in the binary — the defect
 //! this gate closes is a document that stated `WIRE_V` as 15 while the
 //! wire had reached 31, which the next reader (a person or a model)
 //! writes code against.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
-use crate::{gates, proof, walk};
+use crate::walk;
+
+mod facts;
 
 /// What opens a managed span, up to the fact's key.
 const BEGIN: &str = "<!-- xtask:begin ";
@@ -41,76 +48,26 @@ const OPENED: &str = " -->";
 /// What closes a managed span.
 const END: &str = "<!-- xtask:end -->";
 
-/// One fact a document may quote, and how to recount it.
-struct Fact {
-    /// The key a marker names it by.
-    key: &'static str,
-    /// Where the fact lives, for a refusal a reader can act on.
-    home: &'static str,
-    /// Today's value, rendered the way a document writes it.
-    recount: fn(&Path) -> Result<String, XtaskError>,
-}
+/// Every reading this run has already taken, so a fact scanning the
+/// whole tree is recounted once however many documents quote it. A key
+/// no fact owns is absent, which is what a refusal reports.
+type Readings = BTreeMap<String, String>;
 
-/// Every fact a managed span may name. Adding a row is what lets a
-/// document quote one more number; there is no second list.
-const FACTS: [Fact; 6] = [
-    Fact {
-        key: "wire_v",
-        home: "channels::WIRE_V",
-        recount: |_root| Ok(channels::WIRE_V.to_string()),
-    },
-    Fact {
-        key: "command_frames",
-        home: "channels::COMMAND_NAMES",
-        recount: |_root| Ok(channels::COMMAND_NAMES.len().to_string()),
-    },
-    Fact {
-        key: "query_frames",
-        home: "channels::QUERY_NAMES",
-        recount: |_root| Ok(channels::QUERY_NAMES.len().to_string()),
-    },
-    Fact {
-        key: "gate_count",
-        home: "the array in xtask/src/gates.rs",
-        recount: |_root| Ok(gates::COUNT.to_string()),
-    },
-    Fact {
-        key: "dependency_count",
-        home: "Cargo.lock",
-        recount: dependency_count,
-    },
-    Fact {
-        key: "kani_harnesses",
-        home: "the #[kani::proof] attributes in the tree",
-        recount: |root| Ok(proof::harnesses(root)?.len().to_string()),
-    },
-];
-
-/// How many packages the lockfile resolves, workspace members included,
-/// which is the number `sprawling status --deps` lists.
-fn dependency_count(root: &Path) -> Result<String, XtaskError> {
-    let text = walk::read_text(&root.join("Cargo.lock"))?;
-    let packages = text.lines().filter(|line| *line == "[[package]]").count();
-    if packages == 0 {
-        return Err(XtaskError::Doc {
-            file: "Cargo.lock".to_owned(),
-            msg: "no `[[package]]` entries; the lockfile format changed".to_owned(),
-        });
+/// Today's reading for every key these spans name.
+fn readings(root: &Path, found: &[Span], into: &mut Readings) -> Result<(), XtaskError> {
+    for span in found {
+        if into.contains_key(&span.key) {
+            continue;
+        }
+        if let Some(value) = facts::value(root, &span.key)? {
+            into.insert(span.key.clone(), value);
+        }
     }
-    Ok(packages.to_string())
-}
-
-/// Today's value for every fact, recounted once for the whole run.
-fn readings(root: &Path) -> Result<Vec<(&'static str, String)>, XtaskError> {
-    let mut out = Vec::with_capacity(FACTS.len());
-    for fact in &FACTS {
-        out.push((fact.key, (fact.recount)(root)?));
-    }
-    Ok(out)
+    Ok(())
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let values = readings(root)?;
+    let mut values = Readings::new();
     let mut violations = Vec::new();
     for file in documents(root)? {
         let rel = walk::rel(root, &file);
@@ -118,6 +75,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         match spans(&text) {
             Err(malformed) => violations.push(malformed.violation(&rel)),
             Ok(found) => {
+                readings(root, &found, &mut values)?;
                 for span in found {
                     judge(&rel, &span, &values, &mut violations);
                 }
@@ -132,7 +90,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 /// a writer that skips what it cannot recount leaves the document
 /// looking regenerated while one number stays stale.
 pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
-    let values = readings(root)?;
+    let mut values = Readings::new();
     let mut changed = 0_usize;
     for file in documents(root)? {
         let rel = walk::rel(root, &file);
@@ -141,6 +99,7 @@ pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
             file: format!("{rel}:{}", malformed.line),
             msg: malformed.why,
         })?;
+        readings(root, &found, &mut values)?;
         let rewritten = rewrite(&text, &found, &values, &rel)?;
         if rewritten == text {
             continue;
@@ -210,16 +169,16 @@ impl Malformed {
     }
 }
 
-fn judge(rel: &str, span: &Span, values: &[(&'static str, String)], out: &mut Vec<Violation>) {
-    let Some(value) = reading_of(values, &span.key) else {
+fn judge(rel: &str, span: &Span, values: &Readings, out: &mut Vec<Violation>) {
+    let Some(value) = values.get(&span.key) else {
         out.push(Violation {
             gate: "docnum",
             location: format!("{rel}:{}", span.line),
             rule: "a managed span names a fact the generator array defines".to_owned(),
             violation: format!("`{}` is not a fact xtask can recount", span.key),
             alternative: format!(
-                "add it to `FACTS` in xtask/src/docnum.rs, or name one of: {}",
-                keys()
+                "add it to `FACTS` in xtask/src/docnum/facts.rs, or name one of: {}",
+                facts::keys()
             ),
         });
         return;
@@ -235,32 +194,10 @@ fn judge(rel: &str, span: &Span, values: &[(&'static str, String)], out: &mut Ve
         violation: format!(
             "this span reads `{}` where {} says `{value}`",
             span.content.trim(),
-            home_of(&span.key)
+            facts::home(&span.key)
         ),
         alternative: "run `cargo xtask docnum --write` and commit the result".to_owned(),
     });
-}
-
-fn reading_of<'a>(values: &'a [(&'static str, String)], key: &str) -> Option<&'a str> {
-    values
-        .iter()
-        .find(|(name, _)| *name == key)
-        .map(|(_, value)| value.as_str())
-}
-
-fn home_of(key: &str) -> &'static str {
-    FACTS
-        .iter()
-        .find(|fact| fact.key == key)
-        .map_or("its code", |fact| fact.home)
-}
-
-fn keys() -> String {
-    FACTS
-        .iter()
-        .map(|fact| fact.key)
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 /// Every managed span in one document, in the order they appear.
@@ -318,22 +255,17 @@ fn spans(text: &str) -> Result<Vec<Span>, Malformed> {
 }
 
 /// The document with every managed span replaced by today's reading.
-fn rewrite(
-    text: &str,
-    found: &[Span],
-    values: &[(&'static str, String)],
-    rel: &str,
-) -> Result<String, XtaskError> {
+fn rewrite(text: &str, found: &[Span], values: &Readings, rel: &str) -> Result<String, XtaskError> {
     let mut out = String::with_capacity(text.len());
     let mut done = 0_usize;
     for span in found {
-        let Some(value) = reading_of(values, &span.key) else {
+        let Some(value) = values.get(&span.key) else {
             return Err(XtaskError::Doc {
                 file: format!("{rel}:{}", span.line),
                 msg: format!(
                     "`{}` is not a fact xtask can recount; known facts: {}",
                     span.key,
-                    keys()
+                    facts::keys()
                 ),
             });
         };

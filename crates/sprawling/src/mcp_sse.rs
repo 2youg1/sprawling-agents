@@ -157,10 +157,10 @@ impl protocol::Outbound for SseServer {
                     "call an mcp server",
                     format!("{}: no answer within {} ms", self.messages, patience.0),
                 )
+                .retriable()
                 .with_recovery(
                     "the server took the message and said nothing; this run continues without it",
-                )
-                .retriable(),
+                ),
                 RecvTimeoutError::Disconnected => AxError::failure(
                     AxCode::ToolUnavailable,
                     "call an mcp server",
@@ -258,6 +258,10 @@ fn client_for(url: &str) -> Result<reqwest::blocking::Client, AxError> {
         .build()
         .map_err(|err| {
             AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
+                .with_recovery(
+                    "check this server's url in the MCP settings and the proxy settings \
+                     this machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
+                )
         })
 }
 

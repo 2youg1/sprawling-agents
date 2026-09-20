@@ -9,8 +9,10 @@
 //! reads the SPEC as data, so "the table drifted" and "the enum grew
 //! silently" are the same red. Asserts: every AxCode appears exactly
 //! once in the 8-1 table with its declared carrier; every EventKind
-//! exactly once in the 8-4 table with its window class; and the seventh
-//! module-table column names a SPEC section that is on disk.
+//! exactly once in the 8-4 table with its window class; every other
+//! `pub enum` body in the SPEC holds the variants the kernel compiles
+//! (`enums`); and the seventh module-table column names a SPEC section
+//! that is on disk.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -20,6 +22,8 @@ use kernel::{AxCode, Carrier, EventKind, WindowClass};
 use crate::modmap;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
+
+mod enums;
 
 const SPEC_PATH: &str = "crates/kernel/kernel-SPEC.md";
 const ARCH: &str = "ARCHITECTURE.md";
@@ -289,6 +293,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         ));
     }
 
+    enums::check(root, &text, SPEC_PATH, &mut violations)?;
     check_anchors(root, &mut violations)?;
 
     Ok(violations)

@@ -3,10 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One information bar instead of three corners: the city's name, where
-// it stands, what waits for the person, what it has spent, and the one
-// control that stops or releases it. Every fact is stated once and in
-// one place.
+// One information bar instead of three corners: the city's name, six
+// figures for how it stands, what it has spent, and the one control
+// that stops or releases it. Every fact is stated once and in one
+// place.
+//
+// **The six figures come from `Query::Metrics` and from nothing else.**
+// Each of them is also provable from a view this page could have asked
+// for separately - the approval queue, the city view, the recycle bin -
+// and a bar that assembled them that way would hold six numbers under
+// six refresh rules, which is how two figures on one line start
+// disagreeing. That the city is stopped is not among them: the shell
+// states it once, as a banner over every page.
 //
 // The legend below the drawing is the second half of the same job. A
 // city drawn in glyphs that nothing names is a picture; a legend is a
@@ -14,50 +22,107 @@
 
 import { For, Show } from "solid-js";
 
+import { QUERIES } from "../../core/asking";
 import { halt, release } from "../../core/commands";
+import type { Key } from "../../core/lang";
 import { MAYOR, toFragment } from "../../core/route";
-import { usd } from "../../core/time";
-import type { CityAnswer } from "../../wire";
+import type { View } from "../../core/route";
+import { count, usd } from "../../core/time";
+import type { MetricsAnswer } from "../../wire";
 import { useCommand, useSay, useUi } from "../../ui";
-import { Badge } from "../parts/badge";
 import { Button } from "../parts/button";
 
-export function CityBar(props: { readonly city: CityAnswer | undefined }) {
+// One figure on the bar: the word it is offered under, the field it
+// reads, the page a person acts on it from, and whether a figure above
+// zero is something waiting for them rather than something the city is
+// getting on with.
+interface Figure {
+  readonly label: Key;
+  readonly of: (held: MetricsAnswer) => number;
+  readonly to: View | null;
+  readonly waits: boolean;
+}
+
+// The six, in the order a person reads them: what the city has
+// recorded, what is moving, what has stopped, and the three queues.
+//
+// `buildings` is the seventh field and is deliberately not here: the
+// drawing under this bar and the list beside it are already the count
+// of buildings, and a number repeating them would be a second home for
+// one fact.
+const FIGURES: readonly Figure[] = [
+  { label: "metric_events", of: (held) => held.events, to: { kind: "record", lens: "ledger" }, waits: false },
+  { label: "metric_runs_active", of: (held) => held.runs_active, to: null, waits: false },
+  { label: "metric_runs_frozen", of: (held) => held.runs_frozen, to: null, waits: false },
+  {
+    label: "metric_approvals",
+    of: (held) => held.approvals_waiting,
+    to: { kind: "talk", address: MAYOR },
+    waits: true,
+  },
+  { label: "metric_signals", of: (held) => held.signals_waiting, to: null, waits: true },
+  {
+    label: "metric_discards",
+    of: (held) => held.discards_outstanding,
+    to: { kind: "record", lens: "bin" },
+    waits: true,
+  },
+];
+
+// One figure and the word for it. A figure somebody has to answer is
+// drawn in the alert tone only while it is above zero, so the bar of a
+// city with nothing outstanding carries no red at all.
+function Reading(props: { readonly figure: Figure; readonly metrics: MetricsAnswer }) {
+  const say = useSay();
+  const n = () => props.figure.of(props.metrics);
+  const tone = () => (props.figure.waits && n() > 0 ? "text-alert" : "text-text");
+  return (
+    <div class="flex items-baseline gap-tight">
+      <dt class="text-text-faint">{say(props.figure.label)}</dt>
+      <dd class="font-mono">
+        <Show when={props.figure.to} fallback={<span class={tone()}>{count(n())}</span>}>
+          {(to) => (
+            <a
+              href={toFragment(to())}
+              class={`underline decoration-g3 underline-offset-2 hover:decoration-accent ${tone()}`}
+            >
+              {count(n())}
+            </a>
+          )}
+        </Show>
+      </dd>
+    </div>
+  );
+}
+
+export function CityBar() {
   const ui = useUi();
   const say = useSay();
   const command = useCommand();
   const halted = () => ui.conn.belief.halted.includes("city");
-  const approvals = ui.conn.asking.ask("approval_queue");
-  const waiting = () => {
-    const held = approvals();
-    return held !== undefined && "approvals" in held ? held.approvals.items.length : 0;
+  const asked = ui.conn.asking.ask(QUERIES.metrics);
+  const metrics = () => {
+    const held = asked();
+    return held !== undefined && "metrics" in held ? held.metrics : undefined;
   };
-  const cost = ui.conn.asking.ask("cost_view");
+  const cost = ui.conn.asking.ask(QUERIES.cost);
   const spent = () => {
     const held = cost();
     return held !== undefined && "cost" in held ? held.cost.total : null;
   };
-  const active = () => props.city?.active ?? 0;
-  const standing = () => {
-    if (halted()) return { text: say("city_stopped"), weight: "alert" } as const;
-    if (active() > 0) return { text: say("city_active", { n: String(active()) }), weight: "live" } as const;
-    return { text: say("city_quiet"), weight: "quiet" } as const;
-  };
 
   return (
     <header
-      class="flex flex-wrap items-center gap-base border-b border-g2 px-pane py-snug"
+      class="flex flex-wrap items-baseline gap-base border-b border-g2 px-pane py-snug"
       aria-label={say("city_bar")}
     >
       <h1 class="text-title font-title">{ui.conn.belief.city ?? say("nav_city")}</h1>
-      <Badge text={standing().text} weight={standing().weight} dot />
-      <Show when={waiting() > 0}>
-        <a
-          href={toFragment({ kind: "talk", address: MAYOR })}
-          class="rounded-pill bg-g2 px-snug py-tight text-note text-alert hover:bg-g3"
-        >
-          {say("nav_waiting", { n: String(waiting()) })}
-        </a>
+      <Show when={metrics()}>
+        {(held) => (
+          <dl class="flex flex-wrap items-baseline gap-base text-note">
+            <For each={FIGURES}>{(figure) => <Reading figure={figure} metrics={held()} />}</For>
+          </dl>
+        )}
       </Show>
       <Show when={spent()}>
         {(total) => (

@@ -3,39 +3,25 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
-
-//! How a city is stood up and served, as opposed to how one piece of
-//! work is run.
+//! The two values a serve travels on: [`Serving`], everything one
+//! served city is made of, and [`Opening`], everything the writer
+//! thread is opened with.
 //!
-//! Four things happen here and nothing else: the key this listener will
-//! present at its door is settled before a socket exists, the vault is
-//! opened and asked what it really is, the one writer thread is started
-//! with the ledger inside it, and the socket is handed the four sinks it
-//! may reach the city through.
+//! Data only. Nothing here binds, spawns or writes; `serving::worker`
+//! consumes [`Serving`] and `serving::attending` consumes [`Opening`].
+//! Keeping the shapes apart from the code that acts on them is what
+//! lets one caller settle every field before any thread exists.
 //!
-//! **The writer thread is the city's one writer.** The ledger is opened
-//! inside it and never leaves, so the type never has to cross a thread
-//! boundary to prove that a city has one writer (ARCHITECTURE section
-//! 10). Everything a socket does reaches it as a `Command` on a desk,
-//! one at a time.
-//!
-//! Randomness is drawn here rather than in `bin::keying`, which is pure:
-//! this crate draws entropy in one place, and a key a third party can
-//! predict is a door a third party can open.
+//! The point a reader most often gets wrong: the two values face
+//! opposite ways. [`Serving`] is public, so every field of it is part
+//! of what an embedder of this library writes and a field added to it
+//! breaks them; [`Opening`] is visible only inside `serving`, so the
+//! writer thread's parameters may be reshaped freely.
 
 use std::net::SocketAddr;
 
 use kernel::Payload;
 
-/// A URL-safe random string of `bytes` bytes of OS entropy.
-///
-/// Deliberately not the simulator's seeded randomness: a verifier a
-/// third party can predict is a login a third party can finish. This is
-/// the one place in the binary where reproducibility would be a defect.
 /// Everything one served city is made of, in one value.
 ///
 /// Eight loose parameters is a signature nobody calls correctly from
@@ -61,17 +47,6 @@ pub struct Serving {
     pub console: Option<crate::console::Terminal>,
 }
 
-/// Starts the city's one writer, and returns once it is running.
-///
-/// The ledger is opened *inside* this thread and never leaves it: a city
-/// has one writer, and the type never has to cross a thread boundary to
-/// prove it. The handshake is part of the contract - a thread that comes
-/// back from this function has already opened the history and said so,
-/// so a caller never serves a socket over a city that failed to open.
-///
-/// # Errors
-/// Propagates whatever opening the history reports, a thread the
-/// platform will not start, and a worker that ended before reporting.
 /// What a worker is opened with: where the city is, whose keys it may
 /// redeem, what the vault turned out to be, and where its diagnostics
 /// go.

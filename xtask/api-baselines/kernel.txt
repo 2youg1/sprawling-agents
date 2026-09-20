@@ -63,6 +63,7 @@ impl kernel::Discard
 impl kernel::DomainPrefixes
 impl kernel::EgressAllowlist
 impl kernel::EnvVarName
+impl kernel::ErrorDraft
 impl kernel::EventKind
 impl kernel::EventRecord
 impl kernel::EventRef
@@ -276,16 +277,14 @@ pub fn kernel::AxCode::parse(&str) -> core::option::Option<kernel::AxCode>
 pub fn kernel::AxCode::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
 pub fn kernel::AxError::action(&self) -> &str
 pub fn kernel::AxError::code(&self) -> &kernel::AxCode
-pub fn kernel::AxError::failure(kernel::AxCode, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn kernel::AxError::failure(kernel::AxCode, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> kernel::ErrorDraft
 pub fn kernel::AxError::gate(&self) -> core::option::Option<&kernel::GateRefusal>
 pub fn kernel::AxError::is_retriable(&self) -> bool
 pub fn kernel::AxError::nearby(&self) -> &[alloc::string::String]
 pub fn kernel::AxError::recovery(&self) -> &str
-pub fn kernel::AxError::refusal(kernel::AxCode, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, kernel::GateRefusal) -> Self
-pub fn kernel::AxError::retriable(self) -> Self
+pub fn kernel::AxError::refusal(kernel::AxCode, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, kernel::GateRefusal) -> kernel::ErrorDraft
+pub fn kernel::AxError::rewrite_recovery(self, impl core::convert::Into<alloc::string::String>) -> Self
 pub fn kernel::AxError::subject(&self) -> &str
-pub fn kernel::AxError::with_nearby(self, alloc::vec::Vec<alloc::string::String>) -> Self
-pub fn kernel::AxError::with_recovery(self, impl core::convert::Into<alloc::string::String>) -> Self
 pub fn kernel::B3Hash::as_bytes(&self) -> &[u8; 32]
 pub fn kernel::B3Hash::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn kernel::B3Hash::digest(&[u8]) -> Self
@@ -317,6 +316,9 @@ pub fn kernel::EnvVarName::as_str(&self) -> &str
 pub fn kernel::EnvVarName::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::EnvVarName::parse(&str) -> core::result::Result<kernel::EnvVarName, kernel::AxError>
 pub fn kernel::EnvVarName::try_from(alloc::string::String) -> core::result::Result<kernel::EnvVarName, kernel::AxError>
+pub fn kernel::ErrorDraft::retriable(self) -> Self
+pub fn kernel::ErrorDraft::with_nearby(self, alloc::vec::Vec<alloc::string::String>) -> Self
+pub fn kernel::ErrorDraft::with_recovery(self, impl core::convert::Into<alloc::string::String>) -> kernel::AxError
 pub fn kernel::EventKind::window_class(&self) -> kernel::WindowClass
 pub fn kernel::EventRecord::addr(&self) -> core::option::Option<&kernel::Address>
 pub fn kernel::EventRecord::canonical_line(&self) -> core::result::Result<alloc::vec::Vec<u8>, kernel::AxError>
@@ -1127,6 +1129,7 @@ pub struct kernel::DomainPrefixes
 pub struct kernel::EditSample
 pub struct kernel::EgressAllowlist
 pub struct kernel::EnvVarName(_)
+pub struct kernel::ErrorDraft
 pub struct kernel::EventDraft
 pub struct kernel::EventRecord
 pub struct kernel::EventRef

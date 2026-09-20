@@ -97,6 +97,10 @@ fn format_local(utc_ms: u64, offset_min: i32) -> Result<String, AxError> {
             "format local time",
             "date out of range",
         )
+        .with_recovery(
+            "correct this zone's `offset_min` in `[clock]`: the stamp plus the offset \
+             lands outside the years a calendar date can name",
+        )
     })?;
     let (year, month, day) = civil_from_days(day_i64);
     let hour = minute_of_day.div_euclid(60);
@@ -115,7 +119,11 @@ pub fn stamp(now: TimeMs, zones: &[ClockZone]) -> Result<ClockStamp, AxError> {
             AxCode::InvalidArgs,
             "format clock stamp",
             format!("{} zones exceed CLOCK_ZONES_MAX={max}", zones.len()),
-        ));
+        )
+        .with_recovery(format!(
+            "keep at most {max} rows in `[clock] zones`; the UTC row is added on top \
+             of them and is never one of them"
+        )));
     }
     let mut rows = Vec::with_capacity(zones.len().saturating_add(1));
     rows.push(ZoneEntry {
@@ -167,6 +175,10 @@ impl StampGate {
                 "bucket clock stamp",
                 "zero bucket width",
             )
+            .with_recovery(
+                "report this against runtime::clock: every granularity except the one \
+                 that shows no clock owes a bucket width above zero",
+            )
         })?;
         let due = match temporal {
             Temporal::Timestamped => true,
@@ -179,6 +191,10 @@ impl StampGate {
         self.last_bucket = Some(bucket);
         let truncated = bucket.checked_mul(width).ok_or_else(|| {
             AxError::failure(AxCode::InvalidArgs, "bucket clock stamp", "bucket overflow")
+                .with_recovery(
+                    "choose a finer granularity in `[clock]`: truncating this stamp to \
+                     the current bucket overflows the time this city counts in",
+                )
         })?;
         stamp(TimeMs::new(truncated), zones).map(Some)
     }

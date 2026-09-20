@@ -112,7 +112,10 @@ pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>
     }
     let result: &[u8] = sieved.as_deref().unwrap_or(result);
     let len = u64::try_from(result.len()).map_err(|_| {
-        AxError::failure(AxCode::InvalidArgs, "package result", "length exceeds u64")
+        AxError::failure(AxCode::InvalidArgs, "package result", "length exceeds u64").with_recovery(
+            "ask the tool for less at a time: this result is larger than a byte \
+                 count this city can hold",
+        )
     })?;
     let body: Vec<u8>;
     if len <= ctx.cap_bytes {
@@ -123,6 +126,10 @@ pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>
                 AxCode::InvalidArgs,
                 "package result",
                 "offload site vanished",
+            )
+            .with_recovery(
+                "report this against runtime::pipeline: the offload site was present \
+                 one line above and gone on this one",
             )
         })?;
         let record = offload(result, ctx.cap_bytes, &mut site)?;
@@ -159,6 +166,10 @@ pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>
         // byte and say how much went. Never silent.
         let cap = usize::try_from(ctx.cap_bytes).map_err(|_| {
             AxError::failure(AxCode::InvalidArgs, "package result", "cap exceeds usize")
+                .with_recovery(
+                    "lower `[tool] result_cap_bytes`: this cap is larger than this \
+                     machine can address",
+                )
         })?;
         let head = result.get(..cap).unwrap_or(result);
         let dropped = u64::try_from(result.len().saturating_sub(head.len())).unwrap_or(u64::MAX);

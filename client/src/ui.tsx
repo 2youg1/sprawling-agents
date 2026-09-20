@@ -8,15 +8,17 @@
 // Passed as context rather than imported, so a view reaches the browser
 // through exactly what it was given.
 
-import { createContext, useContext } from "solid-js";
+import { createContext, createMemo, useContext } from "solid-js";
+import type { Accessor } from "solid-js";
 
+import { QUERIES } from "./core/asking";
 import type { Key, Lang } from "./core/lang";
 import { fill, say } from "./core/lang";
 import type { Prefs } from "./core/prefs";
 import type { AddressBar, View } from "./core/route";
 import { go } from "./core/route";
 import type { Connection } from "./core/socket";
-import type { Command } from "./wire";
+import type { ApprovalItem, Command } from "./wire";
 
 export interface Ui {
   readonly conn: Connection;
@@ -56,7 +58,10 @@ export function useUi(): Ui {
       prefs: {
         lang: () => "en",
         setLang: () => undefined,
-        effort: () => "medium",
+        // Nobody has chosen, which is what a client with no
+        // preferences behind it knows. A level here would be this
+        // file's own answer to a question `core/prefs.ts` owns.
+        effort: () => null,
         setEffort: () => undefined,
         welcomed: () => false,
         setWelcomed: () => undefined,
@@ -105,10 +110,27 @@ export function useCommand(): (command: Command) => boolean {
 // composers ask the same question of the same answer.
 export function useHearing(): () => boolean {
   const ui = useUi();
-  const endpoints = ui.conn.asking.ask("endpoint_view");
+  const endpoints = ui.conn.asking.ask(QUERIES.endpoints);
   return () => {
     const held = endpoints();
     if (held === undefined || !("endpoints" in held)) return false;
     return held.endpoints.chosen.some((each) => each.tag === "transcribe");
   };
+}
+
+// The questions this city is holding for the person, as one reading
+// three views share: the dot on the rail, the rail's badge, and the
+// tab's title. Before this each of them folded the same answer by
+// hand, and a fourth reader would have folded it a fourth time.
+//
+// It is a hook rather than a prop because the three call sites are in
+// three different places on the page - the same reason `useHearing`
+// above it is one.
+export function useApprovals(): Accessor<readonly ApprovalItem[]> {
+  const ui = useUi();
+  const answer = ui.conn.asking.ask(QUERIES.approvals);
+  return createMemo<readonly ApprovalItem[]>(() => {
+    const held = answer();
+    return held !== undefined && "approvals" in held ? held.approvals.items : [];
+  });
 }

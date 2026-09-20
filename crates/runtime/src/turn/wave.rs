@@ -39,6 +39,10 @@ impl Turn<ToolWave> {
                 "args".to_owned(),
                 serde_json::to_value(&call.args).map_err(|err| {
                     AxError::failure(AxCode::InvalidArgs, "encode tool args", err.to_string())
+                        .with_recovery(
+                            "call the tool again with arguments made of strings and \
+                             whole numbers, which is all this city's payloads carry",
+                        )
                 })?,
             );
             self.journal
@@ -55,6 +59,10 @@ impl Turn<ToolWave> {
                     pictures = attachments;
                     let value = serde_json::to_value(&outcome).map_err(|err| {
                         AxError::failure(AxCode::InvalidArgs, "encode tool result", err.to_string())
+                            .with_recovery(
+                                "report this against the tool that answered: a result \
+                                 payload holds strings and whole numbers only",
+                            )
                     })?;
                     result.insert("result".to_owned(), value.clone());
                     (
@@ -64,6 +72,10 @@ impl Turn<ToolWave> {
                                 "encode tool result",
                                 err.to_string(),
                             )
+                            .with_recovery(
+                                "report this against runtime::turn::wave: the value \
+                                 printed here was accepted as JSON one line above",
+                            )
                         })?,
                         false,
                     )
@@ -71,6 +83,10 @@ impl Turn<ToolWave> {
                 Err(tool_err) => {
                     let value = serde_json::to_value(&tool_err).map_err(|err| {
                         AxError::failure(AxCode::InvalidArgs, "encode tool error", err.to_string())
+                            .with_recovery(
+                                "report this against runtime::turn::wave: an AxError \
+                                 is seven fields of text, numbers and booleans",
+                            )
                     })?;
                     result.insert("error".to_owned(), value.clone());
                     (
@@ -79,6 +95,10 @@ impl Turn<ToolWave> {
                                 AxCode::InvalidArgs,
                                 "encode tool error",
                                 err.to_string(),
+                            )
+                            .with_recovery(
+                                "report this against runtime::turn::wave: the value \
+                                 printed here was accepted as JSON one line above",
                             )
                         })?,
                         true,

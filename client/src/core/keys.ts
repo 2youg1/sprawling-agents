@@ -17,14 +17,18 @@
 // the key itself. Nothing here needs Shift as a fact of its own: the
 // browser already hands `?` and `$` as the character that was typed.
 //
-// The person's overrides live in the same `localStorage` the rest of
+// The person's overrides live in the same browser storage the rest of
 // their preferences do, one row per action, so reading a stored chord
 // never parses a document and never fails in a way that needs handling.
+// Which store that is, and what a browser without one gets instead, is
+// `prefs.ts`'s single decision.
 
 import { createSignal } from "solid-js";
 import type { Accessor } from "solid-js";
 
 import type { Key } from "./lang";
+import { browserRows } from "./prefs";
+import type { Rows } from "./prefs";
 
 // What a key can do. `go.*` moves the address bar, the rest act on the
 // shell itself.
@@ -242,14 +246,6 @@ export function conflictsOf(bound: Readonly<Record<Action, Chord>>): readonly Co
 
 // -------------------------------------------------------------- the map
 
-// The little of `Storage` this needs, so a test hands it a map and the
-// browser hands it `localStorage`.
-export interface Rows {
-  getItem: (key: string) => string | null;
-  setItem: (key: string, value: string) => void;
-  removeItem: (key: string) => void;
-}
-
 export interface Keymap {
   readonly platform: Platform;
   readonly bound: Accessor<Readonly<Record<Action, Chord>>>;
@@ -327,25 +323,6 @@ export function loadKeys(rows: Rows, userAgent: string): Keymap {
 let shared: Keymap | undefined;
 
 export function keymap(): Keymap {
-  shared ??= loadKeys(
-    typeof localStorage === "undefined" ? memory() : localStorage,
-    typeof navigator === "undefined" ? "" : navigator.userAgent,
-  );
+  shared ??= loadKeys(browserRows(), typeof navigator === "undefined" ? "" : navigator.userAgent);
   return shared;
-}
-
-// What a browser without storage remembers: this session, and no
-// longer. A rebind still takes effect; it just does not outlive the
-// tab.
-function memory(): Rows {
-  const held = new Map<string, string>();
-  return {
-    getItem: (key) => held.get(key) ?? null,
-    setItem: (key, value) => {
-      held.set(key, value);
-    },
-    removeItem: (key) => {
-      held.delete(key);
-    },
-  };
 }

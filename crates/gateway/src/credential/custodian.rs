@@ -166,6 +166,10 @@ impl Custodian {
                 AxCode::InvalidArgs,
                 "store credential",
                 "empty value is not a configuration",
+            )
+            .with_recovery(
+                "paste the credential into the settings field again; to remove one, \
+                 delete it instead of storing an empty value",
             ));
         }
         let key = env_key(reference);

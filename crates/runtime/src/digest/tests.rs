@@ -109,7 +109,8 @@ fn the_breaker_opens_after_repeated_failure_and_the_structure_still_stands() {
             AxCode::DigestSuspect,
             "summarise a document",
             "the provider refused",
-        ))
+        )
+        .with_recovery("read the document's headings instead"))
     };
 
     for _ in 0..4 {

@@ -135,7 +135,11 @@ impl Tool for RulesTool {
                 AxCode::InvalidArgs,
                 "read or change a building's rules",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let args = call.args.as_map();
         let mut out = Map::new();

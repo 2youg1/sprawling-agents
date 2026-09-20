@@ -49,7 +49,10 @@ export interface Dispatch {
   readonly addr: Address;
   readonly task: string;
   readonly goal: string;
-  readonly effort: Effort;
+  // `null` when the person has chosen no level: the frame then says
+  // nothing about effort and the provider decides, which is not the
+  // same request as `"none"`, an instruction not to think.
+  readonly effort: Effort | null;
 }
 
 export function dispatch(d: Dispatch): Command {

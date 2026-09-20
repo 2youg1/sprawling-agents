@@ -82,9 +82,7 @@ function recordFragment(lens: Lens): string {
   }
 }
 
-// A head with nothing after it. The lower half of the table is every
-// spelling an older build wrote: each lands on the page that inherited
-// its question.
+// A head with nothing after it, in the spelling this build writes.
 const BARE: Readonly<Record<string, View>> = {
   "": DEFAULT_VIEW,
   talk: DEFAULT_VIEW,
@@ -95,7 +93,11 @@ const BARE: Readonly<Record<string, View>> = {
   cost: { kind: "cost" },
   welcome: { kind: "welcome" },
   gallery: { kind: "gallery" },
+};
 
+// Every spelling an older build wrote: each lands on the page that
+// inherited its question. Read, never written, and never offered.
+const OLD: Readonly<Record<string, View>> = {
   overview: { kind: "city" },
   live: DEFAULT_VIEW,
   sessions: DEFAULT_VIEW,
@@ -107,6 +109,19 @@ const BARE: Readonly<Record<string, View>> = {
   dashboard: { kind: "cost" },
   settings: { kind: "setup" },
 };
+
+// The pages a person may name, for the menus that offer them: every
+// head this build writes, less the empty fragment, which the address
+// bar writes and nobody types. Derived from the table above, so a page
+// somebody can type is a page the address bar can write back.
+export const PAGES: readonly string[] = Object.keys(BARE).filter((head) => head !== "");
+
+// The page one bare name reaches, `None` when this build has no page
+// by that name. A menu that offers a page resolves it through here
+// rather than spelling a fragment of its own.
+export function page(name: string): Option.Option<View> {
+  return Option.fromNullable(BARE[name] ?? OLD[name]);
+}
 
 function named(raw: string): string {
   return raw.replace(/^#*/, "").replace(/^\/*/, "");
@@ -122,7 +137,7 @@ export function fromFragment(raw: string): Option.Option<View> {
   const head = slash < 0 ? path : path.slice(0, slash);
   const tail = slash < 0 ? "" : path.slice(slash + 1);
   if (tail === "") {
-    return Option.fromNullable(BARE[head]);
+    return page(head);
   }
   switch (head) {
     case "talk":

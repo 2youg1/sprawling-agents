@@ -95,7 +95,11 @@ impl Tool for ClaimTool {
                 AxCode::InvalidArgs,
                 "read the plan",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let args = call.args.as_map();
         let mut desk = self.desk.lock().map_err(|_| {

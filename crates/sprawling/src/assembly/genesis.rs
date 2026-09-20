@@ -115,6 +115,10 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
             "create ledger directory",
             err.to_string(),
         )
+        .with_recovery(
+            "free space on this disk, or init the city in a directory this user may \
+             write, then run `sprawling init` again",
+        )
     })?;
     let now = now_ms()?;
     let (mut ledger, _report) =

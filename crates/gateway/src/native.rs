@@ -65,6 +65,10 @@ impl Native {
                     AxCode::CredentialMissing,
                     "resolve credential",
                     "native never authenticates",
+                )
+                .with_recovery(
+                    "drop the `auth` field from this endpoint: local inference takes no \
+                     credential, and an endpoint that needs one is not a native endpoint",
                 ))
             })),
         )?;

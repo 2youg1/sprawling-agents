@@ -17,8 +17,8 @@
 use std::path::Path;
 
 use kernel::{
-    Address, AxCode, AxError, B3Hash, EventDraft, EventKind, EventRecord, EventRef, GENESIS_PREV,
-    RunId, Seq, TimeMs, chain_hash, consts_external::EVENT_LOG_V,
+    Address, AxCode, AxError, B3Hash, EventKind, EventRecord, EventRef, GENESIS_PREV, Seq,
+    chain_hash, consts_external::EVENT_LOG_V,
 };
 use serde::Deserialize;
 
@@ -189,12 +189,20 @@ pub fn rebuild_prefix(
                 "rebuild prefix",
                 "payload has no segments",
             )
+            .with_recovery(
+                "replay a run whose `prompt_composed` line carries `segments`; a \
+                 hand-written line cannot be rebuilt",
+            )
         })?;
     if segments.len() != 4 {
         return Err(AxError::failure(
             AxCode::InvalidArgs,
             "rebuild prefix",
             format!("expected 4 segments, found {}", segments.len()),
+        )
+        .with_recovery(
+            "replay a run recorded by this build: a prefix is four segments, city, \
+             building, resident and run",
         ));
     }
     let mut hashes = Vec::with_capacity(4);
@@ -212,6 +220,10 @@ pub fn rebuild_prefix(
                     "rebuild prefix",
                     format!("{slot}: payload lacks source notes (hand-assembled prefix?)"),
                 )
+                .with_recovery(format!(
+                    "replay a run whose {slot} segment lists the documents it was \
+                     built from; a prefix assembled by hand names none"
+                ))
             })?;
         let mut text = String::new();
         for source in sources {
@@ -220,6 +232,10 @@ pub fn rebuild_prefix(
                 .and_then(serde_json::Value::as_str)
                 .ok_or_else(|| {
                     AxError::failure(AxCode::InvalidArgs, "rebuild prefix", "source without addr")
+                        .with_recovery(
+                            "replay a run whose every source note carries `addr`; \
+                             without it the document cannot be found again",
+                        )
                 })?;
             let addr = Address::parse(addr_raw)?;
             let bytes = resolver(&addr).ok_or_else(|| {
@@ -232,6 +248,10 @@ pub fn rebuild_prefix(
                     "rebuild prefix",
                     format!("{addr_raw}: not utf-8"),
                 )
+                .with_recovery(format!(
+                    "restore {addr_raw} to the UTF-8 text it held when the run \
+                     recorded it; the bytes on disk today are something else"
+                ))
             })?;
             let kept = usize::try_from(
                 source
@@ -241,6 +261,10 @@ pub fn rebuild_prefix(
             )
             .map_err(|_| {
                 AxError::failure(AxCode::InvalidArgs, "rebuild prefix", "kept exceeds usize")
+                    .with_recovery(
+                        "replay this run on a 64-bit machine: the recorded kept span \
+                         is longer than this one can address",
+                    )
             })?;
             let marker = source
                 .get("marker")
@@ -256,6 +280,10 @@ pub fn rebuild_prefix(
                     "rebuild prefix",
                     format!("{addr_raw}: kept span exceeds the document"),
                 )
+                .with_recovery(format!(
+                    "restore {addr_raw} to the text it held when the run recorded it; \
+                     the file on disk today is shorter than the span the run kept"
+                ))
             })?;
             if !text.is_empty() {
                 text.push_str(crate::prefix::DOC_JOIN);
@@ -285,97 +313,21 @@ pub fn rebuild_prefix(
                 AxCode::InvalidArgs,
                 "rebuild prefix",
                 "segment count drifted during rebuild",
+            )
+            .with_recovery(
+                "report this against runtime::replay: four segments went into the \
+                 rebuild and a different number came out",
             ));
         }
     };
     Ok(four)
 }
 
-/// The crash-recovery detection half of resume: a
-/// `tool_called` with no later `tool_result` in the same run is a call
-/// whose outcome is unknown.
-pub fn dangling_tool_calls(ledger: &VerifiedLedger) -> Vec<(RunId, Seq)> {
-    let mut pending: std::collections::BTreeMap<[u8; 16], (RunId, Seq)> =
-        std::collections::BTreeMap::new();
-    let mut dangling = Vec::new();
-    for line in ledger.lines() {
-        let VerifiedLine::Known { record, .. } = line else {
-            continue;
-        };
-        let key = *record.run().as_bytes();
-        match record.kind() {
-            EventKind::ToolCalled => {
-                if let Some(older) = pending.insert(key, (record.run(), record.seq())) {
-                    dangling.push(older);
-                }
-            }
-            EventKind::ToolResult => {
-                pending.remove(&key);
-            }
-            _ => {}
-        }
-    }
-    dangling.extend(pending.into_values());
-    dangling.sort_by_key(|(_, seq)| seq.value());
-    dangling
-}
+/// Crash recovery - detecting a call with no outcome, and closing it -
+/// is the other half of replay and has its own file.
+mod resume;
 
-/// The repair half: the `tool_result` draft that closes a dangling call
-/// with `E_TOOL_OUTCOME_UNKNOWN`. The resume path appends it before any
-/// new turn — the account never shows a call without an outcome.
-pub fn outcome_unknown_draft(call: &EventRecord, t: TimeMs) -> Result<EventDraft, AxError> {
-    if call.kind() != EventKind::ToolCalled {
-        return Err(AxError::failure(
-            AxCode::InvalidArgs,
-            "draft unknown outcome",
-            "record is not a tool_called",
-        ));
-    }
-    let id = call
-        .data()
-        .as_map()
-        .get("id")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("unknown")
-        .to_owned();
-    let name = call
-        .data()
-        .as_map()
-        .get("name")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("unknown")
-        .to_owned();
-    let error = AxError::failure(
-        AxCode::ToolOutcomeUnknown,
-        "recover tool outcome",
-        format!("{name} ({id})"),
-    )
-    .with_recovery(
-        "the call may or may not have taken effect; verify the external state before retrying",
-    );
-    let mut map = serde_json::Map::new();
-    map.insert("tool_use_id".to_owned(), serde_json::Value::String(id));
-    map.insert("name".to_owned(), serde_json::Value::String(name));
-    map.insert(
-        "error".to_owned(),
-        serde_json::to_value(&error).map_err(|err| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "encode unknown outcome",
-                err.to_string(),
-            )
-        })?,
-    );
-    Ok(EventDraft {
-        run: call.run(),
-        t,
-        who: call.who().to_owned(),
-        addr: None,
-        kind: EventKind::ToolResult,
-        data: kernel::Payload::new(map)?,
-        ig: false,
-    })
-}
+pub use resume::{dangling_tool_calls, outcome_unknown_draft};
 
 #[cfg(test)]
 #[allow(

@@ -106,6 +106,10 @@ impl ToolBench {
                             "invoke tool",
                             format!("`{name}` declares Egress but named no host"),
                         )
+                        .with_recovery(
+                            "call the tool again with a `host` argument naming the \
+                             domain it reaches",
+                        )
                     })?
                     .to_owned();
                 let verdict = kernel::egress(
@@ -185,6 +189,10 @@ impl ToolBench {
                     AxCode::ToolUnavailable,
                     "invoke tool",
                     format!("`{name}` declares Spend, which has no instance before P1"),
+                )
+                .with_recovery(
+                    "do this work with a tool that spends nothing; no tool in this build \
+                     can move money",
                 ));
             }
             _ => {
@@ -192,7 +200,11 @@ impl ToolBench {
                     AxCode::InvalidArgs,
                     "invoke tool",
                     format!("`{name}` declares an effect this bench does not route"),
-                ));
+                )
+                .with_recovery(format!(
+                    "give `{name}` an effect this bench routes, or add the route to \
+                     runtime::bench::admit"
+                )));
             }
         }
         Ok(None)
@@ -246,6 +258,10 @@ impl ToolBench {
 /// Refuses arguments that will not serialise, which is a call this
 /// bench cannot judge rather than a call it may let through.
 fn scanned(call: &ToolCall, doing: &'static str) -> Result<Vec<u8>, AxError> {
-    serde_json::to_vec(&call.args)
-        .map_err(|err| AxError::failure(AxCode::InvalidArgs, doing, err.to_string()))
+    serde_json::to_vec(&call.args).map_err(|err| {
+        AxError::failure(AxCode::InvalidArgs, doing, err.to_string()).with_recovery(
+            "call the tool again with arguments made of strings and whole numbers, \
+                 which is all this city's payloads carry",
+        )
+    })
 }

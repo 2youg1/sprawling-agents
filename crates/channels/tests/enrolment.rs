@@ -90,7 +90,8 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
                 AxCode::ToolUnavailable,
                 "transcribe a recording",
                 "this test city has no transcription endpoint",
-            ))
+            )
+            .with_recovery("attach an endpoint that offers transcription"))
         }),
         events: events.clone(),
         queries: Arc::new(|_| {
@@ -135,7 +136,8 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
                 AxCode::InvalidArgs,
                 "stage an attachment",
                 "not in this test",
-            ))
+            )
+            .with_recovery("stage the attachment through a city that carries a workbench"))
         }),
         city: None,
     };

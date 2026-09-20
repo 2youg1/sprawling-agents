@@ -93,6 +93,11 @@ impl WorkshopDesk {
                     "lay out a workshop",
                     format!("{} is scheduled and has no contract", id.as_str()),
                 )
+                .with_recovery(format!(
+                    "remove `{}` from the `depends_on` of every node, or add a node \
+                     for it: the schedule holds a room no node describes",
+                    id.as_str()
+                ))
             })?;
             delegates.ask(Delegated {
                 room: contract.write_domain().clone(),
@@ -142,30 +147,10 @@ pub struct WorkshopTool {
     meta: ToolMeta,
 }
 
-/// The three things this tool does. Exhaustive: an unknown verb is
-/// refused rather than rounded to the harmless one, because the harmless
-/// one here would silently drop a graph somebody meant to run.
-enum Op {
-    LayOut,
-    Question,
-    Judge,
-}
+/// Which verbs this tool answers to is its own fact, in its own file.
+mod op;
 
-impl Op {
-    fn parse(raw: &str) -> Result<Op, AxError> {
-        match raw {
-            "lay_out" => Ok(Op::LayOut),
-            "question" => Ok(Op::Question),
-            "judge" => Ok(Op::Judge),
-            other => Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "run a workshop",
-                format!("no such operation: {other}"),
-            )
-            .with_recovery("lay_out to split the work, question then judge to close the join")),
-        }
-    }
-}
+use op::Op;
 
 impl WorkshopTool {
     /// # Errors
@@ -231,6 +216,23 @@ impl WorkshopTool {
     }
 }
 
+/// The refusal a desk this tool must lock has earned when the thread
+/// that held it died.
+///
+/// Both desks say it, so both say it once: neither can be reached
+/// again inside this process, and ending the run is the only way on.
+fn poisoned(which: &str) -> AxError {
+    AxError::failure(
+        AxCode::StorageFatal,
+        "run a workshop",
+        format!("{which} was left locked by a thread that died"),
+    )
+    .with_recovery(format!(
+        "end this run and resume it: {which} cannot be reached again inside a process \
+         where a thread died holding it"
+    ))
+}
+
 fn text(map: &Map<String, Value>, key: &str) -> Result<String, AxError> {
     map.get(key)
         .and_then(Value::as_str)
@@ -262,6 +264,10 @@ fn contract_of(node: &Value, owner: &str) -> Result<NodeContract, AxError> {
                     "run a workshop",
                     "a dependency is the room of another node",
                 )
+                .with_recovery(
+                    "write each entry of `depends_on` as the room string of another \
+                     node in this same call",
+                )
             })?;
             depends_on.insert(NodeId::parse(raw)?);
         }
@@ -289,16 +295,14 @@ impl Tool for WorkshopTool {
                 AxCode::InvalidArgs,
                 "run a workshop",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let args = call.args.as_map();
-        let mut desk = self.desk.lock().map_err(|_| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "run a workshop",
-                "the desk was left locked by a thread that died",
-            )
-        })?;
+        let mut desk = self.desk.lock().map_err(|_| poisoned("the desk"))?;
         let mut out = Map::new();
         match Op::parse(&text(args, "op")?)? {
             Op::LayOut => {
@@ -319,13 +323,10 @@ impl Tool for WorkshopTool {
                     .iter()
                     .map(|node| contract_of(node, &owner))
                     .collect::<Result<Vec<NodeContract>, AxError>>()?;
-                let mut delegates = self.delegates.lock().map_err(|_| {
-                    AxError::failure(
-                        AxCode::StorageFatal,
-                        "run a workshop",
-                        "the desk was left locked by a thread that died",
-                    )
-                })?;
+                let mut delegates = self
+                    .delegates
+                    .lock()
+                    .map_err(|_| poisoned("the delegation desk"))?;
                 let schedule = desk.lay_out(contracts, &mut delegates)?;
                 out.insert(
                     "schedule".to_owned(),

@@ -86,7 +86,16 @@ impl Completion {
                 entry.insert(
                     "kind".to_owned(),
                     serde_json::to_value(r.kind()).map_err(|err| {
-                        AxError::failure(AxCode::InvalidArgs, "encode evidence", err.to_string())
+                        AxError::failure(
+                            AxCode::InvalidArgs,
+                            "encode evidence",
+                            format!("event kind at seq {}", r.seq().value()),
+                        )
+                        .with_recovery(format!(
+                            "JSON refused this event kind ({err}); cite an event whose kind \
+                             `sprawling replay --seq {}` prints",
+                            r.seq().value()
+                        ))
                     })?,
                 );
                 cited.push(Value::Object(entry));

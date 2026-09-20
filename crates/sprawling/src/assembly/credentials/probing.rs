@@ -89,6 +89,10 @@ pub(super) fn probed_payload(
                 "encode a reach report",
                 err.to_string(),
             )
+            .with_recovery(
+                "report this against sprawling::assembly::credentials::probing: a reach \
+                 report is a plain enum and JSON refuses none of its spellings",
+            )
         })?,
     );
     match &found.served {
@@ -105,6 +109,10 @@ pub(super) fn probed_payload(
                 "facts".to_owned(),
                 serde_json::to_value(rows).map_err(|err| {
                     AxError::failure(AxCode::InvalidArgs, "encode model facts", err.to_string())
+                        .with_recovery(
+                            "report this against sprawling::assembly::credentials::probing: \
+                             model facts are text and whole numbers only",
+                        )
                 })?,
             );
         }

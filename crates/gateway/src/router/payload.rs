@@ -57,7 +57,10 @@ fn tuning_value(tuning: &EndpointTuning) -> Result<Option<Value>, AxError> {
     // the same way it does for every other figure here.
     if tuning.proxying != Proxying::default() {
         let spelled = serde_json::to_value(tuning.proxying).map_err(|err| {
-            AxError::failure(AxCode::InvalidArgs, "encode proxying", err.to_string())
+            AxError::failure(AxCode::InvalidArgs, "encode proxying", err.to_string()).with_recovery(
+                "report this against gateway::router::payload: `Proxying` is a plain \
+                     enum and JSON refuses none of its spellings",
+            )
         })?;
         map.insert("proxying".to_owned(), spelled);
     }
@@ -148,7 +151,10 @@ pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError>
     map.insert(
         "dialect".to_owned(),
         serde_json::to_value(endpoint.dialect).map_err(|err| {
-            AxError::failure(AxCode::InvalidArgs, "encode dialect", err.to_string())
+            AxError::failure(AxCode::InvalidArgs, "encode dialect", err.to_string()).with_recovery(
+                "report this against gateway::router::payload: `Dialect` is a plain \
+                     enum and JSON refuses none of its spellings",
+            )
         })?,
     );
     // The reference, never the credential: this is the byte that makes
@@ -223,6 +229,10 @@ pub fn selected_payload(
         "input".to_owned(),
         serde_json::to_value(entry.input).map_err(|err| {
             AxError::failure(AxCode::InvalidArgs, "encode input kinds", err.to_string())
+                .with_recovery(
+                    "report this against gateway::router::payload: `InputKinds` is a plain \
+                     enum and JSON refuses none of its spellings",
+                )
         })?,
     );
     for (key, price) in [

@@ -196,6 +196,10 @@ pub(super) fn local_model_facts(model: &str) -> Result<gateway::ModelEntry, AxEr
             "read the model catalog",
             "the pinned catalog has no local row",
         )
+        .with_recovery(
+            "restore the `local` row in `gateway::market::MarketSnapshot::builtin`: \
+             local inference is priced from it",
+        )
     })?;
     Ok(gateway::ModelEntry {
         id: model.to_owned(),

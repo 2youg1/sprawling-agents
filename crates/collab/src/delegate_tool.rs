@@ -90,6 +90,10 @@ impl DelegateDesk {
         self.asked.push(work);
         self.asked.last().ok_or_else(|| {
             AxError::failure(AxCode::InvalidArgs, "delegate work", "the request vanished")
+                .with_recovery(
+                    "report this against collab::delegate_tool: the request was pushed \
+                     onto the queue one line above and the queue reads back empty",
+                )
         })
     }
 
@@ -196,7 +200,11 @@ impl Tool for DelegateTool {
                 AxCode::InvalidArgs,
                 "delegate work",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let args = call.args.as_map();
         let room = Address::parse(arg(args, "room")?)?;
@@ -225,6 +233,9 @@ impl Tool for DelegateTool {
                 AxCode::StorageFatal,
                 "delegate work",
                 "the desk was left locked by a thread that died",
+            )
+            .with_recovery(
+                "end this run and resume it: the delegation desk cannot be reached again \n                 inside a process where a thread died holding it",
             )
         })?;
         let accepted = desk.ask(work)?;

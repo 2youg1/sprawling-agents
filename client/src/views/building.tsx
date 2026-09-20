@@ -13,6 +13,7 @@
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
+import { QUERIES } from "../core/asking";
 import { halt, pursue, release } from "../core/commands";
 import { roomOf, toFragment } from "../core/route";
 import type { Address, BuildingAnswer } from "../wire";
@@ -106,7 +107,7 @@ export function Building(props: BuildingProps) {
     const held = answer()();
     return held !== undefined && "building" in held ? held.building : undefined;
   });
-  const city = ui.conn.asking.ask("city_view");
+  const city = ui.conn.asking.ask(QUERIES.city);
   const pursuit = createMemo(() => {
     const held = city();
     return held !== undefined && "city" in held ? held.city.pursuits.find((line) => line.addr === props.address) : undefined;

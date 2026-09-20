@@ -21,6 +21,12 @@ use kernel::{AxCode, AxError};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 
+/// Enrolment is a credential handed to an HTTP route rather than a
+/// frame spoken on the socket, so it has its own file.
+mod enrolment;
+
+pub(crate) use enrolment::{enrol, split_reference};
+
 /// What came back before the city went quiet.
 pub(crate) struct Heard {
     pub(crate) frames: u32,
@@ -59,20 +65,6 @@ impl Heard {
             _ => Spoken::Refused,
         }
     }
-}
-
-/// Splits `realm/name` into its two halves.
-///
-/// Fail-closed on anything else: a reference with no realm, an empty
-/// half, or a second slash is not a credential name this city can hold,
-/// and guessing which half was meant would put a key under a name its
-/// owner did not choose.
-pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)> {
-    let (realm, name) = raw.split_once('/')?;
-    if realm.is_empty() || name.is_empty() || name.contains('/') {
-        return None;
-    }
-    Some((realm, name))
 }
 
 /// The greeting this build sends, computed rather than transcribed.
@@ -136,6 +128,10 @@ pub(crate) fn call(
                 AxCode::StorageFatal,
                 "start the async runtime",
                 err.to_string(),
+            )
+            .with_recovery(
+                "close some programs and try again: this machine would not give the \
+                 process the thread the connection needs",
             )
         })?;
     runtime.block_on(converse(at, &greeting, &body, quiet))
@@ -230,57 +226,6 @@ fn report(text: &str, heard: &mut Heard) {
     }
 }
 
-/// Hands a credential to the local enrolment route and returns the
-/// reference that replaces it.
-///
-/// The value never travels through `argv`, which is readable in the
-/// process table, in shell history, and in whatever started this
-/// process. That is what makes this better custody than the browser
-/// path, where the page holds the plaintext first.
-///
-/// # Errors
-/// Fails when the route refuses - which it does for any peer that is not
-/// on this machine - or when the city cannot be reached.
-pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<String, AxError> {
-    let body = serde_json::json!({ "realm": realm, "name": name, "value": value });
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(20))
-        // The city is on this machine, and a proxy in front of loopback
-        // answers for something else.
-        .no_proxy()
-        .build()
-        .map_err(|err| {
-            AxError::failure(AxCode::Provider, "build an http client", err.to_string())
-        })?;
-    let answer = client
-        .post(format!("http://{at}/enroll"))
-        .json(&body)
-        .send()
-        .map_err(|err| unreachable_city(at, &err.to_string()))?;
-    let status = answer.status();
-    // The reply body is this city's own text, so quoting it is quoting
-    // ourselves rather than a stranger's error page.
-    let said = answer.text().unwrap_or_default();
-    match status.as_u16() {
-        201 => Ok(said),
-        // The city took it and has not said what became of it. Reported
-        // as a failure because the caller must not go on as though the
-        // reference resolves - but with the city's own words, which say
-        // what to check rather than what went wrong.
-        202 => Err(
-            AxError::failure(AxCode::CredentialMissing, "enrol a credential", said).with_recovery(
-                "the city is busy; ask it again once the run it is inside has finished",
-            ),
-        ),
-        code => Err(AxError::failure(
-            AxCode::CredentialMissing,
-            "enrol a credential",
-            format!("the city answered {code}: {said}"),
-        )
-        .with_recovery("enrolment is refused for any peer that is not on this machine")),
-    }
-}
-
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -290,7 +235,7 @@ pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<St
     reason = "test code"
 )]
 mod tests {
-    use super::{Duration, Message, SinkExt, Spoken, StreamExt, hello, split_reference};
+    use super::{Duration, Message, SinkExt, Spoken, StreamExt, hello};
 
     /// A city that answers the greeting and then says nothing is the
     /// third answer, and it must not read as the first.
@@ -353,21 +298,6 @@ mod tests {
             "silence is its own answer, not the answer 'accepted'"
         );
         let _joined = scripted.join();
-    }
-
-    #[test]
-    fn a_reference_is_a_realm_and_a_name() {
-        assert_eq!(
-            split_reference("modelscope/api"),
-            Some(("modelscope", "api"))
-        );
-    }
-
-    #[test]
-    fn anything_that_is_not_two_halves_is_refused_rather_than_guessed() {
-        for raw in ["api", "/api", "modelscope/", "", "a/b/c"] {
-            assert_eq!(split_reference(raw), None, "{raw} was accepted");
-        }
     }
 
     /// The whole reason this module exists: the greeting is derived from

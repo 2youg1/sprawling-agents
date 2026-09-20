@@ -221,7 +221,11 @@ impl Tool for McpTool {
                 AxCode::InvalidArgs,
                 "call an external tool",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let arguments = Value::Object(call.args.as_map().clone());
         let line = self.rpc.call_tool(&self.remote, &arguments)?;

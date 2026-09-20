@@ -49,7 +49,8 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
                 AxCode::ConfigInvalid,
                 "resolve a credential",
                 "none configured",
-            ))
+            )
+            .with_recovery("this test endpoint authenticates with nothing"))
         })),
     )
     .unwrap();

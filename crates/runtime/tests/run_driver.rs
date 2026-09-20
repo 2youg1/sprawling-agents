@@ -118,11 +118,10 @@ struct FailingModel {
 
 impl Model for FailingModel {
     fn call(&mut self, _req: &ModelRequest) -> Result<ModelReturn, AxError> {
-        Err(AxError::failure(
-            self.code,
-            "read the model's reply",
-            "not a tool name",
-        ))
+        Err(
+            AxError::failure(self.code, "read the model's reply", "not a tool name")
+                .with_recovery("name a tool the run registered, or register this one"),
+        )
     }
 }
 
@@ -144,7 +143,8 @@ impl Model for FlakyModel {
                 "call the model",
                 "the provider answered 503",
             )
-            .retriable());
+            .retriable()
+            .with_recovery("wait for the provider and send the turn again"));
         }
         Ok(ModelReturn::bare(
             message_payload(&[ContentBlock::Text {

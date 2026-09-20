@@ -3,20 +3,29 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
-
-//! CLI entry. Subcommands land with their stages and are refused honestly
-//! until then — a refusal that names what is missing beats a stub that
-//! pretends (sprawling-SPEC.md). Live now: status, replay, init, serve,
-//! export, restore, resume, fork.
-
-// The city harness is the library half of this package (`src/lib.rs`);
-// these two are the binary's own. `install` puts this executable where a
-// shell will find it, and `wire_client` talks to a served city from a
-// terminal - both are about the command line rather than about a city.
+//! The subcommands that move a city's data rather than stand a city up:
+//! `call`, `enrol`, `install`, `export`, `restore`, `fork`, `adopt`,
+//! `replay` and `status`.
+//!
+//! Each function here owns only the part a person sees — the usage
+//! line, the sentence printed about what happened, and the exit code —
+//! while the work itself stays in `memory`, `assembly`, `install` and
+//! `wire_client`. That is why every one of them takes the arguments
+//! `router` already read and returns an `ExitCode` instead of a value:
+//! for an agent driving this binary, the exit code is the result.
+//!
+//! Exit codes are a vocabulary rather than a habit: 0 the work was
+//! done, 1 the city or this machine refused, 2 this command line was not
+//! readable, and 3 (`call` only) nothing came back before the quiet
+//! window closed. A refusal carrying an `AxError` is printed by
+//! `city::report`, so its failure line and its recovery line have one
+//! spelling across the whole binary.
+//!
+//! The point a reader most often gets wrong: `fork`, `adopt`, `replay`
+//! and `export` read the city directory directly and never speak to a
+//! serving process, while `call` and `enrol` speak only over the wire
+//! and never touch the directory — the two halves of this module reach
+//! the same city by routes that share nothing.
 
 use super::city::report;
 use super::router::{client_summary, flag_value, log_floor, log_levels};

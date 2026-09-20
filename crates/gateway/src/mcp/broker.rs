@@ -115,6 +115,11 @@ impl Broker {
                 .build()
                 .map_err(|failed| {
                     AxError::failure(AxCode::Provider, "build a test client", failed.to_string())
+                        .with_recovery(
+                            "check the proxy settings this machine exports \
+                             (`HTTPS_PROXY`, `NO_PROXY`) and the TLS roots this build \
+                             was given",
+                        )
                 })?,
             key,
             base: parsed(base)?,
@@ -301,6 +306,10 @@ fn parsed(base: &str) -> Result<reqwest::Url, AxError> {
             "address the application broker",
             bad.to_string(),
         )
+        .with_recovery(format!(
+            "give the broker an absolute url with a scheme and a host, for example \
+             `https://example.com/api`; this build was given `{base}`"
+        ))
     })
 }
 
@@ -317,6 +326,10 @@ impl Broker {
                 "address the application broker",
                 bad.to_string(),
             )
+            .with_recovery(format!(
+                "report this against gateway::mcp::broker: the path `{path}` does not \
+                 join onto the broker's base url"
+            ))
         })?;
         {
             let mut query = target.query_pairs_mut();
@@ -331,16 +344,17 @@ impl Broker {
 /// Reads one answer, turning a status into a code a person can act on.
 fn read(sent: reqwest::Result<reqwest::blocking::Response>, path: &str) -> Result<Value, AxError> {
     let response = sent.map_err(|failed| {
-        let refusal = AxError::failure(
+        let draft = AxError::failure(
             AxCode::Provider,
             "reach the application broker",
             failed.to_string(),
-        )
-        .with_recovery("check this machine's connection, then try again");
-        if failed.is_timeout() {
-            return refusal.retriable();
-        }
-        refusal
+        );
+        let draft = if failed.is_timeout() {
+            draft.retriable()
+        } else {
+            draft
+        };
+        draft.with_recovery("check this machine's connection, then try again")
     })?;
     let status = response.status();
     let body = response.text().unwrap_or_default();
@@ -364,11 +378,11 @@ fn refusal_for(status: reqwest::StatusCode, path: &str, body: &str) -> AxError {
         401 | 403 => AxError::failure(AxCode::CredentialMissing, "ask the broker", subject)
             .with_recovery("store a valid project key for the broker and try again"),
         408 | 429 => AxError::failure(AxCode::Provider, "ask the broker", subject)
-            .with_recovery("wait a moment and try again")
-            .retriable(),
+            .retriable()
+            .with_recovery("wait a moment and try again"),
         500..=599 => AxError::failure(AxCode::Provider, "ask the broker", subject)
-            .with_recovery("the broker is having trouble; try again shortly")
-            .retriable(),
+            .retriable()
+            .with_recovery("the broker is having trouble; try again shortly"),
         _ => AxError::failure(AxCode::Provider, "ask the broker", subject)
             .with_nearby(vec![body.chars().take(200).collect()])
             .with_recovery("connect this application on the broker's own pages instead"),

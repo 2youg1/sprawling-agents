@@ -127,6 +127,11 @@ impl ClaimEffect {
                                     "record why a plan node stopped",
                                     err.to_string(),
                                 )
+                                .with_recovery(
+                                    "report this against collab::claim_effect: the \
+                                     reason a node stopped is a plain enum and JSON \
+                                     refuses none of its spellings",
+                                )
                             })?,
                         );
                         map.insert("line".to_owned(), Value::String(why.line()));

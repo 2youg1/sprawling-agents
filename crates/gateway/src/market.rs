@@ -111,7 +111,11 @@ impl MarketSnapshot {
                     AxCode::InvalidArgs,
                     "build market snapshot",
                     format!("duplicate model id `{id}`"),
-                ));
+                )
+                .with_recovery(format!(
+                    "delete one of the two rows carrying the id `{id}`: a model's facts \
+                     have one row, and two rows are two prices for one call"
+                )));
             }
         }
         Ok(MarketSnapshot { version, entries })

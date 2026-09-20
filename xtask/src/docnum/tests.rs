@@ -3,12 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::collections::BTreeSet;
-
 use super::*;
 
-fn values() -> Vec<(&'static str, String)> {
-    vec![("wire_v", "31".to_owned()), ("gate_count", "20".to_owned())]
+fn values() -> Readings {
+    [
+        ("wire_v".to_owned(), "31".to_owned()),
+        ("gate_count".to_owned(), "20".to_owned()),
+    ]
+    .into_iter()
+    .collect()
 }
 
 fn root() -> std::path::PathBuf {
@@ -98,16 +101,26 @@ fn an_unclosed_or_nested_marker_is_reported_rather_than_read() {
 }
 
 #[test]
-fn every_fact_recounts_to_a_number_and_owns_its_key() {
-    let root = root();
-    let keys: BTreeSet<&str> = FACTS.iter().map(|fact| fact.key).collect();
-    assert_eq!(keys.len(), FACTS.len(), "two facts share one key");
-    for (key, value) in readings(&root).expect("every fact recounts on this tree") {
-        assert!(
-            value.chars().all(|c| c.is_ascii_digit()) && !value.is_empty(),
-            "{key} recounted to {value:?}"
-        );
-    }
+fn a_reading_is_taken_once_however_many_spans_quote_it() {
+    let text = "<!-- xtask:begin wire_v -->1<!-- xtask:end -->\n\
+                <!-- xtask:begin wire_v -->2<!-- xtask:end -->\n";
+    let found = spans(text).expect("the markers are well formed");
+    let mut taken = Readings::new();
+    readings(&root(), &found, &mut taken).expect("wire_v recounts");
+    assert_eq!(taken.len(), 1);
+    assert_eq!(
+        taken.get("wire_v").map(String::as_str),
+        Some(channels::WIRE_V.to_string().as_str())
+    );
+}
+
+#[test]
+fn a_span_naming_no_fact_leaves_the_map_without_it() {
+    let text = "<!-- xtask:begin invented -->7<!-- xtask:end -->\n";
+    let found = spans(text).expect("the markers are well formed");
+    let mut taken = Readings::new();
+    readings(&root(), &found, &mut taken).expect("an unknown key is not an error here");
+    assert!(taken.is_empty());
 }
 
 #[test]

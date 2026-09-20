@@ -28,7 +28,7 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-use crate::backlog::{Backlog, BacklogId, Finished, Started};
+use crate::backlog::{Backlog, Started};
 use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 
 /// Environment variables a child may inherit. Everything else is
@@ -136,7 +136,7 @@ impl ExecTool {
                 exit_code,
                 stdout,
                 stderr,
-            } => outcome(&stdout, &stderr, exit_code, arm)?,
+            } => settled(&stdout, &stderr, exit_code, arm)?,
             Started::Backgrounded { id, what } => backgrounded(&id, &what, arm)?,
         };
         with_environment(result, &inherited)
@@ -200,7 +200,7 @@ impl ExecTool {
                 );
             }
         };
-        outcome(
+        settled(
             &String::from_utf8_lossy(&result.stdout),
             &String::from_utf8_lossy(&result.stderr),
             exit_code,
@@ -223,139 +223,23 @@ impl ExecTool {
         self.through_the_backlog(command, text.to_owned(), "shell")
     }
 }
+/// Every result payload this tool can return has its own file: the
+/// arms above decide what happened, and `outcome` decides how it is
+/// written down.
+mod outcome;
 
-/// What a caller is told about a command that outlived its window.
-///
-/// The handle and the sentence travel together: an agent that is given
-/// an identifier and no instruction waits for it anyway, which is the
-/// behaviour this whole table exists to stop.
-fn backgrounded(id: &BacklogId, what: &str, arm: &str) -> Result<ToolOutcome, AxError> {
-    let mut result = Map::new();
-    result.insert("arm".to_owned(), Value::String(arm.to_owned()));
-    result.insert(
-        "outcome".to_owned(),
-        Value::String("backgrounded".to_owned()),
-    );
-    result.insert("handle".to_owned(), Value::String(id.to_string()));
-    result.insert("what".to_owned(), Value::String(what.to_owned()));
-    result.insert(
-        "detail".to_owned(),
-        Value::String(
-            "still running; do not wait for it - carry on, and its result arrives at the end \
-             of a later tool result"
-                .to_owned(),
-        ),
-    );
-    Ok(ToolOutcome {
-        result: Payload::new(result)?,
-        attachments: Vec::new(),
-    })
-}
-
-/// Adds every background member that has stopped since the last call to
-/// the tail of this result. A command that settles inside its window
-/// carries no handle: the caller asked whether it finished, the table
-/// answered, and the entry is already gone.
-///
-/// It is the tail rather than the head because the answer the caller
-/// asked for is the one it is reading for; what arrived while it was
-/// working comes after.
-fn with_backlog(outcome: ToolOutcome, done: Vec<Finished>) -> Result<ToolOutcome, AxError> {
-    if done.is_empty() {
-        return Ok(outcome);
-    }
-    let mut result = outcome.result.as_map().clone();
-    let rows = done
-        .into_iter()
-        .map(|member| {
-            let mut row = Map::new();
-            row.insert("handle".to_owned(), Value::String(member.id.to_string()));
-            row.insert("what".to_owned(), Value::String(member.what));
-            row.insert(
-                "exit_code".to_owned(),
-                Value::Number(member.exit_code.into()),
-            );
-            row.insert("stdout".to_owned(), Value::String(member.stdout));
-            row.insert("stderr".to_owned(), Value::String(member.stderr));
-            Value::Object(row)
-        })
-        .collect();
-    result.insert("background".to_owned(), Value::Array(rows));
-    Ok(ToolOutcome {
-        result: Payload::new(result)?,
-        attachments: Vec::new(),
-    })
-}
-
-fn outcome(stdout: &str, stderr: &str, exit_code: i64, arm: &str) -> Result<ToolOutcome, AxError> {
-    let mut result = Map::new();
-    result.insert("arm".to_owned(), Value::String(arm.to_owned()));
-    result.insert("stdout".to_owned(), Value::String(stdout.to_owned()));
-    result.insert("stderr".to_owned(), Value::String(stderr.to_owned()));
-    result.insert("exit_code".to_owned(), Value::Number(exit_code.into()));
-    Ok(ToolOutcome {
-        result: Payload::new(result)?,
-        attachments: Vec::new(),
-    })
-}
-
-/// Adds the names this call's child inherited to its result.
-///
-/// Names only, never values: which names a run inherited is a fact the
-/// ledger keeps, and what those names held is a fact it must not.
-fn with_environment(
-    outcome: ToolOutcome,
-    inherited: &BTreeMap<String, String>,
-) -> Result<ToolOutcome, AxError> {
-    let mut result = outcome.result.as_map().clone();
-    result.insert(
-        "env".to_owned(),
-        Value::Array(
-            inherited
-                .keys()
-                .map(|name| Value::String(name.clone()))
-                .collect(),
-        ),
-    );
-    Ok(ToolOutcome {
-        result: Payload::new(result)?,
-        attachments: Vec::new(),
-    })
-}
-
-fn exceptional(
-    stdout: &[u8],
-    stderr: &[u8],
-    kind: &str,
-    detail: Option<String>,
-) -> Result<ToolOutcome, AxError> {
-    let mut result = Map::new();
-    result.insert("arm".to_owned(), Value::String("python".to_owned()));
-    result.insert(
-        "stdout".to_owned(),
-        Value::String(String::from_utf8_lossy(stdout).into_owned()),
-    );
-    result.insert(
-        "stderr".to_owned(),
-        Value::String(String::from_utf8_lossy(stderr).into_owned()),
-    );
-    result.insert("outcome".to_owned(), Value::String(kind.to_owned()));
-    if let Some(detail) = detail {
-        result.insert("detail".to_owned(), Value::String(detail));
-    }
-    Ok(ToolOutcome {
-        result: Payload::new(result)?,
-        attachments: Vec::new(),
-    })
-}
+use outcome::{backgrounded, exceptional, settled, with_backlog, with_environment};
 
 /// Reads the arm out of the call. An unrecognised shape is refused
 /// rather than defaulted to shell — guessing which arm was meant is how
 /// a program run becomes a shell injection.
 pub fn parse_arm(args: &Map<String, Value>) -> Result<ExecArm, AxError> {
-    let arm = args
-        .get("arm")
-        .ok_or_else(|| AxError::failure(AxCode::InvalidArgs, "run exec", "missing `arm`"))?;
+    let arm = args.get("arm").ok_or_else(|| {
+        AxError::failure(AxCode::InvalidArgs, "run exec", "missing `arm`").with_recovery(
+            "name the arm in the call: `program` with a path and args, `python` \
+                 with code, or `shell` with one command line",
+        )
+    })?;
     serde_json::from_value(arm.clone()).map_err(|err| {
         AxError::failure(
             AxCode::InvalidArgs,
@@ -377,7 +261,11 @@ impl Tool for ExecTool {
                 AxCode::InvalidArgs,
                 "run exec",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let answer = match parse_arm(call.args.as_map())? {
             ExecArm::Program { path, args } => self.run_program(&path, &args),

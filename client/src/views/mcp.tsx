@@ -20,7 +20,9 @@ import { ByJson } from "./mcp/by_json";
 import { ByUrl } from "./mcp/by_url";
 import { Composio } from "./mcp/composio";
 import { DesktopForm } from "./desktop";
+import { QUERIES } from "../core/asking";
 import { MAYOR, buildingOf } from "../core/route";
+import { Segmented, type Choice } from "./parts/segmented";
 import { Servers } from "./mcp/servers";
 import { Tabs } from "./parts/tabs";
 import type { Address } from "../wire";
@@ -105,7 +107,7 @@ export function McpForm(props: {
 export function Mcp() {
   const ui = useUi();
   const say = useSay();
-  const city = ui.conn.asking.ask("city_view");
+  const city = ui.conn.asking.ask(QUERIES.city);
   const buildings = createMemo<readonly Address[]>(() => {
     const answer = city();
     if (answer === undefined || !("city" in answer)) return [HALL];
@@ -135,6 +137,13 @@ export function Mcp() {
         return say("mcp_gap_scope_machine");
     }
   };
+  // The three scopes as one question: a screen reader hears one
+  // choice with three answers instead of three pressed buttons, and
+  // the two that the wire cannot carry stay choosable, because the
+  // banner under them is where their gap is explained.
+  const scopes = createMemo<readonly Choice<Scope>[]>(() =>
+    SCOPES.map((which) => ({ value: which, label: scoped(which) })),
+  );
   const composio = reachOf({
     get addr() {
       return chosen();
@@ -149,22 +158,7 @@ export function Mcp() {
       <div class="mb-wide flex flex-wrap items-baseline gap-base">
         <h1 class="text-title font-title">{say("mcp_title")}</h1>
         <span class="text-note text-text-quiet">{say("mcp_scope")}</span>
-        <For each={SCOPES}>
-          {(which) => (
-            <button
-              type="button"
-              aria-pressed={scope() === which}
-              class={`rounded-pill px-base py-tight text-label ${
-                scope() === which ? "bg-g3 text-text" : "text-text-faint hover:text-text-quiet"
-              }`}
-              onClick={() => {
-                setScope(which);
-              }}
-            >
-              {scoped(which)}
-            </button>
-          )}
-        </For>
+        <Segmented label={say("mcp_scope")} options={scopes()} held={scope()} onPick={setScope} />
       </div>
       <Show when={why()}>{(said) => <Banner text={said()} weight="notice" />}</Show>
       <div class="flex min-h-0 flex-1 gap-wide">

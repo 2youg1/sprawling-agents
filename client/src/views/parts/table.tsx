@@ -84,14 +84,16 @@ export function Table<T>(
       <Show when={props.rows.length > 0} fallback={props.empty}>
         <table class="w-full border-collapse text-body">
           <caption class="sr-only">{props.caption}</caption>
-          <thead class="sticky top-0 z-10 bg-g2">
+          {/* No stacking number: a sticky header is positioned and the
+              rows that scroll under it are not, so the header is
+              painted last of the two. */}
+          <thead class="sticky top-0 bg-g2">
             <tr>
               <Show when={props.selection}>
                 {(selection) => (
                   <th class="w-glyph px-base py-snug text-left">
                     <input
                       type="checkbox"
-                      class="accent-accent"
                       aria-label={selection().allLabel}
                       checked={selection().allPicked()}
                       onChange={(event) => {
@@ -129,7 +131,6 @@ export function Table<T>(
                       <td class="px-base py-snug">
                         <input
                           type="checkbox"
-                          class="accent-accent"
                           aria-label={props.keyOf(row)}
                           checked={selection().picked(row)}
                           onChange={(event) => {

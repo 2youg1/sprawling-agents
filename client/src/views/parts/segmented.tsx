@@ -12,9 +12,10 @@
 // because the track is a `radiogroup` and every cell reports whether it
 // is the chosen one. A keyboard crosses the whole control in two keys,
 // because only the chosen cell is a tab stop and the arrows move
-// between cells. And a cell that cannot be chosen says why under the
-// pointer, so the reason arrives before the click rather than as a
-// refusal after it.
+// between cells. And a cell that cannot be chosen says why - through
+// `Tip`, so the reason reaches a pointer, a keyboard and a touch screen
+// alike, and arrives before the click rather than as a refusal after
+// it.
 //
 // The slider travels on `transform` over cells of one width, so the
 // move is a compositor job and no script measures anything. The one
@@ -23,6 +24,9 @@
 // The words are the caller's: this file holds no prose.
 
 import { For, Show, createSignal } from "solid-js";
+import type { JSX } from "solid-js";
+
+import { Tip } from "./tip";
 
 // Which of the two coloured tokens paints the chosen cell. It is a
 // caller's decision and never an inference: this control knows nothing
@@ -64,7 +68,12 @@ export interface SegmentedProps<V extends string> {
   // radios and nothing else.
   readonly label: string;
   readonly options: readonly Choice<V>[];
-  readonly held: V;
+  // `null` is nobody has chosen yet, which the caller may hold and this
+  // control draws: no cell reports itself chosen, no slider is drawn,
+  // and the tab stop falls to the first cell that can be chosen. A
+  // seventh cell or an empty string standing for absence would give
+  // "nobody said" a second spelling, so absence is spelled once.
+  readonly held: V | null;
   readonly onPick: (value: V) => void;
   // The tone of every cell that states no group of its own; a group
   // overrides it for the cells under it.
@@ -128,10 +137,11 @@ export function nextStop<V extends string>(
 // stop rather than one per cell.
 //
 // It is the chosen cell. A control whose held value is not among its
-// cells offers the first choosable one instead, and a control where
-// every cell is refused offers its first cell, so that the reason on
-// it can still be reached. An empty control offers nothing.
-export function tabStop<V extends string>(options: readonly Choice<V>[], held: V): number {
+// cells - including one where nobody has chosen - offers the first
+// choosable one instead, and a control where every cell is refused
+// offers its first cell, so that the reason on it can still be
+// reached. An empty control offers nothing.
+export function tabStop<V extends string>(options: readonly Choice<V>[], held: V | null): number {
   const chosen = options.findIndex((choice) => choice.value === held);
   if (chosen >= 0) return chosen;
   const free = options.findIndex((choice) => choice.why === undefined);
@@ -225,26 +235,39 @@ export function Segmented<V extends string>(props: SegmentedProps<V>) {
                     />
                   </Show>
                   <For each={band.cells}>
-                    {(choice, inBand) => (
-                      <button
-                        ref={(cell) => {
-                          hold(band.from + inBand(), cell);
-                        }}
-                        type="button"
-                        role="radio"
-                        aria-checked={choice.value === props.held}
-                        aria-disabled={choice.why !== undefined}
-                        title={choice.why}
-                        tabindex={band.from + inBand() === stop() ? 0 : -1}
-                        class={`relative rounded-pill px-base py-tight text-label whitespace-nowrap ${ink(choice)}`}
-                        onClick={() => {
-                          if (choice.why !== undefined) return;
-                          props.onPick(choice.value);
-                        }}
-                      >
-                        {choice.label}
-                      </button>
-                    )}
+                    {(choice, inBand) => {
+                      const at = () => band.from + inBand();
+                      // One definition of the cell, drawn bare or
+                      // inside its reason. `Tip` wraps the cell in a
+                      // box of its own, so the cell takes the whole
+                      // grid column and the slider still travels one
+                      // column at a time.
+                      const cell = (hint?: string): JSX.Element => (
+                        <button
+                          ref={(node) => {
+                            hold(at(), node);
+                          }}
+                          type="button"
+                          role="radio"
+                          aria-checked={choice.value === props.held}
+                          aria-disabled={choice.why !== undefined}
+                          aria-describedby={hint}
+                          tabindex={at() === stop() ? 0 : -1}
+                          class={`relative w-full rounded-pill px-base py-tight text-label whitespace-nowrap ${ink(choice)}`}
+                          onClick={() => {
+                            if (choice.why !== undefined) return;
+                            props.onPick(choice.value);
+                          }}
+                        >
+                          {choice.label}
+                        </button>
+                      );
+                      return (
+                        <Show when={choice.why} fallback={cell()}>
+                          {(why) => <Tip text={why()}>{(hint) => cell(hint)}</Tip>}
+                        </Show>
+                      );
+                    }}
                   </For>
                 </div>
               </div>

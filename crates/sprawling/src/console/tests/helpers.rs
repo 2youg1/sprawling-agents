@@ -53,7 +53,8 @@ pub(super) fn answering() -> Answering {
             kernel::AxCode::ConfigInvalid,
             "answer a question",
             format!("{} is not scripted here", other.name()),
-        )),
+        )
+        .with_recovery("this test answers Metrics and nothing else")),
     })
 }
 

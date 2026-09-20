@@ -15,6 +15,7 @@
 
 import { Show, createMemo, createSignal, untrack } from "solid-js";
 
+import { QUERIES } from "../../core/asking";
 import type { RunBelief, Sending } from "../../core/belief";
 import type { Key } from "../../core/lang";
 import { EFFORTS } from "../../core/prefs";
@@ -24,6 +25,7 @@ import type { Reached, Slash, SlashHands } from "../../core/slash";
 import { selectModel } from "../../core/commands";
 import { canRecord, record, type Heard, type Recording } from "../../core/speaking";
 import { Address } from "../../core/address";
+import { motionOff } from "../shared/motion";
 import { useCommand, useGo, useSay, useUi } from "../../ui";
 import { Popover } from "../parts/popover";
 import type { PopoverColumn, PopoverItem } from "../parts/popover";
@@ -43,6 +45,17 @@ const SPELLING: Record<Sending, Key> = {
 // empty room to the foot of a full one (client-SPEC 4-11, §13.5).
 const DROP_MS = 400;
 const EASING = "cubic-bezier(0.2, 0, 0, 1)";
+
+// Whether this engine grows a textarea to fit what is typed in it.
+//
+// `field-sizing: content` does in one declaration what the script
+// below does in three, and it does it before the frame is painted
+// rather than after. Safari and Firefox have not shipped it
+// (client-SPEC 9.0, row 2), so the script stays for them and this is
+// the one place that decides which of the two runs. The height cap is
+// `max-h-output` on both paths, so neither holds a number the other
+// would have to agree with.
+const SIZES_ITSELF = CSS.supports("field-sizing", "content");
 
 // Which list is over the box, if any. One signal rather than two, so
 // the two can never both be open.
@@ -90,10 +103,11 @@ export function Composer(props: ComposerProps) {
   };
 
   const grow = () => {
+    if (SIZES_ITSELF) return;
     const area = box();
     if (area === undefined) return;
     area.style.height = "auto";
-    area.style.height = `${String(Math.min(area.scrollHeight, 240))}px`;
+    area.style.height = `${String(area.scrollHeight)}px`;
   };
   // Whatever put words in the box - a transcription, a completion, a
   // command that empties it - goes through here, so the draft store and
@@ -112,7 +126,7 @@ export function Composer(props: ComposerProps) {
   const drop = () => {
     const held = form();
     if (held === undefined) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (motionOff(document.documentElement)) return;
     const was = held.getBoundingClientRect().top;
     requestAnimationFrame(() => {
       const now = held.getBoundingClientRect().top;
@@ -139,7 +153,7 @@ export function Composer(props: ComposerProps) {
 
   // -------------------------------------------------- what the city offers
 
-  const endpoints = ui.conn.asking.ask("endpoint_view");
+  const endpoints = ui.conn.asking.ask(QUERIES.endpoints);
   const answer = createMemo(() => {
     const held = endpoints();
     return held !== undefined && "endpoints" in held ? held.endpoints : undefined;
@@ -160,7 +174,7 @@ export function Composer(props: ComposerProps) {
   });
   // Every room a person could move this conversation to: the buildings
   // the city knows, and the rooms runs have already opened.
-  const city = ui.conn.asking.ask("city_view");
+  const city = ui.conn.asking.ask(QUERIES.city);
   const rooms = createMemo(() => {
     const held = city();
     const named = new Set<string>([MAYOR]);
@@ -183,6 +197,14 @@ export function Composer(props: ComposerProps) {
       .sort((a, b) => (b.started ?? 0) - (a.started ?? 0))
       .at(0);
   });
+
+  // What the chip says the effort is. Nobody having chosen is a state
+  // of its own rather than a level: `core/prefs.ts` answers `null`,
+  // the field is left out of the request, and the provider decides.
+  const effortWord = () => {
+    const held = ui.prefs.effort();
+    return held === null ? say("effort_unstated") : say(`effort_${held}`);
+  };
 
   const hands = (): SlashHands => ({
     command,
@@ -376,7 +398,7 @@ export function Composer(props: ComposerProps) {
           // A draft restored on mount is taller than one row.
           requestAnimationFrame(grow);
         }}
-        class="block w-full resize-none bg-transparent text-body leading-relaxed text-text placeholder:text-text-disabled"
+        class="block max-h-output w-full resize-none overflow-y-auto bg-transparent text-body leading-relaxed text-text field-sizing-content placeholder:text-text-disabled"
         rows={1}
         placeholder={props.placeholder}
         // A placeholder is not a name: it is gone as soon as somebody
@@ -429,7 +451,7 @@ export function Composer(props: ComposerProps) {
                 </Show>
                 <span class="shrink-0 text-text-disabled">
                   {" · "}
-                  {say("talk_effort")} {say(`effort_${ui.prefs.effort()}`)}
+                  {say("talk_effort")} {effortWord()}
                 </span>
               </button>
             )}

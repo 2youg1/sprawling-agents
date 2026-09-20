@@ -16,6 +16,7 @@
 | U4 定向对抗 | 任意前缀 ＋ 一次 `Stop` ＋ 任意后缀 ＋ 一次必须被拒的派活 | 该性质在随机轨迹上成立，且停摆后那一次派活被拒且拒得其所 |
 | U5 回归 | 反例最小化后渲染成 Rust `#[test]` | 渲染结果与仓内那个 Rust 文件逐字节相同，而该文件由 `cargo test` 编译运行 |
 | U6 历史 | 任意轨迹之后，账本离线自证；改一个字节则不能自证 | `replay` 在干净轨迹上恒绿、在翻过一位的轨迹上恒红 |
+| U7 供应世界 | `Provider`：挂过 endpoint 的第二种世界——一个 URL 的全部拼法、一个注册模型的上限 | 等价类的每种拼法落到同一个 `base_url`；注册过的模型带得出上限；messages 派活拿不到「没有输出上限」 |
 
 **不负责**：任何规则的再实现（链哈希、`IdemKey` 派生、写域判定、份额守恒）；任何 Rust 侧的构建闸门；任何随产品交付的东西。三者中任何一条被违反，本目录应当被删除而不是被修补。
 
@@ -23,7 +24,9 @@
 
 ## 2 验收标准
 
-1. `just adversary` 全绿：13 条检查，`0 failed`。
+1. `just adversary` 全绿：18 条检查，`0 failed`。
+
+   **今天不是 18/18。** U7 新增的五条里有三条红（等价类一条、上限两条），红在产品而不在检查，缺陷与实测证据写在 §4 第四、第五个发现里；两处修复都在 `crates/` 下，它们必须随修复一起转绿，本节的验收标准不为它们放宽。
 2. 没有 Lean 的机器上 `just check` 的行为与本目录不存在时**逐字节相同**；`just adversary` 打印 `skipped: Lean is not installed` 并返回 0。
 3. 模型不预测任何哈希、`seq`、时间戳或 `IdemKey`。凡断言只谈**两条轨迹之间的关系**，或**门对调用方的承诺**（稳定错误码）。
 4. U5 渲染出的 Rust 源码与 `crates/sprawling/tests/from_adversary.rs` 逐字节相同。
@@ -38,7 +41,7 @@
 | 门的形状 | `sprawling call <frame> --at <addr> --quiet-ms <n>`：stdout 每行一枚 JSON 帧，stderr 一行计数，退出码 0／1／2／3 | 线格式换传输时门变成它的 schema，改 `Door.lean` 一处 |
 | 城是什么 | 一个本地目录，`init` 造它，`serve` 端起来，账本在 `.sprawling/ledger/` 下按段分文件 | 布局改变时 `Ground.lean` 的敌意动作报错，属预期 |
 | 静默 | 门的第三种回答。**不是接受**——见 §10「静默不是接受」 | 若将来 `call` 改为「命令被受理才返回」，`quiet` 这一支变成异常而不是取值 |
-| provider | 一个都不挂。于是每一次派活在配置这道门上被拒，而模型知道这一点 | 挂上任何真 endpoint 后本目录会把 `E_CONFIG_INVALID` 报成失配，届时模型要学会第二种世界 |
+| provider | `Model` 的世界一个都不挂，于是每一次派活在配置这道门上被拒，而模型知道这一点；`Provider` 的世界挂一个**这台电脑上没人听的地址**，于是每一次调用停在 socket 上 | 挂上一个真会应答的 endpoint 后，两种世界都要学第三种：调用会成功，而本目录不许自带一个假 provider（§13） |
 | 时钟 | 只用于超时，从不被预测 | —— |
 | 端口 | 从 47100 起向上探，第一个能答 `city_view` 的即用 | 机器上有别的东西占着整段时报错并说明 |
 
@@ -81,6 +84,30 @@ Rust 侧的验收测试全部是**具体轨迹**：`crates/sprawling/tests/assem
 
 `look` 因此不进随机生成器（`Model.lean` 记了理由）：一条随机轨迹里只要出现一次被拒的派活，其后每一个 `look` 都会为同一个原因失败，那会把一个缺陷报成许多个，并把下一个缺陷藏在它后面。
 
+### 第四个发现：一条 URL 归一化规则，写了但没有调用者
+
+一个 endpoint 的五种拼法经 `ProbeEndpoint` 进去，`endpoint_probed` 里出来的是五个不同的 `base_url`。实测（这台电脑，debug 二进制）：
+
+```
+owed: http://127.0.0.1:47199/v1
+saw:  http://127.0.0.1:47199/v1/
+```
+
+**诊断**：`gateway::normalise_entered` 存在、有自己的 proptest、也有主机预设表，而全仓找不到一个生产调用者：`assembly::commanding::routing` 把帧里的 `base_url` 原样装进 `Entered`。于是算法是对的，城却从来没问过它。这正是“门外才看得见”的那一类缺陷：仓内测试测的是函数，而一个 agent 看的是城写下的那个 URL。
+
+**迁移**：`Entered` 的唯一构造处调 `gateway::normalise_entered`，探测与挂载共用那一次归一化的结果。属 `crates/sprawling`，不在本目录。转绿后，反例按 §9 第 4 步渲染回 `crates/sprawling/tests/from_adversary.rs`。
+
+### 第五个发现：事实梯的最后一级没有接在注册上
+
+挂一个 messages 兼容格式的 endpoint，人指名一个目录不认得的模型 id，上限框留空，然后派活。实测两条：
+
+* `model_selected` 的 `max_output_tokens` 是 `null`——注册时没有人问过事实梯。
+* 派活当场被拒：`E_CONFIG_INVALID on opus-nine states no output ceiling`。
+
+**诊断**：`gateway::provider::ceiling::OutputCeiling::resolve` 把四档梯子写齐了（人填 > 上游陈述 > 预设表 > 策略缺省），并且有自己的测试；而 `select_model` 走的是另一条链（人填 → 已注册 → 内置目录），没有第四档，也不写 `ceiling_from`。一个事实两个家，其中一个没有调用者。
+
+**迁移**：`select_model` 经 `OutputCeiling::resolve` 取上限，并把 `ceiling_from` 写进 `model_selected`；删掉本地那条链。同样属 `crates/gateway` 与 `crates/sprawling`，不在本目录。
+
 ## 5 权威信源
 
 **本节只指位置，不抄数值。** 一个被抄进本文的常量就是同一条规则的第二个权威，而它必然先于产品陈旧：这一点是量出来的——本文曾抄下一个 `WIRE_V`，产品早已走过它许多版，而本文读起来仍然像是对的。
@@ -116,11 +143,12 @@ src/Sprawling/Door.lean      唯一知道二进制存在的地方
 src/Sprawling/Ground.lean    一次性场地，以及磁盘的敌意
 src/Sprawling/Check.lean     抽样、收缩、检查树。不知道城是什么
 src/Sprawling/Model.lean     状态模型、后置条件、定向对抗场景
+src/Sprawling/Provider.lean  挂过 endpoint 的第二种世界：URL 等价类与上限
 src/Sprawling/Regression.lean 反例 → Rust #[test]
 test/Main.lean               入口与检查树
 ```
 
-依赖单向：`Model` → `Door` → `Frame`，`Model` → `Ground` → `Door`，`Model` → `Check`，`Regression` 只依赖 `Model`。`Frame` 不 import 任何本工程模块；`Check` 也不，且它**不 import `Door`**——抽样与收缩不允许知道有一座城存在。
+依赖单向：`Model` → `Door` → `Frame`，`Model` → `Ground` → `Door`，`Model` → `Check`，`Provider` → `Ground`，`Regression` 只依赖 `Model`。`Provider` 不 import `Model`：那是另一种世界，两边共用的只有门与场地。`Frame` 不 import 任何本工程模块；`Check` 也不，且它**不 import `Door`**——抽样与收缩不允许知道有一座城存在。
 
 `Ground` 依赖 `Door` 而不是自己起进程：**「二进制在哪」只允许有一个答案**，而场地要用它做三件事（`init`、`serve`、探活）。
 
@@ -175,6 +203,21 @@ def haltIsHonoured : Nat → Gen Trace
 def render : String → Trace → String
 ```
 
+```lean
+-- Provider.lean —— 挂过 endpoint 的第二种世界
+def deadAuthority : String                       -- 这台电脑上没人听的那个地址
+def spellings : String → List String             -- 一个 endpoint 的等价类，穷举而非抽样
+def unreadable : List String                     -- 本构建读不懂的三种帧
+def Ground.text        : Ground → IO String
+def Ground.stillText   : Ground → Nat → IO String  -- 等城停笔，不等任何一条记录
+def Ground.records     : Ground → IO (List Record)
+def Ground.awaiting    : Ground → String → Nat → Nat → IO (List Record)
+def Door.send          : Door → Ground → Verb → IO Unit
+def probedUrls   : Door → Ground → List String → Nat → IO (List String)
+def givenAProvider : Door → Ground → Option Nat → IO Record
+def statedCeiling  : Record → Option Nat
+```
+
 `ask` 返回 `Answer` 而不是抛异常：被拒绝是产品的正常输出，而**解析失败**才是异常——门的形状变了，检查应当当场停下，而不是把新形状当成一次拒绝。
 
 **黑盒边界由类型划定。** `World` 到 `refusal` 全段没有一个签名提到 `IO`，`Gen` 是种子的纯函数；于是决定「欠哪一种失败」的那一半，和抽取轨迹的那一半，都够不到它们正在审判的那座城。一个能先看后判的模型会按构造与产品一致，那是本目录唯一可能在什么都没检查的情况下报绿的路。
@@ -192,6 +235,8 @@ def render : String → Trace → String
 ## 10 实现逻辑
 
 **门**：`IO.Process.output` 在等待之前把两个管道读空——这是手写版本必须记住的死锁：一个没被读的管道会让子进程活着，于是先等待就会在输出超过一个缓冲区时把两边挂住。退出码 0／1／3 都要读 stdout；退出码 2 是用法错，抛出。
+
+**慢路径的动词从历史里读回答案。** `ProbeEndpoint` 与 `AttachEndpoint` 各开一条到 provider 的 socket，而门要等满静默窗口才返回：在连接上等它们的记录，等于在一次往返之外再付一个窗口（实测：窗口 20 s 时一次探测花 32 s）。所以这两个动词发出去后，**拒绝仍然从 socket 上读**，而它们产生的记录从账本里读（`Ground.awaiting`）。等的是「数量到了」而不是「内容对了」，因此不预测任何一条记录；这是对下一段那条规则的唯一例外，而它把「静默」读成它本来的意思——城还没完工，而不是城接受了。
 
 **静默不是接受。** `ask` 在拿到 `welcome` 之后若一个帧都没再来，返回 `quiet`。模型对每个动作声明它期待哪一种回答，**`quiet` 从不满足任何期待**。`log` 与 `welcome` 同样不算回答：城在那条通道上**也**叙述它的拒绝，把叙述算成回答就会把一条城根本没受理的命令报成受理了。
 
@@ -279,6 +324,9 @@ def render : String → Trace → String
 | 三个地址 `acme` / `beta` / `gamma` | 固定的演员表，让反例可读 | 加人时同步改 `Regression.lean` 的模板 |
 | 模板 `minimal` | 两个模板里不带保密约束的那个 | 要测 `confidential` 时它进模型 |
 | 环境变量 `SPRAWLING_BIN` | 二进制位置的唯一入口 | 由 justfile 提供 |
+| 地址 `127.0.0.1:47199` | 第二种世界指向的地方：这台电脑上没人听、在端口池（47100–47115）之外，于是一次探测永远碰不到本套件自己的城 | 外面的进程占住它时，探测的读数变成另一个程序的 |
+| 演员表 `relay` / `opus-nine` | 一个中转站，一个内置目录与预设表都不认得的模型 id——事实梯最后一级正是为这一格而存在 | 预设表有了这个 id 的行时，换一个它不认得的 |
+| 记录预算 240 × 250 ms | 一条命令等自己那条记录的上限。只在城真的还在干活时花掉；一次探测在 debug 二进制上的主要开销是构造 HTTP 客户端，不是那次被拒的连接 | 探测变快后可以调小；调小前要先量 |
 
 ## 15 影响面
 
@@ -288,9 +336,11 @@ def render : String → Trace → String
 
 ## 16 测试与约束
 
-按「坏得越早越省时间」排序，共 13 条：渲染对拍（U5，毫秒级）、门的契约三条（U1，含 §4 那条退出码性质）、随机轨迹（U3）、定向停摆（U4）、账本自洽（U6）、磁盘的三句谎话（U2），最后是按缺陷命名的那一组与那一条。一整套 2 min 35 s（实测，四核 Windows，热缓存）；同一棵树在两核 Linux 上 51 s，差别在起进程的价钱而不在核数。约束是 §2 第 5 条——**咬得动**必须被演示过，而不是被相信。
+按「坏得越早越省时间」排序，共 18 条：渲染对拍（U5，毫秒级）、门的契约三条（U1，含 §4 那条退出码性质）、人填进去的三条（U7：等价类、幂等、读不懂的帧）、挂过 provider 的两条（U7：注册带上限、派活不为上限被拒）、随机轨迹（U3）、定向停摆（U4）、账本自洽（U6）、磁盘的三句谎话（U2），最后是按缺陷命名的那一组与那一条。U7 那五条各自实测为 4–18 s（debug 二进制，四核 Windows），其中的时间几乎全在城构造 HTTP 客户端上；其余十三条一整套 2 min 35 s（实测，四核 Windows，热缓存）；同一棵树在两核 Linux 上 51 s，差别在起进程的价钱而不在核数。约束是 §2 第 5 条——**咬得动**必须被演示过，而不是被相信。
 
 **树里没有一条是被期待失败的。** 一条因为预期会红而被留下的检查，教会每一个看到它的人把红当成常态，于是下一个真的发现落进一次没人读的运行里。
+
+这条规矩与 §2 里那三条现在就是红的检查不矛盾，差别在期限：被期待失败的检查，是没有修复日期的那一条。第四、第五个发现各自点名了要改的那一处，两处都在 `crates/` 下；在它们转绿之前这棵树是红的，而那正是一个对手应该做的事。
 
 **整棵树串行跑。** 一座被端起来的城占着一个端口、一个目录与一条历史，两组同时跑就三样都争。实测过的后果不是变慢而是**换城**：输的那一边城绑不上端口退了出去，它自己的探活却在同一个口上接到了赢的那一边的城，于是一整条轨迹跑在别人的历史上。它把当时还开着的那个缺陷测成了绿的——一个答案取决于哪个线程赢了的对手，比没有对手更坏。
 

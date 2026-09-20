@@ -12,18 +12,21 @@
 // wants the other form; picking `sse` stays here and says what the wire
 // cannot spell.
 
-import { For, Show, createSignal } from "solid-js";
+import { Show, createMemo, createSignal } from "solid-js";
 
 import { EMPTY, SPELLED, WHY, encode } from "./draft";
 import type { Draft, Intake, Transport } from "./draft";
 import { Button } from "../parts/button";
 import { Field } from "../parts/field";
 import { PairTable } from "./pairs";
+import { Segmented, type Choice } from "../parts/segmented";
 import { useSay } from "../../ui";
 
 const OVER_A_URL: Draft = { ...EMPTY, transport: "http" };
 
-const CHIPS: readonly Transport[] = ["http", "sse", "stdio"];
+// The three transports in the order a person meets them, `stdio` last
+// because picking it leaves this door rather than filling it in.
+const TRANSPORTS: readonly Transport[] = ["http", "sse", "stdio"];
 
 export function ByUrl(props: { readonly intake: Intake; readonly onCommandDoor: () => void }) {
   const say = useSay();
@@ -49,27 +52,20 @@ export function ByUrl(props: { readonly intake: Intake; readonly onCommandDoor: 
     }
     setDraft({ ...draft(), transport });
   };
+  const transports = createMemo<readonly Choice<Transport>[]>(() =>
+    TRANSPORTS.map((transport) => ({ value: transport, label: say(SPELLED[transport]) })),
+  );
 
   return (
     <div class="flex flex-col gap-base">
       <div class="flex flex-wrap items-center gap-snug">
         <span class="text-note text-text-quiet">{say("mcp_transport")}</span>
-        <For each={CHIPS}>
-          {(transport) => (
-            <button
-              type="button"
-              aria-pressed={draft().transport === transport}
-              class={`rounded-pill px-base py-tight text-label ${
-                draft().transport === transport ? "bg-g3 text-text" : "text-text-faint hover:text-text-quiet"
-              }`}
-              onClick={() => {
-                pick(transport);
-              }}
-            >
-              {say(SPELLED[transport])}
-            </button>
-          )}
-        </For>
+        <Segmented
+          label={say("mcp_transport")}
+          options={transports()}
+          held={draft().transport}
+          onPick={pick}
+        />
       </div>
       <div class="grid gap-base md:grid-cols-[1fr_2fr]">
         <Field

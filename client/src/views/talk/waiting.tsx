@@ -11,6 +11,7 @@
 
 import { For, Show, createMemo } from "solid-js";
 
+import { QUERIES } from "../../core/asking";
 import { approve } from "../../core/commands";
 import { ago } from "../../core/time";
 import type { ApprovalItem } from "../../wire";
@@ -38,7 +39,7 @@ function grouped(items: readonly ApprovalItem[]): Group[] {
 
 export function Waiting() {
   const ui = useUi();
-  const answer = ui.conn.asking.ask("approval_queue");
+  const answer = ui.conn.asking.ask(QUERIES.approvals);
   const items = createMemo<readonly ApprovalItem[]>(() => {
     const held = answer();
     return held !== undefined && "approvals" in held ? held.approvals.items : [];

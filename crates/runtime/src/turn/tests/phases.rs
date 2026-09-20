@@ -217,7 +217,8 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
                 AxCode::ToolUnavailable,
                 "invoke tool",
                 call.name.to_string(),
-            ))
+            )
+            .with_recovery("this bench registers no tools"))
         })
         .unwrap(),
     );

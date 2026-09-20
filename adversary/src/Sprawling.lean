@@ -8,8 +8,10 @@ import Sprawling.Door
 import Sprawling.Ground
 import Sprawling.Check
 import Sprawling.Model
+import Sprawling.Provider
 import Sprawling.Regression
 
 /-! The library index. It holds no logic; every rule lives in the module that
 owns it, and the dependency order is the one `adversary-SPEC.md` section 7
-draws: `Model` → `Door` → `Frame`, `Model` → `Ground` → `Door`. -/
+draws: `Model` → `Door` → `Frame`, `Model` → `Ground` → `Door`, and `Provider`
+→ `Ground` for the second world. -/

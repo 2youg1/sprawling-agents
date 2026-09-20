@@ -187,10 +187,18 @@ impl Turn<Calling> {
             "message".to_owned(),
             serde_json::to_value(&message).map_err(|err| {
                 AxError::failure(AxCode::InvalidArgs, "encode model message", err.to_string())
+                    .with_recovery(
+                        "report this against runtime::turn: an assistant message is \
+                         text and content blocks, and JSON refuses neither",
+                    )
             })?,
         );
         let calls_len = u64::try_from(calls.len()).map_err(|_| {
             AxError::failure(AxCode::InvalidArgs, "encode model return", "wave too large")
+                .with_recovery(
+                    "lower this model's max output tokens so it asks for fewer tool \
+                     calls in one reply",
+                )
         })?;
         returned.insert("calls".to_owned(), Value::Number(calls_len.into()));
         if let Some(usage) = &usage {
@@ -198,6 +206,10 @@ impl Turn<Calling> {
                 "usage".to_owned(),
                 serde_json::to_value(usage).map_err(|err| {
                     AxError::failure(AxCode::InvalidArgs, "encode usage", err.to_string())
+                        .with_recovery(
+                            "report this against runtime::turn: usage is four whole \
+                             numbers and JSON refuses none of them",
+                        )
                 })?,
             );
         }
@@ -206,6 +218,10 @@ impl Turn<Calling> {
                 "stop".to_owned(),
                 serde_json::to_value(stop).map_err(|err| {
                     AxError::failure(AxCode::InvalidArgs, "encode stop reason", err.to_string())
+                        .with_recovery(
+                            "report this against runtime::turn: a stop reason is a \
+                             plain enum and JSON refuses none of its spellings",
+                        )
                 })?,
             );
         }

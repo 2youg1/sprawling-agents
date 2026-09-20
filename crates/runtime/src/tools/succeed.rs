@@ -121,7 +121,11 @@ impl Tool for SucceedTool {
                 AxCode::InvalidArgs,
                 "ask for a successor",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let reason = call
             .args
@@ -141,6 +145,10 @@ impl Tool for SucceedTool {
                 AxCode::StorageFatal,
                 "ask for a successor",
                 "the desk was left locked by a thread that died",
+            )
+            .with_recovery(
+                "end this run and resume it: the succession desk cannot be reached \
+                 again inside a process where a thread died holding it",
             )
         })?;
         desk.ask(Succession {

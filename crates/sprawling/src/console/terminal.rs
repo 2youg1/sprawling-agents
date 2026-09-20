@@ -3,22 +3,25 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-// Copyright (c) 2026 2youg1 and the sprawling contributors
-
-//! What a line typed into a serving city means (sprawling-SPEC.md
-//! section 8-11).
+//! The console itself: the listener's own facts, and the loop that
+//! carries judged lines into the city (sprawling-SPEC.md section 8-11).
 //!
-//! `sprawling up` used to print four lines and block until Ctrl-C. That
-//! terminal is a surface the product threw away, and on a machine with
-//! no browser it is the only surface there is.
+//! [`Terminal`] is the one home of what the startup banner printed —
+//! URL, bound address, city directory, client source, pairing token.
+//! Those are facts about this process rather than about a history, so no
+//! query can answer them and `/serving` reprints them from here, beside
+//! counts that come from the `Metrics` query a browser also asks.
 //!
-//! Everything here is a pure judgement over one line of text. What the
-//! judgement produces is either a control action the terminal carries
-//! out or a `ClientFrame` that goes to the same desk a browser's frames
-//! go to, so the console decides nothing the server does not.
+//! The loop runs on threads of its own ([`start`]) because reading a
+//! keyboard blocks while the reactor serves a city, and [`drive`] takes
+//! any reader and writer so a test drives exactly the loop a person
+//! does. A command goes onto the `CommandDesk` a browser's frames land
+//! on and a question goes into the `Answering` function the socket
+//! calls, so this console decides nothing the server does not.
+//!
+//! The point a reader most often gets wrong: end of input ends the
+//! console and not the city — a city that stopped answering because
+//! nobody was typing would have made interaction a condition of service.
 
 use super::language::{Line, help, parse};
 

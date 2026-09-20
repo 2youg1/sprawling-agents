@@ -297,7 +297,11 @@ impl Tool for ReadTool {
                 AxCode::InvalidArgs,
                 "read",
                 format!("call routed to the wrong tool: {}", call.name.as_str()),
-            ));
+            )
+            .with_recovery(format!(
+                "call `{}`, the name this tool answers to",
+                self.meta.name.as_str()
+            )));
         }
         let asked = call
             .args
@@ -344,6 +348,10 @@ impl Tool for ReadTool {
                 "read",
                 format!("{asked}: length overflow"),
             )
+            .with_recovery(format!(
+                "read {asked} a range of lines at a time: the whole file is longer \
+                 than a byte count this city can hold"
+            ))
         })?;
         out.insert("bytes".to_owned(), Value::Number(bytes.into()));
         out.insert("text".to_owned(), Value::String(taken.text));
