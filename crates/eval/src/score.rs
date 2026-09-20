@@ -17,7 +17,7 @@
 //! anything by itself** — deciding is `metabolism`'s, and adopting is a
 //! mode's.
 
-use kernel::{ByteLen, UsdMicros};
+use kernel::ByteLen;
 
 /// What is known about one asset over a period.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -27,8 +27,6 @@ pub struct AssetUse {
     /// What it costs to keep in front of a model: the bytes it occupies
     /// in a prefix every time it is disclosed.
     pub resident: ByteLen,
-    /// What was billed to the work that used it, over the same period.
-    pub billed: UsdMicros,
     /// Days since something used it.
     pub idle_days: u32,
 }
@@ -103,13 +101,11 @@ mod tests {
         let used = score(&AssetUse {
             uses: 40,
             resident: ByteLen::new(2_000),
-            billed: UsdMicros::new(0),
             idle_days: 0,
         });
         let hoarded = score(&AssetUse {
             uses: 1,
             resident: ByteLen::new(2_000),
-            billed: UsdMicros::new(0),
             idle_days: 90,
         });
         assert!(used.per_mille > hoarded.per_mille);

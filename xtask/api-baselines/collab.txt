@@ -11,27 +11,22 @@ impl collab::ClaimEffect
 impl collab::ClaimTool
 impl collab::DelegateDesk
 impl collab::DelegateTool
-impl collab::Draft
-impl collab::Drafts
 impl collab::Escalation
 impl collab::FanIn
 impl collab::GoalDesk
 impl collab::GoalTool
 impl collab::Handback
-impl collab::HoldToken
 impl collab::Inbox
 impl collab::Joined
 impl collab::NodeContract
 impl collab::NodeId
 impl collab::OpenRequest
-impl collab::Pr<collab::Merged>
 impl collab::Pr<collab::Open>
 impl collab::Pr<collab::Verified>
 impl collab::PrDesk
 impl collab::PrTool
 impl collab::PrivateQuestion
 impl collab::Reflex
-impl collab::Return
 impl collab::Signal
 impl collab::SignalDesk
 impl collab::SignalId
@@ -117,19 +112,6 @@ pub collab::Reflex::Discard
 pub collab::Reflex::Full
 pub collab::Reflex::Light
 pub collab::Reflex::Notify
-pub collab::Resolution::Delivered
-pub collab::Resolution::Escalated
-pub collab::Resolution::Escalated::holds: u32
-pub collab::Resolution::Held
-pub collab::Resolution::Held::holds: u32
-pub collab::Resolution::Held::token: collab::HoldToken
-pub collab::Resolution::TokenVoid
-pub collab::Resolution::TokenVoid::token: collab::HoldToken
-pub collab::Resolution::Withdrawn
-pub collab::Return::ForceInformed
-pub collab::Return::Rewrite
-pub collab::Return::SendAsIs
-pub collab::Return::Withdraw
 pub collab::Rule::landing: kernel::address::Address
 pub collab::Rule::matches: alloc::string::String
 pub collab::Rule::reflex: collab::Reflex
@@ -141,12 +123,6 @@ pub collab::SignalKind::Broadcast
 pub collab::SignalKind::Mention
 pub collab::SignalKind::Steer
 pub collab::SignalKind::Thread
-pub collab::Submission::Delivered
-pub collab::Submission::Escalated
-pub collab::Submission::Escalated::holds: u32
-pub collab::Submission::Held
-pub collab::Submission::Held::holds: u32
-pub collab::Submission::Held::token: collab::HoldToken
 pub const collab::ARCHIVE_KINDS: [&str; 4]
 pub enum collab::ArchiveEffect
 pub enum collab::ClaimEffect
@@ -155,10 +131,7 @@ pub enum collab::Handback
 pub enum collab::Lane
 pub enum collab::PrEffect
 pub enum collab::Reflex
-pub enum collab::Resolution
-pub enum collab::Return
 pub enum collab::SignalEffect
-pub enum collab::Submission
 pub fn collab::AgentSteer::landing(&self) -> collab::Steer
 pub fn collab::AgentSteer::new(&str, &str) -> core::result::Result<collab::AgentSteer, kernel::error::shape::AxError>
 pub fn collab::AgentSteer::signal(&self, collab::SignalId, kernel::address::Address, kernel::version::Version, kernel::event::identity::TimeMs) -> core::result::Result<collab::Signal, kernel::error::shape::AxError>
@@ -196,17 +169,6 @@ pub fn collab::DelegateDesk::take(&mut self) -> alloc::vec::Vec<collab::Delegate
 pub fn collab::DelegateTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn collab::DelegateTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn collab::DelegateTool::new(alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::DelegateDesk>>) -> core::result::Result<collab::DelegateTool, kernel::error::shape::AxError>
-pub fn collab::Draft::author(&self) -> &str
-pub fn collab::Draft::body(&self) -> &kernel::event::payload::Payload
-pub fn collab::Draft::new(alloc::string::String, kernel::address::Address, kernel::version::Version, kernel::event::payload::Payload) -> collab::Draft
-pub fn collab::Draft::room(&self) -> &kernel::address::Address
-pub fn collab::Draft::seen(&self) -> kernel::version::Version
-pub fn collab::Drafts::held_payload(&self, &collab::Draft, kernel::version::Version) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
-pub fn collab::Drafts::holds(&self, &collab::Draft) -> u32
-pub fn collab::Drafts::new() -> collab::Drafts
-pub fn collab::Drafts::resolve(&mut self, &collab::Draft, collab::Return, kernel::version::Version, u32) -> collab::Resolution
-pub fn collab::Drafts::resolved_payload(&self, &collab::Draft, collab::Return) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
-pub fn collab::Drafts::submit(&mut self, &collab::Draft, kernel::version::Version, u32) -> collab::Submission
 pub fn collab::Escalation::as_str(self) -> &'static str
 pub fn collab::FanIn::accept(&mut self, collab::Artifact)
 pub fn collab::FanIn::artifacts(&self) -> impl core::iter::traits::iterator::Iterator<Item = &collab::Artifact>
@@ -224,8 +186,6 @@ pub fn collab::Handback::by(&self) -> &str
 pub fn collab::Handback::node(&self) -> &collab::NodeId
 pub fn collab::Handback::of(collab::Claim, bool, &str) -> collab::Handback
 pub fn collab::Handback::signal(&self, collab::SignalId, kernel::address::Address, kernel::event::identity::TimeMs) -> core::result::Result<collab::Signal, kernel::error::shape::AxError>
-pub fn collab::HoldToken::shown(&self) -> kernel::version::Version
-pub fn collab::HoldToken::turn(&self) -> u32
 pub fn collab::Inbox::deliver(&mut self, &collab::Signal) -> core::result::Result<kernel::backpressure::Admission, kernel::error::shape::AxError>
 pub fn collab::Inbox::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn collab::Inbox::new(u64, u32) -> collab::Inbox
@@ -250,13 +210,8 @@ pub fn collab::OpenRequest::payload(&self) -> core::result::Result<kernel::event
 pub fn collab::Pr<S>::branch(&self) -> &str
 pub fn collab::Pr<S>::implementer(&self) -> &str
 pub fn collab::Pr<S>::node(&self) -> &collab::NodeId
-pub fn collab::Pr<collab::Merged>::commit(&self) -> &str
-pub fn collab::Pr<collab::Merged>::merged_payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn collab::Pr<collab::Open>::open(collab::NodeId, alloc::string::String, alloc::string::String) -> core::result::Result<collab::Pr<collab::Open>, kernel::error::shape::AxError>
-pub fn collab::Pr<collab::Open>::opened_payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
-pub fn collab::Pr<collab::Open>::rejected_payload(&self, &str, &str) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn collab::Pr<collab::Open>::verified(self, &collab::Artifact) -> core::result::Result<collab::Pr<collab::Verified>, kernel::error::shape::AxError>
-pub fn collab::Pr<collab::Verified>::merged(self, alloc::string::String) -> collab::Pr<collab::Merged>
 pub fn collab::Pr<collab::Verified>::verified_by(&self) -> &str
 pub fn collab::PrDesk::new(alloc::string::String, kernel::address::Address, core::option::Option<alloc::string::String>, core::option::Option<collab::NodeId>, alloc::vec::Vec<collab::OpenRequest>) -> collab::PrDesk
 pub fn collab::PrDesk::take_effects(&mut self) -> alloc::vec::Vec<collab::PrEffect>
@@ -266,7 +221,6 @@ pub fn collab::PrTool::new(kernel::address::Address, alloc::sync::Arc<std::sync:
 pub fn collab::PrivateQuestion::node(&self) -> &collab::NodeId
 pub fn collab::PrivateQuestion::prompt(&self) -> &str
 pub fn collab::Reflex::as_str(self) -> &'static str
-pub fn collab::Return::as_str(self) -> &'static str
 pub fn collab::Signal::at(&self) -> kernel::event::identity::TimeMs
 pub fn collab::Signal::consumed_payload(&self, &str) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn collab::Signal::enqueued_payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
@@ -330,17 +284,13 @@ pub struct collab::ClaimTool
 pub struct collab::DelegateDesk
 pub struct collab::DelegateTool
 pub struct collab::Delegated
-pub struct collab::Draft
-pub struct collab::Drafts
 pub struct collab::FanIn
 pub struct collab::GoalDesk
 pub struct collab::GoalTool
 pub struct collab::Held
-pub struct collab::HoldToken
 pub struct collab::Inbox
 pub struct collab::Joined
 pub struct collab::Landing
-pub struct collab::Merged
 pub struct collab::NodeContract
 pub struct collab::NodeId(_)
 pub struct collab::Open

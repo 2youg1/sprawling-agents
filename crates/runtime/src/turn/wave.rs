@@ -5,10 +5,10 @@
 
 //! Boundary 3: the tool wave, executed in call order.
 
-use kernel::{AxCode, AxError, ContentBlock, EventKind, Ledger, ToolCall, ToolOutcome};
+use kernel::{AxCode, AxError, ContentBlock, Ledger, ToolCall, ToolOutcome};
 use serde_json::{Map, Value};
 
-use super::{Interrupt, PhaseOutcome, Recording, ToolWave, Turn, payload};
+use super::{Carried, Interrupt, PhaseOutcome, Recording, ToolWave, Turn};
 
 impl Turn<ToolWave> {
     /// Boundary 3 (before tool execution). Serial: parallel execution
@@ -16,6 +16,10 @@ impl Turn<ToolWave> {
     /// call order. A tool Err is not a turn Err — it lands in
     /// `tool_result` and goes back to the model (the model is the
     /// recovery subject).
+    ///
+    /// Both tool events reach the ledger through `append_redacted`: a
+    /// tool's arguments and its result are the two payloads most likely
+    /// to quote a credential the work just read.
     pub fn execute(
         mut self,
         interrupt: Interrupt,
@@ -37,8 +41,8 @@ impl Turn<ToolWave> {
                     AxError::failure(AxCode::InvalidArgs, "encode tool args", err.to_string())
                 })?,
             );
-            let echo = ledger.append(self.draft(EventKind::ToolCalled, payload(called)?))?;
-            self.refs.push(echo);
+            self.journal
+                .append_redacted(ledger, Carried::ToolCalled, called)?;
             let mut result = Map::new();
             result.insert("tool_use_id".to_owned(), Value::String(call.id.clone()));
             result.insert("name".to_owned(), Value::String(call.name.to_string()));
@@ -90,14 +94,11 @@ impl Turn<ToolWave> {
                 // reference and four integers whatever the picture is.
                 attachments: pictures,
             });
-            let echo = ledger.append(self.draft(EventKind::ToolResult, payload(result)?))?;
-            self.refs.push(echo);
+            self.journal
+                .append_redacted(ledger, Carried::ToolResult, result)?;
         }
         Ok(PhaseOutcome::Advanced(Turn {
-            run: self.run,
-            who: self.who,
-            t: self.t,
-            refs: self.refs,
+            journal: self.journal,
             state: Recording {
                 model_returned: self.state.model_returned,
                 calls_made: calls.len(),

@@ -128,7 +128,7 @@ pub fn fork_draft(from: RunId, at_seq: Seq, new_run: RunId, t: TimeMs, who: Stri
 - 公开面只改定义模块，**不新增任何根重导出**（`runtime::Opening` 原就在根上；`ToolBench` 原就只能走模块路径，今天仍然）。
 
 ```rust
-pub struct Turn<S> { /* run、who、t、state —— 全私有；相内数据在别的相不可表示 */ }
+pub struct Turn<S> { /* journal（run、who、t、refs、redacted）、state —— 全私有；相内数据在别的相不可表示 */ }
 pub struct Assembling(/* 私有 */);  pub struct Calling { /* prefix 哈希 */ }
 pub struct ToolWave { /* calls */ }   pub struct Recording { /* refs */ }
 
@@ -515,7 +515,8 @@ pub fn admits(mode: Mode, produced: &Produced) -> Admission;
 // `None` 不是 `Some(false)`：「没测」与「测了没过」是两件事。证据以 bool 入参而非 eval 的类型，
 // 因为 eval 在本 crate 之外，而这里问的不是证据怎么来的，是够不够。UD 是唯一要双验证的模式。
 
-// runtime::redact（形状 1 判定）——入口只有一个：`Turn::call` 写 model_returned 之前。
+// runtime::redact（形状 1 判定）——账本侧入口只有一个：`turn::ledger::Journal::append_redacted`，
+// 它管 model_returned、tool_called、tool_result 三类载荷（§8-41）。
 // 窗口块已在此前取出，故思考块签名不受影响；历史与上下文是两个汇，只有一个是永久的。
 // 替换物是 `secret:redacted/<b3-16>` 标记而非 Vault 条目：模型复述的钥匙不是城被托付保管的凭证，
 // 存它等于给它一条没人要求过的命，而哈希前十六位已足以看出两处是否同一个值。
@@ -770,10 +771,12 @@ pub struct RunHooks<'a> {
 | `turn/boundary.rs` | 执行器在相变处交出什么、相变答什么：`Interrupt`、`PhaseOutcome`、`TurnCancelled` |
 | `turn/report.rs` | 一轮跑完交给 run loop 的东西与它被给定的调用形状：`TurnReport`、`CallShape` |
 | `turn/wave.rs` | 边界 3：`impl Turn<ToolWave>` 的工具波，按调用序串行 |
-| `turn/tests.rs` | 纯索引（`mod helpers; mod phases; mod window;`） |
+| `turn/ledger.rs` | 本模块通往账本的唯一一道门：`Journal`、`Authored`、`Carried`（§8-41） |
+| `turn/tests.rs` | 纯索引（`mod helpers; mod phases; mod redaction; mod window;`） |
 | `turn/tests/helpers.rs` | 三处共用的夹具：`TestLedger`、`OneShotModel`、`prefix`／`run_id`／`shape`／`advance`／`probe_call` |
 | `turn/tests/phases.rs` | 四个边界跑在真账本链上（5 个 `#[test]`） |
 | `turn/tests/window.rs` | 开场白与 steer 在窗口里留下什么（3 个 `#[test]`） |
+| `turn/tests/redaction.rs` | 工具参数与工具结果里的密钥进不了账本，其余字段完好（2 个 `#[test]`） |
 
 **开放的字段（均为 `pub(super)`，仅供 `turn.rs` 构造）**：`TurnCancelled.refs`；`TurnReport.refs`、`TurnReport.model_returned`、`TurnReport.calls_made`、`TurnReport.assistant`、`TurnReport.wave_results`。构造点仍只有 `consume_boundary` 与 `Turn::<Recording>::record` 两处，getter 仍是唯一读法；`wave.rs` 不需要开任何字段，因为子模块本就能看见父模块的私有项。
 
@@ -1406,3 +1409,30 @@ fn scratch_dir(&self, id: BacklogId) -> PathBuf;             // temp/sprawling-<
 1. **`BacklogId` 与目录名回答的是两个问题。** id 在**一个** backlog 内部指认一个成员，下一个 backlog 的 id 又从 1 开始；而目录落在整台机器共用的临时目录里。旧名字是 `sprawling-<pid>-<id>`，等于假定那个计数器是进程全局的——它不是。同一进程开两个 backlog，两者的第一条命令必然撞同一个路径。
 2. **撞上之后是无声的。** `File::create` 截断另一方正在写的文件，`collect` 读完即 `remove_dir_all`，删掉另一方还在写的目录。人看到的是一条**退出码为 0、输出为空**的命令——既不报错也不重试，因为从每一方各自的角度看都一切正常。
 3. **生产今天只开一个 backlog，所以这是测试套件先撞上的。** `bin::assembly::lifetime` 全进程一个，而每个跑命令的测试各开一个、`cargo test` 又让它们同时跑。这不构成「只是测试问题」：把唯一性建立在「调用方只会开一个」之上，是把一条不变量交给调用方保管。`backlog::tests` 直接判目录名而不去赛跑两条命令——缺陷本身是确定的，只有损害是时序性的。
+
+### 8-41 回合带进账本的明文，必经打码那道门（S-02）
+
+**不变量：`tool_called`、`tool_result`、`model_returned` 三类事件的载荷，在写进账本之前逐串跑过 `kernel::scan`，命中的区段换成 `secret:redacted/<b3-16>` 标记。** 此前只有 `model_returned` 受这条约束，工具参数与工具结果**逐字**入账：一次 `read` 读出的别人项目的 `.env` 正文、一次 `exec` 的 stdout，就此进入只增且可导出的历史。账本不可重写，所以这类损害不可逆——这是它排在安全清单最前的理由。
+
+```rust
+// turn/ledger.rs —— 本模块通往账本的唯一一道门
+enum Authored { PromptAssembled, ModelCalled, CancelReceived, SteerReceived }  // 回合自己算出的值
+enum Carried  { ModelReturned, ToolCalled, ToolResult }                        // 供应方或工具交回的值
+struct Journal { /* run、who、t、refs、redacted —— 全私有 */ }
+impl Journal {
+    fn append_authored(&mut self, ledger: &mut dyn Ledger, event: Authored, data: Payload)
+        -> Result<EventRef, AxError>;
+    fn append_redacted(&mut self, ledger: &mut dyn Ledger, event: Carried, data: Map<String, Value>)
+        -> Result<EventRef, AxError>;
+    fn append(&mut self, …) -> Result<EventRef, AxError>;   // 本模块唯一的 `Ledger::append` 调用
+}
+```
+
+**四条口径：**
+
+1. **「必经」由类型保证，不由注释约定。** `Authored` 与 `Carried` 把本模块写的七类事件切成互不相交的两半，各自只在一个 append 函数里出现；`EventDraft` 的构造收进私有的 `Journal::append`。于是「不打码就写 `tool_called`」这件事在本模块里**没有可写出来的形式**——要绕过它，得先手写一个 `EventDraft`，那是一个审阅时看得见的动作。
+2. **打码器只有一个。** `Journal::append_redacted` 调 `runtime::redact::redact`，后者调 `kernel::scan`；本 crate 不存在第二个扫描器或第二套标记文法。
+3. **计数进 `TurnReport::redacted()`，内容不进。** 一个数目足以让诊断行说出「打掉了 N 段」，而说不出打掉的是什么；`Journal` 用饱和加法累计，跨相随 `journal` 一起搬。
+4. **窗口留住账本丢掉的。** `wave_results` 与 `assistant` 在打码之前就已从 `ToolOutcome` 与 `ModelReturn` 取出，模型因此仍看得见工具的真实输出，思考块的签名也不受影响——历史与上下文是两个汇，只有账本是永久的。
+
+**关门测试**（`turn/tests/redaction.rs`）：一次 `edit` 调用的参数与结果各带一串 `sk-ant-` 开头的密钥，跑完整回合后账本每一行都不含那串明文，而 `id`、工具名、`path` 参数与替换点周围的散文完好，`report.redacted() >= 2`，`replay::verify_lines` 仍自证。

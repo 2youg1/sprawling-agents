@@ -57,7 +57,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **Locator** | The retrieval grammar, `cas:` or `file:`. Fail-closed: a shape that does not match is refused rather than guessed. |
 | **CAS** | Content-addressed store (BLAKE3). Identical content is stored once for its lifetime. |
 | **projection** | A view rebuilt from the event stream. **Disposable**: deleting the table and rebuilding from the Ledger gives byte-identical results. |
-| **Snapshot** | The same idea inside the browser (`web::app`): equally disposable, equally forward-only. |
+| **Snapshot** | The same idea inside the browser (`client/src/core/belief.ts`): equally disposable, equally forward-only. |
 | **Provenance** | The five facts a commit the city makes carries as git trailers — `Sprawling-Run`, `Sprawling-Actor`, `Sprawling-Model`, `Sprawling-Effort`, `Sprawling-City` — and a sixth, `Sprawling-Predecessor`, when the run replaced another. A projection of the Ledger for readers outside the city; the Ledger stays the authority and the commit id reconciles the two. |
 | **patch** | The text of one file's change between two checkpoints, asked for one file at a time. It is a separate request from the list of what moved, because patch text is file content on a socket: every line a credential scan matches is withheld and named by its line number, never echoed. |
 | **fence** | The commit the city makes before and after a tool wave so a change can be shown and reverted. It lives under `refs/sprawling/runs/`, never on the person's `HEAD`. |

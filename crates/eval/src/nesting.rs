@@ -88,17 +88,6 @@ impl Fault {
         Fault::Truncated,
         Fault::NotApplied,
     ];
-
-    #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::LostField => "lost a field",
-            Self::ChangedBystander => "changed something it was not asked to",
-            Self::Unparseable => "does not parse",
-            Self::Truncated => "stops early",
-            Self::NotApplied => "the edit is not there",
-        }
-    }
 }
 
 /// One real edit, and what a model returned for it.

@@ -13,7 +13,7 @@
 
 use super::super::*;
 use crate::prefix::{FrozenSegment, SegmentSlot};
-use kernel::{GENESIS_PREV, chain_hash};
+use kernel::{EventDraft, GENESIS_PREV, chain_hash};
 
 /// Minimal in-memory ledger for turn tests (the citysim MemLedger is
 /// the real second adapter; this one keeps the crate's tests local).

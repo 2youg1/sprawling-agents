@@ -3,15 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Resident-to-Resident protocols: Inbox, HeldDraft, Workshop, fan-in,
-//! PR flow, arbitration, triage.
+//! Resident-to-Resident protocols: Inbox, Workshop, fan-in, PR flow,
+//! arbitration, triage.
 
 mod arbiter;
 mod archive_tool;
 mod claim_effect;
 mod claim_tool;
 mod delegate_tool;
-mod draft;
 mod fanin;
 mod goal_tool;
 mod handback;
@@ -29,12 +28,11 @@ pub use archive_tool::{ARCHIVE_KINDS, ArchiveDesk, ArchiveEffect, ArchiveTool, H
 pub use claim_effect::{ClaimEffect, evidence_of, still_true};
 pub use claim_tool::{ClaimDesk, ClaimTool};
 pub use delegate_tool::{DelegateDesk, DelegateTool, Delegated};
-pub use draft::{Draft, Drafts, HoldToken, Resolution, Return, Submission};
 pub use fanin::{Artifact, Claim, FanIn, Joined, PrivateQuestion};
 pub use goal_tool::{GoalDesk, GoalEffect, GoalTool};
 pub use handback::Handback;
 pub use inbox::{Inbox, Lane, Signal, SignalId, SignalKind};
-pub use pr::{Merged, Open, Pr, Verified};
+pub use pr::{Open, Pr, Verified};
 pub use pr_tool::{OpenRequest, PrDesk, PrEffect, PrTool};
 pub use signal_tool::{SignalDesk, SignalEffect, SignalTool};
 pub use steer::{AgentSteer, Steer};

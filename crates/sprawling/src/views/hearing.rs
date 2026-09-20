@@ -31,9 +31,15 @@ impl Views {
         &self,
         secrets: gateway::SecretResolver,
     ) -> Result<gateway::Transcriber, AxError> {
+        // A recording arrives at a city-level door carrying no address,
+        // so no building's rules can be read for it and the policy is
+        // stated here rather than taken from a default that would hide
+        // the fact: dictation goes out under the ordinary policy. The
+        // day the upload names the building it is dictated into, this
+        // value comes from that building's rules like every other call.
         let chosen = self.book.select(
             kernel::ModelTag::Transcribe,
-            &kernel::BuildingPolicy::default(),
+            &kernel::BuildingPolicy::new(false),
         )?;
         gateway::transcriber_for(&chosen, secrets)
     }

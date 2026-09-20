@@ -3,8 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Markdown links: what a document tells a reader to open, and where
-//! that lands in the tree.
+//! Markdown links: what a document tells a reader to open, where that
+//! lands in the tree, and how the tree spells it.
+
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Every markdown link target a file mentions, as written.
 pub(super) fn link_targets(text: &str) -> Vec<String> {
@@ -53,4 +55,44 @@ pub(super) fn resolve(from: &str, target: &str) -> String {
         }
     }
     parts.join("/")
+}
+
+/// The published tree indexed by the lower-cased spelling of every path.
+///
+/// A link is judged against this rather than against an `open` call,
+/// because the two disagree exactly where it matters: Windows and macOS
+/// hand out `docs/Glossary.md` when the file is named `docs/glossary.md`,
+/// Linux and the hosting site return 404, and a gate built on `open`
+/// stays green on the machine that wrote the dead link.
+pub(super) struct Spellings<'a> {
+    published: &'a BTreeSet<String>,
+    by_lowercase: BTreeMap<String, &'a str>,
+}
+
+impl<'a> Spellings<'a> {
+    pub(super) fn of(published: &'a BTreeSet<String>) -> Self {
+        let mut by_lowercase = BTreeMap::new();
+        for rel in published {
+            by_lowercase.insert(rel.to_lowercase(), rel.as_str());
+        }
+        Self {
+            published,
+            by_lowercase,
+        }
+    }
+
+    /// The name on disk, when a link reaches a published file whose
+    /// spelling differs from the link in case alone.
+    ///
+    /// `None` covers two different situations on purpose: the link is
+    /// right, or it points at something this tree does not publish as a
+    /// file at all - a directory, or a path already reported by the
+    /// scaffolding assertion. Only the case question is answered here.
+    pub(super) fn miscased(&self, pointed: &str) -> Option<&'a str> {
+        if self.published.contains(pointed) {
+            return None;
+        }
+        let on_disk = self.by_lowercase.get(&pointed.to_lowercase())?;
+        Some(on_disk)
+    }
 }

@@ -58,6 +58,47 @@ fn links_are_read_as_written_and_resolved_against_their_file() {
 }
 
 #[test]
+fn a_link_that_differs_only_in_case_is_caught_here_and_nowhere_else() {
+    let published: BTreeSet<String> = [
+        "docs/glossary.md",
+        "docs/getting-started.md",
+        "AGENTS.md",
+        "crates/kernel/kernel-SPEC.md",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect();
+    let spellings = Spellings::of(&published);
+
+    // The case that happened: eight documents linked to
+    // `docs/glossary.md` while the tree carried `docs/GLOSSARY.md`,
+    // and every assertion in this gate was green on Windows.
+    assert_eq!(
+        spellings.miscased("docs/Glossary.md"),
+        Some("docs/glossary.md")
+    );
+    assert_eq!(
+        spellings.miscased("DOCS/GETTING-STARTED.MD"),
+        Some("docs/getting-started.md")
+    );
+    // A name that is already mixed case is judged the same way round.
+    assert_eq!(
+        spellings.miscased("crates/kernel/kernel-spec.md"),
+        Some("crates/kernel/kernel-SPEC.md")
+    );
+
+    // Right as written.
+    assert_eq!(spellings.miscased("docs/glossary.md"), None);
+    assert_eq!(spellings.miscased("AGENTS.md"), None);
+    // Not a published file at all. Whether that is a directory, a
+    // scaffolding path or a dead link is another assertion's question,
+    // and answering it here would report the weaker sentence first.
+    assert_eq!(spellings.miscased("docs"), None);
+    assert_eq!(spellings.miscased("local/Handoff.md"), None);
+    assert_eq!(spellings.miscased("docs/never-written.md"), None);
+}
+
+#[test]
 fn a_path_from_one_machine_is_caught_and_a_url_is_not() {
     // The false positive this shape invites is every URL in the
     // repository: `https://` ends in a letter, a colon and a slash.

@@ -15,9 +15,9 @@
 //! order is `seq`'s business, time is a parameter, never sampled.
 
 use kernel::{
-    AxCode, AxError, B3Hash, BuildingPolicy, ChatRequest, ContentBlock, EventDraft, EventKind,
-    EventRef, Ledger, Model, ModelRequest, ModelReturn, ModelUsage, Payload, RunId, StopReason,
-    TimeMs, ToolCall, ToolDef, content_from_message,
+    AxCode, AxError, B3Hash, BuildingPolicy, ChatRequest, ContentBlock, EventRef, Ledger, Model,
+    ModelRequest, ModelReturn, ModelUsage, Payload, RunId, StopReason, TimeMs, ToolCall, ToolDef,
+    content_from_message,
 };
 use serde_json::{Map, Value};
 
@@ -25,21 +25,22 @@ use crate::prefix::FrozenPrefix;
 use crate::window::Window;
 
 mod boundary;
+mod ledger;
 mod report;
 mod wave;
+
+use ledger::{Authored, Carried, Journal};
 
 pub use boundary::{Interrupt, PhaseOutcome, TurnCancelled};
 pub use report::{CallShape, TurnReport};
 
 /// The typestate carrier. Phase data lives in `S` and is private to this
 /// module: a phase literal cannot be forged, a phase cannot be skipped,
-/// and no method returns an earlier phase.
+/// and no method returns an earlier phase. Everything the turn writes
+/// goes through `journal`, which is the module's only ledger door.
 #[derive(Debug)]
 pub struct Turn<S> {
-    run: RunId,
-    who: String,
-    t: TimeMs,
-    refs: Vec<EventRef>,
+    journal: Journal,
     state: S,
 }
 
@@ -80,10 +81,7 @@ impl Turn<Assembling> {
     /// advances it between turns (determinism rule 2).
     pub fn begin(run: RunId, who: String, t: TimeMs) -> Turn<Assembling> {
         Turn {
-            run,
-            who,
-            t,
-            refs: Vec::new(),
+            journal: Journal::open(run, who, t),
             state: Assembling(()),
         }
     }
@@ -105,8 +103,8 @@ impl Turn<Assembling> {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
         let prompt = prefix.prompt_payload()?;
-        let echo = ledger.append(self.draft(EventKind::PromptAssembled, prompt))?;
-        self.refs.push(echo);
+        self.journal
+            .append_authored(ledger, Authored::PromptAssembled, prompt)?;
         let chat = ChatRequest {
             model: shape.model.clone(),
             max_tokens: shape.max_tokens,
@@ -116,10 +114,7 @@ impl Turn<Assembling> {
             effort: shape.effort,
         };
         Ok(PhaseOutcome::Advanced(Turn {
-            run: self.run,
-            who: self.who,
-            t: self.t,
-            refs: self.refs,
+            journal: self.journal,
             state: Calling {
                 segments: prefix.segment_hashes(),
                 chat,
@@ -168,16 +163,8 @@ impl Turn<Calling> {
             "model".to_owned(),
             Value::String(request.chat.model.clone()),
         );
-        let echo = ledger.append(EventDraft {
-            run: self.run,
-            t: self.t,
-            who: self.who.clone(),
-            addr: None,
-            kind: EventKind::ModelCalled,
-            data: payload(called)?,
-            ig: false,
-        })?;
-        self.refs.push(echo);
+        self.journal
+            .append_authored(ledger, Authored::ModelCalled, payload(called)?)?;
         // The streaming door when somebody is watching, the blocking one
         // when nobody is. Both return the same `ModelReturn`, and the
         // record below is written from that return in either case - so
@@ -228,26 +215,11 @@ impl Turn<Calling> {
                 Value::Number(billed.get().into()),
             );
         }
-        // The window already holds the blocks this turn will send back,
-        // so redacting here cannot break a thinking block's signature.
-        // What it does stop is a key the model repeated from becoming a
-        // permanent, exportable line of history.
-        let (returned, _redacted) = crate::redact::redact(&returned);
-        let model_returned = ledger.append(EventDraft {
-            run: self.run,
-            t: self.t,
-            who: self.who.clone(),
-            addr: None,
-            kind: EventKind::ModelReturned,
-            data: payload(returned)?,
-            ig: false,
-        })?;
-        self.refs.push(model_returned);
+        let model_returned =
+            self.journal
+                .append_redacted(ledger, Carried::ModelReturned, returned)?;
         Ok(PhaseOutcome::Advanced(Turn {
-            run: self.run,
-            who: self.who,
-            t: self.t,
-            refs: self.refs,
+            journal: self.journal,
             state: ToolWave {
                 calls,
                 model_returned,
@@ -277,7 +249,8 @@ impl Turn<Recording> {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
         Ok(PhaseOutcome::Advanced(TurnReport {
-            refs: self.refs,
+            redacted: self.journal.redacted(),
+            refs: self.journal.take_refs(),
             model_returned: self.state.model_returned,
             calls_made: self.state.calls_made,
             assistant: self.state.assistant,
@@ -289,18 +262,6 @@ impl Turn<Recording> {
 }
 
 impl<S> Turn<S> {
-    fn draft(&self, kind: EventKind, data: Payload) -> EventDraft {
-        EventDraft {
-            run: self.run,
-            t: self.t,
-            who: self.who.clone(),
-            addr: None,
-            kind,
-            data,
-            ig: false,
-        }
-    }
-
     /// The one interrupt consumer. Cancel appends `cancel_received` and
     /// ends the turn; Steer appends `steer_received` and advances — the
     /// executor folds the text into its window for the next assembly.
@@ -312,19 +273,18 @@ impl<S> Turn<S> {
         match interrupt {
             Interrupt::None => Ok(None),
             Interrupt::Cancel => {
-                let echo =
-                    ledger.append(self.draft(EventKind::CancelReceived, Payload::empty()))?;
-                self.refs.push(echo);
-                let mut refs = std::mem::take(&mut self.refs);
-                refs.shrink_to_fit();
-                Ok(Some(TurnCancelled { refs }))
+                self.journal
+                    .append_authored(ledger, Authored::CancelReceived, Payload::empty())?;
+                Ok(Some(TurnCancelled {
+                    refs: self.journal.take_refs(),
+                }))
             }
             Interrupt::Steer { source, text } => {
                 let mut map = Map::new();
                 map.insert("source".to_owned(), Value::String(source));
                 map.insert("text".to_owned(), Value::String(text));
-                let echo = ledger.append(self.draft(EventKind::SteerReceived, payload(map)?))?;
-                self.refs.push(echo);
+                self.journal
+                    .append_authored(ledger, Authored::SteerReceived, payload(map)?)?;
                 Ok(None)
             }
         }

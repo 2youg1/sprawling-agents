@@ -12,7 +12,7 @@
 |---|---|
 | `suite`（含 `holdout` 判定） | 一批真实任务怎么组织、怎么跑两次而结果可比 |
 | `probe` | 一个机制怎么被跨版本地测，而测量本身不改动被测对象 |
-| `score`、`metabolism` | 哪些沉淀资产在升值、哪些该退场 |
+| `score`、`metabolism` | 哪些沉淀资产在升值、哪些该退场（仪器，仅测试构型；§8-3） |
 
 **`holdout` 合并进 `suite`**。它只有一个消费者、没有自有状态——双集是 suite 的性质，第二个模块就是第二个「这道题在哪一半」的问法。模块表删行携 `Verdict:` 尾注。
 
@@ -90,10 +90,18 @@ pub fn compare(before: &Answers, after: &Answers) -> Result<Comparison, AxError>
 - **报位置不报分数**：`lost` 是问题的序号，人自己去读那两个答案——一个摘要在这里正好会掩盖它要报告的那类损失。
 - **探针不去采集**：问问题的是一个 Run，本 crate 恒不在它所测量的那条回路里。
 
-### 8-3 eval::score（形状 1 判定）
+### 8-3 eval::score（形状 1 判定；仅测试构型）
+
+**`score`、`metabolism`、`nesting` 三个模块退出发布库（H-05）**，写作 `#[cfg(test)] mod`，`lib.rs` 不再 `pub use` 它们的任何符号；`eval` 的公开面只剩 `probe`（§8-6）与 `suite`（§8-1）。
+
+理由与 `ablation`（§8-7）同一条，且那条先例就写在同一个 `lib.rs` 里：**这三个模块是仪器，不是能力**。它们回答的是「资产评分这套规则算得对不对」，答法是自己的测试，提问者是读测试的人；而用户下载的二进制里没有任何调用点会问这个问题。把仪器编进发布库，换来的是体积与一份看起来像产品面的假公开 API。
+
+**成本这一维已另有权威**：`AssetUse.billed` 字段随本条删除，因为五维摊回与权威计费额对账住在 `memory::attribution`（§5 已定），`score` 从未读过这个字段——它是同一笔钱的第二个家。
+
+**重开条件**：出现一个生产调用点要对资产排序或退场，例如城层的资产清单视图。届时把需要的模块改回 `mod` 并在本条写下那个调用点。
 
 ```rust
-pub struct AssetUse { pub uses: u32, pub resident: ByteLen, pub billed: UsdMicros, pub idle_days: u32 }
+pub struct AssetUse { pub uses: u32, pub resident: ByteLen, pub idle_days: u32 }
 pub struct Score { pub per_mille: u32, pub idle_days: u32 }
 pub fn score(usage: &AssetUse) -> Score;
 pub fn worst_first<T: Clone>(assets: &[(T, Score)]) -> Vec<(T, Score)>;
@@ -104,7 +112,7 @@ pub fn worst_first<T: Clone>(assets: &[(T, Score)]) -> Vec<(T, Score)>;
 - **`idle_days` 并列而不折进分数**：便宜且无用与昂贵且不可或缺是两回事，一个把它们藏起来的数字比两个数字更糟。
 - **它恒不自己做决定**：排好序给人看；决定归 `metabolism`，采纳归 mode。
 
-### 8-4 eval::metabolism（形状 1 判定）
+### 8-4 eval::metabolism（形状 1 判定；仅测试构型，见 §8-3）
 
 ```rust
 pub const ASSET_IDLE_DAYS: u32 = 90;
@@ -170,17 +178,17 @@ pub fn sweep<T: Clone>(assets: &[(T, AssetUse, Score, bool)]) -> Vec<(T, Disposa
 
 三种格式读成同一组叶子（`path -> value`），因为问题问的是文档的叶子而不是它的语法；三条读法各读各的，就变成在比读法而不是在比格式。Markdown 那条**刻意严格**：一个会修复松散缩进的读法，会藏掉这个 suite 正在计数的那种失败。
 
-### 8-5 eval::nesting 目录化
+### 8-5 eval::nesting 目录化（仅测试构型，见 §8-3）
 
 `nesting.rs` 原有 632 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成三份：
 
-- `nesting.rs`（293 行）——判定本身：`Shape`／`Fault`／`Attempt`／`Verdict`／`Grades` 五个类型，以及 `grade`／`tally`／`recommended`。它同时是索引位置，声明 `mod reading;` 并从中取用 `read` 与 `stops_early`，公开路径 `eval::nesting::*` 一个未变，crate 内其它文件的 `use` 一行未改。
+- `nesting.rs`（293 行）——判定本身：`Shape`／`Fault`／`Attempt`／`Verdict`／`Grades` 五个类型，以及 `grade`／`tally`／`recommended`。它同时是索引位置，声明 `mod reading;` 并从中取用 `read` 与 `stops_early`，模块内路径一个未变，crate 内其它文件的 `use` 一行未改。
 - `nesting/reading.rs`（154 行）——语法一侧：`read`／`leaves`／`walk`／`scalar`／`markdown_leaves`／`stops_early`。把三种格式怎么读成同一组叶子，与「一次编辑错在哪里」的判定分开读。
 - `nesting/tests.rs`（205 行）——原内联 `mod tests` 原样迁出，断言、名字与 13 个 `#[test]` 一个未动。
 
 **无字段开放。** 跨文件只放宽了两个自由函数：`read` 与 `stops_early` 写作 `pub(super) fn`，仍不出 `nesting` 模块；`leaves`／`walk`／`scalar`／`markdown_leaves` 保持私有。
 
-**apisync 未重写基线。** 搬走的全是私有项，`eval` 的公开面逐字节不变。
+**apisync 基线随 §8-3 重算。** 目录化那一次搬走的全是私有项，公开面逐字节不变；`#[cfg(test)]` 那一次把 `score`／`metabolism`／`nesting` 的全部符号撤出公开面，`xtask/api-baselines/eval.txt` 必须在同一次改动里重算。
 
 ### 8-6 handoff 探针真的跑
 

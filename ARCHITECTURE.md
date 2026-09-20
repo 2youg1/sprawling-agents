@@ -537,7 +537,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::credential::oauth::flow::tests | crates/gateway/src/credential/oauth/flow/tests.rs | the oauth fixtures | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::oauth::types | crates/gateway/src/credential/oauth/types.rs | pending, request, tokens | adapter | S3 | built | gateway-SPEC.md#8-4 |
 
-### runtime (61) — one run, from dispatch to freeze
+### runtime (63) — one run, from dispatch to freeze
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -545,7 +545,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::turn::boundary | crates/runtime/src/turn/boundary.rs | what the executor supplies at a phase change, and what a phase change answers | typestate | S2 | built | runtime-SPEC.md#8-3 |
 | runtime::turn::report | crates/runtime/src/turn/report.rs | what a completed turn hands the run loop, and the call shape it was given | typestate | S2 | built | runtime-SPEC.md#8-3 |
 | runtime::turn::wave | crates/runtime/src/turn/wave.rs | boundary 3: the tool wave, executed in call order | typestate | S2 | built | runtime-SPEC.md#8-3 |
+| runtime::turn::ledger | crates/runtime/src/turn/ledger.rs | the only way a turn appends: carried payloads pass the redactor, authored ones do not | typestate | S2 | built | runtime-SPEC.md#8-41 |
 | runtime::turn::tests::helpers | crates/runtime/src/turn/tests/helpers.rs | the ledger, model and prefix fixtures the turn tests share | typestate | S2 | built | runtime-SPEC.md#8-3 |
+| runtime::turn::tests::redaction | crates/runtime/src/turn/tests/redaction.rs | a secret in a tool argument or a tool result never reaches the chain | typestate | S2 | built | runtime-SPEC.md#8-41 |
 | runtime::turn::tests::phases | crates/runtime/src/turn/tests/phases.rs | the four boundaries driven against a real ledger chain | typestate | S2 | built | runtime-SPEC.md#8-3 |
 | runtime::turn::tests::window | crates/runtime/src/turn/tests/window.rs | what the opening lines and a steer put in the window | typestate | S2 | built | runtime-SPEC.md#8-3 |
 | runtime::bench | crates/runtime/src/bench.rs | which door one tool call goes through, in which order, and what a refusal becomes | decision | V3 | built | runtime-SPEC.md#8-19 |
@@ -603,7 +605,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::run::lifecycle | crates/runtime/src/run/lifecycle.rs | what an active run does: the dispatch pair, one turn, and the freeze that is its only exit | typestate | P1 | built | runtime-SPEC.md#8-15 |
 | runtime::diagnostics | crates/runtime/src/diagnostics.rs | the diagnostic log: write-only, five levels, anchored to a Ledger position | adapter | P1 | built | runtime-SPEC.md#8-17 |
 
-### collab (28) — several residents in one building, without stepping on each other
+### collab (26) — several residents in one building, without stepping on each other
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -611,8 +613,6 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | collab::inbox::signal_id | crates/collab/src/inbox/signal_id.rs | a signal id: what a duplicate delivery is recognised by | decision | P2 | built | collab-SPEC.md#8-1 |
 | collab::inbox::signal_kind | crates/collab/src/inbox/signal_kind.rs | what kind of communication a signal is, and its wire name | decision | P2 | built | collab-SPEC.md#8-1 |
 | collab::inbox::tests | crates/collab/src/inbox/tests.rs | deduplication, lane order, bandwidth and the two records, through the production door | decision | P2 | built | collab-SPEC.md#8-1 |
-| collab::draft | crates/collab/src/draft.rs | what happens when the room moved while you were writing | typestate | P2 | built | collab-SPEC.md#8-3 |
-| collab::draft::tests | crates/collab/src/draft/tests.rs | holds, hold tokens, the four ways back and escalation, through the production door | typestate | P2 | built | collab-SPEC.md#8-3 |
 | collab::steer | crates/collab/src/steer.rs | speaking into a run that is already working, at its next safe point | decision | P2 | built | collab-SPEC.md#8-2 |
 | collab::workshop | crates/collab/src/workshop.rs | one creation split into nodes, and the order they run in | decision | P2 | built | collab-SPEC.md#8-4 |
 | collab::workshop::tests | crates/collab/src/workshop/tests.rs | deterministic scheduling, the fan-out, and the three graphs construction refuses | decision | P2 | built | collab-SPEC.md#8-4 |

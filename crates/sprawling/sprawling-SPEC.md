@@ -1287,7 +1287,8 @@ effort: None`，那正是 `session_for`／`room_for` 对它们本来就有的答
 
 ```rust
 let agreed = self.agree_to_work(&at.addr)?;        // 只读；第一条拒绝在这里
-let session = self.session_for(&at.addr, at.session.take(), &task)?;  // 可能花一次 Digest 调用
+let session = self.session_for(&at.addr, at.session.take(), &task, agreed.rules.policy())?;
+// ↑ 可能花一次 Digest 调用，而那次调用带着这座楼的策略
 at.addr = self.room_for(at.addr, session.as_ref())?;                  // ← 第一次写
 if let Some(effort) = at.effort { city::write_effort(&self.city_root, &at.addr, effort)?; }
 let brief = city::write_brief(...)?;
@@ -1296,7 +1297,19 @@ let mut site = self.stand_up(agreed, &at, &given)?;
 ```
 
 **`session_for` 排在答应之后**：它可能向 Digest 模型要一个名字，而为一件城不会接的活付一次模型调用，
-是这条规矩的钱那一面。**`halted_by` 并入 `agree_to_work`**：它本来就是唯一守住的那道门，
+是这条规矩的钱那一面。
+
+**命名这一次调用带着楼的策略走，与跑自己的调用同一格**（S-04）。`agree_to_work` 刚读出的 `rules`
+就在手边，`session_for` 与 `name_the_work` 因此收一个 `&kernel::BuildingPolicy` 参数，由 `EndpointBook::select`
+据它拒绝跑在城之外的端点——判定只有 `select` 一处，这里不复述规则。confidential 楼上的 Digest 端点跑在城之外时，
+这条拒绝**原样上抛**（`E_GATE_DENIED`）而不是塌成「取不到名字」：模型在哪台机器上是人要处理的事，
+恢复语因此同时给出两条出路（自己写 `building/name`，或选一个与城同在一台机器上的 digest 模型）。
+取不到名字的其余失败仍是 `E_INVALID_ARGS`。
+
+**验收**：`assembly::dispatching::tests::a_confidential_building_will_not_name_a_room_with_a_model_off_this_machine`——
+confidential 楼、主模型与城同机、Digest 端点在机器之外，往楼名派活以 `E_GATE_DENIED` 告终，任务原文不上任何一条线。
+
+**`halted_by` 并入 `agree_to_work`**：它本来就是唯一守住的那道门，
 现在与其余五道站在一起，于是「城答应什么」读一处就够。
 
 **采钟点不动**（ARCH §10）：`run_id_for` 的 `now_ms()` 仍在 `renew_if_stale` 之后，
@@ -2524,7 +2537,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 服务端此前只有 `gateway::transcribe` 这个适配器：一件没有任何路可以走到的东西。本节把路修通。
 
 - **人填 URL 与 key 走既有的 attach 表单**。「哪个 endpoint、哪个 model 答这一类活」已有机制——`ModelTag`。第三个 tag `Transcribe` 因此是全部的新增面：第二张表单加第二份存储会是同一个问题的第二个答案，而那把 key 还要有第二条进金库的路。
-- **`Views::transcriber`**（`views::hearing`）：锁内读出选择、造出 `Transcriber`，锁外发请求。一次转写是数秒，而那把锁是全部读的答案所在。
+- **`Views::transcriber`**（`views::hearing`）：锁内读出选择、造出 `Transcriber`，锁外发请求。一次转写是数秒，而那把锁是全部读的答案所在。录音到达的是城一级的门、身上没有地址，读不出任何一座楼的规矩，故这里**写明** `BuildingPolicy::new(false)` 而不是取默认值——把「口述按普通楼出门」这件事摆在读者眼前。上传带上它所属的那座楼之后，这个值同样从楼规来。
 - **`serving::worker::hearing`**：把 views 与金库收成一条 `TranscribeSink`。金库是**工人开的那一把**，经启动握手那条通道交出来（`Started.vault`）——第二个 `Custodian` 会是同一批机密的第二扇门。
 - **容器从请求头读**：`AudioType::of_media_type` fail closed，拒词列出这座城发得出去的五种。浏览器录进它手上有的容器，而只有它知道是哪一个。
 - **页面**：`core/speaking.ts` 管录音与上传，composer 多一个按钮，**转写结果落进输入框而不是直接发出去**——机器听错的那一句必须能改，否则它会花掉一次 run。没有 `transcribe` 选择的城不画这个按钮（`useHearing`）。
@@ -2753,3 +2766,18 @@ pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
 3. **`Built` 两态而不是 `Option<Release>`。** 缺席不是一个缺失的值，而是关于这次构建的一个事实：从工作树构建出来的二进制没有可比的对象，把它报成「过期」是在回答另一个二进制的问题。tag 由 `release.yml` 经 `SPRAWLING_RELEASE_TAG` 传入，`build.rs` 声明该变量（`cargo::rerun-if-env-changed`），否则 cargo 会拿上一个 tag 编出来的二进制顶数，而它的每一份都会报错版本。
 4. **问 npm，不问 GitHub。** 本项目每一次发布都是 pre-release，而 `GET /repos/{owner}/{repo}/releases/latest` 按设计排除 pre-release，对本仓库答 404。npm 的 `latest` dist-tag 才是 `bunx sprawling` 真正解析的东西，问它才是问人真正有的那个问题。
 5. **失败说清停在哪一阶段。** 只在失败路径上多发一次 `gateway::reach`，把 `kernel::reach` 已定义的分阶段读数——名字没解析、连不上、握手失败、对方答了什么状态——放进 recovery。「它没成功」不是一个人能据以行动的答案，而这条路径上多一次请求换一句能行动的话是划算的。退出码报的是问题有没有被回答，而不是答案是什么：版本过期是消息不是故障，而读不到注册表会让人以为自己查过了。
+
+### 8-69 真端点验收闸 `just e2e`（`crates/sprawling/tests/e2e.rs`；Roadmap §20.6、§24.3）
+
+这个仓库的其余检查都在回答一个它自己写的 provider。这一条把一个人粘贴的 base URL、key 与模型名拿来，attach → 选模型 → 派活，再回头读账本——于是「key 填了，从来没跑通」是一次红，而不是一份报告。
+
+**六条口径：**
+
+1. **缺席就一行说明并通过。** 四个环境变量 `SPRAWLING_E2E_BASE_URL`／`SPRAWLING_E2E_KEY`／`SPRAWLING_E2E_MODEL`／`SPRAWLING_E2E_DIALECT` 由测试自己印出来，justfile 不抄第二份。这与 `just adversary` 是同一个诚实形状：静默跳过的闸比没有闸更糟，而在每台没有 key 的机器上都红的闸没有人会跑。
+2. **不进 `just check`。** 它花的是别人的钱与别人的网络；有没有 key 是一台机器可以正当地没有的东西。夜间作业跑它，凭据住在那里。
+3. **从 `RunWorker::handle` 进城，不另起进程。** 本闸要判的真端点是 provider 的那一个；`CARGO_BIN_EXE` 与套接字那一侧归 `adversary/`（xtask boundary 闸：白盒 Rust、黑盒 Lean）。Roadmap §20.6 写的是「经真二进制 HTTP 面」，此处按既有的边界规则改为「经 `channels::server` 递帧的那扇门」——多起一个进程只会多付一道边界成本，而断言仍然共享产品的类型，正是那道闸判为两头不讨好的形状。
+4. **兼容格式随它的端点走，不做命令行开关。** §24.3 写的是 `just e2e --dialect messages --relay`。兼容格式是「你指向的那个端点说哪种线」的属性，与 base URL、key 同源，故与它们并列为环境变量；旗标是这个事实的第二个家，且能与另外三个变量互相矛盾。字面拼法由 `DialectKind` 的 serde 命名给出（`anthropic`／`open_ai`），测试不另列一张表。
+5. **三个断言分三个测试，因为它们的波次不同。** ①`model_called` 出现且账本不带 `E_CONFIG_INVALID`／`E_WIRE_MISMATCH`（W1 关门）；②`model_called` 说得出输出上限来自哪一环（`ceiling_from` 非空）——**这一条在 1.1 上限链条落地前是红的，它是钉在那片叶子前面的桩**，与 ① 合并就成了两个事实一个判决；③ 故意断 key 必红，且 recovery 非空、错误码不是 `E_CONFIG_INVALID`——被拒的凭据是端点的答复，不是一份写坏的配置。
+6. **时长由两次 cargo 调用与两个调参守住。** 编译不占额度：`--no-run` 先付编译（一台 windows-msvc 机器上冷构建实测 2m18s），`timeout 180` 只罩测试进程。`request_max_retries = 0` 让 gateway 的退避一次都不睡，`timeout_ms = 60000` 让一次请求封顶一分钟（Roadmap §0.0：单次 `sleep` ≤ 10 秒、单个测试进程 `timeout` ≤ 180 秒）。
+
+**attach 就是一次真调用。** `admit` 为空表示「这个端点服务什么就收什么」，于是登记当场去问它的模型清单——一把被拒的 key 在 attach 处就被回绝，走不到派活。故三个用例都把 attach 与派活串成一个 `Result` 来判，而不是假定拒绝只会在最后一步出现。

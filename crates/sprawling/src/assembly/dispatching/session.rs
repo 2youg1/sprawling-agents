@@ -37,11 +37,22 @@ impl RunWorker {
     /// fallback is a refusal rather than a name this city made up. A run
     /// living in a room somebody did not choose cannot be found again by
     /// the name they would look for.
+    ///
+    /// `policy` is the building's own, read by the caller from the rules
+    /// it already loaded: naming the work sends the task text to a
+    /// model, so a confidential building governs this call exactly as it
+    /// governs the run's own calls.
+    ///
+    /// # Errors
+    /// Refuses when no legal name could be had, and propagates the
+    /// book's refusal to route a confidential building's text to a model
+    /// that is not on this machine.
     pub(super) fn session_for(
         &mut self,
         addr: &Address,
         session: Option<kernel::SessionName>,
         task: &str,
+        policy: &kernel::BuildingPolicy,
     ) -> Result<Option<kernel::SessionName>, AxError> {
         if session.is_some() {
             return Ok(session);
@@ -52,7 +63,20 @@ impl RunWorker {
         if addr.as_str().contains('/') {
             return Ok(None);
         }
-        let Some(named) = self.name_the_work(task) else {
+        // The choice is made under the building's policy and refused
+        // here rather than swallowed: a confidential building that has
+        // no digest model on this machine is a decision for the person,
+        // and the two ways out are both named.
+        let chosen = self
+            .book
+            .select(kernel::ModelTag::Digest, policy)
+            .map_err(|refused| {
+                refused.with_recovery(
+                    "name the room yourself by sending the work to `building/name`, or choose a \
+                     digest model that runs on this machine",
+                )
+            })?;
+        let Some(named) = self.name_the_work(&chosen, task, policy) else {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "work out what to call this work",
@@ -73,26 +97,32 @@ impl RunWorker {
     /// work is exactly that shape of job, and putting it on the main
     /// model would charge a person reasoning tokens for a filename.
     ///
-    /// `None` for every failure this can have — no model registered for
-    /// the tag, a call that did not come back, an answer that is not a
-    /// legal session name. The caller turns that into a refusal naming
-    /// the field, so a failure here costs a person one field rather than
-    /// putting their work somewhere they will not look for it.
-    fn name_the_work(&mut self, task: &str) -> Option<kernel::SessionName> {
-        let chosen = self
-            .book
-            .select(kernel::ModelTag::Digest, &kernel::BuildingPolicy::default())
-            .ok()?;
+    /// `None` for every failure this can have — a call that did not come
+    /// back, an answer that is not a legal session name. The caller
+    /// turns that into a refusal naming the field, so a failure here
+    /// costs a person one field rather than putting their work somewhere
+    /// they will not look for it.
+    ///
+    /// The endpoint is chosen by the caller under the building's policy,
+    /// and that same policy rides along on the request: the task text
+    /// travels under the rules of the building it was sent to, not under
+    /// a laxer set written here.
+    fn name_the_work(
+        &self,
+        chosen: &gateway::Chosen<'_>,
+        task: &str,
+        policy: &kernel::BuildingPolicy,
+    ) -> Option<kernel::SessionName> {
         let model_id = chosen.entry.id.clone();
         let mut adapter = gateway::adapter_for(
-            &chosen,
+            chosen,
             self.redemption().ok()?,
             dialect_headers(chosen.endpoint.dialect),
         )
         .ok()?;
         let answer = adapter
             .call(&kernel::ModelRequest {
-                policy: kernel::BuildingPolicy::default(),
+                policy: policy.clone(),
                 segments: [kernel::B3Hash::digest(b""); 4],
                 chat: kernel::ChatRequest {
                     model: model_id,

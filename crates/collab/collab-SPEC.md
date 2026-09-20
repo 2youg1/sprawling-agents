@@ -11,7 +11,6 @@
 | 模块 | 这个模块回答的问题 |
 |---|---|
 | `inbox`、`steer` | 一条消息怎么从一个 Agent 到另一个，而重复投递不会变成重复副作用 |
-| `draft` | 两个 Agent 写同一份东西时，谁手里拿着它 |
 | `workshop`、`fanin` | 一件活拆成多个节点后，谁按什么序跑、结果怎么收回来 |
 | `pr` | 写代码的人不验自己的代码，这件事由什么强制 |
 | `arbiter` | 两个 Agent 不同意时，升到哪里（§8-7） |
@@ -39,7 +38,7 @@
 
 **跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
 
-Signal｜Inbox｜Steer｜HeldDraft｜hold token｜four-way return｜Workshop｜NodeContract｜fan-in｜Artifact｜arbitration｜Triage。概念名一律英文原词；该用什么词见 `docs/glossary.md`，不该用什么词见 `xtask/lexicon.toml`。
+Signal｜Inbox｜Steer｜Workshop｜NodeContract｜fan-in｜Artifact｜arbitration｜Triage。概念名一律英文原词；该用什么词见 `docs/glossary.md`，不该用什么词见 `xtask/lexicon.toml`。
 
 ## 7 模块边界
 
@@ -110,33 +109,22 @@ impl AgentSteer {
 
 - **两个入口、一个落点**：人的 Steer 只从 control surface 进城，恒不走 Inbox；Agent 的 Steer 是一件插队首的 Signal。两者都追在下一次工具结果末尾，因为模型只需要认识一种形状。
 - **`user` 前缀只有一个构造子写得出**：`AgentSteer` 的 source 由它自己的 id 拼成 `@id`，故一件自称来自人的注入内容拼不出 `user`——入口分立是安全要求，类型把它变成判定。
-- **Steer 不打断动作**（下接 8-3）：它在安全点被消费并推进（`runtime::turn` 已定）；同一边界上 Cancel 压过 Steer，因为停是不可撤销的那个。本模块只产出落点形状，不重建中断梯。
+- **Steer 不打断动作**：它在安全点被消费并推进（`runtime::turn` 已定）；同一边界上 Cancel 压过 Steer，因为停是不可撤销的那个。本模块只产出落点形状，不重建中断梯。
 - **中断源先问人、再问本屋信箱**（`SignalDesk::take_steer`），**人压过居民**：装配层的 `interrupt_for` 曾只读人的命令队列，那时 `Steer::from_signal` 与整个 `AgentSteer` 是一套写好、测过却永远不会发生的机制。
 - **属名就是回信地址，这是 `@id` 不能改成别的什么的理由**：模型在窗口里读到 `@market/hana:` 时，它读到的既是“这句话不是人说的”，也是 `signal` 的 `to` 参数该填什么。一个只标注“来自另一个 agent”而不给地址的前缀，会让回信变成猜测。
 
-### 8-3 collab::draft（形状 1 判定＋形状 2 值类型）
+### 8-3 collab::draft——已注销（H-05，本条不再有实现）
 
-```rust
-pub struct Draft { /* author、room、seen: Version、body: Payload —— 私有 */ }
-pub enum Return { Rewrite, SendAsIs, Withdraw, ForceInformed }   // 四路退回，穷尽
-pub struct HoldToken { /* room_version、turn —— 私有；只能由服务端发 */ }
-pub enum Submission { Delivered, Held { token: HoldToken, holds: u32 }, Escalated { holds: u32 } }
-pub enum Resolution { Delivered, Withdrawn, Held { token: HoldToken, holds: u32 },
-                      Escalated { holds: u32 }, TokenVoid { token: HoldToken } }
-pub struct Drafts { /* 逐 (author, room) 的 token 与连续退回计数 —— 私有 */ }
-impl Drafts {
-    pub fn submit(&mut self, draft: &Draft, current: Version, turn: u32) -> Submission;
-    pub fn resolve(&mut self, draft: &Draft, choice: Return, current: Version, turn: u32) -> Resolution;
-    pub fn held_payload(&self, draft: &Draft, current: Version) -> Result<Payload, AxError>;
-    pub fn resolved_payload(&self, draft: &Draft, choice: Return) -> Result<Payload, AxError>;
-}
-```
+本条原定义 `Draft`／`Return`／`HoldToken`／`Submission`／`Resolution`／`Drafts`：一条发言携着作者所见的 `room_version` 进房间，房间若已前进则退回作者，四路之一由作者选，`ForceInformed` 消费一枚绑定版本的服务端 hold token。实现连同它自己的测试模块一并删除，公开面 `collab::Draft`／`Drafts`／`HoldToken`／`Resolution`／`Return`／`Submission` 六项从 `lib.rs` 撤出。
 
-- **`room_version` 是通信侧的乐观并发**，与文件写入的 `base_version` 同型：发言携着自己所见的版本，冲突因此显式。
-- **四路都摆出来，不默认重写**：「Room 变了」不等于「这条发言作废」，判断权归发言者。机制在 prefix 零常驻，被撞回的那一刻才学。
-- **`ForceInformed` 不是免费的**：它消费一枚服务端发的 hold token，而 token 绑着退回当时的 `room_version`；Room 又往前走一步，token 即作废并重新退回。**一般规律**：协调闸门上的旁路开关必须是对服务端已展示状态的确认，不能是客户端的一个意见——无条件生效的旁路参数，会被一个被要求「高效」的模型学会预防性地带上，闸门于是在没有任何人决定废除它的情况下静默地不再存在。
-- **token 本回合内有效**：过期不采时钟，而是比回合号——时间只入参不采样（确定性二）。
-- **连续退回 ≥ `DRAFT_HELD_ESCALATE` 即升 owner verdict**：两个 Agent 互相撞回的活锁不在退回循环里空烧。
+**注销的理由不是「没人调用」，而是它要防的那次冲突已经由两处各自解决，本条会成为第三个权威**：
+
+- **同一份文件的并发写**，由 `memory` 的 `base_version` 乐观并发与 worktree 隔离解决——那条路径有真实写者，且冲突落在文件而非发言上。
+- **同一件事的并发认领**，由 `kernel::goal` 的同资源相斥与 `collab::arbiter`（§8-7）的升级梯解决——两个 Agent 撞上时得到的是一条判定，而非一次重写机会。
+
+房间从未带过版本，这一点在代码里是可读的事实而非推测：`Signal` 的 `room_version` 在两个生产写点（`signal_tool`、`handback`）恒为 `Version::FIRST`，故本条的退回分支在生产里不可达。`Signal.room_version` 与 `kernel::consts_policy::DRAFT_HELD_ESCALATE` 在本次改动后失去唯一读者，清除它们要动 wire 键与 kernel 常量表，属另一条改动。
+
+**重开条件**：出现一个真的会前进的房间版本——即有生产写点把 `room_version` 填成 `Version::FIRST` 以外的值。届时正确的做法是让退回从那个写点长出来，而不是把本条原样恢复。
 
 ### 8-4 collab::workshop（形状 2 值类型＋形状 1 判定）
 
@@ -203,20 +191,19 @@ impl FanIn {
 
 ```rust
 pub struct Pr<S> { /* node、implementer、branch —— 私有 */ }
-pub struct Open;  pub struct Verified { /* by */ }  pub struct Merged { /* by、commit */ }
+pub struct Open;  pub struct Verified { /* by */ }
 impl Pr<Open> {
     pub fn open(node: NodeId, implementer: String, branch: String) -> Result<Pr<Open>, AxError>;
     pub fn verified(self, artifact: &Artifact) -> Result<Pr<Verified>, AxError>;
-    pub fn opened_payload(&self) -> Result<Payload, AxError>;
-    pub fn rejected_payload(&self, by: &str, why: &str) -> Result<Payload, AxError>;
 }
-impl Pr<Verified> { pub fn merged(self, commit: String) -> Pr<Merged>; }
-impl Pr<Merged>   { pub fn merged_payload(&self) -> Result<Payload, AxError>; }
+impl Pr<Verified> { pub fn verified_by(&self) -> &str; }
 ```
 
-- **判负线做成类型**：`Pr<Open>` 没有 `merged`，`Artifact` 没有公开构造子；两条都由 `tests/ui/` 的编译失败反例钉住，不靠评审记得。
+- **判负线做成类型**：`Pr<Open>` 拿不到验证者的名字，`Artifact` 没有公开构造子；两条都由 `tests/ui/` 的编译失败反例钉住，不靠评审记得。
 - **不重判验证**：`Artifact` 已携「非生产者跑过 done_check」这个事实；本模块只补「这份产出是不是这个节点的」与「验证者不是实现者」这道兜底（近乎不可达，保留是因为「近乎」正在替一场没人做的评审干活）。
-- **物理 merge 归 `memory::worktree`**：本 crate 决定，那个 crate 搬文件。merge 只走 fast-forward——trunk 动过即退回重做，与 HeldDraft 同一姿态。
+- **记录不在这里写（H-05 改此条）**：`pr_opened` 的唯一权威是 `pr_tool::request::OpenRequest`（§8-10），它带 `commit` 而本模块原来的 `record()` 只拼 `node`／`implementer`／`branch` 三字段——用后者写一行，`OpenRequest::from_payload` 会因缺 `commit` 拒绝重建，两个家今天就持不同形状。故删 `opened_payload`／`rejected_payload`／`merged_payload`／`record` 与 `struct Merged`，本模块只留 `Open→Verified` 这一段判定。
+- **`Merged` 相位随记录一起走**：它除了承载已被否决的那份 payload 之外不做任何判定，生产路径从未到达它；落地事实由 `EventKind::PrMerged` 与 `memory::worktree` 记，判定梯到 `Verified` 为止。
+- **物理 merge 归 `memory::worktree`**：本 crate 决定，那个 crate 搬文件。merge 只走 fast-forward——trunk 动过即退回重做。
 
 ### 8-7 collab::arbiter（形状 1 判定）
 
@@ -520,16 +507,11 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 **apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::SignalDesk`／`collab::SignalTool`／`collab::SignalEffect`，`cargo xtask apisync` 对 collab 无差异。
 
-### 8-18 collab::draft 目录化
+### 8-18 collab::draft 目录化——已随 §8-3 注销
 
-`draft.rs` 原有 466 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
+`draft.rs` 与它的测试模块已删除，本条记录的文件切分不再有对象。切分本身是对的（原 466 行超出 400 行上限），删除的理由见 §8-3。
 
-- `draft.rs`（339 行）——`Draft`、`Return`、`HoldToken`、`Submission`、`Resolution`、`Drafts` 与它的 `submit`／`resolve`／`holds`／`held_payload`／`resolved_payload` 及私有的 `key`／`token`／`hold`／`clear`。它同时是子模块的父模块，声明 `mod tests;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。
-- `draft/tests.rs`（131 行）——原内联 `mod tests` 原样迁出，断言、名字与 8 个 `#[test]` 一个未动；原 `mod tests` 上的 `#[allow(...)]` 列表原样落在父文件的 `mod tests;` 声明上。
-
-**无字段开放。** 测试文件是 `draft` 的子模块，`Draft` 与 `Drafts` 的私有字段对它照旧可见，`use super::*` 之外不需要任何新的可见性。
-
-**apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::Draft`／`collab::Drafts` 等，`cargo xtask apisync` 对 collab 无差异。
+**apisync 基线随本次重算。** `collab::Draft`／`Drafts`／`HoldToken`／`Resolution`／`Return`／`Submission` 与 `collab::Merged` 及 `Pr<Merged>` 的方法一并退出公开面，`xtask/api-baselines/collab.txt` 必须在同一次改动里重算。
 
 ### 8-19 collab::workshop 目录化
 

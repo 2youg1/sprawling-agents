@@ -118,7 +118,6 @@ mod tests {
             uses,
             resident: ByteLen::new(bytes),
             idle_days,
-            ..AssetUse::default()
         }
     }
 

@@ -58,7 +58,7 @@ Stage 2 追加：
 ## 3 假设与歧义
 
 1. **Locator 范围语义**：`L<a>-<b>` 行号 1 起、闭区间（编辑器与 sed 先例）；`B<a>-<b>` 字节偏移 0 起、闭区间（HTTP Range 先例）。两者均要求 `a<=b`，`L` 另要求 `a>=1`。
-2. **Address 附加拒绝面**：设计点名拒绝绝对路径、`..`、空段、非 UTF-8；本文在同一 fail-closed 精神下追加拒绝反斜杠、`.` 段、首尾 `/`、控制字符与 NUL、`:`（Windows 盘符与 NTFS ADS 两面一式拒）。放宽属「对扩展开放」，收紧后不再放回。
+2. **Address 附加拒绝面**：设计点名拒绝绝对路径、`..`、空段、非 UTF-8；本文在同一 fail-closed 精神下追加拒绝反斜杠、`.` 段、首尾 `/`、控制字符与 NUL、`:`（Windows 盘符与 NTFS ADS 两面一式拒）、以点或空白结尾的段（S-01，见 8-55）。放宽属「对扩展开放」，收紧后不再放回。
 3. **git-oid 长度**：S3 引 git2 前按 40 位十六进制小写受理（SHA-1 仓库）；其它长度 fail-closed 拒。SHA-256 仓库支持届时按方向加长度分支。
 4. **`run` 字段恒在**：city 级事件（`city_initialized`、`log_truncated` 等）无所属 Run，取 `RunId::CITY`（nil UUID）哨兵值；uuid v7 的时间戳位保证真实 Run 恒不与 nil 撞。
 5. **`who` 字段是自由字符串**：actor 文法属 city::resident（P1）；届时收紧为类型，本文届时更新。
@@ -235,17 +235,18 @@ pub const RESERVED_PREFIX: &str = ".sprawling";
 impl Address {
     /// Sole constructor. Grammar: relative, `/`-separated, segments of
     /// non-control UTF-8; rejects absolute (incl. drive/UNC), `..`, `.`,
-    /// empty segments, backslash, NUL/control, leading/trailing `/`.
+    /// empty segments, backslash, NUL/control, leading/trailing `/`,
+    /// and any segment ending in a dot or whitespace.
     pub fn parse(raw: &str) -> Result<Self, AxError>;   // E_INVALID_ARGS
     pub fn is_within(&self, prefix: &Address) -> bool;  // 段边界字节前缀；WriteDomain 原语
-    pub fn is_reserved(&self) -> bool;                  // 任一段 == RESERVED_PREFIX（C17，见 8-28）
+    pub fn is_reserved(&self) -> bool;                  // 任一段 ASCII 大小写不敏感 == RESERVED_PREFIX（C17，见 8-28、8-55）
     pub fn as_str(&self) -> &str;
 }
 ```
 
 - 派生：`Clone/Debug/Display/PartialEq/Eq/PartialOrd/Ord/Hash`（BTreeMap 键）。
 - serde：呈现为字符串；`Deserialize` 经 `parse` 复验（fail-closed 读盘）。
-- Windows 按字节比较、不折叠大小写；`is_within` 自反（`a.is_within(a)`）。
+- 同一性按字节：`Eq`、`Ord` 与 `is_within` 在所有平台上逐字节比较，大小写不同的两个地址因而是两个地址；`is_within` 自反（`a.is_within(a)`）。**只有 `is_reserved` 折叠 ASCII 大小写**，因为它是一道只允许多拒的门，而它守的目录名在文件系统那边是大小写不敏感的（8-55）。
 - 符号链接 canonicalize 属效果面（S2 write_domain 的适配层）；本原语只对已规范化相对路径作证。
 - 解析拒绝的 AxError：`action="parse address"`、`subject=原串`、recovery 指出违规成分与合法形态。
 
@@ -1174,7 +1175,7 @@ impl SessionName {
 
 一个人给一次会话的名字会变成它干活的目录，所以它必须恰好是一个地址段。用 `String` 就是把这条规则散到每个记得它的调用方里。
 
-- **段规则向 `Address::parse` 问，不重写**：反斜杠、`:`、控制字符这些依据只有一份；本类型只多拒 `/`、`.`／`..`、`.sprawling` 与 64 字符上限。
+- **段规则向 `Address::parse` 问，不重写**：反斜杠、`:`、控制字符、尾随点与尾随空白这些依据只有一份；本类型只多拒 `/`、`.`／`..`、`.sprawling` 与 64 字符上限。修剪发生在问之前，所以人多敲的尾随空格仍然被原谅，而尾随点落到 `Address` 的那条拒绝上。
 - **修剪两端而不改中间**：人多敲一个空格不是意图；把中间的空格换成连字符则是替他取名。
 - **64 字符**：超过这个长度的不是名字，是一件被写进名字栏的任务；它还要当别人机器上的目录名。
 - **serde 进口复验**：`Deserialize` 走 `parse`（同 `Address`），于是一个从线上来的名字不会因为发送方没检查而变成路径。
@@ -1668,3 +1669,18 @@ pub fn stands(mine: &Release, newest: &Release) -> ReleaseVerdict;
 2. **排序是 semver 自己的。** 日期落在 pre-release 段，于是 `0.0.5-pre.260912` 高于 `0.0.5-pre.260911` 而低于裸的 `0.0.5`——semver 对点分数字标识符按数值比。`Ord` 按字段声明顺序派生即复现该规则，本 crate 与注册表因而对同一对发布给出同一个次序。**这正是本类型存在的理由**：二进制拿自己的裸 `0.0.5` 去比注册表的 `0.0.5-pre.260912`，会把最新的那一版读成更旧的那一版，且无声。
 3. **日期必须随版本一起走，不能摆在旁边。** 一个 pre-alpha 的版本号几乎说不出树有多旧，而树有多旧正是它的读者最需要知道的（CHANGELOG.md 开篇）。故 `released()` 是给人读的那一个渲染，`npm_version()` 是给注册表的那一个。
 4. **无钟无套接字。** 注册表此刻给的是什么，归调用方去取；本模块只判它被递到的东西（ARCHITECTURE.md 第 1 段）。
+
+### 8-55 S-01：保留子树的 Windows 别名（形状 1 判定的两条收紧）
+
+```rust
+pub fn parse(raw: &str) -> Result<Self, AxError>;   // 追加：任一段以点或空白结尾即拒
+pub fn is_reserved(&self) -> bool;                  // 改：eq_ignore_ascii_case
+```
+
+**改它的理由是一个可被利用的洞，不是一个新需求。** 地址最终由 `city_root.join(addr.as_str())` 交给文件系统，而 Win32 在打开文件前剔掉每一段的尾随点与尾随空格，并以大小写不敏感的方式解析目录名。于是 `lab/.SPRAWLING`、`lab/.sprawling.`、`lab/.sprawling ` 三种拼法落到 `lab/.sprawling` 这同一个目录，而逐字节比较的 `is_reserved` 对三者全答假。读路径的 `runtime::tools::chosen_path` 与写路径的 `kernel::write_domain` 共用这一个谓词，所以一个 run 换一种拼法就写得了自己楼的 `BUILDING.md`、自己的 `CONFIG.toml` 与账本目录——8-28 立起来的不变式被拼写绕过。
+
+- **在文法层拒绝别名，而不是在判定层认识别名**：尾随点与尾随空格被 `parse` 一次性拒掉，于是这两种拼法根本构造不出 `Address`，`is_reserved` 之后的每一个读者都不必再知道 Win32 的这条规矩。判定层只留大小写一条，因为大小写别名无法在文法层拒绝——`.SPRAWLING` 是一个人可能真心想要的目录名。
+- **ASCII 折叠够用，理由是保留名自己**：`RESERVED_PREFIX` 全是 ASCII，`eq_ignore_ascii_case` 对它给出的答案与 NTFS 的大写表一致；引入 Unicode 折叠会把一张随版本变的表搬进 kernel，而它多认的字符一个也不在这个常量里。
+- **同一性仍按字节**：`Eq`、`Ord` 与 `is_within` 不折叠大小写。两个方向都安全：写域 `lab` 不收 `LAB/x`，写域 `LAB` 也不收 `lab/x`，失配一律是拒绝。这条不对称是有意的——`is_reserved` 是只许多拒的门，`is_within` 是身份关系，让身份关系折叠大小写会让两个不同地址变成一个。
+- **失效关闭，只会拒绝得更多**：全仓 347 处 `Address::parse` 调用点没有一处传入以点或空格结尾的字面量地址（`grep -rnE 'Address::parse\("[^"]*[. ]"\)'` 空结果）。
+- **重开参数**：①出现一种不经 `join` 而直接与操作系统打交道的地址消费者，剔尾规则因此不再适用——届时收紧点应下移到那个适配层；②8.3 短名（`SPRAWL~1`）与 Unicode 大写表撞上 ASCII（如 U+212A）这两类别名本文不管，因为前者要问文件系统才知道、后者不出现在 `RESERVED_PREFIX` 里，任何一条被实际做成攻击即重开；③若将来保留名不再全是 ASCII，`eq_ignore_ascii_case` 当场失效，改常量的同一个提交必须改这条比较。

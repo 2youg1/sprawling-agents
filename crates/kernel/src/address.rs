@@ -10,8 +10,8 @@
 //! - one constructor: [`Address::parse`]; whatever it accepts is already
 //!   canonical (no normalization happens, non-canonical spellings are
 //!   rejected), so `as_str` is a byte-exact round trip.
-//! - comparison is byte-wise on every platform; Windows case aliases are
-//!   two different addresses on purpose.
+//! - identity is byte-wise on every platform: `Eq`, `Ord` and `is_within`
+//!   never fold case; `is_reserved` alone does, and it only refuses more.
 //! - symlink resolution is an effect-layer concern; this type only judges
 //!   already-canonical relative paths.
 //! - `is_reserved` answers C17: a `.sprawling` subtree can never enter a
@@ -40,8 +40,8 @@ impl Address {
     /// Sole constructor. Rejects: empty input, absolute paths, backslash,
     /// `:` (drive letters and NTFS alternate data streams alike), NUL and
     /// control characters, empty segments (covers leading/trailing and
-    /// doubled `/`), and `.`/`..` segments. Fail-closed: anything not
-    /// exactly canonical is `E_INVALID_ARGS`.
+    /// doubled `/`), `.`/`..` segments, and segments ending in a dot or
+    /// whitespace. Fail-closed: not exactly canonical is `E_INVALID_ARGS`.
     pub fn parse(raw: &str) -> Result<Self, AxError> {
         let reject = |violation: &str| {
             Err(
@@ -73,6 +73,16 @@ impl Address {
             if segment == "." || segment == ".." {
                 return reject("address contains a `.` or `..` segment");
             }
+            // Win32 strips trailing dots and spaces from a path component
+            // before opening the file, so `.sprawling.` opens `.sprawling`.
+            // Refusing the alias here spares every later reader, and
+            // `is_reserved` above all, from knowing that rule.
+            if segment.ends_with('.') || segment.ends_with(char::is_whitespace) {
+                return reject(
+                    "a segment ends with a dot or whitespace, which some file systems drop, \
+                     making this address a second spelling of a different one",
+                );
+            }
         }
         Ok(Address(raw.to_owned()))
     }
@@ -86,7 +96,12 @@ impl Address {
         }
     }
 
-    /// C17 primitive: true iff any segment is [`RESERVED_PREFIX`].
+    /// C17 primitive: true iff any segment is [`RESERVED_PREFIX`],
+    /// compared without ASCII case, because Windows resolves
+    /// `.SPRAWLING` to the same directory and this predicate guards the
+    /// directory rather than the string. ASCII folding is the whole of
+    /// it: the reserved name is ASCII, so a Unicode case table would add
+    /// a second, version-dependent authority on the same question.
     ///
     /// Any segment rather than the first: a building's own rules sit at
     /// `<building>/.sprawling/`, and a run whose write domain is its
@@ -94,7 +109,9 @@ impl Address {
     /// refuse more, which is the direction a fail-closed check may move
     /// in without a second authority to check it against.
     pub fn is_reserved(&self) -> bool {
-        self.0.split('/').any(|segment| segment == RESERVED_PREFIX)
+        self.0
+            .split('/')
+            .any(|segment| segment.eq_ignore_ascii_case(RESERVED_PREFIX))
     }
 
     pub fn as_str(&self) -> &str {
@@ -169,7 +186,8 @@ impl SessionName {
         // the path this name becomes.
         if trimmed.contains('/') || Address::parse(trimmed).is_err() {
             return reject(
-                "a session name is one segment: no `/`, `\\`, `:` or control characters",
+                "a session name is one segment that stands on its own: no `/`, `\\`, `:`, \
+                 control characters, and no trailing dot",
             );
         }
         Ok(SessionName(trimmed.to_owned()))
@@ -224,20 +242,25 @@ mod tests {
     #[test]
     fn parse_rejects_every_banned_form() {
         for bad in [
-            "",           // empty
-            "/abs",       // absolute
-            "a//b",       // empty segment
-            "a/",         // trailing slash
-            "/",          // both
-            "..",         // parent escape
-            "a/../b",     // parent escape inside
-            ".",          // dot segment
-            "a/./b",      // dot segment inside
-            "a\\b",       // backslash
-            "C:/x",       // drive letter (colon)
-            "a/b:stream", // NTFS ADS (colon)
-            "a\u{0}b",    // NUL
-            "a\tb",       // control character
+            "",                  // empty
+            "/abs",              // absolute
+            "a//b",              // empty segment
+            "a/",                // trailing slash
+            "/",                 // both
+            "..",                // parent escape
+            "a/../b",            // parent escape inside
+            ".",                 // dot segment
+            "a/./b",             // dot segment inside
+            "a\\b",              // backslash
+            "C:/x",              // drive letter (colon)
+            "a/b:stream",        // NTFS ADS (colon)
+            "a\u{0}b",           // NUL
+            "a\tb",              // control character
+            ".sprawling.",       // Win32 opens this as `.sprawling`
+            ".sprawling ",       // and this too
+            "lab/.sprawling./x", // the alias one level down
+            "a /b",              // trailing space on an inner segment
+            "docs./notes.md",
         ] {
             let err = Address::parse(bad).unwrap_err();
             assert_eq!(err.code(), &AxCode::InvalidArgs, "should reject {bad:?}");
@@ -314,6 +337,17 @@ mod tests {
                 .is_reserved(),
             "a segment that merely looks like it is not it"
         );
+        // S-01: Windows opens each of these as the reserved directory, so
+        // a byte-wise predicate handed a run a subtree it was refused.
+        for alias in [".SPRAWLING", ".Sprawling/ledger", "lab/.SpRaWlInG/C.toml"] {
+            assert!(Address::parse(alias).unwrap().is_reserved(), "{alias}");
+        }
+        let upper = Address::parse(".SPRAWLING").unwrap();
+        let lower = Address::parse(".sprawling").unwrap();
+        assert_ne!(
+            upper, lower,
+            "identity stays byte-wise; only the guard folds"
+        );
     }
 
     #[test]
@@ -332,7 +366,24 @@ mod tests {
             if let Ok(addr) = Address::parse(&raw) {
                 proptest::prop_assert_eq!(addr.as_str(), raw.as_str());
                 proptest::prop_assert!(!raw.split('/').any(|s| s.is_empty() || s == "." || s == ".."));
+                proptest::prop_assert!(
+                    !raw.split('/').any(|s| s.ends_with('.') || s.ends_with(char::is_whitespace))
+                );
             }
+        }
+
+        /// S-01: every spelling a Windows file system resolves to the
+        /// reserved directory is refused or judged reserved, whatever its
+        /// case, trailing dots and spaces, and depth.
+        #[test]
+        fn a_windows_alias_of_the_reserved_directory_is_never_writable(
+            depth in "(lab/){0,2}",
+            name in "[.][sS][pP][rR][aA][wW][lL][iI][nN][gG]",
+            trailing in "[. ]{0,3}",
+        ) {
+            let raw = format!("{depth}{name}{trailing}/CONFIG.toml");
+            let slipped = matches!(Address::parse(&raw), Ok(addr) if !addr.is_reserved());
+            proptest::prop_assert!(!slipped, "{raw} reaches the reserved subtree");
         }
 
         #[test]

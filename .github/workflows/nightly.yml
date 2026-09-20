@@ -74,6 +74,104 @@ jobs:
               --target x86_64-unknown-linux-gnu -- -max_total_time=60
           done
 
+  # V5 leaf 15.4: the one kani entry that reads like clippy - it scans a
+  # crate and generates a harness for every function whose parameters all
+  # implement `kani::Arbitrary`, so it finds panics, overflows and UB in
+  # code nobody wrote a proposition about.
+  #
+  # **This job is a lead, not a verdict, and it must stay one.** It is
+  # barred from `just check` and from the pull request's required checks,
+  # for two reasons that will not expire soon: `autoharness` is an
+  # experimental feature behind `-Z` whose upstream tracking issue is
+  # still open, and the solver time it spends is a function of whatever
+  # signatures the tree happens to carry today, so a green run tells you
+  # nothing a person can hold a change against. The verdict a change is
+  # held against is `proof` in ci.yml, whose roster `cargo xtask proof`
+  # owns.
+  #
+  # It also cannot make another nightly job red: it is a job of its own,
+  # it runs nothing the others need, and `continue-on-error` keeps the
+  # workflow's own conclusion clear of it. What a finding costs is a
+  # reading, and the report below is what gets read - the summary names
+  # the failing harnesses, the artifact carries the counterexample
+  # traces. Nothing files an issue from here, because an automatic issue
+  # per night is a queue nobody drains; `issues: write` is deliberately
+  # not granted.
+  #
+  # Scope is `kernel`, the crate whose invariants are worth a solver's
+  # time and the only crate `cargo xtask proof` names. Widening it is a
+  # decision to take with a measured run in hand, not a default.
+  #
+  # kani is installed exactly as ci.yml's `proof` job installs it, and
+  # for the same reason it lives on ubuntu there: upstream builds kani
+  # for Linux only.
+  autoharness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: autoharness
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: install kani
+        run: |
+          cargo install --locked kani-verifier
+          cargo kani setup
+      # A broken install would produce an empty report, and an empty
+      # report reads exactly like a clean one, so kani is made to answer
+      # before the scan step can pass by scanning nothing.
+      - name: kani answers, so the scan cannot report nothing
+        run: cargo kani --version
+      # The ceiling is inside the step as well as on the job: a job killed
+      # by `timeout-minutes` is reported as *cancelled*, which reads as
+      # "somebody stopped it". `timeout` exits 124, and the exit code is
+      # recorded below rather than thrown away, so "the scan ran out of
+      # time" and "the scan found something" stay distinguishable in the
+      # summary. `set -e` is off for this one command for that reason.
+      - name: scan the kernel for what no proposition covers
+        id: scan
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p target/autoharness
+          timeout 50m cargo kani autoharness -Z autoharness -p kernel \
+            2>&1 | tee target/autoharness/report.txt
+          echo "status=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+      - name: what the scan says
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          status='${{ steps.scan.outputs.status }}'
+          report=target/autoharness/report.txt
+          {
+            echo "## kani autoharness (nightly lead, not a gate)"
+            case "${status:-missing}" in
+              0) echo "Every generated harness held. Nothing to read below." ;;
+              124) echo "The scan hit its fifty-minute ceiling. The partial output is attached; narrow the scope before reading it as a finding." ;;
+              *) echo "The scan reported failures (exit ${status:-missing}). Each line below names a function whose generated harness did not hold - read it as a lead and reproduce it with a written \`#[kani::proof]\` before changing any code." ;;
+            esac
+            if [ -s "$report" ]; then
+              echo
+              echo '```'
+              grep -E 'Failed|FAILURE|Status: |VERIFICATION' "$report" | head -n 60 || true
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      # The full log, counterexample traces included: the summary holds
+      # the headline, and the trace is what a person needs to write the
+      # harness that turns a lead into a proposition.
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: autoharness-report
+          path: target/autoharness/report.txt
+          if-no-files-found: warn
+
   # Advisories and yanked versions: the one check in this repository whose
   # input is written by other people at a time of their choosing. On a
   # pull request it would turn a change red for a reason its author cannot

@@ -257,6 +257,8 @@ pub fn runtime::TurnReport::calls_made(&self) -> usize
 pub fn runtime::TurnReport::calls_made(&self) -> usize
 pub fn runtime::TurnReport::model_returned(&self) -> &kernel::event::payload::EventRef
 pub fn runtime::TurnReport::model_returned(&self) -> &kernel::event::payload::EventRef
+pub fn runtime::TurnReport::redacted(&self) -> u32
+pub fn runtime::TurnReport::redacted(&self) -> u32
 pub fn runtime::TurnReport::refs(&self) -> &[kernel::event::payload::EventRef]
 pub fn runtime::TurnReport::refs(&self) -> &[kernel::event::payload::EventRef]
 pub fn runtime::TurnReport::stop(&self) -> core::option::Option<kernel::model::wire::StopReason>

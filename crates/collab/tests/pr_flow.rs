@@ -99,19 +99,16 @@ fn a_node_reaches_the_building_only_through_someone_elses_verification() {
             reviewed_by_person: true,
         })
         .unwrap();
-    let merged = verified.merged(commit);
+    // The record of a merge is written by `pr_tool::request::OpenRequest`,
+    // which is the one authority for that payload; this test therefore
+    // ends where the typestate does — at a verification the worktree
+    // has landed.
     assert_eq!(
         std::fs::read_to_string(dir.path().join("lab").join("notes.md")).unwrap(),
-        "after: measured in metres\n",
+        "after: measured in metres
+",
         "the building now stands on the node's work"
     );
-    let record = merged.merged_payload().unwrap();
-    assert_eq!(
-        record.as_map().get("verified_by").and_then(|v| v.as_str()),
-        Some("lab/tests")
-    );
-    assert_eq!(
-        record.as_map().get("commit").and_then(|v| v.as_str()),
-        Some(merged.commit())
-    );
+    assert_eq!(verified.verified_by(), "lab/tests");
+    assert_eq!(commit.len(), commit.trim().len());
 }

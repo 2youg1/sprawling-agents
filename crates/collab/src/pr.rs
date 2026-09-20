@@ -14,10 +14,12 @@
 //! reuses that judgment rather than making a second one.
 //!
 //! What this module adds is the match between a request and the work
-//! offered for it, and the three records the ledger keeps.
+//! offered for it. The ledger records are not written here: the one
+//! authority for a pull request's payload is
+//! [`OpenRequest`](crate::pr_tool::OpenRequest), which carries the
+//! `commit` field a rebuild needs and this module never had.
 
-use kernel::{AxCode, AxError, Payload};
-use serde_json::{Map, Value};
+use kernel::{AxCode, AxError};
 
 use crate::fanin::Artifact;
 use crate::workshop::NodeId;
@@ -39,13 +41,6 @@ pub struct Open;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Verified {
     by: String,
-}
-
-/// Merged: the commit the building now stands on.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Merged {
-    by: String,
-    commit: String,
 }
 
 impl Pr<Open> {
@@ -111,27 +106,6 @@ impl Pr<Open> {
             },
         })
     }
-
-    /// Turns the request down. Rejection is available from the open
-    /// phase only: what has been verified is answered by merging it or
-    /// by opening a new request, not by revoking a verdict.
-    ///
-    /// # Errors
-    /// Propagates the payload's refusal to hold what it was given.
-    pub fn rejected_payload(&self, by: &str, why: &str) -> Result<Payload, AxError> {
-        let mut map = self.record();
-        map.insert("by".to_owned(), Value::String(by.to_owned()));
-        map.insert("why".to_owned(), Value::String(why.to_owned()));
-        Payload::new(map)
-    }
-
-    /// The `pr_opened` record.
-    ///
-    /// # Errors
-    /// Propagates the payload's refusal to hold what it was given.
-    pub fn opened_payload(&self) -> Result<Payload, AxError> {
-        Payload::new(self.record())
-    }
 }
 
 impl Pr<Verified> {
@@ -139,45 +113,6 @@ impl Pr<Verified> {
     #[must_use]
     pub fn verified_by(&self) -> &str {
         &self.state.by
-    }
-
-    /// Records that the branch landed at `commit`. The merge itself is
-    /// `memory`'s: this crate decides, that one moves the files.
-    #[must_use]
-    pub fn merged(self, commit: String) -> Pr<Merged> {
-        Pr {
-            node: self.node,
-            implementer: self.implementer,
-            branch: self.branch,
-            state: Merged {
-                by: self.state.by,
-                commit,
-            },
-        }
-    }
-}
-
-impl Pr<Merged> {
-    #[must_use]
-    pub fn commit(&self) -> &str {
-        &self.state.commit
-    }
-
-    /// The `pr_merged` record.
-    ///
-    /// # Errors
-    /// Propagates the payload's refusal to hold what it was given.
-    pub fn merged_payload(&self) -> Result<Payload, AxError> {
-        let mut map = self.record();
-        map.insert(
-            "verified_by".to_owned(),
-            Value::String(self.state.by.clone()),
-        );
-        map.insert(
-            "commit".to_owned(),
-            Value::String(self.state.commit.clone()),
-        );
-        Payload::new(map)
     }
 }
 
@@ -196,20 +131,6 @@ impl<S> Pr<S> {
     #[must_use]
     pub fn branch(&self) -> &str {
         &self.branch
-    }
-
-    fn record(&self) -> Map<String, Value> {
-        let mut map = Map::new();
-        map.insert(
-            "node".to_owned(),
-            Value::String(self.node.as_str().to_owned()),
-        );
-        map.insert(
-            "implementer".to_owned(),
-            Value::String(self.implementer.clone()),
-        );
-        map.insert("branch".to_owned(), Value::String(self.branch.clone()));
-        map
     }
 }
 
@@ -248,10 +169,9 @@ mod tests {
     }
 
     #[test]
-    fn a_request_nobody_verified_has_no_way_to_merge() {
-        // The proof is the trybuild counterexample in tests/ui: `Pr<Open>`
-        // has no `merged`. Here we hold the other half - the phase a
-        // merge is reachable from is the one verification produces.
+    fn verification_is_the_only_way_out_of_the_open_phase() {
+        // `Pr<Open>` has no method that names a verifier; the phase that
+        // carries one is the phase verification produces.
         let verified = request().verified(&artifact("node-1", "lab/room1", "lab/tests"));
         assert!(verified.is_ok());
         assert_eq!(verified.unwrap().verified_by(), "lab/tests");
@@ -279,37 +199,12 @@ mod tests {
     }
 
     #[test]
-    fn the_three_records_say_who_did_what() {
-        let opened = request().opened_payload().unwrap();
-        assert_eq!(
-            opened.as_map().get("implementer").and_then(Value::as_str),
-            Some("lab/room1")
-        );
-
-        let rejected = request()
-            .rejected_payload("lab/tests", "the done check fails on Windows")
-            .unwrap();
-        assert!(
-            rejected
-                .as_map()
-                .get("why")
-                .and_then(Value::as_str)
-                .is_some_and(|why| why.contains("Windows"))
-        );
-
-        let merged = request()
-            .verified(&artifact("node-1", "lab/room1", "lab/tests"))
-            .unwrap()
-            .merged("abc123".to_owned());
-        assert_eq!(merged.commit(), "abc123");
-        let record = merged.merged_payload().unwrap();
-        assert_eq!(
-            record.as_map().get("verified_by").and_then(Value::as_str),
-            Some("lab/tests")
-        );
-        assert_eq!(
-            record.as_map().get("commit").and_then(Value::as_str),
-            Some("abc123")
-        );
+    fn the_request_carries_the_three_facts_a_record_is_built_from() {
+        // Building the record is `pr_tool::request::OpenRequest`'s; this
+        // phase only holds what it reads.
+        let request = request();
+        assert_eq!(request.node().as_str(), "node-1");
+        assert_eq!(request.implementer(), "lab/room1");
+        assert_eq!(request.branch(), "node-1");
     }
 }

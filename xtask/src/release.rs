@@ -12,13 +12,17 @@
 //! `local/` holds one machine's handoffs, rulings and probes, it is
 //! gitignored, and nothing published may depend on it.
 //!
-//! Five assertions, all about honesty rather than tidiness. Nothing in
+//! Six assertions, all about honesty rather than tidiness. Nothing in
 //! the published tree may be an isolation-zone path, nothing in it may
 //! link to one - a link that is dead for every reader but one is a
 //! sentence written for a reader who does not exist - nothing in it may
 //! carry a path off the machine that built it, nothing in it may cite a
-//! document this tree does not contain, and nothing in it may write one
-//! machine's working record into a product document.
+//! document this tree does not contain, nothing in it may write one
+//! machine's working record into a product document, and no link may
+//! spell a file's name in a case the tree does not use. That last one
+//! catches what a contributor cannot see locally: a link to
+//! `docs/Glossary.md` opens the file named `docs/glossary.md` on Windows
+//! and macOS, and is a 404 on Linux and on the hosting site.
 //!
 //! The fourth assertion exists because the third one missed a real case.
 //! Six files - two settled screens, two SPECs and a gate's own rustdoc -
@@ -49,7 +53,7 @@ mod context;
 mod link;
 
 use context::working_record;
-use link::{link_targets, resolve};
+use link::{Spellings, link_targets, resolve};
 
 /// Path prefixes that stay behind when the tree is published. Closed,
 /// and now one entry long.
@@ -262,6 +266,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let listed = published(root)?;
     let dirs = directory_names(&listed);
     let kept: BTreeSet<String> = listed.into_iter().collect();
+    let spellings = Spellings::of(&kept);
     for rel in &kept {
         let full = root.join(rel);
         // Anything that reads as text is checked for machine paths; a
@@ -366,6 +371,17 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                     alternative: "move the sentence into the product document, or drop it: a \
                                   link a reader cannot follow is worse than no link"
                         .to_owned(),
+                });
+            } else if let Some(on_disk) = spellings.miscased(&pointed) {
+                violations.push(Violation {
+                    gate: "release",
+                    location: format!("{rel} -> {target}"),
+                    rule: "a link spells the name the tree carries, case included".to_owned(),
+                    violation: format!("the tree has `{on_disk}`, not `{pointed}`"),
+                    alternative: format!(
+                        "write the link as `{on_disk}`, or rename the file and move every \
+                         reader with it: Linux opens one spelling only"
+                    ),
                 });
             }
         }

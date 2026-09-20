@@ -6,19 +6,19 @@
 //! Statistical evidence: suites, holdouts, probes, asset scoring,
 //! metabolism. Never a merge gate (C11).
 
-// The City.md ablation instrument answers on demand through its own
-// ignored test and has no product caller; compiling it into the shipped
-// library would ship an instrument, not a capability (eval-SPEC 8-7).
+// Four instruments answer on demand through their own tests and have no
+// product caller; compiling them into the shipped library would ship an
+// instrument, not a capability (eval-SPEC 8-3, 8-4, 8-5, 8-7).
 #[cfg(test)]
 mod ablation;
+#[cfg(test)]
 mod metabolism;
+#[cfg(test)]
 mod nesting;
 mod probe;
+#[cfg(test)]
 mod score;
 mod suite;
 
-pub use metabolism::{ASSET_FLOOR_PER_MILLE, ASSET_IDLE_DAYS, Disposal, dispose, sweep};
-pub use nesting::{Attempt, Fault, Grades, Shape, Verdict, grade, recommended, tally};
 pub use probe::{Answers, Comparison, Probe, ProbeId, compare, handoff_probe};
-pub use score::{AssetUse, Score, score, worst_first};
 pub use suite::{Half, Outcome, Report, Suite, Tally, Task};

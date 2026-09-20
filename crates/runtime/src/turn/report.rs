@@ -15,6 +15,7 @@ use kernel::{Ceiling, ContentBlock, EventRef, ModelUsage, StopReason};
 #[derive(Debug, Clone, PartialEq)]
 pub struct TurnReport {
     pub(super) refs: Vec<EventRef>,
+    pub(super) redacted: u32,
     pub(super) model_returned: EventRef,
     pub(super) calls_made: usize,
     pub(super) assistant: Vec<ContentBlock>,
@@ -32,6 +33,13 @@ impl TurnReport {
 
     pub fn refs(&self) -> &[EventRef] {
         &self.refs
+    }
+
+    /// How many secret-shaped spans this turn replaced before its model
+    /// and tool events reached the ledger. A diagnostic line can say
+    /// this number without saying what was found.
+    pub fn redacted(&self) -> u32 {
+        self.redacted
     }
 
     /// The in-window evidence candidate for `Completion::Done`.

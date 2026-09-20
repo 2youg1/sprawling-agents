@@ -83,6 +83,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 ## 8 接口先行（按模块分章）
 
+**本章的 §8-x 逐节按发生时序写成，故保留当时的名字。** 读到 `crates/web`、`web::*` 或 `web-SPEC.md` 时读的是历史：那个 Rust／wasm 客户端已不在树上，今天的客户端是 TypeScript 的 `client/`，它的 SPEC 是 `client/client-SPEC.md`。陈述今天结构的句子一律用后者的名字。
+
 三条不可动摇的形状约定，它们决定接口而非被接口决定：
 
 1. **`Command` 是穷尽枚举，每个改状态臂携 `IdemKey`**——「双击两下不开两个 Run」由类型保证，不由服务端去重表保证（去重表是第二道，`kernel::gate::dedup` 已有）。
@@ -356,7 +358,7 @@ impl Aggregate {
 
 ### 8-6 crate 面的两项（随 `web` 接入时定下）
 
-**一、`server` feature**（默认开）。`web → channels` 是 depmap 冻结边，而 tokio 的 mio **编译不到 wasm32**。故监听器进 feature：`server = ["dep:tokio", "dep:axum"]`，`web` 取 `default-features = false`，只得 wire／control／aggregate 三模块。浏览器里本来也没有可供监听的 socket，这条分割与现实同形。
+**一、`server` feature**（默认开）。当时 `web → channels` 是 depmap 冻结边，而 tokio 的 mio **编译不到 wasm32**，故监听器进 feature：`server = ["dep:tokio", "dep:axum"]`，那个 wasm 客户端取 `default-features = false`，只得 wire／control／aggregate 三模块。今天 wasm 客户端已不在树上，而分割留着并且仍有一个取它的人：`xtask` 以 `default-features = false, features = ["schema"]` 依赖本 crate，只要词汇与 schema，不要 TCP 栈。
 
 **被否**：把 wire 拆成第六个 crate。那要改 ARCHITECTURE §2 冻结拓扑（需 verdict），而 feature 边界已足以表达「词汇与监听器分开」这一件事。
 
@@ -389,7 +391,7 @@ pub struct SessionName(String);                // 形状 2；一个构造点，�
 - **`SessionName` 是值类型而非 `String`**：它必须能当一个地址段（无 `/`、无 `.`／`..`、无控制字符、非空、不叫 `.sprawling`），否则一个人输入的字会变成一条路径。构造点一个，拒绝携 recovery。
 - **`WIRE_V` 4 → 5**：握手处的 schema hash 因此变，旧页面拒绝而不是误读——这正是那个机制存在的理由。
 - **服务端开房间落在 `city`**（新一节，同期写）：已存在名字→加后缀，目录建在楼下；`.sprawling` 不得为会话名（`city` 的保留名谓词直接答这件事）。
-- **客户端（同期写在 web-SPEC）**：派活条第一格从「你猜 building/room」变成「选一栋楼 ＋ 这次叫什么」；直播页与楼页显示名字而不是 `short_run` 的十六进制。
+- **客户端（同期写在当时的 web-SPEC，今由 `client/client-SPEC.md` 接替）**：派活条第一格从「你猜 building/room」变成「选一栋楼 ＋ 这次叫什么」；直播页与楼页显示名字而不是 `short_run` 的十六进制。
 
 ## 9 工作流程
 

@@ -68,6 +68,9 @@ badge_label = "client"
 # fits a tool result into a window. Each is a capability a resident calls,
 # not a dependency that arrived unasked. 13.5x headroom against the 128 MB
 # budget says the next reading to spend attention on is not this one.
+#
+# This row is the `opt-level = 3` arm of the comparison the row below
+# opens; the criterion that decides between them is stated there, once.
 [release_binary]
 what = "the single binary a person installs, before fonts, wasmtime and CPython are embedded"
 budget_bytes = 134217728
@@ -81,6 +84,37 @@ status = "gated"
 # report. Change this row when a release workflow takes the job over.
 badge_label = "binary · windows-x86_64"
 badge_platform = "windows-x86_64"
+
+# The other arm of one comparison: the same tree, the same profile, the
+# same machine, linked at `opt-level = "z"` instead of `3`. External
+# review proposed five settings for [profile.release] and four of them -
+# `strip = "symbols"`, `lto = "fat"`, `codegen-units = 1`,
+# `panic = "abort"` - were already in Cargo.toml, so `opt-level` is the
+# whole open question, and it is a measurement rather than a judgement.
+#
+# **The criterion, decided before the readings exist so a number cannot
+# talk anybody into anything**: keep `3` unless `"z"` takes at least 15%
+# off [release_binary]'s reading *and* costs no more than 10% of cold
+# start. Below 15% saved, the size is not worth a slower binary; above
+# 10% lost, the wait a person sits through is not worth the bytes. Both
+# arms are read on one machine in one sitting, because a size is a fact
+# about the linker that produced it and a wall-clock figure is a fact
+# about the machine that ran it.
+#
+# No byte budget and no slack here: the 128 MB ceiling is a fact about
+# the binary a person installs and has its home on [release_binary]. This
+# row carries a reading and nothing else.
+#
+# What this comparison will not buy, whatever it reads: no check is
+# turned off for size except `debug-assertions`, and panic messages are
+# never stripped - a refusal that names its action, subject, code and
+# recovery is part of the product, not debug output.
+[release_binary_optz]
+what = "the same single binary, linked at opt-level = \"z\", every other [profile.release] setting unchanged"
+size_bytes = "unmeasured"
+cold_start_ms = "unmeasured"
+measured_by = "just build-web, then CARGO_PROFILE_RELEASE_OPT_LEVEL=z cargo build --release -p sprawling --locked, weighing the linked binary and timing its cold start the same way [release_binary]'s arm is timed"
+status = "not measured: nobody has built this arm yet, so both readings stand as the word `unmeasured` rather than an invented number. Not gated - it is one half of a comparison against [release_binary], and it stops existing the day the criterion above is applied and the losing arm is deleted"
 
 # The unit is a production function because the alternative was measured:
 # any honest file threshold lights up eight files across four crates at

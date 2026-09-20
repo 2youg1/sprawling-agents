@@ -163,3 +163,36 @@ adversary *args:
     # `C:/...` and is absent everywhere it is not needed.
     ! command -v cygpath >/dev/null 2>&1 || binary="$(cygpath -m "$binary")"
     cd adversary && SPRAWLING_BIN="$binary" lake exe adversary {{args}}
+
+# N-14.6: the acceptance gate for a real endpoint (never a gate in `just
+# check`; without credentials it prints one line and succeeds).
+#
+# It is out of `just check` because it spends somebody's money over
+# somebody's network: a key and a reachable endpoint are things a
+# machine may legitimately not have, and a daily loop that needs them
+# would be a loop people stop running. CI runs it nightly, where the
+# credentials live.
+#
+# The test names the environment variables it reads, so run it once to
+# be told them rather than reading a second list here. Which wire the
+# endpoint speaks travels as one of those variables beside the base URL
+# and the key it belongs to, instead of as a flag on this line that
+# could disagree with them.
+#
+# Two cargo invocations, because the cap belongs to the test process and
+# not to the compiler: a cold build of this target measured 2m18s on the
+# development machine, so `--no-run` pays for compilation first and the
+# 180 seconds then bound the calls to the endpoint (Roadmap section 0.0).
+# Serial, so three network tests share one cap and report in order.
+#
+# `args` reaches libtest, which is how one case is run on its own.
+e2e *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v timeout >/dev/null 2>&1 || {
+        echo "e2e needs coreutils timeout: the 180-second cap is part of the gate"
+        exit 1
+    }
+    cargo test -p sprawling --test e2e --locked --no-run
+    timeout 180 cargo test -p sprawling --test e2e --locked -- \
+        --nocapture --test-threads=1 {{args}}

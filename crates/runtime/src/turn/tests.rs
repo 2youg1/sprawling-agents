@@ -5,4 +5,5 @@
 
 mod helpers;
 mod phases;
+mod redaction;
 mod window;
