@@ -2679,6 +2679,14 @@ impl Journal {
 ```rust
 // bin::doctor::installing
 pub(crate) fn install(item: &str, progress: &mut dyn FnMut(&str)) -> Result<(), AxError>;
+// bin::doctor（Recipe 的唯一拒绝语）
+impl Recipe {
+    pub(crate) fn command(&self, item: &str) -> Result<Runnable<'_>, AxError>;
+}
+// bin::doctor::running（本二进制起安装程序的唯一一处）
+pub(crate) const PATIENCE: u32 = 3_600; // knocks, TICK apart
+pub(crate) struct Runnable<'a> { /* 私有：program、args */ }
+pub(crate) fn run(item: &str, runnable: &Runnable, deadline: Duration) -> Result<(), AxError>;
 // bin::assembly::commanding::machine
 impl RunWorker {
     pub(in crate::assembly) fn doctor_install(&mut self, item: &str) -> Result<(), AxError>;
@@ -2687,10 +2695,12 @@ impl RunWorker {
 ```
 
 - **只跑 `Recipe::Command`，走的是终端那条 `Machine::install`**，不是第二个安装器。`Print` 与 `Manual` 各自带着「人自己去做什么」被拒：管道进 shell 的脚本是没人读过的代码，这条纪律不因请求来自页面而松一格。需求表里没有的名字在起任何进程之前就被拒，因为页面问的是这份构建不认识的东西。
+- **「这条配方这座城可不可以跑」只有 `Recipe::command` 一个家**（H-12）。它要么给出 `Runnable`，要么给出那句带恢复语的拒绝；终端（`screen`）、页面（`installing`）与机器适配器（`probe`）三处都问它，所以同一条打印配方在三扇门后读到的是同一句话。`Machine::install` 收的是 `Runnable` 而不是 `Recipe`，于是「不可跑的配方」在这一层已经不可表达，`runnable()` 与 `probe` 里那第二段措辞随之删除。
+- **`bin::doctor::running` 是本二进制起安装程序的唯一一处，等待有上限**（B-25／F-10）。三件事一起成立：`stdin`／`stdout`／`stderr` 一律 `Stdio::null()`，于是要人同意源协议、要人输密码的包管理器立刻读到输入结束而不是坐在一台没有人的终端前；等待是 `try_wait` 的**计数敲门**，而不是 `Command::status()` 那种没有尽头的阻塞；敲完即杀掉子进程并带着 `E_TIMEOUT` 返回，恢复语是「自己在终端里跑这一行」。**上限用敲门次数而不是墙钟，因为本二进制读时钟的地方只有 `bin::assembly` 一处**（ARCHITECTURE §10 第 4 条）；这同时让上限可断言——测试要三次敲门就得到三次，而对着墙钟的断言问的是它跑在哪台机器上。`PATIENCE = 3_600` 次 × `TICK = 50ms` = 180 秒，只有这一个家。杀不掉或收不了尸都写进那条错误的主题——本城起的一个停不掉的进程是人必须知道的事实。
 - **进度就是日志行**（`bin::doctor` 模块名）。安装是本城起的一个进程并等它，值得报告的两件事——将要跑什么、怎么结束——正好是一行日志的形状；第二条进度通道会是同一件事的第二个权威。
 - **`doctor_install` 装完自己再探一遍**：装完仍答启动快照的城，会告诉人他刚装的东西还是没有。
 - **答案不入账本**：机器有什么不是这座城里发生的事——它在本进程之外被改变，写进历史就是写进一份会错的历史。它沿 `RunWorker::examine` 这个 sink 交给服务层的 views，与开城那一次写进去的是同一处。没有 sink 的 worker（命令行逐条驱动的那种）照样探、照样写那一行日志：一个行为取决于有没有人在看的动词，是两个动词。
-- **跑在写线程上，这就是代价**：探测是十几个程序各被起一次的几秒钟，安装是一个包管理器，两者都占住其他命令排的那条队。但另一条路更糟——让读去起进程，会拿着 views 的锁把其他每一次读都堵住，而且没人要求它这么做。
+- **跑在写线程上，代价有上限**：探测是十几个程序各被起一次的几秒钟，安装是一个包管理器，两者都占住其他命令排的那条队。但另一条路更糟——让读去起进程，会拿着 views 的锁把其他每一次读都堵住，而且没人要求它这么做。**此条先前接受的是「占住写线程」本身，那在无期限时等于永远**：一个等在输入上的安装程序会让 `Halt` 与 `Cancel` 都进不来，而那正是人最需要它们的一刻。故代价此后由 `PATIENCE × TICK` 封顶（上一条），写线程最多被一次安装占住 180 秒。
 
 ### 8-65 `bin::mcp_sse`：一台在流上应答的 server（形状 4 适配器；实现 `protocol::Outbound`）
 
@@ -2781,3 +2791,22 @@ pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
 6. **时长由两次 cargo 调用与两个调参守住。** 编译不占额度：`--no-run` 先付编译（一台 windows-msvc 机器上冷构建实测 2m18s），`timeout 180` 只罩测试进程。`request_max_retries = 0` 让 gateway 的退避一次都不睡，`timeout_ms = 60000` 让一次请求封顶一分钟（Roadmap §0.0：单次 `sleep` ≤ 10 秒、单个测试进程 `timeout` ≤ 180 秒）。
 
 **attach 就是一次真调用。** `admit` 为空表示「这个端点服务什么就收什么」，于是登记当场去问它的模型清单——一把被拒的 key 在 attach 处就被回绝，走不到派活。故三个用例都把 attach 与派活串成一个 `Result` 来判，而不是假定拒绝只会在最后一步出现。
+
+### 8-70 `bin::home`：这个人的家目录，以及本产品放在它下面的东西（形状 4 适配器）
+
+```rust
+pub struct Home { /* root —— 私有 */ }
+impl Home {
+    pub fn detect() -> Result<Home, AxError>;   // USERPROFILE，其次 HOME；E_PATH_NOT_FOUND
+    pub fn path(&self) -> &Path;
+    pub fn components(&self) -> PathBuf;        // ~/.sprawling/components
+    pub fn person_config(&self) -> PathBuf;     // ~/.sprawling/config.toml
+}
+```
+
+**四条口径：**
+
+1. **三处派生合一。** `doctor::host::components_dir`、`install::dirs`、`main::router::default_city_location` 此前各读一遍 `USERPROFILE || HOME`，而 C 章 3.1 的人层配置本要写第四遍（Roadmap G-10）。读环境的地方只此一处，其余全部由它派生。
+2. **住在库那一半，因为读者跨两半。** `doctor` 是库模块，`install` 与 `router` 是二进制模块，而二进制够得到库、库够不到二进制。模块名仍按模块表的写法叫 `bin::home`。
+3. **`detect` 失败是类型化错误，调用方各自决定是否致命。** 探组件时家目录缺席只是「看不到」，报告里由 `Absence::NoHome` 说明；装二进制时 Windows 还有 `LOCALAPPDATA` 可落，两者皆无才由 `install::no_home` 拒绝。两处都显式 `match` 错误臂而不是 `.ok()`，于是「没有家目录」是一个被做过的决定。
+4. **`~/.sprawling` 与城里的保留子树共用 `kernel::RESERVED_PREFIX`。** 这是本产品拥有的那一个点目录名，一个名字一个家；它在家目录下装的是属于这个人的东西，不属于任何一座城。`person_config()` 用小写 `config.toml`，与城内各层的 `CONFIG.toml` 不同名——两者是不同的层，同名会诱使某个读者把其中一个当成另一个。本模块只给路径，读写与分层归配置阶梯（H-10）。

@@ -40,6 +40,7 @@ mod index;
 
 pub use index::LedgerIndex;
 pub use index::LineReader;
+pub use index::Refreshed;
 
 mod hot;
 

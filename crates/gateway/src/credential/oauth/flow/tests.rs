@@ -83,6 +83,39 @@ fn a_redeemed_code_becomes_tokens_that_stay_wrapped() {
     );
 }
 
+/// **What the person pastes is `code#state`, not a code.** This
+/// provider's callback page hands back both halves joined by the URL
+/// fragment marker, so the left half is the code and the right half is
+/// the state that proves the redirect answers this process's request.
+#[test]
+fn a_pasted_callback_is_split_and_its_state_is_checked() {
+    let profile = profile_at("http://127.0.0.1:1/v1/oauth/token");
+    let state = "state-of-its-own-randomness";
+    let pending = oauth_begin(&profile, "v".repeat(64), state.to_owned()).unwrap();
+
+    let request = oauth_redeem_request(&profile, &pending, &format!("the-code#{state}")).unwrap();
+    let body: serde_json::Value = serde_json::from_str(&request.body).unwrap();
+    assert_eq!(
+        body["code"], "the-code",
+        "the fragment is not part of the code the token endpoint redeems"
+    );
+
+    // Read out by hand rather than with `expect_err`: a `TokenRequest`
+    // holds the code in plain text, and `Debug` on it would print one.
+    let Err(refused) = oauth_redeem_request(&profile, &pending, "the-code#someone-elses-state")
+    else {
+        panic!("a redirect this process did not start is not redeemed");
+    };
+    assert_eq!(refused.code(), &AxCode::InvalidArgs);
+    assert!(
+        !refused.subject().contains("the-code") && !refused.recovery().contains("the-code"),
+        "a refusal must not carry the code back out: {} / {}",
+        refused.subject(),
+        refused.recovery()
+    );
+    assert!(!refused.recovery().is_empty());
+}
+
 #[test]
 fn a_refresh_exchanges_the_stored_token_for_a_fresh_pair() {
     let access = ["sk-ant-oat01-", "N7pQ2mK4", "vB1nC5tR"].concat();

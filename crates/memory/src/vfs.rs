@@ -35,6 +35,15 @@ pub(crate) trait Vfs: Send {
     /// by recursion, and cannot overflow a stack on a deep city.
     fn list_dirs(&self, dir: &Path) -> io::Result<Vec<PathBuf>>;
     fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
+    /// At most `len` bytes of `path`, starting at `offset`, leaving
+    /// everything before `offset` on the disk.
+    ///
+    /// A short answer means the file ends there, which is how a caller
+    /// asking past the end learns it did: this seam reports the file as
+    /// it is and refuses nothing, so the meaning of an out-of-range
+    /// request stays with the module that owns the request's grammar
+    /// (memory-SPEC 8-3).
+    fn read_at(&self, path: &Path, offset: u64, len: u64) -> io::Result<Vec<u8>>;
     /// Creates the file when absent.
     fn append(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()>;
     fn truncate(&mut self, path: &Path, len: u64) -> io::Result<()>;

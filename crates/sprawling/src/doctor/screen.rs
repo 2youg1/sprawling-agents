@@ -217,10 +217,15 @@ fn offer<R: BufRead, W: Write>(
         let name = finding.requirement.name;
         let recipe = finding.requirement.recipe.at(platform);
         writeln!(out, "\n  {name}: {}", recipe.spelled())?;
-        if !recipe.runnable() {
-            writeln!(out, "  this one is yours to run; nothing was asked")?;
-            continue;
-        }
+        // The one authority on whether this city may run a recipe also
+        // holds the sentence saying what the person does instead.
+        let runnable = match recipe.command(name) {
+            Ok(runnable) => runnable,
+            Err(refused) => {
+                writeln!(out, "  {}", refused.recovery())?;
+                continue;
+            }
+        };
         write!(out, "  run it? [y/N] ")?;
         out.flush()?;
         let mut answer = String::new();
@@ -234,7 +239,7 @@ fn offer<R: BufRead, W: Write>(
             writeln!(out, "  skipped")?;
             continue;
         }
-        match machine.install(name, recipe) {
+        match machine.install(name, &runnable) {
             Ok(()) => installed.push(name),
             Err(err) => {
                 writeln!(out, "  {err}")?;

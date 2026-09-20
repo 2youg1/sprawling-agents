@@ -24,8 +24,6 @@ mod verb;
 pub use act::{Action, frame_for};
 pub use devloop::{DevLoop, LOOKS_MAX, Observation, QUIET_LOOKS, Step};
 pub use diff::{Box2, Difference, diff};
-#[cfg(feature = "conformance")]
-pub use port::assert_port_conformance;
 pub use port::{BrowserPort, Frame, Reply};
 pub use profile::{PROFILES_DIR, Profile};
 pub use session::{ContextId, Recording, Session, SessionRequest};

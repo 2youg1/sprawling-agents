@@ -37,8 +37,9 @@ use tokio::sync::broadcast;
 
 use crate::assets::AssetReply;
 use crate::auth;
+use crate::reception::inbound::Inbound;
 use crate::reception::{BindVerdict, SessionState, SessionStep, decide_bind, decide_frame};
-use crate::wire::{ClientFrame, ServerFrame};
+use crate::wire::ServerFrame;
 
 use super::config::{AcpBody, ServeConfig, ShellState, router};
 
@@ -49,6 +50,7 @@ use std::net::SocketAddr;
 /// either a send, a receive, or the end of the session.
 pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     let mut phase = SessionState::AwaitingHello;
+    let mut inbound = Inbound::new();
     let mut events = state.events.subscribe();
     let mut deltas = state.deltas.subscribe();
     let mut logs = state.logs.subscribe();
@@ -62,17 +64,16 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
             incoming = socket.recv() => {
                 let Some(Ok(message)) = incoming else { return };
                 let Message::Text(text) = message else { continue };
-                let Ok(frame) = serde_json::from_str::<ClientFrame>(&text) else {
-                    let refusal = AxError::failure(
-                        AxCode::WireMismatch,
-                        "decode a client frame",
-                        "the frame does not match this wire",
-                    )
-                    .with_recovery("reload the page to fetch the client this server was built with");
-                    let _ = send(&mut socket, &ServerFrame::Refusal(Box::new(refusal))).await;
-                    return;
+                // A frame this build cannot read and a frame it can are
+                // judged through the same branch below, so a refusal
+                // reaches the peer by one path whichever produced it.
+                let step = match inbound.read(&text) {
+                    Ok(frame) => {
+                        decide_frame(phase, frame, state.token_digest.as_ref(), state.city.as_ref())
+                    }
+                    Err(unreadable) => unreadable,
                 };
-                match decide_frame(phase, frame, state.token_digest.as_ref(), state.city.as_ref()) {
+                match step {
                     SessionStep::Welcome(welcome) => {
                         phase = SessionState::Live;
                         if send(&mut socket, &ServerFrame::Welcome(*welcome)).await.is_err() {
@@ -126,7 +127,9 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         }
                     }
                     SessionStep::Refuse { error, close } => {
-                        let _ = send(&mut socket, &ServerFrame::Refusal(error)).await;
+                        if send(&mut socket, &ServerFrame::Refusal(error)).await.is_err() {
+                            return;
+                        }
                         if close {
                             return;
                         }

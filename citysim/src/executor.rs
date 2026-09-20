@@ -168,8 +168,8 @@ pub fn run_scenario_on(
     let job = job_locator(&addr, &job_md)?;
 
     // The scenario clock: ticks are handed out in the order the driver
-    // asks for them, which is what makes a failure reproducible from a
-    // seed rather than from a stopwatch.
+    // asks for them, which is what makes a failure replay from the
+    // script rather than from a stopwatch.
     let tick = Cell::new(0u64);
     let mut now = || {
         let value = tick.get();
@@ -232,9 +232,9 @@ pub fn run_scenario_on(
         let ctx = GateContext {
             actor: bench_who.clone(),
             now: t,
-            item_id: ApprovalId::new(format!("item-{}", t.value())).ok_or_else(|| {
-                AxError::failure(AxCode::InvalidArgs, "mint approval id", "empty id")
-            })?,
+            // The call's position, never the clock reading: two runs
+            // share a millisecond and must not share an item.
+            item_id: ApprovalId::of(&run, Seq::new(at)),
         };
         let temporal = bench
             .meta_of(call.name.as_str())

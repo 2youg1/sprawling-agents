@@ -22,6 +22,7 @@ pub mod assembly;
 pub mod console;
 pub mod doctor;
 pub mod firstrun;
+pub mod home;
 pub mod release;
 mod revealing;
 pub mod serving;

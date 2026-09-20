@@ -4,6 +4,7 @@ impl sprawling::assembly::RunWorker
 impl sprawling::assembly::RunWorker
 impl sprawling::assembly::RunWorker
 impl sprawling::assembly::ScanReport
+impl sprawling::home::Home
 impl sprawling::serving::Journal
 impl sprawling::serving::Keyed
 pub async fn sprawling::serving::serve(sprawling::serving::Serving) -> core::result::Result<(), kernel::error::shape::AxError>
@@ -27,6 +28,10 @@ pub fn sprawling::firstrun::default_city(&std::path::Path, core::option::Option<
 pub fn sprawling::firstrun::is_writable(&std::path::Path) -> bool
 pub fn sprawling::firstrun::local_url(core::net::socket_addr::SocketAddr) -> alloc::string::String
 pub fn sprawling::firstrun::open_when_ready(core::net::socket_addr::SocketAddr, alloc::string::String)
+pub fn sprawling::home::Home::components(&self) -> std::path::PathBuf
+pub fn sprawling::home::Home::detect() -> core::result::Result<sprawling::home::Home, kernel::error::shape::AxError>
+pub fn sprawling::home::Home::path(&self) -> &std::path::Path
+pub fn sprawling::home::Home::person_config(&self) -> std::path::PathBuf
 pub fn sprawling::release::answer() -> channels::answer::release::ReleaseAnswer
 pub fn sprawling::release::built() -> core::result::Result<sprawling::release::Built, kernel::error::shape::AxError>
 pub fn sprawling::release::newest() -> core::result::Result<kernel::release::Release, kernel::error::shape::AxError>
@@ -41,6 +46,7 @@ pub mod sprawling::assembly
 pub mod sprawling::console
 pub mod sprawling::doctor
 pub mod sprawling::firstrun
+pub mod sprawling::home
 pub mod sprawling::release
 pub mod sprawling::serving
 pub sprawling::assembly::Adopt::EveryFolder
@@ -76,5 +82,6 @@ pub struct sprawling::assembly::InitReport
 pub struct sprawling::assembly::RunWorker
 pub struct sprawling::assembly::ScanReport
 pub struct sprawling::console::Terminal
+pub struct sprawling::home::Home
 pub struct sprawling::serving::Journal
 pub struct sprawling::serving::Serving

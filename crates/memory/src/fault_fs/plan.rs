@@ -65,5 +65,11 @@ pub(crate) struct State {
     pub(crate) files: BTreeMap<PathBuf, FileState>,
     pub(crate) dirs: BTreeSet<PathBuf>,
     pub(crate) op: u64,
+    /// Bytes handed to a reader since this adapter was built.
+    ///
+    /// An op count says how many times the disk was touched; this says
+    /// how much came back, which is the only way to tell a read of one
+    /// range from a read of the whole object that contains it.
+    pub(crate) bytes_read: u64,
     pub(crate) plan: FaultPlan,
 }

@@ -12,7 +12,6 @@ publish.workspace = true
 # other suites in this workspace were already behind this feature; this
 # one was a plain `pub fn` whose lint waiver called it "dev-only by
 # contract" while nothing held the contract.
-conformance = []
 
 [dependencies]
 kernel = { path = "../kernel" }

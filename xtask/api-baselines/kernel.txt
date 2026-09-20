@@ -106,6 +106,7 @@ impl kernel::ToolName
 impl kernel::UsdMicros
 impl kernel::Version
 impl kernel::WriteDomain
+impl kernel::layout::CityLayout
 impl serde_core::ser::Serialize for kernel::AxCode
 impl serde_core::ser::Serialize for kernel::B3Hash
 impl serde_core::ser::Serialize for kernel::GitOid
@@ -183,6 +184,16 @@ pub const kernel::consts_policy::SANDBOX_FUEL_DEFAULT: u64
 pub const kernel::consts_policy::SECRET_ENTROPY_MIN: kernel::consts_policy::Ratio
 pub const kernel::consts_policy::STARTUP_BUDGET_TOKENS: u64
 pub const kernel::consts_policy::WORKTREE_MAX_BYTES: u64
+pub const kernel::layout::ARCHIVE_DIR: &str
+pub const kernel::layout::BUILDING_SHELF: &str
+pub const kernel::layout::CAS_DIR: &str
+pub const kernel::layout::CONFIG_FILE: &str
+pub const kernel::layout::FILTERS_FILE: &str
+pub const kernel::layout::HANDOFF_FILE: &str
+pub const kernel::layout::JOB_FILE: &str
+pub const kernel::layout::LEDGER_DIR: &str
+pub const kernel::layout::LIBRARY_DIR: &str
+pub const kernel::layout::URBANITE_FILE: &str
 pub enum kernel::Admission
 pub enum kernel::AnswerVerdict
 pub enum kernel::Answered
@@ -250,6 +261,8 @@ pub fn kernel::Address::is_within(&self, &kernel::Address) -> bool
 pub fn kernel::Address::parse(&str) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::ApprovalId::as_str(&self) -> &str
 pub fn kernel::ApprovalId::new(impl core::convert::Into<alloc::string::String>) -> core::option::Option<kernel::ApprovalId>
+pub fn kernel::ApprovalId::of(&kernel::RunId, kernel::Seq) -> kernel::ApprovalId
+pub fn kernel::ApprovalId::of_sweep(&kernel::RunId) -> kernel::ApprovalId
 pub fn kernel::Artifact::locator(&self) -> &kernel::Locator
 pub fn kernel::Artifact::verified_by(&self) -> &kernel::EventRef
 pub fn kernel::Artifact::verify(kernel::Claim, kernel::EventRef) -> core::result::Result<kernel::Artifact, kernel::AxError>
@@ -494,6 +507,19 @@ pub fn kernel::gate_discard(&kernel::DiscardRequest, &kernel::Registry, &kernel:
 pub fn kernel::gather_shares(&[kernel::Share]) -> kernel::Share
 pub fn kernel::govern(&kernel::GateContext, &kernel::Address, &kernel::Address, &str, &kernel::Locator, &kernel::TaintSet) -> kernel::GateOutcome
 pub fn kernel::insert_children(&str, &kernel::NodeId, &[kernel::NewChild]) -> core::result::Result<alloc::string::String, kernel::AxError>
+pub fn kernel::layout::CityLayout::archive(&self, &kernel::Address) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::building_skills(&self, &kernel::Address) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::cas(&self) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::config(&self, &kernel::Address) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::filters(&self, &kernel::Address) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::handoff(&self, &kernel::Address) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::job(&self, &kernel::Address) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::ledger(&self) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::library(&self) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::new(&std::path::Path) -> Self
+pub fn kernel::layout::CityLayout::root(&self) -> &std::path::Path
+pub fn kernel::layout::CityLayout::scope(&self, &kernel::Address) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::urbanite(&self, &kernel::Address) -> std::path::PathBuf
 pub fn kernel::markdown(&str) -> alloc::vec::Vec<kernel::Span>
 pub fn kernel::match_item(&kernel::Policy, &kernel::ApprovalItem) -> kernel::PolicyApplication
 pub fn kernel::may_answer(&kernel::Autonomy, &kernel::ApprovalItem, &kernel::Answerer) -> kernel::AnswerVerdict
@@ -1071,6 +1097,7 @@ pub kernel::consts_policy::Ratio::num: u32
 pub mod kernel
 pub mod kernel::consts_external
 pub mod kernel::consts_policy
+pub mod kernel::layout
 pub struct kernel::ActionFingerprint(_)
 pub struct kernel::Address(_)
 pub struct kernel::ApprovalId(_)
@@ -1161,6 +1188,7 @@ pub struct kernel::UsdMicros(_)
 pub struct kernel::Version(_)
 pub struct kernel::consts_external::SecretShape
 pub struct kernel::consts_policy::Ratio
+pub struct kernel::layout::CityLayout
 pub trait kernel::Ledger
 pub trait kernel::Model
 pub trait kernel::Tool: core::marker::Send

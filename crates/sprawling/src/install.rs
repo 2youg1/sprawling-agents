@@ -212,11 +212,15 @@ fn no_home() -> AxError {
     .with_recovery("set HOME, or copy the binary somewhere on PATH yourself")
 }
 
+/// The two roots an install may land under, either of which this
+/// environment may leave unstated; `program_dir` decides between them
+/// and `no_home` refuses when neither is there.
 fn dirs() -> (Option<PathBuf>, Option<PathBuf>) {
     let local_app_data = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
-    let home = std::env::var_os("USERPROFILE")
-        .or_else(|| std::env::var_os("HOME"))
-        .map(PathBuf::from);
+    let home = match sprawling::home::Home::detect() {
+        Ok(home) => Some(home.path().to_path_buf()),
+        Err(_) => None,
+    };
     (local_app_data, home)
 }
 

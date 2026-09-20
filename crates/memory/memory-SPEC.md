@@ -204,10 +204,14 @@ impl Cas {
     /// Full read re-verifies the hash (cheap: BLAKE3 GB/s); mismatch ⇒ CasCorrupt.
     pub fn get(&self, hash: &B3Hash) -> Result<Vec<u8>, MemoryError>;
     /// Range read per Locator semantics (L: 1-based closed; B: 0-based closed).
-    /// Trusts the object as verified at put; full-read paths re-verify.
+    /// Reads only the named bytes; trusts the object as verified at put.
     pub fn get_range(&self, hash: &B3Hash, range: &Range) -> Result<Vec<u8>, MemoryError>;
 }
 ```
+
+**范围读只读要答的那一段，并且不校验。** 取回走 `Vfs::read_at`：`B` 式一次定位读取 `to-from+1` 字节，**短答即越界**（文件到头了，拒而不夹取）；`L` 式自对象开头按 64 KiB 块扫换行，扫到第 `to` 行的终止符即止，付的是答案**之前**的字节，从不付答案之后的字节。语义仍归 `memory::cas::ranges` 一处（`of_object`），`Cas::get_range` 只做存在判定与路径解析。
+
+**两条路里选了「不校验，调用方明示接受」，另一条（分块哈希）落选。** 一个对象的地址覆盖整份内容，拿它校验一个片段就必须把整份读回来重算 BLAKE3——那正是本条要去掉的代价。要让片段可校验就得改写入面：put 时另存一棵分块哈希树（BLAKE3 的可验证流式形态），于是每个对象多一份旁挂物、多一条要与对象保持同步的事实、并且旧对象无树可用。买到的是「范围读能发现位腐烂」，而位腐烂**已经**由 `get` 的全读复算发现，且 §12 已把 `CasCorrupt` 记为不可定义掉的外部事故。因此：**范围读信任 put 时的校验，需要地址被证明的调用方走 `get`**；这句话在 `cas/ranges.rs` 的模块文档里逐字重复一遍，因为改那段代码的人先读的是它。
 
 布局：`<dir>/b3/<hex 前 2>/<hex64>`；临时件 `<dir>/tmp/<hex64>.part`（内容定名：同内容并发写者汇合于同一目标，无随机源；残留 tmp 先 truncate 再写）。put 四步：hash→已存在即去重返回→写 tmp＋`sync_data`→`rename`＋`sync_dir`（分片目录）。范围取回越界＝`RangeOutOfBounds`（fail-closed，不静默夹取）；`L` 式行切分按 `\n`，末行无终止符同计一行；返回字节含行间 `\n`、不含末行终止符；`B` 式按 0 起闭区间直切。
 rename 入 Vfs；FaultFs 模型：rename 原子；新目标目录项在 `sync_dir` 前不存活，断电即整体消失（源已移除）——看似比真实更损，但 put 尚未返回 Ok，无可观察效果被丢失，A3 点 2 的断言面（已命名对象恒不腐蚀）不受影响。
@@ -221,7 +225,11 @@ impl LedgerIndex {
     /// Build by scanning the ledger dir; 旁挂 cache `index.cache` is
     /// loaded when checksum-fresh, rebuilt otherwise (disposable by design).
     pub fn load_or_rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError>;
-    pub fn refresh(&mut self, dir: &Path) -> Result<(), MemoryError>;              // 只读长出来的字节
+    pub fn refresh(&mut self, dir: &Path) -> Result<Refreshed, MemoryError>;       // 只读长出来的字节
+}
+/// 一次 refresh 做了什么，以及为此从盘上抬起了多少字节。
+pub enum Refreshed { Unchanged, Appended { bytes_read: u64 }, Rebuilt }
+impl LedgerIndex {
     pub fn reader(&self, dir: &Path) -> LineReader<'_>;                            // 取行的唯一入口
     pub fn run_seqs_before(&self, run: RunId, before: Option<Seq>)                 // 一个 run 写过的 seq，新的在前
         -> impl Iterator<Item = Seq> + '_;
@@ -246,6 +254,10 @@ impl LineReader<'_> {
 - **索引常驻，不每次查询重建**：在**每一次** `History`／`RunHistory` 里走 `load_or_rebuild`、把整个 `index.cache` 读进来重新解析，5 万条时是 1.5 MB 与 5 万次 String 分配，实测 **14.4 ms 一次查询**。
   - **增量面是 `refresh`，不是“追加时告知索引”**：调用方手里只有 `EventRecord`，段名与偏移是 `jsonl` 的内部事务（§7 第三条）。让观察者携偏移会把分段泄给调用方，而 `refresh` 把那个知识留在本模块。
   - 索引因此多记一张 `scanned: BTreeMap<段名, 已折入字节数>`。`refresh` 逐段比对：**变大就只读新那一段字节**；**变小或消失就全重建**（断尾修复截过段，旧偏移不再可信）；一字未动就什么也不做。
+  - **「上次读到哪」只有这一个家，而且它恒落在整行边界上**：`fold_segment` 只把带终止符的行计入，所以 `scanned` 记的永远是某条记录的结尾，下一次 refresh 从一条记录的开头起读，**取不到半条**。
+  - **定位读，而不是整读再切尾**：`open` + `seek(from)` + `take(size-from)`，读进来的缓冲只装增量。`take` 以本次 `metadata` 读到的长度封顶——stat 与 read 之间落的那条账留给下一次 refresh，而不是折在一个本次没有确认过的偏移上。
+  - **`scanned` 不落盘，所以「偏移写坏」不是一个状态**：它是常驻状态，cache 命中时取当下段大小（cache 新鲜的定义就是字节数与 stamp 相符）。一份被改坏的 cache 过不了 stamp 比对，整份重建；进程内若出现 `scanned > 段长`，走的是「变小」那一支，同样整份重建。任何一条可疑路径的答案都是重建，没有一条会读到半条记录。
+  - **`refresh` 报出它读了多少字节**（`Refreshed`）：整读与定位读折出的索引逐条相同，唯一的区别就是抬起的字节数，所以那个数必须能被断言，也正是 `index_refresh_read` 这条预算的读数来源。
   - `load_or_rebuild` 走 cache 命中时，`scanned` 取当下段大小：**cache 新鲜的定义就是字节数与 stamp 相符**，所以这个赋值精确而不是近似。
   - 消费者：`bin::assembly` 的 `Views` 持一份，每次查询先 `refresh`。刷新代价是一次 `read_dir` 加逐段 `metadata`，与账本大小无关。
 - **run 索引与 seq 索引同住一张旁挂物**：`run_history` 从账本尾部逐行往回读，读满 `channels::HISTORY_SCAN` 行就停，**过滤发生在读完之后**——不属于这个 run 的行也要完整取出再丢掉。索引因此多记一张 `runs: BTreeMap<RunId, BTreeSet<Seq>>`，查询只取属于它的 seq，代价与**答的条数**同阶而不与账本长度同阶。
@@ -634,6 +646,7 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
     fn list(&self, dir: &Path) -> io::Result<Vec<PathBuf>>;     // 排序后返回：遍历确定性
     fn list_dirs(&self, dir: &Path) -> io::Result<Vec<PathBuf>>; // 同为浅层：遍树用显式工作表
     fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
+    fn read_at(&self, path: &Path, offset: u64, len: u64) -> io::Result<Vec<u8>>;  // 定位读；短答＝文件到头
     fn append(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()>;
     fn truncate(&mut self, path: &Path, len: u64) -> io::Result<()>;
     fn sync_data(&mut self, path: &Path) -> io::Result<()>;
@@ -644,6 +657,8 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
 }
 ```
 
+- **`read_at` 只报事实，不判越界**：短答表示文件在那里结束，「要的范围超出了对象」这句话归提出范围的模块（§8-3）。端口若自己拒绝，Locator 文法就有了第二个权威。
+- **`FaultFs` 另记 `bytes_read`**：op 计数答「碰了几次盘」，字节计数答「抬回来多少」，而范围读与整读的唯一区别就是后者。`FaultFs::bytes_read()` 是范围读不整读这条断言的观测面。
 - **端口的符合性套件就是断电点阵**（§8-2）：两个适配器对同一组语义负责，`fault_fs` 存在本身就是这条缝的存在证明（§8.5 设计 A）。
 - **仍然不升真缝**：`pub(crate)`，`JsonlLedger` 把它藏在 `Box<dyn Vfs>` 后面，公开签名里一次不出现（否则 E0445）。
 
@@ -788,3 +803,11 @@ pub fn working_status(city_root: &Path, scope: Option<&str>, base: Option<GitOid
 2. **未跟踪文件照样成行。** 一个 agent 写下又从未入暂存的文件，恰恰是人要找的那个;只列已跟踪改动的清单会把一个新模块报成什么都没发生。为此 `changes::collect` 的 `Untracked` 归入 `How::Added`——工作树有而没有任何提交有的文件，就是这次加出来的。
 3. **`scope` 是一条 pathspec 而不是事后过滤。** 楼页问的是它自己那些文件，让 git 在走差异时就收窄，比走完全城再筛一遍少一趟盘。
 4. **`drift` 整个可缺席。** 没有上游、上游被删、以及处在游离头上，对读者而言是同一件可做的事（没有可比的对象），而与「和上游齐平」不是一回事。
+
+### 8-23 `memory::cas::ranges`：Locator 范围文法住一处（形状 4 适配器）
+
+`get_range` 的文法——`B` 0 起闭区间、`L` 1 起闭区间、行间 `\n` 保留、末行终止符不返回、越界拒不夹取——是一套读法，不是 CAS 的存取。它因此住 `crates/memory/src/cas/ranges.rs`，`Cas::get_range` 只解析对象路径、判定存在，再把 `&dyn Vfs` 与路径交给 `of_object`。
+
+**块长 64 KiB 是本模块的内部事务**（`SCAN_CHUNK_BYTES`）：`L` 式要知道第几行从哪开始，只能从对象开头扫换行，于是代价与**答案之前**的字节同阶，而与对象大小无关——一份 200 MB 的 offload 取第二行，读的是 64 KiB。`B` 式一次定位读即可，不必扫。
+
+**这套文法没有第二个家**：`Cas::get` 仍是唯一会复算 BLAKE3 的读法，`ranges` 一次也不哈希。两条断言守着这件事——`byte_and_line_ranges_follow_locator_semantics` 守文法，`a_range_read_lifts_the_range_rather_than_the_object` 守代价（用 `FaultFs::bytes_read()` 数字节：一个五字节范围移动的字节数必须以十计，而不是以对象长度计）。

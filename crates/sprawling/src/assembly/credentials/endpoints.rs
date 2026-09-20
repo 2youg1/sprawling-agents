@@ -286,7 +286,7 @@ impl RunWorker {
             .with_recovery("choose one of the models the endpoint listed")
             .with_nearby(known.models.clone()));
         }
-        let priced = gateway::MarketSnapshot::builtin().lookup(&model).cloned();
+        let priced = gateway::MarketSnapshot::builtin()?.lookup(&model).cloned();
         // What the person stated outranks the catalogue, and what
         // neither states stays unstated. **The old reading of an unknown
         // model was zero**, which the OpenAI wire wrote out as

@@ -210,3 +210,49 @@ fn the_clerk_answers_as_the_appointed_delegate_and_no_further() {
         AnswerVerdict::SelfApprovalBarred
     );
 }
+
+#[test]
+fn two_runs_raising_their_first_approval_get_two_ids() {
+    // What the clock-shaped identity lost: the two lanes reach here in
+    // the same millisecond, and the inbox keys on this string.
+    let left = RunId::from_bytes([1; 16]);
+    let right = RunId::from_bytes([2; 16]);
+    assert_ne!(
+        ApprovalId::of(&left, Seq::FIRST),
+        ApprovalId::of(&right, Seq::FIRST)
+    );
+    assert_ne!(ApprovalId::of(&left, Seq::FIRST).as_str(), "");
+}
+
+#[test]
+fn replaying_one_run_re_derives_the_same_ids() {
+    let run = RunId::from_bytes([7; 16]);
+    let first: Vec<ApprovalId> = (0..4)
+        .map(|at| ApprovalId::of(&run, Seq::new(at)))
+        .collect();
+    let again: Vec<ApprovalId> = (0..4)
+        .map(|at| ApprovalId::of(&run, Seq::new(at)))
+        .collect();
+    assert_eq!(first, again);
+    // Positions inside one run are distinct, and they sort the way the
+    // run raised them.
+    let mut sorted = first.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(sorted, first);
+}
+
+#[test]
+fn the_sweep_slot_belongs_to_its_run_and_to_no_call_position() {
+    let run = RunId::from_bytes([9; 16]);
+    let other = RunId::from_bytes([10; 16]);
+    assert_ne!(ApprovalId::of_sweep(&run), ApprovalId::of_sweep(&other));
+    assert_ne!(
+        ApprovalId::of_sweep(&run),
+        ApprovalId::of(&run, Seq::new(0))
+    );
+    assert_ne!(
+        ApprovalId::of_sweep(&run),
+        ApprovalId::of(&run, Seq::new(u64::MAX - 1))
+    );
+}

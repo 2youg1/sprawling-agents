@@ -4,10 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Reading and writing frames. The generated `Schema` is the only reader:
-// a frame this build cannot parse is `null`, and the link treats it as
-// a closed connection, because the two ends disagree about the wire and
-// the machine already knows what to do about that. This is the one
-// place Effect is used at run time.
+// a frame this build cannot parse is `null`, and the link judges that as
+// a wire mismatch rather than an outage, because reconnecting meets the
+// same frame again. This is the one place Effect is used at run time.
 
 import { Either, Schema } from "effect";
 

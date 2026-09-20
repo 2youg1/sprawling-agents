@@ -20,7 +20,13 @@ export const Address = Schema.String.pipe(Schema.brand("Address"));
 export type Address = typeof Address.Type;
 
 /**
- * Non-empty item identity; uuid v7 minting is the effect layer's.
+ * Non-empty item identity, derived from the run that raises the item
+ * and that run's own position counter — never from a clock. Four lanes
+ * drive at once by default, so two runs reach their first approval in
+ * one millisecond routinely; a clock-shaped identity makes those two
+ * items one key, the inbox keeps the later one, and the earlier one
+ * disappears from an append-only history that cannot afterwards tell a
+ * lost item from an item that was never raised.
  */
 export const ApprovalId = Schema.String.pipe(Schema.brand("ApprovalId"));
 export type ApprovalId = typeof ApprovalId.Type;

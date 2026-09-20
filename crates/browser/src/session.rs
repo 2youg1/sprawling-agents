@@ -8,9 +8,10 @@
 //!
 //! `Session` mints ids and builds frames; it never holds a socket. That
 //! is what lets a whole browser conversation be asserted without a
-//! browser, and it is why the recording below is a real second adapter
-//! rather than a test double — the binary's transport and this one
-//! differ in where the bytes come from and in nothing else.
+//! browser. The recording below is the offline adapter of the seam: it
+//! answers from a conversation somebody already had, so the assertions
+//! it carries are about the frames this crate builds, not about the
+//! transport in the binary.
 
 use std::collections::BTreeMap;
 
@@ -263,8 +264,6 @@ impl BrowserPort for Recording {
 )]
 mod tests {
     use super::*;
-    #[cfg(feature = "conformance")]
-    use crate::port::assert_port_conformance;
 
     #[test]
     fn a_conversation_numbers_its_own_frames_and_never_reuses_one() {
@@ -321,14 +320,19 @@ mod tests {
         assert_eq!(recording.missed().len(), 1);
     }
 
-    #[cfg(feature = "conformance")]
     #[test]
-    fn the_recording_satisfies_the_seams_assertions() {
+    fn the_recording_answers_the_same_frame_twice_without_consuming_it() {
         let mut session = Session::new();
         let tree = session.tree().unwrap();
         let mut recording = Recording::new();
         recording.answer(&tree, json!({ "contexts": [] }));
-        assert_port_conformance(&mut recording, &tree);
+        let once = recording.send(&tree).unwrap();
+        let twice = recording.send(&tree).unwrap();
+        assert_eq!(
+            once, twice,
+            "a replay is re-enterable; answering is not a take"
+        );
+        assert_eq!(once.id(), tree.id());
     }
 
     #[test]

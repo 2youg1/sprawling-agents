@@ -13,7 +13,7 @@
 use kernel::{AxError, Increment};
 use serde_json::{Value, json};
 
-use crate::mismatch::stream_cut;
+use crate::mismatch::{settled_tool_arguments, stream_cut};
 
 /// What one chunk carries, if it carries either stream. Absent on the
 /// frames that carry a tool call or a finish reason.
@@ -139,16 +139,19 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
     if !calls.is_empty()
         && let Some(map) = message.as_object_mut()
     {
-        let wired: Vec<Value> = calls
-            .into_values()
-            .map(|(id, name, arguments)| {
-                json!({
-                    "id": id,
-                    "type": "function",
-                    "function": { "name": name, "arguments": arguments },
-                })
-            })
-            .collect();
+        let mut wired = Vec::new();
+        for (at, (id, name, arguments)) in calls {
+            // Checked here and carried on as the text this wire spells
+            // it in: a stream cut mid-value is refused with the code
+            // the other dialect uses, rather than reaching the settled
+            // reader as a shape complaint about the dialect itself.
+            settled_tool_arguments(&name, at, &arguments)?;
+            wired.push(json!({
+                "id": id,
+                "type": "function",
+                "function": { "name": name, "arguments": arguments },
+            }));
+        }
         map.insert("tool_calls".to_owned(), Value::Array(wired));
     }
     Ok(json!({
@@ -158,7 +161,12 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
 mod tests {
     use super::settled;
     use serde_json::json;
@@ -179,5 +187,23 @@ mod tests {
         assert_eq!(call["id"], "call_1");
         assert_eq!(call["function"]["name"], "read");
         assert_eq!(call["function"]["arguments"], "{\"path\": \"a.md\"}");
+    }
+
+    /// The same fact as on the other wire, refused with the same code:
+    /// arguments that stop mid-value are half a tool call, and half a
+    /// tool call spent as `exec {}` reaches the gates and runs.
+    #[test]
+    fn tool_arguments_cut_mid_value_are_refused_not_emptied() {
+        let frames = vec![
+            json!({"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call_1", "type": "function", "function": {"name": "exec", "arguments": "{\"cmd\": \"rm "}}]}}]}),
+            json!({"choices": [{"delta": {}, "finish_reason": "tool_calls"}]}),
+        ];
+        let refused = settled(&frames).expect_err("half a tool call is not a tool call");
+        assert_eq!(refused.code(), &kernel::AxCode::Provider);
+        assert!(
+            refused.subject().contains("exec"),
+            "the refusal has to name the tool: {}",
+            refused.subject()
+        );
     }
 }

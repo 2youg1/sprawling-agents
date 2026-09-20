@@ -22,9 +22,10 @@ just check                                  # fmt + clippy (-D warnings, --all-f
 | `just check-client` | the client's lint, typecheck and tests |
 | `just build-web` | build the client bundle into `target/web-dist` |
 | `just dist` | the whole deliverable: client, binary, bill of materials, size badges |
-| `just sim [seed]` | citysim scenarios; a failure reproduces from its seed |
+| `just sim` | citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |
 | `just spec <crate>` | generate a SPEC skeleton |
 | `just api-baseline` | recompute the public-surface baselines |
+| `cargo xtask docnum [--write]` | check every number a document quotes against the code that decides it; `--write` rewrites them |
 | `just replay <log>` | verify a ledger chain offline, read-only |
 | `just mem [pid]` / `just bench` / `just budget` | the measurements, in this platform's own vocabulary |
 | `just fuzz <target>` / `just mutants` | fuzz targets / mutation testing |
@@ -111,7 +112,7 @@ The client (`client/`) is exempt from steps 2 and 3 — see *The view layer* bel
 - Test modules may relax lints locally with `#[allow]` on the test module. Production code carries them as written.
 - Prefer comparing whole objects to comparing fields one at a time.
 - Do not add a test for a statically defined value, or a negative test for logic that was removed.
-- A citysim failure must reproduce from its seed. When it does not, the defect is the determinism, not the scenario.
+- A citysim failure must replay byte for byte from its scenario, which is a fixed script on a counted clock and no random source at all. When it does not, the defect is the determinism, not the scenario.
 - A check that enters through the crates' public faces is Rust, beside the code it judges. A check that enters the way a stranger does — spawning the binary, opening a socket to a served city, speaking the wire from outside — is Lean under `adversary/`. `xtask boundary` holds the line.
 - `adversary/` shares `docs/glossary.md`. Do not coin a name there for something the glossary already names.
 - **When the adversary finds a defect, the knowledge migrates.** A person writes the failing case as a Rust test under `crates/sprawling/tests/`, and `adversary/` does not keep it. It quantifies over traces; it is not a second home for a fact.
@@ -139,6 +140,7 @@ Violating any of these turns CI red with a message naming the rule, the violatio
 | Every kernel enum described in its SPEC table, variant for variant. | `xtask specalign` |
 | Every verb the city can carry out reached by some control, or classified on the wire seam with the reason a person may not ask for it. | `xtask wiring` |
 | `client/src/wire.ts` regenerated whenever `WIRE_V` moves. | `xtask wire-ts` |
+| Every number a document quotes equal to the code that decides it. | `xtask docnum` |
 | The kani harness roster read out of the `#[kani::proof]` attributes: no workflow names a harness, a stated total is the total, and a harness left unproved cites where that was decided. | `xtask proof` |
 | Sizes inside their budget, badges in step with the artifacts. | `xtask budget` |
 | Nothing published that names one machine's home directory, its working notes, or a document this tree does not contain. | `xtask release` |

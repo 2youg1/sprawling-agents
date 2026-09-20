@@ -176,8 +176,55 @@ fn send_token_request(url: &str, body: String, timeout_ms: u64) -> Result<OauthT
     })
 }
 
+/// The code out of what the person pasted back, once the state that
+/// came with it is the one this process sent.
+///
+/// The callback hands back `code#state`: the fragment marker joins the
+/// two, so the left half is redeemed and the right half is compared.
+/// OAuth 2.0 requires the state to be checked whenever one was sent,
+/// and a redirect that answers somebody else's request is refused
+/// rather than redeemed. A paste with no fragment carries no state to
+/// compare, which is what a person copying only the code produces.
+///
+/// # Errors
+/// `InvalidArgs` when the state is not the one this process sent, or
+/// when the paste holds no code. Neither refusal repeats the paste: a
+/// live authorization code is in it.
+fn redeemed_code<'p>(pasted: &'p str, pending: &OauthPending) -> Result<&'p str, AxError> {
+    let (code, returned) = match pasted.split_once('#') {
+        Some((code, returned)) => (code.trim(), Some(returned.trim())),
+        None => (pasted.trim(), None),
+    };
+    if let Some(returned) = returned
+        && returned != pending.state
+    {
+        return Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "redeem an authorization code",
+            "the redirect came back with a state this process did not send",
+        )
+        .with_recovery(
+            "start the login again and paste the whole line the provider's page shows, \
+             from the browser window this city opened",
+        ));
+    }
+    if code.is_empty() {
+        return Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "redeem an authorization code",
+            "the paste holds no authorization code",
+        )
+        .with_recovery("paste the line the provider's page shows after you approve the login"));
+    }
+    Ok(code)
+}
+
 /// The redeem POST for the authorization code; the response's token goes
 /// straight into the vault via `Custodian::set`.
+///
+/// # Errors
+/// `InvalidArgs` when the pasted callback answers a request this
+/// process did not make, which `redeemed_code` decides.
 pub fn oauth_redeem_request(
     profile: &crate::oauth_profiles::OauthProfile,
     pending: &OauthPending,
@@ -185,7 +232,7 @@ pub fn oauth_redeem_request(
 ) -> Result<TokenRequest, AxError> {
     let body = serde_json::json!({
         "grant_type": "authorization_code",
-        "code": code,
+        "code": redeemed_code(code, pending)?,
         "redirect_uri": profile.redirect_uri,
         "client_id": profile.client_id,
         "code_verifier": pending.code_verifier.as_str(),

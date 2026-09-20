@@ -62,7 +62,13 @@ impl MarketSnapshot {
     /// The built-in pinned catalog (data plane; rows the city actually
     /// uses, prices rechecked at stage openings). Micros per Mtok:
     /// $3.00 = 3_000_000.
-    pub fn builtin() -> MarketSnapshot {
+    ///
+    /// # Errors
+    /// `InvalidArgs` when two rows below carry one id. An empty catalog
+    /// returned in that case would refuse every model the city knows
+    /// and name none of them as the reason, so the failure travels to
+    /// the caller instead.
+    pub fn builtin() -> Result<MarketSnapshot, AxError> {
         let rows = vec![
             ModelEntry {
                 id: "claude-sonnet".to_owned(),
@@ -88,15 +94,7 @@ impl MarketSnapshot {
                 cache_write_price: UsdMicros::new(0),
             },
         ];
-        match MarketSnapshot::from_entries(1, rows) {
-            Ok(snapshot) => snapshot,
-            // The built-in table is duplicate-free by construction; a
-            // regression here is a programming error surfaced in tests.
-            Err(_) => MarketSnapshot {
-                version: 1,
-                entries: BTreeMap::new(),
-            },
-        }
+        MarketSnapshot::from_entries(1, rows)
     }
 
     /// Duplicate ids are refused: two prices for one model is two
@@ -146,7 +144,7 @@ mod tests {
 
     #[test]
     fn builtin_rows_resolve_and_duplicates_are_refused() {
-        let market = MarketSnapshot::builtin();
+        let market = MarketSnapshot::builtin().unwrap();
         assert!(market.lookup("claude-sonnet").is_some());
         assert!(market.lookup("nonexistent").is_none());
         assert!(!market.is_empty());
@@ -159,7 +157,7 @@ mod tests {
 
     #[test]
     fn the_catalogue_says_which_rows_can_be_shown_a_picture() {
-        let market = MarketSnapshot::builtin();
+        let market = MarketSnapshot::builtin().unwrap();
         assert_eq!(
             market.lookup("claude-sonnet").unwrap().input,
             InputKinds::TextImage
@@ -174,7 +172,7 @@ mod tests {
 
     #[test]
     fn holding_the_previous_snapshot_is_the_rollback() {
-        let old = MarketSnapshot::builtin();
+        let old = MarketSnapshot::builtin().unwrap();
         let mut rows: Vec<ModelEntry> = old.entries.values().cloned().collect();
         rows[0].input_price = UsdMicros::new(9_999_999);
         let newer = MarketSnapshot::from_entries(2, rows).unwrap();

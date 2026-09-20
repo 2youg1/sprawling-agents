@@ -180,6 +180,64 @@ fn a_resident_index_folds_what_arrived_and_rebuilds_what_was_truncated() {
     }
 }
 
+/// A refresh reads the appended tail, not the segment that holds it.
+///
+/// The assertion is on bytes, because that is the whole difference: an
+/// index that lifted the segment and then sliced its tail folds exactly
+/// the same records and answers exactly the same queries, while paying
+/// the length of the ledger on every query that follows an append.
+#[test]
+fn a_refresh_reads_the_appended_tail_rather_than_the_segment() {
+    let tmp = tempfile::tempdir().unwrap();
+    let before = write_ledger(tmp.path(), 400);
+    let mut index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
+    let path = tmp.path().join("ledger-00000000000000000000.jsonl");
+    let segment_bytes = std::fs::metadata(&path).unwrap().len();
+
+    // Nothing grew, so nothing is opened at all.
+    assert_eq!(index.refresh(tmp.path()).unwrap(), Refreshed::Unchanged);
+
+    let after = write_ledger(tmp.path(), 401);
+    let appended = u64::try_from(
+        after
+            .get(400)
+            .map(|line| line.len().saturating_add(1))
+            .unwrap(),
+    )
+    .unwrap();
+    let cost = index.refresh(tmp.path()).unwrap();
+    assert_eq!(
+        cost,
+        Refreshed::Appended {
+            bytes_read: appended
+        },
+        "one appended record costs one record's bytes, not {segment_bytes}"
+    );
+    assert!(
+        appended.saturating_mul(10) < segment_bytes,
+        "the fixture must be large enough for the two readings to differ"
+    );
+    eprintln!("index_refresh_read: {appended} B read, segment {segment_bytes} B");
+    assert_eq!(index.len(), 401);
+    assert_eq!(index.tail_seq(), Some(Seq::new(400)));
+
+    // The offsets folded before the append still name the right lines.
+    let mut reader = index.reader(tmp.path());
+    assert_eq!(
+        &reader.line_at(Seq::new(0)).unwrap(),
+        before.first().unwrap()
+    );
+    assert_eq!(
+        &reader.line_at(Seq::new(400)).unwrap(),
+        after.get(400).unwrap()
+    );
+
+    // A segment that lost its tail is rebuilt, and says so.
+    let bytes = std::fs::read(&path).unwrap();
+    std::fs::write(&path, bytes.get(..bytes.len() / 2).unwrap()).unwrap();
+    assert_eq!(index.refresh(tmp.path()).unwrap(), Refreshed::Rebuilt);
+}
+
 /// Writes `count` records that cycle through `runs`, so no run owns a
 /// contiguous stretch of the ledger. Returns the seqs each run wrote.
 #[test]

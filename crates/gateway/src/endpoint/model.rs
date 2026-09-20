@@ -144,6 +144,7 @@ mod tests {
         // transport error, so reaching E_INVALID_ARGS proves the check
         // ran before the request left.
         let blind = crate::market::MarketSnapshot::builtin()
+            .unwrap()
             .lookup("local")
             .unwrap()
             .clone();

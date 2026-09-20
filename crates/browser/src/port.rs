@@ -13,8 +13,14 @@
 //! That line is where the testability comes from. A WebDriver session
 //! is a long-lived bidirectional connection, and a crate that owned one
 //! would need an async runtime to be tested at all. Here the adapters
-//! are: a real transport in the binary, and a recording in the test
-//! suite, and the two are held to the same assertions.
+//! are: two transports in the binary (`browser_bidi::socket` and the
+//! lazily started engine that wraps it), and the recording in
+//! [`crate::session`] that replays a conversation offline.
+//!
+//! The transports are what this seam exists for, and no assertion in
+//! this repository runs against them: CI has no browser driver
+//! (ARCHITECTURE.md section 11). What the offline suite proves is the
+//! frame and reply algebra above the seam, which is pure.
 
 use kernel::{AxCode, AxError};
 use serde_json::Value;
@@ -192,42 +198,22 @@ impl Reply {
 /// The seam. One method, because a browser session is a request and a
 /// reply however elaborate the thing on the other side is.
 ///
-/// Adapters: the WebDriver transport in the binary, and the recording in
-/// [`crate::session`]. Both are held to
-/// [`assert_port_conformance`](crate::port::assert_port_conformance).
+/// Three implementations: `browser_bidi::socket::BidiSocket` and
+/// `browser_bidi::lazy::LazyEngine` in the binary, and
+/// [`crate::session::Recording`] for replay. The two in the binary are
+/// why this is a trait and not one concrete type.
+///
+/// There is no conformance suite behind it. One stood here and only the
+/// recording ever answered it, so it asserted that a fixture built to
+/// echo an id echoes an id. A suite returns when a transport can run
+/// it: that needs the reply-routing rule (read past events, match on
+/// id) to live in this crate as pure code, and a socket pair in the
+/// binary's test to drive it.
 pub trait BrowserPort {
     /// # Errors
     /// Transport failures only. A refusal from the remote end arrives as
     /// [`Reply::Error`], which is an answer rather than a fault.
     fn send(&mut self, frame: &Frame) -> Result<Reply, AxError>;
-}
-
-/// One assertion suite for every implementation of the seam.
-///
-/// # Panics
-/// On any implementation that renumbers frames, invents a reply for a
-/// frame nobody sent, or answers after it has been closed.
-#[cfg(feature = "conformance")]
-#[allow(
-    clippy::panic,
-    clippy::expect_used,
-    reason = "conformance suites assert by panicking; the feature keeps them out of the product"
-)]
-pub fn assert_port_conformance<P: BrowserPort>(port: &mut P, known: &Frame) {
-    let reply = port.send(known).expect("a known frame is answered");
-    assert_eq!(
-        reply.id(),
-        known.id(),
-        "a reply belongs to the frame that asked for it; renumbering loses that"
-    );
-    let again = port
-        .send(known)
-        .expect("the same frame is answerable twice");
-    assert_eq!(
-        again.id(),
-        known.id(),
-        "answering once must not poison the session"
-    );
 }
 
 #[cfg(test)]

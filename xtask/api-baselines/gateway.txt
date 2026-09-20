@@ -81,7 +81,7 @@ pub fn gateway::Fallback::then(&str, &str) -> core::result::Result<gateway::Fall
 pub fn gateway::ImageBytes::insert(&mut self, &kernel::locator::Locator, alloc::vec::Vec<u8>)
 pub fn gateway::ImageBytes::is_empty(&self) -> bool
 pub fn gateway::ImageBytes::len(&self) -> usize
-pub fn gateway::MarketSnapshot::builtin() -> gateway::MarketSnapshot
+pub fn gateway::MarketSnapshot::builtin() -> core::result::Result<gateway::MarketSnapshot, kernel::error::shape::AxError>
 pub fn gateway::MarketSnapshot::from_entries(u32, alloc::vec::Vec<gateway::ModelEntry>) -> core::result::Result<gateway::MarketSnapshot, kernel::error::shape::AxError>
 pub fn gateway::MarketSnapshot::is_empty(&self) -> bool
 pub fn gateway::MarketSnapshot::len(&self) -> usize

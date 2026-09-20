@@ -11,6 +11,7 @@ mod error;
 pub use error::{AxCode, AxError, Carrier, GateRefusal};
 
 mod address;
+pub mod layout;
 mod locator;
 
 pub use address::{Address, RESERVED_PREFIX, SessionName};

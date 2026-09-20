@@ -16,8 +16,12 @@
 //!   (interior newlines kept, final terminator excluded), `B` 0-based
 //!   closed; out of bounds refuses, never clamps.
 //!
-//! Full reads re-verify the hash (BLAKE3 runs at GB/s); range reads trust
-//! the object as verified at put.
+//! Full reads re-verify the hash (BLAKE3 runs at GB/s); range reads
+//! trust the object as verified at put and read only the bytes they
+//! answer with, which is why an object is never lifted whole to hand
+//! back a fragment of it.
+
+mod ranges;
 
 use std::path::{Path, PathBuf};
 
@@ -129,40 +133,20 @@ impl Cas {
     }
 
     /// Range retrieval per the Locator grammar; out of bounds refuses.
+    ///
+    /// The answer is read where it sits, so a fragment of a two hundred
+    /// megabyte object costs the fragment. The price of that is stated
+    /// in [`ranges`]: a range read cannot re-verify an address that
+    /// covers the whole object, so it trusts what `put` verified, and a
+    /// caller that needs the address proved calls [`Cas::get`].
     pub fn get_range(&self, hash: &B3Hash, range: &Range) -> Result<Vec<u8>, MemoryError> {
-        let bytes = self.get(hash)?;
-        let out_of_bounds = || MemoryError::RangeOutOfBounds {
-            hash: hash.to_string(),
-        };
-        match range {
-            Range::Bytes { from, to } => {
-                let from = usize::try_from(*from).map_err(|_| out_of_bounds())?;
-                let to = usize::try_from(*to).map_err(|_| out_of_bounds())?;
-                let end = to.checked_add(1).ok_or_else(out_of_bounds)?;
-                bytes
-                    .get(from..end)
-                    .map(<[u8]>::to_vec)
-                    .ok_or_else(out_of_bounds)
-            }
-            Range::Lines { from, to } => {
-                let lines: Vec<&[u8]> = bytes.split(|b| *b == b'\n').collect();
-                // A trailing terminator yields one empty trailing chunk;
-                // it is not a line (SPEC 8-3: unterminated last line still
-                // counts as one).
-                let count = match lines.last() {
-                    Some(&[]) => lines.len().saturating_sub(1),
-                    _ => lines.len(),
-                };
-                let from = usize::try_from(*from).map_err(|_| out_of_bounds())?;
-                let to = usize::try_from(*to).map_err(|_| out_of_bounds())?;
-                if from == 0 || to > count {
-                    return Err(out_of_bounds());
-                }
-                let start = from.saturating_sub(1);
-                let picked: Vec<&[u8]> = lines.get(start..to).ok_or_else(out_of_bounds)?.to_vec();
-                Ok(picked.join(&b'\n'))
-            }
+        let (_, path) = self.object_path(hash);
+        if !self.vfs.exists(&path) {
+            return Err(MemoryError::CasMissing {
+                hash: hash.to_string(),
+            });
         }
+        ranges::of_object(self.vfs.as_ref(), &path, hash, range)
     }
 }
 
@@ -257,6 +241,63 @@ mod tests {
             let err = cas.get_range(&hash, &bad).unwrap_err();
             assert_eq!(err.into_ax().code(), &AxCode::InvalidArgs, "{bad:?}");
         }
+    }
+
+    /// A range read moves the range; a full read moves the object and
+    /// pays for the verification the range read does not do.
+    ///
+    /// The counter is the assertion, because the bytes handed back are
+    /// identical either way: an implementation that lifts the object
+    /// and slices it answers every grammar test above and charges the
+    /// length of the object for every fragment.
+    #[test]
+    fn a_range_read_lifts_the_range_rather_than_the_object() {
+        let fs = FaultFs::new(FaultPlan {
+            cut_at_op: None,
+            cut_on_write: None,
+            torn_tail: TornTail::None,
+        });
+        let mut cas = Cas::open_with(Box::new(fs.clone()), std::path::Path::new("c")).unwrap();
+        let mut content = Vec::new();
+        for i in 0..200_000u32 {
+            content.extend_from_slice(format!("line {i} of a large object\n").as_bytes());
+        }
+        let object_len = u64::try_from(content.len()).unwrap();
+        let hash = cas.put(&content).unwrap();
+
+        let before = fs.bytes_read();
+        let five = cas.get_range(&hash, &Range::bytes(6, 10).unwrap()).unwrap();
+        assert_eq!(five, &content[6..=10]);
+        let five_moved = fs.bytes_read() - before;
+        assert!(
+            five_moved <= 64,
+            "a five-byte range moved {five_moved} bytes of a {object_len}-byte object"
+        );
+
+        let before = fs.bytes_read();
+        let second = cas.get_range(&hash, &Range::lines(2, 2).unwrap()).unwrap();
+        assert_eq!(second, b"line 1 of a large object");
+        let moved = fs.bytes_read() - before;
+        assert!(
+            moved <= ranges::SCAN_CHUNK_BYTES && moved.saturating_mul(10) < object_len,
+            "a line near the front moved {moved} bytes of a {object_len}-byte object"
+        );
+
+        // Past the end still refuses rather than answering short.
+        let err = cas
+            .get_range(&hash, &Range::bytes(object_len - 2, object_len).unwrap())
+            .unwrap_err();
+        assert_eq!(err.into_ax().code(), &AxCode::InvalidArgs);
+
+        // The verifying path is the full read, and it costs the object.
+        let before = fs.bytes_read();
+        assert_eq!(cas.get(&hash).unwrap(), content);
+        let whole = fs.bytes_read() - before;
+        assert!(whole >= object_len);
+        eprintln!(
+            "cas_range_read: object {object_len} B, five-byte range {five_moved} B, \
+             line 2 {moved} B, full read {whole} B"
+        );
     }
 
     /// A3 point 2: power loss around CAS rename. Cut at every op of a put

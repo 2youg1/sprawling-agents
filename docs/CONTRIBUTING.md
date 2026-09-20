@@ -128,7 +128,7 @@ The repository pins the toolchain and leaves the environment to you. `rust-toolc
 | `just build-web` | build the front-end artifact, without `dx` |
 | `just dist` | the whole deliverable: client, binary, bill of materials, and the size badges |
 | `just budget` / `just bench` | every budget with what it costs today; the three wall-clock measurements |
-| `just sim [seed]` | citysim scenarios; a failure reproduces from its seed |
+| `just sim` | citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |
 | `just spec <crate>` | generate a SPEC skeleton |
 | `just api-baseline` | recompute the public-surface baselines |
 | `just replay <log>` | verify a ledger chain offline, read-only |

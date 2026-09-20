@@ -43,10 +43,13 @@ pub use hall::{CLERK_FILE, MAYOR_FILE, hall_identity_path, lay_out_hall_identiti
 pub const ROADMAP_FILE: &str = kernel::ROADMAP_FILE;
 /// Decisions and corrections.
 pub(crate) const MEMO_FILE: &str = "Memo.md";
-/// What the next agent needs before it starts.
-pub const HANDOFF_FILE: &str = "Handoff.md";
-/// The task of one session, in the room it is run from.
-pub const JOB_FILE: &str = "JOB.md";
+/// What the next agent needs before it starts. Named in
+/// `kernel::layout` beside the path it is laid down at, and spelled
+/// here for the same reason `ROADMAP_FILE` is.
+pub const HANDOFF_FILE: &str = kernel::layout::HANDOFF_FILE;
+/// The task of one session, in the room it is run from. Named in
+/// `kernel::layout`, spelled here.
+pub const JOB_FILE: &str = kernel::layout::JOB_FILE;
 /// What this building is and the decisions it holds, written before the
 /// code that follows them. The one spine document that is committed:
 /// a promise a clone cannot read is not a promise.
@@ -146,12 +149,7 @@ pub fn write_brief(
 /// and `roadmap_path` are.
 #[must_use]
 pub fn handoff_path(city_root: &Path, room: &Address) -> PathBuf {
-    let mut path = city_root.to_path_buf();
-    for segment in room.as_str().split('/') {
-        path.push(segment);
-    }
-    path.push(HANDOFF_FILE);
-    path
+    kernel::layout::CityLayout::new(city_root).handoff(room)
 }
 
 /// Lays the blank handoff form down in a room that was just opened.
@@ -225,12 +223,7 @@ pub(crate) fn lay_out(building_root: &Path, addr: &Address) -> Result<(), AxErro
 /// Where the job file of a run at `addr` lives.
 #[must_use]
 pub fn job_path(city_root: &Path, addr: &Address) -> PathBuf {
-    let mut path = city_root.to_path_buf();
-    for segment in addr.as_str().split('/') {
-        path.push(segment);
-    }
-    path.push(JOB_FILE);
-    path
+    kernel::layout::CityLayout::new(city_root).job(addr)
 }
 
 /// Where a building's plan lives.

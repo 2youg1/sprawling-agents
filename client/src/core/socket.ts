@@ -20,7 +20,7 @@ import type { Asking } from "./asking";
 import { createBelief } from "./belief";
 import type { Belief } from "./belief";
 import { decodeFrame, encodeFrame } from "./frames";
-import { advance, connect as start, isLive, newLink } from "./link";
+import { advance, connect as start, isLive, isRefused, newLink } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
 import type { Command, Query, ServerFrame } from "../wire";
 
@@ -60,6 +60,11 @@ export function openConnection(url: string, token: string | null): Connection {
 
   const queue: ServerFrame[] = [];
   let scheduled = false;
+  // The attempt the ladder scheduled, held so a link that turns out to
+  // be refused can cancel it. A refused link that left this running
+  // would reopen the socket behind a message telling the person the
+  // opposite.
+  let reconnect: ReturnType<typeof setTimeout> | null = null;
 
   function sendText(text: string): boolean {
     if (socket?.readyState !== WebSocket.OPEN) {
@@ -105,7 +110,8 @@ export function openConnection(url: string, token: string | null): Connection {
         store.logged(action.line);
         return;
       case "wait":
-        setTimeout(() => {
+        reconnect = setTimeout(() => {
+          reconnect = null;
           step({ kind: "wait_elapsed" });
         }, action.ms);
         return;
@@ -125,6 +131,19 @@ export function openConnection(url: string, token: string | null): Connection {
       setState(next.state);
     }
     perform(action);
+    if (isRefused(link)) {
+      // The machine has stopped this link. Nothing here decides that:
+      // the socket half only carries it out, by cancelling the attempt
+      // the ladder booked and dropping the socket the refusal came in
+      // on. The person's retry is what starts it again.
+      if (reconnect !== null) {
+        clearTimeout(reconnect);
+        reconnect = null;
+      }
+      const open = socket;
+      socket = null;
+      open?.close();
+    }
   }
 
   // Drains what arrived since the last paint, in order, as one update.
@@ -150,9 +169,10 @@ export function openConnection(url: string, token: string | null): Connection {
       }
       const frame = decodeFrame(message.data);
       if (frame === null) {
-        // The two ends disagree about the wire; the machine knows what
-        // a closed link means.
-        opened.close();
+        // The two ends disagree about the wire. Reported as what it is,
+        // never as a close: a page told the socket dropped reconnects,
+        // and it would meet this same frame every time.
+        step({ kind: "undecodable" });
         return;
       }
       // A welcome is folded at once, so the questions the page has been

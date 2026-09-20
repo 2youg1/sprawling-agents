@@ -16,6 +16,7 @@ mod budget;
 mod channel;
 mod color;
 mod depmap;
+mod docnum;
 mod gates;
 mod guard;
 mod header;
@@ -134,6 +135,16 @@ fn main() -> ExitCode {
             }
             Err(err) => report::internal_failure(&err),
         },
+        // `--write` is the recovery the gate itself names, so it is the
+        // same command with one flag rather than a second spelling.
+        Some("docnum") if args.iter().any(|a| a == "--write") => match docnum::write(&root) {
+            Ok(message) => {
+                print!("{message}");
+                ExitCode::SUCCESS
+            }
+            Err(err) => report::internal_failure(&err),
+        },
+        Some("docnum") => report::finish("docnum", docnum::check(&root)),
         Some("secret") => report::finish("secret", secret::check(&root)),
         Some("specalign") => report::finish("specalign", specalign::check(&root)),
         Some("wiring") => report::finish("wiring", wiring::check(&root)),
@@ -207,9 +218,9 @@ fn value_arg(args: &[String], flag: &str) -> Option<String> {
 
 fn usage() {
     eprintln!(
-        "usage: cargo xtask <gates|header|lexicon|modmap|length|boundary|artifact|depmap|npm|secret|color|wording|render|wiring|wire-ts|proof|budget|specalign|apisync|release|guard> [--range a..b] [--write]"
+        "usage: cargo xtask <gates|header|lexicon|modmap|length|boundary|artifact|depmap|npm|secret|color|wording|render|wiring|wire-ts|proof|budget|specalign|apisync|docnum|release|guard> [--range a..b] [--write]"
     );
     eprintln!(
-        "       cargo xtask spec <crate> | badge [--write] | wire-ts --write | proof --list | mem [pid] | sbom | package [--target <triple>] | repro [--full] | channel --tag <tag> --assets <dir> --out <dir>"
+        "       cargo xtask spec <crate> | badge [--write] | wire-ts --write | docnum --write | proof --list | mem [pid] | sbom | package [--target <triple>] | repro [--full] | channel --tag <tag> --assets <dir> --out <dir>"
     );
 }

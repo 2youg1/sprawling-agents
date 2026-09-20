@@ -48,6 +48,7 @@ impl FaultFs {
             files: BTreeMap::new(),
             dirs: BTreeSet::new(),
             op: 0,
+            bytes_read: 0,
             plan,
         })))
     }
@@ -67,6 +68,15 @@ impl FaultFs {
 
     pub fn op_count(&self) -> u64 {
         self.state().op
+    }
+
+    /// How many bytes every read through this adapter has returned.
+    ///
+    /// What a caller checks when the question is read amplification:
+    /// fetching ten bytes out of a ten megabyte object must move ten
+    /// bytes, not ten megabytes.
+    pub fn bytes_read(&self) -> u64 {
+        self.state().bytes_read
     }
 
     /// Counts the op; when it hits the plan, power dies: the cut applies
@@ -155,12 +165,31 @@ impl Vfs for FaultFs {
 
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
         FaultFs::charge(self, "read")?;
-        let state = self.state();
-        state
+        let mut state = self.state();
+        let bytes = state
             .files
             .get(path)
             .map(|f| f.live.clone())
-            .ok_or_else(|| not_found(path))
+            .ok_or_else(|| not_found(path))?;
+        let moved = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        state.bytes_read = state.bytes_read.saturating_add(moved);
+        Ok(bytes)
+    }
+
+    /// The live plane from `offset`, capped at `len`. A file shorter
+    /// than the request answers what it has, the same short answer a
+    /// real read gives at the end of a file.
+    fn read_at(&self, path: &Path, offset: u64, len: u64) -> io::Result<Vec<u8>> {
+        FaultFs::charge(self, "read_at")?;
+        let mut state = self.state();
+        let file = state.files.get(path).ok_or_else(|| not_found(path))?;
+        let at = usize::try_from(offset).unwrap_or(usize::MAX);
+        let take = usize::try_from(len).unwrap_or(usize::MAX);
+        let tail = file.live.get(at..).unwrap_or(&[]);
+        let bytes = tail.get(..take.min(tail.len())).unwrap_or(&[]).to_vec();
+        let moved = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        state.bytes_read = state.bytes_read.saturating_add(moved);
+        Ok(bytes)
     }
 
     fn append(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()> {

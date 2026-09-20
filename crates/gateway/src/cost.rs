@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn the_authoritative_amount_always_wins() {
-        let market = MarketSnapshot::builtin();
+        let market = MarketSnapshot::builtin().unwrap();
         let entry = market.lookup("claude-sonnet").unwrap();
         let cost = settle(&usage(1_000_000, 0, 0, 0), Some(UsdMicros::new(42)), entry).unwrap();
         assert_eq!(cost.billed, UsdMicros::new(42));
@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn the_price_sheet_computes_integer_shares() {
-        let market = MarketSnapshot::builtin();
+        let market = MarketSnapshot::builtin().unwrap();
         let entry = market.lookup("claude-sonnet").unwrap();
         // 1 Mtok in at $3 + 100k out at $15 + 200k cache-read at $0.30.
         let cost = settle(&usage(1_000_000, 100_000, 200_000, 0), None, entry).unwrap();
@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn overflowing_settlements_are_errors_not_wraps() {
-        let market = MarketSnapshot::builtin();
+        let market = MarketSnapshot::builtin().unwrap();
         let entry = market.lookup("claude-sonnet").unwrap();
         let err = settle(&usage(u64::MAX, 0, 0, 0), None, entry).unwrap_err();
         assert!(err.subject().contains("overflow"));

@@ -22,7 +22,15 @@
 
 ## 3 假设与歧义
 
-citysim 不受 ARCHITECTURE §6 模块表约束（表只辖 crates/**），但 MPL 头、lexicon、lints 全库同规。`just sim` 的入口是本 crate 测试（固定剧本＝测试用例）；种子驱动的随机剧本批随故障面落地。Dispatch 的「先落 JOB.md 再产事件」在 sim 里以 `checkpoint_committed`（确定性假 oid＝B3Hash 派生前 20 字节 hex）代文件面——模拟适配器的职责即伪造外部世界，事件序与真城同形。
+citysim 不受 ARCHITECTURE §6 模块表约束（表只辖 crates/**），但 MPL 头、lexicon、lints 全库同规。`just sim` 的入口是本 crate 测试（固定剧本＝测试用例）。**本 crate 没有随机源，也没有种子**：确定性由三件事持有——剧本是写死的、时钟是 `executor` 里的 tick 计数器、执行是单线程；复现一次失败靠的是重跑那个剧本。种子驱动的随机剧本批随故障面落地，届时它会有一个真吃种子的生成器。Dispatch 的「先落 JOB.md 再产事件」在 sim 里以 `checkpoint_committed`（确定性假 oid＝B3Hash 派生前 20 字节 hex）代文件面——模拟适配器的职责即伪造外部世界，事件序与真城同形。
+
+### 3-1 决定：按现实修文档，而不是造一个吃种子的生成器
+
+五处文档曾写「一次失败可以从它的 seed 复现」，而实现里没有任何随机源被种子驱动：`AGENTS.md` 的命令表行与 Tests 一条、`docs/CONTRIBUTING.md` 的命令表行、`docs/glossary.md` 的 **driving pool** 行、`citysim/src/lib.rs` 的 crate 文档（「seeded RNG」）。六处修的是这些表述；`citysim/src/executor.rs` 的时钟注释同改。
+
+选修文档而不是造生成器，理由是种子此刻没有消费者：剧本是测试用例，随机剧本批要等故障面（§8-3 之后）才有东西可随机，现在造一个生成器等于先立一个没有被任何断言驱动的第二权威。**重开参数**：随机剧本批落地时，种子成为 `Scenario` 的一个字段，由它派生每一处分叉，并同批改回这几处表述与 `justfile` 的 `sim` recipe。
+
+**仍未落盘（跨文件，见交付报告）**：`justfile` 的 `sim seed=""` 接一个它不使用的参数；`ARCHITECTURE.md` 三处、`citysim/tests/sieve.rs` 与 `citysim/tests/scenario.rs` 各一处仍写着种子。
 
 ## 4 现状分析
 

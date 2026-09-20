@@ -38,6 +38,9 @@ export type LinkState =
 export type LinkEvent =
   | { readonly kind: "opened" }
   | { readonly kind: "received"; readonly frame: ServerFrame }
+  // A frame arrived that this build cannot read. Its own event, because
+  // it is not an outage: reconnecting meets the same frame again.
+  | { readonly kind: "undecodable" }
   | { readonly kind: "closed" }
   | { readonly kind: "wait_elapsed" }
   | { readonly kind: "retry" };
@@ -77,6 +80,13 @@ export function isLive(link: Link): boolean {
   return link.state.kind === "live";
 }
 
+// Whether this link has stopped. A refused link never reconnects by
+// itself: the socket half reads this to cancel a scheduled attempt and
+// to drop the socket, and only the person's retry starts it again.
+export function isRefused(link: Link): boolean {
+  return link.state.kind === "refused";
+}
+
 // The wait for one attempt number, clamped to the end of the ladder.
 export function backoffMs(attempt: number): number {
   const last = LADDER_MS.length - 1;
@@ -108,6 +118,17 @@ const OUT_OF_ORDER = refusal(
   "reload the page; if it repeats, the address is not a sprawling server",
 );
 
+// A frame this build cannot read. Reconnecting cannot help: the server
+// sends the same frame to the page it comes back as, so the ladder
+// would run for ever behind a blank screen while the one thing that
+// fixes it — fetching the client this server was built with — is a
+// reload away.
+const UNREADABLE = refusal(
+  "read a frame from this city",
+  `this page speaks wire v${String(WIRE_V)} and the server sent a frame it cannot read`,
+  "reload the page to fetch the client this server was built with",
+);
+
 // Starts, or restarts after a refusal was cleared by the person.
 export function connect(link: Link): [Link, LinkAction] {
   return [{ ...link, state: { kind: "opening" } }, { kind: "open" }];
@@ -132,15 +153,31 @@ function welcomed(link: Link, welcome: Welcome): [Link, LinkAction] {
   if (welcome.wire_v !== WIRE_V || welcome.schema !== WIRE_HASH) {
     return refuse(link, mismatch(welcome));
   }
-  // Frames flow again: the next outage starts at the bottom of the
-  // ladder rather than inheriting an old grudge.
   return [
-    { ...link, failures: 0, state: { kind: "live", city: welcome.city ?? null } },
+    { ...link, state: { kind: "live", city: welcome.city ?? null } },
     { kind: "welcomed", welcome },
   ];
 }
 
-function received(link: Link, frame: ServerFrame): [Link, LinkAction] {
+// A refusal the server sent about the wire itself is the one refusal
+// that ends the link: every later frame is at risk of the same
+// disagreement, and a page that keeps asking only repeats it.
+function refused(link: Link, error: AxError): [Link, LinkAction] {
+  return error.code === "E_WIRE_MISMATCH"
+    ? refuse(link, error)
+    : [link, { kind: "report", error }];
+}
+
+function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
+  // Frames are flowing: the next outage starts at the bottom of the
+  // ladder rather than inheriting an old grudge. Counted from data
+  // rather than from the welcome, because a socket that greets and then
+  // drops before saying anything is a link that never worked, and
+  // clearing the count there holds the ladder at its first rung.
+  const link =
+    source.failures === 0 || source.state.kind !== "live"
+      ? source
+      : { ...source, failures: 0 };
   if (link.state.kind === "handshaking") {
     if ("welcome" in frame) {
       return welcomed(link, frame.welcome);
@@ -168,7 +205,7 @@ function received(link: Link, frame: ServerFrame): [Link, LinkAction] {
     return [link, { kind: "logged", line: frame.log }];
   }
   if ("refusal" in frame) {
-    return [link, { kind: "report", error: frame.refusal }];
+    return refused(link, frame.refusal);
   }
   return [link, { kind: "nothing" }];
 }
@@ -197,6 +234,8 @@ export function advance(link: Link, event: LinkEvent): [Link, LinkAction] {
       ];
     case "received":
       return received(link, event.frame);
+    case "undecodable":
+      return refuse(link, UNREADABLE);
     case "closed":
       return retreat(link);
     case "wait_elapsed":

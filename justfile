@@ -69,7 +69,10 @@ proof:
     cargo xtask proof
 
 # citysim scenarios land from S2; the crate's test suite is the entry point.
-sim seed="":
+# No seed argument: the scenarios are fixed scripts driven by a counting
+# clock on one thread, so a failure replays from the script rather than
+# from a number. A seed returns when a random scenario batch does.
+sim:
     cargo test --package citysim --locked
 
 # Generate or refresh a crate SPEC skeleton (apostle-sdd 17 sections + B.5 amendments).

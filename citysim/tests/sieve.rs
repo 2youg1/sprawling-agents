@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The sieve under the scenario driver. The same seed and
+//! The sieve under the scenario driver. The same script and
 //! the same filter table replay a byte-identical window, the second
 //! call of one command shows only what changed, and every sieved
 //! result carries the way back to its original.
@@ -134,7 +134,7 @@ fn tool_results(lines: &[Vec<u8>]) -> Vec<Value> {
 }
 
 #[test]
-fn the_same_seed_and_table_replay_a_byte_identical_window() {
+fn the_same_script_and_table_replay_a_byte_identical_window() {
     let dir = tempfile::tempdir().unwrap();
     let first = run_scenario(scenario(dir.path())).unwrap();
     let second = run_scenario(scenario(dir.path())).unwrap();

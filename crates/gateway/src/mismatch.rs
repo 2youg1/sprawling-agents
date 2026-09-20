@@ -61,6 +61,24 @@ fn quoted(found: &str) -> String {
     }
 }
 
+/// The arguments a streamed tool call was assembled from, or the
+/// refusal that says the stream stopped in the middle of them.
+///
+/// **Half a tool call is not a tool call with fewer arguments.** A cut
+/// stream that is read as `{}` becomes a real call with no arguments:
+/// `exec {}` and `write {}` are recorded, pass the gates, and run. Both
+/// dialects assemble arguments from parts, so both refuse a cut one
+/// here, with one code and one sentence.
+pub(crate) fn settled_tool_arguments(tool: &str, at: u64, raw: &str) -> Result<Value, AxError> {
+    serde_json::from_str(raw).map_err(|err| {
+        stream_cut(&format!(
+            "tool `{tool}` at index {at} sent {} characters of arguments that stop before the \
+             value ends ({err})",
+            raw.chars().count()
+        ))
+    })
+}
+
 pub(crate) fn stream_cut(detail: &str) -> AxError {
     AxError::failure(
         AxCode::Provider,

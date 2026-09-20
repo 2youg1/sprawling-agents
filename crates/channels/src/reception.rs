@@ -23,6 +23,8 @@
 //! token, and a missing token refuses the *start*, not the connection:
 //! "data stays on your team" is a judgement or it is decoration.
 
+pub(crate) mod inbound;
+
 use std::net::SocketAddr;
 
 use kernel::{Address, AxCode, AxError, B3Hash};

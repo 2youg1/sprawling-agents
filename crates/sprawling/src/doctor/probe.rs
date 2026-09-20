@@ -10,7 +10,8 @@
 //! is the component where the variable or the component directory says,
 //! is the interpreter the platform names there, does this build carry
 //! its engine - and, after a person has agreed to one named command,
-//! running that command with this terminal's own stdio.
+//! handing that command to `doctor::running`, which is the one place
+//! this binary starts an install program.
 //!
 //! **A version call has a deadline.** A tool installed half-way can hang
 //! on start-up, and a doctor that hangs is worse than a tool that is
@@ -30,9 +31,9 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::RecvTimeoutError;
 use std::time::Duration;
 
-use kernel::{AxCode, AxError};
+use kernel::AxError;
 
-use super::{Absence, Detection, Fault, Platform, Presence, Recipe, Requirement, Version};
+use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Runnable, Version};
 
 /// What is asked of the machine under this city. Two implementations:
 /// `ThisMachine`, and the scripted one the tests drive, which is what
@@ -44,9 +45,9 @@ pub(crate) trait Machine {
     /// Runs one install command the person has just agreed to.
     ///
     /// # Errors
-    /// Refuses a recipe this city may not run, a command this machine
-    /// cannot start, and a command that ended in failure.
-    fn install(&self, name: &str, recipe: &Recipe) -> Result<(), AxError>;
+    /// Reports a command this machine cannot start, one that ended in
+    /// failure, and one still running at the deadline.
+    fn install(&self, name: &str, runnable: &Runnable) -> Result<(), AxError>;
 }
 
 /// The machine this process is running on.
@@ -108,35 +109,8 @@ impl Machine for ThisMachine {
         }
     }
 
-    fn install(&self, name: &str, recipe: &Recipe) -> Result<(), AxError> {
-        let Recipe::Command { program, args } = recipe else {
-            return Err(AxError::failure(
-                AxCode::ToolUnavailable,
-                "install a tool",
-                format!("{name}: this platform has no command this city may run"),
-            )
-            .with_recovery("run the printed line yourself"));
-        };
-        let status = std::process::Command::new(program)
-            .args(*args)
-            .status()
-            .map_err(|err| {
-                AxError::failure(
-                    AxCode::ToolUnavailable,
-                    "install a tool",
-                    format!("{name}: {program}: {err}"),
-                )
-                .with_recovery("install the package manager first, or run the printed line")
-            })?;
-        if status.success() {
-            return Ok(());
-        }
-        Err(AxError::failure(
-            AxCode::ToolUnavailable,
-            "install a tool",
-            format!("{name}: {} ended in failure", recipe.spelled()),
-        )
-        .with_recovery("run the printed line yourself to see what it reported"))
+    fn install(&self, name: &str, runnable: &Runnable) -> Result<(), AxError> {
+        super::running::run(name, runnable, super::running::PATIENCE)
     }
 }
 

@@ -21,7 +21,7 @@
 
 use kernel::{AxCode, AxError};
 
-use super::{Machine, PATIENCE, Platform, REQUIREMENTS, Recipe, Requirement, ThisMachine};
+use super::{Machine, PATIENCE, Platform, REQUIREMENTS, Requirement, ThisMachine};
 
 /// Runs the recipe this platform has for one named requirement.
 ///
@@ -44,11 +44,9 @@ pub(crate) fn install(item: &str, progress: &mut dyn FnMut(&str)) -> Result<(), 
         .with_recovery("install it the way this operating system installs software"));
     };
     let recipe = requirement.recipe.at(platform);
-    if !recipe.runnable() {
-        return Err(refuse_to_run(item, recipe));
-    }
-    progress(&format!("installing {item}: {}", recipe.spelled()));
-    ThisMachine::new(Some(platform), PATIENCE).install(item, recipe)?;
+    let runnable = recipe.command(item)?;
+    progress(&format!("installing {item}: {}", runnable.spelled()));
+    ThisMachine::new(Some(platform), PATIENCE).install(item, &runnable)?;
     progress(&format!("installed {item}; this city looked again"));
     Ok(())
 }
@@ -72,27 +70,6 @@ fn named(item: &str) -> Result<&'static Requirement, AxError> {
         })
 }
 
-/// Why a recipe that is not a command is not run, in the words that say
-/// what the person does instead.
-fn refuse_to_run(item: &str, recipe: &Recipe) -> AxError {
-    let recovery = match recipe {
-        // Unreachable by the caller's guard, and answered rather than
-        // asserted: a command is what `runnable` means.
-        Recipe::Command { .. } => "run it from here",
-        Recipe::Print(_) => {
-            "run the printed line yourself: a script piped into a shell is code nobody read, and \
-             this city does not read it for you"
-        }
-        Recipe::Manual(_) => "follow the printed instruction: nothing here can install this one",
-    };
-    AxError::failure(
-        AxCode::ToolUnavailable,
-        "install a tool",
-        format!("{item}: {}", recipe.spelled()),
-    )
-    .with_recovery(recovery)
-}
-
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -103,6 +80,7 @@ fn refuse_to_run(item: &str, recipe: &Recipe) -> AxError {
 )]
 mod tests {
     use super::*;
+    use crate::doctor::Recipe;
 
     /// A name nobody offered is refused before any process starts, and
     /// the refusal says how to find a name that works.
@@ -118,10 +96,16 @@ mod tests {
     /// instead, and neither of them says it the same way.
     #[test]
     fn a_printed_recipe_and_a_manual_one_refuse_with_their_own_reason() {
-        let printed = refuse_to_run("bun", &Recipe::Print("curl -fsSL https://bun.sh/install"));
+        let printed = Recipe::Print("curl -fsSL https://bun.sh/install")
+            .command("bun")
+            .err()
+            .expect("a printed recipe is not run from here");
         assert_eq!(printed.code(), &AxCode::ToolUnavailable);
         assert!(printed.recovery().contains("code nobody read"));
-        let by_hand = refuse_to_run("shell", &Recipe::Manual("it ships with the system"));
+        let by_hand = Recipe::Manual("it ships with the system")
+            .command("shell")
+            .err()
+            .expect("a manual recipe is not run from here");
         assert!(by_hand.recovery().contains("nothing here can install"));
         assert_ne!(printed.recovery(), by_hand.recovery());
     }

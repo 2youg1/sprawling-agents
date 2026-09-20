@@ -27,6 +27,7 @@ impl memory::Worktrees
 pub const memory::MANIFEST: &str
 pub enum memory::Head
 pub enum memory::MemoryError
+pub enum memory::Refreshed
 pub fn memory::Attribution::apply(&mut self, &kernel::event::payload::EventRecord) -> core::result::Result<(), memory::MemoryError>
 pub fn memory::Attribution::new() -> memory::Attribution
 pub fn memory::Attribution::report(&self) -> memory::AttributionReport
@@ -76,7 +77,7 @@ pub fn memory::LedgerIndex::len(&self) -> usize
 pub fn memory::LedgerIndex::load_or_rebuild(&std::path::Path) -> core::result::Result<memory::LedgerIndex, memory::MemoryError>
 pub fn memory::LedgerIndex::persist(&self, &std::path::Path) -> core::result::Result<(), memory::MemoryError>
 pub fn memory::LedgerIndex::reader(&self, &std::path::Path) -> memory::LineReader<'_>
-pub fn memory::LedgerIndex::refresh(&mut self, &std::path::Path) -> core::result::Result<(), memory::MemoryError>
+pub fn memory::LedgerIndex::refresh(&mut self, &std::path::Path) -> core::result::Result<memory::Refreshed, memory::MemoryError>
 pub fn memory::LedgerIndex::run_seqs_before(&self, kernel::event::identity::RunId, core::option::Option<kernel::event::identity::Seq>) -> impl core::iter::traits::iterator::Iterator<Item = kernel::event::identity::Seq>
 pub fn memory::LedgerIndex::tail_seq(&self) -> core::option::Option<kernel::event::identity::Seq>
 pub fn memory::LineReader<'_>::line_at(&mut self, kernel::event::identity::Seq) -> core::result::Result<alloc::vec::Vec<u8>, memory::MemoryError>
@@ -201,6 +202,10 @@ pub memory::RecycleEntry::restoration: alloc::string::String
 pub memory::RecycleEntry::restored: bool
 pub memory::RecycleEntry::seq: kernel::event::identity::Seq
 pub memory::RecycleEntry::t: kernel::event::identity::TimeMs
+pub memory::Refreshed::Appended
+pub memory::Refreshed::Appended::bytes_read: u64
+pub memory::Refreshed::Rebuilt
+pub memory::Refreshed::Unchanged
 pub memory::RunHot::addr: core::option::Option<kernel::address::Address>
 pub memory::RunHot::last_kind: kernel::event::kind::EventKind
 pub memory::RunHot::last_seq: kernel::event::identity::Seq

@@ -46,7 +46,7 @@ impl Machine for ScriptedMachine {
         }
     }
 
-    fn install(&self, name: &str, _recipe: &Recipe) -> Result<(), kernel::AxError> {
+    fn install(&self, name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {
         self.asked.borrow_mut().push(name.to_owned());
         Ok(())
     }

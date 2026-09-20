@@ -30,13 +30,18 @@ use super::{Absence, Machine, PATIENCE, Platform, Presence, ThisMachine};
 /// selects on it.
 pub(crate) const ENGINE_CARRIED: bool = cfg!(feature = "sandbox");
 
-/// The machine-level directory this city keeps components in. Never
-/// inside a city: a city carried to another machine must not carry this
-/// machine's components with it (kernel-SPEC.md section 8-22).
+/// The machine-level directory this city keeps components in, or
+/// nothing when this environment states no home directory.
+///
+/// The absence is an answer here rather than a failure: a probe that
+/// cannot look reports the component as missing, with
+/// `Absence::NoHome` carrying the reason to the report
+/// (`crate::home` owns the derivation).
 pub(crate) fn components_dir() -> Option<PathBuf> {
-    std::env::var_os("USERPROFILE")
-        .or_else(|| std::env::var_os("HOME"))
-        .map(|home| PathBuf::from(home).join(".sprawling").join("components"))
+    match crate::home::Home::detect() {
+        Ok(home) => Some(home.components()),
+        Err(_) => None,
+    }
 }
 
 /// The Gecko browser this machine has, whichever brand it is: Firefox,

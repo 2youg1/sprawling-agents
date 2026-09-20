@@ -170,7 +170,7 @@ pub(super) fn dialect_of(provider: &str) -> Result<kernel::DialectKind, AxError>
 
 /// The catalog's `local` row under the name a local server serves it.
 pub(super) fn local_model_facts(model: &str) -> Result<gateway::ModelEntry, AxError> {
-    let market = gateway::MarketSnapshot::builtin();
+    let market = gateway::MarketSnapshot::builtin()?;
     let local = market.lookup("local").ok_or_else(|| {
         AxError::failure(
             AxCode::ConfigInvalid,

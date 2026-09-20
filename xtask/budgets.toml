@@ -352,3 +352,37 @@ what = "records folded per second when a view is rebuilt"
 budget_records_per_second = 50000
 measured_by = "just bench (citysim bench bin, release)"
 status = "measured, not gated: about 493k records/s on windows-x86_64 (2026-08-22), every record folding into a table. The remediation pass found per-record transactions rebuilding at about 1.1k records/s - one disk barrier under every event - and moved the fold to one transaction per batch (Projection::apply_all)"
+
+# What one query pays for the appends that arrived since the last one.
+# `Views` refreshes the resident index before every history query, so a
+# city that just wrote a record charges this to the next reader.
+#
+# The reading is the byte count `LedgerIndex::refresh` returns, which is
+# the whole difference between seeking to the tail and lifting the
+# segment that carries it: both fold the same records and answer the
+# same queries, and only one of them costs the length of the ledger. A
+# segment rolls at 64 MiB, so the reading a whole-segment read would
+# give is bounded by that, while the reading below is bounded by the
+# records that actually arrived.
+#
+[index_refresh_read]
+what = "bytes read by one LedgerIndex::refresh that folds a single appended record"
+measured_by = "cargo test -p memory --lib -- --nocapture a_refresh_reads_the_appended_tail_rather_than_the_segment (the test prints the Refreshed::Appended reading beside the segment length)"
+status = "measured, not gated: 191 B read out of a 76,180 B segment, which is the one appended record and nothing else (2026-09, 401-record fixture). The test asserts the equality rather than a threshold, so a gate here would be a second authority over the same claim"
+
+# Read amplification on a range retrieval: the bytes a `Vfs` hands back
+# while `Cas::get_range` answers, over the bytes in the answer.
+#
+# The retrieval that motivated the row is a small window into a large
+# offloaded object, where lifting the object and re-hashing it charged
+# the whole object per window. `B` now costs the window; `L` costs the
+# bytes before the line it names, because line numbers can only be found
+# by counting newlines from the front.
+#
+# Not gated: the test asserts the readings directly (a five-byte range
+# must move five bytes, a line near the front one scan chunk), so a gate
+# here would be a second authority over the same claim.
+[cas_range_read]
+what = "bytes a Vfs returns while Cas::get_range answers, over the bytes in the answer"
+measured_by = "cargo test -p memory --lib -- --nocapture a_range_read_lifts_the_range_rather_than_the_object (FaultFs::bytes_read deltas around each retrieval)"
+status = "measured, not gated: on a 5,888,890 B object a five-byte `B` range moves 5 B and line 2 moves 65,536 B, against 5,888,890 B for the verifying full read (2026-09). Before this row existed both range reads moved the whole object and re-hashed it"

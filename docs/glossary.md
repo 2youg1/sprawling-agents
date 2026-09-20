@@ -63,7 +63,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **fence** | The commit the city makes before and after a tool wave so a change can be shown and reverted. It lives under `refs/sprawling/runs/`, never on the person's `HEAD`. |
 | **landing commit** | The one commit a reviewing run makes on its worktree branch when it offers a pull request; the merge that follows is the only commit trunk receives. |
 | **accounting thread** | The city's one writer. It alone holds the Ledger, the endpoint book, the plans, the pursuits, the governance fold and the desks, and it alone settles what a run left behind — in the order the results arrive. |
-| **driving pool** | The threads that drive runs. One of them is a **lane**, and it lives exactly as long as the run it drives: it holds that run's driving state and nothing else — no Ledger, no book, no desk. Four lanes, which is the provider's own admission ceiling; a wider pool would only park a lane there. citysim drives no lanes at all, because a scenario reproduces from a seed. |
+| **driving pool** | The threads that drive runs. One of them is a **lane**, and it lives exactly as long as the run it drives: it holds that run's driving state and nothing else — no Ledger, no book, no desk. Four lanes, which is the provider's own admission ceiling; a wider pool would only park a lane there. citysim drives no lanes at all, because a scenario is a fixed script replayed on one thread. |
 | **relay** | The Ledger adapter a driving thread writes through. It carries the EventDraft to the accounting thread and waits for the answer, so `Ok` still means durable and the city still has one writer. |
 
 ## 3 Context and turns

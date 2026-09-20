@@ -6,6 +6,8 @@
 //! The side index: seq to (segment, byte offset).
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom};
 use std::ops::Bound;
 use std::path::Path;
 
@@ -14,6 +16,24 @@ use kernel::{RunId, Seq};
 use crate::error::{MemoryError, io_err};
 
 use super::reader::LineReader;
+
+/// What one [`LedgerIndex::refresh`] did, and what it lifted off the
+/// disk doing it.
+///
+/// The byte count is the difference between reading the appended tail
+/// and reading the segment that carries it, so it is the reading the
+/// `index_refresh_read` budget records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refreshed {
+    /// Every segment was exactly the length this index had already
+    /// folded, so nothing was opened.
+    Unchanged,
+    /// Only the bytes appended since the last look were read.
+    Appended { bytes_read: u64 },
+    /// A segment shrank or vanished, so every offset came from a full
+    /// scan of the directory.
+    Rebuilt,
+}
 
 /// seq → (segment file name, byte offset of the line start).
 pub struct LedgerIndex {
@@ -28,14 +48,47 @@ pub struct LedgerIndex {
     pub(crate) runs: BTreeMap<RunId, BTreeSet<Seq>>,
     /// Bytes of each segment already folded into `entries`.
     ///
-    /// What makes an incremental refresh possible, and what makes it
-    /// safe: a segment that grew is read from here on, and a segment
-    /// that shrank had a tail truncated away, which invalidates every
-    /// offset this map holds for it.
+    /// The one home of "how far this index has read", and it always
+    /// names the end of a complete line: `fold_segment` counts only
+    /// lines that carried their terminator, so the next refresh starts
+    /// where a record starts and can never lift half of one.
+    ///
+    /// It is resident state, never read back off the disk. A cache is
+    /// believed only when the directory's byte count and digest match
+    /// its stamp, and at that moment this map is the segment sizes
+    /// themselves; a cache whose offsets were damaged fails the stamp
+    /// and the whole index is rebuilt. A segment that shrank has the
+    /// same answer, because tail recovery truncates and every offset
+    /// held for that segment then describes bytes that are gone.
     pub(crate) scanned: BTreeMap<String, u64>,
 }
 
 impl LedgerIndex {
+    /// Reads `size - from` bytes of `path`, starting at `from`, and
+    /// leaves everything before `from` on the disk.
+    ///
+    /// `take` bounds the read by the length this refresh stat'ed, so a
+    /// record appended between the stat and the read stays for the next
+    /// refresh rather than being folded at an offset this pass never
+    /// confirmed.
+    ///
+    /// `None` asks the caller to rebuild: it means the span does not fit
+    /// this machine's pointer width, which no ledger this crate writes
+    /// can reach, and a rebuild is the answer that cannot be wrong.
+    fn read_span(path: &Path, from: u64, size: u64) -> Result<Option<Vec<u8>>, MemoryError> {
+        let span = size.saturating_sub(from);
+        let Ok(capacity) = usize::try_from(span) else {
+            return Ok(None);
+        };
+        let mut file = File::open(path).map_err(io_err("open segment", path))?;
+        file.seek(SeekFrom::Start(from))
+            .map_err(io_err("seek segment", path))?;
+        let mut tail = Vec::with_capacity(capacity);
+        file.take(span)
+            .read_to_end(&mut tail)
+            .map_err(io_err("read segment", path))?;
+        Ok(Some(tail))
+    }
     /// Loads the cache when it is checksum-fresh, otherwise scans the
     /// directory. Both paths yield the same map; only the cost differs.
     pub fn load_or_rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError> {
@@ -76,7 +129,11 @@ impl LedgerIndex {
     /// A segment that shrank or vanished forces a full rebuild: tail
     /// recovery truncates, and after it the offsets held for that
     /// segment describe bytes that are no longer there.
-    pub fn refresh(&mut self, dir: &Path) -> Result<(), MemoryError> {
+    ///
+    /// The answer reports how many bytes this refresh read, which is
+    /// what separates seeking to the tail from lifting the segment that
+    /// holds it.
+    pub fn refresh(&mut self, dir: &Path) -> Result<Refreshed, MemoryError> {
         let names = super::cache::segment_names(dir)?;
         let mut fresh = Vec::new();
         for name in &names {
@@ -94,24 +151,24 @@ impl LedgerIndex {
         if self.scanned.keys().any(|held| !names.contains(held)) {
             return self.replace_with(super::cache::rebuild(dir)?);
         }
+        if fresh.is_empty() {
+            return Ok(Refreshed::Unchanged);
+        }
+        let mut bytes_read: u64 = 0;
         for (name, from, size) in fresh {
             let path = dir.join(&name);
-            let bytes = std::fs::read(&path).map_err(io_err("read segment", &path))?;
-            let tail = match usize::try_from(from).ok().and_then(|at| bytes.get(at..)) {
-                Some(tail) => tail,
-                // The offset does not fit this machine's pointer width,
-                // which no ledger this crate writes can reach; rebuilding
-                // is the answer that cannot be wrong.
-                None => return self.replace_with(super::cache::rebuild(dir)?),
+            let Some(tail) = LedgerIndex::read_span(&path, from, size)? else {
+                return self.replace_with(super::cache::rebuild(dir)?);
             };
-            let indexed = self.fold_segment(&name, from, tail);
+            bytes_read = bytes_read.saturating_add(u64::try_from(tail.len()).unwrap_or(u64::MAX));
+            let indexed = self.fold_segment(&name, from, &tail);
             // Only complete lines count as scanned: a torn tail is
             // overwritten by the next append, and remembering it as read
             // would skip the record that replaces it.
             self.scanned
                 .insert(name, from.saturating_add(indexed).min(size));
         }
-        Ok(())
+        Ok(Refreshed::Appended { bytes_read })
     }
 
     /// Indexes the complete lines of `tail`, which begins at `from` in
@@ -148,9 +205,9 @@ impl LedgerIndex {
         }
     }
 
-    fn replace_with(&mut self, built: LedgerIndex) -> Result<(), MemoryError> {
+    fn replace_with(&mut self, built: LedgerIndex) -> Result<Refreshed, MemoryError> {
         *self = built;
-        Ok(())
+        Ok(Refreshed::Rebuilt)
     }
 
     /// A cursor for reading lines out of this index.

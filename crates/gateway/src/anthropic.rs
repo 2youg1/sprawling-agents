@@ -174,18 +174,31 @@ fn block_from(value: &Value, path: &str) -> Result<ContentBlock, AxError> {
         "text" => Ok(ContentBlock::Text {
             text: as_str(require(value, path, "text")?, &format!("{path}.text"))?.to_owned(),
         }),
-        "thinking" => Ok(ContentBlock::Thinking {
-            thinking: as_str(
-                require(value, path, "thinking")?,
-                &format!("{path}.thinking"),
-            )?
-            .to_owned(),
-            signature: as_str(
+        "thinking" => {
+            let signature = as_str(
                 require(value, path, "signature")?,
                 &format!("{path}.signature"),
-            )?
-            .to_owned(),
-        }),
+            )?;
+            // The provider verifies this against the reasoning it
+            // issued and answers 400 when it does not match, so an
+            // empty one is refused on the turn that produced it rather
+            // than on the turn that would have sent it back.
+            if signature.is_empty() {
+                return Err(mismatch(
+                    &format!("{path}.signature"),
+                    "empty; the thinking block arrived without the signature the provider \
+                     verifies it against",
+                ));
+            }
+            Ok(ContentBlock::Thinking {
+                thinking: as_str(
+                    require(value, path, "thinking")?,
+                    &format!("{path}.thinking"),
+                )?
+                .to_owned(),
+                signature: signature.to_owned(),
+            })
+        }
         "redacted_thinking" => Ok(ContentBlock::RedactedThinking {
             data: as_str(require(value, path, "data")?, &format!("{path}.data"))?.to_owned(),
         }),

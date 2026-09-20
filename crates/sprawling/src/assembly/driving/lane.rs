@@ -192,9 +192,11 @@ pub(crate) fn drive_run<L: Ledger>(
             let ctx = kernel::GateContext {
                 actor: bench_who.clone(),
                 now: t,
-                item_id: kernel::ApprovalId::new(format!("item-{}", t.value())).ok_or_else(
-                    || AxError::failure(AxCode::InvalidArgs, "mint approval id", "empty id"),
-                )?,
+                // The call's position, for the reason the key takes it:
+                // four lanes drive at once, so an item named after the
+                // millisecond is an item two runs both claim, and the
+                // inbox keeps only the later one.
+                item_id: kernel::ApprovalId::of(&run_id, kernel::Seq::new(at)),
             };
             match bench.invoke(call, &key, &ctx)? {
                 BenchOutcome::Ran {

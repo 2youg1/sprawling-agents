@@ -90,10 +90,17 @@ impl Manifest {
 /// The name of the file that states what a bundle holds.
 pub const MANIFEST: &str = "MANIFEST.json";
 
-pub(crate) const LEDGER: &str = "ledger";
-pub(crate) const CAS: &str = "cas";
+/// The reserved subtree, as the address grammar spells it.
+pub(crate) use kernel::RESERVED_PREFIX as RESERVED;
+/// A bundle mirrors the city's own names for the two stores it carries,
+/// so a restore lands each one back where it came from. The names
+/// themselves belong to `kernel::layout`, which is where a rename of
+/// either directory happens.
+pub(crate) use kernel::layout::{CAS_DIR as CAS, LEDGER_DIR as LEDGER};
+
+/// The working tree a bundle carries beside the two stores. A bundle's
+/// own name for its own directory, read nowhere else.
 pub(crate) const CITY: &str = "city";
-pub(crate) const RESERVED: &str = ".sprawling";
 
 #[cfg(test)]
 #[allow(

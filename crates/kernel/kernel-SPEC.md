@@ -865,7 +865,13 @@ pub struct UnplannedProgress { pub steps: u32, pub budget: BudgetUse }   // 无 
 ### 8-21 kernel::approval
 
 ```rust
-pub struct ApprovalId(String);               // 非空；uuid v7 由效果层发，kernel 不生成
+pub struct ApprovalId(String);               // 非空；铸造只此一处，与时钟无关
+impl ApprovalId {
+    pub fn of(run: &RunId, seq: Seq) -> ApprovalId;   // 唯一铸口：`ap-{run}-{seq:020}`
+    pub fn of_sweep(run: &RunId) -> ApprovalId;       // = of(run, Seq::new(u64::MAX))：一次 drive 至多一条清扫升级
+    pub fn new(raw: impl Into<String>) -> Option<ApprovalId>;   // 只收既存 id（线上回执、账本、夹具），空串拒
+    pub fn as_str(&self) -> &str;
+}
 #[non_exhaustive] pub enum ApprovalSource { Gate, Agent }
 #[non_exhaustive] pub enum ApprovalClass { Commitment, BudgetLimit, DiscardEscalate, AgentQuestion,
                                            Delegation, Governance, Undoable }
@@ -895,6 +901,8 @@ pub fn expiry(policy: &Policy, now: TimeMs) -> PolicyExpiry;      // idle ≥ PO
 pub fn may_answer(autonomy: &Autonomy, item: &ApprovalItem, answerer: &Answerer) -> AnswerVerdict;
 ```
 
+- **身份取自 run 与位次，不取自时钟**（9.2／B-24）：`DRIVING_LANES = 4` 是默认值，四条车道常在同一毫秒各触第一条审批；毫秒形状的 id 会让两条审批成为一个键，`pending` 与 `origins` 保住后写的那条，先那条从只增账本里消失，而事后无人能把「丢了」与「从未发生」分开。`seq` 是**该 run 自己的单调位次**——正是 run 已经用来 derive `IdemKey` 的那一个计数器（`lane.rs` 与 `citysim/executor.rs` 的 `placed`），在一个 run 内计数、从不跨 run 传递，因此位次只有连同它被数出来的那个 run 才构成身份。两个输入都不是采样值，重放逐字节重算出同一 id，`just replay` 对审批记录仍然自证。位次按 `u64::MAX` 的宽度补零书写，于是同一 run 两条 id 的派生 `Ord` 读出的就是它们被提出的先后。
+- **清扫槽位**：一次 drive 的 discard 升级至多一条，占最高位次（`of_sweep`），调用计数器永远数不到那里，所以它与同一 run 的任何工具调用项都不撞。位次空间的这条划分只有 kernel 这一个家；调用方不自拼字符串。
 - **三必经人的类型化**：`PolicyClass` 不含 Commitment/BudgetLimit/DiscardEscalate，免审规则对三类**不可表示**；`match_item` 对 `tainted` 恒 NotApplicable（C15 的 Taint 条）。
 - `may_answer`：Human 恒 May；Resident r 仅当 autonomy==Delegate(r)（否则 NotTheDelegate）且 item 不属三类且 !tainted（否则 HumanOnly）且 item.actor ≠ r（否则 SelfApprovalBarred）。Deferred 下 Resident 恒 HumanOnly——没有人应答是事实的名字，不是新判定。
 - verdict 先落账再生效、前拦不烧 token：效果层顺序约束（S3/S4），kernel 只出判定。
@@ -1684,3 +1692,43 @@ pub fn is_reserved(&self) -> bool;                  // 改：eq_ignore_ascii_cas
 - **同一性仍按字节**：`Eq`、`Ord` 与 `is_within` 不折叠大小写。两个方向都安全：写域 `lab` 不收 `LAB/x`，写域 `LAB` 也不收 `lab/x`，失配一律是拒绝。这条不对称是有意的——`is_reserved` 是只许多拒的门，`is_within` 是身份关系，让身份关系折叠大小写会让两个不同地址变成一个。
 - **失效关闭，只会拒绝得更多**：全仓 347 处 `Address::parse` 调用点没有一处传入以点或空格结尾的字面量地址（`grep -rnE 'Address::parse\("[^"]*[. ]"\)'` 空结果）。
 - **重开参数**：①出现一种不经 `join` 而直接与操作系统打交道的地址消费者，剔尾规则因此不再适用——届时收紧点应下移到那个适配层；②8.3 短名（`SPRAWL~1`）与 Unicode 大写表撞上 ASCII（如 U+212A）这两类别名本文不管，因为前者要问文件系统才知道、后者不出现在 `RESERVED_PREFIX` 里，任何一条被实际做成攻击即重开；③若将来保留名不再全是 ASCII，`eq_ignore_ascii_case` 当场失效，改常量的同一个提交必须改这条比较。
+
+### 8-56 `kernel::layout`：城内磁盘布局的唯一权威（形状 2 值）
+
+```rust
+pub const LEDGER_DIR: &str = "ledger";
+pub const CAS_DIR: &str = "cas";
+pub const LIBRARY_DIR: &str = "library";
+pub const BUILDING_SHELF: &str = "skills";
+pub const CONFIG_FILE: &str = "CONFIG.toml";
+pub const FILTERS_FILE: &str = "FILTERS.toml";
+pub const ARCHIVE_DIR: &str = "Archive";
+pub const JOB_FILE: &str = "JOB.md";
+pub const HANDOFF_FILE: &str = "Handoff.md";
+pub const URBANITE_FILE: &str = "URBANITE.md";
+
+pub struct CityLayout { /* root —— 私有 */ }
+impl CityLayout {
+    pub fn new(root: &Path) -> Self;
+    pub fn root(&self) -> &Path;
+    pub fn scope(&self, addr: &Address) -> PathBuf;             // root + 逐段
+    pub fn ledger(&self) -> PathBuf;                            // root/.sprawling/ledger
+    pub fn cas(&self) -> PathBuf;                               // root/.sprawling/cas
+    pub fn library(&self) -> PathBuf;                           // root/.sprawling/library
+    pub fn config(&self, addr: &Address) -> PathBuf;            // <scope>/.sprawling/CONFIG.toml
+    pub fn building_skills(&self, addr: &Address) -> PathBuf;   // <scope>/.sprawling/skills
+    pub fn filters(&self, addr: &Address) -> PathBuf;           // <scope>/.sprawling/FILTERS.toml
+    pub fn archive(&self, building: &Address) -> PathBuf;       // <scope>/Archive
+    pub fn job(&self, addr: &Address) -> PathBuf;               // <scope>/JOB.md
+    pub fn handoff(&self, room: &Address) -> PathBuf;           // <scope>/Handoff.md
+    pub fn urbanite(&self, addr: &Address) -> PathBuf;          // <scope>/URBANITE.md
+}
+```
+
+**五条口径：**
+
+1. **一个事实一个家，而这里的事实是「哪一类文件落在哪」。** 立此模块之前，`.sprawling` 在 `kernel::address` 与 `memory::bundle::manifest` 各有一个常量、另有七处手写字面量；`cas` 在六个文件里各自 `join(".sprawling").join("cas")`；「城根＋地址＝目录」在 city 内部有十一处拼接、两种拼法。改名任何一个目录都要靠 grep 找齐，而漏掉的那一处会安静地读一个空目录（Roadmap G-11）。
+2. **形状 2 值，不碰磁盘。** `CityLayout` 只回答某个文件*会在*哪里；创建、读取、拒绝归拥有 I/O 的那一层。路径是数据而不是效应，故它住在 kernel，与它所依赖的地址文法同处一地（ARCHITECTURE.md 第 1 段）。
+3. **`RESERVED_PREFIX` 仍住在 `kernel::address`，本模块引用它。** 它是地址文法的一部分——`is_reserved` 是写域与读路径共用的谓词（8-2、8-55）——而不是一条布局规定。布局这一侧只决定「什么落在保留子树里」：治理一个 scope 的文件（`CONFIG.toml`、`FILTERS.toml`、`skills`）落在该 scope 的 `.sprawling/` 下，于是没有任何写域够得到它们；居民自己写的文件（`JOB.md`、`Handoff.md`、`URBANITE.md`、`Archive/`）落在明处。这条摆放规则由单元测试逐个方法核对，而不是靠注释重申。
+4. **逐段 push 而不是整串 join。** 一个地址在 Windows 与在 Linux 必须落成同一个目录树；整串 join 把 `/` 交给平台去解释，逐段 push 不给它这个机会。此前 city 内部两种拼法并存，本模块只留前一种。
+5. **十一个落点是覆盖面要求，不是便利方法。** 少一个落点，就有一处调用点继续自己拼，于是本模块不再是唯一权威（Roadmap §19.3 第 5 条）。后续新增一类文件时，先在此加方法与常量，再写调用点。

@@ -112,7 +112,7 @@ sprawling: kernel, memory, gateway, runtime, collab, city, eval, browser, protoc
 
 `runtime` has the widest fan-out — three crates at once. It may **use** their interfaces and nothing more; the moment a runtime module starts passing concrete types between `memory` and `gateway`, that edge moves up into the assembly layer.
 
-`xtask` and `citysim` are workspace members outside the product graph. **citysim drives the turn loop a second time**: `runtime::run::drive` with simulated adapters — a scripted model, scripted tools, an in-memory Ledger — which is how one seed reproduces a run. It stops below `bin::assembly`, whose `RunWorker` builds its model adapter out of the endpoint book rather than receiving one; the dispatch policy above that line is held by that module's own tests. `sprawling` carries a lib target so the policy is at least *reachable* — an integration test enters by the same door `channels::server` uses — and inverting the model seam is what a seeded scenario would still need.
+`xtask` and `citysim` are workspace members outside the product graph. **citysim drives the turn loop a second time**: `runtime::run::drive` with simulated adapters — a scripted model, scripted tools, an in-memory Ledger — which is how a script reproduces a run. It stops below `bin::assembly`, whose `RunWorker` builds its model adapter out of the endpoint book rather than receiving one; the dispatch policy above that line is held by that module's own tests. `sprawling` carries a lib target so the policy is at least *reachable* — an integration test enters by the same door `channels::server` uses — and inverting the model seam is what a seeded scenario would still need.
 
 ## 4 Seams
 
@@ -124,7 +124,7 @@ A seam is a trait declared in the inner layer and implemented outside it. **One 
 | `kernel::tool` | crates/kernel/src/tool.rs | runtime tools, collab tools, browser, protocol | citysim: scripted tools |
 | `kernel::model` | crates/kernel/src/model.rs | gateway: native and endpoint | citysim: scripted model |
 | `runtime::sandbox` | crates/runtime/src/sandbox.rs | wasmtime with fuel metering | pass-through and fault doubles |
-| `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | recording and replay adapter |
+| `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
 | `protocol::mcp` | crates/protocol/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
 
 **Two inner seams** stay `pub(crate)` because nothing outside their crate needs them: `memory`'s `Vfs` (real filesystem / deterministic power-loss model) and `gateway`'s `Vault` (platform credential service / in-session store).
@@ -272,7 +272,7 @@ Each of these is a type, not a slogan, and each has a compile-failure counterexa
 
 ## 10 Determinism and hardening
 
-The whole city runs as real code, single-threaded, seed-driven, on a virtual clock. That is not a testing convenience — it is the property that makes a failure reproducible from one seed, and these seven rules are its admission conditions.
+The whole city runs as real code, single-threaded, on a virtual clock, driven by a fixed script. That is not a testing convenience — it is the property that makes a failure replay exactly, and these seven rules are its admission conditions. A seed is what a random scenario batch would need; there is no random source in the simulator today to seed.
 
 | # | Rule | Held by |
 |---|---|---|
@@ -299,10 +299,10 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 | V0 unrepresentable | a whole class of error moved out of what can be written | 15 compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
 | V2 unit and property | a function wrong across a class of inputs | 1,085 tests, properties before examples |
-| V3 conformance | a second adapter behaving unlike the first | one suite per port |
+| V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | three targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 2 of 7 kani harnesses proved, Linux CI — those with an unbounded domain and a solvable one |
-| V6 deterministic simulation | components each correct and wrong together | citysim, six scenario files, failures reproduced from a seed |
+| V6 deterministic simulation | components each correct and wrong together | citysim, six scenario files, failures replayed from their script |
 | V7 mutation | tests that do not bite | `cargo-mutants`, by `just mutants` |
 | V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `fixtures/` |
 | V9 end to end | the thing a person actually wants to do | the real client in a real browser against a real server, on a developer machine |
@@ -310,7 +310,7 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 
 **V10 is not a gate, and the difference is load-bearing.** Section 8 says the wire is the whole API and that a second client writes against it; `adversary/` exercises that permission by writing a third one outside the workspace, in another language, to attack rather than to use. It is reached by `just adversary` and by a schedule, never by `just check` — on a machine with no Lean toolchain, `just check` behaves byte for byte as it does where the directory is absent, and `just adversary` prints one line and succeeds. What it buys that V2 cannot is quantification over traces: V2 proves that the paths we thought of hold, and V10 asks whether the door's stable error codes survive any prefix, one halt, and any suffix. It has already found three things a specific trace would not have — an exit code that means "no refusal arrived in time" where its own documentation promises "the city refused", a dispatch that writes a job file to disk before the guard that refuses it runs, and an `IdemKey` the wire makes every state-changing command carry that `kernel::gate::dedup` checks and nothing calls. All three are recorded in `adversary/adversary-SPEC.md` section 4, and all three are fixed; the third keeps a check of its own because one lane still writes to the Ledger without passing the assembly point that holds the keys.
 
-**Four gaps, named rather than hidden.** CI has no browser driver, so V9 is a command a developer runs rather than a gate. The isometric city compares display lists rather than bitmaps: the preconditions for bitmap comparison are paid for — placement is a pure function of the id, painter order is total, projection and its inverse are exact — but there is no rasteriser. And V6 stops below `bin::assembly` (§3): a seeded scenario reproduces a run, not a dispatch, because `RunWorker` builds its model adapter instead of receiving one. What holds the dispatch policy is that module's own tests, plus the integration tests the lib target makes possible. And the tree holds 7 kani harnesses, of which CI proves two — the two that have both an unbounded domain and a tractable shape, in under a minute each. The other five each carry a `// not-proved:` line in the source stating why, and `cargo xtask proof` reads those lines, skips those harnesses and prints the reason; `cargo xtask proof --list` prints the roster it will prove. Which harness is which belongs to those two readings rather than to this paragraph, and what belongs here is why two shapes put a proposition out of a solver's reach. A harness that builds a `Vec`, a `String` or a `BTreeSet` gives CBMC loops it cannot bound: one such run burned six hours, a second ran forty-five minutes under `--default-unwind 32`, and neither returned. A harness over symbolic non-linear arithmetic gives the solver work that grows with the width of the data it walks: the entropy shape hands it some 2,560 non-linear multiplications, one per slot of a 256-slot count table times ten squarings inside `log2_q10`. A harness over concrete input has a third problem and not a cost one: it states what the `#[test]` or proptest beside it already states.
+**Four gaps, named rather than hidden.** CI has no browser driver, so V9 is a command a developer runs rather than a gate. The isometric city compares display lists rather than bitmaps: the preconditions for bitmap comparison are paid for — placement is a pure function of the id, painter order is total, projection and its inverse are exact — but there is no rasteriser. And V6 stops below `bin::assembly` (§3): a scripted scenario reproduces a run, not a dispatch, because `RunWorker` builds its model adapter instead of receiving one. What holds the dispatch policy is that module's own tests, plus the integration tests the lib target makes possible. And the tree holds 7 kani harnesses, of which CI proves two — the two that have both an unbounded domain and a tractable shape, in under a minute each. The other five each carry a `// not-proved:` line in the source stating why, and `cargo xtask proof` reads those lines, skips those harnesses and prints the reason; `cargo xtask proof --list` prints the roster it will prove. Which harness is which belongs to those two readings rather than to this paragraph, and what belongs here is why two shapes put a proposition out of a solver's reach. A harness that builds a `Vec`, a `String` or a `BTreeSet` gives CBMC loops it cannot bound: one such run burned six hours, a second ran forty-five minutes under `--default-unwind 32`, and neither returned. A harness over symbolic non-linear arithmetic gives the solver work that grows with the width of the data it walks: the entropy shape hands it some 2,560 non-linear multiplications, one per slot of a 256-slot count table times ten squarings inside `log2_q10`. A harness over concrete input has a third problem and not a cost one: it states what the `#[test]` or proptest beside it already states.
 
 ### Four times a gate changed the design
 
@@ -351,11 +351,12 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 
 **The number in each subheading is the number of rows under it**, and `cargo xtask modmap` counts them, because every count a person maintained by hand here had already gone stale. The `desktop` heading is the one exception the machine cannot judge: its files sit outside `crates/`, where the parser does not look.
 
-### kernel (76) — every decision in the city, and nothing that touches a disk
+### kernel (77) — every decision in the city, and nothing that touches a disk
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
 | kernel::address | crates/kernel/src/address.rs | canonical relative paths, write-domain primitive, reserved prefix | value | S1 | built | kernel-SPEC.md#8-2 |
+| kernel::layout | crates/kernel/src/layout.rs | where a city keeps each kind of file: the directory and file names, and the eleven paths derived from a city root and an address | value | S1 | built | kernel-SPEC.md#8-56 |
 | kernel::locator | crates/kernel/src/locator.rs | the one grammar for referring to content: `cas:` and `file:`, fail-closed | value | S1 | built | kernel-SPEC.md#8-3 |
 | kernel::locator::tests | crates/kernel/src/locator/tests.rs | the grammar's round-trip and fail-closed cases | value | S1 | built | kernel-SPEC.md#8-3 |
 | kernel::ledger (port) | crates/kernel/src/ledger.rs | the only write entrance to history; owns `seq` and `prev` | port | S1 | built | kernel-SPEC.md#8-9 |
@@ -432,7 +433,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::highlight::tests | crates/kernel/src/highlight/tests.rs | the lexical rules a reader depends on: precedence, fences, and spans that slice without overlapping | decision | R2 | built | kernel-SPEC.md#8-31 |
 | kernel::schema | crates/kernel/src/schema.rs | the JSON Schema of the five values whose serde is hand-written, so the client generated from the wire reads their strings the way the parser does | adapter | V4 | built | kernel-SPEC.md#8-45 |
 
-### memory (47) — persistence, and every view derived from it
+### memory (48) — persistence, and every view derived from it
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -445,6 +446,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::real_fs | crates/memory/src/real_fs.rs | std::fs, holding the handle it is appending through | adapter | V3 | built | memory-SPEC.md#8-16 |
 | memory::error | crates/memory/src/error.rs | what persistence says when it refuses, and the one door out to `AxError` | value | V3 | built | memory-SPEC.md#8-14 |
 | memory::cas | crates/memory/src/cas.rs | content-addressed storage under BLAKE3, written through a temporary file | adapter | S1 | built | memory-SPEC.md#8-3 |
+| memory::cas::ranges | crates/memory/src/cas/ranges.rs | the Locator range grammar, read off an object without lifting it | adapter | S1 | built | memory-SPEC.md#8-23 |
 | memory::fault_fs | crates/memory/src/fault_fs.rs | the second filesystem adapter: a deterministic power-loss model | adapter | S1 | built | memory-SPEC.md#8-2 |
 | memory::fault_fs::plan | crates/memory/src/fault_fs/plan.rs | which write dies, and how | adapter | S1 | built | memory-SPEC.md#8-2 |
 | memory::fault_fs::fs | crates/memory/src/fault_fs/fs.rs | power cuts on demand | adapter | S1 | built | memory-SPEC.md#8-2 |
@@ -684,7 +686,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | eval::ablation::capabilities | crates/eval/src/ablation/capabilities.rs | the corpus: each thing a resident must be able to do, and the phrase in the document that grants it | data | V3 | built | eval-SPEC.md#8-7 |
 | eval::ablation::tests | crates/eval/src/ablation/tests.rs | the graded fixtures, and the on-demand run against the real City.md | decision | V3 | built | eval-SPEC.md#8-7 |
 
-### channels (35) — the process boundary
+### channels (36) — the process boundary
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -715,6 +717,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::reading | crates/channels/src/reading.rs | reading one ledger payload into the wire's own values, for the two ends that both need it | decision | F1 | built | channels-SPEC.md#8-21 |
 | channels::carried_name | crates/channels/src/carried_name.rs | names this crate does not own, validated at one construction point | value | V3 | built | channels-SPEC.md#8-1 |
 | channels::reception | crates/channels/src/reception.rs | may we bind, may this peer enrol, may we greet it, and what its frame means now | decision | V3 | built | channels-SPEC.md#8-2 |
+| channels::reception::inbound | crates/channels/src/reception/inbound.rs | reading one text frame, and the counted refusal for one this build cannot read | decision | V5 | built | channels-SPEC.md#8-37 |
 | channels::assets | crates/channels/src/assets.rs | the client the browser downloads, and which bytes answer which path | adapter | V3 | built | channels-SPEC.md#8-2 |
 | channels::server | crates/channels/src/server.rs | the listening end; the judgements are pure and the socket makes none | adapter | S4 | built | channels-SPEC.md#8-2 |
 | channels::server::config | crates/channels/src/server/config.rs | routes and bodies | adapter | S4 | built | channels-SPEC.md#8-2 |
@@ -724,7 +727,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (173)
+### browser (12), protocol (5), bin (175)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -853,6 +856,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::mcp_stdio::tests | crates/sprawling/src/mcp_stdio/tests.rs | a real child over a real pipe, a deadline that ends the process, and one process behind every handle | adapter | V5 | built | sprawling-SPEC.md#8-4 |
 | bin::mcp_http::tests | crates/sprawling/src/mcp_http/tests.rs | what the HTTP transport, its session and its redeemed header are held to | adapter | R1 | built | sprawling-SPEC.md#8-15 |
 | bin::firstrun | crates/sprawling/src/firstrun.rs | the first screen, where a city goes when nobody said, and handing a URL to the desktop | adapter | P7 | built | sprawling-SPEC.md#8-8 |
+| bin::home | crates/sprawling/src/home.rs | this person's home directory, and what this machine keeps under it: the components it downloaded and this person's own configuration | adapter | P0 | built | sprawling-SPEC.md#8-70 |
 | bin::release | crates/sprawling/src/release.rs | which release this binary is, and the one registry read that says whether a newer one exists | adapter | V5 | built | sprawling-SPEC.md#8-68 |
 | bin::version | crates/sprawling/src/main/version.rs | what `status` prints about which release this is, and the one command that asks the registry | adapter | V5 | built | sprawling-SPEC.md#8-68 |
 | bin::revealing | crates/sprawling/src/revealing.rs | showing a person an address in their own file manager, selected rather than merely opened | adapter | V5 | built | sprawling-SPEC.md#8-60 |
@@ -865,6 +869,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::doctor::screen | crates/sprawling/src/doctor/screen.rs | the report a person reads, and the one question asked per absent item | adapter | V4 | built | sprawling-SPEC.md#8-40 |
 | bin::doctor::probe | crates/sprawling/src/doctor/probe.rs | this machine answering: a program on the search path, its version under a deadline, one consented install | adapter | V4 | built | sprawling-SPEC.md#8-40 |
 | bin::doctor::installing | crates/sprawling/src/doctor/installing.rs | getting one named item this machine lacks, through the recipe the terminal would have run | adapter | F1 | built | sprawling-SPEC.md#8-64 |
+| bin::doctor::running | crates/sprawling/src/doctor/running.rs | the one place this binary starts an install program: null stdio, a deadline, and a child killed when it passes | adapter | F1 | built | sprawling-SPEC.md#8-64 |
 | bin::doctor::tests | crates/sprawling/src/doctor/tests.rs | every row is detectable and either installable or manual, and consent is asked one item at a time | decision | V4 | built | sprawling-SPEC.md#8-40 |
 | bin::doctor::report | crates/sprawling/src/doctor/report.rs | this machine's answer, in the shape a page reads | projection | V5 | built | sprawling-SPEC.md#8-54 |
 | bin::doctor::presence | crates/sprawling/src/doctor/presence.rs | this machine's answer about one item, in three states: present, broken with its fault, absent with its kind | value | V4 | built | sprawling-SPEC.md#8-50 |

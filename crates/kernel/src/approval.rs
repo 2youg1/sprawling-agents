@@ -12,16 +12,51 @@
 use serde::{Deserialize, Serialize};
 
 use crate::consts_policy::POLICY_IDLE_DAYS;
-use crate::event::TimeMs;
+use crate::event::{RunId, Seq, TimeMs};
 use crate::locator::Locator;
 use crate::registry::ResidentId;
 
-/// Non-empty item identity; uuid v7 minting is the effect layer's.
+/// Non-empty item identity, derived from the run that raises the item
+/// and that run's own position counter — never from a clock. Four lanes
+/// drive at once by default, so two runs reach their first approval in
+/// one millisecond routinely; a clock-shaped identity makes those two
+/// items one key, the inbox keeps the later one, and the earlier one
+/// disappears from an append-only history that cannot afterwards tell a
+/// lost item from an item that was never raised.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ApprovalId(String);
 
 impl ApprovalId {
+    /// Mints the identity of the approval `run` may raise at `seq`.
+    ///
+    /// `seq` is the run's own monotonic position — the counter the run
+    /// already keeps to derive [`crate::IdemKey`], counted inside one run
+    /// and never across runs, so a position is only ever an identity
+    /// together with the run it was counted in. Replay re-derives the
+    /// identical id because neither input is sampled: this is what keeps
+    /// `just replay` self-proving over the approval records.
+    ///
+    /// The position is written zero-padded to the width of `u64::MAX`, so
+    /// the derived `Ord` on two ids of one run reads the order the run
+    /// raised them in.
+    pub fn of(run: &RunId, seq: Seq) -> ApprovalId {
+        ApprovalId(format!("ap-{run}-{:020}", seq.value()))
+    }
+
+    /// Mints the identity of the discard escalation a drive's own sweep
+    /// raises, which happens at most once per run.
+    ///
+    /// The sweep sits at the highest position, which no call position can
+    /// reach, because the sweep counts nothing and the run's call counter
+    /// must stay free to hand out every position it reaches.
+    pub fn of_sweep(run: &RunId) -> ApprovalId {
+        ApprovalId::of(run, Seq::new(u64::MAX))
+    }
+
+    /// Adopts an id that already exists — one echoed back over the wire,
+    /// one read from the ledger, one written into a fixture. Minting is
+    /// [`ApprovalId::of`]; this path only refuses the empty string.
     pub fn new(raw: impl Into<String>) -> Option<ApprovalId> {
         let raw = raw.into();
         if raw.is_empty() {

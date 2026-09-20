@@ -3,9 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Deterministic city simulator, the second Main: thin executor, seeded RNG,
-//! virtual clock, fault injection. Adapters and the invariant checker land
-//! from S1. Dev-only workspace member; not in the product graph.
+//! Deterministic city simulator, the second Main: thin executor, fixed
+//! scripts, a counted clock, fault injection. There is no random source
+//! here and no seed: a scenario is a script written out in a test, and
+//! what makes it replay is that the script, the tick counter and the
+//! single thread are all fixed. Dev-only workspace member; not in the
+//! product graph.
 
 mod checker;
 mod executor;

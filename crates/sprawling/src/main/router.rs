@@ -151,9 +151,12 @@ fn hold() {
 
 /// Where `up` and the first screen put a city nobody named.
 pub(super) fn default_city_location() -> std::path::PathBuf {
-    let home = std::env::var_os("USERPROFILE")
-        .or_else(|| std::env::var_os("HOME"))
-        .map(std::path::PathBuf::from);
+    // A missing home is not a refusal here: the city then goes beside
+    // the binary, which `firstrun::default_city` decides.
+    let home = match sprawling::home::Home::detect() {
+        Ok(home) => Some(home.path().to_path_buf()),
+        Err(_) => None,
+    };
     match std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))

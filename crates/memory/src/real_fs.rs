@@ -12,6 +12,7 @@
 //! and over.
 
 use std::io;
+use std::io::{Read as _, Seek as _, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use crate::vfs::Vfs;
@@ -111,6 +112,23 @@ impl Vfs for RealFs {
 
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
         std::fs::read(path)
+    }
+
+    /// Seek, then read at most `len` bytes. The handle is opened for
+    /// this call and dropped with it: a reader of one range of one
+    /// object has nothing in common with the next call, so there is no
+    /// position worth keeping - unlike the append handle above, which
+    /// serves record after record on the same segment.
+    fn read_at(&self, path: &Path, offset: u64, len: u64) -> io::Result<Vec<u8>> {
+        let mut file = std::fs::File::open(path)?;
+        file.seek(SeekFrom::Start(offset))?;
+        // The buffer grows to what the file actually holds rather than
+        // to what the caller asked for: `len` is a ceiling a caller may
+        // set far above the object, and reserving it up front would let
+        // one request claim memory no file on the disk needs.
+        let mut bytes = Vec::new();
+        file.take(len).read_to_end(&mut bytes)?;
+        Ok(bytes)
     }
 
     fn append(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()> {

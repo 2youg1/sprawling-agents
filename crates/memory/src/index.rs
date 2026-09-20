@@ -18,4 +18,5 @@ mod ledger;
 mod reader;
 
 pub use ledger::LedgerIndex;
+pub use ledger::Refreshed;
 pub use reader::LineReader;

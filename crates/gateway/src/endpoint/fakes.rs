@@ -246,6 +246,7 @@ pub(crate) fn config(url: &str) -> EndpointConfig {
         proxying: kernel::Proxying::default(),
         pricing: Some(
             crate::market::MarketSnapshot::builtin()
+                .unwrap()
                 .lookup("claude-sonnet")
                 .unwrap()
                 .clone(),

@@ -90,9 +90,10 @@ impl RunWorker {
                 > usize::try_from(kernel::consts_policy::DISCARD_FILES_MAX).unwrap_or(usize::MAX)
             {
                 let item = kernel::ApprovalItem {
-                    id: kernel::ApprovalId::new(format!("discard-{run_id}")).ok_or_else(|| {
-                        AxError::failure(AxCode::InvalidArgs, "mint approval id", "empty id")
-                    })?,
+                    // The sweep's own slot in this run: one escalation
+                    // per run, at a position the run's call counter
+                    // never reaches (kernel-SPEC 8-21).
+                    id: kernel::ApprovalId::of_sweep(&run_id),
                     source: kernel::ApprovalSource::Gate,
                     actor: who.to_owned(),
                     artifact: sweep.job_locator.clone(),

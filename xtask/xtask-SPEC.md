@@ -81,7 +81,7 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——列格式一变，只有一处要改。
 
-**本模块不做什么（否定式两条）**：不修改任何被检文件（门只判不改；唯二例外＝spec 只新建不覆盖、`apisync --write` 只重写基线文件）；不缓存扫描结果（每次全量重扫——确定性优于速度）。
+**本模块不做什么（否定式两条）**：判定路径不改任何文件；写盘只发生在带 `--write` 的命令上，且每条只重写它自己生成的那一面——`spec` 只新建不覆盖，`apisync` 只写基线文件，`badge` 只写徽章，`wire-ts` 只写 `client/src/wire.ts`，`docnum` 只写受管区段两个标记之间的字节。不缓存扫描结果（每次全量重扫——确定性优于速度）。
 
 **secret 门细则**：扫描面＝仓内全部文件（含 fixtures／语料），排除隔离区 local/、.git、target；判定器＝`kernel::secret::scan`（xtask 依赖 kernel，工作区成员不占产品拓扑，合法）；命中只报文件＋偏移＋长度，恒不回显字节；无内联豁免（豁免口会被注入内容利用）。兼查：`crates/*/src/**` 内 `.expose(` 调用点白名单＝kernel/src/secret.rs（定义处）、gateway/src/endpoint.rs、gateway/src/native.rs；命中即红。自测纪律：扫描器自身测试的高熵样本在源码中必须拆段拼接，不留可扫描的完整字面量。
 
@@ -159,7 +159,7 @@ pub(crate) struct Violation {
 
 ## 11 边界枚举
 
-词汇表粗体词一个都解析不出（表结构变了→ Doc 错误而非静默通过）；空仓库（无提交→guard 跳过）；表行路径重复；状态列取值非法；围栏块缺失（→ Doc 错误，非零违规）；CRLF 行尾（比对前 trim `\r`）；非 UTF-8 文件（lossy 读，不 panic）；merge 提交（diff-tree -r 照常）；initial commit（`--root`）；**命令面的注释行不参与 ax token 扫描**（`#`／`//` 打头的行不可执行，把它们当命令判是把说明文字当成了行为——首跑即被自身 CI 注释命中的实例回填此条）。
+词汇表粗体词一个都解析不出（表结构变了→ Doc 错误而非静默通过）；空仓库（无提交→guard 跳过）；表行路径重复；状态列取值非法；围栏块缺失（→ Doc 错误，非零违规）；CRLF 行尾（比对前 trim `\r`）；非 UTF-8 文件（lossy 读，不 panic）；merge 提交（diff-tree -r 照常）；initial commit（`--root`）；**一份散文档不可能原样引用 `docnum` 的开标记**（引了它就成为一段受管区段，这是标记即语法的直接后果，故文档描述这个机制时写注释的内容而不写整句注释）；**命令面的注释行不参与 ax token 扫描**（`#`／`//` 打头的行不可执行，把它们当命令判是把说明文字当成了行为——首跑即被自身 CI 注释命中的实例回填此条）。
 
 ## 12 错误处理
 
@@ -181,13 +181,15 @@ serde＋serde_json（cargo metadata 解析；工作区已钉）；toml（lexicon
 
 MPL 头三行；保护路径清单（xtask/、.github/、deny.toml、Cargo.toml、rust-toolchain.toml、clippy.toml、justfile）；被判源码前缀清单（crates/、citysim/、fuzz/）；状态枚举四值；`ax` 的三个可及属性与四个地标元素。各随其权威变更而改，改动本身受 guard 看守。
 
+`docnum` 的两个标记文本（两句 HTML 注释，内容分别是 `xtask:begin <fact>` 与 `xtask:end`）硬编码在 `docnum.rs`，因为它们是文档与门之间的语法本身，没有第二个读者；改它们要把树上全部受管区段同集改掉。**事实清单不硬编码在任何文档里**：它是 `docnum::FACTS` 那张数组。
+
 ## 15 影响面
 
 CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate 的解析契约（列契约已标〔冻〕）。改表格式＝改本 crate。
 
 ## 16 测试与约束
 
-单测：modmap 行解析（正例/六列不齐/状态非法/缝表不误伤）；索引文件判定；lexicon 命中与 `lexicon-ok:` 豁免；depmap 块解析；ax 可及面取出（HTML 与 RSX 两种写法归一）；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；guard 两边判定（混合提交索 `Verdict:` 尾注、单独重新定价不索、基线同步不误伤）。约束：全门无网络、无写盘（spec 子命令除外——它只新建不覆盖）；输出顺序确定。
+单测：modmap 行解析（正例/六列不齐/状态非法/缝表不误伤）；索引文件判定；lexicon 命中与 `lexicon-ok:` 豁免；depmap 块解析；ax 可及面取出（HTML 与 RSX 两种写法归一）；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；guard 两边判定（混合提交索 `Verdict:` 尾注、单独重新定价不索、基线同步不误伤）。docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
 
 ## 17 模型体验
 
@@ -196,6 +198,8 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 ## 18 文档同步
 
 新增门或改保护路径时：AGENTS.md 的规则表、`docs/CONTRIBUTING.md` §3 同集更新。
+
+文档里的数字不靠同步，靠受管区段：把数字圈进一对 `xtask:begin` ／ `xtask:end` 注释，`cargo xtask docnum --write` 负责它此后的每一次取值（§8-16）。
 
 ### 第十三道门：`ax`（历史：这道门已并入 `render`，理由见 §8-13）
 
@@ -516,5 +520,31 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 **第六条断言**：一条落在树内的相对链接，其拼法必须与已发布路径逐字节相等；只在大小写上不同即红，拒词点名盘上的那个名字。判据住 `xtask/src/release/link.rs` 的 `Spellings`（已发布集合加一张小写索引），`release.rs` 仍是唯一的 `Violation` 产地。**`None` 覆盖两种情形且是故意的**：链接是对的，或者它指的根本不是一份已发布文件（目录、或已由脚手架断言报过的路径）——本条只答大小写这一个问题，抢答别的会把更弱的句子排在读者前面。
 
 **这一次的迁移方向是改盘上的名字，不是改链接。** 全仓 30 余处提及一律写 `docs/glossary.md`，其中 `xtask/src/vocabulary.rs:76` 是运行时真的去打开它的那一处；唯一写大写的是文件名自己。故 `docs/GLOSSARY.md` 改名为 `docs/glossary.md`，一处改动，零个读者需要跟着动。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-16 docnum：文档里的数字由一张数组生成并回写
+
+**一份写错的权威文档比没有文档更贵**：下一个读者（人或模型）按它写代码。已经发生的：`ARCHITECTURE.md` 说 `WIRE_V` 是 15 而线上是 31，说 Command 24 条而枚举是 28 条，说 `Cargo.lock` 有 497 个包而锁里是 389 个，说十个 kani harness 而树上有七个。**每一条单独改都是五分钟的事，而三个月后它们会以同样的方式再错一遍**——手敲进文档的数字就是那个事实的第二个家。
+
+**机制＝受管区段。** 文档用一对 HTML 注释圈住一段文字，开标记里写它由哪个事实生成：
+
+<!-- xtask:begin gate_count -->
+21
+<!-- xtask:end -->
+
+上面这一段本身就是一个受管区段，圈的是 `gate_count`：它由 `cargo xtask docnum --write` 写出，读者据此知道这道门长什么样，而它同时受这道门看守，故这份 SPEC 里的示例不可能与机制分叉。
+
+**两种形状，由作者选。** 两个标记各占一行时，值写在自己那一行；两个标记与值同处一行时，值留在行内——于是一个表格单元格与一句散文都能持一段受管区段，而 `--write` 保持作者选的形状不变。
+
+**判据三条**：① 区段的文字等于它的事实今天的读数，不等即红，恢复语是 `cargo xtask docnum --write`；② 区段命名的事实必须在 `FACTS` 数组里，否则红，拒词列出全部已知键；③ 标记不闭合、区段套区段、或多出一个收尾标记，即红——一段读不出来的标记不得被当作没有标记。**`--write` 撞上未知事实时整份文件不写**：跳过它会让文档看起来刚重生过，而其中一个数字仍是旧的。
+
+**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、重算函数」，首批六条：`wire_v`（`channels::WIRE_V`）、`command_frames`（`COMMAND_NAMES` 的长度）、`query_frames`（`QUERY_NAMES` 的长度）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
+
+**扫描面＝仓内全部 `.md`，排除隔离区 `local/`**：受管区段是给读者的承诺，而隔离区从不入库。
+
+**这道门替掉 M-01…M-06 的四条**：`WIRE_V` 与两张帧表条数（M-01）、依赖数（M-03）、§11 的 kani 读数（M-05 的数字面）、`LLM.md` 的清单条数（M-06 的数字面）都改由区段持有。**它替不掉的**：版本表单元格（M-02，属 `depmap` 的 `cargo metadata` 面）、尺寸读数（M-04，属 `budget` 与 `badge`）、以及叙事本身——一段建立在错误基数上的论证要改写成指路，机器判不了它。
+
+**它今天不在 `gates::run` 的数组里。** 入门表与 `COUNT` 的加一，随第一批受管区段落进 `ARCHITECTURE.md` 的那一次改动同集完成——一道判不到任何区段的门恒为绿，先入表只是在门表上多一行噪声。关门判据照旧：**故意把 `WIRE_V` 改成 32 而不动文档，`just check` 必须红。**
 
 **本节属门禁机具，与产品代码分开提交。**

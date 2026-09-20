@@ -12,7 +12,7 @@
 
 | 单元 | 完成的定义 |
 |---|---|
-| port | 两个适配器过同一套 conformance 断言；帧的字节不依赖 map 迭代序 |
+| port | 帧的字节不依赖 map 迭代序；拒绝与读不懂的回复各有一条断言。**不含** conformance 断言——理由见 §8-1 决定 |
 | session | 一次会话的帧序可在无浏览器下逐帧断言；Recording 重放同一问题得同一答案，答不出即报出问不出口的那条 |
 | snapshot | 原始 DOM 恒不入窗（断言）；同一棵树两次快照字节相同；label 超长即截断且不引入换行 |
 | act | 陈旧 generation 恒拒；页面文本进表达式后，字面量内除定界符外无未转义引号 |
@@ -67,8 +67,6 @@ impl Reply {
     pub fn into_result(self) -> Result<Value, AxError>;    // 远端的拒绝带着它自己的词过来
 }
 pub trait BrowserPort { fn send(&mut self, frame: &Frame) -> Result<Reply, AxError>; }
-#[cfg(feature = "conformance")]                            // 恒不进构建物
-pub fn assert_port_conformance<P: BrowserPort>(port: &mut P, known: &Frame);
 
 // 8-2 session（形状 4 适配器＋形状 2）
 pub struct ContextId(/* 私有 */);
@@ -115,9 +113,17 @@ impl Profile { pub fn of(building: &Address, confidential: bool) -> Result<Profi
 
 ## 8.5 两个设计
 
-**第一对（缝画在哪）**：把 WebSocket 会话整体放进本 crate（落选）vs 缝只运帧、套接字归装配层（选中）。前者读起来更像「一个浏览器客户端」，但它把异步运行时拖进一个本可纯的 crate，于是所有断言都要一个 runtime，而「第二适配器」只能是一个假服务器。后者让整段会话在无浏览器、无异步的条件下逐帧断言，录制回放因此是**真的第二适配器**而不是测试替身——一台没有 WebDriver 的机器因此不再是缺口。代价：装配层多一段连接管理，且帧的 id 必须由 `Session` 铸而不能由传输层铸（否则重放会重新编号）。
+**第一对（缝画在哪）**：把 WebSocket 会话整体放进本 crate（落选）vs 缝只运帧、套接字归装配层（选中）。前者读起来更像「一个浏览器客户端」，但它把异步运行时拖进一个本可纯的 crate，于是所有断言都要一个 runtime，而「第二适配器」只能是一个假服务器。后者让整段会话在无浏览器、无异步的条件下逐帧断言，录制回放因此能在一台没有 WebDriver 的机器上重放一次真实会话；它替代不了传输层的证据（§8.6）。代价：装配层多一段连接管理，且帧的 id 必须由 `Session` 铸而不能由传输层铸（否则重放会重新编号）。
 
 **第二对（ref 是什么）**：ref ＝ 页面里的稳定标识（落选）vs ref ＝ 本次快照里的位置（选中）。前者要求页面配合（`id` 属性、`data-testid`），而页面是别人写的；后者把「页面动过了」变成一个可判定事实——ref 携 generation，陈旧即拒。代价：每次动作前必须先看一眼，这正是我们要的顺序。
+
+## 8.6 port 缝的决定（推翻 §8.5 第一对里「录制回放是真的第二适配器」一句）
+
+**决定（§8-1，推翻旧决定「两个适配器过同一套 conformance 断言」）**：`assert_port_conformance` 删除，`BrowserPort` 保留。
+
+- trait 保留的理由是 AGENTS.md「一个 trait 只在已有第二个实现的缝上引入」：缝上有两个生产实现——`crates/sprawling/src/browser_bidi/socket.rs:61` 的 `BidiSocket` 与 `lazy.rs:113` 的 `LazyEngine`（按需起引擎、首帧才连），加上本 crate 的 `Recording`。撤 trait 会让懒起与直连两条路合成一个类型。
+- 套件删除的理由是它的证据为零：唯一调用点在 `session.rs` 的测试里，被测者 `Recording` 按构造就回 `frame.id()` 且回答不消费条目，两条断言恒真；两个生产适配器从不跑它，因为 CI 没有浏览器驱动（ARCHITECTURE.md §11 已具名的四个缺口之一）。留着它，读者会把「过了 conformance」读成「传输层被验过」。
+- **重开参数**：当回复路由规则（读过无 id 的事件、按 id 认领答案）从 `socket.rs` 的 async 循环搬进本 crate 成为纯函数，且 `crates/sprawling` 的测试能用一对本地 socket 驱动它时，套件与它的调用方在同一次改动里回来。那是一次跨两个 crate 的改动，不属于本叶子。
 
 ## 9 工作流程
 
@@ -158,7 +164,7 @@ impl Profile { pub fn of(building: &Address, confidential: bool) -> Result<Profi
 
 ## 16 测试与约束
 
-逐模块 `#[cfg(test)]`；`Recording` 过 `assert_port_conformance`；「原始 DOM 恒不入窗」「字节确定性」「陈旧 generation 恒拒」「回路必有终点」四条各有一条断言。**约束**：本 crate 恒不出现 `async`、恒不依赖 `tokio`、恒不持有文件句柄。
+逐模块 `#[cfg(test)]`；「原始 DOM 恒不入窗」「字节确定性」「陈旧 generation 恒拒」「回路必有终点」四条各有一条断言。**约束**：本 crate 恒不出现 `async`、恒不依赖 `tokio`、恒不持有文件句柄。
 
 ## 17 模型体验
 
@@ -168,7 +174,7 @@ impl Profile { pub fn of(building: &Address, confidential: bool) -> Result<Profi
 
 `ARCHITECTURE.md` §6 browser 六行与 §3 缝清单｜`docs/glossary.md` 若新增词汇｜装配层接线时同步 §6 末接线台账。
 
-**`conformance` feature（test 恒不进构建物）**：`assert_port_conformance` 住 `#[cfg(feature = "conformance")]` 之后，否则它随发行二进制出厂，而「dev-only by contract」这句话没有任何机器持有。本工作区另外四套 conformance 同形，此规则由 `cargo xtask artifact` 持有；`crates/browser/src/session.rs` 中调用它的那条断言同样带 `#[cfg(feature = "conformance")]`，故它在 `--all-features` 下运行——那正是 `just check` 与 `just test` 所用的构建。
+**`conformance` feature 作废**：本 crate 不再有 conformance 套件（§8-1 决定），`crates/browser/Cargo.toml` 的 `conformance = []` 应随之删除（跨文件，见交付报告）。`cargo xtask artifact` 的规则不变，它辖的另外四套 conformance 与本 crate 无关。
 
 ## 19 八个动作，与截图成为证据
 
