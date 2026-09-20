@@ -81,9 +81,9 @@ pub enum ApprovalSource {
     Agent,
 }
 
-/// What kind of decision this is. Wire data (cluster keys serialize), so
-/// open for extension; kernel's own matches stay exhaustive in-crate.
-#[non_exhaustive]
+/// What kind of decision this is. Wire data — the cluster keys
+/// serialize — and closed, so that a new class of decision is a
+/// compile error at every reader that must classify it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -136,7 +136,6 @@ pub struct ApprovalItem {
 /// The classes a Policy may match. Commitment, BudgetLimit and
 /// DiscardEscalate have no variant here — the type-level half of "never
 /// waivable" (9.1); gate code never needs a runtime check for it.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PolicyClass {
@@ -230,7 +229,6 @@ pub fn expiry(policy: &Policy, now: TimeMs) -> PolicyExpiry {
 }
 
 /// Why a policy left the books (`policy_revoked` payload).
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PolicyRevocation {
@@ -241,7 +239,6 @@ pub enum PolicyRevocation {
 
 /// Who answers the Approval Inbox (9.2). Never touches gate decisions —
 /// C15's byte-identical gate sequences are citysim's to assert (P2).
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

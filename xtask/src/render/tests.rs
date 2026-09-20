@@ -69,15 +69,19 @@ fn railed() -> Vec<Drawn> {
     drawn
 }
 
+/// The label a real run takes from the pass it is in; the properties
+/// only carry it into the violation, so one stands in for all of them.
+const AT: &str = "at 1280px, dark in the colours it authored";
+
 fn judge(drawn: &[Drawn]) -> Vec<Violation> {
     let mut out = Vec::new();
-    every_control_is_announceable(drawn, &mut out);
-    every_landmark_is_named(drawn, &mut out);
-    one_first_heading(drawn, &mut out);
-    one_left_edge(drawn, &mut out);
-    nothing_escapes_what_holds_it(drawn, &mut out);
-    rows_share_a_first_mark(drawn, &mut out);
-    no_key_is_underlined(drawn, &mut out);
+    every_control_is_announceable(drawn, AT, &mut out);
+    every_landmark_is_named(drawn, AT, &mut out);
+    one_first_heading(drawn, AT, &mut out);
+    one_left_edge(drawn, AT, &mut out);
+    nothing_escapes_what_holds_it(drawn, AT, &mut out);
+    rows_share_a_first_mark(drawn, AT, &mut out);
+    no_key_is_underlined(drawn, AT, &mut out);
     out
 }
 
@@ -306,6 +310,47 @@ fn a_section_below_the_fold_of_a_fixed_column_is_still_an_escape() {
         "{}",
         rules(&found)
     );
+}
+
+/// The table every screen of this client draws its rows in: the box it
+/// scrolls in is now measured, so the rows are judged against the box
+/// that actually holds them.
+///
+/// Before the probe measured scrolling boxes, the nearest measured
+/// ancestor of a cell was the section two levels out, the exemption for
+/// a scrolling container could never apply, and a table whose content
+/// was two pixels narrower than its box was two pixels from being
+/// reported as a defect by a gate that is right about everything else.
+#[test]
+fn a_row_wider_than_the_box_it_scrolls_in_is_not_an_escape() {
+    let mut drawn = good();
+    let mut box_ = el("DIV", "", [361, 67, 240, 100], (6, 3));
+    box_.scrolls_across = true;
+    box_.scrolls_down = true;
+    drawn.push(box_);
+    drawn.push(el("BUTTON", "排序", [361, 67, 400, 24], (8, 7)));
+    let found = judge(&drawn);
+    assert!(
+        found.iter().all(|v| !v.rule.contains("outside the box")),
+        "{}",
+        rules(&found)
+    );
+}
+
+/// A finding names the pass it was found in: the same page at two
+/// widths is two places a reader has to be sent to.
+#[test]
+fn a_finding_names_the_pass_it_was_found_in() {
+    let mut drawn = good();
+    drawn.push(el("ASIDE", "", [1200, 0, 216, 1061], (3, -1)));
+    let found = judge(&drawn);
+    assert!(found.iter().all(|v| v.location.ends_with(AT)), "{}", {
+        found
+            .iter()
+            .map(|v| v.location.clone())
+            .collect::<Vec<_>>()
+            .join(" | ")
+    });
 }
 
 /// Containment is judged against the nearest measured ancestor, so an

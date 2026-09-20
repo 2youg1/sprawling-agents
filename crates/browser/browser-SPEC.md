@@ -49,7 +49,7 @@ P4 之前 `crates/browser/src/` 只有 `lib.rs` 一行文档。无既有代码�
 **三件邻居的活，及它们各自的主人**：
 
 - **字节怎么走**归 `bin::assembly`：WebSocket、重连、超时住装配层，本 crate 恒不持套接字，也恒不依赖异步运行时。
-- **这栋楼准不准出网**归 `city::policy`：`profile` 只读 confidential 这一位，判定本身在 city。
+- **这栋楼准不准出网**归 `city::policy`：`profile` 只读 confidential 这一位，判定本身在 city。整份 `kernel::BuildingPolicy` 入参而非那一位（G-25）：什么叫 confidential 只有 kernel 一处定义，调用点写 `true` 则是第二处。
 - **页面带回来的内容算什么**归 `kernel::taint`：快照文本与工具结果同落污染环，本 crate 不另设解包面。
 
 ## 8 接口先行
@@ -108,7 +108,7 @@ impl DevLoop { pub fn observe(&mut self, observation: &Observation) -> Result<St
 // 8-6 profile（形状 1 判定）
 pub enum Profile { At { path: Address }, Ephemeral }
 pub const PROFILES_DIR: &str = "browser-profiles";
-impl Profile { pub fn of(building: &Address, confidential: bool) -> Result<Profile, AxError>; pub fn persists(&self) -> bool; }
+impl Profile { pub fn of(building: &Address, policy: &BuildingPolicy) -> Result<Profile, AxError>; pub fn persists(&self) -> bool; }
 ```
 
 ## 8.5 两个设计

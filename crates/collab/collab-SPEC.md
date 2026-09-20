@@ -308,7 +308,7 @@ impl GoalTool { pub fn new(desk: Rc<RefCell<GoalDesk>>) -> Result<GoalTool, AxEr
 - **`Circumstance` 三项里工具只知道一项**：`gate_refused` 与 `touches_intent` 是调用方才知道的事，机器调用方一律传 `false`；`arbitration_tried` 同理。结果是工具只走得到**机械可判**与**交人读**两条路——这是诚实的：意图判断本来就不归一个参数。
 - **同一 Run 内的第二次登记看得见第一次**：desk 把刚登记的条目接在 `registered` 尾上，否则一个 Run 能把同一个资源登记两次而不撞。
 - **登记后才入账**：同 8-8，工具只产 effect；`goal_registered` 与 `goal_conflict` 两种事件由工人在驱动返回后写，工人的目标表随之前推。**不写第三种 `arbitration_verdict`**：`conflict_payload` 已携着那一级，再写一条就是同一件事的第二个权威；该事件留给真正跑过一场仲裁的 Run。
-- **两个 effect 枚举都是穷尽的**（无 `#[non_exhaustive]`，与本库跨 crate 枚举的常规相反）：每个变体都是工人必须写下的一条账，所以新增一个得是**写账那一端的编译错误**，而不是一条直到某个 Signal 惄悄没入账才有人发现的运行期分支——理由同 `AxCode::carrier()` 的穷尽 match。
+- **两个 effect 枚举都是穷尽的**（自 G-22 起全库如此）：每个变体都是工人必须写下的一条账，所以新增一个得是**写账那一端的编译错误**，而不是一条直到某个 Signal 惄悄没入账才有人发现的运行期分支——理由同 `AxCode::carrier()` 的穷尽 match。
 
 ### 8-10 collab::pr_tool（形状 4 适配器）
 
@@ -402,7 +402,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 - **`split` 之后本次 drive 不再持有那根枝**：它拿到的那件活现在是几片，它接下来该拿其中一片。写盘前先把新文本重新解析并 `PlanTree::build` 一次，**拆不出合法树就一个字节都不写**。
 - **`block` 与 `release` 都必须带一句原因**，且原因**随记录走而不是随表格走**：表格只有位置说「Blocked」，一句话该住在 `roadmap_blocked` 的载荷里，在表里再放一份就是同一句话的第二个权威。
 - **哪一种记录由出口决定**（`ClaimEffect::kind`）：绿→`roadmap_finished`，红→`roadmap_blocked`，交回→`roadmap_released`，拆→`roadmap_split`。工人不再自己 match 一遍，于是「停下来意味着什么」只有一个答案。
-- **效果穷尽**（同 `SignalEffect`／`GoalEffect`／`PrEffect`，故意不加 `#[non_exhaustive]`）：每个变体都是工人必须写下的一条账，新增一个变体应当是写入处的编译错误。
+- **效果穷尽**（同 `SignalEffect`／`GoalEffect`／`PrEffect`）：每个变体都是工人必须写下的一条账，新增一个变体应当是写入处的编译错误。
 - **并发口径（诚实边界）**：工人写盘前重读文件，**每个节点只核第一条效果**——一个先认领再结项的 run 两条效果都是它自己按派活时的文件顺序产出的，拿第二条去问磁盘，等于问「我自己刚才那条落盘了没有」，而它没有：desk 是最后整份写一次。行若已不是预期状态则整组丢弃并留一条诊断，而不是覆盖。
 
 ## 8.5 两个设计

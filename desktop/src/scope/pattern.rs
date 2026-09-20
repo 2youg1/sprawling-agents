@@ -15,6 +15,7 @@
 
 /// One allowlist line, held as characters so that matching never slices
 /// a string in the middle of a character.
+#[derive(Debug)]
 pub(crate) struct Pattern {
     glob: Vec<char>,
 }

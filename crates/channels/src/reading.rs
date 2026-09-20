@@ -102,7 +102,11 @@ pub fn used_in(usage: &serde_json::Value) -> Option<Used> {
 pub fn output_in(said: &serde_json::Value) -> Option<Output> {
     match said {
         serde_json::Value::String(text) => bounded(text),
-        other => bounded(&other.to_string()),
+        other @ (serde_json::Value::Null
+        | serde_json::Value::Bool(_)
+        | serde_json::Value::Number(_)
+        | serde_json::Value::Array(_)
+        | serde_json::Value::Object(_)) => bounded(&other.to_string()),
     }
 }
 
@@ -162,6 +166,10 @@ pub fn subject_of(args: Option<&serde_json::Value>) -> Option<String> {
 /// rest: an enum that grew an arm per event would be the event stream
 /// with extra steps.
 #[must_use]
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "an arm per event kind would be the event stream with extra steps"
+)]
 pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
     let at = record.seq();
     let map = record.data().as_map();

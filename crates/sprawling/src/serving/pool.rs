@@ -116,7 +116,7 @@ impl DrivingPool {
                 // Nobody listening means the city stopped pursuing while
                 // this run was going: the history already has whatever
                 // this drive wrote, and there is nothing left to tell.
-                let _ = home.send(Arrival { run, driven });
+                drop(home.send(Arrival { run, driven }));
             })
             .map_err(|source| {
                 AxError::failure(

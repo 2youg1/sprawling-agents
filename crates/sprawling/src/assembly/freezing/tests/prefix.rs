@@ -7,6 +7,8 @@
 //! own conventions, and the task - all as bytes rather than as pointers
 //! at bytes.
 
+#![allow(clippy::wildcard_enum_match_arm, reason = "test code")]
+
 use super::super::*;
 use crate::assembly::fixture::*;
 use crate::assembly::*;

@@ -19,7 +19,6 @@ pub enum Carrier {
 
 /// Closed set of error codes.
 /// Extension is additive only; the wire spelling lives in [`AxCode::as_str`].
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AxCode {
     // Base table (14).

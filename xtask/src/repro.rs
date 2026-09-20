@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Reproducible-build fixture: build the release binary twice from the
-//! same tree and compare bytes. Release三件 item three.
+//! same tree and compare bytes. Release item three.
 //!
 //! Scope is stated rather than implied: the default rebuilds the
 //! `sprawling` crate only (dependencies stay cached), which proves the
@@ -12,15 +12,18 @@
 //! `--full` clears the whole target first - the CI-grade variant, at
 //! several minutes.
 //!
-//! First reading (2026-08-22, windows-msvc): the fixture reported two
-//! hashes - the embed chain is deterministic (gzip mtime zeroed, sorted
-//! tables), but the MSVC link step is not. The known sources are the PE
-//! header timestamp and the debug-directory PDB GUID, both minted by
-//! link.exe per run; the fix line is `-C link-arg=/Brepro` (plus a
-//! pinned PDB path) applied as a release-profile flag. Applying it
-//! invalidates every cached artifact, so it lands with the release
-//! workflow rather than as a mid-session rebuild; until then this
-//! command is the honest register of that gap.
+//! The embed chain is deterministic by construction: the gzip mtime is
+//! zeroed and the tables are sorted. The link step is not deterministic
+//! on its own, and neither is the debug information: link.exe mints a
+//! PE header timestamp and a debug-directory PDB GUID per run, and a
+//! compile records the absolute path of every source it read. Those
+//! three are settled by `/Brepro` and `--remap-path-prefix` in
+//! `.cargo/config.toml`, where every build of this tree reads them,
+//! rather than by the two commands below - a switch this fixture passed
+//! to its own builds would prove an artifact no release ships.
+//!
+//! `platforms.yml` runs this nightly, which is the only automated
+//! reader: two links are minutes, and nobody waits on the verdict.
 
 use std::path::Path;
 use std::process::Command;

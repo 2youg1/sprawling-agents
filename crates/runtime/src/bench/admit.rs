@@ -195,17 +195,6 @@ impl ToolBench {
                      can move money",
                 ));
             }
-            _ => {
-                return Err(AxError::failure(
-                    AxCode::InvalidArgs,
-                    "invoke tool",
-                    format!("`{name}` declares an effect this bench does not route"),
-                )
-                .with_recovery(format!(
-                    "give `{name}` an effect this bench routes, or add the route to \
-                     runtime::bench::admit"
-                )));
-            }
         }
         Ok(None)
     }

@@ -1,11 +1,3 @@
-#[non_exhaustive] pub enum gateway::AudioType
-#[non_exhaustive] pub enum gateway::AuthSpec
-#[non_exhaustive] pub enum gateway::CostSource
-#[non_exhaustive] pub enum gateway::Fallback
-#[non_exhaustive] pub enum gateway::InputKinds
-#[non_exhaustive] pub enum gateway::Persistence
-#[non_exhaustive] pub enum gateway::ProviderOutcome
-#[non_exhaustive] pub enum gateway::Retreat
 #[non_exhaustive] pub gateway::Fallback::Then
 #[non_exhaustive] pub gateway::Retreat::MoveTo
 impl core::default::Default for gateway::AdmissionState
@@ -39,9 +31,17 @@ pub const fn gateway::OutputCeiling::tokens(self) -> kernel::model::wire::Ceilin
 pub const gateway::CALL_TIMEOUT_MS: u64
 pub const gateway::OAUTH_PROFILES: [gateway::OauthProfile; 2]
 pub enum gateway::AdmissionVerdict
+pub enum gateway::AudioType
+pub enum gateway::AuthSpec
 pub enum gateway::CeilingSource
 pub enum gateway::Connection
+pub enum gateway::CostSource
 pub enum gateway::DialectHint
+pub enum gateway::Fallback
+pub enum gateway::InputKinds
+pub enum gateway::Persistence
+pub enum gateway::ProviderOutcome
+pub enum gateway::Retreat
 pub fn gateway::AdmissionState::admit(&self, kernel::event::identity::TimeMs) -> gateway::AdmissionVerdict
 pub fn gateway::AdmissionState::default() -> Self
 pub fn gateway::AdmissionState::interval_ms(&self) -> u64

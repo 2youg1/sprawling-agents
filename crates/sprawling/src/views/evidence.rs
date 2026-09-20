@@ -38,6 +38,10 @@ impl Views {
 /// A record whose locator will not parse produces no row: inventing a
 /// row that points at nothing is worse than one row fewer, and the
 /// record itself is still in the history where the reader can see it.
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "a few kinds produce evidence; the rest of the event vocabulary does not"
+)]
 fn evidence_in(record: &EventRecord) -> Option<channels::EvidenceItem> {
     let map = record.data().as_map();
     let at = record.seq();

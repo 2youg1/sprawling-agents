@@ -73,7 +73,6 @@ pub struct RunPlan {
 /// Where the driver stops to ask whether anything arrived. The turn layer
 /// owns three cancellation-safe points; this enum is how the driver names
 /// them to a caller that knows nothing about turn internals.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SafePoint {
     BeforeAssemble {

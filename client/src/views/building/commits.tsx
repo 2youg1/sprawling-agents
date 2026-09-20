@@ -19,6 +19,7 @@ import { clock, usd } from "../../core/time";
 import type { Address, CommitAnswer, CommitsAnswer, Seq } from "../../wire";
 import { useLang, useSay, useUi } from "../../ui";
 import { Changes } from "../changes";
+import { RowList } from "../parts/row";
 import { Tip } from "../parts/tip";
 
 function short(oid: string): string {
@@ -190,7 +191,7 @@ export function Commits(props: { readonly building: Address }) {
       <h2 class="mb-base text-heading font-heading">{say("bld_commits")}</h2>
       <Show when={rows().length > 0 || !loading()} fallback={<p class="text-text-disabled">…</p>}>
         <Show when={rows().length > 0} fallback={<p class="text-text-faint">{say("commits_empty")}</p>}>
-          <ul>
+          <RowList label={say("bld_commits")}>
             <For each={rows()}>
               {(commit, index) => (
                 <Row
@@ -208,7 +209,7 @@ export function Commits(props: { readonly building: Address }) {
               )}
             </For>
             <li ref={setSentinel} class="h-hair" aria-hidden="true" />
-          </ul>
+          </RowList>
         </Show>
       </Show>
       <Show when={more()}>

@@ -15,7 +15,6 @@ use kernel::{AxCode, AxError};
 /// The audio containers the OpenAI audio wire accepts and a browser
 /// records into. Fail closed: a container not spelled here has no
 /// media type to send, so it cannot reach the wire at all.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AudioType {
     Webm,

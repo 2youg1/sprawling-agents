@@ -80,6 +80,10 @@ pub(super) struct CollaborationFold {
 }
 
 impl CollaborationFold {
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "a few kinds carry collaboration; the rest of the event vocabulary does not"
+    )]
     pub(super) fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
         match record.kind() {
             EventKind::SignalEnqueued => self

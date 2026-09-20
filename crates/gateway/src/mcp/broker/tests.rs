@@ -15,6 +15,9 @@
     clippy::expect_used,
     clippy::indexing_slicing,
     clippy::panic,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
     reason = "test code"
 )]
 

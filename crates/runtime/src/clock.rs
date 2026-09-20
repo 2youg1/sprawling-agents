@@ -55,7 +55,6 @@ fn bucket_ms(granularity: ClockStampGranularity) -> Option<u64> {
         ClockStampGranularity::Minute => Some(60_000),
         ClockStampGranularity::FiveMinute => Some(300_000),
         ClockStampGranularity::Hour => Some(3_600_000),
-        _ => None,
     }
 }
 
@@ -183,7 +182,6 @@ impl StampGate {
         let due = match temporal {
             Temporal::Timestamped => true,
             Temporal::Timeless => self.last_bucket != Some(bucket),
-            _ => false,
         } || self.last_bucket.is_none();
         if !due {
             return Ok(None);

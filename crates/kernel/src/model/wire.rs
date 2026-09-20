@@ -15,8 +15,8 @@ use crate::event::Payload;
 use crate::model::image::ImageRef;
 use crate::tool::ToolName;
 /// Building-level constraints riding along the call. S2 carries the one
-/// load-bearing bit; further fields only grow (14.3).
-#[non_exhaustive]
+/// load-bearing bit; further fields only grow (14.3), and each one is
+/// added at every construction site the compiler names.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuildingPolicy {
     /// Confidential buildings lock the call to the local model pool;
@@ -31,7 +31,6 @@ impl BuildingPolicy {
 }
 
 /// Message author on the canonical (Anthropic-shaped) conversation.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
@@ -39,9 +38,8 @@ pub enum Role {
     Assistant,
 }
 
-/// Why the provider stopped. Verdict-adjacent but wire-borne, so it stays
-/// open like other wire enums (14.3).
-#[non_exhaustive]
+/// Why the provider stopped. Wire-borne and closed: a fourth reason has
+/// to be answered by every dialect that maps one (14.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StopReason {
@@ -98,7 +96,6 @@ pub struct SystemBlock {
 /// [`BuildingPolicy`] does: two outer crates must name it (the gateway
 /// translates it, the wire carries it) and neither may name the other.
 /// `gateway::dialect` is its evaluator, not its definition.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -111,7 +108,6 @@ pub enum DialectKind {
 /// tag exists because some code asks for a model by it, so a tag with no
 /// asker is a setting the person can fill in and never see used. It
 /// grows when a caller appears, not when a name is imagined.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -164,7 +160,6 @@ impl std::fmt::Display for ModelTag {
 ///
 /// Absence (`Option::None`) is not `Effort::None`: absence leaves the
 /// choice to the provider, `Effort::None` asks it not to think.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -206,7 +201,6 @@ pub enum Increment {
 /// The block shapes are the city dialect's, so
 /// <https://platform.claude.com/docs/en/build-with-claude/thinking> is
 /// what a change to them has to agree with.
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ContentBlock {

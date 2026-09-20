@@ -88,10 +88,6 @@ pub(super) fn autonomy_name(autonomy: &kernel::Autonomy) -> String {
         kernel::Autonomy::Owner => "owner".to_owned(),
         kernel::Autonomy::Delegate(resident) => format!("delegate:{}", resident.as_str()),
         kernel::Autonomy::Deferred => "deferred".to_owned(),
-        // A setting this version cannot spell is recorded as the strict
-        // side rather than as a guess: an unreadable autonomy must not
-        // read back as a wider one.
-        _ => "owner".to_owned(),
     }
 }
 

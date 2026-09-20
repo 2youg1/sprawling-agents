@@ -151,16 +151,19 @@ pub(super) fn enrol(args: &[String]) -> ExitCode {
 /// it. Nothing here needs administrator rights, because nothing outside
 /// the person's own profile is touched.
 pub(super) fn install(args: &[String]) -> ExitCode {
-    let uninstall = args.iter().any(|a| a == "--uninstall");
-    let done = match install::install(uninstall) {
+    let direction = if args.iter().any(|a| a == "--uninstall") {
+        install::Direction::Uninstall
+    } else {
+        install::Direction::Install
+    };
+    let done = match install::install(direction) {
         Ok(done) => done,
         Err(err) => return report(err),
     };
     println!();
-    if uninstall {
-        println!("  removed {}", done.binary.display());
-    } else {
-        println!("  installed {}", done.binary.display());
+    match direction {
+        install::Direction::Uninstall => println!("  removed {}", done.binary.display()),
+        install::Direction::Install => println!("  installed {}", done.binary.display()),
     }
     match done.path {
         install::PathOutcome::Unchanged => println!("  PATH already said what it needed to say"),

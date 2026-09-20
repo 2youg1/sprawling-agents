@@ -130,7 +130,9 @@ impl RunWorker {
             })?;
         match kernel::may_answer(&self.governance.autonomy, &pending, answerer) {
             kernel::AnswerVerdict::May => {}
-            refused => {
+            refused @ (kernel::AnswerVerdict::HumanOnly
+            | kernel::AnswerVerdict::SelfApprovalBarred
+            | kernel::AnswerVerdict::NotTheDelegate) => {
                 return Err(AxError::failure(
                     AxCode::ApprovalDenied,
                     "answer an approval",
@@ -287,7 +289,8 @@ impl RunWorker {
                     {
                         record.addr().cloned()
                     }
-                    _ => None,
+                    runtime::replay::VerifiedLine::Known { .. }
+                    | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
                 })
                 .ok_or_else(|| {
                     AxError::failure(

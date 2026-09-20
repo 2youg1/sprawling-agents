@@ -244,12 +244,6 @@ impl crate::router::HostDefaults for Presets {
         match for_host(host)?.dialect? {
             kernel::DialectKind::Anthropic => Some(crate::router::DialectHint::Messages),
             kernel::DialectKind::OpenAi => Some(crate::router::DialectHint::Chat),
-            // `DialectKind` is `#[non_exhaustive]`, so the compiler
-            // cannot see that the two arms above are all of it. A shape
-            // this build does not recognise leaves the form to ask
-            // rather than guessing a path that 404s. The arm goes when
-            // the attribute does (roadmap 7.10).
-            _ => None,
         }
     }
 }

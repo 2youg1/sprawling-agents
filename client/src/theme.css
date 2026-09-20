@@ -431,6 +431,17 @@
   --density: 0.75;
 }
 
+/* A row in a compact list is its title and nothing else: the line that
+ * only elaborates the line above it - a record's payload digest, a
+ * discard's way back, a cost row's share bar, a row's second text - is
+ * not drawn. `.summary` is the class those lists put on that line; the
+ * `<summary>` element of a `<details>` is untouched. The rule sits
+ * outside every layer, so it outranks the utility that gave the line
+ * its own `display`. */
+:root[data-density="compact"] .summary {
+  display: none;
+}
+
 /* A machine asking for more contrast gets it by moving one token. The
  * faintest text steps up to the tier above it, so every line on the page
  * reaches at least Lc 75; nothing else moves, because nothing else was

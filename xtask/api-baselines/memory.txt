@@ -1,5 +1,3 @@
-#[non_exhaustive] pub enum memory::QueueLane
-#[non_exhaustive] pub enum memory::RunPhase
 impl core::fmt::Debug for memory::PlannedMerge<'_>
 impl core::fmt::Debug for memory::Worktrees
 impl kernel::ledger::Ledger for memory::JsonlLedger
@@ -27,7 +25,9 @@ impl memory::Worktrees
 pub const memory::MANIFEST: &str
 pub enum memory::Head
 pub enum memory::MemoryError
+pub enum memory::QueueLane
 pub enum memory::Refreshed
+pub enum memory::RunPhase
 pub fn memory::Attribution::apply(&mut self, &kernel::event::payload::EventRecord) -> core::result::Result<(), memory::MemoryError>
 pub fn memory::Attribution::new() -> memory::Attribution
 pub fn memory::Attribution::report(&self) -> memory::AttributionReport

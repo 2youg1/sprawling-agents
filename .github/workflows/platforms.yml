@@ -1,11 +1,13 @@
 # What ci.yml deliberately does not ask on every push.
 #
-# Two claims live here, and both are about machines rather than about a
-# change. A4/V8 assert byte identity across platforms, so a platform this
-# workflow does not run is a promise rather than a fact. The flake claims
-# a person on NixOS can build this tree with the Rust version
+# Three claims live here, and each is about machines rather than about a
+# change. The gates hold on macOS, which ci.yml never sees, so a platform
+# this workflow does not run is a promise rather than a fact. The flake
+# claims a person on NixOS can build this tree with the Rust version
 # `rust-toolchain.toml` names, and only an evaluation of the flake can say
-# whether that is so.
+# whether that is so. And two builds of one tree are one artifact, which
+# only a rebuild and a hash can answer - `repro` below is the first job
+# in this repository that compares bytes at all.
 #
 # V5 used to be the third, and it left rather than lapsed. The kani job
 # is in `ci.yml` now: its reason for being nightly was that it was the
@@ -105,6 +107,46 @@ jobs:
         shell: bash
         run: rm -rf target/tests
 
+  # Two builds of one tree, byte for byte (release item three).
+  #
+  # Windows, because that is where the nondeterminism lives: link.exe
+  # mints a PE header timestamp and a debug-directory PDB GUID per run,
+  # and a build records the absolute path of every source it compiled.
+  # The switches that settle all three - `/Brepro` and
+  # `--remap-path-prefix` - are in `.cargo/config.toml`, so every build
+  # of this tree carries what this job judges, the release archives
+  # included.
+  #
+  # Nightly rather than on a push: `cargo xtask repro` clears the
+  # release artefacts of one crate and builds twice, and nobody waits on
+  # a verdict that costs two links. The client bundle is built first
+  # through the recipe a person runs, because the binary under
+  # comparison has to be the one a release ships rather than the page
+  # shell a bundle-less build embeds.
+  repro:
+    needs: moved
+    if: needs.moved.outputs.verdict == 'run'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - name: the client bundle the binary embeds
+        run: just build-web
+      - name: two builds of one tree
+        run: cargo xtask repro
+
   # The flake, judged the only way a flake can be judged: by evaluating it.
   #
   # Nightly rather than push, on the same policy as the macOS leg above,
@@ -114,11 +156,13 @@ jobs:
   # pipeline's time budget. Nobody waits for this verdict, so it costs a
   # schedule nothing.
   #
-  # `nix flake check` is what enforces the load-bearing rule: the flake
-  # derives its Rust version from `rust-toolchain.toml`, and
+  # `nix flake check` is what enforces the two load-bearing rules: the
+  # flake derives its Rust version from `rust-toolchain.toml`, and
   # `checks.toolchain-version-is-derived` turns a flake wanting any other
-  # version red. `nix build` then proves the devshell's toolchain can
-  # actually build the binary on a Linux the release now ships for.
+  # version red; `checks.devshell-covers-just-check` then reads
+  # `just prereqs list` and refuses a devshell missing a tool the loop
+  # requires. `nix build` proves the devshell's toolchain can actually
+  # build the binary on a Linux the release now ships for.
   nix:
     needs: moved
     if: needs.moved.outputs.verdict == 'run'

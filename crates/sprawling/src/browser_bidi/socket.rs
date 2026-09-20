@@ -84,6 +84,10 @@ impl BrowserPort for BidiSocket {
                 let message = next
                     .ok_or_else(|| unreachable_browser("the open session", "the socket closed"))?
                     .map_err(|err| unreachable_browser("the open session", &err.to_string()))?;
+                #[expect(
+                    clippy::wildcard_enum_match_arm,
+                    reason = "tungstenite's frame kinds are the transport's; only text carries a reply"
+                )]
                 let text = match message {
                     tokio_tungstenite::tungstenite::Message::Text(text) => text,
                     // Anything else is the transport talking to itself.

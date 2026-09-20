@@ -58,7 +58,6 @@ pub struct SandboxOutcome {
 
 /// How the guest ended. Every variant is a fact about the guest — the
 /// host never hides a guest failure behind a success.
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SandboxExit {
     Success,

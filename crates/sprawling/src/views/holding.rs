@@ -185,6 +185,10 @@ impl Views {
     ///
     /// # Errors
     /// Propagates a view's own refusal to fold a malformed record.
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "a few kinds change what a room holds; the rest of the event vocabulary does not"
+    )]
     pub(crate) fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
         self.hot
             .apply(record)

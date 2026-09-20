@@ -62,11 +62,7 @@ fn live_api(root: &Path, krate: &str) -> Result<String, XtaskError> {
         .output()
         .map_err(|err| XtaskError::Cmd {
             cmd: "cargo public-api".to_owned(),
-            msg: format!(
-                "{err}; install the environment prerequisites: \
-                 `cargo install cargo-public-api --locked` and \
-                 `rustup toolchain install nightly`"
-            ),
+            msg: format!("{err}; run `just prereqs`, which names every tool this repository needs"),
         })?;
     if !output.status.success() {
         return Err(XtaskError::Cmd {

@@ -85,8 +85,10 @@ pub(crate) fn table() -> Vec<ToolCard> {
             description: "Do one thing to one window: click, double, right, drag, scroll, type or \
                  key, at a ref from a snapshot or at a point. `generation` is the snapshot the \
                  action was decided against, and an action decided against an older view is \
-                 refused. It does not retry, it does not chain several actions, and it does not \
-                 fall back to a nearby element when the ref no longer resolves."
+                 refused. The named window must hold the keyboard when the action is sent, and \
+                 must be the window under the point it lands on; otherwise nothing is sent. It \
+                 does not retry, it does not chain several actions, and it does not fall back \
+                 to a nearby element when the ref no longer resolves."
                 .to_owned(),
             schema: json!({
                 "type": "object",

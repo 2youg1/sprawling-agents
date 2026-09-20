@@ -11,7 +11,6 @@ use kernel::{AxCode, AxError};
 /// rather than a flag beside the other three: it is the only one that
 /// overtakes, and urgency has to belong to the signal for one id to
 /// always take one lane.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignalKind {
     Mention,

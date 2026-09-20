@@ -151,7 +151,11 @@ impl RunWorker {
             .into_iter()
             .find_map(|block| match block {
                 kernel::ContentBlock::Text { text } => Some(text),
-                _ => None,
+                kernel::ContentBlock::Thinking { .. }
+                | kernel::ContentBlock::RedactedThinking { .. }
+                | kernel::ContentBlock::ToolUse { .. }
+                | kernel::ContentBlock::Image(_)
+                | kernel::ContentBlock::ToolResult { .. } => None,
             })?;
         let candidate = said
             .lines()

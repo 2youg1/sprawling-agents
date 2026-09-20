@@ -10,29 +10,25 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::Drawn;
+use super::pass::{HEIGHT, Pass, Reported};
+use super::probe::{CONDITIONS, SINK, script};
 use crate::report::XtaskError;
 use crate::walk;
 
 /// Where the instrumented copy and the throwaway browser profile go.
 const WORK: &str = "target/render";
 
-/// The window the gallery is judged in, in CSS pixels.
+/// The engine switch that puts a page in a forced-colour mode.
 ///
-/// One size rather than a sweep: the properties asserted here are true at
-/// every width, and a second viewport would double the run time to
-/// re-check the same facts. A narrow-window rule (what wraps, what
-/// collapses) is a different gate and does not exist yet.
-const VIEWPORT: (u32, u32) = (1440, 1200);
+/// Verified on this repository's own engine rather than taken from a
+/// document: run headless with it and `(forced-colors: active)` matches,
+/// run without it and it does not. The alternative - the devtools
+/// protocol's media emulation - needs a socket, and section 8-13 already
+/// settled that this gate opens no socket.
+const FORCED_COLOURS: &str = "--force-high-contrast";
 
-/// The element the probe writes its measurements into.
-const SINK: &str = "sprawling-render";
-
-/// How long the probe waits for the client to mount before measuring.
-///
-/// Virtual time, not wall time: `--virtual-time-budget` advances timers as
-/// fast as the work allows, so this is a number of frames' worth of
-/// scheduling rather than a second of somebody's life.
-const SETTLE_MS: u32 = 1200;
+/// How long the engine is given to reach the moment the probe measures
+/// at, in the same virtual time the probe's own wait is counted in.
 const BUDGET_MS: u32 = 8000;
 
 /// The engine to render with, in the three tiers section 8-13 fixes.
@@ -111,12 +107,29 @@ fn on_path(names: &[&str]) -> Option<PathBuf> {
 /// probe is a `<script>` this repository does not ship, and writing it
 /// into `target/web-dist` would leave it in whatever `just dist` packages
 /// next.
-pub(super) fn measure(
-    root: &Path,
-    browser: &Path,
-    bundle: &Path,
-    route: &str,
-) -> Result<Vec<Drawn>, XtaskError> {
+/// Where one opening finds what it opens: the same four paths for every
+/// pass of a run.
+pub(super) struct Opening<'a> {
+    pub(super) root: &'a Path,
+    pub(super) browser: &'a Path,
+    pub(super) bundle: &'a Path,
+    pub(super) route: &'a str,
+}
+
+/// What one opening read back: every element the properties are about,
+/// and what the page said about the conditions it drew in.
+pub(super) struct Measured {
+    pub(super) drawn: Vec<Drawn>,
+    pub(super) reported: Reported,
+}
+
+pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskError> {
+    let Opening {
+        root,
+        browser,
+        bundle,
+        route,
+    } = *opening;
     let work = root.join(WORK);
     std::fs::create_dir_all(&work).map_err(|source| XtaskError::Io {
         path: walk::rel(root, &work),
@@ -127,12 +140,16 @@ pub(super) fn measure(
     // Beside the bundle, so that `./assets/…` still resolves: the copy is
     // named for the gate, and `just dist` writes the directory fresh.
     let instrumented = bundle.join("sprawling-render.html");
-    std::fs::write(&instrumented, instrument(&body)).map_err(|source| XtaskError::Io {
+    std::fs::write(&instrumented, instrument(&body, pass)).map_err(|source| XtaskError::Io {
         path: walk::rel(root, &instrumented),
         source,
     })?;
     let profile = work.join("profile");
-    let output = Command::new(browser)
+    let mut command = Command::new(browser);
+    if pass.draws_forced_colours() {
+        command.arg(FORCED_COLOURS);
+    }
+    let output = command
         .arg("--headless=new")
         .arg("--disable-gpu")
         .arg("--no-sandbox")
@@ -143,7 +160,7 @@ pub(super) fn measure(
         // one, and it applies to a throwaway profile.
         .arg("--allow-file-access-from-files")
         .arg(format!("--user-data-dir={}", profile.display()))
-        .arg(format!("--window-size={},{}", VIEWPORT.0, VIEWPORT.1))
+        .arg(format!("--window-size={},{HEIGHT}", pass.width))
         .arg(format!("--virtual-time-budget={BUDGET_MS}"))
         .arg("--dump-dom")
         .arg(format!("{}{route}", url_of(&instrumented)))
@@ -154,18 +171,31 @@ pub(super) fn measure(
         })?;
     let dom = String::from_utf8_lossy(&output.stdout);
     let _ = std::fs::remove_file(&instrumented);
-    let Some(records) = sink(&dom) else {
+    let (Some(records), Some(conditions)) = (sink(&dom, SINK), sink(&dom, CONDITIONS)) else {
         return Err(XtaskError::Cmd {
             cmd: format!("{} --dump-dom {route}", browser.display()),
             msg: "the probe wrote nothing; the engine rendered no page or ran no script".to_owned(),
         });
     };
-    Ok(records.split(" ; ").filter_map(parse).collect())
+    let mut said = conditions.split_whitespace();
+    let (Some(forced), Some(scheme)) = (said.next(), said.next()) else {
+        return Err(XtaskError::Cmd {
+            cmd: format!("{} --dump-dom {route}", browser.display()),
+            msg: format!(
+                "the probe wrote `{conditions}`, which names neither a forced-colour \
+                 mode nor a colour scheme"
+            ),
+        });
+    };
+    Ok(Measured {
+        drawn: records.split(" ; ").filter_map(parse).collect(),
+        reported: Reported::read(forced, scheme),
+    })
 }
 
-/// The measurements the probe left in the document, if it ran.
-fn sink(dom: &str) -> Option<&str> {
-    let open = format!("<pre id=\"{SINK}\">");
+/// What the probe left in one of its two elements, if it ran.
+fn sink<'a>(dom: &'a str, id: &str) -> Option<&'a str> {
+    let open = format!("<pre id=\"{id}\">");
     let start = dom.find(&open)?.checked_add(open.len())?;
     let rest = dom.get(start..)?;
     let end = rest.find("</pre>")?;
@@ -220,113 +250,14 @@ fn decode(field: &str) -> String {
 }
 
 /// Append the probe to a copy of the page.
-fn instrument(body: &str) -> String {
+fn instrument(body: &str, pass: &Pass) -> String {
     match body.rfind("</body>") {
         Some(at) => {
             let (head, tail) = body.split_at(at);
-            format!("{head}{}{tail}", probe())
+            format!("{head}{}{tail}", script(pass))
         }
-        None => format!("{body}{}", probe()),
+        None => format!("{body}{}", script(pass)),
     }
-}
-
-/// The measuring script.
-///
-/// It writes one line per element into a `<pre>` the dump then carries
-/// back, because `--dump-dom` returns the document and nothing else:
-/// anything the gate wants to know has to be in the document when it is
-/// dumped.
-///
-/// The accessible name is taken the way a reader gets it — an explicit
-/// `aria-label`, the element a `aria-labelledby` points at, a `title`, an
-/// `alt`, the `<label>` a box is wrapped in or pointed at by, or the text
-/// the element actually contains. It is not a computed accessibility tree
-/// and does not claim to be; it is what the four authoring mistakes this
-/// gate exists for all show up in.
-///
-/// Two more readings travel with each element: the centre of the first
-/// painted box inside it, and whether a line is drawn under its text.
-/// A decoration reaches every in-flow descendant, so the second is a
-/// walk upwards that stops at the first box nothing propagates into —
-/// an atomic inline, a float, or a box taken out of flow.
-fn probe() -> String {
-    format!(
-        r#"<pre id="{SINK}"></pre>
-<script>
-setTimeout(function () {{
-  var out = [];
-  var seen = [];
-  function named(node) {{
-    var label = node.getAttribute('aria-label');
-    if (label) return label;
-    var by = node.getAttribute('aria-labelledby');
-    if (by) {{
-      var target = document.getElementById(by);
-      if (target) return (target.textContent || '').trim();
-    }}
-    var title = node.getAttribute('title');
-    if (title) return title;
-    var alt = node.getAttribute('alt');
-    if (alt) return alt;
-    var own = (node.textContent || '').trim();
-    if (own) return own;
-    var wrapping = node.closest('label');
-    if (wrapping) return (wrapping.textContent || '').trim();
-    if (node.id) {{
-      var pointed = document.querySelector('label[for="' + node.id + '"]');
-      if (pointed) return (pointed.textContent || '').trim();
-    }}
-    return '';
-  }}
-  function firstMark(node) {{
-    var inside = node.querySelectorAll('*');
-    for (var m = 0; m < inside.length; m++) {{
-      var mark = inside[m].getBoundingClientRect();
-      if (mark.width > 0 && mark.height > 0) return Math.round(mark.left + mark.width / 2);
-    }}
-    return -1;
-  }}
-  function atomic(style) {{
-    return style.display.indexOf('inline-') === 0 || style.display === 'inline-block'
-      || style.position === 'absolute' || style.position === 'fixed' || style.cssFloat !== 'none';
-  }}
-  function underlined(node) {{
-    for (var up = node; up; up = up.parentElement) {{
-      var style = getComputedStyle(up);
-      if ((style.textDecorationLine || '').indexOf('underline') >= 0) return 1;
-      if (up !== node && atomic(style)) return 0;
-    }}
-    return 0;
-  }}
-  var all = document.querySelectorAll(
-    'main, nav, aside, header, footer, section, h1, h2, h3, button, a, input, textarea, select, kbd, [role]'
-  );
-  function scrolling(value) {{ return value === 'auto' || value === 'scroll' ? 1 : 0; }}
-  for (var i = 0; i < all.length; i++) {{
-    var node = all[i];
-    var rect = node.getBoundingClientRect();
-    var style = getComputedStyle(node);
-    var depth = 0;
-    for (var up = node.parentElement; up; up = up.parentElement) depth++;
-    var parent = -1;
-    for (var s = 0; s < seen.length; s++) {{ if (seen[s].contains(node)) parent = s; }}
-    seen.push(node);
-    out.push([
-      node.tagName,
-      node.getAttribute('role') || '-',
-      encodeURIComponent(named(node).slice(0, 80)) || '-',
-      Math.round(rect.left), Math.round(rect.top),
-      Math.round(rect.width), Math.round(rect.height),
-      depth, parent,
-      scrolling(style.overflowX), scrolling(style.overflowY),
-      firstMark(node), underlined(node)
-    ].join(' '));
-  }}
-  document.getElementById('{SINK}').textContent = out.join(' ; ');
-}}, {SETTLE_MS});
-</script>
-"#
-    )
 }
 
 /// A `file://` URL for a path, in the form every engine accepts.

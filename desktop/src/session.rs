@@ -186,7 +186,7 @@ impl Server {
             .get("arguments")
             .cloned()
             .unwrap_or_else(|| json!({}));
-        self.scope.admits(&Reach {
+        let admitted = self.scope.admits(&Reach {
             tool: name,
             title: arguments.get("title").and_then(Value::as_str),
             process: arguments.get("process").and_then(Value::as_str),
@@ -194,7 +194,10 @@ impl Server {
         // The scope is judged before the desk is reached, and that
         // order is the whole of the server-side enforcement: a window
         // this file does not list is refused with no Win32 call made.
-        self.desk.perform(name, &arguments)
+        // The admission travels on into the desk because one tool's
+        // *answer* is scoped as well as its permission: `desktop.windows`
+        // reports only the windows this allowlist could name.
+        self.desk.perform(name, &arguments, &admitted)
     }
 }
 

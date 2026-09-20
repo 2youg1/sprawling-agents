@@ -60,6 +60,9 @@ const ANTHROPIC_KEY_HEADER: &str = "x-api-key";
     clippy::panic,
     clippy::indexing_slicing,
     clippy::arithmetic_side_effects,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
     reason = "test helper"
 )]
 fn key_only_provider() -> (String, std::thread::JoinHandle<Vec<String>>) {
@@ -101,6 +104,7 @@ fn key_only_provider() -> (String, std::thread::JoinHandle<Vec<String>>) {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::wildcard_enum_match_arm,
     reason = "test code"
 )]
 mod tests {

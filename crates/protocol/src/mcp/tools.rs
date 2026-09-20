@@ -233,7 +233,11 @@ impl Tool for McpTool {
         let result = super::outbound::digits_for_floats(Rpc::read(&answer)?);
         let map = match result {
             Value::Object(map) => map,
-            other => {
+            other @ (Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::Array(_)) => {
                 let mut wrapped = Map::new();
                 wrapped.insert("result".to_owned(), other);
                 wrapped

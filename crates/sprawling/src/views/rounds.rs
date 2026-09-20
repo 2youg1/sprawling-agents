@@ -77,6 +77,10 @@ impl Views {
 /// the last wave", which is a different question and not the one a
 /// person opening a session is asking.
 #[must_use]
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "one note carries the opening commit; the others say nothing about it"
+)]
 fn opened_at(turns: &[channels::Turn]) -> Option<kernel::GitOid> {
     turns
         .iter()
@@ -124,6 +128,10 @@ fn closing(records: &[EventRecord]) -> Option<channels::Closing> {
 /// same reason - the window is bounded, so its first rows can be answers
 /// to calls nobody here saw.
 #[must_use]
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "the kinds that open, close and fill a turn are named; every other kind is a note"
+)]
 pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<channels::Turn> {
     let mut folded: Vec<channels::Turn> = Vec::new();
     // Which turn each outstanding call sits in, by the id the runtime

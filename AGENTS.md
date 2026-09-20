@@ -7,9 +7,12 @@ Read this file to the end before the first edit.
 ## The loop
 
 ```bash
-cargo install just cargo-nextest --locked   # once; the toolchain installs itself from rust-toolchain.toml
-just check                                  # fmt + clippy (-D warnings, --all-features) + two feature-combination checks + nextest + the client bundle + every machine gate + the client's own checks
+cargo install just --locked   # once; a recipe cannot check for the tool that runs it
+just prereqs                  # every other tool the loop needs, with the install line for each one that is absent
+just check                    # fmt + clippy (-D warnings, --all-features) + two feature-combination checks + nextest + the client bundle + every machine gate + the client's own checks
 ```
+
+The tools are listed in the `prereqs` recipe and nowhere else, so this file cannot fall behind them. `just check` opens with that recipe, which is why a missing tool is named in milliseconds rather than by a gate twenty minutes in.
 
 `build-web` is inside `check` and not beside it: two of the gates — `render` and `npm` — judge artifacts rather than sources, and a gate whose artifact is absent used to print one line and return green.
 
@@ -17,6 +20,7 @@ just check                                  # fmt + clippy (-D warnings, --all-f
 
 | Command | What it does |
 |---|---|
+| `just prereqs` | every tool the loop needs, and how to install each one that is absent |
 | `just check` | the closing condition for every change |
 | `just gates` | the machine gates alone |
 | `just features` | the two feature combinations nothing else compiles: the workspace on its default features, and `channels` without `server` |

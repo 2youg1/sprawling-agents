@@ -114,6 +114,9 @@ impl DevLoop {
     clippy::panic,
     clippy::indexing_slicing,
     clippy::arithmetic_side_effects,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
     reason = "test code"
 )]
 mod tests {

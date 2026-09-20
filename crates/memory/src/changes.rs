@@ -111,6 +111,10 @@ pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, MemoryEr
             // always the count of what a reader can act on.
             continue;
         };
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "git2::Delta is an upstream open enum; every status we do not name is a change to content"
+        )]
         let how = match delta.status() {
             // Untracked belongs with Added: a file the working tree
             // holds and no commit does is a file this wave added,

@@ -34,9 +34,9 @@ use serde_json::{Map, Value};
 pub(crate) fn for_building(
     city_root: &std::path::Path,
     building: &kernel::Address,
-    confidential: bool,
+    policy: &kernel::BuildingPolicy,
 ) -> Result<BrowserTool, AxError> {
-    let profile = match browser::Profile::of(building, confidential)? {
+    let profile = match browser::Profile::of(building, policy)? {
         browser::Profile::At { path } => city_root.join(path.as_str()),
         // A confidential building is refused a browser where its rules
         // are read, so this arm is what an ephemeral profile would be if
@@ -342,6 +342,9 @@ impl BrowserTool {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
     reason = "test code"
 )]
 mod tests;

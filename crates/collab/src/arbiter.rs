@@ -24,7 +24,6 @@ use kernel::{AxError, GoalEntry, GoalId, GoalResource, GoalVerdict, Payload};
 use serde_json::{Map, Value};
 
 /// Who settles this clash.
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Level {
     /// One after the other; nobody has to judge anything.
@@ -36,7 +35,6 @@ pub enum Level {
 }
 
 /// Why a clash went to the person rather than to an agent.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Escalation {
     /// A gate refused one of the goals. A machine does not overrule a

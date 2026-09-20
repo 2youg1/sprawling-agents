@@ -71,6 +71,10 @@ impl PlanView {
     /// edited the table with the edit tool leaves no `roadmap_*` record,
     /// and a cache that ignored the wave would go on reporting the plan
     /// as it was before the edit.
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "a few kinds stale a plan; the rest of the event vocabulary does not"
+    )]
     pub(crate) fn apply(&mut self, record: &EventRecord) {
         let Some(building) = record.addr().and_then(building_of) else {
             // A record with no address could belong to any building, so

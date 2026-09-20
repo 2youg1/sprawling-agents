@@ -1,2 +1,18 @@
 [alias]
 xtask = "run --quiet --package xtask --"
+
+# The MSVC linker stamps a fresh timestamp into the PE header and a
+# fresh GUID into the PDB on every link, so two builds of one tree
+# differ in bytes that describe neither. `/Brepro` makes both a function
+# of the input. It lives here rather than in a command because
+# `cargo xtask repro` has to judge the artefact `release.yml` ships, not
+# a second one built with different flags.
+#
+# `--remap-path-prefix` is deliberately absent: it takes `FROM=TO` and
+# `FROM` is this checkout's absolute path, which no committed file can
+# state. Two builds in one directory already agree on it, so the switch
+# buys nothing for `xtask repro`; byte-identity across two machines is
+# `platforms.yml`'s question, and the answer there is `-Z trim-paths`
+# on a nightly toolchain this project does not pin.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "link-arg=/Brepro"]

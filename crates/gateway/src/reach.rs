@@ -105,6 +105,10 @@ fn transport(host: &str, port: u16, proxied: bool) -> (Named, Connected) {
     let named = Named::Resolved(u32::try_from(addresses.len()).unwrap_or(u32::MAX));
     let connected = match TcpStream::connect_timeout(first, STAGE_TIMEOUT) {
         Ok(_) => Connected::Open,
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "std::io::ErrorKind is an upstream open enum; two kinds are diagnosed and the rest are quoted"
+        )]
         Err(err) => match err.kind() {
             std::io::ErrorKind::ConnectionRefused => Connected::Refused,
             std::io::ErrorKind::TimedOut => Connected::Silent,

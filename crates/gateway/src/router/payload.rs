@@ -102,7 +102,11 @@ fn pairs(tuning: Option<&Value>, key: &str) -> Vec<(String, String)> {
                 }
                 _ => None,
             },
-            _ => None,
+            Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::Object(_) => None,
         })
         .collect()
 }

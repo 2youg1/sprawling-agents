@@ -104,6 +104,10 @@ impl Governance {
     /// The envelope arrives beside the payload because two of these arms
     /// need it: a run is named by the record it started, and a waiting
     /// item is held against the room that raised it.
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "a few kinds move this fold; the rest of the event vocabulary does not"
+    )]
     pub(super) fn absorb(
         &mut self,
         kind: EventKind,

@@ -16,7 +16,7 @@
 //! endpoint's declared dialect does not match what answered it, so the
 //! recovery says exactly that rather than "try again".
 
-use kernel::{AxCode, AxError, Effort, Payload, Tokens};
+use kernel::{AxCode, AxError, Payload, Tokens};
 use serde_json::Value;
 
 pub(crate) fn mismatch(path: &str, detail: &str) -> AxError {
@@ -120,16 +120,4 @@ pub(crate) fn payload_from(value: &Value, path: &str) -> Result<Payload, AxError
         return Err(mismatch(path, "float payloads are banned city-wide"));
     }
     serde_json::from_value(value.clone()).map_err(|err| mismatch(path, &err.to_string()))
-}
-
-/// A level added to the canonical ladder that this module has not been
-/// taught to write. Fail closed rather than send a neighbouring level:
-/// "I asked for max" must never silently become "I got high".
-pub(crate) fn unspelled_effort(effort: Effort, dialect: &str) -> AxError {
-    AxError::failure(
-        AxCode::ConfigInvalid,
-        format!("put an effort level on the {dialect} wire"),
-        format!("{effort:?} has no spelling in this dialect"),
-    )
-    .with_recovery("teach this dialect the level, or pick one it already writes")
 }

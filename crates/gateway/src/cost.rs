@@ -13,7 +13,6 @@ use kernel::{AxCode, AxError, ModelUsage, UsdMicros};
 use crate::market::ModelEntry;
 
 /// Where the settled number came from.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CostSource {
     Authoritative,

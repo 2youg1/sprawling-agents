@@ -22,11 +22,12 @@
 | rpc | 一条消息恒是单行且不含换行；答案恒携原 `id`；读不出的行回 `-32700` 而不是沉默 |
 | session | 未握手完成前 `tools/list`／`tools/call` 恒被拒；`notifications/initialized` 恒无答案；`ping` 恒答空对象；未知方法回 `-32601` |
 | tools | 六个名字恒在 `tools/list` 里；每条 description 恒含一句「不做什么」；每张 `inputSchema` 恒是 `type: object` |
-| scope | 缺文件与坏文件恒全拒；空 allowlist 恒不容许任何窗口；`record`／`clipboard` 未开则该工具恒被拒；不指名窗口的整屏截取恒被拒 |
+| scope | 缺文件与坏文件恒全拒；空 allowlist 恒不容许任何窗口；`record`／`clipboard` 未开则该工具恒被拒；不指名窗口的整屏截取恒被拒；allowlist 没列的窗口恒不出现在 `desktop.windows` 的答复里 |
 | platform | 非 Windows 上恒回 `E_TOOL_UNAVAILABLE` 并报出平台名；Windows 上六件工具皆真的落到这台桌面上 |
 | windows::target | 名字命中零个窗口恒被拒并指向 `desktop.windows`；命中两个以上恒被拒并列出各自的 title，**恒不**在其中挑一个 |
 | windows::views | 快照恒推进该窗口的 generation；对着旧 generation 做的动作恒被拒；快照没铸过的 ref 恒被拒 |
 | windows::encode | 三种格式各自解得回原尺寸；`scale` 恒按百分比缩，且缩到 0 像素恒被拒而不是产出空图 |
+| windows::focus | 键盘在别的窗口手里时恒不发事件而回 `E_TOOL_UNAVAILABLE`；指针动作落点被别的窗口盖住时同样恒被拒；两条拒词恒写明「什么都没发出去」 |
 | windows::keys | 表里每个键名恒映到一个虚拟键码；表外的键名恒被拒并列出可用的键名 |
 | windows::record | 同一窗口重复 start 恒被拒；未 start 就 stop 恒被拒；stop 恒交出一条落盘路径 |
 | unsafe | 每一个 `unsafe` 块恒带一行 `SAFETY:`，写的是**使它成立的前提**，而不是把这次调用换句话再说一遍 |
@@ -104,10 +105,16 @@ pub(crate) struct Reach<'a> { pub(crate) tool: &'a str, pub(crate) title: Option
 // 读不出来的文件是这份文件本身有缺陷（E_CONFIG_INVALID）。两件事，两个码。
 pub(crate) enum Scope { Closed { code: RefusalCode, because: String }, Open(Allowance) }
 pub(crate) struct Allowance { /* 私有：windows／processes／record／clipboard */ }
+// 准入是一个值：它带着准入了这次调用的那份 allowlist，
+// 于是「答复本身受 scope 约束」的那一件工具读的是同两张 Pattern 表。
+pub(crate) struct Admitted<'a> { /* 私有：&Allowance */ }
+impl Admitted<'_> {
+    pub(crate) fn visible(&self, title: &str, process: &str) -> bool;
+}
 impl Scope {
     pub(crate) fn read(path: Option<&Path>) -> Scope;       // 恒不失败：缺文件与坏文件都关成 Closed
     pub(crate) fn parse(text: &str) -> Scope;
-    pub(crate) fn admits(&self, reach: &Reach<'_>) -> Result<(), Refusal>;
+    pub(crate) fn admits(&self, reach: &Reach<'_>) -> Result<Admitted<'_>, Refusal>;
 }
 
 // 8-4b scope::pattern（形状 2 值类型）
@@ -129,7 +136,7 @@ impl Server {
 }
 
 // 8-6 platform（形状 4 适配器；cfg 二选一，无 trait）
-pub(crate) fn perform(tool: &str, arguments: &Value) -> Result<Value, Refusal>;
+pub(crate) fn perform(tool: &str, arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal>;
 ```
 
 ### 8-7 六张工具卡片
@@ -138,9 +145,9 @@ pub(crate) fn perform(tool: &str, arguments: &Value) -> Result<Value, Refusal>;
 
 | 名字 | 做什么 | 说明里写明**不做**什么 |
 |---|---|---|
-| `desktop.windows` | 列顶层窗口：title、process、bounds、ref | 不激活、不移动、不改变任何窗口 |
+| `desktop.windows` | 列顶层窗口：title、process、bounds、ref，**只列 scope 列得出的那些** | 不激活、不移动、不改变任何窗口，不报 allowlist 之外的窗口 |
 | `desktop.snapshot` | 一个窗口或整屏的 accessibility tree：role、name、ref、bounds | 不给像素、不给控件的内部句柄、不读被遮挡的内容 |
-| `desktop.act` | ref 或 point ＋ 动作（click／double／right／drag／scroll／type／key，带 modifiers），携 snapshot 的 generation | 不合成整段脚本、不重试、不在 generation 过期时改打别处 |
+| `desktop.act` | ref 或 point ＋ 动作（click／double／right／drag／scroll／type／key，带 modifiers），携 snapshot 的 generation；**发事件前先核对前台窗口** | 不合成整段脚本、不重试、不在 generation 过期时改打别处、不在别的窗口拿着键盘时把按键发出去 |
 | `desktop.screenshot` | window／screen／region，format png\|jpeg\|webp，quality、scale，回 base64 ＋ width／height／mime | 不做 OCR、不做比对、不落盘 |
 | `desktop.record` | start／stop：PATH 上有 ffmpeg 则 mp4，否则一个 PNG 序列目录；audio 可选 | 不做剪辑、不做转码、不在没说 stop 时自己停 |
 | `desktop.clipboard` | get／set 文本 | 不碰图片与文件列表、不保留历史 |
@@ -174,13 +181,15 @@ impl Desk {
 | `windows::views` | 一次快照铸了哪些 ref、该窗口现在是第几代、一个动作该不该被这一代接受 | 1 判定 | 否 |
 | `windows::tree` | UIA `IUIAutomation` 树：role／name／ref／bounds | 4 适配器 | **是** |
 | `windows::keys` | 键名到虚拟键码的那张表 | 6 数据 | 否 |
+| `windows::focus` | 键盘现在在谁手里、一个屏幕点下面是哪个窗口，以及两者都不是它时的那句拒词 | 1 判定 | **是**（两次只读，加一次置前）|
 | `windows::act` | `SendInput`：一个动作落到一个窗口上 | 4 适配器 | **是** |
 | `windows::capture` | `PrintWindow`：一个窗口变成一片 BGRA 像素 | 4 适配器 | **是** |
 | `windows::encode` | 像素按 `scale` 缩、按 `format` 编码、按 base64 出门 | 1 判定 | 否 |
-| `windows::record` | start／stop：PATH 上有 ffmpeg 则 mp4，否则一个 PNG 序列目录 | 4 适配器 | 间接 |
+| `windows::record` | 这条连接正在录哪些窗口、每一份由谁在写 | 4 适配器 | 否 |
+| `windows::record::sink` | 一份录制的字节由谁写、落到哪里：有 ffmpeg 出 mp4，没有则本 package 唯一那条线程写 PNG 序列 | 4 适配器 | 间接 |
 | `windows::clipboard` | 运行中的机器的剪贴板，作为文本 | 4 适配器 | **是** |
 
-**这张表的分法就是 Humble Object**（ARCHITECTURE §9）：难测的那一端（`enumerate`／`tree`／`act`／`capture`／`clipboard`）薄到几乎没有判断，判断都搬进了 `target`／`views`／`encode`／`keys`／`geometry` 五个纯模块——它们一行 Win32 都不跑，因而可以被逐条证明。一台没有桌面的机器上，本 package 仍然能证明「哪个窗口被选中」「过期的动作被拒」「一张图缩成什么尺寸」这四件最容易错的事。
+**这张表的分法就是 Humble Object**（ARCHITECTURE §9）：难测的那一端（`enumerate`／`tree`／`act`／`capture`／`clipboard`／`focus` 的三次 FFI）薄到几乎没有判断，判断都搬进了 `target`／`views`／`encode`／`keys`／`geometry`／`focus::settled` 六处纯代码——它们一行 Win32 都不跑，因而可以被逐条证明。一台没有桌面的机器上，本 package 仍然能证明「哪个窗口被选中」「过期的动作被拒」「一张图缩成什么尺寸」「键盘不在这个窗口手里时什么都不发」这几件最容易错的事。
 
 ### 8-9 `unsafe` 的那一条规矩
 
@@ -219,11 +228,13 @@ impl Desk {
 
 **第五对（错误码的第二份拼写怎么收）**：§8.5 第一对接受了「同一拼写、两处定义」，而这里**收成一处可检查的引用**：`refusal.rs` 里每个 `E_` 码旁写明它引自 `kernel::error::code` 的哪一个，并在城里那一侧加一条测试，逐字比对两张表——测试住在 workspace 内（它可以 `use kernel`），比对的对象是本 package 的 `README.md` 与 SPEC 记下的那六个字符串。**结论是不能靠共享依赖消除这份重复**：让 `desktop` 依赖 `kernel`，就把它拉回墙内，而它坐在墙外的唯一理由是 Win32 要 `unsafe`；六个字符串常量换掉这个理由是本末倒置。能做到的是让漂移**可见**——两处定义，一处权威，一条测试在城里那侧盯着。
 
+**第六对（一次 `act` 落在哪个窗口上）**：信任 `scope` 已经判过的那个窗口（落选）vs 发事件之前核对前台窗口，不是它就拒（选中）。`SendInput` 不带窗口：一次按键落在**那一刻**持有键盘的窗口上，而 scope、allowlist 与拒词判的是 title 与 process，这些没有一样跟着事件走。决定动作与发出动作之间隔着一段时间，操作者按一次 Alt+Tab、一个提权对话框弹出来，键盘就在别人手里了——`type` 会把整段文字打进那个窗口，密码框也包括在内；今天全仓 grep `SetForegroundWindow`／`GetForegroundWindow`／`WindowFromPoint` 零命中，故 scope 实际约束住的只有坐标的算法。选中方案是：`windows::focus` 读一次前台窗口，不是它就请求置前并在 200 ms 内有界地重读，仍不是就以 `E_TOOL_UNAVAILABLE` 拒，拒词写明**什么都没有发出去**；指针动作另问第二句——落点下面的顶层窗口也得是它，因为一个窗口可以持有键盘而另一个盖在点击处。比较的是句柄地址这一个纯值，于是这条规则在一台没有桌面的机器上也能逐条证明（§16.2）。付的代价写在明处：置前是一次**副作用**，而它是这台 server 唯一一处主动改变桌面的排布；把它藏起来的做法是不置前直接拒，那会让每一次正常的连续操作都要操作者手动切窗口。
+
 ## 9 工作流程
 
 进程起来 → `main` 取 scope 路径（argv[1]，否则 `SPRAWLING_DESKTOP_SCOPE`，否则无）→ `Scope::read`（缺文件即 `Closed`）→ `Server::serve` 阻塞读 stdin。
 
-每收到一行：`rpc::read` → 按 method 分派 → `initialize` 答能力与自我介绍并进 `Initializing` → `notifications/initialized` 无答案并进 `Ready` → `ping` 答 `{}` → `tools/list` 答六张卡片 → `tools/call` 先 `Scope::admits`，过了再 `platform::perform` → 出一行 → flush。
+每收到一行：`rpc::read` → 按 method 分派 → `initialize` 答能力与自我介绍并进 `Initializing` → `notifications/initialized` 无答案并进 `Ready` → `ping` 答 `{}` → `tools/list` 答六张卡片 → `tools/call` 先 `Scope::admits`（过了交出一个 `Admitted`），再把它随参数一起交给 `platform::perform` → 出一行 → flush。
 
 ## 10 实现逻辑
 
@@ -237,7 +248,7 @@ impl Desk {
 
 ## 11 边界枚举
 
-非 JSON 行／非对象／无 `method`／`params` 非对象／未知方法／握手未完成就调用／`tools/call` 无 `name`／`name` 不在表里／scope 文件缺失／scope 文件语法坏／scope 文件有拼错的键／allowlist 两张表皆空／title 不匹配／process 不匹配／同时给 title 与 process 而只中一个／既不给 title 也不给 process／`record` 未开／`clipboard` 未开／整屏截取／非 Windows 平台／Windows 但本 build 未实现。
+非 JSON 行／非对象／无 `method`／`params` 非对象／未知方法／握手未完成就调用／`tools/call` 无 `name`／`name` 不在表里／scope 文件缺失／scope 文件语法坏／scope 文件有拼错的键／allowlist 两张表皆空／title 不匹配／process 不匹配／同时给 title 与 process 而只中一个／既不给 title 也不给 process／`record` 未开／`clipboard` 未开／整屏截取／非 Windows 平台／Windows 但本 build 未实现／键盘在别的窗口手里且置前请求没有生效／指针动作的落点被别的窗口盖住。
 
 **同时给两个标识则两个都要中**：任何一个给出的标识都要落在它自己那张表里，这是 fail closed 的一致读法。
 
@@ -314,15 +325,15 @@ impl Desk {
 
 逐模块 `#[cfg(test)]`，外加 `tests/smoke.rs`：**真的把二进制拉起来**，从管道里灌一次 `initialize` ＋ 一次 `tools/list`，断言六个名字。它是唯一一处证明「城里那条 `command` 真的能接上」的测试，其余测试都只证明库里的判断。
 
-**约束**：`unsafe` 只在 `platform/windows/` 之下且每块携一行 `SAFETY:`（§8-9）；其余处恒不出现 `unsafe`、`unwrap`、`expect`、`panic!`、`todo!`、裸下标、`as`；算术走 `checked_*`／`saturating_*`；每个文件 ≤400 行、每个函数 ≤200 行且 ≤4 参数。`scope.rs` 因这条尺子而在 446 行处切出 `scope/pattern.rs`——切口落在「一行 allowlist 匹配什么」与「这份文件许可什么」之间，是语义的，不是为了凑行数。
+**约束**：`unsafe` 只在 `platform/windows/` 之下且每块携一行 `SAFETY:`（§8-9）；其余处恒不出现 `unsafe`、`unwrap`、`expect`、`panic!`、`todo!`、裸下标、`as`；算术走 `checked_*`／`saturating_*`；每个文件 ≤400 行、每个函数 ≤200 行且 ≤4 参数。`scope.rs` 因这条尺子而在 446 行处切出 `scope/pattern.rs`——切口落在「一行 allowlist 匹配什么」与「这份文件许可什么」之间，是语义的，不是为了凑行数；`Admitted` 落地时它再次抵线，这一次切出的是 `scope/tests.rs`（形状同 `session/tests.rs`），判定与对判定的断言各占一个文件。
 
-验收命令（在 `desktop/` 内）：`cargo fmt`／`cargo clippy --all-targets -- -D warnings`／`cargo nextest run`。根目录的 `just check` 够不到本 package，因为它不是 workspace member。
+验收命令（在 `desktop/` 内）：`cargo fmt`／`cargo clippy --all-targets -- -D warnings`／`cargo nextest run`；根目录一条 `just check-desktop` 把这三条加上 `cargo deny check` 一起跑，并挂在 `just check` 的依赖链上——`cargo clippy --workspace` 够不到本 package，因为它不是 workspace member。**两道工作区的闸门从外面伸进来**：`xtask length` 把 400 行的文件尺子量到 `desktop/src`（它读文件而不是读 crate，故够得着 `cargo` 够不着的地方），`xtask guard` 的 `wall` 把本 package 的 lint 表、包元数据与共享依赖版本逐键比回根 `Cargo.toml`，例外只有记下理由的那两条（§8.5 第二对，以及本 package 没有 kani harness）。`record.rs` 因那把尺子在 443 行处切出 `record/sink.rs`——切口落在「可不可以开始录」与「由谁写、写到哪」之间。
 
 ### 16.2 怎么测一件需要桌面的事
 
 本 card 的测试分两层，分界线就是 §8-8 那张表的最后一列：
 
-- **不碰 Win32 的五个模块逐条测**（`target`／`views`／`encode`／`keys`／`geometry`）。最容易错的四件事——选中了哪个窗口、过期的动作有没有被拒、一张图缩成什么尺寸、一个键名映到什么——全在这一层，且在**任何**机器上都跑得起来。
+- **不碰 Win32 的那几处逐条测**（`target`／`views`／`encode`／`keys`／`geometry`／`focus::settled`／`Admitted::visible`）。最容易错的六件事——选中了哪个窗口、过期的动作有没有被拒、一张图缩成什么尺寸、一个键名映到什么、键盘不在这个窗口手里时发不发、allowlist 没列的窗口报不报——全在这一层，且在**任何**机器上都跑得起来。
 - **碰 Win32 的五个模块只测「拒绝是诚实的」**：一个不存在的窗口名恒得到一句指向 `desktop.windows` 的拒词，而不是一次崩溃。CI 里没有一张桌面可供点击，故「点下去真的点中了」这件事**恒不**被写成一条会在没有桌面时假装通过的测试；它由操作者在真机上验，本节记下这是一处**具名的空缺**，不是一处被忽略的覆盖率。
 
 这条分界线是诚实的代价：写一条「在没有窗口时也返回 ok」的测试会比现在好看，但它证明的是这条测试自己，不是这台 server。

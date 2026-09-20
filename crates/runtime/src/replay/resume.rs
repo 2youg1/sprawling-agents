@@ -27,6 +27,10 @@ pub fn dangling_tool_calls(ledger: &VerifiedLedger) -> Vec<(RunId, Seq)> {
             continue;
         };
         let key = *record.run().as_bytes();
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "a call and its result open and close a pairing; no other kind opens or closes one"
+        )]
         match record.kind() {
             EventKind::ToolCalled => {
                 if let Some(older) = pending.insert(key, (record.run(), record.seq())) {

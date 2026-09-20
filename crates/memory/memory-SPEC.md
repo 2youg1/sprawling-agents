@@ -276,7 +276,7 @@ impl LineReader<'_> {
 pub struct HotView { /* runs: BTreeMap<RunId, RunHot>、counts —— 私有 */ }
 pub struct RunHot { pub phase: RunPhase, pub last_seq: Seq, pub last_kind: EventKind, pub who: String,
                     pub addr: Option<Address>, pub started: Option<TimeMs> }   // 房间与开始时刻
-#[non_exhaustive] pub enum RunPhase { Active, Frozen }
+pub enum RunPhase { Active, Frozen }
 impl HotView {
     pub fn new() -> HotView;
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), MemoryError>;   // 增量；重复 seq 幂等（只前进）
@@ -378,8 +378,7 @@ Sprawling-City: <hex>
 - **账本仍是权威。** trailers 是**给城外读者的投影**，不是第二个事实来源：谁做了什么由 Ledger
   回答，两边靠 oid 对上（`checkpoint_committed.oid` 与 `file_discarded.restoration`）。
   trailers 与账本不一致时以账本为准，trailers 是要修的那一侧。
-- **effort 的字面来自 serde 的名字**（`kernel::Effort` 是 `#[non_exhaustive]` 的
-  `snake_case`），所以「档位怎么拼」在这个仓库里只有一处权威；缺档位写 `none`。
+- **effort 的字面来自 serde 的名字**（`kernel::Effort` 的 `snake_case`），所以「档位怎么拼」在这个仓库里只有一处权威；缺档位写 `none`。
   模型 id 未知时写空串——写一个假的 id 比写空更糟。
 - **`city_of` 只读第一行**：整本账本可以有几十兆，而创世行是第一段文件的第一行。
 
@@ -566,7 +565,7 @@ impl EventQueue {
     pub fn consume(&mut self) -> Option<QueueItem>;
     pub fn stats(&self) -> QueueStats;   pub fn len(&self) -> u64;   pub fn is_empty(&self) -> bool;
 }
-#[non_exhaustive] pub enum QueueLane { Signal, Approval, Repair }   // 一份实现三队列
+pub enum QueueLane { Signal, Approval, Repair }   // 一份实现三队列
 ```
 
 - 容量入构造子（`new(lane, capacity)`）而非写死常量——三 lane 容量不同是装配事。**重复键返回 `Admit` 而非 `Shed`**：发送方已尽职，告知失败只会招致无效重试；`seen` 持久于队列寿命（消费后仍认得出重复，因为副作用已跑过一次）。被 shed 项不入 `seen`，故重试不算重复。
@@ -613,6 +612,7 @@ pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, MemoryErr
 - **带走什么**：`ledger/`（唯一历史，必带）、`cas/`（Locator 指进去，不带就断链）、城里的产品文件（`City.md`、各楼的 `BUILDING.md`／`Roadmap.md`／`URBANITE.md` 与房间内容）。**不带**：projection 与索引（可弃，恢复后由 Ledger 重建，带了就是第二份历史）；凭证（**它从不在城里**，在宙主机金库——导出一份能拷走凭证的备份会把隐私保证一次性作废）。
 - **为何是目录而非单文件**：单文件要么自造容器格式（多一个要养的格式），要么引 tar／zip 依赖。目录两者都不要，且任何备份工具都能再打包一层——压缩不是本模块的职责。
 - **清单是完整性的依据**：`MANIFEST.json` 记下记录数、链头哈希、CAS 对象数与文件数；`restore` 恢复后重算并比对。不对即拒，而不是“恢复了但少了几条”——后者是历史失真。
+- **清单的四个数全部读自导出结果，因而不能自证**（B-46）：一次把半座城丢掉的拷贝与它自己的清单完全相符。故 `export` **另取源侧的五个数**——账本文件数、CAS 对象数、城内文件数、账本记录数、链头——与目的地逐项比，任一项不等即拒。源侧的数从 `copy_tree`／`copy_city_files` 的返回值来，那正是从前被 `let _ = records;` 丢掉的那个数。
 - **链验在 restore 内**：恢复完即走一遍 Ledger 开启与链校（jsonl 已有的那一道）。交给调用方去验等于把一个必须成立的性质变成约定。
 - **文件顺序确定**：遍历走 `Vfs::list`（已排序），清单用 BTreeMap；同一座城导两次，`MANIFEST.json` 逐字节相同。
 - `Vfs::append` 是**追加**，残留 `.part` 未清即发布出「残骸＋新内容」的拼接体；修法取 cas 既有两层纪律（open 清扫 tmp 残骸＋put 前 `truncate(0)`）而非另立新机制。`invalidate` 对不存在项不报错（末态即调用者所求），载荷携 `existed` 实报。

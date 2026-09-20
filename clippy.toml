@@ -1,3 +1,9 @@
+# Two bools in one signature is a call nobody can read at the call site:
+# `install(true, false)` says nothing about what it does. One bool is
+# still allowed; the second one has to become an enum whose variants are
+# the two states (roadmap G-25).
+max-fn-params-bools = 1
+
 # Time is a parameter, never sampled inside decision or persistence code.
 # The only sanctioned sampling point is Main (bin::assembly), which must
 # carry #[expect(clippy::disallowed_methods, reason = "...")] per call site.

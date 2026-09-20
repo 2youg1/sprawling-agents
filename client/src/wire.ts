@@ -39,8 +39,9 @@ export const ApprovalSource = Schema.Literal("gate", "agent").annotations({ iden
 export type ApprovalSource = typeof ApprovalSource.Type;
 
 /**
- * What kind of decision this is. Wire data (cluster keys serialize), so
- * open for extension; kernel's own matches stay exhaustive in-crate.
+ * What kind of decision this is. Wire data — the cluster keys
+ * serialize — and closed, so that a new class of decision is a
+ * compile error at every reader that must classify it.
  */
 export const ApprovalClass = Schema.Union(
   Schema.Literal("commitment", "budget_limit", "discard_escalate", "agent_question"),

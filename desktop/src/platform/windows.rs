@@ -31,6 +31,7 @@ mod clipboard;
 mod encode;
 mod enumerate;
 mod fault;
+mod focus;
 mod geometry;
 mod keys;
 mod reading;
@@ -42,10 +43,10 @@ mod views;
 use serde_json::{Value, json};
 
 use crate::refusal::{Refusal, RefusalCode};
+use crate::scope::Admitted;
 use act::Action;
 use geometry::Point;
-use keys::Modifier;
-use reading::{asked_for, generation, inset, missing, notches, region, text, whole};
+use reading::{asked_for, generation, held, inset, missing, notches, region, text, whole};
 use views::{DEFAULT_DEPTH, Views};
 
 /// What one connection remembers between calls.
@@ -70,9 +71,14 @@ impl Desk {
     /// on, a window this desktop does not have, an action decided
     /// against a view that has moved on, and anything the operating
     /// system itself refuses.
-    pub(crate) fn perform(&mut self, tool: &str, arguments: &Value) -> Result<Value, Refusal> {
+    pub(crate) fn perform(
+        &mut self,
+        tool: &str,
+        arguments: &Value,
+        admitted: &Admitted<'_>,
+    ) -> Result<Value, Refusal> {
         match tool {
-            "desktop.windows" => listing(arguments),
+            "desktop.windows" => listing(arguments, admitted),
             "desktop.snapshot" => self.snapshot(arguments),
             "desktop.act" => self.act(arguments),
             "desktop.screenshot" => screenshot(arguments),
@@ -128,6 +134,12 @@ impl Desk {
         })?;
         let modifiers = held(arguments)?;
         let action = self.decided(&window, named, arguments)?;
+        // Between deciding where this action lands and sending it, the
+        // desktop may have handed the keyboard to another window, and
+        // `SendInput` follows the keyboard rather than the decision.
+        // The window named here is the window the events reach, or
+        // nothing is sent (desktop-SPEC.md section 8.6, sixth pair).
+        focus::hold(window.handle, action.lands_at())?;
         act::perform(&action, &modifiers)?;
         Ok(json!({
             "title": window.named.title,
@@ -266,45 +278,18 @@ impl Desk {
     }
 }
 
-/// The modifiers this call holds down for the whole of its action.
-///
-/// An unknown one is refused rather than dropped: a caller that asked
-/// for `ctrl` and got a bare click has had a different thing happen than
-/// the one it asked for, and nothing would say so.
-fn held(arguments: &Value) -> Result<Vec<Modifier>, Refusal> {
-    let Some(named) = arguments.get("modifiers") else {
-        return Ok(Vec::new());
-    };
-    let Some(listed) = named.as_array() else {
-        return Err(Refusal::new(
-            RefusalCode::InvalidArgs,
-            "act on a window",
-            "`modifiers` is not a list".to_owned(),
-            "send `modifiers` as an array of ctrl, alt, shift or win",
-        ));
-    };
-    listed
-        .iter()
-        .map(|one| {
-            one.as_str()
-                .ok_or_else(|| {
-                    Refusal::new(
-                        RefusalCode::InvalidArgs,
-                        "act on a window",
-                        "a modifier in the list is not a name".to_owned(),
-                        "send `modifiers` as an array of ctrl, alt, shift or win",
-                    )
-                })
-                .and_then(Modifier::parse)
-        })
-        .collect()
-}
-
 /// `desktop.windows`: what this scope's caller may name.
-fn listing(arguments: &Value) -> Result<Value, Refusal> {
+///
+/// Two filters, and they answer different questions. The allowlist
+/// decides what this caller may be told exists at all — a title carries
+/// a document name and often a person's name, so a scope that lists one
+/// application discloses no other. The `process` argument then narrows
+/// that answer to what the caller asked about.
+fn listing(arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal> {
     let wanted = text(arguments, "process").map(crate::scope::Pattern::new);
     let reported: Vec<Value> = enumerate::desktop()?
         .into_iter()
+        .filter(|window| admitted.visible(&window.named.title, &window.named.process))
         .filter(|window| {
             wanted
                 .as_ref()

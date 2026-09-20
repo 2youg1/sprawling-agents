@@ -17,7 +17,6 @@ pub(crate) trait Vault {
 }
 
 /// How long the active backend keeps a value.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Persistence {
     AcrossReboots,

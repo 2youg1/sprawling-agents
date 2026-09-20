@@ -97,7 +97,7 @@ fn number(value: Option<&Value>) -> Option<u64> {
     match value? {
         Value::Number(found) => found.as_u64(),
         Value::String(text) => text.trim().parse::<u64>().ok(),
-        _ => None,
+        Value::Null | Value::Bool(_) | Value::Array(_) | Value::Object(_) => None,
     }
 }
 

@@ -268,6 +268,8 @@ pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)>;   // "realm/na
 
 **原因**：`sprawling up` 打四行字然后阻塞到 Ctrl-C。那块屏幕是产品白白扔掉的一个面，也是一台没有浏览器的机器**仅有的**那一个面。
 
+**写不出去的一行归一处**（G-23）：`console::terminal::say` 是这个文件里唯一决定「控制台写失败怎么办」的地方——写不进去的控制台是没人在读的控制台，而城不归控制台停，故失败止于此。十三处 `let _ = writeln!(out, …)` 因此不再各自决定一次。同章的两个布尔入参改为枚举（G-25）：`serve_city` 的 `open: bool` 成 `Open::{Browser, Nothing}`，`install::install` 的 `uninstall: bool` 成 `Direction::{Install, Uninstall}`——`install(true)` 在调用点说不出它做了什么。
+
 ```rust
 // bin::console（形状 1 decision；壳在一条线程里，判定全在纯函数）
 pub(crate) enum Line {
@@ -725,9 +727,9 @@ fn city_segment(city_root: &Path) -> Result<Vec<u8>, AxError>;  // NotFound → 
 
 **尺寸不是这次改动的理由**：`dispatch_in` 983 → 977。五十行准入换成四十五行名单加循环，净值接近零；换来的是一个权威而不是两个。
 
-**一个被推翻的假设**：`invoke` 里 `match bench.invoke(…)` 的 `_ =>` 臂看似是死代码——`BenchOutcome` 四个变体已全部列出，且 ARCHITECTURE.md §7 的纪律是「新增一种答案而不回答它就不编译」。删掉它即得 `E0004`：`BenchOutcome` 带 `#[non_exhaustive]`，而本 crate 在它定义的 crate 之外，因此永远无法穷尽匹配。那一臂因此保留，并注明它为何不可达。
+**一个曾被推翻、现已了结的假设**：`invoke` 里 `match bench.invoke(…)` 的 `_ =>` 臂当时看似死代码，删掉却得 `E0004`——`BenchOutcome` 带 `#[non_exhaustive]`，本 crate 在它定义的 crate 之外，穷尽匹配不可写。那一臂因此保留并注明不可达。
 
-——**一个仍未定的接口问题**：`runtime` 不发布（ARCHITECTURE.md §3：「nothing here is published」），而 `#[non_exhaustive]` 是为 crate 外的第三方准备的。在一个工作区内部的判定输出上用它，换来的是每一个下游 match 都得写一个永不执行的分支，而代价正是 §7 想要的那个编译期穷尽性。runtime-SPEC 第 123 行已写下一条相关规则（「14.3 的 non_exhaustive 规则辖 wire 冻结枚举，不辖判定输出」），而 `BenchOutcome` 正是一个判定输出。**这一条是规则与实现不符；改它动的是 `runtime` 公开面且没有可咬的红，故不动，只点名。**
+——**该接口问题已结**（G-22 / 叶子 7.10）：`runtime` 不发布，工作区之外没有第三方，`#[non_exhaustive]` 只换来每个下游一条永不执行的分支。全库枚举现已撤下该属性，这一臂与同类的四十余条一并删除，穷尽性回到编译器手里。
 
 ## 8-28 一次调用的键，只有一份读法
 
@@ -2689,7 +2691,7 @@ impl Journal {
 - **时钟在这里采样**：`docs/logging.md` §8 认可装配层是唯一可以采样的地方，写 entry 的库不许有第二个时间源。读不到钟即 `t` 缺席，而不是把这一行丢掉——锚是 `seq`，为一个时间戳丢诊断是把代价付错了地方。
 - **`Journal` 先于 `Diagnostics` 存在**：sink 是往通道里写的那一半，所以它必须先有；`Serving` 因此同时携 `log` 与 `journal`，在服务层取出 `lines()` 交给 `ServeConfig::logs`。
 - **窗口 512 行**：比增量通道宽、比事件通道窄。`wire` 层底的一座城写得比人读得快，而这里丢掉的是一条诊断而不是一段历史。
-- **`Level` 五个名字的映射住在这里**：`channels` 依赖图上够不到 `runtime`，一条测试把 `LogLevel` 的五个 serde 名与 `Level::as_str()` 逐个钉成相等。`Level` 是 `#[non_exhaustive]`，所以多出来的一级如实落到人读得最宽的那一级，而不是被丢掉——看不见的一行比归错一档更糟。
+- **`Level` 五个名字的映射住在这里**：`channels` 依赖图上够不到 `runtime`，一条测试把 `LogLevel` 的五个 serde 名与 `Level::as_str()` 逐个钉成相等。`Level` 现已是闭枚举（G-22），所以第六级会在这张映射表上编译失败，而不是悄悄落到某一档——归错一档与看不见的一行都不再可能。
 
 ### 8-64 机器上的两个动词：`DoctorInstall` 与 `DoctorRefresh`（形状 4 适配器）
 

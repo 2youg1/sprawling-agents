@@ -59,6 +59,10 @@ pub(crate) fn db_err(op: &'static str) -> impl FnOnce(String) -> MemoryError {
 
 /// One record into the open tables. Shared by the single-record and the
 /// batched fold so "what a record means" has exactly one definition.
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "four kinds build these two tables; the rest of the vocabulary leaves them unchanged"
+)]
 pub(crate) fn fold_record(
     record: &EventRecord,
     runs: &mut redb::Table<'_, &'static str, &'static str>,

@@ -175,6 +175,19 @@ pub(crate) fn start(
     });
 }
 
+/// One line to the console.
+///
+/// A console whose writes fail is a console nobody is reading, and the
+/// city is not the console's to stop, so the failure ends here — stated
+/// once rather than at every line this file prints.
+fn say<W: Write>(out: &mut W, line: &str) {
+    drop(out.write_all(line.as_bytes()));
+    drop(out.write_all(
+        b"
+",
+    ));
+}
+
 /// The loop, over any reader and writer so a test can drive it.
 pub(super) fn drive<R: BufRead, W: Write>(
     terminal: &Terminal,
@@ -199,13 +212,13 @@ pub(super) fn drive<R: BufRead, W: Write>(
         match parse(&typed, selected.as_ref()) {
             Line::Nothing => {}
             Line::Help => {
-                let _ = writeln!(out, "{}", help(selected.as_ref()));
+                say(out, &help(selected.as_ref()));
             }
             Line::OpenWeb => {
                 let url = web_url(terminal);
-                let _ = writeln!(out, "  {url}");
+                say(out, &format!("  {url}"));
                 // Never fatal: the URL is on the screen either way.
-                let _ = crate::firstrun::open_in_browser(&url);
+                drop(crate::firstrun::open_in_browser(&url));
             }
             Line::Serving => {
                 // The counts come from the one question that already
@@ -215,24 +228,20 @@ pub(super) fn drive<R: BufRead, W: Write>(
                     Ok(channels::Answer::Metrics(vitals)) => Some(*vitals),
                     Ok(_) | Err(_) => None,
                 };
-                let _ = writeln!(
-                    out,
-                    "{}",
-                    serving(terminal, vitals.as_ref(), std::process::id())
-                );
+                say(out, &serving(terminal, vitals.as_ref(), std::process::id()));
             }
             Line::Select(addr) => {
-                let _ = writeln!(out, "  work goes to {}", addr.as_str());
+                say(out, &format!("  work goes to {}", addr.as_str()));
                 selected = Some(addr);
             }
             Line::Quit => {
-                let _ = writeln!(out, "  the console is closing; the city keeps serving");
+                say(out, "  the console is closing; the city keeps serving");
                 return;
             }
             Line::Unknown { verb, nearest } => {
-                let _ = writeln!(out, "  no verb `{verb}`");
+                say(out, &format!("  no verb `{verb}`"));
                 if !nearest.is_empty() {
-                    let _ = writeln!(out, "  did you mean: {}", nearest.join(", "));
+                    say(out, &format!("  did you mean: {}", nearest.join(", ")));
                 }
             }
             Line::Frame(frame) => post(desk, answering, *frame, out),
@@ -243,7 +252,7 @@ pub(super) fn drive<R: BufRead, W: Write>(
                 match dispatch(&addr, &task) {
                     Ok(frame) => post(desk, answering, frame, out),
                     Err(err) => {
-                        let _ = writeln!(out, "  {err}");
+                        say(out, &format!("  {err}"));
                     }
                 }
             }
@@ -278,7 +287,7 @@ fn post<W: Write>(
         // terminal and ask it from outside.
         channels::ClientFrame::Query(query) => answer(answering, query, out),
         channels::ClientFrame::Hello(_) => {
-            let _ = writeln!(out, "  this console is already inside the city");
+            say(out, "  this console is already inside the city");
         }
     }
 }
@@ -293,18 +302,18 @@ fn answer<W: Write>(answering: &Answering, query: channels::Query, out: &mut W) 
     match answering(query) {
         Ok(answer) => match serde_json::to_string(&answer) {
             Ok(text) => {
-                let _ = writeln!(out, "{text}");
+                say(out, &text);
             }
             // An answer this build can produce but not spell is a defect
             // in the wire type, and hiding it would make the console
             // silently lossy about the one thing it exists to show.
             Err(err) => {
-                let _ = writeln!(out, "  the answer could not be rendered: {err}");
+                say(out, &format!("  the answer could not be rendered: {err}"));
             }
         },
         Err(error) => {
-            let _ = writeln!(out, "  {error}");
-            let _ = writeln!(out, "  {}", error.recovery());
+            say(out, &format!("  {error}"));
+            say(out, &format!("  {}", error.recovery()));
         }
     }
 }

@@ -16,6 +16,18 @@ use super::files::{
 };
 use super::manifest::{CAS, CITY, LEDGER, MANIFEST, Manifest, RESERVED};
 
+/// One count taken on the city against the same count taken on the
+/// bundle.
+fn agree(what: &str, source: u64, bundle: u64) -> Result<(), MemoryError> {
+    if source == bundle {
+        return Ok(());
+    }
+    Err(MemoryError::Bundle {
+        op: "export",
+        detail: format!("the city holds {source} {what}(s) and the bundle holds {bundle}"),
+    })
+}
+
 /// Export and restore. A namespace rather than a value: neither
 /// direction holds state between calls.
 pub struct Bundle;
@@ -37,20 +49,47 @@ impl Bundle {
         dest: &Path,
     ) -> Result<Manifest, MemoryError> {
         let ledger_dir = city_root.join(RESERVED).join(LEDGER);
-        let records = copy_tree(vfs.as_mut(), &ledger_dir, &dest.join(LEDGER))?;
-        let cas_objects = copy_tree(
-            vfs.as_mut(),
-            &city_root.join(RESERVED).join(CAS),
-            &dest.join(CAS),
-        )?;
-        let files = copy_city_files(vfs.as_mut(), city_root, &dest.join(CITY))?;
+        let cas_dir = city_root.join(RESERVED).join(CAS);
+        let (dest_ledger, dest_cas, dest_city) =
+            (dest.join(LEDGER), dest.join(CAS), dest.join(CITY));
+        let ledger_files = copy_tree(vfs.as_mut(), &ledger_dir, &dest_ledger)?;
+        let cas_copied = copy_tree(vfs.as_mut(), &cas_dir, &dest_cas)?;
+        let city_copied = copy_city_files(vfs.as_mut(), city_root, &dest_city)?;
+        // Every number in the manifest is read back from the bundle, so
+        // the manifest states what a reader of the bundle will find.
         let manifest = Manifest {
-            records: count_records(vfs.as_ref(), &dest.join(LEDGER))?,
-            head: head_of(vfs.as_ref(), &dest.join(LEDGER))?,
-            cas_objects,
-            files,
+            records: count_records(vfs.as_ref(), &dest_ledger)?,
+            head: head_of(vfs.as_ref(), &dest_ledger)?,
+            cas_objects: count_files(vfs.as_ref(), &dest_cas)?,
+            files: count_files(vfs.as_ref(), &dest_city)?,
         };
-        let _ = records;
+        // A manifest read only from the bundle certifies itself: a copy
+        // that silently dropped half the city agrees with its own
+        // manifest. The source side is therefore counted separately and
+        // compared field by field, and a disagreement fails the export
+        // rather than producing a backup that is short.
+        agree(
+            "ledger file",
+            ledger_files,
+            count_files(vfs.as_ref(), &dest_ledger)?,
+        )?;
+        agree("cas object", cas_copied, manifest.cas_objects)?;
+        agree("city file", city_copied, manifest.files)?;
+        agree(
+            "ledger record",
+            count_records(vfs.as_ref(), &ledger_dir)?,
+            manifest.records,
+        )?;
+        let source_head = head_of(vfs.as_ref(), &ledger_dir)?;
+        if source_head != manifest.head {
+            return Err(MemoryError::Bundle {
+                op: "export",
+                detail: format!(
+                    "the city's history ends {source_head} and the bundle's ends {}",
+                    manifest.head
+                ),
+            });
+        }
         write_file(
             vfs.as_mut(),
             &dest.join(MANIFEST),
@@ -164,6 +203,88 @@ mod tests {
         assert!(elsewhere.path().join("lab").join("Roadmap.md").exists());
         // And the restored city is one a writer can continue.
         open_restored(elsewhere.path(), TimeMs::new(9)).unwrap();
+    }
+
+    /// A filesystem that accepts one write and does not keep it, which
+    /// is what a full disk and a cancelled copy look like from here.
+    struct LosesRoadmap(RealFs);
+
+    impl LosesRoadmap {
+        fn swallowed(path: &std::path::Path) -> bool {
+            path.ends_with("Roadmap.md")
+        }
+    }
+
+    impl crate::vfs::Vfs for LosesRoadmap {
+        fn create_dir_all(&mut self, dir: &std::path::Path) -> std::io::Result<()> {
+            self.0.create_dir_all(dir)
+        }
+        fn list(&self, dir: &std::path::Path) -> std::io::Result<Vec<std::path::PathBuf>> {
+            self.0.list(dir)
+        }
+        fn list_dirs(&self, dir: &std::path::Path) -> std::io::Result<Vec<std::path::PathBuf>> {
+            self.0.list_dirs(dir)
+        }
+        fn read(&self, path: &std::path::Path) -> std::io::Result<Vec<u8>> {
+            self.0.read(path)
+        }
+        fn read_at(
+            &self,
+            path: &std::path::Path,
+            offset: u64,
+            len: u64,
+        ) -> std::io::Result<Vec<u8>> {
+            self.0.read_at(path, offset, len)
+        }
+        fn append(&mut self, path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+            if Self::swallowed(path) {
+                return Ok(());
+            }
+            self.0.append(path, bytes)
+        }
+        fn truncate(&mut self, path: &std::path::Path, len: u64) -> std::io::Result<()> {
+            self.0.truncate(path, len)
+        }
+        fn sync_data(&mut self, path: &std::path::Path) -> std::io::Result<()> {
+            if Self::swallowed(path) {
+                return Ok(());
+            }
+            self.0.sync_data(path)
+        }
+        fn rename(&mut self, from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+            self.0.rename(from, to)
+        }
+        fn sync_dir(&mut self, dir: &std::path::Path) -> std::io::Result<()> {
+            self.0.sync_dir(dir)
+        }
+        fn remove_file(&mut self, path: &std::path::Path) -> std::io::Result<()> {
+            self.0.remove_file(path)
+        }
+        fn exists(&self, path: &std::path::Path) -> bool {
+            self.0.exists(path)
+        }
+    }
+
+    /// The manifest is read back from the bundle, so on its own it
+    /// cannot tell a complete bundle from a short one. This is the case
+    /// that the source-side counts exist for.
+    #[test]
+    fn a_city_file_the_bundle_never_received_fails_the_export() {
+        let home = tempfile::tempdir().unwrap();
+        city_with(2, home.path());
+        let carried = tempfile::tempdir().unwrap();
+        let err = Bundle::export_with(
+            Box::new(LosesRoadmap(RealFs::new())),
+            home.path(),
+            carried.path(),
+        )
+        .unwrap_err();
+        let ax = err.into_ax();
+        assert!(
+            ax.subject().contains("city file"),
+            "the export has to name the count that disagreed: {}",
+            ax.subject()
+        );
     }
 
     #[test]

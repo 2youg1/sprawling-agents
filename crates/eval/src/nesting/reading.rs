@@ -57,7 +57,10 @@ fn walk(value: &serde_json::Value, at: &mut String, into: &mut BTreeMap<String, 
                 at.truncate(was);
             }
         }
-        other => {
+        other @ (serde_json::Value::Null
+        | serde_json::Value::Bool(_)
+        | serde_json::Value::Number(_)
+        | serde_json::Value::String(_)) => {
             into.insert(at.clone(), scalar(other));
         }
     }
@@ -68,7 +71,11 @@ fn walk(value: &serde_json::Value, at: &mut String, into: &mut BTreeMap<String, 
 fn scalar(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::String(text) => text.clone(),
-        other => other.to_string(),
+        other @ (serde_json::Value::Null
+        | serde_json::Value::Bool(_)
+        | serde_json::Value::Number(_)
+        | serde_json::Value::Array(_)
+        | serde_json::Value::Object(_)) => other.to_string(),
     }
 }
 

@@ -53,7 +53,6 @@ impl Evidence {
 
 /// The three endings; a fourth cannot be represented (frozen surface,
 /// 14.1). `Limit` is not a kind of done — record limit, not completion.
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Completion {
     Done(Evidence),

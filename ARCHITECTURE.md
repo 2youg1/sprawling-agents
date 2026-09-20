@@ -298,7 +298,7 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->16<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1678<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1700<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->3<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 2 of 7 kani harnesses proved, Linux CI — those with an unbounded domain and a solvable one |
@@ -327,7 +327,7 @@ Sizes are gated because a byte count does not depend on how busy the machine was
 
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
-| Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->288,972 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->7.3×<!-- xtask:end --> headroom | yes |
+| Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->311,050 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->6.7×<!-- xtask:end --> headroom | yes |
 | The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->9,937,920 B<!-- xtask:end -->, client included | yes |
 | Resident memory, one session | ≤<!-- xtask:begin budget_bytes:session_resident -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:session_resident -->4,292,608 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
 | Ledger append plus fsync | p50 ≤5 ms, p99 ≤20 ms | 0.97 ms / 1.61 ms on one NVMe machine | no |
@@ -937,7 +937,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::views::tests | crates/sprawling/src/views/tests.rs | five views answer from the record, not from unavailable | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::governance_tests | crates/sprawling/src/views/governance_tests.rs | who answers and what was answered for the person, and a patch of a commit this city never wrote | projection | V4 | built | sprawling-SPEC.md#8-37 |
 
-### desktop (25) — out of tree: this Windows desktop, offered as an MCP server
+### desktop (28) — out of tree: this Windows desktop, offered as an MCP server
 
 Not a workspace member, and excluded in the root manifest on purpose: `unsafe_code` is `deny` here rather than `forbid`, so the Win32 boundary can relax it at the call sites that need it instead of opening a hole in the wall twelve crates stand behind. The seam it arrives through is the one section 8 already describes — an outside application is reached over MCP, not linked in. `cargo xtask modmap` does not read these rows, because it parses `crates/*/src`; they are here so that one table still lists every file.
 
@@ -950,11 +950,13 @@ Not a workspace member, and excluded in the root manifest on purpose: `unsafe_co
 | desktop::rpc | desktop/src/rpc.rs | one JSON-RPC 2.0 message per line, read and written | adapter | V4 | built | desktop-SPEC.md#8-2 |
 | desktop::tools | desktop/src/tools.rs | the six tools, their schemas, and what each one does not do | data | V4 | built | desktop-SPEC.md#8-3 |
 | desktop::scope | desktop/src/scope.rs | what DESKTOP.toml permits, and the three ways it closes | decision | V4 | built | desktop-SPEC.md#8-4 |
+| desktop::scope::tests | desktop/src/scope/tests.rs | what the allowlist is held to: the three ways it closes, the two switches, and the windows it neither admits nor discloses | decision | V4 | built | desktop-SPEC.md#8-4 |
 | desktop::scope::pattern | desktop/src/scope/pattern.rs | one allowlist line, and what it matches | value | V4 | built | desktop-SPEC.md#8-4 |
 | desktop::session | desktop/src/session.rs | one connection: the handshake order, and one reply per request | adapter | V4 | built | desktop-SPEC.md#8-5 |
 | desktop::session::tests | desktop/src/session/tests.rs | the handshake, the six names, and a refusal for everything this build cannot do | adapter | V4 | built | desktop-SPEC.md#8-5 |
 | desktop::platform | desktop/src/platform.rs | which machine this build is standing on | adapter | V4 | built | desktop-SPEC.md#8-6 |
 | desktop::platform::windows | desktop/src/platform/windows.rs | the Windows arm: the desk one connection holds, and which of the six carries out an admitted call | adapter | V4 | built | desktop-SPEC.md#8-6 |
+| desktop::platform::windows::focus | desktop/src/platform/windows/focus.rs | which window has the keyboard now, and the refusal when it is not the one this action named | decision | V4 | built | desktop-SPEC.md#8-6 |
 | desktop::platform::windows::reading | desktop/src/platform/windows/reading.rs | what one call's arguments say, each field refused by name rather than defaulted | decision | V4 | built | desktop-SPEC.md#8-6 |
 | desktop::platform::windows::fault | desktop/src/platform/windows/fault.rs | the one place a Win32 failure becomes a refusal a caller can act on | adapter | V4 | built | desktop-SPEC.md#8-6 |
 | desktop::platform::windows::geometry | desktop/src/platform/windows/geometry.rs | rectangles, the two coordinate spaces, and what a percentage scales a size to | value | V4 | built | desktop-SPEC.md#8-6 |
@@ -967,6 +969,7 @@ Not a workspace member, and excluded in the root manifest on purpose: `unsafe_co
 | desktop::platform::windows::capture | desktop/src/platform/windows/capture.rs | PrintWindow: one window as pixels, and the all-black answer that is a failure rather than an image | adapter | V4 | built | desktop-SPEC.md#8-6 |
 | desktop::platform::windows::encode | desktop/src/platform/windows/encode.rs | pixels scaled by a percentage and encoded as png, jpeg or webp | decision | V4 | built | desktop-SPEC.md#8-6 |
 | desktop::platform::windows::record | desktop/src/platform/windows/record.rs | start and stop: an mp4 through ffmpeg, or the frame sequence this package's one thread writes | adapter | V4 | built | desktop-SPEC.md#8-6 |
+| desktop::platform::windows::record::sink | desktop/src/platform/windows/record/sink.rs | what writes one recording's bytes and where they land: ffmpeg, or this package's one thread | adapter | V4 | built | desktop-SPEC.md#8-6 |
 | desktop::platform::windows::clipboard | desktop/src/platform/windows/clipboard.rs | this machine's clipboard, as text and as nothing else | adapter | V4 | built | desktop-SPEC.md#8-6 |
 | desktop::platform::elsewhere | desktop/src/platform/elsewhere.rs | every machine that is not Windows, named in its own refusal | adapter | V4 | built | desktop-SPEC.md#8-6 |
 | desktop::smoke | desktop/tests/smoke.rs | the real binary answering the exchange the city's own client sends | adapter | V4 | built | desktop-SPEC.md#8-10 |

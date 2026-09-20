@@ -25,7 +25,6 @@ use crate::admission::{AdmissionState, AdmissionVerdict};
 
 /// What a tag falls back to. Exhaustive on purpose: a third way of
 /// handling a dead endpoint has to be spelled at every reader.
-#[non_exhaustive]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Fallback {
     /// Stop. The run freezes and the reason goes on the ledger.
@@ -42,7 +41,6 @@ pub enum Fallback {
 }
 
 /// What a caller does with a provider failure, given the fallback.
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Retreat {
     /// Freeze the run. No reason is carried here: the reason is the

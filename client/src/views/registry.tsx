@@ -47,12 +47,14 @@ export function RegistryTable(props: { readonly assets: readonly RegistryLine[] 
     {
       key: "at",
       header: say("registry_when"),
+      summary: true,
       render: (line) => <span class="whitespace-nowrap text-note text-text-faint">{clock(lang(), line.at)}</span>,
       compare: (a, b) => a.at - b.at,
     },
     {
       key: "kind",
       header: say("registry_kind"),
+      summary: true,
       // The city's own word for what was filed, which no language
       // translates because it is the event's own spelling.
       render: (line) => <span class="whitespace-nowrap font-mono text-note text-text-quiet">{line.kind}</span>,

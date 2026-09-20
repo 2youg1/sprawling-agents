@@ -53,6 +53,10 @@
 //! why `web::lang`, 3,217 lines of every word the client says in two
 //! languages, is not in the register below.
 //!
+//! **The file rule reaches the client and the out-of-tree desktop
+//! package.** Neither is compiled by a workspace command, and a rule
+//! whose only executor is a compiler is a rule that stops at the wall.
+//!
 //! **The file rule reaches the client, and only the file rule.** The
 //! client is 19,000 lines of TypeScript read by the same two readers,
 //! and until this gate reached it the 400-line line had no executor
@@ -84,7 +88,15 @@ use measurement::{Found, measure};
 /// Where first-party Rust lives. `tests/` and `benches/` are absent on
 /// purpose: test code may relax what production code carries (AGENTS.md),
 /// and a long test is a different question from a long function.
-const SOURCE_DIRS: [&str; 3] = ["crates", "xtask/src", "citysim/src"];
+///
+/// **`desktop/src` is here although it is not in the workspace.** That
+/// package is compiled by no workspace command (root `Cargo.toml`,
+/// `exclude`), and the rule it states for itself is this one
+/// (desktop-SPEC.md section 16). A gate reads files rather than crates,
+/// so it reaches where `cargo` does not — and the same 400 lines apply,
+/// because the reader who has to find one thing in a long file is the
+/// same reader on both sides of that wall.
+const SOURCE_DIRS: [&str; 4] = ["crates", "xtask/src", "citysim/src", "desktop/src"];
 
 /// Where the client's own sources live. Only the file rule reaches
 /// them; the module documentation says why.

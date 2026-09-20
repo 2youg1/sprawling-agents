@@ -63,6 +63,8 @@ export function useUi(): Ui {
         // file's own answer to a question `core/prefs.ts` owns.
         effort: () => null,
         setEffort: () => undefined,
+        panel: () => true,
+        setPanel: () => undefined,
         welcomed: () => false,
         setWelcomed: () => undefined,
         draft: () => "",

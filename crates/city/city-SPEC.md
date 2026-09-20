@@ -298,7 +298,7 @@ pub fn holding_address(holding: &Holding) -> Result<Address, AxError>;
 ### 8-10 city::wizard（形状 1 判定＋形状 2 值类型；含 survey）
 
 ```rust
-#[non_exhaustive] pub enum Standing {
+pub enum Standing {
     Empty,
     Work { adoptable: Vec<Address>, loose: usize },
     AlreadyACity,

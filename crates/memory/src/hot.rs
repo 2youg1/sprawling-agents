@@ -21,7 +21,6 @@ use crate::error::MemoryError;
 /// A Run's phase as the hot view sees it. Freezing is terminal here:
 /// the ledger may keep appending to a frozen Run's history, but the
 /// phase never travels backwards.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunPhase {
     Active,

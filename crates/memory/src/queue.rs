@@ -28,7 +28,6 @@ use crate::error::MemoryError;
 /// names and nothing else; the day they differ in behaviour is the day
 /// they become separate modules, and that exit condition is stated
 /// here rather than discovered later.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueueLane {
     Signal,

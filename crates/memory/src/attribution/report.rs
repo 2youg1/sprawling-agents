@@ -68,6 +68,10 @@ impl Attribution {
 
     /// Folds one record in. Only `model_returned` moves money; the
     /// other two kinds set the basis on which the next call is split.
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "three kinds carry money or its basis; the rest of the vocabulary is silent here"
+    )]
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), MemoryError> {
         match record.kind() {
             EventKind::PromptAssembled => {

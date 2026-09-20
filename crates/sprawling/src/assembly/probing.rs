@@ -74,7 +74,11 @@ fn text_of(returned: &kernel::ModelReturn) -> String {
         .flatten()
         .filter_map(|block| match block {
             kernel::ContentBlock::Text { text } => Some(text),
-            _ => None,
+            kernel::ContentBlock::Thinking { .. }
+            | kernel::ContentBlock::RedactedThinking { .. }
+            | kernel::ContentBlock::ToolUse { .. }
+            | kernel::ContentBlock::Image(_)
+            | kernel::ContentBlock::ToolResult { .. } => None,
         })
         .collect::<Vec<String>>()
         .join("\n")

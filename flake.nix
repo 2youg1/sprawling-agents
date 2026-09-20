@@ -59,13 +59,28 @@
         declaredChannel = (builtins.fromTOML (builtins.readFile toolchainFile)).toolchain.channel;
 
         # `just check` needs these on PATH; a devshell that stops short of
-        # the repository's own closing condition is not a devshell.
+        # the repository's own closing condition is not a devshell. Which
+        # tools those are is decided by the `prereqs` recipe in the
+        # `justfile` and read back by `checks.devshell-covers-just-check`
+        # below, so this list answers a list rather than being a second
+        # one.
         tools = [
           pkgs.just
           pkgs.cargo-nextest
+          pkgs.cargo-public-api
+          pkgs.bun
           pkgs.cargo-deny
           pkgs.git
         ];
+
+        # The one required row this shell cannot answer, named here so
+        # that it stays one. `nightly-rustdoc` is what cargo-public-api
+        # reads, it arrives through rustup, and NixOS cannot start a
+        # rustup-downloaded toolchain at all - which is the reason this
+        # flake exists, stated at the head of the file. So the `apisync`
+        # gate is the single part of `just check` a NixOS shell does not
+        # hold, and CI's `gates` job is where it is held.
+        uncoveredRows = [ "nightly-rustdoc" ];
 
         # aws-lc-sys compiles the AWS-LC C sources, so a shell without cmake
         # and a C compiler fails on `cargo build` rather than on anything a
@@ -131,6 +146,47 @@
                   exit 1
                   ;;
               esac
+              touch "$out"
+            '';
+
+        # A devshell that stops short of `just check` fails here rather
+        # than at the desk of the person who entered it. `just prereqs
+        # list` prints one `class<TAB>name` row per tool, this check
+        # looks each required row up on the PATH the devshell builds, and
+        # a row added to the justfile without a package beside it in
+        # `tools` turns red. The exception list is checked in the other
+        # direction too: an entry that is no longer a required row is a
+        # stale excuse and fails, so it cannot outlive the tool.
+        checks.devshell-covers-just-check =
+          pkgs.runCommand "devshell-covers-just-check"
+            {
+              nativeBuildInputs = [ toolchain pkgs.just ] ++ tools ++ nativeDeps;
+              uncovered = pkgs.lib.concatStringsSep " " uncoveredRows;
+            }
+            ''
+              set -eu
+              tab=$(printf '\t')
+              just --justfile ${self}/justfile --working-directory . prereqs list > rows
+              missing=""
+              while IFS="$tab" read -r class name; do
+                [ "$class" = required ] || continue
+                case " $uncovered " in
+                  *" $name "*) echo "not covered by nix, by decision: $name"; continue ;;
+                esac
+                command -v "$name" >/dev/null 2>&1 || missing="$missing $name"
+              done < rows
+              for name in $uncovered; do
+                grep -qxF "required$tab$name" rows || {
+                  echo "$name is no longer a required row; drop it from uncoveredRows" >&2
+                  exit 1
+                }
+              done
+              if [ -n "$missing" ]; then
+                echo "the devshell does not answer:$missing" >&2
+                echo "add a package for each to 'tools' in flake.nix, or record why nix cannot" >&2
+                exit 1
+              fi
+              echo "every required row of 'just prereqs' answers in this shell"
               touch "$out"
             '';
 

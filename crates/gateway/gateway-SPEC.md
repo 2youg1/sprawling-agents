@@ -79,7 +79,7 @@ admission／market／cost：纯判定与数据面，被 endpoint 与 S3 回合�
 - **`choices` 为 `null` 不是形状问题**，单独报 `E_PROVIDER`：信封是对的、字段都在、只是答案被丢了。实测来源：一家 OpenAI 兼容的托管端点在 `max_tokens` 高于所选模型的上限时，**既不拒也不答**，回 HTTP 200 携 `"choices": null` 与全零 usage。同一家端点上限因模型而异（实测：一个模型在 1024 与 2048 之间就翻，另一个 8192 仍然正常），故**恒不把某个上限写进代码**：那是对侧的数字，写下来就是第二个会漂的权威。拒词只指向该改的那一项（max output tokens），并标 `retriable`。
 
 ```rust
-#[non_exhaustive] pub enum DialectKind { Anthropic, OpenAi }
+pub enum DialectKind { Anthropic, OpenAi }
 pub fn request_wire(kind: DialectKind, req: &ChatRequest) -> Result<serde_json::Value, AxError>;
 pub fn response_from_wire(kind: DialectKind, wire: &serde_json::Value) -> Result<ChatResponse, AxError>;
 pub fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<serde_json::Value, AxError>;
@@ -88,7 +88,7 @@ pub fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<serde_jso
 
 - **保三样**：①断点位——canonical 的 `cache: true` 标记翻到 Anthropic 侧＝`cache_control{type:"ephemeral"}`，逐块原位；OpenAI 侧无显式断点（供应商缓存是隐式前缀匹配），翻译**记录性丢弃**（文档声明，不静默）；②工具形状——`ToolDef{name, description, input_schema}`↔Anthropic `tools[]`／OpenAI `tools[{type:"function",function:{…}}]`，逐字段；tool_use↔tool_calls（id/name/args 无失）；③usage——Anthropic `usage{input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens}`／OpenAI `usage{prompt_tokens,completion_tokens,prompt_tokens_details.cached_tokens}`→`ModelUsage` 四整数字段，缺失字段取 0。
 - 未知 wire 字段：请求侧不产（我们只写自己声明的字段＋overrides）；响应侧忽略未知键、缺必需键报 `E_WIRE_MISMATCH`（subject 写键路径）。
-- canonical 枚举（Role／StopReason／ContentBlock）在 crate 外属 non_exhaustive，本模块通配臂恒 fail-closed（未知变体＝E_WIRE_MISMATCH，不猜不默）；wire JSON 键序＝serde_json BTreeMap 字典序（确定性，对端语义无关）。
+- canonical 枚举（Role／StopReason／ContentBlock）是闭的，本模块对每一支写出真实的臂；新增一支即在两种兼容格式里同时编译失败，这正是要的（G-22）。原先的 fail-closed 通配臂连同 `mismatch::unspelled_effort` 一并删除：它们恒不可达；wire JSON 键序＝serde_json BTreeMap 字典序（确定性，对端语义无关）。
 - `E_ENDPOINT_DIALECT_UNSUPPORTED`：DialectKind 之外的兼容格式请求（wire 探查失败）；本模块两码之外不新增。
 
 **思考块与思考强度的两侧翻译**
@@ -145,7 +145,7 @@ pub struct EndpointConfig {
     pub overrides: Vec<(String, serde_json::Value)>,  // 逐字段请求覆盖：JSON Pointer→值，最后应用
     pub timeout_ms: u64,
 }
-#[non_exhaustive] pub enum AuthSpec { Bearer(SecretRef), Header { name: String, value: SecretRef }, None }
+pub enum AuthSpec { Bearer(SecretRef), Header { name: String, value: SecretRef }, None }
 pub struct Endpoint { /* config、reqwest::blocking::Client、resolver: Box<dyn Fn(&SecretRef)->Result<Sealed<String>,AxError>> —— 私有 */ }
 impl Endpoint { pub fn new(config: EndpointConfig, resolver: /* 兑付闭包，由 credential 提供 */) -> Result<Endpoint, AxError>; }
 impl kernel::Model for Endpoint { /* call：ChatRequest（req.chat）→dialect→HTTP→ChatResponse→ModelReturn */ }
@@ -195,7 +195,7 @@ pub(crate) trait Vault {                        // 内缝：两句话接口
     fn get(&self, reference: &SecretRef) -> Result<Option<Sealed<String>>, AxError>;
     fn delete(&mut self, reference: &SecretRef) -> Result<(), AxError>;   // 探针与轮换用；不出对外接口
 }
-#[non_exhaustive] pub enum Persistence { AcrossReboots, ThisBoot, ThisProcess }
+pub enum Persistence { AcrossReboots, ThisBoot, ThisProcess }
 pub struct Described { pub configured: bool, pub source: String, pub persistence: Persistence, pub writable: bool }
 
 pub struct Custodian { /* backend: Box<dyn Vault>、source 名、persistence —— 私有 */ }
@@ -247,11 +247,11 @@ pub const OAUTH_PROFILES: [OauthProfile; N] = [ /* 各 provider 一行；只有�
 
 ```rust
 pub struct AdmissionState { /* in_flight: u32、interval_ms: u64、consecutive_ok: u32、next_allowed_at: TimeMs —— 字段私有，构造子给初值 */ }
-#[non_exhaustive] pub enum AdmissionVerdict { Admit, Hold { until: TimeMs } }
+pub enum AdmissionVerdict { Admit, Hold { until: TimeMs } }
 pub fn admit(state: &AdmissionState, now: TimeMs) -> AdmissionVerdict;      // 纯判定：不改 state
 pub fn on_dispatch(state: &mut AdmissionState, now: TimeMs) -> Result<(), AxError>;
 pub fn on_outcome(state: &mut AdmissionState, outcome: ProviderOutcome, now: TimeMs) -> Result<(), AxError>;
-#[non_exhaustive] pub enum ProviderOutcome { Ok, RateLimited { retry_after_ms: Option<u64> }, Failed }
+pub enum ProviderOutcome { Ok, RateLimited { retry_after_ms: Option<u64> }, Failed }
 ```
 
 - 确定性 AIMD：RateLimited→interval 加倍（上限封顶；retry_after 在场则取其大者）；连续 `ADMISSION_OK_STREAK=8` 次 Ok→interval 减半（下限 `ADMISSION_MIN_INTERVAL_MS=250`）；并发上限 `ADMISSION_MAX_IN_FLIGHT=4`。三常量为 pub(crate) 数据面（provider 侧工程参数，非城策口径，不入 consts_policy；改须本 SPEC 同集）。
@@ -261,7 +261,7 @@ pub fn on_outcome(state: &mut AdmissionState, outcome: ProviderOutcome, now: Tim
 ### 8-7 gateway::market（形状 6 数据面＋快照）
 
 ```rust
-#[non_exhaustive] #[derive(Default)] #[serde(rename_all = "snake_case")]
+#[derive(Default)] #[serde(rename_all = "snake_case")]
 pub enum InputKinds { #[default] Text, TextImage }      // 这个模型收得下什么
 pub struct ModelEntry { pub id: String, pub context_tokens: u64, pub input: InputKinds,
                         pub input_price: UsdMicros /* per 1M tokens */, pub output_price: UsdMicros,
@@ -282,7 +282,7 @@ impl MarketSnapshot {
 
 ```rust
 pub struct CallCost { pub billed: UsdMicros, pub source: CostSource, pub usage: ModelUsage }
-#[non_exhaustive] pub enum CostSource { Authoritative, PriceSheet }
+pub enum CostSource { Authoritative, PriceSheet }
 pub fn settle(usage: &ModelUsage, authoritative: Option<UsdMicros>, entry: &ModelEntry) -> Result<CallCost, AxError>;
 ```
 
@@ -342,7 +342,7 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<String>, AxEr
 ### 8-11 gateway::fallback（形状 2 值）
 
 ```rust
-#[non_exhaustive] pub enum Fallback { None, #[non_exhaustive] Then { endpoint: String, model: String } }
+pub enum Fallback { None, #[non_exhaustive] Then { endpoint: String, model: String } }
 impl Default for Fallback { fn default() -> Fallback { Fallback::None } }
 impl Fallback {
     pub fn then(endpoint: &str, model: &str) -> Result<Fallback, AxError>;  // 空串在构造点拒（E_CONFIG_INVALID）
@@ -350,7 +350,7 @@ impl Fallback {
     pub fn model(&self) -> Option<&str>;
     pub fn retreat(&self, now: TimeMs, admission: &AdmissionState) -> Retreat;
 }
-#[non_exhaustive] pub enum Retreat {
+pub enum Retreat {
     Freeze,                                                     // None：这次 Run 就此冻住，理由入帐
     #[non_exhaustive] MoveTo { endpoint: String, model: String, not_before: TimeMs },  // Then：退避到此刻之后再动
 }
@@ -366,7 +366,7 @@ pub fn retreat_payload(tag: ModelTag, from: &str, retreat: &Retreat, because: &A
 
 **为什么是值不是判定**：`Fallback` 的不变量（`Then` 的两个名字都非空）只在一个构造点上守，无 setter，这正是形状 2 的依据；`retreat` 是它身上的一个纯查询，不改自身、不采样时钟、不做 I/O。
 
-**枚举变体的字段没有「私有」这一档。** Rust 里 `Then { endpoint, model }` 的两个字段随枚举一同公开，于是一个结构体字面量就能绕过 `then` 写出两个空串。封住它的是**变体上的 `#[non_exhaustive]`**：crate 之外写不出该字面量，只能走构造函数；`Retreat::MoveTo` 同理。枚举上的 `#[non_exhaustive]` 只管匹配不管构造，两道都要标。
+**枚举变体的字段没有「私有」这一档。** Rust 里 `Then { endpoint, model }` 的两个字段随枚举一同公开，于是一个结构体字面量就能绕过 `then` 写出两个空串。封住它的是**变体上的 `#[non_exhaustive]`**：crate 之外写不出该字面量，只能走构造函数；`Retreat::MoveTo` 同理。**枚举上的那一道已撤**（G-22 / 叶子 7.10）：它只管匹配不管构造，买不到这里要的东西，却把新增变体从每个读者面前藏起来。变体上的这一道管的是构造，与穷尽性无关，故留。
 
 **线上还没有设它的字段。** 设置面在设置页，经 `AttachEndpoint`／`SelectModel` 两帧；在那个字段上线之前，城里写下的每一条 `model_selected` 都带 `Fallback::None`。
 
@@ -385,7 +385,7 @@ pub fn transcriber_for(chosen: &Chosen<'_>, secrets: SecretResolver)
     -> Result<Transcriber, AxError>;    // TRANSCRIBE_TIMEOUT_MS = 120_000
 
 // transcribe/recording.rs（形状 2 值）
-#[non_exhaustive] pub enum AudioType { Webm, Ogg, Mpeg, Mp4, Wav }
+pub enum AudioType { Webm, Ogg, Mpeg, Mp4, Wav }
 impl AudioType {
     pub fn media_type(self) -> &'static str;   pub fn file_name(self) -> &'static str;
     pub fn of_media_type(raw: &str) -> Result<AudioType, AxError>;  // 认不得的容器＝E_INVALID_ARGS

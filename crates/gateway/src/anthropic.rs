@@ -30,19 +30,16 @@ use kernel::{
 use serde_json::{Map, Value, json};
 
 use crate::dialect::ImageBytes;
-use crate::mismatch::{
-    as_str, mismatch, mismatch_found, payload_from, require, tokens_or_zero, unspelled_effort,
-};
+use crate::mismatch::{as_str, mismatch, mismatch_found, payload_from, require, tokens_or_zero};
 
 mod stream;
 
 pub(crate) use stream::{increment_of, settled};
 
-fn role_str(role: Role) -> Result<&'static str, AxError> {
+fn role_str(role: Role) -> &'static str {
     match role {
-        Role::User => Ok("user"),
-        Role::Assistant => Ok("assistant"),
-        _ => Err(mismatch("message.role", "unknown canonical role")),
+        Role::User => "user",
+        Role::Assistant => "assistant",
     }
 }
 
@@ -100,7 +97,6 @@ fn block_wire(block: &ContentBlock, images: &ImageBytes) -> Result<Value, AxErro
                 "content": carried, "is_error": is_error,
             }))
         }
-        _ => Err(mismatch("content.block", "unknown canonical block kind")),
     }
 }
 
@@ -138,7 +134,7 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
     }
     let mut messages = Vec::new();
     for message in &req.messages {
-        let role = role_str(message.role)?;
+        let role = role_str(message.role);
         let blocks: Result<Vec<Value>, AxError> = message
             .content
             .iter()
@@ -147,7 +143,7 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
         messages.push(json!({ "role": role, "content": blocks? }));
     }
     root.insert("messages".to_owned(), Value::Array(messages));
-    for (key, value) in effort_fields(req.effort)? {
+    for (key, value) in effort_fields(req.effort) {
         root.insert(key.to_owned(), value);
     }
     if !req.tools.is_empty() {
@@ -281,12 +277,11 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
     })
 }
 
-fn stop_str(stop: StopReason) -> Result<&'static str, AxError> {
+fn stop_str(stop: StopReason) -> &'static str {
     match stop {
-        StopReason::EndTurn => Ok("end_turn"),
-        StopReason::ToolUse => Ok("tool_use"),
-        StopReason::MaxTokens => Ok("max_tokens"),
-        _ => Err(mismatch("stop_reason", "unknown canonical stop reason")),
+        StopReason::EndTurn => "end_turn",
+        StopReason::ToolUse => "tool_use",
+        StopReason::MaxTokens => "max_tokens",
     }
 }
 
@@ -301,7 +296,7 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
         .collect();
     Ok(json!({
         "content": content?,
-        "stop_reason": stop_str(resp.stop)?,
+        "stop_reason": stop_str(resp.stop),
         "usage": {
             "input_tokens": resp.usage.input_tokens.get(),
             "output_tokens": resp.usage.output_tokens.get(),
@@ -314,18 +309,17 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
 /// The request field that states how hard to think. This dialect spells
 /// the five working levels in `effort`, and spells "do not think" in a
 /// different field entirely — `effort` has no `none`.
-fn effort_fields(effort: Option<Effort>) -> Result<Vec<(&'static str, Value)>, AxError> {
+fn effort_fields(effort: Option<Effort>) -> Vec<(&'static str, Value)> {
     let Some(effort) = effort else {
-        return Ok(Vec::new());
+        return Vec::new();
     };
     let level = match effort {
-        Effort::None => return Ok(vec![("thinking", json!({ "type": "disabled" }))]),
+        Effort::None => return vec![("thinking", json!({ "type": "disabled" }))],
         Effort::Low => "low",
         Effort::Medium => "medium",
         Effort::High => "high",
         Effort::XHigh => "xhigh",
         Effort::Max => "max",
-        _ => return Err(unspelled_effort(effort, "anthropic")),
     };
-    Ok(vec![("effort", Value::String(level.to_owned()))])
+    vec![("effort", Value::String(level.to_owned()))]
 }

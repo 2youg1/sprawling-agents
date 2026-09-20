@@ -61,12 +61,12 @@ pub(super) fn use_folder(folder: &std::path::Path) -> ExitCode {
     }
     if assembly::has_history(folder) {
         println!("{} is already a city; opening it", folder.display());
-        return serve_city(folder, DEFAULT_AT, &[], true);
+        return serve_city(folder, DEFAULT_AT, &[], Open::Browser);
     }
     match assembly::form_city(folder, assembly::Adopt::EveryFolder) {
         Ok(report) => {
             report_standing(&report);
-            serve_city(folder, DEFAULT_AT, &[], true)
+            serve_city(folder, DEFAULT_AT, &[], Open::Browser)
         }
         Err(err) => report(err),
     }
@@ -90,10 +90,6 @@ pub(super) fn report_standing(report: &assembly::InitReport) {
                 adoptable.len()
             );
         }
-        // A standing this build does not know is reported by name
-        // rather than passed over: the person is watching their own
-        // work being taken in.
-        other => println!("the folder is in a state this build does not describe: {other:?}"),
     }
     for addr in &report.adopted {
         println!(
@@ -118,7 +114,7 @@ pub(super) fn up_at(city: &std::path::Path, raw: &str, args: &[String]) -> ExitC
             Err(err) => return report(err),
         }
     }
-    serve_city(city, raw, args, true)
+    serve_city(city, raw, args, Open::Browser)
 }
 
 /// The genesis write: a city is born when city_initialized becomes line
@@ -173,18 +169,31 @@ pub(super) fn serve(dir: Option<&String>, addr: Option<&String>, args: &[String]
     let raw = addr
         .filter(|a| !a.starts_with("--"))
         .map_or(DEFAULT_AT, String::as_str);
-    let open = args.iter().any(|a| a == "--open");
+    let open = if args.iter().any(|a| a == "--open") {
+        Open::Browser
+    } else {
+        Open::Nothing
+    };
     serve_city(std::path::Path::new(dir), raw, args, open)
 }
 
 /// Serving proper, reached from `serve` and from `up`. `open` is the only
 /// difference between them: `up` is the appliance and opens the WebUI,
 /// `serve` stays where a person put it unless asked.
+/// What serving does with the person's browser.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Open {
+    /// Show the city: the appliance path, where the window is the point.
+    Browser,
+    /// Leave the screen alone, which is what a service wants.
+    Nothing,
+}
+
 pub(super) fn serve_city(
     city: &std::path::Path,
     raw: &str,
     args: &[String],
-    open: bool,
+    open: Open,
 ) -> ExitCode {
     // A directory with no history is not a city, and saying so beats the
     // storage layer's report that it could not list a ledger directory -
@@ -270,8 +279,9 @@ pub(super) fn serve_city(
     }
     println!("  Open the WebUI in a browser. Ctrl-C stops the city.");
     println!();
-    if open {
-        firstrun::open_when_ready(bind, url);
+    match open {
+        Open::Browser => firstrun::open_when_ready(bind, url),
+        Open::Nothing => {}
     }
     // The one sink a diagnostic line leaves this process through: the
     // terminal, and the page that has the log lens open. Made before
@@ -292,7 +302,7 @@ pub(super) fn serve_city(
     // The terminal this city runs in becomes its console when `up`
     // started it, or when `serve` was asked. `--no-console` is the way
     // out for a supervisor that wants the old blocking shape.
-    let wanted = (open || args.iter().any(|a| a == "--console"))
+    let wanted = (open == Open::Browser || args.iter().any(|a| a == "--console"))
         && !args.iter().any(|a| a == "--no-console");
     let console = wanted.then(|| console::Terminal {
         url: firstrun::local_url(bind),

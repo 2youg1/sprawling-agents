@@ -55,7 +55,7 @@ impl Journal {
         let lines = self.lines.clone();
         Box::new(move |entry: Entry<'_>| {
             eprintln!("{}", runtime::diagnostics::render(entry));
-            let _ = lines.send(carried(entry));
+            drop(lines.send(carried(entry)));
         })
     }
 
@@ -97,12 +97,6 @@ fn level(level: runtime::diagnostics::Level) -> channels::LogLevel {
         runtime::diagnostics::Level::Decide => channels::LogLevel::Decide,
         runtime::diagnostics::Level::Trace => channels::LogLevel::Trace,
         runtime::diagnostics::Level::Wire => channels::LogLevel::Wire,
-        // `Level` is `#[non_exhaustive]`, so the compiler cannot close
-        // this match for us. A level this build does not know is
-        // reported as the widest one a person reads rather than
-        // dropped: a line nobody can see is worse than a line filed
-        // one row too high.
-        _ => channels::LogLevel::Refuse,
     }
 }
 

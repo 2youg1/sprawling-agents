@@ -3,6 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+#![expect(
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
+    clippy::fn_params_excessive_bools,
+    reason = "A gate reads somebody else's vocabulary: `syn`'s syntax               tree and `serde_json`'s value are `#[non_exhaustive]`               upstream, so a wildcard over them is the correct arm               rather than an erased decision, and no arm this package               writes can be made exhaustive by changing this tree. The               other three relax at one remove, for reports written to a               stream nobody reads back and for two independent switches               of one command line. This is the only exception in the               tree, and `expect` makes it self-cleaning: the day no               site needs it, the build says so. It does not extend to a               gate matching on a kernel enum - that arm belongs in the               crate that owns the enum."
+)]
+
 //! Gate runner. One gate per module; `gates` runs them all in order.
 //! Exit codes: 0 clean, 1 violations found, 2 usage or gate-internal failure.
 //! A broken gate must fail loudly (code 2): silent passes are the worst

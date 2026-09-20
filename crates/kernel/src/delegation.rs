@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 
 /// Resident delegates join society and answer for output; Ephemerals are
 /// tools — one clarification channel up, nothing else.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DelegateKind {

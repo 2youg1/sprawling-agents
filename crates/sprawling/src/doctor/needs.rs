@@ -109,7 +109,9 @@ pub(crate) fn lack_line(lack: &Lack) -> String {
         .iter()
         .map(|(item, presence)| match presence {
             Presence::Absent(absence) => format!("no {item} ({})", absence.describe()),
-            other => format!("{item} {}", other.describe()),
+            other @ (Presence::Present { .. } | Presence::Broken { .. }) => {
+                format!("{item} {}", other.describe())
+            }
         })
         .collect();
     format!(

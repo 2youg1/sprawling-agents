@@ -210,7 +210,7 @@ pub fn open_when_ready(bind: SocketAddr, url: String) {
             if std::net::TcpStream::connect_timeout(&addr, PROBE_INTERVAL).is_ok() {
                 // Never fatal: a machine with no handler for URLs still
                 // has a working city, and its address is on the screen.
-                let _ = open_in_browser(&url);
+                drop(open_in_browser(&url));
                 return;
             }
             std::thread::sleep(PROBE_INTERVAL);
@@ -258,6 +258,9 @@ fn handler(url: &str) -> std::process::Command {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
     reason = "test code"
 )]
 mod tests {

@@ -15,6 +15,14 @@
 //! permit it: the allowlist speaks of windows, and a full-screen image
 //! shows everything the allowlist left out (desktop-SPEC.md section 8.5,
 //! third pair).
+//!
+//! **Admission is a value, and it is the only way to reach the desk.**
+//! [`Scope::admits`] hands back an [`Admitted`] carrying the allowlist
+//! that admitted the call, so `desktop.windows` filters what it reports
+//! through the very patterns that admitted it. A window list is as
+//! disclosing as a snapshot — a title carries a document name, a URL
+//! and often a person's name — so the tool that reports titles is held
+//! to the same allowlist as the tools that act on them.
 
 mod pattern;
 
@@ -73,11 +81,39 @@ pub(crate) enum Scope {
 }
 
 /// The four things a scope file states.
+#[derive(Debug)]
 pub(crate) struct Allowance {
     windows: Vec<Pattern>,
     processes: Vec<Pattern>,
     record: bool,
     clipboard: bool,
+}
+
+/// That one call cleared this scope, carrying the allowlist that
+/// cleared it.
+///
+/// `platform::Desk::perform` takes one, so no tool can be carried out
+/// without an admission having been decided first, and the one tool
+/// whose *answer* is scoped rather than merely its permission —
+/// `desktop.windows` — reads the allowlist through this value instead
+/// of through a second copy of it.
+#[derive(Debug)]
+pub(crate) struct Admitted<'a> {
+    allowance: &'a Allowance,
+}
+
+impl Admitted<'_> {
+    /// Whether this scope's caller may be told that one window exists.
+    ///
+    /// A window is visible exactly when the caller could name it: its
+    /// title matches the window list, or its process matches the
+    /// process list. That is the dual of [`Scope::admits`], which
+    /// judges the identifiers a call *gave*; here the identifiers are
+    /// the window's own. An empty allowlist therefore shows nothing,
+    /// which is the same reading that makes it admit nothing.
+    pub(crate) fn visible(&self, title: &str, process: &str) -> bool {
+        self.allowance.visible(title, process)
+    }
 }
 
 impl Scope {
@@ -127,7 +163,7 @@ impl Scope {
     /// Refuses everything when the scope is closed, a tool whose switch
     /// is off, a call that names no window where one is required, and a
     /// window this file does not list.
-    pub(crate) fn admits(&self, reach: &Reach<'_>) -> Result<(), Refusal> {
+    pub(crate) fn admits(&self, reach: &Reach<'_>) -> Result<Admitted<'_>, Refusal> {
         match self {
             Scope::Closed { code, because } => Err(Refusal::new(
                 *code,
@@ -142,18 +178,19 @@ impl Scope {
 }
 
 impl Allowance {
-    fn admits(&self, reach: &Reach<'_>) -> Result<(), Refusal> {
+    fn admits(&self, reach: &Reach<'_>) -> Result<Admitted<'_>, Refusal> {
+        let admitted = Admitted { allowance: self };
         if reach.tool == "desktop.record" && !self.record {
             return Err(switched_off("record"));
         }
         if reach.tool == "desktop.clipboard" {
             if self.clipboard {
-                return Ok(());
+                return Ok(admitted);
             }
             return Err(switched_off("clipboard"));
         }
         if !WINDOW_FACING.contains(&reach.tool) {
-            return Ok(());
+            return Ok(admitted);
         }
         match (reach.title, reach.process) {
             (None, None) => Err(Refusal::new(
@@ -170,9 +207,17 @@ impl Allowance {
                 if let Some(process) = process {
                     admitted_by(&self.processes, process, "process")?;
                 }
-                Ok(())
+                Ok(admitted)
             }
         }
+    }
+
+    /// Whether one window on this desktop is one this scope's caller
+    /// could name, which is what makes it one this caller may be told
+    /// about.
+    fn visible(&self, title: &str, process: &str) -> bool {
+        self.windows.iter().any(|glob| glob.matches(title))
+            || self.processes.iter().any(|glob| glob.matches(process))
     }
 }
 
@@ -202,196 +247,4 @@ fn admitted_by(allowed: &[Pattern], named: &str, kind: &str) -> Result<(), Refus
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    clippy::arithmetic_side_effects,
-    reason = "test code"
-)]
-mod tests {
-    use super::*;
-
-    fn reach<'a>(tool: &'a str, title: Option<&'a str>) -> Reach<'a> {
-        Reach {
-            tool,
-            title,
-            process: None,
-        }
-    }
-
-    /// The rule the whole file exists for: with no scope, this server
-    /// does nothing at all.
-    #[test]
-    fn a_missing_scope_file_refuses_everything() {
-        let nowhere = Path::new("no-such-directory-here/DESKTOP.toml");
-        for scope in [Scope::read(None), Scope::read(Some(nowhere))] {
-            for tool in [
-                "desktop.windows",
-                "desktop.snapshot",
-                "desktop.act",
-                "desktop.screenshot",
-                "desktop.record",
-                "desktop.clipboard",
-            ] {
-                let refusal = scope
-                    .admits(&reach(tool, Some("Notepad")))
-                    .expect_err("a closed scope admits nothing");
-                let error = refusal.as_error();
-                assert_eq!(error["data"]["code"], "E_GATE_DENIED", "{tool}");
-                assert!(
-                    error["data"]["recovery"]
-                        .as_str()
-                        .unwrap()
-                        .contains("DESKTOP.toml"),
-                    "{tool}"
-                );
-            }
-        }
-    }
-
-    /// A file that cannot be read is not a file that permits everything.
-    #[test]
-    fn a_damaged_scope_file_closes_the_scope_rather_than_opening_it() {
-        for text in ["windows = [", "windows = 3", "widnows = [\"*\"]"] {
-            let scope = Scope::parse(text);
-            assert!(
-                scope
-                    .admits(&reach("desktop.act", Some("Notepad")))
-                    .is_err(),
-                "{text}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_listed_window_is_admitted_and_an_unlisted_one_is_not() {
-        let scope = Scope::parse("windows = [\"*Notepad*\", \"Calculator\"]\n");
-        assert!(
-            scope
-                .admits(&reach("desktop.act", Some("a.txt — Notepad")))
-                .is_ok()
-        );
-        assert!(
-            scope
-                .admits(&reach("desktop.snapshot", Some("Calculator")))
-                .is_ok()
-        );
-        let refused = scope
-            .admits(&reach("desktop.screenshot", Some("Password Manager")))
-            .expect_err("an unlisted window is refused");
-        assert_eq!(refused.as_error()["data"]["code"], "E_GATE_DENIED");
-        assert!(
-            refused.as_error()["data"]["recovery"]
-                .as_str()
-                .unwrap()
-                .contains("DESKTOP.toml")
-        );
-        // A process name is judged against the other list, and a call
-        // naming both has to satisfy both.
-        let by_process = Scope::parse("processes = [\"Notepad.exe\"]\n");
-        let named = |process| Reach {
-            tool: "desktop.snapshot",
-            title: None,
-            process: Some(process),
-        };
-        assert!(by_process.admits(&named("NOTEPAD.EXE")).is_ok());
-        assert!(by_process.admits(&named("notepad2.exe")).is_err());
-        // A pattern anchored at both ends does not match a longer title.
-        assert!(
-            scope
-                .admits(&reach("desktop.act", Some("Calculator Plus")))
-                .is_err()
-        );
-    }
-
-    /// The scope file has no way to say "the whole screen", so the whole
-    /// screen is refused rather than assumed.
-    #[test]
-    fn a_capture_that_names_no_window_is_refused_with_a_next_step() {
-        let scope = Scope::parse("windows = [\"*\"]\nrecord = true\n");
-        for tool in [
-            "desktop.snapshot",
-            "desktop.act",
-            "desktop.screenshot",
-            "desktop.record",
-        ] {
-            let refusal = scope
-                .admits(&reach(tool, None))
-                .expect_err("naming no window is refused");
-            let error = refusal.as_error();
-            assert_eq!(error["data"]["code"], "E_GATE_DENIED", "{tool}");
-            assert!(
-                error["data"]["recovery"].as_str().unwrap().contains("name"),
-                "{tool}"
-            );
-        }
-        // Listing windows names none by nature, and is how a caller
-        // learns what to name.
-        assert!(scope.admits(&reach("desktop.windows", None)).is_ok());
-    }
-
-    #[test]
-    fn recording_and_the_clipboard_are_each_off_until_their_own_switch_is_on() {
-        let shut = Scope::parse("windows = [\"*\"]\n");
-        let record = shut
-            .admits(&reach("desktop.record", Some("Notepad")))
-            .expect_err("recording is off by default");
-        assert_eq!(record.as_error()["data"]["code"], "E_GATE_DENIED");
-        assert!(
-            record.as_error()["data"]["recovery"]
-                .as_str()
-                .unwrap()
-                .contains("record")
-        );
-        let clipboard = shut
-            .admits(&reach("desktop.clipboard", None))
-            .expect_err("the clipboard is off by default");
-        assert!(
-            clipboard.as_error()["data"]["recovery"]
-                .as_str()
-                .unwrap()
-                .contains("clipboard")
-        );
-
-        let open = Scope::parse("windows = [\"*\"]\nrecord = true\nclipboard = true\n");
-        assert!(
-            open.admits(&reach("desktop.record", Some("Notepad")))
-                .is_ok()
-        );
-        assert!(open.admits(&reach("desktop.clipboard", None)).is_ok());
-    }
-
-    /// An empty allowlist is a file that lists no window, which is not
-    /// the same thing as a file that lists every window.
-    #[test]
-    fn an_empty_allowlist_admits_no_window() {
-        let scope = Scope::parse("record = true\nclipboard = true\n");
-        assert!(
-            scope
-                .admits(&reach("desktop.act", Some("Notepad")))
-                .is_err()
-        );
-        assert!(scope.admits(&reach("desktop.clipboard", None)).is_ok());
-    }
-
-    #[test]
-    fn a_scope_file_on_disk_is_read_from_the_path_it_was_given() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("DESKTOP.toml");
-        std::fs::write(&path, "windows = [\"*Notepad*\"]\nclipboard = true\n").unwrap();
-        let scope = Scope::read(Some(&path));
-        assert!(
-            scope
-                .admits(&reach("desktop.act", Some("x — Notepad")))
-                .is_ok()
-        );
-        assert!(scope.admits(&reach("desktop.clipboard", None)).is_ok());
-        assert!(
-            scope
-                .admits(&reach("desktop.record", Some("x — Notepad")))
-                .is_err()
-        );
-    }
-}
+mod tests;

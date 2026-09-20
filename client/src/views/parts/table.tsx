@@ -21,6 +21,10 @@ export interface Column<T> {
   readonly render: (row: T) => JSX.Element;
   // Present makes the column sortable.
   readonly compare?: (a: T, b: T) => number;
+  // A column a compact page does not draw. The header and every cell
+  // carry the class `theme.css` hides under `[data-density=compact]`,
+  // so one rule covers a table and a list alike.
+  readonly summary?: true;
   // Present makes the cell an input, and the table hands back what was
   // typed rather than deciding what it means.
   readonly editable?: {
@@ -105,7 +109,10 @@ export function Table<T>(
               </Show>
               <For each={props.columns}>
                 {(column) => (
-                  <th class="px-base py-snug text-left text-note font-label text-text-quiet" aria-sort={said(column.key)}>
+                  <th
+                    class={`px-base py-snug text-left text-note font-label text-text-quiet${column.summary === true ? " summary" : ""}`}
+                    aria-sort={said(column.key)}
+                  >
                     <Show when={column.compare !== undefined} fallback={column.header}>
                       <button
                         type="button"
@@ -142,7 +149,7 @@ export function Table<T>(
                   </Show>
                   <For each={props.columns}>
                     {(column) => (
-                      <td class="px-base py-snug text-text">
+                      <td class={`px-base py-snug text-text${column.summary === true ? " summary" : ""}`}>
                         <Show when={column.editable} fallback={column.render(row)}>
                           {(editable) => (
                             <input

@@ -34,6 +34,10 @@ pub(crate) enum Explanation {
 /// The items that can raise a code, when the code is about this
 /// machine at all. The table this function is: editing it is editing
 /// what `--explain` knows.
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "two codes are about a missing program; the other sixty name no program"
+)]
 fn items_behind(code: AxCode) -> Option<&'static [&'static str]> {
     match code {
         AxCode::ToolUnavailable => Some(&[

@@ -57,6 +57,26 @@ pub(crate) enum Action {
     Key { code: u16 },
 }
 
+impl Action {
+    /// Where on the screen this action lands, when it lands anywhere.
+    ///
+    /// `type` and `key` go wherever the keyboard is, so they name no
+    /// place; a drag names the place it starts from, because that is
+    /// the window it picks something up in. `super::focus` reads this
+    /// to decide whether a second question has to be asked before the
+    /// events are sent.
+    pub(super) fn lands_at(&self) -> Option<Point> {
+        match self {
+            Action::Click { at }
+            | Action::Double { at }
+            | Action::Right { at }
+            | Action::Scroll { at, .. } => Some(*at),
+            Action::Drag { from, .. } => Some(*from),
+            Action::Type { .. } | Action::Key { .. } => None,
+        }
+    }
+}
+
 /// Carries out one action, holding `modifiers` down for the whole of it.
 ///
 /// # Errors
@@ -286,6 +306,26 @@ mod tests {
     /// One character is one press and one release, so a string is
     /// exactly twice its UTF-16 length — including the two units an
     /// emoji takes, which is the case a `chars()` count gets wrong.
+    /// The two actions that go to the keyboard alone name no place, so
+    /// nothing asks what lies under a point they never touch.
+    #[test]
+    fn only_the_pointer_actions_name_a_place_on_the_screen() {
+        let at = Point { x: 10, y: 20 };
+        let to = Point { x: 99, y: 99 };
+        assert_eq!(Action::Click { at }.lands_at(), Some(at));
+        assert_eq!(Action::Scroll { at, notches: -3 }.lands_at(), Some(at));
+        // A drag is judged where it picks something up.
+        assert_eq!(Action::Drag { from: at, to }.lands_at(), Some(at));
+        assert_eq!(
+            Action::Type {
+                text: "hello".to_owned()
+            }
+            .lands_at(),
+            None
+        );
+        assert_eq!(Action::Key { code: 0x0D }.lands_at(), None);
+    }
+
     #[test]
     fn typing_is_one_press_and_one_release_per_utf16_unit() {
         let plain = Action::Type {

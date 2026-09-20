@@ -75,11 +75,11 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             let mut worker = match RunWorker::new(&worker_root, vault, log) {
                 Ok(mut worker) => {
                     worker.open_for_service(vault_notice);
-                    let _ = ready_tx.send(Ok(worker.vault_handle()));
+                    drop(ready_tx.send(Ok(worker.vault_handle())));
                     worker
                 }
                 Err(err) => {
-                    let _ = ready_tx.send(Err(err));
+                    drop(ready_tx.send(Err(err)));
                     return;
                 }
             };
@@ -89,7 +89,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             worker.watch(std::sync::Arc::new(move |delta: channels::Delta| {
                 // No subscribers is not a failure: a city with no browser
                 // open is a city doing its work.
-                let _ = to_watchers.send(delta);
+                drop(to_watchers.send(delta));
             }));
             // Where a fresh look at this machine lands. The same views
             // the start-up look was written into, so a page asking
@@ -113,7 +113,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                 }
                 // A send with no subscribers is not a failure: a city with
                 // no browser open is a city doing its work.
-                let _ = to_clients.send(record.clone());
+                drop(to_clients.send(record.clone()));
             }));
             // A run in progress asks the same desk what arrived, so a
             // Cancel does not have to wait for the run it cancels.
@@ -161,7 +161,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                                 >= SCHEDULE_TICK_MS
                         {
                             read_schedule_at = now;
-                            let _ = worker.tick(now);
+                            drop(worker.tick(now));
                         }
                     }
                     DeskWait::Close => {

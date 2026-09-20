@@ -15,7 +15,6 @@ use crate::taint::TaintSet;
 
 /// Tracked rides git (`file:`), Interred rides CAS (`cas:`), Rebuildable
 /// names its reason. No fourth storage authority exists.
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

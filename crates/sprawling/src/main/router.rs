@@ -137,7 +137,7 @@ fn hold() {
     let mut ignored = String::new();
     // A failed read means there is nobody to wait for, which is the same
     // outcome as being waited for: this process is ending either way.
-    let _ = std::io::stdin().read_line(&mut ignored);
+    drop(std::io::stdin().read_line(&mut ignored));
 }
 
 /// Where `up` and the first screen put a city nobody named.

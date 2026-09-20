@@ -190,6 +190,10 @@ fn spent_by(billed: &memory::AttributionReport, run: RunId) -> UsdMicros {
 /// a record naming no address, which is a commit with no actor to
 /// attribute it to. A projection skips what it cannot read rather than
 /// inventing a row.
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "a few kinds name a commit; the rest of the event vocabulary does not"
+)]
 pub(super) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)> {
     let key = match record.kind() {
         EventKind::CheckpointCommitted => "oid",

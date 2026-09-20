@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 /// and the answer decides whether a picture may be sent at all. The
 /// default is the narrow one, because guessing narrow costs a refusal a
 /// person can act on and guessing wide costs a 400 from the provider.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InputKinds {

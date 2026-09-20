@@ -156,8 +156,8 @@ impl Drop for Engaged {
     fn drop(&mut self) {
         // A browser that has already exited is the outcome this asks
         // for, so its refusal is not news.
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        drop(self.child.kill());
+        drop(self.child.wait());
     }
 }
 

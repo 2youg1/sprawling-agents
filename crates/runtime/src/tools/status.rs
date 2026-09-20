@@ -34,7 +34,6 @@ use crate::mode::Mode;
 /// How the gateway is currently able to serve. Degraded and LocalOnly
 /// are situations the model should plan around, so they are reported
 /// rather than hidden behind a retry.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderMode {
     Normal,

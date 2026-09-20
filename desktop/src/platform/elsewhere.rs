@@ -12,6 +12,7 @@
 //! a reason is a sentence nobody can act on.
 
 use crate::refusal::{Refusal, RefusalCode};
+use crate::scope::Admitted;
 use serde_json::Value;
 
 /// What one connection remembers between calls — which here is
@@ -29,12 +30,21 @@ impl Desk {
         Desk
     }
 
-    /// Carries out one admitted call.
+    /// Carries out one admitted call, which here is none.
+    ///
+    /// The admission is taken and dropped: this arm reports no window,
+    /// so it has nothing to filter, and the parameter is here because
+    /// both arms present one type to `crate::session`.
     ///
     /// # Errors
     /// Refuses every call, naming this platform and the tool that was
     /// asked for.
-    pub(crate) fn perform(&mut self, tool: &str, _arguments: &Value) -> Result<Value, Refusal> {
+    pub(crate) fn perform(
+        &mut self,
+        tool: &str,
+        _arguments: &Value,
+        _admitted: &Admitted<'_>,
+    ) -> Result<Value, Refusal> {
         let platform = std::env::consts::OS;
         Err(Refusal::new(
             RefusalCode::ToolUnavailable,
@@ -59,8 +69,16 @@ mod tests {
 
     #[test]
     fn a_platform_without_this_desktop_is_named_in_the_refusal() {
+        let scope = crate::scope::Scope::parse("windows = [\"*\"]\n");
+        let admitted = scope
+            .admits(&crate::scope::Reach {
+                tool: "desktop.windows",
+                title: None,
+                process: None,
+            })
+            .expect("an open scope admits a listing");
         let refusal = Desk::new()
-            .perform("desktop.windows", &json!({}))
+            .perform("desktop.windows", &json!({}), &admitted)
             .expect_err("this platform carries out nothing");
         let error = refusal.as_error();
         assert_eq!(error["data"]["code"], "E_TOOL_UNAVAILABLE");

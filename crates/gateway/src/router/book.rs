@@ -76,6 +76,10 @@ impl EndpointBook {
     ///
     /// # Errors
     /// As [`EndpointBook::apply`].
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "four kinds move an endpoint book; the rest of the vocabulary passes through"
+    )]
     pub fn apply_payload(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError> {
         match kind {
             EventKind::EndpointAttached => {
@@ -94,6 +98,8 @@ impl EndpointBook {
                 self.chosen.insert(tag, choice);
                 Ok(())
             }
+            // The rest of the vocabulary says nothing about which
+            // endpoint answers, which is what this book holds.
             _ => Ok(()),
         }
     }

@@ -8,13 +8,20 @@
 // unattributed remainder stays visible. A provider that reported no
 // price leaves the total at zero, and the page says so rather than
 // printing $0.00 as if it were a measurement.
+//
+// The bar under a row is that row's summary: it restates the figure
+// beside the name, so a compact page draws the name and the figure and
+// stops there. Which pages are compact is `theme.css`'s one density
+// attribute, not a switch of this page's own.
 
 import { For, Show, createMemo } from "solid-js";
 
 import { QUERIES } from "../core/asking";
+import { MAYOR, toFragment } from "../core/route";
 import { usd } from "../core/time";
 import type { CostAnswer, UsdMicros } from "../wire";
 import { useSay, useUi } from "../ui";
+import { EmptyState } from "./parts/empty";
 
 type Cut = "by_run" | "by_actor" | "by_segment" | "by_tool" | "by_skill";
 const CUTS: readonly Cut[] = ["by_run", "by_actor", "by_segment", "by_tool", "by_skill"];
@@ -29,7 +36,7 @@ function Table(props: { readonly rows: readonly (readonly [string, UsdMicros])[]
               <span class="truncate font-mono text-text-quiet">{name}</span>
               <span class="shrink-0 text-text">{usd(amount)}</span>
             </div>
-            <div class="mt-tight h-dot overflow-hidden rounded-pill bg-g1">
+            <div class="summary mt-tight h-dot overflow-hidden rounded-pill bg-g1">
               <div class="h-full bg-accent" style={{ width: `${String(props.total > 0 ? (amount / props.total) * 100 : 0)}%` }} />
             </div>
           </li>
@@ -59,19 +66,38 @@ export function Cost() {
       </div>
       <Show when={answer()} fallback={<p class="text-text-disabled">…</p>}>
         {(held) => (
-          <Show when={held().total > 0}>
-          <div class="grid gap-wide md:grid-cols-2">
-            <For each={CUTS}>
-              {(cut) => (
-                <section>
-                  <h2 class="mb-snug text-label font-label text-text-quiet">{say(`cost_${cut}`)}</h2>
-                  <Show when={held()[cut].length > 0} fallback={<p class="text-note text-text-disabled">—</p>}>
-                    <Table rows={held()[cut]} total={held().total} />
-                  </Show>
-                </section>
-              )}
-            </For>
-          </div>
+          <Show
+            when={held().total > 0}
+            fallback={
+              // Nothing has been spent, which reads exactly like a page
+              // that failed to load unless the page says which one it
+              // is. Spending starts with a run, and a run starts in the
+              // conversation with the Mayor.
+              <EmptyState
+                text={say("cost_empty")}
+                action={
+                  <a
+                    href={toFragment({ kind: "talk", address: MAYOR })}
+                    class="rounded-control bg-accent px-base py-snug text-label text-g0 hover:bg-accent-hover"
+                  >
+                    {say("city_ask_mayor")}
+                  </a>
+                }
+              />
+            }
+          >
+            <div class="grid gap-wide md:grid-cols-2">
+              <For each={CUTS}>
+                {(cut) => (
+                  <section>
+                    <h2 class="mb-snug text-label font-label text-text-quiet">{say(`cost_${cut}`)}</h2>
+                    <Show when={held()[cut].length > 0} fallback={<p class="text-note text-text-disabled">—</p>}>
+                      <Table rows={held()[cut]} total={held().total} />
+                    </Show>
+                  </section>
+                )}
+              </For>
+            </div>
           </Show>
         )}
       </Show>

@@ -18,7 +18,7 @@ export function enrol(
   name: string,
   value: string,
 ): Promise<Enrolment> {
-  const reference = `secret:${realm}/${name}`;
+  const reference = referenceText({ realm, name });
   return fetch(`${origin}/enroll`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -38,10 +38,27 @@ export function enrol(
   );
 }
 
+// Where one key is filed in the vault.
+export interface SecretAt {
+  readonly realm: string;
+  readonly name: string;
+}
+
 // The realm and name a provider's key is filed under: one key per
 // provider, named after it, so the reference reads as what it is.
-export function referenceFor(provider: string): { realm: string; name: string } {
+export function referenceFor(provider: string): SecretAt {
   return { realm: "providers", name: provider };
+}
+
+// How a place in the vault is spelled in a command.
+//
+// One spelling, here, because two readers need it and they are on
+// opposite sides of an enrolment: the form shows a person what their
+// key is about to be filed under, and the command carries the same
+// text for `kernel::SecretRef::parse` to read back. A second spelling
+// would let the form promise a reference the city cannot resolve.
+export function referenceText(at: SecretAt): string {
+  return `secret:${at.realm}/${at.name}`;
 }
 
 // What this page knows about a key it sent to the vault: the reference

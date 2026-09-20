@@ -32,13 +32,13 @@ use crate::report::Violation;
 /// **A column, not a bar.** Rows that all share one top are a row of
 /// tabs, and asking them to share an x would ask them to sit on top of
 /// one another; a nav whose rows do not stack is left alone.
-pub(super) fn rows_share_a_first_mark(drawn: &[Drawn], out: &mut Vec<Violation>) {
-    for (at, nav) in drawn
+pub(super) fn rows_share_a_first_mark(drawn: &[Drawn], at: &str, out: &mut Vec<Violation>) {
+    for (position, nav) in drawn
         .iter()
         .enumerate()
         .filter(|(_, held)| held.tag == "NAV" && held.drawn())
     {
-        let Ok(index) = i64::try_from(at) else {
+        let Ok(index) = i64::try_from(position) else {
             continue;
         };
         let rows: Vec<&Drawn> = drawn
@@ -68,6 +68,7 @@ pub(super) fn rows_share_a_first_mark(drawn: &[Drawn], out: &mut Vec<Violation>)
             .map(|(centre, name)| format!("{name} at x={centre}"))
             .collect();
         out.push(violation(
+            at,
             "every clickable row in a navigation column starts its first mark at the same x",
             format!(
                 "{} holds {}: {}",
@@ -86,12 +87,13 @@ pub(super) fn rows_share_a_first_mark(drawn: &[Drawn], out: &mut Vec<Violation>)
 /// A key is a face, not a link. The stylesheet underlines a link under
 /// the pointer, and the mark inside it went with it, so `g c` on the
 /// rail read as something to click.
-pub(super) fn no_key_is_underlined(drawn: &[Drawn], out: &mut Vec<Violation>) {
+pub(super) fn no_key_is_underlined(drawn: &[Drawn], at: &str, out: &mut Vec<Violation>) {
     for held in drawn
         .iter()
         .filter(|held| held.tag == "KBD" && held.drawn() && held.underlined)
     {
         out.push(violation(
+            at,
             "no key is drawn with a line under it",
             format!(
                 "{} at x={} y={} carries an underline",

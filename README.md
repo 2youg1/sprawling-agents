@@ -264,6 +264,8 @@ Logging into a provider requires a small set of endpoints and parameters. Rather
 
 **What is followed is intelligence, not code.** Endpoints and parameters are facts; the flow and credential custody are implemented here.
 
+**The browser page stands on the same kind of thing.** Its runtime dependencies are exactly two — `solid-js` and `effect` — and no component library is among them: every control in `client/src/views/parts/` is this repository's own. What is taken from the W3C's ARIA Authoring Practices and from the Kobalte and Ark UI documentation is behaviour published as prose: which pattern a control implements, what each key does, where the focus returns when it closes. **Not one line of their code is in this tree, so nothing is owed for it** — and the keyboard table that reading produced is specified in [`client/client-SPEC.md`](client/client-SPEC.md).
+
 Connections to external applications are likewise outsourced: the city speaks MCP to any MCP server; Composio is one of them. This repository carries no one’s keys, pays for no one, and acts as no proxy. The full list, how to re-verify, and how licenses are handled live in [`docs/third-party.md`](docs/third-party.md). Licenses of code dependencies are checked one by one by `cargo deny`; the allow-list is [`deny.toml`](deny.toml).
 
 ## License

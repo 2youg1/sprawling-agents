@@ -3,6 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+#![expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "test code: this suite names the one event kind it is               about and treats the rest as one arm, rather than               modelling an enum it does not assert on"
+)]
+
 //! Shape 7 — the disposable derived view — asserted once and
 //! instantiated three times.
 //!

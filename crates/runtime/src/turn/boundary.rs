@@ -11,7 +11,6 @@ use kernel::EventRef;
 /// Boundary snapshot, supplied by the executor at every phase change.
 /// `Cancel` ends the turn at the boundary; `Steer` records and advances
 /// (the executor folds the text into its `Window`).
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Interrupt {
     None,
@@ -20,9 +19,8 @@ pub enum Interrupt {
 }
 
 /// A phase change either advances or ends the turn at the boundary.
-/// Deliberately exhaustive: a new outcome must force every executor to
-/// decide, not fall through a catch-all (14.3's non_exhaustive rule
-/// covers wire enums, not verdicts).
+/// Exhaustive, as every enum in this workspace now is: a new outcome
+/// must force every executor to decide, not fall through a catch-all.
 #[derive(Debug)]
 pub enum PhaseOutcome<Next> {
     Advanced(Next),

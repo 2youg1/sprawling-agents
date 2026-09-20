@@ -3,6 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+#![expect(
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
+    reason = "test code: this stand-in drops what a production reader               would act on, because the assertion is about the status               the route answers and not about the reply reaching anyone"
+)]
+
 //! The enrolment route answers what happened to the credential, not what
 //! happened to the request.
 //!

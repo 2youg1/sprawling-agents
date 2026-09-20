@@ -1,13 +1,3 @@
-#[non_exhaustive] pub enum runtime::Interrupt
-#[non_exhaustive] pub enum runtime::Mode
-#[non_exhaustive] pub enum runtime::ProviderMode
-#[non_exhaustive] pub enum runtime::SafePoint
-#[non_exhaustive] pub enum runtime::SandboxExit
-#[non_exhaustive] pub enum runtime::diagnostics::Level
-#[non_exhaustive] pub enum runtime::mode::Mode
-#[non_exhaustive] pub enum runtime::run::SafePoint
-#[non_exhaustive] pub enum runtime::tools::ProviderMode
-#[non_exhaustive] pub enum runtime::turn::Interrupt
 impl core::default::Default for runtime::backlog::Backlog
 impl core::default::Default for runtime::backlog::Backlog
 impl core::fmt::Debug for runtime::diagnostics::Diagnostics
@@ -141,9 +131,14 @@ pub enum runtime::DigestOutcome
 pub enum runtime::Disposal
 pub enum runtime::Expansion
 pub enum runtime::FreezeReason
+pub enum runtime::Interrupt
+pub enum runtime::Mode
 pub enum runtime::Opening
 pub enum runtime::PhaseOutcome<Next>
+pub enum runtime::ProviderMode
 pub enum runtime::Retries
+pub enum runtime::SafePoint
+pub enum runtime::SandboxExit
 pub enum runtime::SegmentSlot
 pub enum runtime::Sieved
 pub enum runtime::Started
@@ -154,13 +149,16 @@ pub enum runtime::bench::BenchOutcome
 pub enum runtime::catalog::Expansion
 pub enum runtime::compaction::Content
 pub enum runtime::compaction::Strategy
+pub enum runtime::diagnostics::Level
 pub enum runtime::digest::BreakerVerdict
 pub enum runtime::digest::DigestOutcome
 pub enum runtime::mode::Admission
+pub enum runtime::mode::Mode
 pub enum runtime::prefix::SegmentSlot
 pub enum runtime::reminder::ContextReminder
 pub enum runtime::replay::VerifiedLine
 pub enum runtime::run::Advance
+pub enum runtime::run::SafePoint
 pub enum runtime::sieve::PassReason
 pub enum runtime::sieve::Sieved
 pub enum runtime::sieve::Stage
@@ -169,6 +167,8 @@ pub enum runtime::sieve::record::PassReason
 pub enum runtime::sieve::record::Sieved
 pub enum runtime::sieve::record::Stage
 pub enum runtime::sieve::record::StageOutcome
+pub enum runtime::tools::ProviderMode
+pub enum runtime::turn::Interrupt
 pub enum runtime::turn::PhaseOutcome<Next>
 pub enum runtime::window::Opening
 pub fn runtime::AbsentSandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>

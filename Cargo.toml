@@ -142,6 +142,16 @@ string_slice = "deny"
 arithmetic_side_effects = "deny"
 as_conversions = "deny"
 dbg_macro = "deny"
+# Added with G-22: with `#[non_exhaustive]` gone from every enum in this
+# workspace, a wildcard arm is the remaining way to stop the compiler
+# naming a new variant at each reader. The other three close the three
+# shapes a decision is erased in: a Result thrown away, a binding with
+# no type to check, and a boolean parameter whose meaning is at the
+# call site rather than in the type.
+wildcard_enum_match_arm = "deny"
+let_underscore_must_use = "deny"
+let_underscore_untyped = "deny"
+fn_params_excessive_bools = "deny"
 
 # Dependencies carry debug info nobody here reads: a backtrace we act on ends
 # in our own code, and the frames below it cost bytes in every .rlib and in

@@ -197,7 +197,7 @@ impl RunWorker {
             admitted.push(Box::new(crate::browser_tool::for_building(
                 &self.city_root,
                 site.building.addr(),
-                site.rules.policy().confidential,
+                site.rules.policy(),
             )?));
         }
         // External tools, for a building whose configuration names a

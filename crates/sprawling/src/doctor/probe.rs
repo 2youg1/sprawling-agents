@@ -304,7 +304,7 @@ fn first_line(stdout: std::process::ChildStdout, patience: Duration) -> Version 
             let first = std::io::BufReader::new(stdout).lines().next();
             // Either end finishing ends the reader: a closed pipe means
             // the program is gone, a closed channel means nobody waits.
-            let _ = sender.send(first);
+            drop(sender.send(first));
         });
     if reader.is_err() {
         return Version::Silent;

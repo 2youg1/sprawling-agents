@@ -34,10 +34,19 @@
 #
 # The earlier readings on this row weighed a WebAssembly client that has
 # since left the tree, so none of them is comparable and none is kept.
+#
+# Reset once more at V0.0.6, and for the same reason: the client the
+# browser downloads is no longer the one 288,972 B described. Four
+# screens arrived together - the artefact panel beside a conversation,
+# the read-only code view with its own lexer, the external-asset
+# registry, and the tool-trace summary - and they are 22 KB of the
+# 311,050 B recorded here. The ratchet is not being loosened: the slack
+# stays at 20 KB, so the next gradual regression is caught exactly as
+# before, against a figure that describes what ships today.
 [frontend_artifact]
 what = "the client the browser downloads, gzipped, the two shipped faces included"
 budget_bytes = 2097152
-best_bytes = 288972
+best_bytes = 311050
 slack_bytes = 20480
 measured_by = "just build-web, then just gates (the whole dist directory, recursive)"
 status = "gated"
@@ -266,7 +275,6 @@ status = "gated, with a register of the files that predate the rule"
 "client/src/core/belief.ts" = 422
 "client/src/views/gallery.tsx" = 791
 "client/src/views/machine.tsx" = 563
-"client/src/views/setup/providers.tsx" = 888
 "client/src/views/talk/composer.tsx" = 497
 
 # White box is Rust, black box is Lean (the person's ruling).

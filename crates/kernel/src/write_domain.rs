@@ -146,7 +146,6 @@ fn document_verdict(target: &Address) -> DomainVerdict {
 
 /// Deliberately exhaustive verdict; `prefixes` feeds the refusal's
 /// nearby list.
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainVerdict {
     Within,
@@ -160,7 +159,6 @@ pub enum DomainVerdict {
 }
 
 /// Why a documents domain refuses a target that is inside its prefixes.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocumentReason {
     /// Not a Markdown document.
@@ -239,6 +237,9 @@ mod verification {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
     reason = "test code"
 )]
 mod tests {

@@ -94,9 +94,7 @@ impl AttachedEndpoint {
 fn chat_path(dialect: DialectKind) -> &'static str {
     match dialect {
         DialectKind::Anthropic => "messages",
-        // Anything not spelled here is served by the OpenAI-compatible
-        // shape, which is what an unknown local server almost always is.
-        _ => "chat/completions",
+        DialectKind::OpenAi => "chat/completions",
     }
 }
 

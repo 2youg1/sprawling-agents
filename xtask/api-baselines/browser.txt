@@ -97,7 +97,7 @@ pub fn browser::PageSnapshot::nodes(&self) -> &[browser::Node]
 pub fn browser::PageSnapshot::read(u64, &serde_json::value::Value) -> core::result::Result<browser::PageSnapshot, kernel::error::shape::AxError>
 pub fn browser::PageSnapshot::resolve(&self, &str) -> core::result::Result<&browser::Node, kernel::error::shape::AxError>
 pub fn browser::PageSnapshot::to_text(&self) -> alloc::string::String
-pub fn browser::Profile::of(&kernel::address::Address, bool) -> core::result::Result<browser::Profile, kernel::error::shape::AxError>
+pub fn browser::Profile::of(&kernel::address::Address, &kernel::model::wire::BuildingPolicy) -> core::result::Result<browser::Profile, kernel::error::shape::AxError>
 pub fn browser::Profile::persists(&self) -> bool
 pub fn browser::Recording::answer(&mut self, &browser::Frame, serde_json::value::Value)
 pub fn browser::Recording::missed(&self) -> &[alloc::string::String]

@@ -5,9 +5,10 @@
 
 //! Which dialect answers a question, and nothing about how it answers.
 //!
-//! Five entrances, one `match` each, and a closed set of two: a dialect
-//! this build cannot translate is refused rather than approximated with
-//! the nearer of the two it knows. What each dialect does with a request
+//! Five entrances, one `match` each, and a closed set of two: a third
+//! dialect is a compile error at all five entrances, which is how it is
+//! kept from being approximated with the nearer of the two we already
+//! write. What each dialect does with a request
 //! is `gateway::anthropic`'s and `gateway::openai`'s; what they share is
 //! `gateway::mismatch`'s.
 //!

@@ -1,4 +1,3 @@
-#[non_exhaustive] pub enum city::Standing
 impl city::ArchiveKind
 impl city::Building
 impl city::BuildingRules
@@ -108,6 +107,7 @@ pub enum city::Link
 pub enum city::ModelPool
 pub enum city::Occupancy
 pub enum city::RunBrief
+pub enum city::Standing
 pub enum city::Vocation
 pub fn city::ArchiveKind::as_str(self) -> &'static str
 pub fn city::ArchiveKind::parse(&str) -> core::result::Result<city::ArchiveKind, kernel::error::shape::AxError>

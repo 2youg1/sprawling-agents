@@ -152,7 +152,9 @@ impl ClaimDesk {
                 RoadmapStatus::Blocked | RoadmapStatus::AwaitingApproval => {
                     red.push(Value::Object(entry));
                 }
-                _ => {}
+                // A branch in progress is its leaves' work, and a row
+                // nobody started or everybody finished asks nothing.
+                RoadmapStatus::InProgress | RoadmapStatus::NotStarted | RoadmapStatus::Done => {}
             }
         }
         for id in tree.ready() {

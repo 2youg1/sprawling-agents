@@ -1,27 +1,3 @@
-#[non_exhaustive] pub enum kernel::ApprovalClass
-#[non_exhaustive] pub enum kernel::Autonomy
-#[non_exhaustive] pub enum kernel::AxCode
-#[non_exhaustive] pub enum kernel::ClockStampGranularity
-#[non_exhaustive] pub enum kernel::Completion
-#[non_exhaustive] pub enum kernel::ContentBlock
-#[non_exhaustive] pub enum kernel::CostTier
-#[non_exhaustive] pub enum kernel::DelegateKind
-#[non_exhaustive] pub enum kernel::DialectKind
-#[non_exhaustive] pub enum kernel::DocumentReason
-#[non_exhaustive] pub enum kernel::DomainVerdict
-#[non_exhaustive] pub enum kernel::Effect
-#[non_exhaustive] pub enum kernel::Effort
-#[non_exhaustive] pub enum kernel::EgressTarget
-#[non_exhaustive] pub enum kernel::EventKind
-#[non_exhaustive] pub enum kernel::ModelTag
-#[non_exhaustive] pub enum kernel::PolicyClass
-#[non_exhaustive] pub enum kernel::PolicyRevocation
-#[non_exhaustive] pub enum kernel::RenderIntent
-#[non_exhaustive] pub enum kernel::Restoration
-#[non_exhaustive] pub enum kernel::Role
-#[non_exhaustive] pub enum kernel::StopReason
-#[non_exhaustive] pub enum kernel::Temporal
-#[non_exhaustive] pub struct kernel::BuildingPolicy
 impl core::convert::From<kernel::EnvVarName> for alloc::string::String
 impl core::convert::From<kernel::ServerLabel> for alloc::string::String
 impl core::convert::TryFrom<alloc::string::String> for kernel::EnvVarName
@@ -201,20 +177,35 @@ pub enum kernel::Admission
 pub enum kernel::AnswerVerdict
 pub enum kernel::Answered
 pub enum kernel::Answerer
+pub enum kernel::ApprovalClass
 pub enum kernel::ApprovalSource
+pub enum kernel::Autonomy
+pub enum kernel::AxCode
 pub enum kernel::Carrier
+pub enum kernel::ClockStampGranularity
 pub enum kernel::CommitmentDecision
+pub enum kernel::Completion
 pub enum kernel::Connected
+pub enum kernel::ContentBlock
+pub enum kernel::CostTier
 pub enum kernel::DedupVerdict
+pub enum kernel::DelegateKind
 pub enum kernel::DelegationVerdict
 pub enum kernel::DenyReason
 pub enum kernel::Depth
+pub enum kernel::DialectKind
 pub enum kernel::DiscardForecast
 pub enum kernel::DiscardRequest
 pub enum kernel::DiscardVerdict
+pub enum kernel::DocumentReason
+pub enum kernel::DomainVerdict
 pub enum kernel::EditWarVerdict
+pub enum kernel::Effect
+pub enum kernel::Effort
 pub enum kernel::EgressOutcome
+pub enum kernel::EgressTarget
 pub enum kernel::EscalateReason
+pub enum kernel::EventKind
 pub enum kernel::EvidenceCell
 pub enum kernel::ExecArm
 pub enum kernel::GateOutcome
@@ -227,10 +218,13 @@ pub enum kernel::Lines
 pub enum kernel::Locator
 pub enum kernel::McpTransport
 pub enum kernel::MemoShape
+pub enum kernel::ModelTag
 pub enum kernel::Named
 pub enum kernel::PlanExit
 pub enum kernel::PolicyApplication
+pub enum kernel::PolicyClass
 pub enum kernel::PolicyExpiry
+pub enum kernel::PolicyRevocation
 pub enum kernel::PolicyVerdict
 pub enum kernel::Progress
 pub enum kernel::Proxying
@@ -239,13 +233,18 @@ pub enum kernel::PursuitVerdict
 pub enum kernel::Range
 pub enum kernel::RegisterVerdict
 pub enum kernel::ReleaseVerdict
+pub enum kernel::RenderIntent
 pub enum kernel::RepairVerdict
+pub enum kernel::Restoration
 pub enum kernel::RoadmapShape
 pub enum kernel::RoadmapStatus
+pub enum kernel::Role
 pub enum kernel::ScopeChange
 pub enum kernel::ShedReason
 pub enum kernel::StallVerdict
 pub enum kernel::StopCause
+pub enum kernel::StopReason
+pub enum kernel::Temporal
 pub enum kernel::Through
 pub enum kernel::Token
 pub enum kernel::VersionVerdict
@@ -1113,6 +1112,7 @@ pub struct kernel::AxError
 pub struct kernel::B3Hash(_)
 pub struct kernel::Blockage
 pub struct kernel::BudgetUse
+pub struct kernel::BuildingPolicy
 pub struct kernel::ByteLen(_)
 pub struct kernel::Ceiling(_)
 pub struct kernel::ChatMessage

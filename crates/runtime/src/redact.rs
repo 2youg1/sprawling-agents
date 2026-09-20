@@ -63,7 +63,7 @@ fn walk(value: &Value, hits: &mut u32) -> Value {
             }
             Value::Object(out)
         }
-        other => other.clone(),
+        Value::Null | Value::Bool(_) | Value::Number(_) => value.clone(),
     }
 }
 

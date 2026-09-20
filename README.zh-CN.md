@@ -227,6 +227,8 @@ just check
 
 **跟随的是情报，不是代码。** 端点和参数是事实；流程与凭证保管在这里自己实现。
 
+**浏览器那一页站的是同一类东西。** 它的运行时依赖恰好两个——`solid-js` 与 `effect`——里面没有任何 UI 库：`client/src/views/parts/` 里的控件都是这个仓库自己写的。从 W3C 的 ARIA Authoring Practices 与 Kobalte、Ark UI 的文档里取的是写成文字的行为：一个控件实现哪个模式、每个键做什么、关闭时焦点还给谁。**他们的代码一行都没有进树，所以这件事不欠任何许可义务**；读出来的那张键盘表落在 [`client/client-SPEC.md`](client/client-SPEC.md) 里。
+
 外部应用的连接同样外包出去：城对任意 MCP server 说 MCP，Composio 是其中之一。这个仓库不带任何人的 key、不替谁付钱、不做代理。完整清单、怎么复核、许可怎么处理在 [`docs/third-party.md`](docs/third-party.md)。代码依赖的许可由 `cargo deny` 逐个核对，白名单是 [`deny.toml`](deny.toml)。
 
 ## 许可

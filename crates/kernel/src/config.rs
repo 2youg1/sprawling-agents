@@ -88,7 +88,6 @@ impl From<EnvVarName> for String {
 
 /// Clock-stamp cadence for result envelopes. The
 /// granularity rides the enum; `Off` costs zero bytes in the window.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClockStampGranularity {

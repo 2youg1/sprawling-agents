@@ -1,6 +1,3 @@
-#[non_exhaustive] pub enum collab::Escalation
-#[non_exhaustive] pub enum collab::Level
-#[non_exhaustive] pub enum collab::SignalKind
 impl collab::AgentSteer
 impl collab::ArchiveDesk
 impl collab::ArchiveTool
@@ -126,12 +123,15 @@ pub collab::SignalKind::Thread
 pub const collab::ARCHIVE_KINDS: [&str; 4]
 pub enum collab::ArchiveEffect
 pub enum collab::ClaimEffect
+pub enum collab::Escalation
 pub enum collab::GoalEffect
 pub enum collab::Handback
 pub enum collab::Lane
+pub enum collab::Level
 pub enum collab::PrEffect
 pub enum collab::Reflex
 pub enum collab::SignalEffect
+pub enum collab::SignalKind
 pub fn collab::AgentSteer::landing(&self) -> collab::Steer
 pub fn collab::AgentSteer::new(&str, &str) -> core::result::Result<collab::AgentSteer, kernel::error::shape::AxError>
 pub fn collab::AgentSteer::signal(&self, collab::SignalId, kernel::address::Address, kernel::version::Version, kernel::event::identity::TimeMs) -> core::result::Result<collab::Signal, kernel::error::shape::AxError>

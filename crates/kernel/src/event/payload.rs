@@ -58,7 +58,10 @@ fn reject_floats(value: &serde_json::Value) -> Result<(), AxError> {
         }
         serde_json::Value::Array(items) => items.iter().try_for_each(reject_floats),
         serde_json::Value::Object(map) => map.values().try_for_each(reject_floats),
-        _ => Ok(()),
+        serde_json::Value::Null
+        | serde_json::Value::Bool(_)
+        | serde_json::Value::Number(_)
+        | serde_json::Value::String(_) => Ok(()),
     }
 }
 

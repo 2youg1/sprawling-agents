@@ -126,7 +126,33 @@ The client draws itself in **Geist Sans** and **Geist Mono** ([vercel/geist-font
 
 The font is not fetched from a font host at run time. The reason is in `client/src/theme.css` beside the declaration: a request to an outside host would tell that host a city was opened, and would draw nothing on a machine with no route out.
 
-## 5 A future bolt-on crate
+## 5 What the client follows, and what it only watches
+
+**No component library is a dependency of this client, and the ruling that keeps it that way is `client/client-SPEC.md` section 7.** The controls under `client/src/views/parts/` are this repository's own, and `cargo xtask npm` holds the client's runtime dependencies to exactly `effect` and `solid-js`, so adding one would mean editing that gate first.
+
+What is followed instead is the same kind of thing section 1 follows for provider login, and for the same reason: **behaviour somebody else wrote down is a fact, and a fact carries no licence obligation.** Which pattern a control implements, what each key does, which `aria-*` value goes where, and when the focus returns to whatever opened the control - that is the useful half of a component library, and all of it is published as prose.
+
+| Source | Licence the project declares | What is followed | Checked |
+|---|---|---|---|
+| WAI-ARIA Authoring Practices Guide, <https://www.w3.org/WAI/ARIA/apg/patterns/> | W3C, permissive document licence per the page's own footer | pattern names and keyboard tables for radio group, tabs, combobox with a listbox popup, modal dialog, and tooltip | 2026-09-20 |
+| Kobalte documentation, <https://kobalte.dev/docs/core/> | MIT, declared by `@kobalte/core` 0.13.14 | how a Solid implementation divides those same patterns into parts, and which `aria-*` each part owns | 2026-09-20 |
+| Ark UI documentation, <https://ark-ui.com/docs/components/> | MIT, declared by `@ark-ui/solid` 5.39.2 | the same division, read as a cross-check against Kobalte | 2026-09-20 |
+
+**Not one line of their code is in this tree, so no licence obligation arises from any of the three** - neither a NOTICE nor a copied licence text, because nothing was copied. What the reading produced is a keyboard table per control in `client/client-SPEC.md` sections 7-2 to 7-6, and, in section 7-8, the eleven places today's code does not yet meet it.
+
+> **A table row in this file must not begin with `| [` while also carrying a `github.com` link, unless it is an upstream-watch row.** `.github/workflows/upstream-watch.yml` greps the whole file for rows that open with `| [` and reads a repository out of any `github.com` URL on the line. The three rows above therefore open with plain text and point at each project's documentation site.
+
+**Three judgements about the frontend stack were recorded as pending, and this is where they are settled.** They were registered to decide one question - whether the UI-library ruling should bet on a framework's component ecosystem - and the answer is that it does not. Each was checked on 2026-09-20 against the upstream's own registry, because a release schedule is a fact with a publisher.
+
+| Judgement as it was recorded | What the upstream says | Where that was read | Verdict |
+|---|---|---|---|
+| SolidJS is about to release V2 | `solid-js` publishes `2.0.0-rc.9` under the `next` tag, released 2026-09-18, while `latest` is still 1.9.15 from 2026-08-17 | npm registry metadata for `solid-js`; the same tag appears as a release in the `solidjs/solid` repository | Stands, with the wording tightened: V2 is at release candidate, and has not replaced the released line. |
+| Dioxus is about to release 0.8 | newest published version is `0.8.0-alpha.1` from 2026-07-31, newest non-prerelease is 0.7.10; the 0.8.0 milestone is open with 41 issues still on it, past a due date of 2025-06-30 | crates.io API for `dioxus`; milestones of the `DioxusLabs/dioxus` repository | Half withdrawn: a 0.8 line exists in alpha, and "about to" has no source, so only the first half is kept. |
+| Blitz has published no stable version | upstream's own README says "Blitz is currently in a beta state"; newest published is `0.3.0-beta.2` from 2026-08-24, newest non-prerelease is `0.2.1`, and the repository publishes no releases of its own | crates.io API for `blitz`; README of the `DioxusLabs/blitz` repository | Rewritten: no 1.0 exists, but `0.2.1` is a non-prerelease on crates.io, so "no stable version" overstated what could be checked. |
+
+**None of the three changes the stack, which was the point of registering them.** A judgement that survives is worth only the wording its source supports, so each row above carries the tightened wording rather than the one it replaced; the ruling they were meant to inform is in the first half of this section, and what would reopen it is in `client/client-SPEC.md` section 7-9.
+
+## 6 A future bolt-on crate
 
 The provider intelligence table is planned to move out into a crate of its own under its own licence (MIT or Apache-2.0), outside this repository's MPL notice, because it is not part of this work.
 
@@ -139,7 +165,7 @@ The acknowledgement in `README.md` does not discharge either. **An acknowledgeme
 
 The same measure governs something not yet started: **upstream synchronisation**. When an upstream publishes a new version - usually because a new model appeared - realigning the bolt-on crate should be **one run opening one pull request**, rather than a person periodically reading two repositories' diffs. It is work the city can do itself, so no separate mechanism is built for it: a schedule entry and a building that owns the bolt-on are enough.
 
-## 6 What will not be done
+## 7 What will not be done
 
 **Upstream code is not vendored in.** Every `.rs` file here carries the MPL-2.0 notice, and a file pasted from an MIT or Apache-2.0 project cannot wear one. Note that the machine only checks whether a notice is present, not whether it is the right one - **so this rule is held by people, not by a gate.**
 

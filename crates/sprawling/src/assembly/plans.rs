@@ -37,6 +37,10 @@ impl RunWorker {
     /// blockage announced twice is one signal: the inbox already
     /// deduplicates by id, and a room told four times about one problem
     /// is a room that stops reading its inbox.
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "one claim effect stops a node red; the others do not stop one"
+    )]
     pub(super) fn tell_whoever_is_behind(
         &mut self,
         at: &Assignment,
@@ -229,6 +233,9 @@ mod pursuing;
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
     reason = "test code"
 )]
 mod tests;

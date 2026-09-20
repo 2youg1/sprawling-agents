@@ -5,13 +5,19 @@
 
 //! What a drive left, on the ledger before it is made true.
 
-use kernel::{AxCode, AxError, EventKind};
+use kernel::{AxCode, AxError, Completion, EventKind};
 use kernel::{Payload, RunId};
 
 use crate::effect;
 
 use super::super::{Assignment, Dispatched, Ending, Handover, RunWorker, Site, held, new_inbox};
 use super::desks::write_plan;
+
+/// The action an `AxError` names when one of the two hand-down desks
+/// cannot be read. Written here rather than at the call site, where the
+/// arm it sits in has no room for it.
+const DELEGATE_DESK: &str = "read the delegate desk";
+const SUCCESSION_DESK: &str = "read the succession desk";
 
 impl RunWorker {
     pub(in crate::assembly) fn settle(
@@ -71,12 +77,16 @@ impl RunWorker {
             }
             effect::Then::Roadmap { path, text } => {
                 let before = std::fs::read_to_string(&path).ok();
+                // The rollback is best effort by construction: the
+                // error a person must see is the one from the write,
+                // and a rollback that also failed cannot be reported
+                // here without replacing it.
                 write_plan(&path, &text).inspect_err(|_| match before {
                     Some(text) => {
-                        let _ = std::fs::write(&path, text);
+                        drop(std::fs::write(&path, text));
                     }
                     None => {
-                        let _ = std::fs::remove_file(&path);
+                        drop(std::fs::remove_file(&path));
                     }
                 })
             }
@@ -244,8 +254,8 @@ impl RunWorker {
         // wave used to have no boundary left to land on, so work asked
         // for by a turn nobody wanted started anyway.
         let handed = match ending {
-            kernel::Completion::Cancelled => Vec::new(),
-            _ => held(delegates, "read the delegate desk")?.take(),
+            Completion::Cancelled => Vec::new(),
+            Completion::Done(_) | Completion::Limit => held(delegates, DELEGATE_DESK)?.take(),
         };
         for work in handed {
             self.note(
@@ -277,8 +287,8 @@ impl RunWorker {
         // the depth is conserved and the successor's table equals this
         // one's. A cancelled run is not succeeded, for the reason above.
         let replaced = match ending {
-            kernel::Completion::Cancelled => None,
-            _ => held(succession, "read the succession desk")?.take(),
+            Completion::Cancelled => None,
+            Completion::Done(_) | Completion::Limit => held(succession, SUCCESSION_DESK)?.take(),
         };
         if let Some(asked) = replaced {
             self.note(

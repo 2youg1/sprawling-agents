@@ -3,15 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Start and stop: an mp4 through ffmpeg, or the frame sequence this
-//! package's one thread writes.
+//! Start and stop: which windows this connection is recording, and
+//! what each recording is being written by.
 //!
-//! **This file holds the only `std::thread::spawn` in the package**, and
-//! it is here because the frame-sequence path is the only thing that has
-//! to happen while the read loop is waiting for the next request. It is
-//! stopped by one flag and joined by `stop`, so a recording cannot
-//! outlive the connection that started it: the desk is dropped with the
-//! connection, and dropping it stops what it was running.
+//! This file is the bookkeeping. What writes the bytes and where they
+//! land is `sink`'s, so the two questions a reader asks separately are
+//! answered separately: *may this recording begin* here, *how is it
+//! written* there.
+//!
+//! A recording cannot outlive the connection that started it: the desk
+//! is dropped with the connection, and dropping it stops what it was
+//! running.
 //!
 //! Two recordings of one window at once is refused rather than merged.
 //! Whichever of the two files a caller then asked for would be a guess,
@@ -22,51 +24,21 @@
 //! recording that silently had no audio track would be discovered by
 //! whoever played it back (desktop-SPEC.md §8.6, fourth pair).
 
+mod sink;
+
 use std::collections::BTreeMap;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::path::PathBuf;
 
 use windows::Win32::Foundation::HWND;
 
 use super::geometry::Bounds;
 use crate::refusal::{Refusal, RefusalCode};
-
-/// The shortest gap between two frames of the frame-sequence path.
-/// `PrintWindow` costs what it costs, and ten frames a second is enough
-/// to see one interaction happen (desktop-SPEC.md §14).
-const FRAME_EVERY: std::time::Duration = std::time::Duration::from_millis(100);
-
-/// How long `stop` waits for ffmpeg to finish writing the file's index,
-/// counted in polls rather than against a clock.
-///
-/// Counted rather than timed on purpose: this package reads no clock at
-/// all, which is the same rule the city holds (`clippy.toml`), and a
-/// bounded count of sleeps bounds the wait just as well. Four hundred
-/// polls a twentieth of a second apart is about twenty seconds.
-const FFMPEG_FINISH_POLLS: u32 = 400;
-
-/// How long one of those polls sleeps.
-const POLL_EVERY: std::time::Duration = std::time::Duration::from_millis(50);
-
-/// What is being written, and by what.
-enum Writing {
-    /// ffmpeg, with its stdin held so it can be asked to finish
-    /// cleanly. Killing it instead would leave an mp4 with no index,
-    /// which is a file nothing plays.
-    Ffmpeg { child: std::process::Child },
-    /// This package's own thread, and the flag that stops it.
-    Frames {
-        stopping: Arc<AtomicBool>,
-        thread: std::thread::JoinHandle<usize>,
-    },
-}
+use sink::{Sink, somewhere};
 
 /// One recording in progress.
 struct Running {
     into: PathBuf,
-    writing: Writing,
+    written_by: Sink,
 }
 
 /// Every recording this connection started, by the window it is of.
@@ -120,12 +92,9 @@ impl Recordings {
         }
         self.begun = self.begun.saturating_add(1);
         let into = somewhere(window, self.begun)?;
-        let writing = match ffmpeg(window, &into) {
-            Some(child) => Writing::Ffmpeg { child },
-            None => frames(handle, bounds, &into)?,
-        };
+        let written_by = Sink::open(window, handle, bounds, &into);
         self.running
-            .insert(window.to_owned(), Running { into, writing });
+            .insert(window.to_owned(), Running { into, written_by });
         self.running
             .get(window)
             .map(|running| running.into.clone())
@@ -155,18 +124,7 @@ impl Recordings {
                  that was never started has nothing to stop",
             ));
         };
-        let how = match running.writing {
-            Writing::Ffmpeg { child } => {
-                finish(child);
-                "mp4"
-            }
-            Writing::Frames { stopping, thread } => {
-                stopping.store(true, Ordering::Release);
-                let _frames = thread.join();
-                "frames"
-            }
-        };
-        Ok((running.into, how))
+        Ok((running.into, running.written_by.close()))
     }
 }
 
@@ -180,133 +138,6 @@ impl Drop for Recordings {
             let _stopped = self.stop(&window);
         }
     }
-}
-
-/// How many names are tried before this gives up looking for a free
-/// one. A machine with a thousand un-cleared recordings of one window
-/// has a housekeeping problem, and silently overwriting the thousandth
-/// would not be the fix.
-const NAMES_TRIED: u32 = 1_000;
-
-/// Where a recording of this window goes.
-///
-/// Not into the city and not into the person's own folders: the scope
-/// file says which windows this server may touch and says nothing about
-/// where it may write, so the answer is the place the operating system
-/// keeps things nobody promised to keep (desktop-SPEC.md §14).
-///
-/// **The directory is created only if it did not exist**, and the name
-/// is bumped until one is free. A second connection recording the same
-/// window has its own counter, so without this the two would write
-/// frames into one directory and each would report a path holding the
-/// other's recording.
-fn somewhere(window: &str, nth: u64) -> Result<PathBuf, Refusal> {
-    let safe: String = window
-        .chars()
-        .map(|glyph| if glyph.is_alphanumeric() { glyph } else { '-' })
-        .take(40)
-        .collect();
-    let under = std::env::temp_dir().join("sprawling-desktop");
-    let mut last = std::io::Error::other("no name was tried");
-    for attempt in 0..NAMES_TRIED {
-        let into = under.join(match attempt {
-            0 => format!("{safe}-{nth}"),
-            again => format!("{safe}-{nth}-{again}"),
-        });
-        if let Err(err) = std::fs::create_dir_all(&under) {
-            last = err;
-            break;
-        }
-        // `create_dir` rather than `create_dir_all` for the leaf: the
-        // second would succeed on a directory that is already there,
-        // and whether it is already there is the whole question.
-        match std::fs::create_dir(&into) {
-            Ok(()) => return Ok(into),
-            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(err) => {
-                last = err;
-                break;
-            }
-        }
-    }
-    Err(Refusal::new(
-        RefusalCode::ToolUnavailable,
-        "record a window",
-        format!("{}: {last}", under.display()),
-        "this machine's temporary directory is not writable, or it already holds a thousand \
-         recordings of this window; clear it out or fix its permissions",
-    ))
-}
-
-/// ffmpeg started on this window, or `None` when this machine has none.
-///
-/// `gdigrab` names the window by its title, which is the same handle on
-/// the window a caller used to name it — so a recording cannot reach a
-/// window the scope file left out by going around it.
-fn ffmpeg(window: &str, into: &Path) -> Option<std::process::Child> {
-    std::process::Command::new("ffmpeg")
-        .args(["-hide_banner", "-loglevel", "error"])
-        .args(["-f", "gdigrab", "-framerate", "10"])
-        .args(["-i", &format!("title={window}")])
-        .arg("-y")
-        .arg(into.join("recording.mp4"))
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .ok()
-}
-
-/// Asks ffmpeg to finish, which is what writes the index an mp4 needs.
-fn finish(mut child: std::process::Child) {
-    if let Some(stdin) = child.stdin.as_mut() {
-        let _asked = stdin.write_all(b"q\n");
-        let _flushed = stdin.flush();
-    }
-    drop(child.stdin.take());
-    for _poll in 0..FFMPEG_FINISH_POLLS {
-        match child.try_wait() {
-            Ok(Some(_ended)) => return,
-            Ok(None) => std::thread::sleep(POLL_EVERY),
-            Err(_unknowable) => break,
-        }
-    }
-    // It was asked politely and given twenty seconds. What is left is a
-    // partial file rather than a process nobody can stop.
-    let _killed = child.kill();
-    let _reaped = child.wait();
-}
-
-/// The frame-sequence path: this package's one thread.
-fn frames(handle: HWND, bounds: Bounds, into: &Path) -> Result<Writing, Refusal> {
-    let stopping = Arc::new(AtomicBool::new(false));
-    let flag = Arc::clone(&stopping);
-    let into = into.to_path_buf();
-    // An `HWND` is a token rather than a pointer into this process's
-    // memory, so it travels as its address and is rebuilt on the other
-    // side. Win32 documents the drawing calls this thread makes as
-    // usable from any thread with the window's handle.
-    let carried = handle.0.expose_provenance();
-    let thread = std::thread::spawn(move || {
-        let handle = HWND(std::ptr::with_exposed_provenance_mut(carried));
-        let mut written: usize = 0;
-        while !flag.load(Ordering::Acquire) {
-            if let Ok(pixels) = super::capture::window(handle, bounds) {
-                let at = into.join(format!("frame-{written:06}.png"));
-                if pixels.save(&at).is_ok() {
-                    written = written.saturating_add(1);
-                }
-            }
-            // A fixed rest between frames rather than a deadline measured
-            // from the frame's start: this package reads no clock. What
-            // that costs is stated rather than hidden — a window that is
-            // slow to draw yields a sparser sequence, so `FRAME_EVERY` is
-            // the shortest gap between frames and not a promised rate.
-            std::thread::sleep(FRAME_EVERY);
-        }
-        written
-    });
-    Ok(Writing::Frames { stopping, thread })
 }
 
 #[cfg(test)]
@@ -418,26 +249,5 @@ mod tests {
         };
         assert!(landed.is_dir(), "{} was not laid out", landed.display());
         let _tidied = std::fs::remove_dir_all(&landed);
-    }
-
-    /// A window title is not a file name, and this is where that stops
-    /// being a problem.
-    #[test]
-    fn a_window_title_full_of_path_characters_still_lands_somewhere_safe() {
-        let hostile = "../../etc/passwd — C:\\Windows\\*?";
-        let into = somewhere(hostile, 1).expect("a hostile title is still a directory name");
-        let name = into.file_name().unwrap_or_default().to_string_lossy();
-        assert!(!name.contains('\\'), "{name}");
-        assert!(!name.contains('/'), "{name}");
-        assert!(!name.contains(".."), "{name}");
-        assert!(into.starts_with(std::env::temp_dir()), "{}", into.display());
-
-        // Two desks that reached the same name get two directories, so
-        // neither reports a path holding the other's frames.
-        let second = somewhere(hostile, 1).expect("a name in use is not a name reused");
-        assert_ne!(second, into);
-        for landed in [into, second] {
-            let _tidied = std::fs::remove_dir_all(&landed);
-        }
     }
 }

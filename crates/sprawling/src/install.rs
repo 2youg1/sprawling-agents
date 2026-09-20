@@ -224,16 +224,24 @@ fn dirs() -> (Option<PathBuf>, Option<PathBuf>) {
     (local_app_data, home)
 }
 
+/// Which direction an install runs in. At the call site `Uninstall`
+/// says what `true` did not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Direction {
+    Install,
+    Uninstall,
+}
+
 /// Installs, or reverses an install.
 ///
 /// # Errors
 /// Fails when there is nowhere to install to, when the copy cannot be
 /// made or removed, or when the search path cannot be read or written.
-pub(crate) fn install(uninstall: bool) -> Result<Report, AxError> {
+pub(crate) fn install(direction: Direction) -> Result<Report, AxError> {
     let (local_app_data, home) = dirs();
     let dir = program_dir(local_app_data.as_deref(), home.as_deref()).ok_or_else(no_home)?;
     let shown = dir.display().to_string();
-    if uninstall {
+    if direction == Direction::Uninstall {
         let removed = displace(&dir)?;
         let path = retract(&shown)?;
         return Ok(Report {

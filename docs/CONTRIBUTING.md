@@ -11,8 +11,9 @@
 ## 0 Thirty seconds
 
 ```bash
-cargo install just cargo-nextest --locked   # once
-just check                                  # the closing condition for every change
+cargo install just --locked   # once; a recipe cannot check for the tool that runs it
+just prereqs                  # every other tool the loop needs, with the install line for each one that is absent
+just check                    # the closing condition for every change
 ```
 
 `just check` is fmt + clippy (`-D warnings`, `--all-features`) + nextest + every machine gate. **A change is finished when that is green.** "I finished it" is a claim; a green run is the evidence.
@@ -72,7 +73,7 @@ The `guard` row is the load-bearing one: it closes the single universal escape h
 
 ## 3.1 Continuous integration
 
-**`ci` runs on every push to `main` and on every pull request**; its five jobs together are exactly `just check` plus the supply-chain read, and nothing else - a green CI implies at least what a green `just check` implies. `platforms` and `nightly` answer questions no one waits for (macOS/kani, fuzz, advisories) and run on a schedule; `upstream-watch` asks the two provider-intelligence upstreams whether they moved, daily.
+**`ci` runs on every push to `main` and on every pull request**; its verdict jobs together are exactly `just check` plus the supply-chain read and the kernel proofs, and nothing else - a green CI implies at least what a green `just check` implies. Every one of them is a required check; the small `changes` job beside them is not, because its only work is to let the proof job skip on a change no proof is about. `platforms` and `nightly` answer questions no one waits for (macOS, the flake, byte-identical rebuilds, fuzz, advisories) and run on a schedule; `upstream-watch` asks the two provider-intelligence upstreams whether they moved, daily.
 
 Three things run there and not here: `cargo-deny` when it is not installed locally, the formal-verification job (Linux only, mirrored locally by properties), and the nightly fuzz and mutation batches. Everything else is `just check`.
 
@@ -111,19 +112,13 @@ One question decides whether a test earns its lines: **would a real defect turn 
 
 ## 7 Environment
 
-The repository pins the toolchain and leaves the environment to you. `rust-toolchain.toml` installs the pinned toolchain automatically; the rest:
-
-| Tool | Purpose | Needed |
-|---|---|---|
-| `just`, `cargo-nextest` | the daily command surface | always |
-| `cargo-deny` | dependency audit | optional locally, always in CI |
-| `bun` | the client's build and checks | when touching `client/` |
-| `cargo-public-api` + nightly | recomputing the public-surface baselines | when changing a public surface |
+The repository pins the toolchain in `rust-toolchain.toml` and names every other tool in the `prereqs` recipe of the `justfile`, which is the only list: run `just prereqs` and it prints what is absent, what needs it, and the line that installs it. Rows marked *required* are what `just check` cannot run without; rows marked *optional* belong to a recipe that says so itself. `nix develop` enters a shell holding those tools, and `nix flake check` refuses a shell that stops short of the list.
 
 ## 8 Command surface
 
 | Command | What it does |
 |---|---|
+| `just prereqs` | every tool the loop needs, and how to install each one that is absent |
 | `just check` | the closing condition: fmt + clippy + nextest + every machine gate |
 | `just gates` | the gates alone |
 | `just build-web` | build the front-end artifact, without `dx` |

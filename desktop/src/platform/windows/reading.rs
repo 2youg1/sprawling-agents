@@ -22,6 +22,7 @@ use serde_json::Value;
 
 use super::encode::{self, Format, Wanted};
 use super::geometry::Inset;
+use super::keys::Modifier;
 use crate::refusal::{Refusal, RefusalCode};
 
 /// How far a scroll goes when the call does not say. Down, because a
@@ -31,6 +32,43 @@ const NOTCHES_BY_DEFAULT: i32 = -3;
 /// One string argument.
 pub(super) fn text<'a>(arguments: &'a Value, field: &str) -> Option<&'a str> {
     arguments.get(field).and_then(Value::as_str)
+}
+
+/// The modifiers this call holds down for the whole of its action.
+///
+/// An unknown one is refused rather than dropped: a caller that asked
+/// for `ctrl` and got a bare click has had a different thing happen
+/// than the one it asked for, and nothing would say so.
+///
+/// # Errors
+/// Refuses a `modifiers` that is not a list, an entry that is not a
+/// name, and a name that is not one of the four.
+pub(super) fn held(arguments: &Value) -> Result<Vec<Modifier>, Refusal> {
+    let Some(named) = arguments.get("modifiers") else {
+        return Ok(Vec::new());
+    };
+    let Some(listed) = named.as_array() else {
+        return Err(not_a_modifier("`modifiers` is not a list"));
+    };
+    listed
+        .iter()
+        .map(|one| {
+            one.as_str()
+                .ok_or_else(|| not_a_modifier("a modifier in the list is not a name"))
+                .and_then(Modifier::parse)
+        })
+        .collect()
+}
+
+/// The one refusal both shapes of a malformed `modifiers` get, so the
+/// next step a caller is given is written once.
+fn not_a_modifier(subject: &str) -> Refusal {
+    Refusal::new(
+        RefusalCode::InvalidArgs,
+        "act on a window",
+        subject.to_owned(),
+        "send `modifiers` as an array of ctrl, alt, shift or win",
+    )
 }
 
 /// One point measured from the window's own top-left corner.

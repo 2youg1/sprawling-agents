@@ -168,6 +168,9 @@ fn provider_refusal(url: &str, detail: &str) -> AxError {
     clippy::indexing_slicing,
     clippy::string_slice,
     clippy::arithmetic_side_effects,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
     reason = "test code"
 )]
 mod tests {

@@ -59,6 +59,13 @@ impl Artifact {
     /// Player–referee in the type: evidence must be a `tool_result` or
     /// `model_returned` ref, else `E_EVIDENCE_MISSING`.
     pub fn verify(claim: Claim, evidence: EventRef) -> Result<Artifact, AxError> {
+        // The two kinds that carry evidence are named; the other sixty
+        // are one answer, and spelling them would be a second copy of
+        // `EventKind` that the next event has to be added to twice.
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "every kind but the two named is refused, and the refusal quotes it"
+        )]
         match evidence.kind() {
             EventKind::ToolResult | EventKind::ModelReturned => Ok(Artifact {
                 locator: claim.locator,

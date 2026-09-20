@@ -32,9 +32,7 @@ use kernel::{
 use serde_json::{Map, Value, json};
 
 use crate::dialect::ImageBytes;
-use crate::mismatch::{
-    as_str, mismatch, mismatch_found, payload_from, require, tokens_or_zero, unspelled_effort,
-};
+use crate::mismatch::{as_str, mismatch, mismatch_found, payload_from, require, tokens_or_zero};
 
 mod stream;
 
@@ -64,15 +62,14 @@ fn empty_answer() -> AxError {
 }
 
 /// This dialect writes every level in one field, `none` included.
-fn effort_field(effort: Effort) -> Result<&'static str, AxError> {
+fn effort_field(effort: Effort) -> &'static str {
     match effort {
-        Effort::None => Ok("none"),
-        Effort::Low => Ok("low"),
-        Effort::Medium => Ok("medium"),
-        Effort::High => Ok("high"),
-        Effort::XHigh => Ok("xhigh"),
-        Effort::Max => Ok("max"),
-        _ => Err(unspelled_effort(effort, "openai")),
+        Effort::None => "none",
+        Effort::Low => "low",
+        Effort::Medium => "medium",
+        Effort::High => "high",
+        Effort::XHigh => "xhigh",
+        Effort::Max => "max",
     }
 }
 
@@ -112,7 +109,10 @@ fn pictures_of(content: &[ContentBlock], images: &ImageBytes) -> Result<Vec<Valu
                     parts.push(image_part(picture, images)?);
                 }
             }
-            _ => {}
+            ContentBlock::Text { .. }
+            | ContentBlock::Thinking { .. }
+            | ContentBlock::RedactedThinking { .. }
+            | ContentBlock::ToolUse { .. } => {}
         }
     }
     Ok(parts)
@@ -190,7 +190,6 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
                 }
                 messages.push(Value::Object(entry));
             }
-            _ => return Err(mismatch("message.role", "unknown canonical role")),
         }
     }
     let mut root = Map::new();
@@ -206,7 +205,7 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
     if let Some(effort) = req.effort {
         root.insert(
             "reasoning".to_owned(),
-            json!({ "effort": effort_field(effort)? }),
+            json!({ "effort": effort_field(effort) }),
         );
     }
     if !req.tools.is_empty() {
@@ -348,7 +347,6 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
         StopReason::EndTurn => "stop",
         StopReason::ToolUse => "tool_calls",
         StopReason::MaxTokens => "length",
-        _ => return Err(mismatch("stop_reason", "unknown canonical stop reason")),
     };
     Ok(json!({
         "choices": [ { "message": Value::Object(message), "finish_reason": finish } ],

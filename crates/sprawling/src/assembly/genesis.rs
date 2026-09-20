@@ -368,7 +368,8 @@ impl RunWorker {
                 {
                     Some(record.clone())
                 }
-                _ => None,
+                runtime::replay::VerifiedLine::Known { .. }
+                | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
             });
             let Some(call) = call else { continue };
             let draft = runtime::replay::outcome_unknown_draft(&call, now_ms()?)?;
@@ -389,6 +390,9 @@ impl RunWorker {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
     reason = "test code"
 )]
 mod tests;

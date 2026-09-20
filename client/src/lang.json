@@ -335,6 +335,10 @@
     "en": "{active} of {runs} at work",
     "zh": "{runs} 次 run，{active} 在跑"
   },
+  "code_crumbs": {
+    "en": "which file this came from",
+    "zh": "这段来自哪个文件"
+  },
   "commits_empty": {
     "en": "no commits",
     "zh": "没有提交"
@@ -374,6 +378,10 @@
   "cost_by_tool": {
     "en": "by tool",
     "zh": "按工具"
+  },
+  "cost_empty": {
+    "en": "no run has spent anything yet",
+    "zh": "还没有哪次派活花掉钱"
   },
   "cost_none": {
     "en": "no price",
@@ -1511,6 +1519,10 @@
     "en": "base_url",
     "zh": "base_url"
   },
+  "setup_base_url_normalised": {
+    "en": "normalised from {entered}; the city calls the URL above",
+    "zh": "已从 {entered} 归一；城调用的是上面那个地址"
+  },
   "setup_copy": {
     "en": "copy",
     "zh": "复制"
@@ -2143,6 +2155,22 @@
     "en": "cut off · {why}",
     "zh": "被截断 · {why}"
   },
+  "talk_deed_explored": {
+    "en": "explored {n} files",
+    "zh": "探索 {n} 次文件"
+  },
+  "talk_deed_other": {
+    "en": "{n} other calls",
+    "zh": "其他 {n} 次调用"
+  },
+  "talk_deed_ran": {
+    "en": "ran {n} commands",
+    "zh": "运行 {n} 条命令"
+  },
+  "talk_deed_wrote": {
+    "en": "wrote {n} files",
+    "zh": "写入 {n} 次文件"
+  },
   "talk_discarded": {
     "en": "{n} discarded",
     "zh": "丢弃 {n} 个"
@@ -2198,6 +2226,26 @@
   "talk_opening_room": {
     "en": "what {room} should work on",
     "zh": "{room} 接下来做什么"
+  },
+  "talk_panel": {
+    "en": "what this run produced",
+    "zh": "这次 run 产出的东西"
+  },
+  "talk_panel_code": {
+    "en": "the file it last worked on",
+    "zh": "它最近处理的文件"
+  },
+  "talk_panel_hide": {
+    "en": "hide what it produced",
+    "zh": "收起产出"
+  },
+  "talk_panel_show": {
+    "en": "show what it produced",
+    "zh": "查看产出"
+  },
+  "talk_panel_terminal": {
+    "en": "what the last command printed",
+    "zh": "最近一条命令的输出"
   },
   "talk_placeholder_mayor": {
     "en": "to the Mayor…",

@@ -5,9 +5,10 @@
 
 //! Which dialect answers a question, and nothing about how it answers.
 //!
-//! Five entrances, one `match` each, and a closed set of two: a dialect
-//! this build cannot translate is refused rather than approximated with
-//! the nearer of the two it knows. What each dialect does with a request
+//! Five entrances, one `match` each, and a closed set of two: a third
+//! dialect is a compile error at all five entrances, which is how it is
+//! kept from being approximated with the nearer of the two we already
+//! write. What each dialect does with a request
 //! is `gateway::anthropic`'s and `gateway::openai`'s; what they share is
 //! `gateway::mismatch`'s.
 //!
@@ -19,7 +20,7 @@
 
 //! Request dialects: one ChatRequest, each wire.
 
-use kernel::{AxCode, AxError, ChatRequest, DialectKind};
+use kernel::{AxError, ChatRequest, DialectKind};
 use serde_json::Value;
 
 use super::images::ImageBytes;
@@ -33,14 +34,6 @@ pub fn request_wire(
     match kind {
         DialectKind::Anthropic => anthropic::request(req, images),
         DialectKind::OpenAi => openai::request(req, images),
-        // Fail closed: a dialect this build cannot translate is not
-        // approximated with the nearer of the two it knows.
-        _ => Err(AxError::failure(
-            AxCode::EndpointDialectUnsupported,
-            "translate wire",
-            format!("{kind:?} is not a dialect this build speaks"),
-        )
-        .with_recovery("attach the endpoint as anthropic or openai")),
     }
 }
 #[cfg(test)]

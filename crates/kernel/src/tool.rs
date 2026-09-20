@@ -130,7 +130,6 @@ pub struct TimeoutMs(pub u64);
 
 /// What kind of boundary a call crosses — this field routes the call to
 /// its gate; it is machine input, not documentation.
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Effect {
@@ -162,7 +161,6 @@ pub enum Effect {
 }
 
 /// Whether "now" is load-bearing for this tool's results (4.3).
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Temporal {
@@ -171,7 +169,6 @@ pub enum Temporal {
 }
 
 /// Cost bucket for budget and routing; consumers arrive in S3.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CostTier {
@@ -182,7 +179,6 @@ pub enum CostTier {
 
 /// Presentation intent; per-call `locations` are a pure function of args
 /// (tool side, S3). Meta-level declarations use an empty list.
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RenderIntent {

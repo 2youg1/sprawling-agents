@@ -38,7 +38,9 @@ use tokio::sync::broadcast;
 use crate::assets::AssetReply;
 use crate::auth;
 use crate::reception::inbound::Inbound;
-use crate::reception::{BindVerdict, SessionState, SessionStep, decide_bind, decide_frame};
+use crate::reception::{
+    BindFace, BindVerdict, SessionState, SessionStep, decide_bind, decide_frame,
+};
 use crate::wire::ServerFrame;
 
 use super::config::{AcpBody, ServeConfig, ShellState, router};
@@ -324,10 +326,13 @@ pub(crate) async fn accept_upload(State(state): State<Arc<ShellState>>, body: By
 /// Refuses an exposed bind without a pairing token; propagates the bind and
 /// accept failures the operating system reports.
 pub async fn serve(config: ServeConfig) -> Result<(), AxError> {
-    let face = match decide_bind(&config.addr, config.token_digest.is_some()) {
-        BindVerdict::Serve(face) => face,
+    // Which face was admitted changes nothing below: the peer address is
+    // read on both, because enrolment is refused off this machine even
+    // when the listener never left it.
+    match decide_bind(&config.addr, config.token_digest.is_some()) {
+        BindVerdict::Serve(BindFace::Loopback | BindFace::Exposed) => {}
         BindVerdict::Refuse(err) => return Err(err),
-    };
+    }
     let listener = tokio::net::TcpListener::bind(config.addr)
         .await
         .map_err(|source| {
@@ -338,11 +343,7 @@ pub async fn serve(config: ServeConfig) -> Result<(), AxError> {
             )
             .with_recovery("choose a free port, or stop the process already holding it")
         })?;
-    let app = router(&config);
-    let _ = face;
-    // Connect info, because one route's policy is the peer's address:
-    // a credential may only be enrolled from this machine.
-    let app = app.into_make_service_with_connect_info::<SocketAddr>();
+    let app = router(&config).into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, app).await.map_err(|source| {
         AxError::failure(
             AxCode::StorageFatal,

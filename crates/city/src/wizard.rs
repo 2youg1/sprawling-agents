@@ -30,7 +30,6 @@ use crate::building::BuildingTemplate;
 /// who points at a folder they have been working in for a year is told
 /// what will be laid down beside their work and what will not be
 /// touched.
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Standing {
     /// Nothing here. A city forms and touches nothing, because there is

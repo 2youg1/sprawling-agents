@@ -117,7 +117,7 @@ pub fn markdown(text: &str) -> Vec<Span> {
             // Inside a fence nothing is read: the block is code, and the
             // span for it is pushed when the fence closes.
             (Some(_), false) => {}
-            (None, false) => read_line(&mut spans, at, line, trimmed),
+            (None, false) => read_line(&mut spans, at, trimmed),
         }
         at = at.saturating_add(line.len());
     }
@@ -131,8 +131,9 @@ pub fn markdown(text: &str) -> Vec<Span> {
     spans
 }
 
-/// One line outside any fence.
-fn read_line(spans: &mut Vec<Span>, at: usize, line: &str, trimmed: &str) {
+/// One line outside any fence. The caller passes the line with its
+/// terminator removed, because every span here is measured inside it.
+fn read_line(spans: &mut Vec<Span>, at: usize, trimmed: &str) {
     let indent = trimmed.len().saturating_sub(trimmed.trim_start().len());
     let body = trimmed.trim_start();
     let start = at.saturating_add(indent);
@@ -159,7 +160,6 @@ fn read_line(spans: &mut Vec<Span>, at: usize, line: &str, trimmed: &str) {
         );
         return;
     }
-    let _ = line;
     inline(spans, start, body);
 }
 
@@ -299,6 +299,9 @@ fn push(spans: &mut Vec<Span>, start: usize, len: usize, token: Token) {
     clippy::panic,
     clippy::indexing_slicing,
     clippy::arithmetic_side_effects,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
     reason = "test code"
 )]
 mod tests;

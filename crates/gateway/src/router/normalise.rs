@@ -173,7 +173,10 @@ pub fn normalise(
         // serves, and it is the same assumption the chat path already
         // makes for a dialect it does not recognise.
         DialectHint::Unset if crate::is_local(&probe) => DialectHint::Chat,
-        settled => settled,
+        settled @ (DialectHint::Unset
+        | DialectHint::Chat
+        | DialectHint::Responses
+        | DialectHint::Messages) => settled,
     };
     Ok(Normalised {
         base_url: format!("{scheme}://{}{path}{suffix}", lowercase_host(authority)),

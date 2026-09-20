@@ -18,6 +18,14 @@
 //! nobody may take without a ruling: a gate loosened while carrying the work
 //! it would otherwise have to pass.
 //!
+//! **The same rule reaches one wall no commit can be judged against.**
+//! `desktop/` is built outside the workspace and carries a copy of the
+//! workspace's lint table, package metadata and dependency versions. A
+//! copy drifts without any commit touching both sides, so the trailer
+//! rule cannot see it; `wall` compares the two, key by key, on every
+//! run. Both halves of this gate answer one question — whether a rule
+//! this repository states is still the rule it enforces.
+//!
 //! Scope: committed history only. The default is HEAD alone; CI passes
 //! `--range`, which is `base..head` for a pull request and `before..after`
 //! for a push, so a commit in the middle of a change-set is judged too and
@@ -28,6 +36,8 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::report::{Violation, XtaskError};
+
+mod wall;
 
 const PROTECTED_PREFIXES: [&str; 2] = ["xtask/", ".github/"];
 const PROTECTED_FILES: [&str; 5] = [
@@ -76,6 +86,14 @@ const JUDGED_PREFIXES: [&str; 5] = ["crates/", "citysim/", "fuzz/", "client/", "
 const TRAILER: &str = "Verdict:";
 
 pub(crate) fn check(root: &Path, range: Option<&str>) -> Result<Vec<Violation>, XtaskError> {
+    let mut violations = wall::check(root)?;
+    violations.extend(history(root, range)?);
+    Ok(violations)
+}
+
+/// The commits in range that changed a gate and the source it judges
+/// without a ruling to say so.
+fn history(root: &Path, range: Option<&str>) -> Result<Vec<Violation>, XtaskError> {
     let commits = match range {
         Some(spec) => git_lines(root, &["rev-list", spec])?,
         None => match git_lines(root, &["rev-parse", "--verify", "HEAD"]) {

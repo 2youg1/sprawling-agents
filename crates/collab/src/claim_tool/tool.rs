@@ -233,7 +233,9 @@ fn parts_of(args: &Map<String, Value>) -> Result<Vec<NewChild>, AxError> {
                     weight: u32::try_from(weight).unwrap_or(u32::MAX),
                 }
             }
-            _ => return Err(refuse("a part that is neither text nor an object")),
+            Value::Null | Value::Bool(_) | Value::Number(_) | Value::Array(_) => {
+                return Err(refuse("a part that is neither text nor an object"));
+            }
         };
         children.push(child);
     }

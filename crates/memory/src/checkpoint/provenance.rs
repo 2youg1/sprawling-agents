@@ -224,9 +224,8 @@ pub fn model_choice_of(data: &Map<String, Value>) -> ModelChoice {
 
 /// How an effort is spelled, taken from `kernel::Effort`'s own serde
 /// names so this repository has one authority for the word rather than a
-/// second table that drifts. `kernel::Effort` is `#[non_exhaustive]`, so
-/// a match here would either need an arm that lies about a new variant
-/// or stop compiling for no reason.
+/// second table that drifts. A `match` here would be that second table:
+/// it would compile while spelling one level differently from the wire.
 ///
 /// Public because three readers show a person this word — the commit's
 /// trailers, the ledger payload beside them, and `sprawling whose` —

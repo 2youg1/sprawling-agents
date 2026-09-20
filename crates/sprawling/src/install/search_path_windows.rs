@@ -123,7 +123,7 @@ fn write(raw: &Raw, value: &str) -> Result<Option<String>, AxError> {
     let outcome = powershell(WRITE, &raw.carrier, Some(&raw.kind));
     // The carrier held nothing secret, but it held the whole of this
     // person's search path, so it does not outlive the edit.
-    let _ = std::fs::remove_file(&raw.carrier);
+    drop(std::fs::remove_file(&raw.carrier));
     outcome?;
     Ok(None)
 }
@@ -132,7 +132,7 @@ pub(super) fn extend(dir: &str) -> Result<(PathOutcome, Option<String>), AxError
     let raw = read()?;
     match plan_append(&raw.value, dir) {
         PathEdit::AlreadyPresent => {
-            let _ = std::fs::remove_file(&raw.carrier);
+            drop(std::fs::remove_file(&raw.carrier));
             Ok((PathOutcome::Unchanged, None))
         }
         PathEdit::Append(next) => {
@@ -146,7 +146,7 @@ pub(super) fn retract(dir: &str) -> Result<PathOutcome, AxError> {
     let raw = read()?;
     match plan_remove(&raw.value, dir) {
         PathRemoval::Absent => {
-            let _ = std::fs::remove_file(&raw.carrier);
+            drop(std::fs::remove_file(&raw.carrier));
             Ok(PathOutcome::Unchanged)
         }
         PathRemoval::Rewrite(next) => {

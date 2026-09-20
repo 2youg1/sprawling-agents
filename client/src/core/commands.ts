@@ -179,6 +179,26 @@ export function dialectOf(api: WireApi): DialectKind | null {
   }
 }
 
+// Which `wire_api` an attached endpoint speaks, from the dialect the
+// city answered with.
+//
+// The inverse of `dialectOf` over the values that have one, written
+// beside it so the endpoint list does not spell the pair a second time
+// - it used to read `dialect === "anthropic" ? "messages" : "chat"`,
+// which is this mapping with the wrong answer built into its second
+// half. `open_ai` answers `chat` because that is the only OpenAI shape
+// the wire carries today; the day `DialectKind` gains the Responses
+// kind, this switch stops compiling and the third answer is written
+// once, here.
+export function wireApiOf(dialect: DialectKind): WireApi {
+  switch (dialect) {
+    case "open_ai":
+      return "chat";
+    case "anthropic":
+      return "messages";
+  }
+}
+
 export interface Endpoint {
   // `[model_providers.<id>]` in Codex's config.toml: the key the
   // credential reference is derived from, and the name the city files

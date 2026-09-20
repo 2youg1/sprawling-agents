@@ -150,6 +150,10 @@ impl Dossier {
     }
 
     /// Folds one record in, keeping only records this resident acted in.
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "two kinds count a resident's runs; the rest of the vocabulary is not about them"
+    )]
     pub fn apply(&mut self, who: &str, record: &EventRecord) {
         if record.who() != who {
             return;

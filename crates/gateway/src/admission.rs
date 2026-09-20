@@ -46,7 +46,6 @@ pub enum AdmissionVerdict {
 }
 
 /// What one provider round reported back.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderOutcome {
     Ok,

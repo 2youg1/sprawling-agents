@@ -7,6 +7,12 @@
 //! refuses, the job bytes the history carries, the prompt it sends, and
 //! the lineage a fork of it writes.
 
+#![allow(
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
+    reason = "test code"
+)]
+
 use super::super::*;
 use crate::assembly::fixture::*;
 use crate::assembly::*;

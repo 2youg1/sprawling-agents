@@ -79,7 +79,7 @@ pub fn digits_for_floats(value: Value) -> Value {
                 .map(|(key, held)| (key, digits_for_floats(held)))
                 .collect(),
         ),
-        other => other,
+        other @ (Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_)) => other,
     }
 }
 

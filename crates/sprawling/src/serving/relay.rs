@@ -123,12 +123,12 @@ impl RelayGate {
                     // undo the line: the history is what the city
                     // believes, and it was written before this send was
                     // tried.
-                    let _ = back.send(Ok(echo));
+                    drop(back.send(Ok(echo)));
                 }
             }
             Err(refused) => {
                 for back in senders {
-                    let _ = back.send(Err(refused.clone()));
+                    drop(back.send(Err(refused.clone())));
                 }
             }
         }
@@ -204,7 +204,7 @@ mod tests {
             self.stopping
                 .store(true, std::sync::atomic::Ordering::Release);
             if let Some(accounting) = self.accounting.take() {
-                let _ = accounting.join();
+                drop(accounting.join());
             }
         }
     }

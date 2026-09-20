@@ -5,9 +5,10 @@
 
 //! Which dialect answers a question, and nothing about how it answers.
 //!
-//! Five entrances, one `match` each, and a closed set of two: a dialect
-//! this build cannot translate is refused rather than approximated with
-//! the nearer of the two it knows. What each dialect does with a request
+//! Five entrances, one `match` each, and a closed set of two: a third
+//! dialect is a compile error at all five entrances, which is how it is
+//! kept from being approximated with the nearer of the two we already
+//! write. What each dialect does with a request
 //! is `gateway::anthropic`'s and `gateway::openai`'s; what they share is
 //! `gateway::mismatch`'s.
 //!
@@ -19,7 +20,7 @@
 
 //! Response dialects: frames back to ChatResponse.
 
-use kernel::{AxCode, AxError, ChatResponse, DialectKind, Increment};
+use kernel::{AxError, ChatResponse, DialectKind, Increment};
 use serde_json::Value;
 
 use crate::{anthropic, openai};
@@ -29,7 +30,6 @@ pub fn increment_of(kind: DialectKind, frame: &Value) -> Option<Increment> {
     match kind {
         DialectKind::Anthropic => anthropic::increment_of(map),
         DialectKind::OpenAi => openai::increment_of(map),
-        _ => None,
     }
     .filter(|held| match held {
         Increment::Said(text) | Increment::Thought(text) => !text.is_empty(),
@@ -54,12 +54,6 @@ pub fn settled_from_stream(kind: DialectKind, frames: &[Value]) -> Result<Value,
     match kind {
         DialectKind::Anthropic => anthropic::settled(frames),
         DialectKind::OpenAi => openai::settled(frames),
-        _ => Err(AxError::failure(
-            AxCode::EndpointDialectUnsupported,
-            "read a streamed answer",
-            format!("{kind:?} is not a dialect this build speaks"),
-        )
-        .with_recovery("attach the endpoint as anthropic or openai")),
     }
 }
 
@@ -68,14 +62,6 @@ pub fn response_from_wire(kind: DialectKind, wire: &Value) -> Result<ChatRespons
     match kind {
         DialectKind::Anthropic => anthropic::response_from(wire),
         DialectKind::OpenAi => openai::response_from(wire),
-        // Fail closed: a dialect this build cannot translate is not
-        // approximated with the nearer of the two it knows.
-        _ => Err(AxError::failure(
-            AxCode::EndpointDialectUnsupported,
-            "translate wire",
-            format!("{kind:?} is not a dialect this build speaks"),
-        )
-        .with_recovery("attach the endpoint as anthropic or openai")),
     }
 }
 
@@ -85,14 +71,6 @@ pub fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<Value, Ax
     match kind {
         DialectKind::Anthropic => anthropic::response_wire(resp),
         DialectKind::OpenAi => openai::response_wire(resp),
-        // Fail closed: a dialect this build cannot translate is not
-        // approximated with the nearer of the two it knows.
-        _ => Err(AxError::failure(
-            AxCode::EndpointDialectUnsupported,
-            "translate wire",
-            format!("{kind:?} is not a dialect this build speaks"),
-        )
-        .with_recovery("attach the endpoint as anthropic or openai")),
     }
 }
 #[cfg(test)]
@@ -109,7 +87,7 @@ pub fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<Value, Ax
 mod tests {
     use super::super::request::{request_wire, sample_request};
     use super::*;
-    use kernel::{ContentBlock, ModelUsage, StopReason};
+    use kernel::{AxCode, ContentBlock, ModelUsage, StopReason};
     use kernel::{Payload, Tokens, ToolName};
     use proptest::prelude::*;
     use serde_json::{Map, json};

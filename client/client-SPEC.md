@@ -1,6 +1,8 @@
 # client-SPEC — the browser client (Solid + Effect, outside the cargo workspace)
 
 > 权威顺序同 AGENTS.md：人的决定 → ARCHITECTURE.md → 本文件 → 代码与测试。本文件记接口与设计；视图层（`src/*.tsx`、`src/theme.css`）按 `docs/frontend-method.md` 免 SPEC 与红绿，效应核（`src/core/`）不免。
+>
+> **免的是画法，不是键盘。** 一个部件遵循哪个 WAI-ARIA 模式、每个键做什么、焦点还给谁、`aria-*` 取什么值，是这一层对使用者的承诺，不是一次视觉迭代；`docs/frontend-method.md` 的豁免因此只覆盖排布、间距、色调与动效，`views/parts/` 的交互契约由 §7 独家规定。
 
 ## 1 定位与边界
 
@@ -93,6 +95,9 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
 - **4-24 后端已经答了的，客户端必须问，问到了必须画。** 一个城答得出而没人问的 `Query`，与一个上了 wire 而没有屏幕读的字段，是同一个缺陷的两半：它们让「这件事做完了」在两侧各有一个说法。三处落点：**其一**，城页顶栏的六个数字全部出自 `Query::Metrics` 一问——事件、在干活的 run、已收尾的 run、等人批的、排队的信号、回收站里的。`MetricsAnswer` 的第七个字段 `buildings` 故意不画：顶栏下面的天际线与旁边的楼列表本身就是楼的数目，再写一个数字就是同一个事实的第二个家。原先的状态徽标一并去掉——它说的 `runs_active` 就是那六个里的一个，而「城停了」由外壳的横幅在每一页说一次（`app.tsx`），顶栏只留那一个停/放的控件。**其二**，`Query::RegistryView` 得到 `views/registry.tsx` 一屏，四列（登记于、类别、所属楼、是什么），走 `parts/table.tsx` 因而每列可排序，默认最新在上。**其三**，run 页直接问 `Query::RunView` 而不再只靠流折出来的 belief：从别人发来的链接打开 `#/run/<id>` 的那一页没见过任何记录，`city_view` 又只列它还在列的 run，所以这条 run 属于哪个房间、是否已经结束，恰好在最需要的那一类 run 上是空的。**两个读法按 seq 判定**：流说的是此刻，摘要说的是城写下来的，两边都带账本位置，所以谁更新是一次比较而不是一次偏好。
 - **4-25 base URL 的形状只拼写一次。** `setup/providers.tsx` 的 `BASE_URL` 同时喂两个读者：框子自己的 `pattern`（浏览器在人还在填表时判，失焦后才红）与 `hostOf`（「看看」和「接上」两个控件的开关）。**`type="url"` 不是那条规则**——它收 `mailto:somebody` 和任何别的 scheme，于是一个这张表单会拒的值可以坐在一个浏览器称为合法的框里，而人是按下一个始终发灰、不说为什么的控件才知道的。形状是：scheme、ASCII 主机、可选端口、可选路径，之后什么都不许有；查询串拒掉，因为供应方陈述的是 API 的根，每个 face 自己在后面挂路径。**登记一条今天的事实**：`gateway::normalise_entered`（叶 1.2）在 attach／probe 路径上没有调用者——`assembly/credentials/endpoints.rs::endpoint_of` 原样存下 `base_url`——所以客户端这条形状规则是今天唯一在生效的那条，等 `normalise_entered` 接上以后，本条必须改写成「客户端只做最宽的判断，永不比城更严」。
 
+- **4-26 「这次调用算哪一类」在客户端只有一张表，而那张表是替身。** `views/talk/trace.ts` 把工具名读成 `Deed`（`explored`／`wrote`／`ran`／`other`），对话页的折叠摘要与制品面板两个读者都问它，所以客户端内部没有第二张表。**权威不在这里**：`kernel::ToolMeta` 为每个注册工具声明了 `effect`（`Read`／`Write`／`Egress`／`Connector`／`Spawn`／`Govern`／`Spend`）与 `render`（`Generic`／`Terminal`／`Diff { locations }`），`runtime/src/tools/exec.rs:99` 的 `RenderIntent::Terminal` 与 `edit.rs:101` 的 `RenderIntent::Diff` 正是制品面板要分的那两半；两个字段今天都不上 wire（`RoundsAnswer` 的 `Call` 只有 `tool`／`subject`／`arguments`／`outcome`／`at`／`output`）。**迁移一次做完**：`Call` 增补 `effect` 与 `render`、`WIRE_V` 随之进位、`trace.ts` 的 `DEEDS` 与 `deedOf` 删除、两个读者改问新字段。在那之前每加一个工具，这张表与工具注册处会各自演化一次，而只有注册处是对的。`parts/code.tsx` 的行号从 1 起算同属这笔债：`Output` 只带 `head` 与 `cut`，不带这段头部在文件里从第几行开始，所以「第 27 行」今天指的是这段输出的第 27 行。
+- **4-27 对话页的第二栏由账本决定要不要画，由容器宽度决定画在哪。** `talk.tsx` 问的 `Query::Rounds` 与 `Thread` 问的是同一句，`core/asking.ts` 按内容合并，因此「现在显示的是哪个 run」只有一个答案；面板不占路由，理由是一条新路由会让这个答案有第二处判定，而两处判定第一次分歧就发生在有人打开别人发来的链接时。**断点问 `main`（具名容器 `page`）而不是问窗口**：左栏钉开时吃掉 232px，按窗口宽算会在 1440px 把两栏挤坏，所以 `@lg/page:`（820px）转成两栏、`@wide/page:`（1120px）让面板长到 `max-w-measure`。**开合状态今天只活一次会话**：它是人的偏好，该住 `~/.sprawling/config.toml` 的 `[ui]`（C 章 3.1），而 `core/prefs.ts` 是本客户端通往浏览器存储的唯一一扇门（设计 3.6 的闸）；3.1 落地前既不在 `talk.tsx` 里开第二扇门，也不假装它持久，于是刷新后面板回到默认展开。
+
 ## 5 `src/core/`（形状按 ARCHITECTURE §9）
 
 | 文件 | 形状 | 接口 |
@@ -116,18 +121,155 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
 
 ## 6 视图（免 SPEC，列出以便定位）
 
-`views/parts/tip.tsx` 提示（见设计 4-18）；`views/rail.tsx` 左栏；`views/talk.tsx` ＋ `talk/{thread,composer,waiting}.tsx` 对话；`views/city.tsx` ＋ `city/{bar,panel,skyline,marks}.tsx` ＋ `city/shape.ts`（超椭圆路径）；`views/registry.tsx`（`Query::RegistryView`：这座城决定留下来的东西，一行一件，见设计 4-24）；`views/building.tsx` ＋ `building/{tree,commits}.tsx`；`views/changes.tsx`（`Changes`／`Hunks` 的一份读法，run 页与楼页共用）；`views/run.tsx`；`views/setup.tsx` ＋ `setup/{providers,models}.tsx`；`views/machine.tsx`（doctor 的答）；`views/desktop.tsx`（一栋楼的桌面白名单）；`views/mcp.tsx`；`views/welcome.tsx`；`views/record.tsx`；`views/cost.tsx`；`views/palette.tsx`；`views/refusal.tsx`；`views/prose.tsx`；`views/gallery.tsx`。
+`views/parts/tip.tsx` 提示（见设计 4-18）；`views/parts/code.tsx` 只读代码视图（面包屑＋行号＋词法着色，见设计 4-26）；`views/rail.tsx` 左栏；`views/talk.tsx` ＋ `talk/{thread,calls,composer,waiting}.tsx` 对话 ＋ `talk/artifact.tsx` 制品面板 ＋ `talk/trace.ts`（工具调用的分类，两个读者共用，见设计 4-26）；`views/city.tsx` ＋ `city/{bar,panel,skyline,marks}.tsx` ＋ `city/shape.ts`（超椭圆路径）；`views/registry.tsx`（`Query::RegistryView`：这座城决定留下来的东西，一行一件，见设计 4-24）；`views/building.tsx` ＋ `building/{tree,commits}.tsx`；`views/changes.tsx`（`Changes`／`Hunks` 的一份读法，run 页与楼页共用）；`views/run.tsx`；`views/setup.tsx` ＋ `setup/{providers,models}.tsx`；`views/machine.tsx`（doctor 的答）；`views/desktop.tsx`（一栋楼的桌面白名单）；`views/mcp.tsx`；`views/welcome.tsx`；`views/record.tsx`；`views/cost.tsx`；`views/palette.tsx`；`views/refusal.tsx`；`views/prose.tsx`；`views/gallery.tsx`。
 
 **`#/gallery` 是一条路由而不是一个构建开关**，因为量它的那道门应当打开一个人真正跑的 bundle；夹具不需要城（`prefs` 走 localStorage）。每个能进入多种状态的屏幕在那里各有一份夹具，`cargo xtask render` 打开真引擎读它。
 
 **左栏是覆盖而不是推挤**：外层 `<div>` 只在钉开（`[`）时取 `w-rail-open`，`<nav>` 绝对定位、hover 时自宽并加投影；正文的左边因此不随指针越过左缘而重排。
 
+**本节只说哪个屏用哪个部件；部件欠使用者什么写在 §7。**
+
 **`views/parts/` 里有五个组件今天只有 `#/gallery` 一个使用者**——`combobox`、`dialog`、`notice`、`row`、`skeleton`。五个都不是「没有第二个座位」：座位都在，只是今天由座位自己手写着同一件事，所以每个组件欠的是一次搬家，不是一次删除。`combobox` 的座位是 `setup/models.tsx` 的两个 `<select>`，一个端点答两百行时下拉正是它替换的那个控件；`dialog` 的座位是今天根本不问的那一问——移除端点与删除 MCP 服务器直接执行，全客户端没有一处确认；`notice` 的座位是 `views/notices.tsx` 与 `views/refusal.tsx`，两处各自手写 AxError 的三段式，所以那件事今天有三个家；`row` 的座位是 `mcp/servers.tsx` 的服务器行、`setup/providers.tsx` 的端点行与 `record.tsx` 的账本行；`skeleton` 的座位是 `views/machine.tsx` 手写的那两条骨架。
 
-## 7 验收
+## 7 `views/parts/` 的交互契约
+
+> **这是规格，不是描述。** 表里写的是部件欠使用者什么；今天的代码欠而未还的十二处，逐条点名在 7-8。模式名与键表借鉴自哪几份文档、为什么不产生许可证义务，一处记在 `docs/third-party.md` §5，本节不复述。
+
+**判定：不引入任何 UI 库依赖。** `xtask/src/npm.rs:64` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为 `effect` 与 `solid-js`，要加一个组件库就得先改那一行，而**一道专为阻止依赖蔓延而设的闸，第一次例外就是它失效的开始**。理由不是保守：`parts/dialog.tsx` 已经把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，四件都是平台承担的，见设计 4-20），`parts/tip.tsx` 已经把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）。**这些正是一个组件库存在的理由，而平台现在自己提供了**；引一个库会让同一件事有两个提供者。判定失效的条件写在 7-9，一个字都不留给临时判断。
+
+### 7-1 不收键的部件
+
+这些部件不进 Tab 序列、不读键，只欠一个角色和一组确切的 `aria-*`。
+
+| 部件 | 角色 | `aria-*` 的确切取值 |
+|---|---|---|
+| `badge.tsx` | 无（行内文本） | 圆点 `aria-hidden="true"`；状态由词承担，颜色只重复那个词 |
+| `banner.tsx` | 实时区域 | `weight="alert"` → `role="alert"`；其余 → `role="status"` |
+| `notice.tsx` | 实时区域 | 同上；`seat` 只改画法（浮起或列在中心），不改角色 |
+| `empty.tsx` | 无 | 形状 `aria-hidden="true"`；那句话与那个动作是它全部的可读内容 |
+| `progress.tsx` | `role="progressbar"` | `aria-label` 取调用方给的名字；`aria-valuemin="0"` 恒在；`total > 0` 时 `aria-valuemax="<total>"`、`aria-valuenow="<done>"`、`aria-busy="false"`，`total ≤ 0` 时这两个值一个都不写并 `aria-busy="true"` |
+| `skeleton.tsx` | `role="status"` | `aria-label`、`aria-busy="true"`；每根条 `aria-hidden="true"` |
+| `row.tsx` 的 `Row` | 无 | `onOpen` 在场时两段文字合成一个 `<button>`，右侧动作各自是独立的一站；行本身不收键，走动由 `RowList` 承担（7-4）|
+| `kbd.tsx` 的 `Kbd` | 无 | 一个字形一个 `<kbd>`，不取焦、不收键 |
+
+### 7-2 一次一个动作的部件
+
+| 部件 | 模式 | 键 | 结果 |
+|---|---|---|---|
+| `button.tsx` | APG Button | Enter | 激活；`state() !== "idle"` 时 `onClick` 原地返回 |
+| | | Space | 同 Enter：平台把两个键都送进同一个 `onClick`，所以一次判定挡住指针、Enter 与 Space 三种输入 |
+| `path.tsx` 的显示控件 | APG Button | Enter／Space | 地址解析得出时发 `reveal`；解析不出时 `aria-disabled="true"`，点击落进一个空操作 |
+| `field.tsx` | 有标签的文本框（无复合模式） | 平台的单行编辑键 | 由浏览器实现，本部件不截获 |
+| | | ↑／↓（`kind="number"`） | 按 `step` 增减，由平台实现 |
+
+`button.tsx` 的 `aria-*`：`aria-disabled` 在 `loading` 或 `why` 在场时为 `"true"`，`aria-busy` 只在 `loading` 时为 `"true"`，`why` 在场时 `aria-describedby` 指向 `Tip` 的 id。**用 `aria-disabled` 而不是 `disabled`**：控件因此留在 Tab 序列里，键盘到得了它，读屏也读得到它为什么按不动。
+
+`field.tsx` 的 `aria-*`：`<label for>` 给名字（`labelling="hidden"` 只把标签移出视线，名字仍在）；`aria-invalid` 恒等于 `error !== undefined`；`aria-describedby` 是调用方的 `describedBy` 与本格说明段 id 的并集，**错误替换说明而不是叠在它上面**，错误段自己带 `role="alert"`。红边有两条权威且说的是两件事：`error` 是城的回答，一到就红；`:user-invalid` 是浏览器读 `type` 与 `pattern` 的结果，失焦后才红。
+
+### 7-3 提示与模态
+
+| 部件 | 模式 | 键 | 结果 |
+|---|---|---|---|
+| `tip.tsx` | APG Tooltip | Escape | **规格要求撤下提示；今天没有实现**（7-8 第 9 条）|
+| `dialog.tsx` | APG Modal Dialog | Tab／Shift+Tab | 在对话框内循环，由平台实现 |
+| | | Escape | 平台发 `cancel`，本部件 `preventDefault()` 后回调 `onCancel`——默认行为会绕过调用方关掉元素，而 `open` 还说着开着 |
+| `kbd.tsx` 的 `Cheatsheet` | 手写的 dialog | Escape | 由外壳 `app.tsx` 的按键处理器答，不在部件里（7-8 第 12 条）|
+
+`tip.tsx` 的 `aria-*`：提示节点是 `role="tooltip"`，id 交给调用方——控件自己有可见文字时写 `aria-describedby`，这句话就是它唯一的名字时写 `aria-labelledby`。**组件不猜**，因为只有调用点知道控件有没有名字。显示由 `:hover` 与 `:focus-within` 触发，延迟 300 ms；提示自己 `pointer-events-none`，永不取焦。
+
+`dialog.tsx` 的 `aria-*`：`aria-labelledby` 指向标题，`aria-describedby` 指向说明段**且仅在 `detail` 在场时才写**。取焦由文档顺序决定：平台取对话框内第一个可聚焦控件，而取消按钮写在确认按钮之前，所以撤不回来的那一问把安全的答案放在手下。**点 `::backdrop` 不关闭**：撤不回来的那一问不该被一次落在外面的点击答掉。
+
+### 7-4 在几件之间走动的部件
+
+| 部件 | 模式 | 键 | 结果 |
+|---|---|---|---|
+| `segmented.tsx` | APG Radio Group（roving tabindex） | Tab／Shift+Tab | 进出控件；控件在 Tab 序列里只占一站 |
+| | | → | 移到下一个可选格并选中它，走到末端回到开头 |
+| | | ← | 移到上一个可选格并选中它，走到开头回到末端 |
+| | | ↓／↑ | **规格要求同 →／←；今天没有实现**（7-8 第 5 条）|
+| | | Space | **规格要求选中当前聚焦格；今天没有实现**（7-8 第 5 条）|
+| `tabs.tsx` | APG Tabs（自动激活） | → | 下一个透镜并立即切换，走到末端回到开头 |
+| | | ← | 上一个透镜并立即切换，走到开头回到末端 |
+| | | Home／End | 第一个／最后一个透镜并立即切换 |
+| | | Space／Enter | 与点击同一条路；因为切换已跟随焦点，它们不额外做事 |
+| `row.tsx` 的 `RowList` | 无 APG 部件模式：一串各自可达的行，加上方向键 | ↓／↑ | 走到下一／上一行，焦点落在那一行第一个可达控件上；**两端不环绕**——一本上千行的账本从末行跳回首行，是把人移到了他看不出自己去过的地方 |
+| | | Home／End | 第一／最后一行的第一个可达控件 |
+| | | 落在文本框、`<select>` 或可编辑区域上的同一批键 | 不接管：那些键在那个控件里已经有意思了 |
+| | | Tab | 照旧逐行走——**每一行仍是一个 Tab 站，方向键是加法不是替换** |
+
+`segmented.tsx` 的 `aria-*`：轨道 `role="radiogroup"` ＋ `aria-label`；每格 `role="radio"`、`aria-checked` 等于「这一格就是 `held`」、`why` 在场时 `aria-disabled="true"` 并 `aria-describedby` 指向 `Tip`。**Tab 序列里的那一站由 `tabStop` 独家决定**：选中格；无选中时第一个可选格；全部被拒时第 0 格（那格的原因还得读得到）；空控件一站都没有。选择跟随焦点，所以不可选的格被 `nextStop` 跳过——落在上面就等于选中它。
+
+`tabs.tsx` 的 `aria-*`：`role="tablist"` ＋ `aria-label`；每个 `role="tab"`、`aria-selected` 等于「这就是 `current`」、`tabindex` 只给当前那个 `0`。自动激活是 APG 对「面板内容已在本地、切换无可察延迟」的推荐读法，本客户端三个使用者都满足它。
+
+### 7-5 开一层列表的复合部件
+
+| 部件 | 模式 | 键 | 结果 |
+|---|---|---|---|
+| `combobox.tsx` | APG Combobox（listbox 弹层） | ↓／↑ | 游标下移／上移一行，钳在列表两端 |
+| | | Home／End | **规格要求到首行／末行；今天没有实现**（7-8 第 2 条）|
+| | | Enter | 采纳游标行，关闭弹层，焦点回触发器 |
+| | | Escape | 关闭弹层，清空过滤词，焦点回触发器 |
+| | | Tab | **规格要求关闭弹层并让焦点正常离开；今天弹层留着**（7-8 第 2 条）|
+| | | 可打印字符 | 过滤，并把游标复位到第 0 行 |
+| `popover.tsx` | 多列 listbox，装在 `role="dialog"` 里 | ↓／↑ | 当前列的游标下移／上移，钳在两端 |
+| | | Home／End | 当前列的首行／末行 |
+| | | Tab／Shift+Tab | **换列**（环绕）并把游标复位到第 0 行——本部件在此覆盖平台的 Tab |
+| | | Enter | 应用当前列的游标行，回调 `onApply` |
+| | | Escape | 回调 `onClose` |
+
+`combobox.tsx` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。今天的实现把 `aria-haspopup="listbox"` ＋ `aria-expanded` 放在触发按钮上、过滤框没有角色、游标只有底色——见 7-8 第 1 条。
+
+`popover.tsx` 的 `aria-*`（规格）：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。**`aria-selected` 在两个部件里必须说同一件事——「这是当前生效的值」**，游标一律由持焦元素的 `aria-activedescendant` 承担；今天 `popover.tsx` 用 `aria-selected` 标游标，而真正生效的那一项只有一个圆点（7-8 第 3 条）。两种触发各有一条焦点路：按钮触发时列表自己取焦（`tabindex` 只给当前列 `0`）；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框里，此时 `aria-activedescendant` 必须写在那个文本框上（7-8 第 4 条）。
+
+### 7-6 表格
+
+`table.tsx` 是一张数据表，**不是 APG Grid**：它不做二维方向键导航，Tab 依次走过排序按钮、勾选框与可改单元格，Enter／Space 在排序按钮上切换方向。
+
+`aria-*`：`<caption class="sr-only">` 给表名；**`aria-sort` 只写在可排序的列上**，取 `"ascending"`／`"descending"`／`"none"`；表头勾选框 `aria-label` 取 `allLabel`，行勾选框取 `keyOf(row)`，可改单元格取 `"<列名> <keyOf(row)>"`。表头勾选框在部分选中时必须是 `indeterminate`——说「一个都没选」是一句假话（7-8 第 7、8 条）。
+
+### 7-7 焦点还原：一条规则，三种实现
+
+**一个把焦点拿走的部件必须把它还给打开它的那个元素**，在它关闭的那一刻。三种实现今天并存，它们的差别只在谁记住了那个元素：
+
+| 谁还 | 部件 | 怎么还 |
+|---|---|---|
+| 平台 | `dialog.tsx` | `close()` 按 HTML 标准把焦点还给 `showModal()` 之前持焦点的元素，本文件因此没有一行取焦代码 |
+| 部件自己 | `combobox.tsx`、`popover.tsx` | 前者记住触发按钮的 ref，`shut()` 时还；后者在 `onMount` 记下当时的 `document.activeElement`，`onCleanup` 还（`bind` 模式下焦点从未离开文本框，因此不还）|
+| 外壳 | `kbd.tsx` 的 `Cheatsheet` | `app.tsx` 在打开前记 `opener`，`closeSheet` 时还——**全客户端唯一一处还原权威不在部件里**，它随 7-8 第 12 条的搬家一起消失 |
+
+### 7-8 今天与模式不符的十二处
+
+每一条都是「规格已定、实现未到」，不是待议的设计问题。
+
+1. `combobox.tsx:92` — 过滤框没有 `role="combobox"`、`aria-controls`、`aria-activedescendant`，游标只有底色；读屏用户按方向键时听不到任何变化。
+2. `combobox.tsx:106`–`127` — 缺 Home／End；Tab 不关闭弹层；全文件没有点外面关闭或失焦关闭的路，一个开着的弹层可以留在页面上。
+3. `combobox.tsx:138` 与 `popover.tsx:176` — 同一个 `aria-selected` 两种读法：前者标已选中的值（对），后者标游标（错），而后者真正生效的那一项只由 `popover.tsx:190` 的圆点承担。
+4. `popover.tsx:163` — `bind` 模式下 `aria-activedescendant` 写在不持焦点的 `<ul>` 上，因此 composer 里按方向键时读屏什么都不报。
+5. `segmented.tsx:182`–`195` — 缺 ↓／↑ 与 Space，APG Radio Group 的键表只实现了一半。
+6. `tabs.tsx:58` — `id="tab-<id>"` 今天没有读者：三个使用者（`run`／`record`／`mcp`）都没有 `role="tabpanel"` ＋ `aria-labelledby`，`<button role="tab">` 也没有 `aria-controls`，所以「这块面板属于哪个页签」在页面上说不出来。
+7. `table.tsx:108` — 不可排序的列也写 `aria-sort="none"`，那是一句关于一个排不了序的列的排序陈述。
+8. `table.tsx:98` — 表头勾选框只有选中与未选中两态，部分选中时说「一个都没选」。
+9. `tip.tsx` — 全文件没有 Escape 撤下提示，而那是 APG Tooltip 的唯一一个键，也是 WCAG 1.4.13「可撤下」要的那一件。
+10. `field.tsx:94` 与 `button.tsx:87` — 「一个人不能用的控件」两套写法：前者用原生 `disabled`（离开 Tab 序列，原因读不出来），后者用 `aria-disabled` 加一次点击判定。规格取后者。
+11. `client/src/views/parts/row.tsx` 的 `RowList` — `<ul>` 直接收调用方的 `<Row>`，而 `Row` 画的是 `<div>`：一个子元素不是 `<li>` 的列表，读屏报得出「一个列表」却报不出「几项」。该文件本波正在改写，所以这一条只记事实、不钉行号。
+12. `kbd.tsx:38`–`60` — `Cheatsheet` 是今天唯一一个没走 `parts/dialog.tsx` 的模态：没有焦点陷阱、没有 `aria-modal`、Esc 在外壳里、还留着全客户端仅剩的层号之一（`kbd.tsx:46` 的 `z-20`，设计 4-21 记的那个例外）。原生 `<dialog>` 三家引擎都支持，所以这一条是搬家而不是取舍。
+
+### 7-9 重开参数：判定在什么条件下失效
+
+**当某个部件的正确无障碍行为在 Chromium、Firefox、WebKit 三家上都无法用平台能力加百行以内的自有代码达成**，才回到「`RUNTIME` 放宽到三项」，并在同一变更集里写明是哪一个部件逼出了这次例外。三条限定一个都不能省：三家都试过（不是一家不支持就算数）、百行算的是自有代码的行数、例外记进本节而不是只躺在一条提交信息里。
+
+今天没有任何部件触发它：`<dialog>`、`::backdrop`、`@starting-style` 与 Popover API 三家都有，而三家之间确实缺的两件（CSS anchor positioning、`field-sizing: content`）都不是无障碍行为，它们各自的降级分支已经在 `tip.tsx` 与 composer 里。
+
+### 7-10 这张表的机器读者
+
+**`#/gallery` 的夹具断言本节的键表**，这是让规格不止有人类读者的那一步：每个收键部件在那条路由上有一份夹具，夹具按「初始焦点 ＋ 一串按键 → 焦点落点、`aria-*` 取值、回调是否发生」逐行断言 7-2 至 7-6。夹具与断言的实现属于 `client/src/views/gallery.tsx` 与 `xtask/src/render/`，本节只定内容。
+
+今天的 `xtask render` 读的是画出来的盒子与它们的名字（`xtask-SPEC.md` 8-13），**一次按键都没有进过真引擎**——在这第二个读数落地之前，本节的键表没有机器读者，这一点如实记在 §8 的「未验的」里。
+
+## 8 验收
 
 `bun run lint`、`bun run typecheck`、`bun run test`（29 条）三样绿，`cargo xtask npm`、`cargo xtask wire-ts`、`cargo xtask color`、`cargo xtask wording`、`cargo xtask render` 绿；`just check-client` 是这三条脚本的一条线。
 
 在一座真城加一个说 OpenAI 形的假供应方上走得通的：连接与握手、引导五步、从 composer 派活、工具调用折叠、Markdown 回复、结局分隔线、城市绘图、目录树与文件原文、run 页四透镜、记录三透镜、成本页、设置页 attach 与 select、`#/mcp` 三扇门加删（写进 `CONFIG.toml`）、楼页提交列表与 session 跳转、左栏展开、草稿留存。
 
-**未验的**：`Changes`／`Hunks` 有内容时的样子、Firefox 与 Zen 的无头截图（`-screenshot` 不出图，须走 BiDi）、`Tip` 两条定位分支各自的 `#/gallery` 夹具（`xtask render` 只读 `#/gallery`，所以这两条分支在真引擎里的落点尚无机器读者）。
+**未验的**：`Changes`／`Hunks` 有内容时的样子、Firefox 与 Zen 的无头截图（`-screenshot` 不出图，须走 BiDi）、`Tip` 两条定位分支各自的 `#/gallery` 夹具（`xtask render` 只读 `#/gallery`，所以这两条分支在真引擎里的落点尚无机器读者）、**§7 的键表**（`xtask render` 今天只量盒子，没有一次按键进过真引擎，所以每一行键表今天的读者只有人）。

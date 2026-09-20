@@ -25,6 +25,7 @@ import type { LogLevel, LogLine, Seq, TimeMs } from "../wire";
 import { useGo, useLang, useSay, useUi } from "../ui";
 import { EmptyState } from "./parts/empty";
 import { Path } from "./parts/path";
+import { RowList } from "./parts/row";
 import { Tabs } from "./parts/tabs";
 import { Tip } from "./parts/tip";
 
@@ -59,10 +60,10 @@ function Ledger() {
               </button>
             )}
           </Show>
-          <ul class="font-mono text-note">
+          <RowList label={say("rec_ledger")}>
             <For each={[...held().records].reverse()}>
               {(record) => (
-                <li class="settled-row border-b border-g1">
+                <li class="settled-row border-b border-g1 font-mono text-note">
                   <Tip text={clock(lang(), record.t)}>
                     {(hint) => (
                       <button
@@ -75,7 +76,7 @@ function Ledger() {
                         <span class="w-figure shrink-0 whitespace-nowrap text-text-faint">{hhmmss(record.t)}</span>
                         <span class="shrink-0 text-text">{record.kind}</span>
                         <span class="shrink-0 text-text-faint">{record.addr ?? record.who}</span>
-                        <span class="min-w-0 flex-1 truncate text-text-disabled">{gist(record.data)}</span>
+                        <span class="summary min-w-0 flex-1 truncate text-text-disabled">{gist(record.data)}</span>
                       </button>
                     )}
                   </Tip>
@@ -87,7 +88,7 @@ function Ledger() {
                 </li>
               )}
             </For>
-          </ul>
+          </RowList>
         </div>
       )}
     </Show>
@@ -166,7 +167,7 @@ function Bin() {
                     <span class="text-text-faint">{clock(lang(), row.at)}</span>
                     <span class={row.restored ? "text-text-disabled" : "text-alert"}>{row.restored ? say("bin_restored") : say("bin_gone")}</span>
                   </div>
-                  <div class="mt-tight truncate font-mono text-text-faint">{way(row)}</div>
+                  <div class="summary mt-tight truncate font-mono text-text-faint">{way(row)}</div>
                 </li>
               )}
             </For>
@@ -305,47 +306,39 @@ function Log() {
   );
 }
 
-// The log lens is not in the address bar: `core/route` spells three
-// lenses, and a fourth spelling is a change to the one translation
-// between a view and the address bar. Until it is spelled there, the
-// log is reached by the tab and not by a bookmark.
-const LOG = "log";
-
+// Which lens is shown is what the address bar says, for all four of
+// them: `core/route` spells the log as `#/record/log`, so a person can
+// send somebody a link to what their machine was writing.
 export function Record(props: { readonly lens: Lens }) {
   const say = useSay();
   const go = useGo();
-  const [log, setLog] = createSignal(false);
-  const current = () => (log() ? LOG : props.lens);
-  const lenses = () => [
-    ...LENSES.map((lens) => ({ id: lens, label: say(`rec_${lens}`) })),
-    { id: LOG, label: say("rec_log") },
-  ];
+  const lenses = () => LENSES.map((lens) => ({ id: lens, label: say(`rec_${lens}`) }));
   const pick = (id: string) => {
     const lens = LENSES.find((each) => each === id);
+    // A name this build does not read leaves the page where it is,
+    // rather than moving somebody somewhere they did not ask for.
     if (lens === undefined) {
-      setLog(true);
       return;
     }
-    setLog(false);
     go({ kind: "record", lens });
   };
   return (
     <div class="mx-auto w-full max-w-page px-pane py-wide">
       <div class="mb-wide flex flex-wrap items-baseline gap-wide">
         <h1 class="text-title font-title">{say("nav_the_record")}</h1>
-        <Tabs label={say("rec_lenses")} lenses={lenses()} current={current()} onPick={pick} />
+        <Tabs label={say("rec_lenses")} lenses={lenses()} current={props.lens} onPick={pick} />
       </div>
       <Switch>
-        <Match when={current() === LOG}>
+        <Match when={props.lens === "log"}>
           <Log />
         </Match>
-        <Match when={current() === "ledger"}>
+        <Match when={props.lens === "ledger"}>
           <Ledger />
         </Match>
-        <Match when={current() === "archive"}>
+        <Match when={props.lens === "archive"}>
           <Archive />
         </Match>
-        <Match when={current() === "bin"}>
+        <Match when={props.lens === "bin"}>
           <Bin />
         </Match>
       </Switch>

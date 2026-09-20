@@ -34,7 +34,10 @@ pub(crate) fn pictures_in(chat: &ChatRequest) -> Vec<&ImageRef> {
             match block {
                 ContentBlock::Image(picture) => found.push(picture),
                 ContentBlock::ToolResult { attachments, .. } => found.extend(attachments.iter()),
-                _ => {}
+                ContentBlock::Text { .. }
+                | ContentBlock::Thinking { .. }
+                | ContentBlock::RedactedThinking { .. }
+                | ContentBlock::ToolUse { .. } => {}
             }
         }
     }
@@ -129,7 +132,7 @@ impl Endpoint {
                 let sealed = (self.redemption.secrets)(value)?;
                 request.header(name, sealed.expose().as_str())
             }
-            _ => request,
+            AuthSpec::None => request,
         })
     }
 

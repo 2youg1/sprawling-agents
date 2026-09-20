@@ -102,9 +102,11 @@ jobs:
   # time and the only crate `cargo xtask proof` names. Widening it is a
   # decision to take with a measured run in hand, not a default.
   #
-  # kani is installed exactly as ci.yml's `proof` job installs it, and
-  # for the same reason it lives on ubuntu there: upstream builds kani
-  # for Linux only.
+  # kani is installed exactly as ci.yml's `proof` job installs it, from
+  # the same pinned version, and for the same reason it lives on ubuntu
+  # there: upstream builds kani for Linux only. A lead read against one
+  # kani and a verdict held by another would disagree for a reason
+  # nobody could see in the report.
   autoharness:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -117,9 +119,21 @@ jobs:
         with:
           shared-key: autoharness
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: install kani
+      - uses: actions/cache@v6
+        id: kani-cache
+        with:
+          path: |
+            ~/.cargo/bin/cargo-kani
+            ~/.cargo/bin/kani
+            ~/.kani
+          key: kani-${{ runner.os }}-${{ hashFiles('.github/workflows/kani-version.txt') }}
+      - name: install the pinned kani
+        if: steps.kani-cache.outputs.cache-hit != 'true'
+        shell: bash
         run: |
-          cargo install --locked kani-verifier
+          set -euo pipefail
+          version=$(cat .github/workflows/kani-version.txt)
+          cargo install --locked "kani-verifier@$version"
           cargo kani setup
       # A broken install would produce an empty report, and an empty
       # report reads exactly like a clean one, so kani is made to answer

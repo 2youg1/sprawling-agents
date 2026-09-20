@@ -21,7 +21,6 @@ use serde_json::Value;
 use super::redemption::Redemption;
 use crate::market::ModelEntry;
 
-#[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum AuthSpec {
     Bearer(SecretRef),
@@ -136,7 +135,11 @@ pub(crate) fn apply_override(
                     map.insert((*segment).to_owned(), value.clone());
                     return Ok(());
                 }
-                _ => {
+                Value::Null
+                | Value::Bool(_)
+                | Value::Number(_)
+                | Value::String(_)
+                | Value::Array(_) => {
                     return Err(AxError::failure(
                         AxCode::ConfigInvalid,
                         "apply request override",
@@ -154,7 +157,11 @@ pub(crate) fn apply_override(
             Value::Object(map) => map
                 .entry((*segment).to_owned())
                 .or_insert_with(|| Value::Object(serde_json::Map::new())),
-            _ => {
+            Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::Array(_) => {
                 return Err(AxError::failure(
                     AxCode::ConfigInvalid,
                     "apply request override",
@@ -179,6 +186,9 @@ pub(crate) fn apply_override(
     clippy::indexing_slicing,
     clippy::string_slice,
     clippy::arithmetic_side_effects,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
     reason = "test code"
 )]
 mod tests {

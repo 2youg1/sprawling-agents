@@ -15,16 +15,24 @@
 // rather than on a fifth welcome step because each of them names
 // something that is on this screen while it is being read, and
 // because the first run in this room replaces them with itself.
+//
+// Beside the conversation, once the room is wide enough to hold two
+// columns, stands what the run produced. The width that decides it is
+// the main region's, asked with a container query: an open rail takes
+// 232px of the window, so a layout that asked the window would put two
+// columns into a space that holds one.
 
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 
 import { cancel, dispatch, steer } from "../core/commands";
 import { sendingInto, type RunBelief } from "../core/belief";
 import { MAYOR, roomOf } from "../core/route";
-import type { Address } from "../wire";
+import type { Address, RoundsAnswer } from "../wire";
 import { useCommand, useHearing, useSay, useUi } from "../ui";
+import { Artifact, PANEL_ID } from "./talk/artifact";
 import { Composer } from "./talk/composer";
 import { Thread } from "./talk/thread";
+import { NOTHING, artifactsIn, type Artifacts } from "./talk/trace";
 import { Waiting } from "./talk/waiting";
 
 export interface TalkProps {
@@ -46,6 +54,27 @@ export function Talk(props: TalkProps) {
   );
   const live = createMemo(() => [...runs()].reverse().find((run) => run.doing.kind !== "frozen"));
   const isMayor = () => props.address === MAYOR;
+
+  // The run the panel speaks for: the one still going, or the last one
+  // this room finished. The same question `Thread` asks, merged with it
+  // by `asking` because the two ask it in the same words.
+  const current = createMemo<RunBelief | undefined>(() => live() ?? runs().at(-1));
+  const rounds = createMemo(() => {
+    const run = current();
+    return run === undefined ? undefined : ui.conn.asking.ask({ rounds: { run: run.run } });
+  });
+  const artifacts = createMemo<Artifacts>(() => {
+    const held = rounds()?.();
+    if (held === undefined || !("rounds" in held)) return NOTHING;
+    const answer: RoundsAnswer = held.rounds;
+    return artifactsIn(answer.turns);
+  });
+  const produced = () => artifacts().file !== null || artifacts().terminal !== null;
+  // Open until the person closes it, and forgotten on reload: this
+  // belongs in the person's own `[ui]` section and there is no door to
+  // it yet (client-SPEC 4-27).
+  const panel = ui.prefs.panel;
+  const setPanel = ui.prefs.setPanel;
 
   const [scroller, setScroller] = createSignal<HTMLDivElement>();
   const [pinned, setPinned] = createSignal(true);
@@ -105,48 +134,71 @@ export function Talk(props: TalkProps) {
   );
 
   return (
-    <div class="flex min-h-0 flex-1 flex-col">
-      <div
-        ref={setScroller}
-        class="min-h-0 flex-1 overflow-y-auto"
-        onScroll={(event) => {
-          const box = event.currentTarget;
-          setPinned(box.scrollHeight - box.scrollTop - box.clientHeight < 48);
-        }}
-      >
-        <div ref={setColumn} class="mx-auto flex min-h-full w-full max-w-talk flex-col justify-end px-pane pb-wide pt-wide">
-          <Show when={!isMayor()}>
-            <p class="mb-wide text-note text-text-faint">{props.address}</p>
-          </Show>
-          {/* An empty room opens with the box in the middle of the page
-              and the room's own name above it, because the first thing
-              asked of a person here is to say something. The box rides
-              down to the bar on the first send (Composer measures the
-              distance itself), so nothing about the drop lives here. */}
-          <Show when={runs().length === 0}>
-            <div class="my-auto flex flex-col items-center gap-base py-section text-center">
-              <p class="text-heading font-heading text-text-disabled">
-                {isMayor() ? say("talk_empty_mayor") : say("talk_empty_room", { room: roomOf(props.address) })}
-              </p>
-              <p class="text-note text-text-faint">
-                {isMayor() ? say("talk_opening_mayor") : say("talk_opening_room", { room: roomOf(props.address) })}
-              </p>
-              <div class="w-full">{composer()}</div>
-              <Show when={isMayor()}>
-                <ul class="max-w-measure list-none text-left text-note text-text-faint">
-                  <li>{say("talk_hint_dispatch")}</li>
-                  <li class="mt-tight">{say("talk_hint_progress")}</li>
-                  <li class="mt-tight">{say("talk_hint_waiting")}</li>
-                </ul>
-              </Show>
-            </div>
-          </Show>
-          <For each={runs()}>{(run) => <Thread run={run} who={roomOf(props.address)} />}</For>
-          <Waiting />
+    <div class="flex min-h-0 flex-1 flex-col @lg/page:flex-row">
+      <div class="flex min-h-0 flex-1 flex-col">
+        {/* The one control the panel has. It is here rather than on the
+            panel because the panel is what it opens: a second control
+            inside would be a second place to look for the same state. */}
+        <Show when={produced()}>
+          <div class="flex justify-end px-pane pt-snug">
+            <button
+              type="button"
+              class="rounded-control px-snug py-tight text-note text-text-faint hover:bg-g1 hover:text-text-quiet"
+              aria-expanded={panel()}
+              aria-controls={PANEL_ID}
+              onClick={() => {
+                setPanel(!panel());
+              }}
+            >
+              {panel() ? say("talk_panel_hide") : say("talk_panel_show")}
+            </button>
+          </div>
+        </Show>
+        <div
+          ref={setScroller}
+          class="min-h-0 flex-1 overflow-y-auto"
+          onScroll={(event) => {
+            const box = event.currentTarget;
+            setPinned(box.scrollHeight - box.scrollTop - box.clientHeight < 48);
+          }}
+        >
+          <div ref={setColumn} class="mx-auto flex min-h-full w-full max-w-talk flex-col justify-end px-pane pb-wide pt-wide">
+            <Show when={!isMayor()}>
+              <p class="mb-wide text-note text-text-faint">{props.address}</p>
+            </Show>
+            {/* An empty room opens with the box in the middle of the page
+                and the room's own name above it, because the first thing
+                asked of a person here is to say something. The box rides
+                down to the bar on the first send (Composer measures the
+                distance itself), so nothing about the drop lives here. */}
+            <Show when={runs().length === 0}>
+              <div class="my-auto flex flex-col items-center gap-base py-section text-center">
+                <p class="text-heading font-heading text-text-disabled">
+                  {isMayor() ? say("talk_empty_mayor") : say("talk_empty_room", { room: roomOf(props.address) })}
+                </p>
+                <p class="text-note text-text-faint">
+                  {isMayor() ? say("talk_opening_mayor") : say("talk_opening_room", { room: roomOf(props.address) })}
+                </p>
+                <div class="w-full">{composer()}</div>
+                <Show when={isMayor()}>
+                  <ul class="max-w-measure list-none text-left text-note text-text-faint">
+                    <li>{say("talk_hint_dispatch")}</li>
+                    <li class="mt-tight">{say("talk_hint_progress")}</li>
+                    <li class="mt-tight">{say("talk_hint_waiting")}</li>
+                  </ul>
+                </Show>
+              </div>
+            </Show>
+            <For each={runs()}>{(run) => <Thread run={run} who={roomOf(props.address)} />}</For>
+            <Waiting />
+          </div>
         </div>
+        <Show when={runs().length > 0}>
+          <div class="mx-auto w-full max-w-talk px-pane pb-pane">{composer()}</div>
+        </Show>
       </div>
-      <Show when={runs().length > 0}>
-        <div class="mx-auto w-full max-w-talk px-pane pb-pane">{composer()}</div>
+      <Show when={produced()}>
+        <Artifact artifacts={artifacts()} open={panel()} />
       </Show>
     </div>
   );

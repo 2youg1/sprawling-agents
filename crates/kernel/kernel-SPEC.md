@@ -131,16 +131,18 @@ gate ──▶ 上述全部（组合面）＋idem
 
 ## 8 接口先行（按模块分章）
 
-**`#[non_exhaustive]` 辖谁，不辖谁**：它辖**冻结面**——会被序列化、跨版本读回、或被城外读者依赖的枚举（`AxCode`、`EventKind`、`Effect`、`DialectKind`、`DelegateKind` 等）。它**不辖判定输出**：`StallVerdict`／`GoalVerdict`／`RepairVerdict`／`DelegationVerdict`／`RegisterVerdict`／`Admission` 一律**刻意穷尽**，理由与 runtime-SPEC 对 `PhaseOutcome` 写的同一句：新增一种结论必须逼每个调用方表态，不得掉进 catch-all。`crates/kernel/src/stall.rs` 与 `backpressure.rs` 的判定枚举是同一条规则的第二、第三处表述。
+**本 crate 无 `#[non_exhaustive]`**（G-22 / 叶子 7.10，2026 判定，取代原先「冻结面开放、判定输出穷尽」的两分）。原分界给 `AxCode`、`EventKind`、`Effect`、`DialectKind`、`DelegateKind` 等冻结面标了开放，代价是 gateway / runtime / sprawling 写下四十余条永远打不到的 `_ =>`；而它们本该是新增变体那天的编译错误——B-03（`responses` 可选却返回 null）正是这样长出来的。**每个枚举都是闭的，穷尽性交给编译器。**
 
-ARCHITECTURE.md §3「nothing here is published」是这条分界成立的前提：工作区之外没有下游，故 `#[non_exhaustive]` 在判定输出上买不到任何兼容性，只卖掉 §7 想要的那个编译期穷尽性。
+ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提：工作区之外没有下游，`#[non_exhaustive]` 在这里买不到任何兼容性。**重开参数**：任一 kernel 类型发布到 crates.io 的那天——那天起工作区之外才有读者，兼容性才第一次值钱。
+
+外部开放枚举（`serde_json::Value`、`std::io::ErrorKind`、`git2::Delta`、tungstenite 的帧类型）与 `EventKind` 这种六十余支的词汇表仍会逼出通配臂：前者不归我们关，后者穷举一遍就是 `EventKind` 的第二份拷贝。这两类各带 `#[expect(clippy::wildcard_enum_match_arm, reason = …)]`，理由写在当处；除此之外通配臂即红。
 
 ### 8-1 kernel::error
 
 **类型**：
 
 ```rust
-#[non_exhaustive]                       // C8：对扩展开放
+                      // C8：对扩展开放
 pub enum AxCode { PathNotFound, /* …36 variant，serde 呈现名见下表 */ }
 
 pub struct GateRefusal {                // three-part refusal；三段必填
@@ -301,7 +303,6 @@ impl Seq { pub const FIRST: Seq;        // 0；创世行
            pub fn next(self) -> Result<Seq, AxError>; }   // checked_add
 pub struct TimeMs(u64);                 // UTC 整数毫秒；只入参不采样
 
-#[non_exhaustive]
 pub enum EventKind { CityInitialized, /* …55 variant，serde 蛇形 */ }
 pub enum WindowClass { InWindow, RecordOnly }
 impl EventKind {
@@ -570,11 +571,9 @@ impl WriteDomain {
     pub fn admits(&self, target: &Address) -> DomainVerdict;
     pub fn prefixes(&self) -> impl Iterator<Item = &Address>;
 }
-#[non_exhaustive]
 pub enum DomainVerdict { Within, Outside { prefixes: Vec<String> } }  // prefixes 供 three-part 的 nearby
 
 pub struct EditSample { pub addr: Address, pub run: RunId }            // 切片序＝时序
-#[non_exhaustive]
 pub enum EditWarVerdict { Calm, Freeze { addr: Address } }
 pub fn observe_edit_war(samples: &[EditSample]) -> EditWarVerdict;
 ```
@@ -664,7 +663,7 @@ pub fn request(active: &BTreeMap<Address, RunId>, scope: &Address, who: &RunId) 
 ### 8-17 kernel::delegation
 
 ```rust
-#[non_exhaustive] pub enum DelegateKind { Resident, Ephemeral }
+pub enum DelegateKind { Resident, Ephemeral }
 impl DelegateKind { pub fn as_str(self) -> &'static str; }   // 一个词一个权威（工具解析与 status 打印同源）
 /// Depth-zero position; the only type with a delegate method (15.3-10).
 pub struct Delegator(/* 私有单元 */);
@@ -860,12 +859,12 @@ impl Evidence {
     pub fn new(refs: Vec<EventRef>) -> Result<Evidence, AxError>;
     pub fn refs(&self) -> &[EventRef];
 }
-#[non_exhaustive] pub enum Completion { Done(Evidence), Limit, Cancelled }
+pub enum Completion { Done(Evidence), Limit, Cancelled }
 
 pub struct PlannedProgress { pub done: u32, pub blocked: u32, pub total: u32 }
 impl PlannedProgress { pub fn ratio(&self) -> (u32, u32); }      // (done, total)；呈现方自算百分比
 pub struct UnplannedProgress { pub steps: u32, pub budget: BudgetUse }   // 无 ratio 方法：类型层诚实（A17）
-#[non_exhaustive] pub enum Progress { Planned(PlannedProgress), Unplanned(UnplannedProgress) }
+pub enum Progress { Planned(PlannedProgress), Unplanned(UnplannedProgress) }
 ```
 
 - 两态分两 struct 而非 enum 携字段：百分比方法只能长在 Planned 上，Unplanned 拿不到——「界面拿不到百分比就画不出百分比」的类型形态。
@@ -881,8 +880,8 @@ impl ApprovalId {
     pub fn new(raw: impl Into<String>) -> Option<ApprovalId>;   // 只收既存 id（线上回执、账本、夹具），空串拒
     pub fn as_str(&self) -> &str;
 }
-#[non_exhaustive] pub enum ApprovalSource { Gate, Agent }
-#[non_exhaustive] pub enum ApprovalClass { Commitment, BudgetLimit, DiscardEscalate, AgentQuestion,
+pub enum ApprovalSource { Gate, Agent }
+pub enum ApprovalClass { Commitment, BudgetLimit, DiscardEscalate, AgentQuestion,
                                            Delegation, Governance, Undoable }
 // Delegation：第一次派生要人点头。Governance：改写一个 scope 的规则要人点头。
 // Undoable：伸到城外、且城里没有任何一处收得回来的后果——目下就是运行中的机器自己的桌面（§8-45）。
@@ -892,21 +891,21 @@ pub struct ApprovalItem { pub id: ApprovalId, pub source: ApprovalSource, pub ac
                           pub action_desc: String, pub artifact: Locator, pub cluster_key: ClusterKey,
                           pub created: TimeMs, pub tainted: bool }
 
-#[non_exhaustive] pub enum PolicyClass { AgentQuestion }          // 可免审类：三必经人类无 variant 可写（类型层禁止）
+pub enum PolicyClass { AgentQuestion }          // 可免审类：三必经人类无 variant 可写（类型层禁止）
 pub struct PolicyMatcher { pub class: PolicyClass, pub detail_prefix: String }
-#[non_exhaustive] pub enum PolicyVerdict { Allow, Deny }
+pub enum PolicyVerdict { Allow, Deny }
 pub struct Policy { pub id: String, pub matcher: PolicyMatcher, pub verdict: PolicyVerdict,
                     pub source: ApprovalId, pub created: TimeMs, pub last_hit: Option<TimeMs> }
                     // 无 revocable 字段：恒真字段不入型（false 不可表示）
-#[non_exhaustive] pub enum PolicyApplication { Applies(PolicyVerdict), NotApplicable }
+pub enum PolicyApplication { Applies(PolicyVerdict), NotApplicable }
 pub fn match_item(policy: &Policy, item: &ApprovalItem) -> PolicyApplication;   // tainted 恒 NotApplicable（C15）
-#[non_exhaustive] pub enum PolicyExpiry { Active, Expired }
+pub enum PolicyExpiry { Active, Expired }
 pub fn expiry(policy: &Policy, now: TimeMs) -> PolicyExpiry;      // idle ≥ POLICY_IDLE_DAYS → Expired；checked
-#[non_exhaustive] pub enum PolicyRevocation { Revoked, Expired, Superseded }   // policy_revoked reason 数据面
+pub enum PolicyRevocation { Revoked, Expired, Superseded }   // policy_revoked reason 数据面
 
-#[non_exhaustive] pub enum Autonomy { Owner, Delegate(ResidentId), Deferred }
-#[non_exhaustive] pub enum Answerer { Human, Resident(ResidentId) }
-#[non_exhaustive] pub enum AnswerVerdict { May, HumanOnly, SelfApprovalBarred, NotTheDelegate }
+pub enum Autonomy { Owner, Delegate(ResidentId), Deferred }
+pub enum Answerer { Human, Resident(ResidentId) }
+pub enum AnswerVerdict { May, HumanOnly, SelfApprovalBarred, NotTheDelegate }
 pub fn may_answer(autonomy: &Autonomy, item: &ApprovalItem, answerer: &Answerer) -> AnswerVerdict;
 ```
 
@@ -920,7 +919,7 @@ pub fn may_answer(autonomy: &Autonomy, item: &ApprovalItem, answerer: &Answerer)
 ### 8-22 kernel::config
 
 ```rust
-#[non_exhaustive] pub enum ClockStampGranularity { Off, Minute, FiveMinute, Hour }   // 类型住 kernel 非 runtime
+pub enum ClockStampGranularity { Off, Minute, FiveMinute, Hour }   // 类型住 kernel 非 runtime
 pub struct LayeredValue<T> { pub city: Option<T>, pub building: Option<T>, pub resident: Option<T> }
 impl<T> LayeredValue<T> { pub fn resolve(&self) -> Option<&T>; }  // resident→building→city 下层覆盖上层
 
@@ -957,16 +956,16 @@ pub fn freeze(clock_stamp: &LayeredValue<ClockStampGranularity>) -> FrozenConfig
 pub struct ToolName(String);        // 非空；ascii 小写/数字/下划线（进 catalog 与事件的名）
 pub struct ServerLabel(String);     // 非空；ascii 小写/数字，恒不含下划线（见下）
 pub struct TimeoutMs(u64);          // 声明即承诺可协作取消
-#[non_exhaustive] pub enum Effect { Read, Write { domain: Address }, Egress,
+pub enum Effect { Read, Write { domain: Address }, Egress,
                                     Connector { label: ServerLabel }, Spawn, Govern, Spend }   // 决定过哪道门
 // Spawn：起第二个 Agent。不归 Read——一次派生能花多少、能碰什么，调用方自己的任何一道门都不管；
 // 管得住它的只有人。故它自成一类，`kernel::gate::delegation` 恒 Escalate，是否已获准由调用方的 granted 集回答。
 // Govern：改写一个 scope 被判的规则。刻意不归 Write——保留子树在每个写域之外，写门本就会拒；
 // 而它拒的理由正是「这件事归人」。`kernel::gate::govern` 恒 Escalate，且把提案正文截前 600 字进 action_desc：
 // 一个只被告知「要改规则」的人是在猜。
-#[non_exhaustive] pub enum Temporal { Timeless, Timestamped }
-#[non_exhaustive] pub enum CostTier { Free, Light, Heavy }        // 三档起步，对扩展开放；路由/预算消费在 S3
-#[non_exhaustive] pub enum RenderIntent { Generic, Terminal, Diff { locations: Vec<Address> } }
+pub enum Temporal { Timeless, Timestamped }
+pub enum CostTier { Free, Light, Heavy }        // 三档起步，对扩展开放；路由/预算消费在 S3
+pub enum RenderIntent { Generic, Terminal, Diff { locations: Vec<Address> } }
                                     // meta 级声明用空 locations；逐调用的 locations 是 args 的纯函数（S3 工具侧）
 pub struct ToolMeta { pub name: ToolName, pub disclosure: String, pub params: Payload,
                       pub effect: Effect, pub cost_tier: CostTier, pub timeout: Option<TimeoutMs>,
@@ -1008,7 +1007,6 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
 ### 8-24 kernel::model（缝清单文件）
 
 ```rust
-#[non_exhaustive]
 pub struct BuildingPolicy { pub confidential: bool }      // S2 最小；构造子 new(confidential)，字段 S3+ 只加
 pub struct ModelRequest { pub policy: BuildingPolicy, pub segments: [B3Hash; 4] }
                                     // segments＝冻结 prefix 分段哈希（与 prompt_assembled 同源）；线格式字段 S3 只加
@@ -1025,11 +1023,11 @@ pub fn assert_model_conformance<M: Model>(model: &mut M);
 **canonical 会话类型族**（城内规范 Dialect 的缝上定义；gateway::dialect 只做翻译，两适配器与剧本模型消费同一形）：
 
 ```rust
-#[non_exhaustive] pub enum Role { User, Assistant }                      // wire 枚举，开放
-#[non_exhaustive] pub enum StopReason { EndTurn, ToolUse, MaxTokens }
-#[non_exhaustive] pub enum ModelTag { Main, Digest, Transcribe }         // ALL: [ModelTag; 3]
+pub enum Role { User, Assistant }                      // wire 枚举，开放
+pub enum StopReason { EndTurn, ToolUse, MaxTokens }
+pub enum ModelTag { Main, Digest, Transcribe }         // ALL: [ModelTag; 3]
 pub struct SystemBlock { pub text: String, pub cache: bool }             // cache＝显式断点标记
-#[non_exhaustive] pub enum ContentBlock { Text{text} | Thinking{thinking, signature}
+pub enum ContentBlock { Text{text} | Thinking{thinking, signature}
                                         | RedactedThinking{data}
                                         | ToolUse{id, name: ToolName, input: Payload}
                                         | ToolResult{tool_use_id, content, is_error} }
@@ -1054,7 +1052,7 @@ pub fn value_has_float(value: &serde_json::Value) -> bool;               // wire
 **思考记录与思考强度**（思考记录原样保留，消息往返恒按 provider 官方规定处理）
 
 ```rust
-#[non_exhaustive] pub enum Effort { None, Low, Medium, High, XHigh, Max }   // 全序；Ord 按声明序
+pub enum Effort { None, Low, Medium, High, XHigh, Max }   // 全序；Ord 按声明序
 pub fn content_from_message(message: &Payload) -> Result<Vec<ContentBlock>, AxError>;  // 契约变更，见下
 pub struct ChatRequest { /* …既有五字段… */ pub effort: Option<Effort> }
 ```
@@ -1075,7 +1073,7 @@ pub enum ImageType { Png, Jpeg, Webp, Gif }        // 封闭枚举：城内认�
 impl ImageType { pub fn mime(&self) -> &'static str; }   // "image/png" 等，两条 wire 共用
 pub struct ImageRef { pub locator: Locator, pub media_type: ImageType,
                       pub width: u32, pub height: u32 }
-#[non_exhaustive] pub enum ContentBlock { /* …既有五变体… */
+pub enum ContentBlock { /* …既有五变体… */
     Image(ImageRef),
     ToolResult { tool_use_id, content, is_error, #[serde(default)] attachments: Vec<ImageRef> } }
 ```
@@ -1119,7 +1117,6 @@ impl<T: zeroize::Zeroize> Sealed<T> {
 ### 8-26 kernel::discard
 
 ```rust
-#[non_exhaustive]
 pub enum Restoration { Tracked(Locator), Interred(Locator), Rebuildable { reason: String } }
 pub struct Discard { /* paths, plan, taint, total_bytes —— 私有 */ }
 impl Discard {
@@ -1132,16 +1129,16 @@ impl Discard {
     pub fn taint(&self) -> &TaintSet;   pub fn total_bytes(&self) -> ByteLen;
 }
 
-#[non_exhaustive] pub enum DiscardRequest { Planned(Discard),
+pub enum DiscardRequest { Planned(Discard),
                                             Unplanned { paths: Vec<Address>, taint: TaintSet, total_bytes: ByteLen } }
-#[non_exhaustive] pub enum EscalateReason { FilesOverMax, BytesOverMax, RegistryAsset, Tainted }
-#[non_exhaustive] pub enum DenyReason { NoRestoration }
-#[non_exhaustive] pub enum DiscardVerdict { Allow, Escalate { reason: EscalateReason }, Deny { reason: DenyReason } }
+pub enum EscalateReason { FilesOverMax, BytesOverMax, RegistryAsset, Tainted }
+pub enum DenyReason { NoRestoration }
+pub enum DiscardVerdict { Allow, Escalate { reason: EscalateReason }, Deny { reason: DenyReason } }
 /// The fifth door's decision table, sole authority —
 /// gate::discard delegates wholly and only shapes the refusal.
 pub fn decide(req: &DiscardRequest, registry: &Registry) -> DiscardVerdict;
 
-#[non_exhaustive] pub enum DiscardForecast { Clear, Suspected { pattern: String } }
+pub enum DiscardForecast { Clear, Suspected { pattern: String } }
 pub fn forecast(arm: &ExecArm) -> DiscardForecast;
 ```
 
@@ -1153,23 +1150,23 @@ pub fn forecast(arm: &ExecArm) -> DiscardForecast;
 
 ```rust
 pub struct GateContext { pub actor: String, pub now: TimeMs, pub item_id: ApprovalId }   // Escalate 造 item 所需；全由调用方注入
-#[non_exhaustive] pub enum GateOutcome { Allow, Escalate { item: ApprovalItem }, Deny { refusal: Box<AxError> } }
+pub enum GateOutcome { Allow, Escalate { item: ApprovalItem }, Deny { refusal: Box<AxError> } }
 
 pub fn domain(domain: &WriteDomain, target: &Address, taint: &TaintSet) -> GateOutcome;   // 判一个文件
 pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutcome;    // 判一块声明的区域（§8-46 末段）
-#[non_exhaustive] pub enum EgressTarget { Loopback, Private, Public { host: String },
+pub enum EgressTarget { Loopback, Private, Public { host: String },
                                           Connector { label: ServerLabel } }   // 分类由效果层解好址后注入
-#[non_exhaustive] pub enum EgressOutcome { Allow { first_public_egress: bool }, Deny { refusal: Box<AxError> } }
+pub enum EgressOutcome { Allow { first_public_egress: bool }, Deny { refusal: Box<AxError> } }
 pub fn egress(spans: &[SecretSpan], target: &EgressTarget, prior_public_egress: bool) -> EgressOutcome;
 // 没有 `spend` 门：它会判的 ladder 不存在，且它从无生产调用方。门由五减四。
-#[non_exhaustive] pub enum CommitmentDecision { Approved, Denied }
+pub enum CommitmentDecision { Approved, Denied }
 pub fn commitment(decision: Option<&CommitmentDecision>, taint: &TaintSet, ctx: &GateContext,
                   action_desc: &str, artifact: &Locator) -> GateOutcome;
 pub fn discard(req: &DiscardRequest, registry: &Registry, ctx: &GateContext,
                action_desc: &str, artifact: &Locator) -> GateOutcome;
 pub fn spawn(parent: Depth, kind: &DelegateKind) -> GateOutcome;      // E_DELEGATION_DEPTH 的塑形处
 
-#[non_exhaustive] pub enum DedupVerdict { Fresh, Duplicate }
+pub enum DedupVerdict { Fresh, Duplicate }
 pub fn dedup(seen: &BTreeSet<IdemKey>, key: &IdemKey) -> DedupVerdict;   // 去重恒先于副作用：调用序纪律＋citysim 不变量看守
 ```
 
@@ -1537,7 +1534,6 @@ impl WriteDomain {
     pub fn prefixes(&self) -> impl Iterator<Item = &Address>;
 }
 
-#[non_exhaustive]
 pub enum DomainVerdict {
     Within,
     Outside { prefixes: Vec<String> },
@@ -1545,7 +1541,6 @@ pub enum DomainVerdict {
     NotWritable { reason: DocumentReason },
 }
 
-#[non_exhaustive]
 pub enum DocumentReason { NotMarkdown, ThePlan }
 
 pub const ROADMAP_FILE: &str = "Roadmap.md";   // 随 ROADMAP_COLUMNS 住 spine::row

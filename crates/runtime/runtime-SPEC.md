@@ -132,10 +132,10 @@ pub struct Turn<S> { /* journal（run、who、t、refs、redacted）、state —
 pub struct Assembling(/* 私有 */);  pub struct Calling { /* prefix 哈希 */ }
 pub struct ToolWave { /* calls */ }   pub struct Recording { /* refs */ }
 
-#[non_exhaustive] pub enum Interrupt { None, Cancel }    // Steer variant 随 S3 只加（消费方传值不 match，开放无痛）
+pub enum Interrupt { None, Cancel }    // Steer variant 随 S3 只加（消费方传值不 match，开放无痛）
 pub enum PhaseOutcome<Next> { Advanced(Next), Cancelled(TurnCancelled) }
 // PhaseOutcome 刻意穷尽：新结局必须逼每个执行器表态，不得掉 catch-all；
-// 14.3 的 non_exhaustive 规则辖 wire 冻结枚举，不辖判定输出（verdict 枚举全库同此例）。
+// G-22 之后全库枚举皆闭，这一条不再是判定输出的例外规则，而是常规。
 pub struct TurnCancelled { /* refs：含 cancel_received —— 私有，getter 取 */ }
 pub struct TurnReport { /* refs、model_returned_ref、wave_len —— getter 取 */ }
 
@@ -317,9 +317,9 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<st
 ```rust
 pub struct Watchdog { /* corrections: u32、provider_failures: u32、retries: Retries —— 私有，逐 Run 一实例 */ }
 #[derive(Default)] pub enum Retries { #[default] UntilHalted, AtMost(u32) }
-#[non_exhaustive] pub enum Disposal { Proceed, CorrectiveSteer { text: String },
+pub enum Disposal { Proceed, CorrectiveSteer { text: String },
                                      BackOff { until: TimeMs }, Freeze { reason: FreezeReason } }
-#[non_exhaustive] pub enum FreezeReason { Stall, ProviderRefused }
+pub enum FreezeReason { Stall, ProviderRefused }
 impl Watchdog {
     pub fn new(retries: Retries) -> Watchdog;
     /// Consumes kernel::stall's verdict verbatim; never re-derives it.
@@ -402,7 +402,7 @@ pub fn dev_entry() -> CatalogEntry;   // 一行披露，全部细则归 expansio
 ### 8-12b runtime::mode 原有面
 
 ```rust
-#[non_exhaustive] pub enum Mode { PlanGoal, Up, Sc, Ud, Experiment }
+pub enum Mode { PlanGoal, Up, Sc, Ud, Experiment }
 impl Mode { pub fn as_str(&self) -> &'static str;              // "plan_goal" | "up" | "sc" | "ud" | "experiment"
             pub fn catalog_entry(&self) -> CatalogEntry }      // 含 PlanGoal 退出条件四列
 ```
@@ -415,7 +415,7 @@ pub struct Mount { pub host: std::path::PathBuf, pub guest: String, pub writable
 pub struct SandboxJob { pub wasm: std::path::PathBuf, pub argv: Vec<String>, pub env: Vec<(String, String)>,
                         pub stdin: Vec<u8>, pub mounts: Vec<Mount>, pub fuel: Fuel }
 pub struct SandboxOutcome { pub stdout: Vec<u8>, pub stderr: Vec<u8>, pub exit: SandboxExit }
-#[non_exhaustive] pub enum SandboxExit { Success, Failure { code: u64 }, FuelExhausted, Trap { message: String } }
+pub enum SandboxExit { Success, Failure { code: u64 }, FuelExhausted, Trap { message: String } }
 pub trait Sandbox { fn run(&mut self, job: &SandboxJob) -> Result<SandboxOutcome, AxError>; }
 
 pub struct WasmtimeSandbox;            // feature = "wasm"；wasip1 直跑（先按 preview1 落地）
@@ -482,7 +482,7 @@ pub struct StatusSnapshot { pub who: String, pub addr: Address, pub mode: Mode, 
     pub write_domain: String, pub locks: Vec<String>, pub worktree_path: String, pub worktree_disk: ByteLen,
     pub signals_pending: u32, pub children: Vec<ChildStatus>, pub now: Option<ClockStamp>,
     pub provider_mode: ProviderMode, pub neighbours: u32 }   // neighbours 在末尾，渲染序与声明序同一
-#[non_exhaustive] pub enum ProviderMode { Normal, Degraded, LocalOnly }
+pub enum ProviderMode { Normal, Degraded, LocalOnly }
 pub struct ChildStatus { pub room: Address, pub kind: DelegateKind }   // 重塑
 pub struct StatusTool { /* snapshot＋ children: Box<dyn Fn() -> Vec<ChildStatus> + Send> ＋ backlog: Option<Backlog> */ }
 impl StatusTool {
@@ -575,7 +575,7 @@ impl ToolBench {
 - L0 三件恒列 prefix（City.md 只放这一级）；catalog 只收 L2——L0 不进 catalog（名字即文档）但 tool_defs 恒含三件（wire 面要 schema）。
 - **否决「Suspected → Discard 门」**：它与 kernel 既有设计冲突，以 kernel 为准。理由：`DiscardRequest` 只有 `Planned`／`Unplanned` 两变体，而 `decide` 对 `Unplanned` **恒判 Deny(NoRestoration)**——把 forecast 的预判包成 Unplanned 送进门，等于让任何含 `rm ` 的 exec 调用全被拒。`kernel::discard` 的注释早已写明正确意图：「text prediction is obfuscatable by design — hits route conservatively, and the git checkpoint net (S3) is the honest backstop」。故 **Suspected 不拒而围栏**：强制 `checkpoint.wave_pre` 先行再放行，删掉的东西因而可回档；**无 checkpoint 网时才拒**（`E_TOOL_UNAVAILABLE`），因为「无保护地跑」是唯一没人选择的结局。此路由使 A14 的先行半链在 exec 臂上机械成立。
 - ToolBench 持 `Option<Checkpoint>` 具体类型而非新 trait：checkpoint 只有一个实现，为尚不存在的第二实现引缝会造空抽象（AGENTS.md：trait 只在已有第二实现的缝上引入）。
-- **`BenchOutcome` 去掉 `#[non_exhaustive]`**：它是判定输出，而本文对 `PhaseOutcome` 写的规则已经辖到它——「14.3 的 non_exhaustive 规则辖 wire 冻结枚举，不辖判定输出」。全工作区扫一遍：`kernel` 的八个判定枚举无一标它（`budget.rs` 行内写着「Deliberately exhaustive verdict enum」），**`BenchOutcome` 是唯一的例外**，于是两个下游各背着一条永不执行的 `_ =>`——而那正是 §7「新增一种答案而不回答它就不编译」要护的东西。收口是编译红：摘掉属性即得两条 `unreachable pattern`（citysim 一条、sprawling 一条），`-D warnings` 下即错，删掉它们才绿。下游从此必须穷尽匹配四臂。
+- **`BenchOutcome` 去掉 `#[non_exhaustive]`**：它是判定输出，两个下游各背着一条永不执行的 `_ =>`，而那正是 §7「新增一种答案而不回答它就不编译」要护的东西。收口是编译红：摘掉属性即得两条 `unreachable pattern`（citysim 一条、sprawling 一条），`-D warnings` 下即错，删掉它们才绿。下游从此必须穷尽匹配四臂。**G-22（叶子 7.10）把这一条推到全库**：本 crate 再无 `#[non_exhaustive]`，`Interrupt`／`Disposal`／`FreezeReason`／`Mode`／`SandboxExit`／`ProviderMode`／`SafePoint`／`Level` 八个枚举同期撤下，`clock.rs` 与 `bench/admit.rs` 的三条通配臂随之删除。
 - **三条规则各回到一处**：`invoke` 曾为 246 行，是 `length` 门报出的两个对象之一。拆它时量到三处重复：① `GateOutcome::Escalate` 的「granted 命中即放行」写了**三遍**（Write／Spawn／Govern）；② `EgressOutcome` 的「首次公开出网要记下来」写了**两遍**（Connector／Egress）；③ `serde_json::to_vec` 扫描参数写了两遍。三条都是规则而不是巧合：一份人给过的允许在三个地方各有一份实现，就是三个可以各自漂走的权威。归位后：`settled` 一处、`crossed` 一处，`admit` 成为那个 `match &effect` 自己的名字。尺寸 246 → 65（`admit` 139、`settled` 11、`crossed` 13）。行为逐字不变，公开面不变。
 - `BenchOutcome` 四态：`Ran{outcome, fenced}`（fenced 携围栏 oid，供波后补记）／`Refused{refusal}`（回流不终止回合）／`Pending{item}`／`Duplicate`。dedup 先于任何副作用；**key 在过门之后才记入 seen**，故被门拒的调用重试不算重放。
 - status 的 result 是**按冻结序渲染的文本**而非 JSON 对象：`serde_json::Map` 对键排序，JSON 对象没有读者可依赖的序，「冻结序」会悄悄变成字母序。序是「模型读到的东西」的属性，故落在模型读到的地方。
@@ -602,7 +602,7 @@ pub struct RunPlan {                 // 一个 Run 的全部常量，调用方�
 - **没有 `budget_turns` 与 `budget` 两栏**：回合上限与花销天花板都不存在，一跑循环到它自己结束为止；停一件正在跑的事是 `Cancel`，停一片是 `Halt`。
 - **`skills` 写进 `run_started` 载荷，且无条件写**（空则空数组），理由与当年 budget 两栏同一条：一个时有时无的 key 是一个读者得猜的形状，而「这栋楼一个都没准进」本身就是一件值得记下的事。进账本而不只留在进程里，是因为「它变了没有」需要一个**早一次的读取**，而进程一走就只剩账本说得出这一轮到底拿到了哪些字节。
 
-#[non_exhaustive] pub enum SafePoint { BeforeAssemble{turn:u32}, BeforeCall{turn:u32}, BeforeWave{turn:u32}, BeforeSpawn{turn:u32} }
+pub enum SafePoint { BeforeAssemble{turn:u32}, BeforeCall{turn:u32}, BeforeWave{turn:u32}, BeforeSpawn{turn:u32} }
 pub enum Advance { Turned, Concluded(Completion) }        // 穷尽；新结局逼每个调用方表态
 
 pub struct RunHooks<'a> {            // 四个闭包，不是四个 trait：本模块只有一个消费者形式
@@ -664,7 +664,7 @@ pub fn digest_once(text, origin, breaker, cached: &mut dyn FnMut(&B3Hash) -> Res
 设计权威是 `docs/logging.md`；本节只记接口与三处口径差异。
 
 ```rust
-#[non_exhaustive] pub enum Level { Refuse, Effect, Decide, Trace, Wire }  // 全序：层底控到该级为止
+pub enum Level { Refuse, Effect, Decide, Trace, Wire }  // 全序：层底控到该级为止
 impl Level { pub const DEFAULT: Level = Effect; pub const ALL: [Level; 5]; pub fn parse(&str) -> Option<Level>; }
 pub struct Site<'a> { pub run: RunId, pub seq: Seq, pub module: &'a str }   // 三字段必填
 pub type Sink = Box<dyn FnMut(&str) + Send>;

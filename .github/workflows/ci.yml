@@ -10,10 +10,10 @@
 # the *sum* of two builds. Split across jobs that start together, it is
 # the slower of the two.
 #
-# Six jobs, none waiting on another. Together they are exactly `just
-# check` plus the supply-chain read and the proofs, and CI must
-# never be weaker than the local command: a green CI that implies less
-# than a green `just check` is worse than no CI.
+# Six verdict jobs, five of which wait on nothing. Together they are
+# exactly `just check` plus the supply-chain read and the proofs, and CI
+# must never be weaker than the local command: a green CI that implies
+# less than a green `just check` is worse than no CI.
 #
 #   clippy   fmt, then the zero-warning build of every target and feature
 #   test     the suite; the only job that produces trybuild scratch
@@ -22,8 +22,19 @@
 #            needs (27s of a 27.5s gate run - it is why the other
 #            twelve no longer queue behind a compile)
 #   client   the client's own linter, typecheck and tests
-#   proof    the kernel propositions kani can hold, against real MIR
+#   proof    the kernel propositions kani can hold, against real MIR;
+#            the one job with a prerequisite, `changes` below
 #   supply   licences, bans and sources; compiles nothing
+#
+# All six are required checks on a pull request, which is a repository
+# setting rather than a line in this file. `changes` is deliberately not
+# required: it exists to let `proof` skip, and a skipped required check
+# counts as met while a required check that never starts blocks the
+# branch for ever.
+#
+# `changes` costs the other five jobs nothing. `needs` is declared per
+# job, and only `proof` declares it, so clippy, test, gates, client and
+# supply still start in the first second of the run.
 #
 # Windows for everything a person can reproduce at their desk: it is the
 # platform the project is developed on, so a red job is a red local run.
@@ -78,6 +89,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Which of this change's paths a proof could possibly be about.
+  #
+  # Installing kani and its own toolchain is minutes, and a pull request
+  # that edits a README has nothing for a solver to hold. This job reads
+  # the change's file list and `proof` below runs only when a path it
+  # judges moved: the kernel it proves over, this workflow, the xtask
+  # that owns the harness roster, and the pinned kani version.
+  #
+  # `dorny/paths-filter` rather than a hand-written `git diff` here: the
+  # range under review is already resolved once in this file, by the
+  # `gates` job, and a second resolver would be a second answer to one
+  # question the first time a push rewrote history.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      proof: ${{ steps.filter.outputs.proof }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            proof:
+              - 'crates/kernel/**'
+              - 'xtask/src/proof.rs'
+              - 'xtask/src/proof/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/kani-version.txt'
+
   # fmt answers in two seconds and rides along here rather than in a job
   # of its own: a whole runner, a whole toolchain download and a whole
   # queue wait to save two seconds is not speed.
@@ -334,6 +375,11 @@ jobs:
   # times). Each returned inside a minute when they were last timed, on
   # 2026-08-29.
   proof:
+    needs: changes
+    # A change that touches nothing a proof is about skips this job, and
+    # a skipped job reports success to a required check. Asking for the
+    # run by hand always proves, because that is what asking means.
+    if: needs.changes.outputs.proof == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -344,15 +390,37 @@ jobs:
         with:
           shared-key: proof
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: install kani
+      # `cargo kani setup` downloads kani's own toolchain, which is
+      # hundreds of megabytes and changes when the pinned version changes
+      # and at no other time. So the key is the pin file alone: keyed on
+      # this workflow instead, every edited comment in it would fetch the
+      # toolchain again.
+      #
+      # The pin is one line in `.github/workflows/kani-version.txt`,
+      # which `nightly.yml` reads as well - a floating install would let
+      # a kani release turn a pull request red for something its author
+      # did not write.
+      - uses: actions/cache@v6
+        id: kani-cache
+        with:
+          path: |
+            ~/.cargo/bin/cargo-kani
+            ~/.cargo/bin/kani
+            ~/.kani
+          key: kani-${{ runner.os }}-${{ hashFiles('.github/workflows/kani-version.txt') }}
+      - name: install the pinned kani
+        if: steps.kani-cache.outputs.cache-hit != 'true'
+        shell: bash
         run: |
-          cargo install --locked kani-verifier
+          set -euo pipefail
+          version=$(cat .github/workflows/kani-version.txt)
+          cargo install --locked "kani-verifier@$version"
           cargo kani setup
       # `cargo xtask proof` skips with one line and succeeds where kani is
       # absent, which is right at a Windows desk and would be a silently
       # empty verdict here. This step is what makes the skip impossible in
-      # CI: a broken install stops the job before the proof step can pass
-      # by proving nothing.
+      # CI: a broken install or a cache restored without the toolchain
+      # stops the job before the proof step can pass by proving nothing.
       - name: kani answers, so the proof step cannot skip
         run: cargo kani --version
       - name: xtask proof

@@ -8,9 +8,9 @@ use crate::secret::SecretSpan;
 
 /// address resolution; kernel never resolves names.
 ///
-/// Non-exhaustive as the specification has always said it is: the kinds
-/// of destination a city can distinguish grow.
-#[non_exhaustive]
+/// Closed: the kinds of destination a city can distinguish still grow,
+/// and every module that decides about a destination has to be shown
+/// the new kind by the compiler on the day it is added.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EgressTarget {
     Loopback,

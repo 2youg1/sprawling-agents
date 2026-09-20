@@ -319,6 +319,10 @@ impl Tool for ReadTool {
         let text = match self.resolve(asked)? {
             Found::Text(text) => text,
             Found::File(path) => std::fs::read_to_string(&path).map_err(|err| {
+                #[expect(
+                    clippy::wildcard_enum_match_arm,
+                    reason = "std::io::ErrorKind is an upstream open enum; a file that exists and will not open is storage"
+                )]
                 let code = match err.kind() {
                     std::io::ErrorKind::NotFound => AxCode::InvalidArgs,
                     _ => AxCode::StorageFatal,

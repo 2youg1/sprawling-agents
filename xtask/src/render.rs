@@ -25,6 +25,12 @@
 //! comparison fails on a font hint and passes on a page that is wrong in
 //! a way nobody photographed.
 //!
+//! **The page is opened once per pass, and a pass is a width and a
+//! lighting.** A property that holds at one width is a property about
+//! that width; the three columns are laid out by container queries, so
+//! the same source draws a different page at 768 and at 2560. Which
+//! passes a run makes lives in `pass.rs` (section 8-16).
+//!
 //! **A missing bundle, a missing browser or a gallery that drew
 //! nothing is a violation, and each says which.** A gate that goes
 //! quiet when it cannot find its subject reports green for a page
@@ -39,17 +45,25 @@ use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
 
+mod announced;
 mod engine;
 mod marks;
+mod pass;
+mod probe;
 
-use engine::{browser, measure};
+use announced::{every_control_is_announceable, every_landmark_is_named, one_first_heading};
+use engine::{Measured, Opening, browser, measure};
 use marks::{no_key_is_underlined, rows_share_a_first_mark};
+use pass::Pass;
 
 /// The client bundle this gate opens: the same one `just dist` embeds.
 const BUNDLE: &str = "target/web-dist";
 
 /// The route that draws every state worth looking at, on fixtures.
 const GALLERY: &str = "#/gallery";
+
+/// Where a finding is located when no pass could be made at all.
+const EVERY_PASS: &str = "in every pass";
 
 /// Two boxes may differ by this many pixels and still count as aligned.
 ///
@@ -149,6 +163,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let bundle = root.join(BUNDLE);
     if !bundle.join("index.html").is_file() {
         return Ok(vec![violation(
+            EVERY_PASS,
             "the client bundle this gate measures is built",
             format!("{BUNDLE}/index.html is not built, so no page was measured"),
             "run `just build-web`",
@@ -156,102 +171,76 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     }
     let Some(browser) = browser() else {
         return Ok(vec![violation(
+            EVERY_PASS,
             "a real engine draws the page this gate measures",
             "no headless browser was found, so no page was measured".to_owned(),
             "install a Chromium-family browser, or point `SPRAWLING_BROWSER` at one",
         )]);
     };
-    let drawn = measure(root, &browser, &bundle, GALLERY)?;
-    if drawn.is_empty() {
-        return Ok(vec![violation(
-            "the gallery draws every state this gate measures",
-            format!("{GALLERY} drew nothing measurable"),
-            "repair the gallery route so it renders its fixtures",
-        )]);
-    }
+    let opening = Opening {
+        root,
+        browser: &browser,
+        bundle: &bundle,
+        route: GALLERY,
+    };
     let mut violations = Vec::new();
-    every_control_is_announceable(&drawn, &mut violations);
-    every_landmark_is_named(&drawn, &mut violations);
-    one_first_heading(&drawn, &mut violations);
-    one_left_edge(&drawn, &mut violations);
-    nothing_escapes_what_holds_it(&drawn, &mut violations);
-    rows_share_a_first_mark(&drawn, &mut violations);
-    no_key_is_underlined(&drawn, &mut violations);
+    for pass in pass::wanted()? {
+        judge(pass, &measure(&opening, pass)?, &mut violations);
+    }
     Ok(violations)
 }
 
-pub(super) fn violation(rule: &str, subject: String, alternative: &str) -> Violation {
+/// Every property, over one opening of the page.
+///
+/// The pass reports itself first: a lighting the page did not take is a
+/// pass that measured some other page, and reading seven properties off
+/// it would report green for a page nobody looked at.
+fn judge(pass: &Pass, measured: &Measured, out: &mut Vec<Violation>) {
+    let at = pass.called();
+    if measured.drawn.is_empty() {
+        out.push(violation(
+            &at,
+            "the gallery draws every state this gate measures",
+            format!("{GALLERY} drew nothing measurable"),
+            "repair the gallery route so it renders its fixtures",
+        ));
+        return;
+    }
+    if let Some(difference) = pass.disagrees(&measured.reported) {
+        out.push(violation(
+            &at,
+            "the page draws itself in the conditions the pass asked for",
+            difference,
+            "the lighting is the `data-theme` attribute `theme.css` selects on, and the forced \
+             mode is the engine's own switch: a pass that cannot set one measures a page it did \
+             not ask for",
+        ));
+        return;
+    }
+    let drawn = &measured.drawn;
+    every_control_is_announceable(drawn, &at, out);
+    every_landmark_is_named(drawn, &at, out);
+    one_first_heading(drawn, &at, out);
+    one_left_edge(drawn, &at, out);
+    nothing_escapes_what_holds_it(drawn, &at, out);
+    rows_share_a_first_mark(drawn, &at, out);
+    no_key_is_underlined(drawn, &at, out);
+}
+
+/// One finding, told where it was found: the same page at two widths is
+/// two places a reader has to be sent to.
+pub(super) fn violation(at: &str, rule: &str, subject: String, alternative: &str) -> Violation {
     Violation {
         gate: "render",
-        location: format!("{BUNDLE} {GALLERY}"),
+        location: format!("{BUNDLE} {GALLERY} {at}"),
         rule: rule.to_owned(),
         violation: subject,
         alternative: alternative.to_owned(),
     }
 }
 
-/// Every control a person can operate says what it is.
-///
-/// The first run of this property found four: the composer's own text
-/// box, on every fixture that draws one. It is the control the whole page
-/// exists for, and to a screen reader it was an unlabelled edit field.
-fn every_control_is_announceable(drawn: &[Drawn], out: &mut Vec<Violation>) {
-    for held in drawn
-        .iter()
-        .filter(|held| held.operable() && held.drawn() && held.anonymous())
-    {
-        let what = if held.role == "-" {
-            held.tag.to_lowercase()
-        } else {
-            format!("{} as {}", held.tag.to_lowercase(), held.role)
-        };
-        out.push(violation(
-            "every control a person can operate has an accessible name",
-            format!(
-                "a {what} at x={} y={} is announced as nothing",
-                held.left, held.top
-            ),
-            "give it an `aria-label` from the phrase table, or let it contain the words it \
-             already shows. A control with no name is a control a screen reader can only \
-             call `button`",
-        ));
-    }
-}
-
-fn every_landmark_is_named(drawn: &[Drawn], out: &mut Vec<Violation>) {
-    for held in drawn
-        .iter()
-        .filter(|held| held.landmark() && held.drawn() && held.anonymous())
-    {
-        out.push(violation(
-            "every landmark says which region it is",
-            format!("a <{}> offers no name to jump to", held.tag.to_lowercase()),
-            "give the landmark an `aria-label` from the phrase table: two unnamed regions are \
-             two entries that read the same in the jump list",
-        ));
-    }
-}
-
-/// One first heading, so a reader arriving by keyboard lands somewhere.
-fn one_first_heading(drawn: &[Drawn], out: &mut Vec<Violation>) {
-    let headings: Vec<&Drawn> = drawn
-        .iter()
-        .filter(|held| held.tag == "H1" && held.drawn())
-        .collect();
-    if headings.len() == 1 {
-        return;
-    }
-    let named: Vec<String> = headings.iter().map(|held| held.called()).collect();
-    out.push(violation(
-        "a page has exactly one first heading",
-        format!("this page has {}: {}", headings.len(), named.join(", ")),
-        "one <h1> names the page; the parts under it are <h2>. A page with none gives a reader \
-         nothing to land on, and a page with two disagrees with itself about what it is",
-    ));
-}
-
 /// Every region in the main column starts at the same x.
-fn one_left_edge(drawn: &[Drawn], out: &mut Vec<Violation>) {
+fn one_left_edge(drawn: &[Drawn], at: &str, out: &mut Vec<Violation>) {
     let Some(main) = drawn.iter().position(|held| held.tag == "MAIN") else {
         return;
     };
@@ -278,6 +267,7 @@ fn one_left_edge(drawn: &[Drawn], out: &mut Vec<Violation>) {
         .map(|(left, name)| format!("{name} at x={left}"))
         .collect();
     out.push(violation(
+        at,
         "a page has one left edge: every region in the main column starts at the same x",
         format!("this page has {}: {}", edges.len(), listed.join(", ")),
         "let one authority set the inline margins - a region states its vertical rhythm, the \
@@ -290,7 +280,7 @@ fn one_left_edge(drawn: &[Drawn], out: &mut Vec<Violation>) {
 /// This is the generalisation of the defect the gate was written for: a
 /// box that has floated out of its container is still painted, still
 /// passes every test, and is the one thing a person sees immediately.
-fn nothing_escapes_what_holds_it(drawn: &[Drawn], out: &mut Vec<Violation>) {
+fn nothing_escapes_what_holds_it(drawn: &[Drawn], at: &str, out: &mut Vec<Violation>) {
     for held in drawn.iter().filter(|held| held.drawn()) {
         let Some(parent) = parent_of(drawn, held) else {
             continue;
@@ -309,6 +299,7 @@ fn nothing_escapes_what_holds_it(drawn: &[Drawn], out: &mut Vec<Violation>) {
                     || held.bottom() > parent.bottom().saturating_add(SLACK)));
         if escapes {
             out.push(violation(
+                at,
                 "nothing is drawn outside the box that holds it",
                 format!(
                     "{} ({},{} {}x{}) leaves {} ({},{} {}x{})",

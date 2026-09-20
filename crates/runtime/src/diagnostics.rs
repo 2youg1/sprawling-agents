@@ -33,7 +33,6 @@ use kernel::{RunId, Seq};
 /// The names answer "who reads this" rather than "how bad is this",
 /// because that is the question with a checkable answer. A severity
 /// ladder would invite the other one.
-#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
     /// The person, live: what a door refused, in three parts.

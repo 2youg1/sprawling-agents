@@ -18,7 +18,15 @@
 // spelled one way where it is written and another way where it is
 // read; and a browser that offers no storage is answered once, so
 // every reader above degrades the same way.
+//
+// **Browser storage refuses by throwing, in three places a person can
+// reach**: a profile that denies storage throws on the property access
+// itself, a private window can grant a store whose quota is zero, and
+// a quota can fill while the tab is open. Each throw is turned into a
+// value here, so no reader above has to know that keeping a row is an
+// operation that can fail, and the first paint cannot die on one.
 
+import { Effect, Either } from "effect";
 import { createSignal } from "solid-js";
 import type { Accessor } from "solid-js";
 
@@ -54,19 +62,79 @@ function memory(): Rows {
   };
 }
 
+// What a browser did when asked, as a value: the result, or nothing
+// when the browser refused. This is the client's second use of Effect
+// at run time and it is the same use as the first - a failure that
+// would otherwise be thrown is read as data (client-SPEC 4-6).
+function attempted<T>(act: () => T): T | null {
+  const ran = Effect.runSync(Effect.either(Effect.try(act)));
+  return Either.isRight(ran) ? ran.right : null;
+}
+
+// The row written and dropped to find out whether this browser keeps
+// anything at all. Named like every other row so a store shared with
+// another application cannot mistake it for theirs.
+const PROBE_KEY = "sprawling.probe";
+
+// The browser's own store with its refusals answered: a row the quota
+// will not take is kept for this session instead, so a person typing
+// into a box never loses the sentence that filled the quota and no
+// page dies on a write.
+function guarded(store: Rows, spare: Rows): Rows {
+  return {
+    getItem: (key) => attempted(() => store.getItem(key)) ?? spare.getItem(key),
+    setItem: (key, value) => {
+      const took = attempted(() => {
+        store.setItem(key, value);
+        return true;
+      });
+      if (took === null) {
+        spare.setItem(key, value);
+      }
+    },
+    removeItem: (key) => {
+      // Both copies are asked to drop the row and neither answer is
+      // needed: a store that refuses a removal is one the probe would
+      // not have admitted, and the session copy is dropped regardless.
+      attempted(() => {
+        store.removeItem(key);
+        return true;
+      });
+      spare.removeItem(key);
+    },
+  };
+}
+
+// Whether this browser gives the client a place to keep rows, decided
+// by writing one and dropping it again. A store that answers the probe
+// is used; a store that throws on the reach, or takes nothing, is
+// stood in for by a map that lasts as long as the tab.
+function decided(): Rows {
+  const spare = memory();
+  const store = attempted<Rows>(() => localStorage);
+  if (store === null) {
+    return spare;
+  }
+  const kept = attempted(() => {
+    store.setItem(PROBE_KEY, PROBE_KEY);
+    store.removeItem(PROBE_KEY);
+    return true;
+  });
+  return kept === null ? spare : guarded(store, spare);
+}
+
 // Where this browser's preferences live, and the only reach for that
 // global in the whole client. A hardened profile, a document rendered
 // before storage is granted, and a test runner all arrive here, and
 // what happens to the three of them is decided once.
-let fallback: Rows | undefined;
+let reached: Rows | undefined;
 
 export function browserRows(): Rows {
-  if (typeof localStorage !== "undefined") return localStorage;
-  // One table for every caller. A fresh one per call would let the
-  // shell and a settings panel each write their own preferences into a
-  // map the other never reads.
-  fallback ??= memory();
-  return fallback;
+  // One table for every caller, and one probe for the whole session. A
+  // fresh one per call would let the shell and a settings panel each
+  // write their own preferences into a map the other never reads.
+  reached ??= decided();
+  return reached;
 }
 
 // ------------------------------------------------------------- the rows
@@ -93,6 +161,12 @@ const MOTION_KEY = "sprawling.appearance.motion";
 // city recorded for it, so this is a starting point and not a setting
 // that reaches back.
 const PROXYING_KEY = "sprawling.network.proxying";
+
+// Whether the artefact panel beside a conversation is open. A debt with
+// a name: it belongs in the person's own TOML layer (roadmap 3.1), and
+// this row moves there whole when that layer lands rather than growing
+// a second reader here.
+const PANEL_KEY = "sprawling.talk.panel";
 
 const PROXYINGS: readonly Proxying[] = ["except_local", "always", "never"];
 
@@ -258,6 +332,9 @@ export interface Prefs {
   // decides whether setup is *needed*; this only decides whether a
   // person who skipped it is nagged again.
   readonly welcomed: Accessor<boolean>;
+  // Whether the artefact panel beside a conversation is open.
+  readonly panel: Accessor<boolean>;
+  readonly setPanel: (open: boolean) => void;
   readonly setWelcomed: (done: boolean) => void;
   // What was typed and not sent, by where it was typed. Not a signal:
   // the box that owns it reads it once when it mounts.
@@ -275,6 +352,9 @@ export function loadPrefs(rows: Rows, browserLang: string): Prefs {
   const [welcomed, setWelcomedSignal] = createSignal<boolean>(
     rows.getItem(WELCOMED_KEY) === "yes",
   );
+  const [panel, setPanelSignal] = createSignal<boolean>(
+    rows.getItem(PANEL_KEY) !== "no",
+  );
   return {
     lang,
     setLang(next) {
@@ -289,6 +369,11 @@ export function loadPrefs(rows: Rows, browserLang: string): Prefs {
         rows.setItem(EFFORT_KEY, next);
       }
       setEffortSignal(next);
+    },
+    panel,
+    setPanel(open) {
+      rows.setItem(PANEL_KEY, open ? "yes" : "no");
+      setPanelSignal(open);
     },
     welcomed,
     setWelcomed(done) {

@@ -14,7 +14,7 @@
 //! is that what happens inside it leaves no trace outside the run, and a
 //! cookie jar is a trace that outlives every run that wrote to it.
 
-use kernel::{Address, AxCode, AxError, RESERVED_PREFIX};
+use kernel::{Address, AxCode, AxError, BuildingPolicy, RESERVED_PREFIX};
 
 /// Where a building's browser profile lives, and whether it may exist.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,10 +33,14 @@ pub const PROFILES_DIR: &str = "browser-profiles";
 impl Profile {
     /// Decides where `building`'s profile lives.
     ///
+    /// The policy arrives whole rather than as the one bit read here,
+    /// so what counts as confidential keeps the one definition it has
+    /// in `kernel`.
+    ///
     /// # Errors
     /// Refuses an address that is not a building — a room does not have
     /// its own login, because a login is a property of the project.
-    pub fn of(building: &Address, confidential: bool) -> Result<Profile, AxError> {
+    pub fn of(building: &Address, policy: &BuildingPolicy) -> Result<Profile, AxError> {
         if building.is_reserved() {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -55,7 +59,7 @@ impl Profile {
                 "name the building, not a room inside it: a login belongs to the project",
             ));
         }
-        if confidential {
+        if policy.confidential {
             return Ok(Profile::Ephemeral);
         }
         let path = Address::parse(&format!(
@@ -87,12 +91,18 @@ mod tests {
         Address::parse(raw).unwrap()
     }
 
+    /// A building that keeps what it is told, which is every building
+    /// except the ones marked confidential.
+    fn open_policy() -> BuildingPolicy {
+        BuildingPolicy::new(false)
+    }
+
     #[test]
     fn two_buildings_never_share_what_the_browser_remembers() {
-        let Profile::At { path: lab } = Profile::of(&addr("lab"), false).unwrap() else {
+        let Profile::At { path: lab } = Profile::of(&addr("lab"), &open_policy()).unwrap() else {
             panic!("an ordinary building keeps a profile");
         };
-        let Profile::At { path: mill } = Profile::of(&addr("mill"), false).unwrap() else {
+        let Profile::At { path: mill } = Profile::of(&addr("mill"), &open_policy()).unwrap() else {
             panic!("an ordinary building keeps a profile");
         };
         assert_ne!(lab, mill);
@@ -101,7 +111,7 @@ mod tests {
 
     #[test]
     fn a_profile_sits_where_no_write_domain_reaches() {
-        let Profile::At { path } = Profile::of(&addr("lab"), false).unwrap() else {
+        let Profile::At { path } = Profile::of(&addr("lab"), &open_policy()).unwrap() else {
             panic!("an ordinary building keeps a profile");
         };
         assert!(
@@ -112,20 +122,20 @@ mod tests {
 
     #[test]
     fn a_confidential_building_keeps_nothing() {
-        let profile = Profile::of(&addr("lab"), true).unwrap();
+        let profile = Profile::of(&addr("lab"), &BuildingPolicy::new(true)).unwrap();
         assert_eq!(profile, Profile::Ephemeral);
         assert!(!profile.persists());
     }
 
     #[test]
     fn a_room_has_no_login_of_its_own() {
-        let err = Profile::of(&addr("lab/room1"), false).unwrap_err();
+        let err = Profile::of(&addr("lab/room1"), &open_policy()).unwrap_err();
         assert_eq!(err.code(), &AxCode::InvalidArgs);
         assert!(err.recovery().contains("belongs to the project"));
     }
 
     #[test]
     fn the_citys_own_subtree_is_not_a_building() {
-        assert!(Profile::of(&addr(RESERVED_PREFIX), false).is_err());
+        assert!(Profile::of(&addr(RESERVED_PREFIX), &open_policy()).is_err());
     }
 }
