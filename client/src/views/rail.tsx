@@ -25,6 +25,7 @@ import { MAYOR, toFragment } from "../core/route";
 import type { View } from "../core/route";
 import { useSay, useUi } from "../ui";
 import { Kbd } from "./parts/kbd";
+import { Tip } from "./parts/tip";
 
 // How long a pointer rests on the collapsed column before it opens, and
 // how long the rail stays open after the pointer leaves.
@@ -181,26 +182,33 @@ export function Rail(props: RailProps) {
           settle(false, LEAVE_MS);
         }}
       >
-        <button
-          type="button"
-          class="flex h-rail items-center gap-base px-base text-label text-text-quiet hover:text-text"
-          onClick={() => {
-            props.onToggle();
-          }}
-          aria-expanded={props.open}
-          title={linkWord()}
-        >
-          <Dot tone={dotClass()} />
-          <Show when={wide()}>
-            <span class="truncate">{ui.conn.belief.city ?? "sprawling"}</span>
-            <Kbd action="rail.toggle" class="ml-auto" />
-          </Show>
-        </button>
+        <Tip text={linkWord()}>
+          {(hint) => (
+            <button
+              type="button"
+              class="flex h-rail w-full items-center gap-base px-base text-label text-text-quiet hover:text-text"
+              onClick={() => {
+                props.onToggle();
+              }}
+              aria-expanded={props.open}
+              // Collapsed, this control shows a status dot and nothing
+              // else, so the hint is the only name it has — the same
+              // reading the `title` it replaced gave a screen reader.
+              aria-labelledby={hint}
+            >
+              <Dot tone={dotClass()} />
+              <Show when={wide()}>
+                <span class="truncate">{ui.conn.belief.city ?? "sprawling"}</span>
+                <Kbd action="rail.toggle" class="ml-auto" />
+              </Show>
+            </button>
+          )}
+        </Tip>
         <Show when={halted()}>
           <div
             class="flex h-rail items-center gap-base px-base text-label text-alert"
             role="status"
-            title={say("halt_title")}
+            aria-label={say("halt_title")}
           >
             <Dot tone="bg-alert" />
             <Show when={wide()}>
@@ -210,44 +218,52 @@ export function Rail(props: RailProps) {
         </Show>
         <For each={items()}>
           {(item) => (
-            <a
-              href={toFragment(item.view)}
-              aria-current={here(item)}
-              class="relative flex h-rail items-center gap-base px-base text-label text-text-faint hover:bg-g1 hover:text-text aria-[current=page]:text-text"
-              title={item.label}
-            >
-              <span class="relative shrink-0">
-                {item.glyph}
-                <Show when={(item.badge ?? 0) > 0}>
-                  <span class="absolute -top-tight -right-tight rounded-pill bg-accent px-tight text-note leading-none text-g0">
-                    {item.badge}
+            <Tip text={item.label}>
+              {(hint) => (
+                <a
+                  href={toFragment(item.view)}
+                  aria-current={here(item)}
+                  aria-labelledby={hint}
+                  class="relative flex h-rail w-full items-center gap-base px-base text-label text-text-faint hover:bg-g1 hover:text-text aria-[current=page]:text-text"
+                >
+                  <span class="relative shrink-0">
+                    {item.glyph}
+                    <Show when={(item.badge ?? 0) > 0}>
+                      <span class="absolute -top-tight -right-tight rounded-pill bg-accent px-tight text-note leading-none text-g0">
+                        {item.badge}
+                      </span>
+                    </Show>
                   </span>
-                </Show>
-              </span>
-              <Show when={wide()}>
-                <span class="truncate">{item.label}</span>
-                <Kbd action={item.action} class="ml-auto" />
-              </Show>
-            </a>
+                  <Show when={wide()}>
+                    <span class="truncate">{item.label}</span>
+                    <Kbd action={item.action} class="ml-auto" />
+                  </Show>
+                </a>
+              )}
+            </Tip>
           )}
         </For>
         <Show when={waiting() > 0}>
-          <a
-            href={toFragment({ kind: "talk", address: MAYOR })}
-            class="flex h-rail items-center gap-base px-base text-label text-alert hover:bg-g1"
-            title={say("nav_waiting", { n: String(waiting()) })}
-          >
-            <span class="relative shrink-0">
-              <HandGlyph />
-              <span class="absolute -top-tight -right-tight rounded-pill bg-alert px-tight text-note leading-none text-g0">
-                {waiting()}
-              </span>
-            </span>
-            <Show when={wide()}>
-              <span class="truncate">{say("nav_waiting", { n: String(waiting()) })}</span>
-              <Kbd action="go.waiting" class="ml-auto" />
-            </Show>
-          </a>
+          <Tip text={say("nav_waiting", { n: String(waiting()) })}>
+            {(hint) => (
+              <a
+                href={toFragment({ kind: "talk", address: MAYOR })}
+                aria-labelledby={hint}
+                class="flex h-rail w-full items-center gap-base px-base text-label text-alert hover:bg-g1"
+              >
+                <span class="relative shrink-0">
+                  <HandGlyph />
+                  <span class="absolute -top-tight -right-tight rounded-pill bg-alert px-tight text-note leading-none text-g0">
+                    {waiting()}
+                  </span>
+                </span>
+                <Show when={wide()}>
+                  <span class="truncate">{say("nav_waiting", { n: String(waiting()) })}</span>
+                  <Kbd action="go.waiting" class="ml-auto" />
+                </Show>
+              </a>
+            )}
+          </Tip>
         </Show>
         <span class="flex-1" />
         <Show when={props.prefix !== null}>
@@ -255,20 +271,24 @@ export function Rail(props: RailProps) {
             {say("keys_prefix", { key: props.prefix ?? "" })}
           </div>
         </Show>
-        <button
-          type="button"
-          class="flex h-rail items-center gap-base px-base text-label text-text-faint hover:bg-g1 hover:text-text"
-          onClick={() => {
-            props.onPalette();
-          }}
-          title={say("nav_palette")}
-        >
-          <PaletteGlyph />
-          <Show when={wide()}>
-            <span class="truncate">{say("nav_everything")}</span>
-            <Kbd action="palette" class="ml-auto" />
-          </Show>
-        </button>
+        <Tip text={say("nav_palette")}>
+          {(hint) => (
+            <button
+              type="button"
+              class="flex h-rail w-full items-center gap-base px-base text-label text-text-faint hover:bg-g1 hover:text-text"
+              onClick={() => {
+                props.onPalette();
+              }}
+              aria-labelledby={hint}
+            >
+              <PaletteGlyph />
+              <Show when={wide()}>
+                <span class="truncate">{say("nav_everything")}</span>
+                <Kbd action="palette" class="ml-auto" />
+              </Show>
+            </button>
+          )}
+        </Tip>
       </nav>
     </div>
   );

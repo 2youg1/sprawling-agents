@@ -27,6 +27,7 @@ import { Address } from "../../core/address";
 import { useCommand, useGo, useSay, useUi } from "../../ui";
 import { Popover } from "../parts/popover";
 import type { PopoverColumn, PopoverItem } from "../parts/popover";
+import { Tip } from "../parts/tip";
 import { Option } from "effect";
 
 // What the send control is spelled, for each of the three places a
@@ -375,7 +376,7 @@ export function Composer(props: ComposerProps) {
           // A draft restored on mount is taller than one row.
           requestAnimationFrame(grow);
         }}
-        class="block w-full resize-none bg-transparent text-body leading-relaxed text-text outline-none placeholder:text-text-disabled"
+        class="block w-full resize-none bg-transparent text-body leading-relaxed text-text placeholder:text-text-disabled"
         rows={1}
         placeholder={props.placeholder}
         // A placeholder is not a name: it is gone as soon as somebody
@@ -411,24 +412,28 @@ export function Composer(props: ComposerProps) {
       />
       <div class="mt-snug flex items-center justify-between gap-base text-note text-text-faint">
         <div class="flex min-w-0 items-center gap-base">
-          <button
-            type="button"
-            class="flex min-w-0 items-center gap-tight rounded-pill bg-g2 px-base py-tight text-note text-text-quiet hover:bg-g3"
-            onClick={() => {
-              setOpen((held) => (held === "choice" ? "none" : "choice"));
-            }}
-            aria-expanded={open() === "choice"}
-            title={say("talk_choose")}
-          >
-            <span class="min-w-0 truncate">{main()?.model ?? say("talk_no_model")}</span>
-            <Show when={here()}>
-              {(room) => <span class="min-w-0 truncate text-text-disabled"> · {room()}</span>}
-            </Show>
-            <span class="shrink-0 text-text-disabled">
-              {" · "}
-              {say("talk_effort")} {say(`effort_${ui.prefs.effort()}`)}
-            </span>
-          </button>
+          <Tip text={say("talk_choose")}>
+            {(hint) => (
+              <button
+                type="button"
+                class="flex min-w-0 items-center gap-tight rounded-pill bg-g2 px-base py-tight text-note text-text-quiet hover:bg-g3"
+                onClick={() => {
+                  setOpen((held) => (held === "choice" ? "none" : "choice"));
+                }}
+                aria-expanded={open() === "choice"}
+                aria-describedby={hint}
+              >
+                <span class="min-w-0 truncate">{main()?.model ?? say("talk_no_model")}</span>
+                <Show when={here()}>
+                  {(room) => <span class="min-w-0 truncate text-text-disabled"> · {room()}</span>}
+                </Show>
+                <span class="shrink-0 text-text-disabled">
+                  {" · "}
+                  {say("talk_effort")} {say(`effort_${ui.prefs.effort()}`)}
+                </span>
+              </button>
+            )}
+          </Tip>
           <Show when={props.hearing === true && canRecord()}>
             <button
               type="button"

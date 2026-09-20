@@ -22,6 +22,7 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, Payload};
 
 use crate::policy::BUILDING_FILE;
@@ -150,11 +151,7 @@ impl Building {
     /// Where this building's own files live.
     #[must_use]
     pub fn root(&self, city_root: &Path) -> PathBuf {
-        let mut path = city_root.to_path_buf();
-        for segment in self.addr.as_str().split('/') {
-            path.push(segment);
-        }
-        path
+        CityLayout::new(city_root).scope(&self.addr)
     }
 
     /// Whether `addr` is a room of this building.
@@ -177,16 +174,21 @@ impl Building {
 /// # Errors
 /// Propagates a city directory that cannot be read.
 pub fn all(city_root: &Path) -> Result<Vec<Address>, AxError> {
-    let entries = std::fs::read_dir(city_root).map_err(|err| {
+    let unreadable = |err: &std::io::Error| {
         AxError::failure(
             AxCode::StorageFatal,
             "list the buildings of a city",
             format!("{}: {err}", city_root.display()),
         )
         .with_recovery("check the city directory is readable")
-    })?;
+    };
+    let entries = std::fs::read_dir(city_root).map_err(|err| unreadable(&err))?;
     let mut out = Vec::new();
-    for entry in entries.flatten() {
+    for entry in entries {
+        // An entry this process cannot stat is reported rather than
+        // skipped: a building missing from this list is a building a
+        // person is told the city does not have.
+        let entry = entry.map_err(|err| unreadable(&err))?;
         if !entry.path().is_dir() {
             continue;
         }

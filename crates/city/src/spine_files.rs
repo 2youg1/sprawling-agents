@@ -233,12 +233,9 @@ pub fn job_path(city_root: &Path, addr: &Address) -> PathBuf {
 /// for where the plan is, and it keeps working after the real one moves.
 #[must_use]
 pub fn roadmap_path(city_root: &Path, building_addr: &Address) -> PathBuf {
-    let mut path = city_root.to_path_buf();
-    for segment in building_addr.as_str().split('/') {
-        path.push(segment);
-    }
-    path.push(ROADMAP_FILE);
-    path
+    kernel::layout::CityLayout::new(city_root)
+        .scope(building_addr)
+        .join(ROADMAP_FILE)
 }
 
 /// A building's plan as it stands, or an empty document when the
@@ -283,15 +280,12 @@ pub fn write_job(
     brief: &JobBrief<'_>,
 ) -> Result<String, AxError> {
     let path = job_path(city_root, addr);
-    if let Some(room) = path.parent() {
-        std::fs::create_dir_all(room).map_err(|err| storage(room, &err))?;
-    }
     let text = format!(
         "# {JOB_FILE} — {}\n\n> The task for this session. Read it in full and leave it \
          unchanged.\n\n## Task\n\n{}\n\n## Goal\n\n{}\n",
         brief.task, brief.task, brief.goal
     );
-    std::fs::write(&path, text.as_bytes()).map_err(|err| storage(&path, &err))?;
+    crate::document::replace(&path, text.as_bytes())?;
     Ok(text)
 }
 

@@ -10,6 +10,7 @@ mod archive;
 mod building;
 mod city_tool;
 mod config_layers;
+mod document;
 mod gitignore;
 mod governed;
 mod library;
@@ -25,7 +26,6 @@ mod vocation;
 mod watch;
 mod wizard;
 
-pub use archive::ARCHIVE_DIR;
 pub use archive::Entry as ArchiveEntry;
 pub use archive::Kind as ArchiveKind;
 pub use archive::day_of;
@@ -41,17 +41,21 @@ pub use building::created_payload as building_created_payload;
 pub use building::{Building, BuildingTemplate, create as create_building};
 pub use city_tool::CityTool;
 pub use config_layers::path as config_path;
-pub use config_layers::{CONFIG_FILE, ConfigLayer, Layer, load as load_config};
+pub use config_layers::{ConfigLayer, Layer, load as load_config};
 pub use config_layers::{write_effort, write_mcp, write_sandbox};
 pub use governed::{Governed, PREFERENCES_FILE, write_governed};
-pub use library::{BUILDING_SHELF, Holding, LIBRARY_DIR, Library};
+// Where each of these files sits is `kernel::layout`'s answer, and the
+// names are re-exported rather than restated so that a caller reading
+// `city::CONFIG_TOML` and the layout that places it cannot disagree.
+pub use kernel::layout::{ARCHIVE_DIR, BUILDING_SHELF, CONFIG_FILE, LIBRARY_DIR, URBANITE_FILE};
+pub use library::{Holding, Library};
 pub use neighbourhood::{Neighbour, Neighbourhood, Occupancy};
 pub use neighbours_tool::NeighboursTool;
 pub use policy::write_rules;
 pub use policy::{BUILDING_FILE, BuildingRules, DomainReach, ModelPool};
 pub use policy::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
 pub use policy::{agents_path, building_path, evaluate, load};
-pub use resident::{Dossier, Identity, Resident, URBANITE_FILE, urbanite_path};
+pub use resident::{Dossier, Identity, Resident, urbanite_path};
 pub use room::all as rooms;
 pub use room::open as open_room;
 pub use rules_tool::RulesTool;

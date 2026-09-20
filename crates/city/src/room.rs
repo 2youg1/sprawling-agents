@@ -14,9 +14,8 @@
 
 use std::path::Path;
 
+use kernel::layout::{ARCHIVE_DIR, CityLayout};
 use kernel::{Address, AxCode, AxError, SessionName};
-
-use crate::archive::ARCHIVE_DIR;
 
 /// How many suffixed names are tried before a person is asked to pick
 /// another word. High enough that nobody meets it by working, low
@@ -41,20 +40,25 @@ const SUFFIX_LIMIT: u32 = 999;
 /// Propagates a directory that exists and cannot be read. A caller that
 /// would rather show what it could read says so at its own call site.
 pub fn all(city_root: &Path, building: &Address) -> Result<Vec<Address>, AxError> {
-    let root = city_root.join(building.as_str());
+    let root = CityLayout::new(city_root).scope(building);
     if !root.is_dir() {
         return Ok(Vec::new());
     }
-    let entries = std::fs::read_dir(&root).map_err(|err| {
+    let unreadable = |err: &std::io::Error| {
         AxError::failure(
             AxCode::StorageFatal,
             "list the rooms of a building",
             format!("{}: {err}", root.display()),
         )
         .with_recovery("check the building directory is readable")
-    })?;
+    };
+    let entries = std::fs::read_dir(&root).map_err(|err| unreadable(&err))?;
     let mut out = Vec::new();
-    for entry in entries.flatten() {
+    for entry in entries {
+        // An entry this process cannot stat is reported rather than
+        // skipped: a room dropped from the list is a room a person is
+        // told does not exist.
+        let entry = entry.map_err(|err| unreadable(&err))?;
         if !entry.path().is_dir() {
             continue;
         }
@@ -93,7 +97,7 @@ pub fn open(city_root: &Path, building: &Address, name: &SessionName) -> Result<
             format!("{}/{}-{attempt}", building.as_str(), name.as_str())
         };
         let addr = Address::parse(&candidate)?;
-        let dir = city_root.join(addr.as_str());
+        let dir = CityLayout::new(city_root).scope(&addr);
         // `create_dir` rather than exists-then-create: the question and
         // the answer are one operation, so two dispatches in the same
         // millisecond cannot both be told the name was free.

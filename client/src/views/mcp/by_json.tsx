@@ -58,7 +58,7 @@ export function ByJson(props: { readonly intake: Intake }) {
   return (
     <div class="flex flex-col gap-base">
       <textarea
-        class="min-h-output w-full min-w-0 rounded-control border border-g3 bg-g2 px-base py-snug font-mono text-note text-text outline-none placeholder:text-text-disabled"
+        class="min-h-output w-full min-w-0 rounded-control border border-g3 bg-g2 px-base py-snug font-mono text-note text-text placeholder:text-text-disabled"
         rows={8}
         aria-label={say("mcp_door_json")}
         placeholder={say("mcp_json_placeholder")}

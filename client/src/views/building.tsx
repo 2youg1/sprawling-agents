@@ -143,7 +143,7 @@ export function Building(props: BuildingProps) {
           fallback={
             <>
               <input
-                class="min-w-0 flex-1 bg-transparent py-tight text-note outline-none placeholder:text-text-disabled"
+                class="min-w-0 flex-1 bg-transparent py-tight text-note placeholder:text-text-disabled"
                 placeholder={say("bld_goal_placeholder")}
                 value={goal()}
                 onInput={(event) => setGoal(event.currentTarget.value)}

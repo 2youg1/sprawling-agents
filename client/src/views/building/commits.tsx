@@ -19,6 +19,7 @@ import { clock, usd } from "../../core/time";
 import type { Address, CommitAnswer, CommitsAnswer, Seq } from "../../wire";
 import { useLang, useSay, useUi } from "../../ui";
 import { Changes } from "../changes";
+import { Tip } from "../parts/tip";
 
 function short(oid: string): string {
   return oid.slice(0, 7);
@@ -80,18 +81,26 @@ function Row(props: {
             </span>
           </Show>
           <Show when={props.commit.lineage.length > 1}>
-            <span class="shrink-0 rounded-pill bg-g2 px-snug text-text-faint" title={say("commits_lineage")}>
-              {say("commits_succeeded", { n: String(props.commit.lineage.length - 1) })}
-            </span>
+            <Tip text={say("commits_lineage")}>
+              {(hint) => (
+                <span class="shrink-0 rounded-pill bg-g2 px-snug text-text-faint" aria-describedby={hint}>
+                  {say("commits_succeeded", { n: String(props.commit.lineage.length - 1) })}
+                </span>
+              )}
+            </Tip>
           </Show>
         </button>
-        <a
-          href={toFragment({ kind: "run", run: props.commit.run })}
-          class="shrink-0 whitespace-nowrap text-text-disabled hover:text-text-quiet"
-          title={say("tree_transcript")}
-        >
-          {clock(lang(), props.commit.at)}
-        </a>
+        <Tip text={say("tree_transcript")}>
+          {(hint) => (
+            <a
+              href={toFragment({ kind: "run", run: props.commit.run })}
+              class="shrink-0 whitespace-nowrap text-text-disabled hover:text-text-quiet"
+              aria-describedby={hint}
+            >
+              {clock(lang(), props.commit.at)}
+            </a>
+          )}
+        </Tip>
         <Show when={props.commit.session}>
           {(session) => (
             <a

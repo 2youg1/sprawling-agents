@@ -486,7 +486,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::fixture | crates/memory/src/bundle/fixture.rs | the one city the bundle tests export | adapter | V3 | built | memory-SPEC.md#8-21 |
 
-### gateway (48) — everything between a decision to call a model and the bytes on the wire
+### gateway (53) — everything between a decision to call a model and the bytes on the wire
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -495,6 +495,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::router::tuning | crates/gateway/src/router/tuning.rs | what a person settled about one endpoint: its label, its deadlines, the headers every call adds and the body fields every call writes | value | F1 | built | gateway-SPEC.md#8-16 |
 | gateway::router::book | crates/gateway/src/router/book.rs | choices the city made | projection | P1 | built | gateway-SPEC.md#8-9 |
 | gateway::router::payload | crates/gateway/src/router/payload.rs | references on the wire | projection | P1 | built | gateway-SPEC.md#8-9 |
+| gateway::router::normalise | crates/gateway/src/router/normalise.rs | what a person pasted, turned into the base URL the city calls and the shape it answers in | decision | V6 | built | gateway-SPEC.md#8-9 |
+| gateway::router::normalise::tests | crates/gateway/src/router/normalise/tests.rs | one row per spelling a provider's documentation prints, plus idempotence and one answer per equivalence class | decision | V6 | built | gateway-SPEC.md#8-9 |
 | gateway::dialect | crates/gateway/src/dialect.rs | which dialect answers a question, and the closed set of two | decision | S3 | built | gateway-SPEC.md#8-1 |
 | gateway::dialect::request | crates/gateway/src/dialect/request.rs | one ChatRequest, each wire | decision | S3 | built | gateway-SPEC.md#8-1 |
 | gateway::dialect::response | crates/gateway/src/dialect/response.rs | frames back to ChatResponse | decision | S3 | built | gateway-SPEC.md#8-1 |
@@ -524,6 +526,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::admission | crates/gateway/src/admission.rs | the provider's concurrency limit and a deterministic minimum interval | decision | S3 | built | gateway-SPEC.md#8-6 |
 | gateway::fallback | crates/gateway/src/fallback.rs | what a tag does when its endpoint will not answer, and the payload the retreat itself is | value | V4 | built | gateway-SPEC.md#8-11 |
 | gateway::market | crates/gateway/src/market.rs | the model catalogue snapshot, pinned so a price cannot move under a run | value | S3 | built | gateway-SPEC.md#8-7 |
+| gateway::provider | crates/gateway/src/provider/mod.rs | what this city knows about a provider before it has asked one | value | V6 | built | gateway-SPEC.md#8-17 |
+| gateway::provider::preset | crates/gateway/src/provider/preset.rs | one vendor's documented paths, shapes and ceilings, each row citing its page | value | V6 | built | gateway-SPEC.md#8-17 |
+| gateway::provider::ceiling | crates/gateway/src/provider/ceiling.rs | which statement about an output ceiling wins, and who made it | decision | V6 | built | gateway-SPEC.md#8-17 |
 | gateway::reach | crates/gateway/src/reach.rs | the staged reading of one base URL, stage by stage | adapter | V5 | built | gateway-SPEC.md#8-15 |
 | gateway::mcp | crates/gateway/src/mcp.rs | the index of the one module allowed to know which broker holds an outside application's OAuth | adapter | V5 | built | channels-SPEC.md#8-35 |
 | gateway::mcp::broker | crates/gateway/src/mcp/broker.rs | the directory, an auth config and the consent page, in three calls and nothing else | adapter | V5 | built | channels-SPEC.md#8-35 |
@@ -638,7 +643,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | collab::workshop_tool::tests | crates/collab/src/workshop_tool/tests.rs | what the workshop tool refuses: a cycle, a second graph, a verdict from nobody who read | adapter | P1 | built | collab-SPEC.md#8-16 |
 | collab::triage | crates/collab/src/triage.rs | where something from outside lands, and whether it starts work | decision | P3 | built | collab-SPEC.md#8-11 |
 
-### city (28) — space, identity, and the documents a building keeps
+### city (32) — space, identity, and the documents a building keeps
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -652,9 +657,13 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | city::spine_files::tests | crates/city/src/spine_files/tests.rs | the laid-out documents, the job file, and the two briefs a session can carry | adapter | P2 | built | city-SPEC.md#8-5 |
 | city::archive | crates/city/src/archive.rs | what a building remembers between runs, indexed by computing it | projection | P3 | built | city-SPEC.md#8-9 |
 | city::library | crates/city/src/library.rs | the city's stock of settled work, and the reading room each building admits | decision | P3 | built | city-SPEC.md#8-8 |
+| city::library::tests | crates/city/src/library/tests.rs | the shelves, the reading room, and the nearer copy that replaces the city's | decision | P3 | built | city-SPEC.md#8-8 |
 | city::config_layers | crates/city/src/config_layers.rs | the three configuration files a run is governed by | decision | P2 | built | city-SPEC.md#8-4 |
 | city::config_layers::write | crates/city/src/config_layers/write.rs | writing a chosen value back into the layer that governs it | decision | P2 | built | city-SPEC.md#8-4 |
 | city::config_layers::tests | crates/city/src/config_layers/tests.rs | the ladder, the refusals, and the write-back round trip | decision | P2 | built | city-SPEC.md#8-4 |
+| city::config_layers::ladder | crates/city/src/config_layers/ladder.rs | which configuration layers exist for an address, read once and in order | decision | V6 | built | city-SPEC.md#8-4 |
+| city::document | crates/city/src/document.rs | putting a document on disk whole, or leaving the old one there | adapter | V6 | built | city-SPEC.md#8-27 |
+| city::document::tests | crates/city/src/document/tests.rs | a reader never meets half a document, and two writers of one do not overwrite each other | adapter | V6 | built | city-SPEC.md#8-27 |
 | city::policy | crates/city/src/policy.rs | `BUILDING.md` evaluated into rules a machine can hold | decision | P1 | built | city-SPEC.md#8-2 |
 | city::policy::evaluate | crates/city/src/policy/evaluate.rs | reading a `BUILDING.md` into the rules a machine holds | decision | V4 | built | city-SPEC.md#8-2 |
 | city::policy::reach | crates/city/src/policy/reach.rs | what a building's residents may write inside their prefixes: everything, or documents | decision | V4 | built | city-SPEC.md#8-2 |
@@ -727,7 +736,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (5), bin (175)
+### browser (12), protocol (5), bin (174)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -868,7 +877,6 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::doctor::table | crates/sprawling/src/doctor/table.rs | the two tiers item by item: how each one is detected, and how each one is installed here | data | V4 | built | sprawling-SPEC.md#8-40 |
 | bin::doctor::screen | crates/sprawling/src/doctor/screen.rs | the report a person reads, and the one question asked per absent item | adapter | V4 | built | sprawling-SPEC.md#8-40 |
 | bin::doctor::probe | crates/sprawling/src/doctor/probe.rs | this machine answering: a program on the search path, its version under a deadline, one consented install | adapter | V4 | built | sprawling-SPEC.md#8-40 |
-| bin::doctor::installing | crates/sprawling/src/doctor/installing.rs | getting one named item this machine lacks, through the recipe the terminal would have run | adapter | F1 | built | sprawling-SPEC.md#8-64 |
 | bin::doctor::running | crates/sprawling/src/doctor/running.rs | the one place this binary starts an install program: null stdio, a deadline, and a child killed when it passes | adapter | F1 | built | sprawling-SPEC.md#8-64 |
 | bin::doctor::tests | crates/sprawling/src/doctor/tests.rs | every row is detectable and either installable or manual, and consent is asked one item at a time | decision | V4 | built | sprawling-SPEC.md#8-40 |
 | bin::doctor::report | crates/sprawling/src/doctor/report.rs | this machine's answer, in the shape a page reads | projection | V5 | built | sprawling-SPEC.md#8-54 |

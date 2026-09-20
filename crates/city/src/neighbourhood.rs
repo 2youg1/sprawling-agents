@@ -243,7 +243,7 @@ mod tests {
     fn resident_at(root: &Path, at: &str, urbanite: &str) {
         let dir: PathBuf = root.join(at);
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join(crate::resident::URBANITE_FILE), urbanite).unwrap();
+        std::fs::write(dir.join(kernel::layout::URBANITE_FILE), urbanite).unwrap();
     }
 
     fn empty_room(root: &Path, at: &str) {
@@ -327,7 +327,7 @@ mod tests {
         let root = dir.path();
         empty_room(root, "lab/notes");
         std::fs::create_dir_all(root.join("lab").join(kernel::RESERVED_PREFIX)).unwrap();
-        std::fs::create_dir_all(root.join("lab").join(crate::archive::ARCHIVE_DIR)).unwrap();
+        std::fs::create_dir_all(root.join("lab").join(kernel::layout::ARCHIVE_DIR)).unwrap();
 
         let seen = Neighbourhood::scan(root, &addr("lab"), &addr("lab/notes"), &|_| 0).unwrap();
         let names: Vec<&str> = seen

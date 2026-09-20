@@ -10,7 +10,7 @@ default: check
 # and `client/node_modules` to exist, and they skip when those are
 # absent. Without this dependency `just check` reported green on a
 # machine where neither gate had ever run.
-check: fmt-check clippy test build-web gates check-client
+check: fmt-check clippy features test build-web gates check-client
 
 fmt:
     cargo fmt --all
@@ -22,6 +22,20 @@ fmt-check:
 # escapes the zero-warning gate without it.
 clippy:
     cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+# The feature combinations nothing else compiles. `clippy` above runs
+# --all-features, `dist` builds the default set of the release binary
+# alone, so two combinations reach no compiler at all: the workspace on
+# its default features, and channels with `server` off - which is the
+# reason that feature exists, since it keeps the TCP stack out of a
+# wasm32 build. Code behind a feature is compiled the day somebody turns
+# that feature on, and a combination that does not build is what the
+# first person to turn it on meets. Two check-mode passes, seconds each
+# on a warm cache; the zero-warning rule stays with `clippy`, which sees
+# every feature at once.
+features:
+    cargo check --workspace --locked
+    cargo check -p channels --no-default-features --locked
 
 # cargo-nextest is an environment prerequisite (see AGENTS.md); `just test-std` is the fallback.
 test:

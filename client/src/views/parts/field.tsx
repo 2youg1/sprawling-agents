@@ -10,12 +10,26 @@
 //
 // The error sits under the box rather than in a corner of the screen,
 // because the field is where the correction is made.
+//
+// **Two authorities decide the red border, and they say different
+// things.** `error` is the city's answer, so it is drawn the moment the
+// page is told; `:user-invalid` is the browser's own reading of `type`
+// and `pattern`, and it holds off until the person has left the box, so
+// a URL is never red while it is half typed.
+//
+// The box carries no `outline` rule of its own. The focus ring is one
+// declaration in `theme.css`, and a box that hid it was the reason a
+// keyboard user could not see where they were on the settings page.
 
 import { Show, createUniqueId } from "solid-js";
 
 export interface FieldProps {
   // Already in the person's language.
   readonly label: string;
+  // Where the label is drawn. `hidden` keeps it as the box's accessible
+  // name and nothing else, for a row or a cell whose column already
+  // carries the word.
+  readonly labelling?: "above" | "hidden";
   readonly value: string;
   readonly onInput: (value: string) => void;
   readonly help?: string;
@@ -28,24 +42,39 @@ export interface FieldProps {
   // A value read character by character - a key, an id, a path - is set
   // in the mono face so a person can check it.
   readonly mono?: boolean;
-  readonly kind?: "text" | "password" | "number";
+  // `number` also asks the on-screen keyboard for digits and gives the
+  // arrow keys a step; `url` lets the browser refuse a value this form
+  // would otherwise send to the city to be refused there.
+  readonly kind?: "text" | "password" | "number" | "url";
+  // How far one arrow key moves a number.
+  readonly step?: number;
+  // What a valid value looks like, for the browser's first pass.
+  readonly pattern?: string;
+  // An explanation the page already draws elsewhere. It is read out
+  // before this field's own help, never instead of it.
+  readonly describedBy?: string;
   readonly disabled?: boolean;
 }
 
 export function Field(props: FieldProps) {
   const box = createUniqueId();
   const note = createUniqueId();
-  // One description at a time: the error replaces the help, so a screen
-  // reader is not read both halves of a contradiction.
-  const described = () => (props.help === undefined && props.error === undefined ? undefined : note);
+  // One description at a time from this field: the error replaces the
+  // help, so a screen reader is not read both halves of a contradiction.
+  const described = () => {
+    const own = props.help === undefined && props.error === undefined ? undefined : note;
+    const ids = [props.describedBy, own].filter((id): id is string => id !== undefined);
+    return ids.length === 0 ? undefined : ids.join(" ");
+  };
+  const kind = () => props.kind ?? "text";
   return (
     <div class="flex w-full min-w-0 flex-col gap-tight">
-      <label class="text-note text-text-quiet" for={box}>
+      <label class={`text-note text-text-quiet ${props.labelling === "hidden" ? "sr-only" : ""}`} for={box}>
         {props.label}
       </label>
       <div
-        class={`flex min-w-0 items-center gap-tight rounded-control border px-base py-snug ${
-          props.error === undefined ? "border-g3 bg-g2" : "border-alert bg-g2"
+        class={`flex min-w-0 items-center gap-tight rounded-control border bg-g2 px-base py-snug has-[:user-invalid]:border-alert ${
+          props.error === undefined ? "border-g3" : "border-alert"
         }`}
       >
         <Show when={props.prefix}>
@@ -53,8 +82,11 @@ export function Field(props: FieldProps) {
         </Show>
         <input
           id={box}
-          type={props.kind ?? "text"}
-          class={`min-w-0 flex-1 bg-transparent text-body text-text outline-none placeholder:text-text-disabled ${
+          type={kind()}
+          inputmode={kind() === "number" ? "numeric" : undefined}
+          step={props.step}
+          pattern={props.pattern}
+          class={`min-w-0 flex-1 bg-transparent text-body text-text placeholder:text-text-disabled ${
             props.mono === true ? "font-mono" : ""
           }`}
           value={props.value}

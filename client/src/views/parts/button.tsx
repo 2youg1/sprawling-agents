@@ -12,6 +12,9 @@
 // The words are the caller's: this file holds no prose.
 
 import { Show } from "solid-js";
+import type { JSX } from "solid-js";
+
+import { Tip } from "./tip";
 
 // primary is the one thing the screen is for, secondary the ones beside
 // it, quiet the ones that must not compete, destructive the one that
@@ -34,7 +37,9 @@ export interface ButtonProps {
   readonly loading?: boolean;
   // Present means the control cannot be used, and says why. It stays
   // focusable and keeps `aria-disabled`, because a `disabled` element is
-  // skipped by the keyboard and its reason is never read out.
+  // skipped by the keyboard and its reason is never read out. The reason
+  // is drawn beside the button rather than left in a `title`, which a
+  // keyboard never reaches and a touch screen never shows.
   readonly why?: string;
   readonly onPress?: () => void;
 }
@@ -42,13 +47,14 @@ export interface ButtonProps {
 export function Button(props: ButtonProps) {
   const stopped = () => props.why !== undefined || props.loading === true;
   const paint = () => (stopped() ? "bg-g2 text-text-disabled" : PAINT[props.tone ?? "secondary"]);
-  return (
+  // One definition of the control, drawn bare or inside its reason.
+  const control = (hint?: string): JSX.Element => (
     <button
       type={props.type ?? "button"}
       class={`inline-flex items-center gap-snug rounded-control px-base py-tight text-label transition-[opacity,transform] duration-100 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${paint()}`}
       aria-disabled={stopped()}
       aria-busy={props.loading === true}
-      title={props.why}
+      aria-describedby={hint}
       onClick={() => {
         if (stopped()) return;
         props.onPress?.();
@@ -60,4 +66,5 @@ export function Button(props: ButtonProps) {
       {props.label}
     </button>
   );
+  return <Show when={props.why} fallback={control()}>{(why) => <Tip text={why()}>{(hint) => control(hint)}</Tip>}</Show>;
 }

@@ -54,7 +54,7 @@ pub(crate) fn for_building(
         )
         .with_recovery("fix the directory's permissions")
     })?;
-    let cas = Cas::open(&city_root.join(kernel::RESERVED_PREFIX).join("cas"))
+    let cas = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
         .map_err(memory::MemoryError::into_ax)?;
     let port = crate::browser_bidi::port_for(city_root);
     BrowserTool::new(

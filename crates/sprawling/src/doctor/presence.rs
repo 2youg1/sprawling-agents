@@ -50,7 +50,10 @@ pub(crate) enum Fault {
     /// The component directory exists and the component file does not:
     /// an install that stopped half way.
     HalfWritten,
-    /// The directory or file could not be read.
+    /// Something about this item this machine would not let the city
+    /// finish: reading the directory or the file, or stopping the
+    /// version call it started. The sentence it carries is the whole
+    /// explanation, and `describe` prints it unchanged.
     Unreadable(String),
 }
 
@@ -169,7 +172,7 @@ impl Absence {
                 format!("{variable} names {}, which is not there", path.display())
             }
             Absence::NoComponent { dir } => format!("no component at {}", dir.display()),
-            Absence::NoHome => "neither USERPROFILE nor HOME is set".to_owned(),
+            Absence::NoHome => crate::home::NO_HOME.to_owned(),
             Absence::NotInThisBuild => "not in this build".to_owned(),
         }
     }

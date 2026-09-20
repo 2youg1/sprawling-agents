@@ -92,7 +92,7 @@ export function Combobox(props: ComboboxProps) {
                 input.focus();
               });
             }}
-            class="mb-tight w-full rounded-control bg-g2 px-base py-snug text-body text-text outline-none placeholder:text-text-disabled"
+            class="mb-tight w-full rounded-control bg-g2 px-base py-snug text-body text-text placeholder:text-text-disabled"
             placeholder={props.placeholder}
             aria-label={props.label}
             value={query()}

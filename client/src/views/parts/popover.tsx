@@ -153,7 +153,7 @@ export function Popover(props: PopoverProps) {
                     return next;
                   });
                 }}
-                class="max-h-palette overflow-y-auto outline-none"
+                class="max-h-palette overflow-y-auto"
                 role="listbox"
                 aria-label={each.label}
                 tabindex={props.bind === undefined && at() === column() ? 0 : -1}

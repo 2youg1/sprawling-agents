@@ -18,6 +18,7 @@ import { kib } from "../../core/time";
 import type { Address, Entry } from "../../wire";
 import { Address as AddressSchema } from "../../wire";
 import { useGo, useSay, useUi } from "../../ui";
+import { Tip } from "../parts/tip";
 
 export interface Picked {
   readonly at: Address;
@@ -105,16 +106,29 @@ function Node(props: {
         }`}
         onClick={pick}
         aria-expanded={isDir() ? open() : undefined}
-        title={transcriptRun() === null ? undefined : say("tree_transcript")}
       >
         <span class="flex w-base shrink-0 justify-center">
-          <Show when={isDir()} fallback={<Show when={transcriptRun()}><span class="text-text-disabled">↗</span></Show>}>
+          <Show when={isDir()} fallback={
+            <Show when={transcriptRun()}>
+              <Tip text={say("tree_transcript")}>
+                {(hint) => <span class="text-text-disabled" role="img" aria-labelledby={hint}>↗</span>}
+              </Tip>
+            </Show>
+          }>
             <Chevron open={open()} />
           </Show>
         </span>
         <span class={`truncate ${transcriptRun() === null ? "" : "font-mono text-text-faint"}`}>{shown()}</span>
         <Show when={live()}>
-          <span class="ml-tight inline-block size-dot shrink-0 rounded-pill bg-accent" title={say("tree_live")} />
+          <Tip text={say("tree_live")}>
+            {(hint) => (
+              <span
+                class="ml-tight inline-block size-dot shrink-0 rounded-pill bg-accent"
+                role="img"
+                aria-labelledby={hint}
+              />
+            )}
+          </Tip>
         </Show>
         <span class="flex-1" />
         <Show when={props.entry.kind !== "directory" ? props.entry.kind : undefined}>

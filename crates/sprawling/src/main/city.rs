@@ -17,13 +17,9 @@ use super::router::{
     COMMANDS, client_summary, default_city_location, flag_value, log_floor, log_levels, named,
 };
 use super::{CLIENT_COMPLETE, CLIENT_FILES};
+use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, console, firstrun, serving};
 use std::process::ExitCode;
-
-/// Where a running city is unless somebody says otherwise. The same
-/// address `up` and `serve` bind by default, so the common case needs
-/// no flag at all.
-pub(super) const DEFAULT_AT: &str = "127.0.0.1:8787";
 
 pub(super) fn up(args: &[String]) -> ExitCode {
     let city = match args.get(1).filter(|a| !a.starts_with("--")) {
@@ -33,7 +29,7 @@ pub(super) fn up(args: &[String]) -> ExitCode {
     let addr = args
         .get(2)
         .filter(|a| !a.starts_with("--"))
-        .map_or("127.0.0.1:8787", String::as_str);
+        .map_or(DEFAULT_AT, String::as_str);
     up_at(&city, addr, args)
 }
 
@@ -53,12 +49,12 @@ pub(super) fn use_folder(folder: &std::path::Path) -> ExitCode {
     }
     if assembly::has_history(folder) {
         println!("{} is already a city; opening it", folder.display());
-        return serve_city(folder, "127.0.0.1:8787", &[], true);
+        return serve_city(folder, DEFAULT_AT, &[], true);
     }
     match assembly::form_city(folder, assembly::Adopt::EveryFolder) {
         Ok(report) => {
             report_standing(&report);
-            serve_city(folder, "127.0.0.1:8787", &[], true)
+            serve_city(folder, DEFAULT_AT, &[], true)
         }
         Err(err) => report(err),
     }
@@ -160,7 +156,7 @@ pub(super) fn serve(dir: Option<&String>, addr: Option<&String>, args: &[String]
     // `serve city --log off` does not read `--log` as an address.
     let raw = addr
         .filter(|a| !a.starts_with("--"))
-        .map_or("127.0.0.1:8787", String::as_str);
+        .map_or(DEFAULT_AT, String::as_str);
     let open = args.iter().any(|a| a == "--open");
     serve_city(std::path::Path::new(dir), raw, args, open)
 }
@@ -191,7 +187,7 @@ pub(super) fn serve_city(
     }
     let Ok(bind) = raw.parse() else {
         eprintln!("not a socket address: {raw}");
-        eprintln!("recovery: give host:port, for example 127.0.0.1:8787");
+        eprintln!("recovery: give host:port, for example {DEFAULT_AT}");
         return ExitCode::from(2);
     };
     // The client source: embedded by default; a directory for the

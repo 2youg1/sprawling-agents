@@ -25,6 +25,7 @@ import { useGo, useLang, useSay, useUi } from "../ui";
 import { EmptyState } from "./parts/empty";
 import { Path } from "./parts/path";
 import { Tabs } from "./parts/tabs";
+import { Tip } from "./parts/tip";
 
 // One line of what a record carries: its scalar fields, the way a
 // person skims a log.
@@ -61,18 +62,22 @@ function Ledger() {
             <For each={[...held().records].reverse()}>
               {(record) => (
                 <li class="border-b border-g1">
-                  <button
-                    type="button"
-                    class="flex h-step w-full items-center gap-base text-left leading-none hover:bg-g1"
-                    onClick={() => setOpen((at) => (at === record.seq ? null : record.seq))}
-                    title={clock(lang(), record.t)}
-                  >
-                    <span class="w-figure shrink-0 text-right text-text-disabled">{record.seq}</span>
-                    <span class="w-figure shrink-0 whitespace-nowrap text-text-faint">{hhmmss(record.t)}</span>
-                    <span class="shrink-0 text-text">{record.kind}</span>
-                    <span class="shrink-0 text-text-faint">{record.addr ?? record.who}</span>
-                    <span class="min-w-0 flex-1 truncate text-text-disabled">{gist(record.data)}</span>
-                  </button>
+                  <Tip text={clock(lang(), record.t)}>
+                    {(hint) => (
+                      <button
+                        type="button"
+                        class="flex h-step w-full items-center gap-base text-left leading-none hover:bg-g1"
+                        onClick={() => setOpen((at) => (at === record.seq ? null : record.seq))}
+                        aria-describedby={hint}
+                      >
+                        <span class="w-figure shrink-0 text-right text-text-disabled">{record.seq}</span>
+                        <span class="w-figure shrink-0 whitespace-nowrap text-text-faint">{hhmmss(record.t)}</span>
+                        <span class="shrink-0 text-text">{record.kind}</span>
+                        <span class="shrink-0 text-text-faint">{record.addr ?? record.who}</span>
+                        <span class="min-w-0 flex-1 truncate text-text-disabled">{gist(record.data)}</span>
+                      </button>
+                    )}
+                  </Tip>
                   <Show when={open() === record.seq}>
                     <pre class="mb-snug max-h-output overflow-auto rounded-card bg-g1 p-base text-text-quiet">
                       {JSON.stringify(record.data, null, 2)}
@@ -100,7 +105,7 @@ function Archive() {
   return (
     <div>
       <input
-        class="mb-base w-full rounded-control bg-g1 px-base py-snug text-body outline-none placeholder:text-text-disabled"
+        class="mb-base w-full rounded-control bg-g1 px-base py-snug text-body placeholder:text-text-disabled"
         placeholder={say("rec_search")}
         value={needle()}
         onInput={(event) => setNeedle(event.currentTarget.value)}
@@ -208,7 +213,7 @@ function Narrow(props: {
     <label class="flex items-center gap-tight text-note text-text-faint">
       {props.label}
       <select
-        class="rounded-control bg-g1 px-snug py-tight font-mono text-note text-text outline-none"
+        class="rounded-control bg-g1 px-snug py-tight font-mono text-note text-text"
         value={props.current}
         onChange={(event) => {
           props.onPick(event.currentTarget.value);
@@ -274,12 +279,22 @@ function Log() {
                 <span class="w-figure shrink-0 text-right text-text-disabled">{line.seq}</span>
                 <span class="w-figure shrink-0 whitespace-nowrap text-text-faint">
                   <Show when={wroteAt(line)}>
-                    {(at) => <span title={clock(lang(), at())}>{hhmmss(at())}</span>}
+                    {(at) => (
+                      // The column shows the time of day; the day itself is
+                      // one key away rather than one hover away.
+                      <Tip text={clock(lang(), at())}>
+                        {(hint) => (
+                          <span tabindex={0} aria-describedby={hint}>
+                            {hhmmss(at())}
+                          </span>
+                        )}
+                      </Tip>
+                    )}
                   </Show>
                 </span>
                 <span class="shrink-0 text-text">{say(`log_${line.level}`)}</span>
                 <span class="shrink-0 text-text-faint">{line.module}</span>
-                <span class="min-w-0 flex-1 break-all text-text-quiet">{line.line}</span>
+                <span class="min-w-0 flex-1 wrap-anywhere text-text-quiet">{line.line}</span>
               </li>
             )}
           </For>

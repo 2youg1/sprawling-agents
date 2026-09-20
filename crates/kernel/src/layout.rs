@@ -110,13 +110,26 @@ impl CityLayout {
     }
 
     /// The configuration layer a scope declares.
-    ///
-    /// The city's own layer is this same rule at the root scope, which
-    /// is why no separate method states it: a layer added later cannot
-    /// land somewhere the runs it governs may write.
     #[must_use]
     pub fn config(&self, addr: &Address) -> PathBuf {
         self.governed(addr).join(CONFIG_FILE)
+    }
+
+    /// The configuration layer the city itself declares.
+    ///
+    /// The same rule as [`config`](Self::config) at the root, and a
+    /// method of its own because the root is not an address: a caller
+    /// without one used to reach past this type and join the two names
+    /// by hand, which is how the reserved prefix grew its second home.
+    #[must_use]
+    pub fn city_config(&self) -> PathBuf {
+        self.governed_root().join(CONFIG_FILE)
+    }
+
+    /// What the city as a whole keeps out of what it sends a model.
+    #[must_use]
+    pub fn city_filters(&self) -> PathBuf {
+        self.governed_root().join(FILTERS_FILE)
     }
 
     /// A building's own shelf of skills.

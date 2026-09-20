@@ -18,6 +18,7 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist, WriteDomain};
 
 mod evaluate;
@@ -202,9 +203,7 @@ impl BuildingRules {
 /// moved (ARCHITECTURE.md section 6).
 #[must_use]
 pub fn building_path(city_root: &Path, addr: &Address) -> PathBuf {
-    scope_path(city_root, addr)
-        .join(kernel::RESERVED_PREFIX)
-        .join(BUILDING_FILE)
+    governed(city_root, addr).join(BUILDING_FILE)
 }
 
 /// Where a project keeps the conventions it came with.
@@ -216,7 +215,9 @@ pub fn building_path(city_root: &Path, addr: &Address) -> PathBuf {
 /// not that.
 #[must_use]
 pub fn agents_path(city_root: &Path, addr: &Address) -> PathBuf {
-    scope_path(city_root, addr).join(crate::spine_files::AGENTS_FILE)
+    CityLayout::new(city_root)
+        .scope(addr)
+        .join(crate::spine_files::AGENTS_FILE)
 }
 
 /// The allowlist the desktop connector is started under, window by
@@ -235,9 +236,7 @@ pub const DESKTOP_SCOPE_FILE: &str = "DESKTOP.toml";
 /// so no write domain reaches this path, including `Everything`'s.
 #[must_use]
 pub fn desktop_scope_path(city_root: &Path, addr: &Address) -> PathBuf {
-    scope_path(city_root, addr)
-        .join(kernel::RESERVED_PREFIX)
-        .join(DESKTOP_SCOPE_FILE)
+    governed(city_root, addr).join(DESKTOP_SCOPE_FILE)
 }
 
 /// Replaces a building's desktop allowlist with what a person wrote.
@@ -260,39 +259,22 @@ pub fn write_desktop_scope(
     text: &str,
 ) -> Result<PathBuf, AxError> {
     let path = desktop_scope_path(city_root, addr);
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(|err| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "write a building's desktop allowlist",
-                format!("{}: {err}", dir.display()),
-            )
-            .with_recovery("fix the directory's permissions")
-        })?;
-    }
-    std::fs::write(&path, text).map_err(|err| {
-        AxError::failure(
-            AxCode::StorageFatal,
-            "write a building's desktop allowlist",
-            format!("{}: {err}", path.display()),
-        )
-        .with_recovery("fix the file's permissions")
-    })?;
+    crate::document::replace(&path, text.as_bytes())?;
     Ok(path)
 }
 
 /// Where a building's rules used to live, for the one refusal that says
 /// so. Nothing reads the file at this path.
 fn legacy_building_path(city_root: &Path, addr: &Address) -> PathBuf {
-    scope_path(city_root, addr).join(BUILDING_FILE)
+    CityLayout::new(city_root).scope(addr).join(BUILDING_FILE)
 }
 
-fn scope_path(city_root: &Path, addr: &Address) -> PathBuf {
-    let mut path = city_root.to_path_buf();
-    for segment in addr.as_str().split('/') {
-        path.push(segment);
-    }
-    path
+/// A scope's own reserved subtree: where what governs that scope sits,
+/// out of reach of every write domain.
+fn governed(city_root: &Path, addr: &Address) -> PathBuf {
+    CityLayout::new(city_root)
+        .scope(addr)
+        .join(kernel::RESERVED_PREFIX)
 }
 
 /// Loads and evaluates a building's rules.
@@ -363,25 +345,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> 
 /// cannot be written.
 pub fn write_rules(city_root: &Path, addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
     let rules = evaluate(addr, text)?;
-    let path = building_path(city_root, addr);
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(|err| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "write a building's rules",
-                format!("{}: {err}", dir.display()),
-            )
-            .with_recovery("fix the directory's permissions")
-        })?;
-    }
-    std::fs::write(&path, text).map_err(|err| {
-        AxError::failure(
-            AxCode::StorageFatal,
-            "write a building's rules",
-            format!("{}: {err}", path.display()),
-        )
-        .with_recovery("fix the file's permissions")
-    })?;
+    crate::document::replace(&building_path(city_root, addr), text.as_bytes())?;
     Ok(rules)
 }
 

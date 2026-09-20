@@ -248,9 +248,15 @@ impl RunWorker {
         ))
     }
 
-    /// Points one tag at one model. The two token counts come from the
-    /// person because no provider's model list carries them, and a
-    /// number invented here would outrank the one that bills.
+    /// Points one tag at one model.
+    ///
+    /// **A figure the person left empty is not a figure they erased.**
+    /// The settings page sends the whole row on every pick, so re-picking
+    /// an already registered model used to overwrite its ceiling with
+    /// nothing, and the next call on the Anthropic wire was refused for a
+    /// field it could no longer write (sprawling-SPEC.md 8-71). An empty
+    /// box now keeps what this same model was registered with, read back
+    /// by `registered_as`.
     pub(in crate::assembly) fn select_model(
         &mut self,
         chosen: Chosen,
@@ -287,18 +293,26 @@ impl RunWorker {
             .with_nearby(known.models.clone()));
         }
         let priced = gateway::MarketSnapshot::builtin()?.lookup(&model).cloned();
-        // What the person stated outranks the catalogue, and what
-        // neither states stays unstated. **The old reading of an unknown
-        // model was zero**, which the OpenAI wire wrote out as
-        // `max_tokens: 0` and a provider answered with no content at
-        // all; the run then froze as work that finished. A ceiling this
-        // city cannot name is now carried as one it cannot name.
+        let registered = super::registered_as(&self.book, tag, &endpoint, &model);
+        // What the person stated outranks what they stated before, which
+        // outranks the catalogue, and what none of the three states
+        // stays unstated. **The old reading of an unknown model was
+        // zero**, which the OpenAI wire wrote out as `max_tokens: 0` and
+        // a provider answered with no content at all; the run then froze
+        // as work that finished. A ceiling this city cannot name is now
+        // carried as one it cannot name.
         let context_tokens = match context_tokens {
-            0 => priced.as_ref().map_or(0, |row| row.context_tokens),
+            0 => registered
+                .as_ref()
+                .map(|row| row.context_tokens)
+                .filter(|held| *held > 0)
+                .or_else(|| priced.as_ref().map(|row| row.context_tokens))
+                .unwrap_or(0),
             stated => stated,
         };
-        let max_output_tokens =
-            max_output_tokens.or_else(|| priced.as_ref().and_then(|row| row.max_output_tokens));
+        let max_output_tokens = max_output_tokens
+            .or_else(|| registered.as_ref().and_then(|row| row.max_output_tokens))
+            .or_else(|| priced.as_ref().and_then(|row| row.max_output_tokens));
         let entry = gateway::ModelEntry {
             id: model,
             context_tokens,
@@ -329,5 +343,56 @@ impl RunWorker {
         // make.
         let payload = gateway::selected_payload(tag, &endpoint, &entry, &gateway::Fallback::None)?;
         self.record(EventKind::ModelSelected, payload)
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use crate::assembly::fixture::{fake_openai, worker_with_provider};
+    use crate::assembly::init_city;
+
+    /// The two rungs this layer owns: what the person sends now, and
+    /// what the book already holds for the same model. The rungs above
+    /// and below them - the provider's own model list and the city's
+    /// policy default - are decided in `gateway::provider::ceiling`,
+    /// where all four are tested together.
+    #[test]
+    fn an_empty_ceiling_keeps_the_one_this_model_was_registered_with() {
+        let dir = tempfile::tempdir().unwrap();
+        init_city(dir.path()).unwrap();
+        let (base_url, _provider) = fake_openai(&["m-1"], Vec::new());
+        // Attaches and picks `m-1` at 32_768 / 4_096, which is the row
+        // a person fills in on the settings page.
+        let mut worker = worker_with_provider(dir.path(), &base_url, "m-1").unwrap();
+        // The same pick again with both boxes empty, which is what the
+        // model dropdown sends when nobody edited the two figures.
+        worker
+            .handle(channels::Command::SelectModel {
+                endpoint: channels::ProviderName::parse("house").unwrap(),
+                model: "m-1".to_owned(),
+                tag: kernel::ModelTag::Main,
+                context_tokens: 0,
+                max_output_tokens: None,
+                idem: kernel::IdemKey::derive(
+                    &kernel::RunId::CITY,
+                    kernel::Seq::FIRST,
+                    b"re-picked",
+                ),
+            })
+            .unwrap();
+        let (_, _, entry, _) = worker.book.choices().next().unwrap();
+        assert_eq!(
+            entry.max_output_tokens,
+            kernel::Ceiling::new(4_096),
+            "re-picking a model erased the ceiling the person entered"
+        );
+        assert_eq!(entry.context_tokens, 32_768);
     }
 }

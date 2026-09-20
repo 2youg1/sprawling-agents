@@ -23,6 +23,7 @@ import type { ModelFact } from "../../core/probed";
 import { EFFORTS } from "../../core/prefs";
 import type { EndpointsAnswer, ModelTag } from "../../wire";
 import { useCommand, useSay, useUi } from "../../ui";
+import { Field } from "../parts/field";
 
 // One ticked row: the model, the two ceilings a person read off the
 // provider's own documentation, and the role it is to fill if any.
@@ -185,13 +186,15 @@ export function ModelTable(props: {
   return (
     <div class="flex flex-col gap-snug text-note">
       <div class="flex flex-wrap items-center gap-snug">
-        <input
-          class="min-w-0 flex-1 rounded-control bg-g2 px-base py-snug text-body text-text outline-none"
-          value={search()}
-          aria-label={say("setup_model_search")}
-          placeholder={say("setup_model_search")}
-          onInput={(event) => setSearch(event.currentTarget.value)}
-        />
+        <div class="min-w-0 flex-1">
+          <Field
+            label={say("setup_model_search")}
+            labelling="hidden"
+            value={search()}
+            placeholder={say("setup_model_search")}
+            onInput={setSearch}
+          />
+        </div>
         <label class="flex items-center gap-tight text-text-quiet">
           <input type="checkbox" checked={textOnly()} onChange={(event) => setTextOnly(event.currentTarget.checked)} />
           {say("setup_text_only")}
@@ -247,29 +250,31 @@ export function ModelTable(props: {
                             onChange={(event) => { setFilled("ticked", row.id, event.currentTarget.checked); }}
                           />
                         </td>
-                        <td class="truncate py-tight font-mono text-text" title={row.id}>
-                          {row.id}
-                        </td>
+                        <td class="min-w-0 wrap-anywhere py-tight font-mono text-text">{row.id}</td>
                         <td class="py-tight">
-                          <input
-                            class="w-full rounded-control bg-g2 px-snug py-tight font-mono text-note text-text outline-none"
+                          <Field
+                            label={`${say("setup_model_context")} ${row.id}`}
+                            labelling="hidden"
+                            kind="number"
+                            step={1024}
+                            mono
                             value={filled.context[row.id] ?? prefilled(row.contextTokens)}
-                            inputmode="numeric"
-                            aria-label={say("setup_model_context")}
-                            onInput={(event) => { setFilled("context", row.id, event.currentTarget.value); }}
+                            onInput={(value) => { setFilled("context", row.id, value); }}
                           />
                         </td>
                         <td class="py-tight">
-                          <input
-                            class="w-full rounded-control bg-g2 px-snug py-tight font-mono text-note text-text outline-none"
+                          <Field
+                            label={`${say("setup_model_output")} ${row.id}`}
+                            labelling="hidden"
+                            kind="number"
+                            step={1024}
+                            mono
                             value={filled.output[row.id] ?? prefilled(row.maxOutputTokens)}
-                            inputmode="numeric"
-                            aria-label={say("setup_model_output")}
-                            onInput={(event) => { setFilled("output", row.id, event.currentTarget.value); }}
+                            onInput={(value) => { setFilled("output", row.id, value); }}
                           />
                         </td>
                         {/* wording-ok: the modalities and the prices the provider itself stated */}
-                        <td class="truncate py-tight text-text-faint" title={row.inputModalities.join(" ")}>
+                        <td class="min-w-0 wrap-anywhere py-tight text-text-faint">
                           {row.inputModalities.length === 0 ? "—" : row.inputModalities.join(" ")}
                         </td>
                         <td class="truncate py-tight font-mono text-text-faint">
@@ -277,7 +282,7 @@ export function ModelTable(props: {
                         </td>
                         <td class="py-tight">
                           <select
-                            class="w-full rounded-control bg-g2 px-snug py-tight text-note text-text outline-none"
+                            class="w-full rounded-control bg-g2 px-snug py-tight text-note text-text"
                             value={filled.role[row.id] ?? ""}
                             aria-label={say("setup_model_role")}
                             onChange={(event) => { setFilled("role", row.id, event.currentTarget.value); }}
@@ -300,16 +305,14 @@ export function ModelTable(props: {
       <Show when={ticked().some((row) => (stated(filled.output[row.id] ?? "") ?? row.maxOutputTokens) === null)}>
         <p class="text-alert">{say("setup_model_needed")}</p>
       </Show>
-      <label class="flex flex-col gap-tight text-text-quiet">
-        {say("setup_manual_ids")}
-        <input
-          class="rounded-control bg-g2 px-base py-snug font-mono text-body text-text outline-none"
-          value={manual()}
-          // wording-ok: model ids, which are the same letters in every language
-          placeholder="gpt-5-mini, claude-sonnet-4"
-          onInput={(event) => setManual(event.currentTarget.value)}
-        />
-      </label>
+      <Field
+        label={say("setup_manual_ids")}
+        mono
+        value={manual()}
+        // wording-ok: model ids, which are the same letters in every language
+        placeholder="gpt-5-mini, claude-sonnet-4"
+        onInput={setManual}
+      />
     </div>
   );
 }
@@ -334,7 +337,7 @@ export function ModelChoice(props: { readonly answer: EndpointsAnswer; readonly 
             <label class="flex flex-col gap-tight text-note text-text-quiet">
               {say(`setup_${tag}`)}
               <select
-                class="rounded-control bg-g2 px-base py-snug text-body text-text outline-none"
+                class="rounded-control bg-g2 px-base py-snug text-body text-text"
                 value={value(tag)}
                 onChange={(event) => {
                   const [endpoint, model] = event.currentTarget.value.split("\u0000");

@@ -19,6 +19,7 @@ import { ACTIONS, LABELS, keymap, spell } from "../../core/keys";
 import type { Action, Chord } from "../../core/keys";
 import { useSay } from "../../ui";
 import { Kbd } from "../parts/kbd";
+import { Tip } from "../parts/tip";
 
 // Keys that are only ever half of a chord.
 const MODIFIERS = ["Control", "Meta", "Shift", "Alt", "AltGraph", "CapsLock"];
@@ -84,28 +85,32 @@ export function KeysSection() {
                   {say("keys_conflict", { name: say(LABELS[taken(action)[0] ?? action]) })}
                 </span>
               </Show>
-              <button
-                type="button"
-                class="rounded-control border border-g2 px-snug py-tight hover:bg-g2 aria-pressed:border-accent"
-                title={say("keys_change")}
-                aria-pressed={recording() === action}
-                onClick={() => {
-                  setRecording(action);
-                  setHeard(null);
-                }}
-                onBlur={stop}
-                onKeyDown={(event) => {
-                  if (recording() === action) {
-                    capture(action, event);
-                  }
-                }}
-              >
-                <Show when={recording() === action} fallback={<Kbd action={action} />}>
-                  <span class="font-mono text-note text-text-faint">
-                    {heard() ?? say("keys_press")}
-                  </span>
-                </Show>
-              </button>
+              <Tip text={say("keys_change")}>
+                {(hint) => (
+                  <button
+                    type="button"
+                    class="rounded-control border border-g2 px-snug py-tight hover:bg-g2 aria-pressed:border-accent"
+                    aria-describedby={hint}
+                    aria-pressed={recording() === action}
+                    onClick={() => {
+                      setRecording(action);
+                      setHeard(null);
+                    }}
+                    onBlur={stop}
+                    onKeyDown={(event) => {
+                      if (recording() === action) {
+                        capture(action, event);
+                      }
+                    }}
+                  >
+                    <Show when={recording() === action} fallback={<Kbd action={action} />}>
+                      <span class="font-mono text-note text-text-faint">
+                        {heard() ?? say("keys_press")}
+                      </span>
+                    </Show>
+                  </button>
+                )}
+              </Tip>
               <button
                 type="button"
                 class="rounded-control px-snug py-tight text-note text-text-faint hover:bg-g2 hover:text-text disabled:invisible"

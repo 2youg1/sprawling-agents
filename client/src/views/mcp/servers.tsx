@@ -79,9 +79,7 @@ export function Servers(props: {
                     {say("mcp_tools")}
                     <span class="text-text-disabled">{toolCount(stateOf(server.label))}</span>
                   </span>
-                  <span class="min-w-0 flex-1 truncate font-mono text-text-faint" title={targetOf(server)}>
-                    {targetOf(server)}
-                  </span>
+                  <span class="min-w-0 flex-1 wrap-anywhere font-mono text-text-faint">{targetOf(server)}</span>
                   <Button
                     label={say("mcp_expand")}
                     tone="quiet"
@@ -101,14 +99,14 @@ export function Servers(props: {
                   <div class="flex flex-col gap-tight border-t border-g2 px-base py-snug text-note">
                     <div class="flex min-w-0 items-baseline gap-snug">
                       <span class="shrink-0 text-text-quiet">{say("mcp_target")}</span>
-                      <span class="min-w-0 break-all font-mono text-text">{targetOf(server)}</span>
+                      <span class="min-w-0 wrap-anywhere font-mono text-text">{targetOf(server)}</span>
                     </div>
                     <Show when={pairsOf(server).length > 0}>
                       <div class="flex min-w-0 flex-col gap-tight">
                         <span class="text-text-quiet">{say(pairCaption(server))}</span>
                         <For each={pairsOf(server)}>
                           {(pair) => (
-                            <span class="min-w-0 break-all font-mono text-text">
+                            <span class="min-w-0 wrap-anywhere font-mono text-text">
                               {pair[0]}
                               <span class="text-text-disabled"> = </span>
                               {pair[1]}

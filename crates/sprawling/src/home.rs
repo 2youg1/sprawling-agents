@@ -32,6 +32,27 @@ const COMPONENTS_DIR: &str = "components";
 /// layers, and a shared name would invite one reader to load the other.
 const PERSON_CONFIG_FILE: &str = "config.toml";
 
+/// Where this product puts the cities it makes for a person who named
+/// no location. Outside the dot directory on purpose: a person opens
+/// this one, edits the documents in it and copies it to another
+/// machine, while everything under the dot directory belongs to this
+/// machine alone.
+const CITIES_DIR: &str = "sprawling";
+
+/// The directory name of a city nobody named.
+///
+/// One name for both placements: `bin::firstrun` decides between the
+/// binary's own directory and the home directory, and a second
+/// spelling there would let the two answers drift apart.
+pub(crate) const CITY_DIR: &str = "city";
+
+/// What this machine looks like when neither variable is set.
+///
+/// `Home::detect` refuses with this sentence and the doctor reports it
+/// for `Absence::NoHome`, so the person reading the refusal and the
+/// person reading the report read one fact.
+pub(crate) const NO_HOME: &str = "neither USERPROFILE nor HOME is set";
+
 /// This person's home directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Home {
@@ -57,9 +78,18 @@ impl Home {
             None => Err(AxError::failure(
                 AxCode::PathNotFound,
                 "find this person's home directory",
-                "neither USERPROFILE nor HOME is set",
+                NO_HOME,
             )
             .with_recovery("set HOME to the directory this person's files live in")),
+        }
+    }
+
+    /// A home at a named directory, for tests that compare paths
+    /// rather than read this machine's environment.
+    #[cfg(test)]
+    pub(crate) fn at(root: &Path) -> Home {
+        Home {
+            root: root.to_path_buf(),
         }
     }
 
@@ -89,6 +119,17 @@ impl Home {
         self.product_dir().join(PERSON_CONFIG_FILE)
     }
 
+    /// Where a city goes when the person named none and the binary's
+    /// own directory will not take one.
+    ///
+    /// Not under the dot directory: a city is the person's own work
+    /// rather than this machine's state, and a city they cannot see in
+    /// their file manager is a city they cannot carry away.
+    #[must_use]
+    pub fn default_city(&self) -> PathBuf {
+        self.root.join(CITIES_DIR).join(CITY_DIR)
+    }
+
     /// This product's own directory under the home directory.
     ///
     /// The same dot name a city reserves for what governs it, because
@@ -111,9 +152,7 @@ mod tests {
     use super::*;
 
     fn home() -> Home {
-        Home {
-            root: PathBuf::from("dwelling"),
-        }
+        Home::at(Path::new("dwelling"))
     }
 
     #[test]
@@ -121,5 +160,19 @@ mod tests {
         let product = Path::new("dwelling").join(kernel::RESERVED_PREFIX);
         assert_eq!(home().components(), product.join(COMPONENTS_DIR));
         assert_eq!(home().person_config(), product.join(PERSON_CONFIG_FILE));
+    }
+
+    /// A city is the person's own work, so it lands where they can see
+    /// it rather than under the directory this machine keeps its own
+    /// state in.
+    #[test]
+    fn a_city_nobody_named_lands_where_the_person_can_see_it() {
+        let city = home().default_city();
+        assert_eq!(city, Path::new("dwelling").join(CITIES_DIR).join(CITY_DIR));
+        assert!(
+            !city.starts_with(Path::new("dwelling").join(kernel::RESERVED_PREFIX)),
+            "a city is not this machine's state: {}",
+            city.display()
+        );
     }
 }

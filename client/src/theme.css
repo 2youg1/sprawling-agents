@@ -24,15 +24,16 @@
  * Nothing is fetched at run time - a client that reached out to a font
  * host would leak that a city was opened, and would draw nothing on a
  * machine with no route out. A missing file is not a failure either:
- * `font-display: swap` and the fallback chain below draw the page with
- * what the machine has.
+ * `font-display: optional` and the fallback chain below draw the page
+ * with what the machine has, and the first link in that chain is
+ * measured against Geist so the page keeps its line breaks either way.
  *
- * Five things a person may change about how the page is drawn - which
+ * Seven things a person may change about how the page is drawn - which
  * way it is lit, the sans face, the mono face, the body size, the
- * amount of colour, and whether anything moves - are declared here and
- * selected from the root element, so the stylesheet stays the one
- * authority for what the choices *are* and the appearance section only
- * says which one holds.
+ * amount of colour, how tight the spacing is, and whether anything
+ * moves - are declared here and selected from the root element, so the
+ * stylesheet stays the one authority for what the choices *are* and the
+ * appearance section only says which one holds.
  *
  * **The ramp is named for the page, never for the ink.** `g0` is the
  * page and `g10` is the surface furthest from it in both ways of
@@ -43,19 +44,48 @@
 
 @import "tailwindcss";
 
+/* `optional` rather than `swap`, because the file is beside the page
+ * rather than across a network: the browser is given a moment to use
+ * Geist and never swaps the face afterwards. A face that arrives late
+ * therefore costs the first paint nothing and moves no text a person is
+ * already reading, which is what `swap` could not promise. `index.html`
+ * preloads both files so that moment is long enough. */
 @font-face {
   font-family: "Geist";
   src: url("./fonts/Geist-Variable.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
 }
 @font-face {
   font-family: "Geist Mono";
   src: url("./fonts/GeistMono-Variable.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
+}
+
+/* What a machine draws with when Geist is not there, re-measured so that
+ * it sets the same words to the same width and the same height.
+ *
+ * The numbers are measurements of the shipped file rather than a taste.
+ * `size-adjust` is Geist's average lowercase advance (0.534 em) over
+ * Segoe UI's (0.493 em); the two overrides are Geist's own ascent
+ * (1.005 em) and descent (0.295 em) divided by that same ratio, so the
+ * line box comes out at Geist's height once the size is adjusted. Arial
+ * and Helvetica measure within one per cent of Segoe UI on the same
+ * test, which is why one face serves all three and the ratio is quoted
+ * for the one this product meets first.
+ *
+ * Geist Mono is given no such face: a fixed advance inside a code block
+ * sets the width of that block and nothing around it. */
+@font-face {
+  font-family: "Geist Fallback";
+  src: local("Segoe UI"), local("Helvetica Neue"), local("Arial");
+  size-adjust: 108.2%;
+  ascent-override: 92.9%;
+  descent-override: 27.3%;
+  line-gap-override: 0%;
 }
 
 @theme {
@@ -106,9 +136,9 @@
    * `--face-sans` or `--face-mono` so that choosing a face moves one
    * value and keeps the whole fallback chain behind it. */
   --font-sans:
-    var(--face-sans), Inter, "IBM Plex Sans", "Source Sans 3", "Public Sans",
-    system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, Arial,
-    sans-serif;
+    var(--face-sans), "Geist Fallback", Inter, "IBM Plex Sans", "Source Sans 3",
+    "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu,
+    Cantarell, Arial, sans-serif;
   --font-mono:
     var(--face-mono), ui-monospace, "Cascadia Mono", "SF Mono", Menlo,
     Consolas, "DejaVu Sans Mono", monospace;
@@ -127,16 +157,19 @@
   --font-weight-body: 400;
   --font-weight-note: 400;
 
-  /* The spacing scale: six steps, every one a multiple of four. Zero is
-   * named too, because a flex column that may shrink needs `min-h-0`,
-   * and with no multiplier the numeral would resolve to nothing. */
+  /* The spacing scale: six steps, every one a multiple of four, and each
+   * one taken through the density coefficient so that tightening the
+   * page is one number rather than six. Zero is named too, because a
+   * flex column that may shrink needs `min-h-0`, and with no multiplier
+   * the numeral would resolve to nothing; zero is left outside the
+   * coefficient because no amount of tightening makes it smaller. */
   --spacing-0: 0px;
-  --spacing-tight: 4px;
-  --spacing-snug: 8px;
-  --spacing-base: 12px;
-  --spacing-pane: 16px;
-  --spacing-wide: 24px;
-  --spacing-section: 32px;
+  --spacing-tight: calc(4px * var(--density));
+  --spacing-snug: calc(8px * var(--density));
+  --spacing-base: calc(12px * var(--density));
+  --spacing-pane: calc(16px * var(--density));
+  --spacing-wide: calc(24px * var(--density));
+  --spacing-section: calc(32px * var(--density));
 
   /* The widths a page is built from: prose, a conversation, a page. */
   --container-measure: 520px;
@@ -161,8 +194,19 @@
   --spacing-caret: 18px;
   --spacing-hair: 2px;
 
-  /* The one shadow: what lifts the box a person writes in off the page. */
-  --shadow-composer: 0 8px 24px oklch(0.1 0.018 264 / 0.45);
+  /* Three heights a box may sit at above the page, and they are one ink
+   * at three strengths rather than three colours: a row or a control
+   * that has lifted slightly, a panel floating over the page, and the
+   * one box that has taken the page's attention entirely. Alpha is not a
+   * hue, so the single-axis rule is untouched. */
+  --shadow-raise: 0 1px 2px oklch(from var(--shadow-ink) l c h / 0.25);
+  --shadow-float: 0 8px 24px oklch(from var(--shadow-ink) l c h / 0.45);
+  --shadow-modal: 0 24px 64px oklch(from var(--shadow-ink) l c h / 0.6);
+  /* The name every caller still spells for the middle tier, pointing at
+   * that tier rather than repeating it. It goes the day the last
+   * `shadow-composer` in `src/views/` is renamed to the height it
+   * means. */
+  --shadow-composer: var(--shadow-float);
 
   /* The corner scales; the shape is the superellipse exponent halved. */
   --radius-panel: 10px;
@@ -226,6 +270,18 @@
 
 :root {
   --chroma: 1;
+  /* How tight the page is, as one coefficient in front of the six
+   * spacing steps, exactly as `--chroma` sits in front of every coloured
+   * token. A density is therefore one number to change and one number to
+   * read, and no step can drift out of proportion with the others. */
+  --density: 1;
+  /* The ink every shadow is cast in: the page's own hue at the darkest
+   * lightness the library uses, carrying no alpha of its own so that
+   * each height states the strength it needs. */
+  --shadow-ink: oklch(0.1 0.018 264);
+  /* What a number is set with when its columns have to hold still: one
+   * advance per digit, and a zero that cannot be read as a letter. */
+  --figures: tabular-nums slashed-zero;
   /* The face each stack starts with. Geist while the person says
    * nothing; the appearance section writes a generic family or a stack
    * they typed. */
@@ -260,8 +316,18 @@
  * text on a card at all - no ink short of black reaches Lc 90 against a
  * surface at 878. The rungs a card and a control are drawn with
  * therefore stay within 45 per mille of the page, and the ramp does its
- * travelling below them, where nothing has to be read. */
+ * travelling below them, where nothing has to be read.
+ *
+ * **`color-scheme` belongs in this block and nowhere else.** The parts of
+ * the page the browser draws for itself - the list a `<select>` drops, the
+ * scrollbar, a date picker, the backdrop behind a modal - read that
+ * property and nothing else, so a light page that forgot to say so stays
+ * dark in exactly the places this stylesheet cannot reach. Saying it here,
+ * beside the eleven rungs that make the page light, leaves one answer to
+ * the question of what lighting holds. */
 :root[data-theme="light"] {
+  color-scheme: light;
+
   --color-g0: oklch(0.978 0.018 264);
   --color-g1: oklch(0.956 0.018 264);
   --color-g2: oklch(0.935 0.018 264);
@@ -316,6 +382,44 @@
   --chroma: 0;
 }
 
+/* A page for somebody reading tables rather than prose. One quarter off
+ * every spacing step, which is the whole change: type, colour and line
+ * height stay where they are, because a compact page is a page with less
+ * air in it and not a page with smaller writing in it. */
+:root[data-density="compact"] {
+  --density: 0.75;
+}
+
+/* A machine asking for more contrast gets it by moving one token. The
+ * faintest text steps up to the tier above it, so every line on the page
+ * reaches at least Lc 75; nothing else moves, because nothing else was
+ * quiet enough to be the complaint. The value is taken from the quiet
+ * token rather than written out, so the step follows whichever way the
+ * page is lit.
+ *
+ * Both selectors are needed and they are not a duplicate: the light page
+ * declares this token at `:root[data-theme="light"]`, which outweighs a
+ * bare `:root`, so the override has to match that weight to be able to
+ * win. */
+@media (prefers-contrast: more) {
+  :root,
+  :root[data-theme] {
+    --color-text-faint: var(--color-text-quiet);
+  }
+}
+
+/* Windows high contrast, and every other forced-colour mode, replaces
+ * each background with a system colour. A shape whose entire message is
+ * its fill - a badge, a status dot, the chosen pill in a group of them -
+ * becomes Canvas on Canvas and disappears. Every pill therefore draws its
+ * own edge in the system ink, which is the one colour the mode guarantees
+ * is visible against whatever it painted behind. */
+@media (forced-colors: active) {
+  .rounded-pill {
+    border: 1px solid CanvasText;
+  }
+}
+
 /* The corners are continuous-curvature (a squircle), the way the old
  * client drew them: each radius utility carries its superellipse
  * exponent, and an engine without `corner-shape` draws a plain arc of
@@ -335,6 +439,15 @@
 @utility rounded-pill {
   border-radius: var(--radius-pill);
   corner-shape: var(--corner-pill-shape);
+}
+
+/* A number that changes while a person watches it keeps its columns.
+ * The `text-figure` step is the size a number is displayed at, so it
+ * carries this without being asked (see the utilities layer at the foot
+ * of this file); anything else - a token count in a table, a duration in
+ * a run, a price in a ledger - asks for it by name. */
+@utility figure {
+  font-variant-numeric: var(--figures);
 }
 
 /* The three motions the city drawing makes, all on the compositor: a
@@ -405,6 +518,38 @@
 .drop {
   animation: drop 200ms var(--ease-standard) both;
 }
+/* The shape of what is coming, while it is coming: a light band travels
+ * across the bar once per pass. A block that fades in and out reads as
+ * something broken, and a band travelling one way reads as something on
+ * its way, which is the whole reason to prefer it.
+ *
+ * **It is not free, and the trade is deliberate.** Moving a background
+ * repaints the box every frame, where the opacity fade it replaces was
+ * composited without repainting anything. The bars are few and small, so
+ * the paint is affordable and the reading is worth it.
+ *
+ * At rest - motion off, or a machine asking for less - the band sits at
+ * the far edge and the bar is the flat grey it travels over, so stopping
+ * the animation needs nothing said about the paint. */
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.shimmer {
+  background-color: var(--color-g2);
+  background-image: linear-gradient(
+    90deg,
+    var(--color-g2) 0 45%,
+    var(--color-g3) 50%,
+    var(--color-g2) 55% 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
 /* Motion has three states and the root element spells which one holds:
  * no attribute follows the machine, `off` reduces whatever the machine
  * says, and `on` keeps the full motion even on a machine that asks for
@@ -417,6 +562,7 @@
   :root:not([data-motion="on"]) .wave,
   :root:not([data-motion="on"]) .rise,
   :root:not([data-motion="on"]) .drop,
+  :root:not([data-motion="on"]) .shimmer,
   :root:not([data-motion="on"]) .animate-pulse {
     animation: none;
   }
@@ -426,6 +572,7 @@
 :root[data-motion="off"] .wave,
 :root[data-motion="off"] .rise,
 :root[data-motion="off"] .drop,
+:root[data-motion="off"] .shimmer,
 :root[data-motion="off"] .animate-pulse {
   animation: none;
 }
@@ -443,6 +590,9 @@
 /* Base: a page is dark, text never pure white, links carry no
  * underline until a hand is on them. */
 @layer base {
+  /* The page is lit from behind unless the light block says otherwise;
+   * that block carries `color-scheme: light` beside the rungs that make
+   * it light, so this line is the default and not a second answer. */
   html {
     color-scheme: dark;
     background: var(--color-g0);
@@ -480,8 +630,43 @@
     font: inherit;
     color: inherit;
   }
+  /* The parts of a control the browser paints for itself: the tick in a
+   * checkbox, the dot in a radio, the bar a `<progress>` fills, and the
+   * caret. Left alone they come out in whichever blue the machine was
+   * shipped with, which is the one colour this library does not use. */
+  input,
+  progress {
+    accent-color: var(--color-accent);
+  }
+  textarea,
+  input {
+    caret-color: var(--color-accent);
+  }
+  /* Selected text is the accent thinned until the words survive it,
+   * derived from the accent rather than chosen beside it so that the
+   * page keeps one hue axis and a person turning colour off turns this
+   * off with it. An engine too old for relative colour drops the line
+   * and falls back to the platform's own selection colour, which is
+   * legible by construction. */
   ::selection {
-    background: var(--color-g4);
+    background: oklch(from var(--color-accent) l c h / 0.35);
+  }
+  /* Anything a link can land on clears the bar that may be sitting over
+   * it, so an approval reached from a notice arrives below the header
+   * rather than under it. */
+  [id] {
+    scroll-margin-top: var(--spacing-bar);
+  }
+  /* A heading breaks into even lines rather than leaving one word alone
+   * on the last of them, and a paragraph avoids ending on a single short
+   * word. Engines without either value ignore the line and set the text
+   * the way they do today. */
+  :is(h1, h2, h3, h4, h5, h6) {
+    text-wrap: balance;
+  }
+  p,
+  li {
+    text-wrap: pretty;
   }
   /* One scrollbar everywhere: thin, the g3 grey, on a transparent
    * track, and a gutter that is reserved before it is needed so a page
@@ -496,6 +681,14 @@
   .overflow-y-auto {
     scrollbar-gutter: stable;
     overscroll-behavior: contain;
+  }
+  /* The page's own scrollport reserves the gutter at both edges, so a
+   * column centred with `mx-auto` stays centred once the page grows past
+   * the fold instead of sliding half a scrollbar to the left. An engine
+   * that does not know `both-edges` drops this line and keeps the single
+   * gutter declared above it. */
+  main {
+    scrollbar-gutter: stable both-edges;
   }
   *:focus-visible {
     outline: 2px solid var(--color-accent);
@@ -515,10 +708,54 @@
   }
 }
 
-/* A dense screen draws a hairline where a coarse one draws a pixel:
- * every rule line, and the caret, thins to half a device pixel's
- * worth at two or more device pixels per CSS pixel. */
+/* Chinese is broken and spaced by rules of its own, and the root element
+ * already carries the language the person chose, so one selector states
+ * all three: no line may begin with a closing bracket or a full stop, an
+ * opening mark may hang into the margin instead of indenting the line
+ * behind it, and the space a full-width mark carries on its left is
+ * trimmed where the line starts. An engine without one of these
+ * properties ignores that line and sets the text as it does today. */
+:root:lang(zh) {
+  line-break: strict;
+  hanging-punctuation: first allow-end;
+  text-spacing-trim: space-first;
+}
+
+/* What the utility layer is told here, it is told in the class names the
+ * views already spell, so that a screen keeps its own vocabulary and
+ * this file stays the only place the answer changes. */
 @layer utilities {
+  /* A viewport unit that survives a phone: `100vh` is measured against a
+   * browser with its address bar hidden, so the shell overflows by the
+   * height of that bar until the person scrolls. `100dvh` is the
+   * viewport there is right now. Desktop reads the two identically. */
+  .h-screen {
+    height: 100dvh;
+  }
+  /* The step a number is displayed at brings its own figures. */
+  .text-figure {
+    font-variant-numeric: var(--figures);
+  }
+  /* A bar pinned to the bottom edge of a phone sits over the home
+   * indicator, so it holds that strip clear. The height has to move with
+   * the padding: a bar told to be exactly one bar tall would spend the
+   * strip out of its own content rather than beside it, and its buttons
+   * would be squeezed by however much the device reserves.
+   *
+   * The reserved strip is zero until `index.html` asks for the viewport
+   * that has one, which is a change the shell has to make first: drawing
+   * under the insets means the rail and the header owe their own edges
+   * the same courtesy. Until then this rule costs nothing and is already
+   * right. */
+  .sticky.bottom-0 {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    height: auto;
+    min-height: var(--spacing-bar);
+  }
+
+  /* A dense screen draws a hairline where a coarse one draws a pixel:
+   * every rule line, and the caret, thins to half a device pixel's
+   * worth at two or more device pixels per CSS pixel. */
   @media (min-resolution: 2dppx) {
     .border,
     .border-t,
@@ -551,4 +788,14 @@
 .settled {
   content-visibility: auto;
   contain-intrinsic-size: auto 160px;
+}
+
+/* The same deferral for one row of a long list - the record, the ledger,
+ * the cost breakdown - where the saving is the one that matters: a
+ * thousand rows cost the first paint only the rows in view. A row is one
+ * step tall, so the height reserved for it is the height it will have
+ * and the scrollbar is right before anything is laid out. */
+.settled-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--spacing-step);
 }

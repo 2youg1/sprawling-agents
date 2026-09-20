@@ -15,6 +15,7 @@ import { For, Show } from "solid-js";
 
 import type { Pair } from "./draft";
 import { Button } from "../parts/button";
+import { Field } from "../parts/field";
 import { useSay } from "../../ui";
 
 export interface PairTableProps {
@@ -28,8 +29,6 @@ export interface PairTableProps {
   readonly note?: string;
 }
 
-const BOX =
-  "min-w-0 flex-1 rounded-control border border-g3 bg-g2 px-base py-snug font-mono text-note text-text outline-none placeholder:text-text-disabled";
 
 export function PairTable(props: PairTableProps) {
   const say = useSay();
@@ -42,22 +41,24 @@ export function PairTable(props: PairTableProps) {
       <For each={props.rows}>
         {(row, index) => (
           <div class="flex min-w-0 items-center gap-tight">
-            <input
-              class={BOX}
-              aria-label={`${props.caption} ${say("mcp_pair_name")}`}
+            <Field
+              label={`${props.caption} ${say("mcp_pair_name")}`}
+              labelling="hidden"
+              mono
               placeholder={say("mcp_pair_name")}
               value={row.name}
-              onInput={(event) => {
-                written(index(), { name: event.currentTarget.value, value: row.value });
+              onInput={(value) => {
+                written(index(), { name: value, value: row.value });
               }}
             />
-            <input
-              class={BOX}
-              aria-label={`${props.caption} ${say("mcp_pair_value")}`}
+            <Field
+              label={`${props.caption} ${say("mcp_pair_value")}`}
+              labelling="hidden"
+              mono
               placeholder={say("mcp_pair_value")}
               value={row.value}
-              onInput={(event) => {
-                written(index(), { name: row.name, value: event.currentTarget.value });
+              onInput={(value) => {
+                written(index(), { name: row.name, value });
               }}
             />
             <Button

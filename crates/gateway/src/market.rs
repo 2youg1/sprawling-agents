@@ -38,12 +38,15 @@ pub struct ModelEntry {
     /// refused at the endpoint rather than dropped on the wire.
     pub input: InputKinds,
     /// The most this model may emit in one response, thinking included.
-    /// A property of the model rather than a caller's preference, and
-    /// one no provider's model list answers, so it is registered with
-    /// the model or it is not known at all. `None` says nobody has
-    /// registered it: the OpenAI wire then omits the field and the
-    /// Anthropic wire refuses, which is the whole difference between a
-    /// call that answers and a call that returns nothing.
+    /// A property of the model rather than a caller's preference.
+    ///
+    /// `None` says this catalogue row states none, which is one rung of
+    /// the ladder in `provider::ceiling` rather than the end of the
+    /// question: a registration reaches the wire with the person's
+    /// figure, the provider's own, this row, or the city's policy
+    /// default, and it records which. Lookup here stays exact by id;
+    /// prefix matching happens in `provider::preset`, and a test keeps
+    /// the two indexes from answering for one id.
     pub max_output_tokens: Option<Ceiling>,
     pub input_price: UsdMicros,
     pub output_price: UsdMicros,

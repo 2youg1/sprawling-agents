@@ -15,6 +15,7 @@ impl gateway::AttachedEndpoint
 impl gateway::AudioType
 impl gateway::AuthSpec
 impl gateway::Broker
+impl gateway::CeilingSource
 impl gateway::Custodian
 impl gateway::Endpoint
 impl gateway::Endpoint
@@ -25,16 +26,22 @@ impl gateway::ImageBytes
 impl gateway::MarketSnapshot
 impl gateway::ModelFacts
 impl gateway::Native
+impl gateway::OutputCeiling
 impl gateway::Persistence
 impl gateway::Recording
 impl gateway::Redemption
 impl gateway::Transcriber
 impl kernel::model::Model for gateway::Endpoint
 impl kernel::model::Model for gateway::Native
+pub const fn gateway::CeilingSource::as_str(self) -> &'static str
+pub const fn gateway::OutputCeiling::source(self) -> gateway::CeilingSource
+pub const fn gateway::OutputCeiling::tokens(self) -> kernel::model::wire::Ceiling
 pub const gateway::CALL_TIMEOUT_MS: u64
 pub const gateway::OAUTH_PROFILES: [gateway::OauthProfile; 2]
 pub enum gateway::AdmissionVerdict
+pub enum gateway::CeilingSource
 pub enum gateway::Connection
+pub enum gateway::DialectHint
 pub fn gateway::AdmissionState::admit(&self, kernel::event::identity::TimeMs) -> gateway::AdmissionVerdict
 pub fn gateway::AdmissionState::default() -> Self
 pub fn gateway::AdmissionState::interval_ms(&self) -> u64
@@ -91,6 +98,7 @@ pub fn gateway::ModelFacts::read(&serde_json::value::Value) -> core::option::Opt
 pub fn gateway::Native::call(&mut self, &kernel::model::seam::ModelRequest) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
 pub fn gateway::Native::new(gateway::NativeConfig) -> core::result::Result<gateway::Native, kernel::error::shape::AxError>
 pub fn gateway::OauthTokens::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn gateway::OutputCeiling::resolve(gateway::Stated, core::option::Option<kernel::model::wire::Ceiling>, &str, &str) -> core::option::Option<gateway::OutputCeiling>
 pub fn gateway::Persistence::consequence(self) -> &'static str
 pub fn gateway::Recording::is_empty(&self) -> bool
 pub fn gateway::Recording::kind(&self) -> gateway::AudioType
@@ -107,6 +115,7 @@ pub fn gateway::attached_payload(&gateway::AttachedEndpoint) -> core::result::Re
 pub fn gateway::client_for(kernel::reach::Proxying, &str) -> reqwest::blocking::client::ClientBuilder
 pub fn gateway::increment_of(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::option::Option<kernel::model::wire::Increment>
 pub fn gateway::is_local(&str) -> bool
+pub fn gateway::normalise_entered(&str, gateway::DialectHint) -> core::result::Result<gateway::Normalised, kernel::error::shape::AxError>
 pub fn gateway::oauth_begin(&gateway::OauthProfile, alloc::string::String, alloc::string::String) -> core::result::Result<gateway::OauthPending, kernel::error::shape::AxError>
 pub fn gateway::oauth_random(&[u8]) -> alloc::string::String
 pub fn gateway::oauth_redeem(&gateway::OauthProfile, &gateway::OauthPending, &str, u64) -> core::result::Result<gateway::OauthTokens, kernel::error::shape::AxError>
@@ -148,6 +157,10 @@ pub gateway::CallCost::source: gateway::CostSource
 pub gateway::CallCost::usage: kernel::model::wire::ModelUsage
 pub gateway::Captured::events: alloc::vec::Vec<kernel::event::payload::Payload>
 pub gateway::Captured::replaced: alloc::vec::Vec<u8>
+pub gateway::CeilingSource::Person
+pub gateway::CeilingSource::Policy
+pub gateway::CeilingSource::Preset
+pub gateway::CeilingSource::Upstream
 pub gateway::Chosen::endpoint: &'b gateway::AttachedEndpoint
 pub gateway::Chosen::entry: &'b gateway::ModelEntry
 pub gateway::Chosen::fallback: &'b gateway::Fallback
@@ -164,6 +177,10 @@ pub gateway::Described::configured: bool
 pub gateway::Described::persistence: gateway::Persistence
 pub gateway::Described::source: alloc::string::String
 pub gateway::Described::writable: bool
+pub gateway::DialectHint::Chat
+pub gateway::DialectHint::Messages
+pub gateway::DialectHint::Responses
+pub gateway::DialectHint::Unset
 pub gateway::EndpointConfig::auth: gateway::AuthSpec
 pub gateway::EndpointConfig::base_url: alloc::string::String
 pub gateway::EndpointConfig::dialect: kernel::model::wire::DialectKind
@@ -184,6 +201,11 @@ pub gateway::EndpointTuning::timeout_ms: core::option::Option<u64>
 pub gateway::Fallback::None
 pub gateway::Fallback::Then::endpoint: alloc::string::String
 pub gateway::Fallback::Then::model: alloc::string::String
+pub gateway::HostPreset::base_path: &'static str
+pub gateway::HostPreset::dialect: core::option::Option<kernel::model::wire::DialectKind>
+pub gateway::HostPreset::host: &'static str
+pub gateway::HostPreset::models: &'static [gateway::ModelPreset]
+pub gateway::HostPreset::source: &'static str
 pub gateway::InputKinds::Text
 pub gateway::InputKinds::TextImage
 pub gateway::ModelEntry::cache_read_price: kernel::budget::UsdMicros
@@ -200,11 +222,18 @@ pub gateway::ModelFacts::input_modalities: alloc::vec::Vec<alloc::string::String
 pub gateway::ModelFacts::input_price: core::option::Option<alloc::string::String>
 pub gateway::ModelFacts::max_output_tokens: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::ModelFacts::output_price: core::option::Option<alloc::string::String>
+pub gateway::ModelPreset::context_tokens: u64
+pub gateway::ModelPreset::id_prefix: &'static str
+pub gateway::ModelPreset::input: gateway::InputKinds
+pub gateway::ModelPreset::max_output_tokens: u64
+pub gateway::ModelPreset::source: &'static str
 pub gateway::NativeConfig::base_url: alloc::string::String
 pub gateway::NativeConfig::model: alloc::string::String
 pub gateway::NativeConfig::pricing: core::option::Option<gateway::ModelEntry>
 pub gateway::NativeConfig::proxying: kernel::reach::Proxying
 pub gateway::NativeConfig::timeout_ms: u64
+pub gateway::Normalised::base_url: alloc::string::String
+pub gateway::Normalised::dialect: gateway::DialectHint
 pub gateway::OauthPending::auth_url: alloc::string::String
 pub gateway::OauthPending::state: alloc::string::String
 pub gateway::OauthProfile::api_base: &'static str
@@ -229,6 +258,8 @@ pub gateway::Retreat::Freeze
 pub gateway::Retreat::MoveTo::endpoint: alloc::string::String
 pub gateway::Retreat::MoveTo::model: alloc::string::String
 pub gateway::Retreat::MoveTo::not_before: kernel::event::identity::TimeMs
+pub gateway::Stated::person: core::option::Option<kernel::model::wire::Ceiling>
+pub gateway::Stated::upstream: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::TokenRequest::body: alloc::string::String
 pub gateway::TokenRequest::url: alloc::string::String
 pub gateway::Toolkit::auth: alloc::string::String
@@ -253,17 +284,22 @@ pub struct gateway::Endpoint
 pub struct gateway::EndpointBook
 pub struct gateway::EndpointConfig
 pub struct gateway::EndpointTuning
+pub struct gateway::HostPreset
 pub struct gateway::ImageBytes(_)
 pub struct gateway::MarketSnapshot
 pub struct gateway::ModelEntry
 pub struct gateway::ModelFacts
+pub struct gateway::ModelPreset
 pub struct gateway::Native
 pub struct gateway::NativeConfig
+pub struct gateway::Normalised
 pub struct gateway::OauthPending
 pub struct gateway::OauthProfile
 pub struct gateway::OauthTokens
+pub struct gateway::OutputCeiling
 pub struct gateway::Recording
 pub struct gateway::Redemption
+pub struct gateway::Stated
 pub struct gateway::TokenRequest
 pub struct gateway::Toolkit
 pub struct gateway::Transcriber

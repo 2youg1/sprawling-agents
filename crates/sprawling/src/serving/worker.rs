@@ -94,7 +94,7 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
     } = serving;
     let city_root = city_root.as_path();
     let token = token.as_deref();
-    let cas_root = city_root.join(".sprawling").join("cas");
+    let cas_root = kernel::layout::CityLayout::new(city_root).cas();
     std::fs::create_dir_all(&cas_root).map_err(|source| {
         AxError::failure(
             AxCode::StorageFatal,

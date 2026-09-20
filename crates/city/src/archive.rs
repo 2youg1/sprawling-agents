@@ -22,10 +22,8 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::layout::CityLayout;
 use kernel::{AxCode, AxError, TimeMs};
-
-/// Where a building's archive sits, relative to the building.
-pub const ARCHIVE_DIR: &str = "Archive";
 
 /// The four kinds. Closed on purpose: a fifth would need a reason, and
 /// "it did not fit" is the reason a category list rots.
@@ -128,9 +126,8 @@ pub fn entry(
         kind,
         day,
         subject: subject.trim().to_owned(),
-        at: city_root
-            .join(building.as_str())
-            .join(ARCHIVE_DIR)
+        at: CityLayout::new(city_root)
+            .archive(building)
             .join(kind.as_str())
             .join(format!("{day}-{}.md", slug(subject))),
     })
@@ -140,30 +137,10 @@ pub fn entry(
 ///
 /// # Errors
 /// Propagates whatever creating the directory or writing the file
-/// reports, and refuses an entry whose path has no directory to sit in.
+/// reports.
 pub fn file(entry: &Entry, body: &str) -> Result<(), AxError> {
-    let dir = entry.at.parent().ok_or_else(|| {
-        AxError::failure(
-            AxCode::InvalidArgs,
-            "file an archive entry",
-            format!("{} has no directory to sit in", entry.at.display()),
-        )
-    })?;
-    std::fs::create_dir_all(dir).map_err(|err| {
-        AxError::failure(
-            AxCode::StorageFatal,
-            "file an archive entry",
-            format!("{}: {err}", dir.display()),
-        )
-    })?;
     let text = format!("# {}\n\n{body}\n", entry.subject);
-    std::fs::write(&entry.at, text.as_bytes()).map_err(|err| {
-        AxError::failure(
-            AxCode::StorageFatal,
-            "file an archive entry",
-            format!("{}: {err}", entry.at.display()),
-        )
-    })
+    crate::document::replace(&entry.at, text.as_bytes())
 }
 
 /// Everything filed in one building, kind then day then subject.
@@ -175,7 +152,7 @@ pub fn file(entry: &Entry, body: &str) -> Result<(), AxError> {
 /// # Errors
 /// Propagates a directory that exists and cannot be read.
 pub fn index(city_root: &Path, building: &kernel::Address) -> Result<Vec<Entry>, AxError> {
-    let root = city_root.join(building.as_str()).join(ARCHIVE_DIR);
+    let root = CityLayout::new(city_root).archive(building);
     let mut entries = Vec::new();
     if !root.exists() {
         return Ok(entries);

@@ -18,10 +18,11 @@
 // shell will find it, and `wire_client` talks to a served city from a
 // terminal - both are about the command line rather than about a city.
 
-use super::city::{DEFAULT_AT, report};
+use super::city::report;
 use super::router::{client_summary, flag_value, log_floor, log_levels};
 use super::version::{check, cut};
 use super::{DEPENDENCIES, install, wire_client};
+use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, serving};
 use std::process::ExitCode;
 

@@ -63,7 +63,7 @@ impl RunWorker {
             collaboration,
             entrance,
         } = Standing::fold(&dir)?;
-        let cas = Cas::open(&city_root.join(".sprawling").join("cas"))
+        let cas = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
             .map_err(memory::MemoryError::into_ax)?;
         // The one place a `Delegator` is minted in this process, which
         // is what makes "a sub-agent cannot set the city working" a

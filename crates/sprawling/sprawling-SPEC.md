@@ -68,6 +68,7 @@ pub(crate) async fn serve(city_root, addr, token, index_html, model) -> Result<(
 - **`fork <city> <run> <seq> [addr]`**＝世系记录形：验链 → `runtime::fork::prefix` 验界 → 节点归属验（seq 处的事件必属于母 Run，否则拒）→ `run_forked` 落账携新 RunId。**不自动发车**：驱动新 Run 是人的下一步 Dispatch；逐字节母前缀入窗属并发期的 must-read 网，不在本形。`Command::Fork` 同路。
 - **`adopt <city> <addr>`**＝收编已存在目录为楼（语义住 `city-SPEC.md` §8-3）。
 - **`serve` 增 `--web-dir <dir>`**：开发回路逐请求读盘；发布形恒走嵌入表（`channels::ClientAssets`，语义住 channels-SPEC §8-2）。
+- **默认地址住 `kernel::consts_policy::DEFAULT_AT`**（`"127.0.0.1:8787"`）。`up`／`serve`／首屏／`call` 与 `enrol` 的 `--at` 缺省，以及「不是 socket 地址」那条恢复语里的示例，全部读这一个值：一个人被告知的地址与真正绑上的地址不能是两处写法。安装脚本与 README 引用同一个值，改它即改这一处。
 
 ## 8-3 视图与 Spine
 
@@ -183,8 +184,10 @@ fn renew_if_stale(&mut self, provider: &str) -> Result<(), AxError>;   // 用之
 // bin::firstrun
 pub(crate) enum FirstScreen { Start(PathBuf), Quit }
 
-pub(crate) fn default_city(exe_dir: &Path, home: Option<&Path>, exe_dir_writable: bool) -> PathBuf;
-pub(crate) fn is_writable(dir: &Path) -> bool;
+pub(crate) enum BesideBinary { Writable, ReadOnly }
+
+pub(crate) fn default_city(exe_dir: &Path, home: Option<&Home>, beside: BesideBinary) -> PathBuf;
+pub(crate) fn writability(dir: &Path) -> BesideBinary;
 pub(crate) fn ask<R: BufRead, W: Write>(city: &Path, input: &mut R, out: &mut W) -> io::Result<FirstScreen>;
 pub(crate) fn open_in_browser(url: &str) -> io::Result<()>;
 pub(crate) fn local_url(bind: SocketAddr) -> String;
@@ -193,13 +196,15 @@ pub(crate) fn local_url(bind: SocketAddr) -> String;
 - **`up <dir>`＝序列的唯一定义**：目录里没有 ledger 就先 `init`，随后 `serve`，随后开浏览器。无参屏与 `start.cmd` 都落到它，`init`／`serve` 仍各自独立可用——一段序列一处权威。
 - **genesis 要人同意**：写 Ledger 第 0 行是全系统唯一一次不可撤销的语义写入，不因「有人双击了一个文件」而发生。无参屏在按键**之前**把最终路径显示出来，人按回车才开城；`q` 退出并打印命令表。
 - **非交互 stdin 无此问**：`read_line` 得 EOF（管道、CI、无人值守）即 `Quit`，主流程打印命令表退 2。这条让该路径在没有 TTY 的地方也可测。
-- **默认位置取 exe 同级 `city/`**：整座城随文件夹可拷、可备、可删，与「一座城市就是一个目录」同构。`is_writable` 探到不可写（解压进 Program Files）就回退 `home/sprawling/city`；回退可见而非暗中，因为路径印在第一屏上。
+- **默认位置取 exe 同级 `city/`**：整座城随文件夹可拷、可备、可删，与「一座城市就是一个目录」同构。`writability` 探到不可写（解压进 Program Files）就回退到 `Home::default_city()`（§8-70）；回退可见而非暗中，因为路径印在第一屏上。
+- **「同级目录可不可写」是二元枚举而不是 bool**（Roadmap G-25）：`writability` 产出 `BesideBinary`，`default_city` 只收它，于是这一个事实在探测端与决定端是同一个拼写，调用点读起来是 `BesideBinary::ReadOnly` 而不是一个无名的 `false`。
+- **回退路径只有 `bin::home` 一处权威**：`~/sprawling/city` 由 `Home::default_city()` 给出，`firstrun` 不再自己拼 `join("sprawling").join("city")`（Roadmap G-10 的第四处）；目录名 `city` 由 `home::CITY_DIR` 一处定义，exe 同级与家目录两种落点共用它。
 - **开浏览器恒非致命**：`open_in_browser` 失败只记一行，`serve` 照跑——URL 在这之前已经打印。命名不取 `browser`：`crates/browser` 已占住「Agent 驱动真实浏览器」这个概念，一名一义。
 - **横幅给人读**：city 目录、WebUI 的完整 URL、客户端完整与否、`Ctrl-C` 停城，四行。bind 是未指定地址（`0.0.0.0`）时 URL 仍给回环形，因为那才是运行中的机器打得开的那一个。
 
 **交付形态**：`just package` 产 `sprawling-<version>-<target>.zip`＝二进制＋`start.cmd`／`start.sh`＋`QUICKSTART.md`；裸 exe 不再单独作附件，双击的目标因此永远是启动器。`release.yml` 由 tag 触发，三平台各跑 `just dist`，`xtask budget` 在打包前拦下页壳客户端（`CLIENT_COMPLETE=false` 的二进制），通过后才附件。手工上传的产物来历不明，是本次全部症状的链头，这条把它关掉。
 
-**本章测试**：`default_city` 可写取同级、不可写取 home；`ask` 空行得 `Start`、`q` 得 `Quit`、EOF 得 `Quit`；第一屏文本在返回前已含最终路径（证明「先示后写」）；`local_url` 对未指定地址给回环形。
+**本章测试**：`default_city` 取 `BesideBinary::Writable` 得同级、取 `ReadOnly` 得 `Home::default_city()` 本身（而不是第二次拼出的同一串）；`ask` 空行得 `Start`、`q` 得 `Quit`、EOF 得 `Quit`；第一屏文本在返回前已含最终路径（证明「先示后写」）；`local_url` 对未指定地址给回环形。
 
 ## 8-9 让二进制成为一个词
 
@@ -1146,7 +1151,7 @@ invert the model seam，仍未动手。**这里不假装做过它。**
 | `Sweep` | drive 之后要收的东西：围栏、被抬起来的审批、job locator | `settle_desks` 11→4 |
 | `Reach` | 这一轮活够得到谁：邻里与代表 | `status_tool` 7→4 |
 | `Entered` | 一个人为接一个 endpoint 输入了什么：名字、base URL、兼容格式、凭证（`Credential` 枚举，不是「密钥＋鉴权头」两个 `Option`） | `endpoint_of` 5→1、`probe_endpoint` 5→1、`attach_endpoint` 6→2 |
-| `Ceilings` | 一行模型声明的两个上限：上下文与最大输出（后者 `Option<Ceiling>`，人没填就退回目录行，目录也不认识就留空） | `select_model` 5→4 |
+| `Ceilings` | 一行模型声明的两个上限：上下文与最大输出（后者 `Option<Ceiling>`；人没填就沿用这个模型上一次登记的值，再退回目录行，见 §8-71） | `select_model` 5→4 |
 
 `record_for` 的五参消得不需要新类型：`effect::Line` 已经装着 `who`／`addr`／`kind`／`data`，
 调用点原本就在把它拆开再递进去，改成整份递。
@@ -2410,6 +2415,7 @@ pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Res
 - **谁问谁**：`workbench::engine::machine_half` 问 `doctor::host` 三次（组件、shell、引擎），它自己只留一条判定——shell 只在冻结配置说 `shell = true` 时才递给 bench，组件缺席不拦派活（python 臂在被调用时才拒），引擎起不来则拒派活。`browser_bidi::lazy::start` 不再按名字盲起，改为 `Engine::choose(&host::firefox(), &host::chromedriver())` 后按路径起。`assembly::mcp::PYTHON_WASM_ENV` 删除。
 - **`SPRAWLING_PYTHON_WASM` 只拼一次，且保留为兼容读法**：拼写唯一处是 `doctor::table::PYTHON_WASM_VARIABLE`。**选的是「变量优先、组件目录次之」**：一个人显式指了一处，就该用那一处；指错了（变量设了但文件不在）报 `Absent(VariableNamesNothing)` 而**不悄悄落到组件目录**——被否决的备选是「目录优先、变量兜底」，它会让一个设错的变量永远没人发现。没设变量时看 `~/.sprawling/components/python-wasi/python.wasm`。测试遍历本 crate 的 `src/`，断言含该字面量的文件恰好一个。
 - **`Broken` 是第三态，不是 `Absent` 的别名**：一个在 PATH 上却起不来的二进制（权限、坏文件、架构不符）、一个存在却没有那份文件的组件目录（下载中断）、一个读不了的目录（权限），三者对 verdict 都算缺，但每一个都带着自己的原因进报告行——**绝不以「absent」一词吞掉一个可以说清的故障**。`Version` 的四态同理：说了、没说、说的不是文本、超时没说；后三者仍算 Present（§8-40 已定：不说话的工具仍是装了的工具）。
+- **本二进制起的每个子进程都由 `doctor::running::stop` 结束**：`ask_version` 读到第一行后杀掉子进程，用的是安装程序超时后走的同一段——杀不掉或收不了尸都不是可以丢掉的 `Result`，而是一句带进 `Fault::Unreadable` 的话，于是「本城起了一个它停不掉的进程」这件事排在它印出的版本号之前给人看。`Fault::Unreadable` 因此是「这台电脑不让本城把这一项做完」的那一态，它携带的那句话就是全部解释，`describe` 原样印出。
 - **`Detection::Built` 的探测是真起一次引擎**，而不是读一个 cfg：一份声称带引擎却起不来的构建，doctor 必须报 `Broken { WillNotStart }`；`ENGINE_CARRIED` 是那个 cfg 的唯一拼写，表引用它。
 - **`ffmpeg` 进表但 doctor 管不到 `desktop/`**：`desktop/` 在墙外、是独立进程，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`desktop/` 不改——这是这里的边界，如实记。`sprawling-desktop` 同样进表（`desktop: true` 的楼要它在 PATH 上；Manual：从 `desktop/` 构建后放上 PATH）。
 - **`browser::profile` 没有探测可搬**：读 browser-SPEC §19-1 确认 profile 是「楼的登录态住城的保留区」这条纯判定，浏览器探测住 `bin::browser_bidi::lazy`，故不改 `crates/browser`。
@@ -2674,11 +2680,9 @@ impl Journal {
 
 ### 8-64 机器上的两个动词：`DoctorInstall` 与 `DoctorRefresh`（形状 4 适配器）
 
-`Query::Doctor` 答的是开城那一刻的快照（§8-53）。于是机器页只能把一行命令复制到终端，装完还要重启城才看得见结果。两条命令补上这段，执行点是 `bin::assembly::commanding::machine`，装的那一步是 `bin::doctor::installing`。
+`Query::Doctor` 答的是开城那一刻的快照（§8-53）。于是机器页只能把一行命令复制到终端，装完还要重启城才看得见结果。两条命令补上这段，执行点是 `bin::assembly::commanding::machine`。
 
 ```rust
-// bin::doctor::installing
-pub(crate) fn install(item: &str, progress: &mut dyn FnMut(&str)) -> Result<(), AxError>;
 // bin::doctor（Recipe 的唯一拒绝语）
 impl Recipe {
     pub(crate) fn command(&self, item: &str) -> Result<Runnable<'_>, AxError>;
@@ -2694,8 +2698,9 @@ impl RunWorker {
 }
 ```
 
+- **查表、取平台、写进度行三件事都在 `doctor_install` 里**（H-12）：`bin::doctor::installing` 曾把前两件搬到一个只有一个调用方的模块里，而三件事的权威分别在 `REQUIREMENTS`、`Platform::current` 与 `Recipe::command`，那一层因此只是穿透。模块连同它的 `named()` 一并删除，进度行仍由这里写，写的时刻因此就是安装到达的时刻，不再先收集后补报。
 - **只跑 `Recipe::Command`，走的是终端那条 `Machine::install`**，不是第二个安装器。`Print` 与 `Manual` 各自带着「人自己去做什么」被拒：管道进 shell 的脚本是没人读过的代码，这条纪律不因请求来自页面而松一格。需求表里没有的名字在起任何进程之前就被拒，因为页面问的是这份构建不认识的东西。
-- **「这条配方这座城可不可以跑」只有 `Recipe::command` 一个家**（H-12）。它要么给出 `Runnable`，要么给出那句带恢复语的拒绝；终端（`screen`）、页面（`installing`）与机器适配器（`probe`）三处都问它，所以同一条打印配方在三扇门后读到的是同一句话。`Machine::install` 收的是 `Runnable` 而不是 `Recipe`，于是「不可跑的配方」在这一层已经不可表达，`runnable()` 与 `probe` 里那第二段措辞随之删除。
+- **「这条配方这座城可不可以跑」只有 `Recipe::command` 一个家**（H-12）。它要么给出 `Runnable`，要么给出那句带恢复语的拒绝；终端（`screen`）、页面（`commanding::machine`）与机器适配器（`probe`）三处都问它，所以同一条打印配方在三扇门后读到的是同一句话。`Machine::install` 收的是 `Runnable` 而不是 `Recipe`，于是「不可跑的配方」在这一层已经不可表达，`runnable()` 与 `probe` 里那第二段措辞随之删除。
 - **`bin::doctor::running` 是本二进制起安装程序的唯一一处，等待有上限**（B-25／F-10）。三件事一起成立：`stdin`／`stdout`／`stderr` 一律 `Stdio::null()`，于是要人同意源协议、要人输密码的包管理器立刻读到输入结束而不是坐在一台没有人的终端前；等待是 `try_wait` 的**计数敲门**，而不是 `Command::status()` 那种没有尽头的阻塞；敲完即杀掉子进程并带着 `E_TIMEOUT` 返回，恢复语是「自己在终端里跑这一行」。**上限用敲门次数而不是墙钟，因为本二进制读时钟的地方只有 `bin::assembly` 一处**（ARCHITECTURE §10 第 4 条）；这同时让上限可断言——测试要三次敲门就得到三次，而对着墙钟的断言问的是它跑在哪台机器上。`PATIENCE = 3_600` 次 × `TICK = 50ms` = 180 秒，只有这一个家。杀不掉或收不了尸都写进那条错误的主题——本城起的一个停不掉的进程是人必须知道的事实。
 - **进度就是日志行**（`bin::doctor` 模块名）。安装是本城起的一个进程并等它，值得报告的两件事——将要跑什么、怎么结束——正好是一行日志的形状；第二条进度通道会是同一件事的第二个权威。
 - **`doctor_install` 装完自己再探一遍**：装完仍答启动快照的城，会告诉人他刚装的东西还是没有。
@@ -2801,12 +2806,22 @@ impl Home {
     pub fn path(&self) -> &Path;
     pub fn components(&self) -> PathBuf;        // ~/.sprawling/components
     pub fn person_config(&self) -> PathBuf;     // ~/.sprawling/config.toml
+    pub fn default_city(&self) -> PathBuf;      // ~/sprawling/city
 }
 ```
 
-**四条口径：**
+**五条口径：**
 
 1. **三处派生合一。** `doctor::host::components_dir`、`install::dirs`、`main::router::default_city_location` 此前各读一遍 `USERPROFILE || HOME`，而 C 章 3.1 的人层配置本要写第四遍（Roadmap G-10）。读环境的地方只此一处，其余全部由它派生。
 2. **住在库那一半，因为读者跨两半。** `doctor` 是库模块，`install` 与 `router` 是二进制模块，而二进制够得到库、库够不到二进制。模块名仍按模块表的写法叫 `bin::home`。
 3. **`detect` 失败是类型化错误，调用方各自决定是否致命。** 探组件时家目录缺席只是「看不到」，报告里由 `Absence::NoHome` 说明；装二进制时 Windows 还有 `LOCALAPPDATA` 可落，两者皆无才由 `install::no_home` 拒绝。两处都显式 `match` 错误臂而不是 `.ok()`，于是「没有家目录」是一个被做过的决定。
-4. **`~/.sprawling` 与城里的保留子树共用 `kernel::RESERVED_PREFIX`。** 这是本产品拥有的那一个点目录名，一个名字一个家；它在家目录下装的是属于这个人的东西，不属于任何一座城。`person_config()` 用小写 `config.toml`，与城内各层的 `CONFIG.toml` 不同名——两者是不同的层，同名会诱使某个读者把其中一个当成另一个。本模块只给路径，读写与分层归配置阶梯（H-10）。
+4. **城不住点目录，因为城是这个人的东西。** `default_city()` 给 `~/sprawling/city`：点目录下装的是与这台电脑绑定的状态（组件、这个人的配置层），而一座城是人要打开、编辑、备份、拷到另一台机器上的工作，看不见的城是备份不了的城。`Absence::NoHome` 那句「neither USERPROFILE nor HOME is set」由 `home::NO_HOME` 一处定义，`detect` 的拒绝与 doctor 的报告读的是同一句。
+5. **`~/.sprawling` 与城里的保留子树共用 `kernel::RESERVED_PREFIX`。** 这是本产品拥有的那一个点目录名，一个名字一个家；它在家目录下装的是属于这个人的东西，不属于任何一座城。`person_config()` 用小写 `config.toml`，与城内各层的 `CONFIG.toml` 不同名——两者是不同的层，同名会诱使某个读者把其中一个当成另一个。本模块只给路径，读写与分层归配置阶梯（H-10）。
+
+### 8-71 空着的上限不是被抹掉的上限（`credentials::endpoints::select_model`）
+
+- **缺陷**：设置页每次选模型都把整行发上来，于是一个人重选自己已经登记过的模型，就把当初填的上限用一个空框覆盖掉了；下一次 messages 兼容格式的调用因为写不出 `max_tokens` 被拒（A 章 B-01 的第二段）。`None` 从此表示「这次没说」，而不是「这次要清空」。
+- **权威从高到低**：人这次填的 → 这个 endpoint 与这个 model id 上一次登记的 → 钉版目录行。**按 endpoint 与 model id 读上一次，而不是只按 tag**：把一个 tag 指向另一个模型时，旧模型的上限不得跟过去。上一次登记从 `book.choices()` 读回——书是「这座城登记了什么」的唯一陈述，在它旁边另存一份就是第二个权威。
+- **`context_tokens` 同理**，`0` 是「这次没说」；两个数字读法一致，因为它们来自同一个空表单。
+- **再往上与再往下的两档住 gateway**（`provider::ceiling`，gateway-SPEC §8-17）：上游 `/v1/models` 的陈述与策略缺省 `OUTPUT_CEILING_DEFAULT`。装配层不复写那条规则，只把人层与书里的值交给它——一条规则两个家，漂开的总是没人看的那个。
+- **来源入账（未落，随共享文件同集落）**：`model_selected` 要带 `ceiling_from: person | upstream | preset | policy`，`model_called` 回显这次调用实际用的那一档；载荷由 `gateway::router::payload` 一处写，拼写取 `CeilingSource::as_str`。账本里看得见来源，因此一次被截断的跑是读出来的，不是猜出来的；`tests/e2e.rs` 里那条桩测试（sprawling-SPEC §2795 第 5 条）就是它的关门条件。

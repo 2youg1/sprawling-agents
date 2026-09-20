@@ -136,7 +136,11 @@ pub(crate) fn run(item: &str, runnable: &Runnable, patience: u32) -> Result<(), 
 /// carried into the caller's message rather than dropped: a process
 /// this city started and could not stop is a fact the person needs,
 /// because it is still holding whatever it was holding.
-fn stop(child: &mut Child) -> Option<String> {
+///
+/// **Every child this binary starts ends here**, the install program
+/// and the `--version` call alike (`doctor::probe::ask_version`), so
+/// what "stopped" means is decided once.
+pub(super) fn stop(child: &mut Child) -> Option<String> {
     if let Err(err) = child.kill() {
         return Some(format!("it could not be stopped: {err}"));
     }

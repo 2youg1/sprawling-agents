@@ -8,7 +8,7 @@ Read this file to the end before the first edit.
 
 ```bash
 cargo install just cargo-nextest --locked   # once; the toolchain installs itself from rust-toolchain.toml
-just check                                  # fmt + clippy (-D warnings, --all-features) + nextest + the client bundle + every machine gate + the client's own checks
+just check                                  # fmt + clippy (-D warnings, --all-features) + two feature-combination checks + nextest + the client bundle + every machine gate + the client's own checks
 ```
 
 `build-web` is inside `check` and not beside it: two of the gates — `render` and `npm` — judge artifacts rather than sources, and a gate whose artifact is absent used to print one line and return green.
@@ -19,6 +19,8 @@ just check                                  # fmt + clippy (-D warnings, --all-f
 |---|---|
 | `just check` | the closing condition for every change |
 | `just gates` | the machine gates alone |
+| `just features` | the two feature combinations nothing else compiles: the workspace on its default features, and `channels` without `server` |
+| `cargo xtask gates --list` | the gate roster, one name per line — what the table below is checked against |
 | `just check-client` | the client's lint, typecheck and tests |
 | `just build-web` | build the client bundle into `target/web-dist` |
 | `just dist` | the whole deliverable: client, binary, bill of materials, size badges |

@@ -141,7 +141,7 @@ impl RunWorker {
         site: &Site,
         addr: &Address,
     ) -> Result<Sieving, AxError> {
-        let cas = memory::Cas::open(&self.city_root.join(".sprawling").join("cas"))
+        let cas = memory::Cas::open(&kernel::layout::CityLayout::new(&self.city_root).cas())
             .map_err(memory::MemoryError::into_ax)?;
         let environment = site.write_root.join(addr.as_str()).join(".rest");
         std::fs::create_dir_all(&environment).map_err(|err| {

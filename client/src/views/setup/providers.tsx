@@ -38,6 +38,8 @@ import type { Enrolment, StoredKey } from "../../core/enrol";
 import type { Key } from "../../core/lang";
 import type { AxCode, AxError, DialectKind, EndpointsAnswer, Proxying } from "../../wire";
 import { useCommand, useSay, useUi } from "../../ui";
+import { Field } from "../parts/field";
+import { Tip } from "../parts/tip";
 import { ModelTable } from "./models";
 import type { ModelRow } from "./models";
 
@@ -288,8 +290,14 @@ function Reachability(props: { readonly probed: Probed }) {
                 <>
                   <dt>{say(label)}</dt>
                   {/* wording-ok: the word the city itself wrote for this stage */}
-                  <dd class="truncate font-mono" title={stage.detail ?? stage.state}>
-                    {stage.figure === null ? stage.state : `${stage.state} ${String(stage.figure)}`}
+                  <dd class="min-w-0 font-mono">
+                    <Tip text={stage.detail ?? stage.state}>
+                      {(hint) => (
+                        <span class="wrap-anywhere" tabindex={0} aria-describedby={hint}>
+                          {stage.figure === null ? stage.state : `${stage.state} ${String(stage.figure)}`}
+                        </span>
+                      )}
+                    </Tip>
                   </dd>
                 </>
               )}
@@ -337,17 +345,19 @@ function PairTable(props: {
       <For each={props.rows}>
         {(row, at) => (
           <div class="flex items-center gap-tight">
-            <input
-              class="min-w-0 flex-1 rounded-control bg-g2 px-snug py-tight font-mono text-note text-text outline-none"
+            <Field
+              label={props.nameLabel}
+              labelling="hidden"
+              mono
               value={row.name}
-              aria-label={props.nameLabel}
-              onInput={(event) => { edit(at(), "name", event.currentTarget.value); }}
+              onInput={(value) => { edit(at(), "name", value); }}
             />
-            <input
-              class="min-w-0 flex-1 rounded-control bg-g2 px-snug py-tight font-mono text-note text-text outline-none"
+            <Field
+              label={props.valueLabel}
+              labelling="hidden"
+              mono
               value={row.value}
-              aria-label={props.valueLabel}
-              onInput={(event) => { edit(at(), "value", event.currentTarget.value); }}
+              onInput={(value) => { edit(at(), "value", value); }}
             />
             <button
               type="button"
@@ -372,24 +382,6 @@ function PairTable(props: {
         {say("setup_add_row")}
       </button>
     </div>
-  );
-}
-
-function Figure(props: {
-  readonly label: string;
-  readonly value: string;
-  readonly onInput: (value: string) => void;
-}) {
-  return (
-    <label class="flex flex-1 flex-col gap-tight text-note text-text-quiet">
-      {props.label}
-      <input
-        class="rounded-control bg-g2 px-base py-snug font-mono text-body text-text outline-none"
-        value={props.value}
-        inputmode="numeric"
-        onInput={(event) => { props.onInput(event.currentTarget.value); }}
-      />
-    </label>
   );
 }
 
@@ -507,36 +499,31 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
         event.preventDefault();
       }}
     >
-      <label class="flex flex-col gap-tight text-note text-text-quiet">
-        {say("setup_id")}
-        <input
-          class="rounded-control bg-g2 px-base py-snug font-mono text-body text-text outline-none"
-          value={draft.id}
-          // wording-ok: a provider's own name, the same word in both languages
-          placeholder="openai"
-          onInput={(event) => { edit("id", event.currentTarget.value); }}
-        />
-        <span class="text-text-faint">{say("setup_id_help")}</span>
-      </label>
-      <label class="flex flex-col gap-tight text-note text-text-quiet">
-        {say("setup_display_name")}
-        <input
-          class="rounded-control bg-g2 px-base py-snug text-body text-text outline-none"
-          value={draft.label}
-          onInput={(event) => { edit("label", event.currentTarget.value); }}
-        />
-        <span class="text-text-faint">{say("setup_display_name_help")}</span>
-      </label>
-      <label class="flex flex-col gap-tight text-note text-text-quiet">
-        {say("setup_base_url")}
-        <input
-          class="rounded-control bg-g2 px-base py-snug font-mono text-body text-text outline-none"
-          value={draft.baseUrl}
-          // wording-ok: an address, which no language translates
-          placeholder="https://api.openai.com/v1"
-          onInput={(event) => { edit("baseUrl", event.currentTarget.value); }}
-        />
-      </label>
+      <Field
+        label={say("setup_id")}
+        help={say("setup_id_help")}
+        mono
+        pattern={ID_SHAPE.source}
+        value={draft.id}
+        // wording-ok: a provider's own name, the same word in both languages
+        placeholder="openai"
+        onInput={(value) => { edit("id", value); }}
+      />
+      <Field
+        label={say("setup_display_name")}
+        help={say("setup_display_name_help")}
+        value={draft.label}
+        onInput={(value) => { edit("label", value); }}
+      />
+      <Field
+        label={say("setup_base_url")}
+        kind="url"
+        mono
+        value={draft.baseUrl}
+        // wording-ok: an address, which no language translates
+        placeholder="https://api.openai.com/v1"
+        onInput={(value) => { edit("baseUrl", value); }}
+      />
       <div class="flex flex-col gap-tight text-note text-text-quiet">
         {say("setup_wire_api")}
         <div class="flex gap-snug">
@@ -556,14 +543,13 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
           <span class="text-alert">{say("setup_wire_api_unsupported")}</span>
         </Show>
       </div>
-      <label class="flex flex-col gap-tight text-note text-text-quiet">
-        {say("setup_key")}
-        <input
-          type="password"
-          autocomplete="off"
-          class="rounded-control bg-g2 px-base py-snug font-mono text-body text-text outline-none"
+      <div class="flex flex-col gap-tight text-note text-text-quiet">
+        <Field
+          label={say("setup_key")}
+          kind="password"
+          mono
           value={draft.key}
-          onInput={(event) => { edit("key", event.currentTarget.value); }}
+          onInput={(value) => { edit("key", value); }}
         />
         <Show when={field().kind === "stored"}>
           <span class="text-text-faint">{say("setup_key_stored")}</span>
@@ -591,7 +577,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
           </span>
           <span class="text-text-faint">{say("setup_key_vault_note")}</span>
         </Show>
-      </label>
+      </div>
 
       <div class="flex flex-col gap-snug">
         <button
@@ -604,19 +590,28 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
         </button>
         <Show when={advanced()}>
           <div class="flex flex-col gap-snug rounded-card bg-g1 px-base py-snug">
-            <div class="flex flex-wrap gap-snug">
-              <Figure
+            <div class="grid gap-snug md:grid-cols-3">
+              <Field
                 label={say("setup_timeout_ms")}
+                kind="number"
+                step={1000}
+                mono
                 value={draft.timeoutMs}
                 onInput={(value) => { setDraft("timeoutMs", value); }}
               />
-              <Figure
+              <Field
                 label={say("setup_request_retries")}
+                kind="number"
+                step={1}
+                mono
                 value={draft.requestRetries}
                 onInput={(value) => { setDraft("requestRetries", value); }}
               />
-              <Figure
+              <Field
                 label={say("setup_stream_idle")}
+                kind="number"
+                step={1000}
+                mono
                 value={draft.streamIdleMs}
                 onInput={(value) => { setDraft("streamIdleMs", value); }}
               />
@@ -785,13 +780,13 @@ export function LoginForm(props: { readonly onAttached?: () => void }) {
         </Show>
       </div>
       <Show when={url()}>
-        <label class="flex flex-col gap-tight text-note text-text-quiet">
-          {say("setup_login_code")}
-          <div class="flex gap-snug">
-            <input
-              class="flex-1 rounded-control bg-g2 px-base py-snug font-mono text-body text-text outline-none"
+        <div class="flex flex-col gap-tight text-note text-text-quiet">
+          <div class="flex items-end gap-snug">
+            <Field
+              label={say("setup_login_code")}
+              mono
               value={code()}
-              onInput={(event) => setCode(event.currentTarget.value)}
+              onInput={setCode}
             />
             <button
               type="button"
@@ -807,7 +802,7 @@ export function LoginForm(props: { readonly onAttached?: () => void }) {
               {say("setup_login_finish")}
             </button>
           </div>
-        </label>
+        </div>
       </Show>
     </div>
   );

@@ -64,7 +64,7 @@ export function DesktopForm(props: { readonly addr: Address }) {
   return (
     <div class="flex flex-col gap-snug">
       <textarea
-        class="min-h-output w-full rounded-control bg-g2 px-base py-snug font-mono text-note text-text outline-none placeholder:text-text-disabled"
+        class="min-h-output w-full rounded-control bg-g2 px-base py-snug font-mono text-note text-text placeholder:text-text-disabled"
         aria-label={say("desktop_allowlist")}
         placeholder={say("desktop_empty")}
         value={draft()}

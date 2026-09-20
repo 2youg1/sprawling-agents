@@ -17,19 +17,31 @@
 //! may not restock it, so an agent cannot quietly grant itself a skill
 //! by writing one.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, B3Hash};
 
-/// Where the city's shared stock sits, under its reserved prefix.
-pub const LIBRARY_DIR: &str = "library";
+/// What a holding is shelved under: the name a reading room admits it
+/// by, and nothing else.
+///
+/// A key rather than a string, and one made in a single place, because
+/// the shelves and the reading-room list have to agree on what counts
+/// as the same holding. Filing by section and name while admitting by
+/// name alone let one name sit on the shelves twice, so a building's
+/// own copy of a skill no longer replaced the city's — which is the
+/// rule the whole nearer-shelf-wins design rests on.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct ShelfKey(String);
 
-/// Where a building's own stock sits, under the building's reserved
-/// subtree. Inside the building directory, so a building copied
-/// elsewhere carries what it knows how to do; outside every write
-/// domain, so the residents of that building still cannot restock it.
-pub const BUILDING_SHELF: &str = "skills";
+impl ShelfKey {
+    /// The key for a name, whether it came off a shelf or out of a list
+    /// a person wrote. Surrounding blanks are not part of a name.
+    fn of(name: &str) -> ShelfKey {
+        ShelfKey(name.trim().to_owned())
+    }
+}
 
 /// One shelved item: what it is called, which section it sits in, and
 /// the one line a catalog would show.
@@ -58,10 +70,14 @@ pub struct Holding {
     pub addr: Address,
 }
 
-/// The city's stock, by section then name.
+/// The city's stock, one entry per name.
+///
+/// One entry per name rather than per section and name: a reading room
+/// admits by name, so two holdings under one name would be two answers
+/// to one question and the nearer shelf would win only sometimes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Library {
-    holdings: BTreeMap<(String, String), Holding>,
+    holdings: BTreeMap<ShelfKey, Holding>,
 }
 
 impl Library {
@@ -74,36 +90,36 @@ impl Library {
     /// Propagates a directory that exists and cannot be read — that is
     /// a broken installation rather than an empty one.
     pub fn scan(city_root: &Path, building: Option<&Address>) -> Result<Library, AxError> {
+        let layout = CityLayout::new(city_root);
         let mut holdings = BTreeMap::new();
         // The city's shelf first, then the building's over the top of
         // it: the nearer shelf wins, which is the rule the configuration
         // ladder already applies to the values a run is governed by.
-        shelve(
-            city_root,
-            &[kernel::RESERVED_PREFIX, LIBRARY_DIR],
-            &mut holdings,
-        )?;
+        shelve(city_root, &layout.library(), &mut holdings)?;
         if let Some(building) = building {
-            shelve(
-                city_root,
-                &[building.as_str(), kernel::RESERVED_PREFIX, BUILDING_SHELF],
-                &mut holdings,
-            )?;
+            shelve(city_root, &layout.building_skills(building), &mut holdings)?;
         }
         Ok(Library { holdings })
     }
+
     /// Everything on the shelves, in section then name order.
     #[must_use]
     pub fn all(&self) -> Vec<&Holding> {
-        self.holdings.values().collect()
+        let mut shelved: Vec<&Holding> = self.holdings.values().collect();
+        shelved.sort_by(|left, right| {
+            left.section
+                .cmp(&right.section)
+                .then(left.name.cmp(&right.name))
+        });
+        shelved
     }
 
     /// The sections, which is the navigation a person browses by.
     #[must_use]
     pub fn sections(&self) -> Vec<&str> {
         let mut seen: Vec<&str> = self
-            .holdings
-            .values()
+            .all()
+            .into_iter()
             .map(|holding| holding.section.as_str())
             .collect();
         seen.dedup();
@@ -120,9 +136,10 @@ impl Library {
     /// its absence.
     #[must_use]
     pub fn reading_room(&self, admitted: &[String]) -> Vec<&Holding> {
-        self.holdings
-            .values()
-            .filter(|holding| admitted.iter().any(|name| name == &holding.name))
+        let admitted: BTreeSet<ShelfKey> = admitted.iter().map(|name| ShelfKey::of(name)).collect();
+        self.all()
+            .into_iter()
+            .filter(|holding| admitted.contains(&ShelfKey::of(&holding.name)))
             .collect()
     }
 
@@ -132,7 +149,7 @@ impl Library {
     pub fn missing(&self, admitted: &[String]) -> Vec<String> {
         admitted
             .iter()
-            .filter(|name| !self.holdings.values().any(|holding| holding.name == **name))
+            .filter(|name| !self.holdings.contains_key(&ShelfKey::of(name)))
             .cloned()
             .collect()
     }
@@ -142,34 +159,35 @@ impl Library {
 /// shelf: most cities start with nothing settled, and most buildings
 /// never keep a skill of their own.
 ///
+/// A holding read from a nearer shelf replaces one of the same name
+/// read earlier, which is what makes a building's own copy of a skill
+/// the one its residents get.
+///
 /// # Errors
 /// Propagates a directory that exists and cannot be read, a holding
-/// that cannot be read, and a path the city cannot spell as an address.
+/// that cannot be read, a name this machine spells outside Unicode, and
+/// a path the city cannot spell as an address.
 fn shelve(
     city_root: &Path,
-    segments: &[&str],
-    holdings: &mut BTreeMap<(String, String), Holding>,
+    root: &Path,
+    holdings: &mut BTreeMap<ShelfKey, Holding>,
 ) -> Result<(), AxError> {
-    let root = segments
-        .iter()
-        .fold(city_root.to_path_buf(), |path, segment| path.join(segment));
     if !root.exists() {
         return Ok(());
     }
-    for section in read_dir(&root)? {
+    for section in read_dir(root)? {
         if !section.is_dir() {
             continue;
         }
-        let section_name = file_name(&section);
+        let section_name = spelled(&section)?;
         for item in read_dir(&section)? {
             if item.is_dir() || item.extension().is_none_or(|ext| ext != "md") {
                 continue;
             }
-            let name = item
-                .file_stem()
-                .and_then(|stem| stem.to_str())
-                .unwrap_or_default()
-                .to_owned();
+            let file = spelled(&item)?;
+            let Some(name) = file.strip_suffix(".md").map(str::to_owned) else {
+                continue;
+            };
             if name.is_empty() {
                 continue;
             }
@@ -180,9 +198,12 @@ fn shelve(
                     format!("{}: {err}", item.display()),
                 )
             })?;
-            let addr = Address::parse(&format!("{}/{section_name}/{name}.md", segments.join("/")))?;
+            // The address is read back off the path the layout chose,
+            // so a shelf that moves cannot leave the addresses of what
+            // sits on it pointing at where it used to be.
+            let addr = address_of(city_root, &item)?;
             holdings.insert(
-                (section_name.clone(), name.clone()),
+                ShelfKey::of(&name),
                 Holding {
                     name,
                     section: section_name.clone(),
@@ -195,6 +216,49 @@ fn shelve(
         }
     }
     Ok(())
+}
+
+/// How the city addresses a file on one of its shelves.
+fn address_of(city_root: &Path, item: &Path) -> Result<Address, AxError> {
+    let relative = item.strip_prefix(city_root).map_err(|_| {
+        AxError::failure(
+            AxCode::StorageFatal,
+            "address a library holding",
+            format!("{} is outside {}", item.display(), city_root.display()),
+        )
+        .with_recovery("scan the library of the city the holding sits in")
+    })?;
+    let mut spelled_out = Vec::new();
+    for component in relative.components() {
+        spelled_out.push(
+            component
+                .as_os_str()
+                .to_str()
+                .ok_or_else(|| unspellable(item))?,
+        );
+    }
+    Address::parse(&spelled_out.join("/"))
+}
+
+/// The last element of a path, as the city has to be able to write it.
+///
+/// A name this machine spells outside Unicode is reported rather than
+/// dropped: a skill silently absent from every reading room is the one
+/// failure a person cannot see from the catalog.
+fn spelled(path: &Path) -> Result<String, AxError> {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_owned)
+        .ok_or_else(|| unspellable(path))
+}
+
+fn unspellable(path: &Path) -> AxError {
+    AxError::failure(
+        AxCode::StorageFatal,
+        "read the library",
+        format!("{} is not named in Unicode", path.display()),
+    )
+    .with_recovery("rename it to letters, digits and dashes, then scan again")
 }
 
 fn read_dir(path: &Path) -> Result<Vec<PathBuf>, AxError> {
@@ -220,13 +284,6 @@ fn read_dir(path: &Path) -> Result<Vec<PathBuf>, AxError> {
     Ok(out)
 }
 
-fn file_name(path: &Path) -> String {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or_default()
-        .to_owned()
-}
-
 fn first_line(text: &str) -> String {
     text.lines()
         .map(str::trim)
@@ -244,124 +301,4 @@ fn first_line(text: &str) -> String {
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
-    use super::*;
-
-    fn stocked(root: &Path) {
-        let shelves = root.join(kernel::RESERVED_PREFIX).join(LIBRARY_DIR);
-        for (section, name, text) in [
-            (
-                "utilities",
-                "unit-tests",
-                "# Writing a test that earns its place\n\nbody",
-            ),
-            ("utilities", "diffing", "How to read a diff\n"),
-            ("domain", "kiln-firing", "# Firing schedules\n"),
-        ] {
-            let dir = shelves.join(section);
-            std::fs::create_dir_all(&dir).unwrap();
-            std::fs::write(dir.join(format!("{name}.md")), text).unwrap();
-        }
-    }
-
-    #[test]
-    fn a_city_with_no_library_has_an_empty_one_rather_than_an_error() {
-        let dir = tempfile::tempdir().unwrap();
-        let library = Library::scan(dir.path(), None).unwrap();
-        assert!(library.all().is_empty());
-        assert!(library.reading_room(&["anything".to_owned()]).is_empty());
-    }
-
-    #[test]
-    fn a_building_takes_only_what_its_list_admits() {
-        let dir = tempfile::tempdir().unwrap();
-        stocked(dir.path());
-        let library = Library::scan(dir.path(), None).unwrap();
-        assert_eq!(library.all().len(), 3, "the shelves hold everything");
-        let admitted = library.reading_room(&["unit-tests".to_owned(), "diffing".to_owned()]);
-        let names: Vec<&str> = admitted.iter().map(|h| h.name.as_str()).collect();
-        assert_eq!(
-            names,
-            vec!["diffing", "unit-tests"],
-            "a thousand may sit on the shelf; this building reads two"
-        );
-    }
-
-    #[test]
-    fn the_one_line_is_the_authors_line() {
-        let dir = tempfile::tempdir().unwrap();
-        stocked(dir.path());
-        let library = Library::scan(dir.path(), None).unwrap();
-        let holding = library
-            .all()
-            .into_iter()
-            .find(|h| h.name == "unit-tests")
-            .unwrap();
-        assert_eq!(holding.disclosure, "Writing a test that earns its place");
-        assert_eq!(holding.section, "utilities");
-    }
-
-    #[test]
-    fn a_name_on_the_list_that_is_not_on_the_shelf_is_reported_to_whoever_wrote_it() {
-        let dir = tempfile::tempdir().unwrap();
-        stocked(dir.path());
-        let library = Library::scan(dir.path(), None).unwrap();
-        let asked = vec!["diffing".to_owned(), "imagined".to_owned()];
-        assert_eq!(library.reading_room(&asked).len(), 1);
-        assert_eq!(library.missing(&asked), vec!["imagined".to_owned()]);
-    }
-
-    #[test]
-    fn a_holding_lives_where_no_run_may_write() {
-        let dir = tempfile::tempdir().unwrap();
-        stocked(dir.path());
-        let library = Library::scan(dir.path(), None).unwrap();
-        let holding = library.all()[0];
-        assert!(
-            holding.addr.is_reserved(),
-            "a resident may read the stock and may not restock it"
-        );
-    }
-
-    /// A building keeps the skills only it uses on its own shelf, inside
-    /// its own directory, and still cannot restock them.
-    #[test]
-    fn a_building_keeps_its_own_shelf_and_the_nearer_shelf_wins() {
-        let dir = tempfile::tempdir().unwrap();
-        stocked(dir.path());
-        let lab = Address::parse("lab").unwrap();
-        let own = dir
-            .path()
-            .join("lab")
-            .join(kernel::RESERVED_PREFIX)
-            .join(BUILDING_SHELF)
-            .join("utilities");
-        std::fs::create_dir_all(&own).unwrap();
-        std::fs::write(own.join("kiln.md"), "Firing a kiln in this lab\n").unwrap();
-        std::fs::write(own.join("unit-tests.md"), "This lab's own rule for tests\n").unwrap();
-
-        let library = Library::scan(dir.path(), Some(&lab)).unwrap();
-        let names: Vec<&str> = library.all().iter().map(|h| h.name.as_str()).collect();
-        assert!(names.contains(&"kiln"), "{names:?}");
-        assert!(names.contains(&"diffing"), "the city's shelf is still read");
-
-        let mine = library
-            .all()
-            .into_iter()
-            .find(|h| h.name == "unit-tests")
-            .unwrap();
-        assert_eq!(
-            mine.disclosure, "This lab's own rule for tests",
-            "the nearer shelf wins, as the configuration ladder already does"
-        );
-        assert!(
-            mine.addr.is_reserved(),
-            "a building's own shelf is still outside its write domain: {}",
-            mine.addr.as_str()
-        );
-
-        // Another building sees only the city's shelf.
-        let other = Library::scan(dir.path(), Some(&Address::parse("vault").unwrap())).unwrap();
-        assert!(!other.all().iter().any(|h| h.name == "kiln"));
-    }
-}
+mod tests;

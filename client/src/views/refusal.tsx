@@ -30,7 +30,7 @@ export function Refusal() {
                 <div class="font-label text-alert">
                   {error().action} <span class="font-mono text-note text-text-faint">{error().code}</span>
                 </div>
-                <div class="mt-tight break-all font-mono text-text">{error().subject}</div>
+                <div class="mt-tight wrap-anywhere font-mono text-text">{error().subject}</div>
                 <Show when={error().recovery !== ""}>
                   <div class="mt-tight text-text-quiet">{error().recovery}</div>
                 </Show>

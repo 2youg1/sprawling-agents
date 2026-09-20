@@ -117,12 +117,36 @@ pub const IMAGE_MAX_BYTES: u64 = 2_097_152;
 /// refusal can name.
 pub const IMAGES_PER_TURN: u32 = 4;
 
+/// How long one answer may be when nobody has said: 8_192 tokens.
+///
+/// The last rung of the output-ceiling ladder, reached only when the
+/// person stated no ceiling, the provider's model list stated none, and
+/// the preset table has no row for the model. The three rungs above it
+/// carry real statements, so this number is never a figure that outranks
+/// one somebody made.
+///
+/// Chosen at the width every provider this city calls accepts for every
+/// model it serves, which is what a number used in place of knowledge
+/// has to be. It truncates a long answer rather than refusing the call,
+/// and `model_selected` records `ceiling_from: policy` so a truncated
+/// run is read off the account rather than guessed at.
+pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;
+
 /// Off by default: zero window bytes until a Building opts in (4.3).
 pub const CLOCK_STAMP_DEFAULT: crate::config::ClockStampGranularity =
     crate::config::ClockStampGranularity::Off;
 
 /// The human answers by default; loosening is an explicit command.
 pub const AUTONOMY_DEFAULT: crate::approval::Autonomy = crate::approval::Autonomy::Owner;
+
+/// Where a city listens when nobody says otherwise: the loopback
+/// interface, so a city started by a double-click is reachable from the
+/// browser on that machine and from nowhere else.
+///
+/// `up`, `serve`, the first screen, and every command that talks to a
+/// served city read this one value, and the installer script and README
+/// quote it, so the address a person is told is the address that binds.
+pub const DEFAULT_AT: &str = "127.0.0.1:8787";
 
 /// The building raised with every city, which holds the city's own plan
 /// and the two residents that serve every other building.
@@ -165,6 +189,15 @@ mod tests {
         assert_eq!(SANDBOX_FUEL_DEFAULT, 200_000_000);
         assert_eq!(IMAGE_MAX_BYTES, 2_097_152);
         assert_eq!(IMAGES_PER_TURN, 4);
+        assert_eq!(OUTPUT_CEILING_DEFAULT, 8_192);
+    }
+
+    /// Zero is not a ceiling: the Anthropic wire refuses it and the
+    /// OpenAI wire sends `max_tokens: 0`, which answers with no content
+    /// at all. The ladder's last rung has to be a number that calls.
+    #[test]
+    fn the_last_rung_of_the_ceiling_ladder_is_a_ceiling() {
+        const { assert!(OUTPUT_CEILING_DEFAULT > 0) };
     }
 
     #[test]

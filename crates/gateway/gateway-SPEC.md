@@ -53,7 +53,7 @@ oauth_profiles（数据面，零分支）◀── credential（流程消费情�
 admission／market／cost：纯判定与数据面，被 endpoint 与 S3 回合层消费
 ```
 
-**market**：`ModelEntry.max_output_tokens: Option<Ceiling>`——一次回答能吐多少字是**模型的事实**，不是调用处的选择；探测接口不返回它，故它随模型登记入目录行。没有任何行登记过的模型，这一列是 `None`：`openai` 兼容格式于是不写 `max_tokens`、由供应方取自己的默认，`anthropic` 兼容格式写不出请求于是拒（`E_CONFIG_INVALID`，恢复语指向登记处）。尚未登记的本地模型沿用 `local` 行的保守上限，登记面（§8-9）接管后改为人确认过的行。
+**market**：`ModelEntry.max_output_tokens: Option<Ceiling>`——一次回答能吐多少字是**模型的事实**，不是调用处的选择；探测接口不返回它，故它随模型登记入目录行。**这一列为空时由谁来答，现在写在 §8-17 的事实梯里，而不再是各兼容格式各自的默认**：`openai` 不写 `max_tokens`、`anthropic` 写不出请求于是拒（`E_CONFIG_INVALID`），是同一个缺口在两条线上的两种后果，而登记时梯子已经把它补上。尚未登记的本地模型沿用 `local` 行的保守上限，登记面（§8-9）接管后改为人确认过的行。
 
 **router**：本 crate 持有 Endpoint 簿——它是**值不是库**，从 Ledger 重建（同 `kernel::registry` 的口径）；本 crate 仍不持 Ledger 句柄，写入由装配层做。
 
@@ -572,3 +572,35 @@ pub fn is_local(base_url: &str) -> bool;                                        
 - **工具服务器与订阅登录用默认值，且是显式地用**（`bin::mcp_http`、`bin::mcp_sse`、`credential::oauth::flow`）：两者都没有一份属于自己的设置可携。**会重新打开这一条的参数**：出现一个必须经代理才能够到的回环 MCP 服务器——到那时 `McpServer` 也要长出这一字段，而不是在这里改常量。
 - **`is_local` 是全城唯一的那一条判断**：本地适配器拒一个不属于这台电脑的 URL、代理决定、设置页上那个 `local` 标记，读的是同一个函数。它曾经是两个（`native::is_loopback` 只认 `localhost`／`127.0.0.1`／`::1`，而 `reach::is_local` 按 `IpAddr::is_loopback` 判），于是 `127.0.0.2` 在一处算这台电脑、在另一处不算。
 - **5 秒一段**：设置页上有人在等，一个在这个时间里答不出来的主机，人要的是知道，而不是继续等。
+
+### 8-17 `gateway::provider`：厂商文档写下来一次，与输出上限的事实梯（形状 6 数据面 ＋ 形状 1 判定）
+
+```rust
+// provider::preset —— 数据面，逐行注出处
+pub struct HostPreset { pub host: &'static str, pub base_path: &'static str,
+                        pub dialect: Option<DialectKind>, pub models: &'static [ModelPreset],
+                        pub source: &'static str }
+pub struct ModelPreset { pub id_prefix: &'static str, pub context_tokens: u64,
+                         pub max_output_tokens: u64, pub input: InputKinds,
+                         pub source: &'static str }
+pub const PRESETS: [HostPreset; 4];
+pub fn for_host(host: &str) -> Option<&'static HostPreset>;
+pub fn model_for(base_url: &str, id: &str) -> Option<&'static ModelPreset>;
+pub fn ceiling_for(base_url: &str, id: &str) -> Option<Ceiling>;
+
+// provider::ceiling —— 判定，四档先命中者胜
+pub enum CeilingSource { Person, Upstream, Preset, Policy }   // as_str(): person|upstream|preset|policy
+pub struct Stated { pub person: Option<Ceiling>, pub upstream: Option<Ceiling> }
+pub struct OutputCeiling { /* 私有：tokens、from */ }
+impl OutputCeiling {
+    pub fn resolve(stated: Stated, pinned: Option<Ceiling>, at: &str, id: &str) -> Option<OutputCeiling>;
+    pub const fn tokens(self) -> Ceiling;  pub const fn source(self) -> CeilingSource;
+}
+```
+
+- **事实梯只有一架，权威从高到低：人填 → 上游陈述 → 本地预设 → 策略缺省**（路线图 §20.2）。人填不是推断，故压过其余三档；上游 `/v1/models` 说过的话压过本城钉下的任何数字；`kernel::consts_policy::OUTPUT_CEILING_DEFAULT = 8_192` 只在前三档全数沉默时作答。**梯子恒有答案**，于是「没有任何行登记过的模型」不再是 messages 兼容格式写不出请求的那个缺口（A 章 B-01）。
+- **`resolve` 的返回值带着是谁答的**（`CeilingSource`），因为只拿到数字的调用方说不出一次跑为什么停在那里。这是对 `anthropic.rs` 那句自我反对的回答——「a ceiling invented at the call site truncates runs for a reason that appears nowhere in the account」：现在它出现在账里（`model_selected.ceiling_from`，见 sprawling-SPEC §8-52）。
+- **钉版目录与预设表是同一档的两个索引**：目录按精确 id 查，预设表按 host ＋ id 前缀查，一条测试钉住两个索引不为同一个 id 作答。`MarketSnapshot::lookup` 因此保持精确匹配，前缀匹配只发生在预设表内。
+- **预设表逐行注出处**，每行带厂商文档地址；查不到的行不发明数字，而是让梯子落到下一档——这就是「不补零、不补默认、不补猜测」在登记面上的样子。价目列本次不落：厂商价目随时在动，一个没有复核日期的价目行就是第二个会漂的权威，价目继续住钉版目录（§8-7），由 Stage 复核。
+- **厂商的 id 属于厂商的 host**：中转站以同名 id 转发时不套用厂商图表，它截在哪里是它自己的事实，而它的模型列表就是它陈述这件事的地方。
+- **主机表只有这一张**：`router::normalise` 的路径与形状缺省从本表取（`openrouter.ai` 是 `/api/v1`、Gemini 形是 `/v1beta`），归一化算法自身不带任何主机名。两者是一件事的两半（路线图 §3.2 审阅第 13 条）。

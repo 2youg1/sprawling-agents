@@ -29,7 +29,7 @@ function Line(props: { readonly notice: Notice }) {
         <span class="font-label text-alert">{error().action}</span>
         <span class="font-mono text-note text-text-faint">{error().code}</span>
       </div>
-      <div class="mt-tight break-all font-mono text-note text-text-quiet">{error().subject}</div>
+      <div class="mt-tight wrap-anywhere font-mono text-note text-text-quiet">{error().subject}</div>
       <Show when={error().recovery !== ""}>
         <div class="mt-tight text-note text-text-faint">{error().recovery}</div>
       </Show>

@@ -153,19 +153,22 @@ fn hold() {
 pub(super) fn default_city_location() -> std::path::PathBuf {
     // A missing home is not a refusal here: the city then goes beside
     // the binary, which `firstrun::default_city` decides.
-    let home = match sprawling::home::Home::detect() {
-        Ok(home) => Some(home.path().to_path_buf()),
-        Err(_) => None,
-    };
+    let home = sprawling::home::Home::detect().ok();
     match std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
     {
         Some(beside) => {
-            let writable = firstrun::is_writable(&beside);
-            firstrun::default_city(&beside, home.as_deref(), writable)
+            let takes_a_city = firstrun::writability(&beside);
+            firstrun::default_city(&beside, home.as_ref(), takes_a_city)
         }
-        None => firstrun::default_city(std::path::Path::new("."), home.as_deref(), true),
+        // No directory to ask about is the working directory, which
+        // this process is already running in.
+        None => firstrun::default_city(
+            std::path::Path::new("."),
+            home.as_ref(),
+            firstrun::BesideBinary::Writable,
+        ),
     }
 }
 

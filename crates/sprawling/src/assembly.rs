@@ -114,7 +114,7 @@ pub(crate) fn now_ms() -> Result<TimeMs, AxError> {
 /// Where a city keeps its ledger: under the reserved prefix, outside
 /// every WriteDomain (C17).
 pub(crate) fn ledger_dir(city_root: &Path) -> PathBuf {
-    city_root.join(".sprawling").join("ledger")
+    kernel::layout::CityLayout::new(city_root).ledger()
 }
 
 /// What the startup scan found and repaired.

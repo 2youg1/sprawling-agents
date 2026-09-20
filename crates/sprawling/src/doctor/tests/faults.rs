@@ -169,3 +169,23 @@ fn a_program_is_looked_for_under_every_name_this_platform_gives_it() {
         assert_eq!(names.len(), 1);
     }
 }
+
+/// The two recipes this city may not run say what the person does
+/// instead, and neither of them says it the same way. Asked of
+/// `Recipe::command`, which is the one place a recipe is refused for
+/// not being runnable (sprawling-SPEC.md section 8-64).
+#[test]
+fn a_printed_recipe_and_a_manual_one_refuse_with_their_own_reason() {
+    let printed = crate::doctor::Recipe::Print("curl -fsSL https://bun.sh/install")
+        .command("bun")
+        .err()
+        .expect("a printed recipe is not run from here");
+    assert_eq!(printed.code(), &kernel::AxCode::ToolUnavailable);
+    assert!(printed.recovery().contains("code nobody read"));
+    let by_hand = crate::doctor::Recipe::Manual("it ships with the system")
+        .command("shell")
+        .err()
+        .expect("a manual recipe is not run from here");
+    assert!(by_hand.recovery().contains("nothing here can install"));
+    assert_ne!(printed.recovery(), by_hand.recovery());
+}

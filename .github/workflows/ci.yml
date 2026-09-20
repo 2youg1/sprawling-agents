@@ -111,6 +111,17 @@ jobs:
       # the zero-warning gate without it.
       - name: clippy
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      # The two feature combinations no other job compiles: the default
+      # set, and channels without `server`, which is the combination a
+      # wasm32 build needs and therefore the reason that feature exists.
+      # They ride in this job rather than in one of their own because a
+      # separate job pays a runner, a toolchain install and a cold cache
+      # - minutes - to run two check-mode passes that take seconds on the
+      # cache this job has already restored.
+      - name: check the default feature set
+        run: cargo check --workspace --locked
+      - name: check channels without its server feature
+        run: cargo check -p channels --no-default-features --locked
 
   test:
     runs-on: windows-latest

@@ -55,30 +55,34 @@ const BLOCK: &[&str] = &[
 /// ordinary case for a building the city just raised.
 pub(crate) fn place(building_root: &Path) -> Result<(), AxError> {
     let path = building_root.join(GITIGNORE_FILE);
-    let existing = match std::fs::read_to_string(&path) {
-        Ok(text) => text,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(err) => return Err(storage(&path, &err)),
-    };
-    let mut out = existing.clone();
-    let mut added = false;
-    for rule in BLOCK {
-        if existing.lines().any(|line| line.trim() == *rule) {
-            continue;
-        }
-        if !out.is_empty() && !out.ends_with('\n') {
+    // Read and write under one hold: the file belongs to the project
+    // and a person may be adding a line to it at the same moment.
+    crate::document::edit(&path, |held| {
+        let existing = match std::fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(err) => return Err(storage(&path, &err)),
+        };
+        let mut out = existing.clone();
+        let mut added = false;
+        for rule in BLOCK {
+            if existing.lines().any(|line| line.trim() == *rule) {
+                continue;
+            }
+            if !out.is_empty() && !out.ends_with('\n') {
+                out.push('\n');
+            }
+            // The block is announced once, and only when something from
+            // it is actually being added below.
+            out.push_str(rule);
             out.push('\n');
+            added = true;
         }
-        // The block is announced once, and only when something from it
-        // is actually being added below.
-        out.push_str(rule);
-        out.push('\n');
-        added = true;
-    }
-    if !added {
-        return Ok(());
-    }
-    std::fs::write(&path, out.as_bytes()).map_err(|err| storage(&path, &err))
+        if !added {
+            return Ok(());
+        }
+        held.replace(out.as_bytes())
+    })
 }
 
 /// A room holds one session's workplace, and the whole of it stays on

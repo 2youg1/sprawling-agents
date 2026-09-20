@@ -69,7 +69,7 @@ impl Views {
     /// kept across a rebuild would outlive the city it was opened
     /// under.
     fn store(&self) -> Option<memory::Cas> {
-        memory::Cas::open(&self.city_root.join(kernel::RESERVED_PREFIX).join("cas")).ok()
+        memory::Cas::open(&kernel::layout::CityLayout::new(&self.city_root).cas()).ok()
     }
 
     /// The `prompt_assembled` record that opened this run.

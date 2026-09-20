@@ -14,56 +14,33 @@
 //! configuration" a judgment instead of an expectation.
 //!
 //! Which layer wins and what an unstated value falls back to are
-//! `kernel::config`'s answers, not this module's. This module answers
-//! only which three files to read.
+//! `kernel::config`'s answers, not this module's; which layers there
+//! are and what each states is [`ladder`]'s. This module answers what
+//! one file says.
 
 use std::path::{Path, PathBuf};
 
 use kernel::{
     Address, AxCode, AxError, Effort, FrozenConfig, LayeredValue, McpServer, McpTransport,
-    RESERVED_PREFIX, SandboxLimits, ServerLabel,
+    SandboxLimits, ServerLabel,
 };
 use serde::Deserialize;
 
-use crate::building::Building;
-
+mod ladder;
 mod write;
 
+pub use ladder::Layer;
 pub use write::{write_effort, write_mcp, write_sandbox};
 
-/// The configuration file at every layer.
-pub const CONFIG_FILE: &str = "CONFIG.toml";
-
-/// One rung of the City -> Building -> Resident ladder.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Layer {
-    City,
-    Building,
-    Resident,
-}
+use ladder::Ladder;
 
 /// Where a layer's file lives for a run at `addr`.
 ///
 /// # Errors
-/// Propagates the reserved-subtree refusal from [`Building::of`]: an
-/// address with no building has no building layer to read.
+/// Propagates the reserved-subtree refusal a layer reports for an
+/// address with no building, which therefore has no building layer.
 pub fn path(city_root: &Path, addr: &Address, layer: Layer) -> Result<PathBuf, AxError> {
-    // The scope this layer speaks for, then that scope's own reserved
-    // subtree. One expression for three layers: the city's file is this
-    // rule at the root scope rather than a case of its own, and a layer
-    // added later cannot land somewhere its own runs may write.
-    let scope = match layer {
-        Layer::City => city_root.to_path_buf(),
-        Layer::Building => Building::of(addr)?.root(city_root),
-        Layer::Resident => {
-            let mut path = city_root.to_path_buf();
-            for segment in addr.as_str().split('/') {
-                path.push(segment);
-            }
-            path
-        }
-    };
-    Ok(scope.join(RESERVED_PREFIX).join(CONFIG_FILE))
+    layer.file(city_root, addr)
 }
 
 /// What one layer declares. An absent file declares nothing, which is
@@ -208,59 +185,29 @@ impl ConfigLayer {
     }
 }
 
-/// Resolves the three layers into the snapshot a run is frozen with.
+/// Resolves the ladder into the snapshot a run is frozen with.
+///
+/// Concern by concern rather than layer by layer: the ladder knows
+/// which layers exist, so this reads as the list of what a run is
+/// governed by, and a layer added later is picked up by all of it at
+/// once.
 ///
 /// # Errors
 /// Refuses an address with no building, an unreadable file, and a file
 /// that does not parse. A missing file is not an error: it is the
 /// ordinary case.
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
-    let city = read_layer(&path(city_root, addr, Layer::City)?)?;
-    let building_path = path(city_root, addr, Layer::Building)?;
-    let building = read_layer(&building_path)?;
-    // An address that *is* its building has two rungs, not three: the
-    // same file counted twice would suggest it can override itself.
-    let resident_path = path(city_root, addr, Layer::Resident)?;
-    let resident = if resident_path == building_path {
-        ConfigLayer::default()
-    } else {
-        read_layer(&resident_path)?
-    };
-
+    let ladder = Ladder::read(city_root, addr)?;
     Ok(kernel::freeze(
+        // No layer of this file has a key for either clock concern
+        // yet: writing one is refused where it is written, so nothing
+        // on the ladder can state them.
         &LayeredValue::default(),
         &LayeredValue::default(),
-        &LayeredValue {
-            city: city.effort(),
-            building: building.effort(),
-            resident: resident.effort(),
-        },
-        &LayeredValue {
-            city: city.sandbox().cloned(),
-            building: building.sandbox().cloned(),
-            resident: resident.sandbox().cloned(),
-        },
-        &LayeredValue {
-            city: city.mcp().map(<[McpServer]>::to_vec),
-            building: building.mcp().map(<[McpServer]>::to_vec),
-            resident: resident.mcp().map(<[McpServer]>::to_vec),
-        },
+        &ladder.resolve(ConfigLayer::effort),
+        &ladder.resolve(|layer| layer.sandbox().cloned()),
+        &ladder.resolve(|layer| layer.mcp().map(<[McpServer]>::to_vec)),
     ))
-}
-
-fn read_layer(path: &Path) -> Result<ConfigLayer, AxError> {
-    match std::fs::read_to_string(path) {
-        // Three files can fail; the refusal says which one did.
-        Ok(text) => ConfigLayer::parse(&text)
-            .map_err(|err| refuse(format!("{}: {}", path.display(), err.subject()))),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(ConfigLayer::default()),
-        Err(err) => Err(AxError::failure(
-            AxCode::StorageFatal,
-            "read a configuration layer",
-            format!("{}: {err}", path.display()),
-        )
-        .with_recovery("fix the file's permissions; a configuration that exists is read")),
-    }
 }
 
 /// One refusal shape for every way a layer can fail to be read, so the

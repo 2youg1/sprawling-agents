@@ -147,16 +147,29 @@ pub fn configured_payload(building: &Building, wrote: Written)
 ### 8-4 city::config_layers（形状 1 判定／求值，兼任文件名权威）
 
 ```rust
-pub const CONFIG_FILE: &str = "CONFIG.toml";
+pub use kernel::layout::CONFIG_FILE;               // 文件名的权威在 kernel::layout
 pub enum Layer { City, Building, Resident }        // 穷尽三级，与 kernel::LayeredValue 同形
 pub fn path(city_root: &Path, addr: &Address, layer: Layer) -> Result<PathBuf, AxError>;
-pub struct ConfigLayer { /* effort —— 私有 */ }
+pub struct ConfigLayer { /* effort / sandbox / mcp —— 私有 */ }
 impl ConfigLayer {
     pub fn parse(text: &str) -> Result<ConfigLayer, AxError>;   // 纯函数，无 I/O
     pub fn effort(&self) -> Option<Effort>;
 }
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError>;
+
+// config_layers::ladder（crate 内）
+impl Layer {
+    const ALL: [Layer; 3];                                              // 由远及近
+    fn file(self, city_root: &Path, addr: &Address) -> Result<PathBuf, AxError>;
+}
+pub(crate) struct Ladder { /* Vec<(Layer, ConfigLayer)> —— 私有，由远及近 */ }
+impl Ladder {
+    fn read(city_root: &Path, addr: &Address) -> Result<Ladder, AxError>;
+    fn resolve<T>(&self, stated: impl Fn(&ConfigLayer) -> Option<T>) -> LayeredValue<T>;
+}
 ```
+
+**一条梯子是一个值**：`Ladder::read` 按 `Layer::ALL` 由远及近读一遍，落点重复的一级丢弃；`load` 逐个关切在梯子上 fold，不再逐级点名。加一级因此是 `Layer` 多一个臂：`ALL`、`file` 与 `resolve` 三处穷尽匹配同时报编译错，直到新一级被安置，而每个关切一次拿到它。`resolve` 是「哪一级填 `LayeredValue` 的哪一格」的唯一一处答案——今天 `kernel::LayeredValue` 只有三格，所以 C 章要加的人层（`~/.sprawling/config.toml`）落地时，`kernel::config` 与本模块在同一次改动里走完。
 
 **门面上换名**（`lib.rs` 按能力组织，不按文件组织）：`load` 已归 `policy`，故本模块对外是 `city::load_config`；`path` 对外是 `city::config_path`；`building::create` 对外是 `city::create_building`，`created_payload` 对外是 `city::building_created_payload`（名字读起来就是它记的那个事件）。
 
@@ -261,9 +274,9 @@ pub fn watch_path(city_root: &Path) -> PathBuf;
 ### 8-8 city::library（形状 2 值类型＋形状 1 判定）
 
 ```rust
-pub const LIBRARY_DIR: &str = "library";           // 住 reserved prefix 之下
-pub struct Holding { pub name, pub section, pub disclosure, pub path }
-pub struct Library { /* BTreeMap<(section, name), Holding> —— 私有 */ }
+pub use kernel::layout::{BUILDING_SHELF, LIBRARY_DIR};   // 住 reserved prefix 之下
+pub struct Holding { pub name, pub section, pub disclosure, pub hash, pub path, pub addr }
+pub struct Library { /* BTreeMap<ShelfKey, Holding> —— 私有，ShelfKey 由 name 造 */ }
 impl Library {
     pub fn scan(city_root: &Path) -> Result<Library, AxError>;   // 无库＝空库，不是错误
     pub fn all(&self) -> Vec<&Holding>;
@@ -278,6 +291,9 @@ pub fn holding_address(holding: &Holding) -> Result<Address, AxError>;
 - **库存住 reserved prefix**：Agent 读得到、写不了。否则一个 Agent 可以给自己发一件 SKILL，而那正是准入清单存在的理由。
 - **一行式条目取作者写的第一行**，不生成摘要：摘要的摘要是消化产物，而消化产物默认可疑。
 - **清单上没有的名字不进 catalog、也不报错**，只留一行诊断给写清单的人——承诺一件取不到的技能比它不在还糟。
+- **书架按名字建键，section 降为字段**：阅览室按名字准入，所以「同一件」必须也按名字判定。键是类型化的 `ShelfKey`，由 `ShelfKey::of` 一处造出，上架与查清单两端都经它——按 `(section, name)` 建键时同名跨 section 的两份同时在架，「近架盖远架」因而在跨 section 时不成立。楼架后插，于是楼自己的那一份替换城里的那一份，哪怕两者归档在不同 section。
+- **读架上的失败逐条上报**：目录项读不动、目录名或文件名不是 Unicode，都带路径报 `E_STORAGE_FATAL`。一件静默缺席于每一间阅览室的 skill，是人从 catalog 上看不出来的那一种故障。
+- **地址从落点反算**：`Holding::addr` 由 `item.strip_prefix(city_root)` 得到，不由 section 与 name 重拼——书架搬家时，架上每一件的地址跟着搬。
 
 ### 8-10 city::wizard（形状 1 判定＋形状 2 值类型；含 survey）
 
@@ -373,7 +389,7 @@ pub fn index(city_root, building) -> Result<Vec<Entry>, AxError>;   // 算出来
 **决定一条记录是什么，与把它写上架，是两步**。原先的 `file(city_root, building, kind, at, subject, body) -> Entry` 把两者合成一步，于是调用方拿到 `Entry`（账本行要的 `kind`／`day`／`subject` 全在里面）时文件已经在架上了；账本行只能后落，而 Ledger 的定义是「Every effect becomes an EventRecord first」。拆开之后：
 
 - `entry` 是纯的：拒空 subject、`day_of(at)` 取整天、按 `<building>/Archive/<kind>/<day>-<slug>.md` 算出落点，全部只读入参。**一条记录是什么，在它到达任何地方之前就已经确定**，所以调用方可以先把它落账再把它写上架。
-- `file` 只写：建目录、写正文。它现在收一个 `&Entry` 而不是六个参数——落点由 `entry` 算过一次，`file` 不再第二次决定它。
+- `file` 只写：经 `city::document` 把正文整份换上去，建目录也由那一处做。它收一个 `&Entry` 而不是六个参数——落点由 `entry` 算过一次，`file` 不再第二次决定它。
 - **仍是一个构造点**：`Entry` 的字段没有对外的写面，`index` 那一支是从盘上读回来的另一种来源（`subject_of(&text)` 而不是入参），两者不共用同一条不变式，因此没有第二个权威。
 
 ### 8-4b 两个没人写的配置层长出写面
@@ -386,6 +402,7 @@ pub fn write_mcp(city_root: &Path, addr: &Address, layer: Layer, servers: &[McpS
 - **与 `write_effort` 同一道门**：梯子（城→楼→房间）本就是「一个 Run 被什么治理」的权威，第二个存储就是第二个答案。其余键原样保留，因为可能是人手写的。
 - **写出的字节必须是 `ConfigFile` 读得回来的那种**：`McpServer` 的 serde 形状是嵌套的，而文件语法是平的（`label` ＋ `command`/`args`/`env` 或 `url`/`headers`/`transport`）。写面照文件语法拼，本 crate 内一处正读一处反写，两者对不上时编译不会说话、测试会——一条往返测试逐支覆盖三种 transport。`Sse` 一行必写出 `transport = "sse"`：缺省是 `http`，不写就会被读回成另一种 transport。
 - **空的 `mcp` 表要写出来而不是省略**：省略即继承上一级，而一个人删掉最后一台服务器不是想继承一台。
+- **三个写面只有一条写路径**：三者各自把要说的话包成 `Change`（穷尽：`Effort` / `Sandbox` / `Mcp`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。
 
 ### 8-14 一次会话选一次的思考强度
 
@@ -396,7 +413,8 @@ pub fn write_effort(city_root: &Path, addr: &Address, effort: Effort) -> Result<
 思考强度放在派活按钮旁边，因为一次会话反正只选一次。
 
 - **写进那一层，而不是另存一份**：选择落到会话自己房间的 `CONFIG.toml`，由已有的 city → building → room 阶梯解析。第二个存处就是第二个答案。
-- **只改 `[model] effort` 一个键**：文件里其它键是人写的，读出来、改一个值、写回去。文件读不动或解析不了就**拒绝**，不覆盖——一份本构建看不懂的配置不是可以随手盖掉的配置。
+- **只改 `[model] effort` 一个键**：文件里其它键是人写的，读出来、改一个值、写回去，与另外两个写面同走 §8-4b 的那一条写路径。文件读不动或解析不了就**拒绝**，不覆盖——一份本构建看不懂的配置不是可以随手盖掉的配置。
+- **这扇门只写 Resident 层**，层级不由调用方给：派活按钮旁边选的强度属于这一次会话的房间。需要按层写强度时，签名要多一个 `Layer` 参数，那是一次公开面变更。
 - **落点在 `<room>/.sprawling/`**，所以这个房间里跑的 Run 读得到、改不了自己的档位。
 
 ### 8-13 city::room（形状 1 判定 ＋ 一个实例化动作）
@@ -489,9 +507,11 @@ bin `RunWorker::dispatch` → `Identity::load(city_root, addr)` → `segment_byt
 
 ## 14 硬编码声明
 
-`URBANITE_FILE = "URBANITE.md"`（公开常量）；Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第一句话）。
+城里每一份文件叫什么、落在哪，权威是 `kernel::layout`：`ARCHIVE_DIR`、`BUILDING_SHELF`、`CONFIG_FILE`、`LIBRARY_DIR`、`URBANITE_FILE` 由本 crate `pub use` 转出而不复述，路径由 `CityLayout` 的十一个方法给出而不逐段 push。`spine_files` 的 `HANDOFF_FILE` 与 `JOB_FILE` 同样只是 `kernel::layout` 那一份的别名。本 crate 自己定义的文件名只剩没进布局表的那几份：`BUILDING_FILE`、`DESKTOP_SCOPE_FILE`、`PREFERENCES_FILE`、`SCHEDULE_FILE`、`WATCH_FILE`、`GITIGNORE_FILE` 与 spine 剩下的那一组。
 
-`CONFIG_FILE = "CONFIG.toml"`（公开常量；三层同名，理由见 §8.5）；新楼的 `BUILDING.md` 字节不写在代码里，而是 `include_str!("../../../docs/templates/BUILDING.md")`——它的权威是那份模板，路径写错在编译期就会被堵住；`Confidential` 模板对该字串做一处行替换（`confidential: false` → `true`），替换是否真的生效由 `policy::evaluate` 读回来断言。
+Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第一句话）。
+
+`CONFIG_FILE`（三层同名，理由见 §8.5）；新楼的 `BUILDING.md` 字节不写在代码里，而是 `include_str!("../../../docs/templates/BUILDING.md")`——它的权威是那份模板，路径写错在编译期就会被堵住；`Confidential` 模板对该字串做一处行替换（`confidential: false` → `true`），替换是否真的生效由 `policy::evaluate` 读回来断言。
 
 ## 15 影响面
 
@@ -715,3 +735,30 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 **恒不复用 `Governed`**：那三份是**城**的文件（`<city>/.sprawling/`），这一份是**楼**的。把楼级路径塞进一个按 city_root 取路径的枚举里，会让那个枚举需要一个只有部分变体用得上的参数。
 
 **线上它走 `ConfigureBuilding` 的第三个可选字段**（channels-SPEC §8-26）：那条帧问的就是「这栋楼的 runs 够得到什么」，沙箱、外部服务器与运行中的机器上的窗口是同一个问题的三面。`configured_payload` 因此收一个 `Written { sandbox, mcp, desktop }` 而不是三个裸布尔——一个调用点写 `(true, false, true)` 说不出哪一位是哪一面。
+
+### 8-27 city::document：一份文档整个换上去，或者旧的留着（形状 4 adapter）
+
+```rust
+pub(crate) fn replace(path: &Path, body: &[u8]) -> Result<(), AxError>;
+pub(crate) fn edit<T>(path: &Path, act: impl FnOnce(&Held<'_>) -> Result<T, AxError>)
+    -> Result<T, AxError>;
+pub(crate) struct Held<'a> { /* 私有 */ }
+impl Held<'_> { pub(crate) fn replace(&self, body: &[u8]) -> Result<(), AxError>; }
+```
+
+**城里写下的每一份文件都有人拿解析器读回来**：配置层、楼的规则、一次会话的 JOB.md。就地截断再流式写入，中间有一段时间盘上既不是旧版也不是新版；断电后那段时间不会结束，于是那间房、那栋楼乃至整座城的每一次派活都失败，直到有人手工改那份文件。两条性质把这扇窗关上，而两条都只写在本模块：
+
+- **要么整份，要么不动**：字节先落到目标同目录的暂存文件，`sync_all` 把它交到设备上，再由一次 `rename` 把它放到位。覆盖式 `rename` 在本项目支持的每一种文件系统上是一个操作，所以读者拿到的是旧版或新版，没有第三种。
+- **同一刻只有一个写者**：一份文档的读-改-写在本进程内互斥。`Held` 只能从 `edit` 里拿到，于是「改写期间锁是持有的」由类型成立，而不是由每个调用点记得成立。
+
+**暂存文件名固定为 `.<文件名>.staging`**：写者在 flush 与 rename 之间被杀会留下它，固定名让下一次写复用同一个位置，而不是攒出一目录谁也说不清归属的碎片；点前缀使城里每一处扫描都跳过它（扫描一律跳过点开头的项）。
+
+**父目录的 `sync_all` 只在 unix 上做**：目录项住在目录里，光刷文件不够；Windows 没有可供进程打开的目录句柄，也不需要——`rename` 调到的 `MoveFileEx`（`REPLACE_EXISTING`）由文件系统自己记日志。
+
+**锁是本进程的**：一个人在编辑器里改同一份文件不受它约束，而在本仓库现有依赖下也无法约束（跨进程文件锁需要新依赖，`crates/city/Cargo.toml` 只认 `kernel` + std + `toml`/`serde`）。挡住那个人的是原子替换：他的编辑器永远读不到半份文档。
+
+**`create_new` 那一族不归本模块**：`spine_files::write_new`、`building::create`、`gitignore::seal_room` 要的是「独占地认领一个名字」，而 `OpenOptions::create_new` 已经把认领与拒绝合成一个操作。把它们改道本模块只会让一条已经成立的规则多一个家。
+
+**错误面**：`E_STORAGE_FATAL`，主题是失败的那条路径与操作系统的原话，恢复语一句——把目录改成可写、确认磁盘有空间，然后重存。八个写面此前各写一遍这句话，现在是一份。
+
+**关门条件**：断电模拟——任意时刻杀进程，`CONFIG.toml` 要么是旧版要么是新版。逼近它的是四条测试：一个读者在另一线程反复替换 512 KiB 文档时每次都读到完整的旧版或新版；被杀的写者留下的暂存文件既不是那份文档、也不挡下一次写；两个线程各二百次读-改-写之后计数是四百；一份文档把它上面的目录一并带来。

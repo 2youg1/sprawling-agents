@@ -3,6 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use kernel::RESERVED_PREFIX;
+use kernel::layout::CONFIG_FILE;
+
 use super::*;
 
 fn addr(raw: &str) -> Address {
@@ -64,7 +67,7 @@ fn the_lower_layer_wins_and_the_upper_one_is_what_it_falls_back_to() {
 fn no_layer_of_the_ladder_is_writable_by_what_it_governs() {
     let dir = tempfile::tempdir().unwrap();
     let room = addr("lab/room1");
-    for layer in [Layer::City, Layer::Building, Layer::Resident] {
+    for layer in Layer::ALL {
         let file = path(dir.path(), &room, layer).unwrap();
         assert!(file.ends_with(CONFIG_FILE), "{layer:?}: {}", file.display());
         let relative = file

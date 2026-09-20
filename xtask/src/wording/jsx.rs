@@ -99,13 +99,34 @@ fn text_nodes(code: &str) -> Vec<String> {
     let mut out = Vec::new();
     let bytes = code.as_bytes();
     let mut index: usize = 0;
+    // What each still-open `<` on this line was: an element, or a type
+    // argument list. A `<` written directly after an identifier
+    // character opens type arguments \u2014 `Choice<V>`, `createSignal<View>`
+    // \u2014 because JSX never spells an element that way: the `<` of a tag
+    // follows whitespace, a bracket, a brace or the start of the line.
+    // Without this, `bands<V extends string>(options: \u2026` reads as an
+    // element whose text is `(options: `.
+    let mut opened: Vec<Opening> = Vec::new();
     while let Some(byte) = bytes.get(index) {
+        if *byte == b'<' {
+            let before = index.checked_sub(1).and_then(|at| bytes.get(at));
+            opened.push(match before {
+                Some(mark) if mark.is_ascii_alphanumeric() || *mark == b'_' => Opening::TypeArgs,
+                _ => Opening::Element,
+            });
+            index = index.saturating_add(1);
+            continue;
+        }
         if *byte != b'>' {
             index = index.saturating_add(1);
             continue;
         }
         let before = index.checked_sub(1).and_then(|at| bytes.get(at));
         if before == Some(&b'=') {
+            index = index.saturating_add(1);
+            continue;
+        }
+        if opened.pop() == Some(Opening::TypeArgs) {
             index = index.saturating_add(1);
             continue;
         }
@@ -122,6 +143,14 @@ fn text_nodes(code: &str) -> Vec<String> {
         index = start.saturating_add(end);
     }
     out
+}
+
+/// What a `<` opened, which decides whether the `>` that closes it can
+/// begin a run of text.
+#[derive(PartialEq, Eq)]
+enum Opening {
+    Element,
+    TypeArgs,
 }
 
 /// The value of a spoken attribute, when it is written as a string

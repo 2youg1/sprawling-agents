@@ -86,21 +86,16 @@ pub city::Written::desktop: bool
 pub city::Written::mcp: bool
 pub city::Written::sandbox: bool
 pub const city::AGENTS_FILE: &str
-pub const city::ARCHIVE_DIR: &str
 pub const city::BUILDING_FILE: &str
-pub const city::BUILDING_SHELF: &str
 pub const city::CITY_FILE: &str
 pub const city::CLERK_FILE: &str
-pub const city::CONFIG_FILE: &str
 pub const city::DESKTOP_SCOPE_FILE: &str
 pub const city::HANDOFF_FILE: &str
 pub const city::JOB_FILE: &str
-pub const city::LIBRARY_DIR: &str
 pub const city::MAYOR_FILE: &str
 pub const city::PREFERENCES_FILE: &str
 pub const city::ROADMAP_FILE: &str
 pub const city::SCHEDULE_FILE: &str
-pub const city::URBANITE_FILE: &str
 pub const city::WATCH_FILE: &str
 pub enum city::ArchiveKind
 pub enum city::BuildingTemplate
@@ -259,3 +254,8 @@ pub struct city::Schedule
 pub struct city::Source
 pub struct city::Watch
 pub struct city::Written
+pub use city::ARCHIVE_DIR
+pub use city::BUILDING_SHELF
+pub use city::CONFIG_FILE
+pub use city::LIBRARY_DIR
+pub use city::URBANITE_FILE

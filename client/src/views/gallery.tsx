@@ -13,6 +13,7 @@
 import { For, createSignal, type JSX } from "solid-js";
 
 import { sendingInto, type Doing, type Sending } from "../core/belief";
+import { WIRE_APIS, type WireApi } from "../core/commands";
 import { EFFORTS } from "../core/prefs";
 import type { ModelFact } from "../core/probed";
 import { offered } from "../core/slash";
@@ -21,6 +22,7 @@ import { ApprovalId, Locator, TimeMs } from "../wire";
 import { useSay } from "../ui";
 import { MachineReport, MachineSkeleton, MachineUnchecked } from "./machine";
 import { SkillsNote } from "./setup";
+import type { Appearance } from "./setup/appearance";
 import { KeysSection } from "./setup/keys";
 import { EffortChoice, ModelTable } from "./setup/models";
 import { AttachForm, EndpointList } from "./setup/providers";
@@ -36,6 +38,7 @@ import { Field } from "./parts/field";
 import { Notice } from "./parts/notice";
 import { Progress } from "./parts/progress";
 import { Row } from "./parts/row";
+import { Segmented, type Choice, type Group } from "./parts/segmented";
 import { Skeleton } from "./parts/skeleton";
 import { Table, type Column } from "./parts/table";
 import { Tabs } from "./parts/tabs";
@@ -125,6 +128,14 @@ const ENDPOINTS: EndpointsAnswer = {
 
 // The four readings of one run, which is what the lens switcher is for.
 const LENSES = ["run_turns", "run_context", "run_changes", "run_evidence"] as const;
+
+// The two laboratories the three dialects come from, and the colour
+// each is given. The sliding chooser is the only control in the client
+// that paints by family, and the mapping is spelled at the call site
+// because the control itself knows no vendor's name. The names are the
+// laboratories' own and are the same letters in every language.
+const OPEN_AI: Group = { label: "OpenAI", tone: "accent" };
+const ANTHROPIC: Group = { label: "Anthropic", tone: "alert" };
 
 // Three things a person can be asked, in the three shapes the cards
 // take: one on its own, several identical ones answered together, and
@@ -268,6 +279,7 @@ export function Gallery() {
 
       <Screens />
       <Parts />
+      <Switches />
     </div>
   );
 }
@@ -669,6 +681,94 @@ function Parts() {
           <Badge text={say("nav_waiting", { n: "3" })} />
           <Badge text={say("status_in_progress")} weight="live" dot />
           <Badge text={say("status_blocked")} weight="alert" dot />
+        </div>
+      </Case>
+    </>
+  );
+}
+
+// The sliding chooser in the five states it can be drawn in: two
+// cells, three cells, three cells under two group headings, a cell
+// that cannot be chosen and says why, and the whole control with
+// motion turned off.
+//
+// It is a component of its own rather than five more cases inside
+// `Parts` because each fixture holds the choice a person made in it,
+// and five more signals is what would push that function past reading
+// in one screen.
+function Switches() {
+  const say = useSay();
+  const [chroma, setChroma] = createSignal<Appearance["chroma"]>("full");
+  const [lighting, setLighting] = createSignal<Appearance["lighting"]>("system");
+  const [motion, setMotion] = createSignal<Appearance["motion"]>("off");
+  const [wire, setWire] = createSignal<WireApi>("chat");
+  const [gated, setGated] = createSignal<WireApi>("chat");
+
+  // The dialect list the provider form offers, grouped by the
+  // laboratory whose wire it speaks. The words are the literal values
+  // of Codex's `wire_api` key, which no language translates.
+  const dialects = (): readonly Choice<WireApi>[] =>
+    WIRE_APIS.map((api) => ({
+      value: api,
+      label: api,
+      group: api === "messages" ? ANTHROPIC : OPEN_AI,
+    }));
+
+  // The same list as this city can serve it today: the middle dialect
+  // is named, drawn and refused, so the reason arrives under the
+  // pointer instead of after the click.
+  const carried = (): readonly Choice<WireApi>[] =>
+    dialects().map((choice) =>
+      choice.value === "responses" ? { ...choice, why: say("setup_wire_api_unsupported") } : choice,
+    );
+
+  return (
+    <>
+      <Case label="segmented · two cells">
+        <Segmented
+          label={say("appearance_chroma")}
+          options={[
+            { value: "full", label: say("appearance_chroma_full") },
+            { value: "off", label: say("appearance_chroma_none") },
+          ]}
+          held={chroma()}
+          onPick={setChroma}
+        />
+      </Case>
+
+      <Case label="segmented · three cells">
+        <Segmented
+          label={say("appearance_lighting")}
+          options={[
+            { value: "system", label: say("appearance_lighting_system") },
+            { value: "dark", label: say("appearance_lighting_dark") },
+            { value: "light", label: say("appearance_lighting_light") },
+          ]}
+          held={lighting()}
+          onPick={setLighting}
+        />
+      </Case>
+
+      <Case label="segmented · three cells under two group headings">
+        <Segmented label={say("setup_wire_api")} options={dialects()} held={wire()} onPick={setWire} />
+      </Case>
+
+      <Case label="segmented · a cell that cannot be chosen">
+        <Segmented label={say("setup_wire_api")} options={carried()} held={gated()} onPick={setGated} />
+      </Case>
+
+      <Case label="segmented · motion off">
+        <div data-motion="off">
+          <Segmented
+            label={say("appearance_motion")}
+            options={[
+              { value: "system", label: say("appearance_motion_system") },
+              { value: "on", label: say("appearance_motion_full") },
+              { value: "off", label: say("appearance_motion_off") },
+            ]}
+            held={motion()}
+            onPick={setMotion}
+          />
         </div>
       </Case>
     </>

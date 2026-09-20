@@ -41,8 +41,7 @@ pub(in crate::assembly) fn provenance(
 /// Propagates a file that exists and cannot be read, and a table that
 /// does not parse.
 fn filter_table(city_root: &Path, building: &Address) -> Result<runtime::FilterTable, AxError> {
-    let layer = |dir: PathBuf| -> Result<Option<String>, AxError> {
-        let file = dir.join(".sprawling").join("FILTERS.toml");
+    let layer = |file: PathBuf| -> Result<Option<String>, AxError> {
         match std::fs::read_to_string(&file) {
             Ok(text) => Ok(Some(text)),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -54,8 +53,17 @@ fn filter_table(city_root: &Path, building: &Address) -> Result<runtime::FilterT
             .with_recovery("make the file readable, or remove it to fall back a layer")),
         }
     };
-    let city = layer(city_root.to_path_buf())?;
-    let building = layer(city_root.join(building.as_str()))?;
+    // The city's layer is the same rule at the city's own scope, which
+    // `CityLayout` states through the reserved subtree and the file
+    // name it owns; the building's layer is one call because a building
+    // has an address.
+    let layout = kernel::layout::CityLayout::new(city_root);
+    let city = layer(
+        city_root
+            .join(kernel::RESERVED_PREFIX)
+            .join(kernel::layout::FILTERS_FILE),
+    )?;
+    let building = layer(layout.filters(building))?;
     runtime::FilterTable::resolve(city.as_deref(), building.as_deref())
 }
 

@@ -145,7 +145,7 @@ export function Table<T>(
                         <Show when={column.editable} fallback={column.render(row)}>
                           {(editable) => (
                             <input
-                              class="w-full min-w-0 rounded-control bg-g1 px-snug py-tight font-mono text-note text-text outline-none"
+                              class="w-full min-w-0 rounded-control bg-g1 px-snug py-tight font-mono text-note text-text"
                               aria-label={`${column.header} ${props.keyOf(row)}`}
                               value={editable().text(row)}
                               onChange={(event) => {

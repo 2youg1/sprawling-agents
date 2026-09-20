@@ -54,6 +54,15 @@ fn main() -> ExitCode {
     };
     let range = value_arg(&args, "--range");
     match args.first().map(String::as_str) {
+        // The roster documents quote, printed from the same array the
+        // usage text renders from: a gate table in a document is checked
+        // against this output rather than maintained beside it.
+        Some("gates") if args.iter().any(|a| a == "--list") => {
+            for gate in GATES {
+                println!("{gate}");
+            }
+            ExitCode::SUCCESS
+        }
         Some("gates") => gates::run(&root, range.as_deref()),
         Some("color") => report::finish("color", color::check(&root)),
         Some("render") => report::finish("render", render::check(&root)),
@@ -71,7 +80,7 @@ fn main() -> ExitCode {
             }
             Err(err) => report::internal_failure(&err),
         },
-        Some("badge") => report::finish("budget", badge::check(&root)),
+        Some("badge") => report::finish("badge", badge::check(&root)),
         Some("mem") => match mem::run(&root, args.get(1).map(String::as_str)) {
             Ok(text) => {
                 println!("{text}");
@@ -216,11 +225,103 @@ fn value_arg(args: &[String], flag: &str) -> Option<String> {
     None
 }
 
+/// Every gate, as the subcommand that runs it alone, in the order
+/// `gates` runs them. Typed by [`gates::COUNT`], so a gate added to the
+/// gate table stops this file compiling until usage names it — which is
+/// how a runnable gate missing from usage is caught before a reader is.
+const GATES: [&str; gates::COUNT] = [
+    "header",
+    "lexicon",
+    "modmap",
+    "length",
+    "boundary",
+    "artifact",
+    "depmap",
+    "npm",
+    "secret",
+    "color",
+    "wording",
+    "render",
+    "wiring",
+    "wire-ts",
+    "docnum",
+    "proof",
+    "budget",
+    "specalign",
+    "apisync",
+    "release",
+    "guard",
+];
+
+/// One command this tool answers beyond running a gate: what a person
+/// types after `cargo xtask`, and what they get for it.
+struct Tool {
+    /// The subcommand and the arguments it takes, as they are typed.
+    call: &'static str,
+    /// What it produces, in one clause.
+    gives: &'static str,
+}
+
+/// Everything `cargo xtask` answers that is not a gate, plus the flags
+/// that change what a gate does. The dispatcher above and this array are
+/// read together, so a command that grows a flag is printed with it.
+const TOOLS: [Tool; 12] = [
+    Tool {
+        call: "gates [--range a..b]",
+        gives: "every gate in order; --range bounds the commits `apisync` and `guard` judge",
+    },
+    Tool {
+        call: "gates --list",
+        gives: "the gate roster, one name per line",
+    },
+    Tool {
+        call: "<gate> [--range a..b]",
+        gives: "one gate on its own",
+    },
+    Tool {
+        call: "<gate> --write",
+        gives: "the recovery that gate names, applied: apisync, docnum, wire-ts, badge",
+    },
+    Tool {
+        call: "proof --list",
+        gives: "the kani harness roster, read from the `#[kani::proof]` attributes",
+    },
+    Tool {
+        call: "spec <crate>",
+        gives: "a SPEC skeleton for that crate",
+    },
+    Tool {
+        call: "mem [pid]",
+        gives: "resident memory of this process or of that pid",
+    },
+    Tool {
+        call: "sbom",
+        gives: "the CycloneDX bill of materials",
+    },
+    Tool {
+        call: "package [--target <triple>]",
+        gives: "the release archive for this machine or for that triple",
+    },
+    Tool {
+        call: "repro [--full]",
+        gives: "two builds of one tree compared byte for byte",
+    },
+    Tool {
+        call: "channel --tag <tag> --assets <dir> --out <dir>",
+        gives: "the npm channel, assembled from that tag's archives",
+    },
+    Tool {
+        call: "budget",
+        gives: "every budget, what it costs today, and what is gated",
+    },
+];
+
 fn usage() {
-    eprintln!(
-        "usage: cargo xtask <gates|header|lexicon|modmap|length|boundary|artifact|depmap|npm|secret|color|wording|render|wiring|wire-ts|proof|budget|specalign|apisync|docnum|release|guard> [--range a..b] [--write]"
-    );
-    eprintln!(
-        "       cargo xtask spec <crate> | badge [--write] | wire-ts --write | docnum --write | proof --list | mem [pid] | sbom | package [--target <triple>] | repro [--full] | channel --tag <tag> --assets <dir> --out <dir>"
-    );
+    eprintln!("usage: cargo xtask <subcommand> [flags]");
+    eprintln!();
+    eprintln!("gates: {}", GATES.join(" "));
+    eprintln!();
+    for tool in &TOOLS {
+        eprintln!("  cargo xtask {:<52} {}", tool.call, tool.gives);
+    }
 }

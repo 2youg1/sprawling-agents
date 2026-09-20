@@ -19,6 +19,8 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use crate::home::Home;
+
 /// How long the WebUI waits for its own city. Everything a city does
 /// before it binds - verifying the chain, folding the views, starting the
 /// worker - happens first, and on a long history that is seconds. A city
@@ -39,25 +41,39 @@ pub enum FirstScreen {
     Quit,
 }
 
+/// Whether the binary's own directory takes a city.
+///
+/// The answer of [`writability`], and the only thing `default_city`
+/// asks about that directory: a boolean parameter at this call site
+/// read as `true` at one end and "writable" at the other, which is two
+/// spellings of one fact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BesideBinary {
+    /// The directory accepted a file, so the city goes there.
+    Writable,
+    /// The directory refused one - unpacked into `Program Files`, on a
+    /// read-only mount, or on a full disk.
+    ReadOnly,
+}
+
 /// Where a city goes when the person named none.
 ///
 /// Beside the binary, so the whole thing stays one folder that can be
 /// moved, copied or deleted as a unit. When that directory cannot be
-/// written - unpacked into `Program Files`, for instance - the city goes
-/// under the home directory instead. The caller shows the result before
+/// written the city goes under the home directory instead, at the path
+/// `Home::default_city` states. The caller shows the result before
 /// creating anything, so the fallback is visible rather than silent.
 ///
 /// With no home to fall back to, this still answers beside the binary:
 /// the screen shows that path and starting there fails with the reason,
 /// which beats inventing a location nobody asked for.
 #[must_use]
-pub fn default_city(exe_dir: &Path, home: Option<&Path>, exe_dir_writable: bool) -> PathBuf {
-    if exe_dir_writable {
-        return exe_dir.join("city");
-    }
-    match home {
-        Some(home) => home.join("sprawling").join("city"),
-        None => exe_dir.join("city"),
+pub fn default_city(exe_dir: &Path, home: Option<&Home>, beside: BesideBinary) -> PathBuf {
+    match (beside, home) {
+        (BesideBinary::Writable, _) | (BesideBinary::ReadOnly, None) => {
+            exe_dir.join(crate::home::CITY_DIR)
+        }
+        (BesideBinary::ReadOnly, Some(home)) => home.default_city(),
     }
 }
 
@@ -65,16 +81,24 @@ pub fn default_city(exe_dir: &Path, home: Option<&Path>, exe_dir_writable: bool)
 /// permissions: a read-only mount, an ACL and a full disk all end the
 /// same way, and only writing finds out.
 #[must_use]
-pub fn is_writable(dir: &Path) -> bool {
-    let probe = dir.join(".sprawling-write-probe");
+pub fn writability(dir: &Path) -> BesideBinary {
+    let probe = dir.join(WRITE_PROBE);
     match std::fs::write(&probe, b"") {
         Ok(()) => {
-            let _ = std::fs::remove_file(&probe);
-            true
+            // The probe is empty and its name says what it is, so a
+            // removal this platform refuses leaves nothing a person has
+            // to understand, and the directory is writable either way.
+            match std::fs::remove_file(&probe) {
+                Ok(()) | Err(_) => BesideBinary::Writable,
+            }
         }
-        Err(_) => false,
+        Err(_) => BesideBinary::ReadOnly,
     }
 }
+
+/// The file `writability` writes and removes. Named after what it is,
+/// because a machine that refuses the removal leaves it behind.
+const WRITE_PROBE: &str = ".sprawling-write-probe";
 
 /// Draws the first screen and reads the one answer it asks for.
 ///
@@ -237,7 +261,7 @@ fn handler(url: &str) -> std::process::Command {
     reason = "test code"
 )]
 mod tests {
-    use super::{FirstScreen, ask, default_city, local_url};
+    use super::{BesideBinary, FirstScreen, Home, ask, default_city, local_url};
     use std::path::{Path, PathBuf};
 
     fn screen(answer: &str) -> (FirstScreen, String) {
@@ -253,23 +277,40 @@ mod tests {
     const UNPACKED: &str = "/unpacked";
     const ELSEWHERE: &str = "/elsewhere";
 
-    #[test]
-    fn city_goes_beside_the_binary_when_that_directory_is_writable() {
-        let beside = default_city(Path::new(UNPACKED), Some(Path::new(ELSEWHERE)), true);
-        assert_eq!(beside, PathBuf::from("/unpacked/city"));
+    /// A home that is nowhere real: these tests compare paths and
+    /// never touch a disk.
+    fn elsewhere() -> Home {
+        Home::at(Path::new(ELSEWHERE))
     }
 
     #[test]
+    fn city_goes_beside_the_binary_when_that_directory_is_writable() {
+        let beside = default_city(
+            Path::new(UNPACKED),
+            Some(&elsewhere()),
+            BesideBinary::Writable,
+        );
+        assert_eq!(beside, PathBuf::from("/unpacked/city"));
+    }
+
+    /// The fallback is the home's own answer rather than a second
+    /// spelling of it, so a city under the home directory has one
+    /// definition (`bin::home`).
+    #[test]
     fn city_falls_back_when_the_binary_directory_is_read_only() {
-        let fallback = default_city(Path::new(UNPACKED), Some(Path::new(ELSEWHERE)), false);
-        assert_eq!(fallback, PathBuf::from("/elsewhere/sprawling/city"));
+        let fallback = default_city(
+            Path::new(UNPACKED),
+            Some(&elsewhere()),
+            BesideBinary::ReadOnly,
+        );
+        assert_eq!(fallback, elsewhere().default_city());
     }
 
     /// With nowhere to fall back to, the answer stays beside the binary
     /// rather than becoming a location nobody asked for.
     #[test]
     fn with_no_fallback_the_answer_is_still_beside_the_binary() {
-        let beside = default_city(Path::new(UNPACKED), None, false);
+        let beside = default_city(Path::new(UNPACKED), None, BesideBinary::ReadOnly);
         assert_eq!(beside, PathBuf::from("/unpacked/city"));
     }
 

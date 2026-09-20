@@ -102,7 +102,7 @@ function Toml(props: { readonly text: string }) {
         />
       </div>
       <pre class="min-w-0 overflow-x-auto rounded-card bg-g1 p-base">
-        <code class="whitespace-pre-wrap break-all font-mono text-note text-text-quiet">{props.text}</code>
+        <code class="whitespace-pre-wrap wrap-anywhere font-mono text-note text-text-quiet">{props.text}</code>
       </pre>
     </aside>
   );

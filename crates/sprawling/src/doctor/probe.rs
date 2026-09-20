@@ -276,12 +276,22 @@ pub(super) fn ask_version(program: &Path, version_arg: &str, patience: Duration)
         None => Version::Silent,
     };
     // The child is done with either way: a late line would be read as
-    // the answer to a question nobody is asking any more.
-    let _ = child.kill();
-    let _ = child.wait();
-    Presence::Present {
-        at: program.to_path_buf(),
-        version,
+    // the answer to a question nobody is asking any more. Ended through
+    // `running::stop`, which is where this binary decides what ending a
+    // child it started means.
+    match super::running::stop(&mut child) {
+        None => Presence::Present {
+            at: program.to_path_buf(),
+            version,
+        },
+        // A version call this machine would not let the city stop
+        // leaves a process behind, and that outranks the version it
+        // printed: the person has to deal with the process before any
+        // answer about this item is worth reading.
+        Some(trouble) => Presence::Broken {
+            at: program.to_path_buf(),
+            fault: Fault::Unreadable(trouble),
+        },
     }
 }
 

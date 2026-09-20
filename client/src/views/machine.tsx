@@ -26,6 +26,7 @@ import { doctorInstall, doctorRefresh } from "../core/commands";
 import type { Answer, DoctorAnswer, DoctorInstall, DoctorItem, DoctorState } from "../wire";
 import { useSay, useUi } from "../ui";
 import { Button } from "./parts/button";
+import { Tip } from "./parts/tip";
 
 const DOCTOR = "sprawling doctor --install";
 
@@ -142,15 +143,19 @@ function Row(props: { readonly item: DoctorItem; readonly onInstall: (item: stri
           fallback={<span class="font-mono text-label text-text">{props.item.name}</span>}
         >
           {(site) => (
-            <a
-              class="font-mono text-label text-text underline decoration-g3 underline-offset-2 hover:decoration-accent"
-              href={site()}
-              target="_blank"
-              rel="noreferrer"
-              title={site()}
-            >
-              {props.item.name}
-            </a>
+            <Tip text={site()}>
+              {(hint) => (
+                <a
+                  class="font-mono text-label text-text underline decoration-g3 underline-offset-2 hover:decoration-accent"
+                  href={site()}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-describedby={hint}
+                >
+                  {props.item.name}
+                </a>
+              )}
+            </Tip>
           )}
         </Show>
         <span class="text-note text-text-faint">{say(stateKey(props.item.state))}</span>
@@ -199,7 +204,7 @@ function Row(props: { readonly item: DoctorItem; readonly onInstall: (item: stri
       <p class="text-note text-text-faint">{props.item.enables}</p>
       <Show when={spelled()}>
         {(how) => (
-          <code class="block whitespace-pre-wrap break-all rounded-control bg-g1 px-snug py-tight font-mono text-note text-text-quiet">
+          <code class="block whitespace-pre-wrap wrap-anywhere rounded-control bg-g1 px-snug py-tight font-mono text-note text-text-quiet">
             {how()}
           </code>
         )}

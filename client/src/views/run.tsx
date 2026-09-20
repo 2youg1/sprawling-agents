@@ -77,10 +77,13 @@ function Context(props: { readonly rounds: RoundsAnswer }) {
               {(turn) => (
                 <li class="my-tight flex items-center gap-snug">
                   <span class="w-figure shrink-0 text-text-disabled">{say("run_turn_n", { n: String(turn.number) })}</span>
-                  <span class="flex h-dot flex-1 overflow-hidden rounded-pill bg-g1">
-                    <span class="bg-g5" style={{ width: `${String(bar(turn, "cached"))}%` }} title={say("run_cached")} />
-                    <span class="bg-accent" style={{ width: `${String(bar(turn, "input"))}%` }} title={say("run_input")} />
-                    <span class="bg-accent-solid" style={{ width: `${String(bar(turn, "output"))}%` }} title={say("run_output")} />
+                  {/* The legend under the list names the three colours, so a
+                      hint on each segment would say a second time what the
+                      page already says once. */}
+                  <span class="flex h-dot flex-1 overflow-hidden rounded-pill bg-g1" aria-hidden="true">
+                    <span class="bg-g5" style={{ width: `${String(bar(turn, "cached"))}%` }} />
+                    <span class="bg-accent" style={{ width: `${String(bar(turn, "input"))}%` }} />
+                    <span class="bg-accent-solid" style={{ width: `${String(bar(turn, "output"))}%` }} />
                   </span>
                   <span class="w-figure shrink-0 text-right text-text-faint">
                     {turn.used ? count(turn.used.input + turn.used.output) : "—"}

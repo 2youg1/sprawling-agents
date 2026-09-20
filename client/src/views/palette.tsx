@@ -217,7 +217,7 @@ export function Palette(props: { readonly onClose: () => void }) {
       >
         <input
           ref={setBox}
-          class="w-full rounded-control bg-g2 px-base py-snug text-body outline-none placeholder:text-text-disabled"
+          class="w-full rounded-control bg-g2 px-base py-snug text-body placeholder:text-text-disabled"
           placeholder={say("palette_placeholder")}
           value={query()}
           onInput={(event) => {

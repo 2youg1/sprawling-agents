@@ -199,7 +199,7 @@ mod tests {
             ("lab/scribe", "# URBANITE.md\n\nReads twice, writes once.\n"),
         ] {
             std::fs::create_dir_all(root.join(at)).unwrap();
-            std::fs::write(root.join(at).join(crate::resident::URBANITE_FILE), text).unwrap();
+            std::fs::write(root.join(at).join(kernel::layout::URBANITE_FILE), text).unwrap();
         }
         std::fs::create_dir_all(root.join("lab").join("store")).unwrap();
         std::fs::create_dir_all(root.join("market")).unwrap();

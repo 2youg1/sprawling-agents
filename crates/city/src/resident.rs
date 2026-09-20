@@ -14,10 +14,8 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, B3Hash, EventKind, EventRecord, RunId, Seq};
-
-/// The file a resident is described by, at the resident's own address.
-pub const URBANITE_FILE: &str = "URBANITE.md";
 
 /// What a prefix's resident segment says when nobody has written an
 /// URBANITE.md. Ephemeral workers run under this: no standing identity,
@@ -129,12 +127,7 @@ pub fn urbanite_path(city_root: &Path, addr: &Address) -> PathBuf {
     if let Some(hall) = crate::spine_files::hall_identity_path(city_root, addr) {
         return hall;
     }
-    let mut path = city_root.to_path_buf();
-    for segment in addr.as_str().split('/') {
-        path.push(segment);
-    }
-    path.push(URBANITE_FILE);
-    path
+    CityLayout::new(city_root).urbanite(addr)
 }
 
 /// What a resident has done, folded from the ledger.

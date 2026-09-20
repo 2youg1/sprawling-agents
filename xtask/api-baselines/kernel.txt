@@ -166,6 +166,7 @@ pub const kernel::consts_policy::CLOCK_STAMP_DEFAULT: kernel::ClockStampGranular
 pub const kernel::consts_policy::CLOCK_ZONES_MAX: u32
 pub const kernel::consts_policy::CREDENTIAL_NAME_MARKERS: [&str; 11]
 pub const kernel::consts_policy::CTX_REMINDER_RATIO: kernel::consts_policy::Ratio
+pub const kernel::consts_policy::DEFAULT_AT: &str
 pub const kernel::consts_policy::DISCARD_BYTES_MAX: u64
 pub const kernel::consts_policy::DISCARD_FILES_MAX: u32
 pub const kernel::consts_policy::DISCARD_RETENTION_DAYS: u32
@@ -179,6 +180,7 @@ pub const kernel::consts_policy::IMAGE_MAX_BYTES: u64
 pub const kernel::consts_policy::INTERVAL_CAP_BYTES: u64
 pub const kernel::consts_policy::LOOP_REPEAT_THRESHOLD: u32
 pub const kernel::consts_policy::OFFLOAD_MIN_BYTES: u64
+pub const kernel::consts_policy::OUTPUT_CEILING_DEFAULT: u64
 pub const kernel::consts_policy::POLICY_IDLE_DAYS: u32
 pub const kernel::consts_policy::SANDBOX_FUEL_DEFAULT: u64
 pub const kernel::consts_policy::SECRET_ENTROPY_MIN: kernel::consts_policy::Ratio
@@ -510,6 +512,8 @@ pub fn kernel::insert_children(&str, &kernel::NodeId, &[kernel::NewChild]) -> co
 pub fn kernel::layout::CityLayout::archive(&self, &kernel::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::building_skills(&self, &kernel::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::cas(&self) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::city_config(&self) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::city_filters(&self) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::config(&self, &kernel::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::filters(&self, &kernel::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::handoff(&self, &kernel::Address) -> std::path::PathBuf

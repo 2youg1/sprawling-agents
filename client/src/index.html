@@ -7,6 +7,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The two faces the page is drawn with, fetched beside the stylesheet
+     rather than after it. theme.css declares them font-display:
+     optional, which gives a face one short moment to arrive and never
+     swaps it in afterwards; without these two lines that moment begins
+     only once the stylesheet has been parsed, and a cold load would set
+     the whole visit in the fallback face. crossorigin is not decoration
+     on a font preload: a fetch made without it is a different fetch from
+     the one the stylesheet makes, so the file would be downloaded twice
+     and the preload would have bought nothing. -->
+<link rel="preload" as="font" type="font/woff2" crossorigin href="./fonts/Geist-Variable.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="./fonts/GeistMono-Variable.woff2">
 <title>sprawling</title>
 </head>
 <body>

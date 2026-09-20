@@ -66,11 +66,7 @@ impl Governed {
 /// Propagates a reserved subtree that cannot be created or written.
 pub fn write_governed(city_root: &Path, which: Governed, body: &str) -> Result<PathBuf, AxError> {
     let path = which.path(city_root);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| crate::spine_files::storage(parent, &err))?;
-    }
-    std::fs::write(&path, body.as_bytes())
-        .map_err(|err| crate::spine_files::storage(&path, &err))?;
+    crate::document::replace(&path, body.as_bytes())?;
     Ok(path)
 }
 

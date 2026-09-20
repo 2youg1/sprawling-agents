@@ -168,6 +168,25 @@ pub(super) fn dialect_of(provider: &str) -> Result<kernel::DialectKind, AxError>
     }
 }
 
+/// What one tag already points at, when it points at this same model
+/// behind this same endpoint.
+///
+/// The book is the one statement of what this city registered, so an
+/// earlier figure is read back out of it rather than held beside it.
+/// Read by endpoint and model id rather than by tag alone: pointing a
+/// tag at another model must not carry the old model's ceiling onto the
+/// new one (sprawling-SPEC.md 8-71).
+pub(super) fn registered_as(
+    book: &gateway::EndpointBook,
+    tag: kernel::ModelTag,
+    endpoint: &str,
+    model: &str,
+) -> Option<gateway::ModelEntry> {
+    book.choices()
+        .find(|(held, at, entry, _)| *held == tag && *at == endpoint && entry.id == model)
+        .map(|(_, _, entry, _)| entry.clone())
+}
+
 /// The catalog's `local` row under the name a local server serves it.
 pub(super) fn local_model_facts(model: &str) -> Result<gateway::ModelEntry, AxError> {
     let market = gateway::MarketSnapshot::builtin()?;
