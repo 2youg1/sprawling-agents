@@ -62,7 +62,7 @@ impl RunWorker {
         // and the count `status` reports.
         let seen =
             city::Neighbourhood::scan(&self.city_root, site.building.addr(), addr, &|room| {
-                self.inboxes.get(room).map_or(0, collab::Inbox::pending)
+                self.rooms.pending(room)
             })?;
         // Where this run stands, carried rather than worked out: a run
         // that inferred its own depth would be one wrong answer away
@@ -134,9 +134,6 @@ impl RunWorker {
                 of: site.provenance(self.city_hash()?, addr),
             })
             .for_job(addr.clone(), job_locator.clone());
-        for cluster in &self.governance.granted {
-            bench.grant(cluster.clone());
-        }
         // One registration feeds both. The catalogue is what the model
         // was told exists and the bench is what routes the call it
         // makes, so a name on one list and not the other is either a

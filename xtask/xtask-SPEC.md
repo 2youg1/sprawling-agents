@@ -11,10 +11,10 @@
 |---|---|
 | header | 每个 `.rs` 前四行恒为 MPL-2.0 通告加版权行，且整份文件只出现这一次 |
 | lexicon | 禁用词命中即红；数据面 `xtask/lexicon.toml` |
-| modmap | `crates/**/src/**/*.rs` ↔ ARCHITECTURE.md §6 模块表一一对应；状态列一致性；索引文件零逻辑 |
-| depmap | crate 依赖边 ⊆ §2 depmap 块；`pub trait` 仅现于 §3 缝清单文件 |
+| modmap | `crates/**/src/**/*.rs` ↔ ARCHITECTURE.md 模块表（§12）一一对应；状态列一致性；索引文件零逻辑 |
+| depmap | crate 依赖边 ⊆ depmap 围栏块；`pub trait` 仅现于**缝那一节**里那张表列出的文件（节由 `architecture` 切出，不按表的形状认表） |
 | guard | 改动门自身、又同时改动门所判源码的提交，必须携 `Verdict:` 尾注；且墙外那份 `desktop/` 的 lint 表、包元数据与共享依赖版本与工作区逐键相等 |
-| wording | 读者拿到的词出自短语表 `client/src/lang.json`：`client/src` 的 `.tsx` 里文本节点与朗读型属性的字面量，去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名 |
+| wording | 读者拿到的词出自短语表 `client/src/lang.json`：`client/src` 的 `.tsx` 里文本节点与朗读型属性的字面量，`.ts` 里拒绝三段（`action`／`subject`／`recovery`／`reason`）与造 `AxError` 的函数的实参，去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名；生成的文件由它的生成器作证 |
 | render | `#/gallery` 在真引擎里画出来，量盒子落在哪：七条性质见 §8-13 与 §8-14 |
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（`wire.rs` 的 `enum Command`、`run_command` 的臂、`client/src`），channels-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | spec | 生成 `<crate>-SPEC.md` 骨架（Daily Loop 的 `just spec`） |
@@ -83,7 +83,7 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 
 ## 7 模块边界
 
-一门一文件。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度参数；此处只说明每道门判什么，不再抄一份清单，也不写它们有几道——要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates`。判定面：`header`｜`lexicon`｜`modmap`｜`length`｜`boundary`｜`artifact`｜`depmap`｜`npm`｜`secret`｜`color`｜`wording`｜`render`｜`wiring`｜`wire-ts`｜`docnum`｜`proof`｜`budget`｜`specalign`｜`apisync`｜`release`｜`guard`。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `wording` 共用的词形读法）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
+一门一文件。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度参数；此处只说明每道门判什么，不再抄一份清单，也不写它们有几道——要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates`。判定面：`header`｜`lexicon`｜`modmap`｜`length`｜`boundary`｜`artifact`｜`depmap`｜`npm`｜`secret`｜`color`｜`wording`｜`render`｜`wiring`｜`wire-ts`｜`docnum`｜`proof`｜`budget`｜`specalign`｜`apisync`｜`release`｜`guard`。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（ARCHITECTURE.md 按 `## N 标题` 切节这一个读法，被 `modmap`、`depmap`、`specalign`、`proof` 共用，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `wording` 共用的词形读法）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——列格式一变，只有一处要改。
 
@@ -191,7 +191,7 @@ MPL 头四行（通告三行加版权一行），且判据是「整份文件只�
 
 ## 15 影响面
 
-CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate 的解析契约（列契约已标〔冻〕）。改表格式＝改本 crate。
+CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（缝表）、§12（模块表）的表格式即本 crate 的解析契约（列契约已标〔冻〕）。改表格式＝改本 crate。
 
 ## 16 测试与约束
 
@@ -442,8 +442,8 @@ CI 与 justfile 调用面；ARCHITECTURE.md §6/§2/§3 的表格式即本 crate
 
 | 变体 | 产物目录 | 归档名 | 归档里的可执行文件 |
 |---|---|---|---|
-| `Host` | `target/release/` | `sprawling-<version>-<os>-<arch>`（不动） | 由 `cfg!(windows)` 判 |
-| `Triple(t)` | `target/<t>/release/` | `sprawling-<version>-<t>` | 由 `t` 里是否含 `windows` 判 |
+| `Host` | `target/release/` | `sprawling-<version>-<os>-<arch>`（不动） | 向平台表按归档名取（§8-23） |
+| `Triple(t)` | `target/<t>/release/` | `sprawling-<version>-<t>` | 向平台表按归档名取（§8-23） |
 
 - **`binary_path` 从 `budget` 迁到 `package`**。「产物住哪里」与「产物叫什么」是同一个事实的两半，分住两个模块就是两个权威；`budget` 反过来向 `package` 要路径，因为它的活是称重而不是定位。
 - **三元组进名字**。不进名字的话，musl 归档会叫 `sprawling-<version>-linux-x86_64.zip`，既不说静态也不说 musl，且**在出现第二份 Linux 产物（gnu）的那一天静默相撞**。既有的两个名字一字不动，故这不是重命名而是给新的一类命名。
@@ -489,7 +489,7 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 
 **会滚动的容器装得下比它显示的更多**，故容纳性那一条按轴放行：探针连同每个元素的 `overflow-x`／`overflow-y` 一起量，父元素在某一轴上是 `auto` 或 `scroll` 时，那一轴不判。理由是这条规则要阻的缺陷是「一个盒子画在了别的东西上面」，而折线以下的内容什么都没画在上面——它靠滚动够到。不放行的话，一页内容多过一屏即报错，而这个产品的每一页都多过一屏。
 
-**`wording` 不读 DOM，理由是它读不出那个区分**。渲染后的页面上，「视图写死的词」与「城供给的值」是同一种字节；旧门能分开它们，靠的恰好是源码里的**位置**。所以该门仍按位置判，只是位置从 RSX 换成 JSX：文本节点与可诵读属性两处，与原来同一张属性表。**它是一个扰器而非解析器**：客户端自己的工具链里已有一份正确的 TSX 解析器，在这里再写一份只会是它更差的副本。两条已知的限写在明处：跨行的文本节点看不到；只读 `.tsx`。两条都是**漏报而非误报**，这是本门赔得起的那一面——视图画的词同时也画在 `#/gallery` 上，`render` 从页上读得到。**依据必须以 `<` 收尾**：`>` 也是泛型参数表的结束符，第一版扫描器因此报了十条类型。
+**`wording` 不读 DOM，理由是它读不出那个区分**。渲染后的页面上，「视图写死的词」与「城供给的值」是同一种字节；旧门能分开它们，靠的恰好是源码里的**位置**。所以该门仍按位置判，只是位置从 RSX 换成 JSX：文本节点与可诵读属性两处，与原来同一张属性表。**它是一个扰器而非解析器**：客户端自己的工具链里已有一份正确的 TSX 解析器，在这里再写一份只会是它更差的副本。两条已知的限写在明处：跨行的文本节点看不到；`.tsx` 只读 JSX 两个位置（`.ts` 的拒绝三段由 §8-24 读）。两条都是**漏报而非误报**，这是本门赔得起的那一面——视图画的词同时也画在 `#/gallery` 上，`render` 从页上读得到。**依据必须以 `<` 收尾**：`>` 也是泛型参数表的结束符，第一版扫描器因此报了十条类型。
 
 下面这些是 `render` 的读法。
 
@@ -641,5 +641,39 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 `RunId::CITY`（nil uuid）标记城一级的记录，而 `client/src/core/belief.ts` 手写了一个同名常量——一个把它拼错的客户端会把每一条城级记录折进一个不存在的 run。生成器因此多发一条：`export const CITY_RUN`，取自 `kernel::RunId::CITY`，与 `WIRE_V`、`WIRE_HASH` 同处文件开头。三者总是一起走且从不被单独选择，故作为一个值 `Constants` 走（`wire_ts.rs` 定义，`emit` 消费），而不是把 `emit` 的参数表加到四个。
 
 **`belief.ts` 那个手写常量随生成物落盘的那一次删除**，改从 `wire.ts` 导入；那一步在 `client/` 里，不在本节的改动范围内。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-22 `architecture`：按节读 ARCHITECTURE.md，不按表的形状认表（形状 6 数据面）
+
+缝清单此前的读法是「任何一行六格管道行，第二格是 `crates/**.rs`」——这是在描述一张表的样子，而不是在描述一个位置。**于是在这份文档任何地方新写一张四列表，都会静默扩大允许声明 `pub trait` 的文件集合，且没有任何东西会说一句话**（B-61）。`modmap` 的两个读者里，只有数计数的那一个知道模块表住在第 12 节，解析行的那一个不知道。
+
+**文档的结构因此只有一个读法**：`architecture::section(text, n)` 取 `## n 标题` 与下一个 `## ` 之间的全部行，`###` 子标题属于它上面的那一节（模块图正是这么写的）。每一行带着它在整份文档里的行号回来，故拒词仍然指向人能打开的那一行。`PATH` 同时是「这份文档叫什么」的唯一一个家——此前 `depmap`、`modmap`、`specalign`、`proof` 各写一份。
+
+**节不在场是 `XtaskError::Doc`，不是空集合**：读成空集合时，缝表消失会表现为树上每一个 `pub trait` 各报一条，真正的发现淹在一百条里。
+
+**今天的读数一字不变**：全部 603 行模块行都在第 12 节内，全部 6 行缝行都在第 4 节内，两道门仍然全绿。这是收紧，不是改判。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-23 归档里有什么，由一张表说了算（形状 2 值）
+
+**归档是否带物料清单，此前取决于 `target/` 里恰好有没有那个文件**（B-75）：没跑过 `just sbom` 的树打出来的归档少一项，且一句都不说，于是同一个 tag 的两次打包对「里面有什么」各执一词。**`Packaged` 三个变体穷举**（`Binary`｜`Document { name, source }`｜`Sbom`），缺哪一项就带着写它的那条 recipe 拒绝。可执行位随变体走，不再由「名字是不是 `sprawling`」判。
+
+**归档里那个可执行文件叫什么，向平台表要**（§8-19、7.14）：那张表已经有 `binary` 一列，而打包器又用 `cfg!(windows)` 与「三元组里含不含 `windows`」各判了一次——一个事实三个家。现在按即将写下的归档名 `-<label>.zip` 向 `platform::with_suffix` 取行；**本次发布不出这份归档的目标被拒绝**，这正是平台表为自己写下的政策。
+
+**发布二进制必须带执行引擎**（B-33）：`AbsentSandbox` 的恢复语让人去装一个带 `wasm` feature 的构建，而下载发布档的人开不了任何 feature。判法与 `budget::carries_client` 同形——读产物的字节，找只有 wasmtime 会写下的那句燃料陷阱文案（默认 feature 集下这棵树一个 wasm crate 都没有，故别处写不出它）。**`sprawling` 包把 `sandbox` 并入 default 是这道拒绝的另一半，它住 `crates/sprawling/Cargo.toml`；并入的那一次，`[release_binary]` 的读数必须在同一笔改动里重取。**
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-24 `wording` 读 `.ts`：一个不画画的模块也说话（形状 1 判定）
+
+门此前只走 `.tsx`，理由是两个位置都是 JSX 位置。**而一个人被城拒绝时读到的那句话住在 `core/` 里，那里一行标记都没有**（B-48）：「每一个读者拿到的词都来自 `lang.json`」这条规则，漏掉的恰是它最容易被违反的那一半。
+
+**两个位置，都是一次拒绝**：写给 `action`／`subject`／`recovery`／`reason` 的字面量（拒绝被造出来的形状），与传给本模块声明为返回 `AxError` 的函数的字面量（拒绝被造出来的方式）。返回类型由扫描器自己认，不在门里养一份函数名单。机器要的字节——wire 值、存储键、导入路径、类名——三者都不在这两个座位上。
+
+**已知的限**：一句话经两跳函数传进来时，只在外层那一跳被读到；再宽就需要类型检查器已经有的调用图，而这是一个扰器。
+
+**本节落地即红 11 条**（`core/link.ts` 9、`core/enrol.ts` 2），它们全部是真的：修法住 `client/`，不在本节的改动范围内。
 
 **本节属门禁机具，与产品代码分开提交。**

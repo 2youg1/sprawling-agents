@@ -123,11 +123,14 @@ impl RunWorker {
         let adapter = gateway::adapter_for(
             &chosen,
             self.redemption()?,
-            dialect_headers(chosen.endpoint.dialect),
+            dialect_headers(chosen.endpoint.dialect)
+                .into_iter()
+                .map(|(name, value)| (name, value.spelled()))
+                .collect(),
         )?;
         let retries = match chosen.endpoint.tuning.request_max_retries {
-            Some(ceiling) => runtime::Retries::AtMost(ceiling),
-            None => runtime::Retries::UntilHalted,
+            gateway::Retries::AtMost(ceiling) => runtime::Retries::AtMost(ceiling),
+            gateway::Retries::UntilHalted => runtime::Retries::UntilHalted,
         };
         Ok(Agreed {
             building,

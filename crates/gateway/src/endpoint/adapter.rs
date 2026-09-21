@@ -12,12 +12,8 @@
 
 use kernel::AxError;
 
-use crate::endpoint::{AuthSpec, Endpoint, EndpointConfig, Redemption};
+use crate::endpoint::{AuthSpec, Endpoint, EndpointConfig, HeaderValue, Redemption};
 use crate::router::Chosen;
-
-/// How long one model call may take. Moved with the choice it serves:
-/// a timeout nobody here reads is a number nobody here can justify.
-pub const CALL_TIMEOUT_MS: u64 = 120_000;
 
 /// The adapter for one chosen model.
 ///
@@ -40,7 +36,9 @@ pub fn adapter_for(
 ) -> Result<Box<dyn kernel::Model + Send>, AxError> {
     let endpoint = chosen.endpoint;
     let tuning = &endpoint.tuning;
-    let timeout_ms = tuning.timeout_ms.unwrap_or(CALL_TIMEOUT_MS);
+    // The tuning answers this, because the figure an untuned endpoint
+    // is called with is the tuning's own default and is stated there.
+    let timeout_ms = tuning.call_timeout_ms();
     if endpoint.is_local()
         && matches!(endpoint.dialect, kernel::DialectKind::OpenAi)
         && matches!(endpoint.auth, AuthSpec::None)
@@ -59,7 +57,7 @@ pub fn adapter_for(
     // rather than adding a second line with the same name: two
     // `anthropic-version` headers is a request no provider promises to
     // read the way either of them meant.
-    let mut extra_headers: Vec<(String, String)> = dialect_headers
+    let mut extra_headers: Vec<(String, HeaderValue)> = dialect_headers
         .into_iter()
         .filter(|(name, _)| {
             !tuning
@@ -67,6 +65,10 @@ pub fn adapter_for(
                 .iter()
                 .any(|(given, _)| given.eq_ignore_ascii_case(name))
         })
+        // A dialect's own headers are this build's literals rather
+        // than a person's entry, so they carry no reference to redeem
+        // and need no scan to clear them.
+        .map(|(name, value)| (name, HeaderValue::Plain(value)))
         .collect();
     extra_headers.extend(tuning.extra_headers.iter().cloned());
     let endpoint = Endpoint::new(
@@ -78,7 +80,7 @@ pub fn adapter_for(
             extra_headers,
             overrides: tuning.applied_overrides(),
             timeout_ms,
-            stream_deadline_ms: tuning.stream_deadline_ms,
+            stream_idle_timeout_ms: tuning.idle_timeout_ms(),
             pricing: Some(chosen.entry.clone()),
             proxying: tuning.proxying,
         },

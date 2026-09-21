@@ -13,8 +13,9 @@
 //! says it made it say. `ClaimDesk` decides; this describes and checks.
 //! Two shapes, so two files (ARCHITECTURE.md section 9).
 
+use kernel::spine::check_roadmap_shape;
 use kernel::{AxCode, AxError, EvidenceCell, Locator, NodeId, Payload, PlanExit};
-use kernel::{RoadmapShape, RoadmapStatus, check_roadmap_shape};
+use kernel::{RoadmapShape, RoadmapStatus};
 use serde_json::{Map, Value};
 
 /// What the run did to the plan. Exhaustive on purpose, like the other

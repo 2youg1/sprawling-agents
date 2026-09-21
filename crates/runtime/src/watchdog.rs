@@ -197,7 +197,8 @@ impl Watchdog {
 )]
 mod tests {
     use super::*;
-    use kernel::{ActionFingerprint, observe};
+    use kernel::ActionFingerprint;
+    use kernel::stall::observe;
 
     #[test]
     fn disposal_is_graded_steer_first_freeze_second() {

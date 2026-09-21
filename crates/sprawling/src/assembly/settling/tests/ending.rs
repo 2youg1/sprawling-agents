@@ -54,13 +54,12 @@ fn an_allowed_item_carries_the_work_on_instead_of_asking_for_the_command_again()
     };
     let item = kernel::ApprovalItem {
         id: kernel::ApprovalId::new("item-1").unwrap(),
-        source: kernel::ApprovalSource::Gate,
         actor: "lab/room1".to_owned(),
         action_desc: "empty the archive".to_owned(),
         artifact: Locator::parse("file:lab/room1@0000000000000000000000000000000000000000")
             .unwrap(),
         cluster_key: kernel::ClusterKey {
-            class: kernel::ApprovalClass::DiscardEscalate,
+            class: kernel::ApprovalClass::Question,
             detail: "lab/room1".to_owned(),
         },
         created: TimeMs::new(1),
@@ -84,7 +83,7 @@ fn an_allowed_item_carries_the_work_on_instead_of_asking_for_the_command_again()
     worker
         .handle(channels::Command::Approve {
             item: kernel::ApprovalId::new("item-1").unwrap(),
-            verdict: kernel::PolicyVerdict::Allow,
+            verdict: kernel::Ruling::Allow,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"approve"),
         })
         .unwrap();
@@ -177,17 +176,16 @@ fn work_handed_down_becomes_a_run_that_cannot_hand_it_down_again() {
             effort: None,
         })
         .unwrap();
-    // Nothing has been handed down yet: the first spawn of a run
-    // waits for the person, and answering carries the work on.
+    // The work went down without anybody being asked: one level of
+    // delegation is what the type allows, and a door that asked would
+    // be a door whose default answer gets clicked through.
     assert!(
-        !city::job_path(dir.path(), &Address::parse("lab/helper").unwrap()).exists(),
-        "a delegate started before anybody allowed it"
+        city::job_path(dir.path(), &Address::parse("lab/helper").unwrap()).exists(),
+        "the delegate was never given a job file"
     );
-    let cluster = allow_the_one_pending_item(&mut worker);
-    assert_eq!(cluster.class, kernel::ApprovalClass::Delegation);
-    assert_eq!(
-        cluster.detail, "lab/room1",
-        "the person is asked once per resident, not once per room it picks"
+    assert!(
+        worker.governance.pending.is_empty(),
+        "a spawn is decided by the type, not by a person"
     );
 
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
@@ -286,23 +284,13 @@ fn what_came_back_from_a_delegate_waits_in_the_room_that_asked_for_it() {
             effort: None,
         })
         .unwrap();
-    allow_the_one_pending_item(&mut worker);
 
-    let waiting = worker
-        .inboxes
-        .get(&room)
-        .expect("the asking room has a queue")
-        .pending();
+    let waiting = worker.rooms.pending(&room);
     assert_eq!(
         waiting, 1,
         "exactly one handback per piece of work handed down"
     );
-    let taken = worker
-        .inboxes
-        .get_mut(&room)
-        .expect("the asking room has a queue")
-        .pull()
-        .unwrap();
+    let taken = worker.rooms.pull_at_home(&room).unwrap();
     let body = taken[0].payload().as_map();
     assert_eq!(body["room"], "lab/helper");
     assert_eq!(
@@ -337,19 +325,7 @@ fn status_tells_a_run_where_the_work_it_handed_down_went() {
                     "kind": "ephemeral",
                 }),
             ),
-            completion("waiting on a person", None),
-            completion_with(
-                "handing it down",
-                "delegate",
-                "tu_2",
-                serde_json::json!({
-                    "room": "lab/helper",
-                    "task": "measure the thing",
-                    "goal": "a number, then stop",
-                    "kind": "ephemeral",
-                }),
-            ),
-            completion_with("where did it go", "status", "tu_3", serde_json::json!({})),
+            completion_with("where did it go", "status", "tu_2", serde_json::json!({})),
             completion("done", None),
         ],
     );
@@ -372,7 +348,6 @@ fn status_tells_a_run_where_the_work_it_handed_down_went() {
             effort: None,
         })
         .unwrap();
-    allow_the_one_pending_item(&mut worker);
 
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let history: String = verified

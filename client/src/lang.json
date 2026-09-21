@@ -135,10 +135,6 @@
     "en": "the clerk",
     "zh": "clerk 代答"
   },
-  "autonomy_deferred": {
-    "en": "wait",
-    "zh": "等着"
-  },
   "autonomy_owner": {
     "en": "me",
     "zh": "我"
@@ -502,6 +498,14 @@
   "effort_xhigh": {
     "en": "xhigh",
     "zh": "xhigh"
+  },
+  "enrol_city_said_nothing": {
+    "en": "the city did not say why",
+    "zh": "这座城没有说明理由"
+  },
+  "enrol_unreachable": {
+    "en": "this browser could not reach the city",
+    "zh": "这个浏览器联系不上这座城"
   },
   "evidence_finished": {
     "en": "finished",
@@ -1563,6 +1567,10 @@
     "en": "thinking",
     "zh": "思考"
   },
+  "setup_effort_city": {
+    "en": "the city's own [model] effort in CONFIG.toml holds until a dispatch states a level for the session it opens",
+    "zh": "城自己的 CONFIG.toml [model] effort 一直生效，直到某次派活为它开的那一场另说一个档位"
+  },
   "setup_effort_essay": {
     "en": "A run freezes its effort when it starts, so a change made now reaches the next run and never the one already going, and each change invalidates the prompt cache the provider built for this conversation. The two wire formats spell the six levels alike but put none in different places: Anthropic disables thinking through a field of its own, OpenAI passes none as the effort itself. Choosing nothing is not the same as choosing none - an unstated effort leaves the decision to the provider, and none turns thinking off.",
     "zh": "一次 run 在起点冻结它的强度，此刻的改动因此只到下一次 run，永远到不了正在跑的那一次；每改一次，供应方为这段对话建好的 prompt 缓存都会作废。两种兼容格式的六档拼写一致，none 的位置却不同：Anthropic 用一个自己的字段关掉思考，OpenAI 把 none 当作强度本身传过去。不选与选 none 是两件事——不选是把决定权留给供应方，选 none 是把思考关掉。"
@@ -1991,6 +1999,10 @@
     "en": "config.toml carries none of this yet",
     "zh": "config.toml 还没有这一节"
   },
+  "setup_toml_unread": {
+    "en": "nothing here can read the city's config.toml yet",
+    "zh": "这一版还读不到城的 config.toml"
+  },
   "setup_transcribe": {
     "en": "transcribe · hears (needs an ASR model such as whisper; a text model cannot go here)",
     "zh": "transcribe · 听写（需要 ASR 模型，如 whisper；文本模型不能填这里）"
@@ -2034,6 +2046,10 @@
   "skills_shelf": {
     "en": "this building's shelf",
     "zh": "这栋楼自己的架子"
+  },
+  "skills_unopened": {
+    "en": "open a skill above to read it here",
+    "zh": "在上面打开一个技能，就在这里读它"
   },
   "skills_used_by": {
     "en": "used by {n} runs",
@@ -2430,5 +2446,33 @@
   "welcome_title": {
     "en": "welcome",
     "zh": "欢迎"
+  },
+  "wire_frame_undecodable": {
+    "en": "this page speaks wire v{ours} and the server sent a frame it cannot read",
+    "zh": "本页说 wire v{ours}，而服务端送来的这一帧它读不了"
+  },
+  "wire_join_action": {
+    "en": "join this city's control surface",
+    "zh": "接入这座城的控制面"
+  },
+  "wire_out_of_order": {
+    "en": "the server streamed frames before completing the handshake",
+    "zh": "服务端在握手完成之前就开始推帧"
+  },
+  "wire_read_frame_action": {
+    "en": "read a frame from this city",
+    "zh": "读取这座城发来的一帧"
+  },
+  "wire_reload_for_client": {
+    "en": "reload the page to fetch the client this server was built with",
+    "zh": "刷新页面，取回与这台服务端一同构建的客户端"
+  },
+  "wire_reload_or_wrong_host": {
+    "en": "reload the page; if it repeats, the address is not a sprawling server",
+    "zh": "刷新页面；若仍如此，这个地址不是一台 sprawling 服务端"
+  },
+  "wire_version_mismatch": {
+    "en": "this page speaks wire v{ours} and the server speaks v{theirs}",
+    "zh": "本页说 wire v{ours}，服务端说 v{theirs}"
   }
 }

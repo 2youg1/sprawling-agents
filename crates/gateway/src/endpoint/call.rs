@@ -22,6 +22,7 @@ use serde_json::Value;
 use crate::dialect::{ImageBytes, request_wire};
 
 use super::config::{AuthSpec, Endpoint, apply_override, provider_err, transport_detail};
+use super::header::HeaderValue;
 use super::models::ModelFacts;
 
 /// Every picture one conversation refers to, in the order the blocks
@@ -83,11 +84,7 @@ impl Endpoint {
     /// Transport failure, a non-success status, or a body without a
     /// readable `data` array; each carries the URL that was asked.
     pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, AxError> {
-        let mut request = self.client.get(url);
-        for (name, value) in &self.config.extra_headers {
-            request = request.header(name, value);
-        }
-        request = self.authorize(request)?;
+        let request = self.authorize(self.client.get(url))?;
         let response = request
             .send()
             .map_err(|err| provider_err("list models", transport_detail(&err)))?;
@@ -117,13 +114,24 @@ impl Endpoint {
         Ok(facts)
     }
 
-    /// Redemption: resolve now, expose only while the header is written,
-    /// drop (zeroize) immediately after.
-    pub(crate) fn authorize(
+    /// Every header this endpoint adds, written in the last slot
+    /// before the wire.
+    ///
+    /// **Redemption happens here for both kinds of credential**: the
+    /// one the registration carries and the one a person put in a
+    /// header of their own. Each `Sealed` is exposed only while its
+    /// header is written and dropped (zeroized) immediately after, and
+    /// writing both kinds in one statement is what keeps a second,
+    /// laxer path from growing beside this one.
+    ///
+    /// # Errors
+    /// Propagates a redemption failure, naming the reference that could
+    /// not be redeemed.
+    pub(super) fn authorize(
         &self,
         request: reqwest::blocking::RequestBuilder,
     ) -> Result<reqwest::blocking::RequestBuilder, AxError> {
-        Ok(match &self.config.auth {
+        let mut request = match &self.config.auth {
             AuthSpec::Bearer(reference) => {
                 let sealed = (self.redemption.secrets)(reference)?;
                 request.header("authorization", format!("Bearer {}", sealed.expose()))
@@ -133,7 +141,56 @@ impl Endpoint {
                 request.header(name, sealed.expose().as_str())
             }
             AuthSpec::None => request,
-        })
+        };
+        for (name, value) in &self.config.extra_headers {
+            request = match value {
+                HeaderValue::Plain(text) => request.header(name, text),
+                HeaderValue::Redeemed(reference) => {
+                    let sealed = (self.redemption.secrets)(reference)?;
+                    request.header(name, sealed.expose().as_str())
+                }
+            };
+        }
+        Ok(request)
+    }
+
+    /// One POST of bytes this endpoint's own body writer did not
+    /// build, answered as JSON.
+    ///
+    /// The audio face sends a multipart form rather than a dialect's
+    /// request body, and it used to reach through this type for the
+    /// transport, the deadline and the status rule. It asks for them
+    /// here instead, so that "how a POST leaves this city, what a
+    /// non-2xx becomes, and whether the provider's body is quoted
+    /// back" is answered once for every caller.
+    ///
+    /// # Errors
+    /// `E_PROVIDER` on transport failure, on a non-success status, and
+    /// on a body that is not JSON; the URL and the status are named and
+    /// the provider's own body never is.
+    pub(crate) fn post_bytes(&self, content_type: &str, body: Vec<u8>) -> Result<Value, AxError> {
+        let url = &self.config.base_url;
+        let request = self
+            .authorize(
+                self.client
+                    .post(url)
+                    .header("content-type", content_type)
+                    .header("accept", "application/json"),
+            )?
+            .body(body);
+        let response = request
+            .send()
+            .map_err(|err| provider_err("post to provider", transport_detail(&err)))?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(provider_err(
+                "post to provider",
+                format!("{url} answered {}", status.as_u16()),
+            ));
+        }
+        response
+            .json()
+            .map_err(|err| provider_err("read provider response", transport_detail(&err)))
     }
 
     /// The bytes for every picture this request refers to.

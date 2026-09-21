@@ -85,6 +85,7 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
         fuel: 10,
         mounts: vec![Address::parse("lab/docs").unwrap()],
         env_passthrough: vec![EnvVarName::parse("ProgramFiles").unwrap()],
+        trusted: Vec::new(),
     };
     let terse = SandboxLimits {
         fuel: 20,

@@ -7,9 +7,9 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::ledger::chain_hash;
 use kernel::{
     AxCode, AxError, EventDraft, EventKind, EventRecord, EventRef, Payload, RunId, Seq, TimeMs,
-    chain_hash,
 };
 
 use crate::error::{MemoryError, io_err};
@@ -218,7 +218,7 @@ impl kernel::Ledger for JsonlLedger {
 }
 
 #[cfg(feature = "conformance")]
-impl kernel::conformance::LedgerInspect for JsonlLedger {
+impl kernel::ledger::conformance::LedgerInspect for JsonlLedger {
     fn raw_lines(&self) -> Result<Vec<Vec<u8>>, AxError> {
         self.read_raw_lines().map_err(MemoryError::into_ax)
     }
@@ -260,7 +260,7 @@ mod tests {
     #[cfg(feature = "conformance")]
     #[test]
     fn passes_the_kernel_conformance_suite() {
-        use kernel::conformance::assert_ledger_conformance;
+        use kernel::ledger::conformance::assert_ledger_conformance;
         let keep: std::cell::RefCell<Vec<tempfile::TempDir>> = std::cell::RefCell::new(Vec::new());
         assert_ledger_conformance(|| {
             let dir = tempfile::tempdir().unwrap();

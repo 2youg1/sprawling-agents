@@ -22,10 +22,13 @@
 //! is a full checkout under the ceiling. That is the fallback arm of the
 //! design, stated as the current state rather than as the design.
 
+mod landing;
 mod lease;
 mod name;
 mod trees;
+mod weight;
 
+pub use landing::{Landing, PlannedMerge};
 pub use lease::WorktreeLease;
 pub use name::WorktreeName;
-pub use trees::{Landing, PlannedMerge, Worktrees};
+pub use trees::Worktrees;

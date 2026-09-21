@@ -14,7 +14,8 @@
 | `error` | 2 值 | `MemoryError` 与 `into_ax`：本 crate 失败词汇的唯一定义点 |
 | `fault_fs` | 4 适配器 | Vfs 第二适配器：撕裂写／乱序持久化／rename 中断；断电点阵的驱动器 |
 | `cas` | 4 适配器 | BLAKE3 寻址存储：范围取回＋临时文件 rename＋去重 |
-| `index` | 7 projection | Ledger 旁挂索引 seq→（段，偏移）；可弃，损坏即重建 |
+| `index` | 7 projection | Ledger 旁挂索引 seq→（段，偏移）；可弃，损坏即重建；持 `Box<dyn Vfs>`，读写皆经内缝 |
+| `reserved` | 2 值 | `outside_reserved(relative)`：哪些字节属于人；checkpoint 与 worktree 共用的唯一谓词 |
 | `hot` | 7 projection | 内存热视图：界面查询在此命中，不读盘 |
 | `projection` | 7 projection | redb 磁盘冷视图：Recycle Bin＋进度视图＋重启恢复 |
 | `attribution` | 7 projection | 成本归因：逐维度精确分割同一总额；A20 对账 |
@@ -219,8 +220,9 @@ rename 入 Vfs；FaultFs 模型：rename 原子；新目标目录项在 `sync_di
 ### 8-4 memory::index（形状 7）
 
 ```rust
-pub struct LedgerIndex { /* entries: BTreeMap<Seq, (String, u64)> —— 段名＋行首字节偏移；
-                            runs: BTreeMap<RunId, BTreeSet<Seq>> —— 谁写了哪几条；私有 */ }
+pub struct LedgerIndex { /* folded: Folded —— entries: BTreeMap<Seq, (String, u64)>（段名＋行首字节偏移）、
+                            runs: BTreeMap<RunId, BTreeSet<Seq>>（谁写了哪几条）、scanned；
+                            vfs: Mutex<Box<dyn Vfs>> —— 内缝，读写皆经它；私有 */ }
 impl LedgerIndex {
     /// Build by scanning the ledger dir; 旁挂 cache `index.cache` is
     /// loaded when checksum-fresh, rebuilt otherwise (disposable by design).
@@ -255,7 +257,7 @@ impl LineReader<'_> {
   - **增量面是 `refresh`，不是“追加时告知索引”**：调用方手里只有 `EventRecord`，段名与偏移是 `jsonl` 的内部事务（§7 第三条）。让观察者携偏移会把分段泄给调用方，而 `refresh` 把那个知识留在本模块。
   - 索引因此多记一张 `scanned: BTreeMap<段名, 已折入字节数>`。`refresh` 逐段比对：**变大就只读新那一段字节**；**变小或消失就全重建**（断尾修复截过段，旧偏移不再可信）；一字未动就什么也不做。
   - **「上次读到哪」只有这一个家，而且它恒落在整行边界上**：`fold_segment` 只把带终止符的行计入，所以 `scanned` 记的永远是某条记录的结尾，下一次 refresh 从一条记录的开头起读，**取不到半条**。
-  - **定位读，而不是整读再切尾**：`open` + `seek(from)` + `take(size-from)`，读进来的缓冲只装增量。`take` 以本次 `metadata` 读到的长度封顶——stat 与 read 之间落的那条账留给下一次 refresh，而不是折在一个本次没有确认过的偏移上。
+  - **定位读，而不是整读再切尾**：`Vfs::read_at(path, from, size-from)`，读进来的缓冲只装增量。长度以本次 `Vfs::size` 读到的值封顶——stat 与 read 之间落的那条账留给下一次 refresh，而不是折在一个本次没有确认过的偏移上。
   - **`scanned` 不落盘，所以「偏移写坏」不是一个状态**：它是常驻状态，cache 命中时取当下段大小（cache 新鲜的定义就是字节数与 stamp 相符）。一份被改坏的 cache 过不了 stamp 比对，整份重建；进程内若出现 `scanned > 段长`，走的是「变小」那一支，同样整份重建。任何一条可疑路径的答案都是重建，没有一条会读到半条记录。
   - **`refresh` 报出它读了多少字节**（`Refreshed`）：整读与定位读折出的索引逐条相同，唯一的区别就是抬起的字节数，所以那个数必须能被断言，也正是 `index_refresh_read` 这条预算的读数来源。
   - `load_or_rebuild` 走 cache 命中时，`scanned` 取当下段大小：**cache 新鲜的定义就是字节数与 stamp 相符**，所以这个赋值精确而不是近似。
@@ -542,6 +544,15 @@ impl WorktreeLease {
 
 - **一节点一棵，且它是 git worktree**：对象共享、工作树不共享，于是两个 Agent 看不见对方的中间态，而合入只走 PR 流。它从 `memory::checkpoint` 已在管的那个仓库分枝——城里不开第二个仓库。
 - **建树前预检，不是建到一半失败**：工作树字节数 > `WORKTREE_MAX_BYTES` 即拒，拒词带当前上限与实测值。reflink 今天不尝试（无 unsafe FFI 或新依赖就没有 CoW 接口），故设计里「CoW 则 reflink，否则按上限拒」在每个平台上都只走后一臂——这是当前口径，不是已实现的 CoW。可用磁盘余量未探（std 无该接口），同样写在明处。
+- **上限只称人的字节（B-45）**：`measure` 跳 `.git` 与 `RESERVED_PREFIX` 子树（谓词住 `memory::reserved`，与 checkpoint 的 `stage_tree` 同一个）。
+  账本、CAS、投影与别人的工作树都住 reserved 之下；把它们算进来，跑了一个月的城会因为自己的簿记长大而拒绝派活，
+  并用一句「城的工作树有 N 字节」说这件事。断言：账本 4 KB、产品文件不到 1 KB 的城仍可领树。
+- **问不出祖先关系不是「不是祖先」（B-68）**：`graph_descendant_of` 的失败按 `Worktree{op:"judge a fast-forward"}` 上报，
+  不再顶替成 `MergeStale`——把一次 git 失败说成「trunk 动过了」，会让一个 trunk 没动的人回去重做不需要重做的活。
+- **释放先注销后删文件（B-69）**：`release` 先 prune（`valid` ＋ `working_tree`），再删残留目录；
+  仓库已经忘掉这棵树时 prune 不是失败，那正是调用方要的末态。
+  倒过来的顺序在中途失败时会留下「git 仍列着、目录已没有」的名字，而它唯一的出口是 `WorktreeBusy`，于是这个名字被永久锁住。
+  `claim` 同时自愈：登记在册但目录不存在即 prune 后重建，与 index 的「存疑即重建」同一反射；`E_WORKTREE_BUSY` 因此恒表示「有人正在用」。
 - **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但尚未做——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。
 - **路径不入历史**：`worktree_opened` 载荷只携 name 与字节数。绝对路径是一台机器自己的事实，写进账本会使一本能搬到另一台机器的历史带上搬不走的东西。
 - **merge 只走 fast-forward**：trunk 在节点分枝之后动过即 `MergeStale`（→`E_VERSION_CONFLICT`），不由机器把一份活重放到别人的活上面——能说出「这份活是否仍然适用」的是做它的人。拒后城内文件逐字节不变（一条断言）。
@@ -559,7 +570,7 @@ impl WorktreeLease {
 ### 8-10 memory::queue（形状 7）
 
 ```rust
-pub struct EventQueue { /* items: BTreeMap<u64, QueueItem>、next_id、seen: BTreeSet<IdemKey>、stats —— 私有 */ }
+pub struct EventQueue { /* items: BTreeMap<u64, QueueItem>、next_id、seen: BTreeMap<IdemKey, TimeMs>、stats —— 私有 */ }
 pub struct QueueItem { pub id: u64, pub key: IdemKey, pub payload: Payload }
 impl EventQueue {
     pub fn new(lane: QueueLane) -> EventQueue;
@@ -575,6 +586,10 @@ pub enum QueueLane { Signal, Approval, Repair }   // 一份实现三队列
 ```
 
 - 容量入构造子（`new(lane, capacity)`）而非写死常量——三 lane 容量不同是装配事。**重复键返回 `Admit` 而非 `Shed`**：发送方已尽职，告知失败只会招致无效重试；`seen` 持久于队列寿命（消费后仍认得出重复，因为副作用已跑过一次）。被 shed 项不入 `seen`，故重试不算重复。
+- **去重记忆按时间有界（B-67）**：`seen` 记下每个键的入队时刻，`enqueue` 先按 `now` 驱逐早于 `IDEM_WINDOW_MS`（六小时）的键。
+  只增不减的集合会让长跑的城为它曾经入过队的每一条事件各留一个键，而重试发生在一次投递的窗口内，不发生在一天之后。
+  时钟倒退时一个键也不驱逐——队列对时钟不持观点，而记得太久只会少跑一次副作用。
+  **常量今天住 `memory::queue`**：路线图要它住 `kernel::consts_policy::QUEUE_IDEM_WINDOW_MS`，那是 kernel 的公开面与 kernel-SPEC §8-8 的条数，本波不改 kernel。
 - 重建性：队列状态＝（signal_enqueued − signal_consumed）的 projection；持久性不在本模块（Ledger 已是历史）。lane 只定账目名字段，三队列零分支差异——差异出现之日即分模块之日（反推式合并的退出条件写在明处）。
 
 ### 8-11 memory::digest_cache（形状 4）
@@ -618,6 +633,9 @@ pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, MemoryErr
 - **带走什么**：`ledger/`（唯一历史，必带）、`cas/`（Locator 指进去，不带就断链）、城里的产品文件（`City.md`、各楼的 `BUILDING.md`／`Roadmap.md`／`URBANITE.md` 与房间内容）。**不带**：projection 与索引（可弃，恢复后由 Ledger 重建，带了就是第二份历史）；凭证（**它从不在城里**，在宙主机金库——导出一份能拷走凭证的备份会把隐私保证一次性作废）。
 - **为何是目录而非单文件**：单文件要么自造容器格式（多一个要养的格式），要么引 tar／zip 依赖。目录两者都不要，且任何备份工具都能再打包一层——压缩不是本模块的职责。
 - **清单是完整性的依据**：`MANIFEST.json` 记下记录数、链头哈希、CAS 对象数与文件数；`restore` 恢复后重算并比对。不对即拒，而不是“恢复了但少了几条”——后者是历史失真。
+- **四个数由 `Manifest::of(vfs, ledger_dir, cas_dir, files_root)` 一处算出**（B-46）：导出量目的地、恢复量城本身、比较的两侧因此是同一种测量。
+  `walk` 返回 `Result`：不存在的目录算空（尚无 CAS 的城），读不动的目录停下并带路径上报——一个子目录静默贡献零个文件，正是一份短了的备份与它自己的清单相符的来路。
+  `restore` 比四个字段而不是两个：丢了 CAS 对象的 bundle 链校全绿、Locator 全部指空，只有对象数说得出这件事。
 - **清单的四个数全部读自导出结果，因而不能自证**（B-46）：一次把半座城丢掉的拷贝与它自己的清单完全相符。故 `export` **另取源侧的五个数**——账本文件数、CAS 对象数、城内文件数、账本记录数、链头——与目的地逐项比，任一项不等即拒。源侧的数从 `copy_tree`／`copy_city_files` 的返回值来，那正是从前被 `let _ = records;` 丢掉的那个数。
 - **链验在 restore 内**：恢复完即走一遍 Ledger 开启与链校（jsonl 已有的那一道）。交给调用方去验等于把一个必须成立的性质变成约定。
 - **文件顺序确定**：遍历走 `Vfs::list`（已排序），清单用 BTreeMap；同一座城导两次，`MANIFEST.json` 逐字节相同。
@@ -652,6 +670,7 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
     fn list(&self, dir: &Path) -> io::Result<Vec<PathBuf>>;     // 排序后返回：遍历确定性
     fn list_dirs(&self, dir: &Path) -> io::Result<Vec<PathBuf>>; // 同为浅层：遍树用显式工作表
     fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
+    fn size(&self, path: &Path) -> io::Result<u64>;             // 段长；index 比长度而不抬字节
     fn read_at(&self, path: &Path, offset: u64, len: u64) -> io::Result<Vec<u8>>;  // 定位读；短答＝文件到头
     fn append(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()>;
     fn truncate(&mut self, path: &Path, len: u64) -> io::Result<()>;
@@ -667,6 +686,16 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
 - **`FaultFs` 另记 `bytes_read`**：op 计数答「碰了几次盘」，字节计数答「抬回来多少」，而范围读与整读的唯一区别就是后者。`FaultFs::bytes_read()` 是范围读不整读这条断言的观测面。
 - **端口的符合性套件就是断电点阵**（§8-2）：两个适配器对同一组语义负责，`fault_fs` 存在本身就是这条缝的存在证明（§8.5 设计 A）。
 - **仍然不升真缝**：`pub(crate)`，`JsonlLedger` 把它藏在 `Box<dyn Vfs>` 后面，公开签名里一次不出现（否则 E0445）。
+- **谁在缝外，以及为什么（H-07）**：本 crate 的 `std::fs::` 命中集合恰好是以下三处，其余全部经 `Vfs`。
+  - `index::reader::OpenSegment`——按 seq 取单行时持住段句柄。`Vfs::read_at` 每次调用开一次文件，
+    那正是这个类型消掉的 734 µs／行（对 0.89 µs 顺走、5.82 µs 逆走，windows-x86_64 NVMe，五万条账本，2026-09-02）。
+    它只读不写，而缝要建模的是崩溃语义，对一次定位读无话可说。
+  - `worktree`——树由 git2 建、由 git2 prune，落盘不经本 crate；`release` 删残留目录同走 `std::fs`。
+    缝拦不住 git2，声称拦得住才是第二个权威。释放顺序与自愈见 §8-9。
+  - `checkpoint`——同样经 git2 提交与检出。
+  - `projection`——redb 自己持有那个文件；「读不动就删了重建」的那一次 `remove_file` 必须与它的 open 走同一层。
+  - **`index` 不在例外之列**：`LedgerIndex` 持 `Box<dyn Vfs>`（锁在 `Mutex` 后，因为 `persist(&self)` 要写盘而公共面是只读的），
+    段列举、段长、尾部增量读、cache 的读写删全部经缝，于是「cache 写到一半断电」第一次有机器面断言。
 
 ### 8-16 memory::real_fs（形状 4 适配器）
 

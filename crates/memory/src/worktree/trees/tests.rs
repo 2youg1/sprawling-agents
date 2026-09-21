@@ -78,6 +78,45 @@ fn one_node_holds_one_tree_and_the_second_claim_is_refused_by_name() {
     trees.claim(&name("node-1")).unwrap();
 }
 
+/// The ceiling asks how big the work is, and a city's own bookkeeping
+/// is not the work. A ledger far past the ceiling must not stop a node
+/// from getting a tree to put a one kilobyte edit in.
+#[test]
+fn the_city_s_own_bookkeeping_does_not_count_against_the_ceiling() {
+    let dir = tempfile::tempdir().unwrap();
+    let trees = city(dir.path());
+    let ledger = dir.path().join(kernel::RESERVED_PREFIX).join("ledger");
+    std::fs::create_dir_all(&ledger).unwrap();
+    let bulk = vec![b'x'; 4096];
+    std::fs::write(ledger.join("ledger-0.jsonl"), &bulk).unwrap();
+
+    let source = trees.repo.workdir().unwrap().to_path_buf();
+    let measured = super::measure(&source).unwrap();
+    assert!(
+        measured.get() < 4096,
+        "the ledger is not somebody's working tree: {} bytes",
+        measured.get()
+    );
+    trees.claim(&name("node-1")).unwrap();
+}
+
+/// A release interrupted between unregistering and deleting, or a
+/// person who deleted the directory by hand, used to lock the name for
+/// good: git still listed it, and `claim` had only one thing to say
+/// about a listed name.
+#[test]
+fn a_registered_tree_with_no_directory_is_taken_back_rather_than_locked_away() {
+    let dir = tempfile::tempdir().unwrap();
+    let trees = city(dir.path());
+    let lease = trees.claim(&name("node-1")).unwrap();
+    let path = lease.path().to_path_buf();
+    std::fs::remove_dir_all(&path).unwrap();
+    assert_eq!(trees.live().unwrap().len(), 1, "git still lists it");
+
+    let again = trees.claim(&name("node-1")).unwrap();
+    assert!(again.path().join("lab").join("notes.md").exists());
+}
+
 #[test]
 fn a_released_tree_takes_its_files_with_it() {
     let dir = tempfile::tempdir().unwrap();

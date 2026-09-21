@@ -194,7 +194,7 @@ replacement = "ALERT"
 
 [[entry]]
 banned = "报批"
-replacement = "Escalate"
+replacement = "Approval Inbox"
 
 [[entry]]
 banned = "全库 SKILL 清单"

@@ -386,7 +386,7 @@ title = \"a window\"
         },
         Command::Approve {
             item: kernel::ApprovalId::new("ap-1").unwrap(),
-            verdict: kernel::PolicyVerdict::Allow,
+            verdict: kernel::Ruling::Allow,
             idem,
         },
         Command::CreatePolicy {

@@ -70,17 +70,22 @@ fn a_key_in_tool_args_and_tool_result_never_reaches_the_ledger() {
     );
     let echoed = key.clone();
     let turn = advance(
-        turn.execute(Interrupt::None, &mut ledger, &mut move |_call| {
-            let mut result = serde_json::Map::new();
-            result.insert(
-                "stdout".to_owned(),
-                Value::String(format!("wrote OPENAI_API_KEY={echoed}")),
-            );
-            Ok(ToolOutcome {
-                result: Payload::new(result).unwrap(),
-                attachments: Vec::new(),
-            })
-        })
+        turn.execute(
+            Interrupt::None,
+            &mut ledger,
+            &mut move |_call| {
+                let mut result = serde_json::Map::new();
+                result.insert(
+                    "stdout".to_owned(),
+                    Value::String(format!("wrote OPENAI_API_KEY={echoed}")),
+                );
+                Ok(ToolOutcome {
+                    result: Payload::new(result).unwrap(),
+                    attachments: Vec::new(),
+                })
+            },
+            &mut |_| NextCall::Allowed,
+        )
         .unwrap(),
     );
     let PhaseOutcome::Advanced(report) = turn.record(Interrupt::None, &mut ledger).unwrap() else {
@@ -151,14 +156,19 @@ fn the_wave_result_block_keeps_what_the_ledger_drops() {
     );
     let echoed = key.clone();
     let turn = advance(
-        turn.execute(Interrupt::None, &mut ledger, &mut move |_call| {
-            let mut result = serde_json::Map::new();
-            result.insert("stdout".to_owned(), Value::String(echoed.clone()));
-            Ok(ToolOutcome {
-                result: Payload::new(result).unwrap(),
-                attachments: Vec::new(),
-            })
-        })
+        turn.execute(
+            Interrupt::None,
+            &mut ledger,
+            &mut move |_call| {
+                let mut result = serde_json::Map::new();
+                result.insert("stdout".to_owned(), Value::String(echoed.clone()));
+                Ok(ToolOutcome {
+                    result: Payload::new(result).unwrap(),
+                    attachments: Vec::new(),
+                })
+            },
+            &mut |_| NextCall::Allowed,
+        )
         .unwrap(),
     );
     let PhaseOutcome::Advanced(report) = turn.record(Interrupt::None, &mut ledger).unwrap() else {

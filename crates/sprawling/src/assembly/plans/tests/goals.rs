@@ -125,10 +125,13 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             effort: None,
         })
         .unwrap();
-    // Laying out a graph is a spawn like any other: the person is
-    // asked once, and their answer carries the whole graph.
-    let cluster = allow_the_one_pending_item(&mut worker);
-    assert_eq!(cluster.class, kernel::ApprovalClass::Delegation);
+    // Laying out a graph is a spawn like any other, and a spawn is
+    // nobody's to approve: how deep work may be handed down is a type,
+    // so the graph is laid out without anybody being asked.
+    assert!(
+        worker.governance.pending.is_empty(),
+        "a spawn is decided by the type, not by a person"
+    );
 
     for node in ["lab/reader", "lab/writer"] {
         assert!(

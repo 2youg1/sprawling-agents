@@ -7,9 +7,8 @@
 //! changes behavior and therefore requires EVAL evidence or an
 //! explicit ruling. Data only — zero branches by charter.
 //!
-//! All fifteen policy entries are landed; three of them carry a type
-//! rather than a plain number (kernel-SPEC 8-8): AUTONOMY_DEFAULT,
-//! CLOCK_STAMP_DEFAULT, SUBAGENT_CTX_LOCK_DEFAULT.
+//! Two entries carry a type rather than a plain number (kernel-SPEC
+//! 8-8): AUTONOMY_DEFAULT and CLOCK_STAMP_DEFAULT.
 
 /// Exact ratio as an integer pair: kernel decision paths never touch
 /// floats (determinism rule 6). Kept unreduced so the spelling mirrors the
@@ -63,11 +62,7 @@ pub const SECRET_ENTROPY_MIN: Ratio = Ratio { num: 7, den: 2 };
 
 pub const DISCARD_FILES_MAX: u32 = 16;
 
-pub const DISCARD_BYTES_MAX: u64 = 1_048_576;
-
 pub const DISCARD_RETENTION_DAYS: u32 = 30;
-
-pub const POLICY_IDLE_DAYS: u32 = 90;
 
 pub const CLOCK_ZONES_MAX: u32 = 4;
 
@@ -136,7 +131,10 @@ pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;
 pub const CLOCK_STAMP_DEFAULT: crate::config::ClockStampGranularity =
     crate::config::ClockStampGranularity::Off;
 
-/// The human answers by default; loosening is an explicit command.
+/// Who reads the Approval Inbox in a city nobody has configured: the
+/// person, because the inbox holds design questions and a design
+/// question is the kind a person wants. What a run may *do* is settled
+/// by the gates, which answer from the rules and never ask.
 pub const AUTONOMY_DEFAULT: crate::approval::Autonomy = crate::approval::Autonomy::Owner;
 
 /// Where a city listens when nobody says otherwise: the loopback
@@ -182,9 +180,7 @@ mod tests {
         assert_eq!(EDIT_WAR_FREEZE, 2);
         assert_eq!(SECRET_ENTROPY_MIN, Ratio { num: 7, den: 2 });
         assert_eq!(DISCARD_FILES_MAX, 16);
-        assert_eq!(DISCARD_BYTES_MAX, 1_048_576);
         assert_eq!(DISCARD_RETENTION_DAYS, 30);
-        assert_eq!(POLICY_IDLE_DAYS, 90);
         assert_eq!(CLOCK_ZONES_MAX, 4);
         assert_eq!(SANDBOX_FUEL_DEFAULT, 200_000_000);
         assert_eq!(IMAGE_MAX_BYTES, 2_097_152);

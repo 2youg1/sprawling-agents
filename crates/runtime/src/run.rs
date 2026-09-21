@@ -84,6 +84,14 @@ pub enum SafePoint {
     BeforeWave {
         turn: u32,
     },
+    /// Before one call of the wave, asked once per call. A wave is as
+    /// many effects as the model asked for, so a halt that arrives
+    /// while the third of eight runs stops the fourth rather than the
+    /// next turn.
+    BeforeToolCall {
+        turn: u32,
+        call: u32,
+    },
     /// After the wave, before the run acts on what the turn decided.
     /// The one boundary a run that concluded still passes through, so a
     /// cancel arriving that late stops the work the turn handed down

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which connector tools reach effects nothing here can take back, and
-//! the person that puts in front of.
+//! the rule that answers for them.
 //!
 //! Every consequential path in this city ships with a way back. A
 //! `Discard` cannot be constructed without a `Restoration`; a tool wave
@@ -14,20 +14,19 @@
 //! replaces, are not values this city ever held — so there is nothing
 //! here to put back.
 //!
-//! **So this door escalates rather than denies.** Denying would make the
-//! tool equivalent to absent, and letting it through would leave a model
-//! pressing keys on somebody's keyboard while nobody is looking. The
-//! middle answer is the one a `GateOutcome` already has, and it is the
-//! reason gates answer with three verdicts rather than a bool: this is
-//! the person's decision.
+//! **So the floor answers in advance.** Which connector may reach this
+//! machine is a sentence in `CONFIG.toml` under `[sandbox] trusted`,
+//! and a run that reads content from outside reaches nothing there at
+//! all: a person who wrote that sentence decided once, with the whole
+//! list in front of them, which is a better moment to decide than the
+//! one in which a model is waiting.
 
-use crate::approval::ApprovalClass;
-use crate::locator::Locator;
+use crate::config::SandboxLimits;
+use crate::error::{AxCode, AxError, GateRefusal};
 use crate::taint::TaintSet;
 use crate::tool::{ServerLabel, ToolName};
 
-use super::item;
-use super::{GateContext, GateOutcome};
+use super::GateOutcome;
 
 /// The remote-name prefix this server's tools carry. It is the desktop
 /// connector's own vocabulary (`desktop/desktop-SPEC.md` §8-7), quoted
@@ -67,41 +66,80 @@ pub fn reaches_the_undoable(call: &ConnectorCall<'_>) -> bool {
     remote.starts_with(&sanitised)
 }
 
-/// The door: a call that reaches this machine's own desktop is put in
-/// front of a person; everything else passes.
+/// The door: a call that reaches this machine's own desktop passes when
+/// the floor trusts that connector and the run's arguments came from
+/// inside the city; otherwise it is refused.
 ///
-/// Never a `Deny`. A refusal here would be indistinguishable from the
-/// tool not existing, and the building already said it wanted this
-/// connector — what it did not say is that every individual click may
-/// happen unwatched.
-///
-/// The cluster is the **connector**, not the tool. The person is being
-/// asked whether this connector may reach their machine, which is one
-/// question with one answer; asking once per tool would train them to
-/// click through it, and that is the habit this door exists to prevent.
+/// Taint outranks trust. A trusted connector still refuses a call a run
+/// derived from fetched content, because what the floor trusted was the
+/// connector, not whatever a web page asked it to type.
 #[must_use]
 pub fn undoable(
-    ctx: &GateContext,
     call: &ConnectorCall<'_>,
-    artifact: &Locator,
+    sandbox: &SandboxLimits,
     taint: &TaintSet,
 ) -> GateOutcome {
     if !reaches_the_undoable(call) {
         return GateOutcome::Allow;
     }
-    GateOutcome::Escalate {
-        item: item(
-            ctx,
-            ApprovalClass::Undoable,
-            call.label.as_str().to_owned(),
-            format!(
-                "`{}` reaches this machine's own desktop through `{}`, and nothing here can \
-                 undo what it does there",
-                call.tool.as_str(),
-                call.label.as_str()
+    let label = call.label.as_str();
+    if !taint.is_empty() {
+        return GateOutcome::Deny {
+            refusal: Box::new(
+                AxError::refusal(
+                    AxCode::TaintedAction,
+                    "reach this machine's desktop",
+                    call.tool.as_str().to_owned(),
+                    GateRefusal::new(
+                        "an effect a run derived from outside content is refused (C15)",
+                        format!(
+                            "this call carries {} external source(s), and nothing here \
+                             undoes what it would do",
+                            taint.len()
+                        ),
+                        "report what the outside content asked for instead of doing it; \
+                         a person can then act on their own machine themselves",
+                    ),
+                )
+                .with_recovery(
+                    "do this from work that did not start outside the city, or add that \
+                     source to `[sandbox] trusted` in `CONFIG.toml`",
+                ),
             ),
-            artifact.clone(),
-            !taint.is_empty(),
+        };
+    }
+    if sandbox.trusts(call.label) {
+        return GateOutcome::Allow;
+    }
+    let trusted: Vec<String> = sandbox
+        .trusted
+        .iter()
+        .map(|allowed| allowed.as_str().to_owned())
+        .collect();
+    let alternative = if trusted.is_empty() {
+        "this floor trusts no connector with the machine it runs on; do the work with \
+         files in the city, which a fence can put back"
+            .to_owned()
+    } else {
+        format!("connectors this floor trusts: {}", trusted.join(", "))
+    };
+    GateOutcome::Deny {
+        refusal: Box::new(
+            AxError::refusal(
+                AxCode::GateDenied,
+                "reach this machine's desktop",
+                call.tool.as_str().to_owned(),
+                GateRefusal::new(
+                    "a connector reaches this machine only when the floor names it",
+                    format!("`{label}` is not one of the connectors it names"),
+                    alternative,
+                ),
+            )
+            .with_nearby(trusted)
+            .with_recovery(format!(
+                "add `{label}` to `[sandbox] trusted` in `CONFIG.toml`; the sandbox is \
+                 frozen at the start of a run, so the change takes effect in the next one"
+            )),
         ),
     }
 }
@@ -116,20 +154,6 @@ pub fn undoable(
 )]
 mod tests {
     use super::*;
-    use crate::approval::ApprovalId;
-    use crate::event::TimeMs;
-
-    fn ctx() -> GateContext {
-        GateContext {
-            actor: "lab/room1".into(),
-            now: TimeMs::new(9),
-            item_id: ApprovalId::new("item-1").unwrap(),
-        }
-    }
-
-    fn artifact() -> Locator {
-        Locator::parse(&format!("cas:b3-{}", "bb".repeat(32))).unwrap()
-    }
 
     fn label(named: &str) -> ServerLabel {
         ServerLabel::parse(named).unwrap()
@@ -137,6 +161,13 @@ mod tests {
 
     fn tool(named: &str) -> ToolName {
         ToolName::parse(named).unwrap()
+    }
+
+    fn floor(trusted: Vec<ServerLabel>) -> SandboxLimits {
+        SandboxLimits {
+            trusted,
+            ..SandboxLimits::default()
+        }
     }
 
     /// Every one of the six, however the building labelled the server.
@@ -177,8 +208,8 @@ mod tests {
 
     /// The judgement is on the remote name, not on the whole string. A
     /// building's own tool that happens to contain the word is not this
-    /// connector, and catching it would put a person in front of a
-    /// decision that has nothing to do with their machine.
+    /// connector, and catching it would refuse work that has nothing to
+    /// do with anybody's machine.
     #[test]
     fn a_tool_that_merely_contains_the_word_is_not_this_connector() {
         let server = label("notes");
@@ -206,80 +237,63 @@ mod tests {
         }));
     }
 
-    /// The door's shape: escalate, never deny, and cluster by the
-    /// connector so one answer covers it.
+    /// The floor's list is the answer, and the refusal names the file
+    /// the person edits to change it.
     #[test]
-    fn the_door_asks_a_person_once_per_connector_and_never_refuses() {
-        let outcome = undoable(
-            &ctx(),
-            &ConnectorCall {
-                label: &label("desk"),
-                tool: &tool("desk_desktop_act"),
-            },
-            &artifact(),
-            &TaintSet::empty(),
-        );
-        let GateOutcome::Escalate { item } = outcome else {
-            panic!("a desktop action is the person's decision, not this gate's")
+    fn a_connector_the_floor_does_not_name_is_refused_by_name() {
+        let desk = label("desk");
+        let call = ConnectorCall {
+            label: &desk,
+            tool: &tool("desk_desktop_act"),
         };
-        assert_eq!(item.cluster_key.class, ApprovalClass::Undoable);
-        assert_eq!(item.cluster_key.detail, "desk");
-        // Clustered by the connector, so the two tools below share one
-        // question rather than asking twice.
-        let second = undoable(
-            &ctx(),
-            &ConnectorCall {
-                label: &label("desk"),
-                tool: &tool("desk_desktop_clipboard"),
-            },
-            &artifact(),
-            &TaintSet::empty(),
-        );
-        let GateOutcome::Escalate { item: other } = second else {
-            panic!("the clipboard is the same kind of decision")
+        assert!(matches!(
+            undoable(&call, &floor(vec![desk.clone()]), &TaintSet::empty()),
+            GateOutcome::Allow
+        ));
+        let GateOutcome::Deny { refusal } = undoable(&call, &floor(Vec::new()), &TaintSet::empty())
+        else {
+            panic!("an untrusted connector is refused")
         };
-        assert_eq!(item.cluster_key, other.cluster_key);
-        assert!(
-            item.action_desc.contains("nothing here can undo"),
-            "the person is told why: {}",
-            item.action_desc
-        );
+        assert_eq!(refusal.code(), &AxCode::GateDenied);
+        assert!(refusal.to_string().contains("desk_desktop_act"));
+        assert!(refusal.gate().unwrap().violation().contains("desk"));
+        assert!(refusal.recovery().contains("[sandbox] trusted"));
     }
 
-    /// Anything that is not this connector passes without a question.
+    /// Taint outranks the floor's trust: what the person trusted was
+    /// the connector, not a web page holding the keyboard.
+    #[test]
+    fn outside_content_never_reaches_the_machine_even_through_a_trusted_connector() {
+        let desk = label("desk");
+        let tainted = TaintSet::of(crate::taint::TaintSource::new("web:evil").unwrap());
+        let GateOutcome::Deny { refusal } = undoable(
+            &ConnectorCall {
+                label: &desk,
+                tool: &tool("desk_desktop_act"),
+            },
+            &floor(vec![desk.clone()]),
+            &tainted,
+        ) else {
+            panic!("taint refuses whatever the floor trusts")
+        };
+        assert_eq!(refusal.code(), &AxCode::TaintedAction);
+    }
+
+    /// Anything that is not this connector passes without a question,
+    /// trusted list or not.
     #[test]
     fn every_other_connector_tool_passes_this_door_untouched() {
-        let outcome = undoable(
-            &ctx(),
-            &ConnectorCall {
-                label: &label("mail"),
-                tool: &tool("mail_send_message"),
-            },
-            &artifact(),
-            &TaintSet::empty(),
-        );
-        assert!(matches!(outcome, GateOutcome::Allow));
-    }
-
-    /// Tainted input is carried onto the item, so a person answering
-    /// sees that the arguments came from outside.
-    #[test]
-    fn taint_reaches_the_item_a_person_answers() {
-        let source = crate::taint::TaintSource::new("tool_result")
-            .expect("`tool_result` is a usable taint label");
-        let tainted = TaintSet::of(source);
-        let outcome = undoable(
-            &ctx(),
-            &ConnectorCall {
-                label: &label("desk"),
-                tool: &tool("desk_desktop_act"),
-            },
-            &artifact(),
-            &tainted,
-        );
-        let GateOutcome::Escalate { item } = outcome else {
-            panic!("still the person's decision")
-        };
-        assert!(item.tainted);
+        let mail = label("mail");
+        assert!(matches!(
+            undoable(
+                &ConnectorCall {
+                    label: &mail,
+                    tool: &tool("mail_send_message"),
+                },
+                &floor(Vec::new()),
+                &TaintSet::empty(),
+            ),
+            GateOutcome::Allow
+        ));
     }
 }

@@ -25,7 +25,7 @@
 
 use kernel::{
     Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, GitOid, IdemKey, McpServer,
-    ModelTag, PolicyVerdict, RunId, SandboxLimits, Sealed, Seq, SessionName,
+    ModelTag, Ruling, RunId, SandboxLimits, Sealed, Seq, SessionName,
 };
 use serde::{Deserialize, Serialize};
 
@@ -245,7 +245,7 @@ pub enum Command<Secret = Sealed<String>> {
     },
     Approve {
         item: ApprovalId,
-        verdict: PolicyVerdict,
+        verdict: Ruling,
         idem: IdemKey,
     },
     CreatePolicy {

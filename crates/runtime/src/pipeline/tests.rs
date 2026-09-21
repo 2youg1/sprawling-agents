@@ -36,10 +36,10 @@ fn small_results_pass_intact_with_zero_envelope_bytes() {
 
 #[test]
 fn oversized_but_small_results_truncate_without_storing() {
-    let big = "y".repeat(2_000);
-    let out = package(big.as_bytes(), no_offload(100)).unwrap();
-    assert!(out.content.starts_with("yyyy"));
-    assert!(out.content.contains("[truncated: 1900 bytes]"));
+    let prose = "The first sentence says what this result is about. ".repeat(40);
+    let out = package(prose.as_bytes(), no_offload(100)).unwrap();
+    assert!(out.content.starts_with("The first sentence"));
+    assert!(out.content.contains("[truncated: "));
     assert!(
         out.events.is_empty(),
         "invariant 3: lossy-without-restore stores nothing"
@@ -67,20 +67,52 @@ fn a_log_keeps_the_end_a_reader_needs_rather_than_the_beginning() {
     );
 }
 
+/// A result that cannot be shortened and has nowhere to go is refused,
+/// rather than cut on a byte and handed to the model looking whole.
+///
+/// The byte cut this replaces produced `{"rows":[1,1,1,[truncated: N
+/// bytes]`, which parses as nothing and reads as a document.
 #[test]
-fn structured_content_is_never_cut_in_half_by_the_shortener() {
-    // Compaction declines on JSON, so with no site to offload to the
-    // byte cut is what is left - but it is said out loud, and the
-    // marker is what tells a reader this is not a document.
+fn structured_content_with_nowhere_to_go_is_refused_rather_than_cut() {
     let json = format!("{{\"rows\":[{}]}}", "1,".repeat(500));
-    let out = package(json.as_bytes(), no_offload(100)).unwrap();
-    assert_eq!(
-        out.content.matches("[truncated:").count(),
-        1,
-        "the cut is one trailing marker, not a gap opened inside the object: {}",
-        out.content
+    let Err(refused) = package(json.as_bytes(), no_offload(100)) else {
+        panic!("a structured result with nowhere to go is refused");
+    };
+    assert_eq!(refused.code(), &kernel::AxCode::InvalidArgs);
+    assert!(
+        refused.recovery().contains("smaller part"),
+        "the refusal says what to do instead: {}",
+        refused.recovery()
     );
-    assert!(out.content.starts_with("{\"rows\":[1,"));
+}
+
+/// Binary is material nothing can read the shape of, so it takes the
+/// same road as structured data: whole into the store, or refused.
+#[test]
+fn bytes_that_are_not_text_are_stored_whole_rather_than_cut() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut cas = Cas::open(&dir.path().join("cas")).unwrap();
+    let env = dir.path().join("env");
+    std::fs::create_dir_all(&env).unwrap();
+    let binary = vec![0xffu8; 9_000];
+    let out = package(
+        &binary,
+        PackContext {
+            cap_bytes: 1_024,
+            stamp: None,
+            net_notice: false,
+            steer: None,
+            reminder: None,
+            offload: Some(OffloadSite {
+                cas: &mut cas,
+                environment: &env,
+            }),
+            sieve: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(out.events.len(), 1, "it left the window whole");
+    assert!(package(&binary, no_offload(1_024)).is_err());
 }
 
 #[test]

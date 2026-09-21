@@ -14,6 +14,8 @@ mod vfs;
 
 mod real_fs;
 
+mod reserved;
+
 mod jsonl;
 
 pub use jsonl::WriteObserver;

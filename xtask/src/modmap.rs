@@ -12,10 +12,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use crate::architecture::{self, Numbered};
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-const ARCH: &str = "ARCHITECTURE.md";
+use architecture::PATH as ARCH;
+
+/// The section the module table is written in. Read through
+/// `architecture` so that a row is recognised by where it sits rather
+/// than by having seven cells wherever somebody wrote it.
+const MODULE_SECTION: u32 = 12;
 /// The status column, in the language the table is written in. It moved
 /// from Chinese to English when the module table became part of what the
 /// repository publishes: a reader of `ARCHITECTURE.md` should not have to
@@ -57,11 +63,24 @@ pub(crate) struct Anchor {
     pub(crate) line: usize,
 }
 
+/// The module table's lines, each with the number it has in the
+/// document.
+///
+/// # Errors
+/// When the document has no module map: a gate whose authority has moved
+/// says so rather than reporting every file in the tree as unregistered.
+fn module_map(text: &str) -> Result<Vec<Numbered<'_>>, XtaskError> {
+    architecture::section(text, MODULE_SECTION).ok_or_else(|| XtaskError::Doc {
+        file: ARCH.to_owned(),
+        msg: format!("no `## {MODULE_SECTION}` section, which is where the module table lives"),
+    })
+}
+
 /// Every registered module's `Spec` cell, in table order.
 pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
     let text = walk::read_text(&root.join(ARCH))?;
     let mut ignored = Vec::new();
-    Ok(parse_rows(&text, &mut ignored)
+    Ok(parse_rows(&module_map(&text)?, &mut ignored)
         .into_iter()
         .map(|row| Anchor {
             module: row.module,
@@ -80,7 +99,7 @@ pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
 pub(crate) fn shapes(root: &Path) -> Result<BTreeMap<String, String>, XtaskError> {
     let text = walk::read_text(&root.join(ARCH))?;
     let mut ignored = Vec::new();
-    Ok(parse_rows(&text, &mut ignored)
+    Ok(parse_rows(&module_map(&text)?, &mut ignored)
         .into_iter()
         .map(|row| (row.path, row.shape))
         .collect())
@@ -88,8 +107,9 @@ pub(crate) fn shapes(root: &Path) -> Result<BTreeMap<String, String>, XtaskError
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let text = walk::read_text(&root.join(ARCH))?;
+    let map = module_map(&text)?;
     let mut violations = Vec::new();
-    let rows = parse_rows(&text, &mut violations);
+    let rows = parse_rows(&map, &mut violations);
 
     let table: BTreeMap<&str, &Row> = rows.iter().map(|row| (row.path.as_str(), row)).collect();
     // Directories that hold registered modules; `<dir>.rs` is then an index file.
@@ -137,7 +157,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         }
     }
 
-    check_counts(&text, &rows, &mut violations);
+    check_counts(&map, &rows, &mut violations);
 
     for row in &rows {
         if row.status != STATUS_PLANNED && !on_disk.contains(&row.path) {
@@ -161,11 +181,11 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 /// and card checklists (not pipe rows) never match (xtask-SPEC.md section 10-2).
 /// The seventh cell is `Spec`; it sits last so the shape and status
 /// positions do not move.
-fn parse_rows(text: &str, violations: &mut Vec<Violation>) -> Vec<Row> {
+fn parse_rows(map: &[Numbered], violations: &mut Vec<Violation>) -> Vec<Row> {
     let mut rows = Vec::new();
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
-    for (index, line) in text.lines().enumerate() {
-        let line_no = index.saturating_add(1);
+    for numbered in map {
+        let (line_no, line) = (numbered.line, numbered.text);
         if !line.trim_start().starts_with('|') {
             continue;
         }
@@ -253,27 +273,15 @@ fn counted_crates(heading: &str) -> Vec<(String, usize)> {
 /// (xtask-SPEC.md section 8-10). `desktop` is out of the parser's reach —
 /// its rows carry `desktop/` paths, which `parse_rows` does not admit —
 /// so its heading is not judged here.
-fn check_counts(text: &str, rows: &[Row], violations: &mut Vec<Violation>) {
+fn check_counts(map: &[Numbered], rows: &[Row], violations: &mut Vec<Violation>) {
     let mut heading: Option<(usize, String)> = None;
-    let mut in_map = false;
     let mut sections: Vec<(usize, usize, String)> = Vec::new();
-    for (index, line) in text.lines().enumerate() {
-        let line_no = index.saturating_add(1);
-        if line.starts_with("## ") {
-            in_map = line.starts_with("## 12 ");
-            if let Some((at, title)) = heading.take() {
-                sections.push((at, line_no, title));
-            }
-            continue;
-        }
-        if !in_map {
-            continue;
-        }
-        if let Some(title) = line.strip_prefix("### ") {
+    for numbered in map {
+        if let Some(title) = numbered.text.strip_prefix("### ") {
             if let Some((at, previous)) = heading.take() {
-                sections.push((at, line_no, previous));
+                sections.push((at, numbered.line, previous));
             }
-            heading = Some((line_no, title.to_owned()));
+            heading = Some((numbered.line, title.to_owned()));
         }
     }
     if let Some((at, title)) = heading {
@@ -339,58 +347,4 @@ fn check_index_content(
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
-mod tests {
-    use super::*;
-
-    const MODULE_ROW: &str = "| kernel::gate | crates/kernel/src/gate.rs | five gates | \
-         decision | S2 | planned | kernel-SPEC.md#8-27 |";
-    const SEAM_ROW: &str =
-        "| kernel::ledger | crates/kernel/src/ledger.rs | memory jsonl | citysim |";
-
-    #[test]
-    fn module_row_parses_and_seam_row_is_ignored() {
-        let mut v = Vec::new();
-        let rows = parse_rows(&format!("{MODULE_ROW}\n{SEAM_ROW}\n"), &mut v);
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].path, "crates/kernel/src/gate.rs");
-        assert!(v.is_empty());
-    }
-
-    #[test]
-    fn bad_status_and_duplicate_are_violations() {
-        let bad = "| kernel::gate | crates/kernel/src/gate.rs | x | 8.2 | S2 | done | s.md#8-1 |";
-        let mut v = Vec::new();
-        let rows = parse_rows(&format!("{bad}\n{MODULE_ROW}\n{MODULE_ROW}\n"), &mut v);
-        assert_eq!(rows.len(), 1);
-        assert_eq!(v.len(), 2);
-    }
-
-    #[test]
-    fn a_heading_states_one_count_per_crate_it_lists() {
-        let one = counted_crates("kernel (73) — every decision in the city");
-        assert_eq!(one, vec![("kernel".to_owned(), 73)]);
-        let three = counted_crates("browser (6), protocol (5), bin (111)");
-        assert_eq!(three.len(), 3);
-        assert_eq!(three.get(2), Some(&("bin".to_owned(), 111)));
-        assert!(counted_crates("The performance register").is_empty());
-    }
-
-    #[test]
-    fn a_stale_count_is_a_violation() {
-        let text = format!("## 12 Module map\n\n### kernel (9)\n\n{MODULE_ROW}\n");
-        let mut ignored = Vec::new();
-        let rows = parse_rows(&text, &mut ignored);
-        let mut violations = Vec::new();
-        check_counts(&text, &rows, &mut violations);
-        assert_eq!(violations.len(), 1);
-        assert!(violations[0].alternative.contains("kernel (1)"));
-    }
-
-    #[test]
-    fn index_name_requires_registered_children() {
-        let dirs: BTreeSet<String> = ["crates/runtime/src/tools".to_owned()].into();
-        assert!(is_index_name("crates/runtime/src/tools.rs", &dirs));
-        assert!(is_index_name("crates/kernel/src/lib.rs", &dirs));
-        assert!(!is_index_name("crates/kernel/src/util.rs", &dirs));
-    }
-}
+mod tests;

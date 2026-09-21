@@ -67,6 +67,7 @@ impl RunWorker {
         };
         self.ledger.append(draft)?;
         self.governance.absorb(kind, RunId::CITY, None, &data);
+        self.expiries.absorb(kind, &data);
         self.book.apply_payload(kind, &data)
     }
 

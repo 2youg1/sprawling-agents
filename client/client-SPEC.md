@@ -96,7 +96,12 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
 - **4-25 base URL 的形状只拼写一次。** `setup/providers.tsx` 的 `BASE_URL` 同时喂两个读者：框子自己的 `pattern`（浏览器在人还在填表时判，失焦后才红）与 `hostOf`（「看看」和「接上」两个控件的开关）。**`type="url"` 不是那条规则**——它收 `mailto:somebody` 和任何别的 scheme，于是一个这张表单会拒的值可以坐在一个浏览器称为合法的框里，而人是按下一个始终发灰、不说为什么的控件才知道的。形状是：scheme、ASCII 主机、可选端口、可选路径，之后什么都不许有；查询串拒掉，因为供应方陈述的是 API 的根，每个 face 自己在后面挂路径。**登记一条今天的事实**：`gateway::normalise_entered`（叶 1.2）在 attach／probe 路径上没有调用者——`assembly/credentials/endpoints.rs::endpoint_of` 原样存下 `base_url`——所以客户端这条形状规则是今天唯一在生效的那条，等 `normalise_entered` 接上以后，本条必须改写成「客户端只做最宽的判断，永不比城更严」。
 
 - **4-26 「这次调用算哪一类」在客户端只有一张表，而那张表是替身。** `views/talk/trace.ts` 把工具名读成 `Deed`（`explored`／`wrote`／`ran`／`other`），对话页的折叠摘要与制品面板两个读者都问它，所以客户端内部没有第二张表。**权威不在这里**：`kernel::ToolMeta` 为每个注册工具声明了 `effect`（`Read`／`Write`／`Egress`／`Connector`／`Spawn`／`Govern`／`Spend`）与 `render`（`Generic`／`Terminal`／`Diff { locations }`），`runtime/src/tools/exec.rs:99` 的 `RenderIntent::Terminal` 与 `edit.rs:101` 的 `RenderIntent::Diff` 正是制品面板要分的那两半；两个字段今天都不上 wire（`RoundsAnswer` 的 `Call` 只有 `tool`／`subject`／`arguments`／`outcome`／`at`／`output`）。**迁移一次做完**：`Call` 增补 `effect` 与 `render`、`WIRE_V` 随之进位、`trace.ts` 的 `DEEDS` 与 `deedOf` 删除、两个读者改问新字段。在那之前每加一个工具，这张表与工具注册处会各自演化一次，而只有注册处是对的。`parts/code.tsx` 的行号从 1 起算同属这笔债：`Output` 只带 `head` 与 `cut`，不带这段头部在文件里从第几行开始，所以「第 27 行」今天指的是这段输出的第 27 行。
-- **4-27 对话页的第二栏由账本决定要不要画，由容器宽度决定画在哪。** `talk.tsx` 问的 `Query::Rounds` 与 `Thread` 问的是同一句，`core/asking.ts` 按内容合并，因此「现在显示的是哪个 run」只有一个答案；面板不占路由，理由是一条新路由会让这个答案有第二处判定，而两处判定第一次分歧就发生在有人打开别人发来的链接时。**断点问 `main`（具名容器 `page`）而不是问窗口**：左栏钉开时吃掉 232px，按窗口宽算会在 1440px 把两栏挤坏，所以 `@lg/page:`（820px）转成两栏、`@wide/page:`（1120px）让面板长到 `max-w-measure`。**开合状态今天只活一次会话**：它是人的偏好，该住 `~/.sprawling/config.toml` 的 `[ui]`（C 章 3.1），而 `core/prefs.ts` 是本客户端通往浏览器存储的唯一一扇门（设计 3.6 的闸）；3.1 落地前既不在 `talk.tsx` 里开第二扇门，也不假装它持久，于是刷新后面板回到默认展开。
+- **4-27 对话页的第二栏由账本决定要不要画，由容器宽度决定画在哪。** `talk.tsx` 问的 `Query::Rounds` 与 `Thread` 问的是同一句，`core/asking.ts` 按内容合并，因此「现在显示的是哪个 run」只有一个答案；面板不占路由，理由是一条新路由会让这个答案有第二处判定，而两处判定第一次分歧就发生在有人打开别人发来的链接时。**断点问 `main`（具名容器 `page`）而不是问窗口**：左栏钉开时吃掉 232px，按窗口宽算会在 1440px 把两栏挤坏，所以 `@lg/page:`（820px）转成两栏、`@wide/page:`（1120px）让面板长到 `max-w-measure`。**开合状态今天只活一次会话**：它是人的偏好，该住 `~/.sprawling/config.toml` 的 `[ui]`（C 章 3.1），而 `core/prefs.ts` 是本客户端一切偏好的唯一一扇门、`core/rows.ts` 是它底下通往浏览器存储的唯一一处触碰；3.1 落地前既不在 `talk.tsx` 里开第二扇门，也不假装它持久，于是刷新后面板回到默认展开。
+
+- **4-28 强度只有一个权威，客户端不留副本。** 城层 `CONFIG.toml` 的 `[model] effort` 经配置梯子冻结进每一次 run（`crates/city/src/config_layers.rs`），所以浏览器里不再存 `sprawling.effort` 这一行。**缺席不是 `"medium"`，缺席是不说**：帧里不写这个字段，城的文件回答；文件也没写时供应方回答，而 `Effort::None` 是「尽量不要想」，是另一件事。一次派活仍可为它开的那一场单独说一个档位（`Dispatch.effort`，城把它写进房间层，city-SPEC 8-14），所以选择器只在 composer 上——那里的作用域与控件的位置一致。**设置页与欢迎页因此不再有强度选择器**：它们承诺的是「从此以后」，而这一版既读不到 `Query::Config`（路线图 3.3）也没有写城层强度的命令帧，一个刷新就忘的设置控件是第二个权威的开始。六句 `effort_note_*` 随选择器搬到 composer 的那一列，做每一格的 `hint`，人在决定的那一刻读到它。
+- **4-29 偏好是一个记录加一扇门。** `core/prefs.ts` 独家拥有每一个存储键的拼写（`ROWS`）与读写，`core/rows.ts` 独家拥有那次对 `localStorage` 的触碰；`keys.ts` 问 `chord(action)`／`setChord`，外观屏问 `held().appearance`／`setAppearance`，网络屏问 `held().proxying`，没有第二处拼一个键名。**门上是五个具名改动而不是一个 `write(record)`**：城接手这些值的那天，每个具名改动各自变成一条命令，而交出整条记录的调用点届时要重写。`Preferences` 这个记录的形状就是将来 `PreferencesAnswer` 的形状（路线图 3.14 的 `[ui]` 与 `[ui.appearance]`），所以那一天改的是这个文件，不是任何一个视图。
+- **4-30 设置页的 `config.toml` 侧栏引用文件，不自己拼。** 原先这一栏用 `[model_providers.<name>]` 拼出一段文字，而城自己的读法只认 `[model]`／`[sandbox]`／`[[mcp]]` 三节——把它抄进 `CONFIG.toml` 的人会拿到一句列出三节的拒绝，一个事实在前端与后端各有一个家且已经分歧。这一版把那段字符串删掉，侧栏只说「这里还读不到城的 config.toml」（`setup_toml_unread`）。填进去的是 `Query::Config { addr }`（路线图 3.3）的答案，它必须带上每个值来自梯子的哪一层，否则页面只能重新猜一遍。
+- **4-31 设置页没有 MCP 组，skills 组是「列表 ＋ 只读源文」。** MCP 组原是一个指向 `#/mcp` 的链接，而左栏已经到得了那一页，所以它是一层什么都不做的中转，删掉。skills 组由 `setup/skills.tsx` 承担三件：放技能的文件夹（欢迎页共用这一件）、楼列（`shared/buildings.tsx`，与 `#/mcp` 同一份）、那栋楼两个书架的清单（`Query::Skills`）与打开一条后的原文（`Query::Document`，走楼页那一个 `FileView`）。**这里没有编辑器，因为城没有那扇门**：library 在保留前缀下，居民可读不可放（`crates/city/src/library.rs`），写门 `Command::PutShelved`（路线图 3.8）还不存在，一个存不下去的 `<textarea>` 会把「改了」说成两件事。
 
 ## 5 `src/core/`（形状按 ARCHITECTURE §9）
 
@@ -112,18 +117,19 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
 | `speaking.ts` | 4 适配器 | `canRecord()`, `record(origin) -> Promise<Recording \| null>`；`Recording.stop() -> Promise<Heard>`，`Heard` 穷尽（text／refused／silent） |
 | `idem.ts` | 2 值 | `mintIdem()` |
 | `mark.ts` | 4 适配器 | `paintMark(document, quiet \| live \| waiting)`：把令牌解算成引擎实际会画的颜色，拼成 SVG data URL 写进 `<link rel="icon">`；零颜色字面量 |
-| `prefs.ts` | 6 数据 | `loadPrefs(storage, browserLang) -> { lang, effort, welcomed, draft(at), setDraft(at, text) }`（localStorage，草稿键 `sprawling.draft.<房间或 run>`） |
+| `rows.ts` | 4 适配器 | `Rows { getItem, setItem, removeItem }`、`memory()`、`browserRows()`：浏览器存储那一扇门，三处会抛的拒绝（禁用存储、配额为零、写时配额满）在这里各变成一个值 |
+| `prefs.ts` | 6 数据 | `Preferences { lang, welcomed, panel, appearance, proxying }`、`PreferenceDoor { held, setLang, setWelcomed, setPanel, setAppearance, setProxying, chord(action), setChord, draft(at), setDraft }`、`loadPreferences(rows, browserLang)`、`preferences()`；**全客户端每一个存储键的拼写都只在这个文件的 `ROWS` 里**（草稿键 `sprawling.draft.<房间或 run>`、快捷键 `sprawling.key.<action>`） |
 | `prose.ts` | 1 判定 | `blocks(text) -> Block[]`, `inline(text) -> Inline[]`：Markdown 读成数据，永不 innerHTML |
 | `route.ts` | 1 判定 | 见 §3-2 |
 | `time.ts` | 1 判定 | `ago`, `clock`, `count`, `usd`, `kib` |
 
-`src/ui.tsx` 是视图拿到的一切：`UiProvider`／`useUi`（conn、prefs、bar、origin、now）、`useSay`（键→词，填槽）、`useGo`、`useCommand`、`useHearing`。
+`src/ui.tsx` 是视图拿到的一切：`UiProvider`／`useUi`（conn、prefs、effort、chooseEffort、bar、origin、now）、`useSay`（键→词，填槽）、`useGo`、`useCommand`、`useHearing`。
 
 ## 6 视图（免 SPEC，列出以便定位）
 
-`views/parts/tip.tsx` 提示（见设计 4-18）；`views/parts/code.tsx` 只读代码视图（面包屑＋行号＋词法着色，见设计 4-26）；`views/rail.tsx` 左栏；`views/talk.tsx` ＋ `talk/{thread,calls,composer,waiting}.tsx` 对话 ＋ `talk/artifact.tsx` 制品面板 ＋ `talk/trace.ts`（工具调用的分类，两个读者共用，见设计 4-26）；`views/city.tsx` ＋ `city/{bar,panel,skyline,marks}.tsx` ＋ `city/shape.ts`（超椭圆路径）；`views/registry.tsx`（`Query::RegistryView`：这座城决定留下来的东西，一行一件，见设计 4-24）；`views/building.tsx` ＋ `building/{tree,commits}.tsx`；`views/changes.tsx`（`Changes`／`Hunks` 的一份读法，run 页与楼页共用）；`views/run.tsx`；`views/setup.tsx` ＋ `setup/{providers,models}.tsx`；`views/machine.tsx`（doctor 的答）；`views/desktop.tsx`（一栋楼的桌面白名单）；`views/mcp.tsx`；`views/welcome.tsx`；`views/record.tsx`；`views/cost.tsx`；`views/palette.tsx`；`views/refusal.tsx`；`views/prose.tsx`；`views/gallery.tsx`。
+`views/parts/tip.tsx` 提示（见设计 4-18）；`views/parts/code.tsx` 只读代码视图（面包屑＋行号＋词法着色，见设计 4-26）；`views/rail.tsx` 左栏；`views/talk.tsx` ＋ `talk/{thread,calls,composer,waiting}.tsx` 对话 ＋ `talk/artifact.tsx` 制品面板 ＋ `talk/trace.ts`（工具调用的分类，两个读者共用，见设计 4-26）；`views/city.tsx` ＋ `city/{bar,panel,skyline,marks}.tsx` ＋ `city/shape.ts`（超椭圆路径）；`views/registry.tsx`（`Query::RegistryView`：这座城决定留下来的东西，一行一件，见设计 4-24）；`views/building.tsx` ＋ `building/{tree,commits}.tsx`；`views/changes.tsx`（`Changes`／`Hunks` 的一份读法，run 页与楼页共用）；`views/run.tsx`；`views/setup.tsx` ＋ `setup/{providers,models,skills,appearance,keys}.tsx`（skills 组见设计 4-31）；`views/shared/{provider,effort,buildings}.tsx`（欢迎页与设置页共用的三件，`buildings.tsx` 的第二个座位是 `#/mcp`）；`views/machine.tsx`（doctor 的答）；`views/desktop.tsx`（一栋楼的桌面白名单）；`views/mcp.tsx`；`views/welcome.tsx`；`views/record.tsx`；`views/cost.tsx`；`views/palette.tsx`；`views/refusal.tsx`；`views/prose.tsx`；`views/gallery.tsx`。
 
-**`#/gallery` 是一条路由而不是一个构建开关**，因为量它的那道门应当打开一个人真正跑的 bundle；夹具不需要城（`prefs` 走 localStorage）。每个能进入多种状态的屏幕在那里各有一份夹具，`cargo xtask render` 打开真引擎读它。
+**`#/gallery` 是一条路由而不是一个构建开关**，因为量它的那道门应当打开一个人真正跑的 bundle；夹具不需要城（偏好走 `core/rows.ts` 那扇门，没有 localStorage 时是一张只活一次会话的表）。每个能进入多种状态的屏幕在那里各有一份夹具，`cargo xtask render` 打开真引擎读它。
 
 **左栏是覆盖而不是推挤**：外层 `<div>` 只在钉开（`[`）时取 `w-rail-open`，`<nav>` 绝对定位、hover 时自宽并加投影；正文的左边因此不随指针越过左缘而重排。
 
@@ -268,7 +274,7 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
 
 ## 8 验收
 
-`bun run lint`、`bun run typecheck`、`bun run test`（29 条）三样绿，`cargo xtask npm`、`cargo xtask wire-ts`、`cargo xtask color`、`cargo xtask wording`、`cargo xtask render` 绿；`just check-client` 是这三条脚本的一条线。
+`bun run lint`、`bun run typecheck`、`bun run test`（83 条）三样绿，`cargo xtask npm`、`cargo xtask wire-ts`、`cargo xtask color`、`cargo xtask wording`、`cargo xtask render` 绿；`just check-client` 是这三条脚本的一条线。
 
 在一座真城加一个说 OpenAI 形的假供应方上走得通的：连接与握手、引导五步、从 composer 派活、工具调用折叠、Markdown 回复、结局分隔线、城市绘图、目录树与文件原文、run 页四透镜、记录三透镜、成本页、设置页 attach 与 select、`#/mcp` 三扇门加删（写进 `CONFIG.toml`）、楼页提交列表与 session 跳转、左栏展开、草稿留存。
 

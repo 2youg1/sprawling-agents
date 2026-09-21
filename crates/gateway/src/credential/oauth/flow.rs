@@ -18,6 +18,7 @@ pub fn oauth_begin(
     code_verifier: String,
     state: String,
 ) -> Result<OauthPending, AxError> {
+    let redirect_uri = redirect_of(profile)?;
     if profile.auth_endpoint.is_empty()
         || profile.token_endpoint.is_empty()
         || profile.client_id.is_empty()
@@ -64,7 +65,7 @@ pub fn oauth_begin(
         "{}?code=true&client_id={}&response_type=code&redirect_uri={}&scope={}&code_challenge={}&code_challenge_method=S256&state={}",
         profile.auth_endpoint,
         percent_encode(profile.client_id),
-        percent_encode(profile.redirect_uri),
+        percent_encode(redirect_uri),
         percent_encode(&scope),
         challenge,
         percent_encode(&state),
@@ -241,7 +242,7 @@ pub fn oauth_redeem_request(
     let body = serde_json::json!({
         "grant_type": "authorization_code",
         "code": redeemed_code(code, pending)?,
-        "redirect_uri": profile.redirect_uri,
+        "redirect_uri": redirect_of(profile)?,
         "client_id": profile.client_id,
         "code_verifier": pending.code_verifier.as_str(),
         "state": pending.state,
@@ -250,6 +251,28 @@ pub fn oauth_redeem_request(
         url: profile.token_endpoint.to_owned(),
         body: body.to_string(),
     })
+}
+
+/// Where the vendor sends the person back, for a family that signs in
+/// by browser redirect.
+///
+/// # Errors
+/// `E_CONFIG_INVALID` naming the grant a family does answer, because a
+/// device-code login driven down the redirect path would print a URL
+/// that asks the vendor for a callback it never promised.
+fn redirect_of(profile: &crate::oauth_profiles::OauthProfile) -> Result<&'static str, AxError> {
+    match profile.grant {
+        crate::oauth_profiles::Grant::AuthorizationCode { redirect_uri } => Ok(redirect_uri),
+        crate::oauth_profiles::Grant::DeviceCode { .. } => Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "begin oauth",
+            format!("{} signs in by device code", profile.provider),
+        )
+        .with_recovery(
+            "sign in to this subscription with a device code, or attach this provider \
+             with an API key",
+        )),
+    }
 }
 
 pub(crate) fn degraded_payload(reason: &str) -> Option<Payload> {

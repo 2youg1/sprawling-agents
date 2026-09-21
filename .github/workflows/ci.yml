@@ -429,10 +429,14 @@ jobs:
   # Licences, banned crates and where they came from. It compiles nothing
   # - it reads `Cargo.lock` - so it is the verdict that arrives first.
   #
-  # `advisories` is deliberately **not** here. An advisory published today
-  # against a dependency nobody touched would turn a pull request red for
-  # a reason that has nothing to do with it, which is how people learn to
-  # ignore a red build. It runs nightly, where red means "go and look".
+  # Which checks run is `just deny`'s to say, and this job calls it for
+  # the reason the `client` job calls `just check-client`: a list spelled
+  # out here is free to drift from the one a person runs at their desk.
+  # `advisories` is deliberately absent from that recipe - an advisory
+  # published today against a dependency nobody touched would turn a pull
+  # request red for a reason that has nothing to do with it, which is how
+  # people learn to ignore a red build. It runs in `nightly.yml`, where
+  # red means "go and look".
   supply:
     runs-on: windows-latest
     timeout-minutes: 20
@@ -440,6 +444,6 @@ jobs:
       - uses: actions/checkout@v7
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-deny
+          tool: cargo-deny,just
       - name: licences, bans and sources
-        run: cargo deny check bans licenses sources
+        run: just deny

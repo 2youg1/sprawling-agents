@@ -20,7 +20,7 @@ use kernel::{AxCode, AxError, ByteLen, Payload};
 use serde_json::{Map, Value, json};
 
 use crate::clock::ClockStamp;
-use crate::compaction;
+use crate::compaction::{self, Shrink};
 use crate::elision::{self, Elided};
 use crate::offload::{OffloadSite, offload};
 use crate::reminder::ContextReminder;
@@ -85,31 +85,60 @@ fn attach(content: &mut String, line: &str) {
     content.push_str(&elision::splice(line, end, line.len(), Elided::Tail).text);
 }
 
-/// The last resort: bytes that are not text, or text the compactor
-/// declined to shorten, cut on a byte with the loss said out loud.
+/// What a result that must leave the window whole is answered with when
+/// there is nowhere to put it.
 ///
-/// Nothing can be read about the shape of these bytes, so no end of
-/// them is known to matter more than another; the front is what a
-/// reader starts from, so the front is what stays.
-fn byte_cut(result: &[u8], cap_bytes: u64) -> Result<Vec<u8>, AxError> {
-    let cap = usize::try_from(cap_bytes).map_err(|_| {
-        AxError::failure(AxCode::InvalidArgs, "package result", "cap exceeds usize").with_recovery(
-            "lower `[tool] result_cap_bytes`: this cap is larger than this \
-             machine can address",
-        )
-    })?;
-    let head = result.get(..cap).unwrap_or(result);
-    let gone = u64::try_from(result.len().saturating_sub(head.len())).unwrap_or(u64::MAX);
-    let mut cut = head.to_vec();
-    cut.extend_from_slice(elision::marker(ByteLen::new(gone)).as_bytes());
-    Ok(cut)
+/// A refusal rather than a byte cut. Structured data cut on a byte
+/// looks parseable and is not, and material nothing recognised is
+/// material no end of which is known to matter - so a city with no
+/// content store says so, rather than handing the model a document it
+/// will read as complete.
+fn nowhere_to_put_it(len: u64) -> AxError {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "package result",
+        format!("{len} bytes that cannot be shortened, and no content store to hold them"),
+    )
+    .with_recovery(
+        "ask the tool for a smaller part at a time: this result would have to be cut \
+         in the middle to fit, and a structured result cut in the middle reads as \
+         complete",
+    )
+}
+
+/// Moves a result out of the window and leaves a reference, accounting
+/// the move.
+///
+/// The four keys of that account are written here and nowhere else, so
+/// a reader folding the ledger finds one shape for every result that
+/// ever left a window.
+fn store(
+    result: &[u8],
+    cap_bytes: u64,
+    site: &mut OffloadSite<'_>,
+    events: &mut Vec<Payload>,
+) -> Result<Vec<u8>, AxError> {
+    let record = offload(result, cap_bytes, site)?;
+    let mut event = Map::new();
+    event.insert(
+        "original".to_owned(),
+        Value::String(record.original.to_string()),
+    );
+    event.insert("len".to_owned(), json!(record.original_len));
+    event.insert("substitute_len".to_owned(), json!(record.substitute.len()));
+    event.insert(
+        "rest_path".to_owned(),
+        Value::String(record.rest_path.display().to_string()),
+    );
+    events.push(Payload::new(event)?);
+    Ok(record.substitute)
 }
 
 /// Packages one tool result for the window. Shrink order: the sieve
 /// first when a command key came with the result and a site exists;
-/// then intact when it fits; offload when large enough and a site
-/// exists; plain truncation otherwise. Then the envelope: clock line,
-/// one-time net notice, steer.
+/// then intact when it fits; offload when the result must leave whole
+/// or is large enough to be worth storing; shortening otherwise. Then
+/// the envelope: clock line, one-time net notice, steer.
 pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError> {
     let mut events = Vec::new();
     let mut offload_site = ctx.offload;
@@ -135,51 +164,38 @@ pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>
                  count this city can hold",
         )
     })?;
-    let body: Vec<u8>;
-    if len <= ctx.cap_bytes {
-        body = result.to_vec();
-    } else if len >= OFFLOAD_MIN_BYTES && offload_site.is_some() {
-        let mut site = offload_site.ok_or_else(|| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "package result",
-                "offload site vanished",
-            )
-            .with_recovery(
-                "report this against runtime::pipeline: the offload site was present \
-                 one line above and gone on this one",
-            )
-        })?;
-        let record = offload(result, ctx.cap_bytes, &mut site)?;
-        let mut event = Map::new();
-        event.insert(
-            "original".to_owned(),
-            Value::String(record.original.to_string()),
-        );
-        event.insert("len".to_owned(), json!(record.original_len));
-        event.insert("substitute_len".to_owned(), json!(record.substitute.len()));
-        event.insert(
-            "rest_path".to_owned(),
-            Value::String(record.rest_path.display().to_string()),
-        );
-        events.push(Payload::new(event)?);
-        body = record.substitute;
-    } else if let Ok(text) = std::str::from_utf8(result) {
-        // Content-aware shortening rather than a byte cut: which end
-        // carries the meaning depends on what this is, and `compaction`
-        // is the one place that decides. Its answer already carries the
-        // marker and the true count of source bytes behind it, so
-        // nothing is appended here. It declines on structured and
-        // unknown content, and a shortening it declined with no site to
-        // offload to leaves the byte cut, said out loud.
-        let cut = compaction::compact(text, ByteLen::new(ctx.cap_bytes));
-        body = match cut.place {
-            Elided::Nothing => byte_cut(result, ctx.cap_bytes)?,
-            Elided::Head | Elided::Middle | Elided::Tail => cut.text.into_bytes(),
-        };
-    } else {
-        body = byte_cut(result, ctx.cap_bytes)?;
-    }
+    // What this result is, and what that means at this size: one
+    // decision, made by the module that owns it. Bytes that are not
+    // text are material nothing can read the shape of, which is what
+    // `Unknown` means.
+    let budget = ByteLen::new(ctx.cap_bytes);
+    let text = std::str::from_utf8(result);
+    let shape = match text {
+        Ok(text) => compaction::detect(text),
+        Err(_) => compaction::Content::Unknown,
+    };
+    let plan = compaction::plan(shape, ByteLen::new(len), budget);
+    // A result that must leave whole goes to the store; one that may be
+    // shortened goes there too when it is big enough to be worth
+    // storing, because a person can then still read all of it.
+    let worth_storing = match plan {
+        Shrink::Keep => false,
+        Shrink::Cut(_) => len >= OFFLOAD_MIN_BYTES,
+        Shrink::MustOffload => true,
+    };
+    let body: Vec<u8> = match (plan, offload_site.as_mut()) {
+        (Shrink::Keep, _) => result.to_vec(),
+        (_, Some(site)) if worth_storing => store(result, ctx.cap_bytes, site, &mut events)?,
+        (Shrink::Cut(strategy), _) => match text {
+            Ok(text) => compaction::shorten(text, strategy, budget)
+                .text
+                .into_bytes(),
+            Err(_) => return Err(nowhere_to_put_it(len)),
+        },
+        // Nowhere to put something that cannot be shortened is the one
+        // case this function refuses.
+        (Shrink::MustOffload, _) => return Err(nowhere_to_put_it(len)),
+    };
     let mut content = String::from_utf8_lossy(&body).into_owned();
     if let Some(stamp) = &ctx.stamp {
         attach(&mut content, &stamp.render());

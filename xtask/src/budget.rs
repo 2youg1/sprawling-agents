@@ -20,6 +20,11 @@ use std::path::Path;
 use crate::package::{ReleaseTarget, binary_path};
 use crate::report::{Violation, XtaskError};
 
+mod carried;
+
+use carried::CLIENT_MARK;
+pub(crate) use carried::{carries_client, carries_engine};
+
 /// The register, as the gate reads it.
 struct Row {
     name: String,
@@ -219,11 +224,6 @@ fn gzipped_total(dist: &Path) -> Result<Option<u64>, XtaskError> {
     Ok(found.then_some(total))
 }
 
-/// Naive subsequence search; the haystack is read once per gate run.
-fn contains(haystack: &[u8], needle: &[u8]) -> bool {
-    !needle.is_empty() && haystack.windows(needle.len()).any(|w| w == needle)
-}
-
 /// The compressed length, computed rather than shelled out for, so the
 /// number does not depend on which gzip is on the path.
 fn gzipped_len(bytes: &[u8]) -> u64 {
@@ -242,28 +242,6 @@ fn binary_bytes(root: &Path) -> Option<u64> {
     let path = binary_path(root, &ReleaseTarget::Host)?;
     std::fs::metadata(path).ok().map(|meta| meta.len())
 }
-
-/// Whether a built binary carries the real client or only the page
-/// shell. One statement of that fact, because the gate refuses on it and
-/// so does `package`, and two readings would drift apart.
-///
-/// # Errors
-/// Propagates the failure of reading the binary: a release artifact that
-/// cannot be read is a finding, not a thing to skip over.
-pub(crate) fn carries_client(binary: &Path) -> Result<bool, XtaskError> {
-    let bytes = std::fs::read(binary).map_err(|source| XtaskError::Io {
-        path: binary.display().to_string(),
-        source,
-    })?;
-    Ok(contains(&bytes, CLIENT_MARK.as_bytes()))
-}
-
-/// The request path that only a built bundle produces.
-///
-/// Vite writes every hashed chunk under `assets/`, and the placeholder
-/// page has no such path in its table. One entry rather than a file name:
-/// the file names carry a content hash and change on every build.
-const CLIENT_MARK: &str = "assets/index-";
 
 #[cfg(test)]
 #[allow(
@@ -358,16 +336,5 @@ mod tests {
         let flat = gzipped_len(&vec![b'a'; 4_000]);
         assert!(total > flat, "the nested file must be weighed too");
         std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[test]
-    fn a_binary_without_the_client_table_is_named_by_the_gate() {
-        // A short stand-in rather than a real chunk name: a content hash
-        // is exactly the shape `xtask secret` is built to notice.
-        assert!(contains(
-            b"...assets/index-x1.js...",
-            CLIENT_MARK.as_bytes()
-        ));
-        assert!(!contains(b"a placeholder build", CLIENT_MARK.as_bytes()));
     }
 }

@@ -133,7 +133,12 @@ impl Profile { pub fn of(building: &Address, policy: &BuildingPolicy) -> Result<
 
 1. **帧先于传输**：`Frame::to_wire` 手写字段序而不用 `serde_json::to_string`，因为录制回放要按字节比对，而 map 的迭代序不是契约。
 2. **回复分两层**：传输失败是 `Err`，远端拒绝是 `Reply::Error`——「这个节点没了」是答案，不是故障；把两者混同会让调用方对着一个错误码猜是谁的问题。
-3. **快照用白名单不用黑名单**：`ROLES` 十四项闭合。「除了 X 都放行」会在平台新增角色时静默变宽，而它变宽的终点就是原始 DOM。
+3. **快照用白名单不用黑名单**：角色词汇十四项闭合。「除了 X 都放行」会在平台新增角色时静默变宽，而它变宽的终点就是原始 DOM。
+   - **词汇只有一个家（B-27）**：`snapshot::ROLE_MAP`（`(标签, 可选 type) → 角色`，27 行）是权威；采树脚本的映射表由 `role_lookup_js()` 从它生成，过滤器 `shown()` 也从它取值。
+     此前脚本把角色定义为「显式 role 属性，否则小写标签名」，而过滤器查的是 ARIA 角色表，两者只在 button/table/form/option/dialog 上重合：
+     不手写 `role=` 的页面快照里**没有链接也没有输入框**，`to_text()` 几乎是空的，act/measure 拿不到 ref。夹具手填角色绕过了脚本，所以测试曾经全绿。
+   - **两条派生断言**：`ROLE_MAP` 产得出的每个角色都在词汇里；词汇里除 `tab` 与 `alert`（无元素隐含，只能由页面显式声明）之外的每一项都至少有一个标签映射到它。
+   - **`<input>` 的 type 缺席读作 `text`**（HTML 默认值）；`hidden`／`file` 等无行可查的 type 不得角色，因而不过河。
 4. **动作里页面文本恒是数据**：`quote` 是页面内容成为代码的唯一位置，逐字符转义，含 U+2028／U+2029（JS 里它们是行终止符）。
 5. **回路必有终点**：`LOOKS_MAX` 与 `QUIET_LOOKS` 两个常量把「不收敛」变成一个结局而不是一段时间。
 
@@ -156,7 +161,7 @@ impl Profile { pub fn of(building: &Address, policy: &BuildingPolicy) -> Result<
 
 ## 14 硬编码声明
 
-`ROLES` 十四项、`LABEL_MAX = 120`、`LOOKS_MAX = 8`、`QUIET_LOOKS = 2`、`PROFILES_DIR`。前两项改动即改变模型看见什么，属 15.2 的行为变更，改需证据；后三项是回路与落盘位置的约定。
+`ROLE_MAP` 二十七行与 `ARIA_ONLY` 两项（合为十四个角色）、`NAME_MAX_JS = 200`（脚本回传的名字上限，与展示上限不同事）、`LABEL_MAX = 120`、`LOOKS_MAX = 8`、`QUIET_LOOKS = 2`、`PROFILES_DIR`。前两项改动即改变模型看见什么，属 15.2 的行为变更，改需证据；后三项是回路与落盘位置的约定。
 
 ## 15 影响面
 

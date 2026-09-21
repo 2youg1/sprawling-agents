@@ -89,7 +89,7 @@ fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
 /// A dispatch the city will not take leaves nothing a person can
 /// find.
 ///
-/// `dispatch_in` opens by saying so - a halted city that laid a job
+/// `prepare_dispatch` opens by saying so - a halted city that laid a job
 /// file down would leave a task in a room no run ever opened - and
 /// the halt was the only door that held it. The room was opened and
 /// the brief was written before the tag was resolved, so a dispatch

@@ -7,9 +7,13 @@
 //!
 //! A release somebody assembled by hand is a release nobody can check.
 //! This assembles the same archive on every platform, out of artifacts the
-//! gates have already weighed, and refuses a binary whose client is only
-//! the page shell - the defect that survives a green build and reaches the
-//! person as an empty browser window.
+//! gates have already weighed, and refuses a binary that would reach a
+//! person half-built: one whose client is the page shell, which arrives as
+//! an empty browser window, and one with no execution engine, which
+//! answers every `python` call with a refusal naming a feature nobody
+//! downloading a release can turn on.
+//!
+//! What the archive carries is `contents`; this module is the packing.
 //!
 //! Entry timestamps are fixed rather than taken from the file system, so
 //! two builds of one tree produce the same archive bytes.
@@ -17,21 +21,12 @@
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
+use crate::platform;
 use crate::report::XtaskError;
 
-/// What rides in the archive beside the binary: the name a person finds
-/// after unpacking, and where it is read from, relative to the root.
-///
-/// One table rather than a literal at each push, because the packer and
-/// the test that proves these files exist have to name the same paths.
-/// `QUICKSTART.md` moved into `docs/` and this, its only reader, kept
-/// asking for the old path - so every archive after that move failed to
-/// assemble, on a release runner, which is the one place nobody watches
-/// until a tag is already cut.
-const PACKAGED_DOCUMENTS: [(&str, &str); 2] = [
-    ("QUICKSTART.md", "docs/dist/QUICKSTART.md"),
-    ("LICENSE", "LICENSE"),
-];
+mod contents;
+
+use contents::{Entry, Executable};
 
 /// Which build an archive is assembled from. Exhaustive on purpose: the
 /// two questions a packager asks — where the binary landed, and what the
@@ -72,18 +67,29 @@ impl ReleaseTarget {
         }
     }
 
-    /// What the executable is called on the system it will run on, which
-    /// is the target's question rather than the assembling machine's.
-    fn binary_name(&self) -> &'static str {
-        let windows = match self {
-            Self::Host => cfg!(windows),
-            Self::Triple(triple) => triple.contains("windows"),
-        };
-        if windows {
-            "sprawling.exe"
-        } else {
-            "sprawling"
-        }
+    /// What the executable is called on the system it will run on.
+    ///
+    /// Asked of the platform table rather than decided here: that table
+    /// is where every spelling of a platform lives, and it already holds
+    /// this one, so the packager reads the name instead of writing a
+    /// second rule about which systems suffix an executable. A target
+    /// the release publishes no archive for is refused, which is the
+    /// policy `platform` states for itself.
+    ///
+    /// # Errors
+    /// When no platform row claims the archive this build would produce.
+    fn binary_name(&self) -> Result<&'static str, XtaskError> {
+        let suffix = format!("-{}.zip", self.label());
+        platform::with_suffix(&suffix)
+            .map(|row| row.binary)
+            .ok_or_else(|| XtaskError::Cmd {
+                cmd: "package".to_owned(),
+                msg: format!(
+                    "no platform this release publishes for ends an archive with `{suffix}`; \
+                     add the row to xtask/src/platform.rs, and the matrix and install scripts \
+                     that restate it, in one change-set"
+                ),
+            })
     }
 }
 
@@ -117,6 +123,15 @@ pub(crate) fn run(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskEr
                 .to_owned(),
         });
     }
+    if !crate::budget::carries_engine(&binary)? {
+        return Err(XtaskError::Cmd {
+            cmd: "package".to_owned(),
+            msg: "this binary carries no execution engine, so every `python` call in the \
+                  archive would be refused; build the release with the engine (the \
+                  `sandbox` feature of the `sprawling` package), then `just dist`"
+                .to_owned(),
+        });
+    }
 
     let stem = format!("sprawling-{}-{}", workspace_version(root)?, target.label());
     let out_dir = root.join("target").join("package");
@@ -126,17 +141,13 @@ pub(crate) fn run(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskEr
     })?;
     let archive = out_dir.join(format!("{stem}.zip"));
 
-    let mut entries: Vec<(String, PathBuf)> = Vec::new();
-    entries.push((target.binary_name().to_owned(), binary));
-    for (name, source) in PACKAGED_DOCUMENTS {
-        entries.push(((*name).to_owned(), root.join(source)));
-    }
-    // The bill of materials when `just dist` produced one; a person who
-    // wants to know what is inside the binary should not have to build it.
-    let sbom = root.join("target").join("sbom.cdx.json");
-    if sbom.is_file() {
-        entries.push(("sbom.cdx.json".to_owned(), sbom));
-    }
+    let entries = contents::entries(
+        root,
+        &Executable {
+            name: target.binary_name()?,
+            path: &binary,
+        },
+    )?;
 
     write_archive(&archive, &stem, &entries)?;
     let size = std::fs::metadata(&archive)
@@ -154,11 +165,7 @@ pub(crate) fn run(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskEr
 
 /// Writes the archive with every entry under one directory, so unpacking
 /// it produces a folder rather than scattering files where it landed.
-fn write_archive(
-    archive: &Path,
-    stem: &str,
-    entries: &[(String, PathBuf)],
-) -> Result<(), XtaskError> {
+fn write_archive(archive: &Path, stem: &str, entries: &[Entry]) -> Result<(), XtaskError> {
     let file = std::fs::File::create(archive).map_err(|source| XtaskError::Io {
         path: archive.display().to_string(),
         source,
@@ -168,20 +175,16 @@ fn write_archive(
         path: path.display().to_string(),
         source,
     };
-    for (name, source) in entries {
-        let bytes = std::fs::read(source).map_err(|err| io(source, err))?;
-        // Executable bits: the archive is the only thing that carries them
-        // to a machine that has never seen this file, and a binary that
-        // arrives without them is a binary nobody can run.
-        let mode = if name == "sprawling" { 0o755 } else { 0o644 };
+    for entry in entries {
+        let bytes = std::fs::read(&entry.source).map_err(|err| io(&entry.source, err))?;
         let options = zip::write::SimpleFileOptions::default()
             .compression_method(zip::CompressionMethod::Deflated)
             .last_modified_time(zip::DateTime::default())
-            .unix_permissions(mode);
-        zip.start_file(format!("{stem}/{name}"), options)
+            .unix_permissions(entry.mode);
+        zip.start_file(format!("{stem}/{}", entry.name), options)
             .map_err(|err| XtaskError::Cmd {
                 cmd: "package".to_owned(),
-                msg: format!("{name}: {err}"),
+                msg: format!("{}: {err}", entry.name),
             })?;
         zip.write_all(&bytes).map_err(|err| io(archive, err))?;
     }
@@ -224,23 +227,14 @@ pub(crate) fn workspace_version(root: &Path) -> Result<String, XtaskError> {
     reason = "test code"
 )]
 mod tests {
-    use super::{PACKAGED_DOCUMENTS, ReleaseTarget, binary_path, write_archive};
+    use super::contents::Entry;
+    use super::{ReleaseTarget, binary_path, write_archive};
 
-    /// The check that was missing: a document the archive is assembled
-    /// from has to be in the tree the archive is assembled out of. This
-    /// fails at `cargo nextest`, on every push, rather than on a release
-    /// runner after a tag has been cut.
-    #[test]
-    fn every_packaged_document_is_in_the_tree() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("xtask sits one level under the repository root");
-        for (name, source) in PACKAGED_DOCUMENTS {
-            let path = root.join(source);
-            assert!(
-                path.is_file(),
-                "the archive packages {name} from {source}, which is not in this tree"
-            );
+    fn entry(name: &str, source: std::path::PathBuf) -> Entry {
+        Entry {
+            name: name.to_owned(),
+            source,
+            mode: 0o644,
         }
     }
 
@@ -277,13 +271,20 @@ mod tests {
     }
 
     /// What the archive calls the executable follows the target it was
-    /// built for, never the machine that assembled it.
+    /// built for, never the machine that assembled it - and a target
+    /// this release publishes no archive for is refused rather than
+    /// guessed at.
     #[test]
     fn the_executable_name_follows_the_target_rather_than_the_host() {
-        let windows = ReleaseTarget::Triple("x86_64-pc-windows-msvc".to_owned());
-        assert_eq!(windows.binary_name(), "sprawling.exe");
         let musl = ReleaseTarget::Triple("x86_64-unknown-linux-musl".to_owned());
-        assert_eq!(musl.binary_name(), "sprawling");
+        assert_eq!(musl.binary_name().unwrap(), "sprawling");
+        let host = ReleaseTarget::Host;
+        assert!(
+            host.binary_name().unwrap().starts_with("sprawling"),
+            "this machine builds an archive the platform table does not claim"
+        );
+        let unpublished = ReleaseTarget::Triple("x86_64-pc-windows-gnu".to_owned());
+        assert!(unpublished.binary_name().is_err());
     }
 
     /// The archive nests under one directory: unpacking it into a folder
@@ -298,7 +299,7 @@ mod tests {
         write_archive(
             &archive,
             "sprawling-9.9.9-test",
-            &[("QUICKSTART.md".to_owned(), source)],
+            &[entry("QUICKSTART.md", source)],
         )
         .unwrap();
 
@@ -318,7 +319,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let source = dir.join("payload.txt");
         std::fs::write(&source, b"payload").unwrap();
-        let entries = [("QUICKSTART.md".to_owned(), source)];
+        let entries = [entry("QUICKSTART.md", source)];
 
         let first = dir.join("first.zip");
         let second = dir.join("second.zip");

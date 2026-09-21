@@ -18,6 +18,22 @@ pub enum Interrupt {
     Steer { source: String, text: String },
 }
 
+/// Whether the wave may start its next call, asked once before each of
+/// them.
+///
+/// Narrower than [`Interrupt`] on purpose. Between two calls of one
+/// wave, the only instruction this city can carry out at once is
+/// stopping: text that arrives to redirect the work belongs to the
+/// window the executor owns, and the executor folds it there before
+/// answering here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NextCall {
+    /// Nothing has stopped this run; the call goes ahead.
+    Allowed,
+    /// A halt reached this run, and the wave ends where it stands.
+    Halted,
+}
+
 /// A phase change either advances or ends the turn at the boundary.
 /// Exhaustive, as every enum in this workspace now is: a new outcome
 /// must force every executor to decide, not fall through a catch-all.

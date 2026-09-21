@@ -31,11 +31,20 @@ import type {
 } from "../wire";
 import {
   Ceiling as CeilingSchema,
+  Effort as EffortSchema,
   ModeTag,
   ProviderName as ProviderNameSchema,
   SessionName as SessionNameSchema,
   TemplateName as TemplateNameSchema,
 } from "../wire";
+
+// The levels a dispatch may ask for, in the wire's own order. The
+// generated schema is the one place they are written, so a level added
+// to `kernel::Effort` appears in every picker without anybody editing
+// a list - and a picker cannot offer one the frame would refuse.
+// Saying nothing is not on this list: it is the field left out, which
+// is what `Dispatch.effort === null` spells below.
+export const EFFORTS: readonly Effort[] = EffortSchema.literals;
 
 // The one mode a conversation runs in: plan first, then work. The city
 // reads any tag it does not know as this one, so the spelling here is

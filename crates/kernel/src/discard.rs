@@ -7,7 +7,7 @@
 //! intent. C14 in the type: a Discard without a
 //! restoration plan cannot be constructed; the unplanned path exists only
 //! as a request shape for exec forecasts — and the door denies it.
-//! This module is the fifth door's sole authority; gate::discard
+//! This module is the discard door's sole authority; `gate::discard`
 //! delegates wholly and only shapes the refusal.
 
 mod forecast;
@@ -15,5 +15,5 @@ mod request;
 mod verdict;
 
 pub use forecast::{DiscardForecast, forecast};
-pub use request::{DenyReason, Discard, DiscardRequest, EscalateReason, Restoration};
+pub use request::{DenyReason, Discard, DiscardRequest, Restoration};
 pub use verdict::{DiscardVerdict, decide};

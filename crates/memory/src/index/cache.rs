@@ -12,8 +12,7 @@ use kernel::{B3Hash, RunId, Seq};
 
 use crate::error::{MemoryError, io_err};
 use crate::jsonl::is_segment;
-
-use super::ledger::LedgerIndex;
+use crate::vfs::Vfs;
 
 /// What the directory looks like right now: total bytes across segments
 /// plus a digest of the segment names and sizes. Coarse on purpose — a
@@ -34,12 +33,67 @@ pub(crate) struct Stamp {
     pub(crate) digest: String,
 }
 
-pub(crate) fn segment_names(dir: &Path) -> Result<Vec<String>, MemoryError> {
+/// Everything the index knows, with no way to read a disk.
+///
+/// Held apart from [`crate::index::LedgerIndex`] because a rebuild
+/// produces exactly this and nothing else: the seam the index reaches
+/// disk through belongs to the index, not to each map it folds.
+pub(crate) struct Folded {
+    pub(crate) entries: BTreeMap<Seq, (String, u64)>,
+    pub(crate) runs: BTreeMap<RunId, BTreeSet<Seq>>,
+    pub(crate) scanned: BTreeMap<String, u64>,
+}
+
+impl Folded {
+    pub(crate) fn empty() -> Folded {
+        Folded {
+            entries: BTreeMap::new(),
+            runs: BTreeMap::new(),
+            scanned: BTreeMap::new(),
+        }
+    }
+
+    /// Indexes the complete lines of `tail`, which begins at `from` in
+    /// the segment. Returns how many bytes those complete lines took.
+    pub(crate) fn fold_segment(&mut self, name: &str, from: u64, tail: &[u8]) -> u64 {
+        let mut offset = from;
+        let mut complete_bytes = 0u64;
+        for line in tail.split_inclusive(|b| *b == b'\n') {
+            if line.last().copied() != Some(b'\n') {
+                break;
+            }
+            let body = line.get(..line.len().saturating_sub(1)).unwrap_or(line);
+            if !body.is_empty() {
+                self.insert_line(name, offset, body);
+            }
+            let len = u64::try_from(line.len()).unwrap_or(0);
+            offset = offset.saturating_add(len);
+            complete_bytes = complete_bytes.saturating_add(len);
+        }
+        complete_bytes
+    }
+
+    /// What indexing one line means, in one place: where it sits, and
+    /// whose it is. A line that does not parse is skipped rather than
+    /// reported — the caller is looking at a ledger that may be damaged,
+    /// and an index is how such a ledger gets repaired.
+    pub(crate) fn insert_line(&mut self, name: &str, offset: u64, body: &[u8]) {
+        let Some(located) = locate(body) else {
+            return;
+        };
+        self.entries.insert(located.seq, (name.to_owned(), offset));
+        if let Some(run) = located.run {
+            self.runs.entry(run).or_default().insert(located.seq);
+        }
+    }
+}
+
+pub(crate) fn segment_names(vfs: &dyn Vfs, dir: &Path) -> Result<Vec<String>, MemoryError> {
     let mut names = Vec::new();
-    let entries = std::fs::read_dir(dir).map_err(io_err("list ledger dir", dir))?;
-    for entry in entries {
-        let entry = entry.map_err(io_err("list ledger dir", dir))?;
-        let path = entry.path();
+    // `Vfs::list` answers files only, already sorted: zero-padded names
+    // sort lexically the way they sort numerically, so the order is the
+    // ledger's own rather than the filesystem's.
+    for path in vfs.list(dir).map_err(io_err("list ledger dir", dir))? {
         if !is_segment(&path) {
             continue;
         }
@@ -47,20 +101,15 @@ pub(crate) fn segment_names(dir: &Path) -> Result<Vec<String>, MemoryError> {
             names.push(name.to_owned());
         }
     }
-    // Zero-padded names sort lexically the way they sort numerically;
-    // sorting here makes the order ours, not the filesystem's.
-    names.sort();
     Ok(names)
 }
 
-pub(crate) fn directory_stamp(dir: &Path) -> Result<Stamp, MemoryError> {
+pub(crate) fn directory_stamp(vfs: &dyn Vfs, dir: &Path) -> Result<Stamp, MemoryError> {
     let mut total: u64 = 0;
     let mut material = String::new();
-    for name in segment_names(dir)? {
+    for name in segment_names(vfs, dir)? {
         let path = dir.join(&name);
-        let size = std::fs::metadata(&path)
-            .map_err(io_err("stat segment", &path))?
-            .len();
+        let size = vfs.size(&path).map_err(io_err("stat segment", &path))?;
         total = total.saturating_add(size);
         material.push_str(&format!("{name}:{size}\n"));
     }
@@ -77,21 +126,22 @@ pub(crate) fn directory_stamp(dir: &Path) -> Result<Stamp, MemoryError> {
 /// A cache is believed only when the directory's byte count matches its
 /// stamp, so at that moment "already indexed" and "size on disk" are the
 /// same number - this is exact rather than an approximation.
-pub(crate) fn sizes_now(dir: &Path) -> BTreeMap<String, u64> {
+pub(crate) fn sizes_now(vfs: &dyn Vfs, dir: &Path) -> BTreeMap<String, u64> {
     let mut sizes = BTreeMap::new();
-    let Ok(names) = segment_names(dir) else {
+    let Ok(names) = segment_names(vfs, dir) else {
         return sizes;
     };
     for name in names {
-        if let Ok(meta) = std::fs::metadata(dir.join(&name)) {
-            sizes.insert(name, meta.len());
+        if let Ok(size) = vfs.size(&dir.join(&name)) {
+            sizes.insert(name, size);
         }
     }
     sizes
 }
 
-pub(crate) fn load_cache(dir: &Path, stamp: &Stamp) -> Option<LedgerIndex> {
-    let raw = std::fs::read_to_string(dir.join(CACHE_NAME)).ok()?;
+pub(crate) fn load_cache(vfs: &dyn Vfs, dir: &Path, stamp: &Stamp) -> Option<Folded> {
+    let bytes = vfs.read(&dir.join(CACHE_NAME)).ok()?;
+    let raw = String::from_utf8(bytes).ok()?;
     let mut lines = raw.lines();
     let header = lines.next()?;
     let expected = format!("{CACHE_MAGIC} {} {}", stamp.bytes, stamp.digest);
@@ -120,18 +170,18 @@ pub(crate) fn load_cache(dir: &Path, stamp: &Stamp) -> Option<LedgerIndex> {
             runs.entry(run).or_default().insert(seq);
         }
     }
-    Some(LedgerIndex {
+    Some(Folded {
         entries,
         runs,
-        scanned: sizes_now(dir),
+        scanned: sizes_now(vfs, dir),
     })
 }
 
-pub(crate) fn rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError> {
-    let mut index = LedgerIndex::empty();
-    for name in segment_names(dir)? {
+pub(crate) fn rebuild(vfs: &dyn Vfs, dir: &Path) -> Result<Folded, MemoryError> {
+    let mut folded = Folded::empty();
+    for name in segment_names(vfs, dir)? {
         let path = dir.join(&name);
-        let bytes = std::fs::read(&path).map_err(io_err("read segment", &path))?;
+        let bytes = vfs.read(&path).map_err(io_err("read segment", &path))?;
         let mut offset: u64 = 0;
         for line in bytes.split_inclusive(|b| *b == b'\n') {
             let complete = line.last().copied() == Some(b'\n');
@@ -143,19 +193,19 @@ pub(crate) fn rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError> {
             // A torn tail carries no seq we can trust; it is skipped, and
             // the next append overwrites it (jsonl owns that repair).
             if complete && !body.is_empty() {
-                index.insert_line(&name, offset, body);
+                folded.insert_line(&name, offset, body);
             }
             if complete {
-                index.scanned.insert(
+                folded.scanned.insert(
                     name.clone(),
                     offset.saturating_add(u64::try_from(line.len()).unwrap_or(0)),
                 );
             }
             offset = offset.saturating_add(u64::try_from(line.len()).unwrap_or(0));
         }
-        index.scanned.entry(name).or_insert(0);
+        folded.scanned.entry(name).or_insert(0);
     }
-    Ok(index)
+    Ok(folded)
 }
 
 /// Where a line sits and whose it is.

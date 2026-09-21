@@ -19,7 +19,7 @@ import { B3Hash, WIRE_HASH, WIRE_V, type AxError } from "../wire";
 // A link that has been greeted, which is where every frame below
 // arrives.
 function live(): Link {
-  const [opening] = connect(newLink(null));
+  const [opening] = connect(newLink(null, "en"));
   const [handshaking] = advance(opening, { kind: "opened" });
   const [settled] = advance(handshaking, {
     kind: "received",

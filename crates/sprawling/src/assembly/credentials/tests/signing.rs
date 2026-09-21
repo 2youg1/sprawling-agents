@@ -101,13 +101,16 @@ fn a_subscription_login_ends_with_a_credential_in_the_vault_and_an_endpoint_atta
     let report = init_city(dir.path()).unwrap();
     let (base, server) = fake_oauth_provider();
     let profile = gateway::OauthProfile {
+        family: gateway::Family::ClaudeCode,
         provider: "anthropic",
         api_base: Box::leak(base.clone().into_boxed_str()),
         auth_endpoint: "https://example.invalid/oauth/authorize",
         token_endpoint: Box::leak(format!("{base}/v1/oauth/token").into_boxed_str()),
         scopes: &["user:inference"],
         client_id: "test-client",
-        redirect_uri: "https://example.invalid/callback",
+        grant: gateway::Grant::AuthorizationCode {
+            redirect_uri: "https://example.invalid/callback",
+        },
         headers: &[],
     };
     let mut worker = RunWorker::new(
@@ -199,15 +202,21 @@ fn a_login_for_a_provider_this_build_has_no_flow_for_is_refused_by_name() {
     assert_eq!(err.code(), &AxCode::ConfigInvalid);
     assert!(err.recovery().contains("API key"));
 
-    // The one whose intelligence row is empty fails closed rather
-    // than sending a person to an empty URL.
-    let err = worker
+    // OpenAI's row states every fact a login needs, so the login
+    // begins. What it does not state is where the API lives: no
+    // watched path says it, and this city does not invent one. The
+    // refusal therefore waits for the moment it matters, which is the
+    // attach after the token is already in the vault.
+    worker
         .handle(channels::Command::Login {
             provider: channels::ProviderName::parse("openai").unwrap(),
             step: channels::LoginStep::Begin,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"login"),
         })
-        .unwrap_err();
-    assert_eq!(err.code(), &AxCode::ConfigInvalid);
-    assert!(err.subject().contains("intelligence incomplete"));
+        .unwrap();
+    let openai = gateway::profile("openai").expect("openai has a row");
+    assert!(
+        openai.api_base.is_empty(),
+        "no watched path states OpenAI's api base; a filled one here was invented"
+    );
 }

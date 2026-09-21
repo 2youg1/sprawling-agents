@@ -34,6 +34,11 @@ pub(super) struct Ending<'a> {
     pub(super) raised: Vec<kernel::ApprovalItem>,
     pub(super) delegates: &'a std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     pub(super) succession: &'a std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
+    /// What the city owes this run, and where a refusal goes back to.
+    /// It arrives here because a successor takes it over: what is owed
+    /// belongs to the piece of work, not to the run that happened to be
+    /// driving it.
+    pub(super) owing: super::Owing,
 }
 
 pub(super) mod desks;

@@ -25,10 +25,10 @@
 //! while "2.3 is being worked on, 2.4 is ready" does not.
 
 use crate::claim_effect::ClaimEffect;
+use kernel::spine::{check_roadmap_shape, insert_children, set_roadmap_status};
 use kernel::{
     Address, AxCode, AxError, Held, Locator, NewChild, NodeId, Payload, PlanExit, PlanTree,
-    RoadmapShape, RoadmapStatus, StopCause, check_roadmap_shape, insert_children,
-    set_roadmap_status,
+    RoadmapShape, RoadmapStatus, StopCause,
 };
 use serde_json::{Map, Value};
 

@@ -22,6 +22,7 @@
 //! queue answers by being consumed and a view that consumed what it
 //! showed would change the thing it reports on.
 
+pub(super) mod answered;
 pub(super) mod answering;
 pub(super) mod archives;
 pub(super) mod commits;

@@ -16,9 +16,10 @@
 
 use std::path::Path;
 
+use kernel::ledger::chain_hash;
 use kernel::{
     Address, AxCode, AxError, B3Hash, EventKind, EventRecord, EventRef, GENESIS_PREV, Seq,
-    chain_hash, consts_external::EVENT_LOG_V,
+    consts_external::EVENT_LOG_V,
 };
 use serde::Deserialize;
 

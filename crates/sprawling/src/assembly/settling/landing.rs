@@ -5,12 +5,13 @@
 
 //! What a drive left, on the ledger before it is made true.
 
-use kernel::{AxCode, AxError, Completion, EventKind};
-use kernel::{Payload, RunId};
+use kernel::{AxError, Completion, RunId};
 
 use crate::effect;
 
-use super::super::{Assignment, Dispatched, Ending, Handover, RunWorker, Site, held, new_inbox};
+use super::super::{
+    Assignment, Dispatched, Ending, Handover, Landed, Owed, Owing, RunWorker, Site, held,
+};
 use super::desks::write_plan;
 
 /// The action an `AxError` names when one of the two hand-down desks
@@ -18,6 +19,19 @@ use super::desks::write_plan;
 /// arm it sits in has no room for it.
 const DELEGATE_DESK: &str = "read the delegate desk";
 const SUCCESSION_DESK: &str = "read the succession desk";
+
+/// Who raised what, and where. The four travel together because an
+/// item filed without any one of them cannot be found again by the
+/// person answering it.
+pub(super) struct Filing<'a> {
+    pub(super) run_id: RunId,
+    pub(super) addr: &'a kernel::Address,
+    pub(super) who: &'a str,
+    /// Whether the run began from content that came in from outside.
+    pub(super) tainted: bool,
+}
+
+mod filing;
 
 impl RunWorker {
     pub(in crate::assembly) fn settle(
@@ -33,24 +47,13 @@ impl RunWorker {
                 let knocks_mark = self.knocks.len();
                 let outcome = (|| {
                     for signal in &signals {
-                        let admitted = self
-                            .inboxes
-                            .entry(signal.room().clone())
-                            .or_insert_with(new_inbox)
-                            .deliver(signal)?;
-                        // A shed delivery is a failure of this arm, not a
-                        // quiet drop: the line is already on the ledger,
-                        // and a line no queue holds is a torn city.
-                        if matches!(admitted, kernel::Admission::Shed { .. }) {
-                            return Err(AxError::failure(
-                                AxCode::BackpressureShed,
-                                "deliver a signal",
-                                format!("room {} shed the signal", signal.room()),
-                            )
-                            .with_recovery(
-                                "the queue is full; the speaker retries when the room drains",
-                            ));
-                        }
+                        // The room table decides what a delivery means,
+                        // including a room whose queue is out with a
+                        // run and a room that sheds: the refusal is
+                        // spelled once, there, because the line is
+                        // already on the ledger and a line no queue
+                        // holds is a torn city.
+                        self.rooms.deliver(signal)?;
                         // Somebody was spoken to. Whether that starts a run
                         // is decided in one place, so that the two ways of
                         // reaching a resident stay one decision.
@@ -122,32 +125,32 @@ impl RunWorker {
         }
     }
 
-    /// Gives the tree back, files what is waiting for a person, and hands
-    /// down the work this run asked for.
+    /// Files what is waiting for a person, hands down the work this run
+    /// asked for, and discharges what the city owed it.
     ///
-    /// Everything here happens whether the run finished or failed, which
-    /// is why the drive's outcome arrives as a `Result` and is unwrapped
-    /// only after the desks are settled: a lease left out and an approval
-    /// nobody filed are both worse than the failure that caused them.
+    /// Everything before the drive's outcome is read happens whether the
+    /// run finished or failed: an approval nobody filed is worse than
+    /// the failure that caused it. What this run borrowed went back
+    /// earlier still, in `return_borrowed`.
     ///
     /// # Errors
-    /// Propagates the drive's own outcome, a tree that will not go back,
-    /// a waiting item that will not serialise, and whatever a run handed
-    /// down reports.
+    /// Propagates the drive's own outcome, a waiting item that will not
+    /// serialise, and whatever starting the work this run handed down
+    /// reports.
     pub(in crate::assembly) fn conclude(
         &mut self,
         site: Site,
         at: &Assignment,
         ending: Ending<'_>,
-    ) -> Result<Dispatched, AxError> {
+    ) -> Result<Landed, AxError> {
         let Ending {
             driven,
             mut raised,
             delegates,
             succession,
+            owing,
         } = ending;
         let Site {
-            lease,
             who,
             run_id,
             model,
@@ -155,61 +158,15 @@ impl RunWorker {
             ..
         } = site;
         let (addr, model) = (at.addr.clone(), model.id.as_str());
-        // The tree goes back whether the run finished or failed. What was
-        // committed on its branch survives; what was not, does not.
-        if let Some(held) = lease {
-            memory::Worktrees::open(&self.city_root)
-                .map_err(memory::MemoryError::into_ax)?
-                .release(held)
-                .map_err(memory::MemoryError::into_ax)?;
-        }
-        // An item that is waiting belongs in the inbox, not only in the
-        // refusal the model saw.
-        // Recorded against the run and the address that raised it, not
-        // against the city: answering this item later has to be able to
-        // find the work it was holding up.
-        if self.tainted_arrival {
-            // C15's marker bit, set where the reason for it is known. A
-            // tainted item takes no policy and no delegate, so a run that
-            // began with a stranger's text cannot have its approvals
-            // waived by a rule somebody wrote for ordinary work.
-            for item in raised.iter_mut() {
-                item.tainted = true;
-            }
-        }
-        for item in raised.iter() {
-            let value = serde_json::to_value(item).map_err(|err| {
-                AxError::failure(
-                    AxCode::InvalidArgs,
-                    "record a waiting item",
-                    err.to_string(),
-                )
-                .with_recovery(
-                    "report this against sprawling::assembly::settling::landing: an \
-                     approval item is text, flags and one address",
-                )
-            })?;
-            let map = value.as_object().cloned().ok_or_else(|| {
-                AxError::failure(
-                    AxCode::InvalidArgs,
-                    "record a waiting item",
-                    "an approval item is an object",
-                )
-                .with_recovery(
-                    "report this against sprawling::assembly::settling::landing: an \
-                     approval item encodes as a JSON object and this one did not",
-                )
-            })?;
-            self.record_for(
+        self.file_the_waiting(
+            &Filing {
                 run_id,
-                effect::Line {
-                    who: who.to_owned(),
-                    addr: addr.clone(),
-                    kind: EventKind::ApprovalRequested,
-                    data: Payload::new(map)?,
-                },
-            )?;
-        }
+                addr: &addr,
+                who: &who,
+                tainted: at.tainted,
+            },
+            &mut raised,
+        )?;
         let frozen = driven?;
         let ending = frozen.completion().clone();
         // What the model saw, beside the room it worked in. The freeze
@@ -268,7 +225,13 @@ impl RunWorker {
             // same piece of work, so it is done under the same ceiling.
             // Defaulting here told a delegate its budget was zero while
             // its parent had been told the truth.
-            let child = self.dispatch_in(
+            //
+            // Into a lane, and the handback follows when the child
+            // lands rather than here: a parent that drove each of its
+            // children to the end held this thread, and with it every
+            // other lane's writes, for the depth of the whole tree
+            // (sprawling-SPEC.md 8-46-2).
+            self.dispatch_into_lane(
                 Assignment {
                     addr: work.room,
                     session: None,
@@ -276,11 +239,12 @@ impl RunWorker {
                     mode: at.mode,
                     parent: Some(run_id),
                     succession: None,
+                    tainted: at.tainted,
                 },
                 work.task,
                 work.goal,
+                owing.child(addr.clone()),
             )?;
-            self.deliver_handback(&addr, &child)?;
         }
         // Who this run asked to replace it: itself, next run. Same
         // address, same work, and the same `parent` - not this run - so
@@ -302,7 +266,12 @@ impl RunWorker {
             // until the third succession.
             let before = self.probe_before(adapter.as_deref_mut(), &frozen, &who)?;
             let plan = frozen.plan();
-            let successor = self.dispatch_in(
+            // **The obligation moves with the work.** A successor is the
+            // same piece of work carrying on, so whoever was owed the
+            // predecessor's ending is owed the successor's, and the
+            // handback or the reply happens when the chain ends rather
+            // than at each link.
+            self.dispatch_into_lane(
                 Assignment {
                     addr: addr.clone(),
                     session: None,
@@ -313,22 +282,58 @@ impl RunWorker {
                         predecessor: run_id,
                         before,
                     }),
+                    tainted: at.tainted,
                 },
                 plan.task.clone(),
                 plan.goal.clone(),
+                owing,
             )?;
-            return Ok(Dispatched {
-                run: successor.run,
+            return Ok(Landed::Elsewhere);
+        }
+        self.discharge(
+            owing,
+            &Dispatched {
+                run: run_id,
                 addr,
                 who,
-                completion: successor.completion,
-            });
+                completion: ending,
+            },
+        )
+    }
+
+    /// Pays what the city owed the run that has just ended.
+    ///
+    /// The one place an entrance's obligation is settled, which is why
+    /// every entrance can share one dispatch path: what differs between
+    /// a person's command, a scheduled job, a knock and a delegate is
+    /// this match and nothing else.
+    ///
+    /// # Errors
+    /// Propagates a handback the parent's room will not take.
+    fn discharge(&mut self, owing: Owing, done: &Dispatched) -> Result<Landed, AxError> {
+        match owing.owed() {
+            Owed::Asked => Ok(Landed::Elsewhere),
+            // Nobody typed a command for this one, so the history is
+            // the only place the reason can appear. A run an operator
+            // did not start is the run they most need a reason for.
+            Owed::Unasked(because) => {
+                let because = because.because();
+                self.note(
+                    runtime::diagnostics::Level::Effect,
+                    "bin::assembly",
+                    &format!("a run the city started itself landed, because {because}"),
+                );
+                Ok(Landed::Elsewhere)
+            }
+            Owed::Row { addr, node } => Ok(Landed::Row {
+                addr: addr.clone(),
+                node: node.clone(),
+            }),
+            Owed::Child { parent } => {
+                let parent = parent.clone();
+                self.deliver_handback(&parent, done)?;
+                Ok(Landed::Elsewhere)
+            }
         }
-        Ok(Dispatched {
-            run: run_id,
-            addr,
-            who,
-            completion: ending,
-        })
     }
 }

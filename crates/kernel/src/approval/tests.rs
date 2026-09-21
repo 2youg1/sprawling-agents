@@ -5,33 +5,23 @@
 
 use super::*;
 
-fn item(class: ApprovalClass, tainted: bool, actor: &str) -> ApprovalItem {
+/// The two residents the table talks about: the appointed delegate, and
+/// anybody else.
+const DELEGATE: &str = "judge@b.1";
+const BYSTANDER: &str = "other@b.9";
+
+fn question(actor: &str) -> ApprovalItem {
     ApprovalItem {
         id: ApprovalId::new("item-1").unwrap(),
-        source: ApprovalSource::Gate,
         actor: actor.into(),
-        action_desc: "send the release mail".into(),
+        action_desc: "which of the two schemas should the importer read".into(),
         artifact: Locator::parse(&format!("cas:b3-{}", "ef".repeat(32))).unwrap(),
         cluster_key: ClusterKey {
-            class,
-            detail: "mail:release".into(),
+            class: ApprovalClass::Question,
+            detail: "importer:schema".into(),
         },
         created: TimeMs::new(1_000),
-        tainted,
-    }
-}
-
-fn policy(prefix: &str) -> Policy {
-    Policy {
-        id: "p-1".into(),
-        matcher: PolicyMatcher {
-            class: PolicyClass::AgentQuestion,
-            detail_prefix: prefix.into(),
-        },
-        verdict: PolicyVerdict::Allow,
-        source: ApprovalId::new("item-0").unwrap(),
-        created: TimeMs::new(0),
-        last_hit: None,
+        tainted: false,
     }
 }
 
@@ -39,119 +29,95 @@ fn resident(name: &str) -> ResidentId {
     ResidentId::new(name).unwrap()
 }
 
-#[test]
-fn policies_match_class_and_prefix_but_never_tainted_items() {
-    let p = policy("mail:");
-    assert_eq!(
-        match_item(&p, &item(ApprovalClass::AgentQuestion, false, "a")),
-        PolicyApplication::Applies(PolicyVerdict::Allow)
-    );
-    assert_eq!(
-        match_item(&p, &item(ApprovalClass::AgentQuestion, true, "a")),
-        PolicyApplication::NotApplicable
-    );
-    assert_eq!(
-        match_item(
-            &policy("web:"),
-            &item(ApprovalClass::AgentQuestion, false, "a")
-        ),
-        PolicyApplication::NotApplicable
-    );
-    // Commitment/BudgetLimit/DiscardEscalate: no PolicyClass variant
-    // exists to even write such a matcher — pinned by a trybuild case.
-    assert_eq!(
-        match_item(&p, &item(ApprovalClass::Commitment, false, "a")),
-        PolicyApplication::NotApplicable
-    );
+/// Who is being asked to answer, spelled so a row of the table reads as
+/// a sentence.
+#[derive(Debug, Clone, Copy)]
+enum Who {
+    Person,
+    TheDelegate,
+    SomebodyElse,
 }
 
-#[test]
-fn idle_policies_expire_and_skewed_clocks_do_not() {
-    const NINETY_DAYS_MS: u64 = 90 * 86_400_000;
-    let mut p = policy("");
-    assert_eq!(expiry(&p, TimeMs::new(0)), PolicyExpiry::Active);
-    assert_eq!(
-        expiry(&p, TimeMs::new(NINETY_DAYS_MS)),
-        PolicyExpiry::Expired
-    );
-    p.last_hit = Some(TimeMs::new(NINETY_DAYS_MS));
-    assert_eq!(
-        expiry(&p, TimeMs::new(NINETY_DAYS_MS.saturating_add(10))),
-        PolicyExpiry::Active
-    );
-    // now before created: skew reads Active, never a panic.
-    let skewed = Policy {
-        created: TimeMs::new(100),
-        ..policy("")
-    };
-    assert_eq!(expiry(&skewed, TimeMs::new(50)), PolicyExpiry::Active);
+fn answerer(who: Who) -> Answerer {
+    match who {
+        Who::Person => Answerer::Human,
+        Who::TheDelegate => Answerer::Resident(resident(DELEGATE)),
+        Who::SomebodyElse => Answerer::Resident(resident(BYSTANDER)),
+    }
 }
 
+/// The truth table of [`may_answer`], every row asserted.
+///
+/// Twelve rows: two autonomy states, three answerers, and the two
+/// actors that matter — the answerer itself, and somebody else. A row
+/// added to the table is a row asserted, which is the property this
+/// test exists for: the rule may not grow a case that nothing checks.
 #[test]
-fn the_answer_matrix_holds() {
-    let delegate = resident("judge@b.1");
-    let autonomy = Autonomy::Delegate(delegate.clone());
-    let question = item(ApprovalClass::AgentQuestion, false, "worker@b.2");
-    // Humans always may.
-    assert_eq!(
-        may_answer(&Autonomy::Owner, &question, &Answerer::Human),
-        AnswerVerdict::May
-    );
-    // The appointed delegate may answer an ordinary question.
-    assert_eq!(
-        may_answer(&autonomy, &question, &Answerer::Resident(delegate.clone())),
-        AnswerVerdict::May
-    );
-    // Not appointed: someone else's ruling counts for nothing.
-    assert_eq!(
-        may_answer(
-            &autonomy,
-            &question,
-            &Answerer::Resident(resident("other@b.9"))
-        ),
-        AnswerVerdict::NotTheDelegate
-    );
-    // Owner mode: no resident is appointed.
-    assert_eq!(
-        may_answer(
+fn the_answer_table_holds_row_by_row() {
+    let delegated = Autonomy::Delegate(resident(DELEGATE));
+    let table: [(&Autonomy, Who, &str, AnswerVerdict); 12] = [
+        // A person answers everything, whoever raised it, under either
+        // autonomy: appointing a delegate hands the inbox over, it does
+        // not take it away.
+        (&Autonomy::Owner, Who::Person, DELEGATE, AnswerVerdict::May),
+        (&Autonomy::Owner, Who::Person, BYSTANDER, AnswerVerdict::May),
+        (&delegated, Who::Person, DELEGATE, AnswerVerdict::May),
+        (&delegated, Who::Person, BYSTANDER, AnswerVerdict::May),
+        // Owner mode: no resident is appointed, so no resident answers.
+        (
             &Autonomy::Owner,
-            &question,
-            &Answerer::Resident(delegate.clone())
+            Who::TheDelegate,
+            BYSTANDER,
+            AnswerVerdict::NotTheDelegate,
         ),
-        AnswerVerdict::NotTheDelegate
-    );
-    // The three classes and tainted items are human-only.
-    for class in [
-        ApprovalClass::Commitment,
-        ApprovalClass::BudgetLimit,
-        ApprovalClass::DiscardEscalate,
-    ] {
+        (
+            &Autonomy::Owner,
+            Who::TheDelegate,
+            DELEGATE,
+            AnswerVerdict::NotTheDelegate,
+        ),
+        (
+            &Autonomy::Owner,
+            Who::SomebodyElse,
+            DELEGATE,
+            AnswerVerdict::NotTheDelegate,
+        ),
+        (
+            &Autonomy::Owner,
+            Who::SomebodyElse,
+            BYSTANDER,
+            AnswerVerdict::NotTheDelegate,
+        ),
+        // Delegate mode: the appointed resident answers what somebody
+        // else asked, and nobody else's ruling counts.
+        (&delegated, Who::TheDelegate, BYSTANDER, AnswerVerdict::May),
+        (
+            &delegated,
+            Who::SomebodyElse,
+            DELEGATE,
+            AnswerVerdict::NotTheDelegate,
+        ),
+        (
+            &delegated,
+            Who::SomebodyElse,
+            BYSTANDER,
+            AnswerVerdict::NotTheDelegate,
+        ),
+        // Self-approval is no approval, even for the delegate.
+        (
+            &delegated,
+            Who::TheDelegate,
+            DELEGATE,
+            AnswerVerdict::SelfApprovalBarred,
+        ),
+    ];
+    for (autonomy, who, actor, expected) in table {
         assert_eq!(
-            may_answer(
-                &autonomy,
-                &item(class, false, "worker@b.2"),
-                &Answerer::Resident(delegate.clone())
-            ),
-            AnswerVerdict::HumanOnly
+            may_answer(autonomy, &question(actor), &answerer(who)),
+            expected,
+            "autonomy {autonomy:?}, answerer {who:?}, raised by {actor}"
         );
     }
-    assert_eq!(
-        may_answer(
-            &autonomy,
-            &item(ApprovalClass::AgentQuestion, true, "worker@b.2"),
-            &Answerer::Resident(delegate.clone())
-        ),
-        AnswerVerdict::HumanOnly
-    );
-    // Self-approval is no approval.
-    assert_eq!(
-        may_answer(
-            &autonomy,
-            &item(ApprovalClass::AgentQuestion, false, "judge@b.1"),
-            &Answerer::Resident(delegate)
-        ),
-        AnswerVerdict::SelfApprovalBarred
-    );
 }
 
 /// The clerk is a delegate like any other: nothing about `hall/clerk`
@@ -164,34 +130,16 @@ fn the_clerk_answers_as_the_appointed_delegate_and_no_further() {
     assert_eq!(
         may_answer(
             &autonomy,
-            &item(ApprovalClass::AgentQuestion, false, "lab/room1"),
+            &question("lab/room1"),
             &Answerer::Resident(clerk.clone())
         ),
         AnswerVerdict::May
-    );
-    // The three must-pass-a-human classes stay the person's.
-    assert_eq!(
-        may_answer(
-            &autonomy,
-            &item(ApprovalClass::BudgetLimit, false, "lab/room1"),
-            &Answerer::Resident(clerk.clone())
-        ),
-        AnswerVerdict::HumanOnly
-    );
-    // A tainted item never reaches the clerk (C15).
-    assert_eq!(
-        may_answer(
-            &autonomy,
-            &item(ApprovalClass::AgentQuestion, true, "lab/room1"),
-            &Answerer::Resident(clerk.clone())
-        ),
-        AnswerVerdict::HumanOnly
     );
     // The Mayor is not the clerk, whatever else it may do.
     assert_eq!(
         may_answer(
             &autonomy,
-            &item(ApprovalClass::AgentQuestion, false, "lab/room1"),
+            &question("lab/room1"),
             &Answerer::Resident(resident(crate::consts_policy::HALL_MAYOR))
         ),
         AnswerVerdict::NotTheDelegate
@@ -200,11 +148,7 @@ fn the_clerk_answers_as_the_appointed_delegate_and_no_further() {
     assert_eq!(
         may_answer(
             &autonomy,
-            &item(
-                ApprovalClass::AgentQuestion,
-                false,
-                crate::consts_policy::HALL_CLERK
-            ),
+            &question(crate::consts_policy::HALL_CLERK),
             &Answerer::Resident(clerk)
         ),
         AnswerVerdict::SelfApprovalBarred
@@ -212,7 +156,7 @@ fn the_clerk_answers_as_the_appointed_delegate_and_no_further() {
 }
 
 #[test]
-fn two_runs_raising_their_first_approval_get_two_ids() {
+fn two_runs_raising_their_first_question_get_two_ids() {
     // What the clock-shaped identity lost: the two lanes reach here in
     // the same millisecond, and the inbox keys on this string.
     let left = RunId::from_bytes([1; 16]);

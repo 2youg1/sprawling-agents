@@ -176,6 +176,16 @@ impl Vfs for FaultFs {
         Ok(bytes)
     }
 
+    /// The live plane's length: what a stat of the running process's
+    /// view reports, so a power cut that dropped an unsynced tail is
+    /// visible here as a segment that shrank.
+    fn size(&self, path: &Path) -> io::Result<u64> {
+        FaultFs::charge(self, "size")?;
+        let state = self.state();
+        let file = state.files.get(path).ok_or_else(|| not_found(path))?;
+        Ok(u64::try_from(file.live.len()).unwrap_or(u64::MAX))
+    }
+
     /// The live plane from `offset`, capped at `len`. A file shorter
     /// than the request answers what it has, the same short answer a
     /// real read gives at the end of a file.

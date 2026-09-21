@@ -155,6 +155,6 @@ mod tests {
                 attachments: Vec::new(),
             })],
         );
-        kernel::tool_conformance::assert_tool_conformance(&mut tool);
+        kernel::tool::conformance::assert_tool_conformance(&mut tool);
     }
 }

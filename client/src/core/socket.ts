@@ -20,6 +20,7 @@
 import { batch, createSignal } from "solid-js";
 import type { Accessor } from "solid-js";
 
+import type { Lang } from "./lang";
 import { createAsking } from "./asking";
 import type { Asking } from "./asking";
 import { createBelief } from "./belief";
@@ -58,8 +59,12 @@ export function socketUrl(location: Location): string {
   return `${scheme}://${location.host}/ws`;
 }
 
-export function openConnection(url: string, token: string | null): Connection {
-  let link: Link = newLink(token);
+export function openConnection(
+  url: string,
+  token: string | null,
+  lang: Lang,
+): Connection {
+  let link: Link = newLink(token, lang);
   let socket: WebSocket | null = null;
   const [state, setState] = createSignal<LinkState>(link.state);
   const store = createBelief();

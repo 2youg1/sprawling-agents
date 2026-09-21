@@ -26,7 +26,7 @@ import { MAYOR, buildingOf, toFragment } from "../core/route";
 import { useGo, useSay, useUi } from "../ui";
 import { Machine } from "./machine";
 import { McpForm } from "./mcp";
-import { SkillsNote } from "./setup";
+import { Shelves } from "./setup/skills";
 import { ModelChoice } from "./setup/models";
 import { EffortSection } from "./shared/effort";
 import { ProviderDoor } from "./shared/provider";
@@ -86,7 +86,7 @@ export function Welcome() {
               <h2 class="mb-base text-label font-label text-text-quiet">{say("setup_mcp")}</h2>
               <McpForm addr={buildingOf(MAYOR)} />
               <h2 class="mt-wide mb-base text-label font-label text-text-quiet">{say("setup_skills_title")}</h2>
-              <SkillsNote />
+              <Shelves />
             </Match>
             <Match when={step() === LAST}>
               <Show when={answer()}>{(held) => <ModelChoice answer={held()} />}</Show>

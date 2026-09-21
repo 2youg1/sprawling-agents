@@ -8,6 +8,9 @@
 use std::path::Path;
 
 use crate::error::MemoryError;
+use crate::vfs::Vfs;
+
+use super::files::{count_files, count_records, head_of};
 
 /// What a bundle claims to contain. Checked on restore, so a truncated
 /// or half-copied bundle is refused rather than restored quietly.
@@ -20,6 +23,35 @@ pub struct Manifest {
 }
 
 impl Manifest {
+    /// The four numbers, counted off the directories that hold the
+    /// thing being described.
+    ///
+    /// One place computes them, so the count a bundle claims and the
+    /// count a restored city is checked against are the same
+    /// measurement of the same kind of directory. Either side counting
+    /// its own way is how the two sides come to disagree about what
+    /// "a file" is.
+    ///
+    /// `files_root` is a city root or a bundle's copy of one, and what
+    /// is counted under it excludes the reserved subtree either way.
+    ///
+    /// # Errors
+    /// Propagates a directory that cannot be walked and a ledger whose
+    /// chain does not verify.
+    pub(crate) fn of(
+        vfs: &dyn Vfs,
+        ledger_dir: &Path,
+        cas_dir: &Path,
+        files_root: &Path,
+    ) -> Result<Manifest, MemoryError> {
+        Ok(Manifest {
+            records: count_records(vfs, ledger_dir)?,
+            head: head_of(vfs, ledger_dir)?,
+            cas_objects: count_files(vfs, cas_dir)?,
+            files: count_files(vfs, files_root)?,
+        })
+    }
+
     /// How many ledger records the bundle holds.
     #[must_use]
     pub fn records(&self) -> u64 {

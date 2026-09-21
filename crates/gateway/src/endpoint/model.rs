@@ -44,14 +44,11 @@ impl Model for Endpoint {
         }
         self.refuse_pictures_a_blind_model_cannot_read(req)?;
         let wire = self.wire_request(req)?;
-        let mut request = self
-            .client
-            .post(&self.config.base_url)
-            .header("content-type", "application/json");
-        for (name, value) in &self.config.extra_headers {
-            request = request.header(name, value);
-        }
-        request = self.authorize(request)?;
+        let request = self.authorize(
+            self.client
+                .post(&self.config.base_url)
+                .header("content-type", "application/json"),
+        )?;
         let response = request
             .json(&wire)
             .send()

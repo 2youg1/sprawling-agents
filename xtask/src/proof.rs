@@ -49,7 +49,7 @@ pub(super) const EXCUSED: &str = "// not-proved:";
 const CI: &str = ".github/workflows/ci.yml";
 
 /// The document whose §11 states how many harnesses exist.
-const ARCH: &str = "ARCHITECTURE.md";
+use crate::architecture::PATH as ARCH;
 
 /// The phrase a stated total is attached to, in the document's own words.
 const STATED: &str = "kani harness";

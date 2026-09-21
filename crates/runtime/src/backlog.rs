@@ -20,6 +20,11 @@
 //! pipe buffer that fills stops the child inside a write — which is the
 //! same hang this module exists to remove, wearing another name.
 //!
+//! How many polls that wait is, and how an ending is read, both belong
+//! to [`waiting`]: the window is carried by the table rather than read
+//! from a constant here, so a caller can choose one short enough to
+//! observe both answers.
+//!
 //! The table has two kinds of member: a background command, which a
 //! halt kills, and a run a resident handed down, which a halt marks and
 //! which stops itself at its next safe point by asking [`Backlog::stopping`]
@@ -31,12 +36,6 @@ use std::process::{Command, Stdio};
 
 use kernel::{Address, AxCode, AxError};
 
-/// How many times the short window is polled, and how long each poll
-/// waits. Their product is the ten seconds a caller blocks for before a
-/// command is handed to the background.
-const WINDOW_POLLS: u32 = 500;
-const POLL_INTERVAL_MS: u64 = 20;
-
 /// One member of the table, for as long as this process lives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BacklogId(u64);
@@ -47,59 +46,6 @@ impl std::fmt::Display for BacklogId {
     }
 }
 
-/// What the short window came to. Exhaustive rather than an optional
-/// handle: "it finished" and "it is still going" are two different
-/// things for the caller to say to a model, and a `None` would leave
-/// which one it was to be inferred.
-#[derive(Debug, PartialEq, Eq)]
-pub enum Started {
-    Settled {
-        exit_code: i64,
-        stdout: String,
-        stderr: String,
-    },
-    Backgrounded {
-        id: BacklogId,
-        what: String,
-    },
-}
-
-/// Which of the two kinds of member a standing entry is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BacklogKind {
-    Command,
-    Run,
-}
-
-impl BacklogKind {
-    #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            BacklogKind::Command => "command",
-            BacklogKind::Run => "run",
-        }
-    }
-}
-
-/// A member that is still running.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Standing {
-    pub id: BacklogId,
-    pub scope: Address,
-    pub what: String,
-    pub kind: BacklogKind,
-}
-
-/// A member that has stopped, collected once and then forgotten.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Finished {
-    pub id: BacklogId,
-    pub what: String,
-    pub exit_code: i64,
-    pub stdout: String,
-    pub stderr: String,
-}
-
 /// The table itself. Cloning gives another handle onto the same table,
 /// which is how the assembly point can stop what a tool started without
 /// either of them knowing about the other. A clone carries `scratch`
@@ -108,14 +54,12 @@ pub struct Finished {
 pub struct Backlog {
     table: std::sync::Arc<std::sync::Mutex<Table>>,
     scratch: Scratch,
+    window: PollBudget,
 }
 
 impl Default for Backlog {
     fn default() -> Backlog {
-        Backlog {
-            table: std::sync::Arc::default(),
-            scratch: Scratch::open(),
-        }
+        Backlog::with_window(PollBudget::DEFAULT)
     }
 }
 
@@ -129,6 +73,17 @@ impl Backlog {
     #[must_use]
     pub fn new() -> Backlog {
         Backlog::default()
+    }
+
+    /// A table whose callers block for this window before a command is
+    /// handed to the background.
+    #[must_use]
+    pub fn with_window(window: PollBudget) -> Backlog {
+        Backlog {
+            table: std::sync::Arc::default(),
+            scratch: Scratch::open(),
+            window,
+        }
     }
 
     /// Starts a command, waits out the short window, and hands back
@@ -177,16 +132,16 @@ impl Backlog {
                 },
             },
         )?;
-        for _ in 0..WINDOW_POLLS {
-            if let Some(exit_code) = self.settle(id)? {
+        for _ in 0..self.window.polls() {
+            if let Some(exit) = self.settle(id)? {
                 let (stdout, stderr) = collect(&dir);
                 return Ok(Started::Settled {
-                    exit_code,
+                    exit,
                     stdout,
                     stderr,
                 });
             }
-            std::thread::sleep(std::time::Duration::from_millis(POLL_INTERVAL_MS));
+            std::thread::sleep(self.window.interval());
         }
         self.hand_over(id)?;
         Ok(Started::Backgrounded { id, what })
@@ -291,12 +246,22 @@ impl Backlog {
             else {
                 continue;
             };
-            if let Ok(Some(status)) = child.try_wait() {
+            let ending = match child.try_wait() {
+                Ok(Some(status)) => Some(Exit::of(&status)),
+                Ok(None) => None,
+                // A host that will not answer is not a member that is
+                // still running: the caller is told the ending was not
+                // read, and the entry stops being reported for ever.
+                Err(_) => Some(Exit::Unknown {
+                    why: Unseen::WaitRefused,
+                }),
+            };
+            if let Some(exit) = ending {
                 let (stdout, stderr) = collect(dir);
                 done.push(Finished {
                     id: *id,
                     what: member.what.clone(),
-                    exit_code: i64::from(status.code().unwrap_or(-1)),
+                    exit,
                     stdout,
                     stderr,
                 });
@@ -354,19 +319,23 @@ impl Backlog {
     /// Whether this member has stopped. Removing it here is what keeps
     /// [`Backlog::harvest`] from reporting a result its own caller is
     /// about to return.
-    fn settle(&self, id: BacklogId) -> Result<Option<i64>, AxError> {
+    fn settle(&self, id: BacklogId) -> Result<Option<Exit>, AxError> {
         let mut table = self.hold()?;
         let Some(Member {
             body: Body::Command { child, .. },
             ..
         }) = table.members.get_mut(&id)
         else {
-            return Ok(Some(-1));
+            return Ok(Some(Exit::Unknown {
+                why: Unseen::LeftTheTable,
+            }));
         };
         let stopped = match child.try_wait() {
-            Ok(Some(status)) => Some(i64::from(status.code().unwrap_or(-1))),
+            Ok(Some(status)) => Some(Exit::of(&status)),
             Ok(None) => None,
-            Err(_) => Some(-1),
+            Err(_) => Some(Exit::Unknown {
+                why: Unseen::WaitRefused,
+            }),
         };
         if stopped.is_some() {
             table.members.remove(&id);
@@ -392,6 +361,10 @@ impl Backlog {
 mod tests;
 
 mod member;
+mod report;
 mod scratch;
+pub mod waiting;
 use member::{Body, Member, RunState, collect, storage};
+pub use report::{BacklogKind, Finished, Standing, Started};
 use scratch::Scratch;
+pub use waiting::{Exit, PollBudget, Unseen};

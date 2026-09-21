@@ -18,6 +18,8 @@ import type {
   ServerFrame,
   Welcome,
 } from "../wire";
+import type { Key, Lang } from "./lang";
+import { fill, say } from "./lang";
 import { B3Hash, WIRE_HASH, WIRE_V } from "../wire";
 
 const SCHEMA: B3Hash = B3Hash.make(WIRE_HASH);
@@ -66,14 +68,19 @@ export type LinkAction =
 export interface Link {
   readonly state: LinkState;
   readonly token: string | null;
+  // Which language this page reads. On the link because the refusals
+  // it mints are sentences a person meets, and `lang.json` is where
+  // every one of those lives; a reducer that built them in English
+  // would be a second place the client's words come from.
+  readonly lang: Lang;
   // Failures since frames last flowed. On the link rather than in the
   // backoff state: every retry passes through `opening` on its way back
   // to `backoff`, and a counter living in the phase never climbs.
   readonly failures: number;
 }
 
-export function newLink(token: string | null): Link {
-  return { state: { kind: "idle" }, token, failures: 0 };
+export function newLink(token: string | null, lang: Lang): Link {
+  return { state: { kind: "idle" }, token, lang, failures: 0 };
 }
 
 export function isLive(link: Link): boolean {
@@ -93,41 +100,56 @@ export function backoffMs(attempt: number): number {
   return LADDER_MS[Math.min(Math.max(attempt, 0), last)] ?? 10000;
 }
 
-function refusal(action: string, subject: string, recovery: string): AxError {
+function refusal(
+  lang: Lang,
+  action: Key,
+  subject: string,
+  recovery: Key,
+): AxError {
   return {
     code: "E_WIRE_MISMATCH",
-    action,
+    action: say(lang, action),
     subject,
-    recovery,
+    recovery: say(lang, recovery),
     nearby: [],
     retriable: false,
   };
 }
 
-function mismatch(welcome: Welcome): AxError {
+function mismatch(lang: Lang, welcome: Welcome): AxError {
   return refusal(
-    "join this city's control surface",
-    `this page speaks wire v${String(WIRE_V)} and the server speaks v${String(welcome.wire_v)}`,
-    "reload the page to fetch the client this server was built with",
+    lang,
+    "wire_join_action",
+    fill(say(lang, "wire_version_mismatch"), {
+      ours: String(WIRE_V),
+      theirs: String(welcome.wire_v),
+    }),
+    "wire_reload_for_client",
   );
 }
 
-const OUT_OF_ORDER = refusal(
-  "join this city's control surface",
-  "the server streamed frames before completing the handshake",
-  "reload the page; if it repeats, the address is not a sprawling server",
-);
+function outOfOrder(lang: Lang): AxError {
+  return refusal(
+    lang,
+    "wire_join_action",
+    say(lang, "wire_out_of_order"),
+    "wire_reload_or_wrong_host",
+  );
+}
 
 // A frame this build cannot read. Reconnecting cannot help: the server
 // sends the same frame to the page it comes back as, so the ladder
 // would run for ever behind a blank screen while the one thing that
 // fixes it — fetching the client this server was built with — is a
 // reload away.
-const UNREADABLE = refusal(
-  "read a frame from this city",
-  `this page speaks wire v${String(WIRE_V)} and the server sent a frame it cannot read`,
-  "reload the page to fetch the client this server was built with",
-);
+function unreadable(lang: Lang): AxError {
+  return refusal(
+    lang,
+    "wire_read_frame_action",
+    fill(say(lang, "wire_frame_undecodable"), { ours: String(WIRE_V) }),
+    "wire_reload_for_client",
+  );
+}
 
 // Starts, or restarts after a refusal was cleared by the person.
 export function connect(link: Link): [Link, LinkAction] {
@@ -151,7 +173,7 @@ function retreat(link: Link): [Link, LinkAction] {
 
 function welcomed(link: Link, welcome: Welcome): [Link, LinkAction] {
   if (welcome.wire_v !== WIRE_V || welcome.schema !== WIRE_HASH) {
-    return refuse(link, mismatch(welcome));
+    return refuse(link, mismatch(link.lang, welcome));
   }
   return [
     { ...link, state: { kind: "live", city: welcome.city ?? null } },
@@ -187,7 +209,7 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
     }
     // A server that streams or answers before welcoming is not speaking
     // this protocol; treat it as the mismatch it is.
-    return refuse(link, OUT_OF_ORDER);
+    return refuse(link, outOfOrder(link.lang));
   }
   if (link.state.kind !== "live") {
     return [link, { kind: "nothing" }];
@@ -235,7 +257,7 @@ export function advance(link: Link, event: LinkEvent): [Link, LinkAction] {
     case "received":
       return received(link, event.frame);
     case "undecodable":
-      return refuse(link, UNREADABLE);
+      return refuse(link, unreadable(link.lang));
     case "closed":
       return retreat(link);
     case "wait_elapsed":

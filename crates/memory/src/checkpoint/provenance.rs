@@ -106,7 +106,7 @@ impl Provenance {
                 Some(line) if !line.is_empty() => line,
                 _ => continue,
             };
-            return Ok(kernel::chain_hash(first));
+            return Ok(kernel::ledger::chain_hash(first));
         }
         Err(MemoryError::Checkpoint {
             op: "read the city's genesis line",

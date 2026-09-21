@@ -24,7 +24,7 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-use crate::arbiter::{Circumstance, Level, arbitrate};
+use crate::arbiter::{Level, arbitrate};
 
 /// What the run did to the city's goal register. Exhaustive for the
 /// same reason as `SignalEffect`: a variant the worker does not record
@@ -111,11 +111,7 @@ impl GoalDesk {
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
         };
-        // The two facts a machine caller cannot know are left false on
-        // purpose: whether a gate refused, and whether the clash is
-        // about intent, are the caller's knowledge, and a tool that
-        // guessed at them would be guessing at the person's business.
-        match arbitrate(&self.registered, &entry, Circumstance::default()) {
+        match arbitrate(&self.registered, &entry) {
             None => {
                 let mut result = Map::new();
                 result.insert("id".to_owned(), Value::String(entry.id.as_str().to_owned()));
@@ -149,11 +145,6 @@ fn next_move(level: &Level) -> String {
         Level::Arbitrate { with } => format!(
             "signal the resident who registered `{}` and agree which of you takes it",
             with.as_str()
-        ),
-        Level::Owner { with, because } => format!(
-            "ask the person: this clashes with `{}` ({})",
-            with.as_str(),
-            because.as_str()
         ),
     }
 }

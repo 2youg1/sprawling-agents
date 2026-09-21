@@ -60,7 +60,9 @@ fn a_command_that_finishes_inside_the_window_produces_no_handle() {
         .run(&addr, "exit 3".to_owned(), finishes_now(3))
         .unwrap();
     match started {
-        Started::Settled { exit_code, .. } => assert_eq!(exit_code, 3),
+        Started::Settled { exit, .. } => {
+            assert_eq!(exit, runtime::Exit::Ended { code: 3 });
+        }
         Started::Backgrounded { .. } => panic!("a short command must still feel synchronous"),
     }
     assert!(

@@ -128,6 +128,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
                 fuel: 4096,
                 mounts: vec![Address::parse("lab/shared").unwrap()],
                 env_passthrough: Vec::new(),
+                trusted: Vec::new(),
             }),
             mcp: Some(vec![kernel::McpServer {
                 label: kernel::ServerLabel::parse("docs").unwrap(),
@@ -214,12 +215,11 @@ fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
     );
 }
 
-/// A building's rules are a governance document, and asking a
-/// person to type one by hand is the wrong door. An agent drafts
-/// them; the person is shown the proposal and allows it; the file
-/// lands in the reserved subtree that no write domain reaches.
+/// A run does not change what governs it. The rules tool answers the
+/// model with a refusal naming the file a person edits, and the
+/// building it was asked about stands exactly as it did.
 #[test]
-fn a_building_can_be_asked_to_rewrite_its_own_rules_and_the_person_decides() {
+fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
     let dir = tempfile::tempdir().unwrap();
     init_city(dir.path()).unwrap();
     let proposal = serde_json::json!({
@@ -264,23 +264,12 @@ fn a_building_can_be_asked_to_rewrite_its_own_rules_and_the_person_decides() {
         "a building rewrote its own rules without anybody being asked"
     );
 
-    let waiting = worker
-        .governance
-        .pending
-        .values()
-        .next()
-        .cloned()
-        .expect("the person was never asked");
-    assert_eq!(waiting.cluster_key.class, kernel::ApprovalClass::Governance);
     assert!(
-        waiting.action_desc.contains("review: true"),
-        "the person is shown what they are allowing: {}",
-        waiting.action_desc
+        worker.governance.pending.is_empty(),
+        "a rule change is not a question: it is refused, and a person edits the file"
     );
-    allow_the_one_pending_item(&mut worker);
-
     let after = city::load(dir.path(), &Address::parse("lab").unwrap()).unwrap();
-    assert!(after.review(), "the allowed proposal never landed");
+    assert!(!after.review(), "a run rewrote the rules it is judged by");
     assert!(
         city::building_path(dir.path(), &Address::parse("lab").unwrap())
             .to_string_lossy()

@@ -294,23 +294,17 @@ pub(super) const PLAN_ONE_FREE_ROW: &str = concat!(
     "| 1 | wire the kiln | 1 |  | Not started |  |\n",
 );
 
-/// Answers the one thing waiting, as the person would. Delegation
-/// now asks before it hands anything down, so a test that wants a
-/// delegate has to say yes first - which is the point of the door.
-pub(super) fn allow_the_one_pending_item(worker: &mut RunWorker) -> kernel::ClusterKey {
-    let item = worker
-        .governance
-        .pending
-        .values()
-        .next()
-        .cloned()
-        .expect("exactly one thing is waiting");
-    worker
-        .handle(channels::Command::Approve {
-            item: item.id.clone(),
-            verdict: kernel::PolicyVerdict::Allow,
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"allow"),
-        })
-        .unwrap();
-    item.cluster_key
+/// A control surface that listens for interrupts and nothing else.
+///
+/// The three sinks are one value and one injection, so a test that
+/// cares about steers says what it does not listen for rather than
+/// reaching for a setter of its own.
+pub(super) fn only_interrupts(
+    source: std::sync::Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>,
+) -> Serving {
+    Serving {
+        deltas: std::sync::Arc::new(|_delta| {}),
+        machine: std::sync::Arc::new(|_found| {}),
+        interrupts: source,
+    }
 }

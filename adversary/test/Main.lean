@@ -383,6 +383,25 @@ private def twoDispatchesAreTwoRuns (door : Door) : IO Unit :=
     | .error why =>
       ensure false s!"two runs at once left a history that does not verify: {why}"
 
+/-! ## What a person saved -/
+
+/-- After any sequence of writes, the configuration on disk and the
+configuration the city answers with are the same configuration.
+
+A setting is saved into a file a person also edits by hand, and read back by a
+fold the page draws from. Those are two homes for one fact, so the property
+worth asserting is that no sequence of writes can drive them apart: the answer
+states the last figure written, the file states that figure and no earlier one,
+and the layer above states none of them.
+
+**This is the invariant a person's own preferences will need, asserted where
+the product already carries it.** `Sprawling.Layer` records why the world is
+written against a building's configuration rather than against a preferences
+frame: that frame does not exist yet, and the property is about the file. -/
+private def savedReadsBack (door : Door) : IO Unit := do
+  report <| ← forAll 3 (← baseSeed) (writeSequence 4) toString shrinkSequence fun written =>
+    writtenReadsBack door written
+
 /-! ## The disk lies -/
 
 /-- The simplest lie a disk can tell: one changed byte.
@@ -484,6 +503,7 @@ private def properties (door : Door) : Tree :=
         , .leaf "work on a messages endpoint is never refused for want of a ceiling"
             (messagesWorkIsNeverRefusedForACeiling door)
         , .leaf "two dispatches at once are two runs" (twoDispatchesAreTwoRuns door) ]
+    , .leaf "what was written into a configuration reads back" (savedReadsBack door)
     , .leaf "a city admits exactly what its rules admit" (traces door)
     , .leaf "a halted city takes no work until it is released" (halting door)
     , .leaf "history reads back as one unbroken chain" (chained door)

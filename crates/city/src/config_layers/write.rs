@@ -129,8 +129,8 @@ fn vaulted(
         if SecretRef::parse(value).is_ok() {
             continue;
         }
-        let named = kernel::names_a_credential(name);
-        let shaped = !kernel::scan(value.as_bytes()).is_empty();
+        let named = kernel::secret::names_a_credential(name);
+        let shaped = !kernel::secret::scan(value.as_bytes()).is_empty();
         let violation = match (named, shaped) {
             (true, _) => "the name reads as a credential",
             (false, true) => "the value has the shape of a credential",

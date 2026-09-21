@@ -203,7 +203,7 @@ export function App() {
     return answer.endpoints.chosen.some((chosen) => chosen.tag === "main");
   });
   createEffect(() => {
-    if (ready() === false && !ui.prefs.welcomed() && view().kind === "talk") {
+    if (ready() === false && !ui.prefs.held().welcomed && view().kind === "talk") {
       go({ kind: "welcome" });
     }
   });
@@ -227,7 +227,7 @@ export function App() {
   createEffect(() => {
     const name = ui.conn.belief.city ?? "sprawling";
     document.title = waiting() > 0 ? `(${String(waiting())}) ${name}` : name;
-    document.documentElement.lang = ui.prefs.lang();
+    document.documentElement.lang = ui.prefs.held().lang;
   });
   createEffect(() => {
     paintMark(document, waiting() > 0 ? "waiting" : working() ? "live" : "quiet");

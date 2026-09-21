@@ -118,7 +118,7 @@ impl PlanView {
                 // back as "no table found", which sends a person to
                 // edit a table when the file will not open.
                 Err(err) => Reading::Unreadable(vec![err.to_string()]),
-                Ok(text) => match kernel::check_roadmap_shape(&text) {
+                Ok(text) => match kernel::spine::check_roadmap_shape(&text) {
                     RoadmapShape::WellFormed { rows } => match PlanTree::build(rows) {
                         Ok(tree) => Reading::Tree(Box::new(tree)),
                         Err(refusal) => Reading::Unreadable(vec![refusal.to_string()]),
@@ -209,7 +209,7 @@ impl PlanView {
                     }),
             })
             .collect();
-        kernel::spread(tree, &red)
+        kernel::blockage::spread(tree, &red)
     }
 }
 

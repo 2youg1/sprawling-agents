@@ -66,7 +66,7 @@ impl ScriptModel {
 /// When the content blocks cannot be encoded into a payload.
 pub fn concluding(said: &str) -> Result<ModelReturn, AxError> {
     Ok(ModelReturn::bare(
-        kernel::message_payload(&[kernel::ContentBlock::Text {
+        kernel::model::message_payload(&[kernel::ContentBlock::Text {
             text: said.to_owned(),
         }])?,
         Vec::new(),
@@ -146,6 +146,6 @@ mod tests {
     #[test]
     fn passes_the_model_conformance_suite() {
         let mut model = ScriptModel::silent();
-        kernel::model_conformance::assert_model_conformance(&mut model, &req());
+        kernel::model::conformance::assert_model_conformance(&mut model, &req());
     }
 }

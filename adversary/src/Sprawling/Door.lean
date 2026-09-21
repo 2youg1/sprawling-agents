@@ -110,6 +110,19 @@ instance : ToString Scope where
 inductive Verb where
   | cityView
   | endpointView
+  /-- One building's own layer, including the sandbox limits it states. -/
+  | buildingView (addr : String)
+  /-- One file of the city, read as the person who opens it reads it.
+
+  The reserved subtree is readable through this verb on purpose, which is what
+  lets a check compare a configuration file with the answer folded from it. -/
+  | document (path : String)
+  /-- Write what one building's runs may reach into that building's own layer.
+
+  Only the instruction budget travels, because it is the one figure in
+  `SandboxLimits` that a person types a number into: everything else this frame
+  carries is sent at its empty value so that two writes differ in one fact. -/
+  | configureBuilding (addr : String) (fuel : Nat) (idem : IdemKey)
   | createBuilding (addr : String) (template : Template) (idem : IdemKey)
   | dispatch (addr : String) (session : String) (idem : IdemKey)
   | halt (scope : Scope) (idem : IdemKey)
@@ -178,6 +191,19 @@ one the product owed. -/
 def Verb.frame : Verb → String
   | .cityView => query "city_view"
   | .endpointView => query "endpoint_view"
+  | .buildingView addr => asked "building_view" [("addr", .str addr)]
+  | .document path => asked "document" [("at", .str path)]
+  | .configureBuilding addr fuel idem =>
+    command "configure_building"
+      [ ("addr", .str addr)
+      , ("sandbox", Json.mkObj
+          [ ("shell", Json.bool false)
+          , ("fuel", Json.num (JsonNumber.fromNat fuel))
+          , ("mounts", Json.arr #[])
+          , ("env_passthrough", Json.arr #[]) ])
+      , ("mcp", .null)
+      , ("desktop", .null)
+      , ("idem", .str idem.value) ]
   | .createBuilding addr template idem =>
     command "create_building"
       [("addr", .str addr), ("template", .str template.name), ("idem", .str idem.value)]
@@ -213,6 +239,10 @@ def Verb.frame : Verb → String
   | .verbatim raw => raw
 where
   query name := (Json.mkObj [("query", .str name)]).compress
+  /-- A query that carries fields is a tagged object where one that carries
+  none is a bare word, which is how serde renders the two kinds of variant. -/
+  asked name fields :=
+    (Json.mkObj [("query", Json.mkObj [(name, Json.mkObj fields)])]).compress
   command name fields := (Json.mkObj [("command", Json.mkObj [(name, Json.mkObj fields)])]).compress
   tokensOrNull : Option Nat → Json
     | some tokens => Json.num (JsonNumber.fromNat tokens)

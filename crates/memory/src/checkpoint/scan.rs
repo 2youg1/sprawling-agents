@@ -5,7 +5,8 @@
 
 //! Checkpoint scans: staged secrets and scoped commits.
 
-use kernel::{TimeMs, scan};
+use kernel::TimeMs;
+use kernel::secret::scan;
 
 use crate::error::MemoryError;
 
@@ -162,13 +163,11 @@ impl Checkpoint {
     /// deletions included.
     fn stage_tree(&mut self) -> Result<(), MemoryError> {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
+        // git asks with 1 for skip and 0 for stage, and what belongs to
+        // the city rather than to a person is `memory::reserved`'s
+        // answer here as much as it is at the worktree ceiling.
         let mut skip_reserved = |path: &std::path::Path, _matched: &[u8]| -> i32 {
-            let rendered = path.to_string_lossy().replace('\\', "/");
-            i32::from(
-                rendered
-                    .split('/')
-                    .any(|part| part == kernel::RESERVED_PREFIX),
-            )
+            i32::from(!crate::reserved::outside_reserved(path))
         };
         index
             .add_all(

@@ -8,7 +8,6 @@ impl collab::ClaimEffect
 impl collab::ClaimTool
 impl collab::DelegateDesk
 impl collab::DelegateTool
-impl collab::Escalation
 impl collab::FanIn
 impl collab::GoalDesk
 impl collab::GoalTool
@@ -50,9 +49,6 @@ pub collab::ArchiveEffect::Recorded::text: alloc::string::String
 pub collab::Arrival::source: alloc::string::String
 pub collab::Arrival::subject: alloc::string::String
 pub collab::Arrival::tainted: bool
-pub collab::Circumstance::arbitration_tried: bool
-pub collab::Circumstance::gate_refused: bool
-pub collab::Circumstance::touches_intent: bool
 pub collab::ClaimEffect::Claimed
 pub collab::ClaimEffect::Claimed::id: kernel::node_id::NodeId
 pub collab::ClaimEffect::Claimed::item: alloc::string::String
@@ -67,9 +63,6 @@ pub collab::Delegated::goal: alloc::string::String
 pub collab::Delegated::kind: kernel::delegation::DelegateKind
 pub collab::Delegated::room: kernel::address::Address
 pub collab::Delegated::task: alloc::string::String
-pub collab::Escalation::ArbitrationExhausted
-pub collab::Escalation::GateRefused
-pub collab::Escalation::Intent
 pub collab::GoalEffect::Conflicted
 pub collab::GoalEffect::Conflicted::entry: kernel::goal::GoalEntry
 pub collab::GoalEffect::Conflicted::level: collab::Level
@@ -87,9 +80,6 @@ pub collab::Lane::Ordinary
 pub collab::Lane::Urgent
 pub collab::Level::Arbitrate
 pub collab::Level::Arbitrate::with: kernel::goal::GoalId
-pub collab::Level::Owner
-pub collab::Level::Owner::because: collab::Escalation
-pub collab::Level::Owner::with: kernel::goal::GoalId
 pub collab::Level::Serialize
 pub collab::Level::Serialize::after: kernel::goal::GoalId
 pub collab::OpenRequest::branch: alloc::string::String
@@ -123,7 +113,6 @@ pub collab::SignalKind::Thread
 pub const collab::ARCHIVE_KINDS: [&str; 4]
 pub enum collab::ArchiveEffect
 pub enum collab::ClaimEffect
-pub enum collab::Escalation
 pub enum collab::GoalEffect
 pub enum collab::Handback
 pub enum collab::Lane
@@ -169,7 +158,6 @@ pub fn collab::DelegateDesk::take(&mut self) -> alloc::vec::Vec<collab::Delegate
 pub fn collab::DelegateTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn collab::DelegateTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn collab::DelegateTool::new(alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::DelegateDesk>>) -> core::result::Result<collab::DelegateTool, kernel::error::shape::AxError>
-pub fn collab::Escalation::as_str(self) -> &'static str
 pub fn collab::FanIn::accept(&mut self, collab::Artifact)
 pub fn collab::FanIn::artifacts(&self) -> impl core::iter::traits::iterator::Iterator<Item = &collab::Artifact>
 pub fn collab::FanIn::decide(&self, &str) -> core::result::Result<collab::Joined, kernel::error::shape::AxError>
@@ -267,7 +255,7 @@ pub fn collab::WorkshopDesk::who(&self) -> &str
 pub fn collab::WorkshopTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn collab::WorkshopTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn collab::WorkshopTool::new(alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::WorkshopDesk>>, alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::DelegateDesk>>) -> core::result::Result<collab::WorkshopTool, kernel::error::shape::AxError>
-pub fn collab::arbitrate(&[kernel::goal::GoalEntry], &kernel::goal::GoalEntry, collab::Circumstance) -> core::option::Option<collab::Level>
+pub fn collab::arbitrate(&[kernel::goal::GoalEntry], &kernel::goal::GoalEntry) -> core::option::Option<collab::Level>
 pub fn collab::conflict_payload(&kernel::goal::GoalEntry, &collab::Level) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn collab::evidence_of(&str, &kernel::node_id::NodeId) -> core::option::Option<kernel::locator::Locator>
 pub fn collab::still_true(&str, &collab::ClaimEffect) -> bool
@@ -277,7 +265,6 @@ pub struct collab::ArchiveDesk
 pub struct collab::ArchiveTool
 pub struct collab::Arrival
 pub struct collab::Artifact
-pub struct collab::Circumstance
 pub struct collab::Claim
 pub struct collab::ClaimDesk
 pub struct collab::ClaimTool

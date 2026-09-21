@@ -65,8 +65,8 @@ The ones whose arguments need saying:
 | `steer {run, text, idem}` | add an instruction to a run without stopping it; it lands after the next tool result |
 | `cancel {run, idem}` | stop one run |
 | `halt {scope, idem}` · `release {scope, idem}` | stop, or let go on, a city, a building, or a workshop |
-| `approve {item, verdict, idem}` · `create_policy {from_item, idem}` | answer what waits for a person; turn one answer into a standing rule |
-| `set_autonomy {scope, autonomy, idem}` | who answers approvals: `owner` (you), `delegate` (a resident), `deferred` |
+| `approve {item, verdict, idem}` · `create_policy {from_item, idem}` | answer a design question a resident asked; turn one answer into a standing rule |
+| `set_autonomy {scope, autonomy, idem}` | who answers those questions: `owner` (you) or `delegate` (a resident) |
 | `attach_endpoint {name, base_url, dialect, secret, auth_header, admit, idem}` | register a provider. `admit` is the model list you declare; a provider that cannot list its models is registered on your word |
 | `select_model {endpoint, model, tag, context_tokens, max_output_tokens, idem}` | point a tag at a model, with the two facts no model list returns |
 | `create_building {addr, template, idem}` · `configure_building {addr, sandbox, mcp, idem}` | raise a building; set its sandbox and the tool servers it may reach |
@@ -127,10 +127,11 @@ What follows, and where to watch it:
 2. Each building pursues its roadmap: rooms open, runs work, the Ledger
    grows. `run_view` for one run; `building_view` for one building's rooms
    and what waits in each.
-3. Where a Gate or a resident needs an answer, the item lands in
-   `approval_queue`. With autonomy delegated to `hall/clerk` — the default a
-   new city is raised with — the clerk answers and records its reason; only a
-   verdict a policy marks as a person's stays for you.
+3. Where a resident needs a design question answered, the item lands in
+   `approval_queue`; a door never puts one there, because a door decides.
+   With autonomy delegated to `hall/clerk` — the default a new city is
+   raised with — the clerk answers and records its reason; a tainted
+   question stays for you.
 4. A building that reviews its own work opens a pull request from a
    worktree; the merge commit that lands on that repository's trunk carries
    the trailers `Sprawling-Run`, `Sprawling-Actor`, `Sprawling-Model`,

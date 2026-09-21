@@ -15,7 +15,7 @@ use kernel::{AxCode, AxError, EventKind};
 use crate::serving::random_token;
 
 use super::super::{RunWorker, now_ms};
-use super::{Credential, Entered, PROBE_TIMEOUT_MS, dialect_of, poisoned_vault};
+use super::{Credential, Entered, PROBE_TIMEOUT_MS, dialect_of, poisoned_vault, subscription};
 
 impl RunWorker {
     /// Renews a subscription credential that is about to stop working.
@@ -31,7 +31,7 @@ impl RunWorker {
     /// the login is over, and saying so beats retrying what will fail
     /// again.
     pub(in crate::assembly) fn renew_if_stale(&mut self, provider: &str) -> Result<(), AxError> {
-        let Some(expires_at) = self.expiries.get(provider).copied() else {
+        let Some(expires_at) = self.expiries.of(provider) else {
             return Ok(());
         };
         // A minute of margin: a call started now must still be holding a
@@ -42,13 +42,13 @@ impl RunWorker {
         let Some(profile) = gateway::profile(provider) else {
             return Ok(());
         };
-        let stored = kernel::SecretRef::parse(&format!("secret:{provider}/oauth-refresh"))?;
+        let stored = subscription::oauth_refresh_ref(provider)?;
         let refresh = {
             let vault = self.vault.lock().map_err(|_| poisoned_vault())?;
             vault.resolve(&stored)?
         };
         let tokens = gateway::oauth_refresh(profile, &refresh, PROBE_TIMEOUT_MS)?;
-        let access = kernel::SecretRef::parse(&format!("secret:{provider}/oauth"))?;
+        let access = subscription::oauth_ref(provider)?;
         {
             let mut vault = self.vault.lock().map_err(|_| poisoned_vault())?;
             vault.set(&access, tokens.access)?;
@@ -73,7 +73,6 @@ impl RunWorker {
                 "expires_at".to_owned(),
                 serde_json::Value::Number(at.into()),
             );
-            self.expiries.insert(provider.to_owned(), at);
         }
         self.record(EventKind::SecretCaptured, Payload::new(map)?)
     }
@@ -148,13 +147,12 @@ impl RunWorker {
                     )
                 })?;
                 let tokens = gateway::oauth_redeem(profile, &pending, &code, PROBE_TIMEOUT_MS)?;
-                let access = kernel::SecretRef::parse(&format!("secret:{provider}/oauth"))?;
+                let access = subscription::oauth_ref(provider)?;
                 {
                     let mut vault = self.vault.lock().map_err(|_| poisoned_vault())?;
                     vault.set(&access, tokens.access)?;
                     if let Some(refresh) = tokens.refresh {
-                        let reference =
-                            kernel::SecretRef::parse(&format!("secret:{provider}/oauth-refresh"))?;
+                        let reference = subscription::oauth_refresh_ref(provider)?;
                         vault.set(&reference, refresh)?;
                     }
                 }
@@ -178,7 +176,6 @@ impl RunWorker {
                         "expires_at".to_owned(),
                         serde_json::Value::Number(at.into()),
                     );
-                    self.expiries.insert(provider.to_owned(), at);
                 }
                 self.record(EventKind::SecretCaptured, Payload::new(map)?)?;
                 if profile.api_base.is_empty() {

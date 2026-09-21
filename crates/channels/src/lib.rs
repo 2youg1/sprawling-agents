@@ -59,8 +59,9 @@ pub use command::{BodyOverride, EndpointTuning, HeaderPair};
 pub use command::{Command, WireCommand};
 pub use command::{GovernedDocument, HaltScope, LoginStep, NoSecret, PursuitStep};
 pub use control::{ControlVerdict, Intervention, classify};
+pub use kernel::highlight::markdown;
 pub use kernel::{FileChange, How, Lines};
-pub use kernel::{Span, Token, markdown};
+pub use kernel::{Span, Token};
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in, subject_of};
 pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
@@ -81,11 +82,11 @@ pub use wire::{LogLevel, LogLine};
 pub use wire::{QUERY_NAMES, WIRE_V, schema_hash};
 
 pub use kernel::{Address, ApprovalId, Autonomy, AxCode, AxError, B3Hash};
-pub use kernel::{ApprovalClass, ApprovalItem, ApprovalSource, ClusterKey, Restoration};
+pub use kernel::{ApprovalClass, ApprovalItem, ClusterKey, Restoration};
 pub use kernel::{BudgetUse, Locator, PlannedProgress, Progress, UnplannedProgress};
 pub use kernel::{DialectKind, Effort, ModelTag};
 pub use kernel::{EventDraft, EventKind, EventRecord, GitOid, IdemKey, RunId};
 pub use kernel::{McpServer, McpTransport, SandboxLimits, ServerLabel};
 pub use kernel::{NodeId, PursuitState, RoadmapStatus, WHOLE_PPB};
 pub use kernel::{Payload, Sealed, Seq, TimeMs, Tokens, UsdMicros};
-pub use kernel::{PolicyVerdict, SessionName, WriteDomain};
+pub use kernel::{Ruling, SessionName, WriteDomain};

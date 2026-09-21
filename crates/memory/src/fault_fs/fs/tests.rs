@@ -17,9 +17,8 @@
 use super::*;
 use crate::jsonl::JsonlLedger;
 use crate::vfs::Vfs;
-use kernel::{
-    EventDraft, EventKind, EventRecord, GENESIS_PREV, Payload, RunId, Seq, TimeMs, chain_hash,
-};
+use kernel::ledger::chain_hash;
+use kernel::{EventDraft, EventKind, EventRecord, GENESIS_PREV, Payload, RunId, Seq, TimeMs};
 use std::path::{Path, PathBuf};
 fn plain() -> FaultPlan {
     FaultPlan {

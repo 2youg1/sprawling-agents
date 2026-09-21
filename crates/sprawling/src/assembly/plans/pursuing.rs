@@ -101,7 +101,7 @@ impl RunWorker {
                 .filter(|node| !busy.contains(node))
                 .collect();
             let kernel::PursuitVerdict::Work { next } =
-                kernel::observe_pursuit(state, &ready, self.flight.in_flight())
+                kernel::pursuit::observe(state, &ready, self.flight.in_flight())
             else {
                 return Ok(Taking::Nothing);
             };
@@ -124,6 +124,7 @@ impl RunWorker {
                     mode: runtime::Mode::PlanGoal,
                     parent: None,
                     succession: None,
+                    tainted: false,
                 },
                 format!("Plan node {next}: {item}"),
                 goal,

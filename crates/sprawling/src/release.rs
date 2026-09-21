@@ -197,7 +197,7 @@ pub fn answer() -> ReleaseAnswer {
         Built::Released(mine) => ReleaseAnswer::Stands {
             mine: line(&mine),
             newest: line(&newest),
-            verdict: kernel::stands(&mine, &newest),
+            verdict: kernel::release::stands(&mine, &newest),
         },
     }
 }

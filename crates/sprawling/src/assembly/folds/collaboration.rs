@@ -222,6 +222,6 @@ pub(in crate::assembly) fn new_inbox() -> collab::Inbox {
 /// How many signals one room may hold, and how many one pull takes.
 /// Bandwidth belongs to the receiver: a sender cannot push more into a
 /// resident's context than the resident agreed to read at once.
-pub(super) const INBOX_CAPACITY: u64 = 256;
+pub(in crate::assembly) const INBOX_CAPACITY: u64 = 256;
 
 pub(super) const SIGNAL_BANDWIDTH: u32 = 4;

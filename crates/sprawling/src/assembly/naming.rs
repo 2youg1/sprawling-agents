@@ -87,7 +87,6 @@ pub(super) fn autonomy_name(autonomy: &kernel::Autonomy) -> String {
     match autonomy {
         kernel::Autonomy::Owner => "owner".to_owned(),
         kernel::Autonomy::Delegate(resident) => format!("delegate:{}", resident.as_str()),
-        kernel::Autonomy::Deferred => "deferred".to_owned(),
     }
 }
 
@@ -99,9 +98,8 @@ pub(crate) fn read_autonomy(name: &str) -> kernel::Autonomy {
             // to nobody: the safe side of this setting is the strict one.
             None => kernel::Autonomy::Owner,
         },
-        _ => match name {
-            "deferred" => kernel::Autonomy::Deferred,
-            _ => kernel::Autonomy::Owner,
-        },
+        // Anything else is the person: an unreadable setting falls
+        // back to the strict side, where only they answer.
+        Some(_) | None => kernel::Autonomy::Owner,
     }
 }

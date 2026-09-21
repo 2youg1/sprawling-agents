@@ -195,7 +195,7 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
     // this one source at once, so it answers by `Fn` rather than by
     // `FnMut` (sprawling-SPEC 8-46-1).
     let left = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(1));
-    worker.attach_interrupts(std::sync::Arc::new(move |_| {
+    worker.serve(only_interrupts(std::sync::Arc::new(move |_| {
         if left
             .fetch_update(
                 std::sync::atomic::Ordering::SeqCst,
@@ -210,7 +210,7 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
             };
         }
         Interrupt::None
-    }));
+    })));
     worker
         .handle(channels::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),

@@ -16,7 +16,7 @@
 )]
 
 use citysim::{MemLedger, check_chain};
-use kernel::conformance::assert_ledger_conformance;
+use kernel::ledger::conformance::assert_ledger_conformance;
 use kernel::{AxCode, EventDraft, EventKind, Ledger as _, Payload, RunId, TimeMs};
 use serde_json::json;
 use std::path::Path;

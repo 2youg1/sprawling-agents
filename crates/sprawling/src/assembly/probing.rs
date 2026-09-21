@@ -68,7 +68,7 @@ fn answers_from(said: &str, count: usize) -> Vec<String> {
 /// What a model said as plain text, or nothing when it said nothing a
 /// reader could compare.
 fn text_of(returned: &kernel::ModelReturn) -> String {
-    kernel::content_from_message(&returned.message)
+    kernel::model::content_from_message(&returned.message)
         .ok()
         .into_iter()
         .flatten()

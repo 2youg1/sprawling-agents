@@ -12,7 +12,7 @@
 //! reader asking "what does a restart find" and "what does a close
 //! leave" is asking one question from two ends.
 
-use super::{Flight, RunWorker, Standing, city_segment, ledger_dir, now_ms};
+use super::{Flight, RoomQueues, RunWorker, Standing, city_segment, ledger_dir, now_ms};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -62,6 +62,7 @@ impl RunWorker {
             governance,
             collaboration,
             entrance,
+            expiries,
         } = Standing::fold(&dir)?;
         let cas = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
             .map_err(memory::MemoryError::into_ax)?;
@@ -77,11 +78,9 @@ impl RunWorker {
             cas,
             book,
             vault: Arc::new(std::sync::Mutex::new(vault)),
-            interrupts: None,
-            watching: None,
-            machine: None,
+            serving: None,
             governance,
-            inboxes: collaboration.inboxes,
+            rooms: RoomQueues::folded(collaboration.inboxes),
             joins: collaboration.joins,
             pursuits,
             plan_holders: collaboration.plan_holders,
@@ -89,8 +88,7 @@ impl RunWorker {
             requests: collaboration.requests,
             delegator,
             last_tick: now,
-            tainted_arrival: false,
-            expiries: std::collections::BTreeMap::new(),
+            expiries,
             logins: std::collections::BTreeMap::new(),
             log,
             knocks: Vec::new(),

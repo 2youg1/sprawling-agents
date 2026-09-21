@@ -203,7 +203,8 @@ impl WorkshopTool {
                 name: ToolName::parse("workshop")?,
                 disclosure: "Split one creation into nodes that run in dependency order, each \
                              in its own room, and judge what comes back. Fan-out over \
-                             delegation: the person is asked once, as for `delegate`."
+                             delegation, and bounded by the same rule as `delegate`: a \
+                             node hands work down no further."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Spawn,

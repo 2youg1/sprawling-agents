@@ -58,10 +58,10 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
 
     let rebuilt = Standing::fold(&report.ledger_dir).unwrap().collaboration;
     let live_queues: std::collections::BTreeMap<String, u32> = worker
-        .inboxes
-        .iter()
-        .filter(|(_, queue)| queue.pending() > 0)
-        .map(|(room, queue)| (room.as_str().to_owned(), queue.pending()))
+        .rooms
+        .queued()
+        .into_iter()
+        .map(|(room, waiting)| (room.as_str().to_owned(), waiting))
         .collect();
     let rebuilt_queues: std::collections::BTreeMap<String, u32> = rebuilt
         .inboxes
@@ -92,13 +92,12 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
     // the same two lines a restart reads.
     let item = kernel::ApprovalItem {
         id: kernel::ApprovalId::new("item-held").unwrap(),
-        source: kernel::ApprovalSource::Gate,
         actor: "market/ito".to_owned(),
         action_desc: "ask hana what she charges".to_owned(),
         artifact: Locator::parse("file:market/ito@0000000000000000000000000000000000000000")
             .unwrap(),
         cluster_key: kernel::ClusterKey {
-            class: kernel::ApprovalClass::DiscardEscalate,
+            class: kernel::ApprovalClass::Question,
             detail: "market/ito".to_owned(),
         },
         created: TimeMs::new(1),
@@ -282,4 +281,60 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
     // same ledger knows the building is open again.
     let restarted = Standing::fold(&ledger_dir(dir.path())).unwrap().governance;
     assert!(restarted.halted.is_empty());
+}
+
+/// The expiry table used to be written only by the process that logged
+/// in: a restart found it empty, renewed nothing, and met each expiry
+/// as a 401 in the middle of a run. It is folded from the capture
+/// records like every other book the worker keeps.
+#[test]
+fn when_a_subscription_credential_expires_survives_a_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+
+    // The shape `login` and `renew_if_stale` write: the reference
+    // names the provider, and the expiry is a time rather than a
+    // secret.
+    let mut captured = serde_json::Map::new();
+    captured.insert(
+        "ref".to_owned(),
+        serde_json::Value::String("secret:anthropic/oauth".to_owned()),
+    );
+    captured.insert(
+        "origin".to_owned(),
+        serde_json::Value::String("anthropic-subscription".to_owned()),
+    );
+    captured.insert(
+        "expires_at".to_owned(),
+        serde_json::Value::Number(1_700_000_000_000_u64.into()),
+    );
+    worker
+        .record(
+            kernel::EventKind::SecretCaptured,
+            kernel::Payload::new(captured).unwrap(),
+        )
+        .unwrap();
+    assert_eq!(
+        worker.expiries.of("anthropic"),
+        Some(1_700_000_000_000),
+        "the worker that wrote the line reads its own book"
+    );
+
+    let rebuilt = Standing::fold(&report.ledger_dir).unwrap().expiries;
+    assert_eq!(
+        rebuilt.of("anthropic"),
+        worker.expiries.of("anthropic"),
+        "a restarted city renews on the schedule the provider stated"
+    );
+    assert_eq!(
+        rebuilt.of("openai"),
+        None,
+        "a provider that never stated an expiry stays unstated"
+    );
 }

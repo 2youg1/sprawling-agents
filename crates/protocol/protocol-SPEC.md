@@ -192,3 +192,16 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 `mcp/tools.rs`（`Listed`／`McpTool`／`tools_from`，`float_at` 开 `pub(crate)` 供 handshake 用）／
 `mcp/outbound.rs`（`Outbound`／`ScriptedOutbound`／`digits_for_floats`＋`EXTERNAL_CALL_PATIENCE`）。
 跨文件私有项开 `pub(crate)`，对外签名逐字节不变。
+
+### 8-16 一次连接要花什么，以及常驻连接表要等哪个数字（K-05）
+
+**先量，再决定。** 路线图 K-05 主张 `RunWorker` 持一张常驻 `McpLink` 表，理由是每一次派活都重拉子进程并重做握手。本 crate 能量的那一半已经量了，记在此处，另一半不在本 crate。
+
+| 读数 | 值 | 怎么来的 |
+|---|---|---|
+| 每台 server 每次连接的消息数 | 2 次有应答的请求（`initialize`、`tools/list`）＋1 条通知（`notifications/initialized`） | `mcp::handshake` 的 `opening_one_connection_costs_two_round_trips_and_one_notification`，用一个计数 `Outbound` 数出来 |
+| 本 crate 为这三条消息花的 CPU | debug 33 µs／release 7 µs（每次连接，100 次取均值，Windows 11 开发机） | 一次性测量：在同一条测试里临时用 `Instant` 计时，读数记在此处后撤走。**计时不留在树里**——`clippy.toml` 对测试也禁 `Instant::now`，而跨机器可复现的读数是消息条数，不是微秒 |
+
+**这两个数字说明的事**：常驻连接表要省的不是本 crate 的时间。拼一行 JSON-RPC 与读一行答案在 release 下是 7 µs，一台 server 三条消息合计仍不到 10 µs；省下来的是**子进程启动**与**两次 stdio 往返**，两者都住装配层（`bin::assembly` 拥有传输，见 §7）。
+
+**因此本 crate 不动**：`Outbound` 缝已经允许一条连接活得比一次 drive 长（`McpLink` 可 clone，寿命由持有者决定），常驻表是持有者的决定，不是文法的决定。要不要做这张表，取决于装配层量出的那个数字——在 `crates/sprawling/src/assembly/dispatching/running.rs` 的 `prepare_dispatch` 里记一次 `mcp_tools` 的耗时，写进 `xtask/budgets.toml` 的 `prepare_dispatch_ms`（K-07 已为它留了行）。**没有那个数字之前，连接表不做。**

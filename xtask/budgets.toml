@@ -198,8 +198,6 @@ names = [
   "crates/collab/src/workshop.rs::new",            # 9
   "crates/collab/src/inbox.rs::new",               # 7
   "crates/collab/src/signal_tool.rs::new",         # 6
-  "crates/kernel/src/gate/govern.rs::govern",       # 6
-  "crates/kernel/src/gate/item.rs::item",           # 6
   "crates/kernel/src/highlight.rs::scan",          # 6
   "crates/runtime/src/turn.rs::assemble",          # 6
   "crates/sprawling/src/effect.rs::of",            # 6
@@ -208,9 +206,6 @@ names = [
   "crates/city/src/archive.rs::entry",             # 5
   "crates/collab/src/pr_tool.rs::new",             # 5
   "crates/kernel/src/config.rs::freeze",           # 5
-  "crates/kernel/src/gate/commitment.rs::commitment", # 5
-  "crates/kernel/src/gate/govern.rs::delegation",   # 5
-  "crates/kernel/src/gate/govern.rs::discard",      # 5
   "crates/runtime/src/digest.rs::digest_once",     # 5
   "crates/runtime/src/fork.rs::fork_draft",        # 5
   "crates/runtime/src/handoff.rs::new",            # 5

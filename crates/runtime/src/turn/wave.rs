@@ -8,7 +8,7 @@
 use kernel::{AxCode, AxError, ContentBlock, Ledger, ToolCall, ToolOutcome};
 use serde_json::{Map, Value};
 
-use super::{Carried, Interrupt, PhaseOutcome, Recording, ToolWave, Turn};
+use super::{Carried, Interrupt, NextCall, PhaseOutcome, Recording, ToolWave, Turn};
 
 impl Turn<ToolWave> {
     /// Boundary 3 (before tool execution). Serial: parallel execution
@@ -20,18 +20,39 @@ impl Turn<ToolWave> {
     /// Both tool events reach the ledger through `append_redacted`: a
     /// tool's arguments and its result are the two payloads most likely
     /// to quote a credential the work just read.
+    ///
+    /// `still_going` is asked before every call, with that call's index.
+    /// One question per wave left a halted scope running whatever the
+    /// model asked for in one reply: eight edits are eight effects, and
+    /// the person who stopped the city waited for all of them.
     pub fn execute(
         mut self,
         interrupt: Interrupt,
         ledger: &mut dyn Ledger,
         invoke: &mut dyn FnMut(&ToolCall) -> Result<ToolOutcome, AxError>,
+        still_going: &mut dyn FnMut(u32) -> NextCall,
     ) -> Result<PhaseOutcome<Turn<Recording>>, AxError> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
         let calls = std::mem::take(&mut self.state.calls);
         let mut wave_results = Vec::new();
+        let mut index = 0u32;
         for call in &calls {
+            // Asked before the call is written down, so a wave that was
+            // stopped leaves no `tool_called` line for work nothing ever
+            // did.
+            let standing = still_going(index);
+            index = index.saturating_add(1);
+            match standing {
+                NextCall::Allowed => {}
+                // Through the same door a phase boundary takes, so a
+                // wave that stops leaves the one `cancel_received` line
+                // every other ending leaves.
+                NextCall::Halted => {
+                    return Ok(PhaseOutcome::Cancelled(self.cancel_here(ledger)?));
+                }
+            }
             let mut called = Map::new();
             called.insert("id".to_owned(), Value::String(call.id.clone()));
             called.insert("name".to_owned(), Value::String(call.name.to_string()));

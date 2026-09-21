@@ -67,7 +67,7 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
     let table = worker.backlog.clone();
     let halted = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let counted = std::sync::Arc::clone(&halted);
-    worker.attach_interrupts(std::sync::Arc::new(move |_run| {
+    worker.serve(only_interrupts(std::sync::Arc::new(move |_run| {
         let standing = table.standing(&lab).unwrap();
         if standing
             .iter()
@@ -77,7 +77,7 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
             counted.fetch_add(reached, std::sync::atomic::Ordering::SeqCst);
         }
         Interrupt::None
-    }));
+    })));
     worker
         .handle(channels::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
@@ -90,7 +90,6 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
         })
         .unwrap();
     let calls_before_the_child = provider.bodies().len();
-    allow_the_one_pending_item(&mut worker);
 
     assert!(
         halted.load(std::sync::atomic::Ordering::SeqCst) >= 1,

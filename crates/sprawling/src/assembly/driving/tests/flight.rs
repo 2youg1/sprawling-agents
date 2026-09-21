@@ -26,6 +26,7 @@ fn asked(addr: &str) -> Assignment {
         mode: runtime::Mode::PlanGoal,
         parent: None,
         succession: None,
+        tainted: false,
     }
 }
 
@@ -77,7 +78,7 @@ fn two_dispatches_from_the_desk_drive_at_once() {
             asked("lab/east"),
             "fire the east kiln".to_owned(),
             "the east kiln is fired".to_owned(),
-            channels::Reply::nowhere(),
+            Owing::asked(channels::Reply::nowhere()),
         )
         .unwrap();
     worker
@@ -85,7 +86,7 @@ fn two_dispatches_from_the_desk_drive_at_once() {
             asked("lab/west"),
             "fire the west kiln".to_owned(),
             "the west kiln is fired".to_owned(),
-            channels::Reply::nowhere(),
+            Owing::asked(channels::Reply::nowhere()),
         )
         .unwrap();
     assert!(worker.driving(), "both drives are in the air");
@@ -171,7 +172,7 @@ fn a_closing_city_lands_the_runs_still_driving() {
             asked("lab/east"),
             "fire the kiln".to_owned(),
             "the kiln is fired".to_owned(),
-            channels::Reply::nowhere(),
+            Owing::asked(channels::Reply::nowhere()),
         )
         .unwrap();
     assert!(worker.driving(), "a lane is going");

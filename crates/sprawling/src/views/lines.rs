@@ -45,16 +45,12 @@ pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> channels::Endpoi
         .collect();
     let chosen = book
         .choices()
-        // The fallback is deliberately not summarised: `ChosenSummary`
-        // is a wire type and this wave does not touch the wire.
-        .map(
-            |(tag, endpoint, entry, _fallback)| channels::ChosenSummary {
-                tag,
-                endpoint: endpoint.to_owned(),
-                model: entry.id.clone(),
-                max_output_tokens: entry.max_output_tokens,
-            },
-        )
+        .map(|(tag, endpoint, entry)| channels::ChosenSummary {
+            tag,
+            endpoint: endpoint.to_owned(),
+            model: entry.id.clone(),
+            max_output_tokens: entry.max_output_tokens,
+        })
         .collect();
     channels::EndpointsAnswer { endpoints, chosen }
 }

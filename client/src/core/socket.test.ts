@@ -81,7 +81,7 @@ describe("the browser half", () => {
   // books nothing, and whatever it had booked is cancelled.
   test("cancels the reconnect when a frame cannot be read", () => {
     install();
-    const conn = openConnection("ws://city.invalid/ws", null);
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
     const first = FakeSocket.opened[0];
     expect(first).toBeDefined();
     first?.onopen?.();
@@ -97,7 +97,7 @@ describe("the browser half", () => {
   // is booked and it opens a second socket when it fires.
   test("books a reconnect when the socket drops", () => {
     install();
-    openConnection("ws://city.invalid/ws", null);
+    openConnection("ws://city.invalid/ws", null, "en");
     const first = FakeSocket.opened[0];
     first?.onopen?.();
     first?.onclose?.();

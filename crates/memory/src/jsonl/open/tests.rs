@@ -5,9 +5,9 @@
 
 use super::super::*;
 use crate::error::MemoryError;
+use kernel::ledger::chain_hash;
 use kernel::{
     AxCode, EventDraft, EventKind, EventRecord, GENESIS_PREV, Payload, RunId, Seq, TimeMs,
-    chain_hash,
 };
 use std::fs;
 use std::path::Path;

@@ -7,13 +7,11 @@
 //! Adapters implement the `kernel::model` seam; the dialect face is pure
 //! translation (deliberately not a trait).
 
-mod admission;
 mod anthropic;
 mod cost;
 mod credential;
 mod dialect;
 mod endpoint;
-mod fallback;
 mod market;
 mod mcp;
 mod mismatch;
@@ -25,7 +23,6 @@ mod reach;
 mod router;
 mod transcribe;
 
-pub use admission::{AdmissionState, AdmissionVerdict, ProviderOutcome};
 pub use cost::{CallCost, CostSource, settle};
 pub use credential::oauth_refresh;
 pub use credential::{Captured, Custodian, Described, EnvReader, Persistence};
@@ -34,13 +31,12 @@ pub use credential::{oauth_random, oauth_redeem, oauth_redeem_request};
 pub use dialect::{ImageBytes, increment_of, request_wire, response_from_wire};
 pub use dialect::{response_wire, settled_from_stream};
 pub use endpoint::adapter_for;
-pub use endpoint::{AuthSpec, CALL_TIMEOUT_MS, Endpoint, EndpointConfig, SecretResolver};
+pub use endpoint::{AuthSpec, Endpoint, EndpointConfig, HeaderValue, SecretResolver};
 pub use endpoint::{ImageResolver, ModelFacts, Redemption};
-pub use fallback::{Fallback, Retreat, retreat_payload};
 pub use market::{InputKinds, MarketSnapshot, ModelEntry};
 pub use mcp::{Broker, Connection, Toolkit};
 pub use native::{Native, NativeConfig};
-pub use oauth_profiles::{OAUTH_PROFILES, OauthProfile, profile};
+pub use oauth_profiles::{Grant, OAUTH_PROFILES, OauthProfile, profile, profile_for};
 pub use provider::ceiling::{CeilingSource, OutputCeiling, Stated};
 pub use provider::modality::Modality;
 pub use provider::preset::{HostPreset, ModelPreset};
@@ -48,5 +44,5 @@ pub use provider::registry::{ConnectionKind, Family, resolve as resolve_connecti
 pub use reach::{client_for, is_local, reach, through};
 pub use router::{AttachedEndpoint, Chosen, EndpointBook, EndpointTuning};
 pub use router::{DialectHint, Normalised, normalise_entered};
-pub use router::{Settled, attached_payload, selected_payload};
+pub use router::{Retries, TuningDefaults, attached_payload, selected_payload};
 pub use transcribe::{AudioType, Recording, Transcriber, TranscriberConfig, transcriber_for};

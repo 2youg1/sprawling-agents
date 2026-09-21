@@ -28,6 +28,7 @@ pub mod tools;
 pub mod transcript;
 
 pub use backlog::{Backlog, BacklogId, BacklogKind, Finished, Standing, Started};
+pub use backlog::{Exit, PollBudget, Unseen};
 pub use tools::ChildStatus;
 pub use tools::EditTool;
 pub use tools::ProviderMode;
@@ -79,6 +80,6 @@ pub use replay::{VerifiedLedger, VerifiedLine};
 pub use run::{Advance, Run, RunHooks, RunPlan, SafePoint, drive};
 pub use sieve::{CommandKey, FilterTable, SieveHistory, SieveRecord, Sieved, sieve};
 pub use transcript::{Transcript, TranscriptRecord};
-pub use turn::{Interrupt, PhaseOutcome, Turn, TurnCancelled, TurnReport};
+pub use turn::{Interrupt, NextCall, PhaseOutcome, Turn, TurnCancelled, TurnReport};
 pub use watchdog::{Disposal, FreezeReason, Retries, Watchdog};
 pub use window::Opening;

@@ -8,74 +8,34 @@
 // the two wire formats disagree about where `none` is written, and
 // saying nothing is not the same as saying `none`.
 //
-// The paragraph states all three; the line under the track states what
-// the level now held costs. The words are in `lang.json` like every
-// other word a reader is handed - this file only says where they go.
+// **There is no picker here, because this page cannot keep an
+// answer.** The standing level is the city's own `[model] effort`,
+// read from `CONFIG.toml` by the configuration ladder that freezes
+// every run; a level kept in this browser instead would ride on every
+// dispatch from it and outrank the file without saying so. What this
+// build can state about the file it can neither read (`Query::Config`,
+// roadmap 3.3) nor write, so the section says where the answer lives
+// and stops there.
+//
+// **A session states its own level in the selector over the
+// composer**, which is where a dispatch is made and the only scope
+// this client can honestly offer: the city writes that level into the
+// room it opens, and every run in that room then holds it.
 //
 // The welcome walk and the settings page both show this, so the
 // paragraph cannot be present on one page and missing from the other.
-// The track used to live beside the model table, which is the other
-// question that screen asks; it is here now because how hard the city
-// thinks is not a fact about which model does the thinking.
+// The words are in `lang.json` like every other word a reader is
+// handed - this file only says where they go.
 
-import { EFFORTS } from "../../core/prefs";
-import { UNSTATED } from "../../core/slash";
-import type { Effort } from "../../wire";
-import { useSay, useUi } from "../../ui";
-import { Segmented, type Choice } from "../parts/segmented";
-
-// The cell for a person who has not chosen, which is the state a new
-// city is in. It leads the track because that is where everybody
-// starts, and no level can stand in for it: `none` asks the provider
-// to think as little as it can, while saying nothing leaves the
-// choice to the provider.
-//
-// What the city keeps stays `Effort | null`. The word is a label this
-// track puts on at the edge that draws a cell and takes off at the
-// edge that writes the choice, so absence keeps its one spelling in
-// `core/prefs.ts`. It is imported rather than written again because a
-// person reaches the same cell by typing `/effort unstated`, and the
-// two have to be the same word.
-type Level = Effort | typeof UNSTATED;
-
-export function EffortChoice() {
-  const ui = useUi();
-  const say = useSay();
-  const cells = (): readonly Choice<Level>[] => [
-    { value: UNSTATED, label: say("effort_unstated") },
-    ...EFFORTS.map((effort) => ({ value: effort, label: say(`effort_${effort}`) })),
-  ];
-  return (
-    <div class="flex flex-col gap-tight text-note text-text-quiet">
-      {say("setup_effort")}
-      <Segmented<Level>
-        label={say("setup_effort")}
-        options={cells()}
-        held={ui.prefs.effort() ?? UNSTATED}
-        onPick={(level) => {
-          ui.prefs.setEffort(level === UNSTATED ? null : level);
-        }}
-      />
-    </div>
-  );
-}
+import { useSay } from "../../ui";
 
 export function EffortSection() {
-  const ui = useUi();
   const say = useSay();
-  // Nobody having chosen is a state of its own, and it is the state a
-  // new city is in: `core/prefs.ts` answers `null`, the request omits
-  // the field, and the provider decides. Reading it as `none` here
-  // would tell a person their city had been asked not to think.
-  const note = () => {
-    const held = ui.prefs.effort();
-    return held === null ? say("effort_note_unstated") : say(`effort_note_${held}`);
-  };
   return (
     <div class="flex flex-col gap-base">
-      <EffortChoice />
+      <p class="text-note text-text-quiet">{say("setup_effort")}</p>
       <p class="max-w-measure text-note leading-relaxed text-text-faint">{say("setup_effort_essay")}</p>
-      <p class="max-w-measure text-note text-text-quiet">{note()}</p>
+      <p class="max-w-measure text-note text-text-quiet">{say("setup_effort_city")}</p>
     </div>
   );
 }

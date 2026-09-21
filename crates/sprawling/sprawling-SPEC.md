@@ -172,6 +172,7 @@ fn renew_if_stale(&mut self, provider: &str) -> Result<(), AxError>;   // 用之
 - **令牌在门那侧判，判定在协议那侧措辞**：`channels` 持配对令牌，故常数时间比对住 `/acp` 路由；`authentic` 这一位传进来，由 `protocol::admit` 说拒词——未配对者只学到一位，这句话的权威只有一个。
 - **入站不是第二个 control surface**：admit 之后就是人按派活条时走的同一条路（同一个 `CommandDesk`、同一个 `Command::Dispatch`）。回给编辑器的只有 progress 三字段，且 run id 是工人接单时才铸的，故此刻诚实的答案是「已受理、尚未完成」。
 - **续期在用之前做，不在 401 之后做**：一次 401 要花掉一整个回合才发现，而 provider 说过的到期时刻这座城已经写下来了（`secret_captured` 携 `expires_at`，非密文）。留一分钟余量；**没有记过到期时刻的 provider 不碰**——不知道什么时候过期，不是每次都换一遍的理由。
+- **到期表是折出来的，不是进程内的记忆**：`Expiries` 吸收 `secret_captured` 的 `expires_at`，键由 `ref` 的 `secret:<provider>/oauth` 解出，写这个拼法与读它的是同一个模块（`assembly::credentials::subscription`）。从前只有登录的那个进程知道到期时刻，重启后表是空的、什么都不续，于是人在运行中撞 401 丢掉一整轮（B-30）。
 - **换新与兑付共用一次发送**：`send_token_request` 是两种 grant 的同一条路，故「不引用对侧正文」这条只写一次、也只可能对一次。
 
 ## 8-8 首次运行与交付形态
@@ -357,7 +358,7 @@ impl RunWorker {
 - **人压过居民**：中断源先问人的命令队列（Cancel 再 Steer），空手才问本屋信箱。
 - **属名不是装饰，是回信地址**：另一个 agent 的话氒不得以人的身份进窗口。类型已经把它变成判定（只有 `Steer::from_person` 写得出 `user`）；同一条规则延到敲门路上——被叫醒的一跑，其 brief 第一句就是「@X signalled you. This run exists because that signal arrived: nobody else asked for it.」。一份读起来像人写的 brief 会让每一封回信寄错地方。
 - **敲门敲的是 Resident，不是一段已封存的对话**：冻结的 Run 是历史，历史只读而不叫醒；被开出来的是那个地址上住户的**一跑新的 Run**，它靠 `Handoff.md` 接住上一场——那正是为穿过一次冻结而造的那件东西。没有 `URBANITE.md` 的地址因此不敲：它是一间房而不是一个人，信就在那儿等到人派个住户过去。
-- **不设叫醒预算**：什么时候该停下来是对话里那几位居民的事，城市的活是把话送到。人要让某个居民不再被打扰，用的是已有的 Halt，`dispatch_in` 当场拒一个被 halt 的 scope。
+- **不设叫醒预算**：什么时候该停下来是对话里那几位居民的事，城市的活是把话送到。人要让某个居民不再被打扰，用的是已有的 Halt，一次派活当场拒一个被 halt 的 scope。
 - **一次对话一道底都没有**：**这座城没有金额上限，也没有回合上限**，那是决定而不是遗漏：什么时候停下来归对话里的居民，花了多少事后从 Ledger 报出来。从无调用方的 spend 门连同它判的 ladder 、以及 `DISPATCH_TURN_BUDGET` 一并删除（kernel-SPEC §11-7、本文 §8-40），刹车此后只剩 `Cancel`（停一件）与 `Halt`（停一片）。
 - **一个敲不成不连坐发件人**：叫不醒的人进诊断日志，不把发件那一跑的 dispatch 弄成失败。
 
@@ -1192,7 +1193,7 @@ budgets.toml 里那两段已经失真的注释单独一枚提交改，因为改�
 
 ## 8-40 先判定后动手：一次派活在城答应之前不写任何东西
 
-`dispatch_in` 的开篇注释一字不差地写着这条规矩——「Nothing is written before the city agrees to take
+`prepare_dispatch` 的开篇注释一字不差地写着这条规矩——「Nothing is written before the city agrees to take
 the work: a halted city that laid a job file down would leave a task in a room no run ever opened」——
 而代码只守住了停摆那一道。**本节把那句注释变成代码的形状。**
 
@@ -1205,7 +1206,7 @@ the work: a halted city that laid a job file down would leave a task in a room n
 | 1 | `commanding::run_command` Dispatch 臂 | `session_for` | `E_INVALID_ARGS`（取不到名字） | 否，但**要花一次 Digest 模型调用** |
 | 2 | 同上 | `room_for` → `city::open_room` | 存储错 | **写：房间目录**（`create_dir`） |
 | 3 | 同上 | `city::write_effort` | 配置错 | **写：房间的 CONFIG.toml** |
-| 4 | `dispatching::dispatch_in` | `halted_by` | `E_GATE_DENIED` | 否 |
+| 4 | `dispatching::prepare_dispatch` | `halted_by` | `E_GATE_DENIED` | 否 |
 | 5 | 同上 | `city::write_brief` | 存储错 | **写：`JOB.md`** |
 | 6 | 同上 | `cas.put` | 存储错 | 写：CAS 对象（`.sprawling/` 内，内容寻址） |
 | 7 | `workbench::stand_up` | `Building::of`／`city::load`／`load_config`／`Router::select`／`renew_if_stale`／`adapter_for`／`Identity::load` | `E_INVALID_ARGS`／`E_CONFIG_INVALID`／`E_GATE_DENIED` | 否 |
@@ -1262,9 +1263,9 @@ impl RunWorker {
 
 ### `Assignment` 多两个字段，理由是规矩不能有两个家
 
-`session_for`／`room_for`／`write_effort` 必须搬进 `dispatch_in`，**否则这条规矩就有两个家**：
-`dispatch_in` 是唯一被所有派活入口共用的地方（人发的动词、批准后续跑的活、`wake`／`tick`／`knock`／
-委派共用的 `dispatch`），而房间是在人发的那条臂上开的。把答应放进 `dispatch_in` 而把开房间留在臂上，
+`session_for`／`room_for`／`write_effort` 必须搬进 `prepare_dispatch`，**否则这条规矩就有两个家**：
+`prepare_dispatch` 是唯一被七个派活入口共用的地方（人发的动词、批准后续跑的活、`wake`／`tick`／`knock`／
+委派子活、继任），而房间是在人发的那条臂上开的。把答应放进 `prepare_dispatch` 而把开房间留在臂上，
 等于让敲门那条路照旧先写后判；把答应也放到臂上，就要在三个调用点各算一次，`renew_if_stale` 会走两趟网。
 
 于是 `Assignment` 从四个字段变六个：
@@ -1400,7 +1401,7 @@ timer——`SCHEDULE_TICK`（20s，`serving.rs`）本身留着——而是说：
 | `wake` | `waking.rs` | `Watch::load` 全表＋`buildings` 全量 | 无（每次全算） |
 | `knock` | `waking.rs` | `Identity::load`（逐 room） | 无 |
 | `answer_knocks` | `waking.rs` | 无（只 drain） | `knocks`（worker 字段） |
-| `dispatch_in` | `dispatching.rs` | `halted_by`（治理折叠） | 无 |
+| `prepare_dispatch` | `dispatching.rs` | `halted_by`（治理折叠） | 无 |
 
 **三处可量**：`wake` 一次读两遍磁盘（watch 表＋全部楼目录）而只为投递一个 arrival；
 `tick` 一次读全表而只为问「自上次以来谁到期」；`Watch::listening` 的「楼还在」
@@ -2215,18 +2216,32 @@ fn land(&mut self, continuation: Continuation, driven: Result<Driven, AxError>) 
 ```rust
 pub(in crate::assembly) struct Flight { pool: DrivingPool, gate: RelayGate, driving: BTreeMap<RunId, InLane> }
 
-/// 一轮活回家之后城还欠着什么。两个派活入口只在这里不同。
+/// 一轮活回家之后城还欠着什么。**七个派活入口只在这里不同。**
 pub(in crate::assembly) enum Owed {
-    /// 人派的活：拒绝有回信地址，而它谈过话的邻居接着答。
-    Asked(channels::Reply),
+    /// 人派的活：它谈过话的邻居接着答。
+    Asked,
     /// 追求认领的一行计划：它回家时那一行若仍然 ready，追求停下而不是再派一次。
     Row { addr: Address, node: NodeId },
+    /// 城自己起的活：排程、外来到达、敲门、批准放行。没有人在等答案。
+    Unasked(Unasked),
+    /// 某轮活交下来的子活：干完之后由提问的房间收 handback。
+    Child { parent: Address },
 }
 
-/// 一次「服务口子＋接一轮活回家」做了什么。
-pub(in crate::assembly) enum Landed { Nothing, Asked, Row { addr: Address, node: NodeId } }
+/// 城自己起一轮活的四个理由。起不来时诊断行按理由归因，故是穷尽枚举而不是一个 bool。
+pub(in crate::assembly) enum Unasked { Schedule, Arrival, Knock, Unblocked }
 
-fn dispatch_into_lane(&mut self, at: Assignment, task: String, goal: String, reply: channels::Reply) -> Result<RunId, AxError>;
+/// 城欠这轮活什么，以及拒绝回哪儿去。两者同行，因为义务比承载它的那轮活活得久：
+/// 继任者对的是「谁要了被它替换的那轮活」。`reply` 用 `Arc` 共享而不是搬走，
+/// 因为落地要在把义务交给继任者之后仍能回一句拒绝。
+pub(in crate::assembly) struct Owing { owed: Owed, reply: Arc<channels::Reply> }
+
+/// 一次「服务口子＋接一轮活回家」做了什么。
+pub(in crate::assembly) enum Landed { Nothing, Row { addr: Address, node: NodeId }, Elsewhere }
+
+fn dispatch_into_lane(&mut self, at: Assignment, task: String, goal: String, owing: Owing) -> Result<RunId, AxError>;
+fn start_unasked(&mut self, addr: Address, task: String, goal: String, because: Unasked) -> Option<RunId>;
+fn land(&mut self, continuation: Continuation, driven: Result<Driven, AxError>, owing: Owing) -> Result<Landed, AxError>;
 fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 ```
 
@@ -2248,10 +2263,36 @@ fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 **关城要把车道等回来**：`DeskWait::Close` 之后不再接新活，但口子照服务、回家的照落账，直到没有活在飞，
 然后才写交接。一条停在 append 上的车道被丢下，丢掉的是城已经答应它耐久的那些行。
 
-**仍在记账线程上驾驶的那三个入口**：排程（`tick`）、外部到达（`wake`）、敲门（`answer_knocks`）走 `dispatch_in`，
-它 = `prepare_dispatch` ＋ 本线程 `drive_run` ＋ `land`。城自己发起的活因此是一次一轮，
-而它跑的时候车道停在各自的 append 上等这条线程回到循环。**这是有界的等待，不是死锁**——
-记账线程从不等车道。把这三个入口也搬上车道，要先回答「谁在等它」，那是另一件事。
+**七个入口全部进车道，`dispatch_in` 退出生产（H-04）**。此前只有 `Command::Dispatch` 走车道，
+而排程（`tick`）、外部到达（`wake`）、敲门（`answer_knocks`）、委派子活与继任（`conclude`）、
+批准放行续活（`answer_approval`）六个入口调同步的 `dispatch_in`，在记账线程上跑完整个 drive。
+代价不是「有界的等待」而是命令台整段关闭：`serve_flight` 只在 attending 的主循环里被调用，
+一次同步 drive 持续几分钟，期间在飞的车道全部停在 relay 追加上，`Halt` 与 `Cancel` 也读不进来。
+
+改法是「谁在等它」由 `Owed` 回答，于是那个问题不再拦路：
+
+| 入口 | `Owed` | 落地时做什么 |
+|---|---|---|
+| `Command::Dispatch` | `Asked` | 醒来的邻居接着答 |
+| `pursue` 的一行 | `Row { addr, node }` | 该行仍 ready 则追求停下 |
+| `tick`／`wake`／`answer_knocks`／`answer_approval` | `Unasked(_)` | 无人可答，起不来时记一条 `Refuse` 诊断 |
+| 委派子活 | `Child { parent }` | 向提问的房间投 handback |
+| 继任 | 继承前任的 `Owing` | 义务随活走：链条结束时才兑现 |
+
+**义务跟着活走，不跟着轮次走**：继任者是同一件工作接着做，所以要 handback 或要回信的那一位，
+等的是链条的末端而不是每一环。`Owed` 因此不需要 `Successor` 这一格——前任的 `Owing` 原值搬给继任者即可，
+谁被替换由 `Assignment.succession.predecessor` 说，一个事实一个家。
+
+**污点随派活走，不随工人走**：`wake` 从前置 `RunWorker.tainted_arrival`、派完再清；
+活进车道之后清旗标的那一刻远在落地之前，被清掉的正是那轮外来活自己的 C15 标记。
+`tainted` 因此成为 `Assignment` 的字段，子活与继任者继承它。
+
+**车道满不是拒绝**：`DrivingPool::full` 是 `pursue` 读的建议值，不是 `start` 的闸；
+人派的活从前就可以超过 `DRIVING_LANES`，城自己起的活同此。超出的部分停在 provider 的 admission 上排队。
+
+**`handle` 仍然是同步的一扇门**：`RunWorker::handle` = 一条命令 ＋ `land_the_rest`，
+于是命令行与测试看到的仍是「调用返回即事情做完」，而落地过程中起的子活、敲门与继任
+都在同一次 `land_the_rest` 里排空。
 
 ### 8-46-3 `bin::serving::pool`
 
@@ -2379,6 +2420,92 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 - `views::rounds::tests` 与 `views::rounds::reading_tests` 把 `web::turn` 的两份测试逐字搬来，跑在服务端的折叠上：**服务端算出来的回合等于视图层对同一批记录算出来的**。红是在真账本上取的——`Query::Rounds` 先答 `Unavailable`，`asking_for_rounds_answers_the_fold_the_view_layer_ran` 在 `init_city` 铺出的城上写三条记录再问，失败于「Rounds answers with rounds」。
 - `views::evidence::tests`：一张截图与一条完成证据各成一行，读不回定位符的载荷不成行。
 - `views::cost_of::tests`：认领过的节点报出那次跑的钱；没人认领过的节点报 0 与空明细，而不是 `Unavailable`。
+
+### 8-46-9 一个房间一个队列：`bin::assembly::rooms`（B-28 ＋ B-29）
+
+形状：**深模块**（ARCH §9 第 1 种）。文件 `crates/sprawling/src/assembly/rooms.rs`。
+
+`RunWorker.inboxes` 从前是 `BTreeMap<Address, Inbox>`，字段注释写着「一个房间恰好一个队列」，而**没有任何东西执行这句话**：
+`open_desks` 以 `remove` ＋ `unwrap_or_else(new_inbox)` 借队列，`settle_desks` 以 `insert` 还队列。
+在 `DRIVING_LANES = 4` 下，`pursue` 把同一栋楼的多行派到**同一个房间地址**，于是第二轮活借到一个空队列，
+先落地那一份被后落地的整份覆盖——账本上写着 `signal_enqueued`，内存里那条信号不存在，而只增账本无法区分
+「本来就没有」与「被覆盖了」。
+
+```rust
+/// 一个房间的队列，以及它在谁手上。
+enum RoomQueue {
+    Home(collab::Inbox),
+    /// 借出期间送来的信号在同一格里等，持有者落地时一并交过去。
+    Lent { to: RunId, waiting: Vec<collab::Signal> },
+}
+
+/// 借到的东西，与这轮活是不是持有者。
+pub(in crate::assembly) enum Holding { TheRoomQueue, ASpare { held_by: RunId } }
+pub(in crate::assembly) struct Lent { inbox: collab::Inbox, holding: Holding }
+
+pub(in crate::assembly) struct RoomQueues { rooms: BTreeMap<Address, RoomQueue> }
+impl RoomQueues {
+    fn folded(rooms: BTreeMap<Address, collab::Inbox>) -> RoomQueues;
+    fn lend(&mut self, addr: &Address, to: RunId) -> Lent;
+    fn give_back(&mut self, addr: &Address, from: RunId, returned: collab::Inbox) -> Result<(), AxError>;
+    fn deliver(&mut self, signal: &collab::Signal) -> Result<(), AxError>;
+    fn pending(&self, addr: &Address) -> u32;
+}
+```
+
+- **借出不是取走**：`Lent` 仍在表里，第二个同房间的 run 得到一份自己的空队列（`Holding::ASpare`）并被记一条
+  `Refuse` 诊断。为什么不是三段式拒绝：`pursue` 的整个 ready set 都派在同一个地址上，拒绝会把并发追求
+  （§8-46-4）整条打掉，而「一个房间一个读者」本身就是对的——两轮活分读一个队列，每轮只看到一半的信。
+- **只有持 `run_id` 的能还**：`give_back` 校验 `Lent.to`，不匹配即 `E_STORAGE_FATAL`。这条把「谁借的谁还」
+  从纪律变成类型之外的运行时断言，而 `Holding` 让调用点根本写不出「拿着 spare 去还」。
+- **借出期间的投递有地方落**：`deliver` 对 `Lent` 推进 `waiting`，上限仍是 `INBOX_CAPACITY`，满了照旧
+  `E_BACKPRESSURE_SHED`。**满溢的措辞只有一个家**：`landing.rs` 里手写的第二份 Shed 判定随之删除。
+- **队列一定回家**：`give_back` 里等候的信号若被拒，队列先放回表再把错误抛出去——一个在回家路上失败的队列
+  从前就是一个城忘掉的队列。
+
+**B-28 与它是同一件事的另一半**。`land` 从前在 `driven?` 处提前返回，`settle_desks` 与 `conclude` 都不执行：
+房间队列丢了，worktree 租约不归还——而这正是磁盘出问题时集中发生的那条路径。此后 `land` 先调
+`return_borrowed`（还队列、还租约），再读 drive 自己的结果；`conclude` 不再释放租约，`settle_desks` 不再收队列，
+两件事各剩一个家。
+
+### 8-46-10 服务态是一个值：`Serving`（G-08）
+
+`RunWorker` 从前有三个各自 `Some` 的 `Option`——`interrupts`／`watching`／`machine`——三个 setter
+（`watch`／`examine`／`attach_interrupts`）由 `serving::attending` 在同一口气里各调一次，文档各自写着
+「None in every worker but the one behind a live control surface」。三个字段容许八种状态而只有两种可达，
+而加第四个 sink 意味着记得加第四个 setter。
+
+```rust
+pub(crate) struct Serving {
+    deltas: Arc<dyn Fn(channels::Delta) + Send + Sync>,
+    machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
+    interrupts: Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>,
+}
+impl RunWorker { pub(crate) fn serve(&mut self, serving: Serving); }
+```
+
+一个 `Option<Serving>`，一个注入点，漏一个即编译错。`serving::attending` 的三次调用合为一次；
+测试要只听中断时经 `fixture::only_interrupts` 明写它不听什么，而不是另开一扇门。
+
+### 8-46-11 排程窗口逐条走完，撤销靠反向命令（B-50 ＋ 4.8）
+
+`tick` 从前先把 `last_tick` 推到 `now` 再逐条派活，`?` 在第 k 条上返回时第 k+1..n 条到期作业**既没跑、没入账、
+也不会回来**：一栋楼地址写错就能让同一分钟里其它所有定时活消失。此后每条到期作业都经 `start_unasked` 尝试，
+起不来的记一条 `Refuse` 诊断并继续下一条，窗口只在整段走完之后才关。
+
+**入账落在诊断日志而不是账本**：`schedule_dispatch_failed` 需要一个新的 `EventKind`，而 wire schema hash
+随 `EventKind::ALL` 变动（channels §8-1），本波 wire 冻结在 32。同一处境下 `answer_knocks` 早已用诊断行记
+「敲不开的门」，此处复用同一机制而不是造第二种。**欠账**：`city::Schedule::due_after` 仍返回三元组，
+不带 `fired_at`，所以窗口只能整段推进而不能逐条推进——补 `fired_at` 要改 `crates/city`，属另一张卡。
+
+**撤销不是一个动词**：`attach` / `select_model` / `set_autonomy` 之后的一键回退，做法是**发同一条命令、带旧值**，
+账本两条线都留着。后端这一侧因此只欠一条性质：设置类命令重复发送与发送一次等价。
+`set_autonomy` 与 `select_model` 折叠取最后一条，故成立（`crates/sprawling/tests/undoing.rs`）。
+**两处不成立，都需要它们各自的卡**：
+
+1. `attach` 没有反向动词——`Command` 里没有 detach，`EndpointLost` 只由 `E_ENDPOINT_DIALECT_UNSUPPORTED` 的
+   carrier 产生，没有命令能写它。撤销 attach 要么加 `Command::DetachEndpoint`（wire 变更），要么这一格不做。
+2. `select_model` 的反向命令要求「上一次选择」存在且那个端点仍然挂着；第一次选择之前没有可回退的值。
 
 ## 8-47 六处探测收成一处：doctor 是「运行中的机器有什么」的唯一权威（`bin::doctor::host`、`bin::doctor::presence`）
 
@@ -2840,3 +2967,11 @@ impl Home {
 - **`context_tokens` 同理**，`0` 是「这次没说」；两个数字读法一致，因为它们来自同一个空表单。
 - **再往上与再往下的两档住 gateway**（`provider::ceiling`，gateway-SPEC §8-17）：上游 `/v1/models` 的陈述与策略缺省 `OUTPUT_CEILING_DEFAULT`。装配层不复写那条规则，只把人层与书里的值交给它——一条规则两个家，漂开的总是没人看的那个。
 - **来源入账（未落，随共享文件同集落）**：`model_selected` 要带 `ceiling_from: person | upstream | preset | policy`，`model_called` 回显这次调用实际用的那一档；载荷由 `gateway::router::payload` 一处写，拼写取 `CeilingSource::as_str`。账本里看得见来源，因此一次被截断的跑是读出来的，不是猜出来的；`tests/e2e.rs` 里那条桩测试（sprawling-SPEC §2795 第 5 条）就是它的关门条件。
+
+### 8-72 从别的工具的配置里读一张 provider 表（`bin::import`，形状 4 适配器）
+
+**单向，一次性。** 这个人机器上已经有 Codex 或 pi 的配置，里面写着他早就填好的 provider：主机、兼容格式、默认路径、模型 id。本城把它读进来，变成一串 `Command`，然后就结束——不订阅那个文件，不回写，不做持续同步。理由是权威：那些文件的权威是它们自己的工具，本城若持续跟随，同一个事实就有了两个家。
+
+**四个模块，各答一个问题。** `import::machine` 只答「那份配置在运行这座城的机器上的哪里」，`~` 经 `bin::home::Home` 解析而不是自己拼；`import::codex` 与 `import::pi` 各拥有一种文法，读不懂的键是错误而不是被跳过；`import::provider` 是读出来的东西在本城词汇里的样子，两种文法都折到它上面，于是「一个 provider 是什么」只有一处定义。
+
+**没查证的字段不写。** 上游文法里本城不确定的键一律登记为待查并留空，而不是猜一个默认值填进去——一个猜出来的 base URL 会在 404 之后让人去查一件本城自己编的事实。

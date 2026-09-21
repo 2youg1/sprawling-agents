@@ -18,11 +18,10 @@ import { Show, createMemo, createSignal, untrack } from "solid-js";
 import { QUERIES } from "../../core/asking";
 import type { RunBelief, Sending } from "../../core/belief";
 import type { Key } from "../../core/lang";
-import { EFFORTS } from "../../core/prefs";
 import { MAYOR, current } from "../../core/route";
 import { UNSTATED, completed, find, offered, parse, reached } from "../../core/slash";
 import type { Slash, SlashHands } from "../../core/slash";
-import { selectModel } from "../../core/commands";
+import { EFFORTS, selectModel } from "../../core/commands";
 import { canRecord, record, type Heard, type Recording } from "../../core/speaking";
 import { Address } from "../../core/address";
 import { motionOff } from "../shared/motion";
@@ -195,9 +194,9 @@ export function Composer(props: ComposerProps) {
   });
 
   // What the chip says the effort is. Nobody having chosen is a state
-  // of its own rather than a level: `core/prefs.ts` answers `null`,
-  // the field is left out of the request, and the provider decides.
-  const effortWord = () => say(`effort_${ui.prefs.effort() ?? UNSTATED}`);
+  // of its own rather than a level: the field is left out of the
+  // request, and the city's own configuration answers for it.
+  const effortWord = () => say(`effort_${ui.effort() ?? UNSTATED}`);
 
   const hands = (): SlashHands => ({
     command,
@@ -213,9 +212,9 @@ export function Composer(props: ComposerProps) {
       );
     },
     models: models(),
-    effort: ui.prefs.effort(),
+    effort: ui.effort(),
     setEffort: (effort) => {
-      ui.prefs.setEffort(effort);
+      ui.chooseEffort(effort);
     },
     goal: say("talk_goal"),
     write,
@@ -265,12 +264,13 @@ export function Composer(props: ComposerProps) {
       {
         id: EFFORT,
         label: say("talk_column_effort"),
-        // Nobody having chosen leads the column, because it is where a
-        // new city starts and the only way back to it from a level.
+        // Nobody having chosen leads the column, and what a level
+        // costs rides beside it: this is where a person decides.
         items: [UNSTATED, ...EFFORTS].map((level) => ({
           id: level,
           label: say(`effort_${level}`),
-          chosen: level === (ui.prefs.effort() ?? UNSTATED),
+          hint: say(`effort_note_${level}`),
+          chosen: level === (ui.effort() ?? UNSTATED),
         })),
       },
     ];
@@ -316,11 +316,11 @@ export function Composer(props: ComposerProps) {
       return;
     }
     if (item.id === UNSTATED) {
-      ui.prefs.setEffort(null);
+      ui.chooseEffort(null);
       return;
     }
     const level = EFFORTS.find((known) => known === item.id);
-    if (level !== undefined) ui.prefs.setEffort(level);
+    if (level !== undefined) ui.chooseEffort(level);
   };
 
   let menuKeys: ((event: KeyboardEvent) => boolean) | null = null;

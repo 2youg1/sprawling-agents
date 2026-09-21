@@ -98,6 +98,17 @@ pub(crate) const PLATFORMS: [Platform; 3] = [
     },
 ];
 
+/// The platform whose archive name ends with `suffix`, or nothing when
+/// this release publishes no such archive.
+///
+/// Every other spelling of a platform hangs off the row this answers
+/// with, so the packager asks by the name it is about to give an archive
+/// and is handed the file name that belongs inside it — rather than
+/// deciding a second time from the machine it happens to be running on.
+pub(crate) fn with_suffix(suffix: &str) -> Option<&'static Platform> {
+    PLATFORMS.iter().find(|row| row.suffix == suffix)
+}
+
 /// The workflow whose matrix builds one archive per row.
 const WORKFLOW: &str = ".github/workflows/release.yml";
 

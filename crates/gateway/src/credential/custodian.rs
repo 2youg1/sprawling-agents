@@ -7,7 +7,8 @@
 use super::oauth::degraded_payload;
 use super::vault::{Described, EnvReader, KeyringVault, MemoryVault, Persistence, Vault, env_key};
 
-use kernel::{AxCode, AxError, Payload, Sealed, SecretRef, scan};
+use kernel::secret::scan;
+use kernel::{AxCode, AxError, Payload, Sealed, SecretRef};
 use serde_json::{Map, Value};
 use zeroize::Zeroizing;
 

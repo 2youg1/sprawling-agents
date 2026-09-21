@@ -42,12 +42,9 @@ impl Entrance {
     /// all. `Some(Ok)` means it was carried out; `Some(Err)` means it
     /// was refused, with the words it was refused in.
     pub(in crate::assembly) fn answered(&self, key: &IdemKey) -> Option<Result<(), AxError>> {
-        match kernel::dedup(&self.seen, key) {
-            kernel::DedupVerdict::Fresh => None,
-            kernel::DedupVerdict::Duplicate => {
-                Some(self.refused.get(key).cloned().map_or(Ok(()), Err))
-            }
-        }
+        self.seen
+            .contains(key)
+            .then(|| self.refused.get(key).cloned().map_or(Ok(()), Err))
     }
 
     /// Takes the key of the command about to be carried out.

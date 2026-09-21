@@ -129,7 +129,7 @@ pub channels::Closing::completion: alloc::string::String
 pub channels::Command::Approve
 pub channels::Command::Approve::idem: kernel::idem::IdemKey
 pub channels::Command::Approve::item: kernel::approval::ApprovalId
-pub channels::Command::Approve::verdict: kernel::approval::PolicyVerdict
+pub channels::Command::Approve::verdict: kernel::approval::Ruling
 pub channels::Command::Attach
 pub channels::Command::Attach::idem: kernel::idem::IdemKey
 pub channels::Command::Attach::notify: alloc::vec::Vec<kernel::event::identity::RunId>
@@ -281,7 +281,7 @@ pub channels::CostOfAnswer::spent: kernel::budget::UsdMicros
 pub channels::Decision::at: kernel::event::identity::TimeMs
 pub channels::Decision::cluster: kernel::approval::ClusterKey
 pub channels::Decision::item: alloc::string::String
-pub channels::Decision::verdict: kernel::approval::PolicyVerdict
+pub channels::Decision::verdict: kernel::approval::Ruling
 pub channels::Delivered::NobodyAsked
 pub channels::Delivered::PeerGone
 pub channels::Delivered::ToThePeer
@@ -871,7 +871,6 @@ pub use channels::Address
 pub use channels::ApprovalClass
 pub use channels::ApprovalId
 pub use channels::ApprovalItem
-pub use channels::ApprovalSource
 pub use channels::Autonomy
 pub use channels::AxCode
 pub use channels::AxError
@@ -895,11 +894,11 @@ pub use channels::ModelTag
 pub use channels::NodeId
 pub use channels::Payload
 pub use channels::PlannedProgress
-pub use channels::PolicyVerdict
 pub use channels::Progress
 pub use channels::PursuitState
 pub use channels::Restoration
 pub use channels::RoadmapStatus
+pub use channels::Ruling
 pub use channels::RunId
 pub use channels::SandboxLimits
 pub use channels::Sealed

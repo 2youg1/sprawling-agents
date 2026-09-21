@@ -155,23 +155,9 @@ impl Tool for EditTool {
             )
             .with_recovery("pass a city-relative path with no `..` and no leading slash")
         })?;
-        match kernel::domain(&self.writable, &target, &kernel::TaintSet::empty()) {
+        match kernel::gate::domain(&self.writable, &target, &kernel::TaintSet::empty()) {
             kernel::GateOutcome::Allow => {}
             kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
-            // A write domain answers allow or deny; the outcome is
-            // exhaustive on purpose, so this arm states the invariant
-            // instead of assuming it.
-            kernel::GateOutcome::Escalate { .. } => {
-                return Err(AxError::failure(
-                    AxCode::InvalidArgs,
-                    "edit file",
-                    "the write domain asked for an approval, which no write domain does",
-                )
-                .with_recovery(
-                    "report this against kernel::gate::domain: a write domain answers \
-                     allow or deny and never asks a person",
-                ));
-            }
         }
 
         let path = self.city_root.join(rel);

@@ -17,6 +17,7 @@
 //! failure mode a gate can have (xtask-SPEC.md section 12).
 
 mod apisync;
+mod architecture;
 mod artifact;
 mod badge;
 mod boundary;

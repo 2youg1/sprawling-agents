@@ -35,8 +35,10 @@ impl RunWorker {
     /// `Landing::record`, so a change that outran its own line cannot be
     /// written from here (section 8-24).
     ///
-    /// The room's queue comes home first and on both paths - an inbox
-    /// left in a dropped desk is a queue the city forgot it had.
+    /// The room's queue is already home by the time this runs: it is
+    /// given back in `return_borrowed`, before the drive's own outcome
+    /// is read, because a queue returned only on the happy path is a
+    /// queue lost exactly when the disk went wrong.
     ///
     /// # Errors
     /// Propagates a payload that will not build, any line the ledger
@@ -50,13 +52,7 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let (addr, who, run_id) = (&at.addr, site.who.as_str(), site.run_id);
         let (write_root, building) = (site.write_root.as_path(), &site.building);
-        // The lent queue comes home first, and on both paths: an inbox
-        // left in a dropped desk is a queue the city forgot it had.
-        let (signal_effects, returned) = {
-            let mut desk = held(&desks.signals, "settle the signal desk")?;
-            (desk.take_effects(), desk.take_inbox())
-        };
-        self.inboxes.insert(addr.clone(), returned);
+        let signal_effects = held(&desks.signals, "settle the signal desk")?.take_effects();
         // Every desk below settles through one door, and that door
         // appends before it changes anything: `effect::Then` has no
         // other source than `Landing::record`, so a change that outran
@@ -94,12 +90,11 @@ impl RunWorker {
                     // per run, at a position the run's call counter
                     // never reaches (kernel-SPEC 8-21).
                     id: kernel::ApprovalId::of_sweep(&run_id),
-                    source: kernel::ApprovalSource::Gate,
                     actor: who.to_owned(),
                     artifact: sweep.job_locator.clone(),
                     action_desc: format!("{swept} files were deleted in one dispatch"),
                     cluster_key: kernel::ClusterKey {
-                        class: kernel::ApprovalClass::DiscardEscalate,
+                        class: kernel::ApprovalClass::Question,
                         detail: addr.as_str().to_owned(),
                     },
                     created: now_ms()?,

@@ -3,200 +3,72 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The startup cache: what this browser saw last time, so the first
-// frame is drawn in the language, at the size and in the light the
-// person left, rather than flashing one face and then another.
+// What this browser remembers about the person, as one value with one
+// door in front of it.
 //
-// Every value here is a guess about a fact the city owns. A guess this
-// build cannot read is dropped rather than replaced by an invented
-// one, because a cache that invents is a second authority: `effort`
-// left unset is the person saying nothing, which reaches the provider
-// as nothing and lets the provider choose.
+// **Every row the client keeps is named here and nowhere else.** The
+// settings screens, the shell and the keymap each used to spell their
+// own row names against the same store, which is how a key written
+// one way and read another goes unnoticed; now they read
+// `PreferenceDoor` and this file is the only reader of `ROWS`.
 //
-// **This file is the client's one door to browser storage.** Every row
-// the page keeps is named here and read back here, so a key cannot be
-// spelled one way where it is written and another way where it is
-// read; and a browser that offers no storage is answered once, so
-// every reader above degrades the same way.
+// **The door is where the city's answer will arrive.** The person's
+// own layer of `config.toml` is the authority these values are headed
+// for (roadmap 3.14), so every reader above already takes them as one
+// record handed over by a door rather than as rows it fetches itself:
+// the day `PreferencesAnswer` lands, this file changes and no view
+// does.
 //
-// **Browser storage refuses by throwing, in three places a person can
-// reach**: a profile that denies storage throws on the property access
-// itself, a private window can grant a store whose quota is zero, and
-// a quota can fill while the tab is open. Each throw is turned into a
-// value here, so no reader above has to know that keeping a row is an
-// operation that can fail, and the first paint cannot die on one.
+// **A guess this build cannot read is dropped rather than repaired.**
+// An unreadable row falls back to the posture the client ships with,
+// which `theme.css` already draws, so a cache can never become a
+// second authority for a value somebody else owns.
+//
+// How hard the model thinks is deliberately absent. It is the city's
+// `[model] effort`, and a copy kept here would ride on every dispatch
+// from this browser and quietly overrule the city's own file.
 
-import { Effect, Either } from "effect";
 import { createSignal } from "solid-js";
 import type { Accessor } from "solid-js";
 
 import type { Lang } from "./lang";
 import { langOf } from "./lang";
-import { Effort as EffortSchema } from "../wire";
-import type { Effort, Proxying } from "../wire";
-
-// ------------------------------------------------------------- the store
-
-// The little of `Storage` this client needs: a test hands it a map and
-// a browser hands it `localStorage`. Narrow on purpose - nothing above
-// may enumerate or clear rows it did not write.
-export interface Rows {
-  readonly getItem: (key: string) => string | null;
-  readonly setItem: (key: string, value: string) => void;
-  readonly removeItem: (key: string) => void;
-}
-
-// What a browser without storage remembers: this session, and no
-// longer. A choice still takes effect; it just does not outlive the
-// tab.
-function memory(): Rows {
-  const held = new Map<string, string>();
-  return {
-    getItem: (key) => held.get(key) ?? null,
-    setItem: (key, value) => {
-      held.set(key, value);
-    },
-    removeItem: (key) => {
-      held.delete(key);
-    },
-  };
-}
-
-// What a browser did when asked, as a value: the result, or nothing
-// when the browser refused. This is the client's second use of Effect
-// at run time and it is the same use as the first - a failure that
-// would otherwise be thrown is read as data (client-SPEC 4-6).
-function attempted<T>(act: () => T): T | null {
-  const ran = Effect.runSync(Effect.either(Effect.try(act)));
-  return Either.isRight(ran) ? ran.right : null;
-}
-
-// The row written and dropped to find out whether this browser keeps
-// anything at all. Named like every other row so a store shared with
-// another application cannot mistake it for theirs.
-const PROBE_KEY = "sprawling.probe";
-
-// The browser's own store with its refusals answered: a row the quota
-// will not take is kept for this session instead, so a person typing
-// into a box never loses the sentence that filled the quota and no
-// page dies on a write.
-function guarded(store: Rows, spare: Rows): Rows {
-  return {
-    getItem: (key) => attempted(() => store.getItem(key)) ?? spare.getItem(key),
-    setItem: (key, value) => {
-      const took = attempted(() => {
-        store.setItem(key, value);
-        return true;
-      });
-      if (took === null) {
-        spare.setItem(key, value);
-      }
-    },
-    removeItem: (key) => {
-      // Both copies are asked to drop the row and neither answer is
-      // needed: a store that refuses a removal is one the probe would
-      // not have admitted, and the session copy is dropped regardless.
-      attempted(() => {
-        store.removeItem(key);
-        return true;
-      });
-      spare.removeItem(key);
-    },
-  };
-}
-
-// Whether this browser gives the client a place to keep rows, decided
-// by writing one and dropping it again. A store that answers the probe
-// is used; a store that throws on the reach, or takes nothing, is
-// stood in for by a map that lasts as long as the tab.
-function decided(): Rows {
-  const spare = memory();
-  const store = attempted<Rows>(() => localStorage);
-  if (store === null) {
-    return spare;
-  }
-  const kept = attempted(() => {
-    store.setItem(PROBE_KEY, PROBE_KEY);
-    store.removeItem(PROBE_KEY);
-    return true;
-  });
-  return kept === null ? spare : guarded(store, spare);
-}
-
-// Where this browser's preferences live, and the only reach for that
-// global in the whole client. A hardened profile, a document rendered
-// before storage is granted, and a test runner all arrive here, and
-// what happens to the three of them is decided once.
-let reached: Rows | undefined;
-
-export function browserRows(): Rows {
-  // One table for every caller, and one probe for the whole session. A
-  // fresh one per call would let the shell and a settings panel each
-  // write their own preferences into a map the other never reads.
-  reached ??= decided();
-  return reached;
-}
+import { browserRows } from "./rows";
+import type { Rows } from "./rows";
+import type { Proxying } from "../wire";
 
 // ------------------------------------------------------------- the rows
 
-const LANG_KEY = "sprawling.lang";
-const EFFORT_KEY = "sprawling.effort";
-const WELCOMED_KEY = "sprawling.welcomed";
-// One unsent message per place a person writes, kept across a reload
-// or a page change; the key is the room or the run.
-const DRAFT_PREFIX = "sprawling.draft.";
-const LIGHTING_KEY = "sprawling.appearance.lighting";
-const SANS_KEY = "sprawling.appearance.sans";
-const MONO_KEY = "sprawling.appearance.mono";
-const SANS_STACK_KEY = "sprawling.appearance.sans_stack";
-const MONO_STACK_KEY = "sprawling.appearance.mono_stack";
-const BODY_KEY = "sprawling.appearance.body";
-const DENSITY_KEY = "sprawling.appearance.density";
-const CHROMA_KEY = "sprawling.appearance.chroma";
-const MOTION_KEY = "sprawling.appearance.motion";
-
-// Which rule a provider attached from now on starts with. A person
-// behind a relay settles it once, on the network screen, instead of on
-// every form they open; an endpoint already attached keeps the rule the
-// city recorded for it, so this is a starting point and not a setting
-// that reaches back.
-const PROXYING_KEY = "sprawling.network.proxying";
-
-// Whether the artefact panel beside a conversation is open. A debt with
-// a name: it belongs in the person's own TOML layer (roadmap 3.1), and
-// this row moves there whole when that layer lands rather than growing
-// a second reader here.
-const PANEL_KEY = "sprawling.talk.panel";
-
-const PROXYINGS: readonly Proxying[] = ["except_local", "always", "never"];
-
-export function defaultProxying(rows: Rows): Proxying {
-  const held = rows.getItem(PROXYING_KEY);
-  return PROXYINGS.find((rule) => rule === held) ?? "except_local";
-}
-
-export function setDefaultProxying(rows: Rows, rule: Proxying): void {
-  rows.setItem(PROXYING_KEY, rule);
-}
-
-// ---------------------------------------------------------------- effort
-
-// The ladder the wire accepts, in the wire's own order. The generated
-// schema is the one place it is written; a level added there appears
-// in every selector without anybody editing a list.
-export const EFFORTS: readonly Effort[] = EffortSchema.literals;
-
-// `null` for a value this build cannot read, which is the same as
-// never having chosen: the request carries no effort and the provider
-// decides. `Effort` has a `"none"` level, and it means the opposite -
-// think as little as possible - so absence may not be spelled with it.
-function readEffort(raw: string | null): Effort | null {
-  return EFFORTS.find((effort) => effort === raw) ?? null;
-}
-
-function readLang(raw: string | null, fallback: string): Lang {
-  return raw === "en" || raw === "zh" ? raw : langOf(fallback);
-}
+// Every row this client keeps, by the name it is kept under. Two of
+// them are families rather than single rows: a draft is kept per place
+// a person writes, and a chord per action the person rebound, so those
+// two are prefixes and the rest are whole names.
+const ROWS = {
+  lang: "sprawling.lang",
+  welcomed: "sprawling.welcomed",
+  // Whether the artefact panel beside a conversation is open.
+  panel: "sprawling.talk.panel",
+  lighting: "sprawling.appearance.lighting",
+  sans: "sprawling.appearance.sans",
+  mono: "sprawling.appearance.mono",
+  sansStack: "sprawling.appearance.sans_stack",
+  monoStack: "sprawling.appearance.mono_stack",
+  body: "sprawling.appearance.body",
+  density: "sprawling.appearance.density",
+  chroma: "sprawling.appearance.chroma",
+  motion: "sprawling.appearance.motion",
+  // Which rule a provider attached from now on starts with. A person
+  // behind a relay settles it once, on the network screen, instead of
+  // on every form they open; an endpoint already attached keeps the
+  // rule the city recorded for it.
+  proxying: "sprawling.network.proxying",
+  // One unsent message per place a person writes, kept across a reload
+  // or a page change; the rest of the name is the room or the run.
+  draft: "sprawling.draft.",
+  // One chord per action the person rebound; the rest of the name is
+  // the action. An action left at its shipped chord has no row.
+  chord: "sprawling.key.",
+} as const;
 
 // ------------------------------------------------------------ appearance
 
@@ -224,6 +96,7 @@ export const FACES: readonly Face[] = ["geist", "system", "custom"];
 export const DENSITIES: readonly Density[] = ["comfortable", "compact"];
 export const CHROMAS: readonly Chroma[] = ["full", "off"];
 export const MOTIONS: readonly Motion[] = ["system", "on", "off"];
+const PROXYINGS: readonly Proxying[] = ["except_local", "always", "never"];
 
 // The sizes a person may ask for. The floor is the smallest size the
 // colour gate has to hold its contrast tiers at, and the ceiling is
@@ -269,6 +142,55 @@ export function sizingOf(text: string): Sizing {
   return px >= BODY_PX.min && px <= BODY_PX.max ? { kind: "sized", px } : { kind: "refused" };
 }
 
+// ---------------------------------------------------------- the reading
+
+// The person's preferences, whole. One value rather than a dozen
+// accessors because that is the shape the city will answer with, and
+// because a screen that changes two of them at once must not be able
+// to write one and drop the other.
+export interface Preferences {
+  readonly lang: Lang;
+  // Whether this browser has walked through the welcome once. The city
+  // decides whether setup is *needed*; this only decides whether a
+  // person who skipped it is nagged again.
+  readonly welcomed: boolean;
+  readonly panel: boolean;
+  readonly appearance: Appearance;
+  readonly proxying: Proxying;
+}
+
+// The one way to the person's preferences: the record as it stands,
+// five named changes to it, and the two families that are read by name
+// because they have one row each per place and per action.
+//
+// Named changes rather than one `write`, because each of them becomes
+// its own command the day the city keeps these: a caller that handed
+// over a whole record would have to be rewritten then, and a caller
+// that says which fact it is changing would not.
+export interface PreferenceDoor {
+  readonly held: Accessor<Preferences>;
+  readonly setLang: (lang: Lang) => void;
+  readonly setWelcomed: (done: boolean) => void;
+  readonly setPanel: (open: boolean) => void;
+  readonly setAppearance: (next: Appearance) => void;
+  readonly setProxying: (rule: Proxying) => void;
+  // The chord the person set for one action, or `""` for an action
+  // they left alone. The spelling is the keymap's grammar, not this
+  // file's: what is kept here is a name and a string.
+  readonly chord: (action: string) => string;
+  readonly setChord: (action: string, spelled: string) => void;
+  // What was typed and not sent, by where it was typed. Not a signal:
+  // the box that owns it reads it once when it mounts.
+  readonly draft: (at: string) => string;
+  readonly setDraft: (at: string, text: string) => void;
+}
+
+// A stored word, or the posture this client ships with when the row is
+// empty or holds a word this build no longer offers.
+function readOne<T extends string>(offered: readonly T[], raw: string | null, fallback: T): T {
+  return offered.find((each) => each === raw) ?? fallback;
+}
+
 function readBody(raw: string | null): number | null {
   const said = sizingOf(raw ?? "");
   return said.kind === "sized" ? said.px : null;
@@ -278,117 +200,110 @@ function readStack(raw: string | null): string {
   return raw !== null && STACK_SHAPE.test(raw) ? raw : "";
 }
 
-// A stored word, or the posture this client ships with when the row is
-// empty or holds a word this build no longer offers.
-function readOne<T extends string>(offered: readonly T[], raw: string | null, fallback: T): T {
-  return offered.find((each) => each === raw) ?? fallback;
+function readLang(raw: string | null, fallback: string): Lang {
+  return raw === "en" || raw === "zh" ? raw : langOf(fallback);
 }
 
-// Every appearance choice this browser holds. A row this build cannot
-// read is not repaired and not invented: it falls back to the posture
-// the client ships with, which `theme.css` already draws.
-export function readAppearance(rows: Rows): Appearance {
+function readAppearance(rows: Rows): Appearance {
   return {
-    lighting: readOne(LIGHTINGS, rows.getItem(LIGHTING_KEY), "system"),
-    sans: readOne(FACES, rows.getItem(SANS_KEY), "geist"),
-    mono: readOne(FACES, rows.getItem(MONO_KEY), "geist"),
-    sansStack: readStack(rows.getItem(SANS_STACK_KEY)),
-    monoStack: readStack(rows.getItem(MONO_STACK_KEY)),
-    body: readBody(rows.getItem(BODY_KEY)),
-    density: readOne(DENSITIES, rows.getItem(DENSITY_KEY), "comfortable"),
-    chroma: readOne(CHROMAS, rows.getItem(CHROMA_KEY), "full"),
-    motion: readOne(MOTIONS, rows.getItem(MOTION_KEY), "system"),
+    lighting: readOne(LIGHTINGS, rows.getItem(ROWS.lighting), "system"),
+    sans: readOne(FACES, rows.getItem(ROWS.sans), "geist"),
+    mono: readOne(FACES, rows.getItem(ROWS.mono), "geist"),
+    sansStack: readStack(rows.getItem(ROWS.sansStack)),
+    monoStack: readStack(rows.getItem(ROWS.monoStack)),
+    body: readBody(rows.getItem(ROWS.body)),
+    density: readOne(DENSITIES, rows.getItem(ROWS.density), "comfortable"),
+    chroma: readOne(CHROMAS, rows.getItem(ROWS.chroma), "full"),
+    motion: readOne(MOTIONS, rows.getItem(ROWS.motion), "system"),
   };
 }
 
 // A size the person has not stated is absent from storage too, so the
 // stylesheet's own figure keeps its one home in `theme.css`.
-export function writeAppearance(rows: Rows, next: Appearance): void {
-  rows.setItem(LIGHTING_KEY, next.lighting);
-  rows.setItem(SANS_KEY, next.sans);
-  rows.setItem(MONO_KEY, next.mono);
-  rows.setItem(SANS_STACK_KEY, next.sansStack);
-  rows.setItem(MONO_STACK_KEY, next.monoStack);
+function writeAppearance(rows: Rows, next: Appearance): void {
+  rows.setItem(ROWS.lighting, next.lighting);
+  rows.setItem(ROWS.sans, next.sans);
+  rows.setItem(ROWS.mono, next.mono);
+  rows.setItem(ROWS.sansStack, next.sansStack);
+  rows.setItem(ROWS.monoStack, next.monoStack);
   if (next.body === null) {
-    rows.removeItem(BODY_KEY);
+    rows.removeItem(ROWS.body);
   } else {
-    rows.setItem(BODY_KEY, String(next.body));
+    rows.setItem(ROWS.body, String(next.body));
   }
-  rows.setItem(DENSITY_KEY, next.density);
-  rows.setItem(CHROMA_KEY, next.chroma);
-  rows.setItem(MOTION_KEY, next.motion);
+  rows.setItem(ROWS.density, next.density);
+  rows.setItem(ROWS.chroma, next.chroma);
+  rows.setItem(ROWS.motion, next.motion);
 }
 
-// ----------------------------------------------------------- the reading
-
-export interface Prefs {
-  readonly lang: Accessor<Lang>;
-  readonly setLang: (lang: Lang) => void;
-  // How hard the model should think, or `null` for a person who has
-  // not said: the choice then belongs to the provider.
-  readonly effort: Accessor<Effort | null>;
-  readonly setEffort: (effort: Effort | null) => void;
-  // Whether this browser has walked through the welcome once. The city
-  // decides whether setup is *needed*; this only decides whether a
-  // person who skipped it is nagged again.
-  readonly welcomed: Accessor<boolean>;
-  // Whether the artefact panel beside a conversation is open.
-  readonly panel: Accessor<boolean>;
-  readonly setPanel: (open: boolean) => void;
-  readonly setWelcomed: (done: boolean) => void;
-  // What was typed and not sent, by where it was typed. Not a signal:
-  // the box that owns it reads it once when it mounts.
-  readonly draft: (at: string) => string;
-  readonly setDraft: (at: string, text: string) => void;
-}
-
-export function loadPrefs(rows: Rows, browserLang: string): Prefs {
-  const [lang, setLangSignal] = createSignal<Lang>(
-    readLang(rows.getItem(LANG_KEY), browserLang),
-  );
-  const [effort, setEffortSignal] = createSignal<Effort | null>(
-    readEffort(rows.getItem(EFFORT_KEY)),
-  );
-  const [welcomed, setWelcomedSignal] = createSignal<boolean>(
-    rows.getItem(WELCOMED_KEY) === "yes",
-  );
-  const [panel, setPanelSignal] = createSignal<boolean>(
-    rows.getItem(PANEL_KEY) !== "no",
-  );
+function readPreferences(rows: Rows, browserLang: string): Preferences {
   return {
-    lang,
-    setLang(next) {
-      rows.setItem(LANG_KEY, next);
-      setLangSignal(next);
+    lang: readLang(rows.getItem(ROWS.lang), browserLang),
+    welcomed: rows.getItem(ROWS.welcomed) === "yes",
+    panel: rows.getItem(ROWS.panel) !== "no",
+    appearance: readAppearance(rows),
+    proxying: readOne(PROXYINGS, rows.getItem(ROWS.proxying), "except_local"),
+  };
+}
+
+// The door onto one store. A test hands it a map and its own language
+// tag; the page reaches the browser's through `preferences()` below.
+export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor {
+  const [held, setHeld] = createSignal<Preferences>(readPreferences(rows, browserLang));
+  // Each change writes its own rows and then the record, so a reader
+  // that redraws on the signal and a reader that reloads the page see
+  // the same thing.
+  return {
+    held,
+    setLang(lang) {
+      rows.setItem(ROWS.lang, lang);
+      setHeld((before) => ({ ...before, lang }));
     },
-    effort,
-    setEffort(next) {
-      if (next === null) {
-        rows.removeItem(EFFORT_KEY);
-      } else {
-        rows.setItem(EFFORT_KEY, next);
-      }
-      setEffortSignal(next);
-    },
-    panel,
-    setPanel(open) {
-      rows.setItem(PANEL_KEY, open ? "yes" : "no");
-      setPanelSignal(open);
-    },
-    welcomed,
     setWelcomed(done) {
-      rows.setItem(WELCOMED_KEY, done ? "yes" : "no");
-      setWelcomedSignal(done);
+      rows.setItem(ROWS.welcomed, done ? "yes" : "no");
+      setHeld((before) => ({ ...before, welcomed: done }));
     },
-    draft(at) {
-      return rows.getItem(DRAFT_PREFIX + at) ?? "";
+    setPanel(open) {
+      rows.setItem(ROWS.panel, open ? "yes" : "no");
+      setHeld((before) => ({ ...before, panel: open }));
     },
+    setAppearance(next) {
+      writeAppearance(rows, next);
+      setHeld((before) => ({ ...before, appearance: next }));
+    },
+    setProxying(rule) {
+      rows.setItem(ROWS.proxying, rule);
+      setHeld((before) => ({ ...before, proxying: rule }));
+    },
+    chord: (action) => rows.getItem(ROWS.chord + action) ?? "",
+    setChord(action, spelled) {
+      if (spelled === "") {
+        rows.removeItem(ROWS.chord + action);
+      } else {
+        rows.setItem(ROWS.chord + action, spelled);
+      }
+    },
+    draft: (at) => rows.getItem(ROWS.draft + at) ?? "",
     setDraft(at, text) {
       if (text === "") {
-        rows.removeItem(DRAFT_PREFIX + at);
+        rows.removeItem(ROWS.draft + at);
       } else {
-        rows.setItem(DRAFT_PREFIX + at, text);
+        rows.setItem(ROWS.draft + at, text);
       }
     },
   };
+}
+
+// The preferences this page runs on. One per document, for the reason
+// the keymap is one per document: the shell, the settings screens and
+// the face the page is drawn in all have to be looking at the same
+// record, and a second copy would let a change go unseen.
+let shared: PreferenceDoor | undefined;
+
+export function preferences(): PreferenceDoor {
+  shared ??= loadPreferences(
+    browserRows(),
+    typeof navigator === "undefined" ? "" : navigator.language,
+  );
+  return shared;
 }

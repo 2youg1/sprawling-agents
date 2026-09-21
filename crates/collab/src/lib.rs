@@ -23,7 +23,7 @@ mod triage;
 mod workshop;
 mod workshop_tool;
 
-pub use arbiter::{Circumstance, Escalation, Level, arbitrate, conflict_payload};
+pub use arbiter::{Level, arbitrate, conflict_payload};
 pub use archive_tool::{ARCHIVE_KINDS, ArchiveDesk, ArchiveEffect, ArchiveTool, Held};
 pub use claim_effect::{ClaimEffect, evidence_of, still_true};
 pub use claim_tool::{ClaimDesk, ClaimTool};

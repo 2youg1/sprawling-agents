@@ -22,9 +22,10 @@
 )]
 
 use gateway::Custodian;
+use kernel::discard::{decide as decide_discard, forecast};
 use kernel::{
     Address, ByteLen, Discard, DiscardForecast, DiscardRequest, DiscardVerdict, ExecArm, Locator,
-    Registry, Restoration, SecretRef, TaintSet, decide_discard, forecast,
+    Restoration, SecretRef, TaintSet,
 };
 
 // ------------------------------------------------------- a pasted credential
@@ -89,24 +90,19 @@ fn a_delete_with_no_way_back_is_refused_rather_than_queued() {
     // Constitution 7.2. The refusal is the point: a Discard that cannot be
     // undone never becomes an event, which is why the Recycle Bin can
     // promise every row a return path.
-    let registry = Registry::default();
     let unplanned = DiscardRequest::Unplanned {
         paths: vec![Address::parse("notes/draft.md").unwrap()],
         taint: TaintSet::default(),
         total_bytes: ByteLen::new(128),
     };
     assert!(
-        matches!(
-            decide_discard(&unplanned, &registry),
-            DiscardVerdict::Deny { .. }
-        ),
+        matches!(decide_discard(&unplanned), DiscardVerdict::Deny { .. }),
         "an unplanned delete has no restoration to point at"
     );
 }
 
 #[test]
 fn a_delete_with_a_checkpoint_behind_it_is_allowed() {
-    let registry = Registry::default();
     let oid = "5a".repeat(20);
     let restoration =
         Restoration::Tracked(Locator::parse(&format!("file:notes/draft.md@{oid}")).unwrap());
@@ -119,10 +115,7 @@ fn a_delete_with_a_checkpoint_behind_it_is_allowed() {
     .expect("a tracked file has a way back");
     let planned = DiscardRequest::Planned(discard);
     assert!(
-        !matches!(
-            decide_discard(&planned, &registry),
-            DiscardVerdict::Deny { .. }
-        ),
+        !matches!(decide_discard(&planned), DiscardVerdict::Deny { .. }),
         "a delete with a commit behind it may proceed"
     );
 }

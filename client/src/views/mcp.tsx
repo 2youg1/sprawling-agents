@@ -12,7 +12,7 @@
 // is on screen - and hands every door one `Intake`, so a door never
 // learns what a scope is and the scope rule stays in one place.
 
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { Show, createMemo, createSignal } from "solid-js";
 
 import { Banner } from "./parts/banner";
 import { ByCommand } from "./mcp/by_command";
@@ -20,16 +20,13 @@ import { ByJson } from "./mcp/by_json";
 import { ByUrl } from "./mcp/by_url";
 import { Composio } from "./mcp/composio";
 import { DesktopForm } from "./desktop";
-import { QUERIES } from "../core/asking";
-import { MAYOR, buildingOf } from "../core/route";
 import { Segmented, type Choice } from "./parts/segmented";
 import { Servers } from "./mcp/servers";
 import { Tabs } from "./parts/tabs";
 import type { Address } from "../wire";
 import { reachOf } from "./mcp/reach";
-import { useSay, useUi } from "../ui";
-
-const HALL = buildingOf(MAYOR);
+import { BuildingColumn, HALL, useBuildings } from "./shared/buildings";
+import { useSay } from "../ui";
 
 type Door = "command" | "url" | "json";
 
@@ -105,15 +102,8 @@ export function McpForm(props: {
 }
 
 export function Mcp() {
-  const ui = useUi();
   const say = useSay();
-  const city = ui.conn.asking.ask(QUERIES.city);
-  const buildings = createMemo<readonly Address[]>(() => {
-    const answer = city();
-    if (answer === undefined || !("city" in answer)) return [HALL];
-    const all = answer.city.buildings.map((b) => b.addr);
-    return [HALL, ...all.filter((addr) => addr !== HALL).sort((a, b) => a.localeCompare(b))];
-  });
+  const buildings = useBuildings();
   const [chosen, setChosen] = createSignal<Address>(HALL);
   const [scope, setScope] = createSignal<Scope>("building");
 
@@ -162,28 +152,13 @@ export function Mcp() {
       </div>
       <Show when={why()}>{(said) => <Banner text={said()} weight="notice" />}</Show>
       <div class="flex min-h-0 flex-1 gap-wide">
-        <nav class="w-tree shrink-0" aria-label={say("mcp_building")}>
-          <ul class="flex flex-col gap-tight">
-            <For each={buildings()}>
-              {(addr) => (
-                <li>
-                  <button
-                    type="button"
-                    class={`w-full rounded-control px-base py-tight text-left text-note ${
-                      chosen() === addr ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"
-                    }`}
-                    onClick={() => {
-                      setChosen(addr);
-                    }}
-                    aria-current={chosen() === addr ? "true" : undefined}
-                  >
-                    {addr === HALL ? say("city_hall") : addr}
-                  </button>
-                </li>
-              )}
-            </For>
-          </ul>
-        </nav>
+        <BuildingColumn
+          label={say("mcp_building")}
+          buildings={buildings()}
+          chosen={chosen()}
+          hall={say("city_hall")}
+          onPick={setChosen}
+        />
         <section class="flex min-w-0 flex-1 flex-col gap-wide">
           <McpForm addr={chosen()} why={why} />
           <div>

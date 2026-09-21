@@ -114,7 +114,7 @@ What the Mayor does with the idea:
 
 That building page is also reached from the city drawing. It shows **the plan**, drawn from that building's `Roadmap.md` and holding no state of its own: a row is **ready**, **waiting**, **working**, **stuck** or **done**, and only leaves count towards the figure, because a branch's work is its children and counting both would count the same effort twice. The **standing goal** panel is the other half: **pursue this** keeps the building handing out ready work by itself, and it stops when nothing is ready and nothing is in flight.
 
-**waiting on you** is everything that cannot move until somebody answers. A new city is raised with approvals delegated to the clerk, so most items are answered there and their reasons land in the Ledger; what a policy marks as yours, and anything carrying content from outside the city, stays for you.
+**waiting on you** is every design question a resident asked that nothing can move without. A new city is raised with those questions delegated to the clerk, so most are answered there and their reasons land in the Ledger; anything carrying content from outside the city stays for you, because no policy waives a tainted question.
 
 **the record** is the one history in three lenses — **the ledger**, **the archive**, **the recycle bin** — and **cost** is what was spent, in five cuts that each sum to the same total. Where a provider reported no price, the page reports tokens and says why there is no amount, instead of printing `$0.00`.
 

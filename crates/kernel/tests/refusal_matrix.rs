@@ -16,25 +16,10 @@
     reason = "test code"
 )]
 
-use kernel::{
-    Address, ApprovalId, AxError, DelegateKind, Depth, DiscardRequest, EgressOutcome, EgressTarget,
-    GateContext, GateOutcome, SecretSpan, TaintSet, TimeMs, WriteDomain,
-};
-
-fn ctx() -> GateContext {
-    GateContext {
-        actor: "worker@sim.1".into(),
-        now: TimeMs::new(1),
-        item_id: ApprovalId::new("item-1").unwrap(),
-    }
-}
-
-fn artifact() -> kernel::Locator {
-    kernel::Locator::parse(&format!("cas:b3-{}", "aa".repeat(32))).unwrap()
-}
+use kernel::gate::{DOORS, conformance};
 
 /// The matrix row: three parts present, non-empty, alternative directive.
-fn assert_complete_refusal(refusal: &AxError, door: &str) {
+fn assert_complete_refusal(refusal: &kernel::AxError, door: &str) {
     let gate = refusal
         .gate()
         .unwrap_or_else(|| panic!("{door}: refusal must carry the three parts"));
@@ -46,54 +31,16 @@ fn assert_complete_refusal(refusal: &AxError, door: &str) {
     );
 }
 
+/// Walks `DOORS` rather than naming doors one at a time, so a door
+/// added to the enum is a door this matrix judges. The samples call the
+/// real functions, so what is judged is the refusal a run receives.
 #[test]
 fn every_door_denial_carries_a_complete_teaching_refusal() {
-    // Domain door.
-    let wd = WriteDomain::new(vec![Address::parse("b1").unwrap()]).unwrap();
-    let GateOutcome::Deny { refusal } =
-        kernel::domain(&wd, &Address::parse("b2/x.md").unwrap(), &TaintSet::empty())
-    else {
-        panic!("outside write must deny")
-    };
-    assert_complete_refusal(&refusal, "domain");
-
-    // Egress door.
-    let span = SecretSpan {
-        start: 0,
-        len: 40,
-        provider: Some("anthropic"),
-    };
-    let EgressOutcome::Deny { refusal } = kernel::egress(
-        std::slice::from_ref(&span),
-        &EgressTarget::Public {
-            host: "x.io".into(),
-        },
-        false,
-    ) else {
-        panic!("secret spans must deny")
-    };
-    assert_complete_refusal(&refusal, "egress");
-
-    // Discard door (unplanned request).
-    let unplanned = DiscardRequest::Unplanned {
-        paths: vec![Address::parse("b/x.md").unwrap()],
-        taint: TaintSet::empty(),
-        total_bytes: kernel::ByteLen::new(1),
-    };
-    let registry = kernel::Registry::new();
-    let GateOutcome::Deny { refusal } =
-        kernel::gate_discard(&unplanned, &registry, &ctx(), "delete b/x.md", &artifact())
-    else {
-        panic!("unplanned discard must deny")
-    };
-    assert_complete_refusal(&refusal, "discard");
-
-    // Spawn admission.
-    let GateOutcome::Deny { refusal } = kernel::spawn(Depth::Delegated, &DelegateKind::Resident)
-    else {
-        panic!("delegated spawn must deny")
-    };
-    assert_complete_refusal(&refusal, "spawn");
+    for door in DOORS {
+        let refusal = conformance::deny_sample(door)
+            .unwrap_or_else(|allowed| panic!("{}: sample was meant to deny", allowed.as_str()));
+        assert_complete_refusal(&refusal, door.as_str());
+    }
 }
 
 #[test]

@@ -48,13 +48,18 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
     );
     let mut invoked = 0u32;
     let turn = advance(
-        turn.execute(Interrupt::None, &mut ledger, &mut |_call| {
-            invoked += 1;
-            Ok(ToolOutcome {
-                result: Payload::empty(),
-                attachments: Vec::new(),
-            })
-        })
+        turn.execute(
+            Interrupt::None,
+            &mut ledger,
+            &mut |_call| {
+                invoked += 1;
+                Ok(ToolOutcome {
+                    result: Payload::empty(),
+                    attachments: Vec::new(),
+                })
+            },
+            &mut |_| NextCall::Allowed,
+        )
         .unwrap(),
     );
     let PhaseOutcome::Advanced(report) = turn.record(Interrupt::None, &mut ledger).unwrap() else {
@@ -212,14 +217,19 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
         .unwrap(),
     );
     let turn = advance(
-        turn.execute(Interrupt::None, &mut ledger, &mut |call| {
-            Err(AxError::failure(
-                AxCode::ToolUnavailable,
-                "invoke tool",
-                call.name.to_string(),
-            )
-            .with_recovery("this bench registers no tools"))
-        })
+        turn.execute(
+            Interrupt::None,
+            &mut ledger,
+            &mut |call| {
+                Err(AxError::failure(
+                    AxCode::ToolUnavailable,
+                    "invoke tool",
+                    call.name.to_string(),
+                )
+                .with_recovery("this bench registers no tools"))
+            },
+            &mut |_| NextCall::Allowed,
+        )
         .unwrap(),
     );
     let PhaseOutcome::Advanced(report) = turn.record(Interrupt::None, &mut ledger).unwrap() else {
@@ -263,11 +273,92 @@ fn the_ledger_chain_stays_verifiable_after_a_turn() {
         .unwrap(),
     );
     let turn = advance(
-        turn.execute(Interrupt::None, &mut ledger, &mut |_call| {
-            panic!("empty wave must not invoke")
-        })
+        turn.execute(
+            Interrupt::None,
+            &mut ledger,
+            &mut |_call| panic!("empty wave must not invoke"),
+            &mut |_| NextCall::Allowed,
+        )
         .unwrap(),
     );
     let _report = turn.record(Interrupt::None, &mut ledger).unwrap();
     crate::replay::verify_lines(ledger.lines.clone()).unwrap();
+}
+
+/// A halt that arrives during a wave stops the wave where it stands.
+///
+/// Before the wave asked, a scope stopped while the model's first edit
+/// was running still got the other three: one question per turn meant
+/// the person who stopped the city waited for every effect the model
+/// had asked for in that one reply.
+#[test]
+fn a_wave_halted_between_two_calls_does_not_make_the_second() {
+    let mut ledger = TestLedger::new();
+    let second = ToolCall {
+        id: "call-2".to_owned(),
+        name: kernel::ToolName::parse("probe").unwrap(),
+        args: Payload::empty(),
+    };
+    let mut model = OneShotModel {
+        calls: vec![probe_call(), second],
+    };
+    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(9));
+    let turn = advance(
+        turn.assemble(
+            Interrupt::None,
+            &mut ledger,
+            &prefix(),
+            &Window::new(),
+            &[],
+            &shape(),
+        )
+        .unwrap(),
+    );
+    let turn = advance(
+        turn.call(
+            Interrupt::None,
+            &mut ledger,
+            &mut model,
+            &BuildingPolicy::default(),
+            None,
+        )
+        .unwrap(),
+    );
+    let mut invoked = 0u32;
+    let outcome = turn
+        .execute(
+            Interrupt::None,
+            &mut ledger,
+            &mut |_call| {
+                invoked += 1;
+                Ok(ToolOutcome {
+                    result: Payload::empty(),
+                    attachments: Vec::new(),
+                })
+            },
+            &mut |call| match call {
+                0 => NextCall::Allowed,
+                _ => NextCall::Halted,
+            },
+        )
+        .unwrap();
+    let PhaseOutcome::Cancelled(cancelled) = outcome else {
+        panic!("a halted wave ends the turn");
+    };
+    assert_eq!(invoked, 1, "the second call was never made");
+    assert!(
+        !cancelled.refs().is_empty(),
+        "the cancellation is on the ledger"
+    );
+    let kinds = ledger.kinds();
+    assert_eq!(
+        kinds.iter().filter(|kind| *kind == "tool_called").count(),
+        1,
+        "nothing was written down for work nothing did: {kinds:?}"
+    );
+    assert_eq!(
+        kinds.last().map(String::as_str),
+        Some("cancel_received"),
+        "{kinds:?}"
+    );
 }

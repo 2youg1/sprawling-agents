@@ -48,6 +48,8 @@ fn a_scheduled_job_starts_by_itself_and_only_once_per_firing() {
         "an hour of downtime owes one run, not four"
     );
 
+    worker.land_the_rest().unwrap();
+
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let started = verified
         .raw_lines()
@@ -128,4 +130,55 @@ fn a_close_lands_between_commands_and_never_inside_one() {
         desk.wait(std::time::Duration::from_millis(1)),
         DeskWait::Close
     ));
+}
+
+/// One job in a window used to take the rest of that window with it:
+/// the tick closed the window first and returned on the first refusal,
+/// so the other jobs due that minute never ran and nothing recorded
+/// that they had not. Every due job is now attempted, and a refusal is
+/// written to the log instead of to the other jobs.
+#[test]
+fn a_scheduled_job_that_cannot_start_does_not_take_the_others_with_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    std::fs::write(
+        city::schedule_path(dir.path()),
+        "[[job]]\nname = \"nowhere\"\naddr = \"ghost/room1\"\n\
+         task = \"sweep a building that is not there\"\ngoal = \"nothing\"\n\
+         every = \"15m\"\n\
+         \n[[job]]\nname = \"sweep\"\naddr = \"lab/room1\"\n\
+         task = \"sweep the roadmap\"\ngoal = \"every row has a status\"\n\
+         every = \"15m\"\n",
+    )
+    .unwrap();
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+
+    let minute = 60_000;
+    worker.last_tick = kernel::TimeMs::new(14 * minute);
+    // Both are taken into a lane, because a lane is where a dispatch
+    // is judged now: the schedule's job is a request, and whether the
+    // building behind it exists is the drive's answer rather than the
+    // tick's. What the tick promises is that it walked the whole
+    // window.
+    assert_eq!(
+        worker.tick(kernel::TimeMs::new(15 * minute)).unwrap(),
+        2,
+        "the job behind the one that cannot start is still owed its run"
+    );
+    worker.land_the_rest().unwrap();
+
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let started: Vec<String> = verified
+        .raw_lines()
+        .iter()
+        .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+        .filter(|value| value["kind"] == "run_started")
+        .filter_map(|value| value["addr"].as_str().map(str::to_owned))
+        .collect();
+    assert_eq!(
+        started,
+        vec!["ghost/room1".to_owned(), "lab/room1".to_owned()],
+        "every job due in the window reached a lane; what the mistyped one          cannot do is stop the one behind it"
+    );
 }

@@ -186,6 +186,77 @@ pub(crate) fn fake_stream_provider(
     (format!("http://{addr}/v1/messages"), handle)
 }
 
+/// A provider that answers a stream at a pace, and then goes quiet
+/// for as long as it is told to.
+///
+/// This is what tells an idle bound from a deadline. A provider that
+/// writes steadily for longer than the bound is a model answering at
+/// length; a provider that stops for longer than the bound is a model
+/// that stopped. One fixture produces both, and the only difference
+/// between the two calls is where the time goes.
+///
+/// Writes after the caller has left are ignored: a client that gave up
+/// on a silence is the case under test, not a failure of the fixture.
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::string_slice,
+    clippy::arithmetic_side_effects,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
+    reason = "test helper"
+)]
+pub(crate) fn paced_stream_provider(
+    frames: Vec<String>,
+    gap: Duration,
+    then_quiet_for: Duration,
+) -> (String, std::thread::JoinHandle<()>) {
+    use std::io::{Read as _, Write as _};
+    use std::net::TcpListener;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let handle = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut buf = vec![0u8; 65536];
+        let mut request = String::new();
+        loop {
+            let n = stream.read(&mut buf).unwrap();
+            request.push_str(&String::from_utf8_lossy(&buf[..n]));
+            if let Some(head_end) = request.find("\r\n\r\n") {
+                let head = &request[..head_end];
+                let content_length = head
+                    .lines()
+                    .find_map(|l| {
+                        l.to_ascii_lowercase()
+                            .strip_prefix("content-length: ")
+                            .map(|v| v.trim().parse::<usize>().unwrap())
+                    })
+                    .unwrap_or(0);
+                if request.len() >= head_end + 4 + content_length {
+                    break;
+                }
+            }
+        }
+        let _ = stream.write_all(
+            b"HTTP/1.1 200 X\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n",
+        );
+        let _ = stream.flush();
+        for frame in &frames {
+            std::thread::sleep(gap);
+            let _ = stream.write_all(format!("data: {frame}\n\n").as_bytes());
+            let _ = stream.flush();
+        }
+        std::thread::sleep(then_quiet_for);
+        let _ = stream.write_all(b"data: [DONE]\n\n");
+        let _ = stream.flush();
+        drop(stream);
+    });
+    (format!("http://{addr}/v1/messages"), handle)
+}
+
 /// A provider that accepts the connection and then says nothing.
 ///
 /// This is the shape of a hang, and it is worse than a refusal: a
@@ -236,13 +307,16 @@ pub(crate) fn config(url: &str) -> EndpointConfig {
             name: "x-api-key".to_owned(),
             value: SecretRef::parse("secret:anthropic/api").unwrap(),
         },
-        extra_headers: vec![("anthropic-version".to_owned(), "2023-06-01".to_owned())],
+        extra_headers: vec![(
+            "anthropic-version".to_owned(),
+            crate::endpoint::HeaderValue::Plain("2023-06-01".to_owned()),
+        )],
         overrides: vec![(
             "/metadata/user_id".to_owned(),
             Value::String("city".to_owned()),
         )],
         timeout_ms: 5_000,
-        stream_deadline_ms: None,
+        stream_idle_timeout_ms: None,
         proxying: kernel::Proxying::default(),
         pricing: Some(
             crate::market::MarketSnapshot::builtin()

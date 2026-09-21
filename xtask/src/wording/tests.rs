@@ -5,8 +5,10 @@
 
 use super::*;
 
+/// What a `.tsx` view hands a reader. The refusal seats a `.ts`
+/// module writes are asserted beside their own reader.
 fn found(src: &str) -> Vec<String> {
-    handed_to_a_reader(src)
+    jsx::handed_to_a_reader(src)
         .into_iter()
         .map(|said| format!("{}: {}", said.seat, said.left))
         .collect()

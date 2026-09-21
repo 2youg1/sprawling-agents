@@ -12,6 +12,8 @@
 //! no timestamps: resume and replay must re-derive the identical key, or
 //! the double-payment defense dies exactly on the recovery path.
 
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::event::{RunId, Seq};
@@ -56,6 +58,61 @@ impl IdemKey {
             digest,
         })
     }
+}
+
+/// The right to perform one unreplayable side effect, once.
+///
+/// A guard exists only because [`claim`] put its key into a seen set,
+/// and the entrance to every effect that cannot be replayed —
+/// decrypting, billing, outward delivery (8.2) — asks for one by
+/// reference. That turns "judge duplicates before you act" from a
+/// sentence in a comment into something the compiler checks: an
+/// entrance that wants a guard cannot be called by a caller that never
+/// claimed.
+#[derive(Debug, PartialEq, Eq)]
+pub struct IdemGuard {
+    key: IdemKey,
+}
+
+impl IdemGuard {
+    /// The key this guard was claimed under, for the record the effect
+    /// writes.
+    #[must_use]
+    pub fn key(&self) -> &IdemKey {
+        &self.key
+    }
+}
+
+/// A key that was already claimed. The caller answers with what the
+/// first claim produced rather than doing the work twice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Duplicate {
+    key: IdemKey,
+}
+
+impl Duplicate {
+    #[must_use]
+    pub fn key(&self) -> &IdemKey {
+        &self.key
+    }
+}
+
+/// Claims `key` in the caller's seen set, handing back the right to
+/// act once.
+///
+/// The set stays the caller's state — kernel holds none — and the
+/// claim is the only way to add to it, so a key that is in the set is
+/// a key some caller was already given the right for.
+///
+/// # Errors
+/// [`Duplicate`] when the key is already in the set, carrying that key
+/// so the caller can look up the answer it gave the first time.
+pub fn claim(seen: &mut BTreeSet<IdemKey>, key: IdemKey) -> Result<IdemGuard, Duplicate> {
+    if seen.contains(&key) {
+        return Err(Duplicate { key });
+    }
+    seen.insert(key);
+    Ok(IdemGuard { key })
 }
 
 impl std::fmt::Display for IdemKey {
@@ -131,6 +188,21 @@ mod tests {
         assert!(serde_json::from_str::<IdemKey>("\"idem1-zz\"").is_err());
         assert!(
             serde_json::from_str::<IdemKey>("\"idem9-00000000000000000000000000000000\"").is_err()
+        );
+    }
+
+    #[test]
+    fn a_key_is_claimable_once_and_the_second_claim_names_it() {
+        let key = IdemKey::derive(&run(), Seq::FIRST, b"send mail");
+        let other = IdemKey::derive(&run(), Seq::FIRST, b"send other mail");
+        let mut seen = BTreeSet::new();
+        let guard = claim(&mut seen, key).expect("the first claim on a fresh key");
+        assert_eq!(guard.key(), &key);
+        let again = claim(&mut seen, key).expect_err("the second claim is a duplicate");
+        assert_eq!(again.key(), &key);
+        assert!(
+            claim(&mut seen, other).is_ok(),
+            "a different action is a different key"
         );
     }
 

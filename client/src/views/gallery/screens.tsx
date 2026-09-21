@@ -14,7 +14,7 @@
 import type { DoctorAnswer } from "../../wire";
 import { useSay } from "../../ui";
 import { MachineReport, MachineSkeleton, MachineUnchecked } from "../machine";
-import { SkillsNote } from "../setup";
+import { Shelves } from "../setup/skills";
 import { KeysSection } from "../setup/keys";
 import { ModelTable } from "../setup/models";
 import { AttachForm, EndpointList } from "../setup/providers";
@@ -24,7 +24,6 @@ import { Button } from "../parts/button";
 import { Cheatsheet } from "../parts/kbd";
 import { Case } from "./case";
 import { ENDPOINTS, PROBED } from "./served";
-import { Stand } from "./stand";
 
 // One machine, with an item in each of the three states a person acts
 // differently on: here, missing and required, missing and optional.
@@ -113,24 +112,15 @@ export function Screens() {
         <ModelTable served={PROBED} onChosen={() => undefined} />
       </Case>
 
-      {/* Nobody having chosen is a state of its own and the state a new
-          city is in: the cell leads the track, and the line under it
-          says the provider decides. A level chosen is the other
-          reading, and the two differ in exactly one sentence. */}
-      <Case label="settings · how hard the city thinks, nobody having said">
-        <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} effort={null}>
-          <EffortSection />
-        </Stand>
-      </Case>
-
-      <Case label="settings · how hard the city thinks, a level chosen">
-        <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} effort="high">
-          <EffortSection />
-        </Stand>
+      {/* One state, because this section holds no answer: where the
+          level is decided is the same sentence whatever the city has
+          been told, and the choosing happens over the composer. */}
+      <Case label="settings · how hard the city thinks">
+        <EffortSection />
       </Case>
 
       <Case label="settings · where this city keeps its skills">
-        <SkillsNote />
+        <Shelves />
       </Case>
     </>
   );

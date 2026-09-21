@@ -137,7 +137,9 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
       const built = endpointOf(draft, outcome.reference);
       if (built !== null) then(built);
     };
-    void enrol(ui.origin, realm, name, typed).then(settle);
+    void enrol({ origin: ui.origin, realm, name, value: typed, lang: ui.prefs.held().lang }).then(
+      settle,
+    );
   };
 
   return (

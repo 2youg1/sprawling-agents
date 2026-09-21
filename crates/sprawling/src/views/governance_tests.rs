@@ -58,7 +58,7 @@ fn the_governance_view_reports_who_answers_and_what_was_answered() {
     );
     answered.insert(
         "cluster".to_owned(),
-        serde_json::json!({ "class": "agent_question", "detail": "lab/room1" }),
+        serde_json::json!({ "class": "question", "detail": "lab/room1" }),
     );
     views
         .apply(&view_record(
@@ -80,7 +80,7 @@ fn the_governance_view_reports_who_answers_and_what_was_answered() {
     );
     assert_eq!(governance.decided.len(), 1, "one thing was decided");
     assert_eq!(governance.decided[0].item, "item-1");
-    assert_eq!(governance.decided[0].verdict, kernel::PolicyVerdict::Allow);
+    assert_eq!(governance.decided[0].verdict, kernel::Ruling::Allow);
     assert_eq!(governance.decided[0].cluster.detail, "lab/room1");
 }
 

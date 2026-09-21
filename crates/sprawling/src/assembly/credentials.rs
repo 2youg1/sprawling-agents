@@ -14,6 +14,7 @@ mod endpoints;
 mod environment;
 mod probing;
 pub(super) mod signing;
+pub(super) mod subscription;
 
 /// The name the environment-configured endpoint is attached under, so a
 /// person reading the settings page can see where it came from.
@@ -84,22 +85,35 @@ impl Entered {
 /// A row with no name and a pointer with no path are dropped: a form
 /// that keeps an empty row open while somebody types is a form whose
 /// half-written rows must not reach a provider.
-pub(super) fn tuning_of(wire: channels::EndpointTuning) -> gateway::EndpointTuning {
+/// # Errors
+/// `E_CONFIG_INVALID` naming the header whose value reads as a
+/// credential without being a vault reference.
+pub(super) fn tuning_of(
+    wire: channels::EndpointTuning,
+) -> Result<gateway::EndpointTuning, AxError> {
     let stated = |figure: Option<u64>| figure.filter(|ms| *ms > 0);
-    gateway::EndpointTuning {
+    let mut extra_headers = Vec::new();
+    for row in wire.headers {
+        let name = row.name.trim().to_owned();
+        if name.is_empty() {
+            continue;
+        }
+        extra_headers.push((
+            name.clone(),
+            gateway::HeaderValue::parse(&name, &row.value)?,
+        ));
+    }
+    Ok(gateway::EndpointTuning {
         label: wire
             .label
             .map(|given| given.trim().to_owned())
             .filter(|given| !given.is_empty()),
         timeout_ms: stated(wire.timeout_ms),
-        request_max_retries: wire.request_max_retries,
-        stream_deadline_ms: stated(wire.stream_idle_timeout_ms),
-        extra_headers: wire
-            .headers
-            .into_iter()
-            .map(|row| (row.name.trim().to_owned(), row.value))
-            .filter(|(name, _)| !name.is_empty())
-            .collect(),
+        request_max_retries: wire
+            .request_max_retries
+            .map_or(gateway::Retries::UntilHalted, gateway::Retries::AtMost),
+        stream_idle_timeout_ms: stated(wire.stream_idle_timeout_ms),
+        extra_headers,
         overrides: wire
             .overrides
             .into_iter()
@@ -107,7 +121,7 @@ pub(super) fn tuning_of(wire: channels::EndpointTuning) -> gateway::EndpointTuni
             .filter(|(pointer, _)| pointer.starts_with('/'))
             .collect(),
         proxying: wire.proxying.unwrap_or_default(),
-    }
+    })
 }
 
 /// How a credential proves itself to a provider.
@@ -167,12 +181,13 @@ pub(super) struct Ceilings {
 pub(super) const PROBE_TIMEOUT_MS: u64 = 15_000;
 
 /// The headers a dialect requires beyond the credential.
-pub(super) fn dialect_headers(dialect: kernel::DialectKind) -> Vec<(String, String)> {
+pub(super) fn dialect_headers(dialect: kernel::DialectKind) -> Vec<(String, gateway::HeaderValue)> {
     match dialect {
-        kernel::DialectKind::Anthropic => {
-            vec![("anthropic-version".to_owned(), ANTHROPIC_VERSION.to_owned())]
-        }
-        _ => Vec::new(),
+        kernel::DialectKind::Anthropic => vec![(
+            "anthropic-version".to_owned(),
+            gateway::HeaderValue::Plain(ANTHROPIC_VERSION.to_owned()),
+        )],
+        kernel::DialectKind::OpenAi => Vec::new(),
     }
 }
 
@@ -219,8 +234,8 @@ pub(super) fn registered_as(
     model: &str,
 ) -> Option<gateway::ModelEntry> {
     book.choices()
-        .find(|(held, at, entry, _)| *held == tag && *at == endpoint && entry.id == model)
-        .map(|(_, _, entry, _)| entry.clone())
+        .find(|(held, at, entry)| *held == tag && *at == endpoint && entry.id == model)
+        .map(|(_, _, entry)| entry.clone())
 }
 
 /// The catalog's `local` row under the name a local server serves it.

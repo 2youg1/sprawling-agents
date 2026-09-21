@@ -116,7 +116,12 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
         for _ in 0..600 {
             let done = backlog.harvest().unwrap();
             if let Some(finished) = done.first() {
-                result["exit_code"] = serde_json::json!(finished.exit_code);
+                result["exit_code"] = match finished.exit {
+                    runtime::Exit::Ended { code } => serde_json::json!(code),
+                    other @ (runtime::Exit::Signalled | runtime::Exit::Unknown { .. }) => {
+                        serde_json::json!(other.as_str())
+                    }
+                };
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(100));

@@ -5,26 +5,36 @@
 
 //! Dependency gate (redline C5). Two assertions, one authority each:
 //! actual crate edges (normal + build deps) are a subset of the `depmap`
-//! fenced block in ARCHITECTURE.md section 2 — no hidden edge, kernel stays
-//! at zero; and `pub trait` appears only in seam files listed in section 3 —
+//! fenced block in ARCHITECTURE.md — no hidden edge, kernel stays at
+//! zero; and `pub trait` appears only in the files the seam table lists —
 //! one adapter is a hypothetical seam, so a trait outside the seam list is
 //! decoration, not architecture.
+//!
+//! The seam table is read out of its own section (`architecture`), never
+//! out of the whole document: a whitelist recognised by the shape of a
+//! table grows the day somebody writes a table of that shape somewhere
+//! else, and nothing says so.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::Command;
 
+use crate::architecture::{self, Numbered};
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-const ARCH: &str = "ARCHITECTURE.md";
+use architecture::PATH as ARCH;
+
+/// Where the seams are declared, and where a `pub trait` may therefore
+/// live.
+const SEAM_SECTION: u32 = 4;
 /// Workspace members outside the product graph.
 const NON_PRODUCT: [&str; 2] = ["xtask", "citysim"];
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let text = walk::read_text(&root.join(ARCH))?;
     let allowed = parse_block(&text)?;
-    let seams = seam_files(&text);
+    let seams = seam_files(&text)?;
     let mut violations = Vec::new();
 
     check_edges(root, &allowed, &mut violations)?;
@@ -68,14 +78,29 @@ fn parse_block(text: &str) -> Result<BTreeMap<String, BTreeSet<String>>, XtaskEr
     })
 }
 
-/// Seam files: section 3 table rows with four data cells and a crates/ path.
-fn seam_files(text: &str) -> BTreeSet<String> {
+/// Seam files: the rows of the seam table, which are four data cells
+/// with a `crates/**.rs` path in the second.
+///
+/// # Errors
+/// When the seam section is not in the document. A gate whose authority
+/// has moved must say so: read as an empty list, every `pub trait` in
+/// the tree would be reported at once and the real finding — that the
+/// seam table is gone — would be one line in a hundred.
+fn seam_files(text: &str) -> Result<BTreeSet<String>, XtaskError> {
+    let declared = architecture::section(text, SEAM_SECTION).ok_or_else(|| XtaskError::Doc {
+        file: ARCH.to_owned(),
+        msg: format!("no `## {SEAM_SECTION}` section, which is where the seams are declared"),
+    })?;
+    Ok(seams_in(&declared))
+}
+
+fn seams_in(declared: &[Numbered]) -> BTreeSet<String> {
     let mut set = BTreeSet::new();
-    for line in text.lines() {
-        if !line.trim_start().starts_with('|') {
+    for line in declared {
+        if !line.text.trim_start().starts_with('|') {
             continue;
         }
-        let cells: Vec<&str> = line.split('|').map(str::trim).collect();
+        let cells: Vec<&str> = line.text.split('|').map(str::trim).collect();
         if cells.len() != 6 {
             continue;
         }
@@ -229,10 +254,32 @@ mod tests {
 
     #[test]
     fn seam_rows_are_four_cell_rows_with_paths() {
-        let text = "| a | crates/kernel/src/ledger.rs | b | c |\n\
-                    | kernel::gate | crates/kernel/src/gate.rs | x | 8.2 | S2 | 未建 |\n";
-        let seams = seam_files(text);
+        let text = format!(
+            "## {SEAM_SECTION} Seams\n\
+             | a | crates/kernel/src/ledger.rs | b | c |\n\
+             | kernel::gate | crates/kernel/src/gate.rs | x | 8.2 | S2 | 未建 |\n"
+        );
+        let seams = seam_files(&text).unwrap();
         assert!(seams.contains("crates/kernel/src/ledger.rs"));
         assert_eq!(seams.len(), 1);
+    }
+
+    /// The defect: a four-column table written anywhere else used to
+    /// widen the set of files allowed to declare a `pub trait`.
+    #[test]
+    fn a_table_outside_the_seam_section_declares_no_seam() {
+        let text = format!(
+            "## {SEAM_SECTION} Seams\n\
+             | a | crates/kernel/src/ledger.rs | b | c |\n\
+             ## 9 Shapes\n\
+             | a | crates/runtime/src/turn.rs | b | c |\n"
+        );
+        let seams = seam_files(&text).unwrap();
+        assert_eq!(seams.len(), 1, "{seams:?}");
+    }
+
+    #[test]
+    fn a_document_with_no_seam_section_is_a_doc_error() {
+        assert!(seam_files("## 2 Stack\n").is_err());
     }
 }

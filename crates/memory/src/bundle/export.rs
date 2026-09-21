@@ -57,12 +57,7 @@ impl Bundle {
         let city_copied = copy_city_files(vfs.as_mut(), city_root, &dest_city)?;
         // Every number in the manifest is read back from the bundle, so
         // the manifest states what a reader of the bundle will find.
-        let manifest = Manifest {
-            records: count_records(vfs.as_ref(), &dest_ledger)?,
-            head: head_of(vfs.as_ref(), &dest_ledger)?,
-            cas_objects: count_files(vfs.as_ref(), &dest_cas)?,
-            files: count_files(vfs.as_ref(), &dest_city)?,
-        };
+        let manifest = Manifest::of(vfs.as_ref(), &dest_ledger, &dest_cas, &dest_city)?;
         // A manifest read only from the bundle certifies itself: a copy
         // that silently dropped half the city agrees with its own
         // manifest. The source side is therefore counted separately and
@@ -139,32 +134,36 @@ impl Bundle {
             Manifest::from_json(&bytes, &at)?
         };
         let ledger_dir = city_root.join(RESERVED).join(LEDGER);
-        if !walk(vfs.as_ref(), &ledger_dir).is_empty() {
+        let cas_dir = city_root.join(RESERVED).join(CAS);
+        if !walk(vfs.as_ref(), &ledger_dir)?.is_empty() {
             return Err(MemoryError::Bundle {
                 op: "restore",
                 detail: format!("{} already holds a ledger", ledger_dir.display()),
             });
         }
         copy_tree(vfs.as_mut(), &bundle.join(LEDGER), &ledger_dir)?;
-        copy_tree(
-            vfs.as_mut(),
-            &bundle.join(CAS),
-            &city_root.join(RESERVED).join(CAS),
-        )?;
+        copy_tree(vfs.as_mut(), &bundle.join(CAS), &cas_dir)?;
         copy_tree(vfs.as_mut(), &bundle.join(CITY), city_root)?;
 
-        let restored = Manifest {
-            records: count_records(vfs.as_ref(), &ledger_dir)?,
-            head: head_of(vfs.as_ref(), &ledger_dir)?,
-            cas_objects: count_files(vfs.as_ref(), &city_root.join(RESERVED).join(CAS))?,
-            files: count_files(vfs.as_ref(), city_root)?,
-        };
-        if restored.records != claimed.records || restored.head != claimed.head {
+        // All four numbers, because a bundle that lost its objects has
+        // the history that points at them: the chain verifies, every
+        // Locator resolves to nothing, and only the object count says
+        // so.
+        let restored = Manifest::of(vfs.as_ref(), &ledger_dir, &cas_dir, city_root)?;
+        if restored != claimed {
             return Err(MemoryError::Bundle {
                 op: "restore",
                 detail: format!(
-                    "the bundle claims {} record(s) ending {}, and {} record(s) ending {} arrived",
-                    claimed.records, claimed.head, restored.records, restored.head
+                    "the bundle claims {} record(s) ending {} with {} cas object(s) and {} file(s), \
+                     and {} record(s) ending {} with {} cas object(s) and {} file(s) arrived",
+                    claimed.records,
+                    claimed.head,
+                    claimed.cas_objects,
+                    claimed.files,
+                    restored.records,
+                    restored.head,
+                    restored.cas_objects,
+                    restored.files
                 ),
             });
         }
@@ -227,6 +226,9 @@ mod tests {
         }
         fn read(&self, path: &std::path::Path) -> std::io::Result<Vec<u8>> {
             self.0.read(path)
+        }
+        fn size(&self, path: &std::path::Path) -> std::io::Result<u64> {
+            self.0.size(path)
         }
         fn read_at(
             &self,
@@ -316,6 +318,33 @@ mod tests {
             ax.subject().contains("record(s) ending"),
             "a partial copy is not a city: {}",
             ax.subject()
+        );
+    }
+
+    /// A bundle can lose every object it carries and still verify as a
+    /// history: the chain is intact, and each Locator in it points at
+    /// nothing. Only the object count says so, which is why restore
+    /// compares four numbers rather than two.
+    #[test]
+    fn a_bundle_that_lost_its_objects_is_refused_rather_than_restored_empty() {
+        let home = tempfile::tempdir().unwrap();
+        city_with(2, home.path());
+        let mut cas = crate::Cas::open(&home.path().join(RESERVED).join(CAS)).unwrap();
+        cas.put(b"what a run offloaded").unwrap();
+        drop(cas);
+
+        let carried = tempfile::tempdir().unwrap();
+        let exported = Bundle::export(home.path(), carried.path()).unwrap();
+        assert_eq!(exported.cas_objects(), 1);
+
+        // The copy reached another machine with its objects missing.
+        std::fs::remove_dir_all(carried.path().join(CAS)).unwrap();
+
+        let elsewhere = tempfile::tempdir().unwrap();
+        let err = Bundle::restore(carried.path(), elsewhere.path()).unwrap_err();
+        assert!(
+            err.into_ax().subject().contains("cas object"),
+            "the refusal has to name the count that disagreed"
         );
     }
 

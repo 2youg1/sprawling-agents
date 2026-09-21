@@ -7,27 +7,14 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{ByteLen, TimeMs, consts_policy::WORKTREE_MAX_BYTES};
+use kernel::{ByteLen, consts_policy::WORKTREE_MAX_BYTES};
 
-use crate::checkpoint::Provenance;
 use crate::error::MemoryError;
 
+use super::landing::{Landing, PlannedMerge};
 use super::lease::WorktreeLease;
 use super::name::WorktreeName;
-
-/// What one merge writes down: four values that arrive together and are
-/// meaningless apart - a subject with nobody's provenance under it says
-/// who merged nothing. `reviewed_by_person` adds one `Reviewed-by: Name
-/// <email>` trailer, and only when this repository's git config also
-/// carries `user.name` and `user.email`: the city does not invent a
-/// person's name.
-pub struct Landing<'a> {
-    /// Determinism rule 2: the signature carries the injected instant.
-    pub t: TimeMs,
-    pub of: &'a Provenance,
-    pub subject: &'a str,
-    pub reviewed_by_person: bool,
-}
+use super::weight::measure;
 
 /// Where the trees live: inside the reserved subtree, because they are
 /// the city's own machinery rather than anybody's writable space. What a
@@ -50,50 +37,6 @@ impl std::fmt::Debug for Worktrees {
             .field("home", &self.home)
             .field("ceiling", &self.ceiling)
             .finish()
-    }
-}
-
-/// A merge that has been decided and not yet made.
-///
-/// The commit the trunk will land on is settled at construction and
-/// every refusal has already happened, so the line announcing this merge
-/// can be written before the trunk moves. [`PlannedMerge::apply`] is the
-/// only way to move it, and [`Worktrees::plan_merge`] is this value's
-/// only source.
-pub struct PlannedMerge<'a> {
-    trees: &'a Worktrees,
-    target: git2::Oid,
-}
-
-/// Names the decision, not the repository holding it: a `Worktrees` has
-/// no useful `Debug` and printing one would say nothing about which
-/// merge this is.
-impl std::fmt::Debug for PlannedMerge<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PlannedMerge")
-            .field("commit", &self.target)
-            .finish()
-    }
-}
-
-impl PlannedMerge<'_> {
-    /// The commit the city trunk will point at, for the line that says so.
-    pub fn commit(&self) -> String {
-        self.target.to_string()
-    }
-
-    /// Brings a node's committed work into the city's own trunk, as a
-    /// merge commit carrying the merging run's trailers. The judgement
-    /// stays fast-forward only; what the history keeps is the merge
-    /// commit, because a pointer move leaves nothing to read and
-    /// no place to say who verified it.
-    ///
-    /// # Errors
-    /// Propagates a trunk that cannot be read, committed onto or checked
-    /// out. The fast-forward judgement is not repeated: it was made, and
-    /// refused if it had to be, before this value existed.
-    pub fn apply(self, landing: &Landing<'_>) -> Result<(), MemoryError> {
-        self.trees.land_merge(self.target, landing)
     }
 }
 
@@ -122,7 +65,7 @@ impl Worktrees {
     /// Refuses a name already in use, a city whose working tree exceeds
     /// the ceiling, and a repository with no commit to branch from.
     pub fn claim(&self, name: &WorktreeName) -> Result<WorktreeLease, MemoryError> {
-        if self.live()?.contains(name) {
+        if self.live()?.contains(name) && !self.reclaim_abandoned(name)? {
             return Err(MemoryError::WorktreeBusy {
                 name: name.as_str().to_owned(),
                 detail: "another node holds this tree".to_owned(),
@@ -215,12 +158,16 @@ impl Worktrees {
         let ours = head
             .peel_to_commit()
             .map_err(|err| refuse("read the city trunk", err.to_string()))?;
-        if theirs.id() != ours.id()
-            && !self
+        // A git failure here is not an answer to the ancestry question.
+        // Reading it as "not a descendant" would report a stale trunk
+        // to somebody whose trunk is fine, and send them to rebuild
+        // work that needed no rebuilding.
+        let descends = theirs.id() == ours.id()
+            || self
                 .repo
                 .graph_descendant_of(theirs.id(), ours.id())
-                .unwrap_or(false)
-        {
+                .map_err(|err| refuse("judge a fast-forward", err.to_string()))?;
+        if !descends {
             return Err(MemoryError::MergeStale {
                 name: name.as_str().to_owned(),
                 detail: format!("the trunk moved to {} after this node branched", ours.id()),
@@ -234,7 +181,11 @@ impl Worktrees {
 
     /// Writes the merge commit [`Worktrees::plan_merge`] settled on: two
     /// parents, the node's tree, and the merging run's trailers.
-    fn land_merge(&self, target: git2::Oid, landing: &Landing<'_>) -> Result<(), MemoryError> {
+    pub(super) fn land_merge(
+        &self,
+        target: git2::Oid,
+        landing: &Landing<'_>,
+    ) -> Result<(), MemoryError> {
         let refuse = |op: &'static str, detail: String| MemoryError::Worktree { op, detail };
         let head = self
             .repo
@@ -301,12 +252,20 @@ impl Worktrees {
         }
     }
 
-    /// Gives a tree back: the files go, then the repository forgets it.
+    /// Gives a tree back: the repository forgets it, then whatever is
+    /// left of its files goes.
+    ///
+    /// That order, because the registration is what makes the name
+    /// unusable. Removing the directory first and then failing left the
+    /// name registered with nothing behind it, and the only thing
+    /// [`Worktrees::claim`] could say about it was that somebody else
+    /// held it — a tree nobody held and nobody could take.
     ///
     /// # Errors
-    /// Propagates a directory that cannot be removed and a repository
-    /// that refuses to prune.
+    /// Propagates a repository that refuses to prune and a directory
+    /// that cannot be removed.
     pub fn release(&self, lease: WorktreeLease) -> Result<(), MemoryError> {
+        self.forget(lease.name())?;
         if lease.path().exists() {
             std::fs::remove_dir_all(lease.path()).map_err(|source| MemoryError::Io {
                 op: "remove a worktree",
@@ -314,20 +273,54 @@ impl Worktrees {
                 source,
             })?;
         }
-        let tree = self
-            .repo
-            .find_worktree(lease.name().as_str())
-            .map_err(|err| MemoryError::Worktree {
-                op: "find a worktree",
-                detail: format!("{}: {err}", lease.name().as_str()),
-            })?;
+        Ok(())
+    }
+
+    /// Unregisters `name`, taking its files with it where git will.
+    ///
+    /// A repository that has already forgotten the tree is the end
+    /// state this asks for, so it is not a failure.
+    fn forget(&self, name: &WorktreeName) -> Result<(), MemoryError> {
+        let tree = match self.repo.find_worktree(name.as_str()) {
+            Ok(tree) => tree,
+            Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
+            Err(err) => {
+                return Err(MemoryError::Worktree {
+                    op: "find a worktree",
+                    detail: format!("{}: {err}", name.as_str()),
+                });
+            }
+        };
         let mut opts = git2::WorktreePruneOptions::new();
         opts.valid(true).working_tree(true);
         tree.prune(Some(&mut opts))
             .map_err(|err| MemoryError::Worktree {
                 op: "prune a worktree",
-                detail: format!("{}: {err}", lease.name().as_str()),
+                detail: format!("{}: {err}", name.as_str()),
             })
+    }
+
+    /// Takes back a registration whose directory is gone, and says
+    /// whether the name is free again.
+    ///
+    /// A release interrupted between the two halves, or a directory a
+    /// person deleted by hand, leaves exactly this: a name git still
+    /// lists with no tree under it. Rebuilding it is the same reflex
+    /// the index has about a cache it doubts, and it is what keeps
+    /// `E_WORKTREE_BUSY` meaning that somebody is working.
+    fn reclaim_abandoned(&self, name: &WorktreeName) -> Result<bool, MemoryError> {
+        let registered =
+            self.repo
+                .find_worktree(name.as_str())
+                .map_err(|err| MemoryError::Worktree {
+                    op: "find a worktree",
+                    detail: format!("{}: {err}", name.as_str()),
+                })?;
+        if registered.path().exists() {
+            return Ok(false);
+        }
+        self.forget(name)?;
+        Ok(true)
     }
 
     /// Every tree the repository knows about, sorted.
@@ -348,45 +341,6 @@ impl Worktrees {
         out.sort();
         Ok(out)
     }
-}
-
-/// Bytes under a directory, git's own bookkeeping excluded. An explicit
-/// worklist rather than recursion: a deep tree is a data-dependent depth,
-/// and a stack overflow is not a failure a caller can handle.
-fn measure(root: &Path) -> Result<ByteLen, MemoryError> {
-    let mut total: u64 = 0;
-    let mut pending = vec![root.to_path_buf()];
-    while let Some(dir) = pending.pop() {
-        let entries = match std::fs::read_dir(&dir) {
-            Ok(entries) => entries,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(source) => {
-                return Err(MemoryError::Io {
-                    op: "measure a worktree",
-                    path: dir.clone(),
-                    source,
-                });
-            }
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let Ok(kind) = entry.file_type() else {
-                continue;
-            };
-            if kind.is_symlink() {
-                continue; // a link's target is measured where it lives
-            }
-            if kind.is_dir() {
-                if path.file_name().is_some_and(|name| name == ".git") {
-                    continue;
-                }
-                pending.push(path);
-            } else if let Ok(meta) = entry.metadata() {
-                total = total.saturating_add(meta.len());
-            }
-        }
-    }
-    Ok(ByteLen::new(total))
 }
 
 #[cfg(test)]

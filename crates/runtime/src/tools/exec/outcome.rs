@@ -16,7 +16,49 @@ use std::collections::BTreeMap;
 use kernel::{AxError, Payload, ToolOutcome};
 use serde_json::{Map, Value};
 
-use crate::backlog::{BacklogId, Finished};
+use crate::backlog::{BacklogId, Exit, Finished};
+
+/// Writes how a child stopped into a result, in the one spelling this
+/// file owns.
+///
+/// A code is written only when there is a code: a command a signal
+/// stopped and a command this city never managed to wait on both used
+/// to be reported as `exit_code: -1`, which a model reads as a program
+/// that ran and failed.
+fn ending(result: &mut Map<String, Value>, exit: Exit) {
+    match exit {
+        Exit::Ended { code } => {
+            result.insert(
+                "exit_code".to_owned(),
+                Value::Number(i64::from(code).into()),
+            );
+        }
+        Exit::Signalled => {
+            result.insert(
+                "outcome".to_owned(),
+                Value::String(exit.as_str().to_owned()),
+            );
+            result.insert(
+                "detail".to_owned(),
+                Value::String(
+                    "a signal stopped this command, so it returned no code; `halt` is \
+                     what usually sends one"
+                        .to_owned(),
+                ),
+            );
+        }
+        Exit::Unknown { why } => {
+            result.insert(
+                "outcome".to_owned(),
+                Value::String(exit.as_str().to_owned()),
+            );
+            result.insert(
+                "detail".to_owned(),
+                Value::String(why.sentence().to_owned()),
+            );
+        }
+    }
+}
 
 /// What a caller is told about a command that outlived its window.
 ///
@@ -68,10 +110,7 @@ pub(super) fn with_backlog(
             let mut row = Map::new();
             row.insert("handle".to_owned(), Value::String(member.id.to_string()));
             row.insert("what".to_owned(), Value::String(member.what));
-            row.insert(
-                "exit_code".to_owned(),
-                Value::Number(member.exit_code.into()),
-            );
+            ending(&mut row, member.exit);
             row.insert("stdout".to_owned(), Value::String(member.stdout));
             row.insert("stderr".to_owned(), Value::String(member.stderr));
             Value::Object(row)
@@ -87,14 +126,14 @@ pub(super) fn with_backlog(
 pub(super) fn settled(
     stdout: &str,
     stderr: &str,
-    exit_code: i64,
+    exit: Exit,
     arm: &str,
 ) -> Result<ToolOutcome, AxError> {
     let mut result = Map::new();
     result.insert("arm".to_owned(), Value::String(arm.to_owned()));
     result.insert("stdout".to_owned(), Value::String(stdout.to_owned()));
     result.insert("stderr".to_owned(), Value::String(stderr.to_owned()));
-    result.insert("exit_code".to_owned(), Value::Number(exit_code.into()));
+    ending(&mut result, exit);
     Ok(ToolOutcome {
         result: Payload::new(result)?,
         attachments: Vec::new(),

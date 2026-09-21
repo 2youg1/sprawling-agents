@@ -250,10 +250,6 @@ mod tests {
     /// this, both transports opened with `server/discover`, which MCP
     /// does not define, and a hosted server answered `-32601: Method
     /// not found` to the first thing this city ever said to it.
-    /// The opening message is the one the specification names. Before
-    /// this, both transports opened with `server/discover`, which MCP
-    /// does not define, and a hosted server answered `-32601: Method
-    /// not found` to the first thing this city ever said to it.
     #[test]
     fn a_connection_opens_with_initialize_carrying_its_three_required_parts() {
         let line = Rpc::new().initialize();
@@ -267,9 +263,6 @@ mod tests {
     /// A notification has no `id`, which is what tells the far end not
     /// to answer it. An id here would leave a client waiting for a
     /// reply that a correct server will never send.
-    /// A notification has no `id`, which is what tells the far end not
-    /// to answer it. An id here would leave a client waiting for a
-    /// reply that a correct server will never send.
     #[test]
     fn the_initialized_notification_carries_no_id() {
         let sent: Value = serde_json::from_str(&Rpc::initialized()).unwrap();
@@ -277,9 +270,6 @@ mod tests {
         assert!(sent.get("id").is_none());
     }
 
-    /// The handshake reads what was negotiated rather than assuming its
-    /// own version was accepted, and it sends the notification the
-    /// specification requires before anything else may be asked.
     /// The handshake reads what was negotiated rather than assuming its
     /// own version was accepted, and it sends the notification the
     /// specification requires before anything else may be asked.
@@ -304,10 +294,6 @@ mod tests {
         );
     }
 
-    /// The defect that made the first real hosted server unusable: its
-    /// results carry relevance scores, the ledger holds no floats, and
-    /// four searches in a row came back as `E_INVALID_ARGS` on a number
-    /// nobody in this city chose.
     /// A far end that answers `initialize` with no version is not
     /// speaking this protocol, and is refused rather than assumed.
     #[test]
@@ -328,5 +314,62 @@ mod tests {
         for line in ["not json", "[]", "{\"jsonrpc\":\"2.0\",\"id\":1}"] {
             assert!(Rpc::read(line).is_err(), "{line}");
         }
+    }
+
+    /// An adapter that answers instantly and counts what it was asked,
+    /// so what one connection costs can be read as messages rather than
+    /// as the speed of whatever machine ran the test.
+    struct Counting {
+        calls: u32,
+        notifications: u32,
+    }
+
+    impl Outbound for Counting {
+        fn call(&mut self, line: &str, _patience: TimeoutMs) -> Result<String, AxError> {
+            self.calls = self.calls.saturating_add(1);
+            let answer = if line.contains("\"initialize\"") {
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\
+                 \"serverInfo\":{\"name\":\"counter\",\"version\":\"1\"}}}"
+            } else {
+                "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[]}}"
+            };
+            Ok(answer.to_owned())
+        }
+
+        fn notify(&mut self, _line: &str, _patience: TimeoutMs) -> Result<(), AxError> {
+            self.notifications = self.notifications.saturating_add(1);
+            Ok(())
+        }
+    }
+
+    /// What opening one connection costs, which is what a standing
+    /// connection table would save per dispatch (K-05).
+    ///
+    /// Two answered requests and one notification, per server, every
+    /// time: `initialize`, `notifications/initialized`, `tools/list`.
+    /// The count is asserted rather than the time, because the count is
+    /// the same on every machine and the time is not - and because this
+    /// city samples the clock in one place, which is not a test. The
+    /// cost a standing table would remove is the process start and the
+    /// round trips, and both belong to the assembly layer that owns the
+    /// transport (protocol-SPEC 8-16).
+    #[test]
+    fn opening_one_connection_costs_two_round_trips_and_one_notification() {
+        let mut server = Counting {
+            calls: 0,
+            notifications: 0,
+        };
+        let rounds = 100u32;
+        for _ in 0..rounds {
+            let mut rpc = Rpc::new();
+            let opened = handshake(&mut server, &mut rpc, EXTERNAL_CALL_PATIENCE).unwrap();
+            assert_eq!(opened.server, "counter");
+            let listed = server
+                .call(&rpc.list_tools(), EXTERNAL_CALL_PATIENCE)
+                .unwrap();
+            Rpc::read(&listed).unwrap();
+        }
+        assert_eq!(server.calls, 2 * rounds, "initialize and tools/list");
+        assert_eq!(server.notifications, rounds, "notifications/initialized");
     }
 }

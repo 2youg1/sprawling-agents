@@ -54,7 +54,7 @@ impl Native {
                 extra_headers: Vec::new(),
                 overrides: Vec::new(),
                 timeout_ms: config.timeout_ms,
-                stream_deadline_ms: None,
+                stream_idle_timeout_ms: None,
                 pricing: config.pricing,
                 proxying: config.proxying,
             },

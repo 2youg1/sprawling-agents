@@ -73,7 +73,7 @@ export function Palette(props: { readonly onClose: () => void }) {
       },
     });
     for (const lang of LANGS) {
-      if (lang !== ui.prefs.lang()) {
+      if (lang !== ui.prefs.held().lang) {
         out.push({
           label: endonym(lang),
           hint: say("setup_language"),
@@ -144,9 +144,9 @@ export function Palette(props: { readonly onClose: () => void }) {
       live: live(),
       newest,
       models: models(),
-      effort: ui.prefs.effort(),
+      effort: ui.effort(),
       setEffort: (effort) => {
-        ui.prefs.setEffort(effort);
+        ui.chooseEffort(effort);
       },
       goal: say("talk_goal"),
       write: (line) => {

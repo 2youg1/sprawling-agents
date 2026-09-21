@@ -104,7 +104,6 @@ mod tests {
     use crate::address::Address;
     use crate::budget::ByteLen;
     use crate::locator::Locator;
-    use crate::registry::Registry;
     use crate::taint::TaintSet;
     use crate::taint::TaintSource;
     use proptest::prelude::*;
@@ -175,11 +174,10 @@ mod tests {
     }
 
     proptest! {
-        /// Kani mirror: Allow implies planned, clean-handed, in-scale.
+        /// Kani mirror: Allow implies planned and clean-handed, at any scale.
         #[test]
         fn allow_implies_every_guard_passed(files in 1usize..24, bytes in any::<u64>(),
                                             tainted in any::<bool>()) {
-            let registry = Registry::new();
             let paths: Vec<Address> = (0..files).map(|i| addr(&format!("b/f{i}"))).collect();
             let taint = if tainted {
                 TaintSet::of(TaintSource::new("web:x").unwrap())
@@ -187,11 +185,9 @@ mod tests {
                 TaintSet::empty()
             };
             let discard = Discard::new(paths, tracked(), taint, ByteLen::new(bytes)).unwrap();
-            let verdict = decide(&DiscardRequest::Planned(discard), &registry);
+            let verdict = decide(&DiscardRequest::Planned(discard));
             if verdict == DiscardVerdict::Allow {
-                prop_assert!(!tainted);
-                prop_assert!(files <= 16);
-                prop_assert!(bytes <= 1_048_576);
+                prop_assert!(!tainted, "a delete asked for from outside is refused");
             }
         }
     }

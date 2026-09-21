@@ -1,5 +1,8 @@
 impl core::default::Default for runtime::backlog::Backlog
 impl core::default::Default for runtime::backlog::Backlog
+impl core::default::Default for runtime::backlog::waiting::PollBudget
+impl core::default::Default for runtime::backlog::waiting::PollBudget
+impl core::default::Default for runtime::backlog::waiting::PollBudget
 impl core::fmt::Debug for runtime::diagnostics::Diagnostics
 impl core::fmt::Display for runtime::backlog::BacklogId
 impl core::fmt::Display for runtime::backlog::BacklogId
@@ -16,6 +19,8 @@ impl kernel::tool::Tool for runtime::StatusTool
 impl kernel::tool::Tool for runtime::StatusTool
 impl kernel::tool::Tool for runtime::SucceedTool
 impl kernel::tool::Tool for runtime::SucceedTool
+impl runtime::BacklogKind
+impl runtime::BacklogKind
 impl runtime::EchoSandbox
 impl runtime::EditTool
 impl runtime::EditTool
@@ -53,8 +58,15 @@ impl runtime::TurnReport
 impl runtime::Watchdog
 impl runtime::backlog::Backlog
 impl runtime::backlog::Backlog
-impl runtime::backlog::BacklogKind
-impl runtime::backlog::BacklogKind
+impl runtime::backlog::waiting::Exit
+impl runtime::backlog::waiting::Exit
+impl runtime::backlog::waiting::Exit
+impl runtime::backlog::waiting::PollBudget
+impl runtime::backlog::waiting::PollBudget
+impl runtime::backlog::waiting::PollBudget
+impl runtime::backlog::waiting::Unseen
+impl runtime::backlog::waiting::Unseen
+impl runtime::backlog::waiting::Unseen
 impl runtime::bench::ToolBench
 impl runtime::catalog::Catalog
 impl runtime::catalog::Catalog
@@ -113,6 +125,9 @@ impl runtime::turn::Turn<runtime::turn::ToolWave>
 impl runtime::turn::Turn<runtime::turn::ToolWave>
 impl runtime::window::Window
 pub const runtime::EXEC_CAP_BYTES: u64
+pub const runtime::backlog::waiting::PollBudget::DEFAULT: runtime::backlog::waiting::PollBudget
+pub const runtime::backlog::waiting::PollBudget::DEFAULT: runtime::backlog::waiting::PollBudget
+pub const runtime::backlog::waiting::PollBudget::DEFAULT: runtime::backlog::waiting::PollBudget
 pub const runtime::diagnostics::Level::ALL: [runtime::diagnostics::Level; 5]
 pub const runtime::diagnostics::Level::DEFAULT: runtime::diagnostics::Level
 pub const runtime::diagnostics::REDACTED: &str
@@ -130,10 +145,12 @@ pub enum runtime::BreakerVerdict
 pub enum runtime::ContextReminder
 pub enum runtime::DigestOutcome
 pub enum runtime::Disposal
+pub enum runtime::Exit
 pub enum runtime::Expansion
 pub enum runtime::FreezeReason
 pub enum runtime::Interrupt
 pub enum runtime::Mode
+pub enum runtime::NextCall
 pub enum runtime::Opening
 pub enum runtime::PhaseOutcome<Next>
 pub enum runtime::ProviderMode
@@ -143,12 +160,18 @@ pub enum runtime::SandboxExit
 pub enum runtime::SegmentSlot
 pub enum runtime::Sieved
 pub enum runtime::Started
+pub enum runtime::Unseen
 pub enum runtime::VerifiedLine
 pub enum runtime::backlog::BacklogKind
+pub enum runtime::backlog::Exit
 pub enum runtime::backlog::Started
+pub enum runtime::backlog::Unseen
+pub enum runtime::backlog::waiting::Exit
+pub enum runtime::backlog::waiting::Unseen
 pub enum runtime::bench::BenchOutcome
 pub enum runtime::catalog::Expansion
 pub enum runtime::compaction::Content
+pub enum runtime::compaction::Shrink
 pub enum runtime::compaction::Strategy
 pub enum runtime::diagnostics::Level
 pub enum runtime::digest::BreakerVerdict
@@ -171,10 +194,13 @@ pub enum runtime::sieve::record::Stage
 pub enum runtime::sieve::record::StageOutcome
 pub enum runtime::tools::ProviderMode
 pub enum runtime::turn::Interrupt
+pub enum runtime::turn::NextCall
 pub enum runtime::turn::PhaseOutcome<Next>
 pub enum runtime::window::Opening
 pub fn runtime::AbsentSandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>
 pub fn runtime::AbsentSandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>
+pub fn runtime::BacklogKind::as_str(self) -> &'static str
+pub fn runtime::BacklogKind::as_str(self) -> &'static str
 pub fn runtime::EchoSandbox::new() -> runtime::EchoSandbox
 pub fn runtime::EchoSandbox::queue_stdout(&mut self, alloc::vec::Vec<u8>)
 pub fn runtime::EchoSandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>
@@ -223,8 +249,8 @@ pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtim
 pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
 pub fn runtime::SegmentSource::whole(kernel::address::Address, u64) -> runtime::SegmentSource
 pub fn runtime::SegmentSource::whole(kernel::address::Address, u64) -> runtime::SegmentSource
-pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus], &[runtime::backlog::Standing]) -> alloc::string::String
-pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus], &[runtime::backlog::Standing]) -> alloc::string::String
+pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus], &[runtime::Standing]) -> alloc::string::String
+pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus], &[runtime::Standing]) -> alloc::string::String
 pub fn runtime::StatusTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::StatusTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::StatusTool::meta(&self) -> &kernel::tool::ToolMeta
@@ -280,25 +306,36 @@ pub fn runtime::backlog::Backlog::enrol_run(&self, &kernel::address::Address, al
 pub fn runtime::backlog::Backlog::enrol_run(&self, &kernel::address::Address, alloc::string::String) -> core::result::Result<runtime::backlog::BacklogId, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::halt(&self, core::option::Option<&kernel::address::Address>) -> core::result::Result<usize, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::halt(&self, core::option::Option<&kernel::address::Address>) -> core::result::Result<usize, kernel::error::shape::AxError>
-pub fn runtime::backlog::Backlog::harvest(&self) -> core::result::Result<alloc::vec::Vec<runtime::backlog::Finished>, kernel::error::shape::AxError>
-pub fn runtime::backlog::Backlog::harvest(&self) -> core::result::Result<alloc::vec::Vec<runtime::backlog::Finished>, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::harvest(&self) -> core::result::Result<alloc::vec::Vec<runtime::Finished>, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::harvest(&self) -> core::result::Result<alloc::vec::Vec<runtime::Finished>, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::leave(&self, runtime::backlog::BacklogId) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::leave(&self, runtime::backlog::BacklogId) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::new() -> runtime::backlog::Backlog
 pub fn runtime::backlog::Backlog::new() -> runtime::backlog::Backlog
-pub fn runtime::backlog::Backlog::run(&self, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::backlog::Started, kernel::error::shape::AxError>
-pub fn runtime::backlog::Backlog::run(&self, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::backlog::Started, kernel::error::shape::AxError>
-pub fn runtime::backlog::Backlog::standing(&self, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<runtime::backlog::Standing>, kernel::error::shape::AxError>
-pub fn runtime::backlog::Backlog::standing(&self, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<runtime::backlog::Standing>, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::run(&self, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::Started, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::run(&self, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::Started, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::standing(&self, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<runtime::Standing>, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::standing(&self, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<runtime::Standing>, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::stopping(&self, runtime::backlog::BacklogId) -> core::result::Result<bool, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::stopping(&self, runtime::backlog::BacklogId) -> core::result::Result<bool, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::with_window(runtime::backlog::waiting::PollBudget) -> runtime::backlog::Backlog
+pub fn runtime::backlog::Backlog::with_window(runtime::backlog::waiting::PollBudget) -> runtime::backlog::Backlog
 pub fn runtime::backlog::BacklogId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn runtime::backlog::BacklogId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-pub fn runtime::backlog::BacklogKind::as_str(self) -> &'static str
-pub fn runtime::backlog::BacklogKind::as_str(self) -> &'static str
+pub fn runtime::backlog::waiting::Exit::as_str(self) -> &'static str
+pub fn runtime::backlog::waiting::Exit::as_str(self) -> &'static str
+pub fn runtime::backlog::waiting::Exit::as_str(self) -> &'static str
+pub fn runtime::backlog::waiting::PollBudget::default() -> runtime::backlog::waiting::PollBudget
+pub fn runtime::backlog::waiting::PollBudget::default() -> runtime::backlog::waiting::PollBudget
+pub fn runtime::backlog::waiting::PollBudget::default() -> runtime::backlog::waiting::PollBudget
+pub fn runtime::backlog::waiting::PollBudget::new(u32, u64) -> runtime::backlog::waiting::PollBudget
+pub fn runtime::backlog::waiting::PollBudget::new(u32, u64) -> runtime::backlog::waiting::PollBudget
+pub fn runtime::backlog::waiting::PollBudget::new(u32, u64) -> runtime::backlog::waiting::PollBudget
+pub fn runtime::backlog::waiting::Unseen::sentence(self) -> &'static str
+pub fn runtime::backlog::waiting::Unseen::sentence(self) -> &'static str
+pub fn runtime::backlog::waiting::Unseen::sentence(self) -> &'static str
 pub fn runtime::bench::ToolBench::for_job(self, kernel::address::Address, kernel::locator::Locator) -> runtime::bench::ToolBench
-pub fn runtime::bench::ToolBench::grant(&mut self, kernel::approval::ClusterKey)
-pub fn runtime::bench::ToolBench::invoke(&mut self, &kernel::tool::ToolCall, &kernel::idem::IdemKey, &kernel::gate::GateContext) -> core::result::Result<runtime::bench::BenchOutcome, kernel::error::shape::AxError>
+pub fn runtime::bench::ToolBench::invoke(&mut self, &kernel::tool::ToolCall, &kernel::idem::IdemKey, kernel::event::identity::TimeMs) -> core::result::Result<runtime::bench::BenchOutcome, kernel::error::shape::AxError>
 pub fn runtime::bench::ToolBench::meta_of(&self, &str) -> core::option::Option<&kernel::tool::ToolMeta>
 pub fn runtime::bench::ToolBench::new(kernel::write_domain::WriteDomain) -> runtime::bench::ToolBench
 pub fn runtime::bench::ToolBench::register(&mut self, alloc::boxed::Box<dyn kernel::tool::Tool>) -> core::result::Result<(), kernel::error::shape::AxError>
@@ -328,9 +365,9 @@ pub fn runtime::clock::StampGate::new(kernel::config::ClockStampGranularity) -> 
 pub fn runtime::clock::StampGate::observe(&mut self, kernel::event::identity::TimeMs, kernel::tool::Temporal, &[kernel::config::ClockZone]) -> core::result::Result<core::option::Option<runtime::clock::ClockStamp>, kernel::error::shape::AxError>
 pub fn runtime::clock::StampGate::observe(&mut self, kernel::event::identity::TimeMs, kernel::tool::Temporal, &[kernel::config::ClockZone]) -> core::result::Result<core::option::Option<runtime::clock::ClockStamp>, kernel::error::shape::AxError>
 pub fn runtime::clock::stamp(kernel::event::identity::TimeMs, &[kernel::config::ClockZone]) -> core::result::Result<runtime::clock::ClockStamp, kernel::error::shape::AxError>
-pub fn runtime::compaction::compact(&str, kernel::budget::ByteLen) -> runtime::elision::Cut
 pub fn runtime::compaction::detect(&str) -> runtime::compaction::Content
-pub fn runtime::compaction::plan(runtime::compaction::Content, kernel::budget::ByteLen, kernel::budget::ByteLen) -> runtime::compaction::Strategy
+pub fn runtime::compaction::plan(runtime::compaction::Content, kernel::budget::ByteLen, kernel::budget::ByteLen) -> runtime::compaction::Shrink
+pub fn runtime::compaction::shorten(&str, runtime::compaction::Strategy, kernel::budget::ByteLen) -> runtime::elision::Cut
 pub fn runtime::diagnostics::Diagnostics::admits(&self, runtime::diagnostics::Level) -> bool
 pub fn runtime::diagnostics::Diagnostics::floor(&self) -> core::option::Option<runtime::diagnostics::Level>
 pub fn runtime::diagnostics::Diagnostics::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -524,8 +561,8 @@ pub fn runtime::turn::Turn<runtime::turn::Calling>::call<'sink>(self, runtime::I
 pub fn runtime::turn::Turn<runtime::turn::Calling>::call<'sink>(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn kernel::model::Model, &kernel::model::wire::BuildingPolicy, core::option::Option<&mut (dyn core::ops::function::FnMut(&kernel::model::wire::Increment) + 'sink)>) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::ToolWave>>, kernel::error::shape::AxError>
 pub fn runtime::turn::Turn<runtime::turn::Recording>::record(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger) -> core::result::Result<runtime::PhaseOutcome<runtime::TurnReport>, kernel::error::shape::AxError>
 pub fn runtime::turn::Turn<runtime::turn::Recording>::record(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger) -> core::result::Result<runtime::PhaseOutcome<runtime::TurnReport>, kernel::error::shape::AxError>
-pub fn runtime::turn::Turn<runtime::turn::ToolWave>::execute(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::Recording>>, kernel::error::shape::AxError>
-pub fn runtime::turn::Turn<runtime::turn::ToolWave>::execute(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::Recording>>, kernel::error::shape::AxError>
+pub fn runtime::turn::Turn<runtime::turn::ToolWave>::execute(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>, &mut dyn core::ops::function::FnMut(u32) -> runtime::NextCall) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::Recording>>, kernel::error::shape::AxError>
+pub fn runtime::turn::Turn<runtime::turn::ToolWave>::execute(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>, &mut dyn core::ops::function::FnMut(u32) -> runtime::NextCall) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::Recording>>, kernel::error::shape::AxError>
 pub fn runtime::version_of(&[u8]) -> alloc::string::String
 pub fn runtime::window::Window::messages(&self) -> &[kernel::model::wire::ChatMessage]
 pub fn runtime::window::Window::new() -> runtime::window::Window
@@ -536,6 +573,7 @@ pub fn runtime::window::Window::push_task_lines(&mut self, &str, &str, runtime::
 pub fn runtime::window::Window::push_tool_results(&mut self, alloc::vec::Vec<kernel::model::wire::ContentBlock>)
 pub mod runtime
 pub mod runtime::backlog
+pub mod runtime::backlog::waiting
 pub mod runtime::bench
 pub mod runtime::catalog
 pub mod runtime::clock
@@ -608,11 +646,16 @@ pub runtime::ExecSetup::mounts: alloc::vec::Vec<runtime::Mount>
 pub runtime::ExecSetup::python_wasm: core::option::Option<std::path::PathBuf>
 pub runtime::ExecSetup::shell: core::option::Option<std::path::PathBuf>
 pub runtime::ExecSetup::workdir: std::path::PathBuf
+pub runtime::Exit::Ended
+pub runtime::Exit::Ended::code: i32
+pub runtime::Exit::Signalled
+pub runtime::Exit::Unknown
+pub runtime::Exit::Unknown::why: runtime::backlog::waiting::Unseen
 pub runtime::Expansion::Said
 pub runtime::Expansion::Said::text: alloc::string::String
 pub runtime::Expansion::Skill
 pub runtime::Expansion::Skill::addr: alloc::string::String
-pub runtime::Finished::exit_code: i64
+pub runtime::Finished::exit: runtime::backlog::waiting::Exit
 pub runtime::Finished::id: runtime::backlog::BacklogId
 pub runtime::Finished::stderr: alloc::string::String
 pub runtime::Finished::stdout: alloc::string::String
@@ -632,6 +675,8 @@ pub runtime::Mode::Up
 pub runtime::Mount::guest: alloc::string::String
 pub runtime::Mount::host: std::path::PathBuf
 pub runtime::Mount::writable: bool
+pub runtime::NextCall::Allowed
+pub runtime::NextCall::Halted
 pub runtime::OffloadRecord::original: kernel::locator::Locator
 pub runtime::OffloadRecord::original_len: u64
 pub runtime::OffloadRecord::rest_path: std::path::PathBuf
@@ -693,6 +738,9 @@ pub runtime::SafePoint::BeforeCall
 pub runtime::SafePoint::BeforeCall::turn: u32
 pub runtime::SafePoint::BeforeSpawn
 pub runtime::SafePoint::BeforeSpawn::turn: u32
+pub runtime::SafePoint::BeforeToolCall
+pub runtime::SafePoint::BeforeToolCall::call: u32
+pub runtime::SafePoint::BeforeToolCall::turn: u32
 pub runtime::SafePoint::BeforeWave
 pub runtime::SafePoint::BeforeWave::turn: u32
 pub runtime::SandboxExit::Failure
@@ -744,14 +792,14 @@ pub runtime::Sieved::Passed::text: alloc::string::String
 pub runtime::SourceDoc::addr: kernel::address::Address
 pub runtime::SourceDoc::bytes: core::option::Option<alloc::vec::Vec<u8>>
 pub runtime::Standing::id: runtime::backlog::BacklogId
-pub runtime::Standing::kind: runtime::backlog::BacklogKind
+pub runtime::Standing::kind: runtime::BacklogKind
 pub runtime::Standing::scope: kernel::address::Address
 pub runtime::Standing::what: alloc::string::String
 pub runtime::Started::Backgrounded
 pub runtime::Started::Backgrounded::id: runtime::backlog::BacklogId
 pub runtime::Started::Backgrounded::what: alloc::string::String
 pub runtime::Started::Settled
-pub runtime::Started::Settled::exit_code: i64
+pub runtime::Started::Settled::exit: runtime::backlog::waiting::Exit
 pub runtime::Started::Settled::stderr: alloc::string::String
 pub runtime::Started::Settled::stdout: alloc::string::String
 pub runtime::StatusSnapshot::addr: kernel::address::Address
@@ -776,6 +824,8 @@ pub runtime::Succession::reason: alloc::string::String
 pub runtime::TranscriptRecord::address: kernel::address::Address
 pub runtime::TranscriptRecord::original: kernel::locator::Locator
 pub runtime::TranscriptRecord::redacted: u32
+pub runtime::Unseen::LeftTheTable
+pub runtime::Unseen::WaitRefused
 pub runtime::VerifiedLine::IgnoredUnknown
 pub runtime::VerifiedLine::IgnoredUnknown::seq: kernel::event::identity::Seq
 pub runtime::VerifiedLine::Known
@@ -786,26 +836,38 @@ pub runtime::ZoneEntry::local: alloc::string::String
 pub runtime::ZoneEntry::offset_min: i32
 pub runtime::backlog::BacklogKind::Command
 pub runtime::backlog::BacklogKind::Run
-pub runtime::backlog::Finished::exit_code: i64
+pub runtime::backlog::Exit::Ended
+pub runtime::backlog::Exit::Ended::code: i32
+pub runtime::backlog::Exit::Signalled
+pub runtime::backlog::Exit::Unknown
+pub runtime::backlog::Exit::Unknown::why: runtime::backlog::waiting::Unseen
+pub runtime::backlog::Finished::exit: runtime::backlog::waiting::Exit
 pub runtime::backlog::Finished::id: runtime::backlog::BacklogId
 pub runtime::backlog::Finished::stderr: alloc::string::String
 pub runtime::backlog::Finished::stdout: alloc::string::String
 pub runtime::backlog::Finished::what: alloc::string::String
 pub runtime::backlog::Standing::id: runtime::backlog::BacklogId
-pub runtime::backlog::Standing::kind: runtime::backlog::BacklogKind
+pub runtime::backlog::Standing::kind: runtime::BacklogKind
 pub runtime::backlog::Standing::scope: kernel::address::Address
 pub runtime::backlog::Standing::what: alloc::string::String
 pub runtime::backlog::Started::Backgrounded
 pub runtime::backlog::Started::Backgrounded::id: runtime::backlog::BacklogId
 pub runtime::backlog::Started::Backgrounded::what: alloc::string::String
 pub runtime::backlog::Started::Settled
-pub runtime::backlog::Started::Settled::exit_code: i64
+pub runtime::backlog::Started::Settled::exit: runtime::backlog::waiting::Exit
 pub runtime::backlog::Started::Settled::stderr: alloc::string::String
 pub runtime::backlog::Started::Settled::stdout: alloc::string::String
+pub runtime::backlog::Unseen::LeftTheTable
+pub runtime::backlog::Unseen::WaitRefused
+pub runtime::backlog::waiting::Exit::Ended
+pub runtime::backlog::waiting::Exit::Ended::code: i32
+pub runtime::backlog::waiting::Exit::Signalled
+pub runtime::backlog::waiting::Exit::Unknown
+pub runtime::backlog::waiting::Exit::Unknown::why: runtime::backlog::waiting::Unseen
+pub runtime::backlog::waiting::Unseen::LeftTheTable
+pub runtime::backlog::waiting::Unseen::WaitRefused
 pub runtime::bench::BenchOutcome::Duplicate
 pub runtime::bench::BenchOutcome::Duplicate::outcome: kernel::tool::ToolOutcome
-pub runtime::bench::BenchOutcome::Pending
-pub runtime::bench::BenchOutcome::Pending::item: alloc::boxed::Box<kernel::approval::ApprovalItem>
 pub runtime::bench::BenchOutcome::Ran
 pub runtime::bench::BenchOutcome::Ran::fenced: core::option::Option<alloc::string::String>
 pub runtime::bench::BenchOutcome::Ran::outcome: kernel::tool::ToolOutcome
@@ -834,10 +896,11 @@ pub runtime::compaction::Content::Prose
 pub runtime::compaction::Content::Structured
 pub runtime::compaction::Content::Table
 pub runtime::compaction::Content::Unknown
+pub runtime::compaction::Shrink::Cut(runtime::compaction::Strategy)
+pub runtime::compaction::Shrink::Keep
+pub runtime::compaction::Shrink::MustOffload
 pub runtime::compaction::Strategy::Ends
 pub runtime::compaction::Strategy::Head
-pub runtime::compaction::Strategy::Keep
-pub runtime::compaction::Strategy::Offload
 pub runtime::compaction::Strategy::Tail
 pub runtime::diagnostics::Entry::level: runtime::diagnostics::Level
 pub runtime::diagnostics::Entry::message: &'a str
@@ -963,6 +1026,9 @@ pub runtime::run::SafePoint::BeforeCall
 pub runtime::run::SafePoint::BeforeCall::turn: u32
 pub runtime::run::SafePoint::BeforeSpawn
 pub runtime::run::SafePoint::BeforeSpawn::turn: u32
+pub runtime::run::SafePoint::BeforeToolCall
+pub runtime::run::SafePoint::BeforeToolCall::call: u32
+pub runtime::run::SafePoint::BeforeToolCall::turn: u32
 pub runtime::run::SafePoint::BeforeWave
 pub runtime::run::SafePoint::BeforeWave::turn: u32
 pub runtime::sieve::Filter::command: alloc::string::String
@@ -1099,6 +1165,8 @@ pub runtime::turn::Interrupt::None
 pub runtime::turn::Interrupt::Steer
 pub runtime::turn::Interrupt::Steer::source: alloc::string::String
 pub runtime::turn::Interrupt::Steer::text: alloc::string::String
+pub runtime::turn::NextCall::Allowed
+pub runtime::turn::NextCall::Halted
 pub runtime::turn::PhaseOutcome::Advanced(Next)
 pub runtime::turn::PhaseOutcome::Cancelled(runtime::TurnCancelled)
 pub runtime::window::Opening::FromJob
@@ -1130,6 +1198,7 @@ pub struct runtime::OffloadRecord
 pub struct runtime::OffloadSite<'a>
 pub struct runtime::PackContext<'a>
 pub struct runtime::Packaged
+pub struct runtime::PollBudget
 pub struct runtime::PrefixPlan
 pub struct runtime::Produced
 pub struct runtime::ReadTool
@@ -1166,7 +1235,9 @@ pub struct runtime::ZoneEntry
 pub struct runtime::backlog::Backlog
 pub struct runtime::backlog::BacklogId(_)
 pub struct runtime::backlog::Finished
+pub struct runtime::backlog::PollBudget
 pub struct runtime::backlog::Standing
+pub struct runtime::backlog::waiting::PollBudget
 pub struct runtime::bench::CheckpointNet
 pub struct runtime::bench::ToolBench
 pub struct runtime::catalog::Catalog

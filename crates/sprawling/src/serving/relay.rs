@@ -155,7 +155,7 @@ mod tests {
     use std::sync::mpsc;
 
     use super::{Relay, RelayGate, RelayRequest};
-    use kernel::conformance::{LedgerInspect, assert_ledger_conformance};
+    use kernel::ledger::conformance::{LedgerInspect, assert_ledger_conformance};
     use kernel::{AxError, EventDraft, EventRef, Ledger};
 
     /// The relay, with the accounting thread it writes through.

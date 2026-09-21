@@ -183,7 +183,7 @@ impl RunWorker {
                 extra_headers,
                 overrides: Vec::new(),
                 timeout_ms: tuning.timeout_ms.unwrap_or(PROBE_TIMEOUT_MS),
-                stream_deadline_ms: None,
+                stream_idle_timeout_ms: None,
                 pricing: None,
                 proxying: tuning.proxying,
             },
@@ -192,7 +192,7 @@ impl RunWorker {
             gateway::Redemption::without_images(self.resolver()),
         )?;
         let url = endpoint.models_url();
-        let mut attempts_left = tuning.request_max_retries.unwrap_or(0);
+        let mut attempts_left = tuning.request_max_retries.without_a_brake();
         loop {
             match probe.list_models(&url) {
                 Ok(served) => return Ok(served),
@@ -294,7 +294,7 @@ mod tests {
                 ),
             })
             .unwrap();
-        let (_, _, entry, _) = worker.book.choices().next().unwrap();
+        let (_, _, entry) = worker.book.choices().next().unwrap();
         assert_eq!(
             entry.max_output_tokens,
             kernel::Ceiling::new(4_096),

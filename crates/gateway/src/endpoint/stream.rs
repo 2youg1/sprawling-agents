@@ -57,24 +57,25 @@ impl Endpoint {
                 );
             }
         }
-        let mut request = self
-            .client
-            .post(&self.config.base_url)
-            .header("content-type", "application/json")
-            .header("accept", "text/event-stream");
-        for (name, value) in &self.config.extra_headers {
-            request = request.header(name, value);
-        }
-        // A streamed answer is allowed to take longer than a settled
-        // one, because the deadline on a stream has to cover the model
-        // writing rather than the provider thinking.
-        if let Some(ms) = self.config.stream_deadline_ms {
-            request = request.timeout(std::time::Duration::from_millis(ms));
-        }
-        request = self.authorize(request)?;
-        let response = request
+        let request = self.authorize(
+            self.client
+                .post(&self.config.base_url)
+                .header("content-type", "application/json")
+                .header("accept", "text/event-stream"),
+        )?;
+        // **A streamed call carries no deadline of its own.** The
+        // transport reads the whole body under one deadline, so any
+        // figure written here would cut an answer for being long; the
+        // bound a person set is a silence, and [`Endpoint::frames_of`]
+        // is where it is applied.
+        let mut sending = request
             .json(&wire)
-            .send()
+            .build()
+            .map_err(|err| provider_err("call provider", transport_detail(&err)))?;
+        *sending.timeout_mut() = None;
+        let response = self
+            .client
+            .execute(sending)
             .map_err(|err| provider_err("call provider", transport_detail(&err)))?;
         let status = response.status();
         if !status.is_success() {
@@ -83,16 +84,73 @@ impl Endpoint {
                 format!("{} answered {}", self.config.base_url, status.as_u16()),
             ));
         }
-        // Line by line as the body arrives, never `.text()`. Reading the
-        // whole body first and then walking its lines produces every
-        // increment after the model has already stopped - the request
-        // says `stream: true`, the provider answers in parts, and the
-        // one place the parts were supposed to stay parts turned them
-        // back into a document.
+        let frames = self.frames_of(response, onto)?;
+        // A cut stream is a provider failure, never a shortened reply:
+        // a return is built from the settled frame, and a body that
+        // ended before that frame arrived has none.
+        let settled = dialect::settled_from_stream(self.config.dialect, &frames)?;
+        let resp = dialect::response_from_wire(self.config.dialect, &settled)?;
+        let billed: Option<UsdMicros> = match &self.config.pricing {
+            Some(entry) => Some(cost::settle(&resp.usage, None, entry)?.billed),
+            None => None,
+        };
+        ModelReturn::from_response(resp, billed)
+    }
+
+    /// Every frame the provider wrote, forwarded as it lands and given
+    /// up on after one silence too long.
+    ///
+    /// **The body is read on a thread of its own so that a silence can
+    /// be measured.** A blocking read cannot be interrupted, and the
+    /// transport's own deadline covers the whole answer rather than the
+    /// gaps in it; a reader beside the caller turns "nothing has
+    /// arrived for this long" into a value the caller can act on, which
+    /// is what the setting has said all along.
+    ///
+    /// The cost is named rather than hidden: when a provider goes
+    /// silent and holds the connection open, the reader stays blocked
+    /// on it until the provider closes it. Ending the call is what a
+    /// person asked for; ending the connection is the provider's, and
+    /// no answer of ours can take it away from them.
+    fn frames_of(
+        &self,
+        response: reqwest::blocking::Response,
+        onto: kernel::Increments<'_>,
+    ) -> Result<Vec<Value>, AxError> {
+        // The stream's own bound when it has one, and the settled
+        // call's when it does not: a stream nobody bounded separately
+        // is still not allowed to go quiet forever.
+        let quiet_ms = self
+            .config
+            .stream_idle_timeout_ms
+            .unwrap_or(self.config.timeout_ms);
+        let quiet = std::time::Duration::from_millis(quiet_ms);
+        let (lines, arriving) = std::sync::mpsc::channel::<std::io::Result<String>>();
+        std::thread::spawn(move || {
+            for line in std::io::BufReader::new(response).lines() {
+                let broke = line.is_err();
+                if lines.send(line).is_err() || broke {
+                    return;
+                }
+            }
+        });
         let mut frames = Vec::new();
-        for line in std::io::BufReader::new(response).lines() {
-            let line =
-                line.map_err(|err| provider_err("read provider response", err.to_string()))?;
+        loop {
+            let line = match arriving.recv_timeout(quiet) {
+                Ok(Ok(line)) => line,
+                Ok(Err(err)) => {
+                    return Err(provider_err("read provider response", err.to_string()));
+                }
+                // The reader reached the end of the body and dropped
+                // its end of the channel, which is how a stream ends.
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return Ok(frames),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    return Err(provider_err(
+                        "read provider response",
+                        format!("no byte arrived for {quiet_ms} ms"),
+                    ));
+                }
+            };
             let Some(payload) = line.strip_prefix("data:") else {
                 continue;
             };
@@ -107,7 +165,7 @@ impl Endpoint {
             // fatal: providers add event types, and a person watching
             // text arrive must not lose a call because one of them was
             // new. What cannot be skipped is the settled answer, and
-            // that is checked below.
+            // the caller checks that.
             let Ok(frame) = serde_json::from_str::<Value>(payload) else {
                 continue;
             };
@@ -116,13 +174,6 @@ impl Endpoint {
             }
             frames.push(frame);
         }
-        let settled = dialect::settled_from_stream(self.config.dialect, &frames)?;
-        let resp = dialect::response_from_wire(self.config.dialect, &settled)?;
-        let billed: Option<UsdMicros> = match &self.config.pricing {
-            Some(entry) => Some(cost::settle(&resp.usage, None, entry)?.billed),
-            None => None,
-        };
-        ModelReturn::from_response(resp, billed)
     }
 }
 
@@ -141,9 +192,106 @@ impl Endpoint {
     reason = "test code"
 )]
 mod tests {
-    use super::super::fakes::{config, fake_stream_provider, request};
+    use super::super::config::EndpointConfig;
+    use super::super::fakes::{config, fake_stream_provider, paced_stream_provider, request};
     use super::super::redemption::redemption;
     use super::*;
+    use std::time::Duration;
+
+    /// One complete answer, frame by frame, in the shape the Anthropic
+    /// stream carries it.
+    fn whole_answer() -> Vec<String> {
+        vec![
+            serde_json::json!({
+                "type": "message_start",
+                "message": {"usage": {"input_tokens": 1_000_000}}
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {"type": "text", "text": ""}
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "text_delta", "text": "still "}
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "text_delta", "text": "writing"}
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "message_delta",
+                "delta": {"stop_reason": "end_turn"},
+                "usage": {"output_tokens": 0}
+            })
+            .to_string(),
+        ]
+    }
+
+    /// **The bound is a silence, not a length.** Five frames 300 ms
+    /// apart run for one and a half seconds under an 800 ms bound: a
+    /// deadline would have cut this answer in half, and the model was
+    /// writing the whole time. This is the case a person met as an
+    /// answer truncated at five minutes while the wire called the
+    /// setting an idle timeout.
+    #[test]
+    fn a_model_that_keeps_writing_is_never_cut_off_for_writing_at_length() {
+        let (url, server) =
+            paced_stream_provider(whole_answer(), Duration::from_millis(300), Duration::ZERO);
+        let mut endpoint = Endpoint::new(
+            EndpointConfig {
+                stream_idle_timeout_ms: Some(800),
+                ..config(&url)
+            },
+            redemption(),
+        )
+        .unwrap();
+        let said = std::cell::RefCell::new(String::new());
+        let mut onto = |held: &kernel::Increment| {
+            if let kernel::Increment::Said(text) = held {
+                said.borrow_mut().push_str(text);
+            }
+        };
+        let ret = endpoint.stream(&request(), &mut onto).unwrap();
+        assert_eq!(said.borrow().as_str(), "still writing");
+        assert_eq!(ret.stop, Some(kernel::StopReason::EndTurn));
+        server.join().unwrap();
+    }
+
+    /// A provider that stops mid-answer is given up on one bound after
+    /// its last byte, and the refusal states the bound rather than the
+    /// transport's own wording.
+    #[test]
+    fn a_stream_that_falls_silent_is_given_up_on_and_says_for_how_long() {
+        let (url, server) = paced_stream_provider(
+            whole_answer().into_iter().take(3).collect::<Vec<String>>(),
+            Duration::from_millis(20),
+            Duration::from_millis(1_500),
+        );
+        let mut endpoint = Endpoint::new(
+            EndpointConfig {
+                stream_idle_timeout_ms: Some(400),
+                ..config(&url)
+            },
+            redemption(),
+        )
+        .unwrap();
+        let mut onto = |_held: &kernel::Increment| {};
+        let err = endpoint.stream(&request(), &mut onto).unwrap_err();
+        assert_eq!(*err.code(), kernel::AxCode::Provider);
+        assert!(
+            err.subject().contains("no byte arrived for 400 ms"),
+            "a stalled stream names the bound it passed: {}",
+            err.subject()
+        );
+        server.join().unwrap();
+    }
 
     /// **A stream nobody forwards is a stream in name only.** The
     /// request asked for `stream: true`, the provider answered in

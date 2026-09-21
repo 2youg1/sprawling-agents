@@ -53,11 +53,9 @@ pub enum Content {
     Unknown,
 }
 
-/// What to do with it.
+/// Which end of a text survives a shortening.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Strategy {
-    /// Small enough; leave it alone.
-    Keep,
     /// Keep the front. Prose and tables read from the top.
     Head,
     /// Keep both ends and mark the gap. Code and diffs are read from
@@ -65,10 +63,26 @@ pub enum Strategy {
     Ends,
     /// Keep the back. A log's news is at the end.
     Tail,
+}
+
+/// What has to happen to one piece of text: decided here, carried out
+/// by the caller.
+///
+/// Exhaustive, and `MustOffload` is why it exists. This module used to
+/// answer "do not shorten it" with a strategy the caller was free to
+/// read as "shorten it plainly, then", and the caller did - which left
+/// one crate holding two answers to whether structured data may be
+/// truncated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Shrink {
+    /// It is within budget and goes to the model unchanged.
+    Keep,
+    /// Shorten it, keeping this end.
+    Cut(Strategy),
     /// Do not shorten it at all — move it out of the window and leave a
     /// reference. Truncated structured data is worse than absent
     /// structured data, because it looks like it can be parsed.
-    Offload,
+    MustOffload,
 }
 
 /// Detection, in priority order, over the first lines only.
@@ -134,45 +148,41 @@ fn looks_like_a_log_line(line: &str) -> bool {
         || line.starts_with("DEBUG")
 }
 
-/// Which strategy that kind of content takes, at that size.
+/// What happens to that kind of content, at that size.
 ///
-/// Below the floor nothing is shortened at all: the machinery costs more
-/// than it saves, and a person reading a shortened five-line result
-/// learns to distrust every shortened result.
+/// The size comparison lives here rather than at the call site, so that
+/// "does it fit" and "what is done when it does not" are one decision
+/// with one home.
 #[must_use]
-pub fn plan(content: Content, size: ByteLen, budget: ByteLen) -> Strategy {
+pub fn plan(content: Content, size: ByteLen, budget: ByteLen) -> Shrink {
     if size.get() <= budget.get() {
-        return Strategy::Keep;
+        return Shrink::Keep;
     }
     match content {
-        Content::Structured => Strategy::Offload,
-        Content::Log => Strategy::Tail,
-        Content::Code | Content::Diff => Strategy::Ends,
-        Content::Prose | Content::Table => Strategy::Head,
+        Content::Structured => Shrink::MustOffload,
+        Content::Log => Shrink::Cut(Strategy::Tail),
+        Content::Code | Content::Diff => Shrink::Cut(Strategy::Ends),
+        Content::Prose | Content::Table => Shrink::Cut(Strategy::Head),
         // Nothing is known about it, so nothing is thrown away on a
         // guess: it leaves the window whole and keeps its reference.
-        Content::Unknown => Strategy::Offload,
+        Content::Unknown => Shrink::MustOffload,
     }
 }
 
-/// Shortens one piece of text to the budget.
+/// Carries out a shortening the caller has already decided on.
 ///
 /// The answer carries the text, the source bytes it lost and which end
 /// lost them, so no caller has to recover the loss by subtracting two
 /// lengths — a subtraction that counted the inserted marker as surviving
 /// text and under-reported the loss by its width.
 ///
-/// `Offload` and `Keep` both come back as `Elided::Nothing` with the
-/// input unchanged: this function shortens, and deciding to move
-/// something out of the window is the caller's, which keeps one
-/// authority for what leaves the window.
+/// Taking the strategy rather than deciding it again is what keeps this
+/// module out of the business of what leaves the window: a caller
+/// holding [`Shrink::MustOffload`] has nothing to call here.
 #[must_use]
-pub fn compact(text: &str, budget: ByteLen) -> Cut {
-    let size = ByteLen::new(u64::try_from(text.len()).unwrap_or(u64::MAX));
-    let strategy = plan(detect(text), size, budget);
+pub fn shorten(text: &str, strategy: Strategy, budget: ByteLen) -> Cut {
     let limit = usize::try_from(budget.get()).unwrap_or(usize::MAX);
     let cut = match strategy {
-        Strategy::Keep | Strategy::Offload => return Cut::whole(text),
         Strategy::Head => keep_head(text, limit),
         Strategy::Tail => keep_tail(text, limit),
         Strategy::Ends => keep_ends(text, limit),
@@ -222,6 +232,18 @@ fn keep_ends(text: &str, limit: usize) -> Cut {
 mod tests {
     use super::*;
 
+    /// Both halves of one caller's work: decide, then carry it out. The
+    /// invariants below hold of the pair, which is how a caller uses
+    /// them, and a text this module declines to shorten comes back
+    /// whole.
+    fn compacted(text: &str, budget: ByteLen) -> Cut {
+        let size = ByteLen::new(u64::try_from(text.len()).unwrap_or(u64::MAX));
+        match plan(detect(text), size, budget) {
+            Shrink::Keep | Shrink::MustOffload => Cut::whole(text),
+            Shrink::Cut(strategy) => shorten(text, strategy, budget),
+        }
+    }
+
     #[test]
     fn the_same_input_is_dispatched_the_same_way_twice() {
         let samples = [
@@ -259,7 +281,7 @@ mod tests {
         ];
         for budget in [0u64, 1, 8, 64, 512, 4_096] {
             for input in &inputs {
-                let cut = compact(input, ByteLen::new(budget));
+                let cut = compacted(input, ByteLen::new(budget));
                 assert!(
                     cut.text.len() <= input.len(),
                     "budget {budget} grew an input of {} to {}",
@@ -276,7 +298,7 @@ mod tests {
         // mid-character unless the cut is moved.
         let text = format!("fn f() {{\n{}\n}}\n", "字".repeat(400));
         for budget in [7u64, 11, 100, 301] {
-            let cut = compact(&text, ByteLen::new(budget));
+            let cut = compacted(&text, ByteLen::new(budget));
             assert!(
                 std::str::from_utf8(cut.text.as_bytes()).is_ok(),
                 "a cut mid-character produces bytes nothing downstream can read"
@@ -289,7 +311,7 @@ mod tests {
         let log = (0..400)
             .map(|n| format!("12:00:{n:02} INFO line {n}\n"))
             .collect::<String>();
-        let cut = compact(&log, ByteLen::new(200));
+        let cut = compacted(&log, ByteLen::new(200));
         assert_eq!(cut.place, Elided::Head, "a log keeps its end");
         let marker = elision::marker(cut.dropped);
         let carried = cut.text.len().saturating_sub(marker.len());
@@ -307,7 +329,7 @@ mod tests {
         let log = (0..400)
             .map(|n| format!("12:00:{n:02} INFO line {n}\n"))
             .collect::<String>();
-        let cut = compact(&log, ByteLen::new(200));
+        let cut = compacted(&log, ByteLen::new(200));
         assert_eq!(cut.place, Elided::Head);
         assert!(
             cut.text.contains("line 399"),
@@ -315,7 +337,7 @@ mod tests {
         );
 
         let prose = "The first sentence says what this is about. ".repeat(200);
-        let cut = compact(&prose, ByteLen::new(200));
+        let cut = compacted(&prose, ByteLen::new(200));
         assert_eq!(cut.place, Elided::Tail);
         assert!(cut.text.starts_with("The first sentence"));
     }
@@ -323,12 +345,15 @@ mod tests {
     #[test]
     fn structured_and_unknown_are_never_truncated() {
         let json = format!("{{\"a\":[{}]}}", "1,".repeat(2_000));
-        let cut = compact(&json, ByteLen::new(64));
-        assert_eq!(cut.place, Elided::Nothing);
-        assert_eq!(cut.text, json, "truncated structured data looks parseable");
+        let size = ByteLen::new(u64::try_from(json.len()).unwrap());
+        assert_eq!(
+            plan(detect(&json), size, ByteLen::new(64)),
+            Shrink::MustOffload,
+            "truncated structured data looks parseable"
+        );
         assert_eq!(
             plan(Content::Unknown, ByteLen::new(9_000), ByteLen::new(64)),
-            Strategy::Offload,
+            Shrink::MustOffload,
             "nothing is thrown away on a guess"
         );
     }
@@ -336,7 +361,7 @@ mod tests {
     #[test]
     fn something_within_budget_is_left_exactly_alone() {
         let text = "a short result";
-        let cut = compact(text, ByteLen::new(4_096));
+        let cut = compacted(text, ByteLen::new(4_096));
         assert_eq!(cut.place, Elided::Nothing);
         assert_eq!(cut.text, text);
     }

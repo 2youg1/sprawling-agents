@@ -193,7 +193,7 @@ impl Diagnostics {
 /// Replaces every secret-shaped span with a marker.
 #[must_use]
 pub fn redact(message: &str) -> String {
-    let hits = kernel::scan(message.as_bytes());
+    let hits = kernel::secret::scan(message.as_bytes());
     if hits.is_empty() {
         return message.to_owned();
     }

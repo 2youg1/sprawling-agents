@@ -43,13 +43,83 @@ pub struct PageSnapshot {
 /// handle, and the page author chooses how long it is.
 const LABEL_MAX: usize = 120;
 
-/// The roles worth showing. A closed list rather than a filter, because
-/// "everything except" grows silently whenever the platform adds a role,
-/// and the thing it grows into is the raw DOM again.
-const ROLES: [&str; 14] = [
-    "button", "link", "textbox", "checkbox", "radio", "combobox", "listbox", "option", "tab",
-    "heading", "alert", "dialog", "table", "form",
+/// What an element is, when its author did not say.
+///
+/// The one authority on the role vocabulary: the script that collects
+/// the tree is generated from this table ([`role_lookup_js`]), and the
+/// filter below admits what this table can produce. Before the table
+/// existed the script called an element by its tag name and the filter
+/// looked for ARIA roles, so the two agreed on five words out of
+/// fourteen: a page that did not hand-write `role=` had no links and no
+/// input fields in its snapshot, and a model had nothing to act on.
+///
+/// Rows are (tag name, the `type` this row is about, role). A row's
+/// `type` is `None` when the element has no `type` attribute worth
+/// consulting. An `<input>` with no `type` is a text field, which is
+/// what the HTML default says, so the generated script reads an absent
+/// `type` as `text`; an `<input>` whose type no row names — `hidden`,
+/// `file` — gets no role and does not cross.
+pub(crate) const ROLE_MAP: [(&str, Option<&str>, &str); 27] = [
+    ("a", None, "link"),
+    ("button", None, "button"),
+    ("input", Some("button"), "button"),
+    ("input", Some("submit"), "button"),
+    ("input", Some("reset"), "button"),
+    ("input", Some("image"), "button"),
+    ("input", Some("checkbox"), "checkbox"),
+    ("input", Some("radio"), "radio"),
+    ("input", Some("text"), "textbox"),
+    ("input", Some("search"), "textbox"),
+    ("input", Some("email"), "textbox"),
+    ("input", Some("tel"), "textbox"),
+    ("input", Some("url"), "textbox"),
+    ("input", Some("password"), "textbox"),
+    ("textarea", None, "textbox"),
+    ("select", None, "combobox"),
+    ("datalist", None, "listbox"),
+    ("option", None, "option"),
+    ("h1", None, "heading"),
+    ("h2", None, "heading"),
+    ("h3", None, "heading"),
+    ("h4", None, "heading"),
+    ("h5", None, "heading"),
+    ("h6", None, "heading"),
+    ("dialog", None, "dialog"),
+    ("table", None, "table"),
+    ("form", None, "form"),
 ];
+
+/// Roles no element implies, admitted because a page that states one
+/// states something a model has to know: which control is the current
+/// tab, and what the page is complaining about.
+const ARIA_ONLY: [&str; 2] = ["tab", "alert"];
+
+/// Whether a role reaches the window. A closed vocabulary rather than a
+/// filter, because "everything except" grows silently whenever the
+/// platform adds a role, and the thing it grows into is the raw DOM
+/// again.
+fn shown(role: &str) -> bool {
+    ROLE_MAP.iter().any(|(_, _, mapped)| *mapped == role) || ARIA_ONLY.contains(&role)
+}
+
+/// The role table as the JavaScript object the collecting script looks
+/// an element up in: `"tag|type"` for a row that names a type, `"tag"`
+/// for one that does not.
+///
+/// Built with `serde_json` so quoting has one author, and generated
+/// rather than written out so the script and the filter cannot come to
+/// disagree about what a `<select>` is.
+pub(crate) fn role_lookup_js() -> String {
+    let mut map = serde_json::Map::new();
+    for (tag, kind, role) in ROLE_MAP {
+        let key = match kind {
+            Some(kind) => format!("{tag}|{kind}"),
+            None => tag.to_owned(),
+        };
+        map.insert(key, Value::String(role.to_owned()));
+    }
+    Value::Object(map).to_string()
+}
 
 fn truncate_label(raw: &str) -> String {
     let cleaned: String = raw
@@ -86,7 +156,7 @@ impl PageSnapshot {
             let Some(role) = entry.get("role").and_then(Value::as_str) else {
                 continue; // a node without a role is furniture
             };
-            if !ROLES.contains(&role) {
+            if !shown(role) {
                 continue;
             }
             let name = truncate_label(
@@ -191,6 +261,56 @@ mod tests {
         assert!(
             !text.contains("window.__data"),
             "a page author's script is not part of what a model reads: {text}"
+        );
+    }
+
+    /// The defect this table was made for: a page that writes no
+    /// `role=` attribute still has links and fields, and the script has
+    /// to call them what the filter is looking for.
+    #[test]
+    fn every_role_an_element_implies_is_a_role_the_window_shows() {
+        for (tag, kind, role) in ROLE_MAP {
+            assert!(
+                shown(role),
+                "<{tag}> (type {kind:?}) is collected as `{role}`, which nothing shows"
+            );
+        }
+    }
+
+    /// The other direction: a role in the vocabulary that no element
+    /// implies and no page can state is a word with no referent.
+    #[test]
+    fn every_role_the_window_shows_can_reach_it() {
+        for aria in ARIA_ONLY {
+            assert!(shown(aria));
+        }
+        for role in [
+            "button", "link", "textbox", "checkbox", "radio", "combobox", "listbox", "option",
+            "heading", "dialog", "table", "form",
+        ] {
+            assert!(
+                ROLE_MAP.iter().any(|(_, _, mapped)| *mapped == role),
+                "`{role}` is shown but no tag is collected as one"
+            );
+        }
+    }
+
+    #[test]
+    fn the_lookup_the_script_uses_says_what_the_table_says() {
+        let js = role_lookup_js();
+        let parsed: Value = serde_json::from_str(&js).unwrap();
+        assert_eq!(parsed.get("a").and_then(Value::as_str), Some("link"));
+        assert_eq!(
+            parsed.get("input|checkbox").and_then(Value::as_str),
+            Some("checkbox")
+        );
+        assert_eq!(
+            parsed.get("select").and_then(Value::as_str),
+            Some("combobox")
+        );
+        assert!(
+            parsed.get("input|hidden").is_none(),
+            "an input nobody can see is not a control"
         );
     }
 

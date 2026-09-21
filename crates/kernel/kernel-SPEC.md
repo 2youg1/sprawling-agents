@@ -29,7 +29,7 @@ Stage 2 落地其余 18 个 kernel 模块（§8-10…§8-27）。**施工序＝�
 | 决断地基 | `taint` | 一切携 Taint 的动作依赖它 |
 | 四判定 | `write_domain` `budget` `backpressure` `stall` | 无互依，可同时落地 |
 | 登记与委派 | `goal` `repair` `delegation` `registry` | registry 供 discard 门查 Asset |
-| 完成与审批 | `spine` `completion` `approval` | gate 的 Escalate 需 ApprovalItem |
+| 完成与审批 | `spine` `completion` `approval` | Inbox只装设计问题；门不产出审批项 |
 | 隐私与删除 | `secret` `discard` | Egress/Discard 两门的判定输入 |
 | 组合面 | `gate` | 五门消费上述全部，故最后 |
 
@@ -497,7 +497,16 @@ impl IdemKey {
 }
 // 定义点仍在 kernel::idem；取关联函数而非自由函数，避免裸名 `derive` 入 crate 门面。
 impl fmt::Display for IdemKey { /* "idem<v>-<hex32>" */ }
+
+pub struct IdemGuard { key: IdemKey }            // 私有字段；唯一铸口是 claim
+impl IdemGuard { pub fn key(&self) -> &IdemKey; }
+pub struct Duplicate { key: IdemKey }            // 已被认领过的键，供调用方取回第一次的答案
+impl Duplicate { pub fn key(&self) -> &IdemKey; }
+/// Claims the key in the caller's seen set: Ok grants the right to act once.
+pub fn claim(seen: &mut BTreeSet<IdemKey>, key: IdemKey) -> Result<IdemGuard, Duplicate>;
 ```
+
+- **`IdemGuard` 取代 `gate::dedup`（F-20）**：旧模块把 `BTreeSet::contains` 改名并把 bool 包成两变体枚举，是穿透层。新形状把「在任何不可重放的副作用之前判重」这条写在注释里的顺序约束变成编译期约束：副作用入口收 `&IdemGuard`，而 guard 只有 `claim` 造得出。seen 集合仍是调用方的状态，kernel 不持有任何状态。
 
 serde：字符串形。动作规范化（action_canonical 的构造规则）属工具面——它在那一面有且只有一个实现，`ToolCall::action`（§8-23）；本模块只定派生函数与框架。
 
@@ -533,9 +542,7 @@ pub const DRAFT_HELD_ESCALATE: u32 = 3;
 pub const EDIT_WAR_FREEZE: u32 = 2;
 pub const SECRET_ENTROPY_MIN: Ratio = Ratio { num: 7, den: 2 };      // 3.5 bits/char
 pub const DISCARD_FILES_MAX: u32 = 16;
-pub const DISCARD_BYTES_MAX: u64 = 1_048_576;
 pub const DISCARD_RETENTION_DAYS: u32 = 30;
-pub const POLICY_IDLE_DAYS: u32 = 90;
 pub const CLOCK_ZONES_MAX: u32 = 4;
 pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;                   // 2 GiB
 ```
@@ -551,7 +558,9 @@ pub const IMAGES_PER_TURN: u32 = 4;           // 一回合最多几张图
 
 `WORKTREE_MAX_BYTES` 是上限而非磁盘余量探测：余量是一台机器当下的事实，上限则是一句拒绝说得出、一个人改得动的数；建树前校，故一座过大的城是被拒而不是被拷到一半（`memory::worktree`）。
 
-16 项中 3 项随类型延后（表先行、值后到，位置恒在本模块）：`AUTONOMY_DEFAULT`（需 `Autonomy`，S2 approval 卡落）；`CLOCK_STAMP_DEFAULT`（需时钟档枚举；该枚举住 kernel 何处属 S2 config 卡决策——kernel 不得依赖 runtime）；`SUBAGENT_CTX_LOCK_DEFAULT`（子代理上下文锁不存在，**此项永不落地**）。余下两项落地前，本模块不提供任何替身值。
+`AUTONOMY_DEFAULT` 与 `CLOCK_STAMP_DEFAULT` 带类型（分别是 `Autonomy` 与 `ClockStampGranularity`），其余为数。`SUBAGENT_CTX_LOCK_DEFAULT` 永不落地——子代理上下文锁不存在。
+
+**两项随 §12「默认 YOLO」这条规则删去**：`POLICY_IDLE_DAYS`（长期豁免机制不存在，闲置过期无对象）与 `DISCARD_BYTES_MAX`（规模不再改变删除的判决，见 §8-26）。`DISCARD_FILES_MAX` 留下，它今天的读者是 `sprawling` 的清扫阈值。
 
 ### 8-9 kernel::ledger（缝清单文件，全库五真缝之一）
 
@@ -931,44 +940,29 @@ pub enum Progress { Planned(PlannedProgress), Unplanned(UnplannedProgress) }
 pub struct ApprovalId(String);               // 非空；铸造只此一处，与时钟无关
 impl ApprovalId {
     pub fn of(run: &RunId, seq: Seq) -> ApprovalId;   // 唯一铸口：`ap-{run}-{seq:020}`
-    pub fn of_sweep(run: &RunId) -> ApprovalId;       // = of(run, Seq::new(u64::MAX))：一次 drive 至多一条清扫升级
+    pub fn of_sweep(run: &RunId) -> ApprovalId;       // = of(run, Seq::new(u64::MAX))
     pub fn new(raw: impl Into<String>) -> Option<ApprovalId>;   // 只收既存 id（线上回执、账本、夹具），空串拒
     pub fn as_str(&self) -> &str;
 }
-pub enum ApprovalSource { Gate, Agent }
-pub enum ApprovalClass { Commitment, BudgetLimit, DiscardEscalate, AgentQuestion,
-                                           Delegation, Governance, Undoable }
-// Delegation：第一次派生要人点头。Governance：改写一个 scope 的规则要人点头。
-// Undoable：伸到城外、且城里没有任何一处收得回来的后果——目下就是运行中的机器自己的桌面（§8-45）。
-// 三者都无对应 PolicyClass variant——一条「豁免改规则」的常设规则会把自己废掉；同样地，一条豁免掉每一次未来点击的常设规则，豁免掉的正是「有人看着」这件事本身。
+pub enum ApprovalClass { Question }          // Inbox只装设计问题
 pub struct ClusterKey { pub class: ApprovalClass, pub detail: String }
-pub struct ApprovalItem { pub id: ApprovalId, pub source: ApprovalSource, pub actor: String,
-                          pub action_desc: String, pub artifact: Locator, pub cluster_key: ClusterKey,
+pub struct ApprovalItem { pub id: ApprovalId, pub actor: String, pub action_desc: String,
+                          pub artifact: Locator, pub cluster_key: ClusterKey,
                           pub created: TimeMs, pub tainted: bool }
-
-pub enum PolicyClass { AgentQuestion }          // 可免审类：三必经人类无 variant 可写（类型层禁止）
-pub struct PolicyMatcher { pub class: PolicyClass, pub detail_prefix: String }
-pub enum PolicyVerdict { Allow, Deny }
-pub struct Policy { pub id: String, pub matcher: PolicyMatcher, pub verdict: PolicyVerdict,
-                    pub source: ApprovalId, pub created: TimeMs, pub last_hit: Option<TimeMs> }
-                    // 无 revocable 字段：恒真字段不入型（false 不可表示）
-pub enum PolicyApplication { Applies(PolicyVerdict), NotApplicable }
-pub fn match_item(policy: &Policy, item: &ApprovalItem) -> PolicyApplication;   // tainted 恒 NotApplicable（C15）
-pub enum PolicyExpiry { Active, Expired }
-pub fn expiry(policy: &Policy, now: TimeMs) -> PolicyExpiry;      // idle ≥ POLICY_IDLE_DAYS → Expired；checked
-pub enum PolicyRevocation { Revoked, Expired, Superseded }   // policy_revoked reason 数据面
-
-pub enum Autonomy { Owner, Delegate(ResidentId), Deferred }
+pub enum Ruling { Allow, Deny }              // 人给一条问题的答复
+pub enum Autonomy { Owner, Delegate(ResidentId) }
 pub enum Answerer { Human, Resident(ResidentId) }
-pub enum AnswerVerdict { May, HumanOnly, SelfApprovalBarred, NotTheDelegate }
+pub enum AnswerVerdict { May, NotTheDelegate, SelfApprovalBarred }
 pub fn may_answer(autonomy: &Autonomy, item: &ApprovalItem, answerer: &Answerer) -> AnswerVerdict;
 ```
 
-- **身份取自 run 与位次，不取自时钟**（9.2／B-24）：`DRIVING_LANES = 4` 是默认值，四条车道常在同一毫秒各触第一条审批；毫秒形状的 id 会让两条审批成为一个键，`pending` 与 `origins` 保住后写的那条，先那条从只增账本里消失，而事后无人能把「丢了」与「从未发生」分开。`seq` 是**该 run 自己的单调位次**——正是 run 已经用来 derive `IdemKey` 的那一个计数器（`lane.rs` 与 `citysim/executor.rs` 的 `placed`），在一个 run 内计数、从不跨 run 传递，因此位次只有连同它被数出来的那个 run 才构成身份。两个输入都不是采样值，重放逐字节重算出同一 id，`just replay` 对审批记录仍然自证。位次按 `u64::MAX` 的宽度补零书写，于是同一 run 两条 id 的派生 `Ord` 读出的就是它们被提出的先后。
-- **清扫槽位**：一次 drive 的 discard 升级至多一条，占最高位次（`of_sweep`），调用计数器永远数不到那里，所以它与同一 run 的任何工具调用项都不撞。位次空间的这条划分只有 kernel 这一个家；调用方不自拼字符串。
-- **三必经人的类型化**：`PolicyClass` 不含 Commitment/BudgetLimit/DiscardEscalate，免审规则对三类**不可表示**；`match_item` 对 `tainted` 恒 NotApplicable（C15 的 Taint 条）。
-- `may_answer`：Human 恒 May；Resident r 仅当 autonomy==Delegate(r)（否则 NotTheDelegate）且 item 不属三类且 !tainted（否则 HumanOnly）且 item.actor ≠ r（否则 SelfApprovalBarred）。Deferred 下 Resident 恒 HumanOnly——没有人应答是事实的名字，不是新判定。
-- verdict 先落账再生效、前拦不烧 token：效果层顺序约束（S3/S4），kernel 只出判定。
+- **身份取自 run 与位次，不取自时钟**（9.2／B-24）：`DRIVING_LANES = 4` 是默认值，四条车道常在同一毫秒各提第一个问题；毫秒形状的 id 会让两条成为一个键，先那条从只增账本里消失，而事后无人能把「丢了」与「从未发生」分开。`seq` 是该 run 自己的单调位次——run 已经用来 derive `IdemKey` 的那一个计数器，在一个 run 内计数、从不跨 run 传递。两个输入都不是采样值，重放逐字节重算出同一 id。位次按 `u64::MAX` 的宽度补零书写，于是同一 run 两条 id 的派生 `Ord` 读出的就是它们被提出的先后。
+- **清扫槽位**：一次 drive 至多一条，占最高位次（`of_sweep`），调用计数器永远数不到那里。位次空间的这条划分只有 kernel 这一个家；调用方不自拼字符串。
+- **`ApprovalClass` 只剩一个臂而枚举留下**：cluster key 是线上数据，类别写在载荷里；第二种问题出现的那天要在每一个读者处编译失败，而不是让一个字段悄悄改变含义。
+- **`ApprovalItem.tainted` 是给人看的出处，不是判决位**：污染改变的是效果的判决（`gate::undoable` 与 `gate::discard` 的 Deny），而一个问题不是效果。
+- `may_answer`：Human 恒 May；Resident r 仅当 autonomy==Delegate(r)（否则 NotTheDelegate）且 item.actor ≠ r（否则 SelfApprovalBarred）。
+- **真值表由测试遍历**（T-03，5.3）：两个 autonomy × 三个应答者 × 两个提问者＝十二行，逐行断言；表里加一行就是断言加一行。
+- verdict 先落账再生效：效果层顺序约束（S3/S4），kernel 只出判定。
 - `AUTONOMY_DEFAULT: Autonomy = Owner` 落 consts_policy。
 
 ### 8-22 kernel::config
@@ -990,9 +984,11 @@ pub fn freeze(clock_stamp: &LayeredValue<ClockStampGranularity>) -> FrozenConfig
 
 **思考强度（config）**：`FrozenConfig` 增 `effort: Option<Effort>`（类型住 §8-24），`freeze` 增该梯入参，缺省 `None`＝不写该字段、由 provider 自行决定。
 
-**沙箱限额（config）**：`SandboxLimits { shell: bool, fuel: u64, mounts: Vec<Address> }`，`FrozenConfig` 增 `sandbox` 字段，`freeze` 增该梯入参。三条口径：①**整值解析而非逐字段合并**——一层说到 sandbox 就说全部，于是欠说的层只会收窄而恒不会悄悄放开上层没提过的能力；②**主机事实不入城**（CPython 工件路径、shell 可执行文件位置走环境变量）——一座城被搬到另一台机器时不该带着运行中的机器的路径；③冻结的理由与工具表相同：**能改变可达范围的东西恒不在回合中变宽**，否则变宽的那一刻没有人审过。缺省 `fuel = SANDBOX_FUEL_DEFAULT`（`consts_policy`，2×10⁸），`shell = false`——shell 是唯一一条从参数读不出可达范围的臂。
+**沙箱限额（config）**：`SandboxLimits { shell: bool, fuel: u64, mounts: Vec<Address>, env_passthrough: Vec<EnvVarName>, trusted: Vec<ServerLabel> }`，`FrozenConfig` 增 `sandbox` 字段，`freeze` 增该梯入参。三条口径：①**整值解析而非逐字段合并**——一层说到 sandbox 就说全部，于是欠说的层只会收窄而恒不会悄悄放开上层没提过的能力；②**主机事实不入城**（CPython 工件路径、shell 可执行文件位置走环境变量）——一座城被搬到另一台机器时不该带着运行中的机器的路径；③冻结的理由与工具表相同：**能改变可达范围的东西恒不在回合中变宽**，否则变宽的那一刻没有人审过。缺省 `fuel = SANDBOX_FUEL_DEFAULT`（`consts_policy`，2×10⁸），`shell = false`——shell 是唯一一条从参数读不出可达范围的臂。
 
 **外部 MCP server（config）**：`McpServer { label: ServerLabel, transport: McpTransport }`，`McpTransport { Stdio { command, args, env }, Http { url, headers }, Sse { url, headers } }`——**穷尽枚举而非两个裸字段**：一行既写 command 又写 url 就是一行要读者去猜的配置，故配置层当场拒（`ServerLabel` 住 §8-23）。**枚举是闭的**（无 `#[non_exhaustive]`）：读者全在这一个二进制里，通配臂只会把下一种 transport 从必须表态的模块面前藏起来。`env` 与 `headers` 皆为名在前、值在后的成对表，值可以是 `secret:realm/name` 引用——交给子进程的名字收不回来，故兑付发生在起进程／发请求的那一格，而恒不写进配置文件。`Sse` 自成一支而不是 `Http` 的一个开关：两者开法与败法都不同。`FrozenConfig` 增 `mcp: Vec<McpServer>`，`freeze` 增该梯入参，缺省空表＝这栋楼不接任何外部 server。三条口径：①**整表覆盖**，与 zones／sandbox 同一条理由——一层说到 `[[mcp]]` 就说全部，欠说的层只会收窄而恒不会悄悄接上上层没提过的服务；②**冻结的理由就是工具表本身**——外部工具在 Run 起点入 catalog，而 provider 把工具数组哈希在 system prompt 之前，Run 内变宽的工具表既自毁缓存又没有人审过；③**命令与参数是主机事实**（一个可执行文件在运行中的机器上的位置），故它们住 `CONFIG.toml` 而恒不入 Ledger 载荷——一座城被搬到另一台机器时不该带着运行中的机器的路径。
+
+**信任的连接器（config）**：`SandboxLimits` 增 `trusted: Vec<ServerLabel>`，缺省空表；`SandboxLimits::trusts(&ServerLabel)` 是这张表的唯一读者。它回答 `gate::undoable` 的问题——这楼层准哪个连接器伸到运行中的运行这座城的机器上。口径与 `mounts` 同形：整值上梯、Run 起点冻结、在解析点拒。缺省空表的意思是「这楼层不准任何连接器碰运行这座城的机器」，而一条写在 `CONFIG.toml` 里的信任是人在看得见整张表时做的决定，比在模型等着时做的决定更值得信。
 
 **环境变量透传（config）**：`SandboxLimits` 增 `env_passthrough: Vec<EnvVarName>`，缺省空表；`EnvVarName` 是本模块的新值类型（形状 2），唯一构造点 `EnvVarName::parse`。
 
@@ -1014,10 +1010,9 @@ pub struct TimeoutMs(u64);          // 声明即承诺可协作取消
 pub enum Effect { Read, Write { domain: Address }, Egress,
                                     Connector { label: ServerLabel }, Spawn, Govern, Spend }   // 决定过哪道门
 // Spawn：起第二个 Agent。不归 Read——一次派生能花多少、能碰什么，调用方自己的任何一道门都不管；
-// 管得住它的只有人。故它自成一类，`kernel::gate::delegation` 恒 Escalate，是否已获准由调用方的 granted 集回答。
+// 管它的是深度规则：`kernel::gate::spawn` 判一层深，被派生的位置再派生恒 Deny。
 // Govern：改写一个 scope 被判的规则。刻意不归 Write——保留子树在每个写域之外，写门本就会拒；
-// 而它拒的理由正是「这件事归人」。`kernel::gate::govern` 恒 Escalate，且把提案正文截前 600 字进 action_desc：
-// 一个只被告知「要改规则」的人是在猜。
+// 而它拒的理由是「一个 run 不得改写审判它自己的规则」，故效果层对这一臂恒拒，规则由人改 TOML。
 pub enum Temporal { Timeless, Timestamped }
 pub enum CostTier { Free, Light, Heavy }        // 三档起步，对扩展开放；路由/预算消费在 S3
 pub enum RenderIntent { Generic, Terminal, Diff { locations: Vec<Address> } }
@@ -1186,51 +1181,65 @@ impl Discard {
 
 pub enum DiscardRequest { Planned(Discard),
                                             Unplanned { paths: Vec<Address>, taint: TaintSet, total_bytes: ByteLen } }
-pub enum EscalateReason { FilesOverMax, BytesOverMax, RegistryAsset, Tainted }
-pub enum DenyReason { NoRestoration }
-pub enum DiscardVerdict { Allow, Escalate { reason: EscalateReason }, Deny { reason: DenyReason } }
-/// The fifth door's decision table, sole authority —
+pub enum DenyReason { NoRestoration, Tainted }
+pub enum DiscardVerdict { Allow, Deny { reason: DenyReason } }
+/// The discard door's decision table, sole authority —
 /// gate::discard delegates wholly and only shapes the refusal.
-pub fn decide(req: &DiscardRequest, registry: &Registry) -> DiscardVerdict;
+pub fn decide(req: &DiscardRequest) -> DiscardVerdict;
 
 pub enum DiscardForecast { Clear, Suspected { pattern: String } }
 pub fn forecast(arm: &ExecArm) -> DiscardForecast;
 ```
 
-- **decide 表**：Unplanned → Deny{NoRestoration}（无还原不可构造使 Planned 恒有 plan，Deny 只剩这一条路）；Planned：taint 非空 → Escalate{Tainted}（恒，无视规模）；paths 数 > `DISCARD_FILES_MAX` → Escalate{FilesOverMax}；total_bytes > `DISCARD_BYTES_MAX` → Escalate{BytesOverMax}；任一 path 命中 Registry Asset（以 file: Locator 前缀形归一查 is_asset；S2 取路径字符串相等）→ Escalate{RegistryAsset}；余 Allow。判序固定（Tainted→Files→Bytes→Asset），确定可重放。
+- **decide 表**：Unplanned → Deny{NoRestoration}（无还原不可构造，使 Planned 恒有 plan）；Planned 且 taint 非空 → Deny{Tainted}（恒，无视规模）；余 Allow。判序固定，确定可重放。
+- **规模与归属不再改答（§12「默认 YOLO」）**：一次 Planned 删除恒带 `Restoration`，因此恒可回滚；十六个文件、一兆字节、别人登记过的 asset 从前是「停下来问人」的三个门槛，而问人不是规则。随之删去 `EscalateReason`、`DISCARD_BYTES_MAX` 与 `decide` 的 `registry` 入参。删除的上界仍有家：write domain 决定一个 resident 够得到哪些文件，registry 保存把 asset 放回去所需的凭据。
 - **forecast 三臂预判力递减**：Program 读 `(path, args)` 整体——basename ∈ {rm, rmdir, del} 或 git 携 reset --hard/clean 或 find 携 -delete；Python/Shell 子串表（rm 、rmdir、-delete、git reset --hard、git clean、os.remove、shutil.rmtree、os.unlink；Shell 另含 `>` 截断重定向）——可被混淆绕过，恒保守；git 兑底在 S3 checkpoint。子串表是 pub(crate) 数据面。
-- kani：Discard 门 fail-closed——Unplanned 恒不 Allow；Tainted 恒不 Allow。
+- kani：Discard 门 fail-closed——Unplanned 恒 Deny；Tainted 恒 Deny。
 
 ### 8-27 kernel::gate
 
 ```rust
-pub struct GateContext { pub actor: String, pub now: TimeMs, pub item_id: ApprovalId }   // Escalate 造 item 所需；全由调用方注入
-pub enum GateOutcome { Allow, Escalate { item: ApprovalItem }, Deny { refusal: Box<AxError> } }
+pub enum GateOutcome { Allow, Deny { refusal: Box<AxError> } }
 
 pub fn domain(domain: &WriteDomain, target: &Address, taint: &TaintSet) -> GateOutcome;   // 判一个文件
-pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutcome;    // 判一块声明的区域（§8-46 末段）
+pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutcome;      // 判一块声明的区域
 pub enum EgressTarget { Loopback, Private, Public { host: String },
-                                          Connector { label: ServerLabel } }   // 分类由效果层解好址后注入
+                        Connector { label: ServerLabel } }   // 分类由效果层解好址后注入
 pub enum EgressOutcome { Allow { first_public_egress: bool }, Deny { refusal: Box<AxError> } }
 pub fn egress(spans: &[SecretSpan], target: &EgressTarget, prior_public_egress: bool) -> EgressOutcome;
-// 没有 `spend` 门：它会判的 ladder 不存在，且它从无生产调用方。门由五减四。
-pub enum CommitmentDecision { Approved, Denied }
-pub fn commitment(decision: Option<&CommitmentDecision>, taint: &TaintSet, ctx: &GateContext,
-                  action_desc: &str, artifact: &Locator) -> GateOutcome;
-pub fn discard(req: &DiscardRequest, registry: &Registry, ctx: &GateContext,
-               action_desc: &str, artifact: &Locator) -> GateOutcome;
+pub fn egress_target(list: &EgressAllowlist, target: &EgressTarget) -> EgressOutcome;
+pub fn discard(req: &DiscardRequest, action_desc: &str) -> GateOutcome;
 pub fn spawn(parent: Depth, kind: &DelegateKind) -> GateOutcome;      // E_DELEGATION_DEPTH 的塑形处
+pub struct ConnectorCall<'a> { pub label: &'a ServerLabel, pub tool: &'a ToolName }
+pub fn reaches_the_undoable(call: &ConnectorCall<'_>) -> bool;
+pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &TaintSet) -> GateOutcome;
 
-pub enum DedupVerdict { Fresh, Duplicate }
-pub fn dedup(seen: &BTreeSet<IdemKey>, key: &IdemKey) -> DedupVerdict;   // 去重恒先于副作用：调用序纪律＋citysim 不变量看守
+pub enum DoorId { Domain, Reach, Egress, EgressHost, Discard, Spawn, Undoable }
+pub const DOORS: [DoorId; 7];
+impl DoorId { pub fn as_str(self) -> &'static str; }
+#[cfg(feature = "conformance")]
+pub mod conformance {
+    pub fn deny_sample(door: DoorId) -> Result<AxError, DoorId>;   // 门自己产出的那条拒绝
+    pub fn taint_readers() -> BTreeMap<DoorId, bool>;              // 哪几道门真的按 taint 改答
+}
 ```
 
-- **`dedup` 的承兑人已经存在**：这个纯函数的 `seen` 集合是调用方的状态，故它成不成立取决于有没有人持有那个集合。今天持有它的有两处：工具面的 `runtime::bench`（一波之内同一把键只调一次），与命令面的 `bin::assembly::commanding::entrance`（`serve_one` 判在任何副作用之前，且重复的键得到第一次的答案）。**本模块的立面不变**——集合仍是调用方的，kernel 仍只回答成员关系；此处记的是「谁在兑现它」，因为一道没有调用方的门与没有门等价（`adversary/adversary-SPEC.md` §4 第三个发现量到的正是这件事）。
-- **gate 是全库唯一 gate 码生产者**：五门 Deny 恒经 `AxError::refusal`（三段必填）；Domain 门 nearby＝domain 前缀表；Discard 门 alternative 恒可执行（分批或 Interred 后重试）；Egress 门 subject 只写位置与跨度数，恒不回显命中字节。
-- **Escalate 的二源归一**（只有两源）：commitment 无决 → item{class: Commitment}；discard Escalate → item{class: DiscardEscalate}；均 source=Gate、tainted＝taint 非空（C15 标记位）。commitment 携 Denied 决定 → Deny（E_APPROVAL_DENIED，非 gate 码故用 failure 形）。
-- **Taint 升档的 S2 实例**：Discard 门 Tainted 恒 Escalate（住 discard::decide）＋Escalate item 的 tainted 标记位（封 Policy/代答）。其余门的升档语义随其审批面出现时实例化（P1/P2），不造无消费者的规则。
-- **首次公网出网**：`egress` 对 Public 且 `!prior_public_egress` 置 `first_public_egress`；NetNotice 挂信封属 pipeline（S3）。Loopback/Private 恒不触发（对 localhost 提醒注入只会训练模型忽略提醒）。
-- kani：四门组合 fail-closed——reserved 目标恒不 Allow；spans 非空恒 Deny；Unplanned Discard 恒不 Allow；Delegated 再派生恒不 Allow。
+- **门只答 Allow 或 Deny（§12「默认 YOLO」这条规则）**：一个需要人点「可以」的动作，要么本来就该做，要么本来就不该做，两者都是规则。随之删去 `GateOutcome::Escalate`、`GateContext`、`gate::item`、`gate::commitment`、`gate::govern`、`gate::delegation`、`gate::dedup`。今天六类升级各得的固定答案与其理由：
+
+  | 从前的类别 | 今天 | 为什么 | 人在哪里改 |
+  |---|---|---|---|
+  | `Commitment` | Allow（无门） | 承诺一个计划是居民自己的工作，账本记录 | 账本与 `status` |
+  | `DiscardEscalate` | Allow（`gate::discard` 只拦无还原与污染） | `Discard` 没有 `Restoration` 就拼不出来，任何删除都能回滚 | 楼的 write domain |
+  | `Delegation` | Allow（无门；`spawn` 仍拦深度） | 委派一层深由类型保证 | — |
+  | `BudgetLimit` | Deny（无门；预算耗尽冻结 run） | 预算是 `CONFIG.toml` 里的规则，超了就冻 | `CONFIG.toml` 的 `[budget]` |
+  | `Governance` | Deny（无门；`Effect::Govern` 在效果层拒） | 一个 run 不得改写审判它自己的规则 | 人改 TOML |
+  | `Undoable` | 按楼层 `[sandbox] trusted` 答 Allow／Deny；tainted 恒 Deny | 已有的 reach 规则，不再多一道问 | `CONFIG.toml` 的 `[sandbox] trusted` |
+
+- **门是数据面（F-17／L-03）**：`DOORS` 是门册，refusal 矩阵遍历它而不是一道一道点名；`deny_sample` 对 `DoorId` 穷尽匹配，于是新增一道门而不给样本编译不过。样本调用真门，矩阵判的是一个 run 会收到的那条拒绝。
+- **gate 是全库唯一 gate 码生产者**：每一道门的 Deny 恒经 `AxError::refusal`（三段必填）；Domain 门 nearby＝domain 前缀表；Undoable 门 nearby＝该楼层信任的连接器表；Discard 门 alternative 恒可执行；Egress 门 subject 只写位置与跨度数，恒不回显命中字节。
+- **Taint 有真判决（S-05／C15）**：`gate::undoable` 对非空 taint 恒 Deny（`E_TAINTED_ACTION`），信任与否都拦——楼层信任的是连接器，不是一张网页借它按下的键；`gate::discard` 对非空 taint 恒 Deny。`conformance::taint_readers` 是这条不变量的机器面，单测断言它每一项为真，于是「taint 只往拒绝文案里加一句」这种恒假分支回不来。
+- **首次公网出网**：`egress` 对 Public 且 `!prior_public_egress` 置 `first_public_egress`；NetNotice 挂信封属 pipeline（S3）。Loopback/Private 恒不触发。
+- kani：门组合 fail-closed——reserved 目标恒不 Allow；spans 非空恒 Deny；Unplanned Discard 恒不 Allow；Delegated 再派生恒不 Allow；tainted 的 desktop 调用恒不 Allow。
 
 ### 8-29 kernel::address::SessionName（形状 2 value）
 
@@ -1353,18 +1362,34 @@ pub fn is_reserved(&self) -> bool;   // 任一段 == RESERVED_PREFIX（原：仅
 S2 激活的码（逐码答「能否定义掉」）：
 
 - `E_OUTSIDE_WRITE_DOMAIN`：不可——写目标是运行期输入，类型只能封构造后非法，封不住越域目标。
-- `E_GATE_DENIED`：不可——Commitment 拒绝需要通用拒码；其余四门各有专码。
-- `E_TAINTED_ACTION`：不可——Taint 升档后被拒的动作需要自述来路的码（生产在 P2 注入剧本接入时）。
+- `E_GATE_DENIED`：不可——Undoable 门与 Egress 主机门用它；其余门各有专码。
+- `E_TAINTED_ACTION`：不可——被 taint 拒掉的动作需要自述来路的码。生产者是 `gate::undoable` 与 `gate::discard`，两处都对非空 taint 恒 Deny。
 - `E_BUDGET_EXHAUSTED`：不可——耗尽是审批不是错误，但模型需要可机读的码知道自己停在哪。
 - `E_LOOP_SUSPECTED`：不可——停滞是观测事实；定义掉它等于假定模型不会循环。
 - `E_GOAL_CONFLICT`／`E_REPAIR_BUSY`：不可——同资源相斥与修复串行化是机制存在理由；Queued/Conflict 是合法结局，码只在回传面携信息。
 - `E_DELEGATION_DEPTH`：不消解（明裁：边界反馈优于沉默缺席）。
-- `E_APPROVAL_PENDING`／`E_APPROVAL_DENIED`：不可——前拦等待与拒批都是用户可达状态。
+- `E_APPROVAL_PENDING`／`E_APPROVAL_DENIED`：不可——一个设计问题停住提问的那个 run，而人可以答「不」；两者都是用户可达状态。门不再产出其中任何一个。
 - `E_EVIDENCE_MISSING`：部分定义掉——无证据 Done 已不可构造（类型半）；构造时拒绝仍需此码（运行时半，A6 双守）。
 - `E_SECRET_EGRESS`／`E_DISCARD_IRREVERSIBLE`：不可——两门存在的理由即这两类越界可发生；类型已把「无 Restoration 的 Discard 值」定义掉，Unplanned 请求（exec 预判路）是剩余不可消部分。
 - `E_CONFIG_INVALID`：不可——SecretRef 形状非法与明文入配置必须在反序列化即拒。
 
 其余未激活码随其生产模块的 SPEC 章逐码作答（S3+）。
+
+### 12.1 定规：默认 YOLO，门只答放行或拦住
+
+`Verdict: user-approved`（Roadmap §6 定规 2；§19.3 第 2、6 条为其前置与补充）
+
+**决定**：删 `GateOutcome::Escalate`；今天会升级问人的六类各得一个固定答案（表在 §8-27）；Inbox只装设计问题（§8-21）；`Autonomy` 二态、默认 `Owner`。
+
+**理由**：一个默认被绕过的闸是死代码加假安全感。一个需要人点「可以」的动作，要么本来就该做，要么本来就不该做，两者都是规则；规则写在人改得动的地方（`CONFIG.toml` 的 `[budget]` 与 `[sandbox] trusted`、楼的 `BUILDING.md`），而不是每次会话问四遍。人的精力应当花在只有人答得了的那一类上：设计问题。
+
+**被否**：①「clerk 代答一切审批」——把人该做的规则判断交给模型每次重新猜一遍，多一次模型调用换一个本来就该是常量的答案；②「保留 `Escalate` 但默认放行」——名义上 YOLO，实际上每次会话问人四次。
+
+**同集删净**：`GateContext`、`gate::item`、`gate::commitment`、`gate::govern`、`gate::delegation`、`gate::dedup`（由 `idem::claim` 与 `IdemGuard` 接替，§8-6）、`PolicyClass`／`PolicyMatcher`／`Policy`／`PolicyApplication`／`PolicyExpiry`／`PolicyRevocation`／`match_item`／`expiry`／`POLICY_IDLE_DAYS`、`ApprovalSource`、`AnswerVerdict::HumanOnly`、`Autonomy::Deferred`、`EscalateReason`／`DISCARD_BYTES_MAX`。
+
+**前置已兑现（§19.3 第 2 条）**：「tainted → Deny」不再是恒假分支——`gate::undoable` 与 `gate::discard` 两处按 taint 真的改答，`gate::conformance::taint_readers` 是这条的机器面，单测逐门断言。
+
+**重开参数**：出现一类没有 `Restoration` 的效果——那时的正确做法是让它不可拼写，而不是把 `Escalate` 加回来。
 
 ## 13 依赖选型
 
@@ -1397,7 +1422,7 @@ memory::jsonl／memory::cas／runtime::replay／runtime::fork／citysim 全部�
 - golden（insta）：创世行＋一条 `building_created` 的 `canonical_line` 字节。
 - conformance：对一个最小内存实现自证可跑；citysim 实现二证。
 - 约束：`cargo clippy --workspace --all-targets -- -D warnings` 零告警；无 `unsafe`；文件前三行 MPL 头。
-- S2 各模块测试面（逐模块文件内 `#[cfg(test)]`＋kani 镜像 proptest）：taint 并集单调／map 保集；write_domain reserved 恒拒／夺回计数；budget 溢出＝Exhausted／逐层报首超；backpressure 单调；stall 尾部连续语义；goal/repair 重叠矩阵；delegation 静动双层；registry verify 拒非证据 kind；spine 表解析正反例＋tally 对账三情形；completion 空证据／错 kind 拒；approval 三必经人矩阵＋自审拒＋tainted 封 Policy；config 字段交集空断言；tool/model conformance 自证；secret 双语料＋熵边界；discard 决策表全分支＋forecast 三臂正反；gate 五门矩阵＋dedup＋refusal 三段非空。
+- S2 各模块测试面（逐模块文件内 `#[cfg(test)]`＋kani 镜像 proptest）：taint 并集单调／map 保集；write_domain reserved 恒拒／夺回计数；budget 溢出＝Exhausted／逐层报首超；backpressure 单调；stall 尾部连续语义；goal/repair 重叠矩阵；delegation 静动双层；registry verify 拒非证据 kind；spine 表解析正反例＋tally 对账三情形；completion 空证据／错 kind 拒；approval 应答真值表十二行遍历＋自审拒；config 字段交集空断言；tool/model conformance 自证；secret 双语料＋熵边界；discard 决策表全分支＋forecast 三臂正反；gate 门册遍历（`DOORS` 每行一条 `deny_sample`，refusal 三段非空）＋taint 有真判决＋`claim` 认领一次。
 
 ## 17 模型体验
 
@@ -1453,7 +1478,9 @@ derive 出来的那个会把线上任意字符串收下、交回一个从没过�
 `discard`／`delegation`／`govern`／`spawn`＋`PROPOSAL_EXCERPT`）、`dedup.rs`（514–528，
 含 `DedupVerdict`）。共享私有 `item()`（50–68）归 `gate/item.rs`（`pub(crate)`，
 四门 Escalate 的唯一造项点）。`GateContext`／`GateOutcome` 留 `gate.rs`（改索引文件，
-零逻辑）。簇间零调用边（各门只调 `item`＋本簇外模块判定函数）；对外签名逐字节不变。
+零逻辑）。**这一节记的是当时那次切分**；此后「默认 YOLO」这条规则删去 `commitment.rs`／`govern.rs`／
+`item.rs`／`dedup.rs`，今天的 `gate/` 是 `domain`／`egress`／`discard`／`spawn`／`undoable`
+五个文件加 `gate.rs` 的门册（§8-27）。簇间零调用边（各门只调 `item`＋本簇外模块判定函数）；对外签名逐字节不变。
 完成检查：SPEC 同变更集 → modmap＋apisync 绿 → citysim 同种子字节重放。
 
 ### 8-37 kernel::plan／spine 目录化（形状：树／份额／节点／阻塞）
@@ -1548,7 +1575,8 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 `approval.rs` 剩 262 行：`ApprovalId`／`ApprovalSource`／`ApprovalClass`／`ClusterKey`／
 `ApprovalItem`／`PolicyClass`／`PolicyMatcher`／`PolicyVerdict`／`Policy`／`PolicyApplication`／
 `PolicyExpiry`／`PolicyRevocation`／`Autonomy`／`Answerer`／`AnswerVerdict` 与
-`match_item`／`expiry`／`may_answer` 全部留在原路径，kernel 作为依赖树根，公共面的规范路径
+`match_item`／`expiry`／`may_answer` 全部留在原路径（**这一节记的是当时那次切分**；此后
+「默认 YOLO」这条规则删去长期豁免机制的全部类型与 `ApprovalSource`，今天的清单见 §8-21），kernel 作为依赖树根，公共面的规范路径
 逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／`clippy -D warnings`／
 `nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
 
@@ -1627,8 +1655,8 @@ pub const HALL_MAYOR: &str = "hall/mayor";
 pub const HALL_CLERK: &str = "hall/clerk";
 ```
 
-- `Autonomy` **不加变体**：`Owner | Delegate(ResidentId) | Deferred` 已经能说出「clerk 代答」——`Delegate(ResidentId::new(HALL_CLERK))`。新增一个 `Clerk` 变体会让同一件事有两种写法，而 `may_answer` 要为两种都作答。
-- `may_answer` 逻辑一字不改：clerk 之所以能答，是因为它就是被任命的 delegate；三必经人类与 tainted 依旧 `HumanOnly`，clerk 自己发起的条目依旧 `SelfApprovalBarred`。kernel 侧只加常量与一条断言 clerk 走通全路的测试。
+- `Autonomy` **不加变体**：`Owner | Delegate(ResidentId)` 已经能说出「clerk 代答」——`Delegate(ResidentId::new(HALL_CLERK))`。新增一个 `Clerk` 变体会让同一件事有两种写法，而 `may_answer` 要为两种都作答。
+- `may_answer` 逻辑对 clerk 无特例：clerk 之所以能答，是因为它就是被任命的 delegate；clerk 自己发起的条目依旧 `SelfApprovalBarred`。kernel 侧只加常量与一条断言 clerk 走通全路的测试。
 - genesis 侧（`bin::assembly`）在 `city_initialized` 之后写一条 `autonomy_changed`，值为 `delegate:hall/clerk`——记录在账上而不是写死在缺省值里，因为「谁来答」是这座城市的一个决定，人可以改它，改动要有一行历史。
 
 ### 8-49 kernel::gate::undoable：拿不回来的那一类外部效应（形状 1 判定）

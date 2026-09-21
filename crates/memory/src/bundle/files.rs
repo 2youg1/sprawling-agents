@@ -6,9 +6,11 @@
 //! Bundle files: walking, counting, copying.
 
 use std::collections::BTreeMap;
+use std::io;
 use std::path::{Path, PathBuf};
 
-use kernel::{EventRecord, GENESIS_PREV, Seq, chain_hash};
+use kernel::ledger::chain_hash;
+use kernel::{EventRecord, GENESIS_PREV, Seq};
 
 use crate::error::{MemoryError, io_err};
 use crate::jsonl::JsonlLedger;
@@ -52,7 +54,7 @@ pub(crate) fn count_records(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<u64, Mem
 
 pub(crate) fn read_lines(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<Vec<Vec<u8>>, MemoryError> {
     let mut out = Vec::new();
-    for path in walk(vfs, ledger_dir) {
+    for path in walk(vfs, ledger_dir)? {
         if path.extension().and_then(|ext| ext.to_str()) != Some("jsonl") {
             continue;
         }
@@ -70,23 +72,48 @@ pub(crate) fn read_lines(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<Vec<Vec<u8>
 
 /// Every file under `root`, at any depth, in a deterministic order.
 ///
+/// A directory that cannot be listed stops the walk with its own
+/// failure: a subdirectory silently contributing zero files is how a
+/// bundle comes out short and agrees with itself about it.
+///
 /// An explicit worklist rather than recursion: a city's depth is not
 /// this module's to assume, and a stack overflow is not catchable.
-pub(crate) fn walk(vfs: &dyn Vfs, root: &Path) -> Vec<PathBuf> {
+pub(crate) fn walk(vfs: &dyn Vfs, root: &Path) -> Result<Vec<PathBuf>, MemoryError> {
     let mut found = Vec::new();
     let mut pending = vec![root.to_path_buf()];
     while let Some(dir) = pending.pop() {
-        found.extend(vfs.list(&dir).unwrap_or_default());
-        pending.extend(vfs.list_dirs(&dir).unwrap_or_default());
+        let Some(files) = present(vfs.list(&dir), &dir)? else {
+            continue;
+        };
+        found.extend(files);
+        if let Some(dirs) = present(vfs.list_dirs(&dir), &dir)? {
+            pending.extend(dirs);
+        }
     }
     found.sort();
-    found
+    Ok(found)
+}
+
+/// A directory that is not there holds nothing, which is an answer; a
+/// directory that refuses to be read is not.
+///
+/// A city with no object store yet has no `cas/` to walk, and export
+/// asks about it before anything has put an object in it.
+fn present(
+    listing: io::Result<Vec<PathBuf>>,
+    dir: &Path,
+) -> Result<Option<Vec<PathBuf>>, MemoryError> {
+    match listing {
+        Ok(paths) => Ok(Some(paths)),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(err) => Err(io_err("walk a bundle directory", dir)(err)),
+    }
 }
 
 /// Copies every file under `from` into `to`, keeping relative paths.
 pub(crate) fn copy_tree(vfs: &mut dyn Vfs, from: &Path, to: &Path) -> Result<u64, MemoryError> {
     let mut copied = 0u64;
-    let files = walk(vfs, from);
+    let files = walk(vfs, from)?;
     if files.is_empty() {
         return Ok(0);
     }
@@ -118,7 +145,7 @@ pub(crate) fn copy_city_files(
 ) -> Result<u64, MemoryError> {
     let mut copied = 0u64;
     let mut seen = BTreeMap::new();
-    for path in walk(vfs, city_root) {
+    for path in walk(vfs, city_root)? {
         let Ok(relative) = path.strip_prefix(city_root) else {
             continue;
         };
@@ -149,7 +176,7 @@ pub(crate) fn copy_city_files(
 
 pub(crate) fn count_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryError> {
     let mut count = 0u64;
-    for path in walk(vfs, root) {
+    for path in walk(vfs, root)? {
         let Ok(relative) = path.strip_prefix(root) else {
             continue;
         };

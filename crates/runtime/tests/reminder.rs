@@ -15,10 +15,11 @@
     reason = "test code"
 )]
 
+use kernel::model::message_payload;
 use kernel::{
     Address, AxError, B3Hash, BuildingPolicy, ContentBlock, EventDraft, EventRef, GENESIS_PREV,
     Ledger, Locator, Model, ModelRequest, ModelReturn, ModelUsage, Payload, RunId, Seq, TimeMs,
-    Tokens, ToolCall, ToolName, ToolOutcome, message_payload,
+    Tokens, ToolCall, ToolName, ToolOutcome,
 };
 use runtime::handoff::Handoff;
 use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};

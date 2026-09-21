@@ -184,7 +184,7 @@ fn a_signal_one_run_sends_is_read_by_the_run_that_pulls_it() {
 /// `AbsentSandbox` refuses with `this build carries no execution
 /// engine` and tells the reader to install a build with the `wasm`
 /// feature. Until the feature and this selection existed there was
-/// no such build: the absent engine was written into `dispatch_in`
+/// no such build: the absent engine was written into the dispatch
 /// as a literal, so the sentence named an action nobody could take
 /// and `runtime::WasmtimeSandbox` had no caller outside its own
 /// tests.

@@ -7,37 +7,50 @@
 // address are read here once and handed in, so every module below
 // takes them as parameters rather than reaching for `window`.
 //
-// Browser storage is reached the same way, through the one door
-// `core/prefs.ts` opens. This file asks for those rows once and hands
-// the same rows to the cache and to the face the page is drawn in, so
-// a browser that offers no storage leaves both of them reading the
-// one store that stands in for it.
+// What the person prefers is reached the same way, through the one
+// door `core/prefs.ts` opens. This file asks for that door once and
+// hands the same one to the shell and to the face the page is drawn
+// in, so a browser that offers no storage leaves both of them reading
+// the one record that stands in for it.
 
+import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 
 import { App } from "./app";
-import { browserRows, loadPrefs, readAppearance } from "./core/prefs";
+import { preferences } from "./core/prefs";
 import { applyAppearance, watchMachineLighting } from "./views/setup/appearance";
+import { langOf } from "./core/lang";
 import { openConnection, socketUrl, tokenIn } from "./core/socket";
 import { UiProvider } from "./ui";
+import type { Effort } from "./wire";
 import "./theme.css";
 
 const main = document.getElementById("main");
 if (main !== null) {
-  const rows = browserRows();
-  const prefs = loadPrefs(rows, navigator.language);
+  const prefs = preferences();
   // Before the first paint: a face chosen once is the face the next
   // window opens with, and applying it after mount is a visible change
   // of shape a person did not ask for.
-  applyAppearance(document.documentElement, readAppearance(rows));
-  watchMachineLighting(document.documentElement, rows);
-  const conn = openConnection(socketUrl(window.location), tokenIn(window.location.search));
-  render(
-    () => (
+  applyAppearance(document.documentElement, prefs.held().appearance);
+  watchMachineLighting(document.documentElement, prefs);
+  const conn = openConnection(
+    socketUrl(window.location),
+    tokenIn(window.location.search),
+    langOf(navigator.language),
+  );
+  render(() => {
+    // How hard the next dispatch asks the model to think, held for as
+    // long as this page is open and written nowhere: the standing
+    // answer is the city's `[model] effort`, and a copy kept in this
+    // browser would silently outrank it.
+    const [effort, chooseEffort] = createSignal<Effort | null>(null);
+    return (
       <UiProvider
         value={{
           conn,
           prefs,
+          effort,
+          chooseEffort,
           bar: window.location,
           origin: window.location.origin,
           now: () => Date.now(),
@@ -45,7 +58,6 @@ if (main !== null) {
       >
         <App />
       </UiProvider>
-    ),
-    main,
-  );
+    );
+  }, main);
 }

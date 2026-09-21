@@ -62,9 +62,10 @@ Trades in the market as {who}.
     let room = Address::parse("market/hana").unwrap();
     // One slot: the second delivery sheds, so the landing settles
     // halfway by construction rather than by luck.
-    worker
-        .inboxes
-        .insert(room.clone(), collab::Inbox::new(1, 1));
+    worker.rooms = crate::assembly::RoomQueues::folded(std::collections::BTreeMap::from([(
+        room.clone(),
+        collab::Inbox::new(1, 1),
+    )]));
     let knocks_mark = worker.knocks.len();
     let at = Assignment {
         addr: Address::parse("market/ito").unwrap(),
@@ -73,6 +74,7 @@ Trades in the market as {who}.
         session: None,
         effort: None,
         mode: runtime::Mode::Up,
+        tainted: false,
     };
     let effects = vec![
         collab::SignalEffect::Enqueued(speaking_signal("s-1", &room)),
@@ -88,9 +90,8 @@ Trades in the market as {who}.
         knocks_mark,
         "knocks pushed by landed signals are cut back on failure"
     );
-    let inbox = worker.inboxes.get(&room).unwrap();
     assert_eq!(
-        inbox.pending(),
+        worker.rooms.pending(&room),
         1,
         "only the first signal landed in the queue"
     );
@@ -121,6 +122,7 @@ fn a_half_filed_shelf_is_unwound() {
         session: None,
         effort: None,
         mode: runtime::Mode::Up,
+        tainted: false,
     };
     let effects = vec![
         collab::ArchiveEffect::Recorded {
@@ -167,5 +169,73 @@ fn a_half_filed_shelf_is_unwound() {
     assert!(
         leftovers.is_empty(),
         "the wound-back shelf keeps filings: {leftovers:?}"
+    );
+}
+
+/// A drive that failed used to take the room's queue with it: `land`
+/// returned at the drive's own outcome, before anything was given
+/// back, so the signals the room was holding vanished exactly when the
+/// disk went wrong. What was borrowed now goes back first.
+#[test]
+fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
+    lay_rules(
+        dir.path(),
+        "lab",
+        "# BUILDING.md\n\n`confidential: false`\n",
+    );
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+
+    let mut waiting = collab::Inbox::new(8, 4);
+    waiting.deliver(&speaking_signal("s-kept", &room)).unwrap();
+    worker.rooms = crate::assembly::RoomQueues::folded(std::collections::BTreeMap::from([(
+        room.clone(),
+        waiting,
+    )]));
+
+    let (driving, continuation) = worker
+        .prepare_dispatch(
+            Assignment {
+                addr: room.clone(),
+                session: None,
+                effort: None,
+                mode: runtime::Mode::PlanGoal,
+                parent: None,
+                succession: None,
+                tainted: false,
+            },
+            "read what is waiting".to_owned(),
+            "the queue is read, then stop".to_owned(),
+        )
+        .unwrap();
+    assert_eq!(
+        worker.rooms.pending(&room),
+        0,
+        "the queue is out with the run that is driving"
+    );
+    drop(driving);
+
+    let failed = kernel::AxError::failure(
+        kernel::AxCode::StorageFatal,
+        "open a checkpoint",
+        "the disk went away",
+    )
+    .with_recovery("this is the failure the test is about");
+    let err = worker
+        .land(
+            continuation,
+            Err(failed),
+            Owing::unasked(crate::assembly::Unasked::Knock),
+        )
+        .unwrap_err();
+    assert_eq!(err.code(), &kernel::AxCode::StorageFatal);
+    assert_eq!(
+        worker.rooms.pending(&room),
+        1,
+        "the room still has what it was holding"
     );
 }

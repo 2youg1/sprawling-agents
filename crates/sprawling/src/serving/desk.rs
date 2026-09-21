@@ -155,10 +155,12 @@ impl CommandDesk {
     pub(crate) fn post(&self, command: channels::Command, reply: channels::Reply) {
         if let Ok(mut waiting) = self.waiting.lock() {
             if let Some(key) = command.idem() {
-                if kernel::dedup(&waiting.keys, key) == kernel::DedupVerdict::Duplicate {
+                // The claim is the insertion: a key already in the set
+                // is a command this desk already took, and taking it
+                // again would be a second run against a paid provider.
+                if kernel::idem::claim(&mut waiting.keys, *key).is_err() {
                     return;
                 }
-                waiting.keys.insert(*key);
             }
             waiting.queue.push_back(Posted { command, reply });
             self.arrived.notify_one();

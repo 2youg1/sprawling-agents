@@ -166,6 +166,25 @@ pub struct SandboxLimits {
     /// would hand every run in every city whatever those names hold.
     #[serde(default)]
     pub env_passthrough: Vec<EnvVarName>,
+    /// Which connector servers this floor lets reach effects nothing
+    /// in the city can take back — today, this machine's own desktop.
+    ///
+    /// Named server by server, and empty by default, for the reason
+    /// `env_passthrough` is: a run that presses keys on somebody's
+    /// keyboard is doing something no fence puts back, so the floor
+    /// says which connector may, in the one file a person edits.
+    #[serde(default)]
+    pub trusted: Vec<ServerLabel>,
+}
+
+impl SandboxLimits {
+    /// Whether this floor lets `label` reach what nothing here can
+    /// undo. The one reader of the trusted list, so the answer cannot
+    /// be spelled two ways.
+    #[must_use]
+    pub fn trusts(&self, label: &ServerLabel) -> bool {
+        self.trusted.iter().any(|allowed| allowed == label)
+    }
 }
 
 impl Default for SandboxLimits {
@@ -175,6 +194,7 @@ impl Default for SandboxLimits {
             fuel: crate::consts_policy::SANDBOX_FUEL_DEFAULT,
             mounts: Vec::new(),
             env_passthrough: Vec::new(),
+            trusted: Vec::new(),
         }
     }
 }

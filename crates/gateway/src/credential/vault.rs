@@ -264,8 +264,15 @@ mod tests {
         );
 
         // Empty intelligence fails closed; short verifiers are refused.
-        let openai = crate::oauth_profiles::profile("openai").unwrap();
-        assert!(oauth_begin(openai, "x".repeat(50), "s".to_owned()).is_err());
+        let xai = crate::oauth_profiles::profile("xai").unwrap();
+        assert!(oauth_begin(xai, "x".repeat(50), "s".to_owned()).is_err());
+        // So does a family whose vendor answers a grant this flow is
+        // not: the refusal names the grant rather than an empty field.
+        let kimi = crate::oauth_profiles::profile("kimi").unwrap();
+        let wrong_grant = oauth_begin(kimi, "x".repeat(50), "s".to_owned())
+            .err()
+            .expect("a device-code family is not begun by redirect");
+        assert!(wrong_grant.subject().contains("device code"));
         assert!(oauth_begin(profile, "short".to_owned(), "s".to_owned()).is_err());
     }
 }

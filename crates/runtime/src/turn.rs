@@ -8,16 +8,19 @@
 //! Interrupts are consumed *only* at phase boundaries — the boundary
 //! snapshot is a parameter of every transition, and no method exists that
 //! could observe one mid-phase. That absence is A9's structural half.
+//! A wave is many effects rather than one, so every call in it is a
+//! boundary of the same kind: the executor is asked before each, and a
+//! halt ends the wave there instead of after its last call.
 //! Steer consumes at a boundary too, but advances: it is an addition to
 //! the window, not an ending.
 //!
 //! All events of one turn share the timestamp given to [`Turn::begin`]:
 //! order is `seq`'s business, time is a parameter, never sampled.
 
+use kernel::model::content_from_message;
 use kernel::{
     AxCode, AxError, B3Hash, BuildingPolicy, ChatRequest, ContentBlock, EventRef, Ledger, Model,
     ModelRequest, ModelReturn, ModelUsage, Payload, RunId, StopReason, TimeMs, ToolCall, ToolDef,
-    content_from_message,
 };
 use serde_json::{Map, Value};
 
@@ -31,7 +34,7 @@ mod wave;
 
 use ledger::{Authored, Carried, Journal};
 
-pub use boundary::{Interrupt, PhaseOutcome, TurnCancelled};
+pub use boundary::{Interrupt, NextCall, PhaseOutcome, TurnCancelled};
 pub use report::{CallShape, TurnReport};
 
 /// The typestate carrier. Phase data lives in `S` and is private to this
@@ -278,6 +281,20 @@ impl Turn<Recording> {
 }
 
 impl<S> Turn<S> {
+    /// Ends the turn where it stands: `cancel_received` and the refs of
+    /// everything this turn wrote.
+    ///
+    /// Reached from the boundary consumer below and from a wave that was
+    /// halted between two calls, so both endings are one line written in
+    /// one place.
+    fn cancel_here(&mut self, ledger: &mut dyn Ledger) -> Result<TurnCancelled, AxError> {
+        self.journal
+            .append_authored(ledger, Authored::CancelReceived, Payload::empty())?;
+        Ok(TurnCancelled {
+            refs: self.journal.take_refs(),
+        })
+    }
+
     /// The one interrupt consumer. Cancel appends `cancel_received` and
     /// ends the turn; Steer appends `steer_received` and advances — the
     /// executor folds the text into its window for the next assembly.
@@ -288,13 +305,7 @@ impl<S> Turn<S> {
     ) -> Result<Option<TurnCancelled>, AxError> {
         match interrupt {
             Interrupt::None => Ok(None),
-            Interrupt::Cancel => {
-                self.journal
-                    .append_authored(ledger, Authored::CancelReceived, Payload::empty())?;
-                Ok(Some(TurnCancelled {
-                    refs: self.journal.take_refs(),
-                }))
-            }
+            Interrupt::Cancel => Ok(Some(self.cancel_here(ledger)?)),
             Interrupt::Steer { source, text } => {
                 let mut map = Map::new();
                 map.insert("source".to_owned(), Value::String(source));

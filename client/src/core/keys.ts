@@ -27,20 +27,20 @@
 // has to name Shift itself, or `Ctrl+Shift+A` and `Ctrl+A` would be
 // one key.
 //
-// The person's overrides live in the same browser storage the rest of
-// their preferences do, one row per action, so reading a stored chord
-// never parses a document and never fails in a way that needs handling.
-// Which store that is, and what a browser without one gets instead, is
-// `prefs.ts`'s single decision. `spell` below is already the written
-// form the person's own `[ui.keys]` table will hold when roadmap 3.1
-// moves these rows out of the browser.
+// The person's overrides are kept with the rest of their preferences,
+// one row per action, and this file asks `prefs.ts` for the chord of
+// an action rather than naming the row: what a row is called is that
+// file's single decision, and so is what a browser with no storage
+// gets instead. `spell` below is already the written form the person's
+// own `[ui.keys]` table will hold when roadmap 3.1 moves these rows
+// out of the browser.
 
 import { createSignal } from "solid-js";
 import type { Accessor } from "solid-js";
 
 import type { Key } from "./lang";
-import { browserRows } from "./prefs";
-import type { Rows } from "./prefs";
+import { preferences } from "./prefs";
+import type { PreferenceDoor } from "./prefs";
 
 // What a key can do. `go.*` moves the address bar, the rest act on the
 // shell itself.
@@ -80,7 +80,6 @@ export interface Chord {
 
 const ACCEL_MARK = "accel+";
 const SHIFT_MARK = "shift+";
-const ROW = "sprawling.key.";
 
 // A key is stored and matched without case, and this is the one place
 // that decides what "without case" means.
@@ -298,10 +297,10 @@ export interface Keymap {
   readonly acting: (pressed: Pressed) => Action | null;
 }
 
-function stored(rows: Rows): Record<Action, Chord> {
+function stored(kept: PreferenceDoor): Record<Action, Chord> {
   const out: Record<string, Chord> = {};
   for (const action of ACTIONS) {
-    out[action] = readChord(rows.getItem(ROW + action) ?? "") ?? DEFAULTS[action];
+    out[action] = readChord(kept.chord(action)) ?? DEFAULTS[action];
   }
   // Built from the same list the type is built from, so every action
   // has a chord; the fallback keeps that true for a reader who cannot
@@ -309,9 +308,9 @@ function stored(rows: Rows): Record<Action, Chord> {
   return { ...DEFAULTS, ...out };
 }
 
-export function loadKeys(rows: Rows, userAgent: string): Keymap {
+export function loadKeys(kept: PreferenceDoor, userAgent: string): Keymap {
   const platform = platformOf(userAgent);
-  const [bound, setBound] = createSignal<Readonly<Record<Action, Chord>>>(stored(rows));
+  const [bound, setBound] = createSignal<Readonly<Record<Action, Chord>>>(stored(kept));
   const put = (action: Action, chord: Chord) => {
     setBound((held) => ({ ...held, [action]: chord }));
   };
@@ -320,16 +319,16 @@ export function loadKeys(rows: Rows, userAgent: string): Keymap {
     bound,
     chord: (action) => bound()[action],
     bind(action, chord) {
-      rows.setItem(ROW + action, spell(chord));
+      kept.setChord(action, spell(chord));
       put(action, chord);
     },
     reset(action) {
-      rows.removeItem(ROW + action);
+      kept.setChord(action, "");
       put(action, DEFAULTS[action]);
     },
     resetAll() {
       for (const action of ACTIONS) {
-        rows.removeItem(ROW + action);
+        kept.setChord(action, "");
       }
       setBound({ ...DEFAULTS });
     },
@@ -348,6 +347,6 @@ export function loadKeys(rows: Rows, userAgent: string): Keymap {
 let shared: Keymap | undefined;
 
 export function keymap(): Keymap {
-  shared ??= loadKeys(browserRows(), typeof navigator === "undefined" ? "" : navigator.userAgent);
+  shared ??= loadKeys(preferences(), typeof navigator === "undefined" ? "" : navigator.userAgent);
   return shared;
 }

@@ -73,7 +73,7 @@ export function Talk(props: TalkProps) {
   // Open until the person closes it, and forgotten on reload: this
   // belongs in the person's own `[ui]` section and there is no door to
   // it yet (client-SPEC 4-27).
-  const panel = ui.prefs.panel;
+  const panel = () => ui.prefs.held().panel;
   const setPanel = ui.prefs.setPanel;
 
   const [scroller, setScroller] = createSignal<HTMLDivElement>();
@@ -111,7 +111,7 @@ export function Talk(props: TalkProps) {
         addr: props.address,
         task: text,
         goal: say("talk_goal"),
-        effort: ui.prefs.effort(),
+        effort: ui.effort(),
       }),
     );
   };

@@ -114,6 +114,10 @@ impl Vfs for RealFs {
         std::fs::read(path)
     }
 
+    fn size(&self, path: &Path) -> io::Result<u64> {
+        std::fs::metadata(path).map(|meta| meta.len())
+    }
+
     /// Seek, then read at most `len` bytes. The handle is opened for
     /// this call and dropped with it: a reader of one range of one
     /// object has nothing in common with the next call, so there is no

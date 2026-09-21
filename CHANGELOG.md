@@ -165,6 +165,58 @@ longer dropped by a dialect enum that had only two variants.
 - 26 `outline-none` are gone, so the focus ring is visible again; 33 `title`
   attributes become a hint both a keyboard and a touch screen reach.
 
+### A door decides, and a question is a person's
+
+A Gate used to have a third answer — hand this decision to a person —
+and the documentation described the approval queue as where those
+landed. A door that cannot decide is a door whose rule nobody wrote, so
+the verdict is now `Allow` or `Deny` and the queue holds what only a
+person can answer: a design question a resident asked. `Autonomy` says
+who answers those, and it has two values rather than three.
+
+- The glossary, the operating guide, the getting-started pages in both
+  languages and `LLM.md` say the same thing about it, which is that an
+  action is never asked about. Where a policy used to mark an item as
+  the person's, what stays for the person is a tainted question, which
+  no policy waives.
+
+### What another harness on this machine already knows
+
+A person who reaches this product has usually told another agent
+harness where their models are, and typing the same base URL a second
+time is the first thing this product asked of them.
+
+- Codex's `[model_providers.*]` and pi's `providers` are read once into
+  rows this city can attach: the name, the address, the wire, and the
+  models the entry lists. Both grammars were settled against their own
+  authority — Codex's by giving its binary a file with each key set to
+  the wrong type and reading which key it named, pi's from the model
+  documentation that ships beside that program.
+- **One direction, and no credential.** Nothing is written back and
+  nothing is watched, so two tools never become two authorities on one
+  setting; and a row says where the other harness keeps its key — an
+  environment variable, a command, or its own file — and never what the
+  key is.
+- An entry this city cannot attach is reported by name with the reason,
+  because a person who configured six providers and is offered four has
+  to be told which two were left out. A wire this city has no dialect
+  for is one of those reasons, and Codex's only supported wire is one:
+  the entry arrives with its address and its variable filled in, and
+  the dialect left for the person.
+
+### The adversary asks what a saved setting reads back as
+
+A setting is saved into a file a person also edits by hand and read
+back by a fold the page draws from, which is two homes for one fact.
+The out-of-tree property checker now drives arbitrary sequences of
+`configure_building` through the wire and holds three relations after
+each one: the answer states the last figure written, the building's own
+`CONFIG.toml` states that figure and no earlier one, and the layer
+above states none of them. It was demonstrated to bite — held against
+the first write instead of the last, it shrinks to a two-step
+counterexample. 21 checks, and a run of the new one takes 26 s on a
+four-core Windows machine with a debug binary.
+
 ### What the machines check
 
 - Every number `ARCHITECTURE.md` and `LLM.md` quote is recounted by

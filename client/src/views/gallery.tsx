@@ -31,6 +31,7 @@ import { Parts } from "./gallery/parts";
 import { Presences } from "./gallery/presence";
 import { Produced } from "./gallery/produced";
 import { Screens } from "./gallery/screens";
+import { Shelved } from "./gallery/shelved";
 import { Switches } from "./gallery/switches";
 
 export function Gallery() {
@@ -44,6 +45,7 @@ export function Gallery() {
       <Produced />
       <Filed />
       <Screens />
+      <Shelved />
       <Parts />
       <Switches />
     </div>

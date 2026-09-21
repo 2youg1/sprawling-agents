@@ -20,6 +20,7 @@ import { Option } from "effect";
 import { Address } from "./address";
 import type { RunBelief } from "./belief";
 import {
+  EFFORTS,
   TEMPLATES,
   cancel,
   createBuilding,
@@ -32,7 +33,6 @@ import {
 } from "./commands";
 import type { Template } from "./commands";
 import type { Key } from "./lang";
-import { EFFORTS } from "./prefs";
 import { PAGES, page } from "./route";
 import type { View } from "./route";
 import type { Command, Effort, RunId, Seq } from "../wire";
@@ -106,11 +106,11 @@ export interface Slash {
 const ALL = "--all";
 const QUEUED = "--queued";
 
-// The word for an effort nobody chose. `core/prefs.ts` keeps that
-// state as `null`; this is its one written form - what a person types
-// after `/effort`, and the id both effort pickers give the cell that
-// reaches it, so the line and the menu cannot come to mean two
-// different things.
+// The word for an effort nobody chose. The page keeps that state as
+// `null` and the frame leaves the field out; this is its one written
+// form - what a person types after `/effort`, and the id the selector
+// over the composer gives the row that reaches it, so the line and
+// the menu cannot come to mean two different things.
 //
 // The assertion keeps the word one word: without it, a menu that
 // builds its rows from `[UNSTATED, ...EFFORTS]` widens the whole list

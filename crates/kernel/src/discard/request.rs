@@ -106,18 +106,15 @@ pub enum DiscardRequest {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EscalateReason {
-    /// Tainted discards never auto-pass, whatever the size (C15).
-    Tainted,
-    FilesOverMax,
-    BytesOverMax,
-    RegistryAsset,
-}
-
+/// Why a discard is refused. Two reasons, and both are rules a person
+/// can read: a delete with no way back, and a delete a run asked for
+/// because something outside the city told it to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DenyReason {
     NoRestoration,
+    /// C15: an effect derived from outside content is refused rather
+    /// than carried out, whatever its size.
+    Tainted,
 }
 
 #[cfg(test)]

@@ -75,7 +75,7 @@ fn walk(value: &Value, hits: &mut u32) -> Value {
 #[must_use]
 pub fn redact_text(text: &str) -> (String, u32) {
     let bytes = text.as_bytes();
-    let spans = kernel::scan(bytes);
+    let spans = kernel::secret::scan(bytes);
     if spans.is_empty() {
         return (text.to_owned(), 0);
     }

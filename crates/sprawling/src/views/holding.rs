@@ -24,7 +24,7 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxCode, AxError, EventKind, EventRecord};
+use kernel::{Address, AxError, EventKind, EventRecord};
 
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
@@ -264,54 +264,8 @@ impl Views {
                     self.assets.push(line);
                 }
             }
-            EventKind::ApprovalRequested => {
-                // The payload *is* the item: it was written by serialising
-                // one, so it reads back as one. Rebuilding a lesser shape
-                // out of hand-picked fields is how this view came to show
-                // every waiting item as "(no summary recorded)" - the field
-                // it read had never been written by anybody.
-                let value = serde_json::Value::Object(record.data().as_map().clone());
-                let item: kernel::ApprovalItem = serde_json::from_value(value).map_err(|err| {
-                    AxError::failure(
-                        AxCode::WireMismatch,
-                        "fold an approval into the queue",
-                        format!("seq {}: {err}", record.seq().value()),
-                    )
-                    .with_recovery(
-                        "the record stands; this view skips it and the observer reports it",
-                    )
-                })?;
-                self.approvals.insert(item.id.as_str().to_owned(), item);
-            }
-            EventKind::ApprovalResolved => {
-                let data = record.data().as_map();
-                if let Some(id) = data.get("id").and_then(serde_json::Value::as_str) {
-                    self.approvals.remove(id);
-                    // The cluster travels with the answer because the
-                    // person answered the group they were shown; a row
-                    // whose cluster will not read back is still an
-                    // answer that happened, so it lands with the class
-                    // it was recorded under rather than being dropped.
-                    let cluster = data
-                        .get("cluster")
-                        .cloned()
-                        .and_then(|value| serde_json::from_value(value).ok())
-                        .unwrap_or(kernel::ClusterKey {
-                            class: kernel::ApprovalClass::AgentQuestion,
-                            detail: String::new(),
-                        });
-                    let verdict = match data.get("verdict").and_then(serde_json::Value::as_str) {
-                        Some("deny") => kernel::PolicyVerdict::Deny,
-                        _ => kernel::PolicyVerdict::Allow,
-                    };
-                    self.decided.push(channels::Decision {
-                        item: id.to_owned(),
-                        verdict,
-                        cluster,
-                        at: record.t(),
-                    });
-                }
-            }
+            EventKind::ApprovalRequested => self.fold_question(record)?,
+            EventKind::ApprovalResolved => self.fold_ruling(record)?,
             EventKind::CityHalted => {
                 let data = record.data().as_map();
                 let scope = data.get("scope").and_then(serde_json::Value::as_str);
@@ -379,7 +333,7 @@ impl Views {
             out.push(channels::PursuitLine {
                 goal,
                 state,
-                verdict: verdict_line(kernel::observe_pursuit(state, &ready, in_flight)),
+                verdict: verdict_line(kernel::pursuit::observe(state, &ready, in_flight)),
                 addr,
             });
         }

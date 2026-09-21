@@ -1,4 +1,4 @@
-error: cannot construct `Discard` with struct literal syntax due to private fields
+error: cannot construct `kernel::Discard` with struct literal syntax due to private fields
   --> tests/ui/no_restoration_discard.rs:11:13
    |
 11 |     let _ = kernel::Discard {

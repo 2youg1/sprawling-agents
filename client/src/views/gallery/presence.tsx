@@ -42,7 +42,7 @@ export function Presences() {
   return (
     <>
       <Case label="presence · grey, nothing to do">
-        <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} effort={null}>
+        <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]}>
           <Presence />
         </Stand>
       </Case>
@@ -52,7 +52,6 @@ export function Presences() {
           link={{ kind: "live", city: "sprawling" }}
           unread={[UNREAD]}
           waiting={[ONE_QUESTION]}
-          effort={null}
         >
           <Presence />
         </Stand>
@@ -61,7 +60,7 @@ export function Presences() {
       {/* Still on its way up, which is the state that resolves by
           itself: the dot pulses rather than asking for anything. */}
       <Case label="presence · yellow and pulsing, the link is still connecting">
-        <Stand link={{ kind: "handshaking" }} unread={[]} waiting={[]} effort={null}>
+        <Stand link={{ kind: "handshaking" }} unread={[]} waiting={[]}>
           <Presence />
         </Stand>
       </Case>

@@ -72,8 +72,9 @@ impl DelegateDesk {
     /// `E_CROSS_BUILDING_DENIED` when the room named is not inside the
     /// asking run's building.
     pub fn ask(&mut self, work: Delegated) -> Result<&Delegated, AxError> {
-        if let GateOutcome::Deny { refusal } = kernel::spawn(self.depth, &work.kind) {
-            return Err(*refusal);
+        match kernel::gate::spawn(self.depth, &work.kind) {
+            GateOutcome::Allow => {}
+            GateOutcome::Deny { refusal } => return Err(*refusal),
         }
         if !work.room.is_within(&self.building) {
             return Err(AxError::failure(
@@ -164,8 +165,9 @@ impl DelegateTool {
             meta: ToolMeta {
                 name: ToolName::parse("delegate")?,
                 disclosure: "Hand one piece of work to another agent in this building, one \
-                             level down. The person is asked the first time; until they \
-                             answer, the call comes back pending."
+                             level down. Nobody is asked: one level is the whole rule, and \
+                             the types hold it, so the call either names the room the work \
+                             will happen in or is refused."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Spawn,

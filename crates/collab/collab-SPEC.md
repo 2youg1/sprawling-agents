@@ -208,17 +208,15 @@ impl Pr<Verified> { pub fn verified_by(&self) -> &str; }
 ### 8-7 collab::arbiter（形状 1 判定）
 
 ```rust
-pub enum Level { Serialize { after: GoalId }, Arbitrate { with: GoalId }, Owner { with: GoalId, because: Escalation } }
-pub enum Escalation { GateRefused, Intent, ArbitrationExhausted }
-pub struct Circumstance { pub gate_refused: bool, pub touches_intent: bool, pub arbitration_tried: bool }
-pub fn arbitrate(registered: &[GoalEntry], candidate: &GoalEntry, circumstance: Circumstance) -> Option<Level>;
+pub enum Level { Serialize { after: GoalId }, Arbitrate { with: GoalId } }
+pub fn arbitrate(registered: &[GoalEntry], candidate: &GoalEntry) -> Option<Level>;
 pub fn conflict_payload(candidate: &GoalEntry, level: &Level) -> Result<Payload, AxError>;
 ```
 
 - **检测进 kernel，仲裁不进**：`kernel::goal::detect_conflict` 只答「撞没撞」；本模块答「谁来裁」。
-- **判序固定**（门拒 → 意图 → 仲裁已试 → 机械 → 读）：同一对目标恒落同一级，重放才可比。
-- **机械可判的只有一种形状**：双方都claim路径，且常设性一高一低——「常设的先走」不需要任何判断。其余（两个常设、外部资源同名）都要读目标陈述，那是模型的活。
-- **机器恒不推翻门**：`gate_refused` 排在最前，压过本可机械串行化的情形；`Circumstance` 三项都是调用方已知而目标条目里看不出来的事实。
+- **判序固定**（机械 → 读）：同一对目标恒落同一级，重放才可比。
+- **机械可判的只有一种形状**：双方都 claim 路径，且常设性一高一低——「常设的先走」不需要任何判断。其余（两个常设、外部资源同名）都要读目标陈述，那是模型的活。
+- **两级而不是三级（H-08＋§12「默认 YOLO」这条规则）**：第三级 `Level::Owner` 连同 `Escalation` 与 `Circumstance` 一并删去。三个 bool 的唯一生产调用点 `goal_tool` 恒传 `false`，于是这一级在生产里从来到不了；`GateRefused` 这个理由更是没了来源——门只答 Allow 或 Deny，被门拒掉的那个 run 不占任何地盘，也就无从与人相撞。一个居民读不定的冲突是一个设计问题，它按设计问题进Inbox，而不是变成一个悄悄没登记上的目标。
 
 ### 8-8b collab::delegate_tool（形状 4 适配器）
 
@@ -234,7 +232,8 @@ impl DelegateDesk {
 pub struct DelegateTool { /* 模型的那一面：{room, task, goal, kind?} */ }
 ```
 
-- **`kernel::gate::spawn` 早已建好，本模块是它的第一个生产调用者**。「一层深」不是本模块的判定，本模块只是把问题递给它；拒绝文字也是门自己的三段式，不在这里重写。
+- **`kernel::gate::spawn` 早已建好，本模块是它的第一个生产调用者**。「一层深」不是本模块的判定，本模块只是把问题递给它；拒绝文字也是门自己的三段式，不在这里重写。判决按 `GateOutcome` 两臂穷尽 match，不用 `if let`：门将来多一种答复，编译器必须当场找上这里。
+- **面向模型的那句话不提人**（§12「默认 YOLO」这条规则）：派活不再等任何人点头，`disclosure` 因此说「要么给出房间，要么被拒」；`workshop` 的那一句同改，两处都不得再写「the person is asked」。
 - **深度是被携入的，不是被推算的**：`DelegateDesk::new` 收 `Depth`。一个自己推算深度的 Run，错一次就是一个孙代理。
 - **一次请求不是一个 Run**。工具答的是「在哪个房间开」，不是结果：在工具调用里驱一个 Run，等于在另一个 Run 的 tool bench 里驱 Run。装配层在父回合落定后取走并派活，子 Run 自己的 `run_started` 携着那个房间。
 - **不新增 EventKind**：父的 `tool_called{name:"delegate"}` 与子的 `run_started{addr}` 已经把这件事记了两遍，再加一个事件种类就是第三遍。
@@ -303,9 +302,9 @@ pub struct GoalTool { /* meta、desk: Rc<RefCell<GoalDesk>> —— 私有 */ }
 impl GoalTool { pub fn new(desk: Rc<RefCell<GoalDesk>>) -> Result<GoalTool, AxError>; }
 ```
 
-- **三层各守其职，一层不多**：`kernel::goal::detect_conflict` 答撞没撞（纯判定）→ `collab::arbitrate` 答谁来裁（三级）→ 本模块只把两者接成一件工具。它恒不自己判冲突，也恒不自己定级。
-- **撞了就不登记**：冲突返回 `E_GOAL_CONFLICT` 三段式拒，第三段是仲裁给的那一级的可执行说法（串行等完某一件｜跟某人商量｜请 owner 裁）。一个只说「不行」的拒绝会让模型换个说法再试一次。
-- **`Circumstance` 三项里工具只知道一项**：`gate_refused` 与 `touches_intent` 是调用方才知道的事，机器调用方一律传 `false`；`arbitration_tried` 同理。结果是工具只走得到**机械可判**与**交人读**两条路——这是诚实的：意图判断本来就不归一个参数。
+- **三层各守其职，一层不多**：`kernel::goal::detect_conflict` 答撞没撞（纯判定）→ `collab::arbitrate` 答谁来裁（两级）→ 本模块只把两者接成一件工具。它恒不自己判冲突，也恒不自己定级。
+- **撞了就不登记**：冲突返回 `E_GOAL_CONFLICT` 三段式拒，第三段是仲裁给的那一级的可执行说法（串行等完某一件｜跟某人商量）。一个只说「不行」的拒绝会让模型换个说法再试一次。
+- **工具只走得到两条路**：机械可判的串行化，与交给居民读。原先那三个「调用方才知道」的 bool 已随 `Level::Owner` 删去（8-7）——一个恒传 `false` 的参数不是入参，是一句没人读的话。
 - **同一 Run 内的第二次登记看得见第一次**：desk 把刚登记的条目接在 `registered` 尾上，否则一个 Run 能把同一个资源登记两次而不撞。
 - **登记后才入账**：同 8-8，工具只产 effect；`goal_registered` 与 `goal_conflict` 两种事件由工人在驱动返回后写，工人的目标表随之前推。**不写第三种 `arbitration_verdict`**：`conflict_payload` 已携着那一级，再写一条就是同一件事的第二个权威；该事件留给真正跑过一场仲裁的 Run。
 - **两个 effect 枚举都是穷尽的**（自 G-22 起全库如此）：每个变体都是工人必须写下的一条账，所以新增一个得是**写账那一端的编译错误**，而不是一条直到某个 Signal 惄悄没入账才有人发现的运行期分支——理由同 `AxCode::carrier()` 的穷尽 match。
@@ -424,6 +423,16 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 ## 12 错误处理
 
 （逐码回答「能否让它不可能发生」——设计规则十。）
+
+### 12.1 定规：仲裁降为两级
+
+`Verdict: user-approved`（Roadmap §6 定规 2 与 §19.3 第 6 条；H-08 第三行）
+
+**决定**：删 `Level::Owner`、`Escalation` 与 `Circumstance`，`arbitrate` 收两个入参。
+
+**理由**：三个 bool 的唯一生产调用点恒传 `false`，第三级在生产里不可达，却按三级的形状散布在公共面、账本载荷与恢复语里。门只答 Allow 或 Deny 之后，`GateRefused` 连来源都没有了。
+
+**被否**：把三个 bool 换成一个穷尽的 `Occasion` 枚举——那会把一个到不了的级别保留成一个更整齐的到不了的级别。
 
 ## 13 依赖选型
 

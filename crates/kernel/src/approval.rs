@@ -3,22 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Approval and Autonomy (9.2). The three
-//! must-pass-a-human classes are unrepresentable in `PolicyClass` — a
-//! policy that would waive them cannot be spelled. Tainted items refuse
-//! both policy waivers and delegate answers (C15). Autonomy changes who
-//! answers the inbox, never what the gates decide.
+//! The Approval Inbox holds design questions and nothing else (9.2).
+//!
+//! An action is either allowed by a rule or refused by one, and both
+//! answers are the gates' (§8-27); what is left for a person is the
+//! question a run cannot answer by reading the rules. So this module
+//! carries one class of item, two autonomy states, and the rule for who
+//! may answer. There is no standing waiver here: a waiver waives an
+//! escalation, and no gate escalates any more.
 
 use serde::{Deserialize, Serialize};
 
-use crate::consts_policy::POLICY_IDLE_DAYS;
 use crate::event::{RunId, Seq, TimeMs};
 use crate::locator::Locator;
 use crate::registry::ResidentId;
 
 /// Non-empty item identity, derived from the run that raises the item
 /// and that run's own position counter — never from a clock. Four lanes
-/// drive at once by default, so two runs reach their first approval in
+/// drive at once by default, so two runs reach their first question in
 /// one millisecond routinely; a clock-shaped identity makes those two
 /// items one key, the inbox keeps the later one, and the earlier one
 /// disappears from an append-only history that cannot afterwards tell a
@@ -28,7 +30,7 @@ use crate::registry::ResidentId;
 pub struct ApprovalId(String);
 
 impl ApprovalId {
-    /// Mints the identity of the approval `run` may raise at `seq`.
+    /// Mints the identity of the question `run` may raise at `seq`.
     ///
     /// `seq` is the run's own monotonic position — the counter the run
     /// already keeps to derive [`crate::IdemKey`], counted inside one run
@@ -44,8 +46,8 @@ impl ApprovalId {
         ApprovalId(format!("ap-{run}-{:020}", seq.value()))
     }
 
-    /// Mints the identity of the discard escalation a drive's own sweep
-    /// raises, which happens at most once per run.
+    /// Mints the identity of the one question a drive's own sweep may
+    /// raise, which happens at most once per run.
     ///
     /// The sweep sits at the highest position, which no call position can
     /// reach, because the sweep counts nothing and the run's call counter
@@ -71,47 +73,24 @@ impl ApprovalId {
     }
 }
 
-/// Who raised it: a gate pre-block (the run waits, no tokens burn) or the
-/// model's own question (batched, never blocking the current action).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum ApprovalSource {
-    Gate,
-    Agent,
-}
-
 /// What kind of decision this is. Wire data — the cluster keys
-/// serialize — and closed, so that a new class of decision is a
-/// compile error at every reader that must classify it.
+/// serialize — and one arm, because a run asks a person exactly one
+/// kind of thing: a question about the design it cannot settle by
+/// reading the rules.
+///
+/// The enum survives its own single arm on purpose. The cluster key is
+/// wire data, and a class named in the payload keeps the day a second
+/// kind of question appears a compile error at every reader rather than
+/// a silent change of meaning for a field that used to say one thing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ApprovalClass {
-    Commitment,
-    BudgetLimit,
-    DiscardEscalate,
-    AgentQuestion,
-    /// Rewriting the rules a scope's own runs are judged by. Like
-    /// `Delegation`, no `PolicyClass` variant: a standing rule that
-    /// waives changes to the rules is a rule that repeals itself.
-    Governance,
-    /// Handing work to a second agent. No `PolicyClass` variant, which
-    /// is the type-level half of "a standing rule never grants this":
-    /// the answer holds for the cluster the person was shown and
-    /// expires with the process, because a permanent waiver on
-    /// delegation is the one waiver that can spend without asking again.
-    Delegation,
-    /// Reaching something outside this city that nothing inside it can
-    /// take back — today, this machine's own desktop. No `PolicyClass`
-    /// variant, for the reason `Delegation` has none: a standing rule
-    /// that waives every future click is the one waiver whose whole
-    /// point was that somebody is watching.
-    Undoable,
+    Question,
 }
 
-/// The clustering key: class + free detail. One human verdict on a key
-/// can become a Policy — for the one class that admits policies.
+/// The clustering key: class + free detail. One answer covers the
+/// cluster a person was shown, and it expires with the process.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ClusterKey {
@@ -123,129 +102,40 @@ pub struct ClusterKey {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ApprovalItem {
     pub id: ApprovalId,
-    pub source: ApprovalSource,
     pub actor: String,
     pub action_desc: String,
     pub artifact: Locator,
     pub cluster_key: ClusterKey,
     pub created: TimeMs,
-    /// C15's marker bit: a tainted item takes no policy and no delegate.
+    /// Whether the run that raised this question started from content
+    /// that came in from outside. Shown to the person answering, and
+    /// decided on by nobody: what taint refuses is an effect, at
+    /// [`crate::gate::undoable`], and a question is not an effect.
     pub tainted: bool,
 }
 
-/// The classes a Policy may match. Commitment, BudgetLimit and
-/// DiscardEscalate have no variant here — the type-level half of "never
-/// waivable" (9.1); gate code never needs a runtime check for it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PolicyClass {
-    AgentQuestion,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PolicyMatcher {
-    pub class: PolicyClass,
-    /// Matches cluster-key details by prefix; empty matches the class.
-    pub detail_prefix: String,
-}
-
+/// How a person answers one item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum PolicyVerdict {
+pub enum Ruling {
     Allow,
     Deny,
 }
 
-/// A waiver that expires. No `revocable` field: it is always true, and a
-/// field that can only hold one value is a place to store a lie.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Policy {
-    pub id: String,
-    pub matcher: PolicyMatcher,
-    pub verdict: PolicyVerdict,
-    /// The human verdict this policy was minted from.
-    pub source: ApprovalId,
-    pub created: TimeMs,
-    pub last_hit: Option<TimeMs>,
-}
-
-/// Deliberately exhaustive.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PolicyApplication {
-    Applies(PolicyVerdict),
-    NotApplicable,
-}
-
-fn class_matches(policy: PolicyClass, item: ApprovalClass) -> bool {
-    match policy {
-        PolicyClass::AgentQuestion => matches!(item, ApprovalClass::AgentQuestion),
-    }
-}
-
-/// Tainted items never take a policy (C15); class and detail prefix must
-/// both hold.
-pub fn match_item(policy: &Policy, item: &ApprovalItem) -> PolicyApplication {
-    if item.tainted {
-        return PolicyApplication::NotApplicable;
-    }
-    if !class_matches(policy.matcher.class, item.cluster_key.class) {
-        return PolicyApplication::NotApplicable;
-    }
-    if !item
-        .cluster_key
-        .detail
-        .starts_with(&policy.matcher.detail_prefix)
-    {
-        return PolicyApplication::NotApplicable;
-    }
-    PolicyApplication::Applies(policy.verdict)
-}
-
-/// Deliberately exhaustive.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PolicyExpiry {
-    Active,
-    Expired,
-}
-
-/// Idle policies expire: an unused waiver is standing
-/// risk, and a stock of them fakes the coverage metric. Clock skew (now
-/// before the last reference) reads Active — expiry is for age, not for
-/// broken clocks.
-pub fn expiry(policy: &Policy, now: TimeMs) -> PolicyExpiry {
-    let reference = policy
-        .last_hit
-        .map_or(policy.created, |hit| hit.max(policy.created));
-    let Some(idle_ms) = now.value().checked_sub(reference.value()) else {
-        return PolicyExpiry::Active;
-    };
-    let threshold_ms = u64::from(POLICY_IDLE_DAYS).saturating_mul(86_400_000);
-    if idle_ms >= threshold_ms {
-        PolicyExpiry::Expired
-    } else {
-        PolicyExpiry::Active
-    }
-}
-
-/// Why a policy left the books (`policy_revoked` payload).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PolicyRevocation {
-    Revoked,
-    Expired,
-    Superseded,
-}
-
-/// Who answers the Approval Inbox (9.2). Never touches gate decisions —
-/// C15's byte-identical gate sequences are citysim's to assert (P2).
+/// Who answers the Approval Inbox (9.2). Two states, because a question
+/// either waits for the person or goes straight to the resident they
+/// appointed; there is no third state in which nobody answers, since
+/// "nobody answered yet" is what an unanswered item already says.
+///
+/// Never touches gate decisions: the gates answer from the rules, and
+/// who reads the inbox cannot change what a rule says.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Autonomy {
     Owner,
     Delegate(ResidentId),
-    Deferred,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -258,25 +148,14 @@ pub enum Answerer {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnswerVerdict {
     May,
-    /// The three classes and every tainted item: humans only (C15).
-    HumanOnly,
-    /// Self-approval is no approval.
-    SelfApprovalBarred,
     /// Only the appointed delegate answers; nobody else's ruling counts.
     NotTheDelegate,
+    /// Self-approval is no approval.
+    SelfApprovalBarred,
 }
 
-fn human_only(item: &ApprovalItem) -> bool {
-    item.tainted
-        || matches!(
-            item.cluster_key.class,
-            ApprovalClass::Commitment | ApprovalClass::BudgetLimit | ApprovalClass::DiscardEscalate
-        )
-}
-
-/// The answering rule. Humans answer everything; a resident answers only
-/// as the appointed delegate, never the three classes, never tainted
-/// items, never its own actions.
+/// The answering rule. A person answers everything; a resident answers
+/// only as the appointed delegate, and never its own question.
 pub fn may_answer(autonomy: &Autonomy, item: &ApprovalItem, answerer: &Answerer) -> AnswerVerdict {
     match answerer {
         Answerer::Human => AnswerVerdict::May,
@@ -284,9 +163,6 @@ pub fn may_answer(autonomy: &Autonomy, item: &ApprovalItem, answerer: &Answerer)
             let appointed = matches!(autonomy, Autonomy::Delegate(d) if d == resident);
             if !appointed {
                 return AnswerVerdict::NotTheDelegate;
-            }
-            if human_only(item) {
-                return AnswerVerdict::HumanOnly;
             }
             if item.actor == resident.as_str() {
                 return AnswerVerdict::SelfApprovalBarred;

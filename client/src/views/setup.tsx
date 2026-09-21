@@ -3,17 +3,29 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Settings: nine groups, one screen each, and beside each screen the
-// same settings as `config.toml` would spell them - so somebody who
-// knows the file can check the page against what they already know.
+// Settings: eight groups, one screen each, and beside each screen the
+// city's own `config.toml` - so somebody who knows the file can check
+// the page against what they already know.
+//
+// **The fragment is quoted from the file or it is not drawn.** This
+// column used to build the text itself, and what it built was a
+// grammar the city's own reader refuses: `[model_providers.<name>]`
+// is Codex's spelling, and a person who copied it into their
+// `CONFIG.toml` got a refusal naming three sections none of which
+// they had written. Reading the file is `Query::Config` (roadmap
+// 3.3), which this build cannot ask, so the column says that and
+// shows nothing.
 //
 // The groups are a left column at 1024 px and wider, and a bottom bar
-// below that; the `config.toml` fragment joins them as a third column
-// at 1440 px and wider. The screen is a signal rather than a route
-// because `core/route.ts` is the address bar's one authority and a
-// group is not a page a person bookmarks.
+// below that; the `config.toml` column joins them at 1440 px and
+// wider. The screen is a signal rather than a route because
+// `core/route.ts` is the address bar's one authority and a group is
+// not a page a person bookmarks.
 //
-// A group whose section another view owns mounts that view.
+// A group whose section another view owns mounts that view. There is
+// no MCP group: it was a link to `#/mcp`, which the rail already
+// reaches, so the settings page carried a way in that did nothing but
+// stand between a person and the page.
 //
 // The page is centred and capped at the page width, so a wide window
 // leaves margins rather than a column of text against the left edge,
@@ -27,28 +39,28 @@ import { setAutonomy } from "../core/commands";
 import { LANGS, endonym } from "../core/lang";
 import type { Key } from "../core/lang";
 import { QUERIES } from "../core/asking";
-import { browserRows, defaultProxying, setDefaultProxying } from "../core/prefs";
+import { preferences } from "../core/prefs";
 import { toFragment } from "../core/route";
-import type { Autonomy, Effort, EndpointsAnswer, Proxying } from "../wire";
+import type { Autonomy, EndpointsAnswer } from "../wire";
 import { ResidentId } from "../wire";
 import { useCommand, useSay, useUi } from "../ui";
 import { Machine } from "./machine";
-import { Button } from "./parts/button";
+import { EmptyState } from "./parts/empty";
 import { Segmented } from "./parts/segmented";
 import { EffortSection } from "./shared/effort";
 import { ProviderDoor } from "./shared/provider";
 import { KeysSection } from "./setup/keys";
 import { AppearanceSection } from "./setup/appearance";
 import { ModelChoice } from "./setup/models";
+import { SkillsSection } from "./setup/skills";
 import { PROXYINGS, proxyingNote } from "./setup/providers";
 
-// The nine screens, in the order a city is set up.
+// The eight screens, in the order a city is set up.
 const GROUPS = [
   "accounts",
   "run",
   "network",
   "tools",
-  "mcp",
   "skills",
   "appearance",
   "keys",
@@ -56,58 +68,14 @@ const GROUPS = [
 ] as const;
 type Group = (typeof GROUPS)[number];
 
-// `wire_api` as Codex spells it, from the dialect the wire carries.
-function wireApi(dialect: "anthropic" | "open_ai"): string {
-  return dialect === "anthropic" ? "messages" : "chat";
-}
-
-// What the providers and the chosen models look like in `config.toml`.
-function providersToml(answer: EndpointsAnswer | undefined): string | null {
-  if (answer === undefined || answer.endpoints.length === 0) {
-    return null;
-  }
-  const blocks = answer.endpoints.map((endpoint) =>
-    [
-      `[model_providers.${endpoint.name}]`,
-      `base_url = "${endpoint.base_url}"`,
-      `wire_api = "${wireApi(endpoint.dialect)}"`,
-      endpoint.has_credential ? `env_key = "secret:providers/${endpoint.name}"` : "",
-    ]
-      .filter((line) => line !== "")
-      .join("\n"),
-  );
-  const chosen = answer.chosen.map((each) => `${each.tag} = "${each.endpoint}/${each.model}"`);
-  return chosen.length === 0
-    ? blocks.join("\n\n")
-    : [...blocks, ["[model]", ...chosen].join("\n")].join("\n\n");
-}
-
-// How hard the city thinks by default, in the section the city reads
-// it from: `[model] effort`, which is the only key `ConfigFile` takes
-// under `[model]` (`crates/city/src/config_layers.rs`).
-//
-// A person who has chosen no effort has no line in the file, and so
-// no section either: absence is what lets the provider choose, and a
-// level written here would be a level nobody asked for.
-//
-// Who answers an approval is not in this file. `set_autonomy` is a
-// command the city records in its own governance, and the reader that
-// parses this file refuses a key it does not know - so a fragment
-// naming `[run] approvals` would hand a person a file their city
-// would reject.
-function modelToml(effort: Effort | null): string | null {
-  return effort === null ? null : `[model]\neffort = "${effort}"`;
-}
-
 // Who answers an approval, as the three settings a person picks
 // between. `delegate` carries an address on the wire, and the clerk is
 // the only resident this screen delegates to.
-type AutonomySetting = "owner" | "delegate" | "deferred";
+type AutonomySetting = "owner" | "delegate";
 
 const AUTONOMIES = [
   ["owner", "autonomy_owner"],
   ["delegate", "autonomy_clerk"],
-  ["deferred", "autonomy_deferred"],
 ] as const satisfies readonly (readonly [AutonomySetting, Key])[];
 
 function autonomySetting(held: Autonomy): AutonomySetting {
@@ -118,33 +86,21 @@ function autonomyOf(setting: AutonomySetting): Autonomy {
   switch (setting) {
     case "owner":
       return "owner";
-    case "deferred":
-      return "deferred";
     case "delegate":
       return { delegate: ResidentId.make("hall/clerk") };
   }
 }
 
-// The fragment beside a screen, when that screen's settings have a
-// `config.toml` spelling today. A group whose settings the file does
-// not carry yet shows none rather than a shape nobody has agreed to.
-function Toml(props: { readonly text: string }) {
+// The column that quotes the city's own `config.toml`, standing empty
+// until something can read the file. One place, so the day
+// `Query::Config` answers there is one column to fill and no second
+// spelling of the file to retire first.
+function Toml() {
   const say = useSay();
   return (
     <aside class="flex min-w-0 flex-col gap-snug" aria-label={say("setup_toml")}>
-      <div class="flex items-center gap-snug">
-        <h2 class="text-label font-label text-text-quiet">{say("setup_toml")}</h2>
-        <Button
-          label={say("setup_copy")}
-          tone="quiet"
-          onPress={() => {
-            void navigator.clipboard.writeText(props.text);
-          }}
-        />
-      </div>
-      <pre class="min-w-0 overflow-x-auto rounded-card bg-g1 p-base">
-        <code class="whitespace-pre-wrap wrap-anywhere font-mono text-note text-text-quiet">{props.text}</code>
-      </pre>
+      <h2 class="text-label font-label text-text-quiet">{say("setup_toml")}</h2>
+      <EmptyState text={say("setup_toml_unread")} />
     </aside>
   );
 }
@@ -161,47 +117,21 @@ function Toml(props: { readonly text: string }) {
 //
 function Network() {
   const say = useSay();
-  const store = browserRows();
-  const [rule, setRule] = createSignal<Proxying>(defaultProxying(store));
+  const kept = preferences();
   return (
     <div class="flex flex-col gap-snug text-note text-text-quiet">
       <span>{say("setup_network_default")}</span>
       <Segmented
         label={say("setup_network_default")}
         options={PROXYINGS.map(([setting, word]) => ({ value: setting, label: say(word) }))}
-        held={rule()}
-        onPick={(next) => {
-          setDefaultProxying(store, next);
-          setRule(next);
-        }}
+        held={kept.held().proxying}
+        onPick={kept.setProxying}
       />
       <span class="text-text-faint">{say("setup_proxying_help")}</span>
-      <Show when={proxyingNote(rule())}>
+      <Show when={proxyingNote(kept.held().proxying)}>
         {(note) => <span class="text-text-faint">{say(note())}</span>}
       </Show>
       <span class="text-text-faint">{say("setup_network_new_only")}</span>
-    </div>
-  );
-}
-
-export function SkillsNote() {
-  const ui = useUi();
-  const say = useSay();
-  const path = () => `${ui.conn.belief.city ?? "<city>"}/.sprawling/library/`;
-  return (
-    <div class="flex flex-col gap-snug text-note text-text-quiet">
-      <p>{say("setup_skills")}</p>
-      <div class="flex items-center gap-snug">
-        <code class="rounded-control bg-g2 px-base py-snug font-mono text-text">{path()}</code>
-        <Button
-          label={say("setup_copy")}
-          tone="quiet"
-          onPress={() => {
-            void navigator.clipboard.writeText(path());
-          }}
-        />
-      </div>
-      <p class="text-text-faint">{say("setup_skills_note")}</p>
     </div>
   );
 }
@@ -221,23 +151,6 @@ export function Setup() {
     const held = governance();
     return held !== undefined && "governance" in held ? held.governance.autonomy : undefined;
   });
-  const toml = createMemo<string | null>(() => {
-    switch (group()) {
-      case "accounts":
-        return providersToml(answer());
-      case "run":
-        return modelToml(ui.prefs.effort());
-      case "network":
-      case "tools":
-      case "mcp":
-      case "skills":
-      case "appearance":
-      case "keys":
-      case "advanced":
-        return null;
-    }
-  });
-
   const tab = (each: Group): JSX.Element => (
     <button
       type="button"
@@ -302,16 +215,8 @@ export function Setup() {
               <Match when={group() === "tools"}>
                 <Machine />
               </Match>
-              <Match when={group() === "mcp"}>
-                <a
-                  href={toFragment({ kind: "mcp" })}
-                  class="inline-block rounded-control bg-g2 px-base py-snug text-label hover:bg-g3"
-                >
-                  {say("nav_mcp")}
-                </a>
-              </Match>
               <Match when={group() === "skills"}>
-                <SkillsNote />
+                <SkillsSection />
               </Match>
               <Match when={group() === "appearance"}>
                 <AppearanceSection />
@@ -320,10 +225,8 @@ export function Setup() {
                   <Segmented
                     label={say("setup_language")}
                     options={LANGS.map((lang) => ({ value: lang, label: endonym(lang) }))}
-                    held={ui.prefs.lang()}
-                    onPick={(lang) => {
-                      ui.prefs.setLang(lang);
-                    }}
+                    held={ui.prefs.held().lang}
+                    onPick={ui.prefs.setLang}
                   />
                 </div>
               </Match>
@@ -342,20 +245,9 @@ export function Setup() {
           </div>
         </div>
 
-        <Show
-          when={toml()}
-          fallback={
-            <p class="min-w-0 text-note text-text-disabled wide:w-tree wide:shrink-0">
-              {say("setup_toml_none")}
-            </p>
-          }
-        >
-          {(text) => (
-            <div class="min-w-0 wide:w-tree wide:shrink-0">
-              <Toml text={text()} />
-            </div>
-          )}
-        </Show>
+        <div class="min-w-0 wide:w-tree wide:shrink-0">
+          <Toml />
+        </div>
       </div>
     </div>
   );

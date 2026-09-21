@@ -14,7 +14,7 @@
 //! accounting thread hands its own, and a lane hands a
 //! [`Relay`](crate::serving::Relay).
 
-use kernel::{AxCode, AxError, Ledger};
+use kernel::{AxError, Ledger};
 use kernel::{RunId, TimeMs};
 use runtime::Interrupt;
 use runtime::bench::BenchOutcome;
@@ -129,7 +129,6 @@ pub(crate) fn drive_run<L: Ledger>(
         signals,
         write_root,
         fence_scope,
-        who,
         run_id,
         of,
         mut sieving,
@@ -143,7 +142,6 @@ pub(crate) fn drive_run<L: Ledger>(
         backlog,
     } = context;
     let mut now = || now_ms();
-    let bench_who = who.clone();
     let mut fence_point =
         memory::Checkpoint::open(&write_root).map_err(memory::MemoryError::into_ax)?;
     // What the bench fenced, so the sweep afterwards knows which commit
@@ -164,12 +162,7 @@ pub(crate) fn drive_run<L: Ledger>(
     let ran: std::rc::Rc<std::cell::RefCell<(u32, u32)>> =
         std::rc::Rc::new(std::cell::RefCell::new((0, 0)));
     let ran_by_bench = std::rc::Rc::clone(&ran);
-    // What the bench raised while the driver held the ledger.
-    let raised: std::rc::Rc<std::cell::RefCell<Vec<kernel::ApprovalItem>>> =
-        std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let raised_by_bench = std::rc::Rc::clone(&raised);
     let driven = {
-        let raised = raised_by_bench;
         let fenced = fenced_by_bench;
         let ran = ran_by_bench;
         let mut interrupt = |_: SafePoint| asking.ask();
@@ -189,16 +182,7 @@ pub(crate) fn drive_run<L: Ledger>(
             // and both run; the same position replayed is one key, which
             // is what deduplication is for.
             let key = kernel::IdemKey::derive(&run_id, kernel::Seq::new(at), &call.action()?);
-            let ctx = kernel::GateContext {
-                actor: bench_who.clone(),
-                now: t,
-                // The call's position, for the reason the key takes it:
-                // four lanes drive at once, so an item named after the
-                // millisecond is an item two runs both claim, and the
-                // inbox keeps only the later one.
-                item_id: kernel::ApprovalId::of(&run_id, kernel::Seq::new(at)),
-            };
-            match bench.invoke(call, &key, &ctx)? {
+            match bench.invoke(call, &key, t)? {
                 BenchOutcome::Ran {
                     outcome,
                     fenced: at,
@@ -226,18 +210,6 @@ pub(crate) fn drive_run<L: Ledger>(
                     sieving.package(call, outcome)
                 }
                 BenchOutcome::Refused { refusal } => Err(*refusal),
-                BenchOutcome::Pending { item } => {
-                    // Stashed rather than recorded here: the ledger is
-                    // the driver's for the length of the run, and one
-                    // writer is the whole point. The record is written
-                    // the moment the drive returns.
-                    let id = item.id.as_str().to_owned();
-                    raised.borrow_mut().push(*item);
-                    Err(
-                        AxError::failure(AxCode::ApprovalPending, "await approval", id)
-                            .with_recovery("answer the approval in the inbox, then dispatch again"),
-                    )
-                }
                 // A replay is answered with what the first call
                 // answered, sieved the same way. An error here would tell
                 // the model its call failed when it succeeded
@@ -292,6 +264,9 @@ pub(crate) fn drive_run<L: Ledger>(
         adapter,
         fenced: fenced.borrow().clone(),
         ran: *ran.borrow(),
-        raised: raised.borrow().clone(),
+        // Nothing a door answers reaches a person any more: a door
+        // answers Allow or Deny. The sweep is the one thing that still
+        // raises a question, and it raises it after this returns.
+        raised: Vec::new(),
     })
 }

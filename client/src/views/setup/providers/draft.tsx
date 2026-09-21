@@ -28,7 +28,7 @@ import type { SetStoreFunction } from "solid-js/store";
 import { WIRE_APIS, dialectOf } from "../../../core/commands";
 import type { Endpoint, Pair, Tuning, WireApi } from "../../../core/commands";
 import type { Key } from "../../../core/lang";
-import { browserRows, defaultProxying } from "../../../core/prefs";
+import { preferences } from "../../../core/prefs";
 import type { Proxying } from "../../../wire";
 import { useSay } from "../../../ui";
 import { Field } from "../../parts/field";
@@ -186,7 +186,7 @@ const FRESH: Omit<Draft, "proxying"> = {
 // An empty form, carrying the proxy rule this machine was last told to
 // start new endpoints with.
 export function freshDraft(): Draft {
-  return { ...FRESH, proxying: defaultProxying(browserRows()) };
+  return { ...FRESH, proxying: preferences().held().proxying };
 }
 
 // A box of digits, or nothing. An empty box and a box holding letters

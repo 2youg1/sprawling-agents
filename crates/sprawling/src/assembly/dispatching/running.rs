@@ -5,14 +5,14 @@
 
 //! Who gets woken, and where the work lands.
 
-use kernel::Locator;
-use kernel::{Address, AxCode, AxError, EventKind};
+use kernel::{Address, Locator};
+use kernel::{AxCode, AxError, EventKind};
 
 use crate::effect;
 
 use super::super::{
-    CITY_VERIFIER, Desks, Driven, Driving, Ending, RunWorker, Site, Sweep, Workbench, artifact_of,
-    new_inbox, now_ms,
+    CITY_VERIFIER, Desks, Driven, Driving, Ending, Holding, Landed, Owing, RunWorker, Site, Sweep,
+    Workbench, artifact_of, held, now_ms,
 };
 use super::{Assignment, Dispatched, Given};
 
@@ -164,7 +164,6 @@ impl RunWorker {
             signals: std::sync::Arc::clone(&desks.signals),
             write_root: site.write_root.clone(),
             fence_scope,
-            who: site.who.clone(),
             run_id: site.run_id,
             of: site.provenance(self.city_hash()?, &at.addr),
             sieving: self.sieving_for(&site, &at.addr)?,
@@ -191,6 +190,13 @@ impl RunWorker {
     /// thread drove: settling is where a run's last lines are written,
     /// and a city has one writer.
     ///
+    /// **What the dispatch borrowed is given back before the drive's
+    /// own outcome is read.** A drive that failed is exactly when the
+    /// room's queue and the worktree lease are most likely to be lost:
+    /// the old order returned early at `driven?`, so a disk that went
+    /// wrong took the room's mail and a tree's lease with it
+    /// (sprawling-SPEC.md 8-46-9).
+    ///
     /// # Errors
     /// Propagates the drive's own failure to open a checkpoint, and
     /// every failure of settling the desks, the requests and the ending.
@@ -198,7 +204,8 @@ impl RunWorker {
         &mut self,
         continuation: Continuation,
         driven: Result<Driven, AxError>,
-    ) -> Result<Dispatched, AxError> {
+        owing: Owing,
+    ) -> Result<Landed, AxError> {
         let Continuation {
             at,
             mut site,
@@ -210,6 +217,7 @@ impl RunWorker {
         if let Some(id) = member {
             self.backlog.leave(id)?;
         }
+        self.return_borrowed(&at, &mut site, &desks)?;
         let Driven {
             outcome: driven,
             adapter: home,
@@ -248,7 +256,8 @@ impl RunWorker {
             }
         };
         self.settle_requests(&site, &at, &desks.pr, &produced)?;
-        self.conclude(
+        self.release_lease(&mut site)?;
+        let landed = self.conclude(
             site,
             &at,
             Ending {
@@ -256,54 +265,68 @@ impl RunWorker {
                 raised,
                 delegates: &workbench.delegates,
                 succession: &workbench.succession,
+                owing,
             },
-        )
+        )?;
+        // Whoever this run spoke to answers next, and whoever they
+        // speak to after that. Drained here rather than on the person's
+        // path alone, because a delegate and a scheduled job start
+        // conversations the same way a typed dispatch does.
+        self.answer_knocks();
+        Ok(landed)
     }
 
-    /// One dispatch: prepared, driven on this thread, landed.
+    /// Gives back everything this dispatch borrowed: the room's queue
+    /// and, under review, the worktree it wrote in.
     ///
-    /// Every caller a person can reach comes through here, and for them
-    /// nothing about the split above is visible: the work is finished
-    /// when the call returns, exactly as it was before a lane existed.
+    /// Called before the drive's outcome is read, so a failed drive
+    /// returns what a finished one returns. A lease left out is a tree
+    /// no later run can claim, and a queue left in a dropped desk is
+    /// mail the ledger says arrived and no room holds.
     ///
     /// # Errors
-    /// Propagates whatever the three phases refuse.
-    pub(in crate::assembly) fn dispatch_in(
+    /// Propagates a desk left locked, a queue this run was not holding,
+    /// and a tree the worktree table will not take back.
+    fn return_borrowed(
         &mut self,
-        at: Assignment,
-        task: String,
-        goal: String,
-    ) -> Result<Dispatched, AxError> {
-        let (driving, continuation) = self.prepare_dispatch(at, task, goal)?;
-        let context = self.drive_context();
-        let driven = super::super::driving::lane::drive_run(driving, &mut self.ledger, context);
-        self.land(continuation, driven)
+        at: &Assignment,
+        site: &mut Site,
+        desks: &Desks,
+    ) -> Result<(), AxError> {
+        let returned = held(&desks.signals, "settle the signal desk")?.take_inbox();
+        match desks.holding {
+            Holding::TheRoomQueue => self.rooms.give_back(&at.addr, site.run_id, returned)?,
+            Holding::ASpare { held_by } => self.note(
+                runtime::diagnostics::Level::Refuse,
+                "collab::inbox",
+                &format!(
+                    "{} read no signals: {held_by} holds the queue of that room",
+                    site.run_id
+                ),
+            ),
+        }
+        Ok(())
     }
 
-    /// Where a building keeps the plan its residents claim rows from.
-    /// One dispatch, run to its frozen end on this thread.
-    pub(in crate::assembly) fn dispatch(
-        &mut self,
-        addr: Address,
-        task: String,
-        goal: String,
-    ) -> Result<(), AxError> {
-        self.dispatch_in(
-            Assignment {
-                addr,
-                // The address is already where the work happens: every
-                // caller of this one is the city dispatching into a room
-                // that exists, rather than a person opening a session.
-                session: None,
-                effort: None,
-                mode: runtime::Mode::PlanGoal,
-                parent: None,
-                succession: None,
-            },
-            task,
-            goal,
-        )
-        .map(drop)
+    /// Gives the borrowed worktree back, once nothing else needs to
+    /// read it.
+    ///
+    /// Later than the queue on purpose. The queue is a value this
+    /// worker holds and comes home on every path; the worktree is a
+    /// directory on disk that the sweep still has to diff against its
+    /// own fence, and releasing it first turns that diff into "object
+    /// not found".
+    ///
+    /// # Errors
+    /// Propagates a repository that will not give the tree back.
+    fn release_lease(&mut self, site: &mut Site) -> Result<(), AxError> {
+        let Some(held) = site.lease.take() else {
+            return Ok(());
+        };
+        memory::Worktrees::open(&self.city_root)
+            .map_err(memory::MemoryError::into_ax)?
+            .release(held)
+            .map_err(memory::MemoryError::into_ax)
     }
 
     /// Tells the run that asked for the work how it came back.
@@ -356,10 +379,10 @@ impl RunWorker {
                 data: signal.enqueued_payload()?,
             },
         )?;
-        self.inboxes
-            .entry(parent.clone())
-            .or_insert_with(new_inbox)
-            .deliver(&signal)?;
+        // Through the room table rather than into a queue of its own:
+        // the parent room may have another run reading in it, and a
+        // handback delivered beside that reader is one nobody collects.
+        self.rooms.deliver(&signal)?;
         // And into the room's join, by the same reading a restart would
         // do: one function decides what a handback signal means.
         if let Some(artifact) = artifact_of(&signal) {

@@ -23,7 +23,7 @@ use kernel::{Address, Locator, Model, RunId};
 /// address, mode and ceiling. Passed side by side they were four
 /// parameters on six signatures, and the depth had to be derived twice.
 ///
-/// The other two are spent in `dispatch_in`'s prologue and never seen
+/// The other two are spent in `prepare_dispatch`'s prologue and never seen
 /// again, and they are here rather than beside it because opening a room
 /// is the first thing this city writes for a dispatch. A caller that
 /// opened it would put the rule "agree before you write" in a second
@@ -51,6 +51,14 @@ pub(super) struct Assignment {
     /// therefore its depth, which is what makes succession a different
     /// verb from delegation.
     pub(super) succession: Option<Handover>,
+    /// Whether this run began with somebody else's text, which decides
+    /// whether the approvals it raises can be waived by a policy (C15).
+    ///
+    /// Carried by the dispatch rather than held by the worker: a run is
+    /// settled long after the entrance that started it returned, so a
+    /// flag the worker set and cleared around one call described
+    /// whichever run happened to be landing.
+    pub(super) tainted: bool,
 }
 
 /// One succession, as the successor's dispatch receives it: who is

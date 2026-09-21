@@ -24,7 +24,7 @@ use kernel::{AxCode, AxError, EventRecord, RunId};
 
 use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK, SCHEDULE_TICK_MS};
 use super::serve::Opening;
-use crate::assembly::{LOOK_AGAIN, RunWorker, now_ms};
+use crate::assembly::{LOOK_AGAIN, RunWorker, Serving, now_ms};
 use crate::views::Views;
 
 /// Where a worker's work goes, and where it comes from.
@@ -84,23 +84,25 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                 }
             };
             // Somebody is watching, so runs ask their provider to
-            // stream. A worker without this call never installs a sink,
-            // and its runs take the blocking path unchanged.
-            worker.watch(std::sync::Arc::new(move |delta: channels::Delta| {
-                // No subscribers is not a failure: a city with no browser
-                // open is a city doing its work.
-                drop(to_watchers.send(delta));
-            }));
-            // Where a fresh look at this machine lands. The same views
-            // the start-up look was written into, so a page asking
-            // what this machine has gets one answer however it was
-            // last taken.
+            // stream, the machine's look has a place to land, and a run
+            // in progress can be interrupted. One call, because a
+            // worker that streamed to a page unable to interrupt it
+            // would be the state this type exists to make unsayable.
             let examined = Arc::clone(&views);
-            worker.examine(Arc::new(move |found: channels::DoctorAnswer| {
-                if let Ok(mut views) = examined.lock() {
-                    views.found_on_this_machine(found);
-                }
-            }));
+            let interrupt_desk = Arc::clone(&worker_desk);
+            worker.serve(Serving {
+                deltas: std::sync::Arc::new(move |delta: channels::Delta| {
+                    // No subscribers is not a failure: a city with no
+                    // browser open is a city doing its work.
+                    drop(to_watchers.send(delta));
+                }),
+                machine: Arc::new(move |found: channels::DoctorAnswer| {
+                    if let Ok(mut views) = examined.lock() {
+                        views.found_on_this_machine(found);
+                    }
+                }),
+                interrupts: Arc::new(move |run: RunId| interrupt_desk.interrupt_for(run)),
+            });
             worker.observe(Box::new(move |record: &EventRecord| {
                 if let Ok(mut views) = views.lock() {
                     // A record the views refuse to fold is reported and
@@ -114,12 +116,6 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                 // A send with no subscribers is not a failure: a city with
                 // no browser open is a city doing its work.
                 drop(to_clients.send(record.clone()));
-            }));
-            // A run in progress asks the same desk what arrived, so a
-            // Cancel does not have to wait for the run it cancels.
-            let interrupt_desk = Arc::clone(&worker_desk);
-            worker.attach_interrupts(Arc::new(move |run: RunId| {
-                interrupt_desk.interrupt_for(run)
             }));
             // When the schedule was last read against. Kept by the
             // loop rather than measured from it, because a city with

@@ -35,6 +35,13 @@ pub(crate) trait Vfs: Send {
     /// by recursion, and cannot overflow a stack on a deep city.
     fn list_dirs(&self, dir: &Path) -> io::Result<Vec<PathBuf>>;
     fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
+    /// How many bytes `path` holds right now.
+    ///
+    /// Separate from [`Vfs::read`] because the side index compares a
+    /// segment's length against the length it has already folded, and
+    /// lifting the segment to learn its length would read the whole
+    /// ledger on every refresh.
+    fn size(&self, path: &Path) -> io::Result<u64>;
     /// At most `len` bytes of `path`, starting at `offset`, leaving
     /// everything before `offset` on the disk.
     ///

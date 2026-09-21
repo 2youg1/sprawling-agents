@@ -3,13 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a person settled about one endpoint, as the book keeps it.
+//! What a person settled about one endpoint, as the book keeps it,
+//! and what holds for an endpoint they settled nothing about.
 //!
 //! The registration says where an endpoint is and how to prove who is
 //! calling. This says how the call is made: what to call the endpoint on
 //! screen, how long it may take, how many times a failed request is made
-//! again, how long a streamed answer may run, the headers every request
-//! adds, and the body fields every request writes.
+//! again, how long a streamed answer may go silent, the headers every
+//! request adds, and the body fields every request writes.
 //!
 //! **An override's value is kept as text.** A ledger that held `0.2`
 //! would hold a float, and this city keeps floats out of its records;
@@ -18,6 +19,29 @@
 
 use kernel::Proxying;
 use serde_json::Value;
+
+use crate::endpoint::HeaderValue;
+
+use super::retries::Retries;
+
+/// What every endpoint is called with until a person says otherwise.
+///
+/// **The one home of these three figures.** A form that printed its own
+/// numbers into empty boxes made an endpoint attached from a form
+/// behave differently from one attached from a configuration file,
+/// while the person had filled in nothing either way; the form shows
+/// these as the placeholders they are, through the configuration query.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TuningDefaults {
+    /// How long one settled request may take, in total.
+    pub timeout_ms: u64,
+    /// The ceiling on making a failed request again.
+    pub retries: Retries,
+    /// How long a streamed answer may go silent. Absent means a stream
+    /// is held to the same bound as a settled call, which is the only
+    /// figure this city can state without inventing one.
+    pub stream_idle_timeout_ms: Option<u64>,
+}
 
 /// How a person set one endpoint up.
 ///
@@ -30,17 +54,18 @@ pub struct EndpointTuning {
     /// How long one settled request may take.
     pub timeout_ms: Option<u64>,
     /// How many times a request worth making again is made again.
-    pub request_max_retries: Option<u32>,
-    /// How long a streamed request may run before the city gives up on
-    /// it. **This is the whole request's deadline, not an idle timer**:
-    /// the blocking transport hands over a body reader with no hook
-    /// between chunks, so the city can bound how long an answer takes
-    /// and cannot bound how long one silence inside it lasts. A stall
-    /// therefore ends here, later than an idle timer would end it.
-    pub stream_deadline_ms: Option<u64>,
-    /// Headers every request to this endpoint adds, name and value. A
-    /// value may be a `secret:realm/name` reference.
-    pub extra_headers: Vec<(String, String)>,
+    /// Absence is a value here rather than a question each reader
+    /// answers for itself.
+    pub request_max_retries: Retries,
+    /// How long a streamed request may go without a byte arriving
+    /// before the city gives up on it. **This is an idle bound, not a
+    /// deadline on the whole answer**: the blocking transport applies
+    /// it to each read of the body, so a model that keeps writing is
+    /// never cut off for writing a long answer, and one that stops
+    /// mid-answer is given up on this long after its last byte.
+    pub stream_idle_timeout_ms: Option<u64>,
+    /// Headers every request to this endpoint adds, name and value.
+    pub extra_headers: Vec<(String, HeaderValue)>,
     /// Body fields every request writes: a JSON pointer, and the text
     /// of the value to write there.
     pub overrides: Vec<(String, String)>,
@@ -52,6 +77,33 @@ pub struct EndpointTuning {
 }
 
 impl EndpointTuning {
+    /// What an endpoint nobody tuned is called with.
+    ///
+    /// The deadline is long because a reasoning model answering a hard
+    /// question is not a stalled one; the retry ceiling is absent
+    /// because `Halt` is this city's brake; the idle bound is absent
+    /// because no figure this city could write down would be the
+    /// provider's.
+    pub const DEFAULTS: TuningDefaults = TuningDefaults {
+        timeout_ms: 120_000,
+        retries: Retries::UntilHalted,
+        stream_idle_timeout_ms: None,
+    };
+
+    /// How long one settled call to this endpoint may take.
+    #[must_use]
+    pub fn call_timeout_ms(&self) -> u64 {
+        self.timeout_ms.unwrap_or(Self::DEFAULTS.timeout_ms)
+    }
+
+    /// How long a streamed call to this endpoint may go silent, when
+    /// that is not its call timeout.
+    #[must_use]
+    pub fn idle_timeout_ms(&self) -> Option<u64> {
+        self.stream_idle_timeout_ms
+            .or(Self::DEFAULTS.stream_idle_timeout_ms)
+    }
+
     /// Whether this endpoint is called the way any endpoint would be.
     ///
     /// The local adapter has no header surface and no override surface,
@@ -130,10 +182,32 @@ mod tests {
         assert!(EndpointTuning::default().is_plain());
         assert!(
             !EndpointTuning {
-                extra_headers: vec![("x-tenant".to_owned(), "east".to_owned())],
+                extra_headers: vec![("x-tenant".to_owned(), HeaderValue::Plain("east".to_owned()))],
                 ..EndpointTuning::default()
             }
             .is_plain()
+        );
+    }
+
+    /// An endpoint nobody tuned is called with the defaults, and the
+    /// defaults are read from the one place that states them.
+    #[test]
+    fn an_untouched_endpoint_takes_the_figures_this_module_states() {
+        let untouched = EndpointTuning::default();
+        assert_eq!(
+            untouched.call_timeout_ms(),
+            EndpointTuning::DEFAULTS.timeout_ms
+        );
+        assert_eq!(untouched.request_max_retries, Retries::UntilHalted);
+        assert_eq!(untouched.idle_timeout_ms(), None);
+        assert_eq!(
+            EndpointTuning {
+                timeout_ms: Some(9_000),
+                stream_idle_timeout_ms: Some(30_000),
+                ..EndpointTuning::default()
+            }
+            .call_timeout_ms(),
+            9_000
         );
     }
 }

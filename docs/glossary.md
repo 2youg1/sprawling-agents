@@ -18,7 +18,7 @@ Everything a run does becomes an **EventRecord** in the **Ledger** before it bec
 
 That is also what makes the interface trustworthy in a specific, narrow way: it can be wrong about what it has not been told, and it cannot be wrong in a way the Ledger does not also record.
 
-Two more relations are worth stating because they are easy to invert. A **Gate** decides one action inside the city, and it answers with an exhaustive verdict rather than a yes or no — so "this needs a person" is a real answer rather than a failure. And a **Discard** is a deletion that carries its own way back: the type has no constructor without one, so a deletion with no restoration is not something the code refuses, it is something the code cannot express.
+Two more relations are worth stating because they are easy to invert. A **Gate** decides one action inside the city, and it decides it: the verdict is `Allow` or `Deny`, and a door that cannot decide is a door whose rule nobody has written. What a person answers is a different thing — a question a resident asked about the design, which no door can settle. And a **Discard** is a deletion that carries its own way back: the type has no constructor without one, so a deletion with no restoration is not something the code refuses, it is something the code cannot express.
 
 > The tables below are the vocabulary itself. The order is reading order rather than alphabetical order, because alphabetical order helps nobody on a first pass.
 
@@ -89,18 +89,17 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **Taint** | External content is data. Taint joins on the union, rises through doors, and has no unwrapping surface. |
 | **WriteDomain** | The set of prefixes a resident may write, and what it may write inside them: `Everything`, or `Documents` — Markdown files only, and never a plan file. The decision primitive is `Address::is_within`; a building declares the second half with one `write:` line in its `BUILDING.md`. |
 | **Documents** | The narrower of the two write-domain kinds: inside its prefixes a resident may write Markdown files and nothing else, and never a plan file. A building declares it with one `write:` line in its `BUILDING.md`; the wider kind is `Everything`. It is what a resident who plans is given, so a planner cannot reach into what a builder produces. |
-| **Escalate** | Handing a decision up to a person, as an ApprovalItem, rather than deciding it. |
-| **undoable effect** | An effect outside this city that nothing inside it can take back — today, a key pressed or a clipboard replaced through the **desktop connector**. It has no Restoration, so the Discard door has nothing to check; the door for it escalates instead of refusing, because refusing would make the tool equivalent to absent. One question per connector, not per tool. |
+| **undoable effect** | An effect outside this city that nothing inside it can take back — today, a key pressed or a clipboard replaced through the **desktop connector**. It has no Restoration, so the Discard door has nothing to check; the door for it decides from what the connector was allowed at attach, because refusing every one of them would make the tool equivalent to absent. One allowance per connector, not per tool. |
 | **Sealed\<T\>** | A sealed value: no Debug, no Display, no Serialize, no Clone. |
 | **SecretRef** | `secret:<realm>/<name>`. Configuration holds the reference; plaintext reaches the Vault only. |
 | **Custody** | Credential custody: capture, replace in place with a reference, redeem at the wire. |
 | **Discard** | Deletion. A Discard without a Restoration cannot be constructed. |
 | **Restoration** | The way back: `Tracked` (committed), `Interred` (in the store), `Rebuildable` (reproducible). |
 | **Recycle Bin** | The view over discarded things, where every row can state its own way back. |
-| **ApprovalItem** | An item awaiting an answer. Two sources (Gate, agent), carrying a cluster key and a tainted flag. |
+| **ApprovalItem** | A design question a resident asked the person, awaiting an answer, carrying a cluster key and a tainted flag. Actions are not asked about: a door either allows one or refuses it. |
 | **Policy** | An exemption rule settled from answered ApprovalItems. It expires. |
 | **Reading Room** | The list of skills a building admits. A name on it that is not on the shelves is left out rather than promised. |
-| **Autonomy** | Who answers: `Owner`, `Delegate`, or `Deferred`. |
+| **Autonomy** | Who answers a question: `Owner` — the person — or `Delegate`, a resident who answers in their place. |
 | **Halt** | The brake, and the only one: stop a city, a building, or a workshop; `release` lets it go on. It shuts the scope to new work and terminates the backlog members inside it, so a command nobody can reach is not what a stopped city is still doing. Ending a run that is already going is `Cancel`, which is a different verb. There is no spend ceiling and no turn ceiling behind it — a city that must stop is stopped by somebody saying so. |
 | **Fallback** | What a tag does when its endpoint will not answer: `None` (freeze, and record why) or `Then` (retreat to a named endpoint and model, which is itself an event). The default is `None`, because switching a person's model in silence is the last decision a default value should make. |
 

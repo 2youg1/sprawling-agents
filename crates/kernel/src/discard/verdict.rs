@@ -5,56 +5,42 @@
 
 //! Discard verdicts: the decision table.
 
-use crate::consts_policy::{DISCARD_BYTES_MAX, DISCARD_FILES_MAX};
-use crate::registry::Registry;
-
-use super::request::{DenyReason, DiscardRequest, EscalateReason};
+use super::request::{DenyReason, DiscardRequest};
 
 /// Deliberately exhaustive verdict.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiscardVerdict {
     Allow,
-    Escalate { reason: EscalateReason },
     Deny { reason: DenyReason },
 }
 
-/// The decision table (7.2), in fixed order: no plan denies; taint
-/// escalates always; then scale (files, bytes); then registry assets;
-/// the rest passes — a restorable, small, clean-handed delete is not
-/// worth an interruption.
-pub fn decide(req: &DiscardRequest, registry: &Registry) -> DiscardVerdict {
-    let (paths, taint, total_bytes) = match req {
+/// The decision table (7.2), in fixed order: no plan denies, taint
+/// denies, the rest passes.
+///
+/// Scale and ownership pass because a planned discard carries a
+/// restoration and is therefore reversible: sixteen files, one
+/// megabyte, and another resident's registered asset used to be the
+/// points at which a person was interrupted, and an interruption is
+/// not a rule. What still bounds a delete in advance is written where
+/// rules live — the write domain says which files a resident reaches
+/// at all, and the registry keeps the evidence that puts a deleted
+/// asset back.
+pub fn decide(req: &DiscardRequest) -> DiscardVerdict {
+    let taint = match req {
         DiscardRequest::Unplanned { .. } => {
             return DiscardVerdict::Deny {
                 reason: DenyReason::NoRestoration,
             };
         }
-        DiscardRequest::Planned(discard) => {
-            (discard.paths(), discard.taint(), discard.total_bytes())
-        }
+        DiscardRequest::Planned(discard) => discard.taint(),
     };
-    if !taint.is_empty() {
-        return DiscardVerdict::Escalate {
-            reason: EscalateReason::Tainted,
-        };
+    if taint.is_empty() {
+        DiscardVerdict::Allow
+    } else {
+        DiscardVerdict::Deny {
+            reason: DenyReason::Tainted,
+        }
     }
-    let over_files = u32::try_from(paths.len()).map_or(true, |count| count > DISCARD_FILES_MAX);
-    if over_files {
-        return DiscardVerdict::Escalate {
-            reason: EscalateReason::FilesOverMax,
-        };
-    }
-    if total_bytes.get() > DISCARD_BYTES_MAX {
-        return DiscardVerdict::Escalate {
-            reason: EscalateReason::BytesOverMax,
-        };
-    }
-    if paths.iter().any(|p| registry.is_asset_at(p)) {
-        return DiscardVerdict::Escalate {
-            reason: EscalateReason::RegistryAsset,
-        };
-    }
-    DiscardVerdict::Allow
 }
 
 #[cfg(test)]
@@ -84,16 +70,18 @@ mod tests {
 
     #[test]
     fn the_decision_table_holds_in_order() {
-        let registry = Registry::new();
-        // Allow: small, clean, planned.
+        // Allow: planned and clean-handed, at any scale.
         assert_eq!(
-            decide(
-                &DiscardRequest::Planned(clean(vec![addr("b/x.md")], 100)),
-                &registry
-            ),
+            decide(&DiscardRequest::Planned(clean(vec![addr("b/x.md")], 100))),
             DiscardVerdict::Allow
         );
-        // Tainted first, regardless of scale.
+        let many: Vec<Address> = (0..17).map(|i| addr(&format!("b/f{i}.md"))).collect();
+        assert_eq!(
+            decide(&DiscardRequest::Planned(clean(many, 4_000_000))),
+            DiscardVerdict::Allow,
+            "a big delete that can be put back is a delete"
+        );
+        // Tainted denies, whatever the scale.
         let tainted = Discard::new(
             vec![addr("b/x.md")],
             tracked(),
@@ -102,91 +90,28 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            decide(&DiscardRequest::Planned(tainted), &registry),
-            DiscardVerdict::Escalate {
-                reason: EscalateReason::Tainted
+            decide(&DiscardRequest::Planned(tainted)),
+            DiscardVerdict::Deny {
+                reason: DenyReason::Tainted
             }
         );
-        // Files over max.
-        let many: Vec<Address> = (0..17).map(|i| addr(&format!("b/f{i}.md"))).collect();
+        // Unplanned denies: no restoration, no delete.
         assert_eq!(
-            decide(&DiscardRequest::Planned(clean(many, 1)), &registry),
-            DiscardVerdict::Escalate {
-                reason: EscalateReason::FilesOverMax
-            }
-        );
-        // Bytes over max.
-        assert_eq!(
-            decide(
-                &DiscardRequest::Planned(clean(vec![addr("b/big.bin")], 1_048_577)),
-                &registry
-            ),
-            DiscardVerdict::Escalate {
-                reason: EscalateReason::BytesOverMax
-            }
-        );
-        // Unplanned denies.
-        assert_eq!(
-            decide(
-                &DiscardRequest::Unplanned {
-                    paths: vec![addr("b/x.md")],
-                    taint: TaintSet::empty(),
-                    total_bytes: ByteLen::new(1)
-                },
-                &registry
-            ),
+            decide(&DiscardRequest::Unplanned {
+                paths: vec![addr("b/x.md")],
+                taint: TaintSet::empty(),
+                total_bytes: ByteLen::new(1)
+            }),
             DiscardVerdict::Deny {
                 reason: DenyReason::NoRestoration
-            }
-        );
-    }
-
-    #[test]
-    fn registry_assets_escalate() {
-        use crate::event::{EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
-        use crate::ledger::GENESIS_PREV;
-        use crate::registry::{Artifact, Claim};
-        let mut registry = Registry::new();
-        let locator = Locator::parse(&format!("file:b/asset.md@{}", "ab".repeat(20))).unwrap();
-        let evidence = EventRecord::from_draft(
-            EventDraft {
-                run: RunId::CITY,
-                t: TimeMs::new(0),
-                who: "city".into(),
-                addr: None,
-                kind: EventKind::ToolResult,
-                data: Payload::empty(),
-                ig: false,
-            },
-            Seq::FIRST,
-            GENESIS_PREV,
-        )
-        .to_ref();
-        let artifact = Artifact::verify(
-            Claim {
-                locator: locator.clone(),
-                by: "worker".into(),
-            },
-            evidence,
-        )
-        .unwrap();
-        registry.register_artifact(artifact);
-        registry.promote_asset(&locator).unwrap();
-        assert_eq!(
-            decide(
-                &DiscardRequest::Planned(clean(vec![addr("b/asset.md")], 10)),
-                &registry
-            ),
-            DiscardVerdict::Escalate {
-                reason: EscalateReason::RegistryAsset
             }
         );
     }
 }
 
 // No kani harness lives here. Deciding a discard takes a `Vec` of
-// addresses, a `BTreeSet` of taint sources and a `Registry`, and CBMC
-// cannot bound those loops: one run burned six hours and a second ran
-// forty-five minutes under `--default-unwind 32`, both on
-// `tainted_never_allows`, and neither returned. The fail-closed
-// propositions are held by the tests above (kernel-SPEC.md section 2).
+// addresses and a `BTreeSet` of taint sources, and CBMC cannot bound
+// those loops: one run burned six hours and a second ran forty-five
+// minutes under `--default-unwind 32`, both on `tainted_never_allows`,
+// and neither returned. The fail-closed propositions are held by the
+// tests above (kernel-SPEC.md section 2).

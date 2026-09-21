@@ -152,5 +152,5 @@ fn the_cap_stops_the_walk_and_the_answer_says_so() {
 fn the_tool_refuses_another_tools_call_and_still_answers() {
     let dir = tempfile::tempdir().unwrap();
     let mut tool = SearchTool::new(dir.path()).unwrap();
-    kernel::tool_conformance::assert_tool_conformance(&mut tool);
+    kernel::tool::conformance::assert_tool_conformance(&mut tool);
 }

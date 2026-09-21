@@ -22,27 +22,22 @@ use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, BuildingPolicy, EventKind, EventRecord, ModelTag, Payload};
 
-use crate::fallback::Fallback;
 use crate::market::ModelEntry;
 
 use super::attached::AttachedEndpoint;
 use super::payload::{read_attached, read_choice, text};
-/// The model that answers for one tag, the endpoint it lives behind,
-/// and what happens when that endpoint will not answer. The third is
-/// here rather than at the call site because a caller holding only the
-/// first two has no honest move left when the call fails.
+/// The model that answers for one tag and the endpoint it lives
+/// behind.
 #[derive(Debug, Clone, Copy)]
 pub struct Chosen<'b> {
     pub endpoint: &'b AttachedEndpoint,
     pub entry: &'b ModelEntry,
-    pub fallback: &'b Fallback,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct Choice {
     pub(crate) endpoint: String,
     pub(crate) entry: ModelEntry,
-    pub(crate) fallback: Fallback,
 }
 
 /// Every endpoint and every choice, rebuilt from the event stream.
@@ -141,7 +136,6 @@ impl EndpointBook {
         Ok(Chosen {
             endpoint,
             entry: &choice.entry,
-            fallback: &choice.fallback,
         })
     }
 
@@ -149,16 +143,11 @@ impl EndpointBook {
         self.endpoints.values()
     }
 
-    /// What is chosen, tag by tag, and what each choice retreats to.
-    pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry, &Fallback)> {
-        self.chosen.iter().map(|(tag, choice)| {
-            (
-                *tag,
-                choice.endpoint.as_str(),
-                &choice.entry,
-                &choice.fallback,
-            )
-        })
+    /// What is chosen, tag by tag.
+    pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry)> {
+        self.chosen
+            .iter()
+            .map(|(tag, choice)| (*tag, choice.endpoint.as_str(), &choice.entry))
     }
 
     #[must_use]
@@ -178,11 +167,10 @@ impl EndpointBook {
     reason = "test code"
 )]
 mod tests {
-    use super::super::payload::{Settled, attached_payload, selected_payload};
+    use super::super::payload::{attached_payload, selected_payload};
     use super::super::tuning::EndpointTuning;
     use super::*;
     use crate::endpoint::AuthSpec;
-    use crate::fallback::Fallback;
     use crate::market::ModelEntry;
     use kernel::{
         AxCode, DialectKind, EventKind, EventRecord, ModelTag, Payload, SecretRef, UsdMicros,
@@ -229,10 +217,6 @@ mod tests {
         }
     }
     fn book_with(base_url: &str) -> EndpointBook {
-        book_falling_back_to(base_url, &Fallback::None)
-    }
-
-    fn book_falling_back_to(base_url: &str, fallback: &Fallback) -> EndpointBook {
         let mut book = EndpointBook::new();
         let endpoint = attached("house", base_url);
         book.apply(&record(
@@ -242,42 +226,44 @@ mod tests {
         .unwrap();
         book.apply(&record(
             EventKind::ModelSelected,
-            selected_payload(
-                ModelTag::Main,
-                "house",
-                &entry("m-large"),
-                &Settled {
-                    fallback,
-                    from: None,
-                },
-            )
-            .unwrap(),
+            selected_payload(ModelTag::Main, "house", &entry("m-large"), None).unwrap(),
         ))
         .unwrap();
         book
     }
 
+    /// A record written while this build carried a retreat arm names
+    /// two keys nothing ever wrote a value into. Reading it must still
+    /// produce the choice it states.
     #[test]
-    fn a_choice_carries_its_fallback_through_the_ledger_and_back() {
-        let spare = Fallback::then("spare", "m-small").unwrap();
-        let book = book_falling_back_to("https://api.example.test/v1", &spare);
-        let chosen = book
-            .select(ModelTag::Main, &BuildingPolicy::default())
-            .unwrap();
-        assert_eq!(*chosen.fallback, spare);
-    }
-
-    #[test]
-    fn a_record_written_before_a_fallback_could_be_set_reads_as_none() {
-        let book = book_with("https://api.example.test/v1");
-        let chosen = book
-            .select(ModelTag::Main, &BuildingPolicy::default())
-            .unwrap();
-        assert_eq!(
-            *chosen.fallback,
-            Fallback::None,
-            "an old ledger must not gain a retreat nobody ever asked for"
+    fn a_record_naming_a_retreat_still_reads_as_the_choice_it_carries() {
+        let mut book = EndpointBook::new();
+        book.apply(&record(
+            EventKind::EndpointAttached,
+            attached_payload(&attached("house", "https://api.example.test/v1")).unwrap(),
+        ))
+        .unwrap();
+        let mut map = selected_payload(ModelTag::Main, "house", &entry("m-large"), None)
+            .unwrap()
+            .as_map()
+            .clone();
+        map.insert(
+            "fallback_endpoint".to_owned(),
+            Value::String("spare".to_owned()),
         );
+        map.insert(
+            "fallback_model".to_owned(),
+            Value::String("m-small".to_owned()),
+        );
+        book.apply(&record(
+            EventKind::ModelSelected,
+            Payload::new(map).unwrap(),
+        ))
+        .unwrap();
+        let chosen = book
+            .select(ModelTag::Main, &BuildingPolicy::default())
+            .unwrap();
+        assert_eq!(chosen.entry.id, "m-large");
     }
 
     #[test]

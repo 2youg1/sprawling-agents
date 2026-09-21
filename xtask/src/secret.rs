@@ -95,7 +95,12 @@ const EXPOSE_WHITELIST: [&str; 6] = [
 ///   `Win32` beside the underscores are what trip the mixed-alphabet
 ///   rule. Only the six names of twenty bytes or more are listed, since
 ///   a shorter one never reaches the entropy detector.
-const NOT_CREDENTIALS: [&str; 7] = [
+/// - `app_EMoamEEZ73f0CkXaXp7hrann` — OpenAI's public OAuth client id,
+///   published by the upstream `docs/third-party.md` section 1 follows.
+///   A client id authorises nothing on its own: the flow it belongs to
+///   proves possession with a PKCE verifier nobody writes down.
+const NOT_CREDENTIALS: [&str; 8] = [
+    "app_EMoamEEZ73f0CkXaXp7hrann",
     "CC_x86_64_unknown_linux_musl",
     "Win32_System_DataExchange",
     "Win32_System_Threading",
@@ -148,7 +153,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         if is_derived(&rel) {
             continue;
         }
-        for span in kernel::scan(&bytes) {
+        for span in kernel::secret::scan(&bytes) {
             let end = span.start.saturating_add(span.len);
             if bytes
                 .get(span.start..end)
@@ -266,7 +271,7 @@ mod tests {
     #[test]
     fn the_detector_still_finds_a_key_shaped_token() {
         let sample = key_shaped();
-        let spans = kernel::scan(sample.as_bytes());
+        let spans = kernel::secret::scan(sample.as_bytes());
         assert!(
             !spans.is_empty(),
             "the allowlist must not have loosened what the detector looks for"

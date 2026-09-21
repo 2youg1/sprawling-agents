@@ -8,7 +8,7 @@
 
 use kernel::{Address, AxError};
 
-use super::super::{RunWorker, new_inbox, now_ms};
+use super::super::{RunWorker, now_ms};
 use super::{Desks, Site};
 
 impl RunWorker {
@@ -19,6 +19,11 @@ impl RunWorker {
     /// room's queue moves into the signal desk rather than being copied
     /// there: one queue per room at all times, and a copy would be a
     /// second answer to what arrived first.
+    ///
+    /// A second run in the same room is given a queue of its own and
+    /// told so in [`Desks::holding`]: the room table lends its queue to
+    /// one reader, and what arrives meanwhile waits there for that
+    /// reader to land (sprawling-SPEC.md 8-46-9).
     ///
     /// # Errors
     /// Propagates a plan that cannot be read and a shelf that cannot be
@@ -41,17 +46,19 @@ impl RunWorker {
         )));
 
         // The room's queue is lent to the desk for the length of the
-        // drive and taken back below. One queue exists per room at all
-        // times; a copy would be a second answer to "what arrived first".
-        let lent = self.inboxes.remove(addr).unwrap_or_else(new_inbox);
-        let waiting = lent.pending();
+        // drive and given back when the run lands. The table keeps the
+        // loan rather than the queue being lifted out of it, so a
+        // second run in the same room is answered instead of being
+        // handed a queue that would overwrite the first one's.
+        let lent = self.rooms.lend(addr, site.run_id);
+        let waiting = lent.inbox.pending();
         let signals = std::sync::Arc::new(std::sync::Mutex::new(collab::SignalDesk::new(
             site.run_id,
             addr.clone(),
             site.who.clone(),
             site.building.addr().clone(),
             now_ms()?,
-            lent,
+            lent.inbox,
         )));
         let goals = std::sync::Arc::new(std::sync::Mutex::new(collab::GoalDesk::new(
             site.run_id,
@@ -103,6 +110,7 @@ impl RunWorker {
             pr,
             plan_path,
             waiting,
+            holding: lent.holding,
         })
     }
 }

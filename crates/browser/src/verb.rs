@@ -42,14 +42,32 @@ const RECORDER_SCRIPT: &str = concat!(
 /// one thing to parse instead of two.
 const CONSOLE_SCRIPT: &str = "JSON.stringify(window.__sprawling_console || [])";
 
+/// How much of an accessible name the page is asked for. A ceiling on
+/// what crosses the socket, not the label a model reads: the snapshot
+/// cuts that to its own handle length.
+const NAME_MAX_JS: usize = 200;
+
 /// Collects the accessibility tree the snapshot reads. Role first,
 /// accessible name second, and nothing else crosses.
-const TREE_SCRIPT: &str = concat!(
-    "JSON.stringify([...document.querySelectorAll('*')].map(e => ({ ",
-    "role: e.getAttribute('role') || e.tagName.toLowerCase(), ",
-    "name: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 200) ",
-    "})))"
-);
+///
+/// The role an element states wins; otherwise the element is looked up
+/// in the table `snapshot` keeps, and an element the table does not
+/// name has no role and is dropped by the snapshot. Generated rather
+/// than written out, because a page that calls a `<select>` something
+/// other than what the filter looks for is a page with no controls in
+/// it.
+fn tree_script() -> String {
+    format!(
+        "JSON.stringify([...document.querySelectorAll('*')].map(e => {{ \
+         const m = {map}; \
+         const t = e.tagName.toLowerCase(); \
+         const k = (e.getAttribute('type') || 'text').toLowerCase(); \
+         return {{ role: e.getAttribute('role') || m[t + '|' + k] || m[t] || '', \
+         name: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, {NAME_MAX_JS}) \
+         }}; }}))",
+        map = crate::snapshot::role_lookup_js()
+    )
+}
 
 /// One thing a run wants the browser to do.
 ///
@@ -160,7 +178,7 @@ impl Verb {
                 session.navigate(context, url)?,
                 session.evaluate(context, RECORDER_SCRIPT)?,
             ]),
-            Verb::Snapshot => Ok(vec![session.evaluate(context, TREE_SCRIPT)?]),
+            Verb::Snapshot => Ok(vec![session.evaluate(context, &tree_script())?]),
             Verb::Act { generation, action } => Ok(vec![frame_for(
                 session,
                 context,

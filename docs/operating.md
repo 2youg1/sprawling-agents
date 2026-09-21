@@ -14,7 +14,7 @@ Everything a person does to running work is one of five, and each is recorded as
 | **Cancel** | stops one run. When Cancel and Steer meet on the same boundary, Cancel wins — stopping is the one that cannot be taken back | live page |
 | **Halt** | stops the whole city; every run reads as halted until you let it go on | control surface |
 | **Release** | lets a halted city go on | control surface |
-| **Approve** | answers what a Gate or an agent escalated | approvals page |
+| **Approve** | answers a design question a resident asked | approvals page |
 
 Steering is not interruption. The instruction is folded into the next assembly, so a request already on the wire is never rewritten mid-flight; what a person said arrives at the next safe point, and the run continues from where it is rather than from where it was.
 
@@ -22,7 +22,7 @@ Steering is not interruption. The instruction is folded into the next assembly, 
 
 The nav is grouped by the question, not by the module.
 
-**Happening now.** *city* is the whole city as a drawing, one prism per building, lit where work is running; the strip above it carries the three numbers no other page can state — how long the Ledger is, how many signals wait in rooms, how much was discarded and never taken back. *live* is one session, line by line, with a bounded window that says what it dropped. *approvals* is what needs a person, grouped so that forty identical questions are one decision — except a tainted item, which stands alone because grouping it would let one answer cover a question nobody read.
+**Happening now.** *city* is the whole city as a drawing, one prism per building, lit where work is running; the strip above it carries the three numbers no other page can state — how long the Ledger is, how many signals wait in rooms, how much was discarded and never taken back. *live* is one session, line by line, with a bounded window that says what it dropped. *approvals* is the design questions residents asked, grouped so that forty identical questions are one decision — except a tainted item, which stands alone because grouping it would let one answer cover a question nobody read.
 
 **The record.** *ledger* is the event stream with filters that always say how many rows they hid. *archive* searches every building's shelves at the moment you ask, and lists what was filed lately from the record — two sources, never merged, each saying which it is. *recycle bin* is every discarded thing with the instruction that brings it back. *cost* is money and tokens, cut five ways, each summing exactly to what was billed.
 

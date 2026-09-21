@@ -23,6 +23,12 @@ use crate::error::{MemoryError, io_err};
 /// time. Over a fifty-thousand record ledger on one windows-x86_64
 /// NVMe machine (2026-09-02): 734 µs a line then, against 0.89 µs
 /// walking forward and 5.82 µs walking backward now.
+///
+/// This held handle is why line reading is the index's one step
+/// outside `Vfs` (memory-SPEC 8-15): the seam's `read_at` opens the
+/// segment per call, which is the 734 µs this type exists to avoid.
+/// Nothing here writes, so the crash semantics the seam is there to
+/// model have nothing to say about it.
 pub struct LineReader<'index> {
     pub(crate) index: &'index LedgerIndex,
     pub(crate) dir: PathBuf,
@@ -33,7 +39,7 @@ impl LineReader<'_> {
     /// One line, without its terminator. A seq absent from the index is
     /// a caller error, not a corrupt ledger.
     pub fn line_at(&mut self, seq: Seq) -> Result<Vec<u8>, MemoryError> {
-        let Some((name, offset)) = self.index.entries.get(&seq) else {
+        let Some((name, offset)) = self.index.folded.entries.get(&seq) else {
             return Err(MemoryError::SeqMissing { seq: seq.value() });
         };
         let offset = *offset;

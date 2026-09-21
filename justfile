@@ -121,10 +121,40 @@ test:
 test-std:
     cargo test --workspace --locked
 
-# All machine gates (xtask). cargo-deny runs in CI and here when installed.
+# All machine gates (xtask), then the supply-chain read.
 gates:
     cargo xtask gates
-    @command -v cargo-deny >/dev/null 2>&1 && cargo deny check || echo "cargo-deny not installed locally; CI runs it"
+    just deny
+
+# The supply-chain read: licences, banned crates, and where they came
+# from. This recipe is the one place that says which checks the daily
+# loop runs, and `ci.yml`'s supply job calls it instead of listing them
+# again.
+#
+# `advisories` is deliberately absent. An advisory published today
+# against a dependency nobody touched would turn a change red for a
+# reason its author did not write, which is how people learn to ignore a
+# red build; `nightly.yml` runs that check, where red means "go and
+# look". What each check judges is `deny.toml`'s to say.
+#
+# Without cargo-deny installed this prints one line and succeeds, because
+# CI installs it on every push. **A cargo-deny that answers and refuses
+# fails this recipe.** The `&& … || echo` that stood here reported "not
+# installed" for a real violation as well as for a missing tool, so
+# `deny.toml`'s yanked-crate rule had never once stopped a merge.
+#
+# The optional directory is for a tree outside the workspace: `desktop/`
+# carries its own manifest and its own deny.toml, and it is read with the
+# same list of checks rather than with a second spelling of it.
+deny dir=".":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v cargo-deny >/dev/null 2>&1; then
+        echo "cargo-deny not installed locally; CI runs it on every push"
+        exit 0
+    fi
+    cd '{{dir}}'
+    cargo deny check bans licenses sources
 
 # L-02: `desktop/` is not compiled by any workspace command - the root
 # Cargo.toml excludes it so the Win32 boundary can relax `unsafe_code`
@@ -140,7 +170,7 @@ check-desktop:
     cd desktop && cargo fmt --all --check
     cd desktop && cargo clippy --all-targets --locked -- -D warnings
     cd desktop && cargo nextest run --locked
-    @cd desktop && { command -v cargo-deny >/dev/null 2>&1 && cargo deny check || echo "cargo-deny not installed locally; CI runs it"; }
+    just deny desktop
 
 # The browser client (client/client-SPEC.md): Solid + Effect, driven by
 # bun, bundled into target/web-dist where crates/sprawling/build.rs reads

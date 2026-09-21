@@ -5,16 +5,18 @@
 
 //! The side index: seq to (segment, byte offset).
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
+use std::collections::BTreeMap;
 use std::ops::Bound;
 use std::path::Path;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use kernel::{RunId, Seq};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::MemoryError;
+use crate::real_fs::RealFs;
+use crate::vfs::Vfs;
 
+use super::cache::Folded;
 use super::reader::LineReader;
 
 /// What one [`LedgerIndex::refresh`] did, and what it lifted off the
@@ -36,67 +38,43 @@ pub enum Refreshed {
 }
 
 /// seq → (segment file name, byte offset of the line start).
+///
+/// The maps live in [`Folded`]; what this type adds is the filesystem
+/// seam they are folded from. The seam sits behind a lock because
+/// writing the cache is the one thing this index does to a disk and its
+/// public face stays read-only: a caller holding `&LedgerIndex` asks
+/// questions, and answering one must not require it to hand over
+/// exclusive access to an artifact it may throw away.
 pub struct LedgerIndex {
-    pub(crate) entries: BTreeMap<Seq, (String, u64)>,
-    /// run → the sequences it wrote.
-    ///
-    /// The same map read the other way round, and the reason one
-    /// session's history costs its own length rather than the ledger's:
-    /// without it, answering "the newest twenty lines of this session"
-    /// meant reading every line back to wherever the answer ran out and
-    /// discarding what belonged to somebody else.
-    pub(crate) runs: BTreeMap<RunId, BTreeSet<Seq>>,
-    /// Bytes of each segment already folded into `entries`.
-    ///
-    /// The one home of "how far this index has read", and it always
-    /// names the end of a complete line: `fold_segment` counts only
-    /// lines that carried their terminator, so the next refresh starts
-    /// where a record starts and can never lift half of one.
-    ///
-    /// It is resident state, never read back off the disk. A cache is
-    /// believed only when the directory's byte count and digest match
-    /// its stamp, and at that moment this map is the segment sizes
-    /// themselves; a cache whose offsets were damaged fails the stamp
-    /// and the whole index is rebuilt. A segment that shrank has the
-    /// same answer, because tail recovery truncates and every offset
-    /// held for that segment then describes bytes that are gone.
-    pub(crate) scanned: BTreeMap<String, u64>,
+    pub(crate) folded: Folded,
+    vfs: Mutex<Box<dyn Vfs>>,
 }
 
 impl LedgerIndex {
-    /// Reads `size - from` bytes of `path`, starting at `from`, and
-    /// leaves everything before `from` on the disk.
-    ///
-    /// `take` bounds the read by the length this refresh stat'ed, so a
-    /// record appended between the stat and the read stays for the next
-    /// refresh rather than being folded at an offset this pass never
-    /// confirmed.
-    ///
-    /// `None` asks the caller to rebuild: it means the span does not fit
-    /// this machine's pointer width, which no ledger this crate writes
-    /// can reach, and a rebuild is the answer that cannot be wrong.
-    fn read_span(path: &Path, from: u64, size: u64) -> Result<Option<Vec<u8>>, MemoryError> {
-        let span = size.saturating_sub(from);
-        let Ok(capacity) = usize::try_from(span) else {
-            return Ok(None);
-        };
-        let mut file = File::open(path).map_err(io_err("open segment", path))?;
-        file.seek(SeekFrom::Start(from))
-            .map_err(io_err("seek segment", path))?;
-        let mut tail = Vec::with_capacity(capacity);
-        file.take(span)
-            .read_to_end(&mut tail)
-            .map_err(io_err("read segment", path))?;
-        Ok(Some(tail))
+    /// The seam, whatever a thread that held it did before it died: a
+    /// disposable side artifact has no invariant a panic could leave
+    /// half-kept, so a poisoned lock is taken as it stands — the same
+    /// stance `FaultFs` takes on its own state.
+    fn seam(&self) -> MutexGuard<'_, Box<dyn Vfs>> {
+        self.vfs.lock().unwrap_or_else(PoisonError::into_inner)
     }
+
     /// Loads the cache when it is checksum-fresh, otherwise scans the
     /// directory. Both paths yield the same map; only the cost differs.
+    ///
+    /// # Errors
+    /// Propagates a ledger directory that cannot be listed or read.
     pub fn load_or_rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError> {
-        let stamp = super::cache::directory_stamp(dir)?;
-        if let Some(index) = super::cache::load_cache(dir, &stamp) {
-            return Ok(index);
-        }
-        super::cache::rebuild(dir)
+        let vfs: Box<dyn Vfs> = Box::new(RealFs::new());
+        let stamp = super::cache::directory_stamp(vfs.as_ref(), dir)?;
+        let folded = match super::cache::load_cache(vfs.as_ref(), dir, &stamp) {
+            Some(folded) => folded,
+            None => super::cache::rebuild(vfs.as_ref(), dir)?,
+        };
+        Ok(LedgerIndex {
+            folded,
+            vfs: Mutex::new(vfs),
+        })
     }
 
     /// An index over nothing.
@@ -107,9 +85,8 @@ impl LedgerIndex {
     #[must_use]
     pub fn empty() -> LedgerIndex {
         LedgerIndex {
-            entries: BTreeMap::new(),
-            runs: BTreeMap::new(),
-            scanned: BTreeMap::new(),
+            folded: Folded::empty(),
+            vfs: Mutex::new(Box::new(RealFs::new())),
         }
     }
 
@@ -133,81 +110,79 @@ impl LedgerIndex {
     /// The answer reports how many bytes this refresh read, which is
     /// what separates seeking to the tail from lifting the segment that
     /// holds it.
+    ///
+    /// # Errors
+    /// Propagates a ledger directory that cannot be listed, stat'ed or
+    /// read.
     pub fn refresh(&mut self, dir: &Path) -> Result<Refreshed, MemoryError> {
-        let names = super::cache::segment_names(dir)?;
-        let mut fresh = Vec::new();
+        let plan = self.plan_refresh(dir)?;
+        match plan {
+            RefreshPlan::Rebuild => {
+                let folded = super::cache::rebuild(self.seam().as_ref(), dir)?;
+                self.folded = folded;
+                Ok(Refreshed::Rebuilt)
+            }
+            RefreshPlan::Unchanged => Ok(Refreshed::Unchanged),
+            RefreshPlan::Appended { spans } => self.fold_spans(dir, spans),
+        }
+    }
+
+    /// What this refresh has to do, decided from segment lengths alone.
+    fn plan_refresh(&self, dir: &Path) -> Result<RefreshPlan, MemoryError> {
+        let vfs = self.seam();
+        let names = super::cache::segment_names(vfs.as_ref(), dir)?;
+        let mut spans = Vec::new();
         for name in &names {
             let path = dir.join(name);
-            let size = std::fs::metadata(&path)
-                .map_err(io_err("stat segment", &path))?
-                .len();
-            match self.scanned.get(name).copied() {
+            let size = vfs
+                .size(&path)
+                .map_err(crate::error::io_err("stat segment", &path))?;
+            match self.folded.scanned.get(name).copied() {
                 Some(done) if done == size => continue,
-                Some(done) if done < size => fresh.push((name.clone(), done, size)),
-                Some(_) => return self.replace_with(super::cache::rebuild(dir)?),
-                None => fresh.push((name.clone(), 0, size)),
+                Some(done) if done < size => spans.push(Span {
+                    name: name.clone(),
+                    from: done,
+                    size,
+                }),
+                Some(_) => return Ok(RefreshPlan::Rebuild),
+                None => spans.push(Span {
+                    name: name.clone(),
+                    from: 0,
+                    size,
+                }),
             }
         }
-        if self.scanned.keys().any(|held| !names.contains(held)) {
-            return self.replace_with(super::cache::rebuild(dir)?);
+        if self.folded.scanned.keys().any(|held| !names.contains(held)) {
+            return Ok(RefreshPlan::Rebuild);
         }
-        if fresh.is_empty() {
-            return Ok(Refreshed::Unchanged);
+        if spans.is_empty() {
+            return Ok(RefreshPlan::Unchanged);
         }
+        Ok(RefreshPlan::Appended { spans })
+    }
+
+    /// Reads each appended span and folds it. The read is bounded by the
+    /// length this refresh stat'ed, so a record appended between the
+    /// stat and the read stays for the next refresh rather than being
+    /// folded at an offset this pass never confirmed.
+    fn fold_spans(&mut self, dir: &Path, spans: Vec<Span>) -> Result<Refreshed, MemoryError> {
         let mut bytes_read: u64 = 0;
-        for (name, from, size) in fresh {
-            let path = dir.join(&name);
-            let Some(tail) = LedgerIndex::read_span(&path, from, size)? else {
-                return self.replace_with(super::cache::rebuild(dir)?);
-            };
+        for span in spans {
+            let path = dir.join(&span.name);
+            let tail = self
+                .seam()
+                .read_at(&path, span.from, span.size.saturating_sub(span.from))
+                .map_err(crate::error::io_err("read segment", &path))?;
             bytes_read = bytes_read.saturating_add(u64::try_from(tail.len()).unwrap_or(u64::MAX));
-            let indexed = self.fold_segment(&name, from, &tail);
+            let indexed = self.folded.fold_segment(&span.name, span.from, &tail);
             // Only complete lines count as scanned: a torn tail is
             // overwritten by the next append, and remembering it as read
             // would skip the record that replaces it.
-            self.scanned
-                .insert(name, from.saturating_add(indexed).min(size));
+            self.folded
+                .scanned
+                .insert(span.name, span.from.saturating_add(indexed).min(span.size));
         }
         Ok(Refreshed::Appended { bytes_read })
-    }
-
-    /// Indexes the complete lines of `tail`, which begins at `from` in
-    /// the segment. Returns how many bytes those complete lines took.
-    pub(crate) fn fold_segment(&mut self, name: &str, from: u64, tail: &[u8]) -> u64 {
-        let mut offset = from;
-        let mut complete_bytes = 0u64;
-        for line in tail.split_inclusive(|b| *b == b'\n') {
-            if line.last().copied() != Some(b'\n') {
-                break;
-            }
-            let body = line.get(..line.len().saturating_sub(1)).unwrap_or(line);
-            if !body.is_empty() {
-                self.insert_line(name, offset, body);
-            }
-            let len = u64::try_from(line.len()).unwrap_or(0);
-            offset = offset.saturating_add(len);
-            complete_bytes = complete_bytes.saturating_add(len);
-        }
-        complete_bytes
-    }
-
-    /// What indexing one line means, in one place: where it sits, and
-    /// whose it is. A line that does not parse is skipped rather than
-    /// reported — the caller is looking at a ledger that may be damaged,
-    /// and an index is how such a ledger gets repaired.
-    pub(crate) fn insert_line(&mut self, name: &str, offset: u64, body: &[u8]) {
-        let Some(located) = super::cache::locate(body) else {
-            return;
-        };
-        self.entries.insert(located.seq, (name.to_owned(), offset));
-        if let Some(run) = located.run {
-            self.runs.entry(run).or_default().insert(located.seq);
-        }
-    }
-
-    fn replace_with(&mut self, built: LedgerIndex) -> Result<Refreshed, MemoryError> {
-        *self = built;
-        Ok(Refreshed::Rebuilt)
     }
 
     /// A cursor for reading lines out of this index.
@@ -241,7 +216,8 @@ impl LedgerIndex {
             Some(seq) => Bound::Excluded(seq),
             None => Bound::Unbounded,
         };
-        self.runs
+        self.folded
+            .runs
             .get(&run)
             .into_iter()
             .flat_map(move |seqs| seqs.range((Bound::Unbounded, upper)).rev().copied())
@@ -249,14 +225,40 @@ impl LedgerIndex {
 
     /// Writes the cache. Failure is not fatal — the index rebuilds next
     /// time, and a disposable artifact must never block the main path.
+    ///
+    /// # Errors
+    /// Propagates a cache file that cannot be replaced, written or
+    /// flushed.
     pub fn persist(&self, dir: &Path) -> Result<(), MemoryError> {
-        let stamp = super::cache::directory_stamp(dir)?;
+        let body = {
+            let vfs = self.seam();
+            let stamp = super::cache::directory_stamp(vfs.as_ref(), dir)?;
+            self.cache_text(&stamp)
+        };
+        let path = dir.join(super::cache::CACHE_NAME);
+        let mut vfs = self.seam();
+        // Append is append: a cache left over from a shorter ledger
+        // would otherwise be spliced onto this one, and the splice
+        // parses far enough to be believed.
+        if vfs.exists(&path) {
+            vfs.remove_file(&path)
+                .map_err(crate::error::io_err("replace the index cache", &path))?;
+        }
+        vfs.append(&path, body.as_bytes())
+            .map_err(crate::error::io_err("write the index cache", &path))?;
+        vfs.sync_data(&path)
+            .map_err(crate::error::io_err("flush the index cache", &path))
+    }
+
+    /// The cache file's whole text: a header naming the directory it
+    /// describes, then one row per line.
+    fn cache_text(&self, stamp: &super::cache::Stamp) -> String {
         // The run map inverted for the length of this write. Held here
         // rather than resident because a cache row is the only reader of
         // "which run owns this seq", and a second resident copy would be
         // a second thing to keep in step.
         let mut owner: BTreeMap<Seq, RunId> = BTreeMap::new();
-        for (run, seqs) in &self.runs {
+        for (run, seqs) in &self.folded.runs {
             for seq in seqs {
                 owner.insert(*seq, *run);
             }
@@ -267,28 +269,42 @@ impl LedgerIndex {
             stamp.bytes,
             stamp.digest
         );
-        for (seq, (segment, offset)) in &self.entries {
+        for (seq, (segment, offset)) in &self.folded.entries {
             let run = match owner.get(seq) {
                 Some(run) => run.to_string(),
                 None => super::cache::NO_RUN.to_owned(),
             };
             out.push_str(&format!("{} {segment} {offset} {run}\n", seq.value()));
         }
-        let path = dir.join(super::cache::CACHE_NAME);
-        std::fs::write(&path, out.as_bytes()).map_err(io_err("write index cache", &path))
+        out
     }
 
     pub fn tail_seq(&self) -> Option<Seq> {
-        self.entries.keys().next_back().copied()
+        self.folded.entries.keys().next_back().copied()
     }
 
     pub fn len(&self) -> usize {
-        self.entries.len()
+        self.folded.entries.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.folded.entries.is_empty()
     }
+}
+
+/// One segment's appended stretch: where this index stopped, and where
+/// the segment now ends.
+struct Span {
+    name: String,
+    from: u64,
+    size: u64,
+}
+
+/// What a refresh decided before it read anything.
+enum RefreshPlan {
+    Unchanged,
+    Appended { spans: Vec<Span> },
+    Rebuild,
 }
 
 #[cfg(test)]

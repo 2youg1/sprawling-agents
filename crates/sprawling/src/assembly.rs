@@ -43,6 +43,7 @@ mod plans;
 mod probing;
 mod recording;
 mod reviewing;
+mod rooms;
 mod settling;
 mod toolkits;
 mod waking;
@@ -51,6 +52,7 @@ mod workbench;
 pub(crate) use building_page::{DOC_BYTES_MAX, read_building};
 use commanding::entrance::Entrance;
 pub(crate) use credentials::signing::resolving;
+use credentials::subscription::Expiries;
 use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
@@ -58,8 +60,9 @@ pub(crate) use dispatching::{Dispatched, acp_dispatch};
 pub(crate) use driving::flight::LOOK_AGAIN;
 use driving::flight::{Flight, Landed};
 pub(crate) use driving::lane::{DriveContext, drive_run};
+use driving::owing::{Owed, Owing, Unasked};
 pub(crate) use driving::{Driven, Driving};
-use folds::{Governance, artifact_of, new_inbox};
+use folds::{Governance, INBOX_CAPACITY, artifact_of, new_inbox};
 pub(crate) use folds::{HALTED, RELEASED, Standing, rebuild_views};
 pub(crate) use genesis::city_address;
 use genesis::city_segment;
@@ -71,6 +74,7 @@ use naming::{
     autonomy_name, building_of, governed_of, mode_of, name_of, not_built, plan_node_of, scope_name,
 };
 use plans::Reporter;
+use rooms::{Holding, RoomQueues};
 use settling::{Ending, Sweep};
 pub(crate) use toolkits::broker_for;
 use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
@@ -143,6 +147,27 @@ impl ScanReport {
     }
 }
 
+/// Where a served city listens, installed once by whoever serves it.
+///
+/// The three sinks are one fact — *somebody is watching this city* —
+/// and a worker that has any of them has all of them. A worker driven
+/// one command at a time has none, and that absence is the switch: its
+/// runs ask their provider for no stream at all, so replay and citysim
+/// take the byte-identical path they always took.
+pub(crate) struct Serving {
+    /// Where a model's text goes while it is still arriving.
+    pub(crate) deltas: Arc<dyn Fn(channels::Delta) + Send + Sync>,
+    /// Where a fresh look at this machine goes: the one place the
+    /// doctor's answer is replaced after the look taken at start-up.
+    pub(crate) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
+    /// What a running dispatch asks at its safe points.
+    ///
+    /// One handle per drive rather than one hook lent out and taken
+    /// back: N runs may be asking at once, and each asks about itself
+    /// (sprawling-SPEC.md 8-46-1).
+    pub(crate) interrupts: Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>,
+}
+
 /// Runs the work a Command asks for. It owns the ledger, so the city has
 /// one writer; commands reach it through a desk, and the socket task
 /// that accepted them is free again immediately.
@@ -165,34 +190,26 @@ pub struct RunWorker {
     /// The vault. Shared because a redemption closure outlives the call
     /// that builds it; the lock is held for one resolve at a time.
     vault: Arc<std::sync::Mutex<gateway::Custodian>>,
-    /// What a running dispatch asks at its safe points. `None` in a
-    /// worker driven one command at a time, which is every worker except
-    /// the one behind a live control surface.
-    /// One handle per drive rather than one hook lent out and taken
-    /// back: N runs may be asking at once, and each asks about itself
-    /// (sprawling-SPEC.md 8-46-1).
-    interrupts: Option<Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>>,
-    /// Where a model's text goes while it is still arriving. `None` in
-    /// every worker but the one behind a live control surface, and that
-    /// is the switch: a run whose city has nobody watching asks its
-    /// provider for no stream at all, so replay and citysim take the
-    /// byte-identical path they always took.
-    watching: Option<std::sync::Arc<dyn Fn(channels::Delta) + Send + Sync>>,
-    /// Where a fresh look at this machine goes. `None` in a worker
-    /// driven one command at a time, which has no views to correct;
-    /// where a city is served it is the one place the doctor's answer
-    /// is replaced after the look taken at start-up.
-    machine: Option<std::sync::Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>>,
+    /// The three places a live control surface listens, or `None` in a
+    /// worker driven one command at a time.
+    ///
+    /// **One `Option`, not three.** The three sinks are installed by
+    /// one caller in one breath and are absent together in every other
+    /// worker; as three fields the type admitted eight states of which
+    /// two were reachable, and adding a fourth sink meant remembering a
+    /// fourth setter (sprawling-SPEC.md 8-46-10).
+    serving: Option<Serving>,
     /// What waits for a person, who may answer it, what has been
     /// allowed, which scopes are shut, and what each waiting item is
     /// holding up. The worker keeps its own copy for the same reason it
     /// keeps the endpoint book: an answer is decided synchronously,
     /// before the record it just wrote has reached any observer.
     governance: Governance,
-    /// What is waiting for each room, folded from the signal records.
-    /// A dispatch lends its room's queue to the signal tool and takes it
-    /// back when the drive ends, so exactly one queue exists per room.
-    pub(super) inboxes: std::collections::BTreeMap<Address, collab::Inbox>,
+    /// What is waiting for each room, folded from the signal records,
+    /// and which run is reading it. A dispatch lends its room's queue
+    /// to the signal tool and takes it back when the drive ends, and
+    /// `rooms` is what holds that to one queue per room.
+    pub(in crate::assembly) rooms: RoomQueues,
     /// What each room already got back from work it handed down. Kept
     /// beside the inboxes because it is folded from the same lines and
     /// belongs to the same room.
@@ -218,14 +235,10 @@ pub struct RunWorker {
     /// worker opens, so a city that was off owes nothing for the time it
     /// was off.
     last_tick: TimeMs,
-    /// Whether the run being dispatched began with somebody else's text.
-    /// Set for the length of one dispatch by `wake`; it decides whether
-    /// the approvals that run raises can be waived by a policy.
-    tainted_arrival: bool,
     /// When each subscription credential stops working, by provider.
     /// Folded from the capture records, so a restarted city renews on
     /// the same schedule rather than discovering expiry through a 401.
-    expiries: std::collections::BTreeMap<String, u64>,
+    expiries: Expiries,
     /// Logins begun and not yet redeemed, by provider. Held in memory
     /// on purpose: a PKCE verifier proves that the process which asked
     /// is the process which redeems, so a verifier that outlived the
@@ -282,39 +295,15 @@ impl RunWorker {
         self.ledger.observe(sink);
     }
 
-    /// Sends every increment a model produces to `sink`, before the call
-    /// it belongs to has settled.
+    /// Takes the three places a served city listens.
     ///
     /// Separate from [`Self::observe`] because the two carry different
-    /// kinds of thing: that one carries history and this one carries a
-    /// view of work in progress. A city with nobody watching never
-    /// installs one, and a run whose city has none asks its provider for
-    /// no stream at all.
-    pub(crate) fn watch(&mut self, sink: std::sync::Arc<dyn Fn(channels::Delta) + Send + Sync>) {
-        self.watching = Some(sink);
-    }
-
-    /// Sends a fresh look at this machine to `sink`.
-    ///
-    /// Separate from [`Self::observe`] because what travels is not
-    /// history: the doctor's answer is about the machine rather than
-    /// about the city, which is why it is set from outside and why a
-    /// rebuild from the ledger leaves it alone.
-    pub(crate) fn examine(
-        &mut self,
-        sink: std::sync::Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
-    ) {
-        self.machine = Some(sink);
-    }
-
-    /// Where a running dispatch asks what arrived. Attached by the serve
-    /// wiring, absent in a worker driven command by command: a source
-    /// nobody set means a run that nothing interrupts.
-    pub(crate) fn attach_interrupts(
-        &mut self,
-        source: Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>,
-    ) {
-        self.interrupts = Some(source);
+    /// kinds of thing: that one carries history, and these carry a view
+    /// of work in progress and of the machine under it. One call rather
+    /// than three, so a worker cannot end up streaming to a page that
+    /// cannot interrupt it.
+    pub(crate) fn serve(&mut self, serving: Serving) {
+        self.serving = Some(serving);
     }
 }
 

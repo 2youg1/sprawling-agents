@@ -15,7 +15,7 @@ use serde_json::Map;
 
 use crate::handoff::Handoff;
 use crate::reminder::ContextGauge;
-use crate::turn::{Interrupt, PhaseOutcome, Turn, TurnReport};
+use crate::turn::{Interrupt, NextCall, PhaseOutcome, Turn, TurnReport};
 use crate::window::Window;
 
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint, payload};
@@ -177,7 +177,23 @@ impl Run<Active> {
         fold_steer(&mut self.state.window, &wave);
         let invoke = &mut hooks.invoke;
         let mut stamped = |call: &ToolCall| invoke(call, t);
-        let turn = match turn.execute(wave, ledger, &mut stamped)? {
+        // The same question the three phase boundaries ask, asked again
+        // before each call of the wave. A cancel ends the wave there; a
+        // steer is folded into the window and the call goes ahead,
+        // because text that redirects the work takes effect at the next
+        // assembly and stopping is the only instruction that can be
+        // carried out between two calls.
+        let asking = &mut hooks.interrupt;
+        let window = &mut self.state.window;
+        let mut still_going = |call: u32| {
+            let arrived = asking(SafePoint::BeforeToolCall { turn: index, call });
+            fold_steer(window, &arrived);
+            match arrived {
+                Interrupt::Cancel => NextCall::Halted,
+                Interrupt::None | Interrupt::Steer { .. } => NextCall::Allowed,
+            }
+        };
+        let turn = match turn.execute(wave, ledger, &mut stamped, &mut still_going)? {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };

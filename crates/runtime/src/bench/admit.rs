@@ -27,14 +27,13 @@ impl ToolBench {
         call: &ToolCall,
         name: &str,
         effect: &Effect,
-        ctx: &GateContext,
     ) -> Result<Option<BenchOutcome>, AxError> {
         match effect {
             Effect::Read => {}
             // The tool declares an area, not a file; the file is judged
             // by the tool itself once a call names one.
             Effect::Write { domain: area } => {
-                let verdict = kernel::reach(&self.domain, area, &self.taint);
+                let verdict = kernel::gate::reach(&self.domain, area, &self.taint);
                 if let Some(answered) = self.settled(verdict) {
                     return Ok(Some(answered));
                 }
@@ -44,8 +43,8 @@ impl ToolBench {
                 // connector's destination is its registration's, so
                 // there is nothing for the call to name and nothing for
                 // a model to get wrong.
-                let spans = kernel::scan(&scanned(call, "scan connector args")?);
-                let verdict = kernel::egress(
+                let spans = kernel::secret::scan(&scanned(call, "scan connector args")?);
+                let verdict = kernel::gate::egress(
                     &spans,
                     &EgressTarget::Connector {
                         label: label.clone(),
@@ -60,38 +59,24 @@ impl ToolBench {
                 // these bytes may leave; this one asks whether what
                 // happens at the other end can be taken back. The
                 // desktop connector is the first thing here for which
-                // the answer is no — a key pressed on somebody's own
-                // machine has no restoration — so it goes to the person
-                // rather than being refused, which would make the tool
-                // equivalent to absent.
+                // the answer can be no: a key pressed on somebody's own
+                // machine has no restoration, so the floor's `[sandbox]`
+                // decides, and content that came in from outside is
+                // refused whatever the floor says.
                 let called = ToolName::parse(name)?;
                 let reaching = kernel::ConnectorCall {
                     label,
                     tool: &called,
                 };
-                if kernel::reaches_the_undoable(&reaching) {
-                    let Some(job) = self.job.as_ref() else {
-                        return Err(AxError::failure(
-                            AxCode::ToolUnavailable,
-                            "invoke tool",
-                            format!(
-                                "`{name}` reaches this machine's desktop and this bench was \
-                                 built without a job"
-                            ),
-                        )
-                        .with_recovery(
-                            "build the bench with `for_job`; an action on somebody's own \
-                             machine that they cannot be asked about is one nobody allowed",
-                        ));
-                    };
-                    let verdict = kernel::undoable(ctx, &reaching, job, &self.taint);
+                if kernel::gate::reaches_the_undoable(&reaching) {
+                    let verdict = kernel::gate::undoable(&reaching, &self.sandbox, &self.taint);
                     if let Some(answered) = self.settled(verdict) {
                         return Ok(Some(answered));
                     }
                 }
             }
             Effect::Egress => {
-                let spans = kernel::scan(&scanned(call, "scan egress args")?);
+                let spans = kernel::secret::scan(&scanned(call, "scan egress args")?);
                 // The target is the tool's to declare; a call that does
                 // not say where it is sending cannot be judged, and an
                 // unjudged egress is the one thing the door exists for.
@@ -112,7 +97,7 @@ impl ToolBench {
                         )
                     })?
                     .to_owned();
-                let verdict = kernel::egress(
+                let verdict = kernel::gate::egress(
                     &spans,
                     &EgressTarget::Public { host },
                     self.prior_public_egress,
@@ -122,65 +107,26 @@ impl ToolBench {
                 }
             }
             Effect::Spawn => {
-                let (Some(asking), Some(job)) = (self.asking.as_ref(), self.job.as_ref()) else {
-                    return Err(AxError::failure(
-                        AxCode::ToolUnavailable,
-                        "invoke tool",
-                        format!("`{name}` declares Spawn and this bench was built without a job"),
-                    )
-                    .with_recovery(
-                        "build the bench with `for_job`; a spawn a person cannot be asked about \
-                         is a spawn nobody allowed",
-                    ));
-                };
-                // The room is the tool's own argument, so the person is
-                // told where the work is going without this layer
-                // learning the tool's schema: an unreadable room reads
-                // as the asking address, and the item still names a real
-                // place.
-                let room = call
-                    .args
-                    .as_map()
-                    .get("room")
-                    .and_then(Value::as_str)
-                    .and_then(|raw| Address::parse(raw).ok())
-                    .unwrap_or_else(|| asking.clone());
-                let verdict = kernel::delegation(ctx, asking, &room, job, &self.taint);
-                if let Some(answered) = self.settled(verdict) {
-                    return Ok(Some(answered));
-                }
+                // No door here. How deep work may be handed down is
+                // a type rather than a question, and the depth a
+                // spawn would reach is known where the parent run
+                // is: `gate::spawn` runs at the dispatch site, with
+                // the parent's `Depth` in hand.
             }
             Effect::Govern => {
-                let (Some(asking), Some(job)) = (self.asking.as_ref(), self.job.as_ref()) else {
-                    return Err(AxError::failure(
-                        AxCode::ToolUnavailable,
-                        "invoke tool",
-                        format!("`{name}` declares Govern and this bench was built without a job"),
-                    )
-                    .with_recovery(
-                        "build the bench with `for_job`; a rule change a person cannot be asked \
-                         about is a rule change nobody allowed",
-                    ));
-                };
-                let scope = call
-                    .args
-                    .as_map()
-                    .get("scope")
-                    .and_then(Value::as_str)
-                    .and_then(|raw| Address::parse(raw).ok())
-                    .unwrap_or_else(|| asking.clone());
-                // What the person is being asked to allow, in their own
-                // reading rather than as a category name.
-                let proposal = call
-                    .args
-                    .as_map()
-                    .get("text")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default();
-                let verdict = kernel::govern(ctx, asking, &scope, proposal, job, &self.taint);
-                if let Some(answered) = self.settled(verdict) {
-                    return Ok(Some(answered));
-                }
+                // A run does not rewrite the rules it is judged by. The
+                // rules are in `CONFIG.toml` and in the building's own
+                // `BUILDING.md`, where a person edits them; a door that
+                // asked instead would be a door whose default answer
+                // gets clicked through.
+                return Err(AxError::failure(
+                    AxCode::GateDenied,
+                    "invoke tool",
+                    format!("`{name}` declares Govern, and a run may not change what governs it"),
+                )
+                .with_recovery(
+                    "edit the scope's `CONFIG.toml`, or the building's `BUILDING.md`, and                      dispatch again",
+                ));
             }
             Effect::Spend => {
                 // No Spend tool instance exists until the egress proxy
@@ -201,20 +147,15 @@ impl ToolBench {
 
     /// What one gate's verdict means to this bench.
     ///
-    /// The granted check lives here and nowhere else. An answer the
-    /// person already gave is not asked again, and the grant is per
-    /// cluster because that is the unit they were shown and answered
-    /// in. The rule used to be written out at each of the three doors
-    /// that can escalate.
+    /// What one gate verdict means to this bench.
+    ///
+    /// Two answers, because a door has two: an Allow lets the call
+    /// through and a Deny is the outcome. No door asks a person, so
+    /// there is no third state for this to carry.
     fn settled(&self, outcome: GateOutcome) -> Option<BenchOutcome> {
         match outcome {
             GateOutcome::Allow => None,
             GateOutcome::Deny { refusal } => Some(BenchOutcome::Refused { refusal }),
-            GateOutcome::Escalate { item } => {
-                (!self.granted.contains(&item.cluster_key)).then(|| BenchOutcome::Pending {
-                    item: Box::new(item),
-                })
-            }
         }
     }
 

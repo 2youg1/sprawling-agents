@@ -26,7 +26,7 @@ use crate::walk;
 mod enums;
 
 const SPEC_PATH: &str = "crates/kernel/kernel-SPEC.md";
-const ARCH: &str = "ARCHITECTURE.md";
+use crate::architecture::PATH as ARCH;
 
 fn violation(rule: &str, violation: String, alternative: &str) -> Violation {
     Violation {

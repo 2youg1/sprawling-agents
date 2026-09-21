@@ -21,11 +21,10 @@
 // `theme.css`, and this file cannot drift away from it.
 //
 // None of it is a fact about the city, so none of it goes over the
-// wire: like the language and the default effort, it lives in this
-// browser's own storage - named, read back and written by
-// `core/prefs.ts`, which is the client's one door to that store. What
-// stays here is the drawing: which attribute each choice becomes, and
-// which word it is offered under.
+// wire: like the language, it is part of the record `core/prefs.ts`
+// keeps and hands over, and this file names no stored row. What stays
+// here is the drawing: which attribute each choice becomes, and which
+// word it is offered under.
 
 import { For, Show, createSignal, onMount } from "solid-js";
 
@@ -38,12 +37,10 @@ import {
   LIGHTINGS,
   MOTIONS,
   STACK_SHAPE,
-  browserRows,
-  readAppearance,
+  preferences,
   sizingOf,
-  writeAppearance,
 } from "../../core/prefs";
-import type { Appearance, Chroma, Density, Face, Lighting, Motion, Rows } from "../../core/prefs";
+import type { Appearance, Chroma, Density, Face, Lighting, Motion, PreferenceDoor } from "../../core/prefs";
 import { useSay } from "../../ui";
 import { Field } from "../parts/field";
 import type { FieldProps } from "../parts/field";
@@ -133,9 +130,9 @@ function machineLighting(): "dark" | "light" {
 // the one place that starts the client: a listener added wherever the
 // settings screen mounts would be a second listener doing the same
 // work, and neither would know about the other.
-export function watchMachineLighting(root: HTMLElement, rows: Rows): void {
+export function watchMachineLighting(root: HTMLElement, kept: PreferenceDoor): void {
   window.matchMedia(MACHINE_LIGHT).addEventListener("change", () => {
-    const held = readAppearance(rows);
+    const held = kept.held().appearance;
     if (held.lighting === "system") applyAppearance(root, held);
   });
 }
@@ -166,8 +163,11 @@ function drawnSize(root: HTMLElement): string {
 export function AppearanceSection() {
   const say = useSay();
   const root = document.documentElement;
-  const rows = browserRows();
-  const [held, setHeld] = createSignal<Appearance>(readAppearance(rows));
+  const kept = preferences();
+  // Read through the door rather than copied into a signal here: a
+  // copy is a second holder of one record, and the two part company
+  // the first time anything else changes a preference.
+  const held = (): Appearance => kept.held().appearance;
   // What is in the size box, which is not the size: a box mid-edit
   // holds text the page must not act on yet.
   const [box, setBox] = createSignal("");
@@ -177,9 +177,8 @@ export function AppearanceSection() {
   const [note, setNote] = createSignal<string | undefined>(undefined);
 
   const write = (next: Appearance) => {
-    writeAppearance(rows, next);
+    kept.setAppearance(next);
     applyAppearance(root, next);
-    setHeld(next);
   };
 
   // The screen can be reached before whatever applies this at start-up

@@ -8,21 +8,34 @@
 // Passed as context rather than imported, so a view reaches the browser
 // through exactly what it was given.
 
-import { createContext, createMemo, useContext } from "solid-js";
+import { createContext, createMemo, createSignal, useContext } from "solid-js";
 import type { Accessor } from "solid-js";
 
 import { QUERIES } from "./core/asking";
 import type { Key, Lang } from "./core/lang";
 import { fill, say } from "./core/lang";
-import type { Prefs } from "./core/prefs";
+import { loadPreferences } from "./core/prefs";
+import type { PreferenceDoor } from "./core/prefs";
+import { memory } from "./core/rows";
 import type { AddressBar, View } from "./core/route";
 import { go } from "./core/route";
 import type { Connection } from "./core/socket";
-import type { ApprovalItem, Command } from "./wire";
+import type { ApprovalItem, Command, Effort } from "./wire";
 
 export interface Ui {
   readonly conn: Connection;
-  readonly prefs: Prefs;
+  readonly prefs: PreferenceDoor;
+  // How hard the model is asked to think in the session the next
+  // dispatch opens, and `null` when nobody has said - which leaves the
+  // field out of the frame, so the city's own `[model] effort` answers
+  // and, failing that, the provider does.
+  //
+  // **It is held for this page and kept nowhere.** A level remembered
+  // in this browser would ride on every dispatch made from it and
+  // overrule the city's file without saying so; what the selector over
+  // the composer states is the session it is about to open.
+  readonly effort: Accessor<Effort | null>;
+  readonly chooseEffort: (level: Effort | null) => void;
   readonly bar: AddressBar;
   readonly origin: string;
   // Milliseconds now, read where a view needs a relative time.
@@ -33,62 +46,55 @@ const UiContext = createContext<Ui>();
 
 export const UiProvider = UiContext.Provider;
 
+// What a view mounted outside the provider is handed. Reaching this is
+// a programming error rather than a state, so the page draws with an
+// idle socket, a store that lasts as long as the call, and the
+// postures the client ships with - none of which this file spells:
+// `loadPreferences` answers them from an empty store, so an error path
+// cannot become a second statement of a default.
+function orphaned(): Ui {
+  const [effort, chooseEffort] = createSignal<Effort | null>(null);
+  return {
+    conn: {
+      state: () => ({ kind: "idle" }),
+      belief: { runs: {}, halted: [], refusal: null, notices: [], city: null, probed: null, logs: [] },
+      asking: {
+        ask: () => () => undefined,
+        refresh: () => undefined,
+        answered: () => undefined,
+        invalidate: () => undefined,
+        reconnected: () => undefined,
+      },
+      command: () => false,
+      retry: () => undefined,
+      dismissRefusal: () => undefined,
+      markNoticesSeen: () => undefined,
+    },
+    prefs: loadPreferences(memory(), ""),
+    effort,
+    chooseEffort,
+    bar: { hash: "" },
+    origin: "",
+    now: () => 0,
+  };
+}
+
 export function useUi(): Ui {
-  const ui = useContext(UiContext);
-  if (ui === undefined) {
-    // Only reachable by a view mounted outside the provider, which is a
-    // programming error rather than a state; the page has nothing to
-    // draw without it.
-    return {
-      conn: {
-        state: () => ({ kind: "idle" }),
-        belief: { runs: {}, halted: [], refusal: null, notices: [], city: null, probed: null, logs: [] },
-        asking: {
-          ask: () => () => undefined,
-          refresh: () => undefined,
-          answered: () => undefined,
-          invalidate: () => undefined,
-          reconnected: () => undefined,
-        },
-        command: () => false,
-        retry: () => undefined,
-        dismissRefusal: () => undefined,
-        markNoticesSeen: () => undefined,
-      },
-      prefs: {
-        lang: () => "en",
-        setLang: () => undefined,
-        // Nobody has chosen, which is what a client with no
-        // preferences behind it knows. A level here would be this
-        // file's own answer to a question `core/prefs.ts` owns.
-        effort: () => null,
-        setEffort: () => undefined,
-        panel: () => true,
-        setPanel: () => undefined,
-        welcomed: () => false,
-        setWelcomed: () => undefined,
-        draft: () => "",
-        setDraft: () => undefined,
-      },
-      bar: { hash: "" },
-      origin: "",
-      now: () => 0,
-    };
-  }
-  return ui;
+  return useContext(UiContext) ?? orphaned();
 }
 
 // The word for one key in the person's language, with its slots filled.
 export function useSay(): (key: Key, slots?: Readonly<Record<string, string>>) => string {
   const ui = useUi();
   return (key, slots) => {
-    const phrase = say(ui.prefs.lang(), key);
+    const phrase = say(ui.prefs.held().lang, key);
     return slots === undefined ? phrase : fill(phrase, slots);
   };
 }
 
 export function useLang(): () => Lang {
-  return useUi().prefs.lang;
+  const ui = useUi();
+  return () => ui.prefs.held().lang;
 }
 
 export function useGo(): (view: View) => void {

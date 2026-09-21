@@ -7,7 +7,8 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{AxCode, AxError, EventRecord, GENESIS_PREV, Seq, TimeMs, chain_hash};
+use kernel::ledger::chain_hash;
+use kernel::{AxCode, AxError, EventRecord, GENESIS_PREV, Seq, TimeMs};
 
 use crate::error::{MemoryError, io_err};
 use crate::real_fs::RealFs;

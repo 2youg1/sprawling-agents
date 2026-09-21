@@ -126,7 +126,7 @@ fn read(diff: &git2::Diff<'_>) -> FilePatch {
             let origin = line.origin();
             let content = String::from_utf8_lossy(line.content());
             let body = content.trim_end_matches(['\r', '\n']);
-            let hits = kernel::scan(body.as_bytes());
+            let hits = kernel::secret::scan(body.as_bytes());
             match hits.first() {
                 Some(hit) => withheld.push(Withheld {
                     number,

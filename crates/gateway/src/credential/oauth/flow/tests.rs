@@ -204,7 +204,7 @@ fn a13_redeemed_value_reaches_the_wire_verbatim() {
             extra_headers: vec![],
             overrides: vec![],
             timeout_ms: 5_000,
-            stream_deadline_ms: None,
+            stream_idle_timeout_ms: None,
             pricing: None,
             proxying: kernel::Proxying::default(),
         },

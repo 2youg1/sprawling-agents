@@ -18,7 +18,6 @@ use super::super::AttachedEndpoint;
 use super::super::book::Choice;
 use super::read_tuning;
 use crate::endpoint::AuthSpec;
-use crate::fallback::Fallback;
 use crate::market::{InputKinds, ModelEntry};
 
 pub(crate) fn invalid(subject: impl Into<String>) -> AxError {
@@ -134,33 +133,15 @@ pub(crate) fn read_choice(payload: &Payload) -> Result<(ModelTag, Choice), AxErr
         cache_read_price: UsdMicros::new(count(payload, "cache_read_price")?),
         cache_write_price: UsdMicros::new(count(payload, "cache_write_price")?),
     };
-    // Both keys or neither: a half-written retreat names a model with
-    // no endpoint to reach it at, and guessing the missing half is the
-    // silent model switch this whole value exists to forbid.
-    let fallback = match (
-        payload
-            .as_map()
-            .get("fallback_endpoint")
-            .and_then(Value::as_str),
-        payload
-            .as_map()
-            .get("fallback_model")
-            .and_then(Value::as_str),
-    ) {
-        (Some(name), Some(id)) => Fallback::then(name, id)?,
-        (None, None) => Fallback::None,
-        _ => {
-            return Err(invalid(
-                "a fallback names only half of an endpoint and a model",
-            ));
-        }
-    };
+    // A record written while this build carried a retreat arm may hold
+    // `fallback_endpoint` and `fallback_model`. Nothing ever wrote a
+    // value into them and nothing acts on them now, so they are read
+    // past in the same way as any other key this book does not own.
     Ok((
         tag,
         Choice {
             endpoint: text(payload, "endpoint")?,
             entry,
-            fallback,
         },
     ))
 }

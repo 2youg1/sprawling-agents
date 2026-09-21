@@ -20,10 +20,12 @@
     reason = "test code"
 )]
 
+use kernel::ledger::chain_hash;
+use kernel::model::message_payload;
 use kernel::{
     Address, AxError, B3Hash, BuildingPolicy, Completion, ContentBlock, EventDraft, EventRef,
     GENESIS_PREV, Ledger, Locator, Model, ModelRequest, ModelReturn, Payload, RunId, TimeMs,
-    ToolCall, ToolName, ToolOutcome, chain_hash, message_payload,
+    ToolCall, ToolName, ToolOutcome,
 };
 use runtime::handoff::Handoff;
 use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};

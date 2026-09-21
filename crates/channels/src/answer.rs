@@ -15,7 +15,7 @@
 
 use kernel::{
     Address, ApprovalItem, Autonomy, Ceiling, ClusterKey, DialectKind, EventKind, EventRecord,
-    FileChange, GitOid, ModelTag, PolicyVerdict, Restoration, RunId, Seq, TimeMs, UsdMicros,
+    FileChange, GitOid, ModelTag, Restoration, Ruling, RunId, Seq, TimeMs, UsdMicros,
 };
 use serde::{Deserialize, Serialize};
 
@@ -267,7 +267,7 @@ pub struct GovernanceAnswer {
 pub struct Decision {
     /// The `ApprovalId` that was answered.
     pub item: String,
-    pub verdict: PolicyVerdict,
+    pub verdict: Ruling,
     /// What the person was shown when they answered: the answer covers
     /// the group, not the one row.
     pub cluster: ClusterKey,

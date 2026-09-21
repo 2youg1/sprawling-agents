@@ -7,10 +7,9 @@
 //! adapter, so simulation histories and real histories are comparable
 //! byte for byte.
 
-use kernel::conformance::LedgerInspect;
-use kernel::{
-    AxError, B3Hash, EventDraft, EventRecord, EventRef, GENESIS_PREV, Ledger, Seq, chain_hash,
-};
+use kernel::ledger::chain_hash;
+use kernel::ledger::conformance::LedgerInspect;
+use kernel::{AxError, B3Hash, EventDraft, EventRecord, EventRef, GENESIS_PREV, Ledger, Seq};
 
 pub struct MemLedger {
     lines: Vec<Vec<u8>>,

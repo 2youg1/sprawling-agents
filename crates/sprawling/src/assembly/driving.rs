@@ -17,6 +17,7 @@ use super::{RunWorker, Site};
 
 pub(crate) mod flight;
 pub(crate) mod lane;
+pub(in crate::assembly) mod owing;
 
 /// What one drive is handed: the machinery it runs on, and the run it
 /// runs as.
@@ -50,8 +51,6 @@ pub(crate) struct Driving {
     /// What a checkpoint fence covers, from [`Site::fence_scope`]:
     /// every prefix of the run's write domain, not just its room.
     pub(crate) fence_scope: Vec<String>,
-    /// The resident this run works as, as three hooks will name it.
-    pub(crate) who: String,
     pub(crate) run_id: RunId,
     /// What every fence this drive raises is signed with.
     pub(crate) of: memory::Provenance,
@@ -119,7 +118,9 @@ pub(crate) struct Driven {
     pub(crate) fenced: Vec<String>,
     /// The run's own commands, as (passed, failed).
     pub(crate) ran: (u32, u32),
-    /// What a gate escalated while the ledger was not the worker's.
+    /// What the drive raised for a person. Empty today: every door
+    /// answers Allow or Deny, and the only question left is the
+    /// sweep's, which is raised after the drive hands the ledger back.
     pub(crate) raised: Vec<kernel::ApprovalItem>,
 }
 
@@ -168,8 +169,14 @@ impl RunWorker {
     /// accounting thread from a lane (sprawling-SPEC.md 8-46-1).
     pub(in crate::assembly) fn drive_context(&self) -> lane::DriveContext {
         lane::DriveContext {
-            watching: self.watching.clone(),
-            person: self.interrupts.clone(),
+            watching: self
+                .serving
+                .as_ref()
+                .map(|at| std::sync::Arc::clone(&at.deltas)),
+            person: self
+                .serving
+                .as_ref()
+                .map(|at| std::sync::Arc::clone(&at.interrupts)),
             backlog: self.backlog.clone(),
         }
     }

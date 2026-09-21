@@ -21,8 +21,7 @@
 use kernel::{AxCode, AxError, ModelTag, Payload, Proxying, SecretRef};
 use serde_json::{Map, Value};
 
-use crate::endpoint::AuthSpec;
-use crate::fallback::Fallback;
+use crate::endpoint::{AuthSpec, HeaderValue};
 use crate::market::ModelEntry;
 
 use super::attached::AttachedEndpoint;
@@ -42,13 +41,13 @@ fn tuning_value(tuning: &EndpointTuning) -> Result<Option<Value>, AxError> {
     }
     for (key, figure) in [
         ("timeout_ms", tuning.timeout_ms),
-        ("stream_deadline_ms", tuning.stream_deadline_ms),
+        ("stream_idle_timeout_ms", tuning.stream_idle_timeout_ms),
     ] {
         if let Some(ms) = figure {
             map.insert(key.to_owned(), Value::Number(ms.into()));
         }
     }
-    if let Some(retries) = tuning.request_max_retries {
+    if let Some(retries) = tuning.request_max_retries.stated() {
         map.insert(
             "request_max_retries".to_owned(),
             Value::Number(retries.into()),
@@ -65,8 +64,16 @@ fn tuning_value(tuning: &EndpointTuning) -> Result<Option<Value>, AxError> {
         })?;
         map.insert("proxying".to_owned(), spelled);
     }
+    // A header's value is written as the person's own spelling, which
+    // for a credential is the reference and never the key: that is what
+    // keeps `endpoint_attached` exportable.
+    let headers: Vec<(String, String)> = tuning
+        .extra_headers
+        .iter()
+        .map(|(name, value)| (name.clone(), value.spelled()))
+        .collect();
     for (key, rows) in [
-        ("extra_headers", &tuning.extra_headers),
+        ("extra_headers", &headers),
         ("overrides", &tuning.overrides),
     ] {
         if !rows.is_empty() {
@@ -132,10 +139,11 @@ pub(super) fn read_tuning(payload: &Payload) -> EndpointTuning {
             .and_then(Value::as_str)
             .map(str::to_owned),
         timeout_ms: figure("timeout_ms"),
-        request_max_retries: figure("request_max_retries")
-            .and_then(|held| u32::try_from(held).ok()),
-        stream_deadline_ms: figure("stream_deadline_ms"),
-        extra_headers: pairs(tuning, "extra_headers"),
+        request_max_retries: super::retries::Retries::of(
+            figure("request_max_retries").and_then(|held| u32::try_from(held).ok()),
+        ),
+        stream_idle_timeout_ms: figure("stream_idle_timeout_ms"),
+        extra_headers: read_headers(tuning),
         overrides: pairs(tuning, "overrides"),
         // A record written before this key existed, and a record whose
         // value this build cannot read, both replay as the default:
@@ -191,27 +199,37 @@ pub(crate) fn auth_reference(auth: &AuthSpec) -> Option<&SecretRef> {
     match auth {
         AuthSpec::Bearer(reference) => Some(reference),
         AuthSpec::Header { value, .. } => Some(value),
-        _ => None,
+        AuthSpec::None => None,
     }
 }
 
-/// What this city settled on besides the model itself.
+/// The extra headers a record kept, read back as values.
 ///
-/// The two travel together because both are decided at the same moment
-/// and neither is a property of the catalogue row: where the call goes
-/// if this endpoint will not answer, and which rung of the ladder
-/// supplied the ceiling. `anthropic.rs` once carried the note that a
-/// ceiling invented at the call site truncates runs for a reason that
-/// appears nowhere in the account; `from` is where that reason appears,
-/// in the spelling [`crate::CeilingSource::as_str`] owns.
-pub struct Settled<'a> {
-    /// Where a call goes when this endpoint will not answer.
-    pub fallback: &'a Fallback,
-    /// Which rung of the ceiling ladder answered, when one did.
-    pub from: Option<crate::CeilingSource>,
+/// Entry is where a value that reads as a credential is refused, so a
+/// record that holds one was written before that refusal existed.
+/// Replay keeps it as the literal it is: the key is already in the
+/// ledger, and dropping the header here would change how a person's
+/// endpoint is called without telling them.
+fn read_headers(tuning: Option<&Value>) -> Vec<(String, HeaderValue)> {
+    pairs(tuning, "extra_headers")
+        .into_iter()
+        .map(|(name, text)| {
+            let value = match HeaderValue::parse(&name, &text) {
+                Ok(value) => value,
+                Err(_) => HeaderValue::Plain(text),
+            };
+            (name, value)
+        })
+        .collect()
 }
 
 /// The one place a `model_selected` payload is formed.
+///
+/// `ceiling_from` names which rung of the ladder supplied the output
+/// ceiling, when one did: `anthropic.rs` once carried the note that a
+/// ceiling invented at the call site truncates runs for a reason that
+/// appears nowhere in the account, and this is where that reason
+/// appears, in the spelling [`crate::CeilingSource::as_str`] owns.
 ///
 /// # Errors
 /// Propagates payload construction failure.
@@ -219,26 +237,12 @@ pub fn selected_payload(
     tag: ModelTag,
     endpoint: &str,
     entry: &ModelEntry,
-    settled: &Settled,
+    ceiling_from: Option<crate::CeilingSource>,
 ) -> Result<Payload, AxError> {
-    let Settled {
-        fallback,
-        from: ceiling_from,
-    } = *settled;
     let mut map = Map::new();
     map.insert("tag".to_owned(), Value::String(tag.as_str().to_owned()));
     map.insert("endpoint".to_owned(), Value::String(endpoint.to_owned()));
     map.insert("model".to_owned(), Value::String(entry.id.clone()));
-    // Written only by the retreating arm, so `None` is spelled by the
-    // absence of the keys — which is also how every record written
-    // before this card spells it.
-    if let (Some(name), Some(id)) = (fallback.endpoint(), fallback.model()) {
-        map.insert(
-            "fallback_endpoint".to_owned(),
-            Value::String(name.to_owned()),
-        );
-        map.insert("fallback_model".to_owned(), Value::String(id.to_owned()));
-    }
     map.insert(
         "context_tokens".to_owned(),
         Value::Number(entry.context_tokens.into()),

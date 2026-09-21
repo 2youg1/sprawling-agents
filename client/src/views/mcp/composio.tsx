@@ -53,7 +53,13 @@ export function Composio(props: { readonly intake: Intake }) {
     const value = key().trim();
     if (value === "") return;
     setRefused(false);
-    void enrol(ui.origin, "mcp", "composio", value).then((outcome) => {
+    void enrol({
+      origin: ui.origin,
+      realm: "mcp",
+      name: "composio",
+      value,
+      lang: ui.prefs.held().lang,
+    }).then((outcome) => {
       if (outcome.kind === "stored") {
         setReference(outcome.reference);
         setKey("");

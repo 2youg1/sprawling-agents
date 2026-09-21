@@ -15,8 +15,8 @@
 import { For } from "solid-js";
 
 import { sendingInto, type Doing, type Sending } from "../../core/belief";
-import { EFFORTS } from "../../core/prefs";
-import { offered } from "../../core/slash";
+import { EFFORTS } from "../../core/commands";
+import { UNSTATED, offered } from "../../core/slash";
 import type { ApprovalClass, ApprovalItem } from "../../wire";
 import { ApprovalId, Locator, TimeMs } from "../../wire";
 import { useSay } from "../../ui";
@@ -61,7 +61,6 @@ function question(
     ),
     cluster_key: { class: key[0], detail: key[1] },
     created: TimeMs.make(at),
-    source: "gate",
     tainted,
   };
 }
@@ -74,7 +73,7 @@ export const ONE_QUESTION: ApprovalItem = question(
   "ai_1",
   "lab/east",
   "exec: rm -rf target",
-  ["undoable", "rm"],
+  ["question", "rm"],
   1,
   false,
 );
@@ -85,13 +84,13 @@ export const ONE_QUESTION: ApprovalItem = question(
 // never grouped with anything.
 const WAITING: readonly ApprovalItem[] = [
   ONE_QUESTION,
-  question("ai_2", "lab/west", "edit: the building's own rules", ["governance", "rules"], 2, false),
-  question("ai_3", "lab/west", "edit: the building's own rules", ["governance", "rules"], 3, false),
+  question("ai_2", "lab/west", "edit: the building's own rules", ["question", "rules"], 2, false),
+  question("ai_3", "lab/west", "edit: the building's own rules", ["question", "rules"], 3, false),
   question(
     "ai_4",
     "hall/mayor",
     "browser: open a page somebody linked",
-    ["agent_question", "open"],
+    ["question", "open"],
     4,
     true,
   ),
@@ -227,10 +226,15 @@ function Menus() {
                   {
                     id: "effort",
                     label: say("talk_column_effort"),
-                    items: EFFORTS.map((effort) => ({
-                      id: effort,
-                      label: say(`effort_${effort}`),
-                      chosen: effort === "medium",
+                    // The column the composer draws: nobody having
+                    // chosen leads it and is the row marked, because
+                    // that is the state a city nobody has told starts
+                    // in, and each level carries what it costs.
+                    items: [UNSTATED, ...EFFORTS].map((level) => ({
+                      id: level,
+                      label: say(`effort_${level}`),
+                      hint: say(`effort_note_${level}`),
+                      chosen: level === UNSTATED,
                     })),
                   },
                 ]}

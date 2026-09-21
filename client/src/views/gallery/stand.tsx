@@ -6,13 +6,12 @@
 // A city to stand a fixture in, for the components that read one.
 //
 // Nearly every fixture on this route takes its state through props,
-// which is the whole reason a component's state is a prop. Two do not.
-// The dot at the top of the rail reads the link, the questions waiting
-// and the refusals nobody has opened; the effort section reads the
-// level this person chose. Both read them through the context every
-// view is handed, so drawing either in a state worth looking at means
-// handing that subtree a city - and this is the one place on this route
-// where a city is made up.
+// which is the whole reason a component's state is a prop. One does
+// not: the dot at the top of the rail reads the link, the questions
+// waiting and the refusals nobody has opened, all three through the
+// context every view is handed - so drawing it in a state worth
+// looking at means handing that subtree a city, and this is the one
+// place on this route where a city is made up.
 //
 // **What the fixture does not state stays the real one's.** The
 // language, the address bar, the origin and the clock come from the
@@ -31,7 +30,7 @@ import type { JSX } from "solid-js";
 import { QUERIES } from "../../core/asking";
 import type { Belief } from "../../core/belief";
 import type { LinkState } from "../../core/link";
-import type { Answer, ApprovalItem, AxError, Effort, Query } from "../../wire";
+import type { Answer, ApprovalItem, AxError, Query } from "../../wire";
 import { UiProvider, useUi } from "../../ui";
 import type { Ui } from "../../ui";
 
@@ -43,8 +42,10 @@ export interface StandProps {
   readonly unread: readonly AxError[];
   // The questions this city is holding for the person.
   readonly waiting: readonly ApprovalItem[];
-  // How hard this city thinks, or `null` for nobody having said.
-  readonly effort: Effort | null;
+  // What this made-up city answers besides the questions waiting. A
+  // fixture that needs a second answer writes the match itself,
+  // because only it knows which question it meant.
+  readonly answers?: (query: Query) => Answer | undefined;
   readonly children: JSX.Element;
 }
 
@@ -63,12 +64,14 @@ export function Stand(props: StandProps) {
     probed: null,
     logs: [],
   };
-  // The one question this stand-in answers. Everything else is
-  // `undefined`, which is what a page that has asked and not yet been
-  // answered holds, and what every other fixture on this route already
-  // draws under.
+  // The question every stand-in answers, and the fixture's own.
+  // Anything neither of them names is `undefined`, which is what a
+  // page that has asked and not yet been answered holds, and what
+  // every other fixture on this route already draws under.
   const answer = (query: Query): Answer | undefined =>
-    query === QUERIES.approvals ? { approvals: { items: props.waiting } } : undefined;
+    query === QUERIES.approvals
+      ? { approvals: { items: props.waiting } }
+      : props.answers?.(query);
   const value: Ui = {
     ...outer,
     conn: {
@@ -79,7 +82,6 @@ export function Stand(props: StandProps) {
       retry: () => undefined,
       markNoticesSeen: () => undefined,
     },
-    prefs: { ...outer.prefs, effort: () => props.effort, setEffort: () => undefined },
   };
   return <UiProvider value={value}>{props.children}</UiProvider>;
 }

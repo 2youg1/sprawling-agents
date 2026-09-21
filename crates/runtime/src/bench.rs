@@ -27,9 +27,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::{
-    Address, ApprovalItem, AxCode, AxError, DedupVerdict, DiscardForecast, Effect, EgressOutcome,
-    EgressTarget, GateContext, GateOutcome, IdemKey, Locator, TaintSet, Tool, ToolCall, ToolName,
-    ToolOutcome, WriteDomain,
+    Address, AxCode, AxError, DiscardForecast, Effect, EgressOutcome, EgressTarget, GateOutcome,
+    IdemKey, Locator, TaintSet, Tool, ToolCall, ToolName, ToolOutcome, WriteDomain,
 };
 
 use serde_json::Value;
@@ -70,6 +69,9 @@ pub struct ToolBench {
     tools: BTreeMap<String, Box<dyn Tool>>,
     domain: WriteDomain,
     taint: TaintSet,
+    /// The floor's limits, which decide whether a connector may reach
+    /// what nothing here can take back.
+    sandbox: kernel::SandboxLimits,
     /// What each key already answered, success or failure. A key alone
     /// would stop the second call's side effect and still owe the model
     /// an answer; the answer is the first call's own, whichever way it
@@ -84,11 +86,6 @@ pub struct ToolBench {
     /// command is refused, because running it unprotected is the one
     /// outcome nobody chose.
     net: Option<CheckpointNet>,
-    /// Cluster keys the person has already allowed. Held rather than
-    /// looked up: the bench runs inside a drive that owns the ledger,
-    /// and a gate that read history mid-wave would be a second reader
-    /// of the thing the driver is writing.
-    granted: Vec<kernel::ClusterKey>,
     /// What this run was given to do, as the approvals list refers to
     /// it. An item that named no artifact would leave a person deciding
     /// about a spawn with nothing to open.
@@ -114,7 +111,6 @@ pub enum BenchOutcome {
     Refused { refusal: Box<AxError> },
     /// A gate wants a human. S3 has no answering face, so the caller
     /// sees the pending item's code and the run parks.
-    Pending { item: Box<ApprovalItem> },
     /// The call was already made, and this is what it answered. A replay
     /// is owed the first result: an error here would teach the model a
     /// call failed when it succeeded.
@@ -127,10 +123,10 @@ impl ToolBench {
             tools: BTreeMap::new(),
             domain,
             taint: TaintSet::empty(),
+            sandbox: kernel::SandboxLimits::default(),
             seen: BTreeMap::new(),
             prior_public_egress: false,
             net: None,
-            granted: Vec::new(),
             job: None,
             asking: None,
         }
@@ -147,14 +143,6 @@ impl ToolBench {
         self.asking = Some(asking);
         self.job = Some(job);
         self
-    }
-
-    /// Records that this cluster has already been allowed.
-    ///
-    /// The caller folds these from the ledger's answers, so a resumed
-    /// run does not stop at the door the person just opened.
-    pub fn grant(&mut self, cluster: kernel::ClusterKey) {
-        self.granted.push(cluster);
     }
 
     /// Hands the bench its checkpoint net. Without one, a suspected
@@ -199,13 +187,13 @@ impl ToolBench {
         &mut self,
         call: &ToolCall,
         key: &IdemKey,
-        ctx: &GateContext,
+        now: kernel::TimeMs,
     ) -> Result<BenchOutcome, AxError> {
         // Before any unreplayable effect (8.2). The judgement is the
         // kernel's and reads a set of keys; what this bench keeps beside
         // each key is the answer it gave.
-        let keys: BTreeSet<IdemKey> = self.seen.keys().copied().collect();
-        if kernel::dedup(&keys, key) == DedupVerdict::Duplicate
+        let mut keys: BTreeSet<IdemKey> = self.seen.keys().copied().collect();
+        if kernel::idem::claim(&mut keys, *key).is_err()
             && let Some(answered) = self.seen.get(key)
         {
             return match answered {
@@ -230,7 +218,7 @@ impl ToolBench {
         let mut fenced = None;
         if name == "exec"
             && let Ok(arm) = crate::tools::parse_arm(call.args.as_map())
-            && let DiscardForecast::Suspected { pattern } = kernel::forecast(&arm)
+            && let DiscardForecast::Suspected { pattern } = kernel::discard::forecast(&arm)
         {
             let Some(net) = self.net.as_mut() else {
                 return Err(AxError::failure(
@@ -244,7 +232,7 @@ impl ToolBench {
             };
             let payload = net
                 .checkpoint
-                .wave_pre(&net.scope, ctx.now, &net.of)
+                .wave_pre(&net.scope, now, &net.of)
                 .map_err(kernel_error_from_memory)?;
             fenced = payload
                 .as_map()
@@ -253,7 +241,7 @@ impl ToolBench {
                 .map(str::to_owned);
         }
 
-        if let Some(answered) = self.admit(call, &name, &effect, ctx)? {
+        if let Some(answered) = self.admit(call, &name, &effect)? {
             return Ok(answered);
         }
 

@@ -12,12 +12,12 @@ use kernel::{EventRecord, Payload, RunId};
 
 use crate::views::Views;
 
-use super::{Entrance, read_autonomy};
+use super::{Entrance, Expiries, read_autonomy};
 
 mod collaboration;
 
 use collaboration::CollaborationFold;
-pub(super) use collaboration::{Collaboration, artifact_of, new_inbox};
+pub(super) use collaboration::{Collaboration, INBOX_CAPACITY, artifact_of, new_inbox};
 
 /// Rebuilds what the worker answers approvals from. Same disposability
 /// as every other view: delete it, replay, get the same answers.
@@ -200,6 +200,11 @@ pub(crate) struct Standing {
     /// the same pass as the other three: recognising a repeat across a
     /// restart must not cost a second read of the whole history.
     pub(super) entrance: Entrance,
+    /// When each subscription credential stops working. On the same
+    /// pass for the same reason, and folded at all because a worker
+    /// that read it only from its own process renewed nothing after a
+    /// restart and met each expiry as a 401 mid-run.
+    pub(super) expiries: Expiries,
 }
 
 impl Standing {
@@ -224,6 +229,7 @@ impl Standing {
         let mut governance = Governance::empty();
         let mut collaboration = CollaborationFold::default();
         let mut entrance = Entrance::default();
+        let mut expiries = Expiries::default();
         if ledger_dir.exists() {
             let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
             for line in verified.raw_lines() {
@@ -232,6 +238,7 @@ impl Standing {
                 governance.absorb(record.kind(), record.run(), record.addr(), record.data());
                 collaboration.absorb(&record)?;
                 entrance.absorb(record.data());
+                expiries.absorb(record.kind(), record.data());
             }
         }
         Ok(Standing {
@@ -239,6 +246,7 @@ impl Standing {
             governance,
             collaboration: collaboration.settle()?,
             entrance,
+            expiries,
         })
     }
 }

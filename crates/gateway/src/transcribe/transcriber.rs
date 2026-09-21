@@ -69,7 +69,7 @@ impl Transcriber {
                 extra_headers: Vec::new(),
                 overrides: Vec::new(),
                 timeout_ms: config.timeout_ms,
-                stream_deadline_ms: None,
+                stream_idle_timeout_ms: None,
                 pricing: None,
                 proxying: config.proxying,
             },
@@ -103,28 +103,13 @@ impl Transcriber {
     /// `E_WIRE_MISMATCH` when the answer carries no `text`.
     pub fn transcribe(&self, recording: &Recording) -> Result<String, AxError> {
         let endpoint = self.attached.as_ref().ok_or_else(unconfigured)?;
-        let url = endpoint.config.base_url.clone();
-        let body = form_body(&endpoint.config.model, recording);
-        let request = endpoint
-            .client
-            .post(&url)
-            .header("content-type", body.content_type)
-            .header("accept", "application/json");
-        let response = endpoint
-            .authorize(request)?
-            .body(body.bytes)
-            .send()
-            .map_err(|err| provider_refusal(&url, &err.to_string()))?;
-        let status = response.status();
-        if !status.is_success() {
-            return Err(provider_refusal(
-                &url,
-                &format!("answered {}", status.as_u16()),
-            ));
-        }
-        let wire: Value = response
-            .json()
-            .map_err(|err| provider_refusal(&url, &err.to_string()))?;
+        let body = form_body(endpoint.model(), recording);
+        // What went wrong on the wire is the endpoint's to state; what
+        // a person does about it is this facility's, because only this
+        // side knows the work can be done by typing instead.
+        let wire: Value = endpoint
+            .post_bytes(&body.content_type, body.bytes)
+            .map_err(|err| err.rewrite_recovery("record again, or type the message instead"))?;
         transcription_of(&wire)
     }
 }
@@ -146,18 +131,6 @@ fn unconfigured() -> AxError {
         "attach an endpoint that serves audio/transcriptions and name the model that \
          transcribes, or type the message instead",
     )
-}
-
-/// The provider's own body never reaches this refusal: an audio face
-/// echoes back what it heard, and what it heard is what a person said.
-fn provider_refusal(url: &str, detail: &str) -> AxError {
-    AxError::failure(
-        AxCode::Provider,
-        "transcribe a recording",
-        format!("{url} {detail}"),
-    )
-    .retriable()
-    .with_recovery("record again, or type the message instead")
 }
 
 #[cfg(test)]

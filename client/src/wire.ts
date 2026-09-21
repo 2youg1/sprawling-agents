@@ -24,7 +24,7 @@ export type Address = typeof Address.Type;
 /**
  * Non-empty item identity, derived from the run that raises the item
  * and that run's own position counter — never from a clock. Four lanes
- * drive at once by default, so two runs reach their first approval in
+ * drive at once by default, so two runs reach their first question in
  * one millisecond routinely; a clock-shaped identity makes those two
  * items one key, the inbox keeps the later one, and the earlier one
  * disappears from an append-only history that cannot afterwards tell a
@@ -34,28 +34,22 @@ export const ApprovalId = Schema.String.pipe(Schema.brand("ApprovalId"));
 export type ApprovalId = typeof ApprovalId.Type;
 
 /**
- * Who raised it: a gate pre-block (the run waits, no tokens burn) or the
- * model's own question (batched, never blocking the current action).
- */
-export const ApprovalSource = Schema.Literal("gate", "agent").annotations({ identifier: "ApprovalSource" });
-export type ApprovalSource = typeof ApprovalSource.Type;
-
-/**
  * What kind of decision this is. Wire data — the cluster keys
- * serialize — and closed, so that a new class of decision is a
- * compile error at every reader that must classify it.
+ * serialize — and one arm, because a run asks a person exactly one
+ * kind of thing: a question about the design it cannot settle by
+ * reading the rules.
+ * 
+ * The enum survives its own single arm on purpose. The cluster key is
+ * wire data, and a class named in the payload keeps the day a second
+ * kind of question appears a compile error at every reader rather than
+ * a silent change of meaning for a field that used to say one thing.
  */
-export const ApprovalClass = Schema.Union(
-  Schema.Literal("commitment", "budget_limit", "discard_escalate", "agent_question"),
-  Schema.Literal("governance"),
-  Schema.Literal("delegation"),
-  Schema.Literal("undoable"),
-).annotations({ identifier: "ApprovalClass" });
+export const ApprovalClass = Schema.Literal("question").annotations({ identifier: "ApprovalClass" });
 export type ApprovalClass = typeof ApprovalClass.Type;
 
 /**
- * The clustering key: class + free detail. One human verdict on a key
- * can become a Policy — for the one class that admits policies.
+ * The clustering key: class + free detail. One answer covers the
+ * cluster a person was shown, and it expires with the process.
  */
 export const ClusterKey = Schema.Struct({
   class: ApprovalClass,
@@ -83,7 +77,6 @@ export const ApprovalItem = Schema.Struct({
   cluster_key: ClusterKey,
   created: TimeMs,
   id: ApprovalId,
-  source: ApprovalSource,
   tainted: Schema.Boolean,
 }).annotations({ identifier: "ApprovalItem" });
 export type ApprovalItem = typeof ApprovalItem.Type;
@@ -363,6 +356,7 @@ export const SandboxLimits = Schema.Struct({
   fuel: Schema.Int,
   mounts: Schema.Array(Address),
   shell: Schema.Boolean,
+  trusted: Schema.optional(Schema.Array(ServerLabel)),
 }).annotations({ identifier: "SandboxLimits" });
 export type SandboxLimits = typeof SandboxLimits.Type;
 
@@ -1010,19 +1004,27 @@ export const ResidentId = Schema.String.pipe(Schema.brand("ResidentId"));
 export type ResidentId = typeof ResidentId.Type;
 
 /**
- * Who answers the Approval Inbox (9.2). Never touches gate decisions —
- * C15's byte-identical gate sequences are citysim's to assert (P2).
+ * Who answers the Approval Inbox (9.2). Two states, because a question
+ * either waits for the person or goes straight to the resident they
+ * appointed; there is no third state in which nobody answers, since
+ * "nobody answered yet" is what an unanswered item already says.
+ * 
+ * Never touches gate decisions: the gates answer from the rules, and
+ * who reads the inbox cannot change what a rule says.
  */
 export const Autonomy = Schema.Union(
-  Schema.Literal("owner", "deferred"),
+  Schema.Literal("owner"),
   Schema.Struct({
     delegate: ResidentId,
   }),
 ).annotations({ identifier: "Autonomy" });
 export type Autonomy = typeof Autonomy.Type;
 
-export const PolicyVerdict = Schema.Literal("allow", "deny").annotations({ identifier: "PolicyVerdict" });
-export type PolicyVerdict = typeof PolicyVerdict.Type;
+/**
+ * How a person answers one item.
+ */
+export const Ruling = Schema.Literal("allow", "deny").annotations({ identifier: "Ruling" });
+export type Ruling = typeof Ruling.Type;
 
 /**
  * One approval, as it was answered.
@@ -1031,7 +1033,7 @@ export const Decision = Schema.Struct({
   at: TimeMs,
   cluster: ClusterKey,
   item: Schema.String,
-  verdict: PolicyVerdict,
+  verdict: Ruling,
 }).annotations({ identifier: "Decision" });
 export type Decision = typeof Decision.Type;
 
@@ -2142,7 +2144,7 @@ export const Command = Schema.Union(
     approve: Schema.Struct({
       idem: IdemKey,
       item: ApprovalId,
-      verdict: PolicyVerdict,
+      verdict: Ruling,
     }),
   }),
   Schema.Struct({

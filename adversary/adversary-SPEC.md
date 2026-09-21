@@ -17,6 +17,7 @@
 | U5 回归 | 两个世界的反例各渲染成 Rust `#[test]`，同一个文件 | 渲染结果与仓内那个 Rust 文件逐字节相同，而该文件由 `cargo test` 编译运行 |
 | U6 历史 | 任意轨迹之后，账本离线自证；改一个字节则不能自证 | `replay` 在干净轨迹上恒绿、在翻过一位的轨迹上恒红 |
 | U7 供应世界 | `Provider`：挂过 endpoint 的第二种世界——一个 URL 的全部拼法、一个注册模型的上限、两条同时跑的车道 | 等价类的每种拼法经探测与经挂载各落到同一个 `base_url`；注册过的模型带得出上限；messages 派活拿不到「没有输出上限」；不等第一条做完就派出去的活是两个 run |
+| U8 配置世界 | `Layer`：写过配置的第三种世界——`configure_building` 任意序列之后，磁盘上的 `CONFIG.toml` 与 `Query::BuildingView` 折出的答案一致 | 任意非空写序列之后：答案等于最后一次写入的值；楼自己那层的文件陈述该值且不再陈述更早的值；上一层一个都不陈述 |
 
 **不负责**：任何规则的再实现（链哈希、`IdemKey` 派生、写域判定、份额守恒）；任何 Rust 侧的构建闸门；任何随产品交付的东西。三者中任何一条被违反，本目录应当被删除而不是被修补。
 
@@ -24,7 +25,7 @@
 
 ## 2 验收标准
 
-1. `just adversary` 全绿：20 条检查，`0 failed`。
+1. `just adversary` 全绿：21 条检查，`0 failed`。
 
    **曾经不是全绿**：U7 的五条里有三条红（等价类一条、上限两条），红在产品而不在检查。两处修复都落在 `crates/` 下——`Entered::resolved` 成为打字地址变成被调用地址的唯一一处，`select_model` 经 `OutputCeiling::resolve` 取上限——三条随之转绿（实测见 §4 第四、第五个发现）。反例按 §9 第 4 步渲染进 `crates/sprawling/tests/from_adversary.rs`，本目录不再留着它们。
 2. 没有 Lean 的机器上 `just check` 的行为与本目录不存在时**逐字节相同**；`just adversary` 打印 `skipped: Lean is not installed` 并返回 0。
@@ -42,6 +43,7 @@
 | 城是什么 | 一个本地目录，`init` 造它，`serve` 端起来，账本在 `.sprawling/ledger/` 下按段分文件 | 布局改变时 `Ground.lean` 的敌意动作报错，属预期 |
 | 静默 | 门的第三种回答。**不是接受**——见 §10「静默不是接受」 | 若将来 `call` 改为「命令被受理才返回」，`quiet` 这一支变成异常而不是取值 |
 | provider | `Model` 的世界一个都不挂，于是每一次派活在配置这道门上被拒，而模型知道这一点；`Provider` 的世界挂一个**这台电脑上没人听的地址**，于是每一次调用停在 socket 上 | 挂上一个真会应答的 endpoint 后，两种世界都要学第三种：调用会成功，而本目录不许自带一个假 provider（§13） |
+| 配置写回 | 「写了什么就读得回什么」这条不变量的对象是 **TOML 文件**，不是哪一条帧。人层偏好的那一条（`PutPreferences` / `Query::Preferences`）今天并不存在，而 `configure_building` 写楼自己那层、`Query::BuildingView` 把它折回来，是同一条不变量今天已经承载的地方，所以性质写在那里 | 那一对帧落地后，`Layer` 换成它们驱动，断言一字不改：变的是谁写进文件，不是文件欠谁什么 |
 | 时钟 | 只用于超时，从不被预测 | —— |
 | 端口 | 从 47100 起向上探，第一个能答 `city_view` 的即用 | 机器上有别的东西占着整段时报错并说明 |
 
@@ -140,6 +142,8 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 | **Ground** | 一次性的场地：一座被端起来的城、它的端口、它的账本目录，以及磁盘可以施加的敌意 |
 | **Trace** | 一串动作及其观察结果，是本目录唯一的断言对象 |
 
+第三种世界的模块叫 `Layer`，这个词不是本目录新起的：它就是 `city::config_layers::Layer`——配置梯子上的一级。
+
 ## 7 模块边界
 
 ```
@@ -152,11 +156,12 @@ src/Sprawling/Ground.lean    一次性场地，以及磁盘的敌意
 src/Sprawling/Check.lean     抽样、收缩、检查树。不知道城是什么
 src/Sprawling/Model.lean     状态模型、后置条件、定向对抗场景
 src/Sprawling/Provider.lean  挂过 endpoint 的第二种世界：URL 等价类与上限
+src/Sprawling/Layer.lean     写过配置的第三种世界：磁盘上的那份与答案里的那份
 src/Sprawling/Regression.lean 两个世界的反例 → 一个 Rust 测试文件
 test/Main.lean               入口与检查树
 ```
 
-依赖单向：`Model` → `Door` → `Frame`，`Model` → `Ground` → `Door`，`Model` → `Check`，`Provider` → `Ground`，`Regression` → `Model` 与 `Provider`。**`Regression` 依赖两个世界，因为交付物是一个文件**：轨迹那条测试的每一步与极性从 `Model` 读，供应世界那两条测试的拼法、中转站名字与模型 id 从 `Provider` 读，于是演员表在本目录里仍然只有一个家。`Provider` 不 import `Model`：那是另一种世界，两边共用的只有门与场地。`Frame` 不 import 任何本工程模块；`Check` 也不，且它**不 import `Door`**——抽样与收缩不允许知道有一座城存在。
+依赖单向：`Model` → `Door` → `Frame`，`Model` → `Ground` → `Door`，`Model` → `Check`，`Provider` → `Ground`，`Layer` → `Ground` 与 `Check`，`Regression` → `Model` 与 `Provider`。`Layer` 不被 `Regression` 读：它至今没有找到反例，而一条没有反例的性质不向 Rust 侧交付任何东西。**`Regression` 依赖两个世界，因为交付物是一个文件**：轨迹那条测试的每一步与极性从 `Model` 读，供应世界那两条测试的拼法、中转站名字与模型 id 从 `Provider` 读，于是演员表在本目录里仍然只有一个家。`Provider` 不 import `Model`：那是另一种世界，两边共用的只有门与场地。`Frame` 不 import 任何本工程模块；`Check` 也不，且它**不 import `Door`**——抽样与收缩不允许知道有一座城存在。
 
 `Ground` 依赖 `Door` 而不是自己起进程：**「二进制在哪」只允许有一个答案**，而场地要用它做三件事（`init`、`serve`、探活）。
 
@@ -229,6 +234,25 @@ def Ground.runsStarted : Ground → Nat → IO (List String)
 def givenAProvider : Door → Ground → Option Nat → IO Record
 def statedCeiling  : Record → Option Nat
 ```
+
+```lean
+-- Layer.lean —— 写过配置的第三种世界
+def configured     : String                      -- 这个世界写的那栋楼
+def buildingLayer  : String                      -- 楼自己那层的 CONFIG.toml
+def cityLayer      : String                      -- 它上面那层
+def budgets        : List Nat                    -- 互不为子串的七个指令预算
+def writeSequence  : Nat → Gen (List Nat)        -- 非空的写序列
+def shrinkSequence : List Nat → List (List Nat)  -- 收缩后仍非空
+def states         : String → Nat → Bool         -- 这份读数陈述了这个数字吗
+def Door.readDocument : Door → Ground → String → IO String
+def Door.readBudget   : Door → Ground → String → IO (Option Nat)
+def Door.writeBudget  : Door → Ground → Nat → Nat → IO (Option String)
+def writtenReadsBack  : Door → List Nat → IO Verdict
+```
+
+`states` 是子串判断而不是一次解析：TOML 的文法权威在 `city::config_layers`，本目录再写一个读者就是第二个权威（§1）。子串够用的前提写在 `budgets` 里——七个四位数互不为子串，于是「文件还陈述着更早那次写入」这条断言不会被两个数字的包含关系伪造。
+
+`Door.readDocument` 把「这一层没有文件」读成空字符串，而把任何别的形状抛出去。这条分界是必须的：一个把读不懂的答案也当成空文件的读者，会让下面每一条「文件没有陈述什么」的断言无条件成立。
 
 `ask` 返回 `Answer` 而不是抛异常：被拒绝是产品的正常输出，而**解析失败**才是异常——门的形状变了，检查应当当场停下，而不是把新形状当成一次拒绝。
 
@@ -333,6 +357,8 @@ def statedCeiling  : Record → Option Nat
 | 端口 47100–47115 | 避开常用段，又不需要网络库依赖；整棵树串行跑，十六个是给外部占用留的余地 | 冲突时报环境问题 |
 | 静默窗口 250 ms | 模型驱动的每个动词都答在 1 ms 内（实测），250 ms 是三个数量级的余量 | 模型开始走慢路径（挂 endpoint）时必须同步改 |
 | 种子 `20260912` | 本地运行必须可复现：一次反例只有在它能被重跑时才值得渲染成 Rust 测试 | 定时任务经 `SPRAWLING_SEED` 用会变的种子，于是「每晚探索新轨迹」与「本地可复现」各得其所 |
+| 指令预算 `7001` 等七个四位数 | 写回性质靠子串判断问文件陈述了什么，互不为子串是这一判断成立的前提 | 加值时要保持该性质；否则「旧值还在文件里」会被包含关系伪造 |
+| 两个层的路径 一个楼自己的 `.sprawling/CONFIG.toml` 与 `.sprawling/CONFIG.toml` | 写回性质要按层分别读 | 布局改变时本目录报错，属预期 |
 | 三个地址 `acme` / `beta` / `gamma` | 固定的演员表，让反例可读 | 加人时同步改 `Regression.lean` 的模板 |
 | 模板 `minimal` | 两个模板里不带保密约束的那个 | 要测 `confidential` 时它进模型 |
 | 环境变量 `SPRAWLING_BIN` | 二进制位置的唯一入口 | 由 justfile 提供 |
@@ -349,7 +375,9 @@ def statedCeiling  : Record → Option Nat
 
 ## 16 测试与约束
 
-按「坏得越早越省时间」排序，共 20 条：渲染对拍（U5，毫秒级）、门的契约三条（U1，含 §4 那条退出码性质）、人填进去的四条（U7：探测的等价类、挂载的等价类、幂等、读不懂的帧）、挂过 provider 的三条（U7：注册带上限、派活不为上限被拒、两条车道是两个 run）、随机轨迹（U3）、定向停摆（U4）、账本自洽（U6）、磁盘的三句谎话（U2），最后是按缺陷命名的那一组与那一条。U7 那七条各自实测为 7–37 s（debug 二进制，四核 Windows），其中的时间几乎全在城构造 HTTP 客户端上；其余十三条一整套 2 min 35 s（实测，四核 Windows，热缓存）；同一棵树在两核 Linux 上 51 s，差别在起进程的价钱而不在核数。约束是 §2 第 5 条——**咬得动**必须被演示过，而不是被相信。
+按「坏得越早越省时间」排序，共 21 条：渲染对拍（U5，毫秒级）、门的契约三条（U1，含 §4 那条退出码性质）、人填进去的四条（U7：探测的等价类、挂载的等价类、幂等、读不懂的帧）、挂过 provider 的三条（U7：注册带上限、派活不为上限被拒、两条车道是两个 run）、配置写回（U8，实测 26 s）、随机轨迹（U3）、定向停摆（U4）、账本自洽（U6）、磁盘的三句谎话（U2），最后是按缺陷命名的那一组与那一条。
+
+**U8 同样被演示过咬得动**（§2 第 5 条）：把“答案等于最后一次写入”改成“等于第一次写入”后，该条报错，收缩 1 次得到两步反例 `[6556, 9223]`；恢复后转绿。U7 那七条各自实测为 7–37 s（debug 二进制，四核 Windows），其中的时间几乎全在城构造 HTTP 客户端上；其余十三条一整套 2 min 35 s（实测，四核 Windows，热缓存）；同一棵树在两核 Linux 上 51 s，差别在起进程的价钱而不在核数。约束是 §2 第 5 条——**咬得动**必须被演示过，而不是被相信。
 
 **树里没有一条是被期待失败的。** 一条因为预期会红而被留下的检查，教会每一个看到它的人把红当成常态，于是下一个真的发现落进一次没人读的运行里。
 

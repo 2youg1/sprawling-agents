@@ -252,7 +252,8 @@ fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
     drop(provider);
 
     let after = std::fs::read_to_string(&plan).unwrap();
-    let kernel::RoadmapShape::WellFormed { rows } = kernel::check_roadmap_shape(&after) else {
+    let kernel::RoadmapShape::WellFormed { rows } = kernel::spine::check_roadmap_shape(&after)
+    else {
         panic!("an edited plan still parses");
     };
     let tree = kernel::PlanTree::build(rows).expect("an edited plan is still a tree");

@@ -117,7 +117,10 @@ impl RunWorker {
         let mut adapter = gateway::adapter_for(
             chosen,
             self.redemption().ok()?,
-            dialect_headers(chosen.endpoint.dialect),
+            dialect_headers(chosen.endpoint.dialect)
+                .into_iter()
+                .map(|(name, value)| (name, value.spelled()))
+                .collect(),
         )
         .ok()?;
         let answer = adapter
@@ -146,7 +149,7 @@ impl RunWorker {
         // sentence around it. The first line, stripped of the
         // punctuation an answer tends to arrive wrapped in, is what is
         // offered to the parser — and the parser decides, not this.
-        let said = kernel::content_from_message(&answer.message)
+        let said = kernel::model::content_from_message(&answer.message)
             .ok()?
             .into_iter()
             .find_map(|block| match block {

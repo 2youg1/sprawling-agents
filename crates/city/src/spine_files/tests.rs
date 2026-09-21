@@ -5,7 +5,8 @@
 
 use super::*;
 use crate::policy::BUILDING_FILE;
-use kernel::{PlanTree, Progress, RoadmapShape, check_roadmap_shape};
+use kernel::spine::check_roadmap_shape;
+use kernel::{PlanTree, Progress, RoadmapShape};
 
 fn addr(raw: &str) -> Address {
     Address::parse(raw).unwrap()

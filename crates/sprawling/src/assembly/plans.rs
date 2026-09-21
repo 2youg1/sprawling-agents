@@ -74,7 +74,7 @@ impl RunWorker {
         };
         let held = self.holders_in(building);
         let mut sent = Vec::new();
-        for notice in kernel::notices(&kernel::spread(&tree, &red), &held) {
+        for notice in kernel::blockage::notices(&kernel::blockage::spread(&tree, &red), &held) {
             let Ok(to) = Address::parse(&notice.to) else {
                 continue;
             };
@@ -138,7 +138,7 @@ impl RunWorker {
     /// is reading.
     fn plan_of(&self, addr: &Address) -> Option<kernel::PlanTree> {
         let text = city::roadmap(&self.city_root, addr).ok()?;
-        match kernel::check_roadmap_shape(&text) {
+        match kernel::spine::check_roadmap_shape(&text) {
             kernel::RoadmapShape::WellFormed { rows } => kernel::PlanTree::build(rows).ok(),
             kernel::RoadmapShape::Malformed { .. } => None,
         }

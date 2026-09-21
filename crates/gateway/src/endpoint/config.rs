@@ -18,6 +18,7 @@ use std::time::Duration;
 use kernel::{AxCode, AxError, DialectKind, Proxying, SecretRef};
 use serde_json::Value;
 
+use super::header::HeaderValue;
 use super::redemption::Redemption;
 use crate::market::ModelEntry;
 
@@ -39,17 +40,22 @@ pub struct EndpointConfig {
     /// canonical request.
     pub model: String,
     pub auth: AuthSpec,
-    /// Plaintext headers (never credentials — those go through `auth`).
-    pub extra_headers: Vec<(String, String)>,
+    /// Headers every request adds. A value is a literal or a vault
+    /// reference, and which one it is decides whether it is redeemed
+    /// in the slot before the wire.
+    pub extra_headers: Vec<(String, HeaderValue)>,
     /// Field-by-field request overrides: JSON pointer to value, applied
     /// last, later entries win. Missing object paths are created.
     pub overrides: Vec<(String, Value)>,
+    /// How long one settled call may take in total: the whole body is
+    /// read under this bound, because a settled call has nothing to
+    /// report until it has all of it.
     pub timeout_ms: u64,
-    /// How long a *streamed* request may run, when that is not
-    /// `timeout_ms`. A model that is still writing is not a model that
-    /// has stopped answering, so a stream is given its own deadline;
-    /// `None` holds a stream to the same deadline as a settled call.
-    pub stream_deadline_ms: Option<u64>,
+    /// How long a *streamed* request may go without a byte arriving.
+    /// A model that is still writing is not a model that has stopped
+    /// answering, so a stream is bounded by its silences rather than
+    /// by its length; `None` bounds each silence by `timeout_ms`.
+    pub stream_idle_timeout_ms: Option<u64>,
     /// Price-sheet row for settlement; `None` settles nothing (billed
     /// stays empty and attribution sees usage only).
     pub pricing: Option<ModelEntry>,
@@ -59,10 +65,18 @@ pub struct EndpointConfig {
     pub proxying: Proxying,
 }
 
+/// One endpoint, ready to call.
+///
+/// The three fields are reachable inside this module tree and nowhere
+/// else: a caller that could take the transport out could also decide
+/// for itself what a non-2xx means and whether the provider's own body
+/// is quoted back, which would put those two answers under two
+/// authorities. What the rest of the crate may do with an endpoint is
+/// on `impl Endpoint`.
 pub struct Endpoint {
-    pub(crate) config: EndpointConfig,
-    pub(crate) client: reqwest::blocking::Client,
-    pub(crate) redemption: Redemption,
+    pub(super) config: EndpointConfig,
+    pub(super) client: reqwest::blocking::Client,
+    pub(super) redemption: Redemption,
 }
 
 /// A transport failure as its whole chain states it.
@@ -89,6 +103,17 @@ impl Endpoint {
             client,
             redemption,
         })
+    }
+
+    /// The provider-side name of the model this endpoint calls.
+    ///
+    /// The one thing a caller outside this module tree reads about a
+    /// configured endpoint: a name, not a handle. Whoever writes a
+    /// body that has to name the model asks for the name and gets
+    /// nothing else.
+    #[must_use]
+    pub(crate) fn model(&self) -> &str {
+        &self.config.model
     }
 }
 

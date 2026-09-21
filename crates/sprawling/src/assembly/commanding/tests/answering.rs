@@ -133,12 +133,11 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
 
     let item = kernel::ApprovalItem {
         id: kernel::ApprovalId::new("item-1").unwrap(),
-        source: kernel::ApprovalSource::Agent,
         actor: "lab/room1".to_owned(),
         action_desc: "send the release mail".to_owned(),
         artifact: Locator::parse(&format!("cas:b3-{}", "ab".repeat(32))).unwrap(),
         cluster_key: kernel::ClusterKey {
-            class: kernel::ApprovalClass::AgentQuestion,
+            class: kernel::ApprovalClass::Question,
             detail: "mail:release".to_owned(),
         },
         created: kernel::TimeMs::new(1_000),
@@ -168,7 +167,7 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     let err = worker
         .answer_approval(
             &kernel::ApprovalId::new("item-1").unwrap(),
-            kernel::PolicyVerdict::Allow,
+            kernel::Ruling::Allow,
             &kernel::Answerer::Resident(kernel::ResidentId::new("lab/room1").unwrap()),
         )
         .unwrap_err();
@@ -179,7 +178,7 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     worker
         .handle(channels::Command::Approve {
             item: kernel::ApprovalId::new("item-1").unwrap(),
-            verdict: kernel::PolicyVerdict::Allow,
+            verdict: kernel::Ruling::Allow,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"approve"),
         })
         .unwrap();
@@ -199,7 +198,7 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     let err = worker
         .handle(channels::Command::Approve {
             item: kernel::ApprovalId::new("item-1").unwrap(),
-            verdict: kernel::PolicyVerdict::Allow,
+            verdict: kernel::Ruling::Allow,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"approve"),
         })
         .unwrap_err();
@@ -234,13 +233,12 @@ fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
     // rendered as "(no summary recorded)" and no test noticed.
     let item = kernel::ApprovalItem {
         id: kernel::ApprovalId::new("a-1".to_owned()).unwrap(),
-        source: kernel::ApprovalSource::Gate,
         actor: "urbanite-2".to_owned(),
         action_desc: "delete the archive".to_owned(),
         artifact: kernel::Locator::parse("file:lab/room1@0000000000000000000000000000000000000000")
             .unwrap(),
         cluster_key: kernel::ClusterKey {
-            class: kernel::ApprovalClass::AgentQuestion,
+            class: kernel::ApprovalClass::Question,
             detail: "lab".to_owned(),
         },
         created: TimeMs::new(1),
@@ -281,6 +279,10 @@ fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
 
     let mut answered = serde_json::Map::new();
     answered.insert("id".to_owned(), serde_json::Value::String("a-1".to_owned()));
+    answered.insert(
+        "verdict".to_owned(),
+        serde_json::Value::String("allow".to_owned()),
+    );
     let resolved = EventRecord::from_draft(
         EventDraft {
             run: RunId::CITY,

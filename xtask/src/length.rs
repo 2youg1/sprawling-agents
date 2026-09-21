@@ -248,8 +248,10 @@ fn judge_file(rule: &FileRule, rel: &str, text: &str, out: &mut Vec<Violation>) 
     }
 }
 
-/// True when a generator wrote this file and says so in it.
-fn generated(text: &str) -> bool {
+/// True when a generator wrote this file and says so in it. Read by
+/// `wording` as well: a sentence a generator wrote is judged where the
+/// generator is.
+pub(crate) fn generated(text: &str) -> bool {
     text.lines().take(10).any(|line| line.contains(GENERATED))
 }
 

@@ -18,11 +18,23 @@
 //! minus consumed — the Ledger is already the history, and a second
 //! durable copy would be a second answer.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
-use kernel::{Admission, IdemKey, ItemMeta, Payload, QueueStats, TimeMs, admit};
+use kernel::backpressure::admit;
+use kernel::{Admission, IdemKey, ItemMeta, Payload, QueueStats, TimeMs};
 
 use crate::error::MemoryError;
+
+/// How long an admitted key stays recognisable as one, in milliseconds:
+/// six hours.
+///
+/// A duplicate arrives because a sender retried, and a sender retries
+/// within its own attempt, not a day later. Remembering every key ever
+/// admitted made a city that runs for weeks carry one entry per event
+/// it ever queued, for a guarantee nothing was still asking for; this
+/// window is the span over which a repeat is a retry rather than a new
+/// request.
+const IDEM_WINDOW_MS: u64 = 6 * 60 * 60 * 1000;
 
 /// Which lane a queue serves. The lanes differ in their accounting
 /// names and nothing else; the day they differ in behaviour is the day
@@ -57,9 +69,14 @@ pub struct EventQueue {
     lane: QueueLane,
     items: BTreeMap<u64, QueueItem>,
     next_id: u64,
-    /// Every key ever admitted. Membership, not occupancy: an item that
-    /// has been consumed must still be recognised as a duplicate.
-    seen: BTreeSet<IdemKey>,
+    /// Each admitted key against the moment it was admitted.
+    ///
+    /// Membership, not occupancy: an item that has been consumed must
+    /// still be recognised as a duplicate. Bounded by time rather than
+    /// by count, because what makes a key uninteresting is that the
+    /// retry window it belongs to has closed, and dropping the oldest
+    /// key of a still-running wave would let its retry through.
+    seen: BTreeMap<IdemKey, TimeMs>,
     capacity: u64,
     shed: u64,
     duplicates: u64,
@@ -71,7 +88,7 @@ impl EventQueue {
             lane,
             items: BTreeMap::new(),
             next_id: 0,
-            seen: BTreeSet::new(),
+            seen: BTreeMap::new(),
             capacity,
             shed: 0,
             duplicates: 0,
@@ -81,13 +98,18 @@ impl EventQueue {
     /// Admission first, then storage. A duplicate key is admitted-and-
     /// ignored rather than refused: the sender did its job, and telling
     /// it otherwise would invite a retry that changes nothing.
+    ///
+    /// # Errors
+    /// Returns nothing today; the fallible signature is the port's, and
+    /// storage that can fail is what it is there for.
     pub fn enqueue(
         &mut self,
         key: IdemKey,
         payload: Payload,
         now: TimeMs,
     ) -> Result<Admission, MemoryError> {
-        if self.seen.contains(&key) {
+        self.forget_stale(now);
+        if self.seen.contains_key(&key) {
             self.duplicates = self.duplicates.saturating_add(1);
             return Ok(Admission::Admit);
         }
@@ -102,7 +124,7 @@ impl EventQueue {
             Admission::Admit => {
                 let id = self.next_id;
                 self.next_id = self.next_id.saturating_add(1);
-                self.seen.insert(key);
+                self.seen.insert(key, now);
                 self.items.insert(
                     id,
                     QueueItem {
@@ -115,6 +137,19 @@ impl EventQueue {
                 Ok(Admission::Admit)
             }
         }
+    }
+
+    /// Drops the keys admitted longer ago than the idempotency window.
+    ///
+    /// A clock that steps backwards keeps every key rather than
+    /// dropping the wrong ones: the queue holds no opinion about the
+    /// clock, and an over-long memory only refuses to run an effect
+    /// twice.
+    fn forget_stale(&mut self, now: TimeMs) {
+        let Some(cutoff) = now.value().checked_sub(IDEM_WINDOW_MS) else {
+            return;
+        };
+        self.seen.retain(|_, admitted| admitted.value() > cutoff);
     }
 
     /// Takes the oldest item. The key stays in `seen`, so a late
@@ -238,6 +273,30 @@ mod tests {
             .map(|item| item.id)
             .collect();
         assert_eq!(ids, vec![0, 1, 2, 3]);
+    }
+
+    /// The dedup set is what a long-running city would otherwise carry
+    /// one entry of per event it ever queued. A key outside the window
+    /// is gone, and the same key after it is a new request.
+    #[test]
+    fn a_key_older_than_the_window_stops_being_a_duplicate() {
+        let mut queue = EventQueue::new(QueueLane::Signal, 8);
+        let k = key(1);
+        queue.enqueue(k, payload("first"), TimeMs::new(0)).unwrap();
+        queue.consume();
+
+        // Inside the window: still the same request.
+        let inside = TimeMs::new(IDEM_WINDOW_MS.saturating_sub(1));
+        queue.enqueue(k, payload("retry"), inside).unwrap();
+        assert_eq!(queue.duplicate_count(), 1);
+        assert!(queue.is_empty(), "a retry inside the window runs nothing");
+
+        // Past it: the memory is gone and so is the entry holding it.
+        let outside = TimeMs::new(IDEM_WINDOW_MS.saturating_add(1));
+        queue.enqueue(k, payload("later"), outside).unwrap();
+        assert_eq!(queue.duplicate_count(), 1, "not counted twice");
+        assert_eq!(queue.len(), 1, "it is a new request");
+        assert_eq!(queue.seen.len(), 1, "and the set holds only that one");
     }
 
     #[test]

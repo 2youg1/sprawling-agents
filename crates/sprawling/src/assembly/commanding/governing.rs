@@ -8,9 +8,7 @@
 use kernel::{Address, AxCode, AxError, EventKind};
 use kernel::{Ledger, Locator, Payload, RunId};
 
-use super::super::{
-    Assignment, RunWorker, autonomy_name, ledger_dir, now_ms, run_id_for, scope_name,
-};
+use super::super::{RunWorker, Unasked, autonomy_name, ledger_dir, now_ms, run_id_for, scope_name};
 
 impl RunWorker {
     /// Shuts a scope to new work, or opens it again.
@@ -112,7 +110,7 @@ impl RunWorker {
     pub(in crate::assembly) fn answer_approval(
         &mut self,
         item: &kernel::ApprovalId,
-        verdict: kernel::PolicyVerdict,
+        verdict: kernel::Ruling,
         answerer: &kernel::Answerer,
     ) -> Result<(), AxError> {
         let pending = self
@@ -128,10 +126,9 @@ impl RunWorker {
                 )
                 .with_recovery("this item is not waiting; the inbox lists the ones that are")
             })?;
-        match kernel::may_answer(&self.governance.autonomy, &pending, answerer) {
+        match kernel::approval::may_answer(&self.governance.autonomy, &pending, answerer) {
             kernel::AnswerVerdict::May => {}
-            refused @ (kernel::AnswerVerdict::HumanOnly
-            | kernel::AnswerVerdict::SelfApprovalBarred
+            refused @ (kernel::AnswerVerdict::SelfApprovalBarred
             | kernel::AnswerVerdict::NotTheDelegate) => {
                 return Err(AxError::failure(
                     AxCode::ApprovalDenied,
@@ -178,7 +175,7 @@ impl RunWorker {
         // both folded from the line just written. Setting either field
         // here as well would be a second authority for a rule the fold
         // already holds.
-        if verdict == kernel::PolicyVerdict::Allow
+        if verdict == kernel::Ruling::Allow
             && let Some(job) = blocked
         {
             // The work the person just unblocked carries on without
@@ -186,22 +183,16 @@ impl RunWorker {
             // again would make the inbox a place to acknowledge things
             // rather than a place to decide them. This is the same piece
             // of work, interrupted.
-            self.dispatch_in(
-                Assignment {
-                    // The room this work was interrupted in already
-                    // exists: this is the same piece of work carrying
-                    // on, not a session being opened.
-                    addr: job.addr,
-                    session: None,
-                    effort: None,
-                    mode: runtime::Mode::PlanGoal,
-                    parent: None,
-                    succession: None,
-                },
-                job.task,
-                job.goal,
-            )
-            .map(drop)?;
+            //
+            // Into a lane, so that answering one item does not hold the
+            // desk for the length of the run it releases - which is how
+            // a person answering a queue of approvals used to wait
+            // minutes between two clicks (sprawling-SPEC.md 8-46-2). The
+            // room it was interrupted in already exists, so no session
+            // is opened.
+            // The start reports its own refusal; there is no run id to
+            // carry back here, because the person already left this desk.
+            self.start_unasked(job.addr, job.task, job.goal, Unasked::Unblocked);
         }
         Ok(())
     }

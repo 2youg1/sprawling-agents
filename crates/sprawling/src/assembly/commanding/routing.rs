@@ -9,8 +9,8 @@ use kernel::TimeMs;
 use kernel::{AxCode, AxError};
 
 use super::super::{
-    Assignment, Ceilings, Chosen, Credential, Entered, HALTED, RELEASED, RunWorker, mode_of,
-    not_built, tuning_of,
+    Assignment, Ceilings, Chosen, Credential, Entered, HALTED, Owing, RELEASED, RunWorker, Unasked,
+    mode_of, not_built, tuning_of,
 };
 
 /// What a Cancel or a Steer is told when no run answers to the id it
@@ -66,10 +66,11 @@ impl RunWorker {
                         mode: mode_of(&mode),
                         parent: None,
                         succession: None,
+                        tainted: false,
                     },
                     task,
                     goal,
-                    reply,
+                    Owing::asked(reply),
                 )
                 .map(drop)
             }
@@ -102,7 +103,7 @@ impl RunWorker {
                 base_url,
                 dialect,
                 credential: Credential::entered(secret, auth_header),
-                tuning: tuning_of(tuning),
+                tuning: tuning_of(tuning)?,
             }),
             channels::Command::AttachEndpoint {
                 name,
@@ -119,7 +120,7 @@ impl RunWorker {
                     base_url,
                     dialect,
                     credential: Credential::entered(secret, auth_header),
-                    tuning: tuning_of(tuning),
+                    tuning: tuning_of(tuning)?,
                 },
                 &admit,
             ),
@@ -238,19 +239,33 @@ impl RunWorker {
     /// moment it opened: a city that was off does not spend its first
     /// minute running yesterday, and the ledger says when it woke.
     ///
+    /// **Every job due in the window is started, and one that cannot be
+    /// is noted rather than swallowing the rest.** The old loop returned
+    /// on the first refusal after the window had already been closed, so
+    /// one mistyped building address made every other job due that
+    /// minute disappear with nothing recorded (sprawling-SPEC.md
+    /// 8-46-2).
+    ///
     /// # Errors
-    /// Propagates the schedule's own refusal to parse, and the first
-    /// dispatch that fails - a scheduled run that cannot start is not
-    /// swallowed just because nobody typed it.
+    /// Propagates the schedule's own refusal to parse. A job that cannot
+    /// be started does not fail this call: nobody is waiting on the
+    /// answer, and the jobs behind it are owed their run.
     pub(crate) fn tick(&mut self, now: TimeMs) -> Result<u32, AxError> {
         let schedule = city::Schedule::load(&self.city_root)?;
         let due = schedule.due_after(self.last_tick, now);
-        self.last_tick = now;
         let mut started: u32 = 0;
         for (addr, task, goal) in due {
-            self.dispatch(addr, task, goal)?;
-            started = started.saturating_add(1);
+            if self
+                .start_unasked(addr, task, goal, Unasked::Schedule)
+                .is_some()
+            {
+                started = started.saturating_add(1);
+            }
         }
+        // The window closes once it has been walked, never before: a
+        // schedule read that stopped halfway used to leave `last_tick`
+        // past jobs no lane ever took.
+        self.last_tick = now;
         Ok(started)
     }
 }

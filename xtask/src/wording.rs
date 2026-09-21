@@ -20,6 +20,23 @@
 //! `color`'s literal scan is - it is a statement about every file
 //! rather than about one table.
 //!
+//! **Two languages of position, one rule.** A `.tsx` view hands a
+//! reader words through markup, which `jsx` reads; a `.ts` module hands
+//! them the parts of a refusal, which `refusal` reads. Reading markup
+//! only left the sentences a person meets when a city refuses them
+//! - the recovery lines in `core/` - outside every reader of this rule.
+//!
+//! A file a generator wrote is not somebody's module, so its words are
+//! judged where the generator is.
+//!
+//! Everything below - the waiver, the slot reader, the two-letter
+//! test - is shared by both, because the question they answer is one
+//! question.
+//!
+//! Two loops rather than one: which positions a file has is decided by
+//! what the file is written in, and reading that off a path inside the
+//! loop would be the same decision made later and less plainly.
+//!
 //! **The predicate is a position, not a vocabulary.** A first cut that
 //! scanned every string literal would judge class names, wire values,
 //! event kinds and format keys, and the same shape of mistake once
@@ -49,6 +66,7 @@
 //! line or the line above - the same mark, the same two-line rule and
 //! the same trade as `lexicon-ok:`.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
@@ -81,37 +99,88 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     if !dir.is_dir() {
         return Ok(Vec::new());
     }
+    let phrases = keys(root)?;
     let mut violations = Vec::new();
+    let markup = Rule {
+        read: jsx::handed_to_a_reader,
+        phrases: &phrases,
+    };
     for path in walk::files_with_ext(&dir, &["tsx"])? {
-        let location = walk::rel(root, &path);
-        // A test may quote a sentence to assert that a page says it.
-        // That is evidence, not a second authority for the wording.
-        if location.contains(".test.") {
-            continue;
-        }
-        let text = walk::read_text(&path)?;
-        let lines: Vec<&str> = text.lines().collect();
-        for said in handed_to_a_reader(drawn(&text)) {
-            if waived(&lines, said.line) {
-                continue;
-            }
-            violations.push(Violation {
-                gate: "wording",
-                location: format!("{location}:{}", said.line),
-                rule: "a word a reader is given comes from lang.json, not from the view".to_owned(),
-                violation: format!(
-                    "{} carries {:?}, which no phrase produced",
-                    said.seat,
-                    clipped(&said.left)
-                ),
-                alternative: format!(
-                    "add a Msg with both languages and fill its named slots; or, for a name that \
-                     is the same word in both, justify inline with `{EXEMPT_MARK} <reason>`"
-                ),
-            });
-        }
+        judge(root, &path, &markup, &mut violations)?;
+    }
+    let modules = Rule {
+        read: refusal::handed_to_a_reader,
+        phrases: &phrases,
+    };
+    for path in walk::files_with_ext(&dir, &["ts"])? {
+        judge(root, &path, &modules, &mut violations)?;
     }
     Ok(violations)
+}
+
+/// Every key `lang.json` defines.
+///
+/// A literal that is one of them is not a word the view wrote: it is
+/// the name of a phrase, and whoever it is handed to resolves it. The
+/// rule is about where words come from, and a key is not a word.
+fn keys(root: &Path) -> Result<BTreeSet<String>, XtaskError> {
+    let path = root.join(CLIENT).join("lang.json");
+    let text = walk::read_text(&path)?;
+    let table: BTreeMap<String, serde_json::Value> =
+        serde_json::from_str(&text).map_err(|err| XtaskError::Doc {
+            file: walk::rel(root, &path),
+            msg: format!("this file does not parse as JSON: {err}"),
+        })?;
+    Ok(table.into_keys().collect())
+}
+
+/// What one judgement needs besides the file it is about: the reader
+/// its language needs, and the phrases `lang.json` defines. Both are
+/// the same for every file in one run, so they travel as one value
+/// rather than as two more parameters.
+struct Rule<'a> {
+    read: fn(&str) -> Vec<Said>,
+    phrases: &'a BTreeSet<String>,
+}
+
+/// Holds one file to the rule, through the reader its language needs.
+fn judge(
+    root: &Path,
+    path: &Path,
+    rule: &Rule<'_>,
+    violations: &mut Vec<Violation>,
+) -> Result<(), XtaskError> {
+    let location = walk::rel(root, path);
+    // A test may quote a sentence to assert that a page says it. That
+    // is evidence, not a second authority for the wording.
+    if location.contains(".test.") {
+        return Ok(());
+    }
+    let text = walk::read_text(path)?;
+    if crate::length::generated(&text) {
+        return Ok(());
+    }
+    let lines: Vec<&str> = text.lines().collect();
+    for said in (rule.read)(drawn(&text)) {
+        if waived(&lines, said.line) || rule.phrases.contains(&said.left) {
+            continue;
+        }
+        violations.push(Violation {
+            gate: "wording",
+            location: format!("{location}:{}", said.line),
+            rule: "a word a reader is given comes from lang.json, not from the view".to_owned(),
+            violation: format!(
+                "{} carries {:?}, which no phrase produced",
+                said.seat,
+                clipped(&said.left)
+            ),
+            alternative: format!(
+                "add a Msg with both languages and fill its named slots; or, for a name that \
+                 is the same word in both, justify inline with `{EXEMPT_MARK} <reason>`"
+            ),
+        });
+    }
+    Ok(())
 }
 
 /// The part of a module that draws, which is everything above its own
@@ -153,8 +222,7 @@ struct Said {
 }
 
 mod jsx;
-
-use jsx::handed_to_a_reader;
+mod refusal;
 
 // -------------------------------------------------------- the predicate
 

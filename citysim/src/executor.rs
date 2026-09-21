@@ -16,8 +16,8 @@
 use std::cell::Cell;
 
 use kernel::{
-    Address, ApprovalId, AxCode, AxError, B3Hash, BuildingPolicy, FrozenConfig, GateContext,
-    IdemKey, Locator, Payload, RunId, Seq, Temporal, TimeMs,
+    Address, AxCode, AxError, B3Hash, BuildingPolicy, FrozenConfig, IdemKey, Locator, Payload,
+    RunId, Seq, Temporal, TimeMs,
 };
 use memory::Checkpoint;
 use runtime::bench::{BenchOutcome, ToolBench};
@@ -102,7 +102,12 @@ fn answer_at(
         SafePoint::BeforeAssemble { turn } => (CancelPoint::BeforeAssemble { turn }, turn),
         SafePoint::BeforeCall { turn } => (CancelPoint::BeforeCall { turn }, turn),
         SafePoint::BeforeWave { turn } => (CancelPoint::BeforeWave { turn }, turn),
-        _ => return Interrupt::None,
+        // A scenario cancels at a turn, and these two sit inside one:
+        // the point they name is reached many times in a turn, so a
+        // scenario cannot address them by number.
+        SafePoint::BeforeToolCall { .. } | SafePoint::BeforeSpawn { .. } => {
+            return Interrupt::None;
+        }
     };
     if cancel == Some(here) {
         return Interrupt::Cancel;
@@ -220,7 +225,6 @@ pub fn run_scenario_on(
         retries: runtime::Retries::UntilHalted,
     };
 
-    let bench_who = who.clone();
     // Where this call sits in this run. It used to be the clock reading,
     // and a wave hands every call in it the same instant on purpose - so
     // two calls of one tool inside one wave derived one key and the
@@ -233,17 +237,10 @@ pub fn run_scenario_on(
         let at = placed.get();
         placed.set(at.saturating_add(1));
         let key = IdemKey::derive(&run, Seq::new(at), &call.action()?);
-        let ctx = GateContext {
-            actor: bench_who.clone(),
-            now: t,
-            // The call's position, never the clock reading: two runs
-            // share a millisecond and must not share an item.
-            item_id: ApprovalId::of(&run, Seq::new(at)),
-        };
         let temporal = bench
             .meta_of(call.name.as_str())
             .map_or(Temporal::Timeless, |meta| meta.temporal);
-        match bench.invoke(call, &key, &ctx)? {
+        match bench.invoke(call, &key, t)? {
             // A replay carries the first call's own result, and is
             // packaged exactly as that result was (runtime-SPEC.md 8-35).
             BenchOutcome::Ran { outcome, .. } | BenchOutcome::Duplicate { outcome } => {
@@ -285,15 +282,6 @@ pub fn run_scenario_on(
             // turn records as a tool_result: boundary feedback, not a dead
             // turn.
             BenchOutcome::Refused { refusal } => Err(*refusal),
-            BenchOutcome::Pending { item } => Err(AxError::failure(
-                AxCode::ApprovalPending,
-                "await approval",
-                item.id.as_str().to_owned(),
-            )
-            .with_recovery(
-                "script an answer for this approval in the scenario, or use a tool \
-                 whose effect the scenario's gates allow",
-            )),
         }
     };
 

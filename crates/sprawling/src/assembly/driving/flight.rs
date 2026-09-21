@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use kernel::{Address, AxCode, AxError, NodeId, RunId};
 
-use super::super::{Continuation, Driven, RunWorker};
+use super::super::{Continuation, Driven, Owed, Owing, RunWorker, Unasked};
 use super::{Driving, lane::DriveContext};
 use crate::serving::pool::{Arrival, DRIVING_LANES, DrivingPool};
 use crate::serving::relay::{Relay, RelayGate};
@@ -35,24 +35,11 @@ use crate::serving::relay::{Relay, RelayGate};
 /// yet.
 pub(crate) const LOOK_AGAIN: Duration = Duration::from_millis(1);
 
-/// What the city still owes once a run has landed.
-///
-/// The two entrances that put a run in a lane differ only here, which
-/// is why the rest of a dispatch has one path rather than two.
-pub(in crate::assembly) enum Owed {
-    /// A person asked for this dispatch: a refusal has an address to go
-    /// back to, and whoever the run spoke to answers next.
-    Asked(channels::Reply),
-    /// A pursuit took this plan row. If the row is still ready when the
-    /// run comes home, the pursuit stops rather than taking it again.
-    Row { addr: Address, node: NodeId },
-}
-
 /// One run in a lane: everything the city does once the drive is home,
 /// and what that landing is owed.
 struct InLane {
     continuation: Continuation,
-    owed: Owed,
+    owing: Owing,
 }
 
 /// What one pass over the crossing and the lanes did.
@@ -60,14 +47,17 @@ struct InLane {
 /// Exhaustive because the two callers act on different parts of it: the
 /// worker loop only needs to know that it made progress, and a pursuit
 /// needs to know which of its own rows came back.
+#[derive(Debug)]
 pub(crate) enum Landed {
     /// No run came home inside the wait. Relay requests were still
     /// served, which is the half that keeps the lanes moving.
     Nothing,
-    /// A dispatch somebody asked for has landed.
-    Asked,
     /// A pursuit's row has landed.
     Row { addr: Address, node: NodeId },
+    /// A run landed that no pursuit is waiting for: a person's
+    /// dispatch, a job the city started itself, or work handed down.
+    /// The worker loop needs to know only that it made progress.
+    Elsewhere,
 }
 
 /// The lanes, the crossing, and what each driving run is carrying.
@@ -110,9 +100,9 @@ impl Flight {
     ) -> std::collections::BTreeSet<NodeId> {
         self.driving
             .values()
-            .filter_map(|lane| match &lane.owed {
+            .filter_map(|lane| match lane.owing.owed() {
                 Owed::Row { addr: at, node } if at == addr => Some(node.clone()),
-                Owed::Row { .. } | Owed::Asked(_) => None,
+                Owed::Row { .. } | Owed::Asked | Owed::Unasked(_) | Owed::Child { .. } => None,
             })
             .collect()
     }
@@ -152,7 +142,11 @@ impl Flight {
             Ok(arrival) => arrival,
             Err(err) => return Some(Err(err)),
         };
-        let Some(InLane { continuation, owed }) = self.driving.remove(&run) else {
+        let Some(InLane {
+            continuation,
+            owing,
+        }) = self.driving.remove(&run)
+        else {
             return Some(Err(AxError::failure(
                 AxCode::StorageFatal,
                 "land a run that came home",
@@ -163,7 +157,7 @@ impl Flight {
         Some(Ok(Home {
             driven,
             continuation,
-            owed,
+            owing,
         }))
     }
 }
@@ -172,7 +166,7 @@ impl Flight {
 struct Home {
     driven: Result<Driven, AxError>,
     continuation: Continuation,
-    owed: Owed,
+    owing: Owing,
 }
 
 impl RunWorker {
@@ -198,26 +192,17 @@ impl RunWorker {
         let Home {
             driven,
             continuation,
-            owed,
+            owing,
         } = arrival?;
-        match owed {
-            Owed::Asked(reply) => match self.land(continuation, driven) {
-                Ok(_) => {
-                    // Whoever this run spoke to answers next, and
-                    // whoever they speak to after that. The person
-                    // asked for one dispatch; what follows is the
-                    // conversation it started.
-                    self.answer_knocks();
-                    Ok(Landed::Asked)
-                }
-                Err(err) => {
-                    self.hand_back(&reply, err.clone());
-                    Err(err)
-                }
-            },
-            Owed::Row { addr, node } => {
-                self.land(continuation, driven)?;
-                Ok(Landed::Row { addr, node })
+        // Read before the obligation is spent, because a successor
+        // takes it over and the refusal below still has to reach the
+        // person who asked for the run this one replaced.
+        let reply = owing.reply();
+        match self.land(continuation, driven, owing) {
+            Ok(landed) => Ok(landed),
+            Err(err) => {
+                self.hand_back(&reply, err.clone());
+                Err(err)
             }
         }
     }
@@ -261,7 +246,7 @@ impl RunWorker {
         at: super::super::Assignment,
         task: String,
         goal: String,
-        reply: channels::Reply,
+        owing: Owing,
     ) -> Result<RunId, AxError> {
         let (driving, continuation) = self.prepare_dispatch(at, task, goal)?;
         let context = self.drive_context();
@@ -270,9 +255,51 @@ impl RunWorker {
             context,
             InLane {
                 continuation,
-                owed: Owed::Asked(reply),
+                owing,
             },
         )
+    }
+
+    /// Starts a run the city asked for itself, and says why in the log
+    /// when it cannot be started.
+    ///
+    /// The three entrances nobody types a command at take this door:
+    /// the schedule, an arrival from outside, and work a person just
+    /// unblocked. None of them has a person waiting on the answer, so a
+    /// refusal is noted against the reason the run existed rather than
+    /// failing whatever was running at the time.
+    pub(in crate::assembly) fn start_unasked(
+        &mut self,
+        addr: Address,
+        task: String,
+        goal: String,
+        because: Unasked,
+    ) -> Option<RunId> {
+        let at = super::super::Assignment {
+            addr: addr.clone(),
+            session: None,
+            effort: None,
+            mode: runtime::Mode::PlanGoal,
+            parent: None,
+            succession: None,
+            tainted: matches!(because, Unasked::Arrival),
+        };
+        match self.dispatch_into_lane(at, task, goal, Owing::unasked(because)) {
+            Ok(run) => Some(run),
+            Err(err) => {
+                self.note(
+                    runtime::diagnostics::Level::Refuse,
+                    "bin::assembly",
+                    &format!(
+                        "no run started at {} although {}: {}",
+                        addr.as_str(),
+                        because.because(),
+                        err.subject()
+                    ),
+                );
+                None
+            }
+        }
     }
 
     /// Puts a prepared drive into a lane on a pursuit's behalf.
@@ -292,7 +319,7 @@ impl RunWorker {
             context,
             InLane {
                 continuation,
-                owed: Owed::Row { addr, node },
+                owing: Owing::row(addr, node),
             },
         )
     }

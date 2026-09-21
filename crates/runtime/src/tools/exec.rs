@@ -28,7 +28,7 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-use crate::backlog::{Backlog, Started};
+use crate::backlog::{Backlog, Exit, Started};
 use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 
 /// Environment variables a child may inherit. Everything else is
@@ -133,10 +133,10 @@ impl ExecTool {
         let started = self.backlog.run(&self.setup.domain, what, command)?;
         let result = match started {
             Started::Settled {
-                exit_code,
+                exit,
                 stdout,
                 stderr,
-            } => settled(&stdout, &stderr, exit_code, arm)?,
+            } => settled(&stdout, &stderr, exit, arm)?,
             Started::Backgrounded { id, what } => backgrounded(&id, &what, arm)?,
         };
         with_environment(result, &inherited)
@@ -183,9 +183,11 @@ impl ExecTool {
             fuel: self.setup.fuel,
         };
         let result = self.sandbox.run(&job)?;
-        let exit_code = match &result.exit {
-            SandboxExit::Success => 0,
-            SandboxExit::Failure { code } => i64::try_from(*code).unwrap_or(i64::MAX),
+        let exit = match &result.exit {
+            SandboxExit::Success => Exit::Ended { code: 0 },
+            SandboxExit::Failure { code } => Exit::Ended {
+                code: i32::try_from(*code).unwrap_or(i32::MAX),
+            },
             // Exhaustion and traps are guest facts the caller must see
             // as themselves, not flattened into a generic non-zero exit.
             SandboxExit::FuelExhausted => {
@@ -203,7 +205,7 @@ impl ExecTool {
         settled(
             &String::from_utf8_lossy(&result.stdout),
             &String::from_utf8_lossy(&result.stderr),
-            exit_code,
+            exit,
             "python",
         )
     }

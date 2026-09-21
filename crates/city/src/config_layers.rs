@@ -85,6 +85,15 @@ impl ConfigLayer {
                         .map_err(|err| refuse(format!("{raw}: {}", err.recovery())))?;
                     env_passthrough.push(name);
                 }
+                // Which connector may reach what nothing here can
+                // undo, named server by server in the one file a
+                // person edits (`kernel::SandboxLimits::trusted`).
+                let mut trusted = Vec::new();
+                for raw in &section.trusted {
+                    let label = ServerLabel::parse(raw)
+                        .map_err(|err| refuse(format!("{raw}: {}", err.recovery())))?;
+                    trusted.push(label);
+                }
                 Some(SandboxLimits {
                     shell: section.shell,
                     fuel: section
@@ -92,6 +101,7 @@ impl ConfigLayer {
                         .unwrap_or(kernel::consts_policy::SANDBOX_FUEL_DEFAULT),
                     mounts,
                     env_passthrough,
+                    trusted,
                 })
             }
         };
@@ -198,7 +208,7 @@ impl ConfigLayer {
 /// ordinary case.
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
     let ladder = Ladder::read(city_root, addr)?;
-    Ok(kernel::freeze(
+    Ok(kernel::config::freeze(
         // No layer of this file has a key for either clock concern
         // yet: writing one is refused where it is written, so nothing
         // on the ladder can state them.
@@ -216,7 +226,7 @@ fn refuse(subject: String) -> AxError {
     AxError::failure(AxCode::ConfigInvalid, "read a configuration layer", subject).with_recovery(
         "this version reads three sections: `[model] effort = \"low|medium|high|xhigh|max\"`, \
          `[sandbox] shell = <bool>, fuel = <integer>, mounts = [<path>], \
-         env_passthrough = [<variable name>]`, and \
+         env_passthrough = [<variable name>], trusted = [<server label>]`, and \
          `[[mcp]] label = <lowercase>, and either command = <program> with args = [<argument>] \
          and env = { NAME = \"value\" }, or url = <https url> with transport = \"http\"|\"sse\" \
          and headers = { Name = \"value\" }`; a value on either table may be a \
@@ -288,6 +298,10 @@ struct SandboxSection {
     mounts: Vec<String>,
     #[serde(default)]
     env_passthrough: Vec<String>,
+    /// Empty unless a person wrote a label here: an effect nothing can
+    /// take back is allowed one server at a time.
+    #[serde(default)]
+    trusted: Vec<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]

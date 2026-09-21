@@ -8,16 +8,26 @@
 // cannot spell a secret; what comes back is the reference to put in
 // the attach form, and the value itself is never held past the send.
 
+import type { Lang } from "./lang";
+import { say } from "./lang";
+
 export type Enrolment =
   | { readonly kind: "stored"; readonly reference: string }
   | { readonly kind: "refused"; readonly reason: string };
 
-export function enrol(
-  origin: string,
-  realm: string,
-  name: string,
-  value: string,
-): Promise<Enrolment> {
+// One enrolment, as the caller states it. Five values that mean
+// nothing apart: where to send it, what to file it under, the secret
+// itself, and the language the answer comes back in.
+export interface Enrolling {
+  readonly origin: string;
+  readonly realm: string;
+  readonly name: string;
+  readonly value: string;
+  readonly lang: Lang;
+}
+
+export function enrol(at: Enrolling): Promise<Enrolment> {
+  const { origin, realm, name, value, lang } = at;
   const reference = referenceText({ realm, name });
   return fetch(`${origin}/enroll`, {
     method: "POST",
@@ -29,11 +39,11 @@ export function enrol(
         ? { kind: "stored", reference }
         : response.text().then((reason) => ({
             kind: "refused",
-            reason: reason === "" ? "the city did not say why" : reason,
+            reason: reason === "" ? say(lang, "enrol_city_said_nothing") : reason,
           })),
     (): Enrolment => ({
       kind: "refused",
-      reason: "this browser could not reach the city",
+      reason: say(lang, "enrol_unreachable"),
     }),
   );
 }

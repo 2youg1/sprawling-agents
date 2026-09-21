@@ -101,8 +101,8 @@ impl RunWorker {
     pub(in crate::assembly) fn look_at_this_machine(&mut self) {
         let found = crate::doctor::report();
         let items = found.items.len();
-        if let Some(sink) = self.machine.as_ref() {
-            sink(found);
+        if let Some(serving) = self.serving.as_ref() {
+            (serving.machine)(found);
         }
         self.note(
             runtime::diagnostics::Level::Effect,

@@ -155,17 +155,20 @@ impl Turn<ToolWave> {
     /// Boundary 3 (工具执行前). One wave, serial in S2; per call
     /// tool_called + tool_result. Invoker is a plain closure — no second
     /// dispatch trait until a second consumer exists (S3 catalog).
+    /// still_going 在每条 call 之前被问一次（B-70，见 §8-28-2）。
     pub fn execute(self, interrupt: Interrupt, ledger: &mut dyn Ledger,
-                   invoke: &mut dyn FnMut(&ToolCall) -> Result<ToolOutcome, AxError>)
+                   invoke: &mut dyn FnMut(&ToolCall) -> Result<ToolOutcome, AxError>,
+                   still_going: &mut dyn FnMut(u32) -> NextCall)
         -> Result<PhaseOutcome<Turn<Recording>>, AxError>;
 }
+pub enum NextCall { Allowed, Halted }   // 比 Interrupt 窄：波内只有「停」可以立刻执行
 impl Turn<Recording> {
     pub fn record(self, interrupt: Interrupt, ledger: &mut dyn Ledger) -> Result<PhaseOutcome<TurnReport>, AxError>;
 }
 ```
 
 - **相变函数携 `&mut dyn Ledger`，相内字段私有**；无返回既往相的方法；跳相／相内取消／字面量构造中间相，三者编译不过（trybuild）。
-- **取消只在边界**：每相变函数首参即边界快照；命中 Cancel → 追加 cancel_received → 返回 Cancelled（回合终止，后续 handoff_written＋run_frozen 归执行器）。相内无任何中断入口＝A9 的结构化一半；另一半（事件序断言）在 citysim。
+- **取消只在边界**：每相变函数首参即边界快照；命中 Cancel → 追加 cancel_received → 返回 Cancelled（回合终止，后续 handoff_written＋run_frozen 归执行器）。相内无任何中断入口＝A9 的结构化一半；另一半（事件序断言）在 citysim。**工具波内的每条 call 同样是一道边界**（B-70）：一波是 N 件副作用而不是一件，于是 `execute` 在每条 call 之前问 `still_going`，并经同一个 `cancel_here` 写下同一条 `cancel_received`——消费中断的地方仍然只有一处。
 - **四取消点**：组装前／provider 调用前／工具执行前／派生前，四点全住本模块。第四点由 `Turn<Recording>::record` 收边界快照，故 `record` 与前三相同形——收 `Interrupt`、答 `PhaseOutcome`。它买到的是别处买不到的一件事：**一个回合把活派下去之后、子 Run 起来之前，仍停得住**；`calls_made == 0` 的收尾回合尤其如此，那一刻在第四点之前根本没有下一个边界。
 - **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。S3 接真 dialect 时只加字段。
 - **工具波 S2 串行**：并行执行串行入账（确定性 5）属 S3 并发波；接口不预留并发参数，入账序＝calls 序。
@@ -295,7 +298,7 @@ pub struct Packaged { pub content: String, pub events: Vec<Payload> }   // event
 pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>;
 ```
 
-- 定序：offload 恒先于截断；`len ≤ cap` →原样；`len > cap 且 len ≥ OFFLOAD_MIN_BYTES 且有 OffloadSite` → offload；否则交 `compaction::compact`，它答 `Elided::Nothing`（结构化与未知内容它不截）时才走 `byte_cut` 纯截断，不入 CAS。两条路的标记都由 `elision` 产出且只出现一次。
+- 定序（H-08 之后）：**判定由 `compaction::plan` 一处给出**，答 `Shrink { Keep, Cut(Strategy), MustOffload }`。`Keep` →原样；`MustOffload`（结构化、未知内容、以及非 UTF-8 字节）与「`Cut` 且 `len ≥ OFFLOAD_MIN_BYTES`」→ 有 `OffloadSite` 就 offload；`Cut` 而无站点或不够大 → `compaction::shorten` 按已定的 `Strategy` 裁。**`MustOffload` 而无站点是一次带恢复语的 `Err`，不是私自的字节切**：截半的结构化数据看上去仍可解析，那正是它比缺席更糟的理由，而旧的 `byte_cut` 让 pipeline 当场推翻 compaction 的定规——一条规则两个家。`byte_cut` 随之删除。标记仍由 `elision` 产出且只出现一次。
 - 信封三附件一处组装：正文后依序追加 clock 行／net_notice 行（恒一次：正在连接互联网提醒，英文定句）／steer 行（`user:`／`@ID:` 前缀）；三行字节不计入 cap（附件与负载分账，附件有自己的封顶常数在实现内断言）。
 - 内容感知压缩分派表属 P3；本模块只持「原样／offload／截断」三臂，接口不预留分派参数。
 
@@ -1091,16 +1094,23 @@ pub struct PackContext<'a> { /* 既有五字段 */ pub sieve: Option<SieveReques
 ```rust
 pub struct BacklogId(u64);                      // Display；一次 serve 内唯一
 pub enum Started {                              // 短窗口的穷尽结果，恒不是 bool
-    Settled { exit_code: i64, stdout: String, stderr: String },
+    Settled { exit: Exit, stdout: String, stderr: String },
     Backgrounded { id: BacklogId, what: String },
 }
 pub struct Standing { pub id: BacklogId, pub scope: Address, pub what: String }
-pub struct Finished { pub id: BacklogId, pub what: String, pub exit_code: i64,
+pub struct Finished { pub id: BacklogId, pub what: String, pub exit: Exit,
                       pub stdout: String, pub stderr: String }
+
+// backlog::waiting —— 等多久，与「怎么结束的」两件事的唯一住处
+pub struct PollBudget { /* polls、interval_ms 私有 */ }
+impl PollBudget { pub const DEFAULT: PollBudget; pub fn new(polls: u32, interval_ms: u64) -> PollBudget; }
+pub enum Exit { Ended { code: i32 }, Signalled, Unknown { why: Unseen } }
+pub enum Unseen { LeftTheTable, WaitRefused }   // 各带一句给模型看的话
 
 #[derive(Clone, Default)]
 pub struct Backlog(/* Arc<Mutex<Table>>，表内是 BTreeMap */);
 impl Backlog {
+    pub fn with_window(window: PollBudget) -> Backlog;   // `new()` 即 PollBudget::DEFAULT
     pub fn run(&self, scope: &Address, what: String, command: Command) -> Result<Started, AxError>;
     pub fn halt(&self, scope: Option<&Address>) -> Result<usize, AxError>;   // None＝整城
     pub fn harvest(&self) -> Result<Vec<Finished>, AxError>;
@@ -1110,7 +1120,9 @@ impl Backlog {
 
 三处实现选择，各有理由：
 
-1. **短窗口靠固定次数的轮询走完，不采样时钟。** 10 s ＝ 500 次 × 20 ms，两个数都是常量。理由是本仓那条「时间是入参，唯一采样点是 `bin::assembly`」——一个为了等十秒而调 `Instant::now()` 的模块会把那条规则打穿，而计数不需要时钟。
+1. **短窗口靠固定次数的轮询走完，不采样时钟，且窗口由调用方注入（B-47）。** 默认 10 s ＝ 500 次 × 20 ms，住 `PollBudget::DEFAULT`；表持一份 `PollBudget`，`Backlog::with_window` 换掉它。理由是本仓那条「时间是入参，唯一采样点是 `bin::assembly`」——一个为了等十秒而调 `Instant::now()` 的模块会把那条规则打穿，而计数不需要时钟。**注入不是为了可配置**：`Settled` 与 `Backgrounded` 两种载荷形状不同，一个不能选窗口的调用方要观察后一种就得真等十秒，于是套件要么慢十秒、要么不判它交付的那个形状。
+
+1b. **退出码是穷尽枚举，不是一个整数（B-47）。** `Exit::Ended { code }`／`Signalled`／`Unknown { why }` 三臂：`-1` 过去同时是「程序返回了负一」「被信号杀死」「本城没问出来」，而读结果的模型分不出是哪一件。`exec` 结果里 `exit_code` 键**只在 `Ended` 时出现**，另两臂写 `outcome`（`signalled`／`unknown`）与一句 `detail`；键名仍只由 `tools/exec/outcome.rs` 拼（§8-26）。
 2. **子进程的输出写文件，不走管道。** 管道缓冲区填满会让后台子进程停在写系统调用上，于是「后台」变成「挂死」——那正是本节要修的那个洞的另一种写法。文件住 `std::env::temp_dir()` 下按 `BacklogId` 命名的一层目录，收割时读完即删。
 3. **表是一份共享句柄（`Clone` 的 `Arc<Mutex<_>>`）。** 装配层持一份，每个 `ExecTool` 持一份克隆，于是 `halt` 够得着 `exec` 起的东西而不必让 `halt` 认识 `exec`。表内是 `BTreeMap`，遍历序恒定。
 
@@ -1136,6 +1148,7 @@ impl Backlog {
 ```
 
 - **一个 run 成员没有进程可杀**：`halt` 对它做的是把身体记成 `Stopping`，而 run 在下一个安全点问 `stopping` 并以 `Interrupt::Cancel` 走 `runtime::turn` 既有的取消路——取消因此仍只在相位边界被消费，§8-28 首段那条法则不动。
+- **每个 call 之前问一次（B-70）**：一次工具波是模型一条回复里要的 N 件副作用，不是一件。`SafePoint::BeforeToolCall { turn, call }` 是第五个安全点，`Turn::<ToolWave>::execute` 在每条 call **入账之前**问 `still_going(call) -> NextCall`；`Halted` 走 `cancel_here` 写下与相位边界同一条 `cancel_received` 并终止回合，于是停城不必等整波跑完，也不会为没做的活留下 `tool_called`。答案窄于 `Interrupt` 是刻意的：两条 call 之间能立刻执行的指令只有「停」，改道的文字属于执行器的 `Window`，由执行器在回答之前折进去。
 - **只有委派下去的 run 入表**。根 run 由 `Cancel` 结束，那是另一个动词（glossary「Halt」行）；把根 run 也入表会让 `halt` 与 `Cancel` 变成同一件事。
 - **`harvest` 与短窗口都跳过 run 成员**：它们收的是进程的退出码，run 的结局在账本上。
 - **`status` 的那一半**：第十四行 `backlog:` 追加在冻结序末尾（追加规则同 `neighbours`），报 `standing(addr)` 里属于本 run 地址的成员——`bg-3 cargo build (command)` 逐条分号相连，没有则 `none`。**不报跑了多久**：本表不采样时钟（§8-28-1 第 1 条），一个为了报时长而采样的 status 会是第二个采样点。
