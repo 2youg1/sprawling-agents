@@ -113,12 +113,7 @@ pub(crate) fn written(
 /// which is what decides whether a repair is safe to make without
 /// asking - eleven of twelve is a typing mistake and three of five is
 /// a column that never had a consensus.
-fn tagged(
-    at: &str,
-    found: &[Deviation<'_>],
-    sources: &Sources,
-    census: Option<&str>,
-) -> String {
+fn tagged(at: &str, found: &[Deviation<'_>], sources: &Sources, census: Option<&str>) -> String {
     let mut edits: BTreeMap<(Group, String), Vec<&Deviation<'_>>> = BTreeMap::new();
     for one in found {
         edits

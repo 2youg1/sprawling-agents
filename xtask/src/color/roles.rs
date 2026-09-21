@@ -105,7 +105,9 @@ pub(super) fn judge_roles(root: &Path, source: &str) -> Result<Vec<Violation>, X
         .map(|held| held.name)
         .collect();
     let roles: Vec<Named<'_>> = declared(source)
-        .filter(|held| !is_rung(held.name) && !is_text(held.name) && !held.value.starts_with("oklch("))
+        .filter(|held| {
+            !is_rung(held.name) && !is_text(held.name) && !held.value.starts_with("oklch(")
+        })
         .collect();
 
     // 1. Everything that is not a rung, a text token or a coloured token
@@ -257,7 +259,9 @@ fn rungs_outside_the_theme(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 /// `grid-` and `group/` all start with a `g` that is not a rung, and a
 /// bare search for `-g` would report every one of them.
 fn rung_utility(line: &str) -> Option<String> {
-    for prefix in ["bg-", "border-", "text-", "fill-", "stroke-", "ring-", "outline-"] {
+    for prefix in [
+        "bg-", "border-", "text-", "fill-", "stroke-", "ring-", "outline-",
+    ] {
         let mut rest = line;
         while let Some(at) = rest.find(prefix) {
             let tail = rest.get(at.saturating_add(prefix.len())..)?;

@@ -75,7 +75,9 @@ impl Sources {
                         continue;
                     }
                     let at = index.saturating_add(1);
-                    found.entry(literal).or_insert_with(|| format!("{rel}:{at}"));
+                    found
+                        .entry(literal)
+                        .or_insert_with(|| format!("{rel}:{at}"));
                 }
             }
         }

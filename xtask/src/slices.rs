@@ -35,8 +35,9 @@ use crate::walk;
 /// The files the slice path is allowed to name, and why: the layout that
 /// derives it, the writer that alone calls the derivation, and the
 /// writer's own fixtures.
-const SHARES_THE_FACT: [&str; 3] = [
+const SHARES_THE_FACT: [&str; 4] = [
     "crates/kernel/src/layout.rs",
+    "crates/kernel/src/layout/tests.rs",
     "crates/memory/src/sessions.rs",
     "crates/memory/src/sessions/tests.rs",
 ];
