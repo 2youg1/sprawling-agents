@@ -318,7 +318,7 @@ status = "gated, with a register of the files that predate the rule"
 [file_length.predating]
 "client/src/core/belief.ts" = 422
 "client/src/views/machine.tsx" = 563
-"client/src/views/talk/composer.tsx" = 496
+"client/src/views/talk/composer.tsx" = 478
 
 # White box is Rust, black box is Lean (the person's ruling).
 # `cargo xtask boundary` refuses a Rust check that reaches this product

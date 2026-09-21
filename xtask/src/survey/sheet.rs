@@ -23,6 +23,8 @@
 
 use std::collections::BTreeMap;
 
+mod tagged;
+
 use super::{Deviation, Finding, Group, Near, Page, Population, Sources, vocabulary};
 
 /// How many sites of one repeated finding are listed before the rest
@@ -66,110 +68,50 @@ pub(crate) enum Shape {
     Tagged,
 }
 
+/// One page as this instrument read it: where it is, what is drawn on
+/// it, what came back off it, and where each class was written.
+///
+/// The four travel together through every sentence this module writes,
+/// because no reading means anything without the page it was taken
+/// from and the source it can be traced back to.
+#[derive(Clone, Copy)]
+pub(crate) struct Survey<'a> {
+    pub(crate) page: &'a Page,
+    pub(crate) at: &'a str,
+    pub(crate) found: &'a [Deviation<'a>],
+    pub(crate) sources: &'a Sources,
+}
+
 /// The whole report over one page, or nothing at all.
-pub(crate) fn written(
-    page: &Page,
-    at: &str,
-    found: &[Deviation<'_>],
-    sources: &Sources,
-    shape: Shape,
-) -> String {
-    let census = vocabulary::unpainted(page);
-    if found.is_empty() && census.is_none() {
+pub(crate) fn written(survey: Survey<'_>, shape: Shape) -> String {
+    let census = vocabulary::unpainted(survey.page);
+    if survey.found.is_empty() && census.is_none() {
         return String::new();
     }
     if shape == Shape::Tagged {
-        return tagged(at, found, sources, census.as_deref());
+        return tagged::tagged(survey, census.as_deref());
     }
     let mut groups: BTreeMap<Group, Vec<&Deviation<'_>>> = BTreeMap::new();
-    for one in found {
+    for one in survey.found {
         groups.entry(one.finding.group()).or_default().push(one);
     }
     let mut out = format!(
-        "survey · {at} · {} group(s) · {} finding(s)\nfix in order; each group moves boxes and \
+        "survey \u{b7} {} \u{b7} {} group(s) \u{b7} {} finding(s)\nfix in order; each group moves boxes and \
          invalidates the next\n",
+        survey.at,
         groups.len(),
-        found.len()
+        survey.found.len()
     );
     for group in Group::IN_ORDER {
         let Some(members) = groups.get(&group) else {
             continue;
         };
-        out.push_str(&written_group(group, members, sources));
+        out.push_str(&written_group(group, members, survey.sources));
     }
     if let Some(line) = census {
         out.push_str(&format!("\n## vocabulary\n{line}\n"));
     }
     out
-}
-
-/// The same readings as named fields.
-///
-/// One `<edit>` per repair, one `<at>` per place it has to be made.
-/// `id` is the key an agent suppresses or diffs on and never changes
-/// when a sentence is reworded; `fix` and `by` are the verb and the
-/// operand, kept apart from the prose so that acting on them needs no
-/// sentence parsing; `cohort` is how many of the population agreed,
-/// which is what decides whether a repair is safe to make without
-/// asking - eleven of twelve is a typing mistake and three of five is
-/// a column that never had a consensus.
-fn tagged(at: &str, found: &[Deviation<'_>], sources: &Sources, census: Option<&str>) -> String {
-    let mut edits: BTreeMap<(Group, String), Vec<&Deviation<'_>>> = BTreeMap::new();
-    for one in found {
-        edits
-            .entry((one.finding.group(), rule(one)))
-            .or_default()
-            .push(one);
-    }
-    let mut out = format!(
-        "<survey page=\"{}\" edits=\"{}\" sites=\"{}\">\n",
-        escaped(at),
-        edits.len(),
-        found.len()
-    );
-    for ((group, headline), sites) in edits {
-        let Some(first) = sites.first() else { continue };
-        out.push_str(&format!(
-            "<edit id=\"{}\" group=\"{}\" standing=\"{}\" sites=\"{}\">\n",
-            first.finding.id(),
-            group.called(),
-            match first.standing() {
-                super::Standing::Refused => "refused",
-                super::Standing::Noted => "noted",
-            },
-            sites.len()
-        ));
-        out.push_str(&format!("<why>{}</why>\n", escaped(&headline)));
-        out.push_str(&format!("<fix>{}</fix>\n", escaped(&remedy(first))));
-        for one in &sites {
-            let where_ = sources
-                .locate(&one.at.class)
-                .map_or_else(String::new, |found| format!(" src=\"{}\"", escaped(found)));
-            out.push_str(&format!(
-                "<site{where_} box=\"{}\" x=\"{}\" y=\"{}\">{}</site>\n",
-                escaped(&one.at.tag),
-                one.at.left,
-                one.at.top,
-                escaped(&says(one))
-            ));
-        }
-        out.push_str("</edit>\n");
-    }
-    if let Some(line) = census {
-        out.push_str(&format!("<unpainted>{}</unpainted>\n", escaped(line)));
-    }
-    out.push_str("</survey>\n");
-    out
-}
-
-/// The five characters that would otherwise close a tag somebody is
-/// still inside. A name on this page can hold any of them.
-fn escaped(raw: &str) -> String {
-    raw.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 /// One group: its heading, then one paragraph per edit.

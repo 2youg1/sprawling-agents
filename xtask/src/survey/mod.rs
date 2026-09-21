@@ -46,7 +46,7 @@ mod source;
 mod vocabulary;
 
 pub(crate) use drawn::{Cut, Drawn, Marking, Overflow, Page, Paint, PaintSource, Sampled, TextRun};
-pub(crate) use sheet::{Shape, remedy, rule, says, written};
+pub(crate) use sheet::{Shape, Survey, remedy, rule, says, written};
 pub(crate) use source::Sources;
 pub(crate) use vocabulary::Declared;
 

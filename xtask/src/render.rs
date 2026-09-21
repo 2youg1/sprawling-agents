@@ -168,7 +168,13 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             ));
         }
         if let Errand::Survey(shape) = errand {
-            print!("{}", survey::written(page, &at, &readings, &sources, shape));
+            let survey = survey::Survey {
+                page,
+                at: &at,
+                found: &readings,
+                sources: &sources,
+            };
+            print!("{}", survey::written(survey, shape));
         }
     }
     Ok(violations)
