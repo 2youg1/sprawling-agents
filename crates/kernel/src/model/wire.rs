@@ -173,6 +173,36 @@ pub enum Effort {
     Max,
 }
 
+impl Effort {
+    /// Every setting, in the order a person is offered them.
+    ///
+    /// The one list. A refusal that spells the allowed values, a form
+    /// that offers them and a document that names them all read this,
+    /// so a seventh setting cannot appear in one of the three and be
+    /// missing from the other two.
+    pub const ALL: [Effort; 6] = [
+        Effort::None,
+        Effort::Low,
+        Effort::Medium,
+        Effort::High,
+        Effort::XHigh,
+        Effort::Max,
+    ];
+
+    /// The word the wire and every configuration file spell it with.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Effort::None => "none",
+            Effort::Low => "low",
+            Effort::Medium => "medium",
+            Effort::High => "high",
+            Effort::XHigh => "xhigh",
+            Effort::Max => "max",
+        }
+    }
+}
+
 /// One piece of what a model is producing, before the call it belongs to
 /// has settled.
 ///

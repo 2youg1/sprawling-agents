@@ -14,21 +14,7 @@
 use kernel::{AxCode, AxError, Payload, StallVerdict, TimeMs};
 use serde_json::{Map, Value};
 
-/// How many times a run may make a failed call again.
-///
-/// Exhaustive rather than a count with a sentinel: "keep trying until
-/// somebody stops this" and "try four times" are different intentions,
-/// and a number cannot spell the first one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Retries {
-    /// No ceiling. What stops the run is `Halt`, the city's one brake.
-    /// This is what a person who settled nothing asked for.
-    #[default]
-    UntilHalted,
-    /// Freeze once this many retries have been spent. Zero is a real
-    /// answer and means "once, then report".
-    AtMost(u32),
-}
+pub use kernel::Retries;
 
 /// One watchdog per run: it holds the correction history and the ceiling
 /// the person set on retries, nothing else.

@@ -22,7 +22,6 @@ impl gateway::OutputCeiling
 impl gateway::Persistence
 impl gateway::Recording
 impl gateway::Redemption
-impl gateway::Retries
 impl gateway::Transcriber
 impl kernel::model::Model for gateway::Endpoint
 impl kernel::model::Model for gateway::Native
@@ -35,9 +34,6 @@ pub const fn gateway::Family::shape(self) -> gateway::DialectHint
 pub const fn gateway::Modality::as_str(self) -> &'static str
 pub const fn gateway::OutputCeiling::source(self) -> gateway::CeilingSource
 pub const fn gateway::OutputCeiling::tokens(self) -> kernel::model::wire::Ceiling
-pub const fn gateway::Retries::of(core::option::Option<u32>) -> gateway::Retries
-pub const fn gateway::Retries::stated(self) -> core::option::Option<u32>
-pub const fn gateway::Retries::without_a_brake(self) -> u32
 pub const gateway::EndpointTuning::DEFAULTS: gateway::TuningDefaults
 pub const gateway::Family::ALL: [gateway::Family; 4]
 pub const gateway::Modality::ALL: [gateway::Modality; 2]
@@ -55,7 +51,6 @@ pub enum gateway::HeaderValue
 pub enum gateway::InputKinds
 pub enum gateway::Modality
 pub enum gateway::Persistence
-pub enum gateway::Retries
 pub fn gateway::AttachedEndpoint::chat_url(&self) -> alloc::string::String
 pub fn gateway::AttachedEndpoint::has_credential(&self) -> bool
 pub fn gateway::AttachedEndpoint::is_local(&self) -> bool
@@ -206,7 +201,7 @@ pub gateway::EndpointTuning::extra_headers: alloc::vec::Vec<(alloc::string::Stri
 pub gateway::EndpointTuning::label: core::option::Option<alloc::string::String>
 pub gateway::EndpointTuning::overrides: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
 pub gateway::EndpointTuning::proxying: kernel::reach::Proxying
-pub gateway::EndpointTuning::request_max_retries: gateway::Retries
+pub gateway::EndpointTuning::request_max_retries: kernel::retries::Retries
 pub gateway::EndpointTuning::stream_idle_timeout_ms: core::option::Option<u64>
 pub gateway::EndpointTuning::timeout_ms: core::option::Option<u64>
 pub gateway::Family::ClaudeCode
@@ -271,8 +266,6 @@ pub gateway::OauthTokens::refresh: core::option::Option<zeroize::Zeroizing<alloc
 pub gateway::Persistence::AcrossReboots
 pub gateway::Persistence::ThisBoot
 pub gateway::Persistence::ThisProcess
-pub gateway::Retries::AtMost(u32)
-pub gateway::Retries::UntilHalted
 pub gateway::Stated::person: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::Stated::upstream: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::TokenRequest::body: alloc::string::String
@@ -286,7 +279,7 @@ pub gateway::TranscriberConfig::base_url: alloc::string::String
 pub gateway::TranscriberConfig::model: alloc::string::String
 pub gateway::TranscriberConfig::proxying: kernel::reach::Proxying
 pub gateway::TranscriberConfig::timeout_ms: u64
-pub gateway::TuningDefaults::retries: gateway::Retries
+pub gateway::TuningDefaults::retries: kernel::retries::Retries
 pub gateway::TuningDefaults::stream_idle_timeout_ms: core::option::Option<u64>
 pub gateway::TuningDefaults::timeout_ms: u64
 pub mod gateway
@@ -325,3 +318,4 @@ pub struct gateway::TuningDefaults
 pub type gateway::EnvReader = alloc::boxed::Box<(dyn core::ops::function::Fn(&str) -> core::option::Option<alloc::string::String> + core::marker::Send)>
 pub type gateway::ImageResolver = alloc::sync::Arc<(dyn core::ops::function::Fn(&kernel::locator::Locator) -> core::result::Result<alloc::vec::Vec<u8>, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type gateway::SecretResolver = alloc::boxed::Box<(dyn core::ops::function::Fn(&kernel::secret::span::SecretRef) -> core::result::Result<kernel::secret::sealed::Sealed<alloc::string::String>, kernel::error::shape::AxError> + core::marker::Send)>
+pub use gateway::Retries

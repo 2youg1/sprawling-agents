@@ -45,6 +45,7 @@ pub mod reach;
 pub mod registry;
 pub mod release;
 pub mod repair;
+pub mod retries;
 #[cfg(feature = "schema")]
 pub mod schema;
 pub mod secret;
@@ -90,6 +91,7 @@ pub use reach::{Answered, Connected, Named, Proxying, Reach, Through};
 pub use registry::{Artifact, Claim, RegisterVerdict, Registry, ResidentId};
 pub use release::{Release, ReleaseVerdict};
 pub use repair::RepairVerdict;
+pub use retries::Retries;
 pub use secret::{Sealed, SecretRef, SecretSpan};
 pub use share::{Share, WHOLE_PPB};
 pub use spine::{EvidenceCell, MEMO_OUTLINE_FIELDS, MemoShape, NewChild, ROADMAP_COLUMNS};

@@ -652,3 +652,7 @@ impl ConnectionKind {
 - **两种失效要分开写，否则下一个读者会把闸关掉**：
   - **设计上正确的失效**：改 effort 使缓存断点失效（§110 引官方排错文档：「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」）。前缀真的变了，人也真的改了配置。**顺带更正一处口口相传的说法**：effort 本身并不住在 prefix 里，它是 `ChatRequest.effort` 独立字段（`bin::assembly::freezing` 冻进 `RunPlan.shape`）；工具卡片同理住 `ChatRequest.tools`。住在 prefix 里的是技能清单（resident 块的 catalog 渲染）。
   - **本条要防的意外失效**：没人决定过、也没人看得见的逐轮变化——时间戳、run id、随机序、每次请求重排的集合，以及照抄来的计费字段。
+
+### 8-31 重试上限住 kernel
+
+`gateway::Retries` 现在是 `kernel::Retries` 的再导出。缺席的含义（`UntilHalted`）、探测在无人可停时读成一次（`without_a_brake`）、以及记进账本时写不写这个数（`stated`），三条都由那一处定义，本 crate 不再自持一份。

@@ -52,6 +52,8 @@ impl kernel::ChatRequest
 impl kernel::ChatRequest
 impl kernel::Discard
 impl kernel::Discard
+impl kernel::Effort
+impl kernel::Effort
 impl kernel::EgressAllowlist
 impl kernel::EgressAllowlist
 impl kernel::ErrorDraft
@@ -157,6 +159,8 @@ impl kernel::registry::ResidentId
 impl kernel::registry::ResidentId
 impl kernel::release::Release
 impl kernel::release::Release
+impl kernel::retries::Retries
+impl kernel::retries::Retries
 impl kernel::share::Share
 impl kernel::share::Share
 impl kernel::stall::ActionFingerprint
@@ -239,9 +243,17 @@ pub const fn kernel::budget::UsdMicros::new(u64) -> kernel::budget::UsdMicros
 pub const fn kernel::budget::UsdMicros::new(u64) -> kernel::budget::UsdMicros
 pub const fn kernel::locator::B3Hash::from_bytes([u8; 32]) -> Self
 pub const fn kernel::locator::B3Hash::from_bytes([u8; 32]) -> Self
+pub const fn kernel::retries::Retries::of(core::option::Option<u32>) -> kernel::retries::Retries
+pub const fn kernel::retries::Retries::of(core::option::Option<u32>) -> kernel::retries::Retries
+pub const fn kernel::retries::Retries::stated(self) -> core::option::Option<u32>
+pub const fn kernel::retries::Retries::stated(self) -> core::option::Option<u32>
+pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
+pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
 pub const kernel::AxCode::ALL: [kernel::AxCode; 36]
 pub const kernel::AxCode::ALL: [kernel::AxCode; 36]
 pub const kernel::DOORS: [kernel::gate::DoorId; 7]
+pub const kernel::Effort::ALL: [kernel::Effort; 6]
+pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::EventKind::ALL: [kernel::EventKind; 67]
 pub const kernel::EventKind::ALL: [kernel::EventKind; 67]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
@@ -370,6 +382,7 @@ pub enum kernel::ReleaseVerdict
 pub enum kernel::RenderIntent
 pub enum kernel::RepairVerdict
 pub enum kernel::Restoration
+pub enum kernel::Retries
 pub enum kernel::RoadmapShape
 pub enum kernel::RoadmapStatus
 pub enum kernel::Role
@@ -442,6 +455,7 @@ pub enum kernel::reach::Through
 pub enum kernel::registry::RegisterVerdict
 pub enum kernel::release::ReleaseVerdict
 pub enum kernel::repair::RepairVerdict
+pub enum kernel::retries::Retries
 pub enum kernel::spine::EvidenceCell
 pub enum kernel::spine::MemoShape
 pub enum kernel::spine::RoadmapShape
@@ -511,6 +525,8 @@ pub fn kernel::Discard::taint(&self) -> &kernel::taint::TaintSet
 pub fn kernel::Discard::taint(&self) -> &kernel::taint::TaintSet
 pub fn kernel::Discard::total_bytes(&self) -> kernel::budget::ByteLen
 pub fn kernel::Discard::total_bytes(&self) -> kernel::budget::ByteLen
+pub fn kernel::Effort::as_str(self) -> &'static str
+pub fn kernel::Effort::as_str(self) -> &'static str
 pub fn kernel::EgressAllowlist::admits(&self, &str) -> bool
 pub fn kernel::EgressAllowlist::admits(&self, &str) -> bool
 pub fn kernel::EgressAllowlist::entries(&self) -> impl core::iter::traits::iterator::Iterator<Item = &str>
@@ -1412,6 +1428,8 @@ pub kernel::Restoration::Interred(kernel::locator::Locator)
 pub kernel::Restoration::Rebuildable
 pub kernel::Restoration::Rebuildable::reason: alloc::string::String
 pub kernel::Restoration::Tracked(kernel::locator::Locator)
+pub kernel::Retries::AtMost(u32)
+pub kernel::Retries::UntilHalted
 pub kernel::RoadmapRow::evidence: kernel::EvidenceCell
 pub kernel::RoadmapRow::id: kernel::node_id::NodeId
 pub kernel::RoadmapRow::item: alloc::string::String
@@ -1957,6 +1975,8 @@ pub kernel::release::ReleaseVerdict::Current
 pub kernel::repair::RepairVerdict::Lease
 pub kernel::repair::RepairVerdict::Queued
 pub kernel::repair::RepairVerdict::Queued::holder: kernel::RunId
+pub kernel::retries::Retries::AtMost(u32)
+pub kernel::retries::Retries::UntilHalted
 pub kernel::secret::SecretSpan::len: usize
 pub kernel::secret::SecretSpan::provider: core::option::Option<&'static str>
 pub kernel::secret::SecretSpan::start: usize
@@ -2079,6 +2099,7 @@ pub mod kernel::reach
 pub mod kernel::registry
 pub mod kernel::release
 pub mod kernel::repair
+pub mod kernel::retries
 pub mod kernel::secret
 pub mod kernel::share
 pub mod kernel::spine

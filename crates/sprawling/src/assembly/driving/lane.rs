@@ -193,12 +193,15 @@ pub(crate) fn drive_run<L: Ledger>(
                     if call.name.as_str() != "exec" {
                         return Ok(outcome);
                     }
-                    let failed = outcome
-                        .result
-                        .as_map()
-                        .get("exit_code")
-                        .and_then(serde_json::Value::as_i64)
-                        .is_some_and(|code| code != 0);
+                    // Absence of `exit_code` is a failure, not a
+                    // success: a command a signal stopped returns no
+                    // code at all, and reading that as zero would let
+                    // a halted build count as tests that passed.
+                    let result = outcome.result.as_map();
+                    let failed = match result.get("exit_code").and_then(serde_json::Value::as_i64) {
+                        Some(code) => code != 0,
+                        None => true,
+                    };
                     {
                         let mut counts = ran.borrow_mut();
                         if failed {

@@ -351,7 +351,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 
 **The number in each subheading is the number of rows under it**, and `cargo xtask modmap` counts them, because every count a person maintained by hand here had already gone stale. The `desktop` heading is the one exception the machine cannot judge: its files sit outside `crates/`, where the parser does not look.
 
-### kernel (81) — every decision in the city, and nothing that touches a disk
+### kernel (82) — every decision in the city, and nothing that touches a disk
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -411,6 +411,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::approval::tests | crates/kernel/src/approval/tests.rs | the three rules a caller depends on: policy matching, idle expiry, and who may answer | value | S2 | built | kernel-SPEC.md#8-21 |
 | kernel::delegation | crates/kernel/src/delegation.rs | two kinds of delegate, one level deep, no grand-delegate | value | S2 | built | kernel-SPEC.md#8-17 |
 | kernel::repair | crates/kernel/src/repair.rs | leases for when the environment itself is broken | decision | S2 | built | kernel-SPEC.md#8-16 |
+| kernel::retries | crates/kernel/src/retries.rs | how many times a failed call is made again, and what an unstated ceiling means | value type | P1 | built | kernel-SPEC.md#8-72 |
 | kernel::config | crates/kernel/src/config.rs | three-layer resolution, and the frozen/live split with no shared field | decision | S2 | built | kernel-SPEC.md#8-22 |
 | kernel::config::tests | crates/kernel/src/config/tests.rs | the ladder rules a caller depends on: lower layers win, whole-list override, and the frozen/live field disjointness | decision | S2 | built | kernel-SPEC.md#8-22 |
 | kernel::tool (port) | crates/kernel/src/tool.rs | what a tool is, in eight fields | port | S2 | built | kernel-SPEC.md#8-23 |
@@ -493,14 +494,13 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::fixture | crates/memory/src/bundle/fixture.rs | the one city the bundle tests export | adapter | V3 | built | memory-SPEC.md#8-21 |
 
-### gateway (57) — everything between a decision to call a model and the bytes on the wire
+### gateway (56) — everything between a decision to call a model and the bytes on the wire
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
 | gateway::router | crates/gateway/src/router.rs | the book of attached endpoints and the model chosen per tag | projection | P1 | built | gateway-SPEC.md#8-9 |
 | gateway::router::attached | crates/gateway/src/router/attached.rs | registration records | projection | P1 | built | gateway-SPEC.md#8-9 |
 | gateway::router::tuning | crates/gateway/src/router/tuning.rs | what a person settled about one endpoint: its label, its deadlines, the headers every call adds and the body fields every call writes | value | F1 | built | gateway-SPEC.md#8-16 |
-| gateway::router::retries | crates/gateway/src/router/retries.rs | how many retries one request gets, and what an unstated answer means | policy | P1 | built | gateway-SPEC.md#8-18 |
 | gateway::router::book | crates/gateway/src/router/book.rs | choices the city made | projection | P1 | built | gateway-SPEC.md#8-9 |
 | gateway::router::payload | crates/gateway/src/router/payload.rs | references on the wire | projection | P1 | built | gateway-SPEC.md#8-9 |
 | gateway::router::payload::reading | crates/gateway/src/router/payload/reading.rs | reading a record back: what a reader may conclude from one this build did not write | projection | P1 | built | gateway-SPEC.md#8-9 |

@@ -139,7 +139,7 @@ pub(super) fn read_tuning(payload: &Payload) -> EndpointTuning {
             .and_then(Value::as_str)
             .map(str::to_owned),
         timeout_ms: figure("timeout_ms"),
-        request_max_retries: super::retries::Retries::of(
+        request_max_retries: kernel::Retries::of(
             figure("request_max_retries").and_then(|held| u32::try_from(held).ok()),
         ),
         stream_idle_timeout_ms: figure("stream_idle_timeout_ms"),

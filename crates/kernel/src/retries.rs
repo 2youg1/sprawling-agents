@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How many times a failed request to one endpoint is made again.
+//! How many times a failed call is made again.
 //!
 //! **One value, one absence.** The same setting used to mean three
 //! things: a dispatch read a missing figure as "retry until somebody
@@ -12,6 +12,11 @@
 //! person, the same endpoint, and two different behaviours. The figure
 //! is a value here, its absence is [`Retries::UntilHalted`] by
 //! construction, and no reader can spell a fourth answer.
+//!
+//! It lives in the kernel because two layers read it and neither
+//! depends on the other: the gateway, deciding whether to send the
+//! request again, and the runtime's watchdog, deciding whether to
+//! freeze the run. One home, or the two drift.
 
 /// The ceiling a person set on retrying one endpoint.
 ///

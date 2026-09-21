@@ -1591,10 +1591,6 @@
     "en": "keybindings",
     "zh": "快捷键"
   },
-  "setup_group_mcp": {
-    "en": "MCP",
-    "zh": "MCP"
-  },
   "setup_group_network": {
     "en": "network",
     "zh": "网络"
@@ -1994,10 +1990,6 @@
   "setup_toml": {
     "en": "the same in config.toml",
     "zh": "等价的 config.toml"
-  },
-  "setup_toml_none": {
-    "en": "config.toml carries none of this yet",
-    "zh": "config.toml 还没有这一节"
   },
   "setup_toml_unread": {
     "en": "nothing here can read the city's config.toml yet",

@@ -1477,3 +1477,7 @@ pub fn splice(text: &str, front: usize, back: usize, place: Elided) -> Cut;
 4. **预留按最宽算。** 标记的宽度随计数的位数变，而计数要等切完才知道；`marker_room(text.len())` 给出该文本能产生的最宽标记，因为丢弃量不可能超过文本自身长度。于是「结果不大于预算」由预留保证，而不是由一次事后检查补救。
 
 **关门测试**（`elision::tests` 与 `compaction::tests`）：`splice` 的 `dropped` 加上去掉标记后的长度恒等于输入长度；任何切口落在字符边界；`compact` 对一段日志报出的丢弃量与幸存字节数加起来是原文长度。
+
+### 8-43 重试上限住 kernel
+
+`Retries` 曾经在 gateway 与 runtime 各有一份，两个臂相同、文档相同，而两个 crate 互不依赖——于是这个事实除了 kernel 无处可住。现在它住 `kernel::retries`：gateway 用它决定要不要再发一次请求，`Watchdog` 用它决定要不要冻结这次运行。`runtime::Retries` 是对它的再导出，不是第二份定义。

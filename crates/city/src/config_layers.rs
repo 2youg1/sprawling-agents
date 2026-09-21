@@ -223,8 +223,15 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
 /// One refusal shape for every way a layer can fail to be read, so the
 /// recovery line is written once and cannot drift between callers.
 fn refuse(subject: String) -> AxError {
+    // The settings are `Effort`'s to list. A recovery line that spelled
+    // them again would be the second place a seventh setting has to be
+    // remembered, and the one nobody remembers.
+    let efforts: Vec<&str> = kernel::Effort::ALL.iter().map(|one| one.as_str()).collect();
     AxError::failure(AxCode::ConfigInvalid, "read a configuration layer", subject).with_recovery(
-        "this version reads three sections: `[model] effort = \"low|medium|high|xhigh|max\"`, \
+        format!(
+            "this version reads three sections: `[model] effort = \"{}\"`, ",
+            efforts.join("|")
+        ) + "\
          `[sandbox] shell = <bool>, fuel = <integer>, mounts = [<path>], \
          env_passthrough = [<variable name>], trusted = [<server label>]`, and \
          `[[mcp]] label = <lowercase>, and either command = <program> with args = [<argument>] \

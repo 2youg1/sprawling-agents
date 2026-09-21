@@ -22,7 +22,7 @@ use serde_json::Value;
 
 use crate::endpoint::HeaderValue;
 
-use super::retries::Retries;
+use kernel::Retries;
 
 /// What every endpoint is called with until a person says otherwise.
 ///
