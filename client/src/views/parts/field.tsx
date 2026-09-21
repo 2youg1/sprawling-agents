@@ -73,8 +73,8 @@ export function Field(props: FieldProps) {
         {props.label}
       </label>
       <div
-        class={`flex min-w-0 items-center gap-tight rounded-control border bg-g2 px-base py-snug has-[:user-invalid]:border-alert ${
-          props.error === undefined ? "border-g3" : "border-alert"
+        class={`flex min-w-0 items-center gap-tight rounded-control border bg-raised px-base py-snug has-[:user-invalid]:border-alert ${
+          props.error === undefined ? "border-edge-input" : "border-alert"
         }`}
       >
         <Show when={props.prefix}>

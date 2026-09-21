@@ -153,7 +153,7 @@ export function Row(props: RowProps) {
     </>
   );
   return (
-    <div class="flex w-full min-w-0 items-center gap-base border-b border-g2 px-base py-snug hover:bg-g1 has-[:focus-visible]:bg-g1">
+    <div class="flex w-full min-w-0 items-center gap-base border-b border-edge px-base py-snug hover:bg-chrome has-[:focus-visible]:bg-chrome">
       <Show
         when={props.onOpen}
         fallback={<div class="flex min-w-0 flex-1 flex-col text-left">{texts()}</div>}

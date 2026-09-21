@@ -58,7 +58,7 @@ export function BuildingColumn(props: BuildingColumnProps) {
               <button
                 type="button"
                 class={`w-full rounded-control px-base py-tight text-left text-note ${
-                  props.chosen === addr ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"
+                  props.chosen === addr ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome"
                 }`}
                 onClick={() => {
                   props.onPick(addr);

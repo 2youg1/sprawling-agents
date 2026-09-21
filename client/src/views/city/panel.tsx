@@ -46,7 +46,7 @@ export function Panel(props: PanelProps) {
         <h2 class="min-w-0 flex-1 truncate text-heading font-heading">{props.addr}</h2>
         <button
           type="button"
-          class="rounded-control px-snug text-label text-text-faint hover:bg-g2"
+          class="rounded-control px-snug text-label text-text-faint hover:bg-raised"
           onClick={() => {
             props.onClose();
           }}
@@ -71,14 +71,14 @@ export function Panel(props: PanelProps) {
       </div>
       <a
         href={toFragment({ kind: "building", address: props.addr })}
-        class="self-start rounded-control bg-g2 px-base py-tight text-label hover:bg-g3"
+        class="self-start rounded-control bg-raised px-base py-tight text-label hover:bg-raised-hover"
       >
         {say("city_enter")}
       </a>
       <Show when={pursuit()}>
         {(line) => (
           <p class="flex items-baseline gap-snug text-note">
-            <span class={`inline-block size-dot shrink-0 rounded-pill ${line().state === "running" ? "bg-accent" : "bg-g4"}`} />
+            <span class={`inline-block size-dot shrink-0 rounded-pill ${line().state === "running" ? "bg-accent" : "bg-mark"}`} />
             <span class="min-w-0 flex-1 text-text-quiet">{line().goal}</span>
           </p>
         )}
@@ -105,9 +105,9 @@ export function Panel(props: PanelProps) {
           <ul class="text-note">
             <For each={runs().slice(0, 8)}>
               {(run) => (
-                <li class="border-b border-g1 py-snug">
+                <li class="border-b border-edge py-snug">
                   <a href={toFragment({ kind: "run", run: run.run })} class="flex items-center gap-snug hover:text-text">
-                    <span class={`inline-block size-dot shrink-0 rounded-pill ${run.doing.kind === "frozen" ? "bg-g4" : "bg-accent"}`} />
+                    <span class={`inline-block size-dot shrink-0 rounded-pill ${run.doing.kind === "frozen" ? "bg-mark" : "bg-accent"}`} />
                     <span class="min-w-0 flex-1 truncate text-text-quiet">{run.task ?? run.run}</span>
                     <Show when={run.started}>{(at) => <span class="shrink-0 text-text-disabled">{clock(lang(), at())}</span>}</Show>
                   </a>

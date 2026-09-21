@@ -67,7 +67,7 @@ function Rooms(props: { readonly answer: BuildingAnswer; readonly onPick: (picke
                 <li>
                   <button
                     type="button"
-                    class="flex h-step w-full items-center gap-snug rounded-control px-snug text-left leading-none text-text-quiet hover:bg-g1"
+                    class="flex h-step w-full items-center gap-snug rounded-control px-snug text-left leading-none text-text-quiet hover:bg-chrome"
                     onClick={() => {
                       props.onPick({ at: at(), kind: "directory" });
                     }}
@@ -125,7 +125,7 @@ export function Building(props: BuildingProps) {
 
   return (
     <div class="flex min-h-0 w-full flex-1 flex-col">
-      <header class="flex flex-wrap items-center gap-base border-b border-g2 px-pane py-snug" aria-label={say("bld_bar")}>
+      <header class="flex flex-wrap items-center gap-base border-b border-edge px-pane py-snug" aria-label={say("bld_bar")}>
         <a href={toFragment({ kind: "city" })} class="text-note text-text-faint hover:text-text-quiet">
           {say("nav_city")}
         </a>
@@ -160,7 +160,7 @@ export function Building(props: BuildingProps) {
         >
           {(line) => (
             <>
-              <span class={`inline-block size-dot rounded-pill ${line().state === "running" ? "bg-accent" : "bg-g4"}`} />
+              <span class={`inline-block size-dot rounded-pill ${line().state === "running" ? "bg-accent" : "bg-mark"}`} />
               <span class="min-w-0 flex-1 truncate text-note text-text-quiet">{line().goal}</span>
               <span class="font-mono text-note text-text-disabled">{line().verdict}</span>
               <Button
@@ -177,18 +177,18 @@ export function Building(props: BuildingProps) {
           tone={halted() ? "secondary" : "quiet"}
           onPress={() => command(halted() ? release({ building: props.address }) : halt({ building: props.address }))}
         />
-        <span class="lg:hidden">
+        <span class="@lg/page:hidden">
           <Button label={say("bld_tree")} tone="quiet" onPress={() => setTreeOpen((held) => !held)} />
         </span>
       </header>
 
-      <div class="flex min-h-0 flex-1 flex-col lg:flex-row">
+      <div class="flex min-h-0 flex-1 flex-col @lg/page:flex-row">
         <aside
-          class={`shrink-0 overflow-y-auto border-g2 px-snug py-base lg:block lg:w-tree lg:border-r ${treeOpen() ? "block border-b" : "hidden"}`}
+          class={`shrink-0 overflow-y-auto border-edge px-snug py-base @lg/page:block @lg/page:w-tree @lg/page:border-r ${treeOpen() ? "block border-b" : "hidden"}`}
         >
           <button
             type="button"
-            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "plan" ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
+            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "plan" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome"}`}
             aria-current={shown().kind === "plan" ? "true" : undefined}
             onClick={() => {
               pick(PLAN);
@@ -199,7 +199,7 @@ export function Building(props: BuildingProps) {
           </button>
           <button
             type="button"
-            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "commits" ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
+            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "commits" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome"}`}
             aria-current={shown().kind === "commits" ? "true" : undefined}
             onClick={() => {
               pick(COMMITS);
@@ -210,7 +210,7 @@ export function Building(props: BuildingProps) {
           </button>
           <button
             type="button"
-            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "changes" ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
+            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "changes" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome"}`}
             aria-current={shown().kind === "changes" ? "true" : undefined}
             onClick={() => {
               pick(CHANGES);
@@ -221,7 +221,7 @@ export function Building(props: BuildingProps) {
           </button>
           <button
             type="button"
-            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "skills" ? "bg-g2 text-text" : "text-text-quiet hover:bg-g1"}`}
+            class={`mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none ${shown().kind === "skills" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome"}`}
             aria-current={shown().kind === "skills" ? "true" : undefined}
             onClick={() => {
               pick(SKILLS);
@@ -256,7 +256,7 @@ export function Building(props: BuildingProps) {
             </Match>
           </Switch>
         </section>
-        <aside class="hidden shrink-0 overflow-y-auto border-l border-g2 px-pane py-base wide:block wide:w-tree" aria-label={say("bld_rooms")}>
+        <aside class="hidden shrink-0 overflow-y-auto border-l border-edge px-pane py-base @wide/page:block @wide/page:w-tree" aria-label={say("bld_rooms")}>
           <Show when={building()}>{(held) => <Rooms answer={held()} onPick={pick} />}</Show>
         </aside>
       </div>

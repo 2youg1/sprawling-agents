@@ -164,8 +164,8 @@ export function Setup() {
   const tab = (each: Group): JSX.Element => (
     <button
       type="button"
-      class={`flex h-bar shrink-0 items-center rounded-control px-base text-label lg:h-auto lg:py-snug ${
-        group() === each ? "bg-g2 text-text" : "text-text-faint hover:bg-g1 hover:text-text-quiet"
+      class={`flex h-bar shrink-0 items-center rounded-control px-base text-label @lg/page:h-auto @lg/page:py-snug ${
+        group() === each ? "bg-raised text-text" : "text-text-faint hover:bg-chrome hover:text-text-quiet"
       }`}
       aria-current={group() === each ? "page" : undefined}
       onClick={() => setGroup(each)}
@@ -175,15 +175,15 @@ export function Setup() {
   );
 
   return (
-    <div class="mx-auto flex min-h-0 w-full max-w-page flex-1 flex-col-reverse gap-wide px-pane py-wide lg:flex-row">
+    <div class="mx-auto flex min-h-0 w-full max-w-page flex-1 flex-col-reverse gap-wide px-pane py-wide @lg/page:flex-row">
       <nav
-        class="sticky bottom-0 z-10 -mx-pane flex h-bar shrink-0 items-center gap-tight overflow-x-auto border-t border-g1 bg-g0 px-pane lg:static lg:mx-0 lg:h-auto lg:w-tree lg:flex-col lg:items-stretch lg:overflow-visible lg:border-0 lg:px-0"
+        class="sticky bottom-0 z-10 -mx-pane flex h-bar shrink-0 items-center gap-tight overflow-x-auto border-t border-edge bg-chrome px-pane @lg/page:static @lg/page:mx-0 @lg/page:h-auto @lg/page:w-tree @lg/page:flex-col @lg/page:items-stretch @lg/page:overflow-visible @lg/page:border-0 @lg/page:px-0"
         aria-label={say("setup_groups")}
       >
         <For each={GROUPS}>{(each) => tab(each)}</For>
       </nav>
 
-      <div class="flex min-w-0 flex-1 flex-col gap-wide wide:flex-row wide:items-start">
+      <div class="flex min-w-0 flex-1 flex-col gap-wide @wide/page:flex-row @wide/page:items-start">
         <div class="flex min-w-0 flex-1 flex-col gap-base">
           <p class="text-note text-text-faint">{say("nav_settings")}</p>
           <div class="flex flex-wrap items-baseline gap-base">
@@ -192,7 +192,7 @@ export function Setup() {
               <Kept keeper={ui.prefs.keeper()} />
             </Show>
           </div>
-          <div class={group() === "tools" ? "min-w-0" : "min-w-0 wide:max-w-measure"}>
+          <div class={group() === "tools" ? "min-w-0" : "min-w-0 @wide/page:max-w-measure"}>
             <Switch>
               <Match when={group() === "accounts"}>
                 <div class="flex flex-col gap-base">
@@ -251,7 +251,7 @@ export function Setup() {
               <Match when={group() === "advanced"}>
                 <a
                   href={toFragment({ kind: "welcome" })}
-                  class="inline-block rounded-control bg-g2 px-base py-snug text-label hover:bg-g3"
+                  class="inline-block rounded-control bg-raised px-base py-snug text-label hover:bg-raised-hover"
                 >
                   {say("setup_rerun")}
                 </a>
@@ -260,7 +260,7 @@ export function Setup() {
           </div>
         </div>
 
-        <div class="min-w-0 wide:w-tree wide:shrink-0">
+        <div class="min-w-0 @wide/page:w-tree @wide/page:shrink-0">
           <Toml />
         </div>
       </div>

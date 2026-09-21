@@ -23,7 +23,7 @@ export function Refusal() {
         {(error) => (
           <div
             role="alert"
-            class="fixed bottom-wide left-wide z-10 w-full max-w-measure rounded-panel border border-alert/50 bg-g1 px-pane py-base text-note shadow-composer"
+            class="fixed bottom-wide left-wide z-10 w-full max-w-measure rounded-panel border border-alert/50 bg-raised px-pane py-base text-note shadow-composer"
           >
             <div class="flex items-start justify-between gap-base">
               <div class="min-w-0">
@@ -44,7 +44,7 @@ export function Refusal() {
               </div>
               <button
                 type="button"
-                class="shrink-0 whitespace-nowrap rounded-control px-snug py-tight text-text-quiet hover:bg-g2"
+                class="shrink-0 whitespace-nowrap rounded-control px-snug py-tight text-text-quiet hover:bg-raised"
                 onClick={() => {
                   ui.conn.dismissRefusal();
                 }}
@@ -55,7 +55,7 @@ export function Refusal() {
             <Show when={state().kind === "refused"}>
               <button
                 type="button"
-                class="mt-snug rounded-control bg-g2 px-base py-tight text-label hover:bg-g3"
+                class="mt-snug rounded-control bg-raised px-base py-tight text-label hover:bg-raised-hover"
                 onClick={() => {
                   ui.conn.retry();
                 }}

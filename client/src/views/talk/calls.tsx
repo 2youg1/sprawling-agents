@@ -52,10 +52,10 @@ export function Calls(props: CallsProps) {
   });
   return (
     <details class="my-tight text-note text-text-faint">
-      <summary class="cursor-pointer rounded-control px-tight marker:text-text-disabled hover:bg-g1 hover:text-text-quiet">
+      <summary class="cursor-pointer rounded-control px-tight marker:text-text-disabled hover:bg-chrome hover:text-text-quiet">
         {summary()}
       </summary>
-      <ul class="mt-tight ml-pane border-l border-g2 pl-base">
+      <ul class="mt-tight ml-pane border-l border-edge pl-base">
         <For each={props.calls}>
           {(call) => (
             <li class="my-tight">
@@ -73,7 +73,7 @@ export function Calls(props: CallsProps) {
               <Show when={call.output}>
                 {(output) => (
                   <>
-                    <pre class="mt-tight max-h-output overflow-auto rounded-card bg-g1 p-snug font-mono text-note text-text-quiet">
+                    <pre class="mt-tight max-h-output overflow-auto rounded-card border border-edge bg-page p-snug font-mono text-note text-text-quiet">
                       {output().head}
                       <Show when={output().cut > 0}>
                         {"\n"}

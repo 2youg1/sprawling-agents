@@ -152,13 +152,13 @@ export function Previews(props: {
   const say = useSay();
   return (
     <>
-      <details class="rounded-card bg-g1 px-base py-snug text-note">
+      <details class="rounded-card bg-chrome px-base py-snug text-note">
         <summary class="cursor-pointer text-text-quiet">{say("setup_preview_toml")}</summary>
         <pre class="mt-snug overflow-auto whitespace-pre-wrap font-mono text-text-faint">
           {configToml(props.draft, props.reference)}
         </pre>
       </details>
-      <details class="rounded-card bg-g1 px-base py-snug text-note">
+      <details class="rounded-card bg-chrome px-base py-snug text-note">
         <summary class="cursor-pointer text-text-quiet">{say("setup_preview_request")}</summary>
         <pre class="mt-snug overflow-auto whitespace-pre-wrap font-mono text-text-faint">
           {requestPreview(props.draft, props.reference, props.model)}

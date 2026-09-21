@@ -152,7 +152,7 @@ export function Parts() {
       </Case>
 
       <Case label="row · status and actions">
-        <div class="rounded-card border border-g3">
+        <div class="rounded-card border border-edge-panel">
           <Row
             primary="hall/mayor"
             secondary={say("talk_tokens", { n: "12480" })}
@@ -198,7 +198,7 @@ export function Parts() {
             action={<Button label={say("part_undo")} tone="quiet" />}
             dismiss={<Button label={say("dismiss")} tone="quiet" />}
           />
-          <div class="rounded-card border border-g3">
+          <div class="rounded-card border border-edge-panel">
             <Notice seat="entry" title={say("part_saved")} at="03:35" />
             <Notice
               seat="entry"

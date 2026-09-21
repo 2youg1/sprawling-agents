@@ -28,6 +28,7 @@ import { halt, release } from "./core/commands";
 import { keymap } from "./core/keys";
 import type { Action } from "./core/keys";
 import { paintMark } from "./core/mark";
+import { RAILS } from "./core/prefs";
 import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
 import type { View } from "./core/route";
 import { useApprovals, useCommand, useGo, useSay, useUi } from "./ui";
@@ -35,6 +36,7 @@ import { Cheatsheet } from "./views/parts/kbd";
 import { Building } from "./views/building";
 import { City } from "./views/city";
 import { Cost } from "./views/cost";
+import { Facts } from "./views/facts";
 import { Palette } from "./views/palette";
 import { Registry } from "./views/registry";
 import { Rail } from "./views/rail";
@@ -100,7 +102,16 @@ export function App() {
   const [view, setView] = createSignal<View>(DEFAULT_VIEW);
   const [paletteOpen, setPaletteOpen] = createSignal(false);
   const [sheetOpen, setSheetOpen] = createSignal(false);
-  const [railOpen, setRailOpen] = createSignal(false);
+  // The rail's posture is the person's, kept where their other
+  // postures are kept: it used to be a signal in this function, so a
+  // reload put the column back and somebody who works with it away
+  // put it away again every morning. Three postures, cycled by one
+  // chord in the order `RAILS` states.
+  const railPosture = () => ui.prefs.held().rail;
+  const cycleRail = () => {
+    const at = RAILS.indexOf(railPosture());
+    ui.prefs.setRail(RAILS[(at + 1) % RAILS.length] ?? "glyphs");
+  };
   // What opened the sheet, so closing it puts the focus back where the
   // person left it.
   let opener: HTMLElement | null = null;
@@ -151,7 +162,7 @@ export function App() {
         setPaletteOpen((open) => !open);
         return;
       case "rail.toggle":
-        setRailOpen((open) => !open);
+        cycleRail();
         return;
       case "help":
         opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -170,7 +181,7 @@ export function App() {
     if (event.key === "Escape") {
       if (paletteOpen()) setPaletteOpen(false);
       else if (sheetOpen()) closeSheet();
-      else if (railOpen()) setRailOpen(false);
+      else if (railPosture() === "named") ui.prefs.setRail("glyphs");
       return;
     }
     // Inside a text box and inside the palette, only a chord that holds
@@ -241,25 +252,25 @@ export function App() {
   });
 
   return (
-    <div class="relative flex h-screen bg-g0 font-sans text-body text-text">
+    <div class="relative flex h-screen bg-page font-sans text-body text-text">
       <a
         href="#main"
-        class="sr-only focus:not-sr-only focus:absolute focus:top-snug focus:left-snug focus:z-30 focus:rounded-control focus:bg-g2 focus:px-base focus:py-snug focus:text-label focus:text-text"
+        class="sr-only focus:not-sr-only focus:absolute focus:top-snug focus:left-snug focus:z-30 focus:rounded-control focus:bg-raised focus:px-base focus:py-snug focus:text-label focus:text-text"
       >
         {say("skip_main")}
       </a>
       <Show when={view().kind !== "welcome"}>
         <Rail
           view={view()}
-          open={railOpen()}
-          onToggle={() => setRailOpen((open) => !open)}
+          posture={railPosture()}
+          onToggle={cycleRail}
           onPalette={() => setPaletteOpen(true)}
         />
       </Show>
       <div class="flex min-h-0 min-w-0 flex-1 flex-col">
         <Show when={halted()}>
           <div
-            class="drop flex shrink-0 flex-wrap items-center gap-base border-b border-g2 bg-g1 px-pane py-snug text-label"
+            class="drop flex shrink-0 flex-wrap items-center gap-base border-b border-edge bg-chrome px-pane py-snug text-label"
             role="status"
           >
             <span class="inline-block size-dot shrink-0 rounded-pill bg-alert" />
@@ -269,7 +280,7 @@ export function App() {
             </Show>
             <button
               type="button"
-              class="ml-auto rounded-control px-base py-tight font-mono text-label text-accent hover:bg-g2"
+              class="ml-auto rounded-control px-base py-tight font-mono text-label text-accent hover:bg-raised"
               onClick={() => command(release("city"))}
             >
               {say("city_release")}
@@ -313,6 +324,16 @@ export function App() {
           </Match>
           </Switch>
         </main>
+        {/* Under every page, and outside `<main>` on purpose: it is a
+            control surface rather than content, so it does not print,
+            and a person tabbing through the page does not walk into
+            seven unlabelled readings. The welcome walk is the one
+            screen without it - nothing is running yet, and a strip of
+            dashes would teach a first-time reader that this product
+            shows them nothing. */}
+        <Show when={view().kind !== "welcome"}>
+          <Facts />
+        </Show>
       </div>
       <Refusal />
       <Show when={paletteOpen()}>

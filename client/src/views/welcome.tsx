@@ -58,12 +58,12 @@ export function Welcome() {
   };
 
   return (
-    <div class="mx-auto flex w-full max-w-page flex-1 gap-section px-pane py-section wide:max-w-none">
+    <div class="mx-auto flex w-full max-w-page flex-1 gap-section px-pane py-section @wide/page:max-w-none">
       <ol class="hidden w-tree shrink-0 flex-col gap-base pt-step text-label md:flex" aria-label={say("welcome_steps")}>
         <For each={STEPS}>
           {(each, index) => (
             <li class={`flex items-center gap-base ${step() === each ? "text-text" : index() < at() ? "text-text-faint" : "text-text-disabled"}`}>
-              <span class={`flex size-step items-center justify-center rounded-pill text-note ${step() === each ? "bg-accent text-g0" : "bg-g1"}`}>
+              <span class={`flex size-step items-center justify-center rounded-pill text-note ${step() === each ? "bg-accent text-on-accent" : "bg-chrome"}`}>
                 {index() + 1}
               </span>
               {say(`welcome_step_${each}`)}
@@ -98,27 +98,27 @@ export function Welcome() {
         </div>
         <div class="mt-wide flex items-center gap-snug text-label">
           <Show when={at() > 0}>
-            <button type="button" class="rounded-control px-base py-snug text-text-quiet hover:bg-g1" onClick={back}>
+            <button type="button" class="rounded-control px-base py-snug text-text-quiet hover:bg-chrome" onClick={back}>
               {say("welcome_back")}
             </button>
           </Show>
           <span class="flex-1" />
           <Show when={step() === "optional"}>
-            <button type="button" class="rounded-control px-base py-snug text-text-faint hover:bg-g1" onClick={next}>
+            <button type="button" class="rounded-control px-base py-snug text-text-faint hover:bg-chrome" onClick={next}>
               {say("welcome_skip")}
             </button>
           </Show>
           <Show
             when={step() !== LAST}
             fallback={
-              <button type="button" class="rounded-control bg-accent px-wide py-snug text-g0 hover:bg-accent-hover" onClick={finish}>
+              <button type="button" class="rounded-control bg-accent px-wide py-snug text-on-accent hover:bg-accent-hover" onClick={finish}>
                 {say("welcome_done")}
               </button>
             }
           >
             <button
               type="button"
-              class="rounded-control bg-accent px-wide py-snug text-g0 hover:bg-accent-hover disabled:bg-g3 disabled:text-text-disabled"
+              class="rounded-control bg-accent px-wide py-snug text-on-accent hover:bg-accent-hover disabled:bg-disabled disabled:text-text-disabled"
               disabled={step() === "provider" && !attached()}
               onClick={next}
             >

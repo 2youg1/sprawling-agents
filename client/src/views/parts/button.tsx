@@ -34,17 +34,17 @@ type State = "idle" | "loading" | "stopped";
 // not use, keeps its muted paint under the pointer instead of lighting
 // up as though the press would land.
 const PAINT: Record<Tone, string> = {
-  primary: "bg-accent text-g0 data-[state=idle]:hover:bg-accent-hover",
-  secondary: "bg-g2 text-text data-[state=idle]:hover:bg-g3",
-  quiet: "text-text-quiet data-[state=idle]:hover:bg-g2",
+  primary: "bg-accent text-on-accent data-[state=idle]:hover:bg-accent-hover",
+  secondary: "bg-raised text-text data-[state=idle]:hover:bg-raised-hover",
+  quiet: "text-text-quiet data-[state=idle]:hover:bg-raised",
   destructive:
-    "bg-g2 text-alert data-[state=idle]:hover:bg-alert data-[state=idle]:hover:text-g0",
+    "bg-raised text-alert data-[state=idle]:hover:bg-alert data-[state=idle]:hover:text-on-accent",
 };
 
 // What every tone looks like once it is no longer idle. One rule for
 // both remaining states, because loading and refused are the same
 // answer to the hand: not now.
-const MUTED = "not-data-[state=idle]:bg-g2 not-data-[state=idle]:text-text-disabled";
+const MUTED = "not-data-[state=idle]:bg-raised not-data-[state=idle]:text-text-disabled";
 
 // The shape, and the four properties that travel when it changes.
 // Background colour is among them so a hover arrives rather than

@@ -57,7 +57,7 @@ const WHEN_WANTED =
 // No stacking number: the hint is positioned and whatever it is drawn
 // over is not, which is already the order the two are painted in.
 const PAINT =
-  "pointer-events-none mb-tight w-max max-w-measure rounded-card border border-g3 bg-g2 " +
+  "pointer-events-none mb-tight w-max max-w-measure rounded-card border border-edge-panel bg-raised " +
   "px-snug py-tight text-note text-text shadow-composer " +
   "transition-[opacity,display] transition-discrete delay-300 duration-200 ease-standard " +
   "motion-reduce:transition-none";

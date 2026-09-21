@@ -37,8 +37,7 @@ const SHELVED: SkillsAnswer = {
     {
       name: "diagnosing-bugs",
       section: "engineering",
-      shelf: "library",
-      at: Address.make("sprawling/.sprawling/library/engineering/diagnosing-bugs.md"),
+      shelf: { library: Address.make("sprawling/.sprawling/library/engineering/diagnosing-bugs.md") },
       disclosure: "Find the defect from the evidence, then write the test that would have caught it.",
       hash: B3Hash.make("af3c1d2e4b5a69780c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7"),
       admitted: true,
@@ -47,8 +46,7 @@ const SHELVED: SkillsAnswer = {
     {
       name: "resolving-merge-conflicts",
       section: "engineering",
-      shelf: "library",
-      at: Address.make("sprawling/.sprawling/library/engineering/resolving-merge-conflicts.md"),
+      shelf: { library: Address.make("sprawling/.sprawling/library/engineering/resolving-merge-conflicts.md") },
       disclosure: "Replay both sides against the tests before choosing either.",
       hash: B3Hash.make("b1c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f901"),
       admitted: false,
@@ -57,10 +55,22 @@ const SHELVED: SkillsAnswer = {
     {
       name: "diagnosing-bugs",
       section: "hall",
-      shelf: "building",
-      at: Address.make("hall/.sprawling/skills/hall/diagnosing-bugs.md"),
+      shelf: { building: Address.make("hall/.sprawling/skills/hall/diagnosing-bugs.md") },
       disclosure: "This hall's own reading of the same name, which the nearer shelf wins with.",
       hash: B3Hash.make("c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90102"),
+      admitted: true,
+      pinned_by: [],
+    },
+    {
+      name: "apostle-antislop",
+      section: "prose",
+      // The arm a running client cannot reach yet, and the reason this
+      // route exists: an external shelf has no city address, so the row
+      // has to name where it came from and refuse to open. Drawn,
+      // measured and read out at every width the gate opens.
+      shelf: { external: { index: 0, path: "prose/apostle-antislop.md" } },
+      disclosure: "Edit prose that has gone model-shaped rather than subject-shaped.",
+      hash: B3Hash.make("d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f9010203"),
       admitted: true,
       pinned_by: [],
     },

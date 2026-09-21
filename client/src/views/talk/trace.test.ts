@@ -57,20 +57,34 @@ describe("what a run did", () => {
 describe("what the panel shows", () => {
   test("a run that produced nothing gets no panel", () => {
     const held = artifactsIn([turn(1, [call("delegate", null, "sent")])]);
-    expect(held.file).toBeNull();
+    expect(held.read).toBeNull();
+    expect(held.wrote).toBeNull();
     expect(held.terminal).toBeNull();
   });
 
-  // The halves are filled independently, so a command run after a file
-  // was read does not push the file out of the panel.
-  test("each half holds the newest of its own kind", () => {
+  // The three panes are filled independently, so a command run after a
+  // file was read does not push the file out of the card.
+  test("each pane holds the newest of its own kind", () => {
     const held = artifactsIn([
       turn(1, [call("read", "old.rs", "one")]),
       turn(2, [call("exec", "cargo build", "built"), call("read", "new.rs", "two")]),
       turn(3, [call("exec", "cargo test", "passed")]),
     ]);
-    expect(held.file?.subject).toBe("new.rs");
+    expect(held.read?.subject).toBe("new.rs");
     expect(held.terminal?.subject).toBe("cargo test");
+  });
+
+  // The pane a change lands in is not the pane a reading lands in.
+  // Folded together, the later of the two won and the other was not
+  // drawn at all - a run that rewrote a module and then read a header
+  // showed the header.
+  test("a file that was changed and a file that was read are two panes", () => {
+    const held = artifactsIn([
+      turn(1, [call("edit", "changed.rs", "one line")]),
+      turn(2, [call("read", "looked.rs", "two")]),
+    ]);
+    expect(held.wrote?.subject).toBe("changed.rs");
+    expect(held.read?.subject).toBe("looked.rs");
   });
 
   test("a call still waiting is not yet an artifact", () => {
@@ -78,7 +92,7 @@ describe("what the panel shows", () => {
       turn(1, [call("edit", "done.rs", "written")]),
       turn(2, [call("edit", "pending.rs", null)]),
     ]);
-    expect(held.file?.subject).toBe("done.rs");
+    expect(held.wrote?.subject).toBe("done.rs");
   });
 
   test("a call that answered with nothing is not an artifact either", () => {

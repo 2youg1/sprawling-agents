@@ -262,7 +262,7 @@ export function ModelTable(props: {
       render: (row) => (
         <div class="w-figure">
           <select
-            class="w-full rounded-control bg-g2 px-snug py-tight text-note text-text"
+            class="w-full rounded-control bg-raised px-snug py-tight text-note text-text"
             value={filled.role[row.id] ?? ""}
             aria-label={`${say("setup_model_role")} ${row.id}`}
             onChange={(event) => { setFilled("role", row.id, event.currentTarget.value); }}
@@ -362,7 +362,7 @@ export function ModelChoice(props: { readonly answer: EndpointsAnswer; readonly 
             <label class="flex flex-col gap-tight text-note text-text-quiet">
               {say(`setup_${tag}`)}
               <select
-                class="rounded-control bg-g2 px-base py-snug text-body text-text"
+                class="rounded-control bg-raised px-base py-snug text-body text-text"
                 value={value(tag)}
                 onChange={(event) => {
                   const [endpoint, model] = event.currentTarget.value.split("\u0000");

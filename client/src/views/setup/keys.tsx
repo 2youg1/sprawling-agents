@@ -58,12 +58,12 @@ export function KeysSection() {
   };
 
   return (
-    <section class="border-t border-g1 py-wide">
+    <section class="border-t border-edge py-wide">
       <h2 class="mb-base text-heading font-heading">{say("keys_title")}</h2>
       <ul class="flex flex-col">
         <For each={ACTIONS}>
           {(action) => (
-            <li class="flex items-center gap-base border-b border-g1 py-snug text-label last:border-b-0">
+            <li class="flex items-center gap-base border-b border-edge py-snug text-label last:border-b-0">
               <span class="min-w-0 flex-1 truncate text-text-quiet">{say(LABELS[action])}</span>
               <Show when={taken(action).length > 0}>
                 <span class="truncate text-note text-alert">
@@ -74,7 +74,7 @@ export function KeysSection() {
                 {(hint) => (
                   <button
                     type="button"
-                    class="rounded-control border border-g2 px-snug py-tight hover:bg-g2 aria-pressed:border-accent"
+                    class="rounded-control border border-edge px-snug py-tight hover:bg-raised aria-pressed:border-accent"
                     aria-describedby={hint}
                     aria-pressed={recording() === action}
                     onClick={() => {
@@ -97,7 +97,7 @@ export function KeysSection() {
               </Tip>
               <button
                 type="button"
-                class="rounded-control px-snug py-tight text-note text-text-faint hover:bg-g2 hover:text-text disabled:invisible"
+                class="rounded-control px-snug py-tight text-note text-text-faint hover:bg-raised hover:text-text disabled:invisible"
                 disabled={!keys.changed(action)}
                 onClick={() => {
                   keys.reset(action);
@@ -111,7 +111,7 @@ export function KeysSection() {
       </ul>
       <button
         type="button"
-        class="mt-base rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2 hover:text-text"
+        class="mt-base rounded-control px-snug py-tight text-label text-text-quiet hover:bg-raised hover:text-text"
         onClick={() => {
           keys.resetAll();
         }}

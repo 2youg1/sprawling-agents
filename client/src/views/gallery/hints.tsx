@@ -43,7 +43,7 @@ export function Hints() {
       </Case>
 
       <Case label="tip · inside a box that scrolls, which clips or is escaped">
-        <div class="h-output overflow-auto rounded-card border border-g3 p-base">
+        <div class="h-output overflow-auto rounded-card border border-edge-panel p-base">
           <Button label={say("part_save")} tone="primary" why={say("part_why_halted")} />
           {/* A box only scrolls when it holds more than it shows. This
               is that surplus and carries nothing else, so the control

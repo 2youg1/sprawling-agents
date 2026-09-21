@@ -45,7 +45,7 @@ export function Shelves() {
     <div class="flex flex-col gap-snug text-note text-text-quiet">
       <p>{say("setup_skills")}</p>
       <div class="flex items-center gap-snug">
-        <code class="rounded-control bg-g2 px-base py-snug font-mono text-text">{path()}</code>
+        <code class="rounded-control bg-raised px-base py-snug font-mono text-text">{path()}</code>
         <Button
           label={say("setup_copy")}
           tone="quiet"

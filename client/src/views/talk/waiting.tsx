@@ -64,13 +64,22 @@ export function WaitingCards(props: { readonly items: readonly ApprovalItem[] })
         return (
           <Show when={first()}>
             {(item) => (
+              // An approval is one of the three things in this product
+              // that stop and ask, so it is drawn in the one language
+              // they share: the bar on the leading edge that `asks`
+              // declares, and a glyph beside the words. The glyph is
+              // what survives a forced-colour mode; the amber is only
+              // reinforcement.
               <div
-                class="my-base rounded-panel border border-alert/50 bg-g1 px-pane py-base"
+                class="asks my-base rounded-panel border border-alert/50 bg-raised py-base pr-pane"
                 role="group"
                 aria-label={say("wait_title")}
               >
                 <div class="flex items-center justify-between text-note">
-                  <span class="text-alert">{say("wait_from", { actor: item().actor })}</span>
+                  <span class="text-alert">
+                    <span aria-hidden="true">! </span>
+                    {say("wait_from", { actor: item().actor })}
+                  </span>
                   <span class="text-text-faint">{ago(lang(), item().created, ui.now())}</span>
                 </div>
                 <p class="my-snug text-body leading-relaxed">{item().action_desc}</p>
@@ -79,12 +88,12 @@ export function WaitingCards(props: { readonly items: readonly ApprovalItem[] })
                     <span class="text-text-faint">{say("wait_same", { n: String(group.items.length) })}</span>
                   </Show>
                   <Show when={item().tainted}>
-                    <span class="rounded-pill bg-g2 px-snug text-text-quiet">{say("wait_tainted")}</span>
+                    <span class="rounded-pill bg-raised px-snug text-text-quiet">{say("wait_tainted")}</span>
                   </Show>
                   <span class="flex-1" />
                   <button
                     type="button"
-                    class="rounded-control px-base py-tight text-label text-text-quiet hover:bg-g2"
+                    class="rounded-control px-base py-tight text-label text-text-quiet hover:bg-raised"
                     onClick={() => {
                       for (const each of group.items) command(approve(each.id, "deny"));
                     }}
@@ -93,7 +102,7 @@ export function WaitingCards(props: { readonly items: readonly ApprovalItem[] })
                   </button>
                   <button
                     type="button"
-                    class="rounded-control bg-accent px-base py-tight text-label text-g0 hover:bg-accent-hover"
+                    class="rounded-control bg-accent px-base py-tight text-label text-on-accent hover:bg-accent-hover"
                     onClick={() => {
                       for (const each of group.items) command(approve(each.id, "allow"));
                     }}

@@ -55,7 +55,7 @@ function Row(props: {
   const lang = useLang();
   const effort = () => (props.commit.effort === null || props.commit.effort === undefined ? "" : ` · ${props.commit.effort}`);
   return (
-    <li class="border-b border-g1">
+    <li class="border-b border-edge">
       <div class="flex items-center gap-base py-snug text-note">
         <button
           type="button"
@@ -84,7 +84,7 @@ function Row(props: {
           <Show when={props.commit.lineage.length > 1}>
             <Tip text={say("commits_lineage")}>
               {(hint) => (
-                <span class="shrink-0 rounded-pill bg-g2 px-snug text-text-faint" aria-describedby={hint}>
+                <span class="shrink-0 rounded-pill bg-raised px-snug text-text-faint" aria-describedby={hint}>
                   {say("commits_succeeded", { n: String(props.commit.lineage.length - 1) })}
                 </span>
               )}
@@ -106,7 +106,7 @@ function Row(props: {
           {(session) => (
             <a
               href={toFragment({ kind: "talk", address: props.commit.actor })}
-              class="shrink-0 rounded-control bg-g1 px-snug py-tight text-label text-text-quiet hover:bg-g2 hover:text-text"
+              class="shrink-0 rounded-control bg-raised px-snug py-tight text-label text-text-quiet hover:bg-raised hover:text-text"
             >
               {session()} →
             </a>

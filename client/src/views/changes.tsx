@@ -24,7 +24,7 @@ export function Hunks(props: { readonly base: GitOid; readonly head: GitOid; rea
   return (
     <Show when={answer()} fallback={<p class="text-text-disabled">…</p>}>
       {(patch) => (
-        <pre class="overflow-x-auto rounded-card bg-g1 p-base font-mono text-note leading-relaxed">
+        <pre class="overflow-x-auto rounded-card border border-edge bg-page p-base font-mono text-note leading-relaxed">
           <For each={patch().lines}>
             {(line) => (
               <div class={line.text.startsWith("+") ? "text-accent" : line.text.startsWith("-") ? "text-alert" : "text-text-quiet"}>
@@ -62,7 +62,7 @@ export function Changes(props: { readonly base: GitOid; readonly head: GitOid | 
           <ul class="text-note">
             <For each={held()}>
               {(file) => (
-                <li class="border-b border-g1">
+                <li class="border-b border-edge">
                   <button
                     type="button"
                     class="flex w-full items-center gap-base py-snug text-left hover:text-text"

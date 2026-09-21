@@ -28,13 +28,25 @@ import type { JSX } from "solid-js";
 
 import { Tip } from "./tip";
 
-// Which of the two coloured tokens paints the chosen cell. It is a
-// caller's decision and never an inference: this control knows nothing
-// about what its values mean.
-export type Tone = "accent" | "alert";
+// What paints the chosen cell. It is a caller's decision and never an
+// inference: this control knows nothing about what its values mean.
+//
+// **`plain` is the default, and that is a change of policy.** The
+// slider used to be filled with the accent, which made "which tab is
+// selected" the loudest mark on any page carrying a segmented control
+// - louder than the stop button, and louder than anything the model
+// had just written. The accent is a budget: it buys the focus ring and
+// the bar beside a selected row, and nothing else. Selection is said
+// here the way it is said everywhere else on this page, by lifting the
+// surface a step.
+//
+// `alert` survives because a choice that widens what a run may do is
+// not the same kind of fact as a choice of units, and a person has to
+// be able to see which one they are looking at across the room.
+export type Tone = "plain" | "alert";
 
 const FILL: Record<Tone, string> = {
-  accent: "bg-accent",
+  plain: "bg-raised-hover",
   alert: "bg-alert",
 };
 
@@ -194,10 +206,14 @@ export function Segmented<V extends string>(props: SegmentedProps<V>) {
     }
   };
 
+  // The ink a cell takes. The chosen cell on an `alert` fill is read
+  // against a coloured solid and takes the page's own rung; on the
+  // plain fill it is read against a surface one step up, and takes the
+  // full text token the rest of the page is set in.
   const ink = (choice: Choice<V>): string => {
     if (choice.why !== undefined) return "text-text-disabled";
-    if (choice.value === props.held) return "text-g0";
-    return "text-text-quiet hover:text-text";
+    if (choice.value !== props.held) return "text-text-quiet hover:text-text";
+    return (props.tone ?? "plain") === "alert" ? "text-on-accent" : "text-text";
   };
 
   return (
@@ -210,18 +226,18 @@ export function Segmented<V extends string>(props: SegmentedProps<V>) {
       <For each={bands(props.options)}>
         {(band, at) => {
           const here = () => band.cells.findIndex((choice) => choice.value === props.held);
-          const tone = () => band.group?.tone ?? props.tone ?? "accent";
+          const tone = () => band.group?.tone ?? props.tone ?? "plain";
           return (
             <>
               <Show when={at() > 0}>
-                <span aria-hidden="true" class="w-hair self-stretch bg-g3" />
+                <span aria-hidden="true" class="w-hair self-stretch bg-edge-panel" />
               </Show>
               <div class="flex flex-col gap-tight">
                 <Show when={band.group}>
                   {(group) => <span class="px-base text-note text-text-quiet">{group().label}</span>}
                 </Show>
                 <div
-                  class="relative grid auto-cols-fr grid-flow-col rounded-pill bg-g1"
+                  class="relative grid auto-cols-fr grid-flow-col rounded-pill bg-track"
                   style={{
                     "--cells": String(band.cells.length),
                     "--held": String(Math.max(here(), 0)),

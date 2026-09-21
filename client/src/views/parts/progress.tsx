@@ -26,7 +26,7 @@ export function Progress(props: ProgressProps) {
   return (
     <div class="flex w-full min-w-0 items-center gap-base">
       <div
-        class="h-snug min-w-0 flex-1 overflow-hidden rounded-pill bg-g2"
+        class="h-snug min-w-0 flex-1 overflow-hidden rounded-pill bg-raised"
         role="progressbar"
         aria-label={props.label}
         aria-valuemin={0}
@@ -36,7 +36,7 @@ export function Progress(props: ProgressProps) {
       >
         <Show
           when={known()}
-          fallback={<div class="h-full w-1/3 animate-pulse rounded-pill bg-g5" />}
+          fallback={<div class="h-full w-1/3 animate-pulse rounded-pill bg-mark" />}
         >
           <div
             class="h-full rounded-pill bg-progress-done transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none"

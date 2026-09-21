@@ -203,13 +203,13 @@ export function Palette(props: { readonly onClose: () => void }) {
 
   return (
     <div
-      class="fixed inset-0 z-20 flex items-start justify-center bg-g0/70 pt-section"
+      class="fixed inset-0 z-20 flex items-start justify-center bg-page/70 pt-section"
       onClick={() => {
         props.onClose();
       }}
     >
       <div
-        class="w-full max-w-measure rounded-panel bg-g1 p-snug shadow-composer"
+        class="w-full max-w-measure rounded-panel bg-raised p-snug shadow-composer"
         role="dialog"
         aria-label={say("nav_palette")}
         onClick={(event) => {
@@ -218,7 +218,7 @@ export function Palette(props: { readonly onClose: () => void }) {
       >
         <input
           ref={setBox}
-          class="w-full rounded-control bg-g2 px-base py-snug text-body placeholder:text-text-disabled"
+          class="w-full rounded-control bg-raised px-base py-snug text-body placeholder:text-text-disabled"
           placeholder={say("palette_placeholder")}
           value={query()}
           onInput={(event) => {
@@ -248,7 +248,7 @@ export function Palette(props: { readonly onClose: () => void }) {
               <li>
                 <button
                   type="button"
-                  class={`flex w-full items-center justify-between gap-snug rounded-control px-base py-snug text-left text-body hover:bg-g2 ${index() === cursor() ? "bg-g2" : ""}`}
+                  class={`flex w-full items-center justify-between gap-snug rounded-control px-base py-snug text-left text-body hover:bg-raised ${index() === cursor() ? "bg-raised" : ""}`}
                   onMouseEnter={() => setCursor(index())}
                   onClick={() => {
                     pick(entry);

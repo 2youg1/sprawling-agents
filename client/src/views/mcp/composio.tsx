@@ -190,7 +190,7 @@ function Row(props: {
 }) {
   const standing = () => props.line.standing;
   return (
-    <li class="rounded-card bg-g1">
+    <li class="rounded-card bg-chrome">
       <div class="flex min-w-0 items-center gap-base px-base py-snug text-note">
         <span class="w-figure shrink-0 truncate text-text">{props.line.name}</span>
         <span class="min-w-0 flex-1 truncate font-mono text-text-faint">{props.line.slug}</span>

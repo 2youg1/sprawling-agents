@@ -96,7 +96,7 @@ export function RegistryTable(props: { readonly assets: readonly RegistryLine[] 
           action={
             <a
               href={toFragment({ kind: "talk", address: MAYOR })}
-              class="rounded-control bg-accent px-base py-snug text-label text-g0 hover:bg-accent-hover"
+              class="rounded-control bg-accent px-base py-snug text-label text-on-accent hover:bg-accent-hover"
             >
               {say("city_ask_mayor")}
             </a>

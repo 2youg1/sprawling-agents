@@ -30,11 +30,31 @@ export interface ThreadProps {
   readonly who: string;
 }
 
+// What a person said, and what the model said, are drawn as different
+// kinds of thing rather than as the same thing with different labels.
+//
+// **A person is a shape; the model is the page.** A filled bubble,
+// right-aligned and held to 83% of the column, reads as one utterance;
+// an answer with no container at all, running the full measure, reads
+// as a document. The reverse - both sides in identical blocks,
+// separated only by a grey name above each - is what this thread drew
+// before, and it made a two-line question and a two-page answer look
+// like the same kind of object.
+//
+// 83% rather than the prose measure: the bubble has to be visibly
+// narrower than the column it sits in, or right-alignment says nothing,
+// and it has to be wide enough that a pasted paragraph does not become
+// a ribbon.
+const SAID_WIDTH = "max-inline-size:83%";
+
 function Person(props: { readonly text: string; readonly label: string; readonly at?: number | undefined }) {
   const lang = useLang();
   return (
     <div class="my-base flex flex-col items-end">
-      <div class="max-w-measure rounded-panel bg-g2 px-pane py-base text-body leading-relaxed whitespace-pre-wrap">
+      <div
+        class="rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap"
+        style={SAID_WIDTH}
+      >
         {props.text}
       </div>
       <div class="mt-tight text-note text-text-disabled">
@@ -66,7 +86,7 @@ function Reasoning(props: { readonly text: string; readonly live?: true }) {
     <div class="my-tight text-note text-text-faint">
       <button
         type="button"
-        class="rounded-control px-tight hover:bg-g1 hover:text-text-quiet"
+        class="rounded-control px-tight hover:bg-chrome hover:text-text-quiet"
         onClick={() => setOpen((held) => !held)}
         aria-expanded={open()}
       >
@@ -75,7 +95,7 @@ function Reasoning(props: { readonly text: string; readonly live?: true }) {
         {say("talk_reasoning_length", { n: count(props.text.length) })}
       </button>
       <Show when={open()}>
-        <div class="mt-tight border-l border-g3 pl-base whitespace-pre-wrap break-words">
+        <div class="mt-tight border-l border-edge-panel pl-base whitespace-pre-wrap break-words">
           {props.text}
         </div>
       </Show>
@@ -281,12 +301,12 @@ export function Thread(props: ThreadProps) {
       </Show>
       <Show when={frozen()}>
         <div class="my-wide flex items-center gap-base text-note text-text-disabled">
-          <span class="h-px flex-1 bg-g2" />
+          <span class="h-px flex-1 bg-raised" />
           <a href={toFragment({ kind: "run", run: props.run.run })} class="hover:text-text-quiet">
             {completion()}
             <Show when={answer()?.closing?.at}>{(at) => <span> · {clock(lang(), at())}</span>}</Show>
           </a>
-          <span class="h-px flex-1 bg-g2" />
+          <span class="h-px flex-1 bg-raised" />
         </div>
       </Show>
     </section>

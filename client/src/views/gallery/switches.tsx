@@ -26,7 +26,7 @@ import { Case } from "./case";
 // that paints by family, and the mapping is spelled at the call site
 // because the control itself knows no vendor's name. The names are the
 // laboratories' own and are the same letters in every language.
-const OPEN_AI: Group = { label: "OpenAI", tone: "accent" };
+const OPEN_AI: Group = { label: "OpenAI", tone: "plain" };
 const ANTHROPIC: Group = { label: "Anthropic", tone: "alert" };
 
 export function Switches() {

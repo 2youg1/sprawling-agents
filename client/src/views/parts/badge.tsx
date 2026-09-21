@@ -14,13 +14,13 @@ import { Show } from "solid-js";
 export type Weight = "quiet" | "live" | "alert";
 
 const PAINT: Record<Weight, string> = {
-  quiet: "bg-g2 text-text-quiet",
-  live: "bg-g2 text-accent",
-  alert: "bg-g2 text-alert",
+  quiet: "bg-raised text-text-quiet",
+  live: "bg-raised text-accent",
+  alert: "bg-raised text-alert",
 };
 
 const DOT: Record<Weight, string> = {
-  quiet: "bg-g5",
+  quiet: "bg-mark",
   live: "bg-accent",
   alert: "bg-alert",
 };

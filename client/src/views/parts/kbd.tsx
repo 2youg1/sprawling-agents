@@ -43,14 +43,14 @@ export function Cheatsheet(props: { readonly onClose: () => void }) {
   });
   return (
     <div
-      class="fixed inset-0 z-20 flex items-start justify-center bg-g0/70 pt-section"
+      class="fixed inset-0 z-20 flex items-start justify-center bg-page/70 pt-section"
       onClick={() => {
         props.onClose();
       }}
     >
       <div
         ref={setPanel}
-        class="rise w-full max-w-measure rounded-panel bg-g1 p-pane shadow-composer"
+        class="rise w-full max-w-measure rounded-panel bg-raised p-pane shadow-composer"
         role="dialog"
         tabindex="-1"
         aria-label={say("keys_title")}
@@ -62,7 +62,7 @@ export function Cheatsheet(props: { readonly onClose: () => void }) {
           <h2 class="text-heading font-heading text-text">{say("keys_title")}</h2>
           <button
             type="button"
-            class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2 hover:text-text"
+            class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-raised hover:text-text"
             onClick={() => {
               props.onClose();
             }}

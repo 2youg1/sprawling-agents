@@ -18,7 +18,7 @@ import type { PursuitLine } from "../../wire";
 
 export function Figure(props: { readonly run: RunBelief; readonly x: number; readonly y: number; readonly delay: number }) {
   const posture = () => props.run.doing.kind;
-  const tone = () => (posture() === "waiting" ? "fill-alert" : "fill-g9");
+  const tone = () => (posture() === "waiting" ? "fill-alert" : "fill-drawn-figure");
   return (
     <g
       class="bob"
@@ -29,9 +29,9 @@ export function Figure(props: { readonly run: RunBelief; readonly x: number; rea
       <circle cx={props.x} cy={props.y - 16} r="4.2" class={tone()} />
       <Show when={posture() === "thinking"}>
         <g class="blink">
-          <circle cx={props.x + 7} cy={props.y - 24} r="1.2" class="fill-g7" />
-          <circle cx={props.x + 10.5} cy={props.y - 28} r="1.6" class="fill-g7" />
-          <circle cx={props.x + 15} cy={props.y - 33} r="2.2" class="fill-g7" />
+          <circle cx={props.x + 7} cy={props.y - 24} r="1.2" class="fill-drawn-aside" />
+          <circle cx={props.x + 10.5} cy={props.y - 28} r="1.6" class="fill-drawn-aside" />
+          <circle cx={props.x + 15} cy={props.y - 33} r="2.2" class="fill-drawn-aside" />
         </g>
       </Show>
       <Show when={posture() === "calling"}>
@@ -48,10 +48,10 @@ export function Flag(props: { readonly x: number; readonly y: number; readonly l
   const running = () => props.line.state === "running";
   return (
     <g aria-label={props.line.goal}>
-      <line x1={props.x} y1={props.y - 22} x2={props.x} y2={props.y} class="stroke-g6" stroke-width="1" />
+      <line x1={props.x} y1={props.y - 22} x2={props.x} y2={props.y} class="stroke-drawn-stem" stroke-width="1" />
       <path
         d={`M${String(props.x)} ${String(props.y - 22)} l16 4 l-16 5 z`}
-        class={running() ? "fill-accent wave" : "fill-g5"}
+        class={running() ? "fill-accent wave" : "fill-drawn-part"}
         style={{ "transform-origin": `${String(props.x)}px ${String(props.y - 18)}px` }}
       />
     </g>

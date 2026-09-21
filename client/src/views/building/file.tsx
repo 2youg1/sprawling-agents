@@ -55,7 +55,7 @@ export function FileView(props: { readonly at: Address; readonly root: Address }
         <Show when={markdown() && doc()?.binary === false}>
           <button
             type="button"
-            class={`rounded-pill px-snug text-note ${raw() ? "bg-g2 text-text" : "text-text-disabled hover:text-text-quiet"}`}
+            class={`rounded-pill px-snug text-note ${raw() ? "bg-raised text-text" : "text-text-disabled hover:text-text-quiet"}`}
             onClick={() => setRaw((held) => !held)}
           >
             .md
@@ -64,7 +64,7 @@ export function FileView(props: { readonly at: Address; readonly root: Address }
       </div>
       <Show when={doc()} fallback={<p class="text-text-disabled">{doc() === null ? say("file_missing") : "…"}</p>}>
         {(held) => (
-          <div class="min-h-0 flex-1 overflow-auto rounded-panel bg-g1/60 p-pane">
+          <div class="min-h-0 flex-1 overflow-auto rounded-panel bg-chrome/60 p-pane">
             <Show when={held().binary}>
               <p class="text-text-faint">{say("file_binary", { kib: kib(held().bytes) })}</p>
             </Show>

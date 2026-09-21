@@ -70,7 +70,7 @@ export function Combobox(props: ComboboxProps) {
       <button
         ref={setTrigger}
         type="button"
-        class="flex w-full min-w-0 items-center justify-between gap-snug rounded-control border border-g3 bg-g2 px-base py-snug text-body text-text hover:bg-g3"
+        class="flex w-full min-w-0 items-center justify-between gap-snug rounded-control border border-edge-input bg-raised px-base py-snug text-body text-text hover:bg-raised-hover"
         aria-label={props.label}
         aria-haspopup="listbox"
         aria-expanded={open()}
@@ -88,14 +88,14 @@ export function Combobox(props: ComboboxProps) {
           under it are not, which is already the order they are painted
           in. */}
       <Show when={open()}>
-        <div class="absolute top-full left-0 mt-tight flex w-full flex-col rounded-panel border border-g3 bg-g1 p-tight shadow-composer transition-[opacity,transform] duration-200 ease-standard motion-reduce:transition-none">
+        <div class="absolute top-full left-0 mt-tight flex w-full flex-col rounded-panel border border-edge-panel bg-raised p-tight shadow-composer transition-[opacity,transform] duration-200 ease-standard motion-reduce:transition-none">
           <input
             ref={(input) => {
               requestAnimationFrame(() => {
                 input.focus();
               });
             }}
-            class="mb-tight w-full rounded-control bg-g2 px-base py-snug text-body text-text placeholder:text-text-disabled"
+            class="mb-tight w-full rounded-control bg-raised px-base py-snug text-body text-text placeholder:text-text-disabled"
             placeholder={props.placeholder}
             aria-label={props.label}
             value={query()}
@@ -137,7 +137,7 @@ export function Combobox(props: ComboboxProps) {
                     role="option"
                     aria-selected={choice.value === props.value}
                     class={`flex cursor-pointer items-baseline justify-between gap-snug rounded-control px-base py-snug text-body ${
-                      index() === cursor() ? "bg-g3 text-text" : "text-text-quiet"
+                      index() === cursor() ? "bg-raised-hover text-text" : "text-text-quiet"
                     }`}
                     onMouseEnter={() => {
                       setAt(index());

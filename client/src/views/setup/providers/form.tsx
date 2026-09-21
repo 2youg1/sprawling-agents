@@ -196,7 +196,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
           <span class="flex gap-snug">
             <button
               type="button"
-              class="rounded-control bg-g2 px-base py-tight text-label hover:bg-g3"
+              class="rounded-control bg-raised px-base py-tight text-label hover:bg-raised-hover"
               onClick={() => {
                 setHeld(null);
               }}
@@ -205,7 +205,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
             </button>
             <button
               type="button"
-              class="rounded-control bg-g2 px-base py-tight text-label hover:bg-g3"
+              class="rounded-control bg-raised px-base py-tight text-label hover:bg-raised-hover"
               onClick={() => {
                 setHeld(null);
                 setDraft("key", "");
@@ -221,7 +221,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
       <div class="flex flex-col gap-snug">
         <button
           type="button"
-          class="self-start rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2"
+          class="self-start rounded-control px-snug py-tight text-label text-text-quiet hover:bg-raised"
           aria-expanded={advanced()}
           onClick={() => setAdvanced(!advanced())}
         >
@@ -251,7 +251,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
       <div class="flex flex-wrap items-center gap-snug">
         <button
           type="button"
-          class="rounded-control bg-g2 px-base py-snug text-label hover:bg-g3 disabled:text-text-disabled"
+          class="rounded-control bg-raised px-base py-snug text-label hover:bg-raised-hover disabled:text-text-disabled"
           disabled={!complete() || busy()}
           onClick={() => {
             setReport(null);
@@ -264,7 +264,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
         </button>
         <button
           type="button"
-          class="rounded-control bg-accent px-base py-snug text-label text-g0 hover:bg-accent-hover disabled:bg-g3 disabled:text-text-disabled"
+          class="rounded-control bg-accent px-base py-snug text-label text-on-accent hover:bg-accent-hover disabled:bg-disabled disabled:text-text-disabled"
           disabled={!complete() || busy()}
           onClick={() => {
             setReport(null);

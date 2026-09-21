@@ -38,8 +38,8 @@ import { Button } from "./button";
 // `transition-discrete` the box would vanish on the first frame of the
 // closing and take its fade with it.
 const SHEET =
-  "m-auto hidden w-full max-w-measure flex-col gap-base rounded-panel border border-g3 " +
-  "bg-g1 p-pane opacity-0 shadow-modal transition-[opacity,display,overlay] " +
+  "m-auto hidden w-full max-w-measure flex-col gap-base rounded-panel border border-edge-panel " +
+  "bg-raised p-pane opacity-0 shadow-modal transition-[opacity,display,overlay] " +
   "transition-discrete duration-200 ease-standard open:flex open:opacity-100 " +
   "starting:open:opacity-0 motion-reduce:transition-none " +
   "backdrop:bg-transparent backdrop:backdrop-brightness-50";

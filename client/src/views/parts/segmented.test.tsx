@@ -15,7 +15,7 @@ import { bands, nextStop, tabStop, type Choice, type Group } from "./segmented";
 
 type Api = "chat" | "responses" | "messages";
 
-const OPEN_AI: Group = { label: "OpenAI", tone: "accent" };
+const OPEN_AI: Group = { label: "OpenAI", tone: "plain" };
 const ANTHROPIC: Group = { label: "Anthropic", tone: "alert" };
 
 // The three dialects as the provider form offers them: two from one
@@ -53,7 +53,7 @@ describe("a flat list is cut into the tracks that are drawn", () => {
 
   test("one name under two tones draws two tracks rather than one of them", () => {
     const split: readonly Choice<Api>[] = [
-      { value: "chat", label: "chat", group: { label: "OpenAI", tone: "accent" } },
+      { value: "chat", label: "chat", group: { label: "OpenAI", tone: "plain" } },
       { value: "responses", label: "responses", group: { label: "OpenAI", tone: "alert" } },
     ];
     expect(bands(split).length).toBe(2);

@@ -88,7 +88,7 @@ export function Status(props: { readonly building: Address }) {
                 <ul class="text-note">
                   <For each={status().files}>
                     {(file) => (
-                      <li class="flex items-center gap-base border-b border-g1 py-snug">
+                      <li class="flex items-center gap-base border-b border-edge py-snug">
                         <span class="w-figure shrink-0 text-text-faint">{how(file)}</span>
                         <span class="flex-1 truncate font-mono text-text-quiet">{file.path}</span>
                         <span class="shrink-0 font-mono text-text-disabled">

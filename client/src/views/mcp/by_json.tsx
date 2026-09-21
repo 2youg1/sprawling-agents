@@ -58,7 +58,7 @@ export function ByJson(props: { readonly intake: Intake }) {
   return (
     <div class="flex flex-col gap-base">
       <textarea
-        class="min-h-output w-full min-w-0 rounded-control border border-g3 bg-g2 px-base py-snug font-mono text-note text-text placeholder:text-text-disabled"
+        class="min-h-output w-full min-w-0 rounded-control border border-edge-panel bg-raised px-base py-snug font-mono text-note text-text placeholder:text-text-disabled"
         rows={8}
         aria-label={say("mcp_door_json")}
         placeholder={say("mcp_json_placeholder")}
@@ -75,7 +75,7 @@ export function ByJson(props: { readonly intake: Intake }) {
       <ul class="flex flex-col gap-tight">
         <For each={rows()}>
           {(row) => (
-            <li class="flex min-w-0 items-center gap-base rounded-card bg-g1 px-base py-snug text-note">
+            <li class="flex min-w-0 items-center gap-base rounded-card bg-chrome px-base py-snug text-note">
               <span class="w-figure shrink-0 truncate font-mono text-text">{row.draft.label}</span>
               <Badge text={say(SPELLED[row.draft.transport])} />
               <Show

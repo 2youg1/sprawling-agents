@@ -70,7 +70,7 @@ export function Servers(props: {
         <ul class="flex flex-col gap-tight" aria-label={say("mcp_servers")}>
           <For each={props.servers}>
             {(server) => (
-              <li class="rounded-card bg-g1">
+              <li class="rounded-card bg-chrome">
                 <div class="flex min-w-0 items-center gap-base px-base py-snug text-note">
                   <span class="w-figure shrink-0 truncate font-label text-text">{server.label}</span>
                   <Badge text={say(transportWord(server))} />
@@ -96,7 +96,7 @@ export function Servers(props: {
                   />
                 </div>
                 <Show when={open() === server.label}>
-                  <div class="flex flex-col gap-tight border-t border-g2 px-base py-snug text-note">
+                  <div class="flex flex-col gap-tight border-t border-edge px-base py-snug text-note">
                     <div class="flex min-w-0 items-baseline gap-snug">
                       <span class="shrink-0 text-text-quiet">{say("mcp_target")}</span>
                       <span class="min-w-0 wrap-anywhere font-mono text-text">{targetOf(server)}</span>
@@ -176,7 +176,7 @@ function Standing(props: { readonly state: McpState | undefined }) {
                 <li class="flex min-w-0 flex-col gap-tight">
                   <span class="font-mono text-text">{tool.name}</span>
                   <span class="text-text-faint">{tool.disclosure}</span>
-                  <pre class="min-w-0 overflow-x-auto rounded-control bg-g2 px-base py-snug font-mono text-text-quiet">
+                  <pre class="min-w-0 overflow-x-auto rounded-control bg-raised px-base py-snug font-mono text-text-quiet">
                     {JSON.stringify(tool.input_schema, null, 2)}
                   </pre>
                 </li>

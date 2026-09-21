@@ -50,6 +50,11 @@ const ROWS = {
   welcomed: "sprawling.welcomed",
   // Whether the artefact panel beside a conversation is open.
   panel: "sprawling.talk.panel",
+  // How much of the rail is drawn. Kept rather than held in memory
+  // because it is a decision about the shape of the window, and a
+  // decision a reload undoes is a decision the person has to take
+  // again every morning.
+  rail: "sprawling.rail",
   lighting: "sprawling.appearance.lighting",
   sans: "sprawling.appearance.sans",
   mono: "sprawling.appearance.mono",
@@ -85,6 +90,15 @@ export type Face = "geist" | "system" | "custom";
 // in `:root[data-density="compact"]`. Two named postures rather than a
 // coefficient, because the coefficient is the stylesheet's to choose.
 export type Density = "comfortable" | "compact";
+// How much of the rail is drawn.
+//
+// Three postures rather than a boolean, and the third is the reason
+// this type exists: `glyphs` is the column of icons, `named` pins it
+// open with every name and chord beside its glyph, and `away` takes
+// the column off the page for somebody reading a long document or
+// watching a wide table. A boolean could carry two of the three and
+// the third was the one people asked for.
+export type Rail = "glyphs" | "named" | "away";
 export type Chroma = "full" | "off";
 // `system` is the absence of an opinion, which is what the stylesheet's
 // `prefers-reduced-motion` block reads.
@@ -96,6 +110,9 @@ export type Motion = "system" | "on" | "off";
 export const LIGHTINGS: readonly Lighting[] = ["system", "dark", "light"];
 export const FACES: readonly Face[] = ["geist", "system", "custom"];
 export const DENSITIES: readonly Density[] = ["comfortable", "compact"];
+// In the order the accelerator cycles them: out from the resting
+// posture, then away, then back.
+export const RAILS: readonly Rail[] = ["glyphs", "named", "away"];
 export const CHROMAS: readonly Chroma[] = ["full", "off"];
 export const MOTIONS: readonly Motion[] = ["system", "on", "off"];
 const PROXYINGS: readonly Proxying[] = ["except_local", "always", "never"];
@@ -157,6 +174,7 @@ export interface Preferences {
   // person who skipped it is nagged again.
   readonly welcomed: boolean;
   readonly panel: boolean;
+  readonly rail: Rail;
   readonly appearance: Appearance;
   readonly proxying: Proxying;
 }
@@ -177,7 +195,7 @@ export type Keeper =
   | "city";
 
 // The one way to the person's preferences: the record as it stands,
-// who is keeping it, the city's answer coming the other way, five
+// who is keeping it, the city's answer coming the other way, six
 // named changes to it, and the two families that are read by name
 // because they have one row each per place and per action.
 //
@@ -199,6 +217,7 @@ export interface PreferenceDoor {
   readonly setLang: (lang: Lang) => void;
   readonly setWelcomed: (done: boolean) => void;
   readonly setPanel: (open: boolean) => void;
+  readonly setRail: (rail: Rail) => void;
   readonly setAppearance: (next: Appearance) => void;
   readonly setProxying: (rule: Proxying) => void;
   // The chord the person set for one action, or `""` for an action
@@ -278,6 +297,7 @@ function readPreferences(rows: Rows, browserLang: string): Preferences {
     lang: readLang(rows.getItem(ROWS.lang), browserLang),
     welcomed: rows.getItem(ROWS.welcomed) === YES,
     panel: rows.getItem(ROWS.panel) !== NO,
+    rail: readOne(RAILS, rows.getItem(ROWS.rail), "glyphs"),
     appearance: readAppearance(rows),
     proxying: readOne(PROXYINGS, rows.getItem(ROWS.proxying), "except_local"),
   };
@@ -290,6 +310,7 @@ function writePreferences(rows: Rows, next: Preferences): void {
   rows.setItem(ROWS.lang, next.lang);
   rows.setItem(ROWS.welcomed, next.welcomed ? YES : NO);
   rows.setItem(ROWS.panel, next.panel ? YES : NO);
+  rows.setItem(ROWS.rail, next.rail);
   writeAppearance(rows, next.appearance);
   rows.setItem(ROWS.proxying, next.proxying);
 }
@@ -321,6 +342,9 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
     },
     setPanel(panel) {
       settle({ ...held(), panel });
+    },
+    setRail(rail) {
+      settle({ ...held(), rail });
     },
     setAppearance(appearance) {
       settle({ ...held(), appearance });

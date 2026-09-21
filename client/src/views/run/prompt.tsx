@@ -29,7 +29,7 @@ function Segment(props: { readonly segment: PrefixSegment }) {
     setCopied(true);
   };
   return (
-    <li class="border-b border-g1">
+    <li class="border-b border-edge">
       <div class="flex items-center gap-base py-snug text-note">
         <button
           type="button"
@@ -56,7 +56,7 @@ function Segment(props: { readonly segment: PrefixSegment }) {
         <Show when={props.segment.stored}>
           <button
             type="button"
-            class="shrink-0 rounded-control bg-g1 px-snug py-tight text-label text-text-quiet hover:bg-g2 hover:text-text"
+            class="shrink-0 rounded-control bg-raised px-snug py-tight text-label text-text-quiet hover:bg-raised hover:text-text"
             onClick={copy}
           >
             {copied() ? say("run_prompt_copied") : say("run_prompt_copy")}
@@ -87,7 +87,7 @@ function Segment(props: { readonly segment: PrefixSegment }) {
               </For>
             </p>
           </Show>
-          <pre class="overflow-x-auto whitespace-pre-wrap break-words rounded-control bg-g1 p-base font-mono text-note text-text-quiet">
+          <pre class="overflow-x-auto whitespace-pre-wrap break-words rounded-control border border-edge bg-page p-base font-mono text-note text-text-quiet">
             {props.segment.text}
           </pre>
         </div>

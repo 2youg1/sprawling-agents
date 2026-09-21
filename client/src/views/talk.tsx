@@ -69,7 +69,13 @@ export function Talk(props: TalkProps) {
     const answer: RoundsAnswer = held.rounds;
     return artifactsIn(answer.turns);
   });
-  const produced = () => artifacts().file !== null || artifacts().terminal !== null;
+  // Whether there is a card to draw at all. Any one of the three
+  // panes is enough; a run that read nothing, changed nothing and ran
+  // nothing gets no card and no control to open one.
+  const produced = () => {
+    const held = artifacts();
+    return held.read !== null || held.wrote !== null || held.terminal !== null;
+  };
   // Open until the person closes it, and forgotten on reload: this
   // belongs in the person's own `[ui]` section and there is no door to
   // it yet (client-SPEC 4-27).
@@ -143,7 +149,7 @@ export function Talk(props: TalkProps) {
           <div class="flex justify-end px-pane pt-snug">
             <button
               type="button"
-              class="rounded-control px-snug py-tight text-note text-text-faint hover:bg-g1 hover:text-text-quiet"
+              class="rounded-control px-snug py-tight text-note text-text-faint hover:bg-chrome hover:text-text-quiet"
               aria-expanded={panel()}
               aria-controls={PANEL_ID}
               onClick={() => {
@@ -163,7 +169,26 @@ export function Talk(props: TalkProps) {
           }}
         >
           <div ref={setColumn} class="mx-auto flex min-h-full w-full max-w-talk flex-col justify-end px-pane pb-wide pt-wide">
-            <Show when={!isMayor()}>
+            {/* The page's own name, and it is always here.
+
+                This page had no `<h1>` at all: the empty room drew its
+                title as a `<p>`, and once a thread started there was
+                nothing naming the page. A reader arriving by keyboard
+                or by screen reader had nothing to land on, and
+                `theme.css` hangs the view transition off `main h1`, so
+                route changes carried nothing across either. `xtask
+                render` never caught it because it opens `#/gallery`
+                and nothing else; it is the first screen of the product
+                and the one page the gate does not look at.
+
+                It is drawn as the heading of an empty room and read
+                out but not drawn once the conversation has started -
+                the thread is then what the page is about, and a
+                standing title above it would be furniture. */}
+            <h1 class={runs().length === 0 ? "sr-only" : "mb-wide text-note text-text-faint"}>
+              {isMayor() ? say("talk_empty_mayor") : roomOf(props.address)}
+            </h1>
+            <Show when={!isMayor() && runs().length === 0}>
               <p class="mb-wide text-note text-text-faint">{props.address}</p>
             </Show>
             {/* An empty room opens with the box in the middle of the page
@@ -180,8 +205,14 @@ export function Talk(props: TalkProps) {
                   {isMayor() ? say("talk_opening_mayor") : say("talk_opening_room", { room: roomOf(props.address) })}
                 </p>
                 <div class="w-full">{composer()}</div>
+                {/* The three opening lines take the composer's own
+                    left edge rather than their own centred one. As a
+                    block of its own width inside a centred column they
+                    began forty pixels to its right, which reads as two
+                    columns that failed to line up rather than as one
+                    thing with a note under it. */}
                 <Show when={isMayor()}>
-                  <ul class="max-w-measure list-none text-left text-note text-text-faint">
+                  <ul class="w-full list-none text-left text-note text-text-faint">
                     <li>{say("talk_hint_dispatch")}</li>
                     <li class="mt-tight">{say("talk_hint_progress")}</li>
                     <li class="mt-tight">{say("talk_hint_waiting")}</li>

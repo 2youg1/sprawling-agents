@@ -193,11 +193,6 @@ export function Composer(props: ComposerProps) {
       .at(0);
   });
 
-  // What the chip says the effort is. Nobody having chosen is a state
-  // of its own rather than a level: the field is left out of the
-  // request, and the city's own configuration answers for it.
-  const effortWord = () => say(`effort_${ui.effort() ?? UNSTATED}`);
-
   const hands = (): SlashHands => ({
     command,
     go,
@@ -361,10 +356,21 @@ export function Composer(props: ComposerProps) {
     void going.stop().then(settle);
   };
 
+  // Focus is said by the edge going from dashed to solid, and by
+  // nothing else.
+  //
+  // It used to turn the whole border a full-strength accent, which
+  // made this box the brightest rectangle on any page that carried
+  // one - brighter than the stop button, which is the control a
+  // person has to hit in a hurry, and brighter than anything the
+  // model had just written. The accent is a budget with two lines in
+  // it: the focus ring and the bar beside a selected row. Dashed to
+  // solid carries the same state without spending any of it, and it
+  // survives a forced-colour mode, where the accent would not.
   return (
     <form
       ref={setForm}
-      class="relative rounded-panel border border-dashed border-g4 bg-g1 p-base shadow-composer focus-within:border-solid focus-within:border-accent"
+      class="relative rounded-panel border border-dashed border-edge-input bg-raised p-base shadow-composer focus-within:border-solid"
       onSubmit={(event) => {
         event.preventDefault();
         submit();
@@ -437,28 +443,32 @@ export function Composer(props: ComposerProps) {
             {(hint) => (
               <button
                 type="button"
-                class="flex min-w-0 items-center gap-tight rounded-pill bg-g2 px-base py-tight text-note text-text-quiet hover:bg-g3"
+                class="flex min-w-0 items-center gap-tight rounded-pill bg-raised px-base py-tight text-note text-text-quiet hover:bg-raised-hover"
                 onClick={() => {
                   setOpen((held) => (held === "choice" ? "none" : "choice"));
                 }}
                 aria-expanded={open() === "choice"}
                 aria-describedby={hint}
               >
-                <span class="min-w-0 truncate">{main()?.model ?? say("talk_no_model")}</span>
+                {/* The verb, not the value. What the model and the
+                    effort currently are is stated once, on the fact
+                    strip along the bottom of the window; a chooser
+                    that also spelled them out would be that fact's
+                    second home, and the two drifted apart the day
+                    `/model` in the palette wrote one of them. What
+                    stays here is what this particular box will send
+                    to, because that is a fact about this box. */}
+                <span class="min-w-0 truncate">{say("talk_choose")}</span>
                 <Show when={here()}>
                   {(room) => <span class="min-w-0 truncate text-text-disabled"> · {room()}</span>}
                 </Show>
-                <span class="shrink-0 text-text-disabled">
-                  {" · "}
-                  {say("talk_effort")} {effortWord()}
-                </span>
               </button>
             )}
           </Tip>
           <Show when={props.hearing === true && canRecord()}>
             <button
               type="button"
-              class={`rounded-pill px-base py-tight text-note ${taking() === null ? "bg-g2 text-text-quiet hover:bg-g3" : "bg-alert text-g0"}`}
+              class={`rounded-pill px-base py-tight text-note ${taking() === null ? "bg-raised text-text-quiet hover:bg-raised-hover" : "bg-alert text-on-accent"}`}
               disabled={hearing()}
               onClick={speak}
             >
@@ -476,7 +486,7 @@ export function Composer(props: ComposerProps) {
           <Show when={props.sending !== "dispatch"}>
             <button
               type="button"
-              class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2 hover:text-alert"
+              class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-raised hover:text-alert"
               onClick={() => props.onStop()}
             >
               {say("talk_stop")}
@@ -484,7 +494,7 @@ export function Composer(props: ComposerProps) {
           </Show>
           <button
             type="submit"
-            class="rounded-control bg-accent px-base py-tight text-label text-g0 hover:bg-accent-hover disabled:bg-g3 disabled:text-text-disabled"
+            class="rounded-control bg-accent px-base py-tight text-label text-on-accent hover:bg-accent-hover disabled:bg-disabled disabled:text-text-disabled"
             disabled={text().trim() === ""}
           >
             {say(SPELLING[props.sending])}

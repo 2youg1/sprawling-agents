@@ -25,7 +25,7 @@ export function EmptyState(props: EmptyStateProps) {
     <div class="flex w-full flex-col items-center gap-base px-pane py-section text-center">
       <Show
         when={props.shape}
-        fallback={<div class="size-figure rounded-panel border border-dashed border-g4" aria-hidden="true" />}
+        fallback={<div class="size-figure rounded-panel border border-dashed border-edge-input" aria-hidden="true" />}
       >
         {(shape) => <div aria-hidden="true">{shape()}</div>}
       </Show>

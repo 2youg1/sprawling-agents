@@ -49,7 +49,7 @@ export function Dot(props: { readonly tone: string }) {
 function Line(props: { readonly notice: Notice }) {
   const error = () => props.notice.error;
   return (
-    <li class="border-b border-g2 px-base py-snug last:border-0">
+    <li class="border-b border-edge px-base py-snug last:border-0">
       <div class="flex items-baseline gap-snug">
         <span class="font-label text-alert">{error().action}</span>
         <span class="font-mono text-note text-text-faint">{error().code}</span>
@@ -86,20 +86,13 @@ export function Presence() {
         return say("link_connecting");
     }
   };
-  // Still on its way, as against arrived or refused: the one state
-  // that resolves without the person doing anything.
-  const settling = () => link() !== "live" && link() !== "refused";
-  const busy = () => approvals().length > 0 || unread() > 0 || link() !== "live";
-  const tone = () => {
-    if (!busy()) return "bg-g5";
-    return settling() ? "bg-alert animate-pulse" : "bg-alert";
-  };
+  const busy = () => approvals().length > 0 || unread() > 0;
+  const tone = () => (busy() ? "bg-alert" : "bg-mark");
   // Collapsed, the dot is the only thing on this control, so its name
-  // has to carry the state as well: what it is, then each of the three
+  // has to carry the state as well: what it is, then each of the two
   // reasons it is yellow.
   const name = () => {
     const parts = [say("presence_title")];
-    if (link() !== "live") parts.push(linkWord());
     if (approvals().length > 0) parts.push(say("nav_waiting", { n: String(approvals().length) }));
     if (unread() > 0) parts.push(say("notices_unread", { n: String(unread()) }));
     return parts.join(" · ");
@@ -124,7 +117,16 @@ export function Presence() {
           rather than in a second mark next to it. */}
       <button
         type="button"
-        class="flex h-rail w-rail items-center px-base text-label text-text-quiet hover:text-text"
+        // `w-full`, because that is what the eight rows under it are.
+        // This one said `w-rail` and came out a pixel wide of every
+        // one of them; taking the width off entirely made it shrink to
+        // its dot and come out two pixels short, which was worse. The
+        // authority is the rows: a column of entries that fill their
+        // holder has one member that states a width of its own, and
+        // the member is the one that is wrong. `xtask render --survey`
+        // put it as seven of eight agreeing, which is how a typing
+        // mistake is told from a column that never had a consensus.
+        class="flex h-rail w-full items-center px-base text-label text-text-quiet hover:text-text"
         aria-expanded={open()}
         aria-label={name()}
         onClick={show}
@@ -135,15 +137,15 @@ export function Presence() {
         <div
           role="dialog"
           aria-label={say("presence_title")}
-          class="absolute top-0 left-full z-20 ml-tight max-h-palette w-palette overflow-y-auto rounded-panel border border-g3 bg-g1 shadow-composer"
+          class="absolute top-0 left-full z-20 ml-tight max-h-palette w-palette overflow-y-auto rounded-panel border border-edge-panel bg-raised shadow-composer"
         >
-          <div class="flex items-center gap-snug border-b border-g2 px-base py-snug text-note">
+          <div class="flex items-center gap-snug border-b border-edge px-base py-snug text-note">
             <Dot tone={tone()} />
             <span class="text-text">{linkWord()}</span>
             <Show when={link() === "refused"}>
               <button
                 type="button"
-                class="ml-auto rounded-control px-base py-tight font-mono text-note text-accent hover:bg-g2"
+                class="ml-auto rounded-control px-base py-tight font-mono text-note text-accent hover:bg-raised"
                 onClick={() => {
                   ui.conn.retry();
                 }}
@@ -153,7 +155,7 @@ export function Presence() {
             </Show>
           </div>
           <Show when={approvals().length > 0}>
-            <section class="border-b border-g2 px-base py-snug" aria-label={say("wait_title")}>
+            <section class="border-b border-edge px-base py-snug" aria-label={say("wait_title")}>
               <h2 class="text-label font-label text-alert">{say("wait_title")}</h2>
               <WaitingCards items={approvals()} />
             </section>

@@ -50,7 +50,7 @@ export function LoginForm(props: { readonly onAttached?: () => void }) {
       <div class="flex items-center gap-snug">
         <button
           type="button"
-          class="rounded-control bg-g2 px-base py-snug text-label hover:bg-g3"
+          class="rounded-control bg-raised px-base py-snug text-label hover:bg-raised-hover"
           onClick={() => command(loginBegin(provider()))}
         >
           {say("setup_login_begin")} · {provider()}
@@ -74,7 +74,7 @@ export function LoginForm(props: { readonly onAttached?: () => void }) {
             />
             <button
               type="button"
-              class="rounded-control bg-accent px-base py-snug text-label text-g0 hover:bg-accent-hover disabled:bg-g3 disabled:text-text-disabled"
+              class="rounded-control bg-accent px-base py-snug text-label text-on-accent hover:bg-accent-hover disabled:bg-disabled disabled:text-text-disabled"
               disabled={code().trim() === ""}
               onClick={() => {
                 if (command(loginCode(provider(), code().trim()))) {
@@ -116,7 +116,7 @@ export function EndpointList(props: { readonly answer: EndpointsAnswer }) {
       <ul class="flex flex-col gap-snug">
         <For each={props.answer.endpoints}>
           {(endpoint) => (
-            <li class="rounded-card bg-g1 px-base py-snug text-note">
+            <li class="rounded-card bg-chrome px-base py-snug text-note">
               <div class="flex items-center gap-snug">
                 <span class="font-label text-text">{endpoint.label}</span>
                 <Show when={endpoint.label !== endpoint.name}>
@@ -131,7 +131,7 @@ export function EndpointList(props: { readonly answer: EndpointsAnswer }) {
               </div>
               <div class="mt-tight flex flex-wrap gap-tight text-text-quiet">
                 <For each={endpoint.models}>
-                  {(row) => <span class="rounded-pill bg-g2 px-snug">{row.id}</span>}
+                  {(row) => <span class="rounded-pill bg-raised px-snug">{row.id}</span>}
                 </For>
               </div>
             </li>

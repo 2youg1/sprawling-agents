@@ -62,7 +62,7 @@ function stateKey(
 function dotOf(item: DoctorItem): string {
   if ("present" in item.state) return "bg-accent";
   if ("broken" in item.state) return "bg-alert";
-  return item.need === "optional" ? "bg-g5" : "bg-alert";
+  return item.need === "optional" ? "bg-mark" : "bg-alert";
 }
 
 // What a present item said when asked its version, when it said
@@ -177,7 +177,7 @@ function Row(props: { readonly item: DoctorItem; readonly onInstall: (item: stri
     return word === null ? {} : { why: say(word) };
   };
   return (
-    <li class="flex flex-col gap-tight border-t border-g1 py-snug">
+    <li class="flex flex-col gap-tight border-t border-edge py-snug">
       <div class="flex flex-wrap items-center gap-snug">
         <span class="flex size-glyph shrink-0 items-center justify-center">
           <span class={`inline-block size-dot rounded-pill ${dotOf(props.item)}`} />
@@ -238,7 +238,7 @@ function Row(props: { readonly item: DoctorItem; readonly onInstall: (item: stri
       <p class="text-note text-text-faint">{props.item.enables}</p>
       <Show when={spelled()}>
         {(how) => (
-          <code class="block whitespace-pre-wrap wrap-anywhere rounded-control bg-g1 px-snug py-tight font-mono text-note text-text-quiet">
+          <code class="block whitespace-pre-wrap wrap-anywhere rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet">
             {how()}
           </code>
         )}
@@ -295,7 +295,7 @@ export function MachineReport(props: {
     props.onInstall?.(item);
   };
   return (
-    <div class="grid min-w-0 grid-cols-1 gap-wide lg:grid-cols-2">
+    <div class="grid min-w-0 grid-cols-1 gap-wide @lg/page:grid-cols-2">
       <Column
         title={say("machine_required")}
         items={required(props.answer)}
@@ -320,9 +320,9 @@ export function MachineSkeleton() {
     <ul class="flex flex-col" aria-label={say("machine_checking")}>
       <For each={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]}>
         {() => (
-          <li class="flex items-center gap-snug border-t border-g1 py-snug">
-            <span class="inline-block size-dot animate-pulse rounded-pill bg-g3" />
-            <span class="h-tight w-tree animate-pulse rounded-pill bg-g2" />
+          <li class="flex items-center gap-snug border-t border-edge py-snug">
+            <span class="inline-block size-dot animate-pulse rounded-pill bg-mark" />
+            <span class="h-tight w-tree animate-pulse rounded-pill bg-raised" />
           </li>
         )}
       </For>
@@ -401,7 +401,7 @@ function Release() {
     ui.conn.asking.refresh(QUERIES.release);
   };
   return (
-    <section class="flex min-w-0 flex-col gap-snug rounded-control bg-g1 p-base">
+    <section class="flex min-w-0 flex-col gap-snug rounded-control bg-chrome p-base">
       <div class="flex flex-wrap items-center gap-snug">
         <h2 class="grow text-label text-text">{say("release_title")}</h2>
         <Button label={say("release_check")} tone="secondary" loading={asking()} onPress={check} />
@@ -453,7 +453,7 @@ function Release() {
                     released: found().newest.released,
                   })}
                 </p>
-                <code class="rounded-control bg-g2 px-base py-snug font-mono text-note text-text">
+                <code class="rounded-control bg-raised px-base py-snug font-mono text-note text-text">
                   {UPDATE_NPM}
                 </code>
                 <p class="text-note text-text-soft">{say("release_archive")}</p>
@@ -539,7 +539,7 @@ export function Machine() {
           loading={asking()}
           onPress={recheck}
         />
-        <code class="rounded-control bg-g1 px-base py-snug font-mono text-note text-text">{DOCTOR}</code>
+        <code class="rounded-control bg-chrome px-base py-snug font-mono text-note text-text">{DOCTOR}</code>
         <Button
           label={say("setup_copy")}
           tone="quiet"

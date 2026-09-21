@@ -84,14 +84,14 @@ export function Table<T>(
   };
 
   return (
-    <div class="max-h-output w-full overflow-auto rounded-card border border-g3">
+    <div class="max-h-output w-full overflow-auto rounded-card border border-edge-panel">
       <Show when={props.rows.length > 0} fallback={props.empty}>
         <table class="w-full border-collapse text-body">
           <caption class="sr-only">{props.caption}</caption>
           {/* No stacking number: a sticky header is positioned and the
               rows that scroll under it are not, so the header is
               painted last of the two. */}
-          <thead class="sticky top-0 bg-g2">
+          <thead class="sticky top-0 bg-raised">
             <tr>
               <Show when={props.selection}>
                 {(selection) => (
@@ -132,7 +132,7 @@ export function Table<T>(
           <tbody>
             <For each={ordered()}>
               {(row) => (
-                <tr class="border-t border-g2">
+                <tr class="border-t border-edge">
                   <Show when={props.selection}>
                     {(selection) => (
                       <td class="px-base py-snug">
@@ -153,7 +153,7 @@ export function Table<T>(
                         <Show when={column.editable} fallback={column.render(row)}>
                           {(editable) => (
                             <input
-                              class="w-full min-w-0 rounded-control bg-g1 px-snug py-tight font-mono text-note text-text"
+                              class="w-full min-w-0 rounded-control bg-chrome px-snug py-tight font-mono text-note text-text"
                               aria-label={`${column.header} ${props.keyOf(row)}`}
                               value={editable().text(row)}
                               onChange={(event) => {

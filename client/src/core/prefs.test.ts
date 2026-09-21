@@ -16,6 +16,7 @@ const STATED: Preferences = {
   lang: "zh",
   welcomed: true,
   panel: false,
+  rail: "away",
   appearance: {
     lighting: "light",
     sans: "system",

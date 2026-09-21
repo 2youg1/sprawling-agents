@@ -74,7 +74,7 @@ function Files(props: DirectoryProps & { readonly entries: readonly Entry[] }) {
         {(entry) => {
           const here = () => AddressSchema.make(`${props.at}/${entry.name}`);
           return (
-            <li class="flex items-center gap-base border-b border-g1 py-snug">
+            <li class="flex items-center gap-base border-b border-edge py-snug">
               <Path
                 path={here()}
                 base={props.root}
@@ -118,7 +118,7 @@ function Runs(props: { readonly at: Address }) {
           action={
             <a
               href={toFragment({ kind: "talk", address: props.at })}
-              class="rounded-control bg-g2 px-base py-tight text-label hover:bg-g3"
+              class="rounded-control bg-raised px-base py-tight text-label hover:bg-raised-hover"
             >
               {say("bld_open_talk")}
             </a>
@@ -129,9 +129,9 @@ function Runs(props: { readonly at: Address }) {
       <ul class="text-note">
         <For each={runs()}>
           {(run) => (
-            <li class="border-b border-g1 py-snug">
+            <li class="border-b border-edge py-snug">
               <a href={toFragment({ kind: "run", run: run.run })} class="flex items-center gap-base hover:text-text">
-                <span class={`inline-block size-dot shrink-0 rounded-pill ${run.doing.kind === "frozen" ? "bg-g4" : "bg-accent"}`} />
+                <span class={`inline-block size-dot shrink-0 rounded-pill ${run.doing.kind === "frozen" ? "bg-mark" : "bg-accent"}`} />
                 <span class="min-w-0 flex-1 truncate text-text-quiet">{run.task ?? run.run}</span>
                 <span class="shrink-0 text-text-faint">{posture(say, run.doing)}</span>
                 <Show when={spent(run.run)}>{(usdMicros) => <span class="shrink-0 text-text-disabled">{usd(usdMicros())}</span>}</Show>
@@ -167,7 +167,7 @@ export function Directory(props: DirectoryProps) {
               <Show when={kind() === "room"}>
                 <a
                   href={toFragment({ kind: "talk", address: props.at })}
-                  class="rounded-control bg-g2 px-base py-tight text-label hover:bg-g3"
+                  class="rounded-control bg-raised px-base py-tight text-label hover:bg-raised-hover"
                 >
                   {say("bld_open_talk")}
                 </a>

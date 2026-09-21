@@ -515,6 +515,42 @@
     "en": "screenshot",
     "zh": "截图"
   },
+  "facts_autonomy": {
+    "en": "door",
+    "zh": "门"
+  },
+  "facts_city": {
+    "en": "this city",
+    "zh": "全城"
+  },
+  "facts_link": {
+    "en": "link",
+    "zh": "连接"
+  },
+  "facts_model": {
+    "en": "model",
+    "zh": "模型"
+  },
+  "facts_region": {
+    "en": "what is running on your behalf",
+    "zh": "此刻替你在跑的是什么"
+  },
+  "facts_run": {
+    "en": "this run",
+    "zh": "本次"
+  },
+  "facts_sandbox": {
+    "en": "sandbox",
+    "zh": "沙箱"
+  },
+  "facts_sandbox_mounts": {
+    "en": "{n} mounted",
+    "zh": "挂载 {n} 处"
+  },
+  "facts_sandbox_open": {
+    "en": "none: the machine itself",
+    "zh": "无：就是这台机器"
+  },
   "file_binary": {
     "en": "binary · {kib}",
     "zh": "二进制 · {kib}"
@@ -2031,6 +2067,10 @@
     "en": "no shelf in this city holds anything",
     "zh": "这座城的书架上还什么都没有"
   },
+  "skills_external": {
+    "en": "shelf {n} · {path}",
+    "zh": "外部书架 {n} · {path}"
+  },
   "skills_library": {
     "en": "the city's library",
     "zh": "城的库"
@@ -2262,6 +2302,10 @@
   "talk_panel": {
     "en": "what this run produced",
     "zh": "这次 run 产出的东西"
+  },
+  "talk_panel_change": {
+    "en": "what changed",
+    "zh": "改动"
   },
   "talk_panel_code": {
     "en": "the file it last worked on",

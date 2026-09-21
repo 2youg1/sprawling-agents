@@ -27,7 +27,27 @@ import { ENDPOINTS, PROBED } from "./served";
 
 // One machine, with an item in each of the three states a person acts
 // differently on: here, missing and required, missing and optional.
+//
+// The confinement it reports is the Windows arm on purpose. It is the
+// one that keeps some axes and not others - a job object ends a
+// process tree and caps what it may spend, and does nothing at all
+// about the network - so it is the arm that proves the page draws a
+// guarantee list rather than a yes or a no. "Windows has no sandbox"
+// would have been easier to draw and would have been false; a machine
+// that says it is boxed in while the box has no lid is worse than one
+// that says it has no box.
 const MACHINE: DoctorAnswer = {
+  custody: { keeps: "across_reboots", store: "platform_service" },
+  sandbox: {
+    arm: "windows_job_object",
+    coverage: [
+      { axis: "filesystem", kept: "kept" },
+      { axis: "process_tree", kept: "kept" },
+      { axis: "resources", kept: "kept" },
+      { axis: "network", kept: "not_kept" },
+      { axis: "user", kept: "not_kept" },
+    ],
+  },
   items: [
     {
       name: "firefox",

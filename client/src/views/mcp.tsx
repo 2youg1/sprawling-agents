@@ -69,7 +69,7 @@ export function McpForm(props: {
         onCheck={reach.check}
         onRemove={reach.withdraw}
       />
-      <div class="flex flex-col gap-base rounded-panel bg-g1/60 p-base">
+      <div class="flex flex-col gap-base rounded-panel bg-chrome/60 p-base">
         <Tabs
           label={say("mcp_doors")}
           current={door()}

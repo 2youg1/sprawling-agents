@@ -286,7 +286,7 @@ export function AppearanceSection() {
       </Show>
       <Show when={installed().length > 0}>
         <select
-          class="w-full min-w-0 rounded-control border border-g3 bg-g2 px-base py-snug text-body text-text"
+          class="w-full min-w-0 rounded-control border border-edge-panel bg-raised px-base py-snug text-body text-text"
           aria-label={say("appearance_local_for", { face: say(name) })}
           onChange={(event) => {
             wear(axis, event.currentTarget.value);
@@ -352,7 +352,7 @@ export function AppearanceSection() {
 
       <div class="flex flex-col gap-tight">
         <span class="text-note text-text-quiet">{say("appearance_preview")}</span>
-        <div class="flex flex-col gap-tight rounded-card bg-g1 p-base">
+        <div class="flex flex-col gap-tight rounded-card bg-chrome p-base">
           <p class="font-sans text-body text-text">{say("appearance_sample")}</p>
           <p class="font-mono text-body text-text-quiet">{say("appearance_sample")}</p>
         </div>

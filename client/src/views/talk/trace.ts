@@ -73,15 +73,26 @@ export function tally(calls: readonly Call[]): Tally {
   return { explored, wrote, ran, other };
 }
 
-// The two halves of the artifact panel: the newest file a call worked
-// on, and the newest command output. Either may be absent, and a run
-// that has produced neither gets no panel at all.
+// The three panes of the artifact card: the newest file a call read,
+// the newest file a call changed, and the newest command output. Any
+// of them may be absent, and a run that has produced none of the
+// three gets no card at all.
+//
+// **Three because `Deed` already says three.** The panel used to fold
+// `explored` and `wrote` into one `file`, so whichever happened last
+// won and the other was not drawn - a run that read a header and then
+// rewrote a module showed the header. Reading a file and changing one
+// are different things to look at: one wants line numbers and the
+// other wants to know what moved. The split costs no new question on
+// the wire, because `deedOf` was already the authority that told them
+// apart for the fold's counting sentence.
 export interface Artifacts {
-  readonly file: Call | null;
+  readonly read: Call | null;
+  readonly wrote: Call | null;
   readonly terminal: Call | null;
 }
 
-export const NOTHING: Artifacts = { file: null, terminal: null };
+export const NOTHING: Artifacts = { read: null, wrote: null, terminal: null };
 
 // Whether this call produced something worth showing: it answered, and
 // it answered in words this build can read. A call still waiting is not
@@ -97,21 +108,31 @@ function produced(call: Call): boolean {
 // thing this run produced, so a person watching a thread and a person
 // opening it later see the same panel.
 export function artifactsIn(turns: readonly Turn[]): Artifacts {
-  let file: Call | null = null;
+  let read: Call | null = null;
+  let wrote: Call | null = null;
   let terminal: Call | null = null;
   for (let turn = turns.length - 1; turn >= 0; turn -= 1) {
     const calls = turns[turn]?.calls ?? [];
     for (let at = calls.length - 1; at >= 0; at -= 1) {
       const call = calls[at];
       if (call === undefined || !produced(call)) continue;
-      const deed = deedOf(call.tool);
-      if (file === null && (deed === "explored" || deed === "wrote")) {
-        file = call;
-      } else if (terminal === null && deed === "ran") {
-        terminal = call;
+      switch (deedOf(call.tool)) {
+        case "explored":
+          read ??= call;
+          break;
+        case "wrote":
+          wrote ??= call;
+          break;
+        case "ran":
+          terminal ??= call;
+          break;
+        case "other":
+          break;
       }
-      if (file !== null && terminal !== null) return { file, terminal };
+      if (read !== null && wrote !== null && terminal !== null) {
+        return { read, wrote, terminal };
+      }
     }
   }
-  return { file, terminal };
+  return { read, wrote, terminal };
 }

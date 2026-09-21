@@ -101,8 +101,8 @@ function Node(props: {
     <li>
       <button
         type="button"
-        class={`group/row flex h-step w-full items-center gap-tight rounded-control pl-tight pr-snug text-left text-note leading-none hover:bg-g1 ${
-          chosen() ? "bg-g2 text-text" : hidden() ? "text-text-disabled" : "text-text-quiet"
+        class={`group/row flex h-step w-full items-center gap-tight rounded-control pl-tight pr-snug text-left text-note leading-none hover:bg-chrome ${
+          chosen() ? "bg-raised text-text" : hidden() ? "text-text-disabled" : "text-text-quiet"
         }`}
         onClick={pick}
         aria-expanded={isDir() ? open() : undefined}
@@ -164,7 +164,7 @@ function Branch(props: {
     return [...answer.listing.entries].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
   });
   return (
-    <ul class={props.depth === 0 ? "" : "ml-base border-l border-g2 pl-tight"}>
+    <ul class={props.depth === 0 ? "" : "ml-base border-l border-edge pl-tight"}>
       <Show when={entries()} fallback={<li class="h-step pl-wide text-note leading-none text-text-disabled">…</li>}>
         {(held) => (
           <Show when={held().length > 0} fallback={<li class="h-step pl-wide text-note leading-none text-text-disabled">{say("tree_empty")}</li>}>

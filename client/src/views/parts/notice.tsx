@@ -39,8 +39,8 @@ export function Notice(props: NoticeProps) {
       role={loud() ? "alert" : "status"}
       class={`flex w-full min-w-0 items-start justify-between gap-base text-note transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
         floating()
-          ? "max-w-measure rounded-panel border border-g3 bg-g1 px-pane py-base shadow-composer"
-          : "border-b border-g2 px-base py-snug"
+          ? "max-w-measure rounded-panel border border-edge-panel bg-raised px-pane py-base shadow-composer"
+          : "border-b border-edge px-base py-snug"
       }`}
     >
       <div class="flex min-w-0 flex-col gap-tight">

@@ -154,7 +154,7 @@ export function proxyingNote(rule: Proxying): Key | undefined {
 // token each paints its cells with. The mapping lives here and nowhere
 // else: no other screen colours anything by which laboratory it came
 // from.
-const OPEN_AI: Group = { label: "OpenAI", tone: "accent" };
+const OPEN_AI: Group = { label: "OpenAI", tone: "plain" };
 const ANTHROPIC: Group = { label: "Anthropic", tone: "alert" };
 
 // The three `wire_api` values as cells of one control, grouped by the
@@ -268,7 +268,7 @@ function PairTable(props: {
             />
             <button
               type="button"
-              class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2"
+              class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-raised"
               aria-label={say("setup_remove_row")}
               onClick={() => {
                 props.onChange(props.rows.filter((_row, index) => index !== at()));
@@ -281,7 +281,7 @@ function PairTable(props: {
       </For>
       <button
         type="button"
-        class="self-start rounded-control bg-g2 px-base py-tight text-label hover:bg-g3"
+        class="self-start rounded-control bg-raised px-base py-tight text-label hover:bg-raised-hover"
         onClick={() => {
           props.onChange([...props.rows, { name: "", value: "" }]);
         }}
@@ -313,7 +313,7 @@ export function AdvancedFields(props: {
     props.onRenamed();
   };
   return (
-    <div class="flex flex-col gap-snug rounded-card bg-g1 px-base py-snug">
+    <div class="flex flex-col gap-snug rounded-card bg-chrome px-base py-snug">
       <div class="grid gap-snug md:grid-cols-2">
         <Field
           label={say("setup_id")}

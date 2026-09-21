@@ -139,7 +139,7 @@ export function Popover(props: PopoverProps) {
   // the text box and the buttons it opens over.
   return (
     <div
-      class="absolute bottom-full left-0 mb-snug w-full rounded-panel border border-g3 bg-g1 p-snug shadow-composer"
+      class="absolute bottom-full left-0 mb-snug w-full rounded-panel border border-edge-panel bg-raised p-snug shadow-composer"
       role="dialog"
       aria-label={props.label}
     >
@@ -175,7 +175,7 @@ export function Popover(props: PopoverProps) {
                       role="option"
                       aria-selected={at() === column() && row() === cursor()}
                       class={`flex cursor-pointer items-center justify-between gap-snug rounded-control px-snug py-tight text-body ${
-                        at() === column() && row() === cursor() ? "bg-g2" : ""
+                        at() === column() && row() === cursor() ? "bg-raised" : ""
                       } ${item.chosen === true ? "text-text" : "text-text-quiet"}`}
                       onMouseEnter={() => {
                         setColumn(at());
@@ -185,15 +185,27 @@ export function Popover(props: PopoverProps) {
                         props.onApply(each, item);
                       }}
                     >
-                      <span class="truncate">
+                      <span class="min-w-0 truncate">
                         <Show when={item.chosen === true}>
                           <span class="mr-tight inline-block size-dot rounded-pill bg-accent align-middle" />
                         </Show>
                         {item.label}
                       </span>
+                      {/* The qualifier shrinks; it does not hold its
+                          width against the row. It was written
+                          `shrink-0` when every hint was a key or a
+                          code, and the effort menu then gave it whole
+                          sentences: a 378px sentence held its width
+                          inside a 221px row and painted over the
+                          column beside it. `xtask render --survey`
+                          found that, at three widths and in both
+                          lightings, without anybody having listed it.
+                          Both halves shrink in proportion to their
+                          own length, so a one-word hint beside a long
+                          label still survives whole. */}
                       <Show when={item.hint}>
                         {(hint) => (
-                          <span class="shrink-0 font-mono text-note text-text-disabled">{hint()}</span>
+                          <span class="min-w-0 truncate font-mono text-note text-text-disabled">{hint()}</span>
                         )}
                       </Show>
                     </li>

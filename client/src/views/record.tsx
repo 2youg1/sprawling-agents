@@ -55,7 +55,7 @@ function Ledger() {
         <div>
           <Show when={held().earlier}>
             {(earlier) => (
-              <button type="button" class="mb-base rounded-control bg-g1 px-base py-tight text-label hover:bg-g2" onClick={() => setBefore(earlier())}>
+              <button type="button" class="mb-base rounded-control bg-raised px-base py-tight text-label hover:bg-raised" onClick={() => setBefore(earlier())}>
                 {say("rec_earlier")}
               </button>
             )}
@@ -63,12 +63,12 @@ function Ledger() {
           <RowList label={say("rec_ledger")}>
             <For each={[...held().records].reverse()}>
               {(record) => (
-                <li class="settled-row border-b border-g1 font-mono text-note">
+                <li class="settled-row border-b border-edge font-mono text-note">
                   <Tip text={clock(lang(), record.t)}>
                     {(hint) => (
                       <button
                         type="button"
-                        class="flex h-step w-full items-center gap-base text-left leading-none hover:bg-g1"
+                        class="flex h-step w-full items-center gap-base text-left leading-none hover:bg-chrome"
                         onClick={() => setOpen((at) => (at === record.seq ? null : record.seq))}
                         aria-describedby={hint}
                       >
@@ -81,7 +81,7 @@ function Ledger() {
                     )}
                   </Tip>
                   <Show when={open() === record.seq}>
-                    <pre class="mb-snug max-h-output overflow-auto rounded-card bg-g1 p-base text-text-quiet">
+                    <pre class="mb-snug max-h-output overflow-auto rounded-card border border-edge bg-page p-base text-text-quiet">
                       {JSON.stringify(record.data, null, 2)}
                     </pre>
                   </Show>
@@ -107,7 +107,7 @@ function Archive() {
   return (
     <div>
       <input
-        class="mb-base w-full rounded-control bg-g1 px-base py-snug text-body placeholder:text-text-disabled"
+        class="mb-base w-full rounded-control border border-edge-input bg-raised px-base py-snug text-body placeholder:text-text-disabled"
         placeholder={say("rec_search")}
         value={needle()}
         onInput={(event) => setNeedle(event.currentTarget.value)}
@@ -118,7 +118,7 @@ function Archive() {
             <ul class="text-note">
               <For each={held()}>
                 {(hit) => (
-                  <li class="settled-row flex gap-base border-b border-g1 py-snug">
+                  <li class="settled-row flex gap-base border-b border-edge py-snug">
                     <span class="w-figure shrink-0 text-text-disabled">{hit.day}</span>
                     <span class="w-figure shrink-0 text-text-faint">{hit.kind}</span>
                     <a href={toFragment({ kind: "building", address: hit.building })} class="shrink-0 text-text-quiet">
@@ -159,7 +159,7 @@ function Bin() {
           <ul class="text-note">
             <For each={held()}>
               {(row) => (
-                <li class="settled-row border-b border-g1 py-snug">
+                <li class="settled-row border-b border-edge py-snug">
                   <div class="flex items-center gap-base">
                     <span class="min-w-0 flex-1">
                       <Path path={row.path} />
@@ -215,7 +215,7 @@ function Narrow(props: {
     <label class="flex items-center gap-tight text-note text-text-faint">
       {props.label}
       <select
-        class="rounded-control bg-g1 px-snug py-tight font-mono text-note text-text"
+        class="rounded-control bg-chrome px-snug py-tight font-mono text-note text-text"
         value={props.current}
         onChange={(event) => {
           props.onPick(event.currentTarget.value);
@@ -277,7 +277,7 @@ function Log() {
         <ul class="font-mono text-note">
           <For each={[...shown()].reverse()}>
             {(line) => (
-              <li class="settled-row flex gap-base border-b border-g1 py-tight">
+              <li class="settled-row flex gap-base border-b border-edge py-tight">
                 <span class="w-figure shrink-0 text-right text-text-disabled">{line.seq}</span>
                 <span class="w-figure shrink-0 whitespace-nowrap text-text-faint">
                   <Show when={wroteAt(line)}>

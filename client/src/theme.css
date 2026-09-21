@@ -125,6 +125,121 @@
   --color-text-faint: oklch(0.771 0.018 264);
   --color-text-disabled: oklch(0.582 0.018 264);
 
+  /* The roles: what a surface is for, as against what a surface is.
+   *
+   * The ramp above holds eleven values and `xtask color` asserts that
+   * count. It never held an answer to the question a view actually
+   * asks - *what should a lifted control be filled with* - so every
+   * view answered it where it stood, and the answer had two hundred
+   * and thirty-six homes: one per `bg-g2` and one per `border-g3` that
+   * somebody typed. None of them was the authority, and two of them
+   * disagreeing was invisible.
+   *
+   * A role is a single hop to a rung and nothing else. It carries no
+   * `oklch()` of its own, because a literal beside the rung it copies
+   * is immediately a second home for that value and has to be re-tuned
+   * whenever the rung moves. The hop also means one declaration serves
+   * both ways of lighting the page: the light block below restates the
+   * rungs, and every role follows without being mentioned there.
+   *
+   * `xtask color` reads this block as a closed vocabulary. A name it
+   * does not know is refused, a name it knows and cannot find here is
+   * refused, a role nothing in `src/views` spells is refused, and a
+   * value that is not a single hop to a declared rung is refused. A
+   * hex alias - the shape this section was first drafted in - fails
+   * twice over: it parses as neither an `oklch()` nor a hop.
+   *
+   * **The page is the deepest surface, and the chrome lifts off it.**
+   * A dark interface usually draws its panels brighter than its page,
+   * which reads as cards pasted onto a board; the reference this
+   * section was measured against does the opposite and draws the code
+   * pane darker than the page, which reads as content set into the
+   * surface. This library cannot copy that directly - `xtask color`
+   * holds the contract that `g0` is the page, and nothing may sit
+   * below it. So the same figure-ground reading is bought from the
+   * other side: content stays on the page at `g0`, and what frames the
+   * work - the rail, the fact bar, a view's own header - rises to
+   * `chrome`. What is left deepest on the screen is the work, and the
+   * contract is untouched.
+   *
+   * The distance that matters is page to raised, which is 100 per
+   * mille on the dark page: a control has to be visible as a thing you
+   * can press without a border. Page to chrome is half that on
+   * purpose, because a frame that announced itself would compete with
+   * the work it frames, and it carries an `edge` as well. */
+
+  /* The four fills a surface can be, from the page outwards. */
+  --color-page: var(--color-g0);
+  --color-chrome: var(--color-g1);
+  --color-raised: var(--color-g2);
+  --color-raised-hover: var(--color-g3);
+
+  /* Three fills that are not a surface a person navigates: what a
+   * person said drawn as a shape, the well a value travels along, and
+   * a control that cannot be pressed. `speech` and `track` sit on the
+   * raised rung today and are named apart from it because they answer
+   * different questions - a bubble is not a control, and moving either
+   * one later must not move the other. */
+  --color-speech: var(--color-g2);
+  --color-track: var(--color-g2);
+  --color-disabled: var(--color-g3);
+
+  /* The fill of a mark that reports a state rather than offering an
+   * action: a run that has stopped, a dependency nothing needs, the
+   * share of a bill that was already paid for. It sits above every
+   * surface because a mark has to be found without being read, and
+   * there is one of it rather than two - the draft of this section
+   * had a rung for `stopped` and a rung for `resting`, and no reader
+   * could have said which a given dot was. */
+  --color-mark: var(--color-g5);
+
+  /* **An edge encodes what can be done to the box, not how high it
+   * sits.** Three brightnesses, told apart at a glance and without
+   * colour: a rule line saying this box ends here, the outline of a
+   * box that is over the page rather than part of it, and a box that
+   * takes what you type. Each step up the ramp is one more thing a
+   * hand can do to what it bounds.
+   *
+   * The reference this ladder was measured against has a fourth and
+   * brightest step for an object a person can pick up and carry off -
+   * an attachment on a message. There is no such object in this
+   * product, and a token nothing fills is a name with a value and no
+   * reader, so the step is not declared. `xtask::color::roles` refuses
+   * a role nothing spells, which is what keeps that true. */
+  --color-edge: var(--color-g2);
+  --color-edge-panel: var(--color-g3);
+  --color-edge-input: var(--color-g4);
+
+  /* The ink that goes on top of a filled coloured token. The page's
+   * own rung is the right answer in both lightings without a second
+   * declaration: where the page is dark the accent is light, and where
+   * the page is light the accent is dark. */
+  --color-on-accent: var(--color-g0);
+
+  /* The city drawing has a vocabulary of its own, and it is not this
+   * file's surfaces.
+   *
+   * A wall is not a raised control and a doorway is not a page: the
+   * drawing's greys encode *depth in a picture* - how near the viewer
+   * a thing is and whether it is a hole, a body or a part - where the
+   * surfaces above encode what can be done to a box. Two different
+   * questions, so two vocabularies rather than one stretched over
+   * both.
+   *
+   * They are here for the reason the surfaces are: twenty-six of these
+   * tones were typed into `views/city/` by hand, one rung at a time,
+   * and re-toning the drawing meant finding all twenty-six and hoping.
+   * The drawing is one picture and its palette is one table. */
+  --color-drawn-hollow: var(--color-g0);
+  --color-drawn-solid: var(--color-g1);
+  --color-drawn-solid-lit: var(--color-g2);
+  --color-drawn-line: var(--color-g3);
+  --color-drawn-edge: var(--color-g4);
+  --color-drawn-part: var(--color-g5);
+  --color-drawn-stem: var(--color-g6);
+  --color-drawn-aside: var(--color-g7);
+  --color-drawn-figure: var(--color-g9);
+
   --background-image-progress-done: linear-gradient(
     90deg,
     var(--color-g10),
@@ -207,12 +322,11 @@
   /* The few fixed sizes a shell needs: the bar, a status dot, the
    * building glyphs, and the pane a tree takes beside a file. */
   --spacing-bar: 44px;
-  /* The window width the shell still breaks at, kept only while views
-     spell `wide:`. `--container-wide` above is the width that answers
-     the same question against the room the columns have; whoever moves
-     the last `wide:` in `src/views/` to `@wide:` deletes this line in
-     the same change. */
-  --breakpoint-wide: 1440px;
+  /* The strip along the bottom of the window that states what is
+   * running on this person's behalf. Shorter than a bar because it is
+   * read and never pressed: it holds one line of the note step and the
+   * air around it, and nothing in it is a target for a pointer. */
+  --spacing-facts: 28px;
   --spacing-rail: 44px;
   --spacing-rail-open: 232px;
   --spacing-glyph: 18px;
@@ -470,6 +584,37 @@
   .rounded-pill {
     border: 1px solid CanvasText;
   }
+  /* The bar keeps its edge in the system ink for the same reason a
+   * pill does, and it matters more here: this is the mark that says a
+   * person has to decide something. */
+  .asks {
+    border-inline-start-color: CanvasText;
+  }
+}
+
+/* **What needs a person's consent, wherever it appears.**
+ *
+ * Three things in this product stop and ask: a run attaching to the
+ * browser the person is signed into, a command about to run outside a
+ * sandbox, and an approval waiting in a queue. They are drawn the same
+ * way on purpose - a person learns the mark once, and every later one
+ * is recognised rather than read.
+ *
+ * A bar down the leading edge, and a glyph beside the words. **The
+ * glyph is the encoding and the colour is the reinforcement**, never
+ * the other way round: a forced-colour mode replaces every fill and
+ * every border colour with a system colour, so a mark that said
+ * "decide this" in amber alone says nothing at all on the machines
+ * whose owner turned that mode on - which are disproportionately the
+ * machines whose owner needs the mark most.
+ *
+ * The bar is the leading edge rather than the left one, because the
+ * page is also set in languages that run the other way.
+ *
+ * `client-SPEC.md` carries the rule; this is where it is drawn. */
+@utility asks {
+  border-inline-start: var(--spacing-hair) solid var(--color-alert);
+  padding-inline-start: var(--spacing-base);
 }
 
 /* The corners are continuous-curvature (a squircle), the way the old
@@ -723,12 +868,23 @@ nav[data-rail] {
   transition-timing-function: var(--ease-standard);
   transition-delay: 200ms;
 }
-nav[data-rail]:hover {
+/* **Only the glyph column opens on hover, and that is the answer to
+ * what a pointer crossing a rail of zero width does.** A person who
+ * put the rail away asked for the whole window; a column that sprang
+ * back out of the left edge whenever the pointer passed it would take
+ * the decision back from them every time they reached for a word at
+ * the start of a line. Away is left by the accelerator that put it
+ * there, and by nothing a hand does in passing.
+ *
+ * The pinned posture is not named here either, for the reason it never
+ * was: the view writes the open width as a class, and a rule outside
+ * every layer would overrule it. */
+nav[data-rail="glyphs"]:hover {
   width: var(--spacing-rail-open);
   box-shadow: var(--shadow-float);
   transition-delay: 120ms;
 }
-nav[data-rail]:hover .rail-label {
+nav[data-rail="glyphs"]:hover .rail-label {
   display: block;
 }
 
@@ -882,8 +1038,24 @@ nav[data-rail]:hover .rail-label {
   details[open]::details-content {
     height: auto;
   }
+  /* The focus ring is one of the two things the accent is spent on,
+   * and it is drawn thinned rather than solid.
+   *
+   * At full strength it was the loudest mark on the screen at all
+   * times - louder than the stop button, which is the one control a
+   * person has to hit in a hurry. Thinning it to 60 per cent of the
+   * accent over whatever is behind keeps it the first thing a
+   * keyboard user finds and stops it being the first thing everybody
+   * else sees. `color-mix` resolves against the surface under it, so
+   * the ring stays legible on the page, on a raised control and on a
+   * floating panel without three values.
+   *
+   * An engine without `color-mix` drops the second declaration and
+   * keeps the solid ring above it, which is the ring that engine
+   * draws today. */
   *:focus-visible {
     outline: 2px solid var(--color-accent);
+    outline-color: color-mix(in oklch, var(--color-accent) 60%, transparent);
     outline-offset: 2px;
   }
   /* Text is shaped for the screen it lands on, not the one it was

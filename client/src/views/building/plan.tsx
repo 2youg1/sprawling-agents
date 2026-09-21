@@ -69,7 +69,7 @@ export function Plan(props: { readonly answer: BuildingAnswer }) {
                 // holding a width of its own.
                 const indent = () => `calc(var(--spacing-pane) * ${String(row.node.split(".").length - 1)})`;
                 return (
-                  <tr class="border-b border-g1">
+                  <tr class="border-b border-edge">
                     <td class="w-figure py-snug pr-snug font-mono text-text-faint" style={{ "padding-left": indent() }}>
                       {row.node}
                     </td>

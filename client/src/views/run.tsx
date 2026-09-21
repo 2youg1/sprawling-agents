@@ -81,8 +81,8 @@ function Context(props: { readonly rounds: RoundsAnswer }) {
                   {/* The legend under the list names the three colours, so a
                       hint on each segment would say a second time what the
                       page already says once. */}
-                  <span class="flex h-dot flex-1 overflow-hidden rounded-pill bg-g1" aria-hidden="true">
-                    <span class="bg-g5" style={{ width: `${String(bar(turn, "cached"))}%` }} />
+                  <span class="flex h-dot flex-1 overflow-hidden rounded-pill bg-track" aria-hidden="true">
+                    <span class="bg-mark" style={{ width: `${String(bar(turn, "cached"))}%` }} />
                     <span class="bg-accent" style={{ width: `${String(bar(turn, "input"))}%` }} />
                     <span class="bg-accent-solid" style={{ width: `${String(bar(turn, "output"))}%` }} />
                   </span>
@@ -94,7 +94,7 @@ function Context(props: { readonly rounds: RoundsAnswer }) {
             </For>
           </ul>
           <p class="mt-snug text-note text-text-disabled">
-            <span class="mr-base"><span class="inline-block size-dot rounded-pill bg-g5" /> {say("run_cached")}</span>
+            <span class="mr-base"><span class="inline-block size-dot rounded-pill bg-mark" /> {say("run_cached")}</span>
             <span class="mr-base"><span class="inline-block size-dot rounded-pill bg-accent" /> {say("run_input")}</span>
             <span><span class="inline-block size-dot rounded-pill bg-accent-solid" /> {say("run_output")}</span>
           </p>
@@ -137,7 +137,7 @@ function Evidence(props: { readonly run: RunId }) {
           <ul class="text-note">
             <For each={held()}>
               {(item) => (
-                <li class="flex items-center gap-base border-b border-g1 py-snug">
+                <li class="flex items-center gap-base border-b border-edge py-snug">
                   <span class="w-figure shrink-0 text-text-faint">{say(`evidence_${item.kind}`)}</span>
                   <span class="flex-1 truncate font-mono text-text-quiet">{item.locator}</span>
                   <Show when={item.picture}>
@@ -239,7 +239,7 @@ export function Run(props: RunProps) {
         <Show when={live()}>
           <button
             type="button"
-            class="rounded-control px-base py-tight text-label text-text-quiet hover:bg-g1 hover:text-alert"
+            class="rounded-control px-base py-tight text-label text-text-quiet hover:bg-chrome hover:text-alert"
             onClick={() => command(cancel(props.run))}
           >
             {say("run_cancel")}
@@ -249,7 +249,7 @@ export function Run(props: RunProps) {
       <Show when={answer()?.opening?.goal}>
         {(goal) => <p class="mb-base text-note text-text-faint">{say("run_goal")}: {goal()}</p>}
       </Show>
-      <nav class="mb-base flex gap-tight border-b border-g1 text-label" aria-label={say("run_lenses")}>
+      <nav class="mb-base flex gap-tight border-b border-edge text-label" aria-label={say("run_lenses")}>
         <For each={LENSES}>
           {(each) => (
             <button

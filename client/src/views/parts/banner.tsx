@@ -29,7 +29,7 @@ export function Banner(props: BannerProps) {
     <div
       role={loud() ? "alert" : "status"}
       class={`flex w-full min-w-0 items-center justify-between gap-base border-b px-pane py-snug text-note transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
-        loud() ? "border-alert/50 bg-g1 text-alert" : "border-g3 bg-g1 text-text-quiet"
+        loud() ? "border-alert/50 bg-raised text-alert" : "border-edge-panel bg-raised text-text-quiet"
       }`}
     >
       <div class="flex min-w-0 items-baseline gap-snug">

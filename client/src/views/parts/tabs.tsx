@@ -46,7 +46,7 @@ export function Tabs(props: TabsProps) {
   };
 
   return (
-    <div class="flex items-center gap-tight border-b border-g2" role="tablist" aria-label={props.label}>
+    <div class="flex items-center gap-tight border-b border-edge" role="tablist" aria-label={props.label}>
       <For each={props.lenses}>
         {(lens, index) => (
           <button

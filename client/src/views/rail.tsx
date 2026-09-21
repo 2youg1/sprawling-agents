@@ -33,6 +33,7 @@ import { For, Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 
 import type { Action } from "../core/keys";
+import type { Rail } from "../core/prefs";
 import { MAYOR, toFragment } from "../core/route";
 import type { View } from "../core/route";
 import { useApprovals, useSay, useUi } from "../ui";
@@ -42,7 +43,7 @@ import { Tip } from "./parts/tip";
 
 export interface RailProps {
   readonly view: View;
-  readonly open: boolean;
+  readonly posture: Rail;
   readonly onToggle: () => void;
   readonly onPalette: () => void;
 }
@@ -124,7 +125,7 @@ export function Rail(props: RailProps) {
   // What a name does while the rail is collapsed. Written on every
   // name the rail can show, so one stylesheet rule reveals them all on
   // hover and this file decides only the pinned case.
-  const label = () => `rail-label truncate ${props.open ? "block" : "hidden"}`;
+  const label = () => `rail-label truncate ${props.posture === "named" ? "block" : "hidden"}`;
 
   const active = createMemo(
     () => Object.values(ui.conn.belief.runs).filter((run) => run.doing.kind !== "frozen").length,
@@ -142,16 +143,33 @@ export function Rail(props: RailProps) {
   const here = (item: Item) => (props.view.kind === item.key ? "page" : undefined);
   const halted = () => ui.conn.belief.halted.includes("city");
 
+  // How wide the column is, and how wide the nav drawn inside it is.
+  //
+  // Two widths rather than one, because a hover widens the nav over
+  // the page instead of pushing it: reading is never disturbed by a
+  // pointer crossing the edge. Away is the third posture and takes
+  // both to zero - the page gets the whole window, and the only way
+  // back is the accelerator, which is why the sheet of keys and the
+  // palette both still reach every view.
+  const held = (): Rail => props.posture;
+  const column = () => {
+    switch (held()) {
+      case "named":
+        return "w-rail-open";
+      case "glyphs":
+        return "w-rail";
+      case "away":
+        return "w-0";
+    }
+  };
+
   return (
-    // The column the page lays out beside is the collapsed width unless
-    // the rail is pinned open; a hover widens the nav over the page
-    // rather than pushing it, so reading is never disturbed by the
-    // pointer passing the edge.
-    <div class={`relative h-full shrink-0 transition-[width] duration-200 motion-reduce:transition-none ${props.open ? "w-rail-open" : "w-rail"}`}>
+    <div class={`relative h-full shrink-0 transition-[width] duration-200 motion-reduce:transition-none ${column()}`}>
       <nav
-        data-rail=""
-        class={`absolute inset-y-0 left-0 z-10 flex flex-col gap-tight border-r border-g1 bg-g0 py-snug transition-[width] duration-200 motion-reduce:transition-none ${props.open ? "w-rail-open shadow-composer" : "w-rail"}`}
+        data-rail={held()}
+        class={`absolute inset-y-0 left-0 z-10 flex flex-col gap-tight border-r border-edge bg-chrome py-snug transition-[width] duration-200 motion-reduce:transition-none ${column()} ${held() === "named" ? "shadow-float" : ""} ${held() === "away" ? "overflow-hidden border-r-0" : ""}`}
         aria-label={say("region_nav")}
+        aria-hidden={held() === "away" ? true : undefined}
       >
         {/* The dot is the city's own state and opens its own panel; the
             name beside it is what pins the rail, so neither control
@@ -164,7 +182,7 @@ export function Rail(props: RailProps) {
             onClick={() => {
               props.onToggle();
             }}
-            aria-expanded={props.open}
+            aria-expanded={held() === "named"}
           >
             <span class="flex items-center gap-base">
               <span class="truncate">{ui.conn.belief.city ?? "sprawling"}</span>
@@ -190,12 +208,19 @@ export function Rail(props: RailProps) {
                   href={toFragment(item.view)}
                   aria-current={here(item)}
                   aria-labelledby={hint}
-                  class="relative flex h-rail w-full items-center gap-base px-base text-label text-text-faint hover:bg-g1 hover:text-text aria-[current=page]:text-text"
+                  class="relative flex h-rail w-full items-center gap-base px-base text-label text-text-faint hover:bg-chrome hover:text-text aria-[current=page]:text-text"
                 >
                   <span class="relative shrink-0">
                     {item.glyph}
+                    {/* A count of what is running is a reading, not an
+                        alarm: it lifts a surface rather than spending
+                        the accent, which this page keeps for the focus
+                        ring and for the bar beside a selected row. The
+                        badge below it, the one that counts people
+                        waiting on an answer, does spend a coloured
+                        token - because that one is a request. */}
                     <Show when={(item.badge ?? 0) > 0}>
-                      <span class="absolute -top-tight -right-tight rounded-pill bg-accent px-tight text-note leading-none text-g0">
+                      <span class="absolute -top-tight -right-tight rounded-pill bg-raised-hover px-tight text-note leading-none text-text">
                         {item.badge}
                       </span>
                     </Show>
@@ -215,11 +240,11 @@ export function Rail(props: RailProps) {
               <a
                 href={toFragment({ kind: "talk", address: MAYOR })}
                 aria-labelledby={hint}
-                class="flex h-rail w-full items-center gap-base px-base text-label text-alert hover:bg-g1"
+                class="flex h-rail w-full items-center gap-base px-base text-label text-alert hover:bg-chrome"
               >
                 <span class="relative shrink-0">
                   <HandGlyph />
-                  <span class="absolute -top-tight -right-tight rounded-pill bg-alert px-tight text-note leading-none text-g0">
+                  <span class="absolute -top-tight -right-tight rounded-pill bg-alert px-tight text-note leading-none text-on-accent">
                     {waiting()}
                   </span>
                 </span>
@@ -236,7 +261,7 @@ export function Rail(props: RailProps) {
           {(hint) => (
             <button
               type="button"
-              class="flex h-rail w-full items-center gap-base px-base text-label text-text-faint hover:bg-g1 hover:text-text"
+              class="flex h-rail w-full items-center gap-base px-base text-label text-text-faint hover:bg-chrome hover:text-text"
               onClick={() => {
                 props.onPalette();
               }}

@@ -116,8 +116,8 @@ const A_TERMINAL: Call = call(
   ),
 );
 
-function panel(file: Call | null, terminal: Call | null): Artifacts {
-  return { file, terminal };
+function panel(read: Call | null, terminal: Call | null, wrote: Call | null = null): Artifacts {
+  return { read, wrote, terminal };
 }
 
 // A file with a trail long enough to wrap, so the crumbs are measured
@@ -203,5 +203,5 @@ function Panel(props: { readonly artifacts: Artifacts }) {
 // fixtures are measured at a height a person actually meets, rather
 // than each growing to the length of whatever file it holds.
 function Frame(props: { readonly children: JSX.Element }) {
-  return <div class="flex h-output flex-col rounded-card border border-g3">{props.children}</div>;
+  return <div class="flex h-output flex-col rounded-card border border-edge-panel">{props.children}</div>;
 }

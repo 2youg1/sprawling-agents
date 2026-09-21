@@ -36,7 +36,7 @@ function Table(props: { readonly rows: readonly (readonly [string, UsdMicros])[]
               <span class="truncate font-mono text-text-quiet">{name}</span>
               <span class="shrink-0 text-text">{usd(amount)}</span>
             </div>
-            <div class="summary mt-tight h-dot overflow-hidden rounded-pill bg-g1">
+            <div class="summary mt-tight h-dot overflow-hidden rounded-pill bg-track">
               <div class="h-full bg-accent" style={{ width: `${String(props.total > 0 ? (amount / props.total) * 100 : 0)}%` }} />
             </div>
           </li>
@@ -78,7 +78,7 @@ export function Cost() {
                 action={
                   <a
                     href={toFragment({ kind: "talk", address: MAYOR })}
-                    class="rounded-control bg-accent px-base py-snug text-label text-g0 hover:bg-accent-hover"
+                    class="rounded-control bg-accent px-base py-snug text-label text-on-accent hover:bg-accent-hover"
                   >
                     {say("city_ask_mayor")}
                   </a>

@@ -42,14 +42,14 @@ function nextStep(code: AxCode): Key {
 export function Refusal(props: { readonly error: AxError; readonly host: string }) {
   const say = useSay();
   return (
-    <div role="alert" class="rounded-card border border-alert/50 bg-g1 px-base py-snug text-note">
+    <div role="alert" class="rounded-card border border-alert/50 bg-chrome px-base py-snug text-note">
       <p class="font-label text-alert">{say("setup_probe_failed", { host: props.host })}</p>
       <p class="mt-tight text-text-quiet">{say(nextStep(props.error.code))}</p>
       <div class="mt-snug flex items-center gap-snug text-text-faint">
         <span class="font-mono">{props.error.code}</span>
         <button
           type="button"
-          class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2"
+          class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-raised"
           onClick={() => {
             void navigator.clipboard.writeText(
               `${props.error.code}\n${props.error.action}\n${props.error.subject}\n${props.error.recovery}`,
@@ -79,7 +79,7 @@ export function Reachability(props: { readonly probed: Probed }) {
       {(found) => (
         <div
           role="status"
-          class={`rounded-card border bg-g1 px-base py-snug text-note ${failed() === null ? "border-g3" : "border-alert/50"}`}
+          class={`rounded-card border bg-chrome px-base py-snug text-note ${failed() === null ? "border-edge-panel" : "border-alert/50"}`}
         >
           <p class={`font-label ${failed() === null ? "text-text" : "text-alert"}`}>
             {say("setup_probe_read", { host: found().host })}
@@ -119,7 +119,7 @@ export function Reachability(props: { readonly probed: Probed }) {
                   <span class="font-mono">{why().code}</span>
                   <button
                     type="button"
-                    class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-g2"
+                    class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-raised"
                     onClick={() => {
                       void navigator.clipboard.writeText(`${why().code} ${why().subject}`);
                     }}

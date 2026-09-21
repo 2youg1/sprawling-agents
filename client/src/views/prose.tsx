@@ -19,7 +19,7 @@ function Inlines(props: { readonly parts: readonly Inline[] }) {
         <Switch>
           <Match when={part.kind === "text" ? part : undefined}>{(p) => p().text}</Match>
           <Match when={part.kind === "code" ? part : undefined}>
-            {(p) => <code class="rounded-control bg-g2 px-tight font-mono text-note">{p().text}</code>}
+            {(p) => <code class="rounded-control bg-raised px-tight font-mono text-note">{p().text}</code>}
           </Match>
           <Match when={part.kind === "strong" ? part : undefined}>
             {(p) => <strong class="font-label">{p().text}</strong>}
@@ -70,14 +70,14 @@ function BlockView(props: { readonly block: Block }) {
       </Match>
       <Match when={props.block.kind === "code" ? props.block : undefined}>
         {(b) => (
-          <pre class="my-snug overflow-x-auto rounded-card bg-g1 p-base font-mono text-note leading-relaxed text-text-quiet">
+          <pre class="my-snug overflow-x-auto rounded-card border border-edge bg-page p-base font-mono text-note leading-relaxed text-text-quiet">
             {b().text}
           </pre>
         )}
       </Match>
       <Match when={props.block.kind === "quote" ? props.block : undefined}>
         {(b) => (
-          <blockquote class="my-snug border-l-2 border-g4 pl-base text-text-quiet">
+          <blockquote class="my-snug border-l-2 border-edge-input pl-base text-text-quiet">
             <Inlines parts={b().inline} />
           </blockquote>
         )}
@@ -92,7 +92,7 @@ function BlockView(props: { readonly block: Block }) {
                     <tr class={index() === 0 ? "text-text-quiet" : ""}>
                       <For each={row}>
                         {(cell) => (
-                          <td class="border-b border-g2 px-snug py-tight align-top">
+                          <td class="border-b border-edge px-snug py-tight align-top">
                             <Inlines parts={inlineOf(cell)} />
                           </td>
                         )}

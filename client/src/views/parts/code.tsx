@@ -246,7 +246,7 @@ export function Code(props: CodeProps) {
     <div class="flex min-h-0 min-w-0 flex-col">
       <Show when={trail().length > 0}>
         <nav
-          class="flex flex-wrap items-center gap-tight border-b border-g2 px-snug py-tight text-note"
+          class="flex flex-wrap items-center gap-tight border-b border-edge px-snug py-tight text-note"
           aria-label={say("code_crumbs")}
         >
           <For each={trail()}>
@@ -265,7 +265,7 @@ export function Code(props: CodeProps) {
       </Show>
       <div class="min-h-0 flex-1 overflow-auto">
         <div class="flex min-w-max font-mono text-note leading-relaxed">
-          <pre class="sticky left-0 shrink-0 select-none bg-g1 px-snug text-right text-text-disabled" aria-hidden="true">
+          <pre class="sticky left-0 shrink-0 select-none bg-chrome px-snug text-right text-text-disabled" aria-hidden="true">
             {gutter()}
           </pre>
           <pre class="px-snug text-text-quiet">

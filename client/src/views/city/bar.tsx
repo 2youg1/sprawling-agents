@@ -113,7 +113,7 @@ export function CityBar() {
 
   return (
     <header
-      class="flex flex-wrap items-baseline gap-base border-b border-g2 px-pane py-snug"
+      class="flex flex-wrap items-baseline gap-base border-b border-edge px-pane py-snug"
       aria-label={say("city_bar")}
     >
       <h1 class="text-title font-title">{ui.conn.belief.city ?? say("nav_city")}</h1>
@@ -155,19 +155,19 @@ function Glyph(props: { readonly mark: Mark }) {
         <rect x="5" y="3" width="6" height="8" rx="1" class="fill-accent-solid" />
       </Show>
       <Show when={props.mark === "figure"}>
-        <circle cx="8" cy="5" r="2.4" class="fill-g9" />
-        <path d="M4.6 13 q3.4 -6 6.8 0 z" class="fill-g9" />
+        <circle cx="8" cy="5" r="2.4" class="fill-drawn-figure" />
+        <path d="M4.6 13 q3.4 -6 6.8 0 z" class="fill-drawn-figure" />
       </Show>
       <Show when={props.mark === "flag"}>
-        <line x1="5" y1="2" x2="5" y2="14" class="stroke-g6" stroke-width="1.2" />
+        <line x1="5" y1="2" x2="5" y2="14" class="stroke-drawn-stem" stroke-width="1.2" />
         <path d="M5 3 l7 1.8 l-7 2.2 z" class="fill-accent" />
       </Show>
       <Show when={props.mark === "lamp"}>
-        <line x1="8" y1="6" x2="8" y2="14" class="stroke-g5" stroke-width="1.2" />
+        <line x1="8" y1="6" x2="8" y2="14" class="stroke-drawn-part" stroke-width="1.2" />
         <circle cx="8" cy="4.4" r="2.6" class="fill-alert" />
       </Show>
       <Show when={props.mark === "plinth"}>
-        <rect x="1" y="6" width="14" height="4" rx="2" class="fill-g3" />
+        <rect x="1" y="6" width="14" height="4" rx="2" class="fill-drawn-line" />
         <rect x="1" y="6" width="8" height="4" rx="2" class="fill-accent" />
       </Show>
     </svg>

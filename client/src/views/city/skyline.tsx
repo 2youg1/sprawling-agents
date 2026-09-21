@@ -93,10 +93,10 @@ function Building(props: {
   const lit = (index: number): RunBelief | undefined => t().runs[t().runs.length - 1 - index];
   const windowClass = (index: number) => {
     const run = lit(index);
-    if (run === undefined) return "fill-g0";
+    if (run === undefined) return "fill-drawn-hollow";
     switch (run.doing.kind) {
       case "frozen":
-        return "fill-g3";
+        return "fill-drawn-line";
       case "waiting":
         return "fill-alert";
       case "calling":
@@ -144,18 +144,18 @@ function Building(props: {
       <Show when={t().hall}>
         <path
           d={`M${String(t().x + t().w / 2 - 34)} ${String(top())} a34 26 0 0 1 68 0 z`}
-          class="fill-g2 stroke-g4"
+          class="fill-drawn-solid-lit stroke-drawn-edge"
           stroke-width="1"
         />
-        <line x1={t().x + t().w / 2} y1={top() - 26} x2={t().x + t().w / 2} y2={top() - 38} class="stroke-g6" stroke-width="1.2" />
-        <circle cx={t().x + t().w / 2} cy={top() - 40} r="2" class="fill-g7" />
+        <line x1={t().x + t().w / 2} y1={top() - 26} x2={t().x + t().w / 2} y2={top() - 38} class="stroke-drawn-stem" stroke-width="1.2" />
+        <circle cx={t().x + t().w / 2} cy={top() - 40} r="2" class="fill-drawn-aside" />
       </Show>
       <path
         d={squircle({ x: t().x, y: top(), w: t().w, h: t().h }, t().hall ? 10 : 6, 4)}
-        class={`${t().hall ? "fill-g2" : "fill-g1"} ${props.picked ? "stroke-accent" : "stroke-g3"} transition-colors group-hover:fill-g3`}
+        class={`${t().hall ? "fill-drawn-solid-lit" : "fill-drawn-solid"} ${props.picked ? "stroke-accent" : "stroke-drawn-line"} transition-colors group-hover:fill-drawn-line`}
         stroke-width={props.picked ? "2" : "1"}
       />
-      <line x1={t().x + 8} y1={top() + 10} x2={t().x + t().w - 8} y2={top() + 10} class="stroke-g3" stroke-width="1" />
+      <line x1={t().x + 8} y1={top() + 10} x2={t().x + t().w - 8} y2={top() + 10} class="stroke-drawn-line" stroke-width="1" />
       <For each={cells()}>
         {(index) => {
           const col = () => index % t().cols;
@@ -181,32 +181,32 @@ function Building(props: {
               width="5"
               height="46"
               rx="1"
-              class="fill-g3"
+              class="fill-drawn-line"
             />
           )}
         </For>
       </Show>
-      <rect x={door().x} y={door().y} width={door().w} height={door().h} rx="2" class="fill-g0" />
+      <rect x={door().x} y={door().y} width={door().w} height={door().h} rx="2" class="fill-drawn-hollow" />
       <rect
         x={door().x + 2}
         y={door().y + 2}
         width={door().w - 4}
         height="4"
         rx="1"
-        class={active().length > 0 ? "fill-accent-solid" : "fill-g2"}
+        class={active().length > 0 ? "fill-accent-solid" : "fill-drawn-solid-lit"}
       />
       <Show when={stuck() > 0}>
         <g class="blink" aria-label={`${String(stuck())} ${say("status_blocked")}`}>
-          <line x1={door().x - 10} y1={props.ground} x2={door().x - 10} y2={props.ground - 26} class="stroke-g5" stroke-width="1" />
+          <line x1={door().x - 10} y1={props.ground} x2={door().x - 10} y2={props.ground - 26} class="stroke-drawn-part" stroke-width="1" />
           <circle cx={door().x - 10} cy={props.ground - 28} r="3" class="fill-alert" />
         </g>
       </Show>
       <Show when={t().pursuit}>{(line) => <Flag x={t().x + t().w - 14} y={top() - (t().hall ? 2 : 0)} line={line()} />}</Show>
-      <rect x={t().x} y={props.ground + 2} width={t().w} height={PLINTH} rx="2" class="fill-g1" />
+      <rect x={t().x} y={props.ground + 2} width={t().w} height={PLINTH} rx="2" class="fill-drawn-solid" />
       <Show when={bars()}>
         {(share) => (
           <g>
-            <rect x={t().x + 6} y={props.ground + 7} width={t().w - 12} height="3" rx="1.5" class="fill-g3" />
+            <rect x={t().x + 6} y={props.ground + 7} width={t().w - 12} height="3" rx="1.5" class="fill-drawn-line" />
             <rect x={t().x + 6} y={props.ground + 7} width={(t().w - 12) * share().done} height="3" rx="1.5" class="fill-accent" />
             <rect
               x={t().x + 6 + (t().w - 12) * share().done}
@@ -334,13 +334,13 @@ export function Skyline(props: SkylineProps) {
             cx={star.x}
             cy={star.y}
             r={star.r}
-            class="fill-g5 blink"
+            class="fill-drawn-part blink"
             style={{ "animation-delay": `${String(star.delay)}ms`, "animation-duration": "2.6s" }}
           />
         )}
       </For>
       <rect x="0" y={ground()} width={width()} height={GROUND_DEPTH} fill="url(#ground)" />
-      <line x1="0" y1={ground()} x2={width()} y2={ground()} class="stroke-g3" stroke-width="1" />
+      <line x1="0" y1={ground()} x2={width()} y2={ground()} class="stroke-drawn-line" stroke-width="1" />
       <For each={towers()}>
         {(tower) => (
           <Building tower={tower} ground={ground()} picked={props.picked === tower.building.addr} onPick={props.onPick} />
