@@ -814,7 +814,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (15), protocol (6), bin (198)
+### browser (29), protocol (6), bin (199)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -825,14 +825,28 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | browser::act::tests | crates/browser/src/act/tests.rs | acting on a page: the reference a snapshot minted, and a page that moved underneath it | decision | P4 | built | browser-SPEC.md#8-4 |
 | browser::devloop | crates/browser/src/devloop.rs | change something, look at it, decide: four outcomes and always an end | decision | P4 | built | browser-SPEC.md#8-5 |
 | browser::profile | crates/browser/src/profile.rs | where a browser keeps what it remembers, and who that belongs to | decision | P4 | built | browser-SPEC.md#8-6 |
-| browser::verb | crates/browser/src/verb.rs | the eight actions the browser tool offers, each read from arguments and turned into frames | decision | V4 | built | browser-SPEC.md#19-2 |
-| browser::verb::tests | crates/browser/src/verb/tests.rs | what the eight actions are read from, and which frames each one puts on the wire | decision | V4 | built | browser-SPEC.md#19-2 |
+| browser::verb | crates/browser/src/verb.rs | the actions the browser tool offers, each read from arguments and turned into frames | decision | V4 | built | browser-SPEC.md#19-2 |
+| browser::verb::tests | crates/browser/src/verb/tests.rs | what each action is read from, and which frames it puts on the wire | decision | V4 | built | browser-SPEC.md#19-2 |
+| browser::verb::script | crates/browser/src/verb/script.rs | the scripts a verb sends, and the one shape every reply comes back in | adapter | V6 | built | browser-SPEC.md#19-2 |
 | browser::verb::read | crates/browser/src/verb/read.rs | reading one call's arguments, including the drag and scroll the desktop vocabulary shares | decision | V4 | built | browser-SPEC.md#19-2 |
 | browser::input | crates/browser/src/input.rs | BiDi pointer and wheel actions, and the element id a drag resolves between two frames | decision | V4 | built | browser-SPEC.md#19-5 |
 | browser::shot | crates/browser/src/shot.rs | what a screenshot was asked for, and what came back: bytes, format, and two integer sides | value | V4 | built | browser-SPEC.md#19-3 |
 | browser::shot::tests | crates/browser/src/shot/tests.rs | the two fractions written out of integers, and a size read from the bytes | value | V4 | built | browser-SPEC.md#19-3 |
 | browser::diff | crates/browser/src/diff.rs | what changed between two screenshots: a ten-thousandth, and the boxes it changed in | decision | V4 | built | browser-SPEC.md#19-4 |
 | browser::diff::tests | crates/browser/src/diff/tests.rs | two screenshots, and what a caller is told about the difference | decision | V4 | built | browser-SPEC.md#19-4 |
+| browser::survey | crates/browser/src/survey.rs | what is wrong with a page as it was drawn, and the one order a reader repairs it in | decision | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::probe | crates/browser/src/survey/probe.rs | the one measurement a page answers with, carried back two ways | adapter | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::probe::read | crates/browser/src/survey/probe/read.rs | the three strings a measurement returns, read into elements and declared words | value | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::drawn | crates/browser/src/survey/drawn.rs | one element as it was painted: box, colour, text, and what holds it | value | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::edge | crates/browser/src/survey/edge.rs | alignment, and the one geometric property that is not alignment | decision | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::edge::accord | crates/browser/src/survey/edge/accord.rs | the one way a population decides what a value should have been | decision | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::legibility | crates/browser/src/survey/legibility.rs | whether text can be read against what is behind it | decision | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::vocabulary | crates/browser/src/survey/vocabulary.rs | the words a page declares, and the readings that fall outside them | decision | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::echo | crates/browser/src/survey/echo.rs | one string painted in two landmarks: a fact with two homes on a screen | decision | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::sheet | crates/browser/src/survey/sheet.rs | every word the instrument says, and the order it says them in | decision | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::sheet::tagged | crates/browser/src/survey/sheet/tagged.rs | the same readings as named fields, for something that will act on them | decision | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::source | crates/browser/src/survey/source.rs | from a box on the screen back to the line that drew it | decision | V6 | built | browser-SPEC.md#19-10 |
+| browser::survey::tests | crates/browser/src/survey/tests.rs | a page judged: what is reported, what is not, and in which order | decision | V6 | built | browser-SPEC.md#19-10 |
 | protocol::mcp | crates/protocol/src/mcp.rs | reaching an MCP server, and the seam its transports sit behind | adapter | P4 | built | protocol-SPEC.md#8-1 |
 | protocol::mcp::handshake | crates/protocol/src/mcp/handshake.rs | initialize, initialized, ready | adapter | P4 | built | protocol-SPEC.md#8-1 |
 | protocol::mcp::tools | crates/protocol/src/mcp/tools.rs | listing, naming, calling | adapter | P4 | built | protocol-SPEC.md#8-1 |
@@ -949,9 +963,10 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::browser_bidi::engine | crates/sprawling/src/browser_bidi/engine.rs | which engine this machine can hold a session with, and the command line that starts it | decision | V4 | built | sprawling-SPEC.md#8-45 |
 | bin::browser_bidi::lazy | crates/sprawling/src/browser_bidi/lazy.rs | an engine nobody has started yet, and the port it will answer on | adapter | V4 | built | sprawling-SPEC.md#8-45 |
 | bin::browser_bidi::socket | crates/sprawling/src/browser_bidi/socket.rs | one frame out, replies in, events read past | adapter | V4 | built | sprawling-SPEC.md#8-45 |
-| bin::browser_tool | crates/sprawling/src/browser_tool.rs | the browser tool: eight actions over one session, and a screenshot that lands in the content store | adapter | V4 | built | sprawling-SPEC.md#8-45 |
+| bin::browser_tool | crates/sprawling/src/browser_tool.rs | the browser tool: every action over one session, and a screenshot that lands in the content store | adapter | V4 | built | sprawling-SPEC.md#8-45 |
 | bin::browser_tool::building | crates/sprawling/src/browser_tool/building.rs | the building's own browser: the profile it keeps, the engine the city starts, and the port derived from the city root | adapter | V4 | built | sprawling-SPEC.md#8-45 |
 | bin::browser_tool::person | crates/sprawling/src/browser_tool/person.rs | the person's own browser: the disclosure that asks first, and the address they declared | adapter | V4 | built | sprawling-SPEC.md#8-45 |
+| bin::browser_tool::surveying | crates/sprawling/src/browser_tool/surveying.rs | a page judged, for a resident that has no repository beside it | decision | V6 | built | browser-SPEC.md#19-10 |
 | bin::browser_bidi::attach | crates/sprawling/src/browser_bidi/attach.rs | the port onto a browser this city did not start: connect, never launch, never stop | adapter | V4 | built | sprawling-SPEC.md#8-45 |
 | bin::browser_tool::tests | crates/sprawling/src/browser_tool/tests.rs | one conversation with a browser, replayed without one | adapter | V4 | built | sprawling-SPEC.md#8-45 |
 | bin::mcp_stdio | crates/sprawling/src/mcp_stdio.rs | an MCP server as a child process, one line per message | adapter | R1 | built | sprawling-SPEC.md#8-4 |

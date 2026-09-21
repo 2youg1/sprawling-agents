@@ -10,10 +10,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::pass::{HEIGHT, Pass, Reported};
-use super::probe::{CONDITIONS, DECLARED, SINK, declared, elements, script};
+use super::probe::{CONDITIONS, DECLARED, SINK, declared, script};
 use crate::report::XtaskError;
-use crate::survey::{Page, PaintSource};
 use crate::walk;
+use browser::survey::probe::Read;
+use browser::survey::{Page, PaintSource};
 
 /// Where the instrumented copy and the throwaway browser profile go.
 const WORK: &str = "target/render";
@@ -163,7 +164,7 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
         .arg(format!("--window-size={},{HEIGHT}", pass.width))
         .arg(format!("--virtual-time-budget={BUDGET_MS}"))
         .arg("--dump-dom")
-        .arg(format!("{}{route}", url_of(&instrumented)))
+        .arg(format!("{}#/{route}", url_of(&instrumented)))
         .output()
         .map_err(|err| XtaskError::Cmd {
             cmd: format!("{} --dump-dom", browser.display()),
@@ -204,16 +205,20 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
             ),
         });
     };
+    // The pass demanded the paint source and the page is asserted
+    // against it below; a resident surveying a page it did not ask for
+    // reads the same three strings and takes the page's own word.
+    let read = Read {
+        sink: records.to_owned(),
+        declared: words.to_owned(),
+        conditions: conditions.to_owned(),
+    };
     Ok(Measured {
-        page: Page {
-            drawn: elements(records),
-            declared: vocabulary,
-            painted_by: if pass.draws_forced_colours() {
-                PaintSource::TheSystem
-            } else {
-                PaintSource::ThePage
-            },
-        },
+        page: read.page(if pass.draws_forced_colours() {
+            PaintSource::TheSystem
+        } else {
+            PaintSource::ThePage
+        }),
         reported: Reported::read(forced, scheme),
     })
 }

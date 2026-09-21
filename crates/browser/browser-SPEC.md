@@ -17,6 +17,7 @@
 | snapshot | 原始 DOM 恒不入窗（断言）；同一棵树两次快照字节相同；label 超长即截断且不引入换行 |
 | act | 陈旧 generation 恒拒；页面文本进表达式后，字面量内除定界符外无未转义引号 |
 | devloop | 任意观察序列在预算内到达一个结局；结局枚举穷尽 |
+| survey | 同一页经 `--dump-dom` 与经 `script.evaluate` 读出同一个 `probe::Read`；`xtask render` 在本仓画廊上恒零发现（量具自身的假阳性已清到 0）；住户路径的 `Sources` 为空时每条发现只点名盒子、不点名行 |
 | profile | 两栋楼的 profile 互不包含；路径住 reserved prefix；**confidential 楼的拒绝只有一个家**：`city::policy::evaluate` 读到 `confidential = true` 与 `browser = true`／`usersbrowser:` 并存即 `E_CONFIG_INVALID`，本 crate 不再有 `Ephemeral` 臂（那是同一个规则的不可达第二家） |
 
 ## 3 假设与歧义
@@ -54,6 +55,7 @@ P4 之前 `crates/browser/src/` 只有 `lib.rs` 一行文档。无既有代码�
 - **字节怎么走**归 `bin::assembly`：WebSocket、重连、超时住装配层，本 crate 恒不持套接字，也恒不依赖异步运行时。
 - **这栋楼准不准出网**归 `city::policy`：`Profile::of` 只收楼的 `Address`，本 crate 读不到 policy；confidential 的判定在 city（§2 profile 行）。
 - **页面带回来的内容算什么**归 `kernel::taint`：快照文本与工具结果同落污染环，本 crate 不另设解包面。
+- **哪一页该被勘察、勘察完谁去改**归调用方：`xtask render` 是门，判的是本仓画廊；`browser` 工具的 `survey` 判的是住户自己打开的那一页。本 crate 只回答「这一页哪里不对」，不回答「该不该红」——`Standing` 由读者解释（§19-10）。
 
 ## 8 接口先行
 
@@ -195,7 +197,7 @@ impl Profile { pub fn of(building: &Address) -> Result<Profile, AxError>; pub fn
 
 **`conformance` feature 作废**：本 crate 不再有 conformance 套件（§8-1 决定），`crates/browser/Cargo.toml` 的 `conformance = []` 应随之删除（跨文件，见交付报告）。`cargo xtask artifact` 的规则不变，它辖的另外四套 conformance 与本 crate 无关。
 
-## 19 八个动作，与截图成为证据
+## 19 工具的动作面，与截图成为证据
 
 ### 19-1 谁起浏览器进程
 
@@ -207,7 +209,7 @@ impl Profile { pub fn of(building: &Address) -> Result<Profile, AxError>; pub fn
 
 ### 19-2 `browser::verb`（新模块，形状 1 判定）
 
-工具 `browser` 的八个动作，读成一个穷尽枚举，再变成帧。**一个动作可能要一帧以上**，所以出口是 `Vec<Frame>` 而不是 `Frame`：`open` 要先导航再装上控制台录音器，`screenshot` 带 `scale` 时要先改 devicePixelRatio。
+工具 `browser` 的每一个动作，读成一个穷尽枚举，再变成帧。**一个动作可能要一帧以上**，所以出口是 `Vec<Frame>` 而不是 `Frame`：`open` 要先导航再装上控制台录音器，`screenshot` 带 `scale` 时要先改 devicePixelRatio。
 
 ```rust
 pub enum Verb {
@@ -262,7 +264,7 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 
 | 单元 | 完成的定义 |
 |---|---|
-| verb | 八个动作各自的帧可在无浏览器下逐帧断言；`act` 无快照即拒；`measure` 的假 ref 在出网前被拒 |
+| verb | 每个动作各自的帧可在无浏览器下逐帧断言；`act` 无快照即拒；`measure` 的假 ref 在出网前被拒 |
 | shot | 同一段 PNG 字节两次读出同一尺寸；非 PNG 不猜尺寸；quality 不引入浮点变量 |
 | diff | 尺寸不同即拒；全同两图为 0；一个像素变化的框恰好含那个像素；解码字节短于头部时拒绝语点名是哪一张 |
 | input | 指针拖拽恒是 pointerMove→pointerDown→pointerMove×n→pointerUp；元素 origin 有界深度找 `sharedId`，找不到即 `E_WIRE_MISMATCH`；滚轮增量可为负 |
@@ -281,6 +283,18 @@ BiDi 的 `input` 是 `script` 之外的另一个协议模块，本 crate 之前�
 `Scroll` 与 point 起点的 `Drag` 都没有元素，不进 `Action::reference()` 的形状；那个方法因此是 `Option<&str>`，`resolves_element()` 说明哪一臂要多一帧。
 
 **与 `desktop.act` 同一份词汇**：`drag` 从 ref 或 point 到 point、`scroll` 用 `to` 表示滚多远、`steps` 为中间移动次数；两侧字段名与含义逐字相同（`desktop-SPEC.md` §8-4 指向本节）。同一个动作在浏览器侧与桌面侧各有一个家会立刻漂开，所以拖拽的形状只有一份。
+
+### 19-10 `browser::survey`（量具毕业进工具，形状 1 判定）
+
+一页哪里画错了，由**一份测量、一套判决**回答，而这一份同时是 `xtask render` 这道门和 `browser` 工具的 `survey` 动作所读的东西。它先在 `xtask` 里长成，在那里把自身的假阳性从 24 条清到 0；毕业进产品 crate 的理由不是它变好了，而是**门与工具原本会各留一份**，而两份会分叉到「门说页面是干净的、住户说页面是坏的」而二者各自诚实。
+
+- **一份测量，两种取回**。`survey::probe::body` 是那段注入页面的 ES5，返回三个字符串（元素、声明的词、绘制条件）。门渲染一次并 dump 整个 DOM，所以它把三串写进三个 `<pre>`；住户勘察的是人自己打开的页面，**不许往那页面上加任何东西**，所以 `probe::evaluated` 把同一段包进一个 promise，三串作为一次 `script.evaluate` 的值回来（`awaitPromise` 本就是开着的）。两条路读的是同一个 `probe::Read`。
+- **`Verb::Survey` 是新的一臂，不是 `Measure` 的扩展**。`Measure { references }` 回答「我点名的这几个节点在哪」，取的是调用方给的引用；survey 不接引用、读整页、返回判决。合成一个臂会让 `references` 在一半调用里恒为空，那是「一个参数被接受然后丢掉」。
+- **主题由调用方决定，而住户不决定**。`body` 收 `Option<&str>`：门为每一个 pass 强制一个主题并据此断言页面照办，住户传 `None`——勘察一个别人打开的页面时强制主题，报的就是没人看过的那一页。同理 `PaintSource`：门按它要求的 pass 给，住户按页面自陈的 `forced-colors` 给。
+- **源码索引在有源码树的那一侧**。`Sources` 的查找（最长字面量匹配）随判决进产品 crate，**走一遍源码树的那一步留在 `xtask`**——产品二进制身边没有仓库。住户得到的每条发现因此只点名盒子、不点名行号，而这是诚实的空状态，不是缺陷：`Sources::default()` 正是为这一天实现的。
+- **答一个字符串，不拆成载荷**。`survey` 动作的结果是 tagged 形态的整份报告（一个 `<edit>` 一处修复、一个 `<at>` 一个落点）。把它拆成结构化载荷等于给同一份报告第二种渲染。
+- **量具自身的两条真缺陷记在这里**，免得下一个人重新发现：`SLACK` 在 observed 路径上从未被应用（十一条假阳性出自这一个 off-by-one）；群体定义有范畴错误——它对所有 holder 都比左右缘，而一行里并排的盒子右缘近似相等纯属巧合，现在先从几何读出容器的堆叠方向，只比容器不分发的那一轴。
+- **一条没做的，明写**：行容器的**交叉轴没有扫**。一行把子元素约束在一条带里，但带里的位置由 `align-items` 决定，本库到处用居中，于是两个不同行高的子元素**按设计**就有不同顶缘。扫过一次，5 条假阳性变 15 条。要正确读它得比较顶／中／底里多数实际持有的那一个，**那是这把尺子还没有的读数**。
 
 ### 19-9 `usersbrowser`（工具，装配层）
 

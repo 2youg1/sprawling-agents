@@ -7,6 +7,12 @@ publish.workspace = true
 
 [dependencies]
 kernel = { path = "../crates/kernel" }
+# The render gate and the `survey` tool take the same readings off a
+# page and reach the same verdicts. The judging lives in the product
+# crate so that there is one of it; what stays here is the engine that
+# drives a headless browser and the walk over a source tree, neither of
+# which a shipped binary has.
+browser = { path = "../crates/browser" }
 # `wire-ts` reads the JSON Schema of the wire and writes the
 # TypeScript client's types from it. Without `server`, so this crate does
 # not pull tokio and axum in to ask what a frame looks like.

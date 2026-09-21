@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The eight actions the `browser` tool offers, read from arguments and
+//! The actions the `browser` tool offers, read from arguments and
 //! turned into frames.
 //!
 //! One action can need more than one frame — opening a page navigates
@@ -13,16 +13,20 @@
 //! module owns which bytes it should put on it.
 
 mod read;
+mod script;
 
 use kernel::{AxCode, AxError, Payload};
-use serde_json::{Value, json};
+use serde_json::json;
 
 use crate::act::{Action, Origin, frame_for, resolve_frame};
 use crate::port::Frame;
 use crate::session::{ContextId, Session};
 use crate::shot::ShotRequest;
 use crate::snapshot::PageSnapshot;
-use read::{missing, number_of, read_action, side_of, text_of};
+use read::{number_of, read_action, side_of, text_of};
+use script::{measure_script, read_references};
+
+pub use script::{complained, read_json};
 
 /// Installs the console recorder. Wrapping rather than replacing keeps
 /// the page's own logging working, which matters because the thing being
@@ -74,7 +78,7 @@ fn tree_script() -> String {
 
 /// One thing a run wants the browser to do.
 ///
-/// Exhaustive, and each variant is one of the eight names the tool
+/// Exhaustive, and each variant is one of the names the tool
 /// offers. A ninth action is a change here, not a string that reaches a
 /// page.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,6 +88,7 @@ pub enum Verb {
     Act { generation: u64, action: Action },
     Screenshot(ShotRequest),
     Measure { references: Vec<String> },
+    Survey,
     Console,
     Viewport { width: u32, height: u32 },
     Close,
@@ -107,6 +112,7 @@ impl Verb {
             | Verb::Act { .. }
             | Verb::Screenshot(_)
             | Verb::Measure { .. }
+            | Verb::Survey
             | Verb::Console
             | Verb::Viewport { .. }
             | Verb::Close => Ok(None),
@@ -164,6 +170,7 @@ impl Verb {
             | Verb::Act { .. }
             | Verb::Screenshot(_)
             | Verb::Measure { .. }
+            | Verb::Survey
             | Verb::Console
             | Verb::Viewport { .. }
             | Verb::Close => Err(AxError::failure(
@@ -199,6 +206,7 @@ impl Verb {
             "measure" => Ok(Verb::Measure {
                 references: read_references(args)?,
             }),
+            "survey" => Ok(Verb::Survey),
             "console" => Ok(Verb::Console),
             "viewport" => Ok(Verb::Viewport {
                 width: side_of(args, "width")?,
@@ -264,6 +272,14 @@ impl Verb {
                 context,
                 &measure_script(looked_at(snapshot, "measure a page")?, references)?,
             )?]),
+            // The page is measured as it was found: a survey that
+            // forced a theme would report a page nobody was looking at.
+            Verb::Survey => {
+                Ok(vec![session.evaluate(
+                    context,
+                    &crate::survey::probe::evaluated(None),
+                )?])
+            }
             Verb::Console => Ok(vec![session.evaluate(context, CONSOLE_SCRIPT)?]),
             Verb::Viewport { width, height } => Ok(vec![session.frame(
                 "browsingContext.setViewport",
@@ -297,92 +313,6 @@ fn origin_mismatch() -> AxError {
         "report this against browser::verb: a drag from a reference is resolved before its \
          input frame is built, and nothing else is",
     )
-}
-
-fn read_references(args: &Payload) -> Result<Vec<String>, AxError> {
-    let raw = args
-        .as_map()
-        .get("refs")
-        .and_then(Value::as_array)
-        .ok_or_else(|| missing("refs"))?;
-    let mut references = Vec::new();
-    for entry in raw {
-        let text = entry.as_str().ok_or_else(|| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "read a browser action",
-                "a reference that is not a string",
-            )
-            .with_recovery("references are minted by the snapshot and look like `e1`")
-        })?;
-        references.push(text.to_owned());
-    }
-    Ok(references)
-}
-
-/// Builds the expression that measures the named nodes.
-///
-/// Every reference goes through the snapshot first, so a reference the
-/// model invented is refused here rather than answered with a box that
-/// belongs to something else.
-fn measure_script(snapshot: &PageSnapshot, references: &[String]) -> Result<String, AxError> {
-    let mut parts = Vec::new();
-    for reference in references {
-        snapshot.resolve(reference)?;
-        parts.push(format!(
-            "(el => {{ const r = el ? el.getBoundingClientRect() : null; return r ? {{ ref: {}, \
-             x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: \
-             Math.round(r.height) }} : {{ ref: {}, x: 0, y: 0, width: 0, height: 0 }}; }})({})",
-            json!(reference),
-            json!(reference),
-            crate::act::selector_of(snapshot, reference)?,
-        ));
-    }
-    Ok(format!("JSON.stringify([{}])", parts.join(",")))
-}
-
-/// Reads what an evaluate came back with.
-///
-/// Every script this module sends returns one JSON string, so there is
-/// one shape to read rather than the driver's whole remote-value
-/// vocabulary.
-///
-/// # Errors
-/// Refuses a reply whose shape this version does not read, and a string
-/// that is not the JSON the script promised.
-pub fn read_json(result: &Value) -> Result<Value, AxError> {
-    let text = result
-        .get("result")
-        .and_then(|inner| inner.get("value"))
-        .and_then(Value::as_str)
-        .ok_or_else(|| {
-            AxError::failure(
-                AxCode::WireMismatch,
-                "read a script result",
-                "no string value",
-            )
-            .with_recovery("check the driver's protocol version")
-        })?;
-    serde_json::from_str(text).map_err(|err| {
-        AxError::failure(
-            AxCode::WireMismatch,
-            "read a script result",
-            err.to_string(),
-        )
-        .with_recovery("the script returns JSON.stringify of its answer")
-    })
-}
-
-/// Whether the console said anything the development loop should stop
-/// for. Error level only: a warning is the page talking, an error is the
-/// page failing.
-#[must_use]
-pub fn complained(console: &Value) -> bool {
-    console.as_array().is_some_and(|entries| {
-        entries
-            .iter()
-            .any(|entry| entry.get("level").and_then(Value::as_str) == Some("error"))
-    })
 }
 
 #[cfg(test)]

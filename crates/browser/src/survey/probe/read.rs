@@ -13,11 +13,11 @@
 //! the whole of the defence available here: the two are one sentence,
 //! and a reader who finds either finds both.
 
+use super::super::{Cut, Declared, Drawn, Marking, Overflow, Paint, Sampled, TextRun};
 use super::BETWEEN;
-use crate::survey::{Cut, Declared, Drawn, Marking, Overflow, Paint, Sampled, TextRun};
 
 /// Every element in one sink, as the probe wrote them.
-pub(crate) fn elements(records: &str) -> Vec<Drawn> {
+pub fn elements(records: &str) -> Vec<Drawn> {
     records.split(BETWEEN).filter_map(element).collect()
 }
 
@@ -55,7 +55,7 @@ fn element(record: &str) -> Option<Drawn> {
 
 /// The page's own vocabulary, as the probe resolved it: one `name value`
 /// per record, colours in hex and lengths in hundredths of a pixel.
-pub(crate) fn declared(records: &str) -> Declared {
+pub fn declared(records: &str) -> Declared {
     let mut colours = Vec::new();
     let mut type_steps = Vec::new();
     let mut spacing = Vec::new();

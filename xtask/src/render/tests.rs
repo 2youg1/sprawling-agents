@@ -5,7 +5,7 @@
 
 use super::*;
 
-use crate::survey::{Declared, Drawn, Overflow, Page, PaintSource, Sampled};
+use browser::survey::{Declared, Drawn, Overflow, Page, PaintSource, Sampled};
 
 /// `Violation` has no `Debug` on purpose (it is rendered, not dumped),
 /// so failures report the rules that fired.

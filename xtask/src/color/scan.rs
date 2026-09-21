@@ -36,8 +36,8 @@ const SPELLS_COLOUR: [&str; 7] = [
     "xtask/src/color/scan.rs",
     "xtask/src/color/tables.rs",
     "xtask/src/color/tests.rs",
-    "xtask/src/render/probe.rs",
-    "xtask/src/survey/tests.rs",
+    "crates/browser/src/survey/probe.rs",
+    "crates/browser/src/survey/tests.rs",
 ];
 
 /// Extensions worth scanning. Rust, and the two file kinds that carry style.

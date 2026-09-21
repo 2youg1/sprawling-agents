@@ -14,7 +14,19 @@ impl browser::Session
 impl browser::Shot
 impl browser::ShotRequest
 impl browser::Verb
+impl browser::survey::Cut
+impl browser::survey::Declared
+impl browser::survey::Deviation<'_>
+impl browser::survey::Drawn
+impl browser::survey::Finding<'_>
+impl browser::survey::Group
+impl browser::survey::Paint
+impl browser::survey::Side
+impl browser::survey::Sources
+impl browser::survey::Surface
+impl browser::survey::probe::Read
 impl core::default::Default for browser::ShotRequest
+impl core::fmt::Display for browser::survey::Paint
 pub browser::Action::Click
 pub browser::Action::Click::reference: alloc::string::String
 pub browser::Action::Drag
@@ -76,19 +88,129 @@ pub browser::Verb::Open
 pub browser::Verb::Open::url: alloc::string::String
 pub browser::Verb::Screenshot(browser::ShotRequest)
 pub browser::Verb::Snapshot
+pub browser::Verb::Survey
 pub browser::Verb::Viewport
 pub browser::Verb::Viewport::height: u32
 pub browser::Verb::Viewport::width: u32
+pub browser::survey::Cohort::of: usize
+pub browser::survey::Cohort::with: usize
+pub browser::survey::Cut::Fits
+pub browser::survey::Cut::Hidden
+pub browser::survey::Cut::Hidden::needs: i64
+pub browser::survey::Cut::Hidden::shown: i64
+pub browser::survey::Cut::Marked
+pub browser::survey::Deviation::at: &'a browser::survey::Drawn
+pub browser::survey::Deviation::finding: browser::survey::Finding<'a>
+pub browser::survey::Drawn::across: browser::survey::Overflow
+pub browser::survey::Drawn::class: alloc::string::String
+pub browser::survey::Drawn::depth: i64
+pub browser::survey::Drawn::down: browser::survey::Overflow
+pub browser::survey::Drawn::fill: core::option::Option<browser::survey::Paint>
+pub browser::survey::Drawn::first_mark: i64
+pub browser::survey::Drawn::height: i64
+pub browser::survey::Drawn::left: i64
+pub browser::survey::Drawn::name: alloc::string::String
+pub browser::survey::Drawn::parent: i64
+pub browser::survey::Drawn::role: alloc::string::String
+pub browser::survey::Drawn::sampled: browser::survey::Sampled
+pub browser::survey::Drawn::tag: alloc::string::String
+pub browser::survey::Drawn::text: core::option::Option<browser::survey::TextRun>
+pub browser::survey::Drawn::top: i64
+pub browser::survey::Drawn::underlined: bool
+pub browser::survey::Drawn::width: i64
+pub browser::survey::Finding::Echoed
+pub browser::survey::Finding::Echoed::homes: usize
+pub browser::survey::Finding::Echoed::other: &'a browser::survey::Drawn
+pub browser::survey::Finding::Echoed::text: &'a str
+pub browser::survey::Finding::Escapes
+pub browser::survey::Finding::Escapes::holder: &'a browser::survey::Drawn
+pub browser::survey::Finding::Escapes::side: browser::survey::Side
+pub browser::survey::Finding::OutOfStep
+pub browser::survey::Finding::OutOfStep::among: browser::survey::Population
+pub browser::survey::Finding::OutOfStep::cohort: browser::survey::Cohort
+pub browser::survey::Finding::OutOfStep::is: i64
+pub browser::survey::Finding::OutOfStep::should_be: i64
+pub browser::survey::Finding::OutOfStep::step: core::option::Option<&'a str>
+pub browser::survey::Finding::TextCut
+pub browser::survey::Finding::TextCut::needs: i64
+pub browser::survey::Finding::TextCut::shown: i64
+pub browser::survey::Finding::UndeclaredPaint
+pub browser::survey::Finding::UndeclaredPaint::nearest: core::option::Option<browser::survey::Near<'a>>
+pub browser::survey::Finding::UndeclaredPaint::on: browser::survey::Surface
+pub browser::survey::Finding::UndeclaredPaint::painted: browser::survey::Paint
+pub browser::survey::Finding::UndeclaredSize
+pub browser::survey::Finding::UndeclaredSize::nearest: core::option::Option<browser::survey::Near<'a>>
+pub browser::survey::Finding::UndeclaredSize::px_x100: u32
+pub browser::survey::Group::Edge
+pub browser::survey::Group::Fact
+pub browser::survey::Group::Paint
+pub browser::survey::Group::Text
+pub browser::survey::Group::Type
+pub browser::survey::Marking::Clip
+pub browser::survey::Marking::Ellipsis
+pub browser::survey::Marking::Spills
+pub browser::survey::Near::apart: u16
+pub browser::survey::Near::token: &'a str
+pub browser::survey::Overflow::Clips
+pub browser::survey::Overflow::Scrolls
+pub browser::survey::Overflow::Shows
+pub browser::survey::Page::declared: browser::survey::Declared
+pub browser::survey::Page::drawn: alloc::vec::Vec<browser::survey::Drawn>
+pub browser::survey::Page::painted_by: browser::survey::PaintSource
+pub browser::survey::PaintSource::ThePage
+pub browser::survey::PaintSource::TheSystem
+pub browser::survey::Population::BoxesThatShareAHolder(browser::survey::Side)
+pub browser::survey::Population::RegionsInTheMainColumn
+pub browser::survey::Population::RowsOfANavigationColumn
+pub browser::survey::Sampled::Frame
+pub browser::survey::Sampled::Words
+pub browser::survey::Shape::Prose
+pub browser::survey::Shape::Tagged
+pub browser::survey::Side::Above
+pub browser::survey::Side::Below
+pub browser::survey::Side::Left
+pub browser::survey::Side::Right
+pub browser::survey::Standing::Noted
+pub browser::survey::Standing::Refused
+pub browser::survey::Surface::Fill
+pub browser::survey::Surface::Ink
+pub browser::survey::Survey::at: &'a str
+pub browser::survey::Survey::found: &'a [browser::survey::Deviation<'a>]
+pub browser::survey::Survey::page: &'a browser::survey::Page
+pub browser::survey::Survey::sources: &'a browser::survey::Sources
+pub browser::survey::TextRun::cut: browser::survey::Cut
+pub browser::survey::TextRun::ink: core::option::Option<browser::survey::Paint>
+pub browser::survey::TextRun::px_x100: u32
+pub browser::survey::probe::Read::conditions: alloc::string::String
+pub browser::survey::probe::Read::declared: alloc::string::String
+pub browser::survey::probe::Read::sink: alloc::string::String
 pub const browser::LOOKS_MAX: u32
 pub const browser::PROFILES_DIR: &str
 pub const browser::QUIET_LOOKS: u32
 pub const browser::STEPS_MAX: u32
+pub const browser::survey::DRAWN_IN: [&str; 3]
+pub const browser::survey::ENOUGH: usize
+pub const browser::survey::Group::IN_ORDER: [browser::survey::Group; 5]
+pub const browser::survey::probe::BETWEEN: &str
+pub const browser::survey::probe::SETTLE_MS: u32
 pub enum browser::Action
 pub enum browser::Origin
 pub enum browser::Reply
 pub enum browser::ResolvedOrigin
 pub enum browser::Step
 pub enum browser::Verb
+pub enum browser::survey::Cut
+pub enum browser::survey::Finding<'a>
+pub enum browser::survey::Group
+pub enum browser::survey::Marking
+pub enum browser::survey::Overflow
+pub enum browser::survey::PaintSource
+pub enum browser::survey::Population
+pub enum browser::survey::Sampled
+pub enum browser::survey::Shape
+pub enum browser::survey::Side
+pub enum browser::survey::Standing
+pub enum browser::survey::Surface
 pub fn browser::Action::reference(&self) -> core::option::Option<&str>
 pub fn browser::Action::resolves_element(&self) -> bool
 pub fn browser::Box2::covers(&self, u32, u32) -> bool
@@ -146,7 +268,41 @@ pub fn browser::frame_for(&mut browser::Session, &browser::ContextId, &browser::
 pub fn browser::read_json(&serde_json::value::Value) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
 pub fn browser::resolve_frame(&mut browser::Session, &browser::ContextId, &browser::PageSnapshot, &str) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
 pub fn browser::shared_id_of(&serde_json::value::Value) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
+pub fn browser::survey::Cut::of(i64, i64, browser::survey::Marking) -> browser::survey::Cut
+pub fn browser::survey::Declared::is_empty(&self) -> bool
+pub fn browser::survey::Declared::of(alloc::vec::Vec<(alloc::string::String, browser::survey::Paint)>, alloc::vec::Vec<(alloc::string::String, u32)>, alloc::vec::Vec<(alloc::string::String, u32)>) -> browser::survey::Declared
+pub fn browser::survey::Declared::spacing_named(&self, i64) -> core::option::Option<&str>
+pub fn browser::survey::Deviation<'_>::standing(&self) -> browser::survey::Standing
+pub fn browser::survey::Drawn::anonymous(&self) -> bool
+pub fn browser::survey::Drawn::called(&self) -> alloc::string::String
+pub fn browser::survey::Drawn::drawn(&self) -> bool
+pub fn browser::survey::Drawn::landmark(&self) -> bool
+pub fn browser::survey::Drawn::operable(&self) -> bool
+pub fn browser::survey::Drawn::shows(&self) -> bool
+pub fn browser::survey::Finding<'_>::group(&self) -> browser::survey::Group
+pub fn browser::survey::Finding<'_>::id(&self) -> &'static str
+pub fn browser::survey::Group::called(self) -> &'static str
+pub fn browser::survey::Paint::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn browser::survey::Paint::of(u8, u8, u8) -> browser::survey::Paint
+pub fn browser::survey::Side::of(self) -> &'static str
+pub fn browser::survey::Sources::locate(&self, &str) -> core::option::Option<&str>
+pub fn browser::survey::Sources::of(alloc::vec::Vec<(alloc::string::String, alloc::string::String)>) -> browser::survey::Sources
+pub fn browser::survey::Surface::of(self) -> &'static str
+pub fn browser::survey::judge(&browser::survey::Page) -> alloc::vec::Vec<browser::survey::Deviation<'_>>
+pub fn browser::survey::literals(&str) -> alloc::vec::Vec<alloc::string::String>
+pub fn browser::survey::probe::Read::conditions(&self) -> core::option::Option<(&str, &str)>
+pub fn browser::survey::probe::Read::page(&self, browser::survey::PaintSource) -> browser::survey::Page
+pub fn browser::survey::probe::body(core::option::Option<&str>) -> alloc::string::String
+pub fn browser::survey::probe::declared(&str) -> browser::survey::Declared
+pub fn browser::survey::probe::elements(&str) -> alloc::vec::Vec<browser::survey::Drawn>
+pub fn browser::survey::probe::evaluated(core::option::Option<&str>) -> alloc::string::String
+pub fn browser::survey::remedy(&browser::survey::Deviation<'_>) -> alloc::string::String
+pub fn browser::survey::rule(&browser::survey::Deviation<'_>) -> alloc::string::String
+pub fn browser::survey::says(&browser::survey::Deviation<'_>) -> alloc::string::String
+pub fn browser::survey::written(browser::survey::Survey<'_>, browser::survey::Shape) -> alloc::string::String
 pub mod browser
+pub mod browser::survey
+pub mod browser::survey::probe
 pub struct browser::Box2
 pub struct browser::Clip
 pub struct browser::ContextId(_)
@@ -163,4 +319,15 @@ pub struct browser::Session
 pub struct browser::SessionRequest
 pub struct browser::Shot
 pub struct browser::ShotRequest
+pub struct browser::survey::Cohort
+pub struct browser::survey::Declared
+pub struct browser::survey::Deviation<'a>
+pub struct browser::survey::Drawn
+pub struct browser::survey::Near<'a>
+pub struct browser::survey::Page
+pub struct browser::survey::Paint
+pub struct browser::survey::Sources
+pub struct browser::survey::Survey<'a>
+pub struct browser::survey::TextRun
+pub struct browser::survey::probe::Read
 pub trait browser::BrowserPort

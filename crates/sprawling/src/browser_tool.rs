@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `browser` tool: eight actions over one session.
+//! The `browser` tool: every action over one session.
 //!
 //! It lives in the assembly layer rather than in `browser` because a
 //! screenshot has to land in `memory::cas`, and the browser crate has no
@@ -24,12 +24,14 @@ use serde_json::{Map, Value};
 
 mod building;
 mod person;
+mod surveying;
 
 use building::BUILDING_DISCLOSURE;
 pub(crate) use building::for_rules;
 
 use person::PERSON_DISCLOSURE;
 pub(crate) use person::Role;
+use surveying::surveyed;
 
 /// The tool a building with `browser: true` gets.
 pub(crate) struct BrowserTool {
@@ -257,6 +259,15 @@ impl BrowserTool {
             Verb::Screenshot(request) => self.stored(result, request.format()),
             Verb::Measure { .. } => Ok(ToolOutcome {
                 result: payload(vec![("boxes", browser::read_json(result)?)])?,
+                attachments: Vec::new(),
+            }),
+            // A survey is one string on purpose. The tagged report is
+            // the shape an agent acts on - one `<edit>` per repair, one
+            // `<at>` per place it has to be made - and splitting it into
+            // a payload of parts here would be a second rendering of a
+            // report that already has one.
+            Verb::Survey => Ok(ToolOutcome {
+                result: payload(vec![("survey", Value::String(surveyed(result)?))])?,
                 attachments: Vec::new(),
             }),
             Verb::Console => {

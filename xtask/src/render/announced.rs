@@ -13,7 +13,7 @@
 
 use super::violation;
 use crate::report::Violation;
-use crate::survey::Drawn;
+use browser::survey::Drawn;
 
 /// Every control a person can operate says what it is.
 ///

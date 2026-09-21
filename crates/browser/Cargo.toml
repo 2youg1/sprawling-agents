@@ -15,6 +15,9 @@ publish.workspace = true
 
 [dependencies]
 kernel = { path = "../kernel" }
+# The probe answers with three named strings; naming them in a
+# type is cheaper than three hand-written lookups at each reader.
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 # A screenshot arrives base64-encoded on the protocol and is measured and
 # compared as pixels. Neither is a parser this crate should write itself.

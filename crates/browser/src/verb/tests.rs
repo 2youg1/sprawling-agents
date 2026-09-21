@@ -3,8 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the eight actions are read from, and which frames each one puts
+//! What each action is read from, and which frames it puts
 //! on the wire.
+
+use serde_json::Value;
 
 use super::*;
 use crate::session::SessionRequest;
@@ -49,7 +51,7 @@ fn the_eight_names_are_the_eight_actions_and_a_ninth_is_refused() {
     ];
     let mut read = Vec::new();
     for name in names {
-        read.push(Verb::read(&args(name)).expect("each of the eight reads"));
+        read.push(Verb::read(&args(name)).expect("each name reads"));
     }
     assert_eq!(read.len(), 8);
     let err = Verb::read(&args(json!({ "action": "scroll" }))).unwrap_err();

@@ -19,7 +19,7 @@
 
 use super::violation;
 use crate::report::Violation;
-use crate::survey::Drawn;
+use browser::survey::Drawn;
 
 /// No key is drawn with a line under it.
 ///

@@ -98,8 +98,8 @@ pub(super) fn user_browser_params() -> Result<Payload, AxError> {
     let properties = serde_json::json!({
         "action": {
             "type": "string",
-            "enum": ["open", "snapshot", "act", "screenshot", "measure", "console", "viewport", "close"],
-            "description": "what to do; `close` ends this run's attachment and never closes the person's browser",
+            "enum": ["open", "snapshot", "act", "screenshot", "measure", "survey", "console", "viewport", "close"],
+            "description": "what to do; `survey` judges the whole page against what it declares - alignment, contrast, spacing, colour - and answers one edit per repair; `close` ends this run's attachment and never closes the person's browser",
         },
         "url": text("for open: the page to open"),
         "kind": {

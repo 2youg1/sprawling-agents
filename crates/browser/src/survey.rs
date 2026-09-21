@@ -41,14 +41,15 @@ mod drawn;
 mod echo;
 mod edge;
 mod legibility;
+pub mod probe;
 mod sheet;
 mod source;
 mod vocabulary;
 
-pub(crate) use drawn::{Cut, Drawn, Marking, Overflow, Page, Paint, PaintSource, Sampled, TextRun};
-pub(crate) use sheet::{Shape, Survey, remedy, rule, says, written};
-pub(crate) use source::Sources;
-pub(crate) use vocabulary::Declared;
+pub use drawn::{Cut, Drawn, Marking, Overflow, Page, Paint, PaintSource, Sampled, TextRun};
+pub use sheet::{Shape, Survey, remedy, rule, says, written};
+pub use source::{DRAWN_IN, ENOUGH, Sources, literals};
+pub use vocabulary::Declared;
 
 /// A box no larger than this in either direction shows nothing to
 /// anybody: it is the size a page clips a sentence to when the sentence
@@ -71,7 +72,7 @@ const SLACK: i64 = 1;
 /// the page, where a large distance is a layout rather than a mistake,
 /// so only near misses count.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Population {
+pub enum Population {
     /// Every region in the main column, by its left edge.
     RegionsInTheMainColumn,
     /// Every clickable row of one navigation column, by the centre of
@@ -83,7 +84,7 @@ pub(crate) enum Population {
 
 /// Which edge of a box a reading is about.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Side {
+pub enum Side {
     Left,
     Right,
     Above,
@@ -92,7 +93,7 @@ pub(crate) enum Side {
 
 /// Which of an element's two colours a reading is about.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Surface {
+pub enum Surface {
     /// The colour its glyphs were painted in.
     Ink,
     /// The colour it fills its own box with.
@@ -107,22 +108,22 @@ pub(crate) enum Surface {
 /// three of five is a column that never had a consensus, and one of two
 /// is not a scale at all.
 #[derive(Clone, Copy)]
-pub(crate) struct Cohort {
-    pub(crate) with: usize,
-    pub(crate) of: usize,
+pub struct Cohort {
+    pub with: usize,
+    pub of: usize,
 }
 
 /// The nearest word the page declares for a value it never declared.
-pub(crate) struct Near<'a> {
-    pub(crate) token: &'a str,
-    pub(crate) apart: u16,
+pub struct Near<'a> {
+    pub token: &'a str,
+    pub apart: u16,
 }
 
 /// Every reading this instrument makes.
 ///
 /// Exhaustive on purpose: a reading added here cannot be added without
 /// saying which group it is repaired in and whether it stops a build.
-pub(crate) enum Finding<'a> {
+pub enum Finding<'a> {
     /// A box out of step with the population it belongs to.
     OutOfStep {
         among: Population,
@@ -170,7 +171,7 @@ pub(crate) enum Finding<'a> {
 /// alignment first would have a person fix a column, repaint it, and
 /// find the column moved.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Group {
+pub enum Group {
     Fact,
     Paint,
     Type,
@@ -185,7 +186,7 @@ impl Group {
     /// boxes one source deletes one of them or changes what it says,
     /// which moves every box after it. A run that repaired alignment
     /// first would align a box that is about to stop existing.
-    pub(crate) const IN_ORDER: [Group; 5] = [
+    pub const IN_ORDER: [Group; 5] = [
         Group::Fact,
         Group::Paint,
         Group::Type,
@@ -193,7 +194,7 @@ impl Group {
         Group::Edge,
     ];
 
-    pub(crate) fn called(self) -> &'static str {
+    pub fn called(self) -> &'static str {
         match self {
             Group::Fact => "fact",
             Group::Paint => "paint",
@@ -213,16 +214,16 @@ impl Group {
 /// somebody switches off, and the repairs it asks for are a design
 /// decision rather than a defect.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Standing {
+pub enum Standing {
     Refused,
     Noted,
 }
 
 /// One reading that is out of step, and everything a repair needs.
-pub(crate) struct Deviation<'a> {
+pub struct Deviation<'a> {
     /// The element that is out of step.
-    pub(crate) at: &'a Drawn,
-    pub(crate) finding: Finding<'a>,
+    pub at: &'a Drawn,
+    pub finding: Finding<'a>,
 }
 
 impl Deviation<'_> {
@@ -232,7 +233,7 @@ impl Deviation<'_> {
     /// subject as well as on itself: it refused the frame of the page
     /// before this instrument existed and goes on refusing it, and the
     /// boxes of words the instrument added to the sample are reported.
-    pub(crate) fn standing(&self) -> Standing {
+    pub fn standing(&self) -> Standing {
         match self.finding {
             Finding::Escapes { .. } => match self.at.sampled {
                 Sampled::Frame => Standing::Refused,
@@ -248,7 +249,7 @@ impl Deviation<'_> {
 }
 
 /// Every reading over one page, in repair order.
-pub(crate) fn judge(page: &Page) -> Vec<Deviation<'_>> {
+pub fn judge(page: &Page) -> Vec<Deviation<'_>> {
     let mut out = Vec::new();
     vocabulary::every_colour_is_a_declared_word(page, &mut out);
     vocabulary::every_size_is_a_declared_step(page, &mut out);
@@ -274,7 +275,7 @@ pub(crate) fn judge(page: &Page) -> Vec<Deviation<'_>> {
 
 impl Finding<'_> {
     /// The group this reading is repaired in.
-    pub(crate) fn group(&self) -> Group {
+    pub fn group(&self) -> Group {
         match *self {
             Finding::Echoed { .. } => Group::Fact,
             Finding::UndeclaredPaint { .. } => Group::Paint,
@@ -301,7 +302,7 @@ impl Finding<'_> {
     /// Never the sentence: prose is written for a reader and gets
     /// rewritten whenever a reader is confused by it, and a key that
     /// moved every time somebody improved a sentence would be no key.
-    pub(crate) fn id(&self) -> &'static str {
+    pub fn id(&self) -> &'static str {
         match *self {
             Finding::Echoed { .. } => "fact.two-homes",
             Finding::UndeclaredPaint { .. } => "paint.undeclared",
@@ -330,7 +331,7 @@ impl Population {
 
 impl Side {
     /// What the reading is an edge of.
-    pub(crate) fn of(self) -> &'static str {
+    pub fn of(self) -> &'static str {
         match self {
             Side::Left => "left edge",
             Side::Right => "right edge",
@@ -341,7 +342,7 @@ impl Side {
 }
 
 impl Surface {
-    pub(crate) fn of(self) -> &'static str {
+    pub fn of(self) -> &'static str {
         match self {
             Surface::Ink => "the ink",
             Surface::Fill => "the fill",

@@ -51,14 +51,16 @@
 
 use std::path::Path;
 
+use browser::survey::{self, Deviation, Standing};
+
 use crate::report::{Violation, XtaskError};
-use crate::survey::{self, Deviation, Standing};
 
 mod announced;
 mod engine;
 mod marks;
 mod pass;
 mod probe;
+mod sources;
 
 use announced::{every_control_is_announceable, every_landmark_is_named, one_first_heading};
 use engine::{Measured, Opening, browser, measure};
@@ -66,7 +68,13 @@ use marks::no_key_is_underlined;
 use pass::Pass;
 
 /// The route that draws every state worth looking at, on fixtures.
-const GALLERY: &str = "#/gallery";
+///
+/// A route, not a URL fragment: the `#/` that carries it belongs to the
+/// one place that builds a URL out of it ([`engine`]). Spelling the
+/// `#` here would put it in a command-line argument, and a shell that
+/// rewrites `#` - which is every Git-Bash on Windows - would then hand
+/// this gate a path on disk instead of a route.
+const GALLERY: &str = "gallery";
 
 /// Where a finding is located when no pass could be made at all.
 const EVERY_PASS: &str = "in every pass";
@@ -131,7 +139,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     // The client's own sources, read once for the whole run: every
     // finding names the line that drew it, and a survey opens the same
     // page five times.
-    let sources = survey::Sources::index(root)?;
+    let sources = sources::index(root)?;
     let opening = Opening {
         root,
         browser: &browser,

@@ -61,7 +61,7 @@ const LISTED: usize = 3;
 /// and a paragraph buried in an opening tag among six other
 /// attributes is a paragraph nobody attends to.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Shape {
+pub enum Shape {
     /// Sentences, for somebody changing a stylesheet.
     Prose,
     /// Named fields, for something that will act on them.
@@ -75,15 +75,15 @@ pub(crate) enum Shape {
 /// because no reading means anything without the page it was taken
 /// from and the source it can be traced back to.
 #[derive(Clone, Copy)]
-pub(crate) struct Survey<'a> {
-    pub(crate) page: &'a Page,
-    pub(crate) at: &'a str,
-    pub(crate) found: &'a [Deviation<'a>],
-    pub(crate) sources: &'a Sources,
+pub struct Survey<'a> {
+    pub page: &'a Page,
+    pub at: &'a str,
+    pub found: &'a [Deviation<'a>],
+    pub sources: &'a Sources,
 }
 
 /// The whole report over one page, or nothing at all.
-pub(crate) fn written(survey: Survey<'_>, shape: Shape) -> String {
+pub fn written(survey: Survey<'_>, shape: Shape) -> String {
     let census = vocabulary::unpainted(survey.page);
     if survey.found.is_empty() && census.is_none() {
         return String::new();
@@ -145,7 +145,7 @@ fn written_group(group: Group, members: &[&Deviation<'_>], sources: &Sources) ->
 
 /// The property a reading is about, in one sentence. Two readings that
 /// share this sentence are one edit.
-pub(crate) fn rule(one: &Deviation<'_>) -> String {
+pub fn rule(one: &Deviation<'_>) -> String {
     match one.finding {
         Finding::OutOfStep { among, .. } => among_says(among),
         Finding::Escapes { .. } => "nothing is drawn outside the box that holds it".to_owned(),
@@ -176,7 +176,7 @@ pub(crate) fn rule(one: &Deviation<'_>) -> String {
 }
 
 /// What was read, and where.
-pub(crate) fn says(one: &Deviation<'_>) -> String {
+pub fn says(one: &Deviation<'_>) -> String {
     let at = one.at;
     match one.finding {
         Finding::OutOfStep {
@@ -241,7 +241,7 @@ pub(crate) fn says(one: &Deviation<'_>) -> String {
 }
 
 /// The edit that ends a reading.
-pub(crate) fn remedy(one: &Deviation<'_>) -> String {
+pub fn remedy(one: &Deviation<'_>) -> String {
     match one.finding {
         Finding::OutOfStep {
             among,

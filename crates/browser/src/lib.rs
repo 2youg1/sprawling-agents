@@ -20,6 +20,7 @@ mod profile;
 mod session;
 mod shot;
 mod snapshot;
+pub mod survey;
 mod verb;
 
 pub use act::{Action, Origin, Point, STEPS_MAX, frame_for, resolve_frame};
