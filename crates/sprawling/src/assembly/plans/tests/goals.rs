@@ -192,11 +192,7 @@ fn three_ready_nodes_drive_three_runs_at_once() {
     let dir = tempfile::tempdir().unwrap();
     let report = init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md\n\n`confidential: false`\n",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
     std::fs::write(
         dir.path().join("lab").join(city::ROADMAP_FILE),
         PLAN_THREE_FREE_ROWS,

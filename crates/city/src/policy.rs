@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `BUILDING.md` evaluated into rules a machine can hold.
+//! `RULES.toml` evaluated into rules a machine can hold.
 //!
 //! A confidential building means three things at once, and each of them
 //! is held somewhere that cannot be talked out of it: the model pool is
@@ -11,36 +11,46 @@
 //! does not leave. This module decides the first two from the file; the
 //! third is the egress door's.
 //!
-//! A building with no `BUILDING.md` is an ordinary building. A
-//! `BUILDING.md` that exists and does not say whether it is confidential
-//! is an error: defaulting a privacy decision quietly is the failure this
-//! whole surface exists to prevent.
+//! A building with no `RULES.toml` is an ordinary building. One that
+//! exists and does not say whether it is confidential is an error:
+//! defaulting a privacy decision quietly is the failure this whole
+//! surface exists to prevent.
+//!
+//! **One document, read by the city and by every resident.** The
+//! prefix carries this file's own bytes, so what an agent reads is what
+//! the city enforces. It was Markdown until the reader had to find keys
+//! in prose and matched them on any line: a sentence that began
+//! `desktop: true` granted this machine's desktop, and a `write:` line
+//! nobody wrote resolved to `Everything`. Both failed towards the
+//! permissive side. Splitting the prose into a second document would
+//! have fixed that and bought a worse thing — two descriptions of one
+//! building, free to disagree.
 
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist, WriteDomain};
 
+mod desktop;
 mod evaluate;
 mod reach;
 
+pub use desktop::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
 pub use evaluate::evaluate;
 pub use reach::DomainReach;
 
-/// The file a building's rules live in, at the building root.
-pub const BUILDING_FILE: &str = "BUILDING.md";
+/// What a building is and what it may do: the one file this module
+/// parses, and the one a resident is given.
+pub const RULES_FILE: &str = "RULES.toml";
+
+/// The name this version no longer writes or reads. It exists for the
+/// single refusal that tells a person where their rules went; nothing
+/// opens a file at this name.
+const SUPERSEDED_FILE: &str = "BUILDING.md";
 
 mod user_browser;
 
 pub use user_browser::{UserBrowser, UserBrowserEndpoint};
-
-const CONFIDENTIAL_KEY: &str = "confidential:";
-const WRITE_KEY: &str = "write:";
-const REVIEW_KEY: &str = "review:";
-const DESKTOP_KEY: &str = "desktop:";
-const WRITE_HEADING: &str = "write domain";
-const EGRESS_HEADING: &str = "egress";
-const READING_HEADING: &str = "reading room";
 
 /// Which models a run in this building may reach. Exhaustive rather than
 /// a bool, because "any" and "local only" are two policies and a third
@@ -201,7 +211,7 @@ impl BuildingRules {
                     format!("{} reaches outside {}", prefix.as_str(), self.addr.as_str()),
                 )
                 .with_recovery(
-                    "remove that prefix, or drop `confidential: true` and say why in the file",
+                    "remove that prefix, or drop `confidential = true` and say why in the file",
                 ));
             }
             prefixes.push(prefix.clone());
@@ -223,8 +233,8 @@ impl BuildingRules {
 /// was the first line of the file and nothing held it until the path
 /// moved (ARCHITECTURE.md section 6).
 #[must_use]
-pub fn building_path(city_root: &Path, addr: &Address) -> PathBuf {
-    governed(city_root, addr).join(BUILDING_FILE)
+pub fn rules_path(city_root: &Path, addr: &Address) -> PathBuf {
+    governed(city_root, addr).join(RULES_FILE)
 }
 
 /// Where a project keeps the conventions it came with.
@@ -241,58 +251,26 @@ pub fn agents_path(city_root: &Path, addr: &Address) -> PathBuf {
         .join(crate::spine_files::AGENTS_FILE)
 }
 
-/// The allowlist the desktop connector is started under, window by
-/// window. Its syntax belongs to the server that reads it
-/// (`desktop/src/scope.rs`); this side only decides where it lives.
-pub const DESKTOP_SCOPE_FILE: &str = "DESKTOP.toml";
-
-/// Where a building's desktop allowlist lives: beside its rules, in the
-/// building's own reserved subtree.
+/// more, if one is on this disk.
 ///
-/// It is a governing document rather than a product. It states, window
-/// by window, what this building's runs may touch on somebody's own
-/// machine — so by the reading `DomainReach` rests on, the
-/// file that decides what residents may do is never a file residents
-/// write. `is_reserved` is true for any address with `.sprawling` in it,
-/// so no write domain reaches this path, including `Everything`'s.
-#[must_use]
-pub fn desktop_scope_path(city_root: &Path, addr: &Address) -> PathBuf {
-    governed(city_root, addr).join(DESKTOP_SCOPE_FILE)
-}
-
-/// Replaces a building's desktop allowlist with what a person wrote.
-///
-/// Whole rather than patched, for the reason `city::governed` gives: a
-/// person edits this in one box and saves it once, and a partial write
-/// would leave the connector scoped by half a line.
-///
-/// **Nothing here parses it.** The authority on this file's syntax is
-/// the server that reads it at startup, and that server fails closed —
-/// a file it cannot read permits nothing. A second parser on this side
-/// would be a second authority, and one of two authorities eventually
-/// reads a file as meaning something the other does not.
-///
-/// # Errors
-/// Propagates a reserved subtree that cannot be created or written.
-pub fn write_desktop_scope(
-    city_root: &Path,
-    addr: &Address,
-    text: &str,
-) -> Result<PathBuf, AxError> {
-    let path = desktop_scope_path(city_root, addr);
-    crate::document::replace(&path, text.as_bytes())?;
-    Ok(path)
-}
-
-/// Where a building's rules used to live, for the one refusal that says
-/// so. Nothing reads the file at this path.
-fn legacy_building_path(city_root: &Path, addr: &Address) -> PathBuf {
-    CityLayout::new(city_root).scope(addr).join(BUILDING_FILE)
+/// Two of them can be: the rules were Markdown before they were TOML,
+/// and before that they sat at the building's root rather than under
+/// its reserved subtree. One question rather than one guard per move,
+/// because every answer has the same consequence — a confidential
+/// building loading as an ordinary one.
+fn superseded(city_root: &Path, addr: &Address) -> Option<PathBuf> {
+    let layout = CityLayout::new(city_root);
+    [
+        governed(city_root, addr).join(SUPERSEDED_FILE),
+        layout.scope(addr).join(SUPERSEDED_FILE),
+    ]
+    .into_iter()
+    .find(|path| path.is_file())
 }
 
 /// A scope's own reserved subtree: where what governs that scope sits,
 /// out of reach of every write domain.
-fn governed(city_root: &Path, addr: &Address) -> PathBuf {
+pub(super) fn governed(city_root: &Path, addr: &Address) -> PathBuf {
     CityLayout::new(city_root)
         .scope(addr)
         .join(kernel::RESERVED_PREFIX)
@@ -304,42 +282,42 @@ fn governed(city_root: &Path, addr: &Address) -> PathBuf {
 /// Propagates an unreadable file, and refuses one that does not state
 /// whether the building is confidential.
 pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> {
-    let path = building_path(city_root, addr);
+    let path = rules_path(city_root, addr);
     match std::fs::read_to_string(&path) {
         Ok(text) => evaluate(addr, &text),
-        // An absent file is an ordinary building - unless the rules are
-        // sitting at the address this layout moved away from, in which
+        // An absent file is an ordinary building - unless a document
+        // this version no longer reads is holding the rules, in which
         // case reading "absent" would turn a confidential building into
         // an ordinary one without anybody being told.
-        Err(err)
-            if err.kind() == std::io::ErrorKind::NotFound
-                && legacy_building_path(city_root, addr).is_file() =>
-        {
-            Err(AxError::failure(
-                AxCode::ConfigInvalid,
-                "read a building's rules",
-                addr.as_str().to_owned(),
-            )
-            .with_recovery(format!(
-                "move {}/{BUILDING_FILE} to {}/{}/{BUILDING_FILE}; a building's rules live where \
-                 its own runs cannot write them",
-                addr.as_str(),
-                addr.as_str(),
-                kernel::RESERVED_PREFIX,
-            )))
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            match superseded(city_root, addr) {
+                Some(stale) => Err(AxError::failure(
+                    AxCode::ConfigInvalid,
+                    "read a building's rules",
+                    addr.as_str().to_owned(),
+                )
+                .with_recovery(format!(
+                    "move the settings in {} into {}, leaving the prose where it is; this \
+                     version reads a building's rules as TOML in its reserved subtree, and \
+                     rules it cannot find would load a confidential building as an ordinary \
+                     one",
+                    stale.display(),
+                    path.display(),
+                ))),
+                None => Ok(BuildingRules {
+                    addr: addr.clone(),
+                    policy: BuildingPolicy::default(),
+                    write_prefixes: Vec::new(),
+                    reach: DomainReach::Everything,
+                    egress: EgressAllowlist::default(),
+                    review: false,
+                    browser: false,
+                    usersbrowser: None,
+                    desktop: false,
+                    reading_room: Vec::new(),
+                }),
+            }
         }
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(BuildingRules {
-            addr: addr.clone(),
-            policy: BuildingPolicy::default(),
-            write_prefixes: Vec::new(),
-            reach: DomainReach::Everything,
-            egress: EgressAllowlist::default(),
-            review: false,
-            browser: false,
-            usersbrowser: None,
-            desktop: false,
-            reading_room: Vec::new(),
-        }),
         Err(err) => Err(AxError::failure(
             AxCode::StorageFatal,
             "read a building's rules",
@@ -367,7 +345,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> 
 /// cannot be written.
 pub fn write_rules(city_root: &Path, addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
     let rules = evaluate(addr, text)?;
-    crate::document::replace(&building_path(city_root, addr), text.as_bytes())?;
+    crate::document::replace(&rules_path(city_root, addr), text.as_bytes())?;
     Ok(rules)
 }
 

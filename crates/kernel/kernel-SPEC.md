@@ -1359,7 +1359,7 @@ pub fn markdown(text: &str) -> Vec<Span>;
 ```
 
 **落点只有一个，而它全是 Markdown。** 界面唯一读文件的地方是 `BuildingDoc.text`，
-而 `read_building` 只收 `BUILDING.md` 与楼根目录下的 `*.md`。agent 写给下一个 agent 的计划与
+而 `read_building` 只收 `RULES.toml` 与楼根目录下的 `*.md`。agent 写给下一个 agent 的计划与
 交接就是这些文件，而人读它们时需要的是标题、列表、行内代码与围栏块彼此分开。
 
 **为什么不上线不上服务端。** 另一种方案是服务端分词、线上走 span，理由是 syntect 在 wasm 里太重。
@@ -1384,12 +1384,12 @@ pub fn markdown(text: &str) -> Vec<Span>;
 pub fn is_reserved(&self) -> bool;   // 任一段 == RESERVED_PREFIX（原：仅首段）
 ```
 
-**改它的理由是一个现存的洞，不是一个新需求。** 一次派活的写域由 `city::policy::write_domain()` 给出，而 `docs/templates/BUILDING.md` 的「Write domains」一节出厂就是一句空括号说明，于是 `write_prefixes` 为空、回落到 `[self.addr]`——**默认写域是整栋楼**。`runtime::tools::edit` 对路径只有 `WriteDomain::admits` 一道依据，`city::load` 又在**每次派活**时重读 `BUILDING.md`。三条合起来：一个 agent 现在就改得了它自己那栋楼的 `BUILDING.md` 与 `CONFIG.toml`——它自己的写域、`confidential`、思考强度与 MCP server 全在那两个文件里，而改动在下一次派活即生效。词汇表写着「一个 agent 改不了自己的账与自己的配置」，BUILDING.md 自己的第一行写着「agents read it and leave it unchanged」——**两句话今天都没有任何东西执行**。
+**改它的理由是一个现存的洞，不是一个新需求。** 一次派活的写域由 `city::policy::write_domain()` 给出，而 `docs/templates/RULES.toml` 的 `prefixes` 出厂就是一个空表，于是 `write_prefixes` 为空、回落到 `[self.addr]`——**默认写域是整栋楼**。`runtime::tools::edit` 对路径只有 `WriteDomain::admits` 一道依据，`city::load` 又在**每次派活**时重读 `BUILDING.md`。三条合起来：一个 agent 现在就改得了它自己那栋楼的 `RULES.toml` 与 `CONFIG.toml`——它自己的写域、`confidential`、思考强度与 MCP server 全在那两个文件里，而改动在下一次派活即生效。词汇表写着「一个 agent 改不了自己的账与自己的配置」，RULES.toml 自己的抬头写着「residents read it and cannot change it」——**两句话今天都没有任何东西执行**。
 
 - **一条规则，三处实例**：一个 scope 的治理字节住在它自己的 `.sprawling/` 里。城是 `<city>/.sprawling/`（今天已然），楼是 `<building>/.sprawling/`，房间是 `<building>/<room>/.sprawling/`。城的现行布局因此不是特例，而是同一条规则在根 scope 上的实例。
 - **失效关闭，只会拒绝得更多**：改后 `is_reserved` 对任何含 `.sprawling` 段的地址答真，`WriteDomain::new` 与 `admits` 两处因此同时收紧。今天库里没有任何代码造得出嵌套的 `.sprawling` 路径，故本改动在行为上是空的，只把不变式先立起来。
 - **不改的东西**：`Address::parse` 的文法不变（`.sprawling` 仍然是一个合法段名，只是含它的地址不再可写）；`RESERVED_PREFIX` 常量不改名，词汇表里它仍叫 reserved prefix。
-- **字节随后才搬**：`CONFIG.toml` 与 `BUILDING.md` 搬进 `<building>/.sprawling/`，楼自己的 skill 存货放进 `<building>/.sprawling/skills/`。先立不变式再搬东西，是为了搬的那一刻目的地已经受保护；反过来就会有一段时间配置坐在新位置上而仍然可写。
+- **字节随后才搬**：`CONFIG.toml` 与 `RULES.toml` 搬进 `<building>/.sprawling/`，楼自己的 skill 存货放进 `<building>/.sprawling/skills/`。先立不变式再搬东西，是为了搬的那一刻目的地已经受保护；反过来就会有一段时间配置坐在新位置上而仍然可写。
 
 ## 8.5 两个设计（crate 级）
 
@@ -1451,7 +1451,7 @@ S2 激活的码（逐码答「能否定义掉」）：
 
 **决定**：删 `GateOutcome::Escalate`；今天会升级问人的六类各得一个固定答案（表在 §8-27）；Inbox只装设计问题（§8-21）；`Autonomy` 二态、默认 `Owner`。
 
-**理由**：一个默认被绕过的闸是死代码加假安全感。一个需要人点「可以」的动作，要么本来就该做，要么本来就不该做，两者都是规则；规则写在人改得动的地方（`CONFIG.toml` 的 `[budget]` 与 `[sandbox] trusted`、楼的 `BUILDING.md`），而不是每次会话问四遍。人的精力应当花在只有人答得了的那一类上：设计问题。
+**理由**：一个默认被绕过的闸是死代码加假安全感。一个需要人点「可以」的动作，要么本来就该做，要么本来就不该做，两者都是规则；规则写在人改得动的地方（`CONFIG.toml` 的 `[budget]` 与 `[sandbox] trusted`、楼的 `RULES.toml`），而不是每次会话问四遍。人的精力应当花在只有人答得了的那一类上：设计问题。
 
 **被否**：①「clerk 代答一切审批」——把人该做的规则判断交给模型每次重新猜一遍，多一次模型调用换一个本来就该是常量的答案；②「保留 `Escalate` 但默认放行」——名义上 YOLO，实际上每次会话问人四次。
 
@@ -1753,7 +1753,7 @@ pub fn undoable(ctx: &GateContext, call: &ConnectorCall<'_>,
 
 **cluster key 取 label，不取工具名**：人被问的是「这个连接器可以碰运行中的机器吗」，一个问题一次。逐工具问会训练人闭着眼点过去，而那正是这道门想防的事。
 
-**这道门与 `BUILDING.md` 的 `desktop:` 是两回事，次序也固定**（city-SPEC §8-25）：楼那一位开关决定这台 server **接不接得上**，这道门决定接上之后**每一次调用要不要问人**。楼说「是」不等于人对每一次点击说「是」。
+**这道门与 `RULES.toml` 的 `desktop` 是两回事，次序也固定**（city-SPEC §8-25）：楼那一位开关决定这台 server **接不接得上**，这道门决定接上之后**每一次调用要不要问人**。楼说「是」不等于人对每一次点击说「是」。
 
 **恒不为它新增 `Effect` 变体**：`Effect` 是路由字段，`Connector` 已经把这一类调用路由到出网门了；再加一格会让每一处 `match Effect` 都要回答一个与它无关的问题。这道门叠在出网门之后，两道各答各的——出网门答「这些字节能出去吗」，本门答「这个后果收得回来吗」。
 
@@ -1842,7 +1842,7 @@ pub fn parse(raw: &str) -> Result<Self, AxError>;   // 追加：任一段以点�
 pub fn is_reserved(&self) -> bool;                  // 改：eq_ignore_ascii_case
 ```
 
-**改它的理由是一个可被利用的洞，不是一个新需求。** 地址最终由 `city_root.join(addr.as_str())` 交给文件系统，而 Win32 在打开文件前剔掉每一段的尾随点与尾随空格，并以大小写不敏感的方式解析目录名。于是 `lab/.SPRAWLING`、`lab/.sprawling.`、`lab/.sprawling ` 三种拼法落到 `lab/.sprawling` 这同一个目录，而逐字节比较的 `is_reserved` 对三者全答假。读路径的 `runtime::tools::chosen_path` 与写路径的 `kernel::write_domain` 共用这一个谓词，所以一个 run 换一种拼法就写得了自己楼的 `BUILDING.md`、自己的 `CONFIG.toml` 与账本目录——8-28 立起来的不变式被拼写绕过。
+**改它的理由是一个可被利用的洞，不是一个新需求。** 地址最终由 `city_root.join(addr.as_str())` 交给文件系统，而 Win32 在打开文件前剔掉每一段的尾随点与尾随空格，并以大小写不敏感的方式解析目录名。于是 `lab/.SPRAWLING`、`lab/.sprawling.`、`lab/.sprawling ` 三种拼法落到 `lab/.sprawling` 这同一个目录，而逐字节比较的 `is_reserved` 对三者全答假。读路径的 `runtime::tools::chosen_path` 与写路径的 `kernel::write_domain` 共用这一个谓词，所以一个 run 换一种拼法就写得了自己楼的 `RULES.toml`、自己的 `CONFIG.toml` 与账本目录——8-28 立起来的不变式被拼写绕过。
 
 - **在文法层拒绝别名，而不是在判定层认识别名**：尾随点与尾随空格被 `parse` 一次性拒掉，于是这两种拼法根本构造不出 `Address`，`is_reserved` 之后的每一个读者都不必再知道 Win32 的这条规矩。判定层只留大小写一条，因为大小写别名无法在文法层拒绝——`.SPRAWLING` 是一个人可能真心想要的目录名。
 - **ASCII 折叠够用，理由是保留名自己**：`RESERVED_PREFIX` 全是 ASCII，`eq_ignore_ascii_case` 对它给出的答案与 NTFS 的大写表一致；引入 Unicode 折叠会把一张随版本变的表搬进 kernel，而它多认的字符一个也不在这个常量里。

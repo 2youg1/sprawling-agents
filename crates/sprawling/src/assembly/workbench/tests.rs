@@ -32,7 +32,7 @@ fn a_building_whose_rules_do_not_parse_stops_the_run_rather_than_guessing() {
             effort: None,
         })
         .unwrap_err();
-    assert!(err.recovery().contains("confidential: false"));
+    assert!(err.recovery().contains(city::RULES_FILE));
 }
 
 /// Until this tool existed a run could only signal an address

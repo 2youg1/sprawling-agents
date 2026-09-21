@@ -58,8 +58,8 @@ pub(crate) fn read_building(
     // a dot directory, and the walk below reads files rather than
     // directories, so a page that only walked would have quietly lost
     // the tab that shows what this building is allowed to do.
-    if let Ok(bytes) = std::fs::read(city::building_path(city_root, addr)) {
-        docs.push(doc_from(city::BUILDING_FILE.to_owned(), &bytes));
+    if let Ok(bytes) = std::fs::read(city::rules_path(city_root, addr)) {
+        docs.push(doc_from(city::RULES_FILE.to_owned(), &bytes));
     }
     if let Ok(entries) = std::fs::read_dir(&root) {
         for entry in entries.flatten() {
@@ -134,7 +134,7 @@ pub(super) fn doc_order(name: &str) -> (u8, String) {
         city::ROADMAP_FILE => 0,
         "Memo.md" => 1,
         "Handoff.md" => 2,
-        city::BUILDING_FILE => 3,
+        city::RULES_FILE => 3,
         city::URBANITE_FILE => 4,
         _ => 5,
     };

@@ -181,11 +181,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
     let dir = tempfile::tempdir().unwrap();
     init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md\n\n`confidential: false`\n",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     let room = Address::parse("lab/room1").unwrap();

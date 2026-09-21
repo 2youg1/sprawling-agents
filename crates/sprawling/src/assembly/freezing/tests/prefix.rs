@@ -18,7 +18,7 @@ use crate::assembly::*;
 /// `AGENTS.md` is the file they are written in. A resident that has to
 /// open it before it can follow it follows it one turn late, or not at
 /// all - the same sentence `building_segment` already carries about
-/// `BUILDING.md`, and the same answer.
+/// `RULES.toml`, and the same answer.
 #[test]
 fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
     let dir = tempfile::tempdir().unwrap();
@@ -58,7 +58,7 @@ fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
         "the project's own conventions never reached the model: {asked}"
     );
     assert!(
-        asked.contains("confidential: false"),
+        asked.contains("confidential = false"),
         "and the city's own rules for the building are still there"
     );
 }
@@ -137,7 +137,7 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
 
     let asked = provider.bodies().join("\n");
     assert!(
-        asked.contains("confidential: false"),
+        asked.contains("confidential = false"),
         "the building's own rules reach the model: {asked}"
     );
     assert!(
@@ -284,7 +284,7 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
         .find(|segment| segment.slot == channels::PrefixSlot::Building)
         .expect("the building slot is one of the four");
     assert!(
-        building.text.contains("confidential: false"),
+        building.text.contains("confidential = false"),
         "the building's own rules read back: {}",
         building.text
     );
@@ -292,7 +292,7 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
         building
             .sources
             .iter()
-            .any(|source| source.addr.as_str() == "lab/.sprawling/BUILDING.md"),
+            .any(|source| source.addr.as_str() == "lab/.sprawling/RULES.toml"),
         "the segment names the file it was read from: {:?}",
         building.sources
     );

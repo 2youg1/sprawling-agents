@@ -88,12 +88,17 @@ fn a_building_whose_rules_will_not_read_is_reported_not_skipped() {
     let dir = tempfile::tempdir().unwrap();
     crate::assembly::init_city(dir.path()).unwrap();
     city::create_building(dir.path(), &lab(), city::BuildingTemplate::Minimal).unwrap();
-    city::write_rules(dir.path(), &lab(), "confidential: false\nbrowser: true\n").unwrap();
+    city::write_rules(
+        dir.path(),
+        &lab(),
+        "confidential = false\nwrite = \"everything\"\nbrowser = true\n",
+    )
+    .unwrap();
     let mill = Address::parse("mill").unwrap();
     city::create_building(dir.path(), &mill, city::BuildingTemplate::Minimal).unwrap();
     std::fs::write(
-        city::building_path(dir.path(), &mill),
-        "confidential: true\nbrowser: true\n",
+        city::rules_path(dir.path(), &mill),
+        "confidential = true\nwrite = \"everything\"\nbrowser = true\n",
     )
     .unwrap();
 
@@ -210,7 +215,12 @@ fn doctor_with_a_city_names_the_building_on_the_screen() {
     let dir = tempfile::tempdir().unwrap();
     crate::assembly::init_city(dir.path()).unwrap();
     city::create_building(dir.path(), &lab(), city::BuildingTemplate::Minimal).unwrap();
-    city::write_rules(dir.path(), &lab(), "confidential: false\nbrowser: true\n").unwrap();
+    city::write_rules(
+        dir.path(),
+        &lab(),
+        "confidential = false\nwrite = \"everything\"\nbrowser = true\n",
+    )
+    .unwrap();
 
     let machine = ScriptedMachine::missing(&["gecko", "chromedriver", "msedgedriver", "webkit"]);
     let mut nobody = std::io::Cursor::new(Vec::new());

@@ -27,7 +27,7 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-use crate::policy::{BUILDING_FILE, building_path, write_rules};
+use crate::policy::{RULES_FILE, rules_path, write_rules};
 
 /// The tool. It holds where the city is and which building the calling
 /// run belongs to, so a run cannot rewrite another building's rules by
@@ -76,7 +76,7 @@ impl RulesTool {
             meta: ToolMeta {
                 name: ToolName::parse("rules")?,
                 disclosure: format!(
-                    "Read this building's {BUILDING_FILE}, or propose the whole of a new one. \
+                    "Read this building's {RULES_FILE}, or propose the whole of a new one. \
                      A proposal is evaluated first and goes to the person before it is written."
                 ),
                 params: Payload::new(params)?,
@@ -149,7 +149,7 @@ impl Tool for RulesTool {
         );
         match Op::parse(arg(args, "op")?)? {
             Op::Read => {
-                let path = building_path(&self.city_root, &self.building);
+                let path = rules_path(&self.city_root, &self.building);
                 let text = std::fs::read_to_string(&path).unwrap_or_default();
                 out.insert("text".to_owned(), Value::String(text));
             }
@@ -208,7 +208,10 @@ mod tests {
         let outcome = tool
             .invoke(&call(
                 "propose",
-                Some("# lab\n\nconfidential: false\nreview: true\n\n## Write domain\n\n- lab\n"),
+                Some(
+                    "confidential = false\nwrite = \"everything\"\nreview = true\n\
+                     prefixes = [\"lab\"]\n",
+                ),
             ))
             .unwrap();
         assert_eq!(outcome.result.as_map()["review"], true);
@@ -220,7 +223,7 @@ mod tests {
             read_back.result.as_map()["text"]
                 .as_str()
                 .unwrap()
-                .contains("review: true")
+                .contains("review = true")
         );
     }
 
@@ -230,13 +233,19 @@ mod tests {
     fn a_proposal_that_does_not_evaluate_leaves_the_old_rules_standing() {
         let dir = tempfile::tempdir().unwrap();
         let mut tool = tool(dir.path());
-        tool.invoke(&call("propose", Some("confidential: false\n")))
-            .unwrap();
+        tool.invoke(&call(
+            "propose",
+            Some("confidential = false\nwrite = \"everything\"\n"),
+        ))
+        .unwrap();
 
         let err = tool
             .invoke(&call(
                 "propose",
-                Some("confidential: true\n\n## Egress\n\n- example.com\n"),
+                Some(
+                    "confidential = true\nwrite = \"everything\"\n\
+                     egress = [\"example.com\"]\n",
+                ),
             ))
             .unwrap_err();
         assert_eq!(err.code(), &AxCode::ConfigInvalid);
@@ -253,10 +262,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut tool = tool(dir.path());
         let err = tool
-            .invoke(&call("propose", Some("# lab\n\nreview: false\n")))
+            .invoke(&call(
+                "propose",
+                Some("write = \"everything\"\nreview = false\n"),
+            ))
             .unwrap_err();
         assert_eq!(err.code(), &AxCode::ConfigInvalid);
-        assert!(!building_path(dir.path(), &Address::parse("lab").unwrap()).exists());
+        assert!(!rules_path(dir.path(), &Address::parse("lab").unwrap()).exists());
     }
 
     #[test]

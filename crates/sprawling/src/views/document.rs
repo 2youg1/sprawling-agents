@@ -92,7 +92,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         crate::assembly::init_city(dir.path()).unwrap();
         let mut views = Views::new(dir.path());
-        let rules = Address::parse("hall/.sprawling/BUILDING.md").unwrap();
+        let rules = Address::parse(&format!(
+            "hall/{}/{}",
+            kernel::RESERVED_PREFIX,
+            city::RULES_FILE
+        ))
+        .unwrap();
         let channels::Answer::Document(answer) =
             views.answer(&channels::Query::Document { at: rules.clone() })
         else {

@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, Payload};
 
-use crate::policy::BUILDING_FILE;
+use crate::policy::RULES_FILE;
 
 pub(crate) mod template;
 
@@ -153,7 +153,7 @@ pub fn create(
     // inside it (kernel-SPEC.md section 8-28).
     let governed = root.join(kernel::RESERVED_PREFIX);
     std::fs::create_dir_all(&governed).map_err(|err| storage(&governed, &err))?;
-    let file = governed.join(BUILDING_FILE);
+    let file = governed.join(RULES_FILE);
     let rules = template.rules(addr)?;
     // `create_new` rather than exists-then-write: the refusal and the
     // write are one operation, so no second caller lands in between.
@@ -179,10 +179,10 @@ pub fn create(
             "create a building",
             addr.as_str().to_owned(),
         )
-        .with_recovery(
-            "this building already has rules; edit its BUILDING.md, or create a building \
-             at an address nobody occupies",
-        )),
+        .with_recovery(format!(
+            "this building already has rules; edit its {RULES_FILE}, or create a building \
+             at an address nobody occupies"
+        ))),
         Err(err) => Err(storage(&file, &err)),
     }
 }

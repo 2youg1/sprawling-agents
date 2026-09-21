@@ -21,11 +21,7 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
     let report = init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("market").join("ito")).unwrap();
     std::fs::create_dir_all(dir.path().join("market").join("hana")).unwrap();
-    lay_rules(
-        dir.path(),
-        "market",
-        "# BUILDING.md\n\n`confidential: false`\n",
-    );
+    lay_rules(dir.path(), "market", &ordinary_rules(""));
 
     let (base_url, _provider) = fake_openai(
         &["m-local"],

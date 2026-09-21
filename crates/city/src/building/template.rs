@@ -13,20 +13,22 @@
 
 use kernel::{Address, AxCode, AxError};
 
-/// The rules a new building starts with. Instantiated at compile time so
-/// that a moved or renamed template breaks the build rather than a city.
-const TEMPLATE_RULES: &str = include_str!("../../../../docs/templates/BUILDING.md");
+/// What a new building is and what it may do: one document, read by
+/// the city and by every resident of the building. Instantiated at
+/// compile time so that a moved or renamed template breaks the build
+/// rather than a city.
+const TEMPLATE_RULES: &str = include_str!("../../../../docs/templates/RULES.toml");
 /// City Hall's rules, fixed rather than derived: what its two residents
 /// may do serves every other building, so it is a property of the city.
-const HALL_RULES: &str = include_str!("../../../../docs/templates/BUILDING-hall.md");
+const HALL_RULES: &str = include_str!("../../../../docs/templates/RULES-hall.toml");
 /// The word every document template carries where a building's own
 /// name goes. One spelling for the rules laid out here and for the
 /// plan, memo and handoff `crate::spine_files` lays out beside them: a
 /// second spelling would leave one of those documents addressed to
 /// `<building name>` for the life of the building.
 pub(crate) const NAME_PLACEHOLDER: &str = "<building name>";
-const ORDINARY_LINE: &str = "`confidential: false`";
-const CONFIDENTIAL_LINE: &str = "`confidential: true`";
+const ORDINARY_LINE: &str = "confidential = false";
+const CONFIDENTIAL_LINE: &str = "confidential = true";
 
 /// What a new building is laid out as. Exhaustive: a template exists
 /// because some kind of building needs different bytes on its first day,
@@ -93,7 +95,7 @@ impl BuildingTemplate {
         }
     }
 
-    /// The `BUILDING.md` bytes this template starts a building with.
+    /// The document this template starts a building with.
     ///
     /// # Errors
     /// Refuses when the template no longer carries the line a
@@ -112,10 +114,10 @@ impl BuildingTemplate {
                     return Err(AxError::failure(
                         AxCode::ConfigInvalid,
                         "lay out a confidential building",
-                        format!("the template no longer carries {ORDINARY_LINE}"),
+                        format!("the template no longer carries `{ORDINARY_LINE}`"),
                     )
                     .with_recovery(
-                        "restore that line in docs/templates/BUILDING.md; the confidential \
+                        "restore that line in docs/templates/RULES.toml; the confidential \
                          template is the ordinary one with that value flipped",
                     ));
                 }

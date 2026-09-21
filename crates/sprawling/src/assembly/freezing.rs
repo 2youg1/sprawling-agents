@@ -108,7 +108,7 @@ pub(super) fn building_segment(
     // The room's own address opens the slot and is not a document, so
     // it is accounted to nothing.
     let mut out = Assembled::of_nothing(addr.as_str().as_bytes().to_vec());
-    let rules_at = city::building_path(city_root, building);
+    let rules_at = city::rules_path(city_root, building);
     if let Ok(rules) = std::fs::read(&rules_at) {
         out.extend(addressed(city_root, &rules_at)?, &rules);
     }

@@ -21,11 +21,7 @@ fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbo
     init_city(dir.path()).unwrap();
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md\n\n`confidential: false`\n",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
     // A directory where the plan belongs. `read_to_string` then fails
     // for a reason that is not "it is not there yet" - the one reason
     // an empty plan is the right answer to - without this test having

@@ -25,11 +25,7 @@ fn a_handoff_that_cannot_be_read_is_refused_by_name() {
     init_city(dir.path()).unwrap();
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md\n\n`confidential: false`\n",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
     let room = Address::parse("lab/room1").unwrap();
     let handoff = city::handoff_path(dir.path(), &room);
     let _ = std::fs::remove_file(&handoff);
@@ -60,11 +56,7 @@ fn work_offered_in_up_mode_without_a_test_does_not_land() {
     let report = init_city(dir.path()).unwrap();
     let note = dir.path().join("lab").join("room1").join("note.md");
     std::fs::create_dir_all(note.parent().unwrap()).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md\n\n`confidential: false`\n\n`review: true`\n",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
     std::fs::write(&note, "before\n").unwrap();
     let (base_url, provider) = fake_openai(
         &["m-local"],

@@ -253,7 +253,7 @@ fn a_folder_somebody_already_works_in_becomes_a_city_around_that_work() {
     for name in ["parser", "notes"] {
         let addr = Address::parse(name).unwrap();
         assert!(
-            city::building_path(dir.path(), &addr).is_file(),
+            city::rules_path(dir.path(), &addr).is_file(),
             "{name} has no rules of its own"
         );
         assert!(city::load(dir.path(), &addr).is_ok());

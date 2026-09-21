@@ -18,16 +18,7 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
     std::fs::create_dir_all(building.join("room2")).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md
-
-`confidential: false`
-
-`review: true`
-",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
     let note = building.join("room1").join("notes.md");
     std::fs::write(
         &note, b"before

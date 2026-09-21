@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError};
 
-use crate::policy::building_path;
+use crate::policy::rules_path;
 
 pub(crate) mod hall;
 
@@ -303,7 +303,7 @@ pub fn write_job(
 pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError> {
     let building = crate::building::Building::of(addr)?;
     let mut out = vec![city_root.join(CITY_FILE)];
-    let rules = building_path(city_root, building.addr());
+    let rules = rules_path(city_root, building.addr());
     if rules.exists() {
         out.push(rules);
     }

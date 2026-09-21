@@ -5,18 +5,9 @@
 
 use super::*;
 
-/// Lays a building's rules where the city reads them.
-///
-/// Through `city::building_path` rather than by joining a file name:
-/// a fixture that spells the path itself is a second authority for
-/// where the rules live, and it goes on passing after the real one
-/// has moved.
-pub(super) fn lay_rules(city_root: &Path, building: &str, text: &str) {
-    let addr = Address::parse(building).unwrap();
-    let file = city::building_path(city_root, &addr);
-    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
-    std::fs::write(file, text).unwrap();
-}
+mod rules;
+
+pub(super) use rules::{lay_rules, ordinary_rules, shut_rules};
 
 /// A loopback provider that answers a model list and then a fixed
 /// number of chat completions, registered the way a person would

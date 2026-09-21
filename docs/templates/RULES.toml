@@ -1,0 +1,63 @@
+# RULES.toml — <building name>
+#
+# What this building is, and what it may do. A person writes this file.
+# The city parses it and hands the same bytes to every resident, so what
+# an agent reads is what the city enforces — there is no second document
+# describing this building, and nothing here that the machine skips.
+#
+# It sits in the building's reserved subtree, which no write domain
+# reaches: residents read it and cannot change it. To propose a change,
+# use the `rules` tool and a person answers.
+#
+# Every key this version knows is below. A key it does not know is
+# refused rather than passed over, so a misspelling is a message instead
+# of a permission that silently never arrived.
+
+# One paragraph, addressed to an agent arriving here for the first time.
+does = ""
+
+# Local conventions: naming, commits, review, and what counts as
+# finished. Write the specific ones — "keep quality high" gives an agent
+# nothing to act on.
+conventions = ""
+
+# Data enters and does not leave, the model pool is restricted to local
+# inference, and writes to other buildings are refused. This is a
+# structural decision rather than a switch: it changes what the building
+# is able to do.
+confidential = false
+
+# What residents may write inside the prefixes below.
+#   "everything" — every file under the prefix.
+#   "documents"  — the Markdown documents under it, and never a plan
+#                  file; the plan has one editing entrance, the `plan`
+#                  tool.
+write = "everything"
+
+# The prefixes residents of this building may write. The reserved
+# subtree is outside every write domain and cannot be listed here.
+prefixes = []
+
+# Work here is offered for review before it lands.
+review = false
+
+# Residents are given the browser tool, which drives a browser the city
+# starts and owns.
+browser = false
+
+# Residents may drive the browser the person is already using: `false`
+# for off, `true` to enable it and be asked for the address, or the
+# address itself, "ws://127.0.0.1:9222/session".
+usersbrowser = false
+
+# Residents are given this machine's own desktop, window by window,
+# under the allowlist in DESKTOP.toml.
+desktop = false
+
+# The domains work here may reach over the network. Empty is none, and a
+# confidential building may not list any.
+egress = []
+
+# Which skills this building admits into its catalog, by name. Name
+# them: a list of names is checkable and "as needed" is not.
+reading_room = []

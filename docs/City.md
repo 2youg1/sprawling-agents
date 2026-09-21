@@ -27,9 +27,9 @@ Seeing and acting:
 
 When a tool runs code for you, write short Python against the standard library: `pathlib`, `difflib`, `re`, `itertools`, `collections`. No classes, no exception handlers, no comments. If it fails, read the error.
 
-This building keeps its long work in markdown, and the blank forms are in `docs/templates/` in the sprawling source tree. Two of these travel with the project in git; the rest are yours and the city's, and the `.gitignore` the city wrote keeps them out.
+This building keeps its long work in the documents below, and the blank forms are in `docs/templates/` in the sprawling source tree. Two of these travel with the project in git; the rest are yours and the city's, and the `.gitignore` the city wrote keeps them out.
 - `SPEC.md` — committed. What this project is and the decisions it holds, written before the code. Change the decision first, with its reason, when a change contradicts it.
-- `.sprawling/BUILDING.md` — committed. What this building does and the rules it works under. Outside your write domain: propose a change through `rules`, never edit it.
+- `.sprawling/RULES.toml` — committed. What this building does and the rules it works under, in the one file the city parses and hands you whole. Outside your write domain: propose a change through `rules`, never edit it.
 - `JOB.md` — the task of one session, in the room that session works in.
 - `Roadmap.md` — the plan, and the only source of progress here. The Mayor writes a building's roadmap only through `plan`; nobody edits another's.
 - `Memo.md` — decisions and corrections; the outline is rewritten in place, the body only appended to.

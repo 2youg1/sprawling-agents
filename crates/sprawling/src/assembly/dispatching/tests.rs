@@ -183,11 +183,7 @@ fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
 fn a_confidential_building_will_not_name_a_room_with_a_model_off_this_machine() {
     let dir = tempfile::tempdir().unwrap();
     init_city(dir.path()).unwrap();
-    lay_rules(
-        dir.path(),
-        "vault",
-        "# BUILDING.md\n\n## confidential\n\n`confidential: true`\n",
-    );
+    lay_rules(dir.path(), "vault", &shut_rules(""));
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     // `.invalid` resolves nowhere on every machine, so the probe fails

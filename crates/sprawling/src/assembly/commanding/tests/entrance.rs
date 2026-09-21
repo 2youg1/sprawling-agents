@@ -61,11 +61,7 @@ fn lines_of(ledger_dir: &Path, kind: &str) -> usize {
 fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
     let dir = tempfile::tempdir().unwrap();
     let report = init_city(dir.path()).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md\n\n`confidential: false`\n",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
 

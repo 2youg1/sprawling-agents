@@ -17,11 +17,7 @@ fn a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked() {
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
     std::fs::create_dir_all(building.join("room2")).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md\n\n`confidential: false`\n\n`review: true`\n",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
 
     let (base_url, _provider) = fake_openai(
         &["m-local"],
@@ -129,11 +125,7 @@ fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
     std::fs::create_dir_all(building.join("room2")).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md\n\n`confidential: false`\n\n`review: true`\n",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
     let note = building.join("room1").join("notes.md");
     std::fs::create_dir_all(note.parent().unwrap()).unwrap();
     std::fs::write(&note, b"before\n").unwrap();
@@ -251,11 +243,7 @@ fn a_merge_no_person_looked_at_names_no_person_as_its_reviewer() {
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
     std::fs::create_dir_all(building.join("room2")).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md\n\n`confidential: false`\n\n`review: true`\n",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
 
     let (base_url, _provider) = fake_openai(
         &["m-local"],

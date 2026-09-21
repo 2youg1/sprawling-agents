@@ -30,7 +30,7 @@ use kernel::{
 use serde_json::{Map, Value};
 
 use crate::building::{BuildingTemplate, adopt, all, create};
-use crate::policy::{BUILDING_FILE, building_path};
+use crate::policy::{RULES_FILE, rules_path};
 
 /// The tool. It holds where the city is, so a model naming a path
 /// cannot move the city it is raising a building in.
@@ -108,7 +108,7 @@ impl CityTool {
             row.insert("addr".to_owned(), Value::String(addr.as_str().to_owned()));
             row.insert(
                 "has_rules".to_owned(),
-                Value::Bool(building_path(&self.city_root, &addr).is_file()),
+                Value::Bool(rules_path(&self.city_root, &addr).is_file()),
             );
             rows.push(Value::Object(row));
         }
@@ -116,7 +116,7 @@ impl CityTool {
         out.insert("buildings".to_owned(), Value::Array(rows));
         out.insert(
             "rules_file".to_owned(),
-            Value::String(BUILDING_FILE.to_owned()),
+            Value::String(RULES_FILE.to_owned()),
         );
         Payload::new(out)
     }
@@ -271,7 +271,7 @@ mod tests {
             .unwrap();
         assert_eq!(raised.result.as_map()["addr"], "lab");
         assert!(
-            crate::policy::building_path(dir.path(), &kernel::Address::parse("lab").unwrap())
+            crate::policy::rules_path(dir.path(), &kernel::Address::parse("lab").unwrap())
                 .is_file()
         );
 

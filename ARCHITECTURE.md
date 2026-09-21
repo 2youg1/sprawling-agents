@@ -166,7 +166,7 @@ A city is one directory. Copy it and it is the same city; delete it and nothing 
 │  └─ CONFIG.toml              city layer of the three-layer configuration
 └─ <building>/                 one building, one line of business
    ├─ .sprawling/              the building's reserved subtree: what governs it
-   │  ├─ BUILDING.md           the building's rules: confidential, review, write domains
+   │  ├─ RULES.toml            what the building is and may do: one parsed file
    │  ├─ CONFIG.toml           building layer, including its MCP servers
    │  └─ skills/               skills only this building admits
    ├─ Roadmap.md               the plan tree, and the denominator of every progress reading
@@ -179,18 +179,18 @@ A city is one directory. Copy it and it is the same city; delete it and nothing 
 
 **One rule, applied at every scope: what governs a scope lives in that scope's `.sprawling/`, and no write domain reaches it.** `is_reserved` answers true for an address with `.sprawling` in any segment, so the check is one predicate in `kernel::address` rather than a list of protected file names. An agent therefore cannot edit its own accounting, its own configuration, its own building's rules, or the history of what it did.
 
-A run's write domain is what its building's `BUILDING.md` declares, and **the whole building when it declares nothing** — which is the shipped template. The room is where a session works, not the boundary that contains it.
+A run's write domain is what its building's `RULES.toml` declares, and **the whole building when it names no prefix** — which is the shipped template. The room is where a session works, not the boundary that contains it.
 
 **`Roadmap.md` is a tree, and the `plan` tool is what writes it.** The index column is a path — `2.3.1` hangs under `2.3` — so one file states a multi-level plan without a second file to say how the levels relate. `Weight` is a ratio among the rows sharing a parent and `Needs` names what must finish first, which is what makes a ready set computable. A resident divides its own branch and cannot reach past it: `kernel::share` has no constructor, so a share exists only by dividing another one, and the total is the whole plan whatever the plan turns into. Only leaves are counted; a branch's work is its children.
 
 ## 7 The wire
 
-One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is <!-- xtask:begin wire_v -->32<!-- xtask:end -->.
+One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is <!-- xtask:begin wire_v -->33<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
 | `Command` | <!-- xtask:begin command_frames -->29<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
-| `Query` | <!-- xtask:begin query_frames -->33<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
+| `Query` | <!-- xtask:begin query_frames -->34<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |
 
@@ -296,7 +296,7 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->16<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1923<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2008<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
@@ -702,7 +702,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | collab::workshop_tool::tests | crates/collab/src/workshop_tool/tests.rs | what the workshop tool refuses: a cycle, a second graph, a verdict from nobody who read | adapter | P1 | built | collab-SPEC.md#8-16 |
 | collab::triage | crates/collab/src/triage.rs | where something from outside lands, and whether it starts work | decision | P3 | built | collab-SPEC.md#8-11 |
 
-### city (41) — space, identity, and the documents a building keeps
+### city (42) — space, identity, and the documents a building keeps
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -731,8 +731,9 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | city::config_layers::write::tests | crates/city/src/config_layers/write/tests.rs | what the write faces state, and what they refuse to write | decision | V0.0.6 | built | city-SPEC.md#8-4b |
 | city::document | crates/city/src/document.rs | putting a document on disk whole, or leaving the old one there | adapter | V6 | built | city-SPEC.md#8-27 |
 | city::document::tests | crates/city/src/document/tests.rs | a reader never meets half a document, and two writers of one do not overwrite each other | adapter | V6 | built | city-SPEC.md#8-27 |
-| city::policy | crates/city/src/policy.rs | `BUILDING.md` evaluated into rules a machine can hold | decision | P1 | built | city-SPEC.md#8-2 |
-| city::policy::evaluate | crates/city/src/policy/evaluate.rs | reading a `BUILDING.md` into the rules a machine holds | decision | V4 | built | city-SPEC.md#8-2 |
+| city::policy | crates/city/src/policy.rs | `RULES.toml` evaluated into rules a machine can hold | decision | P1 | built | city-SPEC.md#8-2 |
+| city::policy::evaluate | crates/city/src/policy/evaluate.rs | reading a `RULES.toml` into the rules a machine holds | decision | V4 | built | city-SPEC.md#8-2 |
+| city::policy::desktop | crates/city/src/policy/desktop.rs | where a building's desktop allowlist lives, and the one door that replaces it; nothing here parses it | adapter | V4 | built | city-SPEC.md#8-25 |
 | city::policy::reach | crates/city/src/policy/reach.rs | what a building's residents may write inside their prefixes: everything, or documents | decision | V4 | built | city-SPEC.md#8-2 |
 | city::policy::user_browser | crates/city/src/policy/user_browser.rs | the address a person's own browser answers on, one parse for the attach and the door | value | V4 | built | city-SPEC.md#8-2 |
 | city::policy::tests | crates/city/src/policy/tests.rs | the confidential three, the refusals, and the write domain a file declares | decision | P1 | built | city-SPEC.md#8-2 |
@@ -813,7 +814,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (15), protocol (6), bin (197)
+### browser (15), protocol (6), bin (198)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -846,6 +847,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::main::tests | crates/sprawling/src/main/tests.rs | flags are never paths, and no ledger is never verified | adapter | S0 | built | sprawling-SPEC.md#8-30 |
 | bin::assembly | crates/sprawling/src/assembly.rs | the assembly point: the worker every module below writes methods for, the one clock sample, and the one door a command enters by | adapter | S0 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::lifetime | crates/sprawling/src/assembly/lifetime.rs | a worker opened over a history, and the city closed in the record | adapter | S0 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::fixture::rules | crates/sprawling/src/assembly/fixture/rules.rs | what a building's rules look like in a test, and where they go | adapter | S0 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::fixture | crates/sprawling/src/assembly/fixture.rs | the fake provider and the worker every assembly test starts from | adapter | S0 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::recording | crates/sprawling/src/assembly/recording.rs | the lines this worker appends: one for the city, one for a run, and the diagnostic note beside them | adapter | V4 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::genesis | crates/sprawling/src/assembly/genesis.rs | forming a city in a directory, taking a folder in as a building, and what a restart finds | adapter | V3 | built | sprawling-SPEC.md#8-39 |

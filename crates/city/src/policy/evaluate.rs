@@ -3,149 +3,171 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Reading a `BUILDING.md` into the rules a machine holds.
+//! Reading a `RULES.toml` into the rules a machine holds.
 //!
-//! The file is Markdown a person writes, so this is a reader rather than
-//! a parser of a format: it looks for the headings and the `key: value`
-//! lines it knows and passes over everything else, which is what lets a
-//! building's rules also be a document its residents read.
+//! **Every key this version reads is a field of [`Written`].** A key it
+//! does not know is refused rather than passed over, and a key is a key
+//! only where the grammar puts one — which is the whole reason this
+//! file is TOML and the prose beside it is not. Until it was split out,
+//! the reader matched `confidential:`, `write:`, `review:`, `browser:`,
+//! `usersbrowser:` and `desktop:` on *any* line of `BUILDING.md`, so a
+//! sentence under "How work is done here" that began `desktop: true`
+//! granted this machine's desktop, and a `write:` line nobody wrote at
+//! all resolved to `Everything`. Both of those failed towards the
+//! permissive side, which is the one direction a permission reader may
+//! never fail in.
+//!
+//! There is no second document. The prefix carries this file's own
+//! bytes, so the prose a resident reads and the settings the city
+//! enforces cannot describe two different buildings.
 
-use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist, ToolName};
+use serde::Deserialize;
+
+use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist};
 
 use super::reach::DomainReach;
-use super::{
-    BUILDING_FILE, BuildingRules, CONFIDENTIAL_KEY, DESKTOP_KEY, EGRESS_HEADING, READING_HEADING,
-    REVIEW_KEY, UserBrowser, UserBrowserEndpoint, WRITE_HEADING, WRITE_KEY,
-};
+use super::{BuildingRules, RULES_FILE, UserBrowser, UserBrowserEndpoint};
 
-/// Evaluates the text of a `BUILDING.md`.
+/// The file as a person wrote it, before any rule is judged.
+///
+/// One struct, so the set of keys this version reads is a thing the
+/// compiler holds rather than a list some reader has to stay in step
+/// with. `write` and `confidential` have no default: they are the two
+/// answers whose absence used to resolve to the permissive side.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Written {
+    /// What this building is, in the person's words, and how work is
+    /// done here.
+    ///
+    /// Declared and deliberately not read. Their reader is the resident,
+    /// which is handed this file's own bytes; parsing them into
+    /// [`BuildingRules`] as well would be a second rendering of text
+    /// that already went out whole. They are fields rather than TOML
+    /// comments so that `deny_unknown_fields` still covers the file: a
+    /// person who misspells `conventions` is told, instead of writing a
+    /// paragraph nothing keeps.
+    #[serde(default)]
+    #[expect(
+        dead_code,
+        reason = "the resident reads these as bytes; a parsed copy would be a second rendering"
+    )]
+    does: String,
+    /// How work is done here, on the same terms as `does`.
+    #[serde(default)]
+    #[expect(
+        dead_code,
+        reason = "the resident reads these as bytes; a parsed copy would be a second rendering"
+    )]
+    conventions: String,
+    confidential: bool,
+    write: String,
+    #[serde(default)]
+    prefixes: Vec<String>,
+    #[serde(default)]
+    review: bool,
+    #[serde(default)]
+    browser: bool,
+    #[serde(default)]
+    usersbrowser: Granted,
+    #[serde(default)]
+    desktop: bool,
+    #[serde(default)]
+    egress: Vec<String>,
+    #[serde(default)]
+    reading_room: Vec<String>,
+}
+
+/// What `usersbrowser` may say: off, on with no address declared yet,
+/// or the address itself.
+///
+/// One key rather than two, for the reason [`UserBrowser`] gives: a
+/// person who wrote the address has answered both questions at once,
+/// and two keys would be two answers that can disagree.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Granted {
+    Switch(bool),
+    At(String),
+}
+
+impl Default for Granted {
+    fn default() -> Granted {
+        Granted::Switch(false)
+    }
+}
+
+/// The refusal for text this version cannot read.
+///
+/// **It does not restate the schema.** `deny_unknown_fields` makes the
+/// deserialiser name the key it met and the keys it expected, and a
+/// second list written here would be the one that goes stale the first
+/// time [`Written`] grows a field. What this adds is what the
+/// deserialiser cannot know: whose file this is and who may change it.
+fn refuse(subject: String) -> AxError {
+    AxError::failure(AxCode::ConfigInvalid, "read a building's rules", subject).with_recovery(
+        format!(
+            "correct {RULES_FILE} in this building's reserved subtree, against the blank form \
+             a new building is laid out with; a resident cannot write it, and proposes a \
+             change through the `rules` tool instead"
+        ),
+    )
+}
+
+/// Evaluates the text of a `RULES.toml`.
 ///
 /// # Errors
-/// Refuses a file with no confidential declaration, or one whose value is
-/// neither `true` nor `false` — a privacy setting that reads as a typo
-/// must not resolve to the permissive side.
+/// Refuses text that is not this version's TOML — a key it does not
+/// know, a missing `confidential` or `write`, a value of the wrong
+/// type — a write prefix that is not an address, and the four settings
+/// a confidential building contradicts by asking for.
 pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
-    let mut confidential: Option<bool> = None;
-    let mut reach = DomainReach::Everything;
-    let mut review = false;
-    let mut browser = false;
-    let mut usersbrowser: Option<UserBrowser> = None;
-    let mut desktop = false;
-    let mut write_prefixes = Vec::new();
-    let mut egress_entries: Vec<String> = Vec::new();
-    let mut in_write_section = false;
-    let mut in_egress_section = false;
-    let mut in_reading_section = false;
-    let mut reading_room: Vec<String> = Vec::new();
-    for line in text.lines() {
-        let trimmed = line.trim();
-        let bare = trimmed.trim_start_matches(['#', '>', '`', '-', '*', ' ']);
-        if trimmed.starts_with('#') {
-            let heading = trimmed.to_ascii_lowercase();
-            in_write_section = heading.contains(WRITE_HEADING);
-            in_egress_section = heading.contains(EGRESS_HEADING);
-            in_reading_section = heading.contains(READING_HEADING);
-            continue;
-        }
-        if in_reading_section && (trimmed.starts_with("- ") || trimmed.starts_with("* ")) {
-            let entry = bare.trim().trim_matches('`').trim();
-            if !entry.is_empty() {
-                reading_room.push(entry.to_owned());
-            }
-            continue;
-        }
-        if in_egress_section && (trimmed.starts_with("- ") || trimmed.starts_with("* ")) {
-            let entry = bare.trim().trim_matches('`').trim();
-            if !entry.is_empty() {
-                egress_entries.push(entry.to_owned());
-            }
-            continue;
-        }
-        if let Some(rest) = bare.strip_prefix(WRITE_KEY) {
-            reach = DomainReach::parse(rest.trim().trim_matches('`').trim())?;
-            continue;
-        }
-        if let Some(rest) = bare.strip_prefix(REVIEW_KEY) {
-            review = flag(REVIEW_KEY, rest)?;
-            continue;
-        }
-        if let Some(rest) = key_value(bare, ToolName::BROWSER) {
-            browser = flag(ToolName::BROWSER, rest)?;
-            continue;
-        }
-        if let Some(rest) = key_value(bare, ToolName::USER_BROWSER) {
-            usersbrowser = read_usersbrowser(rest)?;
-            continue;
-        }
-        if let Some(rest) = bare.strip_prefix(DESKTOP_KEY) {
-            desktop = flag(DESKTOP_KEY, rest)?;
-            continue;
-        }
-        if let Some(rest) = bare.strip_prefix(CONFIDENTIAL_KEY) {
-            confidential = Some(flag(CONFIDENTIAL_KEY, rest)?);
-            continue;
-        }
-        if in_write_section
-            && (trimmed.starts_with("- ") || trimmed.starts_with("* "))
-            && let Ok(prefix) = Address::parse(bare.trim().trim_matches('`'))
-        {
-            write_prefixes.push(prefix);
-        }
+    let written: Written = toml::from_str(text).map_err(|err| refuse(err.to_string()))?;
+    let reach = DomainReach::parse(&written.write)?;
+    let mut write_prefixes = Vec::with_capacity(written.prefixes.len());
+    for prefix in &written.prefixes {
+        // Propagated rather than skipped. A prefix the grammar refuses
+        // used to be dropped where it was read, which left a building
+        // writing less than the person granted it and said so nowhere.
+        write_prefixes.push(Address::parse(prefix)?);
     }
-    let Some(confidential) = confidential else {
-        return Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "evaluate a building's rules",
-            format!("{BUILDING_FILE} does not say whether this building is confidential"),
-        )
-        .with_recovery("add a `confidential: false` line, or `true` and read what it changes"));
+    let usersbrowser = match written.usersbrowser {
+        Granted::Switch(false) => None,
+        Granted::Switch(true) => Some(UserBrowser::Waiting),
+        Granted::At(address) => Some(UserBrowser::At(UserBrowserEndpoint::parse(&address)?)),
     };
-    if confidential && !egress_entries.is_empty() {
-        return Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "evaluate a building's rules",
+    let confidential = written.confidential;
+    if confidential && !written.egress.is_empty() {
+        return Err(contradiction(
             format!(
                 "a confidential building lists {} egress domain(s)",
-                egress_entries.len()
+                written.egress.len()
             ),
-        )
-        .with_recovery(
-            "remove the egress list, or drop `confidential: true`; a confidential building's \
-             data does not leave, so a domain list under it contradicts the setting above it",
+            "remove the egress list, or drop `confidential = true`; a confidential building's \
+             data does not leave, so a domain list beside it contradicts the setting",
         ));
     }
-    if confidential && browser {
-        return Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "evaluate a building's rules",
-            "a confidential building asks for the browser tool",
-        )
-        .with_recovery(
-            "remove the `browser: true` line, or drop `confidential: true`; a browser opens \
-             whatever address it is given, so it is a way out of a building whose data does \
-             not leave",
+    if confidential && written.browser {
+        return Err(contradiction(
+            "a confidential building asks for the browser tool".to_owned(),
+            "remove `browser = true`, or drop `confidential = true`; a browser opens whatever \
+             address it is given, so it is a way out of a building whose data does not leave",
         ));
     }
     if confidential && usersbrowser.is_some() {
-        return Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "evaluate a building's rules",
-            "a confidential building asks to drive the person's browser",
-        )
-        .with_recovery(
-            "remove the `usersbrowser:` line, or drop `confidential: true`; attaching to \
-             that browser reads every login it holds, so the per-building isolation this \
-             setting depends on does not survive it",
+        return Err(contradiction(
+            "a confidential building asks to drive the person's browser".to_owned(),
+            "set `usersbrowser = false`, or drop `confidential = true`; attaching to that \
+             browser reads every login it holds, so the per-building isolation this setting \
+             depends on does not survive it",
         ));
     }
-    if confidential && desktop {
-        return Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "evaluate a building's rules",
-            "a confidential building asks for this machine's desktop",
-        )
-        .with_recovery(
-            "remove the `desktop: true` line, or drop `confidential: true`; a desktop holds              other programs, other windows and one shared clipboard, and none of them belong              to a building whose data does not leave",
+    if confidential && written.desktop {
+        return Err(contradiction(
+            "a confidential building asks for this machine's desktop".to_owned(),
+            "remove `desktop = true`, or drop `confidential = true`; a desktop holds other \
+             programs, other windows and one shared clipboard, and none of them belong to a \
+             building whose data does not leave",
         ));
     }
     Ok(BuildingRules {
@@ -153,53 +175,25 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
         policy: BuildingPolicy::new(confidential),
         write_prefixes,
         reach,
-        egress: EgressAllowlist::new(egress_entries),
-        review,
-        browser,
+        egress: EgressAllowlist::new(written.egress),
+        review: written.review,
+        browser: written.browser,
         usersbrowser,
-        desktop,
-        reading_room,
+        desktop: written.desktop,
+        reading_room: written.reading_room,
     })
 }
 
-/// `key: rest` when the line names this key, and nothing otherwise.
+/// Two settings that are each legal and cannot both hold.
 ///
-/// The colon has to follow the key immediately, so `usersbrowser:` is
-/// not `browser:` with something in front of it.
-fn key_value<'a>(bare: &'a str, key: &str) -> Option<&'a str> {
-    bare.strip_prefix(key)?.strip_prefix(':')
-}
-
-/// The `usersbrowser:` value: off, enabled and asking, or an address.
-///
-/// # Errors
-/// Refuses a value that is none of the three. A tool setting that reads
-/// as a typo must not resolve to the permissive side, and here the
-/// permissive side is a browser somebody's whole life is logged into.
-fn read_usersbrowser(rest: &str) -> Result<Option<UserBrowser>, AxError> {
-    match rest.trim().trim_matches('`').trim() {
-        "false" => Ok(None),
-        "true" => Ok(Some(UserBrowser::Waiting)),
-        other => UserBrowserEndpoint::parse(other).map(|endpoint| Some(UserBrowser::At(endpoint))),
-    }
-}
-
-/// One `key: true|false` line, read the same way for every key.
-///
-/// # Errors
-/// Refuses anything but the two words. A setting that reads as a typo
-/// resolves to neither side: which side is the safe one differs per key,
-/// and a reader who has to know that is a reader who will guess wrong.
-fn flag(key: &str, rest: &str) -> Result<bool, AxError> {
-    let name = key.trim_end_matches(':');
-    match rest.trim().trim_matches('`').trim() {
-        "true" => Ok(true),
-        "false" => Ok(false),
-        other => Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "evaluate a building's rules",
-            format!("`{name}: {other}` is neither true nor false"),
-        )
-        .with_recovery(format!("write `{name}: true` or `{name}: false`"))),
-    }
+/// Separate from [`refuse`] because the recovery is the pair, not the
+/// schema: a reader told to consult the key list here would read a list
+/// on which both of their settings appear.
+fn contradiction(subject: String, recovery: &str) -> AxError {
+    AxError::failure(
+        AxCode::ConfigInvalid,
+        "evaluate a building's rules",
+        subject,
+    )
+    .with_recovery(recovery)
 }

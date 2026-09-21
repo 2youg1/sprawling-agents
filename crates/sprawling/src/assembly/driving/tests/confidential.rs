@@ -25,11 +25,7 @@ use crate::assembly::*;
 fn a_confidential_building_stops_the_run_before_a_remote_call() {
     let dir = tempfile::tempdir().unwrap();
     init_city(dir.path()).unwrap();
-    lay_rules(
-        dir.path(),
-        "vault",
-        "# BUILDING.md\n\n## confidential\n\n`confidential: true`\n",
-    );
+    lay_rules(dir.path(), "vault", &shut_rules(""));
 
     // A remote endpoint, wired as the provider for a confidential
     // building: the refusal must come from the adapter that could

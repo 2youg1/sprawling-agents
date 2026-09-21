@@ -24,7 +24,7 @@ fn a_created_building_is_read_back_by_the_citys_own_parser() {
     assert_eq!(rules.write_domain().unwrap().prefixes().count(), 1);
 
     let text =
-        std::fs::read_to_string(crate::policy::building_path(dir.path(), &addr("lab"))).unwrap();
+        std::fs::read_to_string(crate::policy::rules_path(dir.path(), &addr("lab"))).unwrap();
     assert!(
         text.contains("lab"),
         "a building's own rules name the building"
@@ -88,7 +88,7 @@ fn the_reserved_subtree_belongs_to_no_building() {
 
     let err = create(dir.path(), &addr(".sprawling"), BuildingTemplate::Minimal).unwrap_err();
     assert_eq!(err.code(), &AxCode::InvalidArgs);
-    assert!(!dir.path().join(".sprawling").join(BUILDING_FILE).exists());
+    assert!(!dir.path().join(".sprawling").join(RULES_FILE).exists());
 }
 
 #[test]
@@ -149,7 +149,7 @@ fn adopting_an_existing_directory_keeps_every_file_it_found() {
     // The rules land in the building's reserved subtree; the spine
     // files a person reads and writes stay where they were.
     assert!(
-        crate::policy::building_path(city.path(), &addr("imported")).is_file(),
+        crate::policy::rules_path(city.path(), &addr("imported")).is_file(),
         "an adopted directory has no rules of its own"
     );
     assert!(!repo.join("BUILDING.md").exists());
@@ -191,7 +191,7 @@ fn a_raised_building_ignores_its_roadmap_and_tracks_its_spec() {
     }
     for kept in [
         "!SPEC.md",
-        "!/.sprawling/BUILDING.md",
+        "!/.sprawling/RULES.toml",
         "!/.sprawling/CONFIG.toml",
     ] {
         assert!(

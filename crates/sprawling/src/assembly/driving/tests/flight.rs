@@ -52,11 +52,7 @@ fn two_dispatches_from_the_desk_drive_at_once() {
     let report = init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("west")).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md\n\n`confidential: false`\n",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
     std::fs::write(
         dir.path().join("lab").join(city::ROADMAP_FILE),
         PLAN_TWO_FREE_ROWS,
@@ -155,11 +151,7 @@ fn a_closing_city_lands_the_runs_still_driving() {
     let dir = tempfile::tempdir().unwrap();
     let report = init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
-    lay_rules(
-        dir.path(),
-        "lab",
-        "# BUILDING.md\n\n`confidential: false`\n",
-    );
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
     std::fs::write(
         dir.path().join("lab").join(city::ROADMAP_FILE),
         PLAN_ONE_FREE_ROW,

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-use crate::policy::BUILDING_FILE;
+use crate::policy::RULES_FILE;
 use kernel::spine::check_roadmap_shape;
 use kernel::{PlanTree, Progress, RoadmapShape};
 
@@ -221,7 +221,7 @@ fn the_norms_are_the_citys_and_the_buildings_in_that_order() {
     let after = norms(dir.path(), &room).unwrap();
     assert_eq!(after.len(), 2);
     assert!(after[0].ends_with(CITY_FILE));
-    assert!(after[1].ends_with(BUILDING_FILE));
+    assert!(after[1].ends_with(RULES_FILE));
     assert!(after[1].starts_with(dir.path().join("lab")));
 }
 

@@ -34,7 +34,7 @@ use std::path::Path;
 use kernel::layout::{BUILDING_SHELF, CONFIG_FILE, FILTERS_FILE};
 use kernel::{AxCode, AxError, RESERVED_PREFIX};
 
-use crate::policy::{BUILDING_FILE, DESKTOP_SCOPE_FILE};
+use crate::policy::{DESKTOP_SCOPE_FILE, RULES_FILE};
 use crate::spine_files::{HANDOFF_FILE, MEMO_FILE, ROADMAP_FILE, SPEC_FILE};
 
 /// The file this module writes, named once.
@@ -60,7 +60,7 @@ fn block() -> Vec<String> {
         format!("{RESERVED_PREFIX}/"),
         format!("!/{RESERVED_PREFIX}/"),
         format!("/{RESERVED_PREFIX}/*"),
-        format!("!/{RESERVED_PREFIX}/{BUILDING_FILE}"),
+        format!("!/{RESERVED_PREFIX}/{RULES_FILE}"),
         format!("!/{RESERVED_PREFIX}/{CONFIG_FILE}"),
         format!("!/{RESERVED_PREFIX}/{FILTERS_FILE}"),
         format!("!/{RESERVED_PREFIX}/{DESKTOP_SCOPE_FILE}"),
@@ -168,7 +168,7 @@ mod tests {
             !block.iter().any(|line| line == "!.sprawling/"),
             "the whole reserved subtree is re-admitted at every depth"
         );
-        for promise in [BUILDING_FILE, CONFIG_FILE, FILTERS_FILE, DESKTOP_SCOPE_FILE] {
+        for promise in [RULES_FILE, CONFIG_FILE, FILTERS_FILE, DESKTOP_SCOPE_FILE] {
             let admitted = format!("!/{RESERVED_PREFIX}/{promise}");
             assert!(
                 block.contains(&admitted),

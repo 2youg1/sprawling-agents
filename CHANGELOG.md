@@ -68,7 +68,7 @@ sentence on a question nobody asked.
 - Nothing updates anything. `sprawling install` owns the archive path
   and npm owns its own, so both the terminal and the **machine** page
   print the command and stop.
-- WIRE_V <!-- xtask:begin wire_v -->32<!-- xtask:end -->, recounted from `channels::WIRE_V` while this section is still unreleased.
+- WIRE_V <!-- xtask:begin wire_v -->33<!-- xtask:end -->, recounted from `channels::WIRE_V` while this section is still unreleased.
 
 ### An error with nothing to do about it can no longer be written
 

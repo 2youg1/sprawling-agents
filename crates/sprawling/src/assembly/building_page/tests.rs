@@ -26,7 +26,7 @@ fn a_building_page_still_shows_the_rules_that_govern_it() {
     let rules = answer
         .docs
         .iter()
-        .find(|doc| doc.name == city::BUILDING_FILE)
+        .find(|doc| doc.name == city::RULES_FILE)
         .expect("the page lost the tab that says what this building may do");
     assert!(rules.text.contains("confidential"), "{}", rules.text);
     assert!(
@@ -271,7 +271,7 @@ fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
     let after = city::load(dir.path(), &Address::parse("lab").unwrap()).unwrap();
     assert!(!after.review(), "a run rewrote the rules it is judged by");
     assert!(
-        city::building_path(dir.path(), &Address::parse("lab").unwrap())
+        city::rules_path(dir.path(), &Address::parse("lab").unwrap())
             .to_string_lossy()
             .contains(".sprawling"),
         "the rules live where no write domain reaches"

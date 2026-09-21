@@ -76,9 +76,9 @@ impl Dossier { pub fn apply(&mut self, who: &str, record: &EventRecord); pub fn 
 ### 8-2 city::policy（形状 1 判定＋形状 2 值类型）
 
 ```rust
-pub const BUILDING_FILE: &str = "BUILDING.md";
+pub const RULES_FILE: &str = "RULES.toml";
 pub enum ModelPool { Any, LocalOnly }                 // 穷尽，不是 bool
-pub enum UserBrowser { Waiting, At(UserBrowserEndpoint) }   // `usersbrowser:` 一行的三种读法里去两种
+pub enum UserBrowser { Waiting, At(UserBrowserEndpoint) }   // `usersbrowser` 三种读法里去两种
 pub struct UserBrowserEndpoint { /* url、host —— 私有；parse 是唯一构造点 */ }
 pub struct BuildingRules { /* addr、policy、write_prefixes、browser、usersbrowser —— 私有 */ }
 impl BuildingRules {
@@ -90,13 +90,15 @@ impl BuildingRules {
 pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError>;
 pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError>;
 pub fn write_rules(city_root: &Path, addr: &Address, text: &str) -> Result<BuildingRules, AxError>;
-pub fn building_path(city_root: &Path, addr: &Address) -> PathBuf;
+pub fn rules_path(city_root: &Path, addr: &Address) -> PathBuf;
 ```
 
+- **规则是一份 TOML，散文没有另起一份文件**：这份文件先前是 Markdown，读者在**任意一行**上匹配 `confidential:`／`write:`／`review:`／`browser:`／`usersbrowser:`／`desktop:`，于是「How work is done here」里一句以 `desktop: true` 开头的话就授予了宿主机的桌面，而一栋没写 `write:` 的楼落到 `Everything`。两处都朝宽松的一侧失败，那是权限读者唯一不许失败的方向。改成 TOML 之后键只在文法给出键的位置成立，`deny_unknown_fields` 让拼错成为一条消息而不是一次静默缺席，`confidential` 与 `write` 都不再有缺省。**散文留在同一份文件里**，作 `does` 与 `conventions` 两个键：拆成两份文档同样能关掉撞键，代价是一栋楼有两种说法且可以互相矛盾。居民拿到的就是这份文件本身的字节，所以城判定的与 agent 读到的是同一串。
+
 - **confidential 三条各有其守处**：模型池锁本地由 `gateway::endpoint` **在会泄漏的那一端**拒（`req.policy.confidential` 即拒，携三段式）；写域止于本楼子树由 `write_domain()` 在构造点拒；数据可入不可出归出网门。**把兜底放在会出事的那一层**，路由错了仍然拦得住。
-- **没有 BUILDING.md 是普通楼；有而不声明是错误**：把隐私设置的默认值悄悄取成宽松的那一边，正是这整个面存在的理由。拼写不是 `true`／`false` 同样拒——读起来像笔误的隐私设置不得解析成许可。
+- **没有 RULES.toml 是普通楼；有而不声明是错误**：把隐私设置的默认值悄悄取成宽松的那一边，正是这整个面存在的理由。拼写不是 `true`／`false` 同样拒——读起来像笔误的隐私设置不得解析成许可。
 - **confidential 楼声明越界前缀＝拒而不裁剪**：静默裁剪会让文件说一套、城做另一套；拒绝会指出该改哪一行。
-- **无声明写域时默认只写本楼**：一栋楼至少能写自己，且不多。
+- **无声明写域时默认只写本楼**：一栋楼至少能写自己，且不多。`prefixes` 里一条读不出的地址**传播而不跳过**——先前它被丢在读它的地方，于是一栋楼写得比人授予的少，而这件事没有任何一处说出来。
 - **`review: true` 是楼级开关**：开则每个 Run 得一棵自己的 worktree，写的东西在别人检查并 merge 之前对楼不可见。**默认关**，与 confidential 的「不声明即错」相反——隐私的默认值不得惄悄取宽，而审查纪律的默认值不得惄悄取严：一个人派一个 Agent 去改一行字并盯着看，应当看得到文件变化。拼写不是 `true`／`false` 同样拒。
 - **`## Egress` 列可达域名**：`BuildingRules::egress()` 交 `kernel::egress_target` 判定。类型经 `kernel::EgressAllowlist` 重导出，住哪一簇文件是 kernel 内政（`gate::egress`，公共拼写不变）。**confidential 楼同时列域名＝矛盾，拒**——「数据可入不可出」是那个设置的含义，域名表写在它下面会逼读者自己去调和两句话。
 - **今天的执行点与仍缺的执行点要分清**：provider 路径已被 `endpoint` 的 confidential 拒守住；Agent 自己发起的出网（exec 的 Program／Shell 臂、浏览器）**没有可拦截处**，因为拦截需要 OS sandbox。判定已就位，拦截尚未落地——在那之前不要说「出网已管住」。
@@ -112,7 +114,7 @@ impl RulesTool { pub fn new(city_root: &Path, building: Address) -> Result<Rules
 // meta.effect = Effect::Govern
 ```
 
-- **为什么不是 `edit`**：`BUILDING.md` 住在楼的保留子树，没有任何写域到得了那里——这不是一个要绕过的障碍，它就是规则本身。故另开一道门（`Effect::Govern`），而那道门的守卫是人。
+- **为什么不是 `edit`**：`RULES.toml` 住在楼的保留子树，没有任何写域到得了那里——这不是一个要绕过的障碍，它就是规则本身。故另开一道门（`Effect::Govern`），而那道门的守卫是人。
 - **楼是携入的而不是参数**：工具持调用方自己那栋楼的地址，于是一个 Run 无法靠填另一个名字去改别人的规则。
 - **人看得到自己在批什么**：`kernel::gate::govern` 把提案正文截前 600 字写进 `action_desc`。
 
@@ -146,8 +148,8 @@ pub fn configured_payload(building: &Building, wrote: Written)
 
 - **楼是顶层地址，房间不是楼**：`create` 拒多段地址（`lab/room1` 是 `lab` 里的一个房间）。嵌套楼会使「这个地址归谁管」多出一个答案，而 `Building::of` 取首段这件事今天已被写域、配置与上报对象三处消费。
 - **reserved prefix 下建楼恒拒**：`.sprawling/` 是城自己的账与配置，它在一切写域之外；允许在它下面建楼，就是把一个写域开到账本上。判定用 `Address::is_reserved`，不在本模块重写前缀文法。
-- **二次出生恒拒**：已有 `BUILDING.md` 即拒（同 `init` 拒第二次创世）。覆写会把一栋已在干活的楼的规则静默换掉，而那份规则可能写着 `confidential: true`。
-- **模板字节来自 `docs/templates/BUILDING.md`（`include_str!`）**：人读的那份模板与城写出的那份必须是同一串字节，否则两份会各自漂。`Confidential` 与 `Minimal` 只差一行（`confidential:` 的值），且该差异由 `policy::evaluate` 读回来断言——换行成功与否不靠阅读，靠测试。
+- **二次出生恒拒**：已有 `RULES.toml` 即拒（同 `init` 拒第二次创世）。覆写会把一栋已在干活的楼的规则静默换掉，而那份规则可能写着 `confidential = true`。
+- **模板字节来自 `docs/templates/RULES.toml`（`include_str!`）**：人读的那份模板与城写出的那份必须是同一串字节，否则两份会各自漂。`Confidential` 与 `Minimal` 只差一行（`confidential` 的值），且该差异由 `policy::evaluate` 读回来断言——换行成功与否不靠阅读，靠测试。
 - **先落盘再产事件**：`building_created` 记的是已经发生的事。反过来的顺序会让历史声称一栋目录不存在的楼存在，而重放会把这个谎再说一遍。
 - **只写不读的 payload**：`created_payload` 只有写面，因为今天没有读它的投影——`CityView` 的楼列表读盘（assembly 的 `read_spine`）。读面随第一个真正需要它的投影落地，不提前建。
 - **adopt（兑现「导入一个已有目录」这件事）**：收编一个已存在的目录为楼。复用 `create` 的全部围栏（房间拒、reserved 拒、二次出生拒），只多一条：**目录不存在即拒并指向 create**——收编不存在的东西是建造，两个动词不共用一个事实。Spine 文档恒不覆写（§8-5 既有约束），故被收编目录的 `Roadmap.md` 保持原主的字节；事件仍是 `building_created`，但 payload 携 `adopted: true`——历史不得声称它建造了它只是找到的东西。CLI 入口 `sprawling adopt <city> <addr>`；城外目录先由人搬入城内再收编，本体不做拷贝。
@@ -233,7 +235,7 @@ pub fn handoff(city_root: &Path, building_addr: &Address) -> Result<Option<Strin
 pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError>;
 ```
 
-- **四文档三写一不写**：`lay_out` 写 Roadmap／Memo／Handoff；`BUILDING.md` 归 `building::create`（它的含义归 `policy`）——同一份文件有两个写入者就是两个权威。
+- **四文档三写一不写**：`lay_out` 写 Roadmap／Memo／Handoff；`RULES.toml` 归 `building::create`（它的含义归 `policy`）——同一份文件有两个写入者就是两个权威。
 - **已存在的文档恒不覆写**：一栋已在干活的楼的计划不得因为又跑了一次建楼而回到空白。
 - **模板的占位行不进新楼的 Roadmap**：`docs/templates/Roadmap.md` 里的两行 `Not started` 是给人看的例子；照抄进去，一栋新楼开局就有两件不存在的待办，而它们会进分母。实例化时删掉 Item 列为空的数据行，断言是「新楼的分母是 0」。
 - **JOB.md 先落盘，再产 `run_started`**（模板第一行就这么写）；内容同时进 CAS，于是盘上那份是现场、CAS 那份是历史——Agent 改了 JOB.md 也不会使「当时派的是什么活」不可考。同一个房间再派一件活即覆写它（JOB.md 是本次会话的任务，不是档案）。
@@ -313,7 +315,7 @@ impl Library {
 pub fn city_shelves(city_root: &Path, home: &Path) -> Result<Vec<PathBuf>, AxError>;
 ```
 
-- **中央库存与阅览室的分工是常驻上下文不随磁盘膨胀的唯一原因**：盘上躺一千件与本楼的常驻字节无关；进 catalog 的只有 `BUILDING.md` 的 `## Reading room` 列出的那几件。
+- **中央库存与阅览室的分工是常驻上下文不随磁盘膨胀的唯一原因**：盘上躺一千件与本楼的常驻字节无关；进 catalog 的只有 `RULES.toml` 的 `reading_room` 列出的那几件。
 - **库存住 reserved prefix**：Agent 读得到、写不了。否则一个 Agent 可以给自己发一件 SKILL，而那正是准入清单存在的理由。
 - **一行式条目取作者写的第一行**，不生成摘要：摘要的摘要是消化产物，而消化产物默认可疑。
 - **清单上没有的名字不进 catalog、也不报错**，只留一行诊断给写清单的人——承诺一件取不到的技能比它不在还糟。
@@ -494,7 +496,7 @@ pub struct Holding { …, pub hash: B3Hash }   // 整份文档的 BLAKE3，扫�
 ### 8-11 楼的治理字节搬进它自己的保留子树（沉淀一处路径权威）
 
 ```rust
-pub fn building_path(city_root, addr) -> PathBuf;   // <building>/.sprawling/BUILDING.md
+pub fn rules_path(city_root, addr) -> PathBuf;      // <building>/.sprawling/RULES.toml
 pub fn agents_path(city_root, addr) -> PathBuf;     // <building>/AGENTS.md（项目的，故在保留区之外）
 pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 // 三层统一为 <scope>/.sprawling/CONFIG.toml；city 层因此不再是特例
@@ -503,8 +505,8 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 不变式已经立起来了，这里把字节搬到它后面。
 
 - **三层一个表达式**：`path()` 先算出 scope 目录（城根、楼根、房间目录），再一律 `.join(RESERVED_PREFIX).join(CONFIG_FILE)`。原先 City 层写死了 `city_root.join(RESERVED_PREFIX)` 而另两层没有，那个不对称正是洞口。
-- **旧城必须报错，不得静默降级**：`policy::load` 把「BUILDING.md 不存在」当作默认策略（`confidential: false`）。搬完之后，一座旧城的楼就会从「机密」静默变成「不机密」——所以新位置缺失而旧位置存在时**拒绝**，`E_CONFIG_INVALID`，recovery 直接拿出要执行的那一步移动。这不是兼容适配层（它不读旧文件），是一道不让静默降级发生的门。
-- **楼页仍然看得见 BUILDING.md**：`assembly` 组楼页答案时跳过一切点头目录（房间枚举因此也不会把 `.sprawling` 当房间），故 BUILDING.md 改为**按路径显式读一次**再入档。人在界面上看得到、改得了；楼里的 agent 读得到、写不了。
+- **旧城必须报错，不得静默降级**：`policy::load` 把「规则不存在」当作默认策略（`confidential = false`）。于是一座旧城的楼会从「机密」静默变成「不机密」——所以 `RULES.toml` 缺失而一份**本版不再读的文件**仍在盘上时**拒绝**，`E_CONFIG_INVALID`，recovery 直接拿出要执行的那一步。这不是兼容适配层（它不读旧文件），是一道不让静默降级发生的门。它问的是一个问题而不是每次搬家加一道守卫：`superseded` 同时看楼根与保留子树下的旧名，因为两次搬家（改位置、改格式）的后果完全相同。
+- **楼页仍然看得见规则**：`assembly` 组楼页答案时跳过一切点头目录（房间枚举因此也不会把 `.sprawling` 当房间），故 `RULES.toml` 改为**按路径显式读一次**再入档。人在界面上看得到、改得了；楼里的 agent 读得到、写不了。
 - **默认写域仍是整栋楼，这是故意的**：一次 Run 为它那栋楼产出一份楼级产物是正常的；把默认收紧到房间会把那件事一并禁掉，而洞口在于治理文件的位置，不在于写域的宽窄。
 
 ## 8.5 两个设计
@@ -541,11 +543,11 @@ bin `RunWorker::dispatch` → `Identity::load(city_root, addr)` → `segment_byt
 
 ## 14 硬编码声明
 
-城里每一份文件叫什么、落在哪，权威是 `kernel::layout`：`ARCHIVE_DIR`、`BUILDING_SHELF`、`CONFIG_FILE`、`LIBRARY_DIR`、`URBANITE_FILE` 由本 crate `pub use` 转出而不复述，路径由 `CityLayout` 的十一个方法给出而不逐段 push。`spine_files` 的 `HANDOFF_FILE` 与 `JOB_FILE` 同样只是 `kernel::layout` 那一份的别名。本 crate 自己定义的文件名只剩没进布局表的那几份：`BUILDING_FILE`、`DESKTOP_SCOPE_FILE`、`PREFERENCES_FILE`、`SCHEDULE_FILE`、`WATCH_FILE`、`GITIGNORE_FILE` 与 spine 剩下的那一组。
+城里每一份文件叫什么、落在哪，权威是 `kernel::layout`：`ARCHIVE_DIR`、`BUILDING_SHELF`、`CONFIG_FILE`、`LIBRARY_DIR`、`URBANITE_FILE` 由本 crate `pub use` 转出而不复述，路径由 `CityLayout` 的十一个方法给出而不逐段 push。`spine_files` 的 `HANDOFF_FILE` 与 `JOB_FILE` 同样只是 `kernel::layout` 那一份的别名。本 crate 自己定义的文件名只剩没进布局表的那几份：`RULES_FILE`、`DESKTOP_SCOPE_FILE`、`PREFERENCES_FILE`、`SCHEDULE_FILE`、`WATCH_FILE`、`GITIGNORE_FILE` 与 spine 剩下的那一组。
 
 Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第一句话）。
 
-`CONFIG_FILE`（三层同名，理由见 §8.5）；新楼的 `BUILDING.md` 字节不写在代码里，而是 `include_str!("../../../docs/templates/BUILDING.md")`——它的权威是那份模板，路径写错在编译期就会被堵住；`Confidential` 模板对该字串做一处行替换（`confidential: false` → `true`），替换是否真的生效由 `policy::evaluate` 读回来断言。
+`CONFIG_FILE`（三层同名，理由见 §8.5）；新楼的 `RULES.toml` 字节不写在代码里，而是 `include_str!("../../../docs/templates/RULES.toml")`——它的权威是那份模板，路径写错在编译期就会被堵住；`Confidential` 模板对该字串做一处行替换（`confidential = false` → `true`），替换是否真的生效由 `policy::evaluate` 读回来断言。
 
 ## 15 影响面
 
@@ -565,7 +567,7 @@ bin 装配层的 prefix 组装随之改；`docs/templates/URBANITE.md` 是这份
 
 ## 17 模型体验
 
-三层配置入窗零字节：`CONFIG.toml` 改的是请求字段（effort），不是模型读到的文本；新楼的 `BUILDING.md` 则经 `city::policy` 进判定面，不逐字入窗。
+三层配置入窗零字节：`CONFIG.toml` 改的是请求字段（effort），不是模型读到的文本；新楼的 `RULES.toml` 经 `city::policy` 进判定面，其字节另经 building 段整份入窗——判定与阅读读的是同一串字节。
 
 resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30 行以内：长的描述不会让 Resident 更能干，只会让每个回合更贵——这句话写在模板里，因为模板在场即教学。
 
@@ -575,7 +577,7 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 
 新增模块登记 ARCHITECTURE.md §6 与接线台账；`Dossier` 的生产消费者（Resident 视图）到位时更新台账行。
 
-建楼与配置同期四处：§6 模块表两行翻 `已建`；§6 接线台账的 `kernel::config`（freeze 面）与 Effort 两行改成已接线；`xtask/api-baselines/city.txt` 随公开面重算；`docs/templates/BUILDING.md` 从此是被实例化的那串字节，改它即改新楼的第一句话。
+建楼与配置同期四处：§6 模块表两行翻 `已建`；§6 接线台账的 `kernel::config`（freeze 面）与 Effort 两行改成已接线；`xtask/api-baselines/city.txt` 随公开面重算；`docs/templates/RULES.toml` 从此是被实例化的那串字节，改它即改新楼的第一句话。
 
 邻里名册同期五处：ARCHITECTURE.md §12 模块表增 city 两行、`runtime::tools::status` 一行由十二字段改十三；`docs/glossary.md` 增 **Neighbourhood** 与 **neighbours** 两行（一个概念一个名字，且 `directory` 因与文件系统目录同音而被明确弃用）；`crates/runtime/runtime-SPEC.md` §8-14 的 status 接口块；`xtask/api-baselines/` 的 `city.txt` 与 `runtime.txt`；`docs/templates/URBANITE.md` 的 `## Bring them` 从此是被读取的一节，改它即改全城名册显示的那一行。
 
@@ -608,10 +610,10 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 
 517 行一份文件切成两份，生产代码与测试各占一份：
 
-- `policy.rs`（371 行）：`BUILDING_FILE` 与四个私有键常量、`ModelPool`、`BuildingRules` 及其全部方法（`policy`／`addr`／`egress`／`review`／`reading_room`／`model_pool`／`write_domain`）、`building_path`／`legacy_building_path`／`scope_path`、`load`／`write_rules`／`evaluate`。它仍是 §8-2 那份接口块的家，公开面逐字节不变。
+- `policy.rs`（360 行）：`RULES_FILE`、`SUPERSEDED_FILE`、`ModelPool`、`BuildingRules` 及其全部方法（`policy`／`addr`／`egress`／`review`／`reading_room`／`model_pool`／`write_domain`）、`rules_path`／`superseded`／`scope_path`、`load`／`write_rules`／`evaluate`。它仍是 §8-2 那份接口块的家，公开面逐字节不变。
 - `policy/tests.rs`（150 行）：原内联 `mod tests` 整体迁出，11 个 `#[test]` 与其断言、名字、夹具 `addr` 逐字不动；`use super::*;` 保持，`super` 仍指 `policy`。父文件尾部保留原样的 `#[allow(...)]` 属性列表加一行 `mod tests;`。
 
-**无字段开放**：没有为跨文件引用把任何私有字段升成 `pub(crate)`／`pub(super)`；测试经 `super::*` 看到的私有项（`legacy_building_path`、`BuildingRules` 的字段）与迁出前相同。
+**无字段开放**：没有为跨文件引用把任何私有字段升成 `pub(crate)`／`pub(super)`；测试经 `super::*` 看到的私有项（`superseded`、`BuildingRules` 的字段）与迁出前相同。
 
 **apisync 未重写基线**：公开面不受本次切分影响。
 
@@ -642,7 +644,7 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 pub enum BuildingTemplate { Minimal, Confidential, Hall }   // Hall 的字节是固定的一份模板
 
 // city::policy
-pub enum DomainReach { Everything, Documents }              // BUILDING.md 的 `write:` 一行
+pub enum DomainReach { Everything, Documents }              // RULES.toml 的 `write` 一键
 impl BuildingRules { pub fn reach(&self) -> DomainReach; }
 // write_domain()：Everything → WriteDomain::new，Documents → WriteDomain::documents
 
@@ -685,8 +687,8 @@ pub const SPEC_FILE: &str = "SPEC.md";   // 字节来自 docs/templates/SPEC.md�
 - **`SPEC.md` 是十七节 crate SPEC 的压缩式，不是第二种形状**：`docs/templates/SPEC.md` 的十二节逐节对应 crate SPEC 的节次（需求／验收／假设／权威／命名／边界／接口／错误／依赖／硬编码／测试／决策），只是把「现状分析、工作流程、实现逻辑、影响面、模型体验、文档同步」这几节留给 crate 自己。它压缩，不另起。
 - **`place` 只追加，从不重写**：被收编的目录往往已经有一份 `.gitignore`，里面写着这个项目自己的东西。整份覆盖会把它们冲掉，而那正是 adopt 承诺不会碰的字节。依据是逐行比对（去空白后相等即视为已有），因此重复 raise 不会把同一段追加两次。
 - **显式的反忽略**：`!SPEC.md` 与保留子树的放行行写进块里，而不是靠「没人忽略它们」这个默认。被收编的仓库可能已经忽略了 `*.md` 或一切点开头的目录；那时「这栋楼的承诺在历史里」就是假的，而没有人会发现。
-- **保留子树逐文件放行，不整棵放行**（S-07）：块里先 `.sprawling/` 忽略任意深度的保留子树，再 `!/.sprawling/` 只把这栋楼自己的那一棵放回来，`/.sprawling/*` 把它清空，最后逐行放行五份承诺——`BUILDING.md`、`CONFIG.toml`、`FILTERS.toml`、`DESKTOP.toml` 与 `skills/`。三个理由：①城自己的保留子树同名，账本、对象库与金库引用住在那里，一行 `!.sprawling/` 把它们一并放回版本控制的可见面；②那一行不带斜杠，因此对楼下每一个居民、每一个房间的保留子树同样生效，而那些是机器上的东西，不是这栋楼的承诺；③`CONFIG.toml` 正是 MCP 凭据的落点，它进历史的前提是 §8-4b 的逐值判定同时成立——两件事是同一次改动。
-- **五个名字都从写它的模块取**：`kernel::layout` 的 `CONFIG_FILE`／`FILTERS_FILE`／`BUILDING_SHELF`、`policy` 的 `BUILDING_FILE`／`DESKTOP_SCOPE_FILE`、`spine_files` 的四份脊柱文档名。因此 `BLOCK` 由 `&[&str]` 常量改为 `block() -> Vec<String>`：一个改了名的文档不会在这里留下一条谁都不写的规则。
+- **保留子树逐文件放行，不整棵放行**（S-07）：块里先 `.sprawling/` 忽略任意深度的保留子树，再 `!/.sprawling/` 只把这栋楼自己的那一棵放回来，`/.sprawling/*` 把它清空，最后逐行放行五份承诺——`RULES.toml`、`CONFIG.toml`、`FILTERS.toml`、`DESKTOP.toml` 与 `skills/`。三个理由：①城自己的保留子树同名，账本、对象库与金库引用住在那里，一行 `!.sprawling/` 把它们一并放回版本控制的可见面；②那一行不带斜杠，因此对楼下每一个居民、每一个房间的保留子树同样生效，而那些是机器上的东西，不是这栋楼的承诺；③`CONFIG.toml` 正是 MCP 凭据的落点，它进历史的前提是 §8-4b 的逐值判定同时成立——两件事是同一次改动。
+- **五个名字都从写它的模块取**：`kernel::layout` 的 `CONFIG_FILE`／`FILTERS_FILE`／`BUILDING_SHELF`、`policy` 的 `RULES_FILE`／`DESKTOP_SCOPE_FILE`、`spine_files` 的四份脊柱文档名。因此 `BLOCK` 由 `&[&str]` 常量改为 `block() -> Vec<String>`：一个改了名的文档不会在这里留下一条谁都不写的规则。
 - **顺序就是文法**：git 认最后一条命中的规则，所以「忽略—放回目录—清空—逐行放行」这四步不能重排。这一条由 git 自己验过：外层再写 `.*` 与 `*.md`，`SPEC.md` 与 `.sprawling/CONFIG.toml` 仍然进历史，`.sprawling/ledger/` 仍然不进，一个嵌套目录自己的 `.sprawling/CONFIG.toml` 也不进。
 - **房间由房间自己忽略**：`room::open` 在新开的房间里放一份只有 `*` 一行的 `.gitignore`。楼这一层的 `.gitignore` 写不出「房间」——房间是人当场命名的普通子目录，立楼时它们还不存在，而在被收编的仓库里按通配符去猜哪个子目录是房间会误伤源码目录。
 - 被否：在楼的 `.gitignore` 里写 `*/JOB.md`、`*/URBANITE.md` 一类通配。它只忽略房间里的某几个文件名，会让一次会话的其余产物照样进历史，等于把这条规则写成一半。
@@ -716,7 +718,7 @@ impl CityTool { pub fn new(city_root: &Path) -> Result<CityTool, AxError>; }
 // 工具名 `city`；action ∈ { raise, adopt, list }
 // raise:  { name, template }  —— template 缺省 `minimal`
 // adopt:  { name }
-// list:   —— 无参，答本城的楼与每栋楼是否已有 BUILDING.md
+// list:   —— 无参，答本城的楼与每栋楼是否已有 RULES.toml
 ```
 
 - **`Effect::Govern`，不是 `Effect::Write`**：立一栋楼是在城根下造目录，任何写域都够不到那里，理由与 `rules_tool` 同——这个决定是人的。门本身把它交给人，而不是靠写域的拒绝去兜。
@@ -747,7 +749,7 @@ pub fn write_governed(city_root: &Path, which: Governed, body: &str) -> Result<P
 
 ### 8-25 `desktop:`：这栋楼把桌面交出去了吗（`policy` 内，形状 1 判定）
 
-`BUILDING.md` 多一位开关，读法与 `browser:` 逐字同形：
+`RULES.toml` 多一位开关，读法与 `browser` 逐字同形：
 
 ```rust
 impl BuildingRules {
@@ -769,7 +771,7 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 
 **先问 `DomainReach` 立下的那条读法。**`DomainReach` 把「residents 能写什么」变成了一份可判定的东西，而它成立的前提是：**决定这件事的那份文件，恒不由被它决定的人来写**。`DESKTOP.toml` 恰恰是这一类——它逐窗口地说这栋楼的 runs 能碰运行中的机器上的什么。故它不是产物，是治理文件。
 
-**落点因此是 `<city>/<building>/.sprawling/DESKTOP.toml`**，与 `BUILDING.md`、`CONFIG.toml` 同处，在 reserved prefix 之下——`is_reserved` 对任何含 `.sprawling` 段的地址为真，故**任何写域都够不到它**，包括 `DomainReach::Everything` 的楼。一个 agent 改不了自己被判的那把尺子，这一条在这里是由构造成立的，不是由记得成立的。
+**落点因此是 `<city>/<building>/.sprawling/DESKTOP.toml`**，与 `RULES.toml`、`CONFIG.toml` 同处，在 reserved prefix 之下——`is_reserved` 对任何含 `.sprawling` 段的地址为真，故**任何写域都够不到它**，包括 `DomainReach::Everything` 的楼。一个 agent 改不了自己被判的那把尺子，这一条在这里是由构造成立的，不是由记得成立的。
 
 **写它的是一扇门，不是一个能拼路径的调用方**（`city::governed` §8-24 同一条理由，此处第二次适用而不是第二个权威）：设置页递「哪一栋楼」与「整份文本」，路径由本模块算。能自己拼路径的调用方就能拼出一条走出保留子树的路径。
 
