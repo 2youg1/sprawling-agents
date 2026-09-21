@@ -140,7 +140,6 @@ fn login(&mut self, provider: &str, step: channels::LoginStep) -> Result<(), AxE
 fn login_with(&mut self, profile: &gateway::OauthProfile, provider: &str,
               step: channels::LoginStep) -> Result<(), AxError>;   // 查表之外的全部
 fn random_token(bytes: usize) -> Result<String, AxError>;          // OS 熵，非种子 RNG
-fn dialect_of(provider: &str) -> Result<DialectKind, AxError>;     // 已知 provider 才有答案
 ```
 
 - **熵不走种子**：`random_token` 用 `getrandom`（OS 熵），**恒不**用装配持有的仿真种子——一个第三方能预测的 verifier 就是一个第三方能完成的登录。这是全二进制里唯一一处「可复现即缺陷」的地方，故写在这里而不是留给读者推断。
@@ -662,7 +661,7 @@ self.record_for(…, EventKind::AssetArchived, …)?;          // 后落账
 // Governance —— 现在是 RunWorker 的一个字段，而不是四个散字段加一份重写
 struct Governance {
     pending: BTreeMap<String, ApprovalItem>, autonomy: Autonomy,
-    granted: Vec<ClusterKey>, halted: BTreeSet<String>,
+    granted: Vec<ClusterKey>, halted: BTreeSet<kernel::event::Scope>,
     sent: BTreeMap<RunId, Sent>,          // 从 run_started 折；task、goal、budget
     origins: BTreeMap<String, BlockedJob>, // 从 approval_requested 折；答复时 O(log n)
 }
@@ -1592,7 +1591,7 @@ UNLOADING 见 `close_city`」，让设计里的词与代码的名在文档里相
 
 - `assembly.rs` 772→365：`fixture`（302 行的 `pub(super) mod fixture`）搬 `assembly/fixture.rs`，路径 `assembly::fixture` 不变，故十六个子模块的测试 `use` 一行未改；`new`／`over`／`close_city` 搬 `assembly/lifetime.rs`（LOADING 与 UNLOADING 是一个生命周期的两端，`over` 的 rustdoc 本就这样写）。子模块读父模块私有字段是 Rust 的规则，`RunWorker` 二十二个字段**无一开放**。`Locator` 的引入随 `close_city` 走，`commanding/tests/answering.rs` 原经 `assembly::*` 借到它，现自引 `kernel::Locator`。
 - `workbench.rs` 1000→188：值留父文件（`Site`／`Workbench`／`Reach`／`Desks`／`Situation`＋`status_snapshot`＋`fence_scope`），方法按阶段归子文件：`standing`（`stand_up`）／`desks`（`open_desks`）／`tools`（`lay_out_workbench`＋`status_tool`＋`admit_reading_room`）／`servers`（`mcp_tools`）／`engine`（`execution_engine` 两臂＋`host_shell`）＋`tests.rs`。四个跨 `assembly` 调用的方法由 `pub(super)` 改 `pub(in crate::assembly)`——同一可见范围的精确拼写，不是放宽；子模块读 `Site.branch`／`Desks.waiting`／`Situation` 私有字段走"子读父"规则，**无字段开放**。`engine` 两函数只有 `tools` 与 `tests` 用，不再经父文件转出口。
-- `credentials.rs` 930→130：值与读法留父文件（`Entered`／`Chosen`／`Ceilings`＋四常量＋`dialect_headers`／`poisoned_vault`／`dialect_of`／`local_model_facts`），方法按"签入"与"可调用"归 `signing`（`renew_if_stale`／`login`／`login_with`／`put_secret`／`resolver`）与 `endpoints`（`probe_endpoint`／`endpoint_of`／`attach_endpoint`／`probe`／`select_model`／`seed_from_environment`／`open_for_service`）＋`tests.rs`。八个跨 `assembly` 调用的方法改 `pub(in crate::assembly)`；**无字段开放**。
+- `credentials.rs` 930→130：值与读法留父文件（`Entered`／`Chosen`／`Ceilings`＋四常量＋`dialect_headers`／`poisoned_vault`／`local_model_facts`），方法按"签入"与"可调用"归 `signing`（`renew_if_stale`／`login`／`login_with`／`put_secret`／`resolver`）与 `endpoints`（`probe_endpoint`／`endpoint_of`／`attach_endpoint`／`probe`／`select_model`／`seed_from_environment`／`open_for_service`）＋`tests.rs`。八个跨 `assembly` 调用的方法改 `pub(in crate::assembly)`；**无字段开放**。
 - **`attach_endpoint` 不再以探测为准入条件（gateway-SPEC §8-10 是权威，这里只记装配侧的落地）**：`endpoint_of` 的鉴权头改由 `gateway::AuthSpec::for_dialect` 产出（`Entered.auth_header` 仍恒优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`；`attach_endpoint` 在探测失败时，若 `admit` 非空则按人报的型号登记（`probed=false`，另写一条 `effect` 级诊断点名探测的错），若 `admit` 为空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
 - **`Entered.secret`＋`Entered.auth_header` 合并为 `Credential` 枚举**：`Absent`／`Key{reference, header}`／`Subscription{reference}`。因为「按兼容格式选头」只对 **API key** 成立：登录挣来的订阅令牌在 Anthropic 那里恒走 `Authorization: Bearer`，若也拿 `x-api-key` 发就是 401。两个 `Option` 拼不出这个区别，于是把它写成穷举枚举：**「订阅令牌装在 key 的头里」现在拼不出来**。`Credential::entered` 是线上命令的唯一入口（线上从不携订阅令牌），`signing` 自己造 `Subscription`。改动面：`credentials.rs` 加类型、`commanding/routing.rs` 两个构造点、`credentials/signing.rs` 一个、`assembly.rs` 一行 `use`。
 - **`assembly/folds.rs`**：`folds.rs` 957→286。切法沿 §8-31：先迁测试，再按缝切一簇，字段不为跨文件而开。六条测试按「问的是哪一次折叠」分两份：`folds/tests/standing.rs` 收 `Standing::fold` 的三条（活城与重启折出同一份 governance／collaboration、探针填出的 endpoint book、停摆与放行经账本活过重启），`folds/tests/history.rs` 收 `rebuild_views` 的三条（整城回翻、单会话自取、停在上限的那一页说从哪续）；两份不共用夹具，故无 `helpers.rs`，`folds/tests.rs` 只留 `mod history; mod standing;`。`history.rs` 不再 `use crate::assembly::fixture::*`——那三条测试从未用过夹具，内联 `mod tests` 时它被另外三条借着。迁测后仍 495 行，再切一簇：`Collaboration`／`CollaborationFold`／`artifact_of`／`new_inbox`／`INBOX_CAPACITY`／`SIGNAL_BANDWIDTH` 归 `folds/collaboration.rs`（房间里等着什么、哪块地已被认领），`BlockedJob`／`Sent`／`Governance`／`HALTED`／`RELEASED`／`Standing`／`rebuild_views` 留父文件。原先误挂在 `BlockedJob` 上的两段文档（讲「两个投影」与「筛法重建信号」）随它们描述的类型迁为 `collaboration` 的模块文档，`BlockedJob` 自己那段逐字未动。可见性：`assembly::lifetime` 读 `Collaboration` 的 `inboxes`／`joins`／`goals`／`requests`／`plan_holders` 并调 `pursuits`，`assembly.rs`／`dispatching::running`／`settling::landing`／`workbench::desks` 用 `artifact_of`／`new_inbox`，这七项由 `pub(super)` 改 `pub(in crate::assembly)`——同一可见范围的精确拼写，不是放宽；`CollaborationFold` 与其 `absorb`／`settle` 只有父文件用，`pub(super)` 现指 `folds`。`Collaboration.pursuits`（私有字段）与 `CollaborationFold` 的五个私有字段随 `settle` 同迁，**无字段开放**。父文件因此卸下 `Locator`／`effect`／`pursuit_from`／`building_of`／`plan_node_of` 五个 import，`standing.rs` 自引 `kernel::Locator`。`sprawling` 158 全绿（切前切后同为 6 条 `#[test]`），apisync 基线零漂移，未重写。
@@ -1616,7 +1615,7 @@ UNLOADING 见 `close_city`」，让设计里的词与代码的名在文档里相
 // bin::doctor（形状 1 decision：表与判定；驱动只读写它拿到的那两个句柄）
 pub(crate) enum Tier { Use, Develop }                  // 两层：用得起来，改得动
 pub(crate) enum Need { Required, OneOf(Group), Optional }   // 一组任一即可，见 §8-57
-pub(crate) enum Platform { Windows, MacOs, Linux }
+pub enum Platform { Windows, MacOs, Linux }            // `bin::install` 经它进入，遵 lib.rs 的约定：二进制进入即公开
 pub(crate) struct PerPlatform<T> { windows: T, macos: T, linux: T }
 pub(crate) enum Detection { Program { program, version_arg, places }, Environment { variable } }
 pub(crate) enum Recipe { Command { program, args }, Print(&'static str), Manual(&'static str) }
@@ -2650,7 +2649,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 
 ## 8-52 新客户端要问的四件事，服务端怎么答（`bin::views::listing`、`bin::views::document`、`views::rounds`、`views::holding`；channels-SPEC §8-23）
 
-- **`Views.halted: BTreeSet<String>`**，由 `city_halted` 折出：载荷 `state == "halted"` 加进去，`"released"` 拿出来——与 `assembly::folds::Governance` 读同一条记录、同一对常量（`HALTED`／`RELEASED`），但**不共用那张表**：那张表是工作线程的判定面，这张是答查询的读面，两者从同一条流各自折出，重建即相等（`views::tests`）。`CityAnswer.halted` 是它的 `Vec` 形。
+- **`Views.halted: BTreeSet<kernel::event::Scope>`**，由 `city_halted` 折出：`Admittance::Halted` 加进去，`Released` 拿出来——与 `assembly::folds::Governance` 读同一条记录、同一个 `CityHalted` 结构，但**不共用那张表**：那张表是工作线程的判定面，这张是答查询的读面，两者从同一条流各自折出，重建即相等（`views::tests`）。`CityAnswer.halted` 是它的 `Vec` 形。
 - **`summarize` 把 `RunHot.addr`／`started` 抄进 `RunSummary`**，不读账本。
 - **`rounds_answer` 多读两条记录**：窗口里第一条 `run_started` 成 `Opening { task, goal, at: record.t() }`，第一条 `run_frozen` 成 `Closing { completion, at }`；`turns()` 本身一字不动。
 - **`bin::views::listing`**（新文件）：`at` 为 `None` 读城根，否则读 `city_root/<at>`；`read_dir` 一层，目录在前、文件在后、各按名字 UTF-8 序；读不了的目录答空表而不是拒绝——同 `read_building` 的口径，一个读不了的目录在页面上是一个空目录。符号链接按 `metadata` 判：指向目录的算目录。文件大小 `u64`。
@@ -2991,20 +2990,18 @@ impl Home {
 ### 8-74 折叠读不懂的那一行就说出来，而「关」与「开」只有一种拼法（`assembly::folds`、`views::holding`；Roadmap B-53、G-26）
 
 ```rust
-pub(crate) enum Admission { Halted, Released }
-impl Admission {
-    pub(crate) fn spelling(self) -> &'static str;
-    pub(crate) fn in_record(data: &serde_json::Map<String, serde_json::Value>)
-        -> Result<Option<(&str, Admission)>, AxError>;
-}
-impl Governance { pub(super) fn absorb(..) -> Result<(), AxError>; }
+fn scope_of(scope: &channels::HaltScope) -> kernel::event::Scope;   // assembly::naming：唯一的翻译
+impl Governance { pub(super) fn absorb(..) -> Result<(), AxError>;
+                  halted: BTreeSet<kernel::event::Scope> }
+impl RunWorker { fn halted_by(&self, addr: &Address) -> Option<kernel::event::Scope>; }
 ```
 
 - **`absorb` 改 `Result`**：读不懂的审批项与缺字段的 `run_started` 此前被静默丢掉，于是「历史里有一条这个 build 读不懂的线」表现为开城后少了一批待答项与一段活的说明。两处改为 `E_WIRE_MISMATCH`，恢复语指向写下这段历史的那个 build。
-- **`Admission` 收掉 `HALTED`／`RELEASED` 两个字符串常数**：此前四处手写比较，而两个折叠对一个不认识的状态词答得相反——`Governance` 读成「开」，`Views` 忽略整行。现在两侧读同一个 `in_record`，不认识的词是一次拒绝：把它读成「开」的城会往人已经关掉的作用域里派活。
-- **写的一侧同源**：`set_admission` 收 `Admission` 而不是 `&str`，载荷里的词由 `spelling()` 写出。
+- **「关／开」与「谁来答」的拼法都搬进了 kernel**：`Admittance`、`Scope`、`autonomy_word` 住 `kernel::event`，两个折叠与写方经 `Payload::of`／`Payload::read` 读同一个结构。此前 `Governance` 把不认识的状态词读成「开」、`Views` 忽略整行，而 `read_autonomy` 把读不懂的委派静静读成「人自己答」——三处默认都没了，读不懂的行是一次 `E_WIRE_MISMATCH`。
+- **`halted` 存 `Scope` 而不是字符串**：`halted_by` 用 `Scope::covers` 问包含关系，`split_once(':')` 连同它解不出地址时的静默跳过一并消失；`CityAnswer.halted` 在答的边界上用 `Display` 拼回同样的词。
+- **写的一侧同源**：`set_admission` 收 `kernel::event::record::Admittance`，载荷由该枚举的 serde 拼写写出。
 
-**本章测试**：`an_unreadable_approval_item_stops_the_fold`、`a_halt_and_a_release_round_trip_through_one_spelling`（`assembly::folds::tests`）。
+**本章测试**：`an_unreadable_approval_item_stops_the_fold`（`assembly::folds::tests`）、`an_appointment_this_build_cannot_read_is_refused_rather_than_defaulted`（`kernel::event::record::governance`）。
 
 ### 8-75 给活取名失败时，人被告知的是真正的原因（`assembly::dispatching::session::name_the_work`；Roadmap B-54）
 
@@ -3025,3 +3022,19 @@ fn may_move_plan(kind: EventKind) -> PlanReach;
 - **仍未收进来的两类**：`pr_merged` 与 `rollback_applied` 同样会把文件落进楼里，今天读作 `Untouched`。改它们要连着改 `views::commits` 的期望，故单列一条叶子，不混进本节。
 
 **本章测试**：`a_record_with_no_address_stales_every_plan_it_could_have_moved`、`every_event_kind_has_a_reach`（`plan_view::tests`）。
+
+### 8-77 `bin::person`：这个人自己的那一层（形状 4 适配器；叶子 3.1）
+
+```rust
+pub(crate) fn read() -> Result<PreferencesAnswer, AxError>;      // Query::Preferences 的全部
+pub(crate) fn put(patch: PreferencePatch) -> Result<(), AxError>;// Command::PutPreferences 的全部
+```
+
+- **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `bin::home`（§8-70）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。
+- **`[ui]` 一节就是 `PreferencesAnswer` 的序列化**（channels-SPEC §8-39 第七条）：文件能写的键与答案能说的字段是**同一份声明**，因此本模块只做读与写，不陈述「一项偏好是什么」。一条补丁落在记录上的效果同理，归 `PreferencesAnswer::apply` —— `Chord("")` 是解绑还是绑一个空串，只有一个地方回答。
+- **别的节原样留下**：写是一次读-改-写，经 `city::edit_document`（city-SPEC §8-27）持锁并整份替换。「要么整份要么不动」只有一份实现，人层与城层共用它；再写一份就是给 B-49 立第二个权威。
+- **读不动的文件不覆写**：解析失败报 `E_CONFIG_INVALID`，主题带上文件与是哪一节，恢复语请人手工修或删掉那一节重选。能读回来的才配被改写——写它的人是唯一能修它的人。
+- **不入账**：偏好不属于城的历史，任何 run 都观测不到它。因此这条命令被接受时城无话可播，`adversary` 第四世界据此把「静默」读作接受，而它真正的关门条件是读回来那一组断言（`adversary/src/Sprawling/Person.lean`，叶子 5.6）。
+- **文件缺席不是失败**：那是一个什么都还没定的人，答案是本 build 画的那几档（`PreferencesAnswer::default`）。`lang` 缺席就是缺席，不填 `en`——没人选过之前，只有浏览器自己的语言标签是证据。
+
+**本章测试**：`what_the_file_states_and_what_the_answer_states_are_one_record`、`a_section_this_build_does_not_read_survives_a_write`、`a_file_that_does_not_parse_is_refused_rather_than_replaced`（`person::tests`）。

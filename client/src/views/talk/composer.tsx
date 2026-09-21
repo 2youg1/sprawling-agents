@@ -23,13 +23,13 @@ import { UNSTATED, completed, find, offered, parse, reached } from "../../core/s
 import type { Slash, SlashHands } from "../../core/slash";
 import { EFFORTS, selectModel } from "../../core/commands";
 import { canRecord, record, type Heard, type Recording } from "../../core/speaking";
-import { Address } from "../../core/address";
+import { Address } from "../../wire";
 import { motionOff } from "../shared/motion";
 import { useCommand, useGo, useSay, useUi } from "../../ui";
 import { Popover } from "../parts/popover";
 import type { PopoverColumn, PopoverItem } from "../parts/popover";
 import { Tip } from "../parts/tip";
-import { Option } from "effect";
+import { Option, Schema } from "effect";
 
 // What the send control is spelled, for each of the three places a
 // message can land. `queued` is the one a streaming page would otherwise
@@ -308,7 +308,7 @@ export function Composer(props: ComposerProps) {
       return;
     }
     if (column.id === WORKSPACE) {
-      const address = Option.getOrNull(Address.option(item.id));
+      const address = Option.getOrNull(Schema.decodeOption(Address)(item.id));
       if (address !== null) {
         go({ kind: "talk", address });
         setOpen("none");

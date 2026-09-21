@@ -7,12 +7,14 @@
 
 use std::path::Path;
 
+use kernel::event::Scope;
+use kernel::event::record::{Admittance, AutonomyChanged, CityHalted};
 use kernel::{Address, AxError, EventKind};
 use kernel::{EventRecord, Payload, RunId};
 
 use crate::views::Views;
 
-use super::{Entrance, Expiries, read_autonomy};
+use super::{Entrance, Expiries};
 
 mod collaboration;
 
@@ -52,10 +54,10 @@ pub(super) struct Governance {
     pub(super) pending: std::collections::BTreeMap<String, kernel::ApprovalItem>,
     pub(super) autonomy: kernel::Autonomy,
     pub(super) granted: Vec<kernel::ClusterKey>,
-    /// The scopes a person has shut, by the name `scope_name` gives
-    /// them. Folded from the ledger like everything else the panel
-    /// shows, so a restarted city is still halted.
-    pub(super) halted: std::collections::BTreeSet<String>,
+    /// The scopes a person has shut. Folded from the ledger like
+    /// everything else the panel shows, so a restarted city is still
+    /// halted.
+    pub(super) halted: std::collections::BTreeSet<Scope>,
     /// What each run was sent to do, by run.
     ///
     /// Never pruned, and one short entry per run - the same growth class
@@ -125,7 +127,6 @@ impl Governance {
         addr: Option<&Address>,
         payload: &Payload,
     ) -> Result<(), AxError> {
-        let data = payload.as_map();
         match kind {
             EventKind::RunStarted => {
                 let started = payload.read::<kernel::event::record::RunStarted>()?;
@@ -163,91 +164,25 @@ impl Governance {
                 }
             }
             EventKind::AutonomyChanged => {
-                if let Some(name) = data.get("autonomy").and_then(serde_json::Value::as_str) {
-                    self.autonomy = read_autonomy(name);
-                }
+                self.autonomy = payload.read::<AutonomyChanged>()?.autonomy;
             }
             // One kind for both directions: halting and releasing are
             // one fact changing value, and a second kind would let a
             // reader see a release with no halt before it.
             EventKind::CityHalted => {
-                let Some((scope, admission)) = Admission::in_record(data)? else {
-                    return Ok(());
-                };
-                match admission {
-                    Admission::Halted => {
-                        self.halted.insert(scope.to_owned());
+                let shut = payload.read::<CityHalted>()?;
+                match shut.state {
+                    Admittance::Halted => {
+                        self.halted.insert(shut.scope);
                     }
-                    Admission::Released => {
-                        self.halted.remove(scope);
+                    Admittance::Released => {
+                        self.halted.remove(&shut.scope);
                     }
                 }
             }
             _ => {}
         }
         Ok(())
-    }
-}
-
-/// Whether a scope is shut or open.
-///
-/// The word in a `city_halted` record is spelled here and nowhere else.
-/// It used to be two string constants compared by hand at four places,
-/// and the two folds disagreed about an unrecognised word: one read it
-/// as a release, the other ignored the line (sprawling-SPEC.md 8-74).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum Admission {
-    /// Nothing may be dispatched into this scope.
-    Halted,
-    /// The scope takes work again.
-    Released,
-}
-
-impl Admission {
-    /// Both states, so a reader cannot be written against one of them.
-    const ALL: [Admission; 2] = [Admission::Halted, Admission::Released];
-
-    /// The word the record carries.
-    pub(crate) fn spelling(self) -> &'static str {
-        match self {
-            Admission::Halted => "halted",
-            Admission::Released => "released",
-        }
-    }
-
-    /// The scope and its new state, read off a `city_halted` payload.
-    ///
-    /// `None` is a record naming no scope, which changes nothing.
-    ///
-    /// # Errors
-    /// Refuses a state word this build does not know: a city that read
-    /// it as "open" would be dispatching into a scope a later build
-    /// shut.
-    pub(crate) fn in_record(
-        data: &serde_json::Map<String, serde_json::Value>,
-    ) -> Result<Option<(&str, Admission)>, AxError> {
-        let Some(scope) = data.get("scope").and_then(serde_json::Value::as_str) else {
-            return Ok(None);
-        };
-        let word = data
-            .get("state")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or_default();
-        let known = Admission::ALL
-            .into_iter()
-            .find(|state| state.spelling() == word);
-        let state = known.ok_or_else(|| {
-            AxError::failure(
-                kernel::AxCode::WireMismatch,
-                "read whether a scope is shut",
-                word.to_owned(),
-            )
-            .with_recovery(
-                "open this city with the build that wrote its history: this one knows `halted` \
-                 and `released`",
-            )
-        })?;
-        Ok(Some((scope, state)))
     }
 }
 

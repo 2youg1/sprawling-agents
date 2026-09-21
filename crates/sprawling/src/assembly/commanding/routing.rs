@@ -6,11 +6,12 @@
 //! The verbs a person sends, and what each one does to the city.
 
 use kernel::TimeMs;
+use kernel::event::record::Admittance;
 use kernel::{AxCode, AxError};
 
 use super::super::{
-    Admission, Assignment, Ceilings, Chosen, Credential, Entered, Owing, RunWorker, Unasked,
-    mode_of, not_built, tuning_of,
+    Assignment, Ceilings, Chosen, Credential, Entered, Owing, RunWorker, Unasked, mode_of,
+    not_built, tuning_of,
 };
 
 /// What a Cancel or a Steer is told when no run answers to the id it
@@ -180,11 +181,11 @@ impl RunWorker {
                 item.as_str().to_owned(),
                 "answer it yourself, or appoint that resident as the delegate; handing one                  question on is not built",
             )),
-            channels::Command::PutPreferences { .. } => Err(not_built(
-                "write this person's preferences",
-                "~/.sprawling/config.toml".to_owned(),
-                "edit the file by hand; writing it from the page is not built",
-            )),
+            // Nothing is written into the ledger: this is the person's
+            // own layer and no run can observe it, so a record of it
+            // in the city's one history would travel to every machine
+            // that city is copied to.
+            channels::Command::PutPreferences { patch, .. } => crate::person::put(patch),
             channels::Command::PutShelved { name, .. } => Err(not_built(
                 "write a shelved document",
                 name.clone(),
@@ -197,7 +198,7 @@ impl RunWorker {
             channels::Command::PutDocument {
                 which, ref body, ..
             } => self.put_document(which, body),
-            channels::Command::Halt { scope, .. } => self.set_admission(&scope, Admission::Halted),
+            channels::Command::Halt { scope, .. } => self.set_admission(&scope, Admittance::Halted),
             channels::Command::Reveal { at, .. } => crate::revealing::reveal(&self.city_root, &at),
             channels::Command::DoctorInstall { ref item, .. } => self.doctor_install(item),
             channels::Command::DoctorRefresh { .. } => {
@@ -205,7 +206,7 @@ impl RunWorker {
                 Ok(())
             }
             channels::Command::Release { scope, .. } => {
-                self.set_admission(&scope, Admission::Released)
+                self.set_admission(&scope, Admittance::Released)
             }
             // Cancel and Steer have a second door. `Desk::interrupt_for`
             // lifts them off the queue at the next safe point of the run

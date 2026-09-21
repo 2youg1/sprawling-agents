@@ -15,7 +15,7 @@ use kernel::{AxCode, AxError, EventKind};
 use crate::serving::random_token;
 
 use super::super::{RunWorker, now_ms};
-use super::{Credential, Entered, PROBE_TIMEOUT_MS, dialect_of, poisoned_vault, subscription};
+use super::{Credential, Entered, PROBE_TIMEOUT_MS, poisoned_vault, subscription};
 
 impl RunWorker {
     /// Renews a subscription credential that is about to stop working.
@@ -90,15 +90,23 @@ impl RunWorker {
         step: channels::LoginStep,
     ) -> Result<(), AxError> {
         let profile = *gateway::profile(provider).ok_or_else(|| {
+            // The list is read out of the table rather than written
+            // here: a fifth row would otherwise reach a person as a
+            // sentence naming four.
+            let known: Vec<&str> = gateway::OAUTH_PROFILES
+                .iter()
+                .map(|row| row.provider)
+                .collect();
             AxError::failure(
                 AxCode::ConfigInvalid,
                 "begin a subscription login",
                 provider.to_owned(),
             )
-            .with_recovery(
-                "this build knows the subscription flow of: anthropic; \
+            .with_recovery(format!(
+                "this build knows the subscription flow of: {}; \
                  other providers attach with an API key",
-            )
+                known.join(", ")
+            ))
         })?;
         self.login_with(&profile, provider, step)
     }
@@ -196,7 +204,12 @@ impl RunWorker {
                     Entered {
                         name: provider.to_owned(),
                         base_url: profile.api_base.to_owned(),
-                        dialect: dialect_of(provider)?,
+                        // Which face a subscription answers on is the
+                        // family's statement, read through the
+                        // connection this registration is: a second
+                        // mapping from a provider word to a dialect
+                        // sent Codex's subscription to the chat face.
+                        dialect: gateway::ConnectionKind::Harness(profile.family).wire(),
                         credential: Credential::Subscription {
                             reference: access.to_string(),
                         },

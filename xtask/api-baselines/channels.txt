@@ -4,12 +4,15 @@ impl channels::ClientAssets
 impl channels::Intervention
 impl channels::Note
 impl channels::PairingToken
+impl channels::PreferencesAnswer
 impl channels::ProviderName
 impl channels::Query
 impl channels::Reply
 impl channels::TemplateName
 impl channels::ToolkitSlug
 impl core::convert::From<channels::Command<channels::NoSecret>> for channels::Command
+impl core::default::Default for channels::Appearance
+impl core::default::Default for channels::PreferencesAnswer
 impl core::fmt::Debug for channels::Reply
 impl serde_core::ser::Serialize for channels::NoSecret
 impl<'de> serde_core::de::Deserialize<'de> for channels::NoSecret
@@ -277,9 +280,9 @@ pub channels::CommitsAnswer::more: bool
 pub channels::ConfigAnswer::addr: kernel::address::Address
 pub channels::ConfigAnswer::effort: core::option::Option<channels::SettledEffort>
 pub channels::ConfigAnswer::tuning: channels::TuningDefaults
+pub channels::ConfigLayer::Building
 pub channels::ConfigLayer::City
 pub channels::ConfigLayer::Resident
-pub channels::ConfigLayer::Room
 pub channels::ContentAnswer::binary: bool
 pub channels::ContentAnswer::bytes: u64
 pub channels::ContentAnswer::locator: kernel::locator::Locator
@@ -547,7 +550,7 @@ pub channels::PreferencePatch::Proxying(kernel::reach::Proxying)
 pub channels::PreferencePatch::Welcomed(bool)
 pub channels::PreferencesAnswer::appearance: channels::Appearance
 pub channels::PreferencesAnswer::chords: alloc::vec::Vec<channels::Chord>
-pub channels::PreferencesAnswer::lang: channels::Lang
+pub channels::PreferencesAnswer::lang: core::option::Option<channels::Lang>
 pub channels::PreferencesAnswer::panel: bool
 pub channels::PreferencesAnswer::proxying: kernel::reach::Proxying
 pub channels::PreferencesAnswer::welcomed: bool
@@ -730,8 +733,8 @@ pub channels::ToolkitsAnswer::Shelf
 pub channels::ToolkitsAnswer::Shelf::toolkits: alloc::vec::Vec<channels::ToolkitLine>
 pub channels::ToolkitsAnswer::Unenrolled
 pub channels::TuningDefaults::proxying: kernel::reach::Proxying
-pub channels::TuningDefaults::request_max_retries: u32
-pub channels::TuningDefaults::stream_idle_timeout_ms: u64
+pub channels::TuningDefaults::request_max_retries: core::option::Option<u32>
+pub channels::TuningDefaults::stream_idle_timeout_ms: core::option::Option<u64>
 pub channels::TuningDefaults::timeout_ms: u64
 pub channels::Turn::calls: alloc::vec::Vec<channels::Call>
 pub channels::Turn::notes: alloc::vec::Vec<channels::Note>
@@ -818,6 +821,7 @@ pub fn channels::Aggregate::cities(&self) -> impl core::iter::traits::iterator::
 pub fn channels::Aggregate::detach(&mut self, &channels::CityLabel) -> bool
 pub fn channels::Aggregate::merge(alloc::vec::Vec<(channels::CityLabel, alloc::vec::Vec<kernel::event::payload::EventRecord>)>) -> alloc::vec::Vec<channels::Sighting>
 pub fn channels::Aggregate::new() -> Self
+pub fn channels::Appearance::default() -> Self
 pub fn channels::CityLabel::as_str(&self) -> &str
 pub fn channels::CityLabel::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::ClientAssets::lookup(&self, &str) -> channels::AssetReply
@@ -831,6 +835,8 @@ pub fn channels::Note::at(&self) -> kernel::event::identity::Seq
 pub fn channels::PairingToken::digest(&self) -> kernel::locator::B3Hash
 pub fn channels::PairingToken::from_configured(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::PairingToken::mint([u8; 32]) -> (Self, alloc::string::String)
+pub fn channels::PreferencesAnswer::apply(&mut self, channels::PreferencePatch)
+pub fn channels::PreferencesAnswer::default() -> Self
 pub fn channels::ProviderName::as_str(&self) -> &str
 pub fn channels::ProviderName::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::Query::name(&self) -> &'static str

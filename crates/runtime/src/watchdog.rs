@@ -12,7 +12,7 @@
 //! reason this type exists.
 
 use kernel::{AxCode, AxError, Payload, StallVerdict, TimeMs};
-use serde_json::{Map, Value};
+use serde::{Deserialize, Serialize};
 
 pub use kernel::Retries;
 
@@ -34,13 +34,29 @@ pub enum Disposal {
         text: String,
     },
     /// Try the same call again, not before this moment. The moment is
-    /// the provider's own, carried in from `gateway::admission`.
+    /// the provider's own, carried in from `gateway::admission`, and
+    /// the failure travels with it: "backed off" without what it backed
+    /// off from is a line nobody can act on, and the run loop used to
+    /// write that half of the fact from a second place.
     BackOff {
         until: TimeMs,
+        code: AxCode,
+        subject: String,
     },
     Freeze {
         reason: FreezeReason,
     },
+}
+
+impl Disposal {
+    /// The verdict that asks the same call again, holding what failed.
+    fn backing_off(until: TimeMs, failure: &AxError) -> Disposal {
+        Disposal::BackOff {
+            until,
+            code: *failure.code(),
+            subject: failure.subject().to_owned(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,11 +132,11 @@ impl Watchdog {
             return refused;
         }
         match self.retries {
-            Retries::UntilHalted => Disposal::BackOff { until: not_before },
+            Retries::UntilHalted => Disposal::backing_off(not_before, failure),
             // Counted from the first failure, so `AtMost(0)` spends its
             // one attempt and reports.
             Retries::AtMost(ceiling) if self.provider_failures <= ceiling => {
-                Disposal::BackOff { until: not_before }
+                Disposal::backing_off(not_before, failure)
             }
             Retries::AtMost(_) => refused,
         }
@@ -128,9 +144,12 @@ impl Watchdog {
 
     /// The `watchdog_fired` payload (E_LOOP_SUSPECTED's carrier when the
     /// reason is a stall). Proceed never fires.
+    ///
+    /// # Errors
+    /// `E_INVALID_ARGS` for [`Disposal::Proceed`], which records
+    /// nothing, and whatever `Payload::of` says about the encoding.
     pub fn fired_payload(&self, disposal: &Disposal) -> Result<Payload, AxError> {
-        let mut map = Map::new();
-        match disposal {
+        let action = match disposal {
             Disposal::Proceed => {
                 return Err(AxError::failure(
                     AxCode::InvalidArgs,
@@ -138,36 +157,62 @@ impl Watchdog {
                     "Proceed does not fire",
                 )
                 .with_recovery(
-                    "report this against runtime::watchdog: `Proceed` is the verdict \
-                     that records nothing, and the caller asked it for a payload",
+                    "report this against runtime::watchdog: `Proceed` is the verdict                      that records nothing, and the caller asked it for a payload",
                 ));
             }
-            Disposal::CorrectiveSteer { text } => {
-                map.insert("action".to_owned(), Value::String("steer".to_owned()));
-                map.insert("text".to_owned(), Value::String(text.clone()));
-            }
-            Disposal::BackOff { until } => {
-                map.insert("action".to_owned(), Value::String("back_off".to_owned()));
-                map.insert("until_ms".to_owned(), Value::Number(until.value().into()));
-            }
-            Disposal::Freeze { reason } => {
-                map.insert("action".to_owned(), Value::String("freeze".to_owned()));
-                map.insert(
-                    "reason".to_owned(),
-                    Value::String(reason.as_str().to_owned()),
-                );
-            }
-        }
-        map.insert(
-            "corrections".to_owned(),
-            Value::Number(self.corrections.into()),
-        );
-        map.insert(
-            "provider_failures".to_owned(),
-            Value::Number(self.provider_failures.into()),
-        );
-        Payload::new(map)
+            Disposal::CorrectiveSteer { text } => FiredAction::Steer { text: text.clone() },
+            Disposal::BackOff {
+                until,
+                code,
+                subject,
+            } => FiredAction::BackOff {
+                until_ms: until.value(),
+                code: code.as_str().to_owned(),
+                subject: subject.clone(),
+            },
+            Disposal::Freeze { reason } => FiredAction::Freeze {
+                reason: reason.as_str().to_owned(),
+            },
+        };
+        Payload::of(&WatchdogFired {
+            action,
+            corrections: self.corrections,
+            provider_failures: self.provider_failures,
+        })
     }
+}
+
+/// `watchdog_fired`: what the watchdog did, and how often it has had to.
+///
+/// The one authority for this line's keys. The run loop used to write a
+/// second, narrower shape for the same kind and the same `back_off`
+/// word, so one history held two answers to "what does a watchdog line
+/// look like".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WatchdogFired {
+    #[serde(flatten)]
+    pub action: FiredAction,
+    /// How many corrective steers this run has been given.
+    pub corrections: u32,
+    /// How many provider failures this run has met.
+    pub provider_failures: u32,
+}
+
+/// What the watchdog did, in the word the line carries.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum FiredAction {
+    /// The model was told it is repeating itself.
+    Steer { text: String },
+    /// The same call will be made again, no earlier than `until_ms`,
+    /// because of the failure named here.
+    BackOff {
+        until_ms: u64,
+        code: String,
+        subject: String,
+    },
+    /// The run was frozen.
+    Freeze { reason: String },
 }
 
 #[cfg(test)]
@@ -245,13 +290,19 @@ mod tests {
             let until = TimeMs::new(round.saturating_mul(250).saturating_add(1_000));
             assert_eq!(
                 dog.on_provider_failure(&provider_error(true), until),
-                Disposal::BackOff { until },
+                Disposal::BackOff {
+                    until,
+                    code: AxCode::Provider,
+                    subject: "the provider said no".to_owned(),
+                },
                 "only Halt stops a run that is waiting out a provider"
             );
         }
         let payload = serde_json::to_value(
             dog.fired_payload(&Disposal::BackOff {
                 until: TimeMs::new(1_000),
+                code: AxCode::Provider,
+                subject: "the provider said no".to_owned(),
             })
             .unwrap(),
         )
@@ -259,5 +310,9 @@ mod tests {
         assert_eq!(payload["action"], "back_off");
         assert_eq!(payload["until_ms"], 1_000);
         assert_eq!(payload["provider_failures"], 64);
+        assert_eq!(
+            payload["subject"], "the provider said no",
+            "a line saying it backed off says what it backed off from"
+        );
     }
 }

@@ -7,6 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::event::record::AutonomyChanged;
 use kernel::{Address, AxCode, AxError, EventDraft, EventKind, EventRef};
 use kernel::{Ledger, Payload, RunId};
 use memory::JsonlLedger;
@@ -14,7 +15,7 @@ use memory::JsonlLedger;
 use crate::serving::open_vault;
 
 use super::freezing::Assembled;
-use super::{RunWorker, ScanReport, autonomy_name, ledger_dir, now_ms};
+use super::{RunWorker, ScanReport, ledger_dir, now_ms};
 
 /// The city segment of every prefix, and a file the person is meant to
 /// edit: `init` writes it into the city, and every later run reads that
@@ -150,10 +151,9 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
     // Who answers the approval inbox, written down rather than baked
     // into a default: the person can appoint somebody else, and a
     // change needs a line to change.
-    let mut delegation = serde_json::Map::new();
-    delegation.insert(
-        "autonomy".to_owned(),
-        serde_json::Value::String(autonomy_name(&kernel::Autonomy::Delegate(
+    let delegation = AutonomyChanged {
+        scope: kernel::event::Scope::City,
+        autonomy: kernel::Autonomy::Delegate(
             kernel::ResidentId::new(kernel::consts_policy::HALL_CLERK).ok_or_else(|| {
                 AxError::failure(
                     AxCode::ConfigInvalid,
@@ -162,15 +162,15 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
                 )
                 .with_recovery("a resident id is a non-empty address")
             })?,
-        ))),
-    );
+        ),
+    };
     ledger.append(EventDraft {
         run: RunId::CITY,
         t: now,
         who: "city".to_owned(),
         addr: None,
         kind: EventKind::AutonomyChanged,
-        data: Payload::new(delegation)?,
+        data: Payload::of(&delegation)?,
         ig: false,
     })?;
     // City Hall, and the two identity files its residents are read

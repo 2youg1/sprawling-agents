@@ -370,23 +370,3 @@ fn an_unreadable_approval_item_stops_the_fold() {
         "a refusal a person meets on start-up says what to do next"
     );
 }
-
-/// The two words the `city_halted` payload carries are spelled in one
-/// place, and a third word is a refusal rather than a scope quietly
-/// read as open.
-#[test]
-fn a_halt_and_a_release_round_trip_through_one_spelling() {
-    let halted = serde_json::json!({"scope": "lab", "state": Admission::Halted.spelling()});
-    let released = serde_json::json!({"scope": "lab", "state": Admission::Released.spelling()});
-    let unknown = serde_json::json!({"scope": "lab", "state": "shuttered"});
-    let read = |value: &serde_json::Value| {
-        Admission::in_record(value.as_object().unwrap()).map(|held| held.map(|(_, state)| state))
-    };
-    assert_eq!(read(&halted).unwrap(), Some(Admission::Halted));
-    assert_eq!(read(&released).unwrap(), Some(Admission::Released));
-    assert_eq!(
-        read(&unknown).unwrap_err().code(),
-        &AxCode::WireMismatch,
-        "a word this build does not know is not a release"
-    );
-}

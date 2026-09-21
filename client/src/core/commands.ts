@@ -26,6 +26,7 @@ import type {
   HaltScope,
   McpServer,
   ModelTag,
+  PreferencePatch,
   PursuitStep,
   RunId,
   Seq,
@@ -304,4 +305,12 @@ export function configureDesktop(addr: Address, allowlist: string): Command {
 
 export function putDocument(which: GovernedDocument, body: string): Command {
   return { put_document: { which, body, idem: mintIdem() } };
+}
+
+// One named change to what this person settled about reading their
+// cities. The city keeps the record in this person's own
+// `~/.sprawling/config.toml`; the browser's copy in `core/prefs.ts`
+// is the cache in front of it, never the authority.
+export function putPreferences(patch: PreferencePatch): Command {
+  return { put_preferences: { patch, idem: mintIdem() } };
 }

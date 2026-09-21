@@ -35,7 +35,10 @@ pub(crate) mod stages;
 pub use diff::SieveHistory;
 pub use filter::{Filter, FilterTable};
 pub use key::CommandKey;
-pub use record::{PassReason, SieveRecord, Sieved, Stage, StageOutcome, StageReport};
+pub use record::{
+    PassReason, ResultOffloaded, SieveAccount, SieveRecord, Sieved, Stage, StageOutcome,
+    StageReport,
+};
 
 use scan::{Priority, is_protected, priority};
 use stages::Cuts;

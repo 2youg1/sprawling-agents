@@ -8,6 +8,7 @@ impl city::ConfigLayer
 impl city::Dossier
 impl city::Entry
 impl city::Governed
+impl city::Held<'_>
 impl city::Identity
 impl city::Library
 impl city::Link
@@ -153,6 +154,7 @@ pub fn city::Entry::name(&self) -> &str
 pub fn city::Entry::task(&self) -> &str
 pub fn city::Governed::file(self) -> &'static str
 pub fn city::Governed::path(self, &std::path::Path) -> std::path::PathBuf
+pub fn city::Held<'_>::replace(&self, &[u8]) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::Identity::addr(&self) -> &kernel::address::Address
 pub fn city::Identity::load(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::Identity, kernel::error::shape::AxError>
 pub fn city::Identity::segment_bytes(&self) -> alloc::vec::Vec<u8>
@@ -205,6 +207,7 @@ pub fn city::config_path(&std::path::Path, &kernel::address::Address, city::Laye
 pub fn city::create_building(&std::path::Path, &kernel::address::Address, city::BuildingTemplate) -> core::result::Result<city::Building, kernel::error::shape::AxError>
 pub fn city::day_of(kernel::event::identity::TimeMs) -> u64
 pub fn city::desktop_scope_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
+pub fn city::edit_document<T>(&std::path::Path, impl core::ops::function::FnOnce(&city::Held<'_>) -> core::result::Result<T, kernel::error::shape::AxError>) -> core::result::Result<T, kernel::error::shape::AxError>
 pub fn city::evaluate(&kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
 pub fn city::file_archive(&city::ArchiveEntry, &str) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::hall_identity_path(&std::path::Path, &kernel::address::Address) -> core::option::Option<std::path::PathBuf>
@@ -221,6 +224,7 @@ pub fn city::roadmap(&std::path::Path, &kernel::address::Address) -> core::resul
 pub fn city::roadmap_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::rooms(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<kernel::address::Address>, kernel::error::shape::AxError>
 pub fn city::schedule_path(&std::path::Path) -> std::path::PathBuf
+pub fn city::settled_effort(&std::path::Path, &kernel::address::Address) -> core::result::Result<core::option::Option<(kernel::model::wire::Effort, city::Layer)>, kernel::error::shape::AxError>
 pub fn city::survey(&[(alloc::string::String, bool)], bool) -> city::Standing
 pub fn city::urbanite_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::vocation_of(&kernel::address::Address) -> city::Vocation
@@ -242,6 +246,7 @@ pub struct city::CityTool
 pub struct city::ConfigLayer
 pub struct city::Dossier
 pub struct city::Entry
+pub struct city::Held<'a>
 pub struct city::Holding
 pub struct city::JobBrief<'a>
 pub struct city::Library

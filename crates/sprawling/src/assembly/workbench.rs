@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use kernel::{Address, AxCode, AxError, Model, RunId};
 use runtime::bench::ToolBench;
 
-use super::autonomy_name;
+use kernel::event::record::autonomy_word;
 
 mod desks;
 mod engine;
@@ -233,7 +233,7 @@ pub(super) fn status_snapshot(situation: Situation<'_>) -> runtime::StatusSnapsh
         mode: situation.mode,
         ctx_used: kernel::Tokens::default(),
         ctx_limit: kernel::Tokens::new(situation.context_tokens),
-        trust: autonomy_name(situation.trust),
+        trust: autonomy_word::spell(situation.trust),
         write_domain: situation
             .write_domain
             .prefixes()

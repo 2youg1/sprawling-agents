@@ -12,6 +12,7 @@ import { createContext, createMemo, createSignal, useContext } from "solid-js";
 import type { Accessor } from "solid-js";
 
 import { QUERIES } from "./core/asking";
+import { putPreferences } from "./core/commands";
 import type { Key, Lang } from "./core/lang";
 import { fill, say } from "./core/lang";
 import { loadPreferences } from "./core/prefs";
@@ -114,6 +115,21 @@ export function useGo(): (view: View) => void {
 export function useCommand(): (command: Command) => boolean {
   const ui = useUi();
   return (command) => ui.conn.command(command);
+}
+
+// Picking a language, everywhere it is kept. Two places hold it and
+// this is the only caller that knows both: the browser's cache draws
+// the next first paint without waiting for the socket, and the
+// person's own `~/.sprawling/config.toml` is what a second browser
+// reaching the same city reads. A hook rather than a line repeated at
+// each picker, because the palette and the settings page offer the
+// same choice and one of them would fall behind.
+export function useLanguage(): (lang: Lang) => void {
+  const ui = useUi();
+  return (lang) => {
+    ui.prefs.setLang(lang);
+    ui.conn.command(putPreferences({ lang }));
+  };
 }
 
 // Whether this city has a model chosen to turn speech into text.

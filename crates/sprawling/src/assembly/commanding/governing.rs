@@ -5,13 +5,14 @@
 
 //! The verbs a person sends, and what each one does to the city.
 
+use kernel::event::Scope;
 use kernel::event::record::{
-    ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
+    Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
 };
 use kernel::{Address, AxCode, AxError, EventKind};
 use kernel::{Ledger, Locator, Payload, RunId};
 
-use super::super::{RunWorker, Unasked, autonomy_name, ledger_dir, now_ms, run_id_for, scope_name};
+use super::super::{RunWorker, Unasked, ledger_dir, now_ms, run_id_for, scope_of};
 
 impl RunWorker {
     /// Shuts a scope to new work, or opens it again.
@@ -31,9 +32,9 @@ impl RunWorker {
     pub(in crate::assembly) fn set_admission(
         &mut self,
         scope: &channels::HaltScope,
-        state: super::super::Admission,
+        state: Admittance,
     ) -> Result<(), AxError> {
-        if matches!(state, super::super::Admission::Halted) {
+        if matches!(state, Admittance::Halted) {
             let within = match scope {
                 channels::HaltScope::City => None,
                 channels::HaltScope::Building(addr) | channels::HaltScope::Workshop(addr) => {
@@ -54,8 +55,8 @@ impl RunWorker {
         self.record(
             EventKind::CityHalted,
             Payload::of(&CityHalted {
-                scope: scope_name(scope),
-                state: state.spelling().to_owned(),
+                scope: scope_of(scope),
+                state,
             })?,
         )
     }
@@ -65,18 +66,11 @@ impl RunWorker {
     /// The city covers everything; a building or a workshop covers what
     /// is inside it, by the same containment `WriteDomain` uses, so
     /// "inside" means one thing in this city rather than two.
-    pub(in crate::assembly) fn halted_by(&self, addr: &Address) -> Option<String> {
-        if self.governance.halted.contains("city") {
-            return Some("city".to_owned());
-        }
+    pub(in crate::assembly) fn halted_by(&self, addr: &Address) -> Option<Scope> {
         self.governance
             .halted
             .iter()
-            .find(|name| {
-                name.split_once(':')
-                    .and_then(|(_, rest)| Address::parse(rest).ok())
-                    .is_some_and(|scope| addr.is_within(&scope))
-            })
+            .find(|scope| scope.covers(addr))
             .cloned()
     }
 
@@ -92,8 +86,8 @@ impl RunWorker {
         self.record(
             EventKind::AutonomyChanged,
             Payload::of(&AutonomyChanged {
-                scope: scope_name(scope),
-                autonomy: autonomy_name(&autonomy),
+                scope: scope_of(scope),
+                autonomy,
             })?,
         )
     }

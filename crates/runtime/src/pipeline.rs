@@ -17,14 +17,15 @@
 
 use kernel::consts_policy::OFFLOAD_MIN_BYTES;
 use kernel::{AxCode, AxError, ByteLen, Payload};
-use serde_json::{Map, Value, json};
 
 use crate::clock::ClockStamp;
 use crate::compaction::{self, Shrink};
 use crate::elision::{self, Elided};
 use crate::offload::{OffloadSite, offload};
 use crate::reminder::ContextReminder;
-use crate::sieve::{CommandKey, FilterTable, SieveHistory, SieveInput, Sieved, sieve};
+use crate::sieve::{
+    CommandKey, FilterTable, ResultOffloaded, SieveHistory, SieveInput, Sieved, sieve,
+};
 
 pub mod exec;
 
@@ -109,9 +110,8 @@ fn nowhere_to_put_it(len: u64) -> AxError {
 /// Moves a result out of the window and leaves a reference, accounting
 /// the move.
 ///
-/// The four keys of that account are written here and nowhere else, so
-/// a reader folding the ledger finds one shape for every result that
-/// ever left a window.
+/// The account is [`ResultOffloaded`], which the sieve path writes too:
+/// one shape for every result that ever left a window.
 fn store(
     result: &[u8],
     cap_bytes: u64,
@@ -119,18 +119,24 @@ fn store(
     events: &mut Vec<Payload>,
 ) -> Result<Vec<u8>, AxError> {
     let record = offload(result, cap_bytes, site)?;
-    let mut event = Map::new();
-    event.insert(
-        "original".to_owned(),
-        Value::String(record.original.to_string()),
+    let substitute_len = u64::try_from(record.substitute.len()).map_err(|_| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "account a result that left the window",
+            record.original.to_string(),
+        )
+        .with_recovery("this machine cannot count the substitute's bytes in a u64")
+    })?;
+    events.push(
+        ResultOffloaded {
+            original: record.original.clone(),
+            len: record.original_len,
+            substitute_len,
+            rest_path: record.rest_path.display().to_string(),
+            sieve: None,
+        }
+        .payload()?,
     );
-    event.insert("len".to_owned(), json!(record.original_len));
-    event.insert("substitute_len".to_owned(), json!(record.substitute.len()));
-    event.insert(
-        "rest_path".to_owned(),
-        Value::String(record.rest_path.display().to_string()),
-    );
-    events.push(Payload::new(event)?);
     Ok(record.substitute)
 }
 
@@ -153,7 +159,7 @@ pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>
             text,
         };
         if let Sieved::Cut(record) = sieve(input, request.table, site, request.history)? {
-            events.push(record.payload()?);
+            events.push(record.offloaded().payload()?);
             sieved = Some(record.text.into_bytes());
         }
     }

@@ -28,6 +28,7 @@ impl core::fmt::Display for kernel::address::SessionName
 impl core::fmt::Display for kernel::address::SessionName
 impl core::fmt::Display for kernel::config::EnvVarName
 impl core::fmt::Display for kernel::config::EnvVarName
+impl core::fmt::Display for kernel::event::Scope
 impl core::fmt::Display for kernel::event::Who
 impl core::fmt::Display for kernel::idem::IdemKey
 impl core::fmt::Display for kernel::idem::IdemKey
@@ -133,6 +134,7 @@ impl kernel::delegation::DelegateKind
 impl kernel::delegation::DelegateKind
 impl kernel::delegation::Delegator
 impl kernel::delegation::Delegator
+impl kernel::event::Scope
 impl kernel::event::Who
 impl kernel::event::record::RunFrozen
 impl kernel::gate::DoorId
@@ -196,6 +198,7 @@ impl serde_core::ser::Serialize for kernel::AxCode
 impl serde_core::ser::Serialize for kernel::AxCode
 impl serde_core::ser::Serialize for kernel::SecretRef
 impl serde_core::ser::Serialize for kernel::SecretRef
+impl serde_core::ser::Serialize for kernel::event::Scope
 impl serde_core::ser::Serialize for kernel::event::Who
 impl serde_core::ser::Serialize for kernel::idem::IdemKey
 impl serde_core::ser::Serialize for kernel::idem::IdemKey
@@ -217,6 +220,7 @@ impl<'de> serde_core::de::Deserialize<'de> for kernel::address::Address
 impl<'de> serde_core::de::Deserialize<'de> for kernel::address::Address
 impl<'de> serde_core::de::Deserialize<'de> for kernel::address::SessionName
 impl<'de> serde_core::de::Deserialize<'de> for kernel::address::SessionName
+impl<'de> serde_core::de::Deserialize<'de> for kernel::event::Scope
 impl<'de> serde_core::de::Deserialize<'de> for kernel::event::Who
 impl<'de> serde_core::de::Deserialize<'de> for kernel::idem::IdemKey
 impl<'de> serde_core::de::Deserialize<'de> for kernel::idem::IdemKey
@@ -447,8 +451,10 @@ pub enum kernel::discard::Restoration
 pub enum kernel::error::AxCode
 pub enum kernel::error::Carrier
 pub enum kernel::event::EventKind
+pub enum kernel::event::Scope
 pub enum kernel::event::Who
 pub enum kernel::event::WindowClass
+pub enum kernel::event::record::Admittance
 pub enum kernel::event::record::CheckpointCommitted
 pub enum kernel::event::record::SkipReason
 pub enum kernel::event::record::ToolAnswer
@@ -781,6 +787,11 @@ pub fn kernel::delegation::Delegator::root() -> kernel::delegation::Delegator
 pub fn kernel::delegation::admit(kernel::delegation::Depth, &kernel::delegation::DelegateKind) -> kernel::delegation::DelegationVerdict
 pub fn kernel::discard::decide(&kernel::DiscardRequest) -> kernel::DiscardVerdict
 pub fn kernel::discard::forecast(&kernel::tool::ExecArm) -> kernel::DiscardForecast
+pub fn kernel::event::Scope::covers(&self, &kernel::address::Address) -> bool
+pub fn kernel::event::Scope::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
+pub fn kernel::event::Scope::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn kernel::event::Scope::parse(&str) -> core::result::Result<kernel::event::Scope, kernel::AxError>
+pub fn kernel::event::Scope::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
 pub fn kernel::event::Who::as_str(&self) -> &str
 pub fn kernel::event::Who::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn kernel::event::Who::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -788,6 +799,8 @@ pub fn kernel::event::Who::parse(&str) -> core::result::Result<kernel::event::Wh
 pub fn kernel::event::Who::resident(kernel::address::Address) -> core::result::Result<kernel::event::Who, kernel::AxError>
 pub fn kernel::event::Who::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
 pub fn kernel::event::record::RunFrozen::of(&kernel::completion::Completion) -> kernel::event::record::RunFrozen
+pub fn kernel::event::record::autonomy_word::read(&str) -> core::result::Result<kernel::approval::Autonomy, kernel::AxError>
+pub fn kernel::event::record::autonomy_word::spell(&kernel::approval::Autonomy) -> alloc::string::String
 pub fn kernel::gate::DoorId::as_str(self) -> &'static str
 pub fn kernel::gate::DoorId::as_str(self) -> &'static str
 pub fn kernel::gate::discard(&kernel::DiscardRequest, &str) -> kernel::gate::GateOutcome
@@ -1810,21 +1823,26 @@ pub kernel::event::EventKind::ToolResult
 pub kernel::event::EventKind::ToolkitLinkOpened
 pub kernel::event::EventKind::WatchdogFired
 pub kernel::event::EventKind::WorktreeOpened
+pub kernel::event::Scope::Building(kernel::address::Address)
+pub kernel::event::Scope::City
+pub kernel::event::Scope::Workshop(kernel::address::Address)
 pub kernel::event::Who::City
 pub kernel::event::Who::Person
 pub kernel::event::Who::Resident(kernel::address::Address)
 pub kernel::event::WindowClass::InWindow
 pub kernel::event::WindowClass::RecordOnly
+pub kernel::event::record::Admittance::Halted
+pub kernel::event::record::Admittance::Released
 pub kernel::event::record::ApprovalResolved::cluster: kernel::approval::ClusterKey
 pub kernel::event::record::ApprovalResolved::id: kernel::approval::ApprovalId
 pub kernel::event::record::ApprovalResolved::verdict: kernel::approval::Ruling
-pub kernel::event::record::AutonomyChanged::autonomy: alloc::string::String
-pub kernel::event::record::AutonomyChanged::scope: alloc::string::String
+pub kernel::event::record::AutonomyChanged::autonomy: kernel::approval::Autonomy
+pub kernel::event::record::AutonomyChanged::scope: kernel::event::Scope
 pub kernel::event::record::CheckpointCommitted::Committed(kernel::event::record::Commit)
 pub kernel::event::record::CheckpointCommitted::JobPinned
 pub kernel::event::record::CheckpointCommitted::JobPinned::job: kernel::locator::Locator
-pub kernel::event::record::CityHalted::scope: alloc::string::String
-pub kernel::event::record::CityHalted::state: alloc::string::String
+pub kernel::event::record::CityHalted::scope: kernel::event::Scope
+pub kernel::event::record::CityHalted::state: kernel::event::record::Admittance
 pub kernel::event::record::Commit::by: kernel::event::record::CommitAttribution
 pub kernel::event::record::Commit::files: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::Commit::oid: kernel::locator::GitOid
@@ -2192,6 +2210,7 @@ pub mod kernel::discard
 pub mod kernel::error
 pub mod kernel::event
 pub mod kernel::event::record
+pub mod kernel::event::record::autonomy_word
 pub mod kernel::gate
 pub mod kernel::goal
 pub mod kernel::highlight

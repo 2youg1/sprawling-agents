@@ -113,6 +113,8 @@ impl runtime::sieve::filter::FilterTable
 impl runtime::sieve::key::CommandKey
 impl runtime::sieve::key::CommandKey
 impl runtime::sieve::key::CommandKey
+impl runtime::sieve::record::ResultOffloaded
+impl runtime::sieve::record::ResultOffloaded
 impl runtime::sieve::record::SieveRecord
 impl runtime::sieve::record::SieveRecord
 impl runtime::sieve::record::SieveRecord
@@ -536,9 +538,11 @@ pub fn runtime::sieve::key::CommandKey::of(&kernel::tool::ExecArm) -> runtime::s
 pub fn runtime::sieve::key::CommandKey::subcommand(&self) -> core::option::Option<&str>
 pub fn runtime::sieve::key::CommandKey::subcommand(&self) -> core::option::Option<&str>
 pub fn runtime::sieve::key::CommandKey::subcommand(&self) -> core::option::Option<&str>
-pub fn runtime::sieve::record::SieveRecord::payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
-pub fn runtime::sieve::record::SieveRecord::payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
-pub fn runtime::sieve::record::SieveRecord::payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn runtime::sieve::record::ResultOffloaded::payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn runtime::sieve::record::ResultOffloaded::payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn runtime::sieve::record::SieveRecord::offloaded(&self) -> runtime::sieve::record::ResultOffloaded
+pub fn runtime::sieve::record::SieveRecord::offloaded(&self) -> runtime::sieve::record::ResultOffloaded
+pub fn runtime::sieve::record::SieveRecord::offloaded(&self) -> runtime::sieve::record::ResultOffloaded
 pub fn runtime::sieve::sieve(runtime::sieve::SieveInput<'_>, &runtime::sieve::filter::FilterTable, &mut runtime::offload::OffloadSite<'_>, &mut runtime::sieve::diff::SieveHistory) -> core::result::Result<runtime::sieve::record::Sieved, kernel::error::shape::AxError>
 pub fn runtime::stamp(kernel::event::identity::TimeMs, &[kernel::config::ClockZone]) -> core::result::Result<runtime::clock::ClockStamp, kernel::error::shape::AxError>
 pub fn runtime::structure_of(&str) -> alloc::vec::Vec<runtime::digest::StructureNode>
@@ -637,6 +641,8 @@ pub runtime::DigestOutcome::Structural
 pub runtime::DigestOutcome::Structural::digest: runtime::digest::Digest
 pub runtime::DigestOutcome::Structural::reason: kernel::error::shape::AxError
 pub runtime::Disposal::BackOff
+pub runtime::Disposal::BackOff::code: kernel::error::code::AxCode
+pub runtime::Disposal::BackOff::subject: alloc::string::String
 pub runtime::Disposal::BackOff::until: kernel::event::identity::TimeMs
 pub runtime::Disposal::CorrectiveSteer
 pub runtime::Disposal::CorrectiveSteer::text: alloc::string::String
@@ -1052,6 +1058,15 @@ pub runtime::sieve::Filter::subcommands: alloc::vec::Vec<alloc::string::String>
 pub runtime::sieve::Filter::tail: core::option::Option<u64>
 pub runtime::sieve::PassReason::BelowFloor
 pub runtime::sieve::PassReason::NothingShrank
+pub runtime::sieve::ResultOffloaded::len: u64
+pub runtime::sieve::ResultOffloaded::original: kernel::locator::Locator
+pub runtime::sieve::ResultOffloaded::rest_path: alloc::string::String
+pub runtime::sieve::ResultOffloaded::sieve: core::option::Option<runtime::sieve::record::SieveAccount>
+pub runtime::sieve::ResultOffloaded::substitute_len: u64
+pub runtime::sieve::SieveAccount::filter: alloc::string::String
+pub runtime::sieve::SieveAccount::lines_in: u64
+pub runtime::sieve::SieveAccount::lines_out: u64
+pub runtime::sieve::SieveAccount::stages: alloc::vec::Vec<runtime::sieve::record::StageReport>
 pub runtime::sieve::SieveInput::exit_code: core::option::Option<i64>
 pub runtime::sieve::SieveInput::key: &'a runtime::sieve::key::CommandKey
 pub runtime::sieve::SieveInput::text: &'a str
@@ -1101,6 +1116,15 @@ pub runtime::sieve::filter::Filter::subcommands: alloc::vec::Vec<alloc::string::
 pub runtime::sieve::filter::Filter::tail: core::option::Option<u64>
 pub runtime::sieve::record::PassReason::BelowFloor
 pub runtime::sieve::record::PassReason::NothingShrank
+pub runtime::sieve::record::ResultOffloaded::len: u64
+pub runtime::sieve::record::ResultOffloaded::original: kernel::locator::Locator
+pub runtime::sieve::record::ResultOffloaded::rest_path: alloc::string::String
+pub runtime::sieve::record::ResultOffloaded::sieve: core::option::Option<runtime::sieve::record::SieveAccount>
+pub runtime::sieve::record::ResultOffloaded::substitute_len: u64
+pub runtime::sieve::record::SieveAccount::filter: alloc::string::String
+pub runtime::sieve::record::SieveAccount::lines_in: u64
+pub runtime::sieve::record::SieveAccount::lines_out: u64
+pub runtime::sieve::record::SieveAccount::stages: alloc::vec::Vec<runtime::sieve::record::StageReport>
 pub runtime::sieve::record::SieveRecord::bytes_in: u64
 pub runtime::sieve::record::SieveRecord::bytes_out: u64
 pub runtime::sieve::record::SieveRecord::filter: alloc::string::String
@@ -1282,6 +1306,8 @@ pub struct runtime::run::RunPlan
 pub struct runtime::sieve::CommandKey
 pub struct runtime::sieve::Filter
 pub struct runtime::sieve::FilterTable
+pub struct runtime::sieve::ResultOffloaded
+pub struct runtime::sieve::SieveAccount
 pub struct runtime::sieve::SieveHistory(_)
 pub struct runtime::sieve::SieveInput<'a>
 pub struct runtime::sieve::SieveRecord
@@ -1290,6 +1316,8 @@ pub struct runtime::sieve::diff::SieveHistory(_)
 pub struct runtime::sieve::filter::Filter
 pub struct runtime::sieve::filter::FilterTable
 pub struct runtime::sieve::key::CommandKey
+pub struct runtime::sieve::record::ResultOffloaded
+pub struct runtime::sieve::record::SieveAccount
 pub struct runtime::sieve::record::SieveRecord
 pub struct runtime::sieve::record::StageReport
 pub struct runtime::tools::ChildStatus

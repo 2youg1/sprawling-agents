@@ -11,7 +11,8 @@
 //! file because they are one rule read twice — what counts as dangling
 //! decides what the closing line must say.
 
-use kernel::{AxCode, AxError, EventDraft, EventKind, EventRecord, RunId, Seq, TimeMs};
+use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
+use kernel::{AxCode, AxError, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
 
 use super::{VerifiedLedger, VerifiedLine};
 
@@ -63,52 +64,34 @@ pub fn outcome_unknown_draft(call: &EventRecord, t: TimeMs) -> Result<EventDraft
              call can be closed as an unknown outcome",
         ));
     }
-    let id = call
-        .data()
-        .as_map()
-        .get("id")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("unknown")
-        .to_owned();
-    let name = call
-        .data()
-        .as_map()
-        .get("name")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("unknown")
-        .to_owned();
+    // Read through the one struct `tool_called` is written from: this
+    // used to hunt two keys by hand and call either of them "unknown",
+    // so a call this build could not read was closed against a name
+    // that names nothing and paired with an id no line answers.
+    let called = call.data().read::<ToolCalled>()?;
     let error = AxError::failure(
         AxCode::ToolOutcomeUnknown,
         "recover tool outcome",
-        format!("{name} ({id})"),
+        format!("{name} ({id})", name = called.name.as_str(), id = called.id),
     )
     .with_recovery(
         "the call may or may not have taken effect; verify the external state before retrying",
     );
-    let mut map = serde_json::Map::new();
-    map.insert("tool_use_id".to_owned(), serde_json::Value::String(id));
-    map.insert("name".to_owned(), serde_json::Value::String(name));
-    map.insert(
-        "error".to_owned(),
-        serde_json::to_value(&error).map_err(|err| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "encode unknown outcome",
-                err.to_string(),
-            )
-            .with_recovery(
-                "report this against runtime::replay: an AxError is seven fields of \
-                 text, numbers and booleans, and JSON refuses none of them",
-            )
-        })?,
-    );
+    let answer = ToolAnswer::Failed {
+        error: Payload::of(&error)?,
+    };
+    let data = Payload::of(&ToolResult {
+        tool_use_id: called.id.clone(),
+        name: called.name.clone(),
+        answer,
+    })?;
     Ok(EventDraft {
         run: call.run(),
         t,
         who: call.who().to_owned(),
         addr: None,
         kind: EventKind::ToolResult,
-        data: kernel::Payload::new(map)?,
+        data,
         ig: false,
     })
 }

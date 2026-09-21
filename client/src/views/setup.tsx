@@ -43,7 +43,7 @@ import { preferences } from "../core/prefs";
 import { toFragment } from "../core/route";
 import type { Autonomy, EndpointsAnswer } from "../wire";
 import { ResidentId } from "../wire";
-import { useCommand, useSay, useUi } from "../ui";
+import { useCommand, useLanguage, useSay, useUi } from "../ui";
 import { Machine } from "./machine";
 import { EmptyState } from "./parts/empty";
 import { Segmented } from "./parts/segmented";
@@ -149,6 +149,7 @@ export function Setup() {
   const ui = useUi();
   const say = useSay();
   const command = useCommand();
+  const setLanguage = useLanguage();
   const [group, setGroup] = createSignal<Group>("accounts");
   const endpoints = ui.conn.asking.ask(QUERIES.endpoints);
   const answer = createMemo<EndpointsAnswer | undefined>(() => {
@@ -240,7 +241,7 @@ export function Setup() {
                     label={say("setup_language")}
                     options={LANGS.map((lang) => ({ value: lang, label: endonym(lang) }))}
                     held={ui.prefs.held().lang}
-                    onPick={ui.prefs.setLang}
+                    onPick={setLanguage}
                   />
                 </div>
               </Match>

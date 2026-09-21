@@ -8,12 +8,19 @@
 //! new authority: on conflict, fresh reads and real execution win.
 
 use kernel::{AxCode, AxError, Locator, Payload, RunId};
-use serde_json::{Map, Value};
+use serde::Serialize;
 
 /// Five sections, always present: must-read / overview / progress /
 /// context / next step. Prose quality is the probe's business (P1); the
 /// type enforces structure only.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// This struct is the `handoff_written` payload: its field names are
+/// the line's keys, so the five sections are spelled once rather than
+/// once here and once at the writer. It serializes and does not
+/// deserialize, because [`Handoff::new`] is the only way to hold one
+/// and a reader that built one from a line would be a second door past
+/// that constructor's refusal of an empty must-read list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Handoff {
     must_read: Vec<Locator>,
     overview: String,
@@ -73,27 +80,12 @@ impl Handoff {
         &self.next_step
     }
 
-    /// The `handoff_written` payload: five keys, must-read as locator
-    /// strings.
+    /// The `handoff_written` payload: these five fields, encoded.
+    ///
+    /// # Errors
+    /// Propagates whatever `Payload::of` says about the encoding.
     pub fn payload(&self) -> Result<Payload, AxError> {
-        let mut map = Map::new();
-        map.insert(
-            "must_read".to_owned(),
-            Value::Array(
-                self.must_read
-                    .iter()
-                    .map(|locator| Value::String(locator.to_string()))
-                    .collect(),
-            ),
-        );
-        map.insert("overview".to_owned(), Value::String(self.overview.clone()));
-        map.insert("progress".to_owned(), Value::String(self.progress.clone()));
-        map.insert("context".to_owned(), Value::String(self.context.clone()));
-        map.insert(
-            "next_step".to_owned(),
-            Value::String(self.next_step.clone()),
-        );
-        Payload::new(map)
+        Payload::of(self)
     }
 }
 

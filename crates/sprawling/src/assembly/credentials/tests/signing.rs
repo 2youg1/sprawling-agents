@@ -202,11 +202,14 @@ fn a_login_for_a_provider_this_build_has_no_flow_for_is_refused_by_name() {
     assert_eq!(err.code(), &AxCode::ConfigInvalid);
     assert!(err.recovery().contains("API key"));
 
+    // Every provider this build knows is named in the refusal, and
+    // the sentence is the table's rather than this call site's.
+    for row in gateway::OAUTH_PROFILES {
+        assert!(err.recovery().contains(row.provider), "{}", row.provider);
+    }
+
     // OpenAI's row states every fact a login needs, so the login
-    // begins. What it does not state is where the API lives: no
-    // watched path says it, and this city does not invent one. The
-    // refusal therefore waits for the moment it matters, which is the
-    // attach after the token is already in the vault.
+    // begins.
     worker
         .handle(channels::Command::Login {
             provider: channels::ProviderName::parse("openai").unwrap(),
@@ -214,9 +217,22 @@ fn a_login_for_a_provider_this_build_has_no_flow_for_is_refused_by_name() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"login"),
         })
         .unwrap();
-    let openai = gateway::profile("openai").expect("openai has a row");
-    assert!(
-        openai.api_base.is_empty(),
-        "no watched path states OpenAI's api base; a filled one here was invented"
-    );
+}
+
+/// Which face a finished login attaches on is the family's statement,
+/// read through the connection the registration is. The Codex
+/// subscription answers on the responses face, and a second mapping
+/// from the provider word `openai` to a dialect used to attach it on
+/// the chat face — where its first call is a 404.
+#[test]
+fn a_subscription_is_attached_on_the_face_its_family_answers_on() {
+    for row in gateway::OAUTH_PROFILES {
+        let wire = gateway::ConnectionKind::Harness(row.family).wire();
+        let expected = match row.family {
+            gateway::Family::Codex => kernel::DialectKind::OpenAiResponses,
+            gateway::Family::ClaudeCode => kernel::DialectKind::Anthropic,
+            gateway::Family::GrokBuild | gateway::Family::KimiCli => kernel::DialectKind::OpenAi,
+        };
+        assert_eq!(wire, expected, "{}", row.provider);
+    }
 }

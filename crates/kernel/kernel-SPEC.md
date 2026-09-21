@@ -373,9 +373,18 @@ pub struct Commit { pub oid: GitOid, #[serde(flatten)] pub by: CommitAttribution
 #[serde(untagged)]
 pub enum CheckpointCommitted { JobPinned { job: Locator }, Committed(Commit) }
 
+pub enum Scope { City, Building(Address), Workshop(Address) }   // city | building:<addr> | workshop:<addr>
+impl Scope { pub fn covers(&self, addr: &Address) -> bool; pub fn parse(raw: &str) -> Result<Scope, AxError>; }
+
 pub struct ApprovalResolved { pub id: ApprovalId, pub verdict: Ruling, pub cluster: ClusterKey }
-pub struct AutonomyChanged { pub scope: String, pub autonomy: String }
-pub struct CityHalted { pub scope: String, pub state: String }
+pub struct AutonomyChanged { #[serde(default = "city_wide")] pub scope: Scope,
+                             #[serde(with = "autonomy_word")] pub autonomy: Autonomy }
+pub struct CityHalted { pub scope: Scope, pub state: Admittance }
+#[serde(rename_all = "snake_case")] pub enum Admittance { Halted, Released }
+pub mod autonomy_word {                          // owner | delegate:<resident>
+    pub fn spell(autonomy: &Autonomy) -> String;
+    pub fn read(word: &str) -> Result<Autonomy, AxError>;
+}
 pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
 ```
 
@@ -388,9 +397,13 @@ pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
 旧写法让两个读方各自与字面量比较，认不出的词在一处读作拒、在另一处读作准（M-21）；
 现在认不出的词是一次读失败，不是一个默认值。三键均不 `default`——`approval_resolved`
 自诞生起就无条件写出这三键，缺 verdict 的行该拒而不该猜。
-`AutonomyChanged.scope` / `.autonomy` 与 `CityHalted.scope` / `.state` 仍是字符串：
-这两条小文法的家分别在 `sprawling::assembly::naming` 与 `assembly::folds::Admission`，
-把它们搬进本 crate 是叶子 7.8，待四个仍手写该文法的读方一并迁移。
+`AutonomyChanged` 与 `CityHalted` 的四个值都有类型：作用域是 [`Scope`]，
+「关／开」是 `Admittance`，「谁来答」是 `Autonomy`。三条小文法此前分别由
+`sprawling::assembly` 的 `format!` 写出、由每个读方的 `split_once(':')` 读回，
+认不出的词在一处读作「开」、在另一处读作「人自己答」；现在拼法只有这一处，
+认不出的词是一次 `E_WIRE_MISMATCH`。**已落盘的行照常读**：三种拼法逐字未变，
+而 `autonomy_changed` 的 `scope` 键在它存在之前写下的行里缺席，那样的行指的是整座城，
+`city_wide` 就这样读它。
 
 三条不变量，因为已落盘的账本不可重拼：
 
@@ -1607,7 +1620,7 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 
 **需求**：客户端（`client/src/wire.ts`）由 Rust 的 wire 类型生成，而 wire 携带的值大半是 kernel 的（`RunId`／`Seq`／`Address`／`EventRecord`／`AxError`／`ApprovalItem`……）。它们的 JSON 形状必须有且只有一个权威，而那个权威已经存在：类型声明上的 `#[serde(...)]`。
 
-**接口**：feature `schema`（缺省关，`schemars` 为可选依赖）。开启时，每个出现在帧里的类型带 `#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]`——派生宏读的正是 serde 读的那些属性（`rename_all`／`transparent`／`flatten`／`skip_serializing_if`／`deny_unknown_fields`／`try_from`），所以形状不可能与编码漂开。手写 serde 的五个值（`AxCode`／`IdemKey`／`B3Hash`／`GitOid`／`Locator`）在 `crates/kernel/src/schema.rs` 里各写一条 `impl JsonSchema`：一律是带 `pattern` 的 `string`，`AxCode` 的 `enum` 取自 `AxCode::ALL`——同一张表既产 `as_str` 也产 schema。这五条住一个文件而不是各回原文件，因为 `locator.rs` 已有 375 行，三条 impl 会把它推过 400 行预算；文件只装 `impl` 与它们引用的形状字符串，一处判定也没有。
+**接口**：feature `schema`（缺省关，`schemars` 为可选依赖）。开启时，每个出现在帧里的类型带 `#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]`——派生宏读的正是 serde 读的那些属性（`rename_all`／`transparent`／`flatten`／`skip_serializing_if`／`deny_unknown_fields`／`try_from`），所以形状不可能与编码漂开。派生说不出语法的六个值在 `crates/kernel/src/schema.rs` 里各写一条 `impl JsonSchema`：一律是带 `pattern` 的 `string`，`AxCode` 的 `enum` 取自 `AxCode::ALL`——同一张表既产 `as_str` 也产 schema。前五个（`AxCode`／`IdemKey`／`B3Hash`／`GitOid`／`Locator`）的 serde 本就是手写的；第六个 `Address` 的 serde 是 `transparent`，派生因此只说得出「一个字符串」，而客户端要知道的恰是哪些字符串算数——`ADDRESS_PATTERN` 把 `Address::parse` 收的那套语法写成一条正则（`\p{Cc}` 即 `char::is_control`，`\p{White_Space}` 即 `char::is_whitespace`，读它的引擎一律开 Unicode 语义），`cargo xtask wire-ts` 据此发出 `Schema.pattern`，客户端不再自备一份语法。判定权威仍是 `Address::parse`：它答得出**违反了哪一条**，那是一个人需要的。这六条住一个文件而不是各回原文件，因为 `locator.rs` 已有 375 行，三条 impl 会把它推过 400 行预算；文件只装 `impl` 与它们引用的形状字符串，一处判定也没有。
 
 **缺省公开面不变**：feature 关着时 `cargo public-api -p kernel` 逐字节同以前，基线不动；`--all-features` 下多出的只是 `JsonSchema` 实现。产品二进制不开它。
 

@@ -21,6 +21,7 @@
 //! copy, a registry write and a broadcast.
 
 use kernel::{AxCode, AxError};
+use sprawling::doctor::Platform;
 use std::path::{Path, PathBuf};
 
 /// The word this binary is installed as, whatever the archive called the
@@ -91,12 +92,16 @@ pub(crate) enum PathOutcome {
 /// `None` means neither location could be derived, which is the honest
 /// answer on a machine with no home and no `LOCALAPPDATA`.
 pub(crate) fn program_dir(local_app_data: Option<&Path>, home: Option<&Path>) -> Option<PathBuf> {
-    if cfg!(target_os = "windows") {
-        return local_app_data
+    let under_home = || home.map(|home| home.join(".local").join("bin"));
+    match Platform::current() {
+        Some(Platform::Windows) => local_app_data
             .map(|root| root.join("Programs").join(INSTALLED_STEM))
-            .or_else(|| home.map(|home| home.join(".local").join("bin")));
+            .or_else(under_home),
+        // An unnamed platform is not a reason to invent a location: a
+        // fourth one that keeps its binaries elsewhere arrives here as
+        // a compile error rather than as a wrong directory.
+        Some(Platform::MacOs | Platform::Linux) | None => under_home(),
     }
-    home.map(|home| home.join(".local").join("bin"))
 }
 
 /// The file name this binary is installed under.
@@ -112,10 +117,9 @@ pub(crate) fn installed_name() -> String {
 fn same_directory(entry: &str, dir: &str) -> bool {
     let normalise = |raw: &str| {
         let trimmed = raw.trim().trim_end_matches(['\\', '/']);
-        if cfg!(target_os = "windows") {
-            trimmed.to_lowercase()
-        } else {
-            trimmed.to_owned()
+        match Platform::current() {
+            Some(Platform::Windows) => trimmed.to_lowercase(),
+            Some(Platform::MacOs | Platform::Linux) | None => trimmed.to_owned(),
         }
     };
     !dir.trim().is_empty() && normalise(entry) == normalise(dir)

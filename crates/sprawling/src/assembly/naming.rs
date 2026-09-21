@@ -68,42 +68,16 @@ pub(super) fn plan_node_of(record: &EventRecord) -> Option<kernel::NodeId> {
     kernel::NodeId::parse(record.data().as_map().get("node")?.as_str()?).ok()
 }
 
-/// Rebuilds the endpoint book from the ledger. Same disposability as the
-/// views: nothing about what is attached is stored anywhere else.
+/// Which scope a wire frame names, in the value the ledger records.
 ///
-/// # Errors
-/// Propagates chain verification and payload failures.
-/// How a scope is written into the ledger. Three shapes, one spelling
-/// each; the address rides along because "this building" and "that one"
-/// are different scopes.
-pub(super) fn scope_name(scope: &channels::HaltScope) -> String {
+/// Total: the two sets have the same three members. How that scope is
+/// spelled on a ledger line is [`kernel::event::Scope`]'s and is
+/// written nowhere else, so a halt recorded by this city and a halt
+/// read back by a restart cannot disagree about which scope it named.
+pub(super) fn scope_of(scope: &channels::HaltScope) -> kernel::event::Scope {
     match scope {
-        channels::HaltScope::City => "city".to_owned(),
-        channels::HaltScope::Building(addr) => format!("building:{}", addr.as_str()),
-        channels::HaltScope::Workshop(addr) => format!("workshop:{}", addr.as_str()),
-    }
-}
-
-/// The written form of an autonomy setting, and its reader. One writer
-/// and one reader for one spelling: a delegate's address is part of the
-/// value, so a replay knows which resident was appointed.
-pub(super) fn autonomy_name(autonomy: &kernel::Autonomy) -> String {
-    match autonomy {
-        kernel::Autonomy::Owner => "owner".to_owned(),
-        kernel::Autonomy::Delegate(resident) => format!("delegate:{}", resident.as_str()),
-    }
-}
-
-pub(crate) fn read_autonomy(name: &str) -> kernel::Autonomy {
-    match name.split_once(':') {
-        Some(("delegate", resident)) => match kernel::ResidentId::new(resident) {
-            Some(resident) => kernel::Autonomy::Delegate(resident),
-            // An unreadable delegate falls back to the person rather than
-            // to nobody: the safe side of this setting is the strict one.
-            None => kernel::Autonomy::Owner,
-        },
-        // Anything else is the person: an unreadable setting falls
-        // back to the strict side, where only they answer.
-        Some(_) | None => kernel::Autonomy::Owner,
+        channels::HaltScope::City => kernel::event::Scope::City,
+        channels::HaltScope::Building(addr) => kernel::event::Scope::Building(addr.clone()),
+        channels::HaltScope::Workshop(addr) => kernel::event::Scope::Workshop(addr.clone()),
     }
 }

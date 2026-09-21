@@ -11,7 +11,7 @@
 // reads, so a spelling learned in one place works in the other.
 
 import { For, Show, createMemo, createSignal, onMount } from "solid-js";
-import { Option } from "effect";
+import { Option, Schema } from "effect";
 
 import { QUERIES } from "../core/asking";
 import { halt, release } from "../core/commands";
@@ -20,8 +20,8 @@ import { MAYOR, current, toFragment } from "../core/route";
 import type { View } from "../core/route";
 import { completed, offered, reached } from "../core/slash";
 import type { Reached, Slash, SlashHands } from "../core/slash";
-import { useCommand, useGo, useSay, useUi } from "../ui";
-import { Address } from "../core/address";
+import { useCommand, useGo, useLanguage, useSay, useUi } from "../ui";
+import { Address } from "../wire";
 
 interface Entry {
   readonly label: string;
@@ -34,6 +34,7 @@ export function Palette(props: { readonly onClose: () => void }) {
   const say = useSay();
   const go = useGo();
   const command = useCommand();
+  const setLanguage = useLanguage();
   const [query, setQuery] = createSignal("");
   const [cursor, setCursor] = createSignal(0);
   const [box, setBox] = createSignal<HTMLInputElement>();
@@ -78,7 +79,7 @@ export function Palette(props: { readonly onClose: () => void }) {
           label: endonym(lang),
           hint: say("setup_language"),
           act: () => {
-            ui.prefs.setLang(lang);
+            setLanguage(lang);
           },
         });
       }
@@ -94,7 +95,7 @@ export function Palette(props: { readonly onClose: () => void }) {
       if (run.addr !== null && run.addr !== MAYOR) rooms.add(run.addr);
     }
     for (const room of rooms) {
-      const address = Address.option(room);
+      const address = Schema.decodeOption(Address)(room);
       if (address._tag === "Some") {
         out.push(goTo({ kind: "talk", address: address.value }, room, say("palette_room")));
       }

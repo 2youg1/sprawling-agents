@@ -12,7 +12,7 @@
 use std::path::PathBuf;
 
 use kernel::{AxError, Locator, Payload};
-use serde_json::{Map, Value, json};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PassReason {
@@ -41,7 +41,9 @@ pub struct SieveRecord {
     pub stages: Vec<StageReport>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The stages a result passes through, in the words the ledger holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Stage {
     StripAnsi,
     FoldBlank,
@@ -52,21 +54,8 @@ pub enum Stage {
     Truncate,
 }
 
-impl Stage {
-    fn name(self) -> &'static str {
-        match self {
-            Stage::StripAnsi => "strip_ansi",
-            Stage::FoldBlank => "fold_blank",
-            Stage::DedupTemplate => "dedup_template",
-            Stage::DiffPrevious => "diff_previous",
-            Stage::Filter => "filter",
-            Stage::CutLongLine => "cut_long_line",
-            Stage::Truncate => "truncate",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "outcome", rename_all = "snake_case")]
 pub enum StageOutcome {
     Applied {
         bytes_before: u64,
@@ -82,66 +71,74 @@ pub enum StageOutcome {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StageReport {
     pub stage: Stage,
+    #[serde(flatten)]
     pub outcome: StageOutcome,
 }
 
-impl StageReport {
-    fn json(&self) -> Value {
-        let mut map = Map::new();
-        map.insert(
-            "stage".to_owned(),
-            Value::String(self.stage.name().to_owned()),
-        );
-        match &self.outcome {
-            StageOutcome::Applied {
-                bytes_before,
-                bytes_after,
-            } => {
-                map.insert("outcome".to_owned(), json!("applied"));
-                map.insert("bytes_before".to_owned(), json!(bytes_before));
-                map.insert("bytes_after".to_owned(), json!(bytes_after));
-            }
-            StageOutcome::Noop => {
-                map.insert("outcome".to_owned(), json!("noop"));
-            }
-            StageOutcome::Rejected { grew_to } => {
-                map.insert("outcome".to_owned(), json!("rejected"));
-                map.insert("grew_to".to_owned(), json!(grew_to));
-            }
-            StageOutcome::Unavailable { reason } => {
-                map.insert("outcome".to_owned(), json!("unavailable"));
-                map.insert("reason".to_owned(), json!(reason));
-            }
-        }
-        Value::Object(map)
+/// What the sieve cut out of one result, beyond where it went.
+///
+/// Four keys or eleven: a result that left the window without the
+/// sieve carries the first four and nothing else, which is why this
+/// half is one value with a name rather than seven fields that are all
+/// present or all absent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SieveAccount {
+    /// The filter table this result was cut by.
+    pub filter: String,
+    pub lines_in: u64,
+    pub lines_out: u64,
+    /// Every stage the text passed through, kept, refused or absent.
+    pub stages: Vec<StageReport>,
+}
+
+/// `result_offloaded`: where a result went when it left the window,
+/// and what the sieve did to it on the way.
+///
+/// The one authority for this line's keys. They used to be written by
+/// hand twice - once by the sieve and once by the plain offload path -
+/// so a reader folding a history met two shapes for one kind.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResultOffloaded {
+    /// Where the whole result is kept.
+    pub original: Locator,
+    /// How long the result was.
+    pub len: u64,
+    /// How long what the model sees is.
+    pub substitute_len: u64,
+    /// Where the rest of it was written.
+    pub rest_path: String,
+    /// The sieve's account, absent on the plain offload path.
+    #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
+    pub sieve: Option<SieveAccount>,
+}
+
+impl ResultOffloaded {
+    /// The payload, through the one door a ledger line is written by.
+    ///
+    /// # Errors
+    /// Propagates whatever `Payload::of` says about the encoding.
+    pub fn payload(&self) -> Result<Payload, AxError> {
+        Payload::of(self)
     }
 }
 
 impl SieveRecord {
-    /// The `result_offloaded` payload: the original's locator, the
-    /// substitute's length, and the stage account. Integers only.
-    pub fn payload(&self) -> Result<Payload, AxError> {
-        let mut map = Map::new();
-        map.insert(
-            "original".to_owned(),
-            Value::String(self.original.to_string()),
-        );
-        map.insert("len".to_owned(), json!(self.bytes_in));
-        map.insert("substitute_len".to_owned(), json!(self.bytes_out));
-        map.insert(
-            "rest_path".to_owned(),
-            Value::String(self.rest_path.display().to_string()),
-        );
-        map.insert("filter".to_owned(), Value::String(self.filter.clone()));
-        map.insert("lines_in".to_owned(), json!(self.lines_in));
-        map.insert("lines_out".to_owned(), json!(self.lines_out));
-        map.insert(
-            "stages".to_owned(),
-            Value::Array(self.stages.iter().map(StageReport::json).collect()),
-        );
-        Payload::new(map)
+    /// The `result_offloaded` account for a result the sieve cut.
+    pub fn offloaded(&self) -> ResultOffloaded {
+        ResultOffloaded {
+            original: self.original.clone(),
+            len: self.bytes_in,
+            substitute_len: self.bytes_out,
+            rest_path: self.rest_path.display().to_string(),
+            sieve: Some(SieveAccount {
+                filter: self.filter.clone(),
+                lines_in: self.lines_in,
+                lines_out: self.lines_out,
+                stages: self.stages.clone(),
+            }),
+        }
     }
 }

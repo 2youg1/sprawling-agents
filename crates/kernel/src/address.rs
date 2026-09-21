@@ -33,15 +33,14 @@ pub const RESERVED_PREFIX: &str = ".sprawling";
 /// Canonical relative path; invariants enforced at the sole constructor.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Address(String);
 
 impl Address {
-    /// Sole constructor. Rejects: empty input, absolute paths, backslash,
-    /// `:` (drive letters and NTFS alternate data streams alike), NUL and
-    /// control characters, empty segments (covers leading/trailing and
-    /// doubled `/`), `.`/`..` segments, and segments ending in a dot or
-    /// whitespace. Fail-closed: not exactly canonical is `E_INVALID_ARGS`.
+    /// Sole constructor; `crate::schema` restates this grammar as one
+    /// pattern for clients. Rejects: empty input, absolute paths,
+    /// backslash, `:` (drive letters and NTFS streams alike), control
+    /// characters, empty segments, `.`/`..`, and a segment ending in a
+    /// dot or whitespace. Fail-closed: not canonical is `E_INVALID_ARGS`.
     pub fn parse(raw: &str) -> Result<Self, AxError> {
         let reject = |violation: &str| {
             Err(

@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { Option } from "effect";
 
-import { Address } from "./address";
+import { Address } from "../wire";
 import {
   DEFAULT_VIEW,
   MAYOR,
@@ -19,8 +19,8 @@ import {
 } from "./route";
 import { RunId } from "./run_id";
 
-const lab = Option.getOrThrow(Address.option("lab"));
-const parser = Option.getOrThrow(Address.option("lab/parser"));
+const lab = Address.make("lab");
+const parser = Address.make("lab/parser");
 const seven = Option.getOrThrow(
   RunId.option("07070707-0707-0707-0707-070707070707"),
 );

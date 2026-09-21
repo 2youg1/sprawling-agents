@@ -26,7 +26,7 @@ use kernel::EventRecord;
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
 use super::holding::Views;
-use super::lines::{buildings_of, endpoints_answer, summarize};
+use super::lines::{buildings_of, config_answer, endpoints_answer, summarize};
 use crate::assembly::{ledger_dir, read_building};
 
 /// The answer to a question this city could not look up.
@@ -159,6 +159,34 @@ impl Views {
         }
     }
 
+    /// How much of everything this city is holding right now.
+    ///
+    /// A count that cannot be expressed is reported as the largest
+    /// count this wire can carry rather than dropped: a saturated
+    /// figure is visibly wrong on a page, and an absent one reads as
+    /// zero.
+    fn metrics(&self) -> channels::MetricsAnswer {
+        channels::MetricsAnswer {
+            events: self.events,
+            runs_active: self.hot.active_count(),
+            runs_frozen: self.hot.frozen_count(),
+            buildings: u64::try_from(buildings_of(&self.city_root).len()).unwrap_or(u64::MAX),
+            approvals_waiting: u64::try_from(self.approvals.len()).unwrap_or(u64::MAX),
+            signals_waiting: self
+                .waiting
+                .values()
+                .map(|queue| u64::try_from(queue.len()).unwrap_or(u64::MAX))
+                .sum(),
+            discards_outstanding: self
+                .discards
+                .values()
+                .filter(|row| !row.restored)
+                .count()
+                .try_into()
+                .unwrap_or(u64::MAX),
+        }
+    }
+
     /// Answers one query. Every arm either answers or names itself
     /// unavailable; none of them returns an empty result that a reader
     /// would mistake for an empty city.
@@ -178,7 +206,7 @@ impl Views {
                     frozen,
                     buildings: self.spine(),
                     pursuits: self.pursuit_lines(),
-                    halted: self.halted.iter().cloned().collect(),
+                    halted: self.halted.iter().map(ToString::to_string).collect(),
                 })
             }
             channels::Query::RunView { run } => {
@@ -269,11 +297,23 @@ impl Views {
                 Some(answer) => channels::Answer::Prefix(Box::new(answer)),
                 None => unavailable(format!("Prefix({run})")),
             },
-            // Neither is answerable yet, and "I could not look" is the
-            // honest answer: the page draws its own empty state from it
-            // rather than being handed a guess.
-            channels::Query::Preferences => unavailable("Preferences".to_owned()),
-            channels::Query::Config { addr } => unavailable(format!("Config({})", addr.as_str())),
+            // Read at every asking rather than held: the file is one a
+            // person also edits, and a copy kept in this fold would
+            // answer with what it said the last time somebody used a
+            // page. A file that cannot be read is "I could not look",
+            // which is what the settings page draws its own state
+            // from.
+            channels::Query::Preferences => match crate::person::read() {
+                Ok(settled) => channels::Answer::Preferences(Box::new(settled)),
+                Err(_) => unavailable("Preferences".to_owned()),
+            },
+            // A ladder that cannot be read is "I could not look": the
+            // files are the person's own and the page says so rather
+            // than drawing figures nothing on disk states.
+            channels::Query::Config { addr } => match config_answer(&self.city_root, addr) {
+                Ok(answer) => channels::Answer::Config(Box::new(answer)),
+                Err(_) => unavailable(format!("Config({})", addr.as_str())),
+            },
             channels::Query::Content { locator } => match self.content_answer(locator) {
                 Some(answer) => channels::Answer::Content(Box::new(answer)),
                 None => unavailable(format!("Content({locator})")),
@@ -327,28 +367,7 @@ impl Views {
             channels::Query::ArchiveSearch { needle } => {
                 channels::Answer::Archive(self.search_archives(needle))
             }
-            channels::Query::Metrics => {
-                channels::Answer::Metrics(Box::new(channels::MetricsAnswer {
-                    events: self.events,
-                    runs_active: self.hot.active_count(),
-                    runs_frozen: self.hot.frozen_count(),
-                    buildings: u64::try_from(buildings_of(&self.city_root).len())
-                        .unwrap_or(u64::MAX),
-                    approvals_waiting: u64::try_from(self.approvals.len()).unwrap_or(u64::MAX),
-                    signals_waiting: self
-                        .waiting
-                        .values()
-                        .map(|queue| u64::try_from(queue.len()).unwrap_or(u64::MAX))
-                        .sum(),
-                    discards_outstanding: self
-                        .discards
-                        .values()
-                        .filter(|row| !row.restored)
-                        .count()
-                        .try_into()
-                        .unwrap_or(u64::MAX),
-                }))
-            }
+            channels::Query::Metrics => channels::Answer::Metrics(Box::new(self.metrics())),
         }
     }
 }

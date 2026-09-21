@@ -9,7 +9,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::approval::{ApprovalId, ClusterKey, Ruling};
+use crate::approval::{ApprovalId, Autonomy, ClusterKey, Ruling};
+use crate::error::{AxCode, AxError};
+use crate::event::scope::Scope;
+use crate::registry::ResidentId;
 
 /// `approval_resolved`: how one inbox item was answered.
 ///
@@ -37,32 +40,134 @@ pub struct ApprovalResolved {
     pub cluster: ClusterKey,
 }
 
+/// The word the ledger writes for who answers a scope's Approval
+/// Inbox, and its reader.
+///
+/// `owner` is the person; `delegate:<resident>` is the resident they
+/// appointed, whose address travels in the value so a replay knows who
+/// was appointed. The two halves sit together because they are one
+/// spelling: a writer and a reader in different modules is how an
+/// autonomy written by one build came back as `Owner` in the next.
+pub mod autonomy_word {
+    use super::{Autonomy, AxCode, AxError, ResidentId};
+
+    /// The word before an appointed resident's address.
+    const DELEGATE: &str = "delegate";
+
+    /// The person who owns the city.
+    const OWNER: &str = "owner";
+
+    /// What separates the appointment from the resident it names.
+    const AT: char = ':';
+
+    /// The word a line carries.
+    #[must_use]
+    pub fn spell(autonomy: &Autonomy) -> String {
+        match autonomy {
+            Autonomy::Owner => OWNER.to_owned(),
+            Autonomy::Delegate(resident) => {
+                format!("{DELEGATE}{AT}{resident}", resident = resident.as_str())
+            }
+        }
+    }
+
+    /// Reads back what [`spell`] wrote.
+    ///
+    /// # Errors
+    /// `E_WIRE_MISMATCH` for any other word. It used to fall back to
+    /// the person, which reads as the strict side and is not: a city
+    /// whose history appointed a delegate this build cannot read would
+    /// have shown the person questions the delegate was answering, and
+    /// said nothing about the line it could not read.
+    pub fn read(word: &str) -> Result<Autonomy, AxError> {
+        let unreadable = |detail: &str| {
+            AxError::failure(AxCode::WireMismatch, "read who answers for a scope", detail)
+                .with_recovery(
+                    "open this city with the build that wrote its history: this one knows \
+                     `owner` and `delegate:<resident>`",
+                )
+        };
+        if word == OWNER {
+            return Ok(Autonomy::Owner);
+        }
+        match word.split_once(AT) {
+            Some((DELEGATE, resident)) => ResidentId::new(resident)
+                .map(Autonomy::Delegate)
+                .ok_or_else(|| unreadable(resident)),
+            Some(_) | None => Err(unreadable(word)),
+        }
+    }
+
+    pub(super) fn serialize<S: serde::Serializer>(
+        autonomy: &Autonomy,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&spell(autonomy))
+    }
+
+    pub(super) fn deserialize<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Autonomy, D::Error> {
+        let word = <String as serde::Deserialize>::deserialize(deserializer)?;
+        read(&word).map_err(serde::de::Error::custom)
+    }
+}
+
 /// `autonomy_changed`: who answers the Approval Inbox for a scope from
 /// now on.
 ///
 /// Both values are the words the ledger has always held: the scope as
-/// `sprawling::assembly::naming::scope_name` spells it, the autonomy as
-/// `autonomy_name` does. Those two spellings are still that module's,
-/// and moving them into this crate is leaf 7.8 — it waits on the four
-/// readers outside this family that spell them by hand.
+/// [`Scope`] spells it, the appointment as [`autonomy_word`] does. Both
+/// spellings were a `format!` in `sprawling::assembly` and a
+/// `split_once(':')` at each reader until this struct became the only
+/// way in and out of the line.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AutonomyChanged {
-    pub scope: String,
-    pub autonomy: String,
+    /// What the appointment applies to. A line written before the key
+    /// existed carries no scope and appointed the answerer for the
+    /// whole city, which is what [`city_wide`] reads it as.
+    #[serde(default = "city_wide")]
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
+    pub scope: Scope,
+    #[serde(with = "autonomy_word")]
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
+    pub autonomy: Autonomy,
+}
+
+/// What an `autonomy_changed` line with no scope applies to.
+fn city_wide() -> Scope {
+    Scope::City
+}
+
+/// Whether a scope is shut or open.
+///
+/// The two words a `city_halted` record carries are spelled here and
+/// nowhere else. They used to be two string constants compared by hand
+/// at four places, and the two folds disagreed about an unrecognised
+/// word: one read it as a release, the other ignored the line
+/// (sprawling-SPEC.md 8-74).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Admittance {
+    /// Nothing may be dispatched into this scope.
+    Halted,
+    /// The scope takes work again.
+    Released,
 }
 
 /// `city_halted`: one scope stopped taking work, or started again.
 ///
 /// One kind for both directions, because halting and releasing are one
-/// fact changing value; `state` carries the word
-/// `sprawling::assembly::folds::Admission` spells, which stays that
-/// type's to own.
+/// fact changing value, and a second kind would let a reader see a
+/// release with no halt before it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CityHalted {
-    pub scope: String,
-    pub state: String,
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
+    pub scope: Scope,
+    pub state: Admittance,
 }
 
 /// `governed_document_written`: which of the three documents a person
@@ -89,6 +194,7 @@ pub struct GovernedDocumentWritten {
 )]
 mod tests {
     use super::*;
+    use crate::address::Address;
     use crate::approval::ApprovalClass;
     use crate::event::Payload;
 
@@ -121,6 +227,19 @@ mod tests {
         );
     }
 
+    /// The two words that used to fall back to the strict side, and the
+    /// scope that used to be read with `split_once(':')`.
+    #[test]
+    fn an_appointment_this_build_cannot_read_is_refused_rather_than_defaulted() {
+        let line = serde_json::json!({"scope": "city", "autonomy": "anybody"});
+        let payload: Payload = serde_json::from_value(line).unwrap();
+        let err = payload.read::<AutonomyChanged>().unwrap_err();
+        assert_eq!(err.code(), &AxCode::WireMismatch);
+        let line = serde_json::json!({"scope": "lab", "state": "halted"});
+        let payload: Payload = serde_json::from_value(line).unwrap();
+        assert!(payload.read::<CityHalted>().is_err());
+    }
+
     #[test]
     fn a_verdict_this_build_does_not_know_is_refused_rather_than_defaulted() {
         let line = serde_json::json!({
@@ -135,8 +254,8 @@ mod tests {
     #[test]
     fn the_three_standing_records_keep_their_keys() {
         let halted = Payload::of(&CityHalted {
-            scope: "building:lab".to_owned(),
-            state: "halted".to_owned(),
+            scope: Scope::Building(Address::parse("lab").unwrap()),
+            state: Admittance::Halted,
         })
         .unwrap();
         assert_eq!(
@@ -144,13 +263,17 @@ mod tests {
             r#"{"scope":"building:lab","state":"halted"}"#
         );
         let autonomy = Payload::of(&AutonomyChanged {
-            scope: "city".to_owned(),
-            autonomy: "delegate:hall/clerk.md".to_owned(),
+            scope: Scope::City,
+            autonomy: Autonomy::Delegate(ResidentId::new("hall/clerk.md").unwrap()),
         })
         .unwrap();
         assert_eq!(
             serde_json::to_string(autonomy.as_map()).unwrap(),
             r#"{"autonomy":"delegate:hall/clerk.md","scope":"city"}"#
+        );
+        assert_eq!(
+            autonomy.read::<AutonomyChanged>().unwrap().autonomy,
+            Autonomy::Delegate(ResidentId::new("hall/clerk.md").unwrap())
         );
         let written = Payload::of(&GovernedDocumentWritten {
             which: "MAYOR.md".to_owned(),

@@ -213,19 +213,6 @@ pub(super) fn poisoned_vault() -> AxError {
     .with_recovery("restart the server; enrolled credentials are unaffected")
 }
 
-pub(super) fn dialect_of(provider: &str) -> Result<kernel::DialectKind, AxError> {
-    match provider {
-        "anthropic" => Ok(kernel::DialectKind::Anthropic),
-        "openai" => Ok(kernel::DialectKind::OpenAi),
-        other => Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "choose a dialect for a provider",
-            other.to_owned(),
-        )
-        .with_recovery("attach this provider by hand and state its dialect")),
-    }
-}
-
 /// What one tag already points at, when it points at this same model
 /// behind this same endpoint.
 ///

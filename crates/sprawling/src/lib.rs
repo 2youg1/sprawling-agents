@@ -35,6 +35,7 @@ mod mcp_http;
 mod mcp_redeeming;
 mod mcp_sse;
 mod mcp_stdio;
+mod person;
 mod plan_view;
 mod views;
 

@@ -158,6 +158,12 @@ fn dangling_tool_calls_are_detected_and_repairable() {
         "name".to_owned(),
         serde_json::Value::String("exec".to_owned()),
     );
+    // Every `tool_called` the city writes carries its arguments, and
+    // the repair now reads the line through the struct that writes it.
+    call_data.insert(
+        "args".to_owned(),
+        serde_json::Value::Object(serde_json::Map::new()),
+    );
     mem.append(draft(
         EventKind::ToolCalled,
         Payload::new(call_data.clone()).unwrap(),

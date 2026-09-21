@@ -29,6 +29,52 @@ use kernel::{Address, EventRecord, RunId};
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
+/// What one address is governed by, value by value, with the file each
+/// value came from.
+///
+/// The ladder is climbed once, by the module that owns it, and the
+/// rung it answers with is carried through rather than re-derived: a
+/// page told only the resolved setting would have to read all three
+/// files and climb the same ladder a second time, and two climbs of
+/// one ladder are two answers to one question.
+///
+/// The figures an endpoint nobody tuned is called with are read out of
+/// `gateway::EndpointTuning::DEFAULTS`, which is their one home; a
+/// form that printed its own numbers into empty boxes is what this
+/// answer exists to retire.
+pub(crate) fn config_answer(
+    city_root: &Path,
+    addr: &Address,
+) -> Result<channels::ConfigAnswer, kernel::AxError> {
+    let defaults = gateway::EndpointTuning::DEFAULTS;
+    Ok(channels::ConfigAnswer {
+        addr: addr.clone(),
+        effort: city::settled_effort(city_root, addr)?.map(|(effort, layer)| {
+            channels::SettledEffort {
+                effort,
+                from: rung_of(layer),
+            }
+        }),
+        tuning: channels::TuningDefaults {
+            timeout_ms: defaults.timeout_ms,
+            request_max_retries: defaults.retries.stated(),
+            stream_idle_timeout_ms: defaults.stream_idle_timeout_ms,
+            proxying: kernel::Proxying::default(),
+        },
+    })
+}
+
+/// The one place the ladder's rung becomes the wire's. Exhaustive, so
+/// a rung added to the ladder is a compiler error here rather than a
+/// page that silently reports the wrong file.
+fn rung_of(layer: city::Layer) -> channels::ConfigLayer {
+    match layer {
+        city::Layer::City => channels::ConfigLayer::City,
+        city::Layer::Building => channels::ConfigLayer::Building,
+        city::Layer::Resident => channels::ConfigLayer::Resident,
+    }
+}
+
 /// The settings page's read of the endpoint book.
 pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> channels::EndpointsAnswer {
     let endpoints = book

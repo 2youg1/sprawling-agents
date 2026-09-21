@@ -8,10 +8,15 @@
 // The old table (`crates/web/src/route/fragments.rs`) is folded in at
 // the bottom, so a bookmark from the Dioxus client still opens.
 
-import { Option } from "effect";
+import { Option, Schema } from "effect";
 
-import { Address } from "./address";
+import { Address } from "../wire";
 import { RunId } from "./run_id";
+
+// The address grammar is the server's, carried in the schema `cargo
+// xtask wire-ts` generates from `kernel::Address`. A fragment a person
+// edited by hand is read through it and nowhere else.
+const readAddress = Schema.decodeOption(Address);
 
 // Which lens the record is read through: the whole history, then what was
 // kept, then what was thrown away.
@@ -20,7 +25,7 @@ export type Lens = "ledger" | "archive" | "bin" | "log";
 export const LENSES: readonly Lens[] = ["ledger", "archive", "bin", "log"];
 
 // The room a person talks to when they have named none: the Mayor.
-export const MAYOR: Address = Address("hall/mayor");
+export const MAYOR: Address = Address.make("hall/mayor");
 
 // Which page the content region shows.
 export type View =
@@ -146,13 +151,13 @@ export function fromFragment(raw: string): Option.Option<View> {
   switch (head) {
     case "talk":
     case "s":
-      return Option.map(Address.option(tail), (address) => ({
+      return Option.map(readAddress(tail), (address) => ({
         kind: "talk",
         address,
       }));
     case "building":
     case "b":
-      return Option.map(Address.option(tail), (address) => ({
+      return Option.map(readAddress(tail), (address) => ({
         kind: "building",
         address,
       }));
@@ -199,7 +204,7 @@ export function go(bar: AddressBar, view: View): void {
 // The building an address belongs to: its first segment.
 export function buildingOf(address: Address): Address {
   const slash = address.indexOf("/");
-  return slash < 0 ? address : Address(address.slice(0, slash));
+  return slash < 0 ? address : Address.make(address.slice(0, slash));
 }
 
 // The last segment: what a person called the room.

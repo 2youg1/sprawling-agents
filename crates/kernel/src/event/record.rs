@@ -46,7 +46,10 @@ mod tool;
 mod turn;
 
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
-pub use governance::{ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten};
+pub use governance::{
+    Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
+    autonomy_word,
+};
 pub use log::LogTruncated;
 pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SkillPin};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};

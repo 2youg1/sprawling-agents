@@ -111,8 +111,14 @@ impl Group {
 /// is running on. Everything else matches on the answer, exhaustively
 /// and with no wildcard arm, so a fourth platform becomes a compile
 /// error at every site that would have to decide something about it.
+///
+/// `pub` for the reason lib.rs states: `bin::install` enters through it,
+/// and the binary is part of the "this binary" the paragraph above is
+/// about. Keeping it in reach of the library alone left the installer
+/// asking `cfg!(target_os = ...)` on its own, which is the second
+/// sampling point this type exists to abolish.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum Platform {
+pub enum Platform {
     Windows,
     MacOs,
     Linux,
@@ -125,7 +131,7 @@ impl Platform {
     #[cfg(test)]
     pub(crate) const ALL: [Platform; 3] = [Platform::Windows, Platform::MacOs, Platform::Linux];
 
-    pub(crate) fn current() -> Option<Platform> {
+    pub fn current() -> Option<Platform> {
         if cfg!(target_os = "windows") {
             Some(Platform::Windows)
         } else if cfg!(target_os = "macos") {

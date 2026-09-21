@@ -15,6 +15,15 @@
 //! cut and stays open, so the next run of that room, that building, or
 //! that whole city fails until somebody edits the file by hand.
 //!
+//! **The one writer of a document that is parsed back, inside a city or
+//! not.** The person's own `<home>/.sprawling/config.toml` is read back
+//! by a parser exactly as a `CONFIG.toml` is, and it is written by the
+//! same command traffic, so it is held and replaced through this door
+//! rather than through a second implementation of whole-or-nothing
+//! writing that would be a second authority for the property below.
+//! That is why this module is reachable from outside this crate while
+//! everything it writes for the city itself is not.
+//!
 //! Two properties close it, and this module is the only place either is
 //! spelled:
 //!
@@ -75,7 +84,7 @@ pub(crate) fn replace(path: &Path, body: &[u8]) -> Result<(), AxError> {
 ///
 /// # Errors
 /// Propagates whatever `act` returns.
-pub(crate) fn edit<T>(
+pub fn edit<T>(
     path: &Path,
     act: impl FnOnce(&Held<'_>) -> Result<T, AxError>,
 ) -> Result<T, AxError> {
@@ -93,7 +102,7 @@ pub(crate) fn edit<T>(
 /// Obtainable only from [`edit`], which is what makes "the lock is held
 /// while this document is replaced" a property of the type rather than
 /// a rule each call site has to remember.
-pub(crate) struct Held<'a> {
+pub struct Held<'a> {
     path: &'a Path,
 }
 
@@ -103,7 +112,7 @@ impl Held<'_> {
     /// # Errors
     /// `E_STORAGE_FATAL` naming the path that failed: the directory, the
     /// staging file, or the target.
-    pub(crate) fn replace(&self, body: &[u8]) -> Result<(), AxError> {
+    pub fn replace(&self, body: &[u8]) -> Result<(), AxError> {
         let dir = self.path.parent().ok_or_else(|| {
             storage(
                 self.path,

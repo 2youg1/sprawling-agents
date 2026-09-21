@@ -12,8 +12,8 @@ use proptest::prelude::*;
 
 use crate::offload::OffloadSite;
 use crate::sieve::{
-    CommandKey, FilterTable, PassReason, SieveHistory, SieveInput, Sieved, Stage, StageOutcome,
-    sieve,
+    CommandKey, FilterTable, PassReason, ResultOffloaded, SieveHistory, SieveInput, Sieved, Stage,
+    StageOutcome, sieve,
 };
 
 struct World {
@@ -248,10 +248,17 @@ fn every_filtered_result_says_where_the_original_is() {
     assert!(record.text.ends_with(']'));
     assert!(record.text.contains("[sieve: "));
     assert!(record.text.contains("filter=cargo"));
-    let payload = serde_json::to_value(record.payload().unwrap()).unwrap();
-    assert_eq!(payload["original"], record.original.to_string());
-    assert_eq!(payload["substitute_len"], record.bytes_out);
-    assert!(payload["stages"].as_array().unwrap().len() == 7);
+    let account = record.offloaded();
+    let payload = account.payload().unwrap();
+    let value = serde_json::to_value(&payload).unwrap();
+    assert_eq!(value["original"], record.original.to_string());
+    assert_eq!(value["substitute_len"], record.bytes_out);
+    assert!(value["stages"].as_array().unwrap().len() == 7);
+    assert_eq!(
+        payload.read::<ResultOffloaded>().unwrap(),
+        account,
+        "the account reads back as what was written"
+    );
 }
 
 #[test]

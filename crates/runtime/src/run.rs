@@ -16,7 +16,6 @@ use kernel::{
     Address, AxError, BuildingPolicy, Carrier, Completion, EventDraft, Ledger, Locator, Model,
     Payload, RunId, TimeMs, ToolCall, ToolDef, ToolOutcome,
 };
-use serde_json::{Map, Value};
 
 use crate::catalog::SkillPin;
 use crate::handoff::Handoff;
@@ -251,14 +250,15 @@ pub fn drive(
                 // provider's own `retry-after` and applies it inside
                 // the next call; the watchdog decides only whether
                 // there is a next call.
-                if let crate::Disposal::BackOff { .. } = watchdog.on_provider_failure(&err, t) {
+                let disposal = watchdog.on_provider_failure(&err, t);
+                if let crate::Disposal::BackOff { .. } = disposal {
                     ledger.append(EventDraft {
                         run: run.plan.run,
                         t,
                         who: run.plan.who.clone(),
                         addr: Some(run.plan.addr.clone()),
                         kind: kernel::EventKind::WatchdogFired,
-                        data: payload(retried(&err))?,
+                        data: watchdog.fired_payload(&disposal)?,
                         ig: false,
                     })?;
                     continue;
@@ -282,25 +282,4 @@ pub fn drive(
         }
     };
     run.freeze(ledger, handoff, ending, hooks)
-}
-
-fn payload(map: Map<String, Value>) -> Result<Payload, AxError> {
-    Payload::new(map)
-}
-
-/// The `watchdog_fired` payload for a call that will be made again. The
-/// failure's own code and subject travel with it, because "backed off"
-/// without what it backed off from is a line nobody can act on.
-fn retried(err: &AxError) -> Map<String, Value> {
-    let mut map = Map::new();
-    map.insert("action".to_owned(), Value::String("back_off".to_owned()));
-    map.insert(
-        "code".to_owned(),
-        Value::String(err.code().as_str().to_owned()),
-    );
-    map.insert(
-        "subject".to_owned(),
-        Value::String(err.subject().to_owned()),
-    );
-    map
 }

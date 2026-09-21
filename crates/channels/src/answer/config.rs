@@ -20,13 +20,18 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+/// The rungs are named as `city::Layer` names them, and the two lists
+/// are held together by the one match that turns the city's rung into
+/// this one: a wire that called the building's file `resident` while
+/// the ladder called the room's file that is a wire whose readers
+/// disagree with the run about which file they are looking at.
 pub enum ConfigLayer {
-    /// The city's own `CONFIG.toml`.
+    /// The city's own `CONFIG.toml`, which covers every building.
     City,
     /// The building's file, which covers every room under it.
-    Resident,
+    Building,
     /// The room's own file, which covers one session.
-    Room,
+    Resident,
 }
 
 /// `[model] effort`, and the file that settled it.
@@ -47,14 +52,19 @@ pub struct SettledEffort {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TuningDefaults {
-    /// How long one request may take.
+    /// How long one settled request may take, in total.
     pub timeout_ms: u64,
-    /// How many times a request that failed for a reason worth retrying
-    /// is made again.
-    pub request_max_retries: u32,
+    /// The ceiling on making a failed request again, as
+    /// `kernel::Retries::stated` spells it: absent is "until this city
+    /// is halted", which is what this build asks for and what no
+    /// number says. Zero is a real answer and means "once, then
+    /// report".
+    pub request_max_retries: Option<u32>,
     /// How long a streamed answer may stay silent before the call is
-    /// abandoned.
-    pub stream_idle_timeout_ms: u64,
+    /// abandoned. Absent means a stream is held to the same bound as a
+    /// settled call, which is the only figure this city can state
+    /// without inventing one.
+    pub stream_idle_timeout_ms: Option<u64>,
     /// Which calls go through the machine's proxy.
     pub proxying: Proxying,
 }

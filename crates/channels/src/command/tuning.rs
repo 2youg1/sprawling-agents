@@ -69,9 +69,12 @@ pub struct EndpointTuning {
     /// is made again. Zero is a legal answer and means "once, then
     /// report".
     pub request_max_retries: Option<u32>,
-    /// How long a streamed answer may run. Longer than `timeout_ms` on
-    /// purpose: a model that is still writing is not a model that has
-    /// stopped answering.
+    /// How long a streamed answer may go **without a byte arriving**
+    /// before the city gives up on it. An idle bound rather than a
+    /// deadline on the whole answer, which is how the transport
+    /// applies it: a model that keeps writing is never cut off for
+    /// writing a long answer, and one that stops mid-answer is given
+    /// up on this long after its last byte.
     pub stream_idle_timeout_ms: Option<u64>,
     pub headers: Vec<HeaderPair>,
     pub overrides: Vec<BodyOverride>,

@@ -15,9 +15,9 @@
 // out of the verbs. That is why this file names no view, no signal and
 // no query: the same table runs from a text box and from a palette.
 
-import { Option } from "effect";
+import { Option, Schema } from "effect";
 
-import { Address } from "./address";
+import { Address } from "../wire";
 import type { RunBelief } from "./belief";
 import {
   EFFORTS,
@@ -121,7 +121,7 @@ function addressed(raw: string | undefined): Address | null {
   if (raw === undefined || raw === "" || raw.startsWith("-")) {
     return null;
   }
-  return Option.getOrNull(Address.option(raw));
+  return Option.getOrNull(Schema.decodeOption(Address)(raw));
 }
 
 // Only what `/go` advertises, resolved by the router: a page this

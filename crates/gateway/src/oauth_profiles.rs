@@ -76,22 +76,18 @@ pub const OAUTH_PROFILES: [OauthProfile; 4] = [
     // endpoint paths, the scopes and the loopback redirect, and the
     // auth manager beside it states the client id.
     //
-    // **The API base is now known and is deliberately still empty.**
     // A ChatGPT subscription is served under
     // `https://chatgpt.com/backend-api/codex`, not under the
     // key-billed platform: `model-provider-info` picks that base for
     // every ChatGPT auth mode and `https://api.openai.com/v1` only for
     // an API key (the provider table under `codex-rs/model-provider-
     // info/`, read 2026-09-21 and watched in docs/third-party.md
-    // section 1). That base answers on the responses face, which this build
-    // cannot write yet (roadmap 4.5), so filling the field today would
-    // attach an endpoint whose first call is a 404 in place of a
-    // refusal a person can act on. It is filled in the change that
-    // lands the responses writer.
+    // section 1). That base answers on the responses face, which
+    // `Family::Codex` states and `dialect::responses` writes.
     OauthProfile {
         family: Family::Codex,
         provider: "openai",
-        api_base: "",
+        api_base: "https://chatgpt.com/backend-api/codex",
         auth_endpoint: "https://auth.openai.com/oauth/authorize",
         token_endpoint: "https://auth.openai.com/oauth/token",
         scopes: &[
@@ -278,6 +274,21 @@ mod tests {
         let xai = profile_for(Family::GrokBuild).unwrap();
         assert!(!xai.client_id.is_empty());
         assert!(!xai.scopes.is_empty());
-        assert!(!xai.api_base.is_empty());
+    }
+
+    /// A finished login attaches the endpoint it was for, so every
+    /// family states the base its subscription is served under. An
+    /// empty one leaves the token in the vault and the person with a
+    /// second thing to do by hand.
+    #[test]
+    fn every_family_states_the_base_its_subscription_answers_on() {
+        for family in Family::ALL {
+            let row = profile_for(family).unwrap();
+            assert!(
+                row.api_base.starts_with("https://"),
+                "{} states no api base",
+                row.provider
+            );
+        }
     }
 }

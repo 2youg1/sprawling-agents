@@ -159,6 +159,8 @@ impl ConfigLayer {
     pub fn effort(&self) -> Option<Effort>;
 }
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError>;
+pub fn settled_effort(city_root: &Path, addr: &Address)
+    -> Result<Option<(Effort, Layer)>, AxError>;      // 值连同说出它的那一级
 
 // config_layers::ladder（crate 内）
 impl Layer {
@@ -168,11 +170,14 @@ impl Layer {
 pub(crate) struct Ladder { /* Vec<(Layer, ConfigLayer)> —— 私有，由远及近 */ }
 impl Ladder {
     fn read(city_root: &Path, addr: &Address) -> Result<Ladder, AxError>;
+    fn tagged<T>(&self, stated: impl Fn(&ConfigLayer) -> Option<T>) -> LayeredValue<(T, Layer)>;
     fn resolve<T>(&self, stated: impl Fn(&ConfigLayer) -> Option<T>) -> LayeredValue<T>;
 }
 ```
 
 **一条梯子是一个值**：`Ladder::read` 按 `Layer::ALL` 由远及近读一遍，落点重复的一级丢弃；`load` 逐个关切在梯子上 fold，不再逐级点名。加一级因此是 `Layer` 多一个臂：`ALL`、`file` 与 `resolve` 三处穷尽匹配同时报编译错，直到新一级被安置，而每个关切一次拿到它。`resolve` 是「哪一级填 `LayeredValue` 的哪一格」的唯一一处答案——今天 `kernel::LayeredValue` 只有三格，所以 C 章要加的人层（`~/.sprawling/config.toml`）落地时，`kernel::config` 与本模块在同一次改动里走完。
+
+**来源与值一起答**（叶子 3.3）：`settled_effort` 与 `load` 爬同一条梯子，区别只在它把说出这个值的那一级留着而不是丢掉。只被告知结果的设置页说不出「这是这间房自己写的」还是「这是全城都有的」，于是它只能把三份文件各读一遍、把同一条梯子再爬一次——**同一个问题两个答案，就是从第二次爬梯开始的**。谁压过谁仍由 `kernel::LayeredValue::resolve` 判：`tagged` 只负责「哪一级填哪一格」，`resolve` 是 `tagged` 去掉那一级，所以这条映射在本 crate 里只有一处。`None` 是整条梯子什么都没说，也就是这座城有意把强度交给供应方，而不是替人填一档。
 
 **门面上换名**（`lib.rs` 按能力组织，不按文件组织）：`load` 已归 `policy`，故本模块对外是 `city::load_config`；`path` 对外是 `city::config_path`；`building::create` 对外是 `city::create_building`，`created_payload` 对外是 `city::building_created_payload`（名字读起来就是它记的那个事件）。
 
@@ -756,11 +761,13 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 
 ```rust
 pub(crate) fn replace(path: &Path, body: &[u8]) -> Result<(), AxError>;
-pub(crate) fn edit<T>(path: &Path, act: impl FnOnce(&Held<'_>) -> Result<T, AxError>)
-    -> Result<T, AxError>;
-pub(crate) struct Held<'a> { /* 私有 */ }
-impl Held<'_> { pub(crate) fn replace(&self, body: &[u8]) -> Result<(), AxError>; }
+pub fn edit<T>(path: &Path, act: impl FnOnce(&Held<'_>) -> Result<T, AxError>)
+    -> Result<T, AxError>;                        // 门面上是 city::edit_document
+pub struct Held<'a> { /* 私有 */ }
+impl Held<'_> { pub fn replace(&self, body: &[u8]) -> Result<(), AxError>; }
 ```
+
+**`edit` 与 `Held` 对外开放，`replace` 不**（叶子 3.1 改了这一条记录，理由在此）：人层 `<home>/.sprawling/config.toml` 不在任何一座城里，却与一份 `CONFIG.toml` 同性质——有人手工编辑它，有解析器把它读回来，同一条命令流写它。它要的正是本模块那两条性质，而**再写一份「要么整份要么不动」就是给 B-49 立第二个权威**，两份实现里迟早有一份漏掉 `sync_all` 或漏掉锁。开放的是读-改-写那扇门（`edit` 与它给出的 `Held`），不是整份覆写那条捷径：`replace` 留在 crate 内，因为城外唯一的调用方做的是读-改-写，而一个能整份覆写的外部调用方就能不读就写。
 
 **城里写下的每一份文件都有人拿解析器读回来**：配置层、楼的规则、一次会话的 JOB.md。就地截断再流式写入，中间有一段时间盘上既不是旧版也不是新版；断电后那段时间不会结束，于是那间房、那栋楼乃至整座城的每一次派活都失败，直到有人手工改那份文件。两条性质把这扇窗关上，而两条都只写在本模块：
 

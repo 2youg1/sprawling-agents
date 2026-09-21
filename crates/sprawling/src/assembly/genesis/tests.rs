@@ -330,6 +330,10 @@ fn the_startup_scan_closes_dangling_calls_once_and_reports_the_rest() {
         "name".to_owned(),
         serde_json::Value::String("edit".to_owned()),
     );
+    data.insert(
+        "args".to_owned(),
+        serde_json::Value::Object(serde_json::Map::new()),
+    );
     worker
         .record_for(
             run,

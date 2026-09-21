@@ -21,10 +21,10 @@
 // with the control saying why, because a button whose only possible
 // answer is silence owes the person that sentence.
 
-import { Option } from "effect";
+import { Option, Schema } from "effect";
 import { For, Show, createMemo } from "solid-js";
 
-import { Address } from "../../core/address";
+import { Address } from "../../wire";
 import { reveal } from "../../core/commands";
 import { useCommand, useSay } from "../../ui";
 import { Tip } from "./tip";
@@ -71,7 +71,7 @@ const TEXT = "min-w-0 wrap-anywhere font-mono text-note text-text-quiet";
 export function Path(props: PathProps) {
   const say = useSay();
   const send = useCommand();
-  const address = createMemo(() => Address.option(props.path));
+  const address = createMemo(() => Schema.decodeOption(Address)(props.path));
   const shown = createMemo(() => {
     const base = props.base;
     if (base === undefined || !props.path.startsWith(`${base}/`)) return props.path;

@@ -11,9 +11,9 @@
 
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
-import { Option } from "effect";
+import { Option, Schema } from "effect";
 
-import { Address } from "../core/address";
+import { Address } from "../wire";
 import { adopted, sendingInto } from "../core/belief";
 import { cancel, steer } from "../core/commands";
 import { buildingOf, roomOf, toFragment } from "../core/route";
@@ -41,7 +41,7 @@ function Context(props: { readonly rounds: RoundsAnswer }) {
   // building it belongs to. Which file the page then shows is not in
   // the address bar's vocabulary, so the path stops at the door.
   const opening = (file: string): (() => void) | undefined => {
-    const at = Option.getOrNull(Address.option(file));
+    const at = Option.getOrNull(Schema.decodeOption(Address)(file));
     if (at === null) return undefined;
     return () => {
       go({ kind: "building", address: buildingOf(at) });

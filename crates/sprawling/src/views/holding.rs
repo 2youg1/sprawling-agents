@@ -24,6 +24,7 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::event::record;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
 // Where a city keeps its ledger and how a building reads off disk are
@@ -125,12 +126,11 @@ pub(crate) struct Views {
     /// `BTreeMap` because this is a path a query is answered from.
     pub(super) claims:
         std::collections::BTreeMap<kernel::NodeId, std::collections::BTreeSet<kernel::RunId>>,
-    /// The scopes a halt shut and no release reopened, by the name the
-    /// record carries. Folded here as well as in the worker's own
-    /// governance, from the same record and the same two words: this is
-    /// the reading side, that is the judging side, and a rebuild makes
-    /// them equal.
-    pub(super) halted: std::collections::BTreeSet<String>,
+    /// The scopes a halt shut and no release reopened. Folded here as
+    /// well as in the worker's own governance, from the same record and
+    /// the same type: this is the reading side, that is the judging
+    /// side, and a rebuild makes them equal.
+    pub(super) halted: std::collections::BTreeSet<kernel::event::Scope>,
     /// What this machine had when the city was served, from the one
     /// look the doctor takes at start-up.
     ///
@@ -268,29 +268,19 @@ impl Views {
             EventKind::ApprovalResolved => self.fold_ruling(record)?,
             EventKind::CityHalted => {
                 // The same reading the worker's own governance does, out
-                // of the one type that spells these two words.
-                if let Some((scope, admission)) =
-                    crate::assembly::Admission::in_record(record.data().as_map())?
-                {
-                    match admission {
-                        crate::assembly::Admission::Halted => {
-                            self.halted.insert(scope.to_owned());
-                        }
-                        crate::assembly::Admission::Released => {
-                            self.halted.remove(scope);
-                        }
+                // of the one type that spells this line.
+                let shut = record.data().read::<record::CityHalted>()?;
+                match shut.state {
+                    record::Admittance::Halted => {
+                        self.halted.insert(shut.scope);
+                    }
+                    record::Admittance::Released => {
+                        self.halted.remove(&shut.scope);
                     }
                 }
             }
             EventKind::AutonomyChanged => {
-                if let Some(name) = record
-                    .data()
-                    .as_map()
-                    .get("autonomy")
-                    .and_then(serde_json::Value::as_str)
-                {
-                    self.autonomy = crate::assembly::read_autonomy(name);
-                }
+                self.autonomy = record.data().read::<record::AutonomyChanged>()?.autonomy;
             }
             _ => {}
         }

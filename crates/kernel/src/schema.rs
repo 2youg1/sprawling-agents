@@ -3,22 +3,25 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The JSON Schema of the five values whose serde is written by hand.
+//! The JSON Schema of the six values a derive cannot state.
 //!
 //! Every other value on the wire derives its schema from the declaration
-//! serde reads, so the two cannot drift. These five serialise through
-//! `Display` and parse through their own grammar, and a derive would
-//! describe the struct rather than the string; what a client must know
-//! is stated here instead. Each schema is a string, with the pattern
-//! where the grammar is one line long, and the code list of `AxCode`
-//! taken from the same table that spells the codes (kernel-SPEC.md
-//! section 8-45).
+//! serde reads, so the two cannot drift. These six are strings a
+//! grammar judges: five serialise through `Display` and parse through
+//! that grammar, and [`Address`] is transparent to serde but would
+//! derive as any string at all. A derive therefore tells a client that
+//! a field is a string and nothing about what it must say; what the
+//! client must know is stated here instead. Each schema is a string,
+//! with the pattern where the grammar is one expression long, and the
+//! code list of `AxCode` taken from the same table that spells the
+//! codes (kernel-SPEC.md section 8-45).
 
 use std::borrow::Cow;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde_json::Value;
 
+use crate::address::Address;
 use crate::error::AxCode;
 use crate::idem::IdemKey;
 use crate::locator::{B3Hash, GitOid, Locator};
@@ -51,6 +54,36 @@ impl JsonSchema for AxCode {
         );
         schema.insert("enum".to_owned(), Value::Array(codes));
         schema
+    }
+}
+
+/// The grammar [`Address::parse`] enforces, as the one expression a
+/// schema can carry: one segment, then any number of further segments
+/// after a `/`; each at least one character, none of them `/`, `\`,
+/// `:` or a control character, and the last of them neither a dot nor
+/// whitespace, which is also what refuses `.` and `..`.
+///
+/// The two properties are the ones the constructor asks for: `\p{Cc}`
+/// is `char::is_control` and `\p{White_Space}` is `char::is_whitespace`.
+/// Both need a Unicode-aware matcher, so every reader applies this with
+/// the `u` flag or its equivalent.
+const ADDRESS_PATTERN: &str = concat!(
+    r"^(?:[^/\\:\p{Cc}]*[^/\\:\p{Cc}.\p{White_Space}])",
+    r"(?:/[^/\\:\p{Cc}]*[^/\\:\p{Cc}.\p{White_Space}])*$"
+);
+
+impl JsonSchema for Address {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("Address")
+    }
+
+    fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
+        string_schema(
+            "A canonical relative path inside the city: `/`-separated segments, none empty, \
+             none `.` or `..`, no backslash, no `:`, no control character, and no segment \
+             ending in a dot or whitespace, as `kernel::Address::parse` accepts it.",
+            Some(ADDRESS_PATTERN),
+        )
     }
 }
 
@@ -128,6 +161,28 @@ mod tests {
         ))
         .unwrap();
         assert_matches_pattern(&IdemKey::json_schema(generator), &key);
+    }
+
+    /// The client is given the address grammar rather than writing its
+    /// own, so the schema must carry the constructor's pattern and not
+    /// a derive's bare string. `Address::parse` is what the pattern
+    /// restates, and the cases below are the ones a hand-written
+    /// grammar got wrong.
+    #[test]
+    fn the_address_schema_carries_the_constructors_pattern() {
+        let schema = Address::json_schema(&mut SchemaGenerator::default());
+        assert_eq!(
+            schema.get("pattern").and_then(Value::as_str),
+            Some(ADDRESS_PATTERN)
+        );
+        for ok in ["a", "a/b", "role@building.1/JOB.md", ".sprawling/ledger"] {
+            assert!(Address::parse(ok).is_ok(), "{ok}");
+        }
+        for bad in [
+            "", "/abs", "a//b", "a/", "..", "a/./b", "a\\b", "C:/x", "a\tb", "a /b",
+        ] {
+            assert!(Address::parse(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

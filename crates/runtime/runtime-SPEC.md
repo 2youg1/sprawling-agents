@@ -207,6 +207,7 @@ impl FrozenPrefix {
 ### 8-5 runtime::handoff（形状 2）
 
 ```rust
+#[derive(Serialize)]   // 五个字段名即 handoff_written 的五个键；不派生 Deserialize
 pub struct Handoff { /* must_read、overview、progress、context、next_step —— 私有 */ }
 impl Handoff {
     /// Sole constructor: must-read non-empty; every
@@ -222,6 +223,7 @@ pub struct ResumeSeed { pub run: RunId, pub must_read: Vec<Locator> }
 pub fn resume(handoff: &Handoff, new_run: RunId) -> ResumeSeed;
 ```
 
+- **载荷即这五个字段**：`payload` 是 `Payload::of(self)`，键名由字段名给出，此前在此处又手写了一遍。只派生 `Serialize`：`new` 是持有一个 `Handoff` 的唯一路径，能从一行账本反造一个的读方会绕过它对空 must-read 的拒绝。
 - 「下一步」段首列用户指定动作、must-read 规范类机器填：内容约束属生产者（S3 回合层／P2 spine_files），类型只强制结构。
 - Run<Frozen> 无解冻：resume 不收 Run 值，只收 Handoff——「旧 Run 醒来」在签名上无法拼写。
 
@@ -284,7 +286,7 @@ pub fn build_prefix(plan: PrefixPlan) -> Result<PrefixBuild, AxError>;
 - 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量今天住 prefix.rs 私有面；它们该随其余策略数迁入 `kernel::consts_policy`。
 - 断点：`FrozenPrefix::system_blocks()` 产四块、逐块 cache=true＝断点恒 4＝`CACHE_BREAKPOINTS_MAX`，断点只落段界。
 - A15 重建器：`replay::rebuild_prefix(data: &serde_json::Value, resolver: &dyn Fn(&Address) -> Option<Vec<u8>>) -> Result<[B3Hash; 4], AxError>`——从 prompt_assembled 载荷（逐源 {addr, kept, marker, dropped}）与同源文档重算逐段哈希对拍；resolver 以 Address 取文（钉版 oid 级解析随 checkpoint 接入升级，接口不变）。拼接分隔符的唯一权威住 prefix.rs（`DOC_JOIN`），截断标记的唯一权威住 `runtime::elision`（§8-42），replay 同 crate 复用不另拷。
-- E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::dangling_tool_calls(&VerifiedLedger) -> Vec<(RunId, Seq)>`（tool_called 后邈无同 run 的 tool_result 即 dangling）＋`replay::outcome_unknown_draft(...) -> EventDraft`（补写的 tool_result，携 E_TOOL_OUTCOME_UNKNOWN 错误体）；消费者＝resume 路径（S4 serve；台账登记）。
+- E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::dangling_tool_calls(&VerifiedLedger) -> Vec<(RunId, Seq)>`（tool_called 后邈无同 run 的 tool_result 即 dangling）＋`replay::outcome_unknown_draft(...) -> EventDraft`（补写的 tool_result，携 E_TOOL_OUTCOME_UNKNOWN 错误体）；消费者＝resume 路径（S4 serve；台账登记）。补写方经 `ToolCalled`／`ToolResult` 两个结构读写：此前它手挑 `id` 与 `name` 两个键、任一读不出就写下 `"unknown"`，于是一条这个 build 读不懂的调用被关在一个谁也答不上的 id 上；现在读不懂就是一次拒绝。
 - handoff：形已全（五段＋构造点＋resume 消费），无改动；「下一步段首列用户指定动作」属生产者纪律（S3 执行器／P2 spine_files），类型不另加钩。
 - 第四取消点（派生前）：无派生生产者时推迟落地，理由是提前落地＝死入口＋不可测。`collab::delegate_tool` 是那个生产者：`SafePoint::BeforeSpawn` ＋ `Turn<Recording>::record(interrupt, ledger)`，装配层在 `Completion::Cancelled` 时清空派生台，**被取消的 Run 一件活也交不下去**。
 
@@ -326,7 +328,14 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<st
 pub struct Watchdog { /* corrections: u32、provider_failures: u32、retries: Retries —— 私有，逐 Run 一实例 */ }
 #[derive(Default)] pub enum Retries { #[default] UntilHalted, AtMost(u32) }
 pub enum Disposal { Proceed, CorrectiveSteer { text: String },
-                                     BackOff { until: TimeMs }, Freeze { reason: FreezeReason } }
+                                     BackOff { until: TimeMs, code: AxCode, subject: String },
+                                     Freeze { reason: FreezeReason } }
+pub struct WatchdogFired { #[serde(flatten)] pub action: FiredAction,
+                           pub corrections: u32, pub provider_failures: u32 }
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum FiredAction { Steer { text: String },
+                       BackOff { until_ms: u64, code: String, subject: String },
+                       Freeze { reason: String } }
 pub enum FreezeReason { Stall, ProviderRefused }
 impl Watchdog {
     pub fn new(retries: Retries) -> Watchdog;
@@ -343,7 +352,7 @@ impl Watchdog {
 - **`runtime::run::drive` 是那个调用方**：一次可重试的失败写一条 `watchdog_fired` 再重来，于是历史里第二条 `model_called` 就是人读到的那次重试，而不是一次无声的重复。节奏仍归 `gateway::admission`——它握着 provider 自己的 retry-after，并在下一次调用内部施加；watchdog 只判断还有没有下一次。
 - **为什么删掉 `WATCHDOG_PROVIDER_RETRIES=2`。** 一个计数器对两种截然不同的失败给同一份预算：`E_WIRE_MISMATCH`（对端不说这个形状）重试三次就是把同一个 400 买三遍，而 429 重试三次就放弃又恰好把一个只需要等待的维护窗口当成了死亡。`retriable` 是产错处已经知道的事实（默认 false，fail-closed），拿它分类比在这里重新猜一遍强。
 - **`ProviderExhausted` 改名 `ProviderRefused`。** 既然没有重试预算了，就没有东西被耗尽；冻住的原因是对端给了一个重试不能修复的答复。载荷里的 `reason` 字串同改为 `provider_refused`。
-- fired_payload 字段＝{action: steer|back_off|freeze, text|until_ms|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不再是一个阀值。
+- fired_payload 的形状由 `WatchdogFired` 独家拼出：`drive` 此前对同一个 kind、同一个 `back_off` 词另写一份 {action, code, subject}，于是一份历史里有两种 `watchdog_fired`。退避的原因随 `Disposal::BackOff` 一同旅行——说自己退避却不说退避什么的一行，没人能据以行动。字段＝{action: steer|back_off|freeze, text|(until_ms,code,subject)|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不再是一个阀值。
 
 ### 8-10 runtime::clock（形状 1；纯格式化不采样）
 
@@ -1031,8 +1040,14 @@ pub enum PassReason { BelowFloor, NothingShrank }
 pub struct SieveRecord { pub text: String, pub original: Locator, pub rest_path: PathBuf, pub filter: String,
                          pub lines_in: u64, pub lines_out: u64, pub bytes_in: u64, pub bytes_out: u64,
                          pub stages: Vec<StageReport> }
-impl SieveRecord { pub fn payload(&self) -> Result<Payload, AxError>; }   // result_offloaded 载荷：原文 locator＋替代体长度＋逐级账
-pub struct StageReport { pub stage: Stage, pub outcome: StageOutcome }
+impl SieveRecord { pub fn offloaded(&self) -> ResultOffloaded; }
+pub struct ResultOffloaded { pub original: Locator, pub len: u64, pub substitute_len: u64,
+                             pub rest_path: String,
+                             #[serde(flatten)] pub sieve: Option<SieveAccount> }
+impl ResultOffloaded { pub fn payload(&self) -> Result<Payload, AxError>; }   // result_offloaded 的唯一写方
+pub struct SieveAccount { pub filter: String, pub lines_in: u64, pub lines_out: u64,
+                          pub stages: Vec<StageReport> }
+pub struct StageReport { pub stage: Stage, #[serde(flatten)] pub outcome: StageOutcome }
 pub enum Stage { StripAnsi, FoldBlank, DedupTemplate, DiffPrevious, Filter, CutLongLine, Truncate }
 pub enum StageOutcome { Applied { bytes_before: u64, bytes_after: u64 }, Noop, Rejected { grew_to: u64 }, Unavailable { reason: String } }
 pub fn sieve(input: SieveInput<'_>, table: &FilterTable, site: &mut OffloadSite<'_>, history: &mut SieveHistory)
@@ -1067,7 +1082,7 @@ pub struct PackContext<'a> { /* 既有五字段 */ pub sieve: Option<SieveReques
 |---|---|---|
 | `sieve.rs` | 1 判定 | 阶段定序、逐级「不变长才接受」的判定（`Draft`：行与账同行）、页脚 |
 | `sieve/key.rs` | 2 值 | `CommandKey`：arm／program／args，Ord |
-| `sieve/record.rs` | 2 值 | `Sieved`／`SieveRecord`／`Stage`／`StageOutcome`／`StageReport` 与 `result_offloaded` 载荷 |
+| `sieve/record.rs` | 2 值 | `Sieved`／`SieveRecord`／`Stage`／`StageOutcome`／`StageReport`／`SieveAccount`／`ResultOffloaded`——`result_offloaded` 的唯一形状，筛与直接搬运两条路都经它 |
 | `sieve/filter.rs` | 6 数据 | `Filter`／`FilterTable`：TOML 形、三张内建、三层整值覆盖、命中规则 |
 | `sieve/scan.rs` | 1 判定 | 重要行五级优先级的四类手写扫描；受保护片段（URL、设备码、`secret:` 引用、`路径:行:列`、退出码行）的判定 |
 | `sieve/stages.rs` | 1 判定 | 去 ANSI、空行折叠、模板去重、长行截断、head/tail/中段截断 |

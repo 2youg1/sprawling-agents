@@ -220,6 +220,33 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
     ))
 }
 
+/// How hard the model is asked to think at `addr`, and the rung that
+/// said so.
+///
+/// The same climb `load` makes, answered with the rung kept rather
+/// than spent. A page told only the resolved setting cannot say
+/// whether it is looking at this room's own entry or at something the
+/// city states for every room, so it would have to read all three
+/// files and climb the ladder a second time — and two climbs of one
+/// ladder are two answers to one question.
+///
+/// `None` is a ladder that states nothing, which is this city
+/// deliberately leaving the setting to the provider rather than
+/// filling in a level nobody chose.
+///
+/// # Errors
+/// Refuses an address with no building, an unreadable file, and a file
+/// that does not parse, exactly as [`load`] does.
+pub fn settled_effort(
+    city_root: &Path,
+    addr: &Address,
+) -> Result<Option<(Effort, Layer)>, AxError> {
+    Ok(Ladder::read(city_root, addr)?
+        .tagged(ConfigLayer::effort)
+        .resolve()
+        .copied())
+}
+
 /// One refusal shape for every way a layer can fail to be read, so the
 /// recovery line is written once and cannot drift between callers.
 fn refuse(subject: String) -> AxError {

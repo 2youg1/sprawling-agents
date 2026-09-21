@@ -91,12 +91,21 @@ def Ground.personText (ground : Ground) : IO String := do
 /-- Writes one stack into the person's layer and waits for the answer.
 
 A refusal is the finding, so it is returned rather than thrown: the sequence
-that produced it is what the property prints. -/
+that produced it is what the property prints.
+
+**Silence is acceptance for this one command.** Every other command on this
+wire is seen through the record it appends to the city's one history, and that
+record is what the door reads back as frames. A preference is the person's and
+no run can observe it, so nothing is appended and the city has nothing to
+broadcast — a frame invented here would be the city stating, in its own
+history, something that belongs to whoever is sitting at this machine. What
+proves the write took effect is the read-back below, which is stronger than an
+acknowledgement: it is the file and the answer, compared. -/
 def Door.writeSansStack (door : Door) (ground : Ground) (figure : Nat) (index : Nat) :
     IO (Option String) := do
   match ← door.ask ground.port (.putAppearance (stackOf figure) (idemKey (500 + index))) with
   | .denied complaint => return some s!"writing the stack for {figure} was refused: {complaint}"
-  | .quiet => return some s!"writing the stack for {figure} was answered with silence"
+  | .quiet => return none
   | .accepted _ => return none
 
 /-- After any sequence of `PutPreferences`, the file on disk and the answer

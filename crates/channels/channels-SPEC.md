@@ -1122,9 +1122,10 @@ pub enum ReleaseAnswer {
 
 | 帧 | 形状 | 为什么是这个形状 |
 |---|---|---|
-| `Query::Preferences` → `PreferencesAnswer` | 语言、welcomed、panel、`Appearance`、`proxying`、改过的和弦 | 浏览器曾按行缓存这些：十二个键、三个读取器，各自处理缺省与非法值。整表一扇门，允许值表由本 crate 声明一次并经 schema 传给客户端——**能画出来的选项就是这个 build 装得回的选项** |
+| `Query::Preferences` → `PreferencesAnswer` | `lang: Option<Lang>`、welcomed、panel、`Appearance`、`proxying`、改过的和弦；`#[serde(default, deny_unknown_fields)]` | 浏览器曾按行缓存这些：十二个键、三个读取器，各自处理缺省与非法值。整表一扇门，允许值表由本 crate 声明一次并经 schema 传给客户端——**能画出来的选项就是这个 build 装得回的选项** |
+| 同上：本类型兼任 `[ui]` 的文法 | `[ui]` 节就是 `PreferencesAnswer` 的序列化；缺席字段取 `PreferencesAnswer::default()`（`panel` 是唯一不同于类型默认的一个：没人关之前它开着）；不认的键即拒 | 文件能写的键与答案能说的字段是**同一份声明**，而不是一边一份的两张表。`lang` 缺席而不是填 `en`：没人选过之前，浏览器自己的语言标是唯一的证据，写死一种语言会在每一台从未打开过该设置的机器上盖掉它 |
 | `Command::PutPreferences { patch, idem }` | `PreferencePatch` 闭集：`lang｜welcomed｜panel｜appearance｜proxying｜chord` | 一帧一件事，不是整表写回：两个屏幕各改一件，不得互相覆盖 |
-| `Query::Config { addr }` → `ConfigAnswer` | `effort: Option<SettledEffort>` ＋ `TuningDefaults`；`SettledEffort` 携 `ConfigLayer`（`city｜resident｜room`） | **层是答案的一半。** 只给解析值的页面说不出这是本层写的还是继承来的，于是要把三层再读一遍自己爬一次梯子——**一把梯子爬两次就是一个问题两个答案**。`TuningDefaults` 是 gateway 那三个数的读出，不是它们的第二处声明 |
+| `Query::Config { addr }` → `ConfigAnswer` | `effort: Option<SettledEffort>` ＋ `TuningDefaults`；`SettledEffort` 携 `ConfigLayer`（`city｜building｜resident`，与 `city::Layer` 同拼写）；`TuningDefaults` 为 `timeout_ms` ＋ `request_max_retries: Option<u32>`（`Retries::stated`，缺席即 `UntilHalted`）＋ `stream_idle_timeout_ms: Option<u64>`（缺席即与整通调用同界）＋ `proxying` | **层是答案的一半。** 只给解析值的页面说不出这是本层写的还是继承来的，于是要把三层再读一遍自己爬一次梯子——**一把梯子爬两次就是一个问题两个答案**。层名随 `city::Layer`：线上把楼的文件叫 `resident`、把房的文件叫 `room`，而梯子把房的文件叫 `resident`——读者与被治的那次 run 会对“这是哪一份文件”给出不同的答案；一处穷尽匹配（`bin::views::lines::rung_of`）把两份拼写钉在一起。`TuningDefaults` 是 `gateway::EndpointTuning::DEFAULTS` 的读出，字段形状也随它：重试上限是 `Retries` 而不是一个数（“直到有人按停”没有数字拼得出来），流的那个界是**闲置界而非整答案的截止**，且可缺席 |
 | `Command::PutShelved { shelf, name, text, idem }` | `Shelf { Library, Building(addr) }`；写 `shelved_document_written` | 与 `GovernedDocument` 同一条理由：两处货架都在保留子树里，任何写域都够不着，所以帧里没有路径可拼。`name` 允许子路径，脚本因此留得住自己的文件夹 |
 
 **八、`DialectKind::OpenAiResponses`（4.5 本体）。** kernel 的兼容格式集由二变三，`gateway::dialect` 的五个入口各多一条臂。登记与调用从此说同一句话：人粘贴 responses URL，`ConnectionKind::Responses` 记住了，而 `wire()` 从前仍答 `OpenAi`——**记对了、调错了**。形状取自供应方自己的规格（`openai/openai-openapi`，`openapi.yaml` 自述 API 版本 2.3.0，提交 `ddface9b`），不取自任何客户端库。

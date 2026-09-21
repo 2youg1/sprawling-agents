@@ -296,7 +296,7 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->16<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1884<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1897<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
@@ -349,7 +349,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 
 **The number in each subheading is the number of rows under it**, and `cargo xtask modmap` counts them, because every count a person maintained by hand here had already gone stale. The `desktop` heading is the one exception the machine cannot judge: its files sit outside `crates/`, where the parser does not look.
 
-### kernel (91) — every decision in the city, and nothing that touches a disk
+### kernel (92) — every decision in the city, and nothing that touches a disk
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -363,6 +363,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::event::kind | crates/kernel/src/event/kind.rs | the closed kind set and its window classes | value | S1 | built | kernel-SPEC.md#8-4 |
 | kernel::event::payload | crates/kernel/src/event/payload.rs | payloads, drafts, records, and refs | value | S1 | built | kernel-SPEC.md#8-4 |
 | kernel::event::who | crates/kernel/src/event/who.rs | who wrote a line: the city, the person, or one resident | value type | P1 | built | kernel-SPEC.md#8-20 |
+| kernel::event::scope | crates/kernel/src/event/scope.rs | what a halt, a release or an autonomy change applies to: the city, a building, or a workshop | value type | P1 | built | kernel-SPEC.md#8-4 |
 | kernel::event::payload::tests | crates/kernel/src/event/payload/tests.rs | the payload's float refusal, the canonical line's key order, and the two doors a record passes through | value | V5 | built | kernel-SPEC.md#8-4 |
 | kernel::event::record | crates/kernel/src/event/record.rs | which event kinds have a typed payload, and the three rules every one of them keeps | data | V5 | built | kernel-SPEC.md#8-4 |
 | kernel::event::record::log | crates/kernel/src/event/record/log.rs | the payloads of the lines a run writes about itself | value type | P1 | built | kernel-SPEC.md#8-20 |
@@ -776,7 +777,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (6), bin (187)
+### browser (12), protocol (6), bin (188)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -913,6 +914,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::mcp_http::tests | crates/sprawling/src/mcp_http/tests.rs | what the HTTP transport, its session and its redeemed header are held to | adapter | R1 | built | sprawling-SPEC.md#8-15 |
 | bin::firstrun | crates/sprawling/src/firstrun.rs | the first screen, where a city goes when nobody said, and handing a URL to the desktop | adapter | P7 | built | sprawling-SPEC.md#8-8 |
 | bin::home | crates/sprawling/src/home.rs | this person's home directory, and what this machine keeps under it: the components it downloaded and this person's own configuration | adapter | P0 | built | sprawling-SPEC.md#8-70 |
+| bin::person | crates/sprawling/src/person.rs | what one person settled about reading their cities, in the file under their home directory: the `[ui]` section read whole, one named change put back | adapter | V0.0.6 | built | sprawling-SPEC.md#8-77 |
 | bin::import | crates/sprawling/src/import.rs | reading a provider table out of another tool's configuration, once | adapter | V0.0.6 | built | sprawling-SPEC.md#8-72 |
 | bin::import::codex | crates/sprawling/src/import/codex.rs | the grammar of `~/.codex/config.toml`, as this city reads it | grammar | V0.0.6 | built | sprawling-SPEC.md#8-72 |
 | bin::import::machine | crates/sprawling/src/import/machine.rs | where another tool's configuration lives on this machine | adapter | V0.0.6 | built | sprawling-SPEC.md#8-72 |

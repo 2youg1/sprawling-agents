@@ -16,9 +16,9 @@ export const WIRE_HASH = "67bfc2a041609a524a0eb0f933f694bc09bce47d3224cc54e8a660
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
 /**
- * Canonical relative path; invariants enforced at the sole constructor.
+ * A canonical relative path inside the city: `/`-separated segments, none empty, none `.` or `..`, no backslash, no `:`, no control character, and no segment ending in a dot or whitespace, as `kernel::Address::parse` accepts it.
  */
-export const Address = Schema.String.pipe(Schema.brand("Address"));
+export const Address = Schema.String.pipe(Schema.pattern(new RegExp("^(?:[^/\\\\:\\p{Cc}]*[^/\\\\:\\p{Cc}.\\p{White_Space}])(?:/[^/\\\\:\\p{Cc}]*[^/\\\\:\\p{Cc}.\\p{White_Space}])*$", "u"))).pipe(Schema.brand("Address"));
 export type Address = typeof Address.Type;
 
 /**
@@ -428,7 +428,7 @@ export type FileChange = typeof FileChange.Type;
 /**
  * A git object id: exactly 40 lowercase hex digits.
  */
-export const GitOid = Schema.String.pipe(Schema.brand("GitOid"));
+export const GitOid = Schema.String.pipe(Schema.pattern(new RegExp("^[0-9a-f]{40}$", "u"))).pipe(Schema.brand("GitOid"));
 export type GitOid = typeof GitOid.Type;
 
 /**
@@ -619,11 +619,16 @@ export type CommitsAnswer = typeof CommitsAnswer.Type;
  * nothing looked the same, and the page had to climb the ladder a
  * second time to find out. This is that answer, stated once by the
  * layer that resolved it.
+ * The rungs are named as `city::Layer` names them, and the two lists
+ * are held together by the one match that turns the city's rung into
+ * this one: a wire that called the building's file `resident` while
+ * the ladder called the room's file that is a wire whose readers
+ * disagree with the run about which file they are looking at.
  */
 export const ConfigLayer = Schema.Union(
   Schema.Literal("city"),
+  Schema.Literal("building"),
   Schema.Literal("resident"),
-  Schema.Literal("room"),
 ).annotations({ identifier: "ConfigLayer" });
 export type ConfigLayer = typeof ConfigLayer.Type;
 
@@ -668,8 +673,8 @@ export type Proxying = typeof Proxying.Type;
  */
 export const TuningDefaults = Schema.Struct({
   proxying: Proxying,
-  request_max_retries: Schema.Int,
-  stream_idle_timeout_ms: Schema.Int,
+  request_max_retries: Schema.optional(Schema.NullOr(Schema.Int)),
+  stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),
   timeout_ms: Schema.Int,
 }).annotations({ identifier: "TuningDefaults" });
 export type TuningDefaults = typeof TuningDefaults.Type;
@@ -1191,7 +1196,7 @@ export type GovernanceAnswer = typeof GovernanceAnswer.Type;
 /**
  * A BLAKE3 digest: exactly 64 lowercase hex digits.
  */
-export const B3Hash = Schema.String.pipe(Schema.brand("B3Hash"));
+export const B3Hash = Schema.String.pipe(Schema.pattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
 export type B3Hash = typeof B3Hash.Type;
 
 /**
@@ -1532,14 +1537,23 @@ export type Lang = typeof Lang.Type;
  * Whole rather than a dozen readings, because that is the record the
  * file holds and because a screen that changes two of these at once
  * must not be able to write one and drop the other.
+ * 
+ * **This is the grammar of `[ui]` in the person's own file as well as
+ * the shape of the answer.** The file is read through this type and
+ * written by serialising it, so a key the file may hold and a field
+ * the answer states are one declaration. A section that states only
+ * some of them is read with the rest at the postures
+ * [`PreferencesAnswer::default`] gives, and a key no field claims is
+ * refused where it is written rather than ignored into a setting that
+ * never takes effect.
  */
 export const PreferencesAnswer = Schema.Struct({
-  appearance: Appearance,
-  chords: Schema.Array(Chord),
-  lang: Lang,
-  panel: Schema.Boolean,
-  proxying: Proxying,
-  welcomed: Schema.Boolean,
+  appearance: Schema.optional(Appearance),
+  chords: Schema.optional(Schema.Array(Chord)),
+  lang: Schema.optional(Schema.NullOr(Lang)),
+  panel: Schema.optional(Schema.Boolean),
+  proxying: Schema.optional(Proxying),
+  welcomed: Schema.optional(Schema.Boolean),
 }).annotations({ identifier: "PreferencesAnswer" });
 export type PreferencesAnswer = typeof PreferencesAnswer.Type;
 
@@ -2128,7 +2142,7 @@ export type HaltScope = typeof HaltScope.Type;
 /**
  * The deduplication key of one outward action: `idem1-` then 32 lowercase hex digits.
  */
-export const IdemKey = Schema.String.pipe(Schema.brand("IdemKey"));
+export const IdemKey = Schema.String.pipe(Schema.pattern(new RegExp("^idem1-[0-9a-f]{32}$", "u"))).pipe(Schema.brand("IdemKey"));
 export type IdemKey = typeof IdemKey.Type;
 
 /**

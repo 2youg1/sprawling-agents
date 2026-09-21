@@ -108,13 +108,33 @@ impl Ladder {
     /// One concern across the whole ladder, each rung in the slot it
     /// speaks for.
     ///
-    /// The only place a rung is matched to a slot. `kernel::freeze`
-    /// takes it from here and decides which rung wins and what an
-    /// unstated concern falls back to.
+    /// `kernel::freeze` takes it from here and decides which rung wins
+    /// and what an unstated concern falls back to.
     pub(crate) fn resolve<T>(&self, stated: impl Fn(&ConfigLayer) -> Option<T>) -> LayeredValue<T> {
+        let tagged = self.tagged(stated);
+        LayeredValue {
+            city: tagged.city.map(|(held, _)| held),
+            building: tagged.building.map(|(held, _)| held),
+            resident: tagged.resident.map(|(held, _)| held),
+        }
+    }
+
+    /// One concern across the whole ladder, each statement carrying the
+    /// rung that made it.
+    ///
+    /// The only place a rung is matched to a slot, which is why
+    /// [`Ladder::resolve`] is this with the rung dropped rather than a
+    /// second walk of the same ladder. Which rung then wins stays
+    /// `kernel::LayeredValue::resolve`'s answer: a page that shows
+    /// where a value came from must not be able to disagree with the
+    /// run that was governed by it.
+    pub(crate) fn tagged<T>(
+        &self,
+        stated: impl Fn(&ConfigLayer) -> Option<T>,
+    ) -> LayeredValue<(T, Layer)> {
         let mut across = LayeredValue::default();
         for (rung, layer) in &self.rungs {
-            let held = stated(layer);
+            let held = stated(layer).map(|value| (value, *rung));
             match rung {
                 Layer::City => across.city = held,
                 Layer::Building => across.building = held,

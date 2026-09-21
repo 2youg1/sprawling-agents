@@ -58,6 +58,23 @@ fn a_named_bare_string_is_a_branded_string_and_an_integer_a_branded_int() {
     );
 }
 
+/// The grammar a Rust type owns travels to the client in the schema's
+/// `pattern`; an emitter that dropped it would leave the client to
+/// spell the same grammar again, which is what `core/address.ts` was.
+#[test]
+fn a_pattern_narrows_the_string_it_is_stated_on() {
+    let text = emitted(json!({
+        "Address": { "type": "string", "pattern": "^[^/]+(?:/[^/]+)*$" },
+    }));
+    assert!(
+        text.contains(
+            "export const Address = Schema.String.pipe(Schema.pattern(new \
+             RegExp(\"^[^/]+(?:/[^/]+)*$\", \"u\"))).pipe(Schema.brand(\"Address\"));\n"
+        ),
+        "{text}"
+    );
+}
+
 #[test]
 fn an_externally_tagged_enum_is_a_union_of_literals_and_structs() {
     let text = emitted(json!({

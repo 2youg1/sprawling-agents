@@ -4,11 +4,13 @@ impl sprawling::assembly::RunWorker
 impl sprawling::assembly::RunWorker
 impl sprawling::assembly::RunWorker
 impl sprawling::assembly::ScanReport
+impl sprawling::doctor::Platform
 impl sprawling::home::Home
 impl sprawling::serving::Journal
 impl sprawling::serving::Keyed
 pub async fn sprawling::serving::serve(sprawling::serving::Serving) -> core::result::Result<(), kernel::error::shape::AxError>
 pub enum sprawling::assembly::Adopt
+pub enum sprawling::doctor::Platform
 pub enum sprawling::firstrun::BesideBinary
 pub enum sprawling::firstrun::FirstScreen
 pub enum sprawling::release::Built
@@ -23,6 +25,7 @@ pub fn sprawling::assembly::ScanReport::summary(&self) -> alloc::string::String
 pub fn sprawling::assembly::form_city(&std::path::Path, sprawling::assembly::Adopt) -> core::result::Result<sprawling::assembly::InitReport, kernel::error::shape::AxError>
 pub fn sprawling::assembly::has_history(&std::path::Path) -> bool
 pub fn sprawling::assembly::init_city(&std::path::Path) -> core::result::Result<sprawling::assembly::InitReport, kernel::error::shape::AxError>
+pub fn sprawling::doctor::Platform::current() -> core::option::Option<sprawling::doctor::Platform>
 pub fn sprawling::doctor::verb(&[alloc::string::String]) -> std::process::ExitCode
 pub fn sprawling::firstrun::ask<R: alloc::io::buf_read::BufRead, W: core::io::write::Write>(&std::path::Path, &mut R, &mut W) -> core::io::error::Result<sprawling::firstrun::FirstScreen>
 pub fn sprawling::firstrun::default_city(&std::path::Path, core::option::Option<&sprawling::home::Home>, sprawling::firstrun::BesideBinary) -> std::path::PathBuf
@@ -63,6 +66,9 @@ pub sprawling::console::Terminal::city: alloc::string::String
 pub sprawling::console::Terminal::client: alloc::string::String
 pub sprawling::console::Terminal::token: core::option::Option<alloc::string::String>
 pub sprawling::console::Terminal::url: alloc::string::String
+pub sprawling::doctor::Platform::Linux
+pub sprawling::doctor::Platform::MacOs
+pub sprawling::doctor::Platform::Windows
 pub sprawling::firstrun::BesideBinary::ReadOnly
 pub sprawling::firstrun::BesideBinary::Writable
 pub sprawling::firstrun::FirstScreen::Quit

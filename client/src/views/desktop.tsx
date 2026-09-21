@@ -13,7 +13,7 @@
 
 import { Show, createEffect, createMemo, createSignal } from "solid-js";
 
-import { Address } from "../core/address";
+import { Address } from "../wire";
 import { configureDesktop } from "../core/commands";
 import { useCommand, useSay, useUi } from "../ui";
 
@@ -21,7 +21,7 @@ import { useCommand, useSay, useUi } from "../ui";
 // side too: a page that joined its own path could join one that leaves
 // the subtree.
 export function desktopScopeAt(addr: Address): Address {
-  return Address(`${addr}/.sprawling/DESKTOP.toml`);
+  return Address.make(`${addr}/.sprawling/DESKTOP.toml`);
 }
 
 export function DesktopForm(props: { readonly addr: Address }) {
