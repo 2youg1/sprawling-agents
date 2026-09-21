@@ -182,7 +182,7 @@ pub(crate) fn outside_the_tree(line: &str, dirs: &BTreeSet<String>) -> Option<St
         // A segment that does not begin with a letter is not a name this
         // tree could have anchored: `../assets/app.css` walks up from
         // the file that carries it and is resolved by the link
-        // assertion, and `.sprawling/BUILDING.md` is a path inside a
+        // assertion, and `.sprawling/RULES.toml` is a path inside a
         // city rather than inside this repository.
         if !first.starts_with(|ch: char| ch.is_ascii_alphabetic()) {
             return false;

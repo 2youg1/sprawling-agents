@@ -157,7 +157,7 @@ fn a_document_anchored_outside_the_repository_is_caught_and_shorthand_is_not() {
     // A relative walk upwards is the link assertion's business, and
     // a path inside a city is not a path inside this repository.
     assert!(outside_the_tree("[a](../../docs/frontend-method.md)", &dirs).is_none());
-    assert!(outside_the_tree("edit `.sprawling/BUILDING.md`", &dirs).is_none());
+    assert!(outside_the_tree("edit `.sprawling/RULES.toml`", &dirs).is_none());
     // The build directory is not published and still exists.
     assert!(outside_the_tree("written to target/screens/tokens.css", &dirs).is_none());
     // A word with no extension is not a citation.
@@ -179,7 +179,7 @@ fn only_prose_is_read_for_citations() {
         "//! see docs/glossary.md"
     ));
     assert!(is_prose("crates/city/city-SPEC.md", "anything at all"));
-    assert!(is_prose("docs/templates/BUILDING.md", "<!-- a comment -->"));
+    assert!(is_prose("docs/templates/SPEC.md", "<!-- a comment -->"));
 }
 
 #[test]

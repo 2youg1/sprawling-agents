@@ -44,7 +44,7 @@ fn a_re_pricing_that_travels_alone_needs_no_ruling() {
 /// whatever it does to the code.
 #[test]
 fn ordinary_source_work_is_not_a_gate_change() {
-    let work = paths(&["crates/city/src/building.rs", "docs/templates/BUILDING.md"]);
+    let work = paths(&["crates/city/src/building.rs", "docs/templates/RULES.toml"]);
     assert!(gate_faces(&work, false, false).is_empty());
 }
 
