@@ -21,18 +21,25 @@
 use std::path::{Path, PathBuf};
 
 use kernel::{
-    Address, AxCode, AxError, Effort, FrozenConfig, LayeredValue, McpServer, McpTransport,
-    SandboxLimits, ServerLabel,
+    Address, AxError, Effort, FrozenConfig, LayeredValue, McpServer, McpTransport, SandboxLimits,
+    ServerLabel,
 };
 use serde::Deserialize;
 
 mod ladder;
+mod refuse;
+mod session;
+mod shelves;
 mod write;
 
 pub use ladder::Layer;
+pub use session::{own_layer, write_session};
+pub use shelves::city_shelves;
 pub use write::{write_effort, write_mcp, write_sandbox};
 
 use ladder::Ladder;
+// The refusal shape every reader in this module answers with.
+use refuse::refuse;
 
 /// Where a layer's file lives for a run at `addr`.
 ///
@@ -48,9 +55,12 @@ pub fn path(city_root: &Path, addr: &Address, layer: Layer) -> Result<PathBuf, A
 /// depart from the default.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ConfigLayer {
+    /// The model a scope froze, written once when a session opens.
+    model: Option<String>,
     effort: Option<Effort>,
     sandbox: Option<SandboxLimits>,
     mcp: Option<Vec<McpServer>>,
+    shelves: Option<Vec<String>>,
 }
 
 impl ConfigLayer {
@@ -172,11 +182,29 @@ impl ConfigLayer {
                 Some(servers)
             }
         };
+        let model = file.model.name;
+        if model.as_deref().is_some_and(|name| name.trim().is_empty()) {
+            return Err(refuse(
+                "`[model] name` is empty: leave the key out to state no model".to_owned(),
+            ));
+        }
         Ok(ConfigLayer {
+            model,
             effort: file.model.effort,
             sandbox,
             mcp,
+            // The paths are kept as written: turning `~` into a
+            // directory needs this person's home, which is not this
+            // module's to read, and a value stored half-resolved would
+            // be a second spelling of the same shelf.
+            shelves: file.skills.map(|section| section.shelves),
         })
+    }
+
+    /// The model this scope froze, as written.
+    #[must_use]
+    pub fn model(&self) -> Option<&str> {
+        self.model.as_deref()
     }
 
     #[must_use]
@@ -192,6 +220,13 @@ impl ConfigLayer {
     #[must_use]
     pub fn mcp(&self) -> Option<&[McpServer]> {
         self.mcp.as_deref()
+    }
+
+    /// The directories this layer mounts read-only beside the city's own
+    /// shelves, as written. Empty when the layer has no `[skills]` table.
+    #[must_use]
+    pub fn shelves(&self) -> Option<&[String]> {
+        self.shelves.as_deref()
     }
 }
 
@@ -247,27 +282,6 @@ pub fn settled_effort(
         .copied())
 }
 
-/// One refusal shape for every way a layer can fail to be read, so the
-/// recovery line is written once and cannot drift between callers.
-fn refuse(subject: String) -> AxError {
-    // The settings are `Effort`'s to list. A recovery line that spelled
-    // them again would be the second place a seventh setting has to be
-    // remembered, and the one nobody remembers.
-    let efforts: Vec<&str> = kernel::Effort::ALL.iter().map(|one| one.as_str()).collect();
-    AxError::failure(AxCode::ConfigInvalid, "read a configuration layer", subject).with_recovery(
-        format!(
-            "this version reads three sections: `[model] effort = \"{}\"`, ",
-            efforts.join("|")
-        ) + "\
-         `[sandbox] shell = <bool>, fuel = <integer>, mounts = [<path>], \
-         env_passthrough = [<variable name>], trusted = [<server label>]`, and \
-         `[[mcp]] label = <lowercase>, and either command = <program> with args = [<argument>] \
-         and env = { NAME = \"value\" }, or url = <https url> with transport = \"http\"|\"sse\" \
-         and headers = { Name = \"value\" }`; a value on either table may be a \
-         `secret:realm/name` reference",
-    )
-}
-
 /// A configured table as the wire carries it: name before value, in the
 /// order a `BTreeMap` reads them, so two runs of the same file hand the
 /// same list to the same server.
@@ -284,6 +298,17 @@ struct ConfigFile {
     sandbox: Option<SandboxSection>,
     #[serde(default)]
     mcp: Option<Vec<McpSection>>,
+    #[serde(default)]
+    skills: Option<SkillsSection>,
+}
+
+/// The `[skills]` table: the directories outside the city this city
+/// mounts read-only beside its own shelves.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SkillsSection {
+    #[serde(default)]
+    shelves: Vec<String>,
 }
 
 /// One `[[mcp]]` entry, read as written rather than as parsed types:
@@ -341,6 +366,9 @@ struct SandboxSection {
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ModelSection {
+    /// What a session calls, kept for every run after its first.
+    #[serde(default)]
+    name: Option<String>,
     #[serde(default)]
     effort: Option<Effort>,
 }

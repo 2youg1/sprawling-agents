@@ -155,7 +155,11 @@ fn vaulted(
 
 /// What one edit states. Exhaustive, so the section a value is written
 /// under is decided in one match rather than once per write face.
-enum Change<'a> {
+pub(super) enum Change<'a> {
+    Session {
+        model: &'a str,
+        effort: Option<Effort>,
+    },
     Effort(Effort),
     Sandbox(&'a SandboxLimits),
     Mcp(&'a [McpServer]),
@@ -166,16 +170,16 @@ impl Change<'_> {
     /// person who wrote it left it.
     fn state(&self, document: &mut toml::Table, file: &Path) -> Result<(), AxError> {
         match self {
+            Change::Session { model, effort } => {
+                let section = table(document, "model", file)?;
+                section.insert("name".to_owned(), toml::Value::String((*model).to_owned()));
+                if let Some(effort) = effort {
+                    section.insert("effort".to_owned(), spelled(*effort, file)?);
+                }
+            }
             Change::Effort(effort) => {
-                let model = document
-                    .entry("model".to_owned())
-                    .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-                let toml::Value::Table(model) = model else {
-                    return Err(refuse_file(file, "`[model]` is not a section"));
-                };
-                let spelled = toml::Value::try_from(*effort)
-                    .map_err(|err| refuse_file(file, &err.to_string()))?;
-                model.insert("effort".to_owned(), spelled);
+                table(document, "model", file)?
+                    .insert("effort".to_owned(), spelled(*effort, file)?);
             }
             Change::Sandbox(limits) => {
                 let spelled = toml::Value::try_from(*limits)
@@ -190,6 +194,28 @@ impl Change<'_> {
     }
 }
 
+/// The `[model]` table, made if this file has none: one place the
+/// section is found or created, so the three values written into it
+/// cannot disagree about which table holds them.
+fn table<'d>(
+    document: &'d mut toml::Table,
+    name: &str,
+    file: &Path,
+) -> Result<&'d mut toml::Table, AxError> {
+    let section = document
+        .entry(name.to_owned())
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    let toml::Value::Table(held) = section else {
+        return Err(refuse_file(file, &format!("`[{name}]` is not a section")));
+    };
+    Ok(held)
+}
+
+/// One effort as a configuration file spells it.
+fn spelled(effort: Effort, file: &Path) -> Result<toml::Value, AxError> {
+    toml::Value::try_from(effort).map_err(|err| refuse_file(file, &err.to_string()))
+}
+
 /// Reads one layer's file, states the change in it, and puts it back
 /// whole.
 ///
@@ -198,7 +224,7 @@ impl Change<'_> {
 /// rather than deciding from an original that is already stale, and the
 /// replacement is atomic, so a run reading the file meets the version
 /// before this change or the version after it.
-fn change(
+pub(super) fn change(
     city_root: &Path,
     addr: &Address,
     layer: Layer,
@@ -284,94 +310,4 @@ fn refuse_file(path: &Path, why: &str) -> AxError {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    reason = "test code"
-)]
-mod tests {
-    use super::*;
-
-    fn room() -> Address {
-        Address::parse("lab/room1").unwrap()
-    }
-
-    fn hosted(headers: Vec<(String, String)>) -> Vec<McpServer> {
-        vec![McpServer {
-            label: ServerLabel::parse("hosted").unwrap(),
-            transport: McpTransport::Http {
-                url: "https://example.test/mcp".to_owned(),
-                headers,
-            },
-        }]
-    }
-
-    /// A key typed into the header table of the settings page would be
-    /// written verbatim into a file the project commits, so the write
-    /// face refuses it and says where the value belongs instead.
-    #[test]
-    fn a_header_holding_a_credential_is_refused_before_the_file_is_touched() {
-        let dir = tempfile::tempdir().unwrap();
-        let servers = hosted(vec![(
-            "Authorization".to_owned(),
-            "Bearer sk-ant-not-a-real-key".to_owned(),
-        )]);
-        let err = write_mcp(dir.path(), &room(), Layer::City, &servers).unwrap_err();
-        assert_eq!(err.code(), &AxCode::ConfigInvalid);
-        assert!(err.subject().contains("Authorization"), "{}", err.subject());
-        assert!(err.recovery().contains("secret:realm/name"));
-        assert!(
-            !path(dir.path(), &room(), Layer::City).unwrap().exists(),
-            "a refused write left a file behind"
-        );
-    }
-
-    /// One value at a time: the server whose other header is ordinary
-    /// is still refused for the one that is not.
-    #[test]
-    fn each_value_is_judged_on_its_own() {
-        let dir = tempfile::tempdir().unwrap();
-        let servers = hosted(vec![
-            ("X-Account".to_owned(), "acme".to_owned()),
-            ("Authorization".to_owned(), "secret:mcp/hosted".to_owned()),
-        ]);
-        write_mcp(dir.path(), &room(), Layer::City, &servers).unwrap();
-
-        let leaked = hosted(vec![
-            ("X-Account".to_owned(), "acme".to_owned()),
-            (
-                "X-Trace".to_owned(),
-                // Assembled here rather than written whole, so the
-                // repository's own secret scanner does not read this
-                // fixture as a leaked credential.
-                format!("ghp_{}{}{}", "aB3dE5fG7hJ9k", "L1mN3pQ5rS7t", "U9vW1xY3zA5"),
-            ),
-        ]);
-        let err = write_mcp(dir.path(), &room(), Layer::City, &leaked).unwrap_err();
-        assert!(err.subject().contains("X-Trace"), "{}", err.subject());
-    }
-
-    /// An environment value is judged by the same rule as a header: the
-    /// table it sits in changes the noun in the refusal and nothing
-    /// else.
-    #[test]
-    fn a_credential_in_a_command_environment_is_refused_too() {
-        let dir = tempfile::tempdir().unwrap();
-        let servers = vec![McpServer {
-            label: ServerLabel::parse("apps").unwrap(),
-            transport: McpTransport::Stdio {
-                command: "mcp-apps".to_owned(),
-                args: Vec::new(),
-                env: vec![("API_KEY".to_owned(), "plain-value".to_owned())],
-            },
-        }];
-        let err = write_mcp(dir.path(), &room(), Layer::City, &servers).unwrap_err();
-        assert!(
-            err.subject().contains("environment value"),
-            "{}",
-            err.subject()
-        );
-    }
-}
+mod tests;

@@ -27,10 +27,11 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::layout::{CONFIG_FILE, CityLayout};
-use kernel::{Address, AxCode, AxError, LayeredValue, RESERVED_PREFIX};
+use kernel::layout::CityLayout;
+use kernel::{Address, AxCode, AxError, LayeredValue};
 
-use super::{ConfigLayer, refuse};
+use super::ConfigLayer;
+use super::refuse::refuse;
 use crate::building::Building;
 
 /// One rung of the City -> Building -> Resident ladder, from the
@@ -60,9 +61,10 @@ impl Layer {
     pub(crate) fn file(self, city_root: &Path, addr: &Address) -> Result<PathBuf, AxError> {
         let layout = CityLayout::new(city_root);
         Ok(match self {
-            // `CityLayout::config` takes the address of a scope, and
-            // the city root is the one scope no address names.
-            Layer::City => layout.root().join(RESERVED_PREFIX).join(CONFIG_FILE),
+            // The city's own file is a layout answer, not a joined
+            // path: the root is the one scope no address names, so it
+            // is the one scope that needs a method of its own.
+            Layer::City => layout.city_config(),
             Layer::Building => layout.config(Building::of(addr)?.addr()),
             Layer::Resident => layout.config(addr),
         })
@@ -148,7 +150,11 @@ impl Ladder {
 /// What one file states. Absent states nothing, which is how most
 /// rungs stay: a value is written where somebody meant to depart from
 /// the default.
-fn stated(file: &Path) -> Result<ConfigLayer, AxError> {
+///
+/// Crate-internal because the city's own rung is read without an address
+/// by [`super::city_shelves`]: the missing-file rule is stated once here
+/// rather than a second time for the one caller that has no address.
+pub(crate) fn stated(file: &Path) -> Result<ConfigLayer, AxError> {
     match std::fs::read_to_string(file) {
         // Several files can fail; the refusal says which one did.
         Ok(text) => ConfigLayer::parse(&text)

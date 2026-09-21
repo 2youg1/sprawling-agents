@@ -42,6 +42,7 @@ pub use building::{Building, BuildingTemplate, create as create_building};
 pub use city_tool::CityTool;
 pub use config_layers::path as config_path;
 pub use config_layers::{ConfigLayer, Layer, load as load_config};
+pub use config_layers::{own_layer, write_session};
 pub use config_layers::{settled_effort, write_effort, write_mcp, write_sandbox};
 pub use document::{Held, edit as edit_document};
 pub use governed::{Governed, PREFERENCES_FILE, write_governed};
@@ -49,12 +50,13 @@ pub use governed::{Governed, PREFERENCES_FILE, write_governed};
 // names are re-exported rather than restated so that a caller reading
 // `city::CONFIG_TOML` and the layout that places it cannot disagree.
 pub use kernel::layout::{ARCHIVE_DIR, BUILDING_SHELF, CONFIG_FILE, LIBRARY_DIR, URBANITE_FILE};
-pub use library::{Holding, Library};
+pub use library::{Holding, Library, Shelf};
 pub use neighbourhood::{Neighbour, Neighbourhood, Occupancy};
 pub use neighbours_tool::NeighboursTool;
 pub use policy::write_rules;
 pub use policy::{BUILDING_FILE, BuildingRules, DomainReach, ModelPool};
 pub use policy::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
+pub use policy::{UserBrowser, UserBrowserEndpoint};
 pub use policy::{agents_path, building_path, evaluate, load};
 pub use resident::{Dossier, Identity, Resident, urbanite_path};
 pub use room::all as rooms;
