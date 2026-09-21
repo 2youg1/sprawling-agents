@@ -165,7 +165,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         name: SPRAWLING_DESKTOP,
         tier: Tier::Use,
         need: Need::Optional,
-        enables: "the desktop connector, for a building whose rules say `desktop: true`",
+        enables: "the desktop connector, for a building whose rules declare it",
         detect: Detection::Program {
             program: "sprawling-desktop",
             version_arg: "--version",

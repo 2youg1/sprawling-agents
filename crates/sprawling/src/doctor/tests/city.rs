@@ -20,7 +20,8 @@ fn lab() -> Address {
     Address::parse("lab").unwrap()
 }
 
-/// A building that wrote `browser: true` on a machine with neither
+/// A building whose `RULES.toml` asks for a browser on a machine with
+/// neither
 /// engine is named, with both roads it tried and why each is closed.
 #[test]
 fn a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none() {
@@ -40,7 +41,7 @@ fn a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none() {
     assert_eq!(lacking[0].capability, Capability::Browser);
     let line = lack_line(&lacking[0]);
     assert!(line.contains("lab"), "{line}");
-    assert!(line.contains("browser: true"), "{line}");
+    assert!(line.contains("browser = true"), "{line}");
     assert!(line.contains("gecko"), "{line}");
     assert!(line.contains("chromedriver"), "{line}");
     assert!(line.contains("not on the search path"), "{line}");
@@ -234,7 +235,7 @@ fn doctor_with_a_city_names_the_building_on_the_screen() {
     let ready = run(&asked, &machine, &mut nobody, &mut screen).unwrap();
     assert!(!ready);
     let shown = String::from_utf8(screen).unwrap();
-    assert!(shown.contains("lab: browser: true"), "{shown}");
+    assert!(shown.contains("lab: browser = true"), "{shown}");
     assert!(shown.contains("no gecko"), "{shown}");
 
     let machine = ScriptedMachine::missing(&[]);

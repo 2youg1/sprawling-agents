@@ -1,7 +1,6 @@
 {
   "name": "sprawling-client",
   "private": true,
-  "version": "0.0.5",
   "type": "module",
   "license": "MPL-2.0",
   "scripts": {

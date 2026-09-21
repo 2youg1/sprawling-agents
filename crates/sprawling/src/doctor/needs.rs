@@ -50,11 +50,20 @@ impl Capability {
         }
     }
 
-    /// The line in the building's own files that asked for it.
+    /// The key in the building's own files that asked for it, spelled
+    /// the way that file is written.
+    ///
+    /// The two rules files are not the same syntax, and the spelling
+    /// here is the one a person has to type: a building's capability is
+    /// a key in its `RULES.toml`, a shell is a key in its
+    /// `CONFIG.toml`. This is the only place either is written out for
+    /// a person to read; prose that named one itself would be the
+    /// second home, and the first to go stale when the file's syntax
+    /// moved.
     pub(crate) fn declared_as(self) -> &'static str {
         match self {
-            Capability::Browser => "browser: true",
-            Capability::Desktop => "desktop: true",
+            Capability::Browser => "browser = true",
+            Capability::Desktop => "desktop = true",
             Capability::Shell => "sandbox.shell = true",
         }
     }

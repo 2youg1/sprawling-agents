@@ -54,7 +54,7 @@ pub fn attach(endpoint: Option<&EgressTarget>) -> GateOutcome {
                 )
                 .with_recovery(
                     "start the browser with remote debugging, copy the ws://127.0.0.1:<port>/session \
-                     address it prints, and add `usersbrowser: <that address>` to the building's \
+                     address it prints, and add `usersbrowser = \"<that address>\"` to the building's \
                      RULES.toml; the next dispatch picks it up. Only the person can do this, \
                      because it is their logins the attachment reaches",
                 ),

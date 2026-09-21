@@ -33,7 +33,7 @@ use person::PERSON_DISCLOSURE;
 pub(crate) use person::Role;
 use surveying::surveyed;
 
-/// The tool a building with `browser: true` gets.
+/// The tool a building whose rules say `browser = true` gets.
 pub(crate) struct BrowserTool {
     meta: ToolMeta,
     port: Box<dyn BrowserPort + Send>,

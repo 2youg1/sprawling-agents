@@ -7,7 +7,7 @@
 
 use kernel::{AxCode, AxError};
 
-/// What a building's `usersbrowser:` line says.
+/// What a building's `usersbrowser` key says.
 ///
 /// The value is both the switch and the address: a person who wrote the
 /// line has answered both questions at once, and two lines would be two
@@ -36,7 +36,7 @@ pub struct UserBrowserEndpoint {
 }
 
 impl UserBrowserEndpoint {
-    /// Reads the value of a `usersbrowser:` line.
+    /// Reads the value of the `usersbrowser` key.
     ///
     /// # Errors
     /// Refuses anything but a `ws://` address carrying a host. The
@@ -49,12 +49,12 @@ impl UserBrowserEndpoint {
             AxError::failure(
                 AxCode::ConfigInvalid,
                 "read a building's rules",
-                format!("`usersbrowser: {raw}` is not a browser address"),
+                format!("`usersbrowser = {raw}` is not a browser address"),
             )
             .with_recovery(
-                "write `usersbrowser: ws://127.0.0.1:<port>/session` — the address the browser \
-                 prints when it is started with remote debugging — or `usersbrowser: true` to \
-                 enable the tool and have it ask for the address, or `usersbrowser: false` to \
+                "write `usersbrowser = \"ws://127.0.0.1:<port>/session\"` — the address the browser \
+                 prints when it is started with remote debugging — or `usersbrowser = true` to \
+                 enable the tool and have it ask for the address, or `usersbrowser = false` to \
                  switch it off",
             )
         };

@@ -18,7 +18,7 @@ use super::person::for_user_browser;
 pub(super) const BUILDING_DISCLOSURE: &str = "drive this machine's browser: open a page, look at it, act on it, \
      take a screenshot, measure boxes, read the console, resize, close";
 
-/// Builds the tool a building with `browser: true` gets.
+/// Builds the tool a building whose rules say `browser = true` gets.
 ///
 /// The profile is the building's own, so what a browser remembers - a
 /// login, a cookie, a permission - belongs to one line of business

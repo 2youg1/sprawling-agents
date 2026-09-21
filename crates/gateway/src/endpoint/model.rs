@@ -115,7 +115,7 @@ impl Endpoint {
             self.config.base_url.clone(),
         )
         .with_recovery(
-            "configure a local model for this building, or drop `confidential: true` \
+            "configure a local model for this building, or drop `confidential = true` \
              from its RULES.toml and record why",
         )
     }

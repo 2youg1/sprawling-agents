@@ -261,7 +261,7 @@ dependencies = [
 
 [[package]]
 name = "browser"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "base64 0.22.1",
  "kernel",
@@ -385,7 +385,7 @@ dependencies = [
 
 [[package]]
 name = "channels"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "axum",
  "kernel",
@@ -411,7 +411,7 @@ dependencies = [
 
 [[package]]
 name = "city"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "kernel",
  "serde",
@@ -422,7 +422,7 @@ dependencies = [
 
 [[package]]
 name = "citysim"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "channels",
  "eval",
@@ -462,7 +462,7 @@ dependencies = [
 
 [[package]]
 name = "collab"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "kernel",
  "memory",
@@ -855,7 +855,7 @@ dependencies = [
 
 [[package]]
 name = "eval"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "kernel",
  "serde_json",
@@ -998,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "gateway"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -1510,7 +1510,7 @@ dependencies = [
 
 [[package]]
 name = "kernel"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "blake3",
  "insta",
@@ -1658,7 +1658,7 @@ dependencies = [
 
 [[package]]
 name = "memory"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "blake3",
  "git2",
@@ -1887,7 +1887,7 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "kernel",
  "serde_json",
@@ -2184,7 +2184,7 @@ dependencies = [
 
 [[package]]
 name = "runtime"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "insta",
  "kernel",
@@ -2649,7 +2649,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "browser",
  "channels",
@@ -3969,7 +3969,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xtask"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "browser",
  "channels",

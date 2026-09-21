@@ -18,7 +18,7 @@
 | act | 陈旧 generation 恒拒；页面文本进表达式后，字面量内除定界符外无未转义引号 |
 | devloop | 任意观察序列在预算内到达一个结局；结局枚举穷尽 |
 | survey | 同一页经 `--dump-dom` 与经 `script.evaluate` 读出同一个 `probe::Read`；`xtask render` 在本仓画廊上恒零发现（量具自身的假阳性已清到 0）；住户路径的 `Sources` 为空时每条发现只点名盒子、不点名行 |
-| profile | 两栋楼的 profile 互不包含；路径住 reserved prefix；**confidential 楼的拒绝只有一个家**：`city::policy::evaluate` 读到 `confidential = true` 与 `browser = true`／`usersbrowser:` 并存即 `E_CONFIG_INVALID`，本 crate 不再有 `Ephemeral` 臂（那是同一个规则的不可达第二家） |
+| profile | 两栋楼的 profile 互不包含；路径住 reserved prefix；**confidential 楼的拒绝只有一个家**：`city::policy::evaluate` 读到 `confidential = true` 与 `browser = true`／`usersbrowser` 并存即 `E_CONFIG_INVALID`，本 crate 不再有 `Ephemeral` 臂（那是同一个规则的不可达第二家） |
 
 ## 3 假设与歧义
 
@@ -268,7 +268,7 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 | shot | 同一段 PNG 字节两次读出同一尺寸；非 PNG 不猜尺寸；quality 不引入浮点变量 |
 | diff | 尺寸不同即拒；全同两图为 0；一个像素变化的框恰好含那个像素；解码字节短于头部时拒绝语点名是哪一张 |
 | input | 指针拖拽恒是 pointerMove→pointerDown→pointerMove×n→pointerUp；元素 origin 有界深度找 `sharedId`，找不到即 `E_WIRE_MISMATCH`；滚轮增量可为负 |
-| usersbrowser | 工具名取 `ToolName::USER_BROWSER` 一个权威；未声明地址的楼每次调用都得到门的问题；声明了地址的楼其 effect 带该主机；`usersbrowser:` 与 `browser:` 是两个设置；confidential 楼在 `city::policy` 即拒 |
+| usersbrowser | 工具名取 `ToolName::USER_BROWSER` 一个权威；未声明地址的楼每次调用都得到门的问题；声明了地址的楼其 effect 带该主机；`usersbrowser` 与 `browser` 是两个设置；confidential 楼在 `city::policy` 即拒 |
 
 
 ### 19-7 尚未验证的部分
