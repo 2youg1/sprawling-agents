@@ -29,6 +29,9 @@ pub(super) const CONDITIONS: &str = "sprawling-render-conditions";
 /// Where it writes the words the page declares.
 pub(super) const DECLARED: &str = "sprawling-render-declared";
 
+/// Where the page reports, if it does, that it threw.
+pub(super) const FAILED: &str = "sprawling-render-failed";
+
 /// The measurement, wrapped so a dumped DOM carries it back.
 ///
 /// The engine this gate drives renders once and prints the document, so
@@ -43,6 +46,25 @@ pub(super) fn script(pass: &Pass) -> String {
         r#"<pre id="{SINK}"></pre>
 <pre id="{CONDITIONS}"></pre>
 <pre id="{DECLARED}"></pre>
+<pre id="{FAILED}"></pre>
+<script>
+// **A page that threw is told apart from a page that drew nothing.**
+// Both leave the sink empty, and the two need different repairs: one is
+// a client defect, the other a route that renders no fixtures. Without
+// this the gate said "drew nothing measurable" for a `ParseError` at
+// import time, and finding that cost an hour of bisecting a bundle.
+window.addEventListener('error', function (e) {{
+  var thrown = e.error || {{}};
+  var where = (e.filename || '') + ':' + (e.lineno || '') + ':' + (e.colno || '');
+  document.getElementById('{FAILED}').textContent =
+    (e.message || 'uncaught') + ' at ' + where + (thrown.stack ? ' :: ' + thrown.stack : '');
+}});
+window.addEventListener('unhandledrejection', function (e) {{
+  var reason = e.reason || {{}};
+  document.getElementById('{FAILED}').textContent =
+    'unhandled rejection :: ' + (reason.stack || reason.message || String(reason));
+}});
+</script>
 <script>
 setTimeout(function () {{
   var read = (function () {{{}}})();

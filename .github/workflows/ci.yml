@@ -15,12 +15,13 @@
 # must never be weaker than the local command: a green CI that implies
 # less than a green `just check` is worse than no CI.
 #
-#   clippy   fmt, then the zero-warning build of every target and feature
+#   clippy   fmt, the zero-warning build of every target and feature,
+#            and the two feature combinations `just features` runs
 #   test     the suite; the only job that produces trybuild scratch
 #   gates    the machine gates (`cargo xtask gates` names them), the
 #            client bundle they judge, and the nightly rustdoc apisync
-#            needs (27s of a 27.5s gate run - it is why the other
-#            twelve no longer queue behind a compile)
+#            needs (27s of a 27.5s gate run - it is why the other gates
+#            no longer queue behind a compile)
 #   client   the client's own linter, typecheck and tests
 #   proof    the kernel propositions kani can hold, against real MIR;
 #            the one job with a prerequisite, `changes` below
@@ -152,17 +153,23 @@ jobs:
       # the zero-warning gate without it.
       - name: clippy
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-      # The two feature combinations no other job compiles: the default
-      # set, and channels without `server`, which is the combination a
-      # wasm32 build needs and therefore the reason that feature exists.
-      # They ride in this job rather than in one of their own because a
-      # separate job pays a runner, a toolchain install and a cold cache
-      # - minutes - to run two check-mode passes that take seconds on the
-      # cache this job has already restored.
-      - name: check the default feature set
-        run: cargo check --workspace --locked
-      - name: check channels without its server feature
-        run: cargo check -p channels --no-default-features --locked
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      # The feature combinations `just features` runs: the default set,
+      # test targets included, and channels without `server`, which is the
+      # combination a wasm32 build needs and therefore the reason that
+      # feature exists. They ride in this job rather than in one of their
+      # own because a separate job pays a runner, a toolchain install and a
+      # cold cache - minutes - to run two check-mode passes that take
+      # seconds on the cache this job has already restored.
+      #
+      # The recipe is called rather than repeated here, the way `client` and
+      # `supply` below call `just check-client` and `just deny`: `--all-targets`
+      # is the token a copy in this file lost, and the tree `just features`
+      # rejects was green in this job.
+      - name: the feature combinations `just check` runs
+        run: just features
 
   test:
     runs-on: windows-latest

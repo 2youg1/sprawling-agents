@@ -100,21 +100,26 @@ fmt-check:
 clippy:
     cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
-# The feature combinations nothing else compiles. `clippy` above runs
-# --all-features, `dist` builds the default set of the release binary
-# alone, so two combinations reach no compiler at all: the workspace on
-# its default features, and channels with `server` off - which is the
-# reason that feature exists, since it keeps the TCP stack out of a
-# wasm32 build. Code behind a feature is compiled the day somebody turns
-# that feature on, and a combination that does not build is what the
-# first person to turn it on meets. Two check-mode passes, seconds each
-# on a warm cache; the zero-warning rule stays with `clippy`, which sees
-# every feature at once.
+# The feature combinations this repository checks: the workspace on its
+# default features, test targets included, and `channels` with `server`
+# off - which is the reason that feature exists, since it keeps the TCP
+# stack out of a wasm32 build. Code behind a feature is compiled the day
+# somebody turns that feature on, and a combination that does not build
+# is what the first person to turn it on meets.
+#
+# This recipe is the definition of that check. `just check` runs it and
+# `ci.yml`'s clippy job calls it, so the check a person runs at their
+# desk and the check a pull request gets are one command rather than two
+# spellings of it: the spelling that stood in `ci.yml` had lost
+# `--all-targets`, and the tree this recipe rejects was green there.
 #
 # --all-targets on the first pass because `cargo check` alone does not
 # compile test targets: `refusal_matrix` used items behind
 # `#[cfg(feature = "conformance")]` without declaring that gate, and the
 # only configuration that ever compiled it was `--all-features`.
+#
+# Two check-mode passes, seconds each on a warm cache; the zero-warning
+# rule stays with `clippy`, which sees every feature at once.
 features:
     cargo check --workspace --locked --all-targets
     cargo check -p channels --no-default-features --locked
@@ -243,7 +248,9 @@ budget:
 bench:
     cargo run --release -p citysim --bin bench
 
-# CycloneDX bill of materials -> target/sbom.cdx.json (release item two).
+# CycloneDX bill of materials for the release archive (release item
+# two). Where it lands is written once, in `cargo xtask sbom`, and the
+# archive's contents table reads that same constant.
 sbom:
     cargo xtask sbom
 

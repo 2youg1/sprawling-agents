@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::pass::{HEIGHT, Pass, Reported};
-use super::probe::{CONDITIONS, DECLARED, SINK, declared, script};
+use super::probe::{CONDITIONS, DECLARED, FAILED, SINK, declared, script};
 use crate::report::XtaskError;
 use crate::walk;
 use browser::survey::probe::Read;
@@ -172,6 +172,12 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
         })?;
     let dom = String::from_utf8_lossy(&output.stdout);
     let _ = std::fs::remove_file(&instrumented);
+    if let Some(thrown) = sink(&dom, FAILED).filter(|said| !said.trim().is_empty()) {
+        return Err(XtaskError::Cmd {
+            cmd: format!("{} --dump-dom {route}", browser.display()),
+            msg: format!("the page threw before it drew anything: {thrown}"),
+        });
+    }
     let (Some(records), Some(conditions), Some(words)) = (
         sink(&dom, SINK),
         sink(&dom, CONDITIONS),

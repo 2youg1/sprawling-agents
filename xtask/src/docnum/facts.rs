@@ -39,7 +39,7 @@ pub(super) struct Fact {
 }
 
 /// Every fact a managed span may name.
-const FACTS: [Fact; 16] = [
+const FACTS: [Fact; 17] = [
     Fact {
         key: "wire_v",
         home: "channels::WIRE_V",
@@ -111,6 +111,12 @@ const FACTS: [Fact; 16] = [
         home: "the #[test] attributes in the tree",
         takes: None,
         recount: |root, _arg| recount::test_functions(root),
+    },
+    Fact {
+        key: "adversary_seed",
+        home: "adversary/test/Main.lean",
+        takes: None,
+        recount: |root, _arg| adversary_seed(root),
     },
     Fact {
         key: "dep_version",
@@ -236,6 +242,43 @@ fn register_row(root: &Path, row: &str) -> Result<toml::Value, XtaskError> {
             file: "xtask/budgets.toml".to_owned(),
             msg: format!("no `[{row}]` row, so nothing can be quoted from it"),
         })
+}
+
+/// The seed the adversary draws every property from, read out of the Lean
+/// definition that holds it.
+///
+/// The figure's home is `adversary/`, because that is the program that
+/// draws from it, and `adversary-SPEC.md` quotes it. Reading it here makes
+/// the quotation a managed span: nothing else joins a Lean definition to a
+/// number written in prose, so the two could disagree with every gate
+/// green.
+///
+/// A source that no longer states the seed in the one shape this reader
+/// knows is a failure rather than an empty reading. Reporting nothing
+/// would leave the quoted figure as the only copy, which is the shape of
+/// defect the managed span exists to close.
+fn adversary_seed(root: &Path) -> Result<String, XtaskError> {
+    const SOURCE: &str = "adversary/test/Main.lean";
+    let text = walk::read_text(&root.join(SOURCE))?;
+    let declared = text.lines().find_map(|line| {
+        let value = line
+            .trim_start()
+            .strip_prefix("def defaultSeed")?
+            .split_once(":=")
+            .map(|(_, value)| value.trim())?;
+        Some(value)
+    });
+    match declared {
+        Some(value) if !value.is_empty() && value.bytes().all(|digit| digit.is_ascii_digit()) => {
+            Ok(value.to_owned())
+        }
+        _ => Err(XtaskError::Doc {
+            file: SOURCE.to_owned(),
+            msg: "no `def defaultSeed ... := <digits>` line, so a document quoting the seed \
+                  cannot be recounted against it"
+                .to_owned(),
+        }),
+    }
 }
 
 #[cfg(test)]

@@ -16,6 +16,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
+use crate::sbom;
 
 /// One part of a release archive.
 ///
@@ -52,9 +53,6 @@ pub(super) const ARCHIVE: [Packaged; 4] = [
     },
     Packaged::Sbom,
 ];
-
-/// Where `just sbom` writes the bill of materials, relative to the root.
-pub(super) const SBOM: &str = "target/sbom.cdx.json";
 
 /// Executable bits. The archive is the only thing that carries them to a
 /// machine that has never seen this file, and a binary that arrives
@@ -106,8 +104,8 @@ impl Packaged {
                 mode: READABLE_MODE,
             },
             Self::Sbom => Entry {
-                name: "sbom.cdx.json".to_owned(),
-                source: root.join(SBOM),
+                name: sbom_name()?,
+                source: root.join(sbom::SBOM),
                 mode: READABLE_MODE,
             },
         };
@@ -138,6 +136,19 @@ impl Packaged {
     }
 }
 
+/// The name the archive carries the bill of materials under: the last
+/// segment of the one path that says where it is written.
+fn sbom_name() -> Result<String, XtaskError> {
+    Path::new(sbom::SBOM)
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .map(str::to_owned)
+        .ok_or_else(|| XtaskError::Doc {
+            file: "xtask/src/sbom.rs".to_owned(),
+            msg: format!("`{}` names no file to put in the archive", sbom::SBOM),
+        })
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -146,7 +157,8 @@ impl Packaged {
     reason = "test code"
 )]
 mod tests {
-    use super::{ARCHIVE, Executable, Packaged, SBOM, entries};
+    use super::{ARCHIVE, Executable, Packaged, entries};
+    use crate::sbom::SBOM;
 
     fn repo_root() -> &'static std::path::Path {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

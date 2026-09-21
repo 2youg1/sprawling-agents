@@ -14,6 +14,17 @@ use std::process::Command;
 
 use crate::report::XtaskError;
 
+/// The bill of materials, as this module writes it: one path, relative to
+/// the repository root.
+///
+/// The archive's contents table reads this same constant, and takes the
+/// entry name from its last segment. A second spelling on either side
+/// would let the writer and the packager disagree while the archive still
+/// assembled, and no test would say so: an archive holding a file nobody
+/// wrote is a file missing from it, under a name the reader was told to
+/// expect.
+pub(crate) const SBOM: &str = "target/sbom.cdx.json";
+
 pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
     let out = Command::new("cargo")
         .args(["metadata", "--format-version", "1", "--locked"])
@@ -106,7 +117,7 @@ pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
         },
         "components": components.into_iter().map(|(_, c)| c).collect::<Vec<_>>(),
     });
-    let path = root.join("target").join("sbom.cdx.json");
+    let path = root.join(SBOM);
     let text = format!(
         "{}\n",
         serde_json::to_string_pretty(&bom).unwrap_or_default()
@@ -132,9 +143,9 @@ mod tests {
     fn the_bom_is_written_and_deterministic() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         run(root).unwrap();
-        let first = std::fs::read(root.join("target").join("sbom.cdx.json")).unwrap();
+        let first = std::fs::read(root.join(SBOM)).unwrap();
         run(root).unwrap();
-        let second = std::fs::read(root.join("target").join("sbom.cdx.json")).unwrap();
+        let second = std::fs::read(root.join(SBOM)).unwrap();
         assert_eq!(first, second, "same lockfile, same bytes");
         let parsed: serde_json::Value = serde_json::from_slice(&first).unwrap();
         assert_eq!(parsed["bomFormat"], "CycloneDX");

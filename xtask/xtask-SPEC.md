@@ -32,6 +32,7 @@
 | proof | kani harness 名册只住 `#[kani::proof]` 属性；CI 不得点名 harness，文档不得手写总数 |
 | docnum | 文档里的数字由 `docnum::FACTS` 生成并由 `--write` 回写；区段陈旧、事实未知、标记不闭合各自即红（§8-16） |
 | gates | 顺序跑全部门，聚合报告，任一违规即退出码 1 |
+| features | 工作区在默认 feature 集上（含测试目标）能否编译：`clippy` 与 `nextest` 都取 `--all-features`，`dist` 只构建一个 package；这道门跑编译器而不读源码，判定是那条命令的退出码，故与 `gates` 同住 `gates.rs` |
 | wire-ts | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V`、`WIRE_HASH` 与 `CITY_RUN`（§8-20）；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
 
 ### 门禁针对的 LLM 失效模式（本 crate 存在的理由）
@@ -83,7 +84,7 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 
 ## 7 模块边界
 
-一门一文件。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度参数；此处只说明每道门判什么，不再抄一份清单，也不写它们有几道——要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates`。判定面：`header`｜`lexicon`｜`modmap`｜`length`｜`boundary`｜`slices`｜`artifact`｜`depmap`｜`npm`｜`secret`｜`color`｜`wording`｜`render`｜`wiring`｜`wire-ts`｜`docnum`｜`proof`｜`budget`｜`specalign`｜`apisync`｜`release`｜`guard`。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（ARCHITECTURE.md 按 `## N 标题` 切节这一个读法，被 `modmap`、`depmap`、`specalign`、`proof` 共用，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `wording` 共用的词形读法）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
+判定面一门一文件，`features` 是唯一的例外：它跑编译器而不读源码，判定就是那条命令的退出码，故它没有自己的模块，与它所附属的 `gates` 同住 `gates.rs`（`default_features`）。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。此处只说明每道门判什么：不抄一份名册，也不写它们有几道，因为手写的名册与数组相隔一次代码改动而不是一个 token（产品文档写过「ten gates」而树上跑十二道）。要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates --list`；要知道有几道门，读 §12 那对受管标记。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字，与按 `## N 标题` 切节这一个读法：`section` 被 `modmap` 与 `depmap` 调用；`specalign` 经 `modmap::anchors` 吃同一份读法的产物，`proof` 只取 `PATH`、自己逐行读它与 `kani harness` 相邻的那个数，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `proof` 共用的词形与计数读法，`lexicon` 另用它把文档里的门数与 `COUNT` 对账）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——列格式一变，只有一处要改。
 
@@ -732,5 +733,15 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 **判面与写法。** 判定面是全仓 `.rs` 除去 `crates/kernel/src/layout.rs`（声明路径）与 `crates/memory/src/sessions.rs`（唯一写者）。四个记号分开查，因为一个引用确实会以这四种样子出现：目录常量 `SESSIONS_DIR`、布局方法 `session_slice`、它的逆 `of_ledger`（写者拿账本目录反推城根），以及裸字面量 `"sessions"`——手拼路径的人会的只有这一种写法。
 
 **限制写下来而不是藏起来。** 经中间别名拼出的路径（`let what = "sess"; what.to_owned() + "ions"`）过得去。这道门是绊马索，不是证明；它守的那句话同时写在写者模块的抬头里，读者也有机会看见。
+
+### 8-28 `features` 那两条命令写在 `justfile` 一处，CI 调它
+
+**决定**：这个仓库对 feature 组合的检查是 `just features` 那两条命令——工作区在默认 feature 集上（`--all-targets`，故测试目标也进编译），以及 `channels` 关掉 `server`。`ci.yml` 的 `clippy` 作业调这条 recipe，自己不拼命令。
+
+**为什么**：同一个检查写过三遍时它们真的分叉了——CI 那一遍少了 `--all-targets`，于是本地门红的那棵树在 CI 上是绿的；三处又各自声称「别的命令都不编译这一份」，而三句话合起来互相证伪。`--all-targets` 是非对称的那一半：`cargo check` 单独一条不编译测试目标，而 `refusal_matrix` 曾在未声明 gate 的情况下用 `#[cfg(feature = "conformance")]` 的项，唯一编译过它的配置是 `--all-features`。
+
+**败给的方案**：在 `ci.yml` 里照抄那两条命令，附一句「与 `justfile` 保持一致」。那正是分叉发生时的写法，而没有任何东西会注意到它们不再一致。
+
+**第二份仍在**：`gates::default_features` 在进程内跑同一条工作区检查（门要在进程里拿退出码），两份今天逐字节相同。收口的条件是那条门改调这条 recipe，而它住在 `gates.rs`。
 
 
