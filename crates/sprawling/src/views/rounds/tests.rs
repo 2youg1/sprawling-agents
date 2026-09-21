@@ -272,7 +272,14 @@ fn the_rounds_carry_how_the_session_opened_and_closed() {
     let drafts = [
         (
             EventKind::RunStarted,
-            serde_json::json!({ "task": "plan the week", "goal": "a roadmap", "job": "j" }),
+            // A whole locator, because `run_started` states one and
+            // `kernel::event::record::RunStarted` parses it; "j" was
+            // only ever readable while every key was read on its own.
+            serde_json::json!({
+                "task": "plan the week",
+                "goal": "a roadmap",
+                "job": "file:hall/mayor@0123456789abcdef0123456789abcdef01234567",
+            }),
             TimeMs::new(10),
         ),
         (

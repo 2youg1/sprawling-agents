@@ -20,6 +20,7 @@
 //! than a commit and names no oid at all — so what is asked of a record
 //! is whether it names a commit, never which kind it is.
 
+use kernel::event::record::{CheckpointCommitted, CommitAttribution};
 use kernel::{Address, EventKind, EventRecord, GitOid, RunId, Seq, SessionName, UsdMicros};
 
 /// What one commit's own record says about the run that made it.
@@ -128,7 +129,10 @@ impl super::holding::Views {
     /// Files which run a `run_started` says this one replaced, when it
     /// says so.
     pub(super) fn fold_predecessor(&mut self, record: &EventRecord) {
-        if let Some(predecessor) = memory::predecessor_of(record.data().as_map()) {
+        let Ok(started) = record.data().read::<kernel::event::record::RunStarted>() else {
+            return;
+        };
+        if let Some(predecessor) = started.predecessor {
             self.predecessors.insert(record.run(), predecessor);
         }
     }
@@ -195,13 +199,23 @@ fn spent_by(billed: &memory::AttributionReport, run: RunId) -> UsdMicros {
     reason = "a few kinds name a commit; the rest of the event vocabulary does not"
 )]
 pub(super) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)> {
-    let key = match record.kind() {
-        EventKind::CheckpointCommitted => "oid",
-        EventKind::PrMerged => "commit",
+    let data = record.data();
+    let (oid, by) = match record.kind() {
+        EventKind::CheckpointCommitted => match data.read::<CheckpointCommitted>().ok()? {
+            // The job pin that opens a dispatch names no commit, which
+            // is the one thing this whole enum exists to say out loud.
+            CheckpointCommitted::JobPinned { .. } => return None,
+            CheckpointCommitted::Committed(commit) => (commit.oid, commit.by),
+        },
+        // `pr_merged` carries the same attribution beside a payload of
+        // its own, which keeps its hand-written keys until that family
+        // is typed.
+        EventKind::PrMerged => (
+            GitOid::parse(data.as_map().get("commit")?.as_str()?)?,
+            data.read::<CommitAttribution>().ok()?,
+        ),
         _ => return None,
     };
-    let map = record.data().as_map();
-    let oid = GitOid::parse(map.get(key)?.as_str()?)?;
     Some((
         oid,
         CommitFacts {
@@ -209,7 +223,10 @@ pub(super) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)
             seq: record.seq(),
             at: record.t(),
             actor: record.addr()?.clone(),
-            chosen: memory::model_choice_of(map),
+            chosen: memory::ModelChoice {
+                id: by.model,
+                effort: by.effort,
+            },
         },
     ))
 }

@@ -438,7 +438,7 @@
  * `<summary>` element of a `<details>` is untouched. The rule sits
  * outside every layer, so it outranks the utility that gave the line
  * its own `display`. */
-:root[data-density="compact"] .summary {
+[data-density="compact"] .summary {
   display: none;
 }
 

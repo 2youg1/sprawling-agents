@@ -213,23 +213,11 @@ pub fn observe_edit_war(samples: &[EditSample]) -> EditWarVerdict {
     EditWarVerdict::Calm
 }
 
-#[cfg(kani)]
-mod verification {
-    //! V5: `admits` is total and reserved targets never pass.
-
-    use super::*;
-
-    // not-proved: takes one concrete address, so it states what reserved_target_is_outside_even_for_an_empty_domain already states (kernel-SPEC.md section 2)
-    #[kani::proof]
-    fn reserved_is_never_within() {
-        let domain = WriteDomain::new(vec![Address::parse("b").unwrap()]).unwrap();
-        let target = Address::parse(".sprawling/ledger").unwrap();
-        assert!(matches!(
-            domain.admits(&target),
-            DomainVerdict::Outside { .. }
-        ));
-    }
-}
+// No kani harness lives here. Every value this module judges is an
+// `Address`, which owns a `String`, so a symbolic harness would hand
+// CBMC loops it cannot bound, and a harness over one fixed address
+// would restate the test below at a higher price (kernel-SPEC.md
+// section 2).
 
 #[cfg(test)]
 #[allow(

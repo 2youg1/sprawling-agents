@@ -177,7 +177,7 @@ fn the_tree_holds_the_harnesses_the_workflow_no_longer_names() {
         .to_path_buf();
     let found = super::harnesses(&root).unwrap();
     assert!(
-        found.len() >= 7,
+        found.len() >= 3,
         "the roster shrank to {}; if that was deliberate, ARCHITECTURE §11 states the new total",
         found.len()
     );

@@ -21,7 +21,7 @@ pub use reach::{Answered, Connected, Named, Proxying, Reach, Through};
 pub mod consts_external;
 pub mod consts_policy;
 
-mod event;
+pub mod event;
 
 pub use event::{EventDraft, EventKind, EventRecord, EventRef, Payload};
 pub use event::{RunId, Seq, TimeMs, WindowClass};

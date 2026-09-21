@@ -382,32 +382,38 @@ Sprawling-City: <hex>
   模型 id 未知时写空串——写一个假的 id 比写空更糟。
 - **`city_of` 只读第一行**：整本账本可以有几十兆，而创世行是第一段文件的第一行。
 
-### 8-18 trailers 的账本一侧（随 8-17）
+### 8-18 trailers 的账本一侧（随 8-17，G-15 后重写）
 
 ```rust
 impl Provenance {
-    /// 一条账本记录要携的两个事实：模型与档位。run 与 actor 已经是记录自己的身份
-    /// （`EventRecord::run` 与 `addr`），在载荷里重复它们等于给同一个事实立第二个权威。
-    pub fn model_fields(&self) -> serde_json::Map<String, serde_json::Value>;
+    /// 这次提交出自谁，按每一条指名提交的记录都携的形状给出。
+    /// run 与 actor 已经是记录自己的身份（`EventRecord::run` 与 `addr`），
+    /// 在载荷里重复它们等于给同一个事实立第二个权威。
+    pub fn attribution(&self) -> kernel::event::record::CommitAttribution;
 }
 
-/// 读回 `model_fields` 写下的东西。键缺失或读不成即空 id 与无档位。
-pub fn model_choice_of(data: &serde_json::Map<String, serde_json::Value>) -> ModelChoice;
+/// 没人点过的档位怎么记：记成 `Effort::None`。
+/// `Option` 划出的那条线（由提供方决定 / 要它别想）从未上过 trailer 或账本，
+/// 两边一向都写 `none`；这个坍缩全仓只在这里发生一次。
+pub fn recorded_effort(effort: Option<kernel::Effort>) -> Effort;
 
-/// 档位怎么拼的唯一权威（取自 `kernel::Effort` 的 serde 名，缺即 `none`）。
-pub fn effort_word(effort: Option<kernel::Effort>) -> String;
+/// 档位怎么拼的唯一权威（取自 `kernel::Effort` 的 serde 名）。
+pub fn effort_word(effort: kernel::Effort) -> String;
 ```
 
-- **`checkpoint_committed` 与 `pr_merged` 的载荷各携两个键 `model` 与 `effort`。**
-  8-17 写着「trailers 是投影，账本是权威」，而
-  这两个事实否则只存在于 git 提交上；带上它们，`sprawling whose` 才能
-  只读账本作答（`bin::views`，sprawling-SPEC §8-41）。
-- **写与读住同一个文件**：`model_fields` 与 `model_choice_of` 相邻而居；档位的拼写仍取自
-  `kernel::Effort` 自己的 serde 名字，与 trailers 同一处，于是「档位怎么拼」全仓仍只有一个权威。
-  `effort_word` 因此是公开的：有三个读者把这个词给人看——trailers、账本载荷、
-  以及 `sprawling whose`，而同一个档位三种拼法会让读的人三份都不敢信。
-- **缺键的记录读得回**：不带这两项的 `checkpoint_committed` 没有这两个键，`model_choice_of`
-  对它答空 id 与 `None`——**投影说不知道，好过投影猜一个**。
+- **键的权威搬进 kernel。** `model` / `effort` / `predecessor` 三个键从此由
+  `kernel::event::record::CommitAttribution` 拼写，`Provenance::model_fields`、
+  `model_choice_of`、`predecessor_of` 与三个 `*_FIELD` 常量一并删除。
+  删除的理由是它们已经开始各说各话：`predecessor` 这个键当时在
+  `provenance.rs` 与 `runtime::run::lifecycle` 各手写一次，而读它的只有
+  `run_started` 那一侧。
+- **`checkpoint_committed` 与 `pr_merged` 携同一份归属。** 8-17 写着「trailers 是投影，
+  账本是权威」，而这两个事实否则只存在于 git 提交上；带上它们，`sprawling whose`
+  才能只读账本作答（`bin::views`，sprawling-SPEC §8-41）。两条记录 flatten 同一个结构，
+  于是「一次提交出自谁」不会在两个 kind 上长成两种说法。
+- **缺键的记录读得回**：不带这两项的 `checkpoint_committed` 没有这两个键，
+  `CommitAttribution` 的 `#[serde(default)]` 对它答空 id 与 `None`——
+  **投影说不知道，好过投影猜一个**。
 - **被否的另一条路：让 `sprawling whose` 去读 git trailers。** 那是把投影当成权威，正是 8-17
   明确拒绝的方向；而且一座导出后在别处恢复、`.git` 并不在身边的城将答不出自己的历史。
 
@@ -751,7 +757,7 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 
 ### 8-17 Provenance 的第六条 trailer
 
-`Provenance` 增私有字段 `predecessor: Option<RunId>`，唯一写入口是消费式的 `succeeding(self, RunId) -> Provenance`（`new` 已到四参数上限，而前任与 run 并不总是同行）。有前任时 `trailers()` 多出第六行 `Sprawling-Predecessor: <run-id>`，`model_fields()` 多出 `predecessor` 键；`predecessor_of(&Map)` 读回它，读不到或读不懂答 `None`——一条缺席的世系比一条编出来的好。五条 trailer 的顺序与拼写一字不动，所以旧提交与旧记录逐字节不变。
+`Provenance` 增私有字段 `predecessor: Option<RunId>`，唯一写入口是消费式的 `succeeding(self, RunId) -> Provenance`（`new` 已到四参数上限，而前任与 run 并不总是同行）。有前任时 `trailers()` 多出第六行 `Sprawling-Predecessor: <run-id>`，`attribution()` 多出 `predecessor` 键（8-18）；`Provenance::predecessor()` 是本地读回它的路，账本一侧由 `CommitAttribution` 读回，缺席即 `None`——一条缺席的世系比一条编出来的好。五条 trailer 的顺序与拼写一字不动，所以旧提交与旧记录逐字节不变。
 
 ### 8-19 memory::hunks：一个文件的补丁文本（形状 4 adapter）
 

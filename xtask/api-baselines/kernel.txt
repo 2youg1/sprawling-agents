@@ -15,6 +15,7 @@ impl core::fmt::Display for kernel::ModelTag
 impl core::fmt::Display for kernel::NodeId
 impl core::fmt::Display for kernel::Range
 impl core::fmt::Display for kernel::RunId
+impl core::fmt::Display for kernel::RunId
 impl core::fmt::Display for kernel::SecretRef
 impl core::fmt::Display for kernel::ServerLabel
 impl core::fmt::Display for kernel::SessionName
@@ -41,7 +42,10 @@ impl kernel::EgressAllowlist
 impl kernel::EnvVarName
 impl kernel::ErrorDraft
 impl kernel::EventKind
+impl kernel::EventKind
 impl kernel::EventRecord
+impl kernel::EventRecord
+impl kernel::EventRef
 impl kernel::EventRef
 impl kernel::Evidence
 impl kernel::GateRefusal
@@ -55,6 +59,7 @@ impl kernel::ModelReturn
 impl kernel::ModelTag
 impl kernel::NodeId
 impl kernel::Payload
+impl kernel::Payload
 impl kernel::PlanExit
 impl kernel::PlanNode
 impl kernel::PlanTree
@@ -67,8 +72,10 @@ impl kernel::Release
 impl kernel::ResidentId
 impl kernel::RoadmapStatus
 impl kernel::RunId
+impl kernel::RunId
 impl kernel::Sealed<alloc::string::String>
 impl kernel::SecretRef
+impl kernel::Seq
 impl kernel::Seq
 impl kernel::ServerLabel
 impl kernel::SessionName
@@ -76,6 +83,7 @@ impl kernel::Share
 impl kernel::StopCause
 impl kernel::TaintSet
 impl kernel::TaintSource
+impl kernel::TimeMs
 impl kernel::TimeMs
 impl kernel::Tokens
 impl kernel::ToolCall
@@ -99,6 +107,7 @@ impl<'de> serde_core::de::Deserialize<'de> for kernel::IdemKey
 impl<'de> serde_core::de::Deserialize<'de> for kernel::Locator
 impl<'de> serde_core::de::Deserialize<'de> for kernel::NodeId
 impl<'de> serde_core::de::Deserialize<'de> for kernel::Payload
+impl<'de> serde_core::de::Deserialize<'de> for kernel::Payload
 impl<'de> serde_core::de::Deserialize<'de> for kernel::SecretRef
 impl<'de> serde_core::de::Deserialize<'de> for kernel::SessionName
 impl<'de> serde_core::de::Deserialize<'de> for kernel::ToolName
@@ -117,6 +126,7 @@ pub const fn kernel::UsdMicros::get(self) -> u64
 pub const fn kernel::UsdMicros::new(u64) -> kernel::UsdMicros
 pub const kernel::AxCode::ALL: [kernel::AxCode; 36]
 pub const kernel::EventKind::ALL: [kernel::EventKind; 67]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 67]
 pub const kernel::GENESIS_PREV: kernel::B3Hash
 pub const kernel::IDEM_DERIVE_V: u8
 pub const kernel::MEMO_OUTLINE_FIELDS: [&str; 6]
@@ -128,6 +138,8 @@ pub const kernel::ROADMAP_COLUMNS: usize
 pub const kernel::ROADMAP_FILE: &str
 pub const kernel::ROADMAP_STATUS_SPELLINGS: [(kernel::RoadmapStatus, &str); 5]
 pub const kernel::RunId::CITY: kernel::RunId
+pub const kernel::RunId::CITY: kernel::RunId
+pub const kernel::Seq::FIRST: kernel::Seq
 pub const kernel::Seq::FIRST: kernel::Seq
 pub const kernel::Share::NONE: kernel::Share
 pub const kernel::Share::WHOLE: kernel::Share
@@ -252,6 +264,9 @@ pub enum kernel::WindowClass
 pub enum kernel::WriteDomain
 pub enum kernel::WriteMoment
 pub enum kernel::consts_external::SecretCharset
+pub enum kernel::event::EventKind
+pub enum kernel::event::WindowClass
+pub enum kernel::event::record::CheckpointCommitted
 pub fn alloc::string::String::from(kernel::EnvVarName) -> alloc::string::String
 pub fn alloc::string::String::from(kernel::ServerLabel) -> alloc::string::String
 pub fn kernel::ActionFingerprint::derive(&[u8]) -> kernel::ActionFingerprint
@@ -319,21 +334,38 @@ pub fn kernel::ErrorDraft::retriable(self) -> Self
 pub fn kernel::ErrorDraft::with_nearby(self, alloc::vec::Vec<alloc::string::String>) -> Self
 pub fn kernel::ErrorDraft::with_recovery(self, impl core::convert::Into<alloc::string::String>) -> kernel::AxError
 pub fn kernel::EventKind::window_class(&self) -> kernel::WindowClass
+pub fn kernel::EventKind::window_class(&self) -> kernel::WindowClass
+pub fn kernel::EventRecord::addr(&self) -> core::option::Option<&kernel::Address>
 pub fn kernel::EventRecord::addr(&self) -> core::option::Option<&kernel::Address>
 pub fn kernel::EventRecord::canonical_line(&self) -> core::result::Result<alloc::vec::Vec<u8>, kernel::AxError>
+pub fn kernel::EventRecord::canonical_line(&self) -> core::result::Result<alloc::vec::Vec<u8>, kernel::AxError>
+pub fn kernel::EventRecord::data(&self) -> &kernel::Payload
 pub fn kernel::EventRecord::data(&self) -> &kernel::Payload
 pub fn kernel::EventRecord::from_draft(kernel::EventDraft, kernel::Seq, kernel::B3Hash) -> Self
+pub fn kernel::EventRecord::from_draft(kernel::EventDraft, kernel::Seq, kernel::B3Hash) -> Self
+pub fn kernel::EventRecord::ig(&self) -> bool
 pub fn kernel::EventRecord::ig(&self) -> bool
 pub fn kernel::EventRecord::kind(&self) -> kernel::EventKind
+pub fn kernel::EventRecord::kind(&self) -> kernel::EventKind
+pub fn kernel::EventRecord::parse_line(&[u8]) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::EventRecord::parse_line(&[u8]) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::EventRecord::prev(&self) -> kernel::B3Hash
+pub fn kernel::EventRecord::prev(&self) -> kernel::B3Hash
+pub fn kernel::EventRecord::run(&self) -> kernel::RunId
 pub fn kernel::EventRecord::run(&self) -> kernel::RunId
 pub fn kernel::EventRecord::seq(&self) -> kernel::Seq
+pub fn kernel::EventRecord::seq(&self) -> kernel::Seq
+pub fn kernel::EventRecord::t(&self) -> kernel::TimeMs
 pub fn kernel::EventRecord::t(&self) -> kernel::TimeMs
 pub fn kernel::EventRecord::to_ref(&self) -> kernel::EventRef
+pub fn kernel::EventRecord::to_ref(&self) -> kernel::EventRef
+pub fn kernel::EventRecord::v(&self) -> u32
 pub fn kernel::EventRecord::v(&self) -> u32
 pub fn kernel::EventRecord::who(&self) -> &str
+pub fn kernel::EventRecord::who(&self) -> &str
 pub fn kernel::EventRef::kind(&self) -> kernel::EventKind
+pub fn kernel::EventRef::kind(&self) -> kernel::EventKind
+pub fn kernel::EventRef::seq(&self) -> kernel::Seq
 pub fn kernel::EventRef::seq(&self) -> kernel::Seq
 pub fn kernel::Evidence::new(alloc::vec::Vec<kernel::EventRef>) -> core::result::Result<kernel::Evidence, kernel::AxError>
 pub fn kernel::Evidence::refs(&self) -> &[kernel::EventRef]
@@ -381,9 +413,17 @@ pub fn kernel::NodeId::ordinal(&self) -> u32
 pub fn kernel::NodeId::parent(&self) -> core::option::Option<kernel::NodeId>
 pub fn kernel::NodeId::parse(&str) -> core::result::Result<kernel::NodeId, kernel::AxError>
 pub fn kernel::Payload::as_map(&self) -> &serde_json::map::Map<alloc::string::String, serde_json::value::Value>
+pub fn kernel::Payload::as_map(&self) -> &serde_json::map::Map<alloc::string::String, serde_json::value::Value>
+pub fn kernel::Payload::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn kernel::Payload::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn kernel::Payload::empty() -> Self
+pub fn kernel::Payload::empty() -> Self
 pub fn kernel::Payload::new(serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> core::result::Result<Self, kernel::AxError>
+pub fn kernel::Payload::new(serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> core::result::Result<Self, kernel::AxError>
+pub fn kernel::Payload::of(&impl serde_core::ser::Serialize) -> core::result::Result<Self, kernel::AxError>
+pub fn kernel::Payload::of(&impl serde_core::ser::Serialize) -> core::result::Result<Self, kernel::AxError>
+pub fn kernel::Payload::read<T: serde_core::de::DeserializeOwned>(&self) -> core::result::Result<T, kernel::AxError>
+pub fn kernel::Payload::read<T: serde_core::de::DeserializeOwned>(&self) -> core::result::Result<T, kernel::AxError>
 pub fn kernel::PlanExit::evidence(&self) -> core::option::Option<&kernel::Locator>
 pub fn kernel::PlanExit::id(&self) -> &kernel::NodeId
 pub fn kernel::PlanExit::status(&self) -> kernel::RoadmapStatus
@@ -426,8 +466,12 @@ pub fn kernel::ResidentId::as_str(&self) -> &str
 pub fn kernel::ResidentId::new(impl core::convert::Into<alloc::string::String>) -> core::option::Option<kernel::ResidentId>
 pub fn kernel::RoadmapStatus::spelling(self) -> &'static str
 pub fn kernel::RunId::as_bytes(&self) -> &[u8; 16]
+pub fn kernel::RunId::as_bytes(&self) -> &[u8; 16]
+pub fn kernel::RunId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::RunId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::RunId::from_bytes([u8; 16]) -> Self
+pub fn kernel::RunId::from_bytes([u8; 16]) -> Self
+pub fn kernel::RunId::parse(&str) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::RunId::parse(&str) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::SandboxLimits::default() -> Self
 pub fn kernel::Sealed<T>::expose(&self) -> &T
@@ -440,7 +484,10 @@ pub fn kernel::SecretRef::parse(&str) -> core::result::Result<kernel::SecretRef,
 pub fn kernel::SecretRef::realm(&self) -> &str
 pub fn kernel::SecretRef::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
 pub fn kernel::Seq::new(u64) -> Self
+pub fn kernel::Seq::new(u64) -> Self
 pub fn kernel::Seq::next(self) -> core::result::Result<kernel::Seq, kernel::AxError>
+pub fn kernel::Seq::next(self) -> core::result::Result<kernel::Seq, kernel::AxError>
+pub fn kernel::Seq::value(&self) -> u64
 pub fn kernel::Seq::value(&self) -> u64
 pub fn kernel::ServerLabel::as_str(&self) -> &str
 pub fn kernel::ServerLabel::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -470,6 +517,8 @@ pub fn kernel::Tainted<T>::new(T, kernel::TaintSource) -> kernel::Tainted<T>
 pub fn kernel::Tainted<T>::peek(&self) -> &T
 pub fn kernel::Tainted<T>::taint(&self) -> &kernel::TaintSet
 pub fn kernel::TimeMs::new(u64) -> Self
+pub fn kernel::TimeMs::new(u64) -> Self
+pub fn kernel::TimeMs::value(&self) -> u64
 pub fn kernel::TimeMs::value(&self) -> u64
 pub fn kernel::Tokens::checked_add(self, kernel::Tokens) -> core::option::Option<kernel::Tokens>
 pub fn kernel::Tool::invoke(&mut self, &kernel::ToolCall) -> core::result::Result<kernel::ToolOutcome, kernel::AxError>
@@ -1099,9 +1148,107 @@ pub kernel::consts_external::SecretShape::prefix: &'static str
 pub kernel::consts_external::SecretShape::provider: &'static str
 pub kernel::consts_policy::Ratio::den: u32
 pub kernel::consts_policy::Ratio::num: u32
+pub kernel::event::EventDraft::addr: core::option::Option<kernel::Address>
+pub kernel::event::EventDraft::data: kernel::Payload
+pub kernel::event::EventDraft::ig: bool
+pub kernel::event::EventDraft::kind: kernel::EventKind
+pub kernel::event::EventDraft::run: kernel::RunId
+pub kernel::event::EventDraft::t: kernel::TimeMs
+pub kernel::event::EventDraft::who: alloc::string::String
+pub kernel::event::EventKind::ApprovalRequested
+pub kernel::event::EventKind::ApprovalResolved
+pub kernel::event::EventKind::ArbitrationVerdict
+pub kernel::event::EventKind::AssetArchived
+pub kernel::event::EventKind::AutonomyChanged
+pub kernel::event::EventKind::BackpressureShed
+pub kernel::event::EventKind::BudgetLimit
+pub kernel::event::EventKind::BuildingConfigured
+pub kernel::event::EventKind::BuildingCreated
+pub kernel::event::EventKind::CancelReceived
+pub kernel::event::EventKind::CheckpointCommitted
+pub kernel::event::EventKind::CityHalted
+pub kernel::event::EventKind::CityInitialized
+pub kernel::event::EventKind::CredentialLent
+pub kernel::event::EventKind::CrossBuildingTransfer
+pub kernel::event::EventKind::DigestInvalidated
+pub kernel::event::EventKind::DiscardRestored
+pub kernel::event::EventKind::DraftHeld
+pub kernel::event::EventKind::DraftResolved
+pub kernel::event::EventKind::EndpointAttached
+pub kernel::event::EventKind::EndpointLost
+pub kernel::event::EventKind::EndpointProbed
+pub kernel::event::EventKind::EvalRun
+pub kernel::event::EventKind::FileDiscarded
+pub kernel::event::EventKind::GateChecked
+pub kernel::event::EventKind::GateDenied
+pub kernel::event::EventKind::GoalConflict
+pub kernel::event::EventKind::GoalRegistered
+pub kernel::event::EventKind::GovernedDocumentWritten
+pub kernel::event::EventKind::HandoffWritten
+pub kernel::event::EventKind::LogTruncated
+pub kernel::event::EventKind::LoginStarted
+pub kernel::event::EventKind::ModelCalled
+pub kernel::event::EventKind::ModelReturned
+pub kernel::event::EventKind::ModelSelected
+pub kernel::event::EventKind::PolicyCreated
+pub kernel::event::EventKind::PolicyRevoked
+pub kernel::event::EventKind::PrMerged
+pub kernel::event::EventKind::PrOpened
+pub kernel::event::EventKind::PrRejected
+pub kernel::event::EventKind::PromptAssembled
+pub kernel::event::EventKind::ProviderDegraded
+pub kernel::event::EventKind::PursuitChanged
+pub kernel::event::EventKind::RepairReused
+pub kernel::event::EventKind::RepairStarted
+pub kernel::event::EventKind::ResultOffloaded
+pub kernel::event::EventKind::RoadmapBlocked
+pub kernel::event::EventKind::RoadmapClaimed
+pub kernel::event::EventKind::RoadmapFinished
+pub kernel::event::EventKind::RoadmapReleased
+pub kernel::event::EventKind::RoadmapSplit
+pub kernel::event::EventKind::RollbackApplied
+pub kernel::event::EventKind::RunForked
+pub kernel::event::EventKind::RunFrozen
+pub kernel::event::EventKind::RunStarted
+pub kernel::event::EventKind::SecretCaptured
+pub kernel::event::EventKind::SecretEgressBlocked
+pub kernel::event::EventKind::SignalConsumed
+pub kernel::event::EventKind::SignalEnqueued
+pub kernel::event::EventKind::SteerReceived
+pub kernel::event::EventKind::TaintPromoted
+pub kernel::event::EventKind::TakeoverStarted
+pub kernel::event::EventKind::ToolCalled
+pub kernel::event::EventKind::ToolResult
+pub kernel::event::EventKind::ToolkitLinkOpened
+pub kernel::event::EventKind::WatchdogFired
+pub kernel::event::EventKind::WorktreeOpened
+pub kernel::event::WindowClass::InWindow
+pub kernel::event::WindowClass::RecordOnly
+pub kernel::event::record::CheckpointCommitted::Committed(kernel::event::record::Commit)
+pub kernel::event::record::CheckpointCommitted::JobPinned
+pub kernel::event::record::CheckpointCommitted::JobPinned::job: kernel::Locator
+pub kernel::event::record::Commit::by: kernel::event::record::CommitAttribution
+pub kernel::event::record::Commit::files: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::Commit::oid: kernel::GitOid
+pub kernel::event::record::Commit::scope: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::CommitAttribution::effort: core::option::Option<kernel::Effort>
+pub kernel::event::record::CommitAttribution::model: alloc::string::String
+pub kernel::event::record::CommitAttribution::predecessor: core::option::Option<kernel::RunId>
+pub kernel::event::record::RunForked::at_seq: kernel::Seq
+pub kernel::event::record::RunForked::from: kernel::RunId
+pub kernel::event::record::RunStarted::goal: alloc::string::String
+pub kernel::event::record::RunStarted::job: core::option::Option<kernel::Locator>
+pub kernel::event::record::RunStarted::parent: core::option::Option<kernel::RunId>
+pub kernel::event::record::RunStarted::predecessor: core::option::Option<kernel::RunId>
+pub kernel::event::record::RunStarted::skills: alloc::vec::Vec<kernel::event::record::SkillPin>
+pub kernel::event::record::RunStarted::task: alloc::string::String
+pub kernel::event::record::SkillPin::hash: kernel::B3Hash
+pub kernel::event::record::SkillPin::name: alloc::string::String
 pub mod kernel
 pub mod kernel::consts_external
 pub mod kernel::consts_policy
+pub mod kernel::event
+pub mod kernel::event::record
 pub mod kernel::layout
 pub struct kernel::ActionFingerprint(_)
 pub struct kernel::Address(_)
@@ -1195,6 +1342,18 @@ pub struct kernel::UsdMicros(_)
 pub struct kernel::Version(_)
 pub struct kernel::consts_external::SecretShape
 pub struct kernel::consts_policy::Ratio
+pub struct kernel::event::EventDraft
+pub struct kernel::event::EventRecord
+pub struct kernel::event::EventRef
+pub struct kernel::event::Payload(_)
+pub struct kernel::event::RunId(_)
+pub struct kernel::event::Seq(_)
+pub struct kernel::event::TimeMs(_)
+pub struct kernel::event::record::Commit
+pub struct kernel::event::record::CommitAttribution
+pub struct kernel::event::record::RunForked
+pub struct kernel::event::record::RunStarted
+pub struct kernel::event::record::SkillPin
 pub struct kernel::layout::CityLayout
 pub trait kernel::Ledger
 pub trait kernel::Model

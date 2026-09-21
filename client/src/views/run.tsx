@@ -14,7 +14,7 @@ import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 import { Option } from "effect";
 
 import { Address } from "../core/address";
-import { sendingInto } from "../core/belief";
+import { adopted, sendingInto } from "../core/belief";
 import { cancel, steer } from "../core/commands";
 import { buildingOf, roomOf, toFragment } from "../core/route";
 import { count, usd } from "../core/time";
@@ -180,12 +180,16 @@ export function Run(props: RunProps) {
   // Two readings of one run, and the later one wins. The stream says
   // what is happening now, the summary says what the city has written
   // down, and both state a ledger position - so which is newer is a
-  // comparison rather than a preference.
-  const streamed = createMemo(() => {
-    const held = belief();
+  // comparison rather than a preference, and `core/belief` owns that
+  // comparison because the city page folds the same two readings.
+  //
+  // It is also what this page stands on when the stream has nothing:
+  // a run reached by somebody's link was never streamed here, and a
+  // run the city has stopped listing is dropped from the page's own
+  // table - in both cases the summary is the whole reading.
+  const shown = createMemo(() => {
     const said = summary();
-    if (held === undefined) return false;
-    return said === null || held.lastSeq >= said.last_seq;
+    return said === null ? belief() : adopted(said, belief());
   });
   const answer = createMemo<RoundsAnswer | undefined>(() => {
     const held = rounds()();
@@ -200,10 +204,10 @@ export function Run(props: RunProps) {
     }
     return null;
   });
-  const over = () => (streamed() ? belief()?.doing.kind === "frozen" : summary()?.frozen === true);
-  const known = () => belief() !== undefined || summary() !== null;
+  const over = () => shown()?.doing.kind === "frozen";
+  const known = () => shown() !== undefined;
   const live = () => known() && !over();
-  const room = () => belief()?.addr ?? summary()?.addr ?? null;
+  const room = () => shown()?.addr ?? null;
   const roomWord = () => {
     const at = room();
     return at === null ? say("talk_resident") : roomOf(at);
@@ -230,7 +234,7 @@ export function Run(props: RunProps) {
             summary's `who` is not offered here: it is the resident, and
             a resident's name standing where the task stands reads as a
             task somebody set. */}
-        <h1 class="truncate text-heading font-heading">{answer()?.opening?.task ?? belief()?.task ?? props.run}</h1>
+        <h1 class="truncate text-heading font-heading">{answer()?.opening?.task ?? shown()?.task ?? props.run}</h1>
         <span class="flex-1" />
         <Show when={live()}>
           <button
@@ -263,14 +267,14 @@ export function Run(props: RunProps) {
         <Switch>
           <Match when={lens() === "turns"}>
             <div class="mx-auto max-w-talk">
-              <Show when={belief()} fallback={<p class="text-text-disabled">…</p>}>
+              <Show when={shown()} fallback={<p class="text-text-disabled">…</p>}>
                 {(run) => <Thread run={run()} who={roomWord()} />}
               </Show>
               <Show when={live()}>
                 <div class="mt-wide">
                   <Composer
                     placeholder={say("talk_placeholder_room", { room: roomWord() })}
-                    sending={sendingInto(belief()?.doing)}
+                    sending={sendingInto(shown()?.doing)}
                     draft={props.run}
                     hearing={hearing()}
                     onSend={(text) => command(steer(props.run, text))}

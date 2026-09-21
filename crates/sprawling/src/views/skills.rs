@@ -62,28 +62,17 @@ impl Views {
     /// Files which skills one `run_started` says that run was frozen
     /// with.
     ///
-    /// A pin naming no hash is skipped rather than filed under a guess:
-    /// what a page answers with this is "which runs read these exact
-    /// bytes", and a pin with no hash cannot answer it.
+    /// What a page answers with this is "which runs read these exact
+    /// bytes", so a hash is required of every pin: a record holding a
+    /// pin with no hash is left out whole rather than filed under a
+    /// guess, and `kernel::event::record::SkillPin` is where that
+    /// requirement is stated.
     pub(super) fn fold_skill_pins(&mut self, record: &EventRecord) {
-        let Some(pins) = record
-            .data()
-            .as_map()
-            .get("skills")
-            .and_then(serde_json::Value::as_array)
-        else {
+        let Ok(started) = record.data().read::<kernel::event::record::RunStarted>() else {
             return;
         };
-        for pin in pins {
-            let (Some(name), Some(hash)) = (
-                pin.get("name").and_then(serde_json::Value::as_str),
-                pin.get("hash")
-                    .cloned()
-                    .and_then(|raw| serde_json::from_value::<B3Hash>(raw).ok()),
-            ) else {
-                continue;
-            };
-            let runs = self.skill_pins.entry((name.to_owned(), hash)).or_default();
+        for pin in started.skills {
+            let runs = self.skill_pins.entry((pin.name, pin.hash)).or_default();
             if !runs.contains(&record.run()) {
                 runs.push(record.run());
             }

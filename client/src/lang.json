@@ -123,6 +123,14 @@
     "en": "only letters, digits, spaces, commas and quotes belong in a stack",
     "zh": "字体栈里只能有字母、数字、空格、逗号和引号"
   },
+  "ask_late": {
+    "en": "the page keeps asking; if no answer ever comes back, reconnect from the dot at the top of the rail",
+    "zh": "页面会继续追问；若始终等不到回答，就从左栏顶部那个点重连一次"
+  },
+  "ask_unfiled": {
+    "en": "reload the page to fetch the client this city was built with; report it if a reload does not settle it",
+    "zh": "刷新页面，取回这座城配套的客户端；若刷新后依旧如此，请把它报上来"
+  },
   "autonomy_clerk": {
     "en": "the clerk",
     "zh": "clerk 代答"
@@ -515,6 +523,10 @@
     "en": "first {kib} of {total}",
     "zh": "前 {kib}，共 {total}"
   },
+  "gallery_tip_tall": {
+    "en": "This hint is deliberately long. It opens above the control, and where the window has no room above it the engine drops it below instead; a short hint halfway down a page never asks for that, so the fallback goes unseen. Read where this box lands: above the button means there was room, below it means the flip happened, and a box hanging off the top of the window means neither branch took.",
+    "zh": "这条提示故意写得很长。它开在控件上方；窗口上方腾不出位置时，引擎改把它放到下方。页面中段的一条短提示从不提出这个要求，那条回退分支也就无人看见。看这个框落在哪里：在按钮上方说明位置够用，在下方说明翻转发生了，而挂在窗口上缘之外说明两条分支都没有生效。"
+  },
   "gallery_title": {
     "en": "gallery",
     "zh": "画廊"
@@ -582,6 +594,10 @@
   "keys_rail": {
     "en": "the rail",
     "zh": "左栏"
+  },
+  "keys_reserved": {
+    "en": "the browser takes this key before the page sees it",
+    "zh": "此键被浏览器截走，页面收不到"
   },
   "keys_reset": {
     "en": "default",

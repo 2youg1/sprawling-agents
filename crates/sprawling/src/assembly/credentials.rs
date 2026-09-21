@@ -34,6 +34,42 @@ pub(super) struct Entered {
     pub(super) tuning: gateway::EndpointTuning,
 }
 
+impl Entered {
+    /// What a person pasted, resolved into the base URL this city calls
+    /// and the shape it answers in.
+    ///
+    /// The one place a typed address becomes a called one. Probing and
+    /// attaching both arrive here, so the two cannot reach different
+    /// hosts from the same text \u2014 which is what B-02 was: the form
+    /// probed one URL and the book recorded another, and the second one
+    /// 404ed. A URL whose path already names a face decides the shape,
+    /// because a pasted URL is evidence and a toggle left on its default
+    /// is not.
+    ///
+    /// # Errors
+    /// When the text carries a scheme this city cannot call, or no host
+    /// to call at all.
+    pub(super) fn resolved(mut self) -> Result<Entered, kernel::AxError> {
+        let hint = match self.dialect {
+            kernel::DialectKind::Anthropic => gateway::DialectHint::Messages,
+            kernel::DialectKind::OpenAi => gateway::DialectHint::Chat,
+        };
+        let settled = gateway::normalise_entered(&self.base_url, hint)?;
+        self.dialect = match settled.dialect {
+            gateway::DialectHint::Messages => kernel::DialectKind::Anthropic,
+            // `Responses` has no registration of its own until the wire
+            // carries one (roadmap 4.5). Until then it is called the way
+            // every other OpenAI-shaped endpoint is, which is what the
+            // person chose when they picked that group.
+            gateway::DialectHint::Chat
+            | gateway::DialectHint::Responses
+            | gateway::DialectHint::Unset => kernel::DialectKind::OpenAi,
+        };
+        self.base_url = settled.base_url;
+        Ok(self)
+    }
+}
+
 /// The frame's tuning as the book keeps it.
 ///
 /// Two readings happen here and nowhere else. **A zero is absence**: a

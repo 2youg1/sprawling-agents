@@ -6,11 +6,12 @@
 //! What an active run does on the ledger: the dispatch pair that brings
 //! it into existence, one turn, and the freeze that is its only exit.
 
+use kernel::event::record::{CheckpointCommitted, RunStarted};
 use kernel::{
-    AxCode, AxError, Completion, EventDraft, EventKind, Evidence, Ledger, Model, RunId, StopReason,
-    TimeMs, ToolCall,
+    AxCode, AxError, Completion, EventDraft, EventKind, Evidence, Ledger, Model, Payload, RunId,
+    StopReason, TimeMs, ToolCall,
 };
-use serde_json::{Map, Value};
+use serde_json::Map;
 
 use crate::handoff::Handoff;
 use crate::reminder::ContextGauge;
@@ -65,57 +66,35 @@ impl Run<Active> {
         hooks: &mut RunHooks<'_>,
     ) -> Result<Run<Active>, AxError> {
         let pin_t = (hooks.now)()?;
-        let mut pin = Map::new();
-        pin.insert("job".to_owned(), Value::String(plan.job.to_string()));
+        let pin = CheckpointCommitted::JobPinned {
+            job: plan.job.clone(),
+        };
         ledger.append(EventDraft {
             run: RunId::CITY,
             t: pin_t,
             who: "city".to_owned(),
             addr: Some(plan.addr.clone()),
             kind: EventKind::CheckpointCommitted,
-            data: payload(pin)?,
+            data: Payload::of(&pin)?,
             ig: false,
         })?;
 
         let start_t = (hooks.now)()?;
-        let mut started = Map::new();
-        started.insert("task".to_owned(), Value::String(plan.task.clone()));
-        started.insert("goal".to_owned(), Value::String(plan.goal.clone()));
-        started.insert("job".to_owned(), Value::String(plan.job.to_string()));
-        if let Some(parent) = plan.parent {
-            started.insert("parent".to_owned(), Value::String(parent.to_string()));
-        }
-        if let Some(predecessor) = plan.predecessor {
-            started.insert(
-                "predecessor".to_owned(),
-                Value::String(predecessor.to_string()),
-            );
-        }
-        // Unconditional rather than omitted when empty: a key that comes
-        // and goes is a shape a reader has to guess at, and "this
-        // building admits nothing" is a fact worth recording rather than
-        // an absence to infer.
-        started.insert(
-            "skills".to_owned(),
-            Value::Array(
-                plan.skills
-                    .iter()
-                    .map(|pin| {
-                        let mut row = Map::new();
-                        row.insert("name".to_owned(), Value::String(pin.name.clone()));
-                        row.insert("hash".to_owned(), Value::String(pin.hash.to_string()));
-                        Value::Object(row)
-                    })
-                    .collect(),
-            ),
-        );
+        let started = RunStarted {
+            task: plan.task.clone(),
+            goal: plan.goal.clone(),
+            job: Some(plan.job.clone()),
+            parent: plan.parent,
+            predecessor: plan.predecessor,
+            skills: plan.skills.clone(),
+        };
         ledger.append(EventDraft {
             run: plan.run,
             t: start_t,
             who: "city".to_owned(),
             addr: Some(plan.addr.clone()),
             kind: EventKind::RunStarted,
-            data: payload(started)?,
+            data: Payload::of(&started)?,
             ig: false,
         })?;
 

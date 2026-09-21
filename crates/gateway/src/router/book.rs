@@ -178,7 +178,7 @@ impl EndpointBook {
     reason = "test code"
 )]
 mod tests {
-    use super::super::payload::{attached_payload, selected_payload};
+    use super::super::payload::{Settled, attached_payload, selected_payload};
     use super::super::tuning::EndpointTuning;
     use super::*;
     use crate::endpoint::AuthSpec;
@@ -242,7 +242,16 @@ mod tests {
         .unwrap();
         book.apply(&record(
             EventKind::ModelSelected,
-            selected_payload(ModelTag::Main, "house", &entry("m-large"), fallback).unwrap(),
+            selected_payload(
+                ModelTag::Main,
+                "house",
+                &entry("m-large"),
+                &Settled {
+                    fallback,
+                    from: None,
+                },
+            )
+            .unwrap(),
         ))
         .unwrap();
         book

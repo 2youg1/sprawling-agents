@@ -98,10 +98,16 @@ fn opening(records: &[EventRecord]) -> Option<channels::Opening> {
         .iter()
         .find(|record| record.kind() == EventKind::RunStarted)
         .map(|record| {
-            let map = record.data().as_map();
+            // A `run_started` this build cannot read still opened a
+            // session; the page shows it with no words rather than
+            // dropping the session from the account.
+            let started = record
+                .data()
+                .read::<kernel::event::record::RunStarted>()
+                .unwrap_or_default();
             channels::Opening {
-                task: channels::text(map.get("task")).unwrap_or_default(),
-                goal: channels::text(map.get("goal")).unwrap_or_default(),
+                task: started.task,
+                goal: started.goal,
                 at: record.t(),
             }
         })

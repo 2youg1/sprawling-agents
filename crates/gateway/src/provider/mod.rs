@@ -12,10 +12,23 @@
 //! ladder from the person's own figure down to the city's policy
 //! default (`ceiling`).
 //!
+//! *How one attached endpoint is connected* — resolved once at attach
+//! and recorded, so that no call path derives it again (`registry`),
+//! together with the faces beyond a conversation that connection
+//! serves (`modality`).
+//!
 //! The table is a data plane: every row carries the vendor page or the
 //! measurement it came from, and a fact no row states is left unstated
 //! rather than invented. A figure this city made up would outrank the
 //! one that bills.
 
 pub mod ceiling;
+// Both are re-exported by the crate root, so the attach path in
+// `bin::assembly` reaches them by name the day `WIRE_V` carries
+// `connection_kind` (roadmap 4.5).
+pub mod modality;
 pub mod preset;
+pub mod registry;
+/// The guard on the system prefix this city sends (roadmap 17.2).
+#[cfg(test)]
+mod stability;

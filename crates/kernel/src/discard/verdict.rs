@@ -184,51 +184,9 @@ mod tests {
     }
 }
 
-#[cfg(kani)]
-mod verification {
-    //! V5: the fifth door fails closed — no plan never allows, taint
-    //! never allows.
-
-    use super::super::request::{Discard, DiscardRequest, Restoration};
-    use super::*;
-    use crate::address::Address;
-    use crate::budget::ByteLen;
-    use crate::taint::{TaintSet, TaintSource};
-
-    // not-proved: builds a Vec and a Registry whose loops CBMC cannot bound; the proposition is held by the #[test] beside it (kernel-SPEC.md section 2)
-    #[kani::proof]
-    fn unplanned_never_allows() {
-        let registry = Registry::new();
-        let req = DiscardRequest::Unplanned {
-            paths: vec![Address::parse("b/x").unwrap()],
-            taint: TaintSet::empty(),
-            total_bytes: ByteLen::new(kani::any()),
-        };
-        assert!(matches!(
-            decide(&req, &registry),
-            DiscardVerdict::Deny { .. }
-        ));
-    }
-
-    // not-proved: builds a BTreeSet whose loops CBMC cannot bound; two runs, six hours and forty-five minutes under a bounded unwind, returned nothing (kernel-SPEC.md section 2)
-    #[kani::proof]
-    fn tainted_never_allows() {
-        let registry = Registry::new();
-        let source = TaintSource::new("web:x").unwrap();
-        let discard = Discard::new(
-            vec![Address::parse("b/x").unwrap()],
-            Restoration::Rebuildable {
-                reason: "cargo target".to_owned(),
-            },
-            TaintSet::of(source),
-            ByteLen::new(kani::any()),
-        )
-        .unwrap();
-        assert!(matches!(
-            decide(&DiscardRequest::Planned(discard), &registry),
-            DiscardVerdict::Escalate {
-                reason: EscalateReason::Tainted
-            }
-        ));
-    }
-}
+// No kani harness lives here. Deciding a discard takes a `Vec` of
+// addresses, a `BTreeSet` of taint sources and a `Registry`, and CBMC
+// cannot bound those loops: one run burned six hours and a second ran
+// forty-five minutes under `--default-unwind 32`, both on
+// `tainted_never_allows`, and neither returned. The fail-closed
+// propositions are held by the tests above (kernel-SPEC.md section 2).

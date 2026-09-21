@@ -315,8 +315,8 @@ pub fn runtime::catalog::Catalog::render(&self) -> alloc::string::String
 pub fn runtime::catalog::Catalog::render(&self) -> alloc::string::String
 pub fn runtime::catalog::Catalog::set_mode(&mut self, runtime::mode::Mode)
 pub fn runtime::catalog::Catalog::set_mode(&mut self, runtime::mode::Mode)
-pub fn runtime::catalog::Catalog::skill_pins(&self) -> alloc::vec::Vec<runtime::catalog::SkillPin>
-pub fn runtime::catalog::Catalog::skill_pins(&self) -> alloc::vec::Vec<runtime::catalog::SkillPin>
+pub fn runtime::catalog::Catalog::skill_pins(&self) -> alloc::vec::Vec<kernel::event::record::run::SkillPin>
+pub fn runtime::catalog::Catalog::skill_pins(&self) -> alloc::vec::Vec<kernel::event::record::run::SkillPin>
 pub fn runtime::catalog::Catalog::tool_defs(&self) -> alloc::vec::Vec<kernel::model::wire::ToolDef>
 pub fn runtime::catalog::Catalog::tool_defs(&self) -> alloc::vec::Vec<kernel::model::wire::ToolDef>
 pub fn runtime::clock::ClockStamp::render(&self) -> alloc::string::String
@@ -672,7 +672,7 @@ pub runtime::RunPlan::prefix: runtime::prefix::FrozenPrefix
 pub runtime::RunPlan::retries: runtime::Retries
 pub runtime::RunPlan::run: kernel::event::identity::RunId
 pub runtime::RunPlan::shape: runtime::turn::CallShape
-pub runtime::RunPlan::skills: alloc::vec::Vec<runtime::catalog::SkillPin>
+pub runtime::RunPlan::skills: alloc::vec::Vec<kernel::event::record::run::SkillPin>
 pub runtime::RunPlan::task: alloc::string::String
 pub runtime::RunPlan::tools: alloc::vec::Vec<kernel::model::wire::ToolDef>
 pub runtime::RunPlan::who: alloc::string::String
@@ -730,8 +730,6 @@ pub runtime::Sieved::Cut(runtime::sieve::record::SieveRecord)
 pub runtime::Sieved::Passed
 pub runtime::Sieved::Passed::reason: runtime::sieve::record::PassReason
 pub runtime::Sieved::Passed::text: alloc::string::String
-pub runtime::SkillPin::hash: kernel::locator::B3Hash
-pub runtime::SkillPin::name: alloc::string::String
 pub runtime::SourceDoc::addr: kernel::address::Address
 pub runtime::SourceDoc::bytes: core::option::Option<alloc::vec::Vec<u8>>
 pub runtime::Standing::id: runtime::backlog::BacklogId
@@ -813,8 +811,6 @@ pub runtime::catalog::Expansion::Said
 pub runtime::catalog::Expansion::Said::text: alloc::string::String
 pub runtime::catalog::Expansion::Skill
 pub runtime::catalog::Expansion::Skill::addr: alloc::string::String
-pub runtime::catalog::SkillPin::hash: kernel::locator::B3Hash
-pub runtime::catalog::SkillPin::name: alloc::string::String
 pub runtime::clock::ClockStamp::utc_ms: kernel::event::identity::TimeMs
 pub runtime::clock::ClockStamp::zones: alloc::vec::Vec<runtime::clock::ZoneEntry>
 pub runtime::clock::ZoneEntry::id: alloc::string::String
@@ -939,7 +935,7 @@ pub runtime::run::RunPlan::prefix: runtime::prefix::FrozenPrefix
 pub runtime::run::RunPlan::retries: runtime::Retries
 pub runtime::run::RunPlan::run: kernel::event::identity::RunId
 pub runtime::run::RunPlan::shape: runtime::turn::CallShape
-pub runtime::run::RunPlan::skills: alloc::vec::Vec<runtime::catalog::SkillPin>
+pub runtime::run::RunPlan::skills: alloc::vec::Vec<kernel::event::record::run::SkillPin>
 pub runtime::run::RunPlan::task: alloc::string::String
 pub runtime::run::RunPlan::tools: alloc::vec::Vec<kernel::model::wire::ToolDef>
 pub runtime::run::RunPlan::who: alloc::string::String
@@ -1132,7 +1128,6 @@ pub struct runtime::SieveHistory(_)
 pub struct runtime::SieveRecord
 pub struct runtime::SieveRequest<'a>
 pub struct runtime::SieveSite<'a>
-pub struct runtime::SkillPin
 pub struct runtime::SourceDoc
 pub struct runtime::StampGate
 pub struct runtime::Standing
@@ -1158,7 +1153,6 @@ pub struct runtime::bench::CheckpointNet
 pub struct runtime::bench::ToolBench
 pub struct runtime::catalog::Catalog
 pub struct runtime::catalog::CatalogEntry
-pub struct runtime::catalog::SkillPin
 pub struct runtime::clock::ClockStamp
 pub struct runtime::clock::StampGate
 pub struct runtime::clock::ZoneEntry
@@ -1227,3 +1221,5 @@ pub struct runtime::turn::TurnReport
 pub struct runtime::window::Window
 pub trait runtime::Sandbox: core::marker::Send
 pub type runtime::diagnostics::Sink = alloc::boxed::Box<(dyn core::ops::function::FnMut(runtime::diagnostics::Entry<'_>) + core::marker::Send)>
+pub use runtime::SkillPin
+pub use runtime::catalog::SkillPin

@@ -121,31 +121,10 @@ impl<T> Tainted<T> {
     }
 }
 
-#[cfg(kani)]
-mod verification {
-    //! V5: union monotonicity — joining never drops a source. Runs on the
-    //! CI Linux job (kani has no Windows host); the proptest mirror below
-    //! keeps the property exercised locally.
-
-    use super::*;
-
-    // not-proved: takes two concrete sources, so it states what the proptest mirror beside it states over a wider domain (kernel-SPEC.md section 2)
-    #[kani::proof]
-    fn join_never_drops_a_source() {
-        let pick_a: bool = kani::any();
-        let pick_b: bool = kani::any();
-        let sa = TaintSource::new(if pick_a { "a1" } else { "a2" });
-        let sb = TaintSource::new(if pick_b { "b1" } else { "b2" });
-        let (Some(sa), Some(sb)) = (sa, sb) else {
-            unreachable!("literals are non-empty")
-        };
-        let ta = Tainted::new(1u8, sa.clone());
-        let tb = Tainted::new(2u8, sb.clone());
-        let joined = ta.join(tb, |x, y| x.wrapping_add(*y));
-        assert!(joined.taint().contains(&sa));
-        assert!(joined.taint().contains(&sb));
-    }
-}
+// No kani harness lives here. Union monotonicity is a proposition about
+// a `BTreeSet` of `String`s, which gives CBMC loops it cannot bound, and
+// a harness over two fixed labels would only restate the proptest below
+// over a narrower domain (kernel-SPEC.md section 2).
 
 #[cfg(test)]
 #[allow(

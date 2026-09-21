@@ -27,9 +27,11 @@
 
 mod handshake;
 mod outbound;
+mod reading;
 mod tools;
 
 pub use handshake::PROTOCOL_VERSION;
 pub use handshake::{Handshake, Rpc, handshake};
 pub use outbound::{EXTERNAL_CALL_PATIENCE, Outbound, ScriptedOutbound, digits_for_floats};
+pub use reading::{MESSAGE_CEILING, Received, read_one_message};
 pub use tools::{Listed, McpTool, tools_from};

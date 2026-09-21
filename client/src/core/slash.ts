@@ -18,6 +18,7 @@
 import { Option } from "effect";
 
 import { Address } from "./address";
+import type { RunBelief } from "./belief";
 import {
   TEMPLATES,
   cancel,
@@ -41,6 +42,14 @@ import type { Command, Effort, RunId, Seq } from "../wire";
 export interface Reached {
   readonly run: RunId;
   readonly at: Seq;
+}
+
+// The run a view has in hand, as a verb reaches it, and nothing when
+// the view has none. It lives beside the type rather than beside each
+// caller: the composer and the palette both fill `SlashHands`, and
+// each kept a copy of this one conversion.
+export function reached(run: RunBelief | undefined): Reached | null {
+  return run === undefined ? null : { run: run.run, at: run.lastSeq };
 }
 
 // One model the city could be pointed at, named the way the settings
@@ -96,6 +105,17 @@ export interface Slash {
 
 const ALL = "--all";
 const QUEUED = "--queued";
+
+// The word for an effort nobody chose. `core/prefs.ts` keeps that
+// state as `null`; this is its one written form - what a person types
+// after `/effort`, and the id both effort pickers give the cell that
+// reaches it, so the line and the menu cannot come to mean two
+// different things.
+//
+// The assertion keeps the word one word: without it, a menu that
+// builds its rows from `[UNSTATED, ...EFFORTS]` widens the whole list
+// to `string` and loses the phrase key each row is named by.
+export const UNSTATED = "unstated" as const;
 
 function addressed(raw: string | undefined): Address | null {
   if (raw === undefined || raw === "" || raw.startsWith("-")) {
@@ -219,15 +239,18 @@ export const SLASH: readonly Slash[] = [
   },
   {
     spelling: "/effort",
-    grammar: `[${EFFORTS.join("|")}]`,
+    grammar: `[${[UNSTATED, ...EFFORTS].join("|")}]`,
     about: "slash_effort",
     run: (hands, call) => {
       const asked = call.words.at(0);
-      // Bare `/effort` is how a person takes the choice back off the
-      // table and leaves it to the provider, which is what an unset
-      // selector means and what `"none"` - think as little as possible
-      // - does not. A level nobody offers changes nothing.
-      if (asked === undefined) {
+      // `/effort unstated`, and bare `/effort`, both take the choice
+      // back off the table and leave it to the provider, which is what
+      // an unset selector means and what `"none"` - think as little as
+      // possible - does not. The word is named in the grammar because
+      // a person who has chosen a level needs to see the way back; the
+      // bare form stays because omitting the argument is what the
+      // request itself does. A level nobody offers changes nothing.
+      if (asked === undefined || asked === UNSTATED) {
         hands.setEffort(null);
         hands.write("");
         return;

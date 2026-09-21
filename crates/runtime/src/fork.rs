@@ -11,6 +11,7 @@
 //! Consumes [`VerifiedLedger`] only: replay and fork share one rebuilder,
 //! so fork correctness and replay correctness are the same assertion.
 
+use kernel::event::record::RunForked;
 use kernel::{AxCode, AxError, EventDraft, EventKind, Payload, RunId, Seq, TimeMs};
 
 use crate::replay::VerifiedLedger;
@@ -51,19 +52,14 @@ pub fn fork_draft(
     t: TimeMs,
     who: String,
 ) -> Result<EventDraft, AxError> {
-    let mut map = serde_json::Map::new();
-    map.insert(
-        "from".to_owned(),
-        serde_json::Value::String(from.to_string()),
-    );
-    map.insert("at_seq".to_owned(), serde_json::Value::from(at_seq.value()));
+    let data = Payload::of(&RunForked { from, at_seq })?;
     Ok(EventDraft {
         run: new_run,
         t,
         who,
         addr: None,
         kind: EventKind::RunForked,
-        data: Payload::new(map)?,
+        data,
         ig: false,
     })
 }

@@ -273,7 +273,6 @@ status = "gated, with a register of the files that predate the rule"
 # Delete a row by doing the split, never by raising its number.
 [file_length.predating]
 "client/src/core/belief.ts" = 422
-"client/src/views/gallery.tsx" = 791
 "client/src/views/machine.tsx" = 563
 "client/src/views/talk/composer.tsx" = 497
 
@@ -413,3 +412,26 @@ status = "measured, not gated: 191 B read out of a 76,180 B segment, which is th
 what = "bytes a Vfs returns while Cas::get_range answers, over the bytes in the answer"
 measured_by = "cargo test -p memory --lib -- --nocapture a_range_read_lifts_the_range_rather_than_the_object (FaultFs::bytes_read deltas around each retrieval)"
 status = "measured, not gated: on a 5,888,890 B object a five-byte `B` range moves 5 B and line 2 moves 65,536 B, against 5,888,890 B for the verifying full read (2026-09). Before this row existed both range reads moved the whole object and re-hashed it"
+
+# How much of one message this city reads from an MCP server before it
+# refuses. A server named in `CONFIG.toml` is an outside party, its
+# output is untrusted input, and the process reading it is also the
+# city's only writer - so a message with no end is not a slow tool call
+# but an interrupted history.
+#
+# The figure is derived rather than chosen: `IMAGE_MAX_BYTES` is 2 MiB,
+# base64 grows it to 2,796,203 B, and 8 MiB leaves a tool result room
+# for such a picture, its text and the JSON-RPC envelope, with 3x over
+# the largest payload the city already accepts.
+#
+# Not gated by `xtask budget`: the number is a constant in the source
+# rather than a reading off a build, and `protocol::mcp::reading`'s
+# tests assert both edges of it - a message of exactly the ceiling is
+# read, one byte more is refused with the ceiling named. A gate here
+# would be a second authority over the same claim. The one home is
+# `protocol::mcp::MESSAGE_CEILING`; this row records the reading and the
+# reasoning, never a second copy of the value that decides.
+[mcp_message_ceiling]
+what = "one message read from an MCP server over stdio, before its framing newline"
+measured_by = "cargo test -p protocol --lib reading (a_message_at_the_ceiling_is_read and a_message_above_the_ceiling_is_refused_with_the_ceiling_named)"
+status = "measured, not gated: 8,388,608 B, refused whole rather than truncated, and the connection ends because the unread remainder of a refused message is indistinguishable from the next one (2026-09). Before this row existed the stdio reader grew one String until the machine ran out"

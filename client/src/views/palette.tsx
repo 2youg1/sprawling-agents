@@ -18,20 +18,15 @@ import { halt, release } from "../core/commands";
 import { LANGS, endonym } from "../core/lang";
 import { MAYOR, current, toFragment } from "../core/route";
 import type { View } from "../core/route";
-import { completed, offered } from "../core/slash";
+import { completed, offered, reached } from "../core/slash";
 import type { Reached, Slash, SlashHands } from "../core/slash";
 import { useCommand, useGo, useSay, useUi } from "../ui";
 import { Address } from "../core/address";
-import type { RunBelief } from "../core/belief";
 
 interface Entry {
   readonly label: string;
   readonly hint: string;
   readonly act: () => void;
-}
-
-function reached(run: RunBelief | undefined): Reached | null {
-  return run === undefined ? null : { run: run.run, at: run.lastSeq };
 }
 
 export function Palette(props: { readonly onClose: () => void }) {

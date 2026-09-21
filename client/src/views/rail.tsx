@@ -5,11 +5,12 @@
 
 // Everything that is a button or a badge lives on one edge, so the rest
 // of the page has nothing on it but the work. Collapsed, the rail is a
-// column of glyphs; expanded - by hover, by `[`, or by `?` - it shows
-// each glyph's name and, beside it, the keys that reach it. That is how
-// the shortcuts are taught: not up front, but the moment somebody
-// looks. The keys themselves are read from `core/keys`, so a rebind
-// shows here without this file knowing what was pressed.
+// column of glyphs; expanded - by hover, by the accelerator and `B`,
+// or by `?` - it shows each glyph's name and, beside it, the keys that
+// reach it. That is how the shortcuts are taught: not up front, but
+// the moment somebody looks. The keys themselves are read from
+// `core/keys`, so a rebind shows here without this file knowing what
+// was pressed.
 //
 // **Opening on hover is the stylesheet's job, not this file's.** Two
 // timers used to hold a 120 ms threshold on the way in and a 200 ms
@@ -24,9 +25,9 @@
 //   nav[data-rail]:hover { width: var(--spacing-rail-open); … }
 //   nav[data-rail]:hover .rail-label { display: block }
 //
-// Without those rules the rail still pins open with `[` and still
-// collapses to glyphs, so a stylesheet that has not caught up costs
-// the hover and nothing else.
+// Without those rules the rail still pins open from the keyboard and
+// still collapses to glyphs, so a stylesheet that has not caught up
+// costs the hover and nothing else.
 
 import { For, Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
@@ -42,9 +43,6 @@ import { Tip } from "./parts/tip";
 export interface RailProps {
   readonly view: View;
   readonly open: boolean;
-  // The prefix key already pressed, which the rail says out loud so the
-  // second key is not guessed at.
-  readonly prefix: string | null;
   readonly onToggle: () => void;
   readonly onPalette: () => void;
 }
@@ -234,11 +232,6 @@ export function Rail(props: RailProps) {
           </Tip>
         </Show>
         <span class="flex-1" />
-        <Show when={props.prefix !== null}>
-          <div class="mx-snug rounded-control bg-g2 px-snug py-tight text-center font-mono text-note text-text-quiet" role="status">
-            {say("keys_prefix", { key: props.prefix ?? "" })}
-          </div>
-        </Show>
         <Tip text={say("nav_palette")}>
           {(hint) => (
             <button

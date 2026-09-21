@@ -332,8 +332,14 @@ export function ModelChoice(props: { readonly answer: EndpointsAnswer; readonly 
   const say = useSay();
   const command = useCommand();
   const tags = () => props.tags ?? (["main", "digest", "transcribe"] as const);
+  // An endpoint is carried by the id a command names it with and read
+  // by the name the person gave it. The label is never empty: an
+  // endpoint nobody named is labelled with its own id by the city
+  // (`channels::EndpointSummary`), so this list needs no fallback.
   const options = createMemo(() =>
-    props.answer.endpoints.flatMap((endpoint) => endpoint.models.map((model) => ({ endpoint: endpoint.name, model }))),
+    props.answer.endpoints.flatMap((endpoint) =>
+      endpoint.models.map((model) => ({ endpoint: endpoint.name, label: endpoint.label, model })),
+    ),
   );
   const chosen = (tag: ModelTag) => props.answer.chosen.find((each) => each.tag === tag);
   const value = (tag: ModelTag) => {
@@ -364,7 +370,7 @@ export function ModelChoice(props: { readonly answer: EndpointsAnswer; readonly 
                 <For each={options()}>
                   {(option) => (
                     <option value={`${option.endpoint}\u0000${option.model}`}>
-                      {option.model} · {option.endpoint}
+                      {option.model} · {option.label}
                     </option>
                   )}
                 </For>

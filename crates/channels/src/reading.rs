@@ -17,7 +17,8 @@
 //! rather than an error, because a view that hid a record it could not
 //! parse would be a view that lies about what happened.
 
-use kernel::{EventKind, EventRecord, GitOid};
+use kernel::event::record::CheckpointCommitted;
+use kernel::{EventKind, EventRecord};
 
 use crate::answer::{Note, Output, Used};
 
@@ -189,10 +190,16 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
                 .map(|error| Note::Refused { error, at })
         }
         EventKind::ApprovalRequested => Some(Note::Waiting { at }),
-        EventKind::CheckpointCommitted => text(map.get("oid"))
-            .as_deref()
-            .and_then(GitOid::parse)
-            .map(|oid| Note::Fenced { oid, at }),
+        // The job pin that opens a dispatch is a `checkpoint_committed`
+        // naming no commit, and the record type says so rather than
+        // leaving this reader to infer it from a missing key.
+        EventKind::CheckpointCommitted => match record.data().read() {
+            Ok(CheckpointCommitted::Committed(commit)) => Some(Note::Fenced {
+                oid: commit.oid,
+                at,
+            }),
+            Ok(CheckpointCommitted::JobPinned { .. }) | Err(_) => None,
+        },
         EventKind::SteerReceived | EventKind::SignalConsumed => Some(Note::Arrived {
             from: text(map.get("source"))
                 .or_else(|| text(map.get("from")))

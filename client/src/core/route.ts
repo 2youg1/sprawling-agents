@@ -32,6 +32,7 @@ export type View =
   | { readonly kind: "mcp" }
   | { readonly kind: "record"; readonly lens: Lens }
   | { readonly kind: "cost" }
+  | { readonly kind: "registry" }
   | { readonly kind: "welcome" }
   // Every screen at once, on fixtures, reachable without a city. It is
   // a route rather than a build flag so the gate that measures it opens
@@ -60,6 +61,8 @@ export function toFragment(view: View): string {
       return "#/mcp";
     case "record":
       return recordFragment(view.lens);
+    case "registry":
+      return "#/registry";
     case "cost":
       return "#/cost";
     case "welcome":
@@ -91,6 +94,7 @@ const BARE: Readonly<Record<string, View>> = {
   mcp: { kind: "mcp" },
   record: { kind: "record", lens: "ledger" },
   cost: { kind: "cost" },
+  registry: { kind: "registry" },
   welcome: { kind: "welcome" },
   gallery: { kind: "gallery" },
 };

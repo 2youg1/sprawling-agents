@@ -8,14 +8,18 @@ impl gateway::AudioType
 impl gateway::AuthSpec
 impl gateway::Broker
 impl gateway::CeilingSource
+impl gateway::ConnectionKind
+impl gateway::ConnectionKind
 impl gateway::Custodian
 impl gateway::Endpoint
 impl gateway::Endpoint
 impl gateway::EndpointBook
 impl gateway::EndpointTuning
 impl gateway::Fallback
+impl gateway::Family
 impl gateway::ImageBytes
 impl gateway::MarketSnapshot
+impl gateway::Modality
 impl gateway::ModelFacts
 impl gateway::Native
 impl gateway::OutputCeiling
@@ -26,19 +30,30 @@ impl gateway::Transcriber
 impl kernel::model::Model for gateway::Endpoint
 impl kernel::model::Model for gateway::Native
 pub const fn gateway::CeilingSource::as_str(self) -> &'static str
+pub const fn gateway::ConnectionKind::as_str(self) -> &'static str
+pub const fn gateway::ConnectionKind::path_for(self, gateway::Modality) -> core::option::Option<&'static str>
+pub const fn gateway::ConnectionKind::wire(self) -> kernel::model::wire::DialectKind
+pub const fn gateway::Family::as_str(self) -> &'static str
+pub const fn gateway::Family::shape(self) -> gateway::DialectHint
+pub const fn gateway::Modality::as_str(self) -> &'static str
 pub const fn gateway::OutputCeiling::source(self) -> gateway::CeilingSource
 pub const fn gateway::OutputCeiling::tokens(self) -> kernel::model::wire::Ceiling
 pub const gateway::CALL_TIMEOUT_MS: u64
+pub const gateway::Family::ALL: [gateway::Family; 4]
+pub const gateway::Modality::ALL: [gateway::Modality; 2]
 pub const gateway::OAUTH_PROFILES: [gateway::OauthProfile; 2]
 pub enum gateway::AdmissionVerdict
 pub enum gateway::AudioType
 pub enum gateway::AuthSpec
 pub enum gateway::CeilingSource
 pub enum gateway::Connection
+pub enum gateway::ConnectionKind
 pub enum gateway::CostSource
 pub enum gateway::DialectHint
 pub enum gateway::Fallback
+pub enum gateway::Family
 pub enum gateway::InputKinds
+pub enum gateway::Modality
 pub enum gateway::Persistence
 pub enum gateway::ProviderOutcome
 pub enum gateway::Retreat
@@ -60,6 +75,8 @@ pub fn gateway::AuthSpec::for_dialect(kernel::model::wire::DialectKind, kernel::
 pub fn gateway::Broker::connect(&self, &str, &str) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
 pub fn gateway::Broker::new(kernel::secret::sealed::Sealed<alloc::string::String>, kernel::reach::Proxying) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn gateway::Broker::shelf(&self, &str) -> core::result::Result<alloc::vec::Vec<gateway::Toolkit>, kernel::error::shape::AxError>
+pub fn gateway::ConnectionKind::parse(&str) -> core::result::Result<gateway::ConnectionKind, kernel::error::shape::AxError>
+pub fn gateway::ConnectionKind::url_for(self, &str, gateway::Modality) -> core::option::Option<alloc::string::String>
 pub fn gateway::Custodian::capture(&mut self, &[u8], &str) -> core::result::Result<gateway::Captured, kernel::error::shape::AxError>
 pub fn gateway::Custodian::describe(&self, &kernel::secret::span::SecretRef) -> gateway::Described
 pub fn gateway::Custodian::in_memory() -> gateway::Custodian
@@ -124,10 +141,11 @@ pub fn gateway::oauth_refresh(&gateway::OauthProfile, &kernel::secret::sealed::S
 pub fn gateway::profile(&str) -> core::option::Option<&'static gateway::OauthProfile>
 pub fn gateway::reach(&reqwest::blocking::client::Client, kernel::reach::Proxying, &str, u64) -> kernel::reach::Reach
 pub fn gateway::request_wire(kernel::model::wire::DialectKind, &kernel::model::wire::ChatRequest, &gateway::ImageBytes) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
+pub fn gateway::resolve_connection(gateway::DialectHint, core::option::Option<gateway::Family>) -> core::result::Result<gateway::ConnectionKind, kernel::error::shape::AxError>
 pub fn gateway::response_from_wire(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::result::Result<kernel::model::wire::ChatResponse, kernel::error::shape::AxError>
 pub fn gateway::response_wire(kernel::model::wire::DialectKind, &kernel::model::wire::ChatResponse) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
 pub fn gateway::retreat_payload(kernel::model::wire::ModelTag, &str, &gateway::Retreat, &kernel::error::shape::AxError) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
-pub fn gateway::selected_payload(kernel::model::wire::ModelTag, &str, &gateway::ModelEntry, &gateway::Fallback) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
+pub fn gateway::selected_payload(kernel::model::wire::ModelTag, &str, &gateway::ModelEntry, &gateway::Settled<'_>) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn gateway::settle(&kernel::model::wire::ModelUsage, core::option::Option<kernel::budget::UsdMicros>, &gateway::ModelEntry) -> core::result::Result<gateway::CallCost, kernel::error::shape::AxError>
 pub fn gateway::settled_from_stream(kernel::model::wire::DialectKind, &[serde_json::value::Value]) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
 pub fn gateway::through(kernel::reach::Proxying, &str) -> kernel::reach::Through
@@ -171,6 +189,10 @@ pub gateway::Connection::Connected
 pub gateway::Connection::Connected::alias: alloc::string::String
 pub gateway::Connection::Refused
 pub gateway::Connection::Refused::refusal: kernel::error::shape::AxError
+pub gateway::ConnectionKind::AnthropicNative
+pub gateway::ConnectionKind::Harness(gateway::Family)
+pub gateway::ConnectionKind::OpenAiCompat
+pub gateway::ConnectionKind::Responses
 pub gateway::CostSource::Authoritative
 pub gateway::CostSource::PriceSheet
 pub gateway::Described::configured: bool
@@ -201,6 +223,10 @@ pub gateway::EndpointTuning::timeout_ms: core::option::Option<u64>
 pub gateway::Fallback::None
 pub gateway::Fallback::Then::endpoint: alloc::string::String
 pub gateway::Fallback::Then::model: alloc::string::String
+pub gateway::Family::ClaudeCode
+pub gateway::Family::Codex
+pub gateway::Family::GrokBuild
+pub gateway::Family::KimiCli
 pub gateway::HostPreset::base_path: &'static str
 pub gateway::HostPreset::dialect: core::option::Option<kernel::model::wire::DialectKind>
 pub gateway::HostPreset::host: &'static str
@@ -208,6 +234,8 @@ pub gateway::HostPreset::models: &'static [gateway::ModelPreset]
 pub gateway::HostPreset::source: &'static str
 pub gateway::InputKinds::Text
 pub gateway::InputKinds::TextImage
+pub gateway::Modality::Embedding
+pub gateway::Modality::Rerank
 pub gateway::ModelEntry::cache_read_price: kernel::budget::UsdMicros
 pub gateway::ModelEntry::cache_write_price: kernel::budget::UsdMicros
 pub gateway::ModelEntry::context_tokens: u64
@@ -258,6 +286,8 @@ pub gateway::Retreat::Freeze
 pub gateway::Retreat::MoveTo::endpoint: alloc::string::String
 pub gateway::Retreat::MoveTo::model: alloc::string::String
 pub gateway::Retreat::MoveTo::not_before: kernel::event::identity::TimeMs
+pub gateway::Settled::fallback: &'a gateway::Fallback
+pub gateway::Settled::from: core::option::Option<gateway::CeilingSource>
 pub gateway::Stated::person: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::Stated::upstream: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::TokenRequest::body: alloc::string::String
@@ -299,6 +329,7 @@ pub struct gateway::OauthTokens
 pub struct gateway::OutputCeiling
 pub struct gateway::Recording
 pub struct gateway::Redemption
+pub struct gateway::Settled<'a>
 pub struct gateway::Stated
 pub struct gateway::TokenRequest
 pub struct gateway::Toolkit

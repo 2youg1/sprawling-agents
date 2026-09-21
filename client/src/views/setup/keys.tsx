@@ -27,14 +27,11 @@ const MODIFIERS = ["Control", "Meta", "Shift", "Alt", "AltGraph", "CapsLock"];
 export function KeysSection() {
   const say = useSay();
   const keys = keymap();
-  // The action listening for its new chord, and the prefix key it has
-  // already heard.
+  // The action listening for its new chord.
   const [recording, setRecording] = createSignal<Action | null>(null);
-  const [heard, setHeard] = createSignal<string | null>(null);
 
   const stop = () => {
     setRecording(null);
-    setHeard(null);
   };
   const taken = (action: Action): readonly Action[] => {
     const spelled = spell(keys.chord(action));
@@ -50,24 +47,12 @@ export function KeysSection() {
       stop();
       return;
     }
-    const prefix = heard();
-    if (prefix !== null) {
-      keys.bind(action, { accel: false, prefix, key: event.key });
-      stop();
-      return;
-    }
-    if (event.ctrlKey || event.metaKey) {
-      keys.bind(action, { accel: true, prefix: null, key: event.key });
-      stop();
-      return;
-    }
-    // A key that already opens a chord opens this one too, so `g c`
-    // can be typed the way it is pressed.
-    if (keys.prefixes().includes(event.key)) {
-      setHeard(event.key);
-      return;
-    }
-    const chord: Chord = { accel: false, prefix: null, key: event.key };
+    // Shift is part of a chord only beside the accelerator: without
+    // one, the browser already hands back the character the layout
+    // produced, and judging shift as well would put `?` out of reach
+    // on a keyboard that needs shift to type it.
+    const accel = event.ctrlKey || event.metaKey;
+    const chord: Chord = { accel, shift: accel && event.shiftKey, key: event.key };
     keys.bind(action, chord);
     stop();
   };
@@ -94,7 +79,6 @@ export function KeysSection() {
                     aria-pressed={recording() === action}
                     onClick={() => {
                       setRecording(action);
-                      setHeard(null);
                     }}
                     onBlur={stop}
                     onKeyDown={(event) => {
@@ -105,7 +89,7 @@ export function KeysSection() {
                   >
                     <Show when={recording() === action} fallback={<Kbd action={action} />}>
                       <span class="font-mono text-note text-text-faint">
-                        {heard() ?? say("keys_press")}
+                        {say("keys_press")}
                       </span>
                     </Show>
                   </button>

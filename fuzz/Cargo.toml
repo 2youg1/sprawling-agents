@@ -15,6 +15,15 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 kernel = { path = "../crates/kernel" }
 memory = { path = "../crates/memory" }
+# The three outside-the-process taint surfaces: inbound wire frames, the
+# configuration file a person types, and what an MCP child writes back.
+# `channels` is taken without its listener: a frame is decoded before any
+# socket code sees it, and the server feature would drag tokio and axum
+# into every fuzz binary.
+channels = { path = "../crates/channels", default-features = false }
+city = { path = "../crates/city" }
+protocol = { path = "../crates/protocol" }
+serde_json = "1"
 tempfile = "3"
 
 [[bin]]
@@ -31,11 +40,32 @@ test = false
 doc = false
 bench = false
 
-[workspace]
-
 [[bin]]
 name = "fuzz_jsonl_tail"
 path = "fuzz_targets/fuzz_jsonl_tail.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "fuzz_wire_frame"
+path = "fuzz_targets/fuzz_wire_frame.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_config_toml"
+path = "fuzz_targets/fuzz_config_toml.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_mcp_stdio"
+path = "fuzz_targets/fuzz_mcp_stdio.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

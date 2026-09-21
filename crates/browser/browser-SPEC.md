@@ -228,6 +228,8 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 
 `diff(a, b)` 回答两件事：变了百分之几，以及变的地方在哪几个框里。百分比是**万分比整数**（`changed_ppm`／`ratio_q4`），框是像素坐标的整数矩形，因为这两个数会进账本载荷。尺寸不同的两张图不比较，回 `E_INVALID_ARGS`——把一张缩放到另一张上再比，比出来的差异是缩放算法的，不是页面的。
 
+解码后的字节短于自己头部声明的尺寸时回 `E_WIRE_MISMATCH`，并且**说出是哪一张短了**：先拍的、后拍的、还是两张都短。三种情况的下一步动作不同——要重拍的是哪一张，拒绝语直接给出，读的人不必两张都重来。判定对 `(前, 后)` 两个像素取值穷尽匹配，没有兜底臂。
+
 依赖 `png` 0.18（MIT OR Apache-2.0，`deny.toml` 的 allow 列表已含两者）：产品路径只解码，测试用它的编码器造夹具，于是断言比的是真 PNG 字节而不是一份没人能复核的固定串。
 
 ### 19-5 `browser::devloop` 消费 `look` 的判定
@@ -240,7 +242,7 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 |---|---|
 | verb | 八个动作各自的帧可在无浏览器下逐帧断言；`act` 无快照即拒；`measure` 的假 ref 在出网前被拒 |
 | shot | 同一段 PNG 字节两次读出同一尺寸；非 PNG 不猜尺寸；quality 不引入浮点变量 |
-| diff | 尺寸不同即拒；全同两图为 0；一个像素变化的框恰好含那个像素 |
+| diff | 尺寸不同即拒；全同两图为 0；一个像素变化的框恰好含那个像素；解码字节短于头部时拒绝语点名是哪一张 |
 
 
 ### 19-7 尚未验证的部分

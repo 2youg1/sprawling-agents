@@ -11,9 +11,6 @@
 // The keys are not spelled here. `core/keys` holds the action, the
 // chord that reaches it and the person's own chord if they set one;
 // this file asks it which action a press was and does that one thing.
-// A prefix key arms for `PREFIX_MS` and says so on the rail while it
-// waits, so `g` followed by nothing teaches rather than swallows.
-//
 // A stopped city is said once, here, as a banner over every page: the
 // city page used to draw a crescent nobody could read and dim itself to
 // 40%, which is a mood rather than a message.
@@ -28,7 +25,7 @@ import { Match, Show, Switch, createEffect, createMemo, createSignal, onCleanup,
 
 import { QUERIES } from "./core/asking";
 import { halt, release } from "./core/commands";
-import { PREFIX_MS, keymap } from "./core/keys";
+import { keymap } from "./core/keys";
 import type { Action } from "./core/keys";
 import { paintMark } from "./core/mark";
 import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
@@ -39,6 +36,7 @@ import { Building } from "./views/building";
 import { City } from "./views/city";
 import { Cost } from "./views/cost";
 import { Palette } from "./views/palette";
+import { Registry } from "./views/registry";
 import { Rail } from "./views/rail";
 import { Record } from "./views/record";
 import { motionOff } from "./views/shared/motion";
@@ -60,6 +58,7 @@ const GOES: Readonly<Record<string, View>> = {
   "go.mcp": { kind: "mcp" },
   "go.record": { kind: "record", lens: "ledger" },
   "go.cost": { kind: "cost" },
+  "go.registry": { kind: "registry" },
 };
 
 // The box a person writes in, wherever the page put it. Reached by the
@@ -91,8 +90,6 @@ export function App() {
   const [paletteOpen, setPaletteOpen] = createSignal(false);
   const [sheetOpen, setSheetOpen] = createSignal(false);
   const [railOpen, setRailOpen] = createSignal(false);
-  const [prefix, setPrefix] = createSignal<string | null>(null);
-  let forget: ReturnType<typeof setTimeout> | undefined;
   // What opened the sheet, so closing it puts the focus back where the
   // person left it.
   let opener: HTMLElement | null = null;
@@ -119,17 +116,6 @@ export function App() {
       return;
     }
     document.startViewTransition(settle);
-  };
-  const drop = () => {
-    clearTimeout(forget);
-    setPrefix(null);
-  };
-  const arm = (key: string) => {
-    clearTimeout(forget);
-    setPrefix(key);
-    forget = setTimeout(() => {
-      setPrefix(null);
-    }, PREFIX_MS);
   };
   const closeSheet = () => {
     setSheetOpen(false);
@@ -166,6 +152,7 @@ export function App() {
       case "go.mcp":
       case "go.record":
       case "go.cost":
+      case "go.registry":
       case "go.setup":
       case "go.waiting":
         return;
@@ -174,7 +161,6 @@ export function App() {
   const keys = (event: KeyboardEvent) => {
     const accel = event.ctrlKey || event.metaKey;
     if (event.key === "Escape") {
-      drop();
       if (paletteOpen()) setPaletteOpen(false);
       else if (sheetOpen()) closeSheet();
       else if (railOpen()) setRailOpen(false);
@@ -183,23 +169,12 @@ export function App() {
     // Inside a text box and inside the palette, only a chord that holds
     // the accelerator is the shell's; everything else is being typed.
     if ((typing(event.target) || paletteOpen()) && !accel) {
-      drop();
       return;
     }
-    const action = bindings.acting(event, prefix());
+    const action = bindings.acting(event);
     if (action !== null) {
       event.preventDefault();
-      drop();
       act(action);
-      return;
-    }
-    if (prefix() !== null) {
-      drop();
-      return;
-    }
-    if (!accel && !event.altKey && bindings.prefixes().includes(event.key)) {
-      event.preventDefault();
-      arm(event.key);
     }
   };
   onMount(() => {
@@ -208,7 +183,6 @@ export function App() {
     window.addEventListener("keydown", keys);
   });
   onCleanup(() => {
-    clearTimeout(forget);
     window.removeEventListener("hashchange", follow);
     window.removeEventListener("keydown", keys);
   });
@@ -271,7 +245,6 @@ export function App() {
         <Rail
           view={view()}
           open={railOpen()}
-          prefix={prefix()}
           onToggle={() => setRailOpen((open) => !open)}
           onPalette={() => setPaletteOpen(true)}
         />
@@ -321,6 +294,9 @@ export function App() {
           </Match>
           <Match when={view().kind === "cost"}>
             <Cost />
+          </Match>
+          <Match when={view().kind === "registry"}>
+            <Registry />
           </Match>
           <Match when={view().kind === "welcome"}>
             <Welcome />

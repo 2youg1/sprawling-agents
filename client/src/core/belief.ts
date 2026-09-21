@@ -9,7 +9,8 @@
 // a model is still saying - and nothing that a query answers better.
 // Reading one payload is `channels::reading`'s rule; the two readings
 // used here (task, tool name and subject) copy that rule's field names
-// and nothing else.
+// and nothing else. The subject's key order stays a copy until the
+// city sends the subject it computes (roadmap 7.12).
 
 import { createStore, produce } from "solid-js/store";
 
@@ -25,9 +26,14 @@ import type {
   EventRecord,
   LogLine,
   RunId,
+  RunSummary,
   Seq,
   TimeMs,
 } from "../wire";
+
+// The run every record that belongs to the city itself carries, which
+// `kernel::RunId::CITY` spells as the nil uuid (roadmap M-24).
+const CITY_RUN = "00000000-0000-0000-0000-000000000000";
 
 // What one run is doing, in the words the city page and the room page
 // both read.
@@ -71,6 +77,10 @@ export interface RunBelief {
   readonly lastSeq: Seq;
   readonly lastKind: EventKind;
   readonly doing: Doing;
+  // Heard from the stream and named by no answer yet: an answer folded
+  // before the run began cannot name it, and that silence is not the
+  // city saying the run is over.
+  readonly local: boolean;
   // What the model has said in the call that is still going. Cleared
   // when the call returns, because the record then holds it.
   saying: string;
@@ -159,8 +169,35 @@ function fresh(run: RunId, record: EventRecord): RunBelief {
     lastSeq: record.seq,
     lastKind: record.kind,
     doing: { kind: "thinking" },
+    local: true,
     saying: "",
     thinking: "",
+  };
+}
+
+// One `city_view` row read as a belief, keeping whatever the stream
+// already knew that the row does not carry. The run page reads it too:
+// a run reached by somebody's link was never streamed here, so the
+// row is the only reading of that run this page has.
+export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBelief {
+  // The page's own reading is the newer of the two, so it wins on
+  // everything it knows; a field the stream never carried is still the
+  // row's to state, and the answer settles nothing else but that.
+  if (held !== undefined && held.lastSeq >= summary.last_seq) {
+    const at = held.started ?? summary.started ?? null;
+    return { ...held, addr: held.addr ?? summary.addr ?? null, started: at, local: false };
+  }
+  return {
+    run: summary.run,
+    addr: summary.addr ?? held?.addr ?? null,
+    started: summary.started ?? held?.started ?? null,
+    task: held?.task ?? null,
+    lastSeq: summary.last_seq,
+    lastKind: summary.last_kind,
+    doing: summary.frozen ? { kind: "frozen", completion: null } : (held?.doing ?? { kind: "thinking" }),
+    local: false,
+    saying: held?.saying ?? "",
+    thinking: held?.thinking ?? "",
   };
 }
 
@@ -203,67 +240,30 @@ function fold(held: RunBelief, record: EventRecord): RunBelief {
         doing: { kind: "frozen", completion: text(data, "completion") },
       };
     // Every other kind only advances the position. Listed rather than
-    // defaulted so a new kind is a decision here, not a silence.
-    case "city_initialized":
-    case "building_created":
-    case "building_configured":
-    case "run_forked":
-    case "prompt_assembled":
-    case "result_offloaded":
-    case "gate_checked":
-    case "gate_denied":
-    case "checkpoint_committed":
-    case "handoff_written":
-    case "steer_received":
-    case "cancel_received":
-    case "watchdog_fired":
-    case "budget_limit":
-    case "log_truncated":
-    case "signal_enqueued":
-    case "signal_consumed":
-    case "draft_held":
-    case "draft_resolved":
-    case "goal_registered":
-    case "goal_conflict":
-    case "arbitration_verdict":
-    case "repair_started":
-    case "repair_reused":
-    case "worktree_opened":
-    case "pr_opened":
-    case "pr_merged":
-    case "pr_rejected":
-    case "roadmap_claimed":
-    case "roadmap_finished":
-    case "roadmap_released":
-    case "roadmap_split":
-    case "roadmap_blocked":
-    case "approval_resolved":
-    case "policy_created":
-    case "policy_revoked":
-    case "taint_promoted":
-    case "cross_building_transfer":
-    case "takeover_started":
-    case "rollback_applied":
-    case "city_halted":
-    case "backpressure_shed":
-    case "digest_invalidated":
-    case "endpoint_attached":
-    case "endpoint_lost":
-    case "endpoint_probed":
-    case "model_selected":
-    case "provider_degraded":
-    case "login_started":
-    case "eval_run":
-    case "asset_archived":
-    case "credential_lent":
-    case "secret_captured":
-    case "secret_egress_blocked":
-    case "file_discarded":
-    case "discard_restored":
-    case "autonomy_changed":
-    case "pursuit_changed":
-    case "governed_document_written":
-    case "toolkit_link_opened":
+    // defaulted so a new kind is a decision here, not a silence, and
+    // grouped a family to a line so the list reads as one block: the
+    // reader's question is which kinds move a run, not where one name
+    // sits among sixty.
+    case "city_initialized": case "city_halted": case "building_created":
+    case "building_configured": case "run_forked": case "prompt_assembled":
+    case "result_offloaded": case "log_truncated": case "gate_checked":
+    case "gate_denied": case "approval_resolved": case "policy_created":
+    case "policy_revoked": case "steer_received": case "cancel_received":
+    case "watchdog_fired": case "budget_limit": case "backpressure_shed":
+    case "signal_enqueued": case "signal_consumed": case "draft_held":
+    case "draft_resolved": case "goal_registered": case "goal_conflict":
+    case "arbitration_verdict": case "pursuit_changed": case "repair_started":
+    case "repair_reused": case "worktree_opened": case "checkpoint_committed":
+    case "handoff_written": case "pr_opened": case "pr_merged":
+    case "pr_rejected": case "roadmap_claimed": case "roadmap_finished":
+    case "roadmap_released": case "roadmap_split": case "roadmap_blocked":
+    case "endpoint_attached": case "endpoint_lost": case "endpoint_probed":
+    case "model_selected": case "provider_degraded": case "login_started":
+    case "digest_invalidated": case "eval_run": case "asset_archived":
+    case "toolkit_link_opened": case "credential_lent": case "secret_captured":
+    case "secret_egress_blocked": case "file_discarded": case "discard_restored":
+    case "autonomy_changed": case "taint_promoted": case "cross_building_transfer":
+    case "takeover_started": case "rollback_applied": case "governed_document_written":
       return moved;
   }
 }
@@ -282,29 +282,29 @@ export function createBelief() {
   // What a `city_view` answer says about runs this page never saw. A run
   // the page already follows keeps its own reading: the answer is a
   // position, and the page holds more than a position.
+  //
+  // The answer also says which runs are left, and one it does not name
+  // is dropped: a table that only grows ends a long session in a tab
+  // nobody can use, and a run left behind by a restart or by a freeze
+  // the socket missed goes on telling the skyline and the tab's title
+  // that this city is busy.
   function adoptCity(city: CityAnswer): void {
     setBelief(
       produce((draft) => {
         draft.halted = [...city.halted];
         for (const summary of city.runs) {
-          const held = draft.runs[summary.run];
-          if (held !== undefined && held.lastSeq >= summary.last_seq) {
-            continue;
-          }
-          draft.runs[summary.run] = {
-            run: summary.run,
-            addr: summary.addr ?? held?.addr ?? null,
-            started: summary.started ?? held?.started ?? null,
-            task: held?.task ?? null,
-            lastSeq: summary.last_seq,
-            lastKind: summary.last_kind,
-            doing: summary.frozen
-              ? { kind: "frozen", completion: null }
-              : (held?.doing ?? { kind: "thinking" }),
-            saying: held?.saying ?? "",
-            thinking: held?.thinking ?? "",
-          };
+          draft.runs[summary.run] = adopted(summary, draft.runs[summary.run]);
         }
+        const listed = new Set<string>(city.runs.map((summary) => summary.run));
+        // The exemption is good for one answer: by the next one the
+        // city has had its chance to list the run, which is what
+        // evicts a run a restarted city no longer has.
+        const kept: Record<string, RunBelief> = {};
+        for (const [run, held] of Object.entries(draft.runs)) {
+          if (listed.has(run)) kept[run] = held;
+          else if (held.local) kept[run] = { ...held, local: false };
+        }
+        draft.runs = kept;
       }),
     );
   }
@@ -330,8 +330,7 @@ export function createBelief() {
           if (found !== null) draft.probed = found;
           return;
         }
-        // The nil run marks a record that belongs to the city itself.
-        if (record.run === "00000000-0000-0000-0000-000000000000") {
+        if (record.run === CITY_RUN) {
           return;
         }
         const held = draft.runs[record.run] ?? fresh(record.run, record);

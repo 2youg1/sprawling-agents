@@ -50,8 +50,10 @@ pub fn admit(stats: &QueueStats, item: &ItemMeta) -> Admission {
 
 #[cfg(kani)]
 mod verification {
-    //! V5: admission is total and monotone — a shallower queue never
-    //! makes the same item harder to admit.
+    //! V5: admission is total, monotone — a shallower queue never makes
+    //! the same item harder to admit — and fail-closed when the sum
+    //! overflows. Both harnesses range over every `u64`, and the
+    //! arithmetic is linear, so CBMC returns in under a minute.
 
     use super::*;
 
@@ -79,6 +81,26 @@ mod verification {
         if deep_verdict == Admission::Admit {
             assert_eq!(shallow_verdict, Admission::Admit);
         }
+    }
+
+    /// Fail-closed at the top of the range: whenever admitting the item
+    /// would carry the queue past `u64::MAX`, the answer is Shed. The
+    /// `#[test]` beside it fixes the depth at `u64::MAX`; this holds for
+    /// every depth, capacity and cost whose sum overflows.
+    #[kani::proof]
+    fn an_overflowing_sum_never_admits() {
+        let stats = QueueStats {
+            depth: kani::any(),
+            capacity: kani::any(),
+        };
+        let item = ItemMeta { cost: kani::any() };
+        kani::assume(stats.depth.checked_add(item.cost).is_none());
+        assert_eq!(
+            admit(&stats, &item),
+            Admission::Shed {
+                reason: ShedReason::CapacityExhausted
+            }
+        );
     }
 }
 
@@ -136,6 +158,18 @@ mod tests {
             let shallow_verdict = admit(&QueueStats { depth: shallow, capacity }, &item);
             if deep_verdict == Admission::Admit {
                 prop_assert_eq!(shallow_verdict, Admission::Admit);
+            }
+        }
+
+        /// Kani mirror: a sum past `u64::MAX` sheds rather than wraps.
+        #[test]
+        fn an_overflowing_sum_sheds(capacity in any::<u64>(), depth in any::<u64>(),
+                                    cost in any::<u64>()) {
+            if depth.checked_add(cost).is_none() {
+                prop_assert_eq!(
+                    admit(&QueueStats { depth, capacity }, &ItemMeta { cost }),
+                    Admission::Shed { reason: ShedReason::CapacityExhausted }
+                );
             }
         }
     }

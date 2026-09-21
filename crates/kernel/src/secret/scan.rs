@@ -328,23 +328,20 @@ mod tests {
 
 #[cfg(kani)]
 mod verification {
-    //! V5: the entropy judgment terminates and never panics. The loop
-    //! bounds are constants; kani proves absence of arithmetic panics for
-    //! arbitrary short inputs.
+    //! V5: the fixed-point logarithm terminates and never panics on any
+    //! `u64`. The loop bound is the constant ten, so CBMC derives it and
+    //! no global unwind is passed.
+    //!
+    //! The whole-function property stops here on purpose:
+    //! `entropy_millibits_per_char` calls `log2_q10` once per slot of a
+    //! 256-slot count table and each call squares a `u128` ten times, so
+    //! a harness over the table hands the solver some 2,560 symbolic
+    //! non-linear multiplications and returns no verdict. Totality of
+    //! the whole scan is held by the proptest above; proving it here
+    //! would need a per-slot function this module does not have
+    //! (kernel-SPEC.md section 2).
 
     use super::*;
-
-    // not-proved: hands the solver some 2,560 symbolic non-linear multiplications, one per slot of a 256-slot table; the arithmetic core is proved by log2_q10_is_total (kernel-SPEC.md section 2)
-    #[kani::proof]
-    fn entropy_is_total_on_short_inputs() {
-        let len: usize = kani::any();
-        kani::assume(len <= 4);
-        let mut bytes = [0u8; 4];
-        for slot in bytes.iter_mut() {
-            *slot = kani::any();
-        }
-        let _ = entropy_millibits_per_char(&bytes[..len]);
-    }
 
     #[kani::proof]
     fn log2_q10_is_total() {

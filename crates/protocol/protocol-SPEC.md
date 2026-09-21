@@ -47,6 +47,7 @@
 ## 7 模块边界
 
 - **字节怎么走**归 `bin::assembly`：stdio 子进程的拉起、超时与回收住装配层；本 crate 只出一行、收一行。
+- **一条消息能有多大**归本 crate（`mcp::reading`）：上限是 MCP 这个协议的事实，不是某一种传输的事实；两个传输各写一个数字就是两条会漂的上限。装配层仍然拥有 reader 的形式（线程、管道、`sync_channel`），它把字节交给 `read_one_message` 并接受它的拒绝。
 - **准不准出网**归 `kernel::gate` 的 egress 门：外部工具声明 `Effect::Egress`，路由到那道门；本 crate 只在 confidential 一位上做构造点拒（更早、更硬）。
 - **回来的东西算什么**归 `kernel::taint`：与 L0 工具同落 `kernel::tool` 缝，故自动进污染环，本 crate 无解包面。
 
@@ -85,6 +86,11 @@ impl McpTool {
         -> Result<McpTool, AxError>;
 }
 pub struct ScriptedOutbound { /* 私有 */ }                                          // 第二适配器
+
+// 8-1b 外部输入的消息上限（形状 1 判定；见 §8-15）
+pub const MESSAGE_CEILING: usize = 8_388_608;
+pub enum Received { Message(String), EndOfInput }
+pub fn read_one_message(source: &mut dyn BufRead, server: &str) -> Result<Received, AxError>;
 
 // 8-2 acp（形状 1 判定＋形状 2 值类型）
 pub struct Incoming { pub token: String, pub addr: Address, pub task: String, pub goal: String }
@@ -131,14 +137,14 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 ## 11 边界枚举
 
-非 JSON 行／非对象／既无 result 又无 error／`tools` 缺失／工具无名／标签非法／浮点在顶层、数组内、深层对象内／confidential 楼／空 token／空 task／空 goal／地址落 reserved prefix／重放缺答案。
+一条消息超过 `MESSAGE_CEILING`／流在消息中途断掉／消息不是 UTF-8／非 JSON 行／非对象／既无 result 又无 error／`tools` 缺失／工具无名／标签非法／浮点在顶层、数组内、深层对象内／confidential 楼／空 token／空 task／空 goal／地址落 reserved prefix／重放缺答案。
 
 ## 12 错误处理
 
 | 码 | 何时 | 能否让它不可能发生 |
 |---|---|---|
 | `E_INVALID_ARGS` | 浮点入参、入站字段缺失、路由错工具 | 部分能：浮点由模型给出，故在出口拒并指位置 |
-| `E_WIRE_MISMATCH` | 答案或列表形状读不出 | 不能：对侧版本不由本库决定，fail closed |
+| `E_WIRE_MISMATCH` | 答案或列表形状读不出；一条消息超过 `MESSAGE_CEILING`；流在消息中途断掉；消息不是 UTF-8 | 不能：对侧写多少字节不由本库决定，fail closed；超限恒是整条拒，恒不截断后解析 |
 | `E_TOOL_UNAVAILABLE` | server 返回 error、重放缺答案 | 不能：外部世界的事实 |
 | `E_TIMEOUT` | 期限内未答 | 不能：对侧多久回答不由本库决定；拒词同时是子进程被回收的那一刻 |
 | `E_GATE_DENIED` | confidential 楼构造出站工具 | **能**：构造点即拒，于是「它存在过」这件事不成立 |
@@ -158,7 +164,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 ## 16 测试与约束
 
-逐模块 `#[cfg(test)]`；「单行无换行」「同名不合并」「浮点按位置拒」「confidential 构造即拒」「未配对只泄一位」「重放同答案」六条各有一条断言。**约束**：本 crate 恒不出现 `async`、恒不持文件句柄、恒不内置任何服务商名字。
+逐模块 `#[cfg(test)]`；「单行无换行」「同名不合并」「浮点按位置拒」「confidential 构造即拒」「未配对只泄一位」「重放同答案」六条各有一条断言，再加「恰在上限内的消息照常解析」「超限的消息被整条拒且拒词报出上限与是哪台 server」两条（§8-15）。**约束**：本 crate 恒不出现 `async`、恒不持文件句柄、恒不内置任何服务商名字。
 
 ## 17 模型体验
 
@@ -167,6 +173,18 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 ## 18 文档同步
 
 `ARCHITECTURE.md` §3 缝清单（`Outbound` 一行）与 §6 protocol 两行｜`docs/third-party.md` §二（服务外挂的四条边界）｜装配层接线时同步 §6 末接线台账。
+
+### 8-15 外部输入通道的消息上限（K-06／F-18）
+
+**缺陷所在**：stdio reader 用 `BufReader::lines()`，遇到换行前无限增长一个 `String`；承载答案的 `mpsc::channel()` 又是无界的。MCP server 是 `CONFIG.toml` 指进来的外部方，其输出是不受信任的输入，而读它的进程同时是这座城**唯一的写者**——内存耗尽等于历史中断，不是一次工具调用失败。
+
+三条决定：
+
+1. **上限不是参数。** 路线图 K-06 记的签名是 `read_one_message(reader, ceiling)`；本 SPEC 改为 `read_one_message(source, server)`，上限取自 `MESSAGE_CEILING`。理由：一个可以由调用方选的上限，就是每个传输各选一个的上限，而拒词必须对每一台 server 报出同一个数字。测试用真实大小的输入压两边边界，不靠注入一个小上限。
+2. **数值是推导来的，不是拍的。** `IMAGE_MAX_BYTES` 是 2 MiB，base64 后 2,796,203 B；8 MiB 让一次工具答案装得下这样一张图、它的文字与 JSON-RPC 信封，对本城已接受的最大载荷留 3 倍余量。读数与推导记在 `xtask/budgets.toml` 的 `[mcp_message_ceiling]`，值本身只有 `MESSAGE_CEILING` 一个家。
+3. **拒绝是终止性的，不是跳过一条。** 超限消息未读完的尾巴与下一条消息在字节上无从分辨，所以拒绝之后调用方**恒不**再从同一个 source 读；装配层回收子进程。`Received` 是穷尽枚举而非 `Option<String>`：「对侧关了输出」是调用方要据以停读的状态，用缺席表示它就等于让每个调用点各自重推一遍。
+
+**同集的另一半住装配层**（`bin::mcp_stdio`、`bin::mcp_http`、`bin::mcp_sse`，本 crate 不拥有）：reader 线程改调 `read_one_message`，`mpsc::channel()` 换 `sync_channel(N)`——无界队列在读端慢时把内存吃光，而「慢」正是一个被工具卡住的 Run 的常态；HTTP 那条用 `take(MESSAGE_CEILING)` 包住响应体。
 
 ### 8-14 protocol 目录化（形状：主类型居索引，方法按簇归文件）
 

@@ -8,6 +8,11 @@
 // callbacks into link events, carries out the actions the machine
 // answers with, and hands what arrives to the belief and the asking.
 //
+// The browser's own facilities are reached here and nowhere below:
+// the socket, the frame callback, the timers, and the clock the
+// asking measures its patience by. A module that read the clock
+// itself would be a module a test cannot put in a hurry.
+//
 // Frames are folded once per animation frame rather than as they land:
 // a burst of records becomes one store update and one paint, which is
 // what keeps a busy city under the 16 ms the person asked for.
@@ -20,6 +25,7 @@ import type { Asking } from "./asking";
 import { createBelief } from "./belief";
 import type { Belief } from "./belief";
 import { decodeFrame, encodeFrame } from "./frames";
+import { langOf, say } from "./lang";
 import { advance, connect as start, isLive, isRefused, newLink } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
 import type { Command, Query, ServerFrame } from "../wire";
@@ -74,8 +80,20 @@ export function openConnection(url: string, token: string | null): Connection {
     return true;
   }
 
-  const asking = createAsking((query: Query) =>
-    isLive(link) ? sendText(encodeFrame({ query })) : false,
+  const asking = createAsking(
+    (query: Query) => (isLive(link) ? sendText(encodeFrame({ query })) : false),
+    () => Date.now(),
+    // A question that never came back, and an answer that settles no
+    // question, both land where every other refusal lands: the corner
+    // once, and the bell until the person has read it. The recovery
+    // is the one part written for a person, so it is said here, in
+    // the language `<html lang>` states - which `app.tsx` keeps equal
+    // to the person's choice, and which a screen reader reads the
+    // page by.
+    (phrase, error) => {
+      const lang = langOf(document.documentElement.lang);
+      store.refused({ ...error, recovery: say(lang, phrase) });
+    },
   );
 
   function perform(action: LinkAction): void {

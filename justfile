@@ -77,8 +77,8 @@ prereqs mode="check":
     need optional cargo-kani 'command -v cargo-kani' \
         'cargo install --locked kani-verifier, then cargo kani setup' \
         'just proof; kani has no Windows host, where CI proves instead'
-    need optional elan 'command -v elan' \
-        'https://github.com/leanprover/elan' \
+    need optional lake 'command -v lake' \
+        'https://github.com/leanprover/elan, which installs the toolchain lake comes from' \
         'just adversary alone, which is never a gate'
     if [ "$mode" = list ]; then
         exit 0

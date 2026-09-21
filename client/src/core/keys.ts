@@ -12,16 +12,28 @@
 // "which action was that". The rail, the shell and the settings section
 // read this table; none of them spells a key itself.
 //
-// A chord is at most three facts: the accelerator (Cmd on a Mac, Ctrl
-// everywhere else), a prefix key pressed and released first (`g`), and
-// the key itself. Nothing here needs Shift as a fact of its own: the
-// browser already hands `?` and `$` as the character that was typed.
+// **A chord is what every other application on the machine means by
+// one**: the accelerator (Cmd on a Mac, Ctrl everywhere else), Shift,
+// and the key itself. The `g`-then-letter prefix this table shipped
+// with is gone (roadmap 3.9). It was a habit borrowed from one text
+// editor rather than from the platform, it held a `g` typed anywhere
+// outside a text box for a second and a half before deciding it meant
+// nothing, and no other window the person has open answers it.
+//
+// **Shift is a fact only beside the accelerator.** With no modifier
+// held, the browser hands over the character the layout produced, and
+// that character already says whether Shift was down: `?` is `?`
+// however a keyboard types it. With the accelerator held, the chord
+// has to name Shift itself, or `Ctrl+Shift+A` and `Ctrl+A` would be
+// one key.
 //
 // The person's overrides live in the same browser storage the rest of
 // their preferences do, one row per action, so reading a stored chord
 // never parses a document and never fails in a way that needs handling.
 // Which store that is, and what a browser without one gets instead, is
-// `prefs.ts`'s single decision.
+// `prefs.ts`'s single decision. `spell` below is already the written
+// form the person's own `[ui.keys]` table will hold when roadmap 3.1
+// moves these rows out of the browser.
 
 import { createSignal } from "solid-js";
 import type { Accessor } from "solid-js";
@@ -38,6 +50,7 @@ export const ACTIONS = [
   "go.mcp",
   "go.record",
   "go.cost",
+  "go.registry",
   "go.setup",
   "go.waiting",
   "palette",
@@ -57,39 +70,56 @@ export interface Chord {
   // Cmd on a Mac, Ctrl elsewhere. One fact, drawn two ways, so a chord
   // a person set on one machine still reads correctly on another.
   readonly accel: boolean;
-  // A key pressed and released before the chord's own key, or none.
-  readonly prefix: string | null;
+  // Held beside the accelerator. False on every chord that holds no
+  // accelerator, because the character such a press produces already
+  // says whether Shift was down.
+  readonly shift: boolean;
   // What `KeyboardEvent.key` holds, in the case the person types it.
   readonly key: string;
 }
 
-const PREFIX = "g";
 const ACCEL_MARK = "accel+";
+const SHIFT_MARK = "shift+";
 const ROW = "sprawling.key.";
 
-function plain(key: string): Chord {
-  return { accel: false, prefix: null, key };
-}
-function accel(key: string): Chord {
-  return { accel: true, prefix: null, key };
-}
-function after(key: string): Chord {
-  return { accel: false, prefix: PREFIX, key };
+// A key is stored and matched without case, and this is the one place
+// that decides what "without case" means.
+function folded(key: string): string {
+  return key.toLowerCase();
 }
 
-// The chords this client ships with. `g $` and `?` both need Shift on a
-// US keyboard; both stay, because a layout that cannot type them can
-// now be given a chord that it can.
+function plain(key: string): Chord {
+  return { accel: false, shift: false, key };
+}
+function accel(key: string): Chord {
+  return { accel: true, shift: false, key };
+}
+function accelShift(key: string): Chord {
+  return { accel: true, shift: true, key };
+}
+
+// The chords this client ships with.
+//
+// **Six pages sit on the six digits, in the order the rail draws
+// them**, with settings taken out: settings is on the comma that every
+// browser and every editor puts it on, which leaves the sixth digit
+// for the registry - the one screen that reached this build with no
+// way in at all.
+//
+// `?` and `/` hold no modifier because the shell reads them only
+// outside a text box; that rule is `app.tsx`'s, and it is the reason
+// those two can stay single keys.
 export const DEFAULTS: Readonly<Record<Action, Chord>> = {
-  "go.talk": after("m"),
-  "go.city": after("c"),
-  "go.mcp": after("x"),
-  "go.record": after("r"),
-  "go.cost": after("$"),
-  "go.setup": after("s"),
-  "go.waiting": after("w"),
+  "go.talk": accel("1"),
+  "go.city": accel("2"),
+  "go.mcp": accel("3"),
+  "go.record": accel("4"),
+  "go.cost": accel("5"),
+  "go.registry": accel("6"),
+  "go.setup": accel(","),
+  "go.waiting": accelShift("a"),
   palette: accel("k"),
-  "rail.toggle": plain("["),
+  "rail.toggle": accel("b"),
   help: plain("?"),
   "composer.focus": plain("/"),
   "run.stop": accel("."),
@@ -103,6 +133,7 @@ export const LABELS: Readonly<Record<Action, Key>> = {
   "go.mcp": "nav_mcp",
   "go.record": "nav_the_record",
   "go.cost": "cost_title",
+  "go.registry": "nav_registry",
   "go.setup": "nav_settings",
   "go.waiting": "wait_title",
   palette: "nav_palette",
@@ -112,45 +143,43 @@ export const LABELS: Readonly<Record<Action, Key>> = {
   "run.stop": "city_stop",
 };
 
-// How long a prefix waits for its second key before it is forgotten.
-export const PREFIX_MS = 1500;
+// The keys a browser keeps for itself beside the accelerator: it
+// closes a tab, opens a tab and opens a window before the page is
+// told anything, with or without Shift. A chord bound to one of them
+// therefore never fires. It is shown to the person rather than
+// refused, for the same reason a collision is.
+const RESERVED: readonly string[] = ["n", "t", "w"];
+
+export function reserved(held: Chord): boolean {
+  return held.accel && RESERVED.includes(folded(held.key));
+}
 
 // ------------------------------------------------------------- spelling
 
 // The one written form of a chord: what is stored, and what a chord
 // read back from storage is compared against.
 export function spell(held: Chord): string {
-  const base = held.accel ? `${ACCEL_MARK}${held.key}` : held.key;
-  return held.prefix === null ? base : `${held.prefix} ${base}`;
+  const accelMark = held.accel ? ACCEL_MARK : "";
+  const shiftMark = held.shift ? SHIFT_MARK : "";
+  return `${accelMark}${shiftMark}${folded(held.key)}`;
 }
 
 // The chord a written form names, or none when the text is not one.
 // Storage is the only writer, but a row a person edited by hand is
 // still a row this has to answer for.
 export function readChord(text: string): Chord | null {
-  const words = text.trim().split(" ");
-  if (words.length > 2) {
+  const written = text.trim();
+  const accel = written.startsWith(ACCEL_MARK);
+  const afterAccel = accel ? written.slice(ACCEL_MARK.length) : written;
+  const shift = afterAccel.startsWith(SHIFT_MARK);
+  const key = shift ? afterAccel.slice(SHIFT_MARK.length) : afterAccel;
+  // Shift without the accelerator is a chord nothing here can match,
+  // because a press holding no accelerator is judged by the character
+  // it produced rather than by the modifiers that produced it.
+  if (key === "" || /\s/.test(key) || (shift && !accel)) {
     return null;
   }
-  const last = words.at(-1);
-  const first = words.length === 2 ? words.at(0) : undefined;
-  if (last === undefined || last === "") {
-    return null;
-  }
-  if (first !== undefined && first.length !== 1) {
-    return null;
-  }
-  const marked = last.startsWith(ACCEL_MARK);
-  const key = marked ? last.slice(ACCEL_MARK.length) : last;
-  if (key === "" || key.includes(" ")) {
-    return null;
-  }
-  // An accelerator after a prefix is a chord nothing can type without
-  // the two halves fighting over the modifier.
-  if (marked && first !== undefined) {
-    return null;
-  }
-  return { accel: marked, prefix: first ?? null, key };
+  return { accel, shift, key: folded(key) };
 }
 
 // ------------------------------------------------------------ rendering
@@ -168,23 +197,26 @@ const FACES: Readonly<Record<string, string>> = {
 };
 
 function face(key: string): string {
-  const named = FACES[key.toLowerCase()];
+  const named = FACES[folded(key)];
   if (named !== undefined) {
     return named;
   }
   return key.length === 1 ? key.toUpperCase() : key;
 }
 
-// The marks a chord is drawn as, in the order they are pressed. A
-// prefixed chord keeps the case a person types it in, because `g c` is
-// two keystrokes and reads as two letters; an accelerated one is drawn
-// the way its platform writes it.
+// The marks a chord is drawn as, in the order they are pressed, each
+// the way this platform writes it.
 export function marks(held: Chord, platform: Platform): readonly string[] {
-  if (held.prefix !== null) {
-    return [held.prefix, held.key];
+  const mac = platform === "mac";
+  const out: string[] = [];
+  if (held.accel) {
+    out.push(mac ? "⌘" : "Ctrl");
   }
-  const mark = platform === "mac" ? "⌘" : "Ctrl";
-  return held.accel ? [mark, face(held.key)] : [face(held.key)];
+  if (held.shift) {
+    out.push(mac ? "⇧" : "Shift");
+  }
+  out.push(face(held.key));
+  return out;
 }
 
 // Which modifier this browser's machine calls the accelerator.
@@ -202,17 +234,23 @@ export interface Pressed {
   readonly key: string;
   readonly ctrlKey: boolean;
   readonly metaKey: boolean;
+  readonly shiftKey: boolean;
   readonly altKey: boolean;
 }
 
-export function matches(held: Chord, pressed: Pressed, prefix: string | null): boolean {
-  if (held.prefix !== prefix || pressed.altKey) {
+export function matches(held: Chord, pressed: Pressed): boolean {
+  if (pressed.altKey) {
     return false;
   }
   if (held.accel !== (pressed.ctrlKey || pressed.metaKey)) {
     return false;
   }
-  return held.key.toLowerCase() === pressed.key.toLowerCase();
+  // Shift is asked about only beside the accelerator; the file's
+  // opening paragraph says why the other case must not ask.
+  if (held.accel && held.shift !== pressed.shiftKey) {
+    return false;
+  }
+  return folded(held.key) === folded(pressed.key);
 }
 
 export interface Conflict {
@@ -256,10 +294,8 @@ export interface Keymap {
   readonly resetAll: () => void;
   readonly changed: (action: Action) => boolean;
   readonly conflicts: Accessor<readonly Conflict[]>;
-  // The keys that open a chord rather than finishing one.
-  readonly prefixes: Accessor<readonly string[]>;
-  // Which action a key press reaches, given the prefix already held.
-  readonly acting: (pressed: Pressed, prefix: string | null) => Action | null;
+  // Which action a key press reaches.
+  readonly acting: (pressed: Pressed) => Action | null;
 }
 
 function stored(rows: Rows): Record<Action, Chord> {
@@ -299,20 +335,9 @@ export function loadKeys(rows: Rows, userAgent: string): Keymap {
     },
     changed: (action) => spell(bound()[action]) !== spell(DEFAULTS[action]),
     conflicts: () => conflictsOf(bound()),
-    prefixes() {
+    acting(pressed) {
       const held = bound();
-      const out = new Set<string>();
-      for (const action of ACTIONS) {
-        const prefix = held[action].prefix;
-        if (prefix !== null) {
-          out.add(prefix);
-        }
-      }
-      return [...out];
-    },
-    acting(pressed, prefix) {
-      const held = bound();
-      return ACTIONS.find((action) => matches(held[action], pressed, prefix)) ?? null;
+      return ACTIONS.find((action) => matches(held[action], pressed)) ?? null;
     },
   };
 }

@@ -7,8 +7,10 @@ impl protocol::Progress
 impl protocol::Rpc
 impl protocol::ScriptedOutbound
 pub const protocol::EXTERNAL_CALL_PATIENCE: kernel::tool::TimeoutMs
+pub const protocol::MESSAGE_CEILING: usize
 pub const protocol::PROTOCOL_VERSION: &str
 pub enum protocol::Admitted
+pub enum protocol::Received
 pub fn protocol::Incoming::parse(&serde_json::value::Value) -> core::result::Result<protocol::Incoming, kernel::error::shape::AxError>
 pub fn protocol::McpTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn protocol::McpTool::meta(&self) -> &kernel::tool::ToolMeta
@@ -33,6 +35,7 @@ pub fn protocol::ScriptedOutbound::notify(&mut self, &str, kernel::tool::Timeout
 pub fn protocol::admit(&protocol::Incoming, bool) -> core::result::Result<protocol::Admitted, kernel::error::shape::AxError>
 pub fn protocol::digits_for_floats(serde_json::value::Value) -> serde_json::value::Value
 pub fn protocol::handshake(&mut dyn protocol::Outbound, &mut protocol::Rpc, kernel::tool::TimeoutMs) -> core::result::Result<protocol::Handshake, kernel::error::shape::AxError>
+pub fn protocol::read_one_message(&mut dyn alloc::io::buf_read::BufRead, &str) -> core::result::Result<protocol::Received, kernel::error::shape::AxError>
 pub fn protocol::tools_from(&kernel::tool::ServerLabel, &serde_json::value::Value) -> core::result::Result<alloc::vec::Vec<protocol::Listed>, kernel::error::shape::AxError>
 pub mod protocol
 pub protocol::Admitted::Dispatch
@@ -50,6 +53,8 @@ pub protocol::Listed::remote: alloc::string::String
 pub protocol::Progress::finished: bool
 pub protocol::Progress::run: alloc::string::String
 pub protocol::Progress::turns: u32
+pub protocol::Received::EndOfInput
+pub protocol::Received::Message(alloc::string::String)
 pub struct protocol::Handshake
 pub struct protocol::Incoming
 pub struct protocol::Listed

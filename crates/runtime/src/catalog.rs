@@ -15,6 +15,8 @@
 
 use std::collections::BTreeMap;
 
+pub use kernel::event::record::SkillPin;
+
 use kernel::{AxCode, AxError, B3Hash, ToolDef, ToolMeta};
 
 use crate::mode::Mode;
@@ -30,19 +32,6 @@ pub struct CatalogEntry {
     /// read. `None` for an entry the catalog holds as text of its own,
     /// which has no document to change behind anybody's back.
     pub hash: Option<B3Hash>,
-}
-
-/// One skill, and what it hashed to when this run was given it.
-///
-/// Written into `run_started`, because the question it answers — did
-/// this file change since the city last looked — needs two readings
-/// taken at different times, and the ledger is where this city keeps a
-/// reading it can still compare against later. A file that changes
-/// content while keeping its name is what an injection looks like.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SkillPin {
-    pub name: String,
-    pub hash: B3Hash,
 }
 
 /// What a second-level disclosure turns out to be.

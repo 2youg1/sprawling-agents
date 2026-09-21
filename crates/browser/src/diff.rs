@@ -197,17 +197,49 @@ impl Decoded {
 ///
 /// # Errors
 /// Reports bytes shorter than the size they declared, which is a decoded
-/// picture that lied about itself rather than a difference.
+/// picture that lied about itself rather than a difference. The refusal
+/// names the picture to take again.
 fn same_pixel(first: &Decoded, second: &Decoded, x: u32, y: u32) -> Result<bool, AxError> {
     match (first.pixel(x, y), second.pixel(x, y)) {
+        // Both pictures reach this pixel, so this is a real comparison.
         (Some(left), Some(right)) => Ok(left == right),
-        _ => Err(AxError::failure(
-            AxCode::WireMismatch,
-            "compare two screenshots",
-            "the decoded picture is smaller than its own header",
-        )
-        .with_recovery("take the screenshot again")),
+        // One picture ran out of bytes here and the other did not.
+        (None, Some(_)) => Err(ended_early(Short::Before)),
+        (Some(_), None) => Err(ended_early(Short::After)),
+        // Neither picture reaches this pixel, so neither is usable.
+        (None, None) => Err(ended_early(Short::Both)),
     }
+}
+
+/// Which decoded picture held fewer bytes than its own header declared.
+///
+/// Named rather than counted, because the next step differs per variant:
+/// this says which screenshot to take again.
+enum Short {
+    Before,
+    After,
+    Both,
+}
+
+/// The one refusal a truncated decode reports, so "this picture lied
+/// about its own size" is worded in a single place.
+fn ended_early(side: Short) -> AxError {
+    let (subject, recovery) = match side {
+        Short::Before => (
+            "the earlier picture is smaller than its own header",
+            "take the earlier screenshot again",
+        ),
+        Short::After => (
+            "the later picture is smaller than its own header",
+            "take the later screenshot again",
+        ),
+        Short::Both => (
+            "both pictures are smaller than their own headers",
+            "take both screenshots again",
+        ),
+    };
+    AxError::failure(AxCode::WireMismatch, "compare two screenshots", subject)
+        .with_recovery(recovery)
 }
 
 /// Every picture is decoded to eight-bit RGBA, so one number describes

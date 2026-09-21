@@ -7,7 +7,8 @@
 
 use std::path::Path;
 
-use kernel::{Payload, TimeMs};
+use kernel::event::record::{CheckpointCommitted, Commit};
+use kernel::{GitOid, Payload, TimeMs};
 use serde_json::{Map, Value};
 
 use crate::error::MemoryError;
@@ -43,17 +44,18 @@ fn committed(
     scopes: &[String],
     files: Vec<String>,
 ) -> Result<Payload, MemoryError> {
-    let mut map = of.model_fields();
-    map.insert("oid".to_owned(), Value::String(oid.to_string()));
-    map.insert(
-        "scope".to_owned(),
-        Value::Array(scopes.iter().cloned().map(Value::String).collect()),
-    );
-    map.insert(
-        "files".to_owned(),
-        Value::Array(files.into_iter().map(Value::String).collect()),
-    );
-    Payload::new(map).map_err(|source| MemoryError::Draft { source })
+    let spelled = oid.to_string();
+    let oid = GitOid::parse(&spelled).ok_or_else(|| MemoryError::Checkpoint {
+        op: "record a checkpoint commit",
+        detail: format!("git named this commit {spelled}, which is not 40 hex digits"),
+    })?;
+    let record = CheckpointCommitted::Committed(Commit {
+        oid,
+        by: of.attribution(),
+        scope: scopes.to_vec(),
+        files,
+    });
+    Payload::of(&record).map_err(|source| MemoryError::Draft { source })
 }
 
 pub struct Checkpoint {

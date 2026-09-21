@@ -27,6 +27,7 @@
 mod identity;
 mod kind;
 mod payload;
+pub mod record;
 
 pub use identity::{RunId, Seq, TimeMs};
 pub use kind::{EventKind, WindowClass};

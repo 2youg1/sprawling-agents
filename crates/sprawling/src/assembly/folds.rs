@@ -116,15 +116,15 @@ impl Governance {
         payload: &Payload,
     ) {
         let data = payload.as_map();
-        let text = |key: &str| {
-            data.get(key)
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .to_owned()
-        };
         match kind {
             EventKind::RunStarted => {
-                self.sent(run, &text("task"), &text("goal"));
+                // A line this build cannot read still opened the
+                // session, so the fold files it with no words rather
+                // than leaving the run out of the account.
+                let started = payload
+                    .read::<kernel::event::record::RunStarted>()
+                    .unwrap_or_default();
+                self.sent(run, &started.task, &started.goal);
             }
             EventKind::ApprovalRequested => {
                 let Ok(item) = serde_json::from_value::<kernel::ApprovalItem>(

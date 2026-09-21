@@ -19,6 +19,7 @@
 // thinks is not a fact about which model does the thinking.
 
 import { EFFORTS } from "../../core/prefs";
+import { UNSTATED } from "../../core/slash";
 import type { Effort } from "../../wire";
 import { useSay, useUi } from "../../ui";
 import { Segmented, type Choice } from "../parts/segmented";
@@ -29,12 +30,12 @@ import { Segmented, type Choice } from "../parts/segmented";
 // to think as little as it can, while saying nothing leaves the
 // choice to the provider.
 //
-// What the city keeps stays `Effort | null`. This word is a label the
+// What the city keeps stays `Effort | null`. The word is a label this
 // track puts on at the edge that draws a cell and takes off at the
 // edge that writes the choice, so absence keeps its one spelling in
-// `core/prefs.ts`.
-const UNSTATED = "unstated";
-
+// `core/prefs.ts`. It is imported rather than written again because a
+// person reaches the same cell by typing `/effort unstated`, and the
+// two have to be the same word.
 type Level = Effort | typeof UNSTATED;
 
 export function EffortChoice() {

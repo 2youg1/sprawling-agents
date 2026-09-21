@@ -129,7 +129,7 @@ impl RunWorker {
                         // this record cannot say for itself, so "which
                         // run wrote this commit" is answered from the
                         // ledger rather than from git.
-                        data.extend(of.model_fields());
+                        data.extend(kernel::Payload::of(&of.attribution())?.as_map().clone());
                         self.record_for(
                             run_id,
                             effect::Line {

@@ -48,10 +48,21 @@ Stage 2 落地其余 18 个 kernel 模块（§8-10…§8-27）。**施工序＝�
 Stage 2 追加：
 
 - 类型加固十项全部有型可指；trybuild 八反例全集编译失败。
-- kani 七 harness 入库（`#[cfg(kani)]`）：kani 没有 Windows 宿主，每条性质配 proptest 镜像本地可跑，kani 本体入 CI Linux job（CI 恢复时生效）。
-- **七条里 CI 只证两条，理由不是成本而是信息**：被证的是 `backpressure::verification::admit_is_total_and_monotone_in_depth`（41s）与 `secret::scan::verification::log2_q10_is_total`（53s）——任意 u64 上的全函数性、单调性与定点 log2 的终止性，都是抽样到不了的地方。**不传全局 unwind**：这两条的循环界是常数（`log2_q10` 十次），CBMC 自己推得出来。另外五条写了不证，四条是同一类原因：两条的输入面是具体值（一个 `Address::parse(".sprawling/ledger")`、一个 `TaintSource::new("web:x")`），那是单测穿了一层证明的外衣，而同文件的 `#[cfg(test)]` 里已经有同一命题、且 proptest 的输入面更宽（`write_domain::reserved_target_is_outside_even_for_an_empty_domain`、`discard::allow_implies_every_guard_passed` 取任意 u64，harness 只固定一个值）；另两条构造 `Vec`／`BTreeSet`，CBMC 推不出它们内部循环的上界，无界跑了六小时、`--default-unwind 32` 又跑了 45 分钟，两次都卡在 `discard::verification::tainted_never_allows`，两次都没有给出判决——**全局 unwind 界已被实验证伪，不是这个问题的解法**。
-- **纪律在这里，名单不在这里**：每条不证的 harness 上方带一行 `// not-proved: <理由>`，`cargo xtask proof` 读这行来跳过它并打印理由，`cargo xtask proof --list` 打印今天将被证的名单。**源码标记是名单的唯一权威**，本文因此只写「不证要写明理由」这条纪律，不再养第二份清单。
-- **五条里有一条的不可解原因与另外四条不同**：`secret::scan::verification::entropy_is_total_on_short_inputs` 的输入域是真的（四字节任意），卡住它的是形状：`entropy_millibits_per_char` 对 256 槽计数表逐槽调 `log2_q10`，而每次调用内部做十轮 u128 平方——交给求解器的是约 **2,560 次符号非线性乘法**，非线性乘法正是 SAT 求解器的死穴，十五分钟不返回。它不靠改 unwind 界救：算术核心已由 `log2_q10_is_total` 单独证了，要证全函数得把 harness 改成**对单一槽**而不是对整张表。五条的出路一样只有两条：改成真正符号化的 harness（不再构造堆集合、不再整表求值），或者删掉。
+- kani 三 harness 入库（`#[cfg(kani)]`）：kani 没有 Windows 宿主，每条性质配 proptest 镜像本地可跑，kani 本体入 CI Linux job。
+- **三条全被 CI 证，理由不是成本而是信息**：`backpressure::verification::admit_is_total_and_monotone_in_depth`（41s）、`backpressure::verification::an_overflowing_sum_never_admits`、`secret::scan::verification::log2_q10_is_total`（53s）——任意 u64 上的全函数性、单调性、溢出时的 fail-closed 与定点 log2 的终止性，都是抽样到不了的地方。**不传全局 unwind**：三条的循环界要么没有循环，要么是常数（`log2_q10` 十次），CBMC 自己推得出来。
+- **入库的 harness 恒被证，这是本节的收口条件**：写了不证的 harness 让「本仓有 kani 覆盖」这句话比事实强，故一条性质要么以求解器解得动的形状入库，要么按下一条记为已关闭的决定并从源码删除。
+- **纪律在这里，名单不在这里**：每条不证的 harness 上方带一行 `// not-proved: <理由>`，`cargo xtask proof` 读这行来跳过它并打印理由，`cargo xtask proof --list` 打印今天将被证的名单。**源码标记是名单的唯一权威**，本文因此只写「不证要写明理由」这条纪律，不再养第二份清单。**今天没有一条 harness 带这行标记**：机制留着，是给下一条写得出、暂时证不动的性质一个当场说明自己的地方。
+- **五条「写了不证」的 harness 已注销，这是一个已关闭的决定**（W10 · 15.3）。五条按两类原因删除，删除面同时记在此处与它们原先所在模块的注释里：
+
+  | 已删除的 harness | 为什么这条性质不适合 kani | 今天由谁守 |
+  |---|---|---|
+  | `discard::verdict::verification::unplanned_never_allows` | 判一次 discard 要 `Vec<Address>` 与 `Registry`，CBMC 推不出它们内部循环的上界 | 同文件 `#[test]` |
+  | `discard::verdict::verification::tainted_never_allows` | 同上，另加 `BTreeSet<TaintSource>`；无界跑了六小时、`--default-unwind 32` 又跑了 45 分钟，两次都卡在这一条，两次都没有判决 | 同文件 `#[test]` |
+  | `secret::scan::verification::entropy_is_total_on_short_inputs` | 输入域是真的（四字节任意），卡住它的是形状：`entropy_millibits_per_char` 对 256 槽计数表逐槽调 `log2_q10`，每次调用十轮 u128 平方，交给求解器约 **2,560 次符号非线性乘法**，十五分钟不返回。要证得先有一个「单槽」函数，而产品代码里没有这个函数，为了证明而造一个就是给同一条规则开第二个家 | `scan_is_total_and_in_bounds`（proptest）＋ `log2_q10_is_total`（kani） |
+  | `taint::verification::join_never_drops_a_source` | 命题的载体是 `BTreeSet<String>`；取两个具体 label 则退化成一条更贵的单测 | `join_output_contains_both_inputs`（proptest） |
+  | `write_domain::verification::reserved_is_never_within` | 判定的入参恒是 `Address`（内含 `String`）；取一个具体地址同样退化成单测 | `reserved_target_is_outside_even_for_an_empty_domain`（`#[test]`） |
+
+  **全局 unwind 界已被实验证伪，不是这类问题的解法**：删除的理由是命题的载体是堆集合或非线性算术，不是界没调对。补进来的是 `an_overflowing_sum_never_admits`——`depth + cost` 溢出时恒 Shed，对任意 u64 成立，而它旁边的 `#[test]` 只钉住了 `u64::MAX` 一个点。
 - three-part refusal 矩阵：五门每条 Deny 路径的 refusal 三段非空且 alternative 可执行。
 - conformance feature 全量导出：Ledger＋Tool＋Model 三套件（sandbox 随 S3）。
 
@@ -316,6 +327,10 @@ impl Payload {
     /// (determinism rule 6). Deserialize re-validates on read.
     pub fn new(map: Map<String, Value>) -> Result<Self, AxError>;  // E_INVALID_ARGS
     pub fn empty() -> Self;
+    /// 写侧唯一门：record 结构 -> 载荷；非对象即 E_INVALID_ARGS。
+    pub fn of(record: &impl Serialize) -> Result<Self, AxError>;
+    /// 读侧唯一门：载荷 -> record 结构；读不动即 E_WIRE_MISMATCH。
+    pub fn read<T: DeserializeOwned>(&self) -> Result<T, AxError>;
 }
 
 pub struct EventDraft {                 // 调用方给的一半：语义内容
@@ -336,6 +351,46 @@ impl EventRecord {
 }
 pub struct EventRef { seq: Seq, kind: EventKind }   // 字段私有；无公开构造子
 ```
+
+**`kernel::event::record`——每个 `EventKind` 一个 serde 结构（G-15 / 7.7）**
+
+载荷的键从此只在这里拼写一次；`Payload::of` 与 `Payload::read` 是它与账本之间仅有的两扇门，
+调用点不再手写 `insert("k")` 与 `get("k")`。
+
+```rust
+pub struct SkillPin { pub name: String, pub hash: B3Hash }   // hash 必填
+pub struct RunStarted {                 // 字段全部 #[serde(default)]
+    pub task: String, pub goal: String, pub job: Option<Locator>,
+    pub parent: Option<RunId>, pub predecessor: Option<RunId>,
+    pub skills: Vec<SkillPin>,          // 空亦写出
+}
+pub struct RunForked { pub from: RunId, pub at_seq: Seq }
+pub struct CommitAttribution {          // flatten 进每一条指名提交的记录
+    pub model: String, pub effort: Option<Effort>, pub predecessor: Option<RunId>,
+}
+pub struct Commit { pub oid: GitOid, #[serde(flatten)] pub by: CommitAttribution,
+                    pub scope: Vec<String>, pub files: Vec<String> }
+#[serde(untagged)]
+pub enum CheckpointCommitted { JobPinned { job: Locator }, Committed(Commit) }
+```
+
+已迁移的 kind 与其结构：`run_started`、`run_forked`、`checkpoint_committed`；
+`pr_merged` 借 `CommitAttribution` 记「谁做的这次提交」，其余键待该族迁移。
+未列入的 kind 仍由调用点手写读取。
+
+三条不变量，因为已落盘的账本不可重拼：
+
+1. **字节不动。** 字段名即旧写方用的键；旧写方省略的键写 `skip_serializing_if`，
+   旧写方无条件写出的键（含空数组）无条件写出。键序由 `serde_json` 的 BTreeMap 定，
+   与此处声明序无关。每族一组逐字节对拍测试守住这条。
+2. **读宽写严。** 旧构建可能不写的字段一律 `#[serde(default)]`——`fixtures/golden-s1`
+   里就有一条 `data` 为 `{}` 的 `run_started`；未知键忽略而不拒。
+3. **值保留 kernel 类型。** run 是 `RunId` 而非 `String`，job 是 `Locator`；
+   手写 `Serialize` 的类型挂 `schemars(with = "String")` 说明其 wire 形状。
+
+一处记录在案的形状债：`checkpoint_committed` 同时承载「派工钉住的 job」与「围栏提交」
+两件不同的事，`CheckpointCommitted` 把这件事说出口而不是让读方从缺键推断；拆成两个 kind
+需要新 `EventKind` 与账本版本，故记录在此而不在此处做。
 
 - 序列化细节：`addr` 为 None 与 `ig` 为 false 时省略键；其余八键恒在；键序＝声明序 `v,run,seq,prev,t,who,addr,kind,data,ig`。此即 V8 跨平台字节一致的规范。
 - 铸造纪律（15.3-1）：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（trybuild 反例）。

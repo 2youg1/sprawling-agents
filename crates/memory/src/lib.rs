@@ -85,8 +85,7 @@ pub use checkpoint::Checkpoint;
 pub use checkpoint::ModelChoice;
 pub use checkpoint::Provenance;
 pub use checkpoint::effort_word;
-pub use checkpoint::model_choice_of;
-pub use checkpoint::predecessor_of;
+pub use checkpoint::recorded_effort;
 
 mod changes;
 mod hunks;

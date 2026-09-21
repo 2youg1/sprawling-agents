@@ -50,7 +50,7 @@ pub(super) fn verb(city: Option<&String>, oid: Option<&String>) -> ExitCode {
             println!("actor   {} (session {session})", said.actor.as_str());
             println!(
                 "model   {model} (effort {})",
-                memory::effort_word(said.effort)
+                memory::effort_word(memory::recorded_effort(said.effort))
             );
             println!("ledger  seq {}", said.seq.value());
             for before in said.lineage.iter().skip(1) {

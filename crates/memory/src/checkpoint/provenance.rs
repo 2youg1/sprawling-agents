@@ -20,8 +20,8 @@
 
 use std::path::Path;
 
+use kernel::event::record::CommitAttribution;
 use kernel::{Address, B3Hash, Effort, RunId};
-use serde_json::{Map, Value};
 
 use crate::error::MemoryError;
 use crate::jsonl::ledger_segments_at;
@@ -134,28 +134,16 @@ impl Provenance {
         format!("{}@{short}.sprawling", self.actor.as_str())
     }
 
-    /// The two facts a ledger record must carry so that a reader can ask
-    /// which run wrote a commit without opening git.
-    ///
-    /// The run and the actor are already the record's own identity, so
-    /// repeating them in a payload would give one fact two authorities.
-    /// What the record cannot state for itself is the model and the
-    /// effort, which until they are written here exist only on the git
-    /// commit — and the commit is the projection, not the authority.
-    pub fn model_fields(&self) -> Map<String, Value> {
-        let mut map = Map::new();
-        map.insert(MODEL_FIELD.to_owned(), Value::String(self.model.clone()));
-        map.insert(
-            EFFORT_FIELD.to_owned(),
-            Value::String(effort_word(self.effort)),
-        );
-        if let Some(predecessor) = self.predecessor {
-            map.insert(
-                PREDECESSOR_FIELD.to_owned(),
-                Value::String(predecessor.to_string()),
-            );
+    /// Which session made this commit, in the shape every record that
+    /// names a commit carries it. Both `checkpoint_committed` and
+    /// `pr_merged` are stamped from here, so the two cannot describe
+    /// one commit differently.
+    pub fn attribution(&self) -> CommitAttribution {
+        CommitAttribution {
+            model: self.model.clone(),
+            effort: Some(recorded_effort(self.effort)),
+            predecessor: self.predecessor,
         }
-        map
     }
 
     /// The trailers block, in this order and this spelling, one per line
@@ -167,7 +155,7 @@ impl Provenance {
             self.run,
             self.actor.as_str(),
             self.model,
-            effort_word(self.effort),
+            effort_word(recorded_effort(self.effort)),
             self.city,
         );
         if let Some(predecessor) = self.predecessor {
@@ -182,44 +170,17 @@ impl Provenance {
 /// while still fitting in a terminal beside the address.
 const CITY_PREFIX_HEX: usize = 12;
 
-/// What [`Provenance::model_fields`] writes and
-/// [`model_choice_of`] reads. Named once, because a key spelled in two
-/// places is a key that will be spelled two ways.
-const MODEL_FIELD: &str = "model";
-const EFFORT_FIELD: &str = "effort";
-const PREDECESSOR_FIELD: &str = "predecessor";
-
-/// Reads back the predecessor [`Provenance::model_fields`] wrote, when
-/// it wrote one. A record with none, or one this build cannot parse,
-/// answers `None`: an absent lineage beats an invented one.
-#[must_use]
-pub fn predecessor_of(data: &Map<String, Value>) -> Option<RunId> {
-    data.get(PREDECESSOR_FIELD)
-        .and_then(Value::as_str)
-        .and_then(|raw| RunId::parse(raw).ok())
-}
-
-/// Reads back what [`Provenance::model_fields`] wrote.
+/// How an effort nobody asked for is recorded: as [`Effort::None`].
 ///
-/// A record written before this repository put these two keys on the
-/// ledger says nothing about the model, and so does one whose keys this
-/// build cannot read: both answer an empty id and no effort. A
-/// projection that said "I do not know" is worth more than one that
-/// guessed, because the guess would then disagree with the commit's own
-/// trailers and neither side would say which was wrong.
+/// The distinction `Option` draws — the provider chose, against we asked
+/// it not to think — has never reached the git trailer or the ledger,
+/// both of which have written `none` for either since the first fence.
+/// Every output that has to pick a word goes through here, so one place
+/// decides it and a record written today still reads back the way a
+/// year-old build wrote it.
 #[must_use]
-pub fn model_choice_of(data: &Map<String, Value>) -> ModelChoice {
-    ModelChoice {
-        id: data
-            .get(MODEL_FIELD)
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_owned(),
-        effort: data
-            .get(EFFORT_FIELD)
-            .cloned()
-            .and_then(|word| serde_json::from_value::<Effort>(word).ok()),
-    }
+pub fn recorded_effort(effort: Option<Effort>) -> Effort {
+    effort.unwrap_or(Effort::None)
 }
 
 /// How an effort is spelled, taken from `kernel::Effort`'s own serde
@@ -230,12 +191,9 @@ pub fn model_choice_of(data: &Map<String, Value>) -> ModelChoice {
 /// Public because three readers show a person this word — the commit's
 /// trailers, the ledger payload beside them, and `sprawling whose` —
 /// and three spellings of one effort is how a reader starts doubting
-/// all three. Absent is `none`, which is what the trailer says.
+/// all three.
 #[must_use]
-pub fn effort_word(effort: Option<Effort>) -> String {
-    let Some(effort) = effort else {
-        return "none".to_owned();
-    };
+pub fn effort_word(effort: Effort) -> String {
     serde_json::to_value(effort)
         .ok()
         .and_then(|value| value.as_str().map(str::to_owned))
@@ -293,9 +251,8 @@ mod tests {
             rendered.ends_with(&format!("Sprawling-Predecessor: {predecessor}\n")),
             "{rendered}"
         );
-        let fields = successor.model_fields();
-        assert_eq!(predecessor_of(&fields), Some(predecessor));
-        assert_eq!(predecessor_of(&sample().model_fields()), None);
+        assert_eq!(successor.predecessor(), Some(predecessor));
+        assert_eq!(sample().predecessor(), None);
     }
 
     #[test]
@@ -315,26 +272,13 @@ mod tests {
     }
 
     #[test]
-    fn what_a_record_carries_reads_back_as_the_choice_that_wrote_it() {
-        let fields = sample().model_fields();
-        assert_eq!(fields["model"], "claude-sonnet-4-6");
-        assert_eq!(fields["effort"], "high");
-        let read = model_choice_of(&fields);
-        assert_eq!(read.id, "claude-sonnet-4-6");
-        assert_eq!(read.effort, Some(Effort::High));
-    }
-
-    #[test]
-    fn a_record_that_never_carried_a_model_is_read_as_saying_nothing() {
-        // Every `checkpoint_committed` written before these two keys
-        // existed, and every record whose spelling this build cannot
-        // read: an empty id and no effort, never an invented one.
-        let empty = model_choice_of(&Map::new());
-        assert_eq!(empty.id, String::new());
-        assert_eq!(empty.effort, None);
-        let mut nonsense = Map::new();
-        nonsense.insert("effort".to_owned(), Value::String("enormous".to_owned()));
-        assert_eq!(model_choice_of(&nonsense).effort, None);
+    fn an_effort_nobody_asked_for_is_recorded_as_the_level_none() {
+        // What the ledger record and the git trailer have always said,
+        // now settled once instead of at each output.
+        assert_eq!(recorded_effort(None), Effort::None);
+        assert_eq!(recorded_effort(Some(Effort::High)), Effort::High);
+        assert_eq!(effort_word(recorded_effort(None)), "none");
+        assert_eq!(effort_word(Effort::XHigh), "xhigh");
     }
 
     #[test]

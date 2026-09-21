@@ -20,8 +20,8 @@ import type { RunBelief, Sending } from "../../core/belief";
 import type { Key } from "../../core/lang";
 import { EFFORTS } from "../../core/prefs";
 import { MAYOR, current } from "../../core/route";
-import { completed, find, offered, parse } from "../../core/slash";
-import type { Reached, Slash, SlashHands } from "../../core/slash";
+import { UNSTATED, completed, find, offered, parse, reached } from "../../core/slash";
+import type { Slash, SlashHands } from "../../core/slash";
 import { selectModel } from "../../core/commands";
 import { canRecord, record, type Heard, type Recording } from "../../core/speaking";
 import { Address } from "../../core/address";
@@ -67,11 +67,6 @@ const MODEL = "model";
 const WORKSPACE = "workspace";
 const EFFORT = "effort";
 const COMMANDS = "commands";
-
-// A run as a verb reaches it, or nothing when there is no run.
-function reached(run: RunBelief | undefined): Reached | null {
-  return run === undefined ? null : { run: run.run, at: run.lastSeq };
-}
 
 export interface ComposerProps {
   readonly placeholder: string;
@@ -158,9 +153,10 @@ export function Composer(props: ComposerProps) {
     const held = endpoints();
     return held !== undefined && "endpoints" in held ? held.endpoints : undefined;
   });
+  // The id a command carries, and the name a person reads.
   const models = createMemo(() =>
     (answer()?.endpoints ?? []).flatMap((endpoint) =>
-      endpoint.models.map((model) => ({ endpoint: endpoint.name, model })),
+      endpoint.models.map((model) => ({ endpoint: endpoint.name, label: endpoint.label, model })),
     ),
   );
   const main = createMemo(() => answer()?.chosen.find((each) => each.tag === "main"));
@@ -201,10 +197,7 @@ export function Composer(props: ComposerProps) {
   // What the chip says the effort is. Nobody having chosen is a state
   // of its own rather than a level: `core/prefs.ts` answers `null`,
   // the field is left out of the request, and the provider decides.
-  const effortWord = () => {
-    const held = ui.prefs.effort();
-    return held === null ? say("effort_unstated") : say(`effort_${held}`);
-  };
+  const effortWord = () => say(`effort_${ui.prefs.effort() ?? UNSTATED}`);
 
   const hands = (): SlashHands => ({
     command,
@@ -260,7 +253,7 @@ export function Composer(props: ComposerProps) {
         items: models().map((each) => ({
           id: `${each.endpoint}\u0000${each.model}`,
           label: each.model,
-          hint: each.endpoint,
+          hint: each.label,
           chosen: chosen?.model === each.model && chosen.endpoint === each.endpoint,
         })),
       },
@@ -272,10 +265,12 @@ export function Composer(props: ComposerProps) {
       {
         id: EFFORT,
         label: say("talk_column_effort"),
-        items: EFFORTS.map((effort) => ({
-          id: effort,
-          label: say(`effort_${effort}`),
-          chosen: effort === ui.prefs.effort(),
+        // Nobody having chosen leads the column, because it is where a
+        // new city starts and the only way back to it from a level.
+        items: [UNSTATED, ...EFFORTS].map((level) => ({
+          id: level,
+          label: say(`effort_${level}`),
+          chosen: level === (ui.prefs.effort() ?? UNSTATED),
         })),
       },
     ];
@@ -318,6 +313,10 @@ export function Composer(props: ComposerProps) {
         go({ kind: "talk", address });
         setOpen("none");
       }
+      return;
+    }
+    if (item.id === UNSTATED) {
+      ui.prefs.setEffort(null);
       return;
     }
     const level = EFFORTS.find((known) => known === item.id);

@@ -18,22 +18,23 @@
 
 //! Payload faces: references on the wire, never credentials.
 
-use kernel::{
-    AxCode, AxError, Ceiling, DialectKind, ModelTag, Payload, Proxying, SecretRef, UsdMicros,
-};
+use kernel::{AxCode, AxError, ModelTag, Payload, Proxying, SecretRef};
 use serde_json::{Map, Value};
 
 use crate::endpoint::AuthSpec;
 use crate::fallback::Fallback;
-use crate::market::{InputKinds, ModelEntry};
+use crate::market::ModelEntry;
 
 use super::attached::AttachedEndpoint;
-use super::book::Choice;
 use super::tuning::EndpointTuning;
 
 /// The registration's `tuning` object, written only when the person
 /// settled something. An endpoint they left alone writes no key, so a
 /// record says "nothing was settled" by staying silent about it.
+mod reading;
+
+pub(crate) use reading::{read_attached, read_choice, text};
+
 fn tuning_value(tuning: &EndpointTuning) -> Result<Option<Value>, AxError> {
     let mut map = Map::new();
     if let Some(label) = &tuning.label {
@@ -118,7 +119,7 @@ fn pairs(tuning: Option<&Value>, key: &str) -> Vec<(String, String)> {
 /// this object existed means. A key that is present and unreadable is
 /// left out rather than guessed at, because a deadline this city
 /// invented would be a deadline nobody can explain.
-fn read_tuning(payload: &Payload) -> EndpointTuning {
+pub(super) fn read_tuning(payload: &Payload) -> EndpointTuning {
     let tuning = payload.as_map().get("tuning");
     let figure = |key: &str| {
         tuning
@@ -194,6 +195,22 @@ pub(crate) fn auth_reference(auth: &AuthSpec) -> Option<&SecretRef> {
     }
 }
 
+/// What this city settled on besides the model itself.
+///
+/// The two travel together because both are decided at the same moment
+/// and neither is a property of the catalogue row: where the call goes
+/// if this endpoint will not answer, and which rung of the ladder
+/// supplied the ceiling. `anthropic.rs` once carried the note that a
+/// ceiling invented at the call site truncates runs for a reason that
+/// appears nowhere in the account; `from` is where that reason appears,
+/// in the spelling [`crate::CeilingSource::as_str`] owns.
+pub struct Settled<'a> {
+    /// Where a call goes when this endpoint will not answer.
+    pub fallback: &'a Fallback,
+    /// Which rung of the ceiling ladder answered, when one did.
+    pub from: Option<crate::CeilingSource>,
+}
+
 /// The one place a `model_selected` payload is formed.
 ///
 /// # Errors
@@ -202,8 +219,12 @@ pub fn selected_payload(
     tag: ModelTag,
     endpoint: &str,
     entry: &ModelEntry,
-    fallback: &Fallback,
+    settled: &Settled,
 ) -> Result<Payload, AxError> {
+    let Settled {
+        fallback,
+        from: ceiling_from,
+    } = *settled;
     let mut map = Map::new();
     map.insert("tag".to_owned(), Value::String(tag.as_str().to_owned()));
     map.insert("endpoint".to_owned(), Value::String(endpoint.to_owned()));
@@ -229,6 +250,12 @@ pub fn selected_payload(
             None => Value::Null,
         },
     );
+    if let Some(rung) = ceiling_from {
+        map.insert(
+            "ceiling_from".to_owned(),
+            Value::String(rung.as_str().to_owned()),
+        );
+    }
     map.insert(
         "input".to_owned(),
         serde_json::to_value(entry.input).map_err(|err| {
@@ -248,148 +275,4 @@ pub fn selected_payload(
         map.insert(key.to_owned(), Value::Number(price.get().into()));
     }
     Payload::new(map)
-}
-
-pub(crate) fn invalid(subject: impl Into<String>) -> AxError {
-    AxError::failure(AxCode::WireMismatch, "read an endpoint record", subject)
-        .with_recovery("replay with the build that wrote this record")
-}
-
-pub(crate) fn text(payload: &Payload, key: &str) -> Result<String, AxError> {
-    payload
-        .as_map()
-        .get(key)
-        .and_then(Value::as_str)
-        .map(str::to_owned)
-        .ok_or_else(|| invalid(format!("{key} is missing or not a string")))
-}
-
-/// A registered ceiling, or `None` when this record states none.
-///
-/// Tolerant in both directions a record can spell absence: a key that is
-/// missing or null, and the zero that a build writing `u64` wrote when
-/// no catalogue row knew the model. Zero read back as a ceiling is a
-/// request the provider answers with nothing, so it reads as unknown.
-pub(crate) fn ceiling(payload: &Payload, key: &str) -> Result<Option<Ceiling>, AxError> {
-    match payload.as_map().get(key) {
-        None | Some(Value::Null) => Ok(None),
-        Some(value) => value
-            .as_u64()
-            .map(Ceiling::new)
-            .ok_or_else(|| invalid(format!("{key} is not a count"))),
-    }
-}
-
-pub(crate) fn count(payload: &Payload, key: &str) -> Result<u64, AxError> {
-    payload
-        .as_map()
-        .get(key)
-        .and_then(Value::as_u64)
-        .ok_or_else(|| invalid(format!("{key} is missing or not a count")))
-}
-
-pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxError> {
-    let dialect_value = payload
-        .as_map()
-        .get("dialect")
-        .ok_or_else(|| invalid("dialect is missing"))?;
-    let dialect: DialectKind = serde_json::from_value(dialect_value.clone())
-        .map_err(|err| invalid(format!("dialect: {err}")))?;
-    let auth = match payload.as_map().get("auth").and_then(Value::as_str) {
-        None => AuthSpec::None,
-        Some(raw) => {
-            let reference = SecretRef::parse(raw)?;
-            match payload.as_map().get("auth_header").and_then(Value::as_str) {
-                Some(header) => AuthSpec::Header {
-                    name: header.to_owned(),
-                    value: reference,
-                },
-                None => AuthSpec::Bearer(reference),
-            }
-        }
-    };
-    let models = payload
-        .as_map()
-        .get("models")
-        .and_then(Value::as_array)
-        .ok_or_else(|| invalid("models is missing or not an array"))?
-        .iter()
-        .map(|value| {
-            value
-                .as_str()
-                .map(str::to_owned)
-                .ok_or_else(|| invalid("a model id is not a string"))
-        })
-        .collect::<Result<Vec<String>, AxError>>()?;
-    Ok(AttachedEndpoint {
-        name: text(payload, "name")?,
-        base_url: text(payload, "base_url")?,
-        dialect,
-        auth,
-        models,
-        // Absent means true: every record written before this key
-        // existed came from a probe that succeeded, so an old ledger
-        // replays into the same book it always did.
-        probed: payload
-            .as_map()
-            .get("probed")
-            .and_then(Value::as_bool)
-            .unwrap_or(true),
-        tuning: read_tuning(payload),
-    })
-}
-
-pub(crate) fn read_choice(payload: &Payload) -> Result<(ModelTag, Choice), AxError> {
-    let raw = text(payload, "tag")?;
-    let tag = ModelTag::ALL
-        .into_iter()
-        .find(|candidate| candidate.as_str() == raw)
-        .ok_or_else(|| invalid(format!("{raw} is not a tag this build knows")))?;
-    // Tolerant on purpose: every `model_selected` written before this
-    // key existed replays as text-only rather than as a broken record.
-    let input = match payload.as_map().get("input") {
-        None => InputKinds::default(),
-        Some(value) => {
-            serde_json::from_value(value.clone()).map_err(|err| invalid(format!("input: {err}")))?
-        }
-    };
-    let entry = ModelEntry {
-        id: text(payload, "model")?,
-        context_tokens: count(payload, "context_tokens")?,
-        max_output_tokens: ceiling(payload, "max_output_tokens")?,
-        input,
-        input_price: UsdMicros::new(count(payload, "input_price")?),
-        output_price: UsdMicros::new(count(payload, "output_price")?),
-        cache_read_price: UsdMicros::new(count(payload, "cache_read_price")?),
-        cache_write_price: UsdMicros::new(count(payload, "cache_write_price")?),
-    };
-    // Both keys or neither: a half-written retreat names a model with
-    // no endpoint to reach it at, and guessing the missing half is the
-    // silent model switch this whole value exists to forbid.
-    let fallback = match (
-        payload
-            .as_map()
-            .get("fallback_endpoint")
-            .and_then(Value::as_str),
-        payload
-            .as_map()
-            .get("fallback_model")
-            .and_then(Value::as_str),
-    ) {
-        (Some(name), Some(id)) => Fallback::then(name, id)?,
-        (None, None) => Fallback::None,
-        _ => {
-            return Err(invalid(
-                "a fallback names only half of an endpoint and a model",
-            ));
-        }
-    };
-    Ok((
-        tag,
-        Choice {
-            endpoint: text(payload, "endpoint")?,
-            entry,
-            fallback,
-        },
-    ))
 }

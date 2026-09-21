@@ -311,6 +311,35 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
     toolchain::CARGO_FUZZ,
     toolchain::CARGO_LLVM_COV,
     toolchain::KANI,
+    Requirement {
+        name: "elan",
+        tier: Tier::Develop,
+        need: Need::Optional,
+        enables: "the adversary: property checks that drive the shipped binary over the wire",
+        // `elan` itself is a version manager a person may never call;
+        // what `just adversary` starts is `lake`, so that is what this
+        // machine is asked about.
+        detect: Detection::Program {
+            program: "lake",
+            version_arg: "--version",
+            places: NOWHERE,
+        },
+        homepage: Some("https://github.com/leanprover/elan"),
+        recipe: PerPlatform {
+            windows: Recipe::Command {
+                program: "winget",
+                args: &["install", "--id", "LeanProver.elan", "-e"],
+            },
+            macos: Recipe::Command {
+                program: "brew",
+                args: &["install", "elan-init"],
+            },
+            linux: Recipe::Print(
+                "curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+                 -sSf | sh",
+            ),
+        },
+    },
 ];
 
 const CARGO_INSTALL_JUST: Recipe = Recipe::Command {

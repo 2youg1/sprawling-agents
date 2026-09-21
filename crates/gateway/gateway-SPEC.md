@@ -604,3 +604,44 @@ impl OutputCeiling {
 - **预设表逐行注出处**，每行带厂商文档地址；查不到的行不发明数字，而是让梯子落到下一档——这就是「不补零、不补默认、不补猜测」在登记面上的样子。价目列本次不落：厂商价目随时在动，一个没有复核日期的价目行就是第二个会漂的权威，价目继续住钉版目录（§8-7），由 Stage 复核。
 - **厂商的 id 属于厂商的 host**：中转站以同名 id 转发时不套用厂商图表，它截在哪里是它自己的事实，而它的模型列表就是它陈述这件事的地方。
 - **主机表只有这一张**：`router::normalise` 的路径与形状缺省从本表取（`openrouter.ai` 是 `/api/v1`、Gemini 形是 `/v1beta`），归一化算法自身不带任何主机名。两者是一件事的两半（路线图 §3.2 审阅第 13 条）。
+
+### 8-18 `gateway::provider::registry`：一个端点是怎么连的，attach 时解析一次（形状 1 判定 ＋ 形状 6 数据面）
+
+```rust
+// provider::registry —— 连接解析，attach 后不再重算
+pub enum Family { Codex, ClaudeCode, GrokBuild, KimiCli }      // as_str(): codex|claude_code|grok_build|kimi_cli
+impl Family { pub const fn shape(self) -> DialectHint; pub const ALL: [Family; 4]; }
+pub enum ConnectionKind { OpenAiCompat, Responses, AnthropicNative, Harness(Family) }
+impl ConnectionKind {
+    pub const fn wire(self) -> DialectKind;      // 今天由哪支写请求的笔作答
+    pub const fn as_str(self) -> &'static str;   // 七个扁平词，账本／wire／配置文件共用
+    pub fn parse(word: &str) -> Result<ConnectionKind, AxError>;
+}
+pub fn resolve(shape: DialectHint, subscription: Option<Family>) -> Result<ConnectionKind, AxError>;
+
+// provider::modality —— 会话之外的两张脸（14.4 第一批）
+pub enum Modality { Embedding, Rerank }          // as_str(): embedding|rerank；ALL: [Modality; 2]
+impl ConnectionKind {
+    pub const fn path_for(self, modality: Modality) -> Option<&'static str>;
+    pub fn url_for(self, base_url: &str, modality: Modality) -> Option<String>;
+}
+```
+
+- **「这个端点是怎么连的」今天散在三处，没有一处说得出**：dialect 说由哪支笔写请求，credential 说是 key 还是订阅登录在付账，上限梯说这次调用能写多少。三处各答一半，一致到其中一处被改为止。`ConnectionKind` 是那一个答案，**attach 时在归一化之后解析一次**，写进 `endpoint_attached`、由 `Query::Config` 读回，调用路径不再猜——一件事算两遍就是两遍可以算出不同结果。
+- **登记面今天在丢一个事实**：人粘贴 responses URL，归一化正确地判出 `DialectHint::Responses`，而存进去的 `DialectKind` 只有两个变体，于是它被折成 `OpenAi`（`bin::assembly::credentials::Entered::resolved`）。`ConnectionKind::Responses` 把这句话留住；`wire()` 今天仍答 `OpenAi`，因为本仓只写了一种 OpenAI 形的请求体（路线图 4.5）。**那一天到来时改的是 `wire()` 的一条臂，没有人需要重新 attach 端点。**
+- **订阅决定连接，冲突当场拒绝**：harness 的线属于厂商而不属于表单，故签了某家订阅即 `Harness(family)`；人粘贴的形状与该家的 `shape()` 不一致时报 `E_CONFIG_INVALID` 并给出两条出路（换该厂商自己的 base URL，或改用 API key 登记）。**既不静默丢弃参数，也不替人猜**——两者都会在第一次调用处变成 404。
+- **`DialectHint::Unset` 是真状态而不是缺失值**：没人说过形状时解析拒绝，恢复语指向「把供应方文档印出来的完整 URL 粘进来」，因为带 `chat/completions`／`responses`／`messages` 尾段的 URL 自己就说了。
+- **词只有一套**：七个扁平词（`openai_compat`／`responses`／`anthropic_native` ＋ 四个家名），`as_str` 写、`parse` 读，一条测试钉住往返与不重词。harness 不拼复合串，读者无需切分。
+- **模态第一批只落形状**：`Modality::{Embedding, Rerank}` ＋「哪种连接在哪条路径上服务它」一张表。Anthropic 不发布这两张脸，四家订阅 harness 卖的是会话，故都答 `None`——**没有路径就是不服务**，调用方连 URL 都拼不出来。路径与 base URL 的拼接复用全城唯一那个 `router::join`。**入账（`embedding_called`／`rerank_called`）等 payload 类型化（G-15）落地后再接**，本节不预先写键名。
+- **chat 不是本枚举的成员**：会话路径归已经在调用它的那处（`router::attached::chat_path`），在这里再写一次就是每回合都在发的那条路径有了第二个家。
+
+### 8-19 system prefix 的稳定性是一条被守护的性质（路线图 17.2）
+
+- **性质**：同一配置下连续两次派活，发往端点的 system prefix 逐字节相等。守在 `provider::stability`，不走网络、不需要端点。
+- **为什么它值一道闸**：兼容中转按整段 prompt 做缓存。**一个逐轮变化的字节就把 cache key 挪走一次**，于是一段语义上从未变过的前缀每回合重付全价。情报（使用者观察，本仓未独立复核）：某上游客户端自某版起在发往 `/v1/messages` 的每条请求的 system prompt 最前面插入一行带 `cch=` 参数的文本，每条不同；该字段其官方服务端能识别，中转不能。
+- **供应层不得照抄这个字段**：它是对方服务端的计费旁路，本城既不需要也不该发。断言因此有两条——写出的请求两次逐字节相等；**上线的 system 文本与交给供应层的那几块逐字节相等，前面不多任何东西**，且不含 `cch=`。七种连接各测一遍，新增一种连接若未想过缓存，红在这里而不是红在别人的账单上。
+- **本仓的证伪结论（2026-09-21，读码而非跑网）：没有复现这个病，闸今天是绿的。** 前缀由 `runtime::prefix` 在 Run 开始时冻结一次，四块顺序为 city／building／resident／run，最稳定的在前；`build_prefix` 与 `system_blocks()` 都是对字节的纯函数，**无时钟、无随机、无 run id 进前三块**。
+- **任何新增前缀成分必须说明它为什么可以逐轮变化。** 不能说明的，就得挪到 run 块之后或根本不进前缀。
+- **两种失效要分开写，否则下一个读者会把闸关掉**：
+  - **设计上正确的失效**：改 effort 使缓存断点失效（§110 引官方排错文档：「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」）。前缀真的变了，人也真的改了配置。**顺带更正一处口口相传的说法**：effort 本身并不住在 prefix 里，它是 `ChatRequest.effort` 独立字段（`bin::assembly::freezing` 冻进 `RunPlan.shape`）；工具卡片同理住 `ChatRequest.tools`。住在 prefix 里的是技能清单（resident 块的 catalog 渲染）。
+  - **本条要防的意外失效**：没人决定过、也没人看得见的逐轮变化——时间戳、run id、随机序、每次请求重排的集合，以及照抄来的计费字段。
