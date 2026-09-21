@@ -12,7 +12,7 @@ use crate::assembly::*;
 fn a_building_whose_rules_do_not_parse_stops_the_run_rather_than_guessing() {
     let dir = tempfile::tempdir().unwrap();
     init_city(dir.path()).unwrap();
-    lay_rules(dir.path(), "lab", "# BUILDING.md\n\nnothing declared\n");
+    lay_rules(dir.path(), "lab", "nothing declared\n");
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![

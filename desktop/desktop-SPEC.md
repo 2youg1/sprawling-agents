@@ -314,9 +314,9 @@ impl Desk {
 
 城里要认这台 server，三件事的落点写在这里：
 
-1. **`BUILDING.md` 增一位 `desktop:`**：住在 `city::policy`，与 `confidential:`／`write:`／`review:` 同一处解析。缺省是**关**——一栋楼默认不把桌面交出去，理由与 `record`／`clipboard` 默认关是同一条。
+1. **`RULES.toml` 增一键 `desktop`**：住在 `city::policy`，与 `confidential`／`write`／`review` 同一处解析。缺省是**关**——一栋楼默认不把桌面交出去，理由与 `record`／`clipboard` 默认关是同一条。
 2. **`desktop.` 前缀的 MCP 工具归到「撤不回」那道门**：一次点击没有 restoration，`kernel::discard` 那套「拿得回来才准删」在这里无从谈起，故它该走的是**升给人**（Escalate），不是 Deny。落点是 `runtime::bench::admit` 里 `Effect::Connector` 那一支。
-3. **设置页写 `DESKTOP.toml`**：它是**治理文件**，不是产物——它说的是这栋楼的 runs 能碰什么。故它落在这栋楼的 reserved subtree（`<building>/.sprawling/DESKTOP.toml`），与 `BUILDING.md`／`CONFIG.toml` 同处，**任何 write domain 都够不着**；写它的那一点照 `city::governed` 的形状办（一道门、整份写、不拼路径），而不是让设置页自己拼一个路径出来。这就是 `DomainReach` 立下的那条读法：一份决定「residents 能写什么」的文件，恒不由 resident 写。
+3. **设置页写 `DESKTOP.toml`**：它是**治理文件**，不是产物——它说的是这栋楼的 runs 能碰什么。故它落在这栋楼的 reserved subtree（`<building>/.sprawling/DESKTOP.toml`），与 `RULES.toml`／`CONFIG.toml` 同处，**任何 write domain 都够不着**；写它的那一点照 `city::governed` 的形状办（一道门、整份写、不拼路径），而不是让设置页自己拼一个路径出来。这就是 `DomainReach` 立下的那条读法：一份决定「residents 能写什么」的文件，恒不由 resident 写。
 
 #### 落到哪一步，还欠什么
 

@@ -69,7 +69,7 @@ mod tests {
         for asked in [
             ".sprawling",
             ".sprawling/ledger/0001.jsonl",
-            "lab/.sprawling/BUILDING.md",
+            "lab/.sprawling/RULES.toml",
             "lab/room1/.sprawling/notes/one.md",
         ] {
             let err = admit(asked, "read").unwrap_err();

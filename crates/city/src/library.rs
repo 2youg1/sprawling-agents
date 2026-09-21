@@ -10,7 +10,7 @@
 //! the disk. A thousand skills may sit in the library and all of them
 //! are findable; **not one byte of them enters a run's prefix** unless
 //! that building's reading room admits it, and what a reading room
-//! admits is a list a person wrote in `BUILDING.md`.
+//! admits is a list a person wrote in `RULES.toml`.
 //!
 //! The library lives under the reserved prefix, which is outside every
 //! write domain. That is deliberate: a resident may read the stock and
@@ -134,7 +134,7 @@ impl Library {
     /// What one building's reading room admits.
     ///
     /// Matched by name alone, so a person writing the list in
-    /// `BUILDING.md` does not have to know which section something was
+    /// `RULES.toml` does not have to know which section something was
     /// filed under. A name on the list that is not on the shelves is
     /// simply absent from the result: the catalog shows what a run can
     /// actually reach, and a promise of a missing skill is worse than

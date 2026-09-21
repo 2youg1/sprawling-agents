@@ -12,7 +12,7 @@
 //! questions a second answer.
 //!
 //! The bytes a new building starts with are the template a person reads
-//! in `docs/templates/BUILDING.md`, not a copy of it kept here. One
+//! in `docs/templates/RULES.toml`, not a copy of it kept here. One
 //! string, one authority; the confidential template differs from the
 //! ordinary one by the single line whose value the city refuses to
 //! assume.
@@ -85,7 +85,7 @@ impl Building {
 /// The reserved subtree is not one, and neither is anything a dot
 /// prefixes. Rules are not required here: [`adopt`] exists precisely to
 /// draw them over a directory that was already there, so a directory
-/// with no `BUILDING.md` is a building nobody has written rules for
+/// with no `RULES.toml` is a building nobody has written rules for
 /// yet - and a lister that hid it would hide the thing a person is
 /// about to adopt.
 ///
@@ -189,7 +189,7 @@ pub fn create(
 
 /// Adopts a directory that already exists - a checked-out repository, a
 /// folder of notes - as a building. The same layout `create` writes, on
-/// top of what is already there: `BUILDING.md` must not exist yet, and
+/// top of what is already there: `RULES.toml` must not exist yet, and
 /// the spine files are only laid where they are missing, so nothing the
 /// directory holds is overwritten.
 ///

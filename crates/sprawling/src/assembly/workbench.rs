@@ -148,7 +148,7 @@ impl Site {
     /// room.
     ///
     /// Without a lease the fence is **the run's write domain**, which is
-    /// the building's own subtree plus whatever else its `BUILDING.md`
+    /// the building's own subtree plus whatever else its `RULES.toml`
     /// declares. It used to be the room, on the belief that a room is
     /// the only place a run may write in the city itself - and the gate
     /// never agreed: `city::policy::write_domain` defaults to the whole

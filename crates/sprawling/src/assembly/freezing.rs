@@ -76,7 +76,7 @@ pub(super) const NEWLINE: u8 = 10;
 /// The building slot: where this run stands, then the rules it stands
 /// under.
 ///
-/// `BUILDING.md` is here rather than left for the agent to open because
+/// `RULES.toml` is here rather than left for the agent to open because
 /// it is exactly as stable as the resident's own file — a person writes
 /// it, no run may write it, and it does not move for the length of a
 /// session. A rule an agent has to fetch before it can obey it is a rule
@@ -91,7 +91,7 @@ pub(super) const NEWLINE: u8 = 10;
 /// is an address nobody can check.
 ///
 /// It follows the rules rather than leading them, and says so, because
-/// the two can disagree: `BUILDING.md` is what this city enforces, while
+/// the two can disagree: `RULES.toml` is what this city enforces, while
 /// the project's file was written for whatever harness its authors had.
 /// A resident told to run a test suite by a building with no `exec` has
 /// to know which of the two to believe.

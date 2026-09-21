@@ -32,7 +32,7 @@ A building's own page is not in the nav — a city may hold fifty buildings — 
 
 ## Approving
 
-An item is a design question a resident could not settle by reading the rules, and it states what is being asked, who asked, and what it is about. **Nothing else waits here.** An action is never an item: a door either allows it or refuses it from the rules, and the recovery line of a refusal names the `BUILDING.md` field that would change the answer. Two answers:
+An item is a design question a resident could not settle by reading the rules, and it states what is being asked, who asked, and what it is about. **Nothing else waits here.** An action is never an item: a door either allows it or refuses it from the rules, and the recovery line of a refusal names the `RULES.toml` field that would change the answer. Two answers:
 
 - **allow** — the resident proceeds on your answer.
 - **refuse** — the run is told, in three parts: what was refused, why, and what it can do instead.
@@ -80,7 +80,7 @@ The cost page shows shares against the authoritative total rather than normalisi
 
 ## A second city that watches the first
 
-A building whose `BUILDING.md` says `browser: true` gets the **browser** tool, so a resident can open a page, look at it, click something, and take a screenshot of what it did. The arrangement worth learning is two cities: the first does the work, and the second watches the first one's own WebUI. Every command below was run in this order.
+A building whose `RULES.toml` says `browser = true` gets the **browser** tool, so a resident can open a page, look at it, click something, and take a screenshot of what it did. The arrangement worth learning is two cities: the first does the work, and the second watches the first one's own WebUI. Every command below was run in this order.
 
 **Raise the two cities.** One port serves one city, so the second one gets 8788.
 
@@ -98,10 +98,10 @@ sprawling call '{"command":{"create_building":{"addr":"watchtower","template":"m
 **Let that building drive a browser.** The line goes in the building's own rules, which live where its own residents cannot write them:
 
 ```bash
-echo 'browser: true' >> ~/cities/watcher/watchtower/.sprawling/BUILDING.md
+echo 'browser = true' >> ~/cities/watcher/watchtower/.sprawling/RULES.toml
 ```
 
-The template already wrote `confidential: false` above it. The two settings are refused together — a browser opens whatever address it is given, so it is a way out of a building whose data does not leave — and a city that reads both says which line to change rather than choosing one of them.
+The template already wrote `confidential = false` above it. The two settings are refused together — a browser opens whatever address it is given, so it is a way out of a building whose data does not leave — and a city that reads both says which line to change rather than choosing one of them.
 
 **Send it to look at the first city.**
 

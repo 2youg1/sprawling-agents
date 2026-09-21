@@ -49,13 +49,13 @@ pub fn attach(endpoint: Option<&EgressTarget>) -> GateOutcome {
                          it to listen",
                         "this building enabled `usersbrowser` and declared no address",
                         "ask the person for the address their browser is listening on, and \
-                         have them put it on a `usersbrowser:` line in BUILDING.md",
+                         have them put it on a `usersbrowser` key in RULES.toml",
                     ),
                 )
                 .with_recovery(
                     "start the browser with remote debugging, copy the ws://127.0.0.1:<port>/session \
                      address it prints, and add `usersbrowser: <that address>` to the building's \
-                     BUILDING.md; the next dispatch picks it up. Only the person can do this, \
+                     RULES.toml; the next dispatch picks it up. Only the person can do this, \
                      because it is their logins the attachment reaches",
                 ),
             ),

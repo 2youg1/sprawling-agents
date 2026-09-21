@@ -16,7 +16,7 @@ use super::family::{GECKO, WEBKIT};
 use super::table::{CHROMEDRIVER, MSEDGEDRIVER, SHELL, SPRAWLING_DESKTOP};
 use super::{Finding, Presence};
 
-/// The bits a building declares. Two live in `BUILDING.md`, one in the
+/// The bits a building declares. Two live in `RULES.toml`, one in the
 /// building's frozen `CONFIG.toml`; they are one value here because a
 /// building is judged whole.
 #[derive(Clone, PartialEq, Eq, Debug)]

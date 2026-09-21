@@ -170,7 +170,7 @@ fn prefix_assembly() -> Result<(), String> {
     };
     let plan = runtime::PrefixPlan {
         city: vec![doc("City.md", 6_000)?],
-        building: vec![doc("lab/BUILDING.md", 2_000)?, doc("lab/Memo.md", 4_000)?],
+        building: vec![doc("lab/RULES.toml", 2_000)?, doc("lab/Memo.md", 4_000)?],
         resident: vec![doc("lab/URBANITE.md", 3_000)?],
         run: vec![doc("lab/room1/JOB.md", 1_500)?],
         caps: runtime::SegmentCaps::startup_default(),

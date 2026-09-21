@@ -152,7 +152,7 @@ impl ToolBench {
             Effect::Govern => {
                 // A run does not rewrite the rules it is judged by. The
                 // rules are in `CONFIG.toml` and in the building's own
-                // `BUILDING.md`, where a person edits them; a door that
+                // `RULES.toml`, where a person edits them; a door that
                 // asked instead would be a door whose default answer
                 // gets clicked through.
                 let scope = match subject {
@@ -172,7 +172,7 @@ impl ToolBench {
                     ),
                 )
                 .with_recovery(
-                    "edit the scope's `CONFIG.toml`, or the building's `BUILDING.md`, and                      dispatch again",
+                    "edit the scope's `CONFIG.toml`, or the building's `RULES.toml`, and                      dispatch again",
                 ));
             }
             Effect::Spend => {

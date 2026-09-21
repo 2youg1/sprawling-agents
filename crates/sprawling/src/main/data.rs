@@ -264,7 +264,7 @@ pub(super) fn fork(args: &[String]) -> ExitCode {
     }
 }
 
-/// Adopts an existing directory under the city as a building: BUILDING.md
+/// Adopts an existing directory under the city as a building: RULES.toml
 /// and the missing spine files are laid, nothing found is overwritten.
 pub(super) fn adopt(dir: Option<&String>, addr: Option<&String>) -> ExitCode {
     let (Some(dir), Some(addr_raw)) = (dir, addr) else {
@@ -289,7 +289,7 @@ pub(super) fn adopt(dir: Option<&String>, addr: Option<&String>) -> ExitCode {
                 "adopted {} - its files are untouched, its rules are new",
                 addr.as_str()
             );
-            println!("edit {}/BUILDING.md to shape them", addr.as_str());
+            println!("edit {}/RULES.toml to shape them", addr.as_str());
             ExitCode::SUCCESS
         }
         Err(err) => report(err),

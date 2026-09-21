@@ -316,7 +316,7 @@ mod tests {
         // The rule this card widened. A building keeps what governs it -
         // its rules, its configuration, its own skills - in a reserved
         // subtree of its own, and the run that works in that building has
-        // the whole building as its write domain unless BUILDING.md says
+        // the whole building as its write domain unless RULES.toml says
         // otherwise. Reserved on the first segment only meant the file
         // declaring the write domain sat inside the write domain.
         assert!(Address::parse("lab/.sprawling").unwrap().is_reserved());

@@ -355,7 +355,7 @@ impl PrTool { pub fn new(room: Address, desk: Rc<RefCell<PrDesk>>) -> Result<PrT
 - **被判的是一个 commit 而不是一条分支**：`OpenRequest.commit` 记下开请求那一刻分支站在哪里，Artifact 的 digest 由它派生——**看过一个 commit 的人没有为后一个背书**。
 - **两个 commit 两个键（M-19）**：`pr_merged` 同时携 `reviewed_commit`（被审的）与 `commit`（落地的）。此前装配层把 merge commit 盖在 `commit` 上，一个键装两个事实，Ledger 的链就断在 merge 这一步。`merged_payload` 是这一行的唯一成形处，`verified_by` 与 attribution 一并由它写出；旧行没有 `reviewed_commit`，读作缺席。
 - **没有树的 Run 说得出自己没有**：`open` 在无树时报 `E_TOOL_UNAVAILABLE` 并指向「要审查的楼」，而不是把城里的文件当作自己的产出递出去。
-- **谁得到树：楼说了算**（`BUILDING.md` 的 `review: true`，见 `city-SPEC.md`）。默认不开：一个人派一个 Agent 去一个房间干活并盯着看，应当看得到文件变化；为它强制第二个 Agent 是没人要求过的纪律。
+- **谁得到树：楼说了算**（`RULES.toml` 的 `review = true`，见 `city-SPEC.md`）。默认不开：一个人派一个 Agent 去一个房间干活并盯着看，应当看得到文件变化；为它强制第二个 Agent 是没人要求过的纪律。
 
 ### 8-11 collab::triage（形状 1 判定）
 

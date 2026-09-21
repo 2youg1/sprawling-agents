@@ -318,7 +318,7 @@ pub fn egress_target(list: &EgressAllowlist, target: &EgressTarget) -> EgressOut
                 ),
             )
             .with_recovery(format!(
-                "the egress list lives in the building's `.sprawling/BUILDING.md`; \
+                "the egress list lives in the building's `.sprawling/RULES.toml`; \
                  propose adding {host} to it through the `rules` tool"
             )),
         ),

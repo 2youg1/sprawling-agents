@@ -8,7 +8,7 @@
 //!
 //! Three of the four spine documents are laid out here — `Roadmap.md`
 //! and `Memo.md` with the building, `Handoff.md` with each room. The
-//! fourth, `BUILDING.md`, is written where its meaning lives
+//! fourth, `RULES.toml`, is written where its meaning lives
 //! (`crate::building`, read by `crate::policy`): one file, one writer.
 //!
 //! The handoff is the room's rather than the building's:

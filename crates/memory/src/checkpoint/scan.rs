@@ -150,7 +150,7 @@ impl Checkpoint {
     /// One git pathspec per prefix the run may write under.
     ///
     /// Several, because a write domain is a set: a building's own
-    /// subtree plus whatever else its `BUILDING.md` declares. Staging
+    /// subtree plus whatever else its `RULES.toml` declares. Staging
     /// one of them and judging against all of them is what left files a
     /// run legitimately wrote outside every checkpoint.
     ///

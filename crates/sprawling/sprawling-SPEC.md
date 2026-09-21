@@ -304,16 +304,16 @@ pub(crate) fn snake(camel: &str) -> String;
 
 ## 8-12 prefix 自己带上它要求模型读的东西
 
-**原因**（把四个段拼出来才看得见）：Building 段是 12 字节的地址，Run 段是 71 字节的 `cas:b3-…` 内容哈希。而 City.md 要求模型「read `BUILDING.md`」「`FULL READ:` 给出你的 `JOB.md` 的路径」——**两句话指的东西一个都不在 prompt 里，而城里八个工具没有一个解析 `cas:`**。第三处：City.md 无条件说「你的第一条消息正好有三行」，这对没有 `JOB.md` 的主 Agent 是假的。
+**原因**（把四个段拼出来才看得见）：Building 段是 12 字节的地址，Run 段是 71 字节的 `cas:b3-…` 内容哈希。而 City.md 要求模型「read `RULES.toml`」「`FULL READ:` 给出你的 `JOB.md` 的路径」——**两句话指的东西一个都不在 prompt 里，而城里八个工具没有一个解析 `cas:`**。第三处：City.md 无条件说「你的第一条消息正好有三行」，这对没有 `JOB.md` 的主 Agent 是假的。
 
 ```rust
 // bin::assembly（形状 4 适配器；四个段的填充点）
 fn building_segment(city_root: &Path, addr: &Address, building: &Address) -> Vec<u8>;
-// Building 段 = 地址 + `BUILDING.md` + （若在）`<building>/AGENTS.md`。后者是**被收编的
+// Building 段 = 地址 + `RULES.toml` + （若在）`<building>/AGENTS.md`。后者是**被收编的
 // 项目自带的约定**，按同一句理由直接给而不让居民去取：要先 fetch 才能遵守的规则，
 // 要么晚一回合遵守，要么不遵守。**严格按名匹配**且只看楼自己的根：不向上找父目录、
 // 不认其它拼法、不做搜索——一个读者无法从规则推出来的地址，没人核得了。它排在
-// `BUILDING.md` **之后**并自述位次：二者会冲突（一份叫你跑测试的 AGENTS.md 遇上一栋
+// `RULES.toml` **之后**并自述位次：二者会冲突（一份叫你跑测试的 AGENTS.md 遇上一栋
 // 没有 `exec` 的楼），而城执行的是楼规。文件不在就不写标题：空标题会让居民去
 // 遵守一份不存在的约定。
 fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> Vec<u8>;
@@ -322,7 +322,7 @@ fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> 
 | 槽 | 装什么 | 稳定性依据 |
 |---|---|---|
 | City | 城里那份 `City.md` | 整座城不变 |
-| Building | 地址 ＋ `.sprawling/BUILDING.md` 全文 | 人写、任何写域够不到、整个 Run 不变 |
+| Building | 地址 ＋ `.sprawling/RULES.toml` 全文 | 人写、任何写域够不到、整个 Run 不变 |
 | Resident | `URBANITE.md`（或无身份那 106 字节）＋ catalog | 同一个 Resident 每次 Run 同样的字节 |
 | Run | `Handoff.md`（写过的话）＋ 本次 brief | 每次 Run 一份 |
 
@@ -332,7 +332,7 @@ fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> 
 - **内容哈希整个退出 prompt**。它在 Ledger 里记了两遍（`run.rs:126` 的 pin 与 `:141` 的 started），溯源不依赖模型看见它；`FULL READ:` 那一行随之消失。
 - **CAS 的 pin 改钉 brief 的正文**，两条臂都钉：一次没人派任务的会话，pin 里是「说明没有人派」的那几句，于是 Ledger 的 `job` locator 恒解析得到 Run 段真正携带过的字节，而不是一个从未被写出的文件。
 
-**本章测试**：一次真派活后，provider 收到的请求里含楼规原文（`confidential: false`）、含上一场的 Handoff 正文、含本次 Goal，且**不含** `FULL READ` 与 `cas:b3-`；一次无 Goal 的派活不写 `JOB.md`，请求里说出「working with the person directly」且不把人那句话包成 `Task:` 表单。
+**本章测试**：一次真派活后，provider 收到的请求里含楼规原文（`confidential = false`）、含上一场的 Handoff 正文、含本次 Goal，且**不含** `FULL READ` 与 `cas:b3-`；一次无 Goal 的派活不写 `JOB.md`，请求里说出「working with the person directly」且不把人那句话包成 `Task:` 表单。
 
 ## 8-13 一封信与一次敲门
 
@@ -498,7 +498,7 @@ struct CollaborationFold { … }   // 暂存 enqueued／consumed，`settle` 产 
 
 **四处检查点调用点**：（`workbench/standing.rs` 的 `ensure_base`、`workbench/tools.rs` 的 `with_checkpoint`、`driving.rs` 的逐波围栏、`reviewing.rs` 的 `PrEffect::Opened`）都从 `Site` 与 `RunWorker` 手上凑齐一个 `memory::Provenance`（run id、resident 地址、选中的模型 id 与思考档位、城的创世哈希）交给 memory；城的创世哈希由 `memory::Provenance::city_of(ledger_dir)` 只读账本首段第一行得出。
 
-**红**：在 `review: true` 的楼里派一次带 `archive` 工具调用的活，断言书架仍空。改动之前它拿到 `[Entry { kind: Decision, … lab\Archive\decision\… }]`。同一条测试接着让第二位居民检查并合入，断言书架变为 1 条——**两半同一条测试**，因为只测前半的修法可以是「干脆不写」。
+**红**：在 `review = true` 的楼里派一次带 `archive` 工具调用的活，断言书架仍空。改动之前它拿到 `[Entry { kind: Decision, … lab\Archive\decision\… }]`。同一条测试接着让第二位居民检查并合入，断言书架变为 1 条——**两半同一条测试**，因为只测前半的修法可以是「干脆不写」。
 
 ## 8-19 沙箱接上
 
@@ -786,7 +786,7 @@ planned.apply()?;                           // 才是变化
 
 于是：一个会被拒的合并永远不会先得到一条行（`MergeStale` 早于落账）；一条没落下的行也永远不会已经改了干线（`apply` 需要一个只能从 `plan_merge` 拿到的值，而行写在它之前）。
 
-**红**：`a_merge_the_history_refused_leaves_the_building_where_it_was`。一个 `review: true` 的楼，一跑改文并提交请求，第二跑去检——而第二跑的账本是 `open_faulty`（§8-29 的工具）且 `cut_on_write: Some("pr_merged")`。断言：楼里那份文件仍是 `before`。**改动之前它是 `after`**：干线已经移了，而宣布它的那一行从未落地——一座楼站在它自己的历史说从来没有并入过的工作上。
+**红**：`a_merge_the_history_refused_leaves_the_building_where_it_was`。一个 `review = true` 的楼，一跑改文并提交请求，第二跑去检——而第二跑的账本是 `open_faulty`（§8-29 的工具）且 `cut_on_write: Some("pr_merged")`。断言：楼里那份文件仍是 `before`。**改动之前它是 `after`**：干线已经移了，而宣布它的那一行从未落地——一座楼站在它自己的历史说从来没有并入过的工作上。
 
 **影面**：`memory` 公开面去 `Worktrees::merge`、增 `plan_merge` 与 `PlannedMerge`（基线与 memory-SPEC 同提交）；四个读写方全部迁完后旧入口删除，不留适配。`sprawling` 公开面不变。
 
@@ -2015,7 +2015,7 @@ pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer
 **`form_city` 在 line zero 之后多做三件事**，顺序固定：
 
 1. 追加一条 `autonomy_changed`，值 `delegate:hall/clerk`。**不改 `AUTONOMY_DEFAULT`**：缺省值说的是「没人说过话时怎么办」，而这里是这座城市作出的一个决定，人可以改它，改它要有一行历史可改。`folds` 读回这条线，重启后 clerk 依旧是代答者，无需第二处记忆。
-2. 用 `city::CityPlan::new(None).hall()` 拿到那栋楼，走 `create_building` 落 `BUILDING.md` 与脊柱文档，并记 `building_created`。走这扇门而不是另写一段，是为了让市政厅与任何一栋楼在历史里长得一样。
+2. 用 `city::CityPlan::new(None).hall()` 拿到那栋楼，走 `create_building` 落 `RULES.toml` 与脊柱文档，并记 `building_created`。走这扇门而不是另写一段，是为了让市政厅与任何一栋楼在历史里长得一样。
 3. `city::lay_out_hall_identities` 把 `MAYOR.md` 与 `CLERK.md` 写进 `<city>/.sprawling/`，已存在的不覆盖。
 
 **影响面（一处真实回归，已改）**：从此每座城市至少有两栋楼。`views::tests` 里两处按 `buildings[0]` 取楼的断言改成按地址找 `lab`——它们原本靠「城里只有一栋楼」这个此后不再成立的前提。改的是测试对现实的假设，不是把依据放宽。
@@ -2154,9 +2154,9 @@ impl Engine {
 
 **`kernel::ToolOutcome` 因此加一个字段** `attachments: Vec<ImageRef>`，`#[serde(default)]`，旧历史读成空列表。这是唯一一处跨 crate 的形状变更，波及每一个构造 `ToolOutcome` 的工具（全部改为显式空列表），不改任何一个的行为。`ContentBlock::ToolResult.attachments` 与两条 dialect 备好，`wave.rs` 里那句「a tool that produces a picture fills this in where it runs」等的就是这一步。
 
-### 8-45-4 `BUILDING.md` 的 `browser: true|false`
+### 8-45-4 `RULES.toml` 的 `browser` 的真假两值
 
-`city::policy` 多读一个键。默认 **false**：一栋楼不写这行，它的居民就没有浏览器。这与 `confidential` 的「不写即报错」不同，理由是两者的失败方向相反——隐私设置读成宽松的一侧是事故，而工具没给到只是少一件工具。confidential 楼恒为 false，写了 `browser: true` 即拒，因为一个能开任意 URL 的浏览器就是一条出网路径，而「数据不出去」是那栋楼的全部意思。
+`city::policy` 多读一个键。默认 **false**：一栋楼不写这行，它的居民就没有浏览器。这与 `confidential` 的「不写即报错」不同，理由是两者的失败方向相反——隐私设置读成宽松的一侧是事故，而工具没给到只是少一件工具。confidential 楼恒为 false，写了 `browser = true` 即拒，因为一个能开任意 URL 的浏览器就是一条出网路径，而「数据不出去」是那栋楼的全部意思。
 
 ### 8-45-5 验收
 
@@ -2164,7 +2164,7 @@ impl Engine {
 |---|---|
 | browser_bidi | Firefox 与 Chromium 的参数各自逐字断言；驱动不在即点名拒绝；两次 plan 的端口来自参数而非采样 |
 | browser_tool | 录制适配器上重放 open→snapshot→act→screenshot 一整条；截图后 CAS 里有字节、载荷里有定位符与尺寸、attachments 里有一个 `ImageRef` |
-| BUILDING.md | 不写 `browser:` 即没有；confidential 楼写 `browser: true` 即拒 |
+| RULES.toml | 不写 `browser` 即没有；confidential 楼写 `browser = true` 即拒 |
 
 ## 8-46 同一栋楼里的并发：驾驶池、一次派活切成三段，与拿走整个 ready set 的 `pursue`
 
@@ -2622,7 +2622,7 @@ pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Res
 - **`Broken` 是第三态，不是 `Absent` 的别名**：一个在 PATH 上却起不来的二进制（权限、坏文件、架构不符）、一个存在却没有那份文件的组件目录（下载中断）、一个读不了的目录（权限），三者对 verdict 都算缺，但每一个都带着自己的原因进报告行——**绝不以「absent」一词吞掉一个可以说清的故障**。`Version` 的四态同理：说了、没说、说的不是文本、超时没说；后三者仍算 Present（§8-40 已定：不说话的工具仍是装了的工具）。
 - **本二进制起的每个子进程都由 `doctor::running::stop` 结束**：`ask_version` 读到第一行后杀掉子进程，用的是安装程序超时后走的同一段——杀不掉或收不了尸都不是可以丢掉的 `Result`，而是一句带进 `Fault::Unreadable` 的话，于是「本城起了一个它停不掉的进程」这件事排在它印出的版本号之前给人看。`Fault::Unreadable` 因此是「这台电脑不让本城把这一项做完」的那一态，它携带的那句话就是全部解释，`describe` 原样印出。
 - **`Detection::Built` 的探测是真起一次引擎**，而不是读一个 cfg：一份声称带引擎却起不来的构建，doctor 必须报 `Broken { WillNotStart }`；`ENGINE_CARRIED` 是那个 cfg 的唯一拼写，表引用它。
-- **`ffmpeg` 进表但 doctor 管不到 `desktop/`**：`desktop/` 在墙外、是独立进程，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`desktop/` 不改——这是这里的边界，如实记。`sprawling-desktop` 同样进表（`desktop: true` 的楼要它在 PATH 上；Manual：从 `desktop/` 构建后放上 PATH）。
+- **`ffmpeg` 进表但 doctor 管不到 `desktop/`**：`desktop/` 在墙外、是独立进程，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`desktop/` 不改——这是这里的边界，如实记。`sprawling-desktop` 同样进表（`desktop = true` 的楼要它在 PATH 上；Manual：从 `desktop/` 构建后放上 PATH）。
 - **`browser::profile` 没有探测可搬**：读 browser-SPEC §19-1 确认 profile 是「楼的登录态住城的保留区」这条纯判定，浏览器探测住 `bin::browser_bidi::lazy`，故不改 `crates/browser`。
 - **doctor 进 lib 的公开面只多一行**：`pub use screen::verb`，二进制半边 `main/router.rs` 改调 `sprawling::doctor::verb`；`Machine` 仍是 `pub(crate) trait`，不上缝清单。`xtask/api-baselines/sprawling.txt` 随之重算。
 
@@ -2645,7 +2645,7 @@ pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Res
 
 ## 8-48 doctor 按城回答，按错误码解释（`bin::doctor::needs`、`bin::doctor::visit`、`bin::doctor::explain`）
 
-**原因**：§8-40 的 doctor 回答的是「运行中的机器对这个仓库」，而一个人真正的问题是「我这座城跑得起来吗」：一栋写了 `browser: true` 的楼在没有 Firefox 的机器上，今天要等到 run 撞上 `E_BROWSER_UNAVAILABLE` 才知道。而那条拒绝的 `recovery` 是一句通用话，没有接到运行中的机器的事实上。
+**原因**：§8-40 的 doctor 回答的是「运行中的机器对这个仓库」，而一个人真正的问题是「我这座城跑得起来吗」：一栋写了 `browser = true` 的楼在没有 Firefox 的机器上，今天要等到 run 撞上 `E_BROWSER_UNAVAILABLE` 才知道。而那条拒绝的 `recovery` 是一句通用话，没有接到运行中的机器的事实上。
 
 ```rust
 // bin::doctor::needs（形状 1 decision）：一栋楼的能力位要什么，运行中的机器给不给
@@ -2668,8 +2668,8 @@ pub(crate) fn explain(code: &str, findings: &[Finding], platform: Option<Platfor
 pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<String> }
 ```
 
-- **能力位 → 项目，是一张穷尽表**：`Browser → [gecko, chromedriver, msedgedriver, webkit]`（任一即可，Gecko 在前，因为它不要驱动；见 §8-57）；`Desktop → [sprawling-desktop]`；`Shell → [shell]`。`browser`／`desktop` 读自 `BUILDING.md`（`city::load`），`shell` 读自该楼冻结配置的 `sandbox.shell`（`city::load_config`）——三者合称「BUILDING.md 的能力位」，实际住两份文件，这里如实记。一栋楼的一个位缺时，报告行点名**那栋楼**与它试过的每一项及各自的三态答案：`lab: browser: true, and this machine has no firefox (not on the search path) and no chromedriver (not on the search path)`。
-- **读不了的楼是一行，不是沉默**：`BUILDING.md` 解析失败或 `CONFIG.toml` 无效，那一栋报 `Visited::Unreadable`，屏幕上是 `lab: its rules will not read: <err>`；楼列表本身读不到（不是城）才是 `Err`。**doctor 永不静默**。
+- **能力位 → 项目，是一张穷尽表**：`Browser → [gecko, chromedriver, msedgedriver, webkit]`（任一即可，Gecko 在前，因为它不要驱动；见 §8-57）；`Desktop → [sprawling-desktop]`；`Shell → [shell]`。`browser`／`desktop` 读自 `RULES.toml`（`city::load`），`shell` 读自该楼冻结配置的 `sandbox.shell`（`city::load_config`）——三者合称「RULES.toml 的能力位」，实际住两份文件，这里如实记。一栋楼的一个位缺时，报告行点名**那栋楼**与它试过的每一项及各自的三态答案：`lab: browser: true, and this machine has no firefox (not on the search path) and no chromedriver (not on the search path)`。
+- **读不了的楼是一行，不是沉默**：`RULES.toml` 解析失败或 `CONFIG.toml` 无效，那一栋报 `Visited::Unreadable`，屏幕上是 `lab: its rules will not read: <err>`；楼列表本身读不到（不是城）才是 `Err`。**doctor 永不静默**。
 - **`--explain <code>` 是「错误码 → 主机项目」的一张表**：`E_TOOL_UNAVAILABLE → [sandbox-engine, python-wasi, shell, sprawling-desktop, ffmpeg]`，`E_BROWSER_UNAVAILABLE → [gecko, chromium, chromedriver, msedgedriver, webkit]`。其它已知码答 `NotAboutThisMachine`（它由城里的判定决定，不由运行中的机器决定）；不认识的码答 `NoSuchCode`。每一行是**那一项的三态答案加这平台上的下一步**：`python-wasi  absent: no component at ~/.sprawling/components/python-wasi/python.wasm -> manual: put a CPython wasi build there`——一个人读完那一行就能动手。
 - **边界**：doctor 不从源码构建、不 vendor、不静默。它探测一切，只安装有官方可验证来源的东西，并逐项先问。CPython-WASI 今天没有 python.org 发布的二进制，故它仍是 `Manual`，指向组件目录；这里不下载任何东西。`~/.sprawling/components/` 因此暂时只是 doctor 探测、人填入的约定——记在这里，免得下一步以为那里有个下载器。
 - **退出码**：`doctor <city>` 在该城任一楼缺任一位时退 1，与 §8-40 的「必需项有缺退 1」同一口径；`--explain` 退 0（它是解释，不是判定），只有码本身不存在时退 1——一个拼错的码是一次问错，脚本该知道。
@@ -2714,7 +2714,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **`rounds_answer` 多读两条记录**：窗口里第一条 `run_started` 成 `Opening { task, goal, at: record.t() }`，第一条 `run_frozen` 成 `Closing { completion, at }`；`turns()` 本身一字不动。
 - **`bin::views::listing`**（新文件）：`at` 为 `None` 读城根，否则读 `city_root/<at>`；`read_dir` 一层，目录在前、文件在后、各按名字 UTF-8 序；读不了的目录答空表而不是拒绝——同 `read_building` 的口径，一个读不了的目录在页面上是一个空目录。符号链接按 `metadata` 判：指向目录的算目录。文件大小 `u64`。
 - **`bin::views::document`**（新文件）：路径同上；`std::fs::read` 失败答 `Unavailable`（同 `BuildingView` 对没立过的楼的口径）；头 8 KiB 含 NUL 判 `binary`；否则取前 `DOC_BYTES_MAX` 字节 `from_utf8_lossy`，`truncated = len > DOC_BYTES_MAX`。**不经密钥扫描**：这是城内的文件给城的主人看，而 `Hunks` 的扫描针对的是把补丁文本挂上线的那条路——但 `.sprawling/CONFIG.toml` 里只有 `secret:` 引用，明文本来就不落盘（`xtask secret` 门保证），所以这里没有可泄露的东西。
-- **验收**：`views::listing::tests`——`init_city` 铺出的城根列出 `.sprawling` 与 `hall` 两个目录；`hall` 下列出 `Roadmap.md` 等文件且目录先于文件；不存在的路径答空表。`views::document::tests`——读城里 `hall` 楼自己的 `BUILDING.md` 得到原文、`truncated == false`；一份 NUL 开头的文件判 `binary` 且 `text` 为空；不存在的文件答 `Unavailable`。`views::rounds::tests`——三条记录的会话答出 `opening.task`；冻结后答出 `closing.completion == "done"`。`views::tests`——`city_halted` 后 `city_view.halted == ["city"]`，`released` 后为空。
+- **验收**：`views::listing::tests`——`init_city` 铺出的城根列出 `.sprawling` 与 `hall` 两个目录；`hall` 下列出 `Roadmap.md` 等文件且目录先于文件；不存在的路径答空表。`views::document::tests`——读城里 `hall` 楼自己的 `RULES.toml` 得到原文、`truncated == false`；一份 NUL 开头的文件判 `binary` 且 `text` 为空；不存在的文件答 `Unavailable`。`views::rounds::tests`——三条记录的会话答出 `opening.task`；冻结后答出 `closing.completion == "done"`。`views::tests`——`city_halted` 后 `city_view.halted == ["city"]`，`released` 后为空。
 
 ## 8-53 一座楼做过的提交，倒序分页（`bin::views::commits`、`views::holding`；channels-SPEC §8-24）
 

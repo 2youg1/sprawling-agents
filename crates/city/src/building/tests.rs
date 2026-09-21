@@ -152,7 +152,10 @@ fn adopting_an_existing_directory_keeps_every_file_it_found() {
         crate::policy::rules_path(city.path(), &addr("imported")).is_file(),
         "an adopted directory has no rules of its own"
     );
-    assert!(!repo.join("BUILDING.md").exists());
+    assert!(
+        !repo.join(crate::policy::RULES_FILE).exists(),
+        "the rules belong in the reserved subtree, not in the project root"
+    );
     assert!(repo.join("Memo.md").is_file());
     // Adopting twice refuses: it is already a building.
     assert!(adopt(city.path(), &addr("imported")).is_err());

@@ -98,7 +98,7 @@ impl CityTool {
     }
 
     /// The buildings this city has, each with whether anybody has
-    /// written rules for it yet. A directory with no `BUILDING.md` is
+    /// written rules for it yet. A directory with no `RULES.toml` is
     /// what `adopt` is for, and hiding that from the caller would hide
     /// the one thing it needs to choose a verb.
     fn list(&self) -> Result<Payload, AxError> {

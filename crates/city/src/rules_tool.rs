@@ -6,7 +6,7 @@
 //! The face a building's rules show a model: read them, and propose the
 //! whole of them again.
 //!
-//! **Why this is not `edit`.** `BUILDING.md` lives in the building's
+//! **Why this is not `edit`.** `RULES.toml` lives in the building's
 //! reserved subtree, and no write domain reaches there — which is not an
 //! oversight to work around but the rule itself: a run may not quietly
 //! widen what it is allowed to do. The way through is a door of its own,
@@ -51,7 +51,7 @@ impl RulesTool {
             ),
             (
                 "text",
-                "for propose: the whole of the new BUILDING.md. It is evaluated before anything \
+                "for propose: the whole of the new RULES.toml. It is evaluated before anything \
                  is written, and a document that does not evaluate is refused",
             ),
         ] {

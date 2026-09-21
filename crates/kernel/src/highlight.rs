@@ -6,7 +6,7 @@
 //! Reading a document as spans, so the interface can show its shape.
 //!
 //! The one place this city puts a file on screen is a building's own
-//! pages, and every one of them is Markdown: `BUILDING.md` and whatever
+//! pages, and every one of them is Markdown: `SPEC.md` and whatever
 //! `*.md` sits beside it. Those are what an agent writes for the next
 //! agent and what a person reads to find out what happened, and they
 //! arrived as one flat wall of `<pre>`.

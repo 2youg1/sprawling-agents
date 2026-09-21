@@ -68,7 +68,7 @@ impl BrowserPort for AttachedBrowser {
             )
             .with_recovery(
                 "the person starts their browser with remote debugging and puts the \
-                 ws:// address it prints on a `usersbrowser:` line in BUILDING.md",
+                 ws:// address it prints on a `usersbrowser` key in RULES.toml",
             ));
         };
         if self.socket.is_none() {

@@ -5,7 +5,7 @@
 
 //! What a building's residents may write inside their prefixes.
 //!
-//! One line of `BUILDING.md` decides it, and the value is exhaustive
+//! One line of `RULES.toml` decides it, and the value is exhaustive
 //! rather than a flag: "every file here" and "the Markdown documents
 //! here" are two policies, and City Hall exists because the second one
 //! had to be sayable.

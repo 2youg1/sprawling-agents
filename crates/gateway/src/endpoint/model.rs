@@ -116,7 +116,7 @@ impl Endpoint {
         )
         .with_recovery(
             "configure a local model for this building, or drop `confidential: true` \
-             from its BUILDING.md and record why",
+             from its RULES.toml and record why",
         )
     }
 }

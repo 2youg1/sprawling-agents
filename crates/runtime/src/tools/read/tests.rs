@@ -58,7 +58,7 @@ fn a_model_chosen_path_cannot_reach_a_reserved_subtree() {
     let (mut tool, _catalog) = tool(dir.path());
     for asked in [
         ".sprawling/ledger/0001.jsonl",
-        "lab/.sprawling/BUILDING.md",
+        "lab/.sprawling/RULES.toml",
         ".sprawling/CONFIG.toml",
     ] {
         let err = tool.invoke(&call(asked)).unwrap_err();

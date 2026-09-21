@@ -12,7 +12,7 @@
 //! named exception. An action a person would have to approve is either
 //! one the rules already allow or one they already refuse, and both
 //! answers are written down where a person can change them: `CONFIG.toml`
-//! for budgets and trusted connectors, the building's `BUILDING.md` for
+//! for budgets and trusted connectors, the building's `RULES.toml` for
 //! write domains and egress. A door that escalated would be a door whose
 //! default answer gets clicked through, which is the same as no door.
 //!

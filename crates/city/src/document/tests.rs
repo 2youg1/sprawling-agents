@@ -52,7 +52,7 @@ fn a_reader_never_meets_half_a_document() {
 #[test]
 fn a_staging_file_left_by_a_killed_writer_is_not_the_document() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("BUILDING.md");
+    let path = dir.path().join("RULES.toml");
     replace(&path, b"# the rules as they stand\n").unwrap();
     let staged = staging_path(&path).unwrap();
     std::fs::write(&staged, b"# half a rul").unwrap();
