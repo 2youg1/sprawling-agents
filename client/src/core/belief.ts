@@ -7,64 +7,36 @@
 // server pushes. It holds the little that has to move at the speed of
 // the stream - which runs exist, what each is doing right now, the text
 // a model is still saying - and nothing that a query answers better.
-// Reading one payload is `channels::reading`'s rule; the two readings
-// used here (task, tool name and subject) copy that rule's field names
-// and nothing else. The subject's key order stays a copy until the
-// city sends the subject it computes (roadmap 7.12).
+//
+// **The reading of a record is `reading.ts`'s and the posture is
+// `doing.ts`'s.** This file folds: one record into one run, one answer
+// over the runs it names, one halt record against the list of shut
+// scopes. A record whose payload this build cannot read still advances
+// the position - that, the author and the time are readable - and the
+// field it could not read comes back to the caller to report.
 
 import { createStore, produce } from "solid-js/store";
 
 import { readProbed } from "./probed";
+import { PHASES, moves } from "./doing";
+import type { Doing } from "./doing";
+import { completionOf, haltOf, taskOf, toolCall } from "./reading";
+import { sameScope } from "./scope";
 import type { Probed } from "./probed";
 
-import { CITY_RUN } from "../wire";
+import { CITY_RUN, Seq } from "../wire";
 import type {
   Address,
   AxError,
   CityAnswer,
   Delta,
-  EventKind,
   EventRecord,
+  HaltScope,
   LogLine,
   RunId,
   RunSummary,
-  Seq,
   TimeMs,
 } from "../wire";
-
-// What one run is doing, in the words the city page and the room page
-// both read.
-export type Doing =
-  | { readonly kind: "thinking" }
-  | { readonly kind: "calling"; readonly tool: string; readonly subject: string | null }
-  | { readonly kind: "waiting" }
-  | { readonly kind: "frozen"; readonly completion: string | null };
-
-// Where a message typed right now will land.
-//
-// A steer is consumed at a phase boundary, so "it was sent" and "it was
-// heard" are not one moment: while a tool call is out, the run is inside
-// a system call and the words wait for it to come back. Spelling all
-// three the same way tells a person they are in a conversation when they
-// are in a queue, which is the one thing a streaming page must not say.
-export type Sending = "dispatch" | "steer" | "queued";
-
-// No run, or a frozen one, means the next message opens work rather than
-// interrupting it.
-export function sendingInto(doing: Doing | undefined): Sending {
-  if (doing === undefined) return "dispatch";
-  switch (doing.kind) {
-    case "frozen":
-      return "dispatch";
-    case "thinking":
-      return "steer";
-    // Blocked: inside a tool call, or stopped at an approval nobody has
-    // answered. Neither reaches a safe point until it is over.
-    case "calling":
-    case "waiting":
-      return "queued";
-  }
-}
 
 export interface RunBelief {
   readonly run: RunId;
@@ -72,7 +44,6 @@ export interface RunBelief {
   readonly started: TimeMs | null;
   readonly task: string | null;
   readonly lastSeq: Seq;
-  readonly lastKind: EventKind;
   readonly doing: Doing;
   // Heard from the stream and named by no answer yet: an answer folded
   // before the run began cannot name it, and that silence is not the
@@ -91,26 +62,28 @@ export interface RunBelief {
 // store, which Solid makes read-only.
 export interface Belief {
   runs: Record<string, RunBelief>;
-  halted: string[];
+  halted: HaltScope[];
+  // The ledger position the list of shut scopes is current to. Two
+  // writers touch the list - an answer states the whole of it and a
+  // record changes one scope - so without a position a gap folded back
+  // in after the answer would undo it.
+  haltedAt: Seq;
   // The last refusal a command came back with, for the page to show
   // once and the person to dismiss.
   refusal: AxError | null;
   // Every refusal this session has seen, newest last, bounded. The
   // dismissed one leaves the corner and stays here: a refusal a person
-  // waved away is still the answer to what they asked, and before this
-  // the only copy of it was the one they had just closed.
+  // waved away is still the answer to what they asked.
   notices: Notice[];
   city: string | null;
   // The last probe's answer: which endpoint, what it serves, what each
   // row stated, and where the call stopped. Held here rather than read
-  // off the history's tail, where a long city would push it out of the
-  // window.
+  // off the history's tail, where a long city would push it out.
   probed: Probed | null;
   // The tail of the process log, oldest first. A window rather than an
   // archive: a log is a diagnostic and not history, so the page keeps
-  // what a person can still act on and drops the rest, which is also
-  // what stops a city at the `wire` floor from filling this tab's
-  // memory.
+  // what a person can still act on, which is also what stops a city at
+  // the `wire` floor from filling this tab's memory.
   logs: LogLine[];
 }
 
@@ -130,46 +103,29 @@ export interface Notice {
 // history lives.
 const NOTICE_WINDOW = 50;
 
-function text(data: Record<string, unknown>, key: string): string | null {
-  const held = data[key];
-  return typeof held === "string" ? held : null;
-}
-
-// The one argument a person recognises a call by, in the order
-// `channels::reading::SUBJECT_KEYS` prefers.
-function subjectOf(data: Record<string, unknown>): string | null {
-  const args = data.args;
-  if (typeof args !== "object" || args === null) {
-    return null;
-  }
-  const map: Record<string, unknown> = { ...args };
-  for (const key of ["path", "addr", "program", "arm"]) {
-    const named = text(map, key);
-    if (named !== null) {
-      return named;
-    }
-  }
-  for (const value of Object.values(map)) {
-    if (typeof value === "string") {
-      return value;
-    }
-  }
-  return null;
-}
-
-function fresh(run: RunId, record: EventRecord): RunBelief {
+// A run this page heard of and has no record of: a gap page starting
+// after the beginning, or text that outran the run it belongs to. The
+// position is before the first record (`Seq::FIRST`) and the phase is
+// not yet a fact the stream has stated.
+function unseen(run: RunId, at: Seq): RunBelief {
   return {
     run,
     addr: null,
     started: null,
     task: null,
-    lastSeq: record.seq,
-    lastKind: record.kind,
-    doing: { kind: "thinking" },
+    lastSeq: at,
+    doing: { kind: "unknown" },
     local: true,
     saying: "",
     thinking: "",
   };
+}
+
+// What an answer says a frozen run's ending was. The completion is the
+// record's, and an answer carries none, so a run this page never
+// streamed is frozen with nothing to cite.
+function frozen(held: RunBelief | undefined): Doing {
+  return held?.doing.kind === "frozen" ? held.doing : PHASES.run_frozen;
 }
 
 // One `city_view` row read as a belief, keeping whatever the stream
@@ -184,58 +140,69 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
     const at = held.started ?? summary.started ?? null;
     return { ...held, addr: held.addr ?? summary.addr ?? null, started: at, local: false };
   }
+  // The answer is the newer reading. Its `last_kind` states the phase
+  // where the kind does; a kind that states none leaves what the page
+  // already knew in place, and a run this page never saw keeps the one
+  // thing it knows, which is that the run exists.
+  const stated = moves(summary.last_kind) ? PHASES[summary.last_kind] : undefined;
   return {
     run: summary.run,
     addr: summary.addr ?? held?.addr ?? null,
     started: summary.started ?? held?.started ?? null,
     task: held?.task ?? null,
     lastSeq: summary.last_seq,
-    lastKind: summary.last_kind,
-    doing: summary.frozen ? { kind: "frozen", completion: null } : (held?.doing ?? { kind: "thinking" }),
+    doing: summary.frozen ? frozen(held) : (stated ?? held?.doing ?? { kind: "unknown" }),
     local: false,
     saying: held?.saying ?? "",
     thinking: held?.thinking ?? "",
   };
 }
 
-// One record forward. Exhaustive over the kinds that move a run's
-// posture; everything else only advances the position.
-function fold(held: RunBelief, record: EventRecord): RunBelief {
-  const data = record.data;
-  const moved: RunBelief = { ...held, lastSeq: record.seq, lastKind: record.kind };
+// One record forward, answering the run it produced and the name of the
+// first field in it this build could not read.
+function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] {
+  const moved: RunBelief = { ...held, lastSeq: record.seq };
   switch (record.kind) {
-    case "run_started":
-      return {
-        ...moved,
-        addr: record.addr ?? null,
-        started: record.t,
-        task: text(data, "task"),
-        doing: { kind: "thinking" },
-      };
-    case "model_called":
-      return { ...moved, doing: { kind: "thinking" }, saying: "", thinking: "" };
-    case "model_returned":
-      return { ...moved, saying: "", thinking: "" };
-    case "tool_called":
-      return {
-        ...moved,
-        doing: {
-          kind: "calling",
-          tool: text(data, "name") ?? "tool",
-          subject: subjectOf(data),
+    case "run_started": {
+      const [task, bad] = taskOf(record);
+      return [
+        {
+          ...moved,
+          addr: record.addr ?? null,
+          started: record.t,
+          task,
+          doing: PHASES.run_started,
         },
-      };
+        bad,
+      ];
+    }
+    case "model_called":
+      return [{ ...moved, doing: PHASES.model_called, saying: "", thinking: "" }, null];
+    case "model_returned":
+      return [{ ...moved, saying: "", thinking: "" }, null];
+    case "tool_called": {
+      const [call, bad] = toolCall(record);
+      return [
+        { ...moved, doing: { kind: "calling", tool: call.name, subject: call.subject } },
+        bad,
+      ];
+    }
     case "tool_result":
-      return { ...moved, doing: { kind: "thinking" } };
+      return [{ ...moved, doing: PHASES.tool_result }, null];
     case "approval_requested":
-      return { ...moved, doing: { kind: "waiting" } };
-    case "run_frozen":
-      return {
-        ...moved,
-        saying: "",
-        thinking: "",
-        doing: { kind: "frozen", completion: text(data, "completion") },
-      };
+      return [{ ...moved, doing: PHASES.approval_requested }, null];
+    case "run_frozen": {
+      const [completion, bad] = completionOf(record);
+      return [
+        {
+          ...moved,
+          saying: "",
+          thinking: "",
+          doing: { kind: "frozen", completion },
+        },
+        bad,
+      ];
+    }
     // Every other kind only advances the position. Listed rather than
     // defaulted so a new kind is a decision here, not a silence, and
     // grouped a family to a line so the list reads as one block: the
@@ -263,7 +230,7 @@ function fold(held: RunBelief, record: EventRecord): RunBelief {
     case "takeover_started": case "rollback_applied": case "governed_document_written":
     case "embedding_called": case "rerank_called":
     case "adviser_asked": case "adviser_answered": case "adviser_fell_back":
-      return moved;
+      return [moved, null];
   }
 }
 
@@ -271,6 +238,7 @@ export function createBelief() {
   const [belief, setBelief] = createStore<Belief>({
     runs: {},
     halted: [],
+    haltedAt: Seq.make(0),
     refusal: null,
     notices: [],
     city: null,
@@ -280,17 +248,26 @@ export function createBelief() {
 
   // What a `city_view` answer says about runs this page never saw. A run
   // the page already follows keeps its own reading: the answer is a
-  // position, and the page holds more than a position.
-  //
-  // The answer also says which runs are left, and one it does not name
-  // is dropped: a table that only grows ends a long session in a tab
-  // nobody can use, and a run left behind by a restart or by a freeze
-  // the socket missed goes on telling the skyline and the tab's title
-  // that this city is busy.
+  // position, and the page holds more than a position. A run the answer
+  // does not name is dropped - a table that only grows ends a long
+  // session in a tab nobody can use, and a run left behind by a restart
+  // goes on telling the skyline that this city is busy.
   function adoptCity(city: CityAnswer): void {
     setBelief(
       produce((draft) => {
-        draft.halted = [...city.halted];
+        // The answer states no ledger position of its own. The newest
+        // position it does state - the furthest any run it lists has
+        // been folded - is what it can claim by, so an answer whose runs
+        // are all behind the list of shut scopes cannot take the page
+        // back over an event already folded.
+        const stated = city.runs.reduce(
+          (far, run) => (run.last_seq > far ? run.last_seq : far),
+          Seq.make(0),
+        );
+        if (stated >= draft.haltedAt) {
+          draft.halted = [...city.halted];
+          draft.haltedAt = stated;
+        }
         for (const summary of city.runs) {
           draft.runs[summary.run] = adopted(summary, draft.runs[summary.run]);
         }
@@ -308,51 +285,70 @@ export function createBelief() {
     );
   }
 
-  function apply(record: EventRecord): void {
-    setBelief(
-      produce((draft) => {
-        if (record.kind === "city_halted") {
-          const scope = text(record.data, "scope");
-          const state = text(record.data, "state");
-          if (scope !== null) {
-            const without = draft.halted.filter((held) => held !== scope);
-            draft.halted = state === "halted" ? [...without, scope] : without;
-          }
-          return;
-        }
-        if (record.kind === "city_initialized") {
-          draft.city = record.addr ?? null;
-          return;
-        }
-        if (record.kind === "endpoint_probed") {
-          const found = readProbed(record.data);
-          if (found !== null) draft.probed = found;
-          return;
-        }
-        if (record.run === CITY_RUN) {
-          return;
-        }
-        const held = draft.runs[record.run] ?? fresh(record.run, record);
-        if (held.lastSeq > record.seq) {
-          return;
-        }
-        draft.runs[record.run] = fold(held, record);
-      }),
-    );
+  // One `city_halted` record, which writes the list only when it is
+  // newer than what the list is current to. The two words decide between
+  // stopping and starting, so a record this build cannot read changes
+  // nothing rather than being read as a release.
+  function halted(record: EventRecord): string | null {
+    const [held, bad] = haltOf(record);
+    const scope = held.scope;
+    const state = held.state;
+    if (scope === null || state === null) return bad;
+    if (record.seq > belief.haltedAt) {
+      setBelief(
+        produce((draft) => {
+          const without = draft.halted.filter((each) => !sameScope(each, scope));
+          draft.halted = state === "halted" ? [...without, scope] : without;
+          draft.haltedAt = record.seq;
+        }),
+      );
+    }
+    return null;
   }
 
+  // One record in, answering the name of the first field in it this
+  // build could not read - `null` when it read the whole record.
+  function apply(record: EventRecord): string | null {
+    if (record.kind === "city_halted") {
+      return halted(record);
+    }
+    if (record.kind === "city_initialized") {
+      setBelief("city", record.addr ?? null);
+      return null;
+    }
+    if (record.kind === "endpoint_probed") {
+      const found = readProbed(record.data);
+      if (found !== null) setBelief("probed", found);
+      return null;
+    }
+    if (record.run === CITY_RUN) {
+      return null;
+    }
+    const held = belief.runs[record.run] ?? unseen(record.run, record.seq);
+    if (held.lastSeq > record.seq) {
+      return null;
+    }
+    const [next, bad] = fold(held, record);
+    setBelief("runs", record.run, next);
+    return bad;
+  }
+
+  // One piece of what the model is producing. A page that joins in the
+  // middle of a call hears the model before it hears the run, and those
+  // words are held on a belief of their own rather than dropped: the
+  // run's records fill in the address, the task and the phase as they
+  // arrive, and the next answer that does not list the run takes it
+  // away, because every run born here is `local`.
   function say(delta: Delta): void {
     setBelief(
       produce((draft) => {
-        const held = draft.runs[delta.run];
-        if (held === undefined) {
-          return;
-        }
+        const held = draft.runs[delta.run] ?? unseen(delta.run, Seq.make(0));
         if ("said" in delta.increment) {
           held.saying += delta.increment.said;
         } else {
           held.thinking += delta.increment.thought;
         }
+        draft.runs[delta.run] = held;
       }),
     );
   }
@@ -375,6 +371,12 @@ export function createBelief() {
   // the city refuses because no run answers to that id means the run
   // this page still believes live is not, so it is frozen here rather
   // than left to swallow every further message as a steer.
+  //
+  // **The words decide this, and the code cannot.** `Steer` and `Cancel`
+  // answer the same `E_INVALID_ARGS` when no run answers to the id
+  // (`assembly::commanding::routing`), so a client matching the code
+  // would freeze a run over a refused cancel; the action sentence is the
+  // only discriminator the server states.
   function refused(error: AxError | null): void {
     setBelief(
       produce((draft) => {
@@ -390,7 +392,7 @@ export function createBelief() {
         }
         const held = draft.runs[error.subject];
         if (held !== undefined && held.doing.kind !== "frozen") {
-          draft.runs[error.subject] = { ...held, doing: { kind: "frozen", completion: null } };
+          draft.runs[error.subject] = { ...held, doing: PHASES.run_frozen };
         }
       }),
     );

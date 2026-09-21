@@ -11,7 +11,8 @@
 import { Option, Schema } from "effect";
 
 import { Address } from "../wire";
-import { RunId } from "./run_id";
+import type { RunId } from "../wire";
+import { readRunId } from "./run_id";
 
 // The address grammar is the server's, carried in the schema `cargo
 // xtask wire-ts` generates from `kernel::Address`. A fragment a person
@@ -167,7 +168,7 @@ export function fromFragment(raw: string): Option.Option<View> {
     }
     case "run":
     case "live":
-      return Option.map(RunId.option(tail), (run) => ({ kind: "run", run }));
+      return Option.map(readRunId(tail), (run) => ({ kind: "run", run }));
     default:
       return Option.none();
   }

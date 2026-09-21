@@ -14,6 +14,7 @@
 import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 
 import { QUERIES } from "../core/asking";
+import { buildingIsShut } from "../core/scope";
 import { halt, pursue, release } from "../core/commands";
 import { roomOf, toFragment } from "../core/route";
 import type { Address, BuildingAnswer } from "../wire";
@@ -112,7 +113,7 @@ export function Building(props: BuildingProps) {
     const held = city();
     return held !== undefined && "city" in held ? held.city.pursuits.find((line) => line.addr === props.address) : undefined;
   });
-  const halted = () => ui.conn.belief.halted.includes(props.address);
+  const halted = () => buildingIsShut(ui.conn.belief.halted, props.address);
   const done = createMemo(() => {
     const held = building();
     if (held === undefined || !("planned" in held.progress) || held.progress.planned.total === 0) return null;

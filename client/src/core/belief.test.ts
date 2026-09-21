@@ -5,9 +5,10 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { createBelief, sendingInto, type Doing } from "./belief";
-import type { CityAnswer, EventRecord, RunSummary } from "../wire";
-import { B3Hash, RunId, Seq, TimeMs } from "../wire";
+import { createBelief } from "./belief";
+import { sendingInto, type Doing } from "./doing";
+import type { CityAnswer, EventKind, EventRecord, RunSummary } from "../wire";
+import { Address, B3Hash, CITY_RUN, RunId, Seq, TimeMs } from "../wire";
 
 describe("sending", () => {
   // The defect this pins is one of wording, and it is the one a
@@ -25,6 +26,12 @@ describe("sending", () => {
     expect(sendingInto({ kind: "thinking" })).toBe("steer");
   });
 
+  // A phase nobody stated is not a promise that the words land at a
+  // boundary, and the queue is the spelling that promises least.
+  test("a run whose phase this page was never told queues", () => {
+    expect(sendingInto({ kind: "unknown" })).toBe("queued");
+  });
+
   // Nothing in flight and a run that has ended are the same fact for a
   // person writing: the next message opens work rather than interrupting
   // it. `undefined` is "this room has no live run", not "unknown".
@@ -37,14 +44,15 @@ describe("sending", () => {
 
 const ONE = RunId.make("11111111-1111-4111-8111-111111111111");
 const TWO = RunId.make("22222222-2222-4222-8222-222222222222");
+const NIL = RunId.make(CITY_RUN);
 
-function summary(run: RunId, at: number): RunSummary {
+function summary(run: RunId, at: number, kind: EventKind = "run_started"): RunSummary {
   return {
     run,
     addr: null,
     started: null,
     last_seq: Seq.make(at),
-    last_kind: "run_started",
+    last_kind: kind,
     frozen: false,
     who: "hall/mayor",
   };
@@ -54,19 +62,30 @@ function city(runs: readonly RunSummary[]): CityAnswer {
   return { active: runs.length, buildings: [], frozen: 0, halted: [], pursuits: [], runs };
 }
 
-// One `run_started`, which is how this page first hears of a run the
-// city has not listed to it yet.
-function started(run: RunId, at: number): EventRecord {
+function event(run: RunId, at: number, kind: EventKind, data: Record<string, unknown>): EventRecord {
   return {
     run,
     seq: Seq.make(at),
-    kind: "run_started",
+    kind,
     t: TimeMs.make(at),
     who: "hall/mayor",
     prev: B3Hash.make("0".repeat(64)),
     v: 1,
-    data: { task: "write the report" },
+    data,
   };
+}
+
+// One record of a run, which is how this page first hears of a run the
+// city has not listed to it yet.
+function started(run: RunId, at: number): EventRecord {
+  return event(run, at, "run_started", { task: "write the report" });
+}
+
+// One record of the city itself. A halt is about the whole city or one
+// of its buildings, so it carries the nil run id every city-level record
+// carries.
+function halt(at: number, data: Record<string, unknown>): EventRecord {
+  return event(NIL, at, "city_halted", data);
 }
 
 describe("the runs a page believes in", () => {
@@ -122,5 +141,142 @@ describe("the runs a page believes in", () => {
     store.adoptCity(city([summary(ONE, 5)]));
     expect(store.belief.runs[ONE]?.lastSeq).toBe(Seq.make(12));
     expect(store.belief.runs[ONE]?.task).toBe("write the report");
+  });
+});
+
+describe("the phase a run is in", () => {
+  // The defect: a run adopted from an answer was drawn as `thinking`,
+  // while the row's own `last_kind` said it was stopped at an approval
+  // - the page told a person nothing waited for them while the city was
+  // waiting for them.
+  test("an answer's last kind settles the phase it can state", () => {
+    const store = createBelief();
+    store.adoptCity(city([summary(ONE, 7, "approval_requested")]));
+    expect(store.belief.runs[ONE]?.doing).toEqual({ kind: "waiting" });
+  });
+
+  // A kind that states no phase does not overwrite one the page read
+  // off the stream: the answer is newer, and it still says nothing here.
+  test("a kind that states no phase leaves the page's own reading alone", () => {
+    const store = createBelief();
+    store.apply(event(ONE, 4, "approval_requested", {}));
+    expect(store.belief.runs[ONE]?.doing).toEqual({ kind: "waiting" });
+
+    store.adoptCity(city([summary(ONE, 6, "steer_received")]));
+    expect(store.belief.runs[ONE]?.doing).toEqual({ kind: "waiting" });
+  });
+
+  test("a run this page never saw is unknown rather than thinking", () => {
+    const store = createBelief();
+    store.adoptCity(city([summary(ONE, 7, "steer_received")]));
+    expect(store.belief.runs[ONE]?.doing).toEqual({ kind: "unknown" });
+  });
+
+  // An answer carries no payload, so the phase it states is the whole of
+  // what it can say about a call: the call is named, the tool is not.
+  test("a run whose last kind is a tool call is calling with no tool named", () => {
+    const store = createBelief();
+    store.adoptCity(city([summary(ONE, 7, "tool_called")]));
+    expect(store.belief.runs[ONE]?.doing).toEqual({
+      kind: "calling",
+      tool: null,
+      subject: null,
+    });
+  });
+});
+
+describe("the scopes a person shut", () => {
+  // The defect: an answer replaced the whole list while a `city_halted`
+  // record changed one scope, and nothing compared them by position - so
+  // a gap folded back in after the answer undid it.
+  test("a halt older than the answer that answered it changes nothing", () => {
+    const store = createBelief();
+    store.apply(halt(10, { scope: "building:hall", state: "halted" }));
+    expect(store.belief.halted).toEqual([{ building: Address.make("hall") }]);
+
+    // An answer folded at 20 says the building takes work again.
+    store.adoptCity(city([summary(ONE, 20)]));
+    expect(store.belief.halted).toEqual([]);
+
+    // The record it already folded, delivered again as a gap page.
+    store.apply(halt(10, { scope: "building:hall", state: "halted" }));
+    expect(store.belief.halted).toEqual([]);
+
+    // A halt newer than the answer still lands.
+    store.apply(halt(21, { scope: "city", state: "halted" }));
+    expect(store.belief.halted).toEqual(["city"]);
+  });
+
+  // An answer whose runs are all behind the list cannot take the page
+  // back over what it has already folded.
+  test("an answer older than the list does not release a scope", () => {
+    const store = createBelief();
+    store.apply(halt(10, { scope: "city", state: "halted" }));
+    store.adoptCity(city([summary(ONE, 5)]));
+    expect(store.belief.halted).toEqual(["city"]);
+  });
+});
+
+describe("reading one record", () => {
+  // The defect: every payload key was read through a helper that
+  // answered null for a value present in another shape, so a key this
+  // build had mis-spelled or mis-typed read as "this did not happen".
+  test("a payload this build cannot read answers the field", () => {
+    const store = createBelief();
+    const bad = store.apply(event(ONE, 3, "tool_called", { name: 7, subject: "a file" }));
+    expect(bad).toBe("tool_called.name");
+    // The rest of the record is still folded: the position and the one
+    // field that did read are facts, and only the call's name is lost.
+    expect(store.belief.runs[ONE]?.lastSeq).toBe(Seq.make(3));
+    expect(store.belief.runs[ONE]?.doing).toEqual({
+      kind: "calling",
+      tool: null,
+      subject: "a file",
+    });
+  });
+
+  // A record whose two words decide between stopping and starting is
+  // not read as a release when one of them is a word this build does not
+  // know.
+  test("a halt word this build does not know changes nothing", () => {
+    const store = createBelief();
+    const bad = store.apply(halt(4, { scope: "city", state: "frozen" }));
+    expect(bad).toBe("city_halted.state");
+    expect(store.belief.halted).toEqual([]);
+  });
+
+  // The two absences the structs state: `ToolCalled::subject` is an
+  // `Option` and `RunStarted::task` carries `#[serde(default)]`.
+  test("an absent optional key is a state and not a failure", () => {
+    const store = createBelief();
+    expect(store.apply(event(ONE, 3, "tool_called", { name: "exec" }))).toBeNull();
+    expect(store.belief.runs[ONE]?.doing).toEqual({
+      kind: "calling",
+      tool: "exec",
+      subject: null,
+    });
+  });
+
+  test("an absent task reads the empty string the struct defaults to", () => {
+    const store = createBelief();
+    expect(store.apply(event(ONE, 3, "run_started", {}))).toBeNull();
+    expect(store.belief.runs[ONE]?.task).toBe("");
+  });
+});
+
+describe("text for a run this page has not met", () => {
+  // A page that joins in the middle of a call hears the model before it
+  // hears the run. Dropping those words lost the beginning of the
+  // sentence a person was reading; the run's own records fill in the
+  // address, the task and the phase as they arrive.
+  test("a delta that outran its run is held rather than dropped", () => {
+    const store = createBelief();
+    store.say({ run: ONE, increment: { said: "half a sentence" } });
+    expect(store.belief.runs[ONE]?.saying).toBe("half a sentence");
+    expect(store.belief.runs[ONE]?.local).toBe(true);
+
+    store.apply(started(ONE, 4));
+    expect(store.belief.runs[ONE]?.task).toBe("write the report");
+    expect(store.belief.runs[ONE]?.saying).toBe("half a sentence");
   });
 });

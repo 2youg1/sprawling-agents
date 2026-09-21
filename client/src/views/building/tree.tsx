@@ -13,7 +13,7 @@ import { For, Show, createMemo, createSignal, untrack } from "solid-js";
 
 import { Option } from "effect";
 
-import { RunId } from "../../core/run_id";
+import { readRunId } from "../../core/run_id";
 import { kib } from "../../core/time";
 import type { Address, Entry } from "../../wire";
 import { Address as AddressSchema } from "../../wire";
@@ -70,7 +70,7 @@ function Node(props: {
   const transcriptRun = createMemo(() => {
     const stem = props.entry.name.replace(/\.jsonl$/, "");
     if (stem === props.entry.name) return null;
-    return Option.getOrNull(RunId.option(stem));
+    return Option.getOrNull(readRunId(stem));
   });
   const run = createMemo(() => {
     const id = transcriptRun();

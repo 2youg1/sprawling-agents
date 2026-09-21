@@ -16,7 +16,8 @@
 import { Show, createMemo, createSignal, untrack } from "solid-js";
 
 import { QUERIES } from "../../core/asking";
-import type { RunBelief, Sending } from "../../core/belief";
+import type { RunBelief } from "../../core/belief";
+import type { Sending } from "../../core/doing";
 import type { Key } from "../../core/lang";
 import { MAYOR, current } from "../../core/route";
 import { UNSTATED, completed, find, offered, parse, reached } from "../../core/slash";
@@ -26,8 +27,7 @@ import { canRecord, dictation } from "../../core/speaking";
 import { Address } from "../../wire";
 import { motionOff } from "../shared/motion";
 import { useCommand, useGo, useSay, useUi } from "../../ui";
-import { Popover } from "../parts/popover";
-import type { PopoverColumn, PopoverItem } from "../parts/popover";
+import { Popover, type PopoverColumn, type PopoverItem } from "../parts/popover";
 import { Tip } from "../parts/tip";
 import { Option, Schema } from "effect";
 

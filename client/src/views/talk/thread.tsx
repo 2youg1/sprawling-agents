@@ -217,9 +217,13 @@ function Posture(props: { readonly run: RunBelief; readonly who: string }) {
             case "thinking":
               return say("talk_thinking", { who: props.who });
             case "calling":
-              return callWord(d.tool, d.subject);
+              return d.tool === null ? say("run_doing_calling") : callWord(d.tool, d.subject);
             case "waiting":
               return say("talk_waiting_you");
+            // A run this page knows is live and cannot place: the word
+            // says it is working and claims nothing about the phase.
+            case "unknown":
+              return say("city_at_work");
             case "frozen":
               return "";
           }

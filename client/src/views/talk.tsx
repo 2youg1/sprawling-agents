@@ -25,7 +25,8 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 
 import { cancel, dispatch, steer } from "../core/commands";
-import { sendingInto, type RunBelief } from "../core/belief";
+import { sendingInto } from "../core/doing";
+import type { RunBelief } from "../core/belief";
 import { MAYOR, roomOf } from "../core/route";
 import type { Address, RoundsAnswer } from "../wire";
 import { useCommand, useHearing, useSay, useUi } from "../ui";

@@ -18,6 +18,7 @@ import { halt, release } from "../core/commands";
 import { LANGS, endonym } from "../core/lang";
 import { MAYOR, current, toFragment } from "../core/route";
 import type { View } from "../core/route";
+import { cityIsShut, CITY } from "../core/scope";
 import { completed, offered, reached } from "../core/slash";
 import type { Reached, Slash, SlashHands } from "../core/slash";
 import { useCommand, useGo, useLanguage, useSay, useUi } from "../ui";
@@ -65,12 +66,12 @@ export function Palette(props: { readonly onClose: () => void }) {
       goTo({ kind: "cost" }, say("cost_title")),
       goTo({ kind: "welcome" }, say("setup_rerun")),
     ];
-    const halted = ui.conn.belief.halted.includes("city");
+    const halted = cityIsShut(ui.conn.belief.halted);
     out.push({
       label: halted ? say("city_release") : say("city_stop"),
       hint: "halt",
       act: () => {
-        command(halted ? release("city") : halt("city"));
+        command(halted ? release(CITY) : halt(CITY));
       },
     });
     for (const lang of LANGS) {

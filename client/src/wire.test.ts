@@ -114,7 +114,9 @@ describe("a malformed frame", () => {
     expect(message).toContain("└─ Command");
     expect(message).toContain('["steer"]');
     expect(message).toContain('["run"]');
-    expect(message).toContain('Expected string & Brand<"RunId">, actual 5');
+    // The run id is a pattern before it is a brand, so the mismatch is
+    // reported against the refinement the generated schema states.
+    expect(message).toContain("Expected string, actual 5");
   });
 
   test("with a kind the wire does not know is refused by name", () => {

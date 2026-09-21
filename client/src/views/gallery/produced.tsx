@@ -24,7 +24,14 @@ import { Case } from "./case";
 
 // The run every fixture here speaks for. One id, because the link a cut
 // result offers points at a run page and two ids would point at two.
-const RUN: RunId = RunId.make("run-gallery");
+//
+// A real run id and not a readable label: `RunId` is a `Uuid` on the
+// wire, so its schema states the hyphenated shape and this line is
+// checked when the module loads. A label here threw a `ParseError` at
+// import time and blanked the whole route - which is the schema doing
+// its job, on a fixture that had been spelling an id the city cannot
+// mint.
+const RUN: RunId = RunId.make("0199c0de-1a2b-4c3d-8e4f-5a6b7c8d9e00");
 
 function said(head: string, cut: number): Output {
   return { cut, head };

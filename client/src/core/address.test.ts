@@ -11,8 +11,8 @@
 import { describe, expect, test } from "bun:test";
 import { Option, Schema } from "effect";
 
-import { Address } from "../wire";
-import { RunId } from "./run_id";
+import { Address, RunId } from "../wire";
+import { readRunId } from "./run_id";
 
 const read = Schema.decodeOption(Address);
 
@@ -54,19 +54,27 @@ describe("address", () => {
 });
 
 describe("run id", () => {
-  test("reads a hyphenated uuid and a bare one, and writes the hyphenated form", () => {
+  test("reads the one spelling the city writes", () => {
     const hyphenated = "07070707-0707-0707-0707-070707070707";
-    const readRun = (raw: string): string | null => Option.getOrNull(RunId.option(raw));
-    expect(readRun(hyphenated)).toBe(hyphenated);
-    expect(readRun("07070707070707070707070707070707")).toBe(hyphenated);
-    expect(readRun("07070707-0707-0707-0707-07070707070A")).toBe(
-      "07070707-0707-0707-0707-07070707070a",
-    );
+    expect(Option.getOrNull(readRunId(hyphenated))).toEqual(RunId.make(hyphenated));
   });
 
-  test("refuses what is not a uuid", () => {
-    for (const bad of ["", "not-a-run", "0707070707070707070707070707070", "0707070707070707070707070707070g"]) {
-      expect(RunId.option(bad), bad).toEqual(Option.none());
+  // `uuid::Uuid::parse_str` reads every one of these; `kernel::RunId::
+  // parse` reads none of them, because the city writes the hyphenated
+  // lower-case form and nothing else. A client grammar of its own
+  // accepted the first two, so a link this city would refuse opened a
+  // page here.
+  test("refuses every spelling that is not the one the city writes", () => {
+    for (const bad of [
+      "",
+      "not-a-run",
+      "0707070707070707070707070707070",
+      "07070707070707070707070707070707",
+      "07070707-0707-0707-0707-07070707070A",
+      "{07070707-0707-0707-0707-070707070707}",
+      "urn:uuid:07070707-0707-0707-0707-070707070707",
+    ]) {
+      expect(Option.getOrNull(readRunId(bad)), bad).toBeNull();
     }
   });
 });

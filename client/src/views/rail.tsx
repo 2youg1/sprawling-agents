@@ -36,6 +36,7 @@ import type { Action } from "../core/keys";
 import type { Rail } from "../core/prefs";
 import { MAYOR, toFragment } from "../core/route";
 import type { View } from "../core/route";
+import { cityIsShut } from "../core/scope";
 import { useApprovals, useSay, useUi } from "../ui";
 import { Dot, Presence } from "./notices";
 import { Kbd } from "./parts/kbd";
@@ -141,7 +142,7 @@ export function Rail(props: RailProps) {
     { key: "setup", view: { kind: "setup" }, label: say("nav_settings"), action: "go.setup", glyph: <SetupGlyph /> },
   ]);
   const here = (item: Item) => (props.view.kind === item.key ? "page" : undefined);
-  const halted = () => ui.conn.belief.halted.includes("city");
+  const halted = () => cityIsShut(ui.conn.belief.halted);
 
   // How wide the column is, and how wide the nav drawn inside it is.
   //
@@ -185,7 +186,7 @@ export function Rail(props: RailProps) {
             aria-expanded={held() === "named"}
           >
             <span class="flex items-center gap-base">
-              <span class="truncate">{ui.conn.belief.city ?? "sprawling"}</span>
+              <span class="truncate">{ui.conn.belief.city ?? say("nav_city")}</span>
               <Kbd action="rail.toggle" class="ml-auto" />
             </span>
           </button>

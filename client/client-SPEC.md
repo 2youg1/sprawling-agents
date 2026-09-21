@@ -43,7 +43,7 @@ export function fill(pattern: string, slots: Readonly<Record<string, string>>): 
 - `src/lang.json` 是全部对人的字句，且是唯一权威：每键一条 `{ en, zh }`。
 - 漏译不可表示：`Key` 由 JSON 的类型推出，`say` 对不存在的键在编译期拒绝；测试另拒「中文栏与英文栏逐字相同」，例外是术语（以 `/` 或 `{` 起头，或单 token ≤12 字）。
 
-### 3-2 `src/core/route.ts`（形状 1 判定）＋ `address.ts`、`run_id.ts`（形状 2 值）
+### 3-2 `src/core/route.ts`（形状 1 判定）＋ `src/core/run_id.ts`（形状 4 适配器）
 
 ```ts
 export type View =
@@ -56,12 +56,11 @@ export function unresolved(hash: string): Option<string>; // 空片段答 None�
 export function current(location): Option<View>;          // 读地址栏（薄壳）
 export function go(location, view): void;                 // 写地址栏；hashchange 才动 signal
 
-export type Address = string & Brand<"Address">;  export const Address: Brand.Constructor<Address>;
-export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Constructor<RunId>;
+export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与转写文件名唯一的读法
 ```
 
 - 写一种、读全部旧写法：`overview`／`city`／`live`／空片段都读作与 `hall/mayor` 的对话，`approvals` 读作对话（等人的事插在流里），`ledger`／`archive`／`recycle-bin` 读作 record 三透镜，`dashboard` 读作 cost，`settings` 读作 setup。
-- `address.ts`／`run_id.ts` 是**地址栏那道缝的文法解析器**，与 `wire.ts` 的同名 brand 不重复：生成物的 brand 没有精炼，而这两个文件按 `kernel::address::Address::parse` 与 `RunId` 的文法判合法（非空、非绝对、无 `\`、无 `:`、无控制字符、无空段、无 `.`／`..` 段；8-4-4-4-12 与 32 位纯十六进制两读一写）。`route.ts`／`palette.tsx`／`building/tree.tsx` 依赖它们的 `.option()`。
+- **两个身份值都由 `client/src/wire.ts` 生成，且都带 pattern 精炼**：`Address`（`client/src/wire.ts:21`）是 `kernel::Address::parse` 的路径文法，`RunId`（`:528`）只收连字符小写 uuid。客户端不再自带文法：`core/run_id.ts` 的 `readRunId` 是 `Schema.decodeOption` 于生成的 `RunId`，`route.ts` 的片段读法与 `building/tree.tsx` 的转写文件名读法都调它，认不出答 `None`。**裸 32 位十六进制、`{…}`、`urn:uuid:` 与全大写由此都读不出**，与城收窄后的 `kernel::RunId::parse` 一致；`core/address.ts` 已删，地址栏与目录树的 `Address` 直接来自 wire.ts。
 
 ### 3-3 `src/theme.css`
 
@@ -72,7 +71,7 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
 - **4-1 TypeScript 7.0.2 与 typescript-eslint 8.70.0 不能共用一个 `typescript` 名。** 7.0.2 是 Go 版编译器，包的 `.` 导出只有 `{version, versionMajorMinor}`，没有 JS 编译器 API；typescript-eslint 的 peer 范围是 `>=4.8.4 <6.1.0`，实测 `require('typescript')` 拿不到 `createProgram`。取法：`typescript` 名给 6.0.3（该 API 的最后一条线），7.0.2 以别名 `typescript-native` 安装并承担 `typecheck`。否决「只装 7.0.2、放弃类型感知 lint」：禁 `any`／`as`／非穷尽 switch 都是类型感知规则，没有它们守卫就不存在。否决「只装 6.0.3」：违背「新引入依赖钉最新精确版」且放弃原生编译器的速度。代价：两个编译器读同一份 tsconfig，lint 用 6.0.3 的类型信息，typecheck 用 7.0.2；二者分歧时以 typecheck 为准。**升 `typescript` 这个名要先改本条，不是先改版本号。**
 - **4-2 `bun test` 必须带 `--conditions=browser`。** `solid-js` 的 exports 在 `node` 条件下给 `dist/server.js`，其中 `createEffect` 不跑；`bunfig.toml` 没有能改条件的键（实测 `[test] conditions`、`[run] conditions`、顶层 `conditions` 皆无效）。否决「测试只用不依赖响应性的 API」：效应核的全部价值就是响应性。
 - **4-3 hash 路由，不用 path 路由。** 片段不发给服务端，书签、后退、深链成立，且不动 `ClientAssets::lookup` 那道安全判定。
-- **4-4 `Address`／`RunId` 用 Effect `Brand.refined`，不用 `as`。** Brand 的构造器提供 `.option()`，非法值答 `None`，与 Rust 的 `Result` 同形；`as` 全库禁用（`as const` 除外），所以「新类型」只能由构造器产出。
+- **4-4 身份值只由生成的 `Schema` 产出，`as` 全库禁用。** `Address` 与 `RunId` 是 `wire.ts` 里带 pattern 的 brand，判合法只有一条路：`Schema.decodeOption`，非法值答 `None`，与 Rust 的 `Result` 同形（`core/run_id.ts` 是 run id 那条判定的唯一家）。`as` 全库禁用（`as const` 除外），所以「新类型」只能由构造器产出；`make` 是 brand 的构造器，供本文已经写对的字面量用（`MAYOR` 与夹具），它不查 pattern。
 - **4-5 eslint 配置用 `tseslint.config()` 而不是 ESLint 的 `defineConfig()`。** eslint-plugin-solid 经 `@typescript-eslint/utils` 给 plugin 定型，其 `RuleContext` 仍声明 ESLint 10 已删的成员（`getAncestors`、`parserPath` 等），故该 plugin 对象不可赋给 ESLint 自己的 `Plugin` 类型，`defineConfig` 在 typecheck 下红。`tseslint.config` 是 typescript-eslint 为这道缝留的定型桥，已标 deprecated；配置文件上用一条带理由的 `eslint-disable-next-line @typescript-eslint/no-deprecated`，并开 `reportUnusedDisableDirectives: "error"`——上游修好、桥不再需要的那天，这条指令变「未用」即红，与 Rust 的 `#[expect(reason)]` 同义。否决「把配置文件排除在 tsc 与 lint 之外」：那会让全库唯一不受 `as` 禁令保护的文件恰好是定义禁令的文件。
 - **4-6 Effect 只做 wire 解码。** `core/frames.ts` 用生成的 `Schema` 读每一帧（`Schema.parseJson(ServerFrame)`），这是 Effect 在运行时唯一出现的地方。理由：`Link` 是一个纯状态机，用 Stream／Fiber 包它买不到任何东西，却让每个视图多一层范式。
 - **4-7 首屏即对话。** `#/` ＝ 与 `hall/mayor` 的对话；同一房间的每次 dispatch 是一段线程；live 时 Enter 是 `steer`，冻结后 Enter 是新的 `dispatch { addr: room, session: null }`（`room_for` 对含 `/` 的地址不再开子房间）。等人的事以卡片插进对话流，不另开一页。
@@ -104,8 +103,10 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
   **一进一出两个方向，形状因此不同。** 出城的方向是五个具名改动（`setLang`／`setWelcomed`／`setPanel`／`setAppearance`／`setProxying`），每个将来各自变成一条 `Command::PutPreferences { patch }`——`channels::PreferencePatch` 的六个变体就是这个形状，交出整条记录的调用点届时要重写而具名改动不必。进城的方向是 `adopt(stated)` 一整条：一次回答陈述每一个值，按字段贴回去会贴出半新半旧的一条。`keeper()` 说此刻是哪一层在保管（`"browser"`／`"city"`），设置页把它画出来（`setup/kept.tsx`），因为「清掉浏览器数据会不会丢」是人有权知道的事。
 
   **`readPreferences` 与 `writePreferences` 互为逆，这才使缓存是缓存**：城上次答的就是下一次首帧画的。**快捷键不在这条记录里**：`PreferencesAnswer.chords` 是一张表，而 `Rows` 这道缝故意不能枚举（谁写的谁读），能列出全部覆写的只有 `keys.ts` 的 `ACTIONS`——所以 chord 今天仍按动作名逐行读写，`wire.ts` 重生后随答案一起进记录，那次改动把 `ROWS.chord` 这一族折成记录里的一个字段。
-- **4-30 设置页的 `config.toml` 侧栏引用文件，不自己拼。** 原先这一栏用 `[model_providers.<name>]` 拼出一段文字，而城自己的读法只认 `[model]`／`[sandbox]`／`[[mcp]]` 三节——把它抄进 `CONFIG.toml` 的人会拿到一句列出三节的拒绝，一个事实在前端与后端各有一个家且已经分歧。这一版把那段字符串删掉，侧栏只说「这里还读不到城的 config.toml」（`setup_toml_unread`）。填进去的是 `Query::Config { addr }`（路线图 3.3）的答案。**它逐值带层**：`channels::ConfigAnswer` 是 `{ addr, effort: Option<SettledEffort>, tuning: TuningDefaults }`，`SettledEffort` 带 `from: ConfigLayer`，因而侧栏每一行画的是「值 ＋ 它来自哪一层」，`parts/badge.tsx` 画那一层的名字。**今天画不出来**：Rust 侧的 `Query::Config` 已在，`client/src/wire.ts` 是生成物且尚未重生，所以侧栏仍是 `setup_toml_unread` 的空态；重生之后这一栏是唯一的填入点，不需要先退休任何一处手拼。
-- **4-31 设置页没有 MCP 组，skills 组是「列表 ＋ 只读源文」。** MCP 组原是一个指向 `#/mcp` 的链接，而左栏已经到得了那一页，所以它是一层什么都不做的中转，删掉。skills 组由 `setup/skills.tsx` 承担三件：放技能的文件夹（欢迎页共用这一件）、楼列（`shared/buildings.tsx`，与 `#/mcp` 同一份）、那栋楼两个书架的清单（`Query::Skills`）与打开一条后的原文（`Query::Document`，走楼页那一个 `FileView`）。**这里没有编辑器，因为城没有那扇门**：library 在保留前缀下，居民可读不可放（`crates/city/src/library.rs`），写门 `Command::PutShelved`（路线图 3.8）还不存在，一个存不下去的 `<textarea>` 会把「改了」说成两件事。
+- **4-30 设置页的 `config.toml` 侧栏引用文件，不自己拼。** 原先这一栏用 `[model_providers.<name>]` 拼出一段文字，而城自己的读法只认 `[model]`／`[sandbox]`／`[[mcp]]` 三节——把它抄进 `CONFIG.toml` 的人会拿到一句列出三节的拒绝，一个事实在前端与后端各有一个家且已经分歧。这一版把那段字符串删掉，侧栏只说「这里还读不到城的 config.toml」（`setup_toml_unread`）。填进去的是 `Query::Config { addr }`（路线图 3.3）的答案。**它逐值带层**：`channels::ConfigAnswer` 是 `{ addr, effort: Option<SettledEffort>, tuning: TuningDefaults }`，`SettledEffort` 带 `from: ConfigLayer`，因而侧栏每一行画的是「值 ＋ 它来自哪一层」，`parts/badge.tsx` 画那一层的名字。**今天画不出来**：`Query::Config` 与 `ConfigAnswer` 都在（`client/src/wire.ts` 已带 `ConfigAnswer`），而 `setup.tsx` 那一栏尚未问它，所以侧栏仍是 `setup_toml_unread` 的空态；接上之后这一栏是唯一的填入点，不需要先退休任何一处手拼。
+- **4-31 设置页没有 MCP 组，skills 组是「列表 ＋ 只读源文」。** MCP 组原是一个指向 `#/mcp` 的链接，而左栏已经到得了那一页，所以它是一层什么都不做的中转，删掉。skills 组由 `setup/skills.tsx` 承担三件：放技能的文件夹（欢迎页共用这一件）、楼列（`shared/buildings.tsx`，与 `#/mcp` 同一份）、那栋楼**三个书架**的清单（`Query::Skills`，`SkillShelf` 三臂：城库／楼架／外部架）与打开一条后的原文（`Query::Document`，走楼页那一个 `FileView`；外部架没有城内地址，那一行因此只报名不打开）。**这里没有编辑器，因为城的那扇门答「未建」**：library 在保留前缀下，居民可读不可放（`crates/city/src/library.rs`），`Command::PutShelved` 已在 wire 上而 `crates/sprawling/src/assembly/commanding/routing.rs` 以 `not_built` 拒它，一个存不下去的 `<textarea>` 会把「改了」说成两件事（写面在路线图 3.4）。
+
+  **那两级文件夹路径今天由页面拼写，这是记下的欠账。** `Shelves` 画的是 `${城名}/.sprawling/library/`，而这条路径的家是 `kernel::layout`（`RESERVED_PREFIX` 与 `LIBRARY_DIR`）——客户端与城各拼一次，城改了前缀或目录名，这一行会静默指错地方。退休它需要一个跨 wire 的字段：`SkillsAnswer`（或它的邻居）带一个由 `CityLayout::library()` 相对城根算出的 `Address`，页面改读它。今天没有任何回答携带布局，所以这一处保留并在此记录。
 - **4-32 一个状态药丸只有 `parts/badge.tsx` 一个画法。** `building/plan.tsx` 原先手画五种漆色（`done` 灰、`blocked` 实心 alert、`in_progress` 实心 accent、ready 的 `bg-g3`、其余无底色），那是同一件事的第二个家，且那串嵌套三元没有 `awaiting_approval` 的臂——等人批的一行被画成没人开工的一行。现在一个穷尽 `RoadmapStatus` 的 `weightOf(row)` 给出 `quiet`／`live`／`alert` 三档，`Badge` 画它。**两个状态共用一档是对的**：`ready` 与 `in_progress` 都是城在动，`blocked` 与 `awaiting_approval` 都是城停下来等人，而分辨它们的是词，不是颜色（7-1 的 badge 行）。代价是 done 不再比 not_started 更暗；这不是损失，因为那两个词本来就不同，而颜色按 7-1 只许重复词。
 
 ## 5 `src/core/`（形状按 ARCHITECTURE §9）
@@ -116,9 +117,13 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
 | `frames.ts` | 4 适配器 | `decodeFrame(text) -> ServerFrame \| null`, `encodeFrame(ClientFrame)` |
 | `socket.ts` | 4 适配器 | `openConnection(url, token) -> Connection { state, belief, asking, command, retry, dismissRefusal }`；`tokenIn(search)`, `socketUrl(location)`, `bearing(token)`——POST 递配对码的唯一拼写（`Authorization: Bearer`，服务端读者是 `channels::reception::offered_pairing`） |
 | `asking.ts` | 1 判定 | `createAsking(send) -> { ask(query) -> Accessor<Answer\|undefined>, refresh, answered, invalidate(record), reconnected }`；答案按内容匹配问题，无名者按到达序；`staleBy` 是事件到查询的失效表 |
-| `belief.ts` | 7 投影 | `createBelief() -> { belief: {runs, halted, refusal, city, probed}, adoptCity, apply, say, refused, named }`；`RunBelief { addr, started, task, doing: thinking\|calling\|waiting\|frozen, saying }`；`sendingInto(doing)` |
+| `belief.ts` | 7 投影 | `createBelief() -> { belief, adoptCity, apply(record) -> string \| null, say(delta), logged(line), refused(error), named(city), noticesSeen }`；`Belief { runs, halted, haltedAt, refusal, notices, city, probed, logs }`；`RunBelief { run, addr, started, task, lastSeq, doing, local, saying, thinking }`；`adopted(summary, held)`。**`apply` 答的是它读不出的字段名**（如 `tool_called.name`），`null` 才是读全了：一份形状不对的载荷仍然推进位置，但静默当作缺席的读法已删 |
+| `doing.ts` | 2 值 | `Doing = unknown \| thinking \| calling { tool: string \| null, subject } \| waiting \| frozen { completion }`、`Sending = dispatch \| steer \| queued`、`sendingInto(doing)`；`MOVING`／`moves(kind)`／`PHASES` 是「哪些 kind 陈述姿态、各自陈述什么」的独家表，流与答案两条路都读它 |
+| `reading.ts` | 4 适配器 | `taskOf(record)`、`toolCall(record)`、`completionOf(record)`、`haltOf(record)`，各答 `[值, 读不出的字段名 \| null]`；`kernel::event::record` 的字段名与 serde 属性（`Option` 与 `#[serde(default)]` 各是什么意思）在客户端只有这一处拼写 |
+| `scope.ts` | 4 适配器 | `scopeOf(spelled) -> HaltScope \| null`（Ledger 拼法→frame 拼法，唯一相遇点）、`sameScope`、`buildingIsShut`、`cityIsShut`、`CITY`；`CITY` 是两套拼法共同的那一个词，五个视图改读它，不再手写 `"city"` |
+| `run_id.ts` | 4 适配器 | `readRunId(raw) -> Option<RunId>`：`Schema.decodeOption` 于生成的 `RunId`，地址栏与转写文件名的唯一文法 |
 | `commands.ts` | 2 值 | 每个命令帧一个构造函数，自铸 `IdemKey` |
-| `enrol.ts` | 4 适配器 | `enrol(Enrolling { origin, token, realm, name, value, lang }) -> Promise<Enrolment>`；`referenceFor(provider)`。**引用来自城**：201 正文是 `kernel::SecretRef` 读回后写出的那一句，本页不自己拼一份存起来（M-22） |
+| `enrol.ts` | 4 适配器 | `enrol(Enrolling { origin, token, realm, name, value, lang }) -> Promise<Enrolment>`；`referenceFor(provider)` 是 realm／name 唯一的选词处（realm 是本页选的词，城只判字母表），`referenceText(at)` 是页面预演用的唯一拼法，`keyField`／`secretFor` 保证存的引用只用在它被归档的那个 id 上。**引用来自城**：201 正文是 `kernel::SecretRef` 读回后写出的那一句，本页不自己拼一份存起来（M-22 的客户端半边；realm 生成成 wire 枚举的那一半未落） |
 | `speaking.ts` | 4 适配器 | `canRecord()`, `record(origin, token) -> Promise<Recording \| null>`；`Recording.stop() -> Promise<Heard>`，`Heard` 穷尽（text／refused／silent） |
 | `idem.ts` | 2 值 | `mintIdem()` |
 | `mark.ts` | 4 适配器 | `paintMark(document, quiet \| live \| waiting)`：把令牌解算成引擎实际会画的颜色，拼成 SVG data URL 写进 `<link rel="icon">`；零颜色字面量 |
@@ -360,10 +365,10 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
 
 ## 8 验收
 
-`bun run lint`、`bun run typecheck`、`bun run test`（93 条）三样绿，`cargo xtask npm`、`cargo xtask wire-ts`、`cargo xtask color`、`cargo xtask wording`、`cargo xtask render` 绿；`just check-client` 是这三条脚本的一条线。
+`bun run lint`、`bun run typecheck`、`bun run test`（110 条）三样绿，`cargo xtask npm`、`cargo xtask wire-ts`、`cargo xtask color`、`cargo xtask wording`、`cargo xtask render` 绿；`just check-client` 是这三条脚本的一条线。
 
 在一座真城加一个说 OpenAI 形的假供应方上走得通的：连接与握手、引导五步、从 composer 派活、工具调用折叠、Markdown 回复、结局分隔线、城市绘图、目录树与文件原文、run 页四透镜、记录三透镜、成本页、设置页 attach 与 select、`#/mcp` 三扇门加删（写进 `CONFIG.toml`）、楼页提交列表与 session 跳转、左栏展开、草稿留存。
 
-**`keeper()` 今天只答得出 `"browser"`**：`Query::Preferences` 已在 Rust 侧（`channels::PreferencesAnswer`），`client/src/wire.ts` 尚未重生，所以 `adopt` 在生产路径上没有调用者。`"city"` 那一态由 `#/gallery` 的 `kept` 夹具画出并被 `xtask render` 在五个页宽下量到，因此它不是一条没人看过的分支。重生之后要接的是两处：`ui.tsx` 问 `QUERIES.preferences` 并把答案交给 `adopt`，五个具名改动各发一条 `Command::PutPreferences { patch }`。
+**`keeper()` 今天只答得出 `"browser"`**：`Query::Preferences` 与 `channels::PreferencesAnswer` 都在，`client/src/wire.ts` 也已带 `PreferencesAnswer`，而 `ui.tsx` 尚未问 `QUERIES.preferences`，所以 `adopt` 在生产路径上没有调用者。`"city"` 那一态由 `#/gallery` 的 `kept` 夹具画出并被 `xtask render` 在五个页宽下量到，因此它不是一条没人看过的分支。要接的是两处：`ui.tsx` 问 `QUERIES.preferences` 并把答案交给 `adopt`，五个具名改动各发一条 `Command::PutPreferences { patch }`。
 
 **未验的**：`Changes`／`Hunks` 有内容时的样子、Firefox 与 Zen 的无头截图（`-screenshot` 不出图，须走 BiDi）、`Tip` 两条定位分支各自的 `#/gallery` 夹具（`xtask render` 只读 `#/gallery`，所以这两条分支在真引擎里的落点尚无机器读者）、**§7 的键表**（`xtask render` 今天只量盒子，没有一次按键进过真引擎，所以每一行键表今天的读者只有人）。

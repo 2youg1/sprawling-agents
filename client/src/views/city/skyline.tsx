@@ -103,6 +103,10 @@ function Building(props: {
         return "fill-accent-solid blink";
       case "thinking":
         return "fill-accent-solid";
+      // A live run whose phase this page was never told: the window is
+      // lit, without the blink that says a model is thinking.
+      case "unknown":
+        return "fill-accent-solid";
     }
   };
   const door = () => ({ x: t().x + t().w / 2 - 8, y: props.ground - 22, w: 16, h: 22 });

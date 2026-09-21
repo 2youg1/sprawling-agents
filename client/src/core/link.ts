@@ -156,6 +156,20 @@ function unreadable(lang: Lang): AxError {
   );
 }
 
+// A record whose payload this build cannot read. Its own refusal rather
+// than the unreadable frame above: the frame arrived whole and the socket
+// is still speaking this wire, so the page says which field it could not
+// read and stays live. The recovery is the same one, because the same
+// thing fixes both - the client this server was built with.
+export function unreadableRecord(lang: Lang, at: string): AxError {
+  return refusal(
+    lang,
+    "wire_read_record_action",
+    fill(say(lang, "wire_record_undecodable"), { at }),
+    "wire_reload_for_client",
+  );
+}
+
 // Starts, or restarts after a refusal was cleared by the person.
 export function connect(link: Link): [Link, LinkAction] {
   return [{ ...link, state: { kind: "opening" } }, { kind: "open" }];

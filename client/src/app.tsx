@@ -29,6 +29,7 @@ import { keymap } from "./core/keys";
 import type { Action } from "./core/keys";
 import { paintMark } from "./core/mark";
 import { RAILS } from "./core/prefs";
+import { cityIsShut, CITY } from "./core/scope";
 import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
 import type { View } from "./core/route";
 import { useApprovals, useCommand, useGo, useSay, useUi } from "./ui";
@@ -172,7 +173,7 @@ export function App() {
         focusComposer();
         return;
       case "run.stop":
-        command(halt("city"));
+        command(halt(CITY));
         return;
     }
   };
@@ -232,7 +233,7 @@ export function App() {
   const approvals = useApprovals();
   const waiting = () => approvals().length;
   const working = createMemo(() => Object.values(ui.conn.belief.runs).some((run) => run.doing.kind !== "frozen"));
-  const halted = () => ui.conn.belief.halted.includes("city");
+  const halted = () => cityIsShut(ui.conn.belief.halted);
   // How many runs this city cancelled. The wire carries no count of
   // what one halt froze, so this counts the runs whose own freeze says
   // `cancelled`, which is what a halt writes.
@@ -243,7 +244,10 @@ export function App() {
       ).length,
   );
   createEffect(() => {
-    const name = ui.conn.belief.city ?? "sprawling";
+    // A city nobody has named is still a city, and the word for it is
+    // the one the city page shows: the tab's title and the rail read
+    // the same key as the page's own heading.
+    const name = ui.conn.belief.city ?? say("nav_city");
     document.title = waiting() > 0 ? `(${String(waiting())}) ${name}` : name;
     document.documentElement.lang = ui.prefs.held().lang;
   });
@@ -281,7 +285,7 @@ export function App() {
             <button
               type="button"
               class="ml-auto rounded-control px-base py-tight font-mono text-label text-accent hover:bg-raised"
-              onClick={() => command(release("city"))}
+              onClick={() => command(release(CITY))}
             >
               {say("city_release")}
             </button>

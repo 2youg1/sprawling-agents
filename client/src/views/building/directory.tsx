@@ -17,7 +17,7 @@
 import { For, Show, createMemo } from "solid-js";
 
 import { QUERIES } from "../../core/asking";
-import type { Doing } from "../../core/belief";
+import type { Doing } from "../../core/doing";
 import { roomOf, toFragment } from "../../core/route";
 import { clock, kib, usd } from "../../core/time";
 import type { Address, Entry } from "../../wire";
@@ -52,6 +52,10 @@ function posture(say: ReturnType<typeof useSay>, doing: Doing): string {
       return say("run_doing_calling");
     case "waiting":
       return say("talk_waiting_you");
+    // A phase this page was never told: the run is working and the page
+    // cannot say at what, which is what the one word states.
+    case "unknown":
+      return say("city_at_work");
     case "frozen":
       switch (doing.completion) {
         case "done":

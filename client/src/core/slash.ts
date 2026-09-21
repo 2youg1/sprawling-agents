@@ -35,6 +35,7 @@ import type { Template } from "./commands";
 import type { Key } from "./lang";
 import { PAGES, page } from "./route";
 import type { View } from "./route";
+import { CITY } from "./scope";
 import type { Command, Effort, RunId, Seq } from "../wire";
 
 // A run a verb can act on: which one, and how far it has got. `/fork`
@@ -137,7 +138,7 @@ function paged(name: string | undefined): View | null {
 // otherwise be one body copied twice with a verb swapped.
 function scoped(hands: SlashHands, call: SlashCall, halting: boolean): void {
   if (call.words.includes(ALL)) {
-    hands.command(halting ? halt("city") : release("city"));
+    hands.command(halting ? halt(CITY) : release(CITY));
     return;
   }
   const named = addressed(call.words.at(0));
@@ -154,7 +155,7 @@ function scoped(hands: SlashHands, call: SlashCall, halting: boolean): void {
     }
     return;
   }
-  hands.command(release("city"));
+  hands.command(release(CITY));
 }
 
 export const SLASH: readonly Slash[] = [

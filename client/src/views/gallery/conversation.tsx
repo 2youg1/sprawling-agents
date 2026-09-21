@@ -14,7 +14,7 @@
 
 import { For } from "solid-js";
 
-import { sendingInto, type Doing, type Sending } from "../../core/belief";
+import { sendingInto, type Doing, type Sending } from "../../core/doing";
 import { EFFORTS } from "../../core/commands";
 import { UNSTATED, offered } from "../../core/slash";
 import type { ApprovalClass, ApprovalItem } from "../../wire";
@@ -32,6 +32,7 @@ const POSTURES: readonly Doing[] = [
   { kind: "calling", tool: "exec", subject: "just check" },
   { kind: "waiting" },
   { kind: "frozen", completion: "done" },
+  { kind: "unknown" },
 ];
 
 // How many characters of a live turn are drawn faint. Kept in step with

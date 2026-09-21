@@ -14,7 +14,8 @@ import { For, Match, Show, Switch, createMemo, createSignal } from "solid-js";
 import { Option, Schema } from "effect";
 
 import { Address } from "../wire";
-import { adopted, sendingInto } from "../core/belief";
+import { adopted } from "../core/belief";
+import { sendingInto } from "../core/doing";
 import { cancel, steer } from "../core/commands";
 import { buildingOf, roomOf, toFragment } from "../core/route";
 import { count, usd } from "../core/time";

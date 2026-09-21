@@ -34,7 +34,7 @@ import { createBelief } from "./belief";
 import type { Belief } from "./belief";
 import { decodeFrame, encodeFrame } from "./frames";
 import { langOf, say } from "./lang";
-import { advance, connect as start, isLive, isRefused, newLink } from "./link";
+import { advance, connect as start, isLive, isRefused, newLink, unreadableRecord } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
 import type { Command, HistoryRangeAnswer, Query, Seq, ServerFrame } from "../wire";
 
@@ -146,9 +146,15 @@ export function openConnection(
   // marking every answer stale for them would ask the city for
   // everything again.
   function filled(range: HistoryRangeAnswer): void {
+    // One report per page, naming the first field this build could not
+    // read: a page of two hundred records is one question's answer, and
+    // a notice per record would bury the question in its answer.
+    let bad: string | null = null;
     for (const record of range.records) {
-      store.apply(record);
+      const unreadable = store.apply(record);
+      bad ??= unreadable;
     }
+    if (bad !== null) store.refused(unreadableRecord(lang, bad));
     if (fetching === null || range.from !== fetching) {
       // An answer to a page this page no longer waits for. Its records
       // are folded above; the range it belonged to has moved on.
@@ -204,10 +210,16 @@ export function openConnection(
         askGap();
         asking.reconnected();
         return;
-      case "deliver":
-        store.apply(action.event);
+      case "deliver": {
+        // The field this build could not read, if any, is reported here
+        // rather than swallowed: the frame decoded and the socket is
+        // still speaking this wire, so it goes where every other refusal
+        // goes, and the rest of the record has already been folded.
+        const bad = store.apply(action.event);
         asking.invalidate(action.event);
+        if (bad !== null) store.refused(unreadableRecord(lang, bad));
         return;
+      }
       case "answered":
         if ("history_range" in action.answer) {
           // The one answer that is this page's own question rather than a

@@ -3,42 +3,28 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A run's identity: a uuid, held in the hyphenated lower-case form the
-// Rust side's `Display` writes. Read in the two spellings `uuid::Uuid::
-// parse_str` reads most (hyphenated and bare hex); the `urn:uuid:` and
-// braced forms are not read, and no link in this product writes them.
+// A run's identity as a link or a file name writes it, read by the
+// check the wire generates.
+//
+// The city writes one spelling - the hyphenated lower-case uuid - and
+// `kernel::RunId::parse` accepts that spelling and no other. This file
+// carries no grammar of its own: it decodes with the generated schema,
+// so a fragment or a transcript name holding bare hex, braces, a
+// `urn:uuid:` prefix or upper case answers `None` here exactly as the
+// city refuses it.
 
-import { Brand, Option } from "effect";
+import { Schema } from "effect";
+import type { Option } from "effect";
 
-export type RunId = string & Brand.Brand<"RunId">;
+import { RunId as written } from "../wire";
+import type { RunId } from "../wire";
 
-const HYPHENATED =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const BARE = /^[0-9a-f]{32}$/i;
+// The one reader of a run id written into a link. Decoding rather than
+// matching, because the pattern belongs to the schema the Rust wire
+// generates; a second regular expression here would be a second answer
+// to which ids exist.
+const read = Schema.decodeOption(written);
 
-const brand = Brand.nominal<RunId>();
-
-function hyphenate(bare: string): string {
-  const cut = [8, 12, 16, 20];
-  let out = "";
-  let from = 0;
-  for (const at of cut) {
-    out += `${bare.slice(from, at)}-`;
-    from = at;
-  }
-  return out + bare.slice(from);
+export function readRunId(raw: string): Option.Option<RunId> {
+  return read(raw);
 }
-
-// `RunId.option(raw)` is the only way to obtain one; the value it holds
-// is canonical, so two ids for one run compare equal as strings.
-export const RunId = {
-  option(raw: string): Option.Option<RunId> {
-    if (HYPHENATED.test(raw)) {
-      return Option.some(brand(raw.toLowerCase()));
-    }
-    if (BARE.test(raw)) {
-      return Option.some(brand(hyphenate(raw.toLowerCase())));
-    }
-    return Option.none();
-  },
-} as const;

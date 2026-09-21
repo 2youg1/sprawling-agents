@@ -12,6 +12,7 @@ import { createContext, createMemo, createSignal, useContext } from "solid-js";
 import type { Accessor } from "solid-js";
 
 import { QUERIES } from "./core/asking";
+import { createBelief } from "./core/belief";
 import { putPreferences } from "./core/commands";
 import type { Key, Lang } from "./core/lang";
 import { fill, say } from "./core/lang";
@@ -56,14 +57,15 @@ export const UiProvider = UiContext.Provider;
 // a programming error rather than a state, so the page draws with an
 // idle socket, a store that lasts as long as the call, and the
 // postures the client ships with - none of which this file spells:
-// `loadPreferences` answers them from an empty store, so an error path
-// cannot become a second statement of a default.
+// `loadPreferences` answers them from an empty store, and the belief is
+// the constructor's own empty value, so an error path cannot become a
+// second statement of a default.
 function orphaned(): Ui {
   const [effort, chooseEffort] = createSignal<Effort | null>(null);
   return {
     conn: {
       state: () => ({ kind: "idle" }),
-      belief: { runs: {}, halted: [], refusal: null, notices: [], city: null, probed: null, logs: [] },
+      belief: createBelief().belief,
       asking: {
         ask: () => () => undefined,
         refresh: () => undefined,

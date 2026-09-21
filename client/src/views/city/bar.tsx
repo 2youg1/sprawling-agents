@@ -27,6 +27,7 @@ import { halt, release } from "../../core/commands";
 import type { Key } from "../../core/lang";
 import { MAYOR, toFragment } from "../../core/route";
 import type { View } from "../../core/route";
+import { cityIsShut, CITY } from "../../core/scope";
 import { count, usd } from "../../core/time";
 import type { MetricsAnswer } from "../../wire";
 import { useCommand, useSay, useUi } from "../../ui";
@@ -99,7 +100,7 @@ export function CityBar() {
   const ui = useUi();
   const say = useSay();
   const command = useCommand();
-  const halted = () => ui.conn.belief.halted.includes("city");
+  const halted = () => cityIsShut(ui.conn.belief.halted);
   const asked = ui.conn.asking.ask(QUERIES.metrics);
   const metrics = () => {
     const held = asked();
@@ -136,7 +137,7 @@ export function CityBar() {
         label={halted() ? say("city_release") : say("city_stop")}
         tone={halted() ? "secondary" : "quiet"}
         onPress={() => {
-          command(halted() ? release("city") : halt("city"));
+          command(halted() ? release(CITY) : halt(CITY));
         }}
       />
     </header>

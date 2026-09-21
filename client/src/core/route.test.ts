@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { Option } from "effect";
 
-import { Address } from "../wire";
+import { Address, RunId } from "../wire";
 import {
   DEFAULT_VIEW,
   MAYOR,
@@ -17,13 +17,10 @@ import {
   unresolved,
   type View,
 } from "./route";
-import { RunId } from "./run_id";
 
 const lab = Address.make("lab");
 const parser = Address.make("lab/parser");
-const seven = Option.getOrThrow(
-  RunId.option("07070707-0707-0707-0707-070707070707"),
-);
+const seven = RunId.make("07070707-0707-0707-0707-070707070707");
 
 // Every view this client has, so the round trip is exhaustive by
 // construction: the lint's exhaustiveness check on `toFragment` refuses a

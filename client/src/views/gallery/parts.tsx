@@ -24,6 +24,7 @@ import { Row } from "../parts/row";
 import { Skeleton } from "../parts/skeleton";
 import { Table, type Column } from "../parts/table";
 import { Tabs } from "../parts/tabs";
+import { referenceFor, referenceText } from "../../core/enrol";
 import { Case } from "./case";
 import { CHOSEN, MODELS, type ModelRow } from "./served";
 
@@ -34,7 +35,7 @@ export function Parts() {
   const say = useSay();
   const [host, setHost] = createSignal("api.zenmux.ai");
   const [bad, setBad] = createSignal("api_gateway.internal");
-  const [key, setKey] = createSignal("secret:providers/zenmux");
+  const [key, setKey] = createSignal(referenceText(referenceFor("zenmux")));
   const [model, setModel] = createSignal<string | null>(null);
   const [rows, setRows] = createSignal<readonly ModelRow[]>(MODELS);
   const [picked, setPicked] = createSignal<readonly string[]>([CHOSEN.id]);

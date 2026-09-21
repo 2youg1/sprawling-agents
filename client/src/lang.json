@@ -2507,6 +2507,14 @@
     "en": "read a frame from this city",
     "zh": "读取这座城发来的一帧"
   },
+  "wire_read_record_action": {
+    "en": "read a record from this city",
+    "zh": "读取这座城写下的一条记录"
+  },
+  "wire_record_undecodable": {
+    "en": "this page cannot read the {at} field of a record the city wrote",
+    "zh": "本页读不出这座城写下的记录里的 {at} 字段"
+  },
   "wire_reload_for_client": {
     "en": "reload the page to fetch the client this server was built with",
     "zh": "刷新页面，取回与这台服务端一同构建的客户端"

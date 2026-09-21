@@ -63,19 +63,27 @@ export interface SecretAt {
   readonly name: string;
 }
 
+// The realm this page files a provider's key under. `kernel::SecretRef`
+// judges the alphabet of a realm and not which words exist, so the word
+// is the client's to choose; it is named once because the promise the
+// form shows and the command that carries the reference have to mean
+// the same place.
+const PROVIDERS = "providers";
+
 // The realm and name a provider's key is filed under: one key per
 // provider, named after it, so the reference reads as what it is.
 export function referenceFor(provider: string): SecretAt {
-  return { realm: "providers", name: provider };
+  return { realm: PROVIDERS, name: provider };
 }
 
-// How a place in the vault is spelled in a command.
+// How a place in the vault is spelled, in the one grammar
+// `kernel::SecretRef` writes: `secret:`, then a realm and a name of
+// `[A-Za-z0-9._-]+` separated by `/`.
 //
-// One spelling, here, because two readers need it and they are on
-// opposite sides of an enrolment: the form shows a person what their
-// key is about to be filed under, and the command carries the same
-// text for `kernel::SecretRef::parse` to read back. A second spelling
-// would let the form promise a reference the city cannot resolve.
+// This is the page's promise, not the vault's answer: it is what the
+// form shows before anything is enrolled. Once the city has answered,
+// [`StoredKey.reference`] is what every command carries, because the
+// city parses that text back into the reference it stored.
 export function referenceText(at: SecretAt): string {
   return `secret:${at.realm}/${at.name}`;
 }

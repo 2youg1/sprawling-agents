@@ -25,9 +25,10 @@
 // change it, and a gallery that changed the city would be measuring
 // something it had just altered.
 
-import type { JSX } from "solid-js";
+import { onMount, type JSX } from "solid-js";
 
 import { QUERIES } from "../../core/asking";
+import { createBelief } from "../../core/belief";
 import type { Belief } from "../../core/belief";
 import type { LinkState } from "../../core/link";
 import type { Answer, ApprovalItem, AxError, Query } from "../../wire";
@@ -51,19 +52,19 @@ export interface StandProps {
 
 export function Stand(props: StandProps) {
   const outer = useUi();
-  const belief: Belief = {
-    runs: {},
-    halted: [],
-    refusal: null,
-    // A getter rather than a value, so the list is read when a child
-    // draws it rather than when this component is set up.
-    get notices() {
-      return props.unread.map((error) => ({ error, seen: false }));
-    },
-    city: null,
-    probed: null,
-    logs: [],
-  };
+  // The belief is the constructor's own empty value, and the refusals
+  // this stand was handed go in through the belief's own door - inside
+  // a tracked scope, so a fixture that changes the list after mounting
+  // gets the notice the same way a live page does. A fixture that
+  // spelled the empty value here would be right about the keys and
+  // wrong about every value the moment one changes, and nothing would
+  // fail.
+  const store = createBelief();
+  onMount(() => {
+    for (const error of props.unread) store.refused(error);
+    store.refused(null);
+  });
+  const belief: Belief = store.belief;
   // The question every stand-in answers, and the fixture's own.
   // Anything neither of them names is `undefined`, which is what a
   // page that has asked and not yet been answered holds, and what

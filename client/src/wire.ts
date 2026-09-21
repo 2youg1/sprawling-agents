@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 33 as const;
+export const WIRE_V = 34 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "5e829819d24d22dbe2c072840e75a8cdb09788a697bf9a381b95e02bcbe05114" as const;
+export const WIRE_HASH = "7543f8cd18f2142e400d6c318784102bc75178dc653bfded0df29a5f9da9141c" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -464,6 +464,21 @@ export const BuildingProgress = Schema.Struct({
 export type BuildingProgress = typeof BuildingProgress.Type;
 
 /**
+ * What a Halt, Release or Autonomy change applies to. Unlike modes and
+ * providers, this set is the protocol's own and has no upstream owner.
+ */
+export const HaltScope = Schema.Union(
+  Schema.Literal("city"),
+  Schema.Struct({
+    building: Address,
+  }),
+  Schema.Struct({
+    workshop: Address,
+  }),
+).annotations({ identifier: "HaltScope" });
+export type HaltScope = typeof HaltScope.Type;
+
+/**
  * Whether a pursuit is taking work right now.
  * 
  * Carries serde because a page renders it. The value that must not be
@@ -508,10 +523,9 @@ export const EventKind = Schema.Union(
 export type EventKind = typeof EventKind.Type;
 
 /**
- * Run identity; uuid v7 for humans, nil for the city itself. No
- * generation here — the assembly layer (or a seeded simulator) mints.
+ * A run's identity in the one spelling the city writes it: a hyphenated uuid in lower case, as `kernel::RunId::parse` accepts it. Bare hex, braces, the `urn:uuid:` prefix and upper case are refused.
  */
-export const RunId = Schema.String.pipe(Schema.brand("RunId"));
+export const RunId = Schema.String.pipe(Schema.pattern(new RegExp("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "u"))).pipe(Schema.brand("RunId"));
 export type RunId = typeof RunId.Type;
 
 /**
@@ -540,7 +554,7 @@ export const CityAnswer = Schema.Struct({
   active: Schema.Int,
   buildings: Schema.Array(BuildingProgress),
   frozen: Schema.Int,
-  halted: Schema.Array(Schema.String),
+  halted: Schema.Array(HaltScope),
   pursuits: Schema.Array(PursuitLine),
   runs: Schema.Array(RunSummary),
 }).annotations({ identifier: "CityAnswer" });
@@ -564,14 +578,9 @@ export const Effort = Schema.Literal("none", "low", "medium", "high", "xhigh", "
 export type Effort = typeof Effort.Type;
 
 /**
- * What a person calls one session: one address segment, and therefore
- * one directory under a building.
- * 
- * A `String` here would put the segment rules in whichever caller
- * remembered them. This has one constructor, so a name that cannot be
- * a room cannot be spelled, on the wire or anywhere else.
+ * What a person calls one session: one address segment of at most 64 characters, with the whitespace at either end trimmed, as `kernel::address::SessionName::parse` accepts it. The city refuses the reserved directory's own name as well.
  */
-export const SessionName = Schema.String.pipe(Schema.brand("SessionName"));
+export const SessionName = Schema.String.pipe(Schema.pattern(new RegExp("^\\p{White_Space}*(?:[^\\p{White_Space}/\\\\:\\p{Cc}.]|[^\\p{White_Space}/\\\\:\\p{Cc}][^/\\\\:\\p{Cc}]{0,62}[^/\\\\:\\p{Cc}.\\p{White_Space}])\\p{White_Space}*$", "u"))).pipe(Schema.brand("SessionName"));
 export type SessionName = typeof SessionName.Type;
 
 /**
@@ -2252,21 +2261,6 @@ export const GovernedDocument = Schema.Union(
   Schema.Literal("preferences"),
 ).annotations({ identifier: "GovernedDocument" });
 export type GovernedDocument = typeof GovernedDocument.Type;
-
-/**
- * What a Halt, Release or Autonomy change applies to. Unlike modes and
- * providers, this set is the protocol's own and has no upstream owner.
- */
-export const HaltScope = Schema.Union(
-  Schema.Literal("city"),
-  Schema.Struct({
-    building: Address,
-  }),
-  Schema.Struct({
-    workshop: Address,
-  }),
-).annotations({ identifier: "HaltScope" });
-export type HaltScope = typeof HaltScope.Type;
 
 /**
  * The deduplication key of one outward action: `idem1-` then 32 lowercase hex digits.
