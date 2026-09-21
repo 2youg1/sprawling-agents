@@ -202,6 +202,21 @@ jobs:
           path: target/tests
           key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'crates/*/tests/**') }}
           restore-keys: trybuild-${{ runner.os }}-
+      # The client's dependencies, because a test in this job judges
+      # them: `xtask`'s npm gate reads the installed tree to check every
+      # licence, and refuses to report green when the tree is missing -
+      # which is what a bare runner has. The gate that fell silent here
+      # on twelve gates while claiming fourteen was the same shape, so
+      # this job pays the install rather than losing the assertion.
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - name: install the client's dependencies
+        shell: bash
+        run: cd client && bun install --frozen-lockfile
       # No `--doc` companion: this workspace has no doctest, which is a
       # fact about it (`rg '///\s*```' crates/*/src` finds nothing), not
       # an omission for somebody to fix later by adding a slower command.
