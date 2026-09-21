@@ -61,7 +61,7 @@ The pinned versions live in `Cargo.toml`; this table says why each is there. Whe
 | Serialisation | `serde` 1, `serde_json` 1, `toml` <!-- xtask:begin dep_version:toml -->1.1<!-- xtask:end --> | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` <!-- xtask:begin dep_version:thiserror -->2<!-- xtask:end --> | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. |
-| Dependency count | <!-- xtask:begin dependency_count -->401<!-- xtask:end --> packages in `Cargo.lock` | Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->404<!-- xtask:end --> packages in `Cargo.lock` | Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest` (properties before examples), `insta` (golden output), `trybuild` (proof that something cannot be expressed), `kani` (bounded proof, Linux CI), `cargo-mutants` (do the tests bite), `cargo-fuzz` (parsers against hostile bytes).
 
@@ -185,7 +185,7 @@ A run's write domain is what its building's `RULES.toml` declares, and **the who
 
 ## 7 The wire
 
-One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is <!-- xtask:begin wire_v -->33<!-- xtask:end -->.
+One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is <!-- xtask:begin wire_v -->34<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
@@ -296,7 +296,7 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->16<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2008<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2032<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
@@ -814,7 +814,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (29), protocol (6), bin (199)
+### browser (29), protocol (6), bin (200)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -856,6 +856,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::main | crates/sprawling/src/main.rs | the command line, each subcommand refused honestly until it exists | adapter | S0 | built | sprawling-SPEC.md#8-30 |
 | bin::main::router | crates/sprawling/src/main/router.rs | one verb in, one subcommand out, plus the flags every verb reads | adapter | S0 | built | sprawling-SPEC.md#8-30 |
 | bin::main::city | crates/sprawling/src/main/city.rs | the verbs that raise and serve a city | adapter | S0 | built | sprawling-SPEC.md#8-30 |
+| bin::main::city::opening | crates/sprawling/src/main/city/opening.rs | whether a run opens the person's browser, one rule with two defaults and two ways to refuse | decision | V6 | built | sprawling-SPEC.md#8-30 |
 | bin::main::data | crates/sprawling/src/main/data.rs | the verbs that move bytes and ask about history | adapter | S0 | built | sprawling-SPEC.md#8-30 |
 | bin::main::whose | crates/sprawling/src/main/whose.rs | the verb that asks a commit which run wrote it | adapter | V4 | built | sprawling-SPEC.md#8-30 |
 | bin::main::tests | crates/sprawling/src/main/tests.rs | flags are never paths, and no ledger is never verified | adapter | S0 | built | sprawling-SPEC.md#8-30 |
