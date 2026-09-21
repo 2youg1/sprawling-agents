@@ -260,7 +260,7 @@ impl Turn<Assembling> {
 
 ```rust
 pub struct SourceDoc { pub addr: Address, pub bytes: Option<Vec<u8>> }   // None＝缺失或不可读（跳过入账）
-pub struct SegmentCaps { pub city: u64, pub building: u64, pub resident: u64, pub run: u64 }  // 字节上限；来源＝调用方（S3 取 STARTUP_BUDGET_TOKENS×4 的四均缺省，住 consts 消费侧不另设常量）
+pub struct SegmentCaps { pub city: u64, pub building: u64, pub resident: u64, pub run: u64 }  // 字节上限；来源＝调用方（`startup_default` 取 STARTUP_BUDGET_TOKENS × BYTES_PER_TOKEN ÷ PREFIX_SLOTS）
 pub struct PrefixPlan { pub city: Vec<SourceDoc>, pub building: Vec<SourceDoc>,
                         pub resident: Vec<SourceDoc>, pub run: Vec<SourceDoc>, pub caps: SegmentCaps }
 pub struct PrefixBuild { pub prefix: FrozenPrefix, pub notes: Payload }   // notes＝逐段 sources/skips/truncations（prompt_assembled 载荷入口）
@@ -273,9 +273,10 @@ pub fn build_prefix(plan: PrefixPlan) -> Result<PrefixBuild, AxError>;
 - **正文不在 prompt 里，所以交出去而不是拒绝**：`render()` 只写每条的 disclosure，`expansion` 从未进过窗口。
 - **它是 `Catalog::expand` 的第一个调用者**：在它之前，一栋楼的阅览室能报出一个 skill 的名字而永远交不出它。
 - 跨段去重：同 addr 两段命中只装首次（段序 city→building→resident→run）；后段记 skipped{reason:"duplicate"}。
-- 截断：文件超段位余额即截到边界，原处留 ASCII 标记 `[truncated: N bytes]`（prefix 面向英文窗口），恒不静默丢尾；标记字节从段预算先扣。
+- 截断：文件超段位余额即截到边界，原处留 ASCII 标记（文本与切口规则属 `runtime::elision`，§8-42），恒不静默丢尾；标记字节从段预算先扣。
+- 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量今天住 prefix.rs 私有面；它们该随其余策略数迁入 `kernel::consts_policy`。
 - 断点：`FrozenPrefix::system_blocks()` 产四块、逐块 cache=true＝断点恒 4＝`CACHE_BREAKPOINTS_MAX`，断点只落段界。
-- A15 重建器：`replay::rebuild_prefix(data: &serde_json::Value, resolver: &dyn Fn(&Address) -> Option<Vec<u8>>) -> Result<[B3Hash; 4], AxError>`——从 prompt_assembled 载荷（逐源 {addr, kept, marker, dropped}）与同源文档重算逐段哈希对拍；resolver 以 Address 取文（钉版 oid 级解析随 checkpoint 接入升级，接口不变）。截断标记与拼接规则的唯一权威住 prefix.rs（pub(crate) 常量），replay 同 crate 复用不另拷。
+- A15 重建器：`replay::rebuild_prefix(data: &serde_json::Value, resolver: &dyn Fn(&Address) -> Option<Vec<u8>>) -> Result<[B3Hash; 4], AxError>`——从 prompt_assembled 载荷（逐源 {addr, kept, marker, dropped}）与同源文档重算逐段哈希对拍；resolver 以 Address 取文（钉版 oid 级解析随 checkpoint 接入升级，接口不变）。拼接分隔符的唯一权威住 prefix.rs（`DOC_JOIN`），截断标记的唯一权威住 `runtime::elision`（§8-42），replay 同 crate 复用不另拷。
 - E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::dangling_tool_calls(&VerifiedLedger) -> Vec<(RunId, Seq)>`（tool_called 后邈无同 run 的 tool_result 即 dangling）＋`replay::outcome_unknown_draft(...) -> EventDraft`（补写的 tool_result，携 E_TOOL_OUTCOME_UNKNOWN 错误体）；消费者＝resume 路径（S4 serve；台账登记）。
 - handoff：形已全（五段＋构造点＋resume 消费），无改动；「下一步段首列用户指定动作」属生产者纪律（S3 执行器／P2 spine_files），类型不另加钩。
 - 第四取消点（派生前）：无派生生产者时推迟落地，理由是提前落地＝死入口＋不可测。`collab::delegate_tool` 是那个生产者：`SafePoint::BeforeSpawn` ＋ `Turn<Recording>::record(interrupt, ledger)`，装配层在 `Completion::Cancelled` 时清空派生台，**被取消的 Run 一件活也交不下去**。
@@ -294,7 +295,7 @@ pub struct Packaged { pub content: String, pub events: Vec<Payload> }   // event
 pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>;
 ```
 
-- 定序：offload 恒先于截断；`len ≤ cap` →原样；`len > cap 且 len ≥ OFFLOAD_MIN_BYTES 且有 OffloadSite` → offload；否则纯截断（尾部留 `[truncated: N bytes]`，不入 CAS）。
+- 定序：offload 恒先于截断；`len ≤ cap` →原样；`len > cap 且 len ≥ OFFLOAD_MIN_BYTES 且有 OffloadSite` → offload；否则交 `compaction::compact`，它答 `Elided::Nothing`（结构化与未知内容它不截）时才走 `byte_cut` 纯截断，不入 CAS。两条路的标记都由 `elision` 产出且只出现一次。
 - 信封三附件一处组装：正文后依序追加 clock 行／net_notice 行（恒一次：正在连接互联网提醒，英文定句）／steer 行（`user:`／`@ID:` 前缀）；三行字节不计入 cap（附件与负载分账，附件有自己的封顶常数在实现内断言）。
 - 内容感知压缩分派表属 P3；本模块只持「原样／offload／截断」三臂，接口不预留分派参数。
 
@@ -502,7 +503,7 @@ pub enum Content { Prose, Code, Diff, Log, Structured, Table, Unknown }   // 七
 pub enum Strategy { Keep, Head, Ends, Tail, Offload }
 pub fn detect(text: &str) -> Content;                       // 前几行上的前缀与计数，顺序即设计
 pub fn plan(content: Content, size: ByteLen, budget: ByteLen) -> Strategy;
-pub fn compact(text: &str, budget: ByteLen) -> (String, bool);
+pub fn compact(text: &str, budget: ByteLen) -> elision::Cut;   // 标记与丢弃计数由 elision 一处产出（§8-42）
 // 硬不变量：结果恒不大于输入，且在出口再验一次（真长了就退回原文）。切口落在字符边界。
 // Structured 与 Unknown 恒不截断：被截断的 JSON 比缺席的 JSON 更糟；未知内容不拿猜测去丢东西。
 // 机制面（把大结果移出窗口）仍归 offload——本模块只答「缩不缩、留哪一头」。
@@ -1439,3 +1440,27 @@ impl Journal {
 4. **窗口留住账本丢掉的。** `wave_results` 与 `assistant` 在打码之前就已从 `ToolOutcome` 与 `ModelReturn` 取出，模型因此仍看得见工具的真实输出，思考块的签名也不受影响——历史与上下文是两个汇，只有账本是永久的。
 
 **关门测试**（`turn/tests/redaction.rs`）：一次 `edit` 调用的参数与结果各带一串 `sk-ant-` 开头的密钥，跑完整回合后账本每一行都不含那串明文，而 `id`、工具名、`path` 参数与替换点周围的散文完好，`report.redacted() >= 2`，`replay::verify_lines` 仍自证。
+
+### 8-42 runtime::elision（形状 2 值类型＋形状 6 数据面；**「这里被裁掉了」的唯一权威**）
+
+```rust
+pub enum Elided { Nothing, Head, Middle, Tail }          // 被拿走的那一段在哪一头
+pub struct Cut { pub text: String, pub dropped: ByteLen, pub place: Elided }
+impl Cut { pub fn whole(text: &str) -> Cut; }            // 什么都没拿走
+pub fn marker(dropped: ByteLen) -> String;               // `[truncated: N bytes]`
+pub fn gap_marker(dropped: ByteLen) -> String;           // 同一句，独占一行
+pub fn marker_room(text_len: usize) -> usize;            // 计数未知时按最宽预留
+pub fn gap_marker_room(text_len: usize) -> usize;
+pub fn boundary_before(text: &str, at: usize) -> usize;  // 不大于 at 的最大字符边界
+pub fn boundary_after(text: &str, at: usize) -> usize;
+pub fn splice(text: &str, front: usize, back: usize, place: Elided) -> Cut;
+```
+
+**四条口径：**
+
+1. **一句话，一个产地。** prefix、pipeline、compaction、sieve 四处都会拿走字节，给读者的那句话只有 `marker` 与它的分行形式 `gap_marker`。`replay::rebuild_prefix` 逐字重写同一句才重算得出段哈希：拼写一旦有第二个家，离线重放就在哈希对拍处失败，而失败发生在与改动无关的另一个模块里。
+2. **`dropped` 数的是源字节，标记自己不算。** 去掉标记后的长度加上 `dropped` 恒等于输入长度。计数由 `splice` 从 `front`／`back` 两个边界之差算出，与插标记是同一个动作；调用方拿两个长度相减求丢弃量，减出来的数会把插进去的标记当成幸存文本，因此这条路在接口上不再存在。
+3. **切口只由两个函数给。** `boundary_before` 与 `boundary_after` 是全 crate 仅有的两处字符边界判定。同一个循环写成几份时行为一开始都相同，分叉是无声的：任一处改成向上取整或加最小保留量，另几处不会跟。
+4. **预留按最宽算。** 标记的宽度随计数的位数变，而计数要等切完才知道；`marker_room(text.len())` 给出该文本能产生的最宽标记，因为丢弃量不可能超过文本自身长度。于是「结果不大于预算」由预留保证，而不是由一次事后检查补救。
+
+**关门测试**（`elision::tests` 与 `compaction::tests`）：`splice` 的 `dropped` 加上去掉标记后的长度恒等于输入长度；任何切口落在字符边界；`compact` 对一段日志报出的丢弃量与幸存字节数加起来是原文长度。

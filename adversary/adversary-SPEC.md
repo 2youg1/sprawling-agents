@@ -14,9 +14,9 @@
 | U2 场地 | `Ground`：一次性城目录、一个被端起来的进程、一个端口，以及磁盘上的敌意动作 | 场地退出后不留文件也不留进程；`stored` 看到的正是账本目录里的字节 |
 | U3 模型 | `World` 与 `runTrace`：动作集合与后置条件 | 随机轨迹全通过；把停摆守卫从模型里摘掉则立即报错 |
 | U4 定向对抗 | 任意前缀 ＋ 一次 `Stop` ＋ 任意后缀 ＋ 一次必须被拒的派活 | 该性质在随机轨迹上成立，且停摆后那一次派活被拒且拒得其所 |
-| U5 回归 | 反例最小化后渲染成 Rust `#[test]` | 渲染结果与仓内那个 Rust 文件逐字节相同，而该文件由 `cargo test` 编译运行 |
+| U5 回归 | 两个世界的反例各渲染成 Rust `#[test]`，同一个文件 | 渲染结果与仓内那个 Rust 文件逐字节相同，而该文件由 `cargo test` 编译运行 |
 | U6 历史 | 任意轨迹之后，账本离线自证；改一个字节则不能自证 | `replay` 在干净轨迹上恒绿、在翻过一位的轨迹上恒红 |
-| U7 供应世界 | `Provider`：挂过 endpoint 的第二种世界——一个 URL 的全部拼法、一个注册模型的上限 | 等价类的每种拼法落到同一个 `base_url`；注册过的模型带得出上限；messages 派活拿不到「没有输出上限」 |
+| U7 供应世界 | `Provider`：挂过 endpoint 的第二种世界——一个 URL 的全部拼法、一个注册模型的上限、两条同时跑的车道 | 等价类的每种拼法经探测与经挂载各落到同一个 `base_url`；注册过的模型带得出上限；messages 派活拿不到「没有输出上限」；不等第一条做完就派出去的活是两个 run |
 
 **不负责**：任何规则的再实现（链哈希、`IdemKey` 派生、写域判定、份额守恒）；任何 Rust 侧的构建闸门；任何随产品交付的东西。三者中任何一条被违反，本目录应当被删除而不是被修补。
 
@@ -24,12 +24,12 @@
 
 ## 2 验收标准
 
-1. `just adversary` 全绿：18 条检查，`0 failed`。
+1. `just adversary` 全绿：20 条检查，`0 failed`。
 
-   **今天不是 18/18。** U7 新增的五条里有三条红（等价类一条、上限两条），红在产品而不在检查，缺陷与实测证据写在 §4 第四、第五个发现里；两处修复都在 `crates/` 下，它们必须随修复一起转绿，本节的验收标准不为它们放宽。
+   **曾经不是全绿**：U7 的五条里有三条红（等价类一条、上限两条），红在产品而不在检查。两处修复都落在 `crates/` 下——`Entered::resolved` 成为打字地址变成被调用地址的唯一一处，`select_model` 经 `OutputCeiling::resolve` 取上限——三条随之转绿（实测见 §4 第四、第五个发现）。反例按 §9 第 4 步渲染进 `crates/sprawling/tests/from_adversary.rs`，本目录不再留着它们。
 2. 没有 Lean 的机器上 `just check` 的行为与本目录不存在时**逐字节相同**；`just adversary` 打印 `skipped: Lean is not installed` 并返回 0。
 3. 模型不预测任何哈希、`seq`、时间戳或 `IdemKey`。凡断言只谈**两条轨迹之间的关系**，或**门对调用方的承诺**（稳定错误码）。
-4. U5 渲染出的 Rust 源码与 `crates/sprawling/tests/from_adversary.rs` 逐字节相同。
+4. U5 渲染出的 Rust 源码与 `crates/sprawling/tests/from_adversary.rs` 逐字节相同。渲染器是那个文件的唯一权威：文件里的三条测试、两个辅助函数与每一行注释都从 `Regression.lean` 出，而 URL 的那五种拼法、中转站的名字与那个模型 id 从 `Provider.lean` 出。
 5. **咬得动的证据**：把 `Model.lean` 的 `refusal` 里 `work` 那条停摆守卫摘掉后，`a halted city takes no work until it is released` 必须失败。一个永远为真的性质与没有性质等价。
 
    **已演示。** 摘掉该守卫后该性质报错，收缩 3 次得到两步反例 `Stop City ; Work acme one`，并指出 `refused with Code "E_GATE_DENIED" where Code "E_CONFIG_INVALID" was owed`；恢复后转绿。它咬得动的是**守序**，而不只是「停摆时派活会失败」。这一条同时是对 §13 那套自备机器的验收：生成器、收缩器、极性推导与后置条件四件必须同时工作，才会得到这个最小反例。
@@ -95,7 +95,9 @@ saw:  http://127.0.0.1:47199/v1/
 
 **诊断**：`gateway::normalise_entered` 存在、有自己的 proptest、也有主机预设表，而全仓找不到一个生产调用者：`assembly::commanding::routing` 把帧里的 `base_url` 原样装进 `Entered`。于是算法是对的，城却从来没问过它。这正是“门外才看得见”的那一类缺陷：仓内测试测的是函数，而一个 agent 看的是城写下的那个 URL。
 
-**迁移**：`Entered` 的唯一构造处调 `gateway::normalise_entered`，探测与挂载共用那一次归一化的结果。属 `crates/sprawling`，不在本目录。转绿后，反例按 §9 第 4 步渲染回 `crates/sprawling/tests/from_adversary.rs`。
+**已修。** `Entered::resolved` 是打字地址变成被调用地址的唯一一处，探测与挂载共用那一次归一化的结果。五种拼法现在落到同一个 `base_url`，实测 37 s（探测那条）与 17 s（挂载那条）。
+
+**挂载那一侧此前没有人问过**，故随修复补了第二条检查：探测回答「这个端点供应什么」，挂载决定「这座城会调用哪里」，只有后者是派活真正走下去的那条路——一个探测归一化了而挂载没有的实现，会在设置页上显示对的端点、把活派到别处。反例渲染成 `every_spelling_of_one_endpoint_is_registered_as_one_url`。
 
 ### 第五个发现：事实梯的最后一级没有接在注册上
 
@@ -106,7 +108,13 @@ saw:  http://127.0.0.1:47199/v1/
 
 **诊断**：`gateway::provider::ceiling::OutputCeiling::resolve` 把四档梯子写齐了（人填 > 上游陈述 > 预设表 > 策略缺省），并且有自己的测试；而 `select_model` 走的是另一条链（人填 → 已注册 → 内置目录），没有第四档，也不写 `ceiling_from`。一个事实两个家，其中一个没有调用者。
 
-**迁移**：`select_model` 经 `OutputCeiling::resolve` 取上限，并把 `ceiling_from` 写进 `model_selected`；删掉本地那条链。同样属 `crates/gateway` 与 `crates/sprawling`，不在本目录。
+**已修。** `select_model` 经 `OutputCeiling::resolve` 取上限，并把 `ceiling_from` 写进 `model_selected`；本地那条链删掉了。目录不认得的 id 现在注册着一个数字，梯子的最后一级（`policy`）在账本上署名，派活不再为上限被拒。反例渲染成 `a_model_no_catalogue_prices_is_registered_with_a_ceiling`，它同时钉住那个数字与那个署名。
+
+### 第六个发现：门看得见两条车道，看不见 Inbox
+
+B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id 是 `ap-<run>-<seq>`，故 run 一旦分开，id 就分开；而**一条审批项只由一次工具波中的门抬起来**，工具波要一个会应答的 provider，本目录不许自带一个（§13）。于是这条性质在门外只有一半可观测，本目录只写它能观测的那一半：两条不等第一条做完就派出去的活是两个 run，而两条车道同时追加之后历史仍然是一条链（`two dispatches at once are two runs`，实测 11 s）。
+
+另一半——两个问题在 Inbox 里占两行而不是一行——欠在 `crates/sprawling/tests/e2e.rs`：那里有一个真端点可以问。把它写进本目录就要在本目录里起一个假 provider，而那是本目录被删除的三个理由之一。
 
 ## 5 权威信源
 
@@ -144,11 +152,11 @@ src/Sprawling/Ground.lean    一次性场地，以及磁盘的敌意
 src/Sprawling/Check.lean     抽样、收缩、检查树。不知道城是什么
 src/Sprawling/Model.lean     状态模型、后置条件、定向对抗场景
 src/Sprawling/Provider.lean  挂过 endpoint 的第二种世界：URL 等价类与上限
-src/Sprawling/Regression.lean 反例 → Rust #[test]
+src/Sprawling/Regression.lean 两个世界的反例 → 一个 Rust 测试文件
 test/Main.lean               入口与检查树
 ```
 
-依赖单向：`Model` → `Door` → `Frame`，`Model` → `Ground` → `Door`，`Model` → `Check`，`Provider` → `Ground`，`Regression` 只依赖 `Model`。`Provider` 不 import `Model`：那是另一种世界，两边共用的只有门与场地。`Frame` 不 import 任何本工程模块；`Check` 也不，且它**不 import `Door`**——抽样与收缩不允许知道有一座城存在。
+依赖单向：`Model` → `Door` → `Frame`，`Model` → `Ground` → `Door`，`Model` → `Check`，`Provider` → `Ground`，`Regression` → `Model` 与 `Provider`。**`Regression` 依赖两个世界，因为交付物是一个文件**：轨迹那条测试的每一步与极性从 `Model` 读，供应世界那两条测试的拼法、中转站名字与模型 id 从 `Provider` 读，于是演员表在本目录里仍然只有一个家。`Provider` 不 import `Model`：那是另一种世界，两边共用的只有门与场地。`Frame` 不 import 任何本工程模块；`Check` 也不，且它**不 import `Door`**——抽样与收缩不允许知道有一座城存在。
 
 `Ground` 依赖 `Door` 而不是自己起进程：**「二进制在哪」只允许有一个答案**，而场地要用它做三件事（`init`、`serve`、探活）。
 
@@ -213,7 +221,11 @@ def Ground.stillText   : Ground → Nat → IO String  -- 等城停笔，不等�
 def Ground.records     : Ground → IO (List Record)
 def Ground.awaiting    : Ground → String → Nat → Nat → IO (List Record)
 def Door.send          : Door → Ground → Verb → IO Unit
+def nthName      : Nat → String                  -- 等价类第 n 种拼法注册用的名字
+def attachedUrl  : String                        -- 这个世界挂载用的那一种拼法
 def probedUrls   : Door → Ground → List String → Nat → IO (List String)
+def attachedUrls : Door → Ground → List String → IO (List String)
+def Ground.runsStarted : Ground → Nat → IO (List String)
 def givenAProvider : Door → Ground → Option Nat → IO Record
 def statedCeiling  : Record → Option Nat
 ```
@@ -326,6 +338,7 @@ def statedCeiling  : Record → Option Nat
 | 环境变量 `SPRAWLING_BIN` | 二进制位置的唯一入口 | 由 justfile 提供 |
 | 地址 `127.0.0.1:47199` | 第二种世界指向的地方：这台电脑上没人听、在端口池（47100–47115）之外，于是一次探测永远碰不到本套件自己的城 | 外面的进程占住它时，探测的读数变成另一个程序的 |
 | 演员表 `relay` / `opus-nine` | 一个中转站，一个内置目录与预设表都不认得的模型 id——事实梯最后一级正是为这一格而存在 | 预设表有了这个 id 的行时，换一个它不认得的 |
+| 渲染出的一行 `attach(...)` 不折行 | 最长的那种拼法仍在 rustfmt 的宽度以内，于是渲染器写一行、rustfmt 不动它 | 换一个更长的地址会让 rustfmt 折行，逐字节对拍当场报红——这正是它该报的 |
 | 记录预算 240 × 250 ms | 一条命令等自己那条记录的上限。只在城真的还在干活时花掉；一次探测在 debug 二进制上的主要开销是构造 HTTP 客户端，不是那次被拒的连接 | 探测变快后可以调小；调小前要先量 |
 
 ## 15 影响面
@@ -336,11 +349,11 @@ def statedCeiling  : Record → Option Nat
 
 ## 16 测试与约束
 
-按「坏得越早越省时间」排序，共 18 条：渲染对拍（U5，毫秒级）、门的契约三条（U1，含 §4 那条退出码性质）、人填进去的三条（U7：等价类、幂等、读不懂的帧）、挂过 provider 的两条（U7：注册带上限、派活不为上限被拒）、随机轨迹（U3）、定向停摆（U4）、账本自洽（U6）、磁盘的三句谎话（U2），最后是按缺陷命名的那一组与那一条。U7 那五条各自实测为 4–18 s（debug 二进制，四核 Windows），其中的时间几乎全在城构造 HTTP 客户端上；其余十三条一整套 2 min 35 s（实测，四核 Windows，热缓存）；同一棵树在两核 Linux 上 51 s，差别在起进程的价钱而不在核数。约束是 §2 第 5 条——**咬得动**必须被演示过，而不是被相信。
+按「坏得越早越省时间」排序，共 20 条：渲染对拍（U5，毫秒级）、门的契约三条（U1，含 §4 那条退出码性质）、人填进去的四条（U7：探测的等价类、挂载的等价类、幂等、读不懂的帧）、挂过 provider 的三条（U7：注册带上限、派活不为上限被拒、两条车道是两个 run）、随机轨迹（U3）、定向停摆（U4）、账本自洽（U6）、磁盘的三句谎话（U2），最后是按缺陷命名的那一组与那一条。U7 那七条各自实测为 7–37 s（debug 二进制，四核 Windows），其中的时间几乎全在城构造 HTTP 客户端上；其余十三条一整套 2 min 35 s（实测，四核 Windows，热缓存）；同一棵树在两核 Linux 上 51 s，差别在起进程的价钱而不在核数。约束是 §2 第 5 条——**咬得动**必须被演示过，而不是被相信。
 
 **树里没有一条是被期待失败的。** 一条因为预期会红而被留下的检查，教会每一个看到它的人把红当成常态，于是下一个真的发现落进一次没人读的运行里。
 
-这条规矩与 §2 里那三条现在就是红的检查不矛盾，差别在期限：被期待失败的检查，是没有修复日期的那一条。第四、第五个发现各自点名了要改的那一处，两处都在 `crates/` 下；在它们转绿之前这棵树是红的，而那正是一个对手应该做的事。
+曾经红的那三条现在是绿的，两处修复都在 `crates/` 下（§4 第四、第五个发现）。当时留着它们而不是摘掉，理由在期限：被期待失败的检查，是没有修复日期的那一条；那三条点名了要改的那一处，红只活到修复落地为止。
 
 **整棵树串行跑。** 一座被端起来的城占着一个端口、一个目录与一条历史，两组同时跑就三样都争。实测过的后果不是变慢而是**换城**：输的那一边城绑不上端口退了出去，它自己的探活却在同一个口上接到了赢的那一边的城，于是一整条轨迹跑在别人的历史上。它把当时还开着的那个缺陷测成了绿的——一个答案取决于哪个线程赢了的对手，比没有对手更坏。
 

@@ -4,14 +4,23 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import Sprawling.Model
+import Sprawling.Provider
 
 /-!
-# What this adversary delivers: a Rust test.
+# What this adversary delivers: Rust tests.
 
 A counterexample that stays in Lean is knowledge this repository does not have.
 Rendering it as a test beside the code it accuses moves the knowledge into the
 language that ships, and leaves nothing here that could grow into a second
 authority.
+
+Both worlds deliver here. `Sprawling.Model` hands over a trace, whose steps and
+polarity are read off the model; `Sprawling.Provider` hands over the two facts
+its own checks found broken — one endpoint written down five ways, and a model
+registered with no output ceiling — as the pair of steps a person walks to reach
+them. Nothing is restated: the spellings, the endpoint's name and the model id
+are read from the module that owns them, so a cast changed there is a file
+rendered differently here.
 
 The emitted test enters by the door `channels::server` uses —
 `assembly::RunWorker::handle` — rather than by a socket. The adversary attacks
@@ -171,32 +180,38 @@ element of the outer join, and a trailing newline would end the file on a blank
 line. -/
 private def standingHelper : String :=
   String.intercalate "\n"
-    [ "/// The addresses this city's history says stand, in the order it wrote them."
+    [ "/// The addresses this city's history says stand, sorted."
     , "///"
     , "/// The address is read from the payload rather than from the envelope: a"
     , "/// city-level record is written against `RunId::CITY` with no address of its"
     , "/// own, so an envelope check would pass for the wrong reason."
     , "fn standing(ledger: &std::path::Path) -> Vec<String> {"
-    , "    let verified = runtime::replay::verify_ledger_dir(ledger).unwrap();"
-    , "    let mut addresses: Vec<String> = verified"
-    , "        .raw_lines()"
+    , "    let mut addresses: Vec<String> = stated(ledger, kernel::EventKind::BuildingCreated, \"addr\")"
     , "        .iter()"
-    , "        .filter_map(|line| {"
-    , "            let record = kernel::EventRecord::parse_line(line).unwrap();"
-    , "            if record.kind() != kernel::EventKind::BuildingCreated {"
-    , "                return None;"
-    , "            }"
-    , "            record"
-    , "                .data()"
-    , "                .as_map()"
-    , "                .get(\"addr\")"
-    , "                .and_then(serde_json::Value::as_str)"
-    , "                .map(str::to_owned)"
-    , "        })"
+    , "        .filter_map(|addr| addr.as_str().map(str::to_owned))"
     , "        .collect();"
     , "    addresses.sort();"
     , "    addresses"
     , "}" ]
+
+/-- A city raised, and the worker every test here drives.
+
+`named` says whether the test reads the city's history back afterwards. A name
+nothing reads is a warning, and this workspace refuses one. -/
+private def cityAndWorker (named : Bool) : List String :=
+  [ "    let dir = tempfile::tempdir().unwrap();"
+  , if named then "    let raised = assembly::init_city(dir.path()).unwrap();"
+    else "    assembly::init_city(dir.path()).unwrap();"
+  , ""
+  , "    // The vault is the in-session one: a test that reached the platform"
+  , "    // credential service would write to the machine running it."
+  , "    let mut worker = assembly::RunWorker::new("
+  , "        dir.path(),"
+  , "        gateway::Custodian::in_memory(),"
+  , "        runtime::diagnostics::Diagnostics::off(),"
+  , "    )"
+  , "    .unwrap();"
+  , "" ]
 
 private def preamble (name : String) (trace : Trace) : List String :=
   [ "// This Source Code Form is subject to the terms of the Mozilla Public"
@@ -204,7 +219,7 @@ private def preamble (name : String) (trace : Trace) : List String :=
   , "// file, You can obtain one at https://mozilla.org/MPL/2.0/."
   , "// Copyright (c) 2026 2youg1 and the sprawling contributors"
   , ""
-  , "//! A trace the adversary found, kept here so this repository remembers it."
+  , "//! The traces the adversary found, kept here so this repository remembers them."
   , "//!"
   , "//! Written by `adversary/src/Sprawling/Regression.lean` and compared against it"
   , "//! byte for byte. Change the trace there; changing it here turns the adversary"
@@ -224,27 +239,170 @@ private def preamble (name : String) (trace : Trace) : List String :=
   ++ imports trace
   ++ [ ""
      , "#[test]"
-     , "fn " ++ name ++ "() {"
-     , "    let dir = tempfile::tempdir().unwrap();" ]
-  ++ (if looking trace then
-        ["    let raised = assembly::init_city(dir.path()).unwrap();"]
-      else
-        ["    assembly::init_city(dir.path()).unwrap();"])
+     , "fn " ++ name ++ "() {" ]
+  ++ cityAndWorker (looking trace)
+
+/-- One spelling of one endpoint, entered under a name of its own.
+
+The line is written whole rather than wrapped, which holds while the longest
+spelling keeps it inside the width rustfmt is configured for; a longer
+authority than this one would be reformatted, and the comparison in
+`adversary/test/Main.lean` would report that as a drift. -/
+private def attaching (spelling : String) (index : Nat) : String :=
+  s!"    attach(&mut worker, {quoted s!"{relayName}-{index}"}, {quoted spelling}).unwrap();"
+
+/-- Every spelling of one endpoint reaches one registration.
+
+The defect this remembers is recorded in `adversary-SPEC.md` section 4, fourth
+finding: the normalisation existed, had its own tests, and had no caller, so the
+city wrote down five different URLs for one endpoint and the first call to four
+of them answered 404. -/
+private def oneUrlRegistered : List String :=
+  let spelled := spellings deadAuthority
+  [ "#[test]"
+  , "fn every_spelling_of_one_endpoint_is_registered_as_one_url() {" ]
+  ++ cityAndWorker true
+  ++ [ "    // A provider prints one endpoint several ways and a person pastes"
+     , "    // whichever one they were shown. Nothing listens on this address, so"
+     , "    // every attachment below is one the person's own model id carried." ]
+  ++ spelled.zipIdx.map (fun entry => attaching entry.fst entry.snd)
   ++ [ ""
-     , "    // The vault is the in-session one: a test that reached the platform"
-     , "    // credential service would write to the machine running it."
-     , "    let mut worker = assembly::RunWorker::new("
-     , "        dir.path(),"
-     , "        gateway::Custodian::in_memory(),"
-     , "        runtime::diagnostics::Diagnostics::off(),"
-     , "    )"
-     , "    .unwrap();"
-     , "" ]
+     , "    let written = stated("
+     , "        &raised.ledger_dir,"
+     , "        kernel::EventKind::EndpointAttached,"
+     , "        \"base_url\","
+     , "    );"
+     , "    // One registration per spelling, and the same URL in each: what is"
+     , "    // asserted is the relation between the readings, so no normalisation"
+     , "    // is recomputed here."
+     , s!"    assert_eq!(written.len(), {spelled.length});"
+     , "    assert!("
+     , "        written.windows(2).all(|pair| pair[0] == pair[1]),"
+     , "        \"one endpoint was written down as {written:?}\""
+     , "    );"
+     , "}" ]
 
+/-- A model no catalogue prices is registered with a ceiling anyway.
+
+The defect this remembers is the fifth finding of the same section: the ladder
+in `gateway::provider::ceiling` answered for every rung nobody filled in, and
+`select_model` walked a chain of its own that stopped one rung short — so the
+Anthropic wire, which requires `max_tokens` in every request, could not write
+one for a model the person had just picked from a list. -/
+private def ceilingRegistered : List String :=
+  [ "#[test]"
+  , "fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {" ]
+  ++ cityAndWorker true
+  ++ [ s!"    attach(&mut worker, {quoted relayName}, {quoted attachedUrl}).unwrap();"
+     , "    // The box a person left empty. The Anthropic wire requires"
+     , "    // `max_tokens` in every request, so a registration that kept the"
+     , "    // ceiling unstated is a model this city cannot call at all."
+     , "    worker"
+     , "        .handle(channels::Command::SelectModel {"
+     , s!"            endpoint: channels::ProviderName::parse({quoted relayName}).unwrap(),"
+     , s!"            model: {quoted unlistedModel}.to_owned(),"
+     , "            tag: kernel::ModelTag::Main,"
+     , "            context_tokens: 0,"
+     , "            max_output_tokens: None,"
+     , "            idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b\"select\"),"
+     , "        })"
+     , "        .unwrap();"
+     , ""
+     , "    let ceilings = stated("
+     , "        &raised.ledger_dir,"
+     , "        kernel::EventKind::ModelSelected,"
+     , "        \"max_output_tokens\","
+     , "    );"
+     , "    assert!("
+     , "        ceilings"
+     , "            .first()"
+     , "            .and_then(serde_json::Value::as_u64)"
+     , "            .is_some_and(|tokens| tokens > 0),"
+     , "        \"a model nobody priced was registered with {ceilings:?}\""
+     , "    );"
+     , "    // Which rung answered, read back in the ladder's own spelling: this"
+     , "    // id is in no catalogue and under no preset host, so the policy"
+     , "    // default is the rung that was left."
+     , "    let rungs = stated("
+     , "        &raised.ledger_dir,"
+     , "        kernel::EventKind::ModelSelected,"
+     , "        \"ceiling_from\","
+     , "    );"
+     , "    assert_eq!("
+     , "        rungs.first().and_then(serde_json::Value::as_str),"
+     , "        Some(gateway::CeilingSource::Policy.as_str())"
+     , "    );"
+     , "}" ]
+
+/-- The attachment both provider tests make, written once.
+
+The model id is named rather than left to the probe, for the product's own
+reason: an attachment that declared no id is refused when the probe reaches
+nobody, and nothing listens on this address. -/
+private def attachHelper : List String :=
+  [ "/// One endpoint attached under a name of its own, with the model id the"
+  , "/// person named."
+  , "///"
+  , "/// The id is named rather than left to the probe: most compatible"
+  , "/// endpoints serve no model list, and this address serves nothing at"
+  , "/// all, so an attachment that declared no id would be refused for an"
+  , "/// interface the endpoint never promised."
+  , "fn attach("
+  , "    worker: &mut assembly::RunWorker,"
+  , "    name: &str,"
+  , "    base_url: &str,"
+  , ") -> Result<(), kernel::AxError> {"
+  , "    worker.handle(channels::Command::AttachEndpoint {"
+  , "        name: channels::ProviderName::parse(name)?,"
+  , "        base_url: base_url.to_owned(),"
+  , "        dialect: kernel::DialectKind::Anthropic,"
+  , "        secret: None,"
+  , "        auth_header: None,"
+  , s!"        admit: vec![{quoted unlistedModel}.to_owned()],"
+  , "        tuning: channels::EndpointTuning::default(),"
+  , "        idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, name.as_bytes()),"
+  , "    })"
+  , "}" ]
+
+/-- The one reader of the history in the emitted file.
+
+Every assertion above asks it, and `standing` is written in terms of it rather
+than beside it: two readers of one ledger would be two accounts of what a record
+is. -/
+private def statedHelper : List String :=
+  [ "/// What this city's history states under one kind of record and one"
+  , "/// field, oldest first."
+  , "///"
+  , "/// The ledger is the only reading these tests take: what a city"
+  , "/// registered is what its history says it registered, and a field read"
+  , "/// off a live structure would be a second account of the same fact."
+  , "fn stated("
+  , "    ledger: &std::path::Path,"
+  , "    kind: kernel::EventKind,"
+  , "    field: &str,"
+  , ") -> Vec<serde_json::Value> {"
+  , "    let verified = runtime::replay::verify_ledger_dir(ledger).unwrap();"
+  , "    verified"
+  , "        .raw_lines()"
+  , "        .iter()"
+  , "        .filter_map(|line| {"
+  , "            let record = kernel::EventRecord::parse_line(line).unwrap();"
+  , "            if record.kind() != kind {"
+  , "                return None;"
+  , "            }"
+  , "            record.data().as_map().get(field).cloned()"
+  , "        })"
+  , "        .collect()"
+  , "}" ]
+
+/-- What follows the trace's own test: the two provider counterexamples, and
+the helpers all three tests call. -/
 private def closing (trace : Trace) : List String :=
-  if looking trace then ["}", "", standingHelper] else ["}"]
+  ["}", ""] ++ oneUrlRegistered ++ [""] ++ ceilingRegistered ++ [""] ++ attachHelper
+    ++ [""] ++ statedHelper
+    ++ (if looking trace then ["", standingHelper] else [])
 
-/-- Renders a trace as a Rust integration test. -/
+/-- Renders what both worlds found as one Rust integration test file. -/
 def render (name : String) (trace : Trace) : String :=
   String.join ((preamble name trace ++ walked (sequenced trace) ++ closing trace).map (· ++ "\n"))
 where

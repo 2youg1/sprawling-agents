@@ -174,8 +174,16 @@ status = "gated, with a register of the signatures that predate the rule"
 # The signatures that predate the rule (2026-09-02), worst first. A name
 # not on this list is refused outright, so the list cannot grow; a
 # signature is struck from it by giving the values that travel together a
-# name, never by widening the budget. Forty-two when the rule was drawn,
-# twenty-three now.
+# name, never by widening the budget. How many remain is what the list
+# below says; a count written here as well would be the second home of a
+# number this file already states, and it was wrong within four commits
+# of being written.
+#
+# The register cleans itself. `cargo xtask length` reports a name that
+# has come back inside the budget, and a name that is no longer in the
+# tree, in the same words the file register and `boundary`'s use — so an
+# exception disappears when it is spent instead of silently re-excusing
+# whatever is written at that address next.
 #
 # Sixteen of the original forty-two were in `bin::assembly`, and so were
 # the worst six. That was the file rule's finding reached from another
@@ -306,6 +314,29 @@ status = "gated, with a register of the files that predate the rule"
 
 [boundary.predating]
 files = []
+
+# Which platforms a release publishes for, and what each archive is
+# called, is stated once in `xtask/src/platform.rs`. The workflow matrix,
+# the two install scripts and the npm shim each restate it in another
+# language, and `cargo xtask artifact` holds all four to that table:
+# `install.sh` had come to offer a suffix the matrix never produces, and
+# only the shim was ever compared against anything.
+#
+# The register records an archive name a file spells out that no release
+# builds. It holds one row, and that row is a decision somebody else has
+# to make: `install.sh` offers `-linux-x86_64.zip` "for a gnu build that
+# may join it later", and no such build exists, so a Linux machine is
+# told to look for an asset the matrix cannot produce. Striking it is a
+# one-line edit to a file outside this change-set. The register cleans
+# itself in both directions: the row goes when a platform row claims that
+# suffix, and it goes when nobody spells it any more.
+[archive_naming]
+what = "the suffix every archive a release publishes ends with"
+measured_by = "cargo xtask artifact (the table in xtask/src/platform.rs)"
+status = "gated, with a register of the names spelled before the rule"
+
+[archive_naming.predating]
+suffixes = ["-linux-x86_64.zip"]
 
 [session_resident]
 what = "one session's resident memory, in this platform's own counter"

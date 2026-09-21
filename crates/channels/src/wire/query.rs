@@ -8,49 +8,17 @@
 //!
 //! Queries read state. They are cacheable and free of side effects, so
 //! none carries an `IdemKey` — a Query that needed one would have
-//! stopped being a Query. The name table is in declaration order and a
-//! test holds it there, because the schema hash is built from it and a
-//! table that drifted from the enum would let two builds agree on a hash
-//! while disagreeing on what a frame means.
+//! stopped being a Query. The name table is generated from the variant
+//! list by `named_frames!`, because the schema hash is built from it and
+//! a table that could drift from the enum would let two builds agree on
+//! a hash while disagreeing on what a frame means.
 
 use kernel::{Address, GitOid, Locator, NodeId, RunId, Seq};
 use serde::{Deserialize, Serialize};
 
-/// The Query surface, in declaration order.
-pub const QUERY_NAMES: [&str; 31] = [
-    "History",
-    "RunHistory",
-    "Changes",
-    "Hunks",
-    "Commit",
-    "RunView",
-    "CityView",
-    "ApprovalQueue",
-    "InboxView",
-    "Metrics",
-    "CostView",
-    "ArchiveSearch",
-    "RegistryView",
-    "DiscardView",
-    "EndpointView",
-    "BuildingView",
-    "Governance",
-    "Rounds",
-    "Evidence",
-    "CostOf",
-    "Listing",
-    "Document",
-    "Commits",
-    "Doctor",
-    "Prefix",
-    "Content",
-    "Skills",
-    "GitStatus",
-    "McpHealth",
-    "Toolkits",
-    "Release",
-];
+use crate::named_frames::named_frames;
 
+named_frames! {
 /// Queries read state. They are cacheable and free of side effects, so none
 /// carries an `IdemKey` - a Query that needed one would have stopped being a
 /// Query.
@@ -348,42 +316,7 @@ pub enum Query {
     Release,
 }
 
-impl Query {
-    /// Exhaustive, for the same reason as [`Command::name`].
-    #[must_use]
-    pub fn name(&self) -> &'static str {
-        match *self {
-            Self::History { .. } => "History",
-            Self::RunHistory { .. } => "RunHistory",
-            Self::Changes { .. } => "Changes",
-            Self::Commit { .. } => "Commit",
-            Self::RunView { .. } => "RunView",
-            Self::CityView => "CityView",
-            Self::ApprovalQueue => "ApprovalQueue",
-            Self::InboxView { .. } => "InboxView",
-            Self::Metrics => "Metrics",
-            Self::CostView => "CostView",
-            Self::ArchiveSearch { .. } => "ArchiveSearch",
-            Self::RegistryView => "RegistryView",
-            Self::DiscardView => "DiscardView",
-            Self::EndpointView => "EndpointView",
-            Self::BuildingView { .. } => "BuildingView",
-            Self::Governance => "Governance",
-            Self::Hunks { .. } => "Hunks",
-            Self::Rounds { .. } => "Rounds",
-            Self::Evidence { .. } => "Evidence",
-            Self::CostOf { .. } => "CostOf",
-            Self::Listing { .. } => "Listing",
-            Self::Document { .. } => "Document",
-            Self::Commits { .. } => "Commits",
-            Self::Doctor => "Doctor",
-            Self::Prefix { .. } => "Prefix",
-            Self::Content { .. } => "Content",
-            Self::Skills { .. } => "Skills",
-            Self::GitStatus { .. } => "GitStatus",
-            Self::McpHealth { .. } => "McpHealth",
-            Self::Toolkits => "Toolkits",
-            Self::Release => "Release",
-        }
-    }
+/// The Query surface, in declaration order — the order the handshake
+/// hash mixes these names in.
+pub const QUERY_NAMES;
 }

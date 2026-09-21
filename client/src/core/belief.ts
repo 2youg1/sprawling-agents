@@ -17,6 +17,7 @@ import { createStore, produce } from "solid-js/store";
 import { readProbed } from "./probed";
 import type { Probed } from "./probed";
 
+import { CITY_RUN } from "../wire";
 import type {
   Address,
   AxError,
@@ -30,10 +31,6 @@ import type {
   Seq,
   TimeMs,
 } from "../wire";
-
-// The run every record that belongs to the city itself carries, which
-// `kernel::RunId::CITY` spells as the nil uuid (roadmap M-24).
-const CITY_RUN = "00000000-0000-0000-0000-000000000000";
 
 // What one run is doing, in the words the city page and the room page
 // both read.

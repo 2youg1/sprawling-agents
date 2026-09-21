@@ -92,7 +92,13 @@ use serde::{Deserialize, Serialize};
 /// 31: `Query::Release` answers which release this city is and which
 ///    one npm offers - the only query that reaches the internet, asked
 ///    when somebody presses the button and never on a timer.
-pub const WIRE_V: u32 = 31;
+/// 32: the two name tables the handshake hash is built from are
+///    generated from the frame enums themselves, so a frame is spelled
+///    once. The grammar is unchanged and every frame means what it
+///    meant; the tables now read in declaration order, and the
+///    `Command` table's order was not that, so the hash moved and the
+///    version moves with it.
+pub const WIRE_V: u32 = 32;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
@@ -267,94 +273,13 @@ pub struct LogLine {
 mod tests {
     use super::*;
 
+    /// The table is the variant list, so what is left to check is that
+    /// one frame reads back the entry the generator wrote for it.
     #[test]
-    fn the_query_names_match_the_variants() {
-        let queries = [
-            Query::History {
-                before: None,
-                limit: 20,
-            },
-            Query::RunHistory {
-                run: RunId::from_bytes([1u8; 16]),
-                before: None,
-                limit: 20,
-            },
-            Query::Changes {
-                base: kernel::GitOid::from_bytes([2u8; 20]),
-                head: None,
-            },
-            Query::Hunks {
-                oid_a: kernel::GitOid::from_bytes([4u8; 20]),
-                oid_b: kernel::GitOid::from_bytes([5u8; 20]),
-                path: "lab/lex.rs".to_owned(),
-            },
-            Query::Commit {
-                oid: kernel::GitOid::from_bytes([3u8; 20]),
-            },
-            Query::RunView {
-                run: RunId::from_bytes([1u8; 16]),
-            },
-            Query::CityView,
-            Query::ApprovalQueue,
-            Query::InboxView {
-                addr: Address::parse("acme").unwrap(),
-            },
-            Query::Metrics,
-            Query::CostView,
-            Query::ArchiveSearch {
-                needle: "x".to_owned(),
-            },
-            Query::RegistryView,
-            Query::DiscardView,
-            Query::EndpointView,
-            Query::BuildingView {
-                addr: Address::parse("acme").unwrap(),
-            },
-            Query::Governance,
-            Query::Rounds {
-                run: RunId::from_bytes([1u8; 16]),
-            },
-            Query::Evidence {
-                run: RunId::from_bytes([1u8; 16]),
-            },
-            Query::CostOf {
-                node: kernel::NodeId::parse("2.3").unwrap(),
-            },
-            Query::Listing { at: None },
-            Query::Document {
-                at: Address::parse("acme/Roadmap.md").unwrap(),
-            },
-            Query::Commits {
-                building: None,
-                before: None,
-                limit: 20,
-            },
-            Query::Doctor,
-            Query::Prefix {
-                run: RunId::from_bytes([1u8; 16]),
-            },
-            Query::Content {
-                locator: kernel::Locator::Cas {
-                    hash: B3Hash::digest(b"a segment"),
-                    range: None,
-                },
-            },
-            Query::Skills {
-                building: Address::parse("acme").unwrap(),
-            },
-            Query::GitStatus {
-                building: Address::parse("acme").unwrap(),
-            },
-            Query::McpHealth {
-                addr: Address::parse("acme").unwrap(),
-            },
-            Query::Toolkits,
-            Query::Release,
-        ];
-        assert_eq!(queries.len(), QUERY_NAMES.len());
-        for (query, expected) in queries.iter().zip(QUERY_NAMES) {
-            assert_eq!(query.name(), expected, "declaration order must match");
-        }
+    fn a_query_names_itself_with_its_entry_in_the_table() {
+        assert_eq!(Query::CityView.name(), "CityView");
+        assert!(QUERY_NAMES.contains(&Query::CityView.name()));
+        assert!(QUERY_NAMES.contains(&Query::Release.name()));
     }
 
     #[test]

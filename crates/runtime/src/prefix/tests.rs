@@ -15,6 +15,29 @@ fn four() -> (FrozenSegment, FrozenSegment, FrozenSegment, FrozenSegment) {
 }
 
 #[test]
+fn the_startup_default_divides_the_token_budget_across_every_slot() {
+    let (c, b, r, run) = four();
+    let prefix = FrozenPrefix::assemble(c, b, r, run).unwrap();
+    let slots = u64::try_from(prefix.segments().len()).unwrap();
+    assert_eq!(
+        slots,
+        PREFIX_SLOTS.get(),
+        "the divisor and the number of slots are the same four"
+    );
+    let whole = STARTUP_BUDGET_TOKENS * BYTES_PER_TOKEN;
+    assert_eq!(
+        SegmentCaps::startup_default(),
+        SegmentCaps {
+            city: whole / slots,
+            building: whole / slots,
+            resident: whole / slots,
+            run: whole / slots,
+        },
+        "the caps are bytes and the budget they come from is tokens"
+    );
+}
+
+#[test]
 fn same_input_same_bytes_same_hashes() {
     let (c, b, r, run) = four();
     let (c2, b2, r2, run2) = four();

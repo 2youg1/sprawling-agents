@@ -188,12 +188,20 @@ fn a_raised_building_ignores_its_roadmap_and_tracks_its_spec() {
             "{line} is one session's thinking and does not belong in history"
         );
     }
-    for kept in ["!SPEC.md", "!.sprawling/"] {
+    for kept in [
+        "!SPEC.md",
+        "!/.sprawling/BUILDING.md",
+        "!/.sprawling/CONFIG.toml",
+    ] {
         assert!(
             ignored.lines().any(|row| row.trim() == kept),
             "{kept} is what the building promises and must survive an outer ignore rule"
         );
     }
+    assert!(
+        !ignored.lines().any(|row| row.trim() == "!.sprawling/"),
+        "one negation over the whole reserved subtree would commit the ledger and the vault references with it"
+    );
 }
 
 /// Adoption draws the same line over a directory that already had one

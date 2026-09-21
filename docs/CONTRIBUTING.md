@@ -73,7 +73,7 @@ The `guard` row is the load-bearing one: it closes the single universal escape h
 
 ## 3.1 Continuous integration
 
-**`ci` runs on every push to `main` and on every pull request**; its verdict jobs together are exactly `just check` plus the supply-chain read and the kernel proofs, and nothing else - a green CI implies at least what a green `just check` implies. Every one of them is a required check; the small `changes` job beside them is not, because its only work is to let the proof job skip on a change no proof is about. `platforms` and `nightly` answer questions no one waits for (macOS, the flake, byte-identical rebuilds, fuzz, advisories) and run on a schedule; `upstream-watch` asks the two provider-intelligence upstreams whether they moved, daily.
+**`ci` runs on every push to `main` and on every pull request**; its verdict jobs together are exactly `just check` plus the supply-chain read and the kernel proofs, and nothing else - a green CI implies at least what a green `just check` implies. Every one of them is a required check; the small `changes` job beside them is not, because its only work is to let the proof job skip on a change no proof is about. `platforms` and `nightly` answer questions no one waits for (macOS, the flake, byte-identical rebuilds, fuzz, advisories) and run on a schedule; `upstream-watch` asks each watched path of `docs/third-party.md` section 1 whether it moved, daily.
 
 Three things run there and not here: `cargo-deny` when it is not installed locally, the formal-verification job (Linux only, mirrored locally by properties), and the nightly fuzz and mutation batches. Everything else is `just check`.
 

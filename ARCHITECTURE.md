@@ -187,7 +187,7 @@ A run's write domain is what its building's `BUILDING.md` declares, and **the wh
 
 ## 7 The wire
 
-One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is <!-- xtask:begin wire_v -->31<!-- xtask:end -->.
+One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is <!-- xtask:begin wire_v -->32<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
@@ -298,7 +298,7 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->16<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1733<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1756<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
@@ -554,7 +554,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::credential::oauth::flow::tests | crates/gateway/src/credential/oauth/flow/tests.rs | the oauth fixtures | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::oauth::types | crates/gateway/src/credential/oauth/types.rs | pending, request, tokens | adapter | S3 | built | gateway-SPEC.md#8-4 |
 
-### runtime (66) — one run, from dispatch to freeze
+### runtime (67) — one run, from dispatch to freeze
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -579,6 +579,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | runtime::reminder | crates/runtime/src/reminder.rs | how full the window is, from the provider's own count: two thresholds, each sounding once per run | decision | V4 | built | runtime-SPEC.md#8-34 |
 | runtime::fork | crates/runtime/src/fork.rs | a new run whose in-window history is a byte-identical prefix of another | decision | S1 | built | runtime-SPEC.md#8-2 |
 | runtime::compaction | crates/runtime/src/compaction.rs | when to shorten something and what to keep; never larger than its input | decision | P3 | built | runtime-SPEC.md#8-14 |
+| runtime::elision | crates/runtime/src/elision.rs | the one marker that says text was cut here, and the two boundaries a cut may fall on | policy | P1 | built | runtime-SPEC.md#8-42 |
 | runtime::redact | crates/runtime/src/redact.rs | what a model said, scanned on its way into history | decision | P3 | built | runtime-SPEC.md#8-14 |
 | runtime::sieve | crates/runtime/src/sieve.rs | what survives a command's output, by which command produced it: seven stages in a fixed order, each accepted only when it shrinks, and a tee in front so nothing cut is unreachable | decision | V4 | built | runtime-SPEC.md#8-27 |
 | runtime::sieve::key | crates/runtime/src/sieve/key.rs | which command produced an output: arm, program, arguments, ordered so it can key a `BTreeMap` | value | V4 | built | runtime-SPEC.md#8-27 |
@@ -709,11 +710,12 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | eval::ablation::capabilities | crates/eval/src/ablation/capabilities.rs | the corpus: each thing a resident must be able to do, and the phrase in the document that grants it | data | V3 | built | eval-SPEC.md#8-7 |
 | eval::ablation::tests | crates/eval/src/ablation/tests.rs | the graded fixtures, and the on-demand run against the real City.md | decision | V3 | built | eval-SPEC.md#8-7 |
 
-### channels (36) — the process boundary
+### channels (37) — the process boundary
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
 | channels::wire | crates/channels/src/wire.rs | the envelope both sides speak: the frames, the version and its hash | value | S4 | built | channels-SPEC.md#8-1 |
+| channels::named_frames | crates/channels/src/named_frames.rs | one declaration of a frame family, from which the enum, each variant's wire name and the schema-hash table are all generated | grammar | P1 | built | channels-SPEC.md#8-1 |
 | channels::wire::query | crates/channels/src/wire/query.rs | everything a page may ask, and the name table the schema hash is built from | value | V4 | built | channels-SPEC.md#8-1 |
 | channels::command | crates/channels/src/command.rs | everything a client may ask the city to do, and the one frame it cannot spell | value | V3 | built | channels-SPEC.md#8-1 |
 | channels::command::kind | crates/channels/src/command/kind.rs | names, steps, the wire enum | value | V3 | built | channels-SPEC.md#8-1 |

@@ -402,6 +402,8 @@ pub fn write_mcp(city_root: &Path, addr: &Address, layer: Layer, servers: &[McpS
 - **与 `write_effort` 同一道门**：梯子（城→楼→房间）本就是「一个 Run 被什么治理」的权威，第二个存储就是第二个答案。其余键原样保留，因为可能是人手写的。
 - **写出的字节必须是 `ConfigFile` 读得回来的那种**：`McpServer` 的 serde 形状是嵌套的，而文件语法是平的（`label` ＋ `command`/`args`/`env` 或 `url`/`headers`/`transport`）。写面照文件语法拼，本 crate 内一处正读一处反写，两者对不上时编译不会说话、测试会——一条往返测试逐支覆盖三种 transport。`Sse` 一行必写出 `transport = "sse"`：缺省是 `http`，不写就会被读回成另一种 transport。
 - **空的 `mcp` 表要写出来而不是省略**：省略即继承上一级，而一个人删掉最后一台服务器不是想继承一台。
+- **`env` 与 `headers` 逐值判定凭据，落盘之前就拒**（S-07）：一个值只要不是 `SecretRef::parse` 认得的 `secret:realm/name`，名字命中 `kernel::names_a_credential` 或值命中 `kernel::scan` 即以 `AxCode::ConfigInvalid` 拒，恢复语指向金库。判定在 `write_mcp` 进 `change` 之前逐对做，因此一次被拒的写入一个字节都没落；拒绝文字报出是哪一台服务器、哪一张表、哪一个名字，因为人手里只有那句话。**理由是这份文件进版本库**：楼的 `CONFIG.toml` 由 `city::gitignore` 放行进历史（§8-21），写进去的 key 就在这个项目的每一次克隆里。**判定不重建**：「什么叫凭据」是 `kernel::secret` 的答案，与 `[sandbox] env_passthrough` 走 `EnvVarName::parse` 是同一个权威的两次调用。
+- **读面今天不判这一条**：手写进 `CONFIG.toml` 的明文 key 仍然读得回来。补齐要让 `ConfigLayer::parse` 调同一个谓词，那时谓词升为 `pub(crate)` 并只有一处实现。
 - **三个写面只有一条写路径**：三者各自把要说的话包成 `Change`（穷尽：`Effort` / `Sandbox` / `Mcp`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。
 
 ### 8-14 一次会话选一次的思考强度
@@ -631,7 +633,7 @@ impl CityPlan { pub fn hall(&self) -> &(Address, BuildingTemplate); }   // 恒�
 **接口**：
 
 ```rust
-// city::gitignore（形状 6 数据面＋一个幂等落盘动作）
+// city::gitignore（一张从各模块取名的规则表＋一个幂等落盘动作）
 pub const GITIGNORE_FILE: &str = ".gitignore";
 /// 把本城的忽略规则补进这栋楼的 .gitignore。已有的字节一行不删，
 /// 缺哪行补哪行；文件不存在则整份写出。
@@ -641,10 +643,13 @@ pub(crate) fn place(building_root: &Path) -> Result<(), AxError>;
 pub const SPEC_FILE: &str = "SPEC.md";   // 字节来自 docs/templates/SPEC.md（include_str!）
 ```
 
-- **不对称本身就是这一条的全部内容**：`SPEC.md` 与 `.sprawling/` 进版本库，`Roadmap.md`、`Memo.md`、`Handoff.md` 与各个房间不进。一栋楼向外承诺的东西必须在历史里，任何一次克隆都读得到；一次会话当时在想什么不是承诺，它留在运行中的机器上。
+- **不对称本身就是这一条的全部内容**：`SPEC.md` 与这栋楼自己保留子树里的五份承诺进版本库，`Roadmap.md`、`Memo.md`、`Handoff.md` 与各个房间不进。一栋楼向外承诺的东西必须在历史里，任何一次克隆都读得到；一次会话当时在想什么不是承诺，它留在运行中的机器上。
 - **`SPEC.md` 是十七节 crate SPEC 的压缩式，不是第二种形状**：`docs/templates/SPEC.md` 的十二节逐节对应 crate SPEC 的节次（需求／验收／假设／权威／命名／边界／接口／错误／依赖／硬编码／测试／决策），只是把「现状分析、工作流程、实现逻辑、影响面、模型体验、文档同步」这几节留给 crate 自己。它压缩，不另起。
 - **`place` 只追加，从不重写**：被收编的目录往往已经有一份 `.gitignore`，里面写着这个项目自己的东西。整份覆盖会把它们冲掉，而那正是 adopt 承诺不会碰的字节。依据是逐行比对（去空白后相等即视为已有），因此重复 raise 不会把同一段追加两次。
-- **显式的两行反忽略**：`!SPEC.md` 与 `!.sprawling/` 写进块里，而不是靠「没人忽略它们」这个默认。被收编的仓库可能已经忽略了 `*.md` 或一切点开头的目录；那时「这栋楼的承诺在历史里」就是假的，而没有人会发现。
+- **显式的反忽略**：`!SPEC.md` 与保留子树的放行行写进块里，而不是靠「没人忽略它们」这个默认。被收编的仓库可能已经忽略了 `*.md` 或一切点开头的目录；那时「这栋楼的承诺在历史里」就是假的，而没有人会发现。
+- **保留子树逐文件放行，不整棵放行**（S-07）：块里先 `.sprawling/` 忽略任意深度的保留子树，再 `!/.sprawling/` 只把这栋楼自己的那一棵放回来，`/.sprawling/*` 把它清空，最后逐行放行五份承诺——`BUILDING.md`、`CONFIG.toml`、`FILTERS.toml`、`DESKTOP.toml` 与 `skills/`。三个理由：①城自己的保留子树同名，账本、对象库与金库引用住在那里，一行 `!.sprawling/` 把它们一并放回版本控制的可见面；②那一行不带斜杠，因此对楼下每一个居民、每一个房间的保留子树同样生效，而那些是机器上的东西，不是这栋楼的承诺；③`CONFIG.toml` 正是 MCP 凭据的落点，它进历史的前提是 §8-4b 的逐值判定同时成立——两件事是同一次改动。
+- **五个名字都从写它的模块取**：`kernel::layout` 的 `CONFIG_FILE`／`FILTERS_FILE`／`BUILDING_SHELF`、`policy` 的 `BUILDING_FILE`／`DESKTOP_SCOPE_FILE`、`spine_files` 的四份脊柱文档名。因此 `BLOCK` 由 `&[&str]` 常量改为 `block() -> Vec<String>`：一个改了名的文档不会在这里留下一条谁都不写的规则。
+- **顺序就是文法**：git 认最后一条命中的规则，所以「忽略—放回目录—清空—逐行放行」这四步不能重排。这一条由 git 自己验过：外层再写 `.*` 与 `*.md`，`SPEC.md` 与 `.sprawling/CONFIG.toml` 仍然进历史，`.sprawling/ledger/` 仍然不进，一个嵌套目录自己的 `.sprawling/CONFIG.toml` 也不进。
 - **房间由房间自己忽略**：`room::open` 在新开的房间里放一份只有 `*` 一行的 `.gitignore`。楼这一层的 `.gitignore` 写不出「房间」——房间是人当场命名的普通子目录，立楼时它们还不存在，而在被收编的仓库里按通配符去猜哪个子目录是房间会误伤源码目录。
 - 被否：在楼的 `.gitignore` 里写 `*/JOB.md`、`*/URBANITE.md` 一类通配。它只忽略房间里的某几个文件名，会让一次会话的其余产物照样进历史，等于把这条规则写成一半。
 

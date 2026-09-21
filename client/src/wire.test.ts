@@ -35,8 +35,13 @@ const refused = <A>(result: Either.Either<A, ParseResult.ParseError>): string =>
   });
 
 describe("the wire constants", () => {
-  test("carry the version and the hash the server checks", () => {
-    expect(WIRE_V).toBe(31);
+  // The version's own value belongs to `channels::WIRE_V`, and
+  // `xtask wire-ts` is what holds this file equal to it; repeating the
+  // number here would be a second home that only ever disagrees. The
+  // hash is text rather than a number, so its shape is still worth one
+  // assertion: a truncated one would be refused by every server with
+  // no clue as to why.
+  test("carry a hash of the shape the handshake sends", () => {
     expect(WIRE_HASH).toMatch(/^[0-9a-f]{64}$/);
   });
 });

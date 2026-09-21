@@ -22,14 +22,35 @@ mod emit;
 /// Where the generated file lives, relative to the repository root.
 const TARGET: &str = "client/src/wire.ts";
 
+/// What the generated file states before any type: the wire version
+/// both ends compare, the schema hash the server checks, and the run
+/// identity a city-level record carries. Three values that always
+/// travel together and are never chosen independently, so they travel
+/// as one.
+pub(super) struct Constants {
+    pub(super) wire_v: u32,
+    pub(super) hash: String,
+    /// `kernel::RunId::CITY`, the nil uuid. The client used to write it
+    /// out by hand, and a client that spells this identity differently
+    /// folds every city-level record into a run that does not exist.
+    pub(super) city_run: String,
+}
+
 /// The text the wire produces now.
+///
+/// The three constants come from the types that define them rather than
+/// from anything written here: the city's own run identity is
+/// `kernel::RunId::CITY`, and a client that spelled that nil uuid itself
+/// would fold every city-level record into a run that does not exist.
 fn render() -> Result<String, XtaskError> {
-    let hash = channels::schema_hash().to_string();
-    emit::emit(&channels::wire_schema(), channels::WIRE_V, &hash).map_err(|refused| {
-        XtaskError::Doc {
-            file: format!("channels::wire_schema at {}", refused.at),
-            msg: refused.why,
-        }
+    let constants = Constants {
+        wire_v: channels::WIRE_V,
+        hash: channels::schema_hash().to_string(),
+        city_run: kernel::RunId::CITY.to_string(),
+    };
+    emit::emit(&channels::wire_schema(), &constants).map_err(|refused| XtaskError::Doc {
+        file: format!("channels::wire_schema at {}", refused.at),
+        msg: refused.why,
     })
 }
 

@@ -68,6 +68,54 @@ fn every_excused_signature_is_a_real_one_that_is_still_over() {
     );
 }
 
+/// The gate reports a spent parameter exception in both shapes the
+/// other two registers report: a name that has come back inside the
+/// budget, and a name that is no longer in the tree. Before this, the
+/// parameter register was consulted and never audited, so the test
+/// above was its only reader and `just check` said nothing.
+#[test]
+fn a_spent_parameter_exception_is_reported_in_both_shapes() {
+    let excused: BTreeSet<String> = ["a.rs::wide", "b.rs::narrowed", "c.rs::gone"]
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    let still_here: BTreeMap<String, usize> = [("a.rs::wide", 7), ("b.rs::narrowed", 3)]
+        .into_iter()
+        .map(|(name, args)| (name.to_owned(), args))
+        .collect();
+    let found = spent_signatures(&excused, &still_here, 4);
+    let said: Vec<&str> = found.iter().map(|one| one.violation.as_str()).collect();
+    assert_eq!(said.len(), 2, "{found:#?}");
+    assert!(said[0].contains("b.rs::narrowed takes 3"), "{said:#?}");
+    assert!(said[1].contains("c.rs::gone is excused"), "{said:#?}");
+    assert_eq!(
+        found[0].rule, "an exception that is no longer needed is struck from the register",
+        "the three registers state this rule in one wording"
+    );
+}
+
+/// One register address can name more than one function: `workshop.rs`
+/// holds an eight-parameter `new` and a one-parameter `new`. Reading
+/// whichever was parsed last reported a live exception as spent, and
+/// striking it would have let the wide one through.
+#[test]
+fn an_address_holding_two_functions_is_judged_by_the_wider_one() {
+    let source = "\
+        struct A;\n\
+        struct B;\n\
+        impl A { fn new(a: u8, b: u8, c: u8, d: u8, e: u8) -> Self { Self } }\n\
+        impl B { fn new(a: u8) -> Self { Self } }\n";
+    let parsed = syn::parse_file(source).unwrap();
+    let mut widest: BTreeMap<String, usize> = BTreeMap::new();
+    for found in measure(&parsed.items) {
+        let held = widest.entry(key("x.rs", &found.name)).or_insert(found.args);
+        *held = (*held).max(found.args);
+    }
+    assert_eq!(widest.get("x.rs::new"), Some(&5));
+    let excused: BTreeSet<String> = ["x.rs::new".to_owned()].into_iter().collect();
+    assert!(spent_signatures(&excused, &widest, 4).is_empty());
+}
+
 /// The register is the authority for both numbers, and both are read
 /// from it by name. A row that stops stating its budget must fail
 /// loudly rather than fall back to something this file believes.

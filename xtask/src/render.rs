@@ -56,9 +56,6 @@ use engine::{Measured, Opening, browser, measure};
 use marks::{no_key_is_underlined, rows_share_a_first_mark};
 use pass::Pass;
 
-/// The client bundle this gate opens: the same one `just dist` embeds.
-const BUNDLE: &str = "target/web-dist";
-
 /// The route that draws every state worth looking at, on fixtures.
 const GALLERY: &str = "#/gallery";
 
@@ -160,12 +157,18 @@ impl Drawn {
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let bundle = root.join(BUNDLE);
+    // Where the bundle lands is the build script's statement, read
+    // rather than repeated: this gate and the binary must open one
+    // directory (xtask-SPEC.md section 8-18).
+    let bundle = crate::bundle::dist(root)?;
     if !bundle.join("index.html").is_file() {
         return Ok(vec![violation(
             EVERY_PASS,
             "the client bundle this gate measures is built",
-            format!("{BUNDLE}/index.html is not built, so no page was measured"),
+            format!(
+                "{}/index.html is not built, so no page was measured",
+                bundle.display()
+            ),
             "run `just build-web`",
         )]);
     }
@@ -232,7 +235,7 @@ fn judge(pass: &Pass, measured: &Measured, out: &mut Vec<Violation>) {
 pub(super) fn violation(at: &str, rule: &str, subject: String, alternative: &str) -> Violation {
     Violation {
         gate: "render",
-        location: format!("{BUNDLE} {GALLERY} {at}"),
+        location: format!("{GALLERY} {at}"),
         rule: rule.to_owned(),
         violation: subject,
         alternative: alternative.to_owned(),

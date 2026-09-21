@@ -19,6 +19,8 @@
 //! empty" tries something else, and a caller told "the clipboard says
 //! `[image]`" reasons onward from a sentence nobody wrote.
 
+use std::sync::{Mutex, MutexGuard, PoisonError};
+
 use windows::Win32::Foundation::{HANDLE, HGLOBAL};
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard,
@@ -32,8 +34,26 @@ use crate::refusal::Refusal;
 /// Unicode text, which is the one format this server speaks.
 const CF_UNICODETEXT: u32 = 13;
 
+/// One turn with the clipboard per process.
+///
+/// `OpenClipboard` excludes other processes; it does not exclude the
+/// other threads of this one. A second thread here opens the clipboard
+/// again and is told it succeeded, and then whichever thread finishes
+/// first closes the clipboard under the other: the thread left behind
+/// gets `ERROR_CLIPBOARD_NOT_OPEN` from its next call, and — worse — a
+/// reader that already holds a handle from `GetClipboardData` walks the
+/// block after a writer's `EmptyClipboard` has freed it, which is heap
+/// corruption rather than a refusal. This lock is what makes a [`Held`]
+/// the only one in this process, so the exclusion the `SAFETY` notes
+/// below rely on is real.
+static TURN: Mutex<()> = Mutex::new(());
+
 /// The clipboard, open, and closed again when this value is dropped.
-struct Held;
+struct Held {
+    /// Released after [`Drop::drop`] below has closed the clipboard,
+    /// because a value's fields are dropped after its own `Drop` runs.
+    _turn: MutexGuard<'static, ()>,
+}
 
 impl Held {
     /// # Errors
@@ -45,11 +65,17 @@ impl Held {
         reason = "the clipboard is lent to one process at a time, and only through this FFI entry point"
     )]
     fn open() -> Result<Held, Refusal> {
+        // Waiting here is the point: this thread queues behind the one
+        // that holds the clipboard instead of opening it a second time.
+        // A panic in another thread poisons a lock that guards no data,
+        // and the turn it was holding is over, so the turn is taken.
+        let turn = TURN.lock().unwrap_or_else(PoisonError::into_inner);
         // SAFETY: `None` asks for the clipboard without associating it
         // with a window, which is what a program with no window of its
         // own does. The call either takes the clipboard or fails; there
         // is no state in between, so the `Held` below stands for a
-        // clipboard that really is open.
+        // clipboard that really is open. No other thread of this process
+        // is between an open and a close, because `turn` is held.
         unsafe { OpenClipboard(None) }.map_err(|err| {
             fault::win32(
                 "open this machine's clipboard",
@@ -57,7 +83,7 @@ impl Held {
                 &err,
             )
         })?;
-        Ok(Held)
+        Ok(Held { _turn: turn })
     }
 }
 
@@ -68,9 +94,10 @@ impl Drop for Held {
     )]
     fn drop(&mut self) {
         // SAFETY: a `Held` exists only where `OpenClipboard` succeeded,
-        // and it is closed exactly once, here. Nothing this module hands
-        // out borrows the clipboard past this point: `read` copies the
-        // text out before the `Held` is dropped.
+        // and it is closed exactly once, here, by the thread that opened
+        // it and still holds the turn. Nothing this module hands out
+        // borrows the clipboard past this point: `read` copies the text
+        // out before the `Held` is dropped.
         let _closed = unsafe { CloseClipboard() };
     }
 }
@@ -231,11 +258,22 @@ pub(crate) fn write(text: &str) -> Result<(), Refusal> {
 mod tests {
     use super::*;
 
+    /// A different fact from [`TURN`], which buys one thread one call:
+    /// a test that writes and then asserts on what comes back needs the
+    /// clipboard to itself across the whole pair, and the tests below
+    /// run on threads of one process.
+    static PAIRS: Mutex<()> = Mutex::new(());
+
+    fn pair_turn() -> MutexGuard<'static, ()> {
+        PAIRS.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
     /// This one really does touch the machine running the tests, and it
     /// puts back what it found, because a test that leaves somebody's
     /// clipboard changed is a test that damaged their desktop.
     #[test]
     fn text_written_to_the_clipboard_reads_back_as_itself() {
+        let _pair = pair_turn();
         let Ok(before) = read() else {
             // A build agent with no window station has no clipboard, and
             // that is a refusal this module already reports honestly.
@@ -258,5 +296,49 @@ mod tests {
             let _answered = read();
         }
         assert!(read().is_ok() || read().is_err());
+    }
+
+    /// Threads of one process do not corrupt the clipboard for each
+    /// other.
+    ///
+    /// Before `TURN` existed this aborted the whole test binary with
+    /// `STATUS_HEAP_CORRUPTION`: `OpenClipboard` let a second thread in,
+    /// one thread's `EmptyClipboard` freed the block another thread was
+    /// already walking, and the text that came back was whatever the
+    /// allocator had put there since. Every read here happens after this
+    /// thread's own write, so whatever comes back must be one of the
+    /// texts these threads write; garbled bytes are not.
+    #[test]
+    fn concurrent_threads_each_read_back_a_text_some_thread_wrote() {
+        let _pair = pair_turn();
+        let Ok(before) = read() else {
+            // A build agent with no window station has no clipboard.
+            return;
+        };
+        const THREADS: usize = 4;
+        const ROUNDS: usize = 25;
+        let texts: Vec<String> = (0..THREADS)
+            .map(|index| format!("sprawling clipboard turn {index} 🌍"))
+            .collect();
+        std::thread::scope(|threads| {
+            for mine in &texts {
+                let every = &texts;
+                threads.spawn(move || {
+                    for _round in 0..ROUNDS {
+                        write(mine).expect("this machine's clipboard accepts text");
+                        let seen = read().expect("the clipboard reads back");
+                        let seen = seen.expect("a text just written is there");
+                        assert!(
+                            every.contains(&seen),
+                            "read back {seen:?}, which no thread wrote"
+                        );
+                    }
+                });
+            }
+        });
+        match before {
+            Some(original) => write(&original).expect("the original goes back"),
+            None => write("").expect("an empty clipboard goes back as empty"),
+        }
     }
 }

@@ -18,7 +18,10 @@
 
 use std::path::Path;
 
-use kernel::{Address, AxCode, AxError, Effort, McpServer, McpTransport, SandboxLimits};
+use kernel::{
+    Address, AxCode, AxError, Effort, McpServer, McpTransport, SandboxLimits, SecretRef,
+    ServerLabel,
+};
 
 use super::{Layer, path};
 use crate::document;
@@ -66,15 +69,88 @@ pub fn write_sandbox(
 /// person who removed the last server did not mean to inherit one.
 ///
 /// # Errors
-/// Propagates a file that exists and cannot be read or parsed, and a
-/// directory that cannot be written.
+/// Refuses with `E_CONFIG_INVALID` when one environment value or one
+/// header of one server carries a credential instead of a reference to
+/// the vault, before any byte is written. Propagates a file that exists
+/// and cannot be read or parsed, and a directory that cannot be
+/// written.
 pub fn write_mcp(
     city_root: &Path,
     addr: &Address,
     layer: Layer,
     servers: &[McpServer],
 ) -> Result<(), AxError> {
+    for server in servers {
+        match &server.transport {
+            McpTransport::Stdio { env, .. } => vaulted(&server.label, Carried::Env, env)?,
+            McpTransport::Http { headers, .. } | McpTransport::Sse { headers, .. } => {
+                vaulted(&server.label, Carried::Header, headers)?;
+            }
+        }
+    }
     change(city_root, addr, layer, Change::Mcp(servers))
+}
+
+/// Which table a value sits in, so a refusal names the line a person
+/// has to go and edit.
+#[derive(Clone, Copy)]
+enum Carried {
+    Env,
+    Header,
+}
+
+impl Carried {
+    fn noun(self) -> &'static str {
+        match self {
+            Carried::Env => "environment value",
+            Carried::Header => "header",
+        }
+    }
+}
+
+/// Refuses one pair at a time, so the refusal names which value is the
+/// problem rather than which server.
+///
+/// A `secret:realm/name` reference is what this file is for: the value
+/// on disk says where the secret is kept, and the assembly layer
+/// redeems it when a server is started. Anything else that reads as a
+/// credential — by the name in front of it or by the shape of the value
+/// itself — is refused here, at the one place that writes this file,
+/// because a building's `CONFIG.toml` is committed with the project and
+/// a key written into it is a key in every clone of that repository.
+/// The same judgment `EnvVarName::parse` already applies to a declared
+/// environment name, applied to the value beside it.
+fn vaulted(
+    label: &ServerLabel,
+    carried: Carried,
+    pairs: &[(String, String)],
+) -> Result<(), AxError> {
+    for (name, value) in pairs {
+        if SecretRef::parse(value).is_ok() {
+            continue;
+        }
+        let named = kernel::names_a_credential(name);
+        let shaped = !kernel::scan(value.as_bytes()).is_empty();
+        let violation = match (named, shaped) {
+            (true, _) => "the name reads as a credential",
+            (false, true) => "the value has the shape of a credential",
+            (false, false) => continue,
+        };
+        return Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "write the servers this scope reaches",
+            format!(
+                "{}: {} `{name}`: {violation}",
+                label.as_str(),
+                carried.noun()
+            ),
+        )
+        .with_recovery(
+            "keep the secret in the vault and write its `secret:realm/name` reference here; \
+             this file is committed with the project",
+        ));
+    }
+    Ok(())
 }
 
 /// What one edit states. Exhaustive, so the section a value is written
@@ -205,4 +281,97 @@ fn refuse_file(path: &Path, why: &str) -> AxError {
         format!("{}: {why}", path.display()),
     )
     .with_recovery("fix that file by hand, or delete it and choose again")
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+
+    fn room() -> Address {
+        Address::parse("lab/room1").unwrap()
+    }
+
+    fn hosted(headers: Vec<(String, String)>) -> Vec<McpServer> {
+        vec![McpServer {
+            label: ServerLabel::parse("hosted").unwrap(),
+            transport: McpTransport::Http {
+                url: "https://example.test/mcp".to_owned(),
+                headers,
+            },
+        }]
+    }
+
+    /// A key typed into the header table of the settings page would be
+    /// written verbatim into a file the project commits, so the write
+    /// face refuses it and says where the value belongs instead.
+    #[test]
+    fn a_header_holding_a_credential_is_refused_before_the_file_is_touched() {
+        let dir = tempfile::tempdir().unwrap();
+        let servers = hosted(vec![(
+            "Authorization".to_owned(),
+            "Bearer sk-ant-not-a-real-key".to_owned(),
+        )]);
+        let err = write_mcp(dir.path(), &room(), Layer::City, &servers).unwrap_err();
+        assert_eq!(err.code(), &AxCode::ConfigInvalid);
+        assert!(err.subject().contains("Authorization"), "{}", err.subject());
+        assert!(err.recovery().contains("secret:realm/name"));
+        assert!(
+            !path(dir.path(), &room(), Layer::City).unwrap().exists(),
+            "a refused write left a file behind"
+        );
+    }
+
+    /// One value at a time: the server whose other header is ordinary
+    /// is still refused for the one that is not.
+    #[test]
+    fn each_value_is_judged_on_its_own() {
+        let dir = tempfile::tempdir().unwrap();
+        let servers = hosted(vec![
+            ("X-Account".to_owned(), "acme".to_owned()),
+            ("Authorization".to_owned(), "secret:mcp/hosted".to_owned()),
+        ]);
+        write_mcp(dir.path(), &room(), Layer::City, &servers).unwrap();
+
+        let leaked = hosted(vec![
+            ("X-Account".to_owned(), "acme".to_owned()),
+            (
+                "X-Trace".to_owned(),
+                // Assembled here rather than written whole, so the
+                // repository's own secret scanner does not read this
+                // fixture as a leaked credential.
+                format!("ghp_{}{}{}", "aB3dE5fG7hJ9k", "L1mN3pQ5rS7t", "U9vW1xY3zA5"),
+            ),
+        ]);
+        let err = write_mcp(dir.path(), &room(), Layer::City, &leaked).unwrap_err();
+        assert!(err.subject().contains("X-Trace"), "{}", err.subject());
+    }
+
+    /// An environment value is judged by the same rule as a header: the
+    /// table it sits in changes the noun in the refusal and nothing
+    /// else.
+    #[test]
+    fn a_credential_in_a_command_environment_is_refused_too() {
+        let dir = tempfile::tempdir().unwrap();
+        let servers = vec![McpServer {
+            label: ServerLabel::parse("apps").unwrap(),
+            transport: McpTransport::Stdio {
+                command: "mcp-apps".to_owned(),
+                args: Vec::new(),
+                env: vec![("API_KEY".to_owned(), "plain-value".to_owned())],
+            },
+        }];
+        let err = write_mcp(dir.path(), &room(), Layer::City, &servers).unwrap_err();
+        assert!(
+            err.subject().contains("environment value"),
+            "{}",
+            err.subject()
+        );
+    }
 }

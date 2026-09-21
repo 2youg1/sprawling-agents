@@ -9,10 +9,13 @@
 //! absence of those impls is the isolation guarantee (15.3-4).
 
 use std::collections::BTreeSet;
+use std::num::NonZeroU64;
 
 use kernel::consts_policy::STARTUP_BUDGET_TOKENS;
-use kernel::{Address, AxCode, AxError, B3Hash, Payload, SystemBlock};
+use kernel::{Address, AxCode, AxError, B3Hash, ByteLen, Payload, SystemBlock};
 use serde_json::{Map, Value, json};
+
+use crate::elision;
 
 mod segment;
 
@@ -22,10 +25,18 @@ pub use segment::{FrozenSegment, SegmentSlot, SegmentSource};
 /// (replay) reuses it — one authority for the concatenation rule.
 pub(crate) const DOC_JOIN: &str = "\n\n";
 
-/// The in-place truncation marker. English on purpose — the prefix faces the English window.
-pub(crate) fn truncation_marker(dropped: u64) -> String {
-    format!("[truncated: {dropped} bytes]")
-}
+/// Bytes per token: the rate this crate converts a token budget into a
+/// byte cap at. It is an estimate for English prose and code, and every
+/// budget that crosses the units does it here.
+const BYTES_PER_TOKEN: u64 = 4;
+
+/// A whole-prefix budget divides evenly across the slots. `SegmentSlot`
+/// is the authority on how many slots there are; `prefix::tests` holds
+/// this divisor against that enum so the two cannot drift apart.
+const PREFIX_SLOTS: NonZeroU64 = match NonZeroU64::new(4) {
+    Some(slots) => slots,
+    None => NonZeroU64::MIN,
+};
 
 /// One prefix source document: address plus its frozen bytes, `None`
 /// when missing or unreadable (the skip itself is accounted).
@@ -47,8 +58,7 @@ pub struct SegmentCaps {
 
 impl SegmentCaps {
     pub fn startup_default() -> SegmentCaps {
-        // STARTUP_BUDGET_TOKENS tokens * 4 bytes/token / 4 slots.
-        let per_slot = STARTUP_BUDGET_TOKENS;
+        let per_slot = STARTUP_BUDGET_TOKENS.saturating_mul(BYTES_PER_TOKEN) / PREFIX_SLOTS;
         SegmentCaps {
             city: per_slot,
             building: per_slot,
@@ -107,17 +117,6 @@ pub fn build_prefix(plan: PrefixPlan) -> Result<FrozenPrefix, AxError> {
     Ok(prefix)
 }
 
-fn floor_char_boundary(s: &str, max: usize) -> usize {
-    if max >= s.len() {
-        return s.len();
-    }
-    let mut end = max;
-    while end > 0 && !s.is_char_boundary(end) {
-        end = end.saturating_sub(1);
-    }
-    end
-}
-
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "budget arithmetic on usize values bounded by document sizes already held \
@@ -172,15 +171,12 @@ fn build_segment(
             ));
             continue;
         }
-        // Reserve marker room with the worst-case digit count (dropped
-        // can only shrink once bytes are kept), then floor to a char
-        // boundary so the segment stays valid UTF-8.
-        let worst_marker = truncation_marker(u64::try_from(body.len()).unwrap_or(u64::MAX)).len();
+        let worst_marker = elision::marker_room(body.len());
         if remaining <= worst_marker {
             skipped.push(json!({ "addr": addr, "reason": "no_budget" }));
             continue;
         }
-        let kept = floor_char_boundary(body, remaining - worst_marker);
+        let kept = elision::boundary_before(body, remaining - worst_marker);
         let dropped = u64::try_from(body.len() - kept).map_err(|_| {
             AxError::failure(
                 AxCode::InvalidArgs,
@@ -196,7 +192,7 @@ fn build_segment(
             text.push_str(DOC_JOIN);
         }
         text.push_str(body.get(..kept).unwrap_or_default());
-        text.push_str(&truncation_marker(dropped));
+        text.push_str(&elision::marker(ByteLen::new(dropped)));
         seen.insert(addr.clone());
         sources.push(SegmentSource {
             addr: doc.addr.clone(),

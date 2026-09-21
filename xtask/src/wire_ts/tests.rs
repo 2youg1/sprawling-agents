@@ -10,6 +10,7 @@
 
 use serde_json::{Value, json};
 
+use super::Constants;
 use super::emit::emit;
 use super::first_difference;
 
@@ -17,8 +18,18 @@ fn document(defs: Value) -> Value {
     json!({ "$defs": defs })
 }
 
+/// What every case below states before any type, so a case reads as the
+/// one shape it is about.
+fn constants() -> Constants {
+    Constants {
+        wire_v: 13,
+        hash: "ab12".to_owned(),
+        city_run: "00000000-0000-0000-0000-000000000000".to_owned(),
+    }
+}
+
 fn emitted(defs: Value) -> String {
-    emit(&document(defs), 13, "ab12").unwrap_or_else(|refused| {
+    emit(&document(defs), &constants()).unwrap_or_else(|refused| {
         panic!("refused at {}: {}", refused.at, refused.why);
     })
 }
@@ -37,6 +48,14 @@ fn a_named_bare_string_is_a_branded_string_and_an_integer_a_branded_int() {
     assert!(text.contains("export const Seq = Schema.Int.pipe(Schema.brand(\"Seq\"));\n"));
     assert!(text.contains("export const WIRE_V = 13 as const;\n"));
     assert!(text.contains("export const WIRE_HASH = \"ab12\" as const;\n"));
+    // The city's own run, generated rather than written out by a
+    // client: `belief.ts` kept its own copy of this nil uuid.
+    assert!(
+        text.contains(
+            "export const CITY_RUN = \"00000000-0000-0000-0000-000000000000\" as const;\n"
+        ),
+        "{text}"
+    );
 }
 
 #[test]
@@ -100,8 +119,7 @@ fn a_keyword_outside_the_subset_is_refused_by_name_and_place() {
         &document(json!({
             "Odd": { "type": "object", "properties": { "x": { "allOf": [ { "type": "string" } ] } } },
         })),
-        13,
-        "ab12",
+        &constants(),
     )
     .expect_err("allOf is outside the subset");
     assert_eq!(refused.at, "Odd/properties/x");
@@ -133,8 +151,7 @@ fn a_type_that_refers_to_itself_is_refused() {
         &document(json!({
             "Node": { "type": "object", "properties": { "next": { "$ref": "#/$defs/Node" } } },
         })),
-        13,
-        "ab12",
+        &constants(),
     )
     .expect_err("a cycle has no definition order");
     assert!(refused.why.contains("Node"), "{}", refused.why);
@@ -142,7 +159,7 @@ fn a_type_that_refers_to_itself_is_refused() {
 
 #[test]
 fn the_real_wire_comes_out_whole() {
-    let text = emit(&channels::wire_schema(), channels::WIRE_V, "ab12")
+    let text = emit(&channels::wire_schema(), &constants())
         .unwrap_or_else(|refused| panic!("refused at {}: {}", refused.at, refused.why));
     for name in [
         "ClientFrame",

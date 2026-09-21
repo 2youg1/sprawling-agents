@@ -362,7 +362,10 @@ fn every_transport_the_writer_emits_is_read_back_as_the_same_transport() {
             label: kernel::ServerLabel::parse("hosted").unwrap(),
             transport: McpTransport::Http {
                 url: "https://example.test/mcp".to_owned(),
-                headers: vec![("Authorization".to_owned(), "Bearer x".to_owned())],
+                headers: vec![(
+                    "Authorization".to_owned(),
+                    "secret:city/hosted-token".to_owned(),
+                )],
             },
         },
         McpServer {

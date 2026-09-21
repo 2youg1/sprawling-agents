@@ -74,12 +74,13 @@ fn structured_content_is_never_cut_in_half_by_the_shortener() {
     // marker is what tells a reader this is not a document.
     let json = format!("{{\"rows\":[{}]}}", "1,".repeat(500));
     let out = package(json.as_bytes(), no_offload(100)).unwrap();
-    assert!(out.content.contains("[truncated:"));
-    assert!(
-        !out.content.contains("… (shortened) …"),
-        "a shortened JSON object would still look parsable: {}",
+    assert_eq!(
+        out.content.matches("[truncated:").count(),
+        1,
+        "the cut is one trailing marker, not a gap opened inside the object: {}",
         out.content
     );
+    assert!(out.content.starts_with("{\"rows\":[1,"));
 }
 
 #[test]

@@ -13,10 +13,17 @@
 //! what it is currently thinking, and a plan that is rewritten every
 //! hour turns a history into a diff of nobody's decisions.
 //!
-//! The two `!` lines are written out rather than left to the default.
-//! An adopted repository may already ignore `*.md` or every dot
+//! The `!` lines are written out rather than left to the default. An
+//! adopted repository may already ignore `*.md` or every dot
 //! directory, and in that repository "what this building promises is in
 //! history" would silently be false.
+//!
+//! What the block admits from the reserved subtree is named file by
+//! file. A single `!.sprawling/` re-admitted every reserved subtree at
+//! every depth below the building, and those subtrees are where a city
+//! keeps its ledger, its object store and its references into the
+//! vault: a rule written to carry five promises into history carried
+//! the machine's own records with them.
 //!
 //! Nothing here removes a line. A directory being adopted usually
 //! carries its own rules, and those bytes are exactly what adoption
@@ -24,22 +31,42 @@
 
 use std::path::Path;
 
-use kernel::{AxCode, AxError};
+use kernel::layout::{BUILDING_SHELF, CONFIG_FILE, FILTERS_FILE};
+use kernel::{AxCode, AxError, RESERVED_PREFIX};
+
+use crate::policy::{BUILDING_FILE, DESKTOP_SCOPE_FILE};
+use crate::spine_files::{HANDOFF_FILE, MEMO_FILE, ROADMAP_FILE, SPEC_FILE};
 
 /// The file this module writes, named once.
 pub const GITIGNORE_FILE: &str = ".gitignore";
 
 /// The block, in the order it is written. Data: editing this list is
 /// editing what a city keeps.
-const BLOCK: &[&str] = &[
-    "# sprawling: what this building promises is history; what one session",
-    "# was thinking is not.",
-    "Roadmap.md",
-    "Memo.md",
-    "Handoff.md",
-    "!SPEC.md",
-    "!.sprawling/",
-];
+///
+/// Every name is taken from the module that writes that file, so a
+/// renamed document cannot leave a rule here naming something nobody
+/// writes. Order is the file's grammar rather than taste: git reads the
+/// last matching line, so the reserved subtree is ignored, re-admitted
+/// as a directory, emptied, and then opened for the five promises one
+/// at a time.
+fn block() -> Vec<String> {
+    vec![
+        "# sprawling: what this building promises is history; what one session".to_owned(),
+        "# was thinking is not.".to_owned(),
+        ROADMAP_FILE.to_owned(),
+        MEMO_FILE.to_owned(),
+        HANDOFF_FILE.to_owned(),
+        format!("!{SPEC_FILE}"),
+        format!("{RESERVED_PREFIX}/"),
+        format!("!/{RESERVED_PREFIX}/"),
+        format!("/{RESERVED_PREFIX}/*"),
+        format!("!/{RESERVED_PREFIX}/{BUILDING_FILE}"),
+        format!("!/{RESERVED_PREFIX}/{CONFIG_FILE}"),
+        format!("!/{RESERVED_PREFIX}/{FILTERS_FILE}"),
+        format!("!/{RESERVED_PREFIX}/{DESKTOP_SCOPE_FILE}"),
+        format!("!/{RESERVED_PREFIX}/{BUILDING_SHELF}/"),
+    ]
+}
 
 /// Adds this city's rules to a building's `.gitignore`, keeping every
 /// line that is already there.
@@ -65,8 +92,8 @@ pub(crate) fn place(building_root: &Path) -> Result<(), AxError> {
         };
         let mut out = existing.clone();
         let mut added = false;
-        for rule in BLOCK {
-            if existing.lines().any(|line| line.trim() == *rule) {
+        for rule in block() {
+            if existing.lines().any(|line| line.trim() == rule) {
                 continue;
             }
             if !out.is_empty() && !out.ends_with('\n') {
@@ -74,7 +101,7 @@ pub(crate) fn place(building_root: &Path) -> Result<(), AxError> {
             }
             // The block is announced once, and only when something from
             // it is actually being added below.
-            out.push_str(rule);
+            out.push_str(&rule);
             out.push('\n');
             added = true;
         }
@@ -117,4 +144,60 @@ fn storage(path: &Path, err: &std::io::Error) -> AxError {
         format!("{}: {err}", path.display()),
     )
     .with_recovery("fix the path's permissions, then run this again")
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+
+    /// The reserved subtree is opened for the building's promises and
+    /// for nothing else: the city's ledger and its object store sit in
+    /// a subtree with the same name, and a line that re-admits the
+    /// name admits them too.
+    #[test]
+    fn the_reserved_subtree_is_admitted_file_by_file_and_never_whole() {
+        let block = block();
+        assert!(
+            !block.iter().any(|line| line == "!.sprawling/"),
+            "the whole reserved subtree is re-admitted at every depth"
+        );
+        for promise in [BUILDING_FILE, CONFIG_FILE, FILTERS_FILE, DESKTOP_SCOPE_FILE] {
+            let admitted = format!("!/{RESERVED_PREFIX}/{promise}");
+            assert!(
+                block.contains(&admitted),
+                "{promise} is what this building promises and must survive an outer ignore rule"
+            );
+        }
+        for machines_own in [
+            kernel::layout::LEDGER_DIR,
+            kernel::layout::CAS_DIR,
+            kernel::layout::LIBRARY_DIR,
+        ] {
+            assert!(
+                !block.iter().any(|line| line.contains(machines_own)),
+                "{machines_own} is the city's own record and belongs to no project's history"
+            );
+        }
+    }
+
+    /// Placing the block twice appends nothing, so raising a building
+    /// and adopting the directory it left behind read the same.
+    #[test]
+    fn a_second_placement_adds_no_line() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(GITIGNORE_FILE), "target/\n").unwrap();
+        place(dir.path()).unwrap();
+        let once = std::fs::read_to_string(dir.path().join(GITIGNORE_FILE)).unwrap();
+        place(dir.path()).unwrap();
+        let twice = std::fs::read_to_string(dir.path().join(GITIGNORE_FILE)).unwrap();
+        assert_eq!(once, twice);
+        assert!(once.lines().any(|line| line.trim() == "target/"));
+    }
 }

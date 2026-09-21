@@ -21,8 +21,8 @@ use serde_json::{Map, Value, json};
 
 use crate::clock::ClockStamp;
 use crate::compaction;
+use crate::elision::{self, Elided};
 use crate::offload::{OffloadSite, offload};
-use crate::prefix;
 use crate::reminder::ContextReminder;
 use crate::sieve::{CommandKey, FilterTable, SieveHistory, SieveInput, Sieved, sieve};
 
@@ -78,13 +78,31 @@ fn attach(content: &mut String, line: &str) {
         content.push_str(line);
         return;
     }
-    let mut end = ENVELOPE_ATTACH_MAX_BYTES;
-    while end > 0 && !line.is_char_boundary(end) {
-        end = end.saturating_sub(1);
-    }
-    content.push_str(line.get(..end).unwrap_or_default());
-    let dropped = u64::try_from(line.len().saturating_sub(end)).unwrap_or(u64::MAX);
-    content.push_str(&prefix::truncation_marker(dropped));
+    // The marker is part of the attachment, so its room comes out of
+    // the attachment's own cap rather than being added on top of it.
+    let room = elision::marker_room(line.len());
+    let end = elision::boundary_before(line, ENVELOPE_ATTACH_MAX_BYTES.saturating_sub(room));
+    content.push_str(&elision::splice(line, end, line.len(), Elided::Tail).text);
+}
+
+/// The last resort: bytes that are not text, or text the compactor
+/// declined to shorten, cut on a byte with the loss said out loud.
+///
+/// Nothing can be read about the shape of these bytes, so no end of
+/// them is known to matter more than another; the front is what a
+/// reader starts from, so the front is what stays.
+fn byte_cut(result: &[u8], cap_bytes: u64) -> Result<Vec<u8>, AxError> {
+    let cap = usize::try_from(cap_bytes).map_err(|_| {
+        AxError::failure(AxCode::InvalidArgs, "package result", "cap exceeds usize").with_recovery(
+            "lower `[tool] result_cap_bytes`: this cap is larger than this \
+             machine can address",
+        )
+    })?;
+    let head = result.get(..cap).unwrap_or(result);
+    let gone = u64::try_from(result.len().saturating_sub(head.len())).unwrap_or(u64::MAX);
+    let mut cut = head.to_vec();
+    cut.extend_from_slice(elision::marker(ByteLen::new(gone)).as_bytes());
+    Ok(cut)
 }
 
 /// Packages one tool result for the window. Shrink order: the sieve
@@ -146,36 +164,21 @@ pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>
         );
         events.push(Payload::new(event)?);
         body = record.substitute;
-    } else if let Ok(text) = std::str::from_utf8(result)
-        && let (shortened, true) = compaction::compact(text, ByteLen::new(ctx.cap_bytes))
-    {
+    } else if let Ok(text) = std::str::from_utf8(result) {
         // Content-aware shortening rather than a byte cut: which end
         // carries the meaning depends on what this is, and `compaction`
-        // is the one place that decides. It declines on structured and
-        // unknown content — a truncated JSON object is worse than an
-        // absent one, because it still looks parsable — and when it
-        // declines and there is no site to offload to, the byte cut
-        // below is what is left, said out loud.
-        let dropped =
-            u64::try_from(result.len().saturating_sub(shortened.len())).unwrap_or(u64::MAX);
-        let mut body_text = shortened;
-        body_text.push_str(&prefix::truncation_marker(dropped));
-        body = body_text.into_bytes();
+        // is the one place that decides. Its answer already carries the
+        // marker and the true count of source bytes behind it, so
+        // nothing is appended here. It declines on structured and
+        // unknown content, and a shortening it declined with no site to
+        // offload to leaves the byte cut, said out loud.
+        let cut = compaction::compact(text, ByteLen::new(ctx.cap_bytes));
+        body = match cut.place {
+            Elided::Nothing => byte_cut(result, ctx.cap_bytes)?,
+            Elided::Head | Elided::Middle | Elided::Tail => cut.text.into_bytes(),
+        };
     } else {
-        // Not text, so nothing can be read about its shape: cut on a
-        // byte and say how much went. Never silent.
-        let cap = usize::try_from(ctx.cap_bytes).map_err(|_| {
-            AxError::failure(AxCode::InvalidArgs, "package result", "cap exceeds usize")
-                .with_recovery(
-                    "lower `[tool] result_cap_bytes`: this cap is larger than this \
-                     machine can address",
-                )
-        })?;
-        let head = result.get(..cap).unwrap_or(result);
-        let dropped = u64::try_from(result.len().saturating_sub(head.len())).unwrap_or(u64::MAX);
-        let mut cut = head.to_vec();
-        cut.extend_from_slice(prefix::truncation_marker(dropped).as_bytes());
-        body = cut;
+        body = byte_cut(result, ctx.cap_bytes)?;
     }
     let mut content = String::from_utf8_lossy(&body).into_owned();
     if let Some(stamp) = &ctx.stamp {

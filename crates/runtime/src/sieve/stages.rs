@@ -12,7 +12,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::compaction::boundary_before;
+use crate::elision;
 use crate::sieve::scan::{Priority, is_protected};
 
 /// Runs of this many blank lines and more fold to one.
@@ -182,11 +182,14 @@ pub(crate) fn cut_long_lines(lines: &[String]) -> Vec<String> {
             if line.len() <= LONG_LINE_BYTES || is_protected(line) {
                 return line.clone();
             }
-            let at = boundary_before(line, LONG_LINE_BYTES);
-            let dropped = line.len().saturating_sub(at);
+            let at = elision::boundary_before(line, LONG_LINE_BYTES);
+            let dropped = kernel::ByteLen::new(
+                u64::try_from(line.len().saturating_sub(at)).unwrap_or(u64::MAX),
+            );
             format!(
-                "{} [line truncated: {dropped} bytes]",
-                line.get(..at).unwrap_or_default()
+                "{} {}",
+                line.get(..at).unwrap_or_default(),
+                elision::marker(dropped)
             )
         })
         .collect()
@@ -303,7 +306,7 @@ mod tests {
         let long = "字".repeat(1000);
         let out = cut_long_lines(std::slice::from_ref(&long));
         assert!(out[0].len() < long.len());
-        assert!(out[0].contains("[line truncated:"));
+        assert!(out[0].contains("[truncated:"));
         let url = format!("https://x/{}", "a".repeat(3000));
         assert_eq!(cut_long_lines(std::slice::from_ref(&url))[0], url);
     }

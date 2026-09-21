@@ -232,6 +232,26 @@ private def oneUrlHoweverTyped (door : Door) : IO Unit :=
         ensureEq canonical url
           s!"{spelling} was written down as a different endpoint than the first spelling"
 
+/-- The same class, entered as attachments rather than as probes.
+
+A probe asks an endpoint what it serves; an attachment decides what this city
+will call. Only the second one is what a dispatch travels down, so a probe that
+normalised and an attachment that did not would show a person the endpoint they
+meant on the settings page and send their work somewhere else.
+
+Each spelling is attached under a name of its own, so what is compared is five
+registrations of one URL rather than one registration written five times. -/
+private def everySpellingAttachesToOneEndpoint (door : Door) : IO Unit :=
+  withGround door fun ground => do
+    let entered := spellings deadAuthority
+    let registered ← attachedUrls door ground entered
+    match registered with
+    | [] => ensure false "the equivalence class is empty, so this check asserts nothing"
+    | canonical :: rest =>
+      for (spelling, url) in (entered.drop 1).zip rest do
+        ensureEq canonical url
+          s!"{spelling} was attached as a different endpoint than the first spelling"
+
 /-- The city's own answer, entered again, has to come back unchanged.
 
 Idempotence is proved inside the repository against the algorithm; what cannot
@@ -330,6 +350,39 @@ private def messagesWorkIsNeverRefusedForACeiling (door : Door) : IO Unit :=
     ensure (!mentionsNoCeiling written)
       "a run against an attached messages endpoint stopped for want of a ceiling"
 
+/-- Two dispatches sent without waiting for the first are two runs, and the
+history stays one chain while both of them write.
+
+Four lanes drive at once, so the second dispatch lands while the first run is
+still reaching for a provider. What the door can see of that is identity and
+integrity: two runs this city filed apart, and a history that still verifies
+after both have written into it.
+
+**The half of B-24 this cannot reach is the inbox, and the reason is in the
+product rather than in this check.** An approval item is named
+`ap-<run>-<seq>`, so it is distinct as soon as the runs are; but an item is
+raised only by a gate during a tool wave, which needs a provider that answers,
+and this directory may not host one (adversary-SPEC.md section 13). The
+identity two lanes would have collided on is asserted here; that two questions
+reach two rows of an inbox is owed by `crates/sprawling/tests/e2e.rs`, which
+has a real endpoint to ask. -/
+private def twoDispatchesAreTwoRuns (door : Door) : IO Unit :=
+  withGround door fun ground => do
+    let _ ← givenAProvider door ground none
+    door.send ground (.createBuilding "acme" .minimal (idemKey 320))
+    door.send ground (.createBuilding "beta" .minimal (idemKey 321))
+    door.send ground (.dispatch "acme" "one" (idemKey 322))
+    door.send ground (.dispatch "beta" "one" (idemKey 323))
+    let runs ← ground.runsStarted 2
+    ensureEq 2 runs.eraseDups.length s!"two dispatches at once were filed under {runs}"
+    -- Measured after both runs have stopped writing, because what is asked is
+    -- whether two lanes appending at once left one chain behind them.
+    let _ ← ground.stillText 20
+    match ← door.verify ground.ledger with
+    | .ok _ => pure ()
+    | .error why =>
+      ensure false s!"two runs at once left a history that does not verify: {why}"
+
 /-! ## The disk lies -/
 
 /-- The simplest lie a disk can tell: one changed byte.
@@ -420,6 +473,8 @@ private def properties (door : Door) : Tree :=
         , .leaf "a verb the city cannot perform still answers" (notBuiltStillAnswers door) ]
     , .group "what a person entered"
         [ .leaf "every spelling of one endpoint is one registration" (oneUrlHoweverTyped door)
+        , .leaf "every spelling of one endpoint is one attachment"
+            (everySpellingAttachesToOneEndpoint door)
         , .leaf "the city's own reading, entered again, is unchanged"
             (normalisingTwiceChangesNothing door)
         , .leaf "a frame this build cannot read is refused, not dropped"
@@ -427,7 +482,8 @@ private def properties (door : Door) : Tree :=
     , .group "a city with a provider"
         [ .leaf "a registered model states an output ceiling" (aRegisteredModelHasACeiling door)
         , .leaf "work on a messages endpoint is never refused for want of a ceiling"
-            (messagesWorkIsNeverRefusedForACeiling door) ]
+            (messagesWorkIsNeverRefusedForACeiling door)
+        , .leaf "two dispatches at once are two runs" (twoDispatchesAreTwoRuns door) ]
     , .leaf "a city admits exactly what its rules admit" (traces door)
     , .leaf "a halted city takes no work until it is released" (halting door)
     , .leaf "history reads back as one unbroken chain" (chained door)

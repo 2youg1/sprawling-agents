@@ -19,9 +19,9 @@
 
 ## 2 验收标准
 
-- **wire**：Command 恰 24 个 variant、Query 恰 24 个（计数断言，对本 SPEC §8-1 两表逐名核对）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 恰 28 个 variant、Query 恰 31 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`a6cbdd95fb92eff20fea162b6962222ef14f86a71595929c0d4bf020fb168dfc`；**WIRE_V ＝ 31**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36）。
+  **当前 golden**：`1d5238bc37f70915b49bffbde2dbfc956639a412549ef96c882309e75898f0a0`；**WIRE_V ＝ 32**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -119,15 +119,19 @@ pub enum HaltScope { City, Building(Address), Workshop(Address) }  // 协议自�
 pub enum Command { /* 逐名取本 SPEC §8-1 表 */ }
 pub enum Query   { /* 息 9 */ }
 
+// 两个枚举都由 named_frames! 声明：变体表一处，enum、name()、名表三样由它生成。
+named_frames! { pub enum Command<Secret = Sealed<String>> { /* 逐名取本 SPEC §8-1 表 */ } pub const COMMAND_NAMES; }
+named_frames! { pub enum Query { /* 息 9 */ } pub const QUERY_NAMES; }
+
 impl Command {
-    pub fn name(&self) -> &'static str;   // 穷尽 match：加一个 variant 即编译不过
+    pub fn name(&self) -> &'static str;   // 生成：恒等于本变体在名表里的那一条
     pub fn idem(&self) -> Option<&IdemKey>; // 改状态臂恒 Some；唯一例外 Auth
 }
 impl Query { pub fn name(&self) -> &'static str; }
 
 pub const WIRE_V: u32;
-pub const COMMAND_NAMES: [&str; 17];   // 形状 6 数据面：名字权威
-pub const QUERY_NAMES:   [&str; 9];
+pub const COMMAND_NAMES: [&str; 28];   // 形状 6 数据面：名字权威，长度由变体数生成
+pub const QUERY_NAMES:   [&str; 31];
 pub fn schema_hash() -> B3Hash;        // blake3("sprawling/wire/" || WIRE_V 小端 || 'C'+名… || 'Q'+名…)
 
 pub enum ClientFrame { Hello(Hello), Command(Box<Command>), Query(Query) }
@@ -1077,3 +1081,15 @@ pub enum ReleaseAnswer {
 **计数的用途**：让「同一个旧页面反复撞同一堵墙」在人看到的那条拒绝里可见。它不改变行为——不设阈值、到点不关连接：阈值只会把刚被移除的那条静默断线路径原样请回来。
 
 **被否**：①继续以关连接表达解码失败——这正是 `WIRE_V` 31→32 时旧页面会撞上的路径；②给不可读帧设上限、超限即关——参见上一条的理由；③把解码失败降级为「忽略这一帧」——两端的分歧不会因为丢掉一帧而消失，而下一帧照样读不出。
+
+### 8-38 一帧的拼写只有一处：名表由枚举生成（H-11，`WIRE_V` 31→32）
+
+**规则**：`Query` 与 `Command` 的变体表是这个 crate 里唯一拼写帧名的地方；`name()` 与 `QUERY_NAMES`／`COMMAND_NAMES` 由 `channels::named_frames!` 从同一份变体表生成。
+
+**被删掉的三个家**。此前一个 `Query` 的拼写写在三处：变体自身、`name()` 的手写臂、`QUERY_NAMES` 数组；`Command` 同法。握手赖以成立的 `schema_hash()` 只读第三个。穷尽 `match` 挡得住「新变体不写 `name()`」，挡不住「新变体不进名表」——挡那一条的是 `wire.rs` 里把 31 个变体第四次抄一遍的样本测试，和 `tests/wire_contract.rs` 里两个写成字面量的计数。生成之后，名表就是变体表本身，它不能与枚举不一致，因为它没有第二份内容可以不一致。
+
+**为什么它值一次升版**。名字一个没改、字段一个没动、语义一个没变，但生成出来的两张表按**声明顺序**排，而 `COMMAND_NAMES` 的手写顺序不是声明顺序（`Wake` 手写在第 2 位，声明在第 25 位）。`schema_hash()` 按表的顺序混入名字，于是哈希变了。**哈希变即旧页面必须被拒绝**，这正是 `WIRE_V` 存在的理由，故 31→32 与本次同集。客户端侧只有 `client/src/wire.ts` 由 `xtask wire-ts --write` 重生，没有手改。
+
+**为什么是一个宏而不是两个**。`Query` 与 `Command` 的差别只有一个泛型载体（`Secret`），其余逐字相同；`carried_name!` 已经为四个 newtype 用过同一手法，这是复用既有机制而不是造相似物。
+
+**被否**：①保留手写表、加一道 `xtask` 闸去比对——那是给两个家配一个裁判，而不是把它们合成一个；②用 `strum` 之类的派生宏——多一个依赖换一段本仓库五十行就写得出、且要按本仓库的文档口径读的代码。

@@ -290,7 +290,7 @@ pub fn rebuild_prefix(
             }
             text.push_str(piece);
             if marker {
-                text.push_str(&crate::prefix::truncation_marker(dropped));
+                text.push_str(&crate::elision::marker(kernel::ByteLen::new(dropped)));
             }
         }
         let rebuilt = B3Hash::digest(text.as_bytes());

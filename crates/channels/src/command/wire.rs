@@ -33,42 +33,6 @@ use super::no_secret::NoSecret;
 pub type WireCommand = Command<NoSecret>;
 
 impl<Secret> Command<Secret> {
-    /// Exhaustive by construction: a new variant cannot compile without
-    /// choosing its name here, which is what keeps [`COMMAND_NAMES`] honest.
-    #[must_use]
-    pub fn name(&self) -> &'static str {
-        match *self {
-            Self::Dispatch { .. } => "Dispatch",
-            Self::Wake { .. } => "Wake",
-            Self::Login { .. } => "Login",
-            Self::ConfigureBuilding { .. } => "ConfigureBuilding",
-            Self::ProbeEndpoint { .. } => "ProbeEndpoint",
-            Self::AttachEndpoint { .. } => "AttachEndpoint",
-            Self::SelectModel { .. } => "SelectModel",
-            Self::Fork { .. } => "Fork",
-            Self::Attach { .. } => "Attach",
-            Self::CreateBuilding { .. } => "CreateBuilding",
-            Self::PutSecret { .. } => "PutSecret",
-            Self::Steer { .. } => "Steer",
-            Self::Cancel { .. } => "Cancel",
-            Self::Takeover { .. } => "Takeover",
-            Self::Rollback { .. } => "Rollback",
-            Self::Halt { .. } => "Halt",
-            Self::Reveal { .. } => "Reveal",
-            Self::DoctorInstall { .. } => "DoctorInstall",
-            Self::DoctorRefresh { .. } => "DoctorRefresh",
-            Self::Release { .. } => "Release",
-            Self::BatchByBuilding { .. } => "BatchByBuilding",
-            Self::Approve { .. } => "Approve",
-            Self::CreatePolicy { .. } => "CreatePolicy",
-            Self::SetAutonomy { .. } => "SetAutonomy",
-            Self::Pursue { .. } => "Pursue",
-            Self::PutDocument { .. } => "PutDocument",
-            Self::ConnectToolkit { .. } => "ConnectToolkit",
-            Self::Auth { .. } => "Auth",
-        }
-    }
-
     /// The deduplication key. `None` only for the two Commands that change
     /// nothing: `Auth`, and `PutSecret` whose effect is confined to the host
     /// process and whose replay writes the same Vault entry.

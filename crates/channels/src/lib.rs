@@ -20,6 +20,7 @@ mod auth;
 mod carried_name;
 mod command;
 mod control;
+mod named_frames;
 mod reading;
 #[cfg(feature = "server")]
 mod reception;

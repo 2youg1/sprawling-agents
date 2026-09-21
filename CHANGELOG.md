@@ -17,6 +17,12 @@ release notes and their commits.
 
 ## Unreleased
 
+**This is what V0.0.6 will carry, and no tag carries it yet.** The version in
+`Cargo.toml` still reads the released one on purpose: it is raised once, in a
+single change, when the work behind this section is finished, so a tree that
+announces a version is a tree somebody cut. Read every entry below as landed
+in the repository and unpublished.
+
 ### A binary knows which release it is, and will say so when asked
 
 `sprawling status` printed `0.0.5`, npm carried the same release as
@@ -62,7 +68,119 @@ sentence on a question nobody asked.
 - Nothing updates anything. `sprawling install` owns the archive path
   and npm owns its own, so both the terminal and the **machine** page
   print the command and stop.
-- WIRE_V 31.
+- WIRE_V <!-- xtask:begin wire_v -->32<!-- xtask:end -->, recounted from `channels::WIRE_V` while this section is still unreleased.
+
+### An error with nothing to do about it can no longer be written
+
+`AxError::failure` now returns a draft, and only `with_recovery` turns a
+draft into an error. A refusal that states what failed and leaves the reader
+standing there is not a shape this code can spell any more.
+
+- 172 errors carried an empty recovery line. Each now names a key to press,
+  a file to edit, or a command to run; six whose subject could not carry a
+  recovery had the subject corrected as well.
+- The five files that grew past four hundred lines under that change were
+  split along what each part owns rather than at the midpoint.
+
+### A new variant is a compile error at every reader
+
+44 `#[non_exhaustive]` attributes are gone, and with them 45 wildcard arms
+the compiler had already proved unreachable. The attribute was buying
+nothing and costing the one thing that matters here: a wire shape that was
+offered and answered `null` could exist only because the match downstream
+had a default arm.
+
+- Four clippy lints join the deny list, and the 37 discarded `Result`s and
+  the boolean parameters they turned up are gone with them.
+- One exception, stated once with its reason: a gate in `xtask` reads syn's
+  tree and serde_json's value, and neither can be made exhaustive from here.
+- The first three ledger payloads have serde structs instead of hand-written
+  maps, each proved byte-for-byte against the map it replaces on real
+  fixtures. `Payload::of` and `Payload::read` are the only two doors.
+
+### One home for where a city keeps things, and a document reaches disk whole
+
+Every directory and file name a city keeps is read off `kernel::layout`, and
+the constants that sat beside it in `city` are deleted. A document is now
+written through one door that renames it into place, one writer at a time,
+under a typed shelf key, so a machine that loses power mid-write leaves the
+old file rather than half of the new one.
+
+- `config_layers::Ladder` makes the configuration layers a value. Adding the
+  person's layer is one arm the compiler checks in one place, where it used
+  to be three hand-written reads.
+- A directory this city cannot read says so instead of reading as empty.
+
+### How an endpoint is connected is decided once, at attach
+
+`ConnectionKind` is resolved after the pasted URL has been normalised, is
+written into `endpoint_attached`, and is read back by `Query::Config`. No
+call path re-derives it, and the responses shape a person pasted is no
+longer dropped by a dialect enum that had only two variants.
+
+- One output ceiling ladder answers for every model: the person, then the
+  provider's own model list, then a preset row citing the page it was read
+  from, then the city's policy default. The decision carries which rung
+  answered, so a truncated run is read off the account.
+- Two dispatches of one configuration build the same system prefix, byte for
+  byte, and that is an assertion rather than a hope.
+- Provider intelligence is followed from four vendors' own harnesses, one
+  per family this city signs in to directly; `earendil-works/pi` is retired
+  as a source, because Anthropic's subscription login is implemented here.
+  Which repository, which path, and which commit was read stays in one place
+  that a daily workflow parses: [`docs/third-party.md`](docs/third-party.md)
+  section 1.
+
+### Six defects a person would have met on the default path
+
+- A thinking block's signature survives the Anthropic stream, so the next
+  turn is not refused by the provider.
+- A tool call cut in half is refused instead of sent as a call with no
+  arguments.
+- An MCP server can no longer hand this city a message larger than 8 MiB
+  into the memory of the process that is also its only writer.
+- The built-in price table reports its own failure, and an OAuth callback is
+  split with its `state` checked.
+- The file count a bundle export used to certify from its own destination is
+  compared field by field against the source, so half a city going missing
+  is noticed.
+- A question the city never answers says so after fifteen seconds instead of
+  leaving a skeleton on the screen, and the run table forgets runs the city
+  has stopped listing.
+
+### The screens
+
+- A conversation has a second column: the artefact the last tool produced, a
+  file with line numbers or what a command printed. Tool calls fold to one
+  sentence counted from the turn report, with no new event to carry it.
+- No UI library, and now each part states the WAI-ARIA pattern it
+  implements, its key table, and where focus returns; twelve places where
+  the implementation does not match yet are named with their line numbers.
+- Navigation is Ctrl/Cmd and a digit. The g-prefix chord, its timer and the
+  rail hint that explained it are gone, and the registry screen has a route
+  at last — it had none.
+- Six numbers the city already counted reach the city page, four empty
+  screens say what to do next, a field says it is wrong while it is being
+  typed, and an endpoint says when it is on this computer.
+- 26 `outline-none` are gone, so the focus ring is visible again; 33 `title`
+  attributes become a hint both a keyboard and a touch screen reach.
+
+### What the machines check
+
+- Every number `ARCHITECTURE.md` and `LLM.md` quote is recounted by
+  `cargo xtask docnum` from the code that decides it.
+- `specalign` reconciles every kernel enum variant by variant, which caught
+  `SecretCharset::Base36Lower` against the `UpperBase36` the kernel compiles.
+- Five harnesses that were written and never proved are retired to the tests
+  that already hold them, each with its reason; one solvable harness takes
+  their place, leaving three harnesses, three proofs and no markers.
+- Three fuzz targets cover the three surfaces a stranger reaches: an inbound
+  wire frame, a configuration file, an MCP answer.
+- `just check-desktop` compiles, lints, tests and licence-checks the desktop
+  connector, and a gate reconciles its lint table with the root.
+- `just prereqs` is the one list of what this machine needs, and `AGENTS.md`,
+  `CONTRIBUTING` and `flake.nix` point at it. Two builds of one tree are
+  compared nightly.
 
 ---
 

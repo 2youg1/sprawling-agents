@@ -6,10 +6,11 @@
 //! Single embed point: gzips the web client bundle into OUT_DIR and
 //! generates `client_embed.rs`, the file table main.rs includes.
 //!
-//! The bundle is whatever `just build-web` left in `target/web-dist`:
-//! the client's own `index.html` and the hashed assets Vite wrote beside
-//! it. There is no second shell in this repository, because the one the
-//! client builds is the one the product serves.
+//! The bundle is whatever `just build-web` left in the directory
+//! [`BUNDLE_DIR`] names under cargo's target directory: the client's own
+//! `index.html` and the hashed assets Vite wrote beside it. There is no
+//! second shell in this repository, because the one the client builds is
+//! the one the product serves.
 //!
 //! When the bundle is absent the binary still builds - it carries a
 //! placeholder page, `CLIENT_COMPLETE` is false, and a warning says so -
@@ -30,6 +31,20 @@ use std::path::{Path, PathBuf};
 /// It says which command was not run rather than showing an empty page,
 /// because the person meeting it is a contributor who built from source
 /// and the answer they need is one line long.
+/// The directory the built client lands in, under cargo's target
+/// directory.
+///
+/// **This declaration is the one home of that name.** Four other places
+/// used to spell it, and a build with a renamed output directory still
+/// went green: this file embedded a placeholder with one warning, two
+/// gates skipped, and the defect reached a person as a blank page. The
+/// name lives here rather than in the tooling because this is the only
+/// reader that has to work in the published tree, which carries no
+/// `xtask/`; `xtask` reads this constant out of this file, and its
+/// artifact gate refuses a client build script or a justfile that spells
+/// the directory differently.
+const BUNDLE_DIR: &str = "web-dist";
+
 const PLACEHOLDER: &str = r#"<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>sprawling</title></head>
 <body><p>This binary was built without the client bundle. Run <code>just build-web</code> and rebuild.</p></body></html>
@@ -41,6 +56,11 @@ fn main() {
     // because cargo otherwise reuses a binary compiled under the previous
     // tag and every copy of it would name the wrong release.
     println!("cargo::rerun-if-env-changed=SPRAWLING_RELEASE_TAG");
+    // Where cargo writes, when the person building said so. Read rather
+    // than guessed at: the previous reader walked up from OUT_DIR to the
+    // first directory literally named `target`, which answers wrongly for
+    // every target directory called anything else.
+    println!("cargo::rerun-if-env-changed=CARGO_TARGET_DIR");
     if let Err(msg) = embed() {
         // cargo >= 1.84: `cargo::error` fails the build loudly instead of
         // leaving a stale or missing asset for include_bytes! to trip on.
@@ -51,9 +71,7 @@ fn main() {
 fn embed() -> Result<(), String> {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").map_err(|e| e.to_string())?;
     let out_dir = std::env::var("OUT_DIR").map_err(|e| e.to_string())?;
-    // target/web-dist, robust to profile dirs: walk up from OUT_DIR to the
-    // directory literally named `target`, falling back to ../../target.
-    let dist = target_dir(&out_dir, &manifest).join("web-dist");
+    let dist = target_dir(&manifest).join(BUNDLE_DIR);
     // Emitted even when absent: the first `just build-web` after a
     // placeholder build must trigger a re-embed, not wait for luck.
     println!("cargo::rerun-if-changed={}", dist.display());
@@ -164,14 +182,22 @@ fn collect(root: &Path, dir: &Path, files: &mut Vec<(String, PathBuf)>) -> Resul
     Ok(())
 }
 
-fn target_dir(out_dir: &str, manifest: &str) -> PathBuf {
-    let mut cursor = PathBuf::from(out_dir);
-    while cursor.pop() {
-        if cursor.file_name().is_some_and(|n| n == "target") {
-            return cursor;
+/// Cargo's target directory: what `CARGO_TARGET_DIR` names when it is
+/// set, and the workspace's own `target/` otherwise. A relative value is
+/// resolved against the workspace root, which is how cargo resolves it.
+fn target_dir(manifest: &str) -> PathBuf {
+    let workspace = PathBuf::from(manifest).join("..").join("..");
+    match std::env::var("CARGO_TARGET_DIR") {
+        Ok(named) if !named.is_empty() => {
+            let stated = PathBuf::from(&named);
+            if stated.is_absolute() {
+                stated
+            } else {
+                workspace.join(stated)
+            }
         }
+        _ => workspace.join("target"),
     }
-    PathBuf::from(manifest).join("..").join("..").join("target")
 }
 
 /// Deterministic gzip: fixed level, zeroed mtime.

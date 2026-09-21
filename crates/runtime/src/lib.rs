@@ -12,6 +12,7 @@ pub mod clock;
 pub mod compaction;
 pub mod diagnostics;
 pub mod digest;
+pub mod elision;
 pub mod fork;
 pub mod handoff;
 pub mod mode;

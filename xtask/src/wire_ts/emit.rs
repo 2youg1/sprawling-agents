@@ -21,6 +21,8 @@ use std::fmt::Write as _;
 
 use serde_json::{Map, Value};
 
+use super::Constants;
+
 /// Where the emitter stopped, and on what.
 #[derive(Debug)]
 pub(super) struct Refused {
@@ -36,7 +38,7 @@ const KNOWN: &str = concat!(
 
 const REF_PREFIX: &str = "#/$defs/";
 
-pub(super) fn emit(document: &Value, wire_v: u32, hash: &str) -> Result<String, Refused> {
+pub(super) fn emit(document: &Value, constants: &Constants) -> Result<String, Refused> {
     let defs: BTreeMap<&str, &Value> = document
         .get("$defs")
         .and_then(Value::as_object)
@@ -45,9 +47,15 @@ pub(super) fn emit(document: &Value, wire_v: u32, hash: &str) -> Result<String, 
         .map(|(name, schema)| (name.as_str(), schema))
         .collect();
     let mut out = String::from(HEADER);
-    let _ = writeln!(out, "export const WIRE_V = {wire_v} as const;");
-    out.push_str("/** The schema hash the server checks: `channels::schema_hash()`. */\n");
-    let _ = writeln!(out, "export const WIRE_HASH = \"{hash}\" as const;\n");
+    let _ = write!(
+        out,
+        "export const WIRE_V = {} as const;\n\
+         /** The schema hash the server checks: `channels::schema_hash()`. */\n\
+         export const WIRE_HASH = \"{}\" as const;\n\
+         /** The run a city-level record carries: `kernel::RunId::CITY`. */\n\
+         export const CITY_RUN = \"{}\" as const;\n\n",
+        constants.wire_v, constants.hash, constants.city_run
+    );
     for name in ordered(&defs)? {
         let schema = defs
             .get(name.as_str())

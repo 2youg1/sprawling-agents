@@ -173,7 +173,7 @@ sprawling help                      # 所有命令，一屏列完
 
 | 零件 | 住在哪 | 怎么换 |
 |---|---|---|
-| 订阅登录情报（跟随 openai/codex 与 earendil-works/pi） | `gateway::oauth_profiles`（只有数据零分支）、`gateway::credential`（流程与续期） | 加一行 profile。**凭证保管恒不外包**：明文只到运行中的机器的凭证服务 |
+| 订阅登录情报（跟随 [`docs/third-party.md`](docs/third-party.md) §1 列出的四个 harness 家族） | `gateway::oauth_profiles`（只有数据零分支）、`gateway::credential`（流程与续期） | 加一行 profile。**凭证保管恒不外包**：明文只到运行中的机器的凭证服务 |
 | 模型 endpoint 与 dialect | `gateway::endpoint`、`gateway::dialect`；本地推理走 `gateway::native` | 设置页里填 base URL 与 dialect；本地模型直连，不过网关 |
 | SaaS 与外部工具（[Composio](https://composio.dev) 是其中一个 MCP server） | `protocol::mcp` 的 `Outbound` seam、`bin::mcp_stdio` 与 `bin::mcp_http`、楼的 `CONFIG.toml` | 改一个 URL 或一条命令就换了 server；保密楼一个都不起 |
 | sandbox | `runtime::sandbox` seam（今天的适配器是 wasmtime fuel） | 实现这道 seam，过它的 conformance 断言套件 |
@@ -218,14 +218,11 @@ just check
 
 ## 站在谁的肩上
 
-登录一个 provider 要知道一小把端点和参数。与其自己盯着那些 API 文档，我跟随两个仍在维护的项目：
+登录一个 provider 要知道一小把端点和参数。与其自己盯着那些 API 文档，我跟随各厂商自己在维护的 harness——OpenAI 的 `codex`、Anthropic 的 agent SDK、xAI 的 `grok-build`、Moonshot 的 `kimi-cli`——这座城直接登录的四个家族，一家一个。
 
-| 项目 | 许可 | 跟随什么 |
-|---|---|---|
-| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | OpenAI 的订阅登录：端点、client id、scope、device-code 流程 |
-| [earendil-works/pi](https://github.com/earendil-works/pi) | MIT | Anthropic 与其余订阅 provider 的同类情报 |
+**跟随哪个仓库、仓库里哪条路径、已经读到哪个 commit，只有一个家：[`docs/third-party.md`](docs/third-party.md) §1。** 那张表是一条每日流水线拿去问上游动没动的数据，在这里再抄一份，就等于给一件机器已经依赖的事实添第二个家，上游一动两处就分叉。
 
-**跟随的是情报，不是代码。** 端点和参数是事实；流程与凭证保管在这里自己实现。
+**跟随的是情报，不是代码。** 端点和参数是事实；流程与凭证保管在这里自己实现。上游是专有许可还是 Apache-2.0，这条同样成立——四家里有一家是专有的。
 
 **浏览器那一页站的是同一类东西。** 它的运行时依赖恰好两个——`solid-js` 与 `effect`——里面没有任何 UI 库：`client/src/views/parts/` 里的控件都是这个仓库自己写的。从 W3C 的 ARIA Authoring Practices 与 Kobalte、Ark UI 的文档里取的是写成文字的行为：一个控件实现哪个模式、每个键做什么、关闭时焦点还给谁。**他们的代码一行都没有进树，所以这件事不欠任何许可义务**；读出来的那张键盘表落在 [`client/client-SPEC.md`](client/client-SPEC.md) 里。
 

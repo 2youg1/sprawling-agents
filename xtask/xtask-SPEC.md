@@ -28,11 +28,11 @@
 | length | 一个生产函数不得长过 `function_length`（今 200 行）、不得多于 `argument_count` 个参数（今 4 个，不含接收者），一个源文件不得长过 `file_length`（今 400 行，含测试；权威在 budgets.toml）；函数尺寸与签名以 `syn` 量得，文件尺寸即行数 |
 | npm | `client/` 的依赖面：锁文件在盘且与 `package.json` 逐条同、运行时依赖恰为 `solid-js` 与 `effect`、树上每个包的许可证都在 `deny.toml` 的准许表内 |
 | boundary | Rust 检查不得跨进程边界够到本产品；黑箱那一半住 `adversary/` |
-| artifact | 构建产物与发布档的形状：平台三元组、归档命名、客户端资产在不在二进制里 |
+| artifact | 发布出去的那件东西的形状：测试脚手架不得进产品二进制、客户端落点只有一个家（§8-18）、平台与归档命名只有一张表（§8-19） |
 | proof | kani harness 名册只住 `#[kani::proof]` 属性；CI 不得点名 harness，文档不得手写总数 |
 | docnum | 文档里的数字由 `docnum::FACTS` 生成并由 `--write` 回写；区段陈旧、事实未知、标记不闭合各自即红（§8-16） |
 | gates | 顺序跑全部门，聚合报告，任一违规即退出码 1 |
-| wire-ts | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V` 与 `WIRE_HASH`；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
+| wire-ts | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V`、`WIRE_HASH` 与 `CITY_RUN`（§8-20）；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
 
 ### 门禁针对的 LLM 失效模式（本 crate 存在的理由）
 
@@ -83,7 +83,7 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 
 ## 7 模块边界
 
-一门一文件。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度参数；此处只说明每道门判什么，不再抄一份清单，也不写它们有几道——要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates`。判定面：`header`｜`lexicon`｜`modmap`｜`length`｜`boundary`｜`artifact`｜`depmap`｜`npm`｜`secret`｜`color`｜`wording`｜`render`｜`wiring`｜`wire-ts`｜`docnum`｜`proof`｜`budget`｜`specalign`｜`apisync`｜`release`｜`guard`。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `wording` 共用的词形读法）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）。
+一门一文件。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度参数；此处只说明每道门判什么，不再抄一份清单，也不写它们有几道——要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates`。判定面：`header`｜`lexicon`｜`modmap`｜`length`｜`boundary`｜`artifact`｜`depmap`｜`npm`｜`secret`｜`color`｜`wording`｜`render`｜`wiring`｜`wire-ts`｜`docnum`｜`proof`｜`budget`｜`specalign`｜`apisync`｜`release`｜`guard`。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `wording` 共用的词形读法）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——列格式一变，只有一处要改。
 
@@ -591,5 +591,55 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 | `xtask/src/render/announced.rs` | 屏幕阅读器遇到的那三条（原 `ax` 的三条）：`every_control_is_announceable`、`every_landmark_is_named`、`one_first_heading` |
 
 **关门判据**（两条都实跑过，2026-09-21）：`cargo run -q -p xtask -- render` 五次开页全绿；**把探针写的那个属性名从 `data-theme` 改成别的而不动样式表**，亮色那一次必须红在「页面画的不是这一次要的条件」上（实测拒词：`the pass asked for the light page and the page drew itself dark`）；**把 `--force-high-contrast` 换成任何不开强制色的开关**，强制色那一次同样必须红（实测拒词：`the pass asked for forced colours and the engine drew the colours it authored`）。**改 `PASSES` 里那一行的 `Lighting` 不是这条控制**：它同时改掉了请求与期待，两边仍然一致，故照旧为绿。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-18 `target/web-dist` 的一个家：产品的 build script 说它叫什么
+
+**四个家，写者一个读者三个，互不引用。** `client/vite.config.ts` 写出那个目录，`crates/sprawling/build.rs` 嵌入它，`xtask::render` 打开它，`xtask::budget` 称它。改 `outDir` 之后没有一处会红：build script 走 placeholder 只打一条 warning，两道门各自 skip，`just check` 依旧绿，直到有人下载到一个只有空白页的二进制。**这正是「找不到输入就变绿」那一类失效**（§8-13 点名要避的那一类），而它同时命中了四个家里的三个。
+
+**权威落在 `crates/sprawling/build.rs` 的 `BUNDLE_DIR`，判据两条。** 谁先需要它：任何一次 `cargo build` 都要先由 build script 找到那个目录，而门跑在其后。谁能被另一个引用：build script 是**唯一一个在已发布树里仍要工作的读者**——`release::is_scaffolding` 把 `xtask/` 留在机器上，所以一个住在 `xtask` 的常量在那棵树上根本不存在，而反方向可行——`xtask::bundle` 用 `syn` 从 build script 里读出这个常量。故 `xtask` 侧零副本：`render` 与 `budget` 都调 `bundle::dist(root)`。
+
+**另外两处用另一门语言写，由闸断言相等而不代写**（roadmap §14 对跨语言事实的口径）：`client/vite.config.ts` 与 `justfile` 必须拼出权威说的那个名字，不然 `artifact` 门红。一道门不改别人的打包器配置。
+
+**`target_dir` 的启发式随本节删除。** 原来的读法是从 `OUT_DIR` 向上找第一个**字面叫 `target`** 的目录，它对任何别的名字答错；现在读 `CARGO_TARGET_DIR`，未设时用工作区自己的 `target/`，相对值按 cargo 的规矩相对工作区根解析。
+
+**`render` 的 `location` 因此少了一段前缀**：一处版面违规现在报 `#/gallery <这一次开页>`，不再抄一份构建目录——那条读数对着的是画出来的页面，不是盘上的某个文件。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-19 `xtask::platform`：一张平台表，四份用别的语言写的抄件
+
+**五个家，只有两个之间有过任何约束。** `channel.rs` 的 `ROWS`、`npm/shim.js` 的 `PLATFORMS`、`install.sh` 的后缀表、`install.ps1` 的后缀、`.github/workflows/release.yml` 的 `archive` 矩阵，说的都是同一件事：这个项目为哪些平台构建，每份归档叫什么名字。**已经分叉过**：`install.sh` 提供的 `-linux-x86_64.zip` 对应一个矩阵从不产出的归档，于是一台 Linux 机器被指去下载一个不存在的资产。
+
+**权威是 `xtask/src/platform.rs` 的 `PLATFORMS`**，每行携七个拼法：归档后缀、runner 镜像、`--target`（主机构建为空串）、npm 包名、npm 的 `os`／`cpu`、归档里可执行文件的名字。`channel` 改用它，`Row` 这个第二个类型随之删除。
+
+**三条断言挂在 `artifact` 门下，不新建门。** 挂 `artifact` 而不挂 `release` 的理由是 §1 的门表早已把「发布档的形状：平台三元组、归档命名」写在 `artifact` 那一行——写进 `release` 会让同一个责任有两个家，并让那一行继续说一件不真的话。三条：
+
+1. **矩阵**：`release.yml` 的 `- os:`／`target:` 成对读出，与 `(runner, cargo_target)` 集合双向相等。
+2. **shim**：`npm/shim.js` 的每个条目读成「键、包、可执行文件」，与 `("<os> <cpu>", package, binary)` 双向相等。
+3. **写全的后缀**：`release.yml`、`install.sh`、`install.ps1` 里每一个**写全**的归档后缀，必须是某一行的后缀。
+
+**只判写全的那些，插值拼出来的不判。** `"-${os}-${arch}.zip"` 不是一个可比对的拼法，猜它就会判错一份正确的脚本。这是漏报而非误报，也是赔得起的那一半：拼错的归档名是已经发生过的缺陷，而插值拼出来的那个由下载本身拒绝，并告诉读者这次发布实际带了什么。
+
+**登记表 `[archive_naming.predating]` 与另三张同形，且自清理。** 今天一行：`install.sh` 那个「留给将来某个 gnu 构建」的后缀。它记在册上而不是当场变红，因为划掉它是对一份不在本次改动范围内的文件动一行；**两个方向都会让它过期**——某一行平台表认领了那个后缀，或者再没有人拼它。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-20 `argument_count` 的豁免表自清理，与一个地址上的两个函数
+
+**参数登记表此前只被查询、从不被审计。** `file_length.predating`（§9-9）与 `boundary.predating` 都会把修好的行报出来，参数表只用于跳过：一条签名修到四参以内、或者那个函数被删掉之后，豁免行永远留着，并在任何人重造同名函数时静默重新授权。`length::check` 因此补第三条回收路径 `spent_signatures`，拒词三段与另两处逐字相同。
+
+**一个地址可以住着两个函数，而这正是第一版报错的地方。** 登记表的键是 `文件路径::函数名`，`crates/collab/src/workshop.rs` 里有一个八参的 `new` 与一个一参的 `new`；按解析顺序最后一个覆盖前一个，于是四条仍然有效的豁免被报成已花掉，划掉它们会放那条八参签名过门。**判据改为取同一地址上最宽的那一条**：一个地址只有在它上面没有任何函数超标时才算花掉。
+
+**`budgets.toml` 里那句「二十三」随本节删除**：表上实为 22 行，而一个能被机器数出来的数不由注释手写（§10-5 的同一条）。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-21 `wire-ts` 发出 `CITY_RUN`
+
+`RunId::CITY`（nil uuid）标记城一级的记录，而 `client/src/core/belief.ts` 手写了一个同名常量——一个把它拼错的客户端会把每一条城级记录折进一个不存在的 run。生成器因此多发一条：`export const CITY_RUN`，取自 `kernel::RunId::CITY`，与 `WIRE_V`、`WIRE_HASH` 同处文件开头。三者总是一起走且从不被单独选择，故作为一个值 `Constants` 走（`wire_ts.rs` 定义，`emit` 消费），而不是把 `emit` 的参数表加到四个。
+
+**`belief.ts` 那个手写常量随生成物落盘的那一次删除**，改从 `wire.ts` 导入；那一步在 `client/` 里，不在本节的改动范围内。
 
 **本节属门禁机具，与产品代码分开提交。**

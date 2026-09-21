@@ -239,18 +239,21 @@ fn the_history_states_where_the_output_ceiling_came_from() {
     let Some(live) = live() else { return };
     let dir = tempfile::tempdir().unwrap();
     let raised = assembly::init_city(dir.path()).unwrap();
-    settled(&live, &live.key, dir.path())
-        .and_then(|mut worker| dispatch(&mut worker))
-        .expect("the dispatch reached the endpoint and came home");
+    // The registration alone, without a dispatch: the rung is decided
+    // when the model is chosen, so a gate that also required a call to
+    // come home would report an endpoint outage as a ceiling nobody
+    // stated. What a call does with the figure is the test above.
+    settled(&live, &live.key, dir.path()).expect("the endpoint took this key and this model");
 
-    // A separate test from the one above, and red until the ceiling
-    // chain lands (Roadmap leaf 1.1): a person who set no ceiling must
-    // be able to read which link supplied the one that was sent. Joined
-    // to the assertion above it would report one verdict for two facts,
-    // and the wave that owns each of them is different.
+    // A separate test from the one above, because the two facts are
+    // different: that a call went out, and that the account says which
+    // link supplied the ceiling it carried. `settled` states a figure
+    // of its own, so the rung owed here is the person's - a record
+    // naming any other rung is a registration that quietly replaced a
+    // number somebody entered.
     let stated = history(&raised.ledger_dir)
         .into_iter()
-        .filter(|record| record.kind() == EventKind::ModelCalled)
+        .filter(|record| record.kind() == EventKind::ModelSelected)
         .find_map(|record| {
             record
                 .data()
@@ -259,9 +262,10 @@ fn the_history_states_where_the_output_ceiling_came_from() {
                 .and_then(serde_json::Value::as_str)
                 .map(str::to_owned)
         });
-    assert!(
-        stated.is_some_and(|from| !from.is_empty()),
-        "`model_called` does not say where the output ceiling came from"
+    assert_eq!(
+        stated.as_deref(),
+        Some(gateway::CeilingSource::Person.as_str()),
+        "`model_selected` does not name the person's figure as the ceiling this city registered"
     );
 }
 

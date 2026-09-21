@@ -27,6 +27,15 @@
 //! trait may name the suite that holds its adapters - `BrowserPort`'s
 //! does - and a gate reading item bodies would convict the trait for
 //! documenting itself.
+//!
+//! **Two more shapes of the same artefact, each read from the one place
+//! that owns it.** Where the client bundle lands is stated by the build
+//! script that embeds it (`bundle`), and which platforms a release
+//! publishes is stated by `platform`; both hold the files that restate
+//! them in YAML, shell, PowerShell and JavaScript to what the Rust says.
+//! They are here because this gate answers what a downloaded artefact is
+//! made of, and a bundle directory nobody agrees on and an archive name
+//! nobody builds are both answers to that question.
 
 use std::path::Path;
 
@@ -71,6 +80,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         walk_items(&rel, &parsed.items, &mut violations);
     }
     violations.extend(product_features(root)?);
+    violations.extend(crate::bundle::restated(root)?);
+    violations.extend(crate::platform::restated(root)?);
     Ok(violations)
 }
 

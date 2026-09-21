@@ -16,6 +16,7 @@ impl core::fmt::Debug for channels::Reply
 impl serde_core::ser::Serialize for channels::NoSecret
 impl<'de> serde_core::de::Deserialize<'de> for channels::NoSecret
 impl<Secret> channels::Command<Secret>
+impl<Secret> channels::Command<Secret>
 pub async fn channels::serve(channels::ServeConfig) -> core::result::Result<(), kernel::error::shape::AxError>
 pub channels::AcpBody::addr: alloc::string::String
 pub channels::AcpBody::goal: alloc::string::String

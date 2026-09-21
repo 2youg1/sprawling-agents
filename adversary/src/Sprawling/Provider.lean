@@ -52,6 +52,14 @@ promptly: a name that does not resolve costs a resolver timeout on some
 machines, and every action here is paid in wall clock. -/
 def deadAuthority : String := "127.0.0.1:47199"
 
+/-- The spelling this world attaches with, and the one its regression test
+carries into the repository.
+
+One definition because two would drift: the check below attaches it, and
+`Sprawling.Regression` renders the same URL into the Rust test that remembers
+what went wrong here. -/
+def attachedUrl : String := s!"http://{deadAuthority}/v1"
+
 /-- One endpoint, written every way a provider's documentation prints it.
 
 The class is walked whole rather than sampled. It is finite and small, so
@@ -163,28 +171,6 @@ def Door.send (door : Door) (ground : Ground) (verb : Verb) : IO Unit := do
   | .denied complaint => throw <| IO.userError s!"{verb} was refused: {complaint}"
   | _ => pure ()
 
-/-- Enters each URL and hands back what the city wrote down for it.
-
-Each spelling is entered under a name of its own, because a second attachment
-under one name is a different question from a second spelling of one URL.
-`already` is how many probes this ground has taken before now: the records come
-back in the order the city wrote them, which is the order they were sent, so a
-caller that probes twice in one city says how far along it is rather than
-keeping a second count of its own. -/
-def probedUrls (door : Door) (ground : Ground) (entered : List String) (already : Nat) :
-    IO (List String) := do
-  for (spelling, index) in entered.zipIdx do
-    let ordinal := already + index
-    door.send ground
-      (.probeEndpoint s!"relay-{ordinal}" spelling .messages (idemKey (200 + ordinal)))
-  let written ← ground.awaiting "endpoint_probed" (already + entered.length) recordTries
-  (written.drop already).mapM fun record =>
-    match statedUrl record with
-    | some url => pure url
-    | none =>
-      throw <| IO.userError
-        s!"an endpoint_probed record carries no base_url: {record.data.compress}"
-
 /-- The endpoint and the model this world registers.
 
 An id no catalogue knows and no preset covers, which is the case the ladder's
@@ -194,6 +180,52 @@ rather than drawn, so a counterexample names something a reader recognises
 def relayName : String := "relay"
 
 def unlistedModel : String := "opus-nine"
+
+/-- What the `index`-th member of an equivalence class is registered under.
+
+One name per spelling, because a second registration under one name is a
+different question from a second spelling of one URL. -/
+def nthName (index : Nat) : String := s!"{relayName}-{index}"
+
+/-- Enters each URL as a probe and hands back what the city wrote down for it.
+
+`already` is how many probes this ground has taken before now: the records come
+back in the order the city wrote them, which is the order they were sent, so a
+caller that probes twice in one city says how far along it is rather than
+keeping a second count of its own. -/
+def probedUrls (door : Door) (ground : Ground) (entered : List String) (already : Nat) :
+    IO (List String) := do
+  for (spelling, index) in entered.zipIdx do
+    let ordinal := already + index
+    door.send ground
+      (.probeEndpoint (nthName ordinal) spelling .messages (idemKey (200 + ordinal)))
+  let written ← ground.awaiting "endpoint_probed" (already + entered.length) recordTries
+  (written.drop already).mapM fun record =>
+    match statedUrl record with
+    | some url => pure url
+    | none =>
+      throw <| IO.userError
+        s!"an endpoint_probed record carries no base_url: {record.data.compress}"
+
+/-- Enters each URL as an attachment and hands back what the city registered.
+
+A probe and an attachment are two questions about one URL, and only the second
+one decides what this city will call: a probe that normalised and an attachment
+that did not would leave a settings page showing the right endpoint and a
+dispatch reaching the wrong one. Every spelling carries the model id, because
+an attachment that declared none is refused when the probe reaches nobody. -/
+def attachedUrls (door : Door) (ground : Ground) (entered : List String) :
+    IO (List String) := do
+  for (spelling, index) in entered.zipIdx do
+    door.send ground
+      (.attachEndpoint (nthName index) spelling .messages [unlistedModel] (idemKey (220 + index)))
+  let written ← ground.awaiting "endpoint_attached" entered.length recordTries
+  written.mapM fun record =>
+    match statedUrl record with
+    | some url => pure url
+    | none =>
+      throw <| IO.userError
+        s!"an endpoint_attached record carries no base_url: {record.data.compress}"
 
 /-- The sentence the Anthropic wire writes when it will not call a model.
 
@@ -214,13 +246,20 @@ would keep a working provider out over an interface it never promised. That is
 the product's own rule, and this world stands on it. -/
 def givenAProvider (door : Door) (ground : Ground) (ceiling : Option Nat) : IO Record := do
   door.send ground
-    (.attachEndpoint relayName s!"http://{deadAuthority}/v1" .messages [unlistedModel]
-      (idemKey 300))
+    (.attachEndpoint relayName attachedUrl .messages [unlistedModel] (idemKey 300))
   let _ ← ground.awaiting "endpoint_attached" 1 recordTries
   door.send ground (.selectModel relayName unlistedModel ceiling (idemKey 301))
   match ← ground.awaiting "model_selected" 1 recordTries with
   | chosen :: _ => return chosen
   | [] => throw <| IO.userError "choosing a model wrote no model_selected record"
+
+/-- Which run each of the first `wanted` runs of this city was filed under.
+
+Read from the envelope rather than from any payload: a record states the run it
+belongs to, and that is the identity everything a run raises is named after. -/
+def Ground.runsStarted (ground : Ground) (wanted : Nat) : IO (List String) := do
+  let started ← ground.awaiting "run_started" wanted recordTries
+  return started.map (·.run)
 
 /-- What the `model_selected` record says this city registered the model with.
 

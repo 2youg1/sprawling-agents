@@ -105,8 +105,8 @@ fn on_path(names: &[&str]) -> Option<PathBuf> {
 ///
 /// The bundle is copied and instrumented rather than probed in place: the
 /// probe is a `<script>` this repository does not ship, and writing it
-/// into `target/web-dist` would leave it in whatever `just dist` packages
-/// next.
+/// into the bundle directory would leave it in whatever `just dist`
+/// packages next.
 /// Where one opening finds what it opens: the same four paths for every
 /// pass of a run.
 pub(super) struct Opening<'a> {

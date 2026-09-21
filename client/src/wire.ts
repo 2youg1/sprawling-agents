@@ -9,9 +9,11 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 31 as const;
+export const WIRE_V = 32 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "a6cbdd95fb92eff20fea162b6962222ef14f86a71595929c0d4bf020fb168dfc" as const;
+export const WIRE_HASH = "1d5238bc37f70915b49bffbde2dbfc956639a412549ef96c882309e75898f0a0" as const;
+/** The run a city-level record carries: `kernel::RunId::CITY`. */
+export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
 /**
  * Canonical relative path; invariants enforced at the sole constructor.

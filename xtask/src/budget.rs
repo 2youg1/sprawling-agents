@@ -181,7 +181,9 @@ fn gated_rows(parsed: &toml::Value) -> Vec<Row> {
 /// Weighs one metric, or says it is not built.
 pub(crate) fn measure(root: &Path, name: &str) -> Result<Option<u64>, XtaskError> {
     match name {
-        "frontend_artifact" => gzipped_total(&root.join("target").join("web-dist")),
+        // Where the bundle lands is stated by the build script that
+        // embeds it, so the scale and the binary weigh one directory.
+        "frontend_artifact" => gzipped_total(&crate::bundle::dist(root)?),
         "release_binary" => Ok(binary_bytes(root)),
         // A gated row with no way to weigh it would silently pass; it is
         // an unmeasured row until this match learns it.
@@ -305,7 +307,10 @@ mod tests {
     fn a_metric_this_gate_cannot_weigh_reports_nothing_rather_than_passing() {
         let root = std::env::temp_dir();
         assert_eq!(measure(&root, "ledger_append").unwrap(), None);
-        assert_eq!(measure(&root, "frontend_artifact").unwrap(), None);
+        // A weighable row answers from this checkout, and answers
+        // `None` rather than failing when nothing has been built.
+        let here = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        measure(here, "frontend_artifact").unwrap();
     }
 
     #[test]

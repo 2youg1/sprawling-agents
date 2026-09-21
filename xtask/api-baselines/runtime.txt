@@ -70,6 +70,7 @@ impl runtime::digest::Digest
 impl runtime::digest::Digest
 impl runtime::digest::DigestOutcome
 impl runtime::digest::DigestOutcome
+impl runtime::elision::Cut
 impl runtime::handoff::Handoff
 impl runtime::handoff::Handoff
 impl runtime::mode::Mode
@@ -152,6 +153,7 @@ pub enum runtime::compaction::Strategy
 pub enum runtime::diagnostics::Level
 pub enum runtime::digest::BreakerVerdict
 pub enum runtime::digest::DigestOutcome
+pub enum runtime::elision::Elided
 pub enum runtime::mode::Admission
 pub enum runtime::mode::Mode
 pub enum runtime::prefix::SegmentSlot
@@ -326,7 +328,7 @@ pub fn runtime::clock::StampGate::new(kernel::config::ClockStampGranularity) -> 
 pub fn runtime::clock::StampGate::observe(&mut self, kernel::event::identity::TimeMs, kernel::tool::Temporal, &[kernel::config::ClockZone]) -> core::result::Result<core::option::Option<runtime::clock::ClockStamp>, kernel::error::shape::AxError>
 pub fn runtime::clock::StampGate::observe(&mut self, kernel::event::identity::TimeMs, kernel::tool::Temporal, &[kernel::config::ClockZone]) -> core::result::Result<core::option::Option<runtime::clock::ClockStamp>, kernel::error::shape::AxError>
 pub fn runtime::clock::stamp(kernel::event::identity::TimeMs, &[kernel::config::ClockZone]) -> core::result::Result<runtime::clock::ClockStamp, kernel::error::shape::AxError>
-pub fn runtime::compaction::compact(&str, kernel::budget::ByteLen) -> (alloc::string::String, bool)
+pub fn runtime::compaction::compact(&str, kernel::budget::ByteLen) -> runtime::elision::Cut
 pub fn runtime::compaction::detect(&str) -> runtime::compaction::Content
 pub fn runtime::compaction::plan(runtime::compaction::Content, kernel::budget::ByteLen, kernel::budget::ByteLen) -> runtime::compaction::Strategy
 pub fn runtime::diagnostics::Diagnostics::admits(&self, runtime::diagnostics::Level) -> bool
@@ -372,6 +374,14 @@ pub fn runtime::digest::digest_once(&str, core::option::Option<kernel::locator::
 pub fn runtime::digest::structure_of(&str) -> alloc::vec::Vec<runtime::digest::StructureNode>
 pub fn runtime::digest_once(&str, core::option::Option<kernel::locator::Locator>, &mut runtime::digest::Breaker, &mut dyn core::ops::function::FnMut(&kernel::locator::B3Hash) -> core::result::Result<core::option::Option<runtime::digest::Digest>, kernel::error::shape::AxError>, &mut dyn core::ops::function::FnMut(&str) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>) -> core::result::Result<runtime::digest::DigestOutcome, kernel::error::shape::AxError>
 pub fn runtime::drive(runtime::run::RunPlan, &mut dyn kernel::ledger::Ledger, &mut dyn kernel::model::Model, &mut runtime::run::RunHooks<'_>, &runtime::handoff::Handoff) -> core::result::Result<runtime::run::Run<runtime::run::Frozen>, kernel::error::shape::AxError>
+pub fn runtime::elision::Cut::whole(&str) -> runtime::elision::Cut
+pub fn runtime::elision::boundary_after(&str, usize) -> usize
+pub fn runtime::elision::boundary_before(&str, usize) -> usize
+pub fn runtime::elision::gap_marker(kernel::budget::ByteLen) -> alloc::string::String
+pub fn runtime::elision::gap_marker_room(usize) -> usize
+pub fn runtime::elision::marker(kernel::budget::ByteLen) -> alloc::string::String
+pub fn runtime::elision::marker_room(usize) -> usize
+pub fn runtime::elision::splice(&str, usize, usize, runtime::elision::Elided) -> runtime::elision::Cut
 pub fn runtime::fork::fork_draft(kernel::event::identity::RunId, kernel::event::identity::Seq, kernel::event::identity::RunId, kernel::event::identity::TimeMs, alloc::string::String) -> core::result::Result<kernel::event::payload::EventDraft, kernel::error::shape::AxError>
 pub fn runtime::fork::prefix(&runtime::replay::VerifiedLedger, kernel::event::identity::Seq) -> core::result::Result<alloc::vec::Vec<alloc::vec::Vec<u8>>, kernel::error::shape::AxError>
 pub fn runtime::handoff::Handoff::context(&self) -> &str
@@ -532,6 +542,7 @@ pub mod runtime::clock
 pub mod runtime::compaction
 pub mod runtime::diagnostics
 pub mod runtime::digest
+pub mod runtime::elision
 pub mod runtime::fork
 pub mod runtime::handoff
 pub mod runtime::mode
@@ -851,6 +862,13 @@ pub runtime::digest::StructureNode::level: u8
 pub runtime::digest::StructureNode::offset: kernel::budget::ByteLen
 pub runtime::digest::StructureNode::span: kernel::budget::ByteLen
 pub runtime::digest::StructureNode::title: alloc::string::String
+pub runtime::elision::Cut::dropped: kernel::budget::ByteLen
+pub runtime::elision::Cut::place: runtime::elision::Elided
+pub runtime::elision::Cut::text: alloc::string::String
+pub runtime::elision::Elided::Head
+pub runtime::elision::Elided::Middle
+pub runtime::elision::Elided::Nothing
+pub runtime::elision::Elided::Tail
 pub runtime::handoff::ResumeSeed::must_read: alloc::vec::Vec<kernel::locator::Locator>
 pub runtime::handoff::ResumeSeed::run: kernel::event::identity::RunId
 pub runtime::mode::Admission::Lands
@@ -1162,6 +1180,7 @@ pub struct runtime::diagnostics::Site<'a>
 pub struct runtime::digest::Breaker
 pub struct runtime::digest::Digest
 pub struct runtime::digest::StructureNode
+pub struct runtime::elision::Cut
 pub struct runtime::handoff::Handoff
 pub struct runtime::handoff::ResumeSeed
 pub struct runtime::mode::Produced

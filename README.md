@@ -210,7 +210,7 @@ I sell neither APIs nor account hosting, so everything external sits on a seam a
 
 | Piece | Lives in | How to replace |
 |---|---|---|
-| Subscription-login intel (following openai/codex and earendil-works/pi) | `gateway::oauth_profiles` (data only, zero branches), `gateway::credential` (flow & renewal) | Add one profile line. **Credential custody is never outsourced**: plaintext reaches only the local credential store. |
+| Subscription-login intel (followed from the four harness families listed in [`docs/third-party.md`](docs/third-party.md) §1) | `gateway::oauth_profiles` (data only, zero branches), `gateway::credential` (flow & renewal) | Add one profile line. **Credential custody is never outsourced**: plaintext reaches only the local credential store. |
 | Model endpoint & dialect | `gateway::endpoint`, `gateway::dialect`; local inference via `gateway::native` | Enter base URL and dialect on the settings page; local models connect directly, bypassing the gateway. |
 | SaaS & external tools ([Composio](https://composio.dev) is one MCP server among others) | `protocol::mcp` `Outbound` seam, `bin::mcp_stdio` & `bin::mcp_http`, the building’s `CONFIG.toml` | Change one URL or one command to switch servers; confidential buildings start none. |
 | Sandbox | `runtime::sandbox` seam (current adapter is wasmtime fuel) | Implement the seam and pass its conformance assertion suite. |
@@ -255,14 +255,11 @@ When that is green, a change is considered finished. **PR bodies, issues, and re
 
 ## Standing on the shoulders of others
 
-Logging into a provider requires a small set of endpoints and parameters. Rather than stare at those API docs myself, I follow two actively maintained projects:
+Logging into a provider requires a small set of endpoints and parameters. Rather than stare at those API docs myself, I follow the vendors' own actively maintained harnesses — OpenAI's `codex`, Anthropic's agent SDK, xAI's `grok-build`, Moonshot's `kimi-cli` — one for each of the four families this city signs in to directly.
 
-| Project | License | What is followed |
-|---|---|---|
-| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | OpenAI subscription login: endpoints, client id, scope, device-code flow |
-| [earendil-works/pi](https://github.com/earendil-works/pi) | MIT | The equivalent intel for Anthropic and the other subscription providers |
+**Which repository, which path inside it, and which commit has been read live in one place: [`docs/third-party.md`](docs/third-party.md) §1.** That table is what a daily workflow parses to ask each upstream whether it moved, so a copy of it here would be a second home for a fact a machine already depends on, and the two would drift on the first move.
 
-**What is followed is intelligence, not code.** Endpoints and parameters are facts; the flow and credential custody are implemented here.
+**What is followed is intelligence, not code.** Endpoints and parameters are facts; the flow and credential custody are implemented here. That holds for an upstream under a proprietary licence exactly as it holds for one under Apache-2.0, and one of the four is proprietary.
 
 **The browser page stands on the same kind of thing.** Its runtime dependencies are exactly two — `solid-js` and `effect` — and no component library is among them: every control in `client/src/views/parts/` is this repository's own. What is taken from the W3C's ARIA Authoring Practices and from the Kobalte and Ark UI documentation is behaviour published as prose: which pattern a control implements, what each key does, where the focus returns when it closes. **Not one line of their code is in this tree, so nothing is owed for it** — and the keyboard table that reading produced is specified in [`client/client-SPEC.md`](client/client-SPEC.md).
 

@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use super::ROWS;
+use crate::platform::PLATFORMS;
 
 /// The last version whose platform packages reached the registry under
 /// bare names. npm never reuses a `name@version`, so the scope cannot
@@ -29,19 +29,6 @@ fn the_published_version_is_the_one_a_running_binary_decodes() {
     );
 }
 
-/// Two packages claiming one platform would make which binary a
-/// person gets depend on the order the assets were read in.
-#[test]
-fn no_two_rows_claim_one_platform_or_one_suffix() {
-    for (index, row) in ROWS.iter().enumerate() {
-        for other in ROWS.iter().skip(index + 1) {
-            assert_ne!((row.os, row.cpu), (other.os, other.cpu));
-            assert_ne!(row.suffix, other.suffix);
-            assert_ne!(row.package, other.package);
-        }
-    }
-}
-
 /// The decision beside `ROWS`, carried to the version that can honour
 /// it. Nothing here fires while the workspace still states the version
 /// whose packages are already published; the first commit that moves
@@ -55,7 +42,7 @@ fn the_platform_packages_take_the_scope_from_the_next_version() {
     if version == UNSCOPED_THROUGH {
         return;
     }
-    for row in ROWS {
+    for row in PLATFORMS {
         assert!(
             row.package.starts_with("@sprawling/"),
             "the workspace states {version}, which is past {UNSCOPED_THROUGH}, \
@@ -92,11 +79,7 @@ fn the_shim_execs_rather_than_installs() {
         !shim.contains("sprawling install"),
         "PATH belongs to whoever installed; the shim must not install"
     );
-    for row in ROWS {
-        assert!(
-            shim.contains(row.package),
-            "the shim does not know {}",
-            row.package
-        );
-    }
+    // Which packages the shim knows is `platform::restated`'s question,
+    // asked of the file on disk; asserting it here too would be a
+    // second reader of one fact.
 }

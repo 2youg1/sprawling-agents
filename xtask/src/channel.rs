@@ -30,13 +30,15 @@
 //! archive path; npm and bun own theirs. The shim resolves and execs,
 //! and never calls `sprawling install` — see `npm/shim.js`.
 //!
-//! *The platform list comes from the assets.* An archive with no row
-//! here is refused rather than skipped: the day a Linux archive returns,
-//! this says so instead of publishing a channel that quietly lacks it.
+//! *The platform list comes from the assets.* An archive with no row in
+//! `xtask::platform` is refused rather than skipped: the day a Linux
+//! archive returns, this says so instead of publishing a channel that
+//! quietly lacks it.
 
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 
+use crate::platform::{PLATFORMS, Platform};
 use crate::report::XtaskError;
 
 /// The shim, compiled in so the file a reader opens and the file a
@@ -44,61 +46,9 @@ use crate::report::XtaskError;
 /// already follows for the documents a city writes.
 const SHIM: &str = include_str!("../../npm/shim.js");
 
-/// How an archive's platform suffix becomes an npm package.
-///
-/// `os` and `cpu` are npm's own spellings, and they are what make the
-/// install conditional: npm and bun skip an optional dependency whose
-/// `os`/`cpu` do not match, so one machine downloads one binary.
-struct Row {
-    /// What the release archive's name ends with.
-    suffix: &'static str,
-    package: &'static str,
-    os: &'static str,
-    cpu: &'static str,
-    binary: &'static str,
-}
-
-/// Every platform the channel can carry. The Linux row is here and its
-/// archive is not: `release.yml` holds that build back until it is
-/// settled where a Linux install keeps a credential. A release without
-/// that asset simply publishes two packages; a release *with* an asset
-/// this table does not know is an error, which is the asymmetry that
-/// keeps a new platform from being dropped in silence.
-///
-/// **These names carry the `@sprawling` scope, and the versions at or
-/// below `UNSCOPED_THROUGH` do not.** npm never reuses a `name@version`,
-/// so the rename cannot reach backwards: everything already on the
-/// registry under a bare name stays there and is deprecated in place,
-/// pointing at the scoped name that succeeds it. The root package keeps
-/// its bare name whatever happens to these: `bunx sprawling` is the
-/// whole reason this channel exists, and a scoped root would spell it
-/// `bunx @sprawling/sprawling`. A scoped name writes one directory level
-/// more than a bare one, which is why the publish step enumerates
-/// `target/npm/@sprawling/*/` rather than every child of `target/npm`.
-const ROWS: [Row; 3] = [
-    Row {
-        suffix: "-windows-x86_64.zip",
-        package: "@sprawling/sprawling-windows-x64",
-        os: "win32",
-        cpu: "x64",
-        binary: "sprawling.exe",
-    },
-    Row {
-        suffix: "-macos-aarch64.zip",
-        package: "@sprawling/sprawling-darwin-arm64",
-        os: "darwin",
-        cpu: "arm64",
-        binary: "sprawling",
-    },
-    Row {
-        suffix: "-x86_64-unknown-linux-musl.zip",
-        package: "@sprawling/sprawling-linux-x64-musl",
-        os: "linux",
-        cpu: "x64",
-        binary: "sprawling",
-    },
-];
-
+/// A scoped npm name writes one directory level more than a bare one,
+/// which is why the publish step enumerates `target/npm/@sprawling/*/`
+/// rather than every child of `target/npm`.
 const REPOSITORY: &str = "https://github.com/2youg1/sprawling-agents";
 
 /// One file's bytes, out of a zip that holds it at any depth.
@@ -201,13 +151,13 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
     }
     archives.sort();
 
-    let mut carried: Vec<&Row> = Vec::new();
+    let mut carried: Vec<&Platform> = Vec::new();
     for archive in &archives {
         let name = archive
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let row = ROWS.iter().find(|row| name.ends_with(row.suffix));
+        let row = PLATFORMS.iter().find(|row| name.ends_with(row.suffix));
         let Some(row) = row else {
             return Err(XtaskError::Cmd {
                 cmd: String::from("npm channel"),

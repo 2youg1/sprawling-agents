@@ -32,38 +32,9 @@ use serde::{Deserialize, Serialize};
 use crate::carried_name::{ModeTag, ProviderName, TemplateName, ToolkitSlug, UploadId};
 use crate::command::step::{GovernedDocument, HaltScope, LoginStep, PursuitStep};
 use crate::command::tuning::EndpointTuning;
+use crate::named_frames::named_frames;
 
-pub const COMMAND_NAMES: [&str; 28] = [
-    "Dispatch",
-    "Wake",
-    "Login",
-    "ProbeEndpoint",
-    "AttachEndpoint",
-    "SelectModel",
-    "Fork",
-    "Attach",
-    "CreateBuilding",
-    "ConfigureBuilding",
-    "PutSecret",
-    "Steer",
-    "Cancel",
-    "Takeover",
-    "Rollback",
-    "Halt",
-    "Release",
-    "BatchByBuilding",
-    "Approve",
-    "CreatePolicy",
-    "SetAutonomy",
-    "Pursue",
-    "PutDocument",
-    "Auth",
-    "Reveal",
-    "DoctorInstall",
-    "DoctorRefresh",
-    "ConnectToolkit",
-];
-
+named_frames! {
 /// Commands change state, require authorization, and are idempotent.
 ///
 /// Deliberately *not* `#[non_exhaustive]`: the schema hash is this type's
@@ -352,4 +323,9 @@ pub enum Command<Secret = Sealed<String>> {
     Auth {
         token: String,
     },
+}
+
+/// The Command surface, in declaration order — the order the handshake
+/// hash mixes these names in.
+pub const COMMAND_NAMES;
 }
