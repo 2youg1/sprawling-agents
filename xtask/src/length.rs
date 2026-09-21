@@ -101,8 +101,10 @@ use register::{ARG_ROW, FILE_ROW, PREDATING, ROW, excused, key, limit, predating
 const SOURCE_DIRS: [&str; 4] = ["crates", "xtask/src", "citysim/src", "desktop/src"];
 
 /// Where the client's own sources live. Only the file rule reaches
-/// them; the module documentation says why.
-const CLIENT_DIR: &str = "client/src";
+/// them; the module documentation says why. The directory itself is
+/// `walk`'s to state - five gates used to hold their own spelling of
+/// it, and nothing compared them.
+use crate::walk::CLIENT_SRC as CLIENT_DIR;
 
 /// What the client is written in.
 const CLIENT_EXTENSIONS: [&str; 2] = ["ts", "tsx"];

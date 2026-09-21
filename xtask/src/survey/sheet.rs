@@ -23,17 +23,63 @@
 
 use std::collections::BTreeMap;
 
-use super::{Deviation, Finding, Group, Near, Page, Population, vocabulary};
+use super::{Deviation, Finding, Group, Near, Page, Population, Sources, vocabulary};
 
 /// How many sites of one repeated finding are listed before the rest
 /// are counted.
 const LISTED: usize = 3;
 
+/// Who the report is written for.
+///
+/// **Two readers, one set of readings.** A person scans: prose, the
+/// sentence first, the numbers inside it. An agent does not scan - it
+/// pays per token and matches on shape - so the same reading is worth
+/// more to it as named fields and worth less as a sentence it has to
+/// parse back into fields.
+///
+/// The tagged form is **denser than the prose, not looser**, which is
+/// the condition for it to exist at all: this module's first rule is
+/// that a clean page costs nothing to read. Everything a machine acts
+/// on is an attribute; the one sentence of prose hangs off the edit
+/// rather than off each of its sites, where the prose form repeats it.
+///
+/// **Tags rather than JSON, for two reasons.** A report cut off by a
+/// token budget is still readable as far as it goes and shows that it
+/// was cut, where a truncated JSON document is not a document. And a
+/// tag is an attention anchor to the models that read this: they are
+/// trained on tagged prompts, so `<why>` and `<fix>` work on them the
+/// way a subheading works on a person, which a JSON key in the middle
+/// of a line does not.
+///
+/// That is also why the split between attribute and element is where
+/// it is. **Attributes hold short machine values** - the rule key, the
+/// counts, the source line - because they are matched, not read.
+/// **Elements hold the two sentences** - why it is a finding, and what
+/// to do - because each one is a thing the reader has to attend to,
+/// and a paragraph buried in an opening tag among six other
+/// attributes is a paragraph nobody attends to.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Shape {
+    /// Sentences, for somebody changing a stylesheet.
+    Prose,
+    /// Named fields, for something that will act on them.
+    Tagged,
+}
+
 /// The whole report over one page, or nothing at all.
-pub(crate) fn written(page: &Page, at: &str, found: &[Deviation<'_>]) -> String {
+pub(crate) fn written(
+    page: &Page,
+    at: &str,
+    found: &[Deviation<'_>],
+    sources: &Sources,
+    shape: Shape,
+) -> String {
     let census = vocabulary::unpainted(page);
     if found.is_empty() && census.is_none() {
         return String::new();
+    }
+    if shape == Shape::Tagged {
+        return tagged(at, found, sources, census.as_deref());
     }
     let mut groups: BTreeMap<Group, Vec<&Deviation<'_>>> = BTreeMap::new();
     for one in found {
@@ -49,7 +95,7 @@ pub(crate) fn written(page: &Page, at: &str, found: &[Deviation<'_>]) -> String 
         let Some(members) = groups.get(&group) else {
             continue;
         };
-        out.push_str(&written_group(group, members));
+        out.push_str(&written_group(group, members, sources));
     }
     if let Some(line) = census {
         out.push_str(&format!("\n## vocabulary\n{line}\n"));
@@ -57,8 +103,82 @@ pub(crate) fn written(page: &Page, at: &str, found: &[Deviation<'_>]) -> String 
     out
 }
 
+/// The same readings as named fields.
+///
+/// One `<edit>` per repair, one `<at>` per place it has to be made.
+/// `id` is the key an agent suppresses or diffs on and never changes
+/// when a sentence is reworded; `fix` and `by` are the verb and the
+/// operand, kept apart from the prose so that acting on them needs no
+/// sentence parsing; `cohort` is how many of the population agreed,
+/// which is what decides whether a repair is safe to make without
+/// asking - eleven of twelve is a typing mistake and three of five is
+/// a column that never had a consensus.
+fn tagged(
+    at: &str,
+    found: &[Deviation<'_>],
+    sources: &Sources,
+    census: Option<&str>,
+) -> String {
+    let mut edits: BTreeMap<(Group, String), Vec<&Deviation<'_>>> = BTreeMap::new();
+    for one in found {
+        edits
+            .entry((one.finding.group(), rule(one)))
+            .or_default()
+            .push(one);
+    }
+    let mut out = format!(
+        "<survey page=\"{}\" edits=\"{}\" sites=\"{}\">\n",
+        escaped(at),
+        edits.len(),
+        found.len()
+    );
+    for ((group, headline), sites) in edits {
+        let Some(first) = sites.first() else { continue };
+        out.push_str(&format!(
+            "<edit id=\"{}\" group=\"{}\" standing=\"{}\" sites=\"{}\">\n",
+            first.finding.id(),
+            group.called(),
+            match first.standing() {
+                super::Standing::Refused => "refused",
+                super::Standing::Noted => "noted",
+            },
+            sites.len()
+        ));
+        out.push_str(&format!("<why>{}</why>\n", escaped(&headline)));
+        out.push_str(&format!("<fix>{}</fix>\n", escaped(&remedy(first))));
+        for one in &sites {
+            let where_ = sources
+                .locate(&one.at.class)
+                .map_or_else(String::new, |found| format!(" src=\"{}\"", escaped(found)));
+            out.push_str(&format!(
+                "<site{where_} box=\"{}\" x=\"{}\" y=\"{}\">{}</site>\n",
+                escaped(&one.at.tag),
+                one.at.left,
+                one.at.top,
+                escaped(&says(one))
+            ));
+        }
+        out.push_str("</edit>\n");
+    }
+    if let Some(line) = census {
+        out.push_str(&format!("<unpainted>{}</unpainted>\n", escaped(line)));
+    }
+    out.push_str("</survey>\n");
+    out
+}
+
+/// The five characters that would otherwise close a tag somebody is
+/// still inside. A name on this page can hold any of them.
+fn escaped(raw: &str) -> String {
+    raw.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 /// One group: its heading, then one paragraph per edit.
-fn written_group(group: Group, members: &[&Deviation<'_>]) -> String {
+fn written_group(group: Group, members: &[&Deviation<'_>], sources: &Sources) -> String {
     let mut edits: BTreeMap<String, Vec<&Deviation<'_>>> = BTreeMap::new();
     for one in members {
         edits.entry(rule(one)).or_default().push(one);
@@ -72,7 +192,7 @@ fn written_group(group: Group, members: &[&Deviation<'_>]) -> String {
     for (headline, sites) in edits {
         out.push_str(&format!("{headline}\n"));
         for one in sites.iter().take(LISTED) {
-            out.push_str(&format!("  {}\n", site(one)));
+            out.push_str(&format!("  {}\n", site(one, sources)));
         }
         if let Some(rest) = sites.len().checked_sub(LISTED)
             && rest > 0
@@ -112,6 +232,9 @@ pub(crate) fn rule(one: &Deviation<'_>) -> String {
             pixels(px_x100),
             nearby(nearest.as_ref())
         ),
+        Finding::Echoed { .. } => {
+            "one fact is painted in two places, and nothing links them".to_owned()
+        }
     }
 }
 
@@ -168,6 +291,15 @@ pub(crate) fn says(one: &Deviation<'_>) -> String {
             at.top,
             pixels(px_x100)
         ),
+        Finding::Echoed { other, text, homes } => format!(
+            "`{text}` is painted by {} at x={} y={} and by {} at x={} y={}, in {homes} places",
+            at.called(),
+            at.left,
+            at.top,
+            other.called(),
+            other.left,
+            other.top
+        ),
     }
 }
 
@@ -199,6 +331,10 @@ pub(crate) fn remedy(one: &Deviation<'_>) -> String {
                  when the scale moves"
                 .to_owned(),
         },
+        Finding::Echoed { .. } => "give the two one source, or say why they are two facts. Two \
+             boxes reading two answers agree until the day one of them is written, and the page \
+             has no way to notice"
+            .to_owned(),
     }
 }
 
@@ -227,13 +363,16 @@ fn remedy_out_of_step(among: Population, moved: i64, step: Option<&str>) -> Stri
 /// One place a repeated edit has to be made, named by the literal a
 /// reader greps for rather than by an identifier they would have to
 /// resolve first.
-fn site(one: &Deviation<'_>) -> String {
-    let class = if one.at.class.is_empty() {
-        String::new()
-    } else {
-        format!(" class=\"{}\"", one.at.class)
-    };
-    format!("{}{class}", says(one))
+fn site(one: &Deviation<'_>, sources: &Sources) -> String {
+    match sources.locate(&one.at.class) {
+        // The line that drew it, which is one `edit` away.
+        Some(found) => format!("{found} \u{b7} {}", says(one)),
+        // Nothing in the tree accounts for what this box is wearing,
+        // so the class is printed for a person to grep. A wrong
+        // location would cost more than an absent one.
+        None if one.at.class.is_empty() => says(one),
+        None => format!("{} class=\"{}\"", says(one), one.at.class),
+    }
 }
 
 fn among_says(among: Population) -> String {

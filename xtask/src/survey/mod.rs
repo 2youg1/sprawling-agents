@@ -38,13 +38,16 @@
 //! on is [`Standing`], stated once where each rule is written.
 
 mod drawn;
+mod echo;
 mod edge;
 mod legibility;
 mod sheet;
+mod source;
 mod vocabulary;
 
 pub(crate) use drawn::{Cut, Drawn, Marking, Overflow, Page, Paint, PaintSource, Sampled, TextRun};
-pub(crate) use sheet::{remedy, rule, says, written};
+pub(crate) use sheet::{Shape, remedy, rule, says, written};
+pub(crate) use source::Sources;
 pub(crate) use vocabulary::Declared;
 
 /// A box no larger than this in either direction shows nothing to
@@ -146,6 +149,16 @@ pub(crate) enum Finding<'a> {
         px_x100: u32,
         nearest: Option<Near<'a>>,
     },
+    /// One fact painted in two places that nothing links.
+    Echoed {
+        /// The other box saying the same thing.
+        other: &'a Drawn,
+        /// What both of them painted.
+        text: &'a str,
+        /// How many boxes said it, so a reader can tell a pair from a
+        /// short column.
+        homes: usize,
+    },
 }
 
 /// The order a person repairs in, which is the order in which one
@@ -158,6 +171,7 @@ pub(crate) enum Finding<'a> {
 /// find the column moved.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Group {
+    Fact,
     Paint,
     Type,
     Text,
@@ -166,10 +180,22 @@ pub(crate) enum Group {
 
 impl Group {
     /// Every group, in repair order. The array is the order.
-    pub(crate) const IN_ORDER: [Group; 4] = [Group::Paint, Group::Type, Group::Text, Group::Edge];
+    ///
+    /// `Fact` is first and is not a geometry repair at all: giving two
+    /// boxes one source deletes one of them or changes what it says,
+    /// which moves every box after it. A run that repaired alignment
+    /// first would align a box that is about to stop existing.
+    pub(crate) const IN_ORDER: [Group; 5] = [
+        Group::Fact,
+        Group::Paint,
+        Group::Type,
+        Group::Text,
+        Group::Edge,
+    ];
 
     pub(crate) fn called(self) -> &'static str {
         match self {
+            Group::Fact => "fact",
             Group::Paint => "paint",
             Group::Type => "type",
             Group::Text => "text",
@@ -215,7 +241,8 @@ impl Deviation<'_> {
             Finding::OutOfStep { among, .. } => among.standing(),
             Finding::UndeclaredPaint { .. }
             | Finding::UndeclaredSize { .. }
-            | Finding::TextCut { .. } => Standing::Noted,
+            | Finding::TextCut { .. }
+            | Finding::Echoed { .. } => Standing::Noted,
         }
     }
 }
@@ -226,6 +253,7 @@ pub(crate) fn judge(page: &Page) -> Vec<Deviation<'_>> {
     vocabulary::every_colour_is_a_declared_word(page, &mut out);
     vocabulary::every_size_is_a_declared_step(page, &mut out);
     legibility::no_box_cuts_its_own_text(&page.drawn, &mut out);
+    echo::one_fact_has_one_home(&page.drawn, &mut out);
     edge::nothing_escapes_what_holds_it(&page.drawn, &mut out);
     edge::every_population_agrees(page, &mut out);
     // Stable, so two runs are a diff: repair order first, then the
@@ -248,6 +276,7 @@ impl Finding<'_> {
     /// The group this reading is repaired in.
     pub(crate) fn group(&self) -> Group {
         match *self {
+            Finding::Echoed { .. } => Group::Fact,
             Finding::UndeclaredPaint { .. } => Group::Paint,
             Finding::UndeclaredSize { .. } => Group::Type,
             Finding::TextCut { .. } => Group::Text,
@@ -258,11 +287,32 @@ impl Finding<'_> {
     /// A stable seat within a group, so that two runs sort the same way.
     fn ordinal(&self) -> u8 {
         match *self {
-            Finding::UndeclaredPaint { .. } => 0,
-            Finding::UndeclaredSize { .. } => 1,
-            Finding::TextCut { .. } => 2,
-            Finding::Escapes { .. } => 3,
-            Finding::OutOfStep { .. } => 4,
+            Finding::Echoed { .. } => 0,
+            Finding::UndeclaredPaint { .. } => 1,
+            Finding::UndeclaredSize { .. } => 2,
+            Finding::TextCut { .. } => 3,
+            Finding::Escapes { .. } => 4,
+            Finding::OutOfStep { .. } => 5,
+        }
+    }
+
+    /// The stable key an agent suppresses, tracks or diffs on.
+    ///
+    /// Never the sentence: prose is written for a reader and gets
+    /// rewritten whenever a reader is confused by it, and a key that
+    /// moved every time somebody improved a sentence would be no key.
+    pub(crate) fn id(&self) -> &'static str {
+        match *self {
+            Finding::Echoed { .. } => "fact.two-homes",
+            Finding::UndeclaredPaint { .. } => "paint.undeclared",
+            Finding::UndeclaredSize { .. } => "type.undeclared",
+            Finding::TextCut { .. } => "text.cut",
+            Finding::Escapes { .. } => "edge.escapes",
+            Finding::OutOfStep { among, .. } => match among {
+                Population::RegionsInTheMainColumn => "edge.main-column",
+                Population::RowsOfANavigationColumn => "edge.nav-rows",
+                Population::BoxesThatShareAHolder(_) => "edge.shares-holder",
+            },
         }
     }
 }

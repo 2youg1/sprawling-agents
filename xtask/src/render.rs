@@ -75,6 +75,11 @@ const EVERY_PASS: &str = "in every pass";
 /// this gate refuses.
 const SURVEY: &str = "--survey";
 
+/// The flag that asks for the same readings as named fields rather
+/// than as sentences, for a reader that will act on them rather than
+/// read them.
+const TAGGED: &str = "--tagged";
+
 /// The flag that opens a route other than the gallery.
 const ROUTE: &str = "--route";
 
@@ -86,7 +91,7 @@ const ROUTE: &str = "--route";
 /// somebody is changing the page rather than defending it.
 enum Errand {
     Gate,
-    Survey,
+    Survey(survey::Shape),
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
@@ -115,10 +120,18 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     };
     let route = asked_for(ROUTE).unwrap_or_else(|| GALLERY.to_owned());
     let errand = if flagged(SURVEY) {
-        Errand::Survey
+        Errand::Survey(if flagged(TAGGED) {
+            survey::Shape::Tagged
+        } else {
+            survey::Shape::Prose
+        })
     } else {
         Errand::Gate
     };
+    // The client's own sources, read once for the whole run: every
+    // finding names the line that drew it, and a survey opens the same
+    // page five times.
+    let sources = survey::Sources::index(root)?;
     let opening = Opening {
         root,
         browser: &browser,
@@ -140,15 +153,22 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         no_key_is_underlined(&page.drawn, &at, &mut violations);
         let readings = survey::judge(page);
         for reading in readings.iter().filter(refusable) {
+            // A refusal names the line as well as the page: a gate that
+            // says what is wrong and not where costs its reader the
+            // search every time it goes red.
+            let located = match sources.locate(&reading.at.class) {
+                Some(found) => format!("{at} \u{b7} {found}"),
+                None => at.clone(),
+            };
             violations.push(violation(
-                &at,
+                &located,
                 &survey::rule(reading),
                 survey::says(reading),
                 &survey::remedy(reading),
             ));
         }
-        if let Errand::Survey = errand {
-            print!("{}", survey::written(page, &at, &readings));
+        if let Errand::Survey(shape) = errand {
+            print!("{}", survey::written(page, &at, &readings, &sources, shape));
         }
     }
     Ok(violations)

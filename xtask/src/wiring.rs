@@ -47,8 +47,9 @@ const WIRE_DIR: &str = "crates/channels/src";
 /// arms out from under the gate while leaving the gate green about it.
 const WORKER_DIR: &str = "crates/sprawling/src";
 /// Where the client's controls live. A directory for the same reason
-/// `WORKER_DIR` is one.
-const CLIENT: &str = "client/src";
+/// `WORKER_DIR` is one, and `walk`'s spelling of it because five gates
+/// asked this question and five gates answered it.
+use crate::walk::CLIENT_SRC as CLIENT;
 
 /// Which side is supposed to reach a verb.
 ///

@@ -68,6 +68,30 @@ pub(crate) fn in_isolation_zone(rel: &str) -> bool {
     rel == "local" || rel.starts_with("local/")
 }
 
+/// Where the web client's sources are, spelled once for every gate that
+/// walks them.
+///
+/// Five gates asked this question and five gates answered it: `length`
+/// held `CLIENT_DIR`, `wiring` and `wording` each held a `CLIENT`, and
+/// `color` and `wire-ts` each spelled the directory inside a longer
+/// path. Nothing compared the five, so moving the client would have
+/// left four gates walking a directory that no longer existed and
+/// reporting green about a tree they never opened.
+///
+/// It is a macro as well as a constant because the two longer paths are
+/// `const` items, and `concat!` takes literals: the macro is how a
+/// compile-time path is built from this one without a dependency and
+/// without a second spelling.
+macro_rules! client_src {
+    () => {
+        "client/src"
+    };
+}
+pub(crate) use client_src;
+
+/// The directory the macro above names, for the readers that want a value.
+pub(crate) const CLIENT_SRC: &str = client_src!();
+
 fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), XtaskError> {
     let entries = std::fs::read_dir(dir).map_err(|source| XtaskError::Io {
         path: dir.to_string_lossy().into_owned(),

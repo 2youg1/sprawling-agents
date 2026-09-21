@@ -73,8 +73,9 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 /// Where the client a reader reads lives. Nothing else in the tree
-/// draws, and English in a wire value or an error code is correct.
-const CLIENT: &str = "client/src";
+/// draws, and English in a wire value or an error code is correct. The
+/// directory is `walk`'s to state, not this gate's.
+use crate::walk::CLIENT_SRC as CLIENT;
 
 /// The waiver, spelled as `lexicon`'s is.
 const EXEMPT_MARK: &str = "wording-ok:";

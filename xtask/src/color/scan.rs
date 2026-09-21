@@ -30,8 +30,9 @@ const PRODUCTION_POINTS: [&str; 1] = [THEME];
 /// reads the pixels back, so it must spell the transparent fill that
 /// clears the canvas between readings, and the test states the one
 /// spelling `Paint::to_string` promises a person.
-const SPELLS_COLOUR: [&str; 6] = [
+const SPELLS_COLOUR: [&str; 7] = [
     "xtask/src/color.rs",
+    "xtask/src/color/roles.rs",
     "xtask/src/color/scan.rs",
     "xtask/src/color/tables.rs",
     "xtask/src/color/tests.rs",

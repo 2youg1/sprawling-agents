@@ -175,7 +175,7 @@ fn a_declared_word_nobody_paints_is_named() {
     let mut on = el("DIV", [0, 0, 100, 16], -1);
     on.fill = Some(Paint::of(0x1e, 0x21, 0x26));
     let measured = page(vec![on], ramp());
-    let report = written(&measured, AT, &judge(&measured));
+    let report = written(&measured, AT, &judge(&measured), &Sources::default(), Shape::Prose);
     assert!(report.contains("--color-g0"), "{report}");
     assert!(report.contains("--color-text"), "{report}");
 }
@@ -204,7 +204,7 @@ fn a_clean_page_prints_nothing() {
         Vec::new(),
     );
     let measured = page(vec![on], declared);
-    assert_eq!(written(&measured, AT, &judge(&measured)), "");
+    assert_eq!(written(&measured, AT, &judge(&measured), &Sources::default(), Shape::Prose), "");
 }
 
 /// Two runs over one page are a diff, so the order cannot depend on the
@@ -222,7 +222,7 @@ fn the_groups_come_out_in_repair_order() {
         },
     });
     let measured = page(vec![off], ramp());
-    let report = written(&measured, AT, &judge(&measured));
+    let report = written(&measured, AT, &judge(&measured), &Sources::default(), Shape::Prose);
     let seats: Vec<usize> = Group::IN_ORDER
         .into_iter()
         .filter_map(|group| report.find(&format!("## {}", group.called())))

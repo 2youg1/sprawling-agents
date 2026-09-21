@@ -20,7 +20,9 @@ use crate::report::{Violation, XtaskError};
 mod emit;
 
 /// Where the generated file lives, relative to the repository root.
-const TARGET: &str = "client/src/wire.ts";
+/// The directory is `walk`'s one spelling of it; only the file name is
+/// this generator's to choose.
+const TARGET: &str = concat!(crate::walk::client_src!(), "/wire.ts");
 
 /// What the generated file states before any type: the wire version
 /// both ends compare, the schema hash the server checks, and the run

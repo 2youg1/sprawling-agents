@@ -73,8 +73,92 @@ struct Against<'a> {
 pub(super) fn every_population_agrees<'a>(page: &'a Page, out: &mut Vec<Deviation<'a>>) {
     regions_in_the_main_column(page, out);
     rows_of_each_navigation_column(page, out);
-    for side in [Side::Left, Side::Right] {
-        boxes_that_share_a_holder(page, side, out);
+    boxes_that_share_a_holder(page, out);
+}
+
+/// The direction a container hands its children out in.
+///
+/// **A container may only be asked to agree on the axis it does not
+/// distribute along.** Children stacked down a column share a left and
+/// a right edge and are supposed to; children handed out across a row
+/// share a top and a bottom. Asking a row to agree on its right edges
+/// is a category error, and it is not a harmless one - two boxes in a
+/// row that happen to end within a pixel or two of each other were
+/// reported as a near miss, and every one of those was noise. Five of
+/// the last five findings this instrument carried on a clean tree were
+/// that.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Axis {
+    /// Children go down: compare the edges across.
+    Column,
+    /// Children go across: compare the edges down.
+    Row,
+}
+
+impl Axis {
+    /// Whether a container laid out this way is supposed to agree on
+    /// this edge.
+    ///
+    /// **A column is asked about its left and right edges, and a row
+    /// is asked about nothing.** The first half is the whole point of
+    /// this reading: children stacked down a column share their
+    /// inline edges and a child three pixels off them is a number
+    /// somebody typed.
+    ///
+    /// The second half is a limit, and it was measured rather than
+    /// assumed. A row does constrain its children in the other
+    /// direction - they all sit in one band - but *where* in that band
+    /// each one sits is `align-items`' decision, and under the centred
+    /// alignment this library uses everywhere, two children of
+    /// different heights have different top edges **by design**.
+    /// Sweeping the cross axis of rows turned five false positives
+    /// into fifteen: every one of them was a label beside a key, or a
+    /// select beside its own caption, centred exactly as asked and
+    /// reported as three pixels out.
+    ///
+    /// Reading the cross axis of a row correctly means comparing
+    /// whichever of top, centre and bottom the majority actually
+    /// holds, and that is a reading this instrument does not take yet.
+    /// Saying nothing is the honest state until it does: a reader who
+    /// learns to skip a section has lost the section.
+    fn agrees_on(self, side: Side) -> bool {
+        match (self, side) {
+            (Axis::Column, Side::Left | Side::Right) => true,
+            (Axis::Column, Side::Above | Side::Below) | (Axis::Row, _) => false,
+        }
+    }
+}
+
+/// Which way a container hands its children out, read off the boxes
+/// rather than off the stylesheet.
+///
+/// Read from geometry because the question is about what the page did,
+/// not about what it declared: a `flex-col` that wrapped and a grid
+/// that placed two children on one line are both rows on the screen,
+/// whatever their `display` says. Consecutive children in document
+/// order are either stacked - the next one begins at or below the
+/// bottom of the last - or handed out across. The majority decides,
+/// and a container with no majority is one this reading says nothing
+/// about.
+fn stacking(children: &[(i64, &Drawn)]) -> Option<Axis> {
+    let mut stacked: usize = 0;
+    let mut across: usize = 0;
+    for pair in children.windows(2) {
+        let [(_, before), (_, after)] = pair else {
+            continue;
+        };
+        if after.top >= before.bottom() {
+            stacked = stacked.saturating_add(1);
+        } else if after.left >= before.right() {
+            across = across.saturating_add(1);
+        }
+    }
+    if stacked > across {
+        Some(Axis::Column)
+    } else if across > stacked {
+        Some(Axis::Row)
+    } else {
+        None
     }
 }
 
@@ -152,33 +236,47 @@ fn rows_of_each_navigation_column<'a>(page: &'a Page, out: &mut Vec<Deviation<'a
 /// somebody typed rather than a decision somebody made. A box and its
 /// own ancestor are not in one population, which is why the samples are
 /// grouped by holder rather than swept off the whole page.
-fn boxes_that_share_a_holder<'a>(page: &'a Page, side: Side, out: &mut Vec<Deviation<'a>>) {
-    let mut families: BTreeMap<i64, Vec<(i64, &Drawn)>> = BTreeMap::new();
+fn boxes_that_share_a_holder<'a>(page: &'a Page, out: &mut Vec<Deviation<'a>>) {
+    let mut families: BTreeMap<i64, Vec<(i64, &'a Drawn)>> = BTreeMap::new();
     for held in page
         .drawn
         .iter()
         .filter(|held| held.shows() && held.parent >= 0)
     {
-        let reading = match side {
-            Side::Left => held.left,
-            Side::Right => held.right(),
-            Side::Above => held.top,
-            Side::Below => held.bottom(),
-        };
-        families
-            .entry(held.parent)
-            .or_default()
-            .push((reading, held));
+        // The reading is per side and is taken below; what a family
+        // holds is its children in document order, because `stacking`
+        // asks what consecutive pairs did.
+        families.entry(held.parent).or_default().push((0, held));
     }
-    for samples in families.values() {
-        agree(
-            samples,
-            Against {
-                among: Population::BoxesThatShareAHolder(side),
-                declared: &page.declared,
-            },
-            out,
-        );
+    for children in families.values() {
+        let Some(axis) = stacking(children) else {
+            continue;
+        };
+        for side in [Side::Left, Side::Right, Side::Above, Side::Below] {
+            if !axis.agrees_on(side) {
+                continue;
+            }
+            let samples: Vec<(i64, &'a Drawn)> = children
+                .iter()
+                .map(|(_, held)| {
+                    let reading = match side {
+                        Side::Left => held.left,
+                        Side::Right => held.right(),
+                        Side::Above => held.top,
+                        Side::Below => held.bottom(),
+                    };
+                    (reading, *held)
+                })
+                .collect();
+            agree(
+                &samples,
+                Against {
+                    among: Population::BoxesThatShareAHolder(side),
+                    declared: &page.declared,
+                },
+                out,
+            );
+        }
     }
 }
 
@@ -250,12 +348,22 @@ fn observed<'a>(
             }
         }
         let of: usize = cluster.values().map(Vec::len).sum();
-        let with = cluster.get(&anchor).map_or(0, Vec::len);
+        // Aligned, not identical. `reach` decides whether two boxes are
+        // in the same column at all; `SLACK` decides whether they line
+        // up inside it, and they are different questions. This counted
+        // only the boxes that matched the anchor exactly, so a column
+        // whose members differed by the one pixel a border costs was
+        // reported as a column with no agreement - and every reading in
+        // it was printed. Eleven of the fifteen findings this
+        // instrument carried on a clean tree were that, which is the
+        // whole cost: a report a reader learns to skip is a report that
+        // has stopped working.
+        let with = within(&cluster, anchor, SLACK);
         if of < QUORUM || with.saturating_mul(2) <= of {
             continue;
         }
         for (reading, members) in &cluster {
-            if *reading == anchor {
+            if reading.abs_diff(anchor) <= SLACK.unsigned_abs() {
                 continue;
             }
             tell(

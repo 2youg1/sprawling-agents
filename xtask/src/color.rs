@@ -34,6 +34,7 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 mod contrast;
+mod roles;
 mod scan;
 mod tables;
 
@@ -46,7 +47,7 @@ use tables::{
     parse_type_scale, text_surface_ceiling,
 };
 
-pub(crate) const THEME: &str = "client/src/theme.css";
+pub(crate) const THEME: &str = concat!(crate::walk::client_src!(), "/theme.css");
 pub(crate) const HUE_AXIS: u16 = 264;
 const HUE_ALERT: u16 = 84;
 pub(crate) const GRAY_CHROMA: u16 = 18;
@@ -146,6 +147,12 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     for mode in Mode::ALL {
         violations.extend(judge_tokens(&reading(&source, mode), mode));
     }
+    // The role layer is judged on the stylesheet as written rather than
+    // on either mode's reading of it: a role is a hop to a rung, and the
+    // hop is what makes one declaration serve both lightings, so a
+    // per-mode reading would ask the same question twice and answer it
+    // from a text that no longer holds the hops.
+    violations.extend(roles::judge_roles(root, &source)?);
     violations.extend(scan_for_literals(root)?);
     Ok(violations)
 }
