@@ -318,7 +318,7 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
 
 其余一切「当前 / 已选 / 激活」，一律用表面差抬一档表达。本轮收窄的四处：`parts/segmented.tsx` 的滑块默认色从 accent 改为 `raised-hover`（`Tone` 的缺省从 `accent` 改名为 `plain`）、`rail.tsx` 的在跑计数药丸改为 `raised-hover`、焦点环用 `color-mix` 削到六成、composer 的聚焦边框从「整条 accent」改为「虚线转实线」。
 
-判据是一句可核的话：**全屏对比度最高的元素应当是「停」**，因为那是人需要在慌乱中一次点中的东西。
+规则是一句可核的话：**全屏对比度最高的元素应当是「停」**，因为那是人需要在慌乱中一次点中的东西。
 
 ## 7C 需要人同意的东西，长什么样
 

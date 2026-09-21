@@ -171,7 +171,15 @@ impl Confined {
             .ok_or_else(|| no_arm(Missing::ScratchDirectory))?;
         let copy = fresh(root)?;
         let mut budget = Budget::new();
-        match copy_into(workdir, &copy, &copy, 0, &mut budget) {
+        match copy_into(
+            &Stage {
+                from: workdir,
+                into: &copy,
+                copy: &copy,
+            },
+            0,
+            &mut budget,
+        ) {
             Ok(()) => Ok(copy),
             Err(fault) => {
                 // The half copy goes before the refusal is returned: a
@@ -228,7 +236,7 @@ fn no_job_object() -> AxError {
 
 mod copy;
 
-use copy::{Budget, copy_into, fresh, remove};
+use copy::{Budget, Stage, copy_into, fresh, remove};
 
 /// The command as the platform's wrapper runs it: the whole machine
 /// readable, the copy bound over the working directory, and every

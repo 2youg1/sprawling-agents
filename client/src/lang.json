@@ -549,7 +549,7 @@
   },
   "facts_sandbox_open": {
     "en": "none: the machine itself",
-    "zh": "无：就是这台机器"
+    "zh": "无：宿主机本身"
   },
   "file_binary": {
     "en": "binary · {kib}",

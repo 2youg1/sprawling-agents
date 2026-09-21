@@ -1206,7 +1206,7 @@ pub enum ServerFrame { …, Lagged(Lagged) }
 
 ```rust
 pub enum BindFace {
-    Loopback { token: Option<B3Hash> },   // 只从本机可达；配了令牌就照样要
+    Loopback { token: Option<B3Hash> },   // 只从回环可达；配了令牌就照样要
     Exposed { token: B3Hash },            // 能从别处可达，且从不无凭证服务
 }
 pub fn decide_bind(addr: &SocketAddr, token: Option<B3Hash>) -> BindVerdict;

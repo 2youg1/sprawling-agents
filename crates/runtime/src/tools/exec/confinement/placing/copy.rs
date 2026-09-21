@@ -111,22 +111,25 @@ impl Budget {
     }
 }
 
-/// Copies `from` into the existing directory `into`.
+/// The three directories one copy walk is made of: where it reads,
+/// where it writes, and the copy's own root, which it skips.
+pub(super) struct Stage<'a> {
+    pub(super) from: &'a Path,
+    pub(super) into: &'a Path,
+    pub(super) copy: &'a Path,
+}
+
+/// Copies the directory `stage.from` into the existing `stage.into`.
 ///
-/// `copy` is this copy's own directory, and it is skipped: a working
-/// directory that contains the place copies go - this machine's scratch
-/// root is one - would otherwise be copied into itself, once per copy. A
-/// link is followed, so a working tree that points at a directory outside
-/// it carries that directory's content rather than a link into the
-/// person's tree; a link that points at its own parent is what
+/// `stage.copy` is this copy's own directory, and it is skipped: a
+/// working directory that contains the place copies go - this machine's
+/// scratch root is one - would otherwise be copied into itself, once per
+/// copy. A link is followed, so a working tree that points at a directory
+/// outside it carries that directory's content rather than a link into
+/// the person's tree; a link that points at its own parent is what
 /// [`MAX_DEPTH`] ends.
-pub(super) fn copy_into(
-    from: &Path,
-    into: &Path,
-    copy: &Path,
-    depth: u32,
-    budget: &mut Budget,
-) -> Result<(), AxError> {
+pub(super) fn copy_into(stage: &Stage<'_>, depth: u32, budget: &mut Budget) -> Result<(), AxError> {
+    let Stage { from, into, copy } = *stage;
     if depth > MAX_DEPTH {
         return Err(AxError::failure(
             AxCode::SandboxDenied,
@@ -152,7 +155,15 @@ pub(super) fn copy_into(
         if metadata.is_dir() {
             std::fs::create_dir(&target)
                 .map_err(|err| copy_fault(&target.display().to_string(), &err))?;
-            copy_into(&source, &target, copy, depth.saturating_add(1), budget)?;
+            copy_into(
+                &Stage {
+                    from: &source,
+                    into: &target,
+                    copy,
+                },
+                depth.saturating_add(1),
+                budget,
+            )?;
         } else if metadata.is_file() {
             budget.take(metadata.len())?;
             std::fs::copy(&source, &target)

@@ -171,8 +171,8 @@ impl Turn<Recording> {
 - **取消只在边界**：每相变函数首参即边界快照；命中 Cancel → 追加 cancel_received → 返回 Cancelled（回合终止，后续 handoff_written＋run_frozen 归执行器）。相内无任何中断入口＝A9 的结构化一半；另一半（事件序断言）在 citysim。**工具波内的每条 call 同样是一道边界**（B-70）：一波是 N 件副作用而不是一件，于是 `execute` 在每条 call 之前问 `still_going`，并经同一个 `cancel_here` 写下同一条 `cancel_received`——消费中断的地方仍然只有一处。
 - **四取消点**：组装前／provider 调用前／工具执行前／派生前，四点全住本模块。第四点由 `Turn<Recording>::record` 收边界快照，故 `record` 与前三相同形——收 `Interrupt`、答 `PhaseOutcome`。它买到的是别处买不到的一件事：**一个回合把活派下去之后、子 Run 起来之前，仍停得住**；`calls_made == 0` 的收尾回合尤其如此，那一刻在第四点之前根本没有下一个边界。
 - **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。S3 接真 dialect 时只加字段。
-- **前缀冻结是运行时不变量，不只是测试（E-2）。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名两条路——开一个新 session，或 fork 这个 run；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一判据（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
-- **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语同指新 session 或 fork；`context_tokens` 只喂本机提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判据与拒绝路径，拦在哪里归装配层。
+- **前缀冻结是运行时不变量，不只是测试（E-2）。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名两条路——开一个新 session，或 fork 这个 run；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
+- **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语同指新 session 或 fork；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
 - **工具波 S2 串行**：并行执行串行入账（确定性 5）属 S3 并发波；接口不预留并发参数，入账序＝calls 序。
 
 ### 8-4 runtime::prefix（形状 5＋2）
@@ -207,7 +207,7 @@ pub fn verified_system_hashes(system: &[SystemBlock], frozen: &[B3Hash; 4]) -> R
 ```
 
 - 段序即缓存经济：类型把四段位置写死，断点与各段上限属 S3 完备化（只加字段）。
-- **`segment_hashes()` 返回构造时缓存值，`verified_segment_hashes()` 才是判据。** 一个事实（这段字节的哈希）只有一个权威：`FrozenSegment::assembled` 在构造时算一次，每次派活前从将发的字节重算一次并与它比对。两者不一致意味着模型将读到的字节不是运行冻结的那一份，而那正是「同一事件序列逐字节重放」所依赖的东西，故拒绝而非警告。
+- **`segment_hashes()` 返回构造时缓存值，`verified_segment_hashes()` 才是权威。** 一个事实（这段字节的哈希）只有一个权威：`FrozenSegment::assembled` 在构造时算一次，每次派活前从将发的字节重算一次并与它比对。两者不一致意味着模型将读到的字节不是运行冻结的那一份，而那正是「同一事件序列逐字节重放」所依赖的东西，故拒绝而非警告。
 - 分段哈希经 `B3Hash::digest`（kernel 唯一哈希产地）；A4（同输入同字节）由 golden 断言，A15 重建器随 S3。
 - trybuild 反例：`FrozenSegment::from(TimeMs)`／把 TimeMs 传进 assemble —— 无转换路径，编译不过（ClockStamp 等类型落地后同规逐个加反例）。
 
@@ -577,7 +577,7 @@ pub fn plan(content: Content, size: ByteLen, budget: ByteLen) -> Shrink;
 pub fn shorten(text: &str, strategy: Strategy, budget: ByteLen) -> elision::Cut;   // 标记与丢弃计数由 elision 一处产出（§8-42）
 // 硬不变量：结果恒不大于输入，且在出口再验一次（真长了就退回原文）。切口落在字符边界。
 // Structured 与 Unknown 恒不截断：被截断的 JSON 比缺席的 JSON 更糟；未知内容不拿猜测去丢东西。
-// Markup 的判据是 `\documentclass`／`\begin{document}`，或首几行里两条 ATX 标题且无一行像代码
+// Markup 由以下特征判定： `\documentclass`／`\begin{document}`，或首几行里两条 ATX 标题且无一行像代码
 // （源码文件的 `# ` 注释与标题同形，否则会保注释而丢代码）。检测先于 Table：LaTeX 的表格会让一行带 `|`。
 // `Sections` 保整节至预算尽，再保被丢各节的标题行（骨架）；少于两条标题即只有一个标题，退回首端裁。
 // 机制面（把大结果移出窗口）仍归 offload——本模块只答「缩不缩、留哪一头」。

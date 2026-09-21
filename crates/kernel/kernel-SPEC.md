@@ -1438,7 +1438,7 @@ S2 激活的码（逐码答「能否定义掉」）：
 - `E_LOOP_SUSPECTED`：不可——停滞是观测事实；定义掉它等于假定模型不会循环。
 - `E_GOAL_CONFLICT`／`E_REPAIR_BUSY`：不可——同资源相斥与修复串行化是机制存在理由；Queued/Conflict 是合法结局，码只在回传面携信息。
 - `E_DELEGATION_DEPTH`：不消解（明裁：边界反馈优于沉默缺席）。
-- `E_APPROVAL_PENDING`／`E_APPROVAL_DENIED`：不可——一个设计问题停住提问的那个 run，而人可以答「不」；两者都是用户可达状态。`E_APPROVAL_PENDING` 有一个门的生产者：`gate::attach` 的 Ask（§8-27），它请求的是人的动作而不是收件箱里的一条裁决，所以不产生 `ApprovalItem`；`E_APPROVAL_DENIED` 仍只由人答题面对产生。
+- `E_APPROVAL_PENDING`／`E_APPROVAL_DENIED`：不可——一个设计问题停住提问的那个 run，而人可以答「不」；两者都是用户可达状态。`E_APPROVAL_PENDING` 有一个门的生产者：`gate::attach` 的 Ask（§8-27），它请求的是人的动作而不是 Approval Inbox 里的一条答案，所以不产生 `ApprovalItem`；`E_APPROVAL_DENIED` 仍只由人答题面对产生。
 - `E_EVIDENCE_MISSING`：部分定义掉——无证据 Done 已不可构造（类型半）；构造时拒绝仍需此码（运行时半，A6 双守）。
 - `E_SECRET_EGRESS`／`E_DISCARD_IRREVERSIBLE`：不可——两门存在的理由即这两类越界可发生；类型已把「无 Restoration 的 Discard 值」定义掉，Unplanned 请求（exec 预判路）是剩余不可消部分。
 - `E_CONFIG_INVALID`：不可——SecretRef 形状非法与明文入配置必须在反序列化即拒。
@@ -1881,7 +1881,7 @@ impl CityLayout {
     pub fn handoff(&self, room: &Address) -> PathBuf;           // <scope>/Handoff.md
     pub fn urbanite(&self, addr: &Address) -> PathBuf;          // <scope>/URBANITE.md
     pub fn session_slice(&self, room: &Address) -> PathBuf;     // <首段>/.sprawling/sessions/<其余>.jsonl
-    pub fn names_a_session_slice(relative: &Path) -> bool;     // 某层 sessions 下的路径（栅栏永不暂存）
+    pub fn is_session_projection(relative: &Path) -> bool;     // 某层 sessions 下的路径（栅栏永不暂存）
     pub fn city_address(&self) -> Option<Address>;             // 城自己的名字：根目录名，能拼成地址时
     pub fn of_ledger(dir: &Path) -> Option<CityLayout>;         // ledger() 的逆：从账本目录取回城根
 }
@@ -1894,7 +1894,7 @@ impl CityLayout {
 3. **`RESERVED_PREFIX` 仍住在 `kernel::address`，本模块引用它。** 它是地址文法的一部分——`is_reserved` 是写域与读路径共用的谓词（8-2、8-55）——而不是一条布局规定。布局这一侧只决定「什么落在保留子树里」：治理一个 scope 的文件（`CONFIG.toml`、`FILTERS.toml`、`skills`）落在该 scope 的 `.sprawling/` 下，于是没有任何写域够得到它们；居民自己写的文件（`JOB.md`、`Handoff.md`、`URBANITE.md`、`Archive/`）落在明处。这条摆放规则由单元测试逐个方法核对，而不是靠注释重申。
 4. **逐段 push 而不是整串 join。** 一个地址在 Windows 与在 Linux 必须落成同一个目录树；整串 join 把 `/` 交给平台去解释，逐段 push 不给它这个机会。此前 city 内部两种拼法并存，本模块只留前一种。
 5. **一个落点一个方法，不是便利方法。** 少一个落点，就有一处调用点继续自己拼，于是本模块不再是唯一权威（Roadmap §19.3 第 5 条）。后续新增一类文件时，先在此加方法与常量，再写调用点。
-6. **`session_slice` 是唯一一个按「首段是楼」读地址的方法。** Room 的地址就是 session 的身份，而 Building 是地址的第一段：`webapp/backend/db-migration` 落成 `webapp/.sprawling/sessions/backend/db-migration.jsonl`，地址的嵌套就是文件的嵌套；没有点名 session 的 run 就在楼自己的地址上工作，文件于是叫楼的名字。这条路只被 `memory::sessions` 这一个写者引用，`xtask` 的 `slices` 门钉住这句话。
+6. **`session_slice` 是唯一一个按「首段是楼」读地址的方法。** Room 的地址就是 session 的身份，而 Building 是地址的第一段：地址里楼以下的部分就落成楼自己 sessions 下的目录嵌套，一个 run 不点名 session 时就在楼自己的地址上工作，文件于是叫楼的名字。这条路只被 `memory::sessions` 这一个写者引用，`xtask` 的 `slices` 门钉住这句话。
 7. **`of_ledger` 是 `ledger` 的逆，为「只拿到账本目录」的写者而存在。** 账本的写者手里只有它打开的那一个目录，而切片落在城根之下，故城根必须能从这一个输入反推回来；逆运算住在具名常量所在的同一模块里，任何调用点都不许用 `parent().parent()` 重新拼一遍。不是 `ledger()` 形状的目录不是城（夹具、bundle 的校验台、直接打开的存储），回答 `None`。
 
 ### 8-72 `kernel::retries`：失败的调用再试几次（形状 2 值类型）

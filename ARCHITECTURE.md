@@ -349,12 +349,13 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 
 **The number in each subheading is the number of rows under it**, and `cargo xtask modmap` counts them, because every count a person maintained by hand here had already gone stale. The `desktop` heading is the one exception the machine cannot judge: its files sit outside `crates/`, where the parser does not look.
 
-### kernel (99) — every decision in the city, and nothing that touches a disk
+### kernel (100) — every decision in the city, and nothing that touches a disk
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
 | kernel::address | crates/kernel/src/address.rs | canonical relative paths, write-domain primitive, reserved prefix | value | S1 | built | kernel-SPEC.md#8-2 |
 | kernel::layout | crates/kernel/src/layout.rs | where a city keeps each kind of file: the directory and file names, and the eleven paths derived from a city root and an address | value | S1 | built | kernel-SPEC.md#8-56 |
+| kernel::layout::tests | crates/kernel/src/layout/tests.rs | that the reserved subtree is out of every write domain, that a fence can tell a session projection from a promise, and that the city's name is the directory it lives in | test | V0.0.6 | built | kernel-SPEC.md#8-56 |
 | kernel::locator | crates/kernel/src/locator.rs | the one grammar for referring to content: `cas:` and `file:`, fail-closed | value | S1 | built | kernel-SPEC.md#8-3 |
 | kernel::locator::tests | crates/kernel/src/locator/tests.rs | the grammar's round-trip and fail-closed cases | value | S1 | built | kernel-SPEC.md#8-3 |
 | kernel::ledger (port) | crates/kernel/src/ledger.rs | the only write entrance to history; owns `seq` and `prev` | port | S1 | built | kernel-SPEC.md#8-9 |
@@ -453,7 +454,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::highlight::tests | crates/kernel/src/highlight/tests.rs | the lexical rules a reader depends on: precedence, fences, and spans that slice without overlapping | decision | R2 | built | kernel-SPEC.md#8-31 |
 | kernel::schema | crates/kernel/src/schema.rs | the JSON Schema of the five values whose serde is hand-written, so the client generated from the wire reads their strings the way the parser does | adapter | V4 | built | kernel-SPEC.md#8-45 |
 
-### memory (49) — persistence, and every view derived from it
+### memory (50) — persistence, and every view derived from it
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -487,6 +488,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::checkpoint::fence | crates/memory/src/checkpoint/fence.rs | base, wave pre/post | adapter | S3 | built | memory-SPEC.md#8-17 |
 | memory::checkpoint::fence::tests | crates/memory/src/checkpoint/fence/tests.rs | the fence fixtures | adapter | V4 | built | memory-SPEC.md#8-17 |
 | memory::checkpoint::scan | crates/memory/src/checkpoint/scan.rs | staged secrets and scoped commits | adapter | S3 | built | memory-SPEC.md#8-17 |
+| memory::checkpoint::scan::tests | crates/memory/src/checkpoint/scan/tests.rs | the scope boundary, the staged-secret refusal that never echoes the bytes, and what an empty scope means | test | V0.0.6 | built | memory-SPEC.md#8-17 |
 | memory::checkpoint::provenance | crates/memory/src/checkpoint/provenance.rs | which session a commit came out of, as five git trailers | value | V4 | built | memory-SPEC.md#8-17 |
 | memory::changes | crates/memory/src/changes.rs | what moved between two checkpoints, as paths and counts and never as patch text | adapter | R2 | built | memory-SPEC.md#8-13 |
 | memory::status | crates/memory/src/status.rs | what has not been fenced yet: the branch, its drift from the upstream it tracks, and the files that differ from one commit | adapter | F1 | built | memory-SPEC.md#8-13 |
@@ -507,7 +509,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::fixture | crates/memory/src/bundle/fixture.rs | the one city the bundle tests export | adapter | V3 | built | memory-SPEC.md#8-21 |
 
-### gateway (72) — everything between a decision to call a model and the bytes on the wire
+### gateway (73) — everything between a decision to call a model and the bytes on the wire
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -574,6 +576,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::credential::vault::file | crates/gateway/src/credential/vault/file.rs | one encrypted file, opened by a passphrase: the backend for a machine that keeps nothing across a reboot | adapter | V0.0.6 | built | gateway-SPEC.md#8-21 |
 | gateway::credential::vault::file::tests | crates/gateway/src/credential/vault/file/tests.rs | the round trip, what a grep of the file sees, and the refusal a wrong passphrase gets | adapter | V0.0.6 | built | gateway-SPEC.md#8-21 |
 | gateway::credential::custodian | crates/gateway/src/credential/custodian.rs | capture, resolve, rotate | adapter | S3 | built | gateway-SPEC.md#8-4 |
+| gateway::credential::custodian::tests | crates/gateway/src/credential/custodian/tests.rs | that custody's two read ports agree and an in-memory store says what it is | test | V0.0.6 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::oauth | crates/gateway/src/credential/oauth.rs | PKCE, redeem, refresh | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::oauth::device | crates/gateway/src/credential/oauth/device.rs | the device-code flow: a code a person types on the vendor's page | adapter | V0.0.6 | built | gateway-SPEC.md#8-18 |
 | gateway::credential::oauth::device::poll | crates/gateway/src/credential/oauth/device/poll.rs | how often the token endpoint is asked, and when to stop asking | policy | V0.0.6 | built | gateway-SPEC.md#8-18 |
@@ -760,7 +763,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | eval::ablation::capabilities | crates/eval/src/ablation/capabilities.rs | the corpus: each thing a resident must be able to do, and the phrase in the document that grants it | data | V3 | built | eval-SPEC.md#8-7 |
 | eval::ablation::tests | crates/eval/src/ablation/tests.rs | the graded fixtures, and the on-demand run against the real City.md | decision | V3 | built | eval-SPEC.md#8-7 |
 
-### channels (42) — the process boundary
+### channels (45) — the process boundary
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -776,6 +779,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::command::wire | crates/channels/src/command/wire.rs | no-secret commands and back | value | V3 | built | channels-SPEC.md#8-1 |
 | channels::command::step | crates/channels/src/command/step.rs | the closed sets a command carries: a login step, a halt scope, a governed document, a pursuit step | value | F1 | built | channels-SPEC.md#8-1 |
 | channels::answer | crates/channels/src/answer.rs | what a Query comes back as: one shape per view, and the closed set of them | value | V3 | built | channels-SPEC.md#8-1 |
+| channels::answer::history | crates/channels/src/answer/history.rs | a slice of the one history and one slice of a named range of it, each carrying the endpoints its question did not return | value | V0.0.6 | built | channels-SPEC.md#8-1 |
 | channels::answer::config | crates/channels/src/answer/config.rs | one scope's settled configuration, each value beside the layer it came from | value type | V0.0.6 | built | channels-SPEC.md#8-1 |
 | channels::answer::model_facts | crates/channels/src/answer/model_facts.rs | what a provider stated about one model: window, ceiling, modalities, prices | value type | V0.0.6 | built | channels-SPEC.md#8-1 |
 | channels::answer::building | crates/channels/src/answer/building.rs | what one building says about itself: its plan rows, what is stuck, its goal, its documents and its archive | value | V4 | built | channels-SPEC.md#8-1 |
@@ -798,6 +802,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::reception | crates/channels/src/reception.rs | may we bind, may this peer enrol, may we greet it, and what its frame means now | decision | V3 | built | channels-SPEC.md#8-2 |
 | channels::reception::inbound | crates/channels/src/reception/inbound.rs | reading one text frame, and the counted refusal for one this build cannot read | decision | V5 | built | channels-SPEC.md#8-37 |
 | channels::reception::admission | crates/channels/src/reception/admission.rs | whether one HTTP request holds this city's pairing token, and what each door does when it does not | decision | V6 | built | channels-SPEC.md#8-40 |
+| channels::reception::tests | crates/channels/src/reception/tests.rs | who is let in, and what a session's first frames are allowed to be | test | V0.0.6 | built | channels-SPEC.md#8-2 |
+| channels::server::config::enrolment | crates/channels/src/server/config/enrolment.rs | the one door that carries a credential, and what became of it | adapter | V0.0.6 | built | channels-SPEC.md#8-2 |
 | channels::assets | crates/channels/src/assets.rs | the client the browser downloads, and which bytes answer which path | adapter | V3 | built | channels-SPEC.md#8-2 |
 | channels::server | crates/channels/src/server.rs | the listening end; the judgements are pure and the socket makes none | adapter | S4 | built | channels-SPEC.md#8-2 |
 | channels::server::config | crates/channels/src/server/config.rs | routes and bodies | adapter | S4 | built | channels-SPEC.md#8-2 |
@@ -807,7 +813,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (15), protocol (6), bin (195)
+### browser (15), protocol (6), bin (197)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -880,6 +886,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::workbench::standing | crates/sprawling/src/assembly/workbench/standing.rs | where one run stands, settled once the city has agreed to take the work | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::workbench::desks | crates/sprawling/src/assembly/workbench/desks.rs | the desks one dispatch lends out and takes back | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::workbench::tools | crates/sprawling/src/assembly/workbench/tools.rs | one registration feeding the catalogue and the bench, and the status tool | adapter | V3 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::workbench::tools::reading_room | crates/sprawling/src/assembly/workbench/tools/reading_room.rs | the skills one building's own file admits, and the names on that list which went nowhere | adapter | V0.0.6 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::workbench::servers | crates/sprawling/src/assembly/workbench/servers.rs | the external tools a building's configuration names | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::workbench::engine | crates/sprawling/src/assembly/workbench/engine.rs | the machine half of the exec tool, asked of doctor: the engine, the shell a layer asked for, the python component | adapter | V3 | built | sprawling-SPEC.md#8-50 |
 | bin::assembly::workbench::tests | crates/sprawling/src/assembly/workbench/tests.rs | rules that do not parse, neighbours, signals, and the engine arms | adapter | V3 | built | sprawling-SPEC.md#8-39 |
@@ -1006,6 +1013,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::views::hearing | crates/sprawling/src/views/hearing.rs | the facility that turns a recording into text, as this city's own choice describes it | adapter | V5 | built | sprawling-SPEC.md#8-57 |
 | bin::views::holding | crates/sprawling/src/views/holding.rs | what the views hold and how one record folds in | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::answering | crates/sprawling/src/views/answering.rs | every question a page may ask, answered from the fold | projection | V3 | built | sprawling-SPEC.md#8-37 |
+| bin::views::answering::history | crates/sprawling/src/views/answering/history.rs | the history readers: a bounded slice before a cursor, a named range with its endpoints echoed, and a run's transcript | projection | V0.0.6 | built | sprawling-SPEC.md#8-37 |
 | bin::views::commits | crates/sprawling/src/views/commits.rs | which run wrote a commit, and the commits a building made newest first, folded from the records that announced them | projection | V4 | built | sprawling-SPEC.md#8-53 |
 | bin::views::rounds | crates/sprawling/src/views/rounds.rs | one session's records folded into the rounds a page reads | projection | F1 | built | sprawling-SPEC.md#8-50 |
 | bin::views::rounds::tests | crates/sprawling/src/views/rounds/tests.rs | the fold the view layer used to run, asserted here instead | projection | F1 | built | sprawling-SPEC.md#8-50 |
