@@ -19,6 +19,7 @@ use kernel::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::command::HaltScope;
 use crate::preference::PreferencesAnswer;
 
 mod building;
@@ -165,11 +166,16 @@ pub struct CityAnswer {
     pub buildings: Vec<BuildingProgress>,
     /// The standing goals this city is working towards, if any.
     pub pursuits: Vec<PursuitLine>,
-    /// The scopes shut by `halt` and not yet released, by the name the
-    /// halt record carries: `city`, or a building's or a workshop's
-    /// address. A page that has just opened has no other way to learn
-    /// that the city is stopped.
-    pub halted: Vec<String>,
+    /// The scopes shut by `halt` and not yet released, in the shape a
+    /// `halt` frame names them. A page that has just opened has no
+    /// other way to learn that the city is stopped.
+    ///
+    /// The same type the command carries, not the ledger's string form:
+    /// a reader that had to take `building:<addr>` apart would be
+    /// writing a second copy of a grammar that already has one, and the
+    /// first client to get it wrong reported every shut building as
+    /// running.
+    pub halted: Vec<HaltScope>,
 }
 
 /// What is waiting for a person, as the Ledger recorded it.

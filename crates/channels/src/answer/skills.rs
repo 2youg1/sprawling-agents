@@ -80,7 +80,9 @@ pub struct SkillsAnswer {
     pub building: Address,
     /// Every shelf, city stock first, then this building's own, then the
     /// external shelves in the order the configuration lists them;
-    /// within a shelf, section then name order.
+    /// within a shelf, section then name order. [`SkillShelf`] says
+    /// which shelf a row came from; the scan that fills this list owns
+    /// the order, and nothing here re-sorts it.
     pub skills: Vec<SkillLine>,
     /// Names this building's reading room admits that no shelf holds.
     /// Shown to the person who wrote the list, since only they can fix

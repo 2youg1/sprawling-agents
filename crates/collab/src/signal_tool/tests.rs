@@ -148,3 +148,52 @@ fn the_lent_inbox_comes_back() {
         "what was handed back is no longer held twice"
     );
 }
+
+/// A signal the run cannot read is not the same fact as an empty queue.
+///
+/// A steer-kind signal whose payload carries no words goes into the urgent
+/// line and then fails `Steer::from_signal`. The desk used to answer
+/// "nothing waiting" with that signal already out of the queue and no
+/// effect written, so the history said the steer never arrived: the sender
+/// saw a queued signal and the receiver saw silence. One assertion per
+/// half of that - the refusal is reported, and the consumption is
+/// recorded.
+#[test]
+fn an_unreadable_steer_is_refused_and_still_recorded_as_consumed() {
+    let shared = desk("lab/room1", "lab");
+    let mut body = Map::new();
+    body.insert("text".to_owned(), Value::String(String::new()));
+    let signal = Signal::new(
+        SignalId::parse("s1").unwrap(),
+        SignalKind::Steer,
+        "mason@lab.2".to_owned(),
+        Address::parse("lab/room1").unwrap(),
+        Version::FIRST,
+        Payload::new(body).unwrap(),
+        TimeMs::new(10),
+    )
+    .unwrap();
+    shared.lock().unwrap().inbox.deliver(&signal).unwrap();
+
+    let mut borrowed = shared.lock().unwrap();
+    assert_eq!(borrowed.pending(), 1, "the steer is waiting to be taken");
+    let taken = borrowed.take_steer();
+    assert!(
+        taken.is_err(),
+        "a steer with no words is not one the run can read"
+    );
+    assert_eq!(borrowed.pending(), 0, "taking it left the queue");
+    let effects = borrowed.take_effects();
+    assert_eq!(
+        effects.len(),
+        1,
+        "the consumption is what the ledger records"
+    );
+    match &effects[0] {
+        SignalEffect::Consumed { signal, by } => {
+            assert_eq!(signal.id().as_str(), "s1");
+            assert_eq!(by, "potter@lab.1");
+        }
+        other => panic!("taking a signal consumes it, not {other:?}"),
+    }
+}

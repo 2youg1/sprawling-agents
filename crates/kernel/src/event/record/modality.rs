@@ -47,7 +47,9 @@ pub struct EmbeddingCalled {
 /// The order the service returned is the answer and is not repeated
 /// here; what this line adds is the size of what was asked and of what
 /// came back, so a rerank that quietly scored half the passages can be
-/// found afterwards.
+/// found afterwards. The line states no token count, because the rerank
+/// faces this city writes to report none, and a column nothing can fill
+/// is a promise to the ledger's reader that is never kept.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RerankCalled {
@@ -57,9 +59,6 @@ pub struct RerankCalled {
     pub passages: u64,
     /// How many ranks the answer carried.
     pub ranks: u64,
-    /// What the provider said it read. Absent when it said nothing.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prompt_tokens: Option<Tokens>,
 }
 
 #[cfg(test)]
@@ -105,12 +104,11 @@ mod tests {
     }
 
     #[test]
-    fn a_rerank_line_round_trips_and_reads_a_line_that_stated_no_tokens() {
+    fn a_rerank_line_carries_the_two_counts_and_no_token_column() {
         let call = RerankCalled {
             model: "bge-reranker".to_owned(),
             passages: 40,
             ranks: 40,
-            prompt_tokens: None,
         };
         let payload = Payload::of(&call).unwrap();
         assert_eq!(

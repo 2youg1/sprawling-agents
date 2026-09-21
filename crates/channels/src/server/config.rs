@@ -179,6 +179,12 @@ pub type TranscribeSink = Arc<dyn Fn(Vec<u8>, String) -> Result<String, AxError>
 
 /// The enrolment body: a realm, a name, and the value that will never be
 /// seen again outside the vault.
+///
+/// The realm arrives as text because the caller chooses it: which word a
+/// key is filed under is a building's or a form's decision, not a set
+/// this server fixes, so nothing here enumerates the legal realms. What
+/// the two segments must spell is `kernel::SecretRef`'s grammar, and the
+/// route judges them with it before the credential moves.
 #[derive(Debug, Deserialize)]
 pub struct EnrollBody {
     pub realm: String,

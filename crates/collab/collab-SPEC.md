@@ -278,7 +278,7 @@ impl SignalDesk {
     pub fn new(run: RunId, room: Address, who: String, reach: Address, inbox: Inbox) -> SignalDesk;
     pub fn pending(&self) -> u32;                     // 借出前读，status.signals_pending 的真值
     pub fn take_effects(&mut self) -> Vec<SignalEffect>;
-    pub fn take_steer(&mut self) -> Option<Steer>;    // 一件插队信，已属名为 `@发件人地址`
+    pub fn take_steer(&mut self) -> Result<Option<Steer>, AxError>;  // 一件插队信（已属名为 `@发件人地址`），或没有；读不懂的信是 Err
     pub fn take_inbox(&mut self) -> Inbox;            // 归还借出的 Inbox
 }
 pub struct SignalTool { /* meta、desk: Rc<RefCell<SignalDesk>> —— 私有 */ }
@@ -290,7 +290,7 @@ impl Tool for SignalTool { /* 两个 action：send｜pull */ }
 - **`send` 只入队不投递**：工具只把 Signal 放进 `effects`，真正 `deliver` 到收件房间发生在驱动返回之后、且恒在 `signal_enqueued` 落账之后。因为投影只允许因一条已追加的事件而改变（同 `RunWorker::record`：“the book states what the history says, never what the process hoped to write”）。
 - **发件范围由 `reach` 定界**：`reach` 是发件人所属楼的地址，由装配层经 `city::Building::of` 算好传入——**「一个地址归哪栋楼管」的权威在 city，collab 只执行交给它的边界**。越楼发件恒拒，报 `E_CROSS_BUILDING_DENIED` 且三段完整。`ToolMeta.effect` 是静态的（申报为 `Write { domain: room }`），所以逐件目标判定必须在工具内——工具拥有自己的策略。
 - **id 不采时钟不取随机**：`{run}-s{n}`，`n` 是 desk 自己的计数器。重放同一段历史得到同一批 id，去重才有意义（确定性第七条）。
-- **`take_steer` 取走一件就当场记 `Consumed`**：一件落进窗口的插队信就是已读，不论模型拿它做了什么——否则同一句话会在下一个安全点再落一次，而发件人从历史里看不出它到没到。它与 `pull` 共用同一张队列与同一条 `signal_consumed` 形状，故两扇门没有第二份已读账。
+- **`take_steer` 取走一件就当场记 `Consumed`，包括那件读不成插队信的**：一件离队的信就是已读，不论模型拿它做了什么——否则同一句话会在下一个安全点再落一次，而发件人从历史里看不出它到没到。它与 `pull` 共用同一张队列与同一条 `signal_consumed` 形状，故两扇门没有第二份已读账。**而空队列与读不懂的信不合成一件事**：前者是 `Ok(None)`，后者是 `Err`（`Steer::from_signal` 拒绝非 steer 型的、以及载荷里没有文字的）。读不懂的那件被 `.ok()?` 折成空队列时，一件已离队的信在历史里读作从未到达，而发件人看到的是「已入队」；故那件信无论读得读不懂都入册，两件事各占一个返回值。安全点怎么处理这个拒绝由那一侧决定（`assembly::driving::lane`，sprawling-SPEC §8-73），desk 不替它决定。
 - **`pull` 的剩余量写在结果里**：`status.signals_pending` 是派活那一刻的事实（StatusTool 持的是快照），所以 `pull` 结果里带 `remaining`——一个数字比一套让 status 活起来的机制便宜得多，而且它就在模型正在读的那句话里。
 - **投递失败不静默**：`deliver` 返回 `Admission::Shed` 时，入账的是事实而非成功；削峰判定住 `kernel::backpressure`，本模块不自建第二套限流。
 

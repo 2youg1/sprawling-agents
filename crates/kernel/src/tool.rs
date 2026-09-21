@@ -278,11 +278,9 @@ pub struct ToolOutcome {
 
 /// What one call is about, in the terms its own grammar names it.
 ///
-/// A gate asks about a subject - which area, which host, which scope -
-/// and the tool owning the call's grammar is the only place that can
-/// read it off the arguments. This moved that reading out of the bench
-/// (M-17), which judged the browser tool by a key it never wrote. A
-/// sixth kind is a change here, not a string that reaches a gate.
+/// The tool owning the call's grammar is the only place that can read
+/// it off the arguments (M-17). A sixth kind is a change here, not a
+/// string that reaches a gate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GateSubject {
     /// A city position a call names as its target.
@@ -294,6 +292,8 @@ pub enum GateSubject {
     /// The host a call's own bytes would leave for.
     Host(String),
     /// This call names no subject; the tool's grammar has none for it.
+    /// A door judges such a call against this machine rather than
+    /// skipping it, and refuses it when its effect needs a subject.
     None,
 }
 
@@ -315,8 +315,8 @@ pub trait Tool: Send {
     ///
     /// The default is [`GateSubject::None`] rather than an inference: a
     /// bench that guessed a subject from an argument name has already
-    /// been wrong once, and an effect that needs a subject refuses a
-    /// call carrying none rather than judging the wrong thing.
+    /// been wrong once. `None` says the tool read the call and it names
+    /// none; a door then judges it against this machine, never skips it.
     ///
     /// # Errors
     /// Refuses arguments this tool cannot read - the same refusal its

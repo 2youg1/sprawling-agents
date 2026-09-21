@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 29 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`5e829819d24d22dbe2c072840e75a8cdb09788a697bf9a381b95e02bcbe05114`；**WIRE_V ＝ 33**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41）。
+  **当前 golden**：`7543f8cd18f2142e400d6c318784102bc75178dc653bfded0df29a5f9da9141c`；**WIRE_V ＝ 34**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -144,7 +144,7 @@ pub struct Welcome { pub wire_v: u32, pub schema: B3Hash, pub resume_from: Optio
 
 1. **`Command`／`Query` 不标 `#[non_exhaustive]`**（G-22 之后全库如此，这一条先于它写下）。它们的版城所在的机器制是 schema 哈希（加一个 variant 即改哈希，旧客户端在握手处被拒），不是通配臂。不标它使装配层必须**穷尽处理 18 条命令**——新增一条而无人处理在编译期即红。这是想要的约束，不是疏漏。
 - **`Query::History` 有界且向后翻页**：服务端只广播「接下来发生什么」，于是今天打开的页面把一座运行了一个月的城看成空城。答复恒**旧在前**——那是账本写它们的顺序，也是折叠期待的顺序；要新在前的读者自己倒一下手上的表，而服务端倒序会把折叠变成调用方的问题。上限 `HISTORY_MAX = 500` 由服务端钳，客户端要不到更多：一个调用方钳不动的上限，少一条让服务端做无界工作的路。`Answer` 因此失去 `Eq`（`EventRecord` 的载荷是任意 JSON，JSON 没有全序相等），crate 外无人比较过两个 `Answer`。
-- **`/enroll` 答的是凭据的下场，不是请求的下场**：先前命令一进桌就回 201，于是 vault 拒收谁也不知道，人盯着一条成功消息而密钥根本没存。现在路由**先订阅事件流再投递命令**（顺序是承载的：先投递会让完成得快的 worker 把那一行写进没人在读的流里），然后等三选一——`secret_captured` 且 `ref` 相符即 **201**，`Reply` 回来的拒绝即 **422**，两者都没有即 **202 并在正文里说明为什么是 202**。`SecretSink` 因此长出 `Reply` 参数：worker 在另一条线程上几分钟后拒绝，没有地址的拒绝到不了任何人。
+- **`/enroll` 答的是凭据的下场，不是请求的下场**：先前命令一进桌就回 201，于是 vault 拒收谁也不知道，人盯着一条成功消息而密钥根本没存。现在路由**先订阅事件流再投递命令**（顺序是承载的：先投递会让完成得快的 worker 把那一行写进没人在读的流里），然后等三选一——`secret_captured` 且 `ref` 与所投的引用相符即 **201**，正文就是那条记录里的 `ref`（答出去的就是存进去的那句），`Reply` 回来的拒绝即 **422**，两者都没有即 **202 并在正文里说明为什么是 202**。`SecretSink` 因此长出 `Reply` 参数：worker 在另一条线程上几分钟后拒绝，没有地址的拒绝到不了任何人。
 - **回复通道关闭不等于成功**：worker 成功时不调用 `reply.refuse`，`Reply` 随之析构，于是 `recv()` 立即返回 `None`。若把它读成一个答案，它会与 `secret_captured` 赛跑并经常赢——所以关闭只熄灭那条分支，201 仍然只由事件给出。
 - **`ConfigureBuilding` 写的是楼自己那一级**：`[sandbox]` 与 `[mcp]` 沿城→楼→房间解析，先前无任何写面，于是一个人读得到自己被什么治理却改不动它。答复里回的是**楼自己那一级的值**而不是解析后的值——用解析值填表，第一次按保存就会把城一级的设置抄进楼里。两个字段各自可缺省，缺省即不动那一节；`mcp` 为空表是「这栋楼一个服务器都不够到」，与「没说」不是一回事。
 - **`ProbeEndpoint` 与 `AttachEndpoint` 是两条命令而不是一个开关**：先前模型清单只作为 attach 的副产物到达，于是「看看这把 key 买到了什么」必须先注册。两者的 `IdemKey` 由不同素材派生（`probe:` 前缀），因为问与登记是两件事，一件不得把另一件去重掉。`AttachEndpoint.admit` 空表即全部准入——没看过清单的人本就是这个意思；表里有而 endpoint 不供应的名字被略去而不是被承诺，与阅览室对不在书架上的 skill 的答复同形。
@@ -293,7 +293,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 
 - **只认回环对端，配对令牌也不算数**：令牌认的是人，而这条规则管的是**字节走到哪里**。拒绝的第三段指向宙主机，于是它是约束而非死路。
 - 壳里零策略：判定在 `decide_enroll`，壳只搬字节——同 `decide_bind`／`decide_frame` 的切法，故无需跑服务即可穷尽测。
-- 应答返回 `secret:<realm>/<name>`；值不回声、不入事件载荷。入金库由 `Sealed::into_vault_value`（住 kernel::secret，即 expose 白名单三文件之一）完成，开封因此**不发生在装配层**。
+- 应答返回那条 `secret_captured` 记录写下的 `ref`——金库键的那句文本，不是路由再拼一次的一句；值不回声、不入事件载荷。入金库由 `Sealed::into_vault_value`（住 kernel::secret，即 expose 白名单三文件之一）完成，开封因此**不发生在装配层**。
 
 **`Login` 携 `LoginStep { Begin, Code { code } }`，WIRE_V 1→2**。两步之间站着一个人：provider 在它自己的页面上把 code 显示给他，他再带回来。**用穷尽枚举而不是 `Option<String>`**——「开始登录」与「兑付这个 code」是两个动作、两种失败，一个页面表达其一时恒不该被读作另一个。`COMMAND_NAMES` 不变，故 schema 哈希单靠名字表不会动；这正是 `WIRE_V` 存在的那种情形（语法换形而名字没换），于是版本进位、旧页面在握手期被明确拒绝。**恒不开回环监听端口**：该 provider 的 redirect 就是它自己的页面，多一个监听口就是多一条没人走的入口。
 
@@ -738,7 +738,7 @@ pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
 **这里搬的是读法而不是接口。** 一个会话被读成回合、一次跑留下什么证据、一个计划节点花了多少钱——这三件事此前只有 `crates/web` 会算，于是「线就是全部 API」（ARCHITECTURE §8）在这三处是假的：另写一个客户端就得把折叠逻辑照抄一遍，而照抄出来的那一份迟早与这一份不一致。现在三者各是一次查询，答由 `bin::views` 折出（sprawling-SPEC §8-47）。
 
 - **`Rounds` 的值类型住 `channels`，折叠住 `bin::views`。** 值要上线，故必须可序列化；折叠要读账本，故必须在能读账本的那一层。两者切分开来，正是 ARCHITECTURE §9 的形状 2 与形状 7 的分界。
-- **`channels::reading` 是第三块**：把一条账本载荷读成上面这些值的那些纯函数（`said_in`／`used_in`／`output_in`／`subject_of`／`note_of`）。它住在线这一层而不是服务端，因为**两端都要读**：服务端答 `Rounds` 要它，客户端把推来的 `model_returned` 折进自己的快照也要它（ARCHITECTURE §5 第 12 步：同一个折叠，线的两边）。一份权威，两个调用者。
+- **`channels::reading` 是第三块**：把一条账本载荷读成上面这些值的那些纯函数（`said_in`／`used_in`／`output_in`／`note_of`）。它住在线这一层而不是服务端，因为**两端都要读**：服务端答 `Rounds` 要它，客户端把推来的 `model_returned` 折进自己的快照也要它（ARCHITECTURE §5 第 12 步：同一个折叠，线的两边）。一份权威，两个调用者。**`Call.subject` 不由这里算**：写方在写 `tool_called` 时把它定下（kernel-SPEC §8-4：`ToolCalled::subject_of`），折叠读记录里的 `subject` 键；两个读方各按自己的 map 序推一次，同一次调用已经出现过两个名字。
 - **`Changes` 早已在线上**（§8-20），`memory::changes` 一直是它唯一的权威；查过之后不动它——把一件已经做完的事再做一遍就是造第二个权威。
 - **`Evidence` 只认写下来的东西**：截图是 `tool_result` 载荷里的 `image` 定位符（`bin::browser_tool::stored` 写的那三项：定位符、两条边、media type），完成证据是 `roadmap_finished` 载荷里的 `evidence` 定位符。**答里恒不携字节**：一张图是一个 `cas:` 定位符，取它是资产端点的事，把 base64 塞进查询答会让「看一眼这次跑干了什么」付上整批像素的代价——与 §8-20 拒绝整批补丁同一条理由。
 - **`CostOf` 的分母不在这里**：答只报这个节点上归到的绝对金额与逐跑明细，不报占比。占比需要一个这一端没有的分母（整城总额是 `CostView` 的），而没有分母的百分比正是 `UnplannedProgress` 拒绝拼出来的那种东西。节点到跑的映射由 `roadmap_claimed` 折出（载荷里的 `node` 与记录的 `addr`），钱由 `memory::attribution` 的 `by_run` 给——**不新增任何计价处**。
@@ -1170,7 +1170,7 @@ decide_admission(Door::Acp,        offered, face)  // 未配对仍进，携 Pair
 
 同集两件小的：
 
-- **M-22**：`/enroll` 不再用 `format!` 手拼 `secret:<realm>/<name>`，先经 `kernel::SecretRef::parse` 读回再用它的 `Display` 作答。此前一个本城解析不回来的 realm 或 name 也能换到 201 与一句谁也兑不了的引用；现在那是 422。客户端同改：`enrol()` 用 201 正文里城说的那句引用，不再自己拼一份。
+- **M-22**：`/enroll` 与保存凭据的那条路共用一个构造点：realm 与 name 交给 `kernel::SecretRef::new` 建引用，路由不再手拼 `secret:<realm>/<name>`——手拼的文本本城可能解析不回来，而 201 会把它答出去，所以建不出来即 422。**201 正文引用的是 `secret_captured` 记录里那句 `ref`**：存进去的与答出去的原是同一个值，两处各拼一次今天相等只因没人归一，改一处就分岔。客户端同改：`enrol()` 用 201 正文里城说的那句引用，不再自己拼一份。
 - **B-76**：202 正文里断行残留的连续空格改为反斜杠续行。
 
 
@@ -1244,3 +1244,19 @@ impl BindFace { pub fn token_digest(&self) -> Option<&B3Hash>; }
 #### 五 WebTransport 的重开条件
 
 **不因「需要第二种协议」回来。** 重开条件是**两个都要实测成立**：①这座城真的跑在回环之外；②队头阻塞实测存在（即一条大帧让同一条连接上的小帧延迟到人能察觉）。理由：`ws://` 只到回环、暴露面经终止器是已记录的部署判断（根 `Cargo.toml`，`connect` 不带 TLS），而换成 QUIC 会同时改掉握手、帧界与资产通路，代价落在每一次改 wire 时；收益只在②成立时出现。`Carrier` 这个抽象不在树里：本 crate 只有一个实现，抽出它就是穿透层。
+
+### 8-42 `WIRE_V` 34：关停范围在答案里是一个类型，不是一个地址串
+
+**这一笔只改一处**：`CityAnswer.halted` 由 `Vec<String>` 改成 `Vec<HaltScope>`（`answer.rs`）。
+
+```rust
+pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String>
+```
+
+**根缺陷是同一件事的两种拼法，而读到两种拼法的那个读者刚好把它们比错了。** 一个 scope 在这座城里有两处书写方式，这是 `kernel::event::scope` 记下的分工：**账本**持 `city`／`building:<addr>`／`workshop:<addr>`，因为每一份已写下的历史都是这样；而**命令帧**持 §8-40 的 `HaltScope` 那样的带标签形状。答案面此前把它降成账本的那个串，于是客户端拿到的是 `building:lab` 与裸 `lab` 两个东西，`views/building.tsx:115` 拿后者去比前者——**被停的楼永远读成未停，release 永远不出现**，而两侧各自诚实，没有任何测试会红。
+
+**答案用命令面的类型，因为那是提问的词汇。** 一页宁可拿 `HaltScope` 去比 `HaltScope`，也不要为了知道看的是哪栋楼而把一个字符串拆开——拆开就是给文法安第二个家，而这正是这一笔在关的东西。转换只发生在服务端一处（`views::answering` 的 `named`），账本的书写方式一个字未动。
+
+**客户端那侧的两处消费也归一处**：`core/scope.ts` 是两种拼法唯一的接缝（`scopeOf`／`sameScope`／`buildingIsShut`／`cityIsShut`），`city_halted` 记录折进 `halted` 时经它转一次；其余每个比较点都比较类型。
+
+**顺带记下一条曾被误判的事**：`city_halted` 的载荷里 `scope` 是 `kernel::Scope`，经 `schemars(with = "String")` 在 schema 上呈现为字符串。答案面改用 `HaltScope` 与那条覆盖不冲突——两者是不同的帧，各写各的读者。

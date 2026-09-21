@@ -110,7 +110,12 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
                 let Command::PutSecret { realm, name, .. } = command else {
                     return Ok(());
                 };
-                let reference = format!("secret:{realm}/{name}");
+                // The stand-in stores under the place the real worker
+                // builds, so the reference the route answers with can be
+                // compared with what this vault was told it stored.
+                let place = kernel::SecretRef::new(&realm, &name)
+                    .expect("the body states a realm and a name in the grammar");
+                let reference = place.to_string();
                 match worker_of(&worker) {
                     Worker::Stores => {
                         let _ = answering.send(captured(&reference));
@@ -179,8 +184,9 @@ const BODY: &str = r#"{"realm":"house","name":"key","value":"sk-not-a-real-key"}
 #[tokio::test]
 async fn a_stored_credential_answers_with_the_reference_that_replaced_it() {
     let (status, said) = ask(Worker::Stores, BODY).await;
-    assert_eq!(status, 201, "{said}");
-    assert!(said.contains("secret:house/key"), "{said}");
+    // The whole body, not a field of it: the reference the route answers
+    // with is the one the vault recorded, and nothing else is appended.
+    assert_eq!((status, said.as_str()), (201, "secret:house/key"));
     assert!(
         !said.contains("sk-not-a-real-key"),
         "the value must never come back out"

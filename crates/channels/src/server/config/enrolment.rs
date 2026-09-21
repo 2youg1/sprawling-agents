@@ -13,7 +13,7 @@ use axum::body::Bytes;
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use kernel::{AxError, EventKind, Sealed, SecretRef};
+use kernel::{AxError, EventKind, EventRecord, Sealed, SecretRef};
 use tokio::sync::broadcast;
 
 use crate::command::Command;
@@ -41,23 +41,28 @@ pub(super) async fn accept_enrolment(
             .into_response();
     };
     let EnrollBody { realm, name, value } = enrolment;
-    // The grammar of a vault place is `kernel::SecretRef`'s and this
-    // route reads it back through the same parser every other reader
-    // uses. Spelling it here with `format!` accepted a realm or a name
-    // that no later reader could resolve, and answered 201 with the
-    // unresolvable text (roadmap M-22).
-    let place = match SecretRef::parse(&format!("secret:{realm}/{name}")) {
+    // One place decides whether a realm and a name name a vault place,
+    // and this route asks it rather than spelling `secret:<realm>/<name>`
+    // itself: text assembled here could name a place no later reader
+    // resolves, and the 201 answered with that text (roadmap M-22).
+    let place = match SecretRef::new(&realm, &name) {
         Ok(place) => place,
         Err(err) => {
             return (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response();
         }
     };
-    let reference = place.to_string();
+    // The command carries the segments this route asked the grammar
+    // about, so the key the worker stores cannot be built from text the
+    // constructor never saw.
     let command = Command::PutSecret {
-        realm,
-        name,
+        realm: place.realm().to_owned(),
+        name: place.name().to_owned(),
         value: Sealed::new(Box::new(value)),
     };
+    // What was asked for, named in the replies that arrive without a
+    // record: those say the credential was handed over, not that it was
+    // stored under this name.
+    let asked = place.to_string();
     // Subscribed before the command is posted: a worker that finished
     // while this task was still setting up would otherwise write the one
     // record this request is waiting for into a stream nobody is reading.
@@ -70,7 +75,6 @@ pub(super) async fn accept_enrolment(
     if let Err(err) = (state.secrets)(command, reply) {
         return (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response();
     }
-    let wanted = reference.clone();
     let waited = tokio::time::timeout(ENROLMENT_PATIENCE, async move {
         // The reply address is dropped when the worker finishes without
         // refusing, so a closed refusal channel says only that no
@@ -86,15 +90,8 @@ pub(super) async fn accept_enrolment(
                 },
                 record = records.recv() => match record {
                     Ok(record) => {
-                        if record.kind() == EventKind::SecretCaptured
-                            && record
-                                .data()
-                                .as_map()
-                                .get("ref")
-                                .and_then(serde_json::Value::as_str)
-                                == Some(wanted.as_str())
-                        {
-                            return Waited::Settled(Enrolled::Stored);
+                        if let Some(stored) = stored_reference(&record, &place) {
+                            return Waited::Settled(Enrolled::Stored { reference: stored });
                         }
                     }
                     // This request was overtaken: the record that says what
@@ -110,7 +107,9 @@ pub(super) async fn accept_enrolment(
     })
     .await;
     match waited {
-        Ok(Waited::Settled(Enrolled::Stored)) => (StatusCode::CREATED, reference).into_response(),
+        Ok(Waited::Settled(Enrolled::Stored { reference })) => {
+            (StatusCode::CREATED, reference).into_response()
+        }
         Ok(Waited::Settled(Enrolled::Refused(err))) => {
             (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response()
         }
@@ -120,7 +119,7 @@ pub(super) async fn accept_enrolment(
         Err(_) => (
             StatusCode::ACCEPTED,
             format!(
-                "{reference} was handed to the city and it has not answered within {}s; the \
+                "{asked} was handed to the city and it has not answered within {}s; the \
                  worker may be inside a dispatch. Check whether the reference resolves before \
                  sending the credential again",
                 ENROLMENT_PATIENCE.as_secs()
@@ -133,7 +132,7 @@ pub(super) async fn accept_enrolment(
         Ok(Waited::Overtaken) => (
             StatusCode::ACCEPTED,
             format!(
-                "{reference} was handed to the city, and this server's event stream moved past \
+                "{asked} was handed to the city, and this server's event stream moved past \
                  the request before the vault said what became of it. Check whether the \
                  reference resolves before sending the credential again"
             ),
@@ -144,13 +143,37 @@ pub(super) async fn accept_enrolment(
         Ok(Waited::Ended) => (
             StatusCode::ACCEPTED,
             format!(
-                "{reference} was handed to the city, and the city's event stream ended before \
+                "{asked} was handed to the city, and the city's event stream ended before \
                  the vault said what became of it. Check whether the reference resolves before \
                  sending the credential again"
             ),
         )
             .into_response(),
     }
+}
+
+/// The reference a `secret_captured` record states, when that record is
+/// the one this request is waiting for.
+///
+/// The reply quotes the record rather than the text the route assembled,
+/// so the reference a person is handed is the one the vault stored: two
+/// spellings of one place agree until either is changed, and a record is
+/// what the vault itself said.
+fn stored_reference(record: &EventRecord, place: &SecretRef) -> Option<String> {
+    if record.kind() != EventKind::SecretCaptured {
+        return None;
+    }
+    let said = record.data().as_map().get("ref")?.as_str()?;
+    let Ok(found) = SecretRef::parse(said) else {
+        // A `ref` outside the grammar names no vault place, so it answers
+        // this request exactly as little as another writer's reference
+        // does, and the wait goes on for the record that does.
+        return None;
+    };
+    if found != *place {
+        return None;
+    }
+    Some(said.to_owned())
 }
 
 /// What the city said about one enrolment, or why the wait for it ended.
@@ -170,6 +193,10 @@ enum Waited {
 
 /// What the city said about one enrolment.
 enum Enrolled {
-    Stored,
+    /// The vault stored the credential, and this is the reference its
+    /// `secret_captured` record states — the text the 201 answers with.
+    Stored {
+        reference: String,
+    },
     Refused(AxError),
 }

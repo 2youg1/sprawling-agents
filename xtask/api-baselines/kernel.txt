@@ -137,6 +137,7 @@ impl kernel::delegation::Delegator
 impl kernel::event::Scope
 impl kernel::event::Who
 impl kernel::event::record::RunFrozen
+impl kernel::event::record::ToolCalled
 impl kernel::gate::DoorId
 impl kernel::gate::DoorId
 impl kernel::goal::GoalId
@@ -692,6 +693,8 @@ pub fn kernel::SecretRef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt
 pub fn kernel::SecretRef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::SecretRef::name(&self) -> &str
 pub fn kernel::SecretRef::name(&self) -> &str
+pub fn kernel::SecretRef::new(&str, &str) -> core::result::Result<kernel::SecretRef, kernel::AxError>
+pub fn kernel::SecretRef::new(&str, &str) -> core::result::Result<kernel::SecretRef, kernel::AxError>
 pub fn kernel::SecretRef::parse(&str) -> core::result::Result<kernel::SecretRef, kernel::AxError>
 pub fn kernel::SecretRef::parse(&str) -> core::result::Result<kernel::SecretRef, kernel::AxError>
 pub fn kernel::SecretRef::realm(&self) -> &str
@@ -812,6 +815,7 @@ pub fn kernel::event::Who::parse(&str) -> core::result::Result<kernel::event::Wh
 pub fn kernel::event::Who::resident(kernel::address::Address) -> core::result::Result<kernel::event::Who, kernel::AxError>
 pub fn kernel::event::Who::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
 pub fn kernel::event::record::RunFrozen::of(&kernel::completion::Completion) -> kernel::event::record::RunFrozen
+pub fn kernel::event::record::ToolCalled::subject_of(&kernel::Payload) -> core::option::Option<alloc::string::String>
 pub fn kernel::event::record::autonomy_word::read(&str) -> core::result::Result<kernel::approval::Autonomy, kernel::AxError>
 pub fn kernel::event::record::autonomy_word::spell(&kernel::approval::Autonomy) -> alloc::string::String
 pub fn kernel::gate::DoorId::as_str(self) -> &'static str
@@ -1942,7 +1946,6 @@ pub kernel::event::record::PromptSource::kept: u64
 pub kernel::event::record::PromptSource::marker: bool
 pub kernel::event::record::RerankCalled::model: alloc::string::String
 pub kernel::event::record::RerankCalled::passages: u64
-pub kernel::event::record::RerankCalled::prompt_tokens: core::option::Option<kernel::budget::Tokens>
 pub kernel::event::record::RerankCalled::ranks: u64
 pub kernel::event::record::RunForked::at_seq: kernel::Seq
 pub kernel::event::record::RunForked::from: kernel::RunId
@@ -1969,6 +1972,7 @@ pub kernel::event::record::ToolAnswer::Failed::error: kernel::Payload
 pub kernel::event::record::ToolCalled::args: kernel::Payload
 pub kernel::event::record::ToolCalled::id: alloc::string::String
 pub kernel::event::record::ToolCalled::name: kernel::tool::ToolName
+pub kernel::event::record::ToolCalled::subject: core::option::Option<alloc::string::String>
 pub kernel::event::record::ToolResult::answer: kernel::event::record::ToolAnswer
 pub kernel::event::record::ToolResult::name: kernel::tool::ToolName
 pub kernel::event::record::ToolResult::tool_use_id: alloc::string::String

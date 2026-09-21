@@ -25,12 +25,6 @@ use crate::answer::{Note, Output, Used};
 /// The most lines of one tool's output a row carries.
 pub const OUTPUT_LINES: usize = 12;
 
-/// Argument names that say what a call acted on, in the order they are
-/// preferred. Taken from the tool definitions rather than guessed:
-/// `path` is what twelve of them take, and the rest name their one
-/// subject.
-const SUBJECT_KEYS: [&str; 4] = ["path", "addr", "program", "arm"];
-
 /// A payload field as a string, when it is one.
 #[must_use]
 pub fn text(value: Option<&serde_json::Value>) -> Option<String> {
@@ -144,20 +138,6 @@ fn bounded(whole: &str) -> Option<Output> {
         head: head.join("\n"),
         cut,
     })
-}
-
-/// The one argument a person recognises a call by.
-#[must_use]
-pub fn subject_of(args: Option<&serde_json::Value>) -> Option<String> {
-    let map = args?.as_object()?;
-    for key in SUBJECT_KEYS {
-        if let Some(named) = text(map.get(key)) {
-            return Some(named);
-        }
-    }
-    // A tool this build has no preferred key for still says something,
-    // rather than falling back to the bare tool name.
-    map.values().find_map(|value| text(Some(value)))
 }
 
 /// Whether this kind changed what the turn did or what it waits on, and

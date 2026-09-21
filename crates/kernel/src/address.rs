@@ -133,8 +133,9 @@ impl<'de> Deserialize<'de> for Address {
 
 /// The longest word a person may give a session. It becomes a directory
 /// name on their file system, and a name longer than this is a sentence
-/// that wanted to be a task.
-const SESSION_NAME_MAX: usize = 64;
+/// that wanted to be a task. `crate::schema` states the cap in the
+/// pattern it hands the client from this number.
+pub(crate) const SESSION_NAME_MAX: usize = 64;
 
 /// What a person calls one session: one address segment, and therefore
 /// one directory under a building.
@@ -144,7 +145,6 @@ const SESSION_NAME_MAX: usize = 64;
 /// a room cannot be spelled, on the wire or anywhere else.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SessionName(String);
 
 impl SessionName {
@@ -212,55 +212,52 @@ impl<'de> Deserialize<'de> for SessionName {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    reason = "test code"
-)]
-mod tests {
+#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+pub(crate) mod tests {
     use super::*;
-    use crate::error::AxCode;
+
+    /// The spellings the grammar must take. `crate::schema` applies the
+    /// pattern it hands the client to these same spells, so a case added
+    /// here is judged by both readers.
+    pub(crate) const ACCEPTED: [&str; 5] = [
+        "a",
+        "a/b",
+        "docs/notes.md",
+        "role@building.1/JOB.md",
+        ".sprawling/ledger",
+    ];
+
+    /// What it must refuse, one spelling per rule.
+    pub(crate) const REFUSED: [&str; 19] = [
+        "",                  // empty
+        "/abs",              // absolute
+        "a//b",              // empty segment
+        "a/",                // trailing separator
+        "/",                 // both
+        "..",                // parent escape
+        "a/../b",            // parent escape inside
+        ".",                 // dot segment
+        "a/./b",             // dot segment inside
+        "a\\b",              // backslash
+        "C:/x",              // drive letter (colon)
+        "a/b:stream",        // NTFS ADS (colon)
+        "a\u{0}b",           // NUL
+        "a\tb",              // control character
+        ".sprawling.",       // Win32 opens this as `.sprawling`
+        ".sprawling ",       // and this too
+        "lab/.sprawling./x", // the alias one level down
+        "a /b",              // trailing space on an inner segment
+        "docs./notes.md",
+    ];
 
     #[test]
-    fn parse_accepts_canonical_relative_paths() {
-        for ok in [
-            "a",
-            "a/b",
-            "docs/notes.md",
-            "role@building.1/JOB.md",
-            ".sprawling/ledger",
-        ] {
+    fn every_spelling_in_the_table_gets_its_verdict() {
+        for ok in ACCEPTED {
             let addr = Address::parse(ok).unwrap();
             assert_eq!(addr.as_str(), ok);
             assert_eq!(addr.to_string(), ok);
         }
-    }
-
-    #[test]
-    fn parse_rejects_every_banned_form() {
-        for bad in [
-            "",                  // empty
-            "/abs",              // absolute
-            "a//b",              // empty segment
-            "a/",                // trailing slash
-            "/",                 // both
-            "..",                // parent escape
-            "a/../b",            // parent escape inside
-            ".",                 // dot segment
-            "a/./b",             // dot segment inside
-            "a\\b",              // backslash
-            "C:/x",              // drive letter (colon)
-            "a/b:stream",        // NTFS ADS (colon)
-            "a\u{0}b",           // NUL
-            "a\tb",              // control character
-            ".sprawling.",       // Win32 opens this as `.sprawling`
-            ".sprawling ",       // and this too
-            "lab/.sprawling./x", // the alias one level down
-            "a /b",              // trailing space on an inner segment
-            "docs./notes.md",
-        ] {
+        for bad in REFUSED {
             let err = Address::parse(bad).unwrap_err();
             assert_eq!(err.code(), &AxCode::InvalidArgs, "should reject {bad:?}");
         }

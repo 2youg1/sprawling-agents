@@ -401,13 +401,29 @@ pub struct AdviserAnswered { pub subject: String, #[serde(flatten)] pub answer: 
 #[serde(rename_all = "snake_case")]
 pub enum AdviserFailure { Unavailable, Timeout, Unreadable }
 pub struct AdviserFellBack { pub subject: String, pub reason: AdviserFailure }
+
+pub struct ToolCalled { pub id: String, pub name: ToolName, pub args: Payload,
+                        pub subject: Option<String> }   // 键缺席读作 None
+pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
+                        #[serde(flatten)] pub answer: ToolAnswer }
+#[serde(untagged)]
+pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 ```
 
-已迁移的 kind 与其结构：`run_started`、`run_forked`、`checkpoint_committed`、
-`approval_resolved`、`autonomy_changed`、`city_halted`、`governed_document_written`、
-`embedding_called`／`rerank_called`、`adviser_asked`／`adviser_answered`／`adviser_fell_back`；
+已迁移的 kind 与其结构：`run_started`、`run_forked`、`tool_called`／`tool_result`、
+`checkpoint_committed`、`approval_resolved`、`autonomy_changed`、`city_halted`、
+`governed_document_written`、`embedding_called`／`rerank_called`、
+`adviser_asked`／`adviser_answered`／`adviser_fell_back`；
 `pr_merged` 借 `CommitAttribution` 记「谁做的这次提交」，其余键待该族迁移。
 未列入的 kind 仍由调用点手写读取。
+
+- **`ToolCalled.subject` 在写记录时算定，读方读它，不从 `args` 再推一遍。**
+  两个读方各按自己的 map 序挑第一个字符串时，同一次调用读出两个主语：
+  `{"10":"a","2":"b"}` 在账本的 `BTreeMap` 字节序下是 `"a"`，
+  在浏览器的自有属性序下是 `"b"`。这张优先键表（`path`／`addr`／`program`／`arm`，
+  都不在时取载荷键序里的第一个字符串）只有一处，即 `ToolCalled::subject_of`；
+  写方 `runtime::turn::wave` 调它一次，`channels` 不再持有第二份。
+  `None` 是这次调用的参数没有指名任何东西，是一个真实状态而不是失败。
 
 `ApprovalResolved.verdict` 是 `Ruling` 本身而不是 `format!("{verdict:?}")` 的小写词：
 旧写法让两个读方各自与字面量比较，认不出的词在一处读作拒、在另一处读作准（M-21）；
@@ -1078,8 +1094,12 @@ pub enum Effect { Read, Write { domain: Address }, Egress,
 // AttachUserBrowser：附着到人自己开着的浏览器。地址由登记固定而不是每次调用命名（同 Connector 的理由）；
 // `None` 是人启用了工具却没说地址，`gate::attach` 据此答 Ask 而不是猜。
 pub enum GateSubject { Area(Address), Room(Address), Scope(String), Host(String), None }
-// Tool::subject 的返回：这一次调用说的是什么，由工具自己的文法读出来（M-17）。
-// bench 不再手拼参数名；需要主体的效果（Egress、AttachUserBrowser、Write 的收窄）取不到就拒。
+// Tool::subject 的返回：一条调用说的是什么，由工具自己的文法读出来（M-17）。
+// `None` 是文法读完成参数后的答案「这条调用没有主体」，不是遗漏：Egress 与
+// AttachUserBrowser 收到它就按 `EgressTarget::Loopback` 判，密钥扫描照跑，
+// 因为跳过门会让一条凭据静悄悄进页面；Govern 收到它即拒，因为改规则的调用
+// 必须自己说出改哪个 scope，替它编一个等于把工具的错误说成事实。
+// 文法读不出的调用返回 `Err`，bench 原样拒收。
 pub enum Temporal { Timeless, Timestamped }
 pub enum CostTier { Free, Light, Heavy }        // 三档起步，对扩展开放；路由/预算消费在 S3
 pub enum RenderIntent { Generic, Terminal, Diff { locations: Vec<Address> } }
@@ -1121,6 +1141,8 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
 - **`action` 上报序列化失败而不吞掉它**：搬进来之前那句是 `serde_json::to_string(&call.args).unwrap_or_default()`，而 `unwrap_or_default` 在这里产空串，会让两次参数不同的调用得同一把键——正是本条要消灭的那种碰撞。`Payload` 拒浮点且键恒为字符串，故这条失败臂今天不可达；但「不可达所以取默认值」与「不可达所以据实上报」之间，只有后者在它变得可达那天仍然是对的。
 - **位次仍归调用方**：`seq` 说的是「这次调用坐在这一跑的第几位」，只有驱动那一跑的一方知道。把它一并收进 `ToolBench` 会让键在一次驱动内恒不重复，于是 dedup 永不触发，`dedup_runs_before_the_side_effect`（同一把键调两次、断言第二次不落地）连同它守的那条不变量一起变得写不出来。**收窄接口不值这个价**，故只搬动作字节；citysim 改用与 `bin::assembly` 同形的每跑计数器，是因为钟读数当位次逐字违反确定性第 7 条（「never from a clock」），而不是因为位次该归本模块。
 - **`ServerLabel` 住本模块而非 protocol**：它是一台 MCP server 在城里的名字，也是它每件工具名的第一段（`{label}_{tool}`），故它的文法就是 `ToolName` 的文法减下划线——写在两个 crate 里就是一条规则两个权威。**减下划线是判定而非口味**：允许它会让 `apps_foo_bar` 同时读作两种拆法，而这个名字要路由一次调用。迁入后 `city::config_layers` 在文件边界就能解析它（city 只见 kernel），于是「非法标签」在 Run 存在之前就不可表示。
+- **`GateSubject::None` 是一条判定而不是遗漏**：`None` 说的是「工具的 grammar 读完成参数，这条调用没有主体」。门收到它就按调用真正有的东西判：`Effect::Egress` 与 `Effect::AttachUserBrowser` 按 `EgressTarget::Loopback` 过密钥扫描（未指名去向的字节留在运行中的机器上，扫描照跑，因为跳过门曾让一条凭据静悄悄进页面），`Effect::Write` 的收窄没有更窄的区域可问（声明的 domain 已判过），`Effect::Govern` 则拒收（改规则的调用必须自己说出改哪个 scope，替它编一个等于把工具的错误说成事实）。**被否**：`None` 即跳过门——浏览器工具的非导航调用（`snapshot`、`act` 等）从此不过扫描；`None` 即拒——同一批调用全被拦下，而工具拿不出页面主机：`subject` 只读调用参数，浏览器工具不存当前页地址。文法读不出参数的调用返回 `Err`，bench 原样拒收，两种失败因此在类型上可分辨。
+- **`Area`／`Room`／`Scope` 今天没有生产者**：三种主体各有一个消费者（Write 的收窄用 Area／Room，Govern 用 Scope），能回答它们的工具是 `edit`／`exec`／`archive`／`claim`／`goal`／`pr`／`signal`（各自的写入目标）与 `rules`／`city`（各自治理的 scope）。这些工具的 `subject` 仍取 trait 默认，故收窄与 scope 今天都不生效；`Effect::Govern` 的 `None` 因此被拒收而不是回落到 run 地址。每个工具补上自己的解析即闭合这一段（M-17）。
 
 ### 8-24 kernel::model（缝清单文件）
 
@@ -1208,7 +1230,8 @@ pub enum ContentBlock { /* …既有五变体… */
 
 ```rust
 pub struct SecretRef { /* realm, name —— 私有 */ }
-impl SecretRef { pub fn parse(raw: &str) -> Result<Self, AxError>;   // secret:<realm>/<name>；形状非法＝E_CONFIG_INVALID
+impl SecretRef { pub fn new(realm: &str, name: &str) -> Result<Self, AxError>;  // 两段的唯一构造点
+                 pub fn parse(raw: &str) -> Result<Self, AxError>;   // secret:<realm>/<name>；形状非法＝E_CONFIG_INVALID
                  pub fn realm(&self) -> &str;  pub fn name(&self) -> &str; }
 // Display "secret:<realm>/<name>"；serde 字符串形；恒不入 Locator 文法（两解析器分立）
 
@@ -1229,6 +1252,7 @@ impl<T: zeroize::Zeroize> Sealed<T> {
 }
 ```
 
+- **`SecretRef` 只有一个构造点**。`secret:<realm>/<name>` 是一段文法，故拼接只在 `SecretRef::new` 里发生一次：`parse` 拆出两段后也交给它，两半因此共用同一个拒词；段允许的字符集（字母、数字、`-`、`_`、`.`）也只写在 `new` 里，名字里的 `/` 由它拒绝而不另立一条规则。`channels` 的录入口、`sprawling` 的签入面与到期表、以及客户端的表单曾各自拼出这段文本再交给 `parse` 读回——一段文法多处拼，改一次就分岔，且拼出来的文本本城可能解析不回来。
 - **扫描两侦测器**：①形状表（SECRET_SHAPES：前缀＋字符集＋长度窗）为主；②熵阈为辅——无前缀命中的 token 段（base62/base64url 字符连段，长度 ≥ `ENTROPY_SPAN_MIN_BYTES=20`，pub(crate) 内部事务）且每字符熵 ≥ `SECRET_ENTROPY_MIN`（3.5 bits/char）。两集合并，重叠段归形状命中（provider 信息更多）。
 - **熵的整数化**：kernel 禁浮点——香农熵以 millibit（1/1000 bit）计：定点 log2（shift-and-square，10 位小数位，循环界常数）；判式 `mb·den ≥ num·1000`（checked）。kani：任意输入终止、无 panic、无溢出。
 - **Sealed 取 secrecy::SecretBox**（secrecy 0.10.3＋zeroize 1.9.0，钉版 B.7）：drop 即零化；无 Debug/Display/Serialize/Clone；trybuild 反例＝Sealed 值入 EventRecord/format! 编译不过。`PutSecret` 的命令面（S4）直用本类型。

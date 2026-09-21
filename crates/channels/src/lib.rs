@@ -70,7 +70,7 @@ pub use kernel::{FileChange, How, Lines};
 pub use kernel::{Span, Token};
 pub use preference::{Appearance, Chord, Chroma, Density, Face, Lang, Lighting, Motion};
 pub use preference::{BODY_PX_MAX, BODY_PX_MIN, PreferencePatch, PreferencesAnswer};
-pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in, subject_of};
+pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in};
 pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
 pub use reception::{Admission, BindFace, BindVerdict, Door, HandshakeVerdict, Pairing};

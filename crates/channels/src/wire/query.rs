@@ -261,12 +261,12 @@ pub enum Query {
     },
     /// What one building can do, and where each of those came from.
     ///
-    /// Two shelves in one answer because a reader needs both to make
-    /// sense of either: the city's library is what any building may
-    /// admit, and the building's own shelf is what only it keeps. Which
-    /// runs pinned a skill is folded from `run_started`, so a shelf
-    /// nothing has ever used says so instead of looking unused because
-    /// nobody wrote it down.
+    /// Every shelf in one answer because a reader needs them together
+    /// to make sense of any: a row carries [`crate::SkillShelf`], which
+    /// names the shelves and where each row sits on one. Which runs
+    /// pinned a skill is folded from `run_started`, so a shelf nothing
+    /// has ever used says so instead of looking unused because nobody
+    /// wrote it down.
     Skills {
         building: Address,
     },

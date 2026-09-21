@@ -22,6 +22,10 @@ workspace = true
 proptest.workspace = true
 insta.workspace = true
 trybuild.workspace = true
+# The address and session-name grammars cross to the client as a
+# pattern, and `crate::schema`'s tests are the only place one is applied
+# to an input. Dev-only: no product code reads a regular expression.
+regex = "1"
 
 [features]
 conformance = []

@@ -13,8 +13,7 @@ use crate::error::{AxCode, AxError};
 /// generation here — the assembly layer (or a seeded simulator) mints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct RunId(uuid::Uuid);
+pub struct RunId(#[serde(deserialize_with = "read_run_id")] uuid::Uuid);
 
 impl RunId {
     /// City-level records (genesis, tail truncation) carry the nil id;
@@ -26,15 +25,40 @@ impl RunId {
     }
 
     pub fn parse(raw: &str) -> Result<Self, AxError> {
-        uuid::Uuid::parse_str(raw).map(RunId).map_err(|_| {
-            AxError::failure(AxCode::InvalidArgs, "parse run id", raw)
-                .with_recovery("use a hyphenated uuid")
-        })
+        let reject = || {
+            let err = AxError::failure(AxCode::InvalidArgs, "parse run id", raw).with_recovery(
+                "use the hyphenated lower-case uuid this city writes, as \
+                 `0198f6a2-7c4a-7bbb-9d1e-000000000001`",
+            );
+            Err(err)
+        };
+        let parsed = match uuid::Uuid::parse_str(raw) {
+            Ok(parsed) => parsed,
+            Err(_) => return reject(),
+        };
+        // Canonical echo, as `kernel::locator` does: the value's own
+        // spelling is the only input accepted, which closes bare hex,
+        // braces, the `urn:uuid:` prefix and upper case in one rule.
+        if parsed.hyphenated().to_string() != raw {
+            return reject();
+        }
+        Ok(RunId(parsed))
     }
 
     pub fn as_bytes(&self) -> &[u8; 16] {
         self.0.as_bytes()
     }
+}
+
+/// Reads a run id through [`RunId::parse`], so an identity that arrives
+/// in a frame or a ledger line cannot be read in a spelling the
+/// constructor refuses. The derived `Deserialize` would otherwise ask
+/// `uuid::Uuid` directly, which takes four spellings to this type's one.
+fn read_run_id<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<uuid::Uuid, D::Error> {
+    let raw = String::deserialize(deserializer)?;
+    RunId::parse(&raw)
+        .map(|run| run.0)
+        .map_err(serde::de::Error::custom)
 }
 
 impl std::fmt::Display for RunId {
@@ -105,13 +129,38 @@ mod tests {
     }
 
     #[test]
-    fn run_id_parses_and_city_is_nil() {
+    fn a_run_id_is_read_in_the_one_spelling_the_city_writes() {
         assert_eq!(
             RunId::CITY.to_string(),
             "00000000-0000-0000-0000-000000000000"
         );
         let run = RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000001").unwrap();
         assert_eq!(run.to_string(), "0198f6a2-7c4a-7bbb-9d1e-000000000001");
-        assert!(RunId::parse("not-a-uuid").is_err());
+        for refused in [
+            "not-a-uuid",
+            "0198f6a27c4a7bbb9d1e000000000001",       // bare hex
+            "{0198f6a2-7c4a-7bbb-9d1e-000000000001}", // braced
+            "urn:uuid:0198f6a2-7c4a-7bbb-9d1e-000000000001", // urn
+            "0198F6A2-7C4A-7BBB-9D1E-000000000001",   // upper case
+        ] {
+            assert!(RunId::parse(refused).is_err(), "{refused}");
+        }
+    }
+
+    /// What arrives in a frame or a ledger line is read by the same
+    /// constructor the city writes with, so a spelling the city would
+    /// never write cannot arrive and be believed.
+    #[test]
+    fn serde_reads_a_run_id_through_its_sole_constructor() {
+        let written = "\"0198f6a2-7c4a-7bbb-9d1e-000000000001\"";
+        let run: RunId = serde_json::from_str(written).unwrap();
+        assert_eq!(serde_json::to_string(&run).unwrap(), written);
+        for refused in [
+            "\"0198f6a27c4a7bbb9d1e000000000001\"",
+            "\"{0198f6a2-7c4a-7bbb-9d1e-000000000001}\"",
+            "\"urn:uuid:0198f6a2-7c4a-7bbb-9d1e-000000000001\"",
+        ] {
+            assert!(serde_json::from_str::<RunId>(refused).is_err(), "{refused}");
+        }
     }
 }

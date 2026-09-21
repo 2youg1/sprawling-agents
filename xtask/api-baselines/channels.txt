@@ -134,7 +134,7 @@ pub channels::Chroma::Off
 pub channels::CityAnswer::active: u64
 pub channels::CityAnswer::buildings: alloc::vec::Vec<channels::BuildingProgress>
 pub channels::CityAnswer::frozen: u64
-pub channels::CityAnswer::halted: alloc::vec::Vec<alloc::string::String>
+pub channels::CityAnswer::halted: alloc::vec::Vec<channels::HaltScope>
 pub channels::CityAnswer::pursuits: alloc::vec::Vec<channels::PursuitLine>
 pub channels::CityAnswer::runs: alloc::vec::Vec<channels::RunSummary>
 pub channels::ClientAssets::Disk(std::path::PathBuf)
@@ -913,7 +913,6 @@ pub fn channels::output_in(&serde_json::value::Value) -> core::option::Option<ch
 pub fn channels::router(&channels::ServeConfig, channels::BindFace) -> axum::routing::Router
 pub fn channels::said_in(&serde_json::value::Value) -> core::option::Option<alloc::string::String>
 pub fn channels::schema_hash() -> kernel::locator::B3Hash
-pub fn channels::subject_of(core::option::Option<&serde_json::value::Value>) -> core::option::Option<alloc::string::String>
 pub fn channels::text(core::option::Option<&serde_json::value::Value>) -> core::option::Option<alloc::string::String>
 pub fn channels::thought_in(&serde_json::value::Value) -> core::option::Option<alloc::string::String>
 pub fn channels::used_in(&serde_json::value::Value) -> core::option::Option<channels::Used>

@@ -97,7 +97,7 @@ impl SignalDesk {
     }
 
     /// Takes one steer waiting for this run, ready to land at its next
-    /// safe point.
+    /// safe point, or `None` when nothing is waiting for it.
     ///
     /// The landing is the same one the person's steer uses, and the
     /// attribution is what keeps them apart: [`crate::Steer::from_signal`]
@@ -107,16 +107,29 @@ impl SignalDesk {
     /// the address it answers to — which is what makes a reply
     /// possible at all.
     ///
-    /// Consuming it here is what the ledger records: a steer that landed
-    /// in a window has been read, whether or not the model acts on it.
-    pub fn take_steer(&mut self) -> Option<crate::Steer> {
-        let signal = self.inbox.take_steer()?;
-        let landed = crate::Steer::from_signal(&signal).ok()?;
+    /// Consuming it here is what the ledger records: a signal taken out of
+    /// the queue has been consumed. The effect is pushed for every signal
+    /// taken, whether or not the run can read it, because a signal the run
+    /// cannot read has still left the queue — and a consumption nobody
+    /// wrote down reads as a signal still waiting, which is how a steer
+    /// sent deliberately disappears from the history.
+    ///
+    /// # Errors
+    /// Propagates [`crate::Steer::from_signal`]'s refusal when a consumed
+    /// signal is not a steer this run can read. `Ok(None)` and `Err` are
+    /// two facts — an empty queue and a message that arrived unreadable —
+    /// and folding the second into the first is what this refuses to do.
+    /// How a safe point treats the refusal is the caller's decision.
+    pub fn take_steer(&mut self) -> Result<Option<crate::Steer>, AxError> {
+        let Some(signal) = self.inbox.take_steer() else {
+            return Ok(None);
+        };
+        let landed = crate::Steer::from_signal(&signal);
         self.effects.push(SignalEffect::Consumed {
             signal,
             by: self.who.clone(),
         });
-        Some(landed)
+        landed.map(Some)
     }
 
     /// What the worker has to record. Draining is deliberate: an effect

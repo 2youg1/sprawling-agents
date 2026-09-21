@@ -121,7 +121,7 @@ use serde::{Deserialize, Serialize};
 ///    The increment and the log line keep their silence on purpose:
 ///    neither is written to the Ledger, so a range naming them would
 ///    name records that do not exist.
-pub const WIRE_V: u32 = 33;
+pub const WIRE_V: u32 = 34;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
