@@ -269,6 +269,8 @@ pub fn run_scenario_on(
                         reminder: None,
                         offload: None,
                         sieve: None,
+                        // A scenario has no adviser endpoint: nobody asked.
+                        adviser: None,
                     },
                 )?;
                 let mut wrapped = Map::new();

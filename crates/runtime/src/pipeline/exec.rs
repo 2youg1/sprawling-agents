@@ -84,6 +84,7 @@ pub fn package_exec(
                 table: site.table,
                 history: site.history,
             }),
+            adviser: None,
         },
     )?;
     result.remove("stdout");

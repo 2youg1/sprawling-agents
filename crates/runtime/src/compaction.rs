@@ -31,7 +31,7 @@ use kernel::ByteLen;
 
 use crate::elision::{self, Cut, Elided};
 
-/// What a piece of text is, as far as shortening is concerned. Seven,
+/// What a piece of text is, as far as shortening is concerned. Eight,
 /// and `Unknown` is one of them: a compactor that had to guess would
 /// guess wrong on exactly the material nobody anticipated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,6 +49,10 @@ pub enum Content {
     Structured,
     /// Rows and columns. The header row is load-bearing.
     Table,
+    /// A document with a section structure: LaTeX, or Markdown with
+    /// headings. Its bones are the headings, so it is cut at section
+    /// boundaries and the headings survive the cut.
+    Markup,
     /// Anything else, including binary-looking material.
     Unknown,
 }
@@ -63,6 +67,10 @@ pub enum Strategy {
     Ends,
     /// Keep the back. A log's news is at the end.
     Tail,
+    /// Keep whole sections from the front, then the headings of the
+    /// sections that did not fit. The reader loses bodies and keeps the
+    /// map of what was written.
+    Sections,
 }
 
 /// What has to happen to one piece of text: decided here, carried out
@@ -105,6 +113,12 @@ pub fn detect(text: &str) -> Content {
         return Content::Structured;
     }
     let head: Vec<&str> = trimmed.lines().take(8).collect();
+    // Markup comes before Table: a LaTeX document's proof tables put two
+    // `|` lines in the first screenful, and a table it is not. It comes
+    // before Code too, so a `.tex` preamble is not read as source.
+    if looks_like_markup(&head) {
+        return Content::Markup;
+    }
     if head.len() >= 2 && head.iter().filter(|line| line.contains('|')).count() >= 2 {
         return Content::Table;
     }
@@ -116,22 +130,52 @@ pub fn detect(text: &str) -> Content {
     {
         return Content::Log;
     }
-    if head.iter().any(|line| {
-        let line = line.trim_start();
-        line.starts_with("fn ")
-            || line.starts_with("def ")
-            || line.starts_with("class ")
-            || line.starts_with("import ")
-            || line.starts_with("use ")
-            || line.ends_with('{')
-            || line.ends_with(';')
-    }) {
+    if head.iter().any(|line| looks_like_code(line)) {
         return Content::Code;
     }
     if head.iter().any(|line| line.split_whitespace().count() >= 5) {
         return Content::Prose;
     }
     Content::Unknown
+}
+
+/// Whether the first lines read as a document rather than as a program.
+///
+/// LaTeX announces itself with the two commands that open a document.
+/// Markdown is recognised by heading density, and only in a text whose
+/// first lines hold nothing that reads as code: a source file's `# `
+/// comments share the heading shape, and reading them as a skeleton
+/// would cut code while keeping its comments.
+fn looks_like_markup(head: &[&str]) -> bool {
+    if head.iter().any(|line| {
+        let line = line.trim_start();
+        line.starts_with("\\documentclass") || line.starts_with("\\begin{document}")
+    }) {
+        return true;
+    }
+    !head.iter().any(|line| looks_like_code(line))
+        && head.iter().filter(|line| is_atx_heading(line)).count() >= 2
+}
+
+/// One line that reads as source: a declaration keyword, or the pair of
+/// braces and semicolons statements end in.
+fn looks_like_code(line: &str) -> bool {
+    let line = line.trim_start();
+    line.starts_with("fn ")
+        || line.starts_with("def ")
+        || line.starts_with("class ")
+        || line.starts_with("import ")
+        || line.starts_with("use ")
+        || line.ends_with('{')
+        || line.ends_with(';')
+}
+
+/// A Markdown heading: one to six `#`, then a space. A Python comment
+/// with no space after its `#`, and a `#!` line, are neither.
+fn is_atx_heading(line: &str) -> bool {
+    let line = line.trim_start();
+    let hashes = line.chars().take_while(|c| *c == '#').count();
+    (1..=6).contains(&hashes) && line.chars().nth(hashes) == Some(' ')
 }
 
 /// A log line is one that starts with something that is not prose: a
@@ -163,6 +207,7 @@ pub fn plan(content: Content, size: ByteLen, budget: ByteLen) -> Shrink {
         Content::Log => Shrink::Cut(Strategy::Tail),
         Content::Code | Content::Diff => Shrink::Cut(Strategy::Ends),
         Content::Prose | Content::Table => Shrink::Cut(Strategy::Head),
+        Content::Markup => Shrink::Cut(Strategy::Sections),
         // Nothing is known about it, so nothing is thrown away on a
         // guess: it leaves the window whole and keeps its reference.
         Content::Unknown => Shrink::MustOffload,
@@ -186,6 +231,7 @@ pub fn shorten(text: &str, strategy: Strategy, budget: ByteLen) -> Cut {
         Strategy::Head => keep_head(text, limit),
         Strategy::Tail => keep_tail(text, limit),
         Strategy::Ends => keep_ends(text, limit),
+        Strategy::Sections => keep_sections(text, limit),
     };
     // The invariant, checked here rather than trusted: if a strategy
     // ever produced something longer, the input is returned instead. A
@@ -220,149 +266,115 @@ fn keep_ends(text: &str, limit: usize) -> Cut {
     elision::splice(text, front, back, Elided::Middle)
 }
 
-#[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    clippy::arithmetic_side_effects,
-    reason = "test code"
-)]
-mod tests {
-    use super::*;
+/// One heading line and the bytes it occupies, its line terminator
+/// included: the skeleton is assembled from source spans only, so the
+/// reported loss stays the distance between what was read and what was
+/// kept.
+struct Heading {
+    start: usize,
+    end: usize,
+}
 
-    /// Both halves of one caller's work: decide, then carry it out. The
-    /// invariants below hold of the pair, which is how a caller uses
-    /// them, and a text this module declines to shorten comes back
-    /// whole.
-    fn compacted(text: &str, budget: ByteLen) -> Cut {
-        let size = ByteLen::new(u64::try_from(text.len()).unwrap_or(u64::MAX));
-        match plan(detect(text), size, budget) {
-            Shrink::Keep | Shrink::MustOffload => Cut::whole(text),
-            Shrink::Cut(strategy) => shorten(text, strategy, budget),
+/// Whole sections from the front while they fit, then the headings of
+/// the sections that did not. A reader of a document loses bodies and
+/// keeps the map of what was written, which is what a section cut is
+/// for. Fewer than two headings is a title rather than a structure, and
+/// falls back to keeping the head.
+fn keep_sections(text: &str, limit: usize) -> Cut {
+    let headings = headings_of(text);
+    if headings.len() < 2 {
+        return keep_head(text, limit);
+    }
+    let room = elision::gap_marker_room(text.len());
+    let Some(available) = limit.checked_sub(room) else {
+        return keep_head(text, limit);
+    };
+    // Anything before the first heading (a LaTeX preamble, a Markdown
+    // title block) travels with the first section.
+    let mut head_end = headings.first().map_or(0, |heading| heading.start);
+    if head_end > available {
+        return keep_head(text, limit);
+    }
+    let mut index = 0usize;
+    while let Some(heading) = headings.get(index) {
+        let section_end = headings
+            .get(index.saturating_add(1))
+            .map_or(text.len(), |next| next.start)
+            .max(heading.start);
+        if section_end > available {
+            break;
         }
+        head_end = section_end;
+        index = index.saturating_add(1);
     }
-
-    #[test]
-    fn the_same_input_is_dispatched_the_same_way_twice() {
-        let samples = [
-            "diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b\n",
-            "{\"a\":1}",
-            "| head | row |\n| --- | --- |\n| a | b |\n",
-            "12:00:01 INFO started\n12:00:02 INFO finished\n",
-            "fn main() {\n    let x = 1;\n}\n",
-            "This is an ordinary sentence with more than five words in it.",
-            "??",
-        ];
-        for sample in samples {
-            assert_eq!(detect(sample), detect(sample));
+    // Every heading of every dropped section, while it fits: what the
+    // strategy exists to keep is this list.
+    let mut skeleton = String::new();
+    for heading in headings.iter().skip(index) {
+        let Some(piece) = text.get(heading.start..heading.end) else {
+            continue;
+        };
+        if head_end
+            .saturating_add(skeleton.len())
+            .saturating_add(piece.len())
+            > available
+        {
+            break;
         }
-        assert_eq!(detect(samples[0]), Content::Diff);
-        assert_eq!(detect(samples[1]), Content::Structured);
-        assert_eq!(detect(samples[2]), Content::Table);
-        assert_eq!(detect(samples[3]), Content::Log);
-        assert_eq!(detect(samples[4]), Content::Code);
-        assert_eq!(detect(samples[5]), Content::Prose);
-        assert_eq!(detect(samples[6]), Content::Unknown);
+        skeleton.push_str(piece);
     }
-
-    #[test]
-    fn shortening_never_lengthens() {
-        let inputs = [
-            String::new(),
-            "a".to_owned(),
-            "short".to_owned(),
-            "x".repeat(4_000),
-            "12:00:01 INFO a\n".repeat(300),
-            "fn f() {\n  body();\n}\n".repeat(300),
-            "{\"deep\":[1,2,3]}".repeat(300),
-            "字".repeat(1_000),
-        ];
-        for budget in [0u64, 1, 8, 64, 512, 4_096] {
-            for input in &inputs {
-                let cut = compacted(input, ByteLen::new(budget));
-                assert!(
-                    cut.text.len() <= input.len(),
-                    "budget {budget} grew an input of {} to {}",
-                    input.len(),
-                    cut.text.len()
-                );
-            }
-        }
+    let dropped = text
+        .len()
+        .saturating_sub(head_end)
+        .saturating_sub(skeleton.len());
+    if dropped == 0 {
+        return keep_head(text, limit);
     }
-
-    #[test]
-    fn a_cut_lands_on_a_character_boundary() {
-        // Every character here is three bytes, so a byte budget lands
-        // mid-character unless the cut is moved.
-        let text = format!("fn f() {{\n{}\n}}\n", "字".repeat(400));
-        for budget in [7u64, 11, 100, 301] {
-            let cut = compacted(&text, ByteLen::new(budget));
-            assert!(
-                std::str::from_utf8(cut.text.as_bytes()).is_ok(),
-                "a cut mid-character produces bytes nothing downstream can read"
-            );
-        }
-    }
-
-    #[test]
-    fn what_a_cut_reports_losing_is_what_the_reader_lost() {
-        let log = (0..400)
-            .map(|n| format!("12:00:{n:02} INFO line {n}\n"))
-            .collect::<String>();
-        let cut = compacted(&log, ByteLen::new(200));
-        assert_eq!(cut.place, Elided::Head, "a log keeps its end");
-        let marker = elision::marker(cut.dropped);
-        let carried = cut.text.len().saturating_sub(marker.len());
-        let dropped = usize::try_from(cut.dropped.get()).unwrap();
-        assert_eq!(
-            carried + dropped,
-            log.len(),
-            "the reported loss plus the surviving bytes is the input: {}",
-            cut.text
-        );
-    }
-
-    #[test]
-    fn a_log_keeps_its_end_and_prose_keeps_its_start() {
-        let log = (0..400)
-            .map(|n| format!("12:00:{n:02} INFO line {n}\n"))
-            .collect::<String>();
-        let cut = compacted(&log, ByteLen::new(200));
-        assert_eq!(cut.place, Elided::Head);
-        assert!(
-            cut.text.contains("line 399"),
-            "the news is at the end of a log"
-        );
-
-        let prose = "The first sentence says what this is about. ".repeat(200);
-        let cut = compacted(&prose, ByteLen::new(200));
-        assert_eq!(cut.place, Elided::Tail);
-        assert!(cut.text.starts_with("The first sentence"));
-    }
-
-    #[test]
-    fn structured_and_unknown_are_never_truncated() {
-        let json = format!("{{\"a\":[{}]}}", "1,".repeat(2_000));
-        let size = ByteLen::new(u64::try_from(json.len()).unwrap());
-        assert_eq!(
-            plan(detect(&json), size, ByteLen::new(64)),
-            Shrink::MustOffload,
-            "truncated structured data looks parseable"
-        );
-        assert_eq!(
-            plan(Content::Unknown, ByteLen::new(9_000), ByteLen::new(64)),
-            Shrink::MustOffload,
-            "nothing is thrown away on a guess"
-        );
-    }
-
-    #[test]
-    fn something_within_budget_is_left_exactly_alone() {
-        let text = "a short result";
-        let cut = compacted(text, ByteLen::new(4_096));
-        assert_eq!(cut.place, Elided::Nothing);
-        assert_eq!(cut.text, text);
+    let mut out =
+        String::with_capacity(head_end.saturating_add(room).saturating_add(skeleton.len()));
+    out.push_str(text.get(..head_end).unwrap_or_default());
+    out.push_str(&elision::gap_marker(ByteLen::new(
+        u64::try_from(dropped).unwrap_or(u64::MAX),
+    )));
+    out.push_str(&skeleton);
+    Cut {
+        text: out,
+        dropped: ByteLen::new(u64::try_from(dropped).unwrap_or(u64::MAX)),
+        place: Elided::Middle,
     }
 }
+
+/// Every heading line in the text, in order, with the span it occupies
+/// including its terminator.
+fn headings_of(text: &str) -> Vec<Heading> {
+    let mut headings = Vec::new();
+    let mut at = 0usize;
+    for piece in text.split_inclusive('\n') {
+        let start = at;
+        let end = at.saturating_add(piece.len());
+        if is_section_heading(piece.trim_end_matches(['\n', '\r'])) {
+            headings.push(Heading { start, end });
+        }
+        at = end;
+    }
+    headings
+}
+
+/// The lines a section cut recognises as structure: a Markdown heading,
+/// or the LaTeX commands that open a section.
+fn is_section_heading(line: &str) -> bool {
+    let line = line.trim_start();
+    is_atx_heading(line)
+        || [
+            "\\section",
+            "\\subsection",
+            "\\chapter",
+            "\\part",
+            "\\paragraph",
+        ]
+        .iter()
+        .any(|command| line.starts_with(command))
+}
+
+#[cfg(test)]
+mod tests;

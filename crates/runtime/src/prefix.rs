@@ -189,6 +189,15 @@ fn build_segment(
     ))
 }
 
+/// The same assertion over the copy of the segments a request carries:
+/// four cache-marked system blocks, hashed and compared against the
+/// hashes the run froze. The request is what the provider reads, so this
+/// is the check that the wire form and the record agree.
+///
+/// **The judgement lives in `prefix/segment.rs`**, next to the bytes it
+/// hashes; this line is the path a caller uses.
+pub use segment::verified_system_hashes;
+
 /// The assembled prefix: city, building, resident, run — in that order,
 /// enforced at the only constructor.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -276,6 +285,26 @@ impl FrozenPrefix {
             *self.resident.hash(),
             *self.run.hash(),
         ]
+    }
+
+    /// The four segment hashes, recomputed from the bytes that will be
+    /// sent and checked against the hashes recorded at assembly.
+    ///
+    /// [`segment_hashes`](Self::segment_hashes) answers with the values
+    /// fixed at construction, and nothing in the tree compared them
+    /// against the bytes. A turn that recalculates here cannot send
+    /// bytes the recorded prefix does not describe.
+    ///
+    /// # Errors
+    /// A segment whose bytes no longer hash to what the run froze.
+    pub fn verified_segment_hashes(&self) -> Result<[B3Hash; 4], AxError> {
+        let [city, building, resident, run] = self.segments();
+        Ok([
+            city.verified_hash()?,
+            building.verified_hash()?,
+            resident.verified_hash()?,
+            run.verified_hash()?,
+        ])
     }
 
     /// The `prompt_assembled` payload: four rows, each naming its slot,

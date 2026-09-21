@@ -194,13 +194,52 @@ fn below_the_floor_nothing_is_touched_and_nothing_is_stored() {
     let mut world = world();
     let small = "   Compiling a v0.1.0\n".repeat(20);
     match run(&mut world, &cargo_key(), Some(0), &small) {
-        Sieved::Passed { text, reason } => {
+        Sieved::Passed {
+            text,
+            reason,
+            account,
+        } => {
             assert_eq!(text, small);
             assert_eq!(reason, PassReason::BelowFloor);
+            assert!(
+                account.is_none(),
+                "below the floor no stage runs, and the reason is the whole account"
+            );
         }
         Sieved::Cut(record) => panic!("cut below the floor: {}", record.text),
     }
     assert!(std::fs::read_dir(&world.env).unwrap().next().is_none());
+}
+
+/// A result every stage accepted but none shortened comes back with its
+/// account, rather than silently dropping the seven stage reports. The
+/// input sits just above the floor so the footer is what tips it over.
+#[test]
+fn a_pass_that_ran_the_stages_carries_their_account() {
+    let mut world = world();
+    let text: String = (0..90)
+        .map(|n| {
+            let first = char::from(b'a' + (n % 26) as u8);
+            let second = char::from(b'a' + (n / 26) as u8);
+            format!("record {first}{second} stands alone here\n")
+        })
+        .collect();
+    assert!(text.len() > crate::sieve::SIEVE_FLOOR);
+    match run(&mut world, &listing_key(), Some(0), &text) {
+        Sieved::Passed {
+            text: out,
+            reason,
+            account,
+        } => {
+            assert_eq!(reason, PassReason::NothingShrank);
+            assert_eq!(out, text, "a pass returns the input byte for byte");
+            let account = account.expect("the stages ran, so the pass carries their account");
+            assert_eq!(account.filter, "generic");
+            assert_eq!(account.lines_out, account.lines_in);
+            assert_eq!(account.stages.len(), 7, "{:?}", account.stages);
+        }
+        Sieved::Cut(record) => panic!("expected a pass, got {} bytes", record.text.len()),
+    }
 }
 
 #[test]

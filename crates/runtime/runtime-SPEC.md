@@ -171,6 +171,8 @@ impl Turn<Recording> {
 - **取消只在边界**：每相变函数首参即边界快照；命中 Cancel → 追加 cancel_received → 返回 Cancelled（回合终止，后续 handoff_written＋run_frozen 归执行器）。相内无任何中断入口＝A9 的结构化一半；另一半（事件序断言）在 citysim。**工具波内的每条 call 同样是一道边界**（B-70）：一波是 N 件副作用而不是一件，于是 `execute` 在每条 call 之前问 `still_going`，并经同一个 `cancel_here` 写下同一条 `cancel_received`——消费中断的地方仍然只有一处。
 - **四取消点**：组装前／provider 调用前／工具执行前／派生前，四点全住本模块。第四点由 `Turn<Recording>::record` 收边界快照，故 `record` 与前三相同形——收 `Interrupt`、答 `PhaseOutcome`。它买到的是别处买不到的一件事：**一个回合把活派下去之后、子 Run 起来之前，仍停得住**；`calls_made == 0` 的收尾回合尤其如此，那一刻在第四点之前根本没有下一个边界。
 - **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。S3 接真 dialect 时只加字段。
+- **前缀冻结是运行时不变量，不只是测试（E-2）。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名两条路——开一个新 session，或 fork 这个 run；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一判据（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
+- **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语同指新 session 或 fork；`context_tokens` 只喂本机提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判据与拒绝路径，拦在哪里归装配层。
 - **工具波 S2 串行**：并行执行串行入账（确定性 5）属 S3 并发波；接口不预留并发参数，入账序＝calls 序。
 
 ### 8-4 runtime::prefix（形状 5＋2）
@@ -192,8 +194,12 @@ impl FrozenPrefix {
     pub fn assemble(city: FrozenSegment, building: FrozenSegment,
                     resident: FrozenSegment, run: FrozenSegment) -> Result<FrozenPrefix, AxError>;
     pub fn segment_hashes(&self) -> [B3Hash; 4];
+    /// 从 `bytes()` 重算四段哈希并与构造时记录的对拍；不等即拒绝。
+    pub fn verified_segment_hashes(&self) -> Result<[B3Hash; 4], AxError>;
     pub fn prompt_payload(&self) -> Result<Payload, AxError>;   // prompt_assembled 载荷
 }
+/// 同一断言作用在请求携带的四块上（`turn::call`）：四块、逐块 cache=true、逐块哈希对拍。
+pub fn verified_system_hashes(system: &[SystemBlock], frozen: &[B3Hash; 4]) -> Result<[B3Hash; 4], AxError>;
 // 载荷的键由 `kernel::event::record::PromptAssembled` 一处拼写，写读两端各经 `Payload::of` 与
 // `Payload::read` 一扇门；本模块只提供值：`SegmentSlot::as_str` 给出 slot 名与 breakpoints 行，
 // `SegmentSource::row` 给出 `PromptSource`，`build_segment` 的落选行给出 `PromptSkip`（reason 是
@@ -201,6 +207,7 @@ impl FrozenPrefix {
 ```
 
 - 段序即缓存经济：类型把四段位置写死，断点与各段上限属 S3 完备化（只加字段）。
+- **`segment_hashes()` 返回构造时缓存值，`verified_segment_hashes()` 才是判据。** 一个事实（这段字节的哈希）只有一个权威：`FrozenSegment::assembled` 在构造时算一次，每次派活前从将发的字节重算一次并与它比对。两者不一致意味着模型将读到的字节不是运行冻结的那一份，而那正是「同一事件序列逐字节重放」所依赖的东西，故拒绝而非警告。
 - 分段哈希经 `B3Hash::digest`（kernel 唯一哈希产地）；A4（同输入同字节）由 golden 断言，A15 重建器随 S3。
 - trybuild 反例：`FrozenSegment::from(TimeMs)`／把 TimeMs 传进 assemble —— 无转换路径，编译不过（ClockStamp 等类型落地后同规逐个加反例）。
 
@@ -299,12 +306,21 @@ pub struct PackContext<'a> {
     pub net_notice: bool,                     // gate::egress 首次公网放行信号
     pub steer: Option<(String, String)>,      // (source, text)；上一边界消费到的 Steer
     pub offload: Option<OffloadSite<'a>>,     // None＝无 CAS 可用（纯截断退路）
+    pub sieve: Option<SieveRequest<'a>>,      // exec 结果才带；无站点即无 tee 即不压
+    pub adviser: Option<Consultation>,        // 窗口顾问先跑，判断作参数从此入
 }
 pub struct Packaged { pub content: String, pub events: Vec<Payload> }   // events＝result_offloaded 载荷（入账归调用方）
 pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>;
 ```
 
 - 定序（H-08 之后）：**判定由 `compaction::plan` 一处给出**，答 `Shrink { Keep, Cut(Strategy), MustOffload }`。`Keep` →原样；`MustOffload`（结构化、未知内容、以及非 UTF-8 字节）与「`Cut` 且 `len ≥ OFFLOAD_MIN_BYTES`」→ 有 `OffloadSite` 就 offload；`Cut` 而无站点或不够大 → `compaction::shorten` 按已定的 `Strategy` 裁。**`MustOffload` 而无站点是一次带恢复语的 `Err`，不是私自的字节切**：截半的结构化数据看上去仍可解析，那正是它比缺席更糟的理由，而旧的 `byte_cut` 让 pipeline 当场推翻 compaction 的定规——一条规则两个家。`byte_cut` 随之删除。标记仍由 `elision` 产出且只出现一次。
+- **`Shrink::Cut(Strategy::Sections)` 不交给 offload。** 长文档的节标题骨架是该类存在的理由，而 offload 的替代体是文件头＋指向全文的指针，恰好把骨架丢掉；故 `Markup` 一律走 `shorten`，其余 `Cut` 仍按 `len ≥ OFFLOAD_MIN_BYTES` 入 store。
+- **非 UTF-8 的静默回落已登记**：`Err(_) => Content::Unknown` 丢掉 `Utf8Error` 的原因，把「二进制」折成「未知」；`Unknown` 的整块离窗使它的行为安全，但名字不对。修法需要一个新内容类与它的 plan／shorten 臂，不止一行，故只登记不改。
+- **顾问端口住 `runtime::pipeline::adviser`（形状 3 port＋1 判定），先于 `package` 跑。** 顾问装不进同步的 sieve 链（`Draft::step` 是 `impl FnOnce(&[String]) -> Vec<String>`，无 Result 无 async，而 sieve→package→package_exec 整链同步）；做法是顾问在链外先办，判断作 `PackContext.adviser` 喂进来。三条问法（`Noul` 是非＋概率／`Score` 有序打分／`Choice` 选一，后者仅用于开 session 选模型）与答案／回落载荷形状归 `kernel::event::record`，本模块只翻译与校验。
+- **顾问是窗口的顾问，不是前缀的顾问。** 端口签名只拿得到 `&Window`（与一个已拼好的 `Ask`）：拿不到 `FrozenConfig`，也拿不到 `FrozenPrefix`。逐轮换模型／effort 是前缀失效，不是窗口调整，故在本端口里写不出来；要挡它们得在 `CallShape` 上挡（§8-3）。
+- **顾问的影响只有两条臂，下界是「今天的每个数字」。** `Score { score_bp }` 按 basis points 缩放 cap 给能裁的内容类用；若缩放会把「本会整块保留」的 Structured／Unknown 变成 `MustOffload`，则沿城市自己的 plan 与预算（把一条密度分变成一次拒绝，正是 `Keep` 在防的那件事）。`Noul { keep: false, .. }` 只在「有 `OffloadSite` 且结果大于 cap」时把它移出窗口：offload 只存必须裁的东西，更小的结果没有放得下的去处。`Choice` 不进 `package`（只在开 session 选模型时用）。
+- **失败策略：无回答即无调整，且写进账本。** 未装顾问（`Adviser::none`）、端点不可用／超时、答非所问（问 `Noul` 答 `Score`、选择不在选项内、概率越界）一律回落，`Consultation::payloads()` 产出 `adviser_asked` 加 `adviser_answered`／`adviser_fell_back` 两条载荷随 `Packaged::events` 出去。**`answer()` 返回 `None` 时上面每一个数字在原地不动，所以最坏情况恰好等于今天的行为。**
+- **顾问端点走既有 `AttachEndpoint` 登记路径，不造第二套 provider 表。** 配置不新增 TOML 段（`ConfigLayer` 只有 effort／sandbox／mcp 且四处 `deny_unknown_fields`）；`gateway::adviser::AdviserClient` 收路由已产出的 `Chosen`，用 `adapter_for` 同一支笔、同一份凭证兑付与 deadline。`Choice` 问法在开 session 选模型时用，前缀成形之前。
 - 信封三附件一处组装：正文后依序追加 clock 行／net_notice 行（恒一次：正在连接互联网提醒，英文定句）／steer 行（`user:`／`@ID:` 前缀）；三行字节不计入 cap（附件与负载分账，附件有自己的封顶常数在实现内断言）。
 - 内容感知压缩分派表属 P3；本模块只持「原样／offload／截断」三臂，接口不预留分派参数。
 
@@ -461,6 +477,43 @@ pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob)
 
 **sandbox 增**：`AbsentSandbox` —— 未带执行引擎的构建在缝上的产品实现，逐次以 `E_TOOL_UNAVAILABLE` 拒并携替代臂。它存在的理由是**缺席要是一个判词而不是一个替身**：Echo 放在这个位置会对一个从未运行的 guest 回答「成功」，而第一个察觉的人是相信了那份输出的人。
 
+### 8-13-2 runtime::tools::exec::confinement（宿主进程沙箱：按平台穷尽枚举＋每臂保证清单；形状 3＋2）
+
+上面的 wasip1 面给的是 **guest** 的隔离；exec 的 program／shell 两臂跑的是**宿主进程**，它的隔离只能向平台买，而没有哪个平台把它全卖。故本模块的产物不是开关而是一份分类法：每一臂逐轴说出自己保什么、不保什么，跑在哪一臂上对人与 Agent 都可见（工具 disclosure＋doctor 回报），不是假定。
+
+| 臂 | 保 | 不保 |
+|---|---|---|
+| `LinuxNamespaces { wrapper }` | 文件系统、网络、进程树、用户 | CPU／内存上限 |
+| `WindowsJobObject` | 文件系统（工作目录为副本）、进程树、CPU／内存上限 | **网络**（作业对象不隔离网络）、用户 |
+| `CopiedTree` | 文件系统（写入只落副本、源树只读） | 网络、进程树、用户、CPU／内存上限 |
+| `Unavailable { missing }` | —— | 一切；`missing` 指名缺的是什么 |
+
+```rust
+pub enum Guarantee { Filesystem, Network, ProcessTree, User, Resources }
+pub enum Kept { Yes, No }
+pub struct Assurances { pub filesystem: Kept, pub network: Kept, pub process_tree: Kept, pub user: Kept, pub resources: Kept }
+pub enum Confinement { LinuxNamespaces { wrapper: PathBuf }, WindowsJobObject, CopiedTree, Unavailable { missing: Missing } }
+pub struct Offerings { pub namespace_tool: Option<PathBuf>, pub scratch: Option<PathBuf> }
+impl Confinement { pub fn detect() -> Confinement; pub fn choose(&Offerings) -> Confinement;
+                   pub fn assurances(&self) -> Assurances; pub fn statement(&self) -> String; }
+pub struct Confined { /* arm＋scratch＋outstanding（后台命令的副本） */ }
+impl Confined { pub fn detect() -> Confined; pub fn place(&self, Command, &Path) -> Result<(Command, Placed), AxError>;
+                pub fn settled(&self, Placed) -> Result<(), AxError>; pub fn handed(&mut self, BacklogId, Placed);
+                pub fn reaped(&mut self, &[Finished]) -> Result<(), AxError> }
+pub enum Placement { Sandbox, Host }   // 调用参数 `where`；缺省 Sandbox
+```
+
+- **保证清单在类型上**：`Assurances` 逐轴五字段，每一臂的 `assurances()` 必须写满五轴，故新增一轴即四臂同时编译红——任何一臂都不会留下一个没人问过它的旧答案。`statement()` 由 `Assurances` 与 `Guarantee::phrase()`／`unkept()` 派生而非另写一段话，句子与类型因此不可能分家。
+- **选择是纯函数**：`choose` 取 `Offerings`——有 wrapper 即 `LinuxNamespaces`，否则 `CopiedTree`；scratch 根不可用即 `Unavailable { missing: ScratchDirectory }`。`detect()` 是**唯一的采样点**（`PATH`＋`std::env::temp_dir()`）；测试用 `Offerings` 陈述一台机器而不是借一台。
+- **`WindowsJobObject` 本构建不构造，且拒而不降级**：`CreateJobObject` 是 workspace `unsafe_code = forbid` 在 `desktop/` 之外禁止的 FFI，runtime 的 `Cargo.toml` 也不在本改动的可写面内。以 `CopiedTree` 冒充它会对着一个开着网络的盒子回答「网络已关」，正是本模块存在的理由的镜像，故 `place()` 对它返 `E_SANDBOX_DENIED` 并给「改用 copied tree 且让命令离开网络」的 recovery。Windows 上 `detect()` 因此答 `CopiedTree`，其清单逐字写出网络未隔离——这一句就是 Agent 必须看见的那一句。
+- **副本按命令一份、有界**：`place()` 把 `workdir` 复制进 scratch 根下的新目录，命令在副本里跑；`settled()` 在等待结束时删副本；交给 backlog 的后台命令由 `handed(id, …)` 记名、由 `reaped(&[Finished])` 在其成员报结时删；`Drop` 兜底。**删不掉不把命令判成失败**（与 `backlog/member.rs`、`collect()` 同一条判断：命令的收场是调用方应得的事实，一个临时目录只值磁盘）。界：`MAX_FILES = 100_000`、`MAX_BYTES = 256 MiB`、`MAX_DEPTH = 64`；越界**拒**并报出越过的那一对数字——半份副本会为一堆没带上的文件担保，而本模块的全部理由是防这个。`MAX_DEPTH` 同时终结自指链接造成的无底走查（链接按目标内容复制，因此指向树外的链接带进来的是内容而非一个通向人那棵树的入口）。
+- **`Mount`／`Fuel` 不沿用**：`Fuel` 是 wasmtime 指令计量、`Mount.guest` 是 guest 路径别名，二者 wasip1 专属。本模块保留的是**判断**（能力面＝能到达的路径集）而不是词形。宿主环境照旧不继承（exec 的 env allowlist 未动）；`SandboxJob.env` 的显式注入属 guest 面。
+- **placement**：调用参数 `where: sandbox|host`，缺省 `sandbox`。`host` 是「在原地跑」——它才是碰得到人那棵树的那一臂，故必须由调用方按名说出，也正是与 A-8 同一条纪律（默认引导先在沙箱里做，出沙箱才需要审批）里「需要审批」的那个动作。python 臂无 host 形（它是 wasip1 guest）：要宿主解释器走 program 臂。
+- **公开路径经 `runtime::tools`**：`confinement` 住 `tools/exec/`，`lib.rs` 不在本改动的可写面内，故 doctor 的依赖回报与工具自己的 disclosure 都从 `runtime::tools::{Confinement, Guarantee, Kept, Missing}` 读这一份定义。
+- 证据：`crates/runtime/src/tools/exec/tests.rs` 的 `a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`（真命令、真树：沙箱里写得到、人那棵树不动；同一命令 `where: host` 则写进原树——此对拍使「没动」是能力判定而非命令没写）、`the_arm_a_machine_gets_is_chosen_from_what_it_has`、`every_arm_states_what_it_does_not_hold`、`a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end`、`a_settled_command_leaves_no_copy_behind`。
+
+**未决（§3 口径）**：副本是「一条命令一份」的直译，代价与工作树成正比；一棵带构建缓存的工作树会在每条命令上付一次复制。界内的取舍已定（越界拒而不是部分复制），但「一条命令一份」与「一个工具一份＋每命令同步」哪个对真正的工作树更合适，需要一次实测（一棵真实 room 的复制耗时与其命令数）才能定。
+
 ### 8-14 runtime::tools 四件（形状 4；tools.rs 为纯索引）
 
 ```rust
@@ -470,8 +523,9 @@ pub struct ExecTool { /* workdir、mounts、python_wasm: Option<PathBuf>、sandb
 impl ExecTool { pub fn new(…) -> ExecTool; }
 impl Tool for ExecTool { /* meta：name=exec、effect=Write{domain}、temporal=Timestamped、render=Terminal */ }
 // Program 臂：std::process::Command（workdir 钉定、环境变量白名单——secret 恒不透传）；唯一真子进程产地
+//            缺省在 §8-13-2 的 confinement 副本里跑；`where: host` 才在原地（那条路是一条命令碰得到人那棵树的路）
 // Python 臂：sandbox.run(python_wasm, argv=["python","-c",code], mounts)；组件缺失→E_TOOL_UNAVAILABLE＋alternative＝Program 臂
-// Shell 臂：探测缺失即拒（E_TOOL_UNAVAILABLE，不是降级）；存在则 sh -c／cmd /C
+// Shell 臂：探测缺失即拒（E_TOOL_UNAVAILABLE，不是降级）；存在则 sh -c／cmd /C；placement 与 Program 臂同一权威（§8-13-2）
 
 // tools/edit.rs —— base_version 乐观并发＋写域双闸＋创建臂
 pub struct EditTool { /* city_root、writable: WriteDomain —— 私有 */ }
@@ -515,13 +569,17 @@ impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timest
 - **数的是人，不是地址**：一间没人站着的房间没有读者，把它计入会让 `neighbours: 3` 读起来像「有三个人可以说话」而实际上一个都没有。空房间仍然在工具的答案里，因为它对 delegate 与搬入是真信息。
 - **`children` 是闭包而不是快照字段**：派活发生在 `status` 工具造好之后，一份开跑前拍的快照永远是空的。派生台住 `collab`，而 depmap 不允许 runtime 依赖 collab，故本模块只收一个答「现在派了哪些」的闭包，装配层把台接上去——与 `RunHooks` 四个闭包同一纪律：第二实现不存在时不引 trait。
 // runtime::compaction（形状 6 数据面＋形状 1 判定）
-pub enum Content { Prose, Code, Diff, Log, Structured, Table, Unknown }   // 七类，Unknown 是其中之一
-pub enum Strategy { Keep, Head, Ends, Tail, Offload }
+pub enum Content { Prose, Code, Diff, Log, Structured, Table, Markup, Unknown }   // 八类，Unknown 与 Markup 各是其中之一
+pub enum Strategy { Head, Ends, Tail, Sections }
+pub enum Shrink { Keep, Cut(Strategy), MustOffload }
 pub fn detect(text: &str) -> Content;                       // 前几行上的前缀与计数，顺序即设计
-pub fn plan(content: Content, size: ByteLen, budget: ByteLen) -> Strategy;
-pub fn compact(text: &str, budget: ByteLen) -> elision::Cut;   // 标记与丢弃计数由 elision 一处产出（§8-42）
+pub fn plan(content: Content, size: ByteLen, budget: ByteLen) -> Shrink;
+pub fn shorten(text: &str, strategy: Strategy, budget: ByteLen) -> elision::Cut;   // 标记与丢弃计数由 elision 一处产出（§8-42）
 // 硬不变量：结果恒不大于输入，且在出口再验一次（真长了就退回原文）。切口落在字符边界。
 // Structured 与 Unknown 恒不截断：被截断的 JSON 比缺席的 JSON 更糟；未知内容不拿猜测去丢东西。
+// Markup 的判据是 `\documentclass`／`\begin{document}`，或首几行里两条 ATX 标题且无一行像代码
+// （源码文件的 `# ` 注释与标题同形，否则会保注释而丢代码）。检测先于 Table：LaTeX 的表格会让一行带 `|`。
+// `Sections` 保整节至预算尽，再保被丢各节的标题行（骨架）；少于两条标题即只有一个标题，退回首端裁。
 // 机制面（把大结果移出窗口）仍归 offload——本模块只答「缩不缩、留哪一头」。
 
 // runtime::mode 的准入面（形状 1 判定）
@@ -922,9 +980,11 @@ pub struct RunHooks<'a> {
 
 #### 8-27-1 它是什么，以及为什么不是 LLM
 
-`sieve` 按**产生结果的命令**决定留下什么。它与 `compaction` 相邻而不重叠：`compaction` 看文本形状（Prose／Code／Diff／Log／Structured／Table／Unknown），`sieve` 看命令身份（`cargo build` 与 `git status` 的噪声形状完全不同，而两者都是 Log）。
+`sieve` 按**产生结果的命令**决定留下什么。它与 `compaction` 相邻而不重叠：`compaction` 看文本形状（Prose／Code／Diff／Log／Structured／Table／Markup／Unknown），`sieve` 看命令身份（`cargo build` 与 `git status` 的噪声形状完全不同，而两者都是 Log）。
 
 不用模型做压缩，理由是被架构强制的而非偏好：V6 要求同一颗种子重放出逐字节相同的对话，一个会思考的压缩器会让重放不可能。它同时省掉一次调用的钱与延迟。
+
+**顾问不是这条链上的模型（E-2）。** 它在 `pipeline::package` 之外先跑，判断作为 `PackContext.adviser` 进来，而且答案本身就是账本上的一条记录（`adviser_answered` 或 `adviser_fell_back`）——重放读到的是那条记录，不是再问一次。所以「同一颗种子重放出逐字节相同的对话」仍然成立，而 `sieve` 自己一个模型也不调：它只有七条固定阶段。
 
 #### 8-27-2 位置与法则
 
@@ -1033,7 +1093,8 @@ impl CommandKey {
 }
 pub struct SieveInput<'a> { pub key: &'a CommandKey, pub exit_code: Option<i64>, pub text: &'a str }
 pub enum Sieved {
-    Passed { text: String, reason: PassReason },   // 地板以下／全部阶段被拒：原文一字不动
+    Passed { text: String, reason: PassReason, account: Option<SieveAccount> },
+                                  // 地板以下／全部阶段被拒：原文一字不动；跑过的阶段随 account 出去
     Cut(SieveRecord),
 }
 pub enum PassReason { BelowFloor, NothingShrank }
@@ -1053,6 +1114,9 @@ pub enum StageOutcome { Applied { bytes_before: u64, bytes_after: u64 }, Noop, R
 pub fn sieve(input: SieveInput<'_>, table: &FilterTable, site: &mut OffloadSite<'_>, history: &mut SieveHistory)
     -> Result<Sieved, AxError>;
 // tee 走 offload::tee（pub(crate)；offload() 自身也改经它，store-before-cut 只有一处）；history 无论 Cut／Passed 都记本次原文
+
+- **账目不为任何一条臂而丢。** `Cut` 携 `SieveRecord.stages`；`Passed` 携 `account`——NothingShrank 时七条阶段全在，BelowFloor 时 `None`（没有阶段跑过，`reason` 就是全部账目）。`StageOutcome` 四变体（`Applied`／`Noop`／`Rejected`／`Unavailable`）是每个阶段唯一的答案形状。**顾问不是第八个 stage**：问／答／回落有自己的事件族（`adviser_asked`／`adviser_answered`／`adviser_fell_back`），在这里再记一份就是同一事实两个家；「顾问就是第八个 stage」是 E-2 核验更正前的措辞。
+- **pass 的账目去处**：经 sieve 但未被裁的结果若随后走普通 offload 离窗，`ResultOffloaded.sieve` 携这名 account（此前恒 `None`，等于说「未经 sieve」）；留在窗口内的 pass 不再写账，因为没有任何东西离窗。
 
 // runtime::sieve::filter — 过滤表（形状 6）
 pub struct Filter { id, command, subcommands: Vec<String>, strip_ansi: bool,

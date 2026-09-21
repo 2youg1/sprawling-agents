@@ -101,6 +101,11 @@ impl Turn<Assembling> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
+        // The per-turn digest, recomputed from the bytes this request
+        // will carry and checked against what the session froze. It
+        // comes before `prompt_assembled` is written: a refusal must not
+        // leave a line describing a prefix the city will not send.
+        let segments = prefix.verified_segment_hashes()?;
         let prompt = prefix.prompt_payload()?;
         self.journal
             .append_authored(ledger, Authored::PromptAssembled, prompt)?;
@@ -114,10 +119,7 @@ impl Turn<Assembling> {
         };
         Ok(PhaseOutcome::Advanced(Turn {
             journal: self.journal,
-            state: Calling {
-                segments: prefix.segment_hashes(),
-                chat,
-            },
+            state: Calling { segments, chat },
         }))
     }
 }
@@ -142,6 +144,11 @@ impl Turn<Calling> {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
         let Calling { segments, chat } = self.state;
+        // The hashes above describe the prefix; these describe the four
+        // system blocks that will actually go on the wire. They are the
+        // second per-turn digest, and they disagree only if the request
+        // was built from something other than the prefix it names.
+        let segments = crate::prefix::verified_system_hashes(&chat.system, &segments)?;
         let request = ModelRequest {
             policy: policy.clone(),
             segments,

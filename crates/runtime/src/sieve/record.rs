@@ -20,10 +20,18 @@ pub enum PassReason {
     NothingShrank,
 }
 
-/// The sieve's answer. `Passed` returns the input byte for byte.
+/// The sieve's answer. `Passed` returns the input byte for byte, and
+/// carries the account of whatever ran before it decided not to cut.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Sieved {
-    Passed { text: String, reason: PassReason },
+    Passed {
+        text: String,
+        reason: PassReason,
+        /// The stages that ran, with their counts. `None` below the
+        /// floor, where no stage runs at all and the reason is the whole
+        /// account.
+        account: Option<SieveAccount>,
+    },
     Cut(SieveRecord),
 }
 
@@ -90,7 +98,9 @@ pub struct SieveAccount {
     pub filter: String,
     pub lines_in: u64,
     pub lines_out: u64,
-    /// Every stage the text passed through, kept, refused or absent.
+    /// Every stage the text passed through: applied, no-op, refused or
+    /// unavailable. Below the floor no stage ran, and the reason on
+    /// [`Sieved::Passed`] is the whole account.
     pub stages: Vec<StageReport>,
 }
 

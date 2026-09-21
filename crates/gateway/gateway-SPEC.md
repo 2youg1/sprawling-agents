@@ -109,6 +109,8 @@ OpenAI 侧无对应物：出向翻译**记录性丢弃**思考块（同断点位
 
 **缓存后果写在这里，因为它是选型理由**：官方排错文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」。故强度住 `FrozenConfig`（kernel-SPEC §8-22），Run 内不可变；本模块只负责把已冻结的值翻上线。
 
+**两种缓存失效是两件事，不要合成一件。** ① **供应商侧的 message cache breakpoints**：同一个前缀字节不变，仅因请求形状变了（思考模式、effort、思考预算），对方就把已缓存的**消息**断点作废——本模块与 §8-19 守的是这一条，故强度与模型在 Run 内不得改；② **本城冻结的 system 前缀本身**：四段字节任一段变了，后续请求读到的就是另一份前缀，缓存自然落空——守它的是 runtime 侧的重算对拍（`FrozenPrefix::verified_segment_hashes`，`gateway-SPEC` 不参与）。一句区分：**effort 变了前缀没变，缓存仍会失效；前缀变了哪怕形状一字未改，缓存也已不同。** 顾问之所以可以动窗口而不能动模型与 effort，正是因为窗口属易变半，而这两件属①。
+
 **两条 wire 上的图**
 
 ```rust
@@ -633,7 +635,7 @@ impl ConnectionKind {
 }
 
 // provider::modality::embedding —— 请求与回答的真实形状
-pub struct EmbeddingRequest;                     // new(model, inputs) -> Result；with_dimensions；texts()；body()
+pub struct EmbeddingRequest;                     // new(model, inputs) -> Result；with_dimensions；texts()；dimensions()；body()
 pub struct Embeddings;                           // parse(&Value, &EmbeddingRequest) -> Result
                                                  // vectors() -> &[Vec<f64>]；model()；prompt_tokens()
 
@@ -641,6 +643,12 @@ pub struct Embeddings;                           // parse(&Value, &EmbeddingRequ
 pub struct RerankRequest;                        // new(query, passages) -> Result；passages()；body()
 pub struct Rank { pub passage: usize, pub score: f64 }
 pub struct Ranking;                              // parse(&Value, &RerankRequest) -> Result；ranks()；best()
+
+// provider::modality::call —— 一次调用从头到尾
+pub struct Vectors;                              // of(&AttachedEndpoint, model) -> Result<Vectors, AxError>
+                                                 // url()；embed(&EmbeddingRequest, Redemption) -> Result<(Embeddings, EmbeddingCalled), AxError>
+pub struct Ranks;                                // of(&AttachedEndpoint, model) -> Result<Ranks, AxError>
+                                                 // url()；rank(&RerankRequest, Redemption) -> Result<(Ranking, RerankCalled), AxError>
 ```
 
 - **「这个端点是怎么连的」今天散在三处，没有一处说得出**：dialect 说由哪支笔写请求，credential 说是 key 还是订阅登录在付账，上限梯说这次调用能写多少。三处各答一半，一致到其中一处被改为止。`ConnectionKind` 是那一个答案，**attach 时在归一化之后解析一次**，写进 `endpoint_attached`、由 `Query::Config` 读回，调用路径不再猜——一件事算两遍就是两遍可以算出不同结果。
@@ -648,7 +656,11 @@ pub struct Ranking;                              // parse(&Value, &RerankRequest
 - **订阅决定连接，冲突当场拒绝**：harness 的线属于厂商而不属于表单，故签了某家订阅即 `Harness(family)`；人粘贴的形状与该家的 `shape()` 不一致时报 `E_CONFIG_INVALID` 并给出两条出路（换该厂商自己的 base URL，或改用 API key 登记）。**既不静默丢弃参数，也不替人猜**——两者都会在第一次调用处变成 404。
 - **`DialectHint::Unset` 是真状态而不是缺失值**：没人说过形状时解析拒绝，恢复语指向「把供应方文档印出来的完整 URL 粘进来」，因为带 `chat/completions`／`responses`／`messages` 尾段的 URL 自己就说了。
 - **词只有一套**：七个扁平词（`openai_compat`／`responses`／`anthropic_native` ＋ 四个家名），`as_str` 写、`parse` 读，一条测试钉住往返与不重词。harness 不拼复合串，读者无需切分。
-- **模态第一批只落形状**：`Modality::{Embedding, Rerank}` ＋「哪种连接在哪条路径上服务它」一张表。Anthropic 不发布这两张脸，四家订阅 harness 卖的是会话，故都答 `None`——**没有路径就是不服务**，调用方连 URL 都拼不出来。路径与 base URL 的拼接复用全城唯一那个 `router::join`。**入账（`embedding_called`／`rerank_called`）等 payload 类型化（G-15）落地后再接**，本节不预先写键名。
+- **模态第一批只落形状与那条路**（14.4）：`Modality::{Embedding, Rerank}` ＋「哪种连接在哪条路径上服务它」一张表，加上 `provider::modality::call` 里一次调用的全程。Anthropic 不发布这两张脸，四家订阅 harness 卖的是会话，故都答 `None`——**没有路径就是不服务**，调用方连 URL 都拼不出来，而拒绝语报出的是**这个连接是怎么连的**（人手里能改的那个事实），不是一条他不认识的路径。路径与 base URL 的拼接复用全城唯一那个 `router::join`。
+- **一次调用不自己写传输**（`call`）：向外的 POST、非 2xx 怎么折、凭据写在哪一个头上、超时与代理怎么算，都还是 `endpoint` 那一处的答案；本模块只多给两样本张脸独有的东西：**路径**与**请求体**。自称一个传输层就是第二份「什么叫失败」的定义。
+- **人设的 body override 不到向量面**：override 是指向对话请求体的 JSON 指针（`endpoint::config::apply_override` 会替它造出缺失的路径），同一指针落到 embeddings 体上会多出一个没人读的字段——那是本城在替人回答一个他没问过的关于对话的问题。**额外的头会到**：头是关于端点的事实，不是关于一个体的。
+- **凭据每次调用赎回一次**（`Redemption` 作为调用参数而不是字段）：赎回按设计不缓存，它只为一次操作存在，把 `Secrets` 挂在长寿命对象上就是让它活到一整批检索跑完。
+- **每次调用把手写的那一行还回调用方**：`embed` 返 `(Embeddings, EmbeddingCalled)`、`rank` 返 `(Ranking, RerankCalled)`。本模块没有账本可写，而那一行的归宿是 run 的历史：拿得住账本的人 append `Payload::of(&record)`。载荷的字段类型住 `kernel::event::record::modality`（G-15 已落），本模块不另写一份键名。**rerank 那一行不填 `prompt_tokens`**：本城写入的那两张脸不报用量，填一个派生数就是把本城的估算放进人读账单的那一列。
 - **两张脸的字节形状也各只有一处**（2026-09-21 落）：`embedding` 的请求与回答照 `openai/openai-openapi` 的 `CreateEmbeddingRequest`／`CreateEmbeddingResponse`／`Embedding` 三个 schema 写，`rerank` 照 `huggingface/text-embeddings-inference` 的 `docs/openapi.json` 的 `/rerank` 路径与 `RerankRequest`／`Rank` 写；两处出处与读取日期写在模块头。**请求显式写 `encoding_format`**，因为读答案的那段只认一种编码，而厂商可改的默认值不是可以照着解析的依据。**回答按 `index` 归位而不按到达顺序**：把第三段文字的向量配给第一段，是一个不报错的检索错误。**名次不在本城重排**：分数只在一次回答内可比，服务端排好的序就是答案，再排一次就是本城对自己付钱问来的名次有第二个意见。
 - **chat 不是本枚举的成员**：会话路径归已经在调用它的那处（`router::attached::chat_path`），在这里再写一次就是每回合都在发的那条路径有了第二个家。
 
@@ -747,3 +759,27 @@ impl DeviceLogin {
 **一次兑付只有一个发送**（`credential::oauth::exchange`）：回跳的 JSON 体与设备码的表单体在内容类型之后就是同一次交换——同样的 `access_token`／`refresh_token`／`expires_in`，同样的「拒词不引用对侧正文」（正文里有刚用过的 code）。故 `post_json`／`post_form`／`tokens` 住一处，`FormPost::CONTENT_TYPE` 也读这里的那一个串。状态码交回调用方而不在此判：设备码那条路要从非 2xx 的正文里读 `error` 才知道该不该再问（§3.5），回跳那条路除了停下没有别的事可做。
 
 **账本与界面**：`login_started` 的 `auth_url` 在设备码这家是厂商的验证页（有 `verification_uri_complete` 就用它，那一页已经把码填好了），并多一个 `user_code` 键——**缺席而不是空串**，回跳登录没有这样一个码，空串在页面上会读成「码没取到」。设备码本身恒不进账本、恒不进 `Debug`：它是被偷了就能冒充的那一半。
+
+### 8-23 `gateway::adviser`：一次顾问咨询，走既有登记面（形状 4 适配器）
+
+```rust
+pub struct AdviserClient { /* 由 `adapter_for` 铸出的适配器 ＋ 人选的 model id —— 私有 */ }
+impl AdviserClient {
+    pub fn attached(chosen: &Chosen<'_>, redemption: Redemption,
+                    dialect_headers: Vec<(String, String)>) -> Result<AdviserClient, AxError>;
+    pub fn ask(&mut self, question: Question<'_>, policy: &BuildingPolicy,
+               window: &[ChatMessage]) -> Result<AdviserAnswer, AdviserFailure>;
+}
+pub struct Question<'a> { pub ask: AdviserAsk, pub subject: &'a str,
+                          pub options: &'a [String], pub material: Option<&'a str> }
+```
+
+**`[adviser]` 不是一段 TOML，而是一次普通的 `AttachEndpoint` 登记。** `ConfigLayer` 只有 effort／sandbox／mcp 三节且四处 `deny_unknown_fields`，写一段 `[adviser]` 只会被当场拒；顾问端点的 base_url／dialect／secret／tuning 与任何 provider 一样住 `AttachedEndpoint`，attach 时解析一次，随 `endpoint_attached` 进账本。**不造第二套 provider 表**：`attached` 收路由已经产出的 `Chosen`，与主模型调用同一支笔、同一份凭证兑付、同一套 deadline 与代理判定，所以顾问不可能被本城用一条别的路去连。人选中哪个模型由既有的 `SelectModel`／tag 登记说话，本模块不新增选择面。
+
+**三问一答案，答案的形状在 kernel。** 问法只有 `Noul`（是非＋概率）／`Score`（有序打分）／`Choice`（选一，仅开 session 选模型时用），答案与回落载荷形状归 `kernel::event::record`，本模块只做两件事：把问题拼成一段给模型读的文字，以及把回文严格解成一个答案。解析失败一律 `Unreadable`，**不复述模型原文**——非答案的文字没有读者，而一段会进日志的自由文本是一个没人审计的入口。
+
+**失败是返回值的一部分，不是 `Err`。** 端点不可达／拒绝 → `Unavailable`，deadline 过 → `Timeout`（`AxError` 里唯一能指名的传输失败；provider 适配器今天把超时折在 `E_PROVIDER` 里，此处按码取，不解析文字），回文不是问的那个答案 → `Unreadable`。三种都让调用方回落确定策略并把「回落了」入账（runtime 侧 `Consultation::payloads`），**最坏情况恰好等于没有顾问时的行为**。
+
+**顾问看窗口，不看前缀。** `ask` 的参数只有对话消息；system 那一块是本模块自己的固定指示，不是运行冻结的四段，也不带 cache 断点。这条差别就是顾问与「第二个模型调用」的全部区别：模型与 effort 在 Run 内冻结（见 §8-1 末尾两种缓存失效的区分），而顾问被问的从来只是易变半。
+
+**为什么不新增 `pub trait`。** 这条缝的实现住 runtime 与装配层（装配层把 `AdviserClient` 包成一个闭包交给 `runtime::pipeline::adviser::Adviser::with`），gateway 侧只出一个具体类型，正如 §8-1 的 dialect 不 trait 化、`provider` 的两家各自住文件。

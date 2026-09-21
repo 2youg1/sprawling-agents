@@ -15,7 +15,7 @@
 //! understand whichever it was written against.
 
 use kernel::event::record::PromptSource;
-use kernel::{Address, B3Hash};
+use kernel::{Address, AxCode, AxError, B3Hash, SystemBlock};
 
 /// The four slots in stability order; the order is the cache economics.
 /// Exactly four — deliberately exhaustive.
@@ -93,6 +93,37 @@ impl FrozenSegment {
         &self.hash
     }
 
+    /// Recomputes this segment's hash from the bytes a request will
+    /// carry and checks it against the hash fixed at construction.
+    ///
+    /// # Errors
+    /// The bytes and the recorded hash disagree — which is the one thing
+    /// a frozen prefix may not survive.
+    pub(crate) fn verified_hash(&self) -> Result<B3Hash, AxError> {
+        let fresh = B3Hash::digest(&self.bytes);
+        if fresh != self.hash {
+            return Err(prefix_drifted(format!(
+                "the {} segment's bytes hash to {fresh}, not the recorded {}",
+                self.slot.as_str(),
+                self.hash
+            )));
+        }
+        Ok(fresh)
+    }
+
+    /// A segment whose stored hash does not describe its bytes, so the
+    /// invariant check has something to refuse. Only a test can build
+    /// one; production reaches the check through the bytes it sends.
+    #[cfg(test)]
+    pub(crate) fn mislabelled(slot: SegmentSlot, bytes: Vec<u8>, hash: B3Hash) -> FrozenSegment {
+        FrozenSegment {
+            slot,
+            bytes,
+            hash,
+            sources: Vec::new(),
+        }
+    }
+
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
@@ -135,6 +166,60 @@ impl SegmentSource {
             dropped: self.dropped,
         }
     }
+}
+
+/// The refusal a prefix that no longer matches its own record earns.
+///
+/// A session cannot send one prefix and keep calling it frozen, and the
+/// run's recorded history belongs to the bytes it was told; the two
+/// ways out both leave this run's ledger alone.
+fn prefix_drifted(subject: String) -> AxError {
+    AxError::failure(AxCode::CasCorrupt, "send the frozen prefix", subject).with_recovery(
+        "start a new session, or fork this run: the prefix this turn would send is not \
+         the one the session froze, and the two cannot share a history",
+    )
+}
+
+/// The same assertion over the copy of the segments a request carries:
+/// four cache-marked system blocks, hashed and compared against the
+/// hashes the run froze. The request is what the provider reads, so this
+/// is the check that the wire form and the record agree.
+///
+/// # Errors
+/// A request that does not carry exactly four marked blocks, or whose
+/// blocks hash to something the run did not freeze.
+pub fn verified_system_hashes(
+    system: &[SystemBlock],
+    frozen: &[B3Hash; 4],
+) -> Result<[B3Hash; 4], AxError> {
+    let [first, second, third, fourth] = system else {
+        return Err(prefix_drifted(format!(
+            "the request carries {} system blocks, not the four the prefix has",
+            system.len()
+        )));
+    };
+    let blocks = [first, second, third, fourth];
+    let mut fresh: [B3Hash; 4] = [B3Hash::digest(b""); 4];
+    for (index, (block, expected)) in blocks.iter().zip(frozen.iter()).enumerate() {
+        let slot = SegmentSlot::ALL
+            .get(index)
+            .map_or("unknown", |slot| slot.as_str());
+        if !block.cache {
+            return Err(prefix_drifted(format!(
+                "the {slot} segment lost its cache breakpoint"
+            )));
+        }
+        let hash = B3Hash::digest(block.text.as_bytes());
+        if hash != *expected {
+            return Err(prefix_drifted(format!(
+                "the {slot} segment hashes to {hash}, not the recorded {expected}"
+            )));
+        }
+        if let Some(slot) = fresh.get_mut(index) {
+            *slot = hash;
+        }
+    }
+    Ok(fresh)
 }
 
 #[cfg(test)]

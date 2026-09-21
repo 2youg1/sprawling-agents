@@ -8,6 +8,8 @@
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::as_conversions,
+    clippy::arithmetic_side_effects,
     reason = "test code"
 )]
 
@@ -15,7 +17,7 @@ use super::*;
 use kernel::{ClockStampGranularity, Temporal, TimeMs};
 use memory::Cas;
 
-fn no_offload(cap: u64) -> PackContext<'static> {
+pub(super) fn no_offload(cap: u64) -> PackContext<'static> {
     PackContext {
         cap_bytes: cap,
         stamp: None,
@@ -24,6 +26,7 @@ fn no_offload(cap: u64) -> PackContext<'static> {
         reminder: None,
         offload: None,
         sieve: None,
+        adviser: None,
     }
 }
 
@@ -108,6 +111,7 @@ fn bytes_that_are_not_text_are_stored_whole_rather_than_cut() {
                 environment: &env,
             }),
             sieve: None,
+            adviser: None,
         },
     )
     .unwrap();
@@ -135,6 +139,7 @@ fn large_results_offload_first_and_account_it() {
                 environment: &env,
             }),
             sieve: None,
+            adviser: None,
         },
     )
     .unwrap();
@@ -175,6 +180,7 @@ fn an_exec_result_is_sieved_before_it_is_packaged() {
                 table: &table,
                 history: &mut history,
             }),
+            adviser: None,
         },
     )
     .unwrap();
@@ -204,6 +210,7 @@ fn the_three_attachments_ride_in_order_and_off_means_zero_bytes() {
             reminder: None,
             offload: None,
             sieve: None,
+            adviser: None,
         },
     )
     .unwrap();
@@ -227,6 +234,7 @@ fn the_three_attachments_ride_in_order_and_off_means_zero_bytes() {
             reminder: None,
             offload: None,
             sieve: None,
+            adviser: None,
         },
     )
     .unwrap();
@@ -246,9 +254,72 @@ fn an_overlong_attachment_is_cut_at_the_attachment_cap() {
             reminder: None,
             offload: None,
             sieve: None,
+            adviser: None,
         },
     )
     .unwrap();
     assert!(out.content.len() < 2 + 1 + ENVELOPE_ATTACH_MAX_BYTES + 40);
     assert!(out.content.contains("[truncated: "));
+}
+
+/// A sieve pass that later leaves the window through the plain store
+/// keeps the seven stage reports instead of being accounted as "never
+/// sieved".
+#[test]
+fn a_sieved_pass_that_leaves_carries_its_stage_account() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut cas = Cas::open(&dir.path().join("cas")).unwrap();
+    let env = dir.path().join("env");
+    std::fs::create_dir_all(&env).unwrap();
+    let table = FilterTable::builtin();
+    let mut history = SieveHistory::default();
+    let text: String = (0..200)
+        .map(|n| {
+            let first = char::from(b'a' + (n % 26) as u8);
+            let second = char::from(b'a' + (n / 26) as u8);
+            let third = char::from(b'a' + ((n / 676) % 26) as u8);
+            format!(
+                "record {first}{second}{third} stands alone here {} \n",
+                "and keeps going ".repeat(6)
+            )
+        })
+        .collect();
+    assert!(
+        text.len() > 16_384,
+        "the store has to be worth it: {}",
+        text.len()
+    );
+    let out = package(
+        text.as_bytes(),
+        PackContext {
+            cap_bytes: 1_024,
+            stamp: None,
+            net_notice: false,
+            steer: None,
+            reminder: None,
+            offload: Some(OffloadSite {
+                cas: &mut cas,
+                environment: &env,
+            }),
+            sieve: Some(SieveRequest {
+                key: CommandKey::of(&kernel::ExecArm::Program {
+                    path: "ls".to_owned(),
+                    args: Vec::new(),
+                }),
+                exit_code: Some(0),
+                table: &table,
+                history: &mut history,
+            }),
+            adviser: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(out.events.len(), 1, "the result left through the store");
+    let event = serde_json::to_value(&out.events[0]).unwrap();
+    assert_eq!(event["filter"], "generic");
+    assert_eq!(
+        event["stages"].as_array().map(Vec::len),
+        Some(7),
+        "a pass accounts every stage it ran: {event}"
+    );
 }

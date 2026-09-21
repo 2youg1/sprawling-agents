@@ -8,12 +8,18 @@
 //! of its author, because `cargo build` and `git status` are both logs
 //! and their noise has nothing in common.
 //!
-//! No model is called. The same seed must replay a byte-identical
-//! window (ARCHITECTURE.md §10), and a compactor that thinks cannot
-//! be replayed. Seven stages run in a fixed order, each accepted only
-//! when it shrank the text, and every stage — kept, skipped, refused —
-//! is written into the account, so a filter that stops working is
-//! diagnosable afterwards.
+//! **The replay path never calls a model.** The same seed must replay a
+//! byte-identical window (ARCHITECTURE.md §10), and a compactor that
+//! thinks cannot be replayed. A first run may ask an adviser, and its
+//! answer is a recorded fact (`adviser_asked`, `adviser_answered`,
+//! `adviser_fell_back`) rather than something this module recomputes —
+//! which is why no adviser appears in the stage chain below.
+//!
+//! Seven stages run in a fixed order, each accepted only when it shrank
+//! the text, and every stage that ran — applied, no-op, refused or
+//! unavailable — is carried in the answer: a cut's account, or a pass's
+//! account. Below the floor no stage runs at all and the reason is the
+//! account.
 //!
 //! The tee comes first and is not optional. The original is pinned in
 //! the CAS and materialized as a rest file before anything is cut,
@@ -222,6 +228,9 @@ pub fn sieve(
         return Ok(Sieved::Passed {
             text: text.to_owned(),
             reason: PassReason::BelowFloor,
+            // No stage runs at all below the floor, so there is no
+            // account to carry and the reason is the whole of it.
+            account: None,
         });
     }
     let pinned = tee(text.as_bytes(), site)?;
@@ -297,9 +306,21 @@ pub fn sieve(
     );
     let out = format!("{body}\n{footer}");
     if out.len() > text.len() {
+        // Every stage ran and the total did not shrink. The account
+        // travels with the pass instead of being dropped here, so a
+        // result the sieve declined to cut still says what was tried
+        // when it later leaves the window through the plain store.
         return Ok(Sieved::Passed {
             text: text.to_owned(),
             reason: PassReason::NothingShrank,
+            account: Some(SieveAccount {
+                filter: filter.id.clone(),
+                lines_in,
+                // The sieve emitted nothing: the model reads the input,
+                // so the line count it reads is the one it had.
+                lines_out: lines_in,
+                stages: account,
+            }),
         });
     }
     let bytes_out = u64::try_from(out.len()).unwrap_or(u64::MAX);

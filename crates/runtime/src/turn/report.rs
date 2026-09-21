@@ -6,7 +6,7 @@
 //! What a completed turn hands the run loop, and the frozen `[model]`
 //! section the call is shaped by.
 
-use kernel::{Ceiling, ContentBlock, EventRef, ModelUsage, StopReason};
+use kernel::{AxCode, AxError, Ceiling, ContentBlock, EventRef, ModelUsage, StopReason};
 
 /// What a completed turn hands the run loop. `assistant` and
 /// `wave_results` are the window-folding material — the same content the
@@ -82,4 +82,50 @@ pub struct CallShape {
     /// The model's window, from the endpoint book. Zero when the book
     /// does not say, in which case the context reminder stays silent.
     pub context_tokens: u64,
+}
+
+impl CallShape {
+    /// Refuses a shape that differs from the one a session froze.
+    ///
+    /// The model, its output ceiling and its effort are the fields that
+    /// reach the provider's wire; changing any of them mid-session
+    /// invalidates the message cache breakpoints the frozen prefix is
+    /// paid for, which is why they freeze with the session rather than
+    /// with a form. `context_tokens` is not one of them: it sizes this
+    /// machine's own reminder and never leaves it.
+    ///
+    /// This is the runtime's half of the interception the dispatch face
+    /// owes: `Command::Dispatch { effort }` writes a room's effort, and
+    /// whoever lets that write through asks here first.
+    ///
+    /// # Errors
+    /// `ConfigInvalid`, naming the field that moved and the two ways
+    /// out.
+    pub fn verified_against(&self, frozen: &CallShape) -> Result<(), AxError> {
+        if self.model != frozen.model {
+            return Err(shape_moved(format!(
+                "the model changed from `{}` to `{}`",
+                frozen.model, self.model
+            )));
+        }
+        if self.effort != frozen.effort {
+            return Err(shape_moved(format!(
+                "the effort changed from {:?} to {:?}",
+                frozen.effort, self.effort
+            )));
+        }
+        if self.max_tokens != frozen.max_tokens {
+            return Err(shape_moved("the output ceiling changed".to_owned()));
+        }
+        Ok(())
+    }
+}
+
+/// The refusal a call shape that moved under a running session earns.
+fn shape_moved(subject: String) -> AxError {
+    AxError::failure(AxCode::ConfigInvalid, "dispatch a turn", subject).with_recovery(
+        "open a new session, or fork this run: the model, its ceiling and its effort are \
+         frozen with the session, and a mid-run change would invalidate the prefix the \
+         run is paying to cache",
+    )
 }

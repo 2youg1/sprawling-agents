@@ -16,18 +16,22 @@
 //! sieve left enters the three arms below as the result.
 
 use kernel::consts_policy::OFFLOAD_MIN_BYTES;
+use kernel::event::record::AdviserAnswer;
 use kernel::{AxCode, AxError, ByteLen, Payload};
 
 use crate::clock::ClockStamp;
-use crate::compaction::{self, Shrink};
+use crate::compaction::{self, Shrink, Strategy};
 use crate::elision::{self, Elided};
 use crate::offload::{OffloadSite, offload};
 use crate::reminder::ContextReminder;
 use crate::sieve::{
-    CommandKey, FilterTable, ResultOffloaded, SieveHistory, SieveInput, Sieved, sieve,
+    CommandKey, FilterTable, ResultOffloaded, SieveAccount, SieveHistory, SieveInput, Sieved, sieve,
 };
 
+pub mod adviser;
 pub mod exec;
+
+pub use adviser::{Adviser, Ask, Consultation};
 
 /// Attachments beyond this many bytes are cut with the truncation
 /// marker: attachments ride the envelope, they do not become the body.
@@ -64,6 +68,12 @@ pub struct PackContext<'a> {
     /// Present for `exec` results only. Without an offload site there
     /// is no tee, and without a tee the sieve does not cut.
     pub sieve: Option<SieveRequest<'a>>,
+    /// The window's adviser, consulted before this call: its answer may
+    /// adjust the budget or take the result out of the window, and its
+    /// two ledger lines ride `Packaged::events` whether it answered or
+    /// fell back. `None` means nobody asked, which is not the same as a
+    /// fallback and is not recorded as one.
+    pub adviser: Option<Consultation>,
 }
 
 /// The packaged result: window text plus the events the caller appends
@@ -107,6 +117,19 @@ fn nowhere_to_put_it(len: u64) -> AxError {
     )
 }
 
+/// What one adviser score does to the window's byte budget.
+///
+/// `10_000` basis points leave the budget exactly where the
+/// deterministic plan put it; a lower score spends less before the cut.
+/// Overflow can only mean the scaling changed nothing, so the full cap
+/// stands.
+fn scaled_budget(cap_bytes: u64, score_bp: u16) -> u64 {
+    cap_bytes
+        .checked_mul(u64::from(score_bp))
+        .and_then(|scaled| scaled.checked_div(u64::from(adviser::BASIS_POINTS)))
+        .unwrap_or(cap_bytes)
+}
+
 /// Moves a result out of the window and leaves a reference, accounting
 /// the move.
 ///
@@ -116,8 +139,8 @@ fn store(
     result: &[u8],
     cap_bytes: u64,
     site: &mut OffloadSite<'_>,
-    events: &mut Vec<Payload>,
-) -> Result<Vec<u8>, AxError> {
+    sieve: Option<SieveAccount>,
+) -> Result<(Vec<u8>, Payload), AxError> {
     let record = offload(result, cap_bytes, site)?;
     let substitute_len = u64::try_from(record.substitute.len()).map_err(|_| {
         AxError::failure(
@@ -127,17 +150,15 @@ fn store(
         )
         .with_recovery("this machine cannot count the substitute's bytes in a u64")
     })?;
-    events.push(
-        ResultOffloaded {
-            original: record.original.clone(),
-            len: record.original_len,
-            substitute_len,
-            rest_path: record.rest_path.display().to_string(),
-            sieve: None,
-        }
-        .payload()?,
-    );
-    Ok(record.substitute)
+    let payload = ResultOffloaded {
+        original: record.original.clone(),
+        len: record.original_len,
+        substitute_len,
+        rest_path: record.rest_path.display().to_string(),
+        sieve,
+    }
+    .payload()?;
+    Ok((record.substitute, payload))
 }
 
 /// Packages one tool result for the window. Shrink order: the sieve
@@ -148,7 +169,25 @@ fn store(
 pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError> {
     let mut events = Vec::new();
     let mut offload_site = ctx.offload;
+    // The adviser runs before anything is cut and before the sieve: its
+    // verdict is a parameter of this call, and its two ledger lines are
+    // kept whatever it said. A consultation with no answer leaves every
+    // figure below exactly where it was.
+    let mut score: Option<u16> = None;
+    let mut take_out = false;
+    if let Some(consultation) = &ctx.adviser {
+        events.extend(consultation.payloads()?);
+        match consultation.answer() {
+            Some(AdviserAnswer::Score { score_bp }) => score = Some(*score_bp),
+            // The adviser may take a result out of the window; it may
+            // never force one in. Whether it can is decided below, where
+            // the result's length and the store are both known.
+            Some(AdviserAnswer::Noul { keep: false, .. }) => take_out = true,
+            Some(AdviserAnswer::Noul { .. } | AdviserAnswer::Choice { .. }) | None => {}
+        }
+    }
     let mut sieved: Option<Vec<u8>> = None;
+    let mut passed: Option<SieveAccount> = None;
     if let Some(request) = ctx.sieve
         && let Some(site) = offload_site.as_mut()
         && let Ok(text) = std::str::from_utf8(result)
@@ -158,9 +197,16 @@ pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>
             exit_code: request.exit_code,
             text,
         };
-        if let Sieved::Cut(record) = sieve(input, request.table, site, request.history)? {
-            events.push(record.offloaded().payload()?);
-            sieved = Some(record.text.into_bytes());
+        match sieve(input, request.table, site, request.history)? {
+            Sieved::Cut(record) => {
+                events.push(record.offloaded().payload()?);
+                sieved = Some(record.text.into_bytes());
+            }
+            // The sieve returned the input byte for byte. The stages
+            // that ran are carried instead of dropped, so a result the
+            // sieve declined to cut still has an account when it later
+            // leaves the window through the plain store below.
+            Sieved::Passed { account, .. } => passed = account,
         }
     }
     let result: &[u8] = sieved.as_deref().unwrap_or(result);
@@ -174,24 +220,62 @@ pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>
     // decision, made by the module that owns it. Bytes that are not
     // text are material nothing can read the shape of, which is what
     // `Unknown` means.
-    let budget = ByteLen::new(ctx.cap_bytes);
     let text = std::str::from_utf8(result);
     let shape = match text {
         Ok(text) => compaction::detect(text),
+        // Registered, not fixed: a non-UTF-8 result is silently folded
+        // into `Unknown` here, and `Unknown` is the class that leaves
+        // the window whole. A `Content::Binary` would name it, and the
+        // mutation is larger than one line.
         Err(_) => compaction::Content::Unknown,
     };
-    let plan = compaction::plan(shape, ByteLen::new(len), budget);
+    let cap_budget = ByteLen::new(ctx.cap_bytes);
+    let deterministic = compaction::plan(shape, ByteLen::new(len), cap_budget);
+    // A result that fits has no way out of a window without a site, and
+    // `offload` stores only what it has to cut: the adviser's "not
+    // needed" is therefore acted on only where the city would have had
+    // to shorten or store anyway. The answer is recorded either way.
+    let take_out = take_out && offload_site.is_some() && len > ctx.cap_bytes;
+    let (plan, budget) = if take_out {
+        (Shrink::MustOffload, cap_budget)
+    } else {
+        match score {
+            Some(score_bp) => {
+                let scaled = ByteLen::new(scaled_budget(ctx.cap_bytes, score_bp));
+                let with_adviser = compaction::plan(shape, ByteLen::new(len), scaled);
+                // A density score may shorten a text; it may not turn a
+                // result the city would have kept whole into a refusal.
+                // The only class that can newly become `MustOffload` is
+                // the one nothing may cut, so the city's plan stands —
+                // its budget with it.
+                if with_adviser == Shrink::MustOffload && deterministic != Shrink::MustOffload {
+                    (deterministic, cap_budget)
+                } else {
+                    (with_adviser, scaled)
+                }
+            }
+            None => (deterministic, cap_budget),
+        }
+    };
     // A result that must leave whole goes to the store; one that may be
     // shortened goes there too when it is big enough to be worth
     // storing, because a person can then still read all of it.
     let worth_storing = match plan {
         Shrink::Keep => false,
+        // The section skeleton is the whole point of this class: offload
+        // would replace a long document with the head of the file and a
+        // pointer, which is the outcome `Markup` exists to avoid.
+        Shrink::Cut(Strategy::Sections) => false,
         Shrink::Cut(_) => len >= OFFLOAD_MIN_BYTES,
         Shrink::MustOffload => true,
     };
     let body: Vec<u8> = match (plan, offload_site.as_mut()) {
         (Shrink::Keep, _) => result.to_vec(),
-        (_, Some(site)) if worth_storing => store(result, ctx.cap_bytes, site, &mut events)?,
+        (_, Some(site)) if worth_storing => {
+            let (substitute, account) = store(result, ctx.cap_bytes, site, passed)?;
+            events.push(account);
+            substitute
+        }
         (Shrink::Cut(strategy), _) => match text {
             Ok(text) => compaction::shorten(text, strategy, budget)
                 .text
