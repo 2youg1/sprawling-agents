@@ -22,7 +22,7 @@ import { MAYOR, current } from "../../core/route";
 import { UNSTATED, completed, find, offered, parse, reached } from "../../core/slash";
 import type { Slash, SlashHands } from "../../core/slash";
 import { EFFORTS, selectModel } from "../../core/commands";
-import { canRecord, record, type Heard, type Recording } from "../../core/speaking";
+import { canRecord, dictation } from "../../core/speaking";
 import { Address } from "../../wire";
 import { motionOff } from "../shared/motion";
 import { useCommand, useGo, useSay, useUi } from "../../ui";
@@ -322,39 +322,11 @@ export function Composer(props: ComposerProps) {
 
   // ------------------------------------------------------------- speaking
 
-  const [taking, setTaking] = createSignal<Recording | null>(null);
-  const [hearing, setHearing] = createSignal(false);
-  const [refused, setRefused] = createSignal(false);
-  // The words land in the box rather than being sent: what somebody
-  // said is a draft like any other, and a machine that heard it wrongly
-  // must be correctable before it costs a run.
-  const speak = () => {
-    const going = taking();
-    if (going === null) {
-      setRefused(false);
-      void record(ui.origin, ui.pairing).then((started) => {
-        setTaking(() => started);
-        setRefused(started === null);
-      });
-      return;
-    }
-    setTaking(null);
-    setHearing(true);
-    // The words are appended to whatever is in the box at the moment
-    // the city answers, which is why the read happens inside the
-    // updater rather than beside it: somebody goes on typing while a
-    // recording is being transcribed.
-    const settle = (answer: Heard) => {
-      setHearing(false);
-      setRefused(answer.kind === "refused");
-      if (answer.kind !== "text") {
-        return;
-      }
-      const before = untrack(text);
-      write(before === "" ? answer.text : `${before} ${answer.text}`);
-    };
-    void going.stop().then(settle);
-  };
+  const heard = dictation(ui.origin, ui.pairing, (words) => { untrack(() => {
+      const before = text();
+      write(before === "" ? words : `${before} ${words}`);
+    }); },
+  );
 
   // Focus is said by the edge going from dashed to solid, and by
   // nothing else.
@@ -468,17 +440,17 @@ export function Composer(props: ComposerProps) {
           <Show when={props.hearing === true && canRecord()}>
             <button
               type="button"
-              class={`rounded-pill px-base py-tight text-note ${taking() === null ? "bg-raised text-text-quiet hover:bg-raised-hover" : "bg-alert text-on-accent"}`}
-              disabled={hearing()}
-              onClick={speak}
+              class={`rounded-pill px-base py-tight text-note ${heard.taking() ? "bg-alert text-on-accent" : "bg-raised text-text-quiet hover:bg-raised-hover"}`}
+              disabled={heard.hearing()}
+              onClick={heard.speak}
             >
-              {hearing() ? say("talk_hearing") : taking() === null ? say("talk_record") : say("talk_recording")}
+              {heard.hearing() ? say("talk_hearing") : heard.taking() ? say("talk_recording") : say("talk_record")}
             </button>
           </Show>
           <Show when={kept()}>
             <span class="text-alert">{say("talk_not_live")}</span>
           </Show>
-          <Show when={refused()}>
+          <Show when={heard.refused()}>
             <span class="text-alert">{say("link_refused")}</span>
           </Show>
         </div>

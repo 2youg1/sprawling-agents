@@ -10,6 +10,8 @@
 // about. The city refuses a container it cannot send on, by name, so a
 // guess here would be a guess the person pays for.
 
+import { createSignal } from "solid-js";
+
 import { bearing } from "./socket";
 
 // What a recording attempt ended as. Exhaustive because the composer
@@ -89,4 +91,55 @@ export async function record(origin: string, token: string | null): Promise<Reco
       close();
     },
   };
+}
+
+// Dictation as the three states a person can see it in, kept here
+// rather than in the box that draws them.
+//
+// The box owns where words go; this owns whether a recording is
+// running, whether the city is still transcribing, and whether the last
+// attempt was refused. Splitting it the other way put four signals and
+// a two-branch handler inside a view that already had eleven, and the
+// state was never about the view: a second control that dictates into
+// somewhere else needs the same machine and must not grow a second one.
+export interface Dictation {
+  readonly taking: () => boolean;
+  readonly hearing: () => boolean;
+  readonly refused: () => boolean;
+  readonly speak: () => void;
+}
+
+// `into` is handed the whole new value, not an appendix, so that the
+// read of what is already there happens at the moment the city answers
+// rather than at the moment the button was pressed: somebody goes on
+// typing while a recording is being transcribed.
+export function dictation(
+  origin: string,
+  pairing: string | null,
+  into: (heard: string) => void,
+): Dictation {
+  const [taking, setTaking] = createSignal<Recording | null>(null);
+  const [hearing, setHearing] = createSignal(false);
+  const [refused, setRefused] = createSignal(false);
+  const speak = () => {
+    const going = taking();
+    if (going === null) {
+      setRefused(false);
+      void record(origin, pairing).then((started) => {
+        setTaking(() => started);
+        setRefused(started === null);
+      });
+      return;
+    }
+    setTaking(null);
+    setHearing(true);
+    void going.stop().then((answer: Heard) => {
+      setHearing(false);
+      setRefused(answer.kind === "refused");
+      if (answer.kind === "text") {
+        into(answer.text);
+      }
+    });
+  };
+  return { taking: () => taking() !== null, hearing, refused, speak };
 }
