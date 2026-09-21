@@ -270,13 +270,17 @@ impl RunWorker {
 
     /// Puts one credential in the vault. Nothing about it reaches the
     /// ledger but the fact that it happened.
+    ///
+    /// The vault key and the `ref` the record states are one value built
+    /// once here: a route that announced a reference it spelled itself
+    /// would answer with a place the vault may never have been told.
     pub(in crate::assembly) fn put_secret(
         &mut self,
         realm: String,
         name: String,
         value: kernel::Sealed<String>,
     ) -> Result<(), AxError> {
-        let reference = kernel::SecretRef::parse(&format!("secret:{realm}/{name}"))?;
+        let reference = kernel::SecretRef::new(&realm, &name)?;
         {
             let mut vault = self.vault.lock().map_err(|_| poisoned_vault())?;
             vault.set(&reference, value.into_vault_value())?;

@@ -160,7 +160,11 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
     let writer = history.find("lab/writer").expect("the second node ran");
     assert!(
         reader < writer,
-        "the node everything waits on has to go first"
+        "the node everything waits on has to go first
+         read {reader}, wrote {writer}
+         the earlier mention sits in:
+{}",
+        excerpt(&history, reader.min(writer))
     );
     assert_eq!(
         worker
@@ -168,7 +172,10 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             .get(&room)
             .map_or(0, |join| join.artifacts().count()),
         2,
-        "both results joined, verified by the city rather than by their own producers"
+        "both results joined, verified by the city rather than by their own producers
+         the history, one line per record, is:
+{}",
+        mentioned(&history, "handback")
     );
 }
 
@@ -253,4 +260,42 @@ fn three_ready_nodes_drive_three_runs_at_once() {
         .filter(|line| line["kind"] == "run_frozen")
         .count();
     assert_eq!(frozen, 3, "every run the pursuit started has to freeze");
+}
+
+/// The ledger line around a byte offset, for an assertion that would
+/// otherwise fail with two numbers and no page to look at.
+///
+/// The first mention of a node's address in the history is not always
+/// the node's own record: a plan is laid out by naming every room in it,
+/// and that naming is one line the history holds. An assertion that
+/// compares two `find` offsets has to show the line it landed on, or the
+/// next person re-derives which of the two it meant.
+/// Every ledger line naming a word, joined for an assertion message.
+///
+/// A join count of one instead of two says a handback went missing and
+/// nothing about which one, so the message carries the lines that would
+/// have recorded it.
+fn mentioned(history: &str, word: &str) -> String {
+    let mut out: Vec<&str> = history.lines().filter(|line| line.contains(word)).collect();
+    if out.is_empty() {
+        out = vec!["(no line names it)"];
+    }
+    out.join(
+        "
+",
+    )
+}
+
+fn excerpt(history: &str, at: usize) -> String {
+    // Byte offsets into a ledger line, which is ASCII JSON, so the
+    // slicing clippy warns about cannot land inside a character here.
+    let before = history.get(..at).unwrap_or_default();
+    let start = before
+        .rfind(char::from(10))
+        .map_or(0, |line| line.saturating_add(1));
+    let after = history.get(at..).unwrap_or_default();
+    let end = after
+        .find(char::from(10))
+        .map_or(history.len(), |line| at.saturating_add(line));
+    history.get(start..end).unwrap_or_default().to_owned()
 }

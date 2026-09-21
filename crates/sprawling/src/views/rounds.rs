@@ -172,7 +172,7 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                 let map = record.data().as_map();
                 let call = channels::Call {
                     tool: channels::text(map.get("name")).unwrap_or_else(|| "tool".to_owned()),
-                    subject: channels::subject_of(map.get("args")),
+                    subject: channels::text(map.get("subject")),
                     arguments: map.get("args").and_then(channels::arguments_in),
                     outcome: channels::Outcome::Waiting,
                     at: record.seq(),

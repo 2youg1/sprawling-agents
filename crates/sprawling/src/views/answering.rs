@@ -99,12 +99,7 @@ impl Views {
                     frozen,
                     buildings: self.spine(),
                     pursuits: self.pursuit_lines(),
-                    halted: self
-                        .governance
-                        .halted
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
+                    halted: self.governance.halted.iter().map(named).collect(),
                 })
             }
             channels::Query::RunView { run } => {
@@ -270,5 +265,18 @@ impl Views {
             }
             channels::Query::Metrics => channels::Answer::Metrics(Box::new(self.metrics())),
         }
+    }
+}
+
+/// One shut scope in the shape a `halt` frame names it.
+///
+/// The ledger keeps `Scope` and its own spelling; a page is answered in
+/// the vocabulary it would use to ask, so nothing on the other side has
+/// to take a string apart to know which building it is looking at.
+fn named(scope: &kernel::event::Scope) -> channels::HaltScope {
+    match scope {
+        kernel::event::Scope::City => channels::HaltScope::City,
+        kernel::event::Scope::Building(addr) => channels::HaltScope::Building(addr.clone()),
+        kernel::event::Scope::Workshop(addr) => channels::HaltScope::Workshop(addr.clone()),
     }
 }

@@ -38,6 +38,8 @@ pub(super) fn client_summary() -> String {
 pub(super) const COMMANDS: &str = "\
 commands:
   up [dir] [addr]              raise a city here if needed, serve it, open the WebUI
+                               (--no-open leaves the screen alone, and so does
+                               SPRAWLING_OPEN=never, which also reaches the wizard)
   install [--uninstall]        put this binary on your PATH, or take it back off
   doctor [<city>] [--install]  what this machine has against what a city needs
                                (<city>: judge each building's bits; --install: offer
@@ -46,7 +48,8 @@ commands:
   init <dir> [--adopt]         raise a city: writes the genesis record
                                (--adopt: every folder there becomes a building)
   serve <dir> [addr] [--open]  serve a city that already exists
-                               (--console enters it, --no-console does not)
+                               (--console enters it, --no-console does not;
+                               --no-open and SPRAWLING_OPEN=never are read here too)
   resume <dir>                 after a restart: verify, close what was lost, report
   version                      which release this binary is, and when it was cut
   status [--deps] [--check]    this binary: version, client, what it is built from

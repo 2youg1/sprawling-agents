@@ -25,6 +25,9 @@
 //! that a mistyped path becomes a refusal rather than an empty city at a
 //! location nobody looked at.
 
+#[path = "city/opening.rs"]
+mod opening;
+
 use super::router::{
     COMMANDS, client_summary, default_city_location, flag_value, log_floor, log_levels, named,
 };
@@ -32,6 +35,8 @@ use super::{CLIENT_COMPLETE, CLIENT_FILES};
 use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, console, firstrun, serving};
 use std::process::ExitCode;
+
+use opening::{Open, opening};
 
 pub(super) fn up(args: &[String]) -> ExitCode {
     let city = match args.get(1).filter(|a| !a.starts_with("--")) {
@@ -61,12 +66,12 @@ pub(super) fn use_folder(folder: &std::path::Path) -> ExitCode {
     }
     if assembly::has_history(folder) {
         println!("{} is already a city; opening it", folder.display());
-        return serve_city(folder, DEFAULT_AT, &[], Open::Browser);
+        return serve_city(folder, DEFAULT_AT, &[], opening(&[], Open::Browser));
     }
     match assembly::form_city(folder, assembly::Adopt::EveryFolder) {
         Ok(report) => {
             report_standing(&report);
-            serve_city(folder, DEFAULT_AT, &[], Open::Browser)
+            serve_city(folder, DEFAULT_AT, &[], opening(&[], Open::Browser))
         }
         Err(err) => report(err),
     }
@@ -114,7 +119,7 @@ pub(super) fn up_at(city: &std::path::Path, raw: &str, args: &[String]) -> ExitC
             Err(err) => return report(err),
         }
     }
-    serve_city(city, raw, args, Open::Browser)
+    serve_city(city, raw, args, opening(args, Open::Browser))
 }
 
 /// The genesis write: a city is born when city_initialized becomes line
@@ -169,24 +174,8 @@ pub(super) fn serve(dir: Option<&String>, addr: Option<&String>, args: &[String]
     let raw = addr
         .filter(|a| !a.starts_with("--"))
         .map_or(DEFAULT_AT, String::as_str);
-    let open = if args.iter().any(|a| a == "--open") {
-        Open::Browser
-    } else {
-        Open::Nothing
-    };
+    let open = opening(args, Open::Nothing);
     serve_city(std::path::Path::new(dir), raw, args, open)
-}
-
-/// Serving proper, reached from `serve` and from `up`. `open` is the only
-/// difference between them: `up` is the appliance and opens the WebUI,
-/// `serve` stays where a person put it unless asked.
-/// What serving does with the person's browser.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Open {
-    /// Show the city: the appliance path, where the window is the point.
-    Browser,
-    /// Leave the screen alone, which is what a service wants.
-    Nothing,
 }
 
 pub(super) fn serve_city(

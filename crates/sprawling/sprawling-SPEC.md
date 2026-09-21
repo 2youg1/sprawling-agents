@@ -3044,6 +3044,7 @@ impl Home {
 - **缺陷**：`run_id_for` 把摘要印成十六进制再逐对解回字节，两步各带一个 `unwrap_or`——`from_utf8` 失败取 `"00"`，`from_str_radix` 失败取 `0`。一次解不出的摘要于是变成全零的 run id，而两条不同的活会得到同一个标识。
 - **改法**：`B3Hash::as_bytes()` 的前十六字节即标识，解析这一步整个消失。字节与旧写法逐位相同（印出来的十六进制正是这些字节），故账本与 replay 的字节不变。
 - **`Interrupting::ask` 的同一类默认**：`backlog.stopping(id)` 的 `Err` 此前读作「没停」。读不到那张表的城答不出这个作用域还开着，于是改答为「停」——一次多余的取消看得见，一次漏掉的取消让 run 跑在人已经关掉的作用域里。
+- **`SignalDesk::take_steer` 的拒绝不折平**：desk 返回 `Result<Option<Steer>, AxError>`——`Ok(None)` 是空队列，`Err` 是一件已离队、却读不成插队信的信（非 steer 型，或载荷里没有文字）。`ask` 对 `Err` 答 `Interrupt::None`，与 `serving::desk` 给人那一侧一个空 steer 的答案同字：安全点不是为一封读不懂的信停下来，而没有文字的信也没有内容可以交给这一跑。区别不在答案而在不折平——desk 把每一件取走的信都记成 `Consumed`，于是它不再在两个出口之间消失。
 
 **本章测试**：`two_jobs_at_one_millisecond_get_two_run_ids`（`assembly::dispatching::tests`）。
 

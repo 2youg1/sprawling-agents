@@ -24,21 +24,19 @@ impl Views {
     /// Every shelf one building reads from, with the runs that pinned
     /// each holding.
     ///
-    /// `None` for a building whose shelves will not scan, which is a
-    /// broken installation rather than an empty one: `Unavailable` says
-    /// the view could not look, and an empty list would say this
-    /// building can do nothing.
+    /// `None` for a building whose shelves will not scan and for one
+    /// whose rules will not load. Both are a broken installation rather
+    /// than an empty one: `Unavailable` says the view could not look,
+    /// while an empty list would say this building can do nothing. A
+    /// building with no rules file does admit nothing, and `city::load`
+    /// answers that case with the default rules rather than a failure.
     pub(super) fn skills_answer(&self, building: &Address) -> Option<channels::SkillsAnswer> {
         let home = crate::home::Home::detect().ok()?;
         let shelves = city::Library::scan(&self.city_root, Some(building), home.path()).ok()?;
         // What this building's reading room admits, so a page can show
-        // the stock and the choice in one list. A building with no
-        // rules file admits nothing, which is what a fresh building is.
-        let rules = city::load(&self.city_root, building).ok();
-        let admitted: Vec<String> = rules
-            .as_ref()
-            .map(|held| held.reading_room().to_vec())
-            .unwrap_or_default();
+        // the stock and the choice in one list.
+        let rules = city::load(&self.city_root, building).ok()?;
+        let admitted: Vec<String> = rules.reading_room().to_vec();
         let skills = shelves
             .all()
             .into_iter()
@@ -229,5 +227,31 @@ mod tests {
         );
         assert_eq!(outside.section, "", "that tree files no sections");
         assert_eq!(outside.disclosure, "Diagnose first");
+    }
+
+    /// A building whose rules exist and will not load answers
+    /// `Unavailable`, like a shelf that will not scan: an empty list
+    /// would say the building admits nothing, which is the answer a
+    /// fresh building gives and a broken one must not.
+    #[test]
+    fn rules_that_will_not_load_answer_unavailable_rather_than_admitting_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        crate::assembly::init_city(dir.path()).unwrap();
+        let lab = Address::parse("lab").unwrap();
+        city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
+        std::fs::write(
+            city::rules_path(dir.path(), &lab),
+            "not a rules document [\n",
+        )
+        .unwrap();
+
+        let mut views = Views::new(dir.path());
+        let answer = views.answer(&channels::Query::Skills {
+            building: lab.clone(),
+        });
+        let channels::Answer::Unavailable { query } = answer else {
+            panic!("rules that will not load are not a building that admits nothing");
+        };
+        assert_eq!(query, format!("Skills({})", lab.as_str()));
     }
 }

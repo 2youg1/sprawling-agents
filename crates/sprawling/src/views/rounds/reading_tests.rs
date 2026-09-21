@@ -44,7 +44,8 @@ fn called(seq: u64, id: &str, name: &str, path: &str) -> EventRecord {
     record(
         seq,
         EventKind::ToolCalled,
-        serde_json::json!({ "id": id, "name": name, "args": { "path": path } }),
+        serde_json::json!({ "id": id, "name": name, "args": { "path": path },
+                            "subject": path }),
     )
 }
 

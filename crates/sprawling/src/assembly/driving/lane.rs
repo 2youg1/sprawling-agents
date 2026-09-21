@@ -89,11 +89,19 @@ impl Interrupting {
             return Interrupt::None;
         };
         match desk.take_steer() {
-            Some(steer) => Interrupt::Steer {
+            Ok(Some(steer)) => Interrupt::Steer {
                 source: steer.source().to_owned(),
                 text: steer.text().to_owned(),
             },
-            None => Interrupt::None,
+            Ok(None) => Interrupt::None,
+            // A signal the desk took out of the queue and could not read as
+            // a steer does not interrupt, and the ledger still has it: the
+            // desk records the consumption before it reports the refusal.
+            // A safe point is not the place to stop a run over a message it
+            // cannot act on, which is the answer the person's own entrance
+            // gives an empty steer (serving::desk). What must not happen is
+            // the two arriving here as one case; they do not.
+            Err(_) => Interrupt::None,
         }
     }
 }

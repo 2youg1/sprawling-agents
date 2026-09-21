@@ -42,7 +42,8 @@ fn called(seq: u64, id: &str, name: &str, path: &str) -> EventRecord {
     record(
         seq,
         EventKind::ToolCalled,
-        serde_json::json!({ "id": id, "name": name, "args": { "path": path } }),
+        serde_json::json!({ "id": id, "name": name, "args": { "path": path },
+                            "subject": path }),
     )
 }
 
@@ -157,18 +158,23 @@ fn a_call_whose_arguments_this_build_cannot_read_still_gets_a_row() {
 }
 
 #[test]
-fn a_tool_with_no_preferred_key_is_still_named_by_what_it_acted_on() {
+fn the_fold_shows_the_carried_subject_not_a_reading_of_the_arguments() {
+    // The subject is decided when the record is written; the fold reads
+    // it. A fold that looked at `args` again would be the second answer
+    // this field exists to remove.
     let events = [
         asked(1),
         record(
             2,
             EventKind::ToolCalled,
-            serde_json::json!({ "id": "a", "name": "note", "args": { "body": "ship it" } }),
+            serde_json::json!({ "id": "a", "name": "note",
+                                "args": { "path": "src/lex.rs" },
+                                "subject": "the carried one" }),
         ),
     ];
     assert_eq!(
         turns(&events)[0].calls[0].subject.as_deref(),
-        Some("ship it")
+        Some("the carried one")
     );
 }
 
@@ -217,7 +223,9 @@ fn asking_for_rounds_answers_the_fold_the_view_layer_ran() {
         (EventKind::ModelCalled, serde_json::json!({})),
         (
             EventKind::ToolCalled,
-            serde_json::json!({ "id": "a", "name": "read", "args": { "path": "src/lex.rs" } }),
+            serde_json::json!({ "id": "a", "name": "read",
+                                "args": { "path": "src/lex.rs" },
+                                "subject": "src/lex.rs" }),
         ),
         (
             EventKind::ToolResult,

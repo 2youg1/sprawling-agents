@@ -49,7 +49,7 @@ fn the_city_view_names_the_scopes_a_halt_shut() {
     let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
         panic!("CityView answers with a city");
     };
-    assert_eq!(city.halted, vec!["city".to_owned()]);
+    assert_eq!(city.halted, vec![channels::HaltScope::City]);
 
     views.apply(&halt_record(2, "released")).unwrap();
     let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
