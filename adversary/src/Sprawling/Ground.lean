@@ -212,33 +212,71 @@ where
 private def segments (ground : Ground) : IO (List (String × ByteArray)) := do
   return (← ground.stored).filter fun segment => segment.fst.endsWith ".jsonl"
 
-/-- Flips one bit inside the oldest record a ledger holds, the way damage or a
-hostile disk would.
+/-- Where every complete line of a segment ends: the position of each newline.
 
-Not the end: a damaged tail is a case the product handles on purpose
-(`memory::jsonl` recovers it), and hitting it would test recovery while claiming
-to test detection.
+Found by walking the bytes once rather than by decoding the file, because what
+the caller changes is a byte and a `String` reader would have counted characters. -/
+private def newlinePositions (bytes : List UInt8) : List Nat :=
+  ((bytes.zip (List.range bytes.length)).filter (fun entry => entry.1 == 10)).map
+    (fun entry => entry.2)
 
-Not the middle of the file either, which is what this did first. A city writes
-records of its own accord — it noticed it had no provider while this was
-choosing a byte — so the file's midpoint landed on a chain hash one run and on a
-record's kind the next, and one test produced two different refusals. The first
-line is written by `init` before anything else can happen, so it is the one
-position on this disk that does not depend on timing, and a test that names a
-code has to hit the same byte every time. -/
-def Ground.corrupt (ground : Ground) : IO Unit := do
+/-- The span of every complete line in a segment, oldest first, as a half-open
+byte range: from where the line starts to the newline that ends it.
+
+A tail with no newline is not a line, which is the reader's own judgement about a
+write that did not land (`memory::jsonl` recovers it rather than reading it), and
+an empty line is not a line either. -/
+private def lineSpans (bytes : List UInt8) : List (Nat × Nat) :=
+  let ends := newlinePositions bytes
+  let starts := 0 :: ends.map (fun position => position + 1)
+  (starts.zip ends).filterMap fun span =>
+    if span.1 < span.2 then some span else none
+
+/-- Flips one bit inside the `index`-th record of the oldest segment, counting
+records the way the reader counts them (a record is a complete line).
+
+The bit is flipped rather than set to a value, so the byte cannot stay what it
+was. It can still become a newline, and a caller that is about to name a position
+again should read the file again: `+1` is kept because the alternative is a rule
+about bytes that this directory would have to keep true, and the one place the
+position must not move (`Ground.corrupt 0`) is already the place where nothing
+else can move it either.
+
+**Which index is a question, and the two questions differ.** A caller testing
+detection picks the oldest record, which is the one byte no city process is
+racing — a city writes records of its own accord, so a position chosen later in
+the file can land on a byte that moved between the reading and the writing. A
+caller testing recovery picks the newest line and calls `Ground.tear` instead:
+what is at the end is a path the product supports. -/
+def Ground.corrupt (ground : Ground) (index : Nat) : IO Unit := do
   match ← segments ground with
   | [] => throw <| IO.userError "the city is holding no history to corrupt"
   | (name, bytes) :: _ =>
-    let newline : UInt8 := 10
-    let firstLine := bytes.toList.takeWhile (· != newline) |>.length
-    let position := firstLine / 2
-    match bytes[position]? with
-    | none => throw <| IO.userError "the history is too short to corrupt"
-    | some byte =>
-      IO.FS.writeBinFile (ground.ledger / name) <|
-        bytes.extract 0 position ++ ByteArray.mk #[byte + 1]
-          ++ bytes.extract (position + 1) bytes.size
+    match (lineSpans bytes.toList)[index]? with
+    | none =>
+      throw <| IO.userError s!"the history holds no record at position {index + 1}"
+    | some (start, stop) =>
+      let position := start + (stop - start) / 2
+      match bytes[position]? with
+      | none => throw <| IO.userError "the history is too short to corrupt"
+      | some byte =>
+        IO.FS.writeBinFile (ground.ledger / name) <|
+          bytes.extract 0 position ++ ByteArray.mk #[byte + 1]
+            ++ bytes.extract (position + 1) bytes.size
+
+/-- Writes the ledger back the way a reading found it.
+
+The adversary's own damage has to be undoable, because a check that asks a
+question about several positions asks it about one disk: a file still carrying
+the damage of position `i - 1` would answer for position `i` as well, and the
+second answer would be believed about a line nothing had tested.
+
+The file names are the ones `Ground.stored` read, which is the same assumption
+`corrupt`, `tear` and `duplicate` already make about the layout:
+`adversary-SPEC.md` section 14 records it. -/
+def Ground.putBack (ground : Ground) (saved : List (String × ByteArray)) : IO Unit := do
+  for (name, bytes) in saved do
+    IO.FS.writeBinFile (ground.ledger / name) bytes
 
 /-- Chops the end off the newest segment, the way a power cut does.
 

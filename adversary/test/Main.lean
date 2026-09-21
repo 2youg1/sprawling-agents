@@ -445,20 +445,62 @@ private def preferencesSurviveAnyOrder (door : Door) (seed : Nat) : IO Unit := d
 /-- The simplest lie a disk can tell: one changed byte.
 
 What the reader must never do is believe it. Nothing in the command asks for a
-check, which is the point — verification is not an option a caller can forget. -/
+check, which is the point — verification is not an option a caller can forget.
+
+The oldest record, for the reason `Ground.corrupt` gives: it is the one position
+no city process is racing. -/
 private def tampering (door : Door) : IO Unit :=
   withGround door fun ground => do
     let _ ← door.ask ground.port (.createBuilding "acme" .minimal (idemKey 2))
     match ← door.verify ground.ledger with
     | .error why => ensure false s!"a clean history did not verify: {why}"
     | .ok _ =>
-      ground.corrupt
+      ground.corrupt 0
       match ← door.verify ground.ledger with
       | .error complaint =>
         ensure ((complaint.splitOn "E_CAS_CORRUPT").length > 1)
           s!"a corrupted history was refused, but not as corruption: {complaint}"
       | .ok lines =>
         ensure false s!"a corrupted history verified as {lines} good line(s)"
+
+/-- A change to any record but the last is refused, not only the one record this
+suite had been changing.
+
+`tampering` flips a byte in the oldest record and is right to: that is the one
+position no city process races. But the chain covers every record a later record
+has hashed — `Sprawling.Chain`'s `aCoveredLineCannotChangeUnnoticed` — so
+detection at one position is detection at one position and no more. This walks
+them all, oldest first, and puts the city's own bytes back before each attempt: a
+file still carrying the previous attempt's damage would refuse for that reason,
+and the answer would be believed about a record nothing had changed.
+
+The last record is not in the list. Nothing after it has hedged it, so what it
+says is what the disk says — `theLastLineIsNotCertified` — and the product's
+answer for a damaged tail is recovery rather than refusal, which `torn` asks
+about separately. -/
+private def everyCoveredRecord (door : Door) : IO Unit :=
+  withGround door fun ground => do
+    let _ ← door.ask ground.port (.createBuilding "acme" .minimal (idemKey 21))
+    -- A city writes records of its own accord for a moment after it is raised,
+    -- and the count below is of one file: it is taken once that file is quiet.
+    let _ ← ground.stillText 20
+    let saved ← ground.stored
+    match ← door.verify ground.ledger with
+    | .error why =>
+      ensure false s!"a history did not verify before anything was changed: {why}"
+    | .ok _ =>
+      let records ← ground.records
+      ensure (records.length ≥ 2)
+        s!"this history held {records.length} record(s), so no record in it is covered by another"
+      for index in List.range (records.length - 1) do
+        ground.putBack saved
+        ground.corrupt index
+        match ← door.verify ground.ledger with
+        | .error _ => pure ()
+        | .ok tailSeq =>
+          ensure false <|
+            s!"a change inside record {index + 1} of {records.length} was believed: " ++
+              s!"the chain still verified, with tail seq {tailSeq}"
 
 /-- A tail torn off mid-record, which the product recovers from on purpose.
 
@@ -549,6 +591,7 @@ private def properties (door : Door) (seed : Nat) : Tree :=
     , .leaf "history reads back as one unbroken chain" (chained door seed)
     , .group "the disk lies"
         [ .leaf "a corrupted record is refused, not believed" (tampering door)
+        , .leaf "a change to any record but the last is refused" (everyCoveredRecord door)
         , .leaf "a torn tail is recovered, not refused" (torn door)
         , .leaf "a record written twice is refused" (doubled door) ]
       -- Two symptoms of one cause. They keep their names because what they
