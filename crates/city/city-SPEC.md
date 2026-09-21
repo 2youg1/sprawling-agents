@@ -78,10 +78,13 @@ impl Dossier { pub fn apply(&mut self, who: &str, record: &EventRecord); pub fn 
 ```rust
 pub const BUILDING_FILE: &str = "BUILDING.md";
 pub enum ModelPool { Any, LocalOnly }                 // 穷尽，不是 bool
-pub struct BuildingRules { /* addr、policy、write_prefixes —— 私有 */ }
+pub enum UserBrowser { Waiting, At(UserBrowserEndpoint) }   // `usersbrowser:` 一行的三种读法里去两种
+pub struct UserBrowserEndpoint { /* url、host —— 私有；parse 是唯一构造点 */ }
+pub struct BuildingRules { /* addr、policy、write_prefixes、browser、usersbrowser —— 私有 */ }
 impl BuildingRules {
     pub fn policy(&self) -> &BuildingPolicy;          // 随每次模型调用出行
     pub fn model_pool(&self) -> ModelPool;
+    pub fn usersbrowser(&self) -> Option<&UserBrowser>;
     pub fn write_domain(&self) -> Result<WriteDomain, AxError>;
 }
 pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError>;
@@ -97,6 +100,8 @@ pub fn building_path(city_root: &Path, addr: &Address) -> PathBuf;
 - **`review: true` 是楼级开关**：开则每个 Run 得一棵自己的 worktree，写的东西在别人检查并 merge 之前对楼不可见。**默认关**，与 confidential 的「不声明即错」相反——隐私的默认值不得惄悄取宽，而审查纪律的默认值不得惄悄取严：一个人派一个 Agent 去改一行字并盯着看，应当看得到文件变化。拼写不是 `true`／`false` 同样拒。
 - **`## Egress` 列可达域名**：`BuildingRules::egress()` 交 `kernel::egress_target` 判定。类型经 `kernel::EgressAllowlist` 重导出，住哪一簇文件是 kernel 内政（`gate::egress`，公共拼写不变）。**confidential 楼同时列域名＝矛盾，拒**——「数据可入不可出」是那个设置的含义，域名表写在它下面会逼读者自己去调和两句话。
 - **今天的执行点与仍缺的执行点要分清**：provider 路径已被 `endpoint` 的 confidential 拒守住；Agent 自己发起的出网（exec 的 Program／Shell 臂、浏览器）**没有可拦截处**，因为拦截需要 OS sandbox。判定已就位，拦截尚未落地——在那之前不要说「出网已管住」。
+- **`usersbrowser:` 一行同时是开关与地址**：值 `ws://127.0.0.1:<port>/session` 启用并声明地址，`true` 启用而地址未定（工具每次调用都得到门的问题），absent／`false` 即无此工具。**confidential 楼写这一行即拒**（`E_CONFIG_INVALID`）——附着读的是那个人浏览器里全部登录态，本楼的隔离在那一刻失效。地址的**语法**（`ws://`、主机形状）在此读一次并把 `url`／`host` 一起交出；**loopback 与否是 `kernel::gate::attach` 的政策**，语法不替政策作答。
+- **`browser:` 与 `usersbrowser:` 是两个键**：前者是城自己拉起的浏览器（profile 按楼隔离），后者是人已经开着的那个（人的真 profile）。`browser:` 不是 `usersbrowser:` 的前缀截断——读键时冒号必须紧跟键名，两个设置因此互不误读。
 - **`write_rules` 先求值再落盘**：一份写到一半就不再求值的治理文档会把它那栋楼一起带走。且**整份文档才是单位**：confidential 楼不得列域名，故两行可以各自合法而合在一起非法。
 
 ### 8-2b city::rules_tool（形状 4 适配器）
@@ -153,12 +158,14 @@ pub fn configured_payload(building: &Building, wrote: Written)
 pub use kernel::layout::CONFIG_FILE;               // 文件名的权威在 kernel::layout
 pub enum Layer { City, Building, Resident }        // 穷尽三级，与 kernel::LayeredValue 同形
 pub fn path(city_root: &Path, addr: &Address, layer: Layer) -> Result<PathBuf, AxError>;
-pub struct ConfigLayer { /* effort / sandbox / mcp —— 私有 */ }
+pub struct ConfigLayer { /* model / effort / sandbox / mcp —— 私有 */ }
 impl ConfigLayer {
     pub fn parse(text: &str) -> Result<ConfigLayer, AxError>;   // 纯函数，无 I/O
+    pub fn model(&self) -> Option<&str>;                        // 本次会话选定的模型
     pub fn effort(&self) -> Option<Effort>;
 }
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError>;
+pub fn own_layer(city_root: &Path, addr: &Address) -> Result<ConfigLayer, AxError>;
 pub fn settled_effort(city_root: &Path, addr: &Address)
     -> Result<Option<(Effort, Layer)>, AxError>;      // 值连同说出它的那一级
 
@@ -179,12 +186,14 @@ impl Ladder {
 
 **来源与值一起答**（叶子 3.3）：`settled_effort` 与 `load` 爬同一条梯子，区别只在它把说出这个值的那一级留着而不是丢掉。只被告知结果的设置页说不出「这是这间房自己写的」还是「这是全城都有的」，于是它只能把三份文件各读一遍、把同一条梯子再爬一次——**同一个问题两个答案，就是从第二次爬梯开始的**。谁压过谁仍由 `kernel::LayeredValue::resolve` 判：`tagged` 只负责「哪一级填哪一格」，`resolve` 是 `tagged` 去掉那一级，所以这条映射在本 crate 里只有一处。`None` 是整条梯子什么都没说，也就是这座城有意把强度交给供应方，而不是替人填一档。
 
+**`own_layer` 答的是另一个问题**：梯子回答「一个 Run 被什么治理」，它回答「这个地址自己写下了什么」。差别正是它存在的理由——城或楼那一级给出的默认值不是这个地址做的选择，所以它不能当作选择的记录。文件是地址自己的那份 `CONFIG.toml`（`Layer::Resident` 的落点，也就是会话写的那一份），哪怕梯子把同一份文件当作两级里更远的级读了一次；地址就是楼时两者是同一个文件，所以那种地址自己就是它的会话（§8-14）。
+
 **门面上换名**（`lib.rs` 按能力组织，不按文件组织）：`load` 已归 `policy`，故本模块对外是 `city::load_config`；`path` 对外是 `city::config_path`；`building::create` 对外是 `city::create_building`，`created_payload` 对外是 `city::building_created_payload`（名字读起来就是它记的那个事件）。
 
 - **文件名只有一份，层级由位置决定**：City 层住 `<city>/.sprawling/CONFIG.toml`（reserved prefix 内，因此任何 Resident 的写域都永远叠不上它——「Agent 改不了自己的配置」因此是判定而非推理）；Building 层住 `<city>/<building>/CONFIG.toml`；Resident 层住 `<city>/<addr>/CONFIG.toml`。三处同名，读者认一次就认得完。
 - **地址就是楼时只有两级**：`addr` 与它的 building 相同时，下两级指向同一个文件，只读一次并放在 Building 级。同一份文件在两级各算一次不改变结果，却会让读者以为它能覆盖自己。
 - **缺文件不是错，读不动才是**（同 `resident`）：未声明即每级 `None`，落到 `kernel::consts_policy` 的缺省；一份存在却读不出的配置报 `E_STORAGE_FATAL`。
-- **不认的键即拒**（`deny_unknown_fields`）：静默忽略一个拼错的键，会产生「我设了 effort 而什么也没发生」这个无从诊断的状态。今天只受理 `[model] effort`；`[clock]` 等到它在真城里有消费者时再受理，在那之前写它得到的是一句拒绝而不是一份沉默。
+- **不认的键即拒**（`deny_unknown_fields`）：静默忽略一个拼错的键，会产生「我设了 effort 而什么也没发生」这个无从诊断的状态。今天只受理 `[model] name` 与 `[model] effort`；`[clock]` 等到它在真城里有消费者时再受理，在那之前写它得到的是一句拒绝而不是一份沉默。
 - **梯子不在本模块重建**：下层胜上层由 `kernel::LayeredValue::resolve` 给，冻结由 `kernel::freeze` 给；本模块只回答「哪三份文件、怎么读」。一条规则一个权威。
 - **effort 属 `FrozenConfig` 而非 `LiveConfig`**：改它会作废 message cache breakpoints，因此改动只影响下一个 Run（理由已写在 `kernel::config`，此处不重述只遵守）。
 
@@ -285,16 +294,23 @@ pub fn watch_path(city_root: &Path) -> PathBuf;
 
 ```rust
 pub use kernel::layout::{BUILDING_SHELF, LIBRARY_DIR};   // 住 reserved prefix 之下
-pub struct Holding { pub name, pub section, pub disclosure, pub hash, pub path, pub addr }
+pub enum Shelf {
+    Library(Address),
+    Building(Address),
+    External { index: u8, path: String },
+}
+impl Shelf { pub fn address(&self) -> Option<&Address>; }
+pub struct Holding { pub name, pub section, pub disclosure, pub hash, pub shelf: Shelf }
 pub struct Library { /* BTreeMap<ShelfKey, Holding> —— 私有，ShelfKey 由 name 造 */ }
 impl Library {
-    pub fn scan(city_root: &Path) -> Result<Library, AxError>;   // 无库＝空库，不是错误
+    pub fn scan(city_root: &Path, building: Option<&Address>, home: &Path) -> Result<Library, AxError>;
     pub fn all(&self) -> Vec<&Holding>;
     pub fn sections(&self) -> Vec<&str>;
     pub fn reading_room(&self, admitted: &[String]) -> Vec<&Holding>;
     pub fn missing(&self, admitted: &[String]) -> Vec<String>;
 }
-pub fn holding_address(holding: &Holding) -> Result<Address, AxError>;
+// city::config_layers
+pub fn city_shelves(city_root: &Path, home: &Path) -> Result<Vec<PathBuf>, AxError>;
 ```
 
 - **中央库存与阅览室的分工是常驻上下文不随磁盘膨胀的唯一原因**：盘上躺一千件与本楼的常驻字节无关；进 catalog 的只有 `BUILDING.md` 的 `## Reading room` 列出的那几件。
@@ -303,8 +319,13 @@ pub fn holding_address(holding: &Holding) -> Result<Address, AxError>;
 - **清单上没有的名字不进 catalog、也不报错**，只留一行诊断给写清单的人——承诺一件取不到的技能比它不在还糟。
 - **书架按名字建键，section 降为字段**：阅览室按名字准入，所以「同一件」必须也按名字判定。键是类型化的 `ShelfKey`，由 `ShelfKey::of` 一处造出，上架与查清单两端都经它——按 `(section, name)` 建键时同名跨 section 的两份同时在架，「近架盖远架」因而在跨 section 时不成立。楼架后插，于是楼自己的那一份替换城里的那一份，哪怕两者归档在不同 section。
 - **读架上的失败逐条上报**：目录项读不动、目录名或文件名不是 Unicode，都带路径报 `E_STORAGE_FATAL`。一件静默缺席于每一间阅览室的 skill，是人从 catalog 上看不出来的那一种故障。
-- **地址从落点反算**：`Holding::addr` 由 `item.strip_prefix(city_root)` 得到，不由 section 与 name 重拼——书架搬家时，架上每一件的地址跟着搬。
-
+- **一格书架加一个落点是一个值，不是两个字段**（`Holding::shelf`）：一个持有只在一格书架上、只在一个落点上，两个字段允许「说 library、指向城外的文件」这个任何书架都进不了的状态。三条臂正好是 skill 能在的三个地方，没有第四条；哪一条由**扫盘时读的那个根**给出，不从地址反推——反推只对「两格书架碰巧落在不同地方」成立，而那是个巧合而不是规则。
+- **`Shelf::address()` 答的是 catalog 承诺一件 skill 之前要问的那个问题**：一个条目靠地址打开，城外书架上的文件没有地址。所以**不发明一个假地址**：拼一个看起来像 `Address` 的字符串，会让读者去开一个并不在那儿的文件，且失败发生在第一次 `read` 而不在写下列表的那个时候。
+- **外部书架只读挂载，路径由城自己的配置给出**（`[skills] shelves`，城层一份）：`city_shelves` 在城的那一级上读它，而不是走三层梯子——书架是这台机器上的一个目录，它对每一栋楼同时挂上，让楼或房间能自己挂一本就是让一个作用域准入一份没人选过的文件。
+- **外部书架的布局属于写它的那个 harness**：一层目录一件 skill、目录里放 `SKILL.md`（`SKILL_FILE` 是本城写下这条布局的**唯一一处**）；目录名就是 skill 名。**section 为空**：那棵树没有 section 这一级，替它编一个就是本城对一份它不拥有的东西的猜测。不在那里、不是目录的外部路径直接跳过（空架就是空架）；是文件而不是目录则以 `E_CONFIG_INVALID` 拒并报出是哪一条——一句「配置写了却什么都没发生」是没人能诊断的状态。
+- **外部路径里的 `~` 指这个人自己的 home，home 以参数传入**：读环境不是本 crate 的活（`bin::assembly` 给出 `Home`），因此测试扫的是测试自己造的目录。committed 的城配置里不放一台机器的绝对路径，这正是 `~` 存在的理由。不是 `~` 开头也不是绝对路径的条目在解释处即拒，恢复语说出这条规则。
+- **同一名的优先级是 building > library > external（外部按数组序）**：按最远的架先上、近的盖上去，于是城自己的存货盖过别的程序的目录——城留下一个名字时，那个名字指城的 skill；楼的自己一份又盖过城的。外部条目排到最后，因为它是别人写的：一份目录不是一个权威。
+- **`Holding` 不再携 `path`**：落点由 `Shelf` 说出（城内的两个臂就是地址），而多一个 `PathBuf` 就是同一件事的第二个家，且两层书架下必有一个是错的（§8-12 对 `holding_address` 的同一条理由）。
 ### 8-10 city::wizard（形状 1 判定＋形状 2 值类型；含 survey）
 
 ```rust
@@ -414,20 +435,24 @@ pub fn write_mcp(city_root: &Path, addr: &Address, layer: Layer, servers: &[McpS
 - **空的 `mcp` 表要写出来而不是省略**：省略即继承上一级，而一个人删掉最后一台服务器不是想继承一台。
 - **`env` 与 `headers` 逐值判定凭据，落盘之前就拒**（S-07）：一个值只要不是 `SecretRef::parse` 认得的 `secret:realm/name`，名字命中 `kernel::names_a_credential` 或值命中 `kernel::scan` 即以 `AxCode::ConfigInvalid` 拒，恢复语指向金库。判定在 `write_mcp` 进 `change` 之前逐对做，因此一次被拒的写入一个字节都没落；拒绝文字报出是哪一台服务器、哪一张表、哪一个名字，因为人手里只有那句话。**理由是这份文件进版本库**：楼的 `CONFIG.toml` 由 `city::gitignore` 放行进历史（§8-21），写进去的 key 就在这个项目的每一次克隆里。**判定不重建**：「什么叫凭据」是 `kernel::secret` 的答案，与 `[sandbox] env_passthrough` 走 `EnvVarName::parse` 是同一个权威的两次调用。
 - **读面今天不判这一条**：手写进 `CONFIG.toml` 的明文 key 仍然读得回来。补齐要让 `ConfigLayer::parse` 调同一个谓词，那时谓词升为 `pub(crate)` 并只有一处实现。
-- **三个写面只有一条写路径**：三者各自把要说的话包成 `Change`（穷尽：`Effort` / `Sandbox` / `Mcp`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。
+- **三个写面只有一条写路径**：四者各自把要说的话包成 `Change`（穷尽：`Session` / `Effort` / `Sandbox` / `Mcp`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。`[model]` 那一节的三个值由同一条 `table` 找到或建出，免得三处对「该写进哪张表」各有各的说法。
 
-### 8-14 一次会话选一次的思考强度
+### 8-14 一次会话选一次：模型与思考强度
 
 ```rust
+pub fn write_session(city_root: &Path, addr: &Address, model: &str, effort: Option<Effort>) -> Result<(), AxError>;
 pub fn write_effort(city_root: &Path, addr: &Address, effort: Effort) -> Result<(), AxError>;
 ```
 
-思考强度放在派活按钮旁边，因为一次会话反正只选一次。
+思考强度放在派活按钮旁边，因为一次会话反正只选一次；而会话选定的模型也写进同一份文件，因为供应的 prompt 缓存对着的正是这两个值。
 
+- **一次写下一个会话冻下的两样东西**：`write_session` 落 `[model] name`，并在人选了强度时落 `[model] effort`。模型总写下（一个模型总在指某个东西），强度只在人说了时写下：缺席不是一个值，而是「让供应方决定」，写出来就是把一个没人做的选择记成记录。
 - **写进那一层，而不是另存一份**：选择落到会话自己房间的 `CONFIG.toml`，由已有的 city → building → room 阶梯解析。第二个存处就是第二个答案。
-- **只改 `[model] effort` 一个键**：文件里其它键是人写的，读出来、改一个值、写回去，与另外两个写面同走 §8-4b 的那一条写路径。文件读不动或解析不了就**拒绝**，不覆盖——一份本构建看不懂的配置不是可以随手盖掉的配置。
-- **这扇门只写 Resident 层**，层级不由调用方给：派活按钮旁边选的强度属于这一次会话的房间。需要按层写强度时，签名要多一个 `Layer` 参数，那是一次公开面变更。
-- **落点在 `<room>/.sprawling/`**，所以这个房间里跑的 Run 读得到、改不了自己的档位。
+- **这份记录是会话的，不是运行时的设定**：一个 Run 用哪个模型仍由 endpoint book 选，强度仍爬同一条梯子——两者决定会话从哪里开始。房间写下来的只是它当初从哪里开始，所以登记面之后搬了家，是下次派活拒掉的分歧，而不是它默默执行的变更（`sprawling-SPEC §8-79`）。
+- **只改 `[model]` 表里的键**：文件里其它键是人写的，读出来、改一个值、写回去，与另外三个写面同走 §8-4b 的那一条写路径。文件读不动或解析不了就**拒绝**，不覆盖——一份本构建看不懂的配置不是可以随手盖掉的配置。
+- **`write_effort` 仍在**：它只写强度一个键，供没有会话记录的地址（手搭的房间、`city` 自己的单测）用。派活面走的是 `write_session`，因为那次派活同时也在记下模型。
+- **两扇门都只写 Resident 层**，层级不由调用方给：派活按钮旁边选的强度属于这一次会话的房间。需要按层写强度时，签名要多一个 `Layer` 参数，那是一次公开面变更。
+- **落点就是地址自己的 `CONFIG.toml`**，所以这个房间跑的 Run 读得到、改不了自己的档位；地址就是楼时它就是楼自己那份文件，也就是楼根上的会话（§8-4 的 `own_layer`）。
 
 ### 8-13 city::room（形状 1 判定 ＋ 一个实例化动作）
 
@@ -446,21 +471,18 @@ pub fn open(city_root: &Path, building: &Address, name: &SessionName) -> Result<
 ### 8-12 一个 skill 只有一个家：楼自己的书架
 
 ```rust
-pub struct Holding { pub name, pub section, pub disclosure, pub path, pub addr: Address }
 impl Library {
-    pub fn scan(city_root: &Path, building: Option<&Address>) -> Result<Library, AxError>;
+    pub fn scan(city_root: &Path, building: Option<&Address>, home: &Path) -> Result<Library, AxError>;
 }
-// 删除：pub fn holding_address(&Holding) -> Result<Address, AxError>
 ```
 
 用户要的是「一栋楼就是一个可以 cd 过去的工作区」；已记录的理由是「住户只读得到存货，不得给自己进货」。两者其实不冲突：楼自己的书架放在 `<building>/.sprawling/skills/<section>/<name>.md`，在楼目录里、在写域之外。
 
 - **近的书架盖远的**：同名同 section 时楼的那本胜出。这不是新规则，而是 `config_layers` 已有的那一条（低层胜，高层是回落）在书架上的同一个实例。
 - **城的书架只放两栋以上共用的**：一个 skill 只有一个家。代价是找一本 skill 要看两处，换到的是一栋楼拷走就带着它自己的本事。
-- **`holding_address` 删掉**：它从 section＋name 拼回一个城级路径，而 `Holding` 本来就握着 `path`——两个权威，且在两层书架下其中一个必然答错。地址改为扫盘时算一次、存在 `Holding::addr` 里。
+- **`holding_address` 删掉**：它从 section＋name 拼回一个城级路径，而 `Holding` 本来就握着落点——两个权威，且在两层书架下其中一个必然答错。落点改为扫盘时算一次、存在 `Holding::shelf` 里（§8-8）。
 
 ### 8-13 一本书带着它被读到时的样子
-
 ```rust
 pub struct Holding { …, pub hash: B3Hash }   // 整份文档的 BLAKE3，扫架时算
 ```
@@ -537,7 +559,7 @@ bin 装配层的 prefix 组装随之改；`docs/templates/URBANITE.md` 是这份
 
 三条：身份两态各一条；**段字节跨两次加载稳定**；Dossier 只计本人的 Run 且跨 Run 累加。bin 侧另有一条端到端断言（两次 Dispatch 的 resident 段哈希相同、run 段不同）。
 
-建楼与配置七条：新建的楼被 `policy::load` 读回且 confidential 模板真的锁本地模型池｜二次出生恒拒｜reserved prefix 下建楼恒拒｜房间地址建楼恒拒且拒词指出该建哪栋｜下层配置盖上层｜不认的键即拒｜**写在 `CONFIG.toml` 里的 effort 出现在真实出线请求体里**（bin 侧端到端，假 provider 录下请求体）。
+建楼与配置八条：新建的楼被 `policy::load` 读回且 confidential 模板真的锁本地模型池｜二次出生恒拒｜reserved prefix 下建楼恒拒｜房间地址建楼恒拒且拒词指出该建哪栋｜下层配置盖上层｜不认的键即拒｜**写在 `CONFIG.toml` 里的 effort 出现在真实出线请求体里**（bin 侧端到端，假 provider 录下请求体）｜**`usersbrowser:` 的三种值各读回各的形状，`browser:` 与它互不影响，confidential 楼写它即拒**。
 
 邻里名册六条：扫到的名册**不含我自己**且有人的与空的各自落在对的臂上｜`## Bring them` 在场时取它、缺席时退回第一段正文且跳过标题与引文｜同一座城扫两次字节相同（`read_dir` 序不得泄漏到答案里）｜`scope=city` 只交出楼名、不交出任何住户｜`.sprawling` 与 archive 目录都不是房间｜**模板仍然带着 `## Bring them` 这一节**（对 `docs/templates/URBANITE.md` 的 `include_str!` 断言；模板改名而代码不改，就是一份永远退回正文的名册）。
 

@@ -83,7 +83,7 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 
 ## 7 模块边界
 
-一门一文件。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度参数；此处只说明每道门判什么，不再抄一份清单，也不写它们有几道——要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates`。判定面：`header`｜`lexicon`｜`modmap`｜`length`｜`boundary`｜`artifact`｜`depmap`｜`npm`｜`secret`｜`color`｜`wording`｜`render`｜`wiring`｜`wire-ts`｜`docnum`｜`proof`｜`budget`｜`specalign`｜`apisync`｜`release`｜`guard`。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（ARCHITECTURE.md 按 `## N 标题` 切节这一个读法，被 `modmap`、`depmap`、`specalign`、`proof` 共用，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `wording` 共用的词形读法）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
+一门一文件。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度参数；此处只说明每道门判什么，不再抄一份清单，也不写它们有几道——要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates`。判定面：`header`｜`lexicon`｜`modmap`｜`length`｜`boundary`｜`slices`｜`artifact`｜`depmap`｜`npm`｜`secret`｜`color`｜`wording`｜`render`｜`wiring`｜`wire-ts`｜`docnum`｜`proof`｜`budget`｜`specalign`｜`apisync`｜`release`｜`guard`。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（ARCHITECTURE.md 按 `## N 标题` 切节这一个读法，被 `modmap`、`depmap`、`specalign`、`proof` 共用，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `wording` 共用的词形读法）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——列格式一变，只有一处要改。
 
@@ -171,7 +171,7 @@ pub(crate) struct Violation {
 
 `XtaskError`（thiserror）：`Io{path}`｜`Doc{file,msg}`（数据面不可解析）｜`Cmd{cmd,msg}`（git/cargo 调用失败）｜`Usage`。数据面坏＝退出码 2（门自身故障），不伪装成 0 或 1——门坏了必须显性，静默通过是门的最坏失效。
 
-**一门判不动，不得连累其余各门的结论**（issue #5）。`gates` 的那张数组是急切求值的，<!-- xtask:begin gate_count -->21<!-- xtask:end --> 道门在第一行输出之前就已全部跑完；此前的循环一遇 `Err` 即 `return`，于是排在它后面的 `release` 与 `guard` 结论已在手里却从未被打印。缺 `cargo-public-api` 是 `docs/CONTRIBUTING.md` §7 明列的预期状态，而在那种机器上，一次带违规的运行与一次干净的运行输出逐字相同，作为必要前提的 `guard` 恰在被吞掉的那两道里。故聚合运行遍历到底，逐门报出 `ok`／`N violation(s)`／`could not judge` 三态之一，再统一渲染全部违规。**退出码取最重的一态**：任一门判不动＝2，否则有违规＝1，否则 0——判不动压过判有罪，因为「没判」与「判过且干净」同形正是本条要拆开的东西。
+**一门判不动，不得连累其余各门的结论**（issue #5）。`gates` 的那张数组是急切求值的，<!-- xtask:begin gate_count -->23<!-- xtask:end --> 道门在第一行输出之前就已全部跑完；此前的循环一遇 `Err` 即 `return`，于是排在它后面的 `release` 与 `guard` 结论已在手里却从未被打印。缺 `cargo-public-api` 是 `docs/CONTRIBUTING.md` §7 明列的预期状态，而在那种机器上，一次带违规的运行与一次干净的运行输出逐字相同，作为必要前提的 `guard` 恰在被吞掉的那两道里。故聚合运行遍历到底，逐门报出 `ok`／`N violation(s)`／`could not judge` 三态之一，再统一渲染全部违规。**退出码取最重的一态**：任一门判不动＝2，否则有违规＝1，否则 0——判不动压过判有罪，因为「没判」与「判过且干净」同形正是本条要拆开的东西。
 
 ## 13 依赖选型
 
@@ -541,7 +541,7 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 **机制＝受管区段。** 文档用一对 HTML 注释圈住一段文字，开标记里写它由哪个事实生成：
 
 <!-- xtask:begin gate_count -->
-21
+23
 <!-- xtask:end -->
 
 上面这一段本身就是一个受管区段，圈的是 `gate_count`：它由 `cargo xtask docnum --write` 写出，读者据此知道这道门长什么样，而它同时受这道门看守，故这份 SPEC 里的示例不可能与机制分叉。
@@ -724,4 +724,13 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 **探针读不出声明的词就报错，不静默判。** 词汇表为空会把页上每一个颜色都读成未声明，于是空词汇表是一次「量不了」（退出码 2），不是一页干净。这与 §8-13 点名要避的那一类失效同形。
 
 **本节属门禁机具，与产品代码分开提交。**
+
+### 8-27 `slices`：切片路径只有一个写者
+
+**它防的是一个具体的失法：有人从投影里读出一条「结论」。** session 切片（`memory-SPEC.md` §8-24）是账本的派生物，可删可重建；一旦 `memory::sessions` 之外还有第二个模块引用它的路径，下一次它就会去那里取值做判断，而那些字节没有任何持久性承诺。故判定只有一条：路径住在两处，其余任何 `.rs` 不得叫出它。
+
+**判面与写法。** 判定面是全仓 `.rs` 除去 `crates/kernel/src/layout.rs`（声明路径）与 `crates/memory/src/sessions.rs`（唯一写者）。四个记号分开查，因为一个引用确实会以这四种样子出现：目录常量 `SESSIONS_DIR`、布局方法 `session_slice`、它的逆 `of_ledger`（写者拿账本目录反推城根），以及裸字面量 `"sessions"`——手拼路径的人会的只有这一种写法。
+
+**限制写下来而不是藏起来。** 经中间别名拼出的路径（`let what = "sess"; what.to_owned() + "ions"`）过得去。这道门是绊马索，不是证明；它守的那句话同时写在写者模块的抬头里，读者也有机会看见。
+
 

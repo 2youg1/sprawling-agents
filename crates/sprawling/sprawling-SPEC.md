@@ -340,9 +340,9 @@ fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> 
 
 ```rust
 // bin::assembly
-struct Knock { addr: Address, from: String, mode: runtime::Mode, budget: kernel::BudgetCap }
+struct Knock { addr: Address, from: String, mode: runtime::Mode, conversations: u32 }
 impl RunWorker {
-    fn knock(&mut self, signal: &Signal, speaker: &Address, mode, budget) -> Result<(), AxError>;
+    fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32) -> Result<(), AxError>;
     fn answer_knocks(&mut self);   // 成波排干，循环而非递归
 }
 ```
@@ -357,8 +357,12 @@ impl RunWorker {
 - **人压过居民**：中断源先问人的命令队列（Cancel 再 Steer），空手才问本屋信箱。
 - **属名不是装饰，是回信地址**：另一个 agent 的话氒不得以人的身份进窗口。类型已经把它变成判定（只有 `Steer::from_person` 写得出 `user`）；同一条规则延到敲门路上——被叫醒的一跑，其 brief 第一句就是「@X signalled you. This run exists because that signal arrived: nobody else asked for it.」。一份读起来像人写的 brief 会让每一封回信寄错地方。
 - **敲门敲的是 Resident，不是一段已封存的对话**：冻结的 Run 是历史，历史只读而不叫醒；被开出来的是那个地址上住户的**一跑新的 Run**，它靠 `Handoff.md` 接住上一场——那正是为穿过一次冻结而造的那件东西。没有 `URBANITE.md` 的地址因此不敲：它是一间房而不是一个人，信就在那儿等到人派个住户过去。
-- **不设叫醒预算**：什么时候该停下来是对话里那几位居民的事，城市的活是把话送到。人要让某个居民不再被打扰，用的是已有的 Halt，一次派活当场拒一个被 halt 的 scope。
-- **一次对话一道底都没有**：**这座城没有金额上限，也没有回合上限**，那是决定而不是遗漏：什么时候停下来归对话里的居民，花了多少事后从 Ledger 报出来。从无调用方的 spend 门连同它判的 ladder 、以及 `DISPATCH_TURN_BUDGET` 一并删除（kernel-SPEC §11-7、本文 §8-40），刹车此后只剩 `Cancel`（停一件）与 `Halt`（停一片）。
+- **叫醒有一个上限，但不是一份预算**：一条敲门链与一条继任链各有一个接力上限，住
+  `assembly::driving::owing`（`CONVERSATION_HOPS_MAX` / `SUCCESSION_HOPS_MAX`，§8-46-12）。
+  上限管的是「没有人在里面的链条不许无限长」，不给一轮活定价，也不规定居民之间能谈多少轮；
+  花多少仍事后从 Ledger 报出来，停一片仍是 `Halt`。§8-13 早先「不设叫醒预算」的口径
+  以「刹车就在被链条堵住的线程上」为前提，H-04 之后这个前提不再成立。
+- **一次对话一道底都没有**：**这座城没有金额上限，也没有回合上限**，那是决定而不是遗漏：什么时候停下来归对话里的居民，花了多少事后从 Ledger 报出来。从无调用方的 spend 门连同它判的 ladder 、以及 `DISPATCH_TURN_BUDGET` 一并删除（kernel-SPEC §11-7、本文 §8-40），刹车此后只剩 `Cancel`（停一件）、`Halt`（停一片），以及两条接力链各自的上限（§8-46-12）。
 - **一个敲不成不连坐发件人**：叫不醒的人进诊断日志，不把发件那一跑的 dispatch 弄成失败。
 
 **本章测试**：一位居民向另一位发信，无人再派活而收信人自己跑了一跑，且其 brief 里带着发件人的地址；向一个无 `URBANITE.md` 的房间发信不开任何 Run，信仍在队里。
@@ -1205,7 +1209,7 @@ the work: a halted city that laid a job file down would leave a task in a room n
 |---|---|---|---|---|
 | 1 | `commanding::run_command` Dispatch 臂 | `session_for` | `E_INVALID_ARGS`（取不到名字） | 否，但**要花一次 Digest 模型调用** |
 | 2 | 同上 | `room_for` → `city::open_room` | 存储错 | **写：房间目录**（`create_dir`） |
-| 3 | 同上 | `city::write_effort` | 配置错 | **写：房间的 CONFIG.toml** |
+| 3 | 同上 | `choose_shape` → `city::write_session` | `E_CONFIG_INVALID`（形状已在会话里冻下） | **写：房间的 CONFIG.toml**（只在会话的第一个 Run） |
 | 4 | `dispatching::prepare_dispatch` | `halted_by` | `E_GATE_DENIED` | 否 |
 | 5 | 同上 | `city::write_brief` | 存储错 | **写：`JOB.md`** |
 | 6 | 同上 | `cas.put` | 存储错 | 写：CAS 对象（`.sprawling/` 内，内容寻址） |
@@ -1228,8 +1232,8 @@ the work: a halted city that laid a job file down would leave a task in a room n
 
 **留在答应之后的两条拒绝，各有其理由，写在这里而不是被含糊过去**：
 
-- `city::load_config` 读城／楼／居民三层。它**必须**在 `write_effort` 之后，因为同一次派活写下的
-  effort 要被这一次跑读到（「Chosen once, it holds for every later run in that room」）。把它提前
+- `city::load_config` 读城／楼／居民三层。它**必须**在 `choose_shape` 之后，因为同一次派活写下的
+  模型与 effort 要被这一次跑读到（「Chosen once, it holds for every later run in that room」）。把它提前
   会让这次派活看不见自己刚写下的那一层——那是行为改变，不是顺序整理。
 - `city::Identity::load` 只在**文件权限**上拒绝；文件不存在读作 ephemeral。那是机器的故障而不是
   这座城的依据，与「派活到没立过的楼」不是一类。
@@ -1298,7 +1302,8 @@ let agreed = self.agree_to_work(&at.addr)?;        // 只读；第一条拒绝�
 let session = self.session_for(&at.addr, at.session.take(), &task, agreed.rules.policy())?;
 // ↑ 可能花一次 Digest 调用，而那次调用带着这座楼的策略
 at.addr = self.room_for(at.addr, session.as_ref())?;                  // ← 第一次写
-if let Some(effort) = at.effort { city::write_effort(&self.city_root, &at.addr, effort)?; }
+// 会话冻下的形状写在这里，而已经开着的会话在这里被拒：两件事一个决定。
+self.choose_shape(&at, &agreed.model)?;                              // §8-79
 let brief = city::write_brief(...)?;
 ...
 let mut site = self.stand_up(agreed, &at, &given)?;
@@ -2231,10 +2236,13 @@ pub(in crate::assembly) enum Owed {
 /// 城自己起一轮活的四个理由。起不来时诊断行按理由归因，故是穷尽枚举而不是一个 bool。
 pub(in crate::assembly) enum Unasked { Schedule, Arrival, Knock, Unblocked }
 
-/// 城欠这轮活什么，以及拒绝回哪儿去。两者同行，因为义务比承载它的那轮活活得久：
-/// 继任者对的是「谁要了被它替换的那轮活」。`reply` 用 `Arc` 共享而不是搬走，
-/// 因为落地要在把义务交给继任者之后仍能回一句拒绝。
-pub(in crate::assembly) struct Owing { owed: Owed, reply: Arc<channels::Reply> }
+/// 城欠这轮活什么、拒绝回哪儿去、这条链已经走了多远。三者同行，因为义务比承载它的
+/// 那轮活活得久：继任者对的是「谁要了被它替换的那轮活」，而链条的上限要看得见它
+/// 已经走了几跳。`reply` 用 `Arc` 共享而不是搬走，因为落地要在把义务交给继任者
+/// 之后仍能回一句拒绝。两个计数器住 `Owing` 而不住 `Owed`：它们是义务的属性而不是
+/// 欠着什么这件事的属性，`Owed` 的每个读者（`discharge`、`rows_of`）也不必为它们
+/// 多改一处 match。
+pub(in crate::assembly) struct Owing { owed: Owed, reply: Arc<channels::Reply>, relays: Relays }
 
 /// 一次「服务口子＋接一轮活回家」做了什么。
 pub(in crate::assembly) enum Landed { Nothing, Row { addr: Address, node: NodeId }, Elsewhere }
@@ -2440,8 +2448,8 @@ enum RoomQueue {
 }
 
 /// 借到的东西，与这轮活是不是持有者。
-pub(in crate::assembly) enum Holding { TheRoomQueue, ASpare { held_by: RunId } }
-pub(in crate::assembly) struct Lent { inbox: collab::Inbox, holding: Holding }
+pub(in crate::assembly) enum QueueTenure { TheRoomQueue, ASpare { held_by: RunId } }
+pub(in crate::assembly) struct Lent { inbox: collab::Inbox, tenure: QueueTenure }
 
 pub(in crate::assembly) struct RoomQueues { rooms: BTreeMap<Address, RoomQueue> }
 impl RoomQueues {
@@ -2453,11 +2461,13 @@ impl RoomQueues {
 }
 ```
 
-- **借出不是取走**：`Lent` 仍在表里，第二个同房间的 run 得到一份自己的空队列（`Holding::ASpare`）并被记一条
+- **借出不是取走**：`Lent` 仍在表里，第二个同房间的 run 得到一份自己的空队列（`QueueTenure::ASpare`）并被记一条
   `Refuse` 诊断。为什么不是三段式拒绝：`pursue` 的整个 ready set 都派在同一个地址上，拒绝会把并发追求
   （§8-46-4）整条打掉，而「一个房间一个读者」本身就是对的——两轮活分读一个队列，每轮只看到一半的信。
+  **名字说的是持有关系而不是被持有之物**：城的书架那一件叫 `city::Holding`（图书馆的 holdings），
+  这里说的是这轮活以何种名分拿着队列，故叫 `QueueTenure`。
 - **只有持 `run_id` 的能还**：`give_back` 校验 `Lent.to`，不匹配即 `E_STORAGE_FATAL`。这条把「谁借的谁还」
-  从纪律变成类型之外的运行时断言，而 `Holding` 让调用点根本写不出「拿着 spare 去还」。
+  从纪律变成类型之外的运行时断言，而 `QueueTenure` 让调用点根本写不出「拿着 spare 去还」。
 - **借出期间的投递有地方落**：`deliver` 对 `Lent` 推进 `waiting`，上限仍是 `INBOX_CAPACITY`，满了照旧
   `E_BACKPRESSURE_SHED`。**满溢的措辞只有一个家**：`landing.rs` 里手写的第二份 Shed 判定随之删除。
 - **队列一定回家**：`give_back` 里等候的信号若被拒，队列先放回表再把错误抛出去——一个在回家路上失败的队列
@@ -2510,6 +2520,55 @@ impl RunWorker { pub(crate) fn serve(&mut self, serving: Serving); }
 1. `attach` 没有反向动词——`Command` 里没有 detach，`EndpointLost` 只由 `E_ENDPOINT_DIALECT_UNSUPPORTED` 的
    carrier 产生，没有命令能写它。撤销 attach 要么加 `Command::DetachEndpoint`（wire 变更），要么这一格不做。
 2. `select_model` 的反向命令要求「上一次选择」存在且那个端点仍然挂着；第一次选择之前没有可回退的值。
+
+### 8-46-12 两条接力链各有上限（B-51）
+
+**一条没有人在里面的链不许无限长。** H-04 把七个入口都送进车道之后，敲门链与继任链不再堵住
+记账线程，`Halt` 与 `Cancel` 也读得进来了；但两条链本身仍然无界——A 叫醒 B，B 再叫醒 C，
+或者一轮活连着把自己交给下一轮，每一步都花一次真跑，而没有人答应过这场开销。§8-13 早先
+记的口径是「不设叫醒预算，什么时候停下是对话里那几位居民的事」；那条判断成立的前提是
+链条在记账线程上跑，它的唯一刹车就在被它堵住的线程上。刹车够得着之后，剩下的问题是
+**没有人在场时谁来停**，而一个由居民自己决定长度的环不会自己停。
+
+```rust
+/// 一条链把同一件活带到了哪里。两个计数器分开，因为两条链回答不同的问题：
+/// 这场对话敲醒过几个人，这件活换过几次人。
+#[derive(Clone, Copy, Default)]
+struct Relays { conversations: u32, successions: u32 }
+
+/// 一次敲门链最多唤醒这么多轮 run；一次继任链最多接力这么多轮。
+const CONVERSATION_HOPS_MAX: u32 = 16;
+const SUCCESSION_HOPS_MAX: u32 = 64;
+
+impl Owing {
+    /// 由敲门起的那轮活欠什么：对话向前一跳，超上限即 `E_LOOP_SUSPECTED`。
+    fn knocked(conversations: u32) -> Result<Owing, AxError>;
+    /// 继任者接过的同一份义务：接力向前一跳，超上限即 `E_LOOP_SUSPECTED`。
+    fn after_succession(&self) -> Result<Owing, AxError>;
+}
+struct Knock { addr: Address, from: String, mode: runtime::Mode, conversations: u32 }
+fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32) -> Result<(), AxError>;
+```
+
+- **接力次数记进义务，不记进工人**。两个计数器随 `Owing` 走：继任者拿走的是前任的义务，
+  故它自然继承并加一；敲门推的是 `Knock { conversations }`，`answer_knocks` 由此造出的新
+  一轮活从上一跳加一。委派的子活继承原值而不加——换的是干活的人，不是这条链的位置。
+  计数器不记在 `RunWorker` 上：那正是 C15 删掉的形状（一个 worker 字段描述的是碰巧在
+  落地的哪一轮活），落地完成后字段属于谁没有答案。
+- **一个上限，不是一份预算**。上限管的是「门敲下去会不会没完没了」，不给一轮活定价、
+  不改居民之间能谈多少轮：`16` 是「十六个居民被连着叫醒之后这已经不是一场对话，是一个环」
+  的位置，`64` 是「同一件活换过六十四个住户之后不管人在不在看都该停下」的位置。两个数字
+  都是刹车而不是调过的参数，故都在明处，重开一次对话或再派一次活即可继续。
+- **敲门超限不连坐发件人**。超限在 `answer_knocks` 里判：这一敲不开始新一轮活，落一条
+  `Refuse` 诊断（带地址与拒绝的 subject）后继续下一敲；信已经在房间里，人仍可从 Inbox
+  读它。继任超限在 `conclude` 里判：诊断落 `Refuse`，拒绝随 `hand_back` 回给要这轮活的
+  那一位（`Asked` 到人，`Child` 到父房间，无人时成诊断行），**本轮活照常 `discharge`**
+  ——链断在第一端，不能把已经跑完的那一轮的结局一起吞掉。
+
+**本章测试**：`owing::tests` 里两个边界（上限减一放行、到达上限拒绝，拒绝码
+`E_LOOP_SUSPECTED` 且恢复语非空）；`assembly::waking::tests` 里一条 `conversations: u32::MAX`
+的敲门不开始任何 run（对照：既有的 `a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke`
+证明上限之下一敲照常开跑）。
 
 ## 8-47 六处探测收成一处：doctor 是「运行中的机器有什么」的唯一权威（`bin::doctor::host`、`bin::doctor::presence`）
 
@@ -3053,3 +3112,22 @@ pub(crate) fn put(patch: PreferencePatch) -> Result<(), AxError>;// Command::Put
 - **量在先，门在后**：`xtask/budgets.toml [prepare_dispatch_ms]` 只记读数与机器，不设上限——上限若写在读数之前，要么形同虚设，要么挡住正是要修它的那次改动。
 - **读钟读不出不丢工具**：`mcp_tools` 无法报出 `Result`，因此钟失败时只是不报这一行；连接是工作，读数是诊断。
 - **本章测试**：`a_dispatch_says_what_it_spent_before_the_drive`（`assembly::dispatching::tests`）盯住「读数被说出来」这一件事，不断言数值——墙钟数值属于跑它的那台机器，属于 `budgets.toml` 的那一行。
+
+### 8-79 会话冻下的形状只选一次（`assembly::dispatching::session_shape`、`assembly::dispatching::running`；E-2 前缀冻结的派活面一半）
+
+```rust
+impl RunWorker {
+    /// 记下这次派活冻下的形状，或拒掉一次会移动会话已冻下形状的派活。
+    pub(super) fn choose_shape(&mut self, at: &Assignment, model: &gateway::ModelEntry)
+        -> Result<(), AxError>;
+}
+```
+
+- **不变量一句话**：一个会话的调用形状选一次。房间的 `CONFIG.toml` 在它的第一个 Run 写下 `[model] name`（人选了强度就一并写下 `[model] effort`），此后每次派活读回来与自己要冻下的形状对拍，不等即拒。
+- **为什么住在派活面**：模型、输出上限与 effort 都上供应方的线，中途任何一个移动都会让会话此后每一轮为一段字节从未变过的 prompt 付全价。这道对拍在写简报之前，因此被拒的派活不落一个字节、不动会话一行记录——`prepare_dispatch` 的序幕顺序（§8-40）就是这条拒绝的位置理由。
+- **对拍本身是 runtime 的**：`runtime::turn::CallShape::verified_against` 拥有比较与三句拒绝语，恢复语指向两条出路——**开一个新 session，或 fork 这个 run**。派活面只负责造出两个形状：会话记下的那个，与这次派活将要冻下的那个（模型来自 endpoint book，effort 来自梯子）。
+- **effort 比的是梯子在这里解析出的值**，不是房间那一行：`[model] effort` 一个键都没写过的会话，冻下的是「让供应方决定」，而从这一档挪到任何一档同样是形状移动。
+- **模型比的是登记面现在的答案**：`SelectModel` 改的是城级 tag→model 登记，在那里拦会把正常配置一起禁掉；被挡的是它落到一个已开会话上的那一步。会话记下的模型仍在 endpoint book 里时，上限与窗口从那一行读（它们是模型的属性，抄一份进房间的配置就是同一个事实的第二个家）；模型已不在登记面时，模型那一臂先拒。
+- **`[model] name` 不是「这个 Run 用哪个模型」的权威**：Run 的模型仍由 `EndpointBook::select` 选，会话记录只说它当初从哪个模型开始。两者不一致时这次派活被拒，而不是两个家各说各话（city-SPEC §8-14、§8-4 的 `own_layer`）。
+- **地址就是楼时，地址自己就是会话**：那种地址的「自己那份 `CONFIG.toml`」就是楼的 `CONFIG.toml`（`Layer::Resident` 与 `Layer::Building` 同一文件，city-SPEC §8-4）。
+- **本章测试**：`assembly::dispatching::session_shape::tests::a_session_keeps_the_shape_it_froze_and_refuses_a_different_effort`——同一房间连续两次派活，四条前缀逐槽位哈希相同且 CAS 里的字节相等；第三次改 effort 被拒（`E_CONFIG_INVALID`，恢复语给出两条出路），会话的 effort 一行未动、没有多出一条 `prompt_assembled`；第四次相同请求照跑并再次冻下同一批字节。`a_model_chosen_after_a_session_opened_does_not_reach_it`——已开会话之后改城级登记，往该会话的派活被拒，房间记录仍是原来的模型，而新会话拿到新模型。
