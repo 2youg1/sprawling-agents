@@ -313,8 +313,12 @@ export function ModelTable(props: {
           }}
         />
       </Show>
+      {/* Not an alarm. The ceiling ladder in the city always answers
+          (`gateway::OutputCeiling::resolve`), so an empty box is a
+          decision left to the city rather than a call that will be
+          refused, and the line says which rungs will answer it. */}
       <Show when={ticked().some((row) => ceilingOf(row) === null)}>
-        <p class="text-alert">{say("setup_model_needed")}</p>
+        <p class="text-text-faint">{say("setup_model_needed")}</p>
       </Show>
       <Field
         label={say("setup_manual_ids")}
@@ -338,7 +342,11 @@ export function ModelChoice(props: { readonly answer: EndpointsAnswer; readonly 
   // (`channels::EndpointSummary`), so this list needs no fallback.
   const options = createMemo(() =>
     props.answer.endpoints.flatMap((endpoint) =>
-      endpoint.models.map((model) => ({ endpoint: endpoint.name, label: endpoint.label, model })),
+      endpoint.models.map((row) => ({
+        endpoint: endpoint.name,
+        label: endpoint.label,
+        model: row.id,
+      })),
     ),
   );
   const chosen = (tag: ModelTag) => props.answer.chosen.find((each) => each.tag === tag);

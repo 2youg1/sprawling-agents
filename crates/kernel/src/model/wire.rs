@@ -89,8 +89,10 @@ pub struct SystemBlock {
     pub cache: bool,
 }
 
-/// Which wire the far side speaks. Open for growth; every match on it
-/// handles the known kinds exhaustively and fails closed.
+/// Which wire the far side speaks. Closed: a fourth dialect is a
+/// compile error at every entrance of `gateway::dialect`, which is how
+/// it is kept from being approximated with the nearest of the three
+/// already written.
 ///
 /// Lives here rather than in `gateway` for the same reason
 /// [`BuildingPolicy`] does: two outer crates must name it (the gateway
@@ -101,7 +103,17 @@ pub struct SystemBlock {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DialectKind {
     Anthropic,
+    /// OpenAI's chat completions face, which most relays, most local
+    /// servers and most other laboratories also serve.
     OpenAi,
+    /// OpenAI's responses face: a different request body, a different
+    /// reply shape and a different set of stream event names.
+    ///
+    /// Registered apart from [`DialectKind::OpenAi`] because a person
+    /// who pasted a responses URL said which face they meant, and a
+    /// registration that folded the two would send chat bodies to a
+    /// path that answers 404.
+    OpenAiResponses,
 }
 
 /// What a chosen model is for. Exhaustive rather than a free label: a

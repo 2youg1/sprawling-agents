@@ -20,6 +20,10 @@ mod oauth;
 mod vault;
 
 pub use custodian::{Captured, Custodian};
+pub use oauth::{
+    DeviceAuthorization, DevicePoll, DeviceRefusal, FormPost, PollStep,
+    device_authorization_request,
+};
 pub use oauth::{OauthPending, OauthTokens, TokenRequest, oauth_begin};
 pub use oauth::{oauth_random, oauth_redeem, oauth_redeem_request, oauth_refresh};
 pub use vault::{Described, EnvReader, Persistence};

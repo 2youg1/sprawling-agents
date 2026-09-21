@@ -90,7 +90,12 @@ fn torn_tail_recovers_to_longest_valid_prefix_plus_log_truncated() {
     let last = EventRecord::parse_line(&lines[2]).unwrap();
     assert_eq!(last.kind(), EventKind::LogTruncated);
     assert_eq!(last.t(), TimeMs::new(77), "time is the caller's parameter");
-    assert_eq!(last.who(), "system");
+    assert_eq!(
+        last.who(),
+        kernel::event::Who::City.as_str(),
+        "opening the ledger is the city's own work, and the actor vocabulary has \
+         one home"
+    );
 }
 
 #[test]

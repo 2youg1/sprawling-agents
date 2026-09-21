@@ -92,12 +92,25 @@ use serde::{Deserialize, Serialize};
 /// 31: `Query::Release` answers which release this city is and which
 ///    one npm offers - the only query that reaches the internet, asked
 ///    when somebody presses the button and never on a timer.
-/// 32: the two name tables the handshake hash is built from are
+/// 32: the wire stops guessing, and the tables stop being written by
+///    hand. The two name tables the handshake hash is built from are
 ///    generated from the frame enums themselves, so a frame is spelled
-///    once. The grammar is unchanged and every frame means what it
-///    meant; the tables now read in declaration order, and the
-///    `Command` table's order was not that, so the hash moved and the
-///    version moves with it.
+///    once and both tables read in declaration order. A run's mode was
+///    free text and a model's window was a zero sentinel, and each had
+///    a default the city applied without saying so; they are now a
+///    closed enum and an absent value, both refused at this boundary
+///    when they arrive as something this build does not know. A person
+///    hands one waiting question to a resident with `HandOff`;
+///    `Attach` and `CreatePolicy` are gone, and with them the upload
+///    route behind the first and the escalation mechanism behind the
+///    second. An endpoint now says how it is connected and what it
+///    said about each model it serves, rather than listing bare ids.
+///    Four frames arrive for the two files a person edits: their own
+///    preferences, whole and by named change; what one address is
+///    governed by, with the layer each value came from; and a skill
+///    written onto a shelf. A third dialect rides with them,
+///    `OpenAiResponses`, kept apart from the chat face because
+///    somebody who pasted a responses URL said which face they meant.
 pub const WIRE_V: u32 = 32;
 mod query;
 

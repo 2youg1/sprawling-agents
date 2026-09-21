@@ -128,7 +128,12 @@ pub(crate) fn table() -> Vec<ToolCard> {
                         "description": "the generation of the snapshot this action was decided against",
                     },
                 })),
-                "required": ["action", "generation"],
+                "required": ["action"],
+                // `generation` is required by what the call names, not
+                // by every call: an action at a point was decided
+                // against no snapshot, so demanding the number would
+                // make a caller invent one.
+                "dependentRequired": { "ref": ["generation"] },
                 "additionalProperties": false,
             }),
         },
@@ -164,14 +169,21 @@ pub(crate) fn table() -> Vec<ToolCard> {
         ToolCard {
             name: "desktop.record",
             description: "Start or stop recording one named window: an mp4 when ffmpeg is on \
-                 this machine's PATH, otherwise a directory of PNG frames. The scope file has \
-                 to switch recording on. It does not edit, transcode or upload anything, it \
-                 does not stop on its own, and it does not record sound."
+                 this machine's PATH, otherwise a directory of PNG frames. `start` answers with \
+                 a `recording` id, and `stop` takes that id back, because a window's title can \
+                 change while it is being recorded. The scope file has to switch recording on. \
+                 A recording ends itself after ten minutes. It does not edit, transcode or \
+                 upload anything, and it does not record sound."
                 .to_owned(),
             schema: json!({
                 "type": "object",
                 "properties": properties(json!({
                     "state": { "type": "string", "enum": ["start", "stop"] },
+                    "recording": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "which recording `stop` ends, as `start` reported it",
+                    },
                 })),
                 "required": ["state"],
                 "additionalProperties": false,
@@ -267,6 +279,13 @@ mod tests {
         let properties = &act.schema["properties"];
         assert!(properties["ref"].is_object());
         assert!(properties["generation"].is_object());
+        // What the schema demands is what the implementation demands:
+        // a generation only where a ref was named.
+        assert_eq!(act.schema["required"], json!(["action"]));
+        assert_eq!(
+            act.schema["dependentRequired"],
+            json!({ "ref": ["generation"] })
+        );
         assert!(properties["action"]["enum"].is_array());
         let actions: Vec<&str> = properties["action"]["enum"]
             .as_array()
@@ -297,6 +316,9 @@ mod tests {
             .filter_map(Value::as_str)
             .collect();
         assert_eq!(states, vec!["start", "stop"]);
+        // A stop names the recording rather than the window, so a
+        // retitled window is still one this caller can stop.
+        assert_eq!(record.schema["properties"]["recording"]["type"], "integer");
         let clipboard = card("desktop.clipboard").unwrap();
         assert!(clipboard.schema["required"].is_array());
     }

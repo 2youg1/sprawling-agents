@@ -17,6 +17,14 @@
 //! modality, and under which path. A connection that does not serve one
 //! says so by having no path, so a caller cannot reach a face that is
 //! not there and has nothing to test separately.
+//!
+//! The path is half the answer and the bytes are the other half:
+//! [`embedding`] and [`rerank`] hold the request each face takes and
+//! the answer it gives, each cited to the description its vendor
+//! publishes.
+
+pub mod embedding;
+pub mod rerank;
 
 use super::registry::{ConnectionKind, Family};
 
@@ -155,6 +163,23 @@ mod tests {
             Some("embeddings")
         );
         assert_eq!(ConnectionKind::Responses.path_for(Modality::Rerank), None);
+    }
+
+    /// Every modality this city serves has a path to call and a shape
+    /// to call it with. A modality with a path and no shape would be a
+    /// URL nobody can write a body for.
+    #[test]
+    fn every_served_modality_has_both_a_path_and_a_wire_shape() {
+        let served = ConnectionKind::OpenAiCompat;
+        for modality in Modality::ALL {
+            assert!(served.path_for(modality).is_some(), "{modality:?}");
+        }
+        let vectors = embedding::EmbeddingRequest::new("m".to_owned(), vec!["one".to_owned()])
+            .expect("one text is a request");
+        assert!(vectors.body().contains("encoding_format"));
+        let ranking = rerank::RerankRequest::new("q".to_owned(), vec!["one".to_owned()])
+            .expect("one passage is a request");
+        assert!(ranking.body().contains("texts"));
     }
 
     #[test]

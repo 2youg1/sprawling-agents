@@ -66,7 +66,7 @@ impl RunWorker {
             ig: false,
         };
         self.ledger.append(draft)?;
-        self.governance.absorb(kind, RunId::CITY, None, &data);
+        self.governance.absorb(kind, RunId::CITY, None, &data)?;
         self.expiries.absorb(kind, &data);
         self.book.apply_payload(kind, &data)
     }
@@ -97,7 +97,7 @@ impl RunWorker {
         // absent from `pending`, so the person could not answer it until
         // the process restarted and folded the ledger again. It is the
         // same fold a restart runs, shown the line this process wrote.
-        self.governance.absorb(kind, run, Some(&addr), &data);
+        self.governance.absorb(kind, run, Some(&addr), &data)?;
         Ok(())
     }
 }

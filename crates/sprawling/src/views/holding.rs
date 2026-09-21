@@ -267,17 +267,19 @@ impl Views {
             EventKind::ApprovalRequested => self.fold_question(record)?,
             EventKind::ApprovalResolved => self.fold_ruling(record)?,
             EventKind::CityHalted => {
-                let data = record.data().as_map();
-                let scope = data.get("scope").and_then(serde_json::Value::as_str);
-                let state = data.get("state").and_then(serde_json::Value::as_str);
-                match (scope, state) {
-                    (Some(scope), Some(crate::assembly::HALTED)) => {
-                        self.halted.insert(scope.to_owned());
+                // The same reading the worker's own governance does, out
+                // of the one type that spells these two words.
+                if let Some((scope, admission)) =
+                    crate::assembly::Admission::in_record(record.data().as_map())?
+                {
+                    match admission {
+                        crate::assembly::Admission::Halted => {
+                            self.halted.insert(scope.to_owned());
+                        }
+                        crate::assembly::Admission::Released => {
+                            self.halted.remove(scope);
+                        }
                     }
-                    (Some(scope), Some(crate::assembly::RELEASED)) => {
-                        self.halted.remove(scope);
-                    }
-                    _ => {}
                 }
             }
             EventKind::AutonomyChanged => {

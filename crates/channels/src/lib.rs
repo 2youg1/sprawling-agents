@@ -21,6 +21,7 @@ mod carried_name;
 mod command;
 mod control;
 mod named_frames;
+mod preference;
 mod reading;
 #[cfg(feature = "server")]
 mod reception;
@@ -38,6 +39,7 @@ pub use answer::{BuildingAnswer, BuildingDoc};
 pub use answer::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Turn, Used};
 pub use answer::{ChangesAnswer, CommitAnswer, CommitsAnswer, HISTORY_MAX, HistoryAnswer};
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer, EndpointSummary, EndpointsAnswer};
+pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary, SettledEffort, TuningDefaults};
 pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegment};
 pub use answer::{CostOfAnswer, EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use answer::{Decision, GovernanceAnswer};
@@ -53,15 +55,17 @@ pub use answer::{Standing, ToolkitLine, ToolkitsAnswer};
 #[cfg(feature = "server")]
 pub use assets::{AssetReply, ClientAssets, EmbeddedFile};
 pub use auth::{PairingToken, verify};
-pub use carried_name::{ModeTag, ProviderName, TemplateName, ToolkitSlug, UploadId};
+pub use carried_name::{ProviderName, TemplateName, ToolkitSlug};
 pub use command::COMMAND_NAMES;
 pub use command::{BodyOverride, EndpointTuning, HeaderPair};
 pub use command::{Command, WireCommand};
-pub use command::{GovernedDocument, HaltScope, LoginStep, NoSecret, PursuitStep};
+pub use command::{GovernedDocument, HaltScope, LoginStep, NoSecret, PursuitStep, Shelf};
 pub use control::{ControlVerdict, Intervention, classify};
 pub use kernel::highlight::markdown;
 pub use kernel::{FileChange, How, Lines};
 pub use kernel::{Span, Token};
+pub use preference::{Appearance, Chord, Chroma, Density, Face, Lang, Lighting, Motion};
+pub use preference::{BODY_PX_MAX, BODY_PX_MIN, PreferencePatch, PreferencesAnswer};
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in, subject_of};
 pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
@@ -71,7 +75,7 @@ pub use reception::{SessionState, SessionStep, decide_frame};
 #[cfg(feature = "server")]
 pub use reception::{decide_bind, decide_handshake};
 #[cfg(feature = "server")]
-pub use server::{AcpBody, AcpProgress, AcpSink, TranscribeSink};
+pub use server::{AcpProgress, AcpSink, Pairing, TranscribeSink};
 #[cfg(feature = "server")]
 pub use server::{Delivered, Reply, ServeConfig, router, serve};
 #[cfg(feature = "schema")]
@@ -81,6 +85,7 @@ pub use wire::{Hello, Query, Welcome};
 pub use wire::{LogLevel, LogLine};
 pub use wire::{QUERY_NAMES, WIRE_V, schema_hash};
 
+pub use kernel::model::{Mode, Window};
 pub use kernel::{Address, ApprovalId, Autonomy, AxCode, AxError, B3Hash};
 pub use kernel::{ApprovalClass, ApprovalItem, ClusterKey, Restoration};
 pub use kernel::{BudgetUse, Locator, PlannedProgress, Progress, UnplannedProgress};

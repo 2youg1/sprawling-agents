@@ -148,7 +148,7 @@ fn settled(live: &Live, key: &str, city_root: &Path) -> Result<RunWorker, AxErro
         endpoint,
         model: live.model.clone(),
         tag: kernel::ModelTag::Main,
-        context_tokens: 32_768,
+        context_tokens: kernel::Window::new(32_768),
         max_output_tokens: kernel::Ceiling::new(1_024),
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"e2e-select"),
     })?;
@@ -166,7 +166,7 @@ fn dispatch(worker: &mut RunWorker) -> Result<(), AxError> {
         addr: Address::parse(BUILDING)?,
         task: "Reply with one word: ready.".to_owned(),
         goal: "one answer from the endpoint this city was pointed at".to_owned(),
-        mode: channels::ModeTag::parse("plan")?,
+        mode: kernel::Mode::PlanGoal,
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"e2e-dispatch"),
         session: Some(kernel::SessionName::parse(SESSION)?),
         effort: None,

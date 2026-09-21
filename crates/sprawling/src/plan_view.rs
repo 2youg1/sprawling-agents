@@ -71,40 +71,36 @@ impl PlanView {
     /// edited the table with the edit tool leaves no `roadmap_*` record,
     /// and a cache that ignored the wave would go on reporting the plan
     /// as it was before the edit.
-    #[expect(
-        clippy::wildcard_enum_match_arm,
-        reason = "a few kinds stale a plan; the rest of the event vocabulary does not"
-    )]
     pub(crate) fn apply(&mut self, record: &EventRecord) {
+        let reach = may_move_plan(record.kind());
         let Some(building) = record.addr().and_then(building_of) else {
             // A record with no address could belong to any building, so
-            // every parsed copy is suspect.
-            if matches!(record.kind(), EventKind::CityInitialized) {
+            // a kind that moves a plan makes every parsed copy suspect.
+            // The rule used to name one kind and the comment beside it
+            // named the class, and the comment was the correct one
+            // (sprawling-SPEC.md 8-76).
+            if !matches!(reach, PlanReach::Untouched) {
                 self.read.clear();
             }
             return;
         };
-        match record.kind() {
-            EventKind::RoadmapClaimed => self.read.remove(&building).map(drop).unwrap_or(()),
-            EventKind::RoadmapFinished | EventKind::RoadmapReleased => {
+        match reach {
+            PlanReach::Untouched => {}
+            PlanReach::Stale => {
+                self.read.remove(&building);
+            }
+            PlanReach::NodeFreed => {
                 self.read.remove(&building);
                 if let Some(node) = node_of(record) {
                     self.causes.entry(building).or_default().remove(&node);
                 }
             }
-            EventKind::RoadmapBlocked => {
+            PlanReach::NodeStopped => {
                 self.read.remove(&building);
                 if let (Some(node), Some(why)) = (node_of(record), cause_of(record)) {
                     self.causes.entry(building).or_default().insert(node, why);
                 }
             }
-            EventKind::RoadmapSplit
-            | EventKind::CheckpointCommitted
-            | EventKind::BuildingCreated
-            | EventKind::RunFrozen => {
-                self.read.remove(&building);
-            }
-            _ => {}
         }
     }
 
@@ -218,6 +214,94 @@ fn unplanned() -> Progress {
         steps: 0,
         budget: kernel::BudgetUse::default(),
     })
+}
+
+/// How far one record reaches into what this view holds.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum PlanReach {
+    /// The kind cannot move a plan, so every parsed copy still stands.
+    Untouched,
+    /// The plan may have moved and the parsed copy is out of date.
+    Stale,
+    /// Out of date, and the node the record names is no longer stopped.
+    NodeFreed,
+    /// Out of date, and the node the record names has stopped, for the
+    /// reason the record carries.
+    NodeStopped,
+}
+
+/// Which records can move a plan. Exhaustive on purpose: a kind added
+/// to the vocabulary without an answer here is a compile error rather
+/// than a stale table nobody notices (sprawling-SPEC.md 8-76).
+fn may_move_plan(kind: EventKind) -> PlanReach {
+    match kind {
+        EventKind::RoadmapFinished | EventKind::RoadmapReleased => PlanReach::NodeFreed,
+        EventKind::RoadmapBlocked => PlanReach::NodeStopped,
+        EventKind::CityInitialized
+        | EventKind::BuildingCreated
+        | EventKind::CheckpointCommitted
+        | EventKind::RunFrozen
+        | EventKind::RoadmapClaimed
+        | EventKind::RoadmapSplit => PlanReach::Stale,
+        EventKind::BuildingConfigured
+        | EventKind::RunStarted
+        | EventKind::RunForked
+        | EventKind::PromptAssembled
+        | EventKind::ModelCalled
+        | EventKind::ModelReturned
+        | EventKind::ToolCalled
+        | EventKind::ToolResult
+        | EventKind::ResultOffloaded
+        | EventKind::GateChecked
+        | EventKind::GateDenied
+        | EventKind::HandoffWritten
+        | EventKind::SteerReceived
+        | EventKind::CancelReceived
+        | EventKind::WatchdogFired
+        | EventKind::BudgetLimit
+        | EventKind::LogTruncated
+        | EventKind::SignalEnqueued
+        | EventKind::SignalConsumed
+        | EventKind::DraftHeld
+        | EventKind::DraftResolved
+        | EventKind::GoalRegistered
+        | EventKind::GoalConflict
+        | EventKind::ArbitrationVerdict
+        | EventKind::RepairStarted
+        | EventKind::RepairReused
+        | EventKind::WorktreeOpened
+        | EventKind::PrOpened
+        | EventKind::PrMerged
+        | EventKind::PrRejected
+        | EventKind::PursuitChanged
+        | EventKind::ApprovalRequested
+        | EventKind::ApprovalResolved
+        | EventKind::PolicyCreated
+        | EventKind::PolicyRevoked
+        | EventKind::TaintPromoted
+        | EventKind::CrossBuildingTransfer
+        | EventKind::TakeoverStarted
+        | EventKind::RollbackApplied
+        | EventKind::CityHalted
+        | EventKind::BackpressureShed
+        | EventKind::DigestInvalidated
+        | EventKind::EndpointAttached
+        | EventKind::EndpointProbed
+        | EventKind::EndpointLost
+        | EventKind::ModelSelected
+        | EventKind::ProviderDegraded
+        | EventKind::LoginStarted
+        | EventKind::EvalRun
+        | EventKind::AssetArchived
+        | EventKind::CredentialLent
+        | EventKind::SecretCaptured
+        | EventKind::SecretEgressBlocked
+        | EventKind::FileDiscarded
+        | EventKind::DiscardRestored
+        | EventKind::AutonomyChanged
+        | EventKind::GovernedDocumentWritten
+        | EventKind::ToolkitLinkOpened => PlanReach::Untouched,
+    }
 }
 
 /// The building an address belongs to: its first segment.

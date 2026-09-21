@@ -157,11 +157,12 @@ src/Sprawling/Check.lean     抽样、收缩、检查树。不知道城是什么
 src/Sprawling/Model.lean     状态模型、后置条件、定向对抗场景
 src/Sprawling/Provider.lean  挂过 endpoint 的第二种世界：URL 等价类与上限
 src/Sprawling/Layer.lean     写过配置的第三种世界：磁盘上的那份与答案里的那份
+src/Sprawling/Person.lean    人自己那一层的第四种世界：住在城外的那份与答案里的那份
 src/Sprawling/Regression.lean 两个世界的反例 → 一个 Rust 测试文件
 test/Main.lean               入口与检查树
 ```
 
-依赖单向：`Model` → `Door` → `Frame`，`Model` → `Ground` → `Door`，`Model` → `Check`，`Provider` → `Ground`，`Layer` → `Ground` 与 `Check`，`Regression` → `Model` 与 `Provider`。`Layer` 不被 `Regression` 读：它至今没有找到反例，而一条没有反例的性质不向 Rust 侧交付任何东西。**`Regression` 依赖两个世界，因为交付物是一个文件**：轨迹那条测试的每一步与极性从 `Model` 读，供应世界那两条测试的拼法、中转站名字与模型 id 从 `Provider` 读，于是演员表在本目录里仍然只有一个家。`Provider` 不 import `Model`：那是另一种世界，两边共用的只有门与场地。`Frame` 不 import 任何本工程模块；`Check` 也不，且它**不 import `Door`**——抽样与收缩不允许知道有一座城存在。
+依赖单向：`Model` → `Door` → `Frame`，`Model` → `Ground` → `Door`，`Model` → `Check`，`Provider` → `Ground`，`Layer` → `Ground` 与 `Check`，`Person` → `Layer`，`Regression` → `Model` 与 `Provider`。**`Person` 读 `Layer` 而不自立一套**：两个世界问的是同一件事（一份人也手改的文件与一个折出来的答案会不会分岔），差在那份文件在不在城里；序列生成器、收缩器、“这份读数陈述了某个值吗”那一个子串探针、以及七个互不为子串的四位数，全部只有 `Layer` 一个家。`Layer` 不被 `Regression` 读：它至今没有找到反例，而一条没有反例的性质不向 Rust 侧交付任何东西。**`Regression` 依赖两个世界，因为交付物是一个文件**：轨迹那条测试的每一步与极性从 `Model` 读，供应世界那两条测试的拼法、中转站名字与模型 id 从 `Provider` 读，于是演员表在本目录里仍然只有一个家。`Provider` 不 import `Model`：那是另一种世界，两边共用的只有门与场地。`Frame` 不 import 任何本工程模块；`Check` 也不，且它**不 import `Door`**——抽样与收缩不允许知道有一座城存在。
 
 `Ground` 依赖 `Door` 而不是自己起进程：**「二进制在哪」只允许有一个答案**，而场地要用它做三件事（`init`、`serve`、探活）。
 
@@ -356,7 +357,9 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 | 账本布局 `.sprawling/ledger/*.jsonl` | 敌意动作要按它找到文件 | 该布局改变时本目录报错，属预期 |
 | 端口 47100–47115 | 避开常用段，又不需要网络库依赖；整棵树串行跑，十六个是给外部占用留的余地 | 冲突时报环境问题 |
 | 静默窗口 250 ms | 模型驱动的每个动词都答在 1 ms 内（实测），250 ms 是三个数量级的余量 | 模型开始走慢路径（挂 endpoint）时必须同步改 |
-| 种子 `20260912` | 本地运行必须可复现：一次反例只有在它能被重跑时才值得渲染成 Rust 测试 | 定时任务经 `SPRAWLING_SEED` 用会变的种子，于是「每晚探索新轨迹」与「本地可复现」各得其所 |
+| 种子 `20260912` | 本地运行必须可复现：一次反例只有在它能被重跑时才值得渲染成 Rust 测试。**`SPRAWLING_SEED` 读成三态**：给了且能解成数、没给、给了但解不成。第三态以退码 `2` 在起城之前停住，而不是静默换成默认值：拼错的种子不是关于产品的证据，而报告里那句复现命令必须是这一跑真用过的那一个（B-81）。每一跑开头打印 `seed <值>` | 定时任务经 `SPRAWLING_SEED` 用会变的种子，于是「每晚探索新轨迹」与「本地可复现」各得其所 |
+| 人那一层的路径 `<home>/.sprawling/config.toml` | 第四种世界要按它找到那份磁盘上的读数，而它不在任何一座城里，`document` 查询读不到 | 布局改变时本目录报错，属预期 |
+| 环境变量 `USERPROFILE` 与 `HOME` | 被服务的城按这两个变量找家目录，两个都指向一次性目录；**只覆写其中一个就把答案交给了平台**，而一跑对抗不得动跑它的人自己的偏好 | 产品改读家目录的方式时同步改 `Door.serve` |
 | 指令预算 `7001` 等七个四位数 | 写回性质靠子串判断问文件陈述了什么，互不为子串是这一判断成立的前提 | 加值时要保持该性质；否则「旧值还在文件里」会被包含关系伪造 |
 | 两个层的路径 一个楼自己的 `.sprawling/CONFIG.toml` 与 `.sprawling/CONFIG.toml` | 写回性质要按层分别读 | 布局改变时本目录报错，属预期 |
 | 三个地址 `acme` / `beta` / `gamma` | 固定的演员表，让反例可读 | 加人时同步改 `Regression.lean` 的模板 |

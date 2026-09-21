@@ -193,13 +193,30 @@ mod tests {
             GENESIS_PREV,
         )
     }
+    /// One catalogue row as a probe that answered nothing but the id
+    /// would have left it.
+    use crate::endpoint::ModelFacts;
+    use crate::provider::registry::ConnectionKind;
+
+    fn facts(id: &str) -> ModelFacts {
+        ModelFacts {
+            id: id.to_owned(),
+            context_tokens: None,
+            max_output_tokens: None,
+            input_modalities: Vec::new(),
+            input_price: None,
+            output_price: None,
+        }
+    }
+
     fn attached(name: &str, base_url: &str) -> AttachedEndpoint {
         AttachedEndpoint {
             name: name.to_owned(),
             base_url: base_url.to_owned(),
             dialect: DialectKind::OpenAi,
+            connection_kind: ConnectionKind::OpenAiCompat,
             auth: AuthSpec::Bearer(SecretRef::parse("secret:provider/key").unwrap()),
-            models: vec!["m-small".to_owned(), "m-large".to_owned()],
+            models: vec![facts("m-small"), facts("m-large")],
             probed: true,
             tuning: EndpointTuning::default(),
         }

@@ -22,7 +22,6 @@
 //! rather than remembered.
 
 use kernel::{AxError, EventDraft, EventKind, EventRef, Ledger, Payload, RunId, TimeMs};
-use serde_json::{Map, Value};
 
 /// Events whose payload this module built from values it computed.
 #[derive(Debug, Clone, Copy)]
@@ -133,9 +132,9 @@ impl Journal {
         &mut self,
         ledger: &mut dyn Ledger,
         event: Carried,
-        data: Map<String, Value>,
+        data: Payload,
     ) -> Result<EventRef, AxError> {
-        let (scanned, hits) = crate::redact::redact(&data);
+        let (scanned, hits) = crate::redact::redact(data.as_map());
         self.redacted = self.redacted.saturating_add(hits);
         self.append(ledger, event.kind(), Payload::new(scanned)?)
     }

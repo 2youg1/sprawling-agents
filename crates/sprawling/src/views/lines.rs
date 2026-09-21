@@ -38,7 +38,19 @@ pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> channels::Endpoi
             label: endpoint.label().to_owned(),
             base_url: endpoint.base_url.clone(),
             dialect: endpoint.dialect,
-            models: endpoint.models.clone(),
+            connection_kind: endpoint.connection_kind.as_str().to_owned(),
+            models: endpoint
+                .models
+                .iter()
+                .map(|row| channels::ModelFactsSummary {
+                    id: row.id.clone(),
+                    context_tokens: row.context_tokens.and_then(kernel::Window::new),
+                    max_output_tokens: row.max_output_tokens,
+                    input_modalities: row.input_modalities.clone(),
+                    input_price: row.input_price.clone(),
+                    output_price: row.output_price.clone(),
+                })
+                .collect(),
             local: endpoint.is_local(),
             has_credential: endpoint.has_credential(),
         })

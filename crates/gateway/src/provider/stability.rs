@@ -94,6 +94,18 @@ fn system_on_the_wire(kind: ConnectionKind, chat: &ChatRequest) -> String {
             .collect::<Vec<String>>()
             .join("\n\n"),
         DialectKind::OpenAi => wire["messages"][0]["content"].as_str().unwrap().to_owned(),
+        // The responses writer puts the system segments in the first
+        // input item, as a `developer` message whose parts are the
+        // segments; `instructions` is one string and would lose the
+        // cache breakpoints on their edges. Read part by part, so this
+        // guard still reads the bytes that leave the city.
+        DialectKind::OpenAiResponses => wire["input"][0]["content"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|part| part["text"].as_str().unwrap().to_owned())
+            .collect::<Vec<String>>()
+            .join("\n\n"),
     }
 }
 

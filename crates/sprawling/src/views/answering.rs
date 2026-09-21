@@ -29,6 +29,16 @@ use super::holding::Views;
 use super::lines::{buildings_of, endpoints_answer, summarize};
 use crate::assembly::{ledger_dir, read_building};
 
+/// The answer to a question this city could not look up.
+///
+/// One shape, named once: a reader that met an empty city and a reader
+/// that met a city which could not look have to be able to tell the
+/// difference, and every caller spelling the refusal itself is how the
+/// two start looking alike.
+fn unavailable(query: String) -> channels::Answer {
+    channels::Answer::Unavailable { query }
+}
+
 impl Views {
     /// A bounded slice of the one history, ending just before `before`
     /// or at the tail.
@@ -135,6 +145,18 @@ impl Views {
             records.push(record);
         }
         channels::HistoryAnswer { records, earlier }
+    }
+
+    /// What this machine had when the city started.
+    ///
+    /// A city that never looked says so, for the reason a building
+    /// nobody raised does: a page given an empty machine instead would
+    /// tell a person every tool they have is missing.
+    fn doctor_or_unavailable(&self) -> channels::Answer {
+        match &self.machine {
+            Some(found) => channels::Answer::Doctor(Box::new(found.clone())),
+            None => unavailable("Doctor".to_owned()),
+        }
     }
 
     /// Answers one query. Every arm either answers or names itself
@@ -245,21 +267,20 @@ impl Views {
             // longer holds are both "I could not look".
             channels::Query::Prefix { run } => match self.prefix_answer(*run) {
                 Some(answer) => channels::Answer::Prefix(Box::new(answer)),
-                None => channels::Answer::Unavailable {
-                    query: format!("Prefix({run})"),
-                },
+                None => unavailable(format!("Prefix({run})")),
             },
+            // Neither is answerable yet, and "I could not look" is the
+            // honest answer: the page draws its own empty state from it
+            // rather than being handed a guess.
+            channels::Query::Preferences => unavailable("Preferences".to_owned()),
+            channels::Query::Config { addr } => unavailable(format!("Config({})", addr.as_str())),
             channels::Query::Content { locator } => match self.content_answer(locator) {
                 Some(answer) => channels::Answer::Content(Box::new(answer)),
-                None => channels::Answer::Unavailable {
-                    query: format!("Content({locator})"),
-                },
+                None => unavailable(format!("Content({locator})")),
             },
             channels::Query::Skills { building } => match self.skills_answer(building) {
                 Some(answer) => channels::Answer::Skills(Box::new(answer)),
-                None => channels::Answer::Unavailable {
-                    query: format!("Skills({})", building.as_str()),
-                },
+                None => unavailable(format!("Skills({})", building.as_str())),
             },
             channels::Query::GitStatus { building } => match self.git_status_answer(building) {
                 Some(answer) => channels::Answer::GitStatus(Box::new(answer)),
@@ -270,17 +291,7 @@ impl Views {
             channels::Query::EndpointView => {
                 channels::Answer::Endpoints(endpoints_answer(&self.book))
             }
-            // What this machine had when the city started. A city that
-            // never looked says so, for the reason a building nobody
-            // raised does: "I did not look" is its own answer, and a
-            // page that got an empty machine instead would tell a
-            // person every tool they have is missing.
-            channels::Query::Doctor => match &self.machine {
-                Some(found) => channels::Answer::Doctor(Box::new(found.clone())),
-                None => channels::Answer::Unavailable {
-                    query: "Doctor".to_owned(),
-                },
-            },
+            channels::Query::Doctor => self.doctor_or_unavailable(),
             channels::Query::McpHealth { addr } => {
                 channels::Answer::McpHealth(Box::new(self.mcp_health_answer(addr)))
             }

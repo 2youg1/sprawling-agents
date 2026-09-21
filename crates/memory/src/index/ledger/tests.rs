@@ -291,3 +291,50 @@ fn a_missing_seq_is_a_caller_error_not_a_corrupt_ledger() {
     };
     assert!(matches!(err, MemoryError::SeqMissing { seq: 77 }));
 }
+
+/// What rebuilding a view costs, counted rather than timed: every
+/// record is folded once and every byte of the ledger is read once, so
+/// a rebuild that starts re-reading segments shows up here as read
+/// amplification rather than as a slow afternoon.
+#[test]
+fn a_view_rebuild_folds_every_record_and_reads_the_ledger_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let fs = crate::fault_fs::FaultFs::new(crate::fault_fs::FaultPlan {
+        cut_at_op: None,
+        cut_on_write: None,
+        torn_tail: crate::fault_fs::TornTail::None,
+    });
+    let (mut ledger, _) =
+        crate::JsonlLedger::open_faulty(fs.clone(), dir.path(), TimeMs::new(0)).unwrap();
+    let run = RunId::from_bytes([5u8; 16]);
+    let drafts: Vec<EventDraft> = (0..401)
+        .map(|i| EventDraft {
+            run,
+            t: TimeMs::new(i),
+            who: "tester".to_owned(),
+            addr: None,
+            kind: EventKind::ToolCalled,
+            data: Payload::empty(),
+            ig: false,
+        })
+        .collect();
+    ledger.append_all(drafts).unwrap();
+
+    let before = fs.bytes_read();
+    let mut view = crate::HotView::new();
+    let mut folded = 0u64;
+    let mut ledger_bytes = 0u64;
+    for line in ledger.read_raw_lines().unwrap() {
+        ledger_bytes =
+            ledger_bytes.saturating_add(u64::try_from(line.len().saturating_add(1)).unwrap());
+        view.apply(&EventRecord::parse_line(&line).unwrap())
+            .unwrap();
+        folded = folded.saturating_add(1);
+    }
+    let read = fs.bytes_read().saturating_sub(before);
+    eprintln!(
+        "view_rebuild_read: {folded} records folded, {read} B read for a {ledger_bytes} B ledger"
+    );
+    assert_eq!(folded, 401, "every record is folded exactly once");
+    assert_eq!(read, ledger_bytes, "a rebuild reads each byte once");
+}

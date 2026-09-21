@@ -48,9 +48,20 @@ import { Talk } from "./views/talk";
 import { Gallery } from "./views/gallery";
 import { Welcome } from "./views/welcome";
 
-// Where each `go.*` action lands. Every other action moves the shell
-// rather than the address bar, and is answered below.
-const GOES: Readonly<Record<string, View>> = {
+// The actions that move the address bar. Derived from `Action` rather
+// than written out, so an action named `go.*` in `core/keys` has to
+// land somewhere here before this file compiles.
+type GoAction = Extract<Action, `go.${string}`>;
+
+// Where each of them lands. Every other action moves the shell rather
+// than the address bar, and is answered by the switch below.
+//
+// **Keyed by `GoAction`, which is what makes this table checked**: a
+// key spelled wrong is not an action, and an action left out is a
+// missing property. Before that it was keyed by `string`, so the name
+// of a destination had two homes - this table and `ACTIONS` - and
+// neither could tell the other was wrong (roadmap B-77).
+const GOES: Readonly<Record<GoAction, View>> = {
   "go.talk": { kind: "talk", address: MAYOR },
   "go.waiting": { kind: "talk", address: MAYOR },
   "go.city": { kind: "city" },
@@ -123,12 +134,19 @@ export function App() {
     opener = null;
   };
   const act = (action: Action) => {
-    const to = GOES[action];
-    if (to !== undefined) {
-      go(to);
-      return;
-    }
     switch (action) {
+      // The eight arms that share a body are exactly `GoAction`, so
+      // the lookup is checked here rather than guarded at run time.
+      case "go.talk":
+      case "go.city":
+      case "go.mcp":
+      case "go.record":
+      case "go.cost":
+      case "go.registry":
+      case "go.setup":
+      case "go.waiting":
+        go(GOES[action]);
+        return;
       case "palette":
         setPaletteOpen((open) => !open);
         return;
@@ -144,17 +162,6 @@ export function App() {
         return;
       case "run.stop":
         command(halt("city"));
-        return;
-      // Every `go.*` action was answered by the table above; naming them
-      // keeps a new one a decision here rather than a silence.
-      case "go.talk":
-      case "go.city":
-      case "go.mcp":
-      case "go.record":
-      case "go.cost":
-      case "go.registry":
-      case "go.setup":
-      case "go.waiting":
         return;
     }
   };

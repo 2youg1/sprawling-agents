@@ -14,8 +14,8 @@
 //! spellings of the same fact, and `replay::rebuild_prefix` would only
 //! understand whichever it was written against.
 
+use kernel::event::record::PromptSource;
 use kernel::{Address, B3Hash};
-use serde_json::{Value, json};
 
 /// The four slots in stability order; the order is the cache economics.
 /// Exactly four — deliberately exhaustive.
@@ -28,6 +28,15 @@ pub enum SegmentSlot {
 }
 
 impl SegmentSlot {
+    /// The four slots in prefix order, which is also the order the
+    /// cache breakpoints are declared in on the wire.
+    pub const ALL: [SegmentSlot; 4] = [
+        SegmentSlot::City,
+        SegmentSlot::Building,
+        SegmentSlot::Resident,
+        SegmentSlot::Run,
+    ];
+
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             SegmentSlot::City => "city",
@@ -118,13 +127,13 @@ impl SegmentSource {
     /// `marker` is carried because the rebuild reads it: it says a
     /// truncation marker follows the kept bytes, and the concatenation
     /// rule cannot be recovered from the byte counts alone.
-    pub(crate) fn row(&self) -> Value {
-        json!({
-            "addr": self.addr.as_str(),
-            "kept": self.kept,
-            "marker": self.dropped > 0,
-            "dropped": self.dropped,
-        })
+    pub(crate) fn row(&self) -> PromptSource {
+        PromptSource {
+            addr: self.addr.clone(),
+            kept: self.kept,
+            marker: self.dropped > 0,
+            dropped: self.dropped,
+        }
     }
 }
 
@@ -143,8 +152,8 @@ mod tests {
             dropped: 4,
         };
         assert_eq!(
-            source.row(),
-            json!({ "addr": "City.md", "kept": 12, "marker": true, "dropped": 4 })
+            serde_json::to_value(source.row()).unwrap(),
+            serde_json::json!({ "addr": "City.md", "kept": 12, "marker": true, "dropped": 4 })
         );
     }
 
@@ -154,8 +163,8 @@ mod tests {
     fn a_whole_document_reports_nothing_dropped_and_no_marker() {
         let source = SegmentSource::whole(Address::parse("City.md").unwrap(), 9);
         assert_eq!(
-            source.row(),
-            json!({ "addr": "City.md", "kept": 9, "marker": false, "dropped": 0 })
+            serde_json::to_value(source.row()).unwrap(),
+            serde_json::json!({ "addr": "City.md", "kept": 9, "marker": false, "dropped": 0 })
         );
     }
 }

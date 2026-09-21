@@ -9,8 +9,8 @@
 
 | 模块 | 一句话 |
 |---|---|
-| `wire` | Command 17／Query 9／Event 三分的类型与 JSON 编码；版本＋schema 哈希握手帧 |
-| `server` | WebSocket 服务；静态资源与上传端点；绑定面判定（默认只绑回环） |
+| `wire` | Command／Query／Event 三分的类型与 JSON 编码；版本＋schema 哈希握手帧 |
+| `server` | WebSocket 服务；静态资源；绑定面判定（默认只绑回环） |
 | `auth` | 回环零摩擦；非回环要求配对令牌且常数时间比较；未配置令牌即拒绝启动 |
 | `control` | 人的五动词入口；自持鉴权与幂等（做不到则并入 `server`——ARCHITECTURE §6 已写明这条退路） |
 | `aggregate` | 多 City 只读聚合：只转发 Query 与 Event，恒不转发 Command |
@@ -19,9 +19,9 @@
 
 ## 2 验收标准
 
-- **wire**：Command 恰 28 个 variant、Query 恰 31 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 恰 29 个 variant、Query 恰 33 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`1d5238bc37f70915b49bffbde2dbfc956639a412549ef96c882309e75898f0a0`；**WIRE_V ＝ 32**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36）。
+  **当前 golden**：`67bfc2a041609a524a0eb0f933f694bc09bce47d3224cc54e8a660e95787ecda`；**WIRE_V ＝ 32**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -525,13 +525,14 @@ pub struct Delta { pub run: RunId, pub increment: kernel::Increment }
 | `Halt` | client | 停下一个范围 |
 | `Release` | client | 放开一个范围 |
 | `Approve` | client | 答一条审批 |
-| `SetAutonomy` | client | 定一栋楼的 Autonomy（三态） |
+| `SetAutonomy` | client | 定一栋楼的 Autonomy（两态：本人或被任命的居民） |
+| `HandOff` | client | 把一条问题转给另一位居民去答 |
+| `PutPreferences` | client | 写这个人自己的 `~/.sprawling/config.toml` 的 `[ui]` |
+| `PutShelved` | client | 写一份上架的文档（技能或说明） |
 | `Pursue` | client | 设一个持续追的目标，以及暂停／恢复／清除 |
 | `PutDocument` | client | 写治理这座城的三份文件之一 |
-| `Attach` | client | 传一份附件 |
 | `Takeover` | client | 人接管一条在跑的线 |
 | `Rollback` | client | 回到一个检查点 |
-| `CreatePolicy` | client | 把一条判定变成一条常规 |
 | `BatchByBuilding` | client | 按楼成批派活 |
 | `Wake` | push | 外面发生了一件事；地址由 watch 表与 triage 决定，调用方说不出房间 |
 | `Auth` | handshake | 出示配对令牌，`server::decide_handshake` 吃掉它 |
@@ -1093,3 +1094,30 @@ pub enum ReleaseAnswer {
 **为什么是一个宏而不是两个**。`Query` 与 `Command` 的差别只有一个泛型载体（`Secret`），其余逐字相同；`carried_name!` 已经为四个 newtype 用过同一手法，这是复用既有机制而不是造相似物。
 
 **被否**：①保留手写表、加一道 `xtask` 闸去比对——那是给两个家配一个裁判，而不是把它们合成一个；②用 `strum` 之类的派生宏——多一个依赖换一段本仓库五十行就写得出、且要按本仓库的文档口径读的代码。
+
+### 8-39 WIRE_V 32 的其余七件：闭集、缺席、两个文件与一个兼容格式（叶子 4.5／7.4／7.9／14.2／10.8、定规 2 与 3 的 wire 尾巴）
+
+定规 3 把一次升版里能装下的都装进 32，理由写在那里：**升版的代价是 `wire.ts` 重生与客户端同改，与改动数量无关，分两次就是付两次。** §8-38 是同一次升版的第一件；以下是其余七件。
+
+**一、`mode` 由自由文本改为 `kernel::model::Mode`（7.9）。** 旧形状是 `ModeTag`（非空、无控制字符，值集「归上游」），而上游那一层把认不出的词落成 `PlanGoal`——于是拼错 `experiment` 得到一个规划 run 和零句话。`Mode` 是 `plan_goal｜up｜sc｜ud｜experiment` 的闭集，未知词在反序列化处即拒。**定义落在 kernel 而不是 channels**：与 `DialectKind` 同一条依赖倒置，wire 携带它、`runtime` 求值它，两边都不得指名对方。`carried_name` 因此只剩三个真正开放的名字（provider／template／toolkit）——**值集开放才进那个宏，闭集不进**。
+
+**二、`context_tokens` 由 `u64` 改为 `Option<Window>`（7.4）。** `Window` 与 `Ceiling` 同形（非零新类型）而**不是同一个类型**：一个界定模型能读多少，一个界定它能写多少，互换仍能编译的两个数不该共用一个名字。零在类型上不存在，缺席是 `null`；旧编码把「没人填」写成 `0`，于是上下文提醒拿一段对话去比对一个没人给过的数。
+
+**三、`HandOff`，`CreatePolicy` 删（定规 2 的 wire 尾巴）。** `HandOff { item, to, idem }` 把一条等待中的设计问题交给一位居民，写 `question_handed`；`SetAutonomy` 仍然回答「谁答全部」，两者是不同射程的两个决定，故是两条帧。`CreatePolicy` 随升级机制一起删——没有升级就没有可豁免的。
+
+**四、`Attach` 与上传链条删（S-08）。** 路由 `/upload`、`ServeConfig::upload_sink`、`UploadId` 与 `Command::Attach` 同集删除。事实是这条链**只写不读**：消费它的路由臂无条件拒为 `not_built`，而字节永久落进城目录，无保留期、无清理，字节上限只是 axum 提取器的隐式默认——一个在本仓没有家的数字。
+
+**五、`AcpBody` 删，`protocol::Incoming` 成为唯一入站文法（S-09）。** 旧路径把请求反序列化成 `AcpBody` 再逐字段搬进 `Incoming` 的结构体字面量，于是 `Incoming::parse`——那个拒绝空 task／空 goal 的构造器——**只有测试在调**，rustdoc 承诺的「没有完成定义的 run 报不出自己完成了」在真实编辑器路径上不成立；同一次搬运还把明文令牌抄进一个 `derive(Debug)` 的结构。现在 `AcpSink` 收 `&serde_json::Value` 与 `Pairing`，门只读 `token` 一个键用于判定，其余的键由 `parse` 读——**一个文法一个家**。`Pairing` 是枚举而不是 `bool`：传反了不该还能编译。
+
+**六、`EndpointSummary` 说得出自己是怎么连的，也说得出它服务的模型（14.2、§20.1／§20.2）。** 加 `connection_kind: String`，取 `ConnectionKind::as_str` 的七个扁平词之一；`models: Vec<String>` 升为 `Vec<ModelFactsSummary>`（上限、模态、价格原文）。`dialect` 留在旁边，它答的是更窄的一问——**哪支笔写请求**；两种连接可以共用一支笔而仍是两次不同的登记，只显示笔的页面说不出人当初设的是哪一个。`ModelFactsSummary` 每个字段都是**上游说过的话，不是本城的结论**：缺席就是那一行没说，不在此处补预设表，因为事实梯要在调用处爬一次，答案已经爬过的摘要就是第二个答案。
+
+**七、人能编辑的两个文件各得一扇门（C 章 3.1／3.3、F-02／F-04）。**
+
+| 帧 | 形状 | 为什么是这个形状 |
+|---|---|---|
+| `Query::Preferences` → `PreferencesAnswer` | 语言、welcomed、panel、`Appearance`、`proxying`、改过的和弦 | 浏览器曾按行缓存这些：十二个键、三个读取器，各自处理缺省与非法值。整表一扇门，允许值表由本 crate 声明一次并经 schema 传给客户端——**能画出来的选项就是这个 build 装得回的选项** |
+| `Command::PutPreferences { patch, idem }` | `PreferencePatch` 闭集：`lang｜welcomed｜panel｜appearance｜proxying｜chord` | 一帧一件事，不是整表写回：两个屏幕各改一件，不得互相覆盖 |
+| `Query::Config { addr }` → `ConfigAnswer` | `effort: Option<SettledEffort>` ＋ `TuningDefaults`；`SettledEffort` 携 `ConfigLayer`（`city｜resident｜room`） | **层是答案的一半。** 只给解析值的页面说不出这是本层写的还是继承来的，于是要把三层再读一遍自己爬一次梯子——**一把梯子爬两次就是一个问题两个答案**。`TuningDefaults` 是 gateway 那三个数的读出，不是它们的第二处声明 |
+| `Command::PutShelved { shelf, name, text, idem }` | `Shelf { Library, Building(addr) }`；写 `shelved_document_written` | 与 `GovernedDocument` 同一条理由：两处货架都在保留子树里，任何写域都够不着，所以帧里没有路径可拼。`name` 允许子路径，脚本因此留得住自己的文件夹 |
+
+**八、`DialectKind::OpenAiResponses`（4.5 本体）。** kernel 的兼容格式集由二变三，`gateway::dialect` 的五个入口各多一条臂。登记与调用从此说同一句话：人粘贴 responses URL，`ConnectionKind::Responses` 记住了，而 `wire()` 从前仍答 `OpenAi`——**记对了、调错了**。形状取自供应方自己的规格（`openai/openai-openapi`，`openapi.yaml` 自述 API 版本 2.3.0，提交 `ddface9b`），不取自任何客户端库。

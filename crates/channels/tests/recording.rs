@@ -71,14 +71,6 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
                 finished: true,
             })
         }),
-        upload_sink: Arc::new(|_| {
-            Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "stage an attachment",
-                "not in this test",
-            )
-            .with_recovery("stage the attachment through a city that carries a workbench"))
-        }),
         city: None,
     };
     let peer: SocketAddr = "127.0.0.1:40000".parse().unwrap();

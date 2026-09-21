@@ -5,10 +5,21 @@
 
 //! Boundary 3: the tool wave, executed in call order.
 
-use kernel::{AxCode, AxError, ContentBlock, Ledger, ToolCall, ToolOutcome};
-use serde_json::{Map, Value};
+use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
+use kernel::{AxCode, AxError, ContentBlock, Ledger, Payload, ToolCall, ToolOutcome};
 
 use super::{Carried, Interrupt, NextCall, PhaseOutcome, Recording, ToolWave, Turn};
+
+/// What the model reads back as the text of a tool result: the same
+/// payload the ledger keeps, printed once so the two cannot disagree.
+fn printed(payload: &Payload, action: &'static str) -> Result<String, AxError> {
+    serde_json::to_string(payload).map_err(|err| {
+        AxError::failure(AxCode::InvalidArgs, action, err.to_string()).with_recovery(
+            "report this against runtime::turn::wave: a payload refused JSON after \
+             its construction already accepted it",
+        )
+    })
+}
 
 impl Turn<ToolWave> {
     /// Boundary 3 (before tool execution). Serial: parallel execution
@@ -53,78 +64,43 @@ impl Turn<ToolWave> {
                     return Ok(PhaseOutcome::Cancelled(self.cancel_here(ledger)?));
                 }
             }
-            let mut called = Map::new();
-            called.insert("id".to_owned(), Value::String(call.id.clone()));
-            called.insert("name".to_owned(), Value::String(call.name.to_string()));
-            called.insert(
-                "args".to_owned(),
-                serde_json::to_value(&call.args).map_err(|err| {
-                    AxError::failure(AxCode::InvalidArgs, "encode tool args", err.to_string())
-                        .with_recovery(
-                            "call the tool again with arguments made of strings and \
-                             whole numbers, which is all this city's payloads carry",
-                        )
-                })?,
-            );
+            let called = ToolCalled {
+                id: call.id.clone(),
+                name: call.name.clone(),
+                args: call.args.clone(),
+            };
             self.journal
-                .append_redacted(ledger, Carried::ToolCalled, called)?;
-            let mut result = Map::new();
-            result.insert("tool_use_id".to_owned(), Value::String(call.id.clone()));
-            result.insert("name".to_owned(), Value::String(call.name.to_string()));
+                .append_redacted(ledger, Carried::ToolCalled, Payload::of(&called)?)?;
             let mut pictures = Vec::new();
-            let (content, is_error) = match invoke(call) {
+            let (answer, content, is_error) = match invoke(call) {
                 Ok(ToolOutcome {
                     result: outcome,
                     attachments,
                 }) => {
                     pictures = attachments;
-                    let value = serde_json::to_value(&outcome).map_err(|err| {
-                        AxError::failure(AxCode::InvalidArgs, "encode tool result", err.to_string())
-                            .with_recovery(
-                                "report this against the tool that answered: a result \
-                                 payload holds strings and whole numbers only",
-                            )
-                    })?;
-                    result.insert("result".to_owned(), value.clone());
                     (
-                        serde_json::to_string(&value).map_err(|err| {
-                            AxError::failure(
-                                AxCode::InvalidArgs,
-                                "encode tool result",
-                                err.to_string(),
-                            )
-                            .with_recovery(
-                                "report this against runtime::turn::wave: the value \
-                                 printed here was accepted as JSON one line above",
-                            )
-                        })?,
+                        ToolAnswer::Answered {
+                            result: outcome.clone(),
+                        },
+                        printed(&outcome, "encode tool result")?,
                         false,
                     )
                 }
                 Err(tool_err) => {
-                    let value = serde_json::to_value(&tool_err).map_err(|err| {
-                        AxError::failure(AxCode::InvalidArgs, "encode tool error", err.to_string())
-                            .with_recovery(
-                                "report this against runtime::turn::wave: an AxError \
-                                 is seven fields of text, numbers and booleans",
-                            )
-                    })?;
-                    result.insert("error".to_owned(), value.clone());
+                    let error = Payload::of(&tool_err)?;
                     (
-                        serde_json::to_string(&value).map_err(|err| {
-                            AxError::failure(
-                                AxCode::InvalidArgs,
-                                "encode tool error",
-                                err.to_string(),
-                            )
-                            .with_recovery(
-                                "report this against runtime::turn::wave: the value \
-                                 printed here was accepted as JSON one line above",
-                            )
-                        })?,
+                        ToolAnswer::Failed {
+                            error: error.clone(),
+                        },
+                        printed(&error, "encode tool error")?,
                         true,
                     )
                 }
+            };
+            let result = ToolResult {
+                tool_use_id: call.id.clone(),
+                name: call.name.clone(),
+                answer,
             };
             wave_results.push(ContentBlock::ToolResult {
                 tool_use_id: call.id.clone(),
@@ -136,7 +112,7 @@ impl Turn<ToolWave> {
                 attachments: pictures,
             });
             self.journal
-                .append_redacted(ledger, Carried::ToolResult, result)?;
+                .append_redacted(ledger, Carried::ToolResult, Payload::of(&result)?)?;
         }
         Ok(PhaseOutcome::Advanced(Turn {
             journal: self.journal,

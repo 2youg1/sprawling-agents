@@ -3,11 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a dispatch and a fork record about a run.
+//! What a dispatch, a fork and a freeze record about a run.
 
 use serde::{Deserialize, Serialize};
 
+use crate::completion::Completion;
 use crate::event::identity::{RunId, Seq};
+use crate::event::kind::EventKind;
 use crate::locator::{B3Hash, Locator};
 
 /// One skill a run was dispatched with, pinned to the bytes it read.
@@ -56,6 +58,57 @@ pub struct RunStarted {
     /// absence to infer.
     #[serde(default)]
     pub skills: Vec<SkillPin>,
+}
+
+/// `run_frozen`: how a run ended, and what it cites for having ended
+/// that way.
+///
+/// The three endings are spelled by [`Completion::name`], which stays
+/// the authority for the words: this struct carries whichever word that
+/// method printed rather than an enum that would have to agree with it.
+/// A run that ended any other way cites nothing, and the key is absent
+/// rather than empty, exactly as the hand-written writer left it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct RunFrozen {
+    pub completion: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<Vec<EvidenceCite>>,
+}
+
+impl RunFrozen {
+    /// The one projection from a verdict to the line that records it.
+    ///
+    /// Reading is deliberately not the inverse: a [`Completion::Done`]
+    /// holds [`EventRef`](crate::EventRef)s, and minting those from a
+    /// line would forge the evidence the type exists to guarantee.
+    pub fn of(completion: &Completion) -> RunFrozen {
+        let evidence = match completion {
+            Completion::Done(evidence) => Some(
+                evidence
+                    .refs()
+                    .iter()
+                    .map(|cited| EvidenceCite {
+                        seq: cited.seq(),
+                        kind: cited.kind(),
+                    })
+                    .collect(),
+            ),
+            Completion::Limit | Completion::Cancelled => None,
+        };
+        RunFrozen {
+            completion: completion.name().to_owned(),
+            evidence,
+        }
+    }
+}
+
+/// One line a finished run cites as the evidence it finished.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct EvidenceCite {
+    pub seq: Seq,
+    pub kind: EventKind,
 }
 
 /// `run_forked`: which run this one continues, and from where in it.

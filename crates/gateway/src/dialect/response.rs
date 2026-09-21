@@ -23,6 +23,7 @@
 use kernel::{AxError, ChatResponse, DialectKind, Increment};
 use serde_json::Value;
 
+use super::responses;
 use crate::{anthropic, openai};
 
 pub fn increment_of(kind: DialectKind, frame: &Value) -> Option<Increment> {
@@ -30,6 +31,7 @@ pub fn increment_of(kind: DialectKind, frame: &Value) -> Option<Increment> {
     match kind {
         DialectKind::Anthropic => anthropic::increment_of(map),
         DialectKind::OpenAi => openai::increment_of(map),
+        DialectKind::OpenAiResponses => responses::increment_of(map),
     }
     .filter(|held| match held {
         Increment::Said(text) | Increment::Thought(text) => !text.is_empty(),
@@ -54,6 +56,7 @@ pub fn settled_from_stream(kind: DialectKind, frames: &[Value]) -> Result<Value,
     match kind {
         DialectKind::Anthropic => anthropic::settled(frames),
         DialectKind::OpenAi => openai::settled(frames),
+        DialectKind::OpenAiResponses => responses::settled(frames),
     }
 }
 
@@ -62,6 +65,7 @@ pub fn response_from_wire(kind: DialectKind, wire: &Value) -> Result<ChatRespons
     match kind {
         DialectKind::Anthropic => anthropic::response_from(wire),
         DialectKind::OpenAi => openai::response_from(wire),
+        DialectKind::OpenAiResponses => responses::response_from(wire),
     }
 }
 
@@ -71,6 +75,7 @@ pub fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<Value, Ax
     match kind {
         DialectKind::Anthropic => anthropic::response_wire(resp),
         DialectKind::OpenAi => openai::response_wire(resp),
+        DialectKind::OpenAiResponses => responses::response_wire(resp),
     }
 }
 #[cfg(test)]

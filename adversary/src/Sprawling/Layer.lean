@@ -80,12 +80,15 @@ so the empty candidate is dropped rather than reported as a smaller failure. -/
 def shrinkSequence (written : List Nat) : List (List Nat) :=
   (shrinkList written).filter (fun candidate => !candidate.isEmpty)
 
-/-- Whether a reading of a file states one figure.
+/-- Whether a reading of a file states one value.
 
-Substring rather than a parse, and the budgets above are chosen so that this
-cannot confuse two of them. -/
-def states (text : String) (budget : Nat) : Bool :=
-  (text.splitOn (toString budget)).length > 1
+Substring rather than a parse, and every value driven through it is chosen so
+that this cannot confuse two of them: the budgets above, and the font stacks
+`Sprawling.Person` derives from them. One probe for both worlds, because "does
+this file say this" is one question and a second spelling of it would be a
+second answer. -/
+def states [ToString α] (text : String) (value : α) : Bool :=
+  (text.splitOn (toString value)).length > 1
 
 /-- The text of one file of the city, as the door reads it.
 

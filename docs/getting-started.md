@@ -114,13 +114,13 @@ What the Mayor does with the idea:
 
 That building page is also reached from the city drawing. It shows **the plan**, drawn from that building's `Roadmap.md` and holding no state of its own: a row is **ready**, **waiting**, **working**, **stuck** or **done**, and only leaves count towards the figure, because a branch's work is its children and counting both would count the same effort twice. The **standing goal** panel is the other half: **pursue this** keeps the building handing out ready work by itself, and it stops when nothing is ready and nothing is in flight.
 
-**waiting on you** is every design question a resident asked that nothing can move without. A new city is raised with those questions delegated to the clerk, so most are answered there and their reasons land in the Ledger; anything carrying content from outside the city stays for you, because no policy waives a tainted question.
+**waiting on you** is every design question a resident asked that nothing can move without. A new city is raised with those questions delegated to the clerk, so most are answered there and their reasons land in the Ledger; a question that began with content from outside the city is flagged tainted, so whoever answers it reads it knowing where it came from.
 
 **the record** is the one history in three lenses — **the ledger**, **the archive**, **the recycle bin** — and **cost** is what was spent, in five cuts that each sum to the same total. Where a provider reported no price, the page reports tokens and says why there is no amount, instead of printing `$0.00`.
 
 ## 6 Read the diff, and the merge that landed
 
-Work that is meant to land goes through a pull request inside the city, and the rule that matters is not a rule anybody has to remember: **the resident who wrote the work cannot merge it.** A request that has not been verified has no method that merges it, so an unreviewed merge is a compile error rather than a policy. Verifying and merging are one action, because a verified request nobody merged would be a third state for you to chase.
+Work that is meant to land goes through a pull request inside the city, and the rule that matters is not a rule anybody has to remember: **the resident who wrote the work cannot merge it.** A request that has not been verified has no method that merges it, so an unreviewed merge is a compile error rather than a rule somebody enforces. Verifying and merging are one action, because a verified request nobody merged would be a third state for you to chase.
 
 What you read, in order:
 

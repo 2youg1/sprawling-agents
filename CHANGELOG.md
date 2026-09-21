@@ -217,10 +217,40 @@ the first write instead of the last, it shrinks to a two-step
 counterexample. 21 checks, and a run of the new one takes 26 s on a
 four-core Windows machine with a debug binary.
 
+### The adversary asks what a person settled, and says which seed it used
+
+The property above is about a file the city owns. What a person settles
+about their own reading of the city lives one rung further out, in
+`~/.sprawling/config.toml`, and the same question has to be answered
+there: after any sequence of `PutPreferences`, the file on disk, the
+answer `Query::Preferences` gives, and the city's own configuration
+have to agree about what was written and about whose it is. The checker
+drives that sequence and holds four relations after it, the fourth
+being that the city states none of it — a preference travels with the
+machine, so a city copied to another machine must arrive without one.
+The served city is pointed at a throwaway home directory, so running
+the suite cannot touch the preferences of whoever started it.
+
+A seed that does not parse used to become the default one. The report
+then named a seed the run had not used, and the reproduction line it
+printed reproduced a different trace. `SPRAWLING_SEED` is now read into
+three states — stated, unstated, unreadable — and an unreadable one ends
+the process with a third exit code before a city is raised, because a
+misspelled seed is not evidence about the product. Every run prints the
+seed it actually used.
+
 ### What the machines check
 
 - Every number `ARCHITECTURE.md` and `LLM.md` quote is recounted by
   `cargo xtask docnum` from the code that decides it.
+- A budget may be counted in something other than bytes. The register's
+  gated rows carry a unit, the three keys a row states its budget, its
+  best reading and its slack under are derived from that unit, and
+  `dependency_count` is the first row of the second kind: how many
+  packages `Cargo.lock` resolves, ratcheted, and answerable in a
+  checkout nobody has compiled. That count had four homes at four
+  different values; it is taken once now, and the documents that quote
+  it and the gate that prices it read the same reading.
 - `specalign` reconciles every kernel enum variant by variant, which caught
   `SecretCharset::Base36Lower` against the `UpperBase36` the kernel compiles.
 - Five harnesses that were written and never proved are retired to the tests

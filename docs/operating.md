@@ -22,7 +22,7 @@ Steering is not interruption. The instruction is folded into the next assembly, 
 
 The nav is grouped by the question, not by the module.
 
-**Happening now.** *city* is the whole city as a drawing, one prism per building, lit where work is running; the strip above it carries the three numbers no other page can state — how long the Ledger is, how many signals wait in rooms, how much was discarded and never taken back. *live* is one session, line by line, with a bounded window that says what it dropped. *approvals* is the design questions residents asked, grouped so that forty identical questions are one decision — except a tainted item, which stands alone because grouping it would let one answer cover a question nobody read.
+**Happening now.** *city* is the whole city as a drawing, one prism per building, lit where work is running; the strip above it carries the three numbers no other page can state — how long the Ledger is, how many signals wait in rooms, how much was discarded and never taken back. *live* is one session, line by line, with a bounded window that says what it dropped. *approvals* is the design questions residents asked, grouped so that forty identical questions are one decision.
 
 **The record.** *ledger* is the event stream with filters that always say how many rows they hid. *archive* searches every building's shelves at the moment you ask, and lists what was filed lately from the record — two sources, never merged, each saying which it is. *recycle bin* is every discarded thing with the instruction that brings it back. *cost* is money and tokens, cut five ways, each summing exactly to what was billed.
 
@@ -32,15 +32,16 @@ A building's own page is not in the nav — a city may hold fifty buildings — 
 
 ## Approving
 
-An item states what is being asked, who asked, and what it wants to do. Three answers:
+An item is a design question a resident could not settle by reading the rules, and it states what is being asked, who asked, and what it is about. **Nothing else waits here.** An action is never an item: a door either allows it or refuses it from the rules, and the recovery line of a refusal names the `BUILDING.md` field that would change the answer. Two answers:
 
-- **allow** — this once.
+- **allow** — the resident proceeds on your answer.
 - **refuse** — the run is told, in three parts: what was refused, why, and what it can do instead.
-- **and stop asking me this** — a standing policy, offered only where a policy is admissible. Where it is not, the button is absent rather than offered and then refused, because an interface that offers what the far side will reject teaches people to ignore refusals.
 
-Approving does not merely unblock: the work continues from the answer. What was blocked is dispatched again with the cluster you allowed already granted, so answering a group of five is one action rather than five rounds of the same question.
+There is no third answer that turns one ruling into a standing waiver. A rule is edited where the rule lives, so a permission you meant to grant for good outlives the process rather than expiring with it.
 
-A **tainted** item is one that began with text from outside — a web page, an inbound request, a tool result. It is never grouped, and no policy can waive it.
+Answering does not merely unblock: the work continues from the answer. What was blocked is dispatched again with the cluster you answered already settled, so answering a group of five is one action rather than five rounds of the same question.
+
+A **tainted** item is one that began with text from outside — a web page, an inbound request, a tool result. The flag is shown to whoever answers and decides nothing by itself: what taint refuses is an effect, at the undoable and discard doors, and a question is not an effect.
 
 ## Reading cost honestly
 

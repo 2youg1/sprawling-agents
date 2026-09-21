@@ -21,16 +21,61 @@ use crate::package::{ReleaseTarget, binary_path};
 use crate::report::{Violation, XtaskError};
 
 mod carried;
+mod weighing;
 
 use carried::CLIENT_MARK;
 pub(crate) use carried::{carries_client, carries_engine};
+pub(crate) use weighing::{lockfile_packages, measure};
+
+/// What a gated row counts, and therefore which keys state its budget
+/// and how a finding spells a reading.
+///
+/// Two units, because the register holds two kinds of fact a machine
+/// measures the same way twice: how large a built artifact is, and how
+/// many of something a resolved manifest names. A wall-clock figure is
+/// never a unit here — the register says, per row, why the speed of the
+/// machine that took a reading is recorded and not gated.
+#[derive(Clone, Copy)]
+enum Unit {
+    Bytes,
+    Packages,
+}
+
+impl Unit {
+    /// The three keys a gated row of this unit states its budget, its
+    /// best reading and its slack under.
+    ///
+    /// The suffix is the unit's name, so a row says what it counts
+    /// without a second field repeating it, and a row that states bytes
+    /// cannot be read as a row that states packages.
+    fn keys(self) -> [&'static str; 3] {
+        match self {
+            Unit::Bytes => ["budget_bytes", "best_bytes", "slack_bytes"],
+            Unit::Packages => ["budget_packages", "best_packages", "slack_packages"],
+        }
+    }
+
+    /// One reading, in the words a finding uses.
+    fn spell(self, reading: u64) -> String {
+        match self {
+            Unit::Bytes => format!("{reading} B"),
+            Unit::Packages => format!("{reading} packages"),
+        }
+    }
+}
+
+/// Every unit a gated row may be stated in, walked when the register is
+/// read. A unit added to the enum and left out here would be a unit no
+/// row can use, so the array is beside the enum it enumerates.
+const UNITS: [Unit; 2] = [Unit::Bytes, Unit::Packages];
 
 /// The register, as the gate reads it.
 struct Row {
     name: String,
-    budget_bytes: u64,
-    best_bytes: u64,
-    slack_bytes: u64,
+    unit: Unit,
+    budget: u64,
+    best: u64,
+    slack: u64,
 }
 
 /// The register, parsed. Shared with `badge`, which renders the same
@@ -77,30 +122,35 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             // people learn to run with less.
             continue;
         };
-        if measured > row.budget_bytes {
+        let reading = row.unit.spell(measured);
+        if measured > row.budget {
             violations.push(Violation {
                 gate: "budget",
-                location: format!("{} is {measured} B", row.name),
+                location: format!("{} is {reading}", row.name),
                 rule: "a reading stays inside the budget the design states".to_owned(),
-                violation: format!("{measured} B exceeds the {} B budget", row.budget_bytes),
+                violation: format!(
+                    "{reading} exceeds the {} budget",
+                    row.unit.spell(row.budget)
+                ),
                 alternative:
-                    "make it smaller, or change the budget in the design and say why in the same \
-                     change-set"
+                    "bring the reading back, or change the budget in the design and say why in \
+                     the same change-set"
                         .to_owned(),
             });
             continue;
         }
-        let ceiling = row.best_bytes.saturating_add(row.slack_bytes);
-        if row.best_bytes > 0 && measured > ceiling {
+        let ceiling = row.best.saturating_add(row.slack);
+        if row.best > 0 && measured > ceiling {
             violations.push(Violation {
                 gate: "budget",
-                location: format!("{} is {measured} B", row.name),
+                location: format!("{} is {reading}", row.name),
                 rule: "a number may improve freely and drift only within its slack".to_owned(),
                 violation: format!(
-                    "{measured} B is more than {} B worse than the best recorded {} B",
-                    row.slack_bytes, row.best_bytes
+                    "{reading} is more than {} worse than the best recorded {}",
+                    row.unit.spell(row.slack),
+                    row.unit.spell(row.best)
                 ),
-                alternative: "recover the size, or record the new reading in xtask/budgets.toml \
+                alternative: "recover the reading, or record the new one in xtask/budgets.toml \
                               with the reason it moved"
                     .to_owned(),
             });
@@ -126,14 +176,18 @@ pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
         out.push_str(&format!(
             "{:<22} {:>9}  {:>9}  {:>10}
 ",
-            row.name, reading, row.best_bytes, row.budget_bytes
+            row.name, reading, row.best, row.budget
         ));
     }
     let Some(table) = parsed.as_table() else {
         return Ok(out);
     };
+    let weighed: std::collections::BTreeSet<String> = gated_rows(&parsed)
+        .into_iter()
+        .map(|row| row.name)
+        .collect();
     for (name, value) in table {
-        if value.get("budget_bytes").is_some() {
+        if weighed.contains(name) {
             continue; // already weighed in the table above
         }
         let status = value
@@ -155,7 +209,8 @@ pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
     Ok(out)
 }
 
-/// The rows a machine can weigh: those with a byte budget.
+/// The rows a machine can weigh: those marked gated that state a
+/// budget, a best reading and a slack in one of the units above.
 fn gated_rows(parsed: &toml::Value) -> Vec<Row> {
     let mut rows = Vec::new();
     let Some(table) = parsed.as_table() else {
@@ -166,81 +221,23 @@ fn gated_rows(parsed: &toml::Value) -> Vec<Row> {
             continue;
         }
         let number = |key: &str| value.get(key).and_then(toml::Value::as_integer);
-        let (Some(budget), Some(best), Some(slack)) = (
-            number("budget_bytes"),
-            number("best_bytes"),
-            number("slack_bytes"),
-        ) else {
-            continue;
-        };
-        rows.push(Row {
-            name: name.clone(),
-            budget_bytes: budget.unsigned_abs(),
-            best_bytes: best.unsigned_abs(),
-            slack_bytes: slack.unsigned_abs(),
-        });
+        for unit in UNITS {
+            let [budget_key, best_key, slack_key] = unit.keys();
+            let (Some(budget), Some(best), Some(slack)) =
+                (number(budget_key), number(best_key), number(slack_key))
+            else {
+                continue;
+            };
+            rows.push(Row {
+                name: name.clone(),
+                unit,
+                budget: budget.unsigned_abs(),
+                best: best.unsigned_abs(),
+                slack: slack.unsigned_abs(),
+            });
+        }
     }
     rows
-}
-
-/// Weighs one metric, or says it is not built.
-pub(crate) fn measure(root: &Path, name: &str) -> Result<Option<u64>, XtaskError> {
-    match name {
-        // Where the bundle lands is stated by the build script that
-        // embeds it, so the scale and the binary weigh one directory.
-        "frontend_artifact" => gzipped_total(&crate::bundle::dist(root)?),
-        "release_binary" => Ok(binary_bytes(root)),
-        // A gated row with no way to weigh it would silently pass; it is
-        // an unmeasured row until this match learns it.
-        _ => Ok(None),
-    }
-}
-
-/// What the browser downloads: every file in the bundle, compressed.
-/// Recursive, because the bundle nests (`snippets/<crate>/...`), and a
-/// weight that skipped subdirectories would flatter the artifact.
-fn gzipped_total(dist: &Path) -> Result<Option<u64>, XtaskError> {
-    let Ok(entries) = std::fs::read_dir(dist) else {
-        return Ok(None);
-    };
-    let mut total = 0u64;
-    let mut found = false;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            if let Some(nested) = gzipped_total(&path)? {
-                found = true;
-                total = total.saturating_add(nested);
-            }
-            continue;
-        }
-        let bytes = std::fs::read(&path).map_err(|source| XtaskError::Io {
-            path: path.display().to_string(),
-            source,
-        })?;
-        found = true;
-        total = total.saturating_add(gzipped_len(&bytes));
-    }
-    Ok(found.then_some(total))
-}
-
-/// The compressed length, computed rather than shelled out for, so the
-/// number does not depend on which gzip is on the path.
-fn gzipped_len(bytes: &[u8]) -> u64 {
-    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
-    use std::io::Write as _;
-    if encoder.write_all(bytes).is_err() {
-        return u64::MAX;
-    }
-    match encoder.finish() {
-        Ok(compressed) => u64::try_from(compressed.len()).unwrap_or(u64::MAX),
-        Err(_) => u64::MAX,
-    }
-}
-
-fn binary_bytes(root: &Path) -> Option<u64> {
-    let path = binary_path(root, &ReleaseTarget::Host)?;
-    std::fs::metadata(path).ok().map(|meta| meta.len())
 }
 
 #[cfg(test)]
@@ -269,7 +266,7 @@ mod tests {
             slack_bytes = 10
             status = "measured, not gated: the counter differs per platform"
 
-            [no_bytes]
+            [no_unit_this_gate_knows]
             budget_ms = 5
             status = "gated"
             "#,
@@ -278,17 +275,27 @@ mod tests {
         let rows = gated_rows(&register);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "gated_one");
-        assert_eq!(rows[0].budget_bytes, 100);
+        assert_eq!(rows[0].budget, 100);
     }
 
+    /// A row counting something other than bytes is gated on the same
+    /// three questions, and its findings are spelled in its own unit.
     #[test]
-    fn a_metric_this_gate_cannot_weigh_reports_nothing_rather_than_passing() {
-        let root = std::env::temp_dir();
-        assert_eq!(measure(&root, "ledger_append").unwrap(), None);
-        // A weighable row answers from this checkout, and answers
-        // `None` rather than failing when nothing has been built.
-        let here = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        measure(here, "frontend_artifact").unwrap();
+    fn a_row_counted_in_packages_is_weighed_and_reported_in_packages() {
+        let register: toml::Value = toml::from_str(
+            r#"
+            [dependency_count]
+            budget_packages = 420
+            best_packages = 389
+            slack_packages = 16
+            status = "gated"
+            "#,
+        )
+        .unwrap();
+        let rows = gated_rows(&register);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].budget, 420);
+        assert_eq!(rows[0].unit.spell(390), "390 packages");
     }
 
     #[test]
@@ -313,28 +320,5 @@ mod tests {
                 "{name} does not say how it is measured"
             );
         }
-    }
-
-    #[test]
-    fn compression_is_ours_rather_than_whatever_gzip_is_on_the_path() {
-        assert!(gzipped_len(b"") > 0);
-        let repetitive = vec![b'a'; 10_000];
-        assert!(gzipped_len(&repetitive) < 1_000);
-    }
-
-    #[test]
-    fn the_bundle_weight_counts_nested_directories() {
-        let dir = std::env::temp_dir().join(format!("budget-walk-{}", std::process::id()));
-        std::fs::create_dir_all(dir.join("snippets").join("x")).unwrap();
-        std::fs::write(dir.join("web.js"), vec![b'a'; 4_000]).unwrap();
-        std::fs::write(
-            dir.join("snippets").join("x").join("y.js"),
-            vec![b'b'; 4_000],
-        )
-        .unwrap();
-        let total = gzipped_total(&dir).unwrap().unwrap();
-        let flat = gzipped_len(&vec![b'a'; 4_000]);
-        assert!(total > flat, "the nested file must be weighed too");
-        std::fs::remove_dir_all(&dir).ok();
     }
 }

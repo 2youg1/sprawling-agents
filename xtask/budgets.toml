@@ -277,7 +277,7 @@ status = "gated, with a register of the files that predate the rule"
 [file_length.predating]
 "client/src/core/belief.ts" = 422
 "client/src/views/machine.tsx" = 563
-"client/src/views/talk/composer.tsx" = 497
+"client/src/views/talk/composer.tsx" = 496
 
 # White box is Rust, black box is Lean (the person's ruling).
 # `cargo xtask boundary` refuses a Rust check that reaches this product
@@ -461,3 +461,82 @@ status = "measured, not gated: on a 5,888,890 B object a five-byte `B` range mov
 what = "one message read from an MCP server over stdio, before its framing newline"
 measured_by = "cargo test -p protocol --lib reading (a_message_at_the_ceiling_is_read and a_message_above_the_ceiling_is_refused_with_the_ceiling_named)"
 status = "measured, not gated: 8,388,608 B, refused whole rather than truncated, and the connection ends because the unread remainder of a refused message is indistinguishable from the next one (2026-09). Before this row existed the stdio reader grew one String until the machine ran out"
+
+# --- What K-05 and K-07 asked for, and what already had a home --------
+#
+# Four readings were proposed: the p99 of a ledger append, a view
+# rebuild priced per megabyte, the work a dispatch does before a model
+# is called, and how many packages this tree resolves. Only three rows
+# are below.
+#
+# **The p99 of an append is not among them, because it already has a
+# home.** `[ledger_append]` states `budget_p99_ms` and carries the
+# reading; a row named `ledger_append_p99` would be a second place to
+# state one number, and the two would be edited on different days by
+# different people. Price the append where the append is already
+# priced.
+
+# The same rebuild `[projection_rebuild]` prices, denominated in the
+# thing that actually varies. A record is not a fixed size, so records
+# per second answers "how fast did this fixture fold" and not "what
+# will rebuilding my city cost"; a person with a 400 MB ledger can
+# multiply a per-megabyte figure and cannot multiply a per-record one.
+#
+# **Two rows for one rebuild is one row too many, and this one is meant
+# to win.** Until it has a reading, `[projection_rebuild]` is the row
+# with evidence and stays. The change-set that takes the first reading
+# here deletes `[projection_rebuild]` in the same commit, and neither
+# figure is copied into the other.
+#
+# Gated once it has a reading, unlike the wall-clock rows above it: the
+# denominator removes the fixture's size from the figure, which is what
+# made the others facts about a machine rather than about the design.
+# The budget is not stated until the reading exists, because a ceiling
+# chosen before anybody knows the order of magnitude is a number that
+# will be argued with rather than met.
+[views_rebuild_per_mb]
+what = "milliseconds to rebuild every view, per megabyte of ledger folded"
+measured_by = "just bench (citysim bench bin, release), over a ledger large enough that the fold rather than the open dominates"
+status = "not measured: nobody has taken this reading, so it stands as those words rather than as an invented figure. Not gated yet - a ratchet needs a best reading to ratchet against"
+
+# What a dispatch spends before the model is called: opening the room,
+# writing the brief, standing the run up, and assembling the tools -
+# including, today, starting every MCP server this building declares
+# and shaking hands with each of them. All of it runs on the accounting
+# thread, so it is time during which no lane's append is served.
+#
+# **Measure first, gate later, and the order is the point.** K-05
+# proposes keeping MCP connections open across dispatches; a ceiling
+# written before the reading exists would be a guess that either passes
+# trivially or blocks the change that fixes it. What this row buys
+# today is that the reading gets taken and recorded where the next
+# person will find it.
+[prepare_dispatch_ms]
+what = "one dispatch, from the command arriving to the lane taking the drive, on the accounting thread"
+measured_by = "runtime::diagnostics, which times prepare_dispatch and names the share spent in mcp_tools"
+status = "not measured: the timing is recorded in diagnostics and nobody has read it into a figure yet. Not gated - a wall-clock reading is the machine's, and this one also depends on how many MCP servers a building declares"
+
+# How large this tree's dependency graph is, counted off the resolved
+# lockfile rather than off any manifest: a manifest states what was
+# asked for, and what a person compiles is what the resolution settled.
+#
+# **One count, three readers.** `budget::lockfile_packages` takes it;
+# `docnum`'s `dependency_count` fact quotes it into `ARCHITECTURE.md`
+# and `docs/third-party.md`; this row prices it. The number used to sit
+# in four documents at four different values, none of them right, which
+# is the whole reason it is measured rather than written.
+#
+# Gated, and the only gated row here that needs nothing built: a
+# lockfile is in every checkout. The budget is a decision rather than a
+# measurement, and the decision is that this graph may grow by about
+# one substantial dependency's transitive closure before somebody has
+# to say why in writing. The slack is about what one small crate brings
+# with it, so a routine addition is recorded rather than refused, and a
+# wave of them is refused rather than recorded.
+[dependency_count]
+what = "packages in Cargo.lock once every transitive dependency is resolved, workspace members included"
+budget_packages = 420
+best_packages = 389
+slack_packages = 16
+measured_by = "cargo xtask budget (budget::lockfile_packages, counting [[package]] in Cargo.lock)"
+status = "gated"

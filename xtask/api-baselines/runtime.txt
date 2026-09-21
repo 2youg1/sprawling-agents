@@ -41,6 +41,8 @@ impl runtime::Sandbox for runtime::FaultSandbox
 impl runtime::Sandbox for runtime::FaultSandbox
 impl runtime::SearchTool
 impl runtime::SearchTool
+impl runtime::SegmentSlot
+impl runtime::SegmentSlot
 impl runtime::SegmentSource
 impl runtime::SegmentSource
 impl runtime::StatusSnapshot
@@ -125,6 +127,8 @@ impl runtime::turn::Turn<runtime::turn::ToolWave>
 impl runtime::turn::Turn<runtime::turn::ToolWave>
 impl runtime::window::Window
 pub const runtime::EXEC_CAP_BYTES: u64
+pub const runtime::SegmentSlot::ALL: [runtime::SegmentSlot; 4]
+pub const runtime::SegmentSlot::ALL: [runtime::SegmentSlot; 4]
 pub const runtime::backlog::waiting::PollBudget::DEFAULT: runtime::backlog::waiting::PollBudget
 pub const runtime::backlog::waiting::PollBudget::DEFAULT: runtime::backlog::waiting::PollBudget
 pub const runtime::backlog::waiting::PollBudget::DEFAULT: runtime::backlog::waiting::PollBudget
@@ -462,6 +466,8 @@ pub fn runtime::prefix::FrozenPrefix::system_blocks(&self) -> core::result::Resu
 pub fn runtime::prefix::SegmentCaps::startup_default() -> runtime::prefix::SegmentCaps
 pub fn runtime::prefix::SegmentCaps::startup_default() -> runtime::prefix::SegmentCaps
 pub fn runtime::prefix::build_prefix(runtime::prefix::PrefixPlan) -> core::result::Result<runtime::prefix::FrozenPrefix, kernel::error::shape::AxError>
+pub fn runtime::redact::capture_name(&[u8]) -> alloc::string::String
+pub fn runtime::redact::fingerprint(&[u8]) -> alloc::string::String
 pub fn runtime::redact::redact(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> (serde_json::map::Map<alloc::string::String, serde_json::value::Value>, u32)
 pub fn runtime::redact::redact_text(&str) -> (alloc::string::String, u32)
 pub fn runtime::rematerialize(&kernel::locator::Locator, &mut runtime::offload::OffloadSite<'_>) -> core::result::Result<std::path::PathBuf, kernel::error::shape::AxError>

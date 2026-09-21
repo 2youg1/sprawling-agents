@@ -49,7 +49,7 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
             addr: Address::parse("market/ito").unwrap(),
             task: "ask hana what she charges".to_owned(),
             goal: "a price".to_owned(),
-            mode: channels::ModeTag::parse("plan").unwrap(),
+            mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -207,7 +207,11 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
         panic!("the settings page reads the endpoint book");
     };
     assert_eq!(
-        book.endpoints[0].models,
+        book.endpoints[0]
+            .models
+            .iter()
+            .map(|row| row.id.clone())
+            .collect::<Vec<String>>(),
         vec!["m-large".to_owned()],
         "a subset was ticked and the whole list was registered anyway"
     );
@@ -228,7 +232,7 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
         addr: room.clone(),
         task: "measure the thing".to_owned(),
         goal: "a number, then stop".to_owned(),
-        mode: channels::ModeTag::parse("plan").unwrap(),
+        mode: kernel::Mode::PlanGoal,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, tag),
         session: None,
         effort: None,
@@ -336,5 +340,53 @@ fn when_a_subscription_credential_expires_survives_a_restart() {
         rebuilt.of("openai"),
         None,
         "a provider that never stated an expiry stays unstated"
+    );
+}
+
+/// A line this build cannot read is a line the account is missing, so
+/// the fold says so rather than opening a city with one approval fewer
+/// than its history holds.
+#[test]
+fn an_unreadable_approval_item_stops_the_fold() {
+    let mut governance = Governance::empty();
+    let payload = Payload::new(
+        serde_json::json!({"id": "ap_1", "shape": "a shape this build does not know"})
+            .as_object()
+            .unwrap()
+            .clone(),
+    )
+    .unwrap();
+    let refused = governance
+        .absorb(
+            EventKind::ApprovalRequested,
+            RunId::CITY,
+            Some(&Address::parse("lab").unwrap()),
+            &payload,
+        )
+        .unwrap_err();
+    assert_eq!(refused.code(), &AxCode::WireMismatch);
+    assert!(
+        !refused.recovery().is_empty(),
+        "a refusal a person meets on start-up says what to do next"
+    );
+}
+
+/// The two words the `city_halted` payload carries are spelled in one
+/// place, and a third word is a refusal rather than a scope quietly
+/// read as open.
+#[test]
+fn a_halt_and_a_release_round_trip_through_one_spelling() {
+    let halted = serde_json::json!({"scope": "lab", "state": Admission::Halted.spelling()});
+    let released = serde_json::json!({"scope": "lab", "state": Admission::Released.spelling()});
+    let unknown = serde_json::json!({"scope": "lab", "state": "shuttered"});
+    let read = |value: &serde_json::Value| {
+        Admission::in_record(value.as_object().unwrap()).map(|held| held.map(|(_, state)| state))
+    };
+    assert_eq!(read(&halted).unwrap(), Some(Admission::Halted));
+    assert_eq!(read(&released).unwrap(), Some(Admission::Released));
+    assert_eq!(
+        read(&unknown).unwrap_err().code(),
+        &AxCode::WireMismatch,
+        "a word this build does not know is not a release"
     );
 }

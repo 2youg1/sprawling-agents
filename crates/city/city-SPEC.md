@@ -114,10 +114,11 @@ impl RulesTool { pub fn new(city_root: &Path, building: Address) -> Result<Rules
 ### 8-3 city::building（形状 2 值类型＋一个实例化动作）
 
 ```rust
-pub enum BuildingTemplate { Minimal, Confidential }   // 穷尽；新模板＝新臂
+pub enum BuildingTemplate { Minimal, Confidential, Hall }   // 穷尽；新模板＝新臂
 impl BuildingTemplate {
-    pub fn parse(name: &str) -> Result<BuildingTemplate, AxError>;   // 不认即拒，且报出已知集
-    pub fn name(&self) -> &'static str;
+    pub const ALL: [BuildingTemplate; 3];                            // 三个模板，按人被提供的顺序
+    pub fn parse(name: &str) -> Result<BuildingTemplate, AxError>;   // 经 ALL 与 name 读回；不认即拒，且报出已知集
+    pub fn name(self) -> &'static str;                               // 模板名的唯一拼法
 }
 pub struct Building { /* addr —— 私有 */ }
 impl Building {
@@ -135,6 +136,8 @@ pub fn adopted_payload(building: &Building) -> Result<Payload, AxError>;        
 pub fn configured_payload(building: &Building, wrote: Written)
     -> Result<Payload, AxError>;                              // building_configured
 ```
+
+- **模板名只有一个家**：`parse` 不再另列一张字符串表，而是拿 `ALL` 里每一个的 `name()` 去比；拒词里的合法集也由同一趟生成。于是加一个模板只改枚举与 `name()` 两处，而「解析认得的集合」与「拒词列出的集合」在类型上是同一个（Roadmap 7.14）。`Hall` 的名字取 `kernel::consts_policy::HALL_BUILDING`：City Hall 是唯一一栋地址由城而不是由人定的楼，模板名与那个地址是同一个词。
 
 - **楼是顶层地址，房间不是楼**：`create` 拒多段地址（`lab/room1` 是 `lab` 里的一个房间）。嵌套楼会使「这个地址归谁管」多出一个答案，而 `Building::of` 取首段这件事今天已被写域、配置与上报对象三处消费。
 - **reserved prefix 下建楼恒拒**：`.sprawling/` 是城自己的账与配置，它在一切写域之外；允许在它下面建楼，就是把一个写域开到账本上。判定用 `Address::is_reserved`，不在本模块重写前缀文法。
@@ -572,6 +575,8 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 
 **apisync 未重写基线**：公开面不受本次切分影响。
 
+**第二次切分（`building/template.rs`，126 行）**：`BuildingTemplate`、它的四个模板常量与 `NAME_PLACEHOLDER` 迁入 `building/template.rs`，`building.rs` 因此回到 312 行（单文件 400 行上限）。`rules` 升为 `pub(super)`、`NAME_PLACEHOLDER` 升为 `pub(crate)`——后者是为了收掉 `spine_files.rs` 里那份同值的第二份定义：楼的规则与它的计划、备忘、交接读同一个占位符，两份拼法会让其中一份文件永远写着 `<building name>`。公开面仍由 `building.rs` 的 `pub use template::BuildingTemplate;` 给出，逐字节不变。
+
 ### 8-18 city::policy 目录化
 
 517 行一份文件切成两份，生产代码与测试各占一份：
@@ -582,6 +587,8 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 **无字段开放**：没有为跨文件引用把任何私有字段升成 `pub(crate)`／`pub(super)`；测试经 `super::*` 看到的私有项（`legacy_building_path`、`BuildingRules` 的字段）与迁出前相同。
 
 **apisync 未重写基线**：公开面不受本次切分影响。
+
+**第二次切分（`building/template.rs`，126 行）**：`BuildingTemplate`、它的四个模板常量与 `NAME_PLACEHOLDER` 迁入 `building/template.rs`，`building.rs` 因此回到 312 行（单文件 400 行上限）。`rules` 升为 `pub(super)`、`NAME_PLACEHOLDER` 升为 `pub(crate)`——后者是为了收掉 `spine_files.rs` 里那份同值的第二份定义：楼的规则与它的计划、备忘、交接读同一个占位符，两份拼法会让其中一份文件永远写着 `<building name>`。公开面仍由 `building.rs` 的 `pub use template::BuildingTemplate;` 给出，逐字节不变。
 
 
 ### 8-19 city::building 目录化
@@ -594,6 +601,8 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 **无字段开放**：没有为跨文件引用把任何私有字段升成 `pub(crate)`／`pub(super)`；测试经 `super::*` 看到的私有项（`NAME_PLACEHOLDER`、`BuildingTemplate::rules`）与迁出前相同。
 
 **apisync 未重写基线**：公开面不受本次切分影响。
+
+**第二次切分（`building/template.rs`，126 行）**：`BuildingTemplate`、它的四个模板常量与 `NAME_PLACEHOLDER` 迁入 `building/template.rs`，`building.rs` 因此回到 312 行（单文件 400 行上限）。`rules` 升为 `pub(super)`、`NAME_PLACEHOLDER` 升为 `pub(crate)`——后者是为了收掉 `spine_files.rs` 里那份同值的第二份定义：楼的规则与它的计划、备忘、交接读同一个占位符，两份拼法会让其中一份文件永远写着 `<building name>`。公开面仍由 `building.rs` 的 `pub use template::BuildingTemplate;` 给出，逐字节不变。
 
 ### 8-20 City Hall：随城市立起的那栋楼，和住在里面的两个人
 

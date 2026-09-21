@@ -24,7 +24,7 @@ use std::net::SocketAddr;
 #[cfg(feature = "server")]
 use channels::{BindFace, BindVerdict, HandshakeVerdict, decide_bind, decide_handshake};
 use channels::{
-    COMMAND_NAMES, Command, ModeTag, ProviderName, QUERY_NAMES, Query, WIRE_V, schema_hash,
+    COMMAND_NAMES, Command, Mode, ProviderName, QUERY_NAMES, Query, WIRE_V, schema_hash,
 };
 #[cfg(feature = "server")]
 use channels::{Hello, Welcome};
@@ -46,20 +46,20 @@ fn exposed() -> SocketAddr {
 
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
-    // Twenty-eight commands, thirty-one queries. The count is not a
+    // Twenty-nine commands, thirty-three queries. The count is not a
     // style choice - it is the wire's closed surface.
-    assert_eq!(COMMAND_NAMES.len(), 28, "command table");
-    assert_eq!(QUERY_NAMES.len(), 31, "query table");
+    assert_eq!(COMMAND_NAMES.len(), 29, "command table");
+    assert_eq!(QUERY_NAMES.len(), 33, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 28, "command names are distinct");
+    assert_eq!(sorted.len(), 29, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 31, "query names are distinct");
+    assert_eq!(sorted.len(), 33, "query names are distinct");
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
 
 /// A function of WIRE_V and the two name tables, so any change to the
 /// protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "1d5238bc37f70915b49bffbde2dbfc956639a412549ef96c882309e75898f0a0";
+const WIRE_SCHEMA_GOLDEN: &str = "67bfc2a041609a524a0eb0f933f694bc09bce47d3224cc54e8a660e95787ecda";
 
 // -------------------------------------------------------------- binding face
 
@@ -270,7 +270,7 @@ fn sample_of_every_command() -> Vec<Command> {
             addr: addr.clone(),
             task: "ship it".to_owned(),
             goal: "the tests pass".to_owned(),
-            mode: ModeTag::parse("plan").unwrap(),
+            mode: Mode::PlanGoal,
             idem,
             session: Some(kernel::SessionName::parse("ship it").unwrap()),
             effort: Some(kernel::Effort::High),
@@ -336,7 +336,7 @@ title = \"a window\"
             endpoint: ProviderName::parse("house").unwrap(),
             model: "m-large".to_owned(),
             tag: kernel::ModelTag::Main,
-            context_tokens: 128_000,
+            context_tokens: channels::Window::new(128_000),
             max_output_tokens: kernel::Ceiling::new(8_192),
             idem,
         },
@@ -344,11 +344,6 @@ title = \"a window\"
             run,
             at_seq: Seq::new(3),
             addr: None,
-            idem,
-        },
-        Command::Attach {
-            upload: channels::UploadId::parse("u-0001").unwrap(),
-            notify: vec![run],
             idem,
         },
         Command::CreateBuilding {
@@ -389,8 +384,19 @@ title = \"a window\"
             verdict: kernel::Ruling::Allow,
             idem,
         },
-        Command::CreatePolicy {
-            from_item: kernel::ApprovalId::new("ap-1").unwrap(),
+        Command::HandOff {
+            item: kernel::ApprovalId::new("ap-1").unwrap(),
+            to: kernel::ResidentId::new("clerk").unwrap(),
+            idem,
+        },
+        Command::PutPreferences {
+            patch: channels::PreferencePatch::Lang(channels::Lang::Zh),
+            idem,
+        },
+        Command::PutShelved {
+            shelf: channels::Shelf::Library,
+            name: "reviewing/first-pass.md".to_owned(),
+            text: "# read the SPEC first\n".to_owned(),
             idem,
         },
         Command::SetAutonomy {
@@ -486,7 +492,7 @@ fn a_dispatch_frame_carries_no_spend_ceiling() {
         addr,
         task: "ship it".to_owned(),
         goal: "the tests pass".to_owned(),
-        mode: ModeTag::parse("plan").unwrap(),
+        mode: Mode::PlanGoal,
         idem: kernel::IdemKey::derive(&run, Seq::new(1), b"sample"),
         session: None,
         effort: None,

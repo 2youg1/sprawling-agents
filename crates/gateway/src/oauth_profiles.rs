@@ -71,13 +71,23 @@ pub struct OauthProfile {
 /// the date that file records; a fact no watched path states is left
 /// empty rather than guessed.
 pub const OAUTH_PROFILES: [OauthProfile; 4] = [
-    // Followed from openai/codex at the two paths `docs/third-party.md`
+    // Followed from openai/codex at the paths `docs/third-party.md`
     // section 1 names for it: the login server states the issuer, the
     // endpoint paths, the scopes and the loopback redirect, and the
-    // auth manager beside it states the client id. The API base is not stated by either watched path,
-    // so a finished login still asks the person where to call: an
-    // invented base URL would answer 404 under a fact this city made
-    // up.
+    // auth manager beside it states the client id.
+    //
+    // **The API base is now known and is deliberately still empty.**
+    // A ChatGPT subscription is served under
+    // `https://chatgpt.com/backend-api/codex`, not under the
+    // key-billed platform: `model-provider-info` picks that base for
+    // every ChatGPT auth mode and `https://api.openai.com/v1` only for
+    // an API key (the provider table under `codex-rs/model-provider-
+    // info/`, read 2026-09-21 and watched in docs/third-party.md
+    // section 1). That base answers on the responses face, which this build
+    // cannot write yet (roadmap 4.5), so filling the field today would
+    // attach an endpoint whose first call is a 404 in place of a
+    // refusal a person can act on. It is filled in the change that
+    // lands the responses writer.
     OauthProfile {
         family: Family::Codex,
         provider: "openai",
@@ -114,21 +124,41 @@ pub const OAUTH_PROFILES: [OauthProfile; 4] = [
         },
         headers: &[],
     },
-    // xAI's client reads its issuer, client id and scopes from an OIDC
-    // discovery document at run time, so the watched path
-    // (`crates/codegen/xai-grok-login/src/oidc/`) states the shape of
-    // the flow and none of its constants. The row stays empty until
-    // this city either reads that document itself or finds the
-    // constants in a source it can cite.
+    // xAI's browser login reads its endpoints from an OIDC discovery
+    // document at run time (the `oidc/` module fetches
+    // `{issuer}/.well-known/openid-configuration`), so those two URLs
+    // are the document's to state and are left empty here rather than
+    // pinned in a second place. **The device-code login needs no
+    // discovery**: `device_code.rs` posts to `{issuer}/oauth2/device/
+    // code` and `{issuer}/oauth2/token` with the issuer and client id
+    // the login crate's configuration module states, so this row
+    // carries the grant that can be driven from constants alone (both
+    // paths read 2026-09-21).
     OauthProfile {
         family: Family::GrokBuild,
         provider: "xai",
         api_base: "https://api.x.ai/v1",
         auth_endpoint: "",
-        token_endpoint: "",
-        scopes: &[],
-        client_id: "",
-        grant: Grant::AuthorizationCode { redirect_uri: "" },
+        token_endpoint: "https://auth.x.ai/oauth2/token",
+        scopes: &[
+            "openid",
+            "profile",
+            "email",
+            "offline_access",
+            "grok-cli:access",
+            "api:access",
+            "conversations:read",
+            "conversations:write",
+            "workspaces:read",
+            "workspaces:write",
+        ],
+        // A public OAuth client id, not a secret: the upstream ships it
+        // in a binary every user downloads, and no request is
+        // authorised by holding it.
+        client_id: "b1a00492-073a-47ea-816f-4c329264a828", // secret-ok: public oauth client id
+        grant: Grant::DeviceCode {
+            authorization_endpoint: "https://auth.x.ai/oauth2/device/code",
+        },
         headers: &[],
     },
     // `src/kimi_cli/auth/oauth.py` (client id, OAuth host, both
@@ -178,6 +208,9 @@ mod tests {
         assert!(profile("openai").is_some());
         assert!(profile("nonexistent").is_none());
         // Zero branches: nothing here computes; emptiness is a value.
+        // xAI's browser-redirect endpoint is the discovery document's
+        // to state, so this row leaves it empty and signs in by device
+        // code instead.
         assert!(profile("xai").unwrap().auth_endpoint.is_empty());
     }
 
@@ -218,5 +251,33 @@ mod tests {
             codex.grant,
             Grant::AuthorizationCode { redirect_uri } if redirect_uri.starts_with("http://localhost:")
         ));
+        let xai = profile_for(Family::GrokBuild).unwrap();
+        let Grant::DeviceCode {
+            authorization_endpoint,
+        } = xai.grant
+        else {
+            panic!("the xAI subscription signs in by device code");
+        };
+        assert_eq!(
+            authorization_endpoint,
+            "https://auth.x.ai/oauth2/device/code"
+        );
+        assert!(xai.token_endpoint.starts_with("https://auth.x.ai/"));
+    }
+
+    /// A subscription login that can be driven at all states its token
+    /// endpoint, its client id and at least one scope. A row missing
+    /// one of the three fails closed in the flow, which is correct but
+    /// silent until somebody tries to sign in.
+    #[test]
+    fn a_row_that_states_a_grant_states_what_that_grant_needs() {
+        for family in [Family::Codex, Family::ClaudeCode, Family::KimiCli] {
+            let row = profile_for(family).unwrap();
+            assert!(!row.client_id.is_empty(), "{}", row.provider);
+        }
+        let xai = profile_for(Family::GrokBuild).unwrap();
+        assert!(!xai.client_id.is_empty());
+        assert!(!xai.scopes.is_empty());
+        assert!(!xai.api_base.is_empty());
     }
 }

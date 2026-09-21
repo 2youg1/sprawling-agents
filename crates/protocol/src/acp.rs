@@ -9,8 +9,17 @@
 //! it is the whole security story of the module. An outbound call is
 //! something a resident chose; an inbound request is something a
 //! stranger sent, so nothing here produces work until the request has
-//! been authenticated and turned into an ordinary dispatch that lands in
-//! an ordinary room under an ordinary write domain.
+//! passed the admission middleware and been turned into an ordinary
+//! dispatch that lands in an ordinary room under an ordinary write
+//! domain.
+//!
+//! **Pairing is decided before this module is reached.** Whether a
+//! caller holds this city's token is one judgement on one middleware
+//! that every inbound route passes through (`channels::reception`), so
+//! no request arrives here unpaired and no token is carried in a value
+//! this module could print. A second pairing check here would be a
+//! second authority for the same rule, and two authorities disagree the
+//! day one of them is edited.
 //!
 //! What comes back is progress, not a conversation. An editor watching a
 //! run wants to know where it got to; giving it a channel into the run
@@ -19,13 +28,17 @@
 use kernel::{Address, AxCode, AxError};
 use serde_json::Value;
 
-/// A request from outside, already parsed but not yet trusted.
+/// A request from outside, already read but not yet admitted.
+///
+/// The fields are private and [`Incoming::parse`] is the only way to
+/// make one, which is what makes the grammar single-homed: a caller
+/// cannot assemble a request that skipped the checks `parse` performs,
+/// because there is no syntax for it outside this module.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Incoming {
-    pub token: String,
-    pub addr: Address,
-    pub task: String,
-    pub goal: String,
+    addr: Address,
+    task: String,
+    goal: String,
 }
 
 /// What the city does about it. Exhaustive: an inbound request either
@@ -46,6 +59,9 @@ pub enum Admitted {
 impl Incoming {
     /// Reads one request.
     ///
+    /// Keys this version does not read are ignored, which is what lets
+    /// the pairing token travel beside the request without entering it.
+    ///
     /// # Errors
     /// Refuses a body this version does not read, an address that is not
     /// one, and an empty task or goal. A goal is required for the same
@@ -63,11 +79,10 @@ impl Incoming {
                         "read an external request",
                         format!("missing `{key}`"),
                     )
-                    .with_recovery("send `token`, `addr`, `task` and `goal`, all non-empty")
+                    .with_recovery("send `addr`, `task` and `goal`, all non-empty")
                 })
         };
         Ok(Incoming {
-            token: text("token")?,
             addr: Address::parse(&text("addr")?)?,
             task: text("task")?,
             goal: text("goal")?,
@@ -77,27 +92,14 @@ impl Incoming {
 
 /// Decides whether a request becomes work.
 ///
-/// `authentic` is the pairing check's answer, computed by the caller
-/// against the city's own token — this module never sees the secret,
-/// which is why it can be a pure function.
+/// Takes the request by value: what comes out carries the same three
+/// fields, so a copy of them would be a second version of one request.
 ///
 /// # Errors
-/// Refuses an unauthenticated request without saying anything about the
-/// city, and refuses an address inside the reserved subtree: an outside
-/// caller must not be able to start work on the city's own files even
-/// with a valid token.
-pub fn admit(request: &Incoming, authentic: bool) -> Result<Admitted, AxError> {
-    if !authentic {
-        // The refusal says nothing about whether the address exists, the
-        // building is real, or the token was close. An unauthenticated
-        // caller learns one bit.
-        return Err(AxError::failure(
-            AxCode::GateDenied,
-            "admit an external request",
-            "not paired with this city".to_owned(),
-        )
-        .with_recovery("pair the client from the settings page, then send the token it shows"));
-    }
+/// Refuses an address inside the reserved subtree: an outside caller
+/// must not be able to start work on the city's own files, and holding
+/// the pairing token does not change that.
+pub fn admit(request: Incoming) -> Result<Admitted, AxError> {
     if request.addr.is_reserved() {
         return Err(AxError::failure(
             AxCode::OutsideWriteDomain,
@@ -107,9 +109,9 @@ pub fn admit(request: &Incoming, authentic: bool) -> Result<Admitted, AxError> {
         .with_recovery("name a room in a building; the city's own subtree is not one"));
     }
     Ok(Admitted::Dispatch {
-        addr: request.addr.clone(),
-        task: request.task.clone(),
-        goal: request.goal.clone(),
+        addr: request.addr,
+        task: request.task,
+        goal: request.goal,
     })
 }
 
@@ -159,23 +161,21 @@ mod tests {
     #[test]
     fn a_paired_request_becomes_an_ordinary_dispatch() {
         let request = Incoming::parse(&body()).unwrap();
-        let Admitted::Dispatch { addr, task, goal } = admit(&request, true).unwrap();
+        let Admitted::Dispatch { addr, task, goal } = admit(request).unwrap();
         assert_eq!(addr.as_str(), "lab/room1");
         assert_eq!(task, "fix the kiln timer");
         assert_eq!(goal, "the timer test passes");
     }
 
+    /// The pairing token belongs to the middleware that judges it. A
+    /// request that carries one beside it is read without it, so no
+    /// log line, panic message or ledger payload made from this value
+    /// can publish the secret.
     #[test]
-    fn an_unpaired_caller_learns_exactly_one_bit() {
+    fn the_pairing_token_does_not_enter_the_request() {
         let request = Incoming::parse(&body()).unwrap();
-        let err = admit(&request, false).unwrap_err();
-        assert_eq!(err.code(), &AxCode::GateDenied);
-        assert!(
-            !err.subject().contains("lab"),
-            "a refusal must not confirm that the address exists: {}",
-            err.subject()
-        );
-        assert!(err.recovery().contains("pair"));
+        let printed = format!("{request:?}");
+        assert!(!printed.contains("pair-1234"), "{printed}");
     }
 
     #[test]
@@ -183,17 +183,19 @@ mod tests {
         let mut raw = body();
         raw["addr"] = json!(".sprawling/ledger");
         let request = Incoming::parse(&raw).unwrap();
-        let err = admit(&request, true).unwrap_err();
+        let err = admit(request).unwrap_err();
         assert_eq!(err.code(), &AxCode::OutsideWriteDomain);
+        assert!(err.recovery().contains("room in a building"));
     }
 
     #[test]
     fn every_field_is_required_and_the_refusal_names_the_missing_one() {
-        for key in ["token", "addr", "task", "goal"] {
+        for key in ["addr", "task", "goal"] {
             let mut raw = body();
             raw[key] = json!("");
             let err = Incoming::parse(&raw).unwrap_err();
             assert!(err.subject().contains(key), "{key}: {}", err.subject());
+            assert_eq!(err.code(), &AxCode::InvalidArgs);
         }
         assert!(Incoming::parse(&json!("a string")).is_err());
     }

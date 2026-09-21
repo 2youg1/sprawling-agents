@@ -314,6 +314,26 @@ pub enum Query {
     /// Nothing it answers updates anything. Where a binary lives belongs
     /// to whoever installed it, so this reports and stops.
     Release,
+    /// Everything this person settled about their own reading of the
+    /// city: the language, the appearance, the chords they rebound.
+    ///
+    /// The whole table in one answer, because a browser that cached
+    /// these row by row had a dozen names for them and read three of
+    /// those names back with its own idea of what a missing one means.
+    /// The file is the authority and this is the only door to it.
+    Preferences,
+    /// What one address is actually governed by, value by value, with
+    /// the file each value came from.
+    ///
+    /// **The layer is half the answer.** The three files form a ladder
+    /// - the city's, the building's, the room's - and a page told only
+    /// the resolved figure cannot say whether it is looking at
+    /// something this address states or something it inherited, so it
+    /// would have to read all three and climb the ladder a second
+    /// time. Two climbs of one ladder is two answers to one question.
+    Config {
+        addr: Address,
+    },
 }
 
 /// The Query surface, in declaration order — the order the handshake

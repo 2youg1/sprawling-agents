@@ -192,8 +192,12 @@ impl FrozenPrefix {
     pub fn assemble(city: FrozenSegment, building: FrozenSegment,
                     resident: FrozenSegment, run: FrozenSegment) -> Result<FrozenPrefix, AxError>;
     pub fn segment_hashes(&self) -> [B3Hash; 4];
-    pub fn prompt_payload(&self) -> Result<Payload, AxError>;   // prompt_assembled 载荷：逐段 {slot, hash, len}
+    pub fn prompt_payload(&self) -> Result<Payload, AxError>;   // prompt_assembled 载荷
 }
+// 载荷的键由 `kernel::event::record::PromptAssembled` 一处拼写，写读两端各经 `Payload::of` 与
+// `Payload::read` 一扇门；本模块只提供值：`SegmentSlot::as_str` 给出 slot 名与 breakpoints 行，
+// `SegmentSource::row` 给出 `PromptSource`，`build_segment` 的落选行给出 `PromptSkip`（reason 是
+// 闭集 `SkipReason { Duplicate, Unreadable, NotUtf8, NoBudget }`，不再是四个手写字符串）。
 ```
 
 - 段序即缓存经济：类型把四段位置写死，断点与各段上限属 S3 完备化（只加字段）。
@@ -526,6 +530,11 @@ pub fn admits(mode: Mode, produced: &Produced) -> Admission;
 // 存它等于给它一条没人要求过的命，而哈希前十六位已足以看出两处是否同一个值。
 pub fn redact(payload: &Map<String, Value>) -> (Map<String, Value>, u32);
 pub fn redact_text(text: &str) -> (String, u32);
+// 一个值的短名只有一处口径：`fingerprint` 取 b3 前十六位，标记 `secret:redacted/<b3-16>` 与
+// 保管名 `cap-<b3-16>` 都由它生成。`gateway::Custodian::capture` 现按捕获次序编号（`cap-<n>`），
+// 同一个值每场会话换一个名、两个值跨会话撞同一个名；它应改调 `capture_name`（8-3 的 runtime 半）。
+pub fn fingerprint(found: &[u8]) -> String;      // b3 前十六位
+pub fn capture_name(found: &[u8]) -> String;     // "cap-" + fingerprint
 
 pub struct ToolBench { /* tools: BTreeMap<String, Box<dyn Tool>>、domain: WriteDomain、registry: Registry、
                           taint: TaintSet、seen: BTreeSet<IdemKey>、prior_public_egress: bool —— 私有 */ }
@@ -1439,8 +1448,8 @@ struct Journal { /* run、who、t、refs、redacted —— 全私有 */ }
 impl Journal {
     fn append_authored(&mut self, ledger: &mut dyn Ledger, event: Authored, data: Payload)
         -> Result<EventRef, AxError>;
-    fn append_redacted(&mut self, ledger: &mut dyn Ledger, event: Carried, data: Map<String, Value>)
-        -> Result<EventRef, AxError>;
+    fn append_redacted(&mut self, ledger: &mut dyn Ledger, event: Carried, data: Payload)
+        -> Result<EventRef, AxError>;   // 载荷经 Payload::of 由记录结构构造，扫描在门内做
     fn append(&mut self, …) -> Result<EventRef, AxError>;   // 本模块唯一的 `Ledger::append` 调用
 }
 ```

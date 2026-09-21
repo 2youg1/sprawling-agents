@@ -24,15 +24,27 @@ namespace Sprawling
 one to work in, one to collide with, and one nobody ever raises. -/
 def cast : List String := ["acme", "beta", "gamma"]
 
-/-- One throwaway city: a directory, and the port it is served on. -/
+/-- One throwaway city: a directory, the port it is served on, and the home
+directory the city serving it was given.
+
+The home belongs to the ground because this product keeps one layer outside
+every city, which is what a person settled about their own reading of it. A
+property about that layer needs the directory the served city was pointed at
+rather than the one this suite happens to run under. -/
 structure Ground where
   city : System.FilePath
   port : Port
+  home : System.FilePath
 deriving Inhabited
 
 /-- The one history, as a directory on this disk. -/
 def Ground.ledger (ground : Ground) : System.FilePath :=
   ground.city / ".sprawling" / "ledger"
+
+/-- Where this person's own layer lands: outside the city, beside the
+components this machine downloaded. -/
+def Ground.personLayer (ground : Ground) : System.FilePath :=
+  ground.home / ".sprawling" / "config.toml"
 
 /-- Every port this process may serve a city on, lent out one at a time.
 
@@ -110,18 +122,23 @@ def withGround (door : Door) (act : Ground → IO α) : IO α := do
   let root ← IO.FS.createTempDir
   try
     let city := root / "city"
+    -- The home this city is pointed at, made before it is served: a city that
+    -- was given a directory nobody created would fall back to reporting that
+    -- it has no home, and the person's layer would have nowhere to land.
+    let home := root / "home"
+    IO.FS.createDirAll home
     door.raise city
-    attempt city 4
+    attempt city home 4
   finally
     try IO.FS.removeDirAll root catch _ => pure ()
 where
   /-- One city on one port: `none` when that port was held by something outside
   this process, which is the only case worth another try. -/
-  serveOnce (city : System.FilePath) (port : Port) : IO (Option α) := do
-    let serving ← door.serve city port
+  serveOnce (city : System.FilePath) (home : System.FilePath) (port : Port) : IO (Option α) := do
+    let serving ← door.serve city port home
     try
       if ← waits door port serving 25 then
-        return some (← act { city, port })
+        return some (← act { city, port, home })
       else
         -- Read only on the failing path: the diagnostics are worth the wait
         -- exactly when there is a failure to explain.
@@ -132,7 +149,7 @@ where
           throw <| IO.userError s!"a city would not serve: {complained}"
     finally
       serving.hangUp
-  attempt (city : System.FilePath) : Nat → IO α
+  attempt (city : System.FilePath) (home : System.FilePath) : Nat → IO α
     | 0 =>
       throw <| IO.userError
         "no port between 47100 and 47115 could serve a city; this is the machine's, not the product's"
@@ -142,12 +159,12 @@ where
       -- unchanged; only the port is taken back on the way out, because a
       -- checker that renamed every failure would report the harness where the
       -- product was owed.
-      let raised ← try serveOnce city port catch error => do release port; throw error
+      let raised ← try serveOnce city home port catch error => do release port; throw error
       match raised with
       -- The port is deliberately not handed back. Nothing inside this process
       -- held it, so something outside does, and lending it on would give every
       -- later ground the same obstacle.
-      | none => attempt city left
+      | none => attempt city home left
       | some value =>
         release port
         return value

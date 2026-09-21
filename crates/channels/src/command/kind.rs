@@ -23,16 +23,19 @@
 
 //! Command kinds: names, steps, the wire enum.
 
+use kernel::model::{Mode, Window};
 use kernel::{
     Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, GitOid, IdemKey, McpServer,
-    ModelTag, Ruling, RunId, SandboxLimits, Sealed, Seq, SessionName,
+    ModelTag, ResidentId, Ruling, RunId, SandboxLimits, Sealed, Seq, SessionName,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::carried_name::{ModeTag, ProviderName, TemplateName, ToolkitSlug, UploadId};
+use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
+use crate::command::shelf::Shelf;
 use crate::command::step::{GovernedDocument, HaltScope, LoginStep, PursuitStep};
 use crate::command::tuning::EndpointTuning;
 use crate::named_frames::named_frames;
+use crate::preference::PreferencePatch;
 
 named_frames! {
 /// Commands change state, require authorization, and are idempotent.
@@ -51,7 +54,7 @@ pub enum Command<Secret = Sealed<String>> {
         addr: Address,
         task: String,
         goal: String,
-        mode: ModeTag,
+        mode: Mode,
         idem: IdemKey,
         /// What this session is called, when it is a new one.
         ///
@@ -150,10 +153,10 @@ pub enum Command<Secret = Sealed<String>> {
         endpoint: ProviderName,
         model: String,
         tag: ModelTag,
-        /// The model's window. Zero states no window, and the context
-        /// reminder then stays silent rather than measuring against a
-        /// number nobody gave it.
-        context_tokens: u64,
+        /// The model's window. Absent when nobody stated one, and the
+        /// context reminder then stays silent rather than measuring a
+        /// conversation against a number nobody gave it.
+        context_tokens: Option<Window>,
         /// The model's output ceiling. Absent when the person did not
         /// state one: the city then takes the catalogue's figure, and
         /// where the catalogue has no row the model is registered
@@ -165,11 +168,6 @@ pub enum Command<Secret = Sealed<String>> {
         run: RunId,
         at_seq: Seq,
         addr: Option<Address>,
-        idem: IdemKey,
-    },
-    Attach {
-        upload: UploadId,
-        notify: Vec<RunId>,
         idem: IdemKey,
     },
     CreateBuilding {
@@ -248,8 +246,21 @@ pub enum Command<Secret = Sealed<String>> {
         verdict: Ruling,
         idem: IdemKey,
     },
-    CreatePolicy {
-        from_item: ApprovalId,
+    /// Give one waiting question to a resident to answer.
+    ///
+    /// The inbox holds design questions, and a person who does not
+    /// want to answer one has exactly two ways out: answer it anyway,
+    /// or name somebody who will. This is the second. It moves one
+    /// item and leaves [`Command::SetAutonomy`] to say who answers
+    /// everything, because handing over a single question and
+    /// appointing a standing delegate are different decisions with
+    /// different reach.
+    ///
+    /// Writes `question_handed`, after which the named resident may
+    /// answer this item even though it is not the standing delegate.
+    HandOff {
+        item: ApprovalId,
+        to: ResidentId,
         idem: IdemKey,
     },
     SetAutonomy {
@@ -318,6 +329,31 @@ pub enum Command<Secret = Sealed<String>> {
     /// account on the same application.
     ConnectToolkit {
         toolkit: ToolkitSlug,
+        idem: IdemKey,
+    },
+    /// Change one fact about how this person reads their own city.
+    ///
+    /// One named fact per frame rather than a whole record: two
+    /// screens settling different things must not be able to overwrite
+    /// each other's field on the way past.
+    PutPreferences {
+        patch: PreferencePatch,
+        idem: IdemKey,
+    },
+    /// Write one skill or script onto a shelf.
+    ///
+    /// The shelf and the name are separate because the city owns where
+    /// a shelf lives: the two shelves sit inside the reserved subtree,
+    /// which no write domain reaches, so this is the door a person
+    /// writes there through and there is no path to spell. `name` may
+    /// carry sub-directories, which is how a script keeps its folder.
+    ///
+    /// The body replaces the file whole, for the reason
+    /// [`Command::PutDocument`] gives. Writes `shelved_document_written`.
+    PutShelved {
+        shelf: Shelf,
+        name: String,
+        text: String,
         idem: IdemKey,
     },
     Auth {

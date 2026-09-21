@@ -17,8 +17,9 @@ use serde_json::Value;
 use super::super::AttachedEndpoint;
 use super::super::book::Choice;
 use super::read_tuning;
-use crate::endpoint::AuthSpec;
+use crate::endpoint::{AuthSpec, ModelFacts};
 use crate::market::{InputKinds, ModelEntry};
+use crate::provider::registry::ConnectionKind;
 
 pub(crate) fn invalid(subject: impl Into<String>) -> AxError {
     AxError::failure(AxCode::WireMismatch, "read an endpoint record", subject)
@@ -85,16 +86,42 @@ pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxErr
         .ok_or_else(|| invalid("models is missing or not an array"))?
         .iter()
         .map(|value| {
+            // The record carries ids, because that is all a probe ever
+            // wrote into it. What the provider said about each row is
+            // read from the market when the row is used, so a replay
+            // does not invent facts the history never held.
             value
                 .as_str()
-                .map(str::to_owned)
+                .map(|id| ModelFacts {
+                    id: id.to_owned(),
+                    context_tokens: None,
+                    max_output_tokens: None,
+                    input_modalities: Vec::new(),
+                    input_price: None,
+                    output_price: None,
+                })
                 .ok_or_else(|| invalid("a model id is not a string"))
         })
-        .collect::<Result<Vec<String>, AxError>>()?;
+        .collect::<Result<Vec<ModelFacts>, AxError>>()?;
     Ok(AttachedEndpoint {
         name: text(payload, "name")?,
         base_url: text(payload, "base_url")?,
         dialect,
+        // A record written before this key existed was written by a
+        // build that had one registration per format, so the format is
+        // what the connection was.
+        connection_kind: match payload
+            .as_map()
+            .get("connection_kind")
+            .and_then(Value::as_str)
+        {
+            Some(word) => ConnectionKind::parse(word)?,
+            None => match dialect {
+                DialectKind::Anthropic => ConnectionKind::AnthropicNative,
+                DialectKind::OpenAi => ConnectionKind::OpenAiCompat,
+                DialectKind::OpenAiResponses => ConnectionKind::Responses,
+            },
+        },
         auth,
         models,
         // Absent means true: every record written before this key

@@ -77,17 +77,18 @@ impl Views {
 /// the last wave", which is a different question and not the one a
 /// person opening a session is asking.
 #[must_use]
-#[expect(
-    clippy::wildcard_enum_match_arm,
-    reason = "one note carries the opening commit; the others say nothing about it"
-)]
 fn opened_at(turns: &[channels::Turn]) -> Option<kernel::GitOid> {
     turns
         .iter()
         .flat_map(|turn| turn.notes.iter())
-        .find_map(|note| match *note {
-            channels::Note::Fenced { oid, .. } => Some(oid),
-            _ => None,
+        .find_map(|note| match note {
+            channels::Note::Fenced { oid, .. } => Some(*oid),
+            // The other four notes say what happened in the session;
+            // none of them names the commit it opened at.
+            channels::Note::Refused { .. }
+            | channels::Note::Waiting { .. }
+            | channels::Note::Arrived { .. }
+            | channels::Note::Discarded { .. } => None,
         })
 }
 

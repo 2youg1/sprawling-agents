@@ -54,6 +54,7 @@ import { AppearanceSection } from "./setup/appearance";
 import { ModelChoice } from "./setup/models";
 import { SkillsSection } from "./setup/skills";
 import { PROXYINGS, proxyingNote } from "./setup/providers";
+import { Kept } from "./setup/kept";
 
 // The eight screens, in the order a city is set up.
 const GROUPS = [
@@ -67,6 +68,14 @@ const GROUPS = [
   "advanced",
 ] as const;
 type Group = (typeof GROUPS)[number];
+
+// The three groups whose answers `core/prefs.ts` keeps, and therefore
+// the three whose heading says where those answers live. They are the
+// three arms of the switch below that mount a screen reading the
+// preference door; the other five collect the city's own record - an
+// endpoint, a model, an autonomy - about which a badge naming a
+// keeper would say nothing true.
+const PREFERRED: readonly Group[] = ["network", "appearance", "keys"];
 
 // Who answers an approval, as the three settings a person picks
 // between. `delegate` carries an address on the wire, and the clerk is
@@ -176,7 +185,12 @@ export function Setup() {
       <div class="flex min-w-0 flex-1 flex-col gap-wide wide:flex-row wide:items-start">
         <div class="flex min-w-0 flex-1 flex-col gap-base">
           <p class="text-note text-text-faint">{say("nav_settings")}</p>
-          <h1 class="text-title font-title">{say(`setup_group_${group()}`)}</h1>
+          <div class="flex flex-wrap items-baseline gap-base">
+            <h1 class="text-title font-title">{say(`setup_group_${group()}`)}</h1>
+            <Show when={PREFERRED.includes(group())}>
+              <Kept keeper={ui.prefs.keeper()} />
+            </Show>
+          </div>
           <div class={group() === "tools" ? "min-w-0" : "min-w-0 wide:max-w-measure"}>
             <Switch>
               <Match when={group() === "accounts"}>

@@ -20,7 +20,8 @@
 
 use kernel::DialectKind;
 
-use crate::endpoint::AuthSpec;
+use crate::endpoint::{AuthSpec, ModelFacts};
+use crate::provider::registry::ConnectionKind;
 
 use super::payload::auth_reference;
 use super::tuning::EndpointTuning;
@@ -32,11 +33,20 @@ pub struct AttachedEndpoint {
     /// dialect knows which paths hang off it.
     pub base_url: String,
     pub dialect: DialectKind,
+    /// How this endpoint is connected, resolved once when it was
+    /// attached. `dialect` beside it answers the narrower question of
+    /// which request writer runs, and two connections can share a
+    /// writer while being different registrations; a page given only
+    /// the writer cannot say which one a person set up.
+    pub connection_kind: ConnectionKind,
     pub auth: AuthSpec,
-    /// What the endpoint said it serves. Ids only: no provider returns
-    /// prices or limits from its model list, and a number we invented
-    /// would outrank the one the provider actually bills.
-    pub models: Vec<String>,
+    /// What the endpoint said it serves, with everything it said about
+    /// each row. Kept whole rather than reduced to ids: the probe
+    /// already reads the window, the output ceiling, the modalities and
+    /// the provider's own prices out of `GET .../models`, and throwing
+    /// them away here made the settings page ask a person for figures
+    /// their provider had already stated.
+    pub models: Vec<ModelFacts>,
     /// Where that list came from: `true` when the endpoint answered
     /// `GET .../models`, `false` when it did not and the person named
     /// the ids instead. It says how much the city knows about this
@@ -89,12 +99,13 @@ impl AttachedEndpoint {
     }
 }
 
-/// Both dialects list models at the same path; they differ in the chat
-/// path and in the shape of what comes back.
+/// All three compatible formats list models at the same path; they
+/// differ in the chat path and in the shape of what comes back.
 fn chat_path(dialect: DialectKind) -> &'static str {
     match dialect {
         DialectKind::Anthropic => "messages",
         DialectKind::OpenAi => "chat/completions",
+        DialectKind::OpenAiResponses => "responses",
     }
 }
 
@@ -138,13 +149,27 @@ mod tests {
             GENESIS_PREV,
         )
     }
+    /// One catalogue row as a probe that answered nothing but the id
+    /// would have left it.
+    fn facts(id: &str) -> ModelFacts {
+        ModelFacts {
+            id: id.to_owned(),
+            context_tokens: None,
+            max_output_tokens: None,
+            input_modalities: Vec::new(),
+            input_price: None,
+            output_price: None,
+        }
+    }
+
     fn attached(name: &str, base_url: &str) -> AttachedEndpoint {
         AttachedEndpoint {
             name: name.to_owned(),
             base_url: base_url.to_owned(),
             dialect: DialectKind::OpenAi,
+            connection_kind: ConnectionKind::OpenAiCompat,
             auth: AuthSpec::Bearer(SecretRef::parse("secret:provider/key").unwrap()),
-            models: vec!["m-small".to_owned(), "m-large".to_owned()],
+            models: vec![facts("m-small"), facts("m-large")],
             probed: true,
             tuning: EndpointTuning::default(),
         }

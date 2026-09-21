@@ -181,7 +181,6 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
     if let Ok(mut held) = views.lock() {
         held.lend_the_vault(Arc::clone(&city_vault));
     }
-    let sink_root = cas_root.clone();
     let audio_views = Arc::clone(&views);
     let audio_vault = city_vault;
     let config = channels::ServeConfig {
@@ -212,25 +211,8 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
         // the same desk a person's does. It is not a second control
         // surface: the admission decides what a stranger may learn, and
         // everything after that is the city's usual path.
-        acp: Arc::new(move |body, authentic| acp_dispatch(&acp_desk, body, authentic)),
+        acp: Arc::new(move |body, pairing| acp_dispatch(&acp_desk, body, pairing)),
         transcribe_sink: hearing(audio_views, audio_vault),
-        upload_sink: Arc::new(move |bytes: Vec<u8>| {
-            // Attach bytes reach the content-addressed store, and the handle
-            // a later Command names is the address they landed at. Nothing
-            // enters a work tree here: staging is read-only and outside every
-            // WriteDomain.
-            let digest = kernel::B3Hash::digest(&bytes).to_string();
-            let path = sink_root.join(&digest);
-            std::fs::write(&path, &bytes).map_err(|source| {
-                AxError::failure(
-                    AxCode::StorageFatal,
-                    "stage an attachment",
-                    format!("{}: {source}", path.display()),
-                )
-                .with_recovery("check free space under the city directory")
-            })?;
-            channels::UploadId::parse(&digest)
-        }),
     };
     // The terminal this city is running in, if it was asked for. It gets
     // the same desk the socket posts to and the same event stream the

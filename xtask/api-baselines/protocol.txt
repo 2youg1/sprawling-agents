@@ -32,7 +32,7 @@ pub fn protocol::ScriptedOutbound::missed(&self) -> &[alloc::string::String]
 pub fn protocol::ScriptedOutbound::new() -> protocol::ScriptedOutbound
 pub fn protocol::ScriptedOutbound::notify(&mut self, &str, kernel::tool::TimeoutMs) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn protocol::ScriptedOutbound::notify(&mut self, &str, kernel::tool::TimeoutMs) -> core::result::Result<(), kernel::error::shape::AxError>
-pub fn protocol::admit(&protocol::Incoming, bool) -> core::result::Result<protocol::Admitted, kernel::error::shape::AxError>
+pub fn protocol::admit(protocol::Incoming) -> core::result::Result<protocol::Admitted, kernel::error::shape::AxError>
 pub fn protocol::digits_for_floats(serde_json::value::Value) -> serde_json::value::Value
 pub fn protocol::handshake(&mut dyn protocol::Outbound, &mut protocol::Rpc, kernel::tool::TimeoutMs) -> core::result::Result<protocol::Handshake, kernel::error::shape::AxError>
 pub fn protocol::read_one_message(&mut dyn alloc::io::buf_read::BufRead, &str) -> core::result::Result<protocol::Received, kernel::error::shape::AxError>
@@ -44,10 +44,6 @@ pub protocol::Admitted::Dispatch::goal: alloc::string::String
 pub protocol::Admitted::Dispatch::task: alloc::string::String
 pub protocol::Handshake::protocol_version: alloc::string::String
 pub protocol::Handshake::server: alloc::string::String
-pub protocol::Incoming::addr: kernel::address::Address
-pub protocol::Incoming::goal: alloc::string::String
-pub protocol::Incoming::task: alloc::string::String
-pub protocol::Incoming::token: alloc::string::String
 pub protocol::Listed::meta: kernel::tool::ToolMeta
 pub protocol::Listed::remote: alloc::string::String
 pub protocol::Progress::finished: bool

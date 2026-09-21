@@ -32,7 +32,7 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
                 addr: Address::parse(room).unwrap(),
                 task: "claim the notes".to_owned(),
                 goal: "register a goal, then stop".to_owned(),
-                mode: channels::ModeTag::parse("plan").unwrap(),
+                mode: kernel::Mode::PlanGoal,
                 idem: kernel::IdemKey::derive(
                     &RunId::CITY,
                     kernel::Seq::new(u64::try_from(n).unwrap()),
@@ -119,7 +119,7 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             addr: room.clone(),
             task: "get it measured and written up".to_owned(),
             goal: "a page with a number in it, then stop".to_owned(),
-            mode: channels::ModeTag::parse("plan").unwrap(),
+            mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -219,7 +219,7 @@ fn three_ready_nodes_drive_three_runs_at_once() {
             endpoint: channels::ProviderName::parse("house").unwrap(),
             model: "m-local".to_owned(),
             tag: kernel::ModelTag::Digest,
-            context_tokens: 32_768,
+            context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(4_096),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"digest"),
         })

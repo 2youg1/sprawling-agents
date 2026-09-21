@@ -174,3 +174,65 @@ fn a_dependency_circle_is_a_problem_rather_than_a_silent_empty_plan() {
         reading.problems
     );
 }
+
+/// The record that carries no address is the one the old rule ignored:
+/// a checkpoint written for the city rather than for a room used to
+/// leave every parsed plan in place, and the comment beside the rule
+/// said the opposite.
+#[test]
+fn a_record_with_no_address_stales_every_plan_it_could_have_moved() {
+    let dir = city(PLAN);
+    let mut view = PlanView::default();
+    assert_eq!(view.of(dir.path(), &addr()).rows.len(), 3);
+    std::fs::write(
+        dir.path().join("lab").join("Roadmap.md"),
+        PLAN.replace("| 3 | ship | 1 | 2 | Not started |  |\n", ""),
+    )
+    .unwrap();
+
+    let draft = EventDraft {
+        run: RunId::CITY,
+        t: TimeMs::new(0),
+        who: "owner".into(),
+        addr: None,
+        kind: EventKind::CheckpointCommitted,
+        data: Payload::new(serde_json::Map::new()).unwrap(),
+        ig: false,
+    };
+    view.apply(&EventRecord::from_draft(draft, Seq::FIRST, GENESIS_PREV));
+    assert_eq!(
+        view.of(dir.path(), &addr()).rows.len(),
+        2,
+        "a record belonging to no building makes every parsed plan suspect"
+    );
+}
+
+/// A kind nobody classified would be a plan that goes stale by accident
+/// or never goes stale at all, so the table answers for all of them.
+#[test]
+fn every_event_kind_has_a_reach() {
+    // Named rather than counted. A number here is a second place the
+    // table has to be remembered, and the one nobody updates: adding a
+    // kind that moves a plan should make this list disagree by name,
+    // which says which kind, not that the total moved.
+    let moving: Vec<String> = EventKind::ALL
+        .into_iter()
+        .filter(|kind| may_move_plan(*kind) != PlanReach::Untouched)
+        .map(|kind| format!("{kind:?}"))
+        .collect();
+    assert_eq!(
+        moving,
+        vec![
+            "CityInitialized",
+            "BuildingCreated",
+            "CheckpointCommitted",
+            "RunFrozen",
+            "RoadmapClaimed",
+            "RoadmapFinished",
+            "RoadmapReleased",
+            "RoadmapSplit",
+            "RoadmapBlocked",
+        ],
+        "these kinds move a plan and every other kind leaves it where it was"
+    );
+}

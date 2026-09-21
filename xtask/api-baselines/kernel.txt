@@ -12,18 +12,23 @@ impl core::fmt::Display for kernel::AxCode
 impl core::fmt::Display for kernel::AxCode
 impl core::fmt::Display for kernel::Ceiling
 impl core::fmt::Display for kernel::Ceiling
+impl core::fmt::Display for kernel::Mode
+impl core::fmt::Display for kernel::Mode
 impl core::fmt::Display for kernel::ModelTag
 impl core::fmt::Display for kernel::ModelTag
 impl core::fmt::Display for kernel::RunId
 impl core::fmt::Display for kernel::RunId
 impl core::fmt::Display for kernel::SecretRef
 impl core::fmt::Display for kernel::SecretRef
+impl core::fmt::Display for kernel::Window
+impl core::fmt::Display for kernel::Window
 impl core::fmt::Display for kernel::address::Address
 impl core::fmt::Display for kernel::address::Address
 impl core::fmt::Display for kernel::address::SessionName
 impl core::fmt::Display for kernel::address::SessionName
 impl core::fmt::Display for kernel::config::EnvVarName
 impl core::fmt::Display for kernel::config::EnvVarName
+impl core::fmt::Display for kernel::event::Who
 impl core::fmt::Display for kernel::idem::IdemKey
 impl core::fmt::Display for kernel::idem::IdemKey
 impl core::fmt::Display for kernel::locator::B3Hash
@@ -70,6 +75,8 @@ impl kernel::Held
 impl kernel::Held
 impl kernel::ImageType
 impl kernel::ImageType
+impl kernel::Mode
+impl kernel::Mode
 impl kernel::ModelReturn
 impl kernel::ModelReturn
 impl kernel::ModelTag
@@ -94,6 +101,8 @@ impl kernel::StopCause
 impl kernel::StopCause
 impl kernel::TimeMs
 impl kernel::TimeMs
+impl kernel::Window
+impl kernel::Window
 impl kernel::address::Address
 impl kernel::address::Address
 impl kernel::address::SessionName
@@ -124,6 +133,8 @@ impl kernel::delegation::DelegateKind
 impl kernel::delegation::DelegateKind
 impl kernel::delegation::Delegator
 impl kernel::delegation::Delegator
+impl kernel::event::Who
+impl kernel::event::record::RunFrozen
 impl kernel::gate::DoorId
 impl kernel::gate::DoorId
 impl kernel::goal::GoalId
@@ -185,6 +196,7 @@ impl serde_core::ser::Serialize for kernel::AxCode
 impl serde_core::ser::Serialize for kernel::AxCode
 impl serde_core::ser::Serialize for kernel::SecretRef
 impl serde_core::ser::Serialize for kernel::SecretRef
+impl serde_core::ser::Serialize for kernel::event::Who
 impl serde_core::ser::Serialize for kernel::idem::IdemKey
 impl serde_core::ser::Serialize for kernel::idem::IdemKey
 impl serde_core::ser::Serialize for kernel::locator::B3Hash
@@ -205,6 +217,7 @@ impl<'de> serde_core::de::Deserialize<'de> for kernel::address::Address
 impl<'de> serde_core::de::Deserialize<'de> for kernel::address::Address
 impl<'de> serde_core::de::Deserialize<'de> for kernel::address::SessionName
 impl<'de> serde_core::de::Deserialize<'de> for kernel::address::SessionName
+impl<'de> serde_core::de::Deserialize<'de> for kernel::event::Who
 impl<'de> serde_core::de::Deserialize<'de> for kernel::idem::IdemKey
 impl<'de> serde_core::de::Deserialize<'de> for kernel::idem::IdemKey
 impl<'de> serde_core::de::Deserialize<'de> for kernel::locator::B3Hash
@@ -229,6 +242,12 @@ pub const fn kernel::Ceiling::get(self) -> u64
 pub const fn kernel::Ceiling::get(self) -> u64
 pub const fn kernel::Ceiling::new(u64) -> core::option::Option<kernel::Ceiling>
 pub const fn kernel::Ceiling::new(u64) -> core::option::Option<kernel::Ceiling>
+pub const fn kernel::Mode::as_str(self) -> &'static str
+pub const fn kernel::Mode::as_str(self) -> &'static str
+pub const fn kernel::Window::get(self) -> u64
+pub const fn kernel::Window::get(self) -> u64
+pub const fn kernel::Window::new(u64) -> core::option::Option<kernel::Window>
+pub const fn kernel::Window::new(u64) -> core::option::Option<kernel::Window>
 pub const fn kernel::budget::ByteLen::get(self) -> u64
 pub const fn kernel::budget::ByteLen::get(self) -> u64
 pub const fn kernel::budget::ByteLen::new(u64) -> kernel::budget::ByteLen
@@ -259,6 +278,8 @@ pub const kernel::EventKind::ALL: [kernel::EventKind; 67]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::IDEM_DERIVE_V: u8
 pub const kernel::MEMO_OUTLINE_FIELDS: [&str; 6]
+pub const kernel::Mode::ALL: [kernel::Mode; 5]
+pub const kernel::Mode::ALL: [kernel::Mode; 5]
 pub const kernel::ModelTag::ALL: [kernel::ModelTag; 3]
 pub const kernel::ModelTag::ALL: [kernel::ModelTag; 3]
 pub const kernel::NODE_DEPTH_MAX: usize
@@ -369,6 +390,7 @@ pub enum kernel::Lines
 pub enum kernel::Locator
 pub enum kernel::McpTransport
 pub enum kernel::MemoShape
+pub enum kernel::Mode
 pub enum kernel::ModelTag
 pub enum kernel::Named
 pub enum kernel::PlanExit
@@ -424,8 +446,11 @@ pub enum kernel::discard::Restoration
 pub enum kernel::error::AxCode
 pub enum kernel::error::Carrier
 pub enum kernel::event::EventKind
+pub enum kernel::event::Who
 pub enum kernel::event::WindowClass
 pub enum kernel::event::record::CheckpointCommitted
+pub enum kernel::event::record::SkipReason
+pub enum kernel::event::record::ToolAnswer
 pub enum kernel::gate::DoorId
 pub enum kernel::gate::EgressOutcome
 pub enum kernel::gate::EgressTarget
@@ -440,6 +465,7 @@ pub enum kernel::model::DialectKind
 pub enum kernel::model::Effort
 pub enum kernel::model::ImageType
 pub enum kernel::model::Increment
+pub enum kernel::model::Mode
 pub enum kernel::model::ModelTag
 pub enum kernel::model::Role
 pub enum kernel::model::StopReason
@@ -593,6 +619,8 @@ pub fn kernel::ImageType::mime(&self) -> &'static str
 pub fn kernel::ImageType::mime(&self) -> &'static str
 pub fn kernel::Ledger::append(&mut self, kernel::EventDraft) -> core::result::Result<kernel::EventRef, kernel::AxError>
 pub fn kernel::Ledger::append_all(&mut self, alloc::vec::Vec<kernel::EventDraft>) -> core::result::Result<alloc::vec::Vec<kernel::EventRef>, kernel::AxError>
+pub fn kernel::Mode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn kernel::Mode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::Model::call(&mut self, &kernel::ModelRequest) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
 pub fn kernel::Model::call_streaming(&mut self, &kernel::ModelRequest, kernel::model::Increments<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
 pub fn kernel::ModelReturn::bare(kernel::Payload, alloc::vec::Vec<kernel::tool::ToolCall>) -> kernel::ModelReturn
@@ -669,6 +697,8 @@ pub fn kernel::TimeMs::value(&self) -> u64
 pub fn kernel::TimeMs::value(&self) -> u64
 pub fn kernel::Tool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::AxError>
 pub fn kernel::Tool::meta(&self) -> &kernel::tool::ToolMeta
+pub fn kernel::Window::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn kernel::Window::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::address::Address::as_str(&self) -> &str
 pub fn kernel::address::Address::as_str(&self) -> &str
 pub fn kernel::address::Address::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
@@ -749,6 +779,13 @@ pub fn kernel::delegation::Delegator::root() -> kernel::delegation::Delegator
 pub fn kernel::delegation::admit(kernel::delegation::Depth, &kernel::delegation::DelegateKind) -> kernel::delegation::DelegationVerdict
 pub fn kernel::discard::decide(&kernel::DiscardRequest) -> kernel::DiscardVerdict
 pub fn kernel::discard::forecast(&kernel::tool::ExecArm) -> kernel::DiscardForecast
+pub fn kernel::event::Who::as_str(&self) -> &str
+pub fn kernel::event::Who::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
+pub fn kernel::event::Who::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn kernel::event::Who::parse(&str) -> core::result::Result<kernel::event::Who, kernel::AxError>
+pub fn kernel::event::Who::resident(kernel::address::Address) -> core::result::Result<kernel::event::Who, kernel::AxError>
+pub fn kernel::event::Who::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+pub fn kernel::event::record::RunFrozen::of(&kernel::completion::Completion) -> kernel::event::record::RunFrozen
 pub fn kernel::gate::DoorId::as_str(self) -> &'static str
 pub fn kernel::gate::DoorId::as_str(self) -> &'static str
 pub fn kernel::gate::discard(&kernel::DiscardRequest, &str) -> kernel::gate::GateOutcome
@@ -1139,6 +1176,7 @@ pub kernel::Depth::Delegated
 pub kernel::Depth::Root
 pub kernel::DialectKind::Anthropic
 pub kernel::DialectKind::OpenAi
+pub kernel::DialectKind::OpenAiResponses
 pub kernel::DiscardForecast::Clear
 pub kernel::DiscardForecast::Suspected
 pub kernel::DiscardForecast::Suspected::pattern: alloc::string::String
@@ -1345,6 +1383,11 @@ pub kernel::McpTransport::Stdio::env: alloc::vec::Vec<(alloc::string::String, al
 pub kernel::MemoShape::Malformed
 pub kernel::MemoShape::Malformed::missing: alloc::vec::Vec<&'static str>
 pub kernel::MemoShape::WellFormed
+pub kernel::Mode::Experiment
+pub kernel::Mode::PlanGoal
+pub kernel::Mode::Sc
+pub kernel::Mode::Ud
+pub kernel::Mode::Up
 pub kernel::ModelRequest::chat: kernel::ChatRequest
 pub kernel::ModelRequest::policy: kernel::BuildingPolicy
 pub kernel::ModelRequest::segments: [kernel::locator::B3Hash; 4]
@@ -1761,6 +1804,9 @@ pub kernel::event::EventKind::ToolResult
 pub kernel::event::EventKind::ToolkitLinkOpened
 pub kernel::event::EventKind::WatchdogFired
 pub kernel::event::EventKind::WorktreeOpened
+pub kernel::event::Who::City
+pub kernel::event::Who::Person
+pub kernel::event::Who::Resident(kernel::address::Address)
 pub kernel::event::WindowClass::InWindow
 pub kernel::event::WindowClass::RecordOnly
 pub kernel::event::record::CheckpointCommitted::Committed(kernel::event::record::Commit)
@@ -1773,8 +1819,33 @@ pub kernel::event::record::Commit::scope: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::CommitAttribution::effort: core::option::Option<kernel::Effort>
 pub kernel::event::record::CommitAttribution::model: alloc::string::String
 pub kernel::event::record::CommitAttribution::predecessor: core::option::Option<kernel::RunId>
+pub kernel::event::record::EvidenceCite::kind: kernel::EventKind
+pub kernel::event::record::EvidenceCite::seq: kernel::Seq
+pub kernel::event::record::LogTruncated::dropped_bytes: u64
+pub kernel::event::record::ModelCalled::model: alloc::string::String
+pub kernel::event::record::ModelCalled::segments: alloc::vec::Vec<kernel::locator::B3Hash>
+pub kernel::event::record::ModelReturned::billed_usd_micros: core::option::Option<kernel::budget::UsdMicros>
+pub kernel::event::record::ModelReturned::calls: u64
+pub kernel::event::record::ModelReturned::message: kernel::Payload
+pub kernel::event::record::ModelReturned::stop: core::option::Option<kernel::StopReason>
+pub kernel::event::record::ModelReturned::usage: core::option::Option<kernel::ModelUsage>
+pub kernel::event::record::PromptAssembled::breakpoints: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::PromptAssembled::segments: alloc::vec::Vec<kernel::event::record::PromptSegment>
+pub kernel::event::record::PromptSegment::hash: kernel::locator::B3Hash
+pub kernel::event::record::PromptSegment::len: u64
+pub kernel::event::record::PromptSegment::skipped: alloc::vec::Vec<kernel::event::record::PromptSkip>
+pub kernel::event::record::PromptSegment::slot: alloc::string::String
+pub kernel::event::record::PromptSegment::sources: alloc::vec::Vec<kernel::event::record::PromptSource>
+pub kernel::event::record::PromptSkip::addr: kernel::address::Address
+pub kernel::event::record::PromptSkip::reason: kernel::event::record::SkipReason
+pub kernel::event::record::PromptSource::addr: kernel::address::Address
+pub kernel::event::record::PromptSource::dropped: u64
+pub kernel::event::record::PromptSource::kept: u64
+pub kernel::event::record::PromptSource::marker: bool
 pub kernel::event::record::RunForked::at_seq: kernel::Seq
 pub kernel::event::record::RunForked::from: kernel::RunId
+pub kernel::event::record::RunFrozen::completion: alloc::string::String
+pub kernel::event::record::RunFrozen::evidence: core::option::Option<alloc::vec::Vec<kernel::event::record::EvidenceCite>>
 pub kernel::event::record::RunStarted::goal: alloc::string::String
 pub kernel::event::record::RunStarted::job: core::option::Option<kernel::locator::Locator>
 pub kernel::event::record::RunStarted::parent: core::option::Option<kernel::RunId>
@@ -1783,6 +1854,22 @@ pub kernel::event::record::RunStarted::skills: alloc::vec::Vec<kernel::event::re
 pub kernel::event::record::RunStarted::task: alloc::string::String
 pub kernel::event::record::SkillPin::hash: kernel::locator::B3Hash
 pub kernel::event::record::SkillPin::name: alloc::string::String
+pub kernel::event::record::SkipReason::Duplicate
+pub kernel::event::record::SkipReason::NoBudget
+pub kernel::event::record::SkipReason::NotUtf8
+pub kernel::event::record::SkipReason::Unreadable
+pub kernel::event::record::SteerReceived::source: alloc::string::String
+pub kernel::event::record::SteerReceived::text: alloc::string::String
+pub kernel::event::record::ToolAnswer::Answered
+pub kernel::event::record::ToolAnswer::Answered::result: kernel::Payload
+pub kernel::event::record::ToolAnswer::Failed
+pub kernel::event::record::ToolAnswer::Failed::error: kernel::Payload
+pub kernel::event::record::ToolCalled::args: kernel::Payload
+pub kernel::event::record::ToolCalled::id: alloc::string::String
+pub kernel::event::record::ToolCalled::name: kernel::tool::ToolName
+pub kernel::event::record::ToolResult::answer: kernel::event::record::ToolAnswer
+pub kernel::event::record::ToolResult::name: kernel::tool::ToolName
+pub kernel::event::record::ToolResult::tool_use_id: alloc::string::String
 pub kernel::gate::ConnectorCall::label: &'a kernel::tool::ServerLabel
 pub kernel::gate::ConnectorCall::tool: &'a kernel::tool::ToolName
 pub kernel::gate::DoorId::Discard
@@ -1871,6 +1958,7 @@ pub kernel::model::ContentBlock::ToolUse::input: kernel::Payload
 pub kernel::model::ContentBlock::ToolUse::name: kernel::tool::ToolName
 pub kernel::model::DialectKind::Anthropic
 pub kernel::model::DialectKind::OpenAi
+pub kernel::model::DialectKind::OpenAiResponses
 pub kernel::model::Effort::High
 pub kernel::model::Effort::Low
 pub kernel::model::Effort::Max
@@ -1887,6 +1975,11 @@ pub kernel::model::ImageType::Png
 pub kernel::model::ImageType::Webp
 pub kernel::model::Increment::Said(alloc::string::String)
 pub kernel::model::Increment::Thought(alloc::string::String)
+pub kernel::model::Mode::Experiment
+pub kernel::model::Mode::PlanGoal
+pub kernel::model::Mode::Sc
+pub kernel::model::Mode::Ud
+pub kernel::model::Mode::Up
 pub kernel::model::ModelRequest::chat: kernel::ChatRequest
 pub kernel::model::ModelRequest::policy: kernel::BuildingPolicy
 pub kernel::model::ModelRequest::segments: [kernel::locator::B3Hash; 4]
@@ -2197,6 +2290,7 @@ pub struct kernel::ToolOutcome
 pub struct kernel::UnplannedProgress
 pub struct kernel::UsdMicros(_)
 pub struct kernel::Version(_)
+pub struct kernel::Window(_)
 pub struct kernel::address::Address(_)
 pub struct kernel::address::SessionName(_)
 pub struct kernel::approval::ApprovalId(_)
@@ -2239,9 +2333,21 @@ pub struct kernel::event::Seq(_)
 pub struct kernel::event::TimeMs(_)
 pub struct kernel::event::record::Commit
 pub struct kernel::event::record::CommitAttribution
+pub struct kernel::event::record::EvidenceCite
+pub struct kernel::event::record::LogTruncated
+pub struct kernel::event::record::ModelCalled
+pub struct kernel::event::record::ModelReturned
+pub struct kernel::event::record::PromptAssembled
+pub struct kernel::event::record::PromptSegment
+pub struct kernel::event::record::PromptSkip
+pub struct kernel::event::record::PromptSource
 pub struct kernel::event::record::RunForked
+pub struct kernel::event::record::RunFrozen
 pub struct kernel::event::record::RunStarted
 pub struct kernel::event::record::SkillPin
+pub struct kernel::event::record::SteerReceived
+pub struct kernel::event::record::ToolCalled
+pub struct kernel::event::record::ToolResult
 pub struct kernel::gate::ConnectorCall<'a>
 pub struct kernel::gate::EgressAllowlist
 pub struct kernel::goal::GoalEntry
@@ -2264,6 +2370,7 @@ pub struct kernel::model::ModelReturn
 pub struct kernel::model::ModelUsage
 pub struct kernel::model::SystemBlock
 pub struct kernel::model::ToolDef
+pub struct kernel::model::Window(_)
 pub struct kernel::node_id::NodeId(_)
 pub struct kernel::plan::Held(_)
 pub struct kernel::plan::PlanNode

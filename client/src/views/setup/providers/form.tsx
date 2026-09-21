@@ -120,8 +120,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
     const typed = draft.key.trim();
     const keep = secretFor(held(), id());
     if (typed === "") {
-      const built = endpointOf(draft, keep);
-      if (built !== null) then(built);
+      then(endpointOf(draft, keep));
       return;
     }
     setBusy(true);
@@ -134,8 +133,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
       }
       setHeld({ provider: id(), reference: outcome.reference });
       setDraft("key", "");
-      const built = endpointOf(draft, outcome.reference);
-      if (built !== null) then(built);
+      then(endpointOf(draft, outcome.reference));
     };
     void enrol({ origin: ui.origin, realm, name, value: typed, lang: ui.prefs.held().lang }).then(
       settle,
@@ -172,7 +170,7 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
         {say("setup_wire_api")}
         <Segmented
           label={say("setup_wire_api")}
-          options={wireChoices(say("setup_wire_api_unsupported"))}
+          options={wireChoices()}
           held={draft.wireApi}
           onPick={(api) => { setDraft("wireApi", api); }}
         />

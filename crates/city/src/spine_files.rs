@@ -70,7 +70,8 @@ const HANDOFF_TEMPLATE: &str = include_str!("../../../docs/templates/Handoff.md"
 /// owes left out. One template, so a building's SPEC and a crate's SPEC
 /// stay one shape rather than two competing ones.
 const SPEC_TEMPLATE: &str = include_str!("../../../docs/templates/SPEC.md");
-const NAME_PLACEHOLDER: &str = "<building name>";
+use crate::building::template::NAME_PLACEHOLDER;
+
 const PROJECT_PLACEHOLDER: &str = "<project name>";
 
 /// What a dispatch knows about the work when the job file is written.

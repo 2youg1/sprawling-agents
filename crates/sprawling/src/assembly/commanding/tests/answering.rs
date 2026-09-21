@@ -22,14 +22,19 @@ use kernel::Locator;
 #[test]
 fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
     let desk = CommandDesk::new();
-    let body = |addr: &str| channels::AcpBody {
-        token: "pair-me".to_owned(),
-        addr: addr.to_owned(),
-        task: "read the plan".to_owned(),
-        goal: "one answer".to_owned(),
+    // The body travels as the JSON it arrived as: `protocol::Incoming`
+    // is the only grammar for an inbound request, and nothing on this
+    // path reads a field out of it.
+    let body = |addr: &str| {
+        serde_json::json!({
+            "token": "pair-me",
+            "addr": addr,
+            "task": "read the plan",
+            "goal": "one answer",
+        })
     };
 
-    let err = acp_dispatch(&desk, body("lab/room1"), false).unwrap_err();
+    let err = acp_dispatch(&desk, &body("lab/room1"), channels::Pairing::Absent).unwrap_err();
     assert_eq!(err.code(), &AxCode::GateDenied);
     assert!(
         !err.subject().contains("lab"),
@@ -39,11 +44,11 @@ fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
     assert!(desk.take().is_none(), "and nothing was queued for it");
 
     // The city's own subtree is not a room, with or without a token.
-    let err = acp_dispatch(&desk, body(".sprawling/ledger"), true).unwrap_err();
+    let err = acp_dispatch(&desk, &body(".sprawling/ledger"), channels::Pairing::Held).unwrap_err();
     assert_eq!(err.code(), &AxCode::OutsideWriteDomain);
     assert!(desk.take().is_none());
 
-    let progress = acp_dispatch(&desk, body("lab/room1"), true).unwrap();
+    let progress = acp_dispatch(&desk, &body("lab/room1"), channels::Pairing::Held).unwrap();
     assert!(!progress.finished);
     assert_eq!(progress.turns, 0);
     let Some(channels::Command::Dispatch { addr, task, .. }) = desk.take() else {
@@ -88,7 +93,7 @@ fn a_refused_command_reaches_the_peer_that_sent_it() {
             endpoint: channels::ProviderName::parse("nowhere").unwrap(),
             model: "a-model".to_owned(),
             tag: kernel::ModelTag::Main,
-            context_tokens: 200_000,
+            context_tokens: kernel::Window::new(200_000),
             max_output_tokens: kernel::Ceiling::new(8_192),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
         },

@@ -5,10 +5,15 @@
 //! OAuth on the wire: PKCE, redeem, refresh.
 
 mod codec;
+mod device;
 mod flow;
 mod types;
 
 pub use codec::oauth_random;
+pub use device::{
+    DeviceAuthorization, DevicePoll, DeviceRefusal, FormPost, PollStep,
+    device_authorization_request,
+};
 pub(crate) use flow::degraded_payload;
 pub use flow::{oauth_begin, oauth_redeem, oauth_redeem_request, oauth_refresh};
 pub use types::{OauthPending, OauthTokens, TokenRequest};

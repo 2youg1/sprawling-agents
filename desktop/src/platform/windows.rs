@@ -231,49 +231,14 @@ impl Desk {
     }
 
     /// `desktop.record`: start or stop.
+    ///
+    /// Only a start resolves a window. A stop names the recording by
+    /// the id it was given, so it still ends a recording whose window
+    /// has since retitled itself out of every list this server reads.
     fn record(&mut self, arguments: &Value) -> Result<Value, Refusal> {
-        let window = resolved(arguments)?;
-        let state = text(arguments, "state").ok_or_else(|| {
-            Refusal::new(
-                RefusalCode::InvalidArgs,
-                "record a window",
-                "the call says neither start nor stop".to_owned(),
-                "send `state: start` or `state: stop`",
-            )
-        })?;
-        match state {
-            "start" => {
-                let audio = arguments
-                    .get("audio")
-                    .and_then(Value::as_bool)
-                    .unwrap_or(false);
-                let into = self.recordings.start(
-                    &window.named.title,
-                    window.handle,
-                    window.bounds,
-                    audio,
-                )?;
-                Ok(json!({
-                    "state": "started",
-                    "title": window.named.title,
-                    "into": into.display().to_string(),
-                }))
-            }
-            "stop" => {
-                let (into, how) = self.recordings.stop(&window.named.title)?;
-                Ok(json!({
-                    "state": "stopped",
-                    "title": window.named.title,
-                    "into": into.display().to_string(),
-                    "as": how,
-                }))
-            }
-            other => Err(Refusal::new(
-                RefusalCode::InvalidArgs,
-                "record a window",
-                format!("`{other}` is neither start nor stop"),
-                "send `state: start` or `state: stop`",
-            )),
+        match record::asked(arguments)? {
+            record::Wanted::Start => self.recordings.start(&resolved(arguments)?),
+            record::Wanted::Stop(id) => self.recordings.stop(id),
         }
     }
 }

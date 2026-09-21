@@ -137,14 +137,6 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
                 finished: true,
             })
         }),
-        upload_sink: Arc::new(|_| {
-            Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "stage an attachment",
-                "not in this test",
-            )
-            .with_recovery("stage the attachment through a city that carries a workbench"))
-        }),
         city: None,
     };
     // The peer is this machine, which is the one peer the route admits;

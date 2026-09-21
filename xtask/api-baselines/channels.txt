@@ -2,7 +2,6 @@ impl channels::Aggregate
 impl channels::CityLabel
 impl channels::ClientAssets
 impl channels::Intervention
-impl channels::ModeTag
 impl channels::Note
 impl channels::PairingToken
 impl channels::ProviderName
@@ -10,7 +9,6 @@ impl channels::Query
 impl channels::Reply
 impl channels::TemplateName
 impl channels::ToolkitSlug
-impl channels::UploadId
 impl core::convert::From<channels::Command<channels::NoSecret>> for channels::Command
 impl core::fmt::Debug for channels::Reply
 impl serde_core::ser::Serialize for channels::NoSecret
@@ -18,10 +16,6 @@ impl<'de> serde_core::de::Deserialize<'de> for channels::NoSecret
 impl<Secret> channels::Command<Secret>
 impl<Secret> channels::Command<Secret>
 pub async fn channels::serve(channels::ServeConfig) -> core::result::Result<(), kernel::error::shape::AxError>
-pub channels::AcpBody::addr: alloc::string::String
-pub channels::AcpBody::goal: alloc::string::String
-pub channels::AcpBody::task: alloc::string::String
-pub channels::AcpBody::token: alloc::string::String
 pub channels::AcpProgress::finished: bool
 pub channels::AcpProgress::run: alloc::string::String
 pub channels::AcpProgress::turns: u32
@@ -32,6 +26,7 @@ pub channels::Answer::Changes(channels::ChangesAnswer)
 pub channels::Answer::City(channels::CityAnswer)
 pub channels::Answer::Commit(channels::CommitAnswer)
 pub channels::Answer::Commits(channels::CommitsAnswer)
+pub channels::Answer::Config(alloc::boxed::Box<channels::ConfigAnswer>)
 pub channels::Answer::Content(alloc::boxed::Box<channels::ContentAnswer>)
 pub channels::Answer::Cost(alloc::boxed::Box<channels::CostAnswer>)
 pub channels::Answer::CostOf(channels::CostOfAnswer)
@@ -48,6 +43,7 @@ pub channels::Answer::Inbox(channels::InboxAnswer)
 pub channels::Answer::Listing(channels::ListingAnswer)
 pub channels::Answer::McpHealth(alloc::boxed::Box<channels::McpHealthAnswer>)
 pub channels::Answer::Metrics(alloc::boxed::Box<channels::MetricsAnswer>)
+pub channels::Answer::Preferences(alloc::boxed::Box<channels::PreferencesAnswer>)
 pub channels::Answer::Prefix(alloc::boxed::Box<channels::PrefixAnswer>)
 pub channels::Answer::Registry(channels::RegistryAnswer)
 pub channels::Answer::Release(alloc::boxed::Box<channels::ReleaseAnswer>)
@@ -57,6 +53,15 @@ pub channels::Answer::Skills(alloc::boxed::Box<channels::SkillsAnswer>)
 pub channels::Answer::Toolkits(alloc::boxed::Box<channels::ToolkitsAnswer>)
 pub channels::Answer::Unavailable
 pub channels::Answer::Unavailable::query: alloc::string::String
+pub channels::Appearance::body_px: core::option::Option<u32>
+pub channels::Appearance::chroma: channels::Chroma
+pub channels::Appearance::density: channels::Density
+pub channels::Appearance::lighting: channels::Lighting
+pub channels::Appearance::mono: channels::Face
+pub channels::Appearance::mono_stack: alloc::string::String
+pub channels::Appearance::motion: channels::Motion
+pub channels::Appearance::sans: channels::Face
+pub channels::Appearance::sans_stack: alloc::string::String
 pub channels::ApprovalsAnswer::items: alloc::vec::Vec<kernel::approval::ApprovalItem>
 pub channels::ArchiveAnswer::hits: alloc::vec::Vec<channels::ArchiveHit>
 pub channels::ArchiveAnswer::needle: alloc::string::String
@@ -109,10 +114,14 @@ pub channels::Call::tool: alloc::string::String
 pub channels::ChangesAnswer::base: kernel::locator::GitOid
 pub channels::ChangesAnswer::files: alloc::vec::Vec<kernel::change::FileChange>
 pub channels::ChangesAnswer::head: core::option::Option<kernel::locator::GitOid>
+pub channels::Chord::action: alloc::string::String
+pub channels::Chord::spelled: alloc::string::String
 pub channels::ChosenSummary::endpoint: alloc::string::String
 pub channels::ChosenSummary::max_output_tokens: core::option::Option<kernel::model::wire::Ceiling>
 pub channels::ChosenSummary::model: alloc::string::String
 pub channels::ChosenSummary::tag: kernel::model::wire::ModelTag
+pub channels::Chroma::Full
+pub channels::Chroma::Off
 pub channels::CityAnswer::active: u64
 pub channels::CityAnswer::buildings: alloc::vec::Vec<channels::BuildingProgress>
 pub channels::CityAnswer::frozen: u64
@@ -130,10 +139,6 @@ pub channels::Command::Approve
 pub channels::Command::Approve::idem: kernel::idem::IdemKey
 pub channels::Command::Approve::item: kernel::approval::ApprovalId
 pub channels::Command::Approve::verdict: kernel::approval::Ruling
-pub channels::Command::Attach
-pub channels::Command::Attach::idem: kernel::idem::IdemKey
-pub channels::Command::Attach::notify: alloc::vec::Vec<kernel::event::identity::RunId>
-pub channels::Command::Attach::upload: channels::UploadId
 pub channels::Command::AttachEndpoint
 pub channels::Command::AttachEndpoint::admit: alloc::vec::Vec<alloc::string::String>
 pub channels::Command::AttachEndpoint::auth_header: core::option::Option<alloc::string::String>
@@ -164,15 +169,12 @@ pub channels::Command::CreateBuilding
 pub channels::Command::CreateBuilding::addr: kernel::address::Address
 pub channels::Command::CreateBuilding::idem: kernel::idem::IdemKey
 pub channels::Command::CreateBuilding::template: channels::TemplateName
-pub channels::Command::CreatePolicy
-pub channels::Command::CreatePolicy::from_item: kernel::approval::ApprovalId
-pub channels::Command::CreatePolicy::idem: kernel::idem::IdemKey
 pub channels::Command::Dispatch
 pub channels::Command::Dispatch::addr: kernel::address::Address
 pub channels::Command::Dispatch::effort: core::option::Option<kernel::model::wire::Effort>
 pub channels::Command::Dispatch::goal: alloc::string::String
 pub channels::Command::Dispatch::idem: kernel::idem::IdemKey
-pub channels::Command::Dispatch::mode: channels::ModeTag
+pub channels::Command::Dispatch::mode: kernel::model::mode::Mode
 pub channels::Command::Dispatch::session: core::option::Option<kernel::address::SessionName>
 pub channels::Command::Dispatch::task: alloc::string::String
 pub channels::Command::DoctorInstall
@@ -188,6 +190,10 @@ pub channels::Command::Fork::run: kernel::event::identity::RunId
 pub channels::Command::Halt
 pub channels::Command::Halt::idem: kernel::idem::IdemKey
 pub channels::Command::Halt::scope: channels::HaltScope
+pub channels::Command::HandOff
+pub channels::Command::HandOff::idem: kernel::idem::IdemKey
+pub channels::Command::HandOff::item: kernel::approval::ApprovalId
+pub channels::Command::HandOff::to: kernel::registry::ResidentId
 pub channels::Command::Login
 pub channels::Command::Login::idem: kernel::idem::IdemKey
 pub channels::Command::Login::provider: channels::ProviderName
@@ -208,10 +214,18 @@ pub channels::Command::PutDocument
 pub channels::Command::PutDocument::body: alloc::string::String
 pub channels::Command::PutDocument::idem: kernel::idem::IdemKey
 pub channels::Command::PutDocument::which: channels::GovernedDocument
+pub channels::Command::PutPreferences
+pub channels::Command::PutPreferences::idem: kernel::idem::IdemKey
+pub channels::Command::PutPreferences::patch: channels::PreferencePatch
 pub channels::Command::PutSecret
 pub channels::Command::PutSecret::name: alloc::string::String
 pub channels::Command::PutSecret::realm: alloc::string::String
 pub channels::Command::PutSecret::value: Secret
+pub channels::Command::PutShelved
+pub channels::Command::PutShelved::idem: kernel::idem::IdemKey
+pub channels::Command::PutShelved::name: alloc::string::String
+pub channels::Command::PutShelved::shelf: channels::Shelf
+pub channels::Command::PutShelved::text: alloc::string::String
 pub channels::Command::Release
 pub channels::Command::Release::idem: kernel::idem::IdemKey
 pub channels::Command::Release::scope: channels::HaltScope
@@ -222,7 +236,7 @@ pub channels::Command::Rollback
 pub channels::Command::Rollback::checkpoint: kernel::locator::GitOid
 pub channels::Command::Rollback::idem: kernel::idem::IdemKey
 pub channels::Command::SelectModel
-pub channels::Command::SelectModel::context_tokens: u64
+pub channels::Command::SelectModel::context_tokens: core::option::Option<kernel::model::window::Window>
 pub channels::Command::SelectModel::endpoint: channels::ProviderName
 pub channels::Command::SelectModel::idem: kernel::idem::IdemKey
 pub channels::Command::SelectModel::max_output_tokens: core::option::Option<kernel::model::wire::Ceiling>
@@ -258,6 +272,12 @@ pub channels::CommitsAnswer::before: core::option::Option<kernel::event::identit
 pub channels::CommitsAnswer::building: core::option::Option<kernel::address::Address>
 pub channels::CommitsAnswer::commits: alloc::vec::Vec<channels::CommitAnswer>
 pub channels::CommitsAnswer::more: bool
+pub channels::ConfigAnswer::addr: kernel::address::Address
+pub channels::ConfigAnswer::effort: core::option::Option<channels::SettledEffort>
+pub channels::ConfigAnswer::tuning: channels::TuningDefaults
+pub channels::ConfigLayer::City
+pub channels::ConfigLayer::Resident
+pub channels::ConfigLayer::Room
 pub channels::ContentAnswer::binary: bool
 pub channels::ContentAnswer::bytes: u64
 pub channels::ContentAnswer::locator: kernel::locator::Locator
@@ -287,6 +307,8 @@ pub channels::Delivered::PeerGone
 pub channels::Delivered::ToThePeer
 pub channels::Delta::increment: kernel::model::wire::Increment
 pub channels::Delta::run: kernel::event::identity::RunId
+pub channels::Density::Comfortable
+pub channels::Density::Compact
 pub channels::DiscardAnswer::rows: alloc::vec::Vec<channels::DiscardLine>
 pub channels::DiscardLine::at: kernel::event::identity::TimeMs
 pub channels::DiscardLine::path: alloc::string::String
@@ -350,11 +372,12 @@ pub channels::Drift::behind: u64
 pub channels::EmbeddedFile::gz: &'static [u8]
 pub channels::EmbeddedFile::path: &'static str
 pub channels::EndpointSummary::base_url: alloc::string::String
+pub channels::EndpointSummary::connection_kind: alloc::string::String
 pub channels::EndpointSummary::dialect: kernel::model::wire::DialectKind
 pub channels::EndpointSummary::has_credential: bool
 pub channels::EndpointSummary::label: alloc::string::String
 pub channels::EndpointSummary::local: bool
-pub channels::EndpointSummary::models: alloc::vec::Vec<alloc::string::String>
+pub channels::EndpointSummary::models: alloc::vec::Vec<channels::ModelFactsSummary>
 pub channels::EndpointSummary::name: alloc::string::String
 pub channels::EndpointTuning::headers: alloc::vec::Vec<channels::HeaderPair>
 pub channels::EndpointTuning::label: core::option::Option<alloc::string::String>
@@ -378,6 +401,9 @@ pub channels::EvidenceItem::locator: kernel::locator::Locator
 pub channels::EvidenceItem::picture: core::option::Option<channels::Picture>
 pub channels::EvidenceKind::Finished
 pub channels::EvidenceKind::Screenshot
+pub channels::Face::Custom
+pub channels::Face::Geist
+pub channels::Face::System
 pub channels::Forwarded::address: alloc::string::String
 pub channels::Forwarded::query: channels::Query
 pub channels::GitStatusAnswer::branch: core::option::Option<alloc::string::String>
@@ -415,6 +441,11 @@ pub channels::Intervention::Release
 pub channels::Intervention::Rollback
 pub channels::Intervention::Steer
 pub channels::Intervention::Takeover
+pub channels::Lang::En
+pub channels::Lang::Zh
+pub channels::Lighting::Dark
+pub channels::Lighting::Light
+pub channels::Lighting::System
 pub channels::ListingAnswer::at: core::option::Option<kernel::address::Address>
 pub channels::ListingAnswer::entries: alloc::vec::Vec<channels::Entry>
 pub channels::LogLevel::Decide
@@ -456,6 +487,15 @@ pub channels::MetricsAnswer::events: u64
 pub channels::MetricsAnswer::runs_active: u64
 pub channels::MetricsAnswer::runs_frozen: u64
 pub channels::MetricsAnswer::signals_waiting: u64
+pub channels::ModelFactsSummary::context_tokens: core::option::Option<kernel::model::window::Window>
+pub channels::ModelFactsSummary::id: alloc::string::String
+pub channels::ModelFactsSummary::input_modalities: alloc::vec::Vec<alloc::string::String>
+pub channels::ModelFactsSummary::input_price: core::option::Option<alloc::string::String>
+pub channels::ModelFactsSummary::max_output_tokens: core::option::Option<kernel::model::wire::Ceiling>
+pub channels::ModelFactsSummary::output_price: core::option::Option<alloc::string::String>
+pub channels::Motion::Off
+pub channels::Motion::On
+pub channels::Motion::System
 pub channels::Note::Arrived
 pub channels::Note::Arrived::at: kernel::event::identity::Seq
 pub channels::Note::Arrived::from: alloc::string::String
@@ -479,6 +519,8 @@ pub channels::Outcome::Failed
 pub channels::Outcome::Waiting
 pub channels::Output::cut: usize
 pub channels::Output::head: alloc::string::String
+pub channels::Pairing::Absent
+pub channels::Pairing::Held
 pub channels::PatchLine::number: u32
 pub channels::PatchLine::text: alloc::string::String
 pub channels::Picture::height: u32
@@ -492,6 +534,18 @@ pub channels::PlanRow::node: kernel::node_id::NodeId
 pub channels::PlanRow::ready: bool
 pub channels::PlanRow::share_ppb: u64
 pub channels::PlanRow::status: kernel::spine::row::RoadmapStatus
+pub channels::PreferencePatch::Appearance(channels::Appearance)
+pub channels::PreferencePatch::Chord(channels::Chord)
+pub channels::PreferencePatch::Lang(channels::Lang)
+pub channels::PreferencePatch::Panel(bool)
+pub channels::PreferencePatch::Proxying(kernel::reach::Proxying)
+pub channels::PreferencePatch::Welcomed(bool)
+pub channels::PreferencesAnswer::appearance: channels::Appearance
+pub channels::PreferencesAnswer::chords: alloc::vec::Vec<channels::Chord>
+pub channels::PreferencesAnswer::lang: channels::Lang
+pub channels::PreferencesAnswer::panel: bool
+pub channels::PreferencesAnswer::proxying: kernel::reach::Proxying
+pub channels::PreferencesAnswer::welcomed: bool
 pub channels::PrefixAnswer::run: kernel::event::identity::RunId
 pub channels::PrefixAnswer::segments: alloc::vec::Vec<channels::PrefixSegment>
 pub channels::PrefixSegment::bytes: u64
@@ -531,6 +585,8 @@ pub channels::Query::Commits
 pub channels::Query::Commits::before: core::option::Option<kernel::event::identity::Seq>
 pub channels::Query::Commits::building: core::option::Option<kernel::address::Address>
 pub channels::Query::Commits::limit: u32
+pub channels::Query::Config
+pub channels::Query::Config::addr: kernel::address::Address
 pub channels::Query::Content
 pub channels::Query::Content::locator: kernel::locator::Locator
 pub channels::Query::CostOf
@@ -560,6 +616,7 @@ pub channels::Query::Listing::at: core::option::Option<kernel::address::Address>
 pub channels::Query::McpHealth
 pub channels::Query::McpHealth::addr: kernel::address::Address
 pub channels::Query::Metrics
+pub channels::Query::Preferences
 pub channels::Query::Prefix
 pub channels::Query::Prefix::run: kernel::event::identity::RunId
 pub channels::Query::RegistryView
@@ -614,7 +671,6 @@ pub channels::ServeConfig::queries: alloc::sync::Arc<(dyn core::ops::function::F
 pub channels::ServeConfig::secrets: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Command<kernel::secret::sealed::Sealed<alloc::string::String>>, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::token_digest: core::option::Option<kernel::locator::B3Hash>
 pub channels::ServeConfig::transcribe_sink: channels::TranscribeSink
-pub channels::ServeConfig::upload_sink: alloc::sync::Arc<(dyn core::ops::function::Fn(alloc::vec::Vec<u8>) -> core::result::Result<channels::UploadId, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServerFrame::Answer(alloc::boxed::Box<channels::Answer>)
 pub channels::ServerFrame::Delta(channels::Delta)
 pub channels::ServerFrame::Event(alloc::boxed::Box<kernel::event::payload::EventRecord>)
@@ -629,6 +685,10 @@ pub channels::SessionStep::Refuse
 pub channels::SessionStep::Refuse::close: bool
 pub channels::SessionStep::Refuse::error: alloc::boxed::Box<kernel::error::shape::AxError>
 pub channels::SessionStep::Welcome(alloc::boxed::Box<channels::Welcome>)
+pub channels::SettledEffort::effort: kernel::model::wire::Effort
+pub channels::SettledEffort::from: channels::ConfigLayer
+pub channels::Shelf::Building(kernel::address::Address)
+pub channels::Shelf::Library
 pub channels::Sighting::city: channels::CityLabel
 pub channels::Sighting::event: kernel::event::payload::EventRecord
 pub channels::SignalLine::at: kernel::event::identity::TimeMs
@@ -664,6 +724,10 @@ pub channels::ToolkitsAnswer::Refused::refusal: alloc::boxed::Box<kernel::error:
 pub channels::ToolkitsAnswer::Shelf
 pub channels::ToolkitsAnswer::Shelf::toolkits: alloc::vec::Vec<channels::ToolkitLine>
 pub channels::ToolkitsAnswer::Unenrolled
+pub channels::TuningDefaults::proxying: kernel::reach::Proxying
+pub channels::TuningDefaults::request_max_retries: u32
+pub channels::TuningDefaults::stream_idle_timeout_ms: u64
+pub channels::TuningDefaults::timeout_ms: u64
 pub channels::Turn::calls: alloc::vec::Vec<channels::Call>
 pub channels::Turn::notes: alloc::vec::Vec<channels::Note>
 pub channels::Turn::number: u32
@@ -686,20 +750,25 @@ pub channels::Welcome::schema: kernel::locator::B3Hash
 pub channels::Welcome::wire_v: u32
 pub channels::Withheld::number: u32
 pub channels::Withheld::reason: alloc::string::String
-pub const channels::COMMAND_NAMES: [&str; 28]
+pub const channels::BODY_PX_MAX: u32
+pub const channels::BODY_PX_MIN: u32
+pub const channels::COMMAND_NAMES: [&str; 29]
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
-pub const channels::QUERY_NAMES: [&str; 31]
+pub const channels::QUERY_NAMES: [&str; 33]
 pub const channels::WIRE_V: u32
 pub enum channels::Answer
 pub enum channels::AssetReply
 pub enum channels::BindFace
 pub enum channels::BindVerdict
+pub enum channels::Chroma
 pub enum channels::ClientAssets
 pub enum channels::ClientFrame
 pub enum channels::Command<Secret>
+pub enum channels::ConfigLayer
 pub enum channels::ControlVerdict
 pub enum channels::Delivered
+pub enum channels::Density
 pub enum channels::DoctorAbsence
 pub enum channels::DoctorFault
 pub enum channels::DoctorInstall
@@ -709,16 +778,22 @@ pub enum channels::DoctorTier
 pub enum channels::DoctorVersion
 pub enum channels::EntryKind
 pub enum channels::EvidenceKind
+pub enum channels::Face
 pub enum channels::GovernedDocument
 pub enum channels::HaltScope
 pub enum channels::HandshakeVerdict
 pub enum channels::Intervention
+pub enum channels::Lang
+pub enum channels::Lighting
 pub enum channels::LogLevel
 pub enum channels::LoginStep
 pub enum channels::McpState
+pub enum channels::Motion
 pub enum channels::NoSecret
 pub enum channels::Note
 pub enum channels::Outcome
+pub enum channels::Pairing
+pub enum channels::PreferencePatch
 pub enum channels::PrefixSlot
 pub enum channels::PursuitStep
 pub enum channels::Query
@@ -726,6 +801,7 @@ pub enum channels::ReleaseAnswer
 pub enum channels::ServerFrame
 pub enum channels::SessionState
 pub enum channels::SessionStep
+pub enum channels::Shelf
 pub enum channels::SkillShelf
 pub enum channels::Standing
 pub enum channels::ToolkitsAnswer
@@ -742,8 +818,6 @@ pub fn channels::Command::from(channels::WireCommand) -> Self
 pub fn channels::Command<Secret>::idem(&self) -> core::option::Option<&kernel::idem::IdemKey>
 pub fn channels::Command<Secret>::name(&self) -> &'static str
 pub fn channels::Intervention::as_str(self) -> &'static str
-pub fn channels::ModeTag::as_str(&self) -> &str
-pub fn channels::ModeTag::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::NoSecret::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn channels::NoSecret::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
 pub fn channels::Note::at(&self) -> kernel::event::identity::Seq
@@ -761,8 +835,6 @@ pub fn channels::TemplateName::as_str(&self) -> &str
 pub fn channels::TemplateName::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::ToolkitSlug::as_str(&self) -> &str
 pub fn channels::ToolkitSlug::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
-pub fn channels::UploadId::as_str(&self) -> &str
-pub fn channels::UploadId::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::arguments_in(&serde_json::value::Value) -> core::option::Option<channels::Output>
 pub fn channels::classify(&channels::Command) -> channels::ControlVerdict
 pub fn channels::decide_bind(&core::net::socket_addr::SocketAddr, bool) -> channels::BindVerdict
@@ -779,9 +851,9 @@ pub fn channels::thought_in(&serde_json::value::Value) -> core::option::Option<a
 pub fn channels::used_in(&serde_json::value::Value) -> core::option::Option<channels::Used>
 pub fn channels::verify(core::option::Option<&str>, &kernel::locator::B3Hash) -> bool
 pub mod channels
-pub struct channels::AcpBody
 pub struct channels::AcpProgress
 pub struct channels::Aggregate
+pub struct channels::Appearance
 pub struct channels::ApprovalsAnswer
 pub struct channels::ArchiveAnswer
 pub struct channels::ArchiveHit
@@ -793,12 +865,14 @@ pub struct channels::BuildingDoc
 pub struct channels::BuildingProgress
 pub struct channels::Call
 pub struct channels::ChangesAnswer
+pub struct channels::Chord
 pub struct channels::ChosenSummary
 pub struct channels::CityAnswer
 pub struct channels::CityLabel(_)
 pub struct channels::Closing
 pub struct channels::CommitAnswer
 pub struct channels::CommitsAnswer
+pub struct channels::ConfigAnswer
 pub struct channels::ContentAnswer
 pub struct channels::CostAnswer
 pub struct channels::CostOfAnswer
@@ -832,13 +906,14 @@ pub struct channels::McpHealthAnswer
 pub struct channels::McpServerHealth
 pub struct channels::McpToolLine
 pub struct channels::MetricsAnswer
-pub struct channels::ModeTag(_)
+pub struct channels::ModelFactsSummary
 pub struct channels::Opening
 pub struct channels::Output
 pub struct channels::PairingToken(_)
 pub struct channels::PatchLine
 pub struct channels::Picture
 pub struct channels::PlanRow
+pub struct channels::PreferencesAnswer
 pub struct channels::PrefixAnswer
 pub struct channels::PrefixSegment
 pub struct channels::PrefixSource
@@ -851,6 +926,7 @@ pub struct channels::Reply(_)
 pub struct channels::RoundsAnswer
 pub struct channels::RunSummary
 pub struct channels::ServeConfig
+pub struct channels::SettledEffort
 pub struct channels::Sighting
 pub struct channels::SignalLine
 pub struct channels::SkillLine
@@ -858,13 +934,13 @@ pub struct channels::SkillsAnswer
 pub struct channels::TemplateName(_)
 pub struct channels::ToolkitLine
 pub struct channels::ToolkitSlug(_)
+pub struct channels::TuningDefaults
 pub struct channels::Turn
-pub struct channels::UploadId(_)
 pub struct channels::Upstream
 pub struct channels::Used
 pub struct channels::Welcome
 pub struct channels::Withheld
-pub type channels::AcpSink = alloc::sync::Arc<(dyn core::ops::function::Fn(channels::AcpBody, bool) -> core::result::Result<channels::AcpProgress, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
+pub type channels::AcpSink = alloc::sync::Arc<(dyn core::ops::function::Fn(&serde_json::value::Value, channels::Pairing) -> core::result::Result<channels::AcpProgress, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type channels::TranscribeSink = alloc::sync::Arc<(dyn core::ops::function::Fn(alloc::vec::Vec<u8>, alloc::string::String) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type channels::WireCommand = channels::Command<channels::NoSecret>
 pub use channels::Address
@@ -890,6 +966,7 @@ pub use channels::Lines
 pub use channels::Locator
 pub use channels::McpServer
 pub use channels::McpTransport
+pub use channels::Mode
 pub use channels::ModelTag
 pub use channels::NodeId
 pub use channels::Payload
@@ -912,5 +989,6 @@ pub use channels::Tokens
 pub use channels::UnplannedProgress
 pub use channels::UsdMicros
 pub use channels::WHOLE_PPB
+pub use channels::Window
 pub use channels::WriteDomain
 pub use channels::markdown

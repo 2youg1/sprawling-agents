@@ -24,13 +24,14 @@ impl JsonlLedger {
         now: TimeMs,
         dropped: u64,
     ) -> Result<(), MemoryError> {
-        let mut map = serde_json::Map::new();
-        map.insert("dropped_bytes".to_owned(), serde_json::Value::from(dropped));
-        let data = Payload::new(map).map_err(|source| MemoryError::Draft { source })?;
+        let data = Payload::of(&kernel::event::record::LogTruncated {
+            dropped_bytes: dropped,
+        })
+        .map_err(|source| MemoryError::Draft { source })?;
         let draft = EventDraft {
             run: RunId::CITY,
             t: now,
-            who: "system".to_owned(),
+            who: kernel::event::Who::City.to_string(),
             addr: None,
             kind: EventKind::LogTruncated,
             data,
@@ -293,6 +294,40 @@ mod tests {
             .append_all(vec![draft(EventKind::RunFrozen, 9)])
             .unwrap();
         verify_chain(&reopened.read_raw_lines().unwrap());
+    }
+
+    /// What one production append costs the disk, counted rather than
+    /// timed: `kernel::Ledger::append` is a batch of one, so every
+    /// record pays a whole durability barrier. The op count is the
+    /// budget reading; the wall clock belongs to the machine.
+    #[test]
+    fn one_append_costs_a_fixed_number_of_disk_operations() {
+        let dir = tempfile::tempdir().unwrap();
+        let fs = crate::fault_fs::FaultFs::new(crate::fault_fs::FaultPlan {
+            cut_at_op: None,
+            cut_on_write: None,
+            torn_tail: crate::fault_fs::TornTail::None,
+        });
+        let (mut ledger, _) =
+            JsonlLedger::open_faulty(fs.clone(), dir.path(), TimeMs::new(0)).unwrap();
+        let opened = fs.op_count();
+        kernel::Ledger::append(&mut ledger, draft(EventKind::GateChecked, 1)).unwrap();
+        let first = fs.op_count().saturating_sub(opened);
+        kernel::Ledger::append(&mut ledger, draft(EventKind::GateChecked, 2)).unwrap();
+        let second = fs.op_count().saturating_sub(opened).saturating_sub(first);
+        let bytes: u64 = ledger
+            .read_raw_lines()
+            .unwrap()
+            .iter()
+            .map(|line| u64::try_from(line.len().saturating_add(1)).unwrap())
+            .sum();
+        eprintln!(
+            "ledger_append_ops: {first} disk ops for the first record, {second} for              every one after it, {bytes} B on disk for two records"
+        );
+        assert!(
+            first > second,
+            "the first record also creates the segment and syncs its directory entry"
+        );
     }
 
     fn only_segment(dir: &Path) -> std::path::PathBuf {

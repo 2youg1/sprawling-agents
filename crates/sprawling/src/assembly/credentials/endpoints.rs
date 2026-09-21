@@ -10,7 +10,7 @@ use kernel::{AxCode, AxError, EventKind};
 
 use super::super::RunWorker;
 use super::probing::{Probing, probed_payload, reach_of};
-use super::{Credential, Entered, PROBE_TIMEOUT_MS, dialect_headers};
+use super::{Credential, Entered, PROBE_TIMEOUT_MS, dialect_headers, hint_of};
 
 mod choosing;
 
@@ -70,10 +70,16 @@ impl RunWorker {
                 gateway::AuthSpec::Bearer(kernel::SecretRef::parse(&reference)?)
             }
         };
+        // Resolved here and nowhere later: what a person set up is
+        // settled at the moment they set it up, and a reader that
+        // worked it out again from the writer would be answering a
+        // narrower question than the one it was asked.
+        let connection_kind = gateway::resolve_connection(hint_of(dialect), None)?;
         Ok(gateway::AttachedEndpoint {
             name,
             base_url,
             dialect,
+            connection_kind,
             auth,
             models: Vec::new(),
             probed: false,
@@ -113,8 +119,7 @@ impl RunWorker {
                 endpoint.probed = true;
                 endpoint.models = served
                     .into_iter()
-                    .map(|row| row.id)
-                    .filter(|id| admit.is_empty() || admit.iter().any(|wanted| wanted == id))
+                    .filter(|row| admit.is_empty() || admit.contains(&row.id))
                     .collect();
                 None
             }
@@ -122,7 +127,20 @@ impl RunWorker {
                 return Err(err.rewrite_recovery("name the model ids to admit, then attach again"));
             }
             Err(err) => {
-                endpoint.models = admit.to_vec();
+                // The probe never answered, so the only fact this city
+                // has about these rows is that a person named them.
+                // Everything else stays unstated rather than invented.
+                endpoint.models = admit
+                    .iter()
+                    .map(|id| gateway::ModelFacts {
+                        id: id.clone(),
+                        context_tokens: None,
+                        max_output_tokens: None,
+                        input_modalities: Vec::new(),
+                        input_price: None,
+                        output_price: None,
+                    })
+                    .collect();
                 Some(err.subject().to_owned())
             }
         };
@@ -285,7 +303,7 @@ mod tests {
                 endpoint: channels::ProviderName::parse("house").unwrap(),
                 model: "m-1".to_owned(),
                 tag: kernel::ModelTag::Main,
-                context_tokens: 0,
+                context_tokens: None,
                 max_output_tokens: None,
                 idem: kernel::IdemKey::derive(
                     &kernel::RunId::CITY,

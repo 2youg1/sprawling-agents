@@ -19,8 +19,11 @@ use kernel::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::preference::PreferencesAnswer;
+
 mod building;
 mod commits;
+mod config;
 mod cost_of;
 mod doctor;
 mod document;
@@ -29,6 +32,7 @@ mod git_status;
 mod hunks;
 mod listing;
 mod mcp_health;
+mod model_facts;
 mod prefix;
 mod release;
 mod rounds;
@@ -38,6 +42,7 @@ mod toolkits;
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
 pub use commits::{CommitAnswer, CommitsAnswer};
+pub use config::{ConfigAnswer, ConfigLayer, SettledEffort, TuningDefaults};
 pub use cost_of::CostOfAnswer;
 pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
 pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
@@ -47,18 +52,17 @@ pub use git_status::{Drift, GitStatusAnswer};
 pub use hunks::{HunksAnswer, PatchLine, Withheld};
 pub use listing::{Entry, EntryKind, ListingAnswer};
 pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
+pub use model_facts::ModelFactsSummary;
 pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
 pub use release::{ReleaseAnswer, ReleaseLine};
 pub use rounds::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Turn, Used};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
 
-/// A slice of the one history, oldest first.
-///
-/// Oldest first because that is the order the ledger wrote them and the
-/// order a fold expects; a reader that wants the newest first reverses a
-/// list it already has, and a server that reversed it would make the
-/// fold the caller's problem.
+/// A slice of the one history, oldest first - the order the ledger
+/// wrote them and the order a fold expects. A reader that wants the
+/// newest first reverses a list it already has, and a server that
+/// reversed it would make the fold the caller's problem.
 // No `Eq`: an `EventRecord` carries a payload whose numbers may be
 // floats, and the wire's other answers derive it only because none of
 // them holds one.
@@ -132,7 +136,19 @@ pub struct EndpointSummary {
     pub label: String,
     pub base_url: String,
     pub dialect: DialectKind,
-    pub models: Vec<String>,
+    /// How this endpoint is connected, as one flat word:
+    /// `openai_compat`, `responses`, `anthropic_native`, or the name of
+    /// the first-party harness whose subscription pays for it.
+    ///
+    /// Resolved once when the endpoint was attached and read back
+    /// here. `dialect` beside it answers a narrower question - which
+    /// request writer runs - and two connections can share a writer
+    /// while being different registrations, so a page given only the
+    /// writer cannot say which one a person set up. The word's one
+    /// authority is `gateway::provider::registry::ConnectionKind`.
+    pub connection_kind: String,
+    /// The models this endpoint serves, with what it said about each.
+    pub models: Vec<ModelFactsSummary>,
     /// Whether calls to it stay on this machine, which is the only thing
     /// a confidential building may use.
     pub local: bool,
@@ -237,6 +253,8 @@ pub enum Answer {
     McpHealth(Box<McpHealthAnswer>),
     Toolkits(Box<ToolkitsAnswer>),
     Release(Box<ReleaseAnswer>),
+    Preferences(Box<PreferencesAnswer>),
+    Config(Box<ConfigAnswer>),
     Unavailable { query: String },
 }
 

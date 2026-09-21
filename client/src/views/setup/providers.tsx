@@ -130,7 +130,9 @@ export function EndpointList(props: { readonly answer: EndpointsAnswer }) {
                 <span class="text-text-faint">{endpoint.has_credential ? say("setup_keyed") : say("setup_unkeyed")}</span>
               </div>
               <div class="mt-tight flex flex-wrap gap-tight text-text-quiet">
-                <For each={endpoint.models}>{(model) => <span class="rounded-pill bg-g2 px-snug">{model}</span>}</For>
+                <For each={endpoint.models}>
+                  {(row) => <span class="rounded-pill bg-g2 px-snug">{row.id}</span>}
+                </For>
               </div>
             </li>
           )}

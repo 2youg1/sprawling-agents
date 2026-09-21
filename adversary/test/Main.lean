@@ -24,16 +24,38 @@ toolchain would end up blocking Rust contributors.
 
 open Sprawling
 
-/-- The seed every property starts from.
+/-- The seed every property starts from when nobody states one.
 
 Fixed rather than drawn from the clock. A counterexample is only worth rendering
 into a Rust test if the run that found it can be repeated, and a checker that
 answers differently on two runs of the same tree cannot tell a fix from a lucky
-draw. `SPRAWLING_SEED` moves it for a deliberate second opinion. -/
-def baseSeed : IO Nat := do
+draw. `adversary-SPEC.md` section 20 records the figure; the nightly job states
+`SPRAWLING_SEED` instead, so exploring new traces and reproducing a local red
+are each served without arguing with the other. -/
+def defaultSeed : Nat := 20260912
+
+/-- What `SPRAWLING_SEED` says, in the three states it can be in.
+
+A seed that does not parse used to read as [`defaultSeed`], so a run asked for
+one seed, drew another, and printed the one it was asked for: the reproduction
+instruction in the report named a trace the run had never taken. The three
+states are told apart here, and the unreadable one ends the process before a
+city is raised. -/
+inductive Seed where
+  | stated (value : Nat)
+  | unstated
+  | unreadable (given : String)
+
+/-- Reads the environment into one of those three states and decides nothing
+else. Surrounding whitespace is trimmed, because a value pasted out of a report
+carries it and a trailing newline is not a misspelling. -/
+def readSeed : IO Seed := do
   match ← IO.getEnv "SPRAWLING_SEED" with
-  | some given => return given.toNat?.getD 20260912
-  | none => return 20260912
+  | none => return .unstated
+  | some given =>
+    match given.trimAscii.toString.toNat? with
+    | some value => return .stated value
+    | none => return .unreadable given
 
 /-- Runs an action against a city that is raised for it and thrown away after. -/
 private def driving (door : Door) (act : Attempt α) : IO α :=
@@ -149,13 +171,13 @@ The length bound is the load-bearing one. An action costs 0.3 s measured, and an
 unbounded schedule would grow these traces past seventy actions, which buys
 twenty-two seconds of the same three verbs repeated. What finds a defect here is
 which verbs meet, not how many times. -/
-private def traces (door : Door) : IO Unit := do
-  report <| ← forAll 4 (← baseSeed) (arbitraryTrace 12) traceShown shrinkList fun trace =>
+private def traces (door : Door) (seed : Nat) : IO Unit := do
+  report <| ← forAll 4 seed (arbitraryTrace 12) traceShown shrinkList fun trace =>
     driving door (runTrace initialState trace)
 
 /-- Any prefix, one halt, any suffix, and work that must still be refused. -/
-private def halting (door : Door) : IO Unit := do
-  report <| ← forAll 3 (← baseSeed) (haltIsHonoured 6) traceShown shrinkList fun trace =>
+private def halting (door : Door) (seed : Nat) : IO Unit := do
+  report <| ← forAll 3 seed (haltIsHonoured 6) traceShown shrinkList fun trace =>
     driving door (runTrace initialState trace)
 
 /-- After any trace, the history the city wrote is one unbroken chain.
@@ -164,8 +186,8 @@ Neither half recomputes anything: the door's own offline verifier is asked
 whether the chain holds. A city that forked its own history, or skipped a
 number, would have a history nobody can replay — and replay is what
 `sprawling resume` is built on. -/
-private def chained (door : Door) : IO Unit := do
-  report <| ← forAll 3 (← baseSeed) (arbitraryTrace 12) traceShown shrinkList fun trace =>
+private def chained (door : Door) (seed : Nat) : IO Unit := do
+  report <| ← forAll 3 seed (arbitraryTrace 12) traceShown shrinkList fun trace =>
     driving door do
       match ← runTrace initialState trace with
       | .broke why => return .broke why
@@ -394,13 +416,29 @@ worth asserting is that no sequence of writes can drive them apart: the answer
 states the last figure written, the file states that figure and no earlier one,
 and the layer above states none of them.
 
-**This is the invariant a person's own preferences will need, asserted where
-the product already carries it.** `Sprawling.Layer` records why the world is
-written against a building's configuration rather than against a preferences
-frame: that frame does not exist yet, and the property is about the file. -/
-private def savedReadsBack (door : Door) : IO Unit := do
-  report <| ← forAll 3 (← baseSeed) (writeSequence 4) toString shrinkSequence fun written =>
+**The same invariant one rung further out is `preferencesReadBack` below.**
+This one is about a building's configuration, which the city owns; that one is
+about the person's own layer, which lives outside every city. They are separate
+checks because they are separate files with separate writers, and a single
+check covering both would report one of them and be believed about the other.
+-/
+private def savedReadsBack (door : Door) (seed : Nat) : IO Unit := do
+  report <| ← forAll 3 seed (writeSequence 4) toString shrinkSequence fun written =>
     writtenReadsBack door written
+
+/-- After any sequence of `PutPreferences`, the person's `config.toml` on disk
+and the answer `Query::Preferences` gives state the same configuration.
+
+The property `Sprawling.Person` documents, driven over the same generator the
+building-configuration world uses: one sequence of writes, four readings, and
+no parse of the file's grammar on this side of the wire.
+
+The home directory the served city writes this file into is the ground's own,
+not the one this suite runs under, so a run of this check leaves the
+preferences of whoever started it untouched. -/
+private def preferencesSurviveAnyOrder (door : Door) (seed : Nat) : IO Unit := do
+  report <| ← forAll 3 seed (writeSequence 4) toString shrinkSequence fun written =>
+    preferencesReadBack door written
 
 /-! ## The disk lies -/
 
@@ -483,7 +521,7 @@ private def keyUsedTwice (door : Door) : IO Unit :=
 
 /-! ## The tree -/
 
-private def properties (door : Door) : Tree :=
+private def properties (door : Door) (seed : Nat) : Tree :=
   .group "adversary"
     [ .leaf "the committed Rust test is what this adversary renders" deliverable
     , .group "the door"
@@ -503,10 +541,12 @@ private def properties (door : Door) : Tree :=
         , .leaf "work on a messages endpoint is never refused for want of a ceiling"
             (messagesWorkIsNeverRefusedForACeiling door)
         , .leaf "two dispatches at once are two runs" (twoDispatchesAreTwoRuns door) ]
-    , .leaf "what was written into a configuration reads back" (savedReadsBack door)
-    , .leaf "a city admits exactly what its rules admit" (traces door)
-    , .leaf "a halted city takes no work until it is released" (halting door)
-    , .leaf "history reads back as one unbroken chain" (chained door)
+    , .leaf "what was written into a configuration reads back" (savedReadsBack door seed)
+    , .leaf "what a person settled reads back from their own file"
+        (preferencesSurviveAnyOrder door seed)
+    , .leaf "a city admits exactly what its rules admit" (traces door seed)
+    , .leaf "a halted city takes no work until it is released" (halting door seed)
+    , .leaf "history reads back as one unbroken chain" (chained door seed)
     , .group "the disk lies"
         [ .leaf "a corrupted record is refused, not believed" (tampering door)
         , .leaf "a torn tail is recovered, not refused" (torn door)
@@ -530,12 +570,31 @@ where
     | found :: value :: rest => if found == flag then some value else valueAfter flag (value :: rest)
     | _ => none
 
-def main (args : List String) : IO UInt32 := do
+/-- Runs the tree against whatever this checkout can drive.
+
+The seed is printed before anything is drawn, so the line a person copies into
+`SPRAWLING_SEED` is the seed this run actually used. -/
+private def driveWith (args : List String) (seed : Nat) : IO UInt32 := do
   match ← discover with
   | none =>
     IO.println "skipped: no sprawling binary to drive. Run `just adversary`, or set SPRAWLING_BIN."
     return 0
   | some door =>
-    let tally ← (properties door).run (selectionOf args) ""
+    IO.println s!"seed {seed}"
+    let tally ← (properties door seed).run (selectionOf args) ""
     IO.println s!"{tally.passed} passed, {tally.failed} failed, {tally.skipped} skipped"
     return (if tally.failed == 0 then 0 else 1)
+
+/-- Three exit codes, each meaning one thing: `0` every check that ran held,
+`1` a check broke, and `2` this run was asked for something it could not read.
+The third is separate because a misspelled seed is not evidence about the
+product, and a job that read it as a red would send somebody looking for a
+defect that is not there. -/
+def main (args : List String) : IO UInt32 := do
+  match ← readSeed with
+  | .stated value => driveWith args value
+  | .unstated => driveWith args defaultSeed
+  | .unreadable given =>
+    IO.eprintln s!"SPRAWLING_SEED is {given}, which is not a number, so nothing was run. \
+      Give it the digits a report printed after `seed`, or unset it to use {defaultSeed}."
+    return 2

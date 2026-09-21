@@ -10,15 +10,20 @@ Two kinds of outside thing appear here, and the boundary differs, so they get a 
 
 ## 1 Where the intelligence comes from
 
-Signing in to a provider requires knowing four things: the authorization endpoint, the token endpoint, the client id, and the scopes. Those are **facts** rather than works, and citing them creates no licence obligation. The source still has to be written down, or "check periodically whether upstream changed" is a discipline with no address to go to.
+Signing in to a provider requires knowing four things: the authorization endpoint, the token endpoint, the client id, and the scopes. Calling a face this city did not invent requires one more: the shape of the request and of the answer. Those are **facts** rather than works, and citing them creates no licence obligation. The source still has to be written down, or "check periodically whether upstream changed" is a discipline with no address to go to.
 
 | Project | Licence | What is followed | Where to look | Tracked to |
 |---|---|---|---|---|
 | [openai/codex](https://github.com/openai/codex) | Apache-2.0 | OpenAI's subscription login: authorization endpoint, token endpoint, client id, scopes, device-code flow | `codex-rs/login/` | `1b83e5cdf998` |
 | [openai/codex](https://github.com/openai/codex) | Apache-2.0 | where OpenAI states the contract for driving codex non-interactively, which is the shape the `Codex` family answers in | `docs/exec.md` | `ab753387ccf5` |
+| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | which base URL a ChatGPT subscription is served under, as against the key-billed platform | `codex-rs/model-provider-info/` | `888be42a20c5` |
 | [anthropics/claude-agent-sdk-typescript](https://github.com/anthropics/claude-agent-sdk-typescript) | proprietary, under Anthropic's Commercial Terms of Service | the protocol types the Claude agent wire is spelled in, and which release changed one | `CHANGELOG.md` | `18661edde449` |
-| [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's subscription login: the OIDC endpoints, client id, scopes, and how a refresh is spelled | `crates/codegen/xai-grok-login/src/oidc/` | `482711333c71` |
+| [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's browser login: that the endpoints come from OIDC discovery at `{issuer}/.well-known/openid-configuration`, and how a refresh is spelled | `crates/codegen/xai-grok-login/src/oidc/` | `482711333c71` |
+| [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's issuer `https://auth.x.ai`, the public client id, and the ten scopes a subscription asks for | `crates/codegen/xai-grok-login/src/config.rs` | `75810042ca27` |
+| [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's device-code login: the two endpoint paths under the issuer, and the grant type | `crates/codegen/xai-grok-login/src/device_code.rs` | `482711333c71` |
 | [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) | Apache-2.0 | Moonshot's subscription login: the platform table, the OAuth endpoints, and the refresh | `src/kimi_cli/auth/` | `b5f48ef2aaf1` |
+| [openai/openai-openapi](https://github.com/openai/openai-openapi) | MIT | the request and answer of the embeddings face, which every compatible server copied | `openapi.yaml` | `ddface9bd361` |
+| [huggingface/text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) | Apache-2.0 | the request and answer of the rerank face, which has no OpenAI shape to copy | `docs/openapi.json` | `d246fbf17cc7` |
 
 > **Machine authority**: `.github/workflows/upstream-watch.yml` reads two of
 > the five columns of every row above - the repository out of the project
@@ -26,7 +31,7 @@ Signing in to a provider requires knowing four things: the authorization endpoin
 > The column shape is fixed and the prose around it is not (cf.
 > ARCHITECTURE.md §3, §12 tables).
 
-**One row is one watched path, which is why codex has two.** The workflow sends the fourth cell to the commits API as a single path, so a cell naming two paths would ask GitHub for a path that does not exist, and a run that asks for nothing gets nothing rather than saying so. Two paths therefore mean two rows with two watermarks. The cost is named here rather than discovered later: the workflow suppresses a second issue for a repository that already has one open, so when both codex paths move at once, the second is reported only after the first issue is closed.
+**One row is one watched path, which is why codex has three and grok-build has three.** The workflow sends the fourth cell to the commits API as a single path, so a cell naming two paths would ask GitHub for a path that does not exist, and a run that asks for nothing gets nothing rather than saying so. Two paths therefore mean two rows with two watermarks. The cost is named here rather than discovered later: the workflow suppresses a second issue for a repository that already has one open, so when two paths of one repository move at once, the second is reported only after the first issue is closed. That cost grows with each row a repository gains, and it is paid deliberately: a path nobody watches is a constant that goes stale without a signal.
 
 **The split is by family**, and the families are the four this city signs in to directly: `Codex`, `ClaudeCode`, `GrokBuild`, `KimiCli` - the enum in `gateway::provider::registry`, which cites this section as where its facts come from. A fifth source would buy one cross-check and cost an extra place to read on every review, plus a round of judgement whenever two of them disagree.
 
@@ -35,6 +40,12 @@ Signing in to a provider requires knowing four things: the authorization endpoin
 **Anthropic's SDK repository is not open source, and that changes nothing about what may be followed.** Its `LICENSE.md` places use under Anthropic's Commercial Terms of Service, so no file of it may be copied into this tree under any reading. Facts are still facts: a type name, a field, and the release that changed them carry no copyright, and this city writes its own request. The repository also answers to the shorter name `anthropics/claude-agent-sdk`, which redirects; the row spells the name GitHub canonicalises to, so the watch compares the same repository a person visiting the link lands on.
 
 **codex's `docs/exec.md` is three lines that point at `developers.openai.com`.** The contract it names is published as a web page with no commit history, so the page cannot be watched and the pointer can. A change to those three lines is the one machine-visible signal that the contract moved house, which is what this row buys; the contract's own text is read at the destination.
+
+**Three facts were looked for on 2026-09-21 and two of them were found.** xAI's login constants are in the tree after all: the issuer, the public client id and the ten scopes are literals in the login crate's configuration module, and the device-code login posts to `{issuer}/oauth2/device/code` and `{issuer}/oauth2/token` without consulting the discovery document, so `gateway::oauth_profiles` states that grant. Which base URL a ChatGPT subscription is served under is likewise stated upstream, in a path this table did not watch until today.
+
+**A row is re-checked against its vendor's page or it is left alone.** On 2026-09-21 the documentation sites of Anthropic, OpenAI, Google and xAI answered a block rather than a page — 403, a regional refusal, or no route at all — so the ceiling, modality and price cells of `gateway::provider::preset` were not re-read in that pass and not one of them was changed. A figure re-stated on the strength of a page nobody opened is a figure with no source, which is the defect this whole section exists to prevent.
+
+**The rerank face is the one shape in this table with no vendor behind it.** Nobody publishes `/rerank` as an API a vendor owns; the servers that serve it defined it, so the row above follows the description of the server this city targets, and a second server answering a different shape is a second connection rather than a wildcard in the reader.
 
 **How to re-check**: watch the paths above for changes rather than watching releases. An endpoint migration often arrives in a patch version with no mention in the changelog. Where two sources disagree, the provider's own documentation decides, not the majority. Every row above was read on 2026-09-21.
 

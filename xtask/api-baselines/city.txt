@@ -86,6 +86,7 @@ pub city::Written::mcp: bool
 pub city::Written::sandbox: bool
 pub const city::AGENTS_FILE: &str
 pub const city::BUILDING_FILE: &str
+pub const city::BuildingTemplate::ALL: [city::BuildingTemplate; 3]
 pub const city::CITY_FILE: &str
 pub const city::CLERK_FILE: &str
 pub const city::DESKTOP_SCOPE_FILE: &str

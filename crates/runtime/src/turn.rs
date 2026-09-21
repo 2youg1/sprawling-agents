@@ -17,12 +17,12 @@
 //! All events of one turn share the timestamp given to [`Turn::begin`]:
 //! order is `seq`'s business, time is a parameter, never sampled.
 
+use kernel::event::record::{ModelCalled, ModelReturned, SteerReceived};
 use kernel::model::content_from_message;
 use kernel::{
     AxCode, AxError, B3Hash, BuildingPolicy, ChatRequest, ContentBlock, EventRef, Ledger, Model,
     ModelRequest, ModelReturn, ModelUsage, Payload, RunId, StopReason, TimeMs, ToolCall, ToolDef,
 };
-use serde_json::{Map, Value};
 
 use crate::prefix::FrozenPrefix;
 use crate::window::Window;
@@ -73,10 +73,6 @@ pub struct Recording {
     wave_results: Vec<ContentBlock>,
     usage: Option<ModelUsage>,
     stop: Option<StopReason>,
-}
-
-fn payload(map: Map<String, Value>) -> Result<Payload, AxError> {
-    Payload::new(map)
 }
 
 impl Turn<Assembling> {
@@ -151,23 +147,12 @@ impl Turn<Calling> {
             segments,
             chat,
         };
-        let mut called = Map::new();
-        called.insert(
-            "segments".to_owned(),
-            Value::Array(
-                request
-                    .segments
-                    .iter()
-                    .map(|hash| Value::String(hash.to_string()))
-                    .collect(),
-            ),
-        );
-        called.insert(
-            "model".to_owned(),
-            Value::String(request.chat.model.clone()),
-        );
+        let called = ModelCalled {
+            segments: request.segments.to_vec(),
+            model: request.chat.model.clone(),
+        };
         self.journal
-            .append_authored(ledger, Authored::ModelCalled, payload(called)?)?;
+            .append_authored(ledger, Authored::ModelCalled, Payload::of(&called)?)?;
         // The streaming door when somebody is watching, the blocking one
         // when nobody is. Both return the same `ModelReturn`, and the
         // record below is written from that return in either case - so
@@ -185,17 +170,6 @@ impl Turn<Calling> {
             billed_usd_micros,
         } = returned_value;
         let assistant = content_from_message(&message)?;
-        let mut returned = Map::new();
-        returned.insert(
-            "message".to_owned(),
-            serde_json::to_value(&message).map_err(|err| {
-                AxError::failure(AxCode::InvalidArgs, "encode model message", err.to_string())
-                    .with_recovery(
-                        "report this against runtime::turn: an assistant message is \
-                         text and content blocks, and JSON refuses neither",
-                    )
-            })?,
-        );
         let calls_len = u64::try_from(calls.len()).map_err(|_| {
             AxError::failure(AxCode::InvalidArgs, "encode model return", "wave too large")
                 .with_recovery(
@@ -203,40 +177,18 @@ impl Turn<Calling> {
                      calls in one reply",
                 )
         })?;
-        returned.insert("calls".to_owned(), Value::Number(calls_len.into()));
-        if let Some(usage) = &usage {
-            returned.insert(
-                "usage".to_owned(),
-                serde_json::to_value(usage).map_err(|err| {
-                    AxError::failure(AxCode::InvalidArgs, "encode usage", err.to_string())
-                        .with_recovery(
-                            "report this against runtime::turn: usage is four whole \
-                             numbers and JSON refuses none of them",
-                        )
-                })?,
-            );
-        }
-        if let Some(stop) = &stop {
-            returned.insert(
-                "stop".to_owned(),
-                serde_json::to_value(stop).map_err(|err| {
-                    AxError::failure(AxCode::InvalidArgs, "encode stop reason", err.to_string())
-                        .with_recovery(
-                            "report this against runtime::turn: a stop reason is a \
-                             plain enum and JSON refuses none of its spellings",
-                        )
-                })?,
-            );
-        }
-        if let Some(billed) = billed_usd_micros {
-            returned.insert(
-                "billed_usd_micros".to_owned(),
-                Value::Number(billed.get().into()),
-            );
-        }
-        let model_returned =
-            self.journal
-                .append_redacted(ledger, Carried::ModelReturned, returned)?;
+        let returned = ModelReturned {
+            message,
+            calls: calls_len,
+            usage,
+            stop,
+            billed_usd_micros,
+        };
+        let model_returned = self.journal.append_redacted(
+            ledger,
+            Carried::ModelReturned,
+            Payload::of(&returned)?,
+        )?;
         Ok(PhaseOutcome::Advanced(Turn {
             journal: self.journal,
             state: ToolWave {
@@ -307,11 +259,12 @@ impl<S> Turn<S> {
             Interrupt::None => Ok(None),
             Interrupt::Cancel => Ok(Some(self.cancel_here(ledger)?)),
             Interrupt::Steer { source, text } => {
-                let mut map = Map::new();
-                map.insert("source".to_owned(), Value::String(source));
-                map.insert("text".to_owned(), Value::String(text));
-                self.journal
-                    .append_authored(ledger, Authored::SteerReceived, payload(map)?)?;
+                let steer = SteerReceived { source, text };
+                self.journal.append_authored(
+                    ledger,
+                    Authored::SteerReceived,
+                    Payload::of(&steer)?,
+                )?;
                 Ok(None)
             }
         }

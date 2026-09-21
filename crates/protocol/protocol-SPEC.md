@@ -16,7 +16,7 @@
 | 单元 | 完成的定义 |
 |---|---|
 | mcp | 请求恒是单行且不含换行；两台 server 的同名工具恒是两个工具；浮点入参拒该次调用并报出位置；confidential 楼恒不构造该工具；录制的调用重放得同一答案 |
-| acp | 已配对请求变成 Dispatch 三字段；未配对只学到一位（拒词不确认地址存在）；持有效令牌也够不到 reserved prefix；回给编辑器的只有 progress 三字段 |
+| acp | 已配对请求变成 Dispatch 三字段；`Incoming::parse` 是入站文法的唯一入口（字段私有，本 crate 之外无第二种造法）；配对令牌恒不进入 `Incoming`；持有效令牌也够不到 reserved prefix；回给编辑器的只有 progress 三字段 |
 
 ## 3 假设与歧义
 
@@ -93,9 +93,10 @@ pub enum Received { Message(String), EndOfInput }
 pub fn read_one_message(source: &mut dyn BufRead, server: &str) -> Result<Received, AxError>;
 
 // 8-2 acp（形状 1 判定＋形状 2 值类型）
-pub struct Incoming { pub token: String, pub addr: Address, pub task: String, pub goal: String }
+pub struct Incoming { /* 私有：addr／task／goal；唯一构造者是 parse */ }
+impl Incoming { pub fn parse(body: &Value) -> Result<Incoming, AxError>; }
 pub enum Admitted { Dispatch { addr: Address, task: String, goal: String } }
-pub fn admit(request: &Incoming, authentic: bool) -> Result<Admitted, AxError>;
+pub fn admit(request: Incoming) -> Result<Admitted, AxError>;
 pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 ```
 
@@ -125,7 +126,9 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 **出站**：装配层拉起 server 子进程 → `Rpc::discover` → `Rpc::list_tools` → `tools_from` → catalog 与 bench 各注册一次（工具表随 Run 冻结）→ 模型调用 → `McpTool::invoke` → `call_tool`（浮点检查）→ `Outbound::call` → `Rpc::read` → `ToolOutcome`（污染态）→ 装配层落 `tool_called`／`tool_result`。
 
-**入站**：装配层收 HTTP／stdio 请求 → `Incoming::parse` → 与这座城的配对令牌常数时间比对（`channels::auth`）→ `admit` → `Admitted::Dispatch` → 走与人相同的 `Command::Dispatch` 路径 → 期间回 `Progress`。
+**入站**：`channels` 的入站中间件先与这座城的配对令牌常数时间比对（`channels::auth`，未配对即在路由层被拒）→ 装配层收 HTTP／stdio 请求 → `Incoming::parse` → `admit` → `Admitted::Dispatch` → 走与人相同的 `Command::Dispatch` 路径 → 期间回 `Progress`。
+
+**配对判定不住本 crate**：令牌住 `channels`，判定住那一层中间件，本 crate 因此既看不见密钥也不持有它的副本；`admit` 只判 reserved prefix 这一条本 crate 独有的规则。
 
 ## 10 实现逻辑
 
@@ -133,11 +136,12 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 2. **id 由 `Rpc` 铸**：重放按「方法＋参数」建索引、恒不看 id——重放会重新编号，把 id 计入键就等于永远匹配不上。
 3. **工具名加服务器前缀**：`{label}_{sanitised}`。两台 server 都提供 `search` 时，不加前缀就会有一个工具在不同的楼里做不同的事。
 4. **外部工具声明 `Effect::Egress`＋`Temporal::Timestamped`**：前者把它路由到能说不的那道门，后者是事实——对侧是活的服务，答案是关于此刻的。
-5. **入站拒词只泄一位**：未配对的拒绝不提地址、不提楼、不提令牌像不像。
+5. **入站拒词只泄一位**：未配对的拒绝由中间件出词，不提地址、不提楼、不提令牌像不像。
+6. **`Incoming` 字段私有**：外部编辑器的请求只能经 `parse` 成形，于是「空 task 被拒」这条规则没有第二条入口可绕；同理令牌不是它的字段，一个 `derive(Debug)` 的值因此不可能把明文令牌打进日志。
 
 ## 11 边界枚举
 
-一条消息超过 `MESSAGE_CEILING`／流在消息中途断掉／消息不是 UTF-8／非 JSON 行／非对象／既无 result 又无 error／`tools` 缺失／工具无名／标签非法／浮点在顶层、数组内、深层对象内／confidential 楼／空 token／空 task／空 goal／地址落 reserved prefix／重放缺答案。
+一条消息超过 `MESSAGE_CEILING`／流在消息中途断掉／消息不是 UTF-8／非 JSON 行／非对象／既无 result 又无 error／`tools` 缺失／工具无名／标签非法／浮点在顶层、数组内、深层对象内／confidential 楼／空 addr／空 task／空 goal／地址落 reserved prefix／重放缺答案。
 
 ## 12 错误处理
 

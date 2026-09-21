@@ -104,6 +104,12 @@ impl Governance {
     /// The envelope arrives beside the payload because two of these arms
     /// need it: a run is named by the record it started, and a waiting
     /// item is held against the room that raised it.
+    ///
+    /// # Errors
+    /// Refuses a line this build cannot read. Both of these used to be
+    /// dropped in silence, which made a history written by another
+    /// build open as a city with work missing from its account and
+    /// approvals nobody would ever be asked (sprawling-SPEC.md 8-74).
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "a few kinds move this fold; the rest of the event vocabulary does not"
@@ -114,24 +120,18 @@ impl Governance {
         run: RunId,
         addr: Option<&Address>,
         payload: &Payload,
-    ) {
+    ) -> Result<(), AxError> {
         let data = payload.as_map();
         match kind {
             EventKind::RunStarted => {
-                // A line this build cannot read still opened the
-                // session, so the fold files it with no words rather
-                // than leaving the run out of the account.
-                let started = payload
-                    .read::<kernel::event::record::RunStarted>()
-                    .unwrap_or_default();
+                let started = payload.read::<kernel::event::record::RunStarted>()?;
                 self.sent(run, &started.task, &started.goal);
             }
             EventKind::ApprovalRequested => {
-                let Ok(item) = serde_json::from_value::<kernel::ApprovalItem>(
+                let item = serde_json::from_value::<kernel::ApprovalItem>(
                     serde_json::Value::Object(data.clone()),
-                ) else {
-                    return;
-                };
+                )
+                .map_err(|err| unreadable("read an approval this city raised", &err))?;
                 // What this item is holding up, joined here rather than
                 // hunted for later. Both halves come from the history:
                 // the room from this record's envelope, the work from
@@ -171,25 +171,93 @@ impl Governance {
             // one fact changing value, and a second kind would let a
             // reader see a release with no halt before it.
             EventKind::CityHalted => {
-                let Some(scope) = data.get("scope").and_then(serde_json::Value::as_str) else {
-                    return;
+                let Some((scope, admission)) = Admission::in_record(data)? else {
+                    return Ok(());
                 };
-                if data.get("state").and_then(serde_json::Value::as_str) == Some(HALTED) {
-                    self.halted.insert(scope.to_owned());
-                } else {
-                    self.halted.remove(scope);
+                match admission {
+                    Admission::Halted => {
+                        self.halted.insert(scope.to_owned());
+                    }
+                    Admission::Released => {
+                        self.halted.remove(scope);
+                    }
                 }
             }
             _ => {}
         }
+        Ok(())
     }
 }
 
-/// The value of a halt record's `state` field when the scope is shut.
-pub(crate) const HALTED: &str = "halted";
+/// One refusal for every line of a history this build cannot read.
+fn unreadable(action: &'static str, err: &serde_json::Error) -> AxError {
+    AxError::failure(kernel::AxCode::WireMismatch, action, err.to_string()).with_recovery(
+        "open this city with the build that wrote its history, or move the unreadable line out of \
+         the ledger",
+    )
+}
 
-/// And when it is open again.
-pub(crate) const RELEASED: &str = "released";
+/// Whether a scope is shut or open.
+///
+/// The word in a `city_halted` record is spelled here and nowhere else.
+/// It used to be two string constants compared by hand at four places,
+/// and the two folds disagreed about an unrecognised word: one read it
+/// as a release, the other ignored the line (sprawling-SPEC.md 8-74).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Admission {
+    /// Nothing may be dispatched into this scope.
+    Halted,
+    /// The scope takes work again.
+    Released,
+}
+
+impl Admission {
+    /// Both states, so a reader cannot be written against one of them.
+    const ALL: [Admission; 2] = [Admission::Halted, Admission::Released];
+
+    /// The word the record carries.
+    pub(crate) fn spelling(self) -> &'static str {
+        match self {
+            Admission::Halted => "halted",
+            Admission::Released => "released",
+        }
+    }
+
+    /// The scope and its new state, read off a `city_halted` payload.
+    ///
+    /// `None` is a record naming no scope, which changes nothing.
+    ///
+    /// # Errors
+    /// Refuses a state word this build does not know: a city that read
+    /// it as "open" would be dispatching into a scope a later build
+    /// shut.
+    pub(crate) fn in_record(
+        data: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<Option<(&str, Admission)>, AxError> {
+        let Some(scope) = data.get("scope").and_then(serde_json::Value::as_str) else {
+            return Ok(None);
+        };
+        let word = data
+            .get("state")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default();
+        let known = Admission::ALL
+            .into_iter()
+            .find(|state| state.spelling() == word);
+        let state = known.ok_or_else(|| {
+            AxError::failure(
+                kernel::AxCode::WireMismatch,
+                "read whether a scope is shut",
+                word.to_owned(),
+            )
+            .with_recovery(
+                "open this city with the build that wrote its history: this one knows `halted` \
+                 and `released`",
+            )
+        })?;
+        Ok(Some((scope, state)))
+    }
+}
 
 /// Everything a worker inherits from a history it did not write.
 pub(crate) struct Standing {
@@ -235,7 +303,7 @@ impl Standing {
             for line in verified.raw_lines() {
                 let record = EventRecord::parse_line(line)?;
                 book.apply(&record)?;
-                governance.absorb(record.kind(), record.run(), record.addr(), record.data());
+                governance.absorb(record.kind(), record.run(), record.addr(), record.data())?;
                 collaboration.absorb(&record)?;
                 entrance.absorb(record.data());
                 expiries.absorb(record.kind(), record.data());

@@ -54,13 +54,19 @@ impl RunWorker {
                 )
                 .with_recovery("attach the endpoint first, then choose one of the models it lists")
             })?;
-        if !known.models.contains(&model) {
+        if !known.models.iter().any(|row| row.id == model) {
             return Err(AxError::failure(
                 AxCode::ConfigInvalid,
                 "choose a model",
                 format!("{endpoint} does not serve {model}"),
             )
-            .with_nearby(known.models.clone())
+            .with_nearby(
+                known
+                    .models
+                    .iter()
+                    .map(|row| row.id.clone())
+                    .collect::<Vec<String>>(),
+            )
             .with_recovery("choose one of the models the endpoint listed"));
         }
         let priced = gateway::MarketSnapshot::builtin()?.lookup(&model).cloned();
@@ -72,15 +78,16 @@ impl RunWorker {
         // a provider answered with no content at all; the run then froze
         // as work that finished. A ceiling this city cannot name is now
         // carried as one it cannot name.
-        let context_tokens = match context_tokens {
-            0 => registered
+        let context_tokens = context_tokens.or_else(|| {
+            registered
                 .as_ref()
-                .map(|row| row.context_tokens)
-                .filter(|held| *held > 0)
-                .or_else(|| priced.as_ref().map(|row| row.context_tokens))
-                .unwrap_or(0),
-            stated => stated,
-        };
+                .and_then(|row| kernel::Window::new(row.context_tokens))
+                .or_else(|| {
+                    priced
+                        .as_ref()
+                        .and_then(|row| kernel::Window::new(row.context_tokens))
+                })
+        });
         // The ladder answers, and says which rung answered. The person's
         // figure outranks the one they entered before, which outranks
         // the pinned catalogue and the preset table, and the policy
@@ -101,7 +108,10 @@ impl RunWorker {
         let ceiling_from = resolved.map(gateway::OutputCeiling::source);
         let entry = gateway::ModelEntry {
             id: model,
-            context_tokens,
+            // The catalogue row carries a plain figure; a window nobody
+            // stated is zero there and `None` on the wire, and this is
+            // the one place the two spellings meet.
+            context_tokens: context_tokens.map_or(0, kernel::Window::get),
             max_output_tokens,
             // What a model accepts is the catalogue's fact, not a
             // person's: a form cannot make a text-only model see.

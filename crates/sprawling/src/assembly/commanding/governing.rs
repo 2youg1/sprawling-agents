@@ -28,9 +28,9 @@ impl RunWorker {
     pub(in crate::assembly) fn set_admission(
         &mut self,
         scope: &channels::HaltScope,
-        state: &str,
+        state: super::super::Admission,
     ) -> Result<(), AxError> {
-        if state == super::super::HALTED {
+        if matches!(state, super::super::Admission::Halted) {
             let within = match scope {
                 channels::HaltScope::City => None,
                 channels::HaltScope::Building(addr) | channels::HaltScope::Workshop(addr) => {
@@ -51,7 +51,7 @@ impl RunWorker {
         map.insert("scope".to_owned(), serde_json::Value::String(name.clone()));
         map.insert(
             "state".to_owned(),
-            serde_json::Value::String(state.to_owned()),
+            serde_json::Value::String(state.spelling().to_owned()),
         );
         // Recorded and nothing else: the fold reads `city_halted` and
         // sets the scope, in the one place a restart reads it too.
@@ -259,7 +259,9 @@ impl RunWorker {
         })?;
         let node_owner = verified.lines().get(index).and_then(|line| match line {
             runtime::replay::VerifiedLine::Known { record, .. } => Some(record.run()),
-            _ => None,
+            // A line this build ignores names no run, so it is nobody's
+            // event to fork from.
+            runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
         });
         if node_owner != Some(from) {
             return Err(AxError::failure(

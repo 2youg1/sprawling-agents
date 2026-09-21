@@ -110,7 +110,7 @@ export function Palette(props: { readonly onClose: () => void }) {
     const held = endpoints();
     if (held === undefined || !("endpoints" in held)) return [];
     return held.endpoints.endpoints.flatMap((endpoint) =>
-      endpoint.models.map((model) => ({ endpoint: endpoint.name, model })),
+      endpoint.models.map((row) => ({ endpoint: endpoint.name, model: row.id })),
     );
   });
   const here = createMemo(() => {

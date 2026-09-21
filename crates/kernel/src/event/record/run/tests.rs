@@ -161,3 +161,56 @@ fn a_fork_writes_the_two_keys_runtime_fork_wrote() {
     assert_eq!(back.from, from);
     assert_eq!(back.at_seq, Seq::new(41));
 }
+
+/// The writer that stood in `runtime::run::lifecycle::freeze` before
+/// this struct existed: `Completion::extend_payload`, which is the map
+/// this struct has to reproduce key for key.
+fn hand_written_frozen(completion: &Completion) -> Payload {
+    let mut map = Map::new();
+    completion.extend_payload(&mut map).unwrap();
+    Payload::new(map).unwrap()
+}
+
+fn cited(kind: EventKind) -> crate::EventRef {
+    let draft = crate::EventDraft {
+        run: RunId::CITY,
+        t: crate::TimeMs::new(0),
+        who: "city".to_owned(),
+        addr: None,
+        kind,
+        data: Payload::empty(),
+        ig: false,
+    };
+    crate::EventRecord::from_draft(draft, Seq::new(12), crate::ledger::GENESIS_PREV).to_ref()
+}
+
+#[test]
+fn a_finished_run_writes_the_bytes_completion_extend_payload_wrote() {
+    let done = Completion::Done(
+        crate::Evidence::new(vec![
+            cited(EventKind::ModelReturned),
+            cited(EventKind::ToolResult),
+        ])
+        .unwrap(),
+    );
+    let new = Payload::of(&RunFrozen::of(&done)).unwrap();
+    assert_eq!(bytes(&new), bytes(&hand_written_frozen(&done)));
+    let back: RunFrozen = new.read().unwrap();
+    assert_eq!(back.completion, "done");
+    assert_eq!(
+        back.evidence
+            .unwrap_or_default()
+            .first()
+            .map(|one| one.kind),
+        Some(EventKind::ModelReturned)
+    );
+}
+
+#[test]
+fn the_two_endings_that_cite_nothing_leave_the_key_absent() {
+    for completion in [Completion::Limit, Completion::Cancelled] {
+        let new = Payload::of(&RunFrozen::of(&completion)).unwrap();
+        assert_eq!(bytes(&new), bytes(&hand_written_frozen(&completion)));
+        assert!(!bytes(&new).contains("evidence"), "{}", bytes(&new));
+    }
+}

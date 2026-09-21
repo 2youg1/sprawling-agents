@@ -263,17 +263,18 @@ pub fn drive(
                     })?;
                     continue;
                 }
-                let mut data = Map::new();
-                if let Ok(Value::Object(fields)) = serde_json::to_value(&err) {
-                    data = fields;
-                }
+                // The failure itself is the payload, through the one
+                // door: an encoding that fails travels as a refusal
+                // rather than as an empty object, which is what the
+                // discarded `Result` here used to leave behind.
+                let data = Payload::of(&err)?;
                 ledger.append(EventDraft {
                     run: run.plan.run,
                     t,
                     who: run.plan.who.clone(),
                     addr: Some(run.plan.addr.clone()),
                     kind,
-                    data: payload(data)?,
+                    data,
                     ig: false,
                 })?;
                 break Completion::Cancelled;

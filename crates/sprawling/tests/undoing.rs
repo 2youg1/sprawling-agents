@@ -99,7 +99,7 @@ fn choosing_a_model_needs_the_endpoint_the_earlier_choice_named() {
             endpoint: channels::ProviderName::parse("nowhere").unwrap(),
             model: "m-local".to_owned(),
             tag: kernel::ModelTag::Main,
-            context_tokens: 0,
+            context_tokens: None,
             max_output_tokens: None,
             idem: key(b"choose"),
         })

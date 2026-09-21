@@ -330,7 +330,7 @@ fn dispatch(addr: &Address, task: &str) -> Result<channels::ClientFrame, kernel:
             addr: addr.clone(),
             task: task.to_owned(),
             goal: String::new(),
-            mode: channels::ModeTag::parse("plan")?,
+            mode: channels::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(
                 &kernel::RunId::CITY,
                 kernel::Seq::FIRST,

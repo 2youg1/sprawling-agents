@@ -23,12 +23,14 @@
 
 mod kind;
 mod no_secret;
+mod shelf;
 mod step;
 mod tuning;
 mod wire;
 
 pub use kind::{COMMAND_NAMES, Command};
 pub use no_secret::NoSecret;
+pub use shelf::Shelf;
 pub use step::PursuitStep;
 pub use step::{GovernedDocument, HaltScope, LoginStep};
 pub use tuning::{BodyOverride, EndpointTuning, HeaderPair};

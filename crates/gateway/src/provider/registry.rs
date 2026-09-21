@@ -13,9 +13,10 @@
 //! asking "how is this endpoint connected" gets three partial answers
 //! that agree only until one of them is changed. The registration path
 //! makes it worse by throwing a fact away: an endpoint the person
-//! entered as a responses URL is stored as `DialectKind::OpenAi`,
-//! because the stored enum has no third variant, and every later reader
-//! has to guess what the person pasted.
+//! entered as a responses URL used to be stored as
+//! `DialectKind::OpenAi`, because the stored enum had no third
+//! variant, and every later reader had to guess what the person
+//! pasted.
 //!
 //! [`ConnectionKind`] is that one answer. It is resolved once, at
 //! attach, after normalisation has folded the pasted URL, the person's
@@ -23,6 +24,10 @@
 //! `endpoint_attached` and read back by `Query::Config`. **No call path
 //! re-derives it**, which is the whole point: a fact derived twice is a
 //! fact that can differ twice.
+//!
+//! A responses URL is now called on the responses face. Until this
+//! build wrote that face, [`ConnectionKind::wire`] answered `OpenAi`
+//! for it — the registration was right and the call was not.
 //!
 //! What this module does not hold: the request bytes (`dialect`), the
 //! header a key travels in (`endpoint::auth`), and the login flow of a
@@ -117,21 +122,23 @@ pub enum ConnectionKind {
 }
 
 impl ConnectionKind {
-    /// Which request writer serves this connection today.
+    /// Which request writer serves this connection.
     ///
-    /// `Responses` answers `OpenAi` because this build writes one
-    /// OpenAI-shaped body and the responses body is not written yet
-    /// (roadmap 4.5). **The registration still records `Responses`**,
-    /// so the day that writer exists one arm of this match changes and
-    /// nobody has to re-attach an endpoint to be called correctly.
+    /// Three writers for four connections: the two OpenAI-compatible
+    /// harnesses are called on the chat face their vendors serve, and
+    /// Codex is called on the responses face its subscription answers
+    /// on — which is what [`Family::shape`] already states, read here
+    /// rather than restated.
     #[must_use]
     pub const fn wire(self) -> DialectKind {
         match self {
             ConnectionKind::AnthropicNative => DialectKind::Anthropic,
-            ConnectionKind::OpenAiCompat | ConnectionKind::Responses => DialectKind::OpenAi,
+            ConnectionKind::OpenAiCompat => DialectKind::OpenAi,
+            ConnectionKind::Responses => DialectKind::OpenAiResponses,
             ConnectionKind::Harness(family) => match family {
                 Family::ClaudeCode => DialectKind::Anthropic,
-                Family::Codex | Family::GrokBuild | Family::KimiCli => DialectKind::OpenAi,
+                Family::Codex => DialectKind::OpenAiResponses,
+                Family::GrokBuild | Family::KimiCli => DialectKind::OpenAi,
             },
         }
     }
@@ -276,15 +283,32 @@ mod tests {
         );
     }
 
-    /// The fact the registration path throws away today: a responses
-    /// URL stored as `DialectKind::OpenAi` reaches every later reader
-    /// as a chat endpoint.
+    /// The fact the registration path used to throw away: a responses
+    /// URL stored as `DialectKind::OpenAi` reached every later reader
+    /// as a chat endpoint, and was called on the chat path.
     #[test]
-    fn a_responses_url_stays_a_responses_registration() {
+    fn a_responses_url_is_registered_and_called_on_the_responses_face() {
         let kind = resolve(DialectHint::Responses, None).unwrap();
         assert_eq!(kind, ConnectionKind::Responses);
         assert_ne!(kind, ConnectionKind::OpenAiCompat);
-        assert_eq!(kind.wire(), DialectKind::OpenAi);
+        assert_eq!(kind.wire(), DialectKind::OpenAiResponses);
+    }
+
+    /// One authority for which face a family answers on: the writer
+    /// this build picks agrees with the shape the family states, for
+    /// every family, so a subscription cannot be registered against
+    /// one face and called on another.
+    #[test]
+    fn every_family_is_called_on_the_face_it_says_it_answers_on() {
+        for family in Family::ALL {
+            let by_shape = by_shape(family.shape()).unwrap();
+            assert_eq!(
+                ConnectionKind::Harness(family).wire(),
+                by_shape.wire(),
+                "{} is called on a face it did not claim",
+                family.as_str()
+            );
+        }
     }
 
     #[test]
@@ -308,6 +332,10 @@ mod tests {
         assert_eq!(
             ConnectionKind::Harness(Family::GrokBuild).wire(),
             DialectKind::OpenAi
+        );
+        assert_eq!(
+            ConnectionKind::Harness(Family::Codex).wire(),
+            DialectKind::OpenAiResponses
         );
     }
 

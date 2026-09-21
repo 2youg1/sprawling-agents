@@ -27,6 +27,7 @@ import { useSay } from "../ui";
 import { Conversation } from "./gallery/conversation";
 import { Filed } from "./gallery/filed";
 import { Hints } from "./gallery/hints";
+import { Keepers } from "./gallery/kept";
 import { Parts } from "./gallery/parts";
 import { Presences } from "./gallery/presence";
 import { Produced } from "./gallery/produced";
@@ -46,6 +47,7 @@ export function Gallery() {
       <Filed />
       <Screens />
       <Shelved />
+      <Keepers />
       <Parts />
       <Switches />
     </div>

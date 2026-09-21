@@ -6,19 +6,19 @@
 //! What an active run does on the ledger: the dispatch pair that brings
 //! it into existence, one turn, and the freeze that is its only exit.
 
-use kernel::event::record::{CheckpointCommitted, RunStarted};
+use kernel::event::Who;
+use kernel::event::record::{CheckpointCommitted, RunFrozen, RunStarted};
 use kernel::{
     AxCode, AxError, Completion, EventDraft, EventKind, Evidence, Ledger, Model, Payload, RunId,
     StopReason, TimeMs, ToolCall,
 };
-use serde_json::Map;
 
 use crate::handoff::Handoff;
 use crate::reminder::ContextGauge;
 use crate::turn::{Interrupt, NextCall, PhaseOutcome, Turn, TurnReport};
 use crate::window::Window;
 
-use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint, payload};
+use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
 
 /// A steer changes what the model reads next, so the driver folds it into
 /// the window it owns; the turn layer records that it arrived. Two halves
@@ -72,7 +72,7 @@ impl Run<Active> {
         ledger.append(EventDraft {
             run: RunId::CITY,
             t: pin_t,
-            who: "city".to_owned(),
+            who: Who::City.to_string(),
             addr: Some(plan.addr.clone()),
             kind: EventKind::CheckpointCommitted,
             data: Payload::of(&pin)?,
@@ -91,7 +91,7 @@ impl Run<Active> {
         ledger.append(EventDraft {
             run: plan.run,
             t: start_t,
-            who: "city".to_owned(),
+            who: Who::City.to_string(),
             addr: Some(plan.addr.clone()),
             kind: EventKind::RunStarted,
             data: Payload::of(&started)?,
@@ -260,15 +260,13 @@ impl Run<Active> {
             AxError::failure(AxCode::InvalidArgs, "stamp run_frozen", "u64 overflow")
                 .with_recovery("check the clock the caller injected")
         })?;
-        let mut frozen = Map::new();
-        completion.extend_payload(&mut frozen)?;
         ledger.append(EventDraft {
             run: self.plan.run,
             t: TimeMs::new(closing),
             who: self.plan.who.clone(),
             addr: None,
             kind: EventKind::RunFrozen,
-            data: payload(frozen)?,
+            data: Payload::of(&RunFrozen::of(&completion))?,
             ig: false,
         })?;
         let turns = self.state.turns;
@@ -286,3 +284,13 @@ impl Run<Active> {
         self.state.turns
     }
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests;

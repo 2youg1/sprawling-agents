@@ -53,7 +53,7 @@ Commands, every one the city accepts, generated from the wire schema by
 `cargo xtask docnum` (`sprawling call` lists them too):
 
 <!-- xtask:begin command_names -->
-`dispatch`, `login`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `fork`, `attach`, `create_building`, `put_secret`, `steer`, `cancel`, `takeover`, `rollback`, `halt`, `reveal`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `create_policy`, `set_autonomy`, `pursue`, `wake`, `put_document`, `connect_toolkit`, `auth`
+`dispatch`, `login`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `fork`, `create_building`, `put_secret`, `steer`, `cancel`, `takeover`, `rollback`, `halt`, `reveal`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `hand_off`, `set_autonomy`, `pursue`, `wake`, `put_document`, `connect_toolkit`, `put_preferences`, `put_shelved`, `auth`
 <!-- xtask:end -->
 
 The ones whose arguments need saying:
@@ -80,7 +80,7 @@ with the same key and read the answer you missed.
 Queries, every one the city answers:
 
 <!-- xtask:begin query_names -->
-`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `building_view`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `document`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `release`
+`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `building_view`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `document`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `release`, `preferences`, `config`
 <!-- xtask:end -->
 
 Each answers with one `answer` frame whose shape is the query's own; a

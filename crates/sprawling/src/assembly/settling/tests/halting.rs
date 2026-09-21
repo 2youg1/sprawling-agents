@@ -83,7 +83,7 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
             addr: Address::parse("lab/room1").unwrap(),
             task: "get it measured".to_owned(),
             goal: "the number is written down, then stop".to_owned(),
-            mode: channels::ModeTag::parse("plan").unwrap(),
+            mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,

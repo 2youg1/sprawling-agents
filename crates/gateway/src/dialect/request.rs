@@ -24,6 +24,7 @@ use kernel::{AxError, ChatRequest, DialectKind};
 use serde_json::Value;
 
 use super::images::ImageBytes;
+use super::responses;
 use crate::{anthropic, openai};
 
 pub fn request_wire(
@@ -34,6 +35,7 @@ pub fn request_wire(
     match kind {
         DialectKind::Anthropic => anthropic::request(req, images),
         DialectKind::OpenAi => openai::request(req, images),
+        DialectKind::OpenAiResponses => responses::request(req, images),
     }
 }
 #[cfg(test)]

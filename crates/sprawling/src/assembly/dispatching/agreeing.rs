@@ -17,13 +17,17 @@ use crate::assembly::credentials::dialect_headers;
 /// A run's identity, derived rather than drawn: the same job dispatched
 /// at the same millisecond to the same address is the same run, and no
 /// randomness enters the ledger's identifiers.
+/// The identifier is the digest's first sixteen bytes, taken from the
+/// hash itself rather than from its printed form: the round trip
+/// through hexadecimal had two failure points that both answered zero,
+/// so a digest this build could not print became run `00000…`
+/// (sprawling-SPEC.md 8-73).
 pub(in crate::assembly) fn run_id_for(job: &Locator, addr: &Address, now: TimeMs) -> RunId {
     let seed = format!("{job}|{}|{}", addr.as_str(), now.value());
-    let digest = kernel::B3Hash::digest(seed.as_bytes()).to_string();
+    let digest = kernel::B3Hash::digest(seed.as_bytes());
     let mut bytes = [0u8; 16];
-    for (slot, pair) in bytes.iter_mut().zip(digest.as_bytes().chunks_exact(2)) {
-        let hex = std::str::from_utf8(pair).unwrap_or("00");
-        *slot = u8::from_str_radix(hex, 16).unwrap_or(0);
+    for (slot, byte) in bytes.iter_mut().zip(digest.as_bytes()) {
+        *slot = *byte;
     }
     RunId::from_bytes(bytes)
 }
@@ -37,16 +41,28 @@ pub(in crate::assembly) fn run_id_for(job: &Locator, addr: &Address, now: TimeMs
 /// nothing finished yet.
 pub(crate) fn acp_dispatch(
     desk: &CommandDesk,
-    body: channels::AcpBody,
-    authentic: bool,
+    body: &serde_json::Value,
+    pairing: channels::Pairing,
 ) -> Result<channels::AcpProgress, AxError> {
-    let incoming = protocol::Incoming {
-        token: body.token,
-        addr: Address::parse(&body.addr)?,
-        task: body.task,
-        goal: body.goal,
-    };
-    let protocol::Admitted::Dispatch { addr, task, goal } = protocol::admit(&incoming, authentic)?;
+    if matches!(pairing, channels::Pairing::Absent) {
+        // The refusal says nothing about whether the address exists, the
+        // building is real, or the token was close: an unpaired caller
+        // learns one bit. protocol-SPEC.md section 9 gives this
+        // judgement to the inbound middleware in `channels`; until that
+        // middleware refuses on the route, the door the request already
+        // reached is the one place that can.
+        return Err(AxError::failure(
+            AxCode::GateDenied,
+            "admit an external request",
+            "not paired with this city".to_owned(),
+        )
+        .with_recovery("pair the client from the settings page, then send the token it shows"));
+    }
+    // The body travels as the JSON it arrived as: `Incoming::parse` is
+    // the only constructor the inbound grammar has, and a struct read
+    // here first would be a second reading of the same four keys.
+    let protocol::Admitted::Dispatch { addr, task, goal } =
+        protocol::admit(protocol::Incoming::parse(body)?)?;
     let idem = kernel::IdemKey::derive(
         &RunId::CITY,
         kernel::Seq::FIRST,
@@ -60,7 +76,7 @@ pub(crate) fn acp_dispatch(
             addr,
             task,
             goal,
-            mode: channels::ModeTag::parse("plan")?,
+            mode: channels::Mode::PlanGoal,
             idem,
             // An editor drives an address it already chose.
             session: None,

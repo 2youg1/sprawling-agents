@@ -5,20 +5,24 @@
 
 //! Names of things this crate does not own, on their way through it.
 //!
-//! A mode, a provider, a template, an upload handle: each arrives as
-//! text and leaves as a type that cannot be empty and cannot carry a
-//! control character. That is the whole of what this crate may judge.
+//! A provider, a template, a toolkit slug: each arrives as text and
+//! leaves as a type that cannot be empty and cannot carry a control
+//! character. That is the whole of what this crate may judge.
 //!
-//! **The legal value set stays upstream.** `runtime::Mode` owns which
-//! modes exist, `gateway` owns which providers do, `city` owns the
-//! templates; a closed list here would be a second authority that goes
-//! stale the moment either side adds one. So an unknown value is not an
-//! error at this boundary — it is an error where the authority is, and
-//! it says so with the name in hand.
+//! **The legal value set stays upstream, and only where it is open.**
+//! `gateway` owns which providers exist, `city` owns the templates, a
+//! broker's directory owns the slugs; each of those grows without this
+//! crate hearing about it, so a closed list here would be a second
+//! authority that goes stale the moment either side adds one. An
+//! unknown value is therefore an error where the authority is, and it
+//! says so with the name in hand. A set that is *closed* does not
+//! belong here at all: a run's mode is [`kernel::model::Mode`], which
+//! refuses an unknown word at this boundary rather than carrying it
+//! inward to be guessed at.
 //!
-//! One macro rather than four hand-written newtypes: the four differ in
+//! One macro rather than three hand-written newtypes: they differ in
 //! their name and their doc line and in nothing else, and writing the
-//! same constructor four times is four places for it to drift.
+//! same constructor three times is three places for it to drift.
 
 use kernel::{AxCode, AxError};
 use serde::{Deserialize, Serialize};
@@ -58,20 +62,12 @@ macro_rules! carried_name {
 }
 
 carried_name!(
-    ModeTag,
-    "A mode name in transit. Authority for the mode set is `runtime::Mode`."
-);
-carried_name!(
     ProviderName,
     "A provider name in transit. Authority for the provider set is `gateway`."
 );
 carried_name!(
     TemplateName,
     "A Building template name in transit. Authority is `city`."
-);
-carried_name!(
-    UploadId,
-    "Handle for bytes already delivered to the upload endpoint."
 );
 carried_name!(
     ToolkitSlug,
@@ -84,10 +80,11 @@ mod tests {
 
     #[test]
     fn a_carried_name_rejects_empty_and_control_characters() {
-        assert!(ModeTag::parse("").is_err());
-        assert!(ModeTag::parse("plan\nsteal").is_err());
-        assert_eq!(ModeTag::parse("plan").unwrap().as_str(), "plan");
-        // No closed list: an unknown mode is upstream's to refuse, not ours.
-        assert!(ModeTag::parse("a-mode-we-have-never-heard-of").is_ok());
+        assert!(ProviderName::parse("").is_err());
+        assert!(ProviderName::parse("openai\nsteal").is_err());
+        assert_eq!(ProviderName::parse("openai").unwrap().as_str(), "openai");
+        // No closed list: a provider this build never heard of is the
+        // gateway's to refuse, not this boundary's.
+        assert!(ProviderName::parse("a-relay-we-have-never-heard-of").is_ok());
     }
 }

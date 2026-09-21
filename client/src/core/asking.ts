@@ -49,6 +49,7 @@ export const QUERIES = {
   doctor: "doctor",
   toolkits: "toolkits",
   release: "release",
+  preferences: "preferences",
 } as const satisfies Readonly<Record<string, Extract<Query, string>>>;
 
 // One page of a building's commits. The answer carries the building

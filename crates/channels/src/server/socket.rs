@@ -9,13 +9,13 @@
 //! it serves are `channels::assets`'.
 //!
 //! Five jobs and no policy: serve the client bundle, upgrade a
-//! WebSocket, accept an upload, take a credential from a caller on this
+//! WebSocket, take a credential from a caller on this
 //! machine, and let an outside editor drive the city.
 //!
 //! A refusal made minutes later has no way home, which is why a command
 //! carries the [`Reply`] address of whoever sent it.
 
-//! Sockets: sessions, assets, uploads.
+//! Sockets: sessions and assets.
 
 pub(crate) async fn upgrade(
     State(state): State<Arc<ShellState>>,
@@ -43,7 +43,7 @@ use crate::reception::{
 };
 use crate::wire::ServerFrame;
 
-use super::config::{AcpBody, ServeConfig, ShellState, router};
+use super::config::{Pairing, ServeConfig, ShellState, router};
 
 use super::reply::{Delivered, Reply, refusal_text};
 use std::net::SocketAddr;
@@ -248,28 +248,34 @@ pub(crate) fn asset_response(reply: AssetReply) -> Response {
     }
 }
 
-/// Large attachments travel over HTTP, not as WebSocket frames: a frame
-/// carrying hundreds of megabytes is the wrong shape, and HTTP already
-/// answers ranges, resumption and progress.
 /// An outside editor's request. The token is judged here and the
 /// verdict travels inward; an unauthenticated request still reaches the
 /// admission, because what it may learn is that admission's to decide.
+///
+/// The body is read as JSON and passed on unread. Which keys make a
+/// request, and what each of them must hold, is `protocol::Incoming`'s
+/// single answer; a second reading here would be a second grammar, and
+/// the two would first disagree about an empty field.
 pub(crate) async fn accept_acp(State(state): State<Arc<ShellState>>, body: Bytes) -> Response {
-    let Ok(request) = serde_json::from_slice::<AcpBody>(&body) else {
+    let Ok(request) = serde_json::from_slice::<serde_json::Value>(&body) else {
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
             "send {\"token\":..,\"addr\":..,\"task\":..,\"goal\":..}",
         )
             .into_response();
     };
-    let authentic = match state.token_digest.as_ref() {
+    let held = match state.token_digest.as_ref() {
         // A city with no pairing token configured is a city on loopback
         // only; the door is open to whoever is already on this machine,
         // which is the same rule the control surface follows.
         None => true,
-        Some(digest) => auth::verify(Some(request.token.as_str()), digest),
+        Some(digest) => auth::verify(
+            request.get("token").and_then(serde_json::Value::as_str),
+            digest,
+        ),
     };
-    match (state.acp)(request, authentic) {
+    let pairing = if held { Pairing::Held } else { Pairing::Absent };
+    match (state.acp)(&request, pairing) {
         Ok(progress) => (StatusCode::ACCEPTED, Json(progress)).into_response(),
         Err(err) => (StatusCode::FORBIDDEN, refusal_text(&err)).into_response(),
     }
@@ -303,17 +309,6 @@ pub(crate) async fn accept_recording(
     match (state.transcribe_sink)(body.to_vec(), media) {
         Ok(text) => (StatusCode::OK, text).into_response(),
         Err(err) => (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response(),
-    }
-}
-
-pub(crate) async fn accept_upload(State(state): State<Arc<ShellState>>, body: Bytes) -> Response {
-    match (state.upload_sink)(body.to_vec()) {
-        Ok(id) => (StatusCode::CREATED, id.as_str().to_owned()).into_response(),
-        Err(err) => (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            format!("{}: {}", err.action(), err.recovery()),
-        )
-            .into_response(),
     }
 }
 

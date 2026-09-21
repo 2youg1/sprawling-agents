@@ -155,7 +155,7 @@ export function Composer(props: ComposerProps) {
   // The id a command carries, and the name a person reads.
   const models = createMemo(() =>
     (answer()?.endpoints ?? []).flatMap((endpoint) =>
-      endpoint.models.map((model) => ({ endpoint: endpoint.name, label: endpoint.label, model })),
+      endpoint.models.map((row) => ({ endpoint: endpoint.name, label: endpoint.label, model: row.id })),
     ),
   );
   const main = createMemo(() => answer()?.chosen.find((each) => each.tag === "main"));

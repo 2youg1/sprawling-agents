@@ -16,16 +16,20 @@ pub(super) fn name_of(addr: &Address) -> &str {
     addr.as_str().rsplit('/').next().unwrap_or(addr.as_str())
 }
 
-/// The mode a wire tag names. An unknown tag is the planning mode: a
-/// mode nobody implemented must not silently become a stricter or a
-/// looser one, and planning is the mode that demands nothing.
-pub(super) fn mode_of(tag: &channels::ModeTag) -> runtime::Mode {
-    match tag.as_str() {
-        "up" => runtime::Mode::Up,
-        "sc" => runtime::Mode::Sc,
-        "ud" => runtime::Mode::Ud,
-        "experiment" => runtime::Mode::Experiment,
-        _ => runtime::Mode::PlanGoal,
+/// The discipline a wire frame names, in the word `runtime` evaluates.
+///
+/// Total, with no default: the wire used to carry free text that this
+/// matched against four words and answered every other word with
+/// planning, so a client that misspelled `experiment` got a planning
+/// run and no refusal. The two sets now have the same five members,
+/// and a mode added to either without the other is a compile error.
+pub(super) fn mode_of(mode: channels::Mode) -> runtime::Mode {
+    match mode {
+        channels::Mode::PlanGoal => runtime::Mode::PlanGoal,
+        channels::Mode::Up => runtime::Mode::Up,
+        channels::Mode::Sc => runtime::Mode::Sc,
+        channels::Mode::Ud => runtime::Mode::Ud,
+        channels::Mode::Experiment => runtime::Mode::Experiment,
     }
 }
 

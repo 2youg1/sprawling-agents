@@ -80,7 +80,7 @@ fn deleting_every_log_line_leaves_the_history_byte_identical() {
                 endpoint: channels::ProviderName::parse("house").unwrap(),
                 model: "m-local".to_owned(),
                 tag: kernel::ModelTag::Main,
-                context_tokens: 32_768,
+                context_tokens: kernel::Window::new(32_768),
                 max_output_tokens: kernel::Ceiling::new(4_096),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
             })
@@ -159,7 +159,14 @@ fn a_registration_survives_the_process_that_made_it() {
         .unwrap();
     assert_eq!(live.entry, cold.entry);
     assert_eq!(live.endpoint.base_url, cold.endpoint.base_url);
-    assert_eq!(cold.endpoint.models, vec!["m-large", "m-small"]);
+    assert_eq!(
+        cold.endpoint
+            .models
+            .iter()
+            .map(|row| row.id.as_str())
+            .collect::<Vec<&str>>(),
+        vec!["m-large", "m-small"]
+    );
     assert!(cold.endpoint.is_local(), "a loopback provider is local");
 }
 

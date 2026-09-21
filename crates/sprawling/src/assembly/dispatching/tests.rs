@@ -68,7 +68,7 @@ fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
             addr: Address::parse("market/ito").unwrap(),
             task: "tell hana what matters first".to_owned(),
             goal: "hana knows".to_owned(),
-            mode: channels::ModeTag::parse("plan").unwrap(),
+            mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -116,7 +116,7 @@ fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
             addr: Address::parse("gamma").unwrap(),
             task: "say something".to_owned(),
             goal: "an answer".to_owned(),
-            mode: channels::ModeTag::parse("build").unwrap(),
+            mode: kernel::Mode::Up,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: Some(kernel::SessionName::parse("one").unwrap()),
             effort: None,
@@ -149,7 +149,7 @@ fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
             addr: room.clone(),
             task: "what do you make of this".to_owned(),
             goal: String::new(),
-            mode: channels::ModeTag::parse("plan").unwrap(),
+            mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"talk"),
             session: None,
             effort: None,
@@ -211,7 +211,7 @@ fn a_confidential_building_will_not_name_a_room_with_a_model_off_this_machine() 
             endpoint: channels::ProviderName::parse("far").unwrap(),
             model: "m-far".to_owned(),
             tag: kernel::ModelTag::Digest,
-            context_tokens: 32_768,
+            context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(4_096),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select-far"),
         })
@@ -222,7 +222,7 @@ fn a_confidential_building_will_not_name_a_room_with_a_model_off_this_machine() 
             addr: Address::parse("vault").unwrap(),
             task: "the kiln glaze formula nobody outside this house has".to_owned(),
             goal: "it is written down".to_owned(),
-            mode: channels::ModeTag::parse("plan").unwrap(),
+            mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -246,5 +246,30 @@ fn a_confidential_building_will_not_name_a_room_with_a_model_off_this_machine() 
     assert!(
         !provider.bodies().join("\n").contains("glaze formula"),
         "no call carries the task text of a confidential building"
+    );
+}
+
+/// The identifier is a function of the job, the address and the
+/// millisecond, and nothing else. Two jobs dispatched into the same
+/// millisecond are two runs: the hexadecimal round trip this used to
+/// make had two failure points that both answered zero, and a city
+/// whose runs share an identifier cannot be read back at all.
+#[test]
+fn two_jobs_at_one_millisecond_get_two_run_ids() {
+    let addr = Address::parse("lab/room1").unwrap();
+    let now = kernel::TimeMs::new(1_700_000_000_000);
+    let job = |hex: &str| kernel::Locator::parse(&format!("file:lab/room1@{}", hex.repeat(20)));
+    let one = agreeing::run_id_for(&job("ab").unwrap(), &addr, now);
+    let two = agreeing::run_id_for(&job("cd").unwrap(), &addr, now);
+    assert_ne!(one, two);
+    assert_eq!(
+        one,
+        agreeing::run_id_for(&job("ab").unwrap(), &addr, now),
+        "the same three inputs name the same run, which is what replay rests on"
+    );
+    assert_ne!(
+        one,
+        RunId::from_bytes([0u8; 16]),
+        "a digest the old code could not print became the all-zero run"
     );
 }

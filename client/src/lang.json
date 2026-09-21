@@ -1631,6 +1631,14 @@
     "en": "lowercase letters, digits and hyphens; the key reference derives from it",
     "zh": "小写字母、数字与连字符；密钥引用由它派生"
   },
+  "setup_kept_browser": {
+    "en": "kept in this browser only",
+    "zh": "只存在这个浏览器里"
+  },
+  "setup_kept_city": {
+    "en": "kept in ~/.sprawling/config.toml",
+    "zh": "存在 ~/.sprawling/config.toml 里"
+  },
   "setup_key": {
     "en": "key",
     "zh": "密钥"
@@ -1728,8 +1736,8 @@
     "zh": "输入模态"
   },
   "setup_model_needed": {
-    "en": "a ticked model with no output ceiling is called on the provider's own default",
-    "zh": "勾选了却没填输出上限的模型，按供应方自己的默认值调用"
+    "en": "An empty ceiling is filled by the city: the figure the provider stated, then this city's table of known models, then its policy default. To outrank all three, type a number in this column.",
+    "zh": "上限留空，就由城来填：先用供应方陈述的数字，再查本城的已知模型表，最后落到策略缺省。要压过这三者，就在这一列填上数字。"
   },
   "setup_model_output": {
     "en": "output ceiling",

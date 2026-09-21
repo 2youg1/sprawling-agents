@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 32 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "1d5238bc37f70915b49bffbde2dbfc956639a412549ef96c882309e75898f0a0" as const;
+export const WIRE_HASH = "67bfc2a041609a524a0eb0f933f694bc09bce47d3224cc54e8a660e95787ecda" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -610,6 +610,87 @@ export const CommitsAnswer = Schema.Struct({
 export type CommitsAnswer = typeof CommitsAnswer.Type;
 
 /**
+ * Which file settled one value.
+ * 
+ * **Every value in a [`ConfigAnswer`] carries one.** A settings page
+ * that was told only the resolved figure could not say whether the
+ * person is looking at their own entry, at something the building
+ * inherited, or at the city's — so pressing "reset" and pressing
+ * nothing looked the same, and the page had to climb the ladder a
+ * second time to find out. This is that answer, stated once by the
+ * layer that resolved it.
+ */
+export const ConfigLayer = Schema.Union(
+  Schema.Literal("city"),
+  Schema.Literal("resident"),
+  Schema.Literal("room"),
+).annotations({ identifier: "ConfigLayer" });
+export type ConfigLayer = typeof ConfigLayer.Type;
+
+/**
+ * `[model] effort`, and the file that settled it.
+ */
+export const SettledEffort = Schema.Struct({
+  effort: Effort,
+  from: ConfigLayer,
+}).annotations({ identifier: "SettledEffort" });
+export type SettledEffort = typeof SettledEffort.Type;
+
+/**
+ * Which of this endpoint's calls go through the machine's proxy.
+ * 
+ * A proxy that intercepts loopback answers 502 for a local inference
+ * server, so the city takes an address on its own machine off the
+ * proxy by default — and that default is a rule about the common
+ * machine, not a fact about every machine. Two other settings are real
+ * needs rather than symmetry: a person whose provider sits behind a
+ * relay on loopback that their organisation requires them to audit
+ * needs [`Always`](Proxying::Always), and a person on a virtual network
+ * adapter, whose routes already carry every packet, needs
+ * [`Never`](Proxying::Never) so a stale proxy variable cannot break a
+ * call the machine would otherwise make.
+ */
+export const Proxying = Schema.Union(
+  Schema.Literal("except_local"),
+  Schema.Literal("always"),
+  Schema.Literal("never"),
+).annotations({ identifier: "Proxying" });
+export type Proxying = typeof Proxying.Type;
+
+/**
+ * What an endpoint that settled nothing is called with.
+ * 
+ * **These are the gateway's figures, read out rather than restated.**
+ * The endpoint form used to ship its own three numbers as placeholder
+ * text, so an endpoint attached through the form and one attached by
+ * import behaved differently while the person had filled in nothing;
+ * the form now draws what this carries, and the numbers have one home.
+ */
+export const TuningDefaults = Schema.Struct({
+  proxying: Proxying,
+  request_max_retries: Schema.Int,
+  stream_idle_timeout_ms: Schema.Int,
+  timeout_ms: Schema.Int,
+}).annotations({ identifier: "TuningDefaults" });
+export type TuningDefaults = typeof TuningDefaults.Type;
+
+/**
+ * What one address is governed by, value by value, with the file each
+ * value came from.
+ * 
+ * Answered for an address rather than for the city, because the ladder
+ * has three rungs and only an address says which room's rung is in
+ * play. An address naming a building answers with two rungs climbed
+ * and no room entry, which is what a building with no open session is.
+ */
+export const ConfigAnswer = Schema.Struct({
+  addr: Address,
+  effort: Schema.optional(Schema.NullOr(SettledEffort)),
+  tuning: TuningDefaults,
+}).annotations({ identifier: "ConfigAnswer" });
+export type ConfigAnswer = typeof ConfigAnswer.Type;
+
+/**
  * One object of the content store, cut to what travels.
  * 
  * The same bound and the same text judgement `Document` puts on a file
@@ -889,16 +970,70 @@ export const ChosenSummary = Schema.Struct({
 export type ChosenSummary = typeof ChosenSummary.Type;
 
 /**
- * Which wire the far side speaks. Open for growth; every match on it
- * handles the known kinds exhaustively and fails closed.
+ * Which wire the far side speaks. Closed: a fourth dialect is a
+ * compile error at every entrance of `gateway::dialect`, which is how
+ * it is kept from being approximated with the nearest of the three
+ * already written.
  * 
  * Lives here rather than in `gateway` for the same reason
  * [`BuildingPolicy`] does: two outer crates must name it (the gateway
  * translates it, the wire carries it) and neither may name the other.
  * `gateway::dialect` is its evaluator, not its definition.
  */
-export const DialectKind = Schema.Literal("anthropic", "open_ai").annotations({ identifier: "DialectKind" });
+export const DialectKind = Schema.Union(
+  Schema.Literal("anthropic"),
+  Schema.Literal("open_ai"),
+  Schema.Literal("open_ai_responses"),
+).annotations({ identifier: "DialectKind" });
 export type DialectKind = typeof DialectKind.Type;
+
+/**
+ * The most tokens one model reads in a single call, prompt and reply
+ * together.
+ * 
+ * **Zero is unrepresentable, and absence is not zero.** A window
+ * nobody stated and a window of zero used to be the same byte, so the
+ * context reminder measured a conversation against nothing and
+ * reported every session as full. A figure nobody registered is
+ * carried as `None` all the way to the reminder, which then stays
+ * silent, and every layer in between is spared the rule that zero is
+ * special.
+ * 
+ * A separate type from [`Ceiling`](crate::Ceiling) although both are
+ * non-zero token counts: one bounds what the model may read and the
+ * other bounds what it may write, and a call that swapped them would
+ * compile.
+ */
+export const Window = Schema.Int.pipe(Schema.brand("Window"));
+export type Window = typeof Window.Type;
+
+/**
+ * One model an endpoint serves, with what the endpoint said about it.
+ * 
+ * **An endpoint's list used to arrive as bare ids.** Everything the
+ * provider stated beside each id — the window, the ceiling, what the
+ * model accepts, what it costs — was read at attach, used once to
+ * settle a ceiling, and then dropped, so a person choosing a model saw
+ * a name and nothing to choose by. This is that statement, carried to
+ * the page that shows the list.
+ * 
+ * **Every field is what the upstream said, not what this city
+ * concluded.** Absence means the row said nothing; it never means
+ * zero, and it is never filled in from the preset table here. The
+ * ladder that picks a figure — the person's own entry, then the
+ * upstream's statement, then the preset table, then the policy default
+ * — runs where the call is made, and a summary that had already
+ * climbed it would be a second answer to which figure won.
+ */
+export const ModelFactsSummary = Schema.Struct({
+  context_tokens: Schema.optional(Schema.NullOr(Window)),
+  id: Schema.String,
+  input_modalities: Schema.Array(Schema.String),
+  input_price: Schema.optional(Schema.NullOr(Schema.String)),
+  max_output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
+  output_price: Schema.optional(Schema.NullOr(Schema.String)),
+}).annotations({ identifier: "ModelFactsSummary" });
+export type ModelFactsSummary = typeof ModelFactsSummary.Type;
 
 /**
  * One attached endpoint, as a reader may see it. No credential appears
@@ -907,11 +1042,12 @@ export type DialectKind = typeof DialectKind.Type;
  */
 export const EndpointSummary = Schema.Struct({
   base_url: Schema.String,
+  connection_kind: Schema.String,
   dialect: DialectKind,
   has_credential: Schema.Boolean,
   label: Schema.String,
   local: Schema.Boolean,
-  models: Schema.Array(Schema.String),
+  models: Schema.Array(ModelFactsSummary),
   name: Schema.String,
 }).annotations({ identifier: "EndpointSummary" });
 export type EndpointSummary = typeof EndpointSummary.Type;
@@ -1086,12 +1222,10 @@ export const EventRecord = Schema.Struct({
 export type EventRecord = typeof EventRecord.Type;
 
 /**
- * A slice of the one history, oldest first.
- * 
- * Oldest first because that is the order the ledger wrote them and the
- * order a fold expects; a reader that wants the newest first reverses a
- * list it already has, and a server that reversed it would make the
- * fold the caller's problem.
+ * A slice of the one history, oldest first - the order the ledger
+ * wrote them and the order a fold expects. A reader that wants the
+ * newest first reverses a list it already has, and a server that
+ * reversed it would make the fold the caller's problem.
  */
 export const HistoryAnswer = Schema.Struct({
   earlier: Schema.optional(Schema.NullOr(Seq)),
@@ -1314,6 +1448,100 @@ export const MetricsAnswer = Schema.Struct({
   signals_waiting: Schema.Int,
 }).annotations({ identifier: "MetricsAnswer" });
 export type MetricsAnswer = typeof MetricsAnswer.Type;
+
+/**
+ * Whether colour carries meaning on these pages, or only contrast
+ * does.
+ */
+export const Chroma = Schema.Literal("full", "off").annotations({ identifier: "Chroma" });
+export type Chroma = typeof Chroma.Type;
+
+/**
+ * How much air the spacing steps carry. Two named postures rather than
+ * a coefficient, because the coefficient is the stylesheet's to
+ * choose.
+ */
+export const Density = Schema.Literal("comfortable", "compact").annotations({ identifier: "Density" });
+export type Density = typeof Density.Type;
+
+/**
+ * Where one of the two typefaces comes from.
+ */
+export const Face = Schema.Union(
+  Schema.Literal("geist"),
+  Schema.Literal("system"),
+  Schema.Literal("custom"),
+).annotations({ identifier: "Face" });
+export type Face = typeof Face.Type;
+
+/**
+ * Which palette the pages are drawn in. `System` is the absence of an
+ * opinion, resolved where the page is drawn rather than in the
+ * stylesheet: the light palette is declared once, and a second
+ * declaration of it inside a `prefers-color-scheme` block would be a
+ * second authority for the same rungs.
+ */
+export const Lighting = Schema.Literal("system", "dark", "light").annotations({ identifier: "Lighting" });
+export type Lighting = typeof Lighting.Type;
+
+/**
+ * Whether the pages animate. `System` is the absence of an opinion,
+ * which is what the stylesheet's `prefers-reduced-motion` block reads.
+ */
+export const Motion = Schema.Literal("system", "on", "off").annotations({ identifier: "Motion" });
+export type Motion = typeof Motion.Type;
+
+/**
+ * How the pages look.
+ */
+export const Appearance = Schema.Struct({
+  body_px: Schema.optional(Schema.NullOr(Schema.Int)),
+  chroma: Chroma,
+  density: Density,
+  lighting: Lighting,
+  mono: Face,
+  mono_stack: Schema.String,
+  motion: Motion,
+  sans: Face,
+  sans_stack: Schema.String,
+}).annotations({ identifier: "Appearance" });
+export type Appearance = typeof Appearance.Type;
+
+/**
+ * One chord the person rebound: the action, and the chord as the
+ * keymap spells it.
+ * 
+ * An action left at the chord this build ships has no entry, so the
+ * list says what was changed rather than what the keymap holds.
+ */
+export const Chord = Schema.Struct({
+  action: Schema.String,
+  spelled: Schema.String,
+}).annotations({ identifier: "Chord" });
+export type Chord = typeof Chord.Type;
+
+/**
+ * Which language a person reads the interface in.
+ */
+export const Lang = Schema.Literal("en", "zh").annotations({ identifier: "Lang" });
+export type Lang = typeof Lang.Type;
+
+/**
+ * Everything one person settled about their own copy of the city.
+ * 
+ * Whole rather than a dozen readings, because that is the record the
+ * file holds and because a screen that changes two of these at once
+ * must not be able to write one and drop the other.
+ */
+export const PreferencesAnswer = Schema.Struct({
+  appearance: Appearance,
+  chords: Schema.Array(Chord),
+  lang: Lang,
+  panel: Schema.Boolean,
+  proxying: Proxying,
+  welcomed: Schema.Boolean,
+}).annotations({ identifier: "PreferencesAnswer" });
+export type PreferencesAnswer = typeof PreferencesAnswer.Type;
 
 /**
  * The four slots of a frozen prefix, in the order they are sent.
@@ -1805,6 +2033,12 @@ export const Answer = Schema.Union(
     release: ReleaseAnswer,
   }),
   Schema.Struct({
+    preferences: PreferencesAnswer,
+  }),
+  Schema.Struct({
+    config: ConfigAnswer,
+  }),
+  Schema.Struct({
     unavailable: Schema.Struct({
       query: Schema.String,
     }),
@@ -1840,27 +2074,6 @@ export const HeaderPair = Schema.Struct({
   value: Schema.String,
 }).annotations({ identifier: "HeaderPair" });
 export type HeaderPair = typeof HeaderPair.Type;
-
-/**
- * Which of this endpoint's calls go through the machine's proxy.
- * 
- * A proxy that intercepts loopback answers 502 for a local inference
- * server, so the city takes an address on its own machine off the
- * proxy by default — and that default is a rule about the common
- * machine, not a fact about every machine. Two other settings are real
- * needs rather than symmetry: a person whose provider sits behind a
- * relay on loopback that their organisation requires them to audit
- * needs [`Always`](Proxying::Always), and a person on a virtual network
- * adapter, whose routes already carry every packet, needs
- * [`Never`](Proxying::Never) so a stale proxy variable cannot break a
- * call the machine would otherwise make.
- */
-export const Proxying = Schema.Union(
-  Schema.Literal("except_local"),
-  Schema.Literal("always"),
-  Schema.Literal("never"),
-).annotations({ identifier: "Proxying" });
-export type Proxying = typeof Proxying.Type;
 
 /**
  * Everything a person settles about one endpoint beyond its address.
@@ -1937,13 +2150,63 @@ export const LoginStep = Schema.Union(
 export type LoginStep = typeof LoginStep.Type;
 
 /**
- * A mode name in transit. Authority for the mode set is `runtime::Mode`.
+ * Which discipline a run works under. A run sits in exactly one.
+ * 
+ * Closed, and carried on the wire in this spelling. A dispatch used to
+ * name its mode as free text that the assembly layer matched against
+ * four words and answered every other word with [`Mode::PlanGoal`], so
+ * a client that misspelled `experiment` got a planning run and no
+ * refusal. There is now nothing to misspell: a word outside this set
+ * fails to deserialize at the process boundary, which is where the
+ * sender can still be told.
+ * 
+ * Defined here rather than in `runtime` for the reason
+ * [`DialectKind`](crate::DialectKind) is: the wire carries it and
+ * `runtime` evaluates it, and neither of those crates may name the
+ * other. `runtime::mode` holds what each one admits; this holds only
+ * which ones exist.
  */
-export const ModeTag = Schema.String.pipe(Schema.brand("ModeTag"));
-export type ModeTag = typeof ModeTag.Type;
+export const Mode = Schema.Union(
+  Schema.Literal("plan_goal"),
+  Schema.Literal("up"),
+  Schema.Literal("sc"),
+  Schema.Literal("ud"),
+  Schema.Literal("experiment"),
+).annotations({ identifier: "Mode" });
+export type Mode = typeof Mode.Type;
 
 export const NoSecret = Schema.Never.annotations({ identifier: "NoSecret" });
 export type NoSecret = typeof NoSecret.Type;
+
+/**
+ * One named change to [`PreferencesAnswer`].
+ * 
+ * A closed set of named changes rather than a whole record, so two
+ * screens settling different facts cannot overwrite each other, and so
+ * a frame that names a fact this build does not keep is refused at the
+ * boundary rather than merged.
+ */
+export const PreferencePatch = Schema.Union(
+  Schema.Struct({
+    lang: Lang,
+  }),
+  Schema.Struct({
+    welcomed: Schema.Boolean,
+  }),
+  Schema.Struct({
+    panel: Schema.Boolean,
+  }),
+  Schema.Struct({
+    appearance: Appearance,
+  }),
+  Schema.Struct({
+    proxying: Proxying,
+  }),
+  Schema.Struct({
+    chord: Chord,
+  }),
+).annotations({ identifier: "PreferencePatch" });
+export type PreferencePatch = typeof PreferencePatch.Type;
 
 /**
  * A provider name in transit. Authority for the provider set is `gateway`.
@@ -1970,16 +2233,29 @@ export const PursuitStep = Schema.Union(
 export type PursuitStep = typeof PursuitStep.Type;
 
 /**
+ * Where a [`Command::PutShelved`](crate::Command) writes.
+ * 
+ * Two places and no third, for the reason
+ * [`GovernedDocument`](crate::GovernedDocument) is a closed set: both
+ * of them sit under the city's reserved subtree, which no write
+ * domain reaches, so a frame that named its own path would be a way
+ * to write anywhere inside the one place a resident may not edit. The
+ * city turns a shelf and a name into a path; the sender never spells
+ * one.
+ */
+export const Shelf = Schema.Union(
+  Schema.Literal("library"),
+  Schema.Struct({
+    building: Address,
+  }),
+).annotations({ identifier: "Shelf" });
+export type Shelf = typeof Shelf.Type;
+
+/**
  * A Building template name in transit. Authority is `city`.
  */
 export const TemplateName = Schema.String.pipe(Schema.brand("TemplateName"));
 export type TemplateName = typeof TemplateName.Type;
-
-/**
- * Handle for bytes already delivered to the upload endpoint.
- */
-export const UploadId = Schema.String.pipe(Schema.brand("UploadId"));
-export type UploadId = typeof UploadId.Type;
 
 /**
  * Commands change state, require authorization, and are idempotent.
@@ -1997,7 +2273,7 @@ export const Command = Schema.Union(
       effort: Schema.optional(Schema.NullOr(Effort)),
       goal: Schema.String,
       idem: IdemKey,
-      mode: ModeTag,
+      mode: Mode,
       session: Schema.optional(Schema.NullOr(SessionName)),
       task: Schema.String,
     }),
@@ -2043,7 +2319,7 @@ export const Command = Schema.Union(
   }),
   Schema.Struct({
     select_model: Schema.Struct({
-      context_tokens: Schema.Int,
+      context_tokens: Schema.optional(Schema.NullOr(Window)),
       endpoint: ProviderName,
       idem: IdemKey,
       max_output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
@@ -2057,13 +2333,6 @@ export const Command = Schema.Union(
       at_seq: Seq,
       idem: IdemKey,
       run: RunId,
-    }),
-  }),
-  Schema.Struct({
-    attach: Schema.Struct({
-      idem: IdemKey,
-      notify: Schema.Array(RunId),
-      upload: UploadId,
     }),
   }),
   Schema.Struct({
@@ -2148,9 +2417,10 @@ export const Command = Schema.Union(
     }),
   }),
   Schema.Struct({
-    create_policy: Schema.Struct({
-      from_item: ApprovalId,
+    hand_off: Schema.Struct({
       idem: IdemKey,
+      item: ApprovalId,
+      to: ResidentId,
     }),
   }),
   Schema.Struct({
@@ -2186,6 +2456,20 @@ export const Command = Schema.Union(
     connect_toolkit: Schema.Struct({
       idem: IdemKey,
       toolkit: ToolkitSlug,
+    }),
+  }),
+  Schema.Struct({
+    put_preferences: Schema.Struct({
+      idem: IdemKey,
+      patch: PreferencePatch,
+    }),
+  }),
+  Schema.Struct({
+    put_shelved: Schema.Struct({
+      idem: IdemKey,
+      name: Schema.String,
+      shelf: Shelf,
+      text: Schema.String,
     }),
   }),
   Schema.Struct({
@@ -2326,6 +2610,12 @@ export const Query = Schema.Union(
   }),
   Schema.Literal("toolkits"),
   Schema.Literal("release"),
+  Schema.Literal("preferences"),
+  Schema.Struct({
+    config: Schema.Struct({
+      addr: Address,
+    }),
+  }),
 ).annotations({ identifier: "Query" });
 export type Query = typeof Query.Type;
 

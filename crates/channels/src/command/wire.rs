@@ -44,7 +44,6 @@ impl<Secret> Command<Secret> {
             | Self::Fork { ref idem, .. }
             | Self::ProbeEndpoint { ref idem, .. }
             | Self::ConfigureBuilding { ref idem, .. }
-            | Self::Attach { ref idem, .. }
             | Self::CreateBuilding { ref idem, .. }
             | Self::Steer { ref idem, .. }
             | Self::Cancel { ref idem, .. }
@@ -54,10 +53,12 @@ impl<Secret> Command<Secret> {
             | Self::Release { ref idem, .. }
             | Self::BatchByBuilding { ref idem, .. }
             | Self::Approve { ref idem, .. }
-            | Self::CreatePolicy { ref idem, .. }
+            | Self::HandOff { ref idem, .. }
             | Self::SetAutonomy { ref idem, .. }
             | Self::Pursue { ref idem, .. }
             | Self::PutDocument { ref idem, .. }
+            | Self::PutPreferences { ref idem, .. }
+            | Self::PutShelved { ref idem, .. }
             | Self::AttachEndpoint { ref idem, .. }
             | Self::SelectModel { ref idem, .. }
             | Self::Reveal { ref idem, .. }
@@ -186,15 +187,6 @@ impl From<WireCommand> for Command {
                 addr,
                 idem,
             },
-            Command::Attach {
-                upload,
-                notify,
-                idem,
-            } => Self::Attach {
-                upload,
-                notify,
-                idem,
-            },
             Command::CreateBuilding {
                 addr,
                 template,
@@ -225,7 +217,7 @@ impl From<WireCommand> for Command {
                 verdict,
                 idem,
             },
-            Command::CreatePolicy { from_item, idem } => Self::CreatePolicy { from_item, idem },
+            Command::HandOff { item, to, idem } => Self::HandOff { item, to, idem },
             Command::Pursue { addr, step, idem } => Self::Pursue { addr, step, idem },
             Command::SetAutonomy {
                 scope,
@@ -237,6 +229,18 @@ impl From<WireCommand> for Command {
                 idem,
             },
             Command::PutDocument { which, body, idem } => Self::PutDocument { which, body, idem },
+            Command::PutPreferences { patch, idem } => Self::PutPreferences { patch, idem },
+            Command::PutShelved {
+                shelf,
+                name,
+                text,
+                idem,
+            } => Self::PutShelved {
+                shelf,
+                name,
+                text,
+                idem,
+            },
             Command::Auth { token } => Self::Auth { token },
         }
     }

@@ -12,15 +12,42 @@
 // component gives every column a header, and the three words this plan
 // would need - the node number, the item, its state - are not in
 // `lang.json` yet. The move is one edit behind those three entries.
+//
+// The state on the right is `parts/badge.tsx`. It was five hand-drawn
+// paints here, which is the same thing that component is for, and the
+// nested conditional that chose between them had no arm for a row
+// awaiting approval - that row was drawn as one nobody had started.
 
 import { For, Show } from "solid-js";
 
 import type { BuildingAnswer, PlanRow } from "../../wire";
 import { useSay } from "../../ui";
+import { Badge } from "../parts/badge";
+import type { Weight } from "../parts/badge";
 
 function statusWord(say: ReturnType<typeof useSay>, row: PlanRow): string {
   if (row.status === "not_started" && row.ready) return say("status_ready");
   return say(`status_${row.status}`);
+}
+
+// How loudly one row's state is drawn. Exhaustive over the five states
+// the wire carries, so a sixth is a compile error rather than a row
+// that quietly looks like an idle one. The colour only repeats the
+// word beside it, which is why two states may share a weight: `ready`
+// and `in_progress` are both the city working, and `blocked` and
+// `awaiting_approval` are both the city stopped until somebody acts.
+function weightOf(row: PlanRow): Weight {
+  switch (row.status) {
+    case "in_progress":
+      return "live";
+    case "blocked":
+    case "awaiting_approval":
+      return "alert";
+    case "not_started":
+      return row.ready ? "live" : "quiet";
+    case "done":
+      return "quiet";
+  }
 }
 
 export function Plan(props: { readonly answer: BuildingAnswer }) {
@@ -53,21 +80,7 @@ export function Plan(props: { readonly answer: BuildingAnswer }) {
                       </Show>
                     </td>
                     <td class="py-snug text-right whitespace-nowrap">
-                      <span
-                        class={`rounded-pill px-snug py-tight ${
-                          row.status === "done"
-                            ? "bg-g2 text-text-faint"
-                            : row.status === "blocked"
-                              ? "bg-alert text-g0"
-                              : row.status === "in_progress"
-                                ? "bg-accent text-g0"
-                                : row.ready
-                                  ? "bg-g3 text-text"
-                                  : "text-text-disabled"
-                        }`}
-                      >
-                        {statusWord(say, row)}
-                      </span>
+                      <Badge text={statusWord(say, row)} weight={weightOf(row)} dot />
                     </td>
                   </tr>
                 );

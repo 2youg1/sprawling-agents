@@ -51,23 +51,27 @@ impl Entered {
     /// When the text carries a scheme this city cannot call, or no host
     /// to call at all.
     pub(super) fn resolved(mut self) -> Result<Entered, kernel::AxError> {
-        let hint = match self.dialect {
-            kernel::DialectKind::Anthropic => gateway::DialectHint::Messages,
-            kernel::DialectKind::OpenAi => gateway::DialectHint::Chat,
-        };
-        let settled = gateway::normalise_entered(&self.base_url, hint)?;
+        let settled = gateway::normalise_entered(&self.base_url, hint_of(self.dialect))?;
         self.dialect = match settled.dialect {
             gateway::DialectHint::Messages => kernel::DialectKind::Anthropic,
-            // `Responses` has no registration of its own until the wire
-            // carries one (roadmap 4.5). Until then it is called the way
-            // every other OpenAI-shaped endpoint is, which is what the
-            // person chose when they picked that group.
-            gateway::DialectHint::Chat
-            | gateway::DialectHint::Responses
-            | gateway::DialectHint::Unset => kernel::DialectKind::OpenAi,
+            gateway::DialectHint::Responses => kernel::DialectKind::OpenAiResponses,
+            gateway::DialectHint::Chat | gateway::DialectHint::Unset => kernel::DialectKind::OpenAi,
         };
         self.base_url = settled.base_url;
         Ok(self)
+    }
+}
+
+/// Which shape a compatible format asks the URL reader to expect.
+///
+/// The one translation between the two spellings. The reader speaks in
+/// hints because a person may not have chosen yet; a registration
+/// speaks in formats because by then they have.
+pub(super) fn hint_of(dialect: kernel::DialectKind) -> gateway::DialectHint {
+    match dialect {
+        kernel::DialectKind::Anthropic => gateway::DialectHint::Messages,
+        kernel::DialectKind::OpenAi => gateway::DialectHint::Chat,
+        kernel::DialectKind::OpenAiResponses => gateway::DialectHint::Responses,
     }
 }
 
@@ -171,7 +175,10 @@ pub(super) struct Chosen {
 /// absent ceiling each mean "nobody stated this", and the catalogue's
 /// figure is taken where the catalogue has a row for the model.
 pub(super) struct Ceilings {
-    pub(super) context_tokens: u64,
+    /// `None` when nobody stated one. Zero is unrepresentable here:
+    /// a window of zero and a window nobody registered used to be the
+    /// same byte, and the reminder read every session as full.
+    pub(super) context_tokens: Option<kernel::Window>,
     pub(super) max_output_tokens: Option<kernel::Ceiling>,
 }
 
@@ -187,7 +194,7 @@ pub(super) fn dialect_headers(dialect: kernel::DialectKind) -> Vec<(String, gate
             "anthropic-version".to_owned(),
             gateway::HeaderValue::Plain(ANTHROPIC_VERSION.to_owned()),
         )],
-        kernel::DialectKind::OpenAi => Vec::new(),
+        kernel::DialectKind::OpenAi | kernel::DialectKind::OpenAiResponses => Vec::new(),
     }
 }
 

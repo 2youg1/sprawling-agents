@@ -251,7 +251,7 @@ fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
             addr: Address::parse("lab/room1").unwrap(),
             task: "this building's work needs checking before it lands".to_owned(),
             goal: "the rules say so, then stop".to_owned(),
-            mode: channels::ModeTag::parse("plan").unwrap(),
+            mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,

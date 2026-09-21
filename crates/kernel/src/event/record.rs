@@ -39,7 +39,16 @@
 //! bytes.
 
 mod checkpoint;
+mod log;
 mod run;
+mod tool;
+mod turn;
 
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
-pub use run::{RunForked, RunStarted, SkillPin};
+pub use log::LogTruncated;
+pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SkillPin};
+pub use tool::{ToolAnswer, ToolCalled, ToolResult};
+pub use turn::{
+    ModelCalled, ModelReturned, PromptAssembled, PromptSegment, PromptSkip, PromptSource,
+    SkipReason, SteerReceived,
+};

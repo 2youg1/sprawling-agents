@@ -2975,3 +2975,49 @@ impl Home {
 **四个模块，各答一个问题。** `import::machine` 只答「那份配置在运行这座城的机器上的哪里」，`~` 经 `bin::home::Home` 解析而不是自己拼；`import::codex` 与 `import::pi` 各拥有一种文法，读不懂的键是错误而不是被跳过；`import::provider` 是读出来的东西在本城词汇里的样子，两种文法都折到它上面，于是「一个 provider 是什么」只有一处定义。
 
 **没查证的字段不写。** 上游文法里本城不确定的键一律登记为待查并留空，而不是猜一个默认值填进去——一个猜出来的 base URL 会在 404 之后让人去查一件本城自己编的事实。
+
+### 8-73 run 标识直接取自摘要，而停不下来的疑问算「停」（`assembly::dispatching::agreeing::run_id_for`、`assembly::driving::lane`；Roadmap B-52）
+
+- **缺陷**：`run_id_for` 把摘要印成十六进制再逐对解回字节，两步各带一个 `unwrap_or`——`from_utf8` 失败取 `"00"`，`from_str_radix` 失败取 `0`。一次解不出的摘要于是变成全零的 run id，而两条不同的活会得到同一个标识。
+- **改法**：`B3Hash::as_bytes()` 的前十六字节即标识，解析这一步整个消失。字节与旧写法逐位相同（印出来的十六进制正是这些字节），故账本与 replay 的字节不变。
+- **`Interrupting::ask` 的同一类默认**：`backlog.stopping(id)` 的 `Err` 此前读作「没停」。读不到那张表的城答不出这个作用域还开着，于是改答为「停」——一次多余的取消看得见，一次漏掉的取消让 run 跑在人已经关掉的作用域里。
+
+**本章测试**：`two_jobs_at_one_millisecond_get_two_run_ids`（`assembly::dispatching::tests`）。
+
+### 8-74 折叠读不懂的那一行就说出来，而「关」与「开」只有一种拼法（`assembly::folds`、`views::holding`；Roadmap B-53、G-26）
+
+```rust
+pub(crate) enum Admission { Halted, Released }
+impl Admission {
+    pub(crate) fn spelling(self) -> &'static str;
+    pub(crate) fn in_record(data: &serde_json::Map<String, serde_json::Value>)
+        -> Result<Option<(&str, Admission)>, AxError>;
+}
+impl Governance { pub(super) fn absorb(..) -> Result<(), AxError>; }
+```
+
+- **`absorb` 改 `Result`**：读不懂的审批项与缺字段的 `run_started` 此前被静默丢掉，于是「历史里有一条这个 build 读不懂的线」表现为开城后少了一批待答项与一段活的说明。两处改为 `E_WIRE_MISMATCH`，恢复语指向写下这段历史的那个 build。
+- **`Admission` 收掉 `HALTED`／`RELEASED` 两个字符串常数**：此前四处手写比较，而两个折叠对一个不认识的状态词答得相反——`Governance` 读成「开」，`Views` 忽略整行。现在两侧读同一个 `in_record`，不认识的词是一次拒绝：把它读成「开」的城会往人已经关掉的作用域里派活。
+- **写的一侧同源**：`set_admission` 收 `Admission` 而不是 `&str`，载荷里的词由 `spelling()` 写出。
+
+**本章测试**：`an_unreadable_approval_item_stops_the_fold`、`a_halt_and_a_release_round_trip_through_one_spelling`（`assembly::folds::tests`）。
+
+### 8-75 给活取名失败时，人被告知的是真正的原因（`assembly::dispatching::session::name_the_work`；Roadmap B-54）
+
+- **缺陷**：七处 `.ok()?` 把凭据兑不出、适配器造不出、调用没回来、回复读不懂全部折成一个 `None`，而调用方把 `None` 一律翻成「自己给房间取个名字」。一个 provider 连不上的人被指去填一个字段。
+- **改法**：`name_the_work` 返回 `Result<Option<SessionName>, AxError>`。`Ok(None)` 只留给「模型答了，而它答的不是一个合法的会话名」——包括回复里一个字都没有。其余每一条按它本来的错误上抛，`session_for` 的三段式拒绝因此只在真的该由人补名字时出现。
+
+**本章测试**：类型即判定依据——`Ok(None)` 只有一个来源，编译器守住其余每一条错误路径；既有的 `a_confidential_building_will_not_name_a_room_with_a_model_off_this_machine`（`assembly::dispatching::tests`）仍钉住「该由人补名字」那一条走到三段式拒绝。
+
+### 8-76 哪些记录会动计划，是一张穷尽表（`plan_view::may_move_plan`；Roadmap B-55）
+
+```rust
+enum PlanReach { Untouched, Stale, NodeFreed, NodeStopped }
+fn may_move_plan(kind: EventKind) -> PlanReach;
+```
+
+- **缺陷**：`PlanView::apply` 的注释写「没有地址的记录使每一份解析可疑」，代码只在 `CityInitialized` 时清空；一条没有地址的 `checkpoint_committed` 于是让每栋楼继续报改动前的表。
+- **改法**：失效判定上提为按 `EventKind` 的穷尽表，通配臂消失；没有地址的记录只要它的类别会动计划，就清掉全部解析。类别与旧代码逐条相同，故有地址那条路径上的行为不变。
+- **仍未收进来的两类**：`pr_merged` 与 `rollback_applied` 同样会把文件落进楼里，今天读作 `Untouched`。改它们要连着改 `views::commits` 的期望，故单列一条叶子，不混进本节。
+
+**本章测试**：`a_record_with_no_address_stales_every_plan_it_could_have_moved`、`every_event_kind_has_a_reach`（`plan_view::tests`）。

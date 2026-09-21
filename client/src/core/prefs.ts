@@ -12,12 +12,14 @@
 // one way and read another goes unnoticed; now they read
 // `PreferenceDoor` and this file is the only reader of `ROWS`.
 //
-// **The door is where the city's answer will arrive.** The person's
-// own layer of `config.toml` is the authority these values are headed
-// for (roadmap 3.14), so every reader above already takes them as one
-// record handed over by a door rather than as rows it fetches itself:
-// the day `PreferencesAnswer` lands, this file changes and no view
-// does.
+// **Two layers keep these, and the city wins.** The person's own
+// `~/.sprawling/config.toml` is the authority (roadmap 3.1) and this
+// browser's store is the cache in front of it: the cache draws the
+// first paint so no screen flashes the posture it ships with, and
+// `adopt` replaces the whole record the moment the city answers. A
+// change made before the city has answered is kept in this browser
+// alone, and `keeper()` says so on the settings page rather than
+// leaving a person to find out when they clear the browser's data.
 //
 // **A guess this build cannot read is dropped rather than repaired.**
 // An unreadable row falls back to the posture the client ships with,
@@ -159,16 +161,41 @@ export interface Preferences {
   readonly proxying: Proxying;
 }
 
+// Who keeps these preferences between one visit and the next.
+//
+// Two answers, and a person is entitled to both of them: somebody who
+// picks a face for the page needs to know whether the choice follows
+// them to their next browser or dies with this profile's data.
+export type Keeper =
+  // This browser and nothing else. Clearing its data loses them, and
+  // another browser reaching the same city starts from the postures
+  // this client ships with.
+  | "browser"
+  // The city, in the person's own `~/.sprawling/config.toml`. This
+  // browser still caches the record, and the cache never outranks the
+  // answer: every answer that arrives replaces it whole.
+  | "city";
+
 // The one way to the person's preferences: the record as it stands,
-// five named changes to it, and the two families that are read by name
+// who is keeping it, the city's answer coming the other way, five
+// named changes to it, and the two families that are read by name
 // because they have one row each per place and per action.
 //
 // Named changes rather than one `write`, because each of them becomes
 // its own command the day the city keeps these: a caller that handed
 // over a whole record would have to be rewritten then, and a caller
-// that says which fact it is changing would not.
+// that says which fact it is changing would not. `adopt` is the other
+// direction and is therefore whole - an answer states every value at
+// once, and a record applied field by field could be half of one
+// answer and half of the last.
 export interface PreferenceDoor {
   readonly held: Accessor<Preferences>;
+  readonly keeper: Accessor<Keeper>;
+  // The city's whole record, taken as the one that counts: it becomes
+  // what `held` answers, it is mirrored into the cache so the next
+  // first paint draws it rather than the shipped postures, and it is
+  // the only thing that makes `keeper` say `city`.
+  readonly adopt: (stated: Preferences) => void;
   readonly setLang: (lang: Lang) => void;
   readonly setWelcomed: (done: boolean) => void;
   readonly setPanel: (open: boolean) => void;
@@ -236,44 +263,70 @@ function writeAppearance(rows: Rows, next: Appearance): void {
   rows.setItem(ROWS.motion, next.motion);
 }
 
+// The two words a yes-or-no row is written with, spelled here so the
+// write and the read cannot spell them differently.
+//
+// Each of the two rows is compared against one of them, because an
+// absent row means different things: `welcomed` is false until
+// somebody has walked the welcome, and `panel` is open until somebody
+// has closed it.
+const YES = "yes";
+const NO = "no";
+
 function readPreferences(rows: Rows, browserLang: string): Preferences {
   return {
     lang: readLang(rows.getItem(ROWS.lang), browserLang),
-    welcomed: rows.getItem(ROWS.welcomed) === "yes",
-    panel: rows.getItem(ROWS.panel) !== "no",
+    welcomed: rows.getItem(ROWS.welcomed) === YES,
+    panel: rows.getItem(ROWS.panel) !== NO,
     appearance: readAppearance(rows),
     proxying: readOne(PROXYINGS, rows.getItem(ROWS.proxying), "except_local"),
   };
+}
+
+// The whole record into the cache, which `readPreferences` reads back.
+// The two are inverse, and that is what makes the cache a cache: what
+// the city last answered is what the next first paint draws.
+function writePreferences(rows: Rows, next: Preferences): void {
+  rows.setItem(ROWS.lang, next.lang);
+  rows.setItem(ROWS.welcomed, next.welcomed ? YES : NO);
+  rows.setItem(ROWS.panel, next.panel ? YES : NO);
+  writeAppearance(rows, next.appearance);
+  rows.setItem(ROWS.proxying, next.proxying);
 }
 
 // The door onto one store. A test hands it a map and its own language
 // tag; the page reaches the browser's through `preferences()` below.
 export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor {
   const [held, setHeld] = createSignal<Preferences>(readPreferences(rows, browserLang));
-  // Each change writes its own rows and then the record, so a reader
-  // that redraws on the signal and a reader that reloads the page see
-  // the same thing.
+  const [keeper, setKeeper] = createSignal<Keeper>("browser");
+  // One write path for every change, the city's answer included: the
+  // cache and the signal move together, so a reader that redraws and a
+  // reader that reloads the page never see two different records.
+  const settle = (next: Preferences): void => {
+    writePreferences(rows, next);
+    setHeld(next);
+  };
   return {
     held,
+    keeper,
+    adopt(stated) {
+      settle(stated);
+      setKeeper("city");
+    },
     setLang(lang) {
-      rows.setItem(ROWS.lang, lang);
-      setHeld((before) => ({ ...before, lang }));
+      settle({ ...held(), lang });
     },
-    setWelcomed(done) {
-      rows.setItem(ROWS.welcomed, done ? "yes" : "no");
-      setHeld((before) => ({ ...before, welcomed: done }));
+    setWelcomed(welcomed) {
+      settle({ ...held(), welcomed });
     },
-    setPanel(open) {
-      rows.setItem(ROWS.panel, open ? "yes" : "no");
-      setHeld((before) => ({ ...before, panel: open }));
+    setPanel(panel) {
+      settle({ ...held(), panel });
     },
-    setAppearance(next) {
-      writeAppearance(rows, next);
-      setHeld((before) => ({ ...before, appearance: next }));
+    setAppearance(appearance) {
+      settle({ ...held(), appearance });
     },
-    setProxying(rule) {
-      rows.setItem(ROWS.proxying, rule);
-      setHeld((before) => ({ ...before, proxying: rule }));
+    setProxying(proxying) {
+      settle({ ...held(), proxying });
     },
     chord: (action) => rows.getItem(ROWS.chord + action) ?? "",
     setChord(action, spelled) {

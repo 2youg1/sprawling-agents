@@ -110,10 +110,36 @@ pub fn redact_text(text: &str) -> (String, u32) {
     (out, hits)
 }
 
-fn marker(found: &[u8]) -> String {
+/// How many hex characters of a value's hash stand for the value.
+/// Sixteen is enough to tell two values apart in a history and far too
+/// few to reconstruct one.
+const FINGERPRINT_HEX: usize = 16;
+
+/// The one short name this city gives a secret it must refer to without
+/// holding.
+///
+/// Two places need such a name and they must agree: this module, which
+/// replaces a span in a ledger payload, and the custodian, which stores
+/// the span in the vault under a name. A custodian that numbers its
+/// captures instead - `cap-1`, `cap-2` - gives the same value a
+/// different name in every session and two different values the same
+/// name across two, which is how a stored credential comes back as
+/// somebody else's.
+#[must_use]
+pub fn fingerprint(found: &[u8]) -> String {
     let digest = B3Hash::digest(found).to_string();
-    let short = digest.get(..16).unwrap_or(&digest);
-    format!("secret:{REDACTED_REALM}/{short}")
+    digest.get(..FINGERPRINT_HEX).unwrap_or(&digest).to_owned()
+}
+
+/// The vault name a captured secret is stored under: derived from the
+/// value, so capturing one twice is capturing it once.
+#[must_use]
+pub fn capture_name(found: &[u8]) -> String {
+    format!("cap-{}", fingerprint(found))
+}
+
+fn marker(found: &[u8]) -> String {
+    format!("secret:{REDACTED_REALM}/{}", fingerprint(found))
 }
 
 #[cfg(test)]
@@ -189,6 +215,22 @@ mod tests {
         assert_eq!(redacted.get("count").and_then(Value::as_u64), Some(3));
         let text = serde_json::to_string(&redacted).unwrap();
         assert!(!text.contains(&key));
+    }
+
+    /// One value, one short name, wherever the city has to refer to it:
+    /// the marker a ledger line carries and the vault name a capture is
+    /// stored under are the same sixteen characters.
+    #[test]
+    fn a_marker_and_a_capture_name_stand_for_the_value_the_same_way() {
+        let key = key_shaped();
+        let short = fingerprint(key.as_bytes());
+        assert_eq!(short.len(), 16);
+        assert_eq!(capture_name(key.as_bytes()), format!("cap-{short}"));
+        let (marked, hits) = redact_text(&key);
+        assert_eq!(hits, 1);
+        assert_eq!(marked, format!("secret:redacted/{short}"));
+        let other = ["sk", "2Tg7Yh", "4Nn1Qs", "8Cz5Ud", "6Ke0"].join("");
+        assert_ne!(capture_name(other.as_bytes()), capture_name(key.as_bytes()));
     }
 
     #[test]

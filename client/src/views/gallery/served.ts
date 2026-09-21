@@ -13,11 +13,25 @@
 // them the two screens would disagree about what this provider serves.
 
 import type { ModelFact } from "../../core/probed";
-import type { EndpointsAnswer } from "../../wire";
+import type { EndpointsAnswer, ModelFactsSummary } from "../../wire";
+import { Ceiling, Window } from "../../wire";
 
 // The three model ids, each written once. Every list below names them
 // through these, so a fixture cannot describe a model the endpoint does
 // not serve.
+// One catalogue row as a probe that read the provider's own list would
+// have left it: the id, and whatever that list stated beside it.
+function facts(id: string, context: number | null, ceiling: number | null): ModelFactsSummary {
+  return {
+    id,
+    context_tokens: context === null ? null : Window.make(context),
+    max_output_tokens: ceiling === null ? null : Ceiling.make(ceiling),
+    input_modalities: [],
+    input_price: null,
+    output_price: null,
+  };
+}
+
 const FABLE = "anthropic/claude-fable-5.1";
 const NUCLEUS = "openai/gpt-nucleus-6";
 const MUSE = "meta/muse-spark-1.3-contributor";
@@ -90,20 +104,22 @@ export const ENDPOINTS: EndpointsAnswer = {
   endpoints: [
     {
       base_url: "https://api.zenmux.ai/v1",
+      connection_kind: "openai_compat",
       dialect: "open_ai",
       has_credential: true,
       label: "ZenMux",
       local: false,
-      models: [FABLE, NUCLEUS],
+      models: [facts(FABLE, 204_800, 64_000), facts(NUCLEUS, 400_000, null)],
       name: "zenmux",
     },
     {
       base_url: "http://127.0.0.1:11434/v1",
+      connection_kind: "openai_compat",
       dialect: "open_ai",
       has_credential: false,
       label: "local",
       local: true,
-      models: ["local/qwen3"],
+      models: [facts("local/qwen3", null, null)],
       name: "local",
     },
   ],

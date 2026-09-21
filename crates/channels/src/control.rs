@@ -98,7 +98,6 @@ pub fn classify(command: &Command) -> ControlVerdict {
         | Command::SelectModel { .. }
         | Command::Login { .. }
         | Command::Fork { .. }
-        | Command::Attach { .. }
         | Command::CreateBuilding { .. }
         | Command::PutSecret { .. }
         // Opening a file manager reaches nothing a run is doing.
@@ -110,7 +109,10 @@ pub fn classify(command: &Command) -> ControlVerdict {
         | Command::DoctorRefresh { .. }
         | Command::BatchByBuilding { .. }
         | Command::Approve { .. }
-        | Command::CreatePolicy { .. }
+        // Giving a question to a resident changes who answers it. The
+        // run that asked stays stopped either way, so nothing is being
+        // interrupted and there is no scene to hand over.
+        | Command::HandOff { .. }
         | Command::SetAutonomy { .. }
         // Pausing a standing goal stops the city taking new work; it
         // does not reach into a run that is already going, and a verb
@@ -121,6 +123,11 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // going: the frozen prefix of a live run was assembled before
         // this frame arrived.
         | Command::PutDocument { .. }
+        // What a person settled about their own reading of the city
+        // reaches no run at all, and a skill written onto a shelf is
+        // admitted by the run after this one.
+        | Command::PutPreferences { .. }
+        | Command::PutShelved { .. }
         // Connecting an outside application changes what tools the next
         // run is offered and reaches nothing a run is already doing: a
         // live run holds the tool table it was assembled with, and an

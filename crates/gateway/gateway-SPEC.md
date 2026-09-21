@@ -590,7 +590,7 @@ pub struct HostPreset { pub host: &'static str, pub base_path: &'static str,
 pub struct ModelPreset { pub id_prefix: &'static str, pub context_tokens: u64,
                          pub max_output_tokens: u64, pub input: InputKinds,
                          pub source: &'static str }
-pub const PRESETS: [HostPreset; 4];
+pub const PRESETS: [HostPreset; 7];
 pub fn for_host(host: &str) -> Option<&'static HostPreset>;
 pub fn model_for(base_url: &str, id: &str) -> Option<&'static ModelPreset>;
 pub fn ceiling_for(base_url: &str, id: &str) -> Option<Ceiling>;
@@ -609,6 +609,9 @@ impl OutputCeiling {
 - **`resolve` 的返回值带着是谁答的**（`CeilingSource`），因为只拿到数字的调用方说不出一次跑为什么停在那里。这是对 `anthropic.rs` 那句自我反对的回答——「a ceiling invented at the call site truncates runs for a reason that appears nowhere in the account」：现在它出现在账里（`model_selected.ceiling_from`，见 sprawling-SPEC §8-52）。
 - **钉版目录与预设表是同一档的两个索引**：目录按精确 id 查，预设表按 host ＋ id 前缀查，一条测试钉住两个索引不为同一个 id 作答。`MarketSnapshot::lookup` 因此保持精确匹配，前缀匹配只发生在预设表内。
 - **预设表逐行注出处**，每行带厂商文档地址；查不到的行不发明数字，而是让梯子落到下一档——这就是「不补零、不补默认、不补猜测」在登记面上的样子。价目列本次不落：厂商价目随时在动，一个没有复核日期的价目行就是第二个会漂的权威，价目继续住钉版目录（§8-7），由 Stage 复核。
+- **本表登记七个 host**（2026-09-21 补三行，逐行注出处）：`api.anthropic.com`、`api.openai.com`、`openrouter.ai`、`generativelanguage.googleapis.com`，加 `api.kimi.com`（`/coding/v1`）、`api.moonshot.cn`（`/v1`）、`api.moonshot.ai`（`/v1`），后三行读自 `MoonshotAI/kimi-cli` 的 `src/kimi_cli/auth/platforms.py`（docs/third-party.md §1 已列为被看路径），兼容格式为 OpenAI 兼容——同仓 `kosong/chat_provider/openai_common.py` 以这三个 base URL 构造 OpenAI 客户端。**`api.kimi.com` 与 `openrouter.ai` 是同一类缺陷的两个实例**：一律补 `/v1` 会把订阅端点指到不存在的路径。
+- **§20.2 的列集里，`label` 与「价格」两列本波不落，理由记在此处而不是留空结构**：两列在本城今天都没有读者——界面文案走 wire 与 `lang.json`，计费读钉版目录（§8-7）——而一个没有读者的列就是一个没人会去纠正的第二权威。**重开条件写死**：`EndpointSummary` 开始携带模型展示名时 `label` 进表；`cost::settle` 开始按 host ＋ id 前缀取价时价目列进表，且每格带复核日期。
+- **登记站点的 base URL 有两个家，今天不冲突，且这不是长久之计**：`oauth_profiles.api_base` 写「一次订阅登录完成后去连哪里」，`preset.base_path` 写「人粘一个裸 host 时补什么路径」。`api.kimi.com` 两处都在（`https://api.kimi.com/coding/v1` 与 `/coding/v1`），两处一致但无人断言其一致。**迁移方向**：订阅登录完成后的 attach 走 `normalise_entered`，`api_base` 退成裸 host，路径只由本表作答。
 - **厂商的 id 属于厂商的 host**：中转站以同名 id 转发时不套用厂商图表，它截在哪里是它自己的事实，而它的模型列表就是它陈述这件事的地方。
 - **主机表只有这一张**：`router::normalise` 的路径与形状缺省从本表取（`openrouter.ai` 是 `/api/v1`、Gemini 形是 `/v1beta`），归一化算法自身不带任何主机名。两者是一件事的两半（路线图 §3.2 审阅第 13 条）。
 
@@ -632,6 +635,16 @@ impl ConnectionKind {
     pub const fn path_for(self, modality: Modality) -> Option<&'static str>;
     pub fn url_for(self, base_url: &str, modality: Modality) -> Option<String>;
 }
+
+// provider::modality::embedding —— 请求与回答的真实形状
+pub struct EmbeddingRequest;                     // new(model, inputs) -> Result；with_dimensions；texts()；body()
+pub struct Embeddings;                           // parse(&Value, &EmbeddingRequest) -> Result
+                                                 // vectors() -> &[Vec<f64>]；model()；prompt_tokens()
+
+// provider::modality::rerank —— 同上
+pub struct RerankRequest;                        // new(query, passages) -> Result；passages()；body()
+pub struct Rank { pub passage: usize, pub score: f64 }
+pub struct Ranking;                              // parse(&Value, &RerankRequest) -> Result；ranks()；best()
 ```
 
 - **「这个端点是怎么连的」今天散在三处，没有一处说得出**：dialect 说由哪支笔写请求，credential 说是 key 还是订阅登录在付账，上限梯说这次调用能写多少。三处各答一半，一致到其中一处被改为止。`ConnectionKind` 是那一个答案，**attach 时在归一化之后解析一次**，写进 `endpoint_attached`、由 `Query::Config` 读回，调用路径不再猜——一件事算两遍就是两遍可以算出不同结果。
@@ -640,6 +653,7 @@ impl ConnectionKind {
 - **`DialectHint::Unset` 是真状态而不是缺失值**：没人说过形状时解析拒绝，恢复语指向「把供应方文档印出来的完整 URL 粘进来」，因为带 `chat/completions`／`responses`／`messages` 尾段的 URL 自己就说了。
 - **词只有一套**：七个扁平词（`openai_compat`／`responses`／`anthropic_native` ＋ 四个家名），`as_str` 写、`parse` 读，一条测试钉住往返与不重词。harness 不拼复合串，读者无需切分。
 - **模态第一批只落形状**：`Modality::{Embedding, Rerank}` ＋「哪种连接在哪条路径上服务它」一张表。Anthropic 不发布这两张脸，四家订阅 harness 卖的是会话，故都答 `None`——**没有路径就是不服务**，调用方连 URL 都拼不出来。路径与 base URL 的拼接复用全城唯一那个 `router::join`。**入账（`embedding_called`／`rerank_called`）等 payload 类型化（G-15）落地后再接**，本节不预先写键名。
+- **两张脸的字节形状也各只有一处**（2026-09-21 落）：`embedding` 的请求与回答照 `openai/openai-openapi` 的 `CreateEmbeddingRequest`／`CreateEmbeddingResponse`／`Embedding` 三个 schema 写，`rerank` 照 `huggingface/text-embeddings-inference` 的 `docs/openapi.json` 的 `/rerank` 路径与 `RerankRequest`／`Rank` 写；两处出处与读取日期写在模块头。**请求显式写 `encoding_format`**，因为读答案的那段只认一种编码，而厂商可改的默认值不是可以照着解析的依据。**回答按 `index` 归位而不按到达顺序**：把第三段文字的向量配给第一段，是一个不报错的检索错误。**名次不在本城重排**：分数只在一次回答内可比，服务端排好的序就是答案，再排一次就是本城对自己付钱问来的名次有第二个意见。
 - **chat 不是本枚举的成员**：会话路径归已经在调用它的那处（`router::attached::chat_path`），在这里再写一次就是每回合都在发的那条路径有了第二个家。
 
 ### 8-19 system prefix 的稳定性是一条被守护的性质（路线图 17.2）
@@ -656,3 +670,28 @@ impl ConnectionKind {
 ### 8-31 重试上限住 kernel
 
 `gateway::Retries` 现在是 `kernel::Retries` 的再导出。缺席的含义（`UntilHalted`）、探测在无人可停时读成一次（`without_a_brake`）、以及记进账本时写不写这个数（`stated`），三条都由那一处定义，本 crate 不再自持一份。
+
+### 8-20 第三支笔：OpenAI responses 面（叶子 4.5 · F-05）
+
+`dialect/responses/` 三个文件——`request.rs`（规范请求 → `input` 数组）、`reply.rs`（`output` 数组 ↔ `ChatResponse`）、`stream.rs`（具名事件 → `Increment`，终帧 → 已定答案）。`dialect` 的五个入口各多一条臂，闭集由二变三。
+
+**形状取自供应方自己的规格**：`openai/openai-openapi`，`openapi.yaml` 自述 `info.version` ＝ 2.3.0，提交 `ddface9b`（2026-09-19）。不取自任何客户端库，也不取自记忆。看着不对的字段通常是搬过家的字段——改这里之前先读那份文档。
+
+**它不是第二支笔的一个开关。** chat 面发 `messages`、读 `choices`；这面发 `input`、读 `output`——一个数组，成员是消息、函数调用与推理项，而不是一条挂着若干字段的消息。流是第三套文法：具名事件（`response.output_text.delta`）而不是匿名 chunk。折在一起就是一个在每一步上分支的写入器。
+
+**这面载得动而 chat 面载不动的两件事：**
+
+- **显式缓存断点**。标了 `cache` 的 `SystemBlock` 成为带 `prompt_cache_breakpoint` 的 `input_text` 片段。本城本来就在算段边界，于是把它说出来，而不是交给前缀匹配去猜。system 段因此走 `input[0]`（`role: developer`，一段一片）而非 `instructions`——后者是一个字符串，装不下四段与它们的边界。
+- **流自带已定答案**。终帧（`response.completed`／`incomplete`／`failed`）携整个 response 对象，重组读它而不是缝合碎片。**一个解析器因此得以保持**：流式调用与阻塞调用交给 `response_from` 的是同样的字节，两者得不出不同的结论。
+
+**它主动放弃的一件事**：上一轮的 `Thinking` 块不回发。这面只接受带供应方自己签发的标识与密文的 `reasoning` 项，本城两样都不存；拼一个出来会在第一次调用处被拒。规范记录仍留着那个块，历史不缺东西。
+
+**读不认识的输出项不算失败**：`Item::Unread`——内建工具调用本城从没要过，本 build 之后新增的项也一样；本城要的字段就在它们旁边，全都在。判定写成具名枚举而不是 `_ =>`，于是「放过去」是一个有名字的决定。
+
+**停止原因来自整体而非某条消息**：这面报的是 response 的 `status`，以及 `incomplete` 时的 `reason`。产出了调用就是 `ToolUse`（无论 status 说什么——调用方两种情况下都有一个调用要跑），`incomplete` ＋ `max_output_tokens` 是 `MaxTokens`，`completed` 是 `EndTurn`，其余拒绝而不猜。
+
+**`ConnectionKind::wire()` 从此指向真的那一支**（§8-18 那条「那一天到来时改的是 `wire()` 的一条臂」兑现）：`Responses` → `OpenAiResponses`，`Harness(Codex)` → `OpenAiResponses`（Codex 的订阅答在 responses 面，这是 `Family::shape()` 早已声明的事，此处读它而不是重说一遍）。一条遍历式断言钉住：每一家被调用的脸，与它自己声明的脸相同。
+
+**`store: false` 每条请求都写**：本城自持历史，上游留一份副本就是第二份，且它比本城「决定忘记」这个动作活得更久。
+
+**`provider::stability` 的守卫因此长出第三条读法**：system 文本在这面是 `input[0].content[*].text`。那道闸的两条断言（两次派活逐字节相等、上线文本与交给供应层的几块逐字节相等且前面不多任何东西）现在覆盖全部七种连接。

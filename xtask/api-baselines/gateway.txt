@@ -1,3 +1,5 @@
+impl core::fmt::Debug for gateway::DeviceAuthorization
+impl core::fmt::Debug for gateway::FormPost
 impl core::fmt::Debug for gateway::OauthTokens
 impl gateway::AttachedEndpoint
 impl gateway::AudioType
@@ -7,11 +9,17 @@ impl gateway::CeilingSource
 impl gateway::ConnectionKind
 impl gateway::ConnectionKind
 impl gateway::Custodian
+impl gateway::DeviceAuthorization
+impl gateway::DevicePoll
+impl gateway::DeviceRefusal
+impl gateway::EmbeddingRequest
+impl gateway::Embeddings
 impl gateway::Endpoint
 impl gateway::Endpoint
 impl gateway::EndpointBook
 impl gateway::EndpointTuning
 impl gateway::Family
+impl gateway::FormPost
 impl gateway::HeaderValue
 impl gateway::ImageBytes
 impl gateway::MarketSnapshot
@@ -20,8 +28,10 @@ impl gateway::ModelFacts
 impl gateway::Native
 impl gateway::OutputCeiling
 impl gateway::Persistence
+impl gateway::Ranking
 impl gateway::Recording
 impl gateway::Redemption
+impl gateway::RerankRequest
 impl gateway::Transcriber
 impl kernel::model::Model for gateway::Endpoint
 impl kernel::model::Model for gateway::Native
@@ -29,6 +39,8 @@ pub const fn gateway::CeilingSource::as_str(self) -> &'static str
 pub const fn gateway::ConnectionKind::as_str(self) -> &'static str
 pub const fn gateway::ConnectionKind::path_for(self, gateway::Modality) -> core::option::Option<&'static str>
 pub const fn gateway::ConnectionKind::wire(self) -> kernel::model::wire::DialectKind
+pub const fn gateway::DevicePoll::first_wait_s(&self) -> u64
+pub const fn gateway::Embeddings::prompt_tokens(&self) -> core::option::Option<u64>
 pub const fn gateway::Family::as_str(self) -> &'static str
 pub const fn gateway::Family::shape(self) -> gateway::DialectHint
 pub const fn gateway::Modality::as_str(self) -> &'static str
@@ -36,6 +48,7 @@ pub const fn gateway::OutputCeiling::source(self) -> gateway::CeilingSource
 pub const fn gateway::OutputCeiling::tokens(self) -> kernel::model::wire::Ceiling
 pub const gateway::EndpointTuning::DEFAULTS: gateway::TuningDefaults
 pub const gateway::Family::ALL: [gateway::Family; 4]
+pub const gateway::FormPost::CONTENT_TYPE: &'static str
 pub const gateway::Modality::ALL: [gateway::Modality; 2]
 pub const gateway::OAUTH_PROFILES: [gateway::OauthProfile; 4]
 pub enum gateway::AudioType
@@ -44,6 +57,7 @@ pub enum gateway::CeilingSource
 pub enum gateway::Connection
 pub enum gateway::ConnectionKind
 pub enum gateway::CostSource
+pub enum gateway::DeviceRefusal
 pub enum gateway::DialectHint
 pub enum gateway::Family
 pub enum gateway::Grant
@@ -51,6 +65,7 @@ pub enum gateway::HeaderValue
 pub enum gateway::InputKinds
 pub enum gateway::Modality
 pub enum gateway::Persistence
+pub enum gateway::PollStep
 pub fn gateway::AttachedEndpoint::chat_url(&self) -> alloc::string::String
 pub fn gateway::AttachedEndpoint::has_credential(&self) -> bool
 pub fn gateway::AttachedEndpoint::is_local(&self) -> bool
@@ -73,6 +88,19 @@ pub fn gateway::Custodian::probe() -> (gateway::Custodian, core::option::Option<
 pub fn gateway::Custodian::resolve(&self, &kernel::secret::span::SecretRef) -> core::result::Result<kernel::secret::sealed::Sealed<alloc::string::String>, kernel::error::shape::AxError>
 pub fn gateway::Custodian::set(&mut self, &kernel::secret::span::SecretRef, zeroize::Zeroizing<alloc::string::String>) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn gateway::Custodian::with_env_reader(self, gateway::EnvReader) -> gateway::Custodian
+pub fn gateway::DeviceAuthorization::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn gateway::DeviceAuthorization::parse(&serde_json::value::Value) -> core::result::Result<gateway::DeviceAuthorization, kernel::error::shape::AxError>
+pub fn gateway::DeviceAuthorization::poll(&self) -> gateway::DevicePoll
+pub fn gateway::DeviceAuthorization::token_request(&self, &gateway::OauthProfile) -> gateway::FormPost
+pub fn gateway::DevicePoll::step(&mut self, &gateway::DeviceRefusal, u64) -> gateway::PollStep
+pub fn gateway::DeviceRefusal::read(&str) -> gateway::DeviceRefusal
+pub fn gateway::EmbeddingRequest::body(&self) -> alloc::string::String
+pub fn gateway::EmbeddingRequest::new(alloc::string::String, alloc::vec::Vec<alloc::string::String>) -> core::result::Result<gateway::EmbeddingRequest, kernel::error::shape::AxError>
+pub fn gateway::EmbeddingRequest::texts(&self) -> usize
+pub fn gateway::EmbeddingRequest::with_dimensions(self, u32) -> gateway::EmbeddingRequest
+pub fn gateway::Embeddings::model(&self) -> core::option::Option<&str>
+pub fn gateway::Embeddings::parse(&serde_json::value::Value, &gateway::EmbeddingRequest) -> core::result::Result<gateway::Embeddings, kernel::error::shape::AxError>
+pub fn gateway::Embeddings::vectors(&self) -> &[alloc::vec::Vec<f64>]
 pub fn gateway::Endpoint::call(&mut self, &kernel::model::seam::ModelRequest) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
 pub fn gateway::Endpoint::call_streaming(&mut self, &kernel::model::seam::ModelRequest, kernel::model::Increments<'_>) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
 pub fn gateway::Endpoint::list_models(&self, &str) -> core::result::Result<alloc::vec::Vec<gateway::ModelFacts>, kernel::error::shape::AxError>
@@ -88,6 +116,7 @@ pub fn gateway::EndpointTuning::applied_overrides(&self) -> alloc::vec::Vec<(all
 pub fn gateway::EndpointTuning::call_timeout_ms(&self) -> u64
 pub fn gateway::EndpointTuning::idle_timeout_ms(&self) -> core::option::Option<u64>
 pub fn gateway::EndpointTuning::is_plain(&self) -> bool
+pub fn gateway::FormPost::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn gateway::HeaderValue::parse(&str, &str) -> core::result::Result<gateway::HeaderValue, kernel::error::shape::AxError>
 pub fn gateway::HeaderValue::spelled(&self) -> alloc::string::String
 pub fn gateway::ImageBytes::insert(&mut self, &kernel::locator::Locator, alloc::vec::Vec<u8>)
@@ -105,12 +134,18 @@ pub fn gateway::Native::new(gateway::NativeConfig) -> core::result::Result<gatew
 pub fn gateway::OauthTokens::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn gateway::OutputCeiling::resolve(gateway::Stated, core::option::Option<kernel::model::wire::Ceiling>, &str, &str) -> core::option::Option<gateway::OutputCeiling>
 pub fn gateway::Persistence::consequence(self) -> &'static str
+pub fn gateway::Ranking::best(&self) -> core::option::Option<gateway::Rank>
+pub fn gateway::Ranking::parse(&serde_json::value::Value, &gateway::RerankRequest) -> core::result::Result<gateway::Ranking, kernel::error::shape::AxError>
+pub fn gateway::Ranking::ranks(&self) -> &[gateway::Rank]
 pub fn gateway::Recording::is_empty(&self) -> bool
 pub fn gateway::Recording::kind(&self) -> gateway::AudioType
 pub fn gateway::Recording::len(&self) -> usize
 pub fn gateway::Recording::new(alloc::vec::Vec<u8>, gateway::AudioType) -> core::result::Result<gateway::Recording, kernel::error::shape::AxError>
 pub fn gateway::Redemption::new(gateway::SecretResolver, gateway::ImageResolver) -> gateway::Redemption
 pub fn gateway::Redemption::without_images(gateway::SecretResolver) -> gateway::Redemption
+pub fn gateway::RerankRequest::body(&self) -> alloc::string::String
+pub fn gateway::RerankRequest::new(alloc::string::String, alloc::vec::Vec<alloc::string::String>) -> core::result::Result<gateway::RerankRequest, kernel::error::shape::AxError>
+pub fn gateway::RerankRequest::passages(&self) -> usize
 pub fn gateway::Transcriber::absent() -> gateway::Transcriber
 pub fn gateway::Transcriber::attach(gateway::TranscriberConfig, gateway::SecretResolver) -> core::result::Result<gateway::Transcriber, kernel::error::shape::AxError>
 pub fn gateway::Transcriber::is_attached(&self) -> bool
@@ -118,6 +153,7 @@ pub fn gateway::Transcriber::transcribe(&self, &gateway::Recording) -> core::res
 pub fn gateway::adapter_for(&gateway::Chosen<'_>, gateway::Redemption, alloc::vec::Vec<(alloc::string::String, alloc::string::String)>) -> core::result::Result<alloc::boxed::Box<(dyn kernel::model::Model + core::marker::Send)>, kernel::error::shape::AxError>
 pub fn gateway::attached_payload(&gateway::AttachedEndpoint) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn gateway::client_for(kernel::reach::Proxying, &str) -> reqwest::blocking::client::ClientBuilder
+pub fn gateway::device_authorization_request(&gateway::OauthProfile) -> core::result::Result<gateway::FormPost, kernel::error::shape::AxError>
 pub fn gateway::increment_of(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::option::Option<kernel::model::wire::Increment>
 pub fn gateway::is_local(&str) -> bool
 pub fn gateway::normalise_entered(&str, gateway::DialectHint) -> core::result::Result<gateway::Normalised, kernel::error::shape::AxError>
@@ -140,8 +176,9 @@ pub fn gateway::through(kernel::reach::Proxying, &str) -> kernel::reach::Through
 pub fn gateway::transcriber_for(&gateway::Chosen<'_>, gateway::SecretResolver) -> core::result::Result<gateway::Transcriber, kernel::error::shape::AxError>
 pub gateway::AttachedEndpoint::auth: gateway::AuthSpec
 pub gateway::AttachedEndpoint::base_url: alloc::string::String
+pub gateway::AttachedEndpoint::connection_kind: gateway::ConnectionKind
 pub gateway::AttachedEndpoint::dialect: kernel::model::wire::DialectKind
-pub gateway::AttachedEndpoint::models: alloc::vec::Vec<alloc::string::String>
+pub gateway::AttachedEndpoint::models: alloc::vec::Vec<gateway::ModelFacts>
 pub gateway::AttachedEndpoint::name: alloc::string::String
 pub gateway::AttachedEndpoint::probed: bool
 pub gateway::AttachedEndpoint::tuning: gateway::EndpointTuning
@@ -183,6 +220,14 @@ pub gateway::Described::configured: bool
 pub gateway::Described::persistence: gateway::Persistence
 pub gateway::Described::source: alloc::string::String
 pub gateway::Described::writable: bool
+pub gateway::DeviceAuthorization::user_code: alloc::string::String
+pub gateway::DeviceAuthorization::verification_uri: alloc::string::String
+pub gateway::DeviceAuthorization::verification_uri_complete: core::option::Option<alloc::string::String>
+pub gateway::DeviceRefusal::AccessDenied
+pub gateway::DeviceRefusal::AuthorizationPending
+pub gateway::DeviceRefusal::ExpiredToken
+pub gateway::DeviceRefusal::Other(alloc::string::String)
+pub gateway::DeviceRefusal::SlowDown
 pub gateway::DialectHint::Chat
 pub gateway::DialectHint::Messages
 pub gateway::DialectHint::Responses
@@ -208,6 +253,8 @@ pub gateway::Family::ClaudeCode
 pub gateway::Family::Codex
 pub gateway::Family::GrokBuild
 pub gateway::Family::KimiCli
+pub gateway::FormPost::body: alloc::string::String
+pub gateway::FormPost::url: alloc::string::String
 pub gateway::Grant::AuthorizationCode
 pub gateway::Grant::AuthorizationCode::redirect_uri: &'static str
 pub gateway::Grant::DeviceCode
@@ -266,6 +313,11 @@ pub gateway::OauthTokens::refresh: core::option::Option<zeroize::Zeroizing<alloc
 pub gateway::Persistence::AcrossReboots
 pub gateway::Persistence::ThisBoot
 pub gateway::Persistence::ThisProcess
+pub gateway::PollStep::AskAgainIn
+pub gateway::PollStep::AskAgainIn::seconds: u64
+pub gateway::PollStep::Stop(kernel::error::shape::AxError)
+pub gateway::Rank::passage: usize
+pub gateway::Rank::score: f64
 pub gateway::Stated::person: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::Stated::upstream: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::TokenRequest::body: alloc::string::String
@@ -290,10 +342,15 @@ pub struct gateway::Captured
 pub struct gateway::Chosen<'b>
 pub struct gateway::Custodian
 pub struct gateway::Described
+pub struct gateway::DeviceAuthorization
+pub struct gateway::DevicePoll
+pub struct gateway::EmbeddingRequest
+pub struct gateway::Embeddings
 pub struct gateway::Endpoint
 pub struct gateway::EndpointBook
 pub struct gateway::EndpointConfig
 pub struct gateway::EndpointTuning
+pub struct gateway::FormPost
 pub struct gateway::HostPreset
 pub struct gateway::ImageBytes(_)
 pub struct gateway::MarketSnapshot
@@ -307,8 +364,11 @@ pub struct gateway::OauthPending
 pub struct gateway::OauthProfile
 pub struct gateway::OauthTokens
 pub struct gateway::OutputCeiling
+pub struct gateway::Rank
+pub struct gateway::Ranking
 pub struct gateway::Recording
 pub struct gateway::Redemption
+pub struct gateway::RerankRequest
 pub struct gateway::Stated
 pub struct gateway::TokenRequest
 pub struct gateway::Toolkit

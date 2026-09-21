@@ -63,7 +63,7 @@ fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() 
             addr: Address::parse("lab/room1").unwrap(),
             task: "read the build log".to_owned(),
             goal: "say what it says".to_owned(),
-            mode: channels::ModeTag::parse("build").unwrap(),
+            mode: kernel::Mode::Up,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
             effort: None,

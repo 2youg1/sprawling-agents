@@ -27,91 +27,9 @@ use kernel::{Address, AxCode, AxError, Payload};
 
 use crate::policy::BUILDING_FILE;
 
-/// The rules a new building starts with. Instantiated at compile time so
-/// that a moved or renamed template breaks the build rather than a city.
-const TEMPLATE_RULES: &str = include_str!("../../../docs/templates/BUILDING.md");
-/// City Hall's rules, fixed rather than derived: what its two residents
-/// may do serves every other building, so it is a property of the city.
-const HALL_RULES: &str = include_str!("../../../docs/templates/BUILDING-hall.md");
-const NAME_PLACEHOLDER: &str = "<building name>";
-const ORDINARY_LINE: &str = "`confidential: false`";
-const CONFIDENTIAL_LINE: &str = "`confidential: true`";
+pub(crate) mod template;
 
-/// What a new building is laid out as. Exhaustive: a template exists
-/// because some kind of building needs different bytes on its first day,
-/// and a kind nobody creates is an authority nobody reads.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BuildingTemplate {
-    /// An ordinary building: data may leave, any model may answer.
-    Minimal,
-    /// Data enters and does not leave, the model pool is local, and
-    /// writes stop at this building's own subtree.
-    Confidential,
-    /// City Hall: raised with the city, writing Markdown documents and
-    /// never a plan file, holding no project of its own.
-    Hall,
-}
-
-impl BuildingTemplate {
-    /// Reads a template name as it arrived from the control surface.
-    ///
-    /// # Errors
-    /// Refuses a name this version does not lay out, and says which ones
-    /// it does: a caller that guessed needs the list, not a verdict.
-    pub fn parse(name: &str) -> Result<BuildingTemplate, AxError> {
-        match name {
-            "minimal" => Ok(BuildingTemplate::Minimal),
-            "confidential" => Ok(BuildingTemplate::Confidential),
-            "hall" => Ok(BuildingTemplate::Hall),
-            other => Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "read a building template name",
-                other.to_owned(),
-            )
-            .with_recovery("this version lays out `minimal`, `confidential` and `hall`")),
-        }
-    }
-
-    #[must_use]
-    pub fn name(self) -> &'static str {
-        match self {
-            BuildingTemplate::Minimal => "minimal",
-            BuildingTemplate::Confidential => "confidential",
-            BuildingTemplate::Hall => "hall",
-        }
-    }
-
-    /// The `BUILDING.md` bytes this template starts a building with.
-    ///
-    /// # Errors
-    /// Refuses when the template no longer carries the line a
-    /// confidential building differs by: producing an ordinary building
-    /// from the confidential template is the one failure here that
-    /// nobody would notice until data left.
-    fn rules(self, addr: &Address) -> Result<String, AxError> {
-        let named = TEMPLATE_RULES.replace(NAME_PLACEHOLDER, addr.as_str());
-        match self {
-            BuildingTemplate::Minimal => Ok(named),
-            // Fixed bytes, and the address is not substituted into them:
-            // City Hall is one address in every city.
-            BuildingTemplate::Hall => Ok(HALL_RULES.to_owned()),
-            BuildingTemplate::Confidential => {
-                if !named.contains(ORDINARY_LINE) {
-                    return Err(AxError::failure(
-                        AxCode::ConfigInvalid,
-                        "lay out a confidential building",
-                        format!("the template no longer carries {ORDINARY_LINE}"),
-                    )
-                    .with_recovery(
-                        "restore that line in docs/templates/BUILDING.md; the confidential \
-                         template is the ordinary one with that value flipped",
-                    ));
-                }
-                Ok(named.replace(ORDINARY_LINE, CONFIDENTIAL_LINE))
-            }
-        }
-    }
-}
+pub use template::BuildingTemplate;
 
 /// A building: the top-level address that governs a run.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -76,7 +76,7 @@ impl RunWorker {
                      digest model that runs on this machine",
                 )
             })?;
-        let Some(named) = self.name_the_work(&chosen, task, policy) else {
+        let Some(named) = self.name_the_work(&chosen, task, policy)? else {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "work out what to call this work",
@@ -97,60 +97,63 @@ impl RunWorker {
     /// work is exactly that shape of job, and putting it on the main
     /// model would charge a person reasoning tokens for a filename.
     ///
-    /// `None` for every failure this can have — a call that did not come
-    /// back, an answer that is not a legal session name. The caller
-    /// turns that into a refusal naming the field, so a failure here
-    /// costs a person one field rather than putting their work somewhere
-    /// they will not look for it.
+    /// `Ok(None)` is reserved for one outcome: **the model answered, and
+    /// what it answered is not a legal session name.** A credential that
+    /// cannot be redeemed, an endpoint that cannot be built, a call that
+    /// did not come back and a reply whose content cannot be read are
+    /// each returned as the error they are, because a person told only
+    /// "name the room yourself" would never learn that their provider
+    /// was unreachable (sprawling-SPEC.md 8-75).
     ///
     /// The endpoint is chosen by the caller under the building's policy,
     /// and that same policy rides along on the request: the task text
     /// travels under the rules of the building it was sent to, not under
     /// a laxer set written here.
+    ///
+    /// # Errors
+    /// Propagates the vault's refusal to redeem, the adapter's refusal
+    /// to be built, the provider's own failure, and a reply this build
+    /// cannot read.
     fn name_the_work(
         &self,
         chosen: &gateway::Chosen<'_>,
         task: &str,
         policy: &kernel::BuildingPolicy,
-    ) -> Option<kernel::SessionName> {
+    ) -> Result<Option<kernel::SessionName>, AxError> {
         let model_id = chosen.entry.id.clone();
         let mut adapter = gateway::adapter_for(
             chosen,
-            self.redemption().ok()?,
+            self.redemption()?,
             dialect_headers(chosen.endpoint.dialect)
                 .into_iter()
                 .map(|(name, value)| (name, value.spelled()))
                 .collect(),
-        )
-        .ok()?;
-        let answer = adapter
-            .call(&kernel::ModelRequest {
-                policy: policy.clone(),
-                segments: [kernel::B3Hash::digest(b""); 4],
-                chat: kernel::ChatRequest {
-                    model: model_id,
-                    max_tokens: NAME_TOKENS,
-                    system: vec![kernel::SystemBlock {
-                        text: NAME_THE_WORK.to_owned(),
-                        cache: false,
+        )?;
+        let answer = adapter.call(&kernel::ModelRequest {
+            policy: policy.clone(),
+            segments: [kernel::B3Hash::digest(b""); 4],
+            chat: kernel::ChatRequest {
+                model: model_id,
+                max_tokens: NAME_TOKENS,
+                system: vec![kernel::SystemBlock {
+                    text: NAME_THE_WORK.to_owned(),
+                    cache: false,
+                }],
+                messages: vec![kernel::ChatMessage {
+                    role: kernel::Role::User,
+                    content: vec![kernel::ContentBlock::Text {
+                        text: task.to_owned(),
                     }],
-                    messages: vec![kernel::ChatMessage {
-                        role: kernel::Role::User,
-                        content: vec![kernel::ContentBlock::Text {
-                            text: task.to_owned(),
-                        }],
-                    }],
-                    tools: Vec::new(),
-                    effort: None,
-                },
-            })
-            .ok()?;
+                }],
+                tools: Vec::new(),
+                effort: None,
+            },
+        })?;
         // The model is asked for one word and sometimes writes a
         // sentence around it. The first line, stripped of the
         // punctuation an answer tends to arrive wrapped in, is what is
         // offered to the parser — and the parser decides, not this.
-        let said = kernel::model::content_from_message(&answer.message)
-            .ok()?
+        let spoken = kernel::model::content_from_message(&answer.message)?
             .into_iter()
             .find_map(|block| match block {
                 kernel::ContentBlock::Text { text } => Some(text),
@@ -159,13 +162,20 @@ impl RunWorker {
                 | kernel::ContentBlock::ToolUse { .. }
                 | kernel::ContentBlock::Image(_)
                 | kernel::ContentBlock::ToolResult { .. } => None,
-            })?;
-        let candidate = said
-            .lines()
-            .next()?
+            });
+        // A reply with no words in it is a model that did not name the
+        // work, which is the one outcome the caller turns into a field
+        // for the person to fill.
+        let Some(said) = spoken else {
+            return Ok(None);
+        };
+        let Some(first) = said.lines().next() else {
+            return Ok(None);
+        };
+        let candidate = first
             .trim()
             .trim_matches(|glyph: char| glyph == '`' || glyph == '"' || glyph == '.');
-        kernel::SessionName::parse(candidate).ok()
+        Ok(kernel::SessionName::parse(candidate).ok())
     }
 
     pub(super) fn room_for(

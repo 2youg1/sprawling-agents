@@ -123,6 +123,22 @@ inductive Verb where
   `SandboxLimits` that a person types a number into: everything else this frame
   carries is sent at its empty value so that two writes differ in one fact. -/
   | configureBuilding (addr : String) (fuel : Nat) (idem : IdemKey)
+  /-- Everything this person settled about their own reading of the city,
+  answered whole.
+
+  The file it is folded from is the person's rather than the city's, so this
+  is the one query whose answer says nothing about the directory the city
+  lives in. -/
+  | preferences
+  /-- Settle how the pages look, one named fact at a time, which is all the
+  wire takes.
+
+  Only the sans-serif stack travels as a value worth telling two writes
+  apart by; every other field of the appearance is sent at a fixed posture,
+  for the reason `configureBuilding` sends only a budget. A stack is free
+  text a person types, which is what makes it the field a sequence of writes
+  can be read back through without parsing the file. -/
+  | putAppearance (sansStack : String) (idem : IdemKey)
   | createBuilding (addr : String) (template : Template) (idem : IdemKey)
   | dispatch (addr : String) (session : String) (idem : IdemKey)
   | halt (scope : Scope) (idem : IdemKey)
@@ -203,6 +219,24 @@ def Verb.frame : Verb → String
           , ("env_passthrough", Json.arr #[]) ])
       , ("mcp", .null)
       , ("desktop", .null)
+      , ("idem", .str idem.value) ]
+  | .preferences => query "preferences"
+  | .putAppearance sansStack idem =>
+    command "put_preferences"
+      [ ("patch", Json.mkObj
+          [ ("appearance", Json.mkObj
+              [ ("lighting", .str "system")
+                -- `custom` because a stack is read only for the face that
+                -- says the person wrote one; any other face makes this
+                -- field a value the product is free to drop.
+              , ("sans", .str "custom")
+              , ("mono", .str "geist")
+              , ("sans_stack", .str sansStack)
+              , ("mono_stack", .str "")
+              , ("body_px", Json.null)
+              , ("density", .str "comfortable")
+              , ("chroma", .str "full")
+              , ("motion", .str "system") ]) ])
       , ("idem", .str idem.value) ]
   | .createBuilding addr template idem =>
     command "create_building"
@@ -374,11 +408,21 @@ structure Serving where
 /-- Starts serving a city, and hands back the process still running.
 
 The caller owns its death. `--no-console` matters: without it the process reads
-stdin, and a test harness has no keyboard to give it. -/
-def Door.serve (door : Door) (city : System.FilePath) (port : Port) : IO Serving := do
+stdin, and a test harness has no keyboard to give it.
+
+**`home` is given because this product keeps one layer outside every city.**
+What a person settles about their own reading of the city lives in
+`<home>/.sprawling/config.toml`, and a served city finds that directory by
+reading `USERPROFILE` and then `HOME`. Both are pointed at a throwaway
+directory here, so a property about the person's layer writes into the ground
+it was raised on rather than into the configuration of whoever is running this
+suite. Overriding only one of the two would leave the answer to the platform. -/
+def Door.serve (door : Door) (city : System.FilePath) (port : Port)
+    (home : System.FilePath) : IO Serving := do
   let child ← IO.Process.spawn
     { cmd := door.binary.toString
     , args := #["serve", city.toString, s!"127.0.0.1:{port}", "--no-console"]
+    , env := #[("USERPROFILE", some home.toString), ("HOME", some home.toString)]
     , stdin := servedStdio.stdin
     , stdout := servedStdio.stdout
     , stderr := servedStdio.stderr }

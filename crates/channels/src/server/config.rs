@@ -8,9 +8,9 @@
 //! the judgements it applies are `channels::reception`'s and the bytes
 //! it serves are `channels::assets`'.
 //!
-//! Five jobs and no policy: serve the client bundle, upgrade a
-//! WebSocket, accept an upload, take a credential from a caller on this
-//! machine, and let an outside editor drive the city.
+//! Four jobs and no policy: serve the client bundle, upgrade a
+//! WebSocket, take a credential from a caller on this machine, and let
+//! an outside editor drive the city.
 //!
 //! A refusal made minutes later has no way home, which is why a command
 //! carries the [`Reply`] address of whoever sent it.
@@ -32,15 +32,12 @@ use tokio::sync::broadcast;
 
 use crate::answer::Answer;
 use crate::assets::ClientAssets;
-use crate::carried_name::UploadId;
 use crate::command::{Command, WireCommand};
 use crate::reception::{EnrollVerdict, decide_enroll};
 use crate::wire::Query;
 
 use super::reply::{Delivered, Reply, refusal_text};
-use super::socket::{
-    accept_acp, accept_recording, accept_upload, serve_asset, serve_index, upgrade,
-};
+use super::socket::{accept_acp, accept_recording, serve_asset, serve_index, upgrade};
 pub type SecretSink =
     Arc<dyn Fn(Command<Sealed<String>>, Reply) -> Result<(), AxError> + Send + Sync>;
 
@@ -56,9 +53,9 @@ const ENROLMENT_PATIENCE: std::time::Duration = std::time::Duration::from_secs(2
 
 /// Everything the shell needs that it must not decide for itself.
 ///
-/// `upload_sink` is injected as a closure rather than a trait: `channels`
-/// declares no `pub trait` (it is not on the seam list, ARCHITECTURE
-/// section 3), and one implementation is not a seam.
+/// Each sink is injected as a closure rather than as a trait:
+/// `channels` declares no `pub trait` (it is not on the seam list,
+/// ARCHITECTURE section 3), and one implementation is not a seam.
 pub struct ServeConfig {
     pub addr: SocketAddr,
     /// Digest of the pairing token, never the token. `None` means no token
@@ -68,13 +65,6 @@ pub struct ServeConfig {
     /// The client bundle, handed in by the assembly layer so this crate
     /// never learns where build artifacts live.
     pub client: Arc<ClientAssets>,
-    /// Where `Attach` bytes go. Returns the handle a later Command names.
-    ///
-    /// Takes `Vec<u8>` rather than the transport's own buffer type: the
-    /// assembly layer must not have to name axum to hand us a sink, and a
-    /// public signature that leaks the HTTP library would make replacing it
-    /// a breaking change for every caller.
-    pub upload_sink: Arc<dyn Fn(Vec<u8>) -> Result<UploadId, AxError> + Send + Sync>,
     /// Where a recording goes, and the line of text that comes back.
     ///
     /// A route of its own rather than a Command, for the reason
@@ -136,7 +126,6 @@ pub struct ServeConfig {
 
 pub(crate) struct ShellState {
     pub(crate) client: Arc<ClientAssets>,
-    pub(crate) upload_sink: Arc<dyn Fn(Vec<u8>) -> Result<UploadId, AxError> + Send + Sync>,
     pub(crate) commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Sync>,
     pub(crate) events: broadcast::Sender<EventRecord>,
     pub(crate) deltas: broadcast::Sender<crate::wire::Delta>,
@@ -149,19 +138,6 @@ pub(crate) struct ShellState {
     pub(crate) city: Option<Address>,
 }
 
-/// One request from an outside editor driving this city as an agent.
-///
-/// The shape is the protocol's, not this crate's; what this crate adds
-/// is that the token is compared here, where the pairing token already
-/// lives, and only the verdict travels inward.
-#[derive(Debug, Deserialize)]
-pub struct AcpBody {
-    pub token: String,
-    pub addr: String,
-    pub task: String,
-    pub goal: String,
-}
-
 /// What an accepted request gets back: the run it became, and nothing
 /// else. Progress is what an editor may see; the city's history is not
 /// published through this door.
@@ -172,12 +148,32 @@ pub struct AcpProgress {
     pub finished: bool,
 }
 
+/// Whether the caller held this city's pairing token.
+///
+/// Carried rather than acted on at the door: the refusal an
+/// unauthenticated request receives is `protocol::admit`'s to word,
+/// and it words it so that a stranger learns exactly one bit. An enum
+/// rather than a boolean so that neither the door nor the admission
+/// can pass the verdict the wrong way round and still compile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pairing {
+    Held,
+    Absent,
+}
+
 /// Where an outside request goes once the token has been judged.
 ///
-/// The boolean is carried rather than acted on here: the refusal for an
-/// unauthenticated request is `protocol::admit`'s to word, and it words
-/// it so that a stranger learns exactly one bit.
-pub type AcpSink = Arc<dyn Fn(AcpBody, bool) -> Result<AcpProgress, AxError> + Send + Sync>;
+/// **The body travels as the JSON it arrived as, and nothing here
+/// reads a field out of it.** The grammar of an inbound request is
+/// `protocol::Incoming`, whose `parse` is the only constructor and
+/// therefore the only place the rules about it hold; a struct here
+/// with the same four fields used to be deserialized first and copied
+/// across field by field, which left `parse` with no caller outside
+/// its own tests and carried the plaintext token into a value that
+/// derives `Debug`. The token is read where it is judged, below, and
+/// travels no further.
+pub type AcpSink =
+    Arc<dyn Fn(&serde_json::Value, Pairing) -> Result<AcpProgress, AxError> + Send + Sync>;
 
 /// Where a recording goes: the bytes, the media type the browser
 /// recorded into, and the line of text that comes back.
@@ -197,7 +193,6 @@ pub struct EnrollBody {
 pub fn router(config: &ServeConfig) -> Router {
     let state = Arc::new(ShellState {
         client: Arc::clone(&config.client),
-        upload_sink: Arc::clone(&config.upload_sink),
         commands: Arc::clone(&config.commands),
         events: config.events.clone(),
         deltas: config.deltas.clone(),
@@ -212,7 +207,6 @@ pub fn router(config: &ServeConfig) -> Router {
     Router::new()
         .route("/", get(serve_index))
         .route("/ws", get(upgrade))
-        .route("/upload", post(accept_upload))
         .route("/transcribe", post(accept_recording))
         .route("/enroll", post(accept_enrolment))
         .route("/acp", post(accept_acp))

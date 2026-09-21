@@ -79,16 +79,13 @@ pub(super) fn wire_tags(kind: &str) -> Result<String, XtaskError> {
 
 /// How many packages the lockfile resolves, workspace members included,
 /// which is the number `sprawling status --deps` lists.
+///
+/// Counted by `budget::lockfile_packages`, which is also what the
+/// register's `dependency_count` row is weighed against: a document
+/// quoting one number and a ratchet refusing growth past another would
+/// be two answers to how large this tree's dependency graph is.
 pub(super) fn dependency_count(root: &Path) -> Result<String, XtaskError> {
-    let text = walk::read_text(&root.join("Cargo.lock"))?;
-    let found = text.lines().filter(|line| *line == "[[package]]").count();
-    if found == 0 {
-        return Err(XtaskError::Doc {
-            file: "Cargo.lock".to_owned(),
-            msg: "no `[[package]]` entries; the lockfile format changed".to_owned(),
-        });
-    }
-    Ok(found.to_string())
+    Ok(crate::budget::lockfile_packages(root)?.to_string())
 }
 
 /// How many Rust files sit in one directory of every package: the shape

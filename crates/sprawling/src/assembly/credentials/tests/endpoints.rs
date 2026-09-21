@@ -51,7 +51,13 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
         })
         .unwrap();
     let held = worker.book.endpoints().next().unwrap().clone();
-    assert_eq!(held.models, vec!["m-1".to_owned()]);
+    assert_eq!(
+        held.models
+            .iter()
+            .map(|row| row.id.clone())
+            .collect::<Vec<String>>(),
+        vec!["m-1".to_owned()]
+    );
     assert!(
         !held.probed,
         "this list is the person's word, and the book says so"
@@ -61,7 +67,7 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
             endpoint: channels::ProviderName::parse("declared").unwrap(),
             model: "m-1".to_owned(),
             tag: kernel::ModelTag::Main,
-            context_tokens: 32_768,
+            context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(4_096),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
         })
@@ -116,7 +122,7 @@ fn a_dispatch_without_a_provider_fails_saying_what_to_configure() {
             addr: Address::parse("lab/room1").unwrap(),
             task: "anything".to_owned(),
             goal: "anything".to_owned(),
-            mode: channels::ModeTag::parse("plan").unwrap(),
+            mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -164,7 +170,7 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
             endpoint: channels::ProviderName::parse("proxied").unwrap(),
             model: "m-key".to_owned(),
             tag: kernel::ModelTag::Main,
-            context_tokens: 32_768,
+            context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(4_096),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
         })
@@ -174,7 +180,7 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
             addr: Address::parse("lab/room1").unwrap(),
             task: "say done".to_owned(),
             goal: "auth on the wire".to_owned(),
-            mode: channels::ModeTag::parse("plan").unwrap(),
+            mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,

@@ -50,11 +50,20 @@ export const ID_SHAPE = /^[a-z0-9][a-z0-9-]*$/;
 // pressing a control that stayed grey without saying why.
 //
 // A provider states the root of its API and never the full path, so
-// the shape is a scheme, an ASCII host, an optional port, an optional
-// path, and nothing after it. A query string is refused because a
-// root never carries one, and every face hangs its own path off this
-// value.
-export const BASE_URL = /^https?:\/\/([a-zA-Z0-9.-]+)(?::[0-9]+)?(?:\/[^\s?#]*)?$/;
+// the shape is an optional scheme, an ASCII host, an optional port, an
+// optional path, and nothing after it. A query string is refused
+// because a root never carries one, and every face hangs its own path
+// off this value.
+//
+// **The scheme is optional because the city fills it in.**
+// `gateway::normalise` reads a missing scheme as `https://`, or
+// `http://` for an address on this machine, so a form that demanded
+// one refused text the city would have accepted - and the two
+// documented forms a vendor prints, `api.openai.com/v1` and
+// `127.0.0.1:11434`, are exactly the text that got refused. This box
+// now makes the widest judgement the city makes and never a narrower
+// one; the scheme a value is called under is settled once, there.
+export const BASE_URL = /^(?:https?:\/\/)?([a-zA-Z0-9.-]+)(?::[0-9]+)?(?:\/[^\s?#]*)?$/;
 
 // The host a base URL names, which is what a person reads a reachability
 // report about. A URL this form would refuse has no host, and the form
@@ -161,12 +170,11 @@ const ANTHROPIC: Group = { label: "Anthropic", tone: "alert" };
 // table: each of the three is one token that reads the same in both
 // languages, and a translated `wire_api` would be a value nobody can
 // paste into a `config.toml`.
-export function wireChoices(unsupported: string): readonly Choice<WireApi>[] {
+export function wireChoices(): readonly Choice<WireApi>[] {
   return WIRE_APIS.map((api) => ({
     value: api,
     label: api,
     group: api === "messages" ? ANTHROPIC : OPEN_AI,
-    ...(dialectOf(api) === null ? { why: unsupported } : {}),
   }));
 }
 
@@ -214,16 +222,13 @@ export function tuningOf(draft: Draft): Tuning {
 }
 
 // The endpoint this draft describes, carrying the reference the vault
-// answered with. Nothing when the wire it names is one this city cannot
-// call, which is the same fact the control was already refused under.
-export function endpointOf(draft: Draft, secret: string | null): Endpoint | null {
-  const speaks = dialectOf(draft.wireApi);
-  return speaks === null
-    ? null
-    : {
+// answered with. Every wire a provider states now has a kind this city
+// can call, so there is no shape left for this to refuse.
+export function endpointOf(draft: Draft, secret: string | null): Endpoint {
+  return {
         id: idOf(draft),
         baseUrl: draft.baseUrl.trim(),
-        dialect: speaks,
+        dialect: dialectOf(draft.wireApi),
         secret,
         authHeader: null,
         tuning: tuningOf(draft),

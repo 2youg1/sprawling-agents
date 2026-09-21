@@ -184,9 +184,13 @@ pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError>
             endpoint
                 .models
                 .iter()
-                .map(|id| Value::String(id.clone()))
+                .map(|row| Value::String(row.id.clone()))
                 .collect(),
         ),
+    );
+    map.insert(
+        "connection_kind".to_owned(),
+        Value::String(endpoint.connection_kind.as_str().to_owned()),
     );
     map.insert("probed".to_owned(), Value::Bool(endpoint.probed));
     if let Some(tuning) = tuning_value(&endpoint.tuning)? {

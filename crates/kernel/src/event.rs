@@ -28,7 +28,9 @@ mod identity;
 mod kind;
 mod payload;
 pub mod record;
+mod who;
 
 pub use identity::{RunId, Seq, TimeMs};
 pub use kind::{EventKind, WindowClass};
 pub use payload::{EventDraft, EventRecord, EventRef, Payload};
+pub use who::Who;

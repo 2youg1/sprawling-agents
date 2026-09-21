@@ -3,6 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use super::template::NAME_PLACEHOLDER;
 use super::*;
 use crate::policy::{self, ModelPool};
 

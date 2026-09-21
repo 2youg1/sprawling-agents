@@ -31,10 +31,28 @@ use windows::Win32::Foundation::HWND;
 use super::super::geometry::Bounds;
 use crate::refusal::{Refusal, RefusalCode};
 
-/// The shortest gap between two frames of the frame-sequence path.
-/// `PrintWindow` costs what it costs, and ten frames a second is enough
-/// to see one interaction happen (desktop-SPEC.md §14).
-const FRAME_EVERY: std::time::Duration = std::time::Duration::from_millis(100);
+/// How many frames a second both writers aim for. `PrintWindow` costs
+/// what it costs, and ten frames a second is enough to see one
+/// interaction happen (desktop-SPEC.md §14).
+const FRAMES_A_SECOND: u64 = 10;
+
+/// The shortest gap between two frames of the frame-sequence path,
+/// derived from the rate rather than written beside it.
+const FRAME_EVERY: std::time::Duration = std::time::Duration::from_millis(1_000 / FRAMES_A_SECOND);
+
+/// The most frames one recording writes: ten minutes at the rate above.
+///
+/// **A recording this server started has to end even if nobody stops
+/// it.** The caller may close its connection, forget the id, or ask for
+/// a window nobody touches again; without this the thread would keep
+/// writing PNGs of somebody's desktop until the disk filled. Both
+/// writers are held to the same number, so "how long is the longest
+/// recording" has one answer whichever one this machine ran.
+const MOST_FRAMES: u64 = 6_000;
+
+/// The same ceiling as the seconds ffmpeg is given, which is the only
+/// form ffmpeg accepts it in.
+const MOST_SECONDS: u64 = MOST_FRAMES / FRAMES_A_SECOND;
 
 /// How long [`Sink::close`] waits for ffmpeg to finish writing the
 /// file's index, counted in polls rather than against a clock.
@@ -60,10 +78,12 @@ pub(super) enum Sink {
     /// cleanly. Killing it instead would leave an mp4 with no index,
     /// which is a file nothing plays.
     Ffmpeg { child: std::process::Child },
-    /// This package's own thread, and the flag that stops it.
+    /// This package's own thread, and the flag that stops it. The
+    /// thread also stops itself at `MOST_FRAMES`, so a caller that
+    /// never says stop still gets a recording that ends.
     Frames {
         stopping: Arc<AtomicBool>,
-        thread: std::thread::JoinHandle<usize>,
+        thread: std::thread::JoinHandle<u64>,
     },
 }
 
@@ -161,8 +181,11 @@ pub(super) fn somewhere(window: &str, nth: u64) -> Result<PathBuf, Refusal> {
 fn ffmpeg(window: &str, into: &Path) -> Option<std::process::Child> {
     std::process::Command::new("ffmpeg")
         .args(["-hide_banner", "-loglevel", "error"])
-        .args(["-f", "gdigrab", "-framerate", "10"])
+        .args(["-f", "gdigrab", "-framerate", &FRAMES_A_SECOND.to_string()])
         .args(["-i", &format!("title={window}")])
+        // ffmpeg stops itself at the same ceiling the frame thread
+        // holds, and writes the index for what it recorded.
+        .args(["-t", &MOST_SECONDS.to_string()])
         .arg("-y")
         .arg(into.join("recording.mp4"))
         .stdin(std::process::Stdio::piped())
@@ -204,8 +227,8 @@ fn frames(handle: HWND, bounds: Bounds, into: &Path) -> Sink {
     let carried = handle.0.expose_provenance();
     let thread = std::thread::spawn(move || {
         let handle = HWND(std::ptr::with_exposed_provenance_mut(carried));
-        let mut written: usize = 0;
-        while !flag.load(Ordering::Acquire) {
+        let mut written: u64 = 0;
+        while !flag.load(Ordering::Acquire) && written < MOST_FRAMES {
             if let Ok(pixels) = super::super::capture::window(handle, bounds) {
                 let at = into.join(format!("frame-{written:06}.png"));
                 if pixels.save(&at).is_ok() {

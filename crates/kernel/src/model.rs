@@ -9,11 +9,15 @@
 //! `city::policy` (P1) — dependency inversion, same as the ledger seam.
 
 mod image;
+mod mode;
 mod seam;
+mod window;
 mod wire;
 
 pub use image::{ImageRef, ImageType};
+pub use mode::Mode;
 pub use seam::{ModelRequest, ModelReturn, content_from_message, message_payload, value_has_float};
+pub use window::Window;
 pub use wire::{
     BuildingPolicy, Ceiling, ChatMessage, ChatRequest, ChatResponse, ContentBlock, DialectKind,
     Effort, Increment, ModelTag, ModelUsage, Role, StopReason, SystemBlock, ToolDef,

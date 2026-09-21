@@ -12,8 +12,8 @@ use std::collections::BTreeSet;
 use std::num::NonZeroU64;
 
 use kernel::consts_policy::STARTUP_BUDGET_TOKENS;
+use kernel::event::record::{PromptAssembled, PromptSegment, PromptSkip, SkipReason};
 use kernel::{Address, AxCode, AxError, B3Hash, ByteLen, Payload, SystemBlock};
-use serde_json::{Map, Value, json};
 
 use crate::elision;
 
@@ -127,7 +127,7 @@ fn build_segment(
     docs: &[SourceDoc],
     cap: u64,
     seen: &mut BTreeSet<String>,
-) -> Result<(FrozenSegment, Vec<Value>), AxError> {
+) -> Result<(FrozenSegment, Vec<PromptSkip>), AxError> {
     let cap = usize::try_from(cap).map_err(|_| {
         AxError::failure(
             AxCode::InvalidArgs,
@@ -144,16 +144,20 @@ fn build_segment(
     let mut skipped = Vec::new();
     for doc in docs {
         let addr = doc.addr.as_str().to_owned();
+        let left_out = |reason: SkipReason| PromptSkip {
+            addr: doc.addr.clone(),
+            reason,
+        };
         if seen.contains(&addr) {
-            skipped.push(json!({ "addr": addr, "reason": "duplicate" }));
+            skipped.push(left_out(SkipReason::Duplicate));
             continue;
         }
         let Some(bytes) = &doc.bytes else {
-            skipped.push(json!({ "addr": addr, "reason": "unreadable" }));
+            skipped.push(left_out(SkipReason::Unreadable));
             continue;
         };
         let Ok(body) = std::str::from_utf8(bytes) else {
-            skipped.push(json!({ "addr": addr, "reason": "not_utf8" }));
+            skipped.push(left_out(SkipReason::NotUtf8));
             continue;
         };
         let joiner = if text.is_empty() { 0 } else { DOC_JOIN.len() };
@@ -173,7 +177,7 @@ fn build_segment(
         }
         let worst_marker = elision::marker_room(body.len());
         if remaining <= worst_marker {
-            skipped.push(json!({ "addr": addr, "reason": "no_budget" }));
+            skipped.push(left_out(SkipReason::NoBudget));
             continue;
         }
         let kept = elision::boundary_before(body, remaining - worst_marker);
@@ -218,7 +222,7 @@ pub struct FrozenPrefix {
     /// it. `None` is a prefix assembled from bytes the caller already
     /// held, which skipped nothing because it was never offered a list
     /// of documents.
-    skipped: Option<Vec<Vec<Value>>>,
+    skipped: Option<Vec<Vec<PromptSkip>>>,
 }
 
 impl FrozenPrefix {
@@ -312,12 +316,6 @@ impl FrozenPrefix {
     pub fn prompt_payload(&self) -> Result<Payload, AxError> {
         let mut segments = Vec::new();
         for (index, segment) in self.segments().into_iter().enumerate() {
-            let mut entry = Map::new();
-            entry.insert(
-                "slot".to_owned(),
-                Value::String(segment.slot().as_str().to_owned()),
-            );
-            entry.insert("hash".to_owned(), Value::String(segment.hash().to_string()));
             let len = u64::try_from(segment.bytes().len()).map_err(|_| {
                 AxError::failure(
                     AxCode::InvalidArgs,
@@ -329,27 +327,26 @@ impl FrozenPrefix {
                      longer than a byte count this city can hold",
                 )
             })?;
-            entry.insert("len".to_owned(), Value::Number(len.into()));
-            entry.insert(
-                "sources".to_owned(),
-                Value::Array(segment.sources().iter().map(SegmentSource::row).collect()),
-            );
-            let left_out = self
-                .skipped
-                .as_ref()
-                .and_then(|all| all.get(index))
-                .cloned()
-                .unwrap_or_default();
-            entry.insert("skipped".to_owned(), Value::Array(left_out));
-            segments.push(Value::Object(entry));
+            segments.push(PromptSegment {
+                slot: segment.slot().as_str().to_owned(),
+                hash: *segment.hash(),
+                len,
+                sources: segment.sources().iter().map(SegmentSource::row).collect(),
+                skipped: self
+                    .skipped
+                    .as_ref()
+                    .and_then(|all| all.get(index))
+                    .cloned()
+                    .unwrap_or_default(),
+            });
         }
-        let mut map = Map::new();
-        map.insert("segments".to_owned(), Value::Array(segments));
-        map.insert(
-            "breakpoints".to_owned(),
-            json!(["city", "building", "resident", "run"]),
-        );
-        Payload::new(map)
+        Payload::of(&PromptAssembled {
+            segments,
+            breakpoints: SegmentSlot::ALL
+                .iter()
+                .map(|slot| slot.as_str().to_owned())
+                .collect(),
+        })
     }
 }
 

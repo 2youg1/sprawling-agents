@@ -37,7 +37,7 @@ impl RunWorker {
                 tag: kernel::ModelTag::Main,
             },
             Ceilings {
-                context_tokens: facts.context_tokens,
+                context_tokens: kernel::Window::new(facts.context_tokens),
                 max_output_tokens: facts.max_output_tokens,
             },
         )

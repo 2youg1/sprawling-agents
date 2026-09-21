@@ -27,7 +27,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | Name | What it is |
 |---|---|
 | **City** | One city on one machine: one Ledger, one complete history. Two cities never reference each other. |
-| **Building** | A building within a city. The scope unit for configuration, Archive, and Policy. |
+| **Building** | A building within a city. The scope unit for configuration, Archive, and the rules in `BUILDING.md`. |
 | **Floor** / **Room** | Floors and rooms inside a building. The directory tree is the space. |
 | **Session** | One line of work a person named, kept in a room of that name. Dispatching to a building with a name opens the room; dispatching to the room again continues the session, and its `Handoff.md` is what carries it across. |
 | **Build Floor** / **Workshop** | A floor given to one piece of collaborative work, and the node graph that routes work across it. |
@@ -86,7 +86,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 |---|---|
 | **Gate** | Five doors plus idempotent deduplication. A decision returns an exhaustive verdict rather than a bool. |
 | **three-part refusal** | A refusal states what was refused, why, and an alternative that can be acted on. |
-| **Taint** | External content is data. Taint joins on the union, rises through doors, and has no unwrapping surface. |
+| **Taint** | External content is data. Taint joins on the union, has no unwrapping surface, and refuses two doors outright: an undoable effect and a discard are both denied once tainted text has reached the run that asked for them. |
 | **WriteDomain** | The set of prefixes a resident may write, and what it may write inside them: `Everything`, or `Documents` — Markdown files only, and never a plan file. The decision primitive is `Address::is_within`; a building declares the second half with one `write:` line in its `BUILDING.md`. |
 | **Documents** | The narrower of the two write-domain kinds: inside its prefixes a resident may write Markdown files and nothing else, and never a plan file. A building declares it with one `write:` line in its `BUILDING.md`; the wider kind is `Everything`. It is what a resident who plans is given, so a planner cannot reach into what a builder produces. |
 | **undoable effect** | An effect outside this city that nothing inside it can take back — today, a key pressed or a clipboard replaced through the **desktop connector**. It has no Restoration, so the Discard door has nothing to check; the door for it decides from what the connector was allowed at attach, because refusing every one of them would make the tool equivalent to absent. One allowance per connector, not per tool. |
@@ -97,7 +97,6 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **Restoration** | The way back: `Tracked` (committed), `Interred` (in the store), `Rebuildable` (reproducible). |
 | **Recycle Bin** | The view over discarded things, where every row can state its own way back. |
 | **ApprovalItem** | A design question a resident asked the person, awaiting an answer, carrying a cluster key and a tainted flag. Actions are not asked about: a door either allows one or refuses it. |
-| **Policy** | An exemption rule settled from answered ApprovalItems. It expires. |
 | **Reading Room** | The list of skills a building admits. A name on it that is not on the shelves is left out rather than promised. |
 | **Autonomy** | Who answers a question: `Owner` — the person — or `Delegate`, a resident who answers in their place. |
 | **Halt** | The brake, and the only one: stop a city, a building, or a workshop; `release` lets it go on. It shuts the scope to new work and terminates the backlog members inside it, so a command nobody can reach is not what a stopped city is still doing. Ending a run that is already going is `Cancel`, which is a different verb. There is no spend ceiling and no turn ceiling behind it — a city that must stop is stopped by somebody saying so. |
@@ -140,7 +139,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **interaction contract** | What a part owes a person who is not holding a pointer: the WAI-ARIA pattern it implements, what each key does, the exact `aria-*` values, and which element the focus returns to when the part closes. `client/client-SPEC.md` section 7 is its single authority — how a screen is drawn is exempt from SPEC-first, and this is the half that is not. |
 | **Lens** | Which reading of one history a page is showing: `Ledger`, `Archive`, or `Bin`. Three separate nav entries would ask a person to choose before the question was formed. The lens lives in the address, so a link to the archive is still a link to the archive. |
 | **control surface** | The intervention surface at the bottom: five verbs plus the steer input. |
-| **Approval Inbox** | The queue of pending answers, grouped by cluster key. A tainted item is never grouped. |
+| **Approval Inbox** | The queue of pending answers, grouped by cluster key. |
 | **progress bar** | The progress bar. |
 | **ACCENT** | Jing blue, `H=264`, meaning "something is happening here". |
 | **ALERT** | Champagne gold, `H=84`, meaning "a person is needed here". |

@@ -65,10 +65,13 @@ struct Interrupting {
 impl Interrupting {
     fn ask(&mut self) -> Interrupt {
         // A stopped scope outranks anything a person or a neighbour
-        // still has to say to the run.
+        // still has to say to the run. A backlog that cannot answer
+        // counts as stopped: it cannot promise the scope is still open,
+        // and a run that carried on would be running inside a scope a
+        // person may already have shut (sprawling-SPEC.md 8-73).
         if self
             .member
-            .is_some_and(|id| self.backlog.stopping(id).unwrap_or(false))
+            .is_some_and(|id| self.backlog.stopping(id).unwrap_or(true))
         {
             return Interrupt::Cancel;
         }

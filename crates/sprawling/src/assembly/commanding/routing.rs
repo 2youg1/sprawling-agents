@@ -9,7 +9,7 @@ use kernel::TimeMs;
 use kernel::{AxCode, AxError};
 
 use super::super::{
-    Assignment, Ceilings, Chosen, Credential, Entered, HALTED, Owing, RELEASED, RunWorker, Unasked,
+    Admission, Assignment, Ceilings, Chosen, Credential, Entered, Owing, RunWorker, Unasked,
     mode_of, not_built, tuning_of,
 };
 
@@ -23,7 +23,39 @@ fn no_run_answers(action: &'static str, run: kernel::RunId, recovery: &'static s
     AxError::failure(AxCode::InvalidArgs, action, run.to_string()).with_recovery(recovery)
 }
 
+/// The task and the goal a person typed, travelling together.
+///
+/// An empty goal is not a missing field: no job file is written and the
+/// prefix tells the model a person is at the other end, which is
+/// exactly the shape a single sentence typed into the composer has.
+pub(in crate::assembly) struct Asked {
+    pub(in crate::assembly) task: String,
+    pub(in crate::assembly) goal: String,
+}
+
 impl RunWorker {
+    /// Takes into a lane the work a person asked for.
+    ///
+    /// The session and the effort travel into the dispatch rather than
+    /// being spent here, because opening a room and writing its
+    /// configuration are the first two things this city puts on disk,
+    /// and nothing may be written until the city has agreed to take the
+    /// work. Doing either here would leave the entrances that dispatch
+    /// without a person holding an older, wrong rule.
+    ///
+    /// # Errors
+    /// Propagates every refusal a dispatch can owe before it costs
+    /// anything.
+    fn dispatch_asked(
+        &mut self,
+        at: Assignment,
+        asked: Asked,
+        reply: channels::Reply,
+    ) -> Result<(), AxError> {
+        self.dispatch_into_lane(at, asked.task, asked.goal, Owing::asked(reply))
+            .map(drop)
+    }
+
     /// Carries out one command, with the address its refusal goes back
     /// to.
     ///
@@ -45,35 +77,19 @@ impl RunWorker {
                 session,
                 effort,
                 ..
-            } => {
-                // An empty goal is not a missing field: no job file is
-                // written and the prefix tells the model a person is at
-                // the other end, which is exactly the shape a single
-                // sentence typed into the composer has.
-                //
-                // The session and the effort travel into the dispatch
-                // rather than being spent here, because opening a room
-                // and writing its configuration are the first two things
-                // this city puts on disk, and nothing may be written
-                // until the city has agreed to take the work. Doing
-                // either here would leave the entrances that dispatch
-                // without a person holding an older, wrong rule.
-                self.dispatch_into_lane(
-                    Assignment {
-                        addr,
-                        session,
-                        effort,
-                        mode: mode_of(&mode),
-                        parent: None,
-                        succession: None,
-                        tainted: false,
-                    },
-                    task,
-                    goal,
-                    Owing::asked(reply),
-                )
-                .map(drop)
-            }
+            } => self.dispatch_asked(
+                Assignment {
+                    addr,
+                    session,
+                    effort,
+                    mode: mode_of(mode),
+                    parent: None,
+                    succession: None,
+                    tainted: false,
+                },
+                Asked { task, goal },
+                reply,
+            ),
             channels::Command::Wake {
                 source,
                 subject,
@@ -159,6 +175,21 @@ impl RunWorker {
             channels::Command::SetAutonomy {
                 scope, autonomy, ..
             } => self.set_autonomy(&scope, autonomy),
+            channels::Command::HandOff { item, .. } => Err(not_built(
+                "hand a question to somebody else",
+                item.as_str().to_owned(),
+                "answer it yourself, or appoint that resident as the delegate; handing one                  question on is not built",
+            )),
+            channels::Command::PutPreferences { .. } => Err(not_built(
+                "write this person's preferences",
+                "~/.sprawling/config.toml".to_owned(),
+                "edit the file by hand; writing it from the page is not built",
+            )),
+            channels::Command::PutShelved { name, .. } => Err(not_built(
+                "write a shelved document",
+                name.clone(),
+                "edit the file under the shelf by hand; writing it from the page is not built",
+            )),
             channels::Command::Pursue { addr, step, .. } => self.set_pursuit(&addr, step),
             channels::Command::Fork {
                 run, at_seq, addr, ..
@@ -166,14 +197,16 @@ impl RunWorker {
             channels::Command::PutDocument {
                 which, ref body, ..
             } => self.put_document(which, body),
-            channels::Command::Halt { scope, .. } => self.set_admission(&scope, HALTED),
+            channels::Command::Halt { scope, .. } => self.set_admission(&scope, Admission::Halted),
             channels::Command::Reveal { at, .. } => crate::revealing::reveal(&self.city_root, &at),
             channels::Command::DoctorInstall { ref item, .. } => self.doctor_install(item),
             channels::Command::DoctorRefresh { .. } => {
                 self.look_at_this_machine();
                 Ok(())
             }
-            channels::Command::Release { scope, .. } => self.set_admission(&scope, RELEASED),
+            channels::Command::Release { scope, .. } => {
+                self.set_admission(&scope, Admission::Released)
+            }
             // Cancel and Steer have a second door. `Desk::interrupt_for`
             // lifts them off the queue at the next safe point of the run
             // they name, so arriving here means no run answered - which
@@ -202,16 +235,6 @@ impl RunWorker {
                 "roll a checkpoint back",
                 checkpoint.to_string(),
                 "the checkpoint stands and its contents are readable; undoing it is not built",
-            )),
-            channels::Command::CreatePolicy { from_item, .. } => Err(not_built(
-                "turn an answer into a policy",
-                from_item.as_str().to_owned(),
-                "answer each request as it arrives; standing policies are not built",
-            )),
-            channels::Command::Attach { upload, .. } => Err(not_built(
-                "attach an upload to a run",
-                upload.as_str().to_owned(),
-                "paste the text into the task instead; attaching a file is not built",
             )),
             channels::Command::BatchByBuilding { addr, .. } => Err(not_built(
                 "run a building's work as one batch",

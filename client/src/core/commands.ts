@@ -8,21 +8,24 @@
 // its own idempotency key.
 
 import { mintIdem } from "./idem";
+export type { Endpoint, Pair, Tuning } from "./commands/endpoint";
+export { attachEndpoint, probeEndpoint } from "./commands/endpoint";
+import { providerName } from "./commands/endpoint";
+export { providerName };
 import type {
   Address,
   ApprovalId,
   Autonomy,
   Ceiling,
   Command,
+  Mode,
+  Window,
   DialectKind,
   Effort,
-  EndpointTuning,
-  Proxying,
   GovernedDocument,
   HaltScope,
   McpServer,
   ModelTag,
-  ProviderName,
   PursuitStep,
   RunId,
   Seq,
@@ -32,8 +35,7 @@ import type {
 import {
   Ceiling as CeilingSchema,
   Effort as EffortSchema,
-  ModeTag,
-  ProviderName as ProviderNameSchema,
+  Window as WindowSchema,
   SessionName as SessionNameSchema,
   TemplateName as TemplateNameSchema,
 } from "../wire";
@@ -49,7 +51,7 @@ export const EFFORTS: readonly Effort[] = EffortSchema.literals;
 // The one mode a conversation runs in: plan first, then work. The city
 // reads any tag it does not know as this one, so the spelling here is
 // the explicit form of the default.
-const PLAN_MODE: ModeTag = ModeTag.make("plan_goal");
+const PLAN_MODE: Mode = "plan_goal";
 
 // A dispatch names a room: `addr` is the room itself (`hall/mayor`),
 // and the city opens no second room inside it. Naming a session is the
@@ -174,17 +176,18 @@ export function setAutonomy(scope: HaltScope, autonomy: Autonomy): Command {
 export const WIRE_APIS = ["chat", "responses", "messages"] as const;
 export type WireApi = (typeof WIRE_APIS)[number];
 
-export function dialectOf(api: WireApi): DialectKind | null {
+export function dialectOf(api: WireApi): DialectKind {
   switch (api) {
     case "chat":
       return "open_ai";
     case "messages":
       return "anthropic";
     // The Responses API is a third request shape rather than a second
-    // spelling of Chat Completions; this city's wire cannot carry it,
-    // and a form that sent `open_ai` for it would send the wrong body.
+    // spelling of Chat Completions, and the wire now carries it as
+    // one, so a form no longer has to refuse the provider that speaks
+    // it.
     case "responses":
-      return null;
+      return "open_ai_responses";
   }
 }
 
@@ -195,116 +198,19 @@ export function dialectOf(api: WireApi): DialectKind | null {
 // beside it so the endpoint list does not spell the pair a second time
 // - it used to read `dialect === "anthropic" ? "messages" : "chat"`,
 // which is this mapping with the wrong answer built into its second
-// half. `open_ai` answers `chat` because that is the only OpenAI shape
-// the wire carries today; the day `DialectKind` gains the Responses
-// kind, this switch stops compiling and the third answer is written
-// once, here.
+// half, and total in both directions now that the wire carries the
+// Responses shape under a kind of its own.
 export function wireApiOf(dialect: DialectKind): WireApi {
   switch (dialect) {
     case "open_ai":
       return "chat";
+    case "open_ai_responses":
+      return "responses";
     case "anthropic":
       return "messages";
   }
 }
 
-export interface Endpoint {
-  // `[model_providers.<id>]` in Codex's config.toml: the key the
-  // credential reference is derived from, and the name the city files
-  // the endpoint under.
-  readonly id: string;
-  readonly baseUrl: string;
-  readonly dialect: DialectKind;
-  readonly secret: string | null;
-  readonly authHeader: string | null;
-  readonly tuning: Tuning;
-}
-
-// One row of either key-value table the form draws: a header every
-// request carries, or a JSON pointer into the body it sends.
-export interface Pair {
-  readonly name: string;
-  readonly value: string;
-}
-
-// What a person settled about one endpoint besides its address, in the
-// spelling Codex's `[model_providers.<id>]` uses. Every figure is
-// absent until somebody states one, and the city reads an absent figure
-// as its own default rather than as zero.
-export interface Tuning {
-  readonly label: string | null;
-  readonly timeoutMs: number | null;
-  readonly requestMaxRetries: number | null;
-  readonly streamIdleTimeoutMs: number | null;
-  readonly headers: readonly Pair[];
-  readonly overrides: readonly Pair[];
-  // Which of this endpoint's calls go through the machine's proxy. The
-  // city's own rule keeps a call to an address on this machine off it,
-  // and that is what `null` asks for.
-  readonly proxying: Proxying | null;
-}
-
-// A figure reaches the wire only as a whole number that is not
-// negative. A retry count of zero is a real answer - "once, then report"
-// - so it travels, while every deadline is refused at zero: no request
-// completes in no time, and a cleared box means "the city's own".
-function count(stated: number | null): number | null {
-  return stated !== null && Number.isInteger(stated) && stated >= 0 ? stated : null;
-}
-
-function span(stated: number | null): number | null {
-  const whole = count(stated);
-  return whole !== null && whole > 0 ? whole : null;
-}
-
-// The tuning as the frame carries it. A row whose name is blank is left
-// out: the form keeps an empty row open while somebody types into it,
-// and a half-written header must not reach a provider.
-function tuningFrame(tuning: Tuning): EndpointTuning {
-  const named = (rows: readonly Pair[]) => rows.filter((row) => row.name.trim() !== "");
-  return {
-    label: tuning.label === null || tuning.label.trim() === "" ? null : tuning.label.trim(),
-    timeout_ms: span(tuning.timeoutMs),
-    request_max_retries: count(tuning.requestMaxRetries),
-    stream_idle_timeout_ms: span(tuning.streamIdleTimeoutMs),
-    headers: named(tuning.headers).map((row) => ({ name: row.name.trim(), value: row.value })),
-    overrides: named(tuning.overrides).map((row) => ({ pointer: row.name.trim(), value: row.value })),
-    proxying: tuning.proxying,
-  };
-}
-
-export function providerName(name: string): ProviderName {
-  return ProviderNameSchema.make(name);
-}
-
-export function probeEndpoint(e: Endpoint): Command {
-  return {
-    probe_endpoint: {
-      name: providerName(e.id),
-      base_url: e.baseUrl,
-      dialect: e.dialect,
-      secret: e.secret,
-      auth_header: e.authHeader,
-      tuning: tuningFrame(e.tuning),
-      idem: mintIdem(),
-    },
-  };
-}
-
-export function attachEndpoint(e: Endpoint, admit: readonly string[]): Command {
-  return {
-    attach_endpoint: {
-      name: providerName(e.id),
-      base_url: e.baseUrl,
-      dialect: e.dialect,
-      secret: e.secret,
-      auth_header: e.authHeader,
-      admit: [...admit],
-      tuning: tuningFrame(e.tuning),
-      idem: mintIdem(),
-    },
-  };
-}
 
 // The two ceilings one model row states. They travel together because a
 // context window without an output ceiling describes no model that can
@@ -326,8 +232,11 @@ function ceiling(stated: number | null): Ceiling | null {
   return stated !== null && Number.isInteger(stated) && stated > 0 ? CeilingSchema.make(stated) : null;
 }
 
-function window(stated: number | null): number {
-  return stated !== null && Number.isInteger(stated) && stated > 0 ? stated : 0;
+// A window reaches the wire only as a whole positive number, and zero
+// is not one: a window nobody stated and a window of zero used to be
+// the same byte, and the context reminder read every session as full.
+function window(stated: number | null): Window | null {
+  return stated !== null && Number.isInteger(stated) && stated > 0 ? WindowSchema.make(stated) : null;
 }
 
 export function selectModel(
