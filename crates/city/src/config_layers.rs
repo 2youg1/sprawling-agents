@@ -34,12 +34,13 @@ mod write;
 
 pub use ladder::Layer;
 pub use session::{own_layer, write_session};
+pub(crate) use shelves::SHELVES_KEY;
 pub use shelves::city_shelves;
 pub use write::{write_effort, write_mcp, write_sandbox};
 
 use ladder::Ladder;
-// The refusal shape every reader in this module answers with.
-use refuse::refuse;
+// The refusal shapes every reader in this module answers with.
+use refuse::{refuse, unreadable};
 
 /// Where a layer's file lives for a run at `addr`.
 ///
@@ -71,7 +72,7 @@ impl ConfigLayer {
     /// not read. Ignoring an unrecognised key produces the one state
     /// nobody can diagnose: the setting is written, and nothing happens.
     pub fn parse(text: &str) -> Result<ConfigLayer, AxError> {
-        let file: ConfigFile = toml::from_str(text).map_err(|err| refuse(err.to_string()))?;
+        let file: ConfigFile = toml::from_str(text).map_err(|err| unreadable(text, &err))?;
         let sandbox = match file.sandbox {
             None => None,
             Some(section) => {

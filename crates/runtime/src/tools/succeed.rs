@@ -11,8 +11,11 @@
 //! and hands part of the work to somebody else; `succeed` hands all of
 //! it to the next run of the same resident, which is why a successor
 //! may still delegate. No person is asked: nothing outside the run's
-//! own room changes, no depth is added, and what bounds a chain of
-//! successions is `Halt`, the same brake that bounds everything else.
+//! own room changes, and no depth is added. What bounds a chain of
+//! successions is the hop counter its landing is checked against, in
+//! `crates/sprawling/src/assembly/driving/owing.rs`, whose ceilings are
+//! recorded in sprawling-SPEC.md 8-46-12. `Halt` answers a different
+//! question: it shuts a scope to new work.
 //!
 //! **A request is not a run.** The tool answers with where the successor
 //! will start, not with a result, for the reason `delegate` gives: a run

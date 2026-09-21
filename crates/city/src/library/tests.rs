@@ -261,6 +261,46 @@ fn the_citys_own_stock_beats_an_external_shelf_of_the_same_name() {
     assert!(held.shelf.address().is_some(), "the city's own copy won");
 }
 
+/// The catalog groups by shelf before it looks at a section, so the
+/// city's own stock comes first even when an external holding has no
+/// section to sort under and the building's own is filed late. Sorting
+/// every holding by section once put the external rows on top.
+#[test]
+fn the_catalog_lists_the_citys_stock_before_a_buildings_own_and_an_external_shelf() {
+    let dir = tempfile::tempdir().unwrap();
+    stocked(dir.path());
+    let home = dir.path().join("home");
+    external_skill(&home.join("tools"), "aa-external", "From elsewhere\n");
+    configured(dir.path(), &["~/tools"]);
+    let lab = Address::parse("lab").unwrap();
+    let own = dir
+        .path()
+        .join("lab")
+        .join(kernel::RESERVED_PREFIX)
+        .join(BUILDING_SHELF)
+        .join("zz-section");
+    std::fs::create_dir_all(&own).unwrap();
+    std::fs::write(own.join("zz-building.md"), "The building's own\n").unwrap();
+
+    let library = Library::scan(dir.path(), Some(&lab), &home).unwrap();
+    let named: Vec<&str> = library
+        .all()
+        .into_iter()
+        .map(|held| held.name.as_str())
+        .collect();
+    assert_eq!(
+        named,
+        vec![
+            "kiln-firing",
+            "diffing",
+            "unit-tests",
+            "zz-building",
+            "aa-external",
+        ],
+        "city stock, then the building's own, then the external shelf"
+    );
+}
+
 /// Two shelves are read in the order the configuration lists them, and
 /// each holding says which one it came from.
 #[test]

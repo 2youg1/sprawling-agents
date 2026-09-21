@@ -105,6 +105,7 @@ fn a_key_in_tool_args_and_tool_result_never_reaches_the_ledger() {
     assert_eq!(called["kind"], "tool_called");
     assert_eq!(called["data"]["id"], "call-7");
     assert_eq!(called["data"]["name"], "edit");
+    assert_eq!(called["data"]["subject"], ".env");
     assert_eq!(called["data"]["args"]["path"], ".env");
     let replaced = called["data"]["args"]["replace"].as_str().unwrap();
     assert!(replaced.starts_with("OPENAI_API_KEY=secret:redacted/"));

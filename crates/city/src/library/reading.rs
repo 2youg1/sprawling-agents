@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError, B3Hash};
 
+use crate::config_layers::SHELVES_KEY;
+
 use super::ShelfKey;
 use super::shelf::{Holding, Shelf};
 
@@ -128,9 +130,9 @@ pub(super) fn shelve_external(
             "mount an external skill shelf",
             format!("{} is not a directory", root.display()),
         )
-        .with_recovery(
-            "point `[skills] shelves` at a directory, or take that entry out of the list",
-        ));
+        .with_recovery(format!(
+            "point `{SHELVES_KEY}` at a directory, or take that entry out of the list"
+        )));
     }
     for item in read_dir(root)? {
         if !item.is_dir() {

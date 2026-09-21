@@ -31,7 +31,7 @@ use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, LayeredValue};
 
 use super::ConfigLayer;
-use super::refuse::refuse;
+use super::refuse::{refuse, skills_below_city};
 use crate::building::Building;
 
 /// One rung of the City -> Building -> Resident ladder, from the
@@ -101,7 +101,7 @@ impl Ladder {
             if read.contains(&file) {
                 continue;
             }
-            rungs.push((rung, stated(&file)?));
+            rungs.push((rung, stated(&file, rung)?));
             read.push(file);
         }
         Ok(Ladder { rungs })
@@ -147,24 +147,35 @@ impl Ladder {
     }
 }
 
-/// What one file states. Absent states nothing, which is how most
-/// rungs stay: a value is written where somebody meant to depart from
-/// the default.
+/// What one file states for one rung. Absent states nothing, which is
+/// how most rungs stay: a value is written where somebody meant to
+/// depart from the default.
+///
+/// A rung below the city that states `[skills]` is refused here rather
+/// than read and dropped: a shelf is mounted for every building at
+/// once, so only the city's own file may name one (`city-SPEC.md`
+/// section 8-8).
 ///
 /// Crate-internal because the city's own rung is read without an address
 /// by [`super::city_shelves`]: the missing-file rule is stated once here
 /// rather than a second time for the one caller that has no address.
-pub(crate) fn stated(file: &Path) -> Result<ConfigLayer, AxError> {
-    match std::fs::read_to_string(file) {
+pub(crate) fn stated(file: &Path, rung: Layer) -> Result<ConfigLayer, AxError> {
+    let stated = match std::fs::read_to_string(file) {
         // Several files can fail; the refusal says which one did.
         Ok(text) => ConfigLayer::parse(&text)
-            .map_err(|err| refuse(format!("{}: {}", file.display(), err.subject()))),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(ConfigLayer::default()),
-        Err(err) => Err(AxError::failure(
-            AxCode::StorageFatal,
-            "read a configuration layer",
-            format!("{}: {err}", file.display()),
-        )
-        .with_recovery("fix the file's permissions; a configuration that exists is read")),
+            .map_err(|err| refuse(format!("{}: {}", file.display(), err.subject())))?,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => ConfigLayer::default(),
+        Err(err) => {
+            return Err(AxError::failure(
+                AxCode::StorageFatal,
+                "read a configuration layer",
+                format!("{}: {err}", file.display()),
+            )
+            .with_recovery("fix the file's permissions; a configuration that exists is read"));
+        }
+    };
+    if rung != Layer::City && stated.shelves().is_some() {
+        return Err(skills_below_city(file));
     }
+    Ok(stated)
 }

@@ -94,19 +94,14 @@ impl ToolBench {
                 }
             }
             Effect::Egress => {
-                // A call that names no destination has no egress to
-                // judge; the tool's grammar says which calls name one.
-                // A tool that declares Egress and never names a host is
-                // a wiring defect, and the bench cannot tell it from a
-                // call with nothing to send - so the tool's own tests
-                // hold its grammar to naming every destination it has.
-                if let GateSubject::Host(host) = subject {
-                    let spans = kernel::secret::scan(&scanned(call, "scan egress args")?);
-                    let target = kernel::gate::target_of(host);
-                    let verdict = kernel::gate::egress(&spans, &target, self.prior_public_egress);
-                    if let Some(answered) = self.crossed(verdict) {
-                        return Ok(Some(answered));
-                    }
+                // A call that names no destination keeps its bytes on
+                // this machine, and the scan still runs: what a model
+                // typed into a page would leave through it.
+                let target = bytes_target(name, subject, "send bytes out")?;
+                let spans = kernel::secret::scan(&scanned(call, "scan egress args")?);
+                let verdict = kernel::gate::egress(&spans, &target, self.prior_public_egress);
+                if let Some(answered) = self.crossed(verdict) {
+                    return Ok(Some(answered));
                 }
             }
             Effect::AttachUserBrowser { address } => {
@@ -123,19 +118,9 @@ impl ToolBench {
                     return Ok(Some(answered));
                 }
                 // The bytes are still scanned: what gets typed into a
-                // page is the credential this door can see. The page's
-                // own host decides the first-public-egress notice, and
-                // a call that names no page is the attachment itself,
-                // which is this machine.
-                let page = match subject {
-                    GateSubject::Host(host) => kernel::gate::target_of(host),
-                    GateSubject::None => EgressTarget::Loopback,
-                    other @ (GateSubject::Area(_)
-                    | GateSubject::Room(_)
-                    | GateSubject::Scope(_)) => {
-                        return Err(subject_not_for(name, other, "drive a browser"));
-                    }
-                };
+                // page is the credential this door can see, and a call
+                // that names no page is the attachment itself.
+                let page = bytes_target(name, subject, "drive a browser")?;
                 let spans = kernel::secret::scan(&scanned(call, "scan browser args")?);
                 let verdict = kernel::gate::egress(&spans, &page, self.prior_public_egress);
                 if let Some(answered) = self.crossed(verdict) {
@@ -157,7 +142,12 @@ impl ToolBench {
                 // gets clicked through.
                 let scope = match subject {
                     GateSubject::Scope(scope) => scope.clone(),
-                    GateSubject::None => "the scope this run sits in".to_owned(),
+                    // A governance call names the scope it would rewrite;
+                    // one that names none is refused the same way a
+                    // subject the effect cannot read is.
+                    GateSubject::None => {
+                        return Err(subject_not_for(name, subject, "change what governs"));
+                    }
                     other
                     @ (GateSubject::Area(_) | GateSubject::Room(_) | GateSubject::Host(_)) => {
                         return Err(subject_not_for(name, other, "change what governs"));
@@ -227,10 +217,29 @@ impl ToolBench {
     }
 }
 
+/// The destination one call's bytes go to, for the scan both outward
+/// doors run.
+///
+/// A call whose grammar names no destination keeps its bytes on this
+/// machine, so its target is loopback: the scan runs instead of being
+/// skipped, and no host the call did not name is claimed. Any other
+/// answer is a tool whose `subject` and `effect` disagree, and is
+/// refused rather than judged.
+fn bytes_target(name: &str, subject: &GateSubject, doing: &str) -> Result<EgressTarget, AxError> {
+    match subject {
+        GateSubject::Host(host) => Ok(kernel::gate::target_of(host)),
+        GateSubject::None => Ok(EgressTarget::Loopback),
+        other @ (GateSubject::Area(_) | GateSubject::Room(_) | GateSubject::Scope(_)) => {
+            Err(subject_not_for(name, other, doing))
+        }
+    }
+}
+
 /// A tool answered with a subject its effect does not read. Refused
 /// rather than judged by something else: a tool whose `subject` and
 /// `effect` disagree is a wiring defect, and the next reader needs to
-/// see it here instead of a gate judging the wrong thing.
+/// see it here instead of a gate judging the wrong thing. A subject a
+/// call needed and never named takes the same refusal.
 fn subject_not_for(name: &str, subject: &GateSubject, doing: &str) -> AxError {
     AxError::failure(
         AxCode::InvalidArgs,
@@ -258,12 +267,12 @@ fn spell(subject: &GateSubject) -> &'static str {
 
 /// One call's arguments as the bytes the secret scan reads.
 ///
-/// Two doors reach outside and both scan the same thing; `doing` names
-/// which one, so a failure to serialise says which door it happened at.
+/// `doing` names which outward door asked, so a failure to serialise
+/// says where it happened.
 ///
 /// # Errors
-/// Refuses arguments that will not serialise, which is a call this
-/// bench cannot judge rather than a call it may let through.
+/// Refuses arguments that will not serialise: a call this bench cannot
+/// judge rather than one it may let through.
 fn scanned(call: &ToolCall, doing: &'static str) -> Result<Vec<u8>, AxError> {
     serde_json::to_vec(&call.args).map_err(|err| {
         AxError::failure(AxCode::InvalidArgs, doing, err.to_string()).with_recovery(
@@ -271,4 +280,116 @@ fn scanned(call: &ToolCall, doing: &'static str) -> Result<Vec<u8>, AxError> {
                  which is all this city's payloads carry",
         )
     })
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+    use kernel::{RunId, Seq};
+
+    struct Stub(kernel::ToolMeta, GateSubject);
+
+    fn stub(name: &str, effect: Effect, answer: GateSubject) -> Box<dyn Tool> {
+        Box::new(Stub(
+            kernel::ToolMeta {
+                name: kernel::ToolName::parse(name).unwrap(),
+                disclosure: "a stub the door tests drive".to_owned(),
+                params: kernel::Payload::empty(),
+                effect,
+                cost_tier: kernel::CostTier::Free,
+                timeout: None,
+                render: kernel::RenderIntent::Generic,
+                temporal: kernel::Temporal::Timeless,
+            },
+            answer,
+        ))
+    }
+
+    impl Tool for Stub {
+        fn meta(&self) -> &kernel::ToolMeta {
+            &self.0
+        }
+
+        fn invoke(&mut self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
+            Ok(ToolOutcome {
+                result: kernel::Payload::empty(),
+                attachments: Vec::new(),
+            })
+        }
+
+        fn subject(&self, _call: &ToolCall) -> Result<GateSubject, AxError> {
+            Ok(self.1.clone())
+        }
+    }
+
+    fn bench_with(tool: Box<dyn Tool>) -> ToolBench {
+        let domain = WriteDomain::new(vec![Address::parse("work").unwrap()]).unwrap();
+        let mut bench = ToolBench::new(domain);
+        bench.register(tool).unwrap();
+        bench
+    }
+
+    fn call(tool: &str, args: kernel::Payload) -> ToolCall {
+        ToolCall {
+            id: "c-1".to_owned(),
+            name: kernel::ToolName::parse(tool).unwrap(),
+            args,
+        }
+    }
+
+    fn key(n: u64) -> IdemKey {
+        IdemKey::derive(&RunId::from_bytes([1u8; 16]), Seq::new(n), b"door")
+    }
+
+    fn at() -> kernel::TimeMs {
+        kernel::TimeMs::new(1_700_000_000_000)
+    }
+
+    #[test]
+    fn an_egress_call_that_names_no_host_is_still_scanned() {
+        let mut bench = bench_with(stub("webbish", Effect::Egress, GateSubject::None));
+        let secret = format!("sk-ant-{}", "a1B2c3D4e5".repeat(9));
+        let mut args = serde_json::Map::new();
+        args.insert("text".to_owned(), Value::String(secret));
+        let answered = bench
+            .invoke(
+                &call("webbish", kernel::Payload::new(args).unwrap()),
+                &key(1),
+                at(),
+            )
+            .unwrap();
+        assert!(matches!(answered, BenchOutcome::Refused { .. }));
+    }
+
+    #[test]
+    fn an_egress_call_that_names_no_host_still_runs_when_the_bytes_are_clean() {
+        let mut bench = bench_with(stub("webbish", Effect::Egress, GateSubject::None));
+        let answered = bench
+            .invoke(&call("webbish", kernel::Payload::empty()), &key(2), at())
+            .unwrap();
+        assert!(matches!(answered, BenchOutcome::Ran { .. }));
+    }
+
+    #[test]
+    fn an_egress_call_that_answers_with_an_area_is_refused_as_a_wiring_defect() {
+        let area = Address::parse("work/room").unwrap();
+        let mut bench = bench_with(stub("webbish", Effect::Egress, GateSubject::Area(area)));
+        let refused = bench.invoke(&call("webbish", kernel::Payload::empty()), &key(3), at());
+        assert!(refused.is_err());
+    }
+
+    #[test]
+    fn a_govern_call_that_names_no_scope_is_refused_as_a_tool_that_named_none() {
+        let mut bench = bench_with(stub("ruler", Effect::Govern, GateSubject::None));
+        let refused = bench
+            .invoke(&call("ruler", kernel::Payload::empty()), &key(4), at())
+            .unwrap_err();
+        assert!(refused.subject().contains("no subject"));
+    }
 }

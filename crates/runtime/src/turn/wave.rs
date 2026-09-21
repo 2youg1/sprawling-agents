@@ -67,6 +67,7 @@ impl Turn<ToolWave> {
             let called = ToolCalled {
                 id: call.id.clone(),
                 name: call.name.clone(),
+                subject: ToolCalled::subject_of(&call.args),
                 args: call.args.clone(),
             };
             self.journal

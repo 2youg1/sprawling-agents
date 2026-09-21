@@ -67,6 +67,23 @@ impl Shelf {
             Shelf::External { .. } => None,
         }
     }
+
+    /// Where this shelf sits in the order a catalog lists shelves: the
+    /// city's stock first, then the building's own copy, then the
+    /// external shelves in the order the city's configuration names
+    /// them.
+    ///
+    /// The arms above are that order, and the match below derives the
+    /// position from them: a shelf added later cannot build until it is
+    /// placed, so the enum stays the only place the order is decided.
+    #[must_use]
+    pub(super) fn catalog_position(&self) -> (u8, u32) {
+        match self {
+            Shelf::Library(_) => (0, 0),
+            Shelf::Building(_) => (1, 0),
+            Shelf::External { index, .. } => (2, *index),
+        }
+    }
 }
 
 /// One shelved item: what it is called, which section it sits in, and

@@ -41,7 +41,7 @@ use super::{ConfigLayer, Layer, path};
 /// Refuses an unreadable file and a file that does not parse, exactly
 /// as [`super::load`] does. A missing file states nothing.
 pub fn own_layer(city_root: &Path, addr: &Address) -> Result<ConfigLayer, AxError> {
-    super::ladder::stated(&path(city_root, addr, Layer::Resident)?)
+    super::ladder::stated(&path(city_root, addr, Layer::Resident)?, Layer::Resident)
 }
 
 /// Records what a session froze at its own address.

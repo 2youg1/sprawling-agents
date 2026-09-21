@@ -14,7 +14,7 @@
 //! what a body that will not parse becomes. Those answers already have
 //! one home - the endpoint transport - so a call goes through it and
 //! this module supplies only the two things a vector face differs by:
-//! the path, and the body.
+//! which face of the connection it asks for, and the body.
 //!
 //! **A person's body overrides do not reach a vector face.** An
 //! override is a JSON pointer into a conversation's body, applied by
@@ -58,7 +58,10 @@ pub struct Ranks<'a> {
 /// What both faces need to make one call.
 struct Face<'a> {
     endpoint: &'a AttachedEndpoint,
-    path: &'static str,
+    /// Where this face is called: the registered base and the path this
+    /// connection serves the face under, composed once by [`super`]'s
+    /// `url_for`, which owns both.
+    url: String,
     /// The provider's own id for the model that answers this face,
     /// which is not the conversation's: an embedding model holds no
     /// conversation, and the id an endpoint is called with is its own
@@ -82,7 +85,7 @@ impl<'a> Vectors<'a> {
     /// Where this face is called.
     #[must_use]
     pub fn url(&self) -> String {
-        self.face.url()
+        self.face.url().to_owned()
     }
 
     /// One call, and the line that records it.
@@ -128,14 +131,14 @@ impl<'a> Ranks<'a> {
     /// Where this face is called.
     #[must_use]
     pub fn url(&self) -> String {
-        self.face.url()
+        self.face.url().to_owned()
     }
 
     /// One call, and the line that records it.
     ///
-    /// The line states no token count: the rerank faces this city is
-    /// written against report none, and a figure derived here would be
-    /// this city's estimate sitting in the column a bill is read from.
+    /// The line carries the two counts and no usage: these faces report
+    /// none, and `kernel::event::record::RerankCalled` is where that
+    /// shape is stated.
     ///
     /// # Errors
     /// `E_PROVIDER` when the transport fails, the provider refuses, or
@@ -151,7 +154,6 @@ impl<'a> Ranks<'a> {
             model: self.face.model.clone(),
             passages: u64::try_from(request.passages()).unwrap_or(u64::MAX),
             ranks: u64::try_from(read.ranks().len()).unwrap_or(u64::MAX),
-            prompt_tokens: None,
         };
         Ok((read, record))
     }
@@ -163,21 +165,23 @@ impl<'a> Face<'a> {
         modality: Modality,
         model: String,
     ) -> Result<Face<'a>, AxError> {
-        let path = endpoint
+        // The base and the path are joined by the one function that
+        // owns both, so a face carries the address itself rather than a
+        // path each caller would have to hang off a base again.
+        let url = endpoint
             .connection_kind
-            .path_for(modality)
+            .url_for(&endpoint.base_url, modality)
             .ok_or_else(|| unserved(endpoint, modality))?;
         Ok(Face {
             endpoint,
-            path,
+            url,
             model,
         })
     }
 
-    /// The URL this face hangs off the registered base, joined the way
-    /// every other face this city calls joins it.
-    fn url(&self) -> String {
-        crate::router::join(&self.endpoint.base_url, self.path)
+    /// Where this face is called, composed when the face was built.
+    fn url(&self) -> &str {
+        &self.url
     }
 
     /// One POST, through the transport every other call leaves by.
@@ -189,7 +193,7 @@ impl<'a> Face<'a> {
         let tuning = &self.endpoint.tuning;
         let endpoint = Endpoint::new(
             EndpointConfig {
-                base_url: self.url(),
+                base_url: self.url.clone(),
                 dialect: self.endpoint.connection_kind.wire(),
                 model: self.model.clone(),
                 auth: self.endpoint.auth.clone(),

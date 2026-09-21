@@ -38,6 +38,8 @@ use std::path::Path;
 use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError};
 
+use crate::config_layers::SHELVES_KEY;
+
 /// The city's stock, one entry per name.
 ///
 /// One entry per name rather than per section and name: a reading room
@@ -86,7 +88,7 @@ impl Library {
                     "mount an external skill shelf",
                     "the city names more shelves than an index holds",
                 )
-                .with_recovery("name fewer shelves in `[skills] shelves`")
+                .with_recovery(format!("name fewer shelves in `{SHELVES_KEY}`"))
             })?;
             reading::shelve_external(index, &root, &mut holdings)?;
         }
@@ -107,27 +109,42 @@ impl Library {
         Ok(Library { holdings })
     }
 
-    /// Everything on the shelves, in section then name order.
+    /// Everything on the shelves, in the order a catalog lists them:
+    /// the city's stock first, then the building's own shelf, then the
+    /// external shelves in the order the city's configuration names
+    /// them; within a shelf, section then name order.
+    ///
+    /// The shelf decides that order, not the section: an external
+    /// holding has no section to sort under, so sorting every holding
+    /// by section once put the directories of other programs above the
+    /// city's own stock.
     #[must_use]
     pub fn all(&self) -> Vec<&Holding> {
         let mut shelved: Vec<&Holding> = self.holdings.values().collect();
         shelved.sort_by(|left, right| {
-            left.section
-                .cmp(&right.section)
-                .then(left.name.cmp(&right.name))
+            left.shelf
+                .catalog_position()
+                .cmp(&right.shelf.catalog_position())
+                .then_with(|| left.section.cmp(&right.section))
+                .then_with(|| left.name.cmp(&right.name))
         });
         shelved
     }
 
     /// The sections, which is the navigation a person browses by.
+    ///
+    /// One entry per section, in the order the catalog lists its first
+    /// holding: two shelves may file under the same section name, so
+    /// removing only the neighbours would leave that name twice.
     #[must_use]
     pub fn sections(&self) -> Vec<&str> {
-        let mut seen: Vec<&str> = self
-            .all()
-            .into_iter()
-            .map(|holding| holding.section.as_str())
-            .collect();
-        seen.dedup();
+        let mut seen: Vec<&str> = Vec::new();
+        for holding in self.all() {
+            let section = holding.section.as_str();
+            if !seen.contains(&section) {
+                seen.push(section);
+            }
+        }
         seen
     }
 

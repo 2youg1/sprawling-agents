@@ -18,7 +18,17 @@ use std::path::{Path, PathBuf};
 use kernel::layout::CityLayout;
 use kernel::{AxCode, AxError};
 
+use super::Layer;
 use super::ladder;
+
+/// The key this module mounts, spelled once for every refusal that
+/// names it.
+///
+/// The serde structure `SkillsSection` in [`super`] decides the
+/// spelling; the test at the bottom of this file parses the key as
+/// written here, so renaming the field and leaving this constant behind
+/// turns that test red.
+pub(crate) const SHELVES_KEY: &str = "[skills] shelves";
 
 /// The directories this city's own configuration mounts read-only beside
 /// its own shelves, in the order it lists them.
@@ -33,7 +43,7 @@ use super::ladder;
 /// (see [`shelf_path`]), and propagates a configuration file that exists
 /// and cannot be read or parsed.
 pub fn city_shelves(city_root: &Path, home: &Path) -> Result<Vec<PathBuf>, AxError> {
-    let layer = ladder::stated(&CityLayout::new(city_root).city_config())?;
+    let layer = ladder::stated(&CityLayout::new(city_root).city_config(), Layer::City)?;
     let Some(stated) = layer.shelves() else {
         return Ok(Vec::new());
     };
@@ -44,7 +54,7 @@ pub fn city_shelves(city_root: &Path, home: &Path) -> Result<Vec<PathBuf>, AxErr
     Ok(shelves)
 }
 
-/// How one shelf in `[skills] shelves` becomes a directory.
+/// How one shelf in the city's external shelf list becomes a directory.
 ///
 /// `~` means this person's home directory, and an entry it starts is the
 /// only kind that may be relative: a committed city configuration must
@@ -61,7 +71,7 @@ fn shelf_path(raw: &str, home: &Path) -> Result<PathBuf, AxError> {
         AxError::failure(
             AxCode::ConfigInvalid,
             "mount an external skill shelf",
-            format!("`{raw}` in `[skills] shelves` {because}"),
+            format!("`{raw}` in `{SHELVES_KEY}` {because}"),
         )
         .with_recovery(
             "write a directory as an absolute path, or as `~/...` under this person's \
@@ -85,4 +95,51 @@ fn shelf_path(raw: &str, home: &Path) -> Result<PathBuf, AxError> {
         return Ok(path);
     }
     Err(named("is not an absolute path"))
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+    use crate::config_layers::ConfigLayer;
+
+    /// The name a refusal shows is the key the parser reads: the probe
+    /// is the constant with the table broken onto its own line, so
+    /// renaming the serde field and leaving the constant behind stops
+    /// it parsing.
+    #[test]
+    fn the_name_a_refusal_shows_is_the_key_this_build_reads() {
+        let probe = format!("{} = []\n", SHELVES_KEY.replace("] ", "]\n"));
+        assert!(
+            ConfigLayer::parse(&probe).is_ok(),
+            "the parser does not read `{SHELVES_KEY}`: {probe}"
+        );
+    }
+
+    /// The city's own file is the only one that may name a shelf; a
+    /// building's or a room's is refused where it was written rather
+    /// than read and dropped.
+    #[test]
+    fn a_shelf_below_the_city_layer_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("CONFIG.toml");
+        let document = format!("{} = [\"/elsewhere\"]\n", SHELVES_KEY.replace("] ", "]\n"));
+        std::fs::write(&file, document).unwrap();
+        let err = ladder::stated(&file, Layer::Building).unwrap_err();
+        assert_eq!(err.code(), &AxCode::ConfigInvalid);
+        assert!(
+            err.recovery().contains("city"),
+            "the recovery says where the line belongs: {}",
+            err.recovery()
+        );
+        assert!(
+            ladder::stated(&file, Layer::City).is_ok(),
+            "the city layer owns this key"
+        );
+    }
 }

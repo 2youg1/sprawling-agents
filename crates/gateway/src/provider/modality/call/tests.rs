@@ -141,7 +141,6 @@ fn a_rerank_call_reads_the_answer_and_records_the_line() {
             model: "bge-reranker".to_owned(),
             passages: 2,
             ranks: 2,
-            prompt_tokens: None,
         }
     );
     let seen = server.join().unwrap();

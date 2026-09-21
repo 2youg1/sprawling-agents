@@ -170,7 +170,7 @@ impl ConfigLayer {
     pub fn parse(text: &str) -> Result<ConfigLayer, AxError>;   // 纯函数，无 I/O
     pub fn model(&self) -> Option<&str>;                        // 这一级冻下的模型，照写下的读回
     pub fn effort(&self) -> Option<Effort>;
-    pub fn shelves(&self) -> Option<&[String]>;                 // 这一级声明挂载的外部书架目录
+    pub fn shelves(&self) -> Option<&[String]>;                 // 这一级声明挂载的外部书架目录；只有 City 级可以（§8-8）
 }
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError>;
 pub fn own_layer(city_root: &Path, addr: &Address) -> Result<ConfigLayer, AxError>;
@@ -201,7 +201,7 @@ impl Ladder {
 - **文件名只有一份，层级由位置决定**：City 层住 `<city>/.sprawling/CONFIG.toml`（reserved prefix 内，因此任何 Resident 的写域都永远叠不上它——「Agent 改不了自己的配置」因此是判定而非推理）；Building 层住 `<city>/<building>/CONFIG.toml`；Resident 层住 `<city>/<addr>/CONFIG.toml`。三处同名，读者认一次就认得完。
 - **地址就是楼时只有两级**：`addr` 与它的 building 相同时，下两级指向同一个文件，只读一次并放在 Building 级。同一份文件在两级各算一次不改变结果，却会让读者以为它能覆盖自己。
 - **缺文件不是错，读不动才是**（同 `resident`）：未声明即每级 `None`，落到 `kernel::consts_policy` 的缺省；一份存在却读不出的配置报 `E_STORAGE_FATAL`。
-- **不认的键即拒**（`deny_unknown_fields`）：静默忽略一个拼错的键，会产生「我设了 effort 而什么也没发生」这个无从诊断的状态。本版读哪些键，由 `ConfigFile` 的字段给出，此处不复述；`[clock]` 等到它在真城里有消费者时再受理，在那之前写它得到的是一句拒绝而不是一份沉默。
+- **不认的键即拒**（`deny_unknown_fields`）：静默忽略一个拼错的键，会产生「我设了 effort 而什么也没发生」这个无从诊断的状态。本版读哪些键，由 `ConfigFile` 的字段给出，此处不复述；拒绝文字也不复述这张键表——serde 的报错点名不认识的键、列出该表接受的键，恢复语只从原文里取出报错所在的那张表头（`[model]`、`[[mcp]]`）并说改哪一节。`[clock]` 等到它在真城里有消费者时再受理，在那之前写它得到的是一句拒绝而不是一份沉默。
 - **梯子不在本模块重建**：下层胜上层由 `kernel::LayeredValue::resolve` 给，冻结由 `kernel::freeze` 给；本模块只回答「哪三份文件、怎么读」。一条规则一个权威。
 - **effort 属 `FrozenConfig` 而非 `LiveConfig`**：改它会作废 message cache breakpoints，因此改动只影响下一个 Run（理由已写在 `kernel::config`，此处不重述只遵守）。
 
@@ -326,13 +326,15 @@ pub fn city_shelves(city_root: &Path, home: &Path) -> Result<Vec<PathBuf>, AxErr
 - **一行式条目取作者写的第一行**，不生成摘要：摘要的摘要是消化产物，而消化产物默认可疑。
 - **清单上没有的名字不进 catalog、也不报错**，只留一行诊断给写清单的人——承诺一件取不到的技能比它不在还糟。
 - **书架按名字建键，section 降为字段**：阅览室按名字准入，所以「同一件」必须也按名字判定。键是类型化的 `ShelfKey`，由 `ShelfKey::of` 一处造出，上架与查清单两端都经它——按 `(section, name)` 建键时同名跨 section 的两份同时在架，「近架盖远架」因而在跨 section 时不成立。楼架后插，于是楼自己的那一份替换城里的那一份，哪怕两者归档在不同 section。
+- **身份是名字，hash 不是身份**：`Library` 按名建键、`reading_room` 按名准入，于是每一件都由名字唯一说出；hash 答的是另一个问题——这份文档变了没有、哪一次 run 读的是哪份字节（§8-13）。把两问混为一问，会把「同名改了内容」读成换了一件，把「同一份挂在两处」报成两件。要按 hash 标「亦见于」，先得让 `Holding` 留下被近架盖住的那一份（hash 本身已在 `Holding` 上，缺的是被盖住者的落点与身份），再给答案加一列读它；今天没有这一列，所以「按 hash 判定身份」只是一个没有读者的说法。
 - **读架上的失败逐条上报**：目录项读不动、目录名或文件名不是 Unicode，都带路径报 `E_STORAGE_FATAL`。一件静默缺席于每一间阅览室的 skill，是人从 catalog 上看不出来的那一种故障。
 - **一格书架加一个落点是一个值，不是两个字段**（`Holding::shelf`）：一个持有只在一格书架上、只在一个落点上，两个字段允许「说 library、指向城外的文件」这个任何书架都进不了的状态。三条臂正好是 skill 能在的三个地方，没有第四条；哪一条由**扫盘时读的那个根**给出，不从地址反推——反推只对「两格书架碰巧落在不同地方」成立，而那是个巧合而不是规则。
 - **`Shelf::address()` 答的是 catalog 承诺一件 skill 之前要问的那个问题**：一个条目靠地址打开，城外书架上的文件没有地址。所以**不发明一个假地址**：拼一个看起来像 `Address` 的字符串，会让读者去开一个并不在那儿的文件，且失败发生在第一次 `read` 而不在写下列表的那个时候。
-- **外部书架只读挂载，路径由城自己的配置给出**（`[skills] shelves`，城层一份）：`city_shelves` 在城的那一级上读它，而不是走三层梯子——书架是这座城所在的文件系统上的一个目录，它对每一栋楼同时挂上，让楼或房间能自己挂一本就是让一个作用域准入一份没人选过的文件。
+- **外部书架只读挂载，路径由城自己的配置给出**（`[skills] shelves`，城层一份）：`city_shelves` 在城的那一级上读它，而不是走三层梯子——书架是这座城所在的文件系统上的一个目录，它对每一栋楼同时挂上，让楼或房间能自己挂一本就是让一个作用域准入一份没人选过的文件。楼或房间写下它即在读文件处拒（`E_CONFIG_INVALID`，恢复语说把它移进城自己的 `CONFIG.toml`），而不是解析后丢掉——一份被接受却什么都不发生的配置，写它的人无从诊断。
 - **外部书架的布局属于写它的那个 harness**：一层目录一件 skill、目录里放 `SKILL.md`（`SKILL_FILE` 是本城写下这条布局的**唯一一处**）；目录名就是 skill 名。**section 为空**：那棵树没有 section 这一级，替它编一个就是本城对一份它不拥有的东西的猜测。不在那里、不是目录的外部路径直接跳过（空架就是空架）；是文件而不是目录则以 `E_CONFIG_INVALID` 拒并报出是哪一条——一句「配置写了却什么都没发生」是没人能诊断的状态。
 - **外部路径里的 `~` 指这个人自己的 home，home 以参数传入**：读环境不是本 crate 的活（`bin::assembly` 给出 `Home`），因此测试扫的是测试自己造的目录。committed 的城配置里不放一台机器的绝对路径，这正是 `~` 存在的理由。不是 `~` 开头也不是绝对路径的条目在解释处即拒，恢复语说出这条规则。
 - **同一名的优先级是 building > library > external（外部按数组序）**：按最远的架先上、近的盖上去，于是城自己的存货盖过别的程序的目录——城留下一个名字时，那个名字指城的 skill；楼的自己一份又盖过城的。外部条目排到最后，因为它是别人写的：一份目录不是一个权威。
+- **目录的架次由 `Shelf` 的臂序给出**：`Library::all` 先按 `Shelf::catalog_position`——城库、楼架、外部架按 `[skills] shelves` 的数组序——再按 `(section, name)`。位置是对三条臂的穷尽 match，不另立一张次序表；加一条臂而不在这里安置它，本 crate 编译不过。外部持有者没有 section，若把全部持有者按 `(section, name)` 排，别人的目录会排到城自己的存货之前，那正是上一条优先级的反面。
 - **`Holding` 不再携 `path`**：落点由 `Shelf` 说出（城内的两个臂就是地址），而多一个 `PathBuf` 就是同一件事的第二个家，且两层书架下必有一个是错的（§8-12 对 `holding_address` 的同一条理由）。
 ### 8-10 city::wizard（形状 1 判定＋形状 2 值类型；含 survey）
 

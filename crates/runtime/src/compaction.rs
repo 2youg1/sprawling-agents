@@ -266,13 +266,15 @@ fn keep_ends(text: &str, limit: usize) -> Cut {
     elision::splice(text, front, back, Elided::Middle)
 }
 
-/// One heading line and the bytes it occupies, its line terminator
-/// included: the skeleton is assembled from source spans only, so the
-/// reported loss stays the distance between what was read and what was
-/// kept.
-struct Heading {
+/// One heading line: where its section begins, and the line's own bytes
+/// with the terminator the span includes. The skeleton is assembled from
+/// source spans only, so the reported loss stays the distance between
+/// what was read and what was kept, and the line travels with its
+/// position because an offset and the bytes it indexes are two facts a
+/// later reader could pair wrongly.
+struct Heading<'a> {
     start: usize,
-    end: usize,
+    line: &'a str,
 }
 
 /// Whole sections from the front while they fit, then the headings of
@@ -311,28 +313,31 @@ fn keep_sections(text: &str, limit: usize) -> Cut {
     // strategy exists to keep is this list.
     let mut skeleton = String::new();
     for heading in headings.iter().skip(index) {
-        let Some(piece) = text.get(heading.start..heading.end) else {
-            continue;
-        };
         if head_end
             .saturating_add(skeleton.len())
-            .saturating_add(piece.len())
+            .saturating_add(heading.line.len())
             > available
         {
             break;
         }
-        skeleton.push_str(piece);
+        skeleton.push_str(heading.line);
     }
+    // A section cut keeps whole sections from the front, so its front
+    // position is one the text reports. The bytes and the count below
+    // are taken from that one value: measured apart they are two answers
+    // to "how much of the front survived", and the marker then tells the
+    // reader whichever one is wrong.
+    let head = elision::Boundary::before(text, head_end).head();
     let dropped = text
         .len()
-        .saturating_sub(head_end)
+        .saturating_sub(head.len())
         .saturating_sub(skeleton.len());
     if dropped == 0 {
         return keep_head(text, limit);
     }
-    let mut out =
-        String::with_capacity(head_end.saturating_add(room).saturating_add(skeleton.len()));
-    out.push_str(text.get(..head_end).unwrap_or_default());
+    let survivors = head.len().saturating_add(skeleton.len());
+    let mut out = String::with_capacity(survivors.saturating_add(room));
+    out.push_str(head);
     out.push_str(&elision::gap_marker(ByteLen::new(
         u64::try_from(dropped).unwrap_or(u64::MAX),
     )));
@@ -346,14 +351,14 @@ fn keep_sections(text: &str, limit: usize) -> Cut {
 
 /// Every heading line in the text, in order, with the span it occupies
 /// including its terminator.
-fn headings_of(text: &str) -> Vec<Heading> {
+fn headings_of(text: &str) -> Vec<Heading<'_>> {
     let mut headings = Vec::new();
     let mut at = 0usize;
     for piece in text.split_inclusive('\n') {
         let start = at;
         let end = at.saturating_add(piece.len());
         if is_section_heading(piece.trim_end_matches(['\n', '\r'])) {
-            headings.push(Heading { start, end });
+            headings.push(Heading { start, line: piece });
         }
         at = end;
     }

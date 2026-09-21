@@ -100,7 +100,11 @@ impl ConnectionKind {
     /// `None` when this connection does not serve it.
     ///
     /// The base and the path are joined by the one join this city has,
-    /// the same one the chat face and the model list use.
+    /// the same one the chat face and the model list use, and this is
+    /// the only place a base and a modality path are put together: a
+    /// caller that wants the address asks here rather than joining
+    /// `path_for`'s answer itself, because two compositions agree until
+    /// one of them is changed.
     #[must_use]
     pub fn url_for(self, base_url: &str, modality: Modality) -> Option<String> {
         Some(crate::router::join(base_url, self.path_for(modality)?))
