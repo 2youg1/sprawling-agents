@@ -7,6 +7,7 @@ impl core::fmt::Debug for runtime::diagnostics::Diagnostics
 impl core::fmt::Display for runtime::backlog::BacklogId
 impl core::fmt::Display for runtime::backlog::BacklogId
 impl core::fmt::Display for runtime::diagnostics::Level
+impl core::ops::drop::Drop for runtime::tools::Confined
 impl kernel::tool::Tool for runtime::EditTool
 impl kernel::tool::Tool for runtime::EditTool
 impl kernel::tool::Tool for runtime::ExecTool
@@ -89,6 +90,12 @@ impl runtime::handoff::Handoff
 impl runtime::handoff::Handoff
 impl runtime::mode::Mode
 impl runtime::mode::Mode
+impl runtime::pipeline::adviser::Adviser
+impl runtime::pipeline::adviser::Adviser
+impl runtime::pipeline::adviser::Ask
+impl runtime::pipeline::adviser::Ask
+impl runtime::pipeline::adviser::Consultation
+impl runtime::pipeline::adviser::Consultation
 impl runtime::prefix::FrozenPrefix
 impl runtime::prefix::FrozenPrefix
 impl runtime::prefix::SegmentCaps
@@ -118,8 +125,15 @@ impl runtime::sieve::record::ResultOffloaded
 impl runtime::sieve::record::SieveRecord
 impl runtime::sieve::record::SieveRecord
 impl runtime::sieve::record::SieveRecord
+impl runtime::tools::Assurances
+impl runtime::tools::Confined
+impl runtime::tools::Confinement
+impl runtime::tools::Guarantee
+impl runtime::tools::Missing
+impl runtime::tools::Offerings
 impl runtime::transcript::Transcript
 impl runtime::transcript::Transcript
+impl runtime::turn::CallShape
 impl runtime::turn::Turn<runtime::turn::Assembling>
 impl runtime::turn::Turn<runtime::turn::Assembling>
 impl runtime::turn::Turn<runtime::turn::Calling>
@@ -144,6 +158,7 @@ pub const runtime::sieve::MAX_TOTAL_LINES: usize
 pub const runtime::sieve::MIDDLE_LINES: usize
 pub const runtime::sieve::SIEVE_FLOOR: usize
 pub const runtime::sieve::TAIL_LINES: usize
+pub const runtime::tools::Guarantee::ALL: [runtime::tools::Guarantee; 5]
 pub enum runtime::Admission
 pub enum runtime::Advance
 pub enum runtime::BacklogKind
@@ -184,6 +199,8 @@ pub enum runtime::digest::DigestOutcome
 pub enum runtime::elision::Elided
 pub enum runtime::mode::Admission
 pub enum runtime::mode::Mode
+pub enum runtime::pipeline::Consultation
+pub enum runtime::pipeline::adviser::Consultation
 pub enum runtime::prefix::SegmentSlot
 pub enum runtime::redact::Marker
 pub enum runtime::reminder::ContextReminder
@@ -198,6 +215,11 @@ pub enum runtime::sieve::record::PassReason
 pub enum runtime::sieve::record::Sieved
 pub enum runtime::sieve::record::Stage
 pub enum runtime::sieve::record::StageOutcome
+pub enum runtime::tools::Confinement
+pub enum runtime::tools::Guarantee
+pub enum runtime::tools::Kept
+pub enum runtime::tools::Missing
+pub enum runtime::tools::Placement
 pub enum runtime::tools::ProviderMode
 pub enum runtime::turn::Interrupt
 pub enum runtime::turn::NextCall
@@ -453,6 +475,22 @@ pub fn runtime::offload::rematerialize(&kernel::locator::Locator, &mut runtime::
 pub fn runtime::package(&[u8], runtime::pipeline::PackContext<'_>) -> core::result::Result<runtime::pipeline::Packaged, kernel::error::shape::AxError>
 pub fn runtime::package_exec(&kernel::tool::ToolCall, kernel::tool::ToolOutcome, runtime::pipeline::exec::SieveSite<'_>, core::option::Option<runtime::clock::ClockStamp>) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::parse_arm(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> core::result::Result<kernel::tool::ExecArm, kernel::error::shape::AxError>
+pub fn runtime::pipeline::adviser::Adviser::consult(&mut self, runtime::pipeline::adviser::Ask, &runtime::window::Window, u64) -> runtime::pipeline::adviser::Consultation
+pub fn runtime::pipeline::adviser::Adviser::consult(&mut self, runtime::pipeline::adviser::Ask, &runtime::window::Window, u64) -> runtime::pipeline::adviser::Consultation
+pub fn runtime::pipeline::adviser::Adviser::none() -> runtime::pipeline::adviser::Adviser
+pub fn runtime::pipeline::adviser::Adviser::none() -> runtime::pipeline::adviser::Adviser
+pub fn runtime::pipeline::adviser::Adviser::with(impl for<'a, 'b> core::ops::function::FnMut(&'a runtime::pipeline::adviser::Ask, &'b runtime::window::Window) -> core::result::Result<kernel::event::record::adviser::AdviserAnswer, kernel::event::record::adviser::AdviserFailure> + core::marker::Send + 'static) -> runtime::pipeline::adviser::Adviser
+pub fn runtime::pipeline::adviser::Adviser::with(impl for<'a, 'b> core::ops::function::FnMut(&'a runtime::pipeline::adviser::Ask, &'b runtime::window::Window) -> core::result::Result<kernel::event::record::adviser::AdviserAnswer, kernel::event::record::adviser::AdviserFailure> + core::marker::Send + 'static) -> runtime::pipeline::adviser::Adviser
+pub fn runtime::pipeline::adviser::Ask::choice(impl core::convert::Into<alloc::string::String>, alloc::vec::Vec<alloc::string::String>) -> runtime::pipeline::adviser::Ask
+pub fn runtime::pipeline::adviser::Ask::choice(impl core::convert::Into<alloc::string::String>, alloc::vec::Vec<alloc::string::String>) -> runtime::pipeline::adviser::Ask
+pub fn runtime::pipeline::adviser::Ask::noul(impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> runtime::pipeline::adviser::Ask
+pub fn runtime::pipeline::adviser::Ask::noul(impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> runtime::pipeline::adviser::Ask
+pub fn runtime::pipeline::adviser::Ask::score(impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> runtime::pipeline::adviser::Ask
+pub fn runtime::pipeline::adviser::Ask::score(impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> runtime::pipeline::adviser::Ask
+pub fn runtime::pipeline::adviser::Consultation::answer(&self) -> core::option::Option<&kernel::event::record::adviser::AdviserAnswer>
+pub fn runtime::pipeline::adviser::Consultation::answer(&self) -> core::option::Option<&kernel::event::record::adviser::AdviserAnswer>
+pub fn runtime::pipeline::adviser::Consultation::payloads(&self) -> core::result::Result<alloc::vec::Vec<kernel::event::payload::Payload>, kernel::error::shape::AxError>
+pub fn runtime::pipeline::adviser::Consultation::payloads(&self) -> core::result::Result<alloc::vec::Vec<kernel::event::payload::Payload>, kernel::error::shape::AxError>
 pub fn runtime::pipeline::exec::package_exec(&kernel::tool::ToolCall, kernel::tool::ToolOutcome, runtime::pipeline::exec::SieveSite<'_>, core::option::Option<runtime::clock::ClockStamp>) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::pipeline::package(&[u8], runtime::pipeline::PackContext<'_>) -> core::result::Result<runtime::pipeline::Packaged, kernel::error::shape::AxError>
 pub fn runtime::prefix::FrozenPrefix::assemble(runtime::FrozenSegment, runtime::FrozenSegment, runtime::FrozenSegment, runtime::FrozenSegment) -> core::result::Result<runtime::prefix::FrozenPrefix, kernel::error::shape::AxError>
@@ -465,9 +503,12 @@ pub fn runtime::prefix::FrozenPrefix::segments(&self) -> [&runtime::FrozenSegmen
 pub fn runtime::prefix::FrozenPrefix::segments(&self) -> [&runtime::FrozenSegment; 4]
 pub fn runtime::prefix::FrozenPrefix::system_blocks(&self) -> core::result::Result<alloc::vec::Vec<kernel::model::wire::SystemBlock>, kernel::error::shape::AxError>
 pub fn runtime::prefix::FrozenPrefix::system_blocks(&self) -> core::result::Result<alloc::vec::Vec<kernel::model::wire::SystemBlock>, kernel::error::shape::AxError>
+pub fn runtime::prefix::FrozenPrefix::verified_segment_hashes(&self) -> core::result::Result<[kernel::locator::B3Hash; 4], kernel::error::shape::AxError>
+pub fn runtime::prefix::FrozenPrefix::verified_segment_hashes(&self) -> core::result::Result<[kernel::locator::B3Hash; 4], kernel::error::shape::AxError>
 pub fn runtime::prefix::SegmentCaps::startup_default() -> runtime::prefix::SegmentCaps
 pub fn runtime::prefix::SegmentCaps::startup_default() -> runtime::prefix::SegmentCaps
 pub fn runtime::prefix::build_prefix(runtime::prefix::PrefixPlan) -> core::result::Result<runtime::prefix::FrozenPrefix, kernel::error::shape::AxError>
+pub fn runtime::prefix::verified_system_hashes(&[kernel::model::wire::SystemBlock], &[kernel::locator::B3Hash; 4]) -> core::result::Result<[kernel::locator::B3Hash; 4], kernel::error::shape::AxError>
 pub fn runtime::redact::Marker::spell(self, &[u8]) -> alloc::string::String
 pub fn runtime::redact::fingerprint(&[u8]) -> alloc::string::String
 pub fn runtime::redact::redact(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> (serde_json::map::Map<alloc::string::String, serde_json::value::Value>, u32)
@@ -546,7 +587,28 @@ pub fn runtime::sieve::record::SieveRecord::offloaded(&self) -> runtime::sieve::
 pub fn runtime::sieve::sieve(runtime::sieve::SieveInput<'_>, &runtime::sieve::filter::FilterTable, &mut runtime::offload::OffloadSite<'_>, &mut runtime::sieve::diff::SieveHistory) -> core::result::Result<runtime::sieve::record::Sieved, kernel::error::shape::AxError>
 pub fn runtime::stamp(kernel::event::identity::TimeMs, &[kernel::config::ClockZone]) -> core::result::Result<runtime::clock::ClockStamp, kernel::error::shape::AxError>
 pub fn runtime::structure_of(&str) -> alloc::vec::Vec<runtime::digest::StructureNode>
+pub fn runtime::tools::Assurances::of(self, runtime::tools::Guarantee) -> runtime::tools::Kept
+pub fn runtime::tools::Confined::arm(&self) -> &runtime::tools::Confinement
+pub fn runtime::tools::Confined::detect() -> runtime::tools::Confined
+pub fn runtime::tools::Confined::drop(&mut self)
+pub fn runtime::tools::Confined::handed(&mut self, runtime::backlog::BacklogId, runtime::tools::Placed)
+pub fn runtime::tools::Confined::place(&self, std::process::Command, &std::path::Path) -> core::result::Result<(std::process::Command, runtime::tools::Placed), kernel::error::shape::AxError>
+pub fn runtime::tools::Confined::reaped(&mut self, &[runtime::Finished])
+pub fn runtime::tools::Confined::settled(&self, runtime::tools::Placed)
+pub fn runtime::tools::Confined::statement(&self) -> alloc::string::String
+pub fn runtime::tools::Confined::with_arm(runtime::tools::Confinement, core::option::Option<std::path::PathBuf>) -> runtime::tools::Confined
+pub fn runtime::tools::Confinement::assurances(&self) -> runtime::tools::Assurances
+pub fn runtime::tools::Confinement::choose(&runtime::tools::Offerings) -> runtime::tools::Confinement
+pub fn runtime::tools::Confinement::detect() -> runtime::tools::Confinement
+pub fn runtime::tools::Confinement::name(&self) -> &'static str
+pub fn runtime::tools::Confinement::statement(&self) -> alloc::string::String
+pub fn runtime::tools::Guarantee::phrase(self) -> &'static str
+pub fn runtime::tools::Guarantee::unkept(self) -> &'static str
+pub fn runtime::tools::Missing::phrase(self) -> &'static str
+pub fn runtime::tools::Missing::recovery(self) -> &'static str
+pub fn runtime::tools::Offerings::this_machine() -> runtime::tools::Offerings
 pub fn runtime::tools::parse_arm(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> core::result::Result<kernel::tool::ExecArm, kernel::error::shape::AxError>
+pub fn runtime::tools::parse_placement(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> core::result::Result<runtime::tools::Placement, kernel::error::shape::AxError>
 pub fn runtime::tools::version_of(&[u8]) -> alloc::string::String
 pub fn runtime::transcript::Transcript::address(&kernel::address::Address, kernel::event::identity::RunId) -> core::result::Result<kernel::address::Address, kernel::error::shape::AxError>
 pub fn runtime::transcript::Transcript::address(&kernel::address::Address, kernel::event::identity::RunId) -> core::result::Result<kernel::address::Address, kernel::error::shape::AxError>
@@ -562,6 +624,7 @@ pub fn runtime::transcript::Transcript::redacted(&self) -> u32
 pub fn runtime::transcript::Transcript::redacted(&self) -> u32
 pub fn runtime::transcript::Transcript::run(&self) -> kernel::event::identity::RunId
 pub fn runtime::transcript::Transcript::run(&self) -> kernel::event::identity::RunId
+pub fn runtime::turn::CallShape::verified_against(&self, &runtime::turn::CallShape) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn runtime::turn::Turn<runtime::turn::Assembling>::assemble(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &runtime::prefix::FrozenPrefix, &runtime::window::Window, &[kernel::model::wire::ToolDef], &runtime::turn::CallShape) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::Calling>>, kernel::error::shape::AxError>
 pub fn runtime::turn::Turn<runtime::turn::Assembling>::assemble(self, runtime::Interrupt, &mut dyn kernel::ledger::Ledger, &runtime::prefix::FrozenPrefix, &runtime::window::Window, &[kernel::model::wire::ToolDef], &runtime::turn::CallShape) -> core::result::Result<runtime::PhaseOutcome<runtime::turn::Turn<runtime::turn::Calling>>, kernel::error::shape::AxError>
 pub fn runtime::turn::Turn<runtime::turn::Assembling>::begin(kernel::event::identity::RunId, alloc::string::String, kernel::event::identity::TimeMs) -> runtime::turn::Turn<runtime::turn::Assembling>
@@ -595,6 +658,7 @@ pub mod runtime::handoff
 pub mod runtime::mode
 pub mod runtime::offload
 pub mod runtime::pipeline
+pub mod runtime::pipeline::adviser
 pub mod runtime::pipeline::exec
 pub mod runtime::prefix
 pub mod runtime::redact
@@ -696,6 +760,7 @@ pub runtime::OffloadSite::cas: &'a mut memory::cas::Cas
 pub runtime::OffloadSite::environment: &'a std::path::Path
 pub runtime::Opening::FromJob
 pub runtime::Opening::WithPerson
+pub runtime::PackContext::adviser: core::option::Option<runtime::pipeline::adviser::Consultation>
 pub runtime::PackContext::cap_bytes: u64
 pub runtime::PackContext::net_notice: bool
 pub runtime::PackContext::offload: core::option::Option<runtime::offload::OffloadSite<'a>>
@@ -796,6 +861,7 @@ pub runtime::SieveSite::offload: runtime::offload::OffloadSite<'a>
 pub runtime::SieveSite::table: &'a runtime::sieve::filter::FilterTable
 pub runtime::Sieved::Cut(runtime::sieve::record::SieveRecord)
 pub runtime::Sieved::Passed
+pub runtime::Sieved::Passed::account: core::option::Option<runtime::sieve::record::SieveAccount>
 pub runtime::Sieved::Passed::reason: runtime::sieve::record::PassReason
 pub runtime::Sieved::Passed::text: alloc::string::String
 pub runtime::SourceDoc::addr: kernel::address::Address
@@ -901,6 +967,7 @@ pub runtime::clock::ZoneEntry::offset_min: i32
 pub runtime::compaction::Content::Code
 pub runtime::compaction::Content::Diff
 pub runtime::compaction::Content::Log
+pub runtime::compaction::Content::Markup
 pub runtime::compaction::Content::Prose
 pub runtime::compaction::Content::Structured
 pub runtime::compaction::Content::Table
@@ -910,6 +977,7 @@ pub runtime::compaction::Shrink::Keep
 pub runtime::compaction::Shrink::MustOffload
 pub runtime::compaction::Strategy::Ends
 pub runtime::compaction::Strategy::Head
+pub runtime::compaction::Strategy::Sections
 pub runtime::compaction::Strategy::Tail
 pub runtime::diagnostics::Entry::level: runtime::diagnostics::Level
 pub runtime::diagnostics::Entry::message: &'a str
@@ -962,6 +1030,20 @@ pub runtime::offload::OffloadRecord::rest_path: std::path::PathBuf
 pub runtime::offload::OffloadRecord::substitute: alloc::vec::Vec<u8>
 pub runtime::offload::OffloadSite::cas: &'a mut memory::cas::Cas
 pub runtime::offload::OffloadSite::environment: &'a std::path::Path
+pub runtime::pipeline::Ask::kind: kernel::event::record::adviser::AdviserAsk
+pub runtime::pipeline::Ask::material: core::option::Option<alloc::string::String>
+pub runtime::pipeline::Ask::options: alloc::vec::Vec<alloc::string::String>
+pub runtime::pipeline::Ask::subject: alloc::string::String
+pub runtime::pipeline::Consultation::Answered
+pub runtime::pipeline::Consultation::Answered::answer: kernel::event::record::adviser::AdviserAnswer
+pub runtime::pipeline::Consultation::Answered::ask: kernel::event::record::adviser::AdviserAsk
+pub runtime::pipeline::Consultation::Answered::elapsed_ms: u64
+pub runtime::pipeline::Consultation::Answered::subject: alloc::string::String
+pub runtime::pipeline::Consultation::FellBack
+pub runtime::pipeline::Consultation::FellBack::ask: kernel::event::record::adviser::AdviserAsk
+pub runtime::pipeline::Consultation::FellBack::reason: kernel::event::record::adviser::AdviserFailure
+pub runtime::pipeline::Consultation::FellBack::subject: alloc::string::String
+pub runtime::pipeline::PackContext::adviser: core::option::Option<runtime::pipeline::adviser::Consultation>
 pub runtime::pipeline::PackContext::cap_bytes: u64
 pub runtime::pipeline::PackContext::net_notice: bool
 pub runtime::pipeline::PackContext::offload: core::option::Option<runtime::offload::OffloadSite<'a>>
@@ -975,6 +1057,19 @@ pub runtime::pipeline::SieveRequest::exit_code: core::option::Option<i64>
 pub runtime::pipeline::SieveRequest::history: &'a mut runtime::sieve::diff::SieveHistory
 pub runtime::pipeline::SieveRequest::key: runtime::sieve::key::CommandKey
 pub runtime::pipeline::SieveRequest::table: &'a runtime::sieve::filter::FilterTable
+pub runtime::pipeline::adviser::Ask::kind: kernel::event::record::adviser::AdviserAsk
+pub runtime::pipeline::adviser::Ask::material: core::option::Option<alloc::string::String>
+pub runtime::pipeline::adviser::Ask::options: alloc::vec::Vec<alloc::string::String>
+pub runtime::pipeline::adviser::Ask::subject: alloc::string::String
+pub runtime::pipeline::adviser::Consultation::Answered
+pub runtime::pipeline::adviser::Consultation::Answered::answer: kernel::event::record::adviser::AdviserAnswer
+pub runtime::pipeline::adviser::Consultation::Answered::ask: kernel::event::record::adviser::AdviserAsk
+pub runtime::pipeline::adviser::Consultation::Answered::elapsed_ms: u64
+pub runtime::pipeline::adviser::Consultation::Answered::subject: alloc::string::String
+pub runtime::pipeline::adviser::Consultation::FellBack
+pub runtime::pipeline::adviser::Consultation::FellBack::ask: kernel::event::record::adviser::AdviserAsk
+pub runtime::pipeline::adviser::Consultation::FellBack::reason: kernel::event::record::adviser::AdviserFailure
+pub runtime::pipeline::adviser::Consultation::FellBack::subject: alloc::string::String
 pub runtime::pipeline::exec::SieveSite::history: &'a mut runtime::sieve::diff::SieveHistory
 pub runtime::pipeline::exec::SieveSite::offload: runtime::offload::OffloadSite<'a>
 pub runtime::pipeline::exec::SieveSite::table: &'a runtime::sieve::filter::FilterTable
@@ -1081,6 +1176,7 @@ pub runtime::sieve::SieveRecord::stages: alloc::vec::Vec<runtime::sieve::record:
 pub runtime::sieve::SieveRecord::text: alloc::string::String
 pub runtime::sieve::Sieved::Cut(runtime::sieve::record::SieveRecord)
 pub runtime::sieve::Sieved::Passed
+pub runtime::sieve::Sieved::Passed::account: core::option::Option<runtime::sieve::record::SieveAccount>
 pub runtime::sieve::Sieved::Passed::reason: runtime::sieve::record::PassReason
 pub runtime::sieve::Sieved::Passed::text: alloc::string::String
 pub runtime::sieve::Stage::CutLongLine
@@ -1136,6 +1232,7 @@ pub runtime::sieve::record::SieveRecord::stages: alloc::vec::Vec<runtime::sieve:
 pub runtime::sieve::record::SieveRecord::text: alloc::string::String
 pub runtime::sieve::record::Sieved::Cut(runtime::sieve::record::SieveRecord)
 pub runtime::sieve::record::Sieved::Passed
+pub runtime::sieve::record::Sieved::Passed::account: core::option::Option<runtime::sieve::record::SieveAccount>
 pub runtime::sieve::record::Sieved::Passed::reason: runtime::sieve::record::PassReason
 pub runtime::sieve::record::Sieved::Passed::text: alloc::string::String
 pub runtime::sieve::record::Stage::CutLongLine
@@ -1155,8 +1252,19 @@ pub runtime::sieve::record::StageOutcome::Unavailable
 pub runtime::sieve::record::StageOutcome::Unavailable::reason: alloc::string::String
 pub runtime::sieve::record::StageReport::outcome: runtime::sieve::record::StageOutcome
 pub runtime::sieve::record::StageReport::stage: runtime::sieve::record::Stage
+pub runtime::tools::Assurances::filesystem: runtime::tools::Kept
+pub runtime::tools::Assurances::network: runtime::tools::Kept
+pub runtime::tools::Assurances::process_tree: runtime::tools::Kept
+pub runtime::tools::Assurances::resources: runtime::tools::Kept
+pub runtime::tools::Assurances::user: runtime::tools::Kept
 pub runtime::tools::ChildStatus::kind: kernel::delegation::DelegateKind
 pub runtime::tools::ChildStatus::room: kernel::address::Address
+pub runtime::tools::Confinement::CopiedTree
+pub runtime::tools::Confinement::LinuxNamespaces
+pub runtime::tools::Confinement::LinuxNamespaces::wrapper: std::path::PathBuf
+pub runtime::tools::Confinement::Unavailable
+pub runtime::tools::Confinement::Unavailable::missing: runtime::tools::Missing
+pub runtime::tools::Confinement::WindowsJobObject
 pub runtime::tools::ExecSetup::domain: kernel::address::Address
 pub runtime::tools::ExecSetup::env_passthrough: alloc::vec::Vec<kernel::config::EnvVarName>
 pub runtime::tools::ExecSetup::fuel: runtime::Fuel
@@ -1164,6 +1272,18 @@ pub runtime::tools::ExecSetup::mounts: alloc::vec::Vec<runtime::Mount>
 pub runtime::tools::ExecSetup::python_wasm: core::option::Option<std::path::PathBuf>
 pub runtime::tools::ExecSetup::shell: core::option::Option<std::path::PathBuf>
 pub runtime::tools::ExecSetup::workdir: std::path::PathBuf
+pub runtime::tools::Guarantee::Filesystem
+pub runtime::tools::Guarantee::Network
+pub runtime::tools::Guarantee::ProcessTree
+pub runtime::tools::Guarantee::Resources
+pub runtime::tools::Guarantee::User
+pub runtime::tools::Kept::No
+pub runtime::tools::Kept::Yes
+pub runtime::tools::Missing::ScratchDirectory
+pub runtime::tools::Offerings::namespace_tool: core::option::Option<std::path::PathBuf>
+pub runtime::tools::Offerings::scratch: core::option::Option<std::path::PathBuf>
+pub runtime::tools::Placement::Host
+pub runtime::tools::Placement::Sandbox
 pub runtime::tools::ProviderMode::Degraded
 pub runtime::tools::ProviderMode::LocalOnly
 pub runtime::tools::ProviderMode::Normal
@@ -1286,9 +1406,13 @@ pub struct runtime::handoff::ResumeSeed
 pub struct runtime::mode::Produced
 pub struct runtime::offload::OffloadRecord
 pub struct runtime::offload::OffloadSite<'a>
+pub struct runtime::pipeline::Adviser
+pub struct runtime::pipeline::Ask
 pub struct runtime::pipeline::PackContext<'a>
 pub struct runtime::pipeline::Packaged
 pub struct runtime::pipeline::SieveRequest<'a>
+pub struct runtime::pipeline::adviser::Adviser
+pub struct runtime::pipeline::adviser::Ask
 pub struct runtime::pipeline::exec::SieveSite<'a>
 pub struct runtime::prefix::FrozenPrefix
 pub struct runtime::prefix::FrozenSegment
@@ -1320,10 +1444,14 @@ pub struct runtime::sieve::record::ResultOffloaded
 pub struct runtime::sieve::record::SieveAccount
 pub struct runtime::sieve::record::SieveRecord
 pub struct runtime::sieve::record::StageReport
+pub struct runtime::tools::Assurances
 pub struct runtime::tools::ChildStatus
+pub struct runtime::tools::Confined
 pub struct runtime::tools::EditTool
 pub struct runtime::tools::ExecSetup
 pub struct runtime::tools::ExecTool
+pub struct runtime::tools::Offerings
+pub struct runtime::tools::Placed
 pub struct runtime::tools::ReadTool
 pub struct runtime::tools::SearchTool
 pub struct runtime::tools::StatusSnapshot
@@ -1347,3 +1475,4 @@ pub type runtime::diagnostics::Sink = alloc::boxed::Box<(dyn core::ops::function
 pub use runtime::Retries
 pub use runtime::SkillPin
 pub use runtime::catalog::SkillPin
+pub use runtime::pipeline::adviser::AdviserAsk

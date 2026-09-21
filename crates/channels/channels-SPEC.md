@@ -130,8 +130,8 @@ impl Command {
 impl Query { pub fn name(&self) -> &'static str; }
 
 pub const WIRE_V: u32;
-pub const COMMAND_NAMES: [&str; 28];   // 形状 6 数据面：名字权威，长度由变体数生成
-pub const QUERY_NAMES:   [&str; 31];
+pub const COMMAND_NAMES: [&str; /* 长度由变体数生成 */];   // 形状 6 数据面：名字权威，计数断言见 §2
+pub const QUERY_NAMES:   [&str; /* 长度由变体数生成 */];   // 同上（§8-38）
 pub fn schema_hash() -> B3Hash;        // blake3("sprawling/wire/" || WIRE_V 小端 || 'C'+名… || 'Q'+名…)
 
 pub enum ClientFrame { Hello(Hello), Command(Box<Command>), Query(Query) }
@@ -190,7 +190,7 @@ pub struct EnrollBody { pub realm: String, pub name: String, pub value: String }
 pub enum Door { Transcribe, Enroll, Acp }            // 三扇 HTTP 门，穷尽
 pub enum Pairing { Held, Absent }                    // 不是 bool
 pub enum Admission { Admit(Pairing), Refuse(AxError) }
-pub fn decide_admission(door: Door, offered: Option<&str>, configured: Option<&B3Hash>)
+pub fn decide_admission(door: Door, offered: Option<&str>, face: &BindFace)
     -> Admission;                                    // HTTP 侧唯一的令牌判定
 pub fn offered_pairing(header: Option<&str>) -> Option<&str>;  // `Authorization: Bearer`
 
@@ -824,7 +824,8 @@ ConfigureBuilding { addr: Address, sandbox: Option<SandboxLimits>, mcp: Option<V
 // Query 第 24 条（声明序，QUERY_NAMES 同序追加）
 Doctor,                                   // → Answer::Doctor(Box<DoctorAnswer>)
 
-pub struct DoctorAnswer { pub items: Vec<DoctorItem>, pub tiers: Vec<DoctorVerdict> }
+pub struct DoctorAnswer { pub items: Vec<DoctorItem>, pub tiers: Vec<DoctorVerdict>,
+                          pub sandbox: DoctorSandbox, pub custody: DoctorCustody }
 pub struct DoctorItem { pub name: String, pub tier: DoctorTier, pub need: DoctorNeed,
                         pub enables: String, pub state: DoctorState, pub install: DoctorInstall }
 pub enum DoctorTier { Use, Develop }
@@ -836,12 +837,27 @@ pub enum DoctorAbsence { NotOnSearchPath, VariableNamesNothing { variable, path 
                          NoComponent { dir }, NoHome, NotInThisBuild }
 pub enum DoctorInstall { Command { spelled }, Print { spelled }, Manual { how }, UnknownPlatform }
 pub struct DoctorVerdict { pub tier: DoctorTier, pub missing: Vec<String> }
+
+// 与逐件的 items 并列的两道整机读数：命令跑在什么盒子里、凭据住在哪里。
+pub struct DoctorSandbox { pub arm: DoctorSandboxArm, pub coverage: Vec<DoctorGuarantee> }
+pub enum DoctorSandboxArm { LinuxNamespaces, WindowsJobObject, CopiedTree,
+                            Unavailable { missing: DoctorSandboxMissing } }
+pub enum DoctorSandboxMissing { ScratchDirectory }
+pub struct DoctorGuarantee { pub axis: DoctorGuaranteeAxis, pub kept: DoctorCoverage }
+pub enum DoctorGuaranteeAxis { Filesystem, Network, ProcessTree, User, Resources }
+pub enum DoctorCoverage { Kept, NotKept }
+pub struct DoctorCustody { pub store: DoctorCustodyStore, pub keeps: DoctorCustodyLifetime,
+                           pub refusal: Option<String> }
+pub enum DoctorCustodyStore { PlatformService, EncryptedFile, SessionMemory }
+pub enum DoctorCustodyLifetime { AcrossReboots, WithPassphrase, UntilReboot, ThisProcess }
 ```
 
 - **每一种状态都是枚举，不是句子**。终端那份报告是一台机器的散文，而浏览器说两种语言；线上若携措辞，页面的用词就成了服务端的选择。唯一的例外是 `enables`——那是需求表自己关于「有了它能做什么」的一句话，读者推不出来，这条答案里也没有别的字段装得下它。
 - **答的是城启动时看到的那一眼，不是现问现看**。每一项都是起一个进程问版本；一次查询若这么做，会把答一切读的那条线程按住数秒。城若没看过（一次一条命令驱动的工人就是），答 `Unavailable`——与「一栋没人盖过的楼」同口径：**「我没看」是它自己的答案**，而一台空机器会让页面告诉人他手上每件工具都缺。
 - **`install` 把平台不明单列一支**。三个平台之外的机器上，本项目没有任何配方；此时拼一条别的平台的命令是错的，沉默也是错的。
-- **服务端**：`bin::doctor::report` 把 findings 折成本形状，`Views` 存一份（sprawling-SPEC §8-54）。
+- **沙箱的保证逐轴作答，不是一句「已隔离」**：`coverage` 逐轴一行，`Kept`／`NotKept` 两个字而不是布尔——页面两态都要有词，布尔会让每个读者自己给 `false` 选一个。它存在的理由，是 agent 在动手前要读得到哪几条保证没成立。臂与轴的定义住 `runtime-SPEC §8-13-2`（`Confinement` 与 `Guarantee`），线上重拼一份，逐臂对应只住 `sprawling::doctor::report` 的穷尽匹配——上游加一臂即编译红。
+- **凭据的存放与寿命一起答，`refusal` 是平台服务自己的话**：三者同出 `gateway::Custodian::probe` 的一次往返（`gateway::Custody`，gateway-SPEC §8-4；寿命的全部档位见 §8-21），线上重拼 `Store` 与 `Persistence` 两套词，逐臂对应同住 `sprawling::doctor::report`；`refusal` 缺席读作服务没有拒——或该 store 由城自选，没有服务可拒。
+- **服务端**：`sprawling::doctor::report` 把 findings 与这两道整机读数折成本形状，`Views` 存一份（sprawling-SPEC §8-54）。
 
 ### 8-24 `Query::Commits`：一座楼做过的提交，倒序分页（WIRE_V 17→18）
 
@@ -998,9 +1014,10 @@ pub struct PrefixAnswer  { pub run: RunId, pub segments: Vec<PrefixSegment> }
 pub struct ContentAnswer { pub locator: Locator, pub text: String, pub bytes: u64,
                            pub truncated: bool, pub binary: bool }
 
-pub enum SkillShelf { Library, Building }
+pub enum SkillShelf { Library(Address), Building(Address),
+                      External { index: u32, path: String } }
 pub struct SkillLine  { pub name: String, pub section: String, pub shelf: SkillShelf,
-                        pub at: Address, pub disclosure: String, pub hash: B3Hash,
+                        pub disclosure: String, pub hash: B3Hash,
                         pub admitted: bool, pub pinned_by: Vec<RunId> }
 pub struct SkillsAnswer { pub building: Address, pub skills: Vec<SkillLine>,
                           pub missing: Vec<String> }
@@ -1016,7 +1033,7 @@ pub struct GitStatusAnswer { pub building: Address, pub branch: Option<String>,
 1. **`stored` 与空文本是两件事。** 仓库被清理过与这一段本来就没有内容，读者下一步做的事不同；用空串同时表示两者，会让一次数据丢失看起来像一次正常的装配。
 2. **`Content` 只答 `cas:` 一种方案。** `file:` 指的是树上的一条路径，那是 `Query::Document` 的问题；在这里再答一次就是同一条规则的第二个权威。**被否**：让 `Content` 按方案分流兼收两种——它会把「读一个对象」和「读一个文件」的失败面合成一个，而两者恢复动作不同。
 3. **`PrefixSource.dropped` 恒上线，即使是零。** 「一个字节都没裁」是一次测量，缺省的字段不是。
-4. **技能一行而两个书架**，`shelf` 说它来自哪一格：两张表会让「近的架子压过远的架子」这条既有规则在客户端被重写一遍。`pinned_by` 按**名字加哈希**成对匹配——两次 run 之间被编辑过的 skill 是同一个名字下的两份文档，只按名字匹配会宣称早先那次 run 读到了后来才写的字。
+4. **技能一行而三类架子，`shelf` 同时说它来自哪一格、落在哪里**：按架子各造一张表会让「近的架子压过远的架子」这条既有规则在客户端被重写一遍。两个城内臂携地址，城外臂携第几条挂载与相对该架根的路径——城外那份没有地址，编一个会送读者去开一个不存在的文件（布局与优先级见 city-SPEC §8-8）。`SkillLine.at` 随之删除：架子与落点分成两个字段，就有「说 library 却指向城外」这一态可写。`pinned_by` 按**名字加哈希**成对匹配——两次 run 之间被编辑过的 skill 是同一个名字下的两份文档，只按名字匹配会宣称早先那次 run 读到了后来才写的字。
 5. **`Drift` 整个可缺席，而不是两个零。** 没有上游的分支与和上游齐平的分支不是一回事，读成 `0/0` 的页面会告诉人「你的工作已经推上去了」。
 6. **`GitStatusAnswer.checkpoint` 携整条 `CommitAnswer`。** 变更栏旁边那一行要说出 run、房间、模型与花费，而这四样已经有了唯一形状；另造一个摘要类型就是第二个「一次提交是什么」。
 
@@ -1140,8 +1157,8 @@ pub enum ReleaseAnswer {
 
 ```rust
 // 三扇门共用的那一问，壳里零策略（同 decide_bind／decide_frame 的切法）。
-decide_admission(Door::Transcribe | Door::Enroll, offered, configured)  // 未配对即 E_GATE_DENIED
-decide_admission(Door::Acp,        offered, configured)  // 未配对仍进，携 Pairing::Absent
+decide_admission(Door::Transcribe | Door::Enroll, offered, face)  // 未配对即 E_GATE_DENIED
+decide_admission(Door::Acp,        offered, face)  // 未配对仍进，携 Pairing::Absent
 ```
 
 三条口径：

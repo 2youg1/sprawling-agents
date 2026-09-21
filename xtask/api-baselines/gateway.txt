@@ -2,6 +2,7 @@ impl core::fmt::Debug for gateway::DeviceAuthorization
 impl core::fmt::Debug for gateway::DeviceLogin
 impl core::fmt::Debug for gateway::FormPost
 impl core::fmt::Debug for gateway::OauthTokens
+impl gateway::AdviserClient
 impl gateway::AttachedEndpoint
 impl gateway::AudioType
 impl gateway::AuthSpec
@@ -38,11 +39,14 @@ impl gateway::RerankRequest
 impl gateway::Transcriber
 impl kernel::model::Model for gateway::Endpoint
 impl kernel::model::Model for gateway::Native
+impl<'a> gateway::Ranks<'a>
+impl<'a> gateway::Vectors<'a>
 pub const fn gateway::CeilingSource::as_str(self) -> &'static str
 pub const fn gateway::ConnectionKind::as_str(self) -> &'static str
 pub const fn gateway::ConnectionKind::path_for(self, gateway::Modality) -> core::option::Option<&'static str>
 pub const fn gateway::ConnectionKind::wire(self) -> kernel::model::wire::DialectKind
 pub const fn gateway::DevicePoll::first_wait_s(&self) -> u64
+pub const fn gateway::EmbeddingRequest::dimensions(&self) -> core::option::Option<u32>
 pub const fn gateway::Embeddings::prompt_tokens(&self) -> core::option::Option<u64>
 pub const fn gateway::Family::as_str(self) -> &'static str
 pub const fn gateway::Family::shape(self) -> gateway::DialectHint
@@ -71,6 +75,9 @@ pub enum gateway::Modality
 pub enum gateway::OauthPending
 pub enum gateway::Persistence
 pub enum gateway::PollStep
+pub enum gateway::Store
+pub fn gateway::AdviserClient::ask(&mut self, gateway::Question<'_>, &kernel::model::wire::BuildingPolicy, &[kernel::model::wire::ChatMessage]) -> core::result::Result<kernel::event::record::adviser::AdviserAnswer, kernel::event::record::adviser::AdviserFailure>
+pub fn gateway::AdviserClient::attached(&gateway::Chosen<'_>, gateway::Redemption, alloc::vec::Vec<(alloc::string::String, alloc::string::String)>) -> core::result::Result<gateway::AdviserClient, kernel::error::shape::AxError>
 pub fn gateway::AttachedEndpoint::chat_url(&self) -> alloc::string::String
 pub fn gateway::AttachedEndpoint::has_credential(&self) -> bool
 pub fn gateway::AttachedEndpoint::is_local(&self) -> bool
@@ -85,6 +92,7 @@ pub fn gateway::Broker::new(kernel::secret::sealed::Sealed<alloc::string::String
 pub fn gateway::Broker::shelf(&self, &str) -> core::result::Result<alloc::vec::Vec<gateway::Toolkit>, kernel::error::shape::AxError>
 pub fn gateway::ConnectionKind::parse(&str) -> core::result::Result<gateway::ConnectionKind, kernel::error::shape::AxError>
 pub fn gateway::ConnectionKind::url_for(self, &str, gateway::Modality) -> core::option::Option<alloc::string::String>
+pub fn gateway::Custodian::custody(&self) -> gateway::Custody
 pub fn gateway::Custodian::describe(&self, &kernel::secret::span::SecretRef) -> gateway::Described
 pub fn gateway::Custodian::in_memory() -> gateway::Custodian
 pub fn gateway::Custodian::persistence(&self) -> gateway::Persistence
@@ -147,6 +155,9 @@ pub fn gateway::Persistence::consequence(self) -> &'static str
 pub fn gateway::Ranking::best(&self) -> core::option::Option<gateway::Rank>
 pub fn gateway::Ranking::parse(&serde_json::value::Value, &gateway::RerankRequest) -> core::result::Result<gateway::Ranking, kernel::error::shape::AxError>
 pub fn gateway::Ranking::ranks(&self) -> &[gateway::Rank]
+pub fn gateway::Ranks<'a>::of(&'a gateway::AttachedEndpoint, alloc::string::String) -> core::result::Result<gateway::Ranks<'a>, kernel::error::shape::AxError>
+pub fn gateway::Ranks<'a>::rank(&self, &gateway::RerankRequest, gateway::Redemption) -> core::result::Result<(gateway::Ranking, kernel::event::record::modality::RerankCalled), kernel::error::shape::AxError>
+pub fn gateway::Ranks<'a>::url(&self) -> alloc::string::String
 pub fn gateway::Recording::is_empty(&self) -> bool
 pub fn gateway::Recording::kind(&self) -> gateway::AudioType
 pub fn gateway::Recording::len(&self) -> usize
@@ -160,6 +171,9 @@ pub fn gateway::Transcriber::absent() -> gateway::Transcriber
 pub fn gateway::Transcriber::attach(gateway::TranscriberConfig, gateway::SecretResolver) -> core::result::Result<gateway::Transcriber, kernel::error::shape::AxError>
 pub fn gateway::Transcriber::is_attached(&self) -> bool
 pub fn gateway::Transcriber::transcribe(&self, &gateway::Recording) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
+pub fn gateway::Vectors<'a>::embed(&self, &gateway::EmbeddingRequest, gateway::Redemption) -> core::result::Result<(gateway::Embeddings, kernel::event::record::modality::EmbeddingCalled), kernel::error::shape::AxError>
+pub fn gateway::Vectors<'a>::of(&'a gateway::AttachedEndpoint, alloc::string::String) -> core::result::Result<gateway::Vectors<'a>, kernel::error::shape::AxError>
+pub fn gateway::Vectors<'a>::url(&self) -> alloc::string::String
 pub fn gateway::adapter_for(&gateway::Chosen<'_>, gateway::Redemption, alloc::vec::Vec<(alloc::string::String, alloc::string::String)>) -> core::result::Result<alloc::boxed::Box<(dyn kernel::model::Model + core::marker::Send)>, kernel::error::shape::AxError>
 pub fn gateway::attached_payload(&gateway::AttachedEndpoint) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn gateway::client_for(kernel::reach::Proxying, &str) -> reqwest::blocking::client::ClientBuilder
@@ -225,6 +239,9 @@ pub gateway::ConnectionKind::OpenAiCompat
 pub gateway::ConnectionKind::Responses
 pub gateway::CostSource::Authoritative
 pub gateway::CostSource::PriceSheet
+pub gateway::Custody::persistence: gateway::Persistence
+pub gateway::Custody::refusal: core::option::Option<alloc::string::String>
+pub gateway::Custody::store: gateway::Store
 pub gateway::Described::configured: bool
 pub gateway::Described::persistence: gateway::Persistence
 pub gateway::Described::source: alloc::string::String
@@ -329,12 +346,19 @@ pub gateway::Persistence::ThisProcess
 pub gateway::PollStep::AskAgainIn
 pub gateway::PollStep::AskAgainIn::seconds: u64
 pub gateway::PollStep::Stop(kernel::error::shape::AxError)
+pub gateway::Question::ask: kernel::event::record::adviser::AdviserAsk
+pub gateway::Question::material: core::option::Option<&'a str>
+pub gateway::Question::options: &'a [alloc::string::String]
+pub gateway::Question::subject: &'a str
 pub gateway::Rank::passage: usize
 pub gateway::Rank::score: f64
 pub gateway::RedirectPending::auth_url: alloc::string::String
 pub gateway::RedirectPending::state: alloc::string::String
 pub gateway::Stated::person: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::Stated::upstream: core::option::Option<kernel::model::wire::Ceiling>
+pub gateway::Store::EncryptedFile
+pub gateway::Store::PlatformService
+pub gateway::Store::SessionMemory
 pub gateway::TokenRequest::body: alloc::string::String
 pub gateway::TokenRequest::url: alloc::string::String
 pub gateway::Toolkit::auth: alloc::string::String
@@ -350,11 +374,13 @@ pub gateway::TuningDefaults::retries: kernel::retries::Retries
 pub gateway::TuningDefaults::stream_idle_timeout_ms: core::option::Option<u64>
 pub gateway::TuningDefaults::timeout_ms: u64
 pub mod gateway
+pub struct gateway::AdviserClient
 pub struct gateway::AttachedEndpoint
 pub struct gateway::Broker
 pub struct gateway::CallCost
 pub struct gateway::Chosen<'b>
 pub struct gateway::Custodian
+pub struct gateway::Custody
 pub struct gateway::Described
 pub struct gateway::DeviceAuthorization
 pub struct gateway::DeviceLogin
@@ -378,8 +404,10 @@ pub struct gateway::Normalised
 pub struct gateway::OauthProfile
 pub struct gateway::OauthTokens
 pub struct gateway::OutputCeiling
+pub struct gateway::Question<'a>
 pub struct gateway::Rank
 pub struct gateway::Ranking
+pub struct gateway::Ranks<'a>
 pub struct gateway::Recording
 pub struct gateway::Redemption
 pub struct gateway::RedirectPending
@@ -390,6 +418,7 @@ pub struct gateway::Toolkit
 pub struct gateway::Transcriber
 pub struct gateway::TranscriberConfig
 pub struct gateway::TuningDefaults
+pub struct gateway::Vectors<'a>
 pub type gateway::EnvReader = alloc::boxed::Box<(dyn core::ops::function::Fn(&str) -> core::option::Option<alloc::string::String> + core::marker::Send)>
 pub type gateway::ImageResolver = alloc::sync::Arc<(dyn core::ops::function::Fn(&kernel::locator::Locator) -> core::result::Result<alloc::vec::Vec<u8>, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type gateway::SecretResolver = alloc::boxed::Box<(dyn core::ops::function::Fn(&kernel::secret::span::SecretRef) -> core::result::Result<kernel::secret::sealed::Sealed<alloc::string::String>, kernel::error::shape::AxError> + core::marker::Send)>

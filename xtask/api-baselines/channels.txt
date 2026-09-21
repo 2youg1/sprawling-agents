@@ -1,4 +1,5 @@
 impl channels::Aggregate
+impl channels::BindFace
 impl channels::CityLabel
 impl channels::ClientAssets
 impl channels::Intervention
@@ -43,6 +44,7 @@ pub channels::Answer::Evidence(channels::EvidenceAnswer)
 pub channels::Answer::GitStatus(alloc::boxed::Box<channels::GitStatusAnswer>)
 pub channels::Answer::Governance(channels::GovernanceAnswer)
 pub channels::Answer::History(alloc::boxed::Box<channels::HistoryAnswer>)
+pub channels::Answer::HistoryRange(alloc::boxed::Box<channels::HistoryRangeAnswer>)
 pub channels::Answer::Hunks(alloc::boxed::Box<channels::HunksAnswer>)
 pub channels::Answer::Inbox(channels::InboxAnswer)
 pub channels::Answer::Listing(channels::ListingAnswer)
@@ -83,7 +85,9 @@ pub channels::AssetReply::Found::content_type: &'static str
 pub channels::AssetReply::Found::gzipped: bool
 pub channels::AssetReply::Miss(kernel::error::shape::AxError)
 pub channels::BindFace::Exposed
+pub channels::BindFace::Exposed::token: kernel::locator::B3Hash
 pub channels::BindFace::Loopback
+pub channels::BindFace::Loopback::token: core::option::Option<kernel::locator::B3Hash>
 pub channels::BindVerdict::Refuse(kernel::error::shape::AxError)
 pub channels::BindVerdict::Serve(channels::BindFace)
 pub channels::BlockedLine::line: alloc::string::String
@@ -327,13 +331,34 @@ pub channels::DoctorAbsence::NotOnSearchPath
 pub channels::DoctorAbsence::VariableNamesNothing
 pub channels::DoctorAbsence::VariableNamesNothing::path: alloc::string::String
 pub channels::DoctorAbsence::VariableNamesNothing::variable: alloc::string::String
+pub channels::DoctorAnswer::custody: channels::DoctorCustody
 pub channels::DoctorAnswer::items: alloc::vec::Vec<channels::DoctorItem>
+pub channels::DoctorAnswer::sandbox: channels::DoctorSandbox
 pub channels::DoctorAnswer::tiers: alloc::vec::Vec<channels::DoctorVerdict>
+pub channels::DoctorCoverage::Kept
+pub channels::DoctorCoverage::NotKept
+pub channels::DoctorCustody::keeps: channels::DoctorCustodyLifetime
+pub channels::DoctorCustody::refusal: core::option::Option<alloc::string::String>
+pub channels::DoctorCustody::store: channels::DoctorCustodyStore
+pub channels::DoctorCustodyLifetime::AcrossReboots
+pub channels::DoctorCustodyLifetime::ThisProcess
+pub channels::DoctorCustodyLifetime::UntilReboot
+pub channels::DoctorCustodyLifetime::WithPassphrase
+pub channels::DoctorCustodyStore::EncryptedFile
+pub channels::DoctorCustodyStore::PlatformService
+pub channels::DoctorCustodyStore::SessionMemory
 pub channels::DoctorFault::HalfWritten
 pub channels::DoctorFault::Unreadable
 pub channels::DoctorFault::Unreadable::said: alloc::string::String
 pub channels::DoctorFault::WillNotStart
 pub channels::DoctorFault::WillNotStart::said: alloc::string::String
+pub channels::DoctorGuarantee::axis: channels::DoctorGuaranteeAxis
+pub channels::DoctorGuarantee::kept: channels::DoctorCoverage
+pub channels::DoctorGuaranteeAxis::Filesystem
+pub channels::DoctorGuaranteeAxis::Network
+pub channels::DoctorGuaranteeAxis::ProcessTree
+pub channels::DoctorGuaranteeAxis::Resources
+pub channels::DoctorGuaranteeAxis::User
 pub channels::DoctorInstall::Command
 pub channels::DoctorInstall::Command::spelled: alloc::string::String
 pub channels::DoctorInstall::Manual
@@ -350,6 +375,14 @@ pub channels::DoctorItem::state: channels::DoctorState
 pub channels::DoctorItem::tier: channels::DoctorTier
 pub channels::DoctorNeed::Optional
 pub channels::DoctorNeed::Required
+pub channels::DoctorSandbox::arm: channels::DoctorSandboxArm
+pub channels::DoctorSandbox::coverage: alloc::vec::Vec<channels::DoctorGuarantee>
+pub channels::DoctorSandboxArm::CopiedTree
+pub channels::DoctorSandboxArm::LinuxNamespaces
+pub channels::DoctorSandboxArm::Unavailable
+pub channels::DoctorSandboxArm::Unavailable::missing: channels::DoctorSandboxMissing
+pub channels::DoctorSandboxArm::WindowsJobObject
+pub channels::DoctorSandboxMissing::ScratchDirectory
 pub channels::DoctorState::Absent
 pub channels::DoctorState::Absent::absence: channels::DoctorAbsence
 pub channels::DoctorState::Broken
@@ -436,6 +469,10 @@ pub channels::Hello::token: core::option::Option<alloc::string::String>
 pub channels::Hello::wire_v: u32
 pub channels::HistoryAnswer::earlier: core::option::Option<kernel::event::identity::Seq>
 pub channels::HistoryAnswer::records: alloc::vec::Vec<kernel::event::payload::EventRecord>
+pub channels::HistoryRangeAnswer::from: kernel::event::identity::Seq
+pub channels::HistoryRangeAnswer::next: core::option::Option<kernel::event::identity::Seq>
+pub channels::HistoryRangeAnswer::records: alloc::vec::Vec<kernel::event::payload::EventRecord>
+pub channels::HistoryRangeAnswer::to: kernel::event::identity::Seq
 pub channels::HunksAnswer::lines: alloc::vec::Vec<channels::PatchLine>
 pub channels::HunksAnswer::oid_a: kernel::locator::GitOid
 pub channels::HunksAnswer::oid_b: kernel::locator::GitOid
@@ -449,6 +486,8 @@ pub channels::Intervention::Release
 pub channels::Intervention::Rollback
 pub channels::Intervention::Steer
 pub channels::Intervention::Takeover
+pub channels::Lagged::from: kernel::event::identity::Seq
+pub channels::Lagged::to: kernel::event::identity::Seq
 pub channels::Lang::En
 pub channels::Lang::Zh
 pub channels::Lighting::Dark
@@ -613,6 +652,10 @@ pub channels::Query::Governance
 pub channels::Query::History
 pub channels::Query::History::before: core::option::Option<kernel::event::identity::Seq>
 pub channels::Query::History::limit: u32
+pub channels::Query::HistoryRange
+pub channels::Query::HistoryRange::from: kernel::event::identity::Seq
+pub channels::Query::HistoryRange::limit: u32
+pub channels::Query::HistoryRange::to: kernel::event::identity::Seq
 pub channels::Query::Hunks
 pub channels::Query::Hunks::oid_a: kernel::locator::GitOid
 pub channels::Query::Hunks::oid_b: kernel::locator::GitOid
@@ -682,6 +725,7 @@ pub channels::ServeConfig::transcribe_sink: channels::TranscribeSink
 pub channels::ServerFrame::Answer(alloc::boxed::Box<channels::Answer>)
 pub channels::ServerFrame::Delta(channels::Delta)
 pub channels::ServerFrame::Event(alloc::boxed::Box<kernel::event::payload::EventRecord>)
+pub channels::ServerFrame::Lagged(channels::Lagged)
 pub channels::ServerFrame::Log(channels::LogLine)
 pub channels::ServerFrame::Refusal(alloc::boxed::Box<kernel::error::shape::AxError>)
 pub channels::ServerFrame::Welcome(channels::Welcome)
@@ -704,15 +748,17 @@ pub channels::SignalLine::from: alloc::string::String
 pub channels::SignalLine::id: alloc::string::String
 pub channels::SignalLine::kind: alloc::string::String
 pub channels::SkillLine::admitted: bool
-pub channels::SkillLine::at: kernel::address::Address
 pub channels::SkillLine::disclosure: alloc::string::String
 pub channels::SkillLine::hash: kernel::locator::B3Hash
 pub channels::SkillLine::name: alloc::string::String
 pub channels::SkillLine::pinned_by: alloc::vec::Vec<kernel::event::identity::RunId>
 pub channels::SkillLine::section: alloc::string::String
 pub channels::SkillLine::shelf: channels::SkillShelf
-pub channels::SkillShelf::Building
-pub channels::SkillShelf::Library
+pub channels::SkillShelf::Building(kernel::address::Address)
+pub channels::SkillShelf::External
+pub channels::SkillShelf::External::index: u32
+pub channels::SkillShelf::External::path: alloc::string::String
+pub channels::SkillShelf::Library(kernel::address::Address)
 pub channels::SkillsAnswer::building: kernel::address::Address
 pub channels::SkillsAnswer::missing: alloc::vec::Vec<alloc::string::String>
 pub channels::SkillsAnswer::skills: alloc::vec::Vec<channels::SkillLine>
@@ -763,7 +809,7 @@ pub const channels::BODY_PX_MIN: u32
 pub const channels::COMMAND_NAMES: [&str; 29]
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
-pub const channels::QUERY_NAMES: [&str; 33]
+pub const channels::QUERY_NAMES: [&str; 34]
 pub const channels::WIRE_V: u32
 pub enum channels::Admission
 pub enum channels::Answer
@@ -779,9 +825,15 @@ pub enum channels::ControlVerdict
 pub enum channels::Delivered
 pub enum channels::Density
 pub enum channels::DoctorAbsence
+pub enum channels::DoctorCoverage
+pub enum channels::DoctorCustodyLifetime
+pub enum channels::DoctorCustodyStore
 pub enum channels::DoctorFault
+pub enum channels::DoctorGuaranteeAxis
 pub enum channels::DoctorInstall
 pub enum channels::DoctorNeed
+pub enum channels::DoctorSandboxArm
+pub enum channels::DoctorSandboxMissing
 pub enum channels::DoctorState
 pub enum channels::DoctorTier
 pub enum channels::DoctorVersion
@@ -822,6 +874,7 @@ pub fn channels::Aggregate::detach(&mut self, &channels::CityLabel) -> bool
 pub fn channels::Aggregate::merge(alloc::vec::Vec<(channels::CityLabel, alloc::vec::Vec<kernel::event::payload::EventRecord>)>) -> alloc::vec::Vec<channels::Sighting>
 pub fn channels::Aggregate::new() -> Self
 pub fn channels::Appearance::default() -> Self
+pub fn channels::BindFace::token_digest(&self) -> core::option::Option<&kernel::locator::B3Hash>
 pub fn channels::CityLabel::as_str(&self) -> &str
 pub fn channels::CityLabel::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::ClientAssets::lookup(&self, &str) -> channels::AssetReply
@@ -850,14 +903,14 @@ pub fn channels::ToolkitSlug::as_str(&self) -> &str
 pub fn channels::ToolkitSlug::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::arguments_in(&serde_json::value::Value) -> core::option::Option<channels::Output>
 pub fn channels::classify(&channels::Command) -> channels::ControlVerdict
-pub fn channels::decide_admission(channels::Door, core::option::Option<&str>, core::option::Option<&kernel::locator::B3Hash>) -> channels::Admission
-pub fn channels::decide_bind(&core::net::socket_addr::SocketAddr, bool) -> channels::BindVerdict
-pub fn channels::decide_frame(channels::SessionState, channels::ClientFrame, core::option::Option<&kernel::locator::B3Hash>, core::option::Option<&kernel::address::Address>) -> channels::SessionStep
-pub fn channels::decide_handshake(&channels::Hello, &channels::Welcome, core::option::Option<&kernel::locator::B3Hash>) -> channels::HandshakeVerdict
+pub fn channels::decide_admission(channels::Door, core::option::Option<&str>, &channels::BindFace) -> channels::Admission
+pub fn channels::decide_bind(&core::net::socket_addr::SocketAddr, core::option::Option<kernel::locator::B3Hash>) -> channels::BindVerdict
+pub fn channels::decide_frame(channels::SessionState, channels::ClientFrame, &channels::BindFace, core::option::Option<&kernel::address::Address>) -> channels::SessionStep
+pub fn channels::decide_handshake(&channels::Hello, &channels::Welcome, &channels::BindFace) -> channels::HandshakeVerdict
 pub fn channels::note_of(kernel::event::kind::EventKind, &kernel::event::payload::EventRecord) -> core::option::Option<channels::Note>
 pub fn channels::offered_pairing(core::option::Option<&str>) -> core::option::Option<&str>
 pub fn channels::output_in(&serde_json::value::Value) -> core::option::Option<channels::Output>
-pub fn channels::router(&channels::ServeConfig) -> axum::routing::Router
+pub fn channels::router(&channels::ServeConfig, channels::BindFace) -> axum::routing::Router
 pub fn channels::said_in(&serde_json::value::Value) -> core::option::Option<alloc::string::String>
 pub fn channels::schema_hash() -> kernel::locator::B3Hash
 pub fn channels::subject_of(core::option::Option<&serde_json::value::Value>) -> core::option::Option<alloc::string::String>
@@ -896,7 +949,10 @@ pub struct channels::Delta
 pub struct channels::DiscardAnswer
 pub struct channels::DiscardLine
 pub struct channels::DoctorAnswer
+pub struct channels::DoctorCustody
+pub struct channels::DoctorGuarantee
 pub struct channels::DoctorItem
+pub struct channels::DoctorSandbox
 pub struct channels::DoctorVerdict
 pub struct channels::DocumentAnswer
 pub struct channels::Drift
@@ -913,8 +969,10 @@ pub struct channels::GovernanceAnswer
 pub struct channels::HeaderPair
 pub struct channels::Hello
 pub struct channels::HistoryAnswer
+pub struct channels::HistoryRangeAnswer
 pub struct channels::HunksAnswer
 pub struct channels::InboxAnswer
+pub struct channels::Lagged
 pub struct channels::ListingAnswer
 pub struct channels::LogLine
 pub struct channels::McpHealthAnswer

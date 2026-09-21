@@ -204,15 +204,21 @@ pub(crate) trait Vault {                        // 内缝：两句话接口
     fn get(&self, reference: &SecretRef) -> Result<Option<Sealed<String>>, AxError>;
     fn delete(&mut self, reference: &SecretRef) -> Result<(), AxError>;   // 探针与轮换用；不出对外接口
 }
-pub enum Persistence { AcrossReboots, ThisBoot, ThisProcess }
+pub enum Persistence { /* 全部档位与 consequence() 见 §8-21 */ }
 pub struct Described { pub configured: bool, pub source: String, pub persistence: Persistence, pub writable: bool }
 
-pub struct Custodian { /* backend: Box<dyn Vault>、source 名、persistence —— 私有 */ }
+pub enum Store { PlatformService, EncryptedFile, SessionMemory }   // 一个城把秘密写进哪一家
+pub struct Custody { pub store: Store, pub persistence: Persistence,
+                     pub refusal: Option<String> }   // 平台服务自己的拒词；它成事时与本城自选时皆 None
+
+pub struct Custodian { /* backend: Box<dyn Vault>、store、refusal、env —— 私有 */ }
 impl Custodian {
-    /// Startup probe: write-read-delete on each candidate backend, first
-    /// pass wins; all failed -> session-memory fallback + provider_degraded
-    /// payload returned to the caller for ledger append.
+    /// Startup probe: write-read-delete against the platform service; any
+    /// answer but the value it was asked to keep falls back to session
+    /// memory and returns the provider_degraded payload to the caller for
+    /// ledger append.
     pub fn probe() -> (Custodian, Option<Payload>);
+    pub fn custody(&self) -> Custody;                          // 探测的结论：哪一家、能留多久、平台服务的原话
     pub fn set(&mut self, reference: &SecretRef, value: Zeroizing<String>) -> Result<(), AxError>;
                                     // 遮蔽即拒；空值即未配置；入参取 Zeroizing 非 Sealed：
                                     // `.expose(` 白名单恒三文件（定义处＋两解封点），Custody 是库不是 sink——
@@ -222,9 +228,10 @@ impl Custodian {
 }
 ```
 
-- 生产适配器＝keyring crate（Windows Credential Manager／macOS Keychain／Linux 内核 keyring）；第二适配器＝会话内存 BTreeMap（探测全败的兜底＋测试面）。**恒不自写加密文件**。
+- **生产适配器＝keyring crate（Windows Credential Manager／macOS Keychain／Linux 内核 keyring），兜底＝会话内存 BTreeMap（测试面同用）**；一个城把秘密写进哪一家，由 `Store` 一处命名。探针只试平台服务，失败即落到内存。**加密文件是第三家，带在类型里而尚无探针选它**：打开它的口令要在启动时向人要，那条接线是另一件事（§8-21）。
+- **一次探测的结论是一个值，不是三个读取口**：哪一家、能留多久、平台服务自己说了什么，三答出自同一次往返——分成三处报就可能说出「平台服务能用」与「重启什么都没了」这一对让人无从下手的答案。`custody()` 从 `describe` 与 `resolve` 所读的那批字段铸出，故它说不出一个两个读口都没在用的 store；`refusal` 是平台服务自己的拒词，它成事时与本城自选时皆 `None`。
 - **Linux 存在内核 keyring，不存在 secret service，理由是发布产物。** 发布的 Linux 归档是一份静态 musl 二进制（`x86_64-unknown-linux-musl`），而 secret service 走 D-Bus，树因此另到 `libdbus-sys`，那要求链接宿主的 glibc D-Bus——一份静态二进制与一个 D-Bus 凭据库不能同时为真。故 keyring 的 Linux 特性取 `linux-native`（keyutils，纯 syscall，不需要会话总线、不需要动态库、容器里同样成立），不取 `sync-secret-service`。代价写在类型上而不是写在注释里：内核 keyring 是内存，重启即清，故 `KeyringVault::PERSISTENCE` 在 Linux 上恒为 `Persistence::ThisBoot`，`SOURCE` 恒为 `kernel-keyring`。
-- **等级只说一次，两处读它。** `Persistence::consequence()` 是「这个等级让人付出什么」的唯一权威句；`describe` 报状态（`source`＋`persistence`），`resolve` 未命中时把这句接在 recovery 后面——重启吃掉的 key 因此读作「重启清了内核 keyring，请再输一次」，而不是读作「你从来没配过」。探测成功不产 `provider_degraded`：Linux 上那是健康路径，每次启动报一条假警报只会让这个 kind 没人再读。
+- **等级只说一次，凡报它的地方都读同一处。** `Persistence::consequence()` 是「这个等级让人付出什么」的唯一权威句；`describe` 报状态（`source`＋`persistence`），`resolve` 未命中时把这句接在 recovery 后面——重启吃掉的 key 因此读作「重启清了内核 keyring，请再输一次」，而不是读作「你从来没配过」。探测成功不产 `provider_degraded`：Linux 上那是健康路径，每次启动报一条假警报只会让这个 kind 没人再读。
 - realm/name 由调用方给定，本模块不生成名字：订阅线走 `credentials::subscription` 的逐供应方定名，API key 走 S4 命令面的 `PutSecret`。**恒无计数器命名**——按捕获次序编号会让同一个值每场会话换一个名、两个值跨会话撞同一个名，于是旧账本里的引用兑到别人的凭据。一个值的短名若要由内容导出，口径只有 `runtime::redact::fingerprint` 一处。
 - OAuth 两流程（PKCE／设备码）＝代码：`pub fn oauth_begin(profile, …) -> RedirectPending` 与 `pub fn device_login_begin(profile, now_ms, timeout_ms) -> OauthPending`（§8-22），兑付分别是 `oauth_redeem` 与 `DeviceLogin::ask`。两条路的第二步都由 S4 命令面驱动，恒不在本 crate 里取时钟、取随机或替人等待。续期＝到期前 resolve 触发 refresh 构造。
 - 环境变量是只读来源（键形 `SPRAWLING_SECRET_<REALM>_<NAME>`）：`describe.writable=false`；`set` 撞遮蔽即拒并指名遮蔽者；读取器可注入（edition 2024 的 set_var 不安全，测试恒不改进程环境）。

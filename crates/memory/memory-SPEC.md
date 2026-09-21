@@ -15,7 +15,7 @@
 | `error` | 2 值 | `MemoryError` 与 `into_ax`：本 crate 失败词汇的唯一定义点 |
 | `fault_fs` | 4 适配器 | Vfs 第二适配器：撕裂写／乱序持久化／rename 中断；断电点阵的驱动器 |
 | `cas` | 4 适配器 | BLAKE3 寻址存储：范围取回＋临时文件 rename＋去重 |
-| `index` | 7 projection | Ledger 旁挂索引 seq→（段，偏移）；可弃，损坏即重建；持 `Box<dyn Vfs>`，读写皆经内缝 |
+| `index` | 7 projection | Ledger 旁挂索引 seq→（段，偏移）；可弃，损坏即重建；持 `Box<dyn Vfs>`，只读不写 |
 | `reserved` | 2 值 | `outside_reserved(relative)`：哪些字节属于人；checkpoint 与 worktree 共用的唯一谓词 |
 | `hot` | 7 projection | 内存热视图：界面查询在此命中，不读盘 |
 | `attribution` | 7 projection | 成本归因：逐维度精确分割同一总额；A20 对账 |
@@ -222,10 +222,11 @@ rename 入 Vfs；FaultFs 模型：rename 原子；新目标目录项在 `sync_di
 ```rust
 pub struct LedgerIndex { /* folded: Folded —— entries: BTreeMap<Seq, (String, u64)>（段名＋行首字节偏移）、
                             runs: BTreeMap<RunId, BTreeSet<Seq>>（谁写了哪几条）、scanned；
-                            vfs: Mutex<Box<dyn Vfs>> —— 内缝，读写皆经它；私有 */ }
+                            vfs: Mutex<Box<dyn Vfs>> —— 内缝，私有（谁在缝外见 8-15） */ }
 impl LedgerIndex {
-    /// 扫描账本目录建索引（本就是唯一入口，无库外旁挂物可信）。
+    /// 扫描账本目录建索引（本就是唯一建表入口，无库外旁挂物可信）。
     pub fn rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError>;
+    pub fn empty() -> LedgerIndex;                                                 // 账本目录读不出时先要一个：可弃，refresh 会填上
     pub fn refresh(&mut self, dir: &Path) -> Result<Refreshed, MemoryError>;       // 只读长出来的字节
 }
 /// 一次 refresh 做了什么，以及为此从盘上抬起了多少字节。
@@ -244,14 +245,14 @@ impl LineReader<'_> {
 }
 ```
 
-- **索引不落盘，只有一段常驻内存**：唯一入口是 `rebuild`，扫描账本目录建表；`Views` 持有它并在每次查询前 `refresh`。此前那份 `index.cache` 旁挂物已整体删除：`persist` 在 `db3a342` 之后的树里零生产调用者，读取方因此是在读一份没人写的文件，而「一份没人写的旁挂物」既是永不命中的空转，又是第二个可失效的“答案来源”。删掉的是写与读两半，`Folded`、`rebuild`、`scan` 与 `refresh` 全部保留，故 `rebuild` 仍是「从段重建」。
+- **索引不落盘，只有一段常驻内存**：唯一建表入口是 `rebuild`，扫描账本目录；`Views` 持有它并在每次查询前 `refresh`。此前那份 `index.cache` 旁挂物已整体删除：`persist` 在 `db3a342` 之后的树里零生产调用者，读取方因此是在读一份没人写的文件，而「一份没人写的旁挂物」既是永不命中的空转，又是第二个可失效的“答案来源”。删掉的是写与读两半，`Folded`、`fold_segment`、`rebuild` 与 `refresh` 全部保留，故 `rebuild` 仍是「从段重建」。
 - **取行走游标，而不是每行一次 open ＋逐字节 read**：一次 `History`／`RunHistory` 查询要取一段连续的 seq，而每一行重开段文件、再一次一个字节 `read` 到换行的读法，系统调用数与行长同阶。句柄因此住进 `LineReader`：段名不变即不重开，读用 `BufReader::read_until(b'\n')`，一次填充服务多行。
   - **实测**（5 万条账本，windows-x86_64 NVMe，每种模式 200 行）：顺序读（`history`）**0.89 µs／行**；逆序读（`run_history`）**5.82 µs／行**；随机跳读 **14.9 µs／行**。
   - **位置自持**：游标记住下一行的偏移，与所求偏移相同即不 seek（顺序读全程零 seek），不同则绝对 seek 并弃缓冲。`run_history` 逆序读每行付一次 seek 与一次缓冲填充，仍是常数次系统调用。
-  - **位置用 `Option<u64>` 表达，算不出来就作废**：seek 前、读前各置 `None`，只在一次成功的读之后写回 `offset + 读长`；长度换 `u64` 失败或相加溢出则继续为 `None`，下一次调用必 seek。一个可能错的位置会让游标把别的行的字节交在调用方要的 seq 名下，而旁挂物宁可重做不可误信（与 cache 失效同一条反射）。
+  - **位置用 `Option<u64>` 表达，算不出来就作废**：seek 前、读前各置 `None`，只在一次成功的读之后写回 `offset + 读长`；长度换 `u64` 失败或相加溢出则继续为 `None`，下一次调用必 seek。一个可能错的位置会让游标把别的行的字节交在调用方要的 seq 名下，而旁挂物宁可重做不可误信（与「存疑即重建」同一条反射）。
   - **读一行只此一条路**（`LineReader::line_at`），不留转发壳：否则「怎样读一行」有两个权威，而慢的那个还在原地招手。
   - **段不因此出门**：`LineReader` 的公开面只有 `line_at(seq)`，段名与偏移仍是内部事务（§7 第三条）。
-- **索引常驻，不每次查询重建**：在**每一次** `History`／`RunHistory` 里走 `load_or_rebuild`、把整个 `index.cache` 读进来重新解析，5 万条时是 1.5 MB 与 5 万次 String 分配，实测 **14.4 ms 一次查询**。
+- **索引常驻，不每次查询重建**：每一次 `History`／`RunHistory` 都从头 `rebuild` 一遍时，5 万条账本要逐段重读、逐行取一个 `String`，实测 **14.4 ms 一次查询**。
   - **增量面是 `refresh`，不是“追加时告知索引”**：调用方手里只有 `EventRecord`，段名与偏移是 `jsonl` 的内部事务（§7 第三条）。让观察者携偏移会把分段泄给调用方，而 `refresh` 把那个知识留在本模块。
   - 索引因此多记一张 `scanned: BTreeMap<段名, 已折入字节数>`。`refresh` 逐段比对：**变大就只读新那一段字节**；**变小或消失就全重建**（断尾修复截过段，旧偏移不再可信）；一字未动就什么也不做。
   - **「上次读到哪」只有这一个家，而且它恒落在整行边界上**：`fold_segment` 只把带终止符的行计入，所以 `scanned` 记的永远是某条记录的结尾，下一次 refresh 从一条记录的开头起读，**取不到半条**。
@@ -438,7 +439,7 @@ impl Checkpoint {
   - 输出仍然在本模块排序而不信 walk 的顺序：**这批行落账的顺序是重放要复现的东西**。
 - `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存用 `add_all`＋`update_all` 两步（后者含删除），glob 限于 `<scope>/*`；**session 切片永不进 add**（`CityLayout::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `MemoryError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
-- 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `BUILDING.md` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何栅栏——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
+- 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `RULES.toml` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何栅栏——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
 
 ### 8-13 memory::changes（形状 4 适配器；git2）
 
@@ -594,7 +595,7 @@ pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, MemoryErr
 // Vfs 内缝增 `list_dirs`：两个适配器同改；list 与 list_dirs 都是浅层，遍树用显式工作表（不递归，栈溢出接不住）
 ```
 
-- **带走什么**：`ledger/`（唯一历史，必带）、`cas/`（Locator 指进去，不带就断链）、城里的产品文件（`City.md`、各楼的 `BUILDING.md`／`Roadmap.md`／`URBANITE.md` 与房间内容）。**不带**：索引与任何派生视图（可弃，恢复后由 Ledger 重建，带了就是第二份历史）；凭证（**它从不在城里**，在宙主机金库——导出一份能拷走凭证的备份会把隐私保证一次性作废）。
+- **带走什么**：`ledger/`（唯一历史，必带）、`cas/`（Locator 指进去，不带就断链）、城里的产品文件（`City.md`、各楼的 `RULES.toml`／`Roadmap.md`／`URBANITE.md` 与房间内容）。**不带**：索引与任何派生视图（可弃，恢复后由 Ledger 重建，带了就是第二份历史）；凭证（**它从不在城里**，在宙主机金库——导出一份能拷走凭证的备份会把隐私保证一次性作废）。
 - **为何是目录而非单文件**：单文件要么自造容器格式（多一个要养的格式），要么引 tar／zip 依赖。目录两者都不要，且任何备份工具都能再打包一层——压缩不是本模块的职责。
 - **清单是完整性的依据**：`MANIFEST.json` 记下记录数、链头哈希、CAS 对象数与文件数；`restore` 恢复后重算并比对。不对即拒，而不是“恢复了但少了几条”——后者是历史失真。
 - **四个数由 `Manifest::of(vfs, ledger_dir, cas_dir, files_root)` 一处算出**（B-46）：导出量目的地、恢复量城本身、比较的两侧因此是同一种测量。
@@ -657,8 +658,8 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
   - `worktree`——树由 git2 建、由 git2 prune，落盘不经本 crate；`release` 删残留目录同走 `std::fs`。
     缝拦不住 git2，声称拦得住才是第二个权威。释放顺序与自愈见 §8-9。
   - `checkpoint`——同样经 git2 提交与检出。
-  - **`index` 不在例外之列**：`LedgerIndex` 持 `Box<dyn Vfs>`（锁在 `Mutex` 后，因为 `persist(&self)` 要写盘而公共面是只读的），
-    段列举、段长、尾部增量读、cache 的读写删全部经缝，于是「cache 写到一半断电」第一次有机器面断言。
+  - **`index` 不在例外之列**：`LedgerIndex` 持 `Box<dyn Vfs>`，段列举、段长、整段读（建表）与尾部增量读（刷新）全部经缝，
+    而它没有一步是写；按 seq 取行走 `LineReader`，那正是上一条的例外。
 
 ### 8-16 memory::real_fs（形状 4 适配器）
 

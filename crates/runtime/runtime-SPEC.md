@@ -255,8 +255,10 @@ pub enum Opening { FromJob, WithPerson }   // 穷尽两臂，城在写 brief 时
     pub fn push_tool_results(&mut self, results: Vec<ContentBlock>); // ToolResult 块（pipeline 产出的成品文本）
     pub fn messages(&self) -> &[ChatMessage]; }
 
-pub struct CallShape { pub model: String, pub max_tokens: Option<Ceiling>, pub effort: Option<Effort> }
-                    // 三项全部来自选型点，无一项在调用处手写。model 与 max_tokens 解自
+pub struct CallShape { pub model: String, pub max_tokens: Option<Ceiling>, pub effort: Option<Effort>,
+                       pub context_tokens: u64 }   // 窗口大小；只喂本地提醒、不上线（§8-3）
+impl CallShape { pub fn verified_against(&self, frozen: &CallShape) -> Result<(), AxError>; }   // 冻结判定（§8-3）
+                    // 三个上线字段全部来自选型点，无一项在调用处手写。model 与 max_tokens 解自
                     // 模型目录行（gateway::market::ModelEntry）；effort 解自 kernel::FrozenConfig，
                     // Run 内恒不变——改它就换缓存前缀（理由与出处在 kernel-SPEC §8-22）
 impl Turn<Assembling> {
@@ -311,6 +313,25 @@ pub struct PackContext<'a> {
 }
 pub struct Packaged { pub content: String, pub events: Vec<Payload> }   // events＝result_offloaded 载荷（入账归调用方）
 pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>;
+
+// pipeline::adviser —— 顾问端口（形状 3 port＋1 判定）；三型在 pipeline 上重导出
+pub use kernel::event::record::AdviserAsk;   // 问法与答案的词汇归 kernel，本模块只翻译与校验
+pub struct Ask { pub kind: AdviserAsk, pub subject: String, pub options: Vec<String>,
+                 pub material: Option<String> }
+impl Ask { pub fn noul(subject: impl Into<String>, material: impl Into<String>) -> Ask;
+           pub fn score(subject: impl Into<String>, material: impl Into<String>) -> Ask;
+           pub fn choice(subject: impl Into<String>, options: Vec<String>) -> Ask; }
+pub enum Consultation {
+    Answered { ask: AdviserAsk, subject: String, answer: AdviserAnswer, elapsed_ms: u64 },
+    FellBack { ask: AdviserAsk, subject: String, reason: AdviserFailure },
+}
+impl Consultation { pub fn answer(&self) -> Option<&AdviserAnswer>;
+                    pub fn payloads(&self) -> Result<Vec<Payload>, AxError>; }   // adviser_asked＋答或回落
+pub struct Adviser { /* answer —— 私有 */ }
+impl Adviser { pub fn none() -> Adviser;
+               pub fn with(answer: impl FnMut(&Ask, &Window) -> Result<AdviserAnswer, AdviserFailure>
+                                 + Send + 'static) -> Adviser;
+               pub fn consult(&mut self, ask: Ask, window: &Window, elapsed_ms: u64) -> Consultation; }
 ```
 
 - 定序（H-08 之后）：**判定由 `compaction::plan` 一处给出**，答 `Shrink { Keep, Cut(Strategy), MustOffload }`。`Keep` →原样；`MustOffload`（结构化、未知内容、以及非 UTF-8 字节）与「`Cut` 且 `len ≥ OFFLOAD_MIN_BYTES`」→ 有 `OffloadSite` 就 offload；`Cut` 而无站点或不够大 → `compaction::shorten` 按已定的 `Strategy` 裁。**`MustOffload` 而无站点是一次带恢复语的 `Err`，不是私自的字节切**：截半的结构化数据看上去仍可解析，那正是它比缺席更糟的理由，而旧的 `byte_cut` 让 pipeline 当场推翻 compaction 的定规——一条规则两个家。`byte_cut` 随之删除。标记仍由 `elision` 产出且只出现一次。
@@ -492,19 +513,30 @@ pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob)
 pub enum Guarantee { Filesystem, Network, ProcessTree, User, Resources }
 pub enum Kept { Yes, No }
 pub struct Assurances { pub filesystem: Kept, pub network: Kept, pub process_tree: Kept, pub user: Kept, pub resources: Kept }
+pub enum Missing { ScratchDirectory }
 pub enum Confinement { LinuxNamespaces { wrapper: PathBuf }, WindowsJobObject, CopiedTree, Unavailable { missing: Missing } }
 pub struct Offerings { pub namespace_tool: Option<PathBuf>, pub scratch: Option<PathBuf> }
+impl Guarantee { pub const ALL: [Guarantee; 5]; pub fn phrase(self) -> &'static str; pub fn unkept(self) -> &'static str; }
+impl Missing { pub fn phrase(self) -> &'static str; pub fn recovery(self) -> &'static str; }
+impl Assurances { pub fn of(self, axis: Guarantee) -> Kept; }
+impl Offerings { pub fn this_machine() -> Offerings; }   // 唯一的采样点；两个 detect 都只读它
 impl Confinement { pub fn detect() -> Confinement; pub fn choose(&Offerings) -> Confinement;
-                   pub fn assurances(&self) -> Assurances; pub fn statement(&self) -> String; }
+                   pub fn assurances(&self) -> Assurances; pub fn name(&self) -> &'static str;
+                   pub fn statement(&self) -> String; }
 pub struct Confined { /* arm＋scratch＋outstanding（后台命令的副本） */ }
-impl Confined { pub fn detect() -> Confined; pub fn place(&self, Command, &Path) -> Result<(Command, Placed), AxError>;
-                pub fn settled(&self, Placed) -> Result<(), AxError>; pub fn handed(&mut self, BacklogId, Placed);
-                pub fn reaped(&mut self, &[Finished]) -> Result<(), AxError> }
+impl Confined { pub fn detect() -> Confined; pub fn with_arm(Confinement, Option<PathBuf>) -> Confined;
+                pub fn arm(&self) -> &Confinement; pub fn statement(&self) -> String;
+                pub fn place(&self, Command, &Path) -> Result<(Command, Placed), AxError>;
+                pub fn settled(&self, Placed); pub fn handed(&mut self, BacklogId, Placed);
+                pub fn reaped(&mut self, &[Finished]); }
+impl Drop for Confined { /* 删未报结命令留下的副本 */ }
+pub struct Placed { /* copy —— 私有 */ }
 pub enum Placement { Sandbox, Host }   // 调用参数 `where`；缺省 Sandbox
+pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 ```
 
 - **保证清单在类型上**：`Assurances` 逐轴五字段，每一臂的 `assurances()` 必须写满五轴，故新增一轴即四臂同时编译红——任何一臂都不会留下一个没人问过它的旧答案。`statement()` 由 `Assurances` 与 `Guarantee::phrase()`／`unkept()` 派生而非另写一段话，句子与类型因此不可能分家。
-- **选择是纯函数**：`choose` 取 `Offerings`——有 wrapper 即 `LinuxNamespaces`，否则 `CopiedTree`；scratch 根不可用即 `Unavailable { missing: ScratchDirectory }`。`detect()` 是**唯一的采样点**（`PATH`＋`std::env::temp_dir()`）；测试用 `Offerings` 陈述一台机器而不是借一台。
+- **选择是纯函数**：`choose` 取 `Offerings`——有 wrapper 即 `LinuxNamespaces`，否则 `CopiedTree`；scratch 根不可用即 `Unavailable { missing: ScratchDirectory }`。采样只有 `Offerings::this_machine()` 一处（`PATH`＋`std::env::temp_dir()`），两个 `detect()` 都只读它；测试用 `Offerings` 陈述一台机器而不是借一台。
 - **`WindowsJobObject` 本构建不构造，且拒而不降级**：`CreateJobObject` 是 workspace `unsafe_code = forbid` 在 `desktop/` 之外禁止的 FFI，runtime 的 `Cargo.toml` 也不在本改动的可写面内。以 `CopiedTree` 冒充它会对着一个开着网络的盒子回答「网络已关」，正是本模块存在的理由的镜像，故 `place()` 对它返 `E_SANDBOX_DENIED` 并给「改用 copied tree 且让命令离开网络」的 recovery。Windows 上 `detect()` 因此答 `CopiedTree`，其清单逐字写出网络未隔离——这一句就是 Agent 必须看见的那一句。
 - **副本按命令一份、有界**：`place()` 把 `workdir` 复制进 scratch 根下的新目录，命令在副本里跑；`settled()` 在等待结束时删副本；交给 backlog 的后台命令由 `handed(id, …)` 记名、由 `reaped(&[Finished])` 在其成员报结时删；`Drop` 兜底。**删不掉不把命令判成失败**（与 `backlog/member.rs`、`collect()` 同一条判断：命令的收场是调用方应得的事实，一个临时目录只值磁盘）。界：`MAX_FILES = 100_000`、`MAX_BYTES = 256 MiB`、`MAX_DEPTH = 64`；越界**拒**并报出越过的那一对数字——半份副本会为一堆没带上的文件担保，而本模块的全部理由是防这个。`MAX_DEPTH` 同时终结自指链接造成的无底走查（链接按目标内容复制，因此指向树外的链接带进来的是内容而非一个通向人那棵树的入口）。
 - **`Mount`／`Fuel` 不沿用**：`Fuel` 是 wasmtime 指令计量、`Mount.guest` 是 guest 路径别名，二者 wasip1 专属。本模块保留的是**判断**（能力面＝能到达的路径集）而不是词形。宿主环境照旧不继承（exec 的 env allowlist 未动）；`SandboxJob.env` 的显式注入属 guest 面。

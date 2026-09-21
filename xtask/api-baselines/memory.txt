@@ -73,9 +73,8 @@ pub fn memory::JsonlLedger::read_raw_lines(&self) -> core::result::Result<alloc:
 pub fn memory::LedgerIndex::empty() -> memory::LedgerIndex
 pub fn memory::LedgerIndex::is_empty(&self) -> bool
 pub fn memory::LedgerIndex::len(&self) -> usize
-pub fn memory::LedgerIndex::load_or_rebuild(&std::path::Path) -> core::result::Result<memory::LedgerIndex, memory::MemoryError>
-pub fn memory::LedgerIndex::persist(&self, &std::path::Path) -> core::result::Result<(), memory::MemoryError>
 pub fn memory::LedgerIndex::reader(&self, &std::path::Path) -> memory::LineReader<'_>
+pub fn memory::LedgerIndex::rebuild(&std::path::Path) -> core::result::Result<memory::LedgerIndex, memory::MemoryError>
 pub fn memory::LedgerIndex::refresh(&mut self, &std::path::Path) -> core::result::Result<memory::Refreshed, memory::MemoryError>
 pub fn memory::LedgerIndex::run_seqs_before(&self, kernel::event::identity::RunId, core::option::Option<kernel::event::identity::Seq>) -> impl core::iter::traits::iterator::Iterator<Item = kernel::event::identity::Seq>
 pub fn memory::LedgerIndex::tail_seq(&self) -> core::option::Option<kernel::event::identity::Seq>

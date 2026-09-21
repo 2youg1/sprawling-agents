@@ -17,7 +17,7 @@
 | snapshot | 原始 DOM 恒不入窗（断言）；同一棵树两次快照字节相同；label 超长即截断且不引入换行 |
 | act | 陈旧 generation 恒拒；页面文本进表达式后，字面量内除定界符外无未转义引号 |
 | devloop | 任意观察序列在预算内到达一个结局；结局枚举穷尽 |
-| profile | 两栋楼的 profile 互不包含；路径住 reserved prefix；**confidential 楼的拒绝只有一个家**：`city::policy::evaluate` 读到 `confidential: true` 与 `browser: true`／`usersbrowser:` 并存即 `E_CONFIG_INVALID`，本 crate 不再有 `Ephemeral` 臂（那是同一个规则的不可达第二家） |
+| profile | 两栋楼的 profile 互不包含；路径住 reserved prefix；**confidential 楼的拒绝只有一个家**：`city::policy::evaluate` 读到 `confidential = true` 与 `browser = true`／`usersbrowser:` 并存即 `E_CONFIG_INVALID`，本 crate 不再有 `Ephemeral` 臂（那是同一个规则的不可达第二家） |
 
 ## 3 假设与歧义
 
@@ -52,7 +52,7 @@ P4 之前 `crates/browser/src/` 只有 `lib.rs` 一行文档。无既有代码�
 **三件邻居的活，及它们各自的主人**：
 
 - **字节怎么走**归 `bin::assembly`：WebSocket、重连、超时住装配层，本 crate 恒不持套接字，也恒不依赖异步运行时。
-- **这栋楼准不准出网**归 `city::policy`：`profile` 只读 confidential 这一位，判定本身在 city。整份 `kernel::BuildingPolicy` 入参而非那一位（G-25）：什么叫 confidential 只有 kernel 一处定义，调用点写 `true` 则是第二处。
+- **这栋楼准不准出网**归 `city::policy`：`Profile::of` 只收楼的 `Address`，本 crate 读不到 policy；confidential 的判定在 city（§2 profile 行）。
 - **页面带回来的内容算什么**归 `kernel::taint`：快照文本与工具结果同落污染环，本 crate 不另设解包面。
 
 ## 8 接口先行
@@ -96,6 +96,7 @@ impl PageSnapshot {
 }
 
 // 8-4 act（形状 1 判定）
+pub struct Point { pub x: i64, pub y: i64 }                       // 视口坐标，CSS 像素；滚轮增量可为负
 pub enum Origin { Reference(String), Point(Point) }               // 拖拽从哪开始：快照的 ref 或视口点
 pub enum Action { Click { reference: String }, Type { reference: String, text: String },
                   Read { reference: String },
@@ -106,7 +107,9 @@ impl Action { pub fn reference(&self) -> Option<&str>; pub fn resolves_element(&
 pub fn frame_for(session: &mut Session, context: &ContextId, snapshot: &PageSnapshot,
                  generation: u64, action: &Action) -> Result<Frame, AxError>;   // 仅 script 三臂
 pub fn resolve_frame(session: &mut Session, context: &ContextId, snapshot: &PageSnapshot,
-                     generation: u64, reference: &str) -> Result<Frame, AxError>; // 元素 origin 的第一帧
+                     reference: &str) -> Result<Frame, AxError>;   // 元素 origin 的第一帧；generation 由 Verb::frames 先判
+pub enum ResolvedOrigin { Element(String), Viewport(Point) }       // 已解析的 origin（input::Origin 经根重导出）
+pub fn shared_id_of(value: &Value) -> Result<String, AxError>;     // 从第一帧的回复里读出元素 id
 
 // 8-5 devloop（形状 1 判定）
 pub struct Observation { pub text: String, pub complained: bool }
@@ -223,7 +226,7 @@ impl Verb {
                   snapshot: Option<&PageSnapshot>) -> Result<Vec<Frame>, AxError>;
     pub fn destination(&self) -> Result<Option<String>, AxError>;   // Open 的主机，门据此判出网
     pub fn input_frame(&self, session: &mut Session, context: &ContextId,
-                       origin: Option<input::Origin>) -> Result<Frame, AxError>;
+                       origin: Option<ResolvedOrigin>) -> Result<Frame, AxError>;
 }
 ```
 
@@ -275,7 +278,7 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 
 BiDi 的 `input` 是 `script` 之外的另一个协议模块，本 crate 之前全走 `script.evaluate`。指针动作要说明它从哪开始，而 BiDi 的元素 origin 用页面自己的 shared id 而不是选择器，于是元素起点的拖拽在线上是**两帧**：`act::resolve_frame` 让页面报出元素，`input::shared_id_of` 从回复里读出 id，`input::pointer_frame` 再发 `input.performActions`。`Verb::frames` 只发第一帧，工具在 `invoke` 里补第二帧——判定仍在纯代码里，`Recording` 能逐帧重放。
 
-`Scroll` 不进 `Action::reference()` 的形状（滚轮没有元素），所以那个方法变成 `Option<&str>`，并由 `resolves_element()` 说明哪一臂要多一帧。
+`Scroll` 与 point 起点的 `Drag` 都没有元素，不进 `Action::reference()` 的形状；那个方法因此是 `Option<&str>`，`resolves_element()` 说明哪一臂要多一帧。
 
 **与 `desktop.act` 同一份词汇**：`drag` 从 ref 或 point 到 point、`scroll` 用 `to` 表示滚多远、`steps` 为中间移动次数；两侧字段名与含义逐字相同（`desktop-SPEC.md` §8-4 指向本节）。同一个动作在浏览器侧与桌面侧各有一个家会立刻漂开，所以拖拽的形状只有一份。
 
@@ -283,7 +286,7 @@ BiDi 的 `input` 是 `script` 之外的另一个协议模块，本 crate 之前�
 
 驱动**人已经开着的那个浏览器**，用的是那个人的真 profile。与 `browser` 的差别是安全模型而不是动作集合：`browser` 那台由城拉起、profile 按楼隔离、confidential 楼恒无；`usersbrowser` 连的是人自己的进程，楼与楼的登录态隔离在附着那一刻不再成立，所以：
 
-- **地址是人的声明**：`BUILDING.md` 的 `usersbrowser:` 一行，值为 `ws://127.0.0.1:<port>/session` 时启用该工具并把地址交给 attach 门；值为 `true` 时启用而地址未定，于是每次调用都得到门的问题（`E_APPROVAL_PENDING`）与那句要人做的事；absent 或 `false` 即无此工具。confidential 楼写这一行即在规则读取处被拒。
+- **地址是人的声明**：`RULES.toml` 的 `usersbrowser` 一键，值为 `ws://127.0.0.1:<port>/session` 时启用该工具并把地址交给 attach 门；值为 `true` 时启用而地址未定，于是每次调用都得到门的问题（`E_APPROVAL_PENDING`）与那句要人做的事；absent 或 `false` 即无此工具。confidential 楼写这一键即在规则读取处被拒。
 - **恒不关人的浏览器**：附着的端口（`bin::browser_bidi::attach::AttachedBrowser`）只连、不启动、不结束进程；`Verb::Close` 结束的是一次会话，进程还在。附着是会话级、绑一个 run，run 一结束套接字随工具一起 drop。
 - **入账**：附着是工具的第一次调用，与之后每个动作一样写 `tool_called`／`tool_result`；`disclosure` 写明它需要人先批准并引导先用 `browser`，`params` 给出动作的读法（§19-6 的 usersbrowser 行）。
 - **平台的门就是授权**：Firefox 走 `--remote-debugging-port`、Chromium 走驱动，两者都要求人的动作；这不是我们加的仪式，是平台留下的授权面。地址是否 loopback 由 `gate::attach` 判：非 loopback 的声明被拒，因为那会把登录态读过一个网络。

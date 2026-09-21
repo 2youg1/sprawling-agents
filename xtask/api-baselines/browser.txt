@@ -17,8 +17,15 @@ impl browser::Verb
 impl core::default::Default for browser::ShotRequest
 pub browser::Action::Click
 pub browser::Action::Click::reference: alloc::string::String
+pub browser::Action::Drag
+pub browser::Action::Drag::from: browser::Origin
+pub browser::Action::Drag::steps: u32
+pub browser::Action::Drag::to: browser::Point
 pub browser::Action::Read
 pub browser::Action::Read::reference: alloc::string::String
+pub browser::Action::Scroll
+pub browser::Action::Scroll::at: core::option::Option<browser::Point>
+pub browser::Action::Scroll::by: browser::Point
 pub browser::Action::Type
 pub browser::Action::Type::reference: alloc::string::String
 pub browser::Action::Type::text: alloc::string::String
@@ -35,9 +42,10 @@ pub browser::Node::reference: alloc::string::String
 pub browser::Node::role: alloc::string::String
 pub browser::Observation::complained: bool
 pub browser::Observation::text: alloc::string::String
-pub browser::Profile::At
-pub browser::Profile::At::path: kernel::address::Address
-pub browser::Profile::Ephemeral
+pub browser::Origin::Point(browser::Point)
+pub browser::Origin::Reference(alloc::string::String)
+pub browser::Point::x: i64
+pub browser::Point::y: i64
 pub browser::Reply::Error
 pub browser::Reply::Error::code: alloc::string::String
 pub browser::Reply::Error::id: u64
@@ -45,6 +53,8 @@ pub browser::Reply::Error::message: alloc::string::String
 pub browser::Reply::Success
 pub browser::Reply::Success::id: u64
 pub browser::Reply::Success::result: serde_json::value::Value
+pub browser::ResolvedOrigin::Element(alloc::string::String)
+pub browser::ResolvedOrigin::Viewport(browser::Point)
 pub browser::SessionRequest::network: bool
 pub browser::Step::Complained
 pub browser::Step::Complained::looks: u32
@@ -72,12 +82,15 @@ pub browser::Verb::Viewport::width: u32
 pub const browser::LOOKS_MAX: u32
 pub const browser::PROFILES_DIR: &str
 pub const browser::QUIET_LOOKS: u32
+pub const browser::STEPS_MAX: u32
 pub enum browser::Action
-pub enum browser::Profile
+pub enum browser::Origin
 pub enum browser::Reply
+pub enum browser::ResolvedOrigin
 pub enum browser::Step
 pub enum browser::Verb
-pub fn browser::Action::reference(&self) -> &str
+pub fn browser::Action::reference(&self) -> core::option::Option<&str>
+pub fn browser::Action::resolves_element(&self) -> bool
 pub fn browser::Box2::covers(&self, u32, u32) -> bool
 pub fn browser::BrowserPort::send(&mut self, &browser::Frame) -> core::result::Result<browser::Reply, kernel::error::shape::AxError>
 pub fn browser::ContextId::as_str(&self) -> &str
@@ -97,8 +110,8 @@ pub fn browser::PageSnapshot::nodes(&self) -> &[browser::Node]
 pub fn browser::PageSnapshot::read(u64, &serde_json::value::Value) -> core::result::Result<browser::PageSnapshot, kernel::error::shape::AxError>
 pub fn browser::PageSnapshot::resolve(&self, &str) -> core::result::Result<&browser::Node, kernel::error::shape::AxError>
 pub fn browser::PageSnapshot::to_text(&self) -> alloc::string::String
-pub fn browser::Profile::of(&kernel::address::Address, &kernel::model::wire::BuildingPolicy) -> core::result::Result<browser::Profile, kernel::error::shape::AxError>
-pub fn browser::Profile::persists(&self) -> bool
+pub fn browser::Profile::of(&kernel::address::Address) -> core::result::Result<browser::Profile, kernel::error::shape::AxError>
+pub fn browser::Profile::path(&self) -> &kernel::address::Address
 pub fn browser::Recording::answer(&mut self, &browser::Frame, serde_json::value::Value)
 pub fn browser::Recording::missed(&self) -> &[alloc::string::String]
 pub fn browser::Recording::new() -> browser::Recording
@@ -123,12 +136,16 @@ pub fn browser::Shot::width(&self) -> u32
 pub fn browser::ShotRequest::default() -> browser::ShotRequest
 pub fn browser::ShotRequest::format(&self) -> kernel::model::image::ImageType
 pub fn browser::ShotRequest::read(&kernel::event::payload::Payload) -> core::result::Result<browser::ShotRequest, kernel::error::shape::AxError>
+pub fn browser::Verb::destination(&self) -> core::result::Result<core::option::Option<alloc::string::String>, kernel::error::shape::AxError>
 pub fn browser::Verb::frames(&self, &mut browser::Session, &browser::ContextId, core::option::Option<&browser::PageSnapshot>) -> core::result::Result<alloc::vec::Vec<browser::Frame>, kernel::error::shape::AxError>
+pub fn browser::Verb::input_frame(&self, &mut browser::Session, &browser::ContextId, core::option::Option<browser::ResolvedOrigin>) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
 pub fn browser::Verb::read(&kernel::event::payload::Payload) -> core::result::Result<browser::Verb, kernel::error::shape::AxError>
 pub fn browser::complained(&serde_json::value::Value) -> bool
 pub fn browser::diff(&browser::Shot, &browser::Shot) -> core::result::Result<browser::Difference, kernel::error::shape::AxError>
 pub fn browser::frame_for(&mut browser::Session, &browser::ContextId, &browser::PageSnapshot, u64, &browser::Action) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
 pub fn browser::read_json(&serde_json::value::Value) -> core::result::Result<serde_json::value::Value, kernel::error::shape::AxError>
+pub fn browser::resolve_frame(&mut browser::Session, &browser::ContextId, &browser::PageSnapshot, &str) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
+pub fn browser::shared_id_of(&serde_json::value::Value) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
 pub mod browser
 pub struct browser::Box2
 pub struct browser::Clip
@@ -139,6 +156,8 @@ pub struct browser::Frame
 pub struct browser::Node
 pub struct browser::Observation
 pub struct browser::PageSnapshot
+pub struct browser::Point
+pub struct browser::Profile
 pub struct browser::Recording
 pub struct browser::Session
 pub struct browser::SessionRequest

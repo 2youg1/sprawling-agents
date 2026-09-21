@@ -31,15 +31,15 @@ Stage 2 落地其余 18 个 kernel 模块（§8-10…§8-27）。**施工序＝�
 | 登记与委派 | `goal` `repair` `delegation` `registry` | registry 供 discard 门查 Asset |
 | 完成与审批 | `spine` `completion` `approval` | Inbox只装设计问题；门不产出审批项 |
 | 隐私与删除 | `secret` `discard` | Egress/Discard 两门的判定输入 |
-| 组合面 | `gate` | 五门消费上述全部，故最后 |
+| 组合面 | `gate` | `DOORS` 各门消费上述全部，故最后 |
 
 已有章节只加不改。
 
 ## 2 验收标准
 
 - 每模块单测过 workspace lints（非测试代码零 unwrap/expect/panic/索引切片/裸算术/as）。
-- `EventKind` 64 个 variant、`AxCode` 36 个 variant 与本文 §8-4／§8-1 表逐 variant 一致（S2 起 `xtask specalign` 机器断言）。
-- 每个 EventKind 恰属 in-window／record-only 之一；in-window 恰 8 件。
+- `EventKind` 与 `AxCode` 的 variant 名册与本文 §8-4／§8-1 表逐 variant 一致（S2 起 `xtask specalign` 机器断言）。
+- 每个 EventKind 恰属 in-window／record-only 之一；两分与条数见 §8-4 表。
 - 每个 AxCode 恰有一个 carrier 声明；装载期白名单恰 5 码且封闭。
 - golden EventRecord：规范字节入 insta 快照，跨平台逐字节稳定。
 - proptest：Address 解析拒绝面、is_within 前缀性质、Locator 往返、IdemKey 重算不变。
@@ -63,7 +63,7 @@ Stage 2 追加：
   | `write_domain::verification::reserved_is_never_within` | 判定的入参恒是 `Address`（内含 `String`）；取一个具体地址同样退化成单测 | `reserved_target_is_outside_even_for_an_empty_domain`（`#[test]`） |
 
   **全局 unwind 界已被实验证伪，不是这类问题的解法**：删除的理由是命题的载体是堆集合或非线性算术，不是界没调对。补进来的是 `an_overflowing_sum_never_admits`——`depth + cost` 溢出时恒 Shed，对任意 u64 成立，而它旁边的 `#[test]` 只钉住了 `u64::MAX` 一个点。
-- three-part refusal 矩阵：五门每条 Deny 路径的 refusal 三段非空且 alternative 可执行。
+- three-part refusal 矩阵：`DOORS` 每道门每条 Deny 路径的 refusal 三段非空且 alternative 可执行。
 - conformance feature 全量导出：Ledger＋Tool＋Model 三套件（sandbox 随 S3）。
 
 ## 3 假设与歧义
@@ -314,11 +314,11 @@ impl Seq { pub const FIRST: Seq;        // 0；创世行
            pub fn next(self) -> Result<Seq, AxError>; }   // checked_add
 pub struct TimeMs(u64);                 // UTC 整数毫秒；只入参不采样
 
-pub enum EventKind { CityInitialized, /* …55 variant，serde 蛇形 */ }
+pub enum EventKind { CityInitialized, /* …余下 variant 与两分见本节表，serde 蛇形 */ }
 pub enum WindowClass { InWindow, RecordOnly }
 impl EventKind {
     pub fn window_class(&self) -> WindowClass;  // 穷尽 match；二分权威
-    pub const ALL: [EventKind; 55];             // specalign 与计数断言的数据面
+    pub const ALL: [EventKind; 72];             // 与本节表同一名册：specalign 与计数断言的数据面
 }
 
 pub struct Payload(serde_json::Map<String, Value>);
@@ -1062,6 +1062,10 @@ pub fn freeze(clock_stamp: &LayeredValue<ClockStampGranularity>) -> FrozenConfig
 
 ```rust
 pub struct ToolName(String);        // 非空；ascii 小写/数字/下划线（进 catalog 与事件的名）
+impl ToolName {
+    pub const BROWSER: &'static str = "browser";            // 内建浏览器工具的名：ToolMeta、楼的准入规则与账本夹具共用的唯一拼写
+    pub const USER_BROWSER: &'static str = "usersbrowser";  // 驱使人自己开着的浏览器的工具
+}
 pub struct ServerLabel(String);     // 非空；ascii 小写/数字，恒不含下划线（见下）
 pub struct TimeoutMs(u64);          // 声明即承诺可协作取消
 pub enum Effect { Read, Write { domain: Address }, Egress,
@@ -1095,11 +1099,12 @@ impl ToolCall {
 }
 pub struct ToolOutcome { pub result: Payload, #[serde(default)] pub attachments: Vec<ImageRef> }
 
-pub trait Tool {
+pub trait Tool: Send {
     fn meta(&self) -> &ToolMeta;
     /// Fail-closed identity: a call whose name differs from meta().name
     /// must return E_INVALID_ARGS, never route silently.
     fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
+    fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError>;   // 默认 `GateSubject::None`
 }
 #[cfg(feature = "conformance")]
 pub fn assert_tool_conformance<T: Tool>(tool: &mut T);   // 八字段完备＋name 文法＋错名调用拒收
@@ -1384,7 +1389,7 @@ pub fn markdown(text: &str) -> Vec<Span>;
 pub fn is_reserved(&self) -> bool;   // 任一段 == RESERVED_PREFIX（原：仅首段）
 ```
 
-**改它的理由是一个现存的洞，不是一个新需求。** 一次派活的写域由 `city::policy::write_domain()` 给出，而 `docs/templates/RULES.toml` 的 `prefixes` 出厂就是一个空表，于是 `write_prefixes` 为空、回落到 `[self.addr]`——**默认写域是整栋楼**。`runtime::tools::edit` 对路径只有 `WriteDomain::admits` 一道依据，`city::load` 又在**每次派活**时重读 `BUILDING.md`。三条合起来：一个 agent 现在就改得了它自己那栋楼的 `RULES.toml` 与 `CONFIG.toml`——它自己的写域、`confidential`、思考强度与 MCP server 全在那两个文件里，而改动在下一次派活即生效。词汇表写着「一个 agent 改不了自己的账与自己的配置」，RULES.toml 自己的抬头写着「residents read it and cannot change it」——**两句话今天都没有任何东西执行**。
+**改它的理由是一个现存的洞，不是一个新需求。** 一次派活的写域由 `city::policy::write_domain()` 给出，而 `docs/templates/RULES.toml` 的 `prefixes` 出厂就是一个空表，于是 `write_prefixes` 为空、回落到 `[self.addr]`——**默认写域是整栋楼**。`runtime::tools::edit` 对路径只有 `WriteDomain::admits` 一道依据，`city::load` 又在**每次派活**时重读 `RULES.toml`。三条合起来：一个 agent 现在就改得了它自己那栋楼的 `RULES.toml` 与 `CONFIG.toml`——它自己的写域、`confidential`、思考强度与 MCP server 全在那两个文件里，而改动在下一次派活即生效。词汇表写着「一个 agent 改不了自己的账与自己的配置」，RULES.toml 自己的抬头写着「residents read it and cannot change it」——**两句话今天都没有任何东西执行**。
 
 - **一条规则，三处实例**：一个 scope 的治理字节住在它自己的 `.sprawling/` 里。城是 `<city>/.sprawling/`（今天已然），楼是 `<building>/.sprawling/`，房间是 `<building>/<room>/.sprawling/`。城的现行布局因此不是特例，而是同一条规则在根 scope 上的实例。
 - **失效关闭，只会拒绝得更多**：改后 `is_reserved` 对任何含 `.sprawling` 段的地址答真，`WriteDomain::new` 与 `admits` 两处因此同时收紧。今天库里没有任何代码造得出嵌套的 `.sprawling` 路径，故本改动在行为上是空的，只把不变式先立起来。
@@ -1487,7 +1492,7 @@ memory::jsonl／memory::cas／runtime::replay／runtime::fork／citysim 全部�
 
 ## 16 测试与约束
 
-- 单测（各模块文件内 `#[cfg(test)]`，测试模块头挂放宽 allow）：serde 拼写对拍（as_str×serde×表）；EventKind 计数 55／in-window 计数 8（以 `ALL` 数）；carrier 全映射非重复覆盖 35；构造子不变量（refusal 三段在场、failure 无 gate、retriable 默认 false）；Payload 拒浮点（含嵌套）；Address/Locator 拒绝面正反例；Seq/Version checked 溢出；IdemKey 版本字节在场。
+- 单测（各模块文件内 `#[cfg(test)]`，测试模块头挂放宽 allow）：serde 拼写对拍（as_str×serde×表）；EventKind 计数与 in-window 计数（以 `ALL` 数）；carrier 全映射非重复覆盖 35；构造子不变量（refusal 三段在场、failure 无 gate、retriable 默认 false）；Payload 拒浮点（含嵌套）；Address/Locator 拒绝面正反例；Seq/Version checked 溢出；IdemKey 版本字节在场。
 - proptest：`Address::parse` 往返与 `is_within` 自反/传递/反对称；`Locator` Display↔parse 往返；`IdemKey` 重算恒等＋近旁输入不等样例；`Payload` 任意整数树恒过、含浮点树恒拒。
 - golden（insta）：创世行＋一条 `building_created` 的 `canonical_line` 字节。
 - conformance：对一个最小内存实现自证可跑；citysim 实现二证。

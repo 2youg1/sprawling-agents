@@ -274,11 +274,11 @@ pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
 pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
 pub const kernel::AxCode::ALL: [kernel::AxCode; 36]
 pub const kernel::AxCode::ALL: [kernel::AxCode; 36]
-pub const kernel::DOORS: [kernel::gate::DoorId; 7]
+pub const kernel::DOORS: [kernel::gate::DoorId; 8]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 67]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 67]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 72]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 72]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::IDEM_DERIVE_V: u8
 pub const kernel::MEMO_OUTLINE_FIELDS: [&str; 6]
@@ -328,7 +328,7 @@ pub const kernel::consts_policy::SANDBOX_FUEL_DEFAULT: u64
 pub const kernel::consts_policy::SECRET_ENTROPY_MIN: kernel::consts_policy::Ratio
 pub const kernel::consts_policy::STARTUP_BUDGET_TOKENS: u64
 pub const kernel::consts_policy::WORKTREE_MAX_BYTES: u64
-pub const kernel::gate::DOORS: [kernel::gate::DoorId; 7]
+pub const kernel::gate::DOORS: [kernel::gate::DoorId; 8]
 pub const kernel::idem::IDEM_DERIVE_V: u8
 pub const kernel::layout::ARCHIVE_DIR: &str
 pub const kernel::layout::BUILDING_SHELF: &str
@@ -339,6 +339,7 @@ pub const kernel::layout::HANDOFF_FILE: &str
 pub const kernel::layout::JOB_FILE: &str
 pub const kernel::layout::LEDGER_DIR: &str
 pub const kernel::layout::LIBRARY_DIR: &str
+pub const kernel::layout::SESSIONS_DIR: &str
 pub const kernel::layout::URBANITE_FILE: &str
 pub const kernel::ledger::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::node_id::NODE_DEPTH_MAX: usize
@@ -352,6 +353,10 @@ pub const kernel::spine::MEMO_OUTLINE_FIELDS: [&str; 6]
 pub const kernel::spine::ROADMAP_COLUMNS: usize
 pub const kernel::spine::ROADMAP_FILE: &str
 pub const kernel::spine::ROADMAP_STATUS_SPELLINGS: [(kernel::RoadmapStatus, &str); 5]
+pub const kernel::tool::ToolName::BROWSER: &'static str
+pub const kernel::tool::ToolName::BROWSER: &'static str
+pub const kernel::tool::ToolName::USER_BROWSER: &'static str
+pub const kernel::tool::ToolName::USER_BROWSER: &'static str
 pub const kernel::version::Version::FIRST: kernel::version::Version
 pub const kernel::version::Version::FIRST: kernel::version::Version
 pub enum kernel::Admission
@@ -387,6 +392,7 @@ pub enum kernel::EventKind
 pub enum kernel::EvidenceCell
 pub enum kernel::ExecArm
 pub enum kernel::GateOutcome
+pub enum kernel::GateSubject
 pub enum kernel::GoalResource
 pub enum kernel::GoalVerdict
 pub enum kernel::How
@@ -457,6 +463,9 @@ pub enum kernel::event::Scope
 pub enum kernel::event::Who
 pub enum kernel::event::WindowClass
 pub enum kernel::event::record::Admittance
+pub enum kernel::event::record::AdviserAnswer
+pub enum kernel::event::record::AdviserAsk
+pub enum kernel::event::record::AdviserFailure
 pub enum kernel::event::record::CheckpointCommitted
 pub enum kernel::event::record::SkipReason
 pub enum kernel::event::record::ToolAnswer
@@ -501,6 +510,7 @@ pub enum kernel::stall::StallVerdict
 pub enum kernel::tool::CostTier
 pub enum kernel::tool::Effect
 pub enum kernel::tool::ExecArm
+pub enum kernel::tool::GateSubject
 pub enum kernel::tool::RenderIntent
 pub enum kernel::tool::Temporal
 pub enum kernel::version::VersionVerdict
@@ -706,6 +716,7 @@ pub fn kernel::TimeMs::value(&self) -> u64
 pub fn kernel::TimeMs::value(&self) -> u64
 pub fn kernel::Tool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::AxError>
 pub fn kernel::Tool::meta(&self) -> &kernel::tool::ToolMeta
+pub fn kernel::Tool::subject(&self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::GateSubject, kernel::AxError>
 pub fn kernel::Window::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::Window::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::address::Address::as_str(&self) -> &str
@@ -805,13 +816,16 @@ pub fn kernel::event::record::autonomy_word::read(&str) -> core::result::Result<
 pub fn kernel::event::record::autonomy_word::spell(&kernel::approval::Autonomy) -> alloc::string::String
 pub fn kernel::gate::DoorId::as_str(self) -> &'static str
 pub fn kernel::gate::DoorId::as_str(self) -> &'static str
+pub fn kernel::gate::attach(core::option::Option<&kernel::EgressTarget>) -> kernel::gate::GateOutcome
 pub fn kernel::gate::discard(&kernel::DiscardRequest, &str) -> kernel::gate::GateOutcome
 pub fn kernel::gate::domain(&kernel::write_domain::WriteDomain, &kernel::address::Address, &kernel::taint::TaintSet) -> kernel::gate::GateOutcome
 pub fn kernel::gate::egress(&[kernel::SecretSpan], &kernel::EgressTarget, bool) -> kernel::EgressOutcome
 pub fn kernel::gate::egress_target(&kernel::EgressAllowlist, &kernel::EgressTarget) -> kernel::EgressOutcome
+pub fn kernel::gate::host_of(&str) -> core::result::Result<core::option::Option<alloc::string::String>, kernel::AxError>
 pub fn kernel::gate::reach(&kernel::write_domain::WriteDomain, &kernel::address::Address, &kernel::taint::TaintSet) -> kernel::gate::GateOutcome
 pub fn kernel::gate::reaches_the_undoable(&kernel::ConnectorCall<'_>) -> bool
 pub fn kernel::gate::spawn(kernel::delegation::Depth, &kernel::delegation::DelegateKind) -> kernel::gate::GateOutcome
+pub fn kernel::gate::target_of(&str) -> kernel::EgressTarget
 pub fn kernel::gate::undoable(&kernel::ConnectorCall<'_>, &kernel::config::SandboxLimits, &kernel::taint::TaintSet) -> kernel::gate::GateOutcome
 pub fn kernel::goal::GoalId::as_str(&self) -> &str
 pub fn kernel::goal::GoalId::as_str(&self) -> &str
@@ -835,17 +849,21 @@ pub fn kernel::idem::claim(&mut alloc::collections::btree::set::BTreeSet<kernel:
 pub fn kernel::layout::CityLayout::archive(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::building_skills(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::cas(&self) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::city_address(&self) -> core::option::Option<kernel::address::Address>
 pub fn kernel::layout::CityLayout::city_config(&self) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::city_filters(&self) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::config(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::filters(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::handoff(&self, &kernel::address::Address) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::is_session_projection(&std::path::Path) -> bool
 pub fn kernel::layout::CityLayout::job(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::ledger(&self) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::library(&self) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::new(&std::path::Path) -> Self
+pub fn kernel::layout::CityLayout::of_ledger(&std::path::Path) -> core::option::Option<kernel::layout::CityLayout>
 pub fn kernel::layout::CityLayout::root(&self) -> &std::path::Path
 pub fn kernel::layout::CityLayout::scope(&self, &kernel::address::Address) -> std::path::PathBuf
+pub fn kernel::layout::CityLayout::session_slice(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::urbanite(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::ledger::Ledger::append(&mut self, kernel::EventDraft) -> core::result::Result<kernel::EventRef, kernel::AxError>
 pub fn kernel::ledger::Ledger::append_all(&mut self, alloc::vec::Vec<kernel::EventDraft>) -> core::result::Result<alloc::vec::Vec<kernel::EventRef>, kernel::AxError>
@@ -1031,6 +1049,7 @@ pub fn kernel::tool::ServerLabel::try_from(alloc::string::String) -> core::resul
 pub fn kernel::tool::ServerLabel::try_from(alloc::string::String) -> core::result::Result<kernel::tool::ServerLabel, kernel::AxError>
 pub fn kernel::tool::Tool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::AxError>
 pub fn kernel::tool::Tool::meta(&self) -> &kernel::tool::ToolMeta
+pub fn kernel::tool::Tool::subject(&self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::GateSubject, kernel::AxError>
 pub fn kernel::tool::ToolCall::action(&self) -> core::result::Result<alloc::vec::Vec<u8>, kernel::AxError>
 pub fn kernel::tool::ToolCall::action(&self) -> core::result::Result<alloc::vec::Vec<u8>, kernel::AxError>
 pub fn kernel::tool::ToolName::as_str(&self) -> &str
@@ -1211,6 +1230,7 @@ pub kernel::DomainVerdict::NotWritable::reason: kernel::write_domain::DocumentRe
 pub kernel::DomainVerdict::Outside
 pub kernel::DomainVerdict::Outside::prefixes: alloc::vec::Vec<alloc::string::String>
 pub kernel::DomainVerdict::Within
+pub kernel::DoorId::Attach
 pub kernel::DoorId::Discard
 pub kernel::DoorId::Domain
 pub kernel::DoorId::Egress
@@ -1223,6 +1243,8 @@ pub kernel::EditSample::run: kernel::RunId
 pub kernel::EditWarVerdict::Calm
 pub kernel::EditWarVerdict::Freeze
 pub kernel::EditWarVerdict::Freeze::addr: kernel::address::Address
+pub kernel::Effect::AttachUserBrowser
+pub kernel::Effect::AttachUserBrowser::address: core::option::Option<alloc::string::String>
 pub kernel::Effect::Connector
 pub kernel::Effect::Connector::label: kernel::tool::ServerLabel
 pub kernel::Effect::Egress
@@ -1255,6 +1277,9 @@ pub kernel::EventDraft::kind: kernel::EventKind
 pub kernel::EventDraft::run: kernel::RunId
 pub kernel::EventDraft::t: kernel::TimeMs
 pub kernel::EventDraft::who: alloc::string::String
+pub kernel::EventKind::AdviserAnswered
+pub kernel::EventKind::AdviserAsked
+pub kernel::EventKind::AdviserFellBack
 pub kernel::EventKind::ApprovalRequested
 pub kernel::EventKind::ApprovalResolved
 pub kernel::EventKind::ArbitrationVerdict
@@ -1274,6 +1299,7 @@ pub kernel::EventKind::DigestInvalidated
 pub kernel::EventKind::DiscardRestored
 pub kernel::EventKind::DraftHeld
 pub kernel::EventKind::DraftResolved
+pub kernel::EventKind::EmbeddingCalled
 pub kernel::EventKind::EndpointAttached
 pub kernel::EventKind::EndpointLost
 pub kernel::EventKind::EndpointProbed
@@ -1300,6 +1326,7 @@ pub kernel::EventKind::ProviderDegraded
 pub kernel::EventKind::PursuitChanged
 pub kernel::EventKind::RepairReused
 pub kernel::EventKind::RepairStarted
+pub kernel::EventKind::RerankCalled
 pub kernel::EventKind::ResultOffloaded
 pub kernel::EventKind::RoadmapBlocked
 pub kernel::EventKind::RoadmapClaimed
@@ -1342,8 +1369,15 @@ pub kernel::FrozenConfig::effort: core::option::Option<kernel::Effort>
 pub kernel::FrozenConfig::mcp: alloc::vec::Vec<kernel::config::McpServer>
 pub kernel::FrozenConfig::sandbox: kernel::config::SandboxLimits
 pub kernel::GateOutcome::Allow
+pub kernel::GateOutcome::Ask
+pub kernel::GateOutcome::Ask::question: alloc::boxed::Box<kernel::AxError>
 pub kernel::GateOutcome::Deny
 pub kernel::GateOutcome::Deny::refusal: alloc::boxed::Box<kernel::AxError>
+pub kernel::GateSubject::Area(kernel::address::Address)
+pub kernel::GateSubject::Host(alloc::string::String)
+pub kernel::GateSubject::None
+pub kernel::GateSubject::Room(kernel::address::Address)
+pub kernel::GateSubject::Scope(alloc::string::String)
 pub kernel::GoalEntry::id: kernel::goal::GoalId
 pub kernel::GoalEntry::owner: alloc::string::String
 pub kernel::GoalEntry::resources: alloc::vec::Vec<kernel::goal::GoalResource>
@@ -1757,6 +1791,9 @@ pub kernel::event::EventDraft::kind: kernel::EventKind
 pub kernel::event::EventDraft::run: kernel::RunId
 pub kernel::event::EventDraft::t: kernel::TimeMs
 pub kernel::event::EventDraft::who: alloc::string::String
+pub kernel::event::EventKind::AdviserAnswered
+pub kernel::event::EventKind::AdviserAsked
+pub kernel::event::EventKind::AdviserFellBack
 pub kernel::event::EventKind::ApprovalRequested
 pub kernel::event::EventKind::ApprovalResolved
 pub kernel::event::EventKind::ArbitrationVerdict
@@ -1776,6 +1813,7 @@ pub kernel::event::EventKind::DigestInvalidated
 pub kernel::event::EventKind::DiscardRestored
 pub kernel::event::EventKind::DraftHeld
 pub kernel::event::EventKind::DraftResolved
+pub kernel::event::EventKind::EmbeddingCalled
 pub kernel::event::EventKind::EndpointAttached
 pub kernel::event::EventKind::EndpointLost
 pub kernel::event::EventKind::EndpointProbed
@@ -1802,6 +1840,7 @@ pub kernel::event::EventKind::ProviderDegraded
 pub kernel::event::EventKind::PursuitChanged
 pub kernel::event::EventKind::RepairReused
 pub kernel::event::EventKind::RepairStarted
+pub kernel::event::EventKind::RerankCalled
 pub kernel::event::EventKind::ResultOffloaded
 pub kernel::event::EventKind::RoadmapBlocked
 pub kernel::event::EventKind::RoadmapClaimed
@@ -1834,6 +1873,26 @@ pub kernel::event::WindowClass::InWindow
 pub kernel::event::WindowClass::RecordOnly
 pub kernel::event::record::Admittance::Halted
 pub kernel::event::record::Admittance::Released
+pub kernel::event::record::AdviserAnswer::Choice
+pub kernel::event::record::AdviserAnswer::Choice::chosen: alloc::string::String
+pub kernel::event::record::AdviserAnswer::Noul
+pub kernel::event::record::AdviserAnswer::Noul::confidence_bp: u16
+pub kernel::event::record::AdviserAnswer::Noul::keep: bool
+pub kernel::event::record::AdviserAnswer::Score
+pub kernel::event::record::AdviserAnswer::Score::score_bp: u16
+pub kernel::event::record::AdviserAnswered::answer: kernel::event::record::AdviserAnswer
+pub kernel::event::record::AdviserAnswered::elapsed_ms: u64
+pub kernel::event::record::AdviserAnswered::subject: alloc::string::String
+pub kernel::event::record::AdviserAsk::Choice
+pub kernel::event::record::AdviserAsk::Noul
+pub kernel::event::record::AdviserAsk::Score
+pub kernel::event::record::AdviserAsked::ask: kernel::event::record::AdviserAsk
+pub kernel::event::record::AdviserAsked::subject: alloc::string::String
+pub kernel::event::record::AdviserFailure::Timeout
+pub kernel::event::record::AdviserFailure::Unavailable
+pub kernel::event::record::AdviserFailure::Unreadable
+pub kernel::event::record::AdviserFellBack::reason: kernel::event::record::AdviserFailure
+pub kernel::event::record::AdviserFellBack::subject: alloc::string::String
 pub kernel::event::record::ApprovalResolved::cluster: kernel::approval::ClusterKey
 pub kernel::event::record::ApprovalResolved::id: kernel::approval::ApprovalId
 pub kernel::event::record::ApprovalResolved::verdict: kernel::approval::Ruling
@@ -1851,6 +1910,11 @@ pub kernel::event::record::Commit::scope: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::CommitAttribution::effort: core::option::Option<kernel::Effort>
 pub kernel::event::record::CommitAttribution::model: alloc::string::String
 pub kernel::event::record::CommitAttribution::predecessor: core::option::Option<kernel::RunId>
+pub kernel::event::record::EmbeddingCalled::dimensions: core::option::Option<u64>
+pub kernel::event::record::EmbeddingCalled::inputs: u64
+pub kernel::event::record::EmbeddingCalled::model: alloc::string::String
+pub kernel::event::record::EmbeddingCalled::prompt_tokens: core::option::Option<kernel::budget::Tokens>
+pub kernel::event::record::EmbeddingCalled::vectors: u64
 pub kernel::event::record::EvidenceCite::kind: kernel::EventKind
 pub kernel::event::record::EvidenceCite::seq: kernel::Seq
 pub kernel::event::record::GovernedDocumentWritten::bytes: usize
@@ -1876,6 +1940,10 @@ pub kernel::event::record::PromptSource::addr: kernel::address::Address
 pub kernel::event::record::PromptSource::dropped: u64
 pub kernel::event::record::PromptSource::kept: u64
 pub kernel::event::record::PromptSource::marker: bool
+pub kernel::event::record::RerankCalled::model: alloc::string::String
+pub kernel::event::record::RerankCalled::passages: u64
+pub kernel::event::record::RerankCalled::prompt_tokens: core::option::Option<kernel::budget::Tokens>
+pub kernel::event::record::RerankCalled::ranks: u64
 pub kernel::event::record::RunForked::at_seq: kernel::Seq
 pub kernel::event::record::RunForked::from: kernel::RunId
 pub kernel::event::record::RunFrozen::completion: alloc::string::String
@@ -1906,6 +1974,7 @@ pub kernel::event::record::ToolResult::name: kernel::tool::ToolName
 pub kernel::event::record::ToolResult::tool_use_id: alloc::string::String
 pub kernel::gate::ConnectorCall::label: &'a kernel::tool::ServerLabel
 pub kernel::gate::ConnectorCall::tool: &'a kernel::tool::ToolName
+pub kernel::gate::DoorId::Attach
 pub kernel::gate::DoorId::Discard
 pub kernel::gate::DoorId::Domain
 pub kernel::gate::DoorId::Egress
@@ -1924,6 +1993,8 @@ pub kernel::gate::EgressTarget::Private
 pub kernel::gate::EgressTarget::Public
 pub kernel::gate::EgressTarget::Public::host: alloc::string::String
 pub kernel::gate::GateOutcome::Allow
+pub kernel::gate::GateOutcome::Ask
+pub kernel::gate::GateOutcome::Ask::question: alloc::boxed::Box<kernel::AxError>
 pub kernel::gate::GateOutcome::Deny
 pub kernel::gate::GateOutcome::Deny::refusal: alloc::boxed::Box<kernel::AxError>
 pub kernel::goal::GoalEntry::id: kernel::goal::GoalId
@@ -2143,6 +2214,8 @@ pub kernel::stall::StallVerdict::Stall::repeats: u32
 pub kernel::tool::CostTier::Free
 pub kernel::tool::CostTier::Heavy
 pub kernel::tool::CostTier::Light
+pub kernel::tool::Effect::AttachUserBrowser
+pub kernel::tool::Effect::AttachUserBrowser::address: core::option::Option<alloc::string::String>
 pub kernel::tool::Effect::Connector
 pub kernel::tool::Effect::Connector::label: kernel::tool::ServerLabel
 pub kernel::tool::Effect::Egress
@@ -2159,6 +2232,11 @@ pub kernel::tool::ExecArm::Python
 pub kernel::tool::ExecArm::Python::code: alloc::string::String
 pub kernel::tool::ExecArm::Shell
 pub kernel::tool::ExecArm::Shell::text: alloc::string::String
+pub kernel::tool::GateSubject::Area(kernel::address::Address)
+pub kernel::tool::GateSubject::Host(alloc::string::String)
+pub kernel::tool::GateSubject::None
+pub kernel::tool::GateSubject::Room(kernel::address::Address)
+pub kernel::tool::GateSubject::Scope(alloc::string::String)
 pub kernel::tool::RenderIntent::Diff
 pub kernel::tool::RenderIntent::Diff::locations: alloc::vec::Vec<kernel::address::Address>
 pub kernel::tool::RenderIntent::Generic
@@ -2366,11 +2444,15 @@ pub struct kernel::event::Payload(_)
 pub struct kernel::event::RunId(_)
 pub struct kernel::event::Seq(_)
 pub struct kernel::event::TimeMs(_)
+pub struct kernel::event::record::AdviserAnswered
+pub struct kernel::event::record::AdviserAsked
+pub struct kernel::event::record::AdviserFellBack
 pub struct kernel::event::record::ApprovalResolved
 pub struct kernel::event::record::AutonomyChanged
 pub struct kernel::event::record::CityHalted
 pub struct kernel::event::record::Commit
 pub struct kernel::event::record::CommitAttribution
+pub struct kernel::event::record::EmbeddingCalled
 pub struct kernel::event::record::EvidenceCite
 pub struct kernel::event::record::GovernedDocumentWritten
 pub struct kernel::event::record::LogTruncated
@@ -2380,6 +2462,7 @@ pub struct kernel::event::record::PromptAssembled
 pub struct kernel::event::record::PromptSegment
 pub struct kernel::event::record::PromptSkip
 pub struct kernel::event::record::PromptSource
+pub struct kernel::event::record::RerankCalled
 pub struct kernel::event::record::RunForked
 pub struct kernel::event::record::RunFrozen
 pub struct kernel::event::record::RunStarted

@@ -79,7 +79,12 @@ impl Dossier { pub fn apply(&mut self, who: &str, record: &EventRecord); pub fn 
 pub const RULES_FILE: &str = "RULES.toml";
 pub enum ModelPool { Any, LocalOnly }                 // 穷尽，不是 bool
 pub enum UserBrowser { Waiting, At(UserBrowserEndpoint) }   // `usersbrowser` 三种读法里去两种
-pub struct UserBrowserEndpoint { /* url、host —— 私有；parse 是唯一构造点 */ }
+pub struct UserBrowserEndpoint { /* url、host —— 私有 */ }
+impl UserBrowserEndpoint {
+    pub fn parse(raw: &str) -> Result<UserBrowserEndpoint, AxError>;   // 唯一构造点
+    pub fn url(&self) -> &str;
+    pub fn host(&self) -> &str;
+}
 pub struct BuildingRules { /* addr、policy、write_prefixes、browser、usersbrowser —— 私有 */ }
 impl BuildingRules {
     pub fn policy(&self) -> &BuildingPolicy;          // 随每次模型调用出行
@@ -93,17 +98,17 @@ pub fn write_rules(city_root: &Path, addr: &Address, text: &str) -> Result<Build
 pub fn rules_path(city_root: &Path, addr: &Address) -> PathBuf;
 ```
 
-- **规则是一份 TOML，散文没有另起一份文件**：这份文件先前是 Markdown，读者在**任意一行**上匹配 `confidential:`／`write:`／`review:`／`browser:`／`usersbrowser:`／`desktop:`，于是「How work is done here」里一句以 `desktop: true` 开头的话就授予了宿主机的桌面，而一栋没写 `write:` 的楼落到 `Everything`。两处都朝宽松的一侧失败，那是权限读者唯一不许失败的方向。改成 TOML 之后键只在文法给出键的位置成立，`deny_unknown_fields` 让拼错成为一条消息而不是一次静默缺席，`confidential` 与 `write` 都不再有缺省。**散文留在同一份文件里**，作 `does` 与 `conventions` 两个键：拆成两份文档同样能关掉撞键，代价是一栋楼有两种说法且可以互相矛盾。居民拿到的就是这份文件本身的字节，所以城判定的与 agent 读到的是同一串。
+- **规则是一份 TOML，散文没有另起一份文件**：这份文件先前是 Markdown，读者在**任意一行**上匹配 `confidential:`／`write:`／`review:`／`browser:`／`usersbrowser:`／`desktop:`，于是「How work is done here」里一句以 `desktop = true` 开头的话就授予了宿主机的桌面，而一栋没写 `write:` 的楼落到 `Everything`。两处都朝宽松的一侧失败，那是权限读者唯一不许失败的方向。改成 TOML 之后键只在文法给出键的位置成立，`deny_unknown_fields` 让拼错成为一条消息而不是一次静默缺席，`confidential` 与 `write` 都不再有缺省。**散文留在同一份文件里**，作 `does` 与 `conventions` 两个键：拆成两份文档同样能关掉撞键，代价是一栋楼有两种说法且可以互相矛盾。居民拿到的就是这份文件本身的字节，所以城判定的与 agent 读到的是同一串。
 
 - **confidential 三条各有其守处**：模型池锁本地由 `gateway::endpoint` **在会泄漏的那一端**拒（`req.policy.confidential` 即拒，携三段式）；写域止于本楼子树由 `write_domain()` 在构造点拒；数据可入不可出归出网门。**把兜底放在会出事的那一层**，路由错了仍然拦得住。
 - **没有 RULES.toml 是普通楼；有而不声明是错误**：把隐私设置的默认值悄悄取成宽松的那一边，正是这整个面存在的理由。拼写不是 `true`／`false` 同样拒——读起来像笔误的隐私设置不得解析成许可。
 - **confidential 楼声明越界前缀＝拒而不裁剪**：静默裁剪会让文件说一套、城做另一套；拒绝会指出该改哪一行。
 - **无声明写域时默认只写本楼**：一栋楼至少能写自己，且不多。`prefixes` 里一条读不出的地址**传播而不跳过**——先前它被丢在读它的地方，于是一栋楼写得比人授予的少，而这件事没有任何一处说出来。
-- **`review: true` 是楼级开关**：开则每个 Run 得一棵自己的 worktree，写的东西在别人检查并 merge 之前对楼不可见。**默认关**，与 confidential 的「不声明即错」相反——隐私的默认值不得惄悄取宽，而审查纪律的默认值不得惄悄取严：一个人派一个 Agent 去改一行字并盯着看，应当看得到文件变化。拼写不是 `true`／`false` 同样拒。
+- **`review = true` 是楼级开关**：开则每个 Run 得一棵自己的 worktree，写的东西在别人检查并 merge 之前对楼不可见。**默认关**，与 confidential 的「不声明即错」相反——隐私的默认值不得惄悄取宽，而审查纪律的默认值不得惄悄取严：一个人派一个 Agent 去改一行字并盯着看，应当看得到文件变化。拼写不是 `true`／`false` 同样拒。
 - **`## Egress` 列可达域名**：`BuildingRules::egress()` 交 `kernel::egress_target` 判定。类型经 `kernel::EgressAllowlist` 重导出，住哪一簇文件是 kernel 内政（`gate::egress`，公共拼写不变）。**confidential 楼同时列域名＝矛盾，拒**——「数据可入不可出」是那个设置的含义，域名表写在它下面会逼读者自己去调和两句话。
 - **今天的执行点与仍缺的执行点要分清**：provider 路径已被 `endpoint` 的 confidential 拒守住；Agent 自己发起的出网（exec 的 Program／Shell 臂、浏览器）**没有可拦截处**，因为拦截需要 OS sandbox。判定已就位，拦截尚未落地——在那之前不要说「出网已管住」。
-- **`usersbrowser:` 一行同时是开关与地址**：值 `ws://127.0.0.1:<port>/session` 启用并声明地址，`true` 启用而地址未定（工具每次调用都得到门的问题），absent／`false` 即无此工具。**confidential 楼写这一行即拒**（`E_CONFIG_INVALID`）——附着读的是那个人浏览器里全部登录态，本楼的隔离在那一刻失效。地址的**语法**（`ws://`、主机形状）在此读一次并把 `url`／`host` 一起交出；**loopback 与否是 `kernel::gate::attach` 的政策**，语法不替政策作答。
-- **`browser:` 与 `usersbrowser:` 是两个键**：前者是城自己拉起的浏览器（profile 按楼隔离），后者是人已经开着的那个（人的真 profile）。`browser:` 不是 `usersbrowser:` 的前缀截断——读键时冒号必须紧跟键名，两个设置因此互不误读。
+- **`usersbrowser` 一键同时是开关与地址**：值 `"ws://127.0.0.1:<port>/session"` 启用并声明地址，`true` 启用而地址未定（工具每次调用都得到门的问题），absent／`false` 即无此工具。**confidential 楼写这一键即拒**（`E_CONFIG_INVALID`）——附着读的是那个人浏览器里全部登录态，本楼的隔离在那一刻失效。地址的**语法**（`ws://`、主机形状）在此读一次并把 `url`／`host` 一起交出；**loopback 与否是 `kernel::gate::attach` 的政策**，语法不替政策作答。
+- **`browser` 与 `usersbrowser` 是两个键**：前者是城自己拉起的浏览器（profile 按楼隔离），后者是人已经开着的那个（人的真 profile）。`browser` 不是 `usersbrowser` 的前缀截断——TOML 的键是文法给出的整体，两个设置因此互不误读。
 - **`write_rules` 先求值再落盘**：一份写到一半就不再求值的治理文档会把它那栋楼一起带走。且**整份文档才是单位**：confidential 楼不得列域名，故两行可以各自合法而合在一起非法。
 
 ### 8-2b city::rules_tool（形状 4 适配器）
@@ -160,11 +165,12 @@ pub fn configured_payload(building: &Building, wrote: Written)
 pub use kernel::layout::CONFIG_FILE;               // 文件名的权威在 kernel::layout
 pub enum Layer { City, Building, Resident }        // 穷尽三级，与 kernel::LayeredValue 同形
 pub fn path(city_root: &Path, addr: &Address, layer: Layer) -> Result<PathBuf, AxError>;
-pub struct ConfigLayer { /* model / effort / sandbox / mcp —— 私有 */ }
+pub struct ConfigLayer { /* model / effort / sandbox / mcp / shelves —— 私有 */ }
 impl ConfigLayer {
     pub fn parse(text: &str) -> Result<ConfigLayer, AxError>;   // 纯函数，无 I/O
-    pub fn model(&self) -> Option<&str>;                        // 本次会话选定的模型
+    pub fn model(&self) -> Option<&str>;                        // 这一级冻下的模型，照写下的读回
     pub fn effort(&self) -> Option<Effort>;
+    pub fn shelves(&self) -> Option<&[String]>;                 // 这一级声明挂载的外部书架目录
 }
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError>;
 pub fn own_layer(city_root: &Path, addr: &Address) -> Result<ConfigLayer, AxError>;
@@ -195,7 +201,7 @@ impl Ladder {
 - **文件名只有一份，层级由位置决定**：City 层住 `<city>/.sprawling/CONFIG.toml`（reserved prefix 内，因此任何 Resident 的写域都永远叠不上它——「Agent 改不了自己的配置」因此是判定而非推理）；Building 层住 `<city>/<building>/CONFIG.toml`；Resident 层住 `<city>/<addr>/CONFIG.toml`。三处同名，读者认一次就认得完。
 - **地址就是楼时只有两级**：`addr` 与它的 building 相同时，下两级指向同一个文件，只读一次并放在 Building 级。同一份文件在两级各算一次不改变结果，却会让读者以为它能覆盖自己。
 - **缺文件不是错，读不动才是**（同 `resident`）：未声明即每级 `None`，落到 `kernel::consts_policy` 的缺省；一份存在却读不出的配置报 `E_STORAGE_FATAL`。
-- **不认的键即拒**（`deny_unknown_fields`）：静默忽略一个拼错的键，会产生「我设了 effort 而什么也没发生」这个无从诊断的状态。今天只受理 `[model] name` 与 `[model] effort`；`[clock]` 等到它在真城里有消费者时再受理，在那之前写它得到的是一句拒绝而不是一份沉默。
+- **不认的键即拒**（`deny_unknown_fields`）：静默忽略一个拼错的键，会产生「我设了 effort 而什么也没发生」这个无从诊断的状态。本版读哪些键，由 `ConfigFile` 的字段给出，此处不复述；`[clock]` 等到它在真城里有消费者时再受理，在那之前写它得到的是一句拒绝而不是一份沉默。
 - **梯子不在本模块重建**：下层胜上层由 `kernel::LayeredValue::resolve` 给，冻结由 `kernel::freeze` 给；本模块只回答「哪三份文件、怎么读」。一条规则一个权威。
 - **effort 属 `FrozenConfig` 而非 `LiveConfig`**：改它会作废 message cache breakpoints，因此改动只影响下一个 Run（理由已写在 `kernel::config`，此处不重述只遵守）。
 
@@ -299,7 +305,7 @@ pub use kernel::layout::{BUILDING_SHELF, LIBRARY_DIR};   // 住 reserved prefix 
 pub enum Shelf {
     Library(Address),
     Building(Address),
-    External { index: u8, path: String },
+    External { index: u32, path: String },
 }
 impl Shelf { pub fn address(&self) -> Option<&Address>; }
 pub struct Holding { pub name, pub section, pub disclosure, pub hash, pub shelf: Shelf }
@@ -561,7 +567,7 @@ bin 装配层的 prefix 组装随之改；`docs/templates/URBANITE.md` 是这份
 
 三条：身份两态各一条；**段字节跨两次加载稳定**；Dossier 只计本人的 Run 且跨 Run 累加。bin 侧另有一条端到端断言（两次 Dispatch 的 resident 段哈希相同、run 段不同）。
 
-建楼与配置八条：新建的楼被 `policy::load` 读回且 confidential 模板真的锁本地模型池｜二次出生恒拒｜reserved prefix 下建楼恒拒｜房间地址建楼恒拒且拒词指出该建哪栋｜下层配置盖上层｜不认的键即拒｜**写在 `CONFIG.toml` 里的 effort 出现在真实出线请求体里**（bin 侧端到端，假 provider 录下请求体）｜**`usersbrowser:` 的三种值各读回各的形状，`browser:` 与它互不影响，confidential 楼写它即拒**。
+建楼与配置八条：新建的楼被 `policy::load` 读回且 confidential 模板真的锁本地模型池｜二次出生恒拒｜reserved prefix 下建楼恒拒｜房间地址建楼恒拒且拒词指出该建哪栋｜下层配置盖上层｜不认的键即拒｜**写在 `CONFIG.toml` 里的 effort 出现在真实出线请求体里**（bin 侧端到端，假 provider 录下请求体）｜**`usersbrowser` 的三种值各读回各的形状，`browser` 与它互不影响，confidential 楼写它即拒**。
 
 邻里名册六条：扫到的名册**不含我自己**且有人的与空的各自落在对的臂上｜`## Bring them` 在场时取它、缺席时退回第一段正文且跳过标题与引文｜同一座城扫两次字节相同（`read_dir` 序不得泄漏到答案里）｜`scope=city` 只交出楼名、不交出任何住户｜`.sprawling` 与 archive 目录都不是房间｜**模板仍然带着 `## Bring them` 这一节**（对 `docs/templates/URBANITE.md` 的 `include_str!` 断言；模板改名而代码不改，就是一份永远退回正文的名册）。
 
@@ -663,7 +669,7 @@ impl CityPlan { pub fn hall(&self) -> &(Address, BuildingTemplate); }   // 恒�
 - **为什么 `hall` 在 `CityPlan` 里是恒存在的字段而不是 `Option`**：一座没有 City Hall 的城市不是这个版本能形成的东西。可选性会让「城市有没有市政厅」变成调用点每次都要答一遍的问题，而它只有一个答案。
 - **两份身份文件住 `<city>/.sprawling/`**：写域碰不到保留子树，所以 Mayor 改不了自己是谁，clerk 改不了自己按什么答。这是 `URBANITE.md` 住在居民自己地址下时拿不到的性质，也是这两位与普通居民唯一的结构差别。
 - **路径权威仍只有一个**：`city::resident::urbanite_path` 先问 `spine_files::hall_identity_path`，无答再拼 `<addr>/URBANITE.md`。`Identity::load` 一字不改，因此「有身份文件即居民」这条规则对市政厅与对普通房间是同一条。
-- `write: documents` 由 `policy::evaluate` 读成 `DomainReach`；缺这一行读作 `Everything`，因为既有的每一栋楼都没写这一行，而它们的写域没有变。值既不是 `everything` 也不是 `documents` 时拒绝，理由与 `confidential:` 同：读成打字错误的权限设置不能落到宽松那一侧。
+- `write = "documents"` 由 `policy::evaluate` 读成 `DomainReach`；**缺这一键即拒**，与 `confidential` 同——先前它读作 `Everything`，于是没见过这个设置的人得到最宽的那一档。值既不是 `everything` 也不是 `documents` 时同样拒绝：读成打字错误的权限设置不能落到宽松那一侧。
 - 被否：给 Mayor 一个覆盖全城的 `Everything` 写域，靠 `MAYOR.md` 的措辞请它别碰代码——把不变量交给提示词，等于没有不变量。
 
 ### 8-21 city::gitignore：一栋楼承诺的东西进历史，一次会话在想的东西不进
@@ -747,7 +753,7 @@ pub fn write_governed(city_root: &Path, which: Governed, body: &str) -> Result<P
 - **整份覆写**：这是人在一个框里编辑、按一次保存的文件，写一半会让这座城被半句话治理。旧内容不留在这里——账本上那行 `governed_document_written` 才是回头看的地方。
 - **枚举而不是文件名字符串**：文件名是城的答案，不是发帧的人的答案（channels-SPEC §8-19 同一条理由，两侧各说一次）。
 
-### 8-25 `desktop:`：这栋楼把桌面交出去了吗（`policy` 内，形状 1 判定）
+### 8-25 `desktop`：这栋楼把桌面交出去了吗（`policy` 内，形状 1 判定）
 
 `RULES.toml` 多一位开关，读法与 `browser` 逐字同形：
 
@@ -757,7 +763,7 @@ impl BuildingRules {
 }
 ```
 
-- **缺省是关，与 `browser:` 同、与 `confidential:` 反**。分野是两者各自往哪一侧失手：把隐私设置读成宽松那一侧是一次事故，而少给一件工具只是少一件工具。桌面比浏览器更该守这一条——`desktop.act` 会在这个人自己的机器上按下按键，而按下去的东西没有 restoration。
+- **缺省是关，与 `browser` 同、与 `confidential` 反**。分野是两者各自往哪一侧失手：把隐私设置读成宽松那一侧是一次事故，而少给一件工具只是少一件工具。桌面比浏览器更该守这一条——`desktop.act` 会在这个人自己的机器上按下按键，而按下去的东西没有 restoration。
 - **机密楼恒不给桌面**，理由与 `browser` 那条同构而更强：一台桌面上有别的程序、别的窗口、一整块剪贴板，`desktop.screenshot` 读到的东西没有一样是这栋楼的。「数据可入不可出」与「这栋楼可以截屏运行中的机器」是同一句话的两半，不能同时为真，故在 `evaluate` 里即拒，`E_CONFIG_INVALID`，拒词指出删哪一行。
 - **它开的是「准不准接」，不是「准不准做」。**准不准做归 `DESKTOP.toml`，那是 server 那一侧、按窗口逐条写的 allowlist（`desktop/desktop-SPEC.md` §8-4）。两道门叠着，且**次序固定**：楼说不，连进程都不起；楼说是，仍要那份 allowlist 逐窗口点头。一道门管「这栋楼是干这个的吗」，另一道管「运行中的机器上的哪几个窗口」，把它们合成一道都会让其中一个问题没人问。
 
