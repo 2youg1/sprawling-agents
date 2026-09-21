@@ -35,7 +35,8 @@ use crate::answer::Answer;
 use crate::assets::ClientAssets;
 use crate::command::{Command, WireCommand};
 use crate::reception::{
-    Admission, Door, EnrollVerdict, Pairing, decide_admission, decide_enroll, offered_pairing,
+    Admission, BindFace, Door, EnrollVerdict, Pairing, decide_admission, decide_enroll,
+    offered_pairing,
 };
 use crate::wire::Query;
 
@@ -137,7 +138,14 @@ pub(crate) struct ShellState {
     pub(crate) secrets: SecretSink,
     pub(crate) acp: AcpSink,
     pub(crate) transcribe_sink: TranscribeSink,
-    pub(crate) token_digest: Option<B3Hash>,
+    /// Which face this listener presents, and the credential it demands.
+    /// The value comes from [`decide_bind`] and is the only thing any
+    /// door reads to judge a caller: a shell that held the configured
+    /// digest beside a separate idea of the face could serve an exposed
+    /// one with nothing to demand.
+    ///
+    /// [`decide_bind`]: crate::reception::decide_bind
+    pub(crate) face: BindFace,
     pub(crate) city: Option<Address>,
 }
 
@@ -180,7 +188,11 @@ pub struct EnrollBody {
 
 /// Builds the route table. Split from `serve` so a test can exercise the
 /// routes over an in-process transport without owning a port.
-pub fn router(config: &ServeConfig) -> Router {
+///
+/// `face` is the binding verdict's, so the credential every door judges
+/// against is decided once, before the socket exists, and cannot differ
+/// from the face the listener presents.
+pub fn router(config: &ServeConfig, face: BindFace) -> Router {
     let state = Arc::new(ShellState {
         client: Arc::clone(&config.client),
         commands: Arc::clone(&config.commands),
@@ -191,7 +203,7 @@ pub fn router(config: &ServeConfig) -> Router {
         secrets: Arc::clone(&config.secrets),
         acp: Arc::clone(&config.acp),
         transcribe_sink: Arc::clone(&config.transcribe_sink),
-        token_digest: config.token_digest,
+        face,
         city: config.city.clone(),
     });
     Router::new()
@@ -241,7 +253,7 @@ async fn admit_request(
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok());
-    match decide_admission(door, offered_pairing(offered), state.token_digest.as_ref()) {
+    match decide_admission(door, offered_pairing(offered), &state.face) {
         Admission::Admit(Pairing::Held | Pairing::Absent) => next.run(request).await,
         Admission::Refuse(err) => (StatusCode::FORBIDDEN, refusal_text(&err)).into_response(),
     }
@@ -306,7 +318,7 @@ async fn accept_enrolment(
         loop {
             tokio::select! {
                 refusal = refusals.recv(), if refusal_possible => match refusal {
-                    Some(err) => return Some(Enrolled::Refused(err)),
+                    Some(err) => return Waited::Settled(Enrolled::Refused(err)),
                     None => refusal_possible = false,
                 },
                 record = records.recv() => match record {
@@ -319,28 +331,30 @@ async fn accept_enrolment(
                                 .and_then(serde_json::Value::as_str)
                                 == Some(wanted.as_str())
                         {
-                            return Some(Enrolled::Stored);
+                            return Waited::Settled(Enrolled::Stored);
                         }
                     }
-                    // Lagged means this task missed records, not that the
-                    // enrolment failed; the loop keeps waiting and the
-                    // timeout below is what ends it.
-                    Err(broadcast::error::RecvError::Lagged(_)) => {}
-                    Err(broadcast::error::RecvError::Closed) => return None,
+                    // This request was overtaken: the record that says what
+                    // became of the credential may be among the ones the
+                    // subscription skipped, and a skipped record is not
+                    // sent again. Waiting for the patience to run out would
+                    // only delay an answer this wait can no longer give.
+                    Err(broadcast::error::RecvError::Lagged(_)) => return Waited::Overtaken,
+                    Err(broadcast::error::RecvError::Closed) => return Waited::Ended,
                 },
             }
         }
     })
     .await;
     match waited {
-        Ok(Some(Enrolled::Stored)) => (StatusCode::CREATED, reference).into_response(),
-        Ok(Some(Enrolled::Refused(err))) => {
+        Ok(Waited::Settled(Enrolled::Stored)) => (StatusCode::CREATED, reference).into_response(),
+        Ok(Waited::Settled(Enrolled::Refused(err))) => {
             (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response()
         }
-        // Neither arrived. Two-oh-two says so in the one word HTTP has
-        // for it, and the body says why rather than leaving the caller
-        // to read a status code as an outcome.
-        Ok(None) | Err(_) => (
+        // Nothing arrived inside the patience. Two-oh-two says so in the one
+        // word HTTP has for it, and the body says why rather than leaving the
+        // caller to read a status code as an outcome.
+        Err(_) => (
             StatusCode::ACCEPTED,
             format!(
                 "{reference} was handed to the city and it has not answered within {}s; the \
@@ -350,11 +364,48 @@ async fn accept_enrolment(
             ),
         )
             .into_response(),
+        // The event stream went past this request, which is a different
+        // fact and gets its own sentence: the city may have stored the
+        // credential and this server cannot say whether it did.
+        Ok(Waited::Overtaken) => (
+            StatusCode::ACCEPTED,
+            format!(
+                "{reference} was handed to the city, and this server's event stream moved past \
+                 the request before the vault said what became of it. Check whether the \
+                 reference resolves before sending the credential again"
+            ),
+        )
+            .into_response(),
+        // The stream ended outright, which says nothing about the credential
+        // either; the city is going down, or its writer is.
+        Ok(Waited::Ended) => (
+            StatusCode::ACCEPTED,
+            format!(
+                "{reference} was handed to the city, and the city's event stream ended before \
+                 the vault said what became of it. Check whether the reference resolves before \
+                 sending the credential again"
+            ),
+        )
+            .into_response(),
     }
 }
 
-/// What the city said about one enrolment. Two arms and a timeout, which
-/// is three answers, and the route gives each of them its own status.
+/// What the city said about one enrolment, or why the wait for it ended.
+///
+/// `Stored` and `Refused` are the two answers the worker gives; the other
+/// two are the ways this route stops waiting, and they are separate arms
+/// because they are separate facts: a stream that overtook the request may
+/// have carried the answer past unread, and a stream that ended never
+/// carried it at all.
+enum Waited {
+    Settled(Enrolled),
+    /// The event stream skipped records while this request waited.
+    Overtaken,
+    /// The event stream ended outright.
+    Ended,
+}
+
+/// What the city said about one enrolment.
 enum Enrolled {
     Stored,
     Refused(AxError),

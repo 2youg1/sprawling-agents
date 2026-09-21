@@ -73,8 +73,15 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
         }),
         city: None,
     };
+    // The face comes from the same verdict the listener uses, so the
+    // route under test judges a caller by the rule the served city does.
+    let channels::BindVerdict::Serve(face) =
+        channels::decide_bind(&config.addr, config.token_digest)
+    else {
+        panic!("this test serves a loopback address");
+    };
     let peer: SocketAddr = "127.0.0.1:40000".parse().unwrap();
-    let app = channels::router(&config).layer(MockConnectInfo(peer));
+    let app = channels::router(&config, face).layer(MockConnectInfo(peer));
     let mut request = Request::builder().method("POST").uri("/transcribe");
     if let Some(kind) = media {
         request = request.header("content-type", kind);

@@ -4,9 +4,16 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The browser half of the link: one socket, three listeners, and no
-// decisions. Every judgement is `link.ts`'s; this turns browser
-// callbacks into link events, carries out the actions the machine
+// judgements about the wire. Every judgement is `link.ts`'s; this turns
+// browser callbacks into link events, carries out the actions the machine
 // answers with, and hands what arrives to the belief and the asking.
+//
+// The one conversation it holds of its own is the walk over a gap: a
+// `lagged` frame names a range of ledger records this page never received,
+// and the range is asked for a page at a time and folded like any other
+// record. That is a sequence of questions and answers rather than one
+// frame in and one action out, which is why it lives here and not in the
+// tree of judgements `link.ts` is.
 //
 // The browser's own facilities are reached here and nowhere below:
 // the socket, the frame callback, the timers, and the clock the
@@ -29,7 +36,7 @@ import { decodeFrame, encodeFrame } from "./frames";
 import { langOf, say } from "./lang";
 import { advance, connect as start, isLive, isRefused, newLink } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
-import type { Command, Query, ServerFrame } from "../wire";
+import type { Command, HistoryRangeAnswer, Query, Seq, ServerFrame } from "../wire";
 
 export interface Connection {
   readonly state: Accessor<LinkState>;
@@ -51,6 +58,19 @@ export function tokenIn(search: string): string | null {
   const value = new URLSearchParams(search).get("token");
   return value === null || value === "" ? null : value;
 }
+
+// A range of ledger records this page was told it never received.
+interface Gap {
+  // The first sequence still to fetch.
+  readonly at: Seq;
+  // The last sequence the range reaches.
+  readonly to: Seq;
+}
+
+// One page of a gap. The server caps an answer at its own limit whatever
+// this asks for, and a page small enough to fold in one frame keeps a
+// long gap from holding up the records that are still arriving.
+const GAP_PAGE = 200;
 
 // How a POST offers this city's pairing token.
 //
@@ -82,6 +102,13 @@ export function openConnection(
 
   const queue: ServerFrame[] = [];
   let scheduled = false;
+  // The ranges this page has been told it never received, oldest first,
+  // and the near end of the page in flight. Ranges queue rather than
+  // replace: two losses are two ranges, and the answer's own cursor is
+  // what advances one - so a range that arrives while another is being
+  // filled waits its turn and nothing is dropped between them.
+  const gaps: Gap[] = [];
+  let fetching: Seq | null = null;
   // The attempt the ladder scheduled, held so a link that turns out to
   // be refused can cancel it. A refused link that left this running
   // would reopen the socket behind a message telling the person the
@@ -94,6 +121,51 @@ export function openConnection(
     }
     socket.send(text);
     return true;
+  }
+
+  // Asks for one page of the oldest range still owed, and only when none
+  // is in flight: the wire carries no request id, so a second question
+  // for the same range would be an answer this page cannot tell apart
+  // from the first.
+  function askGap(): void {
+    const front = gaps[0];
+    if (front === undefined || fetching !== null) {
+      return;
+    }
+    fetching = front.at;
+    sendText(
+      encodeFrame({
+        query: { history_range: { from: front.at, to: front.to, limit: GAP_PAGE } },
+      }),
+    );
+  }
+
+  // The records of one page of a gap, folded like any other record: what
+  // the page lost is what happened, and the fold is what draws it. They
+  // invalidate nothing - they are old records rather than news, and
+  // marking every answer stale for them would ask the city for
+  // everything again.
+  function filled(range: HistoryRangeAnswer): void {
+    for (const record of range.records) {
+      store.apply(record);
+    }
+    if (fetching === null || range.from !== fetching) {
+      // An answer to a page this page no longer waits for. Its records
+      // are folded above; the range it belonged to has moved on.
+      return;
+    }
+    fetching = null;
+    const front = gaps.shift();
+    // `??` rather than a null test: an absent cursor and an explicit one
+    // are the same fact on this wire, and the server leaves the field out
+    // when the range is answered.
+    const cursor = range.next ?? null;
+    if (front !== undefined && cursor !== null) {
+      // The server's cursor, not arithmetic here: it is the one place
+      // that knows where the Ledger holds the next record of the range.
+      gaps.unshift({ at: cursor, to: front.to });
+    }
+    askGap();
   }
 
   const asking = createAsking(
@@ -125,6 +197,11 @@ export function openConnection(
       case "welcomed":
         store.refused(null);
         store.named(action.welcome.city ?? null);
+        // A new connection cannot be holding an answer the old one was
+        // asked for, so the walk starts its front range again rather than
+        // waiting for a page that will never arrive.
+        fetching = null;
+        askGap();
         asking.reconnected();
         return;
       case "deliver":
@@ -132,6 +209,13 @@ export function openConnection(
         asking.invalidate(action.event);
         return;
       case "answered":
+        if ("history_range" in action.answer) {
+          // The one answer that is this page's own question rather than a
+          // view's: it settles no held question, so it is folded here and
+          // never reaches the asking.
+          filled(action.answer.history_range);
+          return;
+        }
         if ("city" in action.answer) {
           store.adoptCity(action.answer.city);
         }
@@ -142,6 +226,10 @@ export function openConnection(
         return;
       case "logged":
         store.logged(action.line);
+        return;
+      case "lagged":
+        gaps.push({ at: action.from, to: action.to });
+        askGap();
         return;
       case "wait":
         reconnect = setTimeout(() => {

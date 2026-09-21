@@ -6,11 +6,13 @@
 //! Every judgement the process boundary makes, as pure functions with
 //! exhaustive verdicts.
 //!
-//! Four questions, asked in four different places and answered here:
-//! may this address be bound at all, may this peer put a credential in
-//! the vault, may this peer's opening frame be accepted, and what does
-//! a frame mean in the state the session is in. None of them touches a
-//! socket, a clock or a file, so all four are tested by calling them.
+//! Five questions, asked in five different places and answered here:
+//! may this address be bound at all and which face does it then present,
+//! may this peer put a credential in the vault, may this peer's opening
+//! frame be accepted, what does a frame mean in the state the session is
+//! in, and which records must a session tell the peer it lost. None of
+//! them touches a socket, a clock or a file, so all five are tested by
+//! calling them.
 //!
 //! **This is the thick half of the Humble Object** the listener is
 //! built as (ARCHITECTURE section 9). `channels::server` is declared an
@@ -19,9 +21,10 @@
 //! that it applies all of them. Every branch left in the shell is a
 //! send, a receive, or the end of a session.
 //!
-//! Binding is loopback by default. Exposing the port demands a pairing
-//! token, and a missing token refuses the *start*, not the connection:
-//! "data stays on your team" is a judgement or it is decoration.
+//! Binding is loopback by default, and the face that comes back from
+//! [`decide_bind`] carries the credential it demands: a listener
+//! reachable beyond this machine refuses to start without one, and no
+//! shell can be built with an exposed face that demands nothing.
 
 mod admission;
 pub(crate) mod inbound;
@@ -30,18 +33,40 @@ pub use admission::{Admission, Door, Pairing, decide_admission, offered_pairing}
 
 use std::net::SocketAddr;
 
-use kernel::{Address, AxCode, AxError, B3Hash};
+use kernel::{Address, AxCode, AxError, B3Hash, Seq};
 
 use crate::auth;
 use crate::command::WireCommand;
-use crate::wire::{ClientFrame, Hello, Query, WIRE_V, Welcome, schema_hash};
+use crate::wire::{ClientFrame, Hello, Lagged, Query, WIRE_V, Welcome, schema_hash};
 
-/// Which face the listener presents. An enum rather than `bool` so the
-/// exposed case can never be reached by passing the wrong literal.
+/// Which face the listener presents, and the credential it demands.
+///
+/// **The digest travels inside the exposed face rather than beside it.**
+/// A listener reachable beyond this machine with no credential is not a
+/// state this type can hold, and [`decide_bind`] is the only producer of
+/// one: it refuses that configuration before the socket exists. A
+/// `token_configured: bool` argument said the same thing and left every
+/// shell free to disagree with the verdict it was handed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BindFace {
-    Loopback,
-    Exposed,
+    /// Reachable from this machine only. A token may still be configured - a
+    /// person set one on a city they serve to nobody - and the doors then
+    /// demand it exactly as the exposed face does.
+    Loopback { token: Option<B3Hash> },
+    /// Reachable from elsewhere, and never served without a credential.
+    Exposed { token: B3Hash },
+}
+
+impl BindFace {
+    /// The digest this face demands of every caller. `None` only on the
+    /// loopback face of a city nobody configured a token for.
+    #[must_use]
+    pub fn token_digest(&self) -> Option<&B3Hash> {
+        match self {
+            BindFace::Loopback { token } => token.as_ref(),
+            BindFace::Exposed { token } => Some(token),
+        }
+    }
 }
 
 /// The whole of the binding policy.
@@ -51,30 +76,34 @@ pub enum BindVerdict {
     Refuse(AxError),
 }
 
-/// Decides whether the listener may bind `addr`.
+/// Decides whether the listener may bind `addr`, and which face it then
+/// presents.
 ///
 /// Pure. Four cells, one of which refuses: an address reachable from outside
 /// this machine with no pairing token configured. The refusal happens before
 /// the socket exists, so there is no window in which the port is open and
-/// unauthenticated.
+/// unauthenticated - and the credential the exposed face demands comes back
+/// inside the verdict, so there is no second way to learn it.
 #[must_use]
-pub fn decide_bind(addr: &SocketAddr, token_configured: bool) -> BindVerdict {
+pub fn decide_bind(addr: &SocketAddr, token: Option<B3Hash>) -> BindVerdict {
     if addr.ip().is_loopback() {
-        return BindVerdict::Serve(BindFace::Loopback);
+        return BindVerdict::Serve(BindFace::Loopback { token });
     }
-    if token_configured {
-        return BindVerdict::Serve(BindFace::Exposed);
-    }
-    BindVerdict::Refuse(
-        AxError::failure(
-            AxCode::ConfigInvalid,
-            "bind the control surface",
-            format!("{addr} is reachable beyond this machine and no pairing token is configured"),
-        )
-        .with_recovery(
-            "configure a pairing token before exposing the port, or bind a loopback address",
+    match token {
+        Some(token) => BindVerdict::Serve(BindFace::Exposed { token }),
+        None => BindVerdict::Refuse(
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "bind the control surface",
+                format!(
+                    "{addr} is reachable beyond this machine and no pairing token is configured"
+                ),
+            )
+            .with_recovery(
+                "configure a pairing token before exposing the port, or bind a loopback address",
+            ),
         ),
-    )
+    }
 }
 /// Whether one peer may enrol a credential.
 #[derive(Debug)]
@@ -121,20 +150,20 @@ pub enum HandshakeVerdict {
 ///
 /// Order is deliberate: protocol agreement is settled before credentials.
 /// A browser holding a cached older client is the common case and deserves
-/// "refresh", not "wrong password". Pure - `expected` and `configured` are
+/// "refresh", not "wrong password". Pure - `expected` and `face` are
 /// parameters, never read from ambient state.
 ///
-/// `configured` is a digest, not the token. This crate never holds the
+/// The credential a caller must present is the face's, which means an
+/// exposed face cannot be served without one: [`BindFace::Exposed`] holds
+/// the digest, and there is no other way to reach this function.
+///
+/// The digest is a digest, not the token. This crate never holds the
 /// plaintext of a pairing token: the side that owns the token digests it
 /// once, and the boundary compares digests. That keeps credential exposure
 /// at the redemption points where it is audited, and it costs nothing here
 /// because the comparison hashes both sides anyway.
 #[must_use]
-pub fn decide_handshake(
-    hello: &Hello,
-    expected: &Welcome,
-    configured: Option<&B3Hash>,
-) -> HandshakeVerdict {
+pub fn decide_handshake(hello: &Hello, expected: &Welcome, face: &BindFace) -> HandshakeVerdict {
     if hello.wire_v != expected.wire_v || hello.schema != expected.schema {
         return HandshakeVerdict::Reject(
             AxError::failure(
@@ -148,7 +177,7 @@ pub fn decide_handshake(
             .with_recovery("reload the page to fetch the client this server was built with"),
         );
     }
-    let Some(expected_digest) = configured else {
+    let Some(expected_digest) = face.token_digest() else {
         return HandshakeVerdict::Accept;
     };
     if auth::verify(hello.token.as_deref(), expected_digest) {
@@ -196,7 +225,7 @@ pub enum SessionStep {
 pub fn decide_frame(
     state: SessionState,
     frame: ClientFrame,
-    configured: Option<&B3Hash>,
+    face: &BindFace,
     city: Option<&Address>,
 ) -> SessionStep {
     let expected = Welcome {
@@ -207,7 +236,7 @@ pub fn decide_frame(
     };
     match (state, frame) {
         (SessionState::AwaitingHello, ClientFrame::Hello(hello)) => {
-            match decide_handshake(&hello, &expected, configured) {
+            match decide_handshake(&hello, &expected, face) {
                 HandshakeVerdict::Accept => SessionStep::Welcome(Box::new(expected)),
                 HandshakeVerdict::Reject(error) => SessionStep::Refuse {
                     error: Box::new(error),
@@ -241,6 +270,96 @@ pub fn decide_frame(
         },
     }
 }
+
+/// The range of ledger records a session must name when its event stream
+/// skipped some.
+///
+/// `delivered` is the last record this session sent the peer, or `None`
+/// when it has sent none; `next` is the first record to arrive after the
+/// gap. Pure, and the whole of the rule. The count a lagged subscription
+/// reports says how many messages were skipped and neither endpoint, which
+/// is why both ends are derived from records this session can name - and
+/// why the far end is only knowable here, at the record that ends the gap.
+///
+/// `None` when there is no gap to state: nothing was skipped before
+/// `next`, which happens when `next` is the record `delivered` already
+/// named or when it is the first record there is. A sequence number that
+/// cannot be stepped returns `None` for the same reason and is a case a
+/// ledger which produced `next` cannot reach.
+#[must_use]
+pub(crate) fn decide_lag(delivered: Option<Seq>, next: Seq) -> Option<Lagged> {
+    let from = match delivered {
+        Some(last) => last.value().checked_add(1).map(Seq::new),
+        // A session that has delivered nothing has shown the peer no
+        // stream, so the gap relative to it starts at the first record
+        // the city ever wrote.
+        None => Some(Seq::FIRST),
+    };
+    let to = next.value().checked_sub(1).map(Seq::new);
+    match (from, to) {
+        (Some(from), Some(to)) if to >= from => Some(Lagged { from, to }),
+        _ => None,
+    }
+}
+
+/// What a session owes the peer about the event stream.
+///
+/// Two facts that belong together: the last record this session delivered,
+/// and whether the stream skipped past it since. They travel as one value
+/// because every other combination is meaningless - a session that owes a
+/// range has a delivery to name the near end of it, and one that owes none
+/// has said everything it holds. The rule lives here rather than in the
+/// shell for the reason every other judgement does: it is testable without
+/// a socket.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Stream {
+    /// The peer holds every record this session sent it.
+    Even(Option<Seq>),
+    /// The stream skipped records, and the next one to arrive names the far
+    /// end of what was skipped. The payload is the last delivery.
+    Owed(Option<Seq>),
+}
+
+impl Stream {
+    /// A session that has delivered nothing and owes nothing, which is how
+    /// every session starts.
+    pub(crate) const fn opening() -> Stream {
+        Stream::Even(None)
+    }
+
+    /// The record this session last delivered, from either state.
+    #[must_use]
+    pub(crate) fn delivered(self) -> Option<Seq> {
+        match self {
+            Stream::Even(delivered) | Stream::Owed(delivered) => delivered,
+        }
+    }
+
+    /// The state a skip leaves behind. A session that has not been
+    /// welcomed has shown the peer no stream to measure a gap against - its
+    /// view begins at the welcome, and what a page needs of what came
+    /// before is a question rather than a frame - so it owes nothing.
+    #[must_use]
+    pub(crate) fn skipped(self, live: bool) -> Stream {
+        if live {
+            Stream::Owed(self.delivered())
+        } else {
+            self
+        }
+    }
+
+    /// What to say before sending `next`, and the state that sending it
+    /// leaves behind. The far end of a skipped range is only knowable at
+    /// the record that ends it.
+    #[must_use]
+    pub(crate) fn before(self, next: Seq) -> (Option<Lagged>, Stream) {
+        let lag = match self {
+            Stream::Even(_) => None,
+            Stream::Owed(delivered) => decide_lag(delivered, next),
+        };
+        (lag, Stream::Even(Some(next)))
+    }
+}
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -252,12 +371,18 @@ pub fn decide_frame(
 mod tests {
     use super::*;
 
+    /// The face a test session is judged against when no credential is
+    /// configured: a city on this machine with nobody to distinguish.
+    fn unpaired() -> BindFace {
+        BindFace::Loopback { token: None }
+    }
+
     #[test]
     fn an_ipv6_loopback_is_also_loopback() {
         let addr: SocketAddr = "[::1]:8787".parse().unwrap();
         assert!(matches!(
-            decide_bind(&addr, false),
-            BindVerdict::Serve(BindFace::Loopback)
+            decide_bind(&addr, None),
+            BindVerdict::Serve(BindFace::Loopback { token: None })
         ));
     }
 
@@ -281,11 +406,47 @@ mod tests {
     fn a_pairing_token_does_not_buy_the_right_to_enrol() {
         // An exposed bind is legal with a token; enrolment still is not.
         let exposed: SocketAddr = "203.0.113.7:8787".parse().unwrap();
-        assert!(matches!(
-            decide_bind(&exposed, true),
-            BindVerdict::Serve(BindFace::Exposed)
-        ));
+        let digest = B3Hash::digest(b"pairing-code");
+        let BindVerdict::Serve(face) = decide_bind(&exposed, Some(digest)) else {
+            panic!("an exposed bind with a token is served");
+        };
+        assert_eq!(face.token_digest(), Some(&digest));
         assert!(matches!(decide_enroll(&exposed), EnrollVerdict::Refuse(_)));
+    }
+
+    /// The face is the whole of what a session must present, and an
+    /// exposed one carries the digest: there is no exposed face that
+    /// demands nothing, so no shell can be built with one.
+    #[test]
+    fn a_city_reachable_from_elsewhere_never_serves_without_a_credential() {
+        let exposed: SocketAddr = "203.0.113.7:8787".parse().unwrap();
+        let BindVerdict::Refuse(err) = decide_bind(&exposed, None) else {
+            panic!("an exposed bind with no token refuses to start");
+        };
+        assert_eq!(*err.code(), AxCode::ConfigInvalid);
+        assert!(!err.recovery().is_empty());
+
+        let digest = B3Hash::digest(b"pairing-code");
+        let BindVerdict::Serve(opened) = decide_bind(&exposed, Some(digest)) else {
+            panic!("an exposed bind with a token is served");
+        };
+        assert_eq!(
+            opened.token_digest(),
+            Some(&digest),
+            "the digest the exposed face demands comes back inside the verdict"
+        );
+
+        // Loopback is served with or without a token, and a token a person
+        // configured there is still demanded.
+        let local: SocketAddr = "127.0.0.1:8787".parse().unwrap();
+        let BindVerdict::Serve(paired) = decide_bind(&local, Some(digest)) else {
+            panic!("a loopback bind is served");
+        };
+        assert_eq!(paired.token_digest(), Some(&digest));
+        let BindVerdict::Serve(alone) = decide_bind(&local, None) else {
+            panic!("a loopback bind needs no token");
+        };
+        assert_eq!(alone.token_digest(), None);
     }
 
     fn hello(wire_v: u32, token: Option<&str>) -> ClientFrame {
@@ -305,7 +466,12 @@ mod tests {
 
     #[test]
     fn a_matching_hello_opens_the_session() {
-        let step = decide_frame(SessionState::AwaitingHello, hello(WIRE_V, None), None, None);
+        let step = decide_frame(
+            SessionState::AwaitingHello,
+            hello(WIRE_V, None),
+            &unpaired(),
+            None,
+        );
         let SessionStep::Welcome(welcome) = step else {
             panic!("a matching hello is welcomed");
         };
@@ -318,7 +484,7 @@ mod tests {
         let step = decide_frame(
             SessionState::AwaitingHello,
             hello(WIRE_V.saturating_add(1), None),
-            None,
+            &unpaired(),
             None,
         );
         let SessionStep::Refuse { error, close } = step else {
@@ -330,7 +496,7 @@ mod tests {
 
     #[test]
     fn a_command_before_the_hello_is_refused_rather_than_queued() {
-        let step = decide_frame(SessionState::AwaitingHello, a_command(), None, None);
+        let step = decide_frame(SessionState::AwaitingHello, a_command(), &unpaired(), None);
         let SessionStep::Refuse { close, .. } = step else {
             panic!("an unopened session runs nothing");
         };
@@ -340,14 +506,14 @@ mod tests {
     #[test]
     fn a_live_session_delivers_commands_and_answers_queries() {
         assert!(matches!(
-            decide_frame(SessionState::Live, a_command(), None, None),
+            decide_frame(SessionState::Live, a_command(), &unpaired(), None),
             SessionStep::Deliver(_)
         ));
         assert!(matches!(
             decide_frame(
                 SessionState::Live,
                 ClientFrame::Query(crate::wire::Query::CityView),
-                None,
+                &unpaired(),
                 None
             ),
             SessionStep::Answer(_)
@@ -356,7 +522,7 @@ mod tests {
 
     #[test]
     fn a_second_hello_is_refused_without_ending_the_session() {
-        let step = decide_frame(SessionState::Live, hello(WIRE_V, None), None, None);
+        let step = decide_frame(SessionState::Live, hello(WIRE_V, None), &unpaired(), None);
         let SessionStep::Refuse { close, .. } = step else {
             panic!("one session, one greeting");
         };
@@ -365,16 +531,101 @@ mod tests {
 
     #[test]
     fn an_exposed_session_needs_the_pairing_token() {
-        let digest = B3Hash::digest(b"pairing-code");
+        let exposed = BindFace::Exposed {
+            token: B3Hash::digest(b"pairing-code"),
+        };
         assert!(matches!(
             decide_frame(
                 SessionState::AwaitingHello,
                 hello(WIRE_V, None),
-                Some(&digest),
+                &exposed,
                 None
             ),
             SessionStep::Refuse { close: true, .. }
         ));
+        assert!(matches!(
+            decide_frame(
+                SessionState::AwaitingHello,
+                hello(WIRE_V, Some("pairing-code")),
+                &exposed,
+                None
+            ),
+            SessionStep::Welcome(_)
+        ));
+    }
+
+    /// The far end of a skipped range is the record before the one that
+    /// arrives after the gap: a subscription's count says how many
+    /// messages went by and neither endpoint, so a session that reported
+    /// the count alone would tell the peer nothing it could ask for.
+    #[test]
+    fn a_skipped_range_is_named_by_the_records_on_either_side_of_it() {
+        let delivered = Seq::new(7);
+        let lag = decide_lag(Some(delivered), Seq::new(20)).expect("records 8..=19 were skipped");
+        assert_eq!(lag.from, Seq::new(8), "the record after the last delivered");
+        assert_eq!(
+            lag.to,
+            Seq::new(19),
+            "the record before the one that arrived"
+        );
+    }
+
+    #[test]
+    fn a_session_that_delivered_nothing_owes_the_whole_ledger_and_one_that_lost_nothing_owes_none()
+    {
+        let lag =
+            decide_lag(None, Seq::new(9)).expect("nothing was delivered, so 0..=8 is missing");
+        assert_eq!(lag.from, Seq::FIRST);
+        assert_eq!(lag.to, Seq::new(8));
+        // The record that arrives is the one already delivered, and the
+        // first record there is has nothing before it: neither pair is a
+        // gap, and saying so is not the same as staying silent.
+        assert_eq!(decide_lag(Some(Seq::new(7)), Seq::new(8)), None);
+        assert_eq!(decide_lag(None, Seq::FIRST), None);
+        assert_eq!(decide_lag(Some(Seq::new(7)), Seq::new(7)), None);
+    }
+
+    /// The three moves a session makes around a skip: deliver, lose, report.
+    ///
+    /// This is the state machine the shell's select loop steps through, and
+    /// it is here rather than there because a shell that also held the rule
+    /// applied it would have no way to show that it applied all of it.
+    #[test]
+    fn a_skip_is_reported_once_and_the_debt_settles_at_the_next_record() {
+        let (opening, delivered) = Stream::opening().before(Seq::new(7));
+        assert_eq!(opening, None, "nothing is owed before anything is skipped");
+        assert_eq!(delivered.delivered(), Some(Seq::new(7)));
+
+        let owed = delivered.skipped(true);
+        assert_eq!(
+            owed.delivered(),
+            Some(Seq::new(7)),
+            "the near end of the range is what the peer holds"
+        );
+        let (lag, settled) = owed.before(Seq::new(20));
+        assert_eq!(
+            lag,
+            Some(Lagged {
+                from: Seq::new(8),
+                to: Seq::new(19)
+            })
+        );
+        assert_eq!(settled.delivered(), Some(Seq::new(20)));
+        assert_eq!(
+            settled.before(Seq::new(21)).0,
+            None,
+            "and the debt is paid once, not every record after it"
+        );
+    }
+
+    #[test]
+    fn a_session_that_has_not_been_welcomed_owes_no_range() {
+        // Its view begins at the welcome; what a page needs of what came
+        // before is a question it asks, not a frame it is owed.
+        let skipped = Stream::opening().skipped(false);
+        assert_eq!(skipped.delivered(), None);
+        let (lag, _) = skipped.before(Seq::new(5));
+        assert_eq!(lag, None);
     }
 
     #[test]
@@ -382,10 +633,10 @@ mod tests {
         // 0.0.0.0 reaches every interface; treating it as local would be the
         // exact mistake this judgement exists to prevent.
         let addr: SocketAddr = "0.0.0.0:8787".parse().unwrap();
-        assert!(matches!(decide_bind(&addr, false), BindVerdict::Refuse(_)));
+        assert!(matches!(decide_bind(&addr, None), BindVerdict::Refuse(_)));
         assert!(matches!(
-            decide_bind(&addr, true),
-            BindVerdict::Serve(BindFace::Exposed)
+            decide_bind(&addr, Some(B3Hash::digest(b"pairing-code"))),
+            BindVerdict::Serve(BindFace::Exposed { .. })
         ));
     }
 }

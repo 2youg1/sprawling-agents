@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 32 as const;
+export const WIRE_V = 33 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "67bfc2a041609a524a0eb0f933f694bc09bce47d3224cc54e8a660e95787ecda" as const;
+export const WIRE_HASH = "5e829819d24d22dbe2c072840e75a8cdb09788a697bf9a381b95e02bcbe05114" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -499,6 +499,11 @@ export const EventKind = Schema.Union(
   Schema.Literal("endpoint_probed"),
   Schema.Literal("governed_document_written"),
   Schema.Literal("toolkit_link_opened"),
+  Schema.Literal("embedding_called"),
+  Schema.Literal("rerank_called"),
+  Schema.Literal("adviser_asked"),
+  Schema.Literal("adviser_answered"),
+  Schema.Literal("adviser_fell_back"),
 ).annotations({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 
@@ -778,6 +783,32 @@ export const DiscardAnswer = Schema.Struct({
 export type DiscardAnswer = typeof DiscardAnswer.Type;
 
 /**
+ * How long a value the store keeps stays reachable.
+ */
+export const DoctorCustodyLifetime = Schema.Literal("across_reboots", "with_passphrase", "until_reboot", "this_process").annotations({ identifier: "DoctorCustodyLifetime" });
+export type DoctorCustodyLifetime = typeof DoctorCustodyLifetime.Type;
+
+/**
+ * Which store a city writes secrets to.
+ */
+export const DoctorCustodyStore = Schema.Union(
+  Schema.Literal("platform_service"),
+  Schema.Literal("encrypted_file"),
+  Schema.Literal("session_memory"),
+).annotations({ identifier: "DoctorCustodyStore" });
+export type DoctorCustodyStore = typeof DoctorCustodyStore.Type;
+
+/**
+ * Where this machine's credentials rest, and how long they stay.
+ */
+export const DoctorCustody = Schema.Struct({
+  keeps: DoctorCustodyLifetime,
+  refusal: Schema.optional(Schema.NullOr(Schema.String)),
+  store: DoctorCustodyStore,
+}).annotations({ identifier: "DoctorCustody" });
+export type DoctorCustody = typeof DoctorCustody.Type;
+
+/**
  * What getting the item would cost on this machine.
  */
 export const DoctorInstall = Schema.Union(
@@ -911,6 +942,61 @@ export const DoctorItem = Schema.Struct({
 export type DoctorItem = typeof DoctorItem.Type;
 
 /**
+ * Whether the arm holds the axis. Two words rather than a boolean,
+ * because a page has to word both and a wire that carried `true` would
+ * make every reader choose its own word for `false`.
+ */
+export const DoctorCoverage = Schema.Literal("kept", "not_kept").annotations({ identifier: "DoctorCoverage" });
+export type DoctorCoverage = typeof DoctorCoverage.Type;
+
+/**
+ * What a confinement can promise.
+ */
+export const DoctorGuaranteeAxis = Schema.Literal("filesystem", "network", "process_tree", "user", "resources").annotations({ identifier: "DoctorGuaranteeAxis" });
+export type DoctorGuaranteeAxis = typeof DoctorGuaranteeAxis.Type;
+
+/**
+ * One axis of confinement, and whether this machine's arm holds it.
+ */
+export const DoctorGuarantee = Schema.Struct({
+  axis: DoctorGuaranteeAxis,
+  kept: DoctorCoverage,
+}).annotations({ identifier: "DoctorGuarantee" });
+export type DoctorGuarantee = typeof DoctorGuarantee.Type;
+
+/**
+ * What a machine lacks when it can give no confinement at all.
+ */
+export const DoctorSandboxMissing = Schema.Literal("scratch_directory").annotations({ identifier: "DoctorSandboxMissing" });
+export type DoctorSandboxMissing = typeof DoctorSandboxMissing.Type;
+
+/**
+ * The backend itself. Closed, so a page has a word for every arm and
+ * a new arm is a compile error at every reader.
+ */
+export const DoctorSandboxArm = Schema.Union(
+  Schema.Literal("linux_namespaces"),
+  Schema.Literal("windows_job_object"),
+  Schema.Literal("copied_tree"),
+  Schema.Struct({
+    unavailable: Schema.Struct({
+      missing: DoctorSandboxMissing,
+    }),
+  }),
+).annotations({ identifier: "DoctorSandboxArm" });
+export type DoctorSandboxArm = typeof DoctorSandboxArm.Type;
+
+/**
+ * Which backend a host command runs under on this machine, and what
+ * that arm promises.
+ */
+export const DoctorSandbox = Schema.Struct({
+  arm: DoctorSandboxArm,
+  coverage: Schema.Array(DoctorGuarantee),
+}).annotations({ identifier: "DoctorSandbox" });
+export type DoctorSandbox = typeof DoctorSandbox.Type;
+
+/**
  * Whether one tier is reachable on this machine.
  */
 export const DoctorVerdict = Schema.Struct({
@@ -923,7 +1009,9 @@ export type DoctorVerdict = typeof DoctorVerdict.Type;
  * This machine, item by item, with a verdict for each tier.
  */
 export const DoctorAnswer = Schema.Struct({
+  custody: DoctorCustody,
   items: Schema.Array(DoctorItem),
+  sandbox: DoctorSandbox,
   tiers: Schema.Array(DoctorVerdict),
 }).annotations({ identifier: "DoctorAnswer" });
 export type DoctorAnswer = typeof DoctorAnswer.Type;
@@ -1237,6 +1325,26 @@ export const HistoryAnswer = Schema.Struct({
   records: Schema.Array(EventRecord),
 }).annotations({ identifier: "HistoryAnswer" });
 export type HistoryAnswer = typeof HistoryAnswer.Type;
+
+/**
+ * One slice of a named range of ledger records, and where the slice
+ * continues.
+ * 
+ * **The endpoints come back with the records.** The question that asked
+ * for them carried no cursor a caller holds on to - not a `before` to
+ * walk back from, but two seq numbers that may have arrived in a frame
+ * the caller has already dropped - so an answer that did not name its
+ * own slice could not be told from one for a different range, and a page
+ * filling a gap while its record view is open would file the wrong
+ * answer.
+ */
+export const HistoryRangeAnswer = Schema.Struct({
+  from: Seq,
+  next: Schema.optional(Schema.NullOr(Seq)),
+  records: Schema.Array(EventRecord),
+  to: Seq,
+}).annotations({ identifier: "HistoryRangeAnswer" });
+export type HistoryRangeAnswer = typeof HistoryRangeAnswer.Type;
 
 /**
  * One line of patch text, numbered from the top of the patch so a
@@ -1838,16 +1946,35 @@ export const RoundsAnswer = Schema.Struct({
 export type RoundsAnswer = typeof RoundsAnswer.Type;
 
 /**
- * Which shelf a holding sits on.
+ * Which shelf a holding sits on, and where its document is.
+ * 
+ * One value rather than a shelf name beside a path, because a holding
+ * is on one shelf and at one place, and two fields would let them
+ * disagree: a row that says `library` and points outside the city is a
+ * state no shelf can be in.
  * 
  * Named rather than implied by which list it arrived in, so a page
- * that shows both shelves in one list can still say where a skill
+ * that shows three shelves in one list can still say where a skill
  * came from - which is the question a person asks when two shelves
  * hold the same name and the nearer one wins.
+ * 
+ * **The two city arms are `Query::Document`'s input; the external arm
+ * is not.** A skill on a shelf outside the city has no address, and one
+ * invented for it would send a reader to a file that is not there.
  */
 export const SkillShelf = Schema.Union(
-  Schema.Literal("library"),
-  Schema.Literal("building"),
+  Schema.Struct({
+    library: Address,
+  }),
+  Schema.Struct({
+    building: Address,
+  }),
+  Schema.Struct({
+    external: Schema.Struct({
+      index: Schema.Int,
+      path: Schema.String,
+    }),
+  }),
 ).annotations({ identifier: "SkillShelf" });
 export type SkillShelf = typeof SkillShelf.Type;
 
@@ -1856,7 +1983,6 @@ export type SkillShelf = typeof SkillShelf.Type;
  */
 export const SkillLine = Schema.Struct({
   admitted: Schema.Boolean,
-  at: Address,
   disclosure: Schema.String,
   hash: B3Hash,
   name: Schema.String,
@@ -1958,6 +2084,9 @@ export type ToolkitsAnswer = typeof ToolkitsAnswer.Type;
 export const Answer = Schema.Union(
   Schema.Struct({
     history: HistoryAnswer,
+  }),
+  Schema.Struct({
+    history_range: HistoryRangeAnswer,
   }),
   Schema.Struct({
     changes: ChangesAnswer,
@@ -2525,6 +2654,13 @@ export const Query = Schema.Union(
     }),
   }),
   Schema.Struct({
+    history_range: Schema.Struct({
+      from: Seq,
+      limit: Schema.Int,
+      to: Seq,
+    }),
+  }),
+  Schema.Struct({
     changes: Schema.Struct({
       base: GitOid,
       head: Schema.optional(Schema.NullOr(GitOid)),
@@ -2684,6 +2820,22 @@ export const Delta = Schema.Struct({
 export type Delta = typeof Delta.Type;
 
 /**
+ * Ledger records that never reached a peer, named by both ends.
+ * 
+ * Both ends come from records this session can name, never from the
+ * count a lagged subscription reports: that count says how many
+ * messages were skipped and neither endpoint, so a reader holding it
+ * cannot ask for the range it lost. `from` is the record after the last
+ * one the session delivered; `to` is the record before the first one to
+ * arrive after the gap.
+ */
+export const Lagged = Schema.Struct({
+  from: Seq,
+  to: Seq,
+}).annotations({ identifier: "Lagged" });
+export type Lagged = typeof Lagged.Type;
+
+/**
  * Who reads a log line, and when.
  * 
  * The five `docs/logging.md` names, spelled on the wire exactly as
@@ -2748,6 +2900,9 @@ export const ServerFrame = Schema.Union(
   }),
   Schema.Struct({
     log: LogLine,
+  }),
+  Schema.Struct({
+    lagged: Lagged,
   }),
 ).annotations({ identifier: "ServerFrame" });
 export type ServerFrame = typeof ServerFrame.Type;

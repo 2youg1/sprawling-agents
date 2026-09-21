@@ -30,6 +30,8 @@ mod server;
 mod wire;
 
 pub use aggregate::{Aggregate, CityLabel, Forwarded, Sighting, Upstream};
+pub use answer::DoctorSandboxMissing;
+pub use answer::HistoryRangeAnswer;
 pub use answer::PlanRow;
 pub use answer::PursuitLine;
 pub use answer::RunSummary;
@@ -44,6 +46,8 @@ pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegm
 pub use answer::{CostOfAnswer, EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use answer::{Decision, GovernanceAnswer};
 pub use answer::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
+pub use answer::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
+pub use answer::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use answer::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use answer::{DocumentAnswer, Entry, EntryKind, ListingAnswer};
 pub use answer::{HunksAnswer, PatchLine, Withheld};
@@ -84,7 +88,7 @@ pub use server::{Delivered, Reply, ServeConfig, router, serve};
 pub use wire::wire_schema;
 pub use wire::{ClientFrame, Delta, ServerFrame};
 pub use wire::{Hello, Query, Welcome};
-pub use wire::{LogLevel, LogLine};
+pub use wire::{Lagged, LogLevel, LogLine};
 pub use wire::{QUERY_NAMES, WIRE_V, schema_hash};
 
 pub use kernel::model::{Mode, Window};

@@ -15,6 +15,7 @@ import type {
   Delta,
   EventRecord,
   LogLine,
+  Seq,
   ServerFrame,
   Welcome,
 } from "../wire";
@@ -61,6 +62,10 @@ export type LinkAction =
   // its own, it is never written down, and a page that missed one has
   // lost nothing.
   | { readonly kind: "logged"; readonly line: LogLine }
+  // A range of ledger records the event stream skipped. Its own action
+  // rather than a report: the page can do something about it, and what
+  // it does is ask the Ledger for the range.
+  | { readonly kind: "lagged"; readonly from: Seq; readonly to: Seq }
   | { readonly kind: "wait"; readonly ms: number }
   | { readonly kind: "report"; readonly error: AxError }
   | { readonly kind: "close" };
@@ -214,6 +219,13 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
   if (link.state.kind !== "live") {
     return [link, { kind: "nothing" }];
   }
+  // A second greeting on a live link. It is the same disagreement as any
+  // other out-of-order frame, and naming it is what the compiler's
+  // exhaustiveness check asks for: silence here used to be the fallback
+  // that made a frame this build does not handle invisible.
+  if ("welcome" in frame) {
+    return refuse(link, outOfOrder(link.lang));
+  }
   if ("event" in frame) {
     return [link, { kind: "deliver", event: frame.event }];
   }
@@ -229,7 +241,19 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
   if ("refusal" in frame) {
     return refused(link, frame.refusal);
   }
-  return [link, { kind: "nothing" }];
+  if ("lagged" in frame) {
+    return [link, { kind: "lagged", from: frame.lagged.from, to: frame.lagged.to }];
+  }
+  return unhandled(link, frame);
+}
+
+// The compiler's check that every frame the generated schema admits has a
+// branch above. A frame this build was not taught keeps its own type here
+// and does not compile; what this replaces returned `nothing` for every
+// frame, so forgetting one was a hole no build error named - the wire said
+// a range had been skipped and the page folded it as silence.
+function unhandled(link: Link, _frame: never): [Link, LinkAction] {
+  return refuse(link, unreadable(link.lang));
 }
 
 // Advances the machine by one event.

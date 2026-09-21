@@ -111,7 +111,17 @@ use serde::{Deserialize, Serialize};
 ///    written onto a shelf. A third dialect rides with them,
 ///    `OpenAiResponses`, kept apart from the chat face because
 ///    somebody who pasted a responses URL said which face they meant.
-pub const WIRE_V: u32 = 32;
+/// 33: the event stream says what it skipped. A session slower than the
+///    city used to lose the middle of the stream in silence; a
+///    `Lagged` frame now names the range of ledger records that never
+///    reached it, and `Query::HistoryRange` is the question it asks the
+///    Ledger to get that range back. A city reachable beyond this
+///    machine also refuses to serve a caller with no credential, which
+///    is enforced where it is decided rather than left to a comment.
+///    The increment and the log line keep their silence on purpose:
+///    neither is written to the Ledger, so a range naming them would
+///    name records that do not exist.
+pub const WIRE_V: u32 = 33;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
@@ -230,6 +240,36 @@ pub enum ServerFrame {
     /// position it was written at, which is the integer the two
     /// timelines line up on.
     Log(LogLine),
+    /// The ledger records this session's event stream skipped.
+    ///
+    /// A session that reads slower than the city writes loses the
+    /// middle of the stream: the buffer behind a subscription has a
+    /// fixed capacity, and one slow reader is left behind rather than
+    /// holding the writer up. Losing it in silence was the defect - a
+    /// page drew a history with a hole in it and nothing said so. The
+    /// range is answered from the Ledger, which is the one home of what
+    /// happened.
+    ///
+    /// **Only the event stream states a gap.** An increment and a log
+    /// line are written down nowhere, so a range naming them would name
+    /// records that do not exist, and a reader that missed one has lost
+    /// nothing it could have acted on.
+    Lagged(Lagged),
+}
+
+/// Ledger records that never reached a peer, named by both ends.
+///
+/// Both ends come from records this session can name, never from the
+/// count a lagged subscription reports: that count says how many
+/// messages were skipped and neither endpoint, so a reader holding it
+/// cannot ask for the range it lost. `from` is the record after the last
+/// one the session delivered; `to` is the record before the first one to
+/// arrive after the gap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Lagged {
+    pub from: Seq,
+    pub to: Seq,
 }
 
 /// One piece of what a model is producing, on its way to a page.

@@ -56,6 +56,28 @@ pub enum Query {
         before: Option<Seq>,
         limit: u32,
     },
+    /// The records of the one history between two sequence numbers, both
+    /// ends included: the question a page asks when the event stream tells
+    /// it what it skipped.
+    ///
+    /// [`Query::History`] walks backwards from a cursor, which answers
+    /// "what came before this" and cannot answer "what happened between
+    /// these two". A gap has a near end as well as a far one, and a page
+    /// that walked to the gap's near end from the tail would pay for every
+    /// record in between.
+    ///
+    /// Answered with [`HistoryRangeAnswer`](crate::HistoryRangeAnswer)
+    /// rather than with [`HistoryAnswer`](crate::HistoryAnswer): the
+    /// question carries no cursor a reader holds on to, so the answer has
+    /// to name the slice it is, and a page filling a gap while its record
+    /// view is open is asking both questions at once. A range the Ledger
+    /// holds more records for than `limit` allows is answered up to the
+    /// limit, and the answer says where to ask next.
+    HistoryRange {
+        from: Seq,
+        to: Seq,
+        limit: u32,
+    },
     /// What moved between two checkpoints: paths and counts, never patch
     /// text.
     ///

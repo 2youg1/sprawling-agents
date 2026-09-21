@@ -11,8 +11,9 @@
 //! this file and [`super::decide_handshake`], and it is why both of
 //! them live in `reception` rather than in the shell that calls them.
 
-use kernel::{AxCode, AxError, B3Hash};
+use kernel::{AxCode, AxError};
 
+use super::BindFace;
 use crate::auth;
 
 /// Which HTTP door a request arrived at.
@@ -58,21 +59,21 @@ pub enum Pairing {
 /// `/enroll` judged nothing, so an exposed city let anyone who could
 /// reach the port spend money at a provider (roadmap S-03).
 ///
-/// A city with no token configured is a city on loopback only, which
-/// [`decide_bind`] guarantees at startup; there is nobody to
-/// distinguish, so every door admits as paired.
+/// The rule is the face's, which is why the face is what arrives: a face
+/// that demands no credential is the loopback face of a city nobody
+/// configured a token for, and it came from [`decide_bind`], which
+/// refuses to serve an exposed one. There is nobody to distinguish on
+/// such a city, so every door admits as paired.
 ///
 /// [`Door::Acp`] is admitted unpaired on purpose: what an
 /// unauthenticated editor may learn is `protocol::admit`'s to word, and
 /// it words it so that a stranger learns exactly one bit. The other two
 /// doors act, so they refuse here.
+///
+/// [`decide_bind`]: super::decide_bind
 #[must_use]
-pub fn decide_admission(
-    door: Door,
-    offered: Option<&str>,
-    configured: Option<&B3Hash>,
-) -> Admission {
-    let Some(expected) = configured else {
+pub fn decide_admission(door: Door, offered: Option<&str>, face: &BindFace) -> Admission {
+    let Some(expected) = face.token_digest() else {
         return Admission::Admit(Pairing::Held);
     };
     if auth::verify(offered, expected) {
@@ -118,22 +119,36 @@ pub fn offered_pairing(header: Option<&str>) -> Option<&str> {
 #[allow(clippy::panic, reason = "test code")]
 mod tests {
     use super::*;
+    use kernel::B3Hash;
+
+    /// The face of a city reachable beyond this machine: it demands the
+    /// token by construction.
+    fn exposed() -> BindFace {
+        BindFace::Exposed {
+            token: B3Hash::digest(b"pairing-code"),
+        }
+    }
+
+    /// The face of a city nobody configured a token for, which is only
+    /// ever a city on this machine.
+    fn unpaired() -> BindFace {
+        BindFace::Loopback { token: None }
+    }
 
     #[test]
     fn the_two_acting_doors_refuse_a_stranger_and_the_editor_door_carries_the_bit() {
-        let digest = B3Hash::digest(b"pairing-code");
         for door in [Door::Transcribe, Door::Enroll] {
-            let Admission::Refuse(err) = decide_admission(door, None, Some(&digest)) else {
+            let Admission::Refuse(err) = decide_admission(door, None, &exposed()) else {
                 panic!("{door:?} acts on a request, so it refuses an unpaired one");
             };
             assert_eq!(*err.code(), AxCode::GateDenied);
         }
         assert!(matches!(
-            decide_admission(Door::Acp, None, Some(&digest)),
+            decide_admission(Door::Acp, None, &exposed()),
             Admission::Admit(Pairing::Absent)
         ));
         assert!(matches!(
-            decide_admission(Door::Transcribe, Some("pairing-code"), Some(&digest)),
+            decide_admission(Door::Transcribe, Some("pairing-code"), &exposed()),
             Admission::Admit(Pairing::Held)
         ));
     }
@@ -143,7 +158,7 @@ mod tests {
         for door in [Door::Transcribe, Door::Enroll, Door::Acp] {
             assert!(
                 matches!(
-                    decide_admission(door, None, None),
+                    decide_admission(door, None, &unpaired()),
                     Admission::Admit(Pairing::Held)
                 ),
                 "{door:?} on a loopback-only city"

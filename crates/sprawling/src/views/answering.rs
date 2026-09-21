@@ -90,6 +90,71 @@ impl Views {
         }
     }
 
+    /// The records between two sequence numbers, both ends included.
+    ///
+    /// The question a page asks after the event stream told it which
+    /// range it missed, so both ends are the wire's and neither is a
+    /// cursor: the caller holds no position to walk from, only the two
+    /// numbers a frame named. The slice is capped at `limit` records and
+    /// `next` says where to ask again when the range holds more, because
+    /// the alternative - one unbounded answer - is the whole ledger on a
+    /// socket.
+    ///
+    /// A line that will not read ends the slice rather than emptying it,
+    /// for the reason `run_history` gives: what was read is still true.
+    /// It also ends the walk, so `next` says nothing more can be asked
+    /// for - the gaps the Ledger really has are not ranges this can fill,
+    /// and a cursor pointing past one would have the page ask for ever.
+    fn history_range(
+        &mut self,
+        from: kernel::Seq,
+        to: kernel::Seq,
+        limit: u32,
+    ) -> channels::HistoryRangeAnswer {
+        let empty = channels::HistoryRangeAnswer {
+            from,
+            to,
+            records: Vec::new(),
+            next: None,
+        };
+        if to < from {
+            return empty;
+        }
+        let dir = ledger_dir(&self.city_root);
+        if self.index.refresh(&dir).is_err() {
+            return empty;
+        }
+        let want = u64::from(limit.clamp(1, channels::HISTORY_MAX));
+        let last = from
+            .value()
+            .saturating_add(want.saturating_sub(1))
+            .min(to.value());
+        let mut records = Vec::new();
+        let mut reader = self.index.reader(&dir);
+        // A walk that stopped early found no line at that sequence, which
+        // means the Ledger ends there: nothing beyond it can be asked for
+        // either, and a cursor pointing past it would have the page ask for
+        // ever.
+        let mut walked = true;
+        for value in from.value()..=last {
+            let Ok(line) = reader.line_at(kernel::Seq::new(value)) else {
+                walked = false;
+                break;
+            };
+            let Ok(record) = EventRecord::parse_line(&line) else {
+                walked = false;
+                break;
+            };
+            records.push(record);
+        }
+        channels::HistoryRangeAnswer {
+            from,
+            to,
+            records,
+            next: (walked && last < to.value()).then(|| kernel::Seq::new(last.saturating_add(1))),
+        }
+    }
+
     /// One session's slice of the history, ending just before `before`.
     ///
     /// One bound, not two. The index knows which sequences this run
@@ -241,6 +306,9 @@ impl Views {
             }
             channels::Query::History { before, limit } => {
                 channels::Answer::History(Box::new(self.history(*before, *limit)))
+            }
+            channels::Query::HistoryRange { from, to, limit } => {
+                channels::Answer::HistoryRange(Box::new(self.history_range(*from, *to, *limit)))
             }
             channels::Query::RunHistory { run, before, limit } => {
                 channels::Answer::History(Box::new(self.run_history(*run, *before, *limit)))

@@ -38,8 +38,8 @@ use tokio::sync::broadcast;
 use crate::assets::AssetReply;
 use crate::reception::inbound::Inbound;
 use crate::reception::{
-    Admission, BindFace, BindVerdict, Door, SessionState, SessionStep, decide_admission,
-    decide_bind, decide_frame,
+    Admission, BindVerdict, Door, SessionState, SessionStep, Stream, decide_admission, decide_bind,
+    decide_frame,
 };
 use crate::wire::ServerFrame;
 
@@ -61,6 +61,8 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     // not be dropped and because its rate is the rate at which one
     // person makes mistakes, not the rate of the event stream.
     let (refused, mut refusals) = tokio::sync::mpsc::unbounded_channel::<AxError>();
+    // What this session has delivered and what it still owes.
+    let mut stream = Stream::opening();
     loop {
         tokio::select! {
             incoming = socket.recv() => {
@@ -71,7 +73,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                 // reaches the peer by one path whichever produced it.
                 let step = match inbound.read(&text) {
                     Ok(frame) => {
-                        decide_frame(phase, frame, state.token_digest.as_ref(), state.city.as_ref())
+                        decide_frame(phase, frame, &state.face, state.city.as_ref())
                     }
                     Err(unreadable) => unreadable,
                 };
@@ -150,21 +152,43 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
             event = events.recv() => {
                 match event {
                     Ok(record) => {
-                        if phase == SessionState::Live
-                            && send(&mut socket, &ServerFrame::Event(Box::new(record))).await.is_err() {
-                            return;
+                        if phase == SessionState::Live {
+                            let seq = record.seq();
+                            // The far end of a skipped range is only knowable
+                            // here, at the record that ends it: the count the
+                            // subscription reports says how many messages went
+                            // by and names no endpoint of the range they went
+                            // by in.
+                            let (lag, next) = stream.before(seq);
+                            if let Some(lag) = lag
+                                && send(&mut socket, &ServerFrame::Lagged(lag)).await.is_err()
+                            {
+                                return;
+                            }
+                            if send(&mut socket, &ServerFrame::Event(Box::new(record))).await.is_err() {
+                                return;
+                            }
+                            stream = next;
                         }
                     }
-                    // A slow client loses the middle of the stream rather
-                    // than holding the writer back; it recovers from the
-                    // ledger on reconnect.
-                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    // A slow client does not hold the writer back: the
+                    // subscription leaves it behind and the Ledger answers
+                    // the range it lost. It is told which range that is, so
+                    // it can ask; before this, the middle of the stream
+                    // vanished and nothing said so.
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        stream = stream.skipped(phase == SessionState::Live);
+                    }
+                    // The sender is gone, which means the city is going down:
+                    // there is nothing left to wait for, and a receiver left
+                    // on a closed channel answers immediately for ever.
                     Err(broadcast::error::RecvError::Closed) => return,
                 }
             }
-            // Increments, on their own channel. Lag is ignored without a
-            // word: a missed increment is a missed frame of an animation,
-            // and the settled text arrives as a record either way.
+            // Increments, on their own channel. **A skipped one is not
+            // stated**: an increment is written down nowhere, so a range
+            // naming it would name records that do not exist, and the
+            // settled text arrives as a record either way.
             said = deltas.recv() => {
                 match said {
                     Ok(delta) => {
@@ -174,13 +198,14 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(_)) => {}
-                    Err(broadcast::error::RecvError::Closed) => {}
+                    Err(broadcast::error::RecvError::Closed) => return,
                 }
             }
-            // The process log. Lag is ignored for the reason an
-            // increment's is: a log is a diagnostic and not history, so
-            // a reader that missed a line has lost nothing it could
-            // have acted on.
+            // The process log. A skipped line is not stated for the reason
+            // an increment's is not: a log is a diagnostic and not history,
+            // and the position it carries is the ledger's rather than a
+            // sequence of its own - so no range of it could put a reader back
+            // where it was.
             written = logs.recv() => {
                 match written {
                     Ok(line) => {
@@ -190,7 +215,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(_)) => {}
-                    Err(broadcast::error::RecvError::Closed) => {}
+                    Err(broadcast::error::RecvError::Closed) => return,
                 }
             }
         }
@@ -272,7 +297,7 @@ pub(crate) async fn accept_acp(State(state): State<Arc<ShellState>>, body: Bytes
     let pairing = match decide_admission(
         Door::Acp,
         request.get("token").and_then(serde_json::Value::as_str),
-        state.token_digest.as_ref(),
+        &state.face,
     ) {
         Admission::Admit(pairing) => pairing,
         Admission::Refuse(err) => {
@@ -325,13 +350,15 @@ pub(crate) async fn accept_recording(
 /// Refuses an exposed bind without a pairing token; propagates the bind and
 /// accept failures the operating system reports.
 pub async fn serve(config: ServeConfig) -> Result<(), AxError> {
-    // Which face was admitted changes nothing below: the peer address is
-    // read on both, because enrolment is refused off this machine even
-    // when the listener never left it.
-    match decide_bind(&config.addr, config.token_digest.is_some()) {
-        BindVerdict::Serve(BindFace::Loopback | BindFace::Exposed) => {}
+    // The face that comes back is the whole of what this listener presents
+    // and what it demands; it goes into the shell, where every door reads it
+    // rather than reading the configuration again. The peer address is read
+    // on both faces, because enrolment is refused off this machine even when
+    // the listener never left it.
+    let face = match decide_bind(&config.addr, config.token_digest) {
+        BindVerdict::Serve(face) => face,
         BindVerdict::Refuse(err) => return Err(err),
-    }
+    };
     let listener = tokio::net::TcpListener::bind(config.addr)
         .await
         .map_err(|source| {
@@ -342,7 +369,7 @@ pub async fn serve(config: ServeConfig) -> Result<(), AxError> {
             )
             .with_recovery("choose a free port, or stop the process already holding it")
         })?;
-    let app = router(&config).into_make_service_with_connect_info::<SocketAddr>();
+    let app = router(&config, face).into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, app).await.map_err(|source| {
         AxError::failure(
             AxCode::StorageFatal,

@@ -19,9 +19,9 @@
 
 ## 2 验收标准
 
-- **wire**：Command 恰 29 个 variant、Query 恰 33 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 恰 29 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`67bfc2a041609a524a0eb0f933f694bc09bce47d3224cc54e8a660e95787ecda`；**WIRE_V ＝ 32**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36）。
+  **当前 golden**：`5e829819d24d22dbe2c072840e75a8cdb09788a697bf9a381b95e02bcbe05114`；**WIRE_V ＝ 33**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -40,7 +40,7 @@
 是替尚不存在的第二实现造抽象。真需要语法引擎时它去服务端，线格式那时再长。
 
 **建 run→seq 的索引，理由是两组实测数字。** 其一，一次 `RunHistory` 在 5 万条账本上实测为 **2823 ms**，索引之后压到 **22.4 ms**，而这是「打开昨天的会话」这个动作的全部延迟。其二，那份要随账本同步的派生状态已经存在：`memory::LedgerIndex` 常驻于 `Views` 并每次查询 `refresh`，run 表只是它多一个字段，搭同一趟刷新、同一份 cache、同一条「存疑即重建」的反射，不新增同步义务。至于「第二个权威」：索引回答的是「在哪」，从不回答「是什么」，它可弃且存疑即重建；账本仍是唯一权威。接面与内存代价见 memory-SPEC §8-4。
-- **server**：默认绑定回环；绑非回环且 `auth` 未配置令牌时**拒绝启动**并回 `E_CONFIG_INVALID`（不是启动后再拒连——这是绑定面判定，不是请求面判定）。
+- **server**：默认绑定回环；绑非回环且 `auth` 未配置令牌时**拒绝启动**并回 `E_CONFIG_INVALID`（不是启动后再拒连——这是绑定面判定，不是请求面判定）。**暴露面必须有凭证是一条不变量，不是一句注释**：绑定判定把凭证本身装进 `BindFace::Exposed`，壳只持有这个面，于是「暴露着却不要求任何东西」是一个类型上不存在的状态（§8-41）。
 - **auth**：令牌比较恒为常数时间（不早退）；比较函数以「逐字节差异位置不影响耗时」的性质测试看守。地基是 `server::constant_time_eq` 与 `decide_handshake`；`auth` 模块接令牌的生成、展示与持久化。
 - **aggregate**：**类型化保证**——聚合上游连接的发送面在类型上只接受 `Query`，没有一个能塞进 `Command` 的方法（不是运行时 `if`，是类型上不存在该入口）；以 trybuild 反例钉死。
 - **上传端点**：`Attach` 的字节走 HTTP，不走 WebSocket 帧；命令语义不变（明写这是传输细节）。
@@ -175,9 +175,11 @@ impl From<WireCommand> for Command                     // 总函数；PutSecret 
 **公开名一字未改**（`lib.rs` 重导出）；变的只有 `cargo public-api` 记的**定义模块**，所以 `sprawling` 基线里 `Serving::client` 的类型路径从 `channels::server::ClientAssets` 变成 `channels::assets::ClientAssets`，两份 SPEC 同变更集各记一行。
 
 ```rust
-pub enum BindFace { Loopback, Exposed }              // 穷尽，不是 bool
+// 面里携着它索要的凭证：暴露面因此不能“要求空”。
+pub enum BindFace { Loopback { token: Option<B3Hash> }, Exposed { token: B3Hash } }
 pub enum BindVerdict { Serve(BindFace), Refuse(AxError) }
-pub fn decide_bind(addr: &SocketAddr, token_configured: bool) -> BindVerdict;
+pub fn decide_bind(addr: &SocketAddr, token: Option<B3Hash>) -> BindVerdict;
+impl BindFace { pub fn token_digest(&self) -> Option<&B3Hash>; }
 
 pub enum EnrollVerdict { Accept, Refuse(AxError) }
 pub fn decide_enroll(peer: &SocketAddr) -> EnrollVerdict;   // 只认回环调用方
@@ -193,7 +195,9 @@ pub fn decide_admission(door: Door, offered: Option<&str>, configured: Option<&B
 pub fn offered_pairing(header: Option<&str>) -> Option<&str>;  // `Authorization: Bearer`
 
 pub enum HandshakeVerdict { Accept, Reject(AxError) }
-pub fn decide_handshake(hello: &Hello, expected: &Welcome, configured: Option<&B3Hash>) -> HandshakeVerdict;
+pub fn decide_handshake(hello: &Hello, expected: &Welcome, face: &BindFace) -> HandshakeVerdict;
+// 路由表拿到的也是这个面：壳自己不再读配置里的令牌，因为那样“要求什么”就有两个家。
+pub fn router(config: &ServeConfig, face: BindFace) -> Router;
 
 pub struct ServeConfig {
     pub addr: SocketAddr,
@@ -275,7 +279,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 - **`CityAnswer.buildings: Vec<BuildingProgress>`**：每栋楼一行，携 `Progress` 与 `problems`。解析不出的行进 `problems` 并照显——悄悄丢掉读不懂的行，等于按一个没人选过的分母报进度。
 - **五维成本携权威总额**：`CostAnswer.total` 与五个维度各自求和相等；界面按 `total` 算占比而不自己归一，未归因余额因此看得见。
 
-- **採用 `broadcast` 而非每连接一个队列**：多个标签页是常态；慢客户端被 `Lagged` 拉下而不拖住写入方，它重连时从 `Welcome.resume_from` 补齐（接前端时兑现）。
+- **採用 `broadcast` 而非每连接一个队列**：多个标签页是常态；慢客户端被拉下而不拖住写入方。**丢下的那一段不再静默**：事件流慢过城的会话收到 `ServerFrame::Lagged { from, to }`，按这个区间向账本补拉（§8-41）。三路语义不同，故这三节分开陈述：事件可补、增量与日志恒不可补、会话自己的拒绝根本不走广播。
 
 ## 8.5 两个设计
 
@@ -432,7 +436,7 @@ pub struct SessionName(String);                // 形状 2；一个构造点，�
 | `serde`／`serde_json` | 帧编码 | 已在 workspace |
 | `kernel` | AxError／EventRecord／IdemKey／Sealed／Address | 唯一上游 |
 
-**不引**：任何通用 RPC 框架（wire 是 17＋9 个具名 variant，不是一个可扩展的服务定义）；任何 session 中间件（鉴权面只有配对令牌一件）；任何穿透／中继库。
+**不引**：任何通用 RPC 框架（wire 是 17＋9 个具名 variant，不是一个可扩展的服务定义）；任何 session 中间件（鉴权面只有配对令牌一件）；任何穿透／中继库。**WebTransport／QUIC 同此**：重开条件写在 §8-41 末节（城真的在回环之外且实测有队头阻塞，两条都成立才重开），此前它不因「需要第二种协议」而回来。
 
 **依赖面代价须实测并回填**：引 tokio＋axum 后 `channels` 的依赖 crate 数，按先例（wasmtime 使 runtime 从 71 涨到 257）在收口时记录。
 
@@ -450,11 +454,11 @@ pub struct SessionName(String);                // 形状 2；一个构造点，�
 
 ## 16 测试与约束
 
-- 计数断言：Command 17、Query 9，逐名对本 SPEC §8-1 两表（与 kernel 的 specalign 同规——**若 wire 表也值得机器看守，评估扩 specalign 覆盖面**）。
+- 计数断言：`tests/wire_contract.rs` 逐名核两张名表与枚举变体数是否同步；**数字不写在这里**——一个被抄进本文的计数就是同一条规则的第二个家（同 §8-1 对 golden 的处置：本文只记哈希值本身，因为那是一个不可推导的输出而不是一条可重算的规则）。
 - trybuild 两反例：远程 `PutSecret`（含 `Sealed` 的帧不可序列化）；`aggregate` 发 Command（发送面无该入口）。
 - 常数时间比较的性质测试：差异位置不影响比较耗时。
 - 握手 golden：schema 哈希入快照；改 wire 类型必须同时改快照与本 SPEC。
-- 绑定面判定的单元测试：回环／非回环×有令牌／无令牌四格，只有「非回环＋无令牌」拒绝启动。
+- 绑定面判定的单元测试：回环／非回环×有令牌／无令牌四格，只有「非回环＋无令牌」拒绝启动；并断言判定给出 `BindFace::Exposed` 时里面的摘要就是判定的那一个（凭证属于面的这一条因此有测试，而不只有形状）。
 - 约束：非测试代码遵守 C3 硬化全条；全库禁裸 spawn（确定性第 3 条）——**本 crate 的并发必须是结构化的，带取消令牌**，这是引入 tokio 后第一条要守住的线。
 
 ## 17 模型体验
@@ -1152,3 +1156,74 @@ decide_admission(Door::Acp,        offered, configured)  // 未配对仍进，�
 - **M-22**：`/enroll` 不再用 `format!` 手拼 `secret:<realm>/<name>`，先经 `kernel::SecretRef::parse` 读回再用它的 `Display` 作答。此前一个本城解析不回来的 realm 或 name 也能换到 201 与一句谁也兑不了的引用；现在那是 422。客户端同改：`enrol()` 用 201 正文里城说的那句引用，不再自己拼一份。
 - **B-76**：202 正文里断行残留的连续空格改为反斜杠续行。
 
+
+### 8-41 `WIRE_V` 33：丢帧可见、区间补拉、暴露面凭证（E-1）
+
+三件事同一集落地，因为它们是同一条链上的三个断点：慢会话丢掉的记录没有人说、丢了之后也没有一句话能把那一段要回来、以及「暴露面必须有凭证」当时只是一句注释加一个 bool。
+
+#### 一 丢掉的记录要说出来：`ServerFrame::Lagged { from, to }`
+
+```rust
+pub struct Lagged { pub from: Seq, pub to: Seq }   // 两端都含
+pub enum ServerFrame { …, Lagged(Lagged) }
+```
+
+**两端都取自会话自己数得出的记录，不取自广播报的那个数。** `RecvError::Lagged(u64)` 只说跳过了多少条，一个端点也不给；一个只拿到跳过量的人无法把丢掉的那一段要回来。所以会话新增一份状态——**上一条已发的 `EventRecord.seq`**——`from` 是它之后的第一条；`to` 是**恢复后首条回退一位**，因为「这一段到哪结束」只有在下一条记录到达时才成为事实。同一个值同时装着「已发到哪」和「还欠不欠一段范围」，故它是 `Stream::{Even, Owed}` 而不是一个 bool 加一个 `Option<Seq>`。
+
+**四路语义不同，故四路分开陈述**（四路指一个会话的四个接收臂：自己的拒绝、事件、增量、日志）：
+
+| 臂 | 缓冲 | 拉下时 | 原因 |
+|---|---|---|---|
+| 自己的拒绝 | unbounded mpsc | 不会发生 | 拒绝的速率是一个人犯错的速率，不是城的速率，且一条都不能丢 |
+| 事件 | broadcast 1024 | 发 `Lagged { from, to }` | 记录在账本里，那一段可以要回来 |
+| 增量 | broadcast 256 | 一言不发 | 增量不落账本、不可重放，为它报一个区间等于报一段不存在的记录；settled 文本随后作为记录到达 |
+| 日志 | broadcast 深度见 `serving::journal` | 一言不发 | 日志是诊断不是历史，且它携的位置是账本的位置而不是自己的序号，所以任何区间都放不回读者原来的地方 |
+
+**`Closed` 的两种语义合成一种：会话结束。** 此前事件路 `return`、增量与日志路 `{}`——而一个已关闭的 broadcast 接收端**立刻**返回 `Closed`，于是那两条臂在 `select!` 里变成热转。发端全没了就是城要走了，四条臂一律 `return`。
+
+**「重连从账本补」只在事件一路成立**，SPEC 此前把它写成了三路共用的一句话（`Delta` 的 doc 明写 never written to the Ledger, cannot be replayed，日志同理）；现在它在事件一路兑现，另两路的静默在表里各自有理由。
+
+**还没被欢迎的会话不报区间。** 它没有给对端看过任何一条记录，它的视角从 welcome 开始——而欢迎之前发生的事，页面要的话是一个提问（`Query::History`），不是一帧。
+
+**客户端的闭包臂先封掉。** `client/src/core/link.ts` 末尾原有一个 `return [link, { kind: "nothing" }]`：**忘记处理一帧因此是零编译错误的静默失败**，而新帧刚好要落在这个位置上。现在那条路径是一个参数类型为 `never` 的函数，穷尽时它的实参收敛成 `never`、漏一臂时保持原类型——于是「忘了处理」是编译错误而不是沉默。
+
+#### 二 丢了之后要能要回来：`Query::HistoryRange { from, to, limit }`
+
+`Query::History` 只有 `before: Option<Seq>` 的向后翻页，回答的是「这之前发生了什么」；区间两头都有，从尾巴走到区间的近端要为此付掉中间每一条记录的代价。故新增一条查询：**答面是 `HistoryRangeAnswer { from, to, records, next }`，不是复用 `HistoryAnswer`。**
+
+- **两个端点回声**：提问没有游标可握（两个 seq 来自一帧，那一帧早已被丢掉），所以答必须说出自己切的是哪一段——否则同一页同时开着记录视图与补拉时，两条答无法分辨。
+- **`next` 而不是 `more`**：服务端知道账本里这一段的下一条在哪，答一个游标就是把它已经知道的告诉你；客户端因此不做序号算术。
+- **`HISTORY_MAX = 500` 由服务端钳，客户端要不到更多**；一次补拉是多页，`next` 说下一页从哪起。
+- **走不到的那一步结束区间而不是指一个越界的游标**：一条读不回来的行，或者一条越过账本尾部的区间，都让 `next` 是 `None`。反过来会让客户端对着同一个 `from` 永远问下去。
+- **`QUERY_NAMES` 从 33 增到 34**，schema 哈希随之变（33→34 名字表长了一项，故哈希无论如何都要动，版本因此同集进位）。旧页面在握手期被明确拒绝，这正是该机制存在的理由。
+- **实现住 `sprawling::views::answering::history_range`**，与 `history` 并排、共用同一个 `LedgerIndex::reader`；本 crate 不读盘。
+
+**客户端的补拉走的是「一次一页、答的游标推进」，不是「一次一个可替换的窗口」**：区间排成队列（两次丢失是两个区间），队首一页在飞，答回来了才前进或出队。可替换的窗口在「一页在飞时又来一次丢失」这一刻会丢掉中间那一段。补到的记录**像别的记录一样折进 belief**（`store.apply`），且**不使任何已答的问题变旧**：它们是旧记录而不是新闻，为它们把所有答案标旧等于把整座城重问一遍。视图要不要直接画这一段，是前端道的事（本波只有 socket 半边问它）。
+
+**客户端的 socket 半边**因此是本层唯一会「问一句、等一句、再问」的地方：`client/src/core/socket.ts` 的 `askGap()` 与 `filled()` 两小段，判断仍全在 `link.ts`。
+
+#### 三 暴露面必须有凭证：把凭证装进面里
+
+```rust
+pub enum BindFace {
+    Loopback { token: Option<B3Hash> },   // 只从本机可达；配了令牌就照样要
+    Exposed { token: B3Hash },            // 能从别处可达，且从不无凭证服务
+}
+pub fn decide_bind(addr: &SocketAddr, token: Option<B3Hash>) -> BindVerdict;
+impl BindFace { pub fn token_digest(&self) -> Option<&B3Hash>; }
+```
+
+**强制点：`decide_bind` 是 `BindFace` 的唯一生产者，`serve` 是它的唯一调用者，`router(config, face)` 把面交给壳。** 壳（`ShellState.face`）此后是「这一面要求什么」的唯一读者：`decide_frame`、`decide_admission` 都拿 `&BindFace`，不再拿一个 `Option<&B3Hash>`。
+
+- **以前是什么样**：`decide_bind` 收一个 `token_configured: bool`，`serve` 只 `match` 掉 `Refuse` 而把 `Serve(BindFace)` 丢掉；然后每一道门各自去读 `config.token_digest`。「暴露面必须有凭证」因此靠一句话与一个 bool 维持，而 `router()` 是 pub：第二个入口可以造出一个暴露着却不要求任何东西的壳。
+- **现在是什么样**：`Exposed` 里**没有** `Option`——「暴露着却不要求任何东西」是一个类型上不存在的状态。这个不变量在测试里以四种格钉住（回环有无令牌、暴露有无令牌、以及 `BindingFace` 索要的摘要是不是判定它的那一个）。
+- **`ServeConfig.token_digest` 仍在**：它是配置说的话（谁配了令牌），面是绑定判定给出的判决。判决只此一处产生，故这不是同一个事实的两个家。
+- **`decide_admission` 的那句注释同时兑现**：「没有配令牌的城只可能是回环城」此前由启动时的 `decide_bind` 保证，现在由面的形状保证——它拿到的是一个不可能要求空的东西。
+
+#### 四 `/enroll` 等待里的第四个静默臂
+
+`/enroll` 等的是 `secret_captured`：这条记录在广播上，于是这个等待也可能被流拉下，而**被跳过的记录不会再发一次**。旧代码对 `Lagged` 一言不发、继续等，最后由超时给出一个 202，正文写着「它还没答复」——一句可能不真的话。现在等待的结局是一个枚举：`Settled`／`Overtaken`／`Ended`，被拉下时当场结束等待，202 的正文写成它真正的样子（「城的流走过了这次请求」），因为再等下去也等不到那条记录。
+
+#### 五 WebTransport 的重开条件
+
+**不因「需要第二种协议」回来。** 重开条件是**两个都要实测成立**：①这座城真的跑在回环之外；②队头阻塞实测存在（即一条大帧让同一条连接上的小帧延迟到人能察觉）。理由：`ws://` 只到回环、暴露面经终止器是已记录的部署判断（根 `Cargo.toml`，`connect` 不带 TLS），而换成 QUIC 会同时改掉握手、帧界与资产通路，代价落在每一次改 wire 时；收益只在②成立时出现。`Carrier` 这个抽象不在树里：本 crate 只有一个实现，抽出它就是穿透层。

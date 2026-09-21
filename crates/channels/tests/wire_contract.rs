@@ -46,10 +46,10 @@ fn exposed() -> SocketAddr {
 
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
-    // Twenty-nine commands, thirty-three queries. The count is not a
+    // Thirty-four commands, thirty-four queries. The count is not a
     // style choice - it is the wire's closed surface.
     assert_eq!(COMMAND_NAMES.len(), 29, "command table");
-    assert_eq!(QUERY_NAMES.len(), 33, "query table");
+    assert_eq!(QUERY_NAMES.len(), 34, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
@@ -59,7 +59,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 33, "query names are distinct");
+    assert_eq!(sorted.len(), 34, "query names are distinct");
 }
 
 #[test]
@@ -89,14 +89,14 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 32,
+        WIRE_V, 33,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
 
 /// A function of WIRE_V and the two name tables, so any change to the
 /// protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "67bfc2a041609a524a0eb0f933f694bc09bce47d3224cc54e8a660e95787ecda";
+const WIRE_SCHEMA_GOLDEN: &str = "5e829819d24d22dbe2c072840e75a8cdb09788a697bf9a381b95e02bcbe05114";
 
 // -------------------------------------------------------------- binding face
 
@@ -104,27 +104,36 @@ const WIRE_SCHEMA_GOLDEN: &str = "67bfc2a041609a524a0eb0f933f694bc09bce47d3224cc
 #[test]
 fn the_binding_face_has_exactly_one_refusing_cell() {
     // Constitution 8.3: loopback by default; exposed requires a pairing token;
-    // no token configured means refuse to *start*, not refuse to connect.
+    // no token configured means refuse to *start*, not refuse to connect. The
+    // credential the served face demands comes back inside the verdict, so the
+    // shell that carries it cannot demand something else than the face it is.
+    let secret = kernel::B3Hash::digest(b"pair-me-during-binding");
     assert!(matches!(
-        decide_bind(&loopback(), false),
-        BindVerdict::Serve(BindFace::Loopback)
+        decide_bind(&loopback(), None),
+        BindVerdict::Serve(BindFace::Loopback { token: None })
     ));
     assert!(matches!(
-        decide_bind(&loopback(), true),
-        BindVerdict::Serve(BindFace::Loopback)
+        decide_bind(&loopback(), Some(secret)),
+        BindVerdict::Serve(BindFace::Loopback { token: Some(_) })
     ));
-    assert!(matches!(
-        decide_bind(&exposed(), true),
-        BindVerdict::Serve(BindFace::Exposed)
-    ));
+    let BindVerdict::Serve(exposed_face) = decide_bind(&exposed(), Some(secret)) else {
+        panic!("an exposed bind with a token is served");
+    };
+    assert_eq!(exposed_face.token_digest(), Some(&secret));
 
-    let BindVerdict::Refuse(err) = decide_bind(&exposed(), false) else {
+    let BindVerdict::Refuse(err) = decide_bind(&exposed(), None) else {
         panic!("an exposed bind with no token must refuse to start");
     };
     assert_eq!(*err.code(), AxCode::ConfigInvalid);
     assert!(
         !err.recovery().is_empty(),
         "a refusal names an executable alternative"
+    );
+    // The one pair of cells that differ: a token is demanded beyond this
+    // machine and optional on it.
+    assert_ne!(
+        BindFace::Loopback { token: None }.token_digest(),
+        BindFace::Exposed { token: secret }.token_digest()
     );
 }
 
@@ -145,7 +154,7 @@ fn a_mismatched_schema_hash_is_rejected_before_anything_else() {
         city: None,
     };
     assert!(matches!(
-        decide_handshake(&good, &expected, None),
+        decide_handshake(&good, &expected, &loose()),
         HandshakeVerdict::Accept
     ));
 
@@ -154,10 +163,17 @@ fn a_mismatched_schema_hash_is_rejected_before_anything_else() {
         schema: kernel::B3Hash::digest(b"a client that cached an older front end"),
         token: None,
     };
-    let HandshakeVerdict::Reject(err) = decide_handshake(&stale, &expected, None) else {
+    let HandshakeVerdict::Reject(err) = decide_handshake(&stale, &expected, &loose()) else {
         panic!("a cached older client must be told to refresh, not silently served");
     };
     assert_eq!(*err.code(), AxCode::WireMismatch);
+}
+
+/// The face of a city nobody configured a token for: reachable from this
+/// machine only, demanding nothing.
+#[cfg(feature = "server")]
+fn loose() -> BindFace {
+    BindFace::Loopback { token: None }
 }
 
 #[cfg(feature = "server")]
@@ -170,6 +186,7 @@ fn an_exposed_server_rejects_a_wrong_token_and_accepts_the_right_one() {
         city: None,
     };
     let secret = kernel::B3Hash::digest(b"pair-me-0123456789");
+    let paired = BindFace::Exposed { token: secret };
 
     let wrong = Hello {
         wire_v: WIRE_V,
@@ -177,7 +194,7 @@ fn an_exposed_server_rejects_a_wrong_token_and_accepts_the_right_one() {
         token: Some("pair-me-9876543210".to_owned()),
     };
     assert!(matches!(
-        decide_handshake(&wrong, &expected, Some(&secret)),
+        decide_handshake(&wrong, &expected, &paired),
         HandshakeVerdict::Reject(_)
     ));
 
@@ -187,7 +204,7 @@ fn an_exposed_server_rejects_a_wrong_token_and_accepts_the_right_one() {
         token: Some("pair-me-0123456789".to_owned()),
     };
     assert!(matches!(
-        decide_handshake(&right, &expected, Some(&secret)),
+        decide_handshake(&right, &expected, &paired),
         HandshakeVerdict::Accept
     ));
 
@@ -198,11 +215,17 @@ fn an_exposed_server_rejects_a_wrong_token_and_accepts_the_right_one() {
     };
     assert!(
         matches!(
-            decide_handshake(&absent, &expected, Some(&secret)),
+            decide_handshake(&absent, &expected, &paired),
             HandshakeVerdict::Reject(_)
         ),
         "a missing token is not an empty token"
     );
+    // The same hello, on the face of a city that configured no token, is
+    // admitted: what differs is the face, and nothing else decides.
+    assert!(matches!(
+        decide_handshake(&absent, &expected, &loose()),
+        HandshakeVerdict::Accept
+    ));
 }
 
 // --------------------------------------------------- the two unspellable shapes
@@ -478,6 +501,48 @@ fn asking_for_one_session_is_a_different_frame_from_asking_for_the_city() {
         serde_json::to_vec(&city).expect("a query serialises"),
         bytes,
         "one session and the whole city must not spell the same frame"
+    );
+}
+
+/// The range a slow session lost travels with both of its ends, and the
+/// question that fills it is a frame of its own.
+///
+/// A reader told only how many records went by cannot ask for them: the
+/// count names no endpoint. It is deliberately not `History`, because an
+/// answer to that carries a cursor for a walk backwards and a gap has a
+/// near end as well as a far one.
+#[test]
+fn a_skipped_range_travels_with_both_of_its_ends() {
+    let frame = channels::ServerFrame::Lagged(channels::Lagged {
+        from: Seq::new(12),
+        to: Seq::new(40),
+    });
+    let text = serde_json::to_string(&frame).expect("a frame serialises");
+    let back: channels::ServerFrame = serde_json::from_str(&text).expect("and reads back");
+    assert_eq!(back, frame, "both ends survive the wire");
+    assert!(
+        text.contains("\"from\":12") && text.contains("\"to\":40"),
+        "{text}"
+    );
+
+    let ask = Query::HistoryRange {
+        from: Seq::new(12),
+        to: Seq::new(40),
+        limit: 500,
+    };
+    assert_eq!(ask.name(), "HistoryRange");
+    assert!(QUERY_NAMES.contains(&ask.name()), "named in the table");
+    let bytes = serde_json::to_vec(&ask).expect("a query serialises");
+    let back: Query = serde_json::from_slice(&bytes).expect("and reads back");
+    assert_eq!(back, ask);
+    assert_ne!(
+        bytes,
+        serde_json::to_vec(&Query::History {
+            before: Some(Seq::new(40)),
+            limit: 500,
+        })
+        .expect("a query serialises"),
+        "a range and a backward page must not spell the same frame"
     );
 }
 

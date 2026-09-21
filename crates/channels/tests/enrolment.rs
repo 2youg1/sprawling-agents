@@ -141,8 +141,15 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
     };
     // The peer is this machine, which is the one peer the route admits;
     // the address arrives the way axum hands it to a handler under test.
+    // The face comes from the same verdict the listener uses, so the
+    // route under test judges a caller by the rule the served city does.
+    let channels::BindVerdict::Serve(face) =
+        channels::decide_bind(&config.addr, config.token_digest)
+    else {
+        panic!("this test serves a loopback address");
+    };
     let peer: SocketAddr = "127.0.0.1:40000".parse().unwrap();
-    let app = channels::router(&config).layer(MockConnectInfo(peer));
+    let app = channels::router(&config, face).layer(MockConnectInfo(peer));
     let request = Request::builder()
         .method("POST")
         .uri("/enroll")

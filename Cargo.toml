@@ -85,8 +85,15 @@ tower = { version = "0.5", features = ["util"] }
 # crate axum's `ws` feature already carries - a direct dependency adds no
 # package to the lock, and adding a different WebSocket library would put
 # two implementations of one protocol in one binary. `connect` without
-# TLS: a city's control surface is reached over `ws://`, and a city
-# reachable over TLS is a city behind something that terminates it.
+# TLS, because termination is not this binary's job: `ws://` reaches a
+# loopback control surface, and a city served to another machine is
+# served through a terminator that holds the certificate. What the city
+# owes that deployment is the other half, and it is enforced rather than
+# configured: a face reachable beyond this machine refuses to serve
+# without a credential (channels-SPEC section 8-41). Loading a
+# certificate, renewing it, and choosing cipher suites here would put
+# "how the control surface is protected" in two homes at once - the
+# proxy's configuration and the city's.
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "handshake"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 # OS entropy for the PKCE verifier and the login state. It is not

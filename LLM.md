@@ -80,7 +80,7 @@ with the same key and read the answer you missed.
 Queries, every one the city answers:
 
 <!-- xtask:begin query_names -->
-`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `building_view`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `document`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `release`, `preferences`, `config`
+`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `history_range`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `building_view`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `document`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `release`, `preferences`, `config`
 <!-- xtask:end -->
 
 Each answers with one `answer` frame whose shape is the query's own; a

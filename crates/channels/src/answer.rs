@@ -44,7 +44,10 @@ pub use building::{BuildingProgress, PlanRow, PursuitLine};
 pub use commits::{CommitAnswer, CommitsAnswer};
 pub use config::{ConfigAnswer, ConfigLayer, SettledEffort, TuningDefaults};
 pub use cost_of::CostOfAnswer;
+pub use doctor::DoctorSandboxMissing;
 pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
+pub use doctor::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
+pub use doctor::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use document::DocumentAnswer;
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
@@ -73,6 +76,34 @@ pub struct HistoryAnswer {
     /// Where to ask next to go further back. `None` means this slice
     /// reaches the first record the city ever wrote.
     pub earlier: Option<Seq>,
+}
+
+/// One slice of a named range of ledger records, and where the slice
+/// continues.
+///
+/// **The endpoints come back with the records.** The question that asked
+/// for them carried no cursor a caller holds on to - not a `before` to
+/// walk back from, but two seq numbers that may have arrived in a frame
+/// the caller has already dropped - so an answer that did not name its
+/// own slice could not be told from one for a different range, and a page
+/// filling a gap while its record view is open would file the wrong
+/// answer.
+// No `Eq`, for the reason `HistoryAnswer` gives: a record's payload is
+// arbitrary JSON.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct HistoryRangeAnswer {
+    /// The first sequence this slice could have held, echoed from the
+    /// question.
+    pub from: Seq,
+    /// The last sequence the question asked for, echoed. A `next` of
+    /// `None` says these records are everything the Ledger holds between
+    /// the two.
+    pub to: Seq,
+    pub records: Vec<EventRecord>,
+    /// The sequence to ask from to finish the range, or `None` when the
+    /// range is answered and there is nothing more to ask for.
+    pub next: Option<Seq>,
 }
 
 /// What moved between two checkpoints, one row per file, path order.
@@ -224,6 +255,7 @@ pub struct CostAnswer {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Answer {
     History(Box<HistoryAnswer>),
+    HistoryRange(Box<HistoryRangeAnswer>),
     Changes(ChangesAnswer),
     Commit(CommitAnswer),
     City(CityAnswer),
