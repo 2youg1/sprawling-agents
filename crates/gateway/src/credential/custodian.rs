@@ -18,12 +18,77 @@ use super::vault::{Described, EnvReader, KeyringVault, MemoryVault, Persistence,
 use kernel::{AxCode, AxError, Payload, Sealed, SecretRef};
 use zeroize::Zeroizing;
 
+/// Which store a city writes secrets to.
+///
+/// A value rather than a sentence, because a dependency report and a
+/// person reading it have to be able to match on the answer. The
+/// encrypted file is a store this crate carries and no probe selects
+/// yet: the passphrase that opens it is asked for at start-up, and that
+/// wiring is its own change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Store {
+    /// The platform's own credential service.
+    PlatformService,
+    /// An encrypted file on this machine, opened once per start.
+    EncryptedFile,
+    /// This process only.
+    SessionMemory,
+}
+
+/// What the startup probe concluded: which store this city writes
+/// secrets to, how long that store keeps them, and the platform
+/// service's own refusal when it did not keep the value it was asked
+/// to keep.
+///
+/// One value, because the three answers come from one round trip: a
+/// report that read them separately could say the platform service
+/// works and that everything restarts with nothing, which is the pair
+/// of answers the caller cannot act on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Custody {
+    pub store: Store,
+    pub persistence: Persistence,
+    /// The service's refusal, in its own words. `None` where the
+    /// service worked, and where this city chose the store itself.
+    pub refusal: Option<String>,
+}
+
 /// The inner seam: store, fetch, delete. Nothing else leaves the crate.
 pub struct Custodian {
     backend: Box<dyn Vault + Send>,
-    source: &'static str,
-    persistence: Persistence,
+    /// Which store this city writes to. The name `describe` renders and
+    /// the grade `resolve`'s recovery states are both derived from it,
+    /// so the two read ports cannot answer with different stores.
+    store: Store,
+    /// The platform service's refusal, kept rather than derived: only
+    /// the probe saw it, and `describe` renders state rather than a
+    /// reason a person has to act on.
+    refusal: Option<String>,
     env: EnvReader,
+}
+
+impl Store {
+    /// The name `describe` renders, taken from the backend's own
+    /// constant: a person debugging a lost key needs to know which
+    /// service refused.
+    fn source(self) -> &'static str {
+        match self {
+            Store::PlatformService => KeyringVault::SOURCE,
+            Store::EncryptedFile => "encrypted-file",
+            Store::SessionMemory => MemoryVault::SOURCE,
+        }
+    }
+
+    /// The longest this store keeps a value on this target. The grade is
+    /// a fact about the store rather than about the probe, and it is
+    /// stated here once.
+    fn persistence(self) -> Persistence {
+        match self {
+            Store::PlatformService => KeyringVault::PERSISTENCE,
+            Store::EncryptedFile => Persistence::AcrossRebootsWithPassphrase,
+            Store::SessionMemory => MemoryVault::PERSISTENCE,
+        }
+    }
 }
 
 impl Custodian {
@@ -34,13 +99,14 @@ impl Custodian {
         let probe_ref = match SecretRef::parse("secret:sprawling/startup-probe") {
             Ok(reference) => reference,
             Err(_) => {
+                let reason = "probe reference unparsable";
                 return (
                     Custodian::with_backend(
                         Box::new(MemoryVault::default()),
-                        MemoryVault::SOURCE,
-                        MemoryVault::PERSISTENCE,
+                        Store::SessionMemory,
+                        Some(reason.to_owned()),
                     ),
-                    degraded_payload("probe reference unparsable"),
+                    degraded_payload(reason),
                 );
             }
         };
@@ -54,11 +120,7 @@ impl Custodian {
             });
         match round_trip {
             Ok(Some(read)) if read.as_str() == "probe" => (
-                Custodian::with_backend(
-                    Box::new(KeyringVault),
-                    KeyringVault::SOURCE,
-                    KeyringVault::PERSISTENCE,
-                ),
+                Custodian::with_backend(Box::new(KeyringVault), Store::PlatformService, None),
                 // No notice: the probe passed and this is the platform
                 // service, on Linux included. A `provider_degraded` event
                 // on every healthy Linux start would be a false alarm
@@ -68,19 +130,22 @@ impl Custodian {
                 // took - is answered by `resolve` below, in words.
                 None,
             ),
-            Ok(_) => (
-                Custodian::with_backend(
-                    Box::new(MemoryVault::default()),
-                    MemoryVault::SOURCE,
-                    MemoryVault::PERSISTENCE,
-                ),
-                degraded_payload("platform service returned a different value"),
-            ),
+            Ok(_) => {
+                let reason = "platform service returned a different value";
+                (
+                    Custodian::with_backend(
+                        Box::new(MemoryVault::default()),
+                        Store::SessionMemory,
+                        Some(reason.to_owned()),
+                    ),
+                    degraded_payload(reason),
+                )
+            }
             Err(err) => (
                 Custodian::with_backend(
                     Box::new(MemoryVault::default()),
-                    MemoryVault::SOURCE,
-                    MemoryVault::PERSISTENCE,
+                    Store::SessionMemory,
+                    Some(err.subject().to_owned()),
                 ),
                 degraded_payload(err.subject()),
             ),
@@ -89,22 +154,30 @@ impl Custodian {
 
     /// Session-memory custodian (tests, headless fallback by choice).
     pub fn in_memory() -> Custodian {
-        Custodian::with_backend(
-            Box::new(MemoryVault::default()),
-            MemoryVault::SOURCE,
-            MemoryVault::PERSISTENCE,
-        )
+        Custodian::with_backend(Box::new(MemoryVault::default()), Store::SessionMemory, None)
+    }
+
+    /// What the startup probe concluded, for a report about this
+    /// machine. Built from the fields the two read ports read, so a
+    /// caller cannot be told a store that neither `describe` nor
+    /// `resolve` is using.
+    pub fn custody(&self) -> Custody {
+        Custody {
+            store: self.store,
+            persistence: self.store.persistence(),
+            refusal: self.refusal.clone(),
+        }
     }
 
     fn with_backend(
         backend: Box<dyn Vault + Send>,
-        source: &'static str,
-        persistence: Persistence,
+        store: Store,
+        refusal: Option<String>,
     ) -> Custodian {
         Custodian {
             backend,
-            source,
-            persistence,
+            store,
+            refusal,
             env: Box::new(|key| std::env::var(key).ok()),
         }
     }
@@ -169,7 +242,7 @@ impl Custodian {
             )
             .with_recovery(format!(
                 "store the credential, or set its environment variable: {}",
-                self.persistence.consequence()
+                self.store.persistence().consequence()
             ))),
         }
     }
@@ -188,14 +261,14 @@ impl Custodian {
         let configured = matches!(self.backend.get(reference), Ok(Some(v)) if !v.is_empty());
         Described {
             configured,
-            source: self.source.to_owned(),
-            persistence: self.persistence,
+            source: self.store.source().to_owned(),
+            persistence: self.store.persistence(),
             writable: true,
         }
     }
 
     pub fn persistence(&self) -> Persistence {
-        self.persistence
+        self.store.persistence()
     }
 }
 
@@ -289,6 +362,58 @@ mod tests {
             .set(&reference, Zeroizing::new("new".to_owned()))
             .unwrap_err();
         assert!(err.subject().contains("SPRAWLING_SECRET_ACME_KEY"));
+    }
+
+    /// The one fact with two readers. `resolve` opens the value and
+    /// `describe` only looks, so a backend that decrypts for one and
+    /// not the other answers "not configured" for a credential it can
+    /// redeem - which is what a page would then tell a person about a
+    /// key they entered.
+    ///
+    /// The two ports are asked in every state this custodian can be in;
+    /// the assertions are the state, not a restatement of the code.
+    #[test]
+    fn the_two_read_ports_agree_about_whether_a_reference_is_configured() {
+        let reference = SecretRef::parse("secret:acme/agreement").unwrap();
+        let missing = Custodian::in_memory();
+        assert!(!agreed(&missing, &reference), "nothing is stored");
+
+        let mut stored = Custodian::in_memory();
+        stored
+            .set(&reference, Zeroizing::new(sample_token()))
+            .unwrap();
+        assert!(agreed(&stored, &reference), "a value is stored");
+        assert_eq!(
+            stored.describe(&reference).persistence,
+            stored.custody().persistence,
+            "the store `describe` names and the store a report names are one value"
+        );
+
+        // A name the machine sets is not a store this city can write to,
+        // and both ports have to say the same thing about it.
+        let shaded = Custodian::in_memory().with_env_reader(Box::new(|key| {
+            (key == "SPRAWLING_SECRET_ACME_AGREEMENT").then(String::new)
+        }));
+        assert!(
+            !agreed(&shaded, &reference),
+            "a variable set to nothing is not a credential"
+        );
+
+        let from_env = Custodian::in_memory().with_env_reader(Box::new(|key| {
+            (key == "SPRAWLING_SECRET_ACME_AGREEMENT").then(|| "from-env".to_owned())
+        }));
+        assert!(agreed(&from_env, &reference), "the environment carries it");
+    }
+
+    /// Asks both read ports and returns whether the credential is there.
+    fn agreed(custodian: &Custodian, reference: &SecretRef) -> bool {
+        let redeemed = custodian.resolve(reference).is_ok();
+        let described = custodian.describe(reference).configured;
+        assert_eq!(
+            redeemed, described,
+            "resolve says {redeemed} and describe says {described} about the same reference"
+        );
+        redeemed
     }
 
     #[test]

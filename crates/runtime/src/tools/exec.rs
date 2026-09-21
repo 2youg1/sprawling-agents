@@ -8,12 +8,15 @@
 //! Program runs a host process with a pinned working directory and an
 //! environment allowlist — secrets are never passed through, because a
 //! child process inherits whatever it is given and cannot be asked to
-//! forget. Python runs inside the sandbox, where the capability surface
-//! is the mount list and there is no network at all. Shell probes for
-//! an interpreter and **refuses when there is none**, rather than
-//! quietly rewriting the request as a Program call: a shell line that
-//! silently becomes something else is a worse answer than a refusal
-//! naming what is missing.
+//! forget. It runs in the sandbox this machine's confinement gives it
+//! unless the call names `where: host`; the tool's own description states
+//! which arm that is and what the arm does not hold. Python runs inside
+//! the wasip1 sandbox, where the capability surface is the mount list and
+//! there is no network at all. Shell probes for an interpreter and
+//! **refuses when there is none**, rather than quietly rewriting the
+//! request as a Program call: a shell line that silently becomes
+//! something else is a worse answer than a refusal naming what is
+//! missing.
 //!
 //! A missing component is `E_TOOL_UNAVAILABLE` carrying the alternative
 //! that would work, so the caller redirects instead of guessing.
@@ -30,6 +33,13 @@ use serde_json::{Map, Value};
 
 use crate::backlog::{Backlog, Exit, Started};
 use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
+
+mod confinement;
+
+pub use confinement::{
+    Assurances, Confined, Confinement, Guarantee, Kept, Missing, Offerings, Placed, Placement,
+    parse_placement,
+};
 
 /// Environment variables a child may inherit. Everything else is
 /// dropped: an allowlist stays safe when the process environment grows,
@@ -58,6 +68,7 @@ pub struct ExecTool {
     setup: ExecSetup,
     sandbox: Box<dyn Sandbox>,
     backlog: Backlog,
+    confinement: Confined,
     meta: ToolMeta,
 }
 
@@ -79,19 +90,42 @@ impl ExecTool {
             ),
         );
         properties.insert("arm".to_owned(), Value::Object(arm));
+        let mut placement = Map::new();
+        placement.insert("type".to_owned(), Value::String("string".to_owned()));
+        placement.insert(
+            "description".to_owned(),
+            Value::String(
+                "where the program or shell line runs: `sandbox` (the default) or \
+                 `host`"
+                    .to_owned(),
+            ),
+        );
+        properties.insert("where".to_owned(), Value::Object(placement));
         params.insert("properties".to_owned(), Value::Object(properties));
         params.insert(
             "required".to_owned(),
             Value::Array(vec![Value::String("arm".to_owned())]),
         );
         let domain = setup.domain.clone();
+        let confinement = Confined::detect();
+        // The arm and what it does not hold are in front of the caller,
+        // because a tool that said only "sandboxed" would let a command
+        // that needs a closed network be launched in a box whose network
+        // is open.
+        let disclosure = format!(
+            "Run a program, a Python snippet, or a shell line. A program or shell \
+             line runs in this machine's confinement, {}. Ask for `where: host` to \
+             run one outside it.",
+            confinement.statement()
+        );
         Ok(ExecTool {
             setup,
             sandbox,
             backlog,
+            confinement,
             meta: ToolMeta {
                 name: ToolName::parse("exec")?,
-                disclosure: "Run a program, a Python snippet, or a shell line.".to_owned(),
+                disclosure,
                 params: Payload::new(params)?,
                 effect: Effect::Write { domain },
                 cost_tier: CostTier::Heavy,
@@ -102,7 +136,12 @@ impl ExecTool {
         })
     }
 
-    fn run_program(&self, path: &str, args: &[String]) -> Result<ToolOutcome, AxError> {
+    fn run_program(
+        &mut self,
+        path: &str,
+        args: &[String],
+        placement: Placement,
+    ) -> Result<ToolOutcome, AxError> {
         let mut command = std::process::Command::new(path);
         command.current_dir(&self.setup.workdir).args(args);
         let what = if args.is_empty() {
@@ -110,7 +149,7 @@ impl ExecTool {
         } else {
             format!("{path} {}", args.join(" "))
         };
-        self.through_the_backlog(command, what, "program")
+        self.through_the_backlog(command, what, "program", placement)
     }
 
     /// Every host command goes through the table, whichever arm asked
@@ -120,24 +159,42 @@ impl ExecTool {
     /// authorities and the one with the hole in it would always be the
     /// one nobody remembered.
     fn through_the_backlog(
-        &self,
+        &mut self,
         mut command: std::process::Command,
         what: String,
         arm: &str,
+        placement: Placement,
     ) -> Result<ToolOutcome, AxError> {
         let inherited = self.inherited_environment();
         command.env_clear();
         for (key, value) in &inherited {
             command.env(key, value);
         }
+        let (command, placed) = match placement {
+            Placement::Host => (command, None),
+            Placement::Sandbox => {
+                let (command, placed) = self.confinement.place(command, &self.setup.workdir)?;
+                (command, Some(placed))
+            }
+        };
         let started = self.backlog.run(&self.setup.domain, what, command)?;
         let result = match started {
             Started::Settled {
                 exit,
                 stdout,
                 stderr,
-            } => settled(&stdout, &stderr, exit, arm)?,
-            Started::Backgrounded { id, what } => backgrounded(&id, &what, arm)?,
+            } => {
+                if let Some(placed) = placed {
+                    self.confinement.settled(placed);
+                }
+                settled(&stdout, &stderr, exit, arm)?
+            }
+            Started::Backgrounded { id, what } => {
+                if let Some(placed) = placed {
+                    self.confinement.handed(id, placed);
+                }
+                backgrounded(&id, &what, arm)?
+            }
         };
         with_environment(result, &inherited)
     }
@@ -210,7 +267,7 @@ impl ExecTool {
         )
     }
 
-    fn run_shell(&self, text: &str) -> Result<ToolOutcome, AxError> {
+    fn run_shell(&mut self, text: &str, placement: Placement) -> Result<ToolOutcome, AxError> {
         let Some(shell) = &self.setup.shell else {
             return Err(AxError::failure(
                 AxCode::ToolUnavailable,
@@ -222,7 +279,7 @@ impl ExecTool {
         let flag = if cfg!(windows) { "/C" } else { "-c" };
         let mut command = std::process::Command::new(shell);
         command.current_dir(&self.setup.workdir).arg(flag).arg(text);
-        self.through_the_backlog(command, text.to_owned(), "shell")
+        self.through_the_backlog(command, text.to_owned(), "shell", placement)
     }
 }
 /// Every result payload this tool can return has its own file: the
@@ -231,6 +288,19 @@ impl ExecTool {
 mod outcome;
 
 use outcome::{backgrounded, exceptional, settled, with_backlog, with_environment};
+
+/// The refusal the Python arm gives when asked for a host interpreter.
+fn no_host_python() -> AxError {
+    AxError::failure(
+        AxCode::SandboxDenied,
+        "run python on the host",
+        "the python arm runs a wasip1 guest and has no host form",
+    )
+    .with_recovery(
+        "use `arm: program` with a host interpreter, or leave `where` out to run the \
+         configured component",
+    )
+}
 
 /// Reads the arm out of the call. An unrecognised shape is refused
 /// rather than defaulted to shell — guessing which arm was meant is how
@@ -269,12 +339,22 @@ impl Tool for ExecTool {
                 self.meta.name.as_str()
             )));
         }
+        let placement = parse_placement(call.args.as_map())?;
         let answer = match parse_arm(call.args.as_map())? {
-            ExecArm::Program { path, args } => self.run_program(&path, &args),
-            ExecArm::Python { code } => self.run_python(&code),
-            ExecArm::Shell { text } => self.run_shell(&text),
+            ExecArm::Program { path, args } => self.run_program(&path, &args, placement),
+            // The Python arm has no host form: its interpreter is a
+            // component this build runs as a wasip1 guest, and a host
+            // `python` would be a different program than the one the
+            // arm promises.
+            ExecArm::Python { code } => match placement {
+                Placement::Sandbox => self.run_python(&code),
+                Placement::Host => Err(no_host_python()),
+            },
+            ExecArm::Shell { text } => self.run_shell(&text, placement),
         }?;
-        with_backlog(answer, self.backlog.harvest()?)
+        let finished = self.backlog.harvest()?;
+        self.confinement.reaped(&finished);
+        with_backlog(answer, finished)
     }
 }
 

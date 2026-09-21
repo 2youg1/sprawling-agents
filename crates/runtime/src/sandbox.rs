@@ -7,6 +7,11 @@
 //! behind which a guest program runs with exactly the capabilities it
 //! was handed and no others.
 //!
+//! **This is the guest half.** A plain host command — the exec tool's
+//! program and shell arms — is not a guest, so its isolation is bought
+//! from the platform instead; `runtime::tools` owns that half, names
+//! the arm in use, and states what the arm does not promise.
+//!
 //! The capability surface is the preopen set. A guest can reach a host
 //! directory if and only if a [`Mount`] named it; there is no ambient
 //! filesystem, no environment inheritance, and — because wasip1 has no

@@ -17,9 +17,27 @@ fn call(arm: Value) -> ToolCall {
     }
 }
 
-fn setup(python: Option<PathBuf>, shell: Option<PathBuf>) -> ExecSetup {
+/// The call as the agent writes it: an arm, and where it runs.
+fn call_at(arm: Value, placement: &str) -> ToolCall {
+    let mut args = Map::new();
+    args.insert("arm".to_owned(), arm);
+    args.insert("where".to_owned(), Value::String(placement.to_owned()));
+    ToolCall {
+        id: "c1".to_owned(),
+        name: ToolName::parse("exec").unwrap(),
+        args: Payload::new(args).unwrap(),
+    }
+}
+
+/// A working directory of the test's own.
+///
+/// It is small on purpose. A sandboxed command runs in a copy of this
+/// directory, and pointing the tools at this machine's temporary
+/// directory - which holds whatever the machine left there - would make
+/// every one of these tests copy gigabytes.
+fn setup(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathBuf>) -> ExecSetup {
     ExecSetup {
-        workdir: std::env::temp_dir(),
+        workdir: workdir.to_path_buf(),
         mounts: Vec::new(),
         python_wasm: python,
         shell,
@@ -29,8 +47,13 @@ fn setup(python: Option<PathBuf>, shell: Option<PathBuf>) -> ExecSetup {
     }
 }
 
-fn tool(python: Option<PathBuf>, sandbox: Box<dyn Sandbox>, shell: Option<PathBuf>) -> ExecTool {
-    ExecTool::new(setup(python, shell), sandbox, Backlog::new()).unwrap()
+fn a_tool(
+    workdir: &std::path::Path,
+    python: Option<PathBuf>,
+    sandbox: Box<dyn Sandbox>,
+    shell: Option<PathBuf>,
+) -> ExecTool {
+    ExecTool::new(setup(workdir, python, shell), sandbox, Backlog::new()).unwrap()
 }
 
 /// One variable this process really has, which no building declares by
@@ -77,11 +100,11 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
     let (name, value) = a_name_this_machine_sets();
     let (path, args) = reads_the_variable(&name);
 
-    let mut declared = ExecSetup {
+    let chamber = tempfile::tempdir().unwrap();
+    let declared = ExecSetup {
         env_passthrough: vec![kernel::EnvVarName::parse(&name).unwrap()],
-        ..setup(None, None)
+        ..setup(chamber.path(), None, None)
     };
-    declared.workdir = std::env::temp_dir();
     let mut tool = ExecTool::new(declared, Box::new(EchoSandbox::new()), Backlog::new()).unwrap();
     let outcome = tool
         .invoke(&call(serde_json::json!({
@@ -100,12 +123,13 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
     );
 
     // The same command in a building that declared nothing sees nothing.
-    let mut bare = ExecTool::new(
-        setup(None, None),
+    let bare_chamber = tempfile::tempdir().unwrap();
+    let mut bare = a_tool(
+        bare_chamber.path(),
+        None,
         Box::new(EchoSandbox::new()),
-        Backlog::new(),
-    )
-    .unwrap();
+        None,
+    );
     let outcome = bare
         .invoke(&call(serde_json::json!({
             "program": { "path": path, "args": args }
@@ -122,7 +146,8 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
 
 #[test]
 fn a_missing_component_refuses_and_names_the_alternative() {
-    let mut tool = tool(None, Box::new(EchoSandbox::new()), None);
+    let chamber = tempfile::tempdir().unwrap();
+    let mut tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
     let err = match tool.invoke(&call(
         serde_json::json!({ "python": { "code": "print(1)" } }),
     )) {
@@ -145,9 +170,15 @@ fn a_missing_component_refuses_and_names_the_alternative() {
 
 #[test]
 fn the_python_arm_runs_in_the_sandbox_and_reports_its_own_exit() {
+    let chamber = tempfile::tempdir().unwrap();
     let mut echo = EchoSandbox::new();
     echo.queue_stdout(b"42\n".to_vec());
-    let mut tool = tool(Some(PathBuf::from("python.wasm")), Box::new(echo), None);
+    let mut tool = a_tool(
+        chamber.path(),
+        Some(PathBuf::from("python.wasm")),
+        Box::new(echo),
+        None,
+    );
     let outcome = tool
         .invoke(&call(
             serde_json::json!({ "python": { "code": "print(42)" } }),
@@ -161,13 +192,19 @@ fn the_python_arm_runs_in_the_sandbox_and_reports_its_own_exit() {
 
 #[test]
 fn exhaustion_and_traps_reach_the_caller_as_themselves() {
+    let chamber = tempfile::tempdir().unwrap();
     let sandbox = FaultSandbox::new(vec![
         SandboxExit::FuelExhausted,
         SandboxExit::Trap {
             message: "unreachable".to_owned(),
         },
     ]);
-    let mut tool = tool(Some(PathBuf::from("python.wasm")), Box::new(sandbox), None);
+    let mut tool = a_tool(
+        chamber.path(),
+        Some(PathBuf::from("python.wasm")),
+        Box::new(sandbox),
+        None,
+    );
     let first = tool
         .invoke(&call(
             serde_json::json!({ "python": { "code": "while True: pass" } }),
@@ -187,7 +224,8 @@ fn exhaustion_and_traps_reach_the_caller_as_themselves() {
 
 #[test]
 fn an_unrecognised_arm_is_refused_not_guessed() {
-    let mut tool = tool(None, Box::new(EchoSandbox::new()), None);
+    let chamber = tempfile::tempdir().unwrap();
+    let mut tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
     let err = match tool.invoke(&call(serde_json::json!({ "bash": { "text": "ls" } }))) {
         Err(err) => err,
         Ok(_) => panic!("an unknown arm must refuse"),
@@ -197,7 +235,8 @@ fn an_unrecognised_arm_is_refused_not_guessed() {
 
 #[test]
 fn the_program_arm_runs_a_real_child_with_a_scrubbed_environment() {
-    let mut tool = tool(None, Box::new(EchoSandbox::new()), None);
+    let chamber = tempfile::tempdir().unwrap();
+    let mut tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
     // A program every supported host has, printing nothing useful:
     // the assertion is that it ran and reported its own exit code.
     let (path, args) = if cfg!(windows) {
@@ -213,4 +252,99 @@ fn the_program_arm_runs_a_real_child_with_a_scrubbed_environment() {
     let result = serde_json::to_value(&outcome.result).unwrap();
     assert_eq!(result["exit_code"], 3, "{result}");
     assert_eq!(result["arm"], "program");
+}
+
+/// A command that writes a file beside itself, and prints what it
+/// wrote. Both halves matter: the first proves it could write where it
+/// ran, the second proves where it ran.
+fn writes_beside_itself(name: &str) -> (String, Vec<String>) {
+    if cfg!(windows) {
+        (
+            "cmd".to_owned(),
+            vec![
+                "/C".to_owned(),
+                format!("echo written> {name} && type {name}"),
+            ],
+        )
+    } else {
+        (
+            "sh".to_owned(),
+            vec![
+                "-c".to_owned(),
+                format!("echo written > {name}; cat {name}"),
+            ],
+        )
+    }
+}
+
+/// The one promise the floor arm makes, asked of a real command on a
+/// real tree: it may write, and what it writes does not reach the tree
+/// the person has.
+#[test]
+fn a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone() {
+    let chamber = tempfile::tempdir().unwrap();
+    std::fs::write(chamber.path().join("kept.txt"), b"the person's own\n").unwrap();
+    let mut tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let (path, args) = writes_beside_itself("made.txt");
+    let outcome = tool
+        .invoke(&call(serde_json::json!({
+            "program": { "path": path, "args": args }
+        })))
+        .unwrap();
+    let result = serde_json::to_value(&outcome.result).unwrap();
+    assert_eq!(result["exit_code"], 0, "{result}");
+    assert!(
+        result["stdout"].as_str().unwrap().contains("written"),
+        "the command wrote where it ran: {result}"
+    );
+    assert!(
+        !chamber.path().join("made.txt").exists(),
+        "a sandboxed write must not land in the tree the person has"
+    );
+    assert_eq!(
+        std::fs::read_to_string(chamber.path().join("kept.txt")).unwrap(),
+        "the person's own\n",
+        "the tree it read is the tree the person has"
+    );
+
+    // The same command with the host placement is what reaches the tree,
+    // which is what makes the assertion above a capability decision
+    // rather than a command that never wrote anything.
+    let mut host = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let (path, args) = writes_beside_itself("made.txt");
+    host.invoke(&call_at(
+        serde_json::json!({
+            "program": { "path": path, "args": args }
+        }),
+        "host",
+    ))
+    .unwrap();
+    assert!(
+        chamber.path().join("made.txt").exists(),
+        "the host placement is the one a person decides on, and it is the one that writes"
+    );
+}
+
+#[test]
+fn the_python_arm_has_no_sandbox_host_form() {
+    let chamber = tempfile::tempdir().unwrap();
+    let mut tool = a_tool(
+        chamber.path(),
+        Some(PathBuf::from("python.wasm")),
+        Box::new(EchoSandbox::new()),
+        None,
+    );
+    let err = match tool.invoke(&call_at(
+        serde_json::json!({ "python": { "code": "print(1)" } }),
+        "host",
+    )) {
+        Err(err) => err,
+        Ok(_) => panic!("the wasip1 guest has no host interpreter to run it"),
+    };
+    assert_eq!(*err.code(), AxCode::SandboxDenied);
+    assert!(
+        err.recovery().contains("arm: program"),
+        "{}",
+        err.recovery()
+    );
 }

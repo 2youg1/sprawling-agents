@@ -24,13 +24,21 @@ use super::{examine, verdict};
 /// thread every other read is answered on.
 pub(crate) fn report() -> channels::DoctorAnswer {
     let platform = Platform::current();
-    fold(&examine(&ThisMachine::new(platform, PATIENCE)), platform)
+    let findings = examine(&ThisMachine::new(platform, PATIENCE));
+    fold(&findings, platform, confinement(), custody())
 }
 
 /// The findings, in the shape the wire carries. Separate from the ask
 /// so that a test says what this machine answered instead of having
-/// one.
-fn fold(findings: &[Finding], platform: Option<Platform>) -> channels::DoctorAnswer {
+/// one, and separate from the two machine-wide reads below so that a
+/// verdict is judged without a machine that has a keyring and a search
+/// path.
+fn fold(
+    findings: &[Finding],
+    platform: Option<Platform>,
+    sandbox: channels::DoctorSandbox,
+    custody: channels::DoctorCustody,
+) -> channels::DoctorAnswer {
     channels::DoctorAnswer {
         items: findings.iter().map(|found| item(found, platform)).collect(),
         tiers: Tier::ALL
@@ -43,6 +51,90 @@ fn fold(findings: &[Finding], platform: Option<Platform>) -> channels::DoctorAns
                 },
             })
             .collect(),
+        sandbox,
+        custody,
+    }
+}
+
+/// The arm a host command runs under here, as the wire carries it.
+///
+/// Read from the module that decides it rather than decided again here:
+/// a page naming one arm while commands run under another would be
+/// worse than no page at all.
+fn confinement() -> channels::DoctorSandbox {
+    let arm = runtime::tools::Confinement::detect();
+    channels::DoctorSandbox {
+        arm: arm_name(&arm),
+        coverage: runtime::tools::Guarantee::ALL
+            .iter()
+            .map(|axis| channels::DoctorGuarantee {
+                axis: axis_name(*axis),
+                kept: match arm.assurances().of(*axis) {
+                    runtime::tools::Kept::Yes => channels::DoctorCoverage::Kept,
+                    runtime::tools::Kept::No => channels::DoctorCoverage::NotKept,
+                },
+            })
+            .collect(),
+    }
+}
+
+/// Where this machine's credentials rest, from the one startup probe
+/// there is.
+///
+/// The probe writes a value, reads it back and deletes it, which is what
+/// makes the answer about this machine rather than about a configuration
+/// file. It also builds the `provider_degraded` notice the ledger
+/// carries; that notice belongs to the caller that keeps the custodian,
+/// and this report has no ledger to write it to.
+fn custody() -> channels::DoctorCustody {
+    let (custodian, _notice) = gateway::Custodian::probe();
+    let custody = custodian.custody();
+    channels::DoctorCustody {
+        store: match custody.store {
+            gateway::Store::PlatformService => channels::DoctorCustodyStore::PlatformService,
+            gateway::Store::EncryptedFile => channels::DoctorCustodyStore::EncryptedFile,
+            gateway::Store::SessionMemory => channels::DoctorCustodyStore::SessionMemory,
+        },
+        keeps: match custody.persistence {
+            gateway::Persistence::AcrossReboots => channels::DoctorCustodyLifetime::AcrossReboots,
+            gateway::Persistence::AcrossRebootsWithPassphrase => {
+                channels::DoctorCustodyLifetime::WithPassphrase
+            }
+            gateway::Persistence::ThisBoot => channels::DoctorCustodyLifetime::UntilReboot,
+            gateway::Persistence::ThisProcess => channels::DoctorCustodyLifetime::ThisProcess,
+        },
+        refusal: custody.refusal,
+    }
+}
+
+fn arm_name(arm: &runtime::tools::Confinement) -> channels::DoctorSandboxArm {
+    match arm {
+        runtime::tools::Confinement::LinuxNamespaces { .. } => {
+            channels::DoctorSandboxArm::LinuxNamespaces
+        }
+        runtime::tools::Confinement::WindowsJobObject => {
+            channels::DoctorSandboxArm::WindowsJobObject
+        }
+        runtime::tools::Confinement::CopiedTree => channels::DoctorSandboxArm::CopiedTree,
+        runtime::tools::Confinement::Unavailable { missing } => {
+            channels::DoctorSandboxArm::Unavailable {
+                missing: match missing {
+                    runtime::tools::Missing::ScratchDirectory => {
+                        channels::DoctorSandboxMissing::ScratchDirectory
+                    }
+                },
+            }
+        }
+    }
+}
+
+fn axis_name(axis: runtime::tools::Guarantee) -> channels::DoctorGuaranteeAxis {
+    match axis {
+        runtime::tools::Guarantee::Filesystem => channels::DoctorGuaranteeAxis::Filesystem,
+        runtime::tools::Guarantee::Network => channels::DoctorGuaranteeAxis::Network,
+        runtime::tools::Guarantee::ProcessTree => channels::DoctorGuaranteeAxis::ProcessTree,
+        runtime::tools::Guarantee::User => channels::DoctorGuaranteeAxis::User,
+        runtime::tools::Guarantee::Resources => channels::DoctorGuaranteeAxis::Resources,
     }
 }
 
@@ -145,9 +237,38 @@ fn install(recipe: &super::Recipe) -> channels::DoctorInstall {
 #[cfg(test)]
 #[expect(clippy::expect_used, reason = "test code")]
 mod tests {
+    use super::axis_name;
     use super::fold;
     use crate::doctor::tests::ScriptedMachine;
     use crate::doctor::{Platform, examine};
+
+    /// The two machine-wide reads a fold is given, so that a verdict is
+    /// judged without a machine that has a search path and a keyring.
+    fn stated() -> (channels::DoctorSandbox, channels::DoctorCustody) {
+        (
+            channels::DoctorSandbox {
+                arm: channels::DoctorSandboxArm::CopiedTree,
+                coverage: runtime::tools::Guarantee::ALL
+                    .iter()
+                    .map(|axis| channels::DoctorGuarantee {
+                        axis: axis_name(*axis),
+                        kept: match runtime::tools::Confinement::CopiedTree
+                            .assurances()
+                            .of(*axis)
+                        {
+                            runtime::tools::Kept::Yes => channels::DoctorCoverage::Kept,
+                            runtime::tools::Kept::No => channels::DoctorCoverage::NotKept,
+                        },
+                    })
+                    .collect(),
+            },
+            channels::DoctorCustody {
+                store: channels::DoctorCustodyStore::SessionMemory,
+                keeps: channels::DoctorCustodyLifetime::ThisProcess,
+                refusal: None,
+            },
+        )
+    }
 
     /// The page is told the same thing the terminal is told, item for
     /// item and verdict for verdict - and told it in values rather than
@@ -157,7 +278,13 @@ mod tests {
     fn the_answer_says_what_is_missing_and_what_would_get_it() {
         let machine =
             ScriptedMachine::missing(&["gecko", "webkit", "chromedriver", "msedgedriver"]);
-        let answer = fold(&examine(&machine), Some(Platform::Windows));
+        let (sandbox, custody) = stated();
+        let answer = fold(
+            &examine(&machine),
+            Some(Platform::Windows),
+            sandbox,
+            custody,
+        );
 
         let gecko = answer
             .items
@@ -208,13 +335,43 @@ mod tests {
     fn a_platform_with_no_recipes_offers_none() {
         let machine =
             ScriptedMachine::missing(&["gecko", "webkit", "chromedriver", "msedgedriver"]);
-        let answer = fold(&examine(&machine), None);
+        let (sandbox, custody) = stated();
+        let answer = fold(&examine(&machine), None, sandbox, custody);
         assert!(
             answer
                 .items
                 .iter()
                 .all(|item| item.install == channels::DoctorInstall::UnknownPlatform),
             "nothing can be said about installing on a platform nobody wrote recipes for"
+        );
+    }
+
+    /// What the page shows about the sandbox is the arm's own list, axis
+    /// for axis, rather than a second opinion about it: a report that
+    /// said "sandboxed" while the network stayed open is the failure the
+    /// arm's list exists to prevent.
+    #[test]
+    fn the_sandbox_rows_are_the_arms_own_assurances() {
+        let machine = ScriptedMachine::missing(&[]);
+        let (sandbox, custody) = stated();
+        let answer = fold(
+            &examine(&machine),
+            Some(Platform::Windows),
+            sandbox,
+            custody,
+        );
+        assert_eq!(answer.sandbox.arm, channels::DoctorSandboxArm::CopiedTree);
+        assert_eq!(answer.sandbox.coverage.len(), 5, "one row per axis");
+        let network = answer
+            .sandbox
+            .coverage
+            .iter()
+            .find(|row| row.axis == channels::DoctorGuaranteeAxis::Network)
+            .expect("every axis is reported");
+        assert_eq!(
+            network.kept,
+            channels::DoctorCoverage::NotKept,
+            "the copied tree does not isolate the network, and the page is told so"
         );
     }
 }

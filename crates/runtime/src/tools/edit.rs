@@ -158,6 +158,9 @@ impl Tool for EditTool {
         match kernel::gate::domain(&self.writable, &target, &kernel::TaintSet::empty()) {
             kernel::GateOutcome::Allow => {}
             kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
+            // The write doors do not ask. Were one ever to, the call is
+            // pending, not allowed.
+            kernel::GateOutcome::Ask { question } => return Err(*question),
         }
 
         let path = self.city_root.join(rel);

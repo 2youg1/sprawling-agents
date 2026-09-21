@@ -24,6 +24,12 @@ pub struct DoctorAnswer {
     /// One verdict per tier: a person who only wants to run a city is
     /// not told about what changing this code would need.
     pub tiers: Vec<DoctorVerdict>,
+    /// The confinement a command an agent asks for runs under, and the
+    /// axes that arm does not hold. An agent has to be able to read
+    /// that it is not in a box with the network closed before it acts.
+    pub sandbox: DoctorSandbox,
+    /// Where credentials rest on this machine, and how long they stay.
+    pub custody: DoctorCustody,
 }
 
 /// Who needs an item, and therefore which verdict it counts towards.
@@ -165,4 +171,111 @@ pub struct DoctorVerdict {
     /// The required items of this tier that are absent or broken, in
     /// table order. Empty means ready.
     pub missing: Vec<String>,
+}
+
+/// Which backend a host command runs under on this machine, and what
+/// that arm promises.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DoctorSandbox {
+    pub arm: DoctorSandboxArm,
+    /// One row per axis, in the order the axes are declared. The rows
+    /// are stated rather than left to the page to infer: an arm that
+    /// holds some axes and not others is the whole reason this report
+    /// exists.
+    pub coverage: Vec<DoctorGuarantee>,
+}
+
+/// The backend itself. Closed, so a page has a word for every arm and
+/// a new arm is a compile error at every reader.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum DoctorSandboxArm {
+    /// Namespaces of its own, made by a wrapper program.
+    LinuxNamespaces,
+    /// A Windows job object: the process tree ends together and the
+    /// limits hold, and the network is not isolated.
+    WindowsJobObject,
+    /// The floor every platform has: the command runs in a copy of the
+    /// working tree.
+    CopiedTree,
+    /// No arm at all, and what this machine is missing.
+    Unavailable { missing: DoctorSandboxMissing },
+}
+
+/// What a machine lacks when it can give no confinement at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum DoctorSandboxMissing {
+    ScratchDirectory,
+}
+
+/// One axis of confinement, and whether this machine's arm holds it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DoctorGuarantee {
+    pub axis: DoctorGuaranteeAxis,
+    pub kept: DoctorCoverage,
+}
+
+/// What a confinement can promise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum DoctorGuaranteeAxis {
+    Filesystem,
+    Network,
+    ProcessTree,
+    User,
+    Resources,
+}
+
+/// Whether the arm holds the axis. Two words rather than a boolean,
+/// because a page has to word both and a wire that carried `true` would
+/// make every reader choose its own word for `false`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum DoctorCoverage {
+    Kept,
+    NotKept,
+}
+
+/// Where this machine's credentials rest, and how long they stay.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DoctorCustody {
+    pub store: DoctorCustodyStore,
+    pub keeps: DoctorCustodyLifetime,
+    /// The platform service's own refusal, when it did not keep the
+    /// value it was asked to keep. `None` is a service that worked, and
+    /// a store this city chose itself.
+    pub refusal: Option<String>,
+}
+
+/// Which store a city writes secrets to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum DoctorCustodyStore {
+    /// The platform's own credential service.
+    PlatformService,
+    /// An encrypted file on this machine, opened once per start with a
+    /// passphrase.
+    EncryptedFile,
+    /// This process only.
+    SessionMemory,
+}
+
+/// How long a value the store keeps stays reachable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum DoctorCustodyLifetime {
+    AcrossReboots,
+    WithPassphrase,
+    UntilReboot,
+    ThisProcess,
 }

@@ -16,7 +16,13 @@ mod succeed;
 pub use edit::EditTool;
 pub use edit::version_of;
 pub use exec::parse_arm;
+pub use exec::parse_placement;
 pub use exec::{ExecSetup, ExecTool};
+pub use exec::{Placed, Placement};
+// Where a host command runs is public through this module for the two
+// readers outside the tool: the machine's own dependency report, and a
+// caller deciding whether a task can be done here at all.
+pub use exec::{Assurances, Confined, Confinement, Guarantee, Kept, Missing, Offerings};
 pub use read::ReadTool;
 pub use search::SearchTool;
 pub use status::ChildStatus;

@@ -19,7 +19,7 @@ mod custodian;
 mod oauth;
 mod vault;
 
-pub use custodian::Custodian;
+pub use custodian::{Custodian, Custody, Store};
 pub use oauth::{
     DeviceAuthorization, DeviceLogin, DevicePoll, DeviceRefusal, DeviceStep, FormPost, PollStep,
     device_authorization_request, device_login_begin,
