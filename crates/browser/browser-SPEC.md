@@ -17,11 +17,13 @@
 | snapshot | 原始 DOM 恒不入窗（断言）；同一棵树两次快照字节相同；label 超长即截断且不引入换行 |
 | act | 陈旧 generation 恒拒；页面文本进表达式后，字面量内除定界符外无未转义引号 |
 | devloop | 任意观察序列在预算内到达一个结局；结局枚举穷尽 |
-| profile | 两栋楼的 profile 互不包含；路径住 reserved prefix；confidential 楼恒 Ephemeral |
+| profile | 两栋楼的 profile 互不包含；路径住 reserved prefix；**confidential 楼的拒绝只有一个家**：`city::policy::evaluate` 读到 `confidential: true` 与 `browser: true`／`usersbrowser:` 并存即 `E_CONFIG_INVALID`，本 crate 不再有 `Ephemeral` 臂（那是同一个规则的不可达第二家） |
 
 ## 3 假设与歧义
 
 - **假设**：起进程归 `bin::browser_bidi`；本库恒不拉起浏览器进程、恒不持套接字、恒不下载驱动。
+- **假设（附着）**：连一个已经开着的浏览器也归装配层——本库只把帧交给缝。装配层的 `AttachedBrowser` 与 `LazyEngine` 是同一缝上的第二个实现：前者只连、不启动、不结束进程；后者的 `running`／`Drop` 假定进程归自己，两者因此不能合成一个类型。
+- **假设（未核验的协议形状，离线无法查）**：`input.performActions` 的 `pointer`／`wheel` 源动作字段、元素 origin 的 `SharedReference`、以及 `script.evaluate` 返回节点时 `sharedId` 的嵌套位置，据 W3C 草案写成；`input::shared_id_of` 在回复里按有界深度找 `sharedId`，找不到即 `E_WIRE_MISMATCH`。第一次对着真浏览器跑时要先核这三处。
 - **歧义已定**：BiDi 的 `session.new` 能力集合本版本只请求空能力＋按需 `network` 事件；更多能力等到有消费者再加，因为每一项能力都是远端因此获得的一项许可。
 
 ## 4 现状分析
@@ -35,6 +37,7 @@ P4 之前 `crates/browser/src/` 只有 `lib.rs` 一行文档。无既有代码�
 | 命令形 `{id, CommandData, Extensible}`、模块划分 | <https://www.w3.org/TR/webdriver-bidi/> |
 | `browsingContext` 语义（context 即可载入文档的 navigable） | <https://developer.mozilla.org/en-US/docs/Web/WebDriver/Reference/BiDi/Modules/browsingContext> |
 | `script` 模块 | <https://developer.mozilla.org/en-US/docs/Web/WebDriver/Reference/BiDi/Modules/script> |
+| `input` 模块（指针、滚轮；`performActions` 的源动作与元素 origin） | <https://w3c.github.io/webdriver-bidi/#module-input> |
 
 2026-08-22 复核：规范仍是 W3C 工作草案；本库只用 `session`／`browsingContext`／`script` 三个模块，`network` 仅作为可选订阅出现。
 
@@ -93,9 +96,17 @@ impl PageSnapshot {
 }
 
 // 8-4 act（形状 1 判定）
-pub enum Action { Click { reference: String }, Type { reference: String, text: String }, Read { reference: String } }
+pub enum Origin { Reference(String), Point(Point) }               // 拖拽从哪开始：快照的 ref 或视口点
+pub enum Action { Click { reference: String }, Type { reference: String, text: String },
+                  Read { reference: String },
+                  Drag { from: Origin, to: Point, steps: u32 },   // input.performActions
+                  Scroll { at: Option<Point>, by: Point } }       // 滚轮，by 为 CSS 像素增量
+pub const STEPS_MAX: u32 = 32;
+impl Action { pub fn reference(&self) -> Option<&str>; pub fn resolves_element(&self) -> bool; }
 pub fn frame_for(session: &mut Session, context: &ContextId, snapshot: &PageSnapshot,
-                 generation: u64, action: &Action) -> Result<Frame, AxError>;
+                 generation: u64, action: &Action) -> Result<Frame, AxError>;   // 仅 script 三臂
+pub fn resolve_frame(session: &mut Session, context: &ContextId, snapshot: &PageSnapshot,
+                     generation: u64, reference: &str) -> Result<Frame, AxError>; // 元素 origin 的第一帧
 
 // 8-5 devloop（形状 1 判定）
 pub struct Observation { pub text: String, pub complained: bool }
@@ -106,9 +117,9 @@ pub struct DevLoop { /* 私有 */ }
 impl DevLoop { pub fn observe(&mut self, observation: &Observation) -> Result<Step, AxError>; }
 
 // 8-6 profile（形状 1 判定）
-pub enum Profile { At { path: Address }, Ephemeral }
+pub struct Profile { /* path 私有 */ }
 pub const PROFILES_DIR: &str = "browser-profiles";
-impl Profile { pub fn of(building: &Address, policy: &BuildingPolicy) -> Result<Profile, AxError>; pub fn persists(&self) -> bool; }
+impl Profile { pub fn of(building: &Address) -> Result<Profile, AxError>; pub fn path(&self) -> &Address; }
 ```
 
 ## 8.5 两个设计
@@ -210,6 +221,9 @@ impl Verb {
     pub fn read(args: &Payload) -> Result<Verb, AxError>;
     pub fn frames(&self, session: &mut Session, context: &ContextId,
                   snapshot: Option<&PageSnapshot>) -> Result<Vec<Frame>, AxError>;
+    pub fn destination(&self) -> Result<Option<String>, AxError>;   // Open 的主机，门据此判出网
+    pub fn input_frame(&self, session: &mut Session, context: &ContextId,
+                       origin: Option<input::Origin>) -> Result<Frame, AxError>;
 }
 ```
 
@@ -248,9 +262,28 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 | verb | 八个动作各自的帧可在无浏览器下逐帧断言；`act` 无快照即拒；`measure` 的假 ref 在出网前被拒 |
 | shot | 同一段 PNG 字节两次读出同一尺寸；非 PNG 不猜尺寸；quality 不引入浮点变量 |
 | diff | 尺寸不同即拒；全同两图为 0；一个像素变化的框恰好含那个像素；解码字节短于头部时拒绝语点名是哪一张 |
+| input | 指针拖拽恒是 pointerMove→pointerDown→pointerMove×n→pointerUp；元素 origin 有界深度找 `sharedId`，找不到即 `E_WIRE_MISMATCH`；滚轮增量可为负 |
+| usersbrowser | 工具名取 `ToolName::USER_BROWSER` 一个权威；未声明地址的楼每次调用都得到门的问题；声明了地址的楼其 effect 带该主机；`usersbrowser:` 与 `browser:` 是两个设置；confidential 楼在 `city::policy` 即拒 |
 
 
 ### 19-7 尚未验证的部分
 
 - **`bin::browser_bidi::BidiSocket` 没有对着真浏览器跑过**。逐帧逻辑（发一帧、读到 id 相同的那条、跳过无 id 的事件）由阅读 W3C 草案得出而非由一次真实会话验证。工具那一侧的整条 open→snapshot→act→screenshot 由 `Recording` 逐帧断言，缝的另一个适配器因此是可信的；**这一侧不是**。第一次真跑要看的是三件事：`session.new` 的能力集合是否被 Firefox 接受、`script.evaluate` 的返回值是否真是 `result.value` 的字符串形状、`browsingContext.captureScreenshot` 的 `format.type` 是否收 `image/png` 这一拼写。
 - **`-headless` 有开关没有问的人**：`LaunchPlan` 带这一位并逐字断言，但 `for_building` 恒传 `false`。这一位由哪一面提供尚未定：候选是楼的 `CONFIG.toml` 与派活帧的一个字段。
+
+### 19-8 `browser::input`（新模块，形状 1 判定）
+
+BiDi 的 `input` 是 `script` 之外的另一个协议模块，本 crate 之前全走 `script.evaluate`。指针动作要说明它从哪开始，而 BiDi 的元素 origin 用页面自己的 shared id 而不是选择器，于是元素起点的拖拽在线上是**两帧**：`act::resolve_frame` 让页面报出元素，`input::shared_id_of` 从回复里读出 id，`input::pointer_frame` 再发 `input.performActions`。`Verb::frames` 只发第一帧，工具在 `invoke` 里补第二帧——判定仍在纯代码里，`Recording` 能逐帧重放。
+
+`Scroll` 不进 `Action::reference()` 的形状（滚轮没有元素），所以那个方法变成 `Option<&str>`，并由 `resolves_element()` 说明哪一臂要多一帧。
+
+**与 `desktop.act` 同一份词汇**：`drag` 从 ref 或 point 到 point、`scroll` 用 `to` 表示滚多远、`steps` 为中间移动次数；两侧字段名与含义逐字相同（`desktop-SPEC.md` §8-4 指向本节）。同一个动作在浏览器侧与桌面侧各有一个家会立刻漂开，所以拖拽的形状只有一份。
+
+### 19-9 `usersbrowser`（工具，装配层）
+
+驱动**人已经开着的那个浏览器**，用的是那个人的真 profile。与 `browser` 的差别是安全模型而不是动作集合：`browser` 那台由城拉起、profile 按楼隔离、confidential 楼恒无；`usersbrowser` 连的是人自己的进程，楼与楼的登录态隔离在附着那一刻不再成立，所以：
+
+- **地址是人的声明**：`BUILDING.md` 的 `usersbrowser:` 一行，值为 `ws://127.0.0.1:<port>/session` 时启用该工具并把地址交给 attach 门；值为 `true` 时启用而地址未定，于是每次调用都得到门的问题（`E_APPROVAL_PENDING`）与那句要人做的事；absent 或 `false` 即无此工具。confidential 楼写这一行即在规则读取处被拒。
+- **恒不关人的浏览器**：附着的端口（`bin::browser_bidi::attach::AttachedBrowser`）只连、不启动、不结束进程；`Verb::Close` 结束的是一次会话，进程还在。附着是会话级、绑一个 run，run 一结束套接字随工具一起 drop。
+- **入账**：附着是工具的第一次调用，与之后每个动作一样写 `tool_called`／`tool_result`；`disclosure` 写明它需要人先批准并引导先用 `browser`，`params` 给出动作的读法（§19-6 的 usersbrowser 行）。
+- **平台的门就是授权**：Firefox 走 `--remote-debugging-port`、Chromium 走驱动，两者都要求人的动作；这不是我们加的仪式，是平台留下的授权面。地址是否 loopback 由 `gate::attach` 判：非 loopback 的声明被拒，因为那会把登录态读过一个网络。

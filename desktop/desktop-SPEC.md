@@ -161,6 +161,8 @@ pub(crate) fn perform(tool: ToolName, arguments: &Value, admitted: &Admitted<'_>
 
 `desktop.act` 携 generation 是照抄 `browser::act` 的那一条：**对着一份快照做的决定，恒不落到另一份快照上**——过期就拒，而不是打到那时挪过去的东西上。
 
+**`drag`／`scroll` 的形状只有一份**：桌面侧与浏览器侧读同一组字段——起点是 `ref` 或 `point`，拖拽终点与滚动增量都用 `to`，`steps` 是中间移动次数。浏览器侧由 `browser::input` 实现（`browser-SPEC.md` §19-8），桌面侧由这张表实现；两侧的 `Action`／动词名逐字对齐，不会各自演化出一套。
+
 ### 8-8 Windows 这条胳膊的内部
 
 `platform::perform` 这个自由函数是一张**桌子**：

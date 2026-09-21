@@ -75,7 +75,7 @@ mod tests {
     fn refusal_of(outcome: GateOutcome) -> AxError {
         match outcome {
             GateOutcome::Deny { refusal } => *refusal,
-            GateOutcome::Allow => panic!("expected a refusal"),
+            GateOutcome::Allow | GateOutcome::Ask { .. } => panic!("expected a refusal"),
         }
     }
 

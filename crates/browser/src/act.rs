@@ -16,24 +16,97 @@ use crate::session::{ContextId, Session};
 use crate::snapshot::PageSnapshot;
 use kernel::{AxCode, AxError};
 
+/// A viewport position in CSS pixels. Negative `y` in a scroll delta is
+/// a wheel turned up; a pointer coordinate outside the viewport is the
+/// page's own business rather than something to clamp here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Point {
+    pub x: i64,
+    pub y: i64,
+}
+
+/// Where a pointer action starts.
+///
+/// Exhaustive: either the snapshot named the element, or the caller
+/// named a point. A drag that starts nowhere is not expressible, which
+/// is the point of the type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Origin {
+    /// A reference the snapshot minted. The page is asked for the
+    /// element's own id before the input frame is built, because BiDi
+    /// names an input origin by element reference and not by selector.
+    Reference(String),
+    /// A viewport point.
+    Point(Point),
+}
+
 /// What a run wants done. Exhaustive: an action this crate cannot spell
 /// should be a compile error at the caller, not a string that reaches a
 /// page.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
-    Click { reference: String },
-    Type { reference: String, text: String },
-    Read { reference: String },
+    Click {
+        reference: String,
+    },
+    Type {
+        reference: String,
+        text: String,
+    },
+    Read {
+        reference: String,
+    },
+    /// A pointer press at `from`, moved to `to`, released. `steps` is
+    /// how many intermediate moves the pointer makes on the way, which
+    /// is what a page that tracks a drag reads.
+    Drag {
+        from: Origin,
+        to: Point,
+        steps: u32,
+    },
+    /// One wheel turn at `at` (or at the viewport's own origin), by
+    /// `by` in CSS pixels.
+    Scroll {
+        at: Option<Point>,
+        by: Point,
+    },
 }
 
+/// How many intermediate pointer moves one drag may make. A ceiling on
+/// what crosses the socket, not a taste: a page that needs more than
+/// this to notice the drag is a page a person cannot drag either.
+pub const STEPS_MAX: u32 = 32;
+
 impl Action {
+    /// The snapshot reference this action names, when it names one.
     #[must_use]
-    pub fn reference(&self) -> &str {
+    pub fn reference(&self) -> Option<&str> {
         match self {
             Action::Click { reference }
             | Action::Type { reference, .. }
-            | Action::Read { reference } => reference,
+            | Action::Read { reference } => Some(reference),
+            Action::Drag {
+                from: Origin::Reference(reference),
+                ..
+            } => Some(reference),
+            Action::Drag {
+                from: Origin::Point(_),
+                ..
+            }
+            | Action::Scroll { .. } => None,
         }
+    }
+
+    /// Whether this action needs the page to name an element between
+    /// two frames before its input frame can be built.
+    #[must_use]
+    pub fn resolves_element(&self) -> bool {
+        matches!(
+            self,
+            Action::Drag {
+                from: Origin::Reference(_),
+                ..
+            }
+        )
     }
 }
 
@@ -60,11 +133,17 @@ fn quote(raw: &str) -> String {
 /// Builds the frame that performs `action` against the page `snapshot`
 /// describes.
 ///
+/// Pointer actions ([`Action::Drag`], [`Action::Scroll`]) do not come
+/// through here: they are BiDi `input.performActions`, which is a
+/// different module of the protocol, and they are built by
+/// [`crate::input`]. The refusal below is a guard against a caller that
+/// routes one here, not a state a run reaches.
+///
 /// # Errors
-/// Refuses a reference the snapshot did not mint, and one minted against
+/// Refuses a reference the snapshot did not mint, one minted against
 /// a different generation — the second is the stale-page case, and it is
 /// refused rather than retried because the caller has to look again to
-/// know what it is now clicking.
+/// know what it is now clicking — and an input action routed here.
 pub fn frame_for(
     session: &mut Session,
     context: &ContextId,
@@ -72,29 +151,73 @@ pub fn frame_for(
     generation: u64,
     action: &Action,
 ) -> Result<Frame, AxError> {
-    if generation != snapshot.generation() {
-        return Err(AxError::failure(
-            AxCode::InvalidArgs,
-            "act on a page",
-            format!(
-                "the action was decided against snapshot {generation}, the page is at {}",
-                snapshot.generation()
-            ),
-        )
-        .with_recovery("take a fresh snapshot and decide again"));
-    }
-    let selector = selector_of(snapshot, action.reference())?;
+    ensure_fresh(snapshot, generation)?;
     let expression = match action {
-        Action::Click { .. } => format!("{selector}.click()"),
-        Action::Type { text, .. } => {
+        Action::Click { reference } => format!("{}.click()", selector_of(snapshot, reference)?),
+        Action::Type { reference, text } => {
+            let selector = selector_of(snapshot, reference)?;
             format!(
                 "(el => {{ el.value = {}; el.dispatchEvent(new Event('input', {{ bubbles: true }})); }})({selector})",
                 quote(text)
             )
         }
-        Action::Read { .. } => format!("({selector}).textContent"),
+        Action::Read { reference } => {
+            format!("({}).textContent", selector_of(snapshot, reference)?)
+        }
+        Action::Drag { .. } | Action::Scroll { .. } => {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "act on a page",
+                "a pointer action is not a script",
+            )
+            .with_recovery(
+                "report this against browser::act: pointer actions are built by browser::input",
+            ));
+        }
     };
     session.evaluate(context, &expression)
+}
+
+/// The frame whose reply names the element a pointer action starts from.
+///
+/// BiDi's `input.performActions` names an element origin by the page's
+/// own shared id, which only a `script.evaluate` that returns the node
+/// carries back. The caller sends this frame, reads
+/// [`crate::input::shared_id_of`] out of the reply, and then builds the
+/// input frame.
+///
+/// # Errors
+/// Propagates a reference the snapshot did not mint.
+pub fn resolve_frame(
+    session: &mut Session,
+    context: &ContextId,
+    snapshot: &PageSnapshot,
+    reference: &str,
+) -> Result<Frame, AxError> {
+    session.evaluate(context, &selector_of(snapshot, reference)?)
+}
+
+/// Refuses a decision made against a page that has since changed.
+///
+/// One authority for the rule: `frame_for` and the element-origin resolve
+/// both ask it, so a caller that checks freshness once checks it the same
+/// way the other arm does.
+///
+/// # Errors
+/// Refuses a generation older or newer than the snapshot's own.
+pub(crate) fn ensure_fresh(snapshot: &PageSnapshot, generation: u64) -> Result<(), AxError> {
+    if generation == snapshot.generation() {
+        return Ok(());
+    }
+    Err(AxError::failure(
+        AxCode::InvalidArgs,
+        "act on a page",
+        format!(
+            "the action was decided against snapshot {generation}, the page is at {}",
+            snapshot.generation()
+        ),
+    )
+    .with_recovery("take a fresh snapshot and decide again"))
 }
 
 /// The expression that names one node of `snapshot` in the page.
@@ -151,6 +274,7 @@ fn index_of(reference: &str) -> Result<usize, AxError> {
 }
 
 #[cfg(test)]
+#[cfg(test)]
 #[allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -158,126 +282,4 @@ fn index_of(reference: &str) -> Result<usize, AxError> {
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
-    use super::*;
-    use serde_json::{Value, json};
-
-    fn page(generation: u64) -> PageSnapshot {
-        PageSnapshot::read(
-            generation,
-            &json!([
-                { "role": "button", "name": "Place order" },
-                { "role": "textbox", "name": "Quantity" },
-            ]),
-        )
-        .unwrap()
-    }
-
-    fn expression(frame: &Frame) -> String {
-        frame
-            .params()
-            .get("expression")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_owned()
-    }
-
-    #[test]
-    fn a_click_names_the_node_the_snapshot_showed() {
-        let mut session = Session::new();
-        let context = ContextId::parse("c1").unwrap();
-        let frame = frame_for(
-            &mut session,
-            &context,
-            &page(1),
-            1,
-            &Action::Click {
-                reference: "e1".to_owned(),
-            },
-        )
-        .unwrap();
-        assert_eq!(frame.method(), "script.evaluate");
-        assert!(expression(&frame).contains("'button'"));
-        assert!(expression(&frame).ends_with(".click()"));
-    }
-
-    #[test]
-    fn an_action_decided_against_an_older_page_is_refused_not_retried() {
-        let mut session = Session::new();
-        let context = ContextId::parse("c1").unwrap();
-        let err = frame_for(
-            &mut session,
-            &context,
-            &page(4),
-            3,
-            &Action::Click {
-                reference: "e1".to_owned(),
-            },
-        )
-        .unwrap_err();
-        assert_eq!(err.code(), &AxCode::InvalidArgs);
-        assert!(err.recovery().contains("fresh snapshot"));
-    }
-
-    #[test]
-    fn text_a_page_could_choose_never_becomes_code() {
-        let mut session = Session::new();
-        let context = ContextId::parse("c1").unwrap();
-        let frame = frame_for(
-            &mut session,
-            &context,
-            &page(1),
-            1,
-            &Action::Type {
-                reference: "e2".to_owned(),
-                text: "'); fetch('https://elsewhere.test'); ('".to_owned(),
-            },
-        )
-        .unwrap();
-        let script = expression(&frame);
-        assert!(
-            script.contains("\\'"),
-            "the quote that would close the literal carries a backslash: {script}"
-        );
-        // The page's text sits inside exactly one literal: two
-        // delimiters, and every quote between them escaped. Counting is
-        // the assertion because "looks escaped" is not a property.
-        let after = script.split("el.value = ").nth(1).unwrap();
-        let literal = after.split("; el.dispatchEvent").next().unwrap();
-        let mut bare = 0usize;
-        let mut escaped = false;
-        for ch in literal.chars() {
-            match (escaped, ch) {
-                (true, _) => escaped = false,
-                (false, '\\') => escaped = true,
-                (false, '\'') => bare += 1,
-                (false, _) => {}
-            }
-        }
-        assert_eq!(
-            bare, 2,
-            "only the delimiters may be unescaped quotes: {literal}"
-        );
-    }
-
-    #[test]
-    fn a_reference_that_was_never_minted_is_refused_by_name() {
-        let mut session = Session::new();
-        let context = ContextId::parse("c1").unwrap();
-        for reference in ["e9", "button", "e0", "e"] {
-            assert!(
-                frame_for(
-                    &mut session,
-                    &context,
-                    &page(1),
-                    1,
-                    &Action::Read {
-                        reference: reference.to_owned()
-                    },
-                )
-                .is_err(),
-                "{reference}"
-            );
-        }
-    }
-}
+mod tests;

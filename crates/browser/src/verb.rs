@@ -12,14 +12,17 @@
 //! Nothing here sends anything: the caller owns the socket, and this
 //! module owns which bytes it should put on it.
 
+mod read;
+
 use kernel::{AxCode, AxError, Payload};
 use serde_json::{Value, json};
 
-use crate::act::{Action, frame_for};
+use crate::act::{Action, Origin, frame_for, resolve_frame};
 use crate::port::Frame;
 use crate::session::{ContextId, Session};
 use crate::shot::ShotRequest;
 use crate::snapshot::PageSnapshot;
+use read::{missing, number_of, read_action, side_of, text_of};
 
 /// Installs the console recorder. Wrapping rather than replacing keeps
 /// the page's own logging working, which matters because the thing being
@@ -86,42 +89,94 @@ pub enum Verb {
     Close,
 }
 
-fn missing(field: &str) -> AxError {
-    AxError::failure(
-        AxCode::InvalidArgs,
-        "read a browser action",
-        format!("no `{field}`"),
-    )
-    .with_recovery(format!("pass `{field}`"))
-}
-
-fn text_of(args: &Payload, field: &str) -> Result<String, AxError> {
-    args.as_map()
-        .get(field)
-        .and_then(Value::as_str)
-        .map(str::to_owned)
-        .ok_or_else(|| missing(field))
-}
-
-fn number_of(args: &Payload, field: &str) -> Result<u64, AxError> {
-    args.as_map()
-        .get(field)
-        .and_then(Value::as_u64)
-        .ok_or_else(|| missing(field))
-}
-
-fn side_of(args: &Payload, field: &str) -> Result<u32, AxError> {
-    u32::try_from(number_of(args, field)?).map_err(|_| {
-        AxError::failure(
-            AxCode::InvalidArgs,
-            "read a browser action",
-            format!("`{field}` is larger than a viewport can be"),
-        )
-        .with_recovery("pass a pixel count that fits in 32 bits")
-    })
-}
-
 impl Verb {
+    /// The host this call's bytes would leave for, when it names one.
+    ///
+    /// The tool's own grammar answers this; the bench no longer reads an
+    /// argument name by hand (M-17). A URL with no authority —
+    /// `about:blank`, a `file:` path — names no host, so there is no
+    /// egress to judge.
+    ///
+    /// # Errors
+    /// Refuses an authority this build cannot read, which would leave an
+    /// egress unjudged.
+    pub fn destination(&self) -> Result<Option<String>, AxError> {
+        match self {
+            Verb::Open { url } => kernel::gate::host_of(url),
+            Verb::Snapshot
+            | Verb::Act { .. }
+            | Verb::Screenshot(_)
+            | Verb::Measure { .. }
+            | Verb::Console
+            | Verb::Viewport { .. }
+            | Verb::Close => Ok(None),
+        }
+    }
+
+    /// The frame an input action becomes once its origin is resolved.
+    ///
+    /// `origin` is `Some` exactly when [`Action::resolves_element`] said
+    /// so; a drag from a point takes the point out of its own arguments
+    /// and needs nothing between the frames.
+    ///
+    /// # Errors
+    /// Refuses an action that is not a pointer action, and a resolved
+    /// origin that does not match the action's own.
+    pub fn input_frame(
+        &self,
+        session: &mut Session,
+        context: &ContextId,
+        origin: Option<crate::input::Origin>,
+    ) -> Result<Frame, AxError> {
+        match self {
+            Verb::Act {
+                action: Action::Drag { from, to, steps },
+                ..
+            } => {
+                let from = match (from, origin) {
+                    (Origin::Point(at), None) => crate::input::Origin::Viewport(*at),
+                    (Origin::Reference(_), Some(resolved @ crate::input::Origin::Element(_))) => {
+                        resolved
+                    }
+                    (_, _) => return Err(origin_mismatch()),
+                };
+                crate::input::pointer_frame(
+                    session,
+                    context,
+                    &crate::input::DragPath {
+                        from,
+                        to: *to,
+                        steps: *steps,
+                    },
+                )
+            }
+            Verb::Act {
+                action: Action::Scroll { at, by },
+                ..
+            } => {
+                if origin.is_some() {
+                    return Err(origin_mismatch());
+                }
+                crate::input::wheel_frame(session, context, *at, *by)
+            }
+            Verb::Open { .. }
+            | Verb::Snapshot
+            | Verb::Act { .. }
+            | Verb::Screenshot(_)
+            | Verb::Measure { .. }
+            | Verb::Console
+            | Verb::Viewport { .. }
+            | Verb::Close => Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "act on a page",
+                "this action is not a pointer action",
+            )
+            .with_recovery(
+                "report this against browser::verb: only drag and scroll have input frames",
+            )),
+        }
+    }
+
     /// Reads one call's arguments.
     ///
     /// # Errors
@@ -179,13 +234,31 @@ impl Verb {
                 session.evaluate(context, RECORDER_SCRIPT)?,
             ]),
             Verb::Snapshot => Ok(vec![session.evaluate(context, &tree_script())?]),
-            Verb::Act { generation, action } => Ok(vec![frame_for(
-                session,
-                context,
-                looked_at(snapshot, "act on a page")?,
-                *generation,
-                action,
-            )?]),
+            Verb::Act { generation, action } => match action {
+                Action::Drag { .. } | Action::Scroll { .. } => {
+                    let looked = looked_at(snapshot, "act on a page")?;
+                    if action.resolves_element() {
+                        let Some(reference) = action.reference() else {
+                            return Err(origin_mismatch());
+                        };
+                        // The page names the element first; the input
+                        // frame follows once its reply arrives.
+                        crate::act::ensure_fresh(looked, *generation)?;
+                        Ok(vec![resolve_frame(session, context, looked, reference)?])
+                    } else {
+                        Ok(vec![self.input_frame(session, context, None)?])
+                    }
+                }
+                Action::Click { .. } | Action::Type { .. } | Action::Read { .. } => {
+                    Ok(vec![frame_for(
+                        session,
+                        context,
+                        looked_at(snapshot, "act on a page")?,
+                        *generation,
+                        action,
+                    )?])
+                }
+            },
             Verb::Screenshot(request) => request.frames(session, context),
             Verb::Measure { references } => Ok(vec![session.evaluate(
                 context,
@@ -214,22 +287,16 @@ fn looked_at<'a>(
     })
 }
 
-fn read_action(args: &Payload) -> Result<Action, AxError> {
-    let reference = text_of(args, "ref")?;
-    match text_of(args, "kind")?.as_str() {
-        "click" => Ok(Action::Click { reference }),
-        "read" => Ok(Action::Read { reference }),
-        "type" => Ok(Action::Type {
-            reference,
-            text: text_of(args, "text")?,
-        }),
-        other => Err(AxError::failure(
-            AxCode::InvalidArgs,
-            "read a browser action",
-            other.to_owned(),
-        )
-        .with_recovery("one of click, type, read")),
-    }
+fn origin_mismatch() -> AxError {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "act on a page",
+        "the resolved origin does not match the action",
+    )
+    .with_recovery(
+        "report this against browser::verb: a drag from a reference is resolved before its \
+         input frame is built, and nothing else is",
+    )
 }
 
 fn read_references(args: &Payload) -> Result<Vec<String>, AxError> {

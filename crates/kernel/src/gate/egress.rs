@@ -142,6 +142,132 @@ impl EgressAllowlist {
     }
 }
 
+/// The host a URL names, when it names one.
+///
+/// One authority for the whole workspace: the browser tool reading a page
+/// address and a building reading the address a person declared for
+/// their browser are the same question, and two parsers would answer it
+/// differently the first time either was corrected. No URL parser: only
+/// the authority component is asked for, and `about:blank` or a `file:`
+/// path names no host.
+///
+/// # Errors
+/// Refuses an authority this build cannot read, which would leave an
+/// egress unjudged.
+pub fn host_of(url: &str) -> Result<Option<String>, AxError> {
+    let Some((_scheme, rest)) = url.split_once("://") else {
+        return Ok(None);
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let after_user = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_userinfo, host)| host);
+    if after_user.is_empty() {
+        return Ok(None);
+    }
+    if let Some(bracketed) = after_user.strip_prefix('[') {
+        let (inside, _tail) = bracketed.split_once(']').ok_or_else(malformed_host)?;
+        if inside.is_empty() {
+            return Err(malformed_host());
+        }
+        return Ok(Some(inside.to_ascii_lowercase()));
+    }
+    let host = if let Some((candidate, port)) = after_user.rsplit_once(':') {
+        if !port.is_empty() && port.chars().all(|c| c.is_ascii_digit()) {
+            candidate
+        } else {
+            after_user
+        }
+    } else {
+        after_user
+    };
+    if host.is_empty() || host.contains(':') {
+        return Err(malformed_host());
+    }
+    Ok(Some(host.to_ascii_lowercase()))
+}
+
+fn malformed_host() -> AxError {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "read a url",
+        "the url's host is not a host",
+    )
+    .with_recovery("pass an absolute url, for example `https://example.com/page`")
+}
+
+/// Classifies a host name or address for the egress doors.
+///
+/// The one authority for what this city counts as loopback and as the
+/// private network around it: the target kind decides whether the first
+/// public egress notice is due and whether an attachment to a person's
+/// browser is on this machine at all. The host arrives already resolved
+/// to a name or an address; this function never resolves anything, and
+/// a host it cannot read as an address is public, which is the side
+/// that keeps the notice rather than the side that drops it.
+///
+/// Brackets around an IPv6 literal are stripped, so `[::1]` and `::1`
+/// are one address rather than two rules.
+#[must_use]
+pub fn target_of(host: &str) -> EgressTarget {
+    let bare = host
+        .trim()
+        .trim_end_matches('.')
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .to_ascii_lowercase();
+    if bare == "localhost" || bare == "::1" {
+        return EgressTarget::Loopback;
+    }
+    let octets = ipv4_octets(&bare);
+    if let Some([first, second, ..]) = octets {
+        if first == 127 {
+            return EgressTarget::Loopback;
+        }
+        let private = first == 10
+            || (first == 192 && second == 168)
+            || (first == 172 && (16..=31).contains(&second))
+            || (first == 169 && second == 254);
+        if private {
+            return EgressTarget::Private;
+        }
+    }
+    if let Some(leading) = ipv6_leading(&bare) {
+        // fc00::/7 unique-local and fe80::/10 link-local: the mask keeps
+        // the prefix bits and compares the group that carries them.
+        if (leading & 0xfe00) == 0xfc00 || (leading & 0xffc0) == 0xfe80 {
+            return EgressTarget::Private;
+        }
+    }
+    EgressTarget::Public {
+        host: bare.to_owned(),
+    }
+}
+
+/// Four octets when the string is a dotted IPv4 address, `None`
+/// otherwise. Anything dotted but out of range is a name, which lands
+/// on the public side.
+fn ipv4_octets(host: &str) -> Option<[u8; 4]> {
+    let mut octets = [0u8; 4];
+    let mut at = 0usize;
+    for part in host.split('.') {
+        let octet: u8 = part.parse().ok()?;
+        let slot = octets.get_mut(at)?;
+        *slot = octet;
+        at = at.saturating_add(1);
+    }
+    if at == 4 { Some(octets) } else { None }
+}
+
+/// The first sixteen-bit group of an IPv6 literal, when this is one.
+fn ipv6_leading(host: &str) -> Option<u16> {
+    if !host.contains(':') {
+        return None;
+    }
+    let first = host.split(':').next()?;
+    u16::from_str_radix(first, 16).ok()
+}
+
 /// The destination half of the egress question: may this run reach this
 /// host at all? The payload half stays with [`egress`] — "may these bytes
 /// leave" and "may this host be reached" are two questions, and a caller
@@ -207,118 +333,4 @@ pub fn egress_target(list: &EgressAllowlist, target: &EgressTarget) -> EgressOut
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
-    use super::*;
-    #[test]
-    fn an_allowlist_matches_on_label_boundaries_not_on_text() {
-        let list = EgressAllowlist::new(vec![".Example.com".to_owned(), "docs.rs".to_owned()]);
-        assert!(list.admits("example.com"));
-        assert!(list.admits("api.example.com"));
-        assert!(list.admits("EXAMPLE.COM"), "hosts are case-insensitive");
-        assert!(
-            !list.admits("notexample.com"),
-            "a suffix test would allow this"
-        );
-        assert!(!list.admits("example.com.evil.test"));
-    }
-
-    #[test]
-    fn a_host_outside_the_list_is_refused_in_three_parts_that_name_the_way_out() {
-        let list = EgressAllowlist::new(vec!["example.com".to_owned()]);
-        let target = EgressTarget::Public {
-            host: "pastebin.test".to_owned(),
-        };
-        let EgressOutcome::Deny { refusal } = egress_target(&list, &target) else {
-            panic!("an unlisted host is refused");
-        };
-        assert!(refusal.to_string().contains("pastebin.test"));
-        let gate = refusal.gate().unwrap();
-        assert!(gate.alternative().contains("example.com"));
-    }
-
-    #[test]
-    fn an_empty_list_reaches_nothing_public_and_says_what_to_do_instead() {
-        let list = EgressAllowlist::default();
-        let EgressOutcome::Deny { refusal } = egress_target(
-            &list,
-            &EgressTarget::Public {
-                host: "example.com".to_owned(),
-            },
-        ) else {
-            panic!("a building with no list reaches nothing public");
-        };
-        let gate = refusal.gate().unwrap();
-        assert!(gate.alternative().contains("building that has one"));
-    }
-
-    #[test]
-    fn local_and_private_targets_are_not_egress_at_all() {
-        let list = EgressAllowlist::default();
-        assert!(matches!(
-            egress_target(&list, &EgressTarget::Loopback),
-            EgressOutcome::Allow { .. }
-        ));
-        assert!(
-            matches!(
-                egress_target(&list, &EgressTarget::Private),
-                EgressOutcome::Allow { .. }
-            ),
-            "a confidential building must still reach its own inference server"
-        );
-    }
-
-    #[test]
-    fn the_egress_door_denies_spans_and_flags_the_first_public_hop() {
-        let span = SecretSpan {
-            start: 10,
-            len: 40,
-            provider: Some("anthropic"),
-        };
-        let outcome = egress(
-            std::slice::from_ref(&span),
-            &EgressTarget::Public {
-                host: "api.example.com".into(),
-            },
-            false,
-        );
-        match outcome {
-            EgressOutcome::Deny { refusal } => {
-                assert_eq!(refusal.code(), &AxCode::SecretEgress);
-                assert!(refusal.subject().contains("10+40"));
-                assert!(!refusal.subject().contains("sk-ant"), "never echo bytes");
-                assert!(refusal.gate().unwrap().alternative().contains("rotation"));
-            }
-            EgressOutcome::Allow { .. } => panic!("spans must deny"),
-        }
-        match egress(
-            &[],
-            &EgressTarget::Public {
-                host: "x.dev".into(),
-            },
-            false,
-        ) {
-            EgressOutcome::Allow {
-                first_public_egress,
-            } => assert!(first_public_egress),
-            EgressOutcome::Deny { .. } => panic!("clean egress allows"),
-        }
-        match egress(
-            &[],
-            &EgressTarget::Public {
-                host: "x.dev".into(),
-            },
-            true,
-        ) {
-            EgressOutcome::Allow {
-                first_public_egress,
-            } => assert!(!first_public_egress),
-            EgressOutcome::Deny { .. } => panic!(),
-        }
-        match egress(&[], &EgressTarget::Loopback, false) {
-            EgressOutcome::Allow {
-                first_public_egress,
-            } => assert!(!first_public_egress, "localhost is not the internet"),
-            EgressOutcome::Deny { .. } => panic!(),
-        }
-    }
-}
+mod tests;

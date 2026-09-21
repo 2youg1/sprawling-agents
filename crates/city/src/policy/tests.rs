@@ -308,3 +308,73 @@ fn the_allowlist_is_written_whole_and_not_parsed_here() {
     let second = write_desktop_scope(dir.path(), &lab, "windows = [").unwrap();
     assert_eq!(std::fs::read_to_string(&second).unwrap(), "windows = [");
 }
+
+/// The person's browser is switched on by the address itself: a person
+/// who wrote the line has answered both whether and where, and two lines
+/// would be two answers that can disagree.
+#[test]
+fn the_person_browser_is_switched_on_by_the_address_they_declared() {
+    let silent = evaluate(&addr("lab"), "confidential: false\n").unwrap();
+    assert!(silent.usersbrowser().is_none(), "absent means no");
+    let waiting = evaluate(&addr("lab"), "confidential: false\nusersbrowser: true\n").unwrap();
+    assert!(matches!(waiting.usersbrowser(), Some(UserBrowser::Waiting)));
+    let asked = evaluate(
+        &addr("lab"),
+        "confidential: false\nusersbrowser: ws://127.0.0.1:9222/session\n",
+    )
+    .unwrap();
+    let Some(UserBrowser::At(endpoint)) = asked.usersbrowser() else {
+        panic!("an address switches the tool on");
+    };
+    assert_eq!(endpoint.url(), "ws://127.0.0.1:9222/session");
+    assert_eq!(endpoint.host(), "127.0.0.1");
+    let off = evaluate(&addr("lab"), "confidential: false\nusersbrowser: false\n").unwrap();
+    assert!(off.usersbrowser().is_none());
+}
+
+/// The key is its own: `usersbrowser:` is not `browser:` with a prefix,
+/// so the two lines are two settings rather than one read twice.
+#[test]
+fn the_person_browser_and_the_citys_own_browser_are_two_settings() {
+    let both = evaluate(
+        &addr("lab"),
+        "confidential: false\nbrowser: true\nusersbrowser: ws://127.0.0.1:9222/session\n",
+    )
+    .unwrap();
+    assert!(both.browser());
+    assert!(matches!(both.usersbrowser(), Some(UserBrowser::At(_))));
+    let only_person = evaluate(
+        &addr("lab"),
+        "confidential: false\nusersbrowser: ws://127.0.0.1:9222/session\n",
+    )
+    .unwrap();
+    assert!(!only_person.browser());
+}
+
+/// Attaching to the person's browser reads every login in it, so a
+/// confidential building cannot ask: the per-building isolation these
+/// rules keep is exactly what the attachment dissolves.
+#[test]
+fn a_confidential_building_cannot_ask_for_the_persons_browser() {
+    let err = evaluate(&addr("lab"), "confidential: true\nusersbrowser: true\n").unwrap_err();
+    assert_eq!(err.code(), &AxCode::ConfigInvalid);
+    assert!(err.recovery().contains("usersbrowser"));
+    let err = evaluate(
+        &addr("lab"),
+        "confidential: true\nusersbrowser: ws://127.0.0.1:9222/session\n",
+    )
+    .unwrap_err();
+    assert_eq!(err.code(), &AxCode::ConfigInvalid);
+}
+
+#[test]
+fn a_person_browser_value_that_is_neither_a_switch_nor_an_address_is_refused() {
+    for bad in ["yes", "ftp://127.0.0.1:9222", "ws://", "127.0.0.1:9222"] {
+        let err = evaluate(
+            &addr("lab"),
+            &format!("confidential: false\nusersbrowser: {bad}\n"),
+        )
+        .unwrap_err();
+        assert_eq!(err.code(), &AxCode::ConfigInvalid, "{bad}");
+    }
+}

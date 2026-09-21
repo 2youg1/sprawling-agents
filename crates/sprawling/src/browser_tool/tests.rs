@@ -93,7 +93,7 @@ fn recorded() -> Recording {
 
 fn tool(cas_at: &std::path::Path) -> BrowserTool {
     let cas = Cas::open(cas_at).expect("a cas opens in a fresh directory");
-    BrowserTool::new(Box::new(recorded()), cas).expect("the tool builds")
+    BrowserTool::new(Role::Building, Box::new(recorded()), cas).expect("the tool builds")
 }
 
 fn text(outcome: &ToolOutcome) -> String {
@@ -215,4 +215,70 @@ fn the_tab_is_opened_once_and_the_frames_keep_one_numbering() {
         tool.context.is_some(),
         "the session a tool opened is the session it keeps"
     );
+}
+
+#[test]
+fn the_person_tool_asks_before_it_connects_and_names_itself() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let cas = Cas::open(&dir.path().join("cas")).expect("a cas opens in a fresh directory");
+    let mut waiting = BrowserTool::new(
+        Role::PersonWaiting,
+        Box::new(crate::browser_bidi::AttachedBrowser::waiting()),
+        cas,
+    )
+    .expect("the tool builds");
+    assert_eq!(
+        waiting.meta().name.as_str(),
+        kernel::ToolName::USER_BROWSER,
+        "the person's browser is its own tool"
+    );
+    assert!(matches!(
+        waiting.meta().effect,
+        Effect::AttachUserBrowser { address: None }
+    ));
+    assert!(
+        waiting.meta().disclosure.contains("Use `browser`"),
+        "the disclosure guides to the tool that needs nobody's permission"
+    );
+    let ask = ToolCall {
+        id: "tu_person".to_owned(),
+        name: ToolName::parse(kernel::ToolName::USER_BROWSER).expect("a literal name"),
+        args: args(json!({ "action": "snapshot" })),
+    };
+    let err = waiting
+        .invoke(&ask)
+        .expect_err("nothing connects without an address");
+    assert_eq!(err.code(), &AxCode::BrowserUnavailable);
+}
+
+#[test]
+fn a_declared_address_is_the_effect_the_attach_door_judges() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let cas = Cas::open(&dir.path().join("cas")).expect("a cas opens in a fresh directory");
+    let tool = BrowserTool::new(
+        Role::PersonAt {
+            host: "127.0.0.1".to_owned(),
+        },
+        Box::new(crate::browser_bidi::AttachedBrowser::at(
+            "ws://127.0.0.1:9222/session",
+        )),
+        cas,
+    )
+    .expect("the tool builds");
+    assert!(matches!(
+        tool.meta().effect,
+        Effect::AttachUserBrowser { address: Some(ref host) } if host == "127.0.0.1"
+    ));
+    // The subject is still per call: an open names the page's host, which
+    // is the egress half the same door scans.
+    let subject = tool
+        .subject(&call(
+            json!({ "action": "open", "url": "https://example.com/" }),
+        ))
+        .expect("the call reads");
+    assert_eq!(subject, GateSubject::Host("example.com".to_owned()));
+    let snapshot = tool
+        .subject(&call(json!({ "action": "snapshot" })))
+        .expect("the call reads");
+    assert_eq!(snapshot, GateSubject::None);
 }

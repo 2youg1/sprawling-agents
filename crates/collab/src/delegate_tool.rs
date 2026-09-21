@@ -75,6 +75,9 @@ impl DelegateDesk {
         match kernel::gate::spawn(self.depth, &work.kind) {
             GateOutcome::Allow => {}
             GateOutcome::Deny { refusal } => return Err(*refusal),
+            // The spawn door does not ask. Were it ever to, the call is
+            // pending, not allowed.
+            GateOutcome::Ask { question } => return Err(*question),
         }
         if !work.room.is_within(&self.building) {
             return Err(AxError::failure(

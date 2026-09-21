@@ -14,6 +14,7 @@
 mod act;
 mod devloop;
 mod diff;
+mod input;
 mod port;
 mod profile;
 mod session;
@@ -21,9 +22,10 @@ mod shot;
 mod snapshot;
 mod verb;
 
-pub use act::{Action, frame_for};
+pub use act::{Action, Origin, Point, STEPS_MAX, frame_for, resolve_frame};
 pub use devloop::{DevLoop, LOOKS_MAX, Observation, QUIET_LOOKS, Step};
 pub use diff::{Box2, Difference, diff};
+pub use input::{Origin as ResolvedOrigin, shared_id_of};
 pub use port::{BrowserPort, Frame, Reply};
 pub use profile::{PROFILES_DIR, Profile};
 pub use session::{ContextId, Recording, Session, SessionRequest};

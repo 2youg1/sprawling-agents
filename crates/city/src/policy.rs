@@ -30,10 +30,13 @@ pub use reach::DomainReach;
 /// The file a building's rules live in, at the building root.
 pub const BUILDING_FILE: &str = "BUILDING.md";
 
+mod user_browser;
+
+pub use user_browser::{UserBrowser, UserBrowserEndpoint};
+
 const CONFIDENTIAL_KEY: &str = "confidential:";
 const WRITE_KEY: &str = "write:";
 const REVIEW_KEY: &str = "review:";
-const BROWSER_KEY: &str = "browser:";
 const DESKTOP_KEY: &str = "desktop:";
 const WRITE_HEADING: &str = "write domain";
 const EGRESS_HEADING: &str = "egress";
@@ -59,6 +62,10 @@ pub struct BuildingRules {
     review: bool,
     /// Whether residents here are given the browser tool.
     browser: bool,
+    /// Whether residents here are given the tool that drives the
+    /// browser the person is already using, and where that browser
+    /// answers.
+    usersbrowser: Option<UserBrowser>,
     /// Whether residents here are given this machine's own desktop.
     desktop: bool,
     /// The skills this building takes into its catalog, by name. The
@@ -116,6 +123,20 @@ impl BuildingRules {
     #[must_use]
     pub fn browser(&self) -> bool {
         self.browser
+    }
+
+    /// What this building says about driving the browser a person is
+    /// already using, and where that browser answers.
+    ///
+    /// Absent the line, nothing: the same reading `browser` gets, and
+    /// for a stronger reason — a browser this city started holds one
+    /// building's logins, while the person's own browser holds every
+    /// account that person has. A confidential building never gets the
+    /// tool, because the attachment is exactly what its per-building
+    /// isolation does not survive.
+    #[must_use]
+    pub fn usersbrowser(&self) -> Option<&UserBrowser> {
+        self.usersbrowser.as_ref()
     }
 
     /// Whether a resident of this building may reach this machine's own
@@ -315,6 +336,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> 
             egress: EgressAllowlist::default(),
             review: false,
             browser: false,
+            usersbrowser: None,
             desktop: false,
             reading_room: Vec::new(),
         }),

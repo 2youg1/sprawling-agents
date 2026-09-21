@@ -8,13 +8,20 @@
 //! three mandatory parts. Boundary feedback beats opening sermons — the
 //! refusal is the teaching.
 //!
-//! **A door answers Allow or Deny and never asks a person.** An action
-//! a person would have to approve is either one the rules already
-//! allow or one they already refuse, and both answers are written down
-//! where a person can change them: `CONFIG.toml` for budgets and
-//! trusted connectors, the building's `BUILDING.md` for write domains
-//! and egress. A door that escalated would be a door whose default
-//! answer gets clicked through, which is the same as no door.
+//! **A door answers Allow or Deny, and never asks a person** — with one
+//! named exception. An action a person would have to approve is either
+//! one the rules already allow or one they already refuse, and both
+//! answers are written down where a person can change them: `CONFIG.toml`
+//! for budgets and trusted connectors, the building's `BUILDING.md` for
+//! write domains and egress. A door that escalated would be a door whose
+//! default answer gets clicked through, which is the same as no door.
+//!
+//! [`attach`] is the exception, and it is the only one: what it would
+//! grant is the reading right over every login a person's own browser
+//! holds, so no rule of the city's can answer it. The person's action is
+//! the answer, and the recovery sentence is the question. Whether a door
+//! asks is a property of the door rather than a switch: the roster test
+//! asserts that exactly one door returns [`GateOutcome::Ask`].
 //!
 //! Separate functions, not one fat envelope: each door reads its own
 //! inputs, the effect layer routes by the `Effect` field (5.2), and
@@ -22,23 +29,40 @@
 
 use crate::error::AxError;
 
+mod attach;
 mod discard;
 mod domain;
 mod egress;
 mod spawn;
 mod undoable;
 
+pub use attach::attach;
 pub use discard::discard;
 pub use domain::{domain, reach};
-pub use egress::{EgressAllowlist, EgressOutcome, EgressTarget, egress, egress_target};
+pub use egress::{
+    EgressAllowlist, EgressOutcome, EgressTarget, egress, egress_target, host_of, target_of,
+};
 pub use spawn::spawn;
 pub use undoable::{ConnectorCall, reaches_the_undoable, undoable};
 
-/// Deliberately exhaustive: every caller decides both ways.
+/// Deliberately exhaustive, and the third arm is deliberately rare.
+///
+/// Every caller decides all three ways, so a door that starts asking a
+/// person is a compile error at every caller rather than a behaviour
+/// that changes underneath them. Exactly one door answers `Ask`
+/// ([`attach`]); the refusal matrix asserts that count.
 #[derive(Debug)]
 pub enum GateOutcome {
     Allow,
-    Deny { refusal: Box<AxError> },
+    Deny {
+        refusal: Box<AxError>,
+    },
+    /// The door cannot answer, and the person can. The error carries
+    /// the question: `E_APPROVAL_PENDING`, the three gate parts, and a
+    /// recovery sentence naming the action only the person can take.
+    Ask {
+        question: Box<AxError>,
+    },
 }
 
 /// The roster of doors, as data.
@@ -64,10 +88,13 @@ pub enum DoorId {
     /// [`undoable`] — may this connector reach what nothing here can
     /// take back.
     Undoable,
+    /// [`attach`] — may a run drive the browser a person is already
+    /// using, with that person's logins.
+    Attach,
 }
 
 /// Every door, in the order this module declares them.
-pub const DOORS: [DoorId; 7] = [
+pub const DOORS: [DoorId; 8] = [
     DoorId::Domain,
     DoorId::Reach,
     DoorId::Egress,
@@ -75,6 +102,7 @@ pub const DOORS: [DoorId; 7] = [
     DoorId::Discard,
     DoorId::Spawn,
     DoorId::Undoable,
+    DoorId::Attach,
 ];
 
 impl DoorId {
@@ -90,194 +118,13 @@ impl DoorId {
             DoorId::Discard => "discard",
             DoorId::Spawn => "spawn",
             DoorId::Undoable => "undoable",
+            DoorId::Attach => "attach",
         }
     }
 }
 
 #[cfg(feature = "conformance")]
-pub mod conformance {
-    //! One refusal per door, produced by the door itself.
-    //!
-    //! The samples call the real functions with inputs that deny, so
-    //! what the matrix judges is the refusal a run would receive rather
-    //! than a copy of it written for the test.
-
-    use std::collections::BTreeMap;
-
-    use super::{DoorId, GateOutcome};
-    use crate::address::Address;
-    use crate::budget::ByteLen;
-    use crate::config::SandboxLimits;
-    use crate::delegation::{DelegateKind, Depth};
-    use crate::discard::{Discard, DiscardRequest, Restoration};
-    use crate::error::AxError;
-    use crate::locator::Locator;
-    use crate::secret::SecretSpan;
-    use crate::taint::{TaintSet, TaintSource};
-    use crate::tool::{ServerLabel, ToolName};
-    use crate::write_domain::WriteDomain;
-
-    /// Whatever this door refuses, as it refuses it.
-    ///
-    /// # Errors
-    /// Returns the door's own refusal. The `Ok` side carries the door
-    /// that answered Allow when its sample was meant to deny, which is
-    /// a defect in this function rather than in the door.
-    pub fn deny_sample(door: DoorId) -> Result<AxError, DoorId> {
-        let refused = match door {
-            DoorId::Domain => domain_sample(),
-            DoorId::Reach => reach_sample(),
-            DoorId::Egress => egress_sample(),
-            DoorId::EgressHost => egress_host_sample(),
-            DoorId::Discard => discard_sample(),
-            DoorId::Spawn => spawn_sample(),
-            DoorId::Undoable => undoable_sample(),
-        };
-        refused.ok_or(door)
-    }
-
-    fn refusal_of(outcome: GateOutcome) -> Option<AxError> {
-        match outcome {
-            GateOutcome::Allow => None,
-            GateOutcome::Deny { refusal } => Some(*refusal),
-        }
-    }
-
-    fn refusal_of_egress(outcome: super::EgressOutcome) -> Option<AxError> {
-        match outcome {
-            super::EgressOutcome::Allow { .. } => None,
-            super::EgressOutcome::Deny { refusal } => Some(*refusal),
-        }
-    }
-
-    fn one_room() -> Option<WriteDomain> {
-        WriteDomain::new(vec![Address::parse("b1/room").ok()?]).ok()
-    }
-
-    fn domain_sample() -> Option<AxError> {
-        let elsewhere = Address::parse("b2/other.md").ok()?;
-        refusal_of(super::domain(&one_room()?, &elsewhere, &TaintSet::empty()))
-    }
-
-    fn reach_sample() -> Option<AxError> {
-        let elsewhere = Address::parse("b2").ok()?;
-        refusal_of(super::reach(&one_room()?, &elsewhere, &TaintSet::empty()))
-    }
-
-    fn egress_sample() -> Option<AxError> {
-        let span = SecretSpan {
-            start: 0,
-            len: 40,
-            provider: Some("anthropic"),
-        };
-        refusal_of_egress(super::egress(
-            std::slice::from_ref(&span),
-            &super::EgressTarget::Public {
-                host: "x.io".to_owned(),
-            },
-            false,
-        ))
-    }
-
-    fn egress_host_sample() -> Option<AxError> {
-        refusal_of_egress(super::egress_target(
-            &super::EgressAllowlist::new(vec!["example.com".to_owned()]),
-            &super::EgressTarget::Public {
-                host: "pastebin.test".to_owned(),
-            },
-        ))
-    }
-
-    fn discard_sample() -> Option<AxError> {
-        let unplanned = DiscardRequest::Unplanned {
-            paths: vec![Address::parse("b/x.md").ok()?],
-            taint: TaintSet::empty(),
-            total_bytes: ByteLen::new(1),
-        };
-        refusal_of(super::discard(&unplanned, "delete b/x.md"))
-    }
-
-    fn spawn_sample() -> Option<AxError> {
-        refusal_of(super::spawn(Depth::Delegated, &DelegateKind::Resident))
-    }
-
-    fn undoable_sample() -> Option<AxError> {
-        let label = ServerLabel::parse("desk").ok()?;
-        let tool = ToolName::parse("desk_desktop_act").ok()?;
-        let untrusting = SandboxLimits {
-            trusted: Vec::new(),
-            ..SandboxLimits::default()
-        };
-        refusal_of(super::undoable(
-            &super::ConnectorCall {
-                label: &label,
-                tool: &tool,
-            },
-            &untrusting,
-            &TaintSet::empty(),
-        ))
-    }
-
-    /// Which doors a taint set alone turns into a refusal.
-    ///
-    /// The one place an effect derived from outside content is stopped
-    /// is [`super::undoable`]; the discard door stops it too, through
-    /// `DiscardVerdict`. A caller that wants to know whether taint is
-    /// wired at all asks here instead of grepping.
-    #[must_use]
-    pub fn taint_readers() -> BTreeMap<DoorId, bool> {
-        let source = TaintSource::new("web:evil");
-        let tainted = source.map_or_else(TaintSet::empty, TaintSet::of);
-        let mut readers = BTreeMap::new();
-        readers.insert(DoorId::Undoable, undoable_taint_denies(&tainted));
-        readers.insert(DoorId::Discard, discard_taint_denies(&tainted));
-        readers
-    }
-
-    fn undoable_taint_denies(tainted: &TaintSet) -> bool {
-        let Ok(label) = ServerLabel::parse("desk") else {
-            return false;
-        };
-        let Ok(tool) = ToolName::parse("desk_desktop_act") else {
-            return false;
-        };
-        let trusting = SandboxLimits {
-            trusted: vec![label.clone()],
-            ..SandboxLimits::default()
-        };
-        refusal_of(super::undoable(
-            &super::ConnectorCall {
-                label: &label,
-                tool: &tool,
-            },
-            &trusting,
-            tainted,
-        ))
-        .is_some()
-    }
-
-    fn discard_taint_denies(tainted: &TaintSet) -> bool {
-        let Ok(path) = Address::parse("b/x.md") else {
-            return false;
-        };
-        let Ok(locator) = Locator::parse(&format!("file:b/x.md@{}", "ab".repeat(20))) else {
-            return false;
-        };
-        let Ok(planned) = Discard::new(
-            vec![path],
-            Restoration::Tracked(locator),
-            tainted.clone(),
-            ByteLen::new(1),
-        ) else {
-            return false;
-        };
-        refusal_of(super::discard(
-            &DiscardRequest::Planned(planned),
-            "delete b/x.md",
-        ))
-        .is_some()
-    }
-}
+pub mod conformance;
 
 #[cfg(all(test, feature = "conformance"))]
 #[allow(
@@ -286,59 +133,4 @@ pub mod conformance {
     clippy::panic,
     reason = "test code"
 )]
-mod tests {
-    use super::{DOORS, DoorId, conformance};
-
-    /// Every door in the roster refuses something, and says all three
-    /// parts when it does. Adding a door adds a row here by adding an
-    /// arm to `deny_sample`, which does not compile until it is written.
-    #[test]
-    fn every_door_in_the_roster_has_a_refusal_with_three_parts() {
-        for door in DOORS {
-            let refusal = conformance::deny_sample(door)
-                .unwrap_or_else(|door| panic!("{}: the sample allowed", door.as_str()));
-            let parts = refusal
-                .gate()
-                .unwrap_or_else(|| panic!("{}: refusal without the three parts", door.as_str()));
-            assert!(!parts.rule().is_empty(), "{}: empty rule", door.as_str());
-            assert!(
-                !parts.violation().is_empty(),
-                "{}: empty violation",
-                door.as_str()
-            );
-            assert!(
-                parts.alternative().len() > 12,
-                "{}: the alternative must direct the next action",
-                door.as_str()
-            );
-        }
-    }
-
-    /// The roster names each door once, and the names are the function
-    /// names a reader greps for.
-    #[test]
-    fn the_roster_holds_every_door_exactly_once() {
-        let mut names: Vec<&str> = DOORS.iter().map(|door| door.as_str()).collect();
-        let before = names.len();
-        names.sort_unstable();
-        names.dedup();
-        assert_eq!(names.len(), before, "a door is listed twice");
-        let mut all: Vec<DoorId> = DOORS.to_vec();
-        all.sort_unstable();
-        all.dedup();
-        assert_eq!(all.len(), before);
-    }
-
-    /// Taint reaches a decision rather than a sentence in a refusal:
-    /// both doors that see a taint set refuse on it (C15).
-    #[test]
-    fn the_doors_that_see_taint_refuse_on_it() {
-        for (door, denies) in conformance::taint_readers() {
-            assert!(
-                denies,
-                "{}: taint changed no verdict, so C15 is a false branch there",
-                door.as_str()
-            );
-        }
-    }
-}
+mod tests;

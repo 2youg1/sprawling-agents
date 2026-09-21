@@ -16,8 +16,10 @@
 //! `bin::doctor` already owns the question of what is installed and a
 //! second answer to it would drift.
 
+mod attach;
 mod engine;
 mod lazy;
 mod socket;
 
+pub(crate) use attach::AttachedBrowser;
 pub(crate) use lazy::{LazyEngine, port_for};

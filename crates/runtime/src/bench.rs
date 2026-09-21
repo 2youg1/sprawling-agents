@@ -28,7 +28,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::{
     Address, AxCode, AxError, DiscardForecast, Effect, EgressOutcome, EgressTarget, GateOutcome,
-    IdemKey, Locator, TaintSet, Tool, ToolCall, ToolName, ToolOutcome, WriteDomain,
+    GateSubject, IdemKey, Locator, TaintSet, Tool, ToolCall, ToolName, ToolOutcome, WriteDomain,
 };
 
 use serde_json::Value;
@@ -106,11 +106,12 @@ pub enum BenchOutcome {
         outcome: ToolOutcome,
         fenced: Option<String>,
     },
-    /// A gate refused. The refusal travels back as a tool_result, which
-    /// keeps the turn alive and tells the model what it may not do.
+    /// A gate refused, or asked. Either way the answer travels back as
+    /// a tool_result, which keeps the turn alive and tells the model
+    /// what it may not do or what the person has to do; a pending
+    /// question carries `E_APPROVAL_PENDING` and its recovery sentence
+    /// is the question.
     Refused { refusal: Box<AxError> },
-    /// A gate wants a human. S3 has no answering face, so the caller
-    /// sees the pending item's code and the run parks.
     /// The call was already made, and this is what it answered. A replay
     /// is owed the first result: an error here would teach the model a
     /// call failed when it succeeded.
@@ -213,6 +214,10 @@ impl ToolBench {
             .with_recovery("call one of the tools listed in your catalog"));
         };
         let effect = tool.meta().effect.clone();
+        // What the call is about, in the tool's own grammar (M-17).
+        // Read before any door: a subject this tool cannot read is a
+        // call no door may judge.
+        let subject = tool.subject(call)?;
 
         // exec is forecast first. A hit does not refuse: it fences.
         let mut fenced = None;
@@ -241,7 +246,7 @@ impl ToolBench {
                 .map(str::to_owned);
         }
 
-        if let Some(answered) = self.admit(call, &name, &effect)? {
+        if let Some(answered) = self.admit(call, &name, &effect, &subject)? {
             return Ok(answered);
         }
 

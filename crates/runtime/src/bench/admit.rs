@@ -14,28 +14,46 @@ impl ToolBench {
     /// `None` means the door is open and the tool may run; `Some` means
     /// the door answered for this call and the tool does not run. The
     /// answer is the bench's, not the gate's: a refusal flows back as a
-    /// tool result rather than ending the turn, and an escalation parks
-    /// unless the person has already allowed that cluster.
+    /// tool result rather than ending the turn, and an asking door's
+    /// question reaches the model the same way.
+    ///
+    /// `subject` is what the tool read off its own arguments (M-17).
+    /// The bench used to spell an argument name by hand here, which
+    /// judged the browser tool by a `host` key it never wrote; now the
+    /// tool's grammar answers and this function only matches.
     ///
     /// # Errors
     /// Refuses a call that declares an effect this bench does not route,
-    /// an egress that names no host, a spawn or a rule change on a bench
-    /// built without a job, and arguments that will not serialise for
-    /// the secret scan.
+    /// a subject its effect does not read, a spawn or a rule change on a
+    /// bench built without a job, and arguments that will not serialise
+    /// for the secret scan.
     pub(super) fn admit(
         &mut self,
         call: &ToolCall,
         name: &str,
         effect: &Effect,
+        subject: &GateSubject,
     ) -> Result<Option<BenchOutcome>, AxError> {
         match effect {
             Effect::Read => {}
-            // The tool declares an area, not a file; the file is judged
-            // by the tool itself once a call names one.
+            // The tool declares an area, and a call may name a narrower
+            // one. Both are asked the same question, and both must pass:
+            // the declaration is what the tool promised to reach, and
+            // the call's own area is what it now reaches for.
             Effect::Write { domain: area } => {
                 let verdict = kernel::gate::reach(&self.domain, area, &self.taint);
                 if let Some(answered) = self.settled(verdict) {
                     return Ok(Some(answered));
+                }
+                let named = match subject {
+                    GateSubject::Area(at) | GateSubject::Room(at) => Some(at),
+                    GateSubject::Scope(_) | GateSubject::Host(_) | GateSubject::None => None,
+                };
+                if let Some(at) = named {
+                    let verdict = kernel::gate::reach(&self.domain, at, &self.taint);
+                    if let Some(answered) = self.settled(verdict) {
+                        return Ok(Some(answered));
+                    }
                 }
             }
             Effect::Connector { label } => {
@@ -76,32 +94,50 @@ impl ToolBench {
                 }
             }
             Effect::Egress => {
-                let spans = kernel::secret::scan(&scanned(call, "scan egress args")?);
-                // The target is the tool's to declare; a call that does
-                // not say where it is sending cannot be judged, and an
-                // unjudged egress is the one thing the door exists for.
-                let host = call
-                    .args
-                    .as_map()
-                    .get("host")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| {
-                        AxError::failure(
-                            AxCode::InvalidArgs,
-                            "invoke tool",
-                            format!("`{name}` declares Egress but named no host"),
-                        )
-                        .with_recovery(
-                            "call the tool again with a `host` argument naming the \
-                             domain it reaches",
-                        )
-                    })?
-                    .to_owned();
-                let verdict = kernel::gate::egress(
-                    &spans,
-                    &EgressTarget::Public { host },
-                    self.prior_public_egress,
-                );
+                // A call that names no destination has no egress to
+                // judge; the tool's grammar says which calls name one.
+                // A tool that declares Egress and never names a host is
+                // a wiring defect, and the bench cannot tell it from a
+                // call with nothing to send - so the tool's own tests
+                // hold its grammar to naming every destination it has.
+                if let GateSubject::Host(host) = subject {
+                    let spans = kernel::secret::scan(&scanned(call, "scan egress args")?);
+                    let target = kernel::gate::target_of(host);
+                    let verdict = kernel::gate::egress(&spans, &target, self.prior_public_egress);
+                    if let Some(answered) = self.crossed(verdict) {
+                        return Ok(Some(answered));
+                    }
+                }
+            }
+            Effect::AttachUserBrowser { address } => {
+                // The one door that asks. The address is the tool's
+                // registration's, not the call's: every call attaches to
+                // the browser the person declared, and a model filling
+                // in an address would be inventing a fact the city
+                // already holds. `None` is a building that enabled the
+                // tool and has not been told where the browser answers,
+                // which is the state the person's next action resolves.
+                let endpoint = address.as_deref().map(kernel::gate::target_of);
+                let verdict = kernel::gate::attach(endpoint.as_ref());
+                if let Some(answered) = self.settled(verdict) {
+                    return Ok(Some(answered));
+                }
+                // The bytes are still scanned: what gets typed into a
+                // page is the credential this door can see. The page's
+                // own host decides the first-public-egress notice, and
+                // a call that names no page is the attachment itself,
+                // which is this machine.
+                let page = match subject {
+                    GateSubject::Host(host) => kernel::gate::target_of(host),
+                    GateSubject::None => EgressTarget::Loopback,
+                    other @ (GateSubject::Area(_)
+                    | GateSubject::Room(_)
+                    | GateSubject::Scope(_)) => {
+                        return Err(subject_not_for(name, other, "drive a browser"));
+                    }
+                };
+                let spans = kernel::secret::scan(&scanned(call, "scan browser args")?);
+                let verdict = kernel::gate::egress(&spans, &page, self.prior_public_egress);
                 if let Some(answered) = self.crossed(verdict) {
                     return Ok(Some(answered));
                 }
@@ -119,10 +155,21 @@ impl ToolBench {
                 // `BUILDING.md`, where a person edits them; a door that
                 // asked instead would be a door whose default answer
                 // gets clicked through.
+                let scope = match subject {
+                    GateSubject::Scope(scope) => scope.clone(),
+                    GateSubject::None => "the scope this run sits in".to_owned(),
+                    other
+                    @ (GateSubject::Area(_) | GateSubject::Room(_) | GateSubject::Host(_)) => {
+                        return Err(subject_not_for(name, other, "change what governs"));
+                    }
+                };
                 return Err(AxError::failure(
                     AxCode::GateDenied,
                     "invoke tool",
-                    format!("`{name}` declares Govern, and a run may not change what governs it"),
+                    format!(
+                        "`{name}` declares Govern, and a run may not change what governs it \
+                         ({scope})"
+                    ),
                 )
                 .with_recovery(
                     "edit the scope's `CONFIG.toml`, or the building's `BUILDING.md`, and                      dispatch again",
@@ -147,15 +194,16 @@ impl ToolBench {
 
     /// What one gate's verdict means to this bench.
     ///
-    /// What one gate verdict means to this bench.
-    ///
-    /// Two answers, because a door has two: an Allow lets the call
-    /// through and a Deny is the outcome. No door asks a person, so
-    /// there is no third state for this to carry.
+    /// Three answers, because a door has three: an Allow lets the call
+    /// through, a Deny is the outcome, and an Ask reaches the model as
+    /// the door's own question - `E_APPROVAL_PENDING` with the recovery
+    /// sentence naming what only the person can do. A pending question
+    /// ends the call, not the turn.
     fn settled(&self, outcome: GateOutcome) -> Option<BenchOutcome> {
         match outcome {
             GateOutcome::Allow => None,
             GateOutcome::Deny { refusal } => Some(BenchOutcome::Refused { refusal }),
+            GateOutcome::Ask { question } => Some(BenchOutcome::Refused { refusal: question }),
         }
     }
 
@@ -176,6 +224,35 @@ impl ToolBench {
             }
             EgressOutcome::Deny { refusal } => Some(BenchOutcome::Refused { refusal }),
         }
+    }
+}
+
+/// A tool answered with a subject its effect does not read. Refused
+/// rather than judged by something else: a tool whose `subject` and
+/// `effect` disagree is a wiring defect, and the next reader needs to
+/// see it here instead of a gate judging the wrong thing.
+fn subject_not_for(name: &str, subject: &GateSubject, doing: &str) -> AxError {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "invoke tool",
+        format!(
+            "`{name}` declares {doing} and its `subject` answered {}",
+            spell(subject)
+        ),
+    )
+    .with_recovery(
+        "report this against the tool: `Tool::subject` and `ToolMeta::effect` disagree, \
+         and the bench reads the subject the tool answers with",
+    )
+}
+
+fn spell(subject: &GateSubject) -> &'static str {
+    match subject {
+        GateSubject::Area(_) => "an area",
+        GateSubject::Room(_) => "a room",
+        GateSubject::Scope(_) => "a scope",
+        GateSubject::Host(_) => "a host",
+        GateSubject::None => "no subject",
     }
 }
 

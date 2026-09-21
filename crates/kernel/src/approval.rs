@@ -10,7 +10,9 @@
 //! question a run cannot answer by reading the rules. So this module
 //! carries one class of item, two autonomy states, and the rule for who
 //! may answer. There is no standing waiver here: a waiver waives an
-//! escalation, and no gate escalates any more.
+//! escalation, and the one door that escalates (`gate::attach`) asks
+//! for the person's own action rather than for a ruling in this inbox,
+//! so it files no item here.
 
 use serde::{Deserialize, Serialize};
 

@@ -125,7 +125,7 @@ mod tests {
         let held = record(
             EventKind::ToolResult,
             serde_json::json!({
-                "name": "browser",
+                "name": kernel::ToolName::BROWSER,
                 "result": { "image": cas(), "width": 1280, "height": 720,
                             "media_type": "image/png" },
             }),

@@ -20,6 +20,15 @@ use crate::event::Payload;
 pub struct ToolName(String);
 
 impl ToolName {
+    /// The built-in browser tool's name. One authority, because the
+    /// tool's own `ToolMeta`, the building rule that admits it and the
+    /// ledger fixtures that name its record all spell it.
+    pub const BROWSER: &'static str = "browser";
+
+    /// The tool that drives the browser a person already has open, with
+    /// that person's own profile.
+    pub const USER_BROWSER: &'static str = "usersbrowser";
+
     pub fn parse(raw: &str) -> Result<Self, AxError> {
         let well_formed = !raw.is_empty()
             && raw
@@ -157,6 +166,19 @@ pub enum Effect {
     /// every write domain, so the write door would refuse it, and the
     /// reason it refuses is that this decision is the person's.
     Govern,
+    /// Attaches to a browser the person is already driving, with that
+    /// person's own login state.
+    ///
+    /// Its own class rather than an `Egress`: the bytes a call sends are
+    /// the smaller half of what it reaches for, and a run allowed to
+    /// open pages in a browser this city started has not thereby been
+    /// granted every account that browser is signed into. The address
+    /// is the registration's, not the call's; `None` is a person who
+    /// enabled the tool without saying where it answers, which the
+    /// attach door answers with a question.
+    AttachUserBrowser {
+        address: Option<String>,
+    },
     Spend,
 }
 
@@ -214,18 +236,15 @@ impl ToolCall {
     /// The bytes that say what this call does, for `IdemKey::derive` to
     /// take as its `action_canonical`.
     ///
-    /// The name and the arguments together are the action. Two calls of
+    /// The name and the arguments together are the action: two calls of
     /// one tool with different arguments are two actions, and a key that
-    /// read only the name made them one — which the deduplication then
-    /// reported to the model as a call it had already made. `id` stays
-    /// out: two calls differing only by wire id are the same action.
+    /// read only the name made them one. `id` stays out, because two
+    /// calls differing only by wire id are the same action.
     ///
     /// # Errors
-    /// Propagates arguments that do not serialise. `Payload` keys are
-    /// strings and its values carry no floats, so this arm is out of
-    /// reach today; reporting it is still what keeps the key honest if
-    /// that ever stops being true, because the empty string this used to
-    /// substitute would collide two different calls into one key.
+    /// Propagates arguments that do not serialise, which keeps the key
+    /// honest: the empty string this used to substitute would collide
+    /// two different calls into one key.
     pub fn action(&self) -> Result<Vec<u8>, AxError> {
         let mut action = self.name.as_str().as_bytes().to_vec();
         let args = serde_json::to_string(&self.args).map_err(|err| {
@@ -252,10 +271,30 @@ pub struct ToolOutcome {
     /// They ride here rather than inside `result` because the model has
     /// to see them: the turn loop puts them into the tool result block's
     /// own attachments, and a locator buried in a payload would only
-    /// ever be text. Empty for every tool that answers in words, which
-    /// is all of them but one.
+    /// ever be text.
     #[serde(default)]
     pub attachments: Vec<crate::ImageRef>,
+}
+
+/// What one call is about, in the terms its own grammar names it.
+///
+/// A gate asks about a subject - which area, which host, which scope -
+/// and the tool owning the call's grammar is the only place that can
+/// read it off the arguments. This moved that reading out of the bench
+/// (M-17), which judged the browser tool by a key it never wrote. A
+/// sixth kind is a change here, not a string that reaches a gate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GateSubject {
+    /// A city position a call names as its target.
+    Area(Address),
+    /// The room a call names when it works in one.
+    Room(Address),
+    /// The scope a governance call would rewrite.
+    Scope(String),
+    /// The host a call's own bytes would leave for.
+    Host(String),
+    /// This call names no subject; the tool's grammar has none for it.
+    None,
 }
 
 /// The tool port. Adapters: runtime L0 three, browser, protocol;
@@ -270,6 +309,21 @@ pub trait Tool: Send {
     /// Fail-closed identity: a call whose name differs from `meta().name`
     /// must return `E_INVALID_ARGS`, never route silently.
     fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
+
+    /// What this call is about, read by the grammar this tool already
+    /// parses its arguments with.
+    ///
+    /// The default is [`GateSubject::None`] rather than an inference: a
+    /// bench that guessed a subject from an argument name has already
+    /// been wrong once, and an effect that needs a subject refuses a
+    /// call carrying none rather than judging the wrong thing.
+    ///
+    /// # Errors
+    /// Refuses arguments this tool cannot read - the same refusal its
+    /// `invoke` would produce.
+    fn subject(&self, _call: &ToolCall) -> Result<GateSubject, AxError> {
+        Ok(GateSubject::None)
+    }
 }
 
 /// The exec three-arm shape (L0 frozen surface, 5.1). Lives on the tool

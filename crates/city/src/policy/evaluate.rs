@@ -10,12 +10,12 @@
 //! lines it knows and passes over everything else, which is what lets a
 //! building's rules also be a document its residents read.
 
-use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist};
+use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist, ToolName};
 
 use super::reach::DomainReach;
 use super::{
-    BROWSER_KEY, BUILDING_FILE, BuildingRules, CONFIDENTIAL_KEY, DESKTOP_KEY, EGRESS_HEADING,
-    READING_HEADING, REVIEW_KEY, WRITE_HEADING, WRITE_KEY,
+    BUILDING_FILE, BuildingRules, CONFIDENTIAL_KEY, DESKTOP_KEY, EGRESS_HEADING, READING_HEADING,
+    REVIEW_KEY, UserBrowser, UserBrowserEndpoint, WRITE_HEADING, WRITE_KEY,
 };
 
 /// Evaluates the text of a `BUILDING.md`.
@@ -29,6 +29,7 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
     let mut reach = DomainReach::Everything;
     let mut review = false;
     let mut browser = false;
+    let mut usersbrowser: Option<UserBrowser> = None;
     let mut desktop = false;
     let mut write_prefixes = Vec::new();
     let mut egress_entries: Vec<String> = Vec::new();
@@ -65,19 +66,23 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
             continue;
         }
         if let Some(rest) = bare.strip_prefix(REVIEW_KEY) {
-            review = flag("review", rest)?;
+            review = flag(REVIEW_KEY, rest)?;
             continue;
         }
-        if let Some(rest) = bare.strip_prefix(BROWSER_KEY) {
-            browser = flag("browser", rest)?;
+        if let Some(rest) = key_value(bare, ToolName::BROWSER) {
+            browser = flag(ToolName::BROWSER, rest)?;
+            continue;
+        }
+        if let Some(rest) = key_value(bare, ToolName::USER_BROWSER) {
+            usersbrowser = read_usersbrowser(rest)?;
             continue;
         }
         if let Some(rest) = bare.strip_prefix(DESKTOP_KEY) {
-            desktop = flag("desktop", rest)?;
+            desktop = flag(DESKTOP_KEY, rest)?;
             continue;
         }
         if let Some(rest) = bare.strip_prefix(CONFIDENTIAL_KEY) {
-            confidential = Some(flag("confidential", rest)?);
+            confidential = Some(flag(CONFIDENTIAL_KEY, rest)?);
             continue;
         }
         if in_write_section
@@ -121,6 +126,18 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
              not leave",
         ));
     }
+    if confidential && usersbrowser.is_some() {
+        return Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "evaluate a building's rules",
+            "a confidential building asks to drive the person's browser",
+        )
+        .with_recovery(
+            "remove the `usersbrowser:` line, or drop `confidential: true`; attaching to \
+             that browser reads every login it holds, so the per-building isolation this \
+             setting depends on does not survive it",
+        ));
+    }
     if confidential && desktop {
         return Err(AxError::failure(
             AxCode::ConfigInvalid,
@@ -139,9 +156,32 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
         egress: EgressAllowlist::new(egress_entries),
         review,
         browser,
+        usersbrowser,
         desktop,
         reading_room,
     })
+}
+
+/// `key: rest` when the line names this key, and nothing otherwise.
+///
+/// The colon has to follow the key immediately, so `usersbrowser:` is
+/// not `browser:` with something in front of it.
+fn key_value<'a>(bare: &'a str, key: &str) -> Option<&'a str> {
+    bare.strip_prefix(key)?.strip_prefix(':')
+}
+
+/// The `usersbrowser:` value: off, enabled and asking, or an address.
+///
+/// # Errors
+/// Refuses a value that is none of the three. A tool setting that reads
+/// as a typo must not resolve to the permissive side, and here the
+/// permissive side is a browser somebody's whole life is logged into.
+fn read_usersbrowser(rest: &str) -> Result<Option<UserBrowser>, AxError> {
+    match rest.trim().trim_matches('`').trim() {
+        "false" => Ok(None),
+        "true" => Ok(Some(UserBrowser::Waiting)),
+        other => UserBrowserEndpoint::parse(other).map(|endpoint| Some(UserBrowser::At(endpoint))),
+    }
 }
 
 /// One `key: true|false` line, read the same way for every key.
@@ -150,7 +190,8 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
 /// Refuses anything but the two words. A setting that reads as a typo
 /// resolves to neither side: which side is the safe one differs per key,
 /// and a reader who has to know that is a reader who will guess wrong.
-fn flag(name: &str, rest: &str) -> Result<bool, AxError> {
+fn flag(key: &str, rest: &str) -> Result<bool, AxError> {
+    let name = key.trim_end_matches(':');
     match rest.trim().trim_matches('`').trim() {
         "true" => Ok(true),
         "false" => Ok(false),

@@ -12,58 +12,24 @@
 //! stay in the pure crate and the bytes stay here.
 
 use browser::{
-    BrowserPort, ContextId, DevLoop, Observation, PageSnapshot, Session, SessionRequest, Shot, Verb,
+    BrowserPort, ContextId, DevLoop, Observation, PageSnapshot, ResolvedOrigin, Session,
+    SessionRequest, Shot, Verb,
 };
 use kernel::{
-    AxCode, AxError, CostTier, Effect, ImageRef, ImageType, Locator, Payload, RenderIntent,
-    Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, GateSubject, ImageRef, ImageType, Locator, Payload,
+    RenderIntent, Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use memory::Cas;
 use serde_json::{Map, Value};
 
-/// Builds the tool a building with `browser: true` gets.
-///
-/// The profile is the building's own, so what a browser remembers - a
-/// login, a cookie, a permission - belongs to one line of business
-/// rather than to the machine. The port is derived from the city
-/// directory, so two cities on one machine drive two browsers.
-///
-/// # Errors
-/// Propagates a profile path this city cannot make, and a content store
-/// that will not open.
-pub(crate) fn for_building(
-    city_root: &std::path::Path,
-    building: &kernel::Address,
-    policy: &kernel::BuildingPolicy,
-) -> Result<BrowserTool, AxError> {
-    let profile = match browser::Profile::of(building, policy)? {
-        browser::Profile::At { path } => city_root.join(path.as_str()),
-        // A confidential building is refused a browser where its rules
-        // are read, so this arm is what an ephemeral profile would be if
-        // one ever reached here: a directory nothing is kept in.
-        browser::Profile::Ephemeral => city_root
-            .join(kernel::RESERVED_PREFIX)
-            .join(browser::PROFILES_DIR)
-            .join("ephemeral"),
-    };
-    std::fs::create_dir_all(&profile).map_err(|err| {
-        AxError::failure(
-            AxCode::StorageFatal,
-            "make a browser profile",
-            format!("{}: {err}", profile.display()),
-        )
-        .with_recovery("fix the directory's permissions")
-    })?;
-    let cas = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
-        .map_err(memory::MemoryError::into_ax)?;
-    let port = crate::browser_bidi::port_for(city_root);
-    BrowserTool::new(
-        // A window a person can watch is the default; `-headless` is on
-        // the launch plan for the caller that asks for it.
-        Box::new(crate::browser_bidi::LazyEngine::new(profile, false, port)),
-        cas,
-    )
-}
+mod building;
+mod person;
+
+use building::BUILDING_DISCLOSURE;
+pub(crate) use building::for_rules;
+
+use person::PERSON_DISCLOSURE;
+pub(crate) use person::Role;
 
 /// The tool a building with `browser: true` gets.
 pub(crate) struct BrowserTool {
@@ -91,20 +57,44 @@ pub(crate) struct BrowserTool {
 
 impl BrowserTool {
     /// # Errors
-    /// Refuses a name this build cannot spell, which the literal below
-    /// cannot produce.
-    pub(crate) fn new(port: Box<dyn BrowserPort + Send>, cas: Cas) -> Result<BrowserTool, AxError> {
-        Ok(BrowserTool {
-            meta: ToolMeta {
-                name: ToolName::parse("browser")?,
-                disclosure: "drive this machine's browser: open a page, look at it, act on it, \
-                             take a screenshot, measure boxes, read the console, resize, close"
-                    .to_owned(),
-                params: Payload::empty(),
+    /// Refuses a name this build cannot spell, which the literals below
+    /// cannot produce, and a parameter schema that does not build.
+    pub(crate) fn new(
+        role: Role,
+        port: Box<dyn BrowserPort + Send>,
+        cas: Cas,
+    ) -> Result<BrowserTool, AxError> {
+        let (name, disclosure, params, effect) = match role {
+            Role::Building => (
+                ToolName::BROWSER,
+                BUILDING_DISCLOSURE,
+                Payload::empty(),
                 // Every page a browser opens leaves this machine, so the
                 // egress door decides it - which is also what keeps a
                 // confidential building from ever holding one.
-                effect: Effect::Egress,
+                Effect::Egress,
+            ),
+            Role::PersonAt { host } => (
+                ToolName::USER_BROWSER,
+                PERSON_DISCLOSURE,
+                person::user_browser_params()?,
+                Effect::AttachUserBrowser {
+                    address: Some(host),
+                },
+            ),
+            Role::PersonWaiting => (
+                ToolName::USER_BROWSER,
+                PERSON_DISCLOSURE,
+                person::user_browser_params()?,
+                Effect::AttachUserBrowser { address: None },
+            ),
+        };
+        Ok(BrowserTool {
+            meta: ToolMeta {
+                name: ToolName::parse(name)?,
+                disclosure: disclosure.to_owned(),
+                params,
+                effect,
                 cost_tier: CostTier::Light,
                 timeout: None,
                 render: RenderIntent::Generic,
@@ -127,6 +117,20 @@ impl Tool for BrowserTool {
         &self.meta
     }
 
+    /// The host this call names, read by the same grammar `invoke`
+    /// reads (M-17). The bench used to spell `host` by hand, which this
+    /// tool never wrote.
+    ///
+    /// # Errors
+    /// Refuses arguments this tool cannot read, which is what `invoke`
+    /// would refuse them with.
+    fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
+        match Verb::read(&call.args)?.destination()? {
+            Some(host) => Ok(GateSubject::Host(host)),
+            None => Ok(GateSubject::None),
+        }
+    }
+
     fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
@@ -134,7 +138,10 @@ impl Tool for BrowserTool {
                 "drive a browser",
                 call.name.to_string(),
             )
-            .with_recovery("this tool answers to `browser` and routes nothing else"));
+            .with_recovery(format!(
+                "this tool answers to `{}` and routes nothing else",
+                self.meta.name
+            )));
         }
         let verb = Verb::read(&call.args)?;
         let context = self.tab()?;
@@ -143,8 +150,27 @@ impl Tool for BrowserTool {
         for frame in &frames {
             last = self.port.send(frame)?.into_result()?;
         }
+        // A drag from a reference is two frames: the page names the
+        // element, and the input frame then acts on it. The vocabulary
+        // is `desktop.act`'s — a ref or a point, to a point — so the
+        // same gesture has one description on both sides.
+        if let Verb::Act { action, .. } = &verb
+            && action.resolves_element()
+        {
+            let origin = ResolvedOrigin::Element(browser::shared_id_of(&last)?);
+            let frame = verb.input_frame(&mut self.session, &context, Some(origin))?;
+            last = self.port.send(&frame)?.into_result()?;
+        }
         self.answer(&verb, &last)
     }
+}
+
+/// What a step acted on, as the ledger names it: the reference the
+/// snapshot minted, or the viewport when a pointer action named none.
+fn acted_on(action: &browser::Action) -> String {
+    action
+        .reference()
+        .map_or_else(|| "viewport".to_owned(), str::to_owned)
 }
 
 /// What a step of the development loop is called on the wire. Written
@@ -222,7 +248,7 @@ impl BrowserTool {
                 self.began_again();
                 Ok(ToolOutcome {
                     result: payload(vec![
-                        ("acted", Value::String(action.reference().to_owned())),
+                        ("acted", Value::String(acted_on(action))),
                         ("value", Value::String(result.to_string())),
                     ])?,
                     attachments: Vec::new(),

@@ -169,3 +169,71 @@ fn only_an_error_entry_counts_as_the_page_complaining() {
     ])));
     assert!(!complained(&json!("not an array")));
 }
+
+#[test]
+fn a_drag_reads_a_reference_or_a_point_and_never_both() {
+    let from_ref = Verb::read(&args(json!({
+        "action": "act", "generation": 3, "kind": "drag", "ref": "e1",
+        "to": { "x": 120, "y": 40 }, "steps": 4,
+    })))
+    .expect("a drag from a reference reads");
+    let Verb::Act { action, .. } = &from_ref else {
+        panic!("an act reads back as an act");
+    };
+    assert!(action.resolves_element());
+    assert_eq!(action.reference(), Some("e1"));
+
+    let from_point = Verb::read(&args(json!({
+        "action": "act", "generation": 3, "kind": "drag",
+        "point": { "x": 5, "y": 6 }, "to": { "x": 120, "y": 40 },
+    })))
+    .expect("a drag from a point reads");
+    let Verb::Act { action, .. } = &from_point else {
+        panic!("an act reads back as an act");
+    };
+    assert!(!action.resolves_element());
+    assert_eq!(action.reference(), None);
+
+    for bad in [
+        json!({ "action": "act", "generation": 3, "kind": "drag", "to": { "x": 1, "y": 1 } }),
+        json!({ "action": "act", "generation": 3, "kind": "drag", "ref": "e1",
+                "point": { "x": 1, "y": 1 }, "to": { "x": 1, "y": 1 } }),
+    ] {
+        assert!(
+            Verb::read(&args(bad)).is_err(),
+            "a drag names exactly one start"
+        );
+    }
+}
+
+#[test]
+fn a_scroll_reads_its_deltas_and_an_optional_turn_point() {
+    let verb = Verb::read(&args(json!({
+        "action": "act", "generation": 3, "kind": "scroll",
+        "to": { "x": 0, "y": -240 }, "at": { "x": 10, "y": 20 },
+    })))
+    .expect("a scroll reads");
+    let Verb::Act { action, .. } = &verb else {
+        panic!("an act reads back as an act");
+    };
+    assert_eq!(action.reference(), None);
+    assert!(!action.resolves_element());
+}
+
+#[test]
+fn an_open_names_the_host_the_door_will_judge() {
+    let verb = Verb::read(&args(
+        json!({ "action": "open", "url": "https://example.com/x" }),
+    ))
+    .expect("an open reads");
+    assert_eq!(verb.destination().unwrap(), Some("example.com".to_owned()));
+    let about = Verb::read(&args(json!({ "action": "open", "url": "about:blank" })))
+        .expect("an open reads");
+    assert_eq!(
+        about.destination().unwrap(),
+        None,
+        "no authority, no egress"
+    );
+    let snapshot = Verb::read(&args(json!({ "action": "snapshot" }))).expect("a snapshot reads");
+    assert_eq!(snapshot.destination().unwrap(), None);
+}

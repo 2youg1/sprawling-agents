@@ -20,7 +20,7 @@
     reason = "test code"
 )]
 
-use kernel::gate::{DOORS, conformance};
+use kernel::gate::{DOORS, DoorId, GateOutcome, conformance};
 
 /// The matrix row: three parts present, non-empty, alternative directive.
 fn assert_complete_refusal(refusal: &kernel::AxError, door: &str) {
@@ -37,14 +37,43 @@ fn assert_complete_refusal(refusal: &kernel::AxError, door: &str) {
 
 /// Walks `DOORS` rather than naming doors one at a time, so a door
 /// added to the enum is a door this matrix judges. The samples call the
-/// real functions, so what is judged is the refusal a run receives.
+/// real functions, so what is judged is the answer a run receives.
 #[test]
 fn every_door_denial_carries_a_complete_teaching_refusal() {
     for door in DOORS {
-        let refusal = conformance::deny_sample(door)
+        let answered = conformance::sample(door)
             .unwrap_or_else(|allowed| panic!("{}: sample was meant to deny", allowed.as_str()));
-        assert_complete_refusal(&refusal, door.as_str());
+        match answered {
+            GateOutcome::Deny { refusal } => assert_complete_refusal(&refusal, door.as_str()),
+            GateOutcome::Ask { question } => {
+                assert_eq!(
+                    question.code(),
+                    &kernel::AxCode::ApprovalPending,
+                    "{}: an asking door's question carries the pending code",
+                    door.as_str()
+                );
+                assert_complete_refusal(&question, door.as_str());
+            }
+            GateOutcome::Allow => panic!("{}: sample was meant to deny", door.as_str()),
+        }
     }
+}
+
+/// The YOLO rule of `kernel-SPEC.md` section 12.1 is one door wide, and
+/// this is the property that says so: walking the roster, exactly one
+/// door answers Ask, and it is the attach door. A second asking door
+/// breaks this line rather than a reader's expectation.
+#[test]
+fn exactly_one_door_asks_a_person() {
+    let asking: Vec<DoorId> = DOORS
+        .into_iter()
+        .filter(|door| matches!(conformance::sample(*door), Ok(GateOutcome::Ask { .. })))
+        .collect();
+    assert_eq!(
+        asking,
+        vec![DoorId::Attach],
+        "the attach door is the only door that answers Ask"
+    );
 }
 
 #[test]
