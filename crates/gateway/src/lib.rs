@@ -7,6 +7,7 @@
 //! Adapters implement the `kernel::model` seam; the dialect face is pure
 //! translation (deliberately not a trait).
 
+mod adviser;
 mod anthropic;
 mod cost;
 mod credential;
@@ -23,10 +24,11 @@ mod reach;
 mod router;
 mod transcribe;
 
+pub use adviser::{AdviserClient, Question};
 pub use cost::{CallCost, CostSource, settle};
 pub use credential::oauth_redeem_request;
 pub use credential::oauth_refresh;
-pub use credential::{Custodian, Described, EnvReader, Persistence};
+pub use credential::{Custodian, Custody, Described, EnvReader, Persistence, Store};
 pub use credential::{DeviceAuthorization, DeviceLogin, DevicePoll, DeviceRefusal, DeviceStep};
 pub use credential::{FormPost, PollStep, RedirectPending, device_login_begin};
 pub use credential::{OauthPending, OauthTokens, TokenRequest, oauth_begin};
@@ -42,6 +44,7 @@ pub use native::{Native, NativeConfig};
 pub use oauth_profiles::{Grant, OAUTH_PROFILES, OauthProfile, profile, profile_for};
 pub use provider::ceiling::{CeilingSource, OutputCeiling, Stated};
 pub use provider::modality::Modality;
+pub use provider::modality::call::{Ranks, Vectors};
 pub use provider::modality::embedding::{EmbeddingRequest, Embeddings};
 pub use provider::modality::rerank::{Rank, Ranking, RerankRequest};
 pub use provider::preset::{HostPreset, ModelPreset};

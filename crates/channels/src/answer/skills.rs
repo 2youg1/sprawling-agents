@@ -5,29 +5,43 @@
 
 //! What one building can do, by the shelf each capability sits on.
 //!
-//! Two shelves in one answer because a reader needs both to make sense
-//! of either: the city's library is the stock any building may admit,
-//! and the building's own shelf is what only it keeps. A line is the
-//! same six facts on either shelf, so there is one row type and the
-//! shelf is what differs.
+//! Three shelves in one answer because a reader needs them together to
+//! make sense of any: the city's library is the stock any building may
+//! admit, the building's own shelf is what only it keeps, and the
+//! external shelves are directories the city mounts read-only from
+//! elsewhere on this machine. A line is the same seven facts on either
+//! shelf, so there is one row type and the shelf is what differs.
 
 use kernel::{Address, B3Hash, RunId};
 use serde::{Deserialize, Serialize};
 
-/// Which shelf a holding sits on.
+/// Which shelf a holding sits on, and where its document is.
+///
+/// One value rather than a shelf name beside a path, because a holding
+/// is on one shelf and at one place, and two fields would let them
+/// disagree: a row that says `library` and points outside the city is a
+/// state no shelf can be in.
 ///
 /// Named rather than implied by which list it arrived in, so a page
-/// that shows both shelves in one list can still say where a skill
+/// that shows three shelves in one list can still say where a skill
 /// came from - which is the question a person asks when two shelves
 /// hold the same name and the nearer one wins.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// **The two city arms are `Query::Document`'s input; the external arm
+/// is not.** A skill on a shelf outside the city has no address, and one
+/// invented for it would send a reader to a file that is not there.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SkillShelf {
     /// The city's central stock, under the reserved prefix.
-    Library,
+    Library(Address),
     /// This building's own shelf, inside the building.
-    Building,
+    Building(Address),
+    /// A directory outside the city that the city's configuration
+    /// mounts read-only: which shelf of that list this is, and the
+    /// document's path from the shelf's root.
+    External { index: u32, path: String },
 }
 
 /// One shelved skill.
@@ -35,12 +49,14 @@ pub enum SkillShelf {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SkillLine {
     pub name: String,
+    /// The section the shelf files it under. Empty for a skill on an
+    /// external shelf: that tree is another harness's, it files skills
+    /// one directory per skill with no section above them, and a
+    /// section invented here would be this city's guess about a layout
+    /// it does not own.
     pub section: String,
+    /// Which shelf, and where the document is on it.
     pub shelf: SkillShelf,
-    /// Where the document sits, as the city spells it - which is what
-    /// `Query::Document` takes, so opening a skill needs no second
-    /// question about where its file is.
-    pub at: Address,
     /// The first non-empty line of the document, which is what its
     /// author wrote to describe it.
     pub disclosure: String,
@@ -62,8 +78,9 @@ pub struct SkillLine {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SkillsAnswer {
     pub building: Address,
-    /// Both shelves, city stock first, then this building's own; within
-    /// a shelf, section then name order.
+    /// Every shelf, city stock first, then this building's own, then the
+    /// external shelves in the order the configuration lists them;
+    /// within a shelf, section then name order.
     pub skills: Vec<SkillLine>,
     /// Names this building's reading room admits that no shelf holds.
     /// Shown to the person who wrote the list, since only they can fix

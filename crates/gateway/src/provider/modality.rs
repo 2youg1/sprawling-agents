@@ -23,6 +23,7 @@
 //! the answer it gives, each cited to the description its vendor
 //! publishes.
 
+pub mod call;
 pub mod embedding;
 pub mod rerank;
 

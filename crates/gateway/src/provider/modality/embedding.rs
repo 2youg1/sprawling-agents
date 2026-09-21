@@ -84,6 +84,14 @@ impl EmbeddingRequest {
         self.inputs.len()
     }
 
+    /// The width this request asks for, where it asks for one. What the
+    /// ledger line records, because a stored vector is only comparable
+    /// with one of the same width.
+    #[must_use]
+    pub const fn dimensions(&self) -> Option<u32> {
+        self.dimensions
+    }
+
     /// The JSON body, in the field order the vendor documents.
     #[must_use]
     pub fn body(&self) -> String {
