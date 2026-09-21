@@ -83,7 +83,7 @@ Trades in the market as {who}.
     ];
     let landing =
         effect::Landing::signals(effects, &Address::parse("market/ito").unwrap(), "ito").unwrap();
-    let err = worker.settle(&at, RunId::CITY, landing).unwrap_err();
+    let err = worker.settle(&at, RunId::CITY, landing, 0).unwrap_err();
     assert_eq!(err.code(), &kernel::AxCode::BackpressureShed);
     assert_eq!(
         worker.knocks.len(),
@@ -145,7 +145,7 @@ fn a_half_filed_shelf_is_unwound() {
     .unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    let err = worker.settle(&at, RunId::CITY, landing).unwrap_err();
+    let err = worker.settle(&at, RunId::CITY, landing, 0).unwrap_err();
     assert_eq!(err.code(), &kernel::AxCode::StorageFatal);
     // The first filing was unwound: nothing is on the shelf that the
     // history does not already carry — and the history carries both

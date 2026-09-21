@@ -49,6 +49,7 @@ impl RunWorker {
         at: &Assignment,
         desks: &Desks,
         sweep: Sweep<'_>,
+        conversations: u32,
     ) -> Result<(), AxError> {
         let (addr, who, run_id) = (&at.addr, site.who.as_str(), site.run_id);
         let (write_root, building) = (site.write_root.as_path(), &site.building);
@@ -58,13 +59,13 @@ impl RunWorker {
         // other source than `Landing::record`, so a change that outran
         // its own line cannot be written here.
         let spoken = effect::Landing::signals(signal_effects, addr, who)?;
-        self.settle(at, run_id, spoken)?;
+        self.settle(at, run_id, spoken, conversations)?;
         let ground = effect::Landing::goals(
             held(&desks.goals, "settle the goal desk")?.take_effects(),
             addr,
             who,
         )?;
-        self.settle(at, run_id, ground)?;
+        self.settle(at, run_id, ground, conversations)?;
         // The sweep the forecast cannot replace. A command can be
         // obfuscated past a text prediction; what is missing from the
         // working tree cannot be talked out of. The base is the first
@@ -78,7 +79,7 @@ impl RunWorker {
                 .map_err(memory::MemoryError::into_ax)?;
             let swept = discarded.len();
             let lost = effect::Landing::discards(discarded, addr, who);
-            self.settle(at, run_id, lost)?;
+            self.settle(at, run_id, lost, conversations)?;
             // Over the threshold a person is told, and the class is one
             // no policy can waive. Each file is restorable on its own;
             // what the count says is that nobody meant this.
@@ -127,7 +128,7 @@ impl RunWorker {
                 who,
             )? {
                 effect::Claims::Landed(taken) => {
-                    self.settle(at, run_id, *taken)?;
+                    self.settle(at, run_id, *taken, conversations)?;
                     self.tell_whoever_is_behind(
                         at,
                         Reporter {
@@ -136,6 +137,7 @@ impl RunWorker {
                             who,
                         },
                         &claim_effects,
+                        conversations,
                     )?;
                 }
                 effect::Claims::Stale(nodes) => {
@@ -166,7 +168,7 @@ impl RunWorker {
             addr,
             who,
         )?;
-        self.settle(at, run_id, remembered)?;
+        self.settle(at, run_id, remembered, conversations)?;
         Ok(())
     }
 }

@@ -18,7 +18,6 @@ use channels::ToolkitSlug;
 use kernel::{Address, AxCode, AxError, EventKind, Payload, Proxying, SecretRef};
 
 use super::RunWorker;
-use super::genesis::city_address;
 
 /// Where the broker's project key is enrolled.
 ///
@@ -102,7 +101,7 @@ impl RunWorker {
         &mut self,
         toolkit: &ToolkitSlug,
     ) -> Result<(), AxError> {
-        let city = city_address(&self.city_root);
+        let city = kernel::layout::CityLayout::new(&self.city_root).city_address();
         let held = broker_for(Some(&self.vault), city.as_ref())?.ok_or_else(|| {
             AxError::failure(
                 AxCode::CredentialMissing,

@@ -127,6 +127,10 @@ pub(super) struct Knock {
     /// The mode of the run that spoke. Carried rather than defaulted: an
     /// answer belongs to the same piece of work as the question.
     pub(super) mode: runtime::Mode,
+    /// How many knocks deep the run that spoke was. The woken run is one
+    /// hop further on, and the ceiling is read there
+    /// (sprawling-SPEC.md 8-46-12).
+    pub(super) conversations: u32,
 }
 
 /// What one dispatch left behind. Carried rather than re-derived,
@@ -159,6 +163,7 @@ pub(super) mod agreeing;
 pub(super) mod handback;
 pub(super) mod running;
 pub(super) mod session;
+pub(super) mod session_shape;
 pub(crate) use agreeing::acp_dispatch;
 pub(super) use agreeing::run_id_for;
 #[cfg(test)]

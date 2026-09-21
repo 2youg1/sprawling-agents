@@ -114,6 +114,39 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
     );
 }
 
+/// A knock that would carry one conversation past its ceiling starts
+/// nothing: the signal is already in the room's inbox, and the chain
+/// ends here rather than with another run nobody asked for
+/// (sprawling-SPEC.md 8-46-12). The first test above is the other side
+/// of the boundary: a knock below the ceiling wakes its resident.
+#[test]
+fn a_knock_past_the_conversation_ceiling_starts_no_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let (base_url, provider) = fake_openai(&["m-local"], vec![completion("unused", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker.knocks.push(Knock {
+        addr: Address::parse("market/hana").unwrap(),
+        from: "market/ito".to_owned(),
+        mode: runtime::Mode::PlanGoal,
+        conversations: u32::MAX,
+    });
+    worker.answer_knocks();
+    assert!(!worker.driving(), "a knock past the ceiling opens no lane");
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let started: Vec<String> = verified
+        .raw_lines()
+        .iter()
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .filter(|line| line.contains("\"kind\":\"run_started\""))
+        .collect();
+    assert!(
+        started.is_empty(),
+        "a knock past the ceiling must not start a run: {started:?}"
+    );
+    drop(provider);
+}
+
 #[test]
 fn an_arrival_lands_where_the_watch_table_says_and_starts_tainted() {
     let dir = tempfile::tempdir().unwrap();

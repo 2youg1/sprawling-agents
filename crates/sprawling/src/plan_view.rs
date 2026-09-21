@@ -300,7 +300,15 @@ fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::DiscardRestored
         | EventKind::AutonomyChanged
         | EventKind::GovernedDocumentWritten
-        | EventKind::ToolkitLinkOpened => PlanReach::Untouched,
+        | EventKind::ToolkitLinkOpened
+        // A call to an embeddings or rerank face, and every line an
+        // adviser consultation writes, are about the window one run is
+        // given: none of them names a plan row.
+        | EventKind::EmbeddingCalled
+        | EventKind::RerankCalled
+        | EventKind::AdviserAsked
+        | EventKind::AdviserAnswered
+        | EventKind::AdviserFellBack => PlanReach::Untouched,
     }
 }
 

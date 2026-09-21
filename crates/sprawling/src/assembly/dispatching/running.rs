@@ -9,7 +9,7 @@ use kernel::Locator;
 use kernel::{AxCode, AxError};
 
 use super::super::{
-    Desks, Driven, Driving, Ending, Holding, Landed, Owing, RunWorker, Site, Sweep, Workbench,
+    Desks, Driven, Driving, Ending, Landed, Owing, QueueTenure, RunWorker, Site, Sweep, Workbench,
     held, now_ms,
 };
 use super::{Assignment, Given};
@@ -73,15 +73,15 @@ impl RunWorker {
         // where `addr` stops being where the work was sent and becomes
         // where the run works.
         at.addr = self.room_for(at.addr, session.as_ref())?;
-        // Written into the session's own layer rather than held beside
-        // the run: the ladder that resolves city -> building -> room is
-        // already the authority on how hard a run thinks, and a second
-        // store would be a second answer. Chosen once, it holds for
-        // every later run in that room - and for this one, which is why
-        // it is written before the configuration is frozen.
-        if let Some(effort) = at.effort {
-            city::write_effort(&self.city_root, &at.addr, effort)?;
-        }
+        // What this session already froze, and the one dispatch that is
+        // allowed to choose: the model and the effort are written into
+        // the room's own layer at its first run and only read back at
+        // every later one, because a shape that moved mid-session makes
+        // every turn after it pay full price for a prefix that never
+        // changed. A dispatch that would move it is refused here,
+        // before the brief is written, so a refusal leaves the session
+        // exactly as it was.
+        self.choose_shape(&at, &agreed.model)?;
         // The task file exists first, then the run exists: the job on
         // disk is what the agent reads, and the copy in the store is
         // what the history keeps, so editing one cannot rewrite the
@@ -224,6 +224,10 @@ impl RunWorker {
             job_locator,
             member,
         } = continuation;
+        // Read before the obligation moves on: this run's place in the
+        // conversation is what a signal it sends carries forward, and
+        // `settle_desks` below is where those signals are spoken.
+        let conversations = owing.conversations();
         // Both loans go back before either failure is propagated: a
         // backlog that would not take its member back used to cost the
         // room its mail too (sprawling-SPEC.md 8-46-9).
@@ -248,6 +252,7 @@ impl RunWorker {
                 raised: &mut raised,
                 job_locator: &job_locator,
             },
+            conversations,
         )?;
         // What the run can show for itself. `None` is not `Some(false)`:
         // "nothing ran" and "something ran and failed" are different
@@ -307,9 +312,9 @@ impl RunWorker {
         desks: &Desks,
     ) -> Result<(), AxError> {
         let returned = held(&desks.signals, "settle the signal desk")?.take_inbox();
-        match desks.holding {
-            Holding::TheRoomQueue => self.rooms.give_back(&at.addr, site.run_id, returned)?,
-            Holding::ASpare { held_by } => self.note(
+        match desks.tenure {
+            QueueTenure::TheRoomQueue => self.rooms.give_back(&at.addr, site.run_id, returned)?,
+            QueueTenure::ASpare { held_by } => self.note(
                 runtime::diagnostics::Level::Refuse,
                 "collab::inbox",
                 &format!(

@@ -46,6 +46,10 @@ mod sbom;
 mod secret;
 mod spec;
 mod specalign;
+// The session-slice path gate: only its writer names the path
+// (memory-SPEC 8-24). Declared here because a module lives where the
+// crate root says it does.
+mod slices;
 // The grid instrument (xtask-SPEC.md section 8-26). It is declared here
 // because a module lives where the crate root says it does; it is not a
 // subcommand, and `cargo xtask render --survey` is how a person reaches
@@ -191,12 +195,14 @@ fn main() -> ExitCode {
         Some("lexicon") => report::finish("lexicon", lexicon::check(&root)),
         Some("length") => report::finish("length", length::check(&root)),
         Some("boundary") => report::finish("boundary", boundary::check(&root)),
+        Some("slices") => report::finish("slices", slices::check(&root)),
         Some("artifact") => report::finish("artifact", artifact::check(&root)),
         Some("modmap") => report::finish("modmap", modmap::check(&root)),
         Some("npm") => report::finish("npm", npm::check(&root)),
         Some("depmap") => report::finish("depmap", depmap::check(&root)),
         Some("guard") => report::finish("guard", guard::check(&root, range.as_deref())),
         Some("release") => report::finish("release", release::check(&root)),
+        Some("features") => report::finish("features", gates::default_features(&root)),
         Some("spec") => match spec::run(&root, args.get(1).map(String::as_str)) {
             Ok(message) => {
                 println!("{message}");
@@ -251,6 +257,7 @@ const GATES: [&str; gates::COUNT] = [
     "modmap",
     "length",
     "boundary",
+    "slices",
     "artifact",
     "depmap",
     "npm",
@@ -264,6 +271,7 @@ const GATES: [&str; gates::COUNT] = [
     "proof",
     "budget",
     "specalign",
+    "features",
     "apisync",
     "release",
     "guard",

@@ -195,9 +195,9 @@ pub(super) struct Desks {
     /// is what `status` reports as waiting. Read before the queue goes
     /// to the desk, so it is counted here or not at all.
     waiting: u32,
-    /// Whether this run holds its room's queue, shown when it lands:
+    /// This run's tenure over its room's queue, shown when it lands:
     /// only the holder gives a queue back (sprawling-SPEC.md 8-46-9).
-    pub(super) holding: super::Holding,
+    pub(super) tenure: super::QueueTenure,
 }
 
 /// What a run can be told about itself at the moment it starts.

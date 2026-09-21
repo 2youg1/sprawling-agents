@@ -110,7 +110,7 @@ impl RunWorker {
             pr,
             plan_path,
             waiting,
-            holding: lent.holding,
+            tenure: lent.tenure,
         })
     }
 }

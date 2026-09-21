@@ -105,6 +105,9 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
 }
 #[test]
 fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
+    // Named on the host: a sandboxed command copies the room and its
+    // deletion dies with the copy, so only a host command can leave the
+    // sweep something to report (runtime-SPEC 8-13-2).
     let dir = tempfile::tempdir().unwrap();
     let report = init_city(dir.path()).unwrap();
     let room = dir.path().join("lab").join("room1");
@@ -118,7 +121,10 @@ fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
                 "clearing up",
                 "tu_1",
                 "exec",
-                serde_json::json!({ "arm": { "program": { "path": path, "args": args } } }),
+                serde_json::json!({
+                    "arm": { "program": { "path": path, "args": args } },
+                    "where": "host",
+                }),
             ),
             completion("cleared", None),
         ],

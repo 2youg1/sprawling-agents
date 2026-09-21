@@ -132,7 +132,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
         // this city is recorded. Without it the name lived only in a
         // directory entry, and every interface said "no city" over a
         // city that had been running for a month.
-        addr: city_address(city_root),
+        addr: kernel::layout::CityLayout::new(city_root).city_address(),
         kind: EventKind::CityInitialized,
         data: Payload::empty(),
         ig: false,
@@ -198,18 +198,6 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
         standing,
         adopted,
     })
-}
-
-/// A city's name, read from the directory it lives in.
-///
-/// Not every directory name is an address - a path can hold characters
-/// an address may not - and a city whose directory cannot be spelled as
-/// an address simply has no name to show, which is honest and rare.
-pub(crate) fn city_address(city_root: &Path) -> Option<Address> {
-    city_root
-        .file_name()
-        .and_then(|name| name.to_str())
-        .and_then(|name| Address::parse(name).ok())
 }
 
 /// The city segment as this city has it: the file the person may edit,

@@ -131,10 +131,17 @@ impl RunWorker {
     /// the city's oldest one, and inverting it is how a design starts
     /// paying for a hundred idle personalities.
     ///
-    /// Nothing counts knocks. When a conversation has finished is for
-    /// the residents in it to decide, and a person who wants a resident
-    /// to stop being reachable halts it: a dispatch already refuses a
-    /// halted scope, and `Halt` is the one brake this city has.
+    /// Nothing counts knocks against the worker. When a conversation has
+    /// finished is for the residents in it to decide, and a person who
+    /// wants a resident to stop being reachable halts it: a dispatch
+    /// already refuses a halted scope, and `Halt` is the one brake this
+    /// city has.
+    ///
+    /// **What is counted is the chain's own length.** A conversation
+    /// that would wake the next resident past `CONVERSATION_HOPS_MAX`
+    /// starts no run: the refusal names the address and the signal stays
+    /// in the room's inbox, because a ring of residents waking each
+    /// other is a spend nobody agreed to (sprawling-SPEC.md 8-46-12).
     ///
     /// # Errors
     /// Propagates a resident description that exists and cannot be read:
@@ -145,6 +152,7 @@ impl RunWorker {
         signal: &collab::Signal,
         speaker: &Address,
         mode: runtime::Mode,
+        conversations: u32,
     ) -> Result<(), AxError> {
         let room = signal.room();
         if room == speaker || self.knocks.iter().any(|queued| &queued.addr == room) {
@@ -160,6 +168,7 @@ impl RunWorker {
             addr: room.clone(),
             from: signal.from().to_owned(),
             mode,
+            conversations,
         });
         Ok(())
     }
@@ -181,6 +190,25 @@ impl RunWorker {
     /// over it would punish the wrong run.
     pub(super) fn answer_knocks(&mut self) {
         for knock in std::mem::take(&mut self.knocks) {
+            // The chain is bounded here rather than at the push: a knock
+            // that has already gone as far as it may is stepped over
+            // like one that cannot be answered, so the run that spoke is
+            // not punished for it (sprawling-SPEC.md 8-46-12).
+            let owing = match Owing::knocked(knock.conversations) {
+                Ok(owing) => owing,
+                Err(refusal) => {
+                    self.note(
+                        runtime::diagnostics::Level::Refuse,
+                        "collab::inbox",
+                        &format!(
+                            "{} was signalled and could not be woken: {}",
+                            knock.addr.as_str(),
+                            refusal.subject()
+                        ),
+                    );
+                    continue;
+                }
+            };
             // Attribution is the whole point of this text. The woken
             // resident is told that an agent spoke and which one, in
             // the same `@address` form a steer lands in, so that
@@ -206,7 +234,7 @@ impl RunWorker {
                     "The signals waiting for you have been read, and @{speaker} has an answer \
                      if one was needed."
                 ),
-                Owing::unasked(Unasked::Knock),
+                owing,
             );
             if let Err(err) = outcome {
                 self.note(

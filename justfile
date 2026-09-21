@@ -110,8 +110,13 @@ clippy:
 # first person to turn it on meets. Two check-mode passes, seconds each
 # on a warm cache; the zero-warning rule stays with `clippy`, which sees
 # every feature at once.
+#
+# --all-targets on the first pass because `cargo check` alone does not
+# compile test targets: `refusal_matrix` used items behind
+# `#[cfg(feature = "conformance")]` without declaring that gate, and the
+# only configuration that ever compiled it was `--all-features`.
 features:
-    cargo check --workspace --locked
+    cargo check --workspace --locked --all-targets
     cargo check -p channels --no-default-features --locked
 
 # `just prereqs` names cargo-nextest; `just test-std` is the fallback.

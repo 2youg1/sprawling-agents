@@ -39,6 +39,7 @@ impl RunWorker {
         at: &Assignment,
         run: RunId,
         landing: effect::Landing,
+        conversations: u32,
     ) -> Result<(), AxError> {
         let then = landing.record(&mut |line: effect::Line| self.record_for(run, line))?;
         match then {
@@ -56,8 +57,10 @@ impl RunWorker {
                         self.rooms.deliver(signal)?;
                         // Somebody was spoken to. Whether that starts a run
                         // is decided in one place, so that the two ways of
-                        // reaching a resident stay one decision.
-                        self.knock(signal, &at.addr, at.mode)?;
+                        // reaching a resident stay one decision. The
+                        // speaking run's place in the conversation rides on,
+                        // so the knock this queues is one hop further in.
+                        self.knock(signal, &at.addr, at.mode, conversations)?;
                     }
                     Ok(())
                 })();
@@ -254,7 +257,33 @@ impl RunWorker {
             Completion::Cancelled => None,
             Completion::Done(_) | Completion::Limit => held(succession, SUCCESSION_DESK)?.take(),
         };
-        if let Some(asked) = replaced {
+        // The chain is as long as it may be: no successor is dispatched
+        // and whoever asked hears why. The refusal is noted as well as
+        // handed back, because an obligation with nobody behind it
+        // reaches the diagnostics log and nothing else
+        // (sprawling-SPEC.md 8-46-12). The run itself still lands below,
+        // so refusing a successor does not also take this run's ending
+        // off the ledger.
+        let onward = match replaced {
+            None => None,
+            Some(asked) => match owing.after_succession() {
+                Ok(onward) => Some((asked, onward)),
+                Err(refusal) => {
+                    self.note(
+                        runtime::diagnostics::Level::Refuse,
+                        "runtime::succession",
+                        &format!(
+                            "{} cannot hand over again: {}",
+                            addr.as_str(),
+                            refusal.subject()
+                        ),
+                    );
+                    self.hand_back(&owing.reply(), refusal);
+                    None
+                }
+            },
+        };
+        if let Some((asked, onward)) = onward {
             self.note(
                 runtime::diagnostics::Level::Effect,
                 "runtime::succession",
@@ -270,7 +299,7 @@ impl RunWorker {
             // same piece of work carrying on, so whoever was owed the
             // predecessor's ending is owed the successor's, and the
             // handback or the reply happens when the chain ends rather
-            // than at each link.
+            // than at each link. Its place in the chain moves on with it.
             self.dispatch_into_lane(
                 Assignment {
                     addr: addr.clone(),
@@ -286,7 +315,7 @@ impl RunWorker {
                 },
                 plan.task.clone(),
                 plan.goal.clone(),
-                owing,
+                onward,
             )?;
             return Ok(Landed::Elsewhere);
         }
