@@ -7,7 +7,8 @@
 
 use super::super::vault::Persistence;
 use super::codec::{base64url_nopad, percent_encode};
-use super::types::{OauthPending, OauthTokens, TokenRequest};
+use super::exchange;
+use super::types::{OauthTokens, RedirectPending, TokenRequest};
 
 use kernel::{AxCode, AxError, Payload, Sealed};
 use serde_json::{Map, Value};
@@ -17,7 +18,7 @@ pub fn oauth_begin(
     profile: &crate::oauth_profiles::OauthProfile,
     code_verifier: String,
     state: String,
-) -> Result<OauthPending, AxError> {
+) -> Result<RedirectPending, AxError> {
     let redirect_uri = redirect_of(profile)?;
     if profile.auth_endpoint.is_empty()
         || profile.token_endpoint.is_empty()
@@ -70,7 +71,7 @@ pub fn oauth_begin(
         challenge,
         percent_encode(&state),
     );
-    Ok(OauthPending {
+    Ok(RedirectPending {
         auth_url,
         state,
         code_verifier: Zeroizing::new(code_verifier),
@@ -107,7 +108,7 @@ pub fn oauth_refresh(
 /// endpoint's error page can contain the code that was just sent.
 pub fn oauth_redeem(
     profile: &crate::oauth_profiles::OauthProfile,
-    pending: &OauthPending,
+    pending: &RedirectPending,
     code: &str,
     timeout_ms: u64,
 ) -> Result<OauthTokens, AxError> {
@@ -115,74 +116,21 @@ pub fn oauth_redeem(
     send_token_request(&request.url, request.body, timeout_ms)
 }
 
-/// The one exchange with a token endpoint: send, read, refuse without
-/// quoting. Both grants use it, so neither can drift.
+/// The redirect grant's exchange with a token endpoint: send, read,
+/// refuse without quoting.
 fn send_token_request(url: &str, body: String, timeout_ms: u64) -> Result<OauthTokens, AxError> {
-    // A token endpoint belongs to the provider a person is subscribing
-    // to, so there is no endpoint of theirs to carry a setting; the
-    // city's own default is what applies, and a loopback URL here is a
-    // stand-in a test stood up.
-    let client = crate::client_for(kernel::Proxying::ExceptLocal, url)
-        .timeout(std::time::Duration::from_millis(timeout_ms))
-        .build()
-        .map_err(|err| {
-            AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
-                .with_recovery(
-                    "check the proxy settings this machine exports (`HTTPS_PROXY`, \
-                     `NO_PROXY`) and the TLS roots this build was given",
-                )
-        })?;
-    let response = client
-        .post(url)
-        .header("content-type", "application/json")
-        .body(body)
-        .send()
-        .map_err(|err| {
-            AxError::failure(
-                AxCode::Provider,
-                "redeem an authorization code",
-                err.to_string(),
-            )
-            .with_recovery("check the network and start the login again")
-        })?;
-    let status = response.status();
-    let body: Value = response.json().map_err(|err| {
-        AxError::failure(
-            AxCode::Provider,
-            "read a token answer",
-            format!("{}: {err}", status.as_u16()),
-        )
-        .with_recovery("the provider answered something this version cannot read")
-    })?;
-    if !status.is_success() {
+    let answer = exchange::post_json(url, body, timeout_ms)?;
+    if !answer.ok {
         // The provider's own words are not quoted: this body is the one
         // place a just-used code can appear in plain text.
         return Err(AxError::failure(
             AxCode::Provider,
             "redeem an authorization code",
-            format!("the provider answered {}", status.as_u16()),
+            format!("the provider answered {}", answer.status),
         )
         .with_recovery("start the login again; a code can be redeemed once and expires quickly"));
     }
-    let access = body
-        .get("access_token")
-        .and_then(Value::as_str)
-        .ok_or_else(|| {
-            AxError::failure(
-                AxCode::Provider,
-                "read a token answer",
-                "no access_token in the answer",
-            )
-            .with_recovery("the provider answered something this version cannot read")
-        })?;
-    Ok(OauthTokens {
-        access: Zeroizing::new(access.to_owned()),
-        refresh: body
-            .get("refresh_token")
-            .and_then(Value::as_str)
-            .map(|token| Zeroizing::new(token.to_owned())),
-        expires_in_s: body.get("expires_in").and_then(Value::as_u64),
-    })
+    exchange::tokens(&answer.body)
 }
 
 /// The code out of what the person pasted back, once the state that
@@ -199,7 +147,7 @@ fn send_token_request(url: &str, body: String, timeout_ms: u64) -> Result<OauthT
 /// `InvalidArgs` when the state is not the one this process sent, or
 /// when the paste holds no code. Neither refusal repeats the paste: a
 /// live authorization code is in it.
-fn redeemed_code<'p>(pasted: &'p str, pending: &OauthPending) -> Result<&'p str, AxError> {
+fn redeemed_code<'p>(pasted: &'p str, pending: &RedirectPending) -> Result<&'p str, AxError> {
     let (code, returned) = match pasted.split_once('#') {
         Some((code, returned)) => (code.trim(), Some(returned.trim())),
         None => (pasted.trim(), None),
@@ -236,7 +184,7 @@ fn redeemed_code<'p>(pasted: &'p str, pending: &OauthPending) -> Result<&'p str,
 /// process did not make, which `redeemed_code` decides.
 pub fn oauth_redeem_request(
     profile: &crate::oauth_profiles::OauthProfile,
-    pending: &OauthPending,
+    pending: &RedirectPending,
     code: &str,
 ) -> Result<TokenRequest, AxError> {
     let body = serde_json::json!({

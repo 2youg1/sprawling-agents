@@ -9,9 +9,8 @@
 //! absence of those impls is the isolation guarantee (15.3-4).
 
 use std::collections::BTreeSet;
-use std::num::NonZeroU64;
 
-use kernel::consts_policy::STARTUP_BUDGET_TOKENS;
+use kernel::consts_policy::{BYTES_PER_TOKEN, PREFIX_SLOTS, STARTUP_BUDGET_TOKENS};
 use kernel::event::record::{PromptAssembled, PromptSegment, PromptSkip, SkipReason};
 use kernel::{Address, AxCode, AxError, B3Hash, Payload, SystemBlock};
 
@@ -25,19 +24,6 @@ pub use segment::{FrozenSegment, SegmentSlot, SegmentSource};
 /// (replay) reuses it — one authority for the concatenation rule.
 pub(crate) const DOC_JOIN: &str = "\n\n";
 
-/// Bytes per token: the rate this crate converts a token budget into a
-/// byte cap at. It is an estimate for English prose and code, and every
-/// budget that crosses the units does it here.
-const BYTES_PER_TOKEN: u64 = 4;
-
-/// A whole-prefix budget divides evenly across the slots. `SegmentSlot`
-/// is the authority on how many slots there are; `prefix::tests` holds
-/// this divisor against that enum so the two cannot drift apart.
-const PREFIX_SLOTS: NonZeroU64 = match NonZeroU64::new(4) {
-    Some(slots) => slots,
-    None => NonZeroU64::MIN,
-};
-
 /// One prefix source document: address plus its frozen bytes, `None`
 /// when missing or unreadable (the skip itself is accounted).
 #[derive(Debug, Clone)]
@@ -46,8 +32,9 @@ pub struct SourceDoc {
     pub bytes: Option<Vec<u8>>,
 }
 
-/// Per-slot byte budgets. Callers derive them from config; the default
-/// splits the startup budget evenly (tokens ≈ bytes/4, four slots).
+/// Per-slot byte budgets in bytes, converted from a token budget at
+/// [`BYTES_PER_TOKEN`] and divided across [`PREFIX_SLOTS`]. Callers
+/// derive them from config; the default splits the startup budget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SegmentCaps {
     pub city: u64,

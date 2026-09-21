@@ -6,7 +6,7 @@
 //! The external tools a building's configuration names, each already
 //! connected to its server or left out and named in the diagnostics.
 
-use super::super::{RunWorker, connect_mcp, transport_site};
+use super::super::{RunWorker, connect_mcp, now_ms, transport_site};
 
 impl RunWorker {
     /// The external tools this run may reach, each already connected to
@@ -39,6 +39,12 @@ impl RunWorker {
             );
             return Vec::new();
         }
+        // The half of `[prepare_dispatch_ms]` this file owns: starting
+        // every server this building declares and shaking hands with
+        // each of them. Held apart from the whole-phase reading because
+        // it is the part a resident connection table would remove, and
+        // a figure that mixed the two could not say how much.
+        let began = now_ms().ok();
         let mut offered = Vec::new();
         let resolve = self.resolver();
         for server in &config.mcp {
@@ -68,6 +74,21 @@ impl RunWorker {
                     &format!("{}: {err}; {}", server.label.as_str(), err.recovery()),
                 ),
             }
+        }
+        // A clock this machine would not read is not a reason to lose
+        // the tools: the reading is diagnostic, the connections are the
+        // work.
+        if let (Some(began), Ok(ended)) = (began, now_ms()) {
+            let spent = ended.value().saturating_sub(began.value());
+            self.note(
+                runtime::diagnostics::Level::Trace,
+                "bin::assembly",
+                &format!(
+                    "mcp_tools took {spent} ms over {} declared server(s), offering {} tool(s)",
+                    config.mcp.len(),
+                    offered.len()
+                ),
+            );
         }
         offered
     }

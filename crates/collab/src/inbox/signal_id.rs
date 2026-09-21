@@ -6,10 +6,30 @@
 //! A signal id: what a duplicate delivery is recognised by.
 
 use kernel::{AxCode, AxError};
+use serde::{Deserialize, Serialize};
 
 /// A signal's identity, and the thing duplicates are recognised by.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+///
+/// It serializes as the string [`SignalId::parse`] accepted and reads
+/// back through that same parse, so a ledger line carrying an id meets
+/// the grammar once rather than once per reader.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub struct SignalId(String);
+
+impl TryFrom<String> for SignalId {
+    type Error = AxError;
+
+    fn try_from(raw: String) -> Result<SignalId, AxError> {
+        SignalId::parse(&raw)
+    }
+}
+
+impl From<SignalId> for String {
+    fn from(id: SignalId) -> String {
+        id.0
+    }
+}
 
 impl SignalId {
     /// # Errors

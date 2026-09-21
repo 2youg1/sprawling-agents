@@ -31,7 +31,7 @@ use crate::workshop::NodeId;
 
 mod request;
 
-pub use request::OpenRequest;
+pub use request::{MergedRequest, OpenRequest};
 
 /// What the run did to the city's requests. Exhaustive for the same
 /// reason as the other desks: every variant is a line the worker has to

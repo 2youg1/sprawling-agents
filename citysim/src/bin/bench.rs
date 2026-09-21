@@ -29,7 +29,8 @@ fn main() -> std::process::ExitCode {
     let outcome = ledger_append(&scratch)
         .and_then(|()| durability_barrier(&scratch))
         .and_then(|()| prefix_assembly())
-        .and_then(|()| run_history(&scratch));
+        .and_then(|()| run_history(&scratch))
+        .and_then(|()| views_rebuild(&scratch));
     std::fs::remove_dir_all(&scratch).ok();
     match outcome {
         Ok(()) => std::process::ExitCode::SUCCESS,
@@ -187,6 +188,59 @@ fn prefix_assembly() -> Result<(), String> {
     let p50 = times.get(times.len() / 2).copied().unwrap_or_default();
     println!(
         "prefix_assembly    p50 {:>8.3} ms                    (budget 1 ms; 16.5 KB over four slots, {ROUNDS} rounds)",
+        p50.as_secs_f64() * 1_000.0
+    );
+    Ok(())
+}
+
+/// Budget row `views_rebuild_per_mb`: what rebuilding every view costs,
+/// denominated in the megabytes of ledger folded.
+///
+/// Measured over `sprawling::ask`, which is the whole production
+/// rebuild - verify the chain, parse every line, fold it into every
+/// view - plus answering one query off the result. The query is in
+/// rather than out because a rebuild nobody asks anything of is not a
+/// thing the city ever does, and answering `CityView` is microseconds
+/// against a fold of the whole history.
+///
+/// Per megabyte rather than per record: a record is not a fixed size,
+/// so a per-record figure answers how fast this fixture folded and not
+/// what rebuilding a real city will cost.
+fn views_rebuild(scratch: &std::path::Path) -> Result<(), String> {
+    let city_root = scratch.join("views");
+    let dir = kernel::layout::CityLayout::new(&city_root).ledger();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let (mut ledger, _report) = memory::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
+        .map_err(|e| format!("{}", e.into_ax()))?;
+    // Large enough that the fold rather than the open dominates: the
+    // budget row asks for that in so many words, and a fixture small
+    // enough to be paid for by opening a file would price the wrong
+    // thing.
+    const RECORDS: u64 = 50_000;
+    let drafts: Vec<EventDraft> = (0..RECORDS).map(draft).collect::<Result<_, _>>()?;
+    ledger.append_all(drafts).map_err(|e| format!("{e}"))?;
+    let bytes: u64 = std::fs::read_dir(&dir)
+        .map_err(|e| e.to_string())?
+        .filter_map(Result::ok)
+        .filter_map(|entry| entry.metadata().ok())
+        .map(|meta| meta.len())
+        .sum();
+    let megabytes = f64::from(u32::try_from(bytes).unwrap_or(u32::MAX)) / (1024.0 * 1024.0);
+
+    const ROUNDS: usize = 5;
+    let mut times = Vec::with_capacity(ROUNDS);
+    for _ in 0..ROUNDS {
+        let t0 = stamp();
+        let answer =
+            sprawling::ask(&city_root, &channels::Query::CityView).map_err(|e| format!("{e}"))?;
+        times.push(t0.elapsed());
+        std::hint::black_box(answer);
+    }
+    times.sort();
+    let p50 = times.get(times.len() / 2).copied().unwrap_or_default();
+    let per_mb = p50.as_secs_f64() * 1_000.0 / megabytes;
+    println!(
+        "views_rebuild      p50 {:>8.3} ms   {per_mb:>8.1} ms/MB   ({RECORDS} records, {megabytes:.2} MB of ledger, {ROUNDS} rebuilds)",
         p50.as_secs_f64() * 1_000.0
     );
     Ok(())

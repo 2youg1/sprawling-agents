@@ -8,6 +8,10 @@
 //! alternative is directive prose (names a next action), because the
 //! model is the recovery subject.
 
+// The samples this file judges are compiled only with the conformance
+// feature (`gate::conformance`, `kernel-SPEC.md` section 12.3), so the
+// target is judged in that build and is empty in every other.
+#![cfg(feature = "conformance")]
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

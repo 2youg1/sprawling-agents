@@ -171,7 +171,7 @@ impl Views {
             runs_active: self.hot.active_count(),
             runs_frozen: self.hot.frozen_count(),
             buildings: u64::try_from(buildings_of(&self.city_root).len()).unwrap_or(u64::MAX),
-            approvals_waiting: u64::try_from(self.approvals.len()).unwrap_or(u64::MAX),
+            approvals_waiting: u64::try_from(self.governance.pending.len()).unwrap_or(u64::MAX),
             signals_waiting: self
                 .waiting
                 .values()
@@ -206,7 +206,12 @@ impl Views {
                     frozen,
                     buildings: self.spine(),
                     pursuits: self.pursuit_lines(),
-                    halted: self.halted.iter().map(ToString::to_string).collect(),
+                    halted: self
+                        .governance
+                        .halted
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
                 })
             }
             channels::Query::RunView { run } => {
@@ -214,12 +219,12 @@ impl Views {
             }
             channels::Query::ApprovalQueue => {
                 channels::Answer::Approvals(channels::ApprovalsAnswer {
-                    items: self.approvals.values().cloned().collect(),
+                    items: self.governance.pending.values().cloned().collect(),
                 })
             }
             channels::Query::Governance => {
                 channels::Answer::Governance(channels::GovernanceAnswer {
-                    autonomy: self.autonomy.clone(),
+                    autonomy: self.governance.autonomy.clone(),
                     decided: self.decided.clone(),
                 })
             }

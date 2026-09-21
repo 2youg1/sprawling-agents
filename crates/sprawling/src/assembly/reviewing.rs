@@ -119,24 +119,19 @@ impl RunWorker {
                         let planned = trees
                             .plan_merge(&name)
                             .map_err(memory::MemoryError::into_ax)?;
-                        let mut data = request.payload()?.as_map().clone();
-                        data.insert("verified_by".to_owned(), serde_json::Value::String(by));
-                        data.insert(
-                            "commit".to_owned(),
-                            serde_json::Value::String(planned.commit()),
-                        );
-                        // What the merge commit's own trailers carry and
-                        // this record cannot say for itself, so "which
-                        // run wrote this commit" is answered from the
-                        // ledger rather than from git.
-                        data.extend(kernel::Payload::of(&of.attribution())?.as_map().clone());
+                        // The merged line's keys live once, on
+                        // `OpenRequest::merged_payload`: the commit that
+                        // was reviewed and the commit that landed are
+                        // two facts and therefore two keys.
+                        let data =
+                            request.merged_payload(planned.commit(), by, of.attribution())?;
                         self.record_for(
                             run_id,
                             effect::Line {
                                 who: who.to_owned(),
                                 addr: addr.clone(),
                                 kind: EventKind::PrMerged,
-                                data: Payload::new(data)?,
+                                data,
                             },
                         )?;
                         // A second resident verified this, which is what

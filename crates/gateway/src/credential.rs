@@ -21,9 +21,9 @@ mod vault;
 
 pub use custodian::Custodian;
 pub use oauth::{
-    DeviceAuthorization, DevicePoll, DeviceRefusal, FormPost, PollStep,
-    device_authorization_request,
+    DeviceAuthorization, DeviceLogin, DevicePoll, DeviceRefusal, DeviceStep, FormPost, PollStep,
+    device_authorization_request, device_login_begin,
 };
-pub use oauth::{OauthPending, OauthTokens, TokenRequest, oauth_begin};
+pub use oauth::{OauthPending, OauthTokens, RedirectPending, TokenRequest, oauth_begin};
 pub use oauth::{oauth_random, oauth_redeem, oauth_redeem_request, oauth_refresh};
 pub use vault::{Described, EnvReader, Persistence};

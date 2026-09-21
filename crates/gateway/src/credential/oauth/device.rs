@@ -23,8 +23,10 @@ use kernel::{AxCode, AxError};
 use serde_json::Value;
 use zeroize::Zeroizing;
 
+mod login;
 mod poll;
 
+pub use login::{DeviceLogin, DeviceStep, device_login_begin};
 pub use poll::{DevicePoll, DeviceRefusal, PollStep};
 
 use super::codec::percent_encode;
@@ -55,8 +57,9 @@ pub struct FormPost {
 }
 
 impl FormPost {
-    /// The one content type a form POST is sent under.
-    pub const CONTENT_TYPE: &'static str = "application/x-www-form-urlencoded";
+    /// The one content type a form POST is sent under, read from the
+    /// exchange that sends it rather than spelled again here.
+    pub const CONTENT_TYPE: &'static str = super::exchange::FORM_CONTENT_TYPE;
 }
 
 impl std::fmt::Debug for FormPost {

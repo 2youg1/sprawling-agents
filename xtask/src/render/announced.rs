@@ -11,8 +11,9 @@
 //! they are the three that read the page's names rather than its
 //! geometry, which is why they sit together.
 
-use super::{Drawn, violation};
+use super::violation;
 use crate::report::Violation;
+use crate::survey::Drawn;
 
 /// Every control a person can operate says what it is.
 ///

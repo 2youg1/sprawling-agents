@@ -80,10 +80,20 @@ badge_label = "client"
 #
 # This row is the `opt-level = 3` arm of the comparison the row below
 # opens; the criterion that decides between them is stated there, once.
+# **The ratchet moved on 2026-09-21.** The previous number was taken on
+# 2026-09-13 from a tree fourteen commits behind this one, and the
+# machine that reads this row now links every MSVC target with
+# `lld-link`, a build setting that lives in the machine's own cargo
+# configuration rather than in the repository. Which of the two moved
+# the figure is not separated here, and it does not need to be: a size
+# is a fact about the linker that produced it, which is why this row
+# names one platform and only that platform may refresh its badge. The
+# pending `opt-level = "z"` decision recorded beside it re-weighs this
+# row in the change that ships it.
 [release_binary]
 what = "the single binary a person installs, before fonts, wasmtime and CPython are embedded"
 budget_bytes = 134217728
-best_bytes = 9937920
+best_bytes = 11222016
 slack_bytes = 1048576
 measured_by = "just build-web, cargo build --release, then just gates"
 status = "gated"
@@ -511,16 +521,17 @@ status = "measured, not gated: 8,388,608 B, refused whole rather than truncated,
 # subject with is gone with `memory::projection`, so the per-record row
 # went with it: the views a city rebuilds today live in the process.
 #
-# Gated once it has a reading, unlike the wall-clock rows above it: the
-# denominator removes the fixture's size from the figure, which is what
-# made the others facts about a machine rather than about the design.
-# The budget is not stated until the reading exists, because a ceiling
-# chosen before anybody knows the order of magnitude is a number that
-# will be argued with rather than met.
+# The denominator removes the fixture's size from the figure, which is
+# what made the rows above it facts about a machine rather than about
+# the design. The reading now exists and the ceiling still does not:
+# `xtask budget` reads two units, bytes and packages, so a
+# `best_ms_per_mb` key written here today would be data nobody reads.
+# Gating this row is the unit's work, not the reading's, and the
+# reading had to come first either way.
 [views_rebuild_per_mb]
 what = "milliseconds to rebuild every view, per megabyte of ledger folded"
-measured_by = "just bench (citysim bench bin, release), over a ledger large enough that the fold rather than the open dominates"
-status = "not measured: nobody has taken this reading, so it stands as those words rather than as an invented figure. Not gated yet - a ratchet needs a best reading to ratchet against"
+measured_by = "just bench (citysim bench bin, release), over a ledger large enough that the fold rather than the open dominates: the bench writes 50,000 records into a scratch city and drives the whole production rebuild through `sprawling::ask`, which verifies the chain, parses every line and folds it into every view before answering one CityView"
+status = "measured, not gated: 34.1 ms/MB on windows-x86_64, 16 cores, NVMe (2026-09-21, release) - p50 428.9 ms to rebuild 12.57 MB of ledger, 50,000 records, 5 rebuilds. A ceiling waits on `xtask budget` learning a time unit; until then a figure written as `budget_ms` would be read by nobody"
 
 # What a dispatch spends before the model is called: opening the room,
 # writing the brief, standing the run up, and assembling the tools -
@@ -536,8 +547,8 @@ status = "not measured: nobody has taken this reading, so it stands as those wor
 # person will find it.
 [prepare_dispatch_ms]
 what = "one dispatch, from the command arriving to the lane taking the drive, on the accounting thread"
-measured_by = "nothing yet: `prepare_dispatch` is not timed anywhere in the tree, so the reading has no instrument, let alone a figure. The instrument this row waits for is two clock reads around `prepare_dispatch` and two more around `RunWorker::mcp_tools` in `crates/sprawling/src/assembly/dispatching.rs` and `crates/sprawling/src/assembly/workbench/servers.rs`, written out at `Level::Trace` - the same shape `assembly/credentials/probing.rs` already uses to report `elapsed_ms`, which is why no new sampling point is sanctioned for it"
-status = "not measured: the row was written as though diagnostics already timed this, and it does not - that sentence is corrected here rather than left standing, because a `measured_by` naming an instrument nobody wrote is how an invented figure gets believed later. Not gated - a wall-clock reading is the machine's, and this one also depends on how many MCP servers a building declares"
+measured_by = "the instrument is two clock reads around `prepare_dispatch` (crates/sprawling/src/assembly/dispatching/running.rs) and two more around `RunWorker::mcp_tools` (crates/sprawling/src/assembly/workbench/servers.rs), written out at `Level::Trace` through the city's own clock - the same shape `assembly/credentials/probing.rs` uses to report `elapsed_ms`, which is why no new sampling point was sanctioned for it. Read it off `a_dispatch_says_what_it_spent_before_the_drive` (cargo nextest run -p sprawling --release -E 'test(a_dispatch_says_what_it_spent_before_the_drive)' --no-capture), or off any served city running at that floor"
+status = "measured, not gated: 58 ms median on windows-x86_64, 16 cores, NVMe (2026-09-21, release, four runs: 50, 50, 51, 66; ~70 ms unoptimized when idle), for a dispatch into a fresh city with **no MCP server declared** - so this figure is the floor, and the `mcp_tools` line beside it read 0 ms over 0 servers in every run. The two lines are reported apart because a resident connection table (K-05) removes only the second, and the reading is K-05's own verdict: at 0 ms the table saves nothing, so it stays unbuilt until a served building declares servers and the second line shows them dominating. Not gated - a wall-clock reading is the machine's, and this one also depends on how many MCP servers a building declares"
 
 # How large this tree's dependency graph is, counted off the resolved
 # lockfile rather than off any manifest: a manifest states what was

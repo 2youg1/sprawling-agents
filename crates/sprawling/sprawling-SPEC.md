@@ -455,10 +455,11 @@ let on_disk = std::fs::read_to_string(&plan_path).unwrap_or_default();          
 ## 8-17 一次验证遍历，三个折叠
 
 ```rust
-pub(crate) struct Standing { pub(crate) book: gateway::EndpointBook, governance: Governance, collaboration: Collaboration }
+pub(crate) struct Standing { pub(crate) book: gateway::EndpointBook, governance: views::Governance, collaboration: Collaboration }
 impl Standing { pub(crate) fn fold(ledger_dir: &Path) -> Result<Standing, AxError>; }
 
-impl Governance { fn empty() -> Governance; fn absorb(&mut self, record: &EventRecord); }
+// views/governance.rs —— 判定面与读面共用的那一个定义
+impl Governance { pub(crate) fn empty() -> Governance; fn absorb(&mut self, record: &EventRecord); }
 struct CollaborationFold { … }   // 暂存 enqueued／consumed，`settle` 产 Collaboration
 ```
 
@@ -2649,7 +2650,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 
 ## 8-52 新客户端要问的四件事，服务端怎么答（`bin::views::listing`、`bin::views::document`、`views::rounds`、`views::holding`；channels-SPEC §8-23）
 
-- **`Views.halted: BTreeSet<kernel::event::Scope>`**，由 `city_halted` 折出：`Admittance::Halted` 加进去，`Released` 拿出来——与 `assembly::folds::Governance` 读同一条记录、同一个 `CityHalted` 结构，但**不共用那张表**：那张表是工作线程的判定面，这张是答查询的读面，两者从同一条流各自折出，重建即相等（`views::tests`）。`CityAnswer.halted` 是它的 `Vec` 形。
+- **`Views.governance: views::Governance`**（原 `Views.halted`／`Views.approvals`／`Views.autonomy` 三个散字段）。停摆作用域、待答项与自治档由 `city_halted`／`approval_requested`／`approval_resolved`／`autonomy_changed` 折出，**折法只有 `Governance::absorb` 一处**：工作线程持一份判定面，`Views` 持一份读面，同一个类型、同一遍折，重建即相等（`views::tests`、`what_a_worker_holds_is_what_a_restart_rebuilds`）。此前 `Views` 把这四条记录另拼了一遍，两份拼法对「读不懂的决定算什么」答得不一样。`CityAnswer.halted` 是 `governance.halted` 的 `Vec` 形。
 - **`summarize` 把 `RunHot.addr`／`started` 抄进 `RunSummary`**，不读账本。
 - **`rounds_answer` 多读两条记录**：窗口里第一条 `run_started` 成 `Opening { task, goal, at: record.t() }`，第一条 `run_frozen` 成 `Closing { completion, at }`；`turns()` 本身一字不动。
 - **`bin::views::listing`**（新文件）：`at` 为 `None` 读城根，否则读 `city_root/<at>`；`read_dir` 一层，目录在前、文件在后、各按名字 UTF-8 序；读不了的目录答空表而不是拒绝——同 `read_building` 的口径，一个读不了的目录在页面上是一个空目录。符号链接按 `metadata` 判：指向目录的算目录。文件大小 `u64`。
@@ -2991,7 +2992,7 @@ impl Home {
 
 ```rust
 fn scope_of(scope: &channels::HaltScope) -> kernel::event::Scope;   // assembly::naming：唯一的翻译
-impl Governance { pub(super) fn absorb(..) -> Result<(), AxError>;
+impl Governance { pub(crate) fn absorb(..) -> Result<(), AxError>;   // views/governance.rs
                   halted: BTreeSet<kernel::event::Scope> }
 impl RunWorker { fn halted_by(&self, addr: &Address) -> Option<kernel::event::Scope>; }
 ```
@@ -3038,3 +3039,17 @@ pub(crate) fn put(patch: PreferencePatch) -> Result<(), AxError>;// Command::Put
 - **文件缺席不是失败**：那是一个什么都还没定的人，答案是本 build 画的那几档（`PreferencesAnswer::default`）。`lang` 缺席就是缺席，不填 `en`——没人选过之前，只有浏览器自己的语言标签是证据。
 
 **本章测试**：`what_the_file_states_and_what_the_answer_states_are_one_record`、`a_section_this_build_does_not_read_survives_a_write`、`a_file_that_does_not_parse_is_refused_rather_than_replaced`（`person::tests`）。
+
+### 8-78 一次派活在会计线程上花了多久，城自己说出来（`assembly::dispatching::running`、`assembly::workbench::servers`；Roadmap 11.5、K-05）
+
+```rust
+// prepare_dispatch：进出各读一次城钟，Level::Trace 报出
+"prepare_dispatch took {ms} ms for {addr}"
+// mcp_tools：同法，单独一行
+"mcp_tools took {ms} ms over {n} declared server(s), offering {k} tool(s)"
+```
+
+- **两行而不是一行**：`mcp_tools` 是常驻连接表（F-13）唯一能省掉的那一段，混进总数就说不清省了多少。总数含协商、开房间、写简报、立 run、铺工作台与冻结计划；这一切都在会计线程上，期间没有任何车道的追加被服务。
+- **量在先，门在后**：`xtask/budgets.toml [prepare_dispatch_ms]` 只记读数与机器，不设上限——上限若写在读数之前，要么形同虚设，要么挡住正是要修它的那次改动。
+- **读钟读不出不丢工具**：`mcp_tools` 无法报出 `Result`，因此钟失败时只是不报这一行；连接是工作，读数是诊断。
+- **本章测试**：`a_dispatch_says_what_it_spent_before_the_drive`（`assembly::dispatching::tests`）盯住「读数被说出来」这一件事，不断言数值——墙钟数值属于跑它的那台机器，属于 `budgets.toml` 的那一行。

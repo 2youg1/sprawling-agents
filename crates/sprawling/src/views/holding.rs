@@ -24,7 +24,6 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::event::record;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
 // Where a city keeps its ledger and how a building reads off disk are
@@ -58,7 +57,15 @@ pub(crate) struct Views {
     pub(super) city_root: PathBuf,
     pub(super) hot: memory::HotView,
     pub(super) attribution: memory::Attribution,
-    pub(super) approvals: std::collections::BTreeMap<String, kernel::ApprovalItem>,
+    /// Who may answer, what is waiting, what has already been allowed,
+    /// and which scopes a person has shut.
+    ///
+    /// The reading side of the one governance fold. The worker holds
+    /// the judging side, of the same type and folded by the same
+    /// `absorb`: this view used to spell the four arms a second time,
+    /// and the two spellings disagreed about what an unreadable ruling
+    /// meant.
+    pub(super) governance: super::Governance,
     pub(super) book: gateway::EndpointBook,
     /// The city's own name, as its first record states it. Handed to a
     /// client at the handshake: the event stream only carries what
@@ -111,11 +118,6 @@ pub(crate) struct Views {
     /// declaring a pursuit takes the depth-zero position, and a view
     /// that could mint one would be a second door onto the guard.
     pub(super) pursuits: std::collections::BTreeMap<Address, (String, kernel::PursuitState)>,
-    /// Who answers for this city, folded from `autonomy_changed`. Held
-    /// rather than read off a configuration default: the default is
-    /// where a city starts, and what a person changed it to is a line in
-    /// the history.
-    pub(super) autonomy: kernel::Autonomy,
     /// Every approval this city has answered, oldest first. Appended
     /// rather than keyed, because an answer is a thing that happened
     /// once and the order is what makes the list readable.
@@ -126,11 +128,6 @@ pub(crate) struct Views {
     /// `BTreeMap` because this is a path a query is answered from.
     pub(super) claims:
         std::collections::BTreeMap<kernel::NodeId, std::collections::BTreeSet<kernel::RunId>>,
-    /// The scopes a halt shut and no release reopened. Folded here as
-    /// well as in the worker's own governance, from the same record and
-    /// the same type: this is the reading side, that is the judging
-    /// side, and a rebuild makes them equal.
-    pub(super) halted: std::collections::BTreeSet<kernel::event::Scope>,
     /// What this machine had when the city was served, from the one
     /// look the doctor takes at start-up.
     ///
@@ -154,7 +151,7 @@ impl Views {
             city_root: city_root.to_path_buf(),
             hot: memory::HotView::new(),
             attribution: memory::Attribution::new(),
-            approvals: std::collections::BTreeMap::new(),
+            governance: super::Governance::empty(),
             book: gateway::EndpointBook::new(),
             city: None,
             waiting: std::collections::BTreeMap::new(),
@@ -172,10 +169,8 @@ impl Views {
                 .unwrap_or_else(|_| memory::LedgerIndex::empty()),
             plans: crate::plan_view::PlanView::default(),
             pursuits: std::collections::BTreeMap::new(),
-            autonomy: kernel::consts_policy::AUTONOMY_DEFAULT,
             decided: Vec::new(),
             claims: std::collections::BTreeMap::new(),
-            halted: std::collections::BTreeSet::new(),
             machine: None,
             vault: None,
         }
@@ -197,6 +192,10 @@ impl Views {
             .apply(record)
             .map_err(memory::MemoryError::into_ax)?;
         self.book.apply(record)?;
+        // The one governance fold, shown this line exactly as the
+        // worker's own copy is shown it.
+        self.governance
+            .absorb(record.kind(), record.run(), record.addr(), record.data())?;
         self.plans.apply(record);
         self.events = self.events.saturating_add(1);
         match record.kind() {
@@ -264,24 +263,7 @@ impl Views {
                     self.assets.push(line);
                 }
             }
-            EventKind::ApprovalRequested => self.fold_question(record)?,
             EventKind::ApprovalResolved => self.fold_ruling(record)?,
-            EventKind::CityHalted => {
-                // The same reading the worker's own governance does, out
-                // of the one type that spells this line.
-                let shut = record.data().read::<record::CityHalted>()?;
-                match shut.state {
-                    record::Admittance::Halted => {
-                        self.halted.insert(shut.scope);
-                    }
-                    record::Admittance::Released => {
-                        self.halted.remove(&shut.scope);
-                    }
-                }
-            }
-            EventKind::AutonomyChanged => {
-                self.autonomy = record.data().read::<record::AutonomyChanged>()?.autonomy;
-            }
             _ => {}
         }
         Ok(())

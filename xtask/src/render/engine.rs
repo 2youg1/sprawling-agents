@@ -9,10 +9,10 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::Drawn;
 use super::pass::{HEIGHT, Pass, Reported};
-use super::probe::{CONDITIONS, SINK, script};
+use super::probe::{CONDITIONS, DECLARED, SINK, declared, elements, script};
 use crate::report::XtaskError;
+use crate::survey::{Page, PaintSource};
 use crate::walk;
 
 /// Where the instrumented copy and the throwaway browser profile go.
@@ -116,10 +116,10 @@ pub(super) struct Opening<'a> {
     pub(super) route: &'a str,
 }
 
-/// What one opening read back: every element the properties are about,
+/// What one opening read back: the page as the instrument measures it,
 /// and what the page said about the conditions it drew in.
 pub(super) struct Measured {
-    pub(super) drawn: Vec<Drawn>,
+    pub(super) page: Page,
     pub(super) reported: Reported,
 }
 
@@ -171,12 +171,29 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
         })?;
     let dom = String::from_utf8_lossy(&output.stdout);
     let _ = std::fs::remove_file(&instrumented);
-    let (Some(records), Some(conditions)) = (sink(&dom, SINK), sink(&dom, CONDITIONS)) else {
+    let (Some(records), Some(conditions), Some(words)) = (
+        sink(&dom, SINK),
+        sink(&dom, CONDITIONS),
+        sink(&dom, DECLARED),
+    ) else {
         return Err(XtaskError::Cmd {
             cmd: format!("{} --dump-dom {route}", browser.display()),
             msg: "the probe wrote nothing; the engine rendered no page or ran no script".to_owned(),
         });
     };
+    let vocabulary = declared(words);
+    if vocabulary.is_empty() {
+        // Fail closed: an empty vocabulary would read as a page that
+        // declares nothing, and every colour on it would be reported as
+        // undeclared. A gate that cannot find its subject must say so
+        // rather than judge against nothing.
+        return Err(XtaskError::Cmd {
+            cmd: format!("{} --dump-dom {route}", browser.display()),
+            msg: "the probe read no declared words off the root element; the engine does not \
+                  enumerate custom properties, so nothing can be judged against them"
+                .to_owned(),
+        });
+    }
     let mut said = conditions.split_whitespace();
     let (Some(forced), Some(scheme)) = (said.next(), said.next()) else {
         return Err(XtaskError::Cmd {
@@ -188,7 +205,15 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
         });
     };
     Ok(Measured {
-        drawn: records.split(" ; ").filter_map(parse).collect(),
+        page: Page {
+            drawn: elements(records),
+            declared: vocabulary,
+            painted_by: if pass.draws_forced_colours() {
+                PaintSource::TheSystem
+            } else {
+                PaintSource::ThePage
+            },
+        },
         reported: Reported::read(forced, scheme),
     })
 }
@@ -200,53 +225,6 @@ fn sink<'a>(dom: &'a str, id: &str) -> Option<&'a str> {
     let rest = dom.get(start..)?;
     let end = rest.find("</pre>")?;
     rest.get(..end)
-}
-
-/// `tag role name left top width height depth parent scrolls-x scrolls-y
-/// first-mark underlined`, as the probe writes it. The name is
-/// percent-encoded, because it is the one field that holds a person's
-/// words and those contain spaces.
-fn parse(record: &str) -> Option<Drawn> {
-    let mut field = record.split_whitespace();
-    let tag = field.next()?.to_owned();
-    let role = field.next()?.to_owned();
-    let name = decode(field.next()?);
-    Some(Drawn {
-        tag,
-        role,
-        name,
-        left: field.next()?.parse().ok()?,
-        top: field.next()?.parse().ok()?,
-        width: field.next()?.parse().ok()?,
-        height: field.next()?.parse().ok()?,
-        depth: field.next()?.parse().ok()?,
-        parent: field.next()?.parse().ok()?,
-        scrolls_across: field.next()? == "1",
-        scrolls_down: field.next()? == "1",
-        first_mark: field.next()?.parse().ok()?,
-        underlined: field.next()? == "1",
-    })
-}
-
-/// Percent-decoding, which is all the probe needs on this side.
-fn decode(field: &str) -> String {
-    let bytes = field.as_bytes();
-    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
-    let mut index: usize = 0;
-    while let Some(byte) = bytes.get(index) {
-        if *byte == b'%'
-            && let Some(pair) =
-                field.get(index.saturating_add(1)..index.saturating_add(3).min(field.len()))
-            && let Ok(value) = u8::from_str_radix(pair, 16)
-        {
-            out.push(value);
-            index = index.saturating_add(3);
-            continue;
-        }
-        out.push(*byte);
-        index = index.saturating_add(1);
-    }
-    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Append the probe to a copy of the page.

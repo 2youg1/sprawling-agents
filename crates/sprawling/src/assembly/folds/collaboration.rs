@@ -6,8 +6,7 @@
 //! The two projections the collaboration tools read: what is waiting in
 //! each room, and what ground is already claimed.
 
-use kernel::{Address, AxError, EventKind};
-use kernel::{EventRecord, Locator};
+use kernel::{Address, AxError, EventKind, EventRecord};
 
 use crate::effect;
 use crate::views::pursuit_from;
@@ -90,14 +89,12 @@ impl CollaborationFold {
                 .enqueued
                 .push(collab::Signal::from_payload(record.data())?),
             EventKind::SignalConsumed => {
-                if let Some(id) = record
-                    .data()
-                    .as_map()
-                    .get("id")
-                    .and_then(serde_json::Value::as_str)
-                {
-                    self.consumed.insert(id.to_owned());
-                }
+                // Through the writer's own inverse, and refusing what
+                // it cannot read: a consumption skipped here is a
+                // signal the rebuild believes is still waiting, and a
+                // resident is handed it a second time.
+                let taken = collab::SignalConsumed::from_payload(record.data())?;
+                self.consumed.insert(taken.id.as_str().to_owned());
             }
             EventKind::GoalRegistered => self.goals.push(effect::goal_from_payload(record.data())?),
             EventKind::RoadmapClaimed => {
@@ -164,7 +161,9 @@ impl CollaborationFold {
             // received, whether or not the signal announcing it has been
             // read: reading a notice and holding a result are different
             // facts.
-            if let Some(artifact) = artifact_of(&signal) {
+            if let Some(collab::Handback::Finished(artifact)) =
+                collab::Handback::from_signal(&signal)?
+            {
                 joins
                     .entry(signal.room().clone())
                     .or_default()
@@ -187,32 +186,6 @@ impl CollaborationFold {
             plan_holders,
         })
     }
-}
-
-/// The verified result a handback signal reports, when it reports one.
-///
-/// Reads back what `collab::Handback::signal` wrote, and nothing else -
-/// an ordinary signal between residents is not a result and returns
-/// `None`. The digest is taken from the locator rather than carried
-/// beside it: two fields holding one hash are two places for it to
-/// disagree.
-pub(in crate::assembly) fn artifact_of(signal: &collab::Signal) -> Option<collab::Artifact> {
-    let body = signal.payload().as_map();
-    if body.get("handback").and_then(serde_json::Value::as_str)? != "finished" {
-        return None;
-    }
-    let node = collab::NodeId::parse(body.get("room").and_then(serde_json::Value::as_str)?).ok()?;
-    let at = Locator::parse(body.get("at").and_then(serde_json::Value::as_str)?).ok()?;
-    let Locator::Cas { hash, .. } = at else {
-        return None;
-    };
-    let verified_by = body
-        .get("verified_by")
-        .and_then(serde_json::Value::as_str)?
-        .to_owned();
-    collab::Claim::new(node, at.clone(), hash, signal.from().to_owned())
-        .verified(true, &verified_by)
-        .ok()
 }
 
 pub(in crate::assembly) fn new_inbox() -> collab::Inbox {

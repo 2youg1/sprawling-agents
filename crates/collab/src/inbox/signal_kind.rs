@@ -6,12 +6,18 @@
 //! What kind of communication a signal is, and its wire name.
 
 use kernel::{AxCode, AxError};
+use serde::{Deserialize, Serialize};
 
 /// What kind of communication a signal is. `Steer` is a fourth kind
 /// rather than a flag beside the other three: it is the only one that
 /// overtakes, and urgency has to belong to the signal for one id to
 /// always take one lane.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Its serde form goes through [`SignalKind::as_str`] and
+/// [`SignalKind::parse`] rather than through a derived renaming, so the
+/// four wire words are spelled in one place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub enum SignalKind {
     Mention,
     Thread,
@@ -45,5 +51,19 @@ impl SignalKind {
                 )
             }
         }
+    }
+}
+
+impl TryFrom<String> for SignalKind {
+    type Error = AxError;
+
+    fn try_from(raw: String) -> Result<SignalKind, AxError> {
+        SignalKind::parse(&raw)
+    }
+}
+
+impl From<SignalKind> for String {
+    fn from(kind: SignalKind) -> String {
+        kind.as_str().to_owned()
     }
 }

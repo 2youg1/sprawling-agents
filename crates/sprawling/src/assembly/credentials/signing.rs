@@ -84,6 +84,13 @@ impl RunWorker {
     /// it back. Nothing listens on a port for it — the profile's own
     /// redirect is the provider's page, so a listener would be a second
     /// way in that nobody uses.
+    ///
+    /// The two grants share those two steps. A vendor that signs in by
+    /// device code shows the person a short code instead of a
+    /// redirect, and the second step carries that code back: the
+    /// person approving on another device is the only thing this city
+    /// can wait for, and waiting for it inside the worker would park
+    /// the whole city for as long as they take.
     pub(in crate::assembly) fn login(
         &mut self,
         provider: &str,
@@ -123,12 +130,24 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         match step {
             channels::LoginStep::Begin => {
-                // Two independent draws. The verifier proves the client
-                // that redeems is the client that asked; the state
-                // proves the redirect answers this request. One value
-                // doing both jobs proves neither, and `oauth_begin`
-                // refuses it.
-                let pending = gateway::oauth_begin(profile, random_token(48)?, random_token(24)?)?;
+                // Which grant a vendor answers is the profile's
+                // statement, and the branch is here because the two
+                // flows need different things this crate owns: the
+                // redirect draws entropy, and the device code reads
+                // the clock. Gateway samples neither.
+                let pending = match profile.grant {
+                    // Two independent draws. The verifier proves the
+                    // client that redeems is the client that asked;
+                    // the state proves the redirect answers this
+                    // request. One value doing both jobs proves
+                    // neither, and `oauth_begin` refuses it.
+                    gateway::Grant::AuthorizationCode { .. } => gateway::OauthPending::Redirect(
+                        gateway::oauth_begin(profile, random_token(48)?, random_token(24)?)?,
+                    ),
+                    gateway::Grant::DeviceCode { .. } => {
+                        gateway::device_login_begin(profile, now_ms()?.value(), PROBE_TIMEOUT_MS)?
+                    }
+                };
                 let mut map = serde_json::Map::new();
                 map.insert(
                     "provider".to_owned(),
@@ -136,15 +155,28 @@ impl RunWorker {
                 );
                 // The URL carries a PKCE challenge and a state, both of
                 // which are public by design; no credential exists yet.
+                // A device login's page is public for the same reason:
+                // the code that pairs with it stays in this process.
                 map.insert(
                     "auth_url".to_owned(),
-                    serde_json::Value::String(pending.auth_url.clone()),
+                    serde_json::Value::String(pending.open_url().to_owned()),
                 );
+                // The short code the person types on that page, for
+                // the grant that has one. Absent rather than empty: a
+                // redirect login has no such code, and a blank one on
+                // the page would read as a code that failed to arrive.
+                if let Some(user_code) = pending.user_code() {
+                    map.insert(
+                        "user_code".to_owned(),
+                        serde_json::Value::String(user_code.to_owned()),
+                    );
+                }
                 self.logins.insert(provider.to_owned(), pending);
                 self.record(EventKind::LoginStarted, Payload::new(map)?)
             }
             channels::LoginStep::Code { code } => {
-                let pending = self.logins.remove(provider).ok_or_else(|| {
+                let asked_at = now_ms()?.value();
+                let pending = self.logins.get_mut(provider).ok_or_else(|| {
                     AxError::failure(
                         AxCode::CredentialMissing,
                         "redeem an authorization code",
@@ -154,7 +186,22 @@ impl RunWorker {
                         "start the login first; the code answers a request this process made",
                     )
                 })?;
-                let tokens = gateway::oauth_redeem(profile, &pending, &code, PROBE_TIMEOUT_MS)?;
+                let tokens = match pending {
+                    gateway::OauthPending::Redirect(redirect) => {
+                        gateway::oauth_redeem(profile, redirect, &code, PROBE_TIMEOUT_MS)?
+                    }
+                    gateway::OauthPending::Device(device) => {
+                        match device.ask(profile, &code, asked_at)? {
+                            gateway::DeviceStep::Signed(tokens) => tokens,
+                            gateway::DeviceStep::NotYet { seconds } => {
+                                return Err(not_approved_yet(provider, seconds));
+                            }
+                        }
+                    }
+                };
+                // Spent, and only now: a person who mistyped keeps the
+                // login they began rather than starting a new one.
+                self.logins.remove(provider);
                 let access = subscription::oauth_ref(provider)?;
                 {
                     let mut vault = self.vault.lock().map_err(|_| poisoned_vault())?;
@@ -262,6 +309,24 @@ impl RunWorker {
     pub(crate) fn vault_handle(&self) -> Arc<std::sync::Mutex<gateway::Custodian>> {
         Arc::clone(&self.vault)
     }
+}
+
+/// The person has not finished approving a device-code login, and the
+/// vendor states how long to leave it before asking again.
+///
+/// A refusal rather than a quiet success: nothing was signed in, and
+/// the login is still in flight, so the one thing the person can do is
+/// finish on the vendor's page and say so again.
+fn not_approved_yet(provider: &str, seconds: u64) -> AxError {
+    AxError::failure(
+        AxCode::CredentialMissing,
+        "finish a device-code login",
+        provider.to_owned(),
+    )
+    .with_recovery(format!(
+        "approve the login on the page this city opened, then enter the code again; \
+         the vendor asks for {seconds} seconds between tries"
+    ))
 }
 
 /// One resolver over one vault. A fresh one per operation, because

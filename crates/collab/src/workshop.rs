@@ -22,10 +22,30 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use kernel::{Address, AxCode, AxError, Locator, Version};
+use serde::{Deserialize, Serialize};
 
 /// A node's name within one workshop.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+///
+/// It serializes as the string [`NodeId::parse`] accepted and reads
+/// back through that same parse, so a ledger line carrying a node id
+/// meets the grammar once rather than once per reader.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub struct NodeId(String);
+
+impl TryFrom<String> for NodeId {
+    type Error = AxError;
+
+    fn try_from(raw: String) -> Result<NodeId, AxError> {
+        NodeId::parse(&raw)
+    }
+}
+
+impl From<NodeId> for String {
+    fn from(id: NodeId) -> String {
+        id.0
+    }
+}
 
 impl NodeId {
     /// # Errors

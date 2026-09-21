@@ -414,12 +414,14 @@ dependencies = [
 name = "citysim"
 version = "0.0.5"
 dependencies = [
+ "channels",
  "eval",
  "gateway",
  "kernel",
  "memory",
  "runtime",
  "serde_json",
+ "sprawling",
  "tempfile",
  "zeroize",
 ]
@@ -454,6 +456,7 @@ version = "0.0.5"
 dependencies = [
  "kernel",
  "memory",
+ "serde",
  "serde_json",
  "tempfile",
  "trybuild",

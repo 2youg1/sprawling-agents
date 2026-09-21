@@ -19,16 +19,24 @@ use crate::walk;
 /// without touching which file the token assertions read.
 const PRODUCTION_POINTS: [&str; 1] = [THEME];
 
-/// The files of this gate that spell colour. Same shape and same reason as
-/// `xtask/lexicon.toml` being outside the lexicon scan - a checker has to be
-/// able to spell what it forbids. `tables.rs` joined them when the token
-/// tables moved into the stylesheet: reading an `oklch()` value means naming
-/// the function that holds it.
-const SPELLS_COLOUR: [&str; 4] = [
+/// The files that spell colour because reading a colour means naming
+/// it, and the one test that writes the spelling it asserts. Same shape
+/// and same reason as `xtask/lexicon.toml` being outside the lexicon
+/// scan - a checker has to be able to spell what it forbids.
+/// `tables.rs` joined them when the token tables moved into the
+/// stylesheet: reading an `oklch()` value means naming the function
+/// that holds it. The probe and the survey's `Paint` test are that same
+/// case one step out: the probe hands the engine a value to resolve and
+/// reads the pixels back, so it must spell the transparent fill that
+/// clears the canvas between readings, and the test states the one
+/// spelling `Paint::to_string` promises a person.
+const SPELLS_COLOUR: [&str; 6] = [
     "xtask/src/color.rs",
     "xtask/src/color/scan.rs",
     "xtask/src/color/tables.rs",
     "xtask/src/color/tests.rs",
+    "xtask/src/render/probe.rs",
+    "xtask/src/survey/tests.rs",
 ];
 
 /// Extensions worth scanning. Rust, and the two file kinds that carry style.

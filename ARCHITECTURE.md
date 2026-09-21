@@ -296,7 +296,7 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->16<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1897<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1918<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
@@ -326,7 +326,7 @@ Sizes are gated because a byte count does not depend on how busy the machine was
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
 | Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->311,050 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->6.7×<!-- xtask:end --> headroom | yes |
-| The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->9,937,920 B<!-- xtask:end -->, client included | yes |
+| The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->11,222,016 B<!-- xtask:end -->, client included | yes |
 | Resident memory, one session | ≤<!-- xtask:begin budget_bytes:session_resident -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:session_resident -->4,292,608 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
 | Ledger append plus fsync | p50 ≤5 ms, p99 ≤20 ms | 0.97 ms / 1.61 ms on one NVMe machine | no |
 | Projection rebuild | ≥50,000 records/s | about 493,000 records/s on the same machine | no |
@@ -498,7 +498,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::fixture | crates/memory/src/bundle/fixture.rs | the one city the bundle tests export | adapter | V3 | built | memory-SPEC.md#8-21 |
 
-### gateway (67) — everything between a decision to call a model and the bytes on the wire
+### gateway (69) — everything between a decision to call a model and the bytes on the wire
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -565,6 +565,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::credential::oauth | crates/gateway/src/credential/oauth.rs | PKCE, redeem, refresh | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::oauth::device | crates/gateway/src/credential/oauth/device.rs | the device-code flow: a code a person types on the vendor's page | adapter | V0.0.6 | built | gateway-SPEC.md#8-18 |
 | gateway::credential::oauth::device::poll | crates/gateway/src/credential/oauth/device/poll.rs | how often the token endpoint is asked, and when to stop asking | policy | V0.0.6 | built | gateway-SPEC.md#8-18 |
+| gateway::credential::oauth::device::login | crates/gateway/src/credential/oauth/device/login.rs | one device-code login in flight: what the vendor answered, when the next ask is allowed, and what one ask returns | adapter | V0.0.6 | built | gateway-SPEC.md#8-22 |
+| gateway::credential::oauth::exchange | crates/gateway/src/credential/oauth/exchange.rs | the one POST both OAuth grants end at, and the tokens its answer carries | adapter | V0.0.6 | built | gateway-SPEC.md#8-22 |
 | gateway::credential::oauth::codec | crates/gateway/src/credential/oauth/codec.rs | base64url, percent-encoding, randomness | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::oauth::flow | crates/gateway/src/credential/oauth/flow.rs | begin, redeem, refresh | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::oauth::flow::tests | crates/gateway/src/credential/oauth/flow/tests.rs | the oauth fixtures | adapter | S3 | built | gateway-SPEC.md#8-4 |
@@ -777,7 +779,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::auth | crates/channels/src/auth.rs | pairing tokens: minting, the one readable form, constant-time comparison | value | S4 | built | channels-SPEC.md#8-3 |
 | channels::aggregate | crates/channels/src/aggregate.rs | watching several cities from one interface, queries and events only | decision | S4 | built | channels-SPEC.md#8-5 |
 
-### browser (12), protocol (6), bin (188)
+### browser (12), protocol (6), bin (190)
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -832,7 +834,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::assembly::mcp | crates/sprawling/src/assembly/mcp.rs | reaching the MCP servers a building's configuration names | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::dispatching | crates/sprawling/src/assembly/dispatching.rs | one dispatch, from what a person asked to the run that froze | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::dispatching::agreeing | crates/sprawling/src/assembly/dispatching/agreeing.rs | every refusal a dispatch can owe before it costs anything | adapter | V3 | built | sprawling-SPEC.md#8-39 |
-| bin::assembly::dispatching::running | crates/sprawling/src/assembly/dispatching/running.rs | one dispatch run to its freeze, and the handback it leaves | adapter | V3 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::dispatching::running | crates/sprawling/src/assembly/dispatching/running.rs | one dispatch run to its freeze | adapter | V3 | built | sprawling-SPEC.md#8-39 |
+| bin::assembly::dispatching::handback | crates/sprawling/src/assembly/dispatching/handback.rs | what the run that asked for the work is told when the work comes home | adapter | V0.0.6 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::dispatching::session | crates/sprawling/src/assembly/dispatching/session.rs | which room a dispatch works in: the session a person named, or the name the digest model gives the work | adapter | V4 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::dispatching::tests | crates/sprawling/src/assembly/dispatching/tests.rs | steers, refusals and handbacks as the rooms see them | adapter | V3 | built | sprawling-SPEC.md#8-39 |
 | bin::assembly::toolkits | crates/sprawling/src/assembly/toolkits.rs | where the project key lives, which proxy rule reaches the broker, and who this city is to it | adapter | V5 | built | channels-SPEC.md#8-35 |
@@ -986,6 +989,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | bin::views::standing_tests | crates/sprawling/src/views/standing_tests.rs | what a page that has just opened learns from one city view: rooms, starts, and the scopes a halt shut | projection | F5 | built | sprawling-SPEC.md#8-52 |
 | bin::views::lines | crates/sprawling/src/views/lines.rs | one record rendered as the lines a page reads | projection | V3 | built | sprawling-SPEC.md#8-37 |
 | bin::views::tests | crates/sprawling/src/views/tests.rs | five views answer from the record, not from unavailable | projection | V3 | built | sprawling-SPEC.md#8-37 |
+| bin::views::governance | crates/sprawling/src/views/governance.rs | who may answer, what is waiting, what has already been allowed, and which scopes a person has shut | projection | V0.0.6 | built | sprawling-SPEC.md#8-17 |
 | bin::views::governance_tests | crates/sprawling/src/views/governance_tests.rs | who answers and what was answered for the person, and a patch of a commit this city never wrote | projection | V4 | built | sprawling-SPEC.md#8-37 |
 
 ### desktop (28) — out of tree: this Windows desktop, offered as an MCP server

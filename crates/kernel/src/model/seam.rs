@@ -7,7 +7,7 @@
 //! conversions between assistant content and a ledger payload.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Map;
 
 use super::wire::{
     BuildingPolicy, ChatRequest, ChatResponse, ContentBlock, ModelUsage, StopReason,
@@ -122,15 +122,4 @@ pub fn content_from_message(message: &Payload) -> Result<Vec<ContentBlock>, AxEr
              wrote it, or extend ContentBlock",
         )
     })
-}
-
-/// Guard for wire faces: `serde_json::Value` trees entering payload-adjacent
-/// positions must respect the float ban before conversion.
-pub fn value_has_float(value: &Value) -> bool {
-    match value {
-        Value::Number(n) => !n.is_i64() && !n.is_u64(),
-        Value::Array(items) => items.iter().any(value_has_float),
-        Value::Object(map) => map.values().any(value_has_float),
-        Value::Null | Value::Bool(_) | Value::String(_) => false,
-    }
 }

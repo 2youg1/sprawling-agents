@@ -9,6 +9,7 @@
 use super::super::*;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
+use crate::views::governance::BlockedJob;
 use kernel::Locator;
 
 /// What a working worker holds and what a restarted one rebuilds are

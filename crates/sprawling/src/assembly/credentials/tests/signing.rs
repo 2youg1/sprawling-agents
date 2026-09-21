@@ -236,3 +236,165 @@ fn a_subscription_is_attached_on_the_face_its_family_answers_on() {
         assert_eq!(wire, expected, "{}", row.provider);
     }
 }
+
+/// A vendor that signs in on a second device: it issues a code, hands
+/// over the tokens, then answers the model list the attach probes
+/// for. Dispatched on the request line, so the order the flow makes
+/// them in is part of what this asserts.
+#[cfg(test)]
+fn fake_device_provider() -> (String, std::thread::JoinHandle<Vec<String>>) {
+    use std::io::{Read as _, Write as _};
+
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let handle = std::thread::spawn(move || {
+        let mut seen = Vec::new();
+        let issued = serde_json::json!({
+            "device_code": "dev-7f2a",
+            "user_code": "WDJB-MJHT",
+            "verification_uri": "https://auth.example.invalid/device",
+            // Zero, which this city floors to one second and then
+            // waits out; the test spends it rather than pretending
+            // the rule is not there.
+            "interval": 0,
+            "expires_in": 1800,
+        })
+        .to_string();
+        // Assembled at runtime: a credential-shaped literal is what
+        // the secret gate keeps out of the repository.
+        let access = ["xai-", "Qz7mK2pL9vB4nC5"].concat();
+        let refresh = ["xai-rt-", "Rt3nD8qX2vC6mB1"].concat();
+        let tokens = serde_json::json!({
+            "access_token": access,
+            "refresh_token": refresh,
+            "expires_in": 3600,
+        })
+        .to_string();
+        let models = serde_json::json!({ "data": [{ "id": "grok-4" }] }).to_string();
+        for _ in 0..3 {
+            let Ok((mut stream, _)) = listener.accept() else {
+                break;
+            };
+            let mut buf = vec![0u8; 65536];
+            let Ok(n) = stream.read(&mut buf) else { break };
+            let request = String::from_utf8_lossy(&buf[..n]).into_owned();
+            let body = if request.starts_with("POST /device/code") {
+                issued.clone()
+            } else if request.starts_with("POST /token") {
+                tokens.clone()
+            } else {
+                models.clone()
+            };
+            seen.push(request);
+            let head = format!(
+                "HTTP/1.1 200 X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(head.as_bytes());
+            let _ = stream.write_all(body.as_bytes());
+        }
+        seen
+    });
+    (format!("http://{addr}"), handle)
+}
+
+/// The device-code half of the four subscriptions, end to end: the
+/// code the person reads reaches the ledger, the code they type back
+/// is checked against it, the RFC's interval is waited out, and the
+/// endpoint the login was for is attached.
+#[test]
+fn a_device_code_login_shows_a_code_waits_its_interval_and_attaches_the_endpoint() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let (base, server) = fake_device_provider();
+    let profile = gateway::OauthProfile {
+        family: gateway::Family::GrokBuild,
+        provider: "xai",
+        api_base: Box::leak(base.clone().into_boxed_str()),
+        auth_endpoint: "",
+        token_endpoint: Box::leak(format!("{base}/token").into_boxed_str()),
+        scopes: &["api:access"],
+        client_id: "test-client",
+        grant: gateway::Grant::DeviceCode {
+            authorization_endpoint: Box::leak(format!("{base}/device/code").into_boxed_str()),
+        },
+        headers: &[],
+    };
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+
+    worker
+        .login_with(&profile, "xai", channels::LoginStep::Begin)
+        .unwrap();
+
+    // Another login's code finishes nothing, and no byte is sent.
+    let wrong = worker
+        .login_with(
+            &profile,
+            "xai",
+            channels::LoginStep::Code {
+                code: "AAAA-BBBB".to_owned(),
+            },
+        )
+        .unwrap_err();
+    assert_eq!(wrong.code(), &AxCode::InvalidArgs);
+
+    // Inside the interval the vendor is not asked at all; the person
+    // is told how long to leave it.
+    let early = worker
+        .login_with(
+            &profile,
+            "xai",
+            channels::LoginStep::Code {
+                code: "WDJB-MJHT".to_owned(),
+            },
+        )
+        .unwrap_err();
+    assert_eq!(early.code(), &AxCode::CredentialMissing);
+    assert!(early.recovery().contains("seconds between tries"));
+
+    std::thread::sleep(std::time::Duration::from_millis(1_100));
+    worker
+        .login_with(
+            &profile,
+            "xai",
+            channels::LoginStep::Code {
+                code: "WDJB-MJHT".to_owned(),
+            },
+        )
+        .unwrap();
+
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let history: String = verified
+        .raw_lines()
+        .iter()
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .collect::<Vec<String>>()
+        .join("\n");
+    assert!(
+        history.contains("WDJB-MJHT") && history.contains("auth.example.invalid/device"),
+        "a person reads the code and the page out of the history the page folds"
+    );
+    assert!(
+        !history.contains("dev-7f2a"),
+        "the device code is the secret half and never reaches the ledger"
+    );
+    assert!(history.contains("secret:xai/oauth"));
+    assert!(history.contains("endpoint_attached"));
+
+    let sent = server.join().unwrap();
+    assert_eq!(sent.len(), 3, "issue, redeem, then the attach probe");
+    assert!(
+        sent.iter().any(|request| request
+            .contains("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code")),
+        "the token ask carries the grant RFC 8628 names"
+    );
+    assert!(
+        !history.contains("xai-Qz7mK2p"),
+        "a token never reaches the ledger"
+    );
+}

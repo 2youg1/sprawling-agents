@@ -30,6 +30,7 @@ pub(super) mod cost_of;
 pub(super) mod document;
 pub(super) mod evidence;
 pub(super) mod git_status;
+pub(crate) mod governance;
 #[cfg(test)]
 mod governance_tests;
 pub(super) mod hearing;
@@ -48,6 +49,7 @@ mod standing_tests;
 mod tests;
 pub(super) mod toolkits;
 
+pub(crate) use governance::Governance;
 pub(crate) use holding::Views;
 pub use holding::ask;
 pub(crate) use lines::pursuit_from;

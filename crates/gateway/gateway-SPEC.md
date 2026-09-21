@@ -224,7 +224,7 @@ impl Custodian {
 - **Linux 存在内核 keyring，不存在 secret service，理由是发布产物。** 发布的 Linux 归档是一份静态 musl 二进制（`x86_64-unknown-linux-musl`），而 secret service 走 D-Bus，树因此另到 `libdbus-sys`，那要求链接宿主的 glibc D-Bus——一份静态二进制与一个 D-Bus 凭据库不能同时为真。故 keyring 的 Linux 特性取 `linux-native`（keyutils，纯 syscall，不需要会话总线、不需要动态库、容器里同样成立），不取 `sync-secret-service`。代价写在类型上而不是写在注释里：内核 keyring 是内存，重启即清，故 `KeyringVault::PERSISTENCE` 在 Linux 上恒为 `Persistence::ThisBoot`，`SOURCE` 恒为 `kernel-keyring`。
 - **等级只说一次，两处读它。** `Persistence::consequence()` 是「这个等级让人付出什么」的唯一权威句；`describe` 报状态（`source`＋`persistence`），`resolve` 未命中时把这句接在 recovery 后面——重启吃掉的 key 因此读作「重启清了内核 keyring，请再输一次」，而不是读作「你从来没配过」。探测成功不产 `provider_degraded`：Linux 上那是健康路径，每次启动报一条假警报只会让这个 kind 没人再读。
 - realm/name 由调用方给定，本模块不生成名字：订阅线走 `credentials::subscription` 的逐供应方定名，API key 走 S4 命令面的 `PutSecret`。**恒无计数器命名**——按捕获次序编号会让同一个值每场会话换一个名、两个值跨会话撞同一个名，于是旧账本里的引用兑到别人的凭据。一个值的短名若要由内容导出，口径只有 `runtime::redact::fingerprint` 一处。
-- OAuth 两流程（PKCE／设备码）＝代码：`pub fn oauth_begin(profile, …) -> OauthPending`＋`pub fn oauth_redeem(pending, …) -> Sealed<String>` 的纯构造（HTTP 往返由调用方经 endpoint 的 Client 执行或 S4 命令面驱动；此处交付构造与校验，不交付活体登录）。续期＝到期前 resolve 触发 refresh 构造。
+- OAuth 两流程（PKCE／设备码）＝代码：`pub fn oauth_begin(profile, …) -> RedirectPending` 与 `pub fn device_login_begin(profile, now_ms, timeout_ms) -> OauthPending`（§8-22），兑付分别是 `oauth_redeem` 与 `DeviceLogin::ask`。两条路的第二步都由 S4 命令面驱动，恒不在本 crate 里取时钟、取随机或替人等待。续期＝到期前 resolve 触发 refresh 构造。
 - 环境变量是只读来源（键形 `SPRAWLING_SECRET_<REALM>_<NAME>`）：`describe.writable=false`；`set` 撞遮蔽即拒并指名遮蔽者；读取器可注入（edition 2024 的 set_var 不安全，测试恒不改进程环境）。
 - A13 值正确性经真 Endpoint＋回环假服务在线断言（set→vault→resolve→写头，服务侧见原值）——credential 自身零 `.expose(`；PKCE 以 RFC 7636 Appendix B 向量钉实（S256，sha2 为外部协议事实非第二哈希权威）；base64url／percent-encode 自写纯函数；probe() 对真平台服务的验证属装配期人工清单（测试不擅动开发者凭证库）。
 
@@ -255,11 +255,11 @@ pub fn profile_for(family: Family) -> Option<&'static OauthProfile>;
 - **今天填到什么程度，逐行说清楚**（读于 2026-09-21，源见 `docs/third-party.md` §1 的监视路径）：
   - `Codex`／realm `openai`：issuer `https://auth.openai.com`、`/oauth/authorize`、`/oauth/token`、六个 scope、client id 与回环回跳 `http://localhost:1455/auth/callback` 均取自被监视的 `codex-rs/login/`（`server.rs` 与 上游登录管理器那个文件）。`api_base` 为 `https://chatgpt.com/backend-api/codex`，取自被监视的 `codex-rs/model-provider-info/`：订阅态的每一种 auth mode 都选这个 base，`https://api.openai.com/v1` 只服务 API key。这个 base 答的是 responses 面，而 responses 笔已在 §8-20 落地，故本行填实——**一次登录完成即 attach，attach 用哪支笔由 `Family::Codex` 说了算**（§8-18），不再由 realm 词二次推断。
   - `ClaudeCode`／realm `anthropic`：照旧，本城自己实现的那一份。
-  - `GrokBuild`／realm `xai`：**endpoints 与 client id 待查**。上游客户端在运行时读 OIDC discovery 文档取 issuer／client id／scopes，被监视的 `crates/codegen/xai-grok-login/src/oidc/` 只陈述流程形状而不陈述这三个常量。要补齐只有两条路：本城自己读一次 discovery 文档，或找到一个可引用的来源；在那之前这一行空着并 fail-closed。`api_base` 是厂商文档上的 `https://api.x.ai/v1`，与登录无关，故照填。
+  - `GrokBuild`／realm `xai`：**设备码那条路已填实，浏览器回跳那条仍空着**。被监视的 `crates/codegen/xai-acp-lib` 的 `device_code.rs` 与它的配置模块陈述了 issuer、client id、十个 scope、`https://auth.x.ai/oauth2/device/code` 与 `https://auth.x.ai/oauth2/token`（读于 2026-09-21），这几个常量不经 discovery 即可驱动，故本行以 `Grant::DeviceCode` 填实。`auth_endpoint` 留空是因为浏览器回跳那条路的 issuer 与回跳地址由运行时读到的 OIDC discovery 文档陈述，钉在这里就是给那份文档造第二个家。`api_base` 是厂商文档上的 `https://api.x.ai/v1`。
   - `KimiCli`／realm `kimi`：client id、`https://auth.kimi.com/api/oauth/device_authorization`、`https://auth.kimi.com/api/oauth/token` 与设备码授权取自被监视的 `src/kimi_cli/auth/oauth.py`；`api_base` 为 `https://api.kimi.com/coding/v1`，取自 `platforms.py` 的 Kimi Code 一行——**不是** `api.moonshot.cn`／`.ai`，那两个是按 key 计费的开放平台而不是订阅面。
-- **尚未落地、需要接着做的两件**（不猜协议，写明各自缺什么）：① **设备码流程的发送半边与它的线上形状**。判定半边已全数落地且有测试：`device_authorization_request`（RFC 8628 §3.1 的表单 POST）、`DeviceAuthorization::parse`（§3.2 的四个必填字段）、`DeviceAuthorization::token_request`（§3.4）、`DevicePoll::step`（§3.5 的 `interval`／`slow_down`／过期三条规则，时间以入参到达）。**缺的不是协议而是一次线上决定**：`channels::LoginStep` 只有 `Begin` 与 `Code { code }` 两步，而设备码登录的第二步人什么也粘不回来——他在另一台设备上按了同意，城要自己去问。于是三件事同改才成立：`LoginStep` 增一步（人按下「我已同意」，或城按 `interval` 自行轮询）、`OauthPending` 增第二种形状（在途的是一次设备码登录还是一次回跳登录，穷尽而非两张表）、装配层那张在途登录表随之读新形状。在此之前 `oauth_begin` 对 `DeviceCode` 一行三段式拒，`xai` 与 `kimi` 两家因此只能以 API key attach。② xAI 的 discovery 读取。两条都不改本表的形状。
+- **设备码登录已整条打通（叶子 14.3，本次落地），记法见 §8-22**；`xai` 与 `kimi` 两家因此与另外两家走同一条命令面，不再只能以 API key attach。**此处更正本节上一版记下的那条决定**：它要求 `channels::LoginStep` 增第三步，理由是「设备码登录的第二步人什么也粘不回来」。这条前提不成立——人手里有一样东西可以粘回来，就是城刚给他看的那个 user code。于是第二步不必新增：`Code { code }` 在设备码这家读作「我已在厂商页上同意，这是你给我看的那个码」，两种授权因此共用同一对命令步，客户端与 wire 一字未改。**没有跟着改的另一件要说清楚**：城不自行轮询，人按一次就问一次——在城的工作线程里替一个人等上半小时，会把整座城停在那里。RFC 8628 §3.5 的两条硬规则并没有因此松掉，它们由 `DeviceLogin` 在发送之前执行（见 §8-22）。**仍然缺的一件**：xAI 浏览器回跳那条路的 discovery 读取，它不改本表的形状。
 - **兑付真的发出去（credential＋oauth_profiles）**：`pub fn oauth_redeem(profile, pending, code, timeout_ms) -> Result<OauthTokens, AxError>` 真正把 POST 发出去，`OauthTokens { access, refresh, expires_in_s }` 两个密文恒裹在 `Zeroizing` 里且 `Debug` 手写成 `<redacted>`——`Zeroizing` 自己的 `Debug` 会打印明文，派生一个就等于把活令牌交给第一条格式化它的 panic 信息。**发送住 credential 而不住 endpoint**：本模块就是整条 OAuth 流程，把「造请求」与「发请求」分到两个模块，就是让一次兑付有两个权威。**拒词恒不引用对侧正文**：令牌端点的错误页里可能带着刚用过的 code。`OauthProfile` 增 `api_base`（该 provider 的 API 根，登录完成后据它自动 attach；空串＝fail-closed，与空端点同口径）。
-- **续期与兑付共用一次发送（credential）**：`oauth_refresh(profile, refresh: &Sealed<String>, timeout_ms)` 与兑付**共用一次发送**（`send_token_request`），故「拒词不引用对侧正文」只写一次、也只可能对一次。入参是 `Sealed<String>` 而不是 `&str`：明文只在**线前最后一格**出现，这与 endpoint／native 是同一类兑付点，故本文件同期进 `xtask secret` 的 expose 白名单——**放宽白名单而不是在调用点绕开它**，因为绕开的写法会让装配层持明文，而那正是这张名单存在的理由。
+- **续期与兑付共用一次发送（credential）**：`oauth_refresh(profile, refresh: &Sealed<String>, timeout_ms)` 与兑付**共用一次发送**（`exchange::post_json`；设备码那条走同一模块的 `post_form`），故「拒词不引用对侧正文」只写一次、也只可能对一次。入参是 `Sealed<String>` 而不是 `&str`：明文只在**线前最后一格**出现，这与 endpoint／native 是同一类兑付点，故本文件同期进 `xtask secret` 的 expose 白名单——**放宽白名单而不是在调用点绕开它**，因为绕开的写法会让装配层持明文，而那正是这张名单存在的理由。
 - **回跳带回的是 `code#state`，两半各有各的去处（在 `credential::oauth_redeem_request` 执行）**：`redeemed_code(pasted, pending)` 按 `#` 拆开人粘回来的那一行，左半是去兑付的 code，右半在场即必须与 `pending.state` 逐字节相等，不等即 `E_INVALID_ARGS`。不拆就把整行当 code 发出去，provider 回一个 `invalid_grant`；不核对 state 就等于本进程接受了一次它没有发起过的回跳，而 OAuth 2.0 要求发过 state 的客户端必须核对它。右半缺席按「人只复制了 code」处理而不拒——这是回跳落在人自己浏览器里时的常态。**两句拒词恒不回显粘贴内容**：那一行里带着一个活的授权码。
 - **`state != code_verifier`（在 `credential::oauth_begin` 执行）**：两个值答的是不同的问题——verifier 证明「来兑的就是当初请求的那个客户端」，state 证明「这次回跳对应本进程发起的那次请求」。互用就是把一个证明做两遍、另一个一遍不做，且已有 provider 直接以 `400 invalid_grant` 拒。**在构造点拒而不交给接线的人记住**：这正是一份照上游抄来的实现会具有的形状。
 - **迁出为独立 crate：未做，理由写在这里**。迁出的前提是一个**仓库外**的、持自有许可的上游存在；它今天不存在。在本仓库里建一个「另一个许可的目录」只会同时得到两件坏事：MPL 头门要么被改得认不出它、要么给它戟上一顶不属于它的帽子，而两者都不是迁出。因此只做两件真实可做的：表缺失时恒三段式拒（已在），以及 NOTICE 义务归 `xtask` 的 `release` 门。
@@ -721,3 +721,29 @@ pub enum Persistence { AcrossReboots, AcrossRebootsWithPassphrase, ThisBoot, Thi
 **两个重开参数照抄 §20.5.3，本版不进树**：ML-KEM-1024 在「多机同步金库」立项那天进——今天单机无对象可封；FN-DSA-1024 在「账本需要对第三方可验证的出处证明」立项那天进——今天防篡改由哈希链承担。对称 AEAD 本身已抗量子，故这两条不是安全缺口。
 
 **闸同步扩一条**（`xtask secret`）：城的保留子树（`kernel::RESERVED_PREFIX`）里出现凭据明文，按「城的记录」这条规则报，recovery 指向 `Custodian` 而不是手改；子树内非 UTF-8 的对象（CAS 产物）不按文本规则判，否则第一屏全是内容存储、真正那一行被埋掉。
+
+### 8-22 `gateway::credential::oauth::device::login`：一次在途的设备码登录（叶子 14.3 · F-25 · 形状 2 适配器）
+
+```rust
+pub enum OauthPending {                 // 在途登录的两种形状，穷尽
+    Redirect(RedirectPending),          // 回跳：auth_url ＋ state ＋ code_verifier
+    Device(DeviceLogin),                // 设备码：厂商答的那份 ＋ 轮询表 ＋ 两个时刻
+}
+impl OauthPending {
+    pub fn open_url(&self) -> &str;          // 人要打开的那一页，两种形状同一个问题
+    pub fn user_code(&self) -> Option<&str>; // 只有设备码这家有一个要人念出来的短码
+}
+pub enum DeviceStep { Signed(OauthTokens), NotYet { seconds: u64 } }
+pub fn device_login_begin(profile, now_ms, timeout_ms) -> Result<OauthPending, AxError>;
+impl DeviceLogin {
+    pub fn ask(&mut self, profile, user_code: &str, now_ms: u64) -> Result<DeviceStep, AxError>;
+}
+```
+
+**人就是那个轮询循环。** RFC 8628 让客户端在人于另一台设备上同意期间反复问令牌端点；本城改为「人说一次自己已同意，城就问一次」，因为另一种写法是把跑整座城的那条工作线程停在那里等最多半小时。**这不是把 RFC 的规则让掉**：`ask` 在开 socket 之前先判两件事——粘回来的码不是本次登录给人看的那个就拒（`E_INVALID_ARGS`，与回跳路上 `state` 同一个职责：别人的一次登录不能收尾我这一次），以及厂商声明的 `interval` 还没过就答 `NotYet` 而不发送（§3.5 的 MUST；忽略它的客户端会被厂商限流）。`slow_down` 与过期两条仍由 `DevicePoll::step` 判，`ask` 只负责把新的「最早下次」记在城的时钟上。
+
+**时钟在外，判定在内。** 本 crate 不取时钟也不取随机（`oauth_random` 同理收外部熵）；`now_ms` 由装配层读城的时钟递进来，于是「四秒后才许再问」这条规则在一个不花时间的测试里就能跑完。装配层那张在途登录表因此类型未变——它装的仍是 `OauthPending`，只是这个类型现在穷尽两种形状。
+
+**一次兑付只有一个发送**（`credential::oauth::exchange`）：回跳的 JSON 体与设备码的表单体在内容类型之后就是同一次交换——同样的 `access_token`／`refresh_token`／`expires_in`，同样的「拒词不引用对侧正文」（正文里有刚用过的 code）。故 `post_json`／`post_form`／`tokens` 住一处，`FormPost::CONTENT_TYPE` 也读这里的那一个串。状态码交回调用方而不在此判：设备码那条路要从非 2xx 的正文里读 `error` 才知道该不该再问（§3.5），回跳那条路除了停下没有别的事可做。
+
+**账本与界面**：`login_started` 的 `auth_url` 在设备码这家是厂商的验证页（有 `verification_uri_complete` 就用它，那一页已经把码填好了），并多一个 `user_code` 键——**缺席而不是空串**，回跳登录没有这样一个码，空串在页面上会读成「码没取到」。设备码本身恒不进账本、恒不进 `Debug`：它是被偷了就能冒充的那一半。

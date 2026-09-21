@@ -1,4 +1,5 @@
 impl core::fmt::Debug for gateway::DeviceAuthorization
+impl core::fmt::Debug for gateway::DeviceLogin
 impl core::fmt::Debug for gateway::FormPost
 impl core::fmt::Debug for gateway::OauthTokens
 impl gateway::AttachedEndpoint
@@ -10,6 +11,7 @@ impl gateway::ConnectionKind
 impl gateway::ConnectionKind
 impl gateway::Custodian
 impl gateway::DeviceAuthorization
+impl gateway::DeviceLogin
 impl gateway::DevicePoll
 impl gateway::DeviceRefusal
 impl gateway::EmbeddingRequest
@@ -26,6 +28,7 @@ impl gateway::MarketSnapshot
 impl gateway::Modality
 impl gateway::ModelFacts
 impl gateway::Native
+impl gateway::OauthPending
 impl gateway::OutputCeiling
 impl gateway::Persistence
 impl gateway::Ranking
@@ -58,12 +61,14 @@ pub enum gateway::Connection
 pub enum gateway::ConnectionKind
 pub enum gateway::CostSource
 pub enum gateway::DeviceRefusal
+pub enum gateway::DeviceStep
 pub enum gateway::DialectHint
 pub enum gateway::Family
 pub enum gateway::Grant
 pub enum gateway::HeaderValue
 pub enum gateway::InputKinds
 pub enum gateway::Modality
+pub enum gateway::OauthPending
 pub enum gateway::Persistence
 pub enum gateway::PollStep
 pub fn gateway::AttachedEndpoint::chat_url(&self) -> alloc::string::String
@@ -91,6 +96,10 @@ pub fn gateway::DeviceAuthorization::fmt(&self, &mut core::fmt::Formatter<'_>) -
 pub fn gateway::DeviceAuthorization::parse(&serde_json::value::Value) -> core::result::Result<gateway::DeviceAuthorization, kernel::error::shape::AxError>
 pub fn gateway::DeviceAuthorization::poll(&self) -> gateway::DevicePoll
 pub fn gateway::DeviceAuthorization::token_request(&self, &gateway::OauthProfile) -> gateway::FormPost
+pub fn gateway::DeviceLogin::ask(&mut self, &gateway::OauthProfile, &str, u64) -> core::result::Result<gateway::DeviceStep, kernel::error::shape::AxError>
+pub fn gateway::DeviceLogin::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn gateway::DeviceLogin::open_url(&self) -> &str
+pub fn gateway::DeviceLogin::user_code(&self) -> &str
 pub fn gateway::DevicePoll::step(&mut self, &gateway::DeviceRefusal, u64) -> gateway::PollStep
 pub fn gateway::DeviceRefusal::read(&str) -> gateway::DeviceRefusal
 pub fn gateway::EmbeddingRequest::body(&self) -> alloc::string::String
@@ -130,6 +139,8 @@ pub fn gateway::MarketSnapshot::version(&self) -> u32
 pub fn gateway::ModelFacts::read(&serde_json::value::Value) -> core::option::Option<gateway::ModelFacts>
 pub fn gateway::Native::call(&mut self, &kernel::model::seam::ModelRequest) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
 pub fn gateway::Native::new(gateway::NativeConfig) -> core::result::Result<gateway::Native, kernel::error::shape::AxError>
+pub fn gateway::OauthPending::open_url(&self) -> &str
+pub fn gateway::OauthPending::user_code(&self) -> core::option::Option<&str>
 pub fn gateway::OauthTokens::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn gateway::OutputCeiling::resolve(gateway::Stated, core::option::Option<kernel::model::wire::Ceiling>, &str, &str) -> core::option::Option<gateway::OutputCeiling>
 pub fn gateway::Persistence::consequence(self) -> &'static str
@@ -153,13 +164,14 @@ pub fn gateway::adapter_for(&gateway::Chosen<'_>, gateway::Redemption, alloc::ve
 pub fn gateway::attached_payload(&gateway::AttachedEndpoint) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn gateway::client_for(kernel::reach::Proxying, &str) -> reqwest::blocking::client::ClientBuilder
 pub fn gateway::device_authorization_request(&gateway::OauthProfile) -> core::result::Result<gateway::FormPost, kernel::error::shape::AxError>
+pub fn gateway::device_login_begin(&gateway::OauthProfile, u64, u64) -> core::result::Result<gateway::OauthPending, kernel::error::shape::AxError>
 pub fn gateway::increment_of(kernel::model::wire::DialectKind, &serde_json::value::Value) -> core::option::Option<kernel::model::wire::Increment>
 pub fn gateway::is_local(&str) -> bool
 pub fn gateway::normalise_entered(&str, gateway::DialectHint) -> core::result::Result<gateway::Normalised, kernel::error::shape::AxError>
-pub fn gateway::oauth_begin(&gateway::OauthProfile, alloc::string::String, alloc::string::String) -> core::result::Result<gateway::OauthPending, kernel::error::shape::AxError>
+pub fn gateway::oauth_begin(&gateway::OauthProfile, alloc::string::String, alloc::string::String) -> core::result::Result<gateway::RedirectPending, kernel::error::shape::AxError>
 pub fn gateway::oauth_random(&[u8]) -> alloc::string::String
-pub fn gateway::oauth_redeem(&gateway::OauthProfile, &gateway::OauthPending, &str, u64) -> core::result::Result<gateway::OauthTokens, kernel::error::shape::AxError>
-pub fn gateway::oauth_redeem_request(&gateway::OauthProfile, &gateway::OauthPending, &str) -> core::result::Result<gateway::TokenRequest, kernel::error::shape::AxError>
+pub fn gateway::oauth_redeem(&gateway::OauthProfile, &gateway::RedirectPending, &str, u64) -> core::result::Result<gateway::OauthTokens, kernel::error::shape::AxError>
+pub fn gateway::oauth_redeem_request(&gateway::OauthProfile, &gateway::RedirectPending, &str) -> core::result::Result<gateway::TokenRequest, kernel::error::shape::AxError>
 pub fn gateway::oauth_refresh(&gateway::OauthProfile, &kernel::secret::sealed::Sealed<alloc::string::String>, u64) -> core::result::Result<gateway::OauthTokens, kernel::error::shape::AxError>
 pub fn gateway::profile(&str) -> core::option::Option<&'static gateway::OauthProfile>
 pub fn gateway::profile_for(gateway::Family) -> core::option::Option<&'static gateway::OauthProfile>
@@ -225,6 +237,9 @@ pub gateway::DeviceRefusal::AuthorizationPending
 pub gateway::DeviceRefusal::ExpiredToken
 pub gateway::DeviceRefusal::Other(alloc::string::String)
 pub gateway::DeviceRefusal::SlowDown
+pub gateway::DeviceStep::NotYet
+pub gateway::DeviceStep::NotYet::seconds: u64
+pub gateway::DeviceStep::Signed(gateway::OauthTokens)
 pub gateway::DialectHint::Chat
 pub gateway::DialectHint::Messages
 pub gateway::DialectHint::Responses
@@ -293,8 +308,8 @@ pub gateway::NativeConfig::proxying: kernel::reach::Proxying
 pub gateway::NativeConfig::timeout_ms: u64
 pub gateway::Normalised::base_url: alloc::string::String
 pub gateway::Normalised::dialect: gateway::DialectHint
-pub gateway::OauthPending::auth_url: alloc::string::String
-pub gateway::OauthPending::state: alloc::string::String
+pub gateway::OauthPending::Device(gateway::DeviceLogin)
+pub gateway::OauthPending::Redirect(gateway::RedirectPending)
 pub gateway::OauthProfile::api_base: &'static str
 pub gateway::OauthProfile::auth_endpoint: &'static str
 pub gateway::OauthProfile::client_id: &'static str
@@ -316,6 +331,8 @@ pub gateway::PollStep::AskAgainIn::seconds: u64
 pub gateway::PollStep::Stop(kernel::error::shape::AxError)
 pub gateway::Rank::passage: usize
 pub gateway::Rank::score: f64
+pub gateway::RedirectPending::auth_url: alloc::string::String
+pub gateway::RedirectPending::state: alloc::string::String
 pub gateway::Stated::person: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::Stated::upstream: core::option::Option<kernel::model::wire::Ceiling>
 pub gateway::TokenRequest::body: alloc::string::String
@@ -340,6 +357,7 @@ pub struct gateway::Chosen<'b>
 pub struct gateway::Custodian
 pub struct gateway::Described
 pub struct gateway::DeviceAuthorization
+pub struct gateway::DeviceLogin
 pub struct gateway::DevicePoll
 pub struct gateway::EmbeddingRequest
 pub struct gateway::Embeddings
@@ -357,7 +375,6 @@ pub struct gateway::ModelPreset
 pub struct gateway::Native
 pub struct gateway::NativeConfig
 pub struct gateway::Normalised
-pub struct gateway::OauthPending
 pub struct gateway::OauthProfile
 pub struct gateway::OauthTokens
 pub struct gateway::OutputCeiling
@@ -365,6 +382,7 @@ pub struct gateway::Rank
 pub struct gateway::Ranking
 pub struct gateway::Recording
 pub struct gateway::Redemption
+pub struct gateway::RedirectPending
 pub struct gateway::RerankRequest
 pub struct gateway::Stated
 pub struct gateway::TokenRequest

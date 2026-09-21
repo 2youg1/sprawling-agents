@@ -115,9 +115,9 @@ pub(crate) fn tokens_or_zero(usage: &Value, key: &str, path: &str) -> Result<Tok
     }
 }
 
+/// The float ban is not restated here: `Payload`'s `Deserialize` runs
+/// `Payload::new`, which refuses a float anywhere in the tree and says
+/// why, and this face reports that refusal as the mismatch it is.
 pub(crate) fn payload_from(value: &Value, path: &str) -> Result<Payload, AxError> {
-    if kernel::model::value_has_float(value) {
-        return Err(mismatch(path, "float payloads are banned city-wide"));
-    }
     serde_json::from_value(value.clone()).map_err(|err| mismatch(path, &err.to_string()))
 }

@@ -20,7 +20,7 @@
 
 use kernel::{Address, Admission, AxCode, AxError, IdemKey, Payload, RunId, Seq, TimeMs, Version};
 use memory::{EventQueue, QueueLane};
-use serde_json::{Map, Value};
+use serde::{Deserialize, Serialize};
 
 mod signal_id;
 mod signal_kind;
@@ -29,7 +29,8 @@ pub use signal_id::SignalId;
 pub use signal_kind::SignalKind;
 
 /// Which line a signal waits in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Lane {
     Urgent,
     Ordinary,
@@ -133,18 +134,16 @@ impl Signal {
     /// # Errors
     /// Propagates the payload's refusal to hold what it was given.
     pub fn enqueued_payload(&self) -> Result<Payload, AxError> {
-        let mut map = self.wire();
-        map.insert(
-            "lane".to_owned(),
-            Value::String(
-                match self.lane() {
-                    Lane::Urgent => "urgent",
-                    Lane::Ordinary => "ordinary",
-                }
-                .to_owned(),
-            ),
-        );
-        Payload::new(map)
+        Payload::of(&SignalLine {
+            id: self.id.clone(),
+            kind: self.kind,
+            from: self.from.clone(),
+            room: self.room.clone(),
+            room_version: self.room_version,
+            payload: self.payload.clone(),
+            at: self.at,
+            lane: Some(self.lane()),
+        })
     }
 
     /// The `signal_consumed` record: the id and who took it, because the
@@ -154,85 +153,75 @@ impl Signal {
     /// # Errors
     /// Propagates the payload's refusal to hold what it was given.
     pub fn consumed_payload(&self, by: &str) -> Result<Payload, AxError> {
-        let mut map = Map::new();
-        map.insert("id".to_owned(), Value::String(self.id.as_str().to_owned()));
-        map.insert("by".to_owned(), Value::String(by.to_owned()));
-        Payload::new(map)
+        Payload::of(&SignalConsumed {
+            id: self.id.clone(),
+            by: by.to_owned(),
+        })
     }
 
-    fn wire(&self) -> Map<String, Value> {
-        let mut map = Map::new();
-        map.insert("id".to_owned(), Value::String(self.id.as_str().to_owned()));
-        map.insert(
-            "kind".to_owned(),
-            Value::String(self.kind.as_str().to_owned()),
-        );
-        map.insert("from".to_owned(), Value::String(self.from.clone()));
-        map.insert(
-            "room".to_owned(),
-            Value::String(self.room.as_str().to_owned()),
-        );
-        map.insert(
-            "room_version".to_owned(),
-            Value::Number(self.room_version.value().into()),
-        );
-        map.insert(
-            "payload".to_owned(),
-            Value::Object(self.payload.as_map().clone()),
-        );
-        map.insert("at".to_owned(), Value::Number(self.at.value().into()));
-        map
-    }
-
-    /// Reads back what `enqueued_payload` wrote. The inverse is public
-    /// because rebuilding the queues from the ledger is the only way the
-    /// city knows what is waiting after a restart, and a second parser
-    /// of this shape would be a second answer to that question.
+    /// Reads back what [`enqueued_payload`](Self::enqueued_payload)
+    /// wrote. The inverse is public because rebuilding the queues from
+    /// the ledger is the only way the city knows what is waiting after a
+    /// restart, and a second parser of this shape would be a second
+    /// answer to that question.
     ///
     /// # Errors
     /// Refuses a payload missing a field or carrying a kind this version
     /// does not know.
     pub fn from_payload(payload: &Payload) -> Result<Signal, AxError> {
-        Signal::from_wire(payload.as_map())
-    }
-
-    fn from_wire(map: &Map<String, Value>) -> Result<Signal, AxError> {
-        let text = |key: &str| -> Result<String, AxError> {
-            map.get(key)
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-                .ok_or_else(|| broken(key))
-        };
-        let number = |key: &str| -> Result<u64, AxError> {
-            map.get(key)
-                .and_then(Value::as_u64)
-                .ok_or_else(|| broken(key))
-        };
-        let payload = map
-            .get("payload")
-            .and_then(Value::as_object)
-            .ok_or_else(|| broken("payload"))?;
+        let line: SignalLine = payload.read()?;
         Signal::new(
-            SignalId::parse(&text("id")?)?,
-            SignalKind::parse(&text("kind")?)?,
-            text("from")?,
-            Address::parse(&text("room")?)?,
-            Version::new(number("room_version")?),
-            Payload::new(payload.clone())?,
-            TimeMs::new(number("at")?),
+            line.id,
+            line.kind,
+            line.from,
+            line.room,
+            line.room_version,
+            line.payload,
+            line.at,
         )
     }
 }
 
-fn broken(field: &str) -> AxError {
-    AxError::failure(
-        AxCode::InvalidArgs,
-        "read a queued signal",
-        field.to_owned(),
-    )
-    .with_recovery(
-        "the queue writes this shape itself; a missing field means the two halves disagree",
-    )
+/// `signal_enqueued`: the signal itself, and the line it waits in.
+///
+/// The one authority for this line's keys. They used to be written key
+/// by key and read key by key in this same file, which is two spellings
+/// of seven names and a place for them to drift.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct SignalLine {
+    id: SignalId,
+    kind: SignalKind,
+    from: String,
+    room: Address,
+    room_version: Version,
+    payload: Payload,
+    at: TimeMs,
+    /// Written for a reader outside this crate, never read back here:
+    /// the lane is derived from `kind` by [`Signal::lane`], and reading
+    /// a stored copy would let a line say which lane it took while the
+    /// derivation says another. Absent on a line written before the key
+    /// existed, which changes nothing, for the same reason.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lane: Option<Lane>,
+}
+
+/// `signal_consumed`: which signal was taken, and by whom.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignalConsumed {
+    pub id: SignalId,
+    pub by: String,
+}
+
+impl SignalConsumed {
+    /// Reads back what [`Signal::consumed_payload`] wrote.
+    ///
+    /// # Errors
+    /// Refuses a payload this build cannot read as a consumption. A
+    /// fold that skipped such a line instead would count the signal as
+    /// still waiting and hand it to a resident twice.
+    pub fn from_payload(payload: &Payload) -> Result<SignalConsumed, AxError> {
+        payload.read()
+    }
 }
 
 /// The receiving side: two lines and a bandwidth.
@@ -274,7 +263,7 @@ impl Inbox {
     /// Propagates the queue's own refusal to hold the payload.
     pub fn deliver(&mut self, signal: &Signal) -> Result<Admission, AxError> {
         let key = IdemKey::derive(&RunId::CITY, Seq::FIRST, signal.id().as_str().as_bytes());
-        let payload = Payload::new(signal.wire())?;
+        let payload = signal.enqueued_payload()?;
         let queue = match signal.lane() {
             Lane::Urgent => &mut self.urgent,
             Lane::Ordinary => &mut self.ordinary,
@@ -298,7 +287,7 @@ impl Inbox {
                     None => break,
                 },
             };
-            out.push(Signal::from_wire(item.payload.as_map())?);
+            out.push(Signal::from_payload(&item.payload)?);
         }
         Ok(out)
     }
@@ -319,7 +308,7 @@ impl Inbox {
     /// [`Inbox::pull`], which is the door the model itself uses.
     pub fn take_steer(&mut self) -> Option<Signal> {
         let item = self.urgent.consume()?;
-        Signal::from_wire(item.payload.as_map()).ok()
+        Signal::from_payload(&item.payload).ok()
     }
 
     /// What `status` reports as `signals_pending`.

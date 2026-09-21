@@ -62,7 +62,7 @@ use driving::flight::{Flight, Landed};
 pub(crate) use driving::lane::{DriveContext, drive_run};
 use driving::owing::{Owed, Owing, Unasked};
 pub(crate) use driving::{Driven, Driving};
-use folds::{Governance, INBOX_CAPACITY, artifact_of, new_inbox};
+use folds::{Governance, INBOX_CAPACITY, new_inbox};
 pub(crate) use folds::{Standing, rebuild_views};
 pub(crate) use genesis::city_address;
 use genesis::city_segment;

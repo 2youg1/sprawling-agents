@@ -1126,8 +1126,10 @@ pub struct ModelUsage { pub input_tokens: Tokens, pub output_tokens: Tokens,
                         pub cache_read_tokens: Tokens, pub cache_write_tokens: Tokens }
 pub struct ChatResponse { pub content: Vec<ContentBlock>, pub stop: StopReason, pub usage: ModelUsage }
 pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError>;  // model_returned 载荷的唯一成形处
-pub fn value_has_float(value: &serde_json::Value) -> bool;               // wire 面浮点禁令的判定原语
 ```
+
+浮点禁令只有一个家：`Payload::new`（及其 `Deserialize`）。wire 面把 `serde_json::Value` 转成
+`Payload` 即受判，故 seam 不再另设判定原语，拒绝理由与错误码也只有一处。
 
 - 工具入参／schema 用 Payload：浮点禁令在缝上即成立（这些字节逐字进 Ledger 载荷）；provider 送浮点工具入参＝E_WIRE_MISMATCH（fail-closed，城规优先）。
 - ModelRequest 携 chat 字段（turn 的 Assembling 相组 ChatRequest 入请求）；ModelReturn 携 usage/stop/billed 三字段，另有 `bare()`（脚本最小构造）与 `from_response(resp, billed)`（tool_use 块→波，全量入账）两构造面；turn 的 model_returned 载荷随之增 usage／stop／billed_usd_micros（在场才写）。
@@ -1552,7 +1554,7 @@ secret 门白名单随 `sealed.rs` 搬家）。完成检查：同 8-36。
 `StopReason`／`SystemBlock`／`DialectKind`／`ModelTag`／`Effort`／`ContentBlock`／`ChatMessage`／
 `ToolDef`／`ChatRequest` 含 `empty`／`ModelUsage`／`ChatResponse`）；`model/seam.rs` 收一次调用两个方向
 所载之物与内容↔载荷两转换（`ModelRequest`／`ModelReturn` 含 `bare`／`from_response`、`message_payload`／
-`content_from_message`／`value_has_float`）；`model/conformance.rs` 收 feature 门后的一致性断言；
+`content_from_message`）；`model/conformance.rs` 收 feature 门后的一致性断言；
 `model/tests.rs` 收原 `mod tests`（6 个 `#[test]`，断言与名字不动，补 `AxCode`／`Payload`／`B3Hash`／
 `Map` 四行 `use`，因父文件不再直接引它们）。`model.rs` 剩 75 行：`//!` 文档、两 `mod`、两 `pub use`、
 `Increments` 与 `pub trait Model` —— **trait 必须留在原路径**，`xtask depmap` 只准 seam 清单文件

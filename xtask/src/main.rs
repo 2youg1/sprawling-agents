@@ -46,6 +46,11 @@ mod sbom;
 mod secret;
 mod spec;
 mod specalign;
+// The grid instrument (xtask-SPEC.md section 8-26). It is declared here
+// because a module lives where the crate root says it does; it is not a
+// subcommand, and `cargo xtask render --survey` is how a person reaches
+// it, for the reason section 8-26 states.
+mod survey;
 mod vocabulary;
 mod walk;
 mod wire_ts;

@@ -24,6 +24,7 @@ impl collab::PrTool
 impl collab::PrivateQuestion
 impl collab::Reflex
 impl collab::Signal
+impl collab::SignalConsumed
 impl collab::SignalDesk
 impl collab::SignalId
 impl collab::SignalKind
@@ -33,6 +34,12 @@ impl collab::Triage
 impl collab::Workshop
 impl collab::WorkshopDesk
 impl collab::WorkshopTool
+impl core::convert::From<collab::NodeId> for alloc::string::String
+impl core::convert::From<collab::SignalId> for alloc::string::String
+impl core::convert::From<collab::SignalKind> for alloc::string::String
+impl core::convert::TryFrom<alloc::string::String> for collab::NodeId
+impl core::convert::TryFrom<alloc::string::String> for collab::SignalId
+impl core::convert::TryFrom<alloc::string::String> for collab::SignalKind
 impl core::fmt::Debug for collab::Inbox
 impl core::fmt::Debug for collab::SignalDesk
 impl kernel::tool::Tool for collab::ArchiveTool
@@ -82,6 +89,13 @@ pub collab::Level::Arbitrate
 pub collab::Level::Arbitrate::with: kernel::goal::GoalId
 pub collab::Level::Serialize
 pub collab::Level::Serialize::after: kernel::goal::GoalId
+pub collab::MergedRequest::branch: alloc::string::String
+pub collab::MergedRequest::by: kernel::event::record::checkpoint::CommitAttribution
+pub collab::MergedRequest::commit: alloc::string::String
+pub collab::MergedRequest::implementer: alloc::string::String
+pub collab::MergedRequest::node: collab::NodeId
+pub collab::MergedRequest::reviewed_commit: alloc::string::String
+pub collab::MergedRequest::verified_by: alloc::string::String
 pub collab::OpenRequest::branch: alloc::string::String
 pub collab::OpenRequest::commit: alloc::string::String
 pub collab::OpenRequest::implementer: alloc::string::String
@@ -102,6 +116,8 @@ pub collab::Reflex::Notify
 pub collab::Rule::landing: kernel::address::Address
 pub collab::Rule::matches: alloc::string::String
 pub collab::Rule::reflex: collab::Reflex
+pub collab::SignalConsumed::by: alloc::string::String
+pub collab::SignalConsumed::id: collab::SignalId
 pub collab::SignalEffect::Consumed
 pub collab::SignalEffect::Consumed::by: alloc::string::String
 pub collab::SignalEffect::Consumed::signal: collab::Signal
@@ -121,6 +137,9 @@ pub enum collab::PrEffect
 pub enum collab::Reflex
 pub enum collab::SignalEffect
 pub enum collab::SignalKind
+pub fn alloc::string::String::from(collab::NodeId) -> alloc::string::String
+pub fn alloc::string::String::from(collab::SignalId) -> alloc::string::String
+pub fn alloc::string::String::from(collab::SignalKind) -> alloc::string::String
 pub fn collab::AgentSteer::landing(&self) -> collab::Steer
 pub fn collab::AgentSteer::new(&str, &str) -> core::result::Result<collab::AgentSteer, kernel::error::shape::AxError>
 pub fn collab::AgentSteer::signal(&self, collab::SignalId, kernel::address::Address, kernel::version::Version, kernel::event::identity::TimeMs) -> core::result::Result<collab::Signal, kernel::error::shape::AxError>
@@ -171,6 +190,7 @@ pub fn collab::GoalTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::res
 pub fn collab::GoalTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn collab::GoalTool::new(kernel::address::Address, alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::GoalDesk>>) -> core::result::Result<collab::GoalTool, kernel::error::shape::AxError>
 pub fn collab::Handback::by(&self) -> &str
+pub fn collab::Handback::from_signal(&collab::Signal) -> core::result::Result<core::option::Option<collab::Handback>, kernel::error::shape::AxError>
 pub fn collab::Handback::node(&self) -> &collab::NodeId
 pub fn collab::Handback::of(collab::Claim, bool, &str) -> collab::Handback
 pub fn collab::Handback::signal(&self, collab::SignalId, kernel::address::Address, kernel::event::identity::TimeMs) -> core::result::Result<collab::Signal, kernel::error::shape::AxError>
@@ -193,7 +213,9 @@ pub fn collab::NodeContract::stop(&self) -> &str
 pub fn collab::NodeContract::write_domain(&self) -> &kernel::address::Address
 pub fn collab::NodeId::as_str(&self) -> &str
 pub fn collab::NodeId::parse(&str) -> core::result::Result<collab::NodeId, kernel::error::shape::AxError>
+pub fn collab::NodeId::try_from(alloc::string::String) -> core::result::Result<collab::NodeId, kernel::error::shape::AxError>
 pub fn collab::OpenRequest::from_payload(&kernel::event::payload::Payload) -> core::result::Result<collab::OpenRequest, kernel::error::shape::AxError>
+pub fn collab::OpenRequest::merged_payload(&self, alloc::string::String, alloc::string::String, kernel::event::record::checkpoint::CommitAttribution) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn collab::OpenRequest::payload(&self) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn collab::Pr<S>::branch(&self) -> &str
 pub fn collab::Pr<S>::implementer(&self) -> &str
@@ -221,6 +243,7 @@ pub fn collab::Signal::new(collab::SignalId, collab::SignalKind, alloc::string::
 pub fn collab::Signal::payload(&self) -> &kernel::event::payload::Payload
 pub fn collab::Signal::room(&self) -> &kernel::address::Address
 pub fn collab::Signal::room_version(&self) -> kernel::version::Version
+pub fn collab::SignalConsumed::from_payload(&kernel::event::payload::Payload) -> core::result::Result<collab::SignalConsumed, kernel::error::shape::AxError>
 pub fn collab::SignalDesk::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn collab::SignalDesk::new(kernel::event::identity::RunId, kernel::address::Address, alloc::string::String, kernel::address::Address, kernel::event::identity::TimeMs, collab::Inbox) -> collab::SignalDesk
 pub fn collab::SignalDesk::pending(&self) -> u32
@@ -229,8 +252,10 @@ pub fn collab::SignalDesk::take_inbox(&mut self) -> collab::Inbox
 pub fn collab::SignalDesk::take_steer(&mut self) -> core::option::Option<collab::Steer>
 pub fn collab::SignalId::as_str(&self) -> &str
 pub fn collab::SignalId::parse(&str) -> core::result::Result<collab::SignalId, kernel::error::shape::AxError>
+pub fn collab::SignalId::try_from(alloc::string::String) -> core::result::Result<collab::SignalId, kernel::error::shape::AxError>
 pub fn collab::SignalKind::as_str(self) -> &'static str
 pub fn collab::SignalKind::parse(&str) -> core::result::Result<collab::SignalKind, kernel::error::shape::AxError>
+pub fn collab::SignalKind::try_from(alloc::string::String) -> core::result::Result<collab::SignalKind, kernel::error::shape::AxError>
 pub fn collab::SignalTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn collab::SignalTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn collab::SignalTool::new(alloc::sync::Arc<std::sync::poison::mutex::Mutex<collab::SignalDesk>>) -> core::result::Result<collab::SignalTool, kernel::error::shape::AxError>
@@ -278,6 +303,7 @@ pub struct collab::Held
 pub struct collab::Inbox
 pub struct collab::Joined
 pub struct collab::Landing
+pub struct collab::MergedRequest
 pub struct collab::NodeContract
 pub struct collab::NodeId(_)
 pub struct collab::Open
@@ -288,6 +314,7 @@ pub struct collab::PrTool
 pub struct collab::PrivateQuestion
 pub struct collab::Rule
 pub struct collab::Signal
+pub struct collab::SignalConsumed
 pub struct collab::SignalDesk
 pub struct collab::SignalId(_)
 pub struct collab::SignalTool
@@ -297,3 +324,6 @@ pub struct collab::Verified
 pub struct collab::Workshop
 pub struct collab::WorkshopDesk
 pub struct collab::WorkshopTool
+pub type collab::NodeId::Error = kernel::error::shape::AxError
+pub type collab::SignalId::Error = kernel::error::shape::AxError
+pub type collab::SignalKind::Error = kernel::error::shape::AxError

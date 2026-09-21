@@ -21,6 +21,23 @@ pub struct Ratio {
 
 pub const STARTUP_BUDGET_TOKENS: u64 = 2000;
 
+/// Bytes per token, typical: the rate every budget that crosses the two
+/// units is converted at. It is an estimate for English prose and code,
+/// and it is deliberately not the worst-case ratio
+/// [`INTERVAL_CAP_BYTES`] reasons from - a budget that has to hold is
+/// sized by the worst case, a budget that has to be spent is sized by
+/// the typical one.
+pub const BYTES_PER_TOKEN: u64 = 4;
+
+/// How many slots a whole-prefix budget divides evenly across.
+/// `runtime::prefix::SegmentSlot` is the authority on how many slots
+/// there are, and `runtime::prefix::tests` holds this divisor against
+/// that enum so the two cannot drift apart.
+pub const PREFIX_SLOTS: std::num::NonZeroU64 = match std::num::NonZeroU64::new(4) {
+    Some(slots) => slots,
+    None => std::num::NonZeroU64::MIN,
+};
+
 /// 0.5: the past-half context reminder threshold.
 pub const CTX_REMINDER_RATIO: Ratio = Ratio { num: 1, den: 2 };
 

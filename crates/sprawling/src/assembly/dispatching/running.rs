@@ -5,16 +5,14 @@
 
 //! Who gets woken, and where the work lands.
 
-use kernel::{Address, Locator};
-use kernel::{AxCode, AxError, EventKind};
-
-use crate::effect;
+use kernel::Locator;
+use kernel::{AxCode, AxError};
 
 use super::super::{
-    CITY_VERIFIER, Desks, Driven, Driving, Ending, Holding, Landed, Owing, RunWorker, Site, Sweep,
-    Workbench, artifact_of, held, now_ms,
+    Desks, Driven, Driving, Ending, Holding, Landed, Owing, RunWorker, Site, Sweep, Workbench,
+    held, now_ms,
 };
-use super::{Assignment, Dispatched, Given};
+use super::{Assignment, Given};
 
 /// What the city built for a dispatch before the drive, and needs
 /// again once the drive is home.
@@ -53,6 +51,12 @@ impl RunWorker {
         task: String,
         goal: String,
     ) -> Result<(Driving, Continuation), AxError> {
+        // The reading `xtask/budgets.toml [prepare_dispatch_ms]` states:
+        // what a dispatch spends on the accounting thread before a lane
+        // takes the drive. Read from the city's own clock rather than
+        // from a profiler, because the figure that matters is the one
+        // taken on the thread no append is served on.
+        let began = now_ms()?;
         // Nothing is written before the city agrees to take the work:
         // a halted city that laid a job file down would leave a task in
         // a room no run ever opened.
@@ -158,6 +162,12 @@ impl RunWorker {
             )?),
             None => None,
         };
+        let spent = now_ms()?.value().saturating_sub(began.value());
+        self.note(
+            runtime::diagnostics::Level::Trace,
+            "bin::assembly",
+            &format!("prepare_dispatch took {spent} ms for {}", at.addr.as_str()),
+        );
         let driving = Driving {
             adapter,
             bench: workbench.take_bench()?,
@@ -330,70 +340,5 @@ impl RunWorker {
             .map_err(memory::MemoryError::into_ax)?
             .release(held)
             .map_err(memory::MemoryError::into_ax)
-    }
-
-    /// Tells the run that asked for the work how it came back.
-    ///
-    /// The child's account is pinned in the store before it is judged,
-    /// so the locator the parent is handed resolves to bytes rather than
-    /// to a sentence this process happened to build. The city verifies:
-    /// `Completion::Done` is something the city observed, and a producer
-    /// verifying itself is what `Claim::verified` refuses.
-    pub(in crate::assembly) fn deliver_handback(
-        &mut self,
-        parent: &Address,
-        child: &Dispatched,
-    ) -> Result<(), AxError> {
-        let account = format!(
-            "room: {}\nby: {}\nending: {}\n",
-            child.addr.as_str(),
-            child.who,
-            child.completion.name()
-        );
-        let digest = self
-            .cas
-            .put(account.as_bytes())
-            .map_err(memory::MemoryError::into_ax)?;
-        let claim = collab::Claim::new(
-            collab::NodeId::parse(child.addr.as_str())?,
-            Locator::parse(&format!("cas:b3-{digest}"))?,
-            digest,
-            child.who.clone(),
-        );
-        let back = collab::Handback::of(
-            claim,
-            matches!(child.completion, kernel::Completion::Done(_)),
-            CITY_VERIFIER,
-        );
-        let signal = back.signal(
-            collab::SignalId::parse(&format!("handback-{}", child.run))?,
-            parent.clone(),
-            now_ms()?,
-        )?;
-        // Recorded, then delivered - the same order every other signal
-        // takes, so the queue only ever changes as a consequence of a
-        // line the history already has.
-        self.record_for(
-            child.run,
-            effect::Line {
-                who: child.who.to_owned(),
-                addr: parent.clone(),
-                kind: EventKind::SignalEnqueued,
-                data: signal.enqueued_payload()?,
-            },
-        )?;
-        // Through the room table rather than into a queue of its own:
-        // the parent room may have another run reading in it, and a
-        // handback delivered beside that reader is one nobody collects.
-        self.rooms.deliver(&signal)?;
-        // And into the room's join, by the same reading a restart would
-        // do: one function decides what a handback signal means.
-        if let Some(artifact) = artifact_of(&signal) {
-            self.joins
-                .entry(parent.clone())
-                .or_default()
-                .accept(artifact);
-        }
-        Ok(())
     }
 }

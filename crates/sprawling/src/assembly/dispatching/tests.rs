@@ -273,3 +273,92 @@ fn two_jobs_at_one_millisecond_get_two_run_ids() {
         "a digest the old code could not print became the all-zero run"
     );
 }
+
+/// The instrument `xtask/budgets.toml [prepare_dispatch_ms]` names.
+///
+/// It pins that the reading is taken and said out loud, not what the
+/// reading is: a wall-clock figure belongs to the machine that ran it,
+/// so the row records it beside that machine and this test asserts only
+/// that a dispatch reports what it spent before the lane took the
+/// drive. Run with `--nocapture` to read the figure off this fixture.
+#[test]
+fn a_dispatch_says_what_it_spent_before_the_drive() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+
+    let written = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let sink = std::sync::Arc::clone(&written);
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::new(
+            runtime::diagnostics::Level::Trace,
+            Box::new(move |entry: runtime::diagnostics::Entry<'_>| {
+                sink.lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .push(runtime::diagnostics::render(entry));
+            }),
+        ),
+    )
+    .unwrap();
+    worker
+        .handle(channels::Command::AttachEndpoint {
+            name: channels::ProviderName::parse("house").unwrap(),
+            base_url,
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            admit: Vec::new(),
+            tuning: channels::EndpointTuning::default(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
+        })
+        .unwrap();
+    worker
+        .handle(channels::Command::SelectModel {
+            endpoint: channels::ProviderName::parse("house").unwrap(),
+            model: "m-local".to_owned(),
+            tag: kernel::ModelTag::Main,
+            context_tokens: kernel::Window::new(32_768),
+            max_output_tokens: kernel::Ceiling::new(4_096),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
+        })
+        .unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "write one line".to_owned(),
+            goal: "the line is written".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+
+    let lines = written
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    let prepared: Vec<&String> = lines
+        .iter()
+        .filter(|line| line.contains("prepare_dispatch took"))
+        .collect();
+    let servers: Vec<&String> = lines
+        .iter()
+        .filter(|line| line.contains("mcp_tools took"))
+        .collect();
+    for line in prepared.iter().chain(servers.iter()) {
+        println!("{line}");
+    }
+    assert_eq!(
+        prepared.len(),
+        1,
+        "one dispatch reports its own preparation once: {lines:#?}"
+    );
+    assert_eq!(
+        servers.len(),
+        1,
+        "the servers phase reports separately, because a resident connection table would remove only that part: {lines:#?}"
+    );
+}

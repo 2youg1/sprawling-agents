@@ -5,6 +5,8 @@
 
 use super::*;
 
+use crate::survey::{Declared, Drawn, Overflow, Page, PaintSource, Sampled};
+
 /// `Violation` has no `Debug` on purpose (it is rendered, not dumped),
 /// so failures report the rules that fired.
 fn rules(found: &[Violation]) -> String {
@@ -22,10 +24,14 @@ fn el(tag: &str, name: &str, at: [i64; 4], nesting: (i64, i64)) -> Drawn {
     let [left, top, width, height] = at;
     let (depth, parent) = nesting;
     Drawn {
-        scrolls_across: false,
-        scrolls_down: false,
+        across: Overflow::Shows,
+        down: Overflow::Shows,
+        sampled: Sampled::Frame,
         first_mark: -1,
         underlined: false,
+        fill: None,
+        class: String::new(),
+        text: None,
         tag: tag.to_owned(),
         role: "-".to_owned(),
         name: name.to_owned(),
@@ -73,21 +79,34 @@ fn railed() -> Vec<Drawn> {
 /// only carry it into the violation, so one stands in for all of them.
 const AT: &str = "at 1280px, dark in the colours it authored";
 
-fn judge(drawn: &[Drawn]) -> Vec<Violation> {
+/// The gate's own loop, over a page with no declared vocabulary: these
+/// fixtures paint nothing, so the readings that compare paint against a
+/// palette have nothing to say and the geometry is what is under test.
+fn judge(drawn: Vec<Drawn>) -> Vec<Violation> {
     let mut out = Vec::new();
-    every_control_is_announceable(drawn, AT, &mut out);
-    every_landmark_is_named(drawn, AT, &mut out);
-    one_first_heading(drawn, AT, &mut out);
-    one_left_edge(drawn, AT, &mut out);
-    nothing_escapes_what_holds_it(drawn, AT, &mut out);
-    rows_share_a_first_mark(drawn, AT, &mut out);
-    no_key_is_underlined(drawn, AT, &mut out);
+    every_control_is_announceable(&drawn, AT, &mut out);
+    every_landmark_is_named(&drawn, AT, &mut out);
+    one_first_heading(&drawn, AT, &mut out);
+    no_key_is_underlined(&drawn, AT, &mut out);
+    let page = Page {
+        drawn,
+        declared: Declared::of(Vec::new(), Vec::new(), Vec::new()),
+        painted_by: PaintSource::ThePage,
+    };
+    for reading in survey::judge(&page).iter().filter(refusable) {
+        out.push(violation(
+            AT,
+            &survey::rule(reading),
+            survey::says(reading),
+            &survey::remedy(reading),
+        ));
+    }
     out
 }
 
 #[test]
 fn the_rail_the_client_draws_passes() {
-    let found = judge(&railed());
+    let found = judge(railed());
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
@@ -99,7 +118,7 @@ fn a_dot_five_pixels_left_of_the_glyphs_is_caught() {
     if let Some(first) = drawn.get_mut(7) {
         first.first_mark = 16;
     }
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found.iter().any(|v| v.rule.contains("first mark")),
         "{}",
@@ -120,7 +139,7 @@ fn a_row_of_tabs_is_not_asked_to_share_an_x() {
         tab.depth = 6;
         drawn.push(tab);
     }
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
@@ -130,7 +149,7 @@ fn a_row_of_tabs_is_not_asked_to_share_an_x() {
 fn a_row_with_no_mark_inside_it_is_left_alone() {
     let mut drawn = railed();
     drawn.push(el("A", "没有图形", [0, 140, 44, 44], (5, 0)));
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
@@ -142,7 +161,7 @@ fn an_underlined_key_is_caught() {
     let mut key = el("KBD", "g c", [10, 60, 20, 16], (7, 8));
     key.underlined = true;
     drawn.push(key);
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found.iter().any(|v| v.rule.contains("line under it")),
         "{}",
@@ -154,13 +173,13 @@ fn an_underlined_key_is_caught() {
 fn a_key_with_no_line_under_it_passes() {
     let mut drawn = railed();
     drawn.push(el("KBD", "g c", [10, 60, 20, 16], (7, 8)));
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
 #[test]
 fn the_shape_the_client_draws_passes() {
-    let found = judge(&good());
+    let found = judge(good());
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
@@ -170,7 +189,7 @@ fn the_shape_the_client_draws_passes() {
 fn a_control_with_no_accessible_name_is_caught() {
     let mut drawn = good();
     drawn.push(el("TEXTAREA", "", [373, 106, 704, 24], (8, 3)));
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found
             .iter()
@@ -187,7 +206,7 @@ fn a_control_with_no_accessible_name_is_caught() {
 fn a_control_with_no_area_is_not_asked_for_a_name() {
     let mut drawn = good();
     drawn.push(el("BUTTON", "", [0, 0, 0, 0], (8, 3)));
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
@@ -195,7 +214,7 @@ fn a_control_with_no_area_is_not_asked_for_a_name() {
 fn an_unnamed_landmark_is_caught() {
     let mut drawn = good();
     drawn.push(el("ASIDE", "", [1200, 0, 216, 1061], (3, -1)));
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found.iter().any(|v| v.violation.contains("<aside>")),
         "{}",
@@ -207,7 +226,7 @@ fn an_unnamed_landmark_is_caught() {
 fn a_page_with_two_first_headings_is_caught() {
     let mut drawn = good();
     drawn.push(el("H1", "第二个", [361, 900, 728, 27], (5, 1)));
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found
             .iter()
@@ -220,7 +239,7 @@ fn a_page_with_two_first_headings_is_caught() {
 #[test]
 fn a_page_with_no_first_heading_is_caught() {
     let drawn: Vec<Drawn> = good().into_iter().filter(|held| held.tag != "H1").collect();
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found
             .iter()
@@ -238,7 +257,7 @@ fn a_second_left_edge_is_caught() {
     if let Some(region) = drawn.get_mut(4) {
         region.left = 393;
     }
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found.iter().any(|v| v.rule.contains("one left edge")),
         "{}",
@@ -253,7 +272,7 @@ fn a_single_pixel_of_rounding_is_not_a_second_edge() {
     if let Some(region) = drawn.get_mut(4) {
         region.left = 362;
     }
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
@@ -264,11 +283,11 @@ fn a_single_pixel_of_rounding_is_not_a_second_edge() {
 fn a_box_that_has_left_its_container_is_caught() {
     let mut drawn = good();
     drawn.push(el("BUTTON", "escaped", [1300, 12, 200, 40], (8, 3)));
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found
             .iter()
-            .any(|v| v.violation.contains("escaped") && v.violation.contains("leaves")),
+            .any(|v| v.violation.contains("escaped") && v.rule.contains("outside the box")),
         "{}",
         rules(&found)
     );
@@ -285,10 +304,10 @@ fn a_box_that_has_left_its_container_is_caught() {
 fn a_section_below_the_fold_of_a_scrolling_column_is_not_an_escape() {
     let mut drawn = good();
     if let Some(column) = drawn.get_mut(1) {
-        column.scrolls_down = true;
+        column.down = Overflow::Scrolls;
     }
     drawn.push(el("SECTION", "below", [361, 1041, 728, 412], (5, 1)));
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found.iter().all(|v| !v.rule.contains("outside the box")),
         "{}",
@@ -302,11 +321,11 @@ fn a_section_below_the_fold_of_a_scrolling_column_is_not_an_escape() {
 fn a_section_below_the_fold_of_a_fixed_column_is_still_an_escape() {
     let mut drawn = good();
     drawn.push(el("SECTION", "below", [361, 1041, 728, 412], (5, 1)));
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found
             .iter()
-            .any(|v| v.violation.contains("below") && v.violation.contains("leaves")),
+            .any(|v| v.violation.contains("below") && v.rule.contains("outside the box")),
         "{}",
         rules(&found)
     );
@@ -325,11 +344,11 @@ fn a_section_below_the_fold_of_a_fixed_column_is_still_an_escape() {
 fn a_row_wider_than_the_box_it_scrolls_in_is_not_an_escape() {
     let mut drawn = good();
     let mut box_ = el("DIV", "", [361, 67, 240, 100], (6, 3));
-    box_.scrolls_across = true;
-    box_.scrolls_down = true;
+    box_.across = Overflow::Scrolls;
+    box_.down = Overflow::Scrolls;
     drawn.push(box_);
     drawn.push(el("BUTTON", "排序", [361, 67, 400, 24], (8, 7)));
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found.iter().all(|v| !v.rule.contains("outside the box")),
         "{}",
@@ -343,7 +362,7 @@ fn a_row_wider_than_the_box_it_scrolls_in_is_not_an_escape() {
 fn a_finding_names_the_pass_it_was_found_in() {
     let mut drawn = good();
     drawn.push(el("ASIDE", "", [1200, 0, 216, 1061], (3, -1)));
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(found.iter().all(|v| v.location.ends_with(AT)), "{}", {
         found
             .iter()
@@ -358,7 +377,7 @@ fn a_finding_names_the_pass_it_was_found_in() {
 #[test]
 fn an_element_with_no_measured_parent_is_left_alone() {
     let drawn = vec![el("MAIN", "页面", [44, 0, 1372, 1061], (3, -1))];
-    let found = judge(&drawn);
+    let found = judge(drawn);
     assert!(
         found.iter().all(|v| !v.rule.contains("outside the box")),
         "{}",

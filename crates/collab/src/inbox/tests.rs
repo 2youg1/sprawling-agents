@@ -3,6 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use serde_json::{Map, Value};
+
 use super::*;
 
 fn signal(id: &str, kind: SignalKind) -> Signal {
@@ -138,4 +140,40 @@ fn a_signal_from_nobody_is_not_a_signal() {
     assert_eq!(err.code(), &AxCode::InvalidArgs);
     assert!(SignalId::parse("s 1").is_err());
     assert!(SignalId::parse("").is_err());
+}
+
+/// The bytes on disk do not move: a line written before the shape had a
+/// serde struct reads back through the struct, and the struct writes the
+/// same keys again.
+#[test]
+fn a_line_written_by_hand_before_this_shape_had_a_struct_still_reads() {
+    let mut old = Map::new();
+    old.insert("id".to_owned(), Value::String("handback-7".to_owned()));
+    old.insert("kind".to_owned(), Value::String("thread".to_owned()));
+    old.insert("from".to_owned(), Value::String("lab/helper".to_owned()));
+    old.insert("room".to_owned(), Value::String("lab/room1".to_owned()));
+    old.insert("room_version".to_owned(), Value::Number(1.into()));
+    old.insert("payload".to_owned(), Value::Object(Map::new()));
+    old.insert("at".to_owned(), Value::Number(90.into()));
+    old.insert("lane".to_owned(), Value::String("ordinary".to_owned()));
+    let read = Signal::from_payload(&Payload::new(old.clone()).unwrap()).unwrap();
+    assert_eq!(read.id().as_str(), "handback-7");
+    assert_eq!(read.kind(), SignalKind::Thread);
+    assert_eq!(read.room_version(), Version::new(1));
+    assert_eq!(read.enqueued_payload().unwrap().as_map(), &old);
+
+    // And one written before the lane was projected at all.
+    old.remove("lane");
+    assert!(Signal::from_payload(&Payload::new(old).unwrap()).is_ok());
+}
+
+/// A consumption this build cannot read stops the rebuild instead of
+/// leaving the signal looking like it is still waiting.
+#[test]
+fn a_consumption_that_does_not_read_is_a_refusal_rather_than_a_skip() {
+    let sent = signal("s-9", SignalKind::Mention);
+    let taken = SignalConsumed::from_payload(&sent.consumed_payload("lab/room2").unwrap()).unwrap();
+    assert_eq!(taken.id.as_str(), "s-9");
+    assert_eq!(taken.by, "lab/room2");
+    assert!(SignalConsumed::from_payload(&Payload::empty()).is_err());
 }

@@ -83,7 +83,7 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 
 ## 7 模块边界
 
-一门一文件。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度参数；此处只说明每道门判什么，不再抄一份清单，也不写它们有几道——要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates`。判定面：`header`｜`lexicon`｜`modmap`｜`length`｜`boundary`｜`artifact`｜`depmap`｜`npm`｜`secret`｜`color`｜`wording`｜`render`｜`wiring`｜`wire-ts`｜`docnum`｜`proof`｜`budget`｜`specalign`｜`apisync`｜`release`｜`guard`。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（ARCHITECTURE.md 按 `## N 标题` 切节这一个读法，被 `modmap`、`depmap`、`specalign`、`proof` 共用，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `wording` 共用的词形读法）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
+一门一文件。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度参数；此处只说明每道门判什么，不再抄一份清单，也不写它们有几道——要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates`。判定面：`header`｜`lexicon`｜`modmap`｜`length`｜`boundary`｜`artifact`｜`depmap`｜`npm`｜`secret`｜`color`｜`wording`｜`render`｜`wiring`｜`wire-ts`｜`docnum`｜`proof`｜`budget`｜`specalign`｜`apisync`｜`release`｜`guard`。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（ARCHITECTURE.md 按 `## N 标题` 切节这一个读法，被 `modmap`、`depmap`、`specalign`、`proof` 共用，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `wording` 共用的词形读法）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——列格式一变，只有一处要改。
 
@@ -300,7 +300,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 |---|---|
 | `xtask/src/render.rs` | 门本身：扫哪里（`SCREENS`、`TOKENS`）、对齐容差（`SLACK`）、一个被量出来的盒子是什么（`Box` 及 `right`／`name`／`drawn`）、跳过与判断的次序（`check`），以及三条性质的依据（`judge`、`one_left_edge`、`heads_lead_their_panels`、`head_leads`、`nothing_overflows`） |
 | `xtask/src/render/engine.rs` | 怎么把一张屏真的画出来并把盒子读回来：找引擎（`browser`、`on_path`）、工作目录与视窗（`WORK`、`VIEWPORT`、`SINK`）、渲染一张屏（`Engine`、`Engine::new`、`Engine::measure`）、改写样式表链接并附上探针（`instrument`、`url_of`、`PROBE`）、把探针写下的记录读回来（`sink`、`parse_box`） |
-| `xtask/src/render/marks.rs` | 一行内部的两条读数各自的判定（§8-14）：`rows_share_a_first_mark`、`no_key_is_underlined`、`descends` |
+| `xtask/src/render/marks.rs` | 键面上的下划线这一条判定（§8-14）：`no_key_is_underlined`。**一行第一个标记的那一条已迁走**——它是几何，几何只有 `survey` 一个家（§8-26） |
 | `xtask/src/render/tests.rs` | 原内联 `mod tests` 原样迁出，5 个测试一个不少 |
 
 **无字段开放**：`Box` 及其三个方法留在索引位置按父模块私有项定义，`engine.rs` 作为子模块直接引用；跨文件只把 `Engine`／`Engine::new`／`Engine::measure`／`browser`／`sink`／`parse_box` 提到 `pub(super)`。`main.rs` 经 `render::check` 调用，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
@@ -690,3 +690,38 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 **K-07 提的四行只落三行，缺的那一行是有意不落的。** 账本追加的 p99 已经住在 `[ledger_append]` 的 `budget_p99_ms` 里并带着读数；再立一行 `ledger_append_p99` 就是同一个数两个家，而两个家会在不同的日子被不同的人改。**视图重建的每 MB 读数**（`[views_rebuild_per_mb]`）与既有的 `[projection_rebuild]` 是同一次重建的两种分母，这一点写在那一行的注释里，并写明第一次取到读数的那笔改动要在同一次提交里删掉 `[projection_rebuild]`——两行并存只允许存在到有证据可比的那一天。**派活前置**（`[prepare_dispatch_ms]`）先量后门，理由与 K-05 同：预算若写在读数之前，它要么形同虚设，要么挡住正是要修它的那次改动。
 
 **本节属门禁机具，与产品代码分开提交。**
+
+### 8-26 `survey`：一页画出来之后才有的那些事实
+
+**它量的是布局跑完才诞生的事实，别的一概不量。** 间隙在不在刻度上、颜色是不是 token，读源码就能判，类型系统也挡得住（Tailwind 的方括号、Zig 的枚举）；**两个盒子对不对齐、一行字有没有活着出容器、声明的词里有几个真被画出来**，级联跑完之前谁都不知道。定义里没有 CSS、没有 DOM、没有 Tailwind，所以换一个采集层（桌面控件树、原生视图）填同一份记录，每一条判定原样成立。
+
+**「应该是多少」只有两个来源，按优先级。** 一是页面自己声明的词汇表，运行时从根元素上读回来（`--color-*`／`--text-*`／`--spacing-*`，探针把每个值按浏览器会画的样子解析一遍）；二是**合群判据**——七个盒子的左边在 56、第八个在 58，七票对一票，56 是这一列的事实，58 是一个错字。没有第三份理想设计稿，因为那张稿不存在。
+
+**报告是一次编辑，不是一句抱怨。** 每条读数带着**要写下的那个值**；三十个盒子画同一个未声明的颜色是**一处编辑三十个站点**，不是三十条发现。干净即空：不打印「检查了 847 个元素，0 个问题」，一个人的环视免费，Agent 看一眼要付钱。
+
+**组的顺序是谁使谁失效，不是严重度**：`paint → type → text → edge`。颜色不移动盒子，字号移动行，被裁的文字改变盒子，对齐是前三者的下游；顺序由报告给出，不指望读者自己推。
+
+**三条几何判定从 `render` 迁进来，这是本节存在的第一理由。** `one_left_edge`、`rows_share_a_first_mark`、`nothing_escapes_what_holds_it` 本来写在用它们的那道门旁边——**一页的几何有两个家，正是这件量具要消灭的缺陷**。现在判定只有一处，门是它的消费者。
+
+**门判什么与量具量什么，由 `Standing` 一处分开。** `Refused` 的读数停构建，`Noted` 的读数报给人。理由写在类型上：一件量具装上去当天就把树弄红，是一件会被关掉的量具；而它要求的修改多半是设计裁决，不是缺陷。
+
+**取样面扩大了，门的判定面没有跟着扩大。** 判定要读颜色与被裁的文字，就得量到每一个承载文字的盒子，而门的容纳性判定本来只看「页面的骨架」（区域、控件、标题，以及任何 `overflow` 不是 `visible` 的盒子）。`Sampled { Frame, Words }` 把这件事写在记录上一次：骨架上的越界仍然停构建，取样面新收进来的文字盒子上的越界只报给人。**不写这一格，一次取样面的扩大就会让一道门在它从未判过的东西上变红。**
+
+**容纳性的豁免从「会滚动」改为「不外露」。** 旧判据只豁免 `auto`／`scroll`；一个 `overflow: hidden` 的盒子同样在自己边界上把内容切掉，**什么都没画到外面**，而旧判据把每一个被裁的行都读成一个画到邻居身上的盒子。`Overflow { Shows, Clips, Scrolls }` 三态，只判 `Shows`。
+
+**被裁成一个像素的盒子不参与任何几何判定。** 那是页面把一句话只交给读屏器的写法（`sr-only`），它什么也没画，所以既不可能画到邻居身上、也不可能裁掉谁在读的字、更没有边可对齐；`Drawn::shows()` 与 `Drawn::drawn()` 因此是两个问题——它仍然是一个必须有可及名的控件。
+
+**强制色那一趟不判颜色。** 强制色模式用系统的颜色替换掉样式表声明的每一个颜色，此时问「画出来的是不是声明的那些」，是拿一页去比一份被刻意推翻的调色板，答案是整页。`PaintSource { ThePage, TheSystem }` 写在被量的那一页上。
+
+**对比度不在这一档。** 本仓已有一份对比度模型（`xtask::color::contrast`），标定在单色轴上两个**声明的 token** 之间；把屏幕上画出来的一对颜色接进去，要动一处本次改动不拥有的可见性，而在这里另写一个公式就是这件量具自己反对的第二权威。**本档的可读性只量布局造成的那一种：一个盒子把自己的文字切掉又不画任何记号。** 缺的那一半登记为债（F 章），不以一份副本补上。
+
+**住处与称呼。** 阶段一住 `xtask/src/survey/`，不进产品二进制、不动 wire、不动 `cargo public-api` 基线、不加 `Verb`、不进 `runtime::catalog` 的 `tool_defs`。**它不是一个子命令**：`gates` 那张数组与 `TOOLS` 那张数组各自是自己那件事的唯一权威，为一件还没证明自己的量具各加一行，是在有消费者之前先造 API；`cargo xtask render --survey` 是它的入口，`--route <fragment>` 换一页来量，两个开关都由 `render` 自己读，理由与 `--width` 同（§8-17）。
+
+**探针的记录是一句话，写者与读者同住。** `probe.rs` 生成那段脚本，`probe/read.rs` 读它写下的每一个字段——记录是一行按位置排的字段、背后没有 schema，一边插一个字段而另一边不插，后面每一个字段都会静悄悄错位，而门会继续报出一批已经名不副实的数。父子同住是这里能拿到的全部防御。
+
+**颜色经一个 1×1 的画布取，不自己解析。** 本仓的计算值序列化成 `oklch(…)`，手写一份颜色文法的解析器就是给一份还在长的规范写第二个实现；把值画进画布再读回四个字节，拿到的正是屏幕会收到的那个颜色，且对引擎认得的每一种写法都成立。α 通道按 `src-over` 向祖先合成；链路上出现背景图、混合模式、滤镜或背景滤镜时，答案从文档里推不出来，记录**不带颜色**而不是带一个错的。
+
+**探针读不出声明的词就报错，不静默判。** 词汇表为空会把页上每一个颜色都读成未声明，于是空词汇表是一次「量不了」（退出码 2），不是一页干净。这与 §8-13 点名要避的那一类失效同形。
+
+**本节属门禁机具，与产品代码分开提交。**
+

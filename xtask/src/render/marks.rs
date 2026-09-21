@@ -3,84 +3,23 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two marks a person reads a row by: where its first painted box
-//! starts, and whether a key on it was drawn with a line under it.
+//! The mark a key is not allowed to carry.
 //!
-//! Both are measurements over the same page the other five properties
-//! judge. They live here rather than beside them because both need what
-//! the probe reports *about a row's contents* - the first mark's centre
-//! and the decoration that reaches a key - which nothing else asks for.
+//! **The other reading that used to live here has moved.** Where a
+//! row's first painted box starts is geometry, and geometry is measured
+//! once, by `xtask::survey`; this file kept the half that is not a
+//! position at all - whether a decoration reached a key - and it stays
+//! beside the gate because it is a property of this client's own
+//! stylesheet rather than a measurement any page could be put through.
 //!
 //! **The underline is read as it is drawn at rest.** A decoration a
 //! rule paints only while a pointer rests on a row is not in a dumped
 //! document, so this measures the page nobody is touching. That is an
 //! under-report and never a false one.
 
-use std::collections::{BTreeMap, BTreeSet};
-
-use super::{Drawn, SLACK, violation};
+use super::violation;
 use crate::report::Violation;
-
-/// Every clickable row in a navigation column starts its first mark at
-/// the same x.
-///
-/// The rail's status dot was 8 px wide and its glyphs 18, each centred
-/// in the same 12 px of padding, so the dot's centre sat five pixels
-/// left of every icon under it. The dot now shares the glyph's box, and
-/// this is what holds it there.
-///
-/// **A column, not a bar.** Rows that all share one top are a row of
-/// tabs, and asking them to share an x would ask them to sit on top of
-/// one another; a nav whose rows do not stack is left alone.
-pub(super) fn rows_share_a_first_mark(drawn: &[Drawn], at: &str, out: &mut Vec<Violation>) {
-    for (position, nav) in drawn
-        .iter()
-        .enumerate()
-        .filter(|(_, held)| held.tag == "NAV" && held.drawn())
-    {
-        let Ok(index) = i64::try_from(position) else {
-            continue;
-        };
-        let rows: Vec<&Drawn> = drawn
-            .iter()
-            .filter(|held| {
-                held.operable()
-                    && held.drawn()
-                    && held.first_mark >= 0
-                    && descends(drawn, held, index)
-            })
-            .collect();
-        let stacked: BTreeSet<i64> = rows.iter().map(|row| row.top).collect();
-        if rows.len() < 2 || stacked.len() < 2 {
-            continue;
-        }
-        let mut marks: BTreeMap<i64, String> = BTreeMap::new();
-        for row in &rows {
-            marks.entry(row.first_mark).or_insert_with(|| row.called());
-        }
-        if let (Some(first), Some(last)) = (marks.keys().next(), marks.keys().next_back())
-            && last.saturating_sub(*first) <= SLACK
-        {
-            continue;
-        }
-        let listed: Vec<String> = marks
-            .iter()
-            .map(|(centre, name)| format!("{name} at x={centre}"))
-            .collect();
-        out.push(violation(
-            at,
-            "every clickable row in a navigation column starts its first mark at the same x",
-            format!(
-                "{} holds {}: {}",
-                nav.called(),
-                marks.len(),
-                listed.join(", ")
-            ),
-            "draw the first mark of every row in one box of the same size - a dot centred in \
-             the glyph's box lines up with the glyphs, a dot centred in its own does not",
-        ));
-    }
-}
+use crate::survey::Drawn;
 
 /// No key is drawn with a line under it.
 ///
@@ -106,24 +45,4 @@ pub(super) fn no_key_is_underlined(drawn: &[Drawn], at: &str, out: &mut Vec<Viol
              holds it",
         ));
     }
-}
-
-/// Whether an element sits under the measured element at `ancestor`.
-fn descends(drawn: &[Drawn], held: &Drawn, ancestor: i64) -> bool {
-    let mut at = held.parent;
-    let mut steps = drawn.len();
-    while at >= 0 {
-        if at == ancestor {
-            return true;
-        }
-        let Some(next) = usize::try_from(at).ok().and_then(|index| drawn.get(index)) else {
-            return false;
-        };
-        if steps == 0 {
-            return false;
-        }
-        steps = steps.saturating_sub(1);
-        at = next.parent;
-    }
-    false
 }
