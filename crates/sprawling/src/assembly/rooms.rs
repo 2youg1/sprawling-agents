@@ -38,12 +38,12 @@ enum RoomQueue {
     },
 }
 
-/// Whether the run that asked holds its room's queue.
+/// This run's tenure over its room's queue.
 ///
 /// A dispatch keeps this receipt for as long as it drives and shows it
 /// when it lands: the run named on the queue is the only one that may
 /// give it back, and a run that never held it has nothing to return.
-pub(in crate::assembly) enum Holding {
+pub(in crate::assembly) enum QueueTenure {
     /// This run holds the room's queue.
     TheRoomQueue,
     /// Another run in the same room holds it. This one reads a queue of
@@ -55,7 +55,7 @@ pub(in crate::assembly) enum Holding {
 /// What a dispatch was given when it asked for its room's queue.
 pub(in crate::assembly) struct Lent {
     pub(in crate::assembly) inbox: collab::Inbox,
-    pub(in crate::assembly) holding: Holding,
+    pub(in crate::assembly) tenure: QueueTenure,
 }
 
 /// What is waiting for each room, and which run is reading it.
@@ -82,7 +82,7 @@ impl RoomQueues {
         match self.rooms.get_mut(addr) {
             Some(RoomQueue::Lent { to: holder, .. }) => Lent {
                 inbox: new_inbox(),
-                holding: Holding::ASpare { held_by: *holder },
+                tenure: QueueTenure::ASpare { held_by: *holder },
             },
             Some(entry) => {
                 let lent = std::mem::replace(
@@ -101,7 +101,7 @@ impl RoomQueues {
                         // cost of being wrong the other way is the city.
                         RoomQueue::Lent { .. } => new_inbox(),
                     },
-                    holding: Holding::TheRoomQueue,
+                    tenure: QueueTenure::TheRoomQueue,
                 }
             }
             None => {
@@ -114,7 +114,7 @@ impl RoomQueues {
                 );
                 Lent {
                     inbox: new_inbox(),
-                    holding: Holding::TheRoomQueue,
+                    tenure: QueueTenure::TheRoomQueue,
                 }
             }
         }

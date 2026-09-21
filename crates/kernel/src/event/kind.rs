@@ -119,6 +119,33 @@ pub enum EventKind {
     /// it is a capability, and anybody replaying this log would be
     /// holding one.
     ToolkitLinkOpened,
+
+    // The two faces of an endpoint that are not the conversation (2).
+    /// One call to an attached endpoint's embeddings face, and what came
+    /// back for it. The vectors are absent for the reason `ModelCalled`
+    /// carries no request body: a replay recomputes them from the inputs
+    /// the call recorded.
+    EmbeddingCalled,
+    /// One call to an attached endpoint's rerank face, and how many
+    /// passages and ranks it was about.
+    RerankCalled,
+
+    // The adviser port, consulted about the window (3).
+    /// A judgment was asked of the adviser port about the window.
+    ///
+    /// Asking decides nothing on its own: whether the bytes the model
+    /// reads include the item in question is decided by the answer, or
+    /// by the fallback when none came.
+    AdviserAsked,
+    /// The adviser answered. This is the line a replay reads instead of
+    /// asking again, which is why the answer decides model-request bytes
+    /// and the question that produced it does not.
+    AdviserAnswered,
+    /// No adviser answer was used, and why. The deterministic strategy
+    /// answered instead, and this is the only line that says so: without
+    /// it a window an adviser shaped and a window the city's own policy
+    /// shaped would fold to the same history.
+    AdviserFellBack,
 }
 
 /// The two-way partition; the sole criterion is "does the payload decide
@@ -132,7 +159,7 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 67] = [
+    pub const ALL: [EventKind; 72] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -200,6 +227,11 @@ impl EventKind {
         EventKind::AutonomyChanged,
         EventKind::GovernedDocumentWritten,
         EventKind::ToolkitLinkOpened,
+        EventKind::EmbeddingCalled,
+        EventKind::RerankCalled,
+        EventKind::AdviserAsked,
+        EventKind::AdviserAnswered,
+        EventKind::AdviserFellBack,
     ];
 
     /// The partition authority. Exhaustive on purpose: adding a variant
@@ -213,7 +245,8 @@ impl EventKind {
             | EventKind::ToolResult
             | EventKind::ResultOffloaded
             | EventKind::SteerReceived
-            | EventKind::SignalConsumed => WindowClass::InWindow,
+            | EventKind::SignalConsumed
+            | EventKind::AdviserAnswered => WindowClass::InWindow,
             EventKind::CityInitialized
             | EventKind::BuildingCreated
             | EventKind::BuildingConfigured
@@ -276,6 +309,17 @@ impl EventKind {
             // configuration rather than from this line, so nothing here
             // decides model-request bytes.
             | EventKind::ToolkitLinkOpened
+            // An embedding or a rerank is a call for a derived value,
+            // not a turn of the conversation: the window's bytes are
+            // recorded by `prompt_assembled`, and the answer here is
+            // recorded so a cost can be read off the history.
+            | EventKind::EmbeddingCalled
+            | EventKind::RerankCalled
+            | EventKind::AdviserAsked
+            // The fallback records that the city's own policy answered
+            // instead; the move it made is already written where the
+            // move itself is written.
+            | EventKind::AdviserFellBack
             | EventKind::GovernedDocumentWritten => WindowClass::RecordOnly,
         }
     }
@@ -289,83 +333,4 @@ impl EventKind {
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
-    use super::*;
-    use crate::error::{AxCode, Carrier};
-    use std::collections::BTreeSet;
-    #[test]
-    fn every_kind_spells_itself_once_and_exactly_eight_reach_the_window() {
-        let names: BTreeSet<String> = EventKind::ALL
-            .iter()
-            .map(|k| serde_json::to_string(k).unwrap())
-            .collect();
-        assert_eq!(
-            names.len(),
-            EventKind::ALL.len(),
-            "serde spellings must be unique"
-        );
-        let in_window: Vec<EventKind> = EventKind::ALL
-            .into_iter()
-            .filter(|k| k.window_class() == WindowClass::InWindow)
-            .collect();
-        assert_eq!(in_window.len(), 8);
-        for k in [
-            EventKind::PromptAssembled,
-            EventKind::ModelCalled,
-            EventKind::ModelReturned,
-            EventKind::ToolCalled,
-            EventKind::ToolResult,
-            EventKind::ResultOffloaded,
-            EventKind::SteerReceived,
-            EventKind::SignalConsumed,
-        ] {
-            assert_eq!(k.window_class(), WindowClass::InWindow);
-        }
-        assert_eq!(
-            serde_json::to_string(&EventKind::CityInitialized).unwrap(),
-            "\"city_initialized\""
-        );
-    }
-
-    #[test]
-    fn carrier_declarations_cover_all_35_codes() {
-        let mut loadtime = 0;
-        let mut gate = 0;
-        let mut tool = 0;
-        for code in AxCode::ALL {
-            match code.carrier() {
-                Carrier::Loadtime => loadtime += 1,
-                Carrier::Event(EventKind::GateDenied) => gate += 1,
-                Carrier::Event(EventKind::ToolResult) => tool += 1,
-                Carrier::Event(_) => {}
-            }
-        }
-        assert_eq!(loadtime, 5, "loadtime whitelist is closed at five");
-        assert_eq!(gate, 7);
-        assert_eq!(tool, 18);
-        assert_eq!(
-            AxCode::BudgetExhausted.carrier(),
-            Carrier::Event(EventKind::BudgetLimit)
-        );
-        assert_eq!(
-            AxCode::ApprovalPending.carrier(),
-            Carrier::Event(EventKind::ApprovalRequested)
-        );
-        assert_eq!(
-            AxCode::ApprovalDenied.carrier(),
-            Carrier::Event(EventKind::ApprovalResolved)
-        );
-        assert_eq!(
-            AxCode::Provider.carrier(),
-            Carrier::Event(EventKind::ProviderDegraded)
-        );
-        assert_eq!(
-            AxCode::EndpointDialectUnsupported.carrier(),
-            Carrier::Event(EventKind::EndpointLost)
-        );
-        assert_eq!(
-            AxCode::LoopSuspected.carrier(),
-            Carrier::Event(EventKind::WatchdogFired)
-        );
-    }
-}
+mod tests;

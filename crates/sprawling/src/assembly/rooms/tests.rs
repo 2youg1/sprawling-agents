@@ -42,11 +42,11 @@ fn a_second_run_in_one_room_does_not_take_the_queue_away_from_the_first() {
     let at = room();
 
     let held = rooms.lend(&at, first);
-    assert!(matches!(held.holding, Holding::TheRoomQueue));
+    assert!(matches!(held.tenure, QueueTenure::TheRoomQueue));
     let spare = rooms.lend(&at, second);
-    match spare.holding {
-        Holding::ASpare { held_by } => assert_eq!(held_by, first),
-        Holding::TheRoomQueue => panic!("one room lends one queue"),
+    match spare.tenure {
+        QueueTenure::ASpare { held_by } => assert_eq!(held_by, first),
+        QueueTenure::TheRoomQueue => panic!("one room lends one queue"),
     }
 
     // The run that never held it cannot give it back, however much it

@@ -38,19 +38,25 @@
 //! family's closing condition is that a replay produces identical
 //! bytes.
 
+mod adviser;
 mod checkpoint;
 mod governance;
 mod log;
+mod modality;
 mod run;
 mod tool;
 mod turn;
 
+pub use adviser::{
+    AdviserAnswer, AdviserAnswered, AdviserAsk, AdviserAsked, AdviserFailure, AdviserFellBack,
+};
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     autonomy_word,
 };
 pub use log::LogTruncated;
+pub use modality::{EmbeddingCalled, RerankCalled};
 pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SkillPin};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
