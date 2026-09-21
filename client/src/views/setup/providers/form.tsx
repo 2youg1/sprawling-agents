@@ -135,7 +135,14 @@ export function AttachForm(props: { readonly onAttached?: () => void }) {
       setDraft("key", "");
       then(endpointOf(draft, outcome.reference));
     };
-    void enrol({ origin: ui.origin, realm, name, value: typed, lang: ui.prefs.held().lang }).then(
+    void enrol({
+      origin: ui.origin,
+      token: ui.pairing,
+      realm,
+      name,
+      value: typed,
+      lang: ui.prefs.held().lang,
+    }).then(
       settle,
     );
   };

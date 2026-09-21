@@ -10,7 +10,7 @@
 //! two side by side is what shows that the question is stored whole and
 //! the answer is stored as the ruling plus the cluster it covered.
 
-use kernel::{AxCode, AxError, EventRecord};
+use kernel::{AxError, EventRecord};
 
 use super::holding::Views;
 
@@ -23,19 +23,15 @@ impl Views {
     /// item as "(no summary recorded)" — the field it read had never
     /// been written by anybody.
     ///
+    /// Read through the same [`kernel::ApprovalItem`] the worker's own
+    /// fold reads, so the two sides of one line cannot disagree about
+    /// whether it is an approval.
+    ///
     /// # Errors
     /// Refuses a payload that is not an approval item. The record
     /// stands; this view skips it and the observer reports it.
     pub(super) fn fold_question(&mut self, record: &EventRecord) -> Result<(), AxError> {
-        let value = serde_json::Value::Object(record.data().as_map().clone());
-        let item: kernel::ApprovalItem = serde_json::from_value(value).map_err(|err| {
-            AxError::failure(
-                AxCode::WireMismatch,
-                "fold an approval into the queue",
-                format!("seq {}: {err}", record.seq().value()),
-            )
-            .with_recovery("the record stands; this view skips it and the observer reports it")
-        })?;
+        let item = record.data().read::<kernel::ApprovalItem>()?;
         self.approvals.insert(item.id.as_str().to_owned(), item);
         Ok(())
     }
@@ -43,51 +39,26 @@ impl Views {
     /// Closes one question with the ruling a person gave it.
     ///
     /// The cluster travels with the answer because the person answered
-    /// the group they were shown; a row whose cluster will not read
-    /// back is still an answer that happened, so it lands with an empty
-    /// detail rather than being dropped.
+    /// the group they were shown, and it is read back through the same
+    /// [`kernel::event::record::ApprovalResolved`] the answer was
+    /// written from. Reading the three fields by hand here is how this
+    /// view came to record an empty cluster for a group it could not
+    /// parse while the worker's fold, reading the same line, granted
+    /// nothing at all.
     ///
     /// # Errors
-    /// Refuses a ruling this build cannot read. It used to read as an
-    /// allowance, which showed the person a permission they had never
-    /// given.
+    /// Refuses a ruling this build cannot read. An unknown verdict used
+    /// to read as an allowance, which showed the person a permission
+    /// they had never given.
     pub(super) fn fold_ruling(&mut self, record: &EventRecord) -> Result<(), AxError> {
-        let data = record.data().as_map();
-        let Some(id) = data.get("id").and_then(serde_json::Value::as_str) else {
-            return Ok(());
-        };
-        self.approvals.remove(id);
-        let cluster = data
-            .get("cluster")
-            .cloned()
-            .and_then(|value| serde_json::from_value(value).ok())
-            .unwrap_or(kernel::ClusterKey {
-                class: kernel::ApprovalClass::Question,
-                detail: String::new(),
-            });
-        let spelled = data.get("verdict").and_then(serde_json::Value::as_str);
-        let verdict = match spelled {
-            Some("allow") => kernel::Ruling::Allow,
-            Some("deny") => kernel::Ruling::Deny,
-            Some(_) | None => {
-                return Err(AxError::failure(
-                    AxCode::WireMismatch,
-                    "fold an answer into what was decided",
-                    format!(
-                        "seq {}: {} is not a ruling",
-                        record.seq().value(),
-                        spelled.unwrap_or("no verdict at all")
-                    ),
-                )
-                .with_recovery(
-                    "the record stands; this view skips it and the observer reports it",
-                ));
-            }
-        };
+        let ruled = record
+            .data()
+            .read::<kernel::event::record::ApprovalResolved>()?;
+        self.approvals.remove(ruled.id.as_str());
         self.decided.push(channels::Decision {
-            item: id.to_owned(),
-            verdict,
-            cluster,
+            item: ruled.id.as_str().to_owned(),
+            verdict: ruled.verdict,
+            cluster: ruled.cluster,
             at: record.t(),
         });
         Ok(())

@@ -13,9 +13,9 @@ use std::num::NonZeroU64;
 
 use kernel::consts_policy::STARTUP_BUDGET_TOKENS;
 use kernel::event::record::{PromptAssembled, PromptSegment, PromptSkip, SkipReason};
-use kernel::{Address, AxCode, AxError, B3Hash, ByteLen, Payload, SystemBlock};
+use kernel::{Address, AxCode, AxError, B3Hash, Payload, SystemBlock};
 
-use crate::elision;
+use crate::elision::{self, Elided};
 
 mod segment;
 
@@ -180,28 +180,20 @@ fn build_segment(
             skipped.push(left_out(SkipReason::NoBudget));
             continue;
         }
-        let kept = elision::boundary_before(body, remaining - worst_marker);
-        let dropped = u64::try_from(body.len() - kept).map_err(|_| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "build prefix segment",
-                "length overflow",
-            )
-            .with_recovery(
-                "shorten this source document: the number of bytes cut from it is \
-                 larger than a byte count this city can hold",
-            )
-        })?;
+        let kept = elision::boundary_before(body, remaining.saturating_sub(worst_marker));
+        // The kept bytes, the marker and the count it carries are one
+        // assembly, and `elision` owns it: a tail cut spelled again here
+        // is how a marker and its number come apart.
+        let cut = elision::splice(body, kept, body.len(), Elided::Tail);
         if joiner > 0 {
             text.push_str(DOC_JOIN);
         }
-        text.push_str(body.get(..kept).unwrap_or_default());
-        text.push_str(&elision::marker(ByteLen::new(dropped)));
+        text.push_str(&cut.text);
         seen.insert(addr.clone());
         sources.push(SegmentSource {
             addr: doc.addr.clone(),
             kept: u64::try_from(kept).unwrap_or(u64::MAX),
-            dropped,
+            dropped: cut.dropped.get(),
         });
     }
     Ok((

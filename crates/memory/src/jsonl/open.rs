@@ -7,6 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::consts_external::{LogVersion, readable_log_v};
 use kernel::ledger::chain_hash;
 use kernel::{AxCode, AxError, EventRecord, GENESIS_PREV, Seq, TimeMs};
 
@@ -136,25 +137,20 @@ impl JsonlLedger {
             }
             None => return Ok(()),
         };
-        let current = u64::from(kernel::consts_external::EVENT_LOG_V);
-        if v > current {
-            return Err(MemoryError::VersionAhead {
+        match readable_log_v(v) {
+            // An older ledger opens: the history is append-only and the
+            // lines an earlier build wrote are still its history.
+            LogVersion::Current | LogVersion::Older => Ok(()),
+            LogVersion::Ahead => Err(MemoryError::VersionAhead {
                 path: first.clone(),
                 v,
-            });
-        }
-        if v < 1 {
-            return Err(MemoryError::Envelope {
+            }),
+            LogVersion::NotAVersion => Err(MemoryError::Envelope {
                 path: first.clone(),
                 line: 1,
-                source: AxError::failure(AxCode::InvalidArgs, "probe ledger version", "v < 1")
-                    .with_recovery(
-                        "restore this segment from its checkpoint commit: the ledger \
-                         version starts at 1 and this line declares less",
-                    ),
-            });
+                source: unversioned(v),
+            }),
         }
-        Ok(())
     }
 
     /// Boundary state entering the last segment: chain root, or the
@@ -229,12 +225,33 @@ impl JsonlLedger {
         let mut valid_len = 0usize;
         for (index, line) in lines.iter().enumerate() {
             let parsed = EventRecord::parse_line(line);
-            let ok = match &parsed {
-                Ok(record) => {
-                    record.prev() == run_prev
-                        && record.seq() == run_seq
-                        && record.v() == kernel::consts_external::EVENT_LOG_V
+            // What a version refuses, it refuses by name. A line this
+            // build cannot read is not tail damage, and truncating it as
+            // if it were would delete a newer build's history; the two
+            // refusals used to be one, and both came out saying the
+            // chain did not continue (memory-SPEC 8-1).
+            if let Ok(record) = &parsed {
+                let v = u64::from(record.v());
+                let at = u64::try_from(index).unwrap_or(u64::MAX).saturating_add(1);
+                match readable_log_v(v) {
+                    LogVersion::Current | LogVersion::Older => {}
+                    LogVersion::Ahead => {
+                        return Err(MemoryError::VersionAhead {
+                            path: last.to_path_buf(),
+                            v,
+                        });
+                    }
+                    LogVersion::NotAVersion => {
+                        return Err(MemoryError::Envelope {
+                            path: last.to_path_buf(),
+                            line: at,
+                            source: unversioned(v),
+                        });
+                    }
                 }
+            }
+            let ok = match &parsed {
+                Ok(record) => record.prev() == run_prev && record.seq() == run_seq,
                 Err(_) => false,
             };
             if !ok {
@@ -323,6 +340,22 @@ impl JsonlLedger {
         self.next_seq = run_seq;
         Ok(dropped)
     }
+}
+
+/// The refusal a line below the first ledger version earns.
+///
+/// One sentence for both readers, because "nobody ever wrote this" is
+/// one fact whether the probe or the tail scan meets it first.
+fn unversioned(v: u64) -> AxError {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "read a ledger line's version",
+        format!("v{v} is below the first version any build wrote"),
+    )
+    .with_recovery(
+        "restore this segment from its checkpoint commit: the ledger version starts at 1 \
+         and this line declares less",
+    )
 }
 
 #[cfg(test)]

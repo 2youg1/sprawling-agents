@@ -2,14 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
-//! The custodian: capture, resolve, rotate.
+//! The custodian: store, resolve, rotate.
+//!
+//! **Scanning foreign bytes for secret shapes and putting a marker
+//! where one was is not here.** It is `runtime::redact`, which every
+//! sink that writes model output already goes through, and a second
+//! implementation here would be a second answer to "what must never be
+//! printed". What this module owns is the other half: a value a person
+//! deliberately handed the city, kept under the name the caller asked
+//! for and never handed back except to the wire.
 
 use super::oauth::degraded_payload;
 use super::vault::{Described, EnvReader, KeyringVault, MemoryVault, Persistence, Vault, env_key};
 
-use kernel::secret::scan;
 use kernel::{AxCode, AxError, Payload, Sealed, SecretRef};
-use serde_json::{Map, Value};
 use zeroize::Zeroizing;
 
 /// The inner seam: store, fetch, delete. Nothing else leaves the crate.
@@ -18,16 +24,6 @@ pub struct Custodian {
     source: &'static str,
     persistence: Persistence,
     env: EnvReader,
-    captures: u64,
-}
-
-/// What `capture` returns: the bytes with plaintext replaced by
-/// `secret:` literals, plus the `secret_captured` payloads the caller
-/// appends (realm/name/origin/span length only — no plaintext, no hash
-/// prefix).
-pub struct Captured {
-    pub replaced: Vec<u8>,
-    pub events: Vec<Payload>,
 }
 
 impl Custodian {
@@ -110,7 +106,6 @@ impl Custodian {
             source,
             persistence,
             env: Box::new(|key| std::env::var(key).ok()),
-            captures: 0,
         }
     }
 
@@ -118,41 +113,6 @@ impl Custodian {
     pub fn with_env_reader(mut self, env: EnvReader) -> Custodian {
         self.env = env;
         self
-    }
-
-    /// Custody's effect half: spans from `kernel::secret::scan`, values
-    /// into the vault, `secret:` literals into the bytes. Deterministic
-    /// names: `cap-<n>` under the shape's provider realm.
-    pub fn capture(&mut self, bytes: &[u8], origin: &str) -> Result<Captured, AxError> {
-        let spans = scan(bytes);
-        let mut replaced = bytes.to_vec();
-        let mut events = Vec::new();
-        // Reverse order keeps earlier offsets valid while splicing.
-        for span in spans.iter().rev() {
-            let end = span.start.saturating_add(span.len);
-            let Some(slice) = bytes.get(span.start..end) else {
-                continue;
-            };
-            let plaintext = Zeroizing::new(String::from_utf8_lossy(slice).into_owned());
-            self.captures = self.captures.saturating_add(1);
-            let realm = span.provider.unwrap_or("detected");
-            let name = format!("cap-{}", self.captures);
-            let reference = SecretRef::parse(&format!("secret:{realm}/{name}"))?;
-            self.backend.put(&reference, plaintext)?;
-            let literal = reference.to_string();
-            replaced.splice(span.start..end, literal.bytes());
-            let mut event = Map::new();
-            event.insert("realm".to_owned(), Value::String(realm.to_owned()));
-            event.insert("name".to_owned(), Value::String(name));
-            event.insert("origin".to_owned(), Value::String(origin.to_owned()));
-            event.insert(
-                "span_len".to_owned(),
-                Value::Number(u64::try_from(span.len).unwrap_or(0).into()),
-            );
-            events.push(Payload::new(event)?);
-        }
-        events.reverse();
-        Ok(Captured { replaced, events })
     }
 
     /// Stores a value. Empty is not a configuration; a shaded reference
@@ -261,34 +221,24 @@ mod tests {
         ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat()
     }
 
-    /// A token endpoint that answers one POST with `status` and `body`,
-    /// and reports what it was sent.
-    /// A token endpoint that answers one POST with `status` and `body`,
-    /// and reports what it was sent.
-
+    /// The half of A13 this module owns: a value the person handed over
+    /// goes in under the name the caller named, comes back sealed, and
+    /// is never part of what `describe` renders. The other half - bytes
+    /// that merely look like a key never reaching a sink - belongs to
+    /// `runtime::redact`, and this crate holds no second copy of it.
     #[test]
-    fn a13_capture_leaves_references_not_plaintext() {
+    fn a13_a_stored_credential_is_redeemable_and_never_rendered() {
         let mut custodian = Custodian::in_memory();
-        let paste = format!("my key is {} thanks", sample_token());
-        let captured = custodian.capture(paste.as_bytes(), "paste").unwrap();
-        let replaced = String::from_utf8(captured.replaced.clone()).unwrap();
-        assert!(!replaced.contains(&sample_token()), "no plaintext left");
-        assert!(replaced.contains("secret:anthropic/cap-1"), "{replaced}");
-        // The payload names realm/name/origin/len — nothing else.
-        let event = serde_json::to_value(&captured.events[0]).unwrap();
-        assert_eq!(event["realm"], "anthropic");
-        assert_eq!(event["origin"], "paste");
-        assert!(event.get("value").is_none());
-        assert!(!event.to_string().contains("Zx9yQ2mK4pL7"));
-        // Redemption succeeds and stays sealed; describe reports state,
-        // never the value. (Value correctness is proven on the wire in
-        // `a13_redeemed_value_reaches_the_wire_verbatim` — no expose
-        // call exists outside the two redemption points.)
-        let reference = SecretRef::parse("secret:anthropic/cap-1").unwrap();
+        let reference = SecretRef::parse("secret:anthropic/api-key").unwrap();
+        custodian
+            .set(&reference, Zeroizing::new(sample_token()))
+            .unwrap();
         assert!(custodian.resolve(&reference).is_ok());
         let described = custodian.describe(&reference);
         assert!(described.configured);
         assert_eq!(described.persistence, Persistence::ThisProcess);
+        let rendered = format!("{} {}", described.source, described.configured);
+        assert!(!rendered.contains("Zx9yQ2mK4pL7"), "{rendered}");
     }
 
     #[test]

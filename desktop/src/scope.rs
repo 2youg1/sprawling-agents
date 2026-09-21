@@ -27,6 +27,7 @@
 mod pattern;
 
 use crate::refusal::{Refusal, RefusalCode};
+use crate::tools::ToolName;
 // Re-exported rather than kept private: `platform::windows::target`
 // matches a caller's window name with the same rule this allowlist is
 // matched with. Two rules over window titles would be two places to
@@ -39,18 +40,22 @@ use std::path::Path;
 /// What one `tools/call` asks to touch. The three travel together
 /// because no one of them decides anything on its own.
 pub(crate) struct Reach<'a> {
-    pub(crate) tool: &'a str,
+    pub(crate) tool: ToolName,
     pub(crate) title: Option<&'a str>,
     pub(crate) process: Option<&'a str>,
 }
 
-/// The tools that touch one window, and therefore have to name one.
-const WINDOW_FACING: [&str; 4] = [
-    "desktop.snapshot",
-    "desktop.act",
-    "desktop.screenshot",
-    "desktop.record",
-];
+/// Whether this tool touches one window, and therefore has to name one.
+///
+/// Exhaustive on purpose: a seventh tool is a compile error here, which
+/// is the only moment anybody is certain to ask whether it discloses a
+/// window.
+const fn names_a_window(tool: ToolName) -> bool {
+    match tool {
+        ToolName::Snapshot | ToolName::Act | ToolName::Screenshot | ToolName::Record => true,
+        ToolName::Windows | ToolName::Clipboard => false,
+    }
+}
 
 /// The scope file, as `serde` reads it. Unknown fields are refused: a
 /// misspelt key that silently permitted nothing would be read by its
@@ -180,23 +185,26 @@ impl Scope {
 impl Allowance {
     fn admits(&self, reach: &Reach<'_>) -> Result<Admitted<'_>, Refusal> {
         let admitted = Admitted { allowance: self };
-        if reach.tool == "desktop.record" && !self.record {
+        if reach.tool == ToolName::Record && !self.record {
             return Err(switched_off("record"));
         }
-        if reach.tool == "desktop.clipboard" {
+        if reach.tool == ToolName::Clipboard {
             if self.clipboard {
                 return Ok(admitted);
             }
             return Err(switched_off("clipboard"));
         }
-        if !WINDOW_FACING.contains(&reach.tool) {
+        if !names_a_window(reach.tool) {
             return Ok(admitted);
         }
         match (reach.title, reach.process) {
             (None, None) => Err(Refusal::new(
                 RefusalCode::GateDenied,
                 "use the desktop",
-                format!("`{}` was asked for without naming a window", reach.tool),
+                format!(
+                    "`{}` was asked for without naming a window",
+                    reach.tool.as_str()
+                ),
                 "name the window by its `title` or its `process`; this scope lists windows, so \
                  the whole screen would show what it leaves out",
             )),

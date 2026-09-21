@@ -337,7 +337,7 @@ export function Composer(props: ComposerProps) {
     const going = taking();
     if (going === null) {
       setRefused(false);
-      void record(ui.origin).then((started) => {
+      void record(ui.origin, ui.pairing).then((started) => {
         setTaking(() => started);
         setRefused(started === null);
       });

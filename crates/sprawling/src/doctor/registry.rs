@@ -27,8 +27,9 @@ use std::path::PathBuf;
 /// on to the next member rather than reporting a browser nobody can
 /// start.
 pub(super) fn installed_at(program: &str, start_menu: &str) -> Option<PathBuf> {
-    if !cfg!(target_os = "windows") {
-        return None;
+    match super::Platform::current() {
+        Some(super::Platform::Windows) => {}
+        Some(super::Platform::MacOs | super::Platform::Linux) | None => return None,
     }
     let app_path = format!("{program}.exe");
     let mut keys = vec![

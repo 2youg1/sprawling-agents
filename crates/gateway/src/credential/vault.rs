@@ -9,6 +9,18 @@ use std::collections::BTreeMap;
 use kernel::{AxCode, AxError, SecretRef};
 use zeroize::Zeroizing;
 
+// The third backend. `dead_code` rather than `expect`: the module is
+// complete and its one production caller is the backend choice in
+// `Custodian::probe`, which lands with the wiring change 14.5 names;
+// the test build does construct it, so an expectation here would be
+// unfulfilled in one of the two configurations and warn about that
+// instead.
+#[allow(
+    dead_code,
+    reason = "the passphrase backend awaits its one caller in Custodian::probe (14.5 wiring)"
+)]
+mod file;
+
 /// The inner seam: store, fetch, delete. Nothing else leaves the crate.
 pub(crate) trait Vault {
     fn put(&mut self, reference: &SecretRef, value: Zeroizing<String>) -> Result<(), AxError>;
@@ -20,6 +32,11 @@ pub(crate) trait Vault {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Persistence {
     AcrossReboots,
+    /// An encrypted file on this machine, opened once per start with a
+    /// passphrase. Below `AcrossReboots` because it costs the person
+    /// something every start, and above `ThisBoot` because what it
+    /// costs is a passphrase rather than every credential again.
+    AcrossRebootsWithPassphrase,
     ThisBoot,
     ThisProcess,
 }
@@ -28,6 +45,7 @@ impl Persistence {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Persistence::AcrossReboots => "across_reboots",
+            Persistence::AcrossRebootsWithPassphrase => "across_reboots_with_passphrase",
             Persistence::ThisBoot => "this_boot",
             Persistence::ThisProcess => "this_process",
         }
@@ -45,6 +63,10 @@ impl Persistence {
         match self {
             Persistence::AcrossReboots => {
                 "a stored key survives a restart of this computer, so it is entered once"
+            }
+            Persistence::AcrossRebootsWithPassphrase => {
+                "a stored key lives in an encrypted file on this computer, so the \
+                 passphrase that opens it is entered once each time sprawling starts"
             }
             Persistence::ThisBoot => {
                 "the kernel keyring holds a stored key until this computer reboots, \

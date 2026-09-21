@@ -116,6 +116,20 @@ reqwest = { version = "0.13", default-features = false, features = [
 # The bin's build script gzips the client bundle it embeds; xtask weighs
 # the same artifacts. One version authority for both.
 flate2 = "1"
+# The encrypted vault file's two primitives (14.5, gateway-SPEC 8-21), and
+# nothing beyond them. ChaCha20-Poly1305 is an RFC 8439 AEAD that is fast in
+# pure software on a machine without AES-NI, and Argon2id (RFC 9106) is the
+# password KDF whose slowness is the feature that guards a passphrase.
+# blake3 stays the sole content hash: a fast hash cannot derive a key from a
+# passphrase, so these are two jobs rather than one authority split in two.
+# ML-KEM and FN-DSA stay out until they have a reader; the reopen parameters
+# are recorded in gateway-SPEC 8-21.
+# Both are taken without default features: the vault draws its salt and its
+# nonce from `getrandom`, which this workspace already names, and a second
+# path to the operating system's entropy would be a second authority for
+# one fact. `zeroize` clears the key material each leaves behind.
+chacha20poly1305 = { version = "0.11", default-features = false, features = ["alloc", "zeroize"] }
+argon2 = { version = "0.6", default-features = false, features = ["alloc", "zeroize"] }
 # The JSON Schema the TypeScript client is generated from. The
 # derive reads the same serde attributes the wire is encoded with, so both
 # ends of the socket have one authority; optional in kernel and channels

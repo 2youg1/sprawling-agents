@@ -17,7 +17,7 @@
 
 use super::*;
 
-fn reach<'a>(tool: &'a str, title: Option<&'a str>) -> Reach<'a> {
+fn reach(tool: ToolName, title: Option<&str>) -> Reach<'_> {
     Reach {
         tool,
         title,
@@ -32,24 +32,24 @@ fn a_missing_scope_file_refuses_everything() {
     let nowhere = Path::new("no-such-directory-here/DESKTOP.toml");
     for scope in [Scope::read(None), Scope::read(Some(nowhere))] {
         for tool in [
-            "desktop.windows",
-            "desktop.snapshot",
-            "desktop.act",
-            "desktop.screenshot",
-            "desktop.record",
-            "desktop.clipboard",
+            ToolName::Windows,
+            ToolName::Snapshot,
+            ToolName::Act,
+            ToolName::Screenshot,
+            ToolName::Record,
+            ToolName::Clipboard,
         ] {
             let refusal = scope
                 .admits(&reach(tool, Some("Notepad")))
                 .expect_err("a closed scope admits nothing");
             let error = refusal.as_error();
-            assert_eq!(error["data"]["code"], "E_GATE_DENIED", "{tool}");
+            assert_eq!(error["data"]["code"], "E_GATE_DENIED", "{tool:?}");
             assert!(
                 error["data"]["recovery"]
                     .as_str()
                     .unwrap()
                     .contains("DESKTOP.toml"),
-                "{tool}"
+                "{tool:?}"
             );
         }
     }
@@ -62,7 +62,7 @@ fn a_damaged_scope_file_closes_the_scope_rather_than_opening_it() {
         let scope = Scope::parse(text);
         assert!(
             scope
-                .admits(&reach("desktop.act", Some("Notepad")))
+                .admits(&reach(ToolName::Act, Some("Notepad")))
                 .is_err(),
             "{text}"
         );
@@ -74,16 +74,16 @@ fn a_listed_window_is_admitted_and_an_unlisted_one_is_not() {
     let scope = Scope::parse("windows = [\"*Notepad*\", \"Calculator\"]\n");
     assert!(
         scope
-            .admits(&reach("desktop.act", Some("a.txt — Notepad")))
+            .admits(&reach(ToolName::Act, Some("a.txt — Notepad")))
             .is_ok()
     );
     assert!(
         scope
-            .admits(&reach("desktop.snapshot", Some("Calculator")))
+            .admits(&reach(ToolName::Snapshot, Some("Calculator")))
             .is_ok()
     );
     let refused = scope
-        .admits(&reach("desktop.screenshot", Some("Password Manager")))
+        .admits(&reach(ToolName::Screenshot, Some("Password Manager")))
         .expect_err("an unlisted window is refused");
     assert_eq!(refused.as_error()["data"]["code"], "E_GATE_DENIED");
     assert!(
@@ -96,7 +96,7 @@ fn a_listed_window_is_admitted_and_an_unlisted_one_is_not() {
     // naming both has to satisfy both.
     let by_process = Scope::parse("processes = [\"Notepad.exe\"]\n");
     let named = |process| Reach {
-        tool: "desktop.snapshot",
+        tool: ToolName::Snapshot,
         title: None,
         process: Some(process),
     };
@@ -105,7 +105,7 @@ fn a_listed_window_is_admitted_and_an_unlisted_one_is_not() {
     // A pattern anchored at both ends does not match a longer title.
     assert!(
         scope
-            .admits(&reach("desktop.act", Some("Calculator Plus")))
+            .admits(&reach(ToolName::Act, Some("Calculator Plus")))
             .is_err()
     );
 }
@@ -116,31 +116,31 @@ fn a_listed_window_is_admitted_and_an_unlisted_one_is_not() {
 fn a_capture_that_names_no_window_is_refused_with_a_next_step() {
     let scope = Scope::parse("windows = [\"*\"]\nrecord = true\n");
     for tool in [
-        "desktop.snapshot",
-        "desktop.act",
-        "desktop.screenshot",
-        "desktop.record",
+        ToolName::Snapshot,
+        ToolName::Act,
+        ToolName::Screenshot,
+        ToolName::Record,
     ] {
         let refusal = scope
             .admits(&reach(tool, None))
             .expect_err("naming no window is refused");
         let error = refusal.as_error();
-        assert_eq!(error["data"]["code"], "E_GATE_DENIED", "{tool}");
+        assert_eq!(error["data"]["code"], "E_GATE_DENIED", "{tool:?}");
         assert!(
             error["data"]["recovery"].as_str().unwrap().contains("name"),
-            "{tool}"
+            "{tool:?}"
         );
     }
     // Listing windows names none by nature, and is how a caller
     // learns what to name.
-    assert!(scope.admits(&reach("desktop.windows", None)).is_ok());
+    assert!(scope.admits(&reach(ToolName::Windows, None)).is_ok());
 }
 
 #[test]
 fn recording_and_the_clipboard_are_each_off_until_their_own_switch_is_on() {
     let shut = Scope::parse("windows = [\"*\"]\n");
     let record = shut
-        .admits(&reach("desktop.record", Some("Notepad")))
+        .admits(&reach(ToolName::Record, Some("Notepad")))
         .expect_err("recording is off by default");
     assert_eq!(record.as_error()["data"]["code"], "E_GATE_DENIED");
     assert!(
@@ -150,7 +150,7 @@ fn recording_and_the_clipboard_are_each_off_until_their_own_switch_is_on() {
             .contains("record")
     );
     let clipboard = shut
-        .admits(&reach("desktop.clipboard", None))
+        .admits(&reach(ToolName::Clipboard, None))
         .expect_err("the clipboard is off by default");
     assert!(
         clipboard.as_error()["data"]["recovery"]
@@ -161,10 +161,10 @@ fn recording_and_the_clipboard_are_each_off_until_their_own_switch_is_on() {
 
     let open = Scope::parse("windows = [\"*\"]\nrecord = true\nclipboard = true\n");
     assert!(
-        open.admits(&reach("desktop.record", Some("Notepad")))
+        open.admits(&reach(ToolName::Record, Some("Notepad")))
             .is_ok()
     );
-    assert!(open.admits(&reach("desktop.clipboard", None)).is_ok());
+    assert!(open.admits(&reach(ToolName::Clipboard, None)).is_ok());
 }
 
 /// An empty allowlist is a file that lists no window, which is not
@@ -174,10 +174,10 @@ fn an_empty_allowlist_admits_no_window() {
     let scope = Scope::parse("record = true\nclipboard = true\n");
     assert!(
         scope
-            .admits(&reach("desktop.act", Some("Notepad")))
+            .admits(&reach(ToolName::Act, Some("Notepad")))
             .is_err()
     );
-    assert!(scope.admits(&reach("desktop.clipboard", None)).is_ok());
+    assert!(scope.admits(&reach(ToolName::Clipboard, None)).is_ok());
 }
 
 #[test]
@@ -188,13 +188,13 @@ fn a_scope_file_on_disk_is_read_from_the_path_it_was_given() {
     let scope = Scope::read(Some(&path));
     assert!(
         scope
-            .admits(&reach("desktop.act", Some("x — Notepad")))
+            .admits(&reach(ToolName::Act, Some("x — Notepad")))
             .is_ok()
     );
-    assert!(scope.admits(&reach("desktop.clipboard", None)).is_ok());
+    assert!(scope.admits(&reach(ToolName::Clipboard, None)).is_ok());
     assert!(
         scope
-            .admits(&reach("desktop.record", Some("x — Notepad")))
+            .admits(&reach(ToolName::Record, Some("x — Notepad")))
             .is_err()
     );
 }
@@ -207,7 +207,7 @@ fn a_scope_file_on_disk_is_read_from_the_path_it_was_given() {
 fn a_window_this_scope_does_not_list_is_not_even_reported() {
     let scope = Scope::parse("windows = [\"*Notepad*\"]\n");
     let admitted = scope
-        .admits(&reach("desktop.windows", None))
+        .admits(&reach(ToolName::Windows, None))
         .expect("listing windows names none by nature");
     assert!(admitted.visible("a.txt — Notepad", "notepad.exe"));
     assert!(!admitted.visible("Vault — 1Password", "1password.exe"));
@@ -221,7 +221,7 @@ fn a_window_this_scope_does_not_list_is_not_even_reported() {
 fn a_process_this_scope_lists_makes_its_windows_visible_by_that_name() {
     let by_process = Scope::parse("processes = [\"notepad.exe\"]\n");
     let admitted = by_process
-        .admits(&reach("desktop.windows", None))
+        .admits(&reach(ToolName::Windows, None))
         .expect("listing windows names none by nature");
     assert!(admitted.visible("a.txt — Notepad", "NOTEPAD.EXE"));
     assert!(!admitted.visible("a.txt — Notepad", "notepad2.exe"));
@@ -229,7 +229,7 @@ fn a_process_this_scope_lists_makes_its_windows_visible_by_that_name() {
     // it admit nothing.
     let empty = Scope::parse("record = true\n");
     let nothing = empty
-        .admits(&reach("desktop.windows", None))
+        .admits(&reach(ToolName::Windows, None))
         .expect("the tool itself is not switched off");
     assert!(!nothing.visible("a.txt — Notepad", "notepad.exe"));
 }
@@ -240,7 +240,7 @@ fn a_process_this_scope_lists_makes_its_windows_visible_by_that_name() {
 fn a_closed_scope_yields_no_admission_to_list_windows_with() {
     assert!(
         Scope::read(None)
-            .admits(&reach("desktop.windows", None))
+            .admits(&reach(ToolName::Windows, None))
             .is_err()
     );
 }

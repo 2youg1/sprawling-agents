@@ -123,22 +123,25 @@ impl Machine for ThisMachine {
 /// taking the first of them reports an installed tool as one that will
 /// not say its version.
 pub(super) fn names_of(program: &str) -> Vec<String> {
-    if cfg!(target_os = "windows") {
-        return ["exe", "cmd", "bat"]
+    match super::Platform::current() {
+        Some(super::Platform::Windows) => ["exe", "cmd", "bat"]
             .into_iter()
             .map(|extension| format!("{program}.{extension}"))
             .chain(std::iter::once(program.to_owned()))
-            .collect();
+            .collect(),
+        Some(super::Platform::MacOs | super::Platform::Linux) | None => {
+            vec![program.to_owned()]
+        }
     }
-    vec![program.to_owned()]
 }
 
 /// The first directory on the search path holding this program.
 pub(super) fn on_search_path(search_path: &OsString, program: &str) -> Option<PathBuf> {
-    let separator = if cfg!(target_os = "windows") {
-        ';'
-    } else {
-        ':'
+    let separator = match super::Platform::current() {
+        Some(platform) => platform.search_path_separator(),
+        // A fourth platform is read the POSIX way: it is the spelling
+        // every system but Windows uses.
+        None => super::Platform::Linux.search_path_separator(),
     };
     let search_path = search_path.to_str()?.to_owned();
     let names = names_of(program);

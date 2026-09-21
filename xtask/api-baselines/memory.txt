@@ -16,7 +16,6 @@ impl memory::LineReader<'_>
 impl memory::Manifest
 impl memory::MemoryError
 impl memory::PlannedMerge<'_>
-impl memory::Projection
 impl memory::Provenance
 impl memory::QueueLane
 impl memory::WorktreeLease
@@ -89,13 +88,6 @@ pub fn memory::MemoryError::into_ax(self) -> kernel::error::shape::AxError
 pub fn memory::PlannedMerge<'_>::apply(self, &memory::Landing<'_>) -> core::result::Result<(), memory::MemoryError>
 pub fn memory::PlannedMerge<'_>::commit(&self) -> alloc::string::String
 pub fn memory::PlannedMerge<'_>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-pub fn memory::Projection::apply(&mut self, &kernel::event::payload::EventRecord) -> core::result::Result<(), memory::MemoryError>
-pub fn memory::Projection::apply_all<'a>(&mut self, impl core::iter::traits::collect::IntoIterator<Item = &'a kernel::event::payload::EventRecord>) -> core::result::Result<(), memory::MemoryError>
-pub fn memory::Projection::export_canonical(&self) -> core::result::Result<alloc::vec::Vec<u8>, memory::MemoryError>
-pub fn memory::Projection::last_applied(&self) -> core::option::Option<kernel::event::identity::Seq>
-pub fn memory::Projection::open(&std::path::Path) -> core::result::Result<(memory::Projection, memory::ProjectionOpenReport), memory::MemoryError>
-pub fn memory::Projection::recycle_bin(&self) -> core::result::Result<alloc::vec::Vec<memory::RecycleEntry>, memory::MemoryError>
-pub fn memory::Projection::run_rows(&self) -> core::result::Result<alloc::vec::Vec<memory::RunRow>, memory::MemoryError>
 pub fn memory::Provenance::actor(&self) -> &kernel::address::Address
 pub fn memory::Provenance::attribution(&self) -> kernel::event::record::checkpoint::CommitAttribution
 pub fn memory::Provenance::city_of(&std::path::Path) -> core::result::Result<kernel::locator::B3Hash, memory::MemoryError>
@@ -165,9 +157,6 @@ pub memory::MemoryError::Io::source: core::io::error::Error
 pub memory::MemoryError::MergeStale
 pub memory::MemoryError::MergeStale::detail: alloc::string::String
 pub memory::MemoryError::MergeStale::name: alloc::string::String
-pub memory::MemoryError::Projection
-pub memory::MemoryError::Projection::detail: alloc::string::String
-pub memory::MemoryError::Projection::op: &'static str
 pub memory::MemoryError::RangeOutOfBounds
 pub memory::MemoryError::RangeOutOfBounds::hash: alloc::string::String
 pub memory::MemoryError::SecretEgress
@@ -188,7 +177,6 @@ pub memory::ModelChoice::id: alloc::string::String
 pub memory::OpenReport::recovered: core::option::Option<memory::TailTruncation>
 pub memory::PatchLine::number: u32
 pub memory::PatchLine::text: alloc::string::String
-pub memory::ProjectionOpenReport::rebuilt: core::option::Option<memory::ViewRebuilt>
 pub memory::QueueItem::enqueued_t: kernel::event::identity::TimeMs
 pub memory::QueueItem::id: u64
 pub memory::QueueItem::key: kernel::idem::IdemKey
@@ -196,11 +184,6 @@ pub memory::QueueItem::payload: kernel::event::payload::Payload
 pub memory::QueueLane::Approval
 pub memory::QueueLane::Repair
 pub memory::QueueLane::Signal
-pub memory::RecycleEntry::paths: alloc::vec::Vec<alloc::string::String>
-pub memory::RecycleEntry::restoration: alloc::string::String
-pub memory::RecycleEntry::restored: bool
-pub memory::RecycleEntry::seq: kernel::event::identity::Seq
-pub memory::RecycleEntry::t: kernel::event::identity::TimeMs
 pub memory::Refreshed::Appended
 pub memory::Refreshed::Appended::bytes_read: u64
 pub memory::Refreshed::Rebuilt
@@ -213,11 +196,7 @@ pub memory::RunHot::started: core::option::Option<kernel::event::identity::TimeM
 pub memory::RunHot::who: alloc::string::String
 pub memory::RunPhase::Active
 pub memory::RunPhase::Frozen
-pub memory::RunRow::frozen: core::option::Option<alloc::string::String>
-pub memory::RunRow::run: alloc::string::String
-pub memory::RunRow::started_t: kernel::event::identity::TimeMs
 pub memory::TailTruncation::dropped_bytes: u64
-pub memory::ViewRebuilt::reason: alloc::string::String
 pub memory::Withheld::number: u32
 pub memory::Withheld::reason: alloc::string::String
 pub memory::WorkingStatus::branch: core::option::Option<alloc::string::String>
@@ -243,15 +222,10 @@ pub struct memory::ModelChoice
 pub struct memory::OpenReport
 pub struct memory::PatchLine
 pub struct memory::PlannedMerge<'a>
-pub struct memory::Projection
-pub struct memory::ProjectionOpenReport
 pub struct memory::Provenance
 pub struct memory::QueueItem
-pub struct memory::RecycleEntry
 pub struct memory::RunHot
-pub struct memory::RunRow
 pub struct memory::TailTruncation
-pub struct memory::ViewRebuilt
 pub struct memory::Withheld
 pub struct memory::WorkingStatus
 pub struct memory::WorktreeLease

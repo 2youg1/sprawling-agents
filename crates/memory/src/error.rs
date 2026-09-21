@@ -9,9 +9,9 @@
 //! **Why this is a module of its own.** memory-SPEC 7 recorded
 //! the condition when the type was born: it lived beside the ledger
 //! while fewer than three modules aggregated here, and moved out at
-//! three. Twelve modules import it today, and nine of its twenty
+//! three. Twelve modules import it today, and nine of its fourteen
 //! variants describe failures the ledger cannot produce — a corrupt CAS
-//! object, a projection that will not open, a worktree that is behind
+//! object, a bundle that is not a city, a worktree that is behind
 //! the trunk. Executing a decision whose stated condition has arrived
 //! needs no new argument.
 //!
@@ -57,8 +57,6 @@ pub enum MemoryError {
     RangeOutOfBounds { hash: String },
     #[error("seq {seq} is not in the ledger index")]
     SeqMissing { seq: u64 },
-    #[error("projection {op} failed: {detail}")]
-    Projection { op: &'static str, detail: String },
     #[error("checkpoint {op} failed: {detail}")]
     Checkpoint { op: &'static str, detail: String },
     /// Locations only. The matched bytes are never carried — proving a
@@ -154,13 +152,6 @@ impl MemoryError {
             MemoryError::SeqMissing { seq } => {
                 AxError::failure(AxCode::InvalidArgs, "read ledger line", seq.to_string())
                     .with_recovery("ask for a seq the ledger actually holds")
-            }
-            // The projection is derived: a broken one is discarded and
-            // rebuilt, so its failure never halts the way a ledger
-            // write failure does.
-            MemoryError::Projection { op, detail } => {
-                AxError::failure(AxCode::StorageFatal, op, detail)
-                    .with_recovery("delete the projection file and replay the ledger to rebuild it")
             }
             MemoryError::Bundle { op, detail } => {
                 AxError::failure(AxCode::ConfigInvalid, op, detail).with_recovery(

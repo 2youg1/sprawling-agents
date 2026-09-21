@@ -137,6 +137,33 @@ fn is_derived(rel: &str) -> bool {
     LOCKFILES.contains(&name) || (rel.contains("/snapshots/") && rel.ends_with(".snap"))
 }
 
+/// Whether this path is inside a city's reserved subtree - the Ledger,
+/// the content store and the documents a city writes about itself.
+///
+/// The prefix is `kernel::RESERVED_PREFIX` rather than a second spelling
+/// of it, so a city that renames its records is followed here without
+/// anybody remembering to edit this gate.
+fn in_city_records(rel: &str) -> bool {
+    rel == kernel::RESERVED_PREFIX
+        || rel
+            .strip_prefix(kernel::RESERVED_PREFIX)
+            .is_some_and(|tail| tail.starts_with('/'))
+}
+
+/// What a finding inside a city's records means, as against a finding in
+/// an authored source file.
+///
+/// A credential reaching the Ledger is worse than one reaching a source
+/// file: the Ledger is replayed, is copied into a bundle, and is the one
+/// place every tool of this city may read. The rule is therefore stated
+/// separately, and the recovery names the custodian rather than a
+/// `secret:` literal, because nobody hand-edits a ledger line.
+const LEDGER_RULE: &str =
+    "no credential in cleartext may reach a city's records, which every tool can read (C13)";
+const LEDGER_RECOVERY: &str = "capture the value through gateway::credential::Custodian before \
+     it is written, so the record carries a secret:<realm>/<name> reference; a record already \
+     written is discarded with the run that wrote it";
+
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
     for path in walk::files(root)? {
@@ -153,6 +180,15 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         if is_derived(&rel) {
             continue;
         }
+        let records = in_city_records(&rel);
+        // A content-addressed object is bytes a run produced - a picture,
+        // an archive, a compiled artefact - and the detector's entropy
+        // rule says nothing about them. Judging them anyway reports the
+        // whole store on the first screen and buries the one line that
+        // matters. A credential is text, so text is what is judged here.
+        if records && std::str::from_utf8(&bytes).is_err() {
+            continue;
+        }
         for span in kernel::secret::scan(&bytes) {
             let end = span.start.saturating_add(span.len);
             if bytes
@@ -164,15 +200,22 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             let what = span
                 .provider
                 .map_or("high-entropy token".to_owned(), |p| format!("{p} shape"));
+            let (rule, alternative) = if records {
+                (LEDGER_RULE, LEDGER_RECOVERY)
+            } else {
+                (
+                    "no secret shape may live in the repository (C13)",
+                    "replace the value with a secret:<realm>/<name> reference; \
+                     if it is a scanner self-test sample, assemble it at runtime \
+                     from short fragments",
+                )
+            };
             violations.push(Violation {
                 gate: "secret",
                 location: format!("{rel}:byte {}", span.start),
-                rule: "no secret shape may live in the repository (C13)".to_owned(),
+                rule: rule.to_owned(),
                 violation: format!("{what}, {} bytes", span.len),
-                alternative: "replace the value with a secret:<realm>/<name> reference; \
-                              if it is a scanner self-test sample, assemble it at runtime \
-                              from short fragments"
-                    .to_owned(),
+                alternative: alternative.to_owned(),
             });
         }
         if rel.starts_with("crates/")
@@ -265,6 +308,38 @@ mod tests {
             ["crates/gateway/src/dialect/request.rs:byte 0"],
             "only the authored file is a place a credential can enter"
         );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// The records of a city are scanned, and its content store is not
+    /// judged by a rule written for text.
+    ///
+    /// Both files carry the same key-shaped run, assembled at runtime;
+    /// the object is not valid UTF-8, which is what separates a stored
+    /// artefact from a ledger line.
+    #[test]
+    fn a_ledger_line_is_reported_against_the_records_rule_and_an_object_is_not() {
+        let root = std::env::temp_dir().join(format!("secret-records-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let body = key_shaped();
+        let ledger = root.join(kernel::RESERVED_PREFIX).join("ledger.jsonl");
+        std::fs::create_dir_all(ledger.parent().unwrap()).unwrap();
+        std::fs::write(&ledger, format!("{{\"value\":\"{body}\"}}")).unwrap();
+        let object = root.join(kernel::RESERVED_PREFIX).join("cas").join("ab12");
+        std::fs::create_dir_all(object.parent().unwrap()).unwrap();
+        let mut bytes = vec![0xff_u8, 0xfe];
+        bytes.extend_from_slice(body.as_bytes());
+        std::fs::write(&object, bytes).unwrap();
+
+        let found = check(&root).unwrap();
+        let rules: Vec<&str> = found.iter().map(|v| v.rule.as_str()).collect();
+        assert_eq!(
+            rules,
+            [LEDGER_RULE],
+            "the ledger line is the one finding, and it names the records rule"
+        );
+        assert!(found[0].location.starts_with(kernel::RESERVED_PREFIX));
+        assert!(found[0].alternative.contains("Custodian"));
         std::fs::remove_dir_all(&root).unwrap();
     }
 

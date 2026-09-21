@@ -80,7 +80,6 @@ pub fn gateway::Broker::new(kernel::secret::sealed::Sealed<alloc::string::String
 pub fn gateway::Broker::shelf(&self, &str) -> core::result::Result<alloc::vec::Vec<gateway::Toolkit>, kernel::error::shape::AxError>
 pub fn gateway::ConnectionKind::parse(&str) -> core::result::Result<gateway::ConnectionKind, kernel::error::shape::AxError>
 pub fn gateway::ConnectionKind::url_for(self, &str, gateway::Modality) -> core::option::Option<alloc::string::String>
-pub fn gateway::Custodian::capture(&mut self, &[u8], &str) -> core::result::Result<gateway::Captured, kernel::error::shape::AxError>
 pub fn gateway::Custodian::describe(&self, &kernel::secret::span::SecretRef) -> gateway::Described
 pub fn gateway::Custodian::in_memory() -> gateway::Custodian
 pub fn gateway::Custodian::persistence(&self) -> gateway::Persistence
@@ -195,8 +194,6 @@ pub gateway::AuthSpec::None
 pub gateway::CallCost::billed: kernel::budget::UsdMicros
 pub gateway::CallCost::source: gateway::CostSource
 pub gateway::CallCost::usage: kernel::model::wire::ModelUsage
-pub gateway::Captured::events: alloc::vec::Vec<kernel::event::payload::Payload>
-pub gateway::Captured::replaced: alloc::vec::Vec<u8>
 pub gateway::CeilingSource::Person
 pub gateway::CeilingSource::Policy
 pub gateway::CeilingSource::Preset
@@ -311,6 +308,7 @@ pub gateway::OauthTokens::access: zeroize::Zeroizing<alloc::string::String>
 pub gateway::OauthTokens::expires_in_s: core::option::Option<u64>
 pub gateway::OauthTokens::refresh: core::option::Option<zeroize::Zeroizing<alloc::string::String>>
 pub gateway::Persistence::AcrossReboots
+pub gateway::Persistence::AcrossRebootsWithPassphrase
 pub gateway::Persistence::ThisBoot
 pub gateway::Persistence::ThisProcess
 pub gateway::PollStep::AskAgainIn
@@ -338,7 +336,6 @@ pub mod gateway
 pub struct gateway::AttachedEndpoint
 pub struct gateway::Broker
 pub struct gateway::CallCost
-pub struct gateway::Captured
 pub struct gateway::Chosen<'b>
 pub struct gateway::Custodian
 pub struct gateway::Described

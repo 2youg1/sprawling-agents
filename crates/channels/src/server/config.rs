@@ -22,18 +22,21 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Bytes;
-use axum::extract::{ConnectInfo, State};
-use axum::http::StatusCode;
+use axum::extract::{ConnectInfo, Request, State};
+use axum::http::{StatusCode, header};
+use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
-use kernel::{Address, AxError, B3Hash, EventKind, EventRecord, Sealed};
+use axum::routing::{MethodRouter, get, post};
+use kernel::{Address, AxError, B3Hash, EventKind, EventRecord, Sealed, SecretRef};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
 use crate::answer::Answer;
 use crate::assets::ClientAssets;
 use crate::command::{Command, WireCommand};
-use crate::reception::{EnrollVerdict, decide_enroll};
+use crate::reception::{
+    Admission, Door, EnrollVerdict, Pairing, decide_admission, decide_enroll, offered_pairing,
+};
 use crate::wire::Query;
 
 use super::reply::{Delivered, Reply, refusal_text};
@@ -148,19 +151,6 @@ pub struct AcpProgress {
     pub finished: bool,
 }
 
-/// Whether the caller held this city's pairing token.
-///
-/// Carried rather than acted on at the door: the refusal an
-/// unauthenticated request receives is `protocol::admit`'s to word,
-/// and it words it so that a stranger learns exactly one bit. An enum
-/// rather than a boolean so that neither the door nor the admission
-/// can pass the verdict the wrong way round and still compile.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Pairing {
-    Held,
-    Absent,
-}
-
 /// Where an outside request goes once the token has been judged.
 ///
 /// **The body travels as the JSON it arrived as, and nothing here
@@ -205,13 +195,56 @@ pub fn router(config: &ServeConfig) -> Router {
         city: config.city.clone(),
     });
     Router::new()
+        // The client bundle is the page itself: a browser that has not
+        // been given the pairing code yet still has to load the form it
+        // types the code into, so these two doors stay open by design.
         .route("/", get(serve_index))
         .route("/ws", get(upgrade))
-        .route("/transcribe", post(accept_recording))
-        .route("/enroll", post(accept_enrolment))
+        .route(
+            "/transcribe",
+            paired(Door::Transcribe, &state, post(accept_recording)),
+        )
+        .route(
+            "/enroll",
+            paired(Door::Enroll, &state, post(accept_enrolment)),
+        )
+        // `/acp` judges the same token through the same function, from
+        // inside the handler: an editor offers it as a body key rather
+        // than as a header, and an unpaired editor is answered by
+        // `protocol::admit` rather than at the door.
         .route("/acp", post(accept_acp))
         .route("/{*asset}", get(serve_asset))
         .with_state(state)
+}
+
+/// One door with the pairing judgement in front of it.
+///
+/// The door is baked into the layer rather than read back off the
+/// request path, so the route table above is the only place a path is
+/// spelled.
+fn paired(
+    door: Door,
+    state: &Arc<ShellState>,
+    handler: MethodRouter<Arc<ShellState>>,
+) -> MethodRouter<Arc<ShellState>> {
+    handler.route_layer(from_fn_with_state((door, Arc::clone(state)), admit_request))
+}
+
+/// The layer in front of every acting door: read the offered token,
+/// hand it to the one judgement, and pass or refuse.
+async fn admit_request(
+    State((door, state)): State<(Door, Arc<ShellState>)>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let offered = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok());
+    match decide_admission(door, offered_pairing(offered), state.token_digest.as_ref()) {
+        Admission::Admit(Pairing::Held | Pairing::Absent) => next.run(request).await,
+        Admission::Refuse(err) => (StatusCode::FORBIDDEN, refusal_text(&err)).into_response(),
+    }
 }
 
 /// The one route that carries a credential. It exists as HTTP rather
@@ -233,7 +266,18 @@ async fn accept_enrolment(
             .into_response();
     };
     let EnrollBody { realm, name, value } = enrolment;
-    let reference = format!("secret:{realm}/{name}");
+    // The grammar of a vault place is `kernel::SecretRef`'s and this
+    // route reads it back through the same parser every other reader
+    // uses. Spelling it here with `format!` accepted a realm or a name
+    // that no later reader could resolve, and answered 201 with the
+    // unresolvable text (roadmap M-22).
+    let place = match SecretRef::parse(&format!("secret:{realm}/{name}")) {
+        Ok(place) => place,
+        Err(err) => {
+            return (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response();
+        }
+    };
+    let reference = place.to_string();
     let command = Command::PutSecret {
         realm,
         name,
@@ -299,7 +343,9 @@ async fn accept_enrolment(
         Ok(None) | Err(_) => (
             StatusCode::ACCEPTED,
             format!(
-                "{reference} was handed to the city and it has not answered within {}s; the                  worker may be inside a dispatch. Check whether the reference resolves before                  sending the credential again",
+                "{reference} was handed to the city and it has not answered within {}s; the \
+                 worker may be inside a dispatch. Check whether the reference resolves before \
+                 sending the credential again",
                 ENROLMENT_PATIENCE.as_secs()
             ),
         )

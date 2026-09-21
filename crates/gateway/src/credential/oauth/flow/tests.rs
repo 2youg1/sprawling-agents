@@ -166,10 +166,12 @@ fn a13_redeemed_value_reaches_the_wire_verbatim() {
     use std::io::{Read, Write};
     use std::net::TcpListener;
 
-    // Capture the pasted token, then let the endpoint redeem it.
+    // Store the pasted token, then let the endpoint redeem it.
     let mut custodian = Custodian::in_memory();
-    let paste = format!("key: {}", sample_token());
-    custodian.capture(paste.as_bytes(), "paste").unwrap();
+    let stored = SecretRef::parse("secret:anthropic/api-key").unwrap();
+    custodian
+        .set(&stored, zeroize::Zeroizing::new(sample_token()))
+        .unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let server = std::thread::spawn(move || {
@@ -199,7 +201,7 @@ fn a13_redeemed_value_reaches_the_wire_verbatim() {
             model: "m".to_owned(),
             auth: AuthSpec::Header {
                 name: "x-api-key".to_owned(),
-                value: SecretRef::parse("secret:anthropic/cap-1").unwrap(),
+                value: stored.clone(),
             },
             extra_headers: vec![],
             overrides: vec![],

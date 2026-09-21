@@ -159,7 +159,11 @@ mod tests {
         assert_eq!(carried.seq, kernel::Seq::new(4));
         assert_eq!(carried.run, None);
         assert!(!carried.line.contains(&token), "{}", carried.line);
-        assert!(carried.line.contains(runtime::diagnostics::REDACTED));
+        assert!(
+            carried
+                .line
+                .contains(&runtime::redact::Marker::Plain.spell(token.as_bytes()))
+        );
         assert!(
             watching.try_recv().is_err(),
             "a level the floor refuses reaches no page either"

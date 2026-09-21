@@ -434,6 +434,7 @@ pub enum kernel::completion::Completion
 pub enum kernel::completion::Progress
 pub enum kernel::config::ClockStampGranularity
 pub enum kernel::config::McpTransport
+pub enum kernel::consts_external::LogVersion
 pub enum kernel::consts_external::SecretCharset
 pub enum kernel::delegation::DelegateKind
 pub enum kernel::delegation::DelegationVerdict
@@ -768,6 +769,7 @@ pub fn kernel::config::SandboxLimits::default() -> Self
 pub fn kernel::config::SandboxLimits::trusts(&self, &kernel::tool::ServerLabel) -> bool
 pub fn kernel::config::SandboxLimits::trusts(&self, &kernel::tool::ServerLabel) -> bool
 pub fn kernel::config::freeze(&kernel::config::LayeredValue<kernel::config::ClockStampGranularity>, &kernel::config::LayeredValue<alloc::vec::Vec<kernel::config::ClockZone>>, &kernel::config::LayeredValue<kernel::Effort>, &kernel::config::LayeredValue<kernel::config::SandboxLimits>, &kernel::config::LayeredValue<alloc::vec::Vec<kernel::config::McpServer>>) -> kernel::config::FrozenConfig
+pub fn kernel::consts_external::readable_log_v(u64) -> kernel::consts_external::LogVersion
 pub fn kernel::delegation::Delegate::kind(&self) -> &kernel::delegation::DelegateKind
 pub fn kernel::delegation::Delegate::kind(&self) -> &kernel::delegation::DelegateKind
 pub fn kernel::delegation::DelegateKind::as_str(self) -> &'static str
@@ -1659,6 +1661,10 @@ pub kernel::config::SandboxLimits::fuel: u64
 pub kernel::config::SandboxLimits::mounts: alloc::vec::Vec<kernel::address::Address>
 pub kernel::config::SandboxLimits::shell: bool
 pub kernel::config::SandboxLimits::trusted: alloc::vec::Vec<kernel::tool::ServerLabel>
+pub kernel::consts_external::LogVersion::Ahead
+pub kernel::consts_external::LogVersion::Current
+pub kernel::consts_external::LogVersion::NotAVersion
+pub kernel::consts_external::LogVersion::Older
 pub kernel::consts_external::SecretCharset::Base62
 pub kernel::consts_external::SecretCharset::Base64Url
 pub kernel::consts_external::SecretCharset::HexLower
@@ -1809,9 +1815,16 @@ pub kernel::event::Who::Person
 pub kernel::event::Who::Resident(kernel::address::Address)
 pub kernel::event::WindowClass::InWindow
 pub kernel::event::WindowClass::RecordOnly
+pub kernel::event::record::ApprovalResolved::cluster: kernel::approval::ClusterKey
+pub kernel::event::record::ApprovalResolved::id: kernel::approval::ApprovalId
+pub kernel::event::record::ApprovalResolved::verdict: kernel::approval::Ruling
+pub kernel::event::record::AutonomyChanged::autonomy: alloc::string::String
+pub kernel::event::record::AutonomyChanged::scope: alloc::string::String
 pub kernel::event::record::CheckpointCommitted::Committed(kernel::event::record::Commit)
 pub kernel::event::record::CheckpointCommitted::JobPinned
 pub kernel::event::record::CheckpointCommitted::JobPinned::job: kernel::locator::Locator
+pub kernel::event::record::CityHalted::scope: alloc::string::String
+pub kernel::event::record::CityHalted::state: alloc::string::String
 pub kernel::event::record::Commit::by: kernel::event::record::CommitAttribution
 pub kernel::event::record::Commit::files: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::Commit::oid: kernel::locator::GitOid
@@ -1821,6 +1834,8 @@ pub kernel::event::record::CommitAttribution::model: alloc::string::String
 pub kernel::event::record::CommitAttribution::predecessor: core::option::Option<kernel::RunId>
 pub kernel::event::record::EvidenceCite::kind: kernel::EventKind
 pub kernel::event::record::EvidenceCite::seq: kernel::Seq
+pub kernel::event::record::GovernedDocumentWritten::bytes: usize
+pub kernel::event::record::GovernedDocumentWritten::which: alloc::string::String
 pub kernel::event::record::LogTruncated::dropped_bytes: u64
 pub kernel::event::record::ModelCalled::model: alloc::string::String
 pub kernel::event::record::ModelCalled::segments: alloc::vec::Vec<kernel::locator::B3Hash>
@@ -2331,9 +2346,13 @@ pub struct kernel::event::Payload(_)
 pub struct kernel::event::RunId(_)
 pub struct kernel::event::Seq(_)
 pub struct kernel::event::TimeMs(_)
+pub struct kernel::event::record::ApprovalResolved
+pub struct kernel::event::record::AutonomyChanged
+pub struct kernel::event::record::CityHalted
 pub struct kernel::event::record::Commit
 pub struct kernel::event::record::CommitAttribution
 pub struct kernel::event::record::EvidenceCite
+pub struct kernel::event::record::GovernedDocumentWritten
 pub struct kernel::event::record::LogTruncated
 pub struct kernel::event::record::ModelCalled
 pub struct kernel::event::record::ModelReturned

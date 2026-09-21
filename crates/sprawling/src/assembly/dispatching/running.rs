@@ -214,10 +214,13 @@ impl RunWorker {
             job_locator,
             member,
         } = continuation;
-        if let Some(id) = member {
-            self.backlog.leave(id)?;
-        }
-        self.return_borrowed(&at, &mut site, &desks)?;
+        // Both loans go back before either failure is propagated: a
+        // backlog that would not take its member back used to cost the
+        // room its mail too (sprawling-SPEC.md 8-46-9).
+        let returned = self.return_borrowed(&at, &mut site, &desks);
+        let left = member.map_or(Ok(()), |id| self.backlog.leave(id));
+        returned?;
+        left?;
         let Driven {
             outcome: driven,
             adapter: home,

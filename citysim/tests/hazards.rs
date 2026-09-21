@@ -27,6 +27,7 @@ use kernel::{
     Address, ByteLen, Discard, DiscardForecast, DiscardRequest, DiscardVerdict, ExecArm, Locator,
     Restoration, SecretRef, TaintSet,
 };
+use runtime::redact::{Marker, redact_text};
 
 // ------------------------------------------------------- a pasted credential
 
@@ -34,31 +35,33 @@ use kernel::{
 fn a_pasted_credential_leaves_no_plaintext_behind_it() {
     // A13 as a scenario rather than as a unit: what a person actually does
     // is paste a blob into a field, and everything after that must hold.
-    let mut custodian = Custodian::in_memory();
+    // Scanning and replacing has one home, `runtime::redact`, so that is
+    // where this scenario is driven from.
     // Built at run time so no high-entropy literal sits in this file for
     // `xtask secret` to find - the gate is right to bite those.
     let pasted = format!("sk-ant-{}{}", "A7bQ2xLm".repeat(2), "Zk91Rp4T");
+    let line = format!("the person pasted {pasted} into the field");
 
-    let captured = custodian
-        .capture(pasted.as_bytes(), "anthropic")
-        .expect("a pasted blob that looks like a credential is captured");
+    let (replaced, hits) = redact_text(&line, Marker::Fingerprinted);
 
-    // What goes on the record is the replacement text plus the events. The
-    // plaintext must appear in neither.
-    let replaced = String::from_utf8_lossy(&captured.replaced).into_owned();
+    assert_eq!(hits, 1, "the pasted blob is seen once");
     assert!(
-        replaced.contains("secret:"),
-        "replaced in place by a reference"
+        replaced.contains("secret:redacted/"),
+        "replaced in place by a marker"
     );
     assert!(!replaced.contains(&pasted), "and the plaintext is gone");
     let span: String = pasted.chars().skip(7).take(13).collect();
-    for event in &captured.events {
-        let rendered = format!("{event:?}");
-        assert!(
-            !rendered.contains(&pasted) && !rendered.contains(&span),
-            "no event may carry the value or a recognisable span of it"
-        );
-    }
+    assert!(
+        !replaced.contains(&span),
+        "no recognisable span of it survives either"
+    );
+
+    // Two occurrences of one value read alike, and a diagnostic line says
+    // only that something was there.
+    let (again, _) = redact_text(&pasted, Marker::Fingerprinted);
+    assert!(replaced.contains(again.trim()), "one value, one marker");
+    let (plain, _) = redact_text(&pasted, Marker::Plain);
+    assert_eq!(plain, "secret:redacted");
 }
 
 #[test]

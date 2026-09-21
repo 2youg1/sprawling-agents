@@ -143,6 +143,74 @@ fn higher_version_fixture_is_refused_with_direction_and_path() {
     let after = fs::read(fixture.join("ledger-00000000000000000000.jsonl")).unwrap();
     assert_eq!(before, after, "browsing must never rewrite (A16)");
 }
+/// A `v` below the first version anybody wrote is refused for being
+/// that, wherever it sits. It used to be refused as a broken chain when
+/// it was line one, and silently truncated away when it was not, which
+/// told a person to restore a chain that was never damaged.
+#[test]
+fn a_line_below_the_first_version_is_refused_for_its_version_not_its_chain() {
+    for unversioned_line in [0usize, 1usize] {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut ledger, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+        ledger
+            .append_all(vec![
+                draft(EventKind::CityInitialized, 1),
+                draft(EventKind::BuildingCreated, 2),
+            ])
+            .unwrap();
+        let seg = only_segment(dir.path());
+        drop(ledger);
+
+        // Same byte count, so every prev in the chain still holds: what
+        // the line declares is the only thing that changed.
+        let text = fs::read_to_string(&seg).unwrap();
+        let rewritten: Vec<String> = text
+            .lines()
+            .enumerate()
+            .map(|(index, line)| {
+                if index == unversioned_line {
+                    line.replacen("\"v\":1", "\"v\":0", 1)
+                } else {
+                    line.to_owned()
+                }
+            })
+            .collect();
+        assert!(
+            rewritten[unversioned_line].contains("\"v\":0"),
+            "the fixture must actually declare v0"
+        );
+        fs::write(
+            &seg,
+            format!(
+                "{}
+",
+                rewritten.join(
+                    "
+"
+                )
+            ),
+        )
+        .unwrap();
+
+        let err = JsonlLedger::open(dir.path(), TimeMs::new(3))
+            .err()
+            .expect("a v0 line must refuse to open");
+        let MemoryError::Envelope { line, source, .. } = &err else {
+            panic!("expected Envelope, got {err:?}");
+        };
+        assert_eq!(*line, u64::try_from(unversioned_line).unwrap() + 1);
+        let said = source.to_string();
+        assert!(
+            said.contains("v0"),
+            "the refusal must name the version: {said}"
+        );
+        assert!(
+            !said.contains("chain"),
+            "a version refusal must not blame the chain: {said}"
+        );
+    }
+}
+
 fn only_segment(dir: &Path) -> std::path::PathBuf {
     let mut files: Vec<_> = fs::read_dir(dir)
         .unwrap()

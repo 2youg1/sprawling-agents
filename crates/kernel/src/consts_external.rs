@@ -5,7 +5,13 @@
 
 //! External-fact constants: values that follow the
 //! outside world. Changing one requires evidence that the world changed,
-//! never our own preference. Data only — zero branches by charter.
+//! never our own preference.
+//!
+//! Data, plus the classifications that read that data and nothing else.
+//! The charter used to say "zero branches"; it now says this, because
+//! [`readable_log_v`] answers a question only [`EVENT_LOG_V`] can answer
+//! and every home it could have had instead would have been a second
+//! place to decide which ledgers this build opens.
 
 /// Provider-side explicit cache breakpoint ceiling.
 pub const CACHE_BREAKPOINTS_MAX: u32 = 4;
@@ -15,6 +21,54 @@ pub const PROMPT_CACHE_TTL_SECS: u64 = 300;
 
 /// EventRecord `v`: one monotonic integer, no major/minor split (3.1).
 pub const EVENT_LOG_V: u32 = 1;
+
+/// Where a ledger line's `v` stands against the version this build
+/// writes. The one authority for "which ledgers open"; every reader that
+/// compares a `v` asks [`readable_log_v`] rather than comparing again.
+///
+/// Exhaustive on purpose: a reader that handles three of these and
+/// defaults the fourth is how an unversioned line came to be reported as
+/// a broken chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogVersion {
+    /// Exactly what this build writes. Readable, and appendable.
+    Current,
+    /// Written by an older build, at or above the first version.
+    /// Readable: the ledger is append-only and its history stays on
+    /// disk, so every version from 1 upwards still parses.
+    Older,
+    /// Written by a newer build. Refused whole rather than read in part:
+    /// a line this build does not fully understand must not become the
+    /// prefix of a chain it then extends.
+    Ahead,
+    /// Below the first version anybody ever wrote, `0` included. No
+    /// build produced this, so it is a damaged or foreign line rather
+    /// than an old one.
+    NotAVersion,
+}
+
+/// The first `v` any build of this ledger format wrote. A line below it
+/// was never written by us.
+const EVENT_LOG_V_FIRST: u64 = 1;
+
+/// Classifies one ledger line's `v`.
+///
+/// Takes `u64` because that is what JSON hands a reader before anything
+/// has been validated; a `v` too large for [`EVENT_LOG_V`]'s type is
+/// [`LogVersion::Ahead`] like any other future version.
+#[must_use]
+pub fn readable_log_v(v: u64) -> LogVersion {
+    let current = u64::from(EVENT_LOG_V);
+    if v < EVENT_LOG_V_FIRST {
+        LogVersion::NotAVersion
+    } else if v > current {
+        LogVersion::Ahead
+    } else if v == current {
+        LogVersion::Current
+    } else {
+        LogVersion::Older
+    }
+}
 
 /// The L0 tool set: always present, never discovered (5.1).
 pub const L0_TOOLS: [&str; 3] = ["exec", "edit", "status"];
@@ -142,6 +196,20 @@ mod tests {
         assert_eq!(EVENT_LOG_V, 1);
         assert_eq!(L0_TOOLS, ["exec", "edit", "status"]);
         assert_eq!(SECRET_SHAPES.len(), 11);
+    }
+
+    #[test]
+    fn every_version_a_line_can_carry_lands_in_exactly_one_class() {
+        assert_eq!(readable_log_v(0), LogVersion::NotAVersion);
+        assert_eq!(readable_log_v(u64::from(EVENT_LOG_V)), LogVersion::Current);
+        assert_eq!(
+            readable_log_v(u64::from(EVENT_LOG_V).saturating_add(1)),
+            LogVersion::Ahead
+        );
+        assert_eq!(readable_log_v(u64::MAX), LogVersion::Ahead);
+        for v in EVENT_LOG_V_FIRST..u64::from(EVENT_LOG_V) {
+            assert_eq!(readable_log_v(v), LogVersion::Older, "v{v}");
+        }
     }
 
     #[test]

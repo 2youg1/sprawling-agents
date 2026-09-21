@@ -33,9 +33,13 @@ if (main !== null) {
   // of shape a person did not ask for.
   applyAppearance(document.documentElement, prefs.held().appearance);
   watchMachineLighting(document.documentElement, prefs);
+  // Read once: the socket greets with it and the HTTP doors carry it
+  // as a bearer header, and a second read could answer differently
+  // after the address bar changed.
+  const token = tokenIn(window.location.search);
   const conn = openConnection(
     socketUrl(window.location),
-    tokenIn(window.location.search),
+    token,
     langOf(navigator.language),
   );
   render(() => {
@@ -53,6 +57,7 @@ if (main !== null) {
           chooseEffort,
           bar: window.location,
           origin: window.location.origin,
+          pairing: token,
           now: () => Date.now(),
         }}
       >

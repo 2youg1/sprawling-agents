@@ -26,7 +26,7 @@ mod transcribe;
 pub use cost::{CallCost, CostSource, settle};
 pub use credential::oauth_redeem_request;
 pub use credential::oauth_refresh;
-pub use credential::{Captured, Custodian, Described, EnvReader, Persistence};
+pub use credential::{Custodian, Described, EnvReader, Persistence};
 pub use credential::{DeviceAuthorization, DevicePoll, DeviceRefusal, FormPost, PollStep};
 pub use credential::{OauthPending, OauthTokens, TokenRequest, oauth_begin};
 pub use credential::{device_authorization_request, oauth_random, oauth_redeem};

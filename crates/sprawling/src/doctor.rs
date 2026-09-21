@@ -106,6 +106,11 @@ impl Group {
 /// The three platforms this project is built for. `None` from `current`
 /// is an honest answer: on a fourth platform nothing here can name a
 /// package manager, so `--install` prints and stops.
+///
+/// `current` is the one place in this binary that asks which platform it
+/// is running on. Everything else matches on the answer, exhaustively
+/// and with no wildcard arm, so a fourth platform becomes a compile
+/// error at every site that would have to decide something about it.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Platform {
     Windows,
@@ -137,6 +142,17 @@ impl Platform {
             Platform::Windows => "windows",
             Platform::MacOs => "macos",
             Platform::Linux => "linux",
+        }
+    }
+
+    /// The character that separates one directory from the next inside
+    /// this platform's search path variable. `probe` walks that
+    /// variable, and reading it with the wrong separator reports an
+    /// installed tool as one this machine does not have.
+    pub(crate) const fn search_path_separator(self) -> char {
+        match self {
+            Platform::Windows => ';',
+            Platform::MacOs | Platform::Linux => ':',
         }
     }
 }

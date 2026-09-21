@@ -36,14 +36,14 @@ use kernel::{AxCode, AxError};
 use tokio::sync::broadcast;
 
 use crate::assets::AssetReply;
-use crate::auth;
 use crate::reception::inbound::Inbound;
 use crate::reception::{
-    BindFace, BindVerdict, SessionState, SessionStep, decide_bind, decide_frame,
+    Admission, BindFace, BindVerdict, Door, SessionState, SessionStep, decide_admission,
+    decide_bind, decide_frame,
 };
 use crate::wire::ServerFrame;
 
-use super::config::{Pairing, ServeConfig, ShellState, router};
+use super::config::{ServeConfig, ShellState, router};
 
 use super::reply::{Delivered, Reply, refusal_text};
 use std::net::SocketAddr;
@@ -264,17 +264,21 @@ pub(crate) async fn accept_acp(State(state): State<Arc<ShellState>>, body: Bytes
         )
             .into_response();
     };
-    let held = match state.token_digest.as_ref() {
-        // A city with no pairing token configured is a city on loopback
-        // only; the door is open to whoever is already on this machine,
-        // which is the same rule the control surface follows.
-        None => true,
-        Some(digest) => auth::verify(
-            request.get("token").and_then(serde_json::Value::as_str),
-            digest,
-        ),
+    // The token is judged by `decide_admission`, which is the same
+    // judgement the acting doors are layered with; this door differs
+    // only in where the token is written (a body key, because that is
+    // what an editor sends) and in admitting an unpaired caller so the
+    // admission can word what it may learn.
+    let pairing = match decide_admission(
+        Door::Acp,
+        request.get("token").and_then(serde_json::Value::as_str),
+        state.token_digest.as_ref(),
+    ) {
+        Admission::Admit(pairing) => pairing,
+        Admission::Refuse(err) => {
+            return (StatusCode::FORBIDDEN, refusal_text(&err)).into_response();
+        }
     };
-    let pairing = if held { Pairing::Held } else { Pairing::Absent };
     match (state.acp)(&request, pairing) {
         Ok(progress) => (StatusCode::ACCEPTED, Json(progress)).into_response(),
         Err(err) => (StatusCode::FORBIDDEN, refusal_text(&err)).into_response(),
@@ -347,33 +351,4 @@ pub async fn serve(config: ServeConfig) -> Result<(), AxError> {
         )
         .with_recovery("restart the process; the listener is gone")
     })
-}
-
-#[cfg(test)]
-#[allow(
-    clippy::float_arithmetic,
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    clippy::string_slice,
-    clippy::arithmetic_side_effects,
-    reason = "test code"
-)]
-mod tests {
-    use super::*;
-    use kernel::B3Hash;
-    /// The two facts the acp door decides before anything inward runs:
-    /// a configured token must match, and a city with none is loopback
-    /// only, which is the same rule the control surface follows.
-    #[test]
-    fn the_acp_door_judges_the_token_where_the_token_lives() {
-        let digest = B3Hash::digest(b"pair-me-0123456789");
-        assert!(auth::verify(Some("pair-me-0123456789"), &digest));
-        assert!(!auth::verify(Some("pair-me-9876543210"), &digest));
-        assert!(
-            !auth::verify(None, &digest),
-            "a request carrying no token is not authentic against a configured one"
-        );
-    }
 }

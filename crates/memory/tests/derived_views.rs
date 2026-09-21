@@ -9,13 +9,13 @@
 )]
 
 //! Shape 7 — the disposable derived view — asserted once and
-//! instantiated three times.
+//! instantiated twice.
 //!
-//! `index`, `hot` and `projection` differ in what they store and where,
-//! but they make the same promise: throw the view away, replay the same
-//! ledger, and the observable answer comes back identical. That promise
-//! is what makes them safe to delete, and it is stated here in one
-//! place so the three cannot drift apart.
+//! `index` and `hot` differ in what they store and where, but they make
+//! the same promise: throw the view away, replay the same ledger, and
+//! the observable answer comes back identical. That promise is what
+//! makes them safe to delete, and it is stated here in one place so the
+//! two cannot drift apart.
 
 #![allow(
     clippy::unwrap_used,
@@ -29,7 +29,7 @@ use std::fmt::Debug;
 use std::path::Path;
 
 use kernel::{B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
-use memory::{HotView, LedgerIndex, Projection};
+use memory::{HotView, LedgerIndex};
 use proptest::prelude::*;
 
 /// The skeleton: build twice from the same records, observe both, and
@@ -63,7 +63,7 @@ fn record(run: RunId, seq: u64, kind: EventKind, data: serde_json::Value) -> Eve
     EventRecord::from_draft(draft, Seq::new(seq), B3Hash::digest(b"prev"))
 }
 
-/// Four kinds are enough to exercise every branch the three views have:
+/// Four kinds are enough to exercise every branch the two views have:
 /// two that create rows, one that closes them, one that is plain
 /// progress.
 fn kind_of(pick: u8) -> EventKind {
@@ -155,58 +155,5 @@ proptest! {
                     .collect::<Vec<String>>()
             },
         );
-
-        // Instance 3 — projection: the logical export is byte-identical
-        // even though the redb files need not be.
-        rebuild_is_stable(
-            &records,
-            |records, nonce| {
-                let path = root.path().join(format!("proj-{nonce}.redb"));
-                let (mut projection, _) = Projection::open(&path).expect("open");
-                for r in records {
-                    projection.apply(r).expect("apply");
-                }
-                projection
-            },
-            |projection| projection.export_canonical().expect("export"),
-        );
     }
-}
-
-/// The hot and cold views answer to the same ledger, so where they
-/// overlap they must not disagree — a Run counted active in memory and
-/// frozen on disk would make the interface a liar.
-#[test]
-fn hot_and_cold_agree_where_they_overlap() {
-    let picks: Vec<(u8, u8)> = vec![
-        (0, 0),
-        (3, 0),
-        (0, 1),
-        (1, 1),
-        (2, 0),
-        (3, 1),
-        (0, 2),
-        (2, 2),
-    ];
-    let records = script(&picks);
-    let tmp = tempfile::tempdir().expect("tempdir");
-
-    let mut hot = HotView::new();
-    let (mut cold, _) = Projection::open(&tmp.path().join("overlap.redb")).expect("open");
-    for r in &records {
-        hot.apply(r).expect("hot");
-        cold.apply(r).expect("cold");
-    }
-
-    let hot_runs: Vec<(String, bool)> = hot
-        .runs()
-        .map(|(id, h)| (id.to_string(), h.phase == memory::RunPhase::Frozen))
-        .collect();
-    let cold_runs: Vec<(String, bool)> = cold
-        .run_rows()
-        .expect("rows")
-        .into_iter()
-        .map(|row| (row.run, row.frozen.is_some()))
-        .collect();
-    assert_eq!(hot_runs, cold_runs, "same runs, same phase, same order");
 }

@@ -10,6 +10,8 @@
 // about. The city refuses a container it cannot send on, by name, so a
 // guess here would be a guess the person pays for.
 
+import { bearing } from "./socket";
+
 // What a recording attempt ended as. Exhaustive because the composer
 // draws a different control for each: a refusal is worth saying, and a
 // person who changed their mind is not.
@@ -34,10 +36,10 @@ export function canRecord(): boolean {
   );
 }
 
-async function ask(origin: string, blob: Blob): Promise<Heard> {
+async function ask(origin: string, token: string | null, blob: Blob): Promise<Heard> {
   const answer = await fetch(`${origin}/transcribe`, {
     method: "POST",
-    headers: { "content-type": blob.type },
+    headers: { "content-type": blob.type, ...bearing(token) },
     body: blob,
   });
   const said = await answer.text();
@@ -49,7 +51,7 @@ async function ask(origin: string, blob: Blob): Promise<Heard> {
 
 // Opens the microphone and starts recording. The caller holds the
 // handle; nothing here touches the page.
-export async function record(origin: string): Promise<Recording | null> {
+export async function record(origin: string, token: string | null): Promise<Recording | null> {
   const media = await navigator.mediaDevices
     .getUserMedia({ audio: true })
     .catch(() => null);
@@ -80,7 +82,7 @@ export async function record(origin: string): Promise<Recording | null> {
       await ended;
       close();
       const blob = new Blob(parts, { type: recorder.mimeType });
-      return blob.size === 0 ? { kind: "silent" } : ask(origin, blob);
+      return blob.size === 0 ? { kind: "silent" } : ask(origin, token, blob);
     },
     cancel: () => {
       recorder.stop();

@@ -39,6 +39,15 @@ multiple-versions = "warn"
 deny = [
     { crate = "openssl-sys", reason = "TLS policy is rustls" },
     { crate = "native-tls", reason = "TLS policy is rustls" },
+    # One password KDF for the whole tree, and it is `argon2`
+    # (gateway-SPEC 8-21). A second one is a second answer to "how slow
+    # is slow enough", decided by whichever crate a future dependency
+    # happened to pick. These three are the ones a person reaches for by
+    # habit; a deliberate change replaces the entry rather than adding a
+    # dependency beside it.
+    { crate = "rust-argon2", reason = "the password KDF is the RustCrypto `argon2`" },
+    { crate = "scrypt", reason = "the password KDF is the RustCrypto `argon2`" },
+    { crate = "sodiumoxide", reason = "the AEAD is `chacha20poly1305` and the KDF is `argon2`" },
 ]
 
 [advisories]

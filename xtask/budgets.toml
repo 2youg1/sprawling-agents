@@ -399,12 +399,6 @@ budget_ms = 1
 measured_by = "just bench (citysim bench bin, release)"
 status = "measured, not gated: p50 0.022 ms for 16.5 KB over four slots on windows-x86_64 (2026-08-22)"
 
-[projection_rebuild]
-what = "records folded per second when a view is rebuilt"
-budget_records_per_second = 50000
-measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: about 493k records/s on windows-x86_64 (2026-08-22), every record folding into a table. The remediation pass found per-record transactions rebuilding at about 1.1k records/s - one disk barrier under every event - and moved the fold to one transaction per batch (Projection::apply_all)"
-
 # What one query pays for the appends that arrived since the last one.
 # `Views` refreshes the resident index before every history query, so a
 # city that just wrote a record charges this to the next reader.
@@ -476,17 +470,15 @@ status = "measured, not gated: 8,388,608 B, refused whole rather than truncated,
 # different people. Price the append where the append is already
 # priced.
 
-# The same rebuild `[projection_rebuild]` prices, denominated in the
-# thing that actually varies. A record is not a fixed size, so records
-# per second answers "how fast did this fixture fold" and not "what
-# will rebuilding my city cost"; a person with a 400 MB ledger can
-# multiply a per-megabyte figure and cannot multiply a per-record one.
+# What a rebuild of every view costs, denominated in the thing that
+# actually varies. A record is not a fixed size, so records per second
+# answers "how fast did this fixture fold" and not "what will
+# rebuilding my city cost"; a person with a 400 MB ledger can multiply
+# a per-megabyte figure and cannot multiply a per-record one.
 #
-# **Two rows for one rebuild is one row too many, and this one is meant
-# to win.** Until it has a reading, `[projection_rebuild]` is the row
-# with evidence and stays. The change-set that takes the first reading
-# here deletes `[projection_rebuild]` in the same commit, and neither
-# figure is copied into the other.
+# **One rebuild, one row.** The cold view this figure used to share the
+# subject with is gone with `memory::projection`, so the per-record row
+# went with it: the views a city rebuilds today live in the process.
 #
 # Gated once it has a reading, unlike the wall-clock rows above it: the
 # denominator removes the fixture's size from the figure, which is what

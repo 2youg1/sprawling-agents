@@ -29,7 +29,6 @@ fn main() -> std::process::ExitCode {
     let outcome = ledger_append(&scratch)
         .and_then(|()| durability_barrier(&scratch))
         .and_then(|()| prefix_assembly())
-        .and_then(|()| projection_rebuild(&scratch))
         .and_then(|()| run_history(&scratch));
     std::fs::remove_dir_all(&scratch).ok();
     match outcome {
@@ -189,61 +188,6 @@ fn prefix_assembly() -> Result<(), String> {
     println!(
         "prefix_assembly    p50 {:>8.3} ms                    (budget 1 ms; 16.5 KB over four slots, {ROUNDS} rounds)",
         p50.as_secs_f64() * 1_000.0
-    );
-    Ok(())
-}
-
-/// Budget row `projection_rebuild`: records folded per second when the
-/// disk view is rebuilt from the ledger.
-fn projection_rebuild(scratch: &std::path::Path) -> Result<(), String> {
-    let dir = scratch.join("rebuild");
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let (mut ledger, _report) = memory::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
-        .map_err(|e| format!("{}", e.into_ax()))?;
-    // Every record folds into a table: half start a run, half freeze it,
-    // so the reading measures the fold, not the skip arm.
-    const RECORDS: u64 = 20_000;
-    let drafts: Vec<EventDraft> = (0..RECORDS)
-        .map(|n| {
-            let mut d = draft(n)?;
-            let mut run_bytes = [0u8; 16];
-            run_bytes[..8].copy_from_slice(&(n / 2).to_le_bytes());
-            d.run = RunId::from_bytes(run_bytes);
-            if n % 2 == 0 {
-                d.kind = EventKind::RunStarted;
-            } else {
-                d.kind = EventKind::RunFrozen;
-                let mut map = serde_json::Map::new();
-                map.insert(
-                    "completion".to_owned(),
-                    serde_json::Value::String("done".to_owned()),
-                );
-                d.data = Payload::new(map).map_err(|e| e.to_string())?;
-            }
-            Ok::<EventDraft, String>(d)
-        })
-        .collect::<Result<_, _>>()?;
-    ledger.append_all(drafts).map_err(|e| format!("{e}"))?;
-    let lines = memory::read_raw_lines_at(&dir).map_err(|e| format!("{}", e.into_ax()))?;
-    let records: Vec<kernel::EventRecord> = lines
-        .iter()
-        .map(|line| serde_json::from_slice(line).map_err(|e| e.to_string()))
-        .collect::<Result<_, _>>()?;
-
-    let store = scratch.join("projection.redb");
-    let (mut projection, _) =
-        memory::Projection::open(&store).map_err(|e| format!("{}", e.into_ax()))?;
-    let t0 = stamp();
-    projection
-        .apply_all(records.iter())
-        .map_err(|e| format!("{}", e.into_ax()))?;
-    let took = t0.elapsed();
-    let count = u32::try_from(records.len()).unwrap_or(u32::MAX);
-    println!(
-        "projection_rebuild {} records in {:>8.3} ms   ({:.0} records/s; budget 50,000/s)",
-        records.len(),
-        took.as_secs_f64() * 1_000.0,
-        f64::from(count) / took.as_secs_f64()
     );
     Ok(())
 }

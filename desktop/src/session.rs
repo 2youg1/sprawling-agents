@@ -174,20 +174,20 @@ impl Server {
                 "send `name` alongside `arguments`, as `tools/call` describes",
             )
         })?;
-        if tools::card(name).is_none() {
-            return Err(Refusal::new(
+        let tool = tools::ToolName::parse(name).ok_or_else(|| {
+            Refusal::new(
                 RefusalCode::ToolUnknown,
                 "use the desktop",
                 format!("`{name}` is not a tool this server offers"),
                 "read `tools/list`; this server offers six tools and no others",
-            ));
-        }
+            )
+        })?;
         let arguments = params
             .get("arguments")
             .cloned()
             .unwrap_or_else(|| json!({}));
         let admitted = self.scope.admits(&Reach {
-            tool: name,
+            tool,
             title: arguments.get("title").and_then(Value::as_str),
             process: arguments.get("process").and_then(Value::as_str),
         })?;
@@ -197,7 +197,7 @@ impl Server {
         // The admission travels on into the desk because one tool's
         // *answer* is scoped as well as its permission: `desktop.windows`
         // reports only the windows this allowlist could name.
-        self.desk.perform(name, &arguments, &admitted)
+        self.desk.perform(tool, &arguments, &admitted)
     }
 }
 
@@ -207,7 +207,7 @@ fn listing() -> Vec<Value> {
         .into_iter()
         .map(|card| {
             json!({
-                "name": card.name,
+                "name": card.name.as_str(),
                 "description": card.description,
                 "inputSchema": card.schema,
             })

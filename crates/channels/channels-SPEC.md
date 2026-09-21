@@ -181,8 +181,16 @@ pub fn decide_bind(addr: &SocketAddr, token_configured: bool) -> BindVerdict;
 
 pub enum EnrollVerdict { Accept, Refuse(AxError) }
 pub fn decide_enroll(peer: &SocketAddr) -> EnrollVerdict;   // 只认回环调用方
-pub type SecretSink = Arc<dyn Fn(Command<Sealed<String>>) -> Result<(), AxError> + Send + Sync>;
+pub type SecretSink =
+    Arc<dyn Fn(Command<Sealed<String>>, Reply) -> Result<(), AxError> + Send + Sync>;
 pub struct EnrollBody { pub realm: String, pub name: String, pub value: String }
+
+pub enum Door { Transcribe, Enroll, Acp }            // 三扇 HTTP 门，穷尽
+pub enum Pairing { Held, Absent }                    // 不是 bool
+pub enum Admission { Admit(Pairing), Refuse(AxError) }
+pub fn decide_admission(door: Door, offered: Option<&str>, configured: Option<&B3Hash>)
+    -> Admission;                                    // HTTP 侧唯一的令牌判定
+pub fn offered_pairing(header: Option<&str>) -> Option<&str>;  // `Authorization: Bearer`
 
 pub enum HandshakeVerdict { Accept, Reject(AxError) }
 pub fn decide_handshake(hello: &Hello, expected: &Welcome, configured: Option<&B3Hash>) -> HandshakeVerdict;
@@ -191,7 +199,6 @@ pub struct ServeConfig {
     pub addr: SocketAddr,
     pub token_digest: Option<B3Hash>,   // 摘要，不是令牌
     pub client: Arc<ClientAssets>,      // 客户端资产源由装配层递入
-    pub upload_sink: Arc<dyn Fn(Bytes) -> Result<UploadId, AxError> + Send + Sync>,
 }
 
 // 客户端资产面。
@@ -1121,3 +1128,26 @@ pub enum ReleaseAnswer {
 | `Command::PutShelved { shelf, name, text, idem }` | `Shelf { Library, Building(addr) }`；写 `shelved_document_written` | 与 `GovernedDocument` 同一条理由：两处货架都在保留子树里，任何写域都够不着，所以帧里没有路径可拼。`name` 允许子路径，脚本因此留得住自己的文件夹 |
 
 **八、`DialectKind::OpenAiResponses`（4.5 本体）。** kernel 的兼容格式集由二变三，`gateway::dialect` 的五个入口各多一条臂。登记与调用从此说同一句话：人粘贴 responses URL，`ConnectionKind::Responses` 记住了，而 `wire()` 从前仍答 `OpenAi`——**记对了、调错了**。形状取自供应方自己的规格（`openai/openai-openapi`，`openapi.yaml` 自述 API 版本 2.3.0，提交 `ddface9b`），不取自任何客户端库。
+
+### 8-40 会动作的两扇门先问配对：`decide_admission` 与一层 middleware（S-03、M-22、B-76）
+
+`decide_bind` 把「能从回环之外到达」换成配对令牌的要求，而令牌此前只在 `decide_handshake`（`/ws`）与 `/acp` 的手写分支两处被判：**合法配置的暴露城因此允许任何能到达端口的人写字节进金库路由、并驱动 `transcribe_sink` 花钱**。判定现在只有一个家。
+
+```rust
+// 三扇门共用的那一问，壳里零策略（同 decide_bind／decide_frame 的切法）。
+decide_admission(Door::Transcribe | Door::Enroll, offered, configured)  // 未配对即 E_GATE_DENIED
+decide_admission(Door::Acp,        offered, configured)  // 未配对仍进，携 Pairing::Absent
+```
+
+三条口径：
+
+- **`Door` 是枚举而不是路径字符串**。门烧进 `route_layer` 的状态里，路由表因此仍是全仓唯一拼出 `/transcribe`、`/enroll` 的地方；middleware 不回头读 `uri().path()`，否则路径就有了第二个家。
+- **两扇会动作的门当场拒，`/acp` 不拒**。花钱与收凭证是动作，未配对者不该触发；而外来编辑器「只学到一位」是 `protocol::admit` 的措辞权（§8-1110 的口径未变），所以那扇门把 `Pairing` 传进去而不是自己写拒词。`/acp` 的令牌仍写在 body 的 `token` 键里（编辑器没有别的地方写），但**判定调的是同一个函数**——一个规则一个家，与令牌写在哪无关。
+- **`/` 与 `/{*asset}` 保持开放**：人要先拿到页面，才有地方输入配对码。
+- **令牌怎么递**：socket 写在 hello 帧里（帧类型给了它字段名），POST 没有帧，于是走标准的 `Authorization: Bearer`，`offered_pairing` 是这条拼写在服务端的唯一读者，`client/src/core/socket.ts` 的 `bearing()` 是浏览器侧唯一的写者。
+
+同集两件小的：
+
+- **M-22**：`/enroll` 不再用 `format!` 手拼 `secret:<realm>/<name>`，先经 `kernel::SecretRef::parse` 读回再用它的 `Display` 作答。此前一个本城解析不回来的 realm 或 name 也能换到 201 与一句谁也兑不了的引用；现在那是 422。客户端同改：`enrol()` 用 201 正文里城说的那句引用，不再自己拼一份。
+- **B-76**：202 正文里断行残留的连续空格改为反斜杠续行。
+

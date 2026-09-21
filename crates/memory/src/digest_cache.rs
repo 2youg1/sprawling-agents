@@ -15,6 +15,12 @@
 //! Writes go through tmp-then-rename, the same discipline as the CAS: a
 //! crash leaves a partial file in `tmp/`, never a half-written entry at
 //! its final name.
+//!
+//! **Whether an entry is there has one spelling: [`Vfs::exists`].** It
+//! used to be asked by reading the whole file and looking at whether
+//! the read succeeded, which answered "not cached" for an entry this
+//! process may not open and paid a full read to learn a yes/no. Reading
+//! is for `get`, which wants the bytes (memory-SPEC.md 8-11).
 
 use std::path::{Path, PathBuf};
 
@@ -61,7 +67,7 @@ impl DigestCache {
     /// nothing to decide.
     pub fn put(&mut self, content: &B3Hash, tree_json: &[u8]) -> Result<(), MemoryError> {
         let final_path = self.entry_path(content);
-        if self.fs.read(&final_path).is_ok() {
+        if self.fs.exists(&final_path) {
             return Ok(());
         }
         let tmp_path = self.dir.join("tmp").join(format!("{content}.part"));
@@ -99,7 +105,7 @@ impl DigestCache {
     /// one the caller asked for.
     pub fn invalidate(&mut self, content: &B3Hash, reason: &str) -> Result<Payload, MemoryError> {
         let path = self.entry_path(content);
-        let existed = self.fs.read(&path).is_ok();
+        let existed = self.fs.exists(&path);
         if existed {
             self.fs
                 .remove_file(&path)

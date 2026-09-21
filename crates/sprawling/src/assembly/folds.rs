@@ -106,10 +106,14 @@ impl Governance {
     /// item is held against the room that raised it.
     ///
     /// # Errors
-    /// Refuses a line this build cannot read. Both of these used to be
-    /// dropped in silence, which made a history written by another
-    /// build open as a city with work missing from its account and
-    /// approvals nobody would ever be asked (sprawling-SPEC.md 8-74).
+    /// Refuses a line this build cannot read. The three governance
+    /// payloads are read through the one kernel type each was written
+    /// from, so this fold and `views::answered` cannot answer
+    /// differently about the same line; they used to be dropped in
+    /// silence here, which made a history written by another build open
+    /// as a city with work missing from its account, approvals nobody
+    /// would ever be asked, and an allowance narrower than the person
+    /// gave (sprawling-SPEC.md 8-74).
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "a few kinds move this fold; the rest of the event vocabulary does not"
@@ -128,10 +132,7 @@ impl Governance {
                 self.sent(run, &started.task, &started.goal);
             }
             EventKind::ApprovalRequested => {
-                let item = serde_json::from_value::<kernel::ApprovalItem>(
-                    serde_json::Value::Object(data.clone()),
-                )
-                .map_err(|err| unreadable("read an approval this city raised", &err))?;
+                let item = payload.read::<kernel::ApprovalItem>()?;
                 // What this item is holding up, joined here rather than
                 // hunted for later. Both halves come from the history:
                 // the room from this record's envelope, the work from
@@ -149,17 +150,16 @@ impl Governance {
                 self.pending.insert(item.id.as_str().to_owned(), item);
             }
             EventKind::ApprovalResolved => {
-                if let Some(id) = data.get("id").and_then(serde_json::Value::as_str) {
-                    self.pending.remove(id);
-                    self.origins.remove(id);
-                }
-                let allowed =
-                    data.get("verdict").and_then(serde_json::Value::as_str) == Some("allow");
-                if allowed
-                    && let Some(cluster) = data.get("cluster")
-                    && let Ok(key) = serde_json::from_value::<kernel::ClusterKey>(cluster.clone())
-                {
-                    self.granted.push(key);
+                let ruled = payload.read::<kernel::event::record::ApprovalResolved>()?;
+                self.pending.remove(ruled.id.as_str());
+                self.origins.remove(ruled.id.as_str());
+                // An allowance carries the group the person answered,
+                // so a resumed run may act inside it without asking
+                // again. A ruling whose group this build cannot read is
+                // refused above rather than granted narrower or wider
+                // than the person meant.
+                if ruled.verdict == kernel::Ruling::Allow {
+                    self.granted.push(ruled.cluster);
                 }
             }
             EventKind::AutonomyChanged => {
@@ -187,14 +187,6 @@ impl Governance {
         }
         Ok(())
     }
-}
-
-/// One refusal for every line of a history this build cannot read.
-fn unreadable(action: &'static str, err: &serde_json::Error) -> AxError {
-    AxError::failure(kernel::AxCode::WireMismatch, action, err.to_string()).with_recovery(
-        "open this city with the build that wrote its history, or move the unreadable line out of \
-         the ledger",
-    )
 }
 
 /// Whether a scope is shut or open.

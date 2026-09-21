@@ -11,6 +11,7 @@
 //! `data`, so this module holds the reading of arguments and the list of
 //! commands, and the commands themselves stay where they belong.
 
+use kernel::consts_policy::DEFAULT_AT;
 use sprawling::firstrun;
 
 use super::city::{init, resume, serve, up, up_at, use_folder};
@@ -114,7 +115,7 @@ pub(super) fn first_screen() -> ExitCode {
     let city = default_city_location();
     let answered = firstrun::ask(&city, &mut std::io::stdin().lock(), &mut std::io::stdout());
     let code = match answered {
-        Ok(firstrun::FirstScreen::Start(city)) => up_at(&city, "127.0.0.1:8787", &[]),
+        Ok(firstrun::FirstScreen::Start(city)) => up_at(&city, DEFAULT_AT, &[]),
         Ok(firstrun::FirstScreen::Use(folder)) => use_folder(&folder),
         Ok(firstrun::FirstScreen::Quit) => {
             println!("{COMMANDS}");

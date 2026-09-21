@@ -5,6 +5,9 @@
 
 //! The verbs a person sends, and what each one does to the city.
 
+use kernel::event::record::{
+    ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
+};
 use kernel::{Address, AxCode, AxError, EventKind};
 use kernel::{Ledger, Locator, Payload, RunId};
 
@@ -46,16 +49,15 @@ impl RunWorker {
                 );
             }
         }
-        let name = scope_name(scope);
-        let mut map = serde_json::Map::new();
-        map.insert("scope".to_owned(), serde_json::Value::String(name.clone()));
-        map.insert(
-            "state".to_owned(),
-            serde_json::Value::String(state.spelling().to_owned()),
-        );
         // Recorded and nothing else: the fold reads `city_halted` and
         // sets the scope, in the one place a restart reads it too.
-        self.record(EventKind::CityHalted, Payload::new(map)?)
+        self.record(
+            EventKind::CityHalted,
+            Payload::of(&CityHalted {
+                scope: scope_name(scope),
+                state: state.spelling().to_owned(),
+            })?,
+        )
     }
 
     /// Which shut scope covers this address, if one does.
@@ -87,16 +89,13 @@ impl RunWorker {
         scope: &channels::HaltScope,
         autonomy: kernel::Autonomy,
     ) -> Result<(), AxError> {
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "scope".to_owned(),
-            serde_json::Value::String(scope_name(scope)),
-        );
-        map.insert(
-            "autonomy".to_owned(),
-            serde_json::Value::String(autonomy_name(&autonomy)),
-        );
-        self.record(EventKind::AutonomyChanged, Payload::new(map)?)
+        self.record(
+            EventKind::AutonomyChanged,
+            Payload::of(&AutonomyChanged {
+                scope: scope_name(scope),
+                autonomy: autonomy_name(&autonomy),
+            })?,
+        )
     }
 
     /// Answers one approval item.
@@ -141,36 +140,22 @@ impl RunWorker {
                 ));
             }
         }
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "id".to_owned(),
-            serde_json::Value::String(item.as_str().to_owned()),
-        );
-        map.insert(
-            "verdict".to_owned(),
-            serde_json::Value::String(format!("{verdict:?}").to_lowercase()),
-        );
         // The cluster travels with the answer. The person was shown a
         // group and answered the group, so what a resumed run may do
         // without asking again is exactly that group — and reading it
         // back from the ledger is what makes the answer survive a
         // restart.
-        map.insert(
-            "cluster".to_owned(),
-            serde_json::to_value(&pending.cluster_key).map_err(|err| {
-                AxError::failure(AxCode::InvalidArgs, "record an answer", err.to_string())
-                    .with_recovery(
-                        "report this against sprawling::assembly::commanding::governing: \
-                         a cluster key is a string and JSON refuses none",
-                    )
-            })?,
-        );
+        let answered = Payload::of(&ApprovalResolved {
+            id: item.clone(),
+            verdict,
+            cluster: pending.cluster_key.clone(),
+        })?;
         // Read before the answer is recorded, because recording it is
         // what closes the item: the fold drops the origin along with the
         // pending entry, and carrying the work on is this method's job
         // rather than the record's.
         let blocked = self.governance.origins.get(item.as_str()).cloned();
-        self.record(EventKind::ApprovalResolved, Payload::new(map)?)?;
+        self.record(EventKind::ApprovalResolved, answered)?;
         // The cluster the person allowed and the closing of the item are
         // both folded from the line just written. Setting either field
         // here as well would be a second authority for a rule the fold
@@ -216,16 +201,13 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let which = super::super::governed_of(which);
         city::write_governed(&self.city_root, which, body)?;
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "which".to_owned(),
-            serde_json::Value::String(which.file().to_owned()),
-        );
-        map.insert(
-            "bytes".to_owned(),
-            serde_json::Value::Number(body.len().into()),
-        );
-        self.record(EventKind::GovernedDocumentWritten, Payload::new(map)?)
+        self.record(
+            EventKind::GovernedDocumentWritten,
+            Payload::of(&GovernedDocumentWritten {
+                which: which.file().to_owned(),
+                bytes: body.len(),
+            })?,
+        )
     }
 
     /// Records a fork: a new run identity branched from `from` at the

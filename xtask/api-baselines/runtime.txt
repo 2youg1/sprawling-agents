@@ -93,6 +93,7 @@ impl runtime::prefix::FrozenPrefix
 impl runtime::prefix::FrozenPrefix
 impl runtime::prefix::SegmentCaps
 impl runtime::prefix::SegmentCaps
+impl runtime::redact::Marker
 impl runtime::reminder::ContextGauge
 impl runtime::reminder::ContextGauge
 impl runtime::reminder::ContextReminder
@@ -134,7 +135,6 @@ pub const runtime::backlog::waiting::PollBudget::DEFAULT: runtime::backlog::wait
 pub const runtime::backlog::waiting::PollBudget::DEFAULT: runtime::backlog::waiting::PollBudget
 pub const runtime::diagnostics::Level::ALL: [runtime::diagnostics::Level; 5]
 pub const runtime::diagnostics::Level::DEFAULT: runtime::diagnostics::Level
-pub const runtime::diagnostics::REDACTED: &str
 pub const runtime::mode::DEV_ENTRY: &str
 pub const runtime::pipeline::exec::EXEC_CAP_BYTES: u64
 pub const runtime::sieve::HEAD_LINES: usize
@@ -183,6 +183,7 @@ pub enum runtime::elision::Elided
 pub enum runtime::mode::Admission
 pub enum runtime::mode::Mode
 pub enum runtime::prefix::SegmentSlot
+pub enum runtime::redact::Marker
 pub enum runtime::reminder::ContextReminder
 pub enum runtime::replay::VerifiedLine
 pub enum runtime::run::Advance
@@ -380,7 +381,6 @@ pub fn runtime::diagnostics::Diagnostics::write(&mut self, runtime::diagnostics:
 pub fn runtime::diagnostics::Level::as_str(&self) -> &'static str
 pub fn runtime::diagnostics::Level::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn runtime::diagnostics::Level::parse(&str) -> core::option::Option<runtime::diagnostics::Level>
-pub fn runtime::diagnostics::redact(&str) -> alloc::string::String
 pub fn runtime::diagnostics::render(runtime::diagnostics::Entry<'_>) -> alloc::string::String
 pub fn runtime::digest::Breaker::consecutive_failures(&self) -> u32
 pub fn runtime::digest::Breaker::consecutive_failures(&self) -> u32
@@ -466,10 +466,10 @@ pub fn runtime::prefix::FrozenPrefix::system_blocks(&self) -> core::result::Resu
 pub fn runtime::prefix::SegmentCaps::startup_default() -> runtime::prefix::SegmentCaps
 pub fn runtime::prefix::SegmentCaps::startup_default() -> runtime::prefix::SegmentCaps
 pub fn runtime::prefix::build_prefix(runtime::prefix::PrefixPlan) -> core::result::Result<runtime::prefix::FrozenPrefix, kernel::error::shape::AxError>
-pub fn runtime::redact::capture_name(&[u8]) -> alloc::string::String
+pub fn runtime::redact::Marker::spell(self, &[u8]) -> alloc::string::String
 pub fn runtime::redact::fingerprint(&[u8]) -> alloc::string::String
 pub fn runtime::redact::redact(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> (serde_json::map::Map<alloc::string::String, serde_json::value::Value>, u32)
-pub fn runtime::redact::redact_text(&str) -> (alloc::string::String, u32)
+pub fn runtime::redact::redact_text(&str, runtime::redact::Marker) -> (alloc::string::String, u32)
 pub fn runtime::rematerialize(&kernel::locator::Locator, &mut runtime::offload::OffloadSite<'_>) -> core::result::Result<std::path::PathBuf, kernel::error::shape::AxError>
 pub fn runtime::reminder::ContextGauge::new(kernel::budget::Tokens) -> runtime::reminder::ContextGauge
 pub fn runtime::reminder::ContextGauge::new(kernel::budget::Tokens) -> runtime::reminder::ContextGauge
@@ -990,6 +990,8 @@ pub runtime::prefix::SegmentSource::dropped: u64
 pub runtime::prefix::SegmentSource::kept: u64
 pub runtime::prefix::SourceDoc::addr: kernel::address::Address
 pub runtime::prefix::SourceDoc::bytes: core::option::Option<alloc::vec::Vec<u8>>
+pub runtime::redact::Marker::Fingerprinted
+pub runtime::redact::Marker::Plain
 pub runtime::reminder::ContextReminder::HandoverWindow
 pub runtime::reminder::ContextReminder::HandoverWindow::used: kernel::budget::Tokens
 pub runtime::reminder::ContextReminder::HandoverWindow::window: kernel::budget::Tokens

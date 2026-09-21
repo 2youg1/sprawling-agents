@@ -52,6 +52,17 @@ export function tokenIn(search: string): string | null {
   return value === null || value === "" ? null : value;
 }
 
+// How a POST offers this city's pairing token.
+//
+// The socket offers it inside the hello frame, where the frame type
+// names the field; a POST has no frame, so it carries the standard
+// bearer header, which `channels::reception::offered_pairing` reads.
+// A page opened without a code sends no header at all: a city with no
+// token configured is a city on loopback, and it admits every door.
+export function bearing(token: string | null): Readonly<Record<string, string>> {
+  return token === null ? {} : { authorization: `Bearer ${token}` };
+}
+
 // The address of this city's socket, derived from the page's own origin:
 // a client served by the city it talks to needs no configured endpoint.
 export function socketUrl(location: Location): string {

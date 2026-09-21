@@ -10,10 +10,6 @@ kernel = { path = "../kernel" }
 serde_json.workspace = true
 blake3.workspace = true
 thiserror.workspace = true
-# Cold view store: embedded, transactional,
-# crash-safe by delegation — the projection is derived, so its file is
-# disposable and never a second authority.
-redb = "4.2"
 # Checkpoint fences: git is the restoration
 # authority for tracked files, so the pre-wave commit oid is what a
 # file_discarded points back at. vendored libgit2, no system dependency.

@@ -10,16 +10,19 @@
 
 import type { Lang } from "./lang";
 import { say } from "./lang";
+import { bearing } from "./socket";
 
 export type Enrolment =
   | { readonly kind: "stored"; readonly reference: string }
   | { readonly kind: "refused"; readonly reason: string };
 
-// One enrolment, as the caller states it. Five values that mean
-// nothing apart: where to send it, what to file it under, the secret
-// itself, and the language the answer comes back in.
+// One enrolment, as the caller states it. Six values that mean
+// nothing apart: where to send it, the pairing code this page was
+// opened with, what to file it under, the secret itself, and the
+// language the answer comes back in.
 export interface Enrolling {
   readonly origin: string;
+  readonly token: string | null;
   readonly realm: string;
   readonly name: string;
   readonly value: string;
@@ -27,20 +30,26 @@ export interface Enrolling {
 }
 
 export function enrol(at: Enrolling): Promise<Enrolment> {
-  const { origin, realm, name, value, lang } = at;
-  const reference = referenceText({ realm, name });
+  const { origin, token, realm, name, value, lang } = at;
   return fetch(`${origin}/enroll`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...bearing(token) },
     body: JSON.stringify({ realm, name, value }),
   }).then(
     (response) =>
-      response.status === 201
-        ? { kind: "stored", reference }
-        : response.text().then((reason) => ({
-            kind: "refused",
-            reason: reason === "" ? say(lang, "enrol_city_said_nothing") : reason,
-          })),
+      // **The reference comes back from the city, never from here.**
+      // `kernel::SecretRef` is the grammar of a vault place and the
+      // route answers 201 with the text it parsed, so a realm or a
+      // name this page could spell but the city could not resolve is
+      // a refusal rather than a reference nothing answers to.
+      response.text().then((said): Enrolment =>
+        response.status === 201
+          ? { kind: "stored", reference: said }
+          : {
+              kind: "refused",
+              reason: said === "" ? say(lang, "enrol_city_said_nothing") : said,
+            },
+      ),
     (): Enrolment => ({
       kind: "refused",
       reason: say(lang, "enrol_unreachable"),

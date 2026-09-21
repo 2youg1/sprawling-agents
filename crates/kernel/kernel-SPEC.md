@@ -372,11 +372,25 @@ pub struct Commit { pub oid: GitOid, #[serde(flatten)] pub by: CommitAttribution
                     pub scope: Vec<String>, pub files: Vec<String> }
 #[serde(untagged)]
 pub enum CheckpointCommitted { JobPinned { job: Locator }, Committed(Commit) }
+
+pub struct ApprovalResolved { pub id: ApprovalId, pub verdict: Ruling, pub cluster: ClusterKey }
+pub struct AutonomyChanged { pub scope: String, pub autonomy: String }
+pub struct CityHalted { pub scope: String, pub state: String }
+pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
 ```
 
-已迁移的 kind 与其结构：`run_started`、`run_forked`、`checkpoint_committed`；
+已迁移的 kind 与其结构：`run_started`、`run_forked`、`checkpoint_committed`、
+`approval_resolved`、`autonomy_changed`、`city_halted`、`governed_document_written`；
 `pr_merged` 借 `CommitAttribution` 记「谁做的这次提交」，其余键待该族迁移。
 未列入的 kind 仍由调用点手写读取。
+
+`ApprovalResolved.verdict` 是 `Ruling` 本身而不是 `format!("{verdict:?}")` 的小写词：
+旧写法让两个读方各自与字面量比较，认不出的词在一处读作拒、在另一处读作准（M-21）；
+现在认不出的词是一次读失败，不是一个默认值。三键均不 `default`——`approval_resolved`
+自诞生起就无条件写出这三键，缺 verdict 的行该拒而不该猜。
+`AutonomyChanged.scope` / `.autonomy` 与 `CityHalted.scope` / `.state` 仍是字符串：
+这两条小文法的家分别在 `sprawling::assembly::naming` 与 `assembly::folds::Admission`，
+把它们搬进本 crate 是叶子 7.8，待四个仍手写该文法的读方一并迁移。
 
 三条不变量，因为已落盘的账本不可重拼：
 
@@ -518,6 +532,8 @@ serde：字符串形。动作规范化（action_canonical 的构造规则）属�
 pub const CACHE_BREAKPOINTS_MAX: u32 = 4;
 pub const PROMPT_CACHE_TTL_SECS: u64 = 300;
 pub const EVENT_LOG_V: u32 = 1;                  // EventRecord.v 的唯一来源
+pub enum LogVersion { Current, Older, Ahead, NotAVersion }
+pub fn readable_log_v(v: u64) -> LogVersion;     // 「哪些账本版本读得开」的唯一权威
 pub const L0_TOOLS: [&str; 3] = ["exec", "edit", "status"];
 pub struct SecretShape { pub provider: &'static str, pub prefix: &'static str,
                          pub charset: SecretCharset, pub len: (u16, u16) }   // 闭区间
@@ -526,6 +542,13 @@ pub const SECRET_SHAPES: [SecretShape; N] = [ /* 公开 provider 令牌形状，
 ```
 
 `SECRET_SHAPES` 是数据不是代码（零分支）；消费者是 S2 `kernel::secret::scan` 与 `xtask secret`。
+
+**`readable_log_v`（M-16）**：本模块的章程原写「零分支」，现改为「数据，以及只读这些数据的分类」，
+理由是这条判定除了 `EVENT_LOG_V` 什么都不读，而它可能待的每一个别处都会成为
+「本构建打得开哪些账本」的第二个家。四态穷尽：`Current`＝本构建所写；`Older`＝1 以上、
+低于本版本，读得开（账本只追加，旧行仍是它的历史）；`Ahead`＝更新的构建所写，整条拒读
+而不部分解读；`NotAVersion`＝低于任何构建写过的首版本（含 `0`），是损坏或外来行而非旧行。
+拒读理由由此说版本而不说链——`memory::jsonl::open` 的两个读方此前对 v0 各给一套说法。
 
 ### 8-8 kernel::consts_policy
 

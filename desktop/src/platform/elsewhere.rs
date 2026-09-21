@@ -13,6 +13,7 @@
 
 use crate::refusal::{Refusal, RefusalCode};
 use crate::scope::Admitted;
+use crate::tools::ToolName;
 use serde_json::Value;
 
 /// What one connection remembers between calls — which here is
@@ -41,11 +42,12 @@ impl Desk {
     /// asked for.
     pub(crate) fn perform(
         &mut self,
-        tool: &str,
+        tool: ToolName,
         _arguments: &Value,
         _admitted: &Admitted<'_>,
     ) -> Result<Value, Refusal> {
         let platform = std::env::consts::OS;
+        let tool = tool.as_str();
         Err(Refusal::new(
             RefusalCode::ToolUnavailable,
             "use the desktop",
@@ -72,13 +74,13 @@ mod tests {
         let scope = crate::scope::Scope::parse("windows = [\"*\"]\n");
         let admitted = scope
             .admits(&crate::scope::Reach {
-                tool: "desktop.windows",
+                tool: ToolName::Windows,
                 title: None,
                 process: None,
             })
             .expect("an open scope admits a listing");
         let refusal = Desk::new()
-            .perform("desktop.windows", &json!({}), &admitted)
+            .perform(ToolName::Windows, &json!({}), &admitted)
             .expect_err("this platform carries out nothing");
         let error = refusal.as_error();
         assert_eq!(error["data"]["code"], "E_TOOL_UNAVAILABLE");

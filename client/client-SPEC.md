@@ -114,12 +114,12 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
 |---|---|---|
 | `link.ts` | 1 判定 | `newLink(token)`, `connect`, `advance(link, LinkEvent) -> [Link, LinkAction]`；`LinkAction` 穷尽（open／send／welcomed／deliver／answered／saying／wait／report／close）；阶梯 `[250,500,1000,2000,5000,10000]` |
 | `frames.ts` | 4 适配器 | `decodeFrame(text) -> ServerFrame \| null`, `encodeFrame(ClientFrame)` |
-| `socket.ts` | 4 适配器 | `openConnection(url, token) -> Connection { state, belief, asking, command, retry, dismissRefusal }`；`tokenIn(search)`, `socketUrl(location)` |
+| `socket.ts` | 4 适配器 | `openConnection(url, token) -> Connection { state, belief, asking, command, retry, dismissRefusal }`；`tokenIn(search)`, `socketUrl(location)`, `bearing(token)`——POST 递配对码的唯一拼写（`Authorization: Bearer`，服务端读者是 `channels::reception::offered_pairing`） |
 | `asking.ts` | 1 判定 | `createAsking(send) -> { ask(query) -> Accessor<Answer\|undefined>, refresh, answered, invalidate(record), reconnected }`；答案按内容匹配问题，无名者按到达序；`staleBy` 是事件到查询的失效表 |
 | `belief.ts` | 7 投影 | `createBelief() -> { belief: {runs, halted, refusal, city, probed}, adoptCity, apply, say, refused, named }`；`RunBelief { addr, started, task, doing: thinking\|calling\|waiting\|frozen, saying }`；`sendingInto(doing)` |
 | `commands.ts` | 2 值 | 每个命令帧一个构造函数，自铸 `IdemKey` |
-| `enrol.ts` | 4 适配器 | `enrol(origin, realm, name, value) -> Promise<Enrolment>`；`referenceFor(provider)` |
-| `speaking.ts` | 4 适配器 | `canRecord()`, `record(origin) -> Promise<Recording \| null>`；`Recording.stop() -> Promise<Heard>`，`Heard` 穷尽（text／refused／silent） |
+| `enrol.ts` | 4 适配器 | `enrol(Enrolling { origin, token, realm, name, value, lang }) -> Promise<Enrolment>`；`referenceFor(provider)`。**引用来自城**：201 正文是 `kernel::SecretRef` 读回后写出的那一句，本页不自己拼一份存起来（M-22） |
+| `speaking.ts` | 4 适配器 | `canRecord()`, `record(origin, token) -> Promise<Recording \| null>`；`Recording.stop() -> Promise<Heard>`，`Heard` 穷尽（text／refused／silent） |
 | `idem.ts` | 2 值 | `mintIdem()` |
 | `mark.ts` | 4 适配器 | `paintMark(document, quiet \| live \| waiting)`：把令牌解算成引擎实际会画的颜色，拼成 SVG data URL 写进 `<link rel="icon">`；零颜色字面量 |
 | `rows.ts` | 4 适配器 | `Rows { getItem, setItem, removeItem }`、`memory()`、`browserRows()`：浏览器存储那一扇门，三处会抛的拒绝（禁用存储、配额为零、写时配额满）在这里各变成一个值 |
@@ -128,7 +128,7 @@ export type RunId   = string & Brand<"RunId">;    export const RunId:   Brand.Co
 | `route.ts` | 1 判定 | 见 §3-2 |
 | `time.ts` | 1 判定 | `ago`, `clock`, `count`, `usd`, `kib` |
 
-`src/ui.tsx` 是视图拿到的一切：`UiProvider`／`useUi`（conn、prefs、effort、chooseEffort、bar、origin、now）、`useSay`（键→词，填槽）、`useGo`、`useCommand`、`useHearing`。
+`src/ui.tsx` 是视图拿到的一切：`UiProvider`／`useUi`（conn、prefs、effort、chooseEffort、bar、origin、pairing、now；`pairing` 是开这一页的地址栏上的配对码，两扇会动作的 HTTP 门要它）、`useSay`（键→词，填槽）、`useGo`、`useCommand`、`useHearing`。
 
 ## 6 视图（免 SPEC，列出以便定位）
 

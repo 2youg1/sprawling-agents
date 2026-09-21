@@ -228,15 +228,15 @@ mod tests {
     fn nothing_under_the_reserved_prefix_travels_as_a_city_file() {
         let home = tempfile::tempdir().unwrap();
         city_with(1, home.path());
-        // A projection is disposable; carrying one would be a second
+        // A side index is disposable; carrying one would be a second
         // statement of what happened.
-        let views = home.path().join(RESERVED).join("projection");
-        std::fs::create_dir_all(&views).unwrap();
-        std::fs::write(views.join("cold.redb"), b"derived").unwrap();
+        let cache = home.path().join(RESERVED).join("index");
+        std::fs::create_dir_all(&cache).unwrap();
+        std::fs::write(cache.join("ledger.idx"), b"derived").unwrap();
 
         let carried = tempfile::tempdir().unwrap();
         Bundle::export(home.path(), carried.path()).unwrap();
         assert!(!carried.path().join(CITY).join(RESERVED).exists());
-        assert!(!carried.path().join(CITY).join("projection").exists());
+        assert!(!carried.path().join(CITY).join("index").exists());
     }
 }

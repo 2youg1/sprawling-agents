@@ -90,14 +90,16 @@ Everything an outside tool brings back joins the taint set - outside content is 
 
 Two lists exist and they answer different questions, so both are kept and neither is a copy of the other.
 
-**What this repository chose** is the table below: the twenty-seven crates named in a `Cargo.toml` of this workspace, each with the licence its own manifest declares. A person asking "whose work did these authors decide to stand on" reads this.
+**What this repository chose** is the table below: the twenty-eight crates named in a `Cargo.toml` of this workspace, each with the licence its own manifest declares. A person asking "whose work did these authors decide to stand on" reads this.
 
-**What ends up in the binary** is <!-- xtask:begin dependency_count -->389<!-- xtask:end --> packages once every transitive dependency is resolved, and that list is the lockfile's. `cargo deny check` reads it on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. **That is the machine authority, and this table is deliberately not a second one** — it is twenty-seven rows a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
+**What ends up in the binary** is <!-- xtask:begin dependency_count -->401<!-- xtask:end --> packages once every transitive dependency is resolved, and that list is the lockfile's. `cargo deny check` reads it on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. **That is the machine authority, and this table is deliberately not a second one** — it is twenty-eight rows a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
 
 | Crate | Version | Licence |
 |---|---|---|
+| [argon2](https://crates.io/crates/argon2) | 0.6.0 | MIT OR Apache-2.0 |
 | [axum](https://crates.io/crates/axum) | 0.8.9 | MIT |
 | [blake3](https://crates.io/crates/blake3) | 1.8.7 | CC0-1.0 OR Apache-2.0, or Apache-2.0 with the LLVM exception |
+| [chacha20poly1305](https://crates.io/crates/chacha20poly1305) | 0.11.0 | Apache-2.0 OR MIT |
 | [flate2](https://crates.io/crates/flate2) | 1.1.10 | MIT OR Apache-2.0 |
 | [futures-util](https://crates.io/crates/futures-util) | 0.3.34 | MIT OR Apache-2.0 |
 | [getrandom](https://crates.io/crates/getrandom) | 0.4.3 | MIT OR Apache-2.0 |
@@ -106,7 +108,6 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [keyring](https://crates.io/crates/keyring) | 3.6.3 | MIT OR Apache-2.0 |
 | [proc-macro2](https://crates.io/crates/proc-macro2) | 1.0.107 | MIT OR Apache-2.0 |
 | [proptest](https://crates.io/crates/proptest) | 1.11.0 | MIT OR Apache-2.0 |
-| [redb](https://crates.io/crates/redb) | 4.2.0 | MIT OR Apache-2.0 |
 | [reqwest](https://crates.io/crates/reqwest) | 0.13.5 | MIT OR Apache-2.0 |
 | [secrecy](https://crates.io/crates/secrecy) | 0.10.3 | Apache-2.0 OR MIT |
 | [serde](https://crates.io/crates/serde) | 1.0.229 | MIT OR Apache-2.0 |

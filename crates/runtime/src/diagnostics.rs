@@ -25,6 +25,7 @@
 //! second authority on what a line is made of. [`render`] is the one
 //! way text is produced, and a sink that wants text calls it.
 
+use crate::redact::Marker;
 use kernel::{RunId, Seq};
 
 /// Who reads a line, and when. Ordered from the widest audience to the
@@ -176,12 +177,14 @@ impl Diagnostics {
     /// same function, not a second one, because the scanner nobody
     /// watches is the one that misses something. A hit is replaced in
     /// place: dropping the line would lose the diagnostic entirely, and
-    /// the surrounding words are usually what the reader needed.
+    /// the surrounding words are usually what the reader needed. A log
+    /// line marks plainly: see [`crate::redact::Marker`] for why history
+    /// and a log differ in that one argument and in nothing else.
     pub fn write(&mut self, level: Level, site: Site<'_>, message: &str) {
         if !self.admits(level) {
             return;
         }
-        let scanned = redact(message);
+        let (scanned, _hits) = crate::redact::redact_text(message, Marker::Plain);
         (self.sink)(Entry {
             level,
             site,
@@ -189,43 +192,6 @@ impl Diagnostics {
         });
     }
 }
-
-/// Replaces every secret-shaped span with a marker.
-#[must_use]
-pub fn redact(message: &str) -> String {
-    let hits = kernel::secret::scan(message.as_bytes());
-    if hits.is_empty() {
-        return message.to_owned();
-    }
-    let bytes = message.as_bytes();
-    let mut out = String::with_capacity(message.len());
-    let mut at = 0usize;
-    for hit in hits {
-        // Overlapping or out-of-order spans cannot make this index
-        // backwards; a span that starts before what is already copied is
-        // skipped rather than rewinding the cursor.
-        let Some(end) = hit.start.checked_add(hit.len) else {
-            continue;
-        };
-        if hit.start < at || end > bytes.len() {
-            continue;
-        }
-        if let Some(before) = bytes.get(at..hit.start) {
-            out.push_str(&String::from_utf8_lossy(before));
-        }
-        out.push_str(REDACTED);
-        at = end;
-    }
-    if let Some(rest) = bytes.get(at..) {
-        out.push_str(&String::from_utf8_lossy(rest));
-    }
-    out
-}
-
-/// What a redacted span reads as. A reference-shaped marker, so a reader
-/// who finds one knows both that something was there and that the way to
-/// use it is a reference.
-pub const REDACTED: &str = "secret:redacted";
 
 /// One JSON object per line, for the same reason the wire format is:
 /// the receiver may be a browser, and a person can still read it.
@@ -342,7 +308,7 @@ mod tests {
         );
         let lines = held.lock().unwrap();
         assert!(!lines[0].contains(&token), "line: {}", lines[0]);
-        assert!(lines[0].contains(REDACTED));
+        assert!(lines[0].contains(&Marker::Plain.spell(token.as_bytes())));
         // The words around it survive: a redaction that ate the sentence
         // would cost the reader the thing they came for.
         assert!(lines[0].contains("calling the provider with"));
@@ -350,8 +316,12 @@ mod tests {
 
     #[test]
     fn a_message_with_nothing_to_hide_is_unchanged() {
-        assert_eq!(redact("wrote notes.md"), "wrote notes.md");
-        assert_eq!(redact(""), "");
+        let (mut log, held) = recorder();
+        log.write(Level::Effect, site(), "wrote notes.md");
+        log.write(Level::Effect, site(), "");
+        let lines = held.lock().unwrap();
+        assert!(lines[0].contains("wrote notes.md"));
+        assert!(lines[1].contains("\"message\":\"\""));
     }
 
     #[test]

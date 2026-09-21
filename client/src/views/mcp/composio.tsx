@@ -55,6 +55,7 @@ export function Composio(props: { readonly intake: Intake }) {
     setRefused(false);
     void enrol({
       origin: ui.origin,
+      token: ui.pairing,
       realm: "mcp",
       name: "composio",
       value,

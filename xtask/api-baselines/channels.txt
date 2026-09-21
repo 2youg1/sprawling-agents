@@ -19,6 +19,8 @@ pub async fn channels::serve(channels::ServeConfig) -> core::result::Result<(), 
 pub channels::AcpProgress::finished: bool
 pub channels::AcpProgress::run: alloc::string::String
 pub channels::AcpProgress::turns: u32
+pub channels::Admission::Admit(channels::Pairing)
+pub channels::Admission::Refuse(kernel::error::shape::AxError)
 pub channels::Answer::Approvals(channels::ApprovalsAnswer)
 pub channels::Answer::Archive(channels::ArchiveAnswer)
 pub channels::Answer::Building(alloc::boxed::Box<channels::BuildingAnswer>)
@@ -367,6 +369,9 @@ pub channels::DocumentAnswer::binary: bool
 pub channels::DocumentAnswer::bytes: u64
 pub channels::DocumentAnswer::text: alloc::string::String
 pub channels::DocumentAnswer::truncated: bool
+pub channels::Door::Acp
+pub channels::Door::Enroll
+pub channels::Door::Transcribe
 pub channels::Drift::ahead: u64
 pub channels::Drift::behind: u64
 pub channels::EmbeddedFile::gz: &'static [u8]
@@ -757,6 +762,7 @@ pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
 pub const channels::QUERY_NAMES: [&str; 33]
 pub const channels::WIRE_V: u32
+pub enum channels::Admission
 pub enum channels::Answer
 pub enum channels::AssetReply
 pub enum channels::BindFace
@@ -776,6 +782,7 @@ pub enum channels::DoctorNeed
 pub enum channels::DoctorState
 pub enum channels::DoctorTier
 pub enum channels::DoctorVersion
+pub enum channels::Door
 pub enum channels::EntryKind
 pub enum channels::EvidenceKind
 pub enum channels::Face
@@ -837,10 +844,12 @@ pub fn channels::ToolkitSlug::as_str(&self) -> &str
 pub fn channels::ToolkitSlug::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn channels::arguments_in(&serde_json::value::Value) -> core::option::Option<channels::Output>
 pub fn channels::classify(&channels::Command) -> channels::ControlVerdict
+pub fn channels::decide_admission(channels::Door, core::option::Option<&str>, core::option::Option<&kernel::locator::B3Hash>) -> channels::Admission
 pub fn channels::decide_bind(&core::net::socket_addr::SocketAddr, bool) -> channels::BindVerdict
 pub fn channels::decide_frame(channels::SessionState, channels::ClientFrame, core::option::Option<&kernel::locator::B3Hash>, core::option::Option<&kernel::address::Address>) -> channels::SessionStep
 pub fn channels::decide_handshake(&channels::Hello, &channels::Welcome, core::option::Option<&kernel::locator::B3Hash>) -> channels::HandshakeVerdict
 pub fn channels::note_of(kernel::event::kind::EventKind, &kernel::event::payload::EventRecord) -> core::option::Option<channels::Note>
+pub fn channels::offered_pairing(core::option::Option<&str>) -> core::option::Option<&str>
 pub fn channels::output_in(&serde_json::value::Value) -> core::option::Option<channels::Output>
 pub fn channels::router(&channels::ServeConfig) -> axum::routing::Router
 pub fn channels::said_in(&serde_json::value::Value) -> core::option::Option<alloc::string::String>

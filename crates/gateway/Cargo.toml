@@ -30,8 +30,17 @@ zeroize.workspace = true
 # fact, not a second internal hash authority (blake3 stays sole for
 # content addressing).
 sha2 = "0.11"
-# The one base64 encoder both provider wires take pictures in.
+# The one base64 encoder both provider wires take pictures in, and the
+# encoding the encrypted vault file records a nonce and a ciphertext in.
 base64.workspace = true
+# The encrypted vault file (gateway-SPEC 8-21): one AEAD, one password KDF.
+# `FileVault` is the only reader of either, and it reaches them only on a
+# machine whose credential service refuses to keep a value.
+chacha20poly1305.workspace = true
+argon2.workspace = true
+# The salt and the nonce come from the operating system, never from the
+# seeded generator the simulator runs on.
+getrandom.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

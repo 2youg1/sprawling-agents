@@ -22,6 +22,8 @@ use std::path::Path;
 
 use kernel::{Address, AxCode, AxError};
 
+use crate::doctor::Platform;
+
 /// Opens the desktop's file manager with this address selected.
 ///
 /// # Errors
@@ -51,27 +53,32 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError> {
 /// else opens the directory: `xdg-open` has no selection argument, and
 /// the desktops that do have one spell it differently per file manager,
 /// which is a table this city would then have to keep current.
-#[cfg(target_os = "windows")]
+///
+/// One match over `Platform` rather than three functions behind
+/// `#[cfg]`: the three answers are then readable side by side, and a
+/// fourth platform is a compile error here rather than a silent fall
+/// through to the last arm.
 fn manager(path: &Path) -> std::process::Command {
-    let mut command = std::process::Command::new("explorer");
-    // No space after the comma: `explorer` parses `/select,<path>` as one
-    // argument and opens the person's home directory when it is two.
-    command.arg(format!("/select,{}", path.display()));
-    command
-}
-
-#[cfg(target_os = "macos")]
-fn manager(path: &Path) -> std::process::Command {
-    let mut command = std::process::Command::new("open");
-    command.args(["-R", &path.display().to_string()]);
-    command
-}
-
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
-fn manager(path: &Path) -> std::process::Command {
-    let mut command = std::process::Command::new("xdg-open");
-    command.arg(path.parent().unwrap_or(path).display().to_string());
-    command
+    match Platform::current() {
+        Some(Platform::Windows) => {
+            let mut command = std::process::Command::new("explorer");
+            // No space after the comma: `explorer` parses
+            // `/select,<path>` as one argument and opens the person's
+            // home directory when it is two.
+            command.arg(format!("/select,{}", path.display()));
+            command
+        }
+        Some(Platform::MacOs) => {
+            let mut command = std::process::Command::new("open");
+            command.args(["-R", &path.display().to_string()]);
+            command
+        }
+        Some(Platform::Linux) | None => {
+            let mut command = std::process::Command::new("xdg-open");
+            command.arg(path.parent().unwrap_or(path).display().to_string());
+            command
+        }
+    }
 }
 
 #[cfg(test)]

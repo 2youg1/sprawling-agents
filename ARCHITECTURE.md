@@ -53,7 +53,6 @@ The pinned versions live in `Cargo.toml`; this table says why each is there. Whe
 | HTTP client | `reqwest` <!-- xtask:begin dep_version:reqwest -->0.13<!-- xtask:end -->, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. |
 | Client | Solid 1.9 and Effect 3.22, bundled by Vite, driven by bun | Two runtime dependencies and no framework runtime beyond them: Solid compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
-| Cold views | `redb` <!-- xtask:begin dep_version:redb -->4.2<!-- xtask:end --> | Embedded, transactional, crash-safe. The projection is derived, so its file is disposable and never a second authority. |
 | Content store | BLAKE3 (`blake3` <!-- xtask:begin dep_version:blake3 -->1.8<!-- xtask:end -->) | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
 | Restoration | `git2` <!-- xtask:begin dep_version:git2 -->0.21<!-- xtask:end -->, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
 | Sandbox | `wasmtime` <!-- xtask:begin dep_version:wasmtime -->48<!-- xtask:end --> + `wasmtime-wasi`, wasip1 only | Fuel-metered execution with **no socket host implementation** — the Python arm's mechanical proof that it cannot reach the network. Cost: an optional feature; a build without it refuses tool execution in three parts rather than pretending. |
@@ -62,7 +61,7 @@ The pinned versions live in `Cargo.toml`; this table says why each is there. Whe
 | Serialisation | `serde` 1, `serde_json` 1, `toml` <!-- xtask:begin dep_version:toml -->1.1<!-- xtask:end --> | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` <!-- xtask:begin dep_version:thiserror -->2<!-- xtask:end --> | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. |
-| Dependency count | <!-- xtask:begin dependency_count -->389<!-- xtask:end --> packages in `Cargo.lock` | Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->401<!-- xtask:end --> packages in `Cargo.lock` | Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest` (properties before examples), `insta` (golden output), `trybuild` (proof that something cannot be expressed), `kani` (bounded proof, Linux CI), `cargo-mutants` (do the tests bite), `cargo-fuzz` (parsers against hostile bytes).
 
@@ -129,7 +128,7 @@ A seam is a trait declared in the inner layer and implemented outside it. **One 
 
 **Two inner seams** stay `pub(crate)` because nothing outside their crate needs them: `memory`'s `Vfs` (real filesystem / deterministic power-loss model) and `gateway`'s `Vault` (platform credential service / in-session store).
 
-**Deliberately not seams**: `gateway::dialect` is a pure function and needs no trait; the internals of `city`, `collab` and `eval` have one implementation each and are driven from outside by citysim; `git2` and `redb` are used directly, because an interface with one implementation is decoration.
+**Deliberately not seams**: `gateway::dialect` is a pure function and needs no trait; the internals of `city`, `collab` and `eval` have one implementation each and are driven from outside by citysim; `git2` is used directly, because an interface with one implementation is decoration.
 
 ## 5 One dispatch, end to end
 
@@ -146,7 +145,7 @@ This is the path everything else supports. Following it once explains more than 
 9. **The reply is scanned before it is recorded.** `runtime::redact` puts model output through the same secret scan as everything else, so a key a model repeated does not become permanent.
 10. **Tools run behind gates.** `kernel::gate` answers with an exhaustive verdict — allowed, refused in three parts, or escalated to a person. `memory::checkpoint` puts a git fence before the wave and scans the worktree after it, so anything that disappeared becomes a `file_discarded` event carrying the way back.
 11. **The result comes back shaped.** `runtime::pipeline` builds the result envelope — clock stamp, network reminder, any steer a person sent — and `runtime::compaction` shortens what is too long, always reporting how much it dropped.
-12. **Everything lands in the Ledger, and the views follow.** `memory::hot`, `memory::projection` and `memory::attribution` fold the same event stream into what the pages ask for. The server pushes each event; the client folds it into what it believes. The same fold, on both sides of the wire.
+12. **Everything lands in the Ledger, and the views follow.** `memory::hot` and `memory::attribution` fold the same event stream into what the pages ask for. The server pushes each event; the client folds it into what it believes. The same fold, on both sides of the wire.
 
 13. **A signal reaches whoever it names, working or not.** After the run freezes, each signal it sent is recorded and then delivered. A steer-kind signal slips under the door of a run that is already going, landing at that run's next safe point with `@` and the sender's address in front of it; anyone else who was spoken to is *knocked* — `bin::assembly` starts a run for them, whose brief names the resident who spoke. Only the person's own entrance can render as `user`, which is what makes an answer go to the right place. A knock addresses a resident, never a frozen run: history is read, not woken.
 
@@ -161,7 +160,6 @@ A city is one directory. Copy it and it is the same city; delete it and nothing 
 ├─ .sprawling/                 the city's own reserved subtree
 │  ├─ ledger/                  the only history — jsonl segments, appended, chain-verified
 │  ├─ cas/                     content-addressed store, BLAKE3, one copy per content
-│  ├─ views/                   redb: cold projections, disposable, rebuilt from the ledger
 │  ├─ worktrees/               one git worktree per reviewing run, objects shared
 │  ├─ staging/                 uploads land here read-only, never in a worktree
 │  ├─ library/                 skills more than one building admits
@@ -236,7 +234,7 @@ A confidential building constructs none of them: data may enter and may not leav
 | execution sandbox | `runtime::sandbox` | implement the trait, pass its conformance suite; the shipped adapter is wasmtime with fuel |
 | the client | `channels::wire` | the wire is the whole API; a second client writes against it |
 | the browser driver | `browser::port` | frames in, replies out; the shipped adapter speaks WebDriver BiDi |
-| where views are stored | `memory::projection` | delete the store and it rebuilds from the Ledger, byte-identical |
+| where views are stored | `bin::sprawling::views` | delete the process and they rebuild from the Ledger, byte-identical |
 
 ## 9 Seven shapes
 
@@ -252,7 +250,7 @@ Every module instantiates exactly one of these. The classification earns its pla
 | 6 | data | data only, no branches. Editing it is editing behaviour |
 | 7 | projection | folds the event stream into a view; deleting it and rebuilding gives the same bytes |
 
-**The Humble Object is the recurring move**: the hard-to-test end is stripped to nothing and the thick end stays pure. `runtime::watchdog`, `gateway::endpoint`, `memory::projection` and the sandbox adapters are all instances of it.
+**The Humble Object is the recurring move**: the hard-to-test end is stripped to nothing and the thick end stays pure. `runtime::watchdog`, `gateway::endpoint` and the sandbox adapters are all instances of it.
 
 ### Making illegal states unrepresentable
 
@@ -298,7 +296,7 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->16<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1877<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->1884<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
@@ -351,7 +349,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 
 **The number in each subheading is the number of rows under it**, and `cargo xtask modmap` counts them, because every count a person maintained by hand here had already gone stale. The `desktop` heading is the one exception the machine cannot judge: its files sit outside `crates/`, where the parser does not look.
 
-### kernel (90) — every decision in the city, and nothing that touches a disk
+### kernel (91) — every decision in the city, and nothing that touches a disk
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -376,6 +374,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::event::record::run::tests | crates/kernel/src/event/record/run/tests.rs | that a dispatch and a fork write the bytes their hand-written maps wrote | data | V5 | built | kernel-SPEC.md#8-4 |
 | kernel::event::record::checkpoint | crates/kernel/src/event/record/checkpoint.rs | the job a dispatch pinned, the commit a fence raised, and which session made it | data | V5 | built | kernel-SPEC.md#8-4 |
 | kernel::event::record::checkpoint::tests | crates/kernel/src/event/record/checkpoint/tests.rs | that a fence and a pin write the bytes they have always written | data | V5 | built | kernel-SPEC.md#8-4 |
+| kernel::event::record::governance | crates/kernel/src/event/record/governance.rs | how one approval was answered, who may answer for a scope, what is shut, and which governed document was written | data | V5 | built | kernel-SPEC.md#8-4 |
 | kernel::error | crates/kernel/src/error.rs | AxError and the closed AxCode set, each with its carrier event | value | S1 | built | kernel-SPEC.md#8-1 |
 | kernel::version | crates/kernel/src/version.rs | optimistic concurrency: a write carries the version it read | value | S1 | built | kernel-SPEC.md#8-5 |
 | kernel::release | crates/kernel/src/release.rs | which release a binary is, in both spellings one release has, and how two of them order | value | S1 | built | kernel-SPEC.md#8-54 |
@@ -446,7 +445,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | kernel::highlight::tests | crates/kernel/src/highlight/tests.rs | the lexical rules a reader depends on: precedence, fences, and spans that slice without overlapping | decision | R2 | built | kernel-SPEC.md#8-31 |
 | kernel::schema | crates/kernel/src/schema.rs | the JSON Schema of the five values whose serde is hand-written, so the client generated from the wire reads their strings the way the parser does | adapter | V4 | built | kernel-SPEC.md#8-45 |
 
-### memory (51) — persistence, and every view derived from it
+### memory (47) — persistence, and every view derived from it
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -470,10 +469,6 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::index::reader | crates/memory/src/index/reader.rs | seeking lines without scanning | projection | S3 | built | memory-SPEC.md#8-4 |
 | memory::index::cache | crates/memory/src/index/cache.rs | stamps, caches, rebuilds | projection | S3 | built | memory-SPEC.md#8-4 |
 | memory::hot | crates/memory/src/hot.rs | the in-memory view the interface reads without touching disk | projection | S3 | built | memory-SPEC.md#8-5 |
-| memory::projection | crates/memory/src/projection.rs | the cold view: questions too big for memory, and recovery after restart | projection | S3 | built | memory-SPEC.md#8-6 |
-| memory::projection::tables | crates/memory/src/projection/tables.rs | rows, folds, table grammar | projection | S3 | built | memory-SPEC.md#8-6 |
-| memory::projection::view | crates/memory/src/projection/view.rs | open, apply, read | projection | S3 | built | memory-SPEC.md#8-6 |
-| memory::projection::view::tests | crates/memory/src/projection/view/tests.rs | the view fixtures | projection | S3 | built | memory-SPEC.md#8-6 |
 | memory::attribution | crates/memory/src/attribution.rs | where the money went, in five independent cuts that reconcile | projection | S3 | built | memory-SPEC.md#8-7 |
 | memory::attribution::report | crates/memory/src/attribution/report.rs | reports and buckets | projection | S3 | built | memory-SPEC.md#8-7 |
 | memory::attribution::report::tests | crates/memory/src/attribution/report/tests.rs | the attribution fixtures | projection | S3 | built | memory-SPEC.md#8-7 |
@@ -502,7 +497,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | memory::bundle::files | crates/memory/src/bundle/files.rs | walking, counting, copying | adapter | P1 | built | memory-SPEC.md#8-12 |
 | memory::bundle::fixture | crates/memory/src/bundle/fixture.rs | the one city the bundle tests export | adapter | V3 | built | memory-SPEC.md#8-21 |
 
-### gateway (65) — everything between a decision to call a model and the bytes on the wire
+### gateway (67) — everything between a decision to call a model and the bytes on the wire
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -563,6 +558,8 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | gateway::cost | crates/gateway/src/cost.rs | per-call settlement, with the provider's own figure preferred | decision | S3 | built | gateway-SPEC.md#8-8 |
 | gateway::credential | crates/gateway/src/credential.rs | custody: capture, replace with a reference, redeem at the wire, renew before expiry | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::vault | crates/gateway/src/credential/vault.rs | vaults, backends, persistence | adapter | S3 | built | gateway-SPEC.md#8-4 |
+| gateway::credential::vault::file | crates/gateway/src/credential/vault/file.rs | one encrypted file, opened by a passphrase: the backend for a machine that keeps nothing across a reboot | adapter | V0.0.6 | built | gateway-SPEC.md#8-21 |
+| gateway::credential::vault::file::tests | crates/gateway/src/credential/vault/file/tests.rs | the round trip, what a grep of the file sees, and the refusal a wrong passphrase gets | adapter | V0.0.6 | built | gateway-SPEC.md#8-21 |
 | gateway::credential::custodian | crates/gateway/src/credential/custodian.rs | capture, resolve, rotate | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::oauth | crates/gateway/src/credential/oauth.rs | PKCE, redeem, refresh | adapter | S3 | built | gateway-SPEC.md#8-4 |
 | gateway::credential::oauth::device | crates/gateway/src/credential/oauth/device.rs | the device-code flow: a code a person types on the vendor's page | adapter | V0.0.6 | built | gateway-SPEC.md#8-18 |
@@ -732,7 +729,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | eval::ablation::capabilities | crates/eval/src/ablation/capabilities.rs | the corpus: each thing a resident must be able to do, and the phrase in the document that grants it | data | V3 | built | eval-SPEC.md#8-7 |
 | eval::ablation::tests | crates/eval/src/ablation/tests.rs | the graded fixtures, and the on-demand run against the real City.md | decision | V3 | built | eval-SPEC.md#8-7 |
 
-### channels (41) — the process boundary
+### channels (42) — the process boundary
 
 | Module | File | What it owns | Shape | Since | Status | Spec |
 |---|---|---|---|---|---|---|
@@ -769,6 +766,7 @@ Columns are fixed: **Module | File | What it owns | Shape** (§9) **| Since** (t
 | channels::carried_name | crates/channels/src/carried_name.rs | names this crate does not own, validated at one construction point | value | V3 | built | channels-SPEC.md#8-1 |
 | channels::reception | crates/channels/src/reception.rs | may we bind, may this peer enrol, may we greet it, and what its frame means now | decision | V3 | built | channels-SPEC.md#8-2 |
 | channels::reception::inbound | crates/channels/src/reception/inbound.rs | reading one text frame, and the counted refusal for one this build cannot read | decision | V5 | built | channels-SPEC.md#8-37 |
+| channels::reception::admission | crates/channels/src/reception/admission.rs | whether one HTTP request holds this city's pairing token, and what each door does when it does not | decision | V6 | built | channels-SPEC.md#8-40 |
 | channels::assets | crates/channels/src/assets.rs | the client the browser downloads, and which bytes answer which path | adapter | V3 | built | channels-SPEC.md#8-2 |
 | channels::server | crates/channels/src/server.rs | the listening end; the judgements are pure and the socket makes none | adapter | S4 | built | channels-SPEC.md#8-2 |
 | channels::server::config | crates/channels/src/server/config.rs | routes and bodies | adapter | S4 | built | channels-SPEC.md#8-2 |

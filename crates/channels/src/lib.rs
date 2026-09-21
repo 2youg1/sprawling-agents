@@ -69,13 +69,15 @@ pub use preference::{BODY_PX_MAX, BODY_PX_MIN, PreferencePatch, PreferencesAnswe
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in, subject_of};
 pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
-pub use reception::{BindFace, BindVerdict, HandshakeVerdict};
+pub use reception::{Admission, BindFace, BindVerdict, Door, HandshakeVerdict, Pairing};
 #[cfg(feature = "server")]
 pub use reception::{SessionState, SessionStep, decide_frame};
 #[cfg(feature = "server")]
+pub use reception::{decide_admission, offered_pairing};
+#[cfg(feature = "server")]
 pub use reception::{decide_bind, decide_handshake};
 #[cfg(feature = "server")]
-pub use server::{AcpProgress, AcpSink, Pairing, TranscribeSink};
+pub use server::{AcpProgress, AcpSink, TranscribeSink};
 #[cfg(feature = "server")]
 pub use server::{Delivered, Reply, ServeConfig, router, serve};
 #[cfg(feature = "schema")]

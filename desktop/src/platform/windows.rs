@@ -44,6 +44,7 @@ use serde_json::{Value, json};
 
 use crate::refusal::{Refusal, RefusalCode};
 use crate::scope::Admitted;
+use crate::tools::ToolName;
 use act::Action;
 use geometry::Point;
 use reading::{asked_for, generation, held, inset, missing, notches, region, text, whole};
@@ -73,23 +74,17 @@ impl Desk {
     /// system itself refuses.
     pub(crate) fn perform(
         &mut self,
-        tool: &str,
+        tool: ToolName,
         arguments: &Value,
         admitted: &Admitted<'_>,
     ) -> Result<Value, Refusal> {
         match tool {
-            "desktop.windows" => listing(arguments, admitted),
-            "desktop.snapshot" => self.snapshot(arguments),
-            "desktop.act" => self.act(arguments),
-            "desktop.screenshot" => screenshot(arguments),
-            "desktop.record" => self.record(arguments),
-            "desktop.clipboard" => use_clipboard(arguments),
-            unknown => Err(Refusal::new(
-                RefusalCode::ToolUnknown,
-                "use the desktop",
-                format!("`{unknown}` is not a tool this server offers"),
-                "read `tools/list`; this server offers six tools and no others",
-            )),
+            ToolName::Windows => listing(arguments, admitted),
+            ToolName::Snapshot => self.snapshot(arguments),
+            ToolName::Act => self.act(arguments),
+            ToolName::Screenshot => screenshot(arguments),
+            ToolName::Record => self.record(arguments),
+            ToolName::Clipboard => use_clipboard(arguments),
         }
     }
 

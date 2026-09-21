@@ -25,6 +25,12 @@
 //! the first sixteen hex of the content hash instead, which is enough to
 //! see that two occurrences are the same value and never enough to be
 //! one.
+//!
+//! **Every sink in this crate marks the same way.** The ledger and the
+//! diagnostic log differ in one decision only — whether the marker
+//! carries a fingerprint — and that decision is the [`Marker`] argument
+//! below rather than a second scan-and-replace written next to the
+//! second sink.
 
 use kernel::B3Hash;
 use serde_json::{Map, Value};
@@ -33,6 +39,35 @@ use serde_json::{Map, Value};
 /// is stored under it, and `secret:` references resolve through the
 /// vault, so a reader who tries will be told there is nothing there.
 const REDACTED_REALM: &str = "redacted";
+
+/// What stands where a secret stood, and how much it says about it.
+///
+/// The two sinks differ here and nowhere else. History is kept,
+/// searched and compared, so a marker there tells one value from
+/// another; a diagnostic line is written once and read once, and a
+/// fingerprint in it would be a correlation handle in a stream that
+/// nothing correlates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Marker {
+    /// `secret:redacted` — something was here, and that is all.
+    Plain,
+    /// `secret:redacted/<sixteen hex>` — something was here, and two
+    /// occurrences of one value read alike.
+    Fingerprinted,
+}
+
+impl Marker {
+    /// The text this marker puts in the place of `found`.
+    #[must_use]
+    pub fn spell(self, found: &[u8]) -> String {
+        match self {
+            Marker::Plain => format!("secret:{REDACTED_REALM}"),
+            Marker::Fingerprinted => {
+                format!("secret:{REDACTED_REALM}/{}", fingerprint(found))
+            }
+        }
+    }
+}
 
 /// Replaces every secret-shaped span in every string of `payload`.
 ///
@@ -51,7 +86,7 @@ pub fn redact(payload: &Map<String, Value>) -> (Map<String, Value>, u32) {
 fn walk(value: &Value, hits: &mut u32) -> Value {
     match value {
         Value::String(text) => {
-            let (replaced, found) = redact_text(text);
+            let (replaced, found) = redact_text(text, Marker::Fingerprinted);
             *hits = hits.saturating_add(found);
             Value::String(replaced)
         }
@@ -73,7 +108,7 @@ fn walk(value: &Value, hits: &mut u32) -> Value {
 /// single left-to-right pass is enough and no offset needs adjusting
 /// after a replacement.
 #[must_use]
-pub fn redact_text(text: &str) -> (String, u32) {
+pub fn redact_text(text: &str, marker: Marker) -> (String, u32) {
     let bytes = text.as_bytes();
     let spans = kernel::secret::scan(bytes);
     if spans.is_empty() {
@@ -97,7 +132,7 @@ pub fn redact_text(text: &str) -> (String, u32) {
             continue;
         };
         out.push_str(before);
-        out.push_str(&marker(found));
+        out.push_str(&marker.spell(found));
         at = end;
         hits = hits.saturating_add(1);
     }
@@ -116,30 +151,17 @@ pub fn redact_text(text: &str) -> (String, u32) {
 const FINGERPRINT_HEX: usize = 16;
 
 /// The one short name this city gives a secret it must refer to without
-/// holding.
+/// holding: derived from the value, so one value reads alike in every
+/// session and two values never read alike in one.
 ///
-/// Two places need such a name and they must agree: this module, which
-/// replaces a span in a ledger payload, and the custodian, which stores
-/// the span in the vault under a name. A custodian that numbers its
-/// captures instead - `cap-1`, `cap-2` - gives the same value a
-/// different name in every session and two different values the same
-/// name across two, which is how a stored credential comes back as
+/// A name counted out instead — `cap-1`, `cap-2` — would give the same
+/// value a different name in every session and two different values the
+/// same name across two, which is how a stored credential comes back as
 /// somebody else's.
 #[must_use]
 pub fn fingerprint(found: &[u8]) -> String {
     let digest = B3Hash::digest(found).to_string();
     digest.get(..FINGERPRINT_HEX).unwrap_or(&digest).to_owned()
-}
-
-/// The vault name a captured secret is stored under: derived from the
-/// value, so capturing one twice is capturing it once.
-#[must_use]
-pub fn capture_name(found: &[u8]) -> String {
-    format!("cap-{}", fingerprint(found))
-}
-
-fn marker(found: &[u8]) -> String {
-    format!("secret:{REDACTED_REALM}/{}", fingerprint(found))
 }
 
 #[cfg(test)]
@@ -183,9 +205,9 @@ mod tests {
     fn the_same_value_twice_marks_the_same_way_and_two_values_do_not() {
         let key = key_shaped();
         let other = ["sk", "2Tg7Yh", "4Nn1Qs", "8Cz5Ud", "6Ke0"].join("");
-        let (first, _) = redact_text(&key);
-        let (again, _) = redact_text(&key);
-        let (different, _) = redact_text(&other);
+        let (first, _) = redact_text(&key, Marker::Fingerprinted);
+        let (again, _) = redact_text(&key, Marker::Fingerprinted);
+        let (different, _) = redact_text(&other, Marker::Fingerprinted);
         assert_eq!(first, again, "one value, one marker");
         assert_ne!(first, different, "two values are distinguishable");
     }
@@ -217,20 +239,35 @@ mod tests {
         assert!(!text.contains(&key));
     }
 
-    /// One value, one short name, wherever the city has to refer to it:
-    /// the marker a ledger line carries and the vault name a capture is
-    /// stored under are the same sixteen characters.
+    /// One value, one short name, wherever the city has to refer to it,
+    /// and a name a reader can act on: the marker parses as a reference,
+    /// so somebody who meets one in history knows both that a value was
+    /// there and that the way to a value is the vault, which will tell
+    /// them the `redacted` realm holds nothing.
     #[test]
-    fn a_marker_and_a_capture_name_stand_for_the_value_the_same_way() {
+    fn a_marker_is_a_reference_a_reader_can_follow_to_an_honest_nothing() {
         let key = key_shaped();
         let short = fingerprint(key.as_bytes());
         assert_eq!(short.len(), 16);
-        assert_eq!(capture_name(key.as_bytes()), format!("cap-{short}"));
-        let (marked, hits) = redact_text(&key);
+        let (marked, hits) = redact_text(&key, Marker::Fingerprinted);
         assert_eq!(hits, 1);
         assert_eq!(marked, format!("secret:redacted/{short}"));
-        let other = ["sk", "2Tg7Yh", "4Nn1Qs", "8Cz5Ud", "6Ke0"].join("");
-        assert_ne!(capture_name(other.as_bytes()), capture_name(key.as_bytes()));
+        let reference = kernel::SecretRef::parse(&marked).unwrap();
+        assert_eq!(reference.realm(), REDACTED_REALM);
+        assert_eq!(reference.name(), short);
+    }
+
+    /// The two sinks mark by one rule and differ by one argument: a log
+    /// line says a secret was there, history says which one.
+    #[test]
+    fn a_plain_marker_says_that_something_was_here_and_nothing_more() {
+        let key = key_shaped();
+        let (line, hits) = redact_text(&format!("token {key} used"), Marker::Plain);
+        assert_eq!(hits, 1);
+        assert_eq!(line, "token secret:redacted used");
+        assert!(!line.contains(&fingerprint(key.as_bytes())));
+        let (kept, _) = redact_text(&format!("token {key} used"), Marker::Fingerprinted);
+        assert!(kept.contains(&fingerprint(key.as_bytes())));
     }
 
     #[test]

@@ -95,12 +95,19 @@ pub(crate) fn result_line(id: &Value, result: Value) -> String;
 pub(crate) fn error_line(id: Option<&Value>, refusal: &Refusal) -> String;
 
 // 8-3 tools（形状 6 数据）
-pub(crate) struct ToolCard { pub(crate) name: &'static str, pub(crate) description: String, pub(crate) schema: Value }
+// 六个工具名唯一的家（M-23）：工具表、scope 判定与 platform 路由此前各写一遍字面量。
+pub(crate) enum ToolName { Windows, Snapshot, Act, Screenshot, Record, Clipboard }
+impl ToolName {
+    pub(crate) const ALL: [ToolName; 6];
+    pub(crate) const fn as_str(self) -> &'static str;   // `desktop.windows` …
+    pub(crate) fn parse(name: &str) -> Option<ToolName>; // 未知名字在这里止步，拒词由 session 写
+}
+pub(crate) struct ToolCard { pub(crate) name: ToolName, pub(crate) description: String, pub(crate) schema: Value }
 pub(crate) fn table() -> Vec<ToolCard>;
-pub(crate) fn card(name: &str) -> Option<ToolCard>;
 
 // 8-4 scope（形状 1 判定）
-pub(crate) struct Reach<'a> { pub(crate) tool: &'a str, pub(crate) title: Option<&'a str>, pub(crate) process: Option<&'a str> }
+pub(crate) struct Reach<'a> { pub(crate) tool: ToolName, pub(crate) title: Option<&'a str>, pub(crate) process: Option<&'a str> }
+// 「哪些工具必须指名窗口」由一个对 ToolName 穷尽的 const fn 判定，第七件工具在此处是编译错误。
 // Closed 携码：没人写过的文件是没人给过的许可（E_GATE_DENIED），
 // 读不出来的文件是这份文件本身有缺陷（E_CONFIG_INVALID）。两件事，两个码。
 pub(crate) enum Scope { Closed { code: RefusalCode, because: String }, Open(Allowance) }
@@ -136,7 +143,7 @@ impl Server {
 }
 
 // 8-6 platform（形状 4 适配器；cfg 二选一，无 trait）
-pub(crate) fn perform(tool: &str, arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal>;
+pub(crate) fn perform(tool: ToolName, arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal>;
 ```
 
 ### 8-7 六张工具卡片
@@ -163,7 +170,8 @@ pub(crate) fn perform(tool: &str, arguments: &Value, admitted: &Admitted<'_>) ->
 pub(crate) struct Desk { /* 私有：views／recordings */ }
 impl Desk {
     pub(crate) fn new() -> Desk;
-    pub(crate) fn perform(&mut self, tool: &str, arguments: &Value) -> Result<Value, Refusal>;
+    // 路由对 ToolName 穷尽，unknown 臂已删：未知名字在 ToolName::parse 止步。
+    pub(crate) fn perform(&mut self, tool: ToolName, arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal>;
 }
 ```
 

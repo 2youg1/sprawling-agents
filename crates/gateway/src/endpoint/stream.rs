@@ -19,7 +19,7 @@ use serde_json::Value;
 use crate::cost;
 use crate::dialect;
 
-use super::config::{Endpoint, provider_err, transport_detail};
+use super::config::{Endpoint, ProviderFailure, provider_err};
 
 impl Endpoint {
     /// One call, with the body read as it arrives.
@@ -71,17 +71,20 @@ impl Endpoint {
         let mut sending = request
             .json(&wire)
             .build()
-            .map_err(|err| provider_err("call provider", transport_detail(&err)))?;
+            .map_err(|err| provider_err("call provider", &ProviderFailure::Unbuilt(&err)))?;
         *sending.timeout_mut() = None;
         let response = self
             .client
             .execute(sending)
-            .map_err(|err| provider_err("call provider", transport_detail(&err)))?;
+            .map_err(|err| provider_err("call provider", &ProviderFailure::Exchange(&err)))?;
         let status = response.status();
         if !status.is_success() {
             return Err(provider_err(
                 "call provider",
-                format!("{} answered {}", self.config.base_url, status.as_u16()),
+                &ProviderFailure::Refused {
+                    url: &self.config.base_url,
+                    status,
+                },
             ));
         }
         let frames = self.frames_of(response, onto)?;
@@ -139,7 +142,10 @@ impl Endpoint {
             let line = match arriving.recv_timeout(quiet) {
                 Ok(Ok(line)) => line,
                 Ok(Err(err)) => {
-                    return Err(provider_err("read provider response", err.to_string()));
+                    return Err(provider_err(
+                        "read provider response",
+                        &ProviderFailure::Cut(&err),
+                    ));
                 }
                 // The reader reached the end of the body and dropped
                 // its end of the channel, which is how a stream ends.
@@ -147,7 +153,7 @@ impl Endpoint {
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     return Err(provider_err(
                         "read provider response",
-                        format!("no byte arrived for {quiet_ms} ms"),
+                        &ProviderFailure::Silence { quiet_ms },
                     ));
                 }
             };

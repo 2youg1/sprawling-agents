@@ -21,7 +21,7 @@ use serde_json::Value;
 
 use crate::dialect::{ImageBytes, request_wire};
 
-use super::config::{AuthSpec, Endpoint, apply_override, provider_err, transport_detail};
+use super::config::{AuthSpec, Endpoint, ProviderFailure, apply_override, provider_err};
 use super::header::HeaderValue;
 use super::models::ModelFacts;
 
@@ -87,27 +87,31 @@ impl Endpoint {
         let request = self.authorize(self.client.get(url))?;
         let response = request
             .send()
-            .map_err(|err| provider_err("list models", transport_detail(&err)))?;
+            .map_err(|err| provider_err("list models", &ProviderFailure::Exchange(&err)))?;
         let status = response.status();
         if !status.is_success() {
             return Err(provider_err(
                 "list models",
-                format!("{url} answered {}", status.as_u16()),
+                &ProviderFailure::Refused { url, status },
             ));
         }
         let body: Value = response
             .json()
-            .map_err(|err| provider_err("read the model list", err.to_string()))?;
-        let rows = body
-            .get("data")
-            .and_then(Value::as_array)
-            .ok_or_else(|| provider_err("read the model list", format!("{url}: no data array")))?;
+            .map_err(|err| provider_err("read the model list", &ProviderFailure::Exchange(&err)))?;
+        let rows = body.get("data").and_then(Value::as_array).ok_or_else(|| {
+            provider_err(
+                "read the model list",
+                &ProviderFailure::Unreadable(format!("{url}: no data array")),
+            )
+        })?;
         let mut facts = Vec::new();
         for row in rows {
-            facts.push(
-                ModelFacts::read(row)
-                    .ok_or_else(|| provider_err("read the model list", "a row has no id"))?,
-            );
+            facts.push(ModelFacts::read(row).ok_or_else(|| {
+                provider_err(
+                    "read the model list",
+                    &ProviderFailure::Unreadable("a row has no id".to_owned()),
+                )
+            })?);
         }
         facts.sort_by(|left, right| left.id.cmp(&right.id));
         facts.dedup_by(|left, right| left.id == right.id);
@@ -180,17 +184,17 @@ impl Endpoint {
             .body(body);
         let response = request
             .send()
-            .map_err(|err| provider_err("post to provider", transport_detail(&err)))?;
+            .map_err(|err| provider_err("post to provider", &ProviderFailure::Exchange(&err)))?;
         let status = response.status();
         if !status.is_success() {
             return Err(provider_err(
                 "post to provider",
-                format!("{url} answered {}", status.as_u16()),
+                &ProviderFailure::Refused { url, status },
             ));
         }
         response
             .json()
-            .map_err(|err| provider_err("read provider response", transport_detail(&err)))
+            .map_err(|err| provider_err("read provider response", &ProviderFailure::Exchange(&err)))
     }
 
     /// The bytes for every picture this request refers to.

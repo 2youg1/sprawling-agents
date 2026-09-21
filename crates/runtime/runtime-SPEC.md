@@ -528,13 +528,15 @@ pub fn admits(mode: Mode, produced: &Produced) -> Admission;
 // 窗口块已在此前取出，故思考块签名不受影响；历史与上下文是两个汇，只有一个是永久的。
 // 替换物是 `secret:redacted/<b3-16>` 标记而非 Vault 条目：模型复述的钥匙不是城被托付保管的凭证，
 // 存它等于给它一条没人要求过的命，而哈希前十六位已足以看出两处是否同一个值。
+pub enum Marker { Plain, Fingerprinted }         // 两个汇只差这一个参数，不差第二份实现
+impl Marker { pub fn spell(self, found: &[u8]) -> String; }
 pub fn redact(payload: &Map<String, Value>) -> (Map<String, Value>, u32);
-pub fn redact_text(text: &str) -> (String, u32);
-// 一个值的短名只有一处口径：`fingerprint` 取 b3 前十六位，标记 `secret:redacted/<b3-16>` 与
-// 保管名 `cap-<b3-16>` 都由它生成。`gateway::Custodian::capture` 现按捕获次序编号（`cap-<n>`），
-// 同一个值每场会话换一个名、两个值跨会话撞同一个名；它应改调 `capture_name`（8-3 的 runtime 半）。
+pub fn redact_text(text: &str, marker: Marker) -> (String, u32);
+// 「什么绝不可被打印」在本 crate 只有这一个家：账本走 `Fingerprinted`，诊断行走 `Plain`。
+// 历史被检索与比对，故标记要能分辨两个值；一行日志写一次读一次，哈希后缀在那里只是一个
+// 没人关联的关联句柄。标记恒可由 `kernel::SecretRef::parse` 解析，realm 恒为 `redacted`，
+// 而金库里没有这个 realm——顺着标记去兑的读者得到的是一句诚实的「这里没有」。
 pub fn fingerprint(found: &[u8]) -> String;      // b3 前十六位
-pub fn capture_name(found: &[u8]) -> String;     // "cap-" + fingerprint
 
 pub struct ToolBench { /* tools: BTreeMap<String, Box<dyn Tool>>、domain: WriteDomain、registry: Registry、
                           taint: TaintSet、seen: BTreeSet<IdemKey>、prior_public_egress: bool —— 私有 */ }
@@ -690,13 +692,13 @@ impl Diagnostics {
     pub fn write(&mut self, level: Level, site: Site<'_>, message: &str);
     // 无读方法。这是本模块全部保证的形状半边
 }
-pub fn redact(&str) -> String;   pub const REDACTED: &str = "secret:redacted";
+// 无自己的打码器：`write` 交给 sink 之前调 `redact::redact_text(message, Marker::Plain)`
 ```
 
 - **无读方法即全部形状保证**：「判定与恢复逻辑不读日志」不靠纪律，靠这一点——把一行读回来在类型上拼不出。推论就是收口条件：删光日志，行为、重放与总账逐字节不变。
 - **行上恒无时间戳**（与 `docs/logging.md` 早期口径的差异，已回写该文）：锦点是 `seq`——两条时间线靠一个整数对齐，而采样壁钟会在一个不允许采样的库里开第二个时间源。想要时间的 sink 在装配层自己加。
 - **坐标由 Ledger 自己说**：`memory::JsonlLedger::position()`（返回「现在写一条会落在哪」）。只给位置不给内容：一个能读记录的访问器会把判定逻辑引到它正在写的账上去。
-- **双重防线**：`Sealed` 无 Debug/Display，入行在类型层就不成立（反例 `tests/ui/log_a_credential.rs`）；普通字符串里的明文由 `kernel::scan`——**同一个**扫描器，不是第二个——就地换成 `secret:redacted`。不丢整行：周围那句话通常正是读者要的。
+- **双重防线**：`Sealed` 无 Debug/Display，入行在类型层就不成立（反例 `tests/ui/log_a_credential.rs`）；普通字符串里的明文由 `redact::redact_text`——**同一个**扫描器与**同一份**替换实现，不是第二个——就地换成 `secret:redacted`（`Marker::Plain`）。不丢整行：周围那句话通常正是读者要的。
 - **不引 `tracing`**：它在此处的唯一功能是跨 `await` 携模块名的 span，而回合路径是同步的，该功能今天无消费者。理由已回写 `docs/logging.md` §7。
 - **写入方三处**（§6 的三类各一）：命令被拒（`refuse`，写在 `handle` 而非调用方，因为每个调用方都要）；endpoint 附着与探测结果（`effect`）；dispatch 跑完（`effect`，作为指向 Ledger 的指针）。
 

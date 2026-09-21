@@ -38,6 +38,11 @@ export interface Ui {
   readonly chooseEffort: (level: Effort | null) => void;
   readonly bar: AddressBar;
   readonly origin: string;
+  // The pairing code this page was opened with, as the city's HTTP
+  // doors ask for it (`core/socket.ts` reads it off the address bar
+  // and spells the header). `null` on a city that configured none,
+  // which is a city on loopback.
+  readonly pairing: string | null;
   // Milliseconds now, read where a view needs a relative time.
   readonly now: () => number;
 }
@@ -75,6 +80,7 @@ function orphaned(): Ui {
     chooseEffort,
     bar: { hash: "" },
     origin: "",
+    pairing: null,
     now: () => 0,
   };
 }

@@ -23,7 +23,10 @@
 //! token, and a missing token refuses the *start*, not the connection:
 //! "data stays on your team" is a judgement or it is decoration.
 
+mod admission;
 pub(crate) mod inbound;
+
+pub use admission::{Admission, Door, Pairing, decide_admission, offered_pairing};
 
 use std::net::SocketAddr;
 

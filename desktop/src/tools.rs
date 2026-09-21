@@ -17,9 +17,60 @@
 
 use serde_json::{Value, json};
 
+/// The name of one of the six tools, as a closed set.
+///
+/// **The one authority on what this server's tools are called.** The
+/// table below, the scope decision (`crate::scope`) and the routing in
+/// `crate::platform` each used to spell the six strings out, so a
+/// seventh tool, or a renamed one, was three edits that nothing checked
+/// against each other. Routing now matches this enum and needs no arm
+/// for a name nobody offers: [`ToolName::parse`] is where an unknown
+/// name stops.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ToolName {
+    Windows,
+    Snapshot,
+    Act,
+    Screenshot,
+    Record,
+    Clipboard,
+}
+
+impl ToolName {
+    /// Every name there is. The order the tools are *published* in is
+    /// [`table`]'s, which a test below holds to this list's membership.
+    pub(crate) const ALL: [ToolName; 6] = [
+        ToolName::Windows,
+        ToolName::Snapshot,
+        ToolName::Act,
+        ToolName::Screenshot,
+        ToolName::Record,
+        ToolName::Clipboard,
+    ];
+
+    /// What a caller writes in `tools/call`.
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            ToolName::Windows => "desktop.windows",
+            ToolName::Snapshot => "desktop.snapshot",
+            ToolName::Act => "desktop.act",
+            ToolName::Screenshot => "desktop.screenshot",
+            ToolName::Record => "desktop.record",
+            ToolName::Clipboard => "desktop.clipboard",
+        }
+    }
+
+    /// The name a call sent, or nothing when this server offers no such
+    /// tool. The caller writes the refusal, because the sentence a
+    /// person reads belongs to the door that was knocked on.
+    pub(crate) fn parse(name: &str) -> Option<ToolName> {
+        ToolName::ALL.into_iter().find(|tool| tool.as_str() == name)
+    }
+}
+
 /// One tool, under the three fields `tools/list` publishes.
 pub(crate) struct ToolCard {
-    pub(crate) name: &'static str,
+    pub(crate) name: ToolName,
     pub(crate) description: String,
     pub(crate) schema: Value,
 }
@@ -49,7 +100,7 @@ fn properties(own: Value) -> Value {
 pub(crate) fn table() -> Vec<ToolCard> {
     vec![
         ToolCard {
-            name: "desktop.windows",
+            name: ToolName::Windows,
             description: "List the top-level windows on this desktop: title, owning process, \
                  bounds, and a ref the other tools take. Only windows this server's scope file \
                  lists are reported. It does not focus, move, resize or close anything, and it \
@@ -65,7 +116,7 @@ pub(crate) fn table() -> Vec<ToolCard> {
             }),
         },
         ToolCard {
-            name: "desktop.snapshot",
+            name: ToolName::Snapshot,
             description: "Read the accessibility tree of one named window: role, name, ref and \
                  bounds per node, with a generation number that `desktop.act` carries back. It \
                  does not return pixels, it does not expose native handles, and it does not read \
@@ -81,7 +132,7 @@ pub(crate) fn table() -> Vec<ToolCard> {
             }),
         },
         ToolCard {
-            name: "desktop.act",
+            name: ToolName::Act,
             description: "Do one thing to one window: click, double, right, drag, scroll, type or \
                  key, at a ref from a snapshot or at a point. `generation` is the snapshot the \
                  action was decided against, and an action decided against an older view is \
@@ -138,7 +189,7 @@ pub(crate) fn table() -> Vec<ToolCard> {
             }),
         },
         ToolCard {
-            name: "desktop.screenshot",
+            name: ToolName::Screenshot,
             description: "Capture one named window, or a region of it, and return the image as \
                  base64 with its width, height and mime type. `scale` and `quality` are whole \
                  percentages, because every call is recorded and the record holds no fractions. \
@@ -167,7 +218,7 @@ pub(crate) fn table() -> Vec<ToolCard> {
             }),
         },
         ToolCard {
-            name: "desktop.record",
+            name: ToolName::Record,
             description: "Start or stop recording one named window: an mp4 when ffmpeg is on \
                  this machine's PATH, otherwise a directory of PNG frames. `start` answers with \
                  a `recording` id, and `stop` takes that id back, because a window's title can \
@@ -190,7 +241,7 @@ pub(crate) fn table() -> Vec<ToolCard> {
             }),
         },
         ToolCard {
-            name: "desktop.clipboard",
+            name: ToolName::Clipboard,
             description: "Read this machine's clipboard as text, or replace it with text. The \
                  scope file has to switch the clipboard on. It does not touch images or file \
                  lists, it does not keep a history, and it does not restore what it replaced."
@@ -206,11 +257,6 @@ pub(crate) fn table() -> Vec<ToolCard> {
             }),
         },
     ]
-}
-
-/// One tool by name.
-pub(crate) fn card(name: &str) -> Option<ToolCard> {
-    table().into_iter().find(|card| card.name == name)
 }
 
 #[cfg(test)]
@@ -233,12 +279,25 @@ mod tests {
         "desktop.clipboard",
     ];
 
+    fn card(name: ToolName) -> ToolCard {
+        table()
+            .into_iter()
+            .find(|card| card.name == name)
+            .expect("every name in the enum has a card")
+    }
+
     #[test]
     fn the_table_is_the_six_tools_this_server_promises() {
-        let names: Vec<&str> = table().iter().map(|card| card.name).collect();
+        let names: Vec<&str> = table().iter().map(|card| card.name.as_str()).collect();
         assert_eq!(names, EXPECTED.to_vec());
-        assert!(card("desktop.act").is_some());
-        assert!(card("desktop.reboot").is_none());
+        assert_eq!(ToolName::parse("desktop.act"), Some(ToolName::Act));
+        assert_eq!(ToolName::parse("desktop.reboot"), None);
+        // A name in the enum with no card would be a tool the router
+        // reaches and `tools/list` never mentions.
+        let published: Vec<ToolName> = table().iter().map(|card| card.name).collect();
+        for name in ToolName::ALL {
+            assert!(published.contains(&name), "{} has no card", name.as_str());
+        }
     }
 
     /// The rule this table is held to: a description says what the tool
@@ -249,7 +308,7 @@ mod tests {
             assert!(
                 card.description.contains("does not"),
                 "{} never says what it does not do: {}",
-                card.name,
+                card.name.as_str(),
                 card.description
             );
         }
@@ -260,11 +319,11 @@ mod tests {
     #[test]
     fn every_schema_is_an_object_schema_with_named_properties() {
         for card in table() {
-            assert_eq!(card.schema["type"], "object", "{}", card.name);
+            assert_eq!(card.schema["type"], "object", "{}", card.name.as_str());
             assert!(
                 card.schema["properties"].is_object(),
                 "{} has no properties",
-                card.name
+                card.name.as_str()
             );
         }
     }
@@ -275,7 +334,7 @@ mod tests {
     /// into that position.
     #[test]
     fn acting_names_a_reference_and_the_generation_it_was_decided_against() {
-        let act = card("desktop.act").unwrap();
+        let act = card(ToolName::Act);
         let properties = &act.schema["properties"];
         assert!(properties["ref"].is_object());
         assert!(properties["generation"].is_object());
@@ -300,7 +359,7 @@ mod tests {
 
     #[test]
     fn a_screenshot_names_its_format_and_a_recording_names_its_two_states() {
-        let shot = card("desktop.screenshot").unwrap();
+        let shot = card(ToolName::Screenshot);
         let formats: Vec<&str> = shot.schema["properties"]["format"]["enum"]
             .as_array()
             .unwrap()
@@ -308,7 +367,7 @@ mod tests {
             .filter_map(Value::as_str)
             .collect();
         assert_eq!(formats, vec!["png", "jpeg", "webp"]);
-        let record = card("desktop.record").unwrap();
+        let record = card(ToolName::Record);
         let states: Vec<&str> = record.schema["properties"]["state"]["enum"]
             .as_array()
             .unwrap()
@@ -319,7 +378,7 @@ mod tests {
         // A stop names the recording rather than the window, so a
         // retitled window is still one this caller can stop.
         assert_eq!(record.schema["properties"]["recording"]["type"], "integer");
-        let clipboard = card("desktop.clipboard").unwrap();
+        let clipboard = card(ToolName::Clipboard);
         assert!(clipboard.schema["required"].is_array());
     }
 }

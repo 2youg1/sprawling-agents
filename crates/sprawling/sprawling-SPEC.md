@@ -2468,6 +2468,10 @@ impl RoomQueues {
 `return_borrowed`（还队列、还租约），再读 drive 自己的结果；`conclude` 不再释放租约，`settle_desks` 不再收队列，
 两件事各剩一个家。
 
+**backlog 席位与队列是同一批借来的东西**：`land` 从前先以 `?` 交还 backlog 席位，再调 `return_borrowed`，
+于是一把中毒的 backlog 锁连房间的信一起吞掉。此后两次归还都先做完，再按顺序抛出第一个失败——
+归还路径上没有提前返回。
+
 ### 8-46-10 服务态是一个值：`Serving`（G-08）
 
 `RunWorker` 从前有三个各自 `Some` 的 `Option`——`interrupts`／`watching`／`machine`——三个 setter

@@ -2,7 +2,8 @@
 
 > crate：`memory`。本 SPEC 先于代码存在；实现不多不少地遵守本文。
 > 骨架：十七节；按模块分章。jsonl／fault_fs／cas 三模块住 §8-1…§8-3；
-> index／hot／projection／attribution／checkpoint／queue／digest_cache 七模块住 §8-4…§8-10。
+> index／hot／attribution／checkpoint／queue／digest_cache 六模块住 §8-4…§8-10。
+> §8-6 曾是 redb 冷投影，随 Roadmap 7.15 整体删除；编号留空不重排，ARCHITECTURE §6 的锚因此不动。
 
 ## 1 需求分解
 
@@ -17,7 +18,6 @@
 | `index` | 7 projection | Ledger 旁挂索引 seq→（段，偏移）；可弃，损坏即重建；持 `Box<dyn Vfs>`，读写皆经内缝 |
 | `reserved` | 2 值 | `outside_reserved(relative)`：哪些字节属于人；checkpoint 与 worktree 共用的唯一谓词 |
 | `hot` | 7 projection | 内存热视图：界面查询在此命中，不读盘 |
-| `projection` | 7 projection | redb 磁盘冷视图：Recycle Bin＋进度视图＋重启恢复 |
 | `attribution` | 7 projection | 成本归因：逐维度精确分割同一总额；A20 对账 |
 | `checkpoint` | 4 适配器 | git2 波前 add -A＋波后补记＋staged diff secret 扫描 |
 | `queue` | 7 projection | 一份实现服务三队列；admit 先于入队，去重先于副作用 |
@@ -30,7 +30,7 @@
 - A16：读 `fixtures/ledger-v2/` 高版本夹具 → 方向感知拒绝（报「由更新版本写成」＋原始路径），恒不部分解读。
 - A3 前两点：断电于 EventRecord 落账／CAS rename 各恢复一次（FaultFs 点阵驱动）。
 - CAS：put→get 往返；范围取回（L/B 两式）；去重（同内容二次 put 不二次物化）；断电只留 `tmp/` 半成品，已命名对象恒完好。
-- 同一 Ledger 两次重建，projection 逻辑导出字节逐字节相同；删库重建后导出不变（形状 7 的 proptest 骨架一次三实例化）；index 损坏即重建且查询结果不变；hot 与 projection 对同一流的重叠查询答案一致。
+- 形状 7 的 proptest 骨架一次两实例化：index 损坏即重建且查询结果不变；hot 折同一条流两次得同一份读数。
 - A20——各维度归因之和恒等于同期权威计费额之和（逐维度断言，整数精确无余无溢）。
 - A14 先行半链——波前 checkpoint_committed 携 oid；波后删除逐条补记 file_discarded{restoration=Tracked(波前 oid)}；含 secret shape 的 staged diff 拒提交（E_SECRET_EGRESS，恒不回显字节）；queue 去重先于副作用＋shed 不丢已入队项；digest_cache 同哈希二次 put 幂等。
 
@@ -66,7 +66,7 @@ error ◀──使用── 全部十二个模块（MemoryError 与 into_ax 的�
 ```
 
 **≥3 处跨模块汇聚时按 ARCHITECTURE §5 登记独立 error 模块。**
-今天十二个模块 `use crate::jsonl::MemoryError`，而二十个变体里九个描述的失败 jsonl 永远不会产生——`CasCorrupt`／`Projection`／`Checkpoint`／`SecretEgress`／`Bundle`／`Worktree`／`WorktreeBusy`／`MergeStale`／`RangeOutOfBounds`。
+今天十二个模块 `use crate::jsonl::MemoryError`，而十四个变体里九个描述的失败 jsonl 永远不会产生——`CasCorrupt`／`Checkpoint`／`SecretEgress`／`Bundle`／`Worktree`／`WorktreeBusy`／`MergeStale`／`RangeOutOfBounds`／`Envelope`。
 条件被满足了四倍，所以 `error` 登记为独立模块，`io_err`（`MemoryError::Io` 的构造子）随它走。
 
 **Vfs 与 RealFs 分家的依据是形状而不是行数**：一条缝上的 trait 是形状 3，std::fs 的直译是形状 4，而第二适配器 `fault_fs` 早就是自己的文件。
@@ -84,8 +84,8 @@ error ◀──使用── 全部十二个模块（MemoryError 与 into_ax 的�
 - 不判定任何语义——kind 二分、载荷校验、规范字节全部来自 kernel；jsonl 只定 seq/prev 与介质。
 - 不采样时钟（clippy disallowed 已看守）——`log_truncated` 的 `t` 由 open 的调用方注入；checkpoint 的提交时间同规入参。
 - 不向调用方暴露分段——segment 边界、滚动阈值、文件名全为内部事务；对外只有目录（index 的 seq 寻址经 jsonl 的 pub(crate) 读面，不破此墙）。
-- projection 族恒不成为第二历史——三视图（hot/projection/attribution）与 queue 状态全部可删可重建，恢复逻辑恒不读它们做判定。
-- 不解读语义载荷之外的字段——各 projection 只消费已入账事件的声明字段，不反推、不补獼、不修复历史。
+- 派生视图族恒不成为第二历史——两视图（hot／attribution）与 queue 状态全部可删可重建，恢复逻辑恒不读它们做判定。**本 crate 不再持有任何落盘视图**：城的读面由 `bin::sprawling::views` 在内存里折，删了就重放（Roadmap 7.15）。
+- 不解读语义载荷之外的字段——各派生视图只消费已入账事件的声明字段，不反推、不补齐、不修复历史。
 
 ## 8 接口先行（按模块分章）
 
@@ -134,7 +134,7 @@ impl kernel::Ledger for JsonlLedger { /* append = append_all(vec![d]) */ }
 ```
 
 **落盘形态**：目录内 `ledger-<first_seq 20 位零填>.jsonl` 若干段；行＝`canonical_line`＋`\n`；链与 seq 跨段连续。滚动：当前段字节数 ≥ `SEGMENT_ROLL_BYTES` 时下一波起新段（新段创建后 `sync_dir`）。
-**open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`——高于 `EVENT_LOG_V` 即 `VersionAhead`（先于一切链检，恒不部分解读）；④校验最后一段：逐行 parse＋段内链续，首个非法字节起截断（`truncate`＋`sync_data`），跨段 prev 以前段末行验证；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
+**open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`——判定一律经 `kernel::consts_external::readable_log_v`（M-16）：`Ahead` 即 `VersionAhead`（先于一切链检，恒不部分解读），`NotAVersion`（低于任何构建写过的首版本，含 v0）即 `Envelope` 且拒词说版本，`Current` 与 `Older` 放行；④校验最后一段：逐行 parse＋段内链续，本段任一可解析行的 `v` 同样经 `readable_log_v` 判定——`Ahead` 与 `NotAVersion` 在此**拒**而不作尾损截断（截掉它等于删掉更新构建的历史），首个非法字节起截断（`truncate`＋`sync_data`），跨段 prev 以前段末行验证；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
 **append_all 五步**：逐 draft：seq=next、`EventRecord::from_draft`、`canonical_line`、必要时滚段；写段；单次 `sync_data`（跨段波对每个触及段各一次）；更新 prev/next_seq；铸 refs。任何 Io 错误⇒整波失败，内存态不前进（下次 open 断尾清理半行）。
 
 ### 8-2 memory::fault_fs
@@ -172,7 +172,7 @@ impl JsonlLedger {
 
 **为什么按内容而不只按序号**：`cut_at_op` 在本 crate 内部好用，因为操作序就在眼前。**在装配层它是一个注定碎掉的数字**：要正好落在 `roadmap_claimed` 那一次 append 上得数一个魔术数，而上游任何一处多读一个文件就全盘失效。`cut_on_write` 让调用方用自己的词汇点名那一行——**它仍然完全显式、完全确定**（本模块自述「Everything is explicit… there is no randomness」，这条不破它），并且直接表达要问的那件事：假如这一行没落下。取 `&'static str` 是为了让 `FaultPlan` 保持 `Copy`；点名一条账本行用的是字面量。
 
-**断电点阵**：以 `cut_at_op` 扫描 1..=N 全部注入点各跑一遍「写入→断电→重开→断言」；断言两条：链恒可验，**已返回 Ok 的波恒存活**（append_all 耐久契约的机器面）。A3 点 1（EventRecord 落账）与点 2（CAS rename）在此点阵上断言；git commit 与 projection 写两点接入同一点阵。
+**断电点阵**：以 `cut_at_op` 扫描 1..=N 全部注入点各跑一遍「写入→断电→重开→断言」；断言两条：链恒可验，**已返回 Ok 的波恒存活**（append_all 耐久契约的机器面）。A3 点 1（EventRecord 落账）与点 2（CAS rename）在此点阵上断言；git commit 亦接入同一点阵。
 
 **合并拆成决定与动作**：
 
@@ -263,7 +263,7 @@ impl LineReader<'_> {
   - `load_or_rebuild` 走 cache 命中时，`scanned` 取当下段大小：**cache 新鲜的定义就是字节数与 stamp 相符**，所以这个赋值精确而不是近似。
   - 消费者：`bin::assembly` 的 `Views` 持一份，每次查询先 `refresh`。刷新代价是一次 `read_dir` 加逐段 `metadata`，与账本大小无关。
 - **run 索引与 seq 索引同住一张旁挂物**：`run_history` 从账本尾部逐行往回读，读满 `channels::HISTORY_SCAN` 行就停，**过滤发生在读完之后**——不属于这个 run 的行也要完整取出再丢掉。索引因此多记一张 `runs: BTreeMap<RunId, BTreeSet<Seq>>`，查询只取属于它的 seq，代价与**答的条数**同阶而不与账本长度同阶。
-  - **为什么不放进 `memory::projection`**：冷投影**在运行中的服务端根本没有接线**——`bin::assembly` 的 `Views::apply` 只折 `hot`／`attribution`／`book`，`Projection` 今天的消费者只有 `citysim` 的 bench 与本 crate 的测试。要让 `run_history` 读它，就得先在事件路径上开一个 redb 写事务，而本 SPEC §8-6 量过那条路：**每条事件一个磁盘屏障 ≈ 1.1k records/s**。为一个不需要持久化的答案，给每一条落账加一道屏障，方向是反的。
+  - **为什么不放进一份落盘冷投影**：本 crate 曾有一份（redb 的 `memory::projection`），而**运行中的服务端从未接线**——读面只有 `bin::sprawling::views::Views`，它折 `hot`／`attribution`／`book`。要让 `run_history` 读一份落盘投影，就得在事件路径上开一个写事务，实测每条事件一个磁盘屏障 ≈ 1.1k records/s。为一个不需要持久化的答案给每一条落账加一道屏障，方向是反的，所以那个模块整体删除（Roadmap 7.15）。
   - **为什么可以放进 `index`**：这张旁挂物**已经常驻**（`Views` 持有并每查询 `refresh`），**已经逐行解析过每一条新行**（`locate` 一次 `serde_json` 解析读两个字段），**已经带着「存疑即重建」的可弃性**。run 表搭的是同一趟 refresh、同一份 cache、同一条重建反射，不新增任何同步义务。
   - **对 channels-SPEC §2「不建 run→seq 的索引」的重新定价**：它的两条理由各自的参数都动了。其一「有界扫描付的是几毫秒的解析」——**实测是 22.4 ms**，量级估错了。其二「一份要随账本同步的派生状态」——那份派生状态**已经存在且必须同步**，run 表是它多一个字段，不是多一份。至于「第二个权威」：本模块开篇即写明索引可弃、存疑即重建，它回答的是「在哪」，从不回答「是什么」；账本仍是唯一权威。
   - **内存代价**：5 万条账本上 `runs` 约 1.2 MB（`BTreeSet<Seq>` 每条 8 字节数据加 B 树节点开销），与 `entries` 同阶而更小——后者每条还带一个段名 `String`。计入 `session_resident` 预算（今天 4.29 MB／30 MB 上限）。
@@ -290,39 +290,6 @@ impl HotView {
 - 界面查询在此命中不读盘；run_started→Active，run_frozen→Frozen；其余事件只推进 last_seq/last_kind。
 - **`addr` 与 `started` 从 `run_started` 记下**：`record.addr()` 是这次跑的房间，`record.t()` 是它开始的时刻；二者只在这一种记录上赋值，其余记录不动它们，所以一次跑的房间不会被后来的城市级记录改写。`Option`，因为热视图可能在 `run_started` 之前先看到同一次跑的 `checkpoint_committed`（栅栏先于开场落账），也可能只看到一段没有开场的尾巴——**看不到的事不猜**。理由：`RunSummary.who` 是首条记录的作者、恒为 `city`，单靠它无法把一次跑归到 `hall/mayor` 这个房间，「与 Mayor 的对话」就在线上拼不出来。
 - **城市级记录不进 run 表**：`RunId::CITY`（nil）标记的是属于城而不属于任何 Run 的记录——创世记录、`building_created`。把它们折进 run 表会让 `active_count()` 在一座**从未派过活的城**里返回 1：城市页读服务端的这个数、写「1 run in flight」，而总览页折同一条流写「什么都没在跑」——**一个问题两个答案，而错的那个是服务端的**。
-
-### 8-6 memory::projection（形状 7；redb）
-
-```rust
-pub struct Projection { /* db: redb::Database、last_applied: Option<Seq> —— 私有 */ }
-pub struct ProjectionOpenReport { pub rebuilt: Option<ViewRebuilt> }  // 存盘视图读不开与否
-pub struct ViewRebuilt { pub reason: String }                         // 删档之前，store 说了什么
-impl Projection {
-    /// 恒返回一个可用视图：读不开就删档重来，故不存在「打开失败于派生物」这一态。
-    pub fn open(path: &Path) -> Result<(Projection, ProjectionOpenReport), MemoryError>;
-    /// Idempotent by seq: records at or below last_applied are skipped.
-    pub fn apply(&mut self, record: &EventRecord) -> Result<(), MemoryError>;
-    /// One transaction per batch — the rebuild path.
-    pub fn apply_all<'a>(&mut self, records: impl IntoIterator<Item = &'a EventRecord>) -> Result<(), MemoryError>;
-    pub fn recycle_bin(&self) -> Result<Vec<RecycleEntry>, MemoryError>;    // file_discarded − discard_restored
-    pub fn run_rows(&self) -> Result<Vec<RunRow>, MemoryError>;             // 进度视图：逐 Run 相＋完成态
-    pub fn last_applied(&self) -> Option<Seq>;                              // 重启恢复：从此 seq 之后续接
-    /// Canonical logical export: table-by-table, key-ordered, one line per
-    /// row. Determinism is asserted on these bytes, not on redb's file
-    /// (redb internals may differ run-to-run; the logical view must not).
-    pub fn export_canonical(&self) -> Result<Vec<u8>, MemoryError>;
-}
-pub struct RecycleEntry { pub seq: Seq, pub t: TimeMs, pub paths: Vec<String>, pub restoration: String, pub restored: bool }
-pub struct RunRow { pub run: String, pub started_t: TimeMs, pub frozen: Option<String> /* completion 字串形 */ }
-```
-
-- 三表：`meta`（last_applied）、`runs`、`recycle`；键全为定序编码（seq 大端字节／run 字串）。重建＝删文件重放；导出字节同（验收 §2）。崩溃安全委托 redb 事务（不入缝，只测重建）。
-- 自愈：`open` 读不开存盘视图时**自己删档重开**，而不是把错误抛给调用方。理由是这条 recovery 本来就写在下一段里（`E_STORAGE_FATAL` ⇒「删文件重放」），却没有任何一处代码执行它——一条只写在文档里的 recovery 等于没有 recovery，而它偏偏是「选 redb 无妨、派生物可丢」这个论证的唯一必要前提。删档后 `last_applied` 自然为 `None`，调用方**不需要新接口**：它本来就得处理首次运行的 `None`，重放从头开始正是要它做的事。
-  与 `index::load_or_rebuild` 同一条反射（「存疑即重建，而非报告」），但**不静默**：`ProjectionOpenReport` 照 `JsonlLedger::open` 的既有形状回报，`ViewRebuilt.reason` 留住 store 原话——删档销毁的正是这句话的唯一另一份拷贝，一个重置了却说不出为什么的视图谁也教不会。自愈只试一次：删档后第二次仍失败就照实抛错，于是「文件坏了」自己好，「盘满／无权限」照旧报告，无需辨认错误变体。
-  用词：视图档是**删档重建**，不是 Discard——Discard 是产品概念（携 Restoration 的删除，glossary §4），不借给派生物的清扫。
-- 载荷读取契约（本模块定义，生产端照此写）：`file_discarded` 携 `paths: [string]`（Address 字串形）与 `restoration`（`Restoration` 的 serde 外标形，冷视图只留变体名——完整 Locator 住 Ledger，列表渲染不需要它）；`discard_restored` 携 `discard_seq: u64` 指向它撤销的那条。指不到任何 discard 的 restore **丢弃而非臆造行**（Recycle Bin 是历史不是待办队列，restored 项恒留列）。
-- 行值以 JSON 字串入表（无第二编码权威，导出即可读）；一次 apply ＝ 一个事务，`last_applied` 与行同事务落，故崩溃点恒在两态之一。新增 `MemoryError::Projection{op,detail}`（→ `E_STORAGE_FATAL`，recovery ＝「删文件重放」）：派生物的失败不像 Ledger 写失败那样必须停机。
-- 批折叠：逐条事务重建只有 ≈ 1.1k records/s（每条事件一个磁盘屏障，预算 50k/s 的 1/44）。`apply_all` 把屏障移到批上：一批一事务，折叠逻辑住 `fold_record` 唯一定义，`apply` 委派之；幂等不变（seq 门恩在批内逐条判），空批 abort 不提交，故字节不动。重建读数 ≈ 493k records/s（windows-x86_64）。
 
 ### 8-7 memory::attribution（形状 7）
 
@@ -630,7 +597,7 @@ pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, MemoryErr
 // Vfs 内缝增 `list_dirs`：两个适配器同改；list 与 list_dirs 都是浅层，遍树用显式工作表（不递归，栈溢出接不住）
 ```
 
-- **带走什么**：`ledger/`（唯一历史，必带）、`cas/`（Locator 指进去，不带就断链）、城里的产品文件（`City.md`、各楼的 `BUILDING.md`／`Roadmap.md`／`URBANITE.md` 与房间内容）。**不带**：projection 与索引（可弃，恢复后由 Ledger 重建，带了就是第二份历史）；凭证（**它从不在城里**，在宙主机金库——导出一份能拷走凭证的备份会把隐私保证一次性作废）。
+- **带走什么**：`ledger/`（唯一历史，必带）、`cas/`（Locator 指进去，不带就断链）、城里的产品文件（`City.md`、各楼的 `BUILDING.md`／`Roadmap.md`／`URBANITE.md` 与房间内容）。**不带**：索引与任何派生视图（可弃，恢复后由 Ledger 重建，带了就是第二份历史）；凭证（**它从不在城里**，在宙主机金库——导出一份能拷走凭证的备份会把隐私保证一次性作废）。
 - **为何是目录而非单文件**：单文件要么自造容器格式（多一个要养的格式），要么引 tar／zip 依赖。目录两者都不要，且任何备份工具都能再打包一层——压缩不是本模块的职责。
 - **清单是完整性的依据**：`MANIFEST.json` 记下记录数、链头哈希、CAS 对象数与文件数；`restore` 恢复后重算并比对。不对即拒，而不是“恢复了但少了几条”——后者是历史失真。
 - **四个数由 `Manifest::of(vfs, ledger_dir, cas_dir, files_root)` 一处算出**（B-46）：导出量目的地、恢复量城本身、比较的两侧因此是同一种测量。
@@ -651,7 +618,7 @@ pub enum MemoryError {                      // thiserror；crate 根
     Draft { source: AxError },              // 组 log_truncated 草稿失败（不以死变体粉饰）
     CasMissing / CasCorrupt / RangeOutOfBounds,               // cas
     SeqMissing,                                              // index
-    Projection / Checkpoint / SecretEgress / Bundle,          // 各自的模块
+    Checkpoint / SecretEgress / Bundle,                      // 各自的模块
     Worktree / WorktreeBusy / MergeStale,                    // worktree
 }
 impl MemoryError { pub fn into_ax(self) -> AxError; }   // 跨 crate 边界的唯一出口
@@ -693,7 +660,6 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
   - `worktree`——树由 git2 建、由 git2 prune，落盘不经本 crate；`release` 删残留目录同走 `std::fs`。
     缝拦不住 git2，声称拦得住才是第二个权威。释放顺序与自愈见 §8-9。
   - `checkpoint`——同样经 git2 提交与检出。
-  - `projection`——redb 自己持有那个文件；「读不动就删了重建」的那一次 `remove_file` 必须与它的 open 走同一层。
   - **`index` 不在例外之列**：`LedgerIndex` 持 `Box<dyn Vfs>`（锁在 `Mutex` 后，因为 `persist(&self)` 要写盘而公共面是只读的），
     段列举、段长、尾部增量读、cache 的读写删全部经缝，于是「cache 写到一半断电」第一次有机器面断言。
 
@@ -710,7 +676,7 @@ impl Vfs for RealFs { … }
 
 ## 8.5 两个设计
 
-**A（选中）：Vfs 内缝＋FaultFs 注入**——故障面在文件系统语义层注入，jsonl/cas 的产品代码零测试钩子。杠杆：一套故障模型服务两模块＋日后 checkpoint/projection；断电点阵是 Vfs 语义的性质，不是某模块的分支。
+**A（选中）：Vfs 内缝＋FaultFs 注入**——故障面在文件系统语义层注入，jsonl/cas 的产品代码零测试钩子。杠杆：一套故障模型服务两模块＋日后 checkpoint；断电点阵是 Vfs 语义的性质，不是某模块的分支。
 **B（落选）：jsonl 内置故障开关**（`#[cfg(test)]` 的注入点散布各写步）——不需要 Vfs 抽象，但故障语义与产品逻辑同居一文件，点阵无法复用给 cas，且「测试钩子进产品代码」违背「测试与产品走同一道门」。落选理由：内缝的存在证明是第二适配器，不是一句声明。
 
 ## 9 工作流程
@@ -745,8 +711,8 @@ impl Vfs for RealFs { … }
 ## 13 依赖选型
 
 kernel（workspace 内层）；`thiserror`；`blake3`（经 kernel 的 chain_hash／cas 自身 hash——直接依赖，B.7 钉版）；`serde_json`（envelope 探查）。dev：`proptest`、`tempfile`（RealFs 测试隔离目录）。不引 walkdir（Vfs::list 一层足矣）。
-实测：redb 4.2.0 在钉版 1.97.1 上直接编译通过，接口取 `ReadableDatabase`／`ReadableTable`／`TableDefinition` 三件；形状 7 的重建骨架住 `tests/derived_views.rs`（`tests/` 不受 modmap 辖，与 kernel/runtime 既有集成测试同例），一次定义三次实例化（index／hot／projection），另加冷热重叠查询一致断言。
-`redb = "4.2"`（projection 冷视图；4.2.0 现行，文件格式声明稳定；MSRV 1.89 < 钉版 1.97）；`git2 = "0.21"`（checkpoint；0.21.0 现行，携 libgit2 1.9.6 vendored；libgit2 链接例外已在 `deny.toml` 登记）。两者均不入缝：崩溃安全委托其事务，只测重建与孤儿清扫。
+形状 7 的重建骨架住 `tests/derived_views.rs`（`tests/` 不受 modmap 辖，与 kernel/runtime 既有集成测试同例），一次定义两次实例化（index／hot）。
+**`redb` 已移出**：它唯一的用户是删掉的冷投影，依赖随它走（Roadmap 7.15）。`git2 = "0.21"`（checkpoint；0.21.0 现行，携 libgit2 1.9.6 vendored；libgit2 链接例外已在 `deny.toml` 登记）。git2 不入缝：崩溃安全委托它的事务，只测重建与孤儿清扫。
 
 ## 14 硬编码声明
 
@@ -754,7 +720,7 @@ kernel（workspace 内层）；`thiserror`；`blake3`（经 kernel 的 chain_has
 
 ## 15 影响面
 
-runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费 FaultFs；index/projection 挂同一目录布局。trait 边界 Io 映射为 Io→E_STORAGE_FATAL。
+runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费 FaultFs；index 挂账本目录布局。trait 边界 Io 映射为 Io→E_STORAGE_FATAL。
 
 ## 16 测试与约束
 
@@ -769,8 +735,7 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 `jsonl.rs`（812）→ `jsonl/ledger.rs`（类型＋段文法）／`open.rs`（打开与恢复，测试住 `open/tests.rs`）／
 `append.rs`（追加与读＋kernel::Ledger trait impl）；`index.rs`（783）→ `index/ledger.rs`
 （`LedgerIndex`，测试住 `index/ledger/tests.rs`）／`reader.rs`（`LineReader`＋`OpenSegment`）／
-`cache.rs`（戳／缓存／重建，`Stamp`／`Located`／`CACHE_*` 归此）；`projection.rs`（650）→
-`projection/tables.rs`（表＋fold）／`view.rs`（视图，测试住 `view/tests.rs`）；
+`cache.rs`（戳／缓存／重建，`Stamp`／`Located`／`CACHE_*` 归此）；
 `worktree.rs`（622）→ `worktree/name.rs`／`lease.rs`／`trees.rs`（测试住 `trees/tests.rs`）；
 `bundle.rs`（532）→ `bundle/manifest.rs`（布局常量归此）／`export.rs`（避 `module_inception`）／
 `files.rs`；`checkpoint.rs`（480）→ `checkpoint/fence.rs`／`scan.rs`。

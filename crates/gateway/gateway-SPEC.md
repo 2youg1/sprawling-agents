@@ -17,7 +17,7 @@
 
 - dialect：golden（两 Dialect 各一请求一响应）＋proptest 往返（响应侧 wire→canonical→重渲染 wire 逐字段等值；请求侧断点位／工具形状／文本字节无失）。
 - endpoint：对回环假 provider 服务的半流中断（SSE 截断→E_PROVIDER 且不产伪 ModelReturn）＋幂等重试（同 IdemKey 重发，对外恰一次效果——由调用方 dedup 看守，endpoint 自身无重试暗策略）。
-- credential：A13 链——外来字节命中 shape→`secret_captured`（无明文无哈希前缀）→配置只见 `secret:`→resolve 兑付产 `credential_lent`→`describe` 恒不返回值。探测三态（跨重启／仅本次开机／仅本进程）可注入验证。
+- credential：A13 链——人交出的值进金库（`set`，名字由调用方给）→`secret_captured` 入账（无明文无哈希前缀，写者是装配层 `credentials::signing`）→配置只见 `secret:`→resolve 兑付产 `credential_lent`→`describe` 恒不返回值。**外来字节的扫描与就地替换不在本 crate**：那是 `runtime::redact`，本 crate 不留第二份。探测三态（跨重启／仅本次开机／仅本进程）可注入验证。
 - 调优：一个端点从表单与从导入两条路径附着后，`Query::Config` 回答的超时与重试相同；未调过的端点读到的三个默认值来自 `EndpointTuning::DEFAULTS` 而非任何第二处。
 - cost：权威计费额在场则恒胜价目推算；两源不一致时以权威为准并记差额；A20 的取材面（对账断言住 memory::attribution）。
 
@@ -211,10 +211,6 @@ impl Custodian {
     /// pass wins; all failed -> session-memory fallback + provider_degraded
     /// payload returned to the caller for ledger append.
     pub fn probe() -> (Custodian, Option<Payload>);
-    /// Custody effect half: spans from kernel::secret::scan, plaintext into
-    /// the vault, `secret:` literals back in place. Payloads carry
-    /// realm/name/origin/span length only - no plaintext, no hash prefix.
-    pub fn capture(&mut self, bytes: &[u8], origin: &str) -> Result<Captured, AxError>;
     pub fn set(&mut self, reference: &SecretRef, value: Zeroizing<String>) -> Result<(), AxError>;
                                     // 遮蔽即拒；空值即未配置；入参取 Zeroizing 非 Sealed：
                                     // `.expose(` 白名单恒三文件（定义处＋两解封点），Custody 是库不是 sink——
@@ -222,16 +218,15 @@ impl Custodian {
     pub fn resolve(&self, reference: &SecretRef) -> Result<Sealed<String>, AxError>;   // 未命中→E_CREDENTIAL_MISSING；恒不跨操作缓存
     pub fn describe(&self, reference: &SecretRef) -> Described;                        // 恒不返回值
 }
-pub struct Captured { pub replaced: Vec<u8>, pub events: Vec<Payload> }   // secret_captured 载荷（入账归调用方）
 ```
 
 - 生产适配器＝keyring crate（Windows Credential Manager／macOS Keychain／Linux 内核 keyring）；第二适配器＝会话内存 BTreeMap（探测全败的兜底＋测试面）。**恒不自写加密文件**。
 - **Linux 存在内核 keyring，不存在 secret service，理由是发布产物。** 发布的 Linux 归档是一份静态 musl 二进制（`x86_64-unknown-linux-musl`），而 secret service 走 D-Bus，树因此另到 `libdbus-sys`，那要求链接宿主的 glibc D-Bus——一份静态二进制与一个 D-Bus 凭据库不能同时为真。故 keyring 的 Linux 特性取 `linux-native`（keyutils，纯 syscall，不需要会话总线、不需要动态库、容器里同样成立），不取 `sync-secret-service`。代价写在类型上而不是写在注释里：内核 keyring 是内存，重启即清，故 `KeyringVault::PERSISTENCE` 在 Linux 上恒为 `Persistence::ThisBoot`，`SOURCE` 恒为 `kernel-keyring`。
 - **等级只说一次，两处读它。** `Persistence::consequence()` 是「这个等级让人付出什么」的唯一权威句；`describe` 报状态（`source`＋`persistence`），`resolve` 未命中时把这句接在 recovery 后面——重启吃掉的 key 因此读作「重启清了内核 keyring，请再输一次」，而不是读作「你从来没配过」。探测成功不产 `provider_degraded`：Linux 上那是健康路径，每次启动报一条假警报只会让这个 kind 没人再读。
-- realm/name 派生：capture 时 realm=形状表 provider（无则 "detected"）、name=定长计数器 `cap-<n>`（确定性，无随机）；用户改名属 S4 命令面。
+- realm/name 由调用方给定，本模块不生成名字：订阅线走 `credentials::subscription` 的逐供应方定名，API key 走 S4 命令面的 `PutSecret`。**恒无计数器命名**——按捕获次序编号会让同一个值每场会话换一个名、两个值跨会话撞同一个名，于是旧账本里的引用兑到别人的凭据。一个值的短名若要由内容导出，口径只有 `runtime::redact::fingerprint` 一处。
 - OAuth 两流程（PKCE／设备码）＝代码：`pub fn oauth_begin(profile, …) -> OauthPending`＋`pub fn oauth_redeem(pending, …) -> Sealed<String>` 的纯构造（HTTP 往返由调用方经 endpoint 的 Client 执行或 S4 命令面驱动；此处交付构造与校验，不交付活体登录）。续期＝到期前 resolve 触发 refresh 构造。
 - 环境变量是只读来源（键形 `SPRAWLING_SECRET_<REALM>_<NAME>`）：`describe.writable=false`；`set` 撞遮蔽即拒并指名遮蔽者；读取器可注入（edition 2024 的 set_var 不安全，测试恒不改进程环境）。
-- A13 值正确性经真 Endpoint＋回环假服务在线断言（capture→vault→resolve→写头，服务侧见原值）——credential 自身零 `.expose(`；PKCE 以 RFC 7636 Appendix B 向量钉实（S256，sha2 为外部协议事实非第二哈希权威）；base64url／percent-encode 自写纯函数；probe() 对真平台服务的验证属装配期人工清单（测试不擅动开发者凭证库）。
+- A13 值正确性经真 Endpoint＋回环假服务在线断言（set→vault→resolve→写头，服务侧见原值）——credential 自身零 `.expose(`；PKCE 以 RFC 7636 Appendix B 向量钉实（S256，sha2 为外部协议事实非第二哈希权威）；base64url／percent-encode 自写纯函数；probe() 对真平台服务的验证属装配期人工清单（测试不擅动开发者凭证库）。
 
 ### 8-5 gateway::oauth_profiles（形状 6 数据面）
 
@@ -439,7 +434,7 @@ pub(crate) fn transcription_of(wire: &serde_json::Value) -> Result<String, AxErr
 
 ## 9 工作流程
 
-回合层组 `ChatRequest`（prefix 四段＋窗口历史）→endpoint.call（dialect 翻译＋兑付＋HTTP）→cost.settle→model_returned 载荷（usage＋billed）→attribution（memory 侧）摊回。credential 独立线：启动 probe→capture（Tainted::new 构造点驱动）→resolve（组请求末格）。
+回合层组 `ChatRequest`（prefix 四段＋窗口历史）→endpoint.call（dialect 翻译＋兑付＋HTTP）→cost.settle→model_returned 载荷（usage＋billed）→attribution（memory 侧）摊回。credential 独立线：启动 probe→set（S4 命令面或订阅登录写入）→resolve（组请求末格）。
 
 ## 10 实现逻辑
 
@@ -452,6 +447,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 ## 12 错误处理（逐码答「能否定义掉」）
 
 - `E_PROVIDER`：不可定义掉——网络与对端是本 crate 的本质失败面；subject 写状态码与端点名，恒不含请求体。
+- **「能否再试一次」只有一个家：`endpoint::config::ProviderFailure`**。调用点只说它看见了哪一种失败，retriable 与恢复语由该枚举一处给出，恒不在调用点第二次判定。往返未完成（send／execute／读体／读帧／静默超时）＝`Exchange`／`Cut`／`Silence`，标 `retriable`；对端已答而本城拒绝（非 2xx＝`Refused`，body 形状不可读＝`Unreadable`）与本侧 `.build()` 失败（`Unbuilt`，确定性重演同一失败）不标。此前十五处调用点各自造错、无一 opt-in，使默认 `Retries::UntilHalted` 实际等于零次重试：一次瞬时断连即静默废掉一个 handdown 子运行。
 - `E_WIRE_MISMATCH`：不可定义掉——对端响应形状漂移是外部事实；subject 写键路径。
 - `E_ENDPOINT_DIALECT_UNSUPPORTED`：不可定义掉——用户可配任意 external provider，兼容格式探查失败必须可报。
 - `E_CREDENTIAL_MISSING`／`E_CONFIG_INVALID`：kernel 已有码，语义照 Custody 一节；不新增码。
@@ -505,7 +501,7 @@ ARCHITECTURE §6 gateway 表逐行状态翻转；§6 接线台账登记（endpoi
 ### 8-14 gateway 目录化（形状：主类型居索引，方法按簇归文件）
 
 `credential.rs`（988）→ `credential/vault.rs`（`Vault` 缝＋双后端＋`Persistence`／`Described`／`EnvReader`）／
-`custodian.rs`（`Custodian`／`Captured`）／`oauth/`（`codec.rs` 编码、`flow.rs` 往返、`types.rs` 类型，
+`custodian.rs`（`Custodian`）／`oauth/`（`codec.rs` 编码、`flow.rs` 往返、`types.rs` 类型，
 测试住 `flow/tests.rs`）；`dialect.rs`（512）→ `dialect/request.rs`（`sample_request` 提
 `#[cfg(test)] pub(crate)` 供 response 面复用）／`response.rs`（strategies＋`proptest!` 住此，
 快照搬 `dialect/snapshots/`）；`endpoint.rs`（639）→ `endpoint/config.rs`（类型＋`new`＋
@@ -695,3 +691,33 @@ pub struct Ranking;                              // parse(&Value, &RerankRequest
 **`store: false` 每条请求都写**：本城自持历史，上游留一份副本就是第二份，且它比本城「决定忘记」这个动作活得更久。
 
 **`provider::stability` 的守卫因此长出第三条读法**：system 文本在这面是 `input[0].content[*].text`。那道闸的两条断言（两次派活逐字节相等、上线文本与交给供应层的几块逐字节相等且前面不多任何东西）现在覆盖全部七种连接。
+
+### 8-21 `gateway::credential::vault::file`：口令解开的加密金库文件（叶子 14.5 · F-28 · 形状 4 适配器）
+
+```rust
+pub(crate) struct FileVault { /* path、派生密钥、salt、密文条目 —— 全私有 */ }
+impl FileVault {
+    pub(crate) const SOURCE: &'static str = "encrypted-file";
+    pub(crate) const PERSISTENCE: Persistence = Persistence::AcrossRebootsWithPassphrase;
+    /// 打开或创建；口令不对即 `E_CONFIG_INVALID` 具名拒绝，恒不 panic、恒不当作空金库
+    pub(crate) fn open(path: PathBuf, passphrase: &Zeroizing<String>) -> Result<Self, AxError>;
+}
+impl Vault for FileVault { /* put / get / delete，写即整文件替换 */ }
+pub enum Persistence { AcrossReboots, AcrossRebootsWithPassphrase, ThisBoot, ThisProcess }
+```
+
+**它答的是哪个威胁**：本城的工具调用能 grep 城所运行的电脑。明文躺在配置旁边的凭据，就是 Agent 能读进窗口的凭据；密文对这个读者有效。磁盘被拿走是另一个问题，本节不声称答它——持有口令者本来就不被挡在外面。
+
+**条目逐条封装**：ChaCha20-Poly1305（RFC 8439），每条每次写盘取新的 96 位 nonce；AAD 绑格式版本与 `secret:realm/name`，故一条密文被挪到另一个名下就打不开（有测试钉住）。KEK 只来自口令 + Argon2id（RFC 9106 第二推荐档：64 MiB / 3 轮 / 1 道）。
+
+**成本参数只有一个家**：文件只记 salt 与密文，不记三个 cost 数字——读盘时不听文件的，`FORMAT_VERSION` 变更才是改它们的方式。密钥派生一次、进程内持有：Argon2id 是故意慢的，每次读都派生等于给每次模型调用加一秒。
+
+**原子替换归本模块**（E-6 ④ 的决定）：`city::document` 对城文档做同一支舞，但它是 `city` 的 `pub(crate)`，而 gateway 不依赖 `city`、依赖方向上也不该依赖（ARCHITECTURE §2）。因此这一个文件的替换住在这里；把这支舞提升为两边都能调的权威，是一次连 `city` 两个调用点一起搬的迁移，归拥有 `kernel` 的那条路。**这一条是记录，不是遗漏。**
+
+**等级句仍只有一处**：`Persistence::consequence()` 新增一档 `AcrossRebootsWithPassphrase`，句子是「密钥住在城所运行电脑的一个加密文件里，每次启动城要输一次口令」。`describe` 与 `resolve` 照旧读它。
+
+**后端选择尚未接线**：`Custodian::probe` 今天在 keyring 与内存之间选，接上这一档（何时提示口令、口令从哪里来）落在 `custodian.rs`，本轮不属本路可写集，见交付说明。
+
+**两个重开参数照抄 §20.5.3，本版不进树**：ML-KEM-1024 在「多机同步金库」立项那天进——今天单机无对象可封；FN-DSA-1024 在「账本需要对第三方可验证的出处证明」立项那天进——今天防篡改由哈希链承担。对称 AEAD 本身已抗量子，故这两条不是安全缺口。
+
+**闸同步扩一条**（`xtask secret`）：城的保留子树（`kernel::RESERVED_PREFIX`）里出现凭据明文，按「城的记录」这条规则报，recovery 指向 `Custodian` 而不是手改；子树内非 UTF-8 的对象（CAS 产物）不按文本规则判，否则第一屏全是内容存储、真正那一行被埋掉。

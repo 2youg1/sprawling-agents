@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Effect side of persistence: Ledger on disk, CAS, projections, git
-//! checkpoints, queues. Implements kernel ports; holds no policy.
+//! Effect side of persistence: Ledger on disk, CAS, in-memory derived
+//! views, git checkpoints, queues. Implements kernel ports; holds no
+//! policy.
 
 mod error;
 
@@ -49,14 +50,6 @@ mod hot;
 pub use hot::HotView;
 pub use hot::RunHot;
 pub use hot::RunPhase;
-
-mod projection;
-
-pub use projection::Projection;
-pub use projection::ProjectionOpenReport;
-pub use projection::RecycleEntry;
-pub use projection::RunRow;
-pub use projection::ViewRebuilt;
 
 mod attribution;
 

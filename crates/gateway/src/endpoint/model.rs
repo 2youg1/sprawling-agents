@@ -20,7 +20,7 @@ use crate::cost;
 use crate::dialect::response_from_wire;
 use crate::market::InputKinds;
 
-use super::config::{Endpoint, provider_err, transport_detail};
+use super::config::{Endpoint, ProviderFailure, provider_err};
 impl Model for Endpoint {
     fn call_streaming(
         &mut self,
@@ -52,19 +52,22 @@ impl Model for Endpoint {
         let response = request
             .json(&wire)
             .send()
-            .map_err(|err| provider_err("call provider", transport_detail(&err)))?;
+            .map_err(|err| provider_err("call provider", &ProviderFailure::Exchange(&err)))?;
         let status = response.status();
         if !status.is_success() {
             return Err(provider_err(
                 "call provider",
-                format!("{} answered {}", self.config.base_url, status.as_u16()),
+                &ProviderFailure::Refused {
+                    url: &self.config.base_url,
+                    status,
+                },
             ));
         }
         // A cut stream surfaces here as a body read error — no partial
         // ModelReturn is ever fabricated.
-        let body: Value = response
-            .json()
-            .map_err(|err| provider_err("read provider response", transport_detail(&err)))?;
+        let body: Value = response.json().map_err(|err| {
+            provider_err("read provider response", &ProviderFailure::Exchange(&err))
+        })?;
         let resp = response_from_wire(self.config.dialect, &body)?;
         let billed: Option<UsdMicros> = match &self.config.pricing {
             Some(entry) => Some(cost::settle(&resp.usage, None, entry)?.billed),

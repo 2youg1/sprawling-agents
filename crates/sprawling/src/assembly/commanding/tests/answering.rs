@@ -282,11 +282,19 @@ fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
         "the cluster key survives, or the inbox cannot group anything"
     );
 
+    // The three fields `governing::answer_approval` writes, because the
+    // fold reads them back through the one `ApprovalResolved` type it
+    // was written from: a payload short of the cluster is a line this
+    // build refuses rather than an allowance of unknown width.
     let mut answered = serde_json::Map::new();
     answered.insert("id".to_owned(), serde_json::Value::String("a-1".to_owned()));
     answered.insert(
         "verdict".to_owned(),
         serde_json::Value::String("allow".to_owned()),
+    );
+    answered.insert(
+        "cluster".to_owned(),
+        serde_json::json!({ "class": "question", "detail": "lab" }),
     );
     let resolved = EventRecord::from_draft(
         EventDraft {
