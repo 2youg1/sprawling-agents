@@ -31,7 +31,7 @@ use kernel::{Address, AxError, EventKind, EventRecord};
 // rather than copied, so "where the ledger lives" keeps one answer.
 use super::lines::verdict_line;
 use super::lines::{buildings_of, discard_lines, pursuit_from, registry_line, signal_line};
-use crate::assembly::{city_address, ledger_dir, rebuild_views};
+use crate::assembly::{ledger_dir, rebuild_views};
 
 /// Answers one query out of a city's own history, without serving it.
 ///
@@ -165,7 +165,7 @@ impl Views {
             // An unreadable ledger directory is not a reason to refuse to
             // start: the index is disposable, every refresh tries again,
             // and a city with no ledger yet is the ordinary first run.
-            index: memory::LedgerIndex::load_or_rebuild(&ledger_dir(city_root))
+            index: memory::LedgerIndex::rebuild(&ledger_dir(city_root))
                 .unwrap_or_else(|_| memory::LedgerIndex::empty()),
             plans: crate::plan_view::PlanView::default(),
             pursuits: std::collections::BTreeMap::new(),
@@ -318,6 +318,8 @@ impl Views {
     /// city made before that record carried a name, the directory it
     /// lives in. One place decides, so two readers cannot disagree.
     pub(crate) fn city(&self) -> Option<Address> {
-        self.city.clone().or_else(|| city_address(&self.city_root))
+        self.city
+            .clone()
+            .or_else(|| kernel::layout::CityLayout::new(&self.city_root).city_address())
     }
 }

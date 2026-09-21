@@ -29,5 +29,5 @@ mod ledger;
 mod open;
 
 pub use append::{ledger_segments_at, read_raw_lines_at};
-pub(crate) use ledger::is_segment;
 pub use ledger::{JsonlLedger, OpenReport, TailTruncation, WriteObserver};
+pub(crate) use ledger::{complete_lines, segment_first_seq, segment_names};

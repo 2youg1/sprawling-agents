@@ -179,6 +179,24 @@ impl Checkpoint {
     /// The post-wave sweep: every path present at `pre_oid` and gone
     /// from the working tree becomes a `file_discarded` payload whose
     /// restoration points back into that commit.
+    ///
+    /// **The question is existence, and only existence.** The tree is
+    /// walked once and each blob is looked for on disk; a path that is
+    /// not there is a deletion. Asking git for the tree-to-workdir diff
+    /// instead would hash every path the tree and the worktree agree on,
+    /// and the city itself keeps writing some of those paths after the
+    /// fence (a room's session projection, a worktree under a lease); a
+    /// hash taken through a Windows directory entry that trails the open
+    /// handle refuses the whole sweep. A sweep needs `Deleted` deltas,
+    /// and a deletion is answered without reading any content.
+    ///
+    /// **The tree is the fence's own write domain**, not the whole city:
+    /// `wave_pre` walked exactly these paths before the wave began, so
+    /// the walk costs what staging already cost.
+    ///
+    /// # Errors
+    /// Propagates a `pre_oid` that is not an object, a commit whose tree
+    /// cannot be read, and a working-tree path that cannot be examined.
     pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, MemoryError> {
         let oid = git2::Oid::from_str(pre_oid).map_err(git_err("parse checkpoint oid"))?;
         let commit = self
@@ -186,27 +204,39 @@ impl Checkpoint {
             .find_commit(oid)
             .map_err(git_err("find checkpoint commit"))?;
         let tree = commit.tree().map_err(git_err("read checkpoint tree"))?;
-        // git already knows what is missing, so it is asked once instead
-        // of being told the answer file by file. Walking the whole tree
-        // and calling `exists` on every blob cost one `format!`, one
-        // `PathBuf` and one filesystem stat per tracked file, after every
-        // wave, whether or not that wave touched anything.
-        let mut options = git2::DiffOptions::new();
-        options.include_typechange(true);
-        let diff = self
+        let workdir = self
             .repo
-            .diff_tree_to_workdir(Some(&tree), Some(&mut options))
-            .map_err(git_err("diff checkpoint against the work tree"))?;
+            .workdir()
+            .ok_or_else(|| MemoryError::Checkpoint {
+                op: "sweep the working tree",
+                detail: "the city repository is bare".to_owned(),
+            })?
+            .to_path_buf();
         let mut deleted: Vec<String> = Vec::new();
-        for delta in diff.deltas() {
-            if delta.status() != git2::Delta::Deleted {
-                continue;
+        let mut fault: Option<MemoryError> = None;
+        let walked = tree.walk(git2::TreeWalkMode::PreOrder, |dir, entry| {
+            if entry.kind() != Some(git2::ObjectType::Blob) {
+                return git2::TreeWalkResult::Ok;
             }
-            if let Some(path) = delta.old_file().path().and_then(|p| p.to_str()) {
-                deleted.push(path.replace('\\', "/"));
+            let path = format!("{dir}{}", entry.name().unwrap_or_default());
+            match std::fs::symlink_metadata(workdir.join(&path)) {
+                Ok(_) => {}
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => deleted.push(path),
+                Err(err) => {
+                    fault = Some(MemoryError::Checkpoint {
+                        op: "sweep the working tree",
+                        detail: format!("{path}: {err}"),
+                    });
+                    return git2::TreeWalkResult::Abort;
+                }
             }
+            git2::TreeWalkResult::Ok
+        });
+        walked.map_err(git_err("walk the checkpoint tree"))?;
+        if let Some(err) = fault {
+            return Err(err);
         }
-        // Sorted here rather than trusted from the diff: the order these
+        // Sorted here rather than trusted from the walk: the order these
         // records land in is part of what a replay reproduces.
         deleted.sort();
         let mut payloads = Vec::new();

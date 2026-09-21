@@ -6,14 +6,12 @@
 //! The ledger's side index: seq to (segment, byte
 //! offset), so one line costs an open plus a seek instead of a scan.
 //!
-//! Everything here is disposable. The on-disk cache is believed only
-//! when its stamp matches what the directory looks like right now; any
-//! doubt — parse failure, byte-count drift, checksum mismatch — rebuilds
-//! in silence rather than reporting. A side artifact that lies is worse
-//! than one that is missing, so this module never lets a stale cache
-//! survive a comparison it cannot pass.
+//! Everything here is disposable. The maps live in memory for the life
+//! of the process and are rebuilt from the segments whenever they are
+//! opened; there is no persisted copy to believe and no stamp to
+//! compare, so no doubt has to be resolved in silence.
 
-mod cache;
+mod fold;
 mod ledger;
 mod reader;
 

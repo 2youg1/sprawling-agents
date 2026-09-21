@@ -16,7 +16,7 @@ use crate::error::{MemoryError, io_err};
 use crate::jsonl::JsonlLedger;
 use crate::vfs::Vfs;
 
-use super::manifest::{LEDGER, RESERVED};
+use super::manifest::RESERVED;
 
 pub(crate) fn head_of(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<String, MemoryError> {
     let mut prev = GENESIS_PREV;
@@ -205,7 +205,7 @@ pub(crate) fn write_file(vfs: &mut dyn Vfs, path: &Path, bytes: &[u8]) -> Result
 /// Whatever opening reports; a restored city that cannot be opened is
 /// not restored.
 pub fn open_restored(city_root: &Path, now: kernel::TimeMs) -> Result<PathBuf, MemoryError> {
-    let dir = city_root.join(RESERVED).join(LEDGER);
+    let dir = kernel::layout::CityLayout::new(city_root).ledger();
     let (_ledger, _report) = JsonlLedger::open(&dir, now)?;
     Ok(dir)
 }

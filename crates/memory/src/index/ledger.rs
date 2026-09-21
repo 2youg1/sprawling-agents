@@ -5,7 +5,6 @@
 
 //! The side index: seq to (segment, byte offset).
 
-use std::collections::BTreeMap;
 use std::ops::Bound;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -16,7 +15,7 @@ use crate::error::MemoryError;
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
-use super::cache::Folded;
+use super::fold::Folded;
 use super::reader::LineReader;
 
 /// What one [`LedgerIndex::refresh`] did, and what it lifted off the
@@ -40,11 +39,9 @@ pub enum Refreshed {
 /// seq → (segment file name, byte offset of the line start).
 ///
 /// The maps live in [`Folded`]; what this type adds is the filesystem
-/// seam they are folded from. The seam sits behind a lock because
-/// writing the cache is the one thing this index does to a disk and its
-/// public face stays read-only: a caller holding `&LedgerIndex` asks
-/// questions, and answering one must not require it to hand over
-/// exclusive access to an artifact it may throw away.
+/// seam they are folded from. The seam sits behind a lock so a caller
+/// holding `&LedgerIndex` asks questions without exclusive access, and
+/// every question this type answers is a read: nothing here writes.
 pub struct LedgerIndex {
     pub(crate) folded: Folded,
     vfs: Mutex<Box<dyn Vfs>>,
@@ -59,18 +56,13 @@ impl LedgerIndex {
         self.vfs.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Loads the cache when it is checksum-fresh, otherwise scans the
-    /// directory. Both paths yield the same map; only the cost differs.
+    /// Scans the ledger directory into a fresh index.
     ///
     /// # Errors
     /// Propagates a ledger directory that cannot be listed or read.
-    pub fn load_or_rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError> {
+    pub fn rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError> {
         let vfs: Box<dyn Vfs> = Box::new(RealFs::new());
-        let stamp = super::cache::directory_stamp(vfs.as_ref(), dir)?;
-        let folded = match super::cache::load_cache(vfs.as_ref(), dir, &stamp) {
-            Some(folded) => folded,
-            None => super::cache::rebuild(vfs.as_ref(), dir)?,
-        };
+        let folded = super::fold::rebuild(vfs.as_ref(), dir)?;
         Ok(LedgerIndex {
             folded,
             vfs: Mutex::new(vfs),
@@ -92,8 +84,8 @@ impl LedgerIndex {
 
     /// Folds whatever has been appended since the last look.
     ///
-    /// A resident index is the point: rebuilding one costs a read of the
-    /// whole cache and a `String` for every line in it, which on a fifty
+    /// A resident index is the point: rebuilding one scans every segment
+    /// and allocates a `String` for every line in it, which on a fifty
     /// thousand record ledger was 14.4 ms charged to every single
     /// history query. Refreshing costs one directory listing plus a
     /// `stat` per segment, and reads only the bytes that are new.
@@ -118,7 +110,7 @@ impl LedgerIndex {
         let plan = self.plan_refresh(dir)?;
         match plan {
             RefreshPlan::Rebuild => {
-                let folded = super::cache::rebuild(self.seam().as_ref(), dir)?;
+                let folded = super::fold::rebuild(self.seam().as_ref(), dir)?;
                 self.folded = folded;
                 Ok(Refreshed::Rebuilt)
             }
@@ -130,7 +122,7 @@ impl LedgerIndex {
     /// What this refresh has to do, decided from segment lengths alone.
     fn plan_refresh(&self, dir: &Path) -> Result<RefreshPlan, MemoryError> {
         let vfs = self.seam();
-        let names = super::cache::segment_names(vfs.as_ref(), dir)?;
+        let names = crate::jsonl::segment_names(vfs.as_ref(), dir)?;
         let mut spans = Vec::new();
         for name in &names {
             let path = dir.join(name);
@@ -221,62 +213,6 @@ impl LedgerIndex {
             .get(&run)
             .into_iter()
             .flat_map(move |seqs| seqs.range((Bound::Unbounded, upper)).rev().copied())
-    }
-
-    /// Writes the cache. Failure is not fatal — the index rebuilds next
-    /// time, and a disposable artifact must never block the main path.
-    ///
-    /// # Errors
-    /// Propagates a cache file that cannot be replaced, written or
-    /// flushed.
-    pub fn persist(&self, dir: &Path) -> Result<(), MemoryError> {
-        let body = {
-            let vfs = self.seam();
-            let stamp = super::cache::directory_stamp(vfs.as_ref(), dir)?;
-            self.cache_text(&stamp)
-        };
-        let path = dir.join(super::cache::CACHE_NAME);
-        let mut vfs = self.seam();
-        // Append is append: a cache left over from a shorter ledger
-        // would otherwise be spliced onto this one, and the splice
-        // parses far enough to be believed.
-        if vfs.exists(&path) {
-            vfs.remove_file(&path)
-                .map_err(crate::error::io_err("replace the index cache", &path))?;
-        }
-        vfs.append(&path, body.as_bytes())
-            .map_err(crate::error::io_err("write the index cache", &path))?;
-        vfs.sync_data(&path)
-            .map_err(crate::error::io_err("flush the index cache", &path))
-    }
-
-    /// The cache file's whole text: a header naming the directory it
-    /// describes, then one row per line.
-    fn cache_text(&self, stamp: &super::cache::Stamp) -> String {
-        // The run map inverted for the length of this write. Held here
-        // rather than resident because a cache row is the only reader of
-        // "which run owns this seq", and a second resident copy would be
-        // a second thing to keep in step.
-        let mut owner: BTreeMap<Seq, RunId> = BTreeMap::new();
-        for (run, seqs) in &self.folded.runs {
-            for seq in seqs {
-                owner.insert(*seq, *run);
-            }
-        }
-        let mut out = format!(
-            "{} {} {}\n",
-            super::cache::CACHE_MAGIC,
-            stamp.bytes,
-            stamp.digest
-        );
-        for (seq, (segment, offset)) in &self.folded.entries {
-            let run = match owner.get(seq) {
-                Some(run) => run.to_string(),
-                None => super::cache::NO_RUN.to_owned(),
-            };
-            out.push_str(&format!("{} {segment} {offset} {run}\n", seq.value()));
-        }
-        out
     }
 
     pub fn tail_seq(&self) -> Option<Seq> {

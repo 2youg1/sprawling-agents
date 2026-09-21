@@ -14,7 +14,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 | `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 35（S2 期初增 `E_STORAGE_FATAL`，删 `E_SIGNAL_UNKNOWN`）；carrier 声明位 |
 | `address` | 2 值类型 | 相对 city root 路径 newtype；WriteDomain 原语；reserved prefix 判定 |
 | `locator` | 2 值类型 | `cas:`／`file:` 文法解析与呈现；fail-closed |
-| `event` | 2 值类型 | EventKind 64（基集 55，另有 `autonomy_changed`、roadmap 三件、`login_started`、`endpoint_probed`、`roadmap_split`／`roadmap_blocked`、`pursuit_changed`、`governed_document_written`，共 65）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
+| `event` | 2 值类型 | EventKind 72（二分共 9 条入窗）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
 | `version` | 2 值类型 | 乐观并发：Version 单调值＋base 新鲜度判定 |
 | `idem` | 2 值类型 | IdemKey 确定性派生（BLAKE3 XOF 16 字节＋版本字节） |
 | `consts_external` | 6 数据面 | 外部事实常量 5 项 |
@@ -386,10 +386,26 @@ pub mod autonomy_word {                          // owner | delegate:<resident>
     pub fn read(word: &str) -> Result<Autonomy, AxError>;
 }
 pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
+pub struct EmbeddingCalled { pub model: String, pub inputs: u64, pub vectors: u64,
+                             pub dimensions: Option<u64>, pub prompt_tokens: Option<Tokens> }
+pub struct RerankCalled { pub model: String, pub passages: u64, pub ranks: u64,
+                          pub prompt_tokens: Option<Tokens> }
+
+#[serde(rename_all = "snake_case")] pub enum AdviserAsk { Noul, Score, Choice }
+pub struct AdviserAsked { pub ask: AdviserAsk, pub subject: String }
+#[serde(tag = "ask", rename_all = "snake_case")]
+pub enum AdviserAnswer { Noul { keep: bool, confidence_bp: u16 },
+                         Score { score_bp: u16 }, Choice { chosen: String } }
+pub struct AdviserAnswered { pub subject: String, #[serde(flatten)] pub answer: AdviserAnswer,
+                             pub elapsed_ms: u64 }
+#[serde(rename_all = "snake_case")]
+pub enum AdviserFailure { Unavailable, Timeout, Unreadable }
+pub struct AdviserFellBack { pub subject: String, pub reason: AdviserFailure }
 ```
 
 已迁移的 kind 与其结构：`run_started`、`run_forked`、`checkpoint_committed`、
-`approval_resolved`、`autonomy_changed`、`city_halted`、`governed_document_written`；
+`approval_resolved`、`autonomy_changed`、`city_halted`、`governed_document_written`、
+`embedding_called`／`rerank_called`、`adviser_asked`／`adviser_answered`／`adviser_fell_back`；
 `pr_merged` 借 `CommitAttribution` 记「谁做的这次提交」，其余键待该族迁移。
 未列入的 kind 仍由调用点手写读取。
 
@@ -423,7 +439,7 @@ pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
 - 铸造纪律（15.3-1）：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（trybuild 反例）。
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
-**EventKind 66 全集与二分（specalign 数据面；「入窗」＝InWindow，共 8）**：
+**EventKind 72 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
@@ -494,6 +510,11 @@ pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
 | 隐私与 Discard | `autonomy_changed` | record-only |
 | 治理与设施 | `governed_document_written` | record-only（人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
 | 治理与设施 | `toolkit_link_opened` | record-only（人请求接入一个外部应用，载荷只携 slug。**恒不携站位**——那是关于此刻的事实（channels-SPEC §8-31）；**恒不携 consent URL**——那是一张能力凭证，记进可重放的账本等于发给每一个重放的人） |
+| 供应商与模态 | `embedding_called` | record-only（一次嵌入调用入账：模型、请求多少条、回来多少个向量、调用方要的维度与 provider 自报的 token。向量本身不在此处——与 `model_called` 不携请求体同理，它是可从记录的输入重算的派生值，存两份就是同一件事有两个家） |
+| 供应商与模态 | `rerank_called` | record-only（同形：passages 与 ranks 各记一个数。服务端排好的名次就是答案，不在本城重排，故不在此处再写一份序） |
+| 顾问 | `adviser_asked` | record-only（问了一次判断：问题种类（noul／score／choice）与对象。问本身不决定任何字节） |
+| 顾问 | `adviser_answered` | **in-window**（重放不再问顾问，读到的是这条答案：它决定一件东西留不留在窗口里，因此它决定模型请求字节。**这也是「入窗」从 8 变 9 的那一条**） |
+| 顾问 | `adviser_fell_back` | record-only（没有可用的顾问答案，确定性策略作答，reason 是 `unavailable`／`timeout`／`unreadable` 之一。没有这条，顾问塑形的窗口与城自己策略塑形的窗口会折出同一段历史） |
 
 二分依据唯一：该事件载荷是否决定模型请求字节；不存在第三类。
 
@@ -1044,11 +1065,17 @@ pub struct ToolName(String);        // 非空；ascii 小写/数字/下划线（
 pub struct ServerLabel(String);     // 非空；ascii 小写/数字，恒不含下划线（见下）
 pub struct TimeoutMs(u64);          // 声明即承诺可协作取消
 pub enum Effect { Read, Write { domain: Address }, Egress,
-                                    Connector { label: ServerLabel }, Spawn, Govern, Spend }   // 决定过哪道门
+                                    Connector { label: ServerLabel }, Spawn, Govern,
+                                    AttachUserBrowser { address: Option<String> }, Spend }   // 决定过哪道门
 // Spawn：起第二个 Agent。不归 Read——一次派生能花多少、能碰什么，调用方自己的任何一道门都不管；
 // 管它的是深度规则：`kernel::gate::spawn` 判一层深，被派生的位置再派生恒 Deny。
 // Govern：改写一个 scope 被判的规则。刻意不归 Write——保留子树在每个写域之外，写门本就会拒；
 // 而它拒的理由是「一个 run 不得改写审判它自己的规则」，故效果层对这一臂恒拒，规则由人改 TOML。
+// AttachUserBrowser：附着到人自己开着的浏览器。地址由登记固定而不是每次调用命名（同 Connector 的理由）；
+// `None` 是人启用了工具却没说地址，`gate::attach` 据此答 Ask 而不是猜。
+pub enum GateSubject { Area(Address), Room(Address), Scope(String), Host(String), None }
+// Tool::subject 的返回：这一次调用说的是什么，由工具自己的文法读出来（M-17）。
+// bench 不再手拼参数名；需要主体的效果（Egress、AttachUserBrowser、Write 的收窄）取不到就拒。
 pub enum Temporal { Timeless, Timestamped }
 pub enum CostTier { Free, Light, Heavy }        // 三档起步，对扩展开放；路由/预算消费在 S3
 pub enum RenderIntent { Generic, Terminal, Diff { locations: Vec<Address> } }
@@ -1237,7 +1264,9 @@ pub fn forecast(arm: &ExecArm) -> DiscardForecast;
 ### 8-27 kernel::gate
 
 ```rust
-pub enum GateOutcome { Allow, Deny { refusal: Box<AxError> } }
+pub enum GateOutcome { Allow, Deny { refusal: Box<AxError> }, Ask { question: Box<AxError> } }
+// Ask 是具名例外：门答不了而人答得了，`question` 恒 `E_APPROVAL_PENDING` 且三段齐全，
+// recovery 就是那句要人做的事。DOORS 遍历断言「会问人的门恰有一道」。
 
 pub fn domain(domain: &WriteDomain, target: &Address, taint: &TaintSet) -> GateOutcome;   // 判一个文件
 pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutcome;      // 判一块声明的区域
@@ -1251,18 +1280,21 @@ pub fn spawn(parent: Depth, kind: &DelegateKind) -> GateOutcome;      // E_DELEG
 pub struct ConnectorCall<'a> { pub label: &'a ServerLabel, pub tool: &'a ToolName }
 pub fn reaches_the_undoable(call: &ConnectorCall<'_>) -> bool;
 pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &TaintSet) -> GateOutcome;
+pub fn attach(endpoint: Option<&EgressTarget>) -> GateOutcome;        // 唯一会 Ask 的门
+pub fn host_of(url: &str) -> Result<Option<String>, AxError>;         // url 里的主机，全库一份
+pub fn target_of(host: &str) -> EgressTarget;                         // Loopback／Private／Public 的唯一判定
 
-pub enum DoorId { Domain, Reach, Egress, EgressHost, Discard, Spawn, Undoable }
-pub const DOORS: [DoorId; 7];
+pub enum DoorId { Domain, Reach, Egress, EgressHost, Discard, Spawn, Undoable, Attach }
+pub const DOORS: [DoorId; 8];
 impl DoorId { pub fn as_str(self) -> &'static str; }
 #[cfg(feature = "conformance")]
 pub mod conformance {
-    pub fn deny_sample(door: DoorId) -> Result<AxError, DoorId>;   // 门自己产出的那条拒绝
+    pub fn sample(door: DoorId) -> Result<GateOutcome, DoorId>;    // 门自己的那个非 Allow 答案
     pub fn taint_readers() -> BTreeMap<DoorId, bool>;              // 哪几道门真的按 taint 改答
 }
 ```
 
-- **门只答 Allow 或 Deny（§12「默认 YOLO」这条规则）**：一个需要人点「可以」的动作，要么本来就该做，要么本来就不该做，两者都是规则。随之删去 `GateOutcome::Escalate`、`GateContext`、`gate::item`、`gate::commitment`、`gate::govern`、`gate::delegation`、`gate::dedup`。今天六类升级各得的固定答案与其理由：
+- **门只答 Allow 或 Deny（§12「默认 YOLO」这条规则），`attach` 是唯一的具名例外**：一个需要人点「可以」的动作，要么本来就该做，要么本来就不该做，两者都是规则。随之删去 `GateOutcome::Escalate`、`GateContext`、`gate::item`、`gate::commitment`、`gate::govern`、`gate::delegation`、`gate::dedup`。`attach` 例外所授予的不是一个动作，是那个人自己的浏览器里**全部登录态的读取权**——邮箱、银行、公司后台；`browser::Profile` 整套按楼隔离在附着的那一刻全部失效，所以没有任何一条城的规则答得了它，而人的动作（在运行中的浏览器里亲自打开远程调试并声明地址）就是答案。`attach` 的 Ask 经 bench 原样回到模型：`E_APPROVAL_PENDING` 加一句 recovery，那个 run 不往下走，而人在城之外完成授权。**会问人的门有且只有这一道，数量本身是一条可断言的性质**：`refusal_matrix` 遍历 `DOORS` 断言 Ask 恰好一条。今天六类升级各得的固定答案与其理由：
 
   | 从前的类别 | 今天 | 为什么 | 人在哪里改 |
   |---|---|---|---|
@@ -1406,7 +1438,7 @@ S2 激活的码（逐码答「能否定义掉」）：
 - `E_LOOP_SUSPECTED`：不可——停滞是观测事实；定义掉它等于假定模型不会循环。
 - `E_GOAL_CONFLICT`／`E_REPAIR_BUSY`：不可——同资源相斥与修复串行化是机制存在理由；Queued/Conflict 是合法结局，码只在回传面携信息。
 - `E_DELEGATION_DEPTH`：不消解（明裁：边界反馈优于沉默缺席）。
-- `E_APPROVAL_PENDING`／`E_APPROVAL_DENIED`：不可——一个设计问题停住提问的那个 run，而人可以答「不」；两者都是用户可达状态。门不再产出其中任何一个。
+- `E_APPROVAL_PENDING`／`E_APPROVAL_DENIED`：不可——一个设计问题停住提问的那个 run，而人可以答「不」；两者都是用户可达状态。`E_APPROVAL_PENDING` 有一个门的生产者：`gate::attach` 的 Ask（§8-27），它请求的是人的动作而不是收件箱里的一条裁决，所以不产生 `ApprovalItem`；`E_APPROVAL_DENIED` 仍只由人答题面对产生。
 - `E_EVIDENCE_MISSING`：部分定义掉——无证据 Done 已不可构造（类型半）；构造时拒绝仍需此码（运行时半，A6 双守）。
 - `E_SECRET_EGRESS`／`E_DISCARD_IRREVERSIBLE`：不可——两门存在的理由即这两类越界可发生；类型已把「无 Restoration 的 Discard 值」定义掉，Unplanned 请求（exec 预判路）是剩余不可消部分。
 - `E_CONFIG_INVALID`：不可——SecretRef 形状非法与明文入配置必须在反序列化即拒。
@@ -1824,6 +1856,7 @@ pub fn is_reserved(&self) -> bool;                  // 改：eq_ignore_ascii_cas
 pub const LEDGER_DIR: &str = "ledger";
 pub const CAS_DIR: &str = "cas";
 pub const LIBRARY_DIR: &str = "library";
+pub const SESSIONS_DIR: &str = "sessions";
 pub const BUILDING_SHELF: &str = "skills";
 pub const CONFIG_FILE: &str = "CONFIG.toml";
 pub const FILTERS_FILE: &str = "FILTERS.toml";
@@ -1847,6 +1880,10 @@ impl CityLayout {
     pub fn job(&self, addr: &Address) -> PathBuf;               // <scope>/JOB.md
     pub fn handoff(&self, room: &Address) -> PathBuf;           // <scope>/Handoff.md
     pub fn urbanite(&self, addr: &Address) -> PathBuf;          // <scope>/URBANITE.md
+    pub fn session_slice(&self, room: &Address) -> PathBuf;     // <首段>/.sprawling/sessions/<其余>.jsonl
+    pub fn names_a_session_slice(relative: &Path) -> bool;     // 某层 sessions 下的路径（栅栏永不暂存）
+    pub fn city_address(&self) -> Option<Address>;             // 城自己的名字：根目录名，能拼成地址时
+    pub fn of_ledger(dir: &Path) -> Option<CityLayout>;         // ledger() 的逆：从账本目录取回城根
 }
 ```
 
@@ -1856,7 +1893,9 @@ impl CityLayout {
 2. **形状 2 值，不碰磁盘。** `CityLayout` 只回答某个文件*会在*哪里；创建、读取、拒绝归拥有 I/O 的那一层。路径是数据而不是效应，故它住在 kernel，与它所依赖的地址文法同处一地（ARCHITECTURE.md 第 1 段）。
 3. **`RESERVED_PREFIX` 仍住在 `kernel::address`，本模块引用它。** 它是地址文法的一部分——`is_reserved` 是写域与读路径共用的谓词（8-2、8-55）——而不是一条布局规定。布局这一侧只决定「什么落在保留子树里」：治理一个 scope 的文件（`CONFIG.toml`、`FILTERS.toml`、`skills`）落在该 scope 的 `.sprawling/` 下，于是没有任何写域够得到它们；居民自己写的文件（`JOB.md`、`Handoff.md`、`URBANITE.md`、`Archive/`）落在明处。这条摆放规则由单元测试逐个方法核对，而不是靠注释重申。
 4. **逐段 push 而不是整串 join。** 一个地址在 Windows 与在 Linux 必须落成同一个目录树；整串 join 把 `/` 交给平台去解释，逐段 push 不给它这个机会。此前 city 内部两种拼法并存，本模块只留前一种。
-5. **十一个落点是覆盖面要求，不是便利方法。** 少一个落点，就有一处调用点继续自己拼，于是本模块不再是唯一权威（Roadmap §19.3 第 5 条）。后续新增一类文件时，先在此加方法与常量，再写调用点。
+5. **一个落点一个方法，不是便利方法。** 少一个落点，就有一处调用点继续自己拼，于是本模块不再是唯一权威（Roadmap §19.3 第 5 条）。后续新增一类文件时，先在此加方法与常量，再写调用点。
+6. **`session_slice` 是唯一一个按「首段是楼」读地址的方法。** Room 的地址就是 session 的身份，而 Building 是地址的第一段：`webapp/backend/db-migration` 落成 `webapp/.sprawling/sessions/backend/db-migration.jsonl`，地址的嵌套就是文件的嵌套；没有点名 session 的 run 就在楼自己的地址上工作，文件于是叫楼的名字。这条路只被 `memory::sessions` 这一个写者引用，`xtask` 的 `slices` 门钉住这句话。
+7. **`of_ledger` 是 `ledger` 的逆，为「只拿到账本目录」的写者而存在。** 账本的写者手里只有它打开的那一个目录，而切片落在城根之下，故城根必须能从这一个输入反推回来；逆运算住在具名常量所在的同一模块里，任何调用点都不许用 `parent().parent()` 重新拼一遍。不是 `ledger()` 形状的目录不是城（夹具、bundle 的校验台、直接打开的存储），回答 `None`。
 
 ### 8-72 `kernel::retries`：失败的调用再试几次（形状 2 值类型）
 

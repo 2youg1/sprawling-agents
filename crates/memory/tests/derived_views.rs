@@ -123,7 +123,7 @@ proptest! {
                 let dir = root.path().join(format!("idx-{nonce}"));
                 std::fs::create_dir_all(&dir).expect("mkdir");
                 write_segment(&dir, records);
-                let index = LedgerIndex::load_or_rebuild(&dir).expect("index");
+                let index = LedgerIndex::rebuild(&dir).expect("index");
                 (dir, index)
             },
             |(dir, index)| {

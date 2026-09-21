@@ -14,7 +14,7 @@ use crate::vfs::Vfs;
 use super::files::{
     copy_city_files, copy_tree, count_files, count_records, head_of, walk, write_file,
 };
-use super::manifest::{CAS, CITY, LEDGER, MANIFEST, Manifest, RESERVED};
+use super::manifest::{CAS, CITY, LEDGER, MANIFEST, Manifest};
 
 /// One count taken on the city against the same count taken on the
 /// bundle.
@@ -48,8 +48,9 @@ impl Bundle {
         city_root: &Path,
         dest: &Path,
     ) -> Result<Manifest, MemoryError> {
-        let ledger_dir = city_root.join(RESERVED).join(LEDGER);
-        let cas_dir = city_root.join(RESERVED).join(CAS);
+        let layout = kernel::layout::CityLayout::new(city_root);
+        let ledger_dir = layout.ledger();
+        let cas_dir = layout.cas();
         let (dest_ledger, dest_cas, dest_city) =
             (dest.join(LEDGER), dest.join(CAS), dest.join(CITY));
         let ledger_files = copy_tree(vfs.as_mut(), &ledger_dir, &dest_ledger)?;
@@ -133,8 +134,9 @@ impl Bundle {
                 .map_err(io_err("read a bundle manifest", &at))?;
             Manifest::from_json(&bytes, &at)?
         };
-        let ledger_dir = city_root.join(RESERVED).join(LEDGER);
-        let cas_dir = city_root.join(RESERVED).join(CAS);
+        let layout = kernel::layout::CityLayout::new(city_root);
+        let ledger_dir = layout.ledger();
+        let cas_dir = layout.cas();
         if !walk(vfs.as_ref(), &ledger_dir)?.is_empty() {
             return Err(MemoryError::Bundle {
                 op: "restore",
@@ -182,6 +184,7 @@ impl Bundle {
 mod tests {
     use super::super::files::open_restored;
     use super::super::fixture::city_with;
+    use super::super::manifest::RESERVED;
     use super::*;
     use kernel::{GENESIS_PREV, TimeMs};
 

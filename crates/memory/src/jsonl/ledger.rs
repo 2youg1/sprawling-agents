@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 
 use kernel::{B3Hash, EventRecord, Seq};
 
+use crate::error::{MemoryError, io_err};
 use crate::vfs::Vfs;
 
 /// Segment rolling threshold. Internal affair: changing it changes how
@@ -33,6 +34,11 @@ pub struct JsonlLedger {
     pub(crate) next_seq: Seq,
     pub(crate) prev: B3Hash,
     pub(crate) roll_bytes: u64,
+    /// The per-room projection of what this ledger appends, laid down
+    /// after a wave is durable. `None` for a ledger opened directly in a
+    /// directory that is not a city's, which has no buildings to file
+    /// sessions under.
+    pub(crate) sessions: Option<crate::sessions::Sessions>,
     /// The write-path observer, called only after the wave is durable.
     pub(crate) observer: Option<WriteObserver>,
 }
@@ -53,15 +59,54 @@ pub(crate) struct PriorSegment {
     pub(crate) len: u64,
 }
 
+/// The two names a segment is made of. One home for the grammar: the
+/// writer that names a segment and the readers that recognise one, or
+/// read a sequence back off one, agree because they read these.
+const SEGMENT_PREFIX: &str = "ledger-";
+const SEGMENT_SUFFIX: &str = ".jsonl";
+
 pub(crate) fn segment_file_name(first_seq: Seq) -> String {
-    format!("ledger-{:020}.jsonl", first_seq.value())
+    format!("{SEGMENT_PREFIX}{:020}{SEGMENT_SUFFIX}", first_seq.value())
 }
 
 pub(crate) fn is_segment(path: &Path) -> bool {
     match path.file_name().and_then(|n| n.to_str()) {
-        Some(name) => name.starts_with("ledger-") && name.ends_with(".jsonl"),
+        Some(name) => name.starts_with(SEGMENT_PREFIX) && name.ends_with(SEGMENT_SUFFIX),
         None => false,
     }
+}
+
+/// The first sequence a segment's name claims, for a reader that wants
+/// only the records after a sequence it already holds: it skips the
+/// segments that cannot contain them by reading the name, rather than by
+/// opening the file. `None` for a name that is not this grammar.
+///
+/// The inverse of [`segment_file_name`], and it lives beside it for the
+/// reason the prefix and suffix are constants here: one reader of a
+/// grammar, not two spellings of it.
+pub(crate) fn segment_first_seq(name: &str) -> Option<Seq> {
+    let digits = name
+        .strip_prefix(SEGMENT_PREFIX)?
+        .strip_suffix(SEGMENT_SUFFIX)?;
+    digits.parse::<u64>().ok().map(Seq::new)
+}
+
+/// The segment files of `dir`, in the ledger's own order.
+///
+/// `Vfs::list` answers files only, already sorted: zero-padded names
+/// sort lexically the way they sort numerically, so the order is the
+/// ledger's own rather than the filesystem's.
+pub(crate) fn segment_names(vfs: &dyn Vfs, dir: &Path) -> Result<Vec<String>, MemoryError> {
+    let mut names = Vec::new();
+    for path in vfs.list(dir).map_err(io_err("list ledger dir", dir))? {
+        if !is_segment(&path) {
+            continue;
+        }
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            names.push(name.to_owned());
+        }
+    }
+    Ok(names)
 }
 
 /// Complete (`\n`-terminated) lines and the leftover tail bytes.

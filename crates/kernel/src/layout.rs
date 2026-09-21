@@ -35,6 +35,11 @@ pub const LEDGER_DIR: &str = "ledger";
 pub const CAS_DIR: &str = "cas";
 /// The city's shelves of skills, under the city's reserved subtree.
 pub const LIBRARY_DIR: &str = "library";
+/// One building's projection of the sessions run in it, under that
+/// building's reserved subtree. Derived from the Ledger, so a person
+/// reading a building finds its history beside it; disposable, so nothing
+/// in the product reads it.
+pub const SESSIONS_DIR: &str = "sessions";
 /// A building's own shelf of skills, under that building's reserved
 /// subtree: what this building knows and no other building is given.
 pub const BUILDING_SHELF: &str = "skills";
@@ -175,6 +180,96 @@ impl CityLayout {
         self.scope(addr).join(URBANITE_FILE)
     }
 
+    /// The projection of one session's records: the room address is the
+    /// session's identity, and a building is its first segment.
+    ///
+    /// `webapp/backend/db-migration` is one file named
+    /// `backend/db-migration.jsonl` under `webapp`'s sessions, so the
+    /// nesting of rooms is the nesting of the files and no reader has to
+    /// know which segment was a building. A run that named no session
+    /// works at the building's own address, and its file then carries the
+    /// building's name.
+    #[must_use]
+    pub fn session_slice(&self, room: &Address) -> PathBuf {
+        let raw = room.as_str();
+        let (building, under) = raw.split_once('/').unwrap_or((raw, ""));
+        let name = if under.is_empty() { building } else { under };
+        let mut path = self.root.clone();
+        path.push(building);
+        path.push(RESERVED_PREFIX);
+        path.push(SESSIONS_DIR);
+        path.push(format!("{name}.jsonl"));
+        path
+    }
+
+    /// Whether `relative` names a session slice: a file under some
+    /// scope's reserved `sessions` directory.
+    ///
+    /// A slice is a disposable projection of the Ledger
+    /// (memory-SPEC 8-24) and the city appends to it while a wave runs,
+    /// so the checkpoint never stages one: git reads a workdir file it
+    /// believes it knows, and a file the city itself keeps writing makes
+    /// that read refuse the whole wave. The reserved prefix is required
+    /// immediately before `sessions`, so a person's own directory that
+    /// happens to carry that name is not mistaken for the projection.
+    /// One predicate rather than each caller spelling the directory,
+    /// which is what `xtask slices` holds.
+    #[must_use]
+    pub fn names_a_session_slice(relative: &Path) -> bool {
+        let mut held = false;
+        for component in relative.components() {
+            let Some(name) = component.as_os_str().to_str() else {
+                held = false;
+                continue;
+            };
+            if name.eq_ignore_ascii_case(SESSIONS_DIR) {
+                return held;
+            }
+            held = name.eq_ignore_ascii_case(RESERVED_PREFIX);
+        }
+        false
+    }
+
+    /// The layout whose ledger is `dir`, when `dir` is a city's.
+    ///
+    /// The inverse of [`ledger`](Self::ledger), for the writer that is
+    /// handed the ledger directory and must find the root every other
+    /// path is derived from. `None` for a directory that is not a ledger
+    /// under a reserved prefix: a fixture, a bundle being verified, or a
+    /// store somebody opened directly, none of which is a city.
+    #[must_use]
+    pub fn of_ledger(dir: &Path) -> Option<CityLayout> {
+        if dir.file_name()? != LEDGER_DIR {
+            return None;
+        }
+        let governed = dir.parent()?;
+        if governed.file_name()? != RESERVED_PREFIX {
+            return None;
+        }
+        let root = governed.parent()?;
+        if root.as_os_str().is_empty() {
+            return None;
+        }
+        Some(CityLayout::new(root))
+    }
+
+    /// The city's own name, read from the directory it lives in.
+    ///
+    /// The one address that names the city rather than a room: the
+    /// genesis record carries it so a city can say who it is, and the
+    /// session projection must file it nowhere, because no building is
+    /// named after the city inside itself. Not every directory name is
+    /// an address - a path can hold characters an address may not - and
+    /// a city whose directory cannot be spelled as an address simply has
+    /// no name to show, which is honest and rare.
+    #[must_use]
+    pub fn city_address(&self) -> Option<Address> {
+        self.root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| Address::parse(name).ok())
+    }
+
     /// The city root's own reserved subtree.
     fn governed_root(&self) -> PathBuf {
         self.root.join(RESERVED_PREFIX)
@@ -265,5 +360,101 @@ mod tests {
                 .join(RESERVED_PREFIX)
                 .join(CONFIG_FILE)
         );
+    }
+
+    #[test]
+    fn a_session_slice_lives_under_the_sessions_of_its_first_segment() {
+        let sessions = Path::new("/city")
+            .join("webapp")
+            .join(RESERVED_PREFIX)
+            .join(SESSIONS_DIR);
+        assert_eq!(
+            layout().session_slice(&addr("webapp/api-rewrite")),
+            sessions.join("api-rewrite.jsonl")
+        );
+        // A room one level below a room keeps its own path: the nesting
+        // of the address is the nesting of the files.
+        assert_eq!(
+            layout().session_slice(&addr("webapp/backend/db-migration")),
+            sessions.join("backend").join("db-migration.jsonl")
+        );
+        // A run that named no session works at the building's address.
+        assert_eq!(
+            layout().session_slice(&addr("webapp")),
+            sessions.join("webapp.jsonl")
+        );
+    }
+
+    #[test]
+    fn a_session_slice_is_out_of_every_write_domain() {
+        let path = layout().session_slice(&addr("lab/room1"));
+        let spelled = path.to_string_lossy().replace('\\', "/");
+        let as_address = spelled.trim_start_matches("/city/").to_owned();
+        assert!(
+            addr(&as_address).is_reserved(),
+            "{spelled} is not in a reserved subtree"
+        );
+    }
+
+    #[test]
+    fn a_fence_can_tell_a_session_slice_from_a_promise() {
+        let held = [
+            "lab/.sprawling/sessions/room1.jsonl",
+            "lab/room1/.sprawling/sessions/room1.jsonl",
+            "lab/.SPRAWLING/sessions/room1.jsonl",
+        ];
+        for spelled in held {
+            assert!(
+                CityLayout::names_a_session_slice(Path::new(spelled)),
+                "{spelled} is a session slice"
+            );
+        }
+        let kept = [
+            "lab/.sprawling/CONFIG.toml",
+            "lab/.sprawling/skills/one/SKILL.md",
+            "lab/room1/JOB.md",
+            "sessions/room1.jsonl",
+            "lab/room1/sessions/notes.md",
+            "lab/.sprawling/library/sessions.md",
+        ];
+        for spelled in kept {
+            assert!(
+                !CityLayout::names_a_session_slice(Path::new(spelled)),
+                "{spelled} is a person's or a promise, not a slice"
+            );
+        }
+    }
+
+    #[test]
+    fn a_city_s_name_is_the_directory_it_lives_in() {
+        assert_eq!(
+            CityLayout::new(Path::new("/home/someone/projects/my-city")).city_address(),
+            Some(addr("my-city"))
+        );
+        // A directory name that is not an address is no name at all
+        // rather than a guessed one, and the root itself has none.
+        assert_eq!(
+            CityLayout::new(Path::new("/home/someone/projects/bad:name")).city_address(),
+            None
+        );
+        assert_eq!(CityLayout::new(Path::new("/")).city_address(), None);
+    }
+
+    #[test]
+    fn a_ledger_directory_alone_yields_the_city_it_belongs_to() {
+        let ledger = Path::new("/city").join(RESERVED_PREFIX).join(LEDGER_DIR);
+        assert_eq!(
+            CityLayout::of_ledger(&ledger),
+            Some(CityLayout::new(Path::new("/city")))
+        );
+        // A store opened directly is not a city's ledger: a fixture's
+        // directory, a bundle's scratch space, a relative path.
+        for not_a_city in [
+            Path::new("/store/ledger"),
+            Path::new("/store/.sprawling"),
+            Path::new(".sprawling/ledger"),
+        ] {
+            assert_eq!(CityLayout::of_ledger(not_a_city), None, "{not_a_city:?}");
+        }
     }
 }

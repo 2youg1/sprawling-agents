@@ -278,8 +278,7 @@ fn run_history(scratch: &std::path::Path) -> Result<(), String> {
         .collect::<Result<_, _>>()?;
     ledger.append_all(drafts).map_err(|e| format!("{e}"))?;
 
-    let mut index =
-        memory::LedgerIndex::load_or_rebuild(&dir).map_err(|e| format!("{}", e.into_ax()))?;
+    let mut index = memory::LedgerIndex::rebuild(&dir).map_err(|e| format!("{}", e.into_ax()))?;
     const LIMIT: usize = 500;
     const ROUNDS: usize = 50;
     let mut times = Vec::with_capacity(ROUNDS);

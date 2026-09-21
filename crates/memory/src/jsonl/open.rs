@@ -71,6 +71,11 @@ impl JsonlLedger {
             next_seq: Seq::FIRST,
             prev: GENESIS_PREV,
             roll_bytes: SEGMENT_ROLL_BYTES,
+            // The projection exists only when this ledger is a city's:
+            // it is what tells a writer handed the ledger directory
+            // alone where the buildings' sessions lie. A store opened
+            // directly has no buildings, and files nothing.
+            sessions: crate::sessions::Sessions::for_ledger(dir),
             observer: None,
         };
 

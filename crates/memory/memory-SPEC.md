@@ -224,9 +224,8 @@ pub struct LedgerIndex { /* folded: Folded —— entries: BTreeMap<Seq, (String
                             runs: BTreeMap<RunId, BTreeSet<Seq>>（谁写了哪几条）、scanned；
                             vfs: Mutex<Box<dyn Vfs>> —— 内缝，读写皆经它；私有 */ }
 impl LedgerIndex {
-    /// Build by scanning the ledger dir; 旁挂 cache `index.cache` is
-    /// loaded when checksum-fresh, rebuilt otherwise (disposable by design).
-    pub fn load_or_rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError>;
+    /// 扫描账本目录建索引（本就是唯一入口，无库外旁挂物可信）。
+    pub fn rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError>;
     pub fn refresh(&mut self, dir: &Path) -> Result<Refreshed, MemoryError>;       // 只读长出来的字节
 }
 /// 一次 refresh 做了什么，以及为此从盘上抬起了多少字节。
@@ -235,7 +234,6 @@ impl LedgerIndex {
     pub fn reader(&self, dir: &Path) -> LineReader<'_>;                            // 取行的唯一入口
     pub fn run_seqs_before(&self, run: RunId, before: Option<Seq>)                 // 一个 run 写过的 seq，新的在前
         -> impl Iterator<Item = Seq> + '_;
-    pub fn persist(&self, dir: &Path) -> Result<(), MemoryError>;                  // 写 cache；失败非致命（可弃物不阻止主链路）
     pub fn len(&self) -> usize;  pub fn is_empty(&self) -> bool;                   // 重建后自证条数
     pub fn tail_seq(&self) -> Option<Seq>;
 }
@@ -246,7 +244,7 @@ impl LineReader<'_> {
 }
 ```
 
-- 旁挂 cache 格式：首行 `idx v2 <全目录字节数> <b3 前 16>`＋逐行 `seq segment offset run`（run 未知记 `-`）；校验不符／解析失败／目录字节数变化 → 静默重建（可弃即不报错）。失效判定粗粒度（全目录字节数）是刻意的：旁挂物宁可重建不可误信。
+- **索引不落盘，只有一段常驻内存**：唯一入口是 `rebuild`，扫描账本目录建表；`Views` 持有它并在每次查询前 `refresh`。此前那份 `index.cache` 旁挂物已整体删除：`persist` 在 `db3a342` 之后的树里零生产调用者，读取方因此是在读一份没人写的文件，而「一份没人写的旁挂物」既是永不命中的空转，又是第二个可失效的“答案来源”。删掉的是写与读两半，`Folded`、`rebuild`、`scan` 与 `refresh` 全部保留，故 `rebuild` 仍是「从段重建」。
 - **取行走游标，而不是每行一次 open ＋逐字节 read**：一次 `History`／`RunHistory` 查询要取一段连续的 seq，而每一行重开段文件、再一次一个字节 `read` 到换行的读法，系统调用数与行长同阶。句柄因此住进 `LineReader`：段名不变即不重开，读用 `BufReader::read_until(b'\n')`，一次填充服务多行。
   - **实测**（5 万条账本，windows-x86_64 NVMe，每种模式 200 行）：顺序读（`history`）**0.89 µs／行**；逆序读（`run_history`）**5.82 µs／行**；随机跳读 **14.9 µs／行**。
   - **位置自持**：游标记住下一行的偏移，与所求偏移相同即不 seek（顺序读全程零 seek），不同则绝对 seek 并弃缓冲。`run_history` 逆序读每行付一次 seek 与一次缓冲填充，仍是常数次系统调用。
@@ -258,16 +256,14 @@ impl LineReader<'_> {
   - 索引因此多记一张 `scanned: BTreeMap<段名, 已折入字节数>`。`refresh` 逐段比对：**变大就只读新那一段字节**；**变小或消失就全重建**（断尾修复截过段，旧偏移不再可信）；一字未动就什么也不做。
   - **「上次读到哪」只有这一个家，而且它恒落在整行边界上**：`fold_segment` 只把带终止符的行计入，所以 `scanned` 记的永远是某条记录的结尾，下一次 refresh 从一条记录的开头起读，**取不到半条**。
   - **定位读，而不是整读再切尾**：`Vfs::read_at(path, from, size-from)`，读进来的缓冲只装增量。长度以本次 `Vfs::size` 读到的值封顶——stat 与 read 之间落的那条账留给下一次 refresh，而不是折在一个本次没有确认过的偏移上。
-  - **`scanned` 不落盘，所以「偏移写坏」不是一个状态**：它是常驻状态，cache 命中时取当下段大小（cache 新鲜的定义就是字节数与 stamp 相符）。一份被改坏的 cache 过不了 stamp 比对，整份重建；进程内若出现 `scanned > 段长`，走的是「变小」那一支，同样整份重建。任何一条可疑路径的答案都是重建，没有一条会读到半条记录。
+  - **`scanned` 不落盘，所以「偏移写坏」不是一个状态**：它是常驻状态，建表时取当下段大小，故「已折入」与「盘上长度」在那一刻是同一个数。进程内若出现 `scanned > 段长`，走的是「变小」那一支，同样整份重建。任何一条可疑路径的答案都是重建，没有一条会读到半条记录。
   - **`refresh` 报出它读了多少字节**（`Refreshed`）：整读与定位读折出的索引逐条相同，唯一的区别就是抬起的字节数，所以那个数必须能被断言，也正是 `index_refresh_read` 这条预算的读数来源。
-  - `load_or_rebuild` 走 cache 命中时，`scanned` 取当下段大小：**cache 新鲜的定义就是字节数与 stamp 相符**，所以这个赋值精确而不是近似。
   - 消费者：`bin::assembly` 的 `Views` 持一份，每次查询先 `refresh`。刷新代价是一次 `read_dir` 加逐段 `metadata`，与账本大小无关。
 - **run 索引与 seq 索引同住一张旁挂物**：`run_history` 从账本尾部逐行往回读，读满 `channels::HISTORY_SCAN` 行就停，**过滤发生在读完之后**——不属于这个 run 的行也要完整取出再丢掉。索引因此多记一张 `runs: BTreeMap<RunId, BTreeSet<Seq>>`，查询只取属于它的 seq，代价与**答的条数**同阶而不与账本长度同阶。
   - **为什么不放进一份落盘冷投影**：本 crate 曾有一份（redb 的 `memory::projection`），而**运行中的服务端从未接线**——读面只有 `bin::sprawling::views::Views`，它折 `hot`／`attribution`／`book`。要让 `run_history` 读一份落盘投影，就得在事件路径上开一个写事务，实测每条事件一个磁盘屏障 ≈ 1.1k records/s。为一个不需要持久化的答案给每一条落账加一道屏障，方向是反的，所以那个模块整体删除（Roadmap 7.15）。
-  - **为什么可以放进 `index`**：这张旁挂物**已经常驻**（`Views` 持有并每查询 `refresh`），**已经逐行解析过每一条新行**（`locate` 一次 `serde_json` 解析读两个字段），**已经带着「存疑即重建」的可弃性**。run 表搭的是同一趟 refresh、同一份 cache、同一条重建反射，不新增任何同步义务。
+  - **为什么可以放进 `index`**：这张旁挂物**已经常驻**（`Views` 持有并每查询 `refresh`），**已经逐行解析过每一条新行**（`locate` 一次 `serde_json` 解析读两个字段），**已经带着「存疑即重建」的可弃性**。run 表搭的是同一趟 refresh、同一条重建反射，不新增任何同步义务。
   - **对 channels-SPEC §2「不建 run→seq 的索引」的重新定价**：它的两条理由各自的参数都动了。其一「有界扫描付的是几毫秒的解析」——**实测是 22.4 ms**，量级估错了。其二「一份要随账本同步的派生状态」——那份派生状态**已经存在且必须同步**，run 表是它多一个字段，不是多一份。至于「第二个权威」：本模块开篇即写明索引可弃、存疑即重建，它回答的是「在哪」，从不回答「是什么」；账本仍是唯一权威。
   - **内存代价**：5 万条账本上 `runs` 约 1.2 MB（`BTreeSet<Seq>` 每条 8 字节数据加 B 树节点开销），与 `entries` 同阶而更小——后者每条还带一个段名 `String`。计入 `session_resident` 预算（今天 4.29 MB／30 MB 上限）。
-  - **cache 格式为 `idx v2`**，行形 `seq segment offset run`（run 未知记 `-`）。首行与当前 magic 不符的 cache 走「不符即静默重建」，无迁移代码。
   - **`before` 取开区间**，与线格式 `HistoryAnswer.earlier` 的既有含义（「从这条之前接着问」）同字同义；调用方不再自己算 `before - 1`，那条减法连同它的 `Seq::FIRST` 边界一起消失。
   - **答的顺序**：`run_seqs_before` 由新到旧，因为调用方要的是会话的**末尾**；调用方取够条数后翻转成由旧到新再取行，于是 `LineReader` 全程向前走（0.89 µs／行，而不是逆序的 5.82 µs／行）。
 - `locate` 只探 `seq` 与 `run` 两个字段——索引不要求整条记录可解析，破损日志上的索引正是修复路径所需；`run` 缺失或解析不出的行**照样入 seq 表，只是不属于任何 run**，残尾（无换行结尾）跳过不入索引，其修复归 jsonl。段名排序由本模块自持（不信文件系统枚举序）。新增 `MemoryError::SeqMissing{seq}`（→ `E_INVALID_ARGS`）：问一条从未写过的 seq 是调用者错，不是损坏。
@@ -432,14 +428,15 @@ impl Checkpoint {
 - **`ensure_base` 仍然移动 HEAD**：worktree 从一个提交分枝，城必须先有第一个提交。
 
 - **扫改动过的 blob，不扫整棵树**：遍历 git index 里的**每一个** blob、对**整份内容**跑 `kernel::secret::scan` 且**每一次工具波都跑一遍**时，4.89 MB／350 文件的树实测纯 CPU **212 ms** 每波，另加从 git 对象库 zlib 解压每一个 blob 的开销——**改了一个文件的波，付整棵树的钱**。
-  - 扫描因此走 `diff_tree_to_index(HEAD 树, index)`：git 自己报出这一次提交会新写进去的条目，只有它们被读出内容并扫描。与 `wave_post` 同一个动作——**问 git 什么变了，而不是自己逐文件推**——于是这两处的「什么算改动」由同一个机制回答。
+  - 扫描因此走 `diff_tree_to_index(HEAD 树, index)`：git 自己报出这一次提交会新写进去的条目，只有它们被读出内容并扫描。它问的是 git 而不是自己逐文件推，于是「什么会进树」由暂存与扫描共用的一个机制回答。
   - **无 HEAD 时全扫**：基线那一次没有「上一棵树」可比，扫的就是全部。
   - **守的性质不变，且这是它成立的归纳证明**：`commit` 只从 `wave_pre` 出来，而 `wave_pre` 恒先扫后提交。基例——第一次提交全扫；归纳步——第 N 次提交里未变的 blob 在它进树的那一次已被扫过，变了的这一次扫。于是**每一个进过树的字节都被扫过一次**，而「模型刚写下的密钥不会变成永久」正是这句话：密钥只能随改动进入。
   - **一个被收窄的东西，明写在此**：`kernel::secret::scan` 将来多认一种形状时，**已经提交进树的内容不会被回头重扫**——新形状从此刻起作用于所有到来的改动，但不追溯。追溯要的是一次全树重扫，而那正是这里不再每波支付的开销；真要重扫时，删掉 `.git` 让下一次波成为基线是现成的路。
 
-- **`wave_post` 问 git，不逐文件 stat**：走 pre 提交树的 `TreeWalk`、对**每一个** blob 做一次 `format!`、一次 `PathBuf::join`、一次文件系统 `exists()`，就是**每一波都付整棵树的钱，不管这一波动没动东西**；改用 `diff_tree_to_workdir`，git 自己一遍就报出 `Delta::Deleted`。
-  - 输出仍然在本模块排序而不信 diff 的顺序：**这批行落账的顺序是重放要复现的东西**。
-- `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存用 `add_all`＋`update_all` 两步（后者含删除），glob 限于 `<scope>/*`。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `MemoryError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
+- **`wave_post` 只问存在性，不问内容**：sweep 要的是「pre 提交树里的哪个 blob 从工作区消失了」，而这是一个存在问题——对树里的每个 blob 做一次 `symlink_metadata`，`NotFound` 即删除。**不碰 `diff_tree_to_workdir`**：它为每一个与树对上号的路径求哈希（libgit2 的 `git_diff__oid_for_entry`），而工作区里有城自己刚写完又改动的文件（session 投影，以及任何还开着写句柄的文件）；Windows 的目录枚举尺寸对这样的文件可以落后于句柄里的真实长度，libgit2 拿这个过期尺寸去 `git_odb__hashfd`，读到比声明尺寸多的字节使剩余计数下溢，最后把整次 sweep 拒成 `E_WORKTREE_BUSY`——写路径完全正确，读路径却对城市自己的写入过敏。
+  - 被否：每波走 `diff_tree_to_workdir`。它省的是「每一波付整棵树的钱」，而那棵树是**这次栅栏自己的写域**（`wave_pre` 刚逐文件走过一遍），不是全城；sweep 只报 `Deleted`，而 `Deleted` 是存在问题不是内容问题。被否：`Path::exists()`——它跟随软链，一个悬空软链会被当成删除，`symlink_metadata` 不会。
+  - 输出仍然在本模块排序而不信 walk 的顺序：**这批行落账的顺序是重放要复现的东西**。
+- `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存用 `add_all`＋`update_all` 两步（后者含删除），glob 限于 `<scope>/*`；**session 切片永不进 add**（`CityLayout::names_a_session_slice`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `MemoryError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
 - 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `BUILDING.md` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何栅栏——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
 
@@ -735,7 +732,7 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 `jsonl.rs`（812）→ `jsonl/ledger.rs`（类型＋段文法）／`open.rs`（打开与恢复，测试住 `open/tests.rs`）／
 `append.rs`（追加与读＋kernel::Ledger trait impl）；`index.rs`（783）→ `index/ledger.rs`
 （`LedgerIndex`，测试住 `index/ledger/tests.rs`）／`reader.rs`（`LineReader`＋`OpenSegment`）／
-`cache.rs`（戳／缓存／重建，`Stamp`／`Located`／`CACHE_*` 归此）；
+`fold.rs`（折表与重建，`Folded`／`Located` 归此）；
 `worktree.rs`（622）→ `worktree/name.rs`／`lease.rs`／`trees.rs`（测试住 `trees/tests.rs`）；
 `bundle.rs`（532）→ `bundle/manifest.rs`（布局常量归此）／`export.rs`（避 `module_inception`）／
 `files.rs`；`checkpoint.rs`（480）→ `checkpoint/fence.rs`／`scan.rs`。
@@ -811,3 +808,28 @@ pub fn working_status(city_root: &Path, scope: Option<&str>, base: Option<GitOid
 **块长 64 KiB 是本模块的内部事务**（`SCAN_CHUNK_BYTES`）：`L` 式要知道第几行从哪开始，只能从对象开头扫换行，于是代价与**答案之前**的字节同阶，而与对象大小无关——一份 200 MB 的 offload 取第二行，读的是 64 KiB。`B` 式一次定位读即可，不必扫。
 
 **这套文法没有第二个家**：`Cas::get` 仍是唯一会复算 BLAKE3 的读法，`ranges` 一次也不哈希。两条断言守着这件事——`byte_and_line_ranges_follow_locator_semantics` 守文法，`a_range_read_lifts_the_range_rather_than_the_object` 守代价（用 `FaultFs::bytes_read()` 数字节：一个五字节范围移动的字节数必须以十计，而不是以对象长度计）。
+
+### 8-24 `memory::sessions`：账本投影到各楼的 sessions（形状 7 投影）
+
+```rust
+pub(crate) struct Sessions { /* layout、ledger、vfs、open —— 私有 */ }
+impl Sessions {
+    pub(crate) fn for_ledger(ledger_dir: &Path) -> Option<Sessions>;   // 非城账本 → None
+    pub(crate) fn absorb(&mut self, record: &EventRecord) -> Result<(), MemoryError>;
+}
+pub(crate) const SLICE_MAGIC: &str = "slices v1";
+```
+
+**账本不拆链。** 一条链、一个写者、一本完整历史（`docs/glossary.md` 的 one Ledger 与 one writer）一个字不改；工作区里出现的是一份**从账本投影出来、可删可重建的切片**：一个 room 一个文件，落在它所属 Building 的 `.sprawling/sessions/` 下，地址的嵌套就是文件的嵌套。**城自己的那条记录（地址即城名）不落任何切片**：那个地址是城，不是城里的 Building，给它落一份就会在城根里造一个与城同名的目录（kernel-SPEC 8-56 的 `city_address`）。路径由 `kernel::layout::CityLayout::session_slice` 给出（kernel-SPEC 8-56），本模块是它唯一的调用者；`xtask slices` 门钉住这句话。
+
+**只有账务线程写，而且写在账本落盘之后。** 入口是 `JsonlLedger::append_all`：一段 wave 全部 `sync_data` 之后才逐条 `absorb`。投影写失败不改变账本的返回值——历史已经在盘上，可弃物不得让它的调用方吃到一次假失败——但拒绝被报出（一行 `eprintln!`）而不是被吞掉。**投影永不进栅栏。** `checkpoint::stage_scopes` 跳过任何 `sessions` 下的路径（`CityLayout::names_a_session_slice`）：它还在被账务线程追加，而 git 的暂存要读它以为已经知道的文件；一个仍在长的文件会把整波拒成 `E_WORKTREE_BUSY`（8-8）。可弃物因此从不进历史，也不进任何 diff 的读者面。
+
+**头部是唯一的疑点。** 每份切片首行是 `slices v1 <first_seq>`，即该文件第一条记录的 seq。文件不存在、魔数不符、或首行 seq 与头部不符 → 整份重建：扫账本、按地址过滤、按账本序写下，不写迁移代码。进程重启后接上已有文件时，先校验头部与内容，再从账本把漏掉的尾巴补齐；段名带首 seq，故不可能含新记录的段不打开。断在半行的尾巴先截掉再续，与账本自己的 tail recovery 同一条读法。
+
+**重建逐字节相同。** 每一行都是账本 `canonical_line` 的副本，头部由内容决定（首条记录的 seq），所以删掉整个 `sessions/` 再放一遍得到同样的字节——`deleting_the_sessions_directory_and_replaying_the_ledger_restores_the_bytes` 钉住它。
+
+**产品不读它做判断。** 它只给人的眼睛与城外 agent 的 `read`；`runtime` 的 `read` 工具照旧拒绝 `.sprawling`，城里任何模块想据此决策都被 `slices` 门拦下。
+
+**自带的 `RealFs`，不借账本那条缝。** `RealFs` 同一时刻只持一个追加句柄，写投影会把账本的热句柄挤掉；投影可弃，不该让主干为它付句柄开销。代价是投影不参与 `FaultFs` 的断电模型：断电后它可能落后，下一次 attach 补齐，这正是它可重建的含义。
+
+**没有第二份 session 索引。** 「全城有哪些 session」走目录遍历；切片在追加时写，写者当场就知道 room 地址，索引只会在两者之间造出一个可失效的家。旧 `index.cache` 的写者 `LedgerIndex::persist` 零生产调用者，随本波连同其读取方删除（8-4）。

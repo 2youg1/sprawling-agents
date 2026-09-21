@@ -104,6 +104,19 @@ impl JsonlLedger {
         self.next_seq = seq;
         self.prev = prev;
 
+        // The per-room projection is laid down only now, after the wave
+        // is durable: the bytes it copies exist before it runs. A
+        // refusal is reported and skipped rather than returned - the
+        // history already has the record, and a disposable artifact
+        // must never fail history's caller (memory-SPEC 8-24).
+        if let Some(sessions) = self.sessions.as_mut() {
+            for record in &records {
+                if let Err(error) = sessions.absorb(record) {
+                    eprintln!("a session slice was refused and skipped: {error}");
+                }
+            }
+        }
+
         // Only now, with the bytes synced, does anyone else hear about
         // them: an observer that saw an event the disk never got would be
         // telling the interface something the history does not contain.

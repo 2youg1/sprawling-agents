@@ -85,7 +85,7 @@ fn write_interleaved(dir: &Path, runs: &[RunId], count: u64) -> Vec<(RunId, Vec<
 fn rebuild_finds_every_line_and_seeking_returns_it_verbatim() {
     let tmp = tempfile::tempdir().unwrap();
     let lines = write_ledger(tmp.path(), 5);
-    let index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
+    let index = LedgerIndex::rebuild(tmp.path()).unwrap();
     assert_eq!(index.len(), 5);
     assert_eq!(index.tail_seq(), Some(Seq::new(4)));
     let mut reader = index.reader(tmp.path());
@@ -95,36 +95,10 @@ fn rebuild_finds_every_line_and_seeking_returns_it_verbatim() {
     }
 }
 
-#[test]
-fn a_fresh_cache_is_believed_and_a_stale_one_is_silently_rebuilt() {
-    let tmp = tempfile::tempdir().unwrap();
-    write_ledger(tmp.path(), 3);
-    let index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
-    index.persist(tmp.path()).unwrap();
-    // Fresh: the cache round-trips into an identical map.
-    let loaded = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
-    assert_eq!(loaded.len(), 3);
-    assert_eq!(loaded.tail_seq(), Some(Seq::new(2)));
-    // Stale: growing the ledger without refreshing the cache must
-    // not yield the old answer.
-    write_ledger(tmp.path(), 6);
-    let after = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
-    assert_eq!(after.len(), 6, "byte drift forces a rebuild");
-    assert_eq!(after.tail_seq(), Some(Seq::new(5)));
-}
-
-#[test]
-fn a_corrupt_cache_rebuilds_instead_of_reporting() {
-    let tmp = tempfile::tempdir().unwrap();
-    write_ledger(tmp.path(), 4);
-    std::fs::write(
-        tmp.path().join(crate::index::cache::CACHE_NAME),
-        format!("{} garbage\nnot a row\n", super::super::cache::CACHE_MAGIC),
-    )
-    .unwrap();
-    let index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
-    assert_eq!(index.len(), 4, "a disposable artifact never reports");
-}
+// A fresh cache, a stale one and a corrupt one used to have their own
+// tests here. The cache has no writer left, so the three questions it
+// answered are gone with it: this index is rebuilt from the segments
+// whenever it is opened, and the tests below cover that rebuild.
 
 #[test]
 fn a_torn_tail_is_skipped_and_the_intact_prefix_still_indexes() {
@@ -134,7 +108,7 @@ fn a_torn_tail_is_skipped_and_the_intact_prefix_still_indexes() {
     let mut bytes = std::fs::read(&path).unwrap();
     bytes.extend_from_slice(b"{\"seq\":99,\"partial\"");
     std::fs::write(&path, &bytes).unwrap();
-    let index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
+    let index = LedgerIndex::rebuild(tmp.path()).unwrap();
     assert_eq!(index.len(), 3);
     assert_eq!(index.tail_seq(), Some(Seq::new(2)));
 }
@@ -145,7 +119,7 @@ fn a_torn_tail_is_skipped_and_the_intact_prefix_still_indexes() {
 fn a_resident_index_folds_what_arrived_and_rebuilds_what_was_truncated() {
     let tmp = tempfile::tempdir().unwrap();
     write_ledger(tmp.path(), 3);
-    let mut index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
+    let mut index = LedgerIndex::rebuild(tmp.path()).unwrap();
     assert_eq!(index.len(), 3);
 
     // Nothing moved: refreshing is a no-op, and the map is unchanged.
@@ -190,7 +164,7 @@ fn a_resident_index_folds_what_arrived_and_rebuilds_what_was_truncated() {
 fn a_refresh_reads_the_appended_tail_rather_than_the_segment() {
     let tmp = tempfile::tempdir().unwrap();
     let before = write_ledger(tmp.path(), 400);
-    let mut index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
+    let mut index = LedgerIndex::rebuild(tmp.path()).unwrap();
     let path = tmp.path().join("ledger-00000000000000000000.jsonl");
     let segment_bytes = std::fs::metadata(&path).unwrap().len();
 
@@ -241,25 +215,23 @@ fn a_refresh_reads_the_appended_tail_rather_than_the_segment() {
 /// Writes `count` records that cycle through `runs`, so no run owns a
 /// contiguous stretch of the ledger. Returns the seqs each run wrote.
 #[test]
-fn the_run_map_survives_a_refresh_and_a_cache_round_trip() {
+fn the_run_map_survives_a_refresh() {
     let tmp = tempfile::tempdir().unwrap();
     let mine = RunId::from_bytes([1u8; 16]);
     let yours = RunId::from_bytes([2u8; 16]);
     write_interleaved(tmp.path(), &[mine, yours], 4);
-    let mut index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
+    let mut index = LedgerIndex::rebuild(tmp.path()).unwrap();
     assert_eq!(index.run_seqs_before(mine, None).count(), 2);
 
-    // Appended: the refresh folds the new lines into both maps.
+    // Appended: the refresh folds the new lines into both maps, and a
+    // reopened index reads the same answer from the segments.
     write_interleaved(tmp.path(), &[mine, yours], 10);
     index.refresh(tmp.path()).unwrap();
     assert_eq!(index.run_seqs_before(mine, None).count(), 5);
 
-    // Persisted and read back: a cache that carried offsets but not
-    // runs would answer this with nothing.
-    index.persist(tmp.path()).unwrap();
-    let loaded = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
-    assert_eq!(loaded.len(), 10, "the cache was believed, not rebuilt");
-    assert_eq!(loaded.run_seqs_before(mine, None).count(), 5);
+    let reopened = LedgerIndex::rebuild(tmp.path()).unwrap();
+    assert_eq!(reopened.len(), 10);
+    assert_eq!(reopened.run_seqs_before(mine, None).count(), 5);
 }
 
 /// A line whose `run` cannot be read still belongs in the seq map:
@@ -270,7 +242,7 @@ fn a_line_with_no_readable_run_is_still_indexed_by_seq() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("ledger-00000000000000000000.jsonl");
     std::fs::write(&path, b"{\"seq\":0,\"run\":\"not-a-uuid\"}\n{\"seq\":1}\n").unwrap();
-    let index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
+    let index = LedgerIndex::rebuild(tmp.path()).unwrap();
     assert_eq!(index.len(), 2, "both lines are locatable");
     assert_eq!(index.tail_seq(), Some(Seq::new(1)));
     assert_eq!(
@@ -284,7 +256,7 @@ fn a_line_with_no_readable_run_is_still_indexed_by_seq() {
 fn a_missing_seq_is_a_caller_error_not_a_corrupt_ledger() {
     let tmp = tempfile::tempdir().unwrap();
     write_ledger(tmp.path(), 2);
-    let index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
+    let index = LedgerIndex::rebuild(tmp.path()).unwrap();
     let err = match index.reader(tmp.path()).line_at(Seq::new(77)) {
         Err(err) => err,
         Ok(_) => panic!("an absent seq must not read"),

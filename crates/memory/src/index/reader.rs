@@ -184,7 +184,7 @@ mod tests {
     fn one_reader_answers_out_of_order_seeks_across_segments() {
         let tmp = tempfile::tempdir().unwrap();
         let lines = write_ledger_rolling(tmp.path(), 9, 4);
-        let index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
+        let index = LedgerIndex::rebuild(tmp.path()).unwrap();
         assert_eq!(index.len(), 9, "three segments, nine lines");
         let mut reader = index.reader(tmp.path());
         // Backwards, repeated, and ping-ponging between segments. A
@@ -205,7 +205,7 @@ mod tests {
         let yours = RunId::from_bytes([2u8; 16]);
         let city = RunId::CITY;
         let owned = write_interleaved(tmp.path(), &[mine, yours, city], 30);
-        let index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
+        let index = LedgerIndex::rebuild(tmp.path()).unwrap();
 
         let all: Vec<Seq> = index.run_seqs_before(mine, None).collect();
         let mut expected = owned[0].1.clone();
@@ -237,24 +237,22 @@ mod tests {
     }
 
     #[test]
-    fn the_run_map_survives_a_refresh_and_a_cache_round_trip() {
+    fn the_run_map_survives_a_refresh() {
         let tmp = tempfile::tempdir().unwrap();
         let mine = RunId::from_bytes([1u8; 16]);
         let yours = RunId::from_bytes([2u8; 16]);
         write_interleaved(tmp.path(), &[mine, yours], 4);
-        let mut index = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
+        let mut index = LedgerIndex::rebuild(tmp.path()).unwrap();
         assert_eq!(index.run_seqs_before(mine, None).count(), 2);
 
-        // Appended: the refresh folds the new lines into both maps.
+        // Appended: the refresh folds the new lines into both maps, and a
+        // reopened index reads the same answer from the segments.
         write_interleaved(tmp.path(), &[mine, yours], 10);
         index.refresh(tmp.path()).unwrap();
         assert_eq!(index.run_seqs_before(mine, None).count(), 5);
 
-        // Persisted and read back: a cache that carried offsets but not
-        // runs would answer this with nothing.
-        index.persist(tmp.path()).unwrap();
-        let loaded = LedgerIndex::load_or_rebuild(tmp.path()).unwrap();
-        assert_eq!(loaded.len(), 10, "the cache was believed, not rebuilt");
-        assert_eq!(loaded.run_seqs_before(mine, None).count(), 5);
+        let reopened = LedgerIndex::rebuild(tmp.path()).unwrap();
+        assert_eq!(reopened.len(), 10);
+        assert_eq!(reopened.run_seqs_before(mine, None).count(), 5);
     }
 }

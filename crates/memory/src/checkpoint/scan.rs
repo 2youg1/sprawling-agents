@@ -114,15 +114,29 @@ impl Checkpoint {
     /// Stages every file under `scope`, including deletions. Paths
     /// outside the scope are never touched — the write domain is the
     /// boundary, and a wider `add` would stage what the Run never held.
+    ///
+    /// **A session slice is never staged.** It is a disposable
+    /// projection the city's own accounting thread appends to while the
+    /// wave runs, and a fence that staged it would ask git to read a
+    /// workdir file it believes it already knows; a file still growing
+    /// under an open handle makes that read refuse the whole wave
+    /// (memory-SPEC 8-8, 8-24).
     pub(crate) fn stage_scopes(&mut self, scopes: &[String]) -> Result<Vec<String>, MemoryError> {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
         let patterns = Self::pathspecs(scopes);
         let specs: Vec<&str> = patterns.iter().map(String::as_str).collect();
+        let mut skip_slices = |path: &std::path::Path, _matched: &[u8]| -> i32 {
+            i32::from(kernel::layout::CityLayout::names_a_session_slice(path))
+        };
         index
-            .add_all(specs.iter(), git2::IndexAddOption::DEFAULT, None)
+            .add_all(
+                specs.iter(),
+                git2::IndexAddOption::DEFAULT,
+                Some(&mut skip_slices),
+            )
             .map_err(git_err("stage scope"))?;
         index
-            .update_all(specs.iter(), None)
+            .update_all(specs.iter(), Some(&mut skip_slices))
             .map_err(git_err("stage deletions"))?;
         index.write().map_err(git_err("write index"))?;
         let mut files: Vec<String> = index
