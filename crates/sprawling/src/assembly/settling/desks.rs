@@ -9,7 +9,7 @@ use kernel::{AxCode, AxError};
 
 use crate::effect;
 
-use super::super::{Assignment, Desks, Reporter, RunWorker, Site, Sweep, held, now_ms};
+use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held, now_ms};
 
 /// Writes the plan back, creating nothing that was not there: a
 /// building without a plan is a building whose residents have nothing
@@ -48,9 +48,12 @@ impl RunWorker {
         site: &Site,
         at: &Assignment,
         desks: &Desks,
-        sweep: Sweep<'_>,
-        conversations: u32,
+        settling: Settling<'_>,
     ) -> Result<(), AxError> {
+        let Settling {
+            sweep,
+            conversations,
+        } = settling;
         let (addr, who, run_id) = (&at.addr, site.who.as_str(), site.run_id);
         let (write_root, building) = (site.write_root.as_path(), &site.building);
         let signal_effects = held(&desks.signals, "settle the signal desk")?.take_effects();

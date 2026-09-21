@@ -23,6 +23,18 @@ pub(super) struct Sweep<'a> {
     pub(super) job_locator: &'a Locator,
 }
 
+/// What one landing hands the desks.
+///
+/// The sweep's own material and the depth of the conversation that woke
+/// this run travel together: both are read by the same settling pass, one
+/// to report what the drive deleted and one to keep a knock chain
+/// finite, and a caller that passed them side by side had to keep two
+/// arguments in step (sprawling-SPEC.md 8-46-12).
+pub(super) struct Settling<'a> {
+    pub(super) sweep: Sweep<'a>,
+    pub(super) conversations: u32,
+}
+
 /// What one drive ended with, as the conclusion reads it.
 ///
 /// The drive's own outcome stays a `Result` here rather than being

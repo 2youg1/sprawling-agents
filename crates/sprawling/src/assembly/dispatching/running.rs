@@ -9,8 +9,8 @@ use kernel::Locator;
 use kernel::{AxCode, AxError};
 
 use super::super::{
-    Desks, Driven, Driving, Ending, Landed, Owing, QueueTenure, RunWorker, Site, Sweep, Workbench,
-    held, now_ms,
+    Desks, Driven, Driving, Ending, Landed, Owing, QueueTenure, RunWorker, Settling, Site, Sweep,
+    Workbench, held, now_ms,
 };
 use super::{Assignment, Given};
 
@@ -247,12 +247,14 @@ impl RunWorker {
             &site,
             &at,
             &desks,
-            Sweep {
-                fenced: &fenced,
-                raised: &mut raised,
-                job_locator: &job_locator,
+            Settling {
+                sweep: Sweep {
+                    fenced: &fenced,
+                    raised: &mut raised,
+                    job_locator: &job_locator,
+                },
+                conversations,
             },
-            conversations,
         )?;
         // What the run can show for itself. `None` is not `Some(false)`:
         // "nothing ran" and "something ran and failed" are different
