@@ -90,9 +90,9 @@ badge_label = "client"
 # 2026-09-21; the row records a binary linked the way that decision
 # chose.
 [release_binary]
-what = "the single binary a person installs, before fonts, wasmtime and CPython are embedded"
+what = "the single binary a person installs, with the execution engine its sandbox needs and the web client already inside it"
 budget_bytes = 134217728
-best_bytes = 7154176
+best_bytes = 11523584
 slack_bytes = 1048576
 measured_by = "just build-web, cargo build --release, then just gates"
 status = "gated"

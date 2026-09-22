@@ -266,8 +266,14 @@ repro:
 # machine's default; the badges are then left alone, because README's
 # sizes describe the artifact a person downloads first and two builds of
 # one tag must not disagree about one number.
+# **The engine is part of what ships.** `runtime/wasm` is off by default,
+# so a plain release build carries no execution engine and every `python`
+# call an archive's city makes would be refused; `cargo xtask package`
+# refuses exactly that binary, which is how a release built without this
+# flag fails at the last step instead of publishing a crippled one. The
+# size this produces is the size a person downloads.
 dist target="": build-web
-    cargo build --release -p sprawling --locked {{ if target == "" { "" } else { "--target " + target } }}
+    cargo build --release -p sprawling --features sandbox --locked {{ if target == "" { "" } else { "--target " + target } }}
     cargo xtask sbom
     {{ if target == "" { "cargo xtask badge --write" } else { "echo the badges belong to the host build" } }}
 
