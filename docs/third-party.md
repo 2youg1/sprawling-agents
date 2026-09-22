@@ -14,7 +14,7 @@ Signing in to a provider requires knowing four things: the authorization endpoin
 
 | Project | Licence | What is followed | Where to look | Tracked to |
 |---|---|---|---|---|
-| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | OpenAI's subscription login: authorization endpoint, token endpoint, client id, scopes, device-code flow | `codex-rs/login/` | `1b83e5cdf998` |
+| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | OpenAI's subscription login: authorization endpoint, token endpoint, client id, scopes, device-code flow | `codex-rs/login/` | `87bc50f9d423` |
 | [openai/codex](https://github.com/openai/codex) | Apache-2.0 | where OpenAI states the contract for driving codex non-interactively, which is the shape the `Codex` family answers in | `docs/exec.md` | `ab753387ccf5` |
 | [openai/codex](https://github.com/openai/codex) | Apache-2.0 | which base URL a ChatGPT subscription is served under, as against the key-billed platform | `codex-rs/model-provider-info/` | `888be42a20c5` |
 | [anthropics/claude-agent-sdk-typescript](https://github.com/anthropics/claude-agent-sdk-typescript) | proprietary, under Anthropic's Commercial Terms of Service | the protocol types the Claude agent wire is spelled in, and which release changed one | `CHANGELOG.md` | `18661edde449` |
