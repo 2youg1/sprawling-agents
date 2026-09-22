@@ -263,7 +263,7 @@ dependencies = [
 name = "browser"
 version = "0.0.6"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "kernel",
  "png",
  "serde",
@@ -1001,7 +1001,7 @@ name = "gateway"
 version = "0.0.6"
 dependencies = [
  "argon2",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chacha20poly1305",
  "getrandom 0.4.3",
  "insta",
