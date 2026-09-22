@@ -74,3 +74,14 @@ wildcard_enum_match_arm = "deny"
 let_underscore_must_use = "deny"
 let_underscore_untyped = "deny"
 fn_params_excessive_bools = "deny"
+
+# The same release profile as the workspace's own, for the same reason:
+# a size is a fact about the linker that produced it, and this connector
+# ships to the same machines. `"z"` was chosen there on a measurement -
+# see the `[profile.release]` comment in the root manifest.
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
