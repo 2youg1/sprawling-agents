@@ -92,7 +92,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 **What this repository chose** is the table below: the twenty-eight crates named in a `Cargo.toml` of this workspace, each with the licence its own manifest declares. A person asking "whose work did these authors decide to stand on" reads this.
 
-**What ends up in the binary** is <!-- xtask:begin dependency_count -->404<!-- xtask:end --> packages once every transitive dependency is resolved, and that list is the lockfile's. `cargo deny check` reads it on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. **That is the machine authority, and this table is deliberately not a second one** — it is twenty-eight rows a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
+**What ends up in the binary** is <!-- xtask:begin dependency_count -->402<!-- xtask:end --> packages once every transitive dependency is resolved, and that list is the lockfile's. `cargo deny check` reads it on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. **That is the machine authority, and this table is deliberately not a second one** — it is twenty-eight rows a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
 
 | Crate | Version | Licence |
 |---|---|---|

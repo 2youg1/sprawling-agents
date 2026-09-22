@@ -61,7 +61,7 @@ The pinned versions live in `Cargo.toml`; this table says why each is there. Whe
 | Serialisation | `serde` 1, `serde_json` 1, `toml` <!-- xtask:begin dep_version:toml -->1.1<!-- xtask:end --> | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` <!-- xtask:begin dep_version:thiserror -->2<!-- xtask:end --> | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. |
-| Dependency count | <!-- xtask:begin dependency_count -->404<!-- xtask:end --> packages in `Cargo.lock` | Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->402<!-- xtask:end --> packages in `Cargo.lock` | Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest` (properties before examples), `insta` (golden output), `trybuild` (proof that something cannot be expressed), `kani` (bounded proof, Linux CI), `cargo-mutants` (do the tests bite), `cargo-fuzz` (parsers against hostile bytes).
 
