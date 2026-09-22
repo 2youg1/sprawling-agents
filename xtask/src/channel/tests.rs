@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use crate::platform::PLATFORMS;
+use crate::platform::{PLATFORMS, ROOT_PACKAGE};
 
 /// The last version whose platform packages reached the registry under
 /// bare names. npm never reuses a `name@version`, so the scope cannot
@@ -42,13 +42,18 @@ fn the_platform_packages_take_the_scope_from_the_next_version() {
     if version == UNSCOPED_THROUGH {
         return;
     }
+    assert!(
+        !ROOT_PACKAGE.contains('@') && !ROOT_PACKAGE.contains('/'),
+        "the root package keeps its bare name, because `bunx {ROOT_PACKAGE}` is \
+         what this channel exists for"
+    );
+    let scope = format!("@{ROOT_PACKAGE}/");
     for row in PLATFORMS {
         assert!(
-            row.package.starts_with("@sprawling/"),
+            row.package.starts_with(&scope),
             "the workspace states {version}, which is past {UNSCOPED_THROUGH}, \
-             so {} belongs under the @sprawling scope. Rename it here and in \
-             the shim's table; the root package keeps its bare name, because \
-             `bunx sprawling` is what this channel exists for.",
+             so {} belongs under the {scope} scope. Rename it here and in \
+             the shim's table.",
             row.package
         );
     }

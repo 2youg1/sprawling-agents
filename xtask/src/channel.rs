@@ -38,7 +38,7 @@
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 
-use crate::platform::{PLATFORMS, Platform};
+use crate::platform::{PLATFORMS, Platform, ROOT_PACKAGE};
 use crate::report::XtaskError;
 
 /// The shim, compiled in so the file a reader opens and the file a
@@ -200,11 +200,11 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
          \"files\": [\"bin\"],\n  \
          \"optionalDependencies\": {{\n{optional}\n  }}\n"
     );
-    let dir = out.join("sprawling");
+    let dir = out.join(ROOT_PACKAGE);
     write(
         &dir.join("package.json"),
         manifest(
-            "sprawling",
+            ROOT_PACKAGE,
             &version,
             "Raise a city of agents that work on your repository.",
             &extra,

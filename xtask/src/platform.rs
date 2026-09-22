@@ -54,6 +54,18 @@ pub(crate) struct Platform {
     pub(crate) binary: &'static str,
 }
 
+/// The root package's name, and the scope every platform package sits
+/// under — the scope *is* the root name, so `sprawling` and
+/// `@sprawling/…` are one constant rather than two spellings that can
+/// disagree. `channel` writes every package from this.
+///
+/// **The scope rule is asserted beside `PLATFORMS`, not merely stated.**
+/// A package that reached the registry outside the organisation could
+/// only be taken back by unpublishing the name it landed on, which costs
+/// the whole channel: the root name is what `bunx sprawling` resolves
+/// and what `sprawling status --check` asks for its `latest` tag.
+pub(crate) const ROOT_PACKAGE: &str = "sprawling";
+
 /// Every platform this project ships a binary for.
 ///
 /// An archive with no row here is refused rather than skipped: the day a
