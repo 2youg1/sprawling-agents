@@ -172,10 +172,11 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             .get(&room)
             .map_or(0, |join| join.artifacts().count()),
         2,
-        "both results joined, verified by the city rather than by their own producers
-         the history, one line per record, is:
-{}",
-        mentioned(&history, "handback")
+        "both results joined, verified by the city rather than by their own producers\n\
+         the history, one line per record, is:\n{}\n\
+         and how each run ended:\n{}",
+        mentioned(&history, "handback"),
+        mentioned(&history, "run_frozen")
     );
 }
 
