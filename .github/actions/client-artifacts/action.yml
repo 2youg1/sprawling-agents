@@ -1,0 +1,38 @@
+# What the npm and render gates judge, prepared the one way this
+# repository states it.
+#
+# `npm` reads `client/node_modules` to judge every licence and `render`
+# opens `target/web-dist/index.html` to measure the page. Neither skips
+# when what it judges is absent: a gate that silently judged nothing let
+# one run report green on twelve gates while claiming fourteen, so both
+# refuse instead. A job that runs them therefore has to supply the tree
+# first, and this is the one place that says how.
+#
+# `just build-web` rather than the two bun lines it expands to, because
+# the justfile owns how this client is installed and bundled. Three
+# workflows used to spell those lines themselves; two were never updated
+# when the gates stopped skipping, and v0.0.6 was cut on a verify job
+# that had never installed the tree it judged.
+name: client artefacts
+description: >-
+  Install the client's dependencies and build the bundle, so the npm and
+  render gates judge an artefact instead of refusing its absence.
+runs:
+  using: composite
+  steps:
+    - uses: oven-sh/setup-bun@v2
+    # bun's global download directory, keyed by the lockfile: the same
+    # lockfile wants the same bytes, so an exact hit skips the registry.
+    - uses: actions/cache@v6
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
+        restore-keys: bun-${{ runner.os }}-
+    # The recipe runner, because the command below is a recipe. Jobs that
+    # already install it pay nothing: the action is a no-op on a hit.
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: just
+    - name: build the client bundle the render and npm gates judge
+      shell: bash
+      run: just build-web

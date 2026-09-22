@@ -7,9 +7,11 @@ default: check
 #
 # `build-web` sits before `gates` because two of the gates - render and
 # npm - judge artifacts rather than sources: they need `target/web-dist`
-# and `client/node_modules` to exist, and they skip when those are
-# absent. Without this dependency `just check` reported green on a
-# machine where neither gate had ever run.
+# and `client/node_modules` to exist, and they now refuse rather than
+# skip when those are absent. Without this dependency `just check`
+# reported green on a machine where neither gate had ever run; CI says
+# the same thing through `.github/actions/client-artifacts`, which runs
+# `build-web` for the jobs that run those gates.
 check: prereqs fmt-check clippy features test build-web gates check-client check-desktop
 
 # The one authority on what this repository's loop needs installed.

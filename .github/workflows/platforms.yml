@@ -97,6 +97,13 @@ jobs:
         run: cargo fmt --all --check
       - name: clippy
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      # What the npm and render gates judge. This job repeats the commands
+      # ci.yml runs, and repeated its omission as well: both gates refuse
+      # an absent tree rather than skipping it, so without this step the
+      # two below are red on a bare runner. The schedule has taken the
+      # `moved` job's skip branch since that change landed, which is the
+      # only reason this was still theoretical here and not there.
+      - uses: ./.github/actions/client-artifacts
       - name: xtask gates
         run: cargo xtask gates
       - name: tests

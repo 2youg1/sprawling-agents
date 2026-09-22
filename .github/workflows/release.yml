@@ -7,8 +7,11 @@
 # the page shell, which is the defect that survives a green build and
 # reaches a person as an empty browser window.
 #
-# C1 note: no step here invokes the node toolchain family; the client is
-# The browser client, built by bun.
+# C1 note: this workflow does invoke the node toolchain family, in three
+# places - bun builds the client that `verify` judges and that every
+# archive embeds, and npm publishes the package channel. The zero-js gate
+# that would have asserted otherwise was deleted for the reason ci.yml
+# records: it excluded an architecture rather than a defect.
 name: release
 on:
   push:
@@ -102,6 +105,15 @@ jobs:
           path: target/tests
           key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'crates/*/tests/**') }}
           restore-keys: trybuild-${{ runner.os }}-
+      # What the npm and render gates judge, and what this job ran
+      # without: `tests` fails on the npm gate's own assertion and
+      # `xtask gates` fails on that one and render's. This is how v0.0.6
+      # was cut - the commit that made both gates refuse an absent tree
+      # moved ci.yml and left this file behind, so the claim above that
+      # a red release verify is a red local `just check` was not true of
+      # a bare runner, where `just check` builds the client and this job
+      # never had.
+      - uses: ./.github/actions/client-artifacts
       - name: tests
         run: cargo nextest run --workspace --locked --all-features
       - name: deny

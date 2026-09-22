@@ -150,6 +150,43 @@ fn this_repository_passes_its_own_npm_gate() {
     assert!(said.is_empty(), "{said:#?}");
 }
 
+/// Every workflow that runs these gates prepares what they judge.
+///
+/// This gate refuses an absent `client/node_modules` and `render`
+/// refuses an absent bundle, so a workflow that runs either on a bare
+/// runner is red for a reason no source change explains. Three
+/// workflows spelled that preparation themselves and two were never
+/// updated when the gates stopped skipping: `release.yml` cut v0.0.6
+/// red, and `platforms.yml` was spared only by its schedule taking the
+/// skip branch. The preparation is one composite action so that this
+/// assertion has a single name to look for.
+#[test]
+fn every_workflow_running_the_gates_prepares_what_they_judge() {
+    const PREPARES: &str = "./.github/actions/client-artifacts";
+    const JUDGES: [&str; 2] = ["cargo xtask gates", "cargo nextest run --workspace"];
+    assert!(
+        root()
+            .join(".github/actions/client-artifacts/action.yml")
+            .is_file(),
+        "the action every workflow names has to be the one that exists"
+    );
+    let mut unprepared = Vec::new();
+    for entry in std::fs::read_dir(root().join(".github/workflows")).unwrap() {
+        let path = entry.unwrap().path();
+        let text = std::fs::read_to_string(&path).unwrap();
+        // A comment names these commands to explain them; only a line
+        // that runs one puts the gates in front of a tree.
+        let judges = text
+            .lines()
+            .filter(|line| !line.trim_start().starts_with('#'))
+            .any(|line| JUDGES.iter().any(|command| line.contains(command)));
+        if judges && !text.contains(PREPARES) {
+            unprepared.push(path.display().to_string());
+        }
+    }
+    assert!(unprepared.is_empty(), "{unprepared:#?}");
+}
+
 pub(super) fn root() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()

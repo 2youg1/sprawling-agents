@@ -202,21 +202,19 @@ jobs:
           path: target/tests
           key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'crates/*/tests/**') }}
           restore-keys: trybuild-${{ runner.os }}-
-      # The client's dependencies, because a test in this job judges
-      # them: `xtask`'s npm gate reads the installed tree to check every
-      # licence, and refuses to report green when the tree is missing -
-      # which is what a bare runner has. The gate that fell silent here
-      # on twelve gates while claiming fourteen was the same shape, so
-      # this job pays the install rather than losing the assertion.
-      - uses: oven-sh/setup-bun@v2
-      - uses: actions/cache@v6
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
-          restore-keys: bun-${{ runner.os }}-
-      - name: install the client's dependencies
-        shell: bash
-        run: cd client && bun install --frozen-lockfile
+      # What a test in this job judges: `xtask`'s npm gate reads the
+      # installed tree to check every licence, and refuses to report
+      # green when the tree is missing - which is what a bare runner
+      # has. The gate that fell silent here on twelve gates while
+      # claiming fourteen was the same shape, so this job pays the
+      # install rather than losing the assertion.
+      #
+      # The action bundles as well as installs, which this job does not
+      # need. That is the price of one home: a step here that installed
+      # only would be a second spelling of the preparation, and the two
+      # workflows that held their own spelling are exactly the ones that
+      # were never updated when these gates stopped skipping.
+      - uses: ./.github/actions/client-artifacts
       # No `--doc` companion: this workspace has no doctest, which is a
       # fact about it (`rg '///\s*```' crates/*/src` finds nothing), not
       # an omission for somebody to fix later by adding a slower command.
@@ -269,18 +267,10 @@ jobs:
         with:
           tool: cargo-public-api
       # The render and npm gates judge artifacts, not sources: without
-      # `target/web-dist` and `client/node_modules` they skip, and this
-      # job reported green on twelve gates while claiming fourteen. The
-      # bundle is built here exactly as `just build-web` builds it.
-      - uses: oven-sh/setup-bun@v2
-      - uses: actions/cache@v6
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
-          restore-keys: bun-${{ runner.os }}-
-      - name: build the client bundle the render and npm gates judge
-        shell: bash
-        run: cd client && bun install --frozen-lockfile && bun run build
+      # `target/web-dist` and `client/node_modules` they refuse rather
+      # than skip, and this job once reported green on twelve gates
+      # while claiming fourteen.
+      - uses: ./.github/actions/client-artifacts
       # The apisync gate reads rustdoc JSON, which is nightly-only. It
       # fails closed when the toolchain is missing rather than skipping,
       # so a job without this line stops here instead of passing.
