@@ -69,6 +69,10 @@ impl Unit {
 /// row can use, so the array is beside the enum it enumerates.
 const UNITS: [Unit; 2] = [Unit::Bytes, Unit::Packages];
 
+/// The release optimisation level the register's size reading was taken
+/// with. One word, and the reason the check above exists at all.
+const PROFILE: &str = "z";
+
 /// The register, as the gate reads it.
 struct Row {
     name: String,
@@ -96,6 +100,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let parsed = register(root)?;
 
     let mut violations = crate::badge::check(root)?;
+    violations.extend(release_profile(root)?);
     // The single-binary promise, checked as bytes: a release binary that
     // exists must carry the client bundle's file table. The placeholder
     // build (no `just build-web` beforehand) lacks the assets entry, and
@@ -211,6 +216,61 @@ pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
 
 /// The rows a machine can weigh: those marked gated that state a
 /// budget, a best reading and a slack in one of the units above.
+/// The release profile is the one the register's reading was taken with.
+///
+/// **A size is a fact about the linker that produced it**, so a reading
+/// taken at one `opt-level` describes a binary nobody ships the moment
+/// the profile says another. This is the rule the register already
+/// states for its badge - one platform, and only that platform may
+/// refresh the number - applied to the other half of what a size depends
+/// on. It is a check rather than a comment because the setting is one
+/// word in a manifest and the reading it invalidates is seven megabytes,
+/// and it costs a read: the binary itself is weighed only when somebody
+/// has built one.
+///
+/// `"z"` rather than `3` was decided by a criterion written down before
+/// the readings existed, so no number could talk anybody into anything.
+/// The register carried the losing arm as a row of its own until the day
+/// this setting changed; that row is gone, because once `"z"` is what
+/// ships, a second row describing the same binary is the second home the
+/// register exists to prevent.
+fn release_profile(root: &Path) -> Result<Vec<Violation>, XtaskError> {
+    let path = root.join("Cargo.toml");
+    let text = std::fs::read_to_string(&path).map_err(|source| XtaskError::Io {
+        path: path.display().to_string(),
+        source,
+    })?;
+    let parsed: toml::Value = toml::from_str(&text).map_err(|err| XtaskError::Doc {
+        file: path.display().to_string(),
+        msg: err.to_string(),
+    })?;
+    let stated = parsed
+        .get("profile")
+        .and_then(|profile| profile.get("release"))
+        .and_then(|release| release.get("opt-level"));
+    // Both spellings a level can take, read the same way: `"z"` is a
+    // string and `3` is an integer, and neither is more correct as TOML.
+    let said = match stated {
+        Some(toml::Value::String(text)) => text.clone(),
+        Some(other) => other.to_string(),
+        None => "unstated, which cargo reads as 3".to_owned(),
+    };
+    if said == PROFILE {
+        return Ok(Vec::new());
+    }
+    Ok(vec![Violation {
+        gate: "budget",
+        location: "Cargo.toml [profile.release] opt-level".to_owned(),
+        rule: "the release profile is the one the size reading was taken with".to_owned(),
+        violation: format!(
+            "`opt-level` is `{said}`, so the linked binary is not the one the register weighed"
+        ),
+        alternative: format!(
+            "set `opt-level = \"{PROFILE}\"`, or re-weigh the binary and move the register's              reading in the same commit"
+        ),
+    }])
+}
+
 fn gated_rows(parsed: &toml::Value) -> Vec<Row> {
     let mut rows = Vec::new();
     let Some(table) = parsed.as_table() else {

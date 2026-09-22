@@ -78,8 +78,6 @@ badge_label = "client"
 # not a dependency that arrived unasked. 13.5x headroom against the 128 MB
 # budget says the next reading to spend attention on is not this one.
 #
-# This row is the `opt-level = 3` arm of the comparison the row below
-# opens; the criterion that decides between them is stated there, once.
 # **The ratchet moved on 2026-09-21.** The previous number was taken on
 # 2026-09-13 from a tree fourteen commits behind this one, and the
 # machine that reads this row now links every MSVC target with
@@ -88,12 +86,13 @@ badge_label = "client"
 # the figure is not separated here, and it does not need to be: a size
 # is a fact about the linker that produced it, which is why this row
 # names one platform and only that platform may refresh its badge. The
-# pending `opt-level = "z"` decision recorded beside it re-weighs this
-# row in the change that ships it.
+# `opt-level = "z"` decision was weighed against this row and taken on
+# 2026-09-21; the row records a binary linked the way that decision
+# chose.
 [release_binary]
 what = "the single binary a person installs, before fonts, wasmtime and CPython are embedded"
 budget_bytes = 134217728
-best_bytes = 11222016
+best_bytes = 7154176
 slack_bytes = 1048576
 measured_by = "just build-web, cargo build --release, then just gates"
 status = "gated"
@@ -103,68 +102,6 @@ status = "gated"
 # report. Change this row when a release workflow takes the job over.
 badge_label = "binary · windows-x86_64"
 badge_platform = "windows-x86_64"
-
-# The other arm of one comparison: the same tree, the same profile, the
-# same machine, linked at `opt-level = "z"` instead of `3`. External
-# review proposed five settings for [profile.release] and four of them -
-# `strip = "symbols"`, `lto = "fat"`, `codegen-units = 1`,
-# `panic = "abort"` - were already in Cargo.toml, so `opt-level` is the
-# whole open question, and it is a measurement rather than a judgement.
-#
-# **The criterion, decided before the readings exist so a number cannot
-# talk anybody into anything**: keep `3` unless `"z"` takes at least 15%
-# off [release_binary]'s reading *and* costs no more than 10% of cold
-# start. Below 15% saved, the size is not worth a slower binary; above
-# 10% lost, the wait a person sits through is not worth the bytes. Both
-# arms are read on one machine in one sitting, because a size is a fact
-# about the linker that produced it and a wall-clock figure is a fact
-# about the machine that ran it.
-#
-# No byte budget and no slack here: the 128 MB ceiling is a fact about
-# the binary a person installs and has its home on [release_binary]. This
-# row carries a reading and nothing else.
-#
-# What this comparison will not buy, whatever it reads: no check is
-# turned off for size except `debug-assertions`, and panic messages are
-# never stripped - a refusal that names its action, subject, code and
-# recovery is part of the product, not debug output.
-#
-# **Both arms were read on 2026-09-21, on windows-x86_64, from one
-# worktree, into one target directory that no other work shared.** The
-# paired arm weighed 11,150,336 B at `opt-level = 3` in that same
-# sitting; that figure is the comparison's other half and nothing else -
-# what the shipped binary weighs is [release_binary]'s `best_bytes`, and
-# the two differ because this worktree carried four lanes' unfinished
-# edits while the ratchet's number was taken from a committed tree.
-#
-# The startup probe is `sprawling --version`: process creation, dynamic
-# linking, the argument router, one page of output, exit. It leaves out
-# opening a ledger and standing the server up, so it prices the code the
-# linker laid out rather than the city's first breath. The two arms were
-# run interleaved, two runs each per round for fifteen rounds after a
-# discarded warm-up, because running one arm to completion and then the
-# other prices whatever else the machine was doing in between - and it
-# did: a first, sequential pass read 10.8 ms against 15.5 ms and did not
-# survive interleaving.
-#
-# **The criterion is met and it is met decisively on one side and
-# neutrally on the other**: `"z"` takes 37.9% off the size, far past the
-# 15% the criterion asks for, and costs no cold start at all - its median
-# is 2.1% *below* the `3` arm, which is inside this machine's noise
-# rather than a speed-up. So the profile should keep `"z"`.
-#
-# Applying it is one edit to the root `Cargo.toml` `[profile.release]`
-# and the deletion of this row, in one change: the day `opt-level = "z"`
-# is what ships, this row's subject is [release_binary] and a second row
-# describing it would be the second home the register exists to prevent.
-# [release_binary]'s `best_bytes` is re-weighed in that same change,
-# because the binary it ratchets is then a different binary.
-[release_binary_optz]
-what = "the same single binary, linked at opt-level = \"z\", every other [profile.release] setting unchanged"
-size_bytes = 6927360
-cold_start_ms = 12.85
-measured_by = "just build-web, then CARGO_PROFILE_RELEASE_OPT_LEVEL=z cargo build --release -p sprawling --locked into a target directory of its own, weighing the linked binary and timing `sprawling --version` interleaved against the opt-level = 3 arm built from the same worktree"
-status = "measured, not gated: 6,927,360 B and a 12.85 ms median start, against 11,150,336 B and 13.12 ms for the opt-level = 3 arm (windows-x86_64, 2026-09-21, 30 interleaved runs per arm). 37.9% smaller for no measurable start-up cost, so the criterion above decides for `\"z\"`; the row is deleted by the change that puts it in [profile.release]"
 
 # The unit is a production function because the alternative was measured:
 # any honest file threshold lights up eight files across four crates at
