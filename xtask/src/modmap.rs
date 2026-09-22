@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Module-table gate (redline C4). The table in ARCHITECTURE.md section 6 is a
+//! Module-table gate (redline C4). The table in ARCHITECTURE.md section 12 is a
 //! closed list: every `.rs` under `crates/*/src` is either a registered module,
 //! a `lib.rs`, or a pure index file. Status coherence is checked both ways —
 //! a file that exists while its row still says planned means the builder skipped
@@ -30,7 +30,7 @@ const STATUS_PLANNED: &str = "planned";
 const STATUSES: [&str; 4] = [STATUS_PLANNED, "building", "built", "frozen"];
 
 /// Line prefixes allowed in `lib.rs` and pure index files (single-line
-/// declarations only; a style constraint recorded in ARCHITECTURE.md section 5).
+/// declarations only; a style constraint recorded in ARCHITECTURE.md section 12).
 const INDEX_PREFIXES: [&str; 8] = [
     "//",
     "#![",
@@ -147,12 +147,15 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             violations.push(Violation {
                 gate: "modmap",
                 location: rel,
-                rule: "the module table is a closed list (ARCHITECTURE.md section 6, C4)"
-                    .to_owned(),
+                rule: format!(
+                    "the module table is a closed list (ARCHITECTURE.md section \
+                     {MODULE_SECTION}, C4)"
+                ),
                 violation: "file is not registered in the module table".to_owned(),
-                alternative: "register the module (name/duty/stage/shape) in section 6 \
-                              first, or delete the file"
-                    .to_owned(),
+                alternative: format!(
+                    "register the module (name/duty/stage/shape) in section \
+                     {MODULE_SECTION} first, or delete the file"
+                ),
             });
         }
     }
@@ -164,7 +167,9 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             violations.push(Violation {
                 gate: "modmap",
                 location: format!("{ARCH}:{}", row.line),
-                rule: "a non-planned status claims the file exists (section 6)".to_owned(),
+                rule: format!(
+                    "a non-planned status claims the file exists (section {MODULE_SECTION})"
+                ),
                 violation: format!("{} is marked {} but missing on disk", row.path, row.status),
                 alternative: format!(
                     "create {} or set the row back to {STATUS_PLANNED}",
@@ -222,7 +227,7 @@ fn parse_rows(map: &[Numbered], violations: &mut Vec<Violation>) -> Vec<Row> {
             violations.push(Violation {
                 gate: "modmap",
                 location: format!("{ARCH}:{line_no}"),
-                rule: "one module, one row (section 6)".to_owned(),
+                rule: format!("one module, one row (section {MODULE_SECTION})"),
                 violation: format!("{path} already registered at line {first}"),
                 alternative: "merge the duplicate rows".to_owned(),
             });
@@ -333,9 +338,10 @@ fn check_index_content(
             violations.push(Violation {
                 gate: "modmap",
                 location: format!("{rel}:{}", index.saturating_add(1)),
-                rule: "index files hold declarations only — comments, attributes, \
-                       mod, use (ARCHITECTURE.md section 5)"
-                    .to_owned(),
+                rule: format!(
+                    "index files hold declarations only — comments, attributes, \
+                     mod, use (ARCHITECTURE.md section {MODULE_SECTION})"
+                ),
                 violation: format!("logic line in an index file: {line:?}"),
                 alternative: "move the logic into a registered module".to_owned(),
             });

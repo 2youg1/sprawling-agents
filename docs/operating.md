@@ -132,3 +132,43 @@ The manifest is the integrity test: a short copy is refused at restore rather th
 **Give a building a plan.** `Roadmap.md` is the only task table, and it is the denominator for every progress reading you will see. A building without one is not broken — the pages say "no plan" rather than inventing a percentage — but nothing can report how far along it is either.
 
 **Let the agents keep their own notes.** `Memo.md` for decisions and corrections, `Handoff.md` for the next session, the archive for what was worth keeping. They are ordinary files: readable in the browser, editable in your editor, and the same bytes either way.
+
+## Parts you can replace
+
+This repository bundles nobody's key, pays for nothing, and proxies nothing. Everything that reaches outside is therefore an adapter you can swap, and this section says where each one lives.
+
+### Provider intelligence — followed from four upstreams
+
+Signing in to a provider means knowing four things: authorization endpoint, token endpoint, client id, scopes. Those are facts, and they change without warning, so they are followed from four actively maintained projects rather than watched by hand: [`openai/codex`](https://github.com/openai/codex) (Apache-2.0) for OpenAI, [`anthropics/claude-agent-sdk-typescript`](https://github.com/anthropics/claude-agent-sdk-typescript) for the Claude agent protocol types, [`xai-org/grok-build`](https://github.com/xai-org/grok-build) (Apache-2.0) for xAI, and [`MoonshotAI/kimi-cli`](https://github.com/MoonshotAI/kimi-cli) (Apache-2.0) for Moonshot. `earendil-works/pi` was one of them and is not any more: this city holds its own Anthropic subscription login, so a third party's OAuth intelligence buys it nothing. **What is followed is intelligence, not code** — see [`docs/third-party.md`](third-party.md) for each upstream's obligations, the commit it is tracked to, and how to re-check. The licence table that file carries names every package this workspace depends on directly; the full resolved graph belongs to `cargo deny` and the CycloneDX bill of materials, and the one count of it a reader should trust is the generated figure in `docs/third-party.md` §3.
+
+| To do this | Change this |
+|---|---|
+| add or correct a subscription provider | `gateway::oauth_profiles` — a table with data and zero branches |
+| change how a login is begun, finished or renewed | `gateway::credential` |
+| use an API key instead | the settings page: base URL, dialect, key |
+| speak a third dialect | `gateway::dialect`, a pure two-way translation with the canonical shape in the middle |
+| run a local model | `gateway::native` — local inference never goes through the outbound gateway |
+
+**What you cannot move out**: credential custody. Plaintext reaches the platform credential service and nothing else, configuration holds a `secret:realm/name` reference, and that is part of what the product promises rather than an implementation detail.
+
+### Outside applications — MCP, and Composio as one server among many
+
+Mail, GitHub, Figma, Discord: writing an integration for each is a weekly chore unrelated to the problem here, so the whole class is outsourced over **MCP**. [Composio](https://composio.dev) is the first choice and is reached the same way any other server is — this code never knows what Composio is.
+
+| To do this | Change this |
+|---|---|
+| give a building tools from a server | its `CONFIG.toml`: a `command` starts a child process, a `url` reaches a hosted server |
+| point at a different provider of the same tools | the same URL field. Nothing else changes |
+| add a transport | `bin::mcp_stdio` and `bin::mcp_http` are the two adapters behind `protocol::mcp`'s `Outbound` seam |
+| drive this city from an editor | `protocol::acp` accepts an outside request as an ordinary dispatch |
+
+A confidential building constructs none of them: data may enter and may not leave.
+
+### The rest
+
+| Part | Seam or surface | Note |
+|---|---|---|
+| execution sandbox | `runtime::sandbox` | implement the trait, pass its conformance suite; the shipped adapter is wasmtime with fuel |
+| the client | `channels::wire` | the wire is the whole API; a second client writes against it |
+| the browser driver | `browser::port` | frames in, replies out; the shipped adapter speaks WebDriver BiDi |
+| where views are stored | `bin::sprawling::views` | delete the process and they rebuild from the Ledger, byte-identical |

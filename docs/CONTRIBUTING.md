@@ -114,6 +114,8 @@ One question decides whether a test earns its lines: **would a real defect turn 
 
 The repository pins the toolchain in `rust-toolchain.toml` and names every other tool in the `prereqs` recipe of the `justfile`, which is the only list: run `just prereqs` and it prints what is absent, what needs it, and the line that installs it. Rows marked *required* are what `just check` cannot run without; rows marked *optional* belong to a recipe that says so itself. `nix develop` enters a shell holding those tools, and `nix flake check` refuses a shell that stops short of the list.
 
+**The compile-failure counterexamples (ARCHITECTURE.md §9) are byte comparisons against a compiler's output, so the machine is part of them.** Installing the `rust-src` component makes rustc render a source snippet inside a `note:` that the committed `.stderr` files do not carry, and every counterexample using one goes red without a line of this repository changing. `cargo public-api` pulls that component in, so `just api-baseline` can turn `just check` red on the next run; remove it (`rustup component remove rust-src`) rather than blessing the longer output, which would only move the failure to CI.
+
 ## 8 Command surface
 
 | Command | What it does |

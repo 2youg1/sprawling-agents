@@ -1,16 +1,41 @@
 # ARCHITECTURE — sprawling
 
-> **For someone about to change this code**, and for anyone who wants to know what it is made of and why it has this shape rather than another one.
+> **For someone about to change this code.** It answers what runs, how the
+> units are wired, what happens end to end when one piece of work is
+> dispatched, what is on disk, what crosses the wire, and how the whole thing
+> is verified.
 >
-> It answers: what runs, what the stack is and what each choice costs, how the twelve units are wired, what happens end to end when you dispatch one piece of work, what is on disk, what crosses the wire, which parts you can replace, and how the whole thing is verified.
+> It does not teach the vocabulary ([`docs/glossary.md`](docs/glossary.md)),
+> install anything ([`docs/getting-started.md`](docs/getting-started.md)),
+> list the rules a change must satisfy
+> ([`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)), or explain how to swap a
+> provider ([`docs/operating.md`](docs/operating.md)).
 >
-> It does not teach the vocabulary ([`docs/glossary.md`](docs/glossary.md)), install anything ([`docs/getting-started.md`](docs/getting-started.md)), or list the rules a change must satisfy ([`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)).
+> **What is written here is what is true across modules today.** A rule that
+> governs one module lives in that module's SPEC and its rustdoc; the history
+> of a decision — what was tried, what was rejected, what a gate once caught —
+> lives beside the thing it constrains, so that removing the thing removes the
+> record. This document is therefore as long as the system is complicated, not
+> as long as the project is old, which is what makes *read this before you
+> start* an instruction rather than a wish.
 >
-> **Two tables here are machine authorities**: the fenced `depmap` block in §3 and the module map in §12. `cargo xtask depmap` and `cargo xtask modmap` parse them, so an edge or a file that disagrees with them turns CI red. Their column shapes are fixed; the prose around them is not.
+> **Three kinds of statement, and you can tell them apart.** A figure between
+> `xtask:begin` and `xtask:end` markers is written from the code by
+> `cargo xtask docnum` and cannot drift. A table marked **machine authority**
+> is parsed by a gate, so a disagreement between it and the code is a red
+> build. Everything else is prose a person maintains: true when written, and
+> checked by review alone — when it contradicts the code, the code is right.
 
 ## 1 What runs
 
-One process, one page, and the page is embedded in the binary at build time. The page is `client/`, TypeScript built by bun — npm and node appear nowhere. **The wire is the seam, not the language**: a second client written against it in any language is a supported thing to build, and one was, in Rust compiled to WebAssembly, until the TypeScript one replaced it. The gate that once forbade JavaScript source in this tree was removed because it excluded architectures rather than defects.
+One process serves one page, and the page is inside the binary rather than
+beside it: `crates/sprawling/build.rs` compresses `target/web-dist` and emits
+an `include_bytes!` entry per file, so a server that started has no asset
+directory left to lose. The page is `client/`, TypeScript bundled by bun.
+
+**The wire is the seam, not the language.** A second client written against
+`channels::wire` in any language is a supported thing to build; what the
+shipped one happens to be written in is a replaceable fact.
 
 ```
                       one machine
@@ -21,17 +46,19 @@ One process, one page, and the page is embedded in the binary at build time. The
 │        │           concrete type, samples the clock, hands   │
 │        │           out seeds, and starts every task          │
 │        │                                                     │
-│        ├── runtime ── turns, tools, sandbox, watchdog        │
-│        ├── collab  ── signals, drafts, pull requests         │
-│        ├── city    ── space, residents, archive, schedule    │
-│        ├── eval    ── suites, probes, scoring                │
-│        ├── browser ── WebDriver BiDi sessions                │
+│        ├── runtime ── turns, tools, sandbox, watchdog, fork  │
+│        ├── collab  ── inbox, signals, claims, delegation,    │
+│        │              workshop, fan-in, pull requests        │
+│        ├── city    ── buildings, residents, rooms, archive,  │
+│        │              library, schedule                      │
+│        ├── eval    ── suites, probes, scoring, metabolism    │
+│        ├── browser ── WebDriver BiDi sessions, snapshots     │
 │        ├── protocol── MCP outbound, ACP inbound              │
-│        ├── memory  ── Ledger on disk, CAS, projections, git  │
-│        ├── gateway ── model routing, dialects, credentials   │
-│        └── channels ─ WebSocket server, Command/Query/Event  │
-│                 │                                            │
-│                 │  ws://127.0.0.1:8787/ws                    │
+│        ├── memory  ── Ledger, CAS, projections, git, Vfs     │
+│        ├── gateway ── routing, dialects, market, cost,       │
+│        │              credentials                            │
+│        └── channels ─ WebSocket server, Command/Query/Event, │
+│                 │     admission                              │
 │                 ▼                                            │
 │       client (TypeScript, served from inside the binary)     │
 └──────────────────────────────────────────────────────────────┘
@@ -41,49 +68,59 @@ One process, one page, and the page is embedded in the binary at build time. The
    (a tree on this disk)              (only over one gateway endpoint)
 ```
 
+Each unit's duty is stated here and nowhere else in this document; `kernel`
+is absent from the figure because everything above depends on it and nothing
+it holds is reached from outside the process.
+
+The address the server binds is `kernel::consts_policy::DEFAULT_AT` unless a
+caller overrides it. The value is not repeated here: the CLI defaults, the
+first-run screen, the installer and `README.md` all read that one constant,
+because the address a person is told and the address actually bound may not
+be two spellings (sprawling-SPEC.md section 8-2b).
+
 ## 2 The stack, and what each choice costs
 
-The pinned versions live in `Cargo.toml`; this table says why each is there. Where a choice has a cost, the cost is stated rather than implied.
+The pinned versions live in `Cargo.toml`, which is the authority; this
+table says **why** each choice is there and what it costs. Version numbers
+are deliberately absent — a reader who needs one reads the manifest, and a
+number repeated here would be a second home for a fact Dependabot moves
+every week.
 
 | Concern | Choice | Why it, and what it costs |
 |---|---|---|
 | Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, MSRV 1.97 | The invariants this design cares about are expressible as types, and `#![forbid(unsafe_code)]` holds workspace-wide. Cost: compile times, and a client that has to be built before the binary that embeds it. |
-| Async runtime | `tokio` 1, only in `channels` and the binary | The turn loop is synchronous on purpose — a decision that awaits is a decision that interleaves. Async stops at the process boundary. Cost: one blocking HTTP call per model request, paid inside a worker rather than a reactor. |
-| HTTP server | `axum` <!-- xtask:begin dep_version:axum -->0.8<!-- xtask:end --> with its `ws` feature | It carries the WebSocket implementation itself, so the protocol has one version authority rather than two. |
-| HTTP client | `reqwest` <!-- xtask:begin dep_version:reqwest -->0.13<!-- xtask:end -->, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. |
-| Client | Solid 1.9 and Effect 3.22, bundled by Vite, driven by bun | Two runtime dependencies and no framework runtime beyond them: Solid compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
+| Async runtime | `tokio`, only in `channels` and the binary | The turn loop is synchronous on purpose — a decision that awaits is a decision that interleaves. Async stops at the process boundary. Cost: one blocking HTTP call per model request, paid inside a worker rather than a reactor. |
+| Inbound WebSocket | `axum` with its `ws` feature (`crates/channels/Cargo.toml`) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
+| Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (channels-SPEC section 8-41). |
+| HTTP client | `reqwest`, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. |
+| Client | Solid and Effect, bundled by Vite, driven by bun | Two runtime dependencies and no framework runtime beyond them: Solid compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
-| Content store | BLAKE3 (`blake3` <!-- xtask:begin dep_version:blake3 -->1.8<!-- xtask:end -->) | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
-| Restoration | `git2` <!-- xtask:begin dep_version:git2 -->0.21<!-- xtask:end -->, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
-| Sandbox | `wasmtime` <!-- xtask:begin dep_version:wasmtime -->48<!-- xtask:end --> + `wasmtime-wasi`, wasip1 only | Fuel-metered execution with **no socket host implementation** — the Python arm's mechanical proof that it cannot reach the network. Cost: an optional feature; a build without it refuses tool execution in three parts rather than pretending. |
-| Credentials | `keyring` <!-- xtask:begin dep_version:keyring -->3<!-- xtask:end --> (platform credential service), `secrecy` <!-- xtask:begin dep_version:secrecy -->0.10<!-- xtask:end -->, `zeroize` <!-- xtask:begin dep_version:zeroize -->1.9<!-- xtask:end --> | Plaintext lives in the operating system's own vault, never in a file we wrote. `sha2` <!-- xtask:begin dep_version:sha2 -->0.11<!-- xtask:end --> is present for one external protocol fact: PKCE mandates SHA-256. |
-| Entropy | `getrandom` <!-- xtask:begin dep_version:getrandom -->0.4<!-- xtask:end --> | OS entropy for the PKCE verifier and the login state. It is *not* the seeded RNG the simulator uses, and must never become it. |
-| Serialisation | `serde` 1, `serde_json` 1, `toml` <!-- xtask:begin dep_version:toml -->1.1<!-- xtask:end --> | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
-| Errors | `thiserror` <!-- xtask:begin dep_version:thiserror -->2<!-- xtask:end --> | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
-| Release profile | `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. |
-| Dependency count | <!-- xtask:begin dependency_count -->402<!-- xtask:end --> packages in `Cargo.lock` | Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
+| Restoration | `git2`, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
+| Sandbox | `wasmtime` + `wasmtime-wasi`, wasip1 only | Fuel-metered execution with **no socket host implementation** — the Python arm's mechanical proof that it cannot reach the network. Cost: an optional feature; a build without it refuses tool execution in three parts rather than pretending. |
+| Credentials | `keyring` (platform credential service), `secrecy`, `zeroize` | Plaintext lives in the operating system's own vault, never in a file we wrote. `sha2` is present for one external protocol fact: PKCE mandates SHA-256. |
+| Entropy | `getrandom` | OS entropy for the PKCE verifier and the login state. It is *not* the seeded RNG the simulator uses, and must never become it. |
+| Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
+| Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
+| Release profile | `opt-level = "z"`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `"z"` rather than `3` on a measurement whose criterion was written before the readings existed — the manifest records both arms. |
 
-**Verification tools**, kept out of the shipped binary: `proptest` (properties before examples), `insta` (golden output), `trybuild` (proof that something cannot be expressed), `kani` (bounded proof, Linux CI), `cargo-mutants` (do the tests bite), `cargo-fuzz` (parsers against hostile bytes).
+**Verification tools**, kept out of the shipped binary: `proptest`
+(properties before examples), `insta` (golden output), `trybuild` (proof
+that something cannot be expressed), `kani` (bounded proof, Linux CI),
+`cargo-mutants` (do the tests bite), `cargo-fuzz` (parsers against hostile
+bytes).
 
-## 3 Twelve units and the dependency law
+## 3 The units and the dependency law
 
-Crates are not a reuse mechanism here. They exist so that **the dependency rules are executed by the compiler**: the wall `pub(crate)` builds is drawn at the crate boundary, so twelve crates are twelve walls that actually close.
+Crates are not a reuse mechanism here. They exist so that **the dependency
+rules are executed by the compiler**: the wall `pub(crate)` builds is drawn
+at the crate boundary, so each crate is a wall that actually closes.
 
-```
-sprawling (bin: init/serve/resume/replay/fork/adopt/export/restore/status)
-   ├─ runtime ──→ kernel, memory, gateway   turns, tools, sandbox, watchdog, fork
-   ├─ collab  ──→ kernel, memory            inbox, drafts, workshop, fan-in, pull requests
-   ├─ city    ──→ kernel                    space, residents, archive, library, schedule
-   ├─ eval    ──→ kernel, memory            suites, probes, scoring, metabolism
-   ├─ browser ──→ kernel                    WebDriver BiDi sessions, page snapshots
-   ├─ protocol──→ kernel                    MCP outbound, ACP inbound
-   ├─ memory  ──→ kernel                    Ledger, CAS, projections, attribution, git
-   ├─ gateway ──→ kernel                    routing, dialects, market, cost, credentials
-   └─ channels──→ kernel                    Command/Query/Event, WebSocket server, auth
-kernel: no internal dependencies.
-```
-
-The block below is what the machine reads. Actual edges must be a **subset** of it, so a hidden edge is a red build rather than a discovery:
+The block below is the **machine authority** for those walls, read by
+`cargo xtask depmap`. Actual edges must be a *subset* of it, so a hidden
+edge is a red build rather than a discovery. It is also the unit list:
+counting its rows is how you learn how many there are, which is why no
+number appears in this sentence.
 
 ```depmap
 kernel:
@@ -99,9 +136,18 @@ channels: kernel
 sprawling: kernel, memory, gateway, runtime, collab, city, eval, browser, protocol, channels
 ```
 
-**Three rules.** Dependencies point inward, and never back. A seam declares its trait in the inner layer and implements it in the outer one, so `kernel` can define what a Ledger *is* without knowing where it is written. And splitting into crates buys compiler-enforced layering, not reuse — nothing here is published.
+What each unit owns is stated once, in §1's figure. It is not repeated
+here: the two lists drifted apart while both were maintained by hand, and
+`collab` was carrying a duty in one that its source had never had.
 
-**Three kinds of edge**, and telling them apart is what makes the repository readable:
+**Three rules.** Dependencies point inward, and never back. A seam declares
+its trait in the inner layer and implements it in the outer one, so
+`kernel` can define what a Ledger *is* without knowing where it is written.
+And splitting into crates buys compiler-enforced layering, not reuse —
+nothing here is published.
+
+**Three kinds of edge**, and telling them apart is what makes the
+repository readable:
 
 | Edge | When it exists | Example |
 |---|---|---|
@@ -109,13 +155,30 @@ sprawling: kernel, memory, gateway, runtime, collab, city, eval, browser, protoc
 | Assembly | run time, only in `bin::assembly` | the upload sink in `channels::server` receiving `memory::cas` |
 | Event | anywhere a `kernel::Ledger` handle is held | writing `tool_result` after a tool runs |
 
-`runtime` has the widest fan-out — three crates at once. It may **use** their interfaces and nothing more; the moment a runtime module starts passing concrete types between `memory` and `gateway`, that edge moves up into the assembly layer.
+`runtime` has the widest fan-out — three crates at once. It may **use**
+their interfaces and nothing more; the moment a runtime module starts
+passing concrete types between `memory` and `gateway`, that edge moves up
+into the assembly layer.
 
-`xtask` and `citysim` are workspace members outside the product graph. **citysim drives the turn loop a second time**: `runtime::run::drive` with simulated adapters — a scripted model, scripted tools, an in-memory Ledger — which is how a script reproduces a run. It stops below `bin::assembly`, whose `RunWorker` builds its model adapter out of the endpoint book rather than receiving one; the dispatch policy above that line is held by that module's own tests. `sprawling` carries a lib target so the policy is at least *reachable* — an integration test enters by the same door `channels::server` uses — and inverting the model seam is what a seeded scenario would still need.
+`xtask` and `citysim` are workspace members outside the product graph.
+**citysim drives the turn loop a second time**: `runtime::run::drive` with
+simulated adapters — a scripted model, scripted tools, an in-memory Ledger
+— which is how a script reproduces a run. It stops below `bin::assembly`,
+whose `RunWorker` builds its model adapter out of the endpoint book rather
+than receiving one; the dispatch policy above that line is held by that
+module's own tests. `sprawling` carries a lib target so the policy is at
+least *reachable* — an integration test enters by the same door
+`channels::server` uses — and inverting the model seam is what a seeded
+scenario would still need.
 
 ## 4 Seams
 
-A seam is a trait declared in the inner layer and implemented outside it. **One adapter is a hypothetical seam; two make it real** — so every seam ships with a second implementation, and `cargo xtask depmap` refuses a `pub trait` declared anywhere but the files below.
+A seam is a trait declared in the inner layer and implemented outside it.
+**One adapter is a hypothetical seam; two make it real** — so every seam
+ships with a second implementation.
+
+This table is a **machine authority**: `cargo xtask depmap` refuses a
+`pub trait` declared anywhere but the files it names.
 
 | Seam | Declared in | Production adapter | Second adapter |
 |---|---|---|---|
@@ -126,34 +189,139 @@ A seam is a trait declared in the inner layer and implemented outside it. **One 
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
 | `protocol::mcp` | crates/protocol/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
 
-**Two inner seams** stay `pub(crate)` because nothing outside their crate needs them: `memory`'s `Vfs` (real filesystem / deterministic power-loss model) and `gateway`'s `Vault` (platform credential service / in-session store).
+The *second adapter* column has no checker: a seam whose double was
+deleted would still read as real here. That is a known hole, not a
+guarantee.
 
-**Deliberately not seams**: `gateway::dialect` is a pure function and needs no trait; the internals of `city`, `collab` and `eval` have one implementation each and are driven from outside by citysim; `git2` is used directly, because an interface with one implementation is decoration.
+**Two inner seams** stay `pub(crate)` because nothing outside their crate
+needs them: `memory`'s `Vfs` (real filesystem / deterministic power-loss
+model) and `gateway`'s `Vault` (platform credential service / in-session
+store).
+
+**Deliberately not seams**: `gateway::dialect` is a pure function and needs
+no trait; the internals of `city`, `collab` and `eval` have one
+implementation each and are driven from outside by citysim; `git2` is used
+directly, because an interface with one implementation is decoration.
 
 ## 5 One dispatch, end to end
 
-This is the path everything else supports. Following it once explains more than any diagram of boxes.
+This is the path everything else supports. Following it once explains more
+than any diagram of boxes.
 
-1. **The page sends a Command.** A person fills in the control surface — address, what to produce, what counts as done — and the client's socket sends `Command::Dispatch` over the WebSocket. The frame carries no ceiling of any kind: nobody can price a piece of work before it runs, and the one brake is `Halt`.
-2. **`channels::server` decides whether to accept it.** Two pure judgements — may this address be bound, may this peer be accepted — with the socket code that surrounds them making no judgement at all.
-3. **`bin::assembly` turns it into work.** This is the only place that samples the clock, so the timestamp enters as a parameter from here on. A worker takes the dispatch, and answers every refusal it can owe before it writes anything: the reserved subtree, a halted scope, rules that will not load, and a tag with no model behind it are all decided by `agree_to_work`, which reads and writes nothing. **Opening the room is the first thing this city puts on disk for a dispatch**, so work nobody could take leaves no room behind for a person to find.
-4. **The city writes `run_started` before anything happens.** Every effect becomes an event first; that ordering is the design's load-bearing rule, not a logging preference.
-5. **`runtime::prefix` assembles the frozen prefix** in four segments — city, building, resident, run — from `city::spine_files`, `city::policy` and `city::resident`. Assembling it is itself an event, and the result is frozen for the whole run.
-6. **`runtime::catalog` decides what the model may see**: the three built-in tools, the collaboration tools this building admits, the skills its reading room allows, and any MCP tools discovered from the building's `CONFIG.toml`. `city::neighbourhood` is scanned in the same breath, so the run also knows which addresses it can reach and who stands at them — without it, `signal` takes an address the model has to have been told.
-7. **`runtime::turn` enters its typestate**: Assembling → Calling → Applying → Settling, with four cancellation-safe points. An interruption inside a phase cannot be spelled.
-8. **`gateway` makes the call.** `gateway::router` picks the endpoint attached to this tag; `gateway::dialect` translates the canonical Anthropic-shaped conversation into the provider's dialect; `gateway::credential` redeems a `secret:realm/name` reference into a header at the last moment; `gateway::admission` holds the provider's concurrency limit.
-9. **The reply is scanned before it is recorded.** `runtime::redact` puts model output through the same secret scan as everything else, so a key a model repeated does not become permanent.
-10. **Tools run behind gates.** `kernel::gate` answers with an exhaustive verdict — allowed, refused in three parts, or escalated to a person. `memory::checkpoint` puts a git fence before the wave and scans the worktree after it, so anything that disappeared becomes a `file_discarded` event carrying the way back.
-11. **The result comes back shaped.** `runtime::pipeline` builds the result envelope — clock stamp, network reminder, any steer a person sent — and `runtime::compaction` shortens what is too long, always reporting how much it dropped.
-12. **Everything lands in the Ledger, and the views follow.** `memory::hot` and `memory::attribution` fold the same event stream into what the pages ask for. The server pushes each event; the client folds it into what it believes. The same fold, on both sides of the wire.
+1. **The page sends a Command.** A person fills in the control surface —
+   address, what to produce, what counts as done — and the client's socket
+   sends `Command::Dispatch` over the WebSocket. The frame carries no
+   ceiling of any kind: nobody can price a piece of work before it runs,
+   and the one brake is `Halt`.
+2. **`channels::server` decides whether to accept it.** Two pure
+   judgements — may this address be bound, may this peer be accepted — with
+   the socket code that surrounds them making no judgement at all.
+3. **`bin::assembly` turns it into work.** This is the only place that
+   samples the clock, so the timestamp enters as a parameter from here on.
+   A worker takes the dispatch and answers every refusal it can owe before
+   it writes anything: the reserved subtree, a halted scope, rules that
+   will not load, and a tag with no model behind it are all decided by
+   `agree_to_work`, which reads and writes nothing. **Opening the room is
+   the first thing this city puts on disk for a dispatch**, so work nobody
+   could take leaves no room behind for a person to find.
+4. **The city writes `run_started` before anything happens.** Every effect
+   becomes an event first; that ordering is the design's load-bearing rule,
+   not a logging preference.
+5. **`runtime::prefix` assembles the frozen prefix** in four segments —
+   city, building, resident, run — from `city::spine_files`, `city::policy`
+   and `city::resident`. Assembling it is itself an event, and the result
+   is frozen for the whole run.
+6. **`runtime::catalog` decides what the model may see**: the three
+   built-in tools, the collaboration tools this building admits, the skills
+   its reading room allows, and any MCP tools discovered from the
+   building's `CONFIG.toml`. `city::neighbourhood` is scanned in the same
+   breath, so the run also knows which addresses it can reach and who
+   stands at them — without it, `signal` takes an address the model has to
+   have been told.
+7. **`runtime::turn` enters its typestate**: Assembling → Calling →
+   Applying → Settling, with four cancellation-safe points. An interruption
+   inside a phase cannot be spelled.
+8. **`gateway` makes the call.** `gateway::router` picks the endpoint
+   attached to this tag; `gateway::dialect` translates the canonical
+   Anthropic-shaped conversation into the provider's dialect;
+   `gateway::credential` redeems a `secret:realm/name` reference into a
+   header at the last moment. Nothing here holds a concurrency limit: the
+   module that did was deleted for having no caller, and what it would
+   take to grow one back is recorded where it was removed
+   (gateway-SPEC.md section 8-6).
+9. **The reply is scanned before it is recorded.** `runtime::redact` puts
+   model output through the same secret scan as everything else, so a key a
+   model repeated does not become permanent.
+10. **Tools run behind gates.** `kernel::gate` answers with an exhaustive
+    verdict — allowed, refused in three parts, or escalated to a person.
+    `memory::checkpoint` puts a git fence before the wave and scans the
+    worktree after it, so anything that disappeared becomes a
+    `file_discarded` event carrying the way back.
+11. **The result comes back shaped.** `runtime::pipeline` builds the result
+    envelope — clock stamp, network reminder, any steer a person sent — and
+    `runtime::compaction` shortens what is too long, always reporting how
+    much it dropped.
+12. **Everything lands in the Ledger, and the views follow.**
+    `memory::hot` and `memory::attribution` fold the same event stream into
+    what the pages ask for. The server pushes each event; the client folds
+    it into what it believes. The same fold, on both sides of the wire.
+13. **A signal reaches whoever it names, working or not.** After the run
+    freezes, each signal it sent is recorded and then delivered. A
+    steer-kind signal slips under the door of a run that is already going,
+    landing at that run's next safe point with `@` and the sender's address
+    in front of it; anyone else who was spoken to is *knocked* —
+    `bin::assembly` starts a run for them, whose brief names the resident
+    who spoke. Only the person's own entrance can render as `user`, which
+    is what makes an answer go to the right place. A knock addresses a
+    resident, never a frozen run: history is read, not woken.
 
-13. **A signal reaches whoever it names, working or not.** After the run freezes, each signal it sent is recorded and then delivered. A steer-kind signal slips under the door of a run that is already going, landing at that run's next safe point with `@` and the sender's address in front of it; anyone else who was spoken to is *knocked* — `bin::assembly` starts a run for them, whose brief names the resident who spoke. Only the person's own entrance can render as `user`, which is what makes an answer go to the right place. A knock addresses a resident, never a frozen run: history is read, not woken.
+When the process dies mid-call, `sprawling resume` verifies the chain,
+closes tool calls whose outcome was lost as *unknown* rather than as
+failed, and reports what waits for a person.
 
-When the process dies mid-call, `sprawling resume` verifies the chain, closes tool calls whose outcome was lost as *unknown* rather than as failed, and reports what waits for a person.
+### When it does not go through
+
+The walk above is the path that succeeds. Every way it can stop is one
+shape, and that shape is a type rather than a convention.
+
+**A failure that does not say what to do next cannot be spelled.**
+`AxError` carries seven wire fields in declaration order — which is rule 6
+of §10, so an error is as replayable as an event: a stable `code`, the
+`action` and `subject` it failed on, `nearby` candidates, a `recovery`
+sentence, whether it is `retriable`, and the gate's own refusal when a gate
+is what stopped it. **The model is the audience**, so `nearby` and
+`recovery` hold directly executable information rather than apologies. Both
+constructors return an `ErrorDraft`, and `with_recovery` is the only way
+across to an `AxError` — a failure with no next step is unconstructible,
+not merely discouraged.
+
+**A gate answers one of exactly three ways.** `GateOutcome` is `Allow`,
+`Deny` carrying the refusal, or `Ask` carrying the question. Every caller
+decides all three, so a door that *starts* asking a person is a compile
+error at every call site rather than a behaviour that changes underneath
+them. Exactly one door answers `Ask` today, and the refusal conformance
+matrix asserts that count rather than trusting it. The roster of doors is
+data (`kernel::gate::DOORS`), so a door added to the enum is a door the
+matrix judges, and one without a sample does not compile.
+
+**A refusal has three parts**: `rule` — what the rule is; `violation` —
+what broke it; `alternative` — what to do instead. These are the same
+three parts every gate in `xtask` reports, because a refusal a person reads
+and a refusal a builder reads are one shape, not two.
+
+**A halt names a scope, never a run**: the city, a building, or a
+workshop. A frozen run is history, and history is read rather than woken.
 
 ## 6 On disk
 
-A city is one directory. Copy it and it is the same city; delete it and nothing outside it changes.
+A city is one directory. Copy it and it is the same city; delete it and
+nothing outside it changes.
+
+The tree below is the **trunk, not the full set**. Every path this product
+writes is derived by `kernel::layout` from a city root and an address, and
+that module is the authority; drawing the complete list here would be a
+second home for it, and the one a person reads would be the one that went
+stale.
 
 ```
 <city>/
@@ -161,31 +329,51 @@ A city is one directory. Copy it and it is the same city; delete it and nothing 
 │  ├─ ledger/                  the only history — jsonl segments, appended, chain-verified
 │  ├─ cas/                     content-addressed store, BLAKE3, one copy per content
 │  ├─ worktrees/               one git worktree per reviewing run, objects shared
-│  ├─ staging/                 uploads land here read-only, never in a worktree
 │  ├─ library/                 skills more than one building admits
-│  └─ CONFIG.toml              city layer of the three-layer configuration
+│  ├─ CONFIG.toml              city layer of the three-layer configuration
+│  └─ FILTERS.toml             what this scope keeps out of a transcript
 └─ <building>/                 one building, one line of business
    ├─ .sprawling/              the building's reserved subtree: what governs it
    │  ├─ RULES.toml            what the building is and may do: one parsed file
    │  ├─ CONFIG.toml           building layer, including its MCP servers
-   │  └─ skills/               skills only this building admits
+   │  ├─ skills/               skills only this building admits
+   │  └─ sessions/             the Ledger's projection of what ran here, disposable
    ├─ Roadmap.md               the plan tree, and the denominator of every progress reading
    ├─ Memo.md                  decisions and corrections
    ├─ Handoff.md               what the next session needs
+   ├─ Archive/                 work this building has finished with, by kind and day
    └─ <room>/                  one session's workplace, named by the person who started it
       ├─ URBANITE.md           who this resident is and how it works
       └─ JOB.md                the task for this session
 ```
 
-**One rule, applied at every scope: what governs a scope lives in that scope's `.sprawling/`, and no write domain reaches it.** `is_reserved` answers true for an address with `.sprawling` in any segment, so the check is one predicate in `kernel::address` rather than a list of protected file names. An agent therefore cannot edit its own accounting, its own configuration, its own building's rules, or the history of what it did.
+**One rule, applied at every scope: what governs a scope lives in that
+scope's `.sprawling/`, and no write domain reaches it.** `is_reserved`
+answers true for an address with `.sprawling` in any segment, so the check
+is one predicate in `kernel::address` rather than a list of protected file
+names. An agent therefore cannot edit its own accounting, its own
+configuration, its own building's rules, or the history of what it did.
 
-A run's write domain is what its building's `RULES.toml` declares, and **the whole building when it names no prefix** — which is the shipped template. The room is where a session works, not the boundary that contains it.
+A run's write domain is what its building's `RULES.toml` declares, and
+**the whole building when it names no prefix** — which is the shipped
+template. The room is where a session works, not the boundary that
+contains it.
 
-**`Roadmap.md` is a tree, and the `plan` tool is what writes it.** The index column is a path — `2.3.1` hangs under `2.3` — so one file states a multi-level plan without a second file to say how the levels relate. `Weight` is a ratio among the rows sharing a parent and `Needs` names what must finish first, which is what makes a ready set computable. A resident divides its own branch and cannot reach past it: `kernel::share` has no constructor, so a share exists only by dividing another one, and the total is the whole plan whatever the plan turns into. Only leaves are counted; a branch's work is its children.
+**`Roadmap.md` is a tree, and the `plan` tool is what writes it.** The
+index column is a path — `2.3.1` hangs under `2.3` — so one file states a
+multi-level plan without a second file to say how the levels relate.
+`Weight` is a ratio among the rows sharing a parent and `Needs` names what
+must finish first, which is what makes a ready set computable. A resident
+divides its own branch and cannot reach past it: `kernel::share` has no
+constructor, so a share exists only by dividing another one, and the total
+is the whole plan whatever the plan turns into. Only leaves are counted; a
+branch's work is its children.
 
 ## 7 The wire
 
-One WebSocket, three kinds of frame, and a schema hash that both ends check on connect: a page from a different build refuses rather than misreads. `WIRE_V` is <!-- xtask:begin wire_v -->34<!-- xtask:end -->.
+One WebSocket, three kinds of frame, and a schema hash that both ends check
+on connect: a page from a different build refuses rather than misreads.
+`WIRE_V` is <!-- xtask:begin wire_v -->34<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
@@ -194,51 +382,50 @@ One WebSocket, three kinds of frame, and a schema hash that both ends check on c
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |
 
-Two properties are worth stating because they are enforced by types rather than by review. A `Command` carrying a credential **cannot be serialised**: `Sealed<T>` has no `Serialize`, and the `PutSecret` payload of the remote command type is an uninhabited type, so entering a key over the network is not a request that can be spelled. And every `Query` must be answered exhaustively — the answer match has no catch-all, so adding a query without answering it does not compile.
+Two properties are worth stating because they are enforced by types rather
+than by review. A `Command` carrying a credential **cannot be serialised**:
+`Sealed<T>` has no `Serialize`, and the `PutSecret` payload of the remote
+command type is an uninhabited type, so entering a key over the network is
+not a request that can be spelled. And every `Query` must be answered
+exhaustively — the answer match has no catch-all, so adding a query without
+answering it does not compile.
 
-## 8 Parts you can replace
+## 8 Where to change what
 
-This repository bundles nobody's key, pays for nothing, and proxies nothing. Everything that reaches outside is therefore an adapter you can swap, and this section says where each one lives.
+The table this document never had. Each crate's SPEC settles the interface
+of its own modules; what belongs here is only the first hop, so that
+nobody has to read a hundred module rows to find which SPEC to open.
 
-### Provider intelligence — followed from four upstreams
+The third column names what turns red when the change is wrong — which is
+the part worth knowing before starting, not after.
 
-Signing in to a provider means knowing four things: authorization endpoint, token endpoint, client id, scopes. Those are facts, and they change without warning, so they are followed from four actively maintained projects rather than watched by hand: [`openai/codex`](https://github.com/openai/codex) (Apache-2.0) for OpenAI, [`anthropics/claude-agent-sdk-typescript`](https://github.com/anthropics/claude-agent-sdk-typescript) for the Claude agent protocol types, [`xai-org/grok-build`](https://github.com/xai-org/grok-build) (Apache-2.0) for xAI, and [`MoonshotAI/kimi-cli`](https://github.com/MoonshotAI/kimi-cli) (Apache-2.0) for Moonshot. `earendil-works/pi` was one of them and is not any more: this city holds its own Anthropic subscription login, so a third party's OAuth intelligence buys it nothing. **What is followed is intelligence, not code** — see [`docs/third-party.md`](docs/third-party.md) for each upstream's obligations, the commit it is tracked to, and how to re-check. The licence table that file carries names every package this workspace depends on directly; the full resolved graph belongs to `cargo deny` and the CycloneDX bill of materials, and the one count of it a reader should trust is the generated figure in `docs/third-party.md` §3.
-
-| To do this | Change this |
-|---|---|
-| add or correct a subscription provider | `gateway::oauth_profiles` — a table with data and zero branches |
-| change how a login is begun, finished or renewed | `gateway::credential` |
-| use an API key instead | the settings page: base URL, dialect, key |
-| speak a third dialect | `gateway::dialect`, a pure two-way translation with the canonical shape in the middle |
-| run a local model | `gateway::native` — local inference never goes through the outbound gateway |
-
-**What you cannot move out**: credential custody. Plaintext reaches the platform credential service and nothing else, configuration holds a `secret:realm/name` reference, and that is part of what the product promises rather than an implementation detail.
-
-### Outside applications — MCP, and Composio as one server among many
-
-Mail, GitHub, Figma, Discord: writing an integration for each is a weekly chore unrelated to the problem here, so the whole class is outsourced over **MCP**. [Composio](https://composio.dev) is the first choice and is reached the same way any other server is — this code never knows what Composio is.
-
-| To do this | Change this |
-|---|---|
-| give a building tools from a server | its `CONFIG.toml`: a `command` starts a child process, a `url` reaches a hosted server |
-| point at a different provider of the same tools | the same URL field. Nothing else changes |
-| add a transport | `bin::mcp_stdio` and `bin::mcp_http` are the two adapters behind `protocol::mcp`'s `Outbound` seam |
-| drive this city from an editor | `protocol::acp` accepts an outside request as an ordinary dispatch |
-
-A confidential building constructs none of them: data may enter and may not leave.
-
-### The rest
-
-| Part | Seam or surface | Note |
+| To change this | Go here | Held by |
 |---|---|---|
-| execution sandbox | `runtime::sandbox` | implement the trait, pass its conformance suite; the shipped adapter is wasmtime with fuel |
-| the client | `channels::wire` | the wire is the whole API; a second client writes against it |
-| the browser driver | `browser::port` | frames in, replies out; the shipped adapter speaks WebDriver BiDi |
-| where views are stored | `bin::sprawling::views` | delete the process and they rebuild from the Ledger, byte-identical |
+| a new event kind, or a payload | `kernel::event` + kernel-SPEC | the kind set is closed; `memory` fixtures compare bytes across platforms |
+| a new `Command` or `Query` frame | `channels::wire` + channels-SPEC | `WIRE_V` must rise, and every `Query` must be answered or it does not compile |
+| what a model may call | `runtime::catalog`, tools in `runtime` or `collab` | `kernel::tool` is the seam; a tool with no conformance suite is not a seam |
+| how a provider is spoken to | `gateway::dialect` + gateway-SPEC | a pure two-way translation with the canonical shape in the middle |
+| how a login begins, finishes, renews | `gateway::credential`, `gateway::oauth_profiles` | plaintext may reach only the platform vault; `secret` gate reads every boundary |
+| where a city keeps a file | `kernel::layout` | the reserved subtree is out of every write domain, by one predicate in `kernel::address` |
+| what a building may do | `city::policy` (`RULES.toml`) + city-SPEC | a run's write domain is what its building declares |
+| a crate depending on another | the `depmap` block in §3 | actual edges must be a subset; a hidden edge is a red build |
+| a new seam | §4, and the trait's file | `depmap` refuses a `pub trait` outside the files §4 names |
+| a new module, or a deleted one | the module map in §12 | `modmap` refuses a file absent from the table, and a row whose file is gone |
+| a platform the release ships | `xtask::platform`'s `PLATFORMS` | one row per platform; the npm scope and the bare root name are asserted there |
+| the page | `client/` + client-SPEC | its own lint, typecheck and tests; the bundle is measured against a byte budget |
+| a gate itself | `xtask/` + xtask-SPEC | `guard` asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
+
+Two documents sit beside this one rather than inside it: operating a
+city — swapping a provider, pointing at another MCP server, running a
+local model — is [`docs/operating.md`](docs/operating.md), and what a
+change must satisfy before it merges is
+[`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).
 
 ## 9 Seven shapes
 
-Every module instantiates exactly one of these. The classification earns its place by what it catches: a module that cannot name its shape usually holds two things that want to be separate files.
+Every module instantiates exactly one of these. The classification earns
+its place by what it catches: a module that cannot name its shape usually
+holds two things that want to be separate files.
 
 | # | Shape | The test for it |
 |---|---|---|
@@ -250,13 +437,15 @@ Every module instantiates exactly one of these. The classification earns its pla
 | 6 | data | data only, no branches. Editing it is editing behaviour |
 | 7 | projection | folds the event stream into a view; deleting it and rebuilding gives the same bytes |
 
-**The Humble Object is the recurring move**: the hard-to-test end is stripped to nothing and the thick end stays pure. `runtime::watchdog`, `gateway::endpoint` and the sandbox adapters are all instances of it.
+**The Humble Object is the recurring move**: the hard-to-test end is
+stripped to nothing and the thick end stays pure. `runtime::watchdog`,
+`gateway::endpoint` and the sandbox adapters are all instances of it.
 
 ### Making illegal states unrepresentable
 
-Each of these is a type, not a slogan, and each has a compile-failure counterexample in the test suite — because "unrepresentable" is itself a claim that needs testing.
-
-**These expectations are byte comparisons against a compiler's output, so the machine is part of them.** Installing the `rust-src` component makes rustc render a source snippet inside a `note:` that the committed `.stderr` files do not carry, and every counterexample using one goes red without a line of this repository changing. `cargo public-api` pulls that component in, so `just api-baseline` can turn `just check` red on the next run; remove it (`rustup component remove rust-src`) rather than blessing the longer output, which would only move the failure to CI.
+Each of these is a type, not a slogan, and each has a compile-failure
+counterexample in the test suite — because "unrepresentable" is itself a
+claim that needs testing.
 
 - `EventRef` has no public constructor and no serde ⇒ **a forged event reference cannot be spelled**.
 - `Completion::Done` always carries `Evidence`, and `Completion` has no serde ⇒ **a deserialised "finished" cannot be spelled**.
@@ -268,9 +457,18 @@ Each of these is a type, not a slogan, and each has a compile-failure counterexa
 - `Held` has one private field and two consuming methods ⇒ **a claimed plan node cannot be put down silently**: it is finished with evidence or stopped with a cause, and a run that simply ends spends it on `FrozeWithoutEvidence`.
 - `Pursuit::declare` takes the depth-zero position and a `Delegate` cannot produce one ⇒ **a sub-agent cannot set the city working until the work runs out**.
 
+These expectations are byte comparisons against a compiler's output, so the
+toolchain is part of them. What to do when an installed component changes
+that output is in [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md); it is
+a fact about running the tests, not about the design.
+
 ## 10 Determinism and hardening
 
-The whole city runs as real code, single-threaded, on a virtual clock, driven by a fixed script. That is not a testing convenience — it is the property that makes a failure replay exactly, and these seven rules are its admission conditions. A seed is what a random scenario batch would need; there is no random source in the simulator today to seed.
+The whole city runs as real code, single-threaded, on a virtual clock,
+driven by a fixed script. That is not a testing convenience — it is the
+property that makes a failure replay exactly, and these seven rules are its
+admission conditions. A seed is what a random scenario batch would need;
+there is no random source in the simulator today to seed.
 
 | # | Rule | Held by |
 |---|---|---|
@@ -282,15 +480,27 @@ The whole city runs as real code, single-threaded, on a virtual clock, driven by
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
 | 7 | `IdemKey` derives from `(run, seq, normalised action)` — never from a clock or a random number | property tests |
 
-Rules 1 and 6 together give a checkable property: **the same event sequence replays byte-for-byte identically on any machine.**
+Rules 1 and 6 together give a checkable property: **the same event sequence
+replays byte-for-byte identically on any machine.**
 
-**Hardening** is compile-time, workspace-wide, and identical in tests and production except where a test module relaxes it locally: no `unwrap`, `expect`, `panic!`, `todo!`, `unreachable!`, bare indexing or slicing; arithmetic is checked; narrowing goes through `TryFrom`; `as` casts are denied; `unsafe_code` is forbidden outright. Money and quantities are integer newtypes (`UsdMicros`, `Tokens`, `ByteLen`, `Seq`), and floats stay out of every decision path.
+**Hardening** is compile-time, workspace-wide, and identical in tests and
+production except where a test module relaxes it locally: no `unwrap`,
+`expect`, `panic!`, `todo!`, `unreachable!`, bare indexing or slicing;
+arithmetic is checked; narrowing goes through `TryFrom`; `as` casts are
+denied; `unsafe_code` is forbidden outright. Money and quantities are
+integer newtypes (`UsdMicros`, `Tokens`, `ByteLen`, `Seq`), and floats stay
+out of every decision path.
 
-**The most fragile point in the design is one paragraph long.** A database handle, one `Instant::now()`, or a bare spawn inside `kernel` disables replay, formal verification and deterministic simulation at the same time. The gates hold that line so the property survives a builder who has never read this file.
+**The most fragile point in the design is one paragraph long.** A database
+handle, one `Instant::now()`, or a bare spawn inside `kernel` disables
+replay, formal verification and deterministic simulation at the same time.
+The gates hold that line so the property survives a builder who has never
+read this file.
 
 ## 11 How this is verified, and what it costs
 
-Eleven layers, each catching what the layer above cannot. They deliberately do not overlap: overlapping verification reads as more coverage than it is.
+Eleven layers, each catching what the layer above cannot. They deliberately
+do not overlap: overlapping verification reads as more coverage than it is.
 
 | Layer | Catches | Today |
 |---|---|---|
@@ -306,22 +516,46 @@ Eleven layers, each catching what the layer above cannot. They deliberately do n
 | V9 end to end | the thing a person actually wants to do | the real client in a real browser against a real server, on a developer machine |
 | V10 adversarial | a promise the door makes that holds on the traces we wrote and not on the ones we did not | `adversary/`, out of tree, in Lean, driving the shipped binary over the wire |
 
-**V10 is not a gate, and the difference is load-bearing.** Section 8 says the wire is the whole API and that a second client writes against it; `adversary/` exercises that permission by writing a third one outside the workspace, in another language, to attack rather than to use. It is reached by `just adversary` and by a schedule, never by `just check` — on a machine with no Lean toolchain, `just check` behaves byte for byte as it does where the directory is absent, and `just adversary` prints one line and succeeds. What it buys that V2 cannot is quantification over traces: V2 proves that the paths we thought of hold, and V10 asks whether the door's stable error codes survive any prefix, one halt, and any suffix. It has already found six things a specific trace would not have — an exit code that means "no refusal arrived in time" where its own documentation promises "the city refused"; a dispatch that writes a job file to disk before the guard that refuses it runs; an `IdemKey` the wire makes every state-changing command carry that `kernel::gate::dedup` checks and nothing calls; a URL normalisation rule written and never called, so two spellings of one endpoint registered twice; the last rung of the ceiling ladder never reached from the registration path; and a gate that sees two driving lanes but not the Inbox behind them. Each one is recorded in `adversary/adversary-SPEC.md` section 4, and each is fixed in the change that found it; the third keeps a check of its own because one lane still writes to the Ledger without passing the assembly point that holds the keys.
+**V10 is not a gate, and the difference is load-bearing.** §8 says the wire
+is the whole API and that a second client writes against it; `adversary/`
+exercises that permission by writing a third one outside the workspace, in
+another language, to attack rather than to use. It is reached by
+`just adversary` and by a schedule, never by `just check` — on a machine
+with no Lean toolchain, `just check` behaves byte for byte as it does where
+the directory is absent, and `just adversary` prints one line and succeeds.
+What it buys that V2 cannot is quantification over traces: V2 proves that
+the paths we thought of hold, and V10 asks whether the door's stable error
+codes survive any prefix, one halt, and any suffix. What it has found, and
+what each finding cost to fix, is recorded in
+`adversary/adversary-SPEC.md` section 4 — beside the mechanism rather than
+here, so that retiring the mechanism retires its record.
 
-**Four gaps, named rather than hidden.** CI has no browser driver, so V9 is a command a developer runs rather than a gate. The isometric city compares display lists rather than bitmaps: the preconditions for bitmap comparison are paid for — placement is a pure function of the id, painter order is total, projection and its inverse are exact — but there is no rasteriser. And V6 stops below `bin::assembly` (§3): a scripted scenario reproduces a run, not a dispatch, because `RunWorker` builds its model adapter instead of receiving one. What holds the dispatch policy is that module's own tests, plus the integration tests the lib target makes possible. And the tree holds 3 kani harnesses, all of which CI proves in under a minute each. A harness that builds a `Vec`, a `String` or a `BTreeSet` gives CBMC loops it cannot bound — one such run burned six hours, a second ran forty-five minutes under `--default-unwind 32`, and neither returned — and a harness over symbolic non-linear arithmetic gives the solver work that grows with the data it walks, so five propositions of those two shapes were retired to the `#[test]` and the proptest that already hold them (kernel-SPEC.md section 2). The `// not-proved:` marker and the reader that honours it stay, and today no harness carries one.
-
-### Four times a gate changed the design
-
-Evidence that the mechanism pays for itself. In none of them was the gate loosened.
-
-1. **The secret gate caught an `.expose()` on a boundary.** `ServeConfig` now takes a digest only, so `channels` cannot obtain the pairing token in plaintext at all — which also removed a length side channel.
-2. **The secret gate caught a token's display form.** `PairingToken` now holds only a hash. Sealing a value and unsealing it on the next line is theatre; not holding it is the property that was wanted.
-3. **The colour gate found a contradiction between two documents.** One set the brightest step at L=0.930 while a token table placed a hover variant at 0.945. The reading that makes both legal is that the bound delimits the greyscale information surface, and interactive variants sit above it by design.
-4. **The public-surface gate caught "just one more `pub use` line" three times.** Re-exporting one item is a public-surface change, and to a builder it feels like it is not.
+**Four gaps, named rather than hidden.** CI has no browser driver, so V9 is
+a command a developer runs rather than a gate. The isometric city compares
+display lists rather than bitmaps: the preconditions for bitmap comparison
+are paid for — placement is a pure function of the id, painter order is
+total, projection and its inverse are exact — but there is no rasteriser.
+V6 stops below `bin::assembly` (§3): a scripted scenario reproduces a run,
+not a dispatch, because `RunWorker` builds its model adapter instead of
+receiving one; what holds the dispatch policy is that module's own tests,
+plus the integration tests the lib target makes possible. And the tree
+holds 3 kani harnesses, all of which CI proves in under a minute each — a
+harness that builds a `Vec`, a `String` or a `BTreeSet` gives CBMC loops it
+cannot bound, and one over symbolic non-linear arithmetic gives the solver
+work that grows with the data it walks, so propositions of those two shapes
+are held by the `#[test]` and the proptest instead (kernel-SPEC.md section
+2). The `// not-proved:` marker and the reader that honours it stay, and
+today no harness carries one.
 
 ### The performance register
 
-Sizes are gated because a byte count does not depend on how busy the machine was. Wall-clock figures are measured, reported with the machine that produced them, and never gated: a slow runner is not a defect, and a gate that says it is teaches people to ignore gates. The full register is `xtask/budgets.toml`; `cargo xtask budget` prints it.
+Sizes are gated because a byte count does not depend on how busy the
+machine was. Wall-clock figures are measured, reported with the machine
+that produced them, and never gated: a slow runner is not a defect, and a
+gate that says it is teaches people to ignore gates. **The full register is
+`xtask/budgets.toml`**, which is the authority; `cargo xtask budget` prints
+it, and the readings below are written here by `cargo xtask docnum` rather
+than typed.
 
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
@@ -331,15 +565,33 @@ Sizes are gated because a byte count does not depend on how busy the machine was
 | Ledger append plus fsync | p50 ≤5 ms, p99 ≤20 ms | 0.97 ms / 1.61 ms on one NVMe machine | no |
 | Projection rebuild | ≥50,000 records/s | about 493,000 records/s on the same machine | no |
 | Prefix assembly | ≤1 ms | 0.022 ms for 16.5 KB over four slots | no |
-| Resident segment, catalog included | none stated | 815 B on one real dispatch, with thirteen tools admitted | no: what a building admits is the building's, and a reading room with more in it is not a defect |
 | Runs driving at once | 4 lanes | one thread per run, and one accounting thread taking every write | no: it is a wall this city sets, not a measurement |
 | Kernel mutation score | ≥90% | by `just mutants` | by that command, not by `just check` |
 
-The two size rows are also rendered as the badges in `README.md`, from this same reading — `cargo xtask badge --write`, which `just dist` ends with. Nobody types a size into a document.
+The two size rows are also rendered as the badges in `README.md`, from this
+same reading — `cargo xtask badge --write`, which `just dist` ends with.
+Nobody types a size into a document.
 
-**One honest trade.** With network and model time removed, the throughput ceiling of a city is the throughput ceiling of its Ledger. That is the price of "the Ledger is the only history", stated in the open. The first wall is one this city sets itself: a building working towards a goal drives four runs at a time, because a lane past the provider's own admission ceiling would only park a thread there. Then come the walls outside: provider-side rate limits (a few dozen concurrent calls), Ledger fsync, worktree disk, file-descriptor limits, then the blocking pool. RAM is not among them. **Runs are driven in parallel and accounted for in series** — every line a lane writes crosses to the one thread that owns the Ledger and waits there — so concurrency buys model time back and buys nothing from the Ledger.
+**One honest trade.** With network and model time removed, the throughput
+ceiling of a city is the throughput ceiling of its Ledger. That is the
+price of "the Ledger is the only history", stated in the open. The first
+wall is one this city sets itself: a building working towards a goal drives
+four runs at a time, because a lane past the provider's own admission
+ceiling would only park a thread there. Then come the walls outside:
+provider-side rate limits, Ledger fsync, worktree disk, file-descriptor
+limits, then the blocking pool. RAM is not among them. **Runs are driven in
+parallel and accounted for in series** — every line a lane writes crosses to
+the one thread that owns the Ledger and waits there — so concurrency buys
+model time back and buys nothing from the Ledger.
 
 ## 12 Module map
+
+
+**This section is the machine's data face, and a reader does not read it
+through.** It answers one question at a time — *what owns this file*, *what
+shape is this module*, *which SPEC settles it* — and a search for the
+module you are touching is the way to use it. Everything a person needs to
+form a mental model is in §1 to §11.
 
 The machine's data face, parsed by `cargo xtask modmap`: a `.rs` file under `crates/*/src` that is not in this table turns CI red, and so does a row whose file is missing. `lib.rs` and pure index files are exempt because they hold no logic — that too is checked.
 
@@ -1093,7 +1345,28 @@ Not a workspace member, and excluded in the root manifest on purpose: `unsafe_co
 
 ## 13 Changing this document
 
-- **Structure is add-only.** The topology in §3, the seam list in §4, the shape set in §9 and the module map's column contract change only with an explicit ruling, recorded in the commit that changes them. The seventh column, `Spec`, sits at the end, where it leaves every other column's position alone.
-- **A rejected alternative is recorded where the decision lives**, in the crate's SPEC, rather than in a separate register of regrets.
-- **Adding a module row is the registration step**: the row lands in the same change as the file, before it is written.
-- **Removing a module row requires a ruling** — `cargo xtask guard` refuses the commit otherwise, because a row that quietly disappears is a rule that quietly stops being enforced.
+- **This document is as long as the system is complicated, never as long
+  as the project is old.** What belongs here is what is true *across
+  modules today*. A rule that governs one module belongs to that module's
+  SPEC and its rustdoc; the history of a decision — what was tried, what a
+  gate once caught — belongs beside the thing it constrains, so that
+  retiring the thing retires the record. Anything whose length grows with
+  the calendar rather than with the design has another home, and that is
+  what keeps *read this before you start* a reasonable instruction.
+- **A rejected alternative is recorded where the decision lives**, in the
+  crate's SPEC, rather than in a separate register of regrets.
+- **Three kinds of statement, and a reader may tell them apart.** A figure
+  between `xtask:begin` markers is written from the code by
+  `cargo xtask docnum` and cannot drift. A table marked **machine
+  authority** is parsed by a gate, so a disagreement with the code is a red
+  build. Everything else is prose a person maintains — and where it
+  contradicts the code, the code is right and this document is the defect.
+- **Structure is add-only.** The topology in §3, the seam list in §4, the
+  shape set in §9 and the module map's column contract change only with an
+  explicit ruling, recorded in the commit that changes them.
+- **Adding a module row is the registration step**: the row lands in the
+  same change as the file, before it is written.
+- **Removing a module row requires a ruling** — `cargo xtask guard`
+  refuses the commit otherwise, because a row that quietly disappears is a
+  rule that quietly stops being enforced.
+
