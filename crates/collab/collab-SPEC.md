@@ -32,7 +32,7 @@
 
 ## 5 权威信源
 
-「多 Agent」的语义（一层深、干预五动词、**实现者不自测**、为什么赌多 Agent 的六条及其判负条件）；ARCHITECTURE.md §12 模块图的 collab 段与 §9 七形状；`kernel-SPEC.md` 的 goal／repair／delegation 章。
+「多 Agent」的语义（一层深、干预五动词、**实现者不自测**、为什么赌多 Agent 的六条及其判负条件）；`architecture.toml` 里 collab 那些条目与 §9 七形状；`kernel-SPEC.md` 的 goal／repair／delegation 章。
 
 ## 6 命名统一
 

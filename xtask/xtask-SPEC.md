@@ -11,7 +11,7 @@
 |---|---|
 | header | 每个 `.rs` 前四行恒为 MPL-2.0 通告加版权行，且整份文件只出现这一次 |
 | lexicon | 禁用词命中即红；数据面 `xtask/lexicon.toml` |
-| modmap | `crates/**/src/**/*.rs` ↔ ARCHITECTURE.md 模块表（§12）一一对应；状态列一致性；索引文件零逻辑 |
+| modmap | `crates/**/src/**/*.rs` ↔ `architecture.toml` 一一对应；状态一致性；`owns` 非空；索引文件零逻辑 |
 | depmap | crate 依赖边 ⊆ depmap 围栏块；`pub trait` 仅现于**缝那一节**里那张表列出的文件（节由 `architecture` 切出，不按表的形状认表） |
 | guard | 改动门自身、又同时改动门所判源码的提交，必须携 `Verdict:` 尾注；且墙外那份 `desktop/` 的 lint 表、包元数据与共享依赖版本与工作区逐键相等 |
 | wording | 读者拿到的词出自短语表 `client/src/lang.json`：`client/src` 的 `.tsx` 里文本节点与朗读型属性的字面量，`.ts` 里拒绝三段（`action`／`subject`／`recovery`／`reason`）与造 `AxError` 的函数的实参，去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名；生成的文件由它的生成器作证 |
@@ -76,7 +76,7 @@
 
 ## 5 权威信源
 
-硬化十七条；门表（AGENTS.md）；施工协议（AGENTS.md）；MPL 头全文（`LICENSE`）；退役词全集（`xtask/lexicon.toml`）；ARCHITECTURE.md §3（depmap 块）、§4（缝清单）、§12（模块图列契约）。
+硬化十七条；门表（AGENTS.md）；施工协议（AGENTS.md）；MPL 头全文（`LICENSE`）；退役词全集（`xtask/lexicon.toml`）；ARCHITECTURE.md §3（depmap 块）、§4（缝清单）；`architecture.toml`（模块图字段契约）。
 
 ## 6 命名统一
 
@@ -84,7 +84,7 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 
 ## 7 模块边界
 
-判定面一门一文件，`features` 是唯一的例外：它跑编译器而不读源码，判定就是那条命令的退出码，故它没有自己的模块，与它所附属的 `gates` 同住 `gates.rs`（`default_features`）。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。此处只说明每道门判什么：不抄一份名册，也不写它们有几道，因为手写的名册与数组相隔一次代码改动而不是一个 token（产品文档写过「ten gates」而树上跑十二道）。要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates --list`；要知道有几道门，读 §12 那对受管标记。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字，与按 `## N 标题` 切节这一个读法：`section` 被 `modmap` 与 `depmap` 调用；`specalign` 经 `modmap::anchors` 吃同一份读法的产物，`proof` 只取 `PATH`、自己逐行读它与 `kani harness` 相邻的那个数，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `proof` 共用的词形与计数读法，`lexicon` 另用它把文档里的门数与 `COUNT` 对账）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
+判定面一门一文件，`features` 是唯一的例外：它跑编译器而不读源码，判定就是那条命令的退出码，故它没有自己的模块，与它所附属的 `gates` 同住 `gates.rs`（`default_features`）。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。此处只说明每道门判什么：不抄一份名册，也不写它们有几道，因为手写的名册与数组相隔一次代码改动而不是一个 token（产品文档写过「ten gates」而树上跑十二道）。要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates --list`；要知道有几道门，读 §12 那对受管标记。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字，与按 `## N 标题` 切节这一个读法：`section` 只被 `depmap` 调用（模块图迁入 `architecture.toml` 后 `modmap` 不再按节定位）；`specalign` 经 `modmap::anchors` 吃 TOML 那侧的产物，`proof` 只取 `PATH`、自己逐行读它与 `kani harness` 相邻的那个数，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `proof` 共用的词形与计数读法，`lexicon` 另用它把文档里的门数与 `COUNT` 对账）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——列格式一变，只有一处要改。
 
@@ -192,7 +192,7 @@ MPL 头四行（通告三行加版权一行），且判据是「整份文件只�
 
 ## 15 影响面
 
-CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（缝表）、§12（模块表）的表格式即本 crate 的解析契约（列契约已标〔冻〕）。改表格式＝改本 crate。
+CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（缝表）的表格式，与 `architecture.toml` 的字段名，即本 crate 的解析契约（列契约已标〔冻〕）。改表格式＝改本 crate。
 
 ## 16 测试与约束
 
@@ -434,7 +434,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 
 **带省略号的体是指路牌，不是名单，整名跳过。** `AxCode` 与 `EventKind` 写作 `{ PathNotFound, /* …36 variant */ }`，说的是名单在别处，而那个别处正是 §8-1 与 §8-4 两张表——本门的前两条断言已经逐 variant 对过它们。体内出现 `…` 即跳过该名，于是没有人被教着去替 SPEC 补全一处它故意写短的缩写；`ContentBlock` 的增补卡同理。**首次落地即发现一处真分叉**：SPEC 把 `SecretCharset` 的第四个变体写成 `Base36Lower`，kernel 编译的是 `UpperBase36`（`secret/scan.rs` 判的是「大写＋数字」），SPEC 那侧改了一个词。
 
-**modmap 增一条断言：§12 每个小节标题里的数，等于该小节的行数。** 标题写作 `### kernel (73) — …`，括号里的数就是这个 crate 在册的模块文件数；一个标题可以带多组（`### browser (6), protocol (5), bin (111)`），每组按模块列的前缀分别计数。这条不是新规矩而是既有规矩的一次落实：xtask-SPEC §10-5 已经写下「能被机器数出来的数不由文档手写」，而这些数当时没有机器数，于是十三个里有九个是错的。
+**模块图迁入 `architecture.toml`，小节计数那条断言随之取消。** 它守的是「标题 `### kernel (73) — …` 括号里的数等于该节行数」——一个由人手写、由门核对的数，落地时十三个里有九个是错的。结构化文件没有小节也没有位置，数目由条目本身给出，于是 §10-5「能被机器数出来的数不由文档手写」在这里以更彻底的方式成立：那个数不再被写出来。
 
 ### 8-11 `package` 认目标三元组：一份产物住哪里，叫什么名字（形状 2 值）
 

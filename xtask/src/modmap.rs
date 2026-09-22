@@ -3,25 +3,36 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Module-table gate (redline C4). The table in ARCHITECTURE.md section 12 is a
-//! closed list: every `.rs` under `crates/*/src` is either a registered module,
-//! a `lib.rs`, or a pure index file. Status coherence is checked both ways —
-//! a file that exists while its row still says planned means the builder skipped
-//! the "flip the status" leg of the completion evidence.
+//! Module-map gate (redline C4). `architecture.toml` is a closed list:
+//! every `.rs` under `crates/*/src` is either a registered module, a
+//! `lib.rs`, or a pure index file. Status coherence is checked both ways —
+//! a file that exists while its entry still says planned means the builder
+//! skipped the "flip the status" leg of the completion evidence.
+//!
+//! **The map is data, and used to be prose.** It was a seven-column table
+//! inside `ARCHITECTURE.md`, which cost that document seven hundred lines
+//! nobody reads through and gave every entry a *position* that a person
+//! maintained: each heading stated how many rows sat under it, and that
+//! count could go stale while the rows were right. A structured file has
+//! no positions to keep, and a reader can ask it for one module instead of
+//! scanning for one.
+//!
+//! **`lib.rs` and pure index files are exempt, and that exemption is
+//! checked** rather than trusted: an index file may hold declarations and
+//! nothing else, so exempting it costs no coverage.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use crate::architecture::{self, Numbered};
+use serde::Deserialize;
+
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-use architecture::PATH as ARCH;
-
-/// The section the module table is written in. Read through
-/// `architecture` so that a row is recognised by where it sits rather
-/// than by having seven cells wherever somebody wrote it.
-const MODULE_SECTION: u32 = 12;
+/// The module map. This gate is its only reader, so a field change breaks
+/// one place (xtask-SPEC.md section 8-10); `specalign` names the file when
+/// reporting an anchor it could not resolve.
+pub(crate) const MAP: &str = "architecture.toml";
 /// The status column, in the language the table is written in. It moved
 /// from Chinese to English when the module table became part of what the
 /// repository publishes: a reader of `ARCHITECTURE.md` should not have to
@@ -29,8 +40,8 @@ const MODULE_SECTION: u32 = 12;
 const STATUS_PLANNED: &str = "planned";
 const STATUSES: [&str; 4] = [STATUS_PLANNED, "building", "built", "frozen"];
 
-/// Line prefixes allowed in `lib.rs` and pure index files (single-line
-/// declarations only; a style constraint recorded in ARCHITECTURE.md section 12).
+/// Line prefixes allowed in `lib.rs` and pure index files: single-line
+/// declarations only, which is what makes exempting them free.
 const INDEX_PREFIXES: [&str; 8] = [
     "//",
     "#![",
@@ -42,50 +53,69 @@ const INDEX_PREFIXES: [&str; 8] = [
     "use ",
 ];
 
+/// One module's entry, exactly as the map spells it.
+///
+/// `owns` is read only to refuse an empty one: an entry that does not say
+/// what its module is for has stopped being worth its line. `since` is
+/// carried by the file for a person and by no field here, because no gate
+/// has a use for the stage a module arrived in.
+#[derive(Deserialize)]
+struct Entry {
+    name: String,
+    file: String,
+    owns: String,
+    shape: String,
+    status: String,
+    spec: String,
+}
+
+#[derive(Deserialize)]
+struct Map {
+    module: Vec<Entry>,
+}
+
 struct Row {
     module: String,
     path: String,
     shape: String,
     status: String,
     spec: String,
-    line: usize,
 }
 
-/// One module's claim about where its interface is specified: the raw
-/// seventh cell, with the row it came from.
+/// One module's claim about where its interface is specified.
 ///
 /// Handed to `specalign`, which is the gate that owns "a SPEC says what
-/// the code says". This parser stays the module table's only reader
-/// (xtask-SPEC.md section 8-10), so a column change breaks one place.
+/// the code says". This gate stays the map's only reader (xtask-SPEC.md
+/// section 8-10), so a field change breaks one place. The module names
+/// itself rather than carrying a line number: an entry is found by name in
+/// a structured file, and a name does not move when the file is reordered.
 pub(crate) struct Anchor {
     pub(crate) module: String,
     pub(crate) spec: String,
-    pub(crate) line: usize,
 }
 
-/// The module table's lines, each with the number it has in the
-/// document.
+/// The map, parsed.
 ///
 /// # Errors
-/// When the document has no module map: a gate whose authority has moved
-/// says so rather than reporting every file in the tree as unregistered.
-fn module_map(text: &str) -> Result<Vec<Numbered<'_>>, XtaskError> {
-    architecture::section(text, MODULE_SECTION).ok_or_else(|| XtaskError::Doc {
-        file: ARCH.to_owned(),
-        msg: format!("no `## {MODULE_SECTION}` section, which is where the module table lives"),
+/// When the file is missing or will not parse: a gate whose authority has
+/// moved says so rather than reporting every file in the tree as
+/// unregistered.
+fn read_map(root: &Path) -> Result<Map, XtaskError> {
+    let text = walk::read_text(&root.join(MAP))?;
+    toml::from_str(&text).map_err(|err| XtaskError::Doc {
+        file: MAP.to_owned(),
+        msg: err.to_string(),
     })
 }
 
-/// Every registered module's `Spec` cell, in table order.
+/// Every registered module's `spec`, in the order the map states them.
 pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
-    let text = walk::read_text(&root.join(ARCH))?;
     let mut ignored = Vec::new();
-    Ok(parse_rows(&module_map(&text)?, &mut ignored)
+    Ok(rows(&read_map(root)?, &mut ignored)
         .into_iter()
         .map(|row| Anchor {
             module: row.module,
             spec: row.spec,
-            line: row.line,
         })
         .collect())
 }
@@ -97,19 +127,16 @@ pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
 /// module table has one reader, so a change to its columns breaks one
 /// place.
 pub(crate) fn shapes(root: &Path) -> Result<BTreeMap<String, String>, XtaskError> {
-    let text = walk::read_text(&root.join(ARCH))?;
     let mut ignored = Vec::new();
-    Ok(parse_rows(&module_map(&text)?, &mut ignored)
+    Ok(rows(&read_map(root)?, &mut ignored)
         .into_iter()
         .map(|row| (row.path, row.shape))
         .collect())
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let text = walk::read_text(&root.join(ARCH))?;
-    let map = module_map(&text)?;
     let mut violations = Vec::new();
-    let rows = parse_rows(&map, &mut violations);
+    let rows = rows(&read_map(root)?, &mut violations);
 
     let table: BTreeMap<&str, &Row> = rows.iter().map(|row| (row.path.as_str(), row)).collect();
     // Directories that hold registered modules; `<dir>.rs` is then an index file.
@@ -130,12 +157,12 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                 violations.push(Violation {
                     gate: "modmap",
                     location: rel,
-                    rule: "completion evidence includes flipping the module status \
-                           (ARCHITECTURE.md section 12)"
-                        .to_owned(),
+                    rule: format!(
+                        "completion evidence includes flipping the module status ({MAP})"
+                    ),
                     violation: format!(
-                        "file exists but its row (line {}) still says {STATUS_PLANNED}",
-                        row.line
+                        "file exists but the entry for {} still says {STATUS_PLANNED}",
+                        row.module
                     ),
                     alternative: "flip the status in the same change-set, or delete the file"
                         .to_owned(),
@@ -147,32 +174,25 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             violations.push(Violation {
                 gate: "modmap",
                 location: rel,
-                rule: format!(
-                    "the module table is a closed list (ARCHITECTURE.md section \
-                     {MODULE_SECTION}, C4)"
-                ),
-                violation: "file is not registered in the module table".to_owned(),
+                rule: format!("the module map is a closed list ({MAP}, C4)"),
+                violation: "file is not registered in the module map".to_owned(),
                 alternative: format!(
-                    "register the module (name/duty/stage/shape) in section \
-                     {MODULE_SECTION} first, or delete the file"
+                    "add an entry (name/file/owns/shape/since/status/spec) to {MAP} \
+                     first, or delete the file"
                 ),
             });
         }
     }
 
-    check_counts(&map, &rows, &mut violations);
-
     for row in &rows {
         if row.status != STATUS_PLANNED && !on_disk.contains(&row.path) {
             violations.push(Violation {
                 gate: "modmap",
-                location: format!("{ARCH}:{}", row.line),
-                rule: format!(
-                    "a non-planned status claims the file exists (section {MODULE_SECTION})"
-                ),
+                location: format!("{MAP}: {}", row.module),
+                rule: "a non-planned status claims the file exists".to_owned(),
                 violation: format!("{} is marked {} but missing on disk", row.path, row.status),
                 alternative: format!(
-                    "create {} or set the row back to {STATUS_PLANNED}",
+                    "create {} or set the entry back to {STATUS_PLANNED}",
                     row.path
                 ),
             });
@@ -181,139 +201,62 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// A module row has exactly seven data cells, a `crates/**.rs` path in cell 2,
-/// `::` in cell 1, and a known status in cell 6. Seam-table rows (four cells)
-/// and card checklists (not pipe rows) never match (xtask-SPEC.md section 10-2).
-/// The seventh cell is `Spec`; it sits last so the shape and status
-/// positions do not move.
-fn parse_rows(map: &[Numbered], violations: &mut Vec<Violation>) -> Vec<Row> {
+/// The entries this gate judges: a `::` in the name, a `crates/**.rs`
+/// file, a known status, an `owns` that says something, and one entry per
+/// file.
+///
+/// An entry whose file sits outside `crates/` is carried by the map for a
+/// reader and skipped here, because the walk below only reaches `crates/`
+/// \u2014 `desktop` is built out of tree and its files are not this gate's to
+/// judge.
+fn rows(map: &Map, violations: &mut Vec<Violation>) -> Vec<Row> {
     let mut rows = Vec::new();
-    let mut seen: BTreeMap<String, usize> = BTreeMap::new();
-    for numbered in map {
-        let (line_no, line) = (numbered.line, numbered.text);
-        if !line.trim_start().starts_with('|') {
+    let mut seen: BTreeMap<&str, &str> = BTreeMap::new();
+    for entry in &map.module {
+        let (name, file) = (entry.name.as_str(), entry.file.as_str());
+        if !name.contains("::") || !file.starts_with("crates/") || !file.ends_with(".rs") {
             continue;
         }
-        let cells: Vec<&str> = line.split('|').map(str::trim).collect();
-        if cells.len() != 9 {
-            continue;
-        }
-        let (module, path, shape, status, spec) = match (
-            cells.get(1),
-            cells.get(2),
-            cells.get(4),
-            cells.get(6),
-            cells.get(7),
-        ) {
-            (Some(m), Some(p), Some(h), Some(s), Some(k)) => (*m, *p, *h, *s, *k),
-            _ => continue,
-        };
-        if !module.contains("::") || !path.starts_with("crates/") || !path.ends_with(".rs") {
-            continue;
-        }
-        if !STATUSES.contains(&status) {
+        if !STATUSES.contains(&entry.status.as_str()) {
             violations.push(Violation {
                 gate: "modmap",
-                location: format!("{ARCH}:{line_no}"),
-                rule: "status is one of planned|building|built|frozen (the module-table \
-                       column contract)"
-                    .to_owned(),
-                violation: format!("row for {path} has status {status:?}"),
+                location: format!("{MAP}: {name}"),
+                rule: "status is one of planned|building|built|frozen".to_owned(),
+                violation: format!("entry for {file} has status {:?}", entry.status),
                 alternative: "use a value from the status enum".to_owned(),
             });
             continue;
         }
-        if let Some(first) = seen.get(path) {
+        if entry.owns.trim().is_empty() {
             violations.push(Violation {
                 gate: "modmap",
-                location: format!("{ARCH}:{line_no}"),
-                rule: format!("one module, one row (section {MODULE_SECTION})"),
-                violation: format!("{path} already registered at line {first}"),
-                alternative: "merge the duplicate rows".to_owned(),
+                location: format!("{MAP}: {name}"),
+                rule: "an entry says what its module owns".to_owned(),
+                violation: format!("{name} has an empty `owns`"),
+                alternative: "state the duty in one clause, or delete the entry".to_owned(),
             });
             continue;
         }
-        seen.insert(path.to_owned(), line_no);
+        if let Some(first) = seen.get(file) {
+            violations.push(Violation {
+                gate: "modmap",
+                location: format!("{MAP}: {name}"),
+                rule: "one module, one entry".to_owned(),
+                violation: format!("{file} is already registered as {first}"),
+                alternative: "merge the duplicate entries".to_owned(),
+            });
+            continue;
+        }
+        seen.insert(file, name);
         rows.push(Row {
-            module: module.to_owned(),
-            path: path.to_owned(),
-            shape: shape.to_owned(),
-            status: status.to_owned(),
-            spec: spec.to_owned(),
-            line: line_no,
+            module: entry.name.clone(),
+            path: entry.file.clone(),
+            shape: entry.shape.clone(),
+            status: entry.status.clone(),
+            spec: entry.spec.clone(),
         });
     }
     rows
-}
-
-/// The crate names a module-map subheading counts, each with the number it
-/// claims: `### browser (6), protocol (5), bin (111)` yields three pairs.
-///
-/// A word immediately followed by ` (<digits>)` is a claim; anything else in
-/// the heading is prose. Nothing else in this document writes that shape.
-fn counted_crates(heading: &str) -> Vec<(String, usize)> {
-    let mut pairs = Vec::new();
-    let mut rest = heading;
-    while let Some(open) = rest.find(" (") {
-        let (before, after) = rest.split_at(open);
-        let tail = after.get(2..).unwrap_or_default();
-        let Some(close) = tail.find(')') else { break };
-        let inside = tail.get(..close).unwrap_or_default();
-        let name = before.rsplit([' ', ',']).next().unwrap_or_default();
-        if let Ok(count) = inside.parse::<usize>()
-            && !name.is_empty()
-            && name.chars().all(|c| c.is_ascii_lowercase() || c == '_')
-        {
-            pairs.push((name.to_owned(), count));
-        }
-        rest = tail.get(close..).unwrap_or_default();
-    }
-    pairs
-}
-
-/// Every number a module-map subheading states equals the rows under it.
-///
-/// A count a person maintains by hand is a count that has already gone
-/// stale: nine of the thirteen were wrong when this assertion landed
-/// (xtask-SPEC.md section 8-10). `desktop` is out of the parser's reach —
-/// its rows carry `desktop/` paths, which `parse_rows` does not admit —
-/// so its heading is not judged here.
-fn check_counts(map: &[Numbered], rows: &[Row], violations: &mut Vec<Violation>) {
-    let mut heading: Option<(usize, String)> = None;
-    let mut sections: Vec<(usize, usize, String)> = Vec::new();
-    for numbered in map {
-        if let Some(title) = numbered.text.strip_prefix("### ") {
-            if let Some((at, previous)) = heading.take() {
-                sections.push((at, numbered.line, previous));
-            }
-            heading = Some((numbered.line, title.to_owned()));
-        }
-    }
-    if let Some((at, title)) = heading {
-        sections.push((at, usize::MAX, title));
-    }
-
-    for (start, end, title) in sections {
-        for (name, claimed) in counted_crates(&title) {
-            let prefix = format!("{name}::");
-            let actual = rows
-                .iter()
-                .filter(|row| row.line > start && row.line < end && row.module.starts_with(&prefix))
-                .count();
-            if actual == 0 || actual == claimed {
-                continue;
-            }
-            violations.push(Violation {
-                gate: "modmap",
-                location: format!("{ARCH}:{start}"),
-                rule: "a subheading's count equals the rows under it \
-                       (xtask-SPEC.md section 8-10)"
-                    .to_owned(),
-                violation: format!("heading says {name} ({claimed}), the table has {actual}"),
-                alternative: format!("write {name} ({actual})"),
-            });
-        }
-    }
 }
 
 fn is_index_name(rel: &str, index_dirs: &BTreeSet<String>) -> bool {
@@ -338,10 +281,9 @@ fn check_index_content(
             violations.push(Violation {
                 gate: "modmap",
                 location: format!("{rel}:{}", index.saturating_add(1)),
-                rule: format!(
-                    "index files hold declarations only — comments, attributes, \
-                     mod, use (ARCHITECTURE.md section {MODULE_SECTION})"
-                ),
+                rule: "index files hold declarations only — comments, attributes, \
+                       mod, use"
+                    .to_owned(),
                 violation: format!("logic line in an index file: {line:?}"),
                 alternative: "move the logic into a registered module".to_owned(),
             });

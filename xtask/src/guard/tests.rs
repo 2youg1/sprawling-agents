@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use super::{gate_faces, is_protected, judged_faces, row_path, strikes_only_exemptions};
+use super::{entry_file, gate_faces, is_protected, judged_faces, strikes_only_exemptions};
 
 fn paths(list: &[&str]) -> Vec<String> {
     list.iter().map(|p| (*p).to_owned()).collect()
@@ -134,14 +134,20 @@ fn the_judged_side_of_a_refusal_is_bounded() {
 }
 
 #[test]
-fn status_flip_is_not_a_row_removal() {
-    // A flipped status deletes and re-adds the same path.
-    let removed = row_path("| kernel::gate | crates/kernel/src/gate.rs | x | 8.2 | S2 | 未建 |");
-    let added = row_path("| kernel::gate | crates/kernel/src/gate.rs | x | 8.2 | S2 | 已建 |");
+fn a_status_flip_is_not_an_entry_removal() {
+    // A flipped status deletes and re-adds the same file.
+    let removed = entry_file(
+        r#"  { name = "kernel::gate", file = "crates/kernel/src/gate.rs", status = "planned" },"#,
+    );
+    let added = entry_file(
+        r#"  { name = "kernel::gate", file = "crates/kernel/src/gate.rs", status = "built" },"#,
+    );
     assert_eq!(removed, added);
     assert!(removed.is_some());
-    // Prose mentioning crates/ is not a row.
-    assert_eq!(row_path(" see crates/kernel/src/gate.rs "), None);
+    // Prose mentioning crates/ carries no `file =`, so it is not an entry.
+    assert_eq!(entry_file(" see crates/kernel/src/gate.rs "), None);
+    // Nor is an entry whose file sits outside the tree this gate walks.
+    assert_eq!(entry_file(r#"{ file = "desktop/src/shell.rs" }"#), None);
 }
 
 #[test]

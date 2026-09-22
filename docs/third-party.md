@@ -29,7 +29,7 @@ Signing in to a provider requires knowing four things: the authorization endpoin
 > the five columns of every row above - the repository out of the project
 > link, and the watch path and the tracked commit out of the last two cells.
 > The column shape is fixed and the prose around it is not (cf.
-> ARCHITECTURE.md §3, §12 tables).
+> ARCHITECTURE.md §3's table and `architecture.toml`).
 
 **One row is one watched path, which is why codex has three and grok-build has three.** The workflow sends the fourth cell to the commits API as a single path, so a cell naming two paths would ask GitHub for a path that does not exist, and a run that asks for nothing gets nothing rather than saying so. Two paths therefore mean two rows with two watermarks. The cost is named here rather than discovered later: the workflow suppresses a second issue for a repository that already has one open, so when two paths of one repository move at once, the second is reported only after the first issue is closed. That cost grows with each row a repository gains, and it is paid deliberately: a path nobody watches is a constant that goes stale without a signal.
 

@@ -20,7 +20,7 @@ S0 三件：①CLI 壳（`status` 可用；未到期的子命令给出诚实拒�
 
 ## 5 权威信源
 
-bin 子命令面；装配层是 Main；ARCHITECTURE.md §2（客户端嵌入链）与 §12（模块图的 bin 段）。
+bin 子命令面；装配层是 Main；ARCHITECTURE.md §2（客户端嵌入链）与 `architecture.toml`（模块图里 bin 段那些条目）。
 
 ## 6 命名统一
 
@@ -604,7 +604,7 @@ pub fn key_for(bind: SocketAddr, configured: Option<String>) -> Result<Keyed, Ax
 ## 8-24 一条效应先成为账本行，再成为这座城
 
 ```rust
-// crates/sprawling/src/effect.rs —— ARCHITECTURE.md §12 bin::effect，形状 2（值类型）
+// crates/sprawling/src/effect.rs —— `architecture.toml` 的 bin::effect，形状 2（值类型）
 pub(crate) struct Line { who: String, addr: Address, kind: EventKind, data: Payload }
 
 /// 一张桌子留下的全部效应：它们成为的行，以及行之后才允许发生的变化。
@@ -1045,7 +1045,7 @@ justfile／CI 无涉；S4 前端框架结论书将改写 build.rs 拷贝源与 `
 
 ## 18 文档同步
 
-子命令每扩一个：本 SPEC 增章、ARCHITECTURE.md §12 状态翻转、CLI 三栏表核对。
+子命令每扩一个：本 SPEC 增章、`architecture.toml` 状态翻转、CLI 三栏表核对。
 
 交付形态入册：`just package` 的产物名、`QUICKSTART.md`、README 与 `docs/getting-started.md` 的首次运行段、`release.yml` 的附件清单，五处同改。
 

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Guard gate: the gates guard themselves. A commit that changes gate
-//! machinery (xtask/, lint config, CI, the justfile) or deletes a module-table
+//! machinery (xtask/, lint config, CI, the justfile) or deletes a module-map
 //! row **in the same commit as the source those gates judge** must carry a
 //! `Verdict:` trailer quoting the user's ruling — this closes the "loosen the
 //! gate to pass the gate" shortcut: fix the cause, not the gate.
@@ -35,6 +35,7 @@
 use std::path::Path;
 use std::process::Command;
 
+use crate::modmap::MAP;
 use crate::report::{Violation, XtaskError};
 
 mod wall;
@@ -109,8 +110,7 @@ fn history(root: &Path, range: Option<&str>) -> Result<Vec<Violation>, XtaskErro
     for sha in &commits {
         let files = changed_paths(root, sha)?;
         let message = git_text(root, &["show", "-s", "--format=%B", sha])?;
-        let removes_a_row =
-            files.iter().any(|f| f == "ARCHITECTURE.md") && deletes_module_row(root, sha)?;
+        let removes_a_row = files.iter().any(|f| f == MAP) && deletes_module_entry(root, sha)?;
         let strike = files.iter().any(|f| f == REGISTER)
             && strikes_only_exemptions(&git_text(
                 root,
@@ -168,7 +168,7 @@ fn gate_faces(files: &[String], removes_a_module_row: bool, register_strike: boo
         .cloned()
         .collect();
     if removes_a_module_row {
-        faces.push("ARCHITECTURE.md (module-table row deletion)".to_owned());
+        faces.push(format!("{MAP} (module entry deletion)"));
     }
     faces
 }
@@ -278,17 +278,17 @@ fn exemption_row(line: &str) -> Option<Row<'_>> {
 /// in a deleted diff line and in no added line. A status flip shows up as
 /// delete-plus-add of the same path — the most common legal edit — and must
 /// not demand a ruling (xtask-SPEC.md section 10-4).
-fn deletes_module_row(root: &Path, sha: &str) -> Result<bool, XtaskError> {
-    let diff = git_text(root, &["show", "--format=", sha, "--", "ARCHITECTURE.md"])?;
+fn deletes_module_entry(root: &Path, sha: &str) -> Result<bool, XtaskError> {
+    let diff = git_text(root, &["show", "--format=", sha, "--", MAP])?;
     let mut removed: Vec<String> = Vec::new();
     let mut added: Vec<String> = Vec::new();
     for line in diff.lines() {
         if let Some(rest) = line.strip_prefix('-')
-            && let Some(path) = row_path(rest)
+            && let Some(path) = entry_file(rest)
         {
             removed.push(path);
         } else if let Some(rest) = line.strip_prefix('+')
-            && let Some(path) = row_path(rest)
+            && let Some(path) = entry_file(rest)
         {
             added.push(path);
         }
@@ -296,17 +296,14 @@ fn deletes_module_row(root: &Path, sha: &str) -> Result<bool, XtaskError> {
     Ok(removed.iter().any(|path| !added.contains(path)))
 }
 
-/// Extract the module-row path (cell 2) from a table line, if it is one.
-fn row_path(line: &str) -> Option<String> {
-    let mut cells = line.split('|').map(str::trim);
-    let _leading = cells.next()?;
-    let first = cells.next()?;
-    let second = cells.next()?;
-    if first.contains("::") && second.starts_with("crates/") && second.ends_with(".rs") {
-        Some(second.to_owned())
-    } else {
-        None
-    }
+/// The `file` an entry names, if this line is one.
+///
+/// Read by hand rather than by parsing the file: a diff hunk is not a
+/// document, and one side of it does not parse as TOML.
+fn entry_file(line: &str) -> Option<String> {
+    let after = line.split_once("file = \"")?.1;
+    let path = after.split_once('"')?.0;
+    (path.starts_with("crates/") && path.ends_with(".rs")).then(|| path.to_owned())
 }
 
 /// The paths one commit touches (added, removed or edited).

@@ -48,8 +48,16 @@ pub(super) fn resolve(from: &str, target: &str) -> String {
     for segment in target.split('/') {
         match segment {
             "." | "" => {}
+            // A `..` with nothing left to consume points outside the
+            // repository. Dropping it silently resolved such a link to a
+            // path that happens to exist — `ARCHITECTURE.md` plus
+            // `../docs/glossary.md` became `docs/glossary.md` — so the
+            // gate passed seven links that are 404 for every reader. The
+            // segment is kept instead, and no published path spells one.
             ".." => {
-                parts.pop();
+                if parts.pop().is_none() {
+                    parts.push("..");
+                }
             }
             other => parts.push(other),
         }

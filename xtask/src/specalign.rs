@@ -26,7 +26,7 @@ use crate::walk;
 mod enums;
 
 const SPEC_PATH: &str = "crates/kernel/kernel-SPEC.md";
-use crate::architecture::PATH as ARCH;
+use crate::modmap::MAP;
 
 fn violation(rule: &str, violation: String, alternative: &str) -> Violation {
     Violation {
@@ -76,7 +76,7 @@ fn spec_carrier(cell: &str) -> String {
 }
 
 /// Where a `<crate>-SPEC.md` cell resolves to on disk. `desktop` sits
-/// outside `crates/` on purpose (ARCHITECTURE.md section 12), so its one
+/// outside `crates/` on purpose (`architecture.toml`), so its one
 /// exception is spelled here rather than guessed from the name.
 fn spec_file(crate_name: &str) -> PathBuf {
     if crate_name == "desktop" {
@@ -119,7 +119,7 @@ pub(crate) fn section_present(spec: &str, section: &str) -> bool {
 fn check_anchors(root: &Path, violations: &mut Vec<Violation>) -> Result<(), XtaskError> {
     let mut loaded: BTreeMap<String, Option<String>> = BTreeMap::new();
     for anchor in modmap::anchors(root)? {
-        let at = format!("{ARCH}:{}", anchor.line);
+        let at = format!("{MAP}: {}", anchor.module);
         let Some((file, section)) = anchor.spec.split_once('#') else {
             violations.push(Violation {
                 gate: "specalign",

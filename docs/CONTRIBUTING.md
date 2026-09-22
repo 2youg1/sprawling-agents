@@ -30,7 +30,7 @@ Two places where this is a hard requirement, because both have moved recently:
 
 Then read, in order: this file, `ARCHITECTURE.md` (what the code is made of and why it has this shape), `crates/<crate>/<crate>-SPEC.md` for the crate you are touching (its interfaces and decisions, written before its code), `docs/glossary.md` (the vocabulary; the lexicon gate enforces it), and the tests next to the code you are about to touch.
 
-> **Everything that explains this code ships with it.** The module map and the seam list are sections of `ARCHITECTURE.md`, and each crate's SPEC sits beside that crate. The only thing kept back is one machine's working notes, which are in `.gitignore` and which nothing here may depend on.
+> **Everything that explains this code ships with it.** The seam list is a section of `ARCHITECTURE.md`, the module map is `architecture.toml` beside it, and each crate's SPEC sits beside that crate. The only thing kept back is one machine's working notes, which are in `.gitignore` and which nothing here may depend on.
 
 ## 2 The five steps of one change
 
@@ -38,7 +38,7 @@ Then read, in order: this file, `ARCHITECTURE.md` (what the code is made of and 
 2. **Write the SPEC first.** Interfaces and decisions land in the crate's SPEC before the code exists. A new module states which of the seven shapes it instantiates; when there is no answer, stop and ask rather than write.
 3. **Red.** Write the failing test and **run it once to see it fail**. That run is what tells you the test can bite.
 4. **Green.** Implement until it passes, no more. When the implementation wants to differ from the SPEC, change the SPEC first and then continue.
-5. **Close.** Four things, all of them: `just check` green | the red-to-green transition visible in the commit order | SPEC and code in step | the module map in `ARCHITECTURE.md` updated.
+5. **Close.** Four things, all of them: `just check` green | the red-to-green transition visible in the commit order | SPEC and code in step | the module map in `architecture.toml` updated.
 
 When a session ends with the work unfinished, write the remaining state — where you got to, what blocked you, what comes next — into the SPEC section it belongs to. A handoff that lives only in a person's head is a handoff that did not happen.
 

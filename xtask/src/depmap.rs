@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::Command;
 
-use crate::architecture::{self, Numbered};
+use crate::architecture;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
@@ -94,13 +94,13 @@ fn seam_files(text: &str) -> Result<BTreeSet<String>, XtaskError> {
     Ok(seams_in(&declared))
 }
 
-fn seams_in(declared: &[Numbered]) -> BTreeSet<String> {
+fn seams_in(declared: &[&str]) -> BTreeSet<String> {
     let mut set = BTreeSet::new();
     for line in declared {
-        if !line.text.trim_start().starts_with('|') {
+        if !line.trim_start().starts_with('|') {
             continue;
         }
-        let cells: Vec<&str> = line.text.split('|').map(str::trim).collect();
+        let cells: Vec<&str> = line.split('|').map(str::trim).collect();
         if cells.len() != 6 {
             continue;
         }
