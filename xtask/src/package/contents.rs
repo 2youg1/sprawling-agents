@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
 use crate::sbom;
+use crate::walk;
 
 /// One part of a release archive.
 ///
@@ -38,10 +39,15 @@ pub(super) enum Packaged {
     /// The CycloneDX bill of materials, so a person who wants to know
     /// what is inside the binary does not have to build it.
     Sbom,
+    /// The skills a release ships: `skills/`, walked as it stands. One
+    /// part rather than one row per skill, because the list of skills is
+    /// the directory's business and a closed per-file list here would be
+    /// a second home for it.
+    Skills,
 }
 
 /// Everything a release archive carries, in the order it is written.
-pub(super) const ARCHIVE: [Packaged; 4] = [
+pub(super) const ARCHIVE: [Packaged; 5] = [
     Packaged::Binary,
     Packaged::Document {
         name: "QUICKSTART.md",
@@ -51,6 +57,7 @@ pub(super) const ARCHIVE: [Packaged; 4] = [
         name: "LICENSE",
         source: "LICENSE",
     },
+    Packaged::Skills,
     Packaged::Sbom,
 ];
 
@@ -61,6 +68,10 @@ const EXECUTABLE_MODE: u32 = 0o755;
 
 /// Everything else is read, not run.
 const READABLE_MODE: u32 = 0o644;
+
+/// The name of the tree of skills, spelled once for the walk and for
+/// every entry name the walk produces.
+const SKILLS_DIR: &str = "skills";
 
 /// The release build this archive is assembled around: where it landed,
 /// and what the target it was built for calls it.
@@ -85,42 +96,45 @@ pub(super) struct Entry {
 pub(super) fn entries(root: &Path, binary: &Executable) -> Result<Vec<Entry>, XtaskError> {
     let mut out = Vec::new();
     for part in &ARCHIVE {
-        out.push(part.resolve(root, binary)?);
+        out.extend(part.resolve(root, binary)?);
     }
     Ok(out)
 }
 
 impl Packaged {
-    fn resolve(&self, root: &Path, binary: &Executable) -> Result<Entry, XtaskError> {
-        let entry = match *self {
-            Self::Binary => Entry {
+    fn resolve(&self, root: &Path, binary: &Executable) -> Result<Vec<Entry>, XtaskError> {
+        let entries = match *self {
+            Self::Binary => vec![Entry {
                 name: binary.name.to_owned(),
                 source: binary.path.to_path_buf(),
                 mode: EXECUTABLE_MODE,
-            },
-            Self::Document { name, source } => Entry {
+            }],
+            Self::Document { name, source } => vec![Entry {
                 name: name.to_owned(),
                 source: root.join(source),
                 mode: READABLE_MODE,
-            },
-            Self::Sbom => Entry {
+            }],
+            Self::Sbom => vec![Entry {
                 name: sbom_name()?,
                 source: root.join(sbom::SBOM),
                 mode: READABLE_MODE,
-            },
+            }],
+            Self::Skills => return skills(root),
         };
-        if entry.source.is_file() {
-            return Ok(entry);
+        for entry in &entries {
+            if !entry.source.is_file() {
+                return Err(XtaskError::Cmd {
+                    cmd: "package".to_owned(),
+                    msg: format!(
+                        "the archive carries {} and {} is not there; {}",
+                        entry.name,
+                        entry.source.display(),
+                        self.recovery()
+                    ),
+                });
+            }
         }
-        Err(XtaskError::Cmd {
-            cmd: "package".to_owned(),
-            msg: format!(
-                "the archive carries {} and {} is not there; {}",
-                entry.name,
-                entry.source.display(),
-                self.recovery()
-            ),
-        })
+        Ok(entries)
     }
 
     /// What a person does about this part being absent.
@@ -132,8 +146,47 @@ impl Packaged {
                                       archive in one change-set"
             }
             Self::Sbom => "run `just sbom`, or `just dist`, which ends with it",
+            Self::Skills => {
+                "restore `skills/` from the tree, or change this table and the archive in \
+                 one change-set"
+            }
         }
     }
+}
+
+/// Every file under `skills/`, one entry each, named `skills/<path>`.
+///
+/// Walked rather than listed: which skills a release carries is the
+/// directory's business, and `walk::files` already returns them sorted
+/// by relative path, so two packagings of one tree produce one archive.
+/// `skills/LICENSES.md` rides the same walk, which is how the licence
+/// text travels with the files it covers.
+///
+/// # Errors
+/// Refuses a tree with no `skills/` directory - the part is required
+/// like every other, and an archive that silently ships without the
+/// skills is the defect this table exists to prevent.
+fn skills(root: &Path) -> Result<Vec<Entry>, XtaskError> {
+    let dir = root.join(SKILLS_DIR);
+    if !dir.is_dir() {
+        return Err(XtaskError::Cmd {
+            cmd: "package".to_owned(),
+            msg: format!(
+                "the archive carries the skills and {SKILLS_DIR}/ is not there; restore the \
+                 directory from the tree, or change this table and the archive in one \
+                 change-set"
+            ),
+        });
+    }
+    let mut out = Vec::new();
+    for file in walk::files(&dir)? {
+        out.push(Entry {
+            name: format!("{SKILLS_DIR}/{}", walk::rel(&dir, &file)),
+            source: file,
+            mode: READABLE_MODE,
+        });
+    }
+    Ok(out)
 }
 
 /// The name the archive carries the bill of materials under: the last
@@ -157,13 +210,46 @@ fn sbom_name() -> Result<String, XtaskError> {
     reason = "test code"
 )]
 mod tests {
-    use super::{ARCHIVE, Executable, Packaged, entries};
+    use super::{ARCHIVE, Executable, Packaged, SKILLS_DIR, entries, skills};
     use crate::sbom::SBOM;
 
     fn repo_root() -> &'static std::path::Path {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .expect("xtask sits one level under the repository root")
+    }
+
+    /// The skills ride in the archive exactly as they stand on disk: the
+    /// list of skills is the directory's business, and a person who
+    /// unpacks a release finds them where the harnesses look.
+    #[test]
+    fn the_skills_ride_in_the_archive_under_their_own_paths() {
+        let dir = std::env::temp_dir().join(format!("sprawling-skills-{}", std::process::id()));
+        std::fs::remove_dir_all(&dir).ok();
+        let skill = dir.join("skills").join("alpha");
+        std::fs::create_dir_all(&skill).unwrap();
+        std::fs::write(skill.join("SKILL.md"), b"one").unwrap();
+        std::fs::write(dir.join("skills").join("LICENSES.md"), b"two").unwrap();
+
+        let found = skills(&dir).unwrap();
+        let names: Vec<&str> = found.iter().map(|entry| entry.name.as_str()).collect();
+        assert_eq!(names, ["skills/LICENSES.md", "skills/alpha/SKILL.md"]);
+        assert!(found.iter().all(|entry| entry.mode == super::READABLE_MODE));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A part of the closed list that is not on disk refuses the archive
+    /// and names the way out - the same contract every other part has.
+    #[test]
+    fn a_missing_skills_directory_refuses_the_archive() {
+        let dir = std::env::temp_dir().join(format!("sprawling-noskills-{}", std::process::id()));
+        std::fs::remove_dir_all(&dir).ok();
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let refusal = skills(&dir).expect_err("a tree with no skills must not assemble");
+        let said = refusal.to_string();
+        assert!(said.contains("skills"), "{said}");
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     /// A document the archive is assembled from has to be in the tree the
@@ -189,13 +275,16 @@ mod tests {
         std::fs::remove_dir_all(&root).ok();
         for part in &ARCHIVE {
             let at = match *part {
-                Packaged::Binary => continue,
+                Packaged::Binary | Packaged::Skills => continue,
                 Packaged::Document { source, .. } => root.join(source),
                 Packaged::Sbom => root.join(SBOM),
             };
             std::fs::create_dir_all(at.parent().unwrap()).unwrap();
             std::fs::write(&at, b"content").unwrap();
         }
+        let skill = root.join(SKILLS_DIR).join("example");
+        std::fs::create_dir_all(&skill).unwrap();
+        std::fs::write(skill.join("SKILL.md"), b"skill").unwrap();
         std::fs::write(root.join("sprawling"), b"binary").unwrap();
         root
     }
@@ -240,7 +329,13 @@ mod tests {
         let names: Vec<&str> = found.iter().map(|entry| entry.name.as_str()).collect();
         assert_eq!(
             names,
-            ["sprawling", "QUICKSTART.md", "LICENSE", "sbom.cdx.json"]
+            [
+                "sprawling",
+                "QUICKSTART.md",
+                "LICENSE",
+                "skills/example/SKILL.md",
+                "sbom.cdx.json"
+            ]
         );
         let runnable: Vec<&str> = found
             .iter()

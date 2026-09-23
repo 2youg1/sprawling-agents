@@ -26,7 +26,7 @@
 | color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免 |
 | release | 公开树由过滤生成；六条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径、不得引用树里没有的文件、不得把一台机器的工作记录写进产品文档、链接的拼法与树上的名字逐字节相等（§8-15） |
 | length | 一个生产函数不得长过 `function_length`（今 200 行）、不得多于 `argument_count` 个参数（今 4 个，不含接收者），一个源文件不得长过 `file_length`（今 400 行，含测试；权威在 budgets.toml）；函数尺寸与签名以 `syn` 量得，文件尺寸即行数 |
-| npm | `client/` 的依赖面：锁文件在盘且与 `package.json` 逐条同、运行时依赖恰为 `solid-js` 与 `effect`、树上每个包的许可证都在 `deny.toml` 的准许表内 |
+| npm | `client/` 的依赖面：锁文件在盘且与 `package.json` 逐条同、运行时依赖恰为 `svelte` 与 `effect`、树上每个包的许可证都在 `deny.toml` 的准许表内 |
 | boundary | Rust 检查不得跨进程边界够到本产品；黑箱那一半住 `adversary/` |
 | artifact | 发布出去的那件东西的形状：测试脚手架不得进产品二进制、客户端落点只有一个家（§8-18）、平台与归档命名只有一张表（§8-19） |
 | proof | kani harness 名册只住 `#[kani::proof]` 属性；CI 不得点名 harness，文档不得手写总数 |
@@ -453,6 +453,10 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 - **`release.yml` 的重抄步骤随本节删除**，三行矩阵走同一步 `just package ${{ matrix.target }}`；`just dist` 收下同一个可选参数，并在有三元组时**不写徽章**——README 的徽章描述一个人首先下载的那份产物，由第二个平台改写它会让一个 tag 的两次构建对同一个数字各执一词。
 - **本节属门禁机具，与产品代码分开提交。**
 
+**`skills/` 随归档走，整树收录（形状 2 行）。** 发布物是人解压即用的那一份：一座城对着解压出来的目录找 skill，zip 里没有 `skills/`，拿到发布物的人就测不了 skill 相关的一切。故归档内容表加一个变体 `Packaged::Skills`，**按相对路径排序整树收录**——skill 的名单归那个目录管，逐文件抄一张清单就是给它安第二个家；目录缺失即拒，恢复语与 `Document` 同形。随树同行的是 `skills/LICENSES.md`：MIT 要求版权与许可全文随副本走，CC BY-NC 要求署名，两者都由它承载，于是义务跟着文件走到树外的任何一份副本。
+
+**两条属人裁决在此记录。** ①**`skills/` 下的文档不披 MPL 头，MPL 文件头扫描以 `.rs` 为界**（该门本来就只扫 `.rs`，此裁决把「跳过 Markdown」从现状升为成文规则）：文档的许可证是它自己的 frontmatter 与 `docs/third-party.md` §5，给 CC BY-NC 或 MIT 的文档披 MPL 头就是错述它的条款；被击败的替代方案是逐文件豁免名单，它把一条能写成边界规则的事实变成一张会过期的名单。②**pstack 改编件（`why`／`how`／`blast-radius`）保持 MIT，且每件注明改编者是 2youg1**：改编声明与上游版权行、许可全文一起落在各件的来源注与 `skills/LICENSES.md`——一份不说谁改过的改本，藏的正是它现在是什么。
+
 ### 8-12 `npm`：`client/` 的依赖面（形状 1 判定）
 
 `client/` 进树时，看守它的那道门没有跟着进来。工作区那一侧的依赖面由 `cargo-deny` 与 `depmap` 两道门看着，JavaScript 那一侧当时什么都没有：一次 `bun add` 就能把第三个运行时依赖、一个 GPL 的包、或者一份与 `package.json` 已经对不上的锁文件带进来，而全绿的一次 `just check` 一句都不会说。
@@ -460,7 +464,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 **三条断言，各修一种真实的漂移**：
 
 1. **锁文件在盘上，且与清单逐条同。** `client/bun.lock` 的 `workspaces` 块记着 bun 上次解算时看见的 `dependencies` 与 `devDependencies`；`package.json` 记着今天要的那份。一处不同就说明有人改了清单而没有重解，于是一台开发机装出来的东西与 CI 装出来的东西不是同一棵树。依据是**两张表逐键逐值相等**，缺、多、值不同各报一条。
-2. **运行时依赖恰为 `solid-js` 与 `effect`。** 这是 client-SPEC §1 已经写下的那条界线的机器面：devDependencies 随工具链自由变动，而进到用户浏览器里的东西是一张封闭的两行表。**恰为**而不是**至少**——一个只查白名单不查缺失的门，会放过「solid-js 被误删」这一半。
+2. **运行时依赖恰为 `svelte` 与 `effect`。** 这是 client-SPEC §1 已经写下的那条界线的机器面：devDependencies 随工具链自由变动，而进到用户浏览器里的东西是一张封闭的两行表。**恰为**而不是**至少**——一个只查白名单不查缺失的门，会放过「svelte 被误删」这一半。
 3. **树上每个包的许可证都在准许表内。** 准许表**不是本门新写的**，它就是 `deny.toml` 的 `[licenses] allow`：一个仓库对许可证只应有一个立场，工作区那一侧已经把它写下来了，本门读同一张表。许可证从 `client/node_modules/<包>/package.json` 的 `license` 字段读得——锁文件不带许可证，而已装的树带。
 
 **`node_modules` 不在树上时，第三条 skip 并说出理由，前两条照判。** `node_modules` 是 `.gitignore` 里的名字，一台没有跑过 `bun install` 的机器上它不存在，而**这不是缺陷**；门在自己打印的那一行里说它没看，与 `render` 缺浏览器时同一口径。前两条只读入库文件，故在任何机器上都判得动——**一道会因为环境而整体沉默的门，就是一道在 CI 之外不再存在的门**。
@@ -477,7 +481,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 
 **两条传递进来的许可证在准许表上**：`caniuse-lite` 的 `CC-BY-4.0` 与 `minimatch` 的 `BlueOak-1.0.0`，各一行写在 `deny.toml` 的 `[licenses] allow` 里，理由跟在行旁。依据三条：两者都由 devDependencies 传递带入，到不了用户的浏览器；`CDLA-Permissive-2.0` 为一份证书清单入表是同一形状的先例，`caniuse-lite` 同样是一张数据表，而 `just dist` 写出的物料清单正是 `CC-BY-4.0` 要求的署名落点；`BlueOak-1.0.0` 经 OSI 审议通过，宽松，且授予 MIT 未言明的专利权。
 
-**另一条路——换掉那两个包——走不通，已逐条走查**：`minimatch ^10` 由 `eslint` 自身、`@eslint/config-array` 与 `@typescript-eslint/typescript-estree` 三处同时要求（`10` 之前的 `minimatch` 是 `ISC`，但降版就是降掉 eslint 10）；`caniuse-lite` 由 `browserslist` 要求，而 `browserslist` 经 `@babel/helper-compilation-targets` 由 `vite-plugin-solid` 带入，即 Solid 的编译链本身。两条来路都落在冻结的前端工具链上。
+**另一条路——换掉 minimatch——走不通，已逐条走查**：`minimatch ^10` 由 `eslint` 自身、`@eslint/config-array` 与 `@typescript-eslint/typescript-estree` 三处同时要求（`10` 之前的 `minimatch` 是 `ISC`，但降版就是降掉 eslint 10），它落在冻结的前端工具链上。`caniuse-lite` 的来路已随 Solid 编译链一并消失（`bun.lock` 里既无 `browserslist` 也无 `caniuse-lite`）：准许行只为安装树的旧残留而在，安装树重装后按 re-pricing 流程删行，单独提交。
 
 **翻案条件**：删掉 `deny.toml` 那两行，红的就是本节这道门——放宽写在它自己的提交里，不在门正卡着的那一次改动里，这是 AGENTS.md 的 `guard` 行区分的两件事。
 

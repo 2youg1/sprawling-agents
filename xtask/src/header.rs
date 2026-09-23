@@ -6,6 +6,11 @@
 //! MPL-2.0 header gate: every `.rs` in the repo opens with the exact
 //! Exhibit A notice, then the copyright line.
 //!
+//! Markdown is out of this gate's scope by ruling: a skill document
+//! carries its own licence in its frontmatter and in `skills/LICENSES.md`,
+//! and an MPL notice on a CC BY-NC or MIT document would misstate its
+//! terms.
+//!
 //! The notice is what the licence asks for. The copyright line is not:
 //! Mozilla's own FAQ answers "what do I have to do" with the notice alone
 //! and says a name "is not necessary" (MPL 2.0 FAQ, Q4). It ships here
