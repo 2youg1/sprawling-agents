@@ -26,13 +26,13 @@
 use kernel::model::{Mode, Window};
 use kernel::{
     Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, GitOid, IdemKey, McpServer,
-    ModelTag, ResidentId, Ruling, RunId, SandboxLimits, Sealed, Seq, SessionName,
+    ModelTag, Origin, ResidentId, Ruling, RunId, SandboxLimits, Sealed, SessionName,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
-use crate::command::step::{GovernedDocument, HaltScope, LoginStep, PursuitStep};
+use crate::command::step::{Carry, GovernedDocument, HaltScope, LoginStep, PursuitStep};
 use crate::command::tuning::EndpointTuning;
 use crate::named_frames::named_frames;
 use crate::preference::PreferencePatch;
@@ -164,10 +164,37 @@ pub enum Command<Secret = Sealed<String>> {
         max_output_tokens: Option<Ceiling>,
         idem: IdemKey,
     },
-    Fork {
-        run: RunId,
-        at_seq: Seq,
-        addr: Option<Address>,
+    /// Starts a new session at an address: same room, same person, a
+    /// fresh conversation in it.
+    ///
+    /// **A session is a stretch of a room, not the room.** A room's
+    /// first run writes down the model it calls and how hard it thinks,
+    /// and every later run there refuses to move either, because a
+    /// provider caches a conversation's prefix only while the shape of
+    /// the calls behind it holds still. That rule is right, and without
+    /// this verb it was also a dead end: a person who changed the model
+    /// could no longer dispatch into the room at all. What this frame
+    /// does is let the room start a new stretch, which is a thing a
+    /// person asks for on purpose rather than a change made behind
+    /// their back (sprawling-SPEC.md 8-82).
+    ///
+    /// It carries [`Carry`] rather than a flag: what a new session
+    /// keeps from the one before it has two named answers, and the
+    /// default is the one that keeps nothing.
+    ///
+    /// Writes `session_opened`.
+    OpenSession {
+        addr: Address,
+        carry: Carry,
+        /// What this session continues, when it continues something.
+        ///
+        /// A branch is a session and not a second verb: forking is
+        /// starting a session whose first run begins from a line of
+        /// another conversation, and everything else about it - the
+        /// model it may choose, the effort, the handoff it carries -
+        /// is what [`Carry`] and the room already say
+        /// (sprawling-SPEC.md 8-82).
+        from: Option<Origin>,
         idem: IdemKey,
     },
     CreateBuilding {

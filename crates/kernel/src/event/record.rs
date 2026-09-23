@@ -57,7 +57,7 @@ pub use governance::{
 };
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
-pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SkillPin};
+pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
     ModelCalled, ModelReturned, PromptAssembled, PromptSegment, PromptSkip, PromptSource,

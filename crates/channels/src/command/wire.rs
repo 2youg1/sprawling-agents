@@ -41,7 +41,7 @@ impl<Secret> Command<Secret> {
             Self::Dispatch { ref idem, .. }
             | Self::Wake { ref idem, .. }
             | Self::Login { ref idem, .. }
-            | Self::Fork { ref idem, .. }
+            | Self::OpenSession { ref idem, .. }
             | Self::ProbeEndpoint { ref idem, .. }
             | Self::ConfigureBuilding { ref idem, .. }
             | Self::CreateBuilding { ref idem, .. }
@@ -176,15 +176,15 @@ impl From<WireCommand> for Command {
                 max_output_tokens,
                 idem,
             },
-            Command::Fork {
-                run,
-                at_seq,
+            Command::OpenSession {
                 addr,
+                carry,
+                from,
                 idem,
-            } => Self::Fork {
-                run,
-                at_seq,
+            } => Self::OpenSession {
                 addr,
+                carry,
+                from,
                 idem,
             },
             Command::CreateBuilding {

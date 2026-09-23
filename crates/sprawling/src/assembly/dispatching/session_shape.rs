@@ -20,8 +20,11 @@
 //! for where a session *starts*. What the room states is what that
 //! session *started with*, so a registry that moved since is a
 //! disagreement this dispatch refuses instead of a change it makes
-//! silently. A refusal names the two ways out, because both of them
-//! keep the frozen prefix: open a new session, or fork this run.
+//! silently. A refusal names what a person can do now: put the field
+//! back to what the session froze, or address another room, which opens
+//! a session of its own. The wording is the runtime's
+//! (`runtime::prefix::ANOTHER_ADDRESS`), so no page is promised a verb
+//! the wire does not carry.
 
 use kernel::{AxError, Effort};
 use runtime::turn::CallShape;

@@ -26,7 +26,7 @@ Two places where this is a hard requirement, because both have moved recently:
 
 | Area | Read first |
 |---|---|
-| Front-end code (`client/`) | The framework's own agent guide before touching a component. The framework in force is **Solid**, built by bun through Vite; read <https://docs.solidjs.com/> first, and [`docs/frontend-method.md`](frontend-method.md) for how a screen is accepted here. |
+| Front-end code (`client/`) | The framework's own agent guide before touching a component. The framework in force is **Svelte 5**, built by bun through Vite; read <https://svelte.dev/docs/svelte/overview> first, and [`docs/frontend-method.md`](frontend-method.md) for how a screen is accepted here. |
 
 Then read, in order: this file, `ARCHITECTURE.md` (what the code is made of and why it has this shape), `crates/<crate>/<crate>-SPEC.md` for the crate you are touching (its interfaces and decisions, written before its code), `docs/glossary.md` (the vocabulary; the lexicon gate enforces it), and the tests next to the code you are about to touch.
 
@@ -52,7 +52,7 @@ Every row is enforced by a machine. Violating one turns CI red with a message na
 | One module, one file, semantically named. Register the file in the module table, then create it. Keep `lib.rs` and index files free of logic. | `xtask modmap` |
 | Default to `pub(crate)`. Declare a `pub` trait only in a file on the seam list. | `xtask depmap` |
 | Keep a source file inside 400 lines, in Rust and in the client alike; a file already over the line is pinned in `xtask/budgets.toml` and may only get smaller. Function length and parameter count are measured in Rust only, because measuring them means parsing the language. | `xtask length` |
-| Keep `client/bun.lock` in step with `client/package.json`, keep the runtime dependencies exactly `solid-js` and `effect`, and keep every licence in the installed tree on the list `deny.toml` permits. A tree that has never had `bun install` run in it makes the gate say it skipped the licences. | `xtask npm` |
+| Keep `client/bun.lock` in step with `client/package.json`, keep the runtime dependencies exactly `effect` and `svelte`, and keep every licence in the installed tree on the list `deny.toml` permits. A tree that has never had `bun install` run in it makes the gate say it skipped the licences. | `xtask npm` |
 | Start every `.rs` file with the MPL-2.0 notice, then the copyright line, and carry that head exactly once: a file holding two of them was assembled from two files, and the documentation between them describes the other one. | `xtask header` |
 | Take the time as a parameter. The single sampling point is `bin::assembly`. | `clippy.toml` disallowed methods |
 | Use `BTreeMap` on kernel decision paths; keep floats out of ledger payloads; start tasks from the one spawn point. | review plus the determinism tests in citysim |

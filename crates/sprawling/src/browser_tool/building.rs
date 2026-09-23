@@ -16,7 +16,10 @@ use super::person::for_user_browser;
 
 /// What the model is told about the building's own browser.
 pub(super) const BUILDING_DISCLOSURE: &str = "drive this machine's browser: open a page, look at it, act on it, \
-     take a screenshot, measure boxes, read the console, resize, close";
+     take a screenshot, measure boxes, read the console, resize, close. The accessibility tree \
+     answers most questions; reach for a screenshot when the question is what a person would \
+     see. An element reference carries the snapshot's generation, and one from an older snapshot \
+     is refused and not misdirected.";
 
 /// Builds the tool a building whose rules say `browser = true` gets.
 ///

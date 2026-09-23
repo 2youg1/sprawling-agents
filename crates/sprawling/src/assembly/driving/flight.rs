@@ -277,6 +277,9 @@ impl RunWorker {
     ) -> Option<RunId> {
         let at = super::super::Assignment {
             addr: addr.clone(),
+            // A row in a plan is not a session's first run: whatever the
+            // room branched from was spent by the run that began it.
+            origin: None,
             session: None,
             effort: None,
             mode: runtime::Mode::PlanGoal,

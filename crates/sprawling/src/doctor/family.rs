@@ -24,9 +24,8 @@ mod webkit;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
-use super::probe::{ask_version, on_search_path};
+use super::probe::on_search_path;
 use super::{Absence, Detection, Need, PerPlatform, Platform, Presence, Recipe, Requirement, Tier};
 use super::{Group, registry};
 
@@ -180,17 +179,12 @@ pub(crate) const WEBKIT_ROW: Requirement = Requirement {
 /// The override wins over everything, including a family that has a
 /// member installed: a person who names a browser has answered the
 /// question this function otherwise asks the machine.
-pub(super) fn look(
-    family: Family,
-    platform: Option<Platform>,
-    patience: Duration,
-    search_path: &OsString,
-) -> Presence {
+pub(super) fn look(family: Family, platform: Option<Platform>, search_path: &OsString) -> Presence {
     if let Some(named) = std::env::var_os(BROWSER_VARIABLE).filter(|named| !named.is_empty()) {
         let path = PathBuf::from(&named);
         if claims(family, &path) {
             return match path.is_file() {
-                true => ask_version(&path, "--version", patience),
+                true => found_at(path),
                 false => Presence::Absent(Absence::VariableNamesNothing {
                     variable: BROWSER_VARIABLE,
                     path,
@@ -206,8 +200,22 @@ pub(super) fn look(
     });
     match found {
         None => Presence::Absent(Absence::NotOnSearchPath),
-        Some(path) => ask_version(&path, "--version", patience),
+        Some(path) => found_at(path),
     }
+}
+
+/// A browser this machine has, and the version its installer wrote
+/// beside it.
+///
+/// **Nothing here starts it** (section 8-80): on Windows a Chromium
+/// browser given `--version` opens a window rather than printing a
+/// line, and this function runs at every serve. The price is that a
+/// browser which is on the disk and will not start is reported present;
+/// the engine says so with `E_BROWSER_UNAVAILABLE` when a run asks for
+/// it.
+fn found_at(at: PathBuf) -> Presence {
+    let version = super::version_file::beside(&at);
+    Presence::Present { at, version }
 }
 
 /// Which member a path is, for a report that wants to say `zen` rather

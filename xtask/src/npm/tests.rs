@@ -74,14 +74,14 @@ fn every_way_the_lockfile_and_the_manifest_disagree_is_named() {
 }
 
 /// Both directions. A gate that only refused additions would wave
-/// through the day `solid-js` is deleted by accident, and that is the
+/// through the day `svelte` is deleted by accident, and that is the
 /// half a person would notice last.
 #[test]
 fn the_runtime_allowlist_is_judged_in_both_directions() {
     let extra = manifest_of(
         &document(
             "package.json",
-            r#"{"dependencies": {"effect": "1", "solid-js": "1", "lodash": "1"}}"#,
+            r#"{"dependencies": {"effect": "1", "svelte": "1", "lodash": "1"}}"#,
         )
         .unwrap(),
     );
@@ -95,12 +95,12 @@ fn the_runtime_allowlist_is_judged_in_both_directions() {
     let mut out = Vec::new();
     judge_runtime(&missing, &mut out);
     assert_eq!(out.len(), 1);
-    assert!(out[0].violation.contains("solid-js"));
+    assert!(out[0].violation.contains("svelte"));
 
     let exact = manifest_of(
         &document(
             "package.json",
-            r#"{"dependencies": {"effect": "1", "solid-js": "1"}}"#,
+            r#"{"dependencies": {"effect": "1", "svelte": "1"}}"#,
         )
         .unwrap(),
     );

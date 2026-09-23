@@ -121,7 +121,8 @@ impl SearchTool {
                 name: ToolName::parse("search")?,
                 disclosure: "Find a substring in the files under one path. Literal text, no \
                              regular expressions; the line number it reports is the offset \
-                             `read` continues from."
+                             `read` continues from. A `grep` through `exec` returns the same \
+                             text without the version and without the offset."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,

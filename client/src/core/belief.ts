@@ -15,98 +15,22 @@
 // the position - that, the author and the time are readable - and the
 // field it could not read comes back to the caller to report.
 
-import { createStore, produce } from "solid-js/store";
+import { get, writable } from "svelte/store";
+import type { Readable } from "svelte/store";
 
 import { readProbed } from "./probed";
 import { PHASES, moves } from "./doing";
 import type { Doing } from "./doing";
-import { completionOf, haltOf, taskOf, toolCall } from "./reading";
+import { completionOf, haltOf, sessionStart, taskOf, toolCall } from "./reading";
 import { sameScope } from "./scope";
-import type { Probed } from "./probed";
 
-import { CITY_RUN, Seq } from "../wire";
-import type {
-  Address,
-  AxError,
-  CityAnswer,
-  Delta,
-  EventRecord,
-  HaltScope,
-  LogLine,
-  RunId,
-  RunSummary,
-  TimeMs,
-} from "../wire";
+import { CITY_RUN, Seq, TimeMs } from "../wire";
+import type { AxError, CityAnswer, Delta, EventRecord, LogLine, RunId, RunSummary } from "../wire";
 
-export interface RunBelief {
-  readonly run: RunId;
-  readonly addr: Address | null;
-  readonly started: TimeMs | null;
-  readonly task: string | null;
-  readonly lastSeq: Seq;
-  readonly doing: Doing;
-  // Heard from the stream and named by no answer yet: an answer folded
-  // before the run began cannot name it, and that silence is not the
-  // city saying the run is over.
-  readonly local: boolean;
-  // What the model has said in the call that is still going. Cleared
-  // when the call returns, because the record then holds it.
-  saying: string;
-  // What the model has reasoned in that same call, kept apart for the
-  // reason the wire keeps the two increments apart: a page folds one
-  // and reads the other.
-  thinking: string;
-}
+import type { Belief, RunBelief } from "./belief/shape";
+import { LOG_WINDOW, merged } from "./belief/shape";
+export type { Belief, Notice, RunBelief } from "./belief/shape";
 
-// Mutable only through the store's own setter below; readers get the
-// store, which Solid makes read-only.
-export interface Belief {
-  runs: Record<string, RunBelief>;
-  halted: HaltScope[];
-  // The ledger position the list of shut scopes is current to. Two
-  // writers touch the list - an answer states the whole of it and a
-  // record changes one scope - so without a position a gap folded back
-  // in after the answer would undo it.
-  haltedAt: Seq;
-  // The last refusal a command came back with, for the page to show
-  // once and the person to dismiss.
-  refusal: AxError | null;
-  // Every refusal this session has seen, newest last, bounded. The
-  // dismissed one leaves the corner and stays here: a refusal a person
-  // waved away is still the answer to what they asked.
-  notices: Notice[];
-  city: string | null;
-  // The last probe's answer: which endpoint, what it serves, what each
-  // row stated, and where the call stopped. Held here rather than read
-  // off the history's tail, where a long city would push it out.
-  probed: Probed | null;
-  // The tail of the process log, oldest first. A window rather than an
-  // archive: a log is a diagnostic and not history, so the page keeps
-  // what a person can still act on, which is also what stops a city at
-  // the `wire` floor from filling this tab's memory.
-  logs: LogLine[];
-}
-
-// How many log lines the page keeps. Wide enough to hold the burst
-// around one thing going wrong, narrow enough that a talkative city
-// never becomes this tab's problem.
-const LOG_WINDOW = 500;
-
-// One refusal, kept after the corner has let go of it.
-export interface Notice {
-  readonly error: AxError;
-  seen: boolean;
-}
-
-// How many refusals the bell keeps. Short on purpose: this is a list a
-// person reads, not a record they audit - the ledger is where a city's
-// history lives.
-const NOTICE_WINDOW = 50;
-
-// A run this page heard of and has no record of: a gap page starting
-// after the beginning, or text that outran the run it belongs to. The
-// position is before the first record (`Seq::FIRST`) and the phase is
-// not yet a fact the stream has stated.
 function unseen(run: RunId, at: Seq): RunBelief {
   return {
     run,
@@ -208,6 +132,7 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     // grouped a family to a line so the list reads as one block: the
     // reader's question is which kinds move a run, not where one name
     // sits among sixty.
+    case "session_opened":
     case "city_initialized": case "city_halted": case "building_created":
     case "building_configured": case "run_forked": case "prompt_assembled":
     case "result_offloaded": case "log_truncated": case "gate_checked":
@@ -234,14 +159,29 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
   }
 }
 
-export function createBelief() {
-  const [belief, setBelief] = createStore<Belief>({
+// The store and its folds, as one door. `now` is handed in - a notice
+// is stamped when it first arrived, and a clock a test cannot move is a
+// stamp nobody has checked.
+export interface BeliefStore {
+  readonly belief: Readable<Belief>;
+  readonly adoptCity: (city: CityAnswer) => void;
+  readonly apply: (record: EventRecord) => string | null;
+  readonly say: (delta: Delta) => void;
+  readonly logged: (line: LogLine) => void;
+  readonly refused: (error: AxError | null) => void;
+  readonly named: (city: string | null) => void;
+  readonly noticesSeen: () => void;
+}
+
+export function createBelief(now: () => number): BeliefStore {
+  const store = writable<Belief>({
     runs: {},
     halted: [],
     haltedAt: Seq.make(0),
     refusal: null,
     notices: [],
     city: null,
+    sessions: {},
     probed: null,
     logs: [],
   });
@@ -253,36 +193,35 @@ export function createBelief() {
   // session in a tab nobody can use, and a run left behind by a restart
   // goes on telling the skyline that this city is busy.
   function adoptCity(city: CityAnswer): void {
-    setBelief(
-      produce((draft) => {
-        // The answer states no ledger position of its own. The newest
-        // position it does state - the furthest any run it lists has
-        // been folded - is what it can claim by, so an answer whose runs
-        // are all behind the list of shut scopes cannot take the page
-        // back over an event already folded.
-        const stated = city.runs.reduce(
-          (far, run) => (run.last_seq > far ? run.last_seq : far),
-          Seq.make(0),
-        );
-        if (stated >= draft.haltedAt) {
-          draft.halted = [...city.halted];
-          draft.haltedAt = stated;
-        }
-        for (const summary of city.runs) {
-          draft.runs[summary.run] = adopted(summary, draft.runs[summary.run]);
-        }
-        const listed = new Set<string>(city.runs.map((summary) => summary.run));
-        // The exemption is good for one answer: by the next one the
-        // city has had its chance to list the run, which is what
-        // evicts a run a restarted city no longer has.
-        const kept: Record<string, RunBelief> = {};
-        for (const [run, held] of Object.entries(draft.runs)) {
-          if (listed.has(run)) kept[run] = held;
-          else if (held.local) kept[run] = { ...held, local: false };
-        }
-        draft.runs = kept;
-      }),
+    const held = get(store);
+    // The answer states no ledger position of its own. The newest
+    // position it does state - the furthest any run it lists has been
+    // folded - is what it can claim by, so an answer whose runs are all
+    // behind the list of shut scopes cannot take the page back over an
+    // event already folded.
+    const stated = city.runs.reduce(
+      (far, run) => (run.last_seq > far ? run.last_seq : far),
+      Seq.make(0),
     );
+    const runs: Record<string, RunBelief> = {};
+    const listed = new Set<string>();
+    for (const summary of city.runs) {
+      listed.add(summary.run);
+      runs[summary.run] = adopted(summary, held.runs[summary.run]);
+    }
+    // The exemption for a run only the stream introduced is good for one
+    // answer: by the next one the city has had its chance to list the
+    // run, which is what evicts a run a restarted city no longer has.
+    for (const [run, was] of Object.entries(held.runs)) {
+      if (listed.has(run)) continue;
+      if (was.local) runs[run] = { ...was, local: false };
+    }
+    store.set({
+      ...held,
+      runs,
+      halted: stated >= held.haltedAt ? [...city.halted] : held.halted,
+      haltedAt: stated >= held.haltedAt ? stated : held.haltedAt,
+    });
   }
 
   // One `city_halted` record, which writes the list only when it is
@@ -290,18 +229,18 @@ export function createBelief() {
   // stopping and starting, so a record this build cannot read changes
   // nothing rather than being read as a release.
   function halted(record: EventRecord): string | null {
-    const [held, bad] = haltOf(record);
-    const scope = held.scope;
-    const state = held.state;
-    if (scope === null || state === null) return bad;
-    if (record.seq > belief.haltedAt) {
-      setBelief(
-        produce((draft) => {
-          const without = draft.halted.filter((each) => !sameScope(each, scope));
-          draft.halted = state === "halted" ? [...without, scope] : without;
-          draft.haltedAt = record.seq;
-        }),
-      );
+    const [stated, bad] = haltOf(record);
+    const scope = stated.scope;
+    const word = stated.state;
+    if (scope === null || word === null) return bad;
+    const held = get(store);
+    if (record.seq > held.haltedAt) {
+      const without = held.halted.filter((each) => !sameScope(each, scope));
+      store.set({
+        ...held,
+        halted: word === "halted" ? [...without, scope] : without,
+        haltedAt: record.seq,
+      });
     }
     return null;
   }
@@ -312,24 +251,34 @@ export function createBelief() {
     if (record.kind === "city_halted") {
       return halted(record);
     }
+    const held = get(store);
     if (record.kind === "city_initialized") {
-      setBelief("city", record.addr ?? null);
+      store.set({ ...held, city: record.addr ?? null });
+      return null;
+    }
+    const start = sessionStart(record);
+    if (start !== null) {
+      // Written only forwards: a page that reloads folds an older range
+      // after a newer one, and the newest start is what a stretch begins at.
+      if (start.seq > (held.sessions[start.addr] ?? Seq.make(0))) {
+        store.set({ ...held, sessions: { ...held.sessions, [start.addr]: start.seq } });
+      }
       return null;
     }
     if (record.kind === "endpoint_probed") {
       const found = readProbed(record.data);
-      if (found !== null) setBelief("probed", found);
+      if (found !== null) store.set({ ...held, probed: found });
       return null;
     }
     if (record.run === CITY_RUN) {
       return null;
     }
-    const held = belief.runs[record.run] ?? unseen(record.run, record.seq);
-    if (held.lastSeq > record.seq) {
+    const run = held.runs[record.run] ?? unseen(record.run, record.seq);
+    if (run.lastSeq > record.seq) {
       return null;
     }
-    const [next, bad] = fold(held, record);
-    setBelief("runs", record.run, next);
+    const [next, bad] = fold(run, record);
+    store.set({ ...held, runs: { ...held.runs, [record.run]: next } });
     return bad;
   }
 
@@ -340,31 +289,25 @@ export function createBelief() {
   // arrive, and the next answer that does not list the run takes it
   // away, because every run born here is `local`.
   function say(delta: Delta): void {
-    setBelief(
-      produce((draft) => {
-        const held = draft.runs[delta.run] ?? unseen(delta.run, Seq.make(0));
-        if ("said" in delta.increment) {
-          held.saying += delta.increment.said;
-        } else {
-          held.thinking += delta.increment.thought;
-        }
-        draft.runs[delta.run] = held;
-      }),
-    );
+    const held = get(store);
+    const run = held.runs[delta.run] ?? unseen(delta.run, Seq.make(0));
+    const moved: RunBelief =
+      "said" in delta.increment
+        ? { ...run, saying: run.saying + delta.increment.said }
+        : { ...run, thinking: run.thinking + delta.increment.thought };
+    store.set({ ...held, runs: { ...held.runs, [delta.run]: moved } });
   }
 
   // One line of the process log, appended to the window. The oldest go
   // first, because what a person is reading a log for is what just
   // happened.
   function logged(line: LogLine): void {
-    setBelief(
-      produce((draft) => {
-        draft.logs.push(line);
-        if (draft.logs.length > LOG_WINDOW) {
-          draft.logs.splice(0, draft.logs.length - LOG_WINDOW);
-        }
-      }),
-    );
+    const held = get(store);
+    const logs = [...held.logs, line];
+    if (logs.length > LOG_WINDOW) {
+      logs.splice(0, logs.length - LOG_WINDOW);
+    }
+    store.set({ ...held, logs });
   }
 
   // A refusal is shown once; one kind also corrects the page: a steer
@@ -378,45 +321,32 @@ export function createBelief() {
   // would freeze a run over a refused cancel; the action sentence is the
   // only discriminator the server states.
   function refused(error: AxError | null): void {
-    setBelief(
-      produce((draft) => {
-        draft.refusal = error;
-        if (error !== null) {
-          draft.notices.push({ error, seen: false });
-          if (draft.notices.length > NOTICE_WINDOW) {
-            draft.notices.splice(0, draft.notices.length - NOTICE_WINDOW);
-          }
-        }
-        if (!error?.action.startsWith("steer")) {
-          return;
-        }
-        const held = draft.runs[error.subject];
-        if (held !== undefined && held.doing.kind !== "frozen") {
-          draft.runs[error.subject] = { ...held, doing: PHASES.run_frozen };
-        }
-      }),
-    );
+    const held = get(store);
+    if (error === null) {
+      store.set({ ...held, refusal: null });
+      return;
+    }
+    const notices = merged(held.notices, error, TimeMs.make(now()));
+    const run = error.action.startsWith("steer") ? held.runs[error.subject] : undefined;
+    const runs =
+      run !== undefined && run.doing.kind !== "frozen"
+        ? { ...held.runs, [error.subject]: { ...run, doing: PHASES.run_frozen } }
+        : held.runs;
+    store.set({ ...held, refusal: error, notices, runs });
   }
 
   // The name the welcome carried: a page that only hears what happens
   // next cannot otherwise know the name of a city raised last month.
   function named(city: string | null): void {
-    setBelief("city", city);
+    store.set({ ...get(store), city });
   }
 
   // Reading the bell is what marks it read: an unread count that
   // survived the panel being open would be a number nobody can clear.
   function noticesSeen(): void {
-    setBelief(
-      produce((draft) => {
-        for (const notice of draft.notices) {
-          notice.seen = true;
-        }
-      }),
-    );
+    const held = get(store);
+    store.set({ ...held, notices: held.notices.map((each) => ({ ...each, seen: true })) });
   }
 
-  return { belief, adoptCity, apply, say, logged, refused, named, noticesSeen };
+  return { belief: store, adoptCity, apply, say, logged, refused, named, noticesSeen };
 }
-
-export type BeliefStore = ReturnType<typeof createBelief>;

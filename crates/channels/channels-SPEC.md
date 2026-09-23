@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 29 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`7543f8cd18f2142e400d6c318784102bc75178dc653bfded0df29a5f9da9141c`；**WIRE_V ＝ 34**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42）。
+  **当前 golden**：`e3e542fbe688101c01587c97fc2f56f5a847e321457e95deaeb2b55327064b90`；**WIRE_V ＝ 35**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -525,7 +525,7 @@ pub struct Delta { pub run: RunId, pub increment: kernel::Increment }
 | `ConfigureBuilding` | client | 改一栋楼的规矩 |
 | `AttachEndpoint` | client | 把一个端点挂上 |
 | `SelectModel` | client | 选一个模型 |
-| `Fork` | client | 从一条线上分出第二条 |
+| `OpenSession` | client | 在同一个地址上开新的一段会话（`Carry` 说带不带上一段的交接，`from` 说从哪条线哪一行分出来） |
 | `Reveal` | client | 在人自己的文件管理器里指出一个地址 |
 | `DoctorInstall` | client | 按需求表里的名字装一件机器缺的东西 |
 | `DoctorRefresh` | client | 重新探一遍机器，取代开城时的快照 |
@@ -1102,7 +1102,7 @@ pub enum ReleaseAnswer {
 **规则**：一帧 JSON 在任一侧解不出，就是两端对 wire 的分歧，判 `E_WIRE_MISMATCH`；**恒不把它表达为一次连接断开**。
 
 - **服务端**（`channels::reception::inbound`，形状 1 判定）：`Inbound::read` 是这一侧唯一的入站解码点；解不出即计数一次并产 `SessionStep::Refuse { close: false }`，subject 写「这是本会话第几帧读不出」与本服务端说的 `WIRE_V`，恒不回显对端字节（一个 peer 的帧是它自己的内容，抄进日志就带走了它携的东西）。壳（`server::socket`）因此对「读不出」与「读得出后判出的拒绝」走同一条分支，两种拒绝只有一条送达路径。
-- **客户端**（`client/src/core/link.ts`）：`LinkEvent::undecodable` 与「服务端送来的 `E_WIRE_MISMATCH` 拒绝帧」都把链路置为 `refused`，梯子停摆；`core/socket.ts` 据 `isRefused` 取消已排期的那次重连并丢掉这条 socket。措辞随 `AxError` 的三段走（action／subject／recovery），与握手期的版本不匹配同一渲染处（`views/refusal.tsx`），故人看到的是「刷新页面取这台服务端配的客户端」加一个重试按钮。
+- **客户端**（`client/src/core/link.ts`）：`LinkEvent::undecodable` 与「服务端送来的 `E_WIRE_MISMATCH` 拒绝帧」都把链路置为 `refused`，梯子停摆；`core/socket.ts` 据 `isRefused` 取消已排期的那次重连并丢掉这条 socket。措辞随 `AxError` 的三段走（action／subject／recovery），与握手期的版本不匹配同一渲染处（`views/refusal.svelte`），故人看到的是「刷新页面取这台服务端配的客户端」加一个重试按钮。
 - **退避计数的清零点是「收到一帧数据」，不是「握手成功」**。握手完成即清零时，一条「连上、打招呼、还没说话就断」的 socket 让梯子永远停在第一级 250 ms——一个对人不可见、也长不大的热循环。
 
 **为什么服务端不关连接，而握手期仍然关**（§8.5「握手的失败处置取断连」不变）：握手期页面还没上来，断连就是它唯一能读到的信号，而它读到的正确；握手之后页面**已经把断连读成网络故障**并按梯子重连，于是同一帧在下一条 socket 上重现，人得到一张永远在重连的空白页。告诉它一次，它就停一次。
@@ -1245,6 +1245,24 @@ impl BindFace { pub fn token_digest(&self) -> Option<&B3Hash>; }
 
 **不因「需要第二种协议」回来。** 重开条件是**两个都要实测成立**：①这座城真的跑在回环之外；②队头阻塞实测存在（即一条大帧让同一条连接上的小帧延迟到人能察觉）。理由：`ws://` 只到回环、暴露面经终止器是已记录的部署判断（根 `Cargo.toml`，`connect` 不带 TLS），而换成 QUIC 会同时改掉握手、帧界与资产通路，代价落在每一次改 wire 时；收益只在②成立时出现。`Carrier` 这个抽象不在树里：本 crate 只有一个实现，抽出它就是穿透层。
 
+### 8-43 `WIRE_V` 35：新的会话是一个动词，不是一个开关
+
+```rust
+pub enum Carry { Nothing, Handoff }   // Nothing 是第一个变体，即默认
+Command::OpenSession { addr: Address, carry: Carry, from: Option<Origin>, idem: IdemKey }
+// Origin { run: RunId, at_seq: Seq }  —— kernel::Origin，一个家
+```
+
+**`from` 把「分叉」收进了同一个动词**（S2）。从某句分出去与从此处重开是同一件事的两个起点：都是「在这个房间开新的一段」，只差新的一段要不要继承某条线的对话。所以线上没有第二个动词——原先的 `Fork` 帧退休了（它写下血统却没有任何 dispatch 路径消费它，`routing.rs` 的注释与 runtime §8-2 的 §186 早把这件事记成缺陷），`OpenSession { from: Some(..) }` 是它该在的地方。**血统仍然写在 `run_forked` 里**，由真正开始的那个 run 写：一个分支在「开」的时刻还没有 run，先写一条血统就得先编一个 run id，而那个 run 永远不会存在。
+
+**它答的是一个死路。** 房间的第一个 run 把模型与强度冻进它自己的 `CONFIG.toml`（city-SPEC §8-14），此后形状不同的派活全被 `E_CONFIG_INVALID` 拒——这条规则本身是对的，前缀缓存不能中途换模型；错在被拒之后没有任何出口，换过主模型的人再也派不出去。新的一段会话就是那个出口，而它只能在城里发生（清掉房间自己写下的两行、清掉交接槽位、在账本写 `session_opened`），所以它是一个 Command 而不是页面自己做的几件事。
+
+**`Carry` 是枚举而不是 `bool`。** 两个状态都是有名字的行为，而且落到磁盘上的结果不同：`Nothing` 连 `Handoff.md` 的槽位一起清空，`Handoff` 留着它。`carry: true` 在调用点读不出是哪一个，`Nothing` 也不是「没有值」而是一个答案——它是第一个变体，`Default` 因此不需要人再写一遍。
+
+**`Fork` 不是第二个动词。** S2 会给同一个 `OpenSession` 加 `from: Option<Origin>`，因为从某句分出去与从此处重开是同一件事的两个起点；今天线上那个无参的 `Fork` 帧保留原样，等 S2 一起收。
+
+**本章测试**：`crates/channels/tests/wire_contract.rs` 的命令样本（表长 30、名表去重、golden 哈希）；`Carry` 的默认值在 `channels` 侧有一条断言，因为它是这份规格里唯一被写成「第一个变体」的默认。
+
 ### 8-42 `WIRE_V` 34：关停范围在答案里是一个类型，不是一个地址串
 
 **这一笔只改一处**：`CityAnswer.halted` 由 `Vec<String>` 改成 `Vec<HaltScope>`（`answer.rs`）。
@@ -1253,7 +1271,7 @@ impl BindFace { pub fn token_digest(&self) -> Option<&B3Hash>; }
 pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String>
 ```
 
-**根缺陷是同一件事的两种拼法，而读到两种拼法的那个读者刚好把它们比错了。** 一个 scope 在这座城里有两处书写方式，这是 `kernel::event::scope` 记下的分工：**账本**持 `city`／`building:<addr>`／`workshop:<addr>`，因为每一份已写下的历史都是这样；而**命令帧**持 §8-40 的 `HaltScope` 那样的带标签形状。答案面此前把它降成账本的那个串，于是客户端拿到的是 `building:lab` 与裸 `lab` 两个东西，`views/building.tsx:115` 拿后者去比前者——**被停的楼永远读成未停，release 永远不出现**，而两侧各自诚实，没有任何测试会红。
+**根缺陷是同一件事的两种拼法，而读到两种拼法的那个读者刚好把它们比错了。** 一个 scope 在这座城里有两处书写方式，这是 `kernel::event::scope` 记下的分工：**账本**持 `city`／`building:<addr>`／`workshop:<addr>`，因为每一份已写下的历史都是这样；而**命令帧**持 §8-40 的 `HaltScope` 那样的带标签形状。答案面此前把它降成账本的那个串，于是客户端拿到的是 `building:lab` 与裸 `lab` 两个东西，`views/building.svelte:115` 拿后者去比前者——**被停的楼永远读成未停，release 永远不出现**，而两侧各自诚实，没有任何测试会红。
 
 **答案用命令面的类型，因为那是提问的词汇。** 一页宁可拿 `HaltScope` 去比 `HaltScope`，也不要为了知道看的是哪栋楼而把一个字符串拆开——拆开就是给文法安第二个家，而这正是这一笔在关的东西。转换只发生在服务端一处（`views::answering` 的 `named`），账本的书写方式一个字未动。
 

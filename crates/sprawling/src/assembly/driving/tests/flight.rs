@@ -27,6 +27,7 @@ fn asked(addr: &str) -> Assignment {
         parent: None,
         succession: None,
         tainted: false,
+        origin: None,
     }
 }
 

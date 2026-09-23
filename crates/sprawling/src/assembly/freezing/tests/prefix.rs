@@ -164,9 +164,10 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
     init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let room = Address::parse("lab/room1").unwrap();
     worker
         .handle(channels::Command::Dispatch {
-            addr: Address::parse("lab/room1").unwrap(),
+            addr: room.clone(),
             task: "mother work".to_owned(),
             goal: "a lineage".to_owned(),
             mode: kernel::Mode::PlanGoal,
@@ -189,8 +190,48 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
             _ => None,
         })
         .expect("a dispatch writes run_started");
-    let new_run = worker.fork(mother, node, None).unwrap();
-    assert_ne!(new_run, mother);
+    // Seq 0 is the genesis, a city event: not the mother's node, so a
+    // session cannot branch from it - and the refusal comes before the
+    // room is cleared, because a session that cannot inherit must not
+    // have cost the room its shape.
+    let err = worker
+        .handle(channels::Command::OpenSession {
+            addr: room.clone(),
+            carry: channels::Carry::Nothing,
+            from: Some(kernel::Origin {
+                run: mother,
+                at_seq: kernel::Seq::FIRST,
+            }),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"bad"),
+        })
+        .unwrap_err();
+    assert!(err.subject().contains("not an event of run"), "{err}");
+
+    // The branch itself, and then the dispatch that inherits: the lineage
+    // is the *run's* fact, so it is written when a run begins - a session
+    // that never dispatches never has one.
+    worker
+        .handle(channels::Command::OpenSession {
+            addr: room.clone(),
+            carry: channels::Carry::Nothing,
+            from: Some(kernel::Origin {
+                run: mother,
+                at_seq: node,
+            }),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"branch"),
+        })
+        .unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: room.clone(),
+            task: "carry on".to_owned(),
+            goal: "the line continues".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"carry-on"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
     let after = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
     let forked = after
         .lines()
@@ -201,14 +242,27 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
             {
                 Some(record.clone())
             }
-            _ => None,
+            runtime::replay::VerifiedLine::Known { .. }
+            | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
         })
         .next()
-        .expect("the fork is a ledger fact");
-    assert_eq!(forked.run(), new_run);
-    // Seq 0 is the genesis, a city event: not the mother's node.
-    let err = worker.fork(mother, kernel::Seq::FIRST, None).unwrap_err();
-    assert!(err.subject().contains("not an event of run"), "{err}");
+        .expect("the branch is a ledger fact once a run inherits it");
+    assert_eq!(forked.addr(), Some(&room));
+    assert_eq!(
+        forked.data().as_map().get("from"),
+        Some(&serde_json::Value::from(mother.to_string())),
+        "the payload names the mother"
+    );
+    assert_eq!(
+        forked.data().as_map().get("at_seq"),
+        Some(&serde_json::Value::from(node.value())),
+        "and the line the conversation was cut at"
+    );
+    assert_ne!(
+        forked.run(),
+        mother,
+        "the line belongs to the run that inherits"
+    );
 }
 
 /// Two of the four segments used to be nowhere but the prompt: their

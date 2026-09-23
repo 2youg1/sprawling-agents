@@ -183,6 +183,7 @@ fn plan() -> RunPlan {
         job: Locator::parse(&format!("file:{}/JOB.md@{}", addr.as_str(), "a".repeat(40))).unwrap(),
         parent: None,
         predecessor: None,
+        inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),
             max_tokens: kernel::Ceiling::new(4096),

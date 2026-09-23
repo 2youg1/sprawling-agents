@@ -273,16 +273,15 @@ pub const fn kernel::retries::Retries::stated(self) -> core::option::Option<u32>
 pub const fn kernel::retries::Retries::stated(self) -> core::option::Option<u32>
 pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
 pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
-pub const kernel::AxCode::ALL: [kernel::AxCode; 36]
-pub const kernel::AxCode::ALL: [kernel::AxCode; 36]
+pub const kernel::AxCode::ALL: [kernel::AxCode; 37]
+pub const kernel::AxCode::ALL: [kernel::AxCode; 37]
 pub const kernel::DOORS: [kernel::gate::DoorId; 8]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 72]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 72]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::IDEM_DERIVE_V: u8
-pub const kernel::MEMO_OUTLINE_FIELDS: [&str; 6]
 pub const kernel::Mode::ALL: [kernel::Mode; 5]
 pub const kernel::Mode::ALL: [kernel::Mode; 5]
 pub const kernel::ModelTag::ALL: [kernel::ModelTag; 3]
@@ -350,7 +349,6 @@ pub const kernel::share::Share::NONE: kernel::share::Share
 pub const kernel::share::Share::WHOLE: kernel::share::Share
 pub const kernel::share::Share::WHOLE: kernel::share::Share
 pub const kernel::share::WHOLE_PPB: u64
-pub const kernel::spine::MEMO_OUTLINE_FIELDS: [&str; 6]
 pub const kernel::spine::ROADMAP_COLUMNS: usize
 pub const kernel::spine::ROADMAP_FILE: &str
 pub const kernel::spine::ROADMAP_STATUS_SPELLINGS: [(kernel::RoadmapStatus, &str); 5]
@@ -402,7 +400,6 @@ pub enum kernel::Increment
 pub enum kernel::Lines
 pub enum kernel::Locator
 pub enum kernel::McpTransport
-pub enum kernel::MemoShape
 pub enum kernel::Mode
 pub enum kernel::ModelTag
 pub enum kernel::Named
@@ -502,7 +499,6 @@ pub enum kernel::release::ReleaseVerdict
 pub enum kernel::repair::RepairVerdict
 pub enum kernel::retries::Retries
 pub enum kernel::spine::EvidenceCell
-pub enum kernel::spine::MemoShape
 pub enum kernel::spine::RoadmapShape
 pub enum kernel::spine::RoadmapStatus
 pub enum kernel::spine::ScopeChange
@@ -1008,7 +1004,6 @@ pub fn kernel::share::Share::ppb(self) -> u64
 pub fn kernel::share::Share::split(self, &[u32]) -> core::result::Result<alloc::vec::Vec<kernel::share::Share>, kernel::AxError>
 pub fn kernel::share::Share::split(self, &[u32]) -> core::result::Result<alloc::vec::Vec<kernel::share::Share>, kernel::AxError>
 pub fn kernel::share::gather(&[kernel::share::Share]) -> kernel::share::Share
-pub fn kernel::spine::check_memo_shape(&str) -> kernel::MemoShape
 pub fn kernel::spine::check_roadmap_shape(&str) -> kernel::RoadmapShape
 pub fn kernel::spine::insert_children(&str, &kernel::node_id::NodeId, &[kernel::NewChild]) -> core::result::Result<alloc::string::String, kernel::AxError>
 pub fn kernel::spine::set_roadmap_status(&str, &kernel::node_id::NodeId, kernel::RoadmapStatus, core::option::Option<&kernel::locator::Locator>) -> core::result::Result<alloc::string::String, kernel::AxError>
@@ -1115,6 +1110,7 @@ pub kernel::AxCode::ApprovalPending
 pub kernel::AxCode::BackpressureShed
 pub kernel::AxCode::BrowserUnavailable
 pub kernel::AxCode::BudgetExhausted
+pub kernel::AxCode::Busy
 pub kernel::AxCode::CasCorrupt
 pub kernel::AxCode::ConfigInvalid
 pub kernel::AxCode::CredentialMissing
@@ -1343,6 +1339,7 @@ pub kernel::EventKind::RunFrozen
 pub kernel::EventKind::RunStarted
 pub kernel::EventKind::SecretCaptured
 pub kernel::EventKind::SecretEgressBlocked
+pub kernel::EventKind::SessionOpened
 pub kernel::EventKind::SignalConsumed
 pub kernel::EventKind::SignalEnqueued
 pub kernel::EventKind::SteerReceived
@@ -1434,9 +1431,6 @@ pub kernel::McpTransport::Stdio
 pub kernel::McpTransport::Stdio::args: alloc::vec::Vec<alloc::string::String>
 pub kernel::McpTransport::Stdio::command: alloc::string::String
 pub kernel::McpTransport::Stdio::env: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
-pub kernel::MemoShape::Malformed
-pub kernel::MemoShape::Malformed::missing: alloc::vec::Vec<&'static str>
-pub kernel::MemoShape::WellFormed
 pub kernel::Mode::Experiment
 pub kernel::Mode::PlanGoal
 pub kernel::Mode::Sc
@@ -1466,6 +1460,8 @@ pub kernel::NewChild::weight: u32
 pub kernel::Notice::about: kernel::node_id::NodeId
 pub kernel::Notice::line: alloc::string::String
 pub kernel::Notice::to: alloc::string::String
+pub kernel::Origin::at_seq: kernel::Seq
+pub kernel::Origin::run: kernel::RunId
 pub kernel::PlanExit::Finished
 pub kernel::PlanExit::Finished::evidence: kernel::locator::Locator
 pub kernel::PlanExit::Finished::id: kernel::node_id::NodeId
@@ -1755,6 +1751,7 @@ pub kernel::error::AxCode::ApprovalPending
 pub kernel::error::AxCode::BackpressureShed
 pub kernel::error::AxCode::BrowserUnavailable
 pub kernel::error::AxCode::BudgetExhausted
+pub kernel::error::AxCode::Busy
 pub kernel::error::AxCode::CasCorrupt
 pub kernel::error::AxCode::ConfigInvalid
 pub kernel::error::AxCode::CredentialMissing
@@ -1857,6 +1854,7 @@ pub kernel::event::EventKind::RunFrozen
 pub kernel::event::EventKind::RunStarted
 pub kernel::event::EventKind::SecretCaptured
 pub kernel::event::EventKind::SecretEgressBlocked
+pub kernel::event::EventKind::SessionOpened
 pub kernel::event::EventKind::SignalConsumed
 pub kernel::event::EventKind::SignalEnqueued
 pub kernel::event::EventKind::SteerReceived
@@ -1957,6 +1955,8 @@ pub kernel::event::record::RunStarted::parent: core::option::Option<kernel::RunI
 pub kernel::event::record::RunStarted::predecessor: core::option::Option<kernel::RunId>
 pub kernel::event::record::RunStarted::skills: alloc::vec::Vec<kernel::event::record::SkillPin>
 pub kernel::event::record::RunStarted::task: alloc::string::String
+pub kernel::event::record::SessionOpened::carried: bool
+pub kernel::event::record::SessionOpened::from: core::option::Option<kernel::Origin>
 pub kernel::event::record::SkillPin::hash: kernel::locator::B3Hash
 pub kernel::event::record::SkillPin::name: alloc::string::String
 pub kernel::event::record::SkipReason::Duplicate
@@ -2186,9 +2186,6 @@ pub kernel::spine::EvidenceCell::Empty
 pub kernel::spine::EvidenceCell::Invalid
 pub kernel::spine::EvidenceCell::Invalid::raw: alloc::string::String
 pub kernel::spine::EvidenceCell::Present(kernel::locator::Locator)
-pub kernel::spine::MemoShape::Malformed
-pub kernel::spine::MemoShape::Malformed::missing: alloc::vec::Vec<&'static str>
-pub kernel::spine::MemoShape::WellFormed
 pub kernel::spine::NewChild::item: alloc::string::String
 pub kernel::spine::NewChild::weight: u32
 pub kernel::spine::RoadmapRow::evidence: kernel::EvidenceCell
@@ -2370,6 +2367,7 @@ pub struct kernel::ModelUsage
 pub struct kernel::NewChild
 pub struct kernel::NodeId(_)
 pub struct kernel::Notice
+pub struct kernel::Origin
 pub struct kernel::Payload(_)
 pub struct kernel::PlanNode
 pub struct kernel::PlanTree
@@ -2470,6 +2468,7 @@ pub struct kernel::event::record::RerankCalled
 pub struct kernel::event::record::RunForked
 pub struct kernel::event::record::RunFrozen
 pub struct kernel::event::record::RunStarted
+pub struct kernel::event::record::SessionOpened
 pub struct kernel::event::record::SkillPin
 pub struct kernel::event::record::SteerReceived
 pub struct kernel::event::record::ToolCalled

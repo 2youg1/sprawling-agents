@@ -33,6 +33,7 @@ mod shelves;
 mod write;
 
 pub use ladder::Layer;
+pub(crate) use session::forget as forget_session;
 pub use session::{own_layer, write_session};
 pub(crate) use shelves::SHELVES_KEY;
 pub use shelves::city_shelves;

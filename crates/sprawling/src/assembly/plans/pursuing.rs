@@ -123,6 +123,7 @@ impl RunWorker {
                     effort: None,
                     mode: runtime::Mode::PlanGoal,
                     parent: None,
+                    origin: None,
                     succession: None,
                     tainted: false,
                 },

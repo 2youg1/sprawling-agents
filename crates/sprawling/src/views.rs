@@ -53,3 +53,23 @@ pub(crate) use governance::Governance;
 pub(crate) use holding::Views;
 pub use holding::ask;
 pub(crate) use lines::pursuit_from;
+/// What a `session_opened` line says the session branched from, if
+/// anything.
+///
+/// `Ok(None)` is two facts at once and deliberately one answer: a
+/// session that began without a branch, and a line written before
+/// this key existed. Both mean the same thing to a dispatch - this
+/// session inherits nothing - and the second one cannot be a
+/// refusal, because a ledger this repository ships holds such a
+/// line.
+///
+/// # Errors
+/// Refuses a `from` that is present and cannot be read: a branch
+/// whose origin is unreadable is not a session that began without
+/// one.
+pub(crate) fn session_opened(
+    data: &kernel::Payload,
+) -> Result<Option<kernel::Origin>, kernel::AxError> {
+    let opened = data.read::<kernel::event::record::SessionOpened>()?;
+    Ok(opened.from)
+}

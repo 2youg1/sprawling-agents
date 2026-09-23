@@ -6,25 +6,26 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "typecheck": "bun node_modules/typescript-native/lib/tsc.js --noEmit",
+    "typecheck": "bun scripts/typecheck.ts",
     "lint": "eslint --max-warnings 0",
     "test": "bun test --conditions=browser"
   },
   "dependencies": {
     "effect": "3.22.1",
-    "solid-js": "1.9.15"
+    "svelte": "5.57.1"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@sveltejs/vite-plugin-svelte": "7.3.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/bun": "1.4.2",
+    "@typescript/native": "npm:typescript@7.0.2",
     "eslint": "10.10.0",
-    "eslint-plugin-solid": "0.18.0",
+    "eslint-plugin-svelte": "3.23.0",
+    "svelte-check": "4.7.6",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.0",
-    "typescript-native": "npm:typescript@7.0.2",
-    "vite": "8.2.2",
-    "vite-plugin-solid": "2.11.14"
+    "vite": "8.2.2"
   }
 }

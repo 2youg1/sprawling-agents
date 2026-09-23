@@ -20,8 +20,8 @@
 //! `color`'s literal scan is - it is a statement about every file
 //! rather than about one table.
 //!
-//! **Two languages of position, one rule.** A `.tsx` view hands a
-//! reader words through markup, which `jsx` reads; a `.ts` module hands
+//! **Two languages of position, one rule.** A `.svelte` view hands a
+//! reader words through markup, which `markup` reads; a `.ts` module hands
 //! them the parts of a refusal, which `refusal` reads. Reading markup
 //! only left the sentences a person meets when a city refuses them
 //! - the recovery lines in `core/` - outside every reader of this rule.
@@ -40,8 +40,8 @@
 //! **The predicate is a position, not a vocabulary.** A first cut that
 //! scanned every string literal would judge class names, wire values,
 //! event kinds and format keys, and the same shape of mistake once
-//! produced 79 findings that were all addresses. So this walks the RSX
-//! brace structure and keeps two positions, both of which are a reader
+//! produced 79 findings that were all addresses. So this walks the
+//! template's tag structure and keeps two positions, both of which are a reader
 //! being handed a word:
 //!
 //! 1. a **text node** - a literal standing on its own in an element
@@ -103,10 +103,10 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let phrases = keys(root)?;
     let mut violations = Vec::new();
     let markup = Rule {
-        read: jsx::handed_to_a_reader,
+        read: markup::handed_to_a_reader,
         phrases: &phrases,
     };
-    for path in walk::files_with_ext(&dir, &["tsx"])? {
+    for path in walk::files_with_ext(&dir, &["svelte"])? {
         judge(root, &path, &markup, &mut violations)?;
     }
     let modules = Rule {
@@ -222,7 +222,7 @@ struct Said {
     left: String,
 }
 
-mod jsx;
+mod markup;
 mod refusal;
 
 // -------------------------------------------------------- the predicate

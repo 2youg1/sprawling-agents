@@ -96,8 +96,12 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             },
         ],
     });
-    let (base_url, _provider) = fake_openai(
+    let (base_url, _provider) = fake_openai_routed(
         &["m-local"],
+        vec![
+            ("a number is written down", vec![completion("done", None)]),
+            ("the page exists", vec![completion("done", None)]),
+        ],
         vec![
             completion_with("splitting it up", "workshop", "tu_1", graph.clone()),
             completion("waiting on a person", None),
@@ -173,9 +177,9 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             .map_or(0, |join| join.artifacts().count()),
         2,
         "both results joined, verified by the city rather than by their own producers\n\
-         the history, one line per record, is:\n{}\n\
+         the nodes wrote:\n{}\n\
          and how each run ended:\n{}",
-        mentioned(&history, "handback"),
+        crate::assembly::fixture::node_lines(dir.path()).join("\n"),
         mentioned(&history, "run_frozen")
     );
 }

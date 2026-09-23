@@ -46,8 +46,8 @@ fn exposed() -> SocketAddr {
 
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
-    // Thirty-four commands, thirty-four queries. The count is not a
-    // style choice - it is the wire's closed surface.
+    // Thirty commands, thirty-four queries. The count is not a style
+    // choice - it is the wire's closed surface.
     assert_eq!(COMMAND_NAMES.len(), 29, "command table");
     assert_eq!(QUERY_NAMES.len(), 34, "query table");
 
@@ -89,14 +89,14 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 34,
+        WIRE_V, 35,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
 
 /// A function of WIRE_V and the two name tables, so any change to the
 /// protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "7543f8cd18f2142e400d6c318784102bc75178dc653bfded0df29a5f9da9141c";
+const WIRE_SCHEMA_GOLDEN: &str = "e3e542fbe688101c01587c97fc2f56f5a847e321457e95deaeb2b55327064b90";
 
 // -------------------------------------------------------------- binding face
 
@@ -363,10 +363,13 @@ title = \"a window\"
             max_output_tokens: kernel::Ceiling::new(8_192),
             idem,
         },
-        Command::Fork {
-            run,
-            at_seq: Seq::new(3),
-            addr: None,
+        Command::OpenSession {
+            addr: addr.clone(),
+            carry: channels::Carry::Handoff,
+            from: Some(kernel::Origin {
+                run,
+                at_seq: Seq::new(3),
+            }),
             idem,
         },
         Command::CreateBuilding {
@@ -451,6 +454,44 @@ title = \"a window\"
             idem,
         },
     ]
+}
+
+/// A branch names the run and the line; a session that begins without
+/// one sends `null`, which is how every optional field of a Command is
+/// spelled on this wire (`Dispatch.session` and `effort` are the other
+/// two). The ledger's records spell absence by leaving a key out, and
+/// that difference is deliberate: a record is read by this build, and a
+/// frame is read by whatever is on the other end of a socket.
+#[test]
+fn a_session_frame_says_what_it_branches_from_and_omits_it_when_it_does_not() {
+    let run = kernel::RunId::from_bytes([9u8; 16]);
+    let idem = kernel::IdemKey::derive(&run, Seq::new(1), b"branch");
+    let room = Address::parse("acme/floor1").unwrap();
+    let plain = serde_json::to_value(Command::<channels::NoSecret>::OpenSession {
+        addr: room.clone(),
+        carry: channels::Carry::Nothing,
+        from: None,
+        idem,
+    })
+    .unwrap();
+    assert_eq!(
+        plain["open_session"]["from"],
+        serde_json::Value::Null,
+        "a session that branches from nothing says null: {plain}"
+    );
+
+    let branching = serde_json::to_value(Command::<channels::NoSecret>::OpenSession {
+        addr: room,
+        carry: channels::Carry::Nothing,
+        from: Some(kernel::Origin {
+            run,
+            at_seq: Seq::new(7),
+        }),
+        idem,
+    })
+    .unwrap();
+    assert_eq!(branching["open_session"]["from"]["at_seq"], 7);
+    assert_eq!(branching["open_session"]["from"]["run"], run.to_string());
 }
 
 #[test]

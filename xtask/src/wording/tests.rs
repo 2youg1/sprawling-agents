@@ -5,10 +5,10 @@
 
 use super::*;
 
-/// What a `.tsx` view hands a reader. The refusal seats a `.ts`
+/// What a `.svelte` view hands a reader. The refusal seats a `.ts`
 /// module writes are asserted beside their own reader.
 fn found(src: &str) -> Vec<String> {
-    jsx::handed_to_a_reader(src)
+    markup::handed_to_a_reader(src)
         .into_iter()
         .map(|said| format!("{}: {}", said.seat, said.left))
         .collect()
@@ -43,60 +43,50 @@ fn class_lists_routes_and_wire_values_are_not_words_a_reader_was_given() {
     assert!(found(src).is_empty(), "{:?}", found(src));
 }
 
-/// A type argument list ends with the same character an element does.
-/// The first run of this scanner reported ten of these.
+/// What the template does not draw is not read: a script block is
+/// TypeScript and a style block is CSS, and both are full of literals
+/// no reader ever meets.
 #[test]
-fn a_generic_is_not_an_element() {
-    let src = r"
-      const [view, setView] = createSignal<View>(DEFAULT_VIEW);
-      const held: Record<string, Held> | null = null;
-      const draw = (entry: Entry) => entry.label;
-    ";
+fn script_and_style_blocks_draw_nothing() {
+    let src = r#"
+      <script lang="ts">
+        const hint = "this sentence reaches nobody";
+      </script>
+      <style>
+        .figure::after { content: "nor this one"; }
+      </style>
+      <p>{say("cost_total")}</p>
+    "#;
     assert!(found(src).is_empty(), "{:?}", found(src));
+}
+
+/// An inline expression hole is code, and a comparison inside one is
+/// not a tag: the `<` of `count < 10` opens nothing.
+#[test]
+fn an_expression_hole_is_not_a_text_node() {
+    let src = r#"<span>{count < 10 ? say("cost_total") : say("cost_by_run")}</span>"#;
+    assert!(found(src).is_empty(), "{:?}", found(src));
+}
+
+/// A comment draws nothing, however many words it packs.
+#[test]
+fn a_comment_is_not_a_text_node() {
+    let src = r#"
+      <!-- <p>hidden words travel here</p> -->
+      <span>the drawn half</span><!-- and these words do not -->
+    "#;
+    assert_eq!(found(src), ["a text node: the drawn half"]);
 }
 
 #[test]
 fn both_seats_are_read() {
-    let text = r"<span>12 waiting</span>";
-    assert_eq!(found(text), ["a text node: 12 waiting"]);
-    let spoken = r#"<button aria-label="dismiss" />"#;
-    assert_eq!(found(spoken), ["a spoken attribute: dismiss"]);
-    // `aria-current` is not a spoken attribute: its value is a state a
-    // reader never hears as a word.
-    let obeyed = r#"<button aria-current="true" />"#;
-    assert!(found(obeyed).is_empty(), "{:?}", found(obeyed));
-}
-
-/// What the city supplies is not what the view wrote. A run of slots
-/// with punctuation between them hands a reader nothing.
-#[test]
-fn the_citys_own_values_are_not_the_views_words() {
-    let src = r"<span>{percent}%</span><span>{room}/</span><span>+{added}</span>";
-    assert!(found(src).is_empty(), "{:?}", found(src));
-}
-
-/// A comment addresses a contributor, not somebody using the client.
-#[test]
-fn a_comment_is_not_a_page() {
-    let src = r"// the composer grows to fit what somebody typed
-      <span>{say('talk_send')}</span>";
-    assert!(found(src).is_empty(), "{:?}", found(src));
-}
-
-#[test]
-fn a_waiver_on_the_line_or_the_line_above_is_honoured() {
-    let lines = vec![
-        "// wording-ok: a provider's own name",
-        r#"<input placeholder="openai" />"#,
-        r#"<input placeholder="claude" />"#,
-        r#"<input placeholder="groq" /> // wording-ok: a provider's own name"#,
-    ];
-    assert!(waived(&lines, 2), "the line above did not waive");
-    assert!(waived(&lines, 4), "the line itself did not waive");
-    // The reach is two lines, not the rest of the file: line 3 sits
-    // under a line that carries no mark.
-    assert!(
-        !waived(&lines, 3),
-        "the waiver reached further than one line"
+    let text = r#"<span aria-label="12 waiting">now speaking</span>"#;
+    let said = found(text);
+    assert_eq!(
+        said,
+        [
+            "a text node: now speaking",
+            "a spoken attribute: 12 waiting"
+        ]
     );
 }

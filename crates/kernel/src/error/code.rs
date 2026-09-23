@@ -21,7 +21,7 @@ pub enum Carrier {
 /// Extension is additive only; the wire spelling lives in [`AxCode::as_str`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AxCode {
-    // Base table (14).
+    // Base table (15).
     PathNotFound,
     ToolUnknown,
     ToolUnavailable,
@@ -36,6 +36,13 @@ pub enum AxCode {
     LoopSuspected,
     LocatorInvalid,
     SandboxDenied,
+    /// The address or resource this names is taken right now.
+    ///
+    /// Distinct from `WorktreeBusy` and `RepairBusy`, which are
+    /// about those two mechanisms in particular: this one says a
+    /// *run* is working where the caller wants to act, and names the
+    /// run so the caller can stop it and act.
+    Busy,
     // Collaboration (5). A sixth, `SignalUnknown`, was defined away:
     // signal payloads are written and read by one module, the kind is
     // an exhaustive enum, and a kind this version does not know
@@ -74,7 +81,7 @@ pub enum AxCode {
 impl AxCode {
     /// Every code, in the order the SPEC table lists them. Data face for tests and
     /// (from S2 on) `xtask specalign`.
-    pub const ALL: [AxCode; 36] = [
+    pub const ALL: [AxCode; 37] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,
         AxCode::ToolUnavailable,
@@ -89,6 +96,7 @@ impl AxCode {
         AxCode::LoopSuspected,
         AxCode::LocatorInvalid,
         AxCode::SandboxDenied,
+        AxCode::Busy,
         AxCode::DraftStale,
         AxCode::GoalConflict,
         AxCode::TaintedAction,
@@ -130,6 +138,7 @@ impl AxCode {
             AxCode::LoopSuspected => "E_LOOP_SUSPECTED",
             AxCode::LocatorInvalid => "E_LOCATOR_INVALID",
             AxCode::SandboxDenied => "E_SANDBOX_DENIED",
+            AxCode::Busy => "E_BUSY",
             AxCode::DraftStale => "E_DRAFT_STALE",
             AxCode::GoalConflict => "E_GOAL_CONFLICT",
             AxCode::TaintedAction => "E_TAINTED_ACTION",
@@ -194,6 +203,7 @@ impl AxCode {
             | AxCode::EvidenceMissing
             | AxCode::LocatorInvalid
             | AxCode::SandboxDenied
+            | AxCode::Busy
             | AxCode::DraftStale
             | AxCode::GoalConflict
             | AxCode::RepairBusy
@@ -298,10 +308,13 @@ mod tests {
     }
 
     #[test]
-    fn axcode_is_35_and_spelling_is_bijective() {
-        assert_eq!(AxCode::ALL.len(), 36);
+    fn axcode_is_the_declared_length_and_spelling_is_bijective() {
+        // The length is the close of the table, so it is stated once:
+        // a code added without a spelling, or two codes sharing one,
+        // fails here rather than at a caller.
+        assert_eq!(AxCode::ALL.len(), 37);
         let spellings: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
-        assert_eq!(spellings.len(), 36);
+        assert_eq!(spellings.len(), 37);
         for s in &spellings {
             assert!(s.starts_with("E_"));
         }

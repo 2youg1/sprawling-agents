@@ -74,5 +74,21 @@ pub fn write_session(
     )
 }
 
+/// Forgets the record, so the next session at this address chooses its
+/// own shape.
+///
+/// The inverse of [`write_session`], and one act for the same reason:
+/// the model and the effort are one choice, and forgetting one of them
+/// would leave a later run reading half a shape it cannot move. Only the
+/// keys this module wrote are removed, because the file is a person's as
+/// well as a session's (`city-SPEC.md` 8-14b).
+///
+/// # Errors
+/// Propagates a file that exists and cannot be read or parsed, and a
+/// directory that cannot be written.
+pub(crate) fn forget(city_root: &Path, addr: &Address) -> Result<(), AxError> {
+    change(city_root, addr, Layer::Resident, Change::Forget)
+}
+
 #[cfg(test)]
 mod tests;

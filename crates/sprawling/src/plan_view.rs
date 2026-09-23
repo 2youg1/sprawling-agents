@@ -244,6 +244,7 @@ fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::RoadmapClaimed
         | EventKind::RoadmapSplit => PlanReach::Stale,
         EventKind::BuildingConfigured
+        | EventKind::SessionOpened
         | EventKind::RunStarted
         | EventKind::RunForked
         | EventKind::PromptAssembled

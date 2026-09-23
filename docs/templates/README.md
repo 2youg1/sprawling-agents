@@ -11,12 +11,12 @@ Templates land in the building root with `CreateBuilding`; the two hall files la
 | `SPEC.md` | building root | agent, person | yes | What the project is and the decisions it holds, before the code. The project's guide: it travels with every clone. |
 | `RULES.toml` | `<building>/.sprawling/` | person | yes | What the building is and what it may do. Parsed into a BuildingPolicy, and handed to every resident whole. Outside every write domain, so the agents it governs can only read it. |
 | `Roadmap.md` | building root | agent, through `plan` | no | The single denominator for plan and progress. A city has no second roadmap and no todo tool. |
-| `Memo.md` | building root | agent | no | Decisions and corrections. The outline is rewritten in place; the body is append-only. |
+| `Memo.md` | building root | agent | no | The notepad for what needs recording and has no other home. Its form is the writer's to choose. |
 | `Handoff.md` | building root | agent | no | The recovery package, five sections. **Not a new authority.** |
-| `JOB.md` | room | person or dispatcher | no | The task for this session. The agent **reads it and leaves it unchanged**. |
+| `JOB.md` | room | person or dispatcher | no | The task for this session. The agent **reads it and leaves it unchanged**. `write_job` fills `docs/templates/JOB.md`, which is the only copy of the form. |
 | `URBANITE.md` | with the resident | person | no | Who this resident is and how they work. |
-| `MAYOR.md` | `<city>/.sprawling/` | person | — | Who the Mayor is: the city's planner, writing Markdown only. |
-| `CLERK.md` | `<city>/.sprawling/` | person | — | Who answers approvals when the person does not: what it allows, refuses, and leaves to the person. |
+| `MAYOR.md` | `<city>/.sprawling/` | person | — | Who the Mayor is and how it speaks. The tool list and the prohibitions are compiled into the city and appended after this file, so a persona cannot remove them. |
+| `CLERK.md` | `<city>/.sprawling/` | person | — | Who the clerk is and how it sounds. What it allows, refuses, and leaves to the person is compiled into the city beside it. |
 | `RULES-hall.toml` | `<city>/hall/.sprawling/RULES.toml` | the city | — | The rules City Hall is raised with. The one `RULES.toml` a person does not write, because what the two residents serving every building may do is a property of the city. |
 
 The three files in the building root and the rules beside them are together called the **Spine**. Long-running work stays continuous through these files rather than through session memory — this is what "no continuous self" looks like at the file layer.

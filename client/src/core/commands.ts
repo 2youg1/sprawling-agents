@@ -16,9 +16,11 @@ import type {
   Address,
   ApprovalId,
   Autonomy,
+  Carry,
   Ceiling,
   Command,
   Mode,
+  Origin,
   Window,
   DialectKind,
   Effort,
@@ -29,7 +31,6 @@ import type {
   PreferencePatch,
   PursuitStep,
   RunId,
-  Seq,
   SessionName,
   ToolkitSlug,
 } from "../wire";
@@ -157,12 +158,17 @@ export function createBuilding(addr: Address, template: Template): Command {
   };
 }
 
-// A second line from a point on an existing one. `addr` is null for a
-// fork that stays in the room it came from, which is the only form the
-// palette offers: forking somewhere else is a move, and a move is the
-// dispatch form's business.
-export function fork(run: RunId, atSeq: Seq, addr: Address | null): Command {
-  return { fork: { run, at_seq: atSeq, addr, idem: mintIdem() } };
+// A new session at the same address: a fresh conversation in this
+// room, so the frozen model and effort go and the room may choose both
+// again. `carry` says whether the previous session's handoff travels
+// with it; `"nothing"` is what `/new` means and `"handoff"` is what
+// `--carry` asks for.
+//
+// `from` is what makes it a branch: the new session's first run opens
+// with the conversation another run had exchanged up to that line, so
+// `/fork` is this verb with an origin rather than a second one.
+export function openSession(addr: Address, carry: Carry, from: Origin | null): Command {
+  return { open_session: { addr, carry, from, idem: mintIdem() } };
 }
 
 export function setAutonomy(scope: HaltScope, autonomy: Autonomy): Command {

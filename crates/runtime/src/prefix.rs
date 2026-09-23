@@ -18,6 +18,7 @@ use crate::elision::{self, Elided};
 
 mod segment;
 
+pub(crate) use segment::ANOTHER_ADDRESS;
 pub use segment::{FrozenSegment, SegmentSlot, SegmentSource};
 
 /// Documents inside one segment join on this separator; the rebuilder

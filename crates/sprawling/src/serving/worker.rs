@@ -124,12 +124,13 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
     // The views the control surface reads. Rebuilt from the ledger here,
     // folded forward by the write observer inside the worker: one fold
     // rule, two call sites, no second definition of what a view means.
-    let mut rebuilt = rebuild_views(&ledger_dir(city_root))?;
-    // One look at this machine, before the socket exists. Every item is
-    // a program started and asked its version - seconds rather than
-    // milliseconds - so a page asks what the city found rather than
-    // making the city look again (sprawling-SPEC.md 8-53).
-    rebuilt.found_on_this_machine(crate::doctor::report());
+    let rebuilt = rebuild_views(&ledger_dir(city_root))?;
+    // This machine is not asked here (sprawling-SPEC.md 8-54): the
+    // table is thirty-two items, most of them a program started and
+    // asked its version, and a serve that waited for all of them holds
+    // the socket shut for seconds to answer a question only one page
+    // asks. The answer stays `None` until `DoctorRefresh` fills it,
+    // which is the one verb that asks this machine.
     let views = Arc::new(std::sync::Mutex::new(rebuilt));
     let query_views = Arc::clone(&views);
     // Built once and handed to both surfaces below. The socket and the

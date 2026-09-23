@@ -75,6 +75,7 @@ Trades in the market as {who}.
         effort: None,
         mode: runtime::Mode::Up,
         tainted: false,
+        origin: None,
     };
     let effects = vec![
         collab::SignalEffect::Enqueued(speaking_signal("s-1", &room)),
@@ -123,6 +124,7 @@ fn a_half_filed_shelf_is_unwound() {
         effort: None,
         mode: runtime::Mode::Up,
         tainted: false,
+        origin: None,
     };
     let effects = vec![
         collab::ArchiveEffect::Recorded {
@@ -203,6 +205,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
                 parent: None,
                 succession: None,
                 tainted: false,
+                origin: None,
             },
             "read what is waiting".to_owned(),
             "the queue is read, then stop".to_owned(),

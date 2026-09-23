@@ -1159,9 +1159,25 @@
     "en": "notifications",
     "zh": "通知"
   },
+  "notices_detail": {
+    "en": "the city's own words",
+    "zh": "城的原话"
+  },
+  "notices_mark_all": {
+    "en": "mark all as read",
+    "zh": "全部标为已读"
+  },
+  "notices_clear": {
+    "en": "clear",
+    "zh": "清空"
+  },
   "notices_none": {
     "en": "nothing has been refused",
     "zh": "还没有任何拒绝"
+  },
+  "notices_today": {
+    "en": "today",
+    "zh": "今天"
   },
   "notices_unread": {
     "en": "{n} unread",
@@ -1623,6 +1639,38 @@
     "en": "appearance",
     "zh": "外观"
   },
+  "setup_group_hint_tools": {
+    "en": "the programs this city must find",
+    "zh": "这座城必须找到的程序"
+  },
+  "setup_group_hint_skills": {
+    "en": "what the residents have been taught",
+    "zh": "居民学会了什么"
+  },
+  "setup_group_hint_run": {
+    "en": "what a run may do on this machine",
+    "zh": "一次运行被允许做什么"
+  },
+  "setup_group_hint_network": {
+    "en": "what leaves this machine, and through what",
+    "zh": "什么会出网，走哪条路"
+  },
+  "setup_group_hint_keys": {
+    "en": "the keyboard, and what each key does",
+    "zh": "键盘，以及每个键做什么"
+  },
+  "setup_group_hint_appearance": {
+    "en": "how this page looks to you",
+    "zh": "这个界面看起来怎样"
+  },
+  "setup_group_hint_advanced": {
+    "en": "the record itself, and the doors out of it",
+    "zh": "账本本身，以及离开它的路径"
+  },
+  "setup_group_hint_accounts": {
+    "en": "who the city may call, and with which key",
+    "zh": "城能调用谁，用哪把钥匙"
+  },
   "setup_group_keys": {
     "en": "keybindings",
     "zh": "快捷键"
@@ -1852,8 +1900,8 @@
     "zh": "将要发出的请求"
   },
   "setup_preview_toml": {
-    "en": "the equivalent config.toml",
-    "zh": "等价的 config.toml"
+    "en": "the config.toml this would write",
+    "zh": "即将写入的 config.toml"
   },
   "setup_probe_busy": {
     "en": "asking {host} which models it serves…",
@@ -2035,6 +2083,10 @@
     "en": "the same in config.toml",
     "zh": "等价的 config.toml"
   },
+  "setup_toml_toggle": {
+    "en": "the equivalent config.toml",
+    "zh": "等价的 config.toml"
+  },
   "setup_toml_unread": {
     "en": "nothing here can read the city's config.toml yet",
     "zh": "这一版还读不到城的 config.toml"
@@ -2138,6 +2190,14 @@
   "slash_model": {
     "en": "point main at another model",
     "zh": "把 main 指向另一个模型"
+  },
+  "slash_new_fresh": {
+    "en": "start a new session with no handoff",
+    "zh": "开新对话，不携带交接摘要"
+  },
+  "slash_new": {
+    "en": "start a new session at this address",
+    "zh": "在此地址开一个新对话"
   },
   "slash_raise": {
     "en": "raise a building from a template",
@@ -2263,6 +2323,10 @@
     "en": "read the city, answer, and plan where planning is needed",
     "zh": "读完这座城，回答，需要计划的地方写计划"
   },
+  "talk_handed": {
+    "en": "handed to {room}",
+    "zh": "已交给 {room}"
+  },
   "talk_halted": {
     "en": "city paused",
     "zh": "城已暂停"
@@ -2271,18 +2335,7 @@
     "en": "hearing…",
     "zh": "听写中…"
   },
-  "talk_hint_dispatch": {
-    "en": "Say what needs doing in the box below; Enter hands it to this room.",
-    "zh": "在下面的框里说要做什么，按 Enter 就把它交给这个房间。"
-  },
-  "talk_hint_progress": {
-    "en": "The city page draws every building, and every run going on in it.",
-    "zh": "城市页画着每一栋楼，以及楼里正在跑的每一次 run。"
-  },
-  "talk_hint_waiting": {
-    "en": "A question that stops a run arrives here, in this conversation.",
-    "zh": "卡住一次 run 的问题会出现在这里，就在这段对话里。"
-  },
+
   "talk_no_model": {
     "en": "no model chosen",
     "zh": "还没有选模型"
@@ -2526,5 +2579,397 @@
   "wire_version_mismatch": {
     "en": "this page speaks wire v{ours} and the server speaks v{theirs}",
     "zh": "本页说 wire v{ours}，服务端说 v{theirs}"
+  },
+  "act_fork": {
+    "en": "fork this run",
+    "zh": "从这次运行分叉"
+  },
+  "act_open_session": {
+    "en": "open a new session",
+    "zh": "开新对话"
+  },
+  "act_reconnect": {
+    "en": "reconnect",
+    "zh": "重新连接"
+  },
+  "err_e_busy": {
+    "en": "this room is busy",
+    "zh": "这个房间正忙"
+  },
+  "err_e_config_invalid": {
+    "en": "this room's model is frozen",
+    "zh": "这个房间的模型已冻结"
+  },
+  "err_e_link_refused": {
+    "en": "the city refused this connection",
+    "zh": "城拒绝了这次连接"
+  },
+  "fork_from_turn": {
+    "en": "turn {turn}",
+    "zh": "第 {turn} 轮"
+  },
+  "fork_here": {
+    "en": "fork from here",
+    "zh": "从这里分叉"
+  },
+  "fork_pick_title": {
+    "en": "choose a point to fork from",
+    "zh": "选择分叉点"
+  },
+  "notices_yesterday": {
+    "en": "yesterday",
+    "zh": "昨天"
+  },
+  "session_forked_divider": {
+    "en": "forked from turn {turn} · {at}",
+    "zh": "从第 {turn} 轮分叉 · {at}"
+  },
+  "session_new_divider": {
+    "en": "new session · {at}",
+    "zh": "新对话 · {at}"
+  },
+  "session_previous": {
+    "en": "earlier · {n} rounds",
+    "zh": "上一段 · {n} 轮"
+  },
+  "ui_browser_found": {
+    "en": "the browser the doctor found",
+    "zh": "城找到的那个浏览器"
+  },
+  "ui_browser_path": {
+    "en": "a browser at a path I name",
+    "zh": "我指定的那个浏览器"
+  },
+  "ui_browser_system": {
+    "en": "the system's default browser",
+    "zh": "系统默认浏览器"
+  },
+  "err_e_path_not_found": {
+    "en": "that path is not there",
+    "zh": "找不到这个路径"
+  },
+  "err_e_tool_unknown": {
+    "en": "there is no such tool",
+    "zh": "没有这个工具"
+  },
+  "err_e_tool_unavailable": {
+    "en": "this tool is not available right now",
+    "zh": "这个工具现在不可用"
+  },
+  "err_e_invalid_args": {
+    "en": "the city could not make sense of this request",
+    "zh": "城看不懂这个请求"
+  },
+  "err_e_outside_write_domain": {
+    "en": "this write falls outside the allowed ground",
+    "zh": "这次写入超出了允许的范围"
+  },
+  "err_e_version_conflict": {
+    "en": "the ground changed under this one",
+    "zh": "底下的内容已经变了"
+  },
+  "err_e_gate_denied": {
+    "en": "a rule stopped this",
+    "zh": "一条规则拦下了这件事"
+  },
+  "err_e_budget_exhausted": {
+    "en": "this run has spent all it may",
+    "zh": "这次运行的预算已经花完"
+  },
+  "err_e_timeout": {
+    "en": "this took too long and was cut",
+    "zh": "这件事等得太久，已被切断"
+  },
+  "err_e_provider": {
+    "en": "the provider failed to answer",
+    "zh": "供应商没有答上来"
+  },
+  "err_e_evidence_missing": {
+    "en": "the city needs to see the work first",
+    "zh": "城需要先看到证据"
+  },
+  "err_e_loop_suspected": {
+    "en": "the city suspected a loop and stopped",
+    "zh": "城怀疑陷入循环，已停手"
+  },
+  "err_e_locator_invalid": {
+    "en": "this cannot be pointed at",
+    "zh": "这个指向无法解析"
+  },
+  "err_e_sandbox_denied": {
+    "en": "the sandbox would not allow this",
+    "zh": "沙箱不允许这件事"
+  },
+  "err_e_draft_stale": {
+    "en": "the draft is behind the file",
+    "zh": "草稿已经落后于文件"
+  },
+  "err_e_goal_conflict": {
+    "en": "this goes against the goal",
+    "zh": "这与既定目标相抵触"
+  },
+  "err_e_tainted_action": {
+    "en": "tainted input cannot be acted on",
+    "zh": "被污染的输入不能照做"
+  },
+  "err_e_repair_busy": {
+    "en": "a repair is already running",
+    "zh": "已有一个修复在进行"
+  },
+  "err_e_delegation_depth": {
+    "en": "the delegation is too deep",
+    "zh": "委派层数太深"
+  },
+  "err_e_approval_pending": {
+    "en": "this is waiting for a signature",
+    "zh": "这件事在等人签字"
+  },
+  "err_e_approval_denied": {
+    "en": "the signature was refused",
+    "zh": "签字被拒绝了"
+  },
+  "err_e_cross_building_denied": {
+    "en": "this reaches into another building",
+    "zh": "这伸手进了另一栋楼"
+  },
+  "err_e_digest_suspect": {
+    "en": "the city cannot vouch for these bytes",
+    "zh": "城无法为这些字节背书"
+  },
+  "err_e_credential_missing": {
+    "en": "a credential is missing",
+    "zh": "缺少凭据"
+  },
+  "err_e_cas_corrupt": {
+    "en": "the store is damaged",
+    "zh": "内容库已损坏"
+  },
+  "err_e_storage_fatal": {
+    "en": "the city cannot write anything down",
+    "zh": "城写不下任何东西了"
+  },
+  "err_e_worktree_busy": {
+    "en": "the worktree is busy",
+    "zh": "工作树正忙"
+  },
+  "err_e_browser_unavailable": {
+    "en": "there is no browser to open it with",
+    "zh": "没有可以打开它的浏览器"
+  },
+  "err_e_endpoint_dialect_unsupported": {
+    "en": "this endpoint speaks another dialect",
+    "zh": "这个端点说的是另一种方言"
+  },
+  "err_e_wire_mismatch": {
+    "en": "the client and the city disagree on the wire",
+    "zh": "客户端与城的协议版本对不上"
+  },
+  "err_e_log_version_unsupported": {
+    "en": "this ledger is written in a version this city cannot read",
+    "zh": "这本账本的版本这座城读不了"
+  },
+  "err_e_secret_egress": {
+    "en": "a secret would have left the city",
+    "zh": "这会把密钥送出城外"
+  },
+  "err_e_discard_irreversible": {
+    "en": "this discard cannot be undone",
+    "zh": "这次丢弃不可撤销"
+  },
+  "err_e_backpressure_shed": {
+    "en": "the city shed this to stay live",
+    "zh": "城丢掉了它以保持运转"
+  },
+  "err_e_tool_outcome_unknown": {
+    "en": "the outcome is unknown",
+    "zh": "结果未知"
+  },
+  "code_copy": {
+    "en": "copy",
+    "zh": "复制"
+  },
+  "code_copied": {
+    "en": "copied",
+    "zh": "已复制"
+  },
+  "fork_mother": {
+    "en": "mother run",
+    "zh": "母 run"
+  },
+  "fork_turns": {
+    "en": "turns",
+    "zh": "轮次"
+  },
+  "fork_filter_all": {
+    "en": "all",
+    "zh": "全部"
+  },
+  "fork_filter_no_tools": {
+    "en": "no tools",
+    "zh": "不含工具调用"
+  },
+  "fork_filter_user": {
+    "en": "user turns only",
+    "zh": "只看我说的"
+  },
+  "fork_safe_point": {
+    "en": "that call is still open · forking from the last safe point",
+    "zh": "这次调用还没有回话 · 从最近的安全点分叉"
+  },
+  "session_expand": {
+    "en": "expand",
+    "zh": "展开"
+  },
+  "session_collapse": {
+    "en": "collapse",
+    "zh": "收起"
+  },
+  "talk_enter_hint": {
+    "en": "Enter sends - Shift+Enter newline",
+    "zh": "Enter 发送，Shift+Enter 换行"
+  },
+  "talk_panel_jump": {
+    "en": "open the run page",
+    "zh": "打开 run 页"
+  },
+  "setup_saved": {
+    "en": "saved",
+    "zh": "已保存"
+  },
+  "setup_language_note": {
+    "en": "the language every word here is said in",
+    "zh": "这里所有字句用哪种语言"
+  },
+  "setup_autonomy_note": {
+    "en": "who answers what this city puts in front of a person",
+    "zh": "这座城递给人决定的事由谁答复"
+  },
+  "appearance_lighting_note": {
+    "en": "which palette carries the page",
+    "zh": "页面用明暗哪一套"
+  },
+  "appearance_face_note": {
+    "en": "the face the prose is set in",
+    "zh": "正文用哪个字体"
+  },
+  "appearance_mono_note": {
+    "en": "the face ids, keys and paths are set in",
+    "zh": "id、密钥与路径用哪个字体"
+  },
+  "appearance_body_note": {
+    "en": "how large a line of body text is",
+    "zh": "一行正文有多大"
+  },
+  "appearance_density_note": {
+    "en": "how much air the spacing steps carry",
+    "zh": "间距各档留多少空"
+  },
+  "appearance_chroma_note": {
+    "en": "how much colour the screen takes",
+    "zh": "屏幕用多少颜色"
+  },
+  "appearance_motion_note": {
+    "en": "whether anything moves",
+    "zh": "要不要动起来"
+  },
+  "setup_key_kept": {
+    "en": "archived - leave blank to keep it",
+    "zh": "已归档，留空则沿用"
+  },
+  "setup_face_off": {
+    "en": "this host speaks {faces}",
+    "zh": "这个主机说的是 {faces}"
+  },
+  "setup_form_incomplete": {
+    "en": "finish the fields first",
+    "zh": "先把字段填好"
+  },
+  "setup_role_none": {
+    "en": "no role",
+    "zh": "不指定角色"
+  },
+  "keys_at_default": {
+    "en": "already the default",
+    "zh": "已经是默认"
+  },
+  "part_remove_server": {
+    "en": "remove this server?",
+    "zh": "要移除这台服务器吗？"
+  },
+  "part_remove_server_detail": {
+    "en": "this building stops using the tools it offers",
+    "zh": "这栋楼将不再使用它提供的工具"
+  },
+  "setup_copied": {
+    "en": "copied",
+    "zh": "已复制"
+  },
+  "desktop_unchanged": {
+    "en": "there is nothing to save yet",
+    "zh": "还没有可保存的改动"
+  },
+  "act_no_target": {
+    "en": "this refusal names nothing to act on",
+    "zh": "这次拒绝没有指名对象"
+  },
+  "palette_group_actions": {
+    "en": "actions",
+    "zh": "动作"
+  },
+  "palette_group_navigation": {
+    "en": "navigation",
+    "zh": "导航"
+  },
+  "palette_group_sessions": {
+    "en": "sessions",
+    "zh": "对话"
+  },
+  "palette_needs_model": {
+    "en": "no models are attached yet",
+    "zh": "还没有接上任何模型"
+  },
+  "palette_needs_room": {
+    "en": "no room to dispatch into",
+    "zh": "没有可派活的房间"
+  },
+  "palette_needs_run": {
+    "en": "nothing is running to steer",
+    "zh": "没有正在跑的 run"
+  },
+  "welcome_card_work": {
+    "en": "assign work",
+    "zh": "派活"
+  },
+  "welcome_card_work_hint": {
+    "en": "Write what needs doing and hand it to the Mayor.",
+    "zh": "写下要做的事，交给市长。"
+  },
+  "welcome_card_work_draft": {
+    "en": "Ask the city to …",
+    "zh": "让这座城去办……"
+  },
+  "welcome_card_provider": {
+    "en": "connect a provider",
+    "zh": "接上一家供应商"
+  },
+  "welcome_card_provider_hint": {
+    "en": "Point this city at a model it may call.",
+    "zh": "给这座城指定一个能调用的模型。"
+  },
+  "welcome_card_city": {
+    "en": "see the city",
+    "zh": "看看这座城"
+  },
+  "welcome_card_city_hint": {
+    "en": "Every building, and every run going on in it.",
+    "zh": "每一栋楼，以及楼里正在跑的每一次 run。"
+  },
+  "run_doing_waiting": {
+    "en": "waiting",
+    "zh": "在等人"
+  },
+  "run_doing_frozen": {
+    "en": "wrapped up",
+    "zh": "已收尾"
   }
 }

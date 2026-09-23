@@ -64,6 +64,23 @@ pub(in crate::assembly) struct RoomQueues {
 }
 
 impl RoomQueues {
+    /// Which run is working in this room right now, if one is.
+    ///
+    /// A room's queue is what says so, and this is the same fact
+    /// [`RoomQueues::lend`] already acts on rather than a second book
+    /// of who is busy: a dispatch lends its room's queue for as long as
+    /// it drives, so a lent entry *is* a run at work there, and a room
+    /// whose queue is home has nobody in it. A second run in one room
+    /// holds a spare, and the holder named here is still the one that
+    /// answers - the entry it took is what the spare was issued against
+    /// (sprawling-SPEC.md 8-46-9).
+    pub(in crate::assembly) fn worked_by(&self, addr: &Address) -> Option<RunId> {
+        match self.rooms.get(addr) {
+            Some(RoomQueue::Lent { to, .. }) => Some(*to),
+            Some(RoomQueue::Home(_)) | None => None,
+        }
+    }
+
     /// The queues a history folds to. Nothing is lent when a worker
     /// opens: a run that was driving when the process stopped is not
     /// driving now.

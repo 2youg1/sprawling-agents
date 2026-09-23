@@ -23,7 +23,18 @@ pub enum EventKind {
     /// is the fact the file cannot carry - that the change happened,
     /// when, and to which building.
     BuildingConfigured,
-    // Base set (18).
+    // Base set (19).
+    /// A session started at an address: the shape the last one froze
+    /// was forgotten, and the summary it left was carried or not.
+    ///
+    /// A separate kind from `run_started` because it is a separate
+    /// fact: the first run of a session and the fifth are both
+    /// `run_started`, and only this line says where one session ended
+    /// and the next began. `carried` is recorded even when it is
+    /// false, because "this session carries nothing" is the answer to
+    /// the question a person asks when the model behaves as if it had
+    /// never met them.
+    SessionOpened,
     RunStarted,
     RunForked,
     PromptAssembled,
@@ -159,10 +170,11 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 72] = [
+    pub const ALL: [EventKind; 73] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
+        EventKind::SessionOpened,
         EventKind::RunStarted,
         EventKind::RunForked,
         EventKind::PromptAssembled,
@@ -251,6 +263,10 @@ impl EventKind {
             | EventKind::BuildingCreated
             | EventKind::BuildingConfigured
             | EventKind::RunStarted
+            // Starting a session decides what the next run is given, and
+            // the bytes it is given are recorded by `prompt_assembled`;
+            // nothing here belongs to a window already on the wire.
+            | EventKind::SessionOpened
             | EventKind::RunForked
             | EventKind::GateChecked
             | EventKind::GateDenied

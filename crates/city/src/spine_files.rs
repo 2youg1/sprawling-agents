@@ -33,7 +33,9 @@ pub(crate) mod hall;
 mod blank;
 use blank::{empty_roadmap, is_blank_form};
 
-pub use hall::{CLERK_FILE, MAYOR_FILE, hall_identity_path, lay_out_hall_identities};
+pub use hall::{
+    CLERK_FILE, MAYOR_FILE, hall_discipline, hall_identity_path, lay_out_hall_identities,
+};
 
 /// The plan: the single denominator for progress in a building.
 ///
@@ -70,6 +72,10 @@ const HANDOFF_TEMPLATE: &str = include_str!("../../../docs/templates/Handoff.md"
 /// owes left out. One template, so a building's SPEC and a crate's SPEC
 /// stay one shape rather than two competing ones.
 const SPEC_TEMPLATE: &str = include_str!("../../../docs/templates/SPEC.md");
+/// The job file and the two markers `write_job` fills: one form, one home.
+const JOB_TEMPLATE: &str = include_str!("../../../docs/templates/JOB.md");
+const TASK_PLACEHOLDER: &str = "<fill-task>";
+const GOAL_PLACEHOLDER: &str = "<fill-goal>";
 use crate::building::template::NAME_PLACEHOLDER;
 
 const PROJECT_PLACEHOLDER: &str = "<project name>";
@@ -83,6 +89,11 @@ pub struct JobBrief<'a> {
 }
 
 /// What one session was given to work from.
+///
+/// Whoever assigns the work writes it. The file lands on disk before the
+/// run's first event, so the task exists before the Run does; that
+/// ordering is this type's caller's to keep, which is why the fact lives
+/// here rather than in the form every agent reads.
 ///
 /// Exhaustive, and the two arms are different situations rather than a
 /// present and an absent value: a session either carries out a task
@@ -151,6 +162,39 @@ pub fn write_brief(
 #[must_use]
 pub fn handoff_path(city_root: &Path, room: &Address) -> PathBuf {
     kernel::layout::CityLayout::new(city_root).handoff(room)
+}
+
+/// Empties a room's handoff slot, so the next session in it carries
+/// nothing.
+///
+/// **Removed, not blanked.** The blank form this module lays down when a
+/// room is opened answers `handoff` with `None` exactly as a missing file
+/// does, so writing one would leave two states where one says the same
+/// thing. The bytes are not lost: `handoff_written` in the ledger holds
+/// what the last session wrote, and a replay reads them back from there.
+///
+/// **A slot that is already empty is not a failure.** The caller asked
+/// for a new session, which is a thing that can be done whatever the
+/// previous one left behind (`sprawling-SPEC.md` 8-82).
+///
+/// # Errors
+/// `E_STORAGE_FATAL` naming the path, for every failure except a file
+/// that is not there.
+pub fn clear_handoff(city_root: &Path, room: &Address) -> Result<(), AxError> {
+    let path = handoff_path(city_root, room);
+    match std::fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(AxError::failure(
+            AxCode::StorageFatal,
+            "empty a room's handoff slot",
+            format!("{}: {err}", path.display()),
+        )
+        .with_recovery(
+            "a new session carries nothing handoff; \
+             make this file removable, then start the session again",
+        )),
+    }
 }
 
 /// Lays the blank handoff form down in a room that was just opened.
@@ -269,6 +313,21 @@ pub fn roadmap(city_root: &Path, building_addr: &Address) -> Result<String, AxEr
     }
 }
 
+/// The job form with the brief written into it.
+///
+/// Each marker is scanned once and neither value is ever re-scanned,
+/// so a task naming the goal marker and a goal naming the task marker
+/// both survive verbatim: `split` divides the form on one marker,
+/// `replace` fills the other inside each part, and the join inserts
+/// the first value without looking at it again.
+fn filled(brief: &JobBrief<'_>) -> String {
+    JOB_TEMPLATE
+        .split(TASK_PLACEHOLDER)
+        .map(|part| part.replace(GOAL_PLACEHOLDER, brief.goal))
+        .collect::<Vec<_>>()
+        .join(brief.task)
+}
+
 /// Writes the job file for one run and returns the bytes written, so the
 /// caller can record the same text as history without reading the file
 /// back and hoping it is unchanged.
@@ -281,11 +340,7 @@ pub fn write_job(
     brief: &JobBrief<'_>,
 ) -> Result<String, AxError> {
     let path = job_path(city_root, addr);
-    let text = format!(
-        "# {JOB_FILE} — {}\n\n> The task for this session. Read it in full and leave it \
-         unchanged.\n\n## Task\n\n{}\n\n## Goal\n\n{}\n",
-        brief.task, brief.task, brief.goal
-    );
+    let text = filled(brief);
     crate::document::replace(&path, text.as_bytes())?;
     Ok(text)
 }

@@ -6,66 +6,82 @@
 >
 > **A change that contradicts a decision below changes the decision first, with its reason, in the same change.**
 
-## 1 What it is
+<what>
+(One paragraph, then the units of work that can be accepted separately — each one a row in the acceptance table.)
+</what>
 
-(One paragraph, then the units of work that can be accepted separately — each one a row in section 2.)
-
-## 2 Acceptance
+<acceptance>
 
 | Unit | Done means |
 |---|---|
 | | (A check somebody can run, and its expected result.) |
 
-## 3 Assumptions and open questions
+</acceptance>
 
+<assumptions>
 - **Assumed**: (what the design takes for granted; each one is a place the design can be wrong.)
 - **Open**: (a question with the two answers it could take and what each would change.)
+</assumptions>
 
-## 4 Authorities
+<authorities>
 
 | Fact | Where it is settled |
 |---|---|
 | | (The document, standard, or file that decides it. Prefer a primary source, and date the last time it was checked.) |
 
-## 5 Names
+</authorities>
 
+<names>
 (One word per concept, used everywhere. Retired words go here with their replacement, so a reader of an old commit is not lost.)
+</names>
 
-## 6 Boundaries
-
+<boundaries>
 (What this project owns, what its neighbours own, and the seam between them — the interface, not the wish.)
+</boundaries>
 
-## 7 Interfaces
-
+<interfaces>
 (The types, commands, files or endpoints, written before they exist, with what each promises and what it refuses. Code that differs from this section is wrong until this section is changed.)
+</interfaces>
 
-## 8 Failure
+<failure>
 
 | What is refused | Code | What the caller can do instead |
 |---|---|---|
 | | | |
 
-## 9 Dependencies
+</failure>
+
+<dependencies>
 
 | Dependency | Version | Why this one |
 |---|---|---|
 | | | |
 
-## 10 Values fixed in code
+</dependencies>
+
+<values>
 
 | Value | Where | Why this number |
 |---|---|---|
 | | | |
 
-## 11 Tests and machine-held rules
+</values>
 
+<tests>
 (Which checks run before a change lands, and the command that runs them. A rule a machine holds is listed with the machine; a rule a reviewer holds is listed as such.)
+</tests>
 
-## 12 Decisions
+<decisions>
 
-### S-0001 · <one-line title>
+<decision id="S-0001">
+
+**(one-line title)**
 
 - **Date**:
 - **Decided**:
 - **Instead of**: (the alternative that was rejected, and why it lost.)
 - **Replaces**: (the decision this one supersedes; empty otherwise.)
+
+</decision>
+
+</decisions>

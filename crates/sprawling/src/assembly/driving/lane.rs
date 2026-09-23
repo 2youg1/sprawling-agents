@@ -42,6 +42,22 @@ pub(crate) struct DriveContext {
     /// What is still running while the runs go on, so a halt on a scope
     /// reaches a run inside it.
     pub(crate) backlog: runtime::Backlog,
+    /// One fence at a time per city.
+    ///
+    /// **A repository has one index, and a fence stages and commits it.**
+    /// Two nodes of one ready set drive at once by design
+    /// (`assembly::plans::pursuing`), so their fences can overlap, and
+    /// libgit2's `.git/index.lock` refuses the second one: a run that lost
+    /// that race ended as cancelled and its node was handed back as
+    /// though its own done check had failed. The gate is the width of the
+    /// act, not of the run - a lane waits out the few milliseconds
+    /// another lane's commit takes, and nothing else about two runs is
+    /// serialized.
+    ///
+    /// `memory::checkpoint::scan::write_index` still waits out a lock,
+    /// and that is a different contender: another sprawling process on
+    /// the same city, which no mutex here can see.
+    pub(crate) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
 }
 
 /// Who may interrupt one drive, in rank order: the halt that reached
@@ -106,6 +122,21 @@ impl Interrupting {
     }
 }
 
+/// A lock nobody can take, as a refusal rather than a panic.
+///
+/// The gate is held for one commit's length and by a lane that cannot
+/// panic while holding it (its own failures are values), so this arm is
+/// unreachable; inventing a panic for it would cost the whole city for a
+/// fact it can report instead.
+fn poison(what: &str) -> AxError {
+    AxError::failure(
+        kernel::AxCode::StorageFatal,
+        "take the fence gate",
+        what.to_owned(),
+    )
+    .with_recovery("restart this city: a lock left by a dead thread cannot be trusted")
+}
+
 /// Runs the plan, and hands back what the drive left behind.
 ///
 /// The three hooks live here because they are the only code that
@@ -151,6 +182,7 @@ pub(crate) fn drive_run<L: Ledger>(
         watching,
         person,
         backlog,
+        fence_gate,
     } = context;
     let mut now = || now_ms();
     let mut fence_point =
@@ -239,6 +271,11 @@ pub(crate) fn drive_run<L: Ledger>(
             }
         };
         let mut fence = |t: TimeMs| {
+            // Held for the whole of `wave_pre`: staging, committing and
+            // reading back are one act over one index.
+            let _one_at_a_time = fence_gate
+                .lock()
+                .map_err(|_| poison("this city's fence gate"))?;
             let payload = fence_point
                 .wave_pre(&fence_scope, t, &of)
                 .map_err(memory::MemoryError::into_ax)?;

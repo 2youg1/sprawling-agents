@@ -9,10 +9,9 @@ use kernel::event::Scope;
 use kernel::event::record::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
 };
-use kernel::{Address, AxCode, AxError, EventKind};
-use kernel::{Ledger, Locator, Payload, RunId};
+use kernel::{Address, AxCode, AxError, EventKind, Payload};
 
-use super::super::{RunWorker, Unasked, ledger_dir, now_ms, run_id_for, scope_of};
+use super::super::{RunWorker, Unasked, scope_of};
 
 impl RunWorker {
     /// Shuts a scope to new work, or opens it again.
@@ -202,85 +201,5 @@ impl RunWorker {
                 bytes: body.len(),
             })?,
         )
-    }
-
-    /// Records a fork: a new run identity branched from `from` at the
-    /// event node `at_seq`. The lineage is the record; driving the new
-    /// run is a Dispatch the person (or the interface) sends when ready.
-    /// Prefix semantics are the replay layer's (`runtime::fork::prefix`);
-    /// this method refuses a node the mother does not own.
-    ///
-    /// # Errors
-    /// Refuses a node `from` does not own, and propagates whatever chain
-    /// verification or the prefix bound reports.
-    pub fn fork(
-        &mut self,
-        from: RunId,
-        at_seq: kernel::Seq,
-        addr: Option<Address>,
-    ) -> Result<RunId, AxError> {
-        let verified = runtime::replay::verify_ledger_dir(&ledger_dir(&self.city_root))?;
-        // Validates the bound the same way a prefix build would.
-        let _prefix = runtime::fork::prefix(&verified, at_seq)?;
-        let index = usize::try_from(at_seq.value()).map_err(|_| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "fork",
-                "at_seq does not fit this platform",
-            )
-            .with_recovery(
-                "fork at a lower seq, or run this city on a 64-bit machine: the seq \
-                 asked for is beyond what this one can index",
-            )
-        })?;
-        let node_owner = verified.lines().get(index).and_then(|line| match line {
-            runtime::replay::VerifiedLine::Known { record, .. } => Some(record.run()),
-            // A line this build ignores names no run, so it is nobody's
-            // event to fork from.
-            runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
-        });
-        if node_owner != Some(from) {
-            return Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "fork",
-                format!("seq {} is not an event of run {from}", at_seq.value()),
-            )
-            .with_recovery("name an event node of the run you are forking"));
-        }
-        let fork_addr = match addr {
-            Some(addr) => addr,
-            None => verified
-                .lines()
-                .iter()
-                .find_map(|line| match line {
-                    runtime::replay::VerifiedLine::Known { record, .. }
-                        if record.run() == from && record.kind() == EventKind::RunStarted =>
-                    {
-                        record.addr().cloned()
-                    }
-                    runtime::replay::VerifiedLine::Known { .. }
-                    | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
-                })
-                .ok_or_else(|| {
-                    AxError::failure(
-                        AxCode::InvalidArgs,
-                        "fork",
-                        format!("{from} has no run_started in this ledger"),
-                    )
-                    .with_recovery("name the address to fork into")
-                })?,
-        };
-        let now = now_ms()?;
-        let new_run = run_id_for(
-            &Locator::parse(&format!(
-                "cas:b3-{}",
-                kernel::B3Hash::digest(from.as_bytes())
-            ))?,
-            &fork_addr,
-            now,
-        );
-        let draft = runtime::fork::fork_draft(from, at_seq, new_run, now, "owner".to_owned())?;
-        self.ledger.append(draft)?;
-        Ok(new_run)
     }
 }

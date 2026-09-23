@@ -76,6 +76,19 @@ impl Window {
         self.push_user_text(reminder.render());
     }
 
+    /// What a branch starts from: the messages the mother exchanged, in
+    /// the order she exchanged them.
+    ///
+    /// **Verbatim, and that is not laziness.** The list being pushed was
+    /// folded through this same type, one turn at a time, so it already
+    /// satisfies the invariant below; re-deciding here whether its last
+    /// message may join the next would be a second answer to a rule this
+    /// module owns. The caller pushes the new run's own lines afterwards,
+    /// and those do join.
+    pub fn push_inherited(&mut self, messages: &[ChatMessage]) {
+        self.messages.extend_from_slice(messages);
+    }
+
     pub fn push_assistant(&mut self, content: Vec<ContentBlock>) {
         if !content.is_empty() {
             self.messages.push(ChatMessage {

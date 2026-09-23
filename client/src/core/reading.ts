@@ -27,7 +27,7 @@
 // reported.
 
 import { scopeOf } from "./scope";
-import type { EventRecord, HaltScope } from "../wire";
+import type { EventRecord, HaltScope, Seq } from "../wire";
 
 // One field of a payload, with the name that field is known by when this
 // build cannot read it. `at` is null when it could.
@@ -147,4 +147,23 @@ export function haltOf(record: EventRecord): [Halt, string | null] {
     return [{ scope: null, state: state.value }, where(record, "scope")];
   }
   return [{ scope, state: state.value }, first(held, state)];
+}
+
+// Where a session starts at an address: the room, and the sequence
+// number of the line that began the newest stretch of it.
+//
+// `null` for every record that is not a session start, and for one that
+// names no address - a session is a stretch of a room, and a line that
+// does not say which room is not one the page can file. The caller
+// keeps the newest: a page that reloads folds an older range after a
+// newer one, and the newest start is what a stretch begins at.
+export function sessionStart(record: EventRecord): SessionStart | null {
+  if (record.kind !== "session_opened") return null;
+  const addr = record.addr ?? null;
+  return addr === null ? null : { addr, seq: record.seq };
+}
+
+export interface SessionStart {
+  readonly addr: string;
+  readonly seq: Seq;
 }

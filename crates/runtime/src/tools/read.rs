@@ -226,8 +226,8 @@ impl ReadTool {
             meta: ToolMeta {
                 name: ToolName::parse("read")?,
                 disclosure: "Read a file by its path, or a skill by the name the catalog lists \
-                             it under. At most 512 lines per call; a truncated answer states \
-                             the total and the offset to continue from."
+                             it under. A truncated answer states the total and the offset to \
+                             continue from. Reading a directory or a missing file is refused."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,

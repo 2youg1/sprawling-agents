@@ -86,7 +86,11 @@ impl ExecTool {
         arm.insert(
             "description".to_owned(),
             Value::String(
-                "one of {program:{path,args}}, {python:{code}}, {shell:{text}}".to_owned(),
+                "one of {program:{path,args}}, {python:{code}}, {shell:{text}}; write the \
+                 Python as a short script against the standard library - pathlib, difflib, re, \
+                 itertools, collections - with no classes, no exception handlers and no \
+                 comments, and read the error when it fails"
+                    .to_owned(),
             ),
         );
         properties.insert("arm".to_owned(), Value::Object(arm));
@@ -115,7 +119,8 @@ impl ExecTool {
         let disclosure = format!(
             "Run a program, a Python snippet, or a shell line. A program or shell \
              line runs in this machine's confinement, {}. Ask for `where: host` to \
-             run one outside it.",
+             run one outside it. Use `read` and `search` for what is already written here; a \
+             command that prints it comes back without the version `edit` guards on.",
             confinement.statement()
         );
         Ok(ExecTool {

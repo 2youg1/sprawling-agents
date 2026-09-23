@@ -446,7 +446,8 @@ pub fn runtime::elision::gap_marker_room(usize) -> usize
 pub fn runtime::elision::marker(kernel::budget::ByteLen) -> alloc::string::String
 pub fn runtime::elision::marker_room(usize) -> usize
 pub fn runtime::elision::splice(&str, usize, usize, runtime::elision::Elided) -> runtime::elision::Cut
-pub fn runtime::fork::fork_draft(kernel::event::identity::RunId, kernel::event::identity::Seq, kernel::event::identity::RunId, kernel::event::identity::TimeMs, alloc::string::String) -> core::result::Result<kernel::event::payload::EventDraft, kernel::error::shape::AxError>
+pub fn runtime::fork::fork_draft(kernel::origin::Origin, kernel::event::identity::RunId, kernel::address::Address, kernel::event::identity::TimeMs, alloc::string::String) -> core::result::Result<kernel::event::payload::EventDraft, kernel::error::shape::AxError>
+pub fn runtime::fork::inherited(&runtime::replay::VerifiedLedger, kernel::event::identity::Seq) -> core::result::Result<runtime::fork::Inherited, kernel::error::shape::AxError>
 pub fn runtime::fork::prefix(&runtime::replay::VerifiedLedger, kernel::event::identity::Seq) -> core::result::Result<alloc::vec::Vec<alloc::vec::Vec<u8>>, kernel::error::shape::AxError>
 pub fn runtime::handoff::Handoff::context(&self) -> &str
 pub fn runtime::handoff::Handoff::context(&self) -> &str
@@ -639,6 +640,7 @@ pub fn runtime::version_of(&[u8]) -> alloc::string::String
 pub fn runtime::window::Window::messages(&self) -> &[kernel::model::wire::ChatMessage]
 pub fn runtime::window::Window::new() -> runtime::window::Window
 pub fn runtime::window::Window::push_assistant(&mut self, alloc::vec::Vec<kernel::model::wire::ContentBlock>)
+pub fn runtime::window::Window::push_inherited(&mut self, &[kernel::model::wire::ChatMessage])
 pub fn runtime::window::Window::push_reminder(&mut self, &runtime::reminder::ContextReminder)
 pub fn runtime::window::Window::push_steer(&mut self, &str, &str)
 pub fn runtime::window::Window::push_task_lines(&mut self, &str, &str, runtime::window::Opening)
@@ -793,6 +795,7 @@ pub runtime::RunHooks::invoke: &'a mut dyn core::ops::function::FnMut(&kernel::t
 pub runtime::RunHooks::now: &'a mut dyn core::ops::function::FnMut() -> core::result::Result<kernel::event::identity::TimeMs, kernel::error::shape::AxError>
 pub runtime::RunPlan::addr: kernel::address::Address
 pub runtime::RunPlan::goal: alloc::string::String
+pub runtime::RunPlan::inherited: alloc::vec::Vec<kernel::model::wire::ChatMessage>
 pub runtime::RunPlan::job: kernel::locator::Locator
 pub runtime::RunPlan::opening: runtime::window::Opening
 pub runtime::RunPlan::parent: core::option::Option<kernel::event::identity::RunId>
@@ -1009,6 +1012,8 @@ pub runtime::elision::Elided::Head
 pub runtime::elision::Elided::Middle
 pub runtime::elision::Elided::Nothing
 pub runtime::elision::Elided::Tail
+pub runtime::fork::Inherited::at: kernel::event::identity::Seq
+pub runtime::fork::Inherited::messages: alloc::vec::Vec<kernel::model::wire::ChatMessage>
 pub runtime::handoff::ResumeSeed::must_read: alloc::vec::Vec<kernel::locator::Locator>
 pub runtime::handoff::ResumeSeed::run: kernel::event::identity::RunId
 pub runtime::mode::Admission::Lands
@@ -1113,6 +1118,7 @@ pub runtime::run::RunHooks::invoke: &'a mut dyn core::ops::function::FnMut(&kern
 pub runtime::run::RunHooks::now: &'a mut dyn core::ops::function::FnMut() -> core::result::Result<kernel::event::identity::TimeMs, kernel::error::shape::AxError>
 pub runtime::run::RunPlan::addr: kernel::address::Address
 pub runtime::run::RunPlan::goal: alloc::string::String
+pub runtime::run::RunPlan::inherited: alloc::vec::Vec<kernel::model::wire::ChatMessage>
 pub runtime::run::RunPlan::job: kernel::locator::Locator
 pub runtime::run::RunPlan::opening: runtime::window::Opening
 pub runtime::run::RunPlan::parent: core::option::Option<kernel::event::identity::RunId>
@@ -1401,6 +1407,7 @@ pub struct runtime::digest::Breaker
 pub struct runtime::digest::Digest
 pub struct runtime::digest::StructureNode
 pub struct runtime::elision::Cut
+pub struct runtime::fork::Inherited
 pub struct runtime::handoff::Handoff
 pub struct runtime::handoff::ResumeSeed
 pub struct runtime::mode::Produced

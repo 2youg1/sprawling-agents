@@ -10,7 +10,8 @@
 // about. The city refuses a container it cannot send on, by name, so a
 // guess here would be a guess the person pays for.
 
-import { createSignal } from "solid-js";
+import { derived, get, writable } from "svelte/store";
+import type { Readable } from "svelte/store";
 
 import { bearing } from "./socket";
 
@@ -98,14 +99,14 @@ export async function record(origin: string, token: string | null): Promise<Reco
 //
 // The box owns where words go; this owns whether a recording is
 // running, whether the city is still transcribing, and whether the last
-// attempt was refused. Splitting it the other way put four signals and
+// attempt was refused. Splitting it the other way put four stores and
 // a two-branch handler inside a view that already had eleven, and the
 // state was never about the view: a second control that dictates into
 // somewhere else needs the same machine and must not grow a second one.
 export interface Dictation {
-  readonly taking: () => boolean;
-  readonly hearing: () => boolean;
-  readonly refused: () => boolean;
+  readonly taking: Readable<boolean>;
+  readonly hearing: Readable<boolean>;
+  readonly refused: Readable<boolean>;
   readonly speak: () => void;
 }
 
@@ -118,28 +119,33 @@ export function dictation(
   pairing: string | null,
   into: (heard: string) => void,
 ): Dictation {
-  const [taking, setTaking] = createSignal<Recording | null>(null);
-  const [hearing, setHearing] = createSignal(false);
-  const [refused, setRefused] = createSignal(false);
+  const taking = writable<Recording | null>(null);
+  const hearing = writable(false);
+  const refused = writable(false);
   const speak = () => {
-    const going = taking();
+    const going = get(taking);
     if (going === null) {
-      setRefused(false);
+      refused.set(false);
       void record(origin, pairing).then((started) => {
-        setTaking(() => started);
-        setRefused(started === null);
+        taking.set(started);
+        refused.set(started === null);
       });
       return;
     }
-    setTaking(null);
-    setHearing(true);
+    taking.set(null);
+    hearing.set(true);
     void going.stop().then((answer: Heard) => {
-      setHearing(false);
-      setRefused(answer.kind === "refused");
+      hearing.set(false);
+      refused.set(answer.kind === "refused");
       if (answer.kind === "text") {
         into(answer.text);
       }
     });
   };
-  return { taking: () => taking() !== null, hearing, refused, speak };
+  return {
+    taking: derived(taking, (held) => held !== null),
+    hearing,
+    refused,
+    speak,
+  };
 }

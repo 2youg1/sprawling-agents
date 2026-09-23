@@ -52,7 +52,7 @@ fn a_prefix_whose_bytes_moved_is_refused_before_anything_is_assembled() {
     };
     assert_eq!(refusal.code(), &kernel::AxCode::CasCorrupt);
     assert!(
-        refusal.recovery().contains("fork this run"),
+        refusal.recovery().contains("another address"),
         "the recovery names the way out: {}",
         refusal.recovery()
     );
@@ -132,7 +132,7 @@ fn a_call_shape_that_changed_mid_session_is_refused() {
     };
     assert_eq!(refusal.code(), &kernel::AxCode::ConfigInvalid);
     assert!(
-        refusal.recovery().contains("fork this run"),
+        refusal.recovery().contains("another address"),
         "{}",
         refusal.recovery()
     );

@@ -212,6 +212,9 @@ pub fn run_scenario_on(
         job,
         parent: None,
         predecessor: None,
+        // A simulated run is nobody's branch: it is a scenario's own
+        // first run.
+        inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),
             max_tokens: kernel::Ceiling::new(4096),

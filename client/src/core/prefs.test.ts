@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { describe, expect, test } from "bun:test";
+import { get } from "svelte/store";
 
 import { loadPreferences } from "./prefs";
 import type { Preferences } from "./prefs";
@@ -37,7 +38,7 @@ describe("the cache in front of the city", () => {
     loadPreferences(rows, "en").adopt(STATED);
     // A second door over the same store is the next first paint: it
     // reads the cache and nothing else.
-    expect(loadPreferences(rows, "en").held()).toEqual(STATED);
+    expect(get(loadPreferences(rows, "en").held)).toEqual(STATED);
   });
 
   test("a size nobody stated leaves no row behind for the next paint to find", () => {
@@ -45,31 +46,31 @@ describe("the cache in front of the city", () => {
     const door = loadPreferences(rows, "en");
     door.setAppearance({ ...STATED.appearance, body: 17 });
     door.setAppearance({ ...STATED.appearance, body: null });
-    expect(loadPreferences(rows, "en").held().appearance.body).toBeNull();
+    expect(get(loadPreferences(rows, "en").held).appearance.body).toBeNull();
   });
 
   test("a word this build no longer offers is dropped rather than repaired", () => {
     const rows = memory();
     loadPreferences(rows, "en").adopt(STATED);
     rows.setItem("sprawling.appearance.lighting", "sepia");
-    expect(loadPreferences(rows, "en").held().appearance.lighting).toBe("system");
+    expect(get(loadPreferences(rows, "en").held).appearance.lighting).toBe("system");
   });
 
   test("a browser asking in Chinese is answered in Chinese before anything is stored", () => {
-    expect(loadPreferences(memory(), "zh-Hans-CN").held().lang).toBe("zh");
-    expect(loadPreferences(memory(), "en-GB").held().lang).toBe("en");
+    expect(get(loadPreferences(memory(), "zh-Hans-CN").held).lang).toBe("zh");
+    expect(get(loadPreferences(memory(), "en-GB").held).lang).toBe("en");
   });
 });
 
 describe("who is keeping these", () => {
   test("a browser the city has not answered keeps them itself, and says so", () => {
     const door = loadPreferences(memory(), "en");
-    expect(door.keeper()).toBe("browser");
+    expect(get(door.keeper)).toBe("browser");
     door.setLang("zh");
     // A change made before the city answers does not promote this
     // browser to the authority: it is still the only keeper.
-    expect(door.keeper()).toBe("browser");
-    expect(door.held().lang).toBe("zh");
+    expect(get(door.keeper)).toBe("browser");
+    expect(get(door.held).lang).toBe("zh");
   });
 
   test("the city's answer replaces what this browser held, whole", () => {
@@ -77,16 +78,16 @@ describe("who is keeping these", () => {
     door.setLang("en");
     door.setPanel(true);
     door.adopt(STATED);
-    expect(door.held()).toEqual(STATED);
-    expect(door.keeper()).toBe("city");
+    expect(get(door.held)).toEqual(STATED);
+    expect(get(door.keeper)).toBe("city");
   });
 
   test("a change made after the city answered leaves the city the keeper", () => {
     const door = loadPreferences(memory(), "en");
     door.adopt(STATED);
     door.setProxying("never");
-    expect(door.keeper()).toBe("city");
-    expect(door.held().proxying).toBe("never");
+    expect(get(door.keeper)).toBe("city");
+    expect(get(door.held).proxying).toBe("never");
   });
 });
 

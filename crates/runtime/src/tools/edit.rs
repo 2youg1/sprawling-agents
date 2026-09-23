@@ -92,7 +92,10 @@ impl EditTool {
             meta: ToolMeta {
                 name: ToolName::parse("edit")?,
                 disclosure:
-                    "Replace an exact string in a file, guarded by the version you last saw."
+                    "Replace an exact string in a file, guarded by the version you last saw: \
+                     `old` must match exactly once or the call fails. A file that moved under \
+                     you is refused and not overwritten; read it again and retry. A \
+                     `base_version` of `new` creates the file."
                         .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Write { domain },

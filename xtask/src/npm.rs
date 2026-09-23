@@ -60,8 +60,8 @@ const PERMITTED: &str = "deny.toml";
 
 /// What may reach a person's browser. Exactly these, in both
 /// directions: a gate that only refused additions would wave through the
-/// day `solid-js` is deleted by accident.
-const RUNTIME: [&str; 2] = ["effect", "solid-js"];
+/// day `svelte` is deleted by accident.
+const RUNTIME: [&str; 2] = ["effect", "svelte"];
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     if !root.join(CLIENT).is_dir() {

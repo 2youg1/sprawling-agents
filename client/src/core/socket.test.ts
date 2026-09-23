@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { afterEach, describe, expect, test } from "bun:test";
+import { get } from "svelte/store";
 
 import { openConnection } from "./socket";
 
@@ -87,7 +88,7 @@ describe("the browser half", () => {
     first?.onopen?.();
     first?.onmessage?.({ data: "{\"welcome\":" });
 
-    expect(conn.state().kind).toBe("refused");
+    expect(get(conn.state).kind).toBe("refused");
     expect(first?.closed).toBe(true);
     expect(booked.filter((entry) => !entry.cancelled)).toHaveLength(0);
     expect(FakeSocket.opened).toHaveLength(1);

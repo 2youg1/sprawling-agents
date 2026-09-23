@@ -46,7 +46,7 @@ fn every_kind_spells_itself_once_and_exactly_nine_reach_the_window() {
 }
 
 #[test]
-fn carrier_declarations_cover_all_35_codes() {
+fn carrier_declarations_cover_every_code() {
     let mut loadtime = 0;
     let mut gate = 0;
     let mut tool = 0;
@@ -60,7 +60,7 @@ fn carrier_declarations_cover_all_35_codes() {
     }
     assert_eq!(loadtime, 5, "loadtime whitelist is closed at five");
     assert_eq!(gate, 7);
-    assert_eq!(tool, 18);
+    assert_eq!(tool, 19, "`E_BUSY` joins the refusals a caller reads");
     assert_eq!(
         AxCode::BudgetExhausted.carrier(),
         Carrier::Event(EventKind::BudgetLimit)

@@ -133,6 +133,19 @@ The manifest is the integrity test: a short copy is refused at restore rather th
 
 **Let the agents keep their own notes.** `Memo.md` for decisions and corrections, `Handoff.md` for the next session, the archive for what was worth keeping. They are ordinary files: readable in the browser, editable in your editor, and the same bytes either way.
 
+## Which browser a page opens in
+
+The WebUI is a page, so opening it is a question about your machine rather than about this city: `sprawling serve` prints the address, and the client asks the operating system to open it — the same browser you were already using, with the profile and the logins that are already in it. **Nothing is assumed about which browser that is**, and nothing is started to find out: `sprawling doctor` reads a browser's version from its own files rather than by running it, so a machine whose browser is closed stays a machine with nothing extra running.
+
+Two ways to say otherwise, in this order:
+
+| You want | Do this |
+|---|---|
+| one browser for this city, always | the setting's **browser** row: the name of the executable (`zen`, `firefox`, `msedge`, …) |
+| to override it for one run | `SPRAWLING_BROWSER=<path or name>` in the environment of `sprawling serve` |
+
+The environment wins, because a variable set for one shell is a decision about that shell. A browser named in either place is used as given: this city does not check it is a browser, because a person who names a path means that path. If opening fails, the page still prints its address — copy it into whatever you do have.
+
 ## Parts you can replace
 
 This repository bundles nobody's key, pays for nothing, and proxies nothing. Everything that reaches outside is therefore an adapter you can swap, and this section says where each one lives.

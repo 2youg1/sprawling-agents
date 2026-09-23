@@ -29,14 +29,16 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **City** | One city on one machine: one Ledger, one complete history. Two cities never reference each other. |
 | **Building** | A building within a city. The scope unit for configuration, Archive, and the rules in `RULES.toml`. |
 | **Floor** / **Room** | Floors and rooms inside a building. The directory tree is the space. |
-| **Session** | One line of work a person named, kept in a room of that name. Dispatching to a building with a name opens the room; dispatching to the room again continues the session, and its `Handoff.md` is what carries it across. |
+| **Session** | A stretch of a room. Dispatching to a building with a name opens the room; dispatching into the room again goes on with the session it is in. **`/new` starts a new stretch at the same address** — the model and the effort the last one froze are forgotten, so the room may choose them again, and a person can change their mind about the model without losing the room. What crosses the boundary is chosen: `/new` carries nothing, `/new --carry` carries the room's `Handoff.md`. |
+| **Carry** | What a new session keeps from the one before it. Two answers, both named on the wire: `nothing` (the default, and what `/new` means) and `handoff` (the previous session's summary travels, the frozen shape still goes). |
+| **Origin** | Where a session branched off: a run, and the line of it the branch inherits through. A branch is a new session that opens with another run's conversation, so it is `/new` with an origin rather than a second verb — and the line written down is the one the conversation was actually cut at, which is earlier than the one asked for when that line fell inside a wave of tool calls. |
 | **Build Floor** / **Workshop** | A floor given to one piece of collaborative work, and the node graph that routes work across it. |
 | **Utilities** | The shared services of a city, in the reserved subtree: nothing a resident writes to. |
 | **Resident** | A standing identity with an `URBANITE.md` and a dossier, surviving across runs. |
 | **Ephemeral** | A derived worker discarded after use, with no standing identity. |
 | **Neighbourhood** | The addresses one run can reach, and who stands at each: this building's rooms in full, the city's other buildings by name only. An empty room is listed as a place, because hiding it would read as "this address does not exist". Never called a directory — that word already names a place on disk. |
 | **Run** | One piece of work with a start and an end. **A resident is an identity; an active run is the cost** — the two numbers differ by two orders of magnitude. |
-| **Fork** | A new run branched from a point in another run's history. It records a lineage; it does not start driving by itself. |
+| **Fork** | Branching a conversation: a new session whose first run opens with the conversation another run had up to a line of it. The lineage is recorded (`run_forked`) by the run that inherits; the verb is `/new` with an origin. |
 | **resume** | Reopening a city after the process died: the chain is verified, tool calls whose outcome was lost are closed as unknown, and what waits for a person is reported. |
 | **Address** | A path newtype relative to the city root. It sets the write domain, the default context, and who the work reports to. |
 | **reserved prefix** | A `.sprawling/` directory and its subtree, at any depth, always outside every write domain. Each scope keeps what governs it there — the city, and each building. An agent cannot edit its own accounting, its own configuration, or its own building's rules. |

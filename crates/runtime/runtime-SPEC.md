@@ -114,10 +114,22 @@ pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError>;
 /// silent clamp to the end.
 pub fn prefix(mother: &VerifiedLedger, at_seq: Seq) -> Result<Vec<Vec<u8>>, AxError>;
 /// The run_forked draft for the city Ledger. Caller supplies the new run
-/// id and clock reading; fork itself is pure.
-pub fn fork_draft(from: RunId, at_seq: Seq, new_run: RunId, t: TimeMs, who: String)
+/// id, the room it lands in, and the clock reading; fork itself is pure.
+pub fn fork_draft(origin: Origin, new_run: RunId, addr: Address, t: TimeMs, who: String)
     -> Result<EventDraft, AxError>;      // data = {"from": …, "at_seq": …}
+/// What a new session inherits: the mother's conversation, rebuilt from
+/// her own records, cut at the last line a conversation can be cut at.
+pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxError>;
+pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 ```
+
+**`inherited` 是「分叉」这个词真正的执行体，而它是重建而不是复制。** 一个 run 的 window 由持有它的循环逐回合折起来，进程一停就没有了；折它的那些记录都在账本上。这个函数走母 run 自己的线——开场任务读 `run_started`、助手消息读 `model_returned`、工具结果读 `tool_result`、人中途说的话读 `steer_received`——并把它们**折过流动循环折过的那同一个 `Window` 类型**，所以一条分支拿到的次序就是母亲发出去的次序，而不是对同一批记录的第二次读法。**账本已经过一次脱敏**，分支继承的是母亲真正发出去的那份文本。
+
+**切点只有一处权威，而且它往回退。** 一次工具波是好几行，只有它的末尾是能切的地方：`tool_called` 已写、`tool_result` 未写的中间，是一条「assistant 消息的工具调用没有答案」的半个回合，任何 provider 都拒。所以 `inherited` 维护一个「开着的一波」，命中中途就退回上一次安全点，并在 `Inherited::at` 里如实回报它**实际用到**的那一行——调用方把这一行写进 `run_forked`，于是页面显示的分叉点与模型真正拿到的那一段是同一个事实。
+
+**上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。
+
+**`addr` 落在 `run_forked` 的那一行上**：新 run 的 id 说的是「谁继续谁」，而地址说的是**哪个房间的这次继承已经用掉了**——`assembly::folds::session` 只用这两个字段回答「这个房间的当前一段是否还欠一段对话」。
 
 ### 8-3 runtime::turn（形状 5 typestate 机）＋bench／window
 
@@ -171,9 +183,20 @@ impl Turn<Recording> {
 - **取消只在边界**：每相变函数首参即边界快照；命中 Cancel → 追加 cancel_received → 返回 Cancelled（回合终止，后续 handoff_written＋run_frozen 归执行器）。相内无任何中断入口＝A9 的结构化一半；另一半（事件序断言）在 citysim。**工具波内的每条 call 同样是一道边界**（B-70）：一波是 N 件副作用而不是一件，于是 `execute` 在每条 call 之前问 `still_going`，并经同一个 `cancel_here` 写下同一条 `cancel_received`——消费中断的地方仍然只有一处。
 - **四取消点**：组装前／provider 调用前／工具执行前／派生前，四点全住本模块。第四点由 `Turn<Recording>::record` 收边界快照，故 `record` 与前三相同形——收 `Interrupt`、答 `PhaseOutcome`。它买到的是别处买不到的一件事：**一个回合把活派下去之后、子 Run 起来之前，仍停得住**；`calls_made == 0` 的收尾回合尤其如此，那一刻在第四点之前根本没有下一个边界。
 - **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。S3 接真 dialect 时只加字段。
-- **前缀冻结是运行时不变量，不只是测试（E-2）。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名两条路——开一个新 session，或 fork 这个 run；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
-- **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语同指新 session 或 fork；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
+- **前缀冻结是运行时不变量，不只是测试（E-2）。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名那条今天走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
+- **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
 - **工具波 S2 串行**：并行执行串行入账（确定性 5）属 S3 并发波；接口不预留并发参数，入账序＝calls 序。
+
+#### 8-4-1 一句恢复语只许指向线上真有的动词（`prefix::segment::ANOTHER_ADDRESS`）
+
+```rust
+pub(crate) const ANOTHER_ADDRESS: &str =
+    "send this task to another address, which opens a session of its own";
+```
+
+- **一个事实一个家**：「一个被冻住的会话怎么出去」先前在两处各拼一遍（`prefix::segment::prefix_drifted` 与 `turn::report::shape_moved`），两句话说的是同一件事，而两份拼写可以各自漂。现在动词只拼一遍，两条拒绝各自接上它们自己的解释。
+- **拒绝不得指名一个不存在的动词**：先前的恢复语是「open a new session, or fork this run」——这两件事前端都做不到：同一个地址上开第二个 session 没有任何 Command，`Fork` 写下血统却没有任何 dispatch 路径消费它。**一句指向不存在动词的恢复语，比没有恢复语更坏**：人按它去找，找不到，然后以为是自己没找到。
+- **这句话随动词走**：`OpenSession`（`/new`）上线后，改的是这一个常量，而不是去两处各改一遍。
 
 ### 8-4 runtime::prefix（形状 5＋2）
 

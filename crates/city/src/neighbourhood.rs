@@ -29,7 +29,7 @@ use crate::resident::Identity;
 /// kind of work that belongs with them under. A roster's one line is
 /// taken from there when it exists, because "why would I go to them" is
 /// exactly what that section answers.
-const BRING_HEADING: &str = "## Bring them";
+const BRING_HEADING: &str = "<bring>";
 
 /// Who stands at an address. Exhaustive: either somebody with a standing
 /// identity lives there, or the place is open.
@@ -178,8 +178,8 @@ fn name_of(addr: &Address) -> &str {
 
 /// The one line a roster shows for a resident.
 ///
-/// The `## Bring them` section first, and the first line of prose only
-/// when that section is absent or empty. This is deliberately not
+/// The `<bring>` section first, and the first line of prose only when
+/// that section is absent or empty. This is deliberately not
 /// `library::first_line`, which takes a holding's *title*: a shelf entry
 /// is named by its heading and a resident is described by their prose,
 /// so the two documents are read by two rules that live in two places.
@@ -193,15 +193,15 @@ fn bring_line(text: &str) -> String {
 }
 
 /// The first line of a section, or nothing when the section is empty.
-/// A heading ends it: reading past one would report the next section's
-/// content as this one's.
+/// A heading or a section tag ends it: reading past one would report the
+/// next section's content as this one's.
 fn section_line(tail: &str) -> Option<String> {
     for line in tail.lines() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
-        if trimmed.starts_with('#') {
+        if trimmed.starts_with('#') || trimmed.starts_with('<') {
             return None;
         }
         return Some(trimmed.to_owned());
@@ -209,14 +209,19 @@ fn section_line(tail: &str) -> Option<String> {
     None
 }
 
-/// The first line of prose in a document: not a heading, and not a
-/// blockquote. The template's guidance to the author is a blockquote,
-/// and showing it would give every unedited resident the same sentence
-/// about themselves.
+/// The first line of prose in a document: not a heading, not a
+/// blockquote, and not a section tag. The template's guidance to the
+/// author is a blockquote, and showing it would give every unedited
+/// resident the same sentence about themselves.
 fn first_prose(text: &str) -> Option<String> {
     text.lines()
         .map(str::trim)
-        .find(|line| !line.is_empty() && !line.starts_with('#') && !line.starts_with('>'))
+        .find(|line| {
+            !line.is_empty()
+                && !line.starts_with('#')
+                && !line.starts_with('>')
+                && !line.starts_with('<')
+        })
         .map(str::to_owned)
 }
 
@@ -340,7 +345,7 @@ mod tests {
 
     #[test]
     fn the_line_comes_from_bring_them_when_the_resident_wrote_one() {
-        let filled = "# URBANITE.md — mason\n\n> guidance the author left in place\n\n## Who\n\nA potter.\n\n## Bring them\n\nAnything that has to survive a firing.\n";
+        let filled = "# URBANITE.md — mason\n\n> guidance the author left in place\n\n<who>\nA potter.\n</who>\n\n<bring>\nAnything that has to survive a firing.\n</bring>\n";
         assert_eq!(bring_line(filled), "Anything that has to survive a firing.");
 
         let unsectioned = "# URBANITE.md\n\n> guidance\n\nAsks rather than guesses.\n";
@@ -350,7 +355,8 @@ mod tests {
             "the template's guidance is not a description of anybody"
         );
 
-        let sectionless_but_headed = "# URBANITE.md\n\n## Bring them\n\n## Who\n\nA potter.\n";
+        let sectionless_but_headed =
+            "# URBANITE.md\n\n<bring>\n</bring>\n\n<who>\nA potter.\n</who>\n";
         assert_eq!(
             bring_line(sectionless_but_headed),
             "A potter.",

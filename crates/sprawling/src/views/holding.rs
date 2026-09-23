@@ -128,14 +128,15 @@ pub(crate) struct Views {
     /// `BTreeMap` because this is a path a query is answered from.
     pub(super) claims:
         std::collections::BTreeMap<kernel::NodeId, std::collections::BTreeSet<kernel::RunId>>,
-    /// What this machine had when the city was served, from the one
-    /// look the doctor takes at start-up.
+    /// What this machine had when the doctor last looked, which is when
+    /// somebody last sent `DoctorRefresh`.
     ///
     /// Not folded from anything: this is the one answer here that is
     /// about the machine rather than about the history, which is why it
     /// is set from outside and why a rebuild leaves it alone. `None` is
-    /// a city that never looked - a worker driven one command at a time
-    /// - and it answers `Unavailable` rather than an empty machine.
+    /// a city nobody has asked yet - every city that has just been
+    /// served - and it answers `Unavailable` rather than an empty
+    /// machine.
     pub(super) machine: Option<channels::DoctorAnswer>,
     /// The vault the worker opened; set by `views::served`. `None` is a
     /// `Views` nobody served - a rebuild, a test - and a server wanting

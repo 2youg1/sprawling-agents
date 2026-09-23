@@ -46,7 +46,7 @@ use crate::walk::CLIENT_SRC as VIEWS;
 /// Which file kinds carry a class name. Wider than what the client is
 /// written in, because `index.html` carries classes too and a rung
 /// spelled there draws exactly as wrongly as one spelled in a view.
-const VIEW_EXTS: [&str; 3] = ["tsx", "ts", "html"];
+const VIEW_EXTS: [&str; 3] = ["svelte", "ts", "html"];
 
 /// The closed vocabulary.
 ///

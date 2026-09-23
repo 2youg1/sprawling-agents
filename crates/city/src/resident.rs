@@ -20,8 +20,9 @@ use kernel::{Address, AxCode, AxError, B3Hash, EventKind, EventRecord, RunId, Se
 /// What a prefix's resident segment says when nobody has written an
 /// URBANITE.md. Ephemeral workers run under this: no standing identity,
 /// and the text says so rather than pretending to a character.
-const EPHEMERAL_SEGMENT: &str = "You have no standing identity. Finish the task in JOB.md and report; \
-     nothing about you outlives this run.\n";
+const EPHEMERAL_SEGMENT: &str = "You have no standing identity and you take no work below you. Finish \
+     the task in JOB.md, and say what you did and what you found by writing it into the documents in \
+     your workspace. Nothing about you outlives this run.\n";
 
 /// Standing identity, or the absence of one. Exhaustive: a run is either
 /// carried out by someone the city knows or by a worker it does not.
@@ -43,7 +44,10 @@ impl Identity {
     pub fn load(city_root: &Path, addr: &Address) -> Result<Identity, AxError> {
         let path = urbanite_path(city_root, addr);
         match std::fs::read(&path) {
-            Ok(bytes) => Ok(Identity::Resident(Resident::new(addr.clone(), bytes))),
+            Ok(bytes) => Ok(Identity::Resident(Resident::new(
+                addr.clone(),
+                described(addr, bytes),
+            ))),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
                 Ok(Identity::Ephemeral { addr: addr.clone() })
             }
@@ -81,6 +85,25 @@ impl Identity {
     pub fn who(&self) -> String {
         self.addr().as_str().to_owned()
     }
+}
+
+/// The description a resident is known by, with the discipline the city
+/// carries for its seat.
+///
+/// Composed at load rather than kept apart, so the content hash over
+/// `Resident::urbanite` covers both: two builds whose disciplines differ
+/// never produce the same digest for the same file.
+fn described(addr: &Address, written: Vec<u8>) -> Vec<u8> {
+    let Some(discipline) = crate::spine_files::hall_discipline(addr) else {
+        return written;
+    };
+    let mut out = written;
+    if !out.is_empty() && !out.ends_with(b"\n") {
+        out.push(b'\n');
+    }
+    out.push(b'\n');
+    out.extend_from_slice(discipline.as_bytes());
+    out
 }
 
 /// A standing identity and the description it is known by.

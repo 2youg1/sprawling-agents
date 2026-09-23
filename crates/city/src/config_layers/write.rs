@@ -160,6 +160,10 @@ pub(super) enum Change<'a> {
         model: &'a str,
         effort: Option<Effort>,
     },
+    /// The record a session wrote at its own address, removed: the
+    /// inverse of `Session`, and the one change here that takes
+    /// something out of a file rather than stating it.
+    Forget,
     Effort(Effort),
     Sandbox(&'a SandboxLimits),
     Mcp(&'a [McpServer]),
@@ -175,6 +179,28 @@ impl Change<'_> {
                 section.insert("name".to_owned(), toml::Value::String((*model).to_owned()));
                 if let Some(effort) = effort {
                     section.insert("effort".to_owned(), spelled(*effort, file)?);
+                }
+            }
+            Change::Forget => {
+                // Only the two keys `Change::Session` writes. The table
+                // is where a session states its shape, so a file with no
+                // `[model]` has nothing to forget; a file where `model`
+                // is not a table is one this build cannot read, and it
+                // is refused here rather than silently skipped.
+                let emptied = match document.get_mut("model") {
+                    Some(toml::Value::Table(section)) => {
+                        section.remove("name");
+                        section.remove("effort");
+                        section.is_empty()
+                    }
+                    Some(_) => return Err(refuse_file(file, "`[model]` is not a section")),
+                    None => false,
+                };
+                // An empty `[model]` table is not a statement, and
+                // leaving it would keep a reader asking whether a
+                // session that states nothing is a session at all.
+                if emptied {
+                    document.remove("model");
                 }
             }
             Change::Effort(effort) => {

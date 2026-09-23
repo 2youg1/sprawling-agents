@@ -24,7 +24,7 @@ A screen is finished when `cargo xtask render` is green against
 
 **Every word comes from `client/src/lang.json`.** A view calls `say`; it
 does not write a sentence. `cargo xtask wording` reads the two positions
-where JSX hands a reader words — a text node, and a spoken attribute like
+where the template hands a reader words — a text node, and a spoken attribute like
 `aria-label` — and refuses a literal in either. A proper noun that is the
 same word in both languages cannot go in the table, and carries
 `wording-ok: <reason>` on its line or the line above.
@@ -40,6 +40,15 @@ on the brightest surface text is allowed to sit on.
 **Every state worth looking at has a fixture on `#/gallery`.** That route
 is where a screen is judged, by a person and by the gate, so a state with
 no fixture is a state nobody looks at twice.
+
+**Every fixture states the width its subject is drawn at.** The route
+is as wide as the window, and a row list or a notice stretched across
+1920 pixels says nothing about how it looks in the column it lives in;
+`gallery/case.svelte` therefore draws a component at the conversation's
+width unless the case says otherwise, a page at the window it is a page
+of, and a container under test at its own - the last of which also draws
+the frame, because there the width is the point and an unframed 320px
+table reads as a broken page rather than as a container being tested.
 
 ## What `cargo xtask render` asserts
 
@@ -65,6 +74,41 @@ its subject is green for the wrong reason. The engine is looked for in
 three places, and each is an authority that already exists:
 `SPRAWLING_BROWSER`, then what `sprawling doctor` installed under
 `~/.sprawling/components/`, then the desktop browsers.
+
+## What a settled screen is walked against
+
+`render` measures five properties and cannot see the rest, so the last
+walk is a person with the running window and this list. One pass per
+fixture and per real screen, in both lights:
+
+1. **Contrast.** `text-quiet` and `text-faint` hold 4.5:1 against the
+   pane behind them in both `data-appearance` values; 3:1 for large
+   text and graphics. The colour gate reads the tokens; only an eye
+   reads which tier a screen put where.
+2. **Chinese typography.** No line opens with a closing bracket or a
+   full stop; numbers beside Chinese characters sit on the mono figure
+   face; no measure wider than `talk` (760) for running text.
+3. **Motion, both states.** With `data-motion="reduced"` every
+   animation reaches its final state without transition and the typing
+   cursor stops blinking. A reduced-motion user must lose decoration,
+   never information.
+4. **Focus.** Walk every screen with Tab alone: the ring is visible on
+   every stop, never clipped, and returns to where it left when a
+   dialog closes.
+5. **Hit areas.** Icon buttons measure at least 28 px on a desktop
+   pointer and their `::before` expansion reaches 44 px for touch.
+6. **Empty states.** Shape, the sentence naming what is missing, and an
+   action out. The action may be absent; the sentence may not.
+7. **Notices.** A refusal with a form goes inline beside its field, one
+   without a page goes to a toast, history sits in the drawer. The role
+   matches the seat.
+8. **Tables.** Figure columns are right-aligned on `w-figure`, id
+   columns hold `min-w-[24ch]`, and nothing wraps mid-token.
+9. **No overflow.** No box draws outside the box that holds it,
+   including popovers at the viewport edge.
+10. **Every word sourced.** The wording gate reads the source; the eye
+    confirms the painted result, where a fixture value is the only
+    exception.
 
 ## What is still a person's job
 

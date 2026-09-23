@@ -1,6 +1,10 @@
 /target
 /local
 /adversary/.lake
+# svelte-check's generated transpiled project (its --tsgo lane and editor
+# tooling write it); it is build output, and ESLint's flat config lints
+# dot directories unless they are ignored (client/eslint.config.ts).
+.svelte-check/
 
 # Working records never ship. To a contributor and to a model they are
 # noise; to an attacker they are intelligence — they name a machine, a

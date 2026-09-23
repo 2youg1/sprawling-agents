@@ -35,6 +35,7 @@ mod report;
 mod running;
 mod screen;
 mod table;
+mod version_file;
 mod visit;
 
 pub(crate) use family::Family;

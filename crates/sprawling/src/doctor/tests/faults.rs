@@ -149,7 +149,7 @@ fn a_present_tool_that_says_nothing_is_still_present() {
         }
     );
     assert!(answered.usable());
-    assert!(answered.describe().contains("said nothing"));
+    assert!(answered.describe().contains("no version"));
 }
 
 /// A program is looked for under the names this platform gives it.

@@ -138,7 +138,7 @@ impl Checkpoint {
         index
             .update_all(specs.iter(), Some(&mut skip_slices))
             .map_err(git_err("stage deletions"))?;
-        index.write().map_err(git_err("write index"))?;
+        write_index(&mut index)?;
         let mut files: Vec<String> = index
             .iter()
             .map(|entry| String::from_utf8_lossy(&entry.path).into_owned())
@@ -193,7 +193,7 @@ impl Checkpoint {
         index
             .update_all(["*"], Some(&mut skip_reserved))
             .map_err(git_err("stage deletions"))?;
-        index.write().map_err(git_err("write index"))
+        write_index(&mut index)
     }
 
     /// Commits the index at the injected time. An unchanged tree still
@@ -274,6 +274,52 @@ impl Checkpoint {
         })?;
         Ok(oid.to_string())
     }
+}
+
+/// Writes the index, waiting out a lock another run of this city holds.
+///
+/// **`.git/index.lock` is taken for the length of one write, and two runs
+/// of one building stage their scopes at the same time by design** -
+/// `assembly::plans::pursuing` drives every node of a ready set at once,
+/// in one repository. The loser of that race used to be told "the index
+/// is locked; this might be due to a concurrent or crashed process",
+/// which is true and useless: the concurrent process is this city, the
+/// lock is held for microseconds, and the sentence in front of the person
+/// said "retry the wave" while nothing retried it. A run that hit the
+/// window ended as cancelled, its node was handed back as though its own
+/// done check had failed, and its parent was told nothing it could act
+/// on.
+///
+/// **Bounded, because a lock held by a dead process is a different
+/// fact.** Twenty-five milliseconds apart, twenty times: a genuinely
+/// stuck lock still surfaces as the refusal it is, and that refusal is
+/// what a person can act on.
+///
+/// Retrying is safe because the index being written is the in-memory one
+/// this call built, unchanged by a failed write: the second attempt
+/// states the same thing as the first.
+fn write_index(index: &mut git2::Index) -> Result<(), MemoryError> {
+    const ATTEMPTS: u32 = 20;
+    const WAIT: std::time::Duration = std::time::Duration::from_millis(25);
+    let mut attempt: u32 = 0;
+    loop {
+        attempt = attempt.saturating_add(1);
+        match index.write() {
+            Ok(()) => return Ok(()),
+            Err(err) if concurrent(&err) && attempt < ATTEMPTS => {}
+            Err(err) => return Err(git_err("write index")(err)),
+        }
+        std::thread::sleep(WAIT);
+    }
+}
+
+/// Whether git refused because somebody else holds the index lock.
+///
+/// libgit2 reports that as an index error whose message names the lock
+/// file; anything else - a permission problem, a damaged index - is not a
+/// collision and is refused on the first attempt.
+fn concurrent(err: &git2::Error) -> bool {
+    err.class() == git2::ErrorClass::Index && err.message().contains("index.lock")
 }
 
 #[cfg(test)]

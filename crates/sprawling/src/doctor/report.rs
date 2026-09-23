@@ -18,10 +18,11 @@ use super::{examine, verdict};
 /// Asks this machine once and folds what it said into the answer the
 /// wire carries.
 ///
-/// Called at the point a city is served and nowhere else: every item is
-/// a program started and asked its version, which is seconds rather
-/// than milliseconds, and a query that did that would hold the one
-/// thread every other read is answered on.
+/// Called from `DoctorRefresh` and nowhere else: every item but the
+/// browsers is a program started and asked its version, which is
+/// seconds rather than milliseconds, so neither a serve nor a query
+/// waits for it - a person opening the page that shows it asks for it,
+/// and the city holds the answer until they ask again.
 pub(crate) fn report() -> channels::DoctorAnswer {
     let platform = Platform::current();
     let findings = examine(&ThisMachine::new(platform, PATIENCE));

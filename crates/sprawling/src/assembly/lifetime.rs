@@ -63,6 +63,7 @@ impl RunWorker {
             collaboration,
             entrance,
             expiries,
+            origins,
         } = Standing::fold(&dir)?;
         let cas = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
             .map_err(memory::MemoryError::into_ax)?;
@@ -93,6 +94,8 @@ impl RunWorker {
             log,
             knocks: Vec::new(),
             entrance,
+            origins,
+            fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
             backlog: runtime::Backlog::new(),
             flight: Flight::open(),
         })

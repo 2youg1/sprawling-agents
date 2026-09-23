@@ -5,15 +5,39 @@
 
 //! The closed sets a Command carries: which step of a login, which
 //! scope a halt applies to, which governed document is being written,
-//! and what is being done to a pursuit.
+//! what is being done to a pursuit, and what a new session keeps from
+//! the one before it.
 //!
 //! Each of them is the protocol's own vocabulary with no upstream
 //! owner, which is what separates them from the carried names in
 //! `channels::carried_name`: those defer to whoever owns the value set,
-//! and these four have no one to defer to.
+//! and these have no one to defer to.
 
 use kernel::Address;
 use serde::{Deserialize, Serialize};
+
+/// What a new session at an address keeps from the previous one.
+///
+/// An enum rather than a flag: the two states are named actions with
+/// different results on disk, and `carry: true` at a call site says
+/// neither of them. `Nothing` is the first variant and the default,
+/// because that is what a person means by starting a new session — a
+/// new one, here, not a continuation (`sprawling-SPEC.md` 8-82). The
+/// handoff is the exception a person states.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Carry {
+    /// Forget the shape the last session froze, and carry no summary.
+    #[default]
+    Nothing,
+    /// Forget the shape, keep the summary the last session wrote.
+    ///
+    /// The shape still goes, which is the point of the verb: a person
+    /// who carries the summary changed the model, and a room that kept
+    /// its frozen shape could not dispatch at all.
+    Handoff,
+}
 
 /// Which step of a subscription login a `Login` frame carries.
 ///

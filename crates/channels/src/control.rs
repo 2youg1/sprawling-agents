@@ -97,7 +97,10 @@ pub fn classify(command: &Command) -> ControlVerdict {
         | Command::AttachEndpoint { .. }
         | Command::SelectModel { .. }
         | Command::Login { .. }
-        | Command::Fork { .. }
+        // Starting a session reaches no run in flight: the assembly
+        // refuses it with `E_BUSY` while one is going, and that refusal
+        // belongs where the run is, not here.
+        | Command::OpenSession { .. }
         | Command::CreateBuilding { .. }
         | Command::PutSecret { .. }
         // Opening a file manager reaches nothing a run is doing.

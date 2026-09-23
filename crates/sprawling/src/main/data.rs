@@ -248,16 +248,35 @@ pub(super) fn fork(args: &[String]) -> ExitCode {
         Some(Err(err)) => return report(err),
     };
     let (vault, _notice) = serving::open_vault();
+    // Which room the branch lands in: the address the person named, or
+    // the one the mother ran in, which is the same choice `Fork` used to
+    // make before a branch became a session rather than a run.
+    let Some(room) = addr else {
+        eprintln!("usage: sprawling fork <city-dir> <run> <seq> <addr>");
+        eprintln!("a branch opens a session in a room; name the room it opens in");
+        return ExitCode::from(2);
+    };
+    let origin = kernel::Origin {
+        run,
+        at_seq: kernel::Seq::new(seq),
+    };
     let outcome = assembly::RunWorker::new(
         std::path::Path::new(dir),
         vault,
         runtime::diagnostics::Diagnostics::off(),
     )
-    .and_then(|mut worker| worker.fork(run, kernel::Seq::new(seq), addr));
+    .and_then(|mut worker| {
+        worker.handle(channels::Command::OpenSession {
+            addr: room.clone(),
+            carry: channels::Carry::Nothing,
+            from: Some(origin),
+            idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, b"fork"),
+        })
+    });
     match outcome {
-        Ok(new_run) => {
-            println!("forked as {new_run}");
-            println!("dispatch into the address when ready; the lineage is recorded");
+        Ok(()) => {
+            println!("{} now branches from {run} at seq {seq}", room.as_str());
+            println!("the next dispatch into it inherits that conversation");
             ExitCode::SUCCESS
         }
         Err(err) => report(err),

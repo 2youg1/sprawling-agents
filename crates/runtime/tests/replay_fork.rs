@@ -108,14 +108,22 @@ fn a19_fork_prefix_is_byte_identical_and_mother_is_untouched() {
     // The run_forked draft carries from/at_seq in its payload.
     let child = RunId::from_bytes([7; 16]);
     let draft = fork::fork_draft(
-        RunId::from_bytes([3; 16]),
-        Seq::new(2),
+        kernel::Origin {
+            run: RunId::from_bytes([3; 16]),
+            at_seq: Seq::new(2),
+        },
         child,
+        kernel::Address::parse("lab/room1").unwrap(),
         TimeMs::new(9),
         "owner".to_string(),
     )
     .unwrap();
     assert_eq!(draft.kind, EventKind::RunForked);
+    assert_eq!(
+        draft.addr.as_ref().map(kernel::Address::as_str),
+        Some("lab/room1"),
+        "the room is on the line, so a rebuild knows whose session has been served"
+    );
     assert_eq!(
         draft.data.as_map().get("at_seq"),
         Some(&serde_json::Value::from(2u64))

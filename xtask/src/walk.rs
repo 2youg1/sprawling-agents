@@ -27,7 +27,7 @@ use crate::report::XtaskError;
 /// four names cost four tokens and a parser costs a parser - but that is
 /// the parameter: **the day this list needs a fifth entry that is not a
 /// build directory, read the ignore file instead of adding a row.**
-const SKIP_DIRS: [&str; 4] = [".git", "target", "node_modules", ".lake"];
+const SKIP_DIRS: [&str; 5] = [".git", "target", "node_modules", ".lake", ".svelte-check"];
 
 /// All regular files under `root`, sorted by their relative forward-slash path.
 pub(crate) fn files(root: &Path) -> Result<Vec<PathBuf>, XtaskError> {

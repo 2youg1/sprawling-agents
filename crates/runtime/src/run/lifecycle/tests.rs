@@ -47,6 +47,7 @@ fn plan() -> RunPlan {
         job,
         parent: None,
         predecessor: None,
+        inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),
             max_tokens: Ceiling::new(4096),

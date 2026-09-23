@@ -62,7 +62,7 @@ use driving::flight::{Flight, Landed};
 pub(crate) use driving::lane::{DriveContext, drive_run};
 use driving::owing::{Owed, Owing, Unasked};
 pub(crate) use driving::{Driven, Driving};
-use folds::{Governance, INBOX_CAPACITY, new_inbox};
+use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 pub(crate) use folds::{Standing, rebuild_views};
 use genesis::city_segment;
 pub use genesis::{Adopt, InitReport, form_city, has_history, init_city};
@@ -256,6 +256,12 @@ pub struct RunWorker {
     /// and every `exec` gets a handle onto it, so `halt` reaches a
     /// command without knowing which tool started it.
     backlog: runtime::Backlog,
+    /// What each room's current session branched from, until the run
+    /// that begins it is written (`assembly::folds::session`).
+    pub(in crate::assembly) origins: SessionOrigins,
+    /// One fence at a time per city: a repository has one index, and
+    /// every lane of this worker stages and commits it (`driving::lane`).
+    pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// Every run in a lane right now, the crossing those lanes write
     /// history through, and what the city owes each one when it comes
     /// home. One per city, so the number of runs a city drives at once

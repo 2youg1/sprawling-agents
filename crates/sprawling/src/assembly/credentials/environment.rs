@@ -25,7 +25,7 @@ impl RunWorker {
                 name: ENVIRONMENT_ENDPOINT.to_owned(),
                 base_url: base_url.to_owned(),
                 dialect: kernel::DialectKind::OpenAi,
-                credential: Credential::Absent,
+                credential: Credential::Absent { header: None },
                 tuning: gateway::EndpointTuning::default(),
             },
             &[],

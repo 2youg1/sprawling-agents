@@ -11,6 +11,7 @@ use crate::completion::Completion;
 use crate::event::identity::{RunId, Seq};
 use crate::event::kind::EventKind;
 use crate::locator::{B3Hash, Locator};
+use crate::origin::Origin;
 
 /// One skill a run was dispatched with, pinned to the bytes it read.
 ///
@@ -109,6 +110,34 @@ impl RunFrozen {
 pub struct EvidenceCite {
     pub seq: Seq,
     pub kind: EventKind,
+}
+
+/// `session_opened`: a new session began at this address.
+///
+/// The room is the subject rather than the run, because what changed is
+/// what the *next* run there is governed by: the model and the effort
+/// the previous session froze are gone, and whether the summary it left
+/// travels with this one is the one thing the caller chose. A replay
+/// reads the answer to "why did this run start fresh" from here;
+/// neither fact is visible in the room's files afterwards, because both
+/// were removals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SessionOpened {
+    /// What the session branched from, when it is a branch.
+    ///
+    /// `#[serde(default)]` and absent when there is none, so a line
+    /// written before this key existed reads as a session that began
+    /// without one - which is what it was.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<Origin>,
+    /// Whether the previous session's handoff travelled with it.
+    ///
+    /// **The room itself is the record's own `addr` field**, not a copy
+    /// here: a line that belongs to an address says so in the envelope,
+    /// and a payload copy would be a second place the same address is
+    /// spelled (`kernel-SPEC.md` section 8-4).
+    pub carried: bool,
 }
 
 /// `run_forked`: which run this one continues, and from where in it.

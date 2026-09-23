@@ -1653,7 +1653,7 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 - **逐项征求同意，而不是一次总同意**：`--install` 对每一个缺项先印出**运行中的机器上要跑的那条命令**，再在 stdin 上问 `y/N`，默认是 N。一次总同意会让人对一串他没读过的命令点头，而这些命令改的是他自己的机器。**没被问到的东西恒不安装**。
 - **恒不提权**：这里的每条命令都是用户级的（`winget`／`brew`／`cargo install`／`rustup`），`sudo`／`apt` 那一支落在 `Recipe::Print`，人自己贴。一个默认会请求管理员权限的 doctor，是把「检查」变成了「让我动你的系统」，与 §8-9 的 install 同一条理由：**只碰这个人 profile 里的东西**。
 - **curl 脚本只印不跑（被否决的备选：`curl | sh` 自动安装）**：bun 在没有包管理器的平台上的官方装法是把一段脚本管进 shell。跑它意味着这座城代替人接受了一份它没读过、也无法在此刻校验的远端代码——**被否决**。那一支是 `Recipe::Print`：命令印在屏幕上，人自己决定。
-- **探测是「在不在 PATH 上」加「`--version` 说什么」，且带时限**：一个装坏了的工具会挂在启动上，而 doctor 挂住等于比不装还糟。子进程的读法沿用 `bin::mcp_stdio` 的形状——读在一个线程里，等在一个带 deadline 的 channel 上，超时就杀掉子进程；`patience` 是参数，**不在这里采时钟**。浏览器另加平台标准安装路径与 Windows 的两个注册表键，因为 Windows 与 macOS 上它常常不在 PATH 上（§8-57）。
+- **探测是「在不在 PATH 上」加「`--version` 说什么」，且带时限**：一个装坏了的工具会挂在启动上，而 doctor 挂住等于比不装还糟。子进程的读法沿用 `bin::mcp_stdio` 的形状——读在一个线程里，等在一个带 deadline 的 channel 上，超时就杀掉子进程；`patience` 是参数，**不在这里采时钟**。浏览器另加平台标准安装路径与 Windows 的两个注册表键，因为 Windows 与 macOS 上它常常不在 PATH 上（§8-57）；**浏览器的版本不问它本人**，读它旁边的文件（§8-80），于是这条带时限的子进程路径只剩驱动与命令行工具在走。
 - **四个文件而不是两个，理由是尺寸与形状**：`doctor.rs` 只留判定（表的形状、`finding_line`、`verdict`），表落 `table.rs`，屏幕与那一问落 `screen.rs`，跑子进程的落 `probe.rs`。判定与驱动同住一个文件时 `doctor.rs` 是 399 行——`xtask length` 的 400 之下一行，即下一次编辑必红。**这不是把文件切碎，是把「判断」与「跟人说话」分开**，两者本就不是一件事。
 - **Windows 上先找带扩展名的那个文件**：`bun` 若由 npm 装出来，同一目录下既有无扩展名的 shell 脚本 `bun`（Windows 起不动）又有 `bun.cmd`。先取无扩展名的那个，报出来的是「装了但不说版本」——一个装好的工具被报成半坏的。故 `names_of` 在 Windows 上按 `.exe`／`.cmd`／`.bat`／无扩展名的次序找，这条次序有它自己的测试。
 - **一项是环境变量而不是程序**：exec 工具 python 臂要的 CPython-WASI 组件由 `PYTHON_WASM_ENV` 指路（`bin::assembly::workbench::tools`），故它的探测是「那个变量指的文件在不在」，安装那一栏是 `Manual`——没有包管理器发它。它是 `Optional`，行尾说明它开启的是什么。
@@ -2429,6 +2429,14 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 - `views::evidence::tests`：一张截图与一条完成证据各成一行，读不回定位符的载荷不成行。
 - `views::cost_of::tests`：认领过的节点报出那次跑的钱；没人认领过的节点报 0 与空明细，而不是 `Unavailable`。
 
+### 8-46-13 一个仓一次围栏：`drive_context.fence_gate`
+
+**一轮围栏是一个动作，不是一个 run 的一部分。** 一个 ready set 里的每个节点各占一条 lane 同时跑（§8-46-4），而它们都落在**同一个仓库**里：`Checkpoint::wave_pre` 会 stage 这个 run 的作用域并提交，libgit2 为此取 `.git/index.lock`。两条 lane 的围栏重叠时，后者拿到的是「the index is locked; this might be due to a concurrent or crashed process」——那句话是真的，而「并发的进程」就是这座城自己，锁只被持有几毫秒，而不论是拒绝语还是人看到的那句 recovery（「retry the wave」）都没有人替它重试。**代价不是一条日志**：输了这场竞争的 run 以 `cancelled` 冻结，它的节点被当作「自己的 done check 没过」交回，父 run 因此收到一个它无法据以行动的失败。
+
+**所以这条规则是「一个仓一次围栏」，不是「一个 run 一次围栏」**：`RunWorker` 持一个 `fence_gate`，每条 lane 的 DriveContext 拿到它的克隆，围栏闭包在调用 `wave_pre` 的那一小段里持锁。**宽度是关键**——锁的宽度是一次围栏（stage＋commit＋读回），不是一条 lane 的寿命：两条 lane 的模型调用、工具执行、账本写入全都照旧并行，只有那个动作排成一列。
+
+**两道保险各管一个对手，理由写在各自的位置**：这里的闸门管**同一个进程里**的两条 lane；`memory::checkpoint::scan::write_index` 的等待管**另一个 sprawling 进程**压在同一座城上，那是任何互斥量都看不见的对手。把两者合成一个机制会让其中一侧假装看见了它看不见的东西。
+
 ### 8-46-9 一个房间一个队列：`bin::assembly::rooms`（B-28 ＋ B-29）
 
 形状：**深模块**（ARCH §9 第 1 种）。文件 `crates/sprawling/src/assembly/rooms.rs`。
@@ -2728,8 +2736,8 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 
 - **`bin::doctor::report`**（新文件）：`report()` 问一次运行中的机器并折成 `channels::DoctorAnswer`；`fold(&[Finding], Option<Platform>)` 是可测的那一半，于是一个测试说出机器答了什么而不必有那样一台机器。**它不判断任何事**——哪一项在这里、一个档次缺什么，权威在 `doctor` 与 `table`；这里只换一种说法。`screen` 把同一批 findings 折成一台机器的散文，两者从同一处折出。
 - **`Views.machine: Option<channels::DoctorAnswer>`**，由 `found_on_this_machine` 从外面放进来，**不由任何记录折出**：这是本文件里唯一一个关于机器而非关于历史的答案，所以重建账本不碰它。`None` 答 `Unavailable`。
-- **探测在开门之前跑一次**，`serving::worker::serve` 里，在 `rebuild_views` 之后、`ServeConfig` 之前。**代价量过**：12 项、冷缓存四核约 2 秒，全部花在起进程问版本上。放进查询里会把答一切读的那条线程按住数秒；放进后台线程要多一条「还没答上来」的状态，而页面第一屏正是要那个答案。
-- **客户端**：`client/src/views/machine.tsx` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
+- **探测只由 `DoctorRefresh` 触发，服务一座城时一次也不跑**：表从 12 行长到 32 行，其中大半是起一个进程问它的版本（六件 cargo 子命令各起一次 cargo），windows-x86_64 暖缓存四核一档机器上量得 3.3–4.1 s。先前的决定把它放在开门之前，给出的参数是「12 项约 2 秒」，**两个数都已经移动**：项数翻了一倍有余，而问它的那一屏不再是第一屏（`#/` 是对话，机器那一屏在设置页的「依赖项安装」组里）。它当时否决后台探测的理由是「要多一条『还没答上来』的状态」，而那条状态今天已经存在、有夹具、也有它的动作（`MachineSkeleton` 与 `MachineUnchecked`）——那笔代价早已付过。服务因此不再为一个没人问的答案把套接字关着几秒。
+- **客户端**：`client/src/views/machine.svelte` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。**那一屏打开时城里没有答案，它就发一次 `DoctorRefresh`**（与「重新检查」同一条命令，不是第二条路），每次打开至多一次；城里已有答案时开页不花任何东西。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
 - **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。
 - **验收**：`doctor::report::tests`——没有任何浏览器引擎的假机器答出 `Absent { NotOnSearchPath }`、`use` 档 `missing == ["a browser engine"]` 而 `develop` 档为空；平台不明时每一项的 `install` 都是 `UnknownPlatform`。
 
@@ -2740,7 +2748,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **不新起一条命令**：`ConfigureBuilding` 问的就是「这栋楼的 runs 够得到什么」，沙箱、外部服务器与运行中的机器上的窗口是同一个问题的三面，各自可缺省。
 - **不解析**：`city::write_desktop_scope` 整份覆写，字节即人给的字节。语法的权威是读它的那台 server，且它 fail closed。
 - **载荷第三位**：`city::Written { sandbox, mcp, desktop }` 取代三个裸布尔——调用点写 `(true, false, true)` 说不出哪一位是哪一面。
-- **页面**：`client/src/views/desktop.tsx` 一个框装整份文件，读用 `Query::Document`（`<building>/.sprawling/DESKTOP.toml`），写用 `configure_building`。一个「每个窗口一行」的表单会是这一侧对那份语法的第二次解读。
+- **页面**：`client/src/views/desktop.svelte` 一个框装整份文件，读用 `Query::Document`（`<building>/.sprawling/DESKTOP.toml`），写用 `configure_building`。一个「每个窗口一行」的表单会是这一侧对那份语法的第二次解读。
 - **验收**：`assembly::building_page::tests::the_desktop_allowlist_is_written_where_no_resident_reaches_it`——人写的字节落在 `desktop_scope_path` 上，且那条地址 `is_reserved` 为真（任何写域都够不到）。
 
 ## 8-56 说出来的那句话：录音进城，一行字出来（`bin::views::hearing`、`bin::serving::worker::hearing`；channels-SPEC §8-27）
@@ -2766,7 +2774,7 @@ pub(crate) struct Member { name, program, homepage, confidence, places: PerPlatf
 pub(crate) const BROWSER_VARIABLE: &str = "SPRAWLING_BROWSER";   // 本 crate 唯一拼写
 pub(crate) const GECKO_ROW / CHROMIUM_ROW / WEBKIT_ROW: Requirement;
 pub(crate) fn member_at(family: Family, at: &Path) -> Option<&'static Member>;
-pub(super) fn look(family, platform, patience, search_path) -> Presence;
+pub(super) fn look(family, platform, search_path) -> Presence;   // 版本读自文件，故无 patience（§8-80）
 
 // bin::doctor（表因此能说出「任一即可」与「点进它自己的站」）
 pub(crate) enum Need { Required, OneOf(Group), Optional }
@@ -3126,9 +3134,108 @@ impl RunWorker {
 
 - **不变量一句话**：一个会话的调用形状选一次。房间的 `CONFIG.toml` 在它的第一个 Run 写下 `[model] name`（人选了强度就一并写下 `[model] effort`），此后每次派活读回来与自己要冻下的形状对拍，不等即拒。
 - **为什么住在派活面**：模型、输出上限与 effort 都上供应方的线，中途任何一个移动都会让会话此后每一轮为一段字节从未变过的 prompt 付全价。这道对拍在写简报之前，因此被拒的派活不落一个字节、不动会话一行记录——`prepare_dispatch` 的序幕顺序（§8-40）就是这条拒绝的位置理由。
-- **对拍本身是 runtime 的**：`runtime::turn::CallShape::verified_against` 拥有比较与三句拒绝语，恢复语指向两条出路——**开一个新 session，或 fork 这个 run**。派活面只负责造出两个形状：会话记下的那个，与这次派活将要冻下的那个（模型来自 endpoint book，effort 来自梯子）。
+- **对拍本身是 runtime 的**：`runtime::turn::CallShape::verified_against` 拥有比较与三句拒绝语，恢复语指向人现在就做得到的两件事——**把动过的那一项改回去，或换一个地址派这件活**（runtime-SPEC §8-4-1；`/new` 上线后改的是那一个常量）。派活面只负责造出两个形状：会话记下的那个，与这次派活将要冻下的那个（模型来自 endpoint book，effort 来自梯子）。
 - **effort 比的是梯子在这里解析出的值**，不是房间那一行：`[model] effort` 一个键都没写过的会话，冻下的是「让供应方决定」，而从这一档挪到任何一档同样是形状移动。
 - **模型比的是登记面现在的答案**：`SelectModel` 改的是城级 tag→model 登记，在那里拦会把正常配置一起禁掉；被挡的是它落到一个已开会话上的那一步。会话记下的模型仍在 endpoint book 里时，上限与窗口从那一行读（它们是模型的属性，抄一份进房间的配置就是同一个事实的第二个家）；模型已不在登记面时，模型那一臂先拒。
 - **`[model] name` 不是「这个 Run 用哪个模型」的权威**：Run 的模型仍由 `EndpointBook::select` 选，会话记录只说它当初从哪个模型开始。两者不一致时这次派活被拒，而不是两个家各说各话（city-SPEC §8-14、§8-4 的 `own_layer`）。
 - **地址就是楼时，地址自己就是会话**：那种地址的「自己那份 `CONFIG.toml`」就是楼的 `CONFIG.toml`（`Layer::Resident` 与 `Layer::Building` 同一文件，city-SPEC §8-4）。
 - **本章测试**：`assembly::dispatching::session_shape::tests::a_session_keeps_the_shape_it_froze_and_refuses_a_different_effort`——同一房间连续两次派活，四条前缀逐槽位哈希相同且 CAS 里的字节相等；第三次改 effort 被拒（`E_CONFIG_INVALID`，恢复语给出两条出路），会话的 effort 一行未动、没有多出一条 `prompt_assembled`；第四次相同请求照跑并再次冻下同一批字节。`a_model_chosen_after_a_session_opened_does_not_reach_it`——已开会话之后改城级登记，往该会话的派活被拒，房间记录仍是原来的模型，而新会话拿到新模型。
+
+### 8-80 浏览器的版本读自它旁边的文件，而不是跑它一次（`bin::doctor::version_file`）
+
+**原因**：`family::look` 对找到的每个浏览器跑一次 `ask_version(path, "--version")`。Windows 上 Chromium 系的浏览器收到 `--version` 不打印版本，而是**开一个窗口**；浏览器已在运行时，新进程把请求交给已有实例后自己退出，于是 `running::stop` 杀掉的是那个壳，窗口留在屏幕上。这条探测在每次服务城时跑一遍（§8-54），设置页的「重新检查」再跑一遍，于是一台装了两个 Chromium 牌子的机器每次启动都被弹出两个窗口。**一次健康检查的副作用不该是替人开浏览器**。
+
+```rust
+// bin::doctor::version_file（形状 4 适配器）：装它的那个程序在它旁边写下的版本号
+pub(super) fn beside(program: &Path) -> Version;
+
+// bin::doctor::family：一族的答案不再经过任何子进程
+pub(super) fn look(family, platform, search_path) -> Presence;
+```
+
+- **三种读法一条顺序，且不按族分支**：`application.ini` 的 `[App] Version`（Gecko 在 Windows 与 Linux 把它写在程序旁，在 macOS 写在 `../Resources/`）→ 程序旁以版本号命名的目录（Chromium 在 Windows 的 `Application\<x.y.z.w>\`，在 macOS 的 `Contents/Frameworks/*.framework/Versions/`）→ 程序上方 bundle 的 `Contents/Info.plist` 里的 `CFBundleShortVersionString`（macOS 三族通用，Safari 只有这一条）。**族不是参数**：「这个牌子属于哪一族」的权威是 `family::claims` 与 `member_at`，在这里再判一次就是同一个事实的第二个家。
+- **版本目录按数字逐段比，不按字典序**：升级过的 `Application\` 下常常同时留着两个版本目录，而 `154.0.4258.9` 与 `154.0.4258.32` 的字典序把旧的那个排在后面，于是报出的是已被换掉的版本。
+- **读不出版本仍然是 Present，`Version::Silent` 的意思随之扩成一句**：「版本号读不出来」——一个印了空行的程序与一个旁边没有版本文件的浏览器，对报告是同一件事，而两者都不使这一项缺席（§8-40 已定：不说话的工具仍是装了的工具）。`describe` 因此是 `no version` 而不是 `said nothing`：后者对一个从未被问过版本的浏览器是假话。
+- **失去的那一件事如实记**：`ask_version` 顺带证明了「这个程序起得来」，读文件不证明。一个在盘上却起不来的浏览器此后报 Present，而真相在 `browser_bidi::lazy` 起它时以 `E_BROWSER_UNAVAILABLE` 出现。这是用「每次服务都开窗」换「探测期发现起不来」：前者每次启动都发生，后者只在真要用浏览器那一次才要紧。
+- **驱动仍然问**：`chromedriver`／`msedgedriver` 是 `Detection::Program`，它们真的打印版本且不开窗，`ask_version` 与它的 deadline 因此留在那条路上，只是不再有浏览器走它。
+- **被否决的备选**：① 只在 Windows 上改读法——同一个事实（浏览器的版本）会有两个家，而另外两个平台上的 spawn 同样是几百毫秒与一个别人的进程；② 读 `HKCU\Software\<牌子>\BLBeacon\version`——每个牌子一把钥匙、每个人一份注册表，而版本目录一条规则答全五个 Chromium 牌子，且它是装它的程序刚写下的那一个；③ 给 `Version` 加一个「来源」变体上线——`DoctorVersion` 的四个词回答的是「版本是什么」，来源是城的内政，上线会让今天在跑的客户端解不出整份答案（§8-57 对 `DoctorNeed` 的同一条理由）。
+
+**本章测试**：`version_file::tests::a_browser_says_its_version_through_the_files_beside_it`（三种布局各一份夹具目录：Gecko 的 `application.ini`、Chromium 的两个版本目录取数字大的那个、macOS bundle 的 `Info.plist`；旁边什么都没有的程序答 `Silent`）；`no_browser_is_started_to_learn_its_version`（`family.rs` 的正文里没有 `ask_version` 这个拼写，于是这条不变量在唯一能破它的那个文件上被钉住）。
+
+**本章验收**：装了 Edge 与 Zen 的 Windows 机器上 `sprawling up` 与设置页「重新检查」期间不出现任何新的浏览器窗口；`cargo run -p sprawling -- doctor` 仍报 `gecko present … (zen)` 并带版本号。
+
+### 8-81 空着的密钥框不是删除（`bin::assembly::credentials::endpoints::kept_credential`）
+
+**原因**：供应方表单把 vault 答复的引用只存在组件实例里（`setup/providers/form.svelte` 的 `held`），页面一卸载就没了；`EndpointSummary` 上线只带 `has_credential: bool`，不带引用，所以表单也无从向城要回来。于是第二次打开设置页按「看看」或「接上」时，帧里 `secret: None`：城读成「没有凭据」，探测不带任何 `Authorization` 发出（人读到的是 401「密钥无效」，而那把密钥是好的），接上则把已归档的引用覆盖成空——**静默丢 key**。
+
+```rust
+// bin::assembly::credentials（形状 2 value）
+pub(super) enum Credential { Absent { header: Option<String> }, Key { .. }, Subscription { .. } }
+
+// bin::assembly::credentials::endpoints（形状 1 decision）
+fn kept_credential(&self, name: &str, dialect: DialectKind, header: Option<String>) -> gateway::AuthSpec;
+```
+
+- **一条规则一个家**：`endpoint_of` 是 probe 与 attach 共用的那道门，空引用的读法因此只有它一处，`ProbeEndpoint` 与 `AttachEndpoint` 不可能对同一个空框给出两种答案。
+- **空不是删，删是另一个动词**：`DetachEndpoint` 已在，它说的才是「拿掉」。一个既能表示「不改」又能表示「删掉」的字段，会让每一次不相干的编辑都带着删除凭据的风险。
+- **留引用、重算头**：归档的是 `AuthSpec`（头 + 引用），沿用的只是引用，头按这次进来的接口形态重算——同一把 key 从 chat 面挪到 messages 面要从 `Authorization: Bearer` 变成 `x-api-key`，照抄旧头会对一把好 key 答 401。人自己命名的头仍然压过推导，`Credential::Absent` 因此带着 `header`。
+- **前端说的话此后是真话**：`lang.json` 的 `setup_key_stored`（「此名下已有密钥，留空则沿用」）先前只在表单自己还记得引用时出现，而城当时并不沿用。现在城沿用，那句话改为在**城说这个 id 有凭据**时出现——一句话一个家，不新增第二个键。
+- **被否决的备选**：① 把 `secret:realm/name` 放进 `EndpointSummary` 让表单送回来——凭据引用是城的内政，上线只为让页面把它原样送回，等于给同一个事实开第二个家，还多一条泄露面；② 让表单按约定重新拼出引用（`referenceOf(id)`）——那只对这张表单自己登记过的 key 成立，`import` 与环境变量来的端点引用不同名，会把别人的引用送进这一个端点。
+
+**本章测试**：`credentials::tests::endpoints::an_empty_key_keeps_the_credential_this_city_has_archived`——带 key 接上后，再一次空框 probe 与空框 attach，三次模型表请求都带 `authorization: Bearer sk-archived`，且端点的 `auth` 仍是原引用。
+
+### 8-82 同一个地址上的新一段：`/new`（`bin::assembly::commanding::sessions`、`Command::OpenSession`、`EventKind::SessionOpened`）
+
+**原因**：房间的第一个 run 把模型与强度冻进它自己的 `CONFIG.toml`，此后形状不同的派活都被 `E_CONFIG_INVALID` 拒（§8-79）。换过主模型的人因此再也派不出去，而拒绝的恢复语原先指向两件做不到的事（§8-4-1 已改成诚实的那一条）。设计本身没错——缓存前缀不能中途换模型——错在拒绝之后没有出口，这一章给的就是那个出口。
+
+```rust
+// channels::command（形状 2 value）
+pub enum Carry { Nothing, Handoff }        // Nothing 是第一个变体，即默认
+Command::OpenSession { addr: Address, carry: Carry, from: Option<Origin>, idem: IdemKey }
+// Origin = kernel::Origin { run, at_seq }，由 kernel 拥有，channels 与 runtime 都读它
+
+// kernel（形状 2 value；事件表逐变体登记）
+EventKind::SessionOpened                   // payload：{ carried: bool }；地址在记录自己的 addr 字段
+
+// bin::assembly::commanding::sessions（形状 1 decision + 一次写）
+fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
+```
+
+- **行李里只有行李。** `carried` 在 payload 里，房间在记录自己的 `addr` 字段里（`record_at`）——一条属于某个地址的线本来就在信封上说了地址，payload 再抄一份就是同一个地址的第二个家（kernel-SPEC §8-4）。
+- **一段会话是房间上的一段，不是房间本身**：`/new` 不换地址、不换身份。市长身份按 `hall/mayor` 精确匹配（`city::spine_files::hall`），换到 `hall/mayor-2` 就把身份丢了。
+- **继承进的是 window，不是 prefix**（S2 改写了路线图早先那句话，理由记在这里）。四段 prefix 各是一份**文档**（`PrefixPlan` 的 `SourceDoc`），由人写、可编辑、逐字节哈希；而一段对话是模型说了什么、工具答了什么，`Window` 自己的文档就写着「frozen prefix 的字节永不落在这里」。把历史塞进 prefix 要有第五个槽位（而 prefix 是四段的类型），会让 `prompt_assembled` 声称历史属于它并不属于的那一段，还会让被缓存的前缀每回合都长。**所以 `RunPlan.inherited` 是 window 的材料**（`run/lifecycle.rs` 在开场任务之前推入），而它可重建的证据不是段哈希而是 `run_forked { from, at_seq }` 加上母亲自己的那些行（runtime §8-2 的 `inherited`）。
+- **一份继承只属于开这一段的那一跑。** 房间的当前一段从 `session_opened` 带上来的 `from` 落在折叠里（`assembly::folds::session`），第一次派活取走它并写下 `run_forked`（这一行同时也把「用掉了」记进折叠）；同一段里的第二次派活不再继承。一个分支是一个开头，而开头的那一跑就是继承的那一跑。
+- **分支先验再清。** `from` 指的行必须是那条 run 自己的行（`origin_is_real`），否则 `E_INVALID_ARGS` 现在就到人手里——而不是先把这个房间的形状清掉，再让一跑扑空。
+- **`Carry::Nothing` 必须真的清掉 `Handoff.md` 的槽位**：`assembly::freezing` 无条件读 `city::handoff(root, room)` 并把它折进下一个 run 的 prompt，只清配置而留着文件，新一段仍会继承上一段的摘要，于是开关不起作用（city-SPEC §8-14b 拥有那一步）。
+- **默认不带，理由是 `/new` 对人意味着什么** ——「在这个工作区新开一个会话」，：`/new` 对人意味着「在这个工作区新开一个会话」，带上上一段的摘要是需要说出来的例外；**没有交接时 `--carry` 不弹问、不拒绝**，事件里如实写 `carried: false`——一段新会话就是人要的那件事，没有理由因为交接槽位空着而拒他。被否决的备选：默认带、`--fresh` 不带（路线图早先的建议）——它把例外当成了常态，而且换模型后的新一段仍受旧摘要影响。
+- **拒绝只有一条**：地址上有活跃 run → `E_BUSY`，恢复语「先 `/stop`，再 `/new`」。一次派活正在写这一段的形状时把它换掉，等于让两个 run 各自以为冻的是同一份前缀。
+- **分叉是同一件事多一个起点**：S2 把它做成 `OpenSession { from: Option<Origin> }`，而不是第二个动词；`Fork` 帧的退休随 S2 一起落地。
+- **客户端走同一条路**：`core/commands.ts` 的 `openSession(addr, carry)`；`core/slash.ts` 的 `/new [--carry]`；composer 上方那行的「新对话」按钮；以及拒绝通知上的动作（§8-4-1 的那句话从此指向一个真存在的动词）。
+
+**本章测试**（路线图原先写的 citysim `session_rotates.toml` 没有落点：citysim 的场景是 Rust 结构体，不是 toml，而且这条链路——派活被拒、`/new`、再派活——属于动词所在的 `sprawling`，不属于 runtime 的回合循环；改记在这里）：
+- `assembly::dispatching::session_shape::tests::a_new_session_lets_the_room_use_the_model_chosen_since`：dispatch（模型 A）→ `select_model`（B）→ dispatch 被 `E_CONFIG_INVALID` 拒 → `open_session` → dispatch 成功，且房间这次冻的是 B。
+- `assembly::commanding::sessions::tests` 的四条：房间里有 run 工作时 `E_BUSY` 且房间一字未动；`Nothing` 清形状也清槽位、事件写 `carried: false`；`Handoff` 留摘要、照样清形状、事件写 `carried: true`；没有摘要时 `--carry` 不拒也不撒谎。
+
+**本章验收**：`cargo nextest run -p sprawling -p city -p channels -p kernel` 绿；`cargo xtask wire-ts`、`wiring`、`specalign`、`apisync` 绿。
+
+## 8-60 提示词语料的分层：哪类事实住哪一层（`docs/City.md`＋`ToolMeta`＋`Catalog`）
+
+**依据是成本的形状，不是篇幅的偏好。** 四段前缀与工具 schema 在 `runtime::turn` 的**每一趟请求**里全文重发（`turn.rs:108-117`），于是同一批字节有两种代价：**窗口**是进上下文的一次性入场费（请求累积，前缀不随 turn 增长），**钱**是每 turn 重付（`prompt_cache_breakpoint` 命中后按 `cache_read_price` 折价）。两种读法下窗口占用完全相同，所以「多写一句」永远是全城每次请求少一份工作空间。
+
+由此定下分工，`ToolMeta` 的两个字段各管一半：
+
+| 层 | 字段 | 落点 | 只写 | 执法者 |
+|---|---|---|---|---|
+| 目录行 | `disclosure` | `catalog.render()` 进 Resident 段 | 它是什么、什么时候该用 | `claim_tool/tests.rs` 的 548 B 预算 |
+| 说明书 | `params` 各字段的 `description` | `tool_defs()` 随请求 | 怎么用：字段、取值、默认、拒绝条件 | 同上（量的是两者之和） |
+| 二级展开 | `CatalogEntry::expansion` | 按需 `read` | 整套纪律 | — |
+
+`plan` 的六个动作就住在说明书里（`action` 那句），目录行只剩 84 B 余量而原文已占 83 B——**把动作抄进目录行既付两遍钱也放不下**，那条预算就是这个决定的执法者。`signal` 的四类 kind 同理。
+
+**搬走的**：市长与书记的角色描述（`docs/templates/MAYOR.md`、`CLERK.md` 已逐条写着）、`signal`／`goal`／`pr` 的动词解释（各自 disclosure）、委托的一层上限（`delegate` 的 disclosure）、模式语义（`Mode::catalog_entry()`）、六份文档清单（各模板开头的自述已逐条重复）、浏览器语义（`BUILDING_DISCLOSURE`）、Python 子集（`exec` 的 `arm` 描述）。
+
+**补进 City.md 的**：读全再动手、外置记忆（照模板写、按需读）、通信（先读别人留下的、加入前先问、方式由现场定）、隐私（**上下文本身是泄露面**，不问不找不需要的隐私与密钥值，拿到就叫人换）、环境探测、licence 与 copyright、引用保留完整上下文与出处、重要事实对第二来源交叉验证。这些都是四类身份都成立的话，才留在这个每跑都要付的段落里。
+
+**一句话规则**：City.md 的每一句都必须对 `EPHEMERAL_SEGMENT` 扮下的工人成立——它只有 `JOB.md`、不共享楼、不写 Memo。不成立的降级到 `RULES.toml` 或模式的 catalog 条目，**不降级到 `URBANITE.md`**：那份文件坐在常驻自己的地址上，它改得动，把城级规则放进去等于让被约束者起草规则（`hall.rs` 把市长与书记的身份放在保留子树，理由同一条）。
+
+**`crates/eval::ablation` 是这一章的尺**：它按段落切除文档、报出每段独占哪些能力。当前读数是 12 段、32 项能力、**全部独占**（无一 `Restated`），即每项能力恰好一个家。

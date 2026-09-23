@@ -107,7 +107,7 @@ const SOURCE_DIRS: [&str; 4] = ["crates", "xtask/src", "citysim/src", "desktop/s
 use crate::walk::CLIENT_SRC as CLIENT_DIR;
 
 /// What the client is written in.
-const CLIENT_EXTENSIONS: [&str; 2] = ["ts", "tsx"];
+const CLIENT_EXTENSIONS: [&str; 2] = ["ts", "svelte"];
 
 /// What a generator writes above the file it produced. A file carrying
 /// it is the generator's output rather than somebody's module, so its

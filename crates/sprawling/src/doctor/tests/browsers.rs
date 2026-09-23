@@ -79,6 +79,25 @@ fn a_found_browser_is_reported_by_the_brand_it_is() {
     );
 }
 
+/// A browser's version is read out of the files beside it and never
+/// asked of the browser (sprawling-SPEC.md section 8-80).
+///
+/// On Windows a Chromium browser given `--version` opens a window
+/// instead of printing a line, and when one is already running the new
+/// process hands the request over and exits, so the window outlives the
+/// child this city can stop. `family` is the one file that could bring
+/// that spawn back, and this holds it to reading rather than running.
+#[test]
+fn no_browser_is_started_to_learn_its_version() {
+    let looking = include_str!("../family.rs");
+    for spelling in ["ask_version", "Command::new"] {
+        assert!(
+            !looking.contains(spelling),
+            "doctor::family names {spelling}, so looking for a browser can start one"
+        );
+    }
+}
+
 /// The two members this project cannot simply promise are last in their
 /// families, so a machine with an ordinary browser never answers with
 /// the awkward one.

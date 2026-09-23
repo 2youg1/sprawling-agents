@@ -175,8 +175,8 @@ fn a_session_keeps_the_shape_it_froze_and_refuses_a_different_effort() {
     assert!(
         refused
             .recovery()
-            .contains("open a new session, or fork this run"),
-        "and the two ways out: {refused}"
+            .contains("send this task to another address"),
+        "and the way out a person can take today: {refused}"
     );
     assert_eq!(
         city::settled_effort(dir.path(), &room)
@@ -201,6 +201,51 @@ fn a_session_keeps_the_shape_it_froze_and_refuses_a_different_effort() {
     assert_eq!(
         after[2], frozen[0],
         "the session runs on the prefix it froze"
+    );
+}
+
+/// The way out that `/new` opened: the room that could not dispatch a
+/// moment ago dispatches again, with the model the registry now answers.
+///
+/// The refusal above names two things a person can do, and until
+/// `Command::OpenSession` existed only one of them was real - sending
+/// the work to another address, which is not what somebody who changed
+/// the model meant. This is the second: a new session in the same room,
+/// choosing its shape from what the registry says now.
+#[test]
+fn a_new_session_lets_the_room_use_the_model_chosen_since() {
+    let dir = tempfile::tempdir().unwrap();
+    open_lab(dir.path());
+    let (base_url, _provider) = fake_openai(
+        &["m-local", "m-other"],
+        vec![
+            completion("done", None),
+            completion("done", None),
+            completion("done", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+
+    worker.handle(ask(&room, None, b"dispatch-1")).unwrap();
+    choose(&mut worker, "m-other", b"select-other");
+    let refused = worker.handle(ask(&room, None, b"dispatch-2")).unwrap_err();
+    assert_eq!(*refused.code(), AxCode::ConfigInvalid);
+
+    worker
+        .handle(channels::Command::OpenSession {
+            addr: room.clone(),
+            carry: channels::Carry::Nothing,
+            from: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"open"),
+        })
+        .unwrap();
+
+    worker.handle(ask(&room, None, b"dispatch-3")).unwrap();
+    assert_eq!(
+        city::own_layer(dir.path(), &room).unwrap().model(),
+        Some("m-other"),
+        "the new session froze the model the registry answers with now"
     );
 }
 
@@ -236,8 +281,8 @@ fn a_model_chosen_after_a_session_opened_does_not_reach_it() {
     assert!(
         refused
             .recovery()
-            .contains("open a new session, or fork this run"),
-        "and the two ways out: {refused}"
+            .contains("send this task to another address"),
+        "and the way out a person can take today: {refused}"
     );
     assert_eq!(
         city::own_layer(dir.path(), &room).unwrap().model(),

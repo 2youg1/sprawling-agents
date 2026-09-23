@@ -299,8 +299,8 @@ impl SignalTool {
             meta: ToolMeta {
                 name: ToolName::parse("signal")?,
                 disclosure:
-                    "Speak to another resident, or take the signals waiting for you; call it when \
-                     status says signals are pending."
+                    "Speak to another resident, or to every one of them, or take the signals waiting \
+                     for you; call it when `status` says signals are pending."
                         .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Write { domain: room },

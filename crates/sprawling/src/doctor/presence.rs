@@ -33,7 +33,10 @@ pub(crate) enum Presence {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Version {
     Said(String),
-    /// It started, wrote nothing, and exited.
+    /// Nothing this machine read says which version it is: a program
+    /// that started, wrote nothing and exited, or a browser whose
+    /// installer left no version beside it (section 8-80). Neither
+    /// makes the item absent.
     Silent,
     /// Its first line was not text.
     Unreadable,
@@ -130,7 +133,7 @@ impl Version {
     pub(crate) fn describe(&self) -> String {
         match self {
             Version::Said(text) => text.clone(),
-            Version::Silent => "said nothing".to_owned(),
+            Version::Silent => "no version".to_owned(),
             Version::Unreadable => "unreadable version".to_owned(),
             Version::Late => "no version within the deadline".to_owned(),
         }

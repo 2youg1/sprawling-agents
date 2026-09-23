@@ -14,12 +14,11 @@
 //
 // The wire carries no request id, so an answer is matched to the
 // question by its own content where the answer names it (a run, an
-// address, a node) and by arrival order where it cannot. An answer
-// that matches nothing, and a question nothing answers, are reported
-// rather than waited on for ever.
+// address, a node) and by arrival order where it cannot. An answer that
+// matches nothing, and a question nothing answers, are reported.
 
-import { createSignal, getOwner, onCleanup } from "solid-js";
-import type { Accessor } from "solid-js";
+import { writable } from "svelte/store";
+import type { Readable, Writable } from "svelte/store";
 
 import type { Key } from "./lang";
 import type { Address, Answer, AxCode, AxError, EventKind, EventRecord, Query, Seq } from "../wire";
@@ -67,12 +66,10 @@ export function commitsQuery(building: Address | null, before: Seq | null): Quer
 export type Reported = Omit<AxError, "recovery">;
 
 interface Held {
-  readonly value: Accessor<Answer | undefined>;
-  readonly set: (answer: Answer) => void;
+  readonly value: Writable<Answer | undefined>;
   // Whether this question has already been reported unanswered. One
-  // report per stretch of silence: the page goes on asking, and a
-  // person told every fifteen seconds that the city is not answering
-  // learns nothing after the first time.
+  // report per stretch of silence: a person told every fifteen seconds
+  // that the city is not answering learns nothing after the first time.
   reported: boolean;
   stale: boolean;
   inflight: boolean;
@@ -87,10 +84,9 @@ interface Pending {
   readonly sentAt: number;
 }
 
-// A refusal this page minted about its own asking, in the shape the
-// city writes its own - except for the recovery, which is a sentence
-// for a person and therefore `lang.json`'s to hold: the reporter names
-// the phrase, and the seam that knows the person's language says it.
+// A refusal this page minted about its own asking. The recovery is a
+// sentence for a person and therefore `lang.json`'s: the reporter names
+// the phrase, the seam that knows the language says it.
 function minted(code: AxCode, action: string, subject: string): Reported {
   return { code, action, subject, nearby: [], retriable: false };
 }
@@ -219,11 +215,10 @@ function staleBy(record: EventRecord, key: string, query: Query): boolean {
 }
 
 export interface Asking {
-  // The answer to one question, as a signal: `undefined` until the
-  // first answer lands. Asking inside a Solid owner counts as watching;
-  // a watched answer is refreshed when it goes stale, an unwatched one
-  // waits until somebody looks again.
-  readonly ask: (query: Query) => Accessor<Answer | undefined>;
+  // The answer to one question, as a store: `undefined` until the first
+  // answer lands. Subscribing counts as watching; a watched answer is
+  // refreshed when stale, an unwatched one waits until somebody looks.
+  readonly ask: (query: Query) => Readable<Answer | undefined>;
   readonly refresh: (query: Query) => void;
   readonly answered: (answer: Answer) => void;
   readonly invalidate: (record: EventRecord) => void;
@@ -305,10 +300,8 @@ export function createAsking(
     const key = keyOf(query);
     const found = held.get(key);
     if (found !== undefined) return [key, found];
-    const [value, setValue] = createSignal<Answer | undefined>(undefined);
     const slot: Held = {
-      value,
-      set: (answer) => setValue(() => answer),
+      value: writable<Answer | undefined>(undefined),
       reported: false,
       stale: true,
       inflight: false,
@@ -320,16 +313,22 @@ export function createAsking(
     return [key, slot];
   }
 
-  function ask(query: Query): Accessor<Answer | undefined> {
+  // The public face of one slot: subscribing is what makes an answer
+  // watched, so an answer nobody looks at holds nothing open.
+  function watching(slot: Held): Readable<Answer | undefined> {
+    return {
+      subscribe(run) {
+        slot.watchers += 1;
+        const off = slot.value.subscribe(run);
+        return () => { slot.watchers -= 1; off(); };
+      },
+    };
+  }
+
+  function ask(query: Query): Readable<Answer | undefined> {
     const [key, slot] = slotFor(query);
-    if (getOwner() !== null) {
-      slot.watchers += 1;
-      onCleanup(() => {
-        slot.watchers -= 1;
-      });
-    }
     if (slot.stale) dispatch(key, query, slot);
-    return slot.value;
+    return watching(slot);
   }
 
   function refresh(query: Query): void {
@@ -345,7 +344,7 @@ export function createAsking(
     if (slot === undefined) return;
     slot.inflight = false;
     slot.reported = false;
-    slot.set(answer);
+    slot.value.set(answer);
     if (slot.stale && slot.watchers > 0) schedule(done.key, done.query, slot);
   }
 
@@ -363,7 +362,7 @@ export function createAsking(
     const slot = key === null ? undefined : held.get(key);
     if (slot !== undefined) {
       slot.reported = false;
-      slot.set(answer);
+      slot.value.set(answer);
       return;
     }
     // Neither round could place it, so a question this page holds will

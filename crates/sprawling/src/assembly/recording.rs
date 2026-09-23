@@ -34,6 +34,32 @@ impl RunWorker {
         self.record_where(kind, None, data)
     }
 
+    /// Writes the line that says which run this one continues, and
+    /// marks the session's inheritance spent.
+    ///
+    /// Appended directly rather than through [`Self::record_at`], because
+    /// a lineage belongs to the *new* run and not to the city: the
+    /// record's own `run` field is what says which run continues which,
+    /// and `record_at` speaks for the city.
+    ///
+    /// # Errors
+    /// Propagates a ledger that refuses the append, and the payload
+    /// failing to encode - by then the run has been frozen and the line
+    /// is what a page reads the branch from, so the refusal is raised
+    /// rather than swallowed.
+    pub(super) fn note_lineage(
+        &mut self,
+        addr: &Address,
+        run: RunId,
+        origin: kernel::Origin,
+    ) -> Result<(), AxError> {
+        let t = now_ms()?;
+        let draft = runtime::fork::fork_draft(origin, run, addr.clone(), t, "owner".to_owned())?;
+        self.ledger.append(draft)?;
+        self.origins.spent(addr);
+        Ok(())
+    }
+
     /// The same, for a record that belongs to one address. A pursuit is
     /// a building's, and a record with no address would be a fact about
     /// the city that no view could file under the building it changed.
@@ -60,12 +86,17 @@ impl RunWorker {
             run: RunId::CITY,
             t: now_ms()?,
             who: "owner".to_owned(),
-            addr,
+            addr: addr.clone(),
             kind,
             data: data.clone(),
             ig: false,
         };
         self.ledger.append(draft)?;
+        // Every fold that reads a record this worker writes is shown it
+        // here, because the worker's own books are what its next decision
+        // reads: a fold updated only on the rebuild path would answer a
+        // dispatch about a session the process has already recorded.
+        self.origins.absorb(kind, addr.as_ref(), &data)?;
         self.governance.absorb(kind, RunId::CITY, None, &data)?;
         self.expiries.absorb(kind, &data);
         self.book.apply_payload(kind, &data)

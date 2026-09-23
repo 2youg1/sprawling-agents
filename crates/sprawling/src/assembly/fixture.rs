@@ -9,237 +9,16 @@ mod rules;
 
 pub(super) use rules::{lay_rules, ordinary_rules, shut_rules};
 
-/// A loopback provider that answers a model list and then a fixed
-/// number of chat completions, registered the way a person would
-/// register one so nothing reaches the worker by a door the production
-/// path does not have. Tests that only need it to answer bind it as
-/// `_provider`; tests about what went out on the wire read `bodies()`,
-/// the one place a claim about the wire can be checked.
-pub(super) struct FakeProvider {
-    seen: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
-    _handle: std::thread::JoinHandle<()>,
-}
-
-/// What this provider does with the first chat request it reads.
-/// [`FirstChat::Dropped`] stages the transient disconnect a test
-/// otherwise cannot hit on purpose: the request arrives whole, the
-/// connection closes, no byte of an answer goes back. It spends no
-/// scripted reply and joins no record, so every later turn answers
-/// the question it was written for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum FirstChat {
-    Answered,
-    Dropped,
-}
-
-impl FakeProvider {
-    pub(super) fn bodies(&self) -> Vec<String> {
-        self.seen
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|head| {
-                head.split_once("\r\n\r\n")
-                    .map_or(String::new(), |(_, body)| body.to_owned())
-            })
-            .collect()
-    }
-
-    pub(super) fn exchanges(&self) -> Vec<String> {
-        self.seen.lock().unwrap().clone()
-    }
-}
-
-/// An empty `models` list means this provider serves no model list at
-/// all: `GET .../models` answers 404, the way a gateway or an
-/// Anthropic-format third party does - the shape a city has to attach
-/// on the ids the person declared.
 #[cfg(test)]
-pub(super) fn fake_openai(models: &[&str], replies: Vec<String>) -> (String, FakeProvider) {
-    fake_openai_with(models, replies, FirstChat::Answered)
-}
+mod provider;
 
-/// The same provider, told what to do with the first chat request.
+// The provider the tests below talk to, re-exported so a test names
+// one fixture module and not two.
 #[cfg(test)]
-pub(super) fn fake_openai_with(
-    models: &[&str],
-    replies: Vec<String>,
-    first_chat: FirstChat,
-) -> (String, FakeProvider) {
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let serves_a_list = !models.is_empty();
-    let list = serde_json::json!({
-        "data": models
-            .iter()
-            .map(|id| serde_json::json!({ "id": id }))
-            .collect::<Vec<_>>(),
-    })
-    .to_string();
-    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-    let recorder = std::sync::Arc::clone(&seen);
-    // The last reply repeats: a test says what the interesting turns
-    // are, not how many turns the loop will take. The script is shared
-    // because every connection is served on a thread of its own.
-    let script = std::sync::Arc::new(std::sync::Mutex::new((replies.into_iter(), String::new())));
-    let drops = std::sync::atomic::AtomicBool::new(first_chat == FirstChat::Dropped);
-    let dropping = std::sync::Arc::new(drops);
-    let handle = std::thread::spawn(move || {
-        // **One thread per accepted connection.** Two handdown runs go
-        // into two lanes and call this provider at once; serving them
-        // one after the other leaves the second client waiting on a
-        // socket nobody reads, a timing window the city never has
-        // against a real provider. One bad socket ends that socket, not
-        // the server; the bound is there so a listener that is
-        // genuinely gone stops rather than spins.
-        let mut refused = 0_u32;
-        for stream in listener.incoming() {
-            let Ok(mut stream) = stream else {
-                refused = refused.saturating_add(1);
-                if refused > 64 {
-                    return;
-                }
-                continue;
-            };
-            refused = 0;
-            let recorder = std::sync::Arc::clone(&recorder);
-            let script = std::sync::Arc::clone(&script);
-            let dropping = std::sync::Arc::clone(&dropping);
-            let list = list.clone();
-            std::thread::spawn(move || {
-                use std::io::ErrorKind;
-                let mut head = String::new();
-                let mut buf = [0u8; 4096];
-                let mut whole = false;
-                loop {
-                    let n = match std::io::Read::read(&mut stream, &mut buf) {
-                        // An end of stream, and nothing else, ends the
-                        // reading; a signal or a would-block leaves the
-                        // rest of a request still on its way.
-                        Ok(0) => break,
-                        Ok(n) => n,
-                        Err(e)
-                            if matches!(
-                                e.kind(),
-                                ErrorKind::Interrupted | ErrorKind::WouldBlock
-                            ) =>
-                        {
-                            continue;
-                        }
-                        Err(_) => break,
-                    };
-                    head.push_str(&String::from_utf8_lossy(&buf[..n]));
-                    if let Some(end) = head.find("\r\n\r\n") {
-                        let want = head
-                            .lines()
-                            .find_map(|line| {
-                                line.to_ascii_lowercase()
-                                    .strip_prefix("content-length: ")
-                                    .and_then(|v| v.trim().parse::<usize>().ok())
-                            })
-                            .unwrap_or(0);
-                        let body_seen = head.len().saturating_sub(end.saturating_add(4));
-                        if body_seen >= want {
-                            whole = true;
-                            break;
-                        }
-                    }
-                }
-                // What counts as a request is settled here and nowhere
-                // else. It used to be settled twice - the record asked
-                // for a header terminator and the reply for nothing at
-                // all - so a socket carrying no request stayed off the
-                // record and still spent a scripted reply, and every
-                // turn after it answered the question before it.
-                if !whole {
-                    return;
-                }
-                let a_chat = !head.starts_with("GET ");
-                // The request landed; the answer never starts.
-                if a_chat && dropping.swap(false, std::sync::atomic::Ordering::SeqCst) {
-                    return;
-                }
-                // The whole exchange, headers included: a test about
-                // what went out on the wire needs the headers too.
-                recorder.lock().unwrap().push(head.clone());
-                let (status, body) = if a_chat {
-                    let mut script = script.lock().unwrap();
-                    let (chats, last) = &mut *script;
-                    let next = chats.next().inspect(|reply| last.clone_from(reply));
-                    (200, next.unwrap_or_else(|| last.clone()))
-                } else if serves_a_list {
-                    (200, list)
-                } else {
-                    (404, "{\"error\":\"no such route\"}".to_owned())
-                };
-                let response = format!(
-                    "HTTP/1.1 {status} OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
-                    body.len()
-                );
-                let _ = std::io::Write::write_all(&mut stream, response.as_bytes());
-            });
-        }
-    });
-    (
-        format!("http://{addr}/v1"),
-        FakeProvider {
-            seen,
-            _handle: handle,
-        },
-    )
-}
-
-/// One reply that calls a named tool with the arguments given. The
-/// arguments are the tool's real contract, because an invented shape
-/// here once hid the fact that no canary edit had ever landed on disk.
-pub(super) fn completion_with(
-    text: &str,
-    tool: &str,
-    id: &str,
-    arguments: serde_json::Value,
-) -> String {
-    serde_json::json!({
-        "choices": [{
-            "message": {
-                "role": "assistant",
-                "content": text,
-                "tool_calls": [{
-                    "id": id,
-                    "type": "function",
-                    "function": { "name": tool, "arguments": arguments.to_string() },
-                }],
-            },
-            "finish_reason": "tool_calls",
-        }],
-        "usage": { "prompt_tokens": 12, "completion_tokens": 5 },
-    })
-    .to_string()
-}
-
-pub(super) fn completion(text: &str, call: Option<(&str, &str)>) -> String {
-    let mut message = serde_json::json!({ "role": "assistant", "content": text });
-    let mut finish = "stop";
-    if let Some((id, path)) = call {
-        let arguments = serde_json::json!({
-            "path": path,
-            "base_version": "new",
-            "old": "",
-            "new": "noted\n",
-        })
-        .to_string();
-        message["tool_calls"] = serde_json::json!([{
-            "id": id,
-            "type": "function",
-            "function": { "name": "edit", "arguments": arguments },
-        }]);
-        finish = "tool_calls";
-    }
-    serde_json::json!({
-        "choices": [{ "message": message, "finish_reason": finish }],
-        "usage": { "prompt_tokens": 12, "completion_tokens": 5 },
-    })
-    .to_string()
-}
+pub(super) use provider::{
+    FirstChat, completion, completion_with, fake_openai, fake_openai_routed,
+    fake_openai_routed_with,
+};
 
 /// A worker with one endpoint attached and one model chosen, exactly
 /// as the settings page would leave it.
@@ -272,6 +51,37 @@ pub(super) fn worker_with_provider(
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
     })?;
     Ok(worker)
+}
+
+/// Every line the nodes of a workshop wrote, in order, with the kind of
+/// each - because a handdown that does not come back is a race in what
+/// the city asked for, and the kind of the line that ended a node is what
+/// says why it ended.
+///
+/// The `lab/` prefix is the fixture's own: it is the building every
+/// workshop scenario in this module raises, and a diagnostic that guessed
+/// wider would print the whole history.
+pub(super) fn node_lines(city_root: &Path) -> Vec<String> {
+    runtime::replay::verify_ledger_dir(&ledger_dir(city_root))
+        .map(|verified| {
+            verified
+                .raw_lines()
+                .iter()
+                .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+                .filter(|line| {
+                    line["who"]
+                        .as_str()
+                        .is_some_and(|who| who.starts_with("lab/"))
+                })
+                .map(|line| {
+                    format!(
+                        "seq {} {} {} run {} {:?}",
+                        line["seq"], line["who"], line["kind"], line["run"], line["data"]
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// One completion that calls a named tool with the given arguments.
@@ -351,8 +161,12 @@ fn a_dropped_call_is_asked_again_and_both_handdowns_still_come_back() {
         { "room": "lab/reader", "goal": "read the meter", "stop": "when it is written down",
           "done_check": "a number is written down" },
     ] });
-    let (base_url, _provider) = fake_openai_with(
+    let (base_url, _provider) = fake_openai_routed_with(
         &["m-local"],
+        vec![
+            ("a number is written down", vec![completion("done", None)]),
+            ("the page exists", vec![completion("done", None)]),
+        ],
         vec![
             completion_with("splitting it up", "workshop", "tu_1", graph.clone()),
             completion("waiting on a person", None),
@@ -382,8 +196,30 @@ fn a_dropped_call_is_asked_again_and_both_handdowns_still_come_back() {
         })
         .unwrap();
     let joined = worker.joins.get(&room).map_or(0, |j| j.artifacts().count());
+    // Why a missing handback is worth a paragraph: the failure is a
+    // race in what the provider was asked, so the answer is which
+    // run got what, not which line the cell says is false.
+    let said: Vec<String> = _provider
+        .bodies()
+        .iter()
+        .map(|body| {
+            let room_of = ["a number is written down", "the page exists"]
+                .into_iter()
+                .filter(|mark| body.contains(mark))
+                .collect::<Vec<_>>();
+            format!("{room_of:?}")
+        })
+        .collect();
+    let ends = node_lines(dir.path());
     assert_eq!(
-        joined, 2,
-        "a dropped connection cost a handdown: the call was never asked again"
+        joined,
+        2,
+        "a dropped connection cost a handdown: the call was never asked again;
+         the requests named {said:?};
+{}",
+        ends.join(
+            "
+"
+        )
     );
 }

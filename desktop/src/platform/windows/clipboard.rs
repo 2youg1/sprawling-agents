@@ -268,6 +268,36 @@ mod tests {
         PAIRS.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// One call against a clipboard another program may be holding. The
+    /// module's contract for contention is a refusal whose recovery says
+    /// to try again, so this tries again, boundedly: what these tests
+    /// are about is what comes back, never the wait. Any other refusal,
+    /// and the refusal met after the last attempt, panics with every
+    /// part of it on screen.
+    fn despite_contention<T>(mut work: impl FnMut() -> Result<T, Refusal>) -> T {
+        let mut last = None;
+        for _attempt in 0..200 {
+            match work() {
+                Ok(answer) => return answer,
+                Err(failure) => {
+                    let error = failure.as_error();
+                    let code = error
+                        .get("data")
+                        .and_then(|data| data.get("code"))
+                        .and_then(|code| code.as_str())
+                        .unwrap_or("");
+                    assert_eq!(
+                        code, "E_TOOL_UNAVAILABLE",
+                        "a refusal this helper will not retry: {failure:?}"
+                    );
+                    last = Some(failure);
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+            }
+        }
+        panic!("still contended after the last attempt: {last:?}");
+    }
+
     /// This one really does touch the machine running the tests, and it
     /// puts back what it found, because a test that leaves somebody's
     /// clipboard changed is a test that damaged their desktop.
@@ -280,11 +310,11 @@ mod tests {
             return;
         };
         let written = "sprawling desktop connector — round trip 🌍";
-        write(written).expect("this machine's clipboard accepts text");
-        assert_eq!(read().unwrap().as_deref(), Some(written));
+        despite_contention(|| write(written));
+        assert_eq!(despite_contention(read).as_deref(), Some(written));
         match before {
-            Some(original) => write(&original).expect("the original goes back"),
-            None => write("").expect("an empty clipboard goes back as empty"),
+            Some(original) => despite_contention(|| write(&original)),
+            None => despite_contention(|| write("")),
         }
     }
 
@@ -325,9 +355,12 @@ mod tests {
                 let every = &texts;
                 threads.spawn(move || {
                     for _round in 0..ROUNDS {
-                        write(mine).expect("this machine's clipboard accepts text");
-                        let seen = read().expect("the clipboard reads back");
-                        let seen = seen.expect("a text just written is there");
+                        // The module's contract for contention is a
+                        // refusal whose recovery says to try again, so
+                        // the round tries again: what this test is about
+                        // is what comes back, never the wait.
+                        let taken = despite_contention(|| write(mine).and_then(|()| read()));
+                        let seen = taken.expect("a text just written is there");
                         assert!(
                             every.contains(&seen),
                             "read back {seen:?}, which no thread wrote"

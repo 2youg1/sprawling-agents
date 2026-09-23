@@ -19,9 +19,11 @@ use crate::views::Views;
 use super::{Entrance, Expiries};
 
 mod collaboration;
+mod session;
 
 use collaboration::CollaborationFold;
 pub(super) use collaboration::{Collaboration, INBOX_CAPACITY, new_inbox};
+pub(super) use session::SessionOrigins;
 
 /// Everything a worker inherits from a history it did not write.
 ///
@@ -41,6 +43,9 @@ pub(crate) struct Standing {
     /// that read it only from its own process renewed nothing after a
     /// restart and met each expiry as a 401 mid-run.
     pub(super) expiries: Expiries,
+    /// What each room's current session branched from, until the run
+    /// that begins it is written.
+    pub(super) origins: SessionOrigins,
 }
 
 impl Standing {
@@ -66,6 +71,7 @@ impl Standing {
         let mut collaboration = CollaborationFold::default();
         let mut entrance = Entrance::default();
         let mut expiries = Expiries::default();
+        let mut origins = SessionOrigins::default();
         if ledger_dir.exists() {
             let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
             for line in verified.raw_lines() {
@@ -75,6 +81,7 @@ impl Standing {
                 collaboration.absorb(&record)?;
                 entrance.absorb(record.data());
                 expiries.absorb(record.kind(), record.data());
+                origins.absorb(record.kind(), record.addr(), record.data())?;
             }
         }
         Ok(Standing {
@@ -83,6 +90,7 @@ impl Standing {
             collaboration: collaboration.settle()?,
             entrance,
             expiries,
+            origins,
         })
     }
 }

@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 34 as const;
+export const WIRE_V = 35 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "7543f8cd18f2142e400d6c318784102bc75178dc653bfded0df29a5f9da9141c" as const;
+export const WIRE_HASH = "e3e542fbe688101c01587c97fc2f56f5a847e321457e95deaeb2b55327064b90" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -508,6 +508,7 @@ export type PursuitLine = typeof PursuitLine.Type;
 export const EventKind = Schema.Union(
   Schema.Literal("city_initialized", "building_created", "run_started", "run_forked", "prompt_assembled", "model_called", "model_returned", "tool_called", "tool_result", "result_offloaded", "gate_checked", "gate_denied", "checkpoint_committed", "handoff_written", "steer_received", "cancel_received", "watchdog_fired", "budget_limit", "run_frozen", "log_truncated", "signal_enqueued", "signal_consumed", "draft_held", "draft_resolved", "goal_registered", "goal_conflict", "arbitration_verdict", "repair_started", "repair_reused", "worktree_opened", "pr_opened", "pr_merged", "pr_rejected", "roadmap_claimed", "roadmap_finished", "roadmap_released", "approval_requested", "approval_resolved", "policy_created", "policy_revoked", "taint_promoted", "cross_building_transfer", "takeover_started", "rollback_applied", "city_halted", "backpressure_shed", "digest_invalidated", "endpoint_attached", "endpoint_lost", "model_selected", "provider_degraded", "login_started", "eval_run", "asset_archived", "credential_lent", "secret_captured", "secret_egress_blocked", "file_discarded", "discard_restored", "autonomy_changed"),
   Schema.Literal("building_configured"),
+  Schema.Literal("session_opened"),
   Schema.Literal("roadmap_split"),
   Schema.Literal("roadmap_blocked"),
   Schema.Literal("pursuit_changed"),
@@ -1451,7 +1452,7 @@ export type ListingAnswer = typeof ListingAnswer.Type;
 /**
  * One of the closed set of error codes, as `AxCode::as_str` spells it.
  */
-export const AxCode = Schema.Literal("E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN").annotations({ identifier: "AxCode" });
+export const AxCode = Schema.Literal("E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_BUSY", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN").annotations({ identifier: "AxCode" });
 export type AxCode = typeof AxCode.Type;
 
 /**
@@ -2214,6 +2215,22 @@ export const BodyOverride = Schema.Struct({
 export type BodyOverride = typeof BodyOverride.Type;
 
 /**
+ * What a new session at an address keeps from the previous one.
+ * 
+ * An enum rather than a flag: the two states are named actions with
+ * different results on disk, and `carry: true` at a call site says
+ * neither of them. `Nothing` is the first variant and the default,
+ * because that is what a person means by starting a new session — a
+ * new one, here, not a continuation (`sprawling-SPEC.md` 8-82). The
+ * handoff is the exception a person states.
+ */
+export const Carry = Schema.Union(
+  Schema.Literal("nothing"),
+  Schema.Literal("handoff"),
+).annotations({ identifier: "Carry" });
+export type Carry = typeof Carry.Type;
+
+/**
  * One header every request to this endpoint carries.
  * 
  * The value may be a `secret:realm/name` reference, which the vault
@@ -2314,6 +2331,26 @@ export type Mode = typeof Mode.Type;
 
 export const NoSecret = Schema.Never.annotations({ identifier: "NoSecret" });
 export type NoSecret = typeof NoSecret.Type;
+
+/**
+ * Where a session branched off: one run of this city, and the line in
+ * it that the branch starts after.
+ * 
+ * **The pair has one home, and its older spelling stays where it is.**
+ * A `run_forked` record spells this same pair as `{from, at_seq}`,
+ * because a ledger already written cannot be re-spelled; a value this
+ * build passes around is the type below. A reader holding a `RunForked`
+ * builds an `Origin` from it rather than keeping both.
+ * 
+ * `at_seq` is the line itself and not the line after it: a branch
+ * inherits through that line, and the safe point the rebuild settles on
+ * is that value or an earlier one (`runtime::fork::inherited`).
+ */
+export const Origin = Schema.Struct({
+  at_seq: Seq,
+  run: RunId,
+}).annotations({ identifier: "Origin" });
+export type Origin = typeof Origin.Type;
 
 /**
  * One named change to [`PreferencesAnswer`].
@@ -2465,11 +2502,11 @@ export const Command = Schema.Union(
     }),
   }),
   Schema.Struct({
-    fork: Schema.Struct({
-      addr: Schema.optional(Schema.NullOr(Address)),
-      at_seq: Seq,
+    open_session: Schema.Struct({
+      addr: Address,
+      carry: Carry,
+      from: Schema.optional(Schema.NullOr(Origin)),
       idem: IdemKey,
-      run: RunId,
     }),
   }),
   Schema.Struct({

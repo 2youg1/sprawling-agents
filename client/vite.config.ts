@@ -7,9 +7,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
 import type { Plugin } from "vite";
-import solid from "vite-plugin-solid";
 
 // The three files a shipped face is made of: one variable woff2 per
 // family, and the licence they are given under. `theme.css` names the
@@ -53,12 +53,20 @@ function shippedFace(): Plugin {
 // directory named `web-dist` under the workspace's `target/`, with
 // `index.html` at its root. `base: './'` keeps every asset reference
 // relative, so the same bundle serves from inside the binary.
+//
+// `configFile` is load-bearing: the plugin resolves `svelte.config.*`
+// against `root` (here `src`), while the config lives at the project
+// root beside this file — the one place `svelte-check` also finds it.
 export default defineConfig({
   root: "src",
   base: "./",
-  plugins: [tailwindcss(), solid(), shippedFace()],
+  plugins: [tailwindcss(), svelte({ configFile: "../svelte.config.ts" }), shippedFace()],
   build: {
     outDir: "../../target/web-dist",
     emptyOutDir: true,
+    // No sourcemap ships: the map of this bundle is 4 MB against a
+    // 644 KB bundle, `xtask budget` weighs everything the directory
+    // holds, and `build.rs` embeds every byte of it in the binary.
+    sourcemap: false,
   },
 });

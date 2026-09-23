@@ -3,18 +3,22 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What one provider answered when this city asked what it serves.
+// The answers a made-up city hands the fixtures, written once here.
 //
-// Three fixtures read these rows - the table on the settings page, the
-// model column of the selector over the composer, and the shared
-// controls that sort and correct a table - so the rows are written once
-// here. A second spelling of the same three model ids would be three
-// facts with two homes, and the first time somebody corrected one of
-// them the two screens would disagree about what this provider serves.
+// The provider section is read by three fixtures - the table on the
+// settings page, the model column of the selector over the composer,
+// and the shared controls that sort and correct a table - so the rows
+// are written once here. A second spelling of the same three model ids
+// would be three facts with two homes, and the first time somebody
+// corrected one of them the two screens would disagree about what this
+// provider serves. The notices and the talk rows below carry one
+// refusal and one conversation past several drawings of it for the
+// same reason.
 
+import type { Key } from "../../core/lang";
 import type { ModelFact } from "../../core/probed";
-import type { EndpointsAnswer, ModelFactsSummary } from "../../wire";
-import { Ceiling, Window } from "../../wire";
+import type { AxCode, ApprovalClass, ApprovalItem, EndpointsAnswer, ModelFactsSummary } from "../../wire";
+import { ApprovalId, Ceiling, Locator, TimeMs, Window } from "../../wire";
 
 // The three model ids, each written once. Every list below names them
 // through these, so a fixture cannot describe a model the endpoint does
@@ -124,3 +128,236 @@ export const ENDPOINTS: EndpointsAnswer = {
     },
   ],
 };
+
+// One refusal as the notices fixtures draw it: the three sentences the
+// city wrote, when it arrived, and how many times the same one did.
+// `code` is typed as the wire's closed set, because the recovery verbs
+// a notice offers come from the one table that maps codes to them.
+export interface NoticeLine {
+  readonly code: AxCode;
+  // As the city wrote them: what failed, what it was against, and what
+  // the person can do next. Never translated, never reworded here.
+  readonly action: string;
+  readonly subject: string;
+  readonly recovery: string;
+  // A clock string, already formatted by the caller's own clock.
+  readonly at: string;
+  // One is a single refusal; past one the notice shows the count.
+  readonly count: number;
+}
+
+// A day of refusals under one heading. The heading is a `lang.json`
+// key, so the day is named in the reader's language: today, yesterday,
+// and the day whose only name is that it is earlier than those.
+export interface NoticeDay {
+  readonly heading: Key;
+  readonly rows: readonly NoticeLine[];
+}
+
+// Twelve refusals across three days, newest day first. The subjects
+// span three rooms and two runs, so the rows have something to merge
+// on - a code that repeats under one subject - and something not to.
+export const NOTICE_DAYS: readonly NoticeDay[] = [
+  {
+    heading: "notices_today",
+    rows: [
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_CONFIG_INVALID", action: "dispatch", subject: "hall/mayor", at: "09:12", count: 2,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "the room is frozen against this session; set main back in setup, or run /new" },
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_BUSY", action: "open session", subject: "hall/mayor", at: "09:04", count: 1,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "a run is working in this room; run /stop first, then /new" },
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_TIMEOUT", action: "probe", subject: "api.zenmux.ai", at: "08:47", count: 3,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "the provider did not answer in time; ask the link to try again" },
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_PATH_NOT_FOUND", action: "read", subject: "city/lab/west/NOTES.md", at: "08:31", count: 1,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "that path is not on the listing this building answers with" },
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_TOOL_UNAVAILABLE", action: "call", subject: "browser", at: "08:02", count: 1,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "no engine is installed for this tool; run the doctor's recipe first" },
+    ],
+  },
+  {
+    heading: "notices_yesterday",
+    rows: [
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_CONFIG_INVALID", action: "dispatch", subject: "lab/east", at: "18:22", count: 1,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "the room is frozen against this session; set main back in setup, or run /new" },
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_GATE_DENIED", action: "write", subject: "hall/.sprawling/rules.md", at: "17:50", count: 1,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "a rule stopped this write; the rule names the alternative" },
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_CREDENTIAL_MISSING", action: "probe", subject: "api.deepseek.com", at: "16:11", count: 2,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "file a key for this endpoint in setup, then probe again" },
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_INVALID_ARGS", action: "steer", subject: "run 0199c0de", at: "15:39", count: 1,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "the city could not read this request; the wire shape is in the SPEC" },
+    ],
+  },
+  {
+    heading: "rec_earlier",
+    rows: [
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_BUDGET_EXHAUSTED", action: "dispatch", subject: "lab/west", at: "11:26", count: 1,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "this run has spent all it may; raise the budget or start another run" },
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_WORKTREE_BUSY", action: "checkout", subject: "lab/west", at: "10:58", count: 1,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "another run holds this worktree; run /stop to let go of it" },
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+      { code: "E_LOOP_SUSPECTED", action: "dispatch", subject: "hall/mayor", at: "09:41", count: 4,
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+        recovery: "the watchdog suspected a loop and stopped the run; steer it elsewhere" },
+    ],
+  },
+];
+
+// The corner three deep, as a page that lost its link meets them. The
+// fourth refusal goes to the drawer rather than into a taller stack.
+export const TOASTS: readonly NoticeLine[] = [
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+  { code: "E_WIRE_MISMATCH", action: "connect", subject: "sprawling 0.0.6", at: "03:35", count: 1,
+    // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+    recovery: "the client and the city disagree on the wire; reload after the city updates" },
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+  { code: "E_TIMEOUT", action: "ask", subject: "hall/mayor", at: "03:31", count: 2,
+    // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+    recovery: "the city did not answer in time; ask the link to try again" },
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+  { code: "E_PROVIDER", action: "dispatch", subject: "api.zenmux.ai", at: "03:29", count: 1,
+    // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+    recovery: "the provider failed to answer; the city kept the words for another try" },
+];
+
+// One refusal with a home: it sits under the field it was refused at,
+// and leaves the moment that field is edited.
+export const REFUSED_FIELD: NoticeLine = {
+  code: "E_ENDPOINT_DIALECT_UNSUPPORTED",
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+  action: "attach",
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+  subject: "api_gateway.internal",
+  at: "03:35",
+  count: 1,
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
+  recovery: "this endpoint speaks another dialect; pick the shape it answers in",
+};
+
+// One round of a room: the task the person sent and the answer that
+// came back. `EARLIER_SEGMENT` is the round the session divider folds
+// away - the same shape, one session ago.
+export interface Utterance {
+  readonly speaker: "person" | "resident";
+  readonly text: string;
+}
+
+export const ROUND: readonly Utterance[] = [
+  {
+    speaker: "person",
+    text: "Ask the mayor what this city should keep, and file the answer where the registry can find it.",
+  },
+  {
+    speaker: "resident",
+    text: "The mayor kept three things: the transcript of the first day, the screenshot of the settings page under forced colours, and the release for 0.0.6. All three are filed, and the registry lists them newest first.",
+  },
+];
+
+export const EARLIER_SEGMENT: readonly Utterance[] = [
+  { speaker: "person", text: "What is on the shelves in this building?" },
+  { speaker: "resident", text: "Four holdings across three shelves, and one name the room asks for that no shelf has." },
+  { speaker: "person", text: "Pin the engineering ones for the next run." },
+];
+
+// The fork picker's two columns: the turns of the mother run, and what
+// one of those turns did. The ids key the picker's rows and nothing
+// else reads them.
+export interface TurnLine {
+  readonly id: string;
+  readonly turn: string;
+  readonly at: string;
+}
+
+export const TURNS: readonly TurnLine[] = [
+  { id: "turn-1", turn: "1", at: "11:02" },
+  { id: "turn-2", turn: "2", at: "11:19" },
+  { id: "turn-3", turn: "3", at: "11:47" },
+];
+
+export interface CallLine {
+  readonly id: string;
+  // As one line of the picker's right column: the call and its subject.
+  readonly what: string;
+  readonly at: string;
+}
+
+export const CALLS: readonly CallLine[] = [
+  { id: "call-1", what: "read: city/hall/Handoff.md", at: "11:20" },
+  { id: "call-2", what: "exec: just check", at: "11:24" },
+  { id: "call-3", what: "edit: city/hall/PLAN.md", at: "11:31" },
+  { id: "call-4", what: "exec: cargo nextest", at: "11:44" },
+];
+
+// The questions this city is holding for the person, as the cards and
+// the rail's dot read them. `ONE_QUESTION` is named rather than
+// reached by its position in the list, because the dot and the cards
+// are two readings of the same waiting question and a reordered list
+// must not make them disagree about which one that is; the presences
+// fixture reads it too.
+function question(
+  id: string,
+  actor: string,
+  what: string,
+  key: readonly [ApprovalClass, string],
+  at: number,
+  tainted: boolean,
+): ApprovalItem {
+  return {
+    id: ApprovalId.make(id),
+    actor,
+    action_desc: what,
+    artifact: Locator.make(
+      "cas:b3-0000000000000000000000000000000000000000000000000000000000000000",
+    ),
+    cluster_key: { class: key[0], detail: key[1] },
+    created: TimeMs.make(at),
+    tainted,
+  };
+}
+
+export const ONE_QUESTION: ApprovalItem = question(
+  "ai_1",
+  "lab/east",
+  "exec: rm -rf target",
+  ["question", "rm"],
+  1,
+  false,
+);
+
+// Three things a person can be asked, in the three shapes the cards
+// take: one on its own, several identical ones answered together, and
+// one raised by a run that began with somebody else's words - which is
+// never grouped with anything.
+export const WAITING: readonly ApprovalItem[] = [
+  ONE_QUESTION,
+  question("ai_2", "lab/west", "edit: the building's own rules", ["question", "rules"], 2, false),
+  question("ai_3", "lab/west", "edit: the building's own rules", ["question", "rules"], 3, false),
+  question(
+    "ai_4",
+    "hall/mayor",
+    "browser: open a page somebody linked",
+    ["question", "open"],
+    4,
+    true,
+  ),
+];

@@ -6,4 +6,5 @@
 //! The index of the credential tests.
 
 mod endpoints;
+mod kept;
 mod signing;

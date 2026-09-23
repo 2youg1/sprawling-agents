@@ -240,6 +240,7 @@ impl RunWorker {
                     session: None,
                     effort: None,
                     mode: at.mode,
+                    origin: None,
                     parent: Some(run_id),
                     succession: None,
                     tainted: at.tainted,
@@ -306,6 +307,7 @@ impl RunWorker {
                     session: None,
                     effort: None,
                     mode: at.mode,
+                    origin: None,
                     parent: at.parent,
                     succession: Some(Handover {
                         predecessor: run_id,

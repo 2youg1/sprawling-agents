@@ -24,8 +24,8 @@
 // a burst of records becomes one store update and one paint, which is
 // what keeps a busy city under the 16 ms the person asked for.
 
-import { batch, createSignal } from "solid-js";
-import type { Accessor } from "solid-js";
+import { writable } from "svelte/store";
+import type { Readable } from "svelte/store";
 
 import type { Lang } from "./lang";
 import { createAsking } from "./asking";
@@ -39,8 +39,8 @@ import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
 import type { Command, HistoryRangeAnswer, Query, Seq, ServerFrame } from "../wire";
 
 export interface Connection {
-  readonly state: Accessor<LinkState>;
-  readonly belief: Belief;
+  readonly state: Readable<LinkState>;
+  readonly belief: Readable<Belief>;
   readonly asking: Asking;
   // Sends one command; false when the link is not live, in which case
   // nothing was sent and the person should be told rather than left to
@@ -97,8 +97,12 @@ export function openConnection(
 ): Connection {
   let link: Link = newLink(token, lang);
   let socket: WebSocket | null = null;
-  const [state, setState] = createSignal<LinkState>(link.state);
-  const store = createBelief();
+  // One clock for this connection: the asking measures its patience by
+  // it and the belief stamps each refusal with it, so a question and its
+  // refusal can never disagree about when they happened.
+  const now = () => Date.now();
+  const state = writable<LinkState>(link.state);
+  const store = createBelief(now);
 
   const queue: ServerFrame[] = [];
   let scheduled = false;
@@ -176,7 +180,7 @@ export function openConnection(
 
   const asking = createAsking(
     (query: Query) => (isLive(link) ? sendText(encodeFrame({ query })) : false),
-    () => Date.now(),
+    now,
     // A question that never came back, and an answer that settles no
     // question, both land where every other refusal lands: the corner
     // once, and the bell until the person has read it. The recovery
@@ -259,10 +263,11 @@ export function openConnection(
   }
 
   function step(event: LinkEvent): void {
+    const was = link;
     const [next, action] = advance(link, event);
     link = next;
-    if (next.state !== state()) {
-      setState(next.state);
+    if (next.state !== was.state) {
+      state.set(next.state);
     }
     perform(action);
     if (isRefused(link)) {
@@ -284,11 +289,9 @@ export function openConnection(
   function drain(): void {
     scheduled = false;
     const frames = queue.splice(0, queue.length);
-    batch(() => {
-      for (const frame of frames) {
-        step({ kind: "received", frame });
-      }
-    });
+    for (const frame of frames) {
+      step({ kind: "received", frame });
+    }
   }
 
   function open(): void {
@@ -333,7 +336,7 @@ export function openConnection(
 
   const [begun, first] = start(link);
   link = begun;
-  setState(begun.state);
+  state.set(begun.state);
   perform(first);
 
   return {

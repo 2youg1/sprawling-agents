@@ -225,6 +225,7 @@ impl RunWorker {
                     parent: None,
                     succession: None,
                     tainted: false,
+                    origin: None,
                 },
                 format!(
                     "@{speaker} signalled you. This run exists because that signal arrived: \

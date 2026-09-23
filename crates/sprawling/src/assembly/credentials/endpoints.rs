@@ -58,7 +58,7 @@ impl RunWorker {
             tuning,
         } = entered;
         let auth = match credential {
-            Credential::Absent => gateway::AuthSpec::None,
+            Credential::Absent { header } => self.kept_credential(&name, dialect, header),
             // Which header a key travels in is the compatible format's
             // own answer, so this page does not give a second one.
             Credential::Key { reference, header } => gateway::AuthSpec::for_dialect(
@@ -85,6 +85,40 @@ impl RunWorker {
             probed: false,
             tuning,
         })
+    }
+
+    /// The credential this city already keeps for an endpoint of this
+    /// name, as it should travel now.
+    ///
+    /// **An empty key box means "leave the key alone", never "remove
+    /// it"** (sprawling-SPEC.md 8-81). The form answers the vault once
+    /// and holds the reference only while it is mounted, so every
+    /// later visit says nothing about the credential; reading that as
+    /// `AuthSpec::None` probed without a key and wrote the endpoint
+    /// back without one. Removing a credential is `DetachEndpoint`.
+    ///
+    /// The reference is kept and the header is worked out again,
+    /// because the same key moves between faces: one archived as
+    /// `Authorization: Bearer` under the chat face travels as
+    /// `x-api-key` under the messages face, and carrying the old
+    /// spelling over answers 401 for a key that is good.
+    fn kept_credential(
+        &self,
+        name: &str,
+        dialect: kernel::DialectKind,
+        header: Option<String>,
+    ) -> gateway::AuthSpec {
+        let archived = self
+            .book
+            .endpoints()
+            .find(|endpoint| endpoint.name == name)
+            .map(|endpoint| &endpoint.auth);
+        let reference = match archived {
+            Some(gateway::AuthSpec::Bearer(reference)) => reference.clone(),
+            Some(gateway::AuthSpec::Header { value, .. }) => value.clone(),
+            Some(gateway::AuthSpec::None) | None => return gateway::AuthSpec::None,
+        };
+        gateway::AuthSpec::for_dialect(dialect, reference, header)
     }
 
     /// Registers what the person entered, asking the endpoint what it

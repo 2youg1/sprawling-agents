@@ -35,8 +35,8 @@
 // own `[ui.keys]` table will hold when roadmap 3.1 moves these rows
 // out of the browser.
 
-import { createSignal } from "solid-js";
-import type { Accessor } from "solid-js";
+import { derived, get, writable } from "svelte/store";
+import type { Readable } from "svelte/store";
 
 import type { Key } from "./lang";
 import { preferences } from "./prefs";
@@ -58,6 +58,7 @@ export const ACTIONS = [
   "help",
   "composer.focus",
   "run.stop",
+  "fork.here",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -105,9 +106,9 @@ function accelShift(key: string): Chord {
 // for the registry - the one screen that reached this build with no
 // way in at all.
 //
-// `?` and `/` hold no modifier because the shell reads them only
-// outside a text box; that rule is `app.tsx`'s, and it is the reason
-// those two can stay single keys.
+// `?` and `/` hold no modifier because they are read only outside a
+// text box; that rule is `matches`'s below, and it is the reason those
+// two can stay single keys.
 export const DEFAULTS: Readonly<Record<Action, Chord>> = {
   "go.talk": accel("1"),
   "go.city": accel("2"),
@@ -122,6 +123,10 @@ export const DEFAULTS: Readonly<Record<Action, Chord>> = {
   help: plain("?"),
   "composer.focus": plain("/"),
   "run.stop": accel("."),
+  // Branch the conversation from the entry under the hand. One letter
+  // with no modifier, because it is read only outside a text box and
+  // only where a thread entry is hovered or focused (roadmap 4.5).
+  "fork.here": plain("f"),
 };
 
 // The word each action is called by, which is a phrase key rather than
@@ -140,6 +145,7 @@ export const LABELS: Readonly<Record<Action, Key>> = {
   help: "keys_help",
   "composer.focus": "keys_composer",
   "run.stop": "city_stop",
+  "fork.here": "fork_here",
 };
 
 // The keys a browser keeps for itself beside the accelerator: it
@@ -235,6 +241,10 @@ export interface Pressed {
   readonly metaKey: boolean;
   readonly shiftKey: boolean;
   readonly altKey: boolean;
+  // Where the press landed: a text field the person is writing in, or
+  // the page at large. The caller knows the target element; this table
+  // only needs the fact.
+  readonly target: "field" | "page";
 }
 
 export function matches(held: Chord, pressed: Pressed): boolean {
@@ -242,6 +252,13 @@ export function matches(held: Chord, pressed: Pressed): boolean {
     return false;
   }
   if (held.accel !== (pressed.ctrlKey || pressed.metaKey)) {
+    return false;
+  }
+  // Inside a text field a single key is what the person is typing, so
+  // only a chord holding the accelerator is the shell's. Without this
+  // rule a `/` in a sentence moved the focus to the composer and a `[`
+  // took the rail away mid-word.
+  if (pressed.target === "field" && !held.accel) {
     return false;
   }
   // Shift is asked about only beside the accelerator; the file's
@@ -285,14 +302,14 @@ export function conflictsOf(bound: Readonly<Record<Action, Chord>>): readonly Co
 
 export interface Keymap {
   readonly platform: Platform;
-  readonly bound: Accessor<Readonly<Record<Action, Chord>>>;
+  readonly bound: Readable<Readonly<Record<Action, Chord>>>;
   readonly chord: (action: Action) => Chord;
   readonly bind: (action: Action, chord: Chord) => void;
   // Back to what this client ships with.
   readonly reset: (action: Action) => void;
   readonly resetAll: () => void;
   readonly changed: (action: Action) => boolean;
-  readonly conflicts: Accessor<readonly Conflict[]>;
+  readonly conflicts: Readable<readonly Conflict[]>;
   // Which action a key press reaches.
   readonly acting: (pressed: Pressed) => Action | null;
 }
@@ -310,14 +327,14 @@ function stored(kept: PreferenceDoor): Record<Action, Chord> {
 
 export function loadKeys(kept: PreferenceDoor, userAgent: string): Keymap {
   const platform = platformOf(userAgent);
-  const [bound, setBound] = createSignal<Readonly<Record<Action, Chord>>>(stored(kept));
+  const held = writable<Readonly<Record<Action, Chord>>>(stored(kept));
   const put = (action: Action, chord: Chord) => {
-    setBound((held) => ({ ...held, [action]: chord }));
+    held.update((was) => ({ ...was, [action]: chord }));
   };
   return {
     platform,
-    bound,
-    chord: (action) => bound()[action],
+    bound: held,
+    chord: (action) => get(held)[action],
     bind(action, chord) {
       kept.setChord(action, spell(chord));
       put(action, chord);
@@ -330,13 +347,13 @@ export function loadKeys(kept: PreferenceDoor, userAgent: string): Keymap {
       for (const action of ACTIONS) {
         kept.setChord(action, "");
       }
-      setBound({ ...DEFAULTS });
+      held.set({ ...DEFAULTS });
     },
-    changed: (action) => spell(bound()[action]) !== spell(DEFAULTS[action]),
-    conflicts: () => conflictsOf(bound()),
+    changed: (action) => spell(get(held)[action]) !== spell(DEFAULTS[action]),
+    conflicts: derived(held, conflictsOf),
     acting(pressed) {
-      const held = bound();
-      return ACTIONS.find((action) => matches(held[action], pressed)) ?? null;
+      const bound = get(held);
+      return ACTIONS.find((action) => matches(bound[action], pressed)) ?? null;
     },
   };
 }

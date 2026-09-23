@@ -250,6 +250,26 @@
    * in the order it is likely to have it. A stack begins with
    * `--face-sans` or `--face-mono` so that choosing a face moves one
    * value and keeps the whole fallback chain behind it. */
+  /* **No CJK family is named here.** Han glyphs reach whatever face the
+   * machine has, because that is what an engine does with a glyph none of
+   * the named families carries, and the platform's own choice is the only
+   * one available on the terms this project can accept.
+   *
+   * Two terms, and either one alone decides it. A licence: this stack may
+   * name only families the client could redistribute (`fonts/OFL.txt`,
+   * `docs/third-party.md` section 4), and the faces a person actually has
+   * on Windows and macOS - Microsoft YaHei, PingFang, Hiragino - are
+   * their vendors' and not ours to prefer. A size: the first family a
+   * stack would sensibly name is 17,773,244 B as its vendor ships it and
+   * 11,266,972 B through `gzip -9` (windows-x86_64, 2026-09), against a
+   * 2,097,152 B budget in `xtask/budgets.toml` for a client that is
+   * 322,687 B gzipped today, so shipping one is not a close call.
+   *
+   * What is given up is small: the fallback face's baseline and x-height
+   * differ from the shipped face's, which shows only where Latin and Han
+   * share one line, and naming a CJK face would not have removed that on
+   * a machine that lacks the named one - it would have made the result
+   * depend on which fonts happen to be installed. */
   --font-sans:
     var(--face-sans), "Geist Fallback", Inter, "IBM Plex Sans", "Source Sans 3",
     "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu,
@@ -318,6 +338,14 @@
    * written twice. */
   --container-lg: 820px;
   --container-wide: 1120px;
+  /* **A container named after a spacing step cannot be reached.**
+   * `max-w-wide` is `--spacing-wide`, 24px, and not the 1120px
+   * above: Tailwind resolves the utility's named value out of the
+   * spacing scale first, so a `max-w-wide` on a page column caps it
+   * at twenty-four pixels and every child of it collapses. Use
+   * `max-w-page`, or write the value out as `max-w-[1120px]`, or
+   * rename the step. Only `page`, `measure` and `talk` are names a
+   * spacing token does not shadow. */
 
   /* The few fixed sizes a shell needs: the bar, a status dot, the
    * building glyphs, and the pane a tree takes beside a file. */
@@ -329,7 +357,21 @@
   --spacing-facts: 28px;
   --spacing-rail: 44px;
   --spacing-rail-open: 232px;
-  --spacing-glyph: 18px;
+  /* The icon grids. An icon is drawn on one of two squares - sixteen
+   * for a mark that sits inside a line of text, twenty for the ones a
+   * column of navigation is built from - and the box it is drawn in is
+   * that square, so a stroke stays on the pixel the artist put it on. */
+  --spacing-glyph-sm: 16px;
+  --spacing-glyph: 20px;
+  /* The three heights a control may sit at. Named here because they were
+   * being invented at each call site, and three buttons standing in one
+   * row came out 26, 28 and 30 pixels tall. A control is small when it
+   * lives inside a row or a table cell, ordinary when it is a field or a
+   * secondary button, and large when it is the one action a screen is
+   * for. */
+  --spacing-control-sm: 28px;
+  --spacing-control: 32px;
+  --spacing-control-lg: 36px;
   --spacing-dot: 8px;
   --spacing-tree: 300px;
   --spacing-figure: 72px;
@@ -346,20 +388,14 @@
    * hue, so the single-axis rule is untouched. */
   --shadow-raise: 0 1px 2px oklch(from var(--shadow-ink) l c h / 0.25);
   --shadow-float: 0 8px 24px oklch(from var(--shadow-ink) l c h / 0.45);
-  --shadow-modal: 0 24px 64px oklch(from var(--shadow-ink) l c h / 0.6);
-  /* A migration shim, and nothing else: it is the name callers spelled
-   * when there was one shadow, pointing at the middle tier rather than
-   * repeating its value, so that the three heights above could land
-   * before any view was touched. Whoever renames the last
-   * `shadow-composer` in `src/views/` to the height it means deletes
-   * this line in the same change; until then it keeps the old spelling
-   * drawing the right shadow. */
-  --shadow-composer: var(--shadow-float);
+  /* The tier a sheet takes: a drawer, a dialog, the one box that has
+   * taken the page rather than floating over a part of it. */
+  --shadow-sheet: 0 24px 64px oklch(from var(--shadow-ink) l c h / 0.6);
 
   /* The corner scales; the shape is the superellipse exponent halved. */
-  --radius-panel: 10px;
-  --radius-card: 7px;
-  --radius-control: 5px;
+  --radius-panel: 12px;
+  --radius-card: 8px;
+  --radius-control: 6px;
   --radius-pill: 999px;
 
   /* The one duration: the acknowledgement a control owes a hand. A
@@ -726,6 +762,40 @@
 .drop {
   animation: drop 200ms var(--ease-standard) both;
 }
+/* The motion vocabulary is four names and this is its whole table:
+ * `cut` is no motion at all (no class - it is what a same-level page
+ * switch does), `rise` above comes up from below, `slide` comes in
+ * from the left edge a revealed page belongs to, and `fade` is a state
+ * change that keeps its position. Every one moves only transform and
+ * opacity, and every one goes still under the two reduction lists
+ * below. An exit is deliberately not in this table: a leaving element
+ * animates through `transition-behavior: allow-discrete` plus a
+ * display toggle in the component that owns it (the dialog draws
+ * itself this way already), never through a JS timer. */
+@keyframes slide {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.slide {
+  animation: slide 200ms var(--ease-standard) both;
+}
+.fade {
+  animation: fade 150ms var(--ease-standard) both;
+}
 /* The shape of what is coming, while it is coming: a light band travels
  * across the bar once per pass. A block that fades in and out reads as
  * something broken, and a band travelling one way reads as something on
@@ -770,6 +840,8 @@
   :root:not([data-motion="on"]) .wave,
   :root:not([data-motion="on"]) .rise,
   :root:not([data-motion="on"]) .drop,
+  :root:not([data-motion="on"]) .slide,
+  :root:not([data-motion="on"]) .fade,
   :root:not([data-motion="on"]) .shimmer,
   :root:not([data-motion="on"]) .animate-pulse {
     animation: none;
@@ -790,6 +862,8 @@
 [data-motion="off"] .wave,
 [data-motion="off"] .rise,
 [data-motion="off"] .drop,
+[data-motion="off"] .slide,
+[data-motion="off"] .fade,
 [data-motion="off"] .shimmer,
 [data-motion="off"] .animate-pulse {
   animation: none;
@@ -1083,6 +1157,15 @@ nav[data-rail="glyphs"]:hover .rail-label {
   line-break: strict;
   hanging-punctuation: first allow-end;
   text-spacing-trim: space-first;
+  /* A Chinese character carries far more strokes into the same square
+   * than a Latin letter does, so the same nominal size is a denser
+   * mark: the note step is not reduced here, and the lines are given
+   * more room. Tracking is a Latin device - it separates words by
+   * spacing their letters - and on a script whose words are already
+   * separate squares it only loosens the line. */
+  --text-note: var(--text-body);
+  line-height: 1.6;
+  letter-spacing: 0;
 }
 
 /* What the utility layer is told here, it is told in the class names the

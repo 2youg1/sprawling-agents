@@ -168,16 +168,28 @@ impl SegmentSource {
     }
 }
 
+/// The one way out of a frozen session a person can take today, in the
+/// words the verb is spelled with.
+///
+/// Every refusal meaning "this session cannot take this turn" ends
+/// here, so no refusal promises a verb the wire does not carry: there
+/// is no command that opens a second session at one address, and a
+/// forked run is recorded without anything driving it (runtime-SPEC.md
+/// section 8-4-1). When such a verb arrives, this sentence is where it
+/// is spelled, once.
+pub(crate) const ANOTHER_ADDRESS: &str =
+    "send this task to another address, which opens a session of its own";
+
 /// The refusal a prefix that no longer matches its own record earns.
 ///
 /// A session cannot send one prefix and keep calling it frozen, and the
-/// run's recorded history belongs to the bytes it was told; the two
-/// ways out both leave this run's ledger alone.
+/// run's recorded history belongs to the bytes it was told; the way out
+/// leaves this run's ledger alone.
 fn prefix_drifted(subject: String) -> AxError {
-    AxError::failure(AxCode::CasCorrupt, "send the frozen prefix", subject).with_recovery(
-        "start a new session, or fork this run: the prefix this turn would send is not \
-         the one the session froze, and the two cannot share a history",
-    )
+    AxError::failure(AxCode::CasCorrupt, "send the frozen prefix", subject).with_recovery(format!(
+        "{ANOTHER_ADDRESS}: the prefix this turn would send is not the one the session \
+         froze, and the two cannot share a history"
+    ))
 }
 
 /// The same assertion over the copy of the segments a request carries:

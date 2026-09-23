@@ -59,6 +59,11 @@ pub(super) struct Assignment {
     /// flag the worker set and cleared around one call described
     /// whichever run happened to be landing.
     pub(super) tainted: bool,
+    /// What this session branched off, when it did. Set by the dispatch
+    /// from the worker's own fold of `session_opened`, spent by the first
+    /// run of that session and by no later one: a branch is a beginning,
+    /// and the run that begins it is the one that inherits.
+    pub(super) origin: Option<kernel::Origin>,
 }
 
 /// One succession, as the successor's dispatch receives it: who is

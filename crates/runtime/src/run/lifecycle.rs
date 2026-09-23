@@ -99,6 +99,10 @@ impl Run<Active> {
         })?;
 
         let mut window = Window::new();
+        // A branch opens with the conversation it branched from, and then
+        // its own lines: the task joins the mother's last user message when
+        // one is open, which is the same rule a steer follows.
+        window.push_inherited(&plan.inherited);
         window.push_task_lines(&plan.task, &plan.goal, plan.opening);
         let gauge = ContextGauge::new(kernel::Tokens::new(plan.shape.context_tokens));
         Ok(Run {

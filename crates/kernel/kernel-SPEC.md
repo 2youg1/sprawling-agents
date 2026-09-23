@@ -11,7 +11,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 
 | 模块 | 形状（ARCHITECTURE §7） | 一句话 |
 |---|---|---|
-| `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 35（S2 期初增 `E_STORAGE_FATAL`，删 `E_SIGNAL_UNKNOWN`）；carrier 声明位 |
+| `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 37（S2 期初增 `E_STORAGE_FATAL`，删 `E_SIGNAL_UNKNOWN`，S1 增 `E_BUSY`）；carrier 声明位 |
 | `address` | 2 值类型 | 相对 city root 路径 newtype；WriteDomain 原语；reserved prefix 判定 |
 | `locator` | 2 值类型 | `cas:`／`file:` 文法解析与呈现；fail-closed |
 | `event` | 2 值类型 | EventKind 72（二分共 9 条入窗）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
@@ -154,7 +154,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 
 ```rust
                       // C8：对扩展开放
-pub enum AxCode { PathNotFound, /* …36 variant，serde 呈现名见下表 */ }
+pub enum AxCode { PathNotFound, /* …37 variant，serde 呈现名见下表 */ }
 
 pub struct GateRefusal {                // three-part refusal；三段必填
     rule: String, violation: String, alternative: String,
@@ -199,7 +199,7 @@ impl ErrorDraft {
 
 「gate 码走 `refusal`」由构造纪律＋单测保证；S2 `kernel::gate` 是全库唯一 gate 码生产者，citysim 不变量 8 号在系统层复验。derive `Serialize/Deserialize`（Ledger 载荷需要）、`Clone/Debug/PartialEq`；`thiserror::Error` 提供 Display（`{code}: {action} on {subject}`）。
 
-**AxCode 36 全集与 carrier 对应（specalign 数据面）**
+**AxCode 37 全集与 carrier 对应（specalign 数据面）**
 
 > 协作组由六降为五——`E_SIGNAL_UNKNOWN` 已定义掉（三码之一；理由与实测见 `collab-SPEC.md` §8-1）。删除时全仓只有本文件提到它，零生产者。剩下两码（`E_WORKTREE_BUSY`／`E_DIGEST_SUSPECT`）已在各自 SPEC 里答过「能否定义掉」，答案是能保留——它们各自有一个真实的运行期情境。
 
@@ -220,6 +220,7 @@ impl ErrorDraft {
 | 基表 | `E_LOOP_SUSPECTED` | `watchdog_fired` |
 | 基表 | `E_LOCATOR_INVALID` | `tool_result` |
 | 基表 | `E_SANDBOX_DENIED` | `tool_result` |
+| 基表 | `E_BUSY` | `tool_result` |
 | 协作 | `E_DRAFT_STALE` | `tool_result` |
 | 协作 | `E_GOAL_CONFLICT` | `tool_result` |
 | 协作 | `E_TAINTED_ACTION` | `gate_denied` |
@@ -244,6 +245,7 @@ impl ErrorDraft {
 | 运行未知 | `E_TOOL_OUTCOME_UNKNOWN` | `tool_result` |
 
 装载期五码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED`）＝C9 唯一例外白名单，封闭且不得增长（第 5 码于 S2 期初增补）；`Carrier::Loadtime` 即其类型面。
+`E_BUSY` 的 carrier 与 `E_WORKTREE_BUSY` 一样是 `tool_result`，而两者的区别在名字里：那一个说的是工作树这个机制，这一个说的是**同一个地址上有 run 正在工作**，拒绝里点名那条 run，调用方据此先停它再动手。
 两条呈现约束：`E_SECRET_EGRESS` 的 subject 只写 SecretRef 与位置、恒不回显命中字节；`E_DISCARD_IRREVERSIBLE` 的 alternative 必须可执行。执行点在各生产模块（S2），此处记为 carrier 表随附契约。
 
 **carrier() 依赖 `EventKind`**：故它与 `event` 模块同一变更集落码；本表与其余全部（AxError／GateRefusal／AxCode／serde／构造子）不依赖它。
@@ -410,7 +412,7 @@ pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
 pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 ```
 
-已迁移的 kind 与其结构：`run_started`、`run_forked`、`tool_called`／`tool_result`、
+已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`tool_called`／`tool_result`、
 `checkpoint_committed`、`approval_resolved`、`autonomy_changed`、`city_halted`、
 `governed_document_written`、`embedding_called`／`rerank_called`、
 `adviser_asked`／`adviser_answered`／`adviser_fell_back`；
@@ -455,13 +457,14 @@ pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 - 铸造纪律（15.3-1）：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（trybuild 反例）。
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
-**EventKind 72 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
+**EventKind 73 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
 | 创世与空间 | `city_initialized` | record-only（创世行，prev＝64 个 0） |
 | 创世与空间 | `building_created` | record-only |
 | 创世与空间 | `building_configured` | record-only |
+| 基集 | `session_opened` | record-only（新的一段从哪里开始；`prompt_assembled` 记的是它之后给了那一跑什么） |
 | 基集 | `run_started` | record-only |
 | 基集 | `run_forked` | record-only |
 | 基集 | `prompt_assembled` | **in-window** |
@@ -865,9 +868,6 @@ pub fn set_roadmap_status(text: &str, id: &NodeId, status: RoadmapStatus,
                           evidence: Option<&Locator>) -> Result<String, AxError>;
 pub fn insert_children(text: &str, parent: &NodeId, children: &[NewChild]) -> Result<String, AxError>;
 
-pub const MEMO_OUTLINE_FIELDS: [&str; 6];
-pub enum MemoShape { WellFormed, Malformed { missing: Vec<&'static str> } }
-pub fn check_memo_shape(text: &str) -> MemoShape;
 pub enum ScopeChange { Keep, Add, Drop }
 pub enum WriteMoment { BeforeReport, AfterFeedback, OnPlanChange }
 ```

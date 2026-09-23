@@ -121,7 +121,14 @@ use serde::{Deserialize, Serialize};
 ///    The increment and the log line keep their silence on purpose:
 ///    neither is written to the Ledger, so a range naming them would
 ///    name records that do not exist.
-pub const WIRE_V: u32 = 34;
+/// 35: a session can start again at an address. A room's first run
+///    froze the model it calls and how hard it thinks, and every later
+///    run there refused to move either, so a person who changed the
+///    model had no way back into that room. `Command::OpenSession` is
+///    that way back: it forgets the shape, keeps the previous session's
+///    handoff only when the frame says to carry it, and writes
+///    `session_opened` with what it did.
+pub const WIRE_V: u32 = 35;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

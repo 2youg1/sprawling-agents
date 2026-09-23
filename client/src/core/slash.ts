@@ -25,21 +25,22 @@ import {
   cancel,
   createBuilding,
   dispatch,
-  fork,
   halt,
+  openSession,
   release,
   selectModel,
   steer,
 } from "./commands";
 import type { Template } from "./commands";
+import { askFork } from "./forking";
 import type { Key } from "./lang";
 import { PAGES, page } from "./route";
 import type { View } from "./route";
 import { CITY } from "./scope";
 import type { Command, Effort, RunId, Seq } from "../wire";
 
-// A run a verb can act on: which one, and how far it has got. `/fork`
-// needs both, `/steer` and `/stop` only the first.
+// A run a verb can act on: which one, and how far it has got. `/steer`
+// and `/stop` need the first, and a branch needs both.
 export interface Reached {
   readonly run: RunId;
   readonly at: Seq;
@@ -106,6 +107,7 @@ export interface Slash {
 
 const ALL = "--all";
 const QUEUED = "--queued";
+const CARRY = "--carry";
 
 // The word for an effort nobody chose. The page keeps that state as
 // `null` and the frame leaves the field out; this is its one written
@@ -214,15 +216,39 @@ export const SLASH: readonly Slash[] = [
     },
   },
   {
+    spelling: "/new",
+    grammar: "[--carry]",
+    about: "slash_new",
+    run: (hands, call) => {
+      if (hands.here === null) return;
+      // `--carry` is the exception a person states: a new session
+      // normally starts here with nothing from the last one, and a room
+      // with no handoff to bring answers `carried: false` rather than
+      // refusing, so the word is passed on instead of second-guessed.
+      const carry = call.words.includes(CARRY) ? "handoff" : "nothing";
+      hands.command(openSession(hands.here, carry, null));
+      hands.write("");
+    },
+  },
+  {
     spelling: "/fork",
-    grammar: "<addr>",
+    grammar: "[addr]",
     about: "slash_fork",
     run: (hands, call) => {
-      const room = call.words.at(0);
-      if (room === undefined) return;
+      const room = addressed(call.words.at(0));
+      if (room === null) {
+        // No address means the point is in this conversation: the
+        // picker above the box knows the turns and where each one sits.
+        askFork();
+        hands.write("");
+        return;
+      }
+      // With an address the branch goes to that room, from the tail of
+      // the newest run there: forking into another room predates the
+      // picker and keeps its meaning.
       const newest = hands.newest(room);
       if (newest === null) return;
-      hands.command(fork(newest.run, newest.at, null));
+      hands.command(openSession(room, "nothing", { run: newest.run, at_seq: newest.at }));
       hands.write("");
     },
   },
@@ -343,35 +369,4 @@ export function offered(line: string): readonly Slash[] {
     return [whole];
   }
   return SLASH.filter((known) => known.spelling.startsWith(call.verb));
-}
-
-function shared(spellings: readonly string[]): string {
-  const first = spellings.at(0);
-  if (first === undefined) {
-    return "";
-  }
-  let out = first;
-  for (const spelling of spellings) {
-    while (!spelling.startsWith(out)) {
-      out = out.slice(0, -1);
-    }
-  }
-  return out;
-}
-
-// What Tab makes of a line: the one match completed, or the longest
-// prefix every match shares. A line Tab cannot improve comes back
-// unchanged, so the caller has nothing to decide.
-export function completed(line: string): string {
-  const call = parse(line);
-  if (call === null) {
-    return line;
-  }
-  const hits = SLASH.filter((known) => known.spelling.startsWith(call.verb));
-  const only = hits.length === 1 ? hits.at(0) : undefined;
-  if (only !== undefined) {
-    return call.rest === "" ? `${only.spelling} ` : line;
-  }
-  const prefix = shared(hits.map((known) => known.spelling));
-  return prefix.length > call.verb.length ? prefix : line;
 }

@@ -122,10 +122,17 @@ impl CallShape {
 }
 
 /// The refusal a call shape that moved under a running session earns.
+///
+/// The recovery names what a person can do from the page in front of
+/// them: put the field the subject names back, or leave this session
+/// by addressing another room. The second way out is spelled in one
+/// place (`prefix::segment::ANOTHER_ADDRESS`), so no refusal here can
+/// name a verb the wire does not carry.
 fn shape_moved(subject: String) -> AxError {
-    AxError::failure(AxCode::ConfigInvalid, "dispatch a turn", subject).with_recovery(
-        "open a new session, or fork this run: the model, its ceiling and its effort are \
-         frozen with the session, and a mid-run change would invalidate the prefix the \
-         run is paying to cache",
-    )
+    AxError::failure(AxCode::ConfigInvalid, "dispatch a turn", subject).with_recovery(format!(
+        "put the field the subject names back to what this session froze, or \
+         {}: the model, its ceiling and its effort freeze with the session, \
+         and a mid-run change would invalidate the prefix the run is paying to cache",
+        crate::prefix::ANOTHER_ADDRESS
+    ))
 }

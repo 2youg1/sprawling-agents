@@ -16,7 +16,10 @@
 ///
 /// The test is the form's own parenthetical guidance: every section of
 /// the template carries one, and a session that wrote the file replaced
-/// them with what it found.
+/// them with what it found. A section's tags are boundaries rather than
+/// content, so a line of markup says nothing about whether the form was
+/// filled — and a body line that happens to open with `(` is content
+/// rather than guidance only when it does not close with `)`.
 pub(super) fn is_blank_form(text: &str) -> bool {
     let filled = text
         .lines()
@@ -25,6 +28,7 @@ pub(super) fn is_blank_form(text: &str) -> bool {
             !trimmed.is_empty()
                 && !trimmed.starts_with('#')
                 && !trimmed.starts_with('>')
+                && !trimmed.starts_with('<')
                 && !(trimmed.starts_with('(') && trimmed.ends_with(')'))
         })
         .count();

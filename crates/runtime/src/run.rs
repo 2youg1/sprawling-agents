@@ -17,6 +17,8 @@ use kernel::{
     Payload, RunId, TimeMs, ToolCall, ToolDef, ToolOutcome,
 };
 
+use kernel::ChatMessage;
+
 use crate::catalog::SkillPin;
 use crate::handoff::Handoff;
 use crate::prefix::FrozenPrefix;
@@ -51,6 +53,14 @@ pub struct RunPlan {
     /// fact folded from the ledger rather than inferred from two runs
     /// sharing an address.
     pub predecessor: Option<RunId>,
+    /// The conversation this run starts from, when it is the first run of
+    /// a session that branched off another. Empty for every other run.
+    ///
+    /// It is the window's material and not the prefix's: a prefix segment
+    /// is a document a person can read and edit, while this is what the
+    /// model said and what the tools answered, and the ledger is where
+    /// those live (`runtime::fork::inherited` rebuilds them from it).
+    pub inherited: Vec<ChatMessage>,
     pub shape: CallShape,
     pub prefix: FrozenPrefix,
     pub policy: BuildingPolicy,

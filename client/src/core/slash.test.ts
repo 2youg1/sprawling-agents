@@ -4,9 +4,15 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { describe, expect, test } from "bun:test";
+import { get } from "svelte/store";
 
 import table from "../lang.json";
-import { SLASH, completed, find, offered, parse } from "./slash";
+import { Address, RunId, Seq } from "../wire";
+import type { Command, Origin } from "../wire";
+import { SLASH, find, offered, parse } from "./slash";
+import type { Slash, SlashCall, SlashHands } from "./slash";
+import { completed } from "./completion";
+import { forkAsked } from "./forking";
 
 describe("slash", () => {
   test("every verb is spelled once, with a slash", () => {
@@ -60,5 +66,128 @@ describe("slash", () => {
     expect(completed("/mc")).toBe("/mcp ");
     expect(completed("/zzz")).toBe("/zzz");
     expect(completed("read the city")).toBe("read the city");
+  });
+});
+
+// `/new` and `/fork` are one verb with and without an origin: both send
+// the same `OpenSession`, and the difference is what the new session
+// inherits. These cases hold that seam - the picker request, the carry
+// flag, and the one place `from` is built.
+describe("new and fork", () => {
+  const MOTHER = RunId.make("00000000-0000-0000-0000-000000000001");
+
+  function called(line: string): SlashCall {
+    const held = parse(line);
+    expect(held, `${line} is a command line`).not.toBeNull();
+    return held ?? { verb: "", words: [], rest: "" };
+  }
+
+  function verb(spelling: string): Slash {
+    const known = find(spelling);
+    expect(known, `${spelling} is a verb the table holds`).toBeDefined();
+    return (
+      known ?? {
+        spelling,
+        grammar: "",
+        about: "slash_help",
+        run: () => undefined,
+      }
+    );
+  }
+
+  // Every capability a verb may reach for, recording what it sent and
+  // answering `newest` for the one room named below.
+  function hands(
+    here: Address | null,
+    newest: (room: string) => { run: RunId; at: Seq } | null,
+  ): { filled: SlashHands; sent: Command[]; written: string[] } {
+    const sent: Command[] = [];
+    const written: string[] = [];
+    return {
+      sent,
+      written,
+      filled: {
+        command: (command) => {
+          sent.push(command);
+          return true;
+        },
+        go: () => undefined,
+        here,
+        live: null,
+        newest,
+        models: [],
+        effort: null,
+        setEffort: () => undefined,
+        goal: "a goal",
+        write: (line) => written.push(line),
+      },
+    };
+  }
+
+  // What the sent frames asked the city to open, or `null` when none
+  // did. One reader, because every case below asks the same question.
+  function opened(
+    sent: readonly Command[],
+  ): { addr: Address; carry: string; from: Origin | null } | null {
+    for (const frame of sent) {
+      if ("open_session" in frame) {
+        return {
+          addr: frame.open_session.addr,
+          carry: frame.open_session.carry,
+          from: frame.open_session.from ?? null,
+        };
+      }
+    }
+    return null;
+  }
+
+  test("/new opens a session here and carries nothing by default", () => {
+    const room = Address.make("hall/mayor");
+    const held = hands(room, () => null);
+    verb("/new").run(held.filled, called("/new"));
+    expect(opened(held.sent)).toEqual({ addr: room, carry: "nothing", from: null });
+    expect(held.written).toEqual([""]);
+  });
+
+  test("/new --carry brings the handoff along, and says so", () => {
+    const room = Address.make("lab/room1");
+    const held = hands(room, () => null);
+    verb("/new").run(held.filled, called("/new --carry"));
+    expect(opened(held.sent)).toEqual({ addr: room, carry: "handoff", from: null });
+  });
+
+  test("/new outside a room sends nothing", () => {
+    const held = hands(null, () => null);
+    verb("/new").run(held.filled, called("/new"));
+    expect(held.sent).toHaveLength(0);
+  });
+
+  test("/fork with no argument asks for the picker and clears the line", () => {
+    const before = get(forkAsked);
+    const held = hands(Address.make("hall/mayor"), () => null);
+    verb("/fork").run(held.filled, called("/fork"));
+    expect(get(forkAsked), "the talk screen watches this count").toBe(before + 1);
+    expect(held.sent, "no frame goes out: the picker names the point").toHaveLength(0);
+    expect(held.written).toEqual([""]);
+  });
+
+  test("/fork with an address branches that room's newest run at its tail", () => {
+    const target = Address.make("lab/room1");
+    const held = hands(Address.make("hall/mayor"), (room) =>
+      room === target ? { run: MOTHER, at: Seq.make(7) } : null,
+    );
+    verb("/fork").run(held.filled, called("/fork lab/room1"));
+    expect(opened(held.sent)).toEqual({
+      addr: target,
+      carry: "nothing",
+      from: { run: MOTHER, at_seq: Seq.make(7) },
+    });
+  });
+
+  test("/fork naming a room with no run does nothing", () => {
+    const held = hands(Address.make("hall/mayor"), () => null);
+    verb("/fork").run(held.filled, called("/fork lab/room1"));
+    expect(held.sent).toHaveLength(0);
+    expect(held.written, "the line stays for editing").toHaveLength(0);
   });
 });

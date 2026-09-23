@@ -30,8 +30,8 @@
 // `[model] effort`, and a copy kept here would ride on every dispatch
 // from this browser and quietly overrule the city's own file.
 
-import { createSignal } from "solid-js";
-import type { Accessor } from "solid-js";
+import { get, writable } from "svelte/store";
+import type { Readable } from "svelte/store";
 
 import type { Lang } from "./lang";
 import { langOf } from "./lang";
@@ -207,8 +207,8 @@ export type Keeper =
 // once, and a record applied field by field could be half of one
 // answer and half of the last.
 export interface PreferenceDoor {
-  readonly held: Accessor<Preferences>;
-  readonly keeper: Accessor<Keeper>;
+  readonly held: Readable<Preferences>;
+  readonly keeper: Readable<Keeper>;
   // The city's whole record, taken as the one that counts: it becomes
   // what `held` answers, it is mirrored into the cache so the next
   // first paint draws it rather than the shipped postures, and it is
@@ -318,39 +318,39 @@ function writePreferences(rows: Rows, next: Preferences): void {
 // The door onto one store. A test hands it a map and its own language
 // tag; the page reaches the browser's through `preferences()` below.
 export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor {
-  const [held, setHeld] = createSignal<Preferences>(readPreferences(rows, browserLang));
-  const [keeper, setKeeper] = createSignal<Keeper>("browser");
+  const held = writable<Preferences>(readPreferences(rows, browserLang));
+  const keeper = writable<Keeper>("browser");
   // One write path for every change, the city's answer included: the
-  // cache and the signal move together, so a reader that redraws and a
+  // cache and the store move together, so a reader that redraws and a
   // reader that reloads the page never see two different records.
   const settle = (next: Preferences): void => {
     writePreferences(rows, next);
-    setHeld(next);
+    held.set(next);
   };
   return {
     held,
     keeper,
     adopt(stated) {
       settle(stated);
-      setKeeper("city");
+      keeper.set("city");
     },
     setLang(lang) {
-      settle({ ...held(), lang });
+      settle({ ...get(held), lang });
     },
     setWelcomed(welcomed) {
-      settle({ ...held(), welcomed });
+      settle({ ...get(held), welcomed });
     },
     setPanel(panel) {
-      settle({ ...held(), panel });
+      settle({ ...get(held), panel });
     },
     setRail(rail) {
-      settle({ ...held(), rail });
+      settle({ ...get(held), rail });
     },
     setAppearance(appearance) {
-      settle({ ...held(), appearance });
+      settle({ ...get(held), appearance });
     },
     setProxying(proxying) {
-      settle({ ...held(), proxying });
+      settle({ ...get(held), proxying });
     },
     chord: (action) => rows.getItem(ROWS.chord + action) ?? "",
     setChord(action, spelled) {

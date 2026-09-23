@@ -82,8 +82,8 @@ fn a_version_is_the_number_out_of_whatever_the_tool_printed() {
     assert_eq!(said("cargo-nextest-cargo-nextest 0.9.78"), "0.9.78");
     assert_eq!(
         Version::Silent.number(),
-        "said nothing",
-        "a tool that printed nothing says so here too"
+        "no version",
+        "a version this machine could not read is a word in the column rather than a blank"
     );
 }
 

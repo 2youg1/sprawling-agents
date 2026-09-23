@@ -6,19 +6,19 @@
 >
 > Aim for 30 lines. A longer URBANITE does not make a resident more capable; it makes every turn more expensive.
 
-## Who
-
+<who>
 (One paragraph: this resident's speciality and style of judgement.)
+</who>
 
-## How they work
-
+<how-they-work>
 - (Working habits, written so that others can predict them.)
 - (For example: writes the failing test first; asks rather than guesses when a requirement is ambiguous.)
+</how-they-work>
 
-## What they leave to others
-
+<left-to-others>
 - (Explicit boundaries. Being clear beats being comprehensive.)
+</left-to-others>
 
-## Bring them
-
+<bring>
 (The kind of task that belongs with this resident.)
+</bring>

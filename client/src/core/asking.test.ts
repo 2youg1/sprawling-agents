@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { afterEach, describe, expect, test } from "bun:test";
-import { createRoot } from "solid-js";
+import { get } from "svelte/store";
 
 import { QUERIES, createAsking, keyOf } from "./asking";
 import type { Reported } from "./asking";
@@ -100,10 +100,10 @@ describe("asking", () => {
     );
     const shelf = asking.ask(QUERIES.toolkits);
     expect(asked).toEqual([keyOf(QUERIES.toolkits)]);
-    expect(shelf()).toBeUndefined();
+    expect(get(shelf)).toBeUndefined();
 
     asking.answered({ toolkits: "unenrolled" });
-    expect(shelf()).toEqual({ toolkits: "unenrolled" });
+    expect(get(shelf)).toEqual({ toolkits: "unenrolled" });
   });
 
   test("a question stays unanswered until its own answer lands", () => {
@@ -118,8 +118,8 @@ describe("asking", () => {
     asking.answered({
       city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
     });
-    expect(doctor()).toBeUndefined();
-    expect(city()).toBeDefined();
+    expect(get(doctor)).toBeUndefined();
+    expect(get(city)).toBeDefined();
   });
 
   // The defect: a question the city never answered left `inflight`
@@ -133,7 +133,7 @@ describe("asking", () => {
     expect(driver.reports, "still inside its patience").toHaveLength(0);
 
     driver.pass(2_000);
-    expect(doctor(), "an answer already on screen would stay").toBeUndefined();
+    expect(get(doctor), "an answer already on screen would stay").toBeUndefined();
     expect(driver.reports).toHaveLength(1);
     expect(driver.reports[0]?.[0], "the sentence a person reads").toBe("ask_late");
     expect(driver.reports[0]?.[1].code).toBe("E_TIMEOUT");
@@ -150,7 +150,7 @@ describe("asking", () => {
     expect(driver.reports).toHaveLength(1);
 
     driver.ask.answered({ toolkits: "unenrolled" });
-    expect(toolkits()).toEqual({ toolkits: "unenrolled" });
+    expect(get(toolkits)).toEqual({ toolkits: "unenrolled" });
     expect(driver.reports, "a late answer is not an unplaceable one").toHaveLength(1);
   });
 
@@ -174,7 +174,7 @@ describe("asking", () => {
   // tells a person nothing the first did not.
   test("a watched question is asked again, and reported once", () => {
     const driver = driven();
-    createRoot(() => driver.ask.ask(QUERIES.doctor));
+    const watching = driver.ask.ask(QUERIES.doctor).subscribe(() => undefined);
     expect(driver.sent).toHaveLength(1);
 
     driver.pass(16_000);
@@ -185,6 +185,7 @@ describe("asking", () => {
     driver.pass(16_000);
     expect(driver.sent).toHaveLength(2);
     expect(driver.reports, "said once for one stretch of silence").toHaveLength(1);
+    watching();
   });
 
   // A question that was never sent is not a question waiting on an

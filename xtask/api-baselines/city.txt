@@ -219,6 +219,7 @@ pub fn city::building_adopted_payload(&city::Building) -> core::result::Result<k
 pub fn city::building_configured_payload(&city::Building, city::Written) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn city::building_created_payload(&city::Building, city::BuildingTemplate) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn city::buildings(&std::path::Path) -> core::result::Result<alloc::vec::Vec<kernel::address::Address>, kernel::error::shape::AxError>
+pub fn city::clear_session(&std::path::Path, &kernel::address::Address) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::config_path(&std::path::Path, &kernel::address::Address, city::Layer) -> core::result::Result<std::path::PathBuf, kernel::error::shape::AxError>
 pub fn city::create_building(&std::path::Path, &kernel::address::Address, city::BuildingTemplate) -> core::result::Result<city::Building, kernel::error::shape::AxError>
 pub fn city::day_of(kernel::event::identity::TimeMs) -> u64
@@ -226,6 +227,7 @@ pub fn city::desktop_scope_path(&std::path::Path, &kernel::address::Address) -> 
 pub fn city::edit_document<T>(&std::path::Path, impl core::ops::function::FnOnce(&city::Held<'_>) -> core::result::Result<T, kernel::error::shape::AxError>) -> core::result::Result<T, kernel::error::shape::AxError>
 pub fn city::evaluate(&kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
 pub fn city::file_archive(&city::ArchiveEntry, &str) -> core::result::Result<(), kernel::error::shape::AxError>
+pub fn city::forget_shape(&std::path::Path, &kernel::address::Address) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::hall_identity_path(&std::path::Path, &kernel::address::Address) -> core::option::Option<std::path::PathBuf>
 pub fn city::handoff(&std::path::Path, &kernel::address::Address) -> core::result::Result<core::option::Option<alloc::string::String>, kernel::error::shape::AxError>
 pub fn city::handoff_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf

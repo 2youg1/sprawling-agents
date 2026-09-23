@@ -20,7 +20,7 @@
 //! With the line named, the next step is one `edit` call:
 //!
 //! ```text
-//! client/src/views/machine.tsx:118 · the left edge … reads 579
+//! client/src/views/machine.svelte:118 · the left edge … reads 579
 //! ```
 //!
 //! **The match is by the longest literal, and it is honest about
@@ -34,7 +34,7 @@
 //! reader who opens the wrong file trusts the next location less.
 
 /// The file kinds a class literal can be written in.
-pub const DRAWN_IN: [&str; 3] = ["tsx", "ts", "html"];
+pub const DRAWN_IN: [&str; 3] = ["svelte", "ts", "html"];
 
 /// How long a literal has to be before it identifies anything.
 ///

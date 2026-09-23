@@ -80,6 +80,10 @@ impl RunWorker {
                 ..
             } => self.dispatch_asked(
                 Assignment {
+                    // Read from the room's own history rather than sent
+                    // by the page: a session that branched off another
+                    // said so once, at the moment it began.
+                    origin: self.origins.get(&addr),
                     addr,
                     session,
                     effort,
@@ -192,9 +196,9 @@ impl RunWorker {
                 "edit the file under the shelf by hand; writing it from the page is not built",
             )),
             channels::Command::Pursue { addr, step, .. } => self.set_pursuit(&addr, step),
-            channels::Command::Fork {
-                run, at_seq, addr, ..
-            } => self.fork(run, at_seq, addr).map(|_| ()),
+            channels::Command::OpenSession {
+                addr, carry, from, ..
+            } => self.open_session(&addr, carry, from),
             channels::Command::PutDocument {
                 which, ref body, ..
             } => self.put_document(which, body),

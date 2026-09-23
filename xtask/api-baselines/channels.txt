@@ -120,6 +120,8 @@ pub channels::Call::outcome: channels::Outcome
 pub channels::Call::output: core::option::Option<channels::Output>
 pub channels::Call::subject: core::option::Option<alloc::string::String>
 pub channels::Call::tool: alloc::string::String
+pub channels::Carry::Handoff
+pub channels::Carry::Nothing
 pub channels::ChangesAnswer::base: kernel::locator::GitOid
 pub channels::ChangesAnswer::files: alloc::vec::Vec<kernel::change::FileChange>
 pub channels::ChangesAnswer::head: core::option::Option<kernel::locator::GitOid>
@@ -191,11 +193,6 @@ pub channels::Command::DoctorInstall::idem: kernel::idem::IdemKey
 pub channels::Command::DoctorInstall::item: alloc::string::String
 pub channels::Command::DoctorRefresh
 pub channels::Command::DoctorRefresh::idem: kernel::idem::IdemKey
-pub channels::Command::Fork
-pub channels::Command::Fork::addr: core::option::Option<kernel::address::Address>
-pub channels::Command::Fork::at_seq: kernel::event::identity::Seq
-pub channels::Command::Fork::idem: kernel::idem::IdemKey
-pub channels::Command::Fork::run: kernel::event::identity::RunId
 pub channels::Command::Halt
 pub channels::Command::Halt::idem: kernel::idem::IdemKey
 pub channels::Command::Halt::scope: channels::HaltScope
@@ -207,6 +204,11 @@ pub channels::Command::Login
 pub channels::Command::Login::idem: kernel::idem::IdemKey
 pub channels::Command::Login::provider: channels::ProviderName
 pub channels::Command::Login::step: channels::LoginStep
+pub channels::Command::OpenSession
+pub channels::Command::OpenSession::addr: kernel::address::Address
+pub channels::Command::OpenSession::carry: channels::Carry
+pub channels::Command::OpenSession::from: core::option::Option<kernel::origin::Origin>
+pub channels::Command::OpenSession::idem: kernel::idem::IdemKey
 pub channels::Command::ProbeEndpoint
 pub channels::Command::ProbeEndpoint::auth_header: core::option::Option<alloc::string::String>
 pub channels::Command::ProbeEndpoint::base_url: alloc::string::String
@@ -816,6 +818,7 @@ pub enum channels::Answer
 pub enum channels::AssetReply
 pub enum channels::BindFace
 pub enum channels::BindVerdict
+pub enum channels::Carry
 pub enum channels::Chroma
 pub enum channels::ClientAssets
 pub enum channels::ClientFrame

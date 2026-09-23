@@ -1,60 +1,56 @@
-# client — the browser client
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at https://mozilla.org/MPL/2.0/.
+Copyright (c) 2026 2youg1 and the sprawling contributors
+-->
 
-The page a person opens against one running `sprawling` binary. It is
-TypeScript, built by [bun](https://bun.sh) and Vite, and it lives outside
-the cargo workspace on purpose: the wire in `crates/channels` is the whole
-API, and a client written against it in another language is a supported
-thing to build. Decisions and interfaces
-are recorded in [`client-SPEC.md`](client-SPEC.md).
+# The browser client
 
-## Two runtime dependencies, and why only two
+The city's face: a Svelte 5 single-page client, served by the same
+binary that runs the city. It talks exactly one protocol
+(`client/src/wire.ts`, generated — never edited by hand) and holds no
+state of its own beyond the browser cache behind `core/prefs.ts`.
 
-| Package | What it is for |
+## Toolchain
+
+| Tool | Role |
 |---|---|
-| `solid-js` | The views. Settled HTML becomes JSX with almost no transcription (`class`, plain boolean attributes), and a component is a function that runs once, so the DOM it draws is the DOM it declared. |
-| `effect` | The effectful core: the socket ladder, enrolment, asking, pacing, wire decoding through generated `Schema`, and `Match` for exhaustive frame handling. It gives typed errors and branded values, which is how this repository's Rust side thinks. |
+| **bun** | installs, runs, tests and builds. There is no other JavaScript runtime here. |
+| **Svelte 5** | the view layer, runes (`$props`/`$derived`/`$state`) in components. |
+| **Vite 8** | the build, through `@sveltejs/vite-plugin-svelte`. `crates/sprawling/build.rs` embeds `dist/` as it is written, so the output paths are a contract with the binary. |
+| **Tailwind CSS 4** | utilities compiled from `@import "tailwindcss"`. Scanning is automatic and covers `.svelte`; do not configure content paths. |
+| **TypeScript 7 (`@typescript/native`)** | the checking lane, through `scripts/typecheck.ts` (the `--tsgo` path). The wrapper pins the lane: a run with findings exits non-zero, and a toolchain that failed to load cannot read as clean. |
+| **typescript-eslint** | the lint lane. `typescript@6` exists only to version-gate it and `svelte-check`. |
+| **effect** | schema decoding on the wire, together with `svelte` the only runtime dependency. |
 
-No router library: the hash routes are hand-written in `src/core/route.ts`,
-which reads every fragment the previous client wrote and writes one
-spelling. No UI kit: colour, type, spacing and shape come from
-`src/theme.css`, and that file is the only place a colour, size
-or family literal may appear.
-
-## The boundary: Effect for the effectful core, Solid for views
-
-Effect is used narrowly and never wraps a view. The only seam between the
-two is `src/core/bridge.ts`: an Effect `Stream` becomes a Solid signal, and
-an `Effect` becomes a resource holding an `Exit`. Failure crosses that
-seam as data, never as an exception, which is why the lint bans below are
-possible at all.
-
-## What the lint bans, and why
-
-- `any` and every type assertion except `as const` — an `as` is a claim the
-  compiler stops checking; construct the value instead (`Brand.refined`).
-- `throw` and `try` — Effect owns failure; a value that can fail is an
-  `Effect` or an `Either`.
-- a `switch` that does not cover its union — the same rule as Rust's
-  exhaustive `match`, so adding a variant is a red build, not a silent gap.
-- unused variables, and `eslint-plugin-solid`'s reactivity rules, which turn
-  Solid's one silent failure (destructured props) into a red build.
-
-Every word a person reads comes from `src/lang.json`, in both languages.
-
-## Firefox first
-
-Firefox is the browser this is built and accepted in. Open every screen in
-Firefox before anything else, and treat a Firefox-only defect as a defect.
-
-## Building and checking
+## Commands
 
 ```bash
-just build-web       # bun install --frozen-lockfile && bun run build  ->  target/web-dist
-just check-client    # lint, typecheck, tests
-cd client && bun run dev   # Vite dev server
+bun install        # once
+bun run lint       # eslint, zero warnings allowed
+bun run typecheck  # svelte-check + the TS7 lane, both strict
+bun test --conditions=browser   # the logic next to what it judges
+bun run build      # dist/ for build.rs to embed
 ```
 
-`bun.lock` is the authority for every version; `trustedDependencies` is
-absent, so no package runs a lifecycle script on install. `typecheck` runs
-TypeScript 7 (the native compiler, installed as `typescript-native`);
-the linter's parser needs the JS compiler API and reads `typescript` 6.0.3.
+`cargo xtask gates` runs the gates that judge this directory from
+outside: `npm` (lockfile and licences), `wording` (every word from
+`lang.json`), `color` (colour only in `theme.css`), `budget` (bundle
+size), `render` (what was drawn), `wiring` (every wire verb reachable).
+See `docs/frontend-method.md` for how a screen is built and accepted.
+
+## Where code goes
+
+| Path | What lives there |
+|---|---|
+| `src/core/` | plain `.ts`: the socket, the belief folds, the keymap, the phrase table's reader, preferences. Store-shaped values from `svelte/store`; `bun test` runs against these directly. |
+| `src/ui.ts` | the one gate out of `core/` to components: `setUi` at startup, `ui()` everywhere else. |
+| `src/views/` | one route or region per file, runes, under 400 lines each. |
+| `src/views/parts/` | the controls this repository draws itself — the only home for a button, a field, a badge, a dialog, a tooltip. Adding one means `client-SPEC.md` §7 first. |
+| `src/views/gallery/` | the fixtures `#/gallery` serves and `cargo xtask render` measures. |
+| `src/theme.css` | the `@theme` block: the only file allowed a colour literal. |
+| `src/lang.json` | every word a reader is given, both languages. |
+| `src/wire.ts` | generated by `cargo xtask wire-ts`; committed, never edited. |
+
+The interfaces, the keyboard table and the accessibility contracts are
+in [`client-SPEC.md`](../client/client-SPEC.md).

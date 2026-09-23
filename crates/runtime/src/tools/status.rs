@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The status tool: the model's view of its own situation, in the
-//! thirteen frozen fields, in that order.
+//! thirteen lines, in that order.
 //!
 //! The order is not cosmetic. A model reading its status reads the top
 //! first, so identity and mode come before the context reading, and that
@@ -137,7 +137,11 @@ impl StatusTool {
             meta: ToolMeta {
                 name: ToolName::parse("status")?,
                 disclosure:
-                    "Report your current situation: mode, context, domain, children, backlog."
+                    "Report your current situation in thirteen lines: who you are, where you \
+                     are, your mode, context used against the window, your trust, your write \
+                     domain and its locks, the worktree and its size, the signals waiting, your \
+                     children, the clock, whether the provider is serving, your neighbours, and \
+                     your backlog. None of it is stated anywhere else."
                         .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,

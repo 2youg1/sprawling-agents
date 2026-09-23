@@ -135,8 +135,12 @@ pub(super) fn tuning_of(
 /// subscription token in the header a key uses" is a 401 nobody can
 /// read off a form.
 pub(super) enum Credential {
-    /// Nothing was enrolled.
-    Absent,
+    /// No key was entered this time, which is not the same as no key:
+    /// the city keeps what it has for this endpoint, and only
+    /// `DetachEndpoint` removes one (sprawling-SPEC.md 8-81). The
+    /// header is the one the person named for a key, which still
+    /// decides how an archived reference travels.
+    Absent { header: Option<String> },
     /// A key the person entered, as a `secret:realm/name` reference and
     /// never plaintext. The header is the compatible format's own
     /// answer unless the person named one.
@@ -155,7 +159,7 @@ impl Credential {
     /// it: that one is earned by a login inside this process.
     pub(super) fn entered(reference: Option<String>, header: Option<String>) -> Credential {
         match reference {
-            None => Credential::Absent,
+            None => Credential::Absent { header },
             Some(reference) => Credential::Key { reference, header },
         }
     }
