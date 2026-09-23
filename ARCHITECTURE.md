@@ -93,7 +93,7 @@ every week.
 | Inbound WebSocket | `axum` with its `ws` feature (`crates/channels/Cargo.toml`) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
 | Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (channels-SPEC section 8-41). |
 | HTTP client | `reqwest`, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. |
-| Client | Solid and Effect, bundled by Vite, driven by bun | Two runtime dependencies and no framework runtime beyond them: Solid compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
+| Client | Svelte and Effect, bundled by Vite, driven by bun | Two runtime dependencies and no framework runtime beyond them: Svelte compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
 | Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
 | Restoration | `git2`, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
@@ -378,7 +378,7 @@ on connect: a page from a different build refuses rather than misreads.
 
 | Frame | Count | What it is |
 |---|---|---|
-| `Command` | <!-- xtask:begin command_frames -->29<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
+| `Command` | <!-- xtask:begin command_frames -->30<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
 | `Query` | <!-- xtask:begin query_frames -->34<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |
@@ -507,7 +507,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->16<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2045<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2047<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |

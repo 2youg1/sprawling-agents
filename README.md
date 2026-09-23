@@ -44,7 +44,7 @@ I don’t sell APIs and I can’t afford a hard drive full of your data, so ever
 
 ## What it is
 
-One binary, one browser page, and the page is embedded inside the binary at build time. **The client is replaceable**: `client/` is TypeScript — Solid and Effect, built by [bun](https://bun.sh), never npm and never node — and anything that speaks the WebSocket protocol in `crates/channels` is a client. It is written against the WebSocket protocol in `crates/channels`, and anything else that speaks that protocol is a client too, in whatever language you and your agents write best. The gate that once forbade JavaScript in this tree was removed for exactly that reason — it was excluding architectures rather than defects.
+One binary, one browser page, and the page is embedded inside the binary at build time. **The client is replaceable**: `client/` is TypeScript — Svelte and Effect, built by [bun](https://bun.sh), never npm and never node — and anything that speaks the WebSocket protocol in `crates/channels` is a client. It is written against the WebSocket protocol in `crates/channels`, and anything else that speaks that protocol is a client too, in whatever language you and your agents write best. The gate that once forbade JavaScript in this tree was removed for exactly that reason — it was excluding architectures rather than defects.
 
 The directory tree on disk *is* the space: a **City** is a directory tree, a project is a **Building**, an agent’s workspace is a **Room**.
 
@@ -263,11 +263,13 @@ Logging into a provider requires a small set of endpoints and parameters. Rather
 
 **The browser page stands on the same kind of thing.** Its runtime dependencies are exactly two — `svelte` and `effect` — and no component library is among them: every control in `client/src/views/parts/` is this repository's own. What is taken from the W3C's ARIA Authoring Practices and from the Kobalte and Ark UI documentation is behaviour published as prose: which pattern a control implements, what each key does, where the focus returns when it closes. **Not one line of their code is in this tree, so nothing is owed for it** — and the keyboard table that reading produced is specified in [`client/client-SPEC.md`](client/client-SPEC.md).
 
+**The skills under [`skills/`](skills/) stand on earlier work, and say so.** Three of them — `sdd`, `tutor`, `translation` — are English translations and adaptations of Chinese-language skills I wrote and published as open source under AGPL-3.0-or-later (the translation skill's original byline also credits Claude Fable 5), relicensed CC BY-NC 4.0 **within this project only**. The other three — `why`, `how`, `blast-radius` — are my modified adaptations of [pstack](https://github.com/cursor/plugins/tree/main/pstack) (Lauren Tan (poteto), MIT); they keep their licence, and every file names me as the one who modified it. `skills/LICENSES.md` travels with the directory, in the release archive too. This paragraph is the acknowledgment; [`docs/third-party.md`](docs/third-party.md) §5 is the terms.
+
 Connections to external applications are likewise outsourced: the city speaks MCP to any MCP server; Composio is one of them. This repository carries no one’s keys, pays for no one, and acts as no proxy. The full list, how to re-verify, and how licenses are handled live in [`docs/third-party.md`](docs/third-party.md). Licenses of code dependencies are checked one by one by `cargo deny`; the allow-list is [`deny.toml`](deny.toml).
 
 ## License
 
-MPL-2.0 — see [`LICENSE`](LICENSE).
+MPL-2.0 — see [`LICENSE`](LICENSE), except the skills under [`skills/`](skills/): those keep their own licences — CC BY-NC 4.0 for my three, MIT for the pstack adaptations — and ship in the release archive with `skills/LICENSES.md`. Terms and credit: [`docs/third-party.md`](docs/third-party.md) §5.
 
 ---
 
