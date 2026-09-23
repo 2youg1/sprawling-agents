@@ -266,6 +266,9 @@ pub struct Written {
     /// The desktop allowlist, which lives in the building's reserved
     /// subtree rather than in `CONFIG.toml`.
     pub desktop: bool,
+    /// Where the context reminder's second rung sits, `[context]` of
+    /// the building's own layer.
+    pub context: bool,
 }
 
 /// The ledger record for a reconfiguration: which faces of a building's
@@ -289,6 +292,7 @@ pub fn configured_payload(building: &Building, wrote: Written) -> Result<Payload
     map.insert("sandbox".to_owned(), serde_json::Value::Bool(wrote.sandbox));
     map.insert("mcp".to_owned(), serde_json::Value::Bool(wrote.mcp));
     map.insert("desktop".to_owned(), serde_json::Value::Bool(wrote.desktop));
+    map.insert("context".to_owned(), serde_json::Value::Bool(wrote.context));
     Payload::new(map)
 }
 

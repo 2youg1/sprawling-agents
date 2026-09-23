@@ -658,6 +658,15 @@ export const SettledEffort = Schema.Struct({
 export type SettledEffort = typeof SettledEffort.Type;
 
 /**
+ * `[context] second_threshold`, and the file that settled it.
+ */
+export const SettledSecond = Schema.Struct({
+  from: ConfigLayer,
+  percent: Schema.Int,
+}).annotations({ identifier: "SettledSecond" });
+export type SettledSecond = typeof SettledSecond.Type;
+
+/**
  * Which of this endpoint's calls go through the machine's proxy.
  * 
  * A proxy that intercepts loopback answers 502 for a local inference
@@ -707,6 +716,7 @@ export type TuningDefaults = typeof TuningDefaults.Type;
 export const ConfigAnswer = Schema.Struct({
   addr: Address,
   effort: Schema.optional(Schema.NullOr(SettledEffort)),
+  second: Schema.optional(Schema.NullOr(SettledSecond)),
   tuning: TuningDefaults,
 }).annotations({ identifier: "ConfigAnswer" });
 export type ConfigAnswer = typeof ConfigAnswer.Type;
@@ -2492,6 +2502,7 @@ export const Command = Schema.Union(
   Schema.Struct({
     configure_building: Schema.Struct({
       addr: Address,
+      context_second_threshold: Schema.optional(Schema.NullOr(Schema.Int)),
       desktop: Schema.optional(Schema.NullOr(Schema.String)),
       idem: IdemKey,
       mcp: Schema.optional(Schema.NullOr(Schema.Array(McpServer))),

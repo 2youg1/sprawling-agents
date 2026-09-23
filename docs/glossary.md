@@ -80,7 +80,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **result envelope** | The envelope around a tool result, carrying three attachments: clock stamp, network reminder, and Steer. |
 | **ClockStamp** | The clock stamp. With the feature off, output is byte-identical to a build that never had it. |
 | **ceiling ladder** | The ordered statements about how many tokens one model may write, read farthest-to-nearest until one answers: the figure the person entered, then the provider's own model list, then a preset row citing the page it was read from, then the city's policy default. Which rung answered travels with the decision as `ceiling_from` in `model_selected`, so a truncated answer is read off the account rather than guessed at. A model no statement covers is still callable, which is what the ladder exists to guarantee — the Anthropic wire refuses a request that names no ceiling. |
-| **context reminder** | The line that says how full the window is, computed from the provider's reported `input_tokens` against the model's `context_tokens` and never from a byte count. Two thresholds, 25% and 65%; each sounds once per run, and the second says the budget left is still enough to write a handoff and `succeed`. |
+| **context reminder** | The line that says how full the window is, computed from the provider's reported `input_tokens` against the model's `context_tokens` and never from a byte count. Two thresholds: 25%, and a second one the person may move between 30% and 90% (65% unless a layer states one); each sounds once per run, and the second says the budget left is still enough to write a handoff and `succeed`. |
 
 ## 4 Decisions and safety
 

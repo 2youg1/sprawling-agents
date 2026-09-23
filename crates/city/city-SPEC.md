@@ -218,6 +218,8 @@ impl Ladder {
 
 **`[sandbox]` 的第五个字段**：`trusted`（字符串表，缺省空表），逐项解成 `kernel::ServerLabel`。它答的是「这层楼允许哪一台 connector 服务器去做城里谁都收不回的事」（今天只有运行这座城的机器的桌面），语义与读者住 `kernel::SandboxLimits::trusts`，本节只管它在 TOML 里怎么写、在哪一层写、写错了在解析点怎么拒。与 `mounts`／`env_passthrough` 同形：一名一行、缺省为空、整节整值上梯——收不回的效果按服务器逐台放行，而不是一次放宽给所有人。
 
+**`[context]` 一节**：`CONFIG.toml` 第四节 `[context]`，一个字段 `second_threshold`（整数百分比）——上下文提醒第二道阈值响在哪一格。值的形状与合法域住 `kernel::config::SecondThreshold`（kernel-SPEC §8-22），提醒怎么响住 `runtime::reminder`，本节只管它在 TOML 里怎么写、在哪一层写、写错时在哪拒。与 `mounts`／`env_passthrough`／`trusted` 逐条同形：整值上梯、Run 起点冻结、解析点拒——30–90 域外的值在解析点由 `SecondThreshold::parse` 拒（`E_INVALID_ARGS`，恢复语带合法域），不钳位、不读后丢。缺省是「没有一层说话」，而「缺席取 `CTX_REMINDER_SECOND_DEFAULT`」只在 `runtime::reminder` 一处判定。
+
 ### 8-5 city::spine_files（形状 6 数据面＋落盘动作）
 
 ```rust
@@ -564,6 +566,8 @@ bin `RunWorker::dispatch` → `Identity::load(city_root, addr)` → `segment_byt
 
 `E_STORAGE_FATAL`（读不动一个存在的描述）：不可定义掉——文件系统权限是外部世界的事实，而静默降级是被明拒的替代。
 
+`E_INVALID_ARGS`（`[context] second_threshold` 域外）：不可定义掉——值是人写的输入，类型把「构造后非法」定义掉了，「构造时非法」必须留码；钳位是被明拒的替代。
+
 ## 13 依赖选型
 
 只依赖 `kernel`（拓扑硬约束）＋ std。dev 依赖 `tempfile`。
@@ -808,7 +812,7 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 
 **恒不复用 `Governed`**：那三份是**城**的文件（`<city>/.sprawling/`），这一份是**楼**的。把楼级路径塞进一个按 city_root 取路径的枚举里，会让那个枚举需要一个只有部分变体用得上的参数。
 
-**线上它走 `ConfigureBuilding` 的第三个可选字段**（channels-SPEC §8-26）：那条帧问的就是「这栋楼的 runs 够得到什么」，沙箱、外部服务器与运行中的机器上的窗口是同一个问题的三面。`configured_payload` 因此收一个 `Written { sandbox, mcp, desktop }` 而不是三个裸布尔——一个调用点写 `(true, false, true)` 说不出哪一位是哪一面。
+**线上它走 `ConfigureBuilding` 的第四个可选字段**（channels-SPEC §8-40）：那条帧问的就是「这栋楼的 runs 按什么规矩来」，沙箱、外部服务器、运行中的机器上的窗口与第二级提醒落哪一层是同一个问题的四面。`configured_payload` 因此收一个 `Written { sandbox, mcp, desktop, context }` 而不是四个裸布尔——一个调用点写 `(true, false, true, false)` 说不出哪一位是哪一面。
 
 ### 8-27 city::document：一份文档整个换上去，或者旧的留着（形状 4 adapter）
 

@@ -22,10 +22,12 @@ use std::path::{Path, PathBuf};
 
 use kernel::{
     Address, AxError, Effort, FrozenConfig, LayeredValue, McpServer, McpTransport, SandboxLimits,
-    ServerLabel,
+    SecondThreshold, ServerLabel,
 };
 use serde::Deserialize;
 
+use context::ContextSection;
+mod context;
 mod ladder;
 mod refuse;
 mod session;
@@ -37,7 +39,7 @@ pub(crate) use session::forget as forget_session;
 pub use session::{own_layer, write_session};
 pub(crate) use shelves::SHELVES_KEY;
 pub use shelves::city_shelves;
-pub use write::{write_effort, write_mcp, write_sandbox};
+pub use write::{write_effort, write_mcp, write_sandbox, write_second_threshold};
 
 use ladder::Ladder;
 // The refusal shapes every reader in this module answers with.
@@ -62,6 +64,8 @@ pub struct ConfigLayer {
     effort: Option<Effort>,
     sandbox: Option<SandboxLimits>,
     mcp: Option<Vec<McpServer>>,
+    /// The second context-reminder rung this layer states.
+    second_threshold: Option<SecondThreshold>,
     shelves: Option<Vec<String>>,
 }
 
@@ -190,11 +194,16 @@ impl ConfigLayer {
                 "`[model] name` is empty: leave the key out to state no model".to_owned(),
             ));
         }
+        let second_threshold = file
+            .context
+            .map(|section| SecondThreshold::parse(section.second_threshold))
+            .transpose()?;
         Ok(ConfigLayer {
             model,
             effort: file.model.effort,
             sandbox,
             mcp,
+            second_threshold,
             // The paths are kept as written: turning `~` into a
             // directory needs this person's home, which is not this
             // module's to read, and a value stored half-resolved would
@@ -212,6 +221,14 @@ impl ConfigLayer {
     #[must_use]
     pub fn effort(&self) -> Option<Effort> {
         self.effort
+    }
+
+    /// The second context-reminder rung this layer states. Taken
+    /// (`SecondThreshold`) rather than raw: what is spelled in a file
+    /// and refused sits before this value exists.
+    #[must_use]
+    pub fn second_threshold(&self) -> Option<SecondThreshold> {
+        self.second_threshold
     }
 
     #[must_use]
@@ -254,6 +271,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
         &ladder.resolve(ConfigLayer::effort),
         &ladder.resolve(|layer| layer.sandbox().cloned()),
         &ladder.resolve(|layer| layer.mcp().map(<[McpServer]>::to_vec)),
+        &ladder.resolve(|layer| layer.second_threshold),
     ))
 }
 
@@ -284,6 +302,19 @@ pub fn settled_effort(
         .copied())
 }
 
+/// Where the context reminder's second rung sits at this address, and
+/// which layer stated it. Absent means no layer stated one and the
+/// city's own default answers.
+pub fn settled_second(
+    city_root: &Path,
+    addr: &Address,
+) -> Result<Option<(SecondThreshold, Layer)>, AxError> {
+    Ok(Ladder::read(city_root, addr)?
+        .tagged(ConfigLayer::second_threshold)
+        .resolve()
+        .copied())
+}
+
 /// A configured table as the wire carries it: name before value, in the
 /// order a `BTreeMap` reads them, so two runs of the same file hand the
 /// same list to the same server.
@@ -300,6 +331,8 @@ struct ConfigFile {
     sandbox: Option<SandboxSection>,
     #[serde(default)]
     mcp: Option<Vec<McpSection>>,
+    #[serde(default)]
+    context: Option<ContextSection>,
     #[serde(default)]
     skills: Option<SkillsSection>,
 }

@@ -41,6 +41,7 @@ fn quiet_config() -> FrozenConfig {
         sandbox: kernel::SandboxLimits::default(),
         mcp: Vec::new(),
         effort: None,
+        second_threshold: None,
     }
 }
 
@@ -430,6 +431,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
             sandbox: kernel::SandboxLimits::default(),
             mcp: Vec::new(),
             effort: None,
+            second_threshold: None,
         },
         // The real net over the real tree: A14's leading half.
         checkpoint: Some((

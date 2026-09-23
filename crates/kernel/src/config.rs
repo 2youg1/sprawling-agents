@@ -97,6 +97,63 @@ pub enum ClockStampGranularity {
     Hour,
 }
 
+/// Where the context reminder's second rung sits: a whole percent of the
+/// window, `30` through `90` (the three numbers live in `consts_policy`).
+///
+/// One construction point, [`SecondThreshold::parse`], so a rung the city
+/// refuses cannot be spelled, and its refusal carries the domain: that is
+/// the only sentence a person editing a `CONFIG.toml` gets. Why the domain
+/// is bounded is `consts_policy::INTERVAL_CAP_BYTES`'s derivation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "u64", into = "u64")]
+pub struct SecondThreshold(u64);
+
+impl SecondThreshold {
+    /// Sole constructor. `raw` is a whole percent of the window.
+    ///
+    /// # Errors
+    /// `E_INVALID_ARGS`, naming the value and the domain it is outside,
+    /// when `raw` is not `30..=90`. Never clamped: a file that states 25
+    /// means something its writer has to be told is not accepted.
+    pub fn parse(raw: u64) -> Result<SecondThreshold, AxError> {
+        let floor = crate::consts_policy::CTX_REMINDER_SECOND_MIN;
+        let ceiling = crate::consts_policy::CTX_REMINDER_SECOND_MAX;
+        if (floor..=ceiling).contains(&raw) {
+            return Ok(SecondThreshold(raw));
+        }
+        Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "set the second context-reminder threshold",
+            raw.to_string(),
+        )
+        .with_recovery(format!(
+            "the legal domain is {floor} through {ceiling} percent of the window; state a whole \
+             percent in it, or leave the key out for {}",
+            crate::consts_policy::CTX_REMINDER_SECOND_DEFAULT
+        )))
+    }
+
+    /// The rung, as a whole percent of the window.
+    #[must_use]
+    pub fn percent(self) -> u64 {
+        self.0
+    }
+}
+
+impl TryFrom<u64> for SecondThreshold {
+    type Error = AxError;
+
+    fn try_from(raw: u64) -> Result<SecondThreshold, AxError> {
+        SecondThreshold::parse(raw)
+    }
+}
+
+impl From<SecondThreshold> for u64 {
+    fn from(rung: SecondThreshold) -> u64 {
+        rung.0
+    }
+}
+
 /// One value across the City -> Building -> Resident override ladder.
 /// Lower layers win; absence falls through upward.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -295,6 +352,12 @@ pub struct FrozenConfig {
     /// so a run that could retune itself would keep paying to rebuild
     /// the cache it just discarded. A change applies to the next run.
     pub effort: Option<Effort>,
+    /// Where the context reminder's second rung sits. `None` when no
+    /// layer states one: the rung falls back to
+    /// `consts_policy::CTX_REMINDER_SECOND_DEFAULT` where it is read.
+    /// Frozen with the run: a rung that moved mid-run would make "each
+    /// rung sounds once per run" depend on when somebody edited a file.
+    pub second_threshold: Option<SecondThreshold>,
 }
 
 /// Hot-reloadable surface. Empty in S2 by design: the type exists so the
@@ -311,6 +374,7 @@ pub fn freeze(
     effort: &LayeredValue<Effort>,
     sandbox: &LayeredValue<SandboxLimits>,
     mcp: &LayeredValue<Vec<McpServer>>,
+    second_threshold: &LayeredValue<SecondThreshold>,
 ) -> FrozenConfig {
     FrozenConfig {
         clock_stamp: *clock_stamp.resolve().unwrap_or(&CLOCK_STAMP_DEFAULT),
@@ -321,6 +385,7 @@ pub fn freeze(
         // an unstated layer reaches nothing rather than inheriting a
         // reach nobody at that layer wrote down.
         mcp: mcp.resolve().cloned().unwrap_or_default(),
+        second_threshold: second_threshold.resolve().copied(),
     }
 }
 

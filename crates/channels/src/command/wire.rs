@@ -118,12 +118,14 @@ impl From<WireCommand> for Command {
                 sandbox,
                 mcp,
                 desktop,
+                context_second_threshold,
                 idem,
             } => Self::ConfigureBuilding {
                 addr,
                 sandbox,
                 mcp,
                 desktop,
+                context_second_threshold,
                 idem,
             },
             Command::ProbeEndpoint {

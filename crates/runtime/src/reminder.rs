@@ -12,18 +12,16 @@
 //! one.
 //!
 //! Two thresholds, and each sounds exactly once per run. At a quarter
-//! only the usage is reported; at two thirds the run is told that what
+//! only the usage is reported; at the second rung — 65% of the window
+//! unless a layer moved it — the run is told that what
 //! is left is still enough to write a handoff and `succeed`, and that
 //! past this point it will not be. A gauge that jumps past both in one
 //! reading sounds the higher one only: two sentences stacked at once
 //! are noise, and the lower one has nothing left to say.
 
 use kernel::Tokens;
-
-/// Percent of the window at which usage is first reported.
-const QUARTER: u64 = 25;
-/// Percent of the window past which a handoff is due.
-const TWO_THIRDS: u64 = 65;
+use kernel::config::SecondThreshold;
+use kernel::consts_policy::{CTX_REMINDER_FIRST_PERCENT, CTX_REMINDER_SECOND_DEFAULT};
 
 /// Which thresholds have sounded. Monotone: a gauge never goes back to
 /// a lower state, so a threshold cannot sound twice.
@@ -31,7 +29,7 @@ const TWO_THIRDS: u64 = 65;
 enum Sounded {
     Nothing,
     Quarter,
-    TwoThirds,
+    Handover,
 }
 
 /// The line the run is given, with the figures it is computed from.
@@ -80,14 +78,21 @@ fn percent(used: Tokens, window: Tokens) -> u64 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContextGauge {
     window: Tokens,
+    /// Where the second rung sits, as a whole percent: the city's rung
+    /// when a layer stated one, else `CTX_REMINDER_SECOND_DEFAULT`.
+    second_at: u64,
     sounded: Sounded,
 }
 
 impl ContextGauge {
+    /// `second` is the configuration ladder's answer for this run, and
+    /// `None` means no layer spoke: the default applies here, at the one
+    /// place a rung is read.
     #[must_use]
-    pub fn new(window: Tokens) -> ContextGauge {
+    pub fn new(window: Tokens, second: Option<SecondThreshold>) -> ContextGauge {
         ContextGauge {
             window,
+            second_at: second.map_or(CTX_REMINDER_SECOND_DEFAULT, SecondThreshold::percent),
             sounded: Sounded::Nothing,
         }
     }
@@ -102,15 +107,15 @@ impl ContextGauge {
         let at = percent(used, self.window);
         let window = self.window;
         match self.sounded {
-            Sounded::Nothing | Sounded::Quarter if at >= TWO_THIRDS => {
-                self.sounded = Sounded::TwoThirds;
+            Sounded::Nothing | Sounded::Quarter if at >= self.second_at => {
+                self.sounded = Sounded::Handover;
                 Some(ContextReminder::HandoverWindow { used, window })
             }
-            Sounded::Nothing if at >= QUARTER => {
+            Sounded::Nothing if at >= CTX_REMINDER_FIRST_PERCENT => {
                 self.sounded = Sounded::Quarter;
                 Some(ContextReminder::Usage { used, window })
             }
-            Sounded::Nothing | Sounded::Quarter | Sounded::TwoThirds => None,
+            Sounded::Nothing | Sounded::Quarter | Sounded::Handover => None,
         }
     }
 }
@@ -127,7 +132,7 @@ mod tests {
     use super::*;
 
     fn gauge() -> ContextGauge {
-        ContextGauge::new(Tokens::new(1_000))
+        ContextGauge::new(Tokens::new(1_000), None)
     }
 
     #[test]
@@ -174,9 +179,33 @@ mod tests {
         );
     }
 
+    /// A layer that moved the second rung moves the line with it: the
+    /// handover claim is about the budget left at that rung, so the rung
+    /// is the city's to set (kernel-SPEC 8-22).
+    #[test]
+    fn the_second_rung_moves_when_a_layer_moved_it() {
+        let moved = kernel::config::SecondThreshold::parse(30).unwrap();
+        let mut gauge = ContextGauge::new(Tokens::new(1_000), Some(moved));
+        assert_eq!(
+            gauge.observe(Tokens::new(260)),
+            Some(ContextReminder::Usage {
+                used: Tokens::new(260),
+                window: Tokens::new(1_000)
+            })
+        );
+        assert_eq!(
+            gauge.observe(Tokens::new(300)),
+            Some(ContextReminder::HandoverWindow {
+                used: Tokens::new(300),
+                window: Tokens::new(1_000)
+            }),
+            "the moved rung sounds where it was moved to"
+        );
+    }
+
     #[test]
     fn no_window_means_no_percentage() {
-        let mut gauge = ContextGauge::new(Tokens::new(0));
+        let mut gauge = ContextGauge::new(Tokens::new(0), None);
         assert_eq!(gauge.observe(Tokens::new(u64::MAX)), None);
     }
 

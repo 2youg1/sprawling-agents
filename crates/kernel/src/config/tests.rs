@@ -19,7 +19,8 @@ fn lower_layer_overrides_upper() {
             &LayeredValue::default(),
             &LayeredValue::default(),
             &LayeredValue::default(),
-            &LayeredValue::default()
+            &LayeredValue::default(),
+            &LayeredValue::default(),
         )
         .clock_stamp,
         ClockStampGranularity::Minute
@@ -35,7 +36,8 @@ fn lower_layer_overrides_upper() {
             &LayeredValue::default(),
             &LayeredValue::default(),
             &LayeredValue::default(),
-            &LayeredValue::default()
+            &LayeredValue::default(),
+            &LayeredValue::default(),
         )
         .clock_stamp,
         ClockStampGranularity::FiveMinute
@@ -47,6 +49,7 @@ fn absence_everywhere_takes_the_policy_default() {
     let ladder: LayeredValue<ClockStampGranularity> = LayeredValue::default();
     let frozen = freeze(
         &ladder,
+        &LayeredValue::default(),
         &LayeredValue::default(),
         &LayeredValue::default(),
         &LayeredValue::default(),
@@ -72,6 +75,7 @@ fn effort_resolves_down_the_same_ladder() {
         &LayeredValue::default(),
         &LayeredValue::default(),
         &effort,
+        &LayeredValue::default(),
         &LayeredValue::default(),
         &LayeredValue::default(),
     );
@@ -102,6 +106,7 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
         &LayeredValue::default(),
         &ladder,
         &LayeredValue::default(),
+        &LayeredValue::default(),
     );
     assert_eq!(frozen.sandbox.fuel, 20);
     assert!(
@@ -114,6 +119,7 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
 #[test]
 fn an_unstated_sandbox_is_closed_with_the_default_fuel() {
     let frozen = freeze(
+        &LayeredValue::default(),
         &LayeredValue::default(),
         &LayeredValue::default(),
         &LayeredValue::default(),
@@ -153,6 +159,7 @@ fn zones_override_as_a_whole_list() {
         &LayeredValue::default(),
         &LayeredValue::default(),
         &LayeredValue::default(),
+        &LayeredValue::default(),
     );
     assert_eq!(frozen.clock_zones.len(), 1);
     assert_eq!(frozen.clock_zones[0].id, "nyc");
@@ -179,11 +186,13 @@ fn servers_override_as_a_whole_table_and_silence_reaches_nothing() {
         &LayeredValue::default(),
         &LayeredValue::default(),
         &ladder,
+        &LayeredValue::default(),
     );
     assert_eq!(frozen.mcp.len(), 1);
     assert_eq!(frozen.mcp[0].label.as_str(), "apps");
 
     let silent = freeze(
+        &LayeredValue::default(),
         &LayeredValue::default(),
         &LayeredValue::default(),
         &LayeredValue::default(),
@@ -204,6 +213,7 @@ fn frozen_and_live_share_no_field() {
         sandbox: SandboxLimits::default(),
         effort: None,
         mcp: Vec::new(),
+        second_threshold: None,
     })
     .unwrap();
     let live = serde_json::to_value(LiveConfig {}).unwrap();
@@ -260,6 +270,55 @@ fn a_credential_shaped_variable_name_is_refused_where_the_config_is_read() {
 }
 
 #[test]
+fn the_second_rung_resolves_down_the_same_ladder() {
+    let stated = SecondThreshold::parse(70).unwrap();
+    let ladder = LayeredValue {
+        city: Some(SecondThreshold::parse(40).unwrap()),
+        building: None,
+        resident: Some(stated),
+    };
+    let frozen = freeze(
+        &LayeredValue::default(),
+        &LayeredValue::default(),
+        &LayeredValue::default(),
+        &LayeredValue::default(),
+        &LayeredValue::default(),
+        &ladder,
+    );
+    assert_eq!(frozen.second_threshold, Some(stated));
+
+    let silent = freeze(
+        &LayeredValue::default(),
+        &LayeredValue::default(),
+        &LayeredValue::default(),
+        &LayeredValue::default(),
+        &LayeredValue::default(),
+        &LayeredValue::default(),
+    );
+    assert_eq!(
+        silent.second_threshold, None,
+        "no layer speaking is a fact, not a default: the rung falls back where it is read"
+    );
+}
+
+/// The refusal is the only sentence a person editing a `CONFIG.toml`
+/// gets, so it carries the legal domain; nothing is clamped.
+#[test]
+fn a_stated_rung_is_refused_outside_its_domain_with_the_domain_in_the_refusal() {
+    for refused in [29, 91] {
+        let err = SecondThreshold::parse(refused).expect_err("outside the domain");
+        let recovery = err.recovery();
+        assert!(
+            recovery.contains("30") && recovery.contains("90"),
+            "{refused}: {recovery}"
+        );
+    }
+    for taken in [30, 90] {
+        assert_eq!(SecondThreshold::parse(taken).unwrap().percent(), taken);
+    }
+}
+
+#[test]
 fn the_declared_environment_names_ride_the_same_whole_value_ladder_as_mounts() {
     let city_layer = SandboxLimits {
         env_passthrough: vec![EnvVarName::parse("CARGO_HOME").unwrap()],
@@ -275,6 +334,7 @@ fn the_declared_environment_names_ride_the_same_whole_value_ladder_as_mounts() {
         &LayeredValue::default(),
         &LayeredValue::default(),
         &ladder,
+        &LayeredValue::default(),
         &LayeredValue::default(),
     );
     assert!(

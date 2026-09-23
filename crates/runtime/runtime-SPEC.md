@@ -1460,21 +1460,21 @@ impl Run<Frozen> { pub fn transcript(&self) -> Result<Transcript, AxError>; pub 
 
 | 阈值 | 说的话 |
 |---|---|
-| 25% | 只报用量：`[context] 25% of the window used (N of M input tokens).` |
-| 65% | 报用量，并说明剩余预算仍够写 handoff 并 `succeed`，过了这一点就不够了 |
+| 25%（`CTX_REMINDER_FIRST_PERCENT`，恒不可调） | 只报用量：`[context] 25% of the window used (N of M input tokens).` |
+| 第二道：缺省 65%（`CTX_REMINDER_SECOND_DEFAULT`），合法域 30–90、可由配置梯子调（kernel-SPEC §8-22） | 报用量，并说明剩余预算仍够写 handoff 并 `succeed`，过了这一点就不够了 |
 
-**每道阈值一跑恰响一次**。状态是穷尽枚举 `Sounded { Nothing, Quarter, TwoThirds }` 而不是两个布尔；一跳越过两道（0→70%）时只响高的那一道，低的一并作废——两句话叠在一起是噪声。
+**每道阈值一跑恰响一次**。状态是穷尽枚举 `Sounded { Nothing, Quarter, Handover }` 而不是两个布尔；一跳越过两道（0→70%）时只响高的那一道，低的一并作废——两句话叠在一起是噪声。
 
 ```rust
-pub struct ContextGauge { window: Tokens, sounded: Sounded }
-impl ContextGauge { pub fn new(window: Tokens) -> ContextGauge; pub fn observe(&mut self, used: Tokens) -> Option<ContextReminder>; }
+pub struct ContextGauge { window: Tokens, second_at: u64, sounded: Sounded }
+impl ContextGauge { pub fn new(window: Tokens, second: Option<SecondThreshold>) -> ContextGauge; pub fn observe(&mut self, used: Tokens) -> Option<ContextReminder>; }
 pub enum ContextReminder { Usage { used: Tokens, window: Tokens }, HandoverWindow { used: Tokens, window: Tokens } }
 impl ContextReminder { pub fn render(&self) -> String; }
 ```
 
-`window == 0`（簿上没写）恒不响：没有分母就没有百分比，与 `UnplannedProgress` 同一条理。整数算术：`used * 100 / window` 用 checked 乘法。
+`second` 来自 `RunPlan.second_threshold`：配置梯子冻结的值，`None`＝没有一层说话，取 `CTX_REMINDER_SECOND_DEFAULT`，「缺席取默认」只在这一个构造点判定。`window == 0`（簿上没写）恒不响：没有分母就没有百分比，与 `UnplannedProgress` 同一条理。整数算术：`used * 100 / window` 用 checked 乘法。
 
-**接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Window::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
+**接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`RunPlan` 增 `second_threshold: Option<SecondThreshold>`（Run 起点冻结，理由住 kernel-SPEC §8-22）；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Window::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
 
 ### 8-29 回合不再有上限
 

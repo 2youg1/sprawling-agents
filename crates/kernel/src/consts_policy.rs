@@ -38,8 +38,15 @@ pub const PREFIX_SLOTS: std::num::NonZeroU64 = match std::num::NonZeroU64::new(4
     None => std::num::NonZeroU64::MIN,
 };
 
-/// 0.5: the past-half context reminder threshold.
-pub const CTX_REMINDER_RATIO: Ratio = Ratio { num: 1, den: 2 };
+/// Where the context reminder's two rungs sit, as whole percents of the
+/// window. The first is not adjustable: one number, one meaning. The
+/// second is the one a layer may move, and these three numbers are the
+/// whole of what it may move it between — `kernel::config::SecondThreshold`
+/// enforces the domain at its one construction point.
+pub const CTX_REMINDER_FIRST_PERCENT: u64 = 25;
+pub const CTX_REMINDER_SECOND_DEFAULT: u64 = 65;
+pub const CTX_REMINDER_SECOND_MIN: u64 = 30;
+pub const CTX_REMINDER_SECOND_MAX: u64 = 90;
 
 pub const LOOP_REPEAT_THRESHOLD: u32 = 3;
 
@@ -56,13 +63,21 @@ pub const OFFLOAD_MIN_BYTES: u64 = 16_384;
 /// `read` and `search` hand back an interval of something the caller can
 /// ask for again, so their ceiling only paces delivery.
 ///
-/// Derived, not chosen: the context reminders fire at 25% and 65%, and a
-/// ladder means nothing if one step can clear a rung unseen - skipping
-/// the first needs a jump over 40%, the second over 35%, so one result
-/// stays under 35% of the window. At 2.5 bytes per token, the worst
-/// realistic ratio (base64, hash-dense text), 64 KiB is 26.2K tokens:
-/// 20.5% of a 128K window, with 1.7x to spare. 128 KiB would be 41% and
-/// out. Measured against this repository's 928 tracked text files, the
+/// Derived, not chosen: the context reminders sound at 25% and at the
+/// second rung — `CTX_REMINDER_SECOND_DEFAULT` unless a layer moves it
+/// between `CTX_REMINDER_SECOND_MIN` and `CTX_REMINDER_SECOND_MAX` — and
+/// a ladder means nothing if one result can clear a rung unseen. The gaps
+/// one result must not cover are the second rung minus 25 into the first
+/// rung, and 100 minus the second rung past the last: 40 and 35 points at
+/// the default pair, so one result stays under 35% of the window. At 2.5
+/// bytes per token, the worst realistic ratio (base64, hash-dense text),
+/// 64 KiB is 26.2K tokens: 20.5% of a 128K window, with 1.7x to spare.
+/// 128 KiB would be 41% and out. A rung moved off the default narrows its
+/// gap below that: under 60 one result can spend the first rung unseen,
+/// and over 65 one result can fill the window past the second while its
+/// "still enough to write a handoff" claim is still fixed text — which is
+/// the arithmetic the 90 ceiling of the legal domain is priced from.
+/// Measured against this repository's 928 tracked text files, the
 /// bytes in their first 512 lines run p50 6,275 / p95 16,055 / p99
 /// 49,373 / max 73,978, so 64 KiB binds on one of them: it is a guard
 /// against input that is not line-structured - a minified bundle, a
@@ -188,9 +203,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_twelve_landed_policies_hold_their_documented_values() {
+    fn the_landed_policies_hold_their_documented_values() {
         assert_eq!(STARTUP_BUDGET_TOKENS, 2000);
-        assert_eq!(CTX_REMINDER_RATIO, Ratio { num: 1, den: 2 });
+        assert_eq!(CTX_REMINDER_FIRST_PERCENT, 25);
+        assert_eq!(CTX_REMINDER_SECOND_DEFAULT, 65);
+        assert_eq!(CTX_REMINDER_SECOND_MIN, 30);
+        assert_eq!(CTX_REMINDER_SECOND_MAX, 90);
         assert_eq!(LOOP_REPEAT_THRESHOLD, 3);
         assert_eq!(OFFLOAD_MIN_BYTES, 16_384);
         assert_eq!(DRAFT_HELD_ESCALATE, 3);
@@ -215,8 +233,17 @@ mod tests {
 
     #[test]
     fn ratios_never_divide_by_zero() {
-        for ratio in [CTX_REMINDER_RATIO, SECRET_ENTROPY_MIN] {
+        for ratio in [SECRET_ENTROPY_MIN] {
             assert_ne!(ratio.den, 0);
         }
+    }
+
+    /// The default sits inside the domain the one construction point
+    /// enforces, or a run with no configured layer would have no legal
+    /// rung.
+    #[test]
+    fn the_default_second_rung_sits_inside_its_domain() {
+        const { assert!(CTX_REMINDER_SECOND_MIN <= CTX_REMINDER_SECOND_DEFAULT) };
+        const { assert!(CTX_REMINDER_SECOND_DEFAULT <= CTX_REMINDER_SECOND_MAX) };
     }
 }

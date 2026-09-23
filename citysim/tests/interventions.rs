@@ -109,6 +109,7 @@ fn two_wave_scenario(cancel: Option<CancelPoint>, steer: Option<(u32, String)>) 
             sandbox: kernel::SandboxLimits::default(),
             mcp: Vec::new(),
             effort: None,
+            second_threshold: None,
         },
         checkpoint: None,
         cancel,

@@ -221,6 +221,7 @@ pub fn run_scenario_on(
             effort: None,
             context_tokens: 0,
         },
+        second_threshold: None,
         prefix,
         policy: BuildingPolicy::default(),
         tools: Vec::new(),

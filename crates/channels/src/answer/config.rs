@@ -42,6 +42,16 @@ pub struct SettledEffort {
     pub from: ConfigLayer,
 }
 
+/// `[context] second_threshold`, and the file that settled it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SettledSecond {
+    /// A whole percent of the window, already taken by
+    /// `kernel::config::SecondThreshold`'s one construction point.
+    pub percent: u64,
+    pub from: ConfigLayer,
+}
+
 /// What an endpoint that settled nothing is called with.
 ///
 /// **These are the gateway's figures, read out rather than restated.**
@@ -86,5 +96,10 @@ pub struct ConfigAnswer {
     /// is a statement this city deliberately makes rather than filling
     /// in a level nobody chose.
     pub effort: Option<SettledEffort>,
+    /// Where the context reminder's second rung sits at this address.
+    /// Absent means no layer stated it and the city's own default
+    /// answers, which is a statement rather than a gap: the page draws
+    /// the default instead of an empty box.
+    pub second: Option<SettledSecond>,
     pub tuning: TuningDefaults,
 }

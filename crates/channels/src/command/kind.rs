@@ -107,6 +107,12 @@ pub enum Command<Secret = Sealed<String>> {
         sandbox: Option<SandboxLimits>,
         mcp: Option<Vec<McpServer>>,
         desktop: Option<String>,
+        /// Where the context reminder's second rung sits, as one layer
+        /// states it: a raw percent on the wire. The domain is
+        /// `kernel::config::SecondThreshold`'s one construction point,
+        /// and a deserializer that enforced it here would be the second
+        /// place that rule lives.
+        context_second_threshold: Option<u64>,
         idem: IdemKey,
     },
     AttachEndpoint {

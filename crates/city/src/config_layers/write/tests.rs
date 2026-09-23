@@ -3,7 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the three write faces state, and what they refuse to write.
+//! What the four write faces state, and what they refuse to write.
+//!
+//! The second rung's domain is `SecondThreshold`'s one construction
+//! point and is tested there; what is tested here is that a taken value
+//! lands where the ladder reads it back.
 
 #![allow(
     clippy::unwrap_used,
@@ -32,6 +36,40 @@ fn hosted(headers: Vec<(String, String)>) -> Vec<McpServer> {
 /// A key typed into the header table of the settings page would be
 /// written verbatim into a file the project commits, so the write
 /// face refuses it and says where the value belongs instead.
+/// The second rung survives a round trip: what the write face puts into
+/// the layer's own file is what a later read of that file states.
+#[test]
+fn the_second_rung_is_written_into_the_layers_own_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let threshold = SecondThreshold::parse(72).unwrap();
+    write_second_threshold(dir.path(), &room(), Layer::Building, threshold).unwrap();
+    let file = path(dir.path(), &room(), Layer::Building).unwrap();
+    let document = read_document(&file).unwrap();
+    assert_eq!(
+        document["context"]["second_threshold"].as_integer(),
+        Some(72),
+        "the percent lands where the ladder reads it"
+    );
+}
+
+/// Both ends of the domain are written. The domain itself is
+/// `SecondThreshold`'s one construction point and is judged there, not
+/// re-judged here.
+#[test]
+fn both_ends_of_the_domain_are_written() {
+    for (percent, landed) in [(30, 30_i64), (90, 90_i64)] {
+        let dir = tempfile::tempdir().unwrap();
+        let threshold = SecondThreshold::parse(percent).unwrap();
+        write_second_threshold(dir.path(), &room(), Layer::Building, threshold).unwrap();
+        let file = path(dir.path(), &room(), Layer::Building).unwrap();
+        let document = read_document(&file).unwrap();
+        assert_eq!(
+            document["context"]["second_threshold"].as_integer(),
+            Some(landed)
+        );
+    }
+}
+
 #[test]
 fn a_header_holding_a_credential_is_refused_before_the_file_is_touched() {
     let dir = tempfile::tempdir().unwrap();

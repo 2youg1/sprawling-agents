@@ -55,6 +55,12 @@ pub(crate) fn config_answer(
                 from: rung_of(layer),
             }
         }),
+        second: city::settled_second(city_root, addr)?.map(|(threshold, layer)| {
+            channels::SettledSecond {
+                percent: u64::from(threshold),
+                from: rung_of(layer),
+            }
+        }),
         tuning: channels::TuningDefaults {
             timeout_ms: defaults.timeout_ms,
             request_max_retries: defaults.retries.stated(),

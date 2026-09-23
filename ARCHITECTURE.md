@@ -482,7 +482,10 @@ there is no random source in the simulator today to seed.
 | 7 | `IdemKey` derives from `(run, seq, normalised action)` — never from a clock or a random number | property tests |
 
 Rules 1 and 6 together give a checkable property: **the same event sequence
-replays byte-for-byte identically on any machine.**
+replays byte-for-byte identically on any machine.** The property covers the
+accounting, not the world: what replays is each external call's recorded
+result, read back from the Ledger. A replay never re-executes a tool or a
+model call — a changed world would diverge through no defect of the record.
 
 **Hardening** is compile-time, workspace-wide, and identical in tests and
 production except where a test module relaxes it locally: no `unwrap`,

@@ -62,6 +62,12 @@ pub struct RunPlan {
     /// those live (`runtime::fork::inherited` rebuilds them from it).
     pub inherited: Vec<ChatMessage>,
     pub shape: CallShape,
+    /// Where the context reminder's second rung sits for this run: the
+    /// configuration ladder's answer, or `None` when no layer stated one
+    /// and the policy default sounds. Frozen with the run like every
+    /// setting here, so "each rung sounds once per run" cannot depend on
+    /// when somebody edited a file.
+    pub second_threshold: Option<kernel::SecondThreshold>,
     pub prefix: FrozenPrefix,
     pub policy: BuildingPolicy,
     pub tools: Vec<ToolDef>,

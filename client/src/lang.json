@@ -395,6 +395,30 @@
     "en": "cost",
     "zh": "成本"
   },
+  "context_second_save": {
+    "en": "write it",
+    "zh": "写入"
+  },
+  "context_second_unchanged": {
+    "en": "nothing new to write",
+    "zh": "没有新值可写"
+  },
+  "context_second_unit": {
+    "en": "%",
+    "zh": "%"
+  },
+  "context_second": {
+    "en": "second reminder",
+    "zh": "第二级提醒"
+  },
+  "context_second_note": {
+    "en": "where in the window the line about a handoff is said",
+    "zh": "窗口用到几成时，提醒该写交接了"
+  },
+  "context_second_range": {
+    "en": "a whole percent of the window from {min} to {max}; the default is {default}",
+    "zh": "窗口的整数百分比，{min} 到 {max}；默认 {default}"
+  },
   "desktop_allowlist": {
     "en": "windows this building may touch",
     "zh": "这栋楼能碰的窗口"

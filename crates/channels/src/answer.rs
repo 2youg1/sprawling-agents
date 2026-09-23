@@ -44,7 +44,7 @@ mod toolkits;
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
 pub use commits::{CommitAnswer, CommitsAnswer};
-pub use config::{ConfigAnswer, ConfigLayer, SettledEffort, TuningDefaults};
+pub use config::{ConfigAnswer, ConfigLayer, SettledEffort, SettledSecond, TuningDefaults};
 pub use cost_of::CostOfAnswer;
 pub use doctor::DoctorSandboxMissing;
 pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};

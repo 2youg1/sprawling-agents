@@ -15,10 +15,10 @@
   // answer.** The standing level is the city's own `[model] effort`,
   // read from `CONFIG.toml` by the configuration ladder that freezes
   // every run; a level kept in this browser instead would ride on every
-  // dispatch from it and outrank the file without saying so. What this
-  // build can state about the file it can neither read (`Query::Config`,
-  // roadmap 3.3) nor write, so the section says where the answer lives
-  // and stops there.
+  // dispatch from it and outrank the file without saying so. What this page states
+  // about the file is where the answer lives - the level is
+  // `Query::Config`'s to answer and the session selector's to write - so
+  // the section says that and stops there.
   //
   // **A session states its own level in the selector over the
   // composer**, which is where a dispatch is made and the only scope

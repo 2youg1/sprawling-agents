@@ -117,6 +117,7 @@ fn scenario(root: &std::path::Path) -> Scenario {
             sandbox: kernel::SandboxLimits::default(),
             mcp: Vec::new(),
             effort: None,
+            second_threshold: None,
         },
         checkpoint: None,
         cancel: None,

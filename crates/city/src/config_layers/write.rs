@@ -18,6 +18,7 @@
 
 use std::path::Path;
 
+use kernel::config::SecondThreshold;
 use kernel::{
     Address, AxCode, AxError, Effort, McpServer, McpTransport, SandboxLimits, SecretRef,
     ServerLabel,
@@ -59,6 +60,28 @@ pub fn write_sandbox(
     limits: &SandboxLimits,
 ) -> Result<(), AxError> {
     change(city_root, addr, layer, Change::Sandbox(limits))
+}
+
+/// Writes the context reminder's second rung into one scope's own
+/// configuration.
+///
+/// Same door as [`write_effort`] and the same reason: the ladder that
+/// resolves city → building → room is the only store. The value arrives
+/// already taken by `kernel::config::SecondThreshold`'s one construction
+/// point, so an out-of-domain percent is refused where the file is
+/// parsed, never here. Other keys are preserved, because a person may
+/// have written them.
+///
+/// # Errors
+/// Propagates a file that exists and cannot be read or parsed, and a
+/// directory that cannot be written.
+pub fn write_second_threshold(
+    city_root: &Path,
+    addr: &Address,
+    layer: Layer,
+    threshold: SecondThreshold,
+) -> Result<(), AxError> {
+    change(city_root, addr, layer, Change::SecondThreshold(threshold))
 }
 
 /// Writes the external servers this scope reaches into its own
@@ -167,6 +190,10 @@ pub(super) enum Change<'a> {
     Effort(Effort),
     Sandbox(&'a SandboxLimits),
     Mcp(&'a [McpServer]),
+    /// The context reminder's second rung. Arrives already taken by
+    /// `SecondThreshold`'s one construction point: a raw percent is
+    /// refused where it is parsed, never where it is written.
+    SecondThreshold(SecondThreshold),
 }
 
 impl Change<'_> {
@@ -214,6 +241,12 @@ impl Change<'_> {
             }
             Change::Mcp(servers) => {
                 document.insert("mcp".to_owned(), toml::Value::Array(rows(servers)));
+            }
+            Change::SecondThreshold(threshold) => {
+                let percent = i64::try_from(u64::from(*threshold))
+                    .map_err(|err| refuse_file(file, &err.to_string()))?;
+                table(document, "context", file)?
+                    .insert("second_threshold".to_owned(), toml::Value::Integer(percent));
             }
         }
         Ok(())

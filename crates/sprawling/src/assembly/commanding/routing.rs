@@ -107,10 +107,15 @@ impl RunWorker {
                 sandbox,
                 mcp,
                 desktop,
+                context_second_threshold,
                 ..
-            } => {
-                self.configure_building(&addr, sandbox.as_ref(), mcp.as_deref(), desktop.as_deref())
-            }
+            } => self.configure_building(
+                &addr,
+                sandbox.as_ref(),
+                mcp.as_deref(),
+                desktop.as_deref(),
+                context_second_threshold,
+            ),
             channels::Command::ProbeEndpoint {
                 name,
                 base_url,

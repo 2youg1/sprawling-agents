@@ -290,6 +290,7 @@ export function configureMcp(addr: Address, mcp: readonly McpServer[]): Command 
       mcp: [...mcp],
       sandbox: null,
       desktop: null,
+      context_second_threshold: null,
       idem: mintIdem(),
     },
   };
@@ -305,6 +306,25 @@ export function configureDesktop(addr: Address, allowlist: string): Command {
       mcp: null,
       sandbox: null,
       desktop: allowlist,
+      context_second_threshold: null,
+      idem: mintIdem(),
+    },
+  };
+}
+
+// Where the context reminder's second rung sits: a whole percent of the
+// window. Sent as a raw number because the domain is
+// `kernel::config::SecondThreshold`'s one construction point - a form
+// that enforced it here would be the second place that rule lives - and
+// the refusal comes back carrying the legal span.
+export function configureContext(addr: Address, percent: number): Command {
+  return {
+    configure_building: {
+      addr,
+      mcp: null,
+      sandbox: null,
+      desktop: null,
+      context_second_threshold: percent,
       idem: mintIdem(),
     },
   };

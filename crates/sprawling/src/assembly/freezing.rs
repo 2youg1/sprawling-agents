@@ -299,6 +299,7 @@ impl RunWorker {
                 // figure, which is what `status` already reports.
                 context_tokens: site.model.context_tokens,
             },
+            second_threshold: site.config.second_threshold,
             prefix,
             policy: site.rules.policy().clone(),
             tools,

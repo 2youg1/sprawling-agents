@@ -104,7 +104,10 @@ impl Run<Active> {
         // one is open, which is the same rule a steer follows.
         window.push_inherited(&plan.inherited);
         window.push_task_lines(&plan.task, &plan.goal, plan.opening);
-        let gauge = ContextGauge::new(kernel::Tokens::new(plan.shape.context_tokens));
+        let gauge = ContextGauge::new(
+            kernel::Tokens::new(plan.shape.context_tokens),
+            plan.second_threshold,
+        );
         Ok(Run {
             plan,
             state: Active {

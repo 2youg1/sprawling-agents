@@ -256,6 +256,7 @@ impl RunWorker {
         sandbox: Option<&kernel::SandboxLimits>,
         mcp: Option<&[kernel::McpServer]>,
         desktop: Option<&str>,
+        context_second_threshold: Option<u64>,
     ) -> Result<(), AxError> {
         let building = city::Building::of(addr)?;
         if let Some(limits) = sandbox {
@@ -273,6 +274,20 @@ impl RunWorker {
                 city::Layer::Building,
                 servers,
             )?;
+        }
+        // Taken before written: the domain is `SecondThreshold`'s one
+        // construction point, so an out-of-domain percent is refused
+        // here rather than written and refused at the next read.
+        let mut context = false;
+        if let Some(percent) = context_second_threshold {
+            let threshold = kernel::config::SecondThreshold::parse(percent)?;
+            city::write_second_threshold(
+                &self.city_root,
+                building.addr(),
+                city::Layer::Building,
+                threshold,
+            )?;
+            context = true;
         }
         // Written whole and never parsed here: the connector that reads
         // it at start-up is the authority on its syntax and fails closed,
@@ -292,6 +307,7 @@ impl RunWorker {
                 sandbox: sandbox.is_some(),
                 mcp: mcp.is_some(),
                 desktop: desktop.is_some(),
+                context,
             },
         )?;
         self.record(EventKind::BuildingConfigured, payload)
