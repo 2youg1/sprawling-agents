@@ -36,6 +36,8 @@
   import Forking from "./talk/forking.svelte";
   import type { Boundary, ForkPlan } from "./talk/forking";
   import Thread from "./talk/thread.svelte";
+  import { anchorAt, footOf } from "./talk/anchoring";
+  import type { Anchoring } from "./talk/anchoring";
   import { NOTHING, artifactsIn } from "./talk/trace";
   import Waiting from "./talk/waiting.svelte";
 
@@ -50,11 +52,6 @@
   const belief = u.conn.belief;
   const effort = u.effort;
   const held = u.prefs.held;
-
-  // How close to the foot the viewport has to sit for the thread to
-  // keep it there (ux B1). Past this the person has scrolled up to read,
-  // and their place is theirs.
-  const TOLERANCE = 40;
 
   // The runs of this room, oldest first. A run whose room is not yet
   // known is not shown here rather than shown in the wrong room.
@@ -173,16 +170,21 @@
   // Keep the newest words in view while the person is at the foot, and
   // leave them alone once they have scrolled up to read. The column
   // grows when answers land as well as when records do, so its size is
-  // what is watched (ux B1).
+  // what is watched; the judgement itself is `talk/anchoring`'s (ux B1).
   let scroller = $state<HTMLDivElement | undefined>(undefined);
   let column = $state<HTMLDivElement | undefined>(undefined);
-  let pinned = $state(true);
+  let anchoring = $state<Anchoring>("follow");
   $effect(() => {
     const held = column;
-    if (held === undefined) return;
+    const box = scroller;
+    if (held === undefined || box === undefined) return;
+    // The first judgement is measured rather than assumed: a scroller
+    // left mid-history must not be yanked to the foot by the first
+    // append after it.
+    anchoring = anchorAt(footOf(box));
     const watcher = new ResizeObserver(() => {
-      const box = scroller;
-      if (pinned && box !== undefined) box.scrollTop = box.scrollHeight;
+      const now = scroller;
+      if (anchoring === "follow" && now !== undefined) now.scrollTop = now.scrollHeight;
     });
     watcher.observe(held);
     return () => {
@@ -246,8 +248,7 @@
       bind:this={scroller}
       class="min-h-0 flex-1 overflow-y-auto"
       onscroll={(event) => {
-        const box = event.currentTarget;
-        pinned = box.scrollHeight - box.scrollTop - box.clientHeight < TOLERANCE;
+        anchoring = anchorAt(footOf(event.currentTarget));
       }}
     >
       <!-- An empty room opens with the box about a third of the way down

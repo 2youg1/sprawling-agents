@@ -33,6 +33,7 @@
 
   import { say } from "../core/lang";
   import { setUi, ui } from "../ui";
+  import Anchored from "./gallery/anchored.svelte";
   import Conversation from "./gallery/conversation.svelte";
   import Filed from "./gallery/filed.svelte";
   import Hints from "./gallery/hints.svelte";
@@ -72,6 +73,7 @@
   <Hints />
   <Presences />
   <Conversation />
+  <Anchored />
   <Produced />
   <Filed />
   <Screens />

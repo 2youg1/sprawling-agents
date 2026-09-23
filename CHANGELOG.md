@@ -164,6 +164,8 @@ longer dropped by a dialect enum that had only two variants.
   typed, and an endpoint says when it is on this computer.
 - 26 `outline-none` are gone, so the focus ring is visible again; 33 `title`
   attributes become a hint both a keyboard and a touch screen reach.
+- A thread stays where the reader is: streaming appends no longer steal the
+  reading position, and the view follows only when the reader is at the foot.
 
 ### A door decides, and a question is a person's
 
