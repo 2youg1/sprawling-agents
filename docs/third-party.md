@@ -154,7 +154,24 @@ The client draws itself in **Geist Sans** and **Geist Mono** ([vercel/geist-font
 
 The font is not fetched from a font host at run time. The reason is in `client/src/theme.css` beside the declaration: a request to an outside host would tell that host a city was opened, and would draw nothing on a machine with no route out.
 
-## 5 What the client follows, and what it only watches
+## 5 The skills this repository ships
+
+Six skills under `skills/` travel with this tree, and they are the first files in it that the MPL notice does not govern. The directory is a skill shelf in the layout every harness on this machine files a skill as - one directory per skill, holding `SKILL.md`, which `crates/city/src/library/reading.rs` spells in the one place this city states it - so a city mounts it read-only through `[skills] shelves`, and a person copies it anywhere a skill is read. **The release archive carries the directory as itself**, `skills/LICENSES.md` beside it: `cargo xtask package` walks the tree in, so the person who unpacks a release finds the skills where the harnesses look.
+
+| Skill | What it is for | Licence | Origin |
+|---|---|---|---|
+| `skills/sdd/SKILL.md` | spec-first programming work: a SPEC.md before the code, the code kept in step with it | CC BY-NC 4.0 | the author's own Chinese-language skill, translated here |
+| `skills/tutor/SKILL.md` | discovery teaching: one person, dialogue and verifiable outcomes, no courseware | CC BY-NC 4.0 | the same |
+| `skills/translation/SKILL.md` | low-variance translation of form-as-content text into Chinese | CC BY-NC 4.0 | the same |
+| `skills/why/SKILL.md` | design rationale read off evidence, with citations | MIT | modified adaptation of pstack's `why` |
+| `skills/how/SKILL.md` | how a subsystem works, and how to critique it | MIT | modified adaptation of pstack's `how` |
+| `skills/blast-radius/SKILL.md` | what a change breaks somewhere else | MIT | modified adaptation of pstack's `blast-radius` |
+
+**What is owed, and to whom.** The three are the repository owner's own work (2youg1), translated and adapted from the original Chinese-language skills, which are published as open source under AGPL-3.0-or-later. **The licence is changed only within this project**: the files above carry CC BY-NC 4.0, and the originals remain AGPL-3.0-or-later. CC BY-NC 4.0 makes two demands of every reuse, and both are obligations rather than courtesies - credit the author, and no commercial use without separate permission. The credit therefore travels twice on purpose: `README.md` acknowledges what these files stand on, and each file carries its own provenance note, so a copy that leaves this tree still carries the name it owes. The translation skill keeps the byline its original wore - KL9 ＆ Claude Fable 5. The pstack three stay MIT: upstream is pstack by Lauren Tan (poteto) ([cursor/plugins](https://github.com/cursor/plugins)), Copyright (c) 2026 Lauren Tan, and **the modifications are marked as 2youg1's (2026)** - a modified version that does not say who modified it hides what it now is. `skills/LICENSES.md` travels with the directory and carries the full MIT text and the attribution each licence asks for, so the obligations reach a copy that leaves this tree.
+
+**Nothing under `skills/` enters the binary or the client bundle; the archive carries them as themselves.** These are prompt documents, read at run time by whoever keeps a city, and the release archive packs the directory whole - so the obligations travel with the files and their `LICENSES.md`, in the tree and in the zip alike. This is the one corner of the tree where a reader may not assume MPL-2.0, which is why `README.md` says so at the licence line, and why the MPL header gate judges `.rs` alone: a notice on a CC BY-NC or MIT document would misstate its terms.
+
+## 6 What the client follows, and what it only watches
 
 **No component library is a dependency of this client, and the ruling that keeps it that way is `client/client-SPEC.md` section 7.** The controls under `client/src/views/parts/` are this repository's own, and `cargo xtask npm` holds the client's runtime dependencies to exactly `effect` and `svelte`, so adding one would mean editing that gate first.
 
@@ -180,7 +197,7 @@ What is followed instead is the same kind of thing section 1 follows for provide
 
 **None of the three changes the stack, which was the point of registering them.** A judgement that survives is worth only the wording its source supports, so each row above carries the tightened wording rather than the one it replaced; the ruling they were meant to inform is in the first half of this section, and what would reopen it is in `client/client-SPEC.md` section 7-9.
 
-## 6 A future bolt-on crate
+## 7 A future bolt-on crate
 
 The provider intelligence table is planned to move out into a crate of its own under its own licence (MIT or Apache-2.0), outside this repository's MPL notice, because it is not part of this work. It is now four families rather than two providers, so what moves out is larger than when this was written, and each family's watch travels with it as its own row.
 
@@ -193,7 +210,7 @@ The acknowledgement in `README.md` does not discharge either. **An acknowledgeme
 
 The same measure governs something not yet started: **upstream synchronisation**. When an upstream publishes a new version - usually because a new model appeared - realigning the bolt-on crate should be **one run opening one pull request**, rather than a person periodically reading two repositories' diffs. It is work the city can do itself, so no separate mechanism is built for it: a schedule entry and a building that owns the bolt-on are enough.
 
-## 7 What will not be done
+## 8 What will not be done
 
 **Upstream code is not vendored in.** Every `.rs` file here carries the MPL-2.0 notice, and a file pasted from an MIT or Apache-2.0 project cannot wear one. Note that the machine only checks whether a notice is present, not whether it is the right one - **so this rule is held by people, not by a gate.**
 

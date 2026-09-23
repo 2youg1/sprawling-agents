@@ -264,6 +264,75 @@ seed it actually used.
   `CONTRIBUTING` and `flake.nix` point at it. Two builds of one tree are
   compared nightly.
 
+### The repository ships skills of its own
+
+`skills/` carries six - `sdd`, `tutor`, `translation`, `why`, `how` and
+`blast-radius` - and the directory is a skill shelf in the layout every harness
+on this machine files a skill as, so a city mounts it read-only through
+`[skills] shelves` and a person loads it in pi or claude unchanged. The release
+archive carries the directory as itself (`cargo xtask package`), so a person who
+unpacks a release finds the skills where the harnesses look. Until now the
+skill surfaces had nothing real to load: the library scan, the catalog and the
+Reading Room were exercised against generated stubs, and a person testing them
+by hand had no skill to pick up.
+
+**They are the first files in this tree the MPL notice does not govern.** The
+first three are English translations and adaptations of the author's own
+Chinese-language open-source skills - CC BY-NC 4.0 here, licensed that way only
+within this project while the originals remain AGPL-3.0-or-later. The last
+three are the author's modified adaptations of pstack's skills and keep their
+MIT licence, each naming the one who modified it. `skills/LICENSES.md` travels
+with them; `docs/third-party.md` §5 records the terms, `README.md` the
+acknowledgment.
+
+### A resident writes the spine documents it lives in
+
+A building keeps its long work in `Roadmap.md` and the job a run starts
+from in the rest of its spine. Until tonight the only hand that could
+write them was the one at the file system: `plan` reaches `Roadmap.md`
+and `edit` the others from inside the city, so a write could land on top
+of a file that had just moved.
+
+- `PutSpine` carries the text the sender started from. The write is a
+  read-modify-write through `city::document`, and a stale `base` is
+  refused rather than overwritten - the sender writes once more against
+  what is there now.
+- The write lands as `SpineDocumentWritten` before it becomes anything
+  else, recording without re-running. The plan table hears it as stale:
+  a person's write to `Roadmap.md` moves the plan like any other, so the
+  table is re-read rather than trusted.
+
+### A plan is measured in two figures
+
+Either completion figure alone misleads (kernel::completion): the count
+of leaves says how many pieces the plan turned out to have, and the
+weighted share says how much of the whole those pieces stand for.
+
+- `client/src/core/share.ts` counts shares of a whole in integer
+  billionths - the one place a share is counted, so no float reaches a
+  plan.
+- The plan view draws both figures, and the skyline reads done and
+  blocked as fractions of the same whole.
+
+### The client stands on Svelte
+
+The browser page moved from Solid to Svelte 5. What the architecture
+promises does not move with it: the client is still replaceable,
+written against the WebSocket protocol in `crates/channels`, and its
+runtime dependencies are still exactly two - `svelte` and `effect` -
+with the one job Effect has, decoding the wire, unchanged.
+
+- The Solid-era `tseslint.config` bridge, kept for
+  `eslint-plugin-solid`'s type gap, left with the plugin it served;
+  `eslint-plugin-svelte` types cleanly through `defineConfig()`.
+- `cargo xtask npm` holds the two runtime dependencies in both
+  directions, so a deleted `svelte` fails the gate as loudly as an
+  added UI kit.
+- The move left its name behind in two values: the manifest and the
+  gate said `svelte` while `AGENTS.md`, `ARCHITECTURE.md`, `README.md`
+  and `README.zh-CN.md` still said Solid. Every one of them reads from
+  the one authority now.
+
 ---
 
 ## v0.0.5-Pre-alpha-260912

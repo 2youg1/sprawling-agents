@@ -53,7 +53,7 @@ Commands, every one the city accepts, generated from the wire schema by
 `cargo xtask docnum` (`sprawling call` lists them too):
 
 <!-- xtask:begin command_names -->
-`dispatch`, `login`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `open_session`, `create_building`, `put_secret`, `steer`, `cancel`, `takeover`, `rollback`, `halt`, `reveal`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `hand_off`, `set_autonomy`, `pursue`, `wake`, `put_document`, `connect_toolkit`, `put_preferences`, `put_shelved`, `auth`
+`dispatch`, `login`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `open_session`, `create_building`, `put_secret`, `steer`, `cancel`, `takeover`, `rollback`, `halt`, `reveal`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `hand_off`, `set_autonomy`, `pursue`, `wake`, `put_document`, `put_spine`, `connect_toolkit`, `put_preferences`, `put_shelved`, `auth`
 <!-- xtask:end -->
 
 The ones whose arguments need saying:
