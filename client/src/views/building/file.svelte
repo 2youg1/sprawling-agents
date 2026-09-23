@@ -16,12 +16,23 @@
   // one of the two seats `mx-auto` is allowed in (client-SPEC 4-33) -
   // while numbered lines grow to their longest line and scroll, because
   // code and tables are never capped.
+  import { putSpine } from "../../core/commands";
   import { fill, say } from "../../core/lang";
   import { kib } from "../../core/time";
   import { ui } from "../../ui";
-  import type { Address, DocumentAnswer } from "../../wire";
+  import { Address, type DocumentAnswer, type SpineDocument } from "../../wire";
   import Path from "../parts/path.svelte";
   import Prose from "../prose.svelte";
+
+  // The four documents a person may write through this door. `PutSpine`
+  // names one of them and never a path, so a file outside this table has
+  // no control to draw and no way to be written from here.
+  const SPINE: Record<string, SpineDocument | undefined> = {
+    "Roadmap.md": "roadmap",
+    "Memo.md": "memo",
+    "Handoff.md": "handoff",
+    "SPEC.md": "spec",
+  };
 
   interface Props {
     readonly at: Address;
@@ -46,6 +57,35 @@
 
   const markdown = $derived(at.endsWith(".md"));
   let raw = $state(false);
+  let editing = $state(false);
+  let draft = $state("");
+
+  // Which spine document this is, and the building it belongs to. The
+  // name decides, and the building is whatever stands above it: these
+  // four sit at a building's root, so the path already says both.
+  const spine = $derived.by((): { which: SpineDocument; building: Address } | null => {
+    const cut = at.lastIndexOf("/");
+    if (cut < 0) return null;
+    const which = SPINE[at.slice(cut + 1)];
+    return which === undefined ? null : { which, building: Address.make(at.slice(0, cut)) };
+  });
+
+  function change(): void {
+    const held = doc;
+    if (held === undefined || held === null) return;
+    draft = held.text;
+    editing = true;
+  }
+
+  // The body is sent whole with the text the person started from, so a
+  // resident that rewrote the file underneath is refused rather than
+  // written over.
+  function save(): void {
+    const to = spine;
+    const held = doc;
+    if (to === null || held === undefined || held === null) return;
+    if (u.send(putSpine(to.building, to.which, held.text, draft))) editing = false;
+  }
 
   const lines = $derived(
     doc === undefined || doc === null
@@ -78,6 +118,15 @@
         <!-- wording-ok: the name of the file format this toggle shows the source of -->
         .md
       </button>
+      {#if spine !== null && !editing}
+        <button
+          type="button"
+          class="h-control-sm rounded-pill px-snug text-note text-text-disabled hover:text-text-quiet"
+          onclick={change}
+        >
+          {say($lang, "file_edit")}
+        </button>
+      {/if}
     {/if}
   </div>
   {#if doc === undefined}
@@ -95,7 +144,30 @@
         </p>
       {/if}
       {#if !doc.binary}
-        {#if markdown && !raw}
+        {#if editing}
+          <textarea
+            class="min-h-palette w-full rounded-card border border-edge-input bg-chrome p-snug font-mono text-note leading-relaxed"
+            bind:value={draft}
+          ></textarea>
+          <div class="mt-base flex gap-base">
+            <button
+              type="button"
+              class="h-control-sm rounded-pill bg-raised px-snug text-note text-text"
+              onclick={save}
+            >
+              {say($lang, "file_save")}
+            </button>
+            <button
+              type="button"
+              class="h-control-sm rounded-pill px-snug text-note text-text-disabled hover:text-text-quiet"
+              onclick={() => {
+                editing = false;
+              }}
+            >
+              {say($lang, "file_discard")}
+            </button>
+          </div>
+        {:else if markdown && !raw}
           <div class="mx-auto w-full max-w-measure">
             <Prose text={doc.text} />
           </div>

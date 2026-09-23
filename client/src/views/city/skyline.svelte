@@ -20,6 +20,7 @@
 
   import type { RunBelief } from "../../core/belief";
   import { fill, say } from "../../core/lang";
+  import { fraction } from "../../core/share";
   import { ui } from "../../ui";
   import type { Address, BuildingProgress, CityAnswer, PursuitLine } from "../../wire";
   import Mark from "./marks.svelte";
@@ -99,7 +100,7 @@
   function ratio(building: BuildingProgress): { done: number; blocked: number } | null {
     if ("planned" in building.progress) {
       const plan = building.progress.planned;
-      return { done: plan.done_ppb / 1e9, blocked: plan.blocked_ppb / 1e9 };
+      return { done: fraction(plan.done_ppb), blocked: fraction(plan.blocked_ppb) };
     }
     return null;
   }

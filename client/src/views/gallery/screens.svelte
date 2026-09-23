@@ -26,6 +26,77 @@
   import type { Lang } from "../../core/lang";
   import { say } from "../../core/lang";
   import type { Recovery } from "../../core/recovering";
+  import type { BuildingAnswer } from "../../wire";
+  import { Address, NodeId, Tokens, UsdMicros } from "../../wire";
+  import Plan from "../building/plan.svelte";
+
+  // One plan in the state the two figures exist for: a branch that was
+  // divided generously, so the share says more than the count does.
+  // Three leaves, one finished, one running, one held up - and 50%
+  // behind the reader while only a third of the leaves are done, which
+  // is the difference the second figure is drawn to let somebody see.
+  const PLANNED: BuildingAnswer = {
+    addr: Address.make("lab"),
+    archive: [],
+    blocked: [
+      { line: "waiting on the endpoint to answer", source: NodeId.make("3"), waiting: 2 },
+    ],
+    docs: [],
+    mcp: [],
+    plan: [
+      {
+        evidence: null,
+        item: "read the shape before changing it",
+        leaf: true,
+        needs: [],
+        node: NodeId.make("1"),
+        ready: true,
+        share_ppb: 500_000_000,
+        status: "done",
+      },
+      {
+        evidence: null,
+        item: "wire the two halves together",
+        leaf: true,
+        needs: [NodeId.make("1")],
+        node: NodeId.make("2"),
+        ready: true,
+        share_ppb: 300_000_000,
+        status: "in_progress",
+      },
+      {
+        evidence: null,
+        item: "cut a release",
+        leaf: true,
+        needs: [NodeId.make("2")],
+        node: NodeId.make("3"),
+        ready: false,
+        share_ppb: 200_000_000,
+        status: "blocked",
+      },
+    ],
+    problems: [],
+    progress: {
+      planned: { blocked: 1, blocked_ppb: 200_000_000, done: 1, done_ppb: 500_000_000, total: 3 },
+    },
+    rooms: [],
+    sandbox: null,
+  };
+
+  // The other face. A plan the city could not read has no denominator,
+  // and the interface says so rather than painting a fraction it does
+  // not have (kernel::completion, A17's type half).
+  const UNPLANNED: BuildingAnswer = {
+    ...PLANNED,
+    plan: [],
+    problems: ["row 2 has 4 columns; the table has six"],
+    progress: {
+      unplanned: {
+        budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) },
+        steps: 7,
+      },
+    },
+  };
 
   // One machine, with an item in each of the three states a person
   // acts differently on: here, missing and required, missing and
@@ -269,4 +340,16 @@ error, and both red markings at once would say it twice. -->
       count={REFUSED_FIELD.count}
     />
   </div>
+</Case>
+
+<!-- The two figures the plan carries, and the face that has neither.
+     One case each, because a renderer is told to handle both and a
+     fixture that only ever drew the happy face would leave the other
+     unpainted and unjudged. -->
+<Case label="building · plan showing a share and a leaf count">
+  <Plan answer={PLANNED} />
+</Case>
+
+<Case label="building · plan the city could not read">
+  <Plan answer={UNPLANNED} />
 </Case>

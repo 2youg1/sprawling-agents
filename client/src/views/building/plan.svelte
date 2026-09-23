@@ -24,11 +24,13 @@
   // started.
 
   import type { Key } from "../../core/lang";
-  import { say } from "../../core/lang";
+  import { fill, say } from "../../core/lang";
+  import { percent } from "../../core/share";
   import { ui } from "../../ui";
   import type { BuildingAnswer, PlanRow, RoadmapStatus } from "../../wire";
   import Badge from "../parts/badge.svelte";
   import type { Weight } from "../parts/glyph";
+  import Progress from "../parts/progress.svelte";
 
   interface Props {
     readonly answer: BuildingAnswer;
@@ -83,6 +85,29 @@
 </script>
 
 <div>
+  <!-- Two figures, because either alone misleads (kernel::completion).
+       The bar is the leaves, which say how many pieces the plan turned
+       out to have; the figure beside it is the weighted share, which
+       moves when a branch is divided generously. A reader seeing both
+       can tell work finished from work redistributed. -->
+  {#if "planned" in answer.progress}
+    <div class="mb-base flex items-center gap-base">
+      <Progress
+        label={say($lang, "plan_progress")}
+        done={answer.progress.planned.done}
+        total={answer.progress.planned.total}
+      />
+      <span class="shrink-0 font-mono text-note text-text-faint"
+        >{fill(say($lang, "plan_share"), {
+          percent: String(percent(answer.progress.planned.done_ppb)),
+        })}</span
+      >
+    </div>
+  {:else}
+    <p class="mb-base text-note text-text-faint">
+      {fill(say($lang, "plan_unplanned"), { steps: String(answer.progress.unplanned.steps) })}
+    </p>
+  {/if}
   {#if answer.problems.length > 0}
     <ul class="mb-base rounded-card border border-alert/40 px-base py-snug text-note text-text-quiet">
       {#each answer.problems as problem (problem)}

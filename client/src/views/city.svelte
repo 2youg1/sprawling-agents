@@ -19,6 +19,7 @@
   import { QUERIES } from "../core/asking";
   import { fill, say } from "../core/lang";
   import { MAYOR, toFragment } from "../core/route";
+  import { percent } from "../core/share";
   import type { Address, BuildingProgress, CityAnswer } from "../wire";
   import { ui } from "../ui";
   import Bar from "./city/bar.svelte";
@@ -56,8 +57,8 @@
 
   function share(building: BuildingProgress): string | null {
     if (!("planned" in building.progress)) return null;
-    const percent = String(Math.round(building.progress.planned.done_ppb / 1e7));
-    return fill(say($lang, "city_done_percent"), { percent });
+    const done = String(percent(building.progress.planned.done_ppb));
+    return fill(say($lang, "city_done_percent"), { percent: done });
   }
 </script>
 

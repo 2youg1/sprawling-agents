@@ -555,6 +555,18 @@
     "en": "binary · {kib}",
     "zh": "二进制 · {kib}"
   },
+  "file_edit": {
+    "en": "change this file",
+    "zh": "改这份文件"
+  },
+  "file_save": {
+    "en": "save",
+    "zh": "保存"
+  },
+  "file_discard": {
+    "en": "leave it",
+    "zh": "不改了"
+  },
   "file_missing": {
     "en": "missing",
     "zh": "不存在"
@@ -1315,9 +1327,21 @@
     "en": "node",
     "zh": "节点"
   },
+  "plan_progress": {
+    "en": "plan progress",
+    "zh": "计划进度"
+  },
+  "plan_share": {
+    "en": "{percent}% of the plan's weight",
+    "zh": "占计划权重的 {percent}%"
+  },
   "plan_status": {
     "en": "state",
     "zh": "状态"
+  },
+  "plan_unplanned": {
+    "en": "no plan to measure against: {steps} steps taken",
+    "zh": "没有可度量的计划：已走 {steps} 步"
   },
   "presence_title": {
     "en": "what the city is telling you",

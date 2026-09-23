@@ -21,6 +21,7 @@ import type {
   Command,
   Mode,
   Origin,
+  SpineDocument,
   Window,
   DialectKind,
   Effort,
@@ -311,6 +312,20 @@ export function configureDesktop(addr: Address, allowlist: string): Command {
 
 export function putDocument(which: GovernedDocument, body: string): Command {
   return { put_document: { which, body, idem: mintIdem() } };
+}
+
+// One of a building's own spine documents. `base` is the text the
+// person started from: these have a second writer - a resident reaches
+// `Roadmap.md` through `plan` - so a file that moved underneath is
+// refused rather than overwritten, and the change is written once more
+// against what is there now.
+export function putSpine(
+  building: Address,
+  which: SpineDocument,
+  base: string,
+  body: string,
+): Command {
+  return { put_spine: { building, which, base, body, idem: mintIdem() } };
 }
 
 // One named change to what this person settled about reading their
