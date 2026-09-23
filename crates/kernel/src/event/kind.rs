@@ -119,6 +119,8 @@ pub enum EventKind {
     /// answerable from the one history rather than from a file's
     /// modification time.
     GovernedDocumentWritten,
+    /// A person wrote one of a building's own spine documents.
+    SpineDocumentWritten,
     /// A person asked to connect an outside application, and the broker
     /// that holds its OAuth opened a consent session.
     ///
@@ -170,7 +172,7 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 73] = [
+    pub const ALL: [EventKind; 74] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -238,6 +240,7 @@ impl EventKind {
         EventKind::DiscardRestored,
         EventKind::AutonomyChanged,
         EventKind::GovernedDocumentWritten,
+        EventKind::SpineDocumentWritten,
         EventKind::ToolkitLinkOpened,
         EventKind::EmbeddingCalled,
         EventKind::RerankCalled,
@@ -336,7 +339,8 @@ impl EventKind {
             // instead; the move it made is already written where the
             // move itself is written.
             | EventKind::AdviserFellBack
-            | EventKind::GovernedDocumentWritten => WindowClass::RecordOnly,
+            | EventKind::GovernedDocumentWritten
+            | EventKind::SpineDocumentWritten => WindowClass::RecordOnly,
         }
     }
 }

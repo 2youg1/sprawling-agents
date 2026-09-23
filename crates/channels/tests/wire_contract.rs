@@ -48,13 +48,13 @@ fn exposed() -> SocketAddr {
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // Thirty commands, thirty-four queries. The count is not a style
     // choice - it is the wire's closed surface.
-    assert_eq!(COMMAND_NAMES.len(), 29, "command table");
+    assert_eq!(COMMAND_NAMES.len(), 30, "command table");
     assert_eq!(QUERY_NAMES.len(), 34, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 29, "command names are distinct");
+    assert_eq!(sorted.len(), 30, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
@@ -83,6 +83,9 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
     assert_eq!(schema_hash(), schema_hash(), "hash is a pure function");
     // Golden: this pins the current wire. Changing a variant changes the hash,
     // which forces the SPEC to move in the same change set (apisync gate).
+    // `WIRE_V` stays where it is because a name changed: the version rises
+    // only for a grammar reshaped with the names held (§298), and a new
+    // name already moves the hash that the handshake compares.
     assert_eq!(
         schema_hash().to_string(),
         WIRE_SCHEMA_GOLDEN,
@@ -96,7 +99,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
 
 /// A function of WIRE_V and the two name tables, so any change to the
 /// protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "e3e542fbe688101c01587c97fc2f56f5a847e321457e95deaeb2b55327064b90";
+const WIRE_SCHEMA_GOLDEN: &str = "a33212548089805e44943526ce2790929b5f1f78bfdd3b33bc46fbd9b429b25d";
 
 // -------------------------------------------------------------- binding face
 
@@ -306,6 +309,15 @@ fn sample_of_every_command() -> Vec<Command> {
         Command::PutDocument {
             which: channels::GovernedDocument::Mayor,
             body: "# who the Mayor is
+"
+            .to_owned(),
+            idem,
+        },
+        Command::PutSpine {
+            building: Address::parse("lab").unwrap(),
+            which: channels::SpineDocument::Memo,
+            base: String::new(),
+            body: "# Memo — lab
 "
             .to_owned(),
             idem,

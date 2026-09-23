@@ -232,6 +232,7 @@ fn every_event_kind_has_a_reach() {
             "RoadmapReleased",
             "RoadmapSplit",
             "RoadmapBlocked",
+            "SpineDocumentWritten",
         ],
         "these kinds move a plan and every other kind leaves it where it was"
     );

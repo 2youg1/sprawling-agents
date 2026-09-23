@@ -242,7 +242,10 @@ fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::CheckpointCommitted
         | EventKind::RunFrozen
         | EventKind::RoadmapClaimed
-        | EventKind::RoadmapSplit => PlanReach::Stale,
+        | EventKind::RoadmapSplit
+        // A person's write to `Roadmap.md` moves the plan like any
+        // other, so the table is re-read rather than trusted.
+        | EventKind::SpineDocumentWritten => PlanReach::Stale,
         EventKind::BuildingConfigured
         | EventKind::SessionOpened
         | EventKind::RunStarted

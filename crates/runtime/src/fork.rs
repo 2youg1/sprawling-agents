@@ -246,6 +246,7 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
             | EventKind::DiscardRestored
             | EventKind::AutonomyChanged
             | EventKind::GovernedDocumentWritten
+            | EventKind::SpineDocumentWritten
             | EventKind::ToolkitLinkOpened
             | EventKind::EmbeddingCalled
             | EventKind::RerankCalled

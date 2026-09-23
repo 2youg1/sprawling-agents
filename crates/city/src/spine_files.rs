@@ -44,7 +44,7 @@ pub use hall::{
 /// one alias — not two.
 pub const ROADMAP_FILE: &str = kernel::ROADMAP_FILE;
 /// Decisions and corrections.
-pub(crate) const MEMO_FILE: &str = "Memo.md";
+pub const MEMO_FILE: &str = "Memo.md";
 /// What the next agent needs before it starts. Named in
 /// `kernel::layout` beside the path it is laid down at, and spelled
 /// here for the same reason `ROADMAP_FILE` is.

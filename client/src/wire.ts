@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 35 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "e3e542fbe688101c01587c97fc2f56f5a847e321457e95deaeb2b55327064b90" as const;
+export const WIRE_HASH = "a33212548089805e44943526ce2790929b5f1f78bfdd3b33bc46fbd9b429b25d" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -514,6 +514,7 @@ export const EventKind = Schema.Union(
   Schema.Literal("pursuit_changed"),
   Schema.Literal("endpoint_probed"),
   Schema.Literal("governed_document_written"),
+  Schema.Literal("spine_document_written"),
   Schema.Literal("toolkit_link_opened"),
   Schema.Literal("embedding_called"),
   Schema.Literal("rerank_called"),
@@ -2426,6 +2427,24 @@ export const Shelf = Schema.Union(
 export type Shelf = typeof Shelf.Type;
 
 /**
+ * Which of a building's own spine documents a write carries.
+ * 
+ * Named rather than addressed, for the reason [`GovernedDocument`]
+ * gives: where these files live is the city's answer and not the
+ * sender's. Unlike the three documents that govern a city, these have
+ * a second writer — a resident reaches `Roadmap.md` through `plan` and
+ * the others through `edit` — so a write to one of them is a write that
+ * can lose a race, and the caller says which text it started from.
+ */
+export const SpineDocument = Schema.Union(
+  Schema.Literal("roadmap"),
+  Schema.Literal("memo"),
+  Schema.Literal("handoff"),
+  Schema.Literal("spec"),
+).annotations({ identifier: "SpineDocument" });
+export type SpineDocument = typeof SpineDocument.Type;
+
+/**
  * A Building template name in transit. Authority is `city`.
  */
 export const TemplateName = Schema.String.pipe(Schema.brand("TemplateName"));
@@ -2624,6 +2643,15 @@ export const Command = Schema.Union(
       body: Schema.String,
       idem: IdemKey,
       which: GovernedDocument,
+    }),
+  }),
+  Schema.Struct({
+    put_spine: Schema.Struct({
+      base: Schema.String,
+      body: Schema.String,
+      building: Address,
+      idem: IdemKey,
+      which: SpineDocument,
     }),
   }),
   Schema.Struct({

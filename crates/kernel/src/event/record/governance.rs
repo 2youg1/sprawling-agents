@@ -184,6 +184,24 @@ pub struct GovernedDocumentWritten {
     pub bytes: usize,
 }
 
+/// `spine_document_written`: which of a building's own spine documents
+/// a person wrote, and how long it now is.
+///
+/// Carries the building because these four live at a building's root
+/// while the three governed ones live in the city's own reserved
+/// subtree. Never the text, for the reason [`GovernedDocumentWritten`]
+/// gives.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SpineDocumentWritten {
+    /// The building the document belongs to.
+    pub building: String,
+    /// The document's file name.
+    pub which: String,
+    /// The length of what was written, in bytes.
+    pub bytes: usize,
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

@@ -67,6 +67,7 @@ pub use schedule::{Cadence, Entry, SCHEDULE_FILE, Schedule, schedule_path};
 pub use session::{clear_session, forget_shape};
 pub use spine_files::{AGENTS_FILE, CITY_FILE, CLERK_FILE, HANDOFF_FILE, JOB_FILE, MAYOR_FILE};
 pub use spine_files::{JobBrief, ROADMAP_FILE, RunBrief};
+pub use spine_files::{MEMO_FILE, SPEC_FILE};
 pub use spine_files::{hall_identity_path, lay_out_hall_identities};
 pub use spine_files::{handoff, handoff_path};
 pub use spine_files::{job_path, norms, roadmap, roadmap_path, write_brief, write_job};

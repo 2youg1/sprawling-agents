@@ -126,6 +126,10 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // going: the frozen prefix of a live run was assembled before
         // this frame arrived.
         | Command::PutDocument { .. }
+        // A building's own spine documents take the same reading, and
+        // one more: they have a second writer, so the frame carries the
+        // text it started from and a file that moved is refused.
+        | Command::PutSpine { .. }
         // What a person settled about their own reading of the city
         // reaches no run at all, and a skill written onto a shelf is
         // admitted by the run after this one.

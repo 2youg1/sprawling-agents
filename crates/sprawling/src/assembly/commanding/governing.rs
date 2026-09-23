@@ -8,6 +8,7 @@
 use kernel::event::Scope;
 use kernel::event::record::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
+    SpineDocumentWritten,
 };
 use kernel::{Address, AxCode, AxError, EventKind, Payload};
 
@@ -201,5 +202,72 @@ impl RunWorker {
                 bytes: body.len(),
             })?,
         )
+    }
+
+    /// Writes one of a building's own spine documents, and records that
+    /// it happened.
+    ///
+    /// A read-modify-write through `city::document`, so a resident
+    /// writing `Roadmap.md` through `plan` cannot be lost between this
+    /// frame's read and its write. `base` is the text the sender started
+    /// from, and a file that has moved is refused: these documents have
+    /// two writers, which is exactly the case [`Self::put_document`]
+    /// says it does not have, so the two doors hold different guards.
+    ///
+    /// # Errors
+    /// Refuses when the file is no longer the text the sender started
+    /// from, when it cannot be read for any other reason, when the
+    /// write will not land, and when the history will not take the line
+    /// announcing it.
+    pub(in crate::assembly) fn put_spine(
+        &mut self,
+        building: &Address,
+        which: channels::SpineDocument,
+        base: &str,
+        body: &str,
+    ) -> Result<(), AxError> {
+        let name = spine_name(which);
+        let path = self.city_root.join(building.as_str()).join(name);
+        city::edit_document(&path, |held| {
+            let on_disk = match std::fs::read(&path) {
+                Ok(bytes) => bytes,
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+                Err(err) => {
+                    return Err(AxError::failure(
+                        AxCode::StorageFatal,
+                        format!("read {name}"),
+                        format!("{}: {err}", path.display()),
+                    )
+                    .with_recovery("fix the file's permissions, then send the change again"));
+                }
+            };
+            if on_disk != base.as_bytes() {
+                return Err(AxError::failure(
+                    AxCode::InvalidArgs,
+                    format!("write {name}"),
+                    "the file is no longer the text you started from",
+                )
+                .with_recovery("read the file again and send the change once more"));
+            }
+            held.replace(body.as_bytes())
+        })?;
+        self.record(
+            EventKind::SpineDocumentWritten,
+            Payload::of(&SpineDocumentWritten {
+                building: building.as_str().to_owned(),
+                which: name.to_owned(),
+                bytes: body.len(),
+            })?,
+        )
+    }
+}
+
+/// The file name one spine document is written to.
+fn spine_name(which: channels::SpineDocument) -> &'static str {
+    match which {
+        channels::SpineDocument::Roadmap => city::ROADMAP_FILE,
+        channels::SpineDocument::Memo => city::MEMO_FILE,
+        channels::SpineDocument::Handoff => city::HANDOFF_FILE,
+        channels::SpineDocument::Spec => city::SPEC_FILE,
     }
 }

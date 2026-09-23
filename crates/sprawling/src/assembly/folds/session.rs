@@ -148,6 +148,7 @@ impl SessionOrigins {
             | EventKind::DiscardRestored
             | EventKind::AutonomyChanged
             | EventKind::GovernedDocumentWritten
+            | EventKind::SpineDocumentWritten
             | EventKind::ToolkitLinkOpened
             | EventKind::EmbeddingCalled
             | EventKind::RerankCalled

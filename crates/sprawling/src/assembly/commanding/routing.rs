@@ -202,6 +202,13 @@ impl RunWorker {
             channels::Command::PutDocument {
                 which, ref body, ..
             } => self.put_document(which, body),
+            channels::Command::PutSpine {
+                building: ref at,
+                which,
+                ref base,
+                ref body,
+                ..
+            } => self.put_spine(at, which, base, body),
             channels::Command::Halt { scope, .. } => self.set_admission(&scope, Admittance::Halted),
             channels::Command::Reveal { at, .. } => crate::revealing::reveal(&self.city_root, &at),
             channels::Command::DoctorInstall { ref item, .. } => self.doctor_install(item),

@@ -88,6 +88,28 @@ pub enum GovernedDocument {
     Preferences,
 }
 
+/// Which of a building's own spine documents a write carries.
+///
+/// Named rather than addressed, for the reason [`GovernedDocument`]
+/// gives: where these files live is the city's answer and not the
+/// sender's. Unlike the three documents that govern a city, these have
+/// a second writer — a resident reaches `Roadmap.md` through `plan` and
+/// the others through `edit` — so a write to one of them is a write that
+/// can lose a race, and the caller says which text it started from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum SpineDocument {
+    /// The plan and the only source of progress in a building.
+    Roadmap,
+    /// The notepad: whatever needs recording and has no other home.
+    Memo,
+    /// What the next session needs and cannot get from the files.
+    Handoff,
+    /// What this project is and the decisions it holds.
+    Spec,
+}
+
 /// What a `Pursue` command does to a pursuit.
 ///
 /// `Clear` and `Pause` are different actions and both exist: pausing

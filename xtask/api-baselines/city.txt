@@ -101,10 +101,12 @@ pub const city::DESKTOP_SCOPE_FILE: &str
 pub const city::HANDOFF_FILE: &str
 pub const city::JOB_FILE: &str
 pub const city::MAYOR_FILE: &str
+pub const city::MEMO_FILE: &str
 pub const city::PREFERENCES_FILE: &str
 pub const city::ROADMAP_FILE: &str
 pub const city::RULES_FILE: &str
 pub const city::SCHEDULE_FILE: &str
+pub const city::SPEC_FILE: &str
 pub const city::WATCH_FILE: &str
 pub enum city::ArchiveKind
 pub enum city::BuildingTemplate

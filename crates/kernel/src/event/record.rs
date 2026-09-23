@@ -53,7 +53,7 @@ pub use adviser::{
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
-    autonomy_word,
+    SpineDocumentWritten, autonomy_word,
 };
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};

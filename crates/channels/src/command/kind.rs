@@ -3,24 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Everything a client may ask the city to do, and the two invariants
-//! that live in the type system rather than in a check.
-//!
-//! - `Command` is generic over the carrier of a secret. `WireCommand`
-//!   fixes that carrier to an uninhabited type, so a frame arriving from
-//!   a socket cannot be a `PutSecret` — not "is rejected", but has no
-//!   representation. Credentials are enrolled on the host machine, and
-//!   that constraint is held by construction.
-//! - Every state-changing Command owns an `IdemKey` field. There is no
-//!   constructor that omits it, so "double-clicking twice opens two
-//!   runs" is not reachable from this type.
-//!
-//! The enum is not `#[non_exhaustive]`: the wire version is the
-//! versioning mechanism, so the assembly layer must handle every variant
-//! and a new one fails to compile until somebody decides what it does.
-//! That is what keeps a button off the client until the city can answer
-//! the frame behind it.
-
 //! Command kinds: names, steps, the wire enum.
 
 use kernel::model::{Mode, Window};
@@ -32,7 +14,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
-use crate::command::step::{Carry, GovernedDocument, HaltScope, LoginStep, PursuitStep};
+use crate::command::step::{
+    Carry, GovernedDocument, HaltScope, LoginStep, PursuitStep, SpineDocument,
+};
 use crate::command::tuning::EndpointTuning;
 use crate::named_frames::named_frames;
 use crate::preference::PreferencePatch;
@@ -328,6 +312,21 @@ pub enum Command<Secret = Sealed<String>> {
     /// second writer to lose a race against.
     PutDocument {
         which: GovernedDocument,
+        body: String,
+        idem: IdemKey,
+    },
+    /// Writes one of a building's own spine documents.
+    ///
+    /// The body replaces the file whole. Unlike [`Command::PutDocument`]
+    /// these have a second writer - a resident reaches `Roadmap.md`
+    /// through `plan` and the others through `edit` - so `base` carries
+    /// the text the sender started from and a file that moved underneath
+    /// it is refused rather than overwritten. One guard for two writers,
+    /// and the same one `edit` holds resident-side.
+    PutSpine {
+        building: Address,
+        which: SpineDocument,
+        base: String,
         body: String,
         idem: IdemKey,
     },

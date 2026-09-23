@@ -32,6 +32,6 @@ pub use kind::{COMMAND_NAMES, Command};
 pub use no_secret::NoSecret;
 pub use shelf::Shelf;
 pub use step::PursuitStep;
-pub use step::{Carry, GovernedDocument, HaltScope, LoginStep};
+pub use step::{Carry, GovernedDocument, HaltScope, LoginStep, SpineDocument};
 pub use tuning::{BodyOverride, EndpointTuning, HeaderPair};
 pub use wire::WireCommand;
