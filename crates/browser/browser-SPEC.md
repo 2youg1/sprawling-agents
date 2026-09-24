@@ -302,7 +302,7 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 **仍然未定的一件事**：上界怎么在不拒的情况下生效。那次会话量到的 `imageSize` 行为是**原样忽略**（§19-3），所以今天超上界是一句拒绝。要不拒就只能在捕获前改 `devicePixelRatio`，而那要先把"页面可能因它重排"当作已知代价写下；另一个方向是先把区域量准（矩形臂已知，元素臂要页面报框），再据此算比例。两者的参数都写在 §19-3 那两条里。
 
 - **`-headless` 有开关没有问的人**：`LaunchPlan` 带这一位并逐字断言，但 `for_building` 恒传 `false`。这一位由哪一面提供尚未定：候选是楼的 `CONFIG.toml` 与派活帧的一个字段。
-- **引擎只看 `firefox` 这个名字**：`Engine::choose` 只认 Firefox 与 `chromedriver`，而能说这协议的 Gecko 不止一个名字，于是机器上已有的引擎可能对这座城隐形。这一条的参数是：名字表要不要变成一张有据可查的表（就像平台表那一族），而不是一个拼写。
+- **引擎的名字不止一个，而且已经是查表**：`host::firefox` 走的是 `doctor` 的 `gecko` 条目（`Need::OneOf(Group::BrowserEngine)`），家族表里有 firefox、zen、librewolf、waterfox、floorp、firefox-developer、firefox-nightly、tor-browser 八行，`SPRAWLING_BROWSER` 可压过其一；`Engine::choose` 的参数只是叫 `firefox`，取的是这条答案的路径——所以一个只有 fork、没有 Firefox 的机器是可起的。**仍未定的只是：某个具体 fork 是否接受本 crate 的启动参数与会话形态**，而那要在那个 fork 上真的起一次会话才算数。
 
 ### 19-8 `browser::input`（新模块，形状 1 判定）
 
