@@ -42,7 +42,7 @@ fn a_screenshot_asked_for_with_nothing_is_a_png_of_the_whole_page() {
     let request = ShotRequest::read(&args(json!({ "action": "screenshot" }))).unwrap();
     assert_eq!(request, ShotRequest::default());
     let mut session = Session::new();
-    let frames = request.frames(&mut session, &context()).unwrap();
+    let frames = request.frames(&mut session, &context(), None).unwrap();
     assert_eq!(frames.len(), 1);
     assert_eq!(frames[0].method(), "browsingContext.captureScreenshot");
     let wire = frames[0].to_wire();
@@ -59,7 +59,7 @@ fn the_two_fractions_the_protocol_wants_are_written_out_of_integers() {
     })))
     .unwrap();
     let mut session = Session::new();
-    let frames = request.frames(&mut session, &context()).unwrap();
+    let frames = request.frames(&mut session, &context(), None).unwrap();
     assert_eq!(
         frames.len(),
         2,
@@ -77,13 +77,79 @@ fn a_clip_travels_whole_or_is_refused() {
     })))
     .unwrap();
     let mut session = Session::new();
-    let frames = whole.frames(&mut session, &context()).unwrap();
+    let frames = whole.frames(&mut session, &context(), None).unwrap();
     let wire = frames[0].to_wire();
     assert!(wire.contains("\"height\":480"), "{wire}");
     let err =
         ShotRequest::read(&args(json!({ "clip": { "x": 0, "y": 0, "width": 640 } }))).unwrap_err();
     assert_eq!(err.code(), &AxCode::InvalidArgs);
     assert!(err.subject().contains("height"));
+}
+
+#[test]
+fn every_capture_states_the_cap_and_the_reply_is_judged_against_it() {
+    let request = ShotRequest::read(&args(json!({ "action": "screenshot" }))).unwrap();
+    let mut session = Session::new();
+    let frames = request.frames(&mut session, &context(), None).unwrap();
+    let wire = frames[0].to_wire();
+    assert!(wire.contains("\"imageSize\""), "{wire}");
+    assert!(wire.contains("1920"), "{wire}");
+    assert!(SHOT_MAX_EDGE_PX.admit(1920, 1080).is_ok());
+    let err = SHOT_MAX_EDGE_PX.admit(1921, 1080).unwrap_err();
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+    assert!(err.recovery().contains("1920"), "{}", err.recovery());
+}
+
+#[test]
+fn a_reference_covers_an_element_the_page_reports() {
+    let request = ShotRequest::read(&args(json!({ "ref": "e12", "generation": 3 }))).unwrap();
+    assert!(request.resolves_element());
+    let mut session = Session::new();
+    let err = request.frames(&mut session, &context(), None).unwrap_err();
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+    assert!(err.recovery().contains("snapshot"));
+    let frame = request
+        .capture_frame(
+            &mut session,
+            &context(),
+            &json!({ "result": { "type": "node", "sharedId": "n1" } }),
+        )
+        .unwrap();
+    let wire = frame.to_wire();
+    assert_eq!(frame.method(), "browsingContext.captureScreenshot");
+    assert!(wire.contains("\"type\":\"element\""), "{wire}");
+    assert!(wire.contains("\"sharedId\":\"n1\""), "{wire}");
+    assert!(wire.contains("\"imageSize\""), "{wire}");
+}
+
+#[test]
+fn a_rectangle_has_nothing_to_resolve_and_says_so() {
+    let request = ShotRequest::read(&args(json!({
+        "clip": { "x": 0, "y": 0, "width": 10, "height": 10 },
+    })))
+    .unwrap();
+    assert!(!request.resolves_element());
+    let mut session = Session::new();
+    let err = request
+        .capture_frame(&mut session, &context(), &json!({}))
+        .unwrap_err();
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+}
+
+#[test]
+fn a_shot_covers_one_region_and_naming_two_is_refused() {
+    let err = ShotRequest::read(&args(json!({
+        "clip": { "x": 0, "y": 0, "width": 10, "height": 10 },
+        "ref": "e12",
+        "generation": 1,
+    })))
+    .unwrap_err();
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+    let err = ShotRequest::read(&args(json!({ "ref": "e12" }))).unwrap_err();
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+    assert!(err.subject().contains("generation"), "{}", err.subject());
+    let err = ShotRequest::read(&args(json!({ "ref": 7 }))).unwrap_err();
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
 }
 
 #[test]

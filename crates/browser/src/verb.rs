@@ -267,7 +267,7 @@ impl Verb {
                     )?])
                 }
             },
-            Verb::Screenshot(request) => request.frames(session, context),
+            Verb::Screenshot(request) => request.frames(session, context, snapshot),
             Verb::Measure { references } => Ok(vec![session.evaluate(
                 context,
                 &measure_script(looked_at(snapshot, "measure a page")?, references)?,
@@ -293,7 +293,7 @@ impl Verb {
     }
 }
 
-fn looked_at<'a>(
+pub(crate) fn looked_at<'a>(
     snapshot: Option<&'a PageSnapshot>,
     doing: &'static str,
 ) -> Result<&'a PageSnapshot, AxError> {

@@ -96,6 +96,84 @@ fn tool(cas_at: &std::path::Path) -> BrowserTool {
     BrowserTool::new(Role::Building, Box::new(recorded()), cas).expect("the tool builds")
 }
 
+fn tool_with(cas_at: &std::path::Path, port: Recording) -> BrowserTool {
+    let cas = Cas::open(cas_at).expect("a cas opens in a fresh directory");
+    BrowserTool::new(Role::Building, Box::new(port), cas).expect("the tool builds")
+}
+
+/// The conversation a screenshot by reference has: the page names the
+/// element, and the capture that follows covers it.
+fn recorded_by_reference() -> Recording {
+    let mut mirror = Session::new();
+    let context = ContextId::parse("c1").expect("a literal id");
+    let mut recording = Recording::new();
+    let begin = mirror
+        .begin(SessionRequest::default())
+        .expect("a session begins");
+    recording.answer(&begin, json!({ "sessionId": "s1" }));
+    let tree = mirror.tree().expect("the tree is asked for");
+    recording.answer(&tree, json!({ "contexts": [{ "context": "c1" }] }));
+    let page = json!([{ "role": "button", "name": "Place order" }]);
+    let mut answer = |verb: Value, snapshot: Option<&PageSnapshot>, results: Vec<Value>| {
+        let frames = Verb::read(&args(verb))
+            .expect("the verb reads")
+            .frames(&mut mirror, &context, snapshot)
+            .expect("the frames build");
+        for (frame, result) in frames.iter().zip(results) {
+            recording.answer(frame, result);
+        }
+    };
+    answer(
+        json!({ "action": "snapshot" }),
+        None,
+        vec![string_result(&page.to_string())],
+    );
+    let looked = PageSnapshot::read(1, &page).expect("the tree reads");
+    let asked = json!({ "action": "screenshot", "ref": "e1", "generation": 1 });
+    answer(
+        asked.clone(),
+        Some(&looked),
+        vec![json!({ "result": { "type": "node", "sharedId": "n1", "value": { "nodeType": 1 } } })],
+    );
+    // The capture frame is built from the resolve reply, so it is recorded
+    // against that same reply.
+    let Verb::Screenshot(request) = Verb::read(&args(asked)).expect("a shot reads") else {
+        panic!("a screenshot verb");
+    };
+    let capture = request
+        .capture_frame(
+            &mut mirror,
+            &context,
+            &json!({ "result": { "type": "node", "sharedId": "n1" } }),
+        )
+        .expect("the capture builds");
+    recording.answer(&capture, json!({ "data": ONE_RED_PIXEL }));
+    recording
+}
+
+#[test]
+fn a_screenshot_by_reference_covers_the_element_the_page_named() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let mut tool = tool_with(&dir.path().join("cas"), recorded_by_reference());
+    tool.invoke(&call(json!({ "action": "snapshot" })))
+        .expect("the page is looked at");
+    let shot = tool
+        .invoke(&call(
+            json!({ "action": "screenshot", "ref": "e1", "generation": 1 }),
+        ))
+        .expect("the element is photographed");
+    let result = text(&shot);
+    assert!(
+        result.contains("cas:b3-"),
+        "a clipped shot becomes evidence too: {result}"
+    );
+    assert_eq!(shot.attachments.len(), 1);
+    assert_eq!(
+        (shot.attachments[0].width, shot.attachments[0].height),
+        (1, 1)
+    );
+}
+
 fn text(outcome: &ToolOutcome) -> String {
     serde_json::to_string(&outcome.result).expect("a payload serialises")
 }

@@ -30,6 +30,6 @@ pub use input::{Origin as ResolvedOrigin, shared_id_of};
 pub use port::{BrowserPort, Frame, Reply};
 pub use profile::{PROFILES_DIR, Profile};
 pub use session::{ContextId, Recording, Session, SessionRequest};
-pub use shot::{Clip, Shot, ShotRequest};
+pub use shot::{Clip, Element, Rect, SHOT_MAX_EDGE_PX, Shot, ShotMaxEdge, ShotRequest};
 pub use snapshot::{Node, PageSnapshot};
 pub use verb::{Verb, complained, read_json};

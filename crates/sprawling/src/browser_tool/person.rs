@@ -114,10 +114,11 @@ pub(super) fn user_browser_params() -> Result<Payload, AxError> {
             "description": "for measure: the references to measure",
         },
         "text": text("for type: what to type"),
+        "ref": text("for screenshot: the region to cover, as a reference from the snapshot; the page reports that element's box, so nothing is guessed"),
         "generation": {
             "type": "integer",
             "minimum": 0,
-            "description": "for act: the snapshot the action was decided against",
+            "description": "for act, or for screenshot with `ref`: the snapshot the decision was made against",
         },
         "to": point("for drag: where the drag ends; for scroll: how far it moves, in CSS pixels"),
         "point": point("for drag: a viewport point to start from, when no ref does"),

@@ -2,6 +2,7 @@ impl browser::Action
 impl browser::Box2
 impl browser::BrowserPort for browser::Recording
 impl browser::BrowserPort for browser::Recording
+impl browser::Clip
 impl browser::ContextId
 impl browser::DevLoop
 impl browser::Difference
@@ -12,6 +13,7 @@ impl browser::Recording
 impl browser::Reply
 impl browser::Session
 impl browser::Shot
+impl browser::ShotMaxEdge
 impl browser::ShotRequest
 impl browser::Verb
 impl browser::survey::Cut
@@ -45,10 +47,8 @@ pub browser::Box2::height: u32
 pub browser::Box2::width: u32
 pub browser::Box2::x: u32
 pub browser::Box2::y: u32
-pub browser::Clip::height: u32
-pub browser::Clip::width: u32
-pub browser::Clip::x: u32
-pub browser::Clip::y: u32
+pub browser::Clip::Element(browser::Element)
+pub browser::Clip::Rect(browser::Rect)
 pub browser::Node::name: alloc::string::String
 pub browser::Node::reference: alloc::string::String
 pub browser::Node::role: alloc::string::String
@@ -58,6 +58,10 @@ pub browser::Origin::Point(browser::Point)
 pub browser::Origin::Reference(alloc::string::String)
 pub browser::Point::x: i64
 pub browser::Point::y: i64
+pub browser::Rect::height: u32
+pub browser::Rect::width: u32
+pub browser::Rect::x: u32
+pub browser::Rect::y: u32
 pub browser::Reply::Error
 pub browser::Reply::Error::code: alloc::string::String
 pub browser::Reply::Error::id: u64
@@ -187,6 +191,7 @@ pub browser::survey::probe::Read::sink: alloc::string::String
 pub const browser::LOOKS_MAX: u32
 pub const browser::PROFILES_DIR: &str
 pub const browser::QUIET_LOOKS: u32
+pub const browser::SHOT_MAX_EDGE_PX: browser::ShotMaxEdge
 pub const browser::STEPS_MAX: u32
 pub const browser::survey::DRAWN_IN: [&str; 3]
 pub const browser::survey::ENOUGH: usize
@@ -194,6 +199,7 @@ pub const browser::survey::Group::IN_ORDER: [browser::survey::Group; 5]
 pub const browser::survey::probe::BETWEEN: &str
 pub const browser::survey::probe::SETTLE_MS: u32
 pub enum browser::Action
+pub enum browser::Clip
 pub enum browser::Origin
 pub enum browser::Reply
 pub enum browser::ResolvedOrigin
@@ -215,6 +221,8 @@ pub fn browser::Action::reference(&self) -> core::option::Option<&str>
 pub fn browser::Action::resolves_element(&self) -> bool
 pub fn browser::Box2::covers(&self, u32, u32) -> bool
 pub fn browser::BrowserPort::send(&mut self, &browser::Frame) -> core::result::Result<browser::Reply, kernel::error::shape::AxError>
+pub fn browser::Clip::of(core::option::Option<browser::Rect>, core::option::Option<browser::Element>) -> core::result::Result<core::option::Option<browser::Clip>, kernel::error::shape::AxError>
+pub fn browser::Clip::resolves_element(&self) -> bool
 pub fn browser::ContextId::as_str(&self) -> &str
 pub fn browser::ContextId::parse(&str) -> core::result::Result<browser::ContextId, kernel::error::shape::AxError>
 pub fn browser::DevLoop::looks(&self) -> u32
@@ -255,9 +263,12 @@ pub fn browser::Shot::height(&self) -> u32
 pub fn browser::Shot::media(&self) -> kernel::model::image::ImageType
 pub fn browser::Shot::read(&serde_json::value::Value, kernel::model::image::ImageType) -> core::result::Result<browser::Shot, kernel::error::shape::AxError>
 pub fn browser::Shot::width(&self) -> u32
+pub fn browser::ShotMaxEdge::admit(self, u32, u32) -> core::result::Result<(), kernel::error::shape::AxError>
+pub fn browser::ShotRequest::capture_frame(&self, &mut browser::Session, &browser::ContextId, &serde_json::value::Value) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
 pub fn browser::ShotRequest::default() -> browser::ShotRequest
 pub fn browser::ShotRequest::format(&self) -> kernel::model::image::ImageType
 pub fn browser::ShotRequest::read(&kernel::event::payload::Payload) -> core::result::Result<browser::ShotRequest, kernel::error::shape::AxError>
+pub fn browser::ShotRequest::resolves_element(&self) -> bool
 pub fn browser::Verb::destination(&self) -> core::result::Result<core::option::Option<alloc::string::String>, kernel::error::shape::AxError>
 pub fn browser::Verb::frames(&self, &mut browser::Session, &browser::ContextId, core::option::Option<&browser::PageSnapshot>) -> core::result::Result<alloc::vec::Vec<browser::Frame>, kernel::error::shape::AxError>
 pub fn browser::Verb::input_frame(&self, &mut browser::Session, &browser::ContextId, core::option::Option<browser::ResolvedOrigin>) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
@@ -304,10 +315,10 @@ pub mod browser
 pub mod browser::survey
 pub mod browser::survey::probe
 pub struct browser::Box2
-pub struct browser::Clip
 pub struct browser::ContextId(_)
 pub struct browser::DevLoop
 pub struct browser::Difference
+pub struct browser::Element
 pub struct browser::Frame
 pub struct browser::Node
 pub struct browser::Observation
@@ -315,9 +326,11 @@ pub struct browser::PageSnapshot
 pub struct browser::Point
 pub struct browser::Profile
 pub struct browser::Recording
+pub struct browser::Rect
 pub struct browser::Session
 pub struct browser::SessionRequest
 pub struct browser::Shot
+pub struct browser::ShotMaxEdge(_)
 pub struct browser::ShotRequest
 pub struct browser::survey::Cohort
 pub struct browser::survey::Declared

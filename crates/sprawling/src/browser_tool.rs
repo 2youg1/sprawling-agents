@@ -12,8 +12,8 @@
 //! stay in the pure crate and the bytes stay here.
 
 use browser::{
-    BrowserPort, ContextId, DevLoop, Observation, PageSnapshot, ResolvedOrigin, Session,
-    SessionRequest, Shot, Verb,
+    BrowserPort, ContextId, DevLoop, Observation, PageSnapshot, ResolvedOrigin, SHOT_MAX_EDGE_PX,
+    Session, SessionRequest, Shot, Verb,
 };
 use kernel::{
     AxCode, AxError, CostTier, Effect, GateSubject, ImageRef, ImageType, Locator, Payload,
@@ -161,6 +161,16 @@ impl Tool for BrowserTool {
         {
             let origin = ResolvedOrigin::Element(browser::shared_id_of(&last)?);
             let frame = verb.input_frame(&mut self.session, &context, Some(origin))?;
+            last = self.port.send(&frame)?.into_result()?;
+        }
+        // A shot by reference is the same two frames: the page names the
+        // element, and the capture then covers it. The handle is read out
+        // of the reply by the request itself, so nothing else can crop to
+        // an element the page never named.
+        if let Verb::Screenshot(request) = &verb
+            && request.resolves_element()
+        {
+            let frame = request.capture_frame(&mut self.session, &context, &last)?;
             last = self.port.send(&frame)?.into_result()?;
         }
         self.answer(&verb, &last)
@@ -347,6 +357,7 @@ impl BrowserTool {
     /// that will not take the bytes.
     fn stored(&mut self, result: &Value, media: ImageType) -> Result<ToolOutcome, AxError> {
         let shot = Shot::read(result, media)?;
+        SHOT_MAX_EDGE_PX.admit(shot.width(), shot.height())?;
         let hash = self
             .cas
             .put(shot.bytes())
