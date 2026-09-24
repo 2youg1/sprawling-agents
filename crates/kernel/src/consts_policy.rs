@@ -233,9 +233,7 @@ mod tests {
 
     #[test]
     fn ratios_never_divide_by_zero() {
-        for ratio in [SECRET_ENTROPY_MIN] {
-            assert_ne!(ratio.den, 0);
-        }
+        assert_ne!(SECRET_ENTROPY_MIN.den, 0);
     }
 
     /// The default sits inside the domain the one construction point
