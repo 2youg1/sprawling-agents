@@ -9,7 +9,7 @@
 //! path with the socket swapped out — not a double of the tool.
 
 use super::*;
-use browser::{Recording, SessionRequest};
+use browser::{BrowserPort, Frame, Recording, Reply, SessionRequest};
 use serde_json::json;
 
 /// One red pixel, as a real PNG.
@@ -25,6 +25,38 @@ const ONE_RED_PIXEL: &str = concat!(
     "DwAEhQGAhKmMIQAA",
     "AABJRU5ErkJggg=="
 );
+
+/// A PNG whose header says 2000 by 1500, and nothing else.
+///
+/// Only the header is read — `Shot::read` takes the two sides from the
+/// bytes rather than from what anybody said they would be — so a picture
+/// past the cap costs forty-five bytes instead of three megabytes.
+const PAST_THE_CAP: &str = "iVBORw0KGgoAAAANSUhEUgAAB9AAAAXcCAYAAAB6ZRUrAAAAAElFTkSuQmCC";
+
+/// A port that answers by arrival rather than by what was asked.
+///
+/// The recording answers by the frame's own bytes, which is what makes a
+/// reordered conversation replay — and it cannot express the one thing
+/// the cap needs tested, because the second capture asks the same
+/// question as the first and must be answered differently.
+#[derive(Default)]
+struct Sequence {
+    answers: Vec<Value>,
+}
+
+impl BrowserPort for Sequence {
+    fn send(&mut self, frame: &Frame) -> Result<Reply, AxError> {
+        let result = match frame.method() {
+            "session.new" => json!({ "sessionId": "s1" }),
+            "browsingContext.getTree" => json!({ "contexts": [{ "context": "c1" }] }),
+            _ => self.answers.remove(0),
+        };
+        Ok(Reply::Success {
+            id: frame.id(),
+            result,
+        })
+    }
+}
 
 fn args(value: Value) -> Payload {
     Payload::new(value.as_object().cloned().unwrap_or_else(Map::new)).expect("no floats")
@@ -149,6 +181,98 @@ fn recorded_by_reference() -> Recording {
         .expect("the capture builds");
     recording.answer(&capture, json!({ "data": ONE_RED_PIXEL }));
     recording
+}
+
+/// The conversation a screenshot by reference set has: the page reports
+/// the boxes, and the capture that follows covers all of them.
+fn recorded_by_union() -> Recording {
+    let mut mirror = Session::new();
+    let context = ContextId::parse("c1").expect("a literal id");
+    let mut recording = Recording::new();
+    let begin = mirror
+        .begin(SessionRequest::default())
+        .expect("a session begins");
+    recording.answer(&begin, json!({ "sessionId": "s1" }));
+    let tree = mirror.tree().expect("the tree is asked for");
+    recording.answer(&tree, json!({ "contexts": [{ "context": "c1" }] }));
+    let page = json!([
+        { "role": "button", "name": "Place order" },
+        { "role": "textbox", "name": "Quantity" },
+    ]);
+    let mut answer = |verb: Value, snapshot: Option<&PageSnapshot>, results: Vec<Value>| {
+        let frames = Verb::read(&args(verb))
+            .expect("the verb reads")
+            .frames(&mut mirror, &context, snapshot)
+            .expect("the frames build");
+        for (frame, result) in frames.iter().zip(results) {
+            recording.answer(frame, result);
+        }
+    };
+    answer(
+        json!({ "action": "snapshot" }),
+        None,
+        vec![string_result(&page.to_string())],
+    );
+    let looked = PageSnapshot::read(1, &page).expect("the tree reads");
+    let boxes = json!([
+        { "ref": "e1", "x": 10, "y": 20, "width": 100, "height": 50 },
+        { "ref": "e2", "x": 150, "y": 5, "width": 40, "height": 200 },
+    ]);
+    let asked = json!({ "action": "screenshot", "refs": ["e1", "e2"], "generation": 1 });
+    answer(
+        asked.clone(),
+        Some(&looked),
+        vec![string_result(&boxes.to_string())],
+    );
+    let Verb::Screenshot(request) = Verb::read(&args(asked)).expect("a shot reads") else {
+        panic!("a screenshot verb");
+    };
+    let capture = request
+        .capture_frame(&mut mirror, &context, &string_result(&boxes.to_string()))
+        .expect("the capture builds");
+    recording.answer(&capture, json!({ "data": ONE_RED_PIXEL }));
+    recording
+}
+
+#[test]
+fn a_screenshot_past_the_cap_is_taken_again_and_the_smaller_one_kept() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let cas = Cas::open(&dir.path().join("cas")).expect("a cas opens in a fresh directory");
+    let port = Sequence {
+        answers: vec![
+            json!({ "data": PAST_THE_CAP }),
+            json!({}),
+            json!({ "data": ONE_RED_PIXEL }),
+        ],
+    };
+    let mut tool = BrowserTool::new(Role::Building, Box::new(port), cas).expect("the tool builds");
+    let shot = tool
+        .invoke(&call(json!({ "action": "screenshot" })))
+        .expect("the shot is taken again and kept");
+    assert_eq!(shot.attachments.len(), 1);
+    assert_eq!(
+        (shot.attachments[0].width, shot.attachments[0].height),
+        (1, 1)
+    );
+}
+
+#[test]
+fn a_screenshot_by_reference_set_covers_every_element_it_named() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let mut tool = tool_with(&dir.path().join("cas"), recorded_by_union());
+    tool.invoke(&call(json!({ "action": "snapshot" })))
+        .expect("the page is looked at");
+    let shot = tool
+        .invoke(&call(
+            json!({ "action": "screenshot", "refs": ["e1", "e2"], "generation": 1 }),
+        ))
+        .expect("the elements are photographed together");
+    let result = text(&shot);
+    assert!(
+        result.contains("cas:b3-"),
+        "a union shot becomes evidence too: {result}"
+    );
+    assert_eq!(shot.attachments.len(), 1);
 }
 
 #[test]

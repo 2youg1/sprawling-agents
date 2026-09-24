@@ -38,14 +38,7 @@ impl BrowserTool {
         request: &ShotRequest,
         result: &Value,
     ) -> Result<ToolOutcome, AxError> {
-        let mut shot = Shot::read(result, request.format())?;
-        if SHOT_MAX_EDGE_PX.exceeds(shot.width(), shot.height()) {
-            let longest = shot.width().max(shot.height());
-            let context = self.tab()?;
-            let frame = request.refit_frame(&mut self.session, &context, longest)?;
-            let reply = self.port.send(&frame)?.into_result()?;
-            shot = Shot::read(&reply, request.format())?;
-        }
+        let shot = Shot::read(result, request.format())?;
         SHOT_MAX_EDGE_PX.admit(shot.width(), shot.height())?;
         let hash = self
             .cas

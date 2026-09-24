@@ -12,8 +12,8 @@
 //! stay in the pure crate and the bytes stay here.
 
 use browser::{
-    BrowserPort, ContextId, DevLoop, Observation, PageSnapshot, ResolvedOrigin, Session,
-    SessionRequest, Verb,
+    BrowserPort, ContextId, DevLoop, Observation, PageSnapshot, ResolvedOrigin, SHOT_MAX_EDGE_PX,
+    Session, SessionRequest, Shot, Verb,
 };
 use kernel::{
     AxCode, AxError, CostTier, Effect, GateSubject, Payload, RenderIntent, Temporal, Tool,
@@ -153,6 +153,9 @@ impl Tool for BrowserTool {
         for frame in &frames {
             last = self.port.send(frame)?.into_result()?;
         }
+        // The frames that produced `last`, kept for the one case that has to
+        // ask the same thing twice: a picture past the cap.
+        let mut sent = frames;
         // A drag from a reference is two frames: the page names the
         // element, and the input frame then acts on it. The vocabulary
         // is `desktop.act`'s — a ref or a point, to a point — so the
@@ -173,6 +176,23 @@ impl Tool for BrowserTool {
         {
             let frame = request.capture_frame(&mut self.session, &context, &last)?;
             last = self.port.send(&frame)?.into_result()?;
+            sent.push(frame);
+        }
+        // A picture past the cap is asked for once more: the density that
+        // fits it is set, and then the same frames are replayed, because
+        // the capture itself is what has to come back smaller. The cost of
+        // touching the page's density is paid only here, where the
+        // alternative is refusing the shot.
+        if let Verb::Screenshot(request) = &verb {
+            let shot = Shot::read(&last, request.format())?;
+            if SHOT_MAX_EDGE_PX.exceeds(shot.width(), shot.height()) {
+                let longest = shot.width().max(shot.height());
+                let refit = request.refit_frame(&mut self.session, &context, longest)?;
+                self.port.send(&refit)?.into_result()?;
+                for again in &sent {
+                    last = self.port.send(again)?.into_result()?;
+                }
+            }
         }
         self.answer(&verb, &last)
     }
