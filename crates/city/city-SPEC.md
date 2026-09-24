@@ -119,9 +119,10 @@ impl RulesTool { pub fn new(city_root: &Path, building: Address) -> Result<Rules
 // meta.effect = Effect::Govern
 ```
 
-- **为什么不是 `edit`**：`RULES.toml` 住在楼的保留子树，没有任何写域到得了那里——这不是一个要绕过的障碍，它就是规则本身。故另开一道门（`Effect::Govern`），而那道门的守卫是人。
+- **每一次经工具台的调用都在效果层被拒，这是定规而不是漏接**：一个 run 不改写审判它自己的规则（§12.1 定规；kernel-SPEC §8-27 的 `Governance` 行）。`Effect::Govern` 无门、无审批、无 `ApprovalItem`：`runtime::bench::admit` 在 `invoke` 之前就把调用拒掉，拒绝以 tool result 回到模型而回合不终止（`runtime::turn::wave`「A tool Err is not a turn Err」那条）。规则要变只有人改文件这一条路——`RULES.toml` 的唯一写者是人，下一个 run 按改后的字节受审。
+- **两种拒词，一条定规**：本工具的 `subject` 今天取 trait 默认（`GateSubject::None`），调用因此落进「答出的主体与声明的效果不一致」那条拒；每个工具补上自己的 `subject` 解析（M-17）之后，拒词换成 `E_GATE_DENIED` 的「一个 run 不得改写审判它自己的规则」，恢复语指向人改的 `CONFIG.toml` 与 `RULES.toml`。两种拒都出自效果层，run 都到不了 `invoke`。
+- **为什么不是 `edit`**：`RULES.toml` 住在楼的保留子树，没有任何写域到得了那里——这不是一个要绕过的障碍，它就是规则本身。写面（`policy::write_rules`）因此只有本工具的 `invoke` 一个调用方，形状是整份提案、先求值后落盘（§8-2 末条）；run 到不了它，人改文件也不经它。
 - **楼是携入的而不是参数**：工具持调用方自己那栋楼的地址，于是一个 Run 无法靠填另一个名字去改别人的规则。
-- **人看得到自己在批什么**：`kernel::gate::govern` 把提案正文截前 600 字写进 `action_desc`。
 
 ### 8-3 city::building（形状 2 值类型＋一个实例化动作）
 
@@ -567,6 +568,17 @@ bin `RunWorker::dispatch` → `Identity::load(city_root, addr)` → `segment_byt
 `E_STORAGE_FATAL`（读不动一个存在的描述）：不可定义掉——文件系统权限是外部世界的事实，而静默降级是被明拒的替代。
 
 `E_INVALID_ARGS`（`[context] second_threshold` 域外）：不可定义掉——值是人写的输入，类型把「构造后非法」定义掉了，「构造时非法」必须留码；钳位是被明拒的替代。
+### 12.1 定规：一个 run 不改写审判它自己的规则
+
+`Verdict: user-approved`（kernel-SPEC §12.1 那条定规的城侧应用；六类升级的固定答案表见 kernel-SPEC §8-27）
+
+**决定**：`rules`／`city` 两件工具保留 `Effect::Govern`，而这个效果在效果层恒拒：run 提不出提案、等不到审批、写不了规则。规则要变只有人改文件这一条路——`RULES.toml` 的唯一写者是人；建楼走线上命令 `CreateBuilding`，收编走 CLI 的 `sprawling adopt`。
+
+**理由**：规则是审判一个 run 的尺子，而提案-审批形把改尺子的手留给被审判者、把「批准」放进一个 agent 循环——默认答案会被点过去的门等于没有门（kernel-SPEC §12.1 同一理由，此处第二次适用而不是第二个权威）。规则的正确位置是文件本身：diff、历史与回退都在版本库里，而一份获批的提案正文只在一次对话里活过一回。
+
+**被否**：govern 存在形——提案正文由 `kernel::gate::govern` 截一段写进 `action_desc` 供人过目，门问人、批后落盘。它与 `GateOutcome::Escalate` 在 kernel 侧同集删净（kernel-SPEC §12.1 的同集删净名单列着 `gate::govern`）；`rules_tool` 的 `op=propose` 只保留「整份文档、先求值后落盘」这个形状（§8-2b），通向它的判定是拒而不是问。
+
+**重开参数**：`attach` 是唯一会问人的门，理由是人的动作本身就是答案、没有可以点过去的默认（kernel-SPEC §8-27）。治理审批只有取得同样的性质——人在 run 之外对整份 diff 作答，且不存在「全批」的默认——才需要重新论证这一条；参数不动，定规不动。
 
 ## 13 依赖选型
 
@@ -754,10 +766,10 @@ impl CityTool { pub fn new(city_root: &Path) -> Result<CityTool, AxError>; }
 // list:   —— 无参，答本城的楼与每栋楼是否已有 RULES.toml
 ```
 
-- **`Effect::Govern`，不是 `Effect::Write`**：立一栋楼是在城根下造目录，任何写域都够不到那里，理由与 `rules_tool` 同——这个决定是人的。门本身把它交给人，而不是靠写域的拒绝去兜。
+- **`Effect::Govern`，不是 `Effect::Write`**：立一栋楼是在城根下造目录，任何写域都够不到那里，理由与 `rules_tool` 同——这个决定是人的。判定与 §8-2b 同一条（此处第二次适用而不是第二个权威）：调用在效果层被拒，run 里的 `raise`／`adopt` 到不了盘。
 - **三个动作一条目录行**：`list` 是 `raise` 与 `adopt` 的前提（叫什么名字、哪个目录已经在那儿），拆成第二个工具只会多一行给模型读。
 - **动作不认即拒并报出已知集**：猜错这里意味着把「收编一个已有目录」执行成「新建一栋空楼」，而后者会在人的工作目录旁边多出一份不属于它的模板。
-- **本工具只装给市政厅的居民**（见 8-22）。别的楼要新增一栋楼，走人的控制面。
+- **本工具只装给市政厅的居民**（见 8-22），但装上不改变判定——每一次调用都在效果层被拒（§8-2b）。建楼与收编恒走人的手：线上命令 `CreateBuilding`，或 CLI 的 `sprawling adopt <city> <addr>`（§8-3），无论哪个地址在问。
 
 ### 8-24 Handoff 从楼搬到房间
 

@@ -9,9 +9,10 @@
 //! **Why this is not `edit`.** `RULES.toml` lives in the building's
 //! reserved subtree, and no write domain reaches there — which is not an
 //! oversight to work around but the rule itself: a run may not quietly
-//! widen what it is allowed to do. The way through is a door of its own,
-//! `Effect::Govern`, which always asks the person and shows them the
-//! proposal.
+//! widen what it is allowed to do. The declaration is `Effect::Govern`,
+//! and that effect is refused at the effect layer (city-SPEC section
+//! 8-2b): a run may not change what governs it, so every call comes
+//! back as a refusal and a person edits the file.
 //!
 //! **Whole document, not a patch.** These rules are evaluated as one
 //! text — a confidential building may list no egress domains, so two
@@ -76,8 +77,8 @@ impl RulesTool {
             meta: ToolMeta {
                 name: ToolName::parse("rules")?,
                 disclosure: format!(
-                    "Read this building's {RULES_FILE}, or propose the whole of a new one. \
-                     A proposal is evaluated first and goes to the person before it is written."
+                    "What this building's runs are judged by. No run may change it: every \
+                     call here is refused, and a person edits the {RULES_FILE}."
                 ),
                 params: Payload::new(params)?,
                 effect: Effect::Govern,

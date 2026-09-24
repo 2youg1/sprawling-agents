@@ -216,8 +216,8 @@ fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
 }
 
 /// A run does not change what governs it. The rules tool answers the
-/// model with a refusal naming the file a person edits, and the
-/// building it was asked about stands exactly as it did.
+/// model with a refusal rather than a rewrite, and the building it was
+/// asked about stands exactly as it did.
 #[test]
 fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
     let dir = tempfile::tempdir().unwrap();

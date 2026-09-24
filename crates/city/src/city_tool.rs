@@ -15,11 +15,14 @@
 //! **`Effect::Govern`, not `Effect::Write`.** A building is a top-level
 //! directory of the city, and no write domain reaches there. That is
 //! not an obstacle to route around: the shape of the city is the
-//! person's decision, so the call goes through the door that always
-//! asks them, exactly as `crate::rules_tool` does.
+//! person's decision, and `Effect::Govern` is refused at the effect
+//! layer (city-SPEC section 8-2b) exactly as `crate::rules_tool` is —
+//! a run raises nothing; a person does, outside a run.
 //!
 //! Only City Hall's residents are given this tool
-//! ([`crate::vocation`]). Every other building asks a person.
+//! ([`crate::vocation`]); whatever the address asking, a building is
+//! raised through the `CreateBuilding` command and adopted through the
+//! `sprawling adopt` CLI (city-SPEC section 8-3).
 
 use std::path::{Path, PathBuf};
 
@@ -83,9 +86,10 @@ impl CityTool {
             city_root: city_root.to_path_buf(),
             meta: ToolMeta {
                 name: ToolName::parse("city")?,
-                disclosure: "List this city's buildings, raise a new one, or adopt a \
-                             directory that is already here. Raising and adopting go to \
-                             the person before anything is laid out."
+                disclosure: "This city's buildings: list them, raise a new one, or adopt a \
+                             directory that is already here. Every call here is refused — \
+                             the shape of the city is the person's decision, taken outside \
+                             a run."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Govern,

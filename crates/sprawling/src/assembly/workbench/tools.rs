@@ -87,9 +87,10 @@ impl RunWorker {
         let pr_tool = collab::PrTool::new(addr.clone(), std::sync::Arc::clone(&desks.pr))?;
         let claim_tool = collab::ClaimTool::new(std::sync::Arc::clone(&desks.plan))?;
         let archive_tool = collab::ArchiveTool::new(std::sync::Arc::clone(&desks.shelf))?;
-        // The one door into the building's own governance. It reaches
-        // the reserved subtree, which no write domain does, so it goes
-        // through the person rather than through the write gate.
+        // The refusal face of the building's own governance. It reaches
+        // for the reserved subtree, which no write domain does, and
+        // `Effect::Govern` is refused at the effect layer: a run does
+        // not change what governs it (city-SPEC section 8-2b).
         let rules_tool = city::RulesTool::new(&self.city_root, site.building.addr().clone())?;
         // The one door onto the rest of the city. It is registered
         // beside `signal` rather than behind it because the two answer
