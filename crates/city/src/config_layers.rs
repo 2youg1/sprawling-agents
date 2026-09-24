@@ -38,8 +38,8 @@ mod write;
 pub use ladder::Layer;
 pub(crate) use session::forget as forget_session;
 pub use session::{own_layer, write_session};
-pub(crate) use shelves::SHELVES_KEY;
 pub use settled::{settled_effort, settled_second};
+pub(crate) use shelves::SHELVES_KEY;
 pub use shelves::city_shelves;
 pub use write::{write_effort, write_mcp, write_sandbox, write_second_threshold};
 

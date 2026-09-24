@@ -171,7 +171,7 @@ fn the_breakpoint_marker_changes_no_recorded_byte() {
         serde_json::to_vec(&plain).unwrap()
     );
     assert_eq!(
-        shape(&[plain.clone()]),
+        shape(std::slice::from_ref(&plain)),
         shape(&[anchored]),
         "and outside the shape a cache compares"
     );
