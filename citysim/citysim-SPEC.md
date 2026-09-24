@@ -32,6 +32,22 @@ citysim 不受 ARCHITECTURE §6 模块表约束（表只辖 crates/**），但 M
 
 **仍未落盘（跨文件，见交付报告）**：`justfile` 的 `sim seed=""` 接一个它不使用的参数；`ARCHITECTURE.md` 三处、`citysim/tests/sieve.rs` 与 `citysim/tests/scenario.rs` 各一处仍写着种子。
 
+### 3-2 决定：计时边界取「动作的可观察端点」，进程动作以退出为端点
+
+四动作里两个跨进程（安装的落位确认、启动）：端点是被拉起进程**退出被观察到**，因为「可接受命令」在产品外部可观察的最短证据就是一条轻命令被应答完毕。落盘动作（建城、开 session）以公面调用**返回**为端点，因为返回即账本已带自身屏障落盘（落账先于效果）。被击败的备选：以进程内部时点（参数解析完成、监听就绪）为端点——那要在产品里插桩，改写被测路径（fx 报告「不抄」第五条：测量专用分支守着一条不发货的路径）。
+
+### 3-3 决定：安装边界含归档摘要校验、不含 PATH 写入
+
+摘要校验（sha256）是 `install.sh`／`install.ps1` 从归档就位到解包之间必经的一步，删掉它测的就是不验签的安装——红线「验签不删」在测量口径里同样成立，故计为安装的子步并单列读数。验签哈希（T1 签名验签）另记 **0**：T1 尚 stub，签名验签今日不存在，记 0 并注明，T1 落地后此子步只增不删。PATH 写入（`sprawling install` 的注册表写与桌面广播）在边界外：它是一次性的桌面状态写入，第二次运行幂等（`PathEdit::AlreadyPresent`），计进每样本会把桌面状态写入误报成安装成本。被击败的备选：整段 `install.sh` 全测——含网络下载与 shell 启动，网络不计是 T14 既定口径。
+
+### 3-4 决定：计量主语是 Rust measuring Main，不是 adversary/ 也不是 criterion
+
+四动作零行为断言，只计时；`adversary/` 量化行为轨迹，Lean 侧不为墙钟定价。criterion 是第二套仪表（T13「不另造第二套仪表」）：本族挂 `just bench` 族，同一 wall-clock 口径（测而不门）。它拉起产品二进制——被测动作本身即进程边界（口径点名「进程拉起到可接受命令」）；boundary 门判的是**检查**站哪一侧，其越过面 token（`CARGO_BIN_EXE`／`SPRAWLING_BIN` 等）本族一个不写，被测二进制取自构建档目录（`cargo build` 同时放置两个产物的地方），`just bench-startup` 先构建后测量，故不接手工路径也不会测到旧产物。被击败的备选：把四动作写进 `adversary/`——那里没有秒表也没有本仓词汇，量出来的东西无法与 `just bench` 对表。
+
+### 3-5 决定：被测可执行文件的名字在本 crate 只重述一处，注释点名它的权威
+
+`executable_name()` 拼的是 `install.rs` 装出来的那个名字：`INSTALLED_STEM` 加本平台后缀。该事实的权威是 `xtask/src/platform.rs` 每平台的 `binary` 字段，`cargo xtask artifact` 把发行侧的四种拼法（工作流矩阵、两个安装脚本、npm shim）钉在它上面；citysim 这一处不在那四种之内，它是唯一需要这个名字的**测量**读者。够不到权威的原因是位置而非取舍：`install` 模块住在 `crates/sprawling/src/main.rs`，二进制的模块不可 import，而 `xtask` 是工具不是依赖。本 crate 内只留这一处拼写——`shipped_binary` 找的路径名与 `archive_of` 写出的 zip 成员名都读它。**重开参数**：这个名字若移进 `sprawling` lib 成为公共面，本函数改为读它，重述随之删除。
+
 ## 4 现状分析
 
 空壳 lib。无性能议题。
@@ -128,6 +144,53 @@ let key = IdemKey::derive(&run, Seq::new(at), &call.action()?);   // 动作字�
 **红**：`two_reads_in_one_wave_are_two_calls`——一个回合携两次同名、参数不同的调用，断言两条 `tool_result` 都带结果、都不带 `error`。
 
 **不变的东西**：`IdemKey` 不进任何 payload，故账本字节不变，`golden-p0`（由 `run_scenario` 现跑重生）不需重生——这是带原型跑完全套验过的，不是读一个 payload 推的。
+
+### 8-5 bench_startup 族：四动作压档的测量面（只实测，不优化）
+
+四动作各给三件套（能否进 p99≤1ms／极限读数／主导成本件），优化另波。本族是 `just bench` 的同族仪表：同一 citysim bin 面、同一 wall-clock 口径（测而不门，读数标注机器类属）。四行读数落在 `xtask/budgets.toml` 的 `[install]`／`[startup]`／`[raise_city]`／`[open_session]`，无预算键故不门；机器类属、样本数与四个动作的子指标数字都写在行内，本 SPEC 不重抄它们。
+
+```rust
+// citysim/src/bin/bench_startup.rs —— measuring Main：本族唯一计时采样点（`stamp()`，同 bin::bench 先例）；`SAMPLES` 是每动作次数的唯一之家，循环、预分配与报告同读它
+// citysim/src/bin/bench_startup/samples.rs —— shape: decision（时间以 Duration 入参；无时钟、无 I/O）
+pub struct Samples { /* 一次构造点持有 ≥1 个 Duration；invalid state 不可拼写 */ }
+pub enum Share { P50, P95, P99 }
+pub enum SampleKind { Plain, Suspicious }   // > 3 × p50 标可疑：Defender 实时扫描等外扰的标注位
+pub enum Tier { Within, Outside }           // 第二档：p99 ≤ 1 ms
+impl Samples {
+    pub fn of(head: Duration, tail: Vec<Duration>) -> Samples;
+    pub fn p(&self, Share) -> Duration;     // nearest-rank
+    pub fn floor(&self) -> Duration;  pub fn peak(&self) -> Duration;
+    pub fn kind_at(&self, usize) -> SampleKind;
+    pub fn suspicious(&self) -> usize;
+    pub fn tier(&self) -> Tier;
+}
+// citysim/src/bin/bench_startup/actions.rs —— shape: adapter（薄驱动产品公面，口径即边界；两处跨进程动作走的都是产品自己的路径）
+pub const SAMPLES: usize;
+pub struct PerSample { pub processes: u64, pub files: u64, pub barriers: u64 }
+pub struct Action { pub total: Samples, pub steps: Vec<(&'static str, Samples)>, pub per_sample: PerSample }
+pub fn install(scratch: &Path, archive_path: &Path) -> Result<Action, AxError>;
+pub fn startup(binary: &Path) -> Result<Action, AxError>;
+pub fn raise_city(scratch: &Path) -> Result<Action, AxError>;
+pub fn open_session(city: &Path) -> Result<Action, AxError>;
+pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str>;
+// citysim/src/bin/bench_startup/actions/archive.rs —— shape: adapter（发行档的格式读写都在这里：摘要、解包、写出 fixture 条目；`sha2`／`zip` 各在 workspace 清单里一个名字，打包步与本次读数不会对它们生出第二种拼法）
+// citysim/src/bin/bench_startup/actions/footprint.rs —— shape: adapter（一次 walk 供所有读者：一个样本在一棵树下写了多少文件、多少账行、某个名字在哪、以及样本之间如何把目录清平）
+```
+
+**四个计时边界**（起止、子步、决定见 §3-2／§3-3）。样本 200／动作（≥100）；p50/p95/p99 取 nearest-rank；读数全样本给出（基线永不减除），可疑样本只标注不剔除。
+
+| 动作 | 起点 | 终点 | 子步 |
+|---|---|---|---|
+| ① install | 归档已就位（zip 在 scratch，网络不计） | 解出的可执行文件拉起 `version` 应答并退出 | 归档摘要校验（sha256）｜解包写可执行文件｜落位确认（进程创建＋运行到退出） |
+| ② startup | `CreateProcess` 发出 | 轻命令 `version` 退出被观察到 | 进程创建（spawn 返回）｜程序运行（返回→退出） |
+| ③ raise_city | `assembly::init_city` 调用发出 | 调用返回（创世记录落盘，每条账各带自己的屏障） | 无子步切分（不插桩产品）；主导件由计数×地板归因 |
+| ④ open_session | `RunWorker::handle(Command::OpenSession)` 发出 | 调用返回（`session_opened` 已落账，房内下一 run 可开工即可接输入） | 同上 |
+
+**子指标拆分（各自计数，先行）**：进程创建（①1／样、②1／样、③0、④0，时间取子步）；文件创建（`PerSample.files`：①＝解包写出的文件数，③＝创世城市树的文件数，④＝首样本前后 city 文件数之差；②自身不落盘，记 0 而不是把它被指向的那棵树算进来）与耐久屏障（`PerSample.barriers`，一账一屏障，地板引用 `just bench` 的 `durability_barrier` 行，不另起第二仪表）；验签哈希＝0（T1 尚 stub，记 0 并注明，见 §3-3）；Defender 实时扫描干扰＝可疑样本数与下标（`SampleKind`），①③ 每样本全新首触（必扫），② 复用同一映像（首样本后转热）。
+
+**失败**：产品公面的失败原样抛 `AxError`，不新增码；测量自体的失败（被测二进制不在构建档目录等）用既有码走三段式（动作/主体/`AxCode`/recovery）。
+
+**红**：`samples.rs` 的 nearest-rank 分位、可疑标注、第二档判定三个测试先行，跑一次见红再实现。`footprint` 三条（计数只数文件不数目录、按名找文件不论深度且不认目录、账行按行数而非按文件数）与 `actions` 一条（主导子步取中位最大者，无子步切分答 `None`）守的是**读数本身**：数错一个文件或指错一个主导件，报告就在说假话。
 
 ## 8.5 两个设计
 

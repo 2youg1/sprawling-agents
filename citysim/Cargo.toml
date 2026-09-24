@@ -14,6 +14,11 @@ eval = { path = "../crates/eval" }
 channels = { path = "../crates/channels" }
 sprawling = { path = "../crates/sprawling" }
 serde_json.workspace = true
+# The install action prices the release archive's digest and its unpack
+# (citysim-SPEC.md 8-5): sha2 is the digest the release publishes, zip
+# is the archive format `cargo xtask package` writes.
+sha2.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

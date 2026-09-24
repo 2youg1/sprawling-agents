@@ -29,7 +29,7 @@ zeroize.workspace = true
 # RFC 7636 mandates SHA-256 for the S256 challenge: an external protocol
 # fact, not a second internal hash authority (blake3 stays sole for
 # content addressing).
-sha2 = "0.11"
+sha2.workspace = true
 # The one base64 encoder both provider wires take pictures in, and the
 # encoding the encrypted vault file records a nonce and a ciphertext in.
 base64.workspace = true

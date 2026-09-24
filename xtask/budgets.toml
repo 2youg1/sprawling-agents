@@ -492,6 +492,59 @@ what = "one dispatch, from the command arriving to the lane taking the drive, on
 measured_by = "the instrument is two clock reads around `prepare_dispatch` (crates/sprawling/src/assembly/dispatching/running.rs) and two more around `RunWorker::mcp_tools` (crates/sprawling/src/assembly/workbench/servers.rs), written out at `Level::Trace` through the city's own clock - the same shape `assembly/credentials/probing.rs` uses to report `elapsed_ms`, which is why no new sampling point was sanctioned for it. Read it off `a_dispatch_says_what_it_spent_before_the_drive` (cargo nextest run -p sprawling --release -E 'test(a_dispatch_says_what_it_spent_before_the_drive)' --no-capture), or off any served city running at that floor"
 status = "measured, not gated: 58 ms median on windows-x86_64, 16 cores, NVMe (2026-09-21, release, four runs: 50, 50, 51, 66; ~70 ms unoptimized when idle), for a dispatch into a fresh city with **no MCP server declared** - so this figure is the floor, and the `mcp_tools` line beside it read 0 ms over 0 servers in every run. The two lines are reported apart because a resident connection table (K-05) removes only the second, and the reading is K-05's own verdict: at 0 ms the table saves nothing, so it stays unbuilt until a served building declares servers and the second line shows them dominating. Not gated - a wall-clock reading is the machine's, and this one also depends on how many MCP servers a building declares"
 
+# T14's four-action pressure reading (deepening plan section 3 T14): the
+# first path a person walks - install, start, raise a city, open a session
+# - priced at its own boundary. Each action owes three pieces: whether its
+# tail fits the second tier (p99 <= 1 ms), the limit reading, and the
+# dominant cost. Optimisation is a later wave; these are readings.
+#
+# **No action reaches the second tier.** The closest, `open_session`, is
+# seven times outside it at p99 and the furthest, `install`, is thirteen
+# thousand. For two of the four the machine's on-access scanner rather
+# than the product is what the boundary mostly prices, which is a fact
+# about this class of machine and the reason these rows are measured
+# rather than gated.
+#
+# **The spread between two runs is wider than anything these actions have
+# changed.** An earlier run of this same logic read `startup` at p50
+# 100.661 ms and `open_session` at p99 49.884, against 26.290 and 7.230
+# below. One reading of this family is one sample of a machine, and a
+# later reader comparing two of them compares two machines' worth of
+# scheduling as much as two revisions - so a row here records what was
+# seen, never what is promised.
+#
+# Every action reports a floor beside its middle. The floor is what the
+# action costs while the machine is quiet; the peak is what the machine's
+# other work cost the sample that met it. `suspicious` counts the samples
+# above three times the middle - flagged and never removed, because a
+# reading that hid its tail would describe a machine nobody has.
+#
+# `just bench-startup` is the only instrument. It builds the client
+# bundle and the release binary first, so the archive the install action
+# unpacks was built from the tree under test and no run is driven by a
+# stale artifact. T14's two red lines hold in every row below: the digest
+# stays inside the install boundary, and no fsync was removed to move a
+# number.
+[install]
+what = "the archive in place to the unpacked executable answering `version`: digest, unpack, launch"
+measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples, p50/p95/p99 nearest-rank over all of them"
+status = "measured, not gated: p50 2500.477 ms, p95 8143.716, p99 12877.433; floor 1440.964, peak 14654.704; 13 of 200 above three times the middle, at #38 #44 #58 #65 #66 #71 #72 #73 #74 #77 #78 #79 #80 (windows-x86_64, 16 cores, NVMe, 2026-09-24). Four orders of magnitude outside the second tier. **Dominant: `launch`**, 2330.106 ms of the 2500.477 ms middle, because the unpacked 6,886,400 B executable is a file the on-access scanner has never seen - so this boundary prices the scanner as much as the install. The product's half is 155 ms of the same middle: 147.052 ms to inflate the 3,646,091 B archive and write its member, 8.117 ms to SHA-256 those bytes. One process and one file per sample, no barriers"
+
+[startup]
+what = "`CreateProcess` sent to the light command's exit observed: create, run"
+measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples"
+status = "measured, not gated: p50 26.290 ms, p95 29.840, p99 31.298; floor 22.412, peak 1031.043; 1 of 200 above three times the middle, at #0 (windows-x86_64, 16 cores, NVMe, 2026-09-24). Thirty times outside the second tier and the tightest tail of the four. **Dominant: `run`**, 20.686 ms of the 26.290 ms middle against 5.343 ms for the spawn call itself. The one suspicious sample is the first: a cold 6,886,400 B image costs 1031.043 ms where the warm floor is 22.412 ms, so on this machine the first start of an installed binary is forty-six times the steady state and the second start is not. One process per sample, no files, no barriers"
+
+[raise_city]
+what = "`assembly::init_city` called to the genesis record on disk, its barrier included"
+measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples"
+status = "measured, not gated: p50 94.570 ms, p95 106.497, p99 115.862; floor 62.545, peak 175.839; none of the 200 above three times the middle (windows-x86_64, 16 cores, NVMe, 2026-09-24). A hundred times outside the second tier. No sub-step split: one would have to be instrumented inside the product, and T14 prices the path a person walks rather than one built for the bench, so the dominant cost is **attributed rather than measured**. One sample writes 9 files and 3 barriers, and 3 barriers at the `durability_barrier` row's 562.4 us/record floor is about 1.7 ms of the 94.570 ms middle. The other 93 ms is creating the tree and reading the config layers, which is where a second reading should look. 0 processes per sample"
+
+[open_session]
+what = "`Command::OpenSession` arriving to the call returning, `session_opened` on disk"
+measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples"
+status = "measured, not gated: p50 4.796 ms, p95 5.574, p99 7.230; floor 4.051, peak 27.509; 1 of 200 above three times the middle, at #0 (windows-x86_64, 16 cores, NVMe, 2026-09-24). Seven times outside the second tier, and the closest of the four to it - which is what the plan predicted before anything was measured. No sub-step split, so the dominant cost is attributed rather than measured: one sample writes 2 files and 1 barrier, and that barrier is about 0.6 ms of the 4.796 ms middle, so the cost sits in the room rather than in fsync. 0 processes per sample"
+
 # How large this tree's dependency graph is, counted off the resolved
 # lockfile rather than off any manifest: a manifest states what was
 # asked for, and what a person compiles is what the resolution settled.

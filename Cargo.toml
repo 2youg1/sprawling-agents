@@ -125,6 +125,17 @@ reqwest = { version = "0.13", default-features = false, features = [
 # The bin's build script gzips the client bundle it embeds; xtask weighs
 # the same artifacts. One version authority for both.
 flate2 = "1"
+# The digest the *release publishes* (`digest: sha256:` on the GitHub
+# asset), verified on the install path and priced by citysim's
+# `bench_startup`. blake3 above stays this product's sole content hash;
+# this one addresses nothing inside a city and answers only to the
+# outside world's spelling (consts_external family). One version
+# authority: gateway's PKCE verifier and the bench share it.
+sha2 = "0.11"
+# The release archive's format, written by `cargo xtask package` and
+# read back by citysim's `bench_startup` install action. One version
+# authority for both.
+zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
 # The encrypted vault file's two primitives (14.5, gateway-SPEC 8-21), and
 # nothing beyond them. ChaCha20-Poly1305 is an RFC 8439 AEAD that is fast in
 # pure software on a machine without AES-NI, and Argon2id (RFC 9106) is the

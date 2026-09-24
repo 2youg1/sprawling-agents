@@ -267,6 +267,21 @@ budget:
 bench:
     cargo run --release -p citysim --bin bench
 
+# T14: the four-action pressure reading (citysim-SPEC.md 8-5) - install,
+# startup, raise a city, open a session - measured, never gated.
+#
+# `build-web` first, the same dependency `dist` carries: without the
+# bundle the binary embeds a placeholder page, and a placeholder is not
+# the artifact a person installs - its weight is what the install action
+# unpacks and the startup action loads.
+#
+# The shipped binary is built next and the bench measures the one that
+# lands beside its own executable, so no run can be driven by a stale
+# artifact. This recipe is where that ordering lives.
+bench-startup: build-web
+    cargo build --release -p sprawling --locked
+    cargo run --release -p citysim --bin bench_startup --locked
+
 # CycloneDX bill of materials for the release archive (release item
 # two). Where it lands is written once, in `cargo xtask sbom`, and the
 # archive's contents table reads that same constant.
