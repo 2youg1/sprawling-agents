@@ -1087,6 +1087,7 @@ pub struct ToolName(String);        // 非空；ascii 小写/数字/下划线（
 impl ToolName {
     pub const BROWSER: &'static str = "browser";            // 内建浏览器工具的名：ToolMeta、楼的准入规则与账本夹具共用的唯一拼写
     pub const USER_BROWSER: &'static str = "usersbrowser";  // 驱使人自己开着的浏览器的工具
+    pub const EXEC: &'static str = "exec";                  // 三臂执行工具的名：discard 预报、命令计数与 sieve 三处按名路由，拼写只此一家
 }
 pub struct ServerLabel(String);     // 非空；ascii 小写/数字，恒不含下划线（见下）
 pub struct TimeoutMs(u64);          // 声明即承诺可协作取消
@@ -1122,6 +1123,24 @@ impl ToolCall {
     /// `id` stays out, because two calls differing only by wire id are
     /// the same action.
     pub fn action(&self) -> Result<Vec<u8>, AxError>;
+    /// 参数的规范 JSON，只算一次，之后各处借用（A2 一次解析多用）：
+    /// `action` 拼接它、密钥扫描读它。字节恒等于 `serde_json::to_string`
+    /// 于 `args`——键序即 BTreeMap 序，故与逐次序列化逐字节同解（oracle 三件套之首）。
+    /// 首调用时铸出；`ToolCall` 无 `args` 变更面，故缓存与 map 永不可能分歧。
+    pub fn args_canonical(&self) -> &serde_json::value::RawValue;
+}
+
+// kernel::tool::route（形状 2 value）：名字→处理器的预编译路由表
+pub struct ToolRoute { /* 按 meta().name 排序的槽表 */ }
+impl ToolRoute {
+    pub fn new() -> ToolRoute;
+    /// 登记一件工具：排序插入，重名拒（E_INVALID_ARGS，恢复语指名两件冲突的登记）。
+    pub fn register(&mut self, tool: Box<dyn Tool>) -> Result<(), AxError>;
+    /// 一次探测（排序数组二分，零分配）：名→处理器。缺席即 `None`。
+    pub fn resolve(&mut self, name: &str) -> Option<&mut dyn Tool>;
+    pub fn meta_of(&self, name: &str) -> Option<&ToolMeta>;
+    /// 已登记的名，按序——缺席拒收的 `nearby` 候选从这里来。
+    pub fn names(&self) -> impl Iterator<Item = &str> + '_;
 }
 pub struct ToolOutcome { pub result: Payload, #[serde(default)] pub attachments: Vec<ImageRef> }
 
@@ -1140,6 +1159,9 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
 ```
 
 - **`params` 复用 `Payload`**：键序 BTreeMap＋拒浮点白拿；schema 约定属 S3 工具实珰。
+- **`ToolRoute`（预编译路由表，A1）**：登记时按名排序一次（预编译点），此后每次调用一次二分探测即得处理器——替掉 `ToolBench` 里 `BTreeMap<String,_>` 的一次调用两次探测与每次探测的 `String` 分配。**被否**：①`phf`／`matchers` 类 const 期完美哈希——名册不是编译期常量，connector 工具名（`{label}_{tool}`）由楼的 `CONFIG.toml` 在登记时到达，而 phf 表会把内建名的拼写再抄一份，正是本模块用 `ToolName` 常量消灭的那种第二家；②维持 BTreeMap 双探测——fx 反例（线性扫描且一次调用查两次）在本仓的对应物就是这两次探测。排序数组二分（`slice::binary_search_by`）是任务允许的 const fn 排序数组二分形：名表建在 const 不可行的部分（名册动态）已由①说明，探测算法本身即那条二分。
+- **`ToolName::EXEC`**：`"exec"` 曾逐字写在 `runtime::bench`（discard 预报）、`bin::assembly::driving::lane`（两处：命令计数与 sieve）与 `citysim::executor`（两处）——一个事实五个家。`BROWSER` 的先例同理；拼写收进本模块后五处读者共用一常量。
+- **`args_canonical`（A2 一次解析多用）**：同一份参数 JSON 曾在一次调用里全序列化两遍（`action` 与密钥扫描），两遍的字节本就相等。现在首用时铸一次 `RawValue`（键序规范化随 `Payload` 一次解析完成），此后 `action` 拼接它、`scanned` 读它——借用 raw 切片传递，杀掉重复的全量走表。**被否**：①参数以 provider 原文 raw 切片直传——原文键序不定，会把 `tool_called` 的规范字节与 `IdemKey` 的 `action_canonical` 一起变成 provider 格式的函数，撞「canonical 字节逐字节不变」与「resume/replay 重派生同键」两条不动摇；②把缓存上移进 `Payload`——`Payload` 进每个事件记录的字节与 wire schema，波及面大于收益，留作后续阶段。
 - **conformance 三断言**：①meta 八字段形状合法（name 文法、disclosure 非空）；②错名调用拒收（E_INVALID_ARGS）；③拒收后工具仍可用（再次正确调用不受污染）。
 - ExecArm 住本模块而非 runtime：discard::forecast（S2）先于 exec 工具（S3）需要它；工具面参数枚举属 tool 面（「可枚举的必用枚举」）。
 - **`Effect::Connector { label }`**：目的地由**登记**而非逐调用参数定的那一类出站。`Egress` 的主语是一次调用（去哪台主机写在 args 里），`Connector` 的主语是一件工具（它恒只通往那一台 server）。**两者不得合并**：合并后要么让模型去填一个城自己已经知道的 `host`（一个可以填错的事实），要么让出站门拿不到目标而无法判定。发现它的时刻就是接线的时刻：`Effect::Egress` 写下时没有调用方，而第一次真调用当场拿到 `E_INVALID_ARGS: declares Egress but named no host`。
