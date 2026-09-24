@@ -59,6 +59,7 @@ replay、verify、VerifiedLedger、VerifiedLine、fork prefix、`at_seq`。不�
 replay ──▶ kernel(event/ledger/error)、memory(jsonl::read_raw_lines)
 fork   ──▶ replay(VerifiedLedger)、kernel
 turn   ──▶ kernel(ledger/event/error/tool/model)、prefix(FrozenPrefix)
+turn/recovery ──▶ turn(ledger 的 Journal)、kernel(model/error)   // 模型调用恢复管线（§8-44）
 prefix ──▶ kernel(locator::B3Hash/event::Payload/error)
 handoff──▶ kernel(locator/event/error)
 pipeline ──▶ offload、sieve、clock、kernel(tool)
@@ -845,6 +846,8 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 ## 12 错误处理（逐码答「能否定义掉」）
 
+- 恢复层不造码（§8-44）：恢复段的失败恒是它拿到的那个类型化错误，可定义性随原码走；该层改变的只是「同样的请求再发一次」与「换一扇门再问一次」之间的选择。
+
 - `E_INVALID_ARGS`（at_seq 越界）：不可定义掉——「从已冻结 Run 最后事件之后分叉」是用户可达输入（§19.1 点名）；静默夹取是被明拒的替代。
 - `E_LOG_VERSION_UNSUPPORTED`（v 判向＋未知 kind 无 ig）：不可定义掉——数据比二进制长寿。
 - 链断/seq 洞/非规范字节：以 `E_CAS_CORRUPT` 报（存储完整性族；subject=行号与路径）——能否定义掉＝「介质位腐烂在设计边界外」，同 memory-SPEC §12。
@@ -1630,6 +1633,57 @@ pub fn splice(text: &str, front: usize, back: usize, place: Elided) -> Cut;
 4. **预留按最宽算。** 标记的宽度随计数的位数变，而计数要等切完才知道；`marker_room(text.len())` 给出该文本能产生的最宽标记，因为丢弃量不可能超过文本自身长度。于是「结果不大于预算」由预留保证，而不是由一次事后检查补救。
 
 **关门测试**（`elision::tests` 与 `compaction::tests`）：`splice` 的 `dropped` 加上去掉标记后的长度恒等于输入长度——**对任意一对下标成立**，包括落在字符内部的与顺序颠倒的一对（proptest 量化，不是举例）；任何切口落在字符边界；`compact` 对一段日志报出的丢弃量与幸存字节数加起来是原文长度。
+
+### 8-44 turn::recovery —— 模型调用恢复管线的段契约（形状 2 值＋形状 3 内缝）
+
+**错误分层三层各管一段。**「同一个请求还能不能再发一次」（`is_retriable`）的唯一家是 `gateway::endpoint::config::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语写的就是 "the watchdog decides retry or failover"，段对那一族恒 `Skipped`。
+
+```rust
+// turn/recovery.rs（形状 2 值＋形状 3 内缝；pub(super)：turn 之外没有第二个用户）
+pub(super) enum SegmentOutcome {
+    Recovered(ModelReturn),   // 修好了：回合拿这个 ModelReturn 照常写 model_returned
+    Failed(AxError),          // 认出失败且动了手，没修成：修复重发拿到的原错误，码与恢复语必带
+    Skipped(AxError),         // 不是本段要修的：被递上的错误原样转手给下一段
+}
+pub(super) trait Segment {
+    fn attempt(&mut self, failure: &AxError, call: &mut ModelCall<'_>) -> SegmentOutcome;
+}
+pub(super) struct ModelCall<'a> { /* journal、ledger、model、request、streamed —— 全私有 */ }
+impl ModelCall<'_> {
+    pub(super) fn open(journal: &mut Journal, ledger: &mut dyn Ledger,
+                       model: &mut dyn Model, request: &ModelRequest) -> ModelCall<'_>;
+    pub(super) fn streamed(&self) -> bool;               // 失败那次是不是从流式门出去的
+    pub(super) fn resend_blocking(&mut self) -> Result<ModelReturn, AxError>;  // 换阻塞门再问一次
+    pub(super) fn ask(&mut self, segments: &mut [&mut dyn Segment],
+                      onto: Option<&mut (dyn FnMut(&Increment) + '_)>) -> Result<ModelReturn, AxError>;
+}
+/// 接力：名单序逐段递上失败；Skipped 转手即问下一段；Recovered／Failed 即止；
+/// 全段转手则把最后转手的错误原样答成 Skipped。
+pub(super) fn recover(segments: &mut [&mut dyn Segment], call: &mut ModelCall<'_>, failure: AxError)
+    -> SegmentOutcome;
+pub(super) struct BlockingResend;                        // 今天唯一的生产段
+```
+
+**五条口径：**
+
+1. **三值穷尽且闭。** 新答案必须逼每个调用方表态；`Skipped` 必携它被递上的那个错误——code／action／subject／recovery／retriable 逐字段同行，跳过是转手而不是吞掉，`let _ =` 一族在本模块没有落点。每段的答案都是类型化 `AxError`，稳定码与恢复语由 `AxError` 的构造契约保证必带（"a failure with no next step is unconstructible"）。
+2. **接力序就是名单序**，第一个非 `Skipped` 的答案终止接力。`recover` 自己也答同一个三值型（全段转手＝`Skipped(原错误)`），管线套管线仍是一种形状。
+3. **落账先于效果，每次外发都算。** `model_called` 在每一次尝试之前落账（首打与段的重发同走 `ModelCall`），历史里第二条 `model_called` 就是那次修复重发——与 §8-9 重试同一读法，不是一次无声的重复。
+4. **错误形不动。** 不新增 AxCode、不给 AxError 加字段；`AxCode::carrier()` 的穷尽不变。
+5. **回合层只见 `Result`。** `ask` 把三值折成 `Ok(return)`／`Err(该带的那个错误)`：段间谁转手了什么是本模块面的事实，回合层不需要第二次解读。
+
+**失败码**：本层不造码。`Failed` 携带的是修复重发拿到的原错误（生产段即阻塞门自己的失败，码由 gateway 一处给出，通常是 `E_WIRE_MISMATCH`）；全段转手即首个失败的原码，逐字段不变。`E_WIRE_MISMATCH` 的"能否定义掉"随 §12 走：恢复段只是把「同样的请求再发一次」换成「换一扇门再问一次」，没有改变该码的可定义性。
+
+**生产段 `BlockingResend` 的触发点，一个都不多**：失败那次走的是**流式门**且失败码是 `E_WIRE_MISMATCH`。理由：两扇门是同一条缝的两个口（`kernel::model` 保证同答同败），但**流式装配与整身解析是两条解析路径**——流式工具调用拼接出的半句话在阻塞门是一份完整 body。其余失败一律 `Skipped`：可重试族归 watchdog，门拒与配置族换门重发只会把同一个拒词买回来。
+
+**被否（各记理由与会重开它的参数）：**
+
+- **eve 的空响应 nudge 段**：「一条什么都没说的回复」意味着什么，§8-37 的 `concluded` 是唯一判定处（`Completion::Limit`），调用层再判一次就是第二个家，而 nudge 重发还会改写那条以供应方真实报文钉住的剧本。参数：有"空响应是瞬态"的实测数据时，与 §8-37 一同重开。
+- **eve 的「剔除被拒工具后重发」段**：本仓的 provider 拒绝从不回引 body（`ProviderFailure::Refused`），没有类型化触发点可依，靠错误文本嗅探即造脆弱权威；无声砍工具是能力的静默降级，与"拒答即声明"相悖。参数：gateway 的拒绝族带上类型化的拒绝面之后重开。
+- **eve 的「补悬空 tool_result 后重发」段**：回合窗口按构造无悬空调用（被取消的回合不入窗；`inherited` 遇开波回退到上一安全点），触发点不存在；账本侧关帐的权威在 `replay::resume`，不写第二份。参数：出现能把悬空对话推进窗口的新入口时重开。
+- **盲重试段（对可重试失败原样重发）**：该判定属于 watchdog 与 `gateway::admission`（§8-9：watchdog 只判断还有没有下一次），段越权即第二个重试权威。
+- **`Skipped` 无载荷（unit 变体）**：结构上确实吞不掉错误，但"这一段转手的是哪个错误"也在答案里读不出来了，而谁把什么交给谁正是段契约要陈述的事实。
+- **段＝闭枚举（形状 6）**：多段场景只能靠触发点拼装，契约测不直接，且新修复进来即改枚举与全部 match。trait 的第二实现是测试里的记账段（本仓缝规则认可的替身一族：测试时钟、计数店）。
 
 ### 8-43 重试上限住 kernel
 

@@ -17,7 +17,7 @@
 //! All events of one turn share the timestamp given to [`Turn::begin`]:
 //! order is `seq`'s business, time is a parameter, never sampled.
 
-use kernel::event::record::{ModelCalled, ModelReturned, SteerReceived};
+use kernel::event::record::{ModelReturned, SteerReceived};
 use kernel::model::content_from_message;
 use kernel::{
     AxCode, AxError, B3Hash, BuildingPolicy, ChatRequest, ContentBlock, EventRef, Ledger, Model,
@@ -29,6 +29,7 @@ use crate::window::Window;
 
 mod boundary;
 mod ledger;
+mod recovery;
 mod report;
 mod wave;
 
@@ -154,21 +155,17 @@ impl Turn<Calling> {
             segments,
             chat,
         };
-        let called = ModelCalled {
-            segments: request.segments.to_vec(),
-            model: request.chat.model.clone(),
-        };
-        self.journal
-            .append_authored(ledger, Authored::ModelCalled, Payload::of(&called)?)?;
         // The streaming door when somebody is watching, the blocking one
         // when nobody is. Both return the same `ModelReturn`, and the
         // record below is written from that return in either case - so
         // what a page sees arriving and what the ledger keeps cannot come
-        // from two different readings of one reply.
-        let returned_value = match deltas {
-            Some(onto) => model.call_streaming(&request, onto)?,
-            None => model.call(&request)?,
-        };
+        // from two different readings of one reply. A failure goes to the
+        // recovery pipeline before it leaves this phase (runtime-SPEC
+        // §8-44), and every attempt - first or repaired - is recorded
+        // before it is made.
+        let mut call = recovery::ModelCall::open(&mut self.journal, ledger, model, &request);
+        let mut repair = recovery::BlockingResend;
+        let returned_value = call.ask(&mut [&mut repair], deltas)?;
         let ModelReturn {
             message,
             calls,

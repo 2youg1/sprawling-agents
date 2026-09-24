@@ -6,5 +6,6 @@
 mod frozen;
 mod helpers;
 mod phases;
+mod recovery;
 mod redaction;
 mod window;
