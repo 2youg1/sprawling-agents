@@ -34,7 +34,7 @@ Then read, in order: this file, `ARCHITECTURE.md` (what the code is made of and 
 
 ## 2 The five steps of one change
 
-1. **Take one bounded piece of work** — one session's worth, small enough to finish and verify. Read what it touches in full before you start: the crate's SPEC, the neighbouring modules, and their tests.
+1. **Take one bounded piece of work** — small enough to finish and verify. Read what it touches in full before you start: the crate's SPEC, the neighbouring modules, and their tests.
 2. **Write the SPEC first.** Interfaces and decisions land in the crate's SPEC before the code exists. A new module states which of the seven shapes it instantiates; when there is no answer, stop and ask rather than write.
 3. **Red.** Write the failing test and **run it once to see it fail**. That run is what tells you the test can bite.
 4. **Green.** Implement until it passes, no more. When the implementation wants to differ from the SPEC, change the SPEC first and then continue.

@@ -52,7 +52,7 @@ The tools are listed in the `prereqs` recipe and nowhere else, so this file cann
 
 ## One change, five steps
 
-1. **Take one piece of work.** One session, one bounded change; read its context in full before starting.
+1. **Take one piece of work.** Read its context in full before starting: the crate's SPEC, the neighbouring modules, and their tests.
 2. **Write the SPEC first.** Interfaces and decisions land in the crate's SPEC before the code exists. A new module states which of the seven shapes it instantiates ([`ARCHITECTURE.md`](ARCHITECTURE.md) §9); when there is no answer, stop and ask rather than write.
 3. **Red.** Write the failing test and **run it once to watch it fail**. That run is what proves the test can bite.
 4. **Green.** Implement until it passes, no more. When the implementation wants to differ from the SPEC, change the SPEC first.
