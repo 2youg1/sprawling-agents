@@ -73,6 +73,17 @@ fn build_kernel() -> Result<(), String> {
         _ => "Debug",
     };
     let dir = zig_dir()?;
+    // Both trees belong under cargo's own output directory. Left to the
+    // Zig default they land in `zig/`, inside the source tree: the cache
+    // holds generated objects keyed by this machine's absolute paths, and
+    // a published document may not name a path that exists on one machine
+    // (`xtask release` reads every file in the tree, not only the tracked
+    // ones). `.gitignore` hides them from git; this keeps them from
+    // existing where the gate looks.
+    let out_dir = PathBuf::from(env_or("OUT_DIR", "."));
+    let cache = out_dir.join("zig-cache");
+    let global_cache = out_dir.join("zig-global-cache");
+    let prefix = out_dir.join("zig-out");
     for name in ["src/lib.zig", "build.zig", "build.zig.zon"] {
         println!("cargo::rerun-if-changed={}", dir.join(name).display());
     }
@@ -82,6 +93,12 @@ fn build_kernel() -> Result<(), String> {
             &format!("-Doptimize={optimize}"),
             &format!("-Dtarget={triple}"),
         ])
+        .arg("--cache-dir")
+        .arg(&cache)
+        .arg("--global-cache-dir")
+        .arg(&global_cache)
+        .arg("--prefix")
+        .arg(&prefix)
         .current_dir(&dir)
         .output()
         .map_err(|err| format!("cannot run `{zig}` in {}: {err}", dir.display()))?;
@@ -95,7 +112,7 @@ fn build_kernel() -> Result<(), String> {
             "`zig build {optimize}` refused: {last}; this crate needs Zig 0.16.0, which `just prereqs` names"
         ));
     }
-    let out = dir.join("zig-out").join("lib");
+    let out = prefix.join("lib");
     println!("cargo::rustc-link-search=native={}", out.display());
     println!("cargo::rustc-link-lib=static=mem");
     if triple.contains("windows") {
