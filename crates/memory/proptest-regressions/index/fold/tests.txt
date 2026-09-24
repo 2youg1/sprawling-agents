@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 6d0826b220708249b702650de0038ee8295f6469201154e7f52ca7d32a648cd8 # shrinks to held = [Line { seg: 0, offset: 0, seq: 0, run: Some("00000000-0000-0000-0000-000000000000") }], probes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

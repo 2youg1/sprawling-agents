@@ -5,7 +5,6 @@
 
 //! The side index: seq to (segment, byte offset).
 
-use std::ops::Bound;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
@@ -204,27 +203,19 @@ impl LedgerIndex {
     /// A run this index never saw yields nothing, which is the truth and
     /// needs no separate answer.
     pub fn run_seqs_before(&self, run: RunId, before: Option<Seq>) -> impl Iterator<Item = Seq> {
-        let upper = match before {
-            Some(seq) => Bound::Excluded(seq),
-            None => Bound::Unbounded,
-        };
-        self.folded
-            .runs
-            .get(&run)
-            .into_iter()
-            .flat_map(move |seqs| seqs.range((Bound::Unbounded, upper)).rev().copied())
+        self.folded.run_seqs_before(run, before).into_iter()
     }
 
     pub fn tail_seq(&self) -> Option<Seq> {
-        self.folded.entries.keys().next_back().copied()
+        self.folded.tail_seq()
     }
 
     pub fn len(&self) -> usize {
-        self.folded.entries.len()
+        self.folded.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.folded.entries.is_empty()
+        self.folded.is_empty()
     }
 }
 

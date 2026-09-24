@@ -39,10 +39,9 @@ impl LineReader<'_> {
     /// One line, without its terminator. A seq absent from the index is
     /// a caller error, not a corrupt ledger.
     pub fn line_at(&mut self, seq: Seq) -> Result<Vec<u8>, MemoryError> {
-        let Some((name, offset)) = self.index.folded.entries.get(&seq) else {
+        let Some((name, offset)) = self.index.folded.loc_of(seq) else {
             return Err(MemoryError::SeqMissing { seq: seq.value() });
         };
-        let offset = *offset;
         let segment = match self.open.take() {
             Some(open) if open.name == *name => open,
             _ => OpenSegment::open(&self.dir, name)?,

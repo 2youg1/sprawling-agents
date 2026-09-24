@@ -220,8 +220,8 @@ rename 入 Vfs；FaultFs 模型：rename 原子；新目标目录项在 `sync_di
 ### 8-4 memory::index（形状 7）
 
 ```rust
-pub struct LedgerIndex { /* folded: Folded —— entries: BTreeMap<Seq, (String, u64)>（段名＋行首字节偏移）、
-                            runs: BTreeMap<RunId, BTreeSet<Seq>>（谁写了哪几条）、scanned；
+pub struct LedgerIndex { /* folded: Folded —— entries 三列（seqs: Vec<Seq> 严格递增、segs: Vec<String> 段名字典、
+                            locs: Vec<(字典 id, 行首字节偏移)>）、runs: Vec<RunSpans>（run→连续 seq 值区间表，按 run 排序）、scanned；
                             vfs: Mutex<Box<dyn Vfs>> —— 内缝，私有（谁在缝外见 8-15） */ }
 impl LedgerIndex {
     /// 扫描账本目录建索引（本就是唯一建表入口，无库外旁挂物可信）。
@@ -264,7 +264,10 @@ impl LineReader<'_> {
   - **为什么不放进一份落盘冷投影**：本 crate 曾有一份（redb 的 `memory::projection`），而**运行中的服务端从未接线**——读面只有 `bin::sprawling::views::Views`，它折 `hot`／`attribution`／`book`。要让 `run_history` 读一份落盘投影，就得在事件路径上开一个写事务，实测每条事件一个磁盘屏障 ≈ 1.1k records/s。为一个不需要持久化的答案给每一条落账加一道屏障，方向是反的，所以那个模块整体删除（Roadmap 7.15）。
   - **为什么可以放进 `index`**：这张旁挂物**已经常驻**（`Views` 持有并每查询 `refresh`），**已经逐行解析过每一条新行**（`locate` 一次 `serde_json` 解析读两个字段），**已经带着「存疑即重建」的可弃性**。run 表搭的是同一趟 refresh、同一条重建反射，不新增任何同步义务。
   - **对 channels-SPEC §2「不建 run→seq 的索引」的重新定价**：它的两条理由各自的参数都动了。其一「有界扫描付的是几毫秒的解析」——**实测是 22.4 ms**，量级估错了。其二「一份要随账本同步的派生状态」——那份派生状态**已经存在且必须同步**，run 表是它多一个字段，不是多一份。至于「第二个权威」：本模块开篇即写明索引可弃、存疑即重建，它回答的是「在哪」，从不回答「是什么」；账本仍是唯一权威。
-  - **内存代价**：5 万条账本上 `runs` 约 1.2 MB（`BTreeSet<Seq>` 每条 8 字节数据加 B 树节点开销），与 `entries` 同阶而更小——后者每条还带一个段名 `String`。计入 `session_resident` 预算（今天 4.29 MB／30 MB 上限）。
+  - **内存代价**：`runs` 不再是每条 seq 一个 B 树节点，而是每 run 一段或几段区间；`entries` 也不再每条带一个段名 `String`，段名进字典一行一个。计入 `session_resident` 预算（今天 4.29 MB／30 MB 上限）。
+  - **三列替 BTreeMap（SoA）**：`entries` 拆成 `seqs`／`segs`／`locs` 三列后，查 Seq 是一次二分，追加落在每列列尾（账本自身按 seq 追加，插 O(1) 均摊），行邻接扫描走连续内存。行序虽由追加定，破损账本可能说出相反的序，而破损账本上的索引正是修复路径所需：乱序行由同一次搜索就位，同一 seq 写两次留最后位置——被替换的 map 同样覆写。**被否**：①每条再带一列 run 归属——「谁写了哪几条」与区间表是同一事实，两列造第二个家，而 entry 列没有任何查询要读；②区间存列位置——中间插入使全部位置失效，区间只能存 seq 值。
+  - **run 表是区间，不是 id 集**：run 是连续突发，写入即尾部并段；真交错的 run 就是几段区间。只有值域首尾相接才并段，而并段时缺口里的值必然都写过（两端点各自由一次写入造出），故区间从不声称没写过的 seq。成员查询＝区间定位后按值下探，答的顺序仍由新到旧。**被否**：`BTreeSet<Seq>` 每条一个 id，长 run 不塌缩。
+  - **等价锁在 `index/fold/tests.rs`**：oracle 是被替换掉的 BTreeMap／BTreeSet 原实现，proptest 喂随机行流（乱序与重复 seq、不可解析的 run 名、非文档行）断言全部公开查询恒同解。
   - **`before` 取开区间**，与线格式 `HistoryAnswer.earlier` 的既有含义（「从这条之前接着问」）同字同义；调用方不再自己算 `before - 1`，那条减法连同它的 `Seq::FIRST` 边界一起消失。
   - **答的顺序**：`run_seqs_before` 由新到旧，因为调用方要的是会话的**末尾**；调用方取够条数后翻转成由旧到新再取行，于是 `LineReader` 全程向前走（0.89 µs／行，而不是逆序的 5.82 µs／行）。
 - `locate` 只探 `seq` 与 `run` 两个字段——索引不要求整条记录可解析，破损日志上的索引正是修复路径所需；`run` 缺失或解析不出的行**照样入 seq 表，只是不属于任何 run**，残尾（无换行结尾）跳过不入索引，其修复归 jsonl。段名排序由本模块自持（不信文件系统枚举序）。新增 `MemoryError::SeqMissing{seq}`（→ `E_INVALID_ARGS`）：问一条从未写过的 seq 是调用者错，不是损坏。
