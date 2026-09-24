@@ -96,6 +96,7 @@ pub city::UserBrowser::At(city::UserBrowserEndpoint)
 pub city::UserBrowser::Waiting
 pub city::Vocation::Builds
 pub city::Vocation::Plans
+pub city::Written::context: bool
 pub city::Written::desktop: bool
 pub city::Written::mcp: bool
 pub city::Written::sandbox: bool
@@ -161,6 +162,7 @@ pub fn city::ConfigLayer::mcp(&self) -> core::option::Option<&[kernel::config::M
 pub fn city::ConfigLayer::model(&self) -> core::option::Option<&str>
 pub fn city::ConfigLayer::parse(&str) -> core::result::Result<city::ConfigLayer, kernel::error::shape::AxError>
 pub fn city::ConfigLayer::sandbox(&self) -> core::option::Option<&kernel::config::SandboxLimits>
+pub fn city::ConfigLayer::second_threshold(&self) -> core::option::Option<kernel::config::SecondThreshold>
 pub fn city::ConfigLayer::shelves(&self) -> core::option::Option<&[alloc::string::String]>
 pub fn city::Dossier::apply(&mut self, &str, &kernel::event::payload::EventRecord)
 pub fn city::Dossier::is_live(&self) -> bool
@@ -261,6 +263,7 @@ pub fn city::rooms(&std::path::Path, &kernel::address::Address) -> core::result:
 pub fn city::rules_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::schedule_path(&std::path::Path) -> std::path::PathBuf
 pub fn city::settled_effort(&std::path::Path, &kernel::address::Address) -> core::result::Result<core::option::Option<(kernel::model::wire::Effort, city::Layer)>, kernel::error::shape::AxError>
+pub fn city::settled_second(&std::path::Path, &kernel::address::Address) -> core::result::Result<core::option::Option<(kernel::config::SecondThreshold, city::Layer)>, kernel::error::shape::AxError>
 pub fn city::survey(&[(alloc::string::String, bool)], bool) -> city::Standing
 pub fn city::urbanite_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::vocation_of(&kernel::address::Address) -> city::Vocation
@@ -273,6 +276,7 @@ pub fn city::write_job(&std::path::Path, &kernel::address::Address, &city::JobBr
 pub fn city::write_mcp(&std::path::Path, &kernel::address::Address, city::Layer, &[kernel::config::McpServer]) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::write_rules(&std::path::Path, &kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
 pub fn city::write_sandbox(&std::path::Path, &kernel::address::Address, city::Layer, &kernel::config::SandboxLimits) -> core::result::Result<(), kernel::error::shape::AxError>
+pub fn city::write_second_threshold(&std::path::Path, &kernel::address::Address, city::Layer, kernel::config::SecondThreshold) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::write_session(&std::path::Path, &kernel::address::Address, &str, core::option::Option<kernel::model::wire::Effort>) -> core::result::Result<(), kernel::error::shape::AxError>
 pub mod city
 pub struct city::ArchiveEntry

@@ -5,6 +5,7 @@
 
 //! The verbs a person sends, and what each one does to the city.
 
+pub(super) mod configure;
 pub(super) mod door;
 pub(super) mod entrance;
 pub(super) mod governing;

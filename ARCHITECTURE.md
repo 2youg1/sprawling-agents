@@ -55,6 +55,7 @@ shipped one happens to be written in is a replaceable fact.
 │        ├── browser ── WebDriver BiDi sessions, snapshots     │
 │        ├── protocol── MCP outbound, ACP inbound              │
 │        ├── memory  ── Ledger, CAS, projections, git, Vfs     │
+│        ├── mem     ── the Zig kernel's Rust face             │
 │        ├── gateway ── routing, dialects, market, cost,       │
 │        │              credentials                            │
 │        └── channels ─ WebSocket server, Command/Query/Event, │
@@ -103,7 +104,7 @@ every week.
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = "z"`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `"z"` rather than `3` on a measurement whose criterion was written before the readings existed — the manifest records both arms. |
-| Dependency count | <!-- xtask:begin dependency_count -->402<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->403<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
 (properties before examples), `insta` (golden output), `trybuild` (proof
@@ -125,6 +126,7 @@ number appears in this sentence.
 
 ```depmap
 kernel:
+mem: kernel
 memory: kernel
 gateway: kernel
 runtime: kernel, memory, gateway
@@ -374,7 +376,7 @@ branch's work is its children.
 
 One WebSocket, three kinds of frame, and a schema hash that both ends check
 on connect: a page from a different build refuses rather than misreads.
-`WIRE_V` is <!-- xtask:begin wire_v -->36<!-- xtask:end -->.
+`WIRE_V` is <!-- xtask:begin wire_v -->37<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
@@ -510,9 +512,9 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->16<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2048<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2088<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
-| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
+| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->7<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
 | V6 deterministic simulation | components each correct and wrong together | citysim, <!-- xtask:begin citysim_scenarios -->7<!-- xtask:end --> scenario files, failures replayed from their script |
 | V7 mutation | tests that do not bite | `cargo-mutants`, by `just mutants` |

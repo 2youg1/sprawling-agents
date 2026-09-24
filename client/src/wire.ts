@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 36 as const;
+export const WIRE_V = 37 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "f189f1d8a9263d4667393a5ede6f335f15a1935b05f496cd6bab768700a96217" as const;
+export const WIRE_HASH = "23860a7061c5ecee69478cfae653ab2e56ec94d212df63ed685691514693c29a" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 

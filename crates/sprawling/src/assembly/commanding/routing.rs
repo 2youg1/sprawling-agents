@@ -111,10 +111,12 @@ impl RunWorker {
                 ..
             } => self.configure_building(
                 &addr,
-                sandbox.as_ref(),
-                mcp.as_deref(),
-                desktop.as_deref(),
-                context_second_threshold,
+                super::configure::Reconfiguration {
+                    sandbox: sandbox.as_ref(),
+                    mcp: mcp.as_deref(),
+                    desktop: desktop.as_deref(),
+                    context_second_threshold,
+                },
             ),
             channels::Command::ProbeEndpoint {
                 name,

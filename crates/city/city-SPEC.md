@@ -177,6 +177,10 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError>;
 pub fn own_layer(city_root: &Path, addr: &Address) -> Result<ConfigLayer, AxError>;
 pub fn settled_effort(city_root: &Path, addr: &Address)
     -> Result<Option<(Effort, Layer)>, AxError>;      // 值连同说出它的那一级
+pub fn settled_second(city_root: &Path, addr: &Address)
+    -> Result<Option<(SecondThreshold, Layer)>, AxError>;  // 第二道阈值，同上
+pub fn write_second_threshold(city_root: &Path, addr: &Address, layer: Layer,
+    threshold: SecondThreshold) -> Result<(), AxError>;    // 与 write_effort 同一扇门
 
 // config_layers::ladder（crate 内）
 impl Layer {
@@ -193,7 +197,9 @@ impl Ladder {
 
 **一条梯子是一个值**：`Ladder::read` 按 `Layer::ALL` 由远及近读一遍，落点重复的一级丢弃；`load` 逐个关切在梯子上 fold，不再逐级点名。加一级因此是 `Layer` 多一个臂：`ALL`、`file` 与 `resolve` 三处穷尽匹配同时报编译错，直到新一级被安置，而每个关切一次拿到它。`resolve` 是「哪一级填 `LayeredValue` 的哪一格」的唯一一处答案——今天 `kernel::LayeredValue` 只有三格，所以 C 章要加的人层（`~/.sprawling/config.toml`）落地时，`kernel::config` 与本模块在同一次改动里走完。
 
-**来源与值一起答**（叶子 3.3）：`settled_effort` 与 `load` 爬同一条梯子，区别只在它把说出这个值的那一级留着而不是丢掉。只被告知结果的设置页说不出「这是这间房自己写的」还是「这是全城都有的」，于是它只能把三份文件各读一遍、把同一条梯子再爬一次——**同一个问题两个答案，就是从第二次爬梯开始的**。谁压过谁仍由 `kernel::LayeredValue::resolve` 判：`tagged` 只负责「哪一级填哪一格」，`resolve` 是 `tagged` 去掉那一级，所以这条映射在本 crate 里只有一处。`None` 是整条梯子什么都没说，也就是这座城有意把强度交给供应方，而不是替人填一档。
+**来源与值一起答**（叶子 3.3）：`settled_effort` 与 `load` 爬同一条梯子，区别只在它把说出这个值的那一级留着而不是丢掉。只被告知结果的设置页说不出「这是这间房自己写的」还是「这是全城都有的」，于是它只能把三份文件各读一遍、把同一条梯子再爬一次——**同一个问题两个答案，就是从第二次爬梯开始的**。谁压过谁仍由 `kernel::LayeredValue::resolve` 判：`tagged` 只负责「哪一级填哪一格」，`resolve` 是 `tagged` 去掉那一级，所以这条映射在本 crate 里只有一处。`None` 是整条梯子什么都没说，也就是这座城有意把强度交给供应方，而不是替人填一档。`settled_second` 是同一条路的第二个值：第二道提醒阈值也说得出是那一级写的。
+
+**写面与读面同源**：`write_second_threshold` 与 `write_effort` 走同一扇门（读—改—写整份 `CONFIG.toml`，别人写的键原样保留），收的值已经是 `SecondThreshold`——域在那一个构造点判定过，写面不再判一次；要值的字符串形状或拒因句式，答案在 `kernel::config`。
 
 **`own_layer` 答的是另一个问题**：梯子回答「一个 Run 被什么治理」，它回答「这个地址自己写下了什么」。差别正是它存在的理由——城或楼那一级给出的默认值不是这个地址做的选择，所以它不能当作选择的记录。文件是地址自己的那份 `CONFIG.toml`（`Layer::Resident` 的落点，也就是会话写的那一份），哪怕梯子把同一份文件当作两级里更远的级读了一次；地址就是楼时两者是同一个文件，所以那种地址自己就是它的会话（§8-14）。
 

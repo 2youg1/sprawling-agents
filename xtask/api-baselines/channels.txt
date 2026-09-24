@@ -169,6 +169,7 @@ pub channels::Command::Cancel::idem: kernel::idem::IdemKey
 pub channels::Command::Cancel::run: kernel::event::identity::RunId
 pub channels::Command::ConfigureBuilding
 pub channels::Command::ConfigureBuilding::addr: kernel::address::Address
+pub channels::Command::ConfigureBuilding::context_second_threshold: core::option::Option<u64>
 pub channels::Command::ConfigureBuilding::desktop: core::option::Option<alloc::string::String>
 pub channels::Command::ConfigureBuilding::idem: kernel::idem::IdemKey
 pub channels::Command::ConfigureBuilding::mcp: core::option::Option<alloc::vec::Vec<kernel::config::McpServer>>
@@ -285,6 +286,7 @@ pub channels::CommitsAnswer::commits: alloc::vec::Vec<channels::CommitAnswer>
 pub channels::CommitsAnswer::more: bool
 pub channels::ConfigAnswer::addr: kernel::address::Address
 pub channels::ConfigAnswer::effort: core::option::Option<channels::SettledEffort>
+pub channels::ConfigAnswer::second: core::option::Option<channels::SettledSecond>
 pub channels::ConfigAnswer::tuning: channels::TuningDefaults
 pub channels::ConfigLayer::Building
 pub channels::ConfigLayer::City
@@ -739,6 +741,8 @@ pub channels::SessionStep::Refuse::error: alloc::boxed::Box<kernel::error::shape
 pub channels::SessionStep::Welcome(alloc::boxed::Box<channels::Welcome>)
 pub channels::SettledEffort::effort: kernel::model::wire::Effort
 pub channels::SettledEffort::from: channels::ConfigLayer
+pub channels::SettledSecond::from: channels::ConfigLayer
+pub channels::SettledSecond::percent: u64
 pub channels::Shelf::Building(kernel::address::Address)
 pub channels::Shelf::Library
 pub channels::Sighting::city: channels::CityLabel
@@ -1005,6 +1009,7 @@ pub struct channels::RoundsAnswer
 pub struct channels::RunSummary
 pub struct channels::ServeConfig
 pub struct channels::SettledEffort
+pub struct channels::SettledSecond
 pub struct channels::Sighting
 pub struct channels::SignalLine
 pub struct channels::SkillLine

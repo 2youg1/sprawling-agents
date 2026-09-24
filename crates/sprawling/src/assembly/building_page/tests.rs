@@ -138,6 +138,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
                 },
             }]),
             desktop: None,
+            context_second_threshold: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"reach"),
         })
         .unwrap();
@@ -193,6 +194,7 @@ fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
             sandbox: None,
             mcp: None,
             desktop: Some(allowlist.to_owned()),
+            context_second_threshold: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"desktop"),
         })
         .unwrap();

@@ -359,6 +359,7 @@ title = \"a window\"
 "
                 .to_owned(),
             ),
+            context_second_threshold: None,
             idem,
         },
         Command::ProbeEndpoint {

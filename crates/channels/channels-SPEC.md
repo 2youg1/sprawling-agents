@@ -1287,3 +1287,13 @@ pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String
 - **`control` 与 reach 表同集缩面**：`Intervention` 少两臂，只剩 Steer／Cancel／Halt 加 Release 返程（§8-4）；「中断一个活着的 Run 恒以 Handoff 收尾」的中断动词随之只剩 Steer／Cancel；§19-2 删两行。
 - **事件词同集删二**（kernel-SPEC §8-4 表）：`rollback_applied`／`takeover_started` 无生产者，账本从未写下过携它们的行，故已写历史的字节与逐字节重放不受影响；携这两个词的行今天在读侧入口拒（`E_INVALID_ARGS`，kernel `parse_line` 的既有码）。
 - **两帧的拒因不再是 `not_built`**：`not_built` 只留给仍在文法里、等待执行者的动词；对这两帧，字节在解码处就不再是命令（§8-37 的 `E_WIRE_MISMATCH` 口径不变）。
+
+### 8-45 `WIRE_V` 37：`ConfigureBuilding` 长出第二道阈值的面
+
+`Command::ConfigureBuilding` 多一个可选字段 `context_second_threshold: Option<u64>`，`Query::Config` 的回答多一个 `second: Option<SettledSecond>`；schema 哈希随之变，故同集进位 36→37。
+
+- **一个字段而不是一条新帧**：那条帧问的就是「这栋楼的 runs 按什么规矩来」——沙箱、外部服务器、桌面白名单与第二道阈值是同一个问题的四面；为它单立一帧会给同一个问题两个写入口。
+- **线上传裸 `u64`，域的判定不在这条帧上**：合法域与拒因句式是 `kernel::config::SecondThreshold` 的一个构造点（30–90，拒因带域），在这条帧上再判一次就是同一个规则的第二个家；越界值在解析点拒，拒因随答复回到设置页。
+- **回答带 `SettledSecond { percent, from }`**：`from` 是说出这个值的那一级文件，理由与 `SettledEffort` 同（`Query::Config` 回答表那一条）；缺省不是缺口，而是城一级默认值在生效，页面据此把一个空框画成默认值。
+- **线的背面是同一件事**：写入经 `city::write_second_threshold` 落到那一级的 `CONFIG.toml` 的 `[context] second_threshold`，与 `write_effort` 同一扇门（读—改—写整份文件，别人的键原样保留）；`building_configured` 的载荷因此从三面到四面（`Written::context`）。
+- **`WIRE_V` 的路不单独走**：36→37 记的是这一次面变，与 §8-44 的 35→36 无关；两次都在 §2 的 golden 里看得见。

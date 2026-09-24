@@ -78,7 +78,7 @@ pub fn scan(input: &[u8]) -> Result<EnvelopeSpans<'_>, AxError>;
 | `MAX_DEPTH` | 1024 | `zig/src/lib.zig` |
 | 整数码 0/-1/-2/-3 | 见上表 | `zig/src/lib.zig` 的 `Code`，Rust `KernelRefusal` 镜像 |
 
-键重复的裁定序镜像 serde derive：语法错误（-1）优先于键重复（-2），与 serde 先解析后判重复的次序一致；重复的 envelope 键记先见的 span，但该次调用必以 -2 拒绝。
+键重复的判定序镜像 serde derive：语法错误（-1）优先于键重复（-2），与 serde 先解析后判重复的次序一致；重复的 envelope 键记先见的 span，但该次调用必以 -2 拒绝。
 
 ## 10 实现逻辑
 
@@ -93,7 +93,7 @@ pub fn scan(input: &[u8]) -> Result<EnvelopeSpans<'_>, AxError>;
 1. **Zig 只回整数码，Rust 单点映射 `AxError`，未知码恒拒。** 理由：错误三段式的文案家留在 Rust 不动，跨界的只有可穷尽的整数。被击败：Zig 回错误字符串（把文案家推过 FFI，两个家各写各的句子）；未知码兜底成一个默认错（把失败擦成默认，正是 ClaimUnknown 同形所拒）。
 2. **envelope 键表两处拼写，等价套件锁合。** 理由：固定键表让 Zig 侧用 comptime 完美哈希（`std.StaticStringMap`）并给出固定槽位的零分配输出；`export fn` 无法携带 Rust 穿举，镜像由 proptest 等价承担——这正是手写加速器三件套的本职。被击败：每次调用传键表（键名单一家在 Rust，但无法 comptime 建查找表，每次调用重建匹配，输出槽位仍需两侧约定）。
 3. **扫描器只出 span，不解码值。** 理由：类型解码是域语义，留 Rust 按 span 整段借出后做；一次解析多用由此成立。被击败：扫描器直接出类型化值（把域模型推进 Zig，违反本内核的形制）。
-4. **键重复的形制镜像 serde derive：五个 envelope 名重复即拒，未知名重复放行。** 理由：迁移后行为与今日 `runtime::replay` 的探查观察等价；裁定序保持"语法错误先于键重复"。被击败：一律拒重复（会拒掉 serde 今天接受的行）；后键覆盖（把一个判定悄悄换成默认值）。
+4. **键重复的形制镜像 serde derive：五个 envelope 名重复即拒，未知名重复放行。** 理由：迁移后行为与今日 `runtime::replay` 的探查观察等价；判定序保持"语法错误先于键重复"。被击败：一律拒重复（会拒掉 serde 今天接受的行）；后键覆盖（把一个判定悄悄换成默认值）。
 5. **`crates/mem` 的 lints 表是工作区表的副本，`unsafe_code` 从 `forbid` 放宽为 `deny`。** 理由：Cargo 不允许 `[lints]` 继承与覆盖并存，而 FFI 边界必须有 `unsafe`；先例 `desktop/`（desktop-SPEC §8.5），这是全库第二个也是最后一个放宽点，每个 `unsafe` 块一条 `SAFETY:` 前置条件。被击败：把 FFI 移到 workspace 之外的第二个包（为一层薄适配把 crate 移出依赖法的管辖，得不偿失）。此放宽提交需 `Verdict:` trailer。
 
 ## 13 依赖选型

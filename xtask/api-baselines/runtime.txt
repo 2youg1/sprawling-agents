@@ -515,8 +515,8 @@ pub fn runtime::redact::fingerprint(&[u8]) -> alloc::string::String
 pub fn runtime::redact::redact(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> (serde_json::map::Map<alloc::string::String, serde_json::value::Value>, u32)
 pub fn runtime::redact::redact_text(&str, runtime::redact::Marker) -> (alloc::string::String, u32)
 pub fn runtime::rematerialize(&kernel::locator::Locator, &mut runtime::offload::OffloadSite<'_>) -> core::result::Result<std::path::PathBuf, kernel::error::shape::AxError>
-pub fn runtime::reminder::ContextGauge::new(kernel::budget::Tokens) -> runtime::reminder::ContextGauge
-pub fn runtime::reminder::ContextGauge::new(kernel::budget::Tokens) -> runtime::reminder::ContextGauge
+pub fn runtime::reminder::ContextGauge::new(kernel::budget::Tokens, core::option::Option<kernel::config::SecondThreshold>) -> runtime::reminder::ContextGauge
+pub fn runtime::reminder::ContextGauge::new(kernel::budget::Tokens, core::option::Option<kernel::config::SecondThreshold>) -> runtime::reminder::ContextGauge
 pub fn runtime::reminder::ContextGauge::observe(&mut self, kernel::budget::Tokens) -> core::option::Option<runtime::reminder::ContextReminder>
 pub fn runtime::reminder::ContextGauge::observe(&mut self, kernel::budget::Tokens) -> core::option::Option<runtime::reminder::ContextReminder>
 pub fn runtime::reminder::ContextReminder::render(&self) -> alloc::string::String
@@ -805,6 +805,7 @@ pub runtime::RunPlan::predecessor: core::option::Option<kernel::event::identity:
 pub runtime::RunPlan::prefix: runtime::prefix::FrozenPrefix
 pub runtime::RunPlan::retries: kernel::retries::Retries
 pub runtime::RunPlan::run: kernel::event::identity::RunId
+pub runtime::RunPlan::second_threshold: core::option::Option<kernel::config::SecondThreshold>
 pub runtime::RunPlan::shape: runtime::turn::CallShape
 pub runtime::RunPlan::skills: alloc::vec::Vec<kernel::event::record::run::SkillPin>
 pub runtime::RunPlan::task: alloc::string::String
@@ -1128,6 +1129,7 @@ pub runtime::run::RunPlan::predecessor: core::option::Option<kernel::event::iden
 pub runtime::run::RunPlan::prefix: runtime::prefix::FrozenPrefix
 pub runtime::run::RunPlan::retries: kernel::retries::Retries
 pub runtime::run::RunPlan::run: kernel::event::identity::RunId
+pub runtime::run::RunPlan::second_threshold: core::option::Option<kernel::config::SecondThreshold>
 pub runtime::run::RunPlan::shape: runtime::turn::CallShape
 pub runtime::run::RunPlan::skills: alloc::vec::Vec<kernel::event::record::run::SkillPin>
 pub runtime::run::RunPlan::task: alloc::string::String

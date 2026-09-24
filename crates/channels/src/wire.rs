@@ -134,7 +134,7 @@ use serde::{Deserialize, Serialize};
 ///    branch and a git revert (kernel-SPEC.md section 12.2), and old
 ///    pages are refused at the handshake rather than given buttons that
 ///    can only fail.
-pub const WIRE_V: u32 = 36;
+pub const WIRE_V: u32 = 37;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

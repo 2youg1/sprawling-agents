@@ -1,11 +1,15 @@
 impl core::convert::From<kernel::config::EnvVarName> for alloc::string::String
 impl core::convert::From<kernel::config::EnvVarName> for alloc::string::String
+impl core::convert::From<kernel::config::SecondThreshold> for u64
+impl core::convert::From<kernel::config::SecondThreshold> for u64
 impl core::convert::From<kernel::tool::ServerLabel> for alloc::string::String
 impl core::convert::From<kernel::tool::ServerLabel> for alloc::string::String
 impl core::convert::TryFrom<alloc::string::String> for kernel::config::EnvVarName
 impl core::convert::TryFrom<alloc::string::String> for kernel::config::EnvVarName
 impl core::convert::TryFrom<alloc::string::String> for kernel::tool::ServerLabel
 impl core::convert::TryFrom<alloc::string::String> for kernel::tool::ServerLabel
+impl core::convert::TryFrom<u64> for kernel::config::SecondThreshold
+impl core::convert::TryFrom<u64> for kernel::config::SecondThreshold
 impl core::default::Default for kernel::config::SandboxLimits
 impl core::default::Default for kernel::config::SandboxLimits
 impl core::fmt::Display for kernel::AxCode
@@ -128,6 +132,8 @@ impl kernel::config::EnvVarName
 impl kernel::config::EnvVarName
 impl kernel::config::SandboxLimits
 impl kernel::config::SandboxLimits
+impl kernel::config::SecondThreshold
+impl kernel::config::SecondThreshold
 impl kernel::delegation::Delegate
 impl kernel::delegation::Delegate
 impl kernel::delegation::DelegateKind
@@ -278,8 +284,8 @@ pub const kernel::AxCode::ALL: [kernel::AxCode; 37]
 pub const kernel::DOORS: [kernel::gate::DoorId; 8]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 72]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 72]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::IDEM_DERIVE_V: u8
 pub const kernel::Mode::ALL: [kernel::Mode; 5]
@@ -308,7 +314,10 @@ pub const kernel::consts_policy::BYTES_PER_TOKEN: u64
 pub const kernel::consts_policy::CLOCK_STAMP_DEFAULT: kernel::config::ClockStampGranularity
 pub const kernel::consts_policy::CLOCK_ZONES_MAX: u32
 pub const kernel::consts_policy::CREDENTIAL_NAME_MARKERS: [&str; 11]
-pub const kernel::consts_policy::CTX_REMINDER_RATIO: kernel::consts_policy::Ratio
+pub const kernel::consts_policy::CTX_REMINDER_FIRST_PERCENT: u64
+pub const kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT: u64
+pub const kernel::consts_policy::CTX_REMINDER_SECOND_MAX: u64
+pub const kernel::consts_policy::CTX_REMINDER_SECOND_MIN: u64
 pub const kernel::consts_policy::DEFAULT_AT: &str
 pub const kernel::consts_policy::DISCARD_FILES_MAX: u32
 pub const kernel::consts_policy::DISCARD_RETENTION_DAYS: u32
@@ -788,7 +797,13 @@ pub fn kernel::config::SandboxLimits::default() -> Self
 pub fn kernel::config::SandboxLimits::default() -> Self
 pub fn kernel::config::SandboxLimits::trusts(&self, &kernel::tool::ServerLabel) -> bool
 pub fn kernel::config::SandboxLimits::trusts(&self, &kernel::tool::ServerLabel) -> bool
-pub fn kernel::config::freeze(&kernel::config::LayeredValue<kernel::config::ClockStampGranularity>, &kernel::config::LayeredValue<alloc::vec::Vec<kernel::config::ClockZone>>, &kernel::config::LayeredValue<kernel::Effort>, &kernel::config::LayeredValue<kernel::config::SandboxLimits>, &kernel::config::LayeredValue<alloc::vec::Vec<kernel::config::McpServer>>) -> kernel::config::FrozenConfig
+pub fn kernel::config::SecondThreshold::parse(u64) -> core::result::Result<kernel::config::SecondThreshold, kernel::AxError>
+pub fn kernel::config::SecondThreshold::parse(u64) -> core::result::Result<kernel::config::SecondThreshold, kernel::AxError>
+pub fn kernel::config::SecondThreshold::percent(self) -> u64
+pub fn kernel::config::SecondThreshold::percent(self) -> u64
+pub fn kernel::config::SecondThreshold::try_from(u64) -> core::result::Result<kernel::config::SecondThreshold, kernel::AxError>
+pub fn kernel::config::SecondThreshold::try_from(u64) -> core::result::Result<kernel::config::SecondThreshold, kernel::AxError>
+pub fn kernel::config::freeze(&kernel::config::LayeredValue<kernel::config::ClockStampGranularity>, &kernel::config::LayeredValue<alloc::vec::Vec<kernel::config::ClockZone>>, &kernel::config::LayeredValue<kernel::Effort>, &kernel::config::LayeredValue<kernel::config::SandboxLimits>, &kernel::config::LayeredValue<alloc::vec::Vec<kernel::config::McpServer>>, &kernel::config::LayeredValue<kernel::config::SecondThreshold>) -> kernel::config::FrozenConfig
 pub fn kernel::consts_external::readable_log_v(u64) -> kernel::consts_external::LogVersion
 pub fn kernel::delegation::Delegate::kind(&self) -> &kernel::delegation::DelegateKind
 pub fn kernel::delegation::Delegate::kind(&self) -> &kernel::delegation::DelegateKind
@@ -1085,6 +1100,8 @@ pub fn kernel::write_domain::WriteDomain::prefixes(&self) -> impl core::iter::tr
 pub fn kernel::write_domain::WriteDomain::reaches(&self, &kernel::address::Address) -> bool
 pub fn kernel::write_domain::WriteDomain::reaches(&self, &kernel::address::Address) -> bool
 pub fn kernel::write_domain::observe_edit_war(&[kernel::write_domain::EditSample]) -> kernel::write_domain::EditWarVerdict
+pub fn u64::from(kernel::config::SecondThreshold) -> u64
+pub fn u64::from(kernel::config::SecondThreshold) -> u64
 pub kernel::Admission::Admit
 pub kernel::Admission::Shed
 pub kernel::Admission::Shed::reason: kernel::backpressure::ShedReason
@@ -1372,6 +1389,7 @@ pub kernel::FrozenConfig::clock_zones: alloc::vec::Vec<kernel::config::ClockZone
 pub kernel::FrozenConfig::effort: core::option::Option<kernel::Effort>
 pub kernel::FrozenConfig::mcp: alloc::vec::Vec<kernel::config::McpServer>
 pub kernel::FrozenConfig::sandbox: kernel::config::SandboxLimits
+pub kernel::FrozenConfig::second_threshold: core::option::Option<kernel::config::SecondThreshold>
 pub kernel::GateOutcome::Allow
 pub kernel::GateOutcome::Ask
 pub kernel::GateOutcome::Ask::question: alloc::boxed::Box<kernel::AxError>
@@ -1692,6 +1710,7 @@ pub kernel::config::FrozenConfig::clock_zones: alloc::vec::Vec<kernel::config::C
 pub kernel::config::FrozenConfig::effort: core::option::Option<kernel::Effort>
 pub kernel::config::FrozenConfig::mcp: alloc::vec::Vec<kernel::config::McpServer>
 pub kernel::config::FrozenConfig::sandbox: kernel::config::SandboxLimits
+pub kernel::config::FrozenConfig::second_threshold: core::option::Option<kernel::config::SecondThreshold>
 pub kernel::config::LayeredValue::building: core::option::Option<T>
 pub kernel::config::LayeredValue::city: core::option::Option<T>
 pub kernel::config::LayeredValue::resident: core::option::Option<T>
@@ -2403,6 +2422,7 @@ pub struct kernel::RoadmapRow
 pub struct kernel::RunId(_)
 pub struct kernel::SandboxLimits
 pub struct kernel::Sealed<T: zeroize::Zeroize>(_)
+pub struct kernel::SecondThreshold(_)
 pub struct kernel::SecretRef
 pub struct kernel::SecretSpan
 pub struct kernel::Seq(_)
@@ -2451,6 +2471,7 @@ pub struct kernel::config::LayeredValue<T>
 pub struct kernel::config::LiveConfig
 pub struct kernel::config::McpServer
 pub struct kernel::config::SandboxLimits
+pub struct kernel::config::SecondThreshold(_)
 pub struct kernel::consts_external::SecretShape
 pub struct kernel::consts_policy::Ratio
 pub struct kernel::delegation::Delegate
@@ -2558,6 +2579,8 @@ pub trait kernel::tool::Tool: core::marker::Send
 pub type kernel::Increments<'a> = &'a mut dyn core::ops::function::FnMut(&kernel::Increment)
 pub type kernel::config::EnvVarName::Error = kernel::AxError
 pub type kernel::config::EnvVarName::Error = kernel::AxError
+pub type kernel::config::SecondThreshold::Error = kernel::AxError
+pub type kernel::config::SecondThreshold::Error = kernel::AxError
 pub type kernel::model::Increments<'a> = &'a mut dyn core::ops::function::FnMut(&kernel::Increment)
 pub type kernel::tool::ServerLabel::Error = kernel::AxError
 pub type kernel::tool::ServerLabel::Error = kernel::AxError
