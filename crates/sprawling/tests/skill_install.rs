@@ -9,6 +9,14 @@
 //! from the CAS under the hash the install reported, which is what makes
 //! the shelved document's origin checkable after the fact.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+
 use city::{Placed, Slot, install_skill};
 
 const BODY: &str = "# Diagnose first\n\nbody\n";
