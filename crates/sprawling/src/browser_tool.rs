@@ -169,7 +169,7 @@ impl Tool for BrowserTool {
         // of the reply by the request itself, so nothing else can crop to
         // an element the page never named.
         if let Verb::Screenshot(request) = &verb
-            && request.resolves_element()
+            && request.waits_for_page()
         {
             let frame = request.capture_frame(&mut self.session, &context, &last)?;
             last = self.port.send(&frame)?.into_result()?;

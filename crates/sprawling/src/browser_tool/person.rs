@@ -115,6 +115,11 @@ pub(super) fn user_browser_params() -> Result<Payload, AxError> {
         },
         "text": text("for type: what to type"),
         "ref": text("for screenshot: the region to cover, as a reference from the snapshot; the page reports that element's box, so nothing is guessed"),
+        "refs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "for screenshot: the references to cover together as one region; the boxes come from the same measurement `measure` reads",
+        },
         "generation": {
             "type": "integer",
             "minimum": 0,

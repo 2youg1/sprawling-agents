@@ -43,7 +43,7 @@ pub(super) fn read_references(args: &Payload) -> Result<Vec<String>, AxError> {
 /// Every reference goes through the snapshot first, so a reference the
 /// model invented is refused here rather than answered with a box that
 /// belongs to something else.
-pub(super) fn measure_script(
+pub(crate) fn measure_script(
     snapshot: &PageSnapshot,
     references: &[String],
 ) -> Result<String, AxError> {

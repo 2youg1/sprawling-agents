@@ -238,24 +238,27 @@ impl Verb {
 
 截图的选项与回来的字节。`quality` 是 **0..=100 的整数**而不是浮点：浮点不进判定路径，而 BiDi 要的 `0.85` 只在最后一刻由 `format!("0.{q:02}")` 解析成 JSON 数，于是本仓库里没有一个 f64 变量。`scale` 同样是百分比整数，`100` 表示不改。
 
-**一张截图裁哪一块，两个入口，互斥**：`clip` 是四个整数（x、y、width、height，CSS 像素），`ref` ＋ `generation` 是快照铸出、世代守卫的引用。**两臂而不是两个可空字段**：一块区域只有一个来处，两个 `Option` 会允许调用方同时点名，而同时点名没有答案。
+**一张截图裁哪一块，三个入口，互斥**：`clip` 是四个整数（x、y、width、height，CSS 像素）；`ref` ＋ `generation` 是快照铸出、世代守卫的引用；`refs` ＋ `generation` 是同样守卫的一组引用，取它们的包围矩形。**三臂而不是三个可空字段**：一块区域只有一个来处，三个 `Option` 会允许调用方同时点名，而同时点名没有答案。
 
 ```rust
-pub enum Clip { Rect(Rect), Element(Element) }
+pub enum Clip { Rect(Rect), Element(Element), Union(Union) }
 pub struct Rect { pub x: u32, pub y: u32, pub width: u32, pub height: u32 }
 pub struct Element { /* reference、generation 私有 */ }
-pub struct ElementHandle(String);   // 页面为元素铸出的句柄，只由解析帧的回复铸出
+pub struct Union { /* references、generation 私有 */ }
 pub struct ShotRequest { pub clip: Option<Clip>, pub format: ImageType,
                          pub quality: Option<u8>, pub scale: Option<u32> }
 pub struct Shot { /* bytes、width、height 私有 */ }
-impl Clip { pub fn resolves_element(&self) -> bool; }
+impl Clip { pub fn waits_for_page(&self) -> bool; }
 impl ShotRequest {
-    pub fn resolves_element(&self) -> bool;
+    pub fn waits_for_page(&self) -> bool;
+    /// 先发的一帧之后：`reply` 是它自己的回复。
     pub fn capture_frame(&self, session: &mut Session, context: &ContextId,
-                         element: &ElementHandle) -> Result<Frame, AxError>;
+                         reply: &Value) -> Result<Frame, AxError>;
 }
 impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError>; }
 ```
+
+**并集是协议装不下的那一臂**：BiDi 没有多元素裁剪，所以它先量后拍——`frames` 发的正是 `measure` 用的那段取框脚本（同一个 `measure_script`、同一个 `Math.round`），`capture_frame` 把回复里的盒子在 Rust 里求并（`checked` 算术，越界即拒），再以矩形臂拍。**框因此只有一个来源**：截图覆盖的区域与 `measure` 报出的区域是同一次读数，不可能两个说法。并集是全库唯一一个「多个元素 → 一个区域」的地方，也是这一臂存在的理由。
 
 **`ref` 走的是一帧换一帧的两段路**，与 §19-8 的元素起点同形：`Verb::frames` 只发让页面报出元素的那一帧（`act::resolve_frame`，世代守卫仍是 `act::ensure_fresh` 一个权威），`input::shared_id_of` 从回复里取出驱动的句柄，`ShotRequest::capture_frame` 再发捕获帧，`clip` 拼成 `{"type":"element","element":{"sharedId":…}}`。**元素裁剪的矩形因此不由本仓计算**：它由页面报给驱动，没有四舍五入，也没有第二次测量，于是不存在「模型看到的框」与「裁出来的图」两个家。矩形臂上传入句柄、或元素臂上没有句柄，都回 `E_INVALID_ARGS`：这条路上没有可解的句柄，是正确的拒绝而不是不可能的状态。
 

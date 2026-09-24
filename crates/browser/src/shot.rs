@@ -19,7 +19,8 @@ use kernel::{AxCode, AxError, ImageType, Payload};
 use serde_json::{Map, Value, json};
 
 pub use cap::{SHOT_MAX_EDGE_PX, ShotMaxEdge};
-pub use clip::{Clip, Element, Rect};
+pub use clip::{Clip, Element, Rect, Union};
+use clip::{generation_of, reference_of, references_of};
 pub use result::Shot;
 
 use crate::port::Frame;
@@ -83,50 +84,6 @@ fn required(field: &str) -> AxError {
     .with_recovery("a clip is x, y, width and height together")
 }
 
-/// The reference a call names, when it names one.
-///
-/// # Errors
-/// Refuses a `ref` that is present and is not a reference: silently
-/// ignoring it would photograph the whole page while the caller believed
-/// it had asked for one element.
-fn reference_of(args: &Payload) -> Result<Option<String>, AxError> {
-    match args.as_map().get("ref") {
-        None | Some(Value::Null) => Ok(None),
-        Some(Value::String(reference)) if !reference.is_empty() => Ok(Some(reference.clone())),
-        Some(Value::String(_)) | Some(_) => Err(AxError::failure(
-            AxCode::InvalidArgs,
-            "read a screenshot request",
-            "`ref` is not a reference",
-        )
-        .with_recovery("a reference is minted by the snapshot and looks like `e12`")),
-    }
-}
-
-/// The snapshot generation a reference was read against.
-///
-/// # Errors
-/// Refuses a missing or malformed generation: a reference without one is
-/// a position in no snapshot, and `act` refuses it the same way.
-fn generation_of(args: &Payload) -> Result<u64, AxError> {
-    let bad = || {
-        AxError::failure(
-            AxCode::InvalidArgs,
-            "photograph a page",
-            "a `ref` names a position in one snapshot, and its generation came with none",
-        )
-        .with_recovery("pass the `generation` the snapshot answered with, the way `act` does")
-    };
-    match args.as_map().get("generation") {
-        Some(Value::Number(number)) => number.as_u64().ok_or_else(bad),
-        None | Some(Value::Null) | Some(_) => Err(bad()),
-    }
-}
-
-/// A JSON number built out of digits rather than out of a float.
-///
-/// # Errors
-/// Refuses a percentage this build cannot spell, which the two callers
-/// below cannot produce.
 fn ratio(percent: u32) -> Result<Value, AxError> {
     let whole = percent
         .checked_div(100)
@@ -169,7 +126,11 @@ impl ShotRequest {
             None => None,
             Some(reference) => Some(Element::new(reference, generation_of(args)?)),
         };
-        let clip = Clip::of(rect, element)?;
+        let union = match references_of(args)? {
+            None => None,
+            Some(references) => Some(Union::new(references, generation_of(args)?)),
+        };
+        let clip = Clip::of(rect, element, union)?;
         let format = match args.as_map().get("format").and_then(Value::as_str) {
             None | Some("png") => ImageType::Png,
             Some("jpeg") => ImageType::Jpeg,
@@ -207,10 +168,11 @@ impl ShotRequest {
         self.format
     }
 
-    /// Whether this shot has to wait for the page to name an element.
+    /// Whether the page has to answer before this shot can be captured:
+    /// an element it names, or a set of boxes it reports.
     #[must_use]
-    pub fn resolves_element(&self) -> bool {
-        self.clip.as_ref().is_some_and(Clip::resolves_element)
+    pub fn waits_for_page(&self) -> bool {
+        self.clip.as_ref().is_some_and(Clip::waits_for_page)
     }
 
     /// The frames one screenshot needs.
@@ -244,21 +206,39 @@ impl ShotRequest {
                     element.reference(),
                 )?);
             }
-            Some(Clip::Rect(_)) | None => frames.push(self.capture(session, context, None)?),
+            Some(Clip::Union(union)) => {
+                let looked = crate::verb::looked_at(snapshot, "photograph a page")?;
+                crate::act::ensure_fresh(looked, union.generation())?;
+                // The boxes come from the script `measure` sends, so the
+                // region a shot covers and the region a measurement
+                // reports are read once and cannot disagree.
+                frames.push(session.evaluate(
+                    context,
+                    &crate::verb::script::measure_script(looked, union.references())?,
+                )?);
+            }
+            Some(Clip::Rect(_)) | None => {
+                let clip = match &self.clip {
+                    Some(clip) => Some(clip.wire(None)?),
+                    None => None,
+                };
+                frames.push(self.capture(session, context, clip)?);
+            }
         }
         Ok(frames)
     }
 
-    /// The capture frame, once the page has named the element this shot
-    /// covers.
+    /// The capture frame, once the page has answered about the region.
     ///
-    /// `reply` is the resolve frame's own reply: the handle the page
-    /// minted is read out of it here rather than handed in, so no caller
-    /// can crop to an element the page never named.
+    /// `reply` is the frame this shot sent first: the resolve frame's
+    /// reply for an element, the measure frame's for a set of boxes. The
+    /// handle or the boxes are read out of it here rather than handed in,
+    /// so no caller can crop to an element or a region the page never
+    /// reported.
     ///
     /// # Errors
-    /// Refuses a shot that covers a rectangle, which has nothing to
-    /// resolve, and propagates a reply that carries no handle.
+    /// Refuses a shot that covers a rectangle, which had nothing to
+    /// resolve, and propagates a reply this build cannot read.
     pub fn capture_frame(
         &self,
         session: &mut Session,
@@ -266,9 +246,13 @@ impl ShotRequest {
         reply: &Value,
     ) -> Result<Frame, AxError> {
         match &self.clip {
-            Some(Clip::Element(_)) => {
+            Some(clip @ Clip::Element(_)) => {
                 let shared_id = crate::input::shared_id_of(reply)?;
-                self.capture(session, context, Some(&shared_id))
+                self.capture(session, context, Some(clip.wire(Some(&shared_id))?))
+            }
+            Some(Clip::Union(_)) => {
+                let rect = Union::around(reply)?;
+                self.capture(session, context, Some(Clip::Rect(rect).wire(None)?))
             }
             Some(Clip::Rect(_)) | None => Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -276,8 +260,8 @@ impl ShotRequest {
                 "this shot covers a rectangle, so nothing was resolved",
             )
             .with_recovery(
-                "report this against browser::shot: a capture frame follows a resolve frame \
-                 only when the shot names an element",
+                "report this against browser::shot: a capture frame follows a page's answer \
+                 only when the shot names an element or a set of references",
             )),
         }
     }
@@ -324,29 +308,13 @@ impl ShotRequest {
         Ok(frames)
     }
 
-    /// One capture frame. `element` is the page's handle for the element
-    /// this shot covers, and is `Some` only on that one arm.
+    /// One capture frame, with the clip the caller has already resolved.
     fn capture(
         &self,
         session: &mut Session,
         context: &ContextId,
-        element: Option<&str>,
+        clip: Option<Value>,
     ) -> Result<Frame, AxError> {
-        let clip = match (&self.clip, element) {
-            (Some(clip), handle) => Some(clip.wire(handle)?),
-            (None, None) => None,
-            (None, Some(_)) => {
-                return Err(AxError::failure(
-                    AxCode::InvalidArgs,
-                    "photograph a page",
-                    "a handle arrived for a shot that covers no element",
-                )
-                .with_recovery(
-                    "report this against browser::shot: a handle is minted only for a shot by \
-                     reference",
-                ));
-            }
-        };
         let mut params = Map::new();
         params.insert(
             "context".to_owned(),

@@ -103,7 +103,7 @@ fn every_capture_states_the_cap_and_the_reply_is_judged_against_it() {
 #[test]
 fn a_reference_covers_an_element_the_page_reports() {
     let request = ShotRequest::read(&args(json!({ "ref": "e12", "generation": 3 }))).unwrap();
-    assert!(request.resolves_element());
+    assert!(request.waits_for_page());
     let mut session = Session::new();
     let err = request.frames(&mut session, &context(), None).unwrap_err();
     assert_eq!(err.code(), &AxCode::InvalidArgs);
@@ -128,7 +128,7 @@ fn a_rectangle_has_nothing_to_resolve_and_says_so() {
         "clip": { "x": 0, "y": 0, "width": 10, "height": 10 },
     })))
     .unwrap();
-    assert!(!request.resolves_element());
+    assert!(!request.waits_for_page());
     let mut session = Session::new();
     let err = request
         .capture_frame(&mut session, &context(), &json!({}))
@@ -180,6 +180,55 @@ fn a_picture_past_the_cap_is_asked_for_again_at_a_computed_density() {
         "{}",
         frame.to_wire()
     );
+}
+
+#[test]
+fn a_union_covers_every_named_element_from_the_boxes_measure_reads() {
+    let request = ShotRequest::read(&args(json!({
+        "refs": ["e1", "e2"], "generation": 4,
+    })))
+    .unwrap();
+    assert!(request.waits_for_page());
+    let page = json!([
+        { "role": "button", "name": "One" },
+        { "role": "textbox", "name": "Two" },
+    ]);
+    let looked = PageSnapshot::read(4, &page).unwrap();
+    let mut session = Session::new();
+    let frames = request
+        .frames(&mut session, &context(), Some(&looked))
+        .unwrap();
+    assert_eq!(frames.len(), 1, "the page reports the boxes first");
+    assert_eq!(frames[0].method(), "script.evaluate");
+    let boxes = json!({
+        "result": { "type": "string", "value":
+            "[{\"ref\":\"e1\",\"x\":10,\"y\":20,\"width\":100,\"height\":50},\
+              {\"ref\":\"e2\",\"x\":150,\"y\":5,\"width\":40,\"height\":200}]" }
+    });
+    let frame = request
+        .capture_frame(&mut session, &context(), &boxes)
+        .unwrap();
+    let wire = frame.to_wire();
+    assert_eq!(frame.method(), "browsingContext.captureScreenshot");
+    assert!(wire.contains("\"x\":10"), "{wire}");
+    assert!(wire.contains("\"y\":5"), "{wire}");
+    assert!(wire.contains("\"width\":180"), "{wire}");
+    assert!(wire.contains("\"height\":200"), "{wire}");
+    assert!(wire.contains("\"imageSize\""), "{wire}");
+}
+
+#[test]
+fn a_union_of_nothing_is_refused_and_so_is_one_decided_on_a_moved_page() {
+    let err = ShotRequest::read(&args(json!({ "refs": [], "generation": 1 }))).unwrap_err();
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+    let request = ShotRequest::read(&args(json!({ "refs": ["e1"], "generation": 9 }))).unwrap();
+    let page = json!([{ "role": "button", "name": "One" }]);
+    let looked = PageSnapshot::read(4, &page).unwrap();
+    let mut session = Session::new();
+    let err = request
+        .frames(&mut session, &context(), Some(&looked))
+        .unwrap_err();
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
 }
 
 #[test]

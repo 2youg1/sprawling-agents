@@ -13,7 +13,7 @@
 //! module owns which bytes it should put on it.
 
 mod read;
-mod script;
+pub(crate) mod script;
 
 use kernel::{AxCode, AxError, Payload};
 use serde_json::json;
