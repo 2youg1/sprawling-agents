@@ -373,3 +373,28 @@ fn a_relative_shelf_path_is_refused() {
         err.recovery()
     );
 }
+
+/// An empty or dot-prefixed name is not a holding: the scan skips it,
+/// which is what makes a name the install refuses one rule rather than
+/// a preference, and keeps a half-written staging file out of every
+/// catalog for the same reason.
+#[test]
+fn a_dotted_item_is_invisible_to_the_scan() {
+    let dir = tempfile::tempdir().unwrap();
+    let shelves = dir.path().join(kernel::RESERVED_PREFIX).join(LIBRARY_DIR);
+    std::fs::create_dir_all(shelves.join("utilities")).unwrap();
+    std::fs::write(shelves.join("utilities").join(".draft.md"), "# Draft\n").unwrap();
+    std::fs::create_dir_all(shelves.join(".hidden-tools")).unwrap();
+    std::fs::write(
+        shelves.join(".hidden-tools").join("sneaky.md"),
+        "# Sneaky\n",
+    )
+    .unwrap();
+
+    let library = scan(dir.path(), None).unwrap();
+    assert!(
+        library.all().is_empty(),
+        "a dot-prefixed name is not a holding: {:?}",
+        library.all()
+    );
+}

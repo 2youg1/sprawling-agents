@@ -26,16 +26,17 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+mod install;
 mod reading;
 mod shelf;
 
+pub use install::{Installed, Placed, PlannedInstall, Slot, install, plan_install};
 pub use shelf::{Holding, Shelf};
 
-use reading::OwnShelf;
+use shelf::OwnShelf;
 use shelf::ShelfKey;
 use std::path::Path;
 
-use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError};
 
 use crate::config_layers::SHELVES_KEY;
@@ -70,7 +71,6 @@ impl Library {
         building: Option<&Address>,
         home: &Path,
     ) -> Result<Library, AxError> {
-        let layout = CityLayout::new(city_root);
         let mut holdings = BTreeMap::new();
         // The farthest shelf first, so that the nearer one replaces it
         // under one name: the city's own stock is written by whoever
@@ -92,17 +92,11 @@ impl Library {
             })?;
             reading::shelve_external(index, &root, &mut holdings)?;
         }
-        reading::shelve(
-            city_root,
-            &layout.library(),
-            OwnShelf::Library,
-            &mut holdings,
-        )?;
+        reading::shelve(city_root, &OwnShelf::Library, &mut holdings)?;
         if let Some(building) = building {
             reading::shelve(
                 city_root,
-                &layout.building_skills(building),
-                OwnShelf::Building,
+                &OwnShelf::Building(building.clone()),
                 &mut holdings,
             )?;
         }

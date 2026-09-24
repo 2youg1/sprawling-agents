@@ -10,7 +10,74 @@
 //! and the address a page opens one by is the whole of the answer this
 //! module owns.
 
+use kernel::layout::CityLayout;
 use kernel::{Address, B3Hash};
+
+use std::path::PathBuf;
+
+/// The extension a shelved document carries: one skill is one document,
+/// filed as `<name>.md`. Both directions of that spelling live here, so
+/// the scan that reads a shelf and the install that writes one cannot
+/// disagree about what a holding's file is called.
+pub(super) const HOLDING_EXT: &str = "md";
+
+/// The name a shelved file is filed under, or `None` when the file is
+/// not a holding.
+pub(super) fn holding_name(file_name: &str) -> Option<String> {
+    let name = file_name.strip_suffix(HOLDING_EXT)?;
+    let name = name.strip_suffix('.')?;
+    if name.is_empty() {
+        return None;
+    }
+    Some(name.to_owned())
+}
+
+/// The file name a holding of `name` is shelved as.
+pub(super) fn holding_file_name(name: &str) -> String {
+    format!("{name}.{HOLDING_EXT}")
+}
+
+/// Whether `name` is a name something can be filed under: non-empty,
+/// not starting with a dot, and one path segment.
+///
+/// The one rule both directions answer to: the scan skips what it
+/// rejects and the install refuses it, so a half-written staging file
+/// beside a document and a name no catalog would ever show are one rule
+/// seen from two sides rather than two rules that can drift.
+pub(super) fn plain_name(name: &str) -> bool {
+    !name.is_empty() && !name.starts_with('.') && !name.contains(['/', '\\'])
+}
+
+/// Which of the shelves the city keeps itself.
+///
+/// A shelf outside the city is another program's directory mounted
+/// read-only (section 8-8), so there is no arm for one here: filing a
+/// skill on it is something that cannot be asked for rather than
+/// something refused. The building arm carries the address because the
+/// shelf is that building's own subtree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum OwnShelf {
+    Library,
+    Building(Address),
+}
+
+impl OwnShelf {
+    /// Where this shelf's root sits in the city.
+    pub(super) fn root(&self, layout: &CityLayout) -> PathBuf {
+        match self {
+            OwnShelf::Library => layout.library(),
+            OwnShelf::Building(building) => layout.building_skills(building),
+        }
+    }
+
+    /// Where a document read off this shelf sits.
+    pub(super) fn at(&self, item: Address) -> Shelf {
+        match self {
+            OwnShelf::Library => Shelf::Library(item),
+            OwnShelf::Building(_) => Shelf::Building(item),
+        }
+    }
+}
 
 /// What a holding is shelved under: the name a reading room admits it
 /// by, and nothing else.
@@ -108,4 +175,32 @@ pub struct Holding {
     /// Which shelf, and where on it. One value, so a reader opening the
     /// document and a page naming the shelf read one fact.
     pub shelf: Shelf,
+}
+
+impl Holding {
+    /// One holding, derived from the document's bytes in exactly one
+    /// place. The disclosure line and the content hash are what every
+    /// scan and every install reports, and two derivations of them would
+    /// be two answers to what this document said.
+    pub(super) fn of(name: String, section: String, text: &str, shelf: Shelf) -> Holding {
+        Holding {
+            name,
+            section,
+            disclosure: first_line(text),
+            hash: B3Hash::digest(text.as_bytes()),
+            shelf,
+        }
+    }
+}
+
+/// The first non-empty line of a document, trimmed of its heading mark:
+/// what the author wrote to describe it, and the one line a catalog
+/// would show.
+fn first_line(text: &str) -> String {
+    text.lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or_default()
+        .trim_start_matches(['#', ' '])
+        .to_owned()
 }

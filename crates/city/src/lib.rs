@@ -53,6 +53,8 @@ pub use governed::{Governed, PREFERENCES_FILE, write_governed};
 // `city::CONFIG_TOML` and the layout that places it cannot disagree.
 pub use kernel::layout::{ARCHIVE_DIR, BUILDING_SHELF, CONFIG_FILE, LIBRARY_DIR, URBANITE_FILE};
 pub use library::{Holding, Library, Shelf};
+pub use library::{Installed, Placed, PlannedInstall, Slot};
+pub use library::{install as install_skill, plan_install as plan_skill_install};
 pub use neighbourhood::{Neighbour, Neighbourhood, Occupancy};
 pub use neighbours_tool::NeighboursTool;
 pub use policy::write_rules;

@@ -14,11 +14,13 @@ impl city::Library
 impl city::Link
 impl city::Neighbourhood
 impl city::NeighboursTool
+impl city::PlannedInstall
 impl city::Resident
 impl city::RulesTool
 impl city::RunBrief
 impl city::Schedule
 impl city::Shelf
+impl city::Slot
 impl city::Source
 impl city::UserBrowserEndpoint
 impl city::Watch
@@ -52,6 +54,8 @@ pub city::Holding::shelf: city::Shelf
 pub city::Identity::Ephemeral
 pub city::Identity::Ephemeral::addr: kernel::address::Address
 pub city::Identity::Resident(city::Resident)
+pub city::Installed::holding: city::Holding
+pub city::Installed::placed: city::Placed
 pub city::JobBrief::goal: &'a str
 pub city::JobBrief::task: &'a str
 pub city::Layer::Building
@@ -70,6 +74,8 @@ pub city::Neighbour::waiting: u32
 pub city::Occupancy::Empty
 pub city::Occupancy::Resident
 pub city::Occupancy::Resident::bring: alloc::string::String
+pub city::Placed::AlreadyShelved
+pub city::Placed::Fresh
 pub city::Relocation::crosses_building: bool
 pub city::Relocation::from: kernel::address::Address
 pub city::Relocation::to: kernel::address::Address
@@ -118,6 +124,7 @@ pub enum city::Layer
 pub enum city::Link
 pub enum city::ModelPool
 pub enum city::Occupancy
+pub enum city::Placed
 pub enum city::RunBrief
 pub enum city::Shelf
 pub enum city::Standing
@@ -189,6 +196,9 @@ pub fn city::Neighbourhood::scan(&std::path::Path, &kernel::address::Address, &k
 pub fn city::NeighboursTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn city::NeighboursTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn city::NeighboursTool::new(city::Neighbourhood) -> core::result::Result<city::NeighboursTool, kernel::error::shape::AxError>
+pub fn city::PlannedInstall::apply(self, &mut dyn core::ops::function::FnMut(&[u8]) -> core::result::Result<kernel::locator::B3Hash, kernel::error::shape::AxError>) -> core::result::Result<city::Installed, kernel::error::shape::AxError>
+pub fn city::PlannedInstall::hash(&self) -> &kernel::locator::B3Hash
+pub fn city::PlannedInstall::name(&self) -> &str
 pub fn city::Resident::addr(&self) -> &kernel::address::Address
 pub fn city::Resident::digest(&self) -> kernel::locator::B3Hash
 pub fn city::RulesTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
@@ -201,6 +211,8 @@ pub fn city::Schedule::entries(&self) -> &[city::Entry]
 pub fn city::Schedule::load(&std::path::Path) -> core::result::Result<city::Schedule, kernel::error::shape::AxError>
 pub fn city::Schedule::parse(&str) -> core::result::Result<city::Schedule, kernel::error::shape::AxError>
 pub fn city::Shelf::address(&self) -> core::option::Option<&kernel::address::Address>
+pub fn city::Slot::building(&kernel::address::Address, &str) -> core::result::Result<city::Slot, kernel::error::shape::AxError>
+pub fn city::Slot::library(&str) -> core::result::Result<city::Slot, kernel::error::shape::AxError>
 pub fn city::Source::addr(&self) -> &kernel::address::Address
 pub fn city::Source::building(&self) -> &str
 pub fn city::Source::matches(&self) -> &str
@@ -233,6 +245,7 @@ pub fn city::forget_shape(&std::path::Path, &kernel::address::Address) -> core::
 pub fn city::hall_identity_path(&std::path::Path, &kernel::address::Address) -> core::option::Option<std::path::PathBuf>
 pub fn city::handoff(&std::path::Path, &kernel::address::Address) -> core::result::Result<core::option::Option<alloc::string::String>, kernel::error::shape::AxError>
 pub fn city::handoff_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
+pub fn city::install_skill(&std::path::Path, &city::Slot, &std::path::Path, &mut dyn core::ops::function::FnMut(&[u8]) -> core::result::Result<kernel::locator::B3Hash, kernel::error::shape::AxError>) -> core::result::Result<city::Installed, kernel::error::shape::AxError>
 pub fn city::job_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
 pub fn city::lay_out_hall_identities(&std::path::Path) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::load(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
@@ -240,6 +253,7 @@ pub fn city::load_config(&std::path::Path, &kernel::address::Address) -> core::r
 pub fn city::norms(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<std::path::PathBuf>, kernel::error::shape::AxError>
 pub fn city::open_room(&std::path::Path, &kernel::address::Address, &kernel::address::SessionName) -> core::result::Result<kernel::address::Address, kernel::error::shape::AxError>
 pub fn city::own_layer(&std::path::Path, &kernel::address::Address) -> core::result::Result<city::ConfigLayer, kernel::error::shape::AxError>
+pub fn city::plan_skill_install(&std::path::Path, &city::Slot, &std::path::Path) -> core::result::Result<city::PlannedInstall, kernel::error::shape::AxError>
 pub fn city::relocate(&kernel::address::Address, &kernel::address::Address) -> core::result::Result<city::Relocation, kernel::error::shape::AxError>
 pub fn city::roadmap(&std::path::Path, &kernel::address::Address) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
 pub fn city::roadmap_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
@@ -271,15 +285,18 @@ pub struct city::Dossier
 pub struct city::Entry
 pub struct city::Held<'a>
 pub struct city::Holding
+pub struct city::Installed
 pub struct city::JobBrief<'a>
 pub struct city::Library
 pub struct city::Neighbour
 pub struct city::Neighbourhood
 pub struct city::NeighboursTool
+pub struct city::PlannedInstall
 pub struct city::Relocation
 pub struct city::Resident
 pub struct city::RulesTool
 pub struct city::Schedule
+pub struct city::Slot
 pub struct city::Source
 pub struct city::UserBrowserEndpoint
 pub struct city::Watch

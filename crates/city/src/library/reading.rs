@@ -13,35 +13,18 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxCode, AxError, B3Hash};
+use kernel::layout::CityLayout;
+use kernel::{Address, AxCode, AxError};
 
 use crate::config_layers::SHELVES_KEY;
 
 use super::ShelfKey;
-use super::shelf::{Holding, Shelf};
+use super::shelf::{Holding, OwnShelf, Shelf, holding_name, plain_name};
 
 /// What a skill on a shelf outside the city is filed as: one directory
 /// per skill, holding this file. It is the layout pi, claude and agents
 /// all use, and the one place this city states it.
-const SKILL_FILE: &str = "SKILL.md";
-
-/// One of the two shelves the city keeps itself: the two a holding can
-/// be at an address on.
-#[derive(Debug, Clone, Copy)]
-pub(super) enum OwnShelf {
-    Library,
-    Building,
-}
-
-impl OwnShelf {
-    /// Where a document read off this shelf sits.
-    fn at(self, addr: Address) -> Shelf {
-        match self {
-            OwnShelf::Library => Shelf::Library(addr),
-            OwnShelf::Building => Shelf::Building(addr),
-        }
-    }
-}
+pub(super) const SKILL_FILE: &str = "SKILL.md";
 
 /// Reads one shelf into the map. A shelf that is not there is an empty
 /// shelf: most cities start with nothing settled, and most buildings
@@ -57,27 +40,30 @@ impl OwnShelf {
 /// a path the city cannot spell as an address.
 pub(super) fn shelve(
     city_root: &Path,
-    root: &Path,
-    shelf: OwnShelf,
+    shelf: &OwnShelf,
     holdings: &mut BTreeMap<ShelfKey, Holding>,
 ) -> Result<(), AxError> {
+    let root = shelf.root(&CityLayout::new(city_root));
     if !root.exists() {
         return Ok(());
     }
-    for section in read_dir(root)? {
+    for section in read_dir(&root)? {
         if !section.is_dir() {
             continue;
         }
         let section_name = spelled(&section)?;
+        if !plain_name(&section_name) {
+            continue;
+        }
         for item in read_dir(&section)? {
-            if item.is_dir() || item.extension().is_none_or(|ext| ext != "md") {
+            if item.is_dir() {
                 continue;
             }
             let file = spelled(&item)?;
-            let Some(name) = file.strip_suffix(".md").map(str::to_owned) else {
+            let Some(name) = holding_name(&file) else {
                 continue;
             };
-            if name.is_empty() {
+            if !plain_name(&name) {
                 continue;
             }
             let text = read_holding(&item)?;
@@ -87,13 +73,7 @@ pub(super) fn shelve(
             let addr = address_of(city_root, &item)?;
             holdings.insert(
                 ShelfKey::of(&name),
-                Holding {
-                    name,
-                    section: section_name.clone(),
-                    disclosure: first_line(&text),
-                    hash: B3Hash::digest(text.as_bytes()),
-                    shelf: shelf.at(addr),
-                },
+                Holding::of(name, section_name.clone(), &text, shelf.at(addr)),
             );
         }
     }
@@ -147,25 +127,17 @@ pub(super) fn shelve_external(
             continue;
         }
         let text = read_holding(&document)?;
+        let path = format!("{name}/{SKILL_FILE}");
         holdings.insert(
             ShelfKey::of(&name),
-            Holding {
-                name: name.clone(),
-                section: String::new(),
-                disclosure: first_line(&text),
-                hash: B3Hash::digest(text.as_bytes()),
-                shelf: Shelf::External {
-                    index,
-                    path: format!("{name}/{SKILL_FILE}"),
-                },
-            },
+            Holding::of(name, String::new(), &text, Shelf::External { index, path }),
         );
     }
     Ok(())
 }
 
 /// One holding's bytes, or the refusal that names the file.
-fn read_holding(item: &Path) -> Result<String, AxError> {
+pub(super) fn read_holding(item: &Path) -> Result<String, AxError> {
     std::fs::read_to_string(item).map_err(|err| {
         AxError::failure(
             AxCode::StorageFatal,
@@ -180,7 +152,7 @@ fn read_holding(item: &Path) -> Result<String, AxError> {
 }
 
 /// How the city addresses a file on one of its shelves.
-fn address_of(city_root: &Path, item: &Path) -> Result<Address, AxError> {
+pub(super) fn address_of(city_root: &Path, item: &Path) -> Result<Address, AxError> {
     let relative = item.strip_prefix(city_root).map_err(|_| {
         AxError::failure(
             AxCode::StorageFatal,
@@ -206,7 +178,7 @@ fn address_of(city_root: &Path, item: &Path) -> Result<Address, AxError> {
 /// A name this machine spells outside Unicode is reported rather than
 /// dropped: a skill silently absent from every reading room is the one
 /// failure a person cannot see from the catalog.
-fn spelled(path: &Path) -> Result<String, AxError> {
+pub(super) fn spelled(path: &Path) -> Result<String, AxError> {
     path.file_name()
         .and_then(|name| name.to_str())
         .map(str::to_owned)
@@ -222,7 +194,7 @@ fn unspellable(path: &Path) -> AxError {
     .with_recovery("rename it to letters, digits and dashes, then scan again")
 }
 
-fn read_dir(path: &Path) -> Result<Vec<PathBuf>, AxError> {
+pub(super) fn read_dir(path: &Path) -> Result<Vec<PathBuf>, AxError> {
     let mut out = Vec::new();
     let entries = std::fs::read_dir(path).map_err(|err| {
         AxError::failure(
@@ -251,13 +223,4 @@ fn read_dir(path: &Path) -> Result<Vec<PathBuf>, AxError> {
     }
     out.sort();
     Ok(out)
-}
-
-fn first_line(text: &str) -> String {
-    text.lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty())
-        .unwrap_or_default()
-        .trim_start_matches(['#', ' '])
-        .to_owned()
 }
