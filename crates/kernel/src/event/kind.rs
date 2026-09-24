@@ -96,8 +96,6 @@ pub enum EventKind {
     PolicyRevoked,
     TaintPromoted,
     CrossBuildingTransfer,
-    TakeoverStarted,
-    RollbackApplied,
     CityHalted,
     BackpressureShed,
     DigestInvalidated,
@@ -178,7 +176,7 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 75] = [
+    pub const ALL: [EventKind; 73] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -227,8 +225,6 @@ impl EventKind {
         EventKind::PolicyRevoked,
         EventKind::TaintPromoted,
         EventKind::CrossBuildingTransfer,
-        EventKind::TakeoverStarted,
-        EventKind::RollbackApplied,
         EventKind::CityHalted,
         EventKind::BackpressureShed,
         EventKind::DigestInvalidated,
@@ -314,8 +310,6 @@ impl EventKind {
             | EventKind::PolicyRevoked
             | EventKind::TaintPromoted
             | EventKind::CrossBuildingTransfer
-            | EventKind::TakeoverStarted
-            | EventKind::RollbackApplied
             | EventKind::CityHalted
             | EventKind::BackpressureShed
             | EventKind::DigestInvalidated
