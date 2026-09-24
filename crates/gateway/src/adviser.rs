@@ -104,6 +104,7 @@ impl AdviserClient {
         let word = ask_word(question.ask)?;
         let mut messages = window.to_vec();
         messages.push(ChatMessage {
+            cache: false,
             role: Role::User,
             content: vec![ContentBlock::Text {
                 text: question_text(&word, &question),

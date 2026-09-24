@@ -140,6 +140,7 @@ impl RunWorker {
                     cache: false,
                 }],
                 messages: vec![kernel::ChatMessage {
+                    cache: false,
                     role: kernel::Role::User,
                     content: vec![kernel::ContentBlock::Text {
                         text: task.to_owned(),

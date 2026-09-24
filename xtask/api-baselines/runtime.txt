@@ -530,6 +530,7 @@ pub fn runtime::replay::VerifiedLedger::tail_seq(&self) -> core::option::Option<
 pub fn runtime::replay::dangling_tool_calls(&runtime::replay::VerifiedLedger) -> alloc::vec::Vec<(kernel::event::identity::RunId, kernel::event::identity::Seq)>
 pub fn runtime::replay::outcome_unknown_draft(&kernel::event::payload::EventRecord, kernel::event::identity::TimeMs) -> core::result::Result<kernel::event::payload::EventDraft, kernel::error::shape::AxError>
 pub fn runtime::replay::rebuild_prefix(&serde_json::value::Value, &dyn core::ops::function::Fn(&kernel::address::Address) -> core::option::Option<alloc::vec::Vec<u8>>) -> core::result::Result<[kernel::locator::B3Hash; 4], kernel::error::shape::AxError>
+pub fn runtime::replay::rebuild_shape(core::option::Option<(&serde_json::value::Value, &serde_json::value::Value)>, &serde_json::value::Value, &serde_json::value::Value) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn runtime::replay::verify_ledger_dir(&std::path::Path) -> core::result::Result<runtime::replay::VerifiedLedger, kernel::error::shape::AxError>
 pub fn runtime::replay::verify_lines(alloc::vec::Vec<alloc::vec::Vec<u8>>) -> core::result::Result<runtime::replay::VerifiedLedger, kernel::error::shape::AxError>
 pub fn runtime::resume(&runtime::handoff::Handoff, kernel::event::identity::RunId) -> runtime::handoff::ResumeSeed

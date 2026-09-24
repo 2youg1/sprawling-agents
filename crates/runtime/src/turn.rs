@@ -110,7 +110,7 @@ impl Turn<Assembling> {
         let prompt = prefix.prompt_payload()?;
         self.journal
             .append_authored(ledger, Authored::PromptAssembled, prompt)?;
-        let chat = ChatRequest {
+        let mut chat = ChatRequest {
             model: shape.model.clone(),
             max_tokens: shape.max_tokens,
             system: prefix.system_blocks()?,
@@ -118,6 +118,10 @@ impl Turn<Assembling> {
             tools: tools.to_vec(),
             effort: shape.effort,
         };
+        // The cache region ends at the tail of the conversation, so
+        // everything this request carries - trailing tool results
+        // included - is inside the region the next request can hit.
+        crate::prefix::shape::anchor_tail(&mut chat.messages);
         Ok(PhaseOutcome::Advanced(Turn {
             journal: self.journal,
             state: Calling { segments, chat },

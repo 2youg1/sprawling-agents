@@ -14,6 +14,7 @@ use kernel::{
 };
 
 use crate::handoff::Handoff;
+use crate::prefix::shape::PromptShape;
 use crate::reminder::ContextGauge;
 use crate::turn::{Interrupt, NextCall, PhaseOutcome, Turn, TurnReport};
 use crate::window::Window;
@@ -115,6 +116,7 @@ impl Run<Active> {
                 turns: 0,
                 last_turn_t: None,
                 gauge,
+                prior_shape: None,
             },
         })
     }
@@ -150,6 +152,27 @@ impl Run<Active> {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };
+        // What this request looks like to a prompt cache, and which of its
+        // regions moved since the request before it. Written here, after the
+        // turn has assembled, so the line describes a request that exists;
+        // the shape of the first request says so rather than claiming a
+        // comparison nobody made.
+        let shape = PromptShape::of(
+            &self.plan.prefix,
+            &self.plan.tools,
+            self.state.window.messages(),
+        )?;
+        let changed = shape.attribute(self.state.prior_shape.as_ref());
+        ledger.append(EventDraft {
+            run: self.plan.run,
+            t,
+            who: self.plan.who.clone(),
+            addr: Some(self.plan.addr.clone()),
+            kind: EventKind::PromptShapeCompared,
+            data: Payload::of(&shape.recorded(changed)?)?,
+            ig: false,
+        })?;
+        self.state.prior_shape = Some(shape);
         let calling = (hooks.interrupt)(SafePoint::BeforeCall { turn: index });
         fold_steer(&mut self.state.window, &calling);
         let turn = match turn.call(

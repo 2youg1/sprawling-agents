@@ -38,6 +38,12 @@ pub enum EventKind {
     RunStarted,
     RunForked,
     PromptAssembled,
+    /// One request's cache shape, and which of its regions moved since
+    /// the request before it. The line that turns a cache miss into a
+    /// named cause: system, tools or the conversation. It measures the
+    /// request rather than deciding any of its bytes, which is why it is
+    /// record-only.
+    PromptShapeCompared,
     ModelCalled,
     ModelReturned,
     ToolCalled,
@@ -172,7 +178,7 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 74] = [
+    pub const ALL: [EventKind; 75] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -180,6 +186,7 @@ impl EventKind {
         EventKind::RunStarted,
         EventKind::RunForked,
         EventKind::PromptAssembled,
+        EventKind::PromptShapeCompared,
         EventKind::ModelCalled,
         EventKind::ModelReturned,
         EventKind::ToolCalled,
@@ -270,6 +277,9 @@ impl EventKind {
             // the bytes it is given are recorded by `prompt_assembled`;
             // nothing here belongs to a window already on the wire.
             | EventKind::SessionOpened
+            // The cache shape measures what a request carries; it never
+            // decides any of those bytes.
+            | EventKind::PromptShapeCompared
             | EventKind::RunForked
             | EventKind::GateChecked
             | EventKind::GateDenied

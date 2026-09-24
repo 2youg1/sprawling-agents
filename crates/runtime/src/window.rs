@@ -92,6 +92,7 @@ impl Window {
     pub fn push_assistant(&mut self, content: Vec<ContentBlock>) {
         if !content.is_empty() {
             self.messages.push(ChatMessage {
+                cache: false,
                 role: Role::Assistant,
                 content,
             });
@@ -106,6 +107,7 @@ impl Window {
         match self.messages.last_mut() {
             Some(last) if last.role == Role::User => last.content.extend(results),
             _ => self.messages.push(ChatMessage {
+                cache: false,
                 role: Role::User,
                 content: results,
             }),
@@ -121,6 +123,7 @@ impl Window {
         match self.messages.last_mut() {
             Some(last) if last.role == Role::User => last.content.push(block),
             _ => self.messages.push(ChatMessage {
+                cache: false,
                 role: Role::User,
                 content: vec![block],
             }),

@@ -161,6 +161,10 @@ pub struct Active {
     last_turn_t: Option<TimeMs>,
     /// How full the window is, read off each call's reported usage.
     gauge: ContextGauge,
+    /// The cache shape of the request this run sent last, which is what
+    /// the next one is compared against. `None` before the first
+    /// request, and that absence is the `FirstRequest` a record states.
+    prior_shape: Option<crate::prefix::shape::PromptShape>,
 }
 
 /// A frozen run. There is no method back to [`Active`]: waking an old run

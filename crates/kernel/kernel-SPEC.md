@@ -457,7 +457,7 @@ pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 - 铸造纪律（15.3-1）：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（trybuild 反例）。
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
-**EventKind 73 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
+**EventKind 74 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
@@ -468,6 +468,7 @@ pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 | 基集 | `run_started` | record-only |
 | 基集 | `run_forked` | record-only |
 | 基集 | `prompt_assembled` | **in-window** |
+| 基集 | `prompt_shape_compared` | record-only（一次请求的缓存形态与归因：量请求、不裁字节；段哈希仍由 `prompt_assembled` 独家记账） |
 | 基集 | `model_called` | **in-window** |
 | 基集 | `model_returned` | **in-window** |
 | 基集 | `tool_called` | **in-window** |

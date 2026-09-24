@@ -251,6 +251,8 @@ fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::RunStarted
         | EventKind::RunForked
         | EventKind::PromptAssembled
+        // The cache shape measures one request; it names no plan row.
+        | EventKind::PromptShapeCompared
         | EventKind::ModelCalled
         | EventKind::ModelReturned
         | EventKind::ToolCalled

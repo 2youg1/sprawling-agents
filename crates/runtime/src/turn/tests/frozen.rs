@@ -64,8 +64,9 @@ fn a_prefix_whose_bytes_moved_is_refused_before_anything_is_assembled() {
 }
 
 /// The second per-turn digest: the four system blocks the request carries
-/// must hash to the four the run froze, and each must keep its cache
-/// breakpoint.
+/// must hash to the four the run froze, and keep the breakpoint plan -
+/// every segment edge before the tail carrying one, the tail edge carrying
+/// none because the tail anchor on the conversation holds the fourth.
 #[test]
 fn the_system_blocks_a_request_carries_are_checked_against_the_frozen_hashes() {
     let frozen: [B3Hash; 4] = [
@@ -74,7 +75,7 @@ fn the_system_blocks_a_request_carries_are_checked_against_the_frozen_hashes() {
         B3Hash::digest(b"r"),
         B3Hash::digest(b"j"),
     ];
-    let blocks = |run: &str, cached: bool| {
+    let blocks = |run: &str, tail_marked: bool| {
         vec![
             kernel::SystemBlock {
                 text: "c".to_owned(),
@@ -90,21 +91,31 @@ fn the_system_blocks_a_request_carries_are_checked_against_the_frozen_hashes() {
             },
             kernel::SystemBlock {
                 text: run.to_owned(),
-                cache: cached,
+                cache: tail_marked,
             },
         ]
     };
     assert_eq!(
-        crate::prefix::verified_system_hashes(&blocks("j", true), &frozen).unwrap(),
+        crate::prefix::verified_system_hashes(&blocks("j", false), &frozen).unwrap(),
         frozen
     );
-    let Err(moved) = crate::prefix::verified_system_hashes(&blocks("k", true), &frozen) else {
+    let Err(moved) = crate::prefix::verified_system_hashes(&blocks("k", false), &frozen) else {
         panic!("a block that moved is refused");
     };
     assert_eq!(moved.code(), &kernel::AxCode::CasCorrupt);
     assert!(moved.subject().contains("run"), "{}", moved);
-    let Err(unmarked) = crate::prefix::verified_system_hashes(&blocks("j", false), &frozen) else {
-        panic!("a block that lost its breakpoint is refused");
+    let Err(anchored_twice) = crate::prefix::verified_system_hashes(&blocks("j", true), &frozen)
+    else {
+        panic!("a breakpoint where the tail anchor lives is refused");
+    };
+    assert!(
+        anchored_twice.subject().contains("cache breakpoint"),
+        "{anchored_twice}"
+    );
+    let mut lost = blocks("j", false);
+    lost[1].cache = false;
+    let Err(unmarked) = crate::prefix::verified_system_hashes(&lost, &frozen) else {
+        panic!("a segment edge that lost its breakpoint is refused");
     };
     assert!(
         unmarked.subject().contains("cache breakpoint"),

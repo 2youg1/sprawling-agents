@@ -163,15 +163,17 @@ fn multibyte_truncation_lands_on_a_char_boundary() {
 }
 
 #[test]
-fn system_blocks_are_four_and_all_cache_marked() {
+fn system_blocks_mark_every_edge_but_the_one_the_tail_anchor_holds() {
     let prefix = build_prefix(plan()).unwrap();
     let blocks = prefix.system_blocks().unwrap();
     assert_eq!(blocks.len(), 4);
-    assert!(blocks.iter().all(|b| b.cache));
+    let marked = u32::try_from(blocks.iter().filter(|b| b.cache).count()).unwrap();
     assert_eq!(
-        u32::try_from(blocks.iter().filter(|b| b.cache).count()).unwrap(),
-        kernel::consts_external::CACHE_BREAKPOINTS_MAX
+        marked.saturating_add(1),
+        kernel::consts_external::CACHE_BREAKPOINTS_MAX,
+        "three segment edges carry their breakpoint and the fourth is the tail anchor"
     );
+    assert!(!blocks.last().unwrap().cache);
 }
 
 #[test]

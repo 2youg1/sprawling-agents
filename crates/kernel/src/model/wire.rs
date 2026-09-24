@@ -283,6 +283,17 @@ pub enum ContentBlock {
 pub struct ChatMessage {
     pub role: Role,
     pub content: Vec<ContentBlock>,
+    /// An explicit prompt-cache breakpoint on this message.
+    ///
+    /// A request-side annotation, deliberately outside serde: the bytes
+    /// a ledger or a transcript records are the same with and without
+    /// it, which is what lets the marker move without the recorded
+    /// conversation moving. `runtime::prefix::shape::anchor_tail` is the
+    /// only producer, and it anchors the tail - so everything a request
+    /// carries, trailing tool results included, sits inside the region a
+    /// later request can hit.
+    #[serde(skip)]
+    pub cache: bool,
 }
 
 /// A tool as the provider sees it; sourced from catalog `tool_defs` only.

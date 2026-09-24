@@ -53,6 +53,7 @@ fn assert_seeing_a_picture_answers<M: Model>(model: &mut M, benign: &ModelReques
     };
     let mut seeing = benign.clone();
     seeing.chat.messages.push(ChatMessage {
+        cache: false,
         role: Role::User,
         content: vec![ContentBlock::Image(ImageRef {
             locator,

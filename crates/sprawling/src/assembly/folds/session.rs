@@ -88,6 +88,7 @@ impl SessionOrigins {
             | EventKind::BuildingConfigured
             | EventKind::RunStarted
             | EventKind::PromptAssembled
+            | EventKind::PromptShapeCompared
             | EventKind::ModelCalled
             | EventKind::ModelReturned
             | EventKind::ToolCalled

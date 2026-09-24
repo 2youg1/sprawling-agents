@@ -111,12 +111,14 @@ pub(crate) fn sample_request() -> ChatRequest {
         ],
         messages: vec![
             ChatMessage {
+                cache: false,
                 role: Role::User,
                 content: vec![ContentBlock::Text {
                     text: "Task: probe".to_owned(),
                 }],
             },
             ChatMessage {
+                cache: false,
                 role: Role::Assistant,
                 content: vec![
                     ContentBlock::Text {
@@ -130,6 +132,7 @@ pub(crate) fn sample_request() -> ChatRequest {
                 ],
             },
             ChatMessage {
+                cache: false,
                 role: Role::User,
                 content: vec![ContentBlock::ToolResult {
                     tool_use_id: "tu_1".to_owned(),

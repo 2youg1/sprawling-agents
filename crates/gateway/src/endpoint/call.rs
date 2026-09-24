@@ -261,6 +261,7 @@ mod tests {
             }));
         }
         req.chat.messages.push(kernel::ChatMessage {
+            cache: false,
             role: kernel::Role::User,
             content,
         });

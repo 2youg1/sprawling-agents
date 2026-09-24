@@ -18,6 +18,8 @@ use crate::elision::{self, Elided};
 
 mod segment;
 
+pub(crate) mod shape;
+
 pub(crate) use segment::ANOTHER_ADDRESS;
 pub use segment::{FrozenSegment, SegmentSlot, SegmentSource};
 
@@ -248,14 +250,18 @@ impl FrozenPrefix {
         })
     }
 
-    /// The wire form of the frozen prefix: four system blocks, every one
-    /// an explicit cache breakpoint — exactly `CACHE_BREAKPOINTS_MAX`.
+    /// The wire form of the frozen prefix: four system blocks, each
+    /// segment edge but the last carrying an explicit cache breakpoint.
+    /// The fourth breakpoint is the tail anchor on the conversation
+    /// ([`shape::anchor_tail`]), so a request stays inside the provider's
+    /// ceiling while its whole body remains cacheable.
     /// Segments must be UTF-8 (build_prefix guarantees it; hand-built
     /// test prefixes must comply to reach the wire).
     pub fn system_blocks(&self) -> Result<Vec<SystemBlock>, AxError> {
         self.segments()
             .iter()
-            .map(|segment| {
+            .enumerate()
+            .map(|(index, segment)| {
                 let text = std::str::from_utf8(segment.bytes())
                     .map_err(|_| {
                         AxError::failure(
@@ -270,7 +276,10 @@ impl FrozenPrefix {
                         ))
                     })?
                     .to_owned();
-                Ok(SystemBlock { text, cache: true })
+                Ok(SystemBlock {
+                    text,
+                    cache: index.saturating_add(1) < self.segments().len(),
+                })
             })
             .collect()
     }

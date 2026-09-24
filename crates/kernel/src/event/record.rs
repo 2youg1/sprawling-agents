@@ -60,6 +60,6 @@ pub use modality::{EmbeddingCalled, RerankCalled};
 pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
-    ModelCalled, ModelReturned, PromptAssembled, PromptSegment, PromptSkip, PromptSource,
-    SkipReason, SteerReceived,
+    ModelCalled, ModelReturned, PartChange, PromptAssembled, PromptSegment, PromptShapeCompared,
+    PromptSkip, PromptSource, ShapeChanged, ShapePart, SkipReason, SteerReceived,
 };

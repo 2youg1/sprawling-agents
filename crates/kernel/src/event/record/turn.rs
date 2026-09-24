@@ -145,6 +145,73 @@ pub struct SteerReceived {
     pub text: String,
 }
 
+/// One part of a request's cache shape, as a record states it: how many
+/// bytes the part carries, and their hash.
+///
+/// Both figures because two questions read this row. A prompt cache
+/// compares the hash; a person asking why a request is expensive needs
+/// the bytes, which no hash can answer for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ShapePart {
+    pub bytes: u64,
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
+    pub hash: B3Hash,
+}
+
+/// Whether one region of a request differs from the request before it.
+/// A closed pair rather than a bare `bool`, so a reader meets the word
+/// that says which way it went.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum PartChange {
+    Same,
+    Moved,
+}
+
+/// What moved between one request's cache shape and the previous one.
+///
+/// `FirstRequest` is a variant rather than a silent "nothing moved": a
+/// run's first request has no earlier shape to compare against, and
+/// recording it as unchanged would read as a cache hit about to happen.
+/// A miss is explained by naming what moved, which is what the second
+/// variant is for.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "basis", rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum ShapeChanged {
+    FirstRequest,
+    Compared {
+        /// The frozen segments whose bytes differ, by slot name, in
+        /// prefix order. Empty means the system half is unchanged.
+        system: Vec<String>,
+        tools: PartChange,
+        run: PartChange,
+    },
+}
+
+/// `prompt_shape_compared`: one request's cache shape where a prompt
+/// cache looks at it, and which of its regions moved since the request
+/// before it in the same run.
+///
+/// The four segments are deliberately absent: `prompt_assembled`,
+/// written immediately before this line, already states each one's hash
+/// and length, and a second copy here would be a second home for them.
+/// What this adds are the two regions that record never names - the tool
+/// table and the conversation - and the comparison itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct PromptShapeCompared {
+    pub tools: ShapePart,
+    pub run: ShapePart,
+    /// The most bytes this request can be billed as input, counted from
+    /// the parts above and the segments `prompt_assembled` states, added
+    /// with checked arithmetic.
+    pub upper_bound: u64,
+    pub changed: ShapeChanged,
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

@@ -193,13 +193,22 @@ fn prefix_drifted(subject: String) -> AxError {
 }
 
 /// The same assertion over the copy of the segments a request carries:
-/// four cache-marked system blocks, hashed and compared against the
-/// hashes the run froze. The request is what the provider reads, so this
-/// is the check that the wire form and the record agree.
+/// four system blocks, the segment edges before the last carrying their
+/// cache breakpoints, hashed and compared against the hashes the run
+/// froze. The request is what the provider reads, so this is the check
+/// that the wire form and the record agree.
+///
+/// The breakpoint plan is checked here too, because it is part of what
+/// the wire must say: every edge but the last carries one ("lost its
+/// cache breakpoint"), and the last edge carries none, because the
+/// fourth breakpoint is the tail anchor on the conversation and a
+/// request carrying five is one the provider refuses
+/// (`CACHE_BREAKPOINTS_MAX`).
 ///
 /// # Errors
-/// A request that does not carry exactly four marked blocks, or whose
-/// blocks hash to something the run did not freeze.
+/// A request that does not carry four blocks, one that moved a
+/// breakpoint off its edge or added one where the tail anchor lives, or
+/// whose blocks hash to something the run did not freeze.
 pub fn verified_system_hashes(
     system: &[SystemBlock],
     frozen: &[B3Hash; 4],
@@ -216,7 +225,13 @@ pub fn verified_system_hashes(
         let slot = SegmentSlot::ALL
             .get(index)
             .map_or("unknown", |slot| slot.as_str());
-        if !block.cache {
+        let tail_edge = index.saturating_add(1) == blocks.len();
+        if tail_edge && block.cache {
+            return Err(prefix_drifted(format!(
+                "the {slot} segment carries a cache breakpoint the tail anchor already holds"
+            )));
+        }
+        if !tail_edge && !block.cache {
             return Err(prefix_drifted(format!(
                 "the {slot} segment lost its cache breakpoint"
             )));

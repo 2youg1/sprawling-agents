@@ -330,6 +330,12 @@ mod resume;
 
 pub use resume::{dangling_tool_calls, outcome_unknown_draft};
 
+/// The cache shape a replay rebuilds from two records and then judges
+/// for itself.
+mod shape;
+
+pub use shape::rebuild_shape;
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

@@ -465,6 +465,8 @@ pub enum kernel::event::record::AdviserAnswer
 pub enum kernel::event::record::AdviserAsk
 pub enum kernel::event::record::AdviserFailure
 pub enum kernel::event::record::CheckpointCommitted
+pub enum kernel::event::record::PartChange
+pub enum kernel::event::record::ShapeChanged
 pub enum kernel::event::record::SkipReason
 pub enum kernel::event::record::ToolAnswer
 pub enum kernel::gate::DoorId
@@ -1150,6 +1152,7 @@ pub kernel::BudgetUse::usd: kernel::budget::UsdMicros
 pub kernel::BuildingPolicy::confidential: bool
 pub kernel::Carrier::Event(kernel::EventKind)
 pub kernel::Carrier::Loadtime
+pub kernel::ChatMessage::cache: bool
 pub kernel::ChatMessage::content: alloc::vec::Vec<kernel::ContentBlock>
 pub kernel::ChatMessage::role: kernel::Role
 pub kernel::ChatRequest::effort: core::option::Option<kernel::Effort>
@@ -1322,6 +1325,7 @@ pub kernel::EventKind::PrMerged
 pub kernel::EventKind::PrOpened
 pub kernel::EventKind::PrRejected
 pub kernel::EventKind::PromptAssembled
+pub kernel::EventKind::PromptShapeCompared
 pub kernel::EventKind::ProviderDegraded
 pub kernel::EventKind::PursuitChanged
 pub kernel::EventKind::RepairReused
@@ -1838,6 +1842,7 @@ pub kernel::event::EventKind::PrMerged
 pub kernel::event::EventKind::PrOpened
 pub kernel::event::EventKind::PrRejected
 pub kernel::event::EventKind::PromptAssembled
+pub kernel::event::EventKind::PromptShapeCompared
 pub kernel::event::EventKind::ProviderDegraded
 pub kernel::event::EventKind::PursuitChanged
 pub kernel::event::EventKind::RepairReused
@@ -1931,6 +1936,8 @@ pub kernel::event::record::ModelReturned::calls: u64
 pub kernel::event::record::ModelReturned::message: kernel::Payload
 pub kernel::event::record::ModelReturned::stop: core::option::Option<kernel::StopReason>
 pub kernel::event::record::ModelReturned::usage: core::option::Option<kernel::ModelUsage>
+pub kernel::event::record::PartChange::Moved
+pub kernel::event::record::PartChange::Same
 pub kernel::event::record::PromptAssembled::breakpoints: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::PromptAssembled::segments: alloc::vec::Vec<kernel::event::record::PromptSegment>
 pub kernel::event::record::PromptSegment::hash: kernel::locator::B3Hash
@@ -1938,6 +1945,10 @@ pub kernel::event::record::PromptSegment::len: u64
 pub kernel::event::record::PromptSegment::skipped: alloc::vec::Vec<kernel::event::record::PromptSkip>
 pub kernel::event::record::PromptSegment::slot: alloc::string::String
 pub kernel::event::record::PromptSegment::sources: alloc::vec::Vec<kernel::event::record::PromptSource>
+pub kernel::event::record::PromptShapeCompared::changed: kernel::event::record::ShapeChanged
+pub kernel::event::record::PromptShapeCompared::run: kernel::event::record::ShapePart
+pub kernel::event::record::PromptShapeCompared::tools: kernel::event::record::ShapePart
+pub kernel::event::record::PromptShapeCompared::upper_bound: u64
 pub kernel::event::record::PromptSkip::addr: kernel::address::Address
 pub kernel::event::record::PromptSkip::reason: kernel::event::record::SkipReason
 pub kernel::event::record::PromptSource::addr: kernel::address::Address
@@ -1959,6 +1970,13 @@ pub kernel::event::record::RunStarted::skills: alloc::vec::Vec<kernel::event::re
 pub kernel::event::record::RunStarted::task: alloc::string::String
 pub kernel::event::record::SessionOpened::carried: bool
 pub kernel::event::record::SessionOpened::from: core::option::Option<kernel::Origin>
+pub kernel::event::record::ShapeChanged::Compared
+pub kernel::event::record::ShapeChanged::Compared::run: kernel::event::record::PartChange
+pub kernel::event::record::ShapeChanged::Compared::system: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::ShapeChanged::Compared::tools: kernel::event::record::PartChange
+pub kernel::event::record::ShapeChanged::FirstRequest
+pub kernel::event::record::ShapePart::bytes: u64
+pub kernel::event::record::ShapePart::hash: kernel::locator::B3Hash
 pub kernel::event::record::SkillPin::hash: kernel::locator::B3Hash
 pub kernel::event::record::SkillPin::name: alloc::string::String
 pub kernel::event::record::SkipReason::Duplicate
@@ -2042,6 +2060,7 @@ pub kernel::locator::Range::Lines
 pub kernel::locator::Range::Lines::from: u64
 pub kernel::locator::Range::Lines::to: u64
 pub kernel::model::BuildingPolicy::confidential: bool
+pub kernel::model::ChatMessage::cache: bool
 pub kernel::model::ChatMessage::content: alloc::vec::Vec<kernel::ContentBlock>
 pub kernel::model::ChatMessage::role: kernel::Role
 pub kernel::model::ChatRequest::effort: core::option::Option<kernel::Effort>
@@ -2467,6 +2486,7 @@ pub struct kernel::event::record::ModelCalled
 pub struct kernel::event::record::ModelReturned
 pub struct kernel::event::record::PromptAssembled
 pub struct kernel::event::record::PromptSegment
+pub struct kernel::event::record::PromptShapeCompared
 pub struct kernel::event::record::PromptSkip
 pub struct kernel::event::record::PromptSource
 pub struct kernel::event::record::RerankCalled
@@ -2474,6 +2494,7 @@ pub struct kernel::event::record::RunForked
 pub struct kernel::event::record::RunFrozen
 pub struct kernel::event::record::RunStarted
 pub struct kernel::event::record::SessionOpened
+pub struct kernel::event::record::ShapePart
 pub struct kernel::event::record::SkillPin
 pub struct kernel::event::record::SpineDocumentWritten
 pub struct kernel::event::record::SteerReceived

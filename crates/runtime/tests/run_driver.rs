@@ -258,11 +258,13 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
             "checkpoint_committed",
             "run_started",
             "prompt_assembled",
+            "prompt_shape_compared",
             "model_called",
             "model_returned",
             "tool_called",
             "tool_result",
             "prompt_assembled",
+            "prompt_shape_compared",
             "model_called",
             "model_returned",
             "handoff_written",
@@ -272,14 +274,15 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
     assert!(matches!(frozen.completion(), Completion::Done(_)));
     assert_eq!(frozen.turns(), 2);
     // Dispatch takes two stamps, each turn one, and the freeze one more
-    // with run_frozen derived from it: two ledger lines, one event.
+    // with run_frozen derived from it: two ledger lines, one event. The
+    // shape line rides its turn's stamp; it samples nothing of its own.
     let stamps = ledger.stamps();
     assert_eq!(stamps[0], 0);
     assert_eq!(stamps[1], 1);
     assert_eq!(stamps[2], 2);
-    assert_eq!(stamps[7], 3);
-    assert_eq!(stamps[10], 4);
-    assert_eq!(stamps[11], 5);
+    assert_eq!(stamps[8], 3);
+    assert_eq!(stamps[12], 4);
+    assert_eq!(stamps[13], 5);
 }
 
 /// There is no ceiling to reach, so a run goes on until its
@@ -480,8 +483,8 @@ fn a_fence_runs_before_the_wave_and_carries_the_turns_stamp() {
     // rebuilds is worth more than a saved object.
     assert_eq!(fenced, vec![2, 3]);
     let kinds = ledger.kinds();
-    assert_eq!(kinds[5], "checkpoint_committed");
-    assert_eq!(kinds[6], "tool_called");
+    assert_eq!(kinds[6], "checkpoint_committed");
+    assert_eq!(kinds[7], "tool_called");
 }
 
 #[test]

@@ -113,6 +113,7 @@ impl RunWorker {
             })
             .unwrap_or_default();
         messages.push(kernel::ChatMessage {
+            cache: false,
             role: kernel::Role::User,
             content: vec![kernel::ContentBlock::Text {
                 text: questions_block(&probe),
@@ -171,6 +172,7 @@ impl RunWorker {
                     max_tokens: PROBE_TOKENS,
                     system: plan.prefix.system_blocks().ok()?,
                     messages: vec![kernel::ChatMessage {
+                        cache: false,
                         role: kernel::Role::User,
                         content: vec![kernel::ContentBlock::Text {
                             text: questions_block(&probe),

@@ -189,6 +189,9 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
             | EventKind::SessionOpened
             | EventKind::RunForked
             | EventKind::PromptAssembled
+            // The cache shape measures a request; it is not one of the
+            // things the mother said.
+            | EventKind::PromptShapeCompared
             | EventKind::ModelCalled
             | EventKind::ToolCalled
             | EventKind::ResultOffloaded

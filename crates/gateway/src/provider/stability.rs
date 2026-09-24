@@ -72,6 +72,7 @@ fn dispatch() -> ChatRequest {
             },
         ],
         messages: vec![ChatMessage {
+            cache: false,
             role: Role::User,
             content: vec![ContentBlock::Text {
                 text: "Task: probe".to_owned(),
