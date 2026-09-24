@@ -112,18 +112,7 @@ fn format_local(utc_ms: u64, offset_min: i32) -> Result<String, AxError> {
 /// Formats one stamp: UTC row first (always), then every configured zone.
 /// Zones beyond `CLOCK_ZONES_MAX` are refused, not silently dropped.
 pub fn stamp(now: TimeMs, zones: &[ClockZone]) -> Result<ClockStamp, AxError> {
-    let max = u64::from(CLOCK_ZONES_MAX);
-    if u64::try_from(zones.len()).unwrap_or(u64::MAX) > max {
-        return Err(AxError::failure(
-            AxCode::InvalidArgs,
-            "format clock stamp",
-            format!("{} zones exceed CLOCK_ZONES_MAX={max}", zones.len()),
-        )
-        .with_recovery(format!(
-            "keep at most {max} rows in `[clock] zones`; the UTC row is added on top \
-             of them and is never one of them"
-        )));
-    }
+    CLOCK_ZONES_MAX.admit(zones.len())?;
     let mut rows = Vec::with_capacity(zones.len().saturating_add(1));
     rows.push(ZoneEntry {
         id: "utc".to_owned(),
@@ -270,7 +259,9 @@ mod tests {
             })
             .collect();
         let err = stamp(TimeMs::new(0), &too_many).unwrap_err();
-        assert_eq!(*err.code(), AxCode::InvalidArgs);
+        // The refusal is the limit's own, whole: a caller that spelled a
+        // sentence of its own would be a second authority for one limit.
+        assert_eq!(err, CLOCK_ZONES_MAX.admit(5).unwrap_err());
     }
 
     #[test]

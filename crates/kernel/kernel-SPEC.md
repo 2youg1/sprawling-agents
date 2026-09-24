@@ -623,22 +623,24 @@ pub const EDIT_WAR_FREEZE: u32 = 2;
 pub const SECRET_ENTROPY_MIN: Ratio = Ratio { num: 7, den: 2 };      // 3.5 bits/char
 pub const DISCARD_FILES_MAX: u32 = 16;
 pub const DISCARD_RETENTION_DAYS: u32 = 30;
-pub const CLOCK_ZONES_MAX: u32 = 4;
+pub const CLOCK_ZONES_MAX: ClockZonesMax = ClockZonesMax::new(4);    // §8-73：拒因从类型给出
 pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;                   // 2 GiB
 ```
 
 **两项图片政策**：
 
 ```rust
-pub const IMAGE_MAX_BYTES: u64 = 2_097_152;   // 2 MiB：一张图的字节上限
-pub const IMAGES_PER_TURN: u32 = 4;           // 一回合最多几张图
+pub const IMAGE_MAX_BYTES: ImageMaxBytes = ImageMaxBytes::new(2_097_152); // 2 MiB：一张图的字节上限
+pub const IMAGES_PER_TURN: ImagesPerTurn = ImagesPerTurn::new(4);          // 一回合最多几张图
 ```
+
+三项上限带 `kernel::policy_limit` 类型（§8-73）：合法域判定与四段拒因文案由类型一处给出，调用方只递观测值，拼不出第二种拒因；数的唯一家仍是本节。
 
 两个数都是「一句拒绝说得出、一个人改得动」的上限，与 `WORKTREE_MAX_BYTES` 同口径。2 MiB 取自两家 provider 都能收下的 base64 体量（base64 膨胀 4/3，2 MiB 上线约 2.7 MiB），4 张取自一回合窗口预算：再多就是把窗口花在像素上而不是任务上。
 
 `WORKTREE_MAX_BYTES` 是上限而非磁盘余量探测：余量是一台机器当下的事实，上限则是一句拒绝说得出、一个人改得动的数；建树前校，故一座过大的城是被拒而不是被拷到一半（`memory::worktree`）。
 
-`AUTONOMY_DEFAULT` 与 `CLOCK_STAMP_DEFAULT` 带类型（分别是 `Autonomy` 与 `ClockStampGranularity`），其余为数。`SUBAGENT_CTX_LOCK_DEFAULT` 永不落地——子代理上下文锁不存在。
+`AUTONOMY_DEFAULT` 与 `CLOCK_STAMP_DEFAULT` 带类型（分别是 `Autonomy` 与 `ClockStampGranularity`）；`IMAGE_MAX_BYTES`／`IMAGES_PER_TURN`／`CLOCK_ZONES_MAX` 带 `policy_limit` 类型（§8-73），其余为数。`SUBAGENT_CTX_LOCK_DEFAULT` 永不落地——子代理上下文锁不存在。
 
 **两项随 §12「默认 YOLO」这条规则删去**：`POLICY_IDLE_DAYS`（长期豁免机制不存在，闲置过期无对象）与 `DISCARD_BYTES_MAX`（规模不再改变删除的判决，见 §8-26）。`DISCARD_FILES_MAX` 留下，它今天的读者是 `sprawling` 的清扫阈值。
 
@@ -1541,6 +1543,18 @@ S2 激活的码（逐码答「能否定义掉」）：
 
 **重开参数**：出现「栅栏提交不足以还原」的实据——例如跨楼多工作树需要一次原子还原，或人要在页面上单键回到某条栅栏。重开时先回答「还原的是文件还是对话」：两者各自的载体今天都在（git／分支），缺的只是入口，而不是机制。
 
+### 12.3 定规：上限类政策值的拒因句式从类型给出，调用方拼不出第二种拒因
+
+`Verdict: user-approved`
+
+**决定**：有拒因语义的政策值 newtype 化（`kernel::policy_limit`，§8-73）：域内域外的判定与动作／主体／码／recovery 四段文案由类型一处给出，调用方只递观测值。外部铸不出一个更松的政策值（无公开构造器、字段私有、无 serde），也读不出裸数去拼自己的句子（无 getter、无 `Display`），第二种拒因无从拼起——编译失败反例 `forge_policy_limit` 钉住这两扇门。
+
+**理由**：三段拒因是这座城对模型的教学面，同一个上限的句子散在几个调用点时，改数漏改句就会让一个上限说出两种话；四段文案收进类型，句子与域永远同一个家，改一处即改全部。
+
+**被否**：①维持调用点手拼拒因（现状）——上限改动要靠人记得三处句子，漏一处即两种拒因；②一个泛型 `PolicyLimit<R>` 加标签参数——句式仍要按标签分支，只是把三个 `admit` 压成一个 match，可交换面反而变宽；③给类型留 getter 或 `Display` 让调用点自拼句子——那正是第二种拒因的入口。
+
+**重开参数**：出现可由人移动的上限（像第二道阈值那样进 `CONFIG.toml`）时，构造点改为解析式（域外在解析点拒、拒因带合法域），本定规「拒因从类型给出」不动。
+
 ## 13 依赖选型
 
 `serde`＋`serde_json`（规范字节与载荷；B.7 钉版）；`thiserror`（Display/Error derive；B.7）；`blake3`（唯一哈希，B.7 钉 S1；1.8.6 现行 stable）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）。S2 增：`secrecy` 0.10.3＋`zeroize` 1.9.0（Sealed；B.7 钉 Stage 2–3，2026-08 复核为最新）。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
@@ -2000,3 +2014,30 @@ impl CityLayout {
 与 `Ceiling` 同形而**不合并**：一个界定模型一次能读多少，一个界定它能写多少，两者互换后仍然能编译，所以它们是两个类型。这不是「相似文本各写一遍」——共用一个名字买到的是让调用处把输入上限传进输出上限的那一天。
 
 **`DialectKind` 由二变三**：`Anthropic｜OpenAi｜OpenAiResponses`。responses 面与 chat 面请求体不同、回复形状不同、流式事件名不同，是第三支笔而不是第二支笔的开关；折在一起就成了一个在每一步上分支的写入器，那正是「给一张脸改的东西够得到另一张脸」的形状。求值仍全在 `gateway::dialect`。
+
+### 8-73 `kernel::policy_limit`：上限类政策值的合法域与拒因句式，从类型给出（形状 2 值）
+
+**它关的缺陷**：上限过去是裸整数，四段拒因（动作／主体／码／recovery）由每个调用点手拼——`gateway::endpoint::call` 的 `too_many`／`too_large`、`runtime::clock::stamp` 内联的一段，三处各自 `format!` 同一个数，顺手还各自 `try_from` 一次。数会改，句子会漏改，调用方也拼得出第二种拒因。
+
+**形状**：三个形状 2 值类型，各带私有字段、一个 crate 内构造器和唯一方法 `admit`。`admit` 是判定与文案的同一入口：域内回 `Ok(())`，越界回 `E_INVALID_ARGS`，四段全部由类型给出。
+
+| 类型 | 唯一实例（数的家仍是 `consts_policy`，§8-8） | `admit` | 越界时的四段 |
+|---|---|---|---|
+| `ImagesPerTurn` | `IMAGES_PER_TURN` | `admit(found: usize) -> Result<(), AxError>` | 动作 `put pictures on a provider request`；主体 `this turn carries {found} pictures`；recovery `one turn carries at most {max} pictures; send the rest in a later turn` |
+| `ImageMaxBytes` | `IMAGE_MAX_BYTES` | `admit(at: &Locator, size: usize) -> Result<(), AxError>` | 动作 `put a picture on a provider request`；主体 `{at} is {size} bytes`；recovery `one picture is at most {max} bytes; shrink it before attaching it` |
+| `ClockZonesMax` | `CLOCK_ZONES_MAX` | `admit(configured: usize) -> Result<(), AxError>` | 动作 `format clock stamp`；主体 `{configured} zones exceed CLOCK_ZONES_MAX={max}`；recovery ``keep at most {max} rows in `[clock] zones`; the UTC row is added on top of them and is never one of them`` |
+
+**合法域**：`0..=max`（含端点）——恰好落在上限上的观测被收下，越界一步即拒（不钳位）。句式与域随类型走，改上限只改 `consts_policy` 一处。观测值是 `usize`，上限是 `u64`，比较在 `u64` 里做：`usize` 至多 64 位，窄化在任何 Rust 目标上都不会失败，那条失败支仍答「越界」，这条判定因此不依赖目标的指针宽度。
+
+**拼不出第二种拒因**：字段私有、唯一构造器 `new` 是 `pub(crate)`（只给 `consts_policy` 铸实例）、无 serde、无 getter、无 `Display`。外部调用方既铸不出一个更松的上限（那就等于第二种拒因），也读不出裸数去 `format!` 自己的句子；四段文案的唯一生产点是 `admit`。编译失败反例 `tests/ui/forge_policy_limit.rs` 钉住「调用方铸不出政策值」。两处生产调用点（`gateway::endpoint::call::pictures_for`、`runtime::clock::stamp`）的测试以整值相等断言「调用方交出的就是本类型的拒因」，某一个调用点再拼一句自有文案即红。
+
+**三个类型不合并且不并入 `Ceiling`／`Window`**（8-40 同一条理）：上限互换后仍然编译得过，一个类型就是一个可交换面。
+
+**队列（其余政策值逐个 newtype 化时从这里取）**：
+
+- `WORKTREE_MAX_BYTES`：有拒因，但今天拒因是 `MemoryError::WorktreeBusy` 的 detail（两个数都在里面），迁它的前提是那句 detail 也从类型派生。
+- `INTERVAL_CAP_BYTES`：无拒因——它只调速（read／search 截断并报 total 与 next_offset）；可迁的是四处 `usize::try_from(..).unwrap_or(usize::MAX)` 同一换算的重复。
+- `OUTPUT_CEILING_DEFAULT`：合法域（非零）今天是两个家——`consts_policy` 的测试与 `gateway::provider::ceiling` 的 `Ceiling::new(..)?`；铸成 `Ceiling` 实例即一个家。
+- `SANDBOX_FUEL_DEFAULT`：`SandboxLimits.fuel` 是裸 `u64`，域未设。
+- `STARTUP_BUDGET_TOKENS`／`BYTES_PER_TOKEN`／`LOOP_REPEAT_THRESHOLD`／`OFFLOAD_MIN_BYTES`／`DRAFT_HELD_ESCALATE`／`EDIT_WAR_FREEZE`／`DISCARD_FILES_MAX`／`DISCARD_RETENTION_DAYS`：算术输入或判定输入，无拒因句式，保持裸数即是正确形状。
+- `PREFIX_SLOTS`：域已在类型上（`NonZeroU64`），不迁。

@@ -7,8 +7,9 @@
 //! changes behavior and therefore requires EVAL evidence or an
 //! explicit ruling. Data only — zero branches by charter.
 //!
-//! Two entries carry a type rather than a plain number (kernel-SPEC
-//! 8-8): AUTONOMY_DEFAULT and CLOCK_STAMP_DEFAULT.
+//! Five entries carry a type rather than a plain number (kernel-SPEC
+//! 8-8): AUTONOMY_DEFAULT, CLOCK_STAMP_DEFAULT, and the three limits
+//! whose refusal derives from their type (kernel-SPEC 8-73).
 
 /// Exact ratio as an integer pair: kernel decision paths never touch
 /// floats (determinism rule 6). Kept unreduced so the spelling mirrors the
@@ -96,7 +97,8 @@ pub const DISCARD_FILES_MAX: u32 = 16;
 
 pub const DISCARD_RETENTION_DAYS: u32 = 30;
 
-pub const CLOCK_ZONES_MAX: u32 = 4;
+pub const CLOCK_ZONES_MAX: crate::policy_limit::ClockZonesMax =
+    crate::policy_limit::ClockZonesMax::new(4);
 
 /// Instruction budget for one sandboxed call when no layer states one.
 /// Large enough that ordinary work finishes, small enough that a loop
@@ -137,12 +139,14 @@ pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;
 /// 2 MiB per picture. A ceiling a refusal can state and a person can
 /// raise, sized so a base64 body (4/3 of this) stays inside what both
 /// providers accept.
-pub const IMAGE_MAX_BYTES: u64 = 2_097_152;
+pub const IMAGE_MAX_BYTES: crate::policy_limit::ImageMaxBytes =
+    crate::policy_limit::ImageMaxBytes::new(2_097_152);
 
 /// Four pictures in one turn. Past that the window is being spent on
 /// pixels rather than on the work, and a limit stated once is what a
 /// refusal can name.
-pub const IMAGES_PER_TURN: u32 = 4;
+pub const IMAGES_PER_TURN: crate::policy_limit::ImagesPerTurn =
+    crate::policy_limit::ImagesPerTurn::new(4);
 
 /// How long one answer may be when nobody has said: 8_192 tokens.
 ///
@@ -216,10 +220,13 @@ mod tests {
         assert_eq!(SECRET_ENTROPY_MIN, Ratio { num: 7, den: 2 });
         assert_eq!(DISCARD_FILES_MAX, 16);
         assert_eq!(DISCARD_RETENTION_DAYS, 30);
-        assert_eq!(CLOCK_ZONES_MAX, 4);
+        assert_eq!(CLOCK_ZONES_MAX, crate::policy_limit::ClockZonesMax::new(4));
         assert_eq!(SANDBOX_FUEL_DEFAULT, 200_000_000);
-        assert_eq!(IMAGE_MAX_BYTES, 2_097_152);
-        assert_eq!(IMAGES_PER_TURN, 4);
+        assert_eq!(
+            IMAGE_MAX_BYTES,
+            crate::policy_limit::ImageMaxBytes::new(2_097_152)
+        );
+        assert_eq!(IMAGES_PER_TURN, crate::policy_limit::ImagesPerTurn::new(4));
         assert_eq!(OUTPUT_CEILING_DEFAULT, 8_192);
     }
 

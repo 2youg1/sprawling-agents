@@ -167,6 +167,9 @@ impl kernel::node_id::NodeId
 impl kernel::node_id::NodeId
 impl kernel::plan::PlanTree
 impl kernel::plan::PlanTree
+impl kernel::policy_limit::ClockZonesMax
+impl kernel::policy_limit::ImageMaxBytes
+impl kernel::policy_limit::ImagesPerTurn
 impl kernel::pursuit::Pursuit
 impl kernel::pursuit::Pursuit
 impl kernel::reach::Reach
@@ -312,7 +315,7 @@ pub const kernel::consts_external::SECRET_SHAPES: [kernel::consts_external::Secr
 pub const kernel::consts_policy::AUTONOMY_DEFAULT: kernel::approval::Autonomy
 pub const kernel::consts_policy::BYTES_PER_TOKEN: u64
 pub const kernel::consts_policy::CLOCK_STAMP_DEFAULT: kernel::config::ClockStampGranularity
-pub const kernel::consts_policy::CLOCK_ZONES_MAX: u32
+pub const kernel::consts_policy::CLOCK_ZONES_MAX: kernel::policy_limit::ClockZonesMax
 pub const kernel::consts_policy::CREDENTIAL_NAME_MARKERS: [&str; 11]
 pub const kernel::consts_policy::CTX_REMINDER_FIRST_PERCENT: u64
 pub const kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT: u64
@@ -326,8 +329,8 @@ pub const kernel::consts_policy::EDIT_WAR_FREEZE: u32
 pub const kernel::consts_policy::HALL_BUILDING: &str
 pub const kernel::consts_policy::HALL_CLERK: &str
 pub const kernel::consts_policy::HALL_MAYOR: &str
-pub const kernel::consts_policy::IMAGES_PER_TURN: u32
-pub const kernel::consts_policy::IMAGE_MAX_BYTES: u64
+pub const kernel::consts_policy::IMAGES_PER_TURN: kernel::policy_limit::ImagesPerTurn
+pub const kernel::consts_policy::IMAGE_MAX_BYTES: kernel::policy_limit::ImageMaxBytes
 pub const kernel::consts_policy::INTERVAL_CAP_BYTES: u64
 pub const kernel::consts_policy::LOOP_REPEAT_THRESHOLD: u32
 pub const kernel::consts_policy::OFFLOAD_MIN_BYTES: u64
@@ -961,6 +964,9 @@ pub fn kernel::plan::PlanTree::progress(&self) -> kernel::completion::Progress
 pub fn kernel::plan::PlanTree::progress(&self) -> kernel::completion::Progress
 pub fn kernel::plan::PlanTree::ready(&self) -> alloc::vec::Vec<kernel::node_id::NodeId>
 pub fn kernel::plan::PlanTree::ready(&self) -> alloc::vec::Vec<kernel::node_id::NodeId>
+pub fn kernel::policy_limit::ClockZonesMax::admit(self, usize) -> core::result::Result<(), kernel::AxError>
+pub fn kernel::policy_limit::ImageMaxBytes::admit(self, &kernel::locator::Locator, usize) -> core::result::Result<(), kernel::AxError>
+pub fn kernel::policy_limit::ImagesPerTurn::admit(self, usize) -> core::result::Result<(), kernel::AxError>
 pub fn kernel::pursuit::Pursuit::declare(&kernel::delegation::Delegator, alloc::string::String) -> core::result::Result<kernel::pursuit::Pursuit, kernel::AxError>
 pub fn kernel::pursuit::Pursuit::declare(&kernel::delegation::Delegator, alloc::string::String) -> core::result::Result<kernel::pursuit::Pursuit, kernel::AxError>
 pub fn kernel::pursuit::Pursuit::goal(&self) -> &str
@@ -2340,6 +2346,7 @@ pub mod kernel::locator
 pub mod kernel::model
 pub mod kernel::node_id
 pub mod kernel::plan
+pub mod kernel::policy_limit
 pub mod kernel::pursuit
 pub mod kernel::reach
 pub mod kernel::registry
@@ -2544,6 +2551,9 @@ pub struct kernel::node_id::NodeId(_)
 pub struct kernel::plan::Held(_)
 pub struct kernel::plan::PlanNode
 pub struct kernel::plan::PlanTree
+pub struct kernel::policy_limit::ClockZonesMax(_)
+pub struct kernel::policy_limit::ImageMaxBytes(_)
+pub struct kernel::policy_limit::ImagesPerTurn(_)
 pub struct kernel::pursuit::Pursuit
 pub struct kernel::reach::Reach
 pub struct kernel::registry::Artifact

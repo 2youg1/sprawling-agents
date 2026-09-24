@@ -1,0 +1,27 @@
+error[E0603]: tuple struct constructor `ClockZonesMax` is private
+  --> tests/ui/forge_policy_limit.rs:13:41
+   |
+13 |     let literal = kernel::policy_limit::ClockZonesMax(9);
+   |                                         ^^^^^^^^^^^^^ private tuple struct constructor
+   |
+  ::: src/policy_limit.rs
+   |
+   | pub struct ClockZonesMax(u64);
+   |                          --- a constructor is private if any of the fields is private
+   |
+note: the tuple struct constructor `ClockZonesMax` is defined here
+  --> src/policy_limit.rs
+   |
+   | pub struct ClockZonesMax(u64);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0624]: associated function `new` is private
+  --> tests/ui/forge_policy_limit.rs:12:55
+   |
+12 |     let minted = kernel::policy_limit::ImagesPerTurn::new(9);
+   |                                                       ^^^ private associated function
+   |
+  ::: src/policy_limit.rs
+   |
+   |     pub(crate) const fn new(max: u64) -> ImagesPerTurn {
+   |     -------------------------------------------------- private associated function defined here

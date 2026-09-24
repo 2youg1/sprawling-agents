@@ -16,7 +16,7 @@
 #[cfg(test)]
 use kernel::UsdMicros;
 use kernel::consts_policy::{IMAGE_MAX_BYTES, IMAGES_PER_TURN};
-use kernel::{AxCode, AxError, ChatRequest, ContentBlock, ImageRef, Locator, ModelRequest};
+use kernel::{AxError, ChatRequest, ContentBlock, ImageRef, ModelRequest};
 use serde_json::Value;
 
 use crate::dialect::{ImageBytes, request_wire};
@@ -45,29 +45,6 @@ pub(crate) fn pictures_in(chat: &ChatRequest) -> Vec<&ImageRef> {
     found
 }
 
-fn too_many(found: usize) -> AxError {
-    AxError::failure(
-        AxCode::InvalidArgs,
-        "put pictures on a provider request",
-        format!("this turn carries {found} pictures"),
-    )
-    .with_recovery(format!(
-        "one turn carries at most {IMAGES_PER_TURN} pictures; \
-         send the rest in a later turn"
-    ))
-}
-
-fn too_large(at: &Locator, size: usize) -> AxError {
-    AxError::failure(
-        AxCode::InvalidArgs,
-        "put a picture on a provider request",
-        format!("{at} is {size} bytes"),
-    )
-    .with_recovery(format!(
-        "one picture is at most {IMAGE_MAX_BYTES} bytes; \
-         shrink it before attaching it"
-    ))
-}
 impl Endpoint {
     /// What the far side says it serves, and what it says about each.
     ///
@@ -204,15 +181,11 @@ impl Endpoint {
     /// that one exists.
     fn pictures_for(&self, chat: &ChatRequest) -> Result<ImageBytes, AxError> {
         let found = pictures_in(chat);
-        if u32::try_from(found.len()).unwrap_or(u32::MAX) > IMAGES_PER_TURN {
-            return Err(too_many(found.len()));
-        }
+        IMAGES_PER_TURN.admit(found.len())?;
         let mut images = ImageBytes::default();
         for picture in found {
             let bytes = (self.redemption.images)(&picture.locator)?;
-            if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > IMAGE_MAX_BYTES {
-                return Err(too_large(&picture.locator, bytes.len()));
-            }
+            IMAGE_MAX_BYTES.admit(&picture.locator, bytes.len())?;
             images.insert(&picture.locator, bytes);
         }
         Ok(images)
@@ -323,12 +296,9 @@ mod tests {
         let endpoint =
             Endpoint::new(config("http://127.0.0.1:1/v1/messages"), redemption()).unwrap();
         let err = endpoint.wire_request(&seeing(5)).unwrap_err();
-        assert_eq!(*err.code(), AxCode::InvalidArgs);
-        assert!(
-            err.recovery().contains("4"),
-            "a refusal that will not say the limit cannot be acted on: {}",
-            err.recovery()
-        );
+        // The refusal is the limit's own, whole: a caller that spelled a
+        // sentence of its own would be a second authority for one limit.
+        assert_eq!(err, IMAGES_PER_TURN.admit(5).unwrap_err());
         // Four is still a turn this endpoint will carry.
         assert!(endpoint.wire_request(&seeing(4)).is_ok());
     }
@@ -343,9 +313,13 @@ mod tests {
             ),
         )
         .unwrap();
-        let err = endpoint.wire_request(&seeing(1)).unwrap_err();
-        assert_eq!(*err.code(), AxCode::InvalidArgs);
-        assert!(err.recovery().contains("2097152"), "{}", err.recovery());
+        let request = seeing(1);
+        let at = pictures_in(&request.chat)
+            .first()
+            .map(|picture| picture.locator.clone())
+            .expect("the fixture puts one picture in the chat");
+        let err = endpoint.wire_request(&request).unwrap_err();
+        assert_eq!(err, IMAGE_MAX_BYTES.admit(&at, 3_000_000).unwrap_err());
     }
 
     #[test]
