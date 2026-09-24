@@ -224,7 +224,7 @@ fn one_conversation_replays_from_open_to_a_screenshot_that_is_evidence() {
     );
     let picture = &shot.attachments[0];
     assert_eq!((picture.width, picture.height), (1, 1));
-    assert_eq!(picture.media_type, ImageType::Png);
+    assert_eq!(picture.media_type, kernel::ImageType::Png);
     let kernel::Locator::Cas { hash, .. } = &picture.locator else {
         panic!("a screenshot is stored by content, not by path");
     };

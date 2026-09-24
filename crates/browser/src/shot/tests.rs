@@ -153,6 +153,36 @@ fn a_shot_covers_one_region_and_naming_two_is_refused() {
 }
 
 #[test]
+fn a_picture_past_the_cap_is_asked_for_again_at_a_computed_density() {
+    assert!(!SHOT_MAX_EDGE_PX.exceeds(1920, 1080));
+    assert!(SHOT_MAX_EDGE_PX.exceeds(2000, 1500));
+    let request = ShotRequest::read(&args(json!({ "action": "screenshot" }))).unwrap();
+    let mut session = Session::new();
+    let frame = request.refit_frame(&mut session, &context(), 2000).unwrap();
+    assert_eq!(frame.method(), "browsingContext.setViewport");
+    assert!(
+        frame.to_wire().contains("\"devicePixelRatio\":0.96"),
+        "{}",
+        frame.to_wire()
+    );
+    // A density the caller asked for is kept, and the cap is applied to it.
+    let dense = ShotRequest::read(&args(json!({ "action": "screenshot", "scale": 200 }))).unwrap();
+    let frame = dense.refit_frame(&mut session, &context(), 2000).unwrap();
+    assert!(
+        frame.to_wire().contains("\"devicePixelRatio\":1.92"),
+        "{}",
+        frame.to_wire()
+    );
+    // A side already inside the cap is never enlarged to fill it.
+    let frame = request.refit_frame(&mut session, &context(), 1000).unwrap();
+    assert!(
+        frame.to_wire().contains("\"devicePixelRatio\":1.0"),
+        "{}",
+        frame.to_wire()
+    );
+}
+
+#[test]
 fn a_screenshots_size_is_read_from_its_own_bytes() {
     let shot = Shot::read(&json!({ "data": ONE_RED_PIXEL }), ImageType::Png).unwrap();
     assert_eq!((shot.width(), shot.height()), (1, 1));

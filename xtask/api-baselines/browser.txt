@@ -264,10 +264,12 @@ pub fn browser::Shot::media(&self) -> kernel::model::image::ImageType
 pub fn browser::Shot::read(&serde_json::value::Value, kernel::model::image::ImageType) -> core::result::Result<browser::Shot, kernel::error::shape::AxError>
 pub fn browser::Shot::width(&self) -> u32
 pub fn browser::ShotMaxEdge::admit(self, u32, u32) -> core::result::Result<(), kernel::error::shape::AxError>
+pub fn browser::ShotMaxEdge::exceeds(self, u32, u32) -> bool
 pub fn browser::ShotRequest::capture_frame(&self, &mut browser::Session, &browser::ContextId, &serde_json::value::Value) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
 pub fn browser::ShotRequest::default() -> browser::ShotRequest
 pub fn browser::ShotRequest::format(&self) -> kernel::model::image::ImageType
 pub fn browser::ShotRequest::read(&kernel::event::payload::Payload) -> core::result::Result<browser::ShotRequest, kernel::error::shape::AxError>
+pub fn browser::ShotRequest::refit_frame(&self, &mut browser::Session, &browser::ContextId, u32) -> core::result::Result<browser::Frame, kernel::error::shape::AxError>
 pub fn browser::ShotRequest::resolves_element(&self) -> bool
 pub fn browser::Verb::destination(&self) -> core::result::Result<core::option::Option<alloc::string::String>, kernel::error::shape::AxError>
 pub fn browser::Verb::frames(&self, &mut browser::Session, &browser::ContextId, core::option::Option<&browser::PageSnapshot>) -> core::result::Result<alloc::vec::Vec<browser::Frame>, kernel::error::shape::AxError>

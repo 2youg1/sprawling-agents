@@ -282,6 +282,31 @@ impl ShotRequest {
         }
     }
 
+    /// The frame that captures this region again, small enough to fit.
+    ///
+    /// A capture that came back with a side past the cap is asked for
+    /// once more at the density that brings that side down to the cap,
+    /// composed with the density the caller asked for. It is the only
+    /// lever the protocol gives: `imageSize` is stated and ignored, and
+    /// the cost — a page that queries `resolution` may lay out
+    /// differently at the new ratio — is paid only where the alternative
+    /// is a refusal of the shot.
+    ///
+    /// # Errors
+    /// Refuses a side this build cannot state a density for.
+    pub fn refit_frame(
+        &self,
+        session: &mut Session,
+        context: &ContextId,
+        longest: u32,
+    ) -> Result<Frame, AxError> {
+        let ratio = SHOT_MAX_EDGE_PX.fit(longest, self.scale.unwrap_or(100))?;
+        session.frame(
+            "browsingContext.setViewport",
+            json!({ "context": context.as_str(), "devicePixelRatio": ratio }),
+        )
+    }
+
     /// The device-ratio change a scale asks for, which comes before
     /// anything is captured.
     fn density_frames(

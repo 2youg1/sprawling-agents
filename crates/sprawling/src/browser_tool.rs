@@ -12,18 +12,19 @@
 //! stay in the pure crate and the bytes stay here.
 
 use browser::{
-    BrowserPort, ContextId, DevLoop, Observation, PageSnapshot, ResolvedOrigin, SHOT_MAX_EDGE_PX,
-    Session, SessionRequest, Shot, Verb,
+    BrowserPort, ContextId, DevLoop, Observation, PageSnapshot, ResolvedOrigin, Session,
+    SessionRequest, Verb,
 };
 use kernel::{
-    AxCode, AxError, CostTier, Effect, GateSubject, ImageRef, ImageType, Locator, Payload,
-    RenderIntent, Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, GateSubject, Payload, RenderIntent, Temporal, Tool,
+    ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use memory::Cas;
 use serde_json::{Map, Value};
 
 mod building;
 mod person;
+mod storing;
 mod surveying;
 
 use building::BUILDING_DISCLOSURE;
@@ -266,7 +267,7 @@ impl BrowserTool {
                     attachments: Vec::new(),
                 })
             }
-            Verb::Screenshot(request) => self.stored(result, request.format()),
+            Verb::Screenshot(request) => self.stored(request, result),
             Verb::Measure { .. } => Ok(ToolOutcome {
                 result: payload(vec![("boxes", browser::read_json(result)?)])?,
                 attachments: Vec::new(),
@@ -343,43 +344,6 @@ impl BrowserTool {
                 ("looks", Value::from(looks)),
             ])?,
             attachments: Vec::new(),
-        })
-    }
-
-    /// A screenshot, put where it becomes evidence.
-    ///
-    /// Three things happen together or none does: the bytes land in the
-    /// content store, the payload carries the locator and the two sides,
-    /// and the outcome carries the picture itself so the model sees it.
-    ///
-    /// # Errors
-    /// Propagates a reply this build cannot read and a content store
-    /// that will not take the bytes.
-    fn stored(&mut self, result: &Value, media: ImageType) -> Result<ToolOutcome, AxError> {
-        let shot = Shot::read(result, media)?;
-        SHOT_MAX_EDGE_PX.admit(shot.width(), shot.height())?;
-        let hash = self
-            .cas
-            .put(shot.bytes())
-            .map_err(memory::MemoryError::into_ax)?;
-        let locator = Locator::parse(&format!("cas:b3-{hash}"))?;
-        let picture = ImageRef {
-            locator,
-            media_type: shot.media(),
-            width: shot.width(),
-            height: shot.height(),
-        };
-        Ok(ToolOutcome {
-            result: payload(vec![
-                ("image", Value::String(picture.locator.to_string())),
-                ("width", Value::from(picture.width)),
-                ("height", Value::from(picture.height)),
-                (
-                    "media_type",
-                    Value::String(picture.media_type.mime().to_owned()),
-                ),
-            ])?,
-            attachments: vec![picture],
         })
     }
 }
