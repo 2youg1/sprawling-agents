@@ -14,7 +14,7 @@
 //! spellings of the same fact, and `replay::rebuild_prefix` would only
 //! understand whichever it was written against.
 
-use kernel::event::record::PromptSource;
+use kernel::event::record::{PromptSource, SummaryProducer};
 use kernel::{Address, AxCode, AxError, B3Hash, SystemBlock};
 
 /// The four slots in stability order; the order is the cache economics.
@@ -141,15 +141,19 @@ pub struct SegmentSource {
     pub addr: Address,
     pub kept: u64,
     pub dropped: u64,
+    /// The compressed summary's producer fingerprint, when this document
+    /// is one. It travels to the row untouched.
+    pub producer: Option<SummaryProducer>,
 }
 
 impl SegmentSource {
     /// A document that reached its segment whole.
-    pub fn whole(addr: Address, kept: u64) -> SegmentSource {
+    pub fn whole(addr: Address, kept: u64, producer: Option<SummaryProducer>) -> SegmentSource {
         SegmentSource {
             addr,
             kept,
             dropped: 0,
+            producer,
         }
     }
 
@@ -164,6 +168,7 @@ impl SegmentSource {
             kept: self.kept,
             marker: self.dropped > 0,
             dropped: self.dropped,
+            producer: self.producer.clone(),
         }
     }
 }
@@ -262,6 +267,7 @@ mod tests {
             addr: Address::parse("City.md").unwrap(),
             kept: 12,
             dropped: 4,
+            producer: None,
         };
         assert_eq!(
             serde_json::to_value(source.row()).unwrap(),
@@ -273,7 +279,7 @@ mod tests {
     /// leaving a reader to infer it from a missing key.
     #[test]
     fn a_whole_document_reports_nothing_dropped_and_no_marker() {
-        let source = SegmentSource::whole(Address::parse("City.md").unwrap(), 9);
+        let source = SegmentSource::whole(Address::parse("City.md").unwrap(), 9, None);
         assert_eq!(
             serde_json::to_value(source.row()).unwrap(),
             serde_json::json!({ "addr": "City.md", "kept": 9, "marker": false, "dropped": 0 })

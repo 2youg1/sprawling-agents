@@ -275,8 +275,8 @@ pub fn runtime::SearchTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::SearchTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
 pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
-pub fn runtime::SegmentSource::whole(kernel::address::Address, u64) -> runtime::SegmentSource
-pub fn runtime::SegmentSource::whole(kernel::address::Address, u64) -> runtime::SegmentSource
+pub fn runtime::SegmentSource::whole(kernel::address::Address, u64, core::option::Option<kernel::event::record::turn::SummaryProducer>) -> runtime::SegmentSource
+pub fn runtime::SegmentSource::whole(kernel::address::Address, u64, core::option::Option<kernel::event::record::turn::SummaryProducer>) -> runtime::SegmentSource
 pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus], &[runtime::Standing]) -> alloc::string::String
 pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus], &[runtime::Standing]) -> alloc::string::String
 pub fn runtime::StatusTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
@@ -394,6 +394,7 @@ pub fn runtime::clock::StampGate::observe(&mut self, kernel::event::identity::Ti
 pub fn runtime::clock::StampGate::observe(&mut self, kernel::event::identity::TimeMs, kernel::tool::Temporal, &[kernel::config::ClockZone]) -> core::result::Result<core::option::Option<runtime::clock::ClockStamp>, kernel::error::shape::AxError>
 pub fn runtime::clock::stamp(kernel::event::identity::TimeMs, &[kernel::config::ClockZone]) -> core::result::Result<runtime::clock::ClockStamp, kernel::error::shape::AxError>
 pub fn runtime::compaction::detect(&str) -> runtime::compaction::Content
+pub fn runtime::compaction::mint(&str, core::option::Option<&kernel::event::record::turn::SummaryProducer>) -> kernel::event::record::turn::SummaryProducer
 pub fn runtime::compaction::plan(runtime::compaction::Content, kernel::budget::ByteLen, kernel::budget::ByteLen) -> runtime::compaction::Shrink
 pub fn runtime::compaction::shorten(&str, runtime::compaction::Strategy, kernel::budget::ByteLen) -> runtime::elision::Cut
 pub fn runtime::diagnostics::Diagnostics::admits(&self, runtime::diagnostics::Level) -> bool
@@ -848,6 +849,7 @@ pub runtime::SegmentSlot::Run
 pub runtime::SegmentSource::addr: kernel::address::Address
 pub runtime::SegmentSource::dropped: u64
 pub runtime::SegmentSource::kept: u64
+pub runtime::SegmentSource::producer: core::option::Option<kernel::event::record::turn::SummaryProducer>
 pub runtime::SieveRecord::bytes_in: u64
 pub runtime::SieveRecord::bytes_out: u64
 pub runtime::SieveRecord::filter: alloc::string::String
@@ -871,6 +873,7 @@ pub runtime::Sieved::Passed::reason: runtime::sieve::record::PassReason
 pub runtime::Sieved::Passed::text: alloc::string::String
 pub runtime::SourceDoc::addr: kernel::address::Address
 pub runtime::SourceDoc::bytes: core::option::Option<alloc::vec::Vec<u8>>
+pub runtime::SourceDoc::producer: core::option::Option<kernel::event::record::turn::SummaryProducer>
 pub runtime::Standing::id: runtime::backlog::BacklogId
 pub runtime::Standing::kind: runtime::BacklogKind
 pub runtime::Standing::scope: kernel::address::Address
@@ -1096,8 +1099,10 @@ pub runtime::prefix::SegmentSlot::Run
 pub runtime::prefix::SegmentSource::addr: kernel::address::Address
 pub runtime::prefix::SegmentSource::dropped: u64
 pub runtime::prefix::SegmentSource::kept: u64
+pub runtime::prefix::SegmentSource::producer: core::option::Option<kernel::event::record::turn::SummaryProducer>
 pub runtime::prefix::SourceDoc::addr: kernel::address::Address
 pub runtime::prefix::SourceDoc::bytes: core::option::Option<alloc::vec::Vec<u8>>
+pub runtime::prefix::SourceDoc::producer: core::option::Option<kernel::event::record::turn::SummaryProducer>
 pub runtime::redact::Marker::Fingerprinted
 pub runtime::redact::Marker::Plain
 pub runtime::reminder::ContextReminder::HandoverWindow

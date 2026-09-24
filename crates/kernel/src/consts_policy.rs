@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn ratios_never_divide_by_zero() {
-        assert_ne!(SECRET_ENTROPY_MIN.den, 0);
+        const { assert!(SECRET_ENTROPY_MIN.den > 0) };
     }
 
     /// The default sits inside the domain the one construction point

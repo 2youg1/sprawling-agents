@@ -62,4 +62,6 @@ pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
     ModelCalled, ModelReturned, PartChange, PromptAssembled, PromptSegment, PromptShapeCompared,
     PromptSkip, PromptSource, ShapeChanged, ShapePart, SkipReason, SteerReceived,
+    ModelCalled, ModelReturned, PromptAssembled, PromptSegment, PromptSkip, PromptSource,
+    SkipReason, SteerReceived, SummaryProducer,
 };

@@ -41,7 +41,7 @@ impl Assembled {
     pub(super) fn of_one(addr: Address, bytes: Vec<u8>) -> Assembled {
         let kept = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
         Assembled {
-            sources: vec![SegmentSource::whole(addr, kept)],
+            sources: vec![SegmentSource::whole(addr, kept, None)],
             bytes,
         }
     }
@@ -59,6 +59,7 @@ impl Assembled {
         self.sources.push(SegmentSource::whole(
             at,
             u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+            None,
         ));
     }
 

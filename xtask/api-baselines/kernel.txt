@@ -142,6 +142,7 @@ impl kernel::delegation::Delegator
 impl kernel::delegation::Delegator
 impl kernel::event::Scope
 impl kernel::event::Who
+impl kernel::event::record::PromptSource
 impl kernel::event::record::RunFrozen
 impl kernel::event::record::ToolCalled
 impl kernel::gate::DoorId
@@ -484,6 +485,7 @@ pub enum kernel::event::record::CheckpointCommitted
 pub enum kernel::event::record::PartChange
 pub enum kernel::event::record::ShapeChanged
 pub enum kernel::event::record::SkipReason
+pub enum kernel::event::record::SummaryProducer
 pub enum kernel::event::record::ToolAnswer
 pub enum kernel::gate::DoorId
 pub enum kernel::gate::EgressOutcome
@@ -834,6 +836,7 @@ pub fn kernel::event::Who::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fm
 pub fn kernel::event::Who::parse(&str) -> core::result::Result<kernel::event::Who, kernel::AxError>
 pub fn kernel::event::Who::resident(kernel::address::Address) -> core::result::Result<kernel::event::Who, kernel::AxError>
 pub fn kernel::event::Who::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+pub fn kernel::event::record::PromptSource::producer(&self) -> kernel::event::record::SummaryProducer
 pub fn kernel::event::record::RunFrozen::of(&kernel::completion::Completion) -> kernel::event::record::RunFrozen
 pub fn kernel::event::record::ToolCalled::subject_of(&kernel::Payload) -> core::option::Option<alloc::string::String>
 pub fn kernel::event::record::autonomy_word::read(&str) -> core::result::Result<kernel::approval::Autonomy, kernel::AxError>
@@ -1980,6 +1983,7 @@ pub kernel::event::record::PromptSource::addr: kernel::address::Address
 pub kernel::event::record::PromptSource::dropped: u64
 pub kernel::event::record::PromptSource::kept: u64
 pub kernel::event::record::PromptSource::marker: bool
+pub kernel::event::record::PromptSource::producer: core::option::Option<kernel::event::record::SummaryProducer>
 pub kernel::event::record::RerankCalled::model: alloc::string::String
 pub kernel::event::record::RerankCalled::passages: u64
 pub kernel::event::record::RerankCalled::ranks: u64
@@ -2013,6 +2017,10 @@ pub kernel::event::record::SpineDocumentWritten::bytes: usize
 pub kernel::event::record::SpineDocumentWritten::which: alloc::string::String
 pub kernel::event::record::SteerReceived::source: alloc::string::String
 pub kernel::event::record::SteerReceived::text: alloc::string::String
+pub kernel::event::record::SummaryProducer::Unknown
+pub kernel::event::record::SummaryProducer::Written
+pub kernel::event::record::SummaryProducer::Written::generation: core::num::nonzero::NonZeroU32
+pub kernel::event::record::SummaryProducer::Written::model: alloc::string::String
 pub kernel::event::record::ToolAnswer::Answered
 pub kernel::event::record::ToolAnswer::Answered::result: kernel::Payload
 pub kernel::event::record::ToolAnswer::Failed

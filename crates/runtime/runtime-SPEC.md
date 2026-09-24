@@ -301,7 +301,12 @@ impl Turn<Assembling> {
 **prefix 四段全量**（新增构建面；既有 FrozenSegment/assemble 不动）：
 
 ```rust
-pub struct SourceDoc { pub addr: Address, pub bytes: Option<Vec<u8>> }   // None＝缺失或不可读（跳过入账）
+pub struct SourceDoc { pub addr: Address, pub bytes: Option<Vec<u8>>,   // None＝缺失或不可读（跳过入账）
+                        pub producer: Option<SummaryProducer> }   // 本文档是压缩摘要时它的生产者指纹；非摘要＝None
+pub enum SummaryProducer { Written { model: String, generation: NonZeroU32 }, Unknown }
+    // 住 kernel::event::record（记录字段的类型归 kernel），随 `PromptSource` 行走；
+    // `generation` 数的是摘要的代数（链上第一份＝1，摘要的摘要加一），`NonZeroU32`
+    // 使「还没数」拼不出 0——零与未知是两件事，与 `ModelReturned` 缺席≠报零同族。
 pub struct SegmentCaps { pub city: u64, pub building: u64, pub resident: u64, pub run: u64 }  // 字节上限；来源＝调用方（`startup_default` 取 STARTUP_BUDGET_TOKENS × BYTES_PER_TOKEN ÷ PREFIX_SLOTS）
 pub struct PrefixPlan { pub city: Vec<SourceDoc>, pub building: Vec<SourceDoc>,
                         pub resident: Vec<SourceDoc>, pub run: Vec<SourceDoc>, pub caps: SegmentCaps }
@@ -314,11 +319,11 @@ pub fn build_prefix(plan: PrefixPlan) -> Result<PrefixBuild, AxError>;
 - **`Catalog::expand` 改答 `Expansion { Skill { addr }, Said { text } }` 而不是 `String`**：skill 展开成一个可打开的地址，其余展开成目录自己持有的正文；两者压成一个字符串时，调用方只能拿它去试解析成地址，而一段恰好能解析成地址的正文就会被当成文件打开。这个错误真发生了，是一条红测试拿住的。
 - **正文不在 prompt 里，所以交出去而不是拒绝**：`render()` 只写每条的 disclosure，`expansion` 从未进过窗口。
 - **它是 `Catalog::expand` 的第一个调用者**：在它之前，一栋楼的阅览室能报出一个 skill 的名字而永远交不出它。
-- 跨段去重：同 addr 两段命中只装首次（段序 city→building→resident→run）；后段记 skipped{reason:"duplicate"}。
+- **压缩摘要的来源行携生产者指纹**：`SourceDoc.producer` 一路随文档走 `SegmentSource` → `PromptSource` 行，`prompt_assembled` 因此对每份压缩摘要标注生产模型与代数。**读取端恒答 `producer()`，键缺席即 `Unknown`，永不补猜**：一行没写这个键，是「这份记录没说」，而回放恰好跑在哪个模型上不构成答案。缺席与显式 `Unknown` 在读取端同归 `Unknown`，在写入端则不同——非摘要的行不写这个键，来源不明的摘要写 `"unknown"`，于是「不是摘要」与「摘要但不知谁写的」在账上可分。
 - 截断：文件超段位余额即截到边界，原处留 ASCII 标记（文本与切口规则属 `runtime::elision`，§8-42），恒不静默丢尾；标记字节从段预算先扣。
 - 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量住 `kernel::consts_policy`（`BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`），与 `STARTUP_BUDGET_TOKENS` 同一个家；prefix.rs 只读不再自定。
 - 断点：`FrozenPrefix::system_blocks()` 产四块、逐块 cache=true＝断点恒 4＝`CACHE_BREAKPOINTS_MAX`，断点只落段界。
-- A15 重建器：`replay::rebuild_prefix(data: &serde_json::Value, resolver: &dyn Fn(&Address) -> Option<Vec<u8>>) -> Result<[B3Hash; 4], AxError>`——从 prompt_assembled 载荷（逐源 {addr, kept, marker, dropped}）与同源文档重算逐段哈希对拍；resolver 以 Address 取文（钉版 oid 级解析随 checkpoint 接入升级，接口不变）。拼接分隔符的唯一权威住 prefix.rs（`DOC_JOIN`），截断标记的唯一权威住 `runtime::elision`（§8-42），replay 同 crate 复用不另拷。
+- A15 重建器：`replay::rebuild_prefix(data: &serde_json::Value, resolver: &dyn Fn(&Address) -> Option<Vec<u8>>) -> Result<[B3Hash; 4], AxError>`——从 prompt_assembled 载荷（逐源的键以 `kernel::event::record::PromptSource` 为准：`{addr, kept, marker, dropped, producer}`，其中 `producer` 不参与对拍，因为哈希只盖段字节、指纹不是字节的一部分）与同源文档重算逐段哈希对拍；resolver 以 Address 取文（钉版 oid 级解析随 checkpoint 接入升级，接口不变）。拼接分隔符的唯一权威住 prefix.rs（`DOC_JOIN`），截断标记的唯一权威住 `runtime::elision`（§8-42），replay 同 crate 复用不另拷。
 - E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::dangling_tool_calls(&VerifiedLedger) -> Vec<(RunId, Seq)>`（tool_called 后邈无同 run 的 tool_result 即 dangling）＋`replay::outcome_unknown_draft(...) -> EventDraft`（补写的 tool_result，携 E_TOOL_OUTCOME_UNKNOWN 错误体）；消费者＝resume 路径（S4 serve；台账登记）。补写方经 `ToolCalled`／`ToolResult` 两个结构读写：此前它手挑 `id` 与 `name` 两个键、任一读不出就写下 `"unknown"`，于是一条这个 build 读不懂的调用被关在一个谁也答不上的 id 上；现在读不懂就是一次拒绝。
 - handoff：形已全（五段＋构造点＋resume 消费），无改动；「下一步段首列用户指定动作」属生产者纪律（S3 执行器／P2 spine_files），类型不另加钩。
 - 第四取消点（派生前）：无派生生产者时推迟落地，理由是提前落地＝死入口＋不可测。`collab::delegate_tool` 是那个生产者：`SafePoint::BeforeSpawn` ＋ `Turn<Recording>::record(interrupt, ledger)`，装配层在 `Completion::Cancelled` 时清空派生台，**被取消的 Run 一件活也交不下去**。
@@ -631,12 +636,18 @@ pub enum Shrink { Keep, Cut(Strategy), MustOffload }
 pub fn detect(text: &str) -> Content;                       // 前几行上的前缀与计数，顺序即设计
 pub fn plan(content: Content, size: ByteLen, budget: ByteLen) -> Shrink;
 pub fn shorten(text: &str, strategy: Strategy, budget: ByteLen) -> elision::Cut;   // 标记与丢弃计数由 elision 一处产出（§8-42）
+// runtime::compaction::producer（形状 1 判定）——压缩摘要生产者指纹的唯一铸印处
+pub fn mint(model: &str, previous: Option<&SummaryProducer>) -> SummaryProducer;
+// 链上无前代＝第 1 代；前代已记＝代数加一（checked，数不下了记 Unknown）；
+// 模型名为空、或链上前代是 Unknown＝Unknown。**前代未知则代数未知**：给一份
+// 没人数过的链补一个代数就是补猜，而半张指纹（有模型、无代数）是另一半的猜测。
 // 硬不变量：结果恒不大于输入，且在出口再验一次（真长了就退回原文）。切口落在字符边界。
 // Structured 与 Unknown 恒不截断：被截断的 JSON 比缺席的 JSON 更糟；未知内容不拿猜测去丢东西。
 // Markup 由以下特征判定： `\documentclass`／`\begin{document}`，或首几行里两条 ATX 标题且无一行像代码
 // （源码文件的 `# ` 注释与标题同形，否则会保注释而丢代码）。检测先于 Table：LaTeX 的表格会让一行带 `|`。
 // `Sections` 保整节至预算尽，再保被丢各节的标题行（骨架）；少于两条标题即只有一个标题，退回首端裁。
 // 机制面（把大结果移出窗口）仍归 offload——本模块只答「缩不缩、留哪一头」。
+// 生产者指纹的判定（谁写的、第几代）住本模块的子模块 compaction::producer（§12.1）：一条规则一个家，别处不写这个阈值。
 
 // runtime::mode 的准入面（形状 1 判定）
 pub struct Produced { pub tests_passed: Option<bool>, pub contract_moved: bool,
@@ -856,6 +867,18 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 - `E_INVALID_ARGS`（at_seq 越界）：不可定义掉——「从已冻结 Run 最后事件之后分叉」是用户可达输入（§19.1 点名）；静默夹取是被明拒的替代。
 - `E_LOG_VERSION_UNSUPPORTED`（v 判向＋未知 kind 无 ig）：不可定义掉——数据比二进制长寿。
 - 链断/seq 洞/非规范字节：以 `E_CAS_CORRUPT` 报（存储完整性族；subject=行号与路径）——能否定义掉＝「介质位腐烂在设计边界外」，同 memory-SPEC §12。
+
+### 12.1 定规：压缩摘要的生产者指纹只在记录处答，缺失即显式未知
+
+**决定**：每份压缩摘要在 `prompt_assembled` 的来源行标注生产模型与代数（`SummaryProducer::Written { model, generation }`），铸印判定唯一住 `runtime::compaction::producer::mint`（§8-14），读取端唯一答 `PromptSource::producer()`：键缺席即 `Unknown`，显式 `Unknown` 与缺席在读取端同归 `Unknown`。代数用 `NonZeroU32`，链上前代未知则新摘要也记 `Unknown`。
+
+**理由**：换模型之后，一份旧摘要摆在新模型面前，「谁写的、隔了几代摘要」必须答得出或明说答不出，否则回放只能沉默。补猜的两条近路都通向错误答案：拿回放当下跑的模型答旧摘要的生产者，拿「链上大概只有一代」答代数。与 `ModelReturned` 缺席≠报零同族：0 代拼不出来，缺席也不等于 0 代。
+
+**落点**：判定住 `runtime::compaction::producer::mint`（`compaction.rs` 的子模块，模块图同变更集登记）而不是 `plan` 的形参。`plan(content, size, budget) -> Shrink` 答的是「缩不缩、留哪一头」，指纹答的是「谁写的、第几代」；把后者塞进前者的返回值，要么改 `Shrink` 的语义，要么让一条函数兼职两个互不相干的决定。判定仍然只在本模块内、只有一处，别处不写这个阈值——「一个家」要求的是唯一，不是与 `plan` 同一个函数。
+
+**被否**：①读取端从邻近 `model_called` 反推生产者——账本上两条线的相邻是排版事实不是生产事实，摘要跨会话携带后两者可以分属两个模型；②代数缺省 0——0 是一个断言（第零代），缺席是不知道，两种答案在同一字段里就是一种谎言；③把指纹并进 `compaction::plan` 的返回值——见上条落点，两个决定一个出口。
+
+**重开参数**：出现「摘要链上代数与实际压缩次数对不上」的实证（例如旁路直写摘要的生产者），重开的是 `mint` 的前代口径，不是缺失记未知这一条。
 
 ## 13 依赖选型
 

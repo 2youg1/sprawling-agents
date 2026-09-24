@@ -180,6 +180,11 @@ fn prefix_assembly() -> Result<(), String> {
                     .take(bytes)
                     .collect(),
             ),
+            // The bench measures assembly, not provenance: a document
+            // with no stated producer is the case the read side must
+            // answer `unknown` for, and naming one here would only
+            // exercise the other branch.
+            producer: None,
         })
     };
     let plan = runtime::PrefixPlan {
