@@ -93,7 +93,7 @@ pub fn body(theme: Option<&str>) -> String {
         ),
         None => String::new(),
     };
-    format!(
+    let inner = format!(
         r#"
 {forced}
   var out = [];
@@ -216,7 +216,7 @@ pub fn body(theme: Option<&str>) -> String {
     var frame = node.matches(NAMED) || across !== 'shows' || down !== 'shows';
     if (!frame && !writes(node)) continue;
     if (node.checkVisibility && !node.checkVisibility()) continue;
-    var rect = node.getBoundingClientRect();
+    var box = boxOf(node);
     var depth = 0;
     for (var up = node.parentElement; up; up = up.parentElement) depth++;
     var parent = -1;
@@ -226,8 +226,8 @@ pub fn body(theme: Option<&str>) -> String {
       node.tagName,
       node.getAttribute('role') || '-',
       encodeURIComponent(named(node).slice(0, 80)) || '-',
-      Math.round(rect.left), Math.round(rect.top),
-      Math.round(rect.width), Math.round(rect.height),
+      box[0], box[1],
+      box[2], box[3],
       depth, parent,
       across, down, frame ? 'frame' : 'words',
       firstMark(node), underlined(node),
@@ -263,7 +263,9 @@ pub fn body(theme: Option<&str>) -> String {
       (getComputedStyle(document.documentElement).colorScheme || 'normal').replace(/\s+/g, '-')
   }};
 "#
-    )
+    );
+    // The one box reading, spliced in ahead of the walk that uses it.
+    format!("{box_of}\n{inner}", box_of = crate::geometry::BOX_OF)
 }
 
 /// The measurement as one expression a driver can evaluate, resolving

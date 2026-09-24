@@ -51,15 +51,18 @@ pub(crate) fn measure_script(
     for reference in references {
         snapshot.resolve(reference)?;
         parts.push(format!(
-            "(el => {{ const r = el ? el.getBoundingClientRect() : null; return r ? {{ ref: {}, \
-             x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: \
-             Math.round(r.height) }} : {{ ref: {}, x: 0, y: 0, width: 0, height: 0 }}; }})({})",
-            json!(reference),
-            json!(reference),
-            crate::act::selector_of(snapshot, reference)?,
+            "(el => {{ if (!el) return {{ ref: {reference}, x: 0, y: 0, width: 0, height: 0 }}; \
+             const box = boxOf(el); return {{ ref: {reference}, x: box[0], y: box[1], \
+             width: box[2], height: box[3] }}; }})({selector})",
+            reference = json!(reference),
+            selector = crate::act::selector_of(snapshot, reference)?,
         ));
     }
-    Ok(format!("JSON.stringify([{}])", parts.join(",")))
+    Ok(format!(
+        "{box_of}; JSON.stringify([{parts}])",
+        box_of = crate::geometry::BOX_OF,
+        parts = parts.join(",")
+    ))
 }
 
 /// Reads what an evaluate came back with.

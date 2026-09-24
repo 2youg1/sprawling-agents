@@ -14,6 +14,7 @@
 mod act;
 mod devloop;
 mod diff;
+mod geometry;
 mod input;
 mod port;
 mod profile;
