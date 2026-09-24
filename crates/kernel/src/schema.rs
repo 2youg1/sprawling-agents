@@ -359,7 +359,9 @@ mod tests {
                     let parsed = SessionName::parse(&raw).is_ok();
                     assert!(matched || !parsed, "session name {raw:?}");
                     if matched && !parsed {
-                        assert_eq!(raw.trim(), RESERVED_PREFIX, "{raw:?}");
+                        // A file system ignores case: `.SPRAWLING` names
+                        // the reserved directory too, and a pattern cannot say so.
+                        assert!(raw.trim().eq_ignore_ascii_case(RESERVED_PREFIX), "{raw:?}");
                     }
                 }
             }
@@ -383,15 +385,15 @@ mod tests {
         }
 
         /// `SessionName::parse` refuses one word the pattern cannot: the
-        /// reserved directory's own name. Every other disagreement is a
-        /// defect, and the assertion inside says which one remains.
+        /// reserved directory's own name, in any case - a file system
+        /// that ignores case makes `.SPRAWLING` the same directory.
         #[test]
         fn the_session_name_pattern_parts_from_the_constructor_on_one_word(raw in boundary_text()) {
             let matched = SESSION_NAME_MATCHER.is_match(&raw);
             let parsed = SessionName::parse(&raw).is_ok();
             prop_assert!(matched || !parsed);
             if matched && !parsed {
-                prop_assert_eq!(raw.trim(), RESERVED_PREFIX);
+                prop_assert!(raw.trim().eq_ignore_ascii_case(RESERVED_PREFIX), "{}", raw);
             }
         }
     }

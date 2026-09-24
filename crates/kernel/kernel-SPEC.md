@@ -1443,7 +1443,7 @@ pub fn markdown(text: &str) -> Vec<Span>;
 ### 8-28 C17 从「首段」扩到「任一段」（形状 2 value 的一条原语）
 
 ```rust
-pub fn is_reserved(&self) -> bool;   // 任一段 == RESERVED_PREFIX（原：仅首段）
+pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCII 折叠，见 8-55；原：仅首段）
 ```
 
 **改它的理由是一个现存的洞，不是一个新需求。** 一次派活的写域由 `city::policy::write_domain()` 给出，而 `docs/templates/RULES.toml` 的 `prefixes` 出厂就是一个空表，于是 `write_prefixes` 为空、回落到 `[self.addr]`——**默认写域是整栋楼**。`runtime::tools::edit` 对路径只有 `WriteDomain::admits` 一道依据，`city::load` 又在**每次派活**时重读 `RULES.toml`。三条合起来：一个 agent 现在就改得了它自己那栋楼的 `RULES.toml` 与 `CONFIG.toml`——它自己的写域、`confidential`、思考强度与 MCP server 全在那两个文件里，而改动在下一次派活即生效。词汇表写着「一个 agent 改不了自己的账与自己的配置」，RULES.toml 自己的抬头写着「residents read it and cannot change it」——**两句话今天都没有任何东西执行**。
