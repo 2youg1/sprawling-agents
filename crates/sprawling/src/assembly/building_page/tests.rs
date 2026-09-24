@@ -122,7 +122,6 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
 
     worker
         .handle(channels::Command::ConfigureBuilding {
-            context_second_threshold: None,
             addr: room.clone(),
             sandbox: Some(kernel::SandboxLimits {
                 shell: true,
@@ -191,7 +190,6 @@ fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
     let allowlist = "[[window]]\ntitle = \"kusanagi\"\n";
     worker
         .handle(channels::Command::ConfigureBuilding {
-            context_second_threshold: None,
             addr: lab.clone(),
             sandbox: None,
             mcp: None,

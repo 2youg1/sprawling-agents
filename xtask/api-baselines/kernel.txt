@@ -331,6 +331,7 @@ pub const kernel::consts_policy::DISCARD_FILES_MAX: u32
 pub const kernel::consts_policy::DISCARD_RETENTION_DAYS: u32
 pub const kernel::consts_policy::DRAFT_HELD_ESCALATE: u32
 pub const kernel::consts_policy::EDIT_WAR_FREEZE: u32
+pub const kernel::consts_policy::EXCHANGE_BUDGET_BYTES: u64
 pub const kernel::consts_policy::HALL_BUILDING: &str
 pub const kernel::consts_policy::HALL_CLERK: &str
 pub const kernel::consts_policy::HALL_MAYOR: &str
