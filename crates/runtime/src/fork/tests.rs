@@ -17,6 +17,8 @@
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
+    clippy::wildcard_enum_match_arm,
     reason = "test code"
 )]
 
@@ -167,4 +169,101 @@ fn a_cut_the_history_does_not_hold_is_refused() {
     let err = crate::fork::inherited(&verified, Seq::new(99)).unwrap_err();
     assert_eq!(err.code(), &kernel::AxCode::InvalidArgs);
     assert!(err.recovery().contains("ends at seq 3"), "{err}");
+}
+
+/// A loud mother: a reply and a result whose texts overflow the
+/// exchange's budget together. What a branch inherits is the compacted
+/// exchange — the same bytes the turn boundary folded into the mother's
+/// window, computed at the same boundary of the same turn.
+#[test]
+fn a_branch_inherits_the_compacted_exchange_not_the_raw_records() {
+    fn prose(len: usize) -> String {
+        let unit = "lorem ipsum dolor sit amet ";
+        let mut out = unit.repeat(len / unit.len() + 1);
+        out.truncate(len);
+        out
+    }
+    let reply = prose(40_000);
+    let answer =
+        serde_json::to_string(&Payload::of(&serde_json::json!({ "note": prose(20_000) })).unwrap())
+            .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let (mut ledger, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+    let drafts = [
+        line(
+            EventKind::RunStarted,
+            Payload::of(&RunStarted {
+                task: "measure the meter".to_owned(),
+                goal: "a number is written down".to_owned(),
+                ..RunStarted::default()
+            })
+            .unwrap(),
+        ),
+        line(
+            EventKind::ModelReturned,
+            Payload::of(&ModelReturned {
+                message: kernel::model::message_payload(&[ContentBlock::Text {
+                    text: reply.clone(),
+                }])
+                .unwrap(),
+                calls: 1,
+                usage: None,
+                stop: None,
+                billed_usd_micros: None,
+            })
+            .unwrap(),
+        ),
+        line(
+            EventKind::ToolCalled,
+            Payload::of(&ToolCalled {
+                id: "tu_1".to_owned(),
+                name: kernel::ToolName::parse("status").unwrap(),
+                args: Payload::empty(),
+                subject: None,
+            })
+            .unwrap(),
+        ),
+        line(
+            EventKind::ToolResult,
+            Payload::of(&ToolResult {
+                tool_use_id: "tu_1".to_owned(),
+                name: kernel::ToolName::parse("status").unwrap(),
+                answer: ToolAnswer::Answered {
+                    result: Payload::of(&serde_json::json!({ "note": prose(20_000) })).unwrap(),
+                },
+            })
+            .unwrap(),
+        ),
+    ];
+    ledger.append_all(drafts.to_vec()).unwrap();
+    let verified = replay::verify_ledger_dir(dir.path()).unwrap();
+    let inherited = crate::fork::inherited(&verified, Seq::new(3)).unwrap();
+
+    let mut exchange = crate::compaction::Exchange::new();
+    exchange.push_assistant(vec![ContentBlock::Text {
+        text: reply.clone(),
+    }]);
+    exchange.push_result(ContentBlock::ToolResult {
+        tool_use_id: "tu_1".to_owned(),
+        content: answer.clone(),
+        is_error: false,
+        attachments: Vec::new(),
+    });
+    exchange.compact().unwrap();
+
+    let assistant = inherited.messages[1].content.clone();
+    assert_eq!(assistant, exchange.assistant().to_vec());
+    let results = inherited.messages[2].content.clone();
+    assert_eq!(results, exchange.results().to_vec());
+    // The exchange overflows its budget as one turn, and the reply is
+    // what the compaction shortened: the raw record is longer than what
+    // a branch starts from.
+    assert!(reply.len() > assistant_text(&assistant).len());
+}
+
+fn assistant_text(blocks: &[ContentBlock]) -> String {
+    match &blocks[0] {
+        ContentBlock::Text { text } => text.clone(),
+        other => panic!("expected a text block, got {other:?}"),
+    }
 }

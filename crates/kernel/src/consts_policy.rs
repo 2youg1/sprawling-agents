@@ -85,6 +85,25 @@ pub const OFFLOAD_MIN_BYTES: u64 = 16_384;
 /// lockfile, a generated table - and not a tax on ordinary reading.
 pub const INTERVAL_CAP_BYTES: u64 = 65_536;
 
+/// What one turn's exchange — its assistant reply and its wave's
+/// results — may occupy in the window, in bytes. Shared evenly across
+/// the exchange's texts when the whole does not fit; which end of a text
+/// survives is `runtime::compaction`'s decision, and this file only says
+/// how much there is.
+///
+/// Derived, not chosen: one reply at the city's default output ceiling,
+/// converted at the rate every two-unit budget crosses at. A reply is
+/// the one part of an exchange no landing-time mechanism has bounded
+/// yet — a tool result is capped where it lands and its original is
+/// pinned first — so the exchange's budget is priced at exactly the
+/// largest thing the model is allowed to say. The `checked_mul` is
+/// const-evaluated over two literals and cannot fail; the match is the
+/// const-safe spelling of that product.
+pub const EXCHANGE_BUDGET_BYTES: u64 = match OUTPUT_CEILING_DEFAULT.checked_mul(BYTES_PER_TOKEN) {
+    Some(bytes) => bytes,
+    None => BYTES_PER_TOKEN,
+};
+
 pub const DRAFT_HELD_ESCALATE: u32 = 3;
 
 pub const EDIT_WAR_FREEZE: u32 = 2;

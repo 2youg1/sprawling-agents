@@ -516,7 +516,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->7<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
-| V6 deterministic simulation | components each correct and wrong together | citysim, <!-- xtask:begin citysim_scenarios -->7<!-- xtask:end --> scenario files, failures replayed from their script |
+| V6 deterministic simulation | components each correct and wrong together | citysim, <!-- xtask:begin citysim_scenarios -->8<!-- xtask:end --> scenario files, failures replayed from their script |
 | V7 mutation | tests that do not bite | `cargo-mutants`, by `just mutants` |
 | V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `fixtures/` |
 | V9 end to end | the thing a person actually wants to do | the real client in a real browser against a real server, on a developer machine |

@@ -20,6 +20,7 @@ use kernel::{
     Payload, RunId, Seq, TimeMs,
 };
 
+use crate::compaction::Exchange;
 use crate::replay::{VerifiedLedger, VerifiedLine};
 use crate::window::{Opening, Window};
 
@@ -83,6 +84,13 @@ pub struct Inherited {
 /// wrote after scanning for credentials, so a branch inherits the text
 /// the mother actually sent, which is the redacted one. That is the
 /// honest reading: the bytes before redaction exist nowhere any more.
+///
+/// **The turn boundary's compaction is re-applied here, from the same
+/// judgment.** The mother's window carries the compacted exchange of
+/// each turn (`runtime::compaction::Exchange`), and this rebuild compacts
+/// at the same boundary of the same turn, so a branch starts from the
+/// bytes the mother sent rather than from the fuller bytes the ledger
+/// kept.
 ///
 /// **A reminder is not rebuilt, and cannot be.** The context gauge's
 /// nudge is folded into the window without a record of its own, because
@@ -150,25 +158,26 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
                 // answered, which a run cannot produce. Reading it as
                 // the start of a new turn is what keeps a damaged
                 // history from being silently rewound.
-                commit(&mut window, open.take());
+                commit(&mut window, open.take())?;
                 let returned = record.data().read::<ModelReturned>()?;
                 let assistant = content_from_message(&returned.message)?;
+                let mut exchange = Exchange::new();
+                exchange.push_assistant(assistant);
                 open = Some(Wave {
-                    assistant,
-                    results: Vec::new(),
+                    exchange,
                     expect: usize::try_from(returned.calls).unwrap_or(usize::MAX),
                 });
                 if returned.calls == 0 {
-                    commit(&mut window, open.take());
+                    commit(&mut window, open.take())?;
                     at = record.seq();
                 }
             }
             EventKind::ToolResult => {
                 let result = record.data().read::<ToolResult>()?;
                 if let Some(wave) = open.as_mut() {
-                    wave.results.push(result_block(&result)?);
-                    if wave.results.len() >= wave.expect {
-                        commit(&mut window, open.take());
+                    wave.exchange.push_result(result_block(&result)?);
+                    if wave.exchange.results().len() >= wave.expect {
+                        commit(&mut window, open.take())?;
                         at = record.seq();
                     }
                 }
@@ -268,19 +277,25 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
 
 /// One turn being folded: the assistant message and the results it is
 /// waiting for, held together because neither is a conversation without
-/// the other.
+/// the other. The value is `Exchange`, the same one the turn layer
+/// collects live, so the two folds cannot drift.
 struct Wave {
-    assistant: Vec<ContentBlock>,
-    results: Vec<ContentBlock>,
+    exchange: Exchange,
     expect: usize,
 }
 
-fn commit(window: &mut Window, wave: Option<Wave>) {
-    let Some(wave) = wave else {
-        return;
+/// Folds one whole turn into the window, at the same boundary the live
+/// turn compacts at: the wave is complete here or it is dropped whole,
+/// so the compaction meets what the turn boundary met and answers the
+/// same bytes.
+fn commit(window: &mut Window, wave: Option<Wave>) -> Result<(), AxError> {
+    let Some(mut wave) = wave else {
+        return Ok(());
     };
-    window.push_assistant(wave.assistant);
-    window.push_tool_results(wave.results);
+    wave.exchange.compact()?;
+    window.push_assistant(wave.exchange.assistant().to_vec());
+    window.push_tool_results(wave.exchange.results().to_vec());
+    Ok(())
 }
 
 /// One tool result as the model reads it back, rebuilt from the record

@@ -9,9 +9,13 @@
 use kernel::{AxCode, AxError, Ceiling, ContentBlock, EventRef, ModelUsage, StopReason};
 
 /// What a completed turn hands the run loop. `assistant` and
-/// `wave_results` are the window-folding material — the same content the
-/// ledger carries in `model_returned.data.content` and `tool_result`
-/// events (C16: live folding and offline rebuild share one source).
+/// `wave_results` are the window-folding material — the turn's
+/// exchange, compacted at the closing boundary of `record`. The records
+/// are what the compaction works from: `model_returned.data.content`
+/// keeps the reply whole, and each `tool_result` is the payload the
+/// window text was printed from. `runtime::fork` rebuilds both from
+/// those records through the same compaction at the same boundary, so a
+/// rebuild and a live fold still share one source.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TurnReport {
     pub(super) refs: Vec<EventRef>,

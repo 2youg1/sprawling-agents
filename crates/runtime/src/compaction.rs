@@ -31,8 +31,10 @@ use kernel::ByteLen;
 
 use crate::elision::{self, Cut, Elided};
 
+mod exchange;
 mod producer;
 
+pub(crate) use exchange::Exchange;
 pub use producer::mint;
 
 /// What a piece of text is, as far as shortening is concerned. Eight,

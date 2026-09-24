@@ -128,7 +128,7 @@ pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 
 **切点只有一处权威，而且它往回退。** 一次工具波是好几行，只有它的末尾是能切的地方：`tool_called` 已写、`tool_result` 未写的中间，是一条「assistant 消息的工具调用没有答案」的半个回合，任何 provider 都拒。所以 `inherited` 维护一个「开着的一波」，命中中途就退回上一次安全点，并在 `Inherited::at` 里如实回报它**实际用到**的那一行——调用方把这一行写进 `run_forked`，于是页面显示的分叉点与模型真正拿到的那一段是同一个事实。
 
-**上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。
+**上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。**回合边界的压缩会重建**：母亲窗口里每回合的 exchange 是收尾边界压缩后的字节，`inherited` 在同一边界对同一材料重放同一判定（8-44），分支拿到的是母亲真正发出去的那一份，而不是账本里更全的那一份。
 
 **`addr` 落在 `run_forked` 的那一行上**：新 run 的 id 说的是「谁继续谁」，而地址说的是**哪个房间的这次继承已经用掉了**——`assembly::folds::session` 只用这两个字段回答「这个房间的当前一段是否还欠一段对话」。
 
@@ -293,7 +293,8 @@ impl Turn<Assembling> {
 // Interrupt 增 Steer { source: String, text: String }：边界消费→追加 steer_received（in-window）→照常 Advanced（不终止回合）；
 // 文本回折入 Window 归执行器（它持 Window 与 Steer 原文），呼应「追加在结果末尾」。
 // TurnReport 长入：model_content: Vec<ContentBlock>（助手内容）与 wave_results: Vec<ContentBlock>（ToolResult 块）——
-// 执行器据此折叠 Window；离线重建同源于 model_returned.data.content 与 tool_result 事件（C16 一致）。
+// 执行器据此折叠 Window；两份材料是收尾边界压缩后的 exchange（8-44），离线重建同源于
+// model_returned.data.content 与 tool_result 事件并在同一边界重放同一判定（C16 由 8-44 的对拍承接）。
 // kernel::ToolCall 增 id 字段：tool_use↔tool_result 对号是两 Dialect 的 wire 硬性要求；
 // tool_called 载荷增 id，tool_result 载荷增 tool_use_id。
 ```
@@ -879,6 +880,10 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 **被否**：①读取端从邻近 `model_called` 反推生产者——账本上两条线的相邻是排版事实不是生产事实，摘要跨会话携带后两者可以分属两个模型；②代数缺省 0——0 是一个断言（第零代），缺席是不知道，两种答案在同一字段里就是一种谎言；③把指纹并进 `compaction::plan` 的返回值——见上条落点，两个决定一个出口。
 
 **重开参数**：出现「摘要链上代数与实际压缩次数对不上」的实证（例如旁路直写摘要的生产者），重开的是 `mint` 的前代口径，不是缺失记未知这一条。
+### 12.1 定规：回合边界的压缩只在收尾边界换快照
+- **决定**：一回合的 exchange 只允许在 `Turn<Recording>::record` 的收尾边界被压缩替换，时机是工具波全落地之后、一回合一次；判定由 `compaction::plan` 一处给出（8-44），`turn.rs` 不写任何阈值比较；`runtime::fork` 在同一边界重放同一判定。
+- **理由**：压缩若在波中换快照，它看见的是半截波，分组与 `fork` 的逐回合重建不同，同一历史会折出两种字节，分支与母亲分叉——这正是确定性回放（ARCHITECTURE §10）要排除的失败。收尾边界是这一波的唯一完整分组点。
+- **击败的备选**：①逐结果在波中压缩——分组随落地次序漂移，重放无法复现；②在 `turn.rs` 写一份阈值判断——「装不装得下」已经有一个家（`compaction::plan`），第二个家会各自漂移；③在边界把 `MustOffload` 的文本换成引用——这扇门没有 store，且城里没有工具解析得了引用，模型拿到的将是一条跟不上的指针，故该类文本原样保留、以 Ledger 为回路。
 
 ## 13 依赖选型
 
@@ -890,6 +895,7 @@ S3 增：`wasmtime = "48"`（feature `wasm` 内藏，钉版理由见 §8-13；wa
 无（行号计法与 recovery 文句不构成行为常量）。
 
 S3 增两处 pub(crate) 数据面（改须本 SPEC 同集；没有 `WATCHDOG_PROVIDER_RETRIES`，理由见 §8-9）：信封附件封顶 `ENVELOPE_ATTACH_MAX_BYTES=1024`（§8-7：附件与负载分账的断言界）；net_notice／truncation／offload 提示句三定句（ASCII，住 pipeline／offload 实现内，改句＝改入窗字节＝过本 SPEC）。
+8-44 增一项常量读取（值与理由住 `kernel::consts_policy`，本文件不复写）：`EXCHANGE_BUDGET_BYTES`——回合 exchange 的入窗预算，`compaction::exchange` 是唯一读者。
 
 ## 15 影响面
 
@@ -900,6 +906,7 @@ S3：assemble 签名长入波及 citysim 执行器（同集更新）；kernel::m
 
 单测：五步各拒绝分支＋ig 跳过；fork 越界；fork_draft 载荷形。proptest：对任意合法 draft 序列（经内存 Ledger 物化）verify 恒过；任意单字节翻转恒拒。A2/A19 演示测试入 crates/runtime/tests/。约束：clippy 零告警。
 S3 增：A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）；A7 往返四断言；A18 零字节；watchdog 分级序；A10 三断言（feature `wasm` 下真 wasmtime＋WAT）；L0×失败注入矩阵（三臂×（正常／工具错／拒收））；ToolBench 门路由（Deny 回流／Escalate 回流／dedup 先于副作用）。
+8-44 增：`compaction::exchange::tests` 三例（预算内全保留；超预算回复按 `plan` 裁、结构化结果整块保留；份额随 exchange 大小走）；`turn/tests/compaction` 两例（收尾边界才换快照、波中达阈值按全波分组一次压）；`fork/tests` 一例（分支继承的是压缩后的 exchange）；citysim `compaction` 两例（波中达阈值账本全字节保留、同剧本逐字节重放）。
 
 ## 17 模型体验
 
@@ -1718,3 +1725,15 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 ### 8-43 重试上限住 kernel
 
 `Retries` 曾经在 gateway 与 runtime 各有一份，两个臂相同、文档相同，而两个 crate 互不依赖——于是这个事实除了 kernel 无处可住。现在它住 `kernel::retries`：gateway 用它决定要不要再发一次请求，`Watchdog` 用它决定要不要冻结这次运行。`runtime::Retries` 是对它的再导出，不是第二份定义。
+
+### 8-44 runtime::compaction::exchange（形状 2 值＋形状 1 判定）：回合边界的压缩
+
+一回合加进 window 的东西是一对值：发出调用的助手回复与那波的答案——少了任何一半都不是对话，所以它们是一个值 `Exchange`（形状 2），由 `Turn<ToolWave>` 在波落地时收集、由 `runtime::fork` 从同一批记录重建。压缩只发生在 `Turn<Recording>::record` 的收尾边界（工具波全落地之后），这扇门一个回合只开一次（形状 1 判定住 `compact_texts`，调用的是 `compaction::plan`）。
+
+- **判定并入 `compaction::plan`，`turn.rs` 不另写阈值**：exchange 的总字节对着预算 `EXCHANGE_BUDGET_BYTES`（住 `kernel::consts_policy`）触发；触发后每段文本按**均分份额**过 `plan`：`Keep` 与 `MustOffload` 原样，`Cut(Strategy)` 走 `shorten`。除 `plan` 外这条路上没有第二次「装不装得下」的比较。
+- **波中永不换快照**：半落地的波会让压缩按半截分组，而 `fork` 是一回合一回合同一值重建的——两边分组不同就是同一历史两种字节，分支从此与母亲分叉。故收集期不压、只在收尾边界对全波一次压；红测用「全波分组与半波分组产出不同字节」钉住这一点。
+- **`MustOffload` 在这扇门上不动文本**：它要的是整块离窗留引用，而这扇门没有 store（tee 在落地管线那一侧），城里也没有工具解析得了引用——所以文本留原样。回路不是窗口：进这扇门的文本恒等于账上 `model_returned.data.content` 与 `tool_result` 里的那一份（`turn/wave.rs` 只打印一次、`fork` 由同一条记录重建），而 `exec` 结果在落地时已被管线裁过或 tee 过——原件在 CAS、账上有 `result_offloaded` 指过去。两条路都没有「只存在于窗口里」的字节。
+- **thinking 与 redacted thinking 永不碰**：thinking 块带覆盖其字节的签名，redacted 形态是封好的密文。
+- **`runtime::fork` 同边界重放**：`inherited` 的 `Wave` 持同一个 `Exchange`，在波收齐（或整波丢弃）的同一点 `compact()`——live 折叠与离线重建因此同源同字节，C16 的承诺由这条对拍承接。
+- **唯一的失败**：`Exchange::compact` 在一段文本计不进 `u64` 时以 `E_INVALID_ARGS` 报（动作＝压缩这一回合的 exchange，主体＝那段文本，recovery 指向本模块）——这是「没有人解析得了的窗口字节」，不是可恢复的压缩结果。live 路径（`record`）与回放路径（`inherited`）在同一个值上走同一次判定，故同一段文本两边同样拒，回放不会因为压缩而少一条分支。
+- **数字一个家**：预算只住 `consts_policy::EXCHANGE_BUDGET_BYTES`，本文件不复写它的值。

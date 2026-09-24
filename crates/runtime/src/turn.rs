@@ -24,6 +24,7 @@ use kernel::{
     ModelRequest, ModelReturn, ModelUsage, Payload, RunId, StopReason, TimeMs, ToolCall, ToolDef,
 };
 
+use crate::compaction::Exchange;
 use crate::prefix::FrozenPrefix;
 use crate::window::Window;
 
@@ -70,8 +71,7 @@ pub struct ToolWave {
 pub struct Recording {
     model_returned: EventRef,
     calls_made: usize,
-    assistant: Vec<ContentBlock>,
-    wave_results: Vec<ContentBlock>,
+    exchange: Exchange,
     usage: Option<ModelUsage>,
     stop: Option<StopReason>,
 }
@@ -215,10 +215,16 @@ impl Turn<Recording> {
     /// extra is appended here, because every effect is already on the
     /// ledger. What the phase exists for is the fourth boundary — the
     /// last moment before the run acts on what this turn decided,
-    /// including the work it handed down.
+    /// including the work it handed down — and for the one compaction
+    /// door a turn has. The wave is whole by now, so this is the one
+    /// moment its snapshot may be replaced; a compactor meeting a
+    /// half-landed wave would group what this boundary groups once, and
+    /// `runtime::fork` rebuilding one turn at a time would answer
+    /// different bytes for the same history.
     ///
     /// # Errors
-    /// Propagates the ledger's refusal to record the boundary event.
+    /// Propagates the ledger's refusal to record the boundary event and
+    /// a text the compaction cannot count.
     pub fn record(
         mut self,
         interrupt: Interrupt,
@@ -227,15 +233,23 @@ impl Turn<Recording> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
+        let Recording {
+            model_returned,
+            calls_made,
+            mut exchange,
+            usage,
+            stop,
+        } = self.state;
+        exchange.compact()?;
         Ok(PhaseOutcome::Advanced(TurnReport {
             redacted: self.journal.redacted(),
             refs: self.journal.take_refs(),
-            model_returned: self.state.model_returned,
-            calls_made: self.state.calls_made,
-            assistant: self.state.assistant,
-            wave_results: self.state.wave_results,
-            usage: self.state.usage,
-            stop: self.state.stop,
+            model_returned,
+            calls_made,
+            assistant: exchange.assistant().to_vec(),
+            wave_results: exchange.results().to_vec(),
+            usage,
+            stop,
         }))
     }
 }

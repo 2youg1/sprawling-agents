@@ -18,7 +18,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 | `version` | 2 值类型 | 乐观并发：Version 单调值＋base 新鲜度判定 |
 | `idem` | 2 值类型 | IdemKey 确定性派生（BLAKE3 XOF 16 字节＋版本字节） |
 | `consts_external` | 6 数据面 | 外部事实常量 5 项 |
-| `consts_policy` | 6 数据面 | 政策常量 15 项（已落 12，3 项随类型延后，见 §8-8） |
+| `consts_policy` | 6 数据面 | 政策常量 16 项（已落 13，3 项随类型延后，见 §8-8） |
 | `ledger` | 3 端口 | 唯一写入口 trait；链语义（GENESIS_PREV／chain_hash）；conformance 套件 |
 
 Stage 2 落地其余 18 个 kernel 模块（§8-10…§8-27）。**施工序＝依赖序**：
@@ -620,6 +620,7 @@ pub const CTX_REMINDER_SECOND_MAX: u64 = 90;                         // 第二�
 pub const LOOP_REPEAT_THRESHOLD: u32 = 3;
 pub const OFFLOAD_MIN_BYTES: u64 = 16_384;
 pub const INTERVAL_CAP_BYTES: u64 = 65_536;                          // 一次区间读／检索的窗口预算
+pub const EXCHANGE_BUDGET_BYTES: u64 = OUTPUT_CEILING_DEFAULT * BYTES_PER_TOKEN;  // 一回合 exchange 的窗口预算（runtime-SPEC.md 8-44）
 pub const DRAFT_HELD_ESCALATE: u32 = 3;
 pub const EDIT_WAR_FREEZE: u32 = 2;
 pub const SECRET_ENTROPY_MIN: Ratio = Ratio { num: 7, den: 2 };      // 3.5 bits/char

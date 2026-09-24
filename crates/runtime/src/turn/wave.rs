@@ -8,6 +8,8 @@
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{AxCode, AxError, ContentBlock, Ledger, Payload, ToolCall, ToolOutcome};
 
+use crate::compaction::Exchange;
+
 use super::{Carried, Interrupt, NextCall, PhaseOutcome, Recording, ToolWave, Turn};
 
 /// What the model reads back as the text of a tool result: the same
@@ -47,7 +49,8 @@ impl Turn<ToolWave> {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
         let calls = std::mem::take(&mut self.state.calls);
-        let mut wave_results = Vec::new();
+        let mut exchange = Exchange::new();
+        exchange.push_assistant(std::mem::take(&mut self.state.assistant));
         let mut index = 0u32;
         for call in &calls {
             // Asked before the call is written down, so a wave that was
@@ -103,7 +106,7 @@ impl Turn<ToolWave> {
                 name: call.name.clone(),
                 answer,
             };
-            wave_results.push(ContentBlock::ToolResult {
+            exchange.push_result(ContentBlock::ToolResult {
                 tool_use_id: call.id.clone(),
                 content,
                 is_error,
@@ -120,8 +123,7 @@ impl Turn<ToolWave> {
             state: Recording {
                 model_returned: self.state.model_returned,
                 calls_made: calls.len(),
-                assistant: self.state.assistant,
-                wave_results,
+                exchange,
                 usage: self.state.usage,
                 stop: self.state.stop,
             },
