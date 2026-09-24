@@ -335,6 +335,133 @@ with the one job Effect has, decoding the wire, unchanged.
   and `README.zh-CN.md` still said Solid. Every one of them reads from
   the one authority now.
 
+
+### A tool call is routed before it is made, and parsed once
+
+The dispatch path between the wire and a tool did a linear scan of the
+registry and parsed the same argument bytes as often as three times. A
+call now finds its handler through a table built at compile time, and the
+argument envelope is borrowed rather than re-decoded, so the bytes a tool
+is handed are the bytes that arrived.
+
+- `crates/kernel/src/tool` holds the one routing table; the oracle is the
+  scan it replaces, and a property test holds the two to the same answer
+  for every name.
+- The microbenchmark reports p50, p95 and p99 per dispatch and fails the
+  build above a threshold, so the number is a reading rather than a
+  claim. fx's published "10µs" is not carried as a promise: it is a
+  figure from outside that repository, and this one states which segment
+  it measured.
+
+### The prompt cache shape is a fact on the ledger
+
+A request's prefix, tool table and window can move between two calls of
+one run, and which of them moved decides whether a provider's cache hits.
+Each assembled request now writes `prompt_shape_compared` with the four
+prefix segment hashes, the tool table's hash and the run's, and names the
+region that changed since the request before it.
+
+- The breakpoint sits at the last user or assistant anchor rather than at
+  the tail: a tool result past the breakpoint is exactly the ~50% hit
+  rate eve's own harness recorded.
+- `Query::Config` answers the second context-reminder rung beside the
+  layer that stated it, and the settings page writes it through
+  `ConfigureBuilding` — one field on a frame that already asks what a
+  building's runs are governed by, rather than a second frame for one
+  question.
+- The ledger's bytes change because the city writes a new line, so the P0
+  golden and the a9 expectations move with it; the regenerated fixture
+  was compared kind by kind against the committed one, and differs by
+  three `prompt_shape_compared` lines and nothing else.
+
+### A skill install is judged before it lands
+
+A skill package or a resident's own skill reached the shelf by being
+copied there. It now passes a static precheck first — nothing is
+executed, symbolic links are refused, name conflicts are refused, and a
+directory that changes between the check and the swap refuses the whole
+install — and lands through a staging directory that is exchanged in one
+step.
+
+- The content hash goes into the CAS and the provenance is recorded, so a
+  shelved document's origin is checkable afterwards and reinstalling the
+  same bytes is idempotent.
+- `city::install_skill` is one entry point taking the store it registers
+  with, which is how the same code serves the CLI and a resident.
+
+### The wire stops promising verbs it cannot carry
+
+`Command::Takeover` and `Command::Rollback` were parseable and had no
+executor: the assembler answered `not_built` to both, so a client could
+draw a button that never worked. Both frames are gone, `WIRE_V` moves
+35 → 36, and the two event words with no producer (`rollback_applied`,
+`takeover_started`) leave in the same change.
+
+- **Rollback is a branch and a git restore**, recorded as the ruling it
+  is: a run does not rewrite the rules that judge it, and the file is
+  where a rule's diff, history and revert already live.
+- `RulesChanged` closes the other half: a hand edit to `RULES.toml` or
+  `CONFIG.toml` reaches the ledger before it takes effect, its payload
+  carries the before and after digests rather than the text, and a file
+  that moved underneath is refused with `E_VERSION_CONFLICT` instead of
+  overwritten.
+- One SPEC said the governance door existed and another said it had been
+  deleted while the code stood with the second; the city's document now
+  agrees with the code, in the change that touched both.
+
+### A plan's compression waits for the turn, and says who produced it
+
+Two things were true of compaction at once: it could replace a snapshot
+while a tool wave was still landing, and a digest it produced named
+neither the model nor the generation that produced it.
+
+- Compression happens only at the recording boundary, after the whole
+  wave has landed, and the decision lives in `compaction::plan` rather
+  than beside the turn.
+- Every summary carries its producing model and generation in the ledger
+  event; a summary whose producer is absent reads back as **unknown**, an
+  answer distinct from a generation spelled `0`.
+- The model-call recovery path returns `recovered | failed | skipped` per
+  segment, and `skipped` carries the stable code of the failure before it
+  rather than swallowing it.
+
+### The city can weigh itself, and its kernel has a byte-level home
+
+Three pieces arrived together, because each is what the others are
+measured against: the measurement surfaces, the starting numbers, and a
+place for byte-level work that is not unsafe Rust.
+
+- `zig/` builds a static library whose FFI face is one thin crate
+  (`crates/mem`) — the second and last place in this tree where
+  `unsafe_code` is `deny` rather than `forbid`, and each `unsafe` block
+  states the precondition that makes it sound. The Zig caches and install
+  tree are built under cargo's output directory, so a build never writes
+  a machine's absolute paths into the source tree.
+- Four load scenarios (runs in parallel, a large ledger fold, a large
+  worktree placement, a long streamed session) report RAM as an average
+  and a peak, and latency at p50/p95/p99 with the persistence commit as a
+  separate figure — a flush on an ordinary disk has a physical floor that
+  must not stand in for the harness's own cost.
+- The first onboarding actions are measured rather than optimised:
+  install, start-up, a new workspace and a new session each report
+  whether they can reach the second tier, what they actually measure and
+  which piece costs the most. Optimising them is future work, and the
+  durability red lines — signature verification and `fsync` — are not
+  part of it.
+
+### A deletion inside the grace window, and a download that is verified
+
+- Deleting a skill or an MCP server asks for confirmation only where the
+  deletion cannot be taken back; where the bytes are still in the store
+  and reinstalling them is idempotent, the action happens and an undo
+  window stands beside it.
+- A release artifact is verified before it is installed: the signature
+  format, the public key's home and the archive-bomb limits are written
+  down, `install.sh`, `install.ps1` and the npm shim check bytes against
+  the signature, and an unsigned artifact is refused by name rather than
+  accepted quietly. The signing key's custody is a separate decision and
+  is not answered here.
+
 ---
 
 ## v0.0.5-Pre-alpha-260912
