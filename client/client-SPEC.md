@@ -384,3 +384,12 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 **`keeper()` 今天只答得出 `"browser"`**：`Query::Preferences` 与 `channels::PreferencesAnswer` 都在，`client/src/wire.ts` 也已带 `PreferencesAnswer`，而 `ui.svelte` 尚未问 `QUERIES.preferences`，所以 `adopt` 在生产路径上没有调用者。`"city"` 那一态由 `#/gallery` 的 `kept` 夹具画出并被 `xtask render` 在五个页宽下量到，因此它不是一条没人看过的分支。要接的是两处：`ui.svelte` 问 `QUERIES.preferences` 并把答案交给 `adopt`，五个具名改动各发一条 `Command::PutPreferences { patch }`。
 
 **未验的**：`Changes`／`Hunks` 有内容时的样子、Firefox 与 Zen 的无头截图（`-screenshot` 不出图，须走 BiDi）、`Tip` 两条定位分支各自的 `#/gallery` 夹具（`xtask render` 只读 `#/gallery`，所以这两条分支在真引擎里的落点尚无机器读者）、**§7 的键表**（`xtask render` 今天只量盒子，没有一次按键进过真引擎，所以每一行键表今天的读者只有人）。
+
+## 12 Decisions（决策）
+
+### 12-1 删除动作的形态是 dialog 确认，不是撤销 toast
+
+- **决策**：删 MCP（及同族删除动作）经 `parts/dialog` 确认后才发帧——取消答案写在确认之下，撤不回来的那一问把安全的答案放在手下（4-20）。不引入 6s 撤销 toast。
+- **理由**：撤销 toast 只在删除可逆时成立，而删除在今天的树上不可逆。删 MCP 是整表换写 `CONFIG.toml` 的 `mcp` 数组（`crates/city/src/config_layers/write.rs` 的 `write_mcp`），被删行不留副本；配置写不入账（`RulesChanged` 未落）；技能侧没有删除动词——library 只读，`Command::PutShelved` 以 `not_built` 拒，技能安装预检与 provenance＋CAS（deepening-plan T7）未落。一个会自己落下的删除把不可恢复的内容交给无人看着的计时器。
+- **被击败的备选**：6s 撤销 toast，撤销窗口过后才真正落删除——窗口内不发帧，撤销即取消，账上没有「删了又还」的一对。被败因只是今日删除不可逆；被删内容一旦可恢复，该形态即为首选。
+- **重开参数**：被删内容留下可恢复副本——library 入 CAS、来源记 provenance、同哈希重装幂等（T7 落地），或配置写留痕可还原。参数移动后按被击败备选的形态实现：撤销窗口过后才真正落删除，删除事件于落删除时入账，先落账再生效的口径不变。
