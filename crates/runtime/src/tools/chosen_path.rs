@@ -46,8 +46,9 @@ pub(crate) fn admit(asked: &str, action: &'static str) -> Result<Address, AxErro
             format!("{asked} is inside a reserved subtree"),
         )
         .with_recovery(
-            "a `.sprawling` directory holds what governs a scope, and no run reads its own \
-             governance; ask for a skill by its catalog name instead, or name a path outside it",
+            "a reserved subtree holds what governs a scope or keeps the repository itself \
+             (`.sprawling`, `.git`), and no run reads its own governance; ask for a skill by \
+             its catalog name instead, or name a path outside it",
         ));
     }
     Ok(addr)

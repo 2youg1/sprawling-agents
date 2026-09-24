@@ -123,3 +123,31 @@ fn a_change_made_before_a_restart_is_still_read_after_it() {
     assert!(rendered.contains("work/leak.env"), "{rendered}");
     assert!(!rendered.contains(&token), "positions only: {rendered}");
 }
+
+/// The alias rule at the checkpoint door (memory-SPEC 8-25): a scope
+/// whose path crosses a link refuses the whole wave, because a name
+/// that leads into `.git` would capture reserved bytes under a lying
+/// name - and a `file_discarded` restoration would write back through
+/// it.
+#[test]
+fn a_wave_whose_scope_crosses_a_link_is_refused() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/notes.md", "a line");
+    write(tmp.path(), ".git/hooks/pre-run", "hook-body");
+    if !crate::alias::tests::place_link(
+        true,
+        &tmp.path().join(".git").join("hooks"),
+        &tmp.path().join("work").join("alias-dir"),
+    ) {
+        return;
+    }
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let err = checkpoint
+        .wave_pre(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap_err();
+    assert_eq!(
+        *err.into_ax().code(),
+        kernel::AxCode::OutsideWriteDomain,
+        "the refusal names the write-domain rule"
+    );
+}

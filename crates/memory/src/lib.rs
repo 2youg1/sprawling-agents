@@ -11,6 +11,10 @@ mod error;
 
 pub use error::MemoryError;
 
+mod alias;
+
+pub use alias::{AliasKind, WriteTarget};
+
 mod vfs;
 
 mod real_fs;

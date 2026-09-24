@@ -207,6 +207,27 @@ impl Tool for EditTool {
             .with_recovery("include enough surrounding text to name exactly one occurrence"));
         }
         let updated = text.replacen(old, new, 1);
+        // A name that is a link lands this write somewhere the gate
+        // never judged - `.git/hooks` through a junction is privilege
+        // escalation (memory-SPEC 8-25). And the write lands in a fresh
+        // entry: the name is removed first and recreated, so a hard
+        // link's other names keep their bytes.
+        memory::WriteTarget::at("edit file", &path).map_err(|err| err.into_ax())?;
+        if let Err(err) = std::fs::remove_file(&path) {
+            // A name that is not there is what removal asked for; any
+            // other refusal is the disk saying no.
+            if err.kind() != std::io::ErrorKind::NotFound {
+                return Err(AxError::failure(
+                    AxCode::StorageFatal,
+                    "edit file",
+                    format!("{rel}: {err}"),
+                )
+                .with_recovery(format!(
+                    "free space on the disk holding the city, or clear the read-only \
+                     flag on {rel}, then edit again"
+                )));
+            }
+        }
         std::fs::write(&path, updated.as_bytes()).map_err(|err| {
             AxError::failure(AxCode::StorageFatal, "edit file", format!("{rel}: {err}"))
                 .with_recovery(format!(
@@ -255,6 +276,11 @@ impl EditTool {
             )
             .with_recovery("pass old:\"\" and the whole file in `new`"));
         }
+        // The alias check runs before any directory is made: making a
+        // parent through a link would land a directory inside the
+        // protected metadata the link reaches, before the write itself
+        // is refused (memory-SPEC 8-25).
+        memory::WriteTarget::at("edit file", path).map_err(|err| err.into_ax())?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|err| {
                 AxError::failure(AxCode::StorageFatal, "edit file", format!("{rel}: {err}"))

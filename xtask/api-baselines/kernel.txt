@@ -290,6 +290,7 @@ pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
 pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
+pub const kernel::GIT_METADATA: &str
 pub const kernel::IDEM_DERIVE_V: u8
 pub const kernel::Mode::ALL: [kernel::Mode; 5]
 pub const kernel::Mode::ALL: [kernel::Mode; 5]
@@ -297,6 +298,7 @@ pub const kernel::ModelTag::ALL: [kernel::ModelTag; 3]
 pub const kernel::ModelTag::ALL: [kernel::ModelTag; 3]
 pub const kernel::NODE_DEPTH_MAX: usize
 pub const kernel::PLAN_WHOLE_PPB: u64
+pub const kernel::PROTECTED_METADATA: [&str; 2]
 pub const kernel::RESERVED_PREFIX: &str
 pub const kernel::ROADMAP_COLUMNS: usize
 pub const kernel::ROADMAP_FILE: &str
@@ -306,6 +308,8 @@ pub const kernel::RunId::CITY: kernel::RunId
 pub const kernel::Seq::FIRST: kernel::Seq
 pub const kernel::Seq::FIRST: kernel::Seq
 pub const kernel::WHOLE_PPB: u64
+pub const kernel::address::GIT_METADATA: &str
+pub const kernel::address::PROTECTED_METADATA: [&str; 2]
 pub const kernel::address::RESERVED_PREFIX: &str
 pub const kernel::consts_external::CACHE_BREAKPOINTS_MAX: u32
 pub const kernel::consts_external::EVENT_LOG_V: u32

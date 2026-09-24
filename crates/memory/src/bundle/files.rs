@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use kernel::ledger::chain_hash;
 use kernel::{EventRecord, GENESIS_PREV, Seq};
 
+use crate::alias::WriteTarget;
 use crate::error::{MemoryError, io_err};
 use crate::jsonl::JsonlLedger;
 use crate::vfs::Vfs;
@@ -74,7 +75,10 @@ pub(crate) fn read_lines(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<Vec<Vec<u8>
 ///
 /// A directory that cannot be listed stops the walk with its own
 /// failure: a subdirectory silently contributing zero files is how a
-/// bundle comes out short and agrees with itself about it.
+/// bundle comes out short and agrees with itself about it. So does an
+/// alias: walking one would read through it, and a copy that followed a
+/// link would carry bytes no name in the bundle accounts for
+/// (memory-SPEC 8-25).
 ///
 /// An explicit worklist rather than recursion: a city's depth is not
 /// this module's to assume, and a stack overflow is not catchable.
@@ -85,13 +89,71 @@ pub(crate) fn walk(vfs: &dyn Vfs, root: &Path) -> Result<Vec<PathBuf>, MemoryErr
         let Some(files) = present(vfs.list(&dir), &dir)? else {
             continue;
         };
+        for file in &files {
+            refuse_alias(file)?;
+        }
         found.extend(files);
         if let Some(dirs) = present(vfs.list_dirs(&dir), &dir)? {
+            for sub in &dirs {
+                refuse_alias(sub)?;
+            }
             pending.extend(dirs);
         }
     }
     found.sort();
     Ok(found)
+}
+
+/// One entry against the alias rule, refused whole.
+fn refuse_alias(path: &Path) -> Result<(), MemoryError> {
+    match crate::alias::kind_at(path)? {
+        Some(kind) => Err(crate::alias::refused("walk a store or bundle", path, kind)),
+        None => Ok(()),
+    }
+}
+
+/// What travels as a city file: the open tree and each scope's
+/// governance, never git metadata and never the city's own stores.
+///
+/// Root `.sprawling` holds the two stores, and they travel through
+/// faces of their own; a nested one is a building's own rules and is
+/// part of the city. `.git` at any depth is protected metadata, and a
+/// bundle that carried it would plant hooks on restore (kernel-SPEC
+/// 8-73). The names come from kernel's one list; nothing here
+/// re-spells them.
+fn travels(relative: &Path) -> bool {
+    !relative.starts_with(RESERVED)
+        && !relative.components().any(|component| {
+            component
+                .as_os_str()
+                .to_str()
+                .is_some_and(|segment| segment.eq_ignore_ascii_case(kernel::GIT_METADATA))
+        })
+}
+
+/// The restore door's half of the same rule: a bundle may carry city
+/// files and nothing else. Export **selects** what travels; restore
+/// **refuses** what never could - all or nothing, never a skip.
+///
+/// # Errors
+/// `MemoryError::Bundle` naming the first entry that is not a city
+/// file; `MemoryError::Alias` from the walk.
+pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<(), MemoryError> {
+    for path in walk(vfs, root)? {
+        let Ok(relative) = path.strip_prefix(root) else {
+            continue;
+        };
+        if !travels(relative) {
+            return Err(MemoryError::Bundle {
+                op: "restore",
+                detail: format!(
+                    "{} carries protected metadata, which no bundle may hold",
+                    path.display()
+                ),
+            });
+        }
+    }
+    Ok(())
 }
 
 /// A directory that is not there holds nothing, which is an answer; a
@@ -124,6 +186,10 @@ pub(crate) fn copy_tree(vfs: &mut dyn Vfs, from: &Path, to: &Path) -> Result<u64
             continue;
         };
         let target = to.join(relative);
+        // Cleared before any directory is made: making a parent through
+        // a link would land a directory inside what the link reaches,
+        // before the file write is refused (memory-SPEC 8-25).
+        let cleared = WriteTarget::at("copy a bundle file", &target)?;
         if let Some(parent) = target.parent() {
             vfs.create_dir_all(parent)
                 .map_err(io_err("make a bundle directory", parent))?;
@@ -131,7 +197,7 @@ pub(crate) fn copy_tree(vfs: &mut dyn Vfs, from: &Path, to: &Path) -> Result<u64
         let bytes = vfs
             .read(&path)
             .map_err(io_err("read a bundle file", &path))?;
-        write_file(vfs, &target, &bytes)?;
+        write_file(vfs, &cleared, &bytes)?;
         copied = copied.saturating_add(1);
     }
     Ok(copied)
@@ -149,7 +215,7 @@ pub(crate) fn copy_city_files(
         let Ok(relative) = path.strip_prefix(city_root) else {
             continue;
         };
-        if relative.starts_with(RESERVED) {
+        if !travels(relative) {
             continue;
         }
         seen.insert(relative.to_path_buf(), path);
@@ -161,6 +227,9 @@ pub(crate) fn copy_city_files(
         .map_err(io_err("make a bundle directory", to))?;
     for (relative, path) in seen {
         let target = to.join(&relative);
+        // Cleared before any directory is made, for the reason the
+        // sibling walk gives.
+        let cleared = WriteTarget::at("copy a city file", &target)?;
         if let Some(parent) = target.parent() {
             vfs.create_dir_all(parent)
                 .map_err(io_err("make a bundle directory", parent))?;
@@ -168,7 +237,7 @@ pub(crate) fn copy_city_files(
         let bytes = vfs
             .read(&path)
             .map_err(io_err("read a bundle file", &path))?;
-        write_file(vfs, &target, &bytes)?;
+        write_file(vfs, &cleared, &bytes)?;
         copied = copied.saturating_add(1);
     }
     Ok(copied)
@@ -180,7 +249,7 @@ pub(crate) fn count_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryError
         let Ok(relative) = path.strip_prefix(root) else {
             continue;
         };
-        if relative.starts_with(RESERVED) {
+        if !travels(relative) {
             continue;
         }
         count = count.saturating_add(1);
@@ -188,7 +257,13 @@ pub(crate) fn count_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryError
     Ok(count)
 }
 
-pub(crate) fn write_file(vfs: &mut dyn Vfs, path: &Path, bytes: &[u8]) -> Result<(), MemoryError> {
+/// Writes one bundle file under a target the alias rule has cleared.
+pub(crate) fn write_file(
+    vfs: &mut dyn Vfs,
+    target: &WriteTarget,
+    bytes: &[u8],
+) -> Result<(), MemoryError> {
+    let path = target.as_path();
     if vfs.exists(path) {
         vfs.remove_file(path)
             .map_err(io_err("replace a bundle file", path))?;

@@ -306,3 +306,26 @@ fn a_person_who_looked_is_named_from_the_repositorys_own_config() {
         "{message}"
     );
 }
+
+/// A tree is never placed through a link: the checkout would write
+/// through whatever the name leads to, and `worktrees/node-1` reaching
+/// into the reserved subtree is exactly that.
+#[test]
+fn a_tree_is_never_placed_through_a_link() {
+    let dir = tempfile::tempdir().unwrap();
+    let trees = city(dir.path());
+    let home = dir.path().join(".sprawling").join("worktrees");
+    std::fs::create_dir_all(&home).unwrap();
+    let kept = dir.path().join(".sprawling").join("kept");
+    std::fs::create_dir_all(&kept).unwrap();
+    if !crate::alias::tests::place_link(true, &kept, &home.join("node-1")) {
+        return;
+    }
+    let err = trees.claim(&name("node-1")).unwrap_err();
+    assert_eq!(err.into_ax().code(), &kernel::AxCode::OutsideWriteDomain);
+    assert_eq!(
+        std::fs::read_dir(&kept).unwrap().count(),
+        0,
+        "the reserved directory the link reaches holds nothing new"
+    );
+}

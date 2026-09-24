@@ -99,6 +99,9 @@ impl Worktrees {
             source,
         })?;
         let path = self.home.join(name.as_str());
+        // The checkout lands at this name, and a name that is an alias
+        // would write the whole tree through it (memory-SPEC 8-25).
+        crate::alias::WriteTarget::at("place a worktree", &path)?;
         // A node that has held a tree before still has its branch: the
         // tree is a materialization, the branch is the line of work.
         // Reattaching is what makes releasing a tree cheap enough to do

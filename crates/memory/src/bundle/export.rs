@@ -7,12 +7,14 @@
 
 use std::path::Path;
 
+use crate::alias::WriteTarget;
 use crate::error::{MemoryError, io_err};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
 use super::files::{
-    copy_city_files, copy_tree, count_files, count_records, head_of, walk, write_file,
+    copy_city_files, copy_tree, count_files, count_records, head_of, only_city_files, walk,
+    write_file,
 };
 use super::manifest::{CAS, CITY, LEDGER, MANIFEST, Manifest};
 
@@ -86,11 +88,8 @@ impl Bundle {
                 ),
             });
         }
-        write_file(
-            vfs.as_mut(),
-            &dest.join(MANIFEST),
-            manifest.to_json().as_bytes(),
-        )?;
+        let target = WriteTarget::at("write a bundle manifest", &dest.join(MANIFEST))?;
+        write_file(vfs.as_mut(), &target, manifest.to_json().as_bytes())?;
         Ok(manifest)
     }
 
@@ -134,6 +133,10 @@ impl Bundle {
                 .map_err(io_err("read a bundle manifest", &at))?;
             Manifest::from_json(&bytes, &at)?
         };
+        // A bundle carries city files and nothing else: git metadata in
+        // one is forged, and restoring it would plant hooks. Refused
+        // before anything is copied, all or nothing (memory-SPEC 8-12).
+        only_city_files(vfs.as_ref(), &bundle.join(CITY))?;
         let layout = kernel::layout::CityLayout::new(city_root);
         let ledger_dir = layout.ledger();
         let cas_dir = layout.cas();
@@ -181,186 +184,4 @@ impl Bundle {
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
-    use super::super::files::open_restored;
-    use super::super::fixture::city_with;
-    use super::super::manifest::RESERVED;
-    use super::*;
-    use kernel::{GENESIS_PREV, TimeMs};
-
-    #[test]
-    fn a_city_comes_back_in_an_empty_directory_and_its_chain_verifies() {
-        let home = tempfile::tempdir().unwrap();
-        city_with(3, home.path());
-        let carried = tempfile::tempdir().unwrap();
-        let exported = Bundle::export(home.path(), carried.path()).unwrap();
-        assert_eq!(exported.records(), 3);
-        assert_ne!(exported.head(), GENESIS_PREV.to_string());
-
-        let elsewhere = tempfile::tempdir().unwrap();
-        let restored = Bundle::restore(carried.path(), elsewhere.path()).unwrap();
-        assert_eq!(restored, exported);
-        // The work came with it, not only the history.
-        assert!(elsewhere.path().join("City.md").exists());
-        assert!(elsewhere.path().join("lab").join("Roadmap.md").exists());
-        // And the restored city is one a writer can continue.
-        open_restored(elsewhere.path(), TimeMs::new(9)).unwrap();
-    }
-
-    /// A filesystem that accepts one write and does not keep it, which
-    /// is what a full disk and a cancelled copy look like from here.
-    struct LosesRoadmap(RealFs);
-
-    impl LosesRoadmap {
-        fn swallowed(path: &std::path::Path) -> bool {
-            path.ends_with("Roadmap.md")
-        }
-    }
-
-    impl crate::vfs::Vfs for LosesRoadmap {
-        fn create_dir_all(&mut self, dir: &std::path::Path) -> std::io::Result<()> {
-            self.0.create_dir_all(dir)
-        }
-        fn list(&self, dir: &std::path::Path) -> std::io::Result<Vec<std::path::PathBuf>> {
-            self.0.list(dir)
-        }
-        fn list_dirs(&self, dir: &std::path::Path) -> std::io::Result<Vec<std::path::PathBuf>> {
-            self.0.list_dirs(dir)
-        }
-        fn read(&self, path: &std::path::Path) -> std::io::Result<Vec<u8>> {
-            self.0.read(path)
-        }
-        fn size(&self, path: &std::path::Path) -> std::io::Result<u64> {
-            self.0.size(path)
-        }
-        fn read_at(
-            &self,
-            path: &std::path::Path,
-            offset: u64,
-            len: u64,
-        ) -> std::io::Result<Vec<u8>> {
-            self.0.read_at(path, offset, len)
-        }
-        fn append(&mut self, path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
-            if Self::swallowed(path) {
-                return Ok(());
-            }
-            self.0.append(path, bytes)
-        }
-        fn truncate(&mut self, path: &std::path::Path, len: u64) -> std::io::Result<()> {
-            self.0.truncate(path, len)
-        }
-        fn sync_data(&mut self, path: &std::path::Path) -> std::io::Result<()> {
-            if Self::swallowed(path) {
-                return Ok(());
-            }
-            self.0.sync_data(path)
-        }
-        fn rename(&mut self, from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
-            self.0.rename(from, to)
-        }
-        fn sync_dir(&mut self, dir: &std::path::Path) -> std::io::Result<()> {
-            self.0.sync_dir(dir)
-        }
-        fn remove_file(&mut self, path: &std::path::Path) -> std::io::Result<()> {
-            self.0.remove_file(path)
-        }
-        fn exists(&self, path: &std::path::Path) -> bool {
-            self.0.exists(path)
-        }
-    }
-
-    /// The manifest is read back from the bundle, so on its own it
-    /// cannot tell a complete bundle from a short one. This is the case
-    /// that the source-side counts exist for.
-    #[test]
-    fn a_city_file_the_bundle_never_received_fails_the_export() {
-        let home = tempfile::tempdir().unwrap();
-        city_with(2, home.path());
-        let carried = tempfile::tempdir().unwrap();
-        let err = Bundle::export_with(
-            Box::new(LosesRoadmap(RealFs::new())),
-            home.path(),
-            carried.path(),
-        )
-        .unwrap_err();
-        let ax = err.into_ax();
-        assert!(
-            ax.subject().contains("city file"),
-            "the export has to name the count that disagreed: {}",
-            ax.subject()
-        );
-    }
-
-    #[test]
-    fn a_short_copy_is_refused_rather_than_restored_quietly() {
-        let home = tempfile::tempdir().unwrap();
-        city_with(4, home.path());
-        let carried = tempfile::tempdir().unwrap();
-        Bundle::export(home.path(), carried.path()).unwrap();
-
-        // Lose the last record, as an interrupted copy would.
-        let segment = std::fs::read_dir(carried.path().join(LEDGER))
-            .unwrap()
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .find(|path| path.extension().and_then(|e| e.to_str()) == Some("jsonl"))
-            .unwrap();
-        let bytes = std::fs::read(&segment).unwrap();
-        let cut = bytes
-            .iter()
-            .rposition(|byte| *byte == b'\n')
-            .and_then(|last| bytes[..last].iter().rposition(|byte| *byte == b'\n'))
-            .unwrap();
-        std::fs::write(&segment, &bytes[..=cut]).unwrap();
-
-        let elsewhere = tempfile::tempdir().unwrap();
-        let err = Bundle::restore(carried.path(), elsewhere.path()).unwrap_err();
-        let ax = err.into_ax();
-        assert!(
-            ax.subject().contains("record(s) ending"),
-            "a partial copy is not a city: {}",
-            ax.subject()
-        );
-    }
-
-    /// A bundle can lose every object it carries and still verify as a
-    /// history: the chain is intact, and each Locator in it points at
-    /// nothing. Only the object count says so, which is why restore
-    /// compares four numbers rather than two.
-    #[test]
-    fn a_bundle_that_lost_its_objects_is_refused_rather_than_restored_empty() {
-        let home = tempfile::tempdir().unwrap();
-        city_with(2, home.path());
-        let mut cas = crate::Cas::open(&home.path().join(RESERVED).join(CAS)).unwrap();
-        cas.put(b"what a run offloaded").unwrap();
-        drop(cas);
-
-        let carried = tempfile::tempdir().unwrap();
-        let exported = Bundle::export(home.path(), carried.path()).unwrap();
-        assert_eq!(exported.cas_objects(), 1);
-
-        // The copy reached another machine with its objects missing.
-        std::fs::remove_dir_all(carried.path().join(CAS)).unwrap();
-
-        let elsewhere = tempfile::tempdir().unwrap();
-        let err = Bundle::restore(carried.path(), elsewhere.path()).unwrap_err();
-        assert!(
-            err.into_ax().subject().contains("cas object"),
-            "the refusal has to name the count that disagreed"
-        );
-    }
-
-    #[test]
-    fn a_city_is_never_restored_on_top_of_another() {
-        let home = tempfile::tempdir().unwrap();
-        city_with(2, home.path());
-        let carried = tempfile::tempdir().unwrap();
-        Bundle::export(home.path(), carried.path()).unwrap();
-
-        // The city it came from still has its ledger, so restoring back
-        // onto it would be a merge of two histories.
-        let err = Bundle::restore(carried.path(), home.path()).unwrap_err();
-        assert!(err.into_ax().subject().contains("already holds a ledger"));
-    }
-}
+mod tests;

@@ -82,6 +82,14 @@ pub enum MemoryError {
     /// is the question a machine must not answer by itself.
     #[error("worktree {name} is behind the trunk: {detail}")]
     MergeStale { name: String, detail: String },
+    /// A name that is an alias. The family is refused whole (memory-SPEC
+    /// 8-25): a write through one lands where the name does not say.
+    #[error("{op} refused at {path}: that name is a {kind}")]
+    Alias {
+        op: &'static str,
+        path: PathBuf,
+        kind: crate::alias::AliasKind,
+    },
 }
 
 impl MemoryError {
@@ -165,6 +173,13 @@ impl MemoryError {
             MemoryError::SecretEgress { locations } => {
                 AxError::failure(AxCode::SecretEgress, "commit checkpoint", locations)
                     .with_recovery("remove the secret from the staged files, then retry")
+            }
+            MemoryError::Alias { op, path, kind } => {
+                AxError::failure(AxCode::OutsideWriteDomain, op, path.display().to_string())
+                    .with_recovery(format!(
+                        "a {kind} at this name reaches a file other than this name; \
+                         replace it with a plain file, then retry"
+                    ))
             }
         }
     }

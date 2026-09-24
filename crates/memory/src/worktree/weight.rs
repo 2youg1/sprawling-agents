@@ -54,9 +54,9 @@ pub(super) fn measure(root: &Path) -> Result<ByteLen, MemoryError> {
                 continue; // a link's target is measured where it lives
             }
             if kind.is_dir() {
-                if path.file_name().is_some_and(|name| name == ".git") {
-                    continue;
-                }
+                // `outside_reserved` names git's own metadata beside the
+                // city's reserved subtree, so what is bookkeeping rather
+                // than work has one predicate here as everywhere.
                 let ours = path
                     .strip_prefix(root)
                     .is_ok_and(|relative| !outside_reserved(relative));

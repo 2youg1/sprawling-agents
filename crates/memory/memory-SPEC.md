@@ -40,6 +40,7 @@
 2. **断尾扫描范围**：append-only 事故只伤尾部——只完整校验最后一段，并以前一段末行验跨段链续；更早段的全链校验归 replay（A2）。
 3. **目录 fsync**：POSIX 上新建/rename 后同步父目录；Windows 无目录句柄同步原语，`sync_dir` 为显式 no-op。断电点阵在 FaultFs 模型层保持严格语义（未 sync_dir 的目录项不存活），使代码纪律跨平台一致；「fsync 返回但未落盘」的平台复验属 A3 完整版。
 4. **存储写失败码**：`append` 的 Io 失败映射 `E_STORAGE_FATAL`（装载期第 5 码，进程级 fatal）。
+5. **硬链接的判定按平台分两半，两半都写在这里。** junction 与 symlink 都是重解析点，`file_type().is_symlink()` 对两者同真，故合为 `AliasKind::Link`，在每一扇写门字面拒绝。硬链接在 Unix 由 `std::os::unix::fs::MetadataExt::nlink` 判定：`nlink>1` 的普通文件即 `AliasKind::HardLink`，同样在构造点字面拒绝；在 Windows 稳定版 `std` 读不到链接计数（`MetadataExt::number_of_links` 属未稳定特性 `windows_by_handle`，`std::fs::hard_link_count` 不存在），而 `unsafe_code` 全库 forbid、其豁免不得引入本 workspace，故 Windows 上硬链接臂由**写入恒落新 entry** 兜住（写前移除该名再建：`bundle::files::write_file` 与 `runtime::tools::edit` 同一纪律）——穿透在结构上不可能，只是不报拒。被否：为读链接计数引入窄 FFI（撞 unsafe 定规）或夜间特性（撞稳定工具链定规）。**重开参数**：Windows `std` 出现稳定的 `number_of_links` 或等价 API 时，把该臂并入构造点字面拒绝；Unix `nlink` 语义若变化，改 `kind_at` 一处。
 
 ## 4 现状分析
 
@@ -443,6 +444,7 @@ impl Checkpoint {
 - `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存用 `add_all`＋`update_all` 两步（后者含删除），glob 限于 `<scope>/*`；**session 切片永不进 add**（`CityLayout::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `MemoryError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
 - 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `RULES.toml` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何栅栏——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
+- **写域拒绝链接穿透（junction／symlink 字面拒；硬链接臂见 8-25 与 §3.5）。** 暂存回调对每个命中路径问 `memory::alias`：任一链接使**整波拒绝**（`MemoryError::Alias`），绝不跳过继续——跳过即部分捕获，`file_discarded` 的恢复地址会指向一份与自己不符的树。git 交回调的是相对仓根的路径，判别名前必须先拼上工作树根（否则问的是进程自己的目录）。保护元数据在栅栏侧是**跳过**而非拒绝（`memory::reserved::outside_reserved`）：那些字节另有家（城或楼的治理、git 的对象库），与 `stage_tree` 跳过保留子树同口径；被拒的 run 拿到的 recovery 是「把链接换成普通文件后重试」，故不会卡死在自己的目录上。
 
 ### 8-13 memory::changes（形状 4 适配器；git2）
 
@@ -608,6 +610,8 @@ pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, MemoryErr
 - **链验在 restore 内**：恢复完即走一遍 Ledger 开启与链校（jsonl 已有的那一道）。交给调用方去验等于把一个必须成立的性质变成约定。
 - **文件顺序确定**：遍历走 `Vfs::list`（已排序），清单用 BTreeMap；同一座城导两次，`MANIFEST.json` 逐字节相同。
 - `Vfs::append` 是**追加**，残留 `.part` 未清即发布出「残骸＋新内容」的拼接体；修法取 cas 既有两层纪律（open 清扫 tmp 残骸＋put 前 `truncate(0)`）而非另立新机制。`invalidate` 对不存在项不报错（末态即调用者所求），载荷携 `existed` 实报。
+- **什么算城里的文件：`travels` 一个家（形状 1 判定）。** 导出端与恢复端问同一个谓词：根层 `.sprawling`（其内容经 ledger／cas 两张门各走各的）与任何深度的 `.git`（受保护元数据，写下即提权）不算城文件；楼自己的 `.sprawling`（`RULES.toml` 等治理字节）**随行**，它是城的一部分。名字引自 kernel 的名单（12.3 定规），不重拼字符串。两侧的策略不同且必须不同：导出端**跳过**（选择带走什么，源城里的簿记本来就不走），恢复端**拒绝**（全成或全拒——一份夹带 `.git` 的 bundle 是伪造品，恢复它就是在落 hooks）。
+- **别名永不落盘（8-25）。** `walk` 见到任一链接拒绝整次操作；`write_file` 只接受 `alias::WriteTarget`（构造点查目标与每一级父目录）并恒落新 entry（写前移除该名再建），硬链接臂由此保证。链接臂是拒绝不是跳过——对照组的 “skipped N files” 就是宽容部分还原。悬空链接在列举中不可见（`is_file`／`is_dir` 走不到它），但落盘必须先过 `WriteTarget`，故恒拒仍然成立。
 
 ### 8-14 memory::error（形状 2 值）
 
@@ -621,6 +625,7 @@ pub enum MemoryError {                      // thiserror；crate 根
     SeqMissing,                                              // index
     Checkpoint / SecretEgress / Bundle,                      // 各自的模块
     Worktree / WorktreeBusy / MergeStale,                    // worktree
+    Alias { op: &'static str, path: PathBuf, kind: alias::AliasKind },  // → E_OUTSIDE_WRITE_DOMAIN（8-25）
 }
 impl MemoryError { pub fn into_ax(self) -> AxError; }   // 跨 crate 边界的唯一出口
 pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) -> MemoryError;
@@ -661,6 +666,7 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
   - `worktree`——树由 git2 建、由 git2 prune，落盘不经本 crate；`release` 删残留目录同走 `std::fs`。
     缝拦不住 git2，声称拦得住才是第二个权威。释放顺序与自愈见 §8-9。
   - `checkpoint`——同样经 git2 提交与检出。
+  - `alias`——重解析点与链接计数是 `std::fs` 自己的事实（`file_type().is_symlink()` 对 symlink 与 junction 同真，Unix `MetadataExt::nlink` 判硬链接），Vfs 的崩溃语义模型对它们无话可说；它只问元数据、不读不写字节。
   - **`index` 不在例外之列**：`LedgerIndex` 持 `Box<dyn Vfs>`，段列举、段长、整段读（建表）与尾部增量读（刷新）全部经缝，
     而它没有一步是写；按 seq 取行走 `LineReader`，那正是上一条的例外。
 
@@ -707,6 +713,7 @@ impl Vfs for RealFs { … }
 - `WorktreeBusy`→`E_WORKTREE_BUSY`：可定义掉但尚未做——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。它同时承担「该节点的树被占」与「再开一棵就越上限」两个情形：两者的可执行替代同为「先归还一棵」，而区分它们的是 subject 不是码。
 - `MergeStale`→`E_VERSION_CONFLICT`：不可定义掉——两个节点同时开工就会有一个后到；能定义掉的那部分（“合到一半失败”）已由 fast-forward 判定在动手之前定义掉。
 - `Worktree`→`E_STORAGE_FATAL`：不可定义掉——仓库与文件系统是外部世界；能定义掉的那部分（名字走出目录）已由 `WorktreeName` 在构造点定义掉。
+- `Alias`→`E_OUTSIDE_WRITE_DOMAIN`：不可定义掉——名字与它指向的文件之间隔着一个链接是外部文件系统的事实；能定义掉的那部分（一次写入经链接穿透）已由 `WriteTarget` 在构造点定义掉，recovery 恒为「换成普通文件后重试」，故被拒的 run 不会卡死。Unix 上硬链接臂就在这个码下（`nlink>1` 即拒）；Windows 上链接计数不可判定（§3.5），由落盘纪律拆别名而非报拒。
 - `Envelope`→`E_LOG_VERSION_UNSUPPORTED` 同族拒读（段中损坏非尾部＝不可自动修复，指出路径交人决定）。
 
 ## 13 依赖选型
@@ -837,3 +844,20 @@ pub(crate) const SLICE_MAGIC: &str = "slices v1";
 **自带的 `RealFs`，不借账本那条缝。** `RealFs` 同一时刻只持一个追加句柄，写投影会把账本的热句柄挤掉；投影可弃，不该让主干为它付句柄开销。代价是投影不参与 `FaultFs` 的断电模型：断电后它可能落后，下一次 attach 补齐，这正是它可重建的含义。
 
 **没有第二份 session 索引。** 「全城有哪些 session」走目录遍历；切片在追加时写，写者当场就知道 room 地址，索引只会在两者之间造出一个可失效的家。旧 `index.cache` 的写者 `LedgerIndex::persist` 零生产调用者，随本波连同其读取方删除（8-4）。
+
+### 8-25 `memory::alias`：别名族与被清空的写目标（形状 2 值）
+
+```rust
+pub enum AliasKind { Link, HardLink }   // Link＝symlink 与 junction（Win32 重解析点族）
+pub struct WriteTarget(PathBuf);        // 字段私有；唯一构造点是 at
+impl WriteTarget {
+    pub fn at(op: &'static str, path: &Path) -> Result<WriteTarget, MemoryError>;   // 查目标与每一级父目录
+    pub fn as_path(&self) -> &Path;
+}
+pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, MemoryError>;   // 叶级分类，walk 用
+```
+
+- **别名族全不穿透（junction／symlink／硬链接）。** junction 与 symlink 都是重解析点、`file_type().is_symlink()` 对两者同真，故合为 `Link`，在每一扇门**字面拒绝**。硬链接在 Unix 由 `nlink>1` 判定、同样字面拒绝；在 Windows 稳定版 `std` 读不到链接计数（§3.5），由**写入恒落新 entry** 的落盘纪律兜住：写前移除该名再建，其它名字保有旧字节，穿透在结构上不可能。**被否：跳过并报数**（对照组 “skipped N files”）——部分落盘破坏全成/全拒，且一行计数无法让重放方复现跳过了哪几个。
+- **`WriteTarget` 是形状 2 值：不变量在唯一构造点，字段私有。** 「未经检查的写目标拼不出来」由 trybuild 编译失败反例钉住（`tests/ui/`，M8 惯例）。它的证明范围是「检查那一刻这个名与它的父级都不是链接」；检查与落盘之间的替换窗口属效果面，故两个采样点（walk 与写入）都过同一判定。Unix 上硬链接在判定内被拒；Windows 上判定读不到链接计数，落盘纪律另兜该臂。
+- **消费面是三个写域加一个工具写面**：checkpoint 暂存回调（8-8）、bundle 的 `write_file`（8-12）、worktree 放置，加上 `runtime::tools::edit` 的物理写入（运行的写域）——经链接写保留路径在每一扇门恒拒。
+- **proptest 族「别名永不落盘」**：对别名种类 × 目标（受保护／普通）× 落点（名上／父目录）的组合，凡该平台造得出的别名（junction 无需特权即可创建；symlink 需特权；硬链接随处可造）：链接臂与 Unix 硬链接臂写入被拒，Windows 硬链接臂写入落新 entry；各臂同一断言——目标字节不变、别名带不出新字节；该平台造不出的退化为断言「放置失败时盘上无任何变化」，各臂同性质。

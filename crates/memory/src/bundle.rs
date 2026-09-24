@@ -21,7 +21,7 @@
 //! backup tool can wrap one.
 
 mod export;
-mod files;
+pub(crate) mod files;
 #[cfg(test)]
 mod fixture;
 mod manifest;

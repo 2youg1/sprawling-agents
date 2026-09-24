@@ -1,5 +1,7 @@
 impl core::fmt::Debug for memory::PlannedMerge<'_>
 impl core::fmt::Debug for memory::Worktrees
+impl core::fmt::Debug for memory::WriteTarget
+impl core::fmt::Display for memory::AliasKind
 impl kernel::ledger::Ledger for memory::JsonlLedger
 impl memory::Attribution
 impl memory::Bundle
@@ -21,12 +23,15 @@ impl memory::QueueLane
 impl memory::WorktreeLease
 impl memory::WorktreeName
 impl memory::Worktrees
+impl memory::WriteTarget
 pub const memory::MANIFEST: &str
+pub enum memory::AliasKind
 pub enum memory::Head
 pub enum memory::MemoryError
 pub enum memory::QueueLane
 pub enum memory::Refreshed
 pub enum memory::RunPhase
+pub fn memory::AliasKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn memory::Attribution::apply(&mut self, &kernel::event::payload::EventRecord) -> core::result::Result<(), memory::MemoryError>
 pub fn memory::Attribution::new() -> memory::Attribution
 pub fn memory::Attribution::report(&self) -> memory::AttributionReport
@@ -108,6 +113,9 @@ pub fn memory::Worktrees::live(&self) -> core::result::Result<alloc::vec::Vec<me
 pub fn memory::Worktrees::open(&std::path::Path) -> core::result::Result<memory::Worktrees, memory::MemoryError>
 pub fn memory::Worktrees::plan_merge(&self, &memory::WorktreeName) -> core::result::Result<memory::PlannedMerge<'_>, memory::MemoryError>
 pub fn memory::Worktrees::release(&self, memory::WorktreeLease) -> core::result::Result<(), memory::MemoryError>
+pub fn memory::WriteTarget::as_path(&self) -> &std::path::Path
+pub fn memory::WriteTarget::at(&'static str, &std::path::Path) -> core::result::Result<memory::WriteTarget, memory::MemoryError>
+pub fn memory::WriteTarget::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn memory::between(&std::path::Path, kernel::locator::GitOid, memory::Head) -> core::result::Result<alloc::vec::Vec<kernel::change::FileChange>, memory::MemoryError>
 pub fn memory::effort_word(kernel::model::wire::Effort) -> alloc::string::String
 pub fn memory::ledger_segments_at(&std::path::Path) -> core::result::Result<alloc::vec::Vec<std::path::PathBuf>, memory::MemoryError>
@@ -116,6 +124,8 @@ pub fn memory::open_restored(&std::path::Path, kernel::event::identity::TimeMs) 
 pub fn memory::read_raw_lines_at(&std::path::Path) -> core::result::Result<alloc::vec::Vec<alloc::vec::Vec<u8>>, memory::MemoryError>
 pub fn memory::recorded_effort(core::option::Option<kernel::model::wire::Effort>) -> kernel::model::wire::Effort
 pub fn memory::working_status(&std::path::Path, core::option::Option<&str>, core::option::Option<kernel::locator::GitOid>) -> core::result::Result<memory::WorkingStatus, memory::MemoryError>
+pub memory::AliasKind::HardLink
+pub memory::AliasKind::Link
 pub memory::AttributionReport::by_actor: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub memory::AttributionReport::by_run: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub memory::AttributionReport::by_segment: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
@@ -132,6 +142,10 @@ pub memory::Landing::of: &'a memory::Provenance
 pub memory::Landing::reviewed_by_person: bool
 pub memory::Landing::subject: &'a str
 pub memory::Landing::t: kernel::event::identity::TimeMs
+pub memory::MemoryError::Alias
+pub memory::MemoryError::Alias::kind: memory::AliasKind
+pub memory::MemoryError::Alias::op: &'static str
+pub memory::MemoryError::Alias::path: std::path::PathBuf
 pub memory::MemoryError::Bundle
 pub memory::MemoryError::Bundle::detail: alloc::string::String
 pub memory::MemoryError::Bundle::op: &'static str
@@ -230,4 +244,5 @@ pub struct memory::WorkingStatus
 pub struct memory::WorktreeLease
 pub struct memory::WorktreeName(_)
 pub struct memory::Worktrees
+pub struct memory::WriteTarget(_)
 pub type memory::WriteObserver = alloc::boxed::Box<(dyn core::ops::function::FnMut(&kernel::event::payload::EventRecord) + core::marker::Send)>

@@ -132,9 +132,10 @@ impl CityPlan {
                         "raise the first building",
                         name.to_owned(),
                     )
-                    .with_recovery(format!(
-                        "`{RESERVED_PREFIX}` is the city's own subtree; choose another name"
-                    )));
+                    .with_recovery(
+                        "protected metadata names the city's own directories \
+                         (`.sprawling`, `.git`); choose another name",
+                    ));
                 }
                 if addr.as_str().contains('/') {
                     return Err(AxError::failure(

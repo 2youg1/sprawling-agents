@@ -226,3 +226,117 @@ fn a_documents_tool_writes_markdown_and_refuses_code_by_name() {
         .unwrap_err();
     assert_eq!(*plan.code(), AxCode::OutsideWriteDomain);
 }
+
+/// Places a junction at `to` leading to `from` (a symlink off
+/// Windows). `false` when this machine hands out no link at all.
+#[cfg(windows)]
+fn place_link(_file: bool, from: &Path, to: &Path) -> bool {
+    std::process::Command::new("cmd")
+        .args([
+            "/c",
+            "mklink",
+            "/J",
+            &to.display().to_string(),
+            &from.display().to_string(),
+        ])
+        .output()
+        .is_ok_and(|out| out.status.success())
+}
+
+#[cfg(not(windows))]
+fn place_link(file: bool, from: &Path, to: &Path) -> bool {
+    let _ = file;
+    std::os::unix::fs::symlink(from, to).is_ok()
+}
+
+/// The acceptance of the protected-metadata rule at a run's own write
+/// face: `work/alias-dir/pre-run` crossing a junction into
+/// `.git/hooks` is privilege escalation through a name the write-domain
+/// gate already allowed. The write is refused whole, and the hook keeps
+/// its bytes.
+#[test]
+fn an_edit_through_a_link_to_a_reserved_path_is_refused() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut tool = tool(tmp.path());
+    std::fs::create_dir_all(tmp.path().join(".git").join("hooks")).unwrap();
+    let hook = tmp.path().join(".git").join("hooks").join("pre-run");
+    std::fs::write(&hook, b"hook-body").unwrap();
+    if !place_link(
+        true,
+        &tmp.path().join(".git").join("hooks"),
+        &tmp.path().join("work").join("alias-dir"),
+    ) {
+        return;
+    }
+
+    let version = version_of(b"hook-body");
+    let refused = tool
+        .invoke(&call(
+            "work/alias-dir/pre-run",
+            &version,
+            "hook-body",
+            "escalated",
+        ))
+        .unwrap_err();
+    assert_eq!(*refused.code(), AxCode::OutsideWriteDomain);
+    assert_eq!(
+        std::fs::read(&hook).unwrap(),
+        b"hook-body",
+        "the reserved file the link reaches is byte-identical"
+    );
+}
+
+/// Creating below a name that is a link must not make a single
+/// directory at the link's target. The alias check has to run before
+/// `create_dir_all`, or a protected subtree gains a directory through a
+/// name the write-domain gate already allowed (memory-SPEC 8-25).
+#[test]
+fn creating_below_a_link_leaves_the_link_target_untouched() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut tool = tool(tmp.path());
+    let hooks = tmp.path().join(".git").join("hooks");
+    std::fs::create_dir_all(&hooks).unwrap();
+    if !place_link(true, &hooks, &tmp.path().join("work").join("alias-dir")) {
+        return;
+    }
+
+    let refused = tool
+        .invoke(&call("work/alias-dir/sub/x.md", CREATES, "", "body"))
+        .unwrap_err();
+    assert_eq!(*refused.code(), AxCode::OutsideWriteDomain);
+    assert_eq!(
+        std::fs::read_dir(&hooks).unwrap().count(),
+        0,
+        "no directory is made through the link"
+    );
+}
+
+/// The hard-link arm: whatever verdict an edit whose name shares an
+/// inode with a reserved file is greeted with, the reserved file is
+/// whole afterwards - the write never lands in it.
+#[test]
+fn an_edit_through_a_hard_link_leaves_the_reserved_file_whole() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut tool = tool(tmp.path());
+    std::fs::create_dir_all(tmp.path().join(".git").join("hooks")).unwrap();
+    let hook = tmp.path().join(".git").join("hooks").join("pre-run");
+    std::fs::write(&hook, b"hook-body").unwrap();
+    if !std::fs::hard_link(&hook, tmp.path().join("work").join("a.txt")).is_ok() {
+        return;
+    }
+
+    let version = version_of(b"hook-body");
+    let outcome = tool.invoke(&call("work/a.txt", &version, "hook-body", "escalated"));
+    if outcome.is_ok() {
+        assert_eq!(
+            std::fs::read_to_string(tmp.path().join("work").join("a.txt")).unwrap(),
+            "escalated",
+            "the write lands at the name it was given"
+        );
+    }
+    assert_eq!(
+        std::fs::read(&hook).unwrap(),
+        b"hook-body",
+        "the reserved file behind the other name is byte-identical: the write never landed"
+    );
+}

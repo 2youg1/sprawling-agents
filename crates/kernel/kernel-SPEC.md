@@ -255,6 +255,8 @@ impl ErrorDraft {
 ```rust
 pub struct Address(String);             // 不变量在唯一构造点强制；无 setter
 pub const RESERVED_PREFIX: &str = ".sprawling";
+pub const GIT_METADATA: &str = ".git";
+pub const PROTECTED_METADATA: [&str; 2] = [RESERVED_PREFIX, GIT_METADATA];  // 名单唯一住处（8-73）
 
 impl Address {
     /// Sole constructor. Grammar: relative, `/`-separated, segments of
@@ -263,7 +265,7 @@ impl Address {
     /// and any segment ending in a dot or whitespace.
     pub fn parse(raw: &str) -> Result<Self, AxError>;   // E_INVALID_ARGS
     pub fn is_within(&self, prefix: &Address) -> bool;  // 段边界字节前缀；WriteDomain 原语
-    pub fn is_reserved(&self) -> bool;                  // 任一段 ASCII 大小写不敏感 == RESERVED_PREFIX（C17，见 8-28、8-55）
+    pub fn is_reserved(&self) -> bool;                  // 任一段 ASCII 大小写不敏感命中 PROTECTED_METADATA 之一（C17，见 8-28、8-55、8-73）
     pub fn as_str(&self) -> &str;
 }
 ```
@@ -1478,6 +1480,22 @@ pub fn is_reserved(&self) -> bool;   // 任一段 == RESERVED_PREFIX（原：仅
 
 空 Payload（合法，`{}`）；`ig:true` 且未知 kind（读侧放行跳过——replay 章）；`Seq::MAX.next()`（E_INVALID_ARGS，实践不可达但算术必 checked）；`Range` 端点相等（合法，单行/单字节）；`B0-0`（首字节）；`L1-1`（首行）；地址单段（合法）；`RESERVED_PREFIX` 恰为全路径（is_reserved 真）；`".sprawlingx/a"`（首段非 `.sprawling`，不 reserved——段边界判定）；Locator 尾随空白（拒）；hex 奇数长（拒）；`E_...` 码字符串反序列化未知码（serde 报错→读侧 fail-closed）。
 
+### 8-73 受保护元数据并入保留谓词（形状 1 判定的扩面）
+
+```rust
+pub const RESERVED_PREFIX: &str = ".sprawling";
+pub const GIT_METADATA: &str = ".git";
+pub const PROTECTED_METADATA: [&str; 2] = [RESERVED_PREFIX, GIT_METADATA];
+pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCII 大小写不敏感）
+```
+
+- **验收标准是「写某路径即提权」。** `.git` 里放着 hooks（写下一个 hook 就是在下一次 git 操作时执行自己的代码）、config（`core.fsmonitor` 等键即执行）、refs（栅栏引用 `refs/sprawling/runs/<run>/<seq>` 是 run 自己的记账）与对象库（`file_discarded` 的恢复地址指向的对象）。一个写得了 `.git` 的 run 既能提权也能改自己的账，与 `.sprawling` 同罪，故同门。
+- **并入保留谓词，不另立写目标名单。** 写域构造（`WriteDomain::new`）、写域判定（`admits`／`reaches`）、读路径（`runtime::tools::chosen_path`）、`SessionName`、`memory::reserved` 全部已经问这一个谓词（或这一个名单），名单一扩即全体收紧；另立一份「写目标名单」就是给同一个问题两个家。
+- **读面一并收紧，这是有意的。** `is_reserved` 是只许多拒的门（8-28）：`read`／`search` 对 `.git` 由可读变拒读，只多拒不错放；`search` 原先单独跳过 `.git` 的那一行字面量随本节删除。
+- **`SessionName` 的保留名判定改问 `is_reserved`。** 原来是 `trimmed == RESERVED_PREFIX` 的逐字节比较，`.SPRAWLING` 能当房间名建出 Windows 别名目录；改后名单与 ASCII 折叠与地址谓词同源。
+- **被否的另一条路：只在写判定处加 `.git`，读判定不动。** 那要维护「写名单」「读名单」两份名单、两个家，而读 `.git` 只会把对象库字节当普通文件递给模型，没有任何读者需要它。
+- **重开参数**：出现第二种「写下即提权」的元数据目录、或 `.git` 不再是其中之一时改名单；名单成员必须全 ASCII（8-55 的折叠论证随名单走，`GIT_METADATA` 改拼写的提交必须同步改比较方式）。
+
 ## 12 错误处理（逐码答「能否定义掉」——规则十）
 
 已激活的码：
@@ -1554,6 +1572,10 @@ S2 激活的码（逐码答「能否定义掉」）：
 **被否**：①维持调用点手拼拒因（现状）——上限改动要靠人记得三处句子，漏一处即两种拒因；②一个泛型 `PolicyLimit<R>` 加标签参数——句式仍要按标签分支，只是把三个 `admit` 压成一个 match，可交换面反而变宽；③给类型留 getter 或 `Display` 让调用点自拼句子——那正是第二种拒因的入口。
 
 **重开参数**：出现可由人移动的上限（像第二道阈值那样进 `CONFIG.toml`）时，构造点改为解析式（域外在解析点拒、拒因带合法域），本定规「拒因从类型给出」不动。
+
+### 12.3 定规：受保护元数据名单只有 kernel::address 一个家
+
+`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`memory::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是内存侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 memory 的别名族规则承担（memory-SPEC 8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
 
 ## 13 依赖选型
 

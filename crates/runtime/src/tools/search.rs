@@ -312,12 +312,9 @@ fn sorted_entries(path: &Path) -> Option<Vec<String>> {
 /// `read` reaches through `chosen_path`; a name that cannot be an
 /// address at all — one holding a backslash, a colon, a control
 /// character — is left alone, because this city cannot say where it is.
-/// `.git` is skipped for a different reason, stated in its own line:
-/// it is an object store, and scanning it yields hits nobody can act on.
+/// Git's own metadata is inside that predicate too (kernel-SPEC 8-73),
+/// and scanning an object store yields hits nobody can act on.
 fn admissible(rel: &str, name: &str) -> Option<String> {
-    if name == ".git" {
-        return None;
-    }
     let child = if rel.is_empty() {
         name.to_owned()
     } else {

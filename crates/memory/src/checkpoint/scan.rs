@@ -13,6 +13,9 @@ use crate::error::MemoryError;
 use super::fence::{Checkpoint, git_err};
 use super::provenance::Provenance;
 
+mod stage_filter;
+use stage_filter::{StageFilter, workdir};
+
 /// One commit, decided before anything is written.
 ///
 /// Four values that are meaningless apart — a subject without the
@@ -120,24 +123,27 @@ impl Checkpoint {
     /// wave runs, and a fence that staged it would ask git to read a
     /// workdir file it believes it already knows; a file still growing
     /// under an open handle makes that read refuse the whole wave
-    /// (memory-SPEC 8-8, 8-24).
+    /// (memory-SPEC 8-8, 8-24). Nor does one ever stage protected
+    /// metadata or an alias - [`StageFilter`] owns that rule.
     pub(crate) fn stage_scopes(&mut self, scopes: &[String]) -> Result<Vec<String>, MemoryError> {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
         let patterns = Self::pathspecs(scopes);
         let specs: Vec<&str> = patterns.iter().map(String::as_str).collect();
-        let mut skip_slices = |path: &std::path::Path, _matched: &[u8]| -> i32 {
-            i32::from(kernel::layout::CityLayout::is_session_projection(path))
-        };
-        index
-            .add_all(
-                specs.iter(),
-                git2::IndexAddOption::DEFAULT,
-                Some(&mut skip_slices),
-            )
-            .map_err(git_err("stage scope"))?;
-        index
-            .update_all(specs.iter(), Some(&mut skip_slices))
-            .map_err(git_err("stage deletions"))?;
+        let mut filter = StageFilter::new(workdir(&self.repo)?);
+        {
+            let mut admit = |path: &std::path::Path, _matched: &[u8]| -> i32 { filter.admit(path) };
+            index
+                .add_all(
+                    specs.iter(),
+                    git2::IndexAddOption::DEFAULT,
+                    Some(&mut admit),
+                )
+                .map_err(git_err("stage scope"))?;
+            index
+                .update_all(specs.iter(), Some(&mut admit))
+                .map_err(git_err("stage deletions"))?;
+        }
+        filter.refused()?;
         write_index(&mut index)?;
         let mut files: Vec<String> = index
             .iter()
@@ -177,22 +183,17 @@ impl Checkpoint {
     /// deletions included.
     fn stage_tree(&mut self) -> Result<(), MemoryError> {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
-        // git asks with 1 for skip and 0 for stage, and what belongs to
-        // the city rather than to a person is `memory::reserved`'s
-        // answer here as much as it is at the worktree ceiling.
-        let mut skip_reserved = |path: &std::path::Path, _matched: &[u8]| -> i32 {
-            i32::from(!crate::reserved::outside_reserved(path))
-        };
-        index
-            .add_all(
-                ["*"],
-                git2::IndexAddOption::DEFAULT,
-                Some(&mut skip_reserved),
-            )
-            .map_err(git_err("stage the tree"))?;
-        index
-            .update_all(["*"], Some(&mut skip_reserved))
-            .map_err(git_err("stage deletions"))?;
+        let mut filter = StageFilter::new(workdir(&self.repo)?);
+        {
+            let mut admit = |path: &std::path::Path, _matched: &[u8]| -> i32 { filter.admit(path) };
+            index
+                .add_all(["*"], git2::IndexAddOption::DEFAULT, Some(&mut admit))
+                .map_err(git_err("stage the tree"))?;
+            index
+                .update_all(["*"], Some(&mut admit))
+                .map_err(git_err("stage deletions"))?;
+        }
+        filter.refused()?;
         write_index(&mut index)
     }
 
