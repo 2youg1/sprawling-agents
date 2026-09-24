@@ -354,9 +354,9 @@ fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
     // A verb the wire spells and this city cannot perform. It says
     // so, and says what to do instead.
     let unbuilt = worker
-        .handle(channels::Command::Takeover {
-            run: RunId::CITY,
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"takeover"),
+        .handle(channels::Command::BatchByBuilding {
+            addr: Address::parse("lab").unwrap(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"batch"),
         })
         .unwrap_err();
     assert_eq!(*unbuilt.code(), AxCode::WireMismatch);
@@ -366,7 +366,9 @@ fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
         unbuilt.recovery()
     );
     assert!(
-        unbuilt.recovery().contains("Steer") || unbuilt.recovery().contains("steer"),
+        unbuilt
+            .recovery()
+            .contains("dispatch the rooms one at a time"),
         "and names what to do instead: {}",
         unbuilt.recovery()
     );

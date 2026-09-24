@@ -140,7 +140,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **part** | One control in `client/src/views/parts/`, and the only implementation of it the client has: the button, the labelled field, the table, the tooltip. A screen composes parts rather than writing a control of its own, because a second implementation is where two behaviours begin to differ. |
 | **interaction contract** | What a part owes a person who is not holding a pointer: the WAI-ARIA pattern it implements, what each key does, the exact `aria-*` values, and which element the focus returns to when the part closes. `client/client-SPEC.md` section 7 is its single authority — how a screen is drawn is exempt from SPEC-first, and this is the half that is not. |
 | **Lens** | Which reading of one history a page is showing: `Ledger`, `Archive`, or `Bin`. Three separate nav entries would ask a person to choose before the question was formed. The lens lives in the address, so a link to the archive is still a link to the archive. |
-| **control surface** | The intervention surface at the bottom: five verbs plus the steer input. |
+| **control surface** | The intervention surface at the bottom: three verbs plus the steer input. |
 | **Approval Inbox** | The queue of pending answers, grouped by cluster key. |
 | **progress bar** | The progress bar. |
 | **ACCENT** | Jing blue, `H=264`, meaning "something is happening here". |

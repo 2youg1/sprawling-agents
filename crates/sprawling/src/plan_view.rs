@@ -286,8 +286,6 @@ fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::PolicyRevoked
         | EventKind::TaintPromoted
         | EventKind::CrossBuildingTransfer
-        | EventKind::TakeoverStarted
-        | EventKind::RollbackApplied
         | EventKind::CityHalted
         | EventKind::BackpressureShed
         | EventKind::DigestInvalidated

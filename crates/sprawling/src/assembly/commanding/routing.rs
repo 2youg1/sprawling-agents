@@ -238,21 +238,11 @@ impl RunWorker {
                 run,
                 "no run in flight answers to that id: steer one while it runs, or dispatch a new one",
             )),
-            // Six verbs the wire spells and this city cannot perform.
+            // Four verbs the wire spells and this city cannot perform.
             // Answered one at a time rather than by a catch-all, so that
             // a Command added without an executor stops the build here:
             // `channels::Command` is deliberately not `non_exhaustive`,
             // and this match is what that decision buys.
-            channels::Command::Takeover { run, .. } => Err(not_built(
-                "take over a run",
-                run.to_string(),
-                "steer the run instead; taking the wheel from it is not built",
-            )),
-            channels::Command::Rollback { checkpoint, .. } => Err(not_built(
-                "roll a checkpoint back",
-                checkpoint.to_string(),
-                "the checkpoint stands and its contents are readable; undoing it is not built",
-            )),
             channels::Command::BatchByBuilding { addr, .. } => Err(not_built(
                 "run a building's work as one batch",
                 addr.as_str().to_owned(),

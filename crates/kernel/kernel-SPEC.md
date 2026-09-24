@@ -458,6 +458,7 @@ pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
 **EventKind 74 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
+**EventKind 72 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
@@ -509,8 +510,6 @@ pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 | 治理与设施 | `policy_revoked` | record-only |
 | 治理与设施 | `taint_promoted` | record-only |
 | 治理与设施 | `cross_building_transfer` | record-only |
-| 治理与设施 | `takeover_started` | record-only |
-| 治理与设施 | `rollback_applied` | record-only |
 | 治理与设施 | `city_halted` | record-only |
 | 治理与设施 | `backpressure_shed` | record-only |
 | 治理与设施 | `digest_invalidated` | record-only |
@@ -1530,6 +1529,17 @@ S2 激活的码（逐码答「能否定义掉」）：
 **被否**：①第四种配置机制（浏览器偏好存储）——同一个值两个家，浏览器副本会越过文件成为第二个权威（client-SPEC 4-28 同一条理）；②域外钳位——钳位把一个写错的值变成一个没人被告知的决定。
 
 **重开参数**：出现「提醒到得太晚、handoff 写不下」的实际数据时，重开的是上限 90，不是本定规。
+### 12.2 定规：回滚＝分支＋git 还原
+
+`Verdict: user-approved`
+
+**决定**：回滚不设动词。回到过去的两条路都是既有的：对话走**分支**（`OpenSession { from }` 从另一条线的某一行开新的一段），文件走 **git 还原**（工具波前后的栅栏提交在 `refs/sprawling/runs/` 之下，可读、可 revert）。`Command::Rollback`／`Command::Takeover` 两帧与 `rollback_applied`／`takeover_started` 两个事件词删除；「人接管一条在跑的线」由既有干预动词（Steer／Cancel）承担。
+
+**理由**：两帧自上线起没有执行者（装配层以 `not_built` 作答），两个事件词没有生产者——一个拼得出、执行不了的动词是对客户端的假承诺，事件词则是账本文法里的一段空文法。补齐执行面要引入文件快照库或改写账本：账本 append-only 不动，文件快照库被两案共同拒绝。没有它们，「回到检查点」就是让城去做 git 已经会做的事，并为它编一段没有载体的历史。
+
+**被否**：补执行面（地址预验一个函数、回滚全成或全拒、Takeover 恒以 Handoff 收尾）——它把承诺补实，代价却是文件快照库与第二份文件历史，与「git 栅栏是文件的唯一还原载体」冲突。
+
+**重开参数**：出现「栅栏提交不足以还原」的实据——例如跨楼多工作树需要一次原子还原，或人要在页面上单键回到某条栅栏。重开时先回答「还原的是文件还是对话」：两者各自的载体今天都在（git／分支），缺的只是入口，而不是机制。
 
 ## 13 依赖选型
 

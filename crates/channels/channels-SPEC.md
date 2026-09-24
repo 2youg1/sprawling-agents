@@ -3,7 +3,7 @@
 > crate：`channels`（lib，依赖 kernel）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
 > 骨架：十七节；按模块分章、每章自足。
 > 五模块：wire／server／control／auth／aggregate。
-> 本 crate 覆盖的语义：wire 面（Command／Query／Event、编码与握手、绑定面）、干预五动词、多台机器一个界面、Autonomy 应答者、三队列。
+> 本 crate 覆盖的语义：wire 面（Command／Query／Event、编码与握手、绑定面）、干预动词、多台机器一个界面、Autonomy 应答者、三队列。
 
 ## 1 需求分解
 
@@ -12,16 +12,16 @@
 | `wire` | Command／Query／Event 三分的类型与 JSON 编码；版本＋schema 哈希握手帧 |
 | `server` | WebSocket 服务；静态资源；绑定面判定（默认只绑回环） |
 | `auth` | 回环零摩擦；非回环要求配对令牌且常数时间比较；未配置令牌即拒绝启动 |
-| `control` | 人的五动词入口；自持鉴权与幂等（做不到则并入 `server`——ARCHITECTURE §6 已写明这条退路） |
+| `control` | 人的干预动词入口；自持鉴权与幂等（做不到则并入 `server`——ARCHITECTURE §6 已写明这条退路） |
 | `aggregate` | 多 City 只读聚合：只转发 Query 与 Event，恒不转发 Command |
 
 **本 crate 是进程外边界的唯一守卫**。它不实现任何业务判定：Command 的执行、Query 的求值、Event 的产生全在上游（runtime／memory／city），本 crate 只负责「让非法的帧在类型层或握手层就不存在」。
 
 ## 2 验收标准
 
-- **wire**：Command 恰 30 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 恰 28 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`a33212548089805e44943526ce2790929b5f1f78bfdd3b33bc46fbd9b429b25d`；**WIRE_V ＝ 35**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
+  **当前 golden**：`f189f1d8a9263d4667393a5ede6f335f15a1935b05f496cd6bab768700a96217`；**WIRE_V ＝ 36**（帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -60,13 +60,13 @@
 
 ## 5 权威信源
 
-wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）；聚合层硬约束「聚合层只转发 Query 与 Event，恒不转发 Command」；五动词语义表；`Sealed<T>` 的不可序列化性质；`kernel::error` 的装载期五码白名单（kernel-SPEC §8-1，封闭且不得增长）。外部：axum 0.8.9（2026-04-14，内含 tokio-tungstenite 0.29）与 tokio。
+wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）；聚合层硬约束「聚合层只转发 Query 与 Event，恒不转发 Command」；干预动词语义表；`Sealed<T>` 的不可序列化性质；`kernel::error` 的装载期五码白名单（kernel-SPEC §8-1，封闭且不得增长）。外部：axum 0.8.9（2026-04-14，内含 tokio-tungstenite 0.29）与 tokio。
 
 ## 6 命名统一
 
 **跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
 
-Command／Query／Event（三分的原名，不译）；Dispatch／Login／Fork／Attach／CreateBuilding／PutSecret／Steer／Cancel／Takeover／Rollback／Halt／Release／BatchByBuilding／Approve／CreatePolicy／SetAutonomy／Auth／Wake（命令原名，逐字取本 SPEC §8-1 表）；RunView／CityView／ApprovalQueue／InboxView／Metrics／CostView／ArchiveSearch／RegistryView／DiscardView（9 查询原名）；control surface（不译）；配对令牌＝pairing token；握手＝handshake。
+Command／Query／Event（三分的原名，不译）；Dispatch／Login／Fork／Attach／CreateBuilding／PutSecret／Steer／Cancel／Halt／Release／BatchByBuilding／Approve／CreatePolicy／SetAutonomy／Auth／Wake（命令原名，逐字取本 SPEC §8-1 表）；RunView／CityView／ApprovalQueue／InboxView／Metrics／CostView／ArchiveSearch／RegistryView／DiscardView（9 查询原名）；control surface（不译）；配对令牌＝pairing token；握手＝handshake。
 
 ## 7 模块边界
 
@@ -74,7 +74,7 @@ Command／Query／Event（三分的原名，不译）；Dispatch／Login／Fork�
                     ┌── wire（类型与编码；无 I/O，纯数据与纯函数）
 server（tokio＋axum）┤
   ├ WS 端点         ├── auth（令牌判定；常数时间比较）
-  ├ 静态资源         └── control（五动词入口；鉴权与幂等）
+  ├ 静态资源         └── control（干预动词入口；鉴权与幂等）
   └ 上传端点（HTTP）
 aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query）
 ```
@@ -165,7 +165,7 @@ impl From<WireCommand> for Command                     // 总函数；PutSecret 
 
 4. **`Auth`／`Hello` 的令牌是明文 `String`，而 `PutSecret` 的值是 `Sealed`**。不对称是故意的：配对令牌**必须跨线**才能完成配对，在传输中密封它只是自欺；它在**落地一刻**被封（`decide_handshake` 只接受 `&Sealed<String>` 作为已配置值）。凭证则相反：它本就不应跨线。
 
-5. **`Rollback{checkpoint}` 携 `kernel::GitOid`，为此给 `GitOid` 补 serde**（与紧邻的 `B3Hash` 同形：40 位小写 hex，长度不对即拒）。**被否**：在 wire 里自建 `CheckpointRef(String)` 并自校 40 hex——那是 git oid 形状的第二个权威。该变更属 kernel 公开面，已与 kernel-SPEC §8-2 同集提交（apisync 门）。
+5. **wire 携 git 的 oid 时携 `kernel::GitOid` 本体**（`Query::Commit`／`Query::Hunks` 的 oid，与紧邻的 `B3Hash` 同形：40 位小写 hex，长度不对即拒），故 `GitOid` 带 serde。**被否**：在 wire 里自建 `CheckpointRef(String)` 并自校 40 hex——那是 git oid 形状的第二个权威。该变更属 kernel 公开面，已与 kernel-SPEC §8-2 同集提交（apisync 门）。
 
 ### 8-2 channels::server（形状 4 薄壳）＋reception（形状 1）＋assets（形状 4）
 
@@ -334,7 +334,7 @@ pub fn verify(presented: Option<&str>, expected: &B3Hash) -> bool;  // 常数时
 ### 8-4 channels::control（形状 1 判定函数）
 
 ```rust
-pub enum Intervention { Steer, Cancel, Takeover, Rollback, Halt, Release }
+pub enum Intervention { Steer, Cancel, Halt, Release }
 pub enum ControlVerdict {
     Intervene { verb: Intervention, run: Option<RunId>, must_write_handoff: bool },
     NotAnIntervention,
@@ -343,7 +343,7 @@ pub enum ControlVerdict {
 pub fn classify(command: &Command) -> ControlVerdict;
 ```
 
-**本模块持有的唯一规则**：中断一个活着的 Run 的三个动词（Steer／Cancel／Rollback）**恒以 Handoff 收尾**，使下一位（人或 Agent）拿得到完整现场。`Takeover` 同理。`Halt`／`Release` 按 scope 停一片，不针对单个 Run，故 `run` 为 `None` 且不强制 Handoff。
+**本模块持有的唯一规则**：中断一个活着的 Run 的两个动词（Steer／Cancel）**恒以 Handoff 收尾**，使下一位（人或 Agent）拿得到完整现场。`Halt`／`Release` 按 scope 停一片，不针对单个 Run，故 `run` 为 `None` 且不强制 Handoff。
 
 **`must_write_handoff` 为什么是返回值而不是副作用**：本 crate 不持 Ledger 句柄（§7 已写）。它只能**说出义务**，履行义务的是装配层。把它做成返回值的代价是装配层可能忽略它——故同变更集交付一条断言：一次干预的事件序里若无 `handoff_written`，即失败。
 
@@ -543,14 +543,12 @@ pub struct Delta { pub run: RunId, pub increment: kernel::Increment }
 | `PutShelved` | client | 写一份上架的文档（技能或说明） |
 | `Pursue` | client | 设一个持续追的目标，以及暂停／恢复／清除 |
 | `PutDocument` | client | 写治理这座城的三份文件之一 |
-| `Takeover` | client | 人接管一条在跑的线 |
-| `Rollback` | client | 回到一个检查点 |
 | `BatchByBuilding` | client | 按楼成批派活 |
 | `Wake` | push | 外面发生了一件事；地址由 watch 表与 triage 决定，调用方说不出房间 |
 | `Auth` | handshake | 出示配对令牌，`server::decide_handshake` 吃掉它 |
 | `PutSecret` | sealed | 唯一没有字节形式的 Command；`Sealed<String>` 在线上不可居留 |
 
-**`client` 而尚未落地的五个**（`Attach`／`Takeover`／`Rollback`／`CreatePolicy`／`BatchByBuilding`）今天由 `not_built` 作答，
+**`client` 而尚未落地的三个**（`HandOff`／`PutShelved`／`BatchByBuilding`）今天由 `not_built` 作答，
 所以门对它们要求的是**客户端不画**——`not_built` 的 rustdoc 说的就是这件事，现在有机器看着了。
 它们的 reach 仍写 `client`，因为那是它们做完之后该去的地方；写成别的取值等于把「还没做」记成「不该做」。
 
@@ -1262,7 +1260,7 @@ Command::OpenSession { addr: Address, carry: Carry, from: Option<Origin>, idem: 
 
 **`Fork` 不是第二个动词。** S2 会给同一个 `OpenSession` 加 `from: Option<Origin>`，因为从某句分出去与从此处重开是同一件事的两个起点；今天线上那个无参的 `Fork` 帧保留原样，等 S2 一起收。
 
-**本章测试**：`crates/channels/tests/wire_contract.rs` 的命令样本（表长 30、名表去重、golden 哈希）；`Carry` 的默认值在 `channels` 侧有一条断言，因为它是这份规格里唯一被写成「第一个变体」的默认。
+**本章测试**：`crates/channels/tests/wire_contract.rs` 的命令样本（表长 28、名表去重、golden 哈希）；`Carry` 的默认值在 `channels` 侧有一条断言，因为它是这份规格里唯一被写成「第一个变体」的默认。
 
 ### 8-42 `WIRE_V` 34：关停范围在答案里是一个类型，不是一个地址串
 
@@ -1279,3 +1277,13 @@ pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String
 **客户端那侧的两处消费也归一处**：`core/scope.ts` 是两种拼法唯一的接缝（`scopeOf`／`sameScope`／`buildingIsShut`／`cityIsShut`），`city_halted` 记录折进 `halted` 时经它转一次；其余每个比较点都比较类型。
 
 **顺带记下一条曾被误判的事**：`city_halted` 的载荷里 `scope` 是 `kernel::Scope`，经 `schemars(with = "String")` 在 schema 上呈现为字符串。答案面改用 `HaltScope` 与那条覆盖不冲突——两者是不同的帧，各写各的读者。
+
+### 8-44 `WIRE_V` 36：删掉两个拼得出、执行不了的动词
+
+`Command::Takeover` 与 `Command::Rollback` 删除；`COMMAND_NAMES` 从 30 到 28，schema 哈希随之变（golden 见 §2），故同集进位 35→36。
+
+- **它们从来没有执行者**：装配层自上线起就对这两帧以 `not_built` 作答（§19 记的那次失效的三个动词之二），而客户端按 §19-2 的门要求不画它们。一条线上拼得出、任何东西都执行不了的命令，是对客户端的假承诺；删帧之后旧页面在握手期被明确拒绝（§8.5），而不是拿到一个永远失败的按钮。
+- **规则的家在 kernel-SPEC §12.2**（回滚＝分支＋git 还原），含理由、被否方案与重开参数；本节只记线的形状，不复述第二份。
+- **`control` 与 reach 表同集缩面**：`Intervention` 少两臂，只剩 Steer／Cancel／Halt 加 Release 返程（§8-4）；「中断一个活着的 Run 恒以 Handoff 收尾」的中断动词随之只剩 Steer／Cancel；§19-2 删两行。
+- **事件词同集删二**（kernel-SPEC §8-4 表）：`rollback_applied`／`takeover_started` 无生产者，账本从未写下过携它们的行，故已写历史的字节与逐字节重放不受影响；携这两个词的行今天在读侧入口拒（`E_INVALID_ARGS`，kernel `parse_line` 的既有码）。
+- **两帧的拒因不再是 `not_built`**：`not_built` 只留给仍在文法里、等待执行者的动词；对这两帧，字节在解码处就不再是命令（§8-37 的 `E_WIRE_MISMATCH` 口径不变）。

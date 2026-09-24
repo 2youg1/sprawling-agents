@@ -129,8 +129,6 @@ impl SessionOrigins {
             | EventKind::PolicyRevoked
             | EventKind::TaintPromoted
             | EventKind::CrossBuildingTransfer
-            | EventKind::TakeoverStarted
-            | EventKind::RollbackApplied
             | EventKind::CityHalted
             | EventKind::BackpressureShed
             | EventKind::DigestInvalidated

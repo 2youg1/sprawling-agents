@@ -18,7 +18,7 @@
 
 use channels::{Command, ControlVerdict, HaltScope, Intervention, PairingToken};
 use channels::{classify, verify};
-use kernel::{Address, GitOid, IdemKey, RunId, Seq};
+use kernel::{Address, IdemKey, RunId, Seq};
 
 fn key() -> IdemKey {
     IdemKey::derive(&RunId::from_bytes([3u8; 16]), Seq::new(1), b"control")
@@ -44,14 +44,6 @@ fn interrupting_a_live_run_always_owes_a_handoff() {
             run: run(),
             idem: key(),
         },
-        Command::Takeover {
-            run: run(),
-            idem: key(),
-        },
-        Command::Rollback {
-            checkpoint: GitOid::from_bytes([0x5au8; 20]),
-            idem: key(),
-        },
     ];
     for command in interrupting {
         let name = command.name();
@@ -59,7 +51,7 @@ fn interrupting_a_live_run_always_owes_a_handoff() {
             must_write_handoff, ..
         } = classify(&command)
         else {
-            panic!("`{name}` is one of the five verbs");
+            panic!("`{name}` is one of the verbs that reach a live Run");
         };
         assert!(must_write_handoff, "`{name}` must end with a Handoff");
     }
@@ -99,17 +91,16 @@ fn the_verbs_are_exactly_the_ones_the_control_surface_shows() {
     let verbs = [
         Intervention::Steer,
         Intervention::Cancel,
-        Intervention::Takeover,
-        Intervention::Rollback,
         Intervention::Halt,
         Intervention::Release,
     ];
-    // Five verbs plus Release, the return path for Halt.
-    assert_eq!(verbs.len(), 6);
+    // Three verbs that reach work already running, plus Release - the
+    // return path for Halt.
+    assert_eq!(verbs.len(), 4);
     let mut names: Vec<&str> = verbs.iter().map(|v| v.as_str()).collect();
     names.sort_unstable();
     names.dedup();
-    assert_eq!(names.len(), 6, "verb names are distinct");
+    assert_eq!(names.len(), 4, "verb names are distinct");
 }
 
 #[test]

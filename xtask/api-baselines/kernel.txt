@@ -278,8 +278,8 @@ pub const kernel::AxCode::ALL: [kernel::AxCode; 37]
 pub const kernel::DOORS: [kernel::gate::DoorId; 8]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 74]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 74]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 72]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 72]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::IDEM_DERIVE_V: u8
 pub const kernel::Mode::ALL: [kernel::Mode; 5]
@@ -1337,7 +1337,6 @@ pub kernel::EventKind::RoadmapClaimed
 pub kernel::EventKind::RoadmapFinished
 pub kernel::EventKind::RoadmapReleased
 pub kernel::EventKind::RoadmapSplit
-pub kernel::EventKind::RollbackApplied
 pub kernel::EventKind::RunForked
 pub kernel::EventKind::RunFrozen
 pub kernel::EventKind::RunStarted
@@ -1349,7 +1348,6 @@ pub kernel::EventKind::SignalEnqueued
 pub kernel::EventKind::SpineDocumentWritten
 pub kernel::EventKind::SteerReceived
 pub kernel::EventKind::TaintPromoted
-pub kernel::EventKind::TakeoverStarted
 pub kernel::EventKind::ToolCalled
 pub kernel::EventKind::ToolResult
 pub kernel::EventKind::ToolkitLinkOpened
@@ -1854,7 +1852,6 @@ pub kernel::event::EventKind::RoadmapClaimed
 pub kernel::event::EventKind::RoadmapFinished
 pub kernel::event::EventKind::RoadmapReleased
 pub kernel::event::EventKind::RoadmapSplit
-pub kernel::event::EventKind::RollbackApplied
 pub kernel::event::EventKind::RunForked
 pub kernel::event::EventKind::RunFrozen
 pub kernel::event::EventKind::RunStarted
@@ -1866,7 +1863,6 @@ pub kernel::event::EventKind::SignalEnqueued
 pub kernel::event::EventKind::SpineDocumentWritten
 pub kernel::event::EventKind::SteerReceived
 pub kernel::event::EventKind::TaintPromoted
-pub kernel::event::EventKind::TakeoverStarted
 pub kernel::event::EventKind::ToolCalled
 pub kernel::event::EventKind::ToolResult
 pub kernel::event::EventKind::ToolkitLinkOpened

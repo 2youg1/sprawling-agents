@@ -287,8 +287,8 @@ mod tests {
         let performed = performed(&root, &all).unwrap();
         assert!(performed.contains("Dispatch"), "dispatch has an executor");
         assert!(
-            !performed.contains("Takeover"),
-            "takeover is answered with not_built"
+            !performed.contains("BatchByBuilding"),
+            "batch-by-building is answered with not_built"
         );
         let emitted = emitted(&root, &all).unwrap();
         assert!(emitted.contains("Dispatch"), "the client draws dispatch");

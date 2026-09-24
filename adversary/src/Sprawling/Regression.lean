@@ -71,7 +71,7 @@ private def verbOf : Action y → String
   | .work .. => "Dispatch"
   | .stop _ => "Halt"
   | .resume _ => "Release"
-  | .seize => "Takeover"
+  | .batch .. => "BatchByBuilding"
   | .look => "Look is read from the Ledger and never handed to a worker"
 
 private def fieldsOf (index : Nat) : Action y → List String
@@ -89,7 +89,7 @@ private def fieldsOf (index : Nat) : Action y → List String
     , "effort: None," ]
   | .stop scope => [s!"scope: {scopeOf scope},", idemField index]
   | .resume scope => [s!"scope: {scopeOf scope},", idemField index]
-  | .seize => ["run: RunId::from_bytes([1u8; 16]),", idemField index]
+  | .batch addr => [s!"addr: Address::parse({quoted addr}).unwrap(),", idemField index]
   | .look => []
 
 /-- One `handle` call, laid out the way rustfmt lays a method chain out. -/

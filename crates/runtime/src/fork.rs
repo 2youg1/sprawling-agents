@@ -229,8 +229,6 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
             | EventKind::PolicyRevoked
             | EventKind::TaintPromoted
             | EventKind::CrossBuildingTransfer
-            | EventKind::TakeoverStarted
-            | EventKind::RollbackApplied
             | EventKind::CityHalted
             | EventKind::BackpressureShed
             | EventKind::DigestInvalidated

@@ -127,6 +127,28 @@ fn parse_line_fails_closed() {
     );
 }
 
+/// A kind that left the vocabulary is refused where lines are read, and
+/// the refusal carries a stable code and a way forward rather than a
+/// serde sentence. `takeover_started` and `rollback_applied` left with
+/// the commands behind them (kernel-SPEC.md section 12.2); no line
+/// carrying them was ever written, so nothing already on disk changes,
+/// and a hand-written one is refused rather than read.
+#[test]
+fn a_kind_that_left_the_vocabulary_is_refused_with_a_stable_code() {
+    for retired in ["takeover_started", "rollback_applied"] {
+        let raw = format!(
+            r#"{{"v":1,"run":"00000000-0000-0000-0000-000000000000","seq":0,"prev":"0000000000000000000000000000000000000000000000000000000000000000","t":0,"who":"x","kind":"{retired}","data":{{}}}}"#
+        );
+        let err = EventRecord::parse_line(raw.as_bytes())
+            .expect_err("a retired kind is not a line of this history");
+        assert_eq!(err.code(), &AxCode::InvalidArgs);
+        assert!(
+            !err.recovery().is_empty(),
+            "the refusal owes a way forward: {err}"
+        );
+    }
+}
+
 #[test]
 fn event_ref_reports_the_record_it_was_minted_from() {
     let record = EventRecord::from_draft(

@@ -18,14 +18,12 @@ use kernel::{AxCode, AxError, RunId};
 
 use crate::command::Command;
 
-/// The verbs the control surface shows. Five interventions plus `Release`,
+/// The verbs the control surface shows. Three interventions plus `Release`,
 /// the return path that `Halt` needs in order not to be a trap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Intervention {
     Steer,
     Cancel,
-    Takeover,
-    Rollback,
     Halt,
     Release,
 }
@@ -38,8 +36,6 @@ impl Intervention {
         match self {
             Self::Steer => "Steer",
             Self::Cancel => "Cancel",
-            Self::Takeover => "Takeover",
-            Self::Rollback => "Rollback",
             Self::Halt => "Halt",
             Self::Release => "Release",
         }
@@ -86,8 +82,6 @@ pub fn classify(command: &Command) -> ControlVerdict {
             intervene(Intervention::Steer, Some(run))
         }
         Command::Cancel { run, .. } => intervene(Intervention::Cancel, Some(run)),
-        Command::Takeover { run, .. } => intervene(Intervention::Takeover, Some(run)),
-        Command::Rollback { .. } => intervene(Intervention::Rollback, None),
         Command::Halt { .. } => scope_intervention(Intervention::Halt),
         Command::Release { .. } => scope_intervention(Intervention::Release),
         Command::Dispatch { .. }
@@ -162,41 +156,5 @@ fn scope_intervention(verb: Intervention) -> ControlVerdict {
         verb,
         run: None,
         must_write_handoff: false,
-    }
-}
-
-#[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    reason = "test code"
-)]
-mod tests {
-    use super::*;
-    use kernel::{IdemKey, Seq};
-
-    #[test]
-    fn rollback_intervenes_without_naming_a_run_but_still_owes_a_handoff() {
-        // Rollback names a checkpoint, not a Run: which Runs it disturbs is
-        // the assembly layer's to work out from the checkpoint's scope. The
-        // Handoff obligation stands, because whatever was running stops.
-        let run = kernel::RunId::from_bytes([2u8; 16]);
-        let command = Command::Rollback {
-            checkpoint: kernel::GitOid::from_bytes([1u8; 20]),
-            idem: IdemKey::derive(&run, Seq::new(1), b"rb"),
-        };
-        let ControlVerdict::Intervene {
-            verb,
-            run,
-            must_write_handoff,
-        } = classify(&command)
-        else {
-            panic!("Rollback is one of the verbs");
-        };
-        assert_eq!(verb, Intervention::Rollback);
-        assert!(run.is_none());
-        assert!(must_write_handoff);
     }
 }

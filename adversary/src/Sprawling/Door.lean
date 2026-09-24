@@ -143,7 +143,9 @@ inductive Verb where
   | dispatch (addr : String) (session : String) (idem : IdemKey)
   | halt (scope : Scope) (idem : IdemKey)
   | release (scope : Scope) (idem : IdemKey)
-  | takeover (run : String) (idem : IdemKey)
+  /-- Ask for a building's work as one batch — a verb the wire spells and
+  the city does not perform. -/
+  | batchByBuilding (addr : String) (idem : IdemKey)
   /-- Ask a base URL what it serves, and attach nothing. -/
   | probeEndpoint (name : String) (baseUrl : String) (dialect : Dialect) (idem : IdemKey)
   /-- Register a base URL, admitting the model ids named.
@@ -252,7 +254,8 @@ def Verb.frame : Verb → String
       , ("effort", .null) ]
   | .halt scope idem => command "halt" [("scope", scopeValue scope), ("idem", .str idem.value)]
   | .release scope idem => command "release" [("scope", scopeValue scope), ("idem", .str idem.value)]
-  | .takeover run idem => command "takeover" [("run", .str run), ("idem", .str idem.value)]
+  | .batchByBuilding addr idem =>
+    command "batch_by_building" [("addr", .str addr), ("idem", .str idem.value)]
   | .probeEndpoint name baseUrl dialect idem =>
     command "probe_endpoint"
       ([("name", .str name)] ++ entered baseUrl dialect ++ [("idem", .str idem.value)])

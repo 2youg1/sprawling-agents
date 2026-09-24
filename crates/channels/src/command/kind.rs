@@ -7,8 +7,8 @@
 
 use kernel::model::{Mode, Window};
 use kernel::{
-    Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, GitOid, IdemKey, McpServer,
-    ModelTag, Origin, ResidentId, Ruling, RunId, SandboxLimits, Sealed, SessionName,
+    Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, IdemKey, McpServer, ModelTag,
+    Origin, ResidentId, Ruling, RunId, SandboxLimits, Sealed, SessionName,
 };
 use serde::{Deserialize, Serialize};
 
@@ -206,14 +206,6 @@ pub enum Command<Secret = Sealed<String>> {
     },
     Cancel {
         run: RunId,
-        idem: IdemKey,
-    },
-    Takeover {
-        run: RunId,
-        idem: IdemKey,
-    },
-    Rollback {
-        checkpoint: GitOid,
         idem: IdemKey,
     },
     Halt {

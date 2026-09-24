@@ -55,9 +55,9 @@ inductive Action : Yield → Type where
   | stop (scope : Scope) : Action .nothing
   /-- Admit it again. -/
   | resume (scope : Scope) : Action .nothing
-  /-- Take the wheel from a run — a verb the wire spells and the city does not
-  perform. -/
-  | seize : Action .nothing
+  /-- Ask for a building's work as one batch — a verb the wire spells and the
+  city does not perform. -/
+  | batch (addr : String) : Action .nothing
   /-- Read the city back. -/
   | look : Action .addresses
 
@@ -73,7 +73,7 @@ instance : ToString (Action y) where
     | .work addr session => s!"Work {addr} {session}"
     | .stop scope => s!"Stop {scope}"
     | .resume scope => s!"Resume {scope}"
-    | .seize => "Seize"
+    | .batch addr => s!"Batch {addr}"
     | .look => "Look"
 
 instance : ToString Any where
@@ -166,7 +166,7 @@ def refusal (world : World) : Action y → Option Code
   | .resume _ => none
   -- Not built, and answered one verb at a time rather than by a catch-all, so
   -- the promise is that this verb refuses with a code and a way forward.
-  | .seize => some ⟨"E_WIRE_MISMATCH"⟩
+  | .batch _ => some ⟨"E_WIRE_MISMATCH"⟩
   | .look => none
 
 /-- Whether the model admits this action as one that succeeds.
@@ -185,7 +185,7 @@ def nextState (world : World) : Action y → World
   | .work _ _ => minted world
   | .stop scope => minted { world with halted := scope :: world.halted.erase scope }
   | .resume scope => minted { world with halted := world.halted.erase scope }
-  | .seize => minted world
+  | .batch _ => minted world
   | .look => world
 where
   minted next := { next with minted := world.minted + 1 }
@@ -235,12 +235,12 @@ private def aScope (world : World) : Gen Scope :=
     , (1, do return .building (← Gen.elements "acme" (world.buildings.map Prod.fst ++ ["acme"]))) ]
 
 def arbitraryAction (world : World) : Gen Any :=
-  Gen.frequency (pure ⟨.nothing, .seize⟩)
+  Gen.frequency (pure ⟨.nothing, .batch "acme"⟩)
     [ (4, do return ⟨.nothing, .raise (← anAddress) .minimal⟩)
     , (5, do return ⟨.nothing, .work (← anAddress) (← aSession)⟩)
     , (3, do return ⟨.nothing, .stop (← aScope world)⟩)
     , (2, do return ⟨.nothing, .resume (← aScope world)⟩)
-    , (1, pure ⟨.nothing, .seize⟩) ]
+    , (1, do return ⟨.nothing, .batch (← anAddress)⟩) ]
 
 /-- A trace of at most `size` actions, each drawn against the world the ones
 before it left. -/
@@ -271,7 +271,7 @@ private def verbOf (key : IdemKey) : Action y → Verb
   | .work addr session => .dispatch addr session key
   | .stop scope => .halt scope key
   | .resume scope => .release scope key
-  | .seize => .takeover "00000000-0000-7000-8000-000000000000" key
+  | .batch addr => .batchByBuilding addr key
   | .look => .cityView
 
 /-- What the frames a city sent back mean for the action that asked.
@@ -285,7 +285,7 @@ private def project : (act : Action y) → List Frame → Option y.Observed
   | .work .., _ => some ()
   | .stop _, _ => some ()
   | .resume _, _ => some ()
-  | .seize, _ => some ()
+  | .batch _, _ => some ()
 
 /-- Drives one action through the door and reads what came back.
 
@@ -316,7 +316,7 @@ def postcondition (world : World) : (act : Action y) → y.Observed → Option S
   | .work .., _ => none
   | .stop _, _ => none
   | .resume _, _ => none
-  | .seize, _ => none
+  | .batch _, _ => none
 
 /-- What a refused action still owes.
 

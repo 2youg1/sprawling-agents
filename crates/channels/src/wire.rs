@@ -128,7 +128,13 @@ use serde::{Deserialize, Serialize};
 ///    that way back: it forgets the shape, keeps the previous session's
 ///    handoff only when the frame says to carry it, and writes
 ///    `session_opened` with what it did.
-pub const WIRE_V: u32 = 35;
+/// 36: `Takeover` and `Rollback` are gone. Both were spelled on the
+///    wire and performed by nothing; a verb no executor answers is a
+///    promise the client must not be able to make. Backing out is a
+///    branch and a git revert (kernel-SPEC.md section 12.2), and old
+///    pages are refused at the handshake rather than given buttons that
+///    can only fail.
+pub const WIRE_V: u32 = 36;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

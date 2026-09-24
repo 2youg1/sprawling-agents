@@ -3088,7 +3088,7 @@ fn may_move_plan(kind: EventKind) -> PlanReach;
 
 - **缺陷**：`PlanView::apply` 的注释写「没有地址的记录使每一份解析可疑」，代码只在 `CityInitialized` 时清空；一条没有地址的 `checkpoint_committed` 于是让每栋楼继续报改动前的表。
 - **改法**：失效判定上提为按 `EventKind` 的穷尽表，通配臂消失；没有地址的记录只要它的类别会动计划，就清掉全部解析。类别与旧代码逐条相同，故有地址那条路径上的行为不变。
-- **仍未收进来的两类**：`pr_merged` 与 `rollback_applied` 同样会把文件落进楼里，今天读作 `Untouched`。改它们要连着改 `views::commits` 的期望，故单列一条叶子，不混进本节。
+- **仍未收进来的一类**：`pr_merged` 同样会把文件落进楼里，今天读作 `Untouched`。改它要连着改 `views::commits` 的期望，故单列一条叶子，不混进本节。
 
 **本章测试**：`a_record_with_no_address_stales_every_plan_it_could_have_moved`、`every_event_kind_has_a_reach`（`plan_view::tests`）。
 

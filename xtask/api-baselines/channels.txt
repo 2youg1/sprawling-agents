@@ -249,9 +249,6 @@ pub channels::Command::Release::scope: channels::HaltScope
 pub channels::Command::Reveal
 pub channels::Command::Reveal::at: kernel::address::Address
 pub channels::Command::Reveal::idem: kernel::idem::IdemKey
-pub channels::Command::Rollback
-pub channels::Command::Rollback::checkpoint: kernel::locator::GitOid
-pub channels::Command::Rollback::idem: kernel::idem::IdemKey
 pub channels::Command::SelectModel
 pub channels::Command::SelectModel::context_tokens: core::option::Option<kernel::model::window::Window>
 pub channels::Command::SelectModel::endpoint: channels::ProviderName
@@ -267,9 +264,6 @@ pub channels::Command::Steer
 pub channels::Command::Steer::idem: kernel::idem::IdemKey
 pub channels::Command::Steer::run: kernel::event::identity::RunId
 pub channels::Command::Steer::text: alloc::string::String
-pub channels::Command::Takeover
-pub channels::Command::Takeover::idem: kernel::idem::IdemKey
-pub channels::Command::Takeover::run: kernel::event::identity::RunId
 pub channels::Command::Wake
 pub channels::Command::Wake::body: alloc::string::String
 pub channels::Command::Wake::idem: kernel::idem::IdemKey
@@ -491,9 +485,7 @@ pub channels::InboxAnswer::waiting: alloc::vec::Vec<channels::SignalLine>
 pub channels::Intervention::Cancel
 pub channels::Intervention::Halt
 pub channels::Intervention::Release
-pub channels::Intervention::Rollback
 pub channels::Intervention::Steer
-pub channels::Intervention::Takeover
 pub channels::Lagged::from: kernel::event::identity::Seq
 pub channels::Lagged::to: kernel::event::identity::Seq
 pub channels::Lang::En
@@ -818,7 +810,7 @@ pub channels::Withheld::number: u32
 pub channels::Withheld::reason: alloc::string::String
 pub const channels::BODY_PX_MAX: u32
 pub const channels::BODY_PX_MIN: u32
-pub const channels::COMMAND_NAMES: [&str; 30]
+pub const channels::COMMAND_NAMES: [&str; 28]
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
 pub const channels::QUERY_NAMES: [&str; 34]

@@ -328,7 +328,7 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 | `raise` 一个含 `.sprawling` 段的地址 | 一定被拒，且 `E_INVALID_ARGS` |
 | `work` 而城或该楼停摆 | 一定被拒，且 `E_GATE_DENIED` |
 | `work` 而未停摆且无 provider | 一定被拒，且 `E_CONFIG_INVALID` |
-| `seize` | 一定被拒，且 `E_WIRE_MISMATCH`，且 `recovery` 非空 |
+| `batch`（一条拼得出、执行不了的帧） | 一定被拒，且 `E_WIRE_MISMATCH`，且 `recovery` 非空 |
 | `look` | 答里的楼集合恰是模型记的那一套 |
 | 每一次拒绝 | `recovery` 非空——三段式承诺的第三段 |
 

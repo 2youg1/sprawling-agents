@@ -47,8 +47,6 @@ impl<Secret> Command<Secret> {
             | Self::CreateBuilding { ref idem, .. }
             | Self::Steer { ref idem, .. }
             | Self::Cancel { ref idem, .. }
-            | Self::Takeover { ref idem, .. }
-            | Self::Rollback { ref idem, .. }
             | Self::Halt { ref idem, .. }
             | Self::Release { ref idem, .. }
             | Self::BatchByBuilding { ref idem, .. }
@@ -202,8 +200,6 @@ impl From<WireCommand> for Command {
             Command::PutSecret { value, .. } => match value {},
             Command::Steer { run, text, idem } => Self::Steer { run, text, idem },
             Command::Cancel { run, idem } => Self::Cancel { run, idem },
-            Command::Takeover { run, idem } => Self::Takeover { run, idem },
-            Command::Rollback { checkpoint, idem } => Self::Rollback { checkpoint, idem },
             Command::Halt { scope, idem } => Self::Halt { scope, idem },
             Command::Reveal { at, idem } => Self::Reveal { at, idem },
             Command::DoctorInstall { item, idem } => Self::DoctorInstall { item, idem },

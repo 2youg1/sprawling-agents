@@ -46,15 +46,15 @@ fn exposed() -> SocketAddr {
 
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
-    // Thirty commands, thirty-four queries. The count is not a style
+    // Twenty-eight commands, thirty-four queries. The count is not a style
     // choice - it is the wire's closed surface.
-    assert_eq!(COMMAND_NAMES.len(), 30, "command table");
+    assert_eq!(COMMAND_NAMES.len(), 28, "command table");
     assert_eq!(QUERY_NAMES.len(), 34, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 30, "command names are distinct");
+    assert_eq!(sorted.len(), 28, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
@@ -92,14 +92,14 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 35,
+        WIRE_V, 36,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
 
 /// A function of WIRE_V and the two name tables, so any change to the
 /// protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "a33212548089805e44943526ce2790929b5f1f78bfdd3b33bc46fbd9b429b25d";
+const WIRE_SCHEMA_GOLDEN: &str = "f189f1d8a9263d4667393a5ede6f335f15a1935b05f496cd6bab768700a96217";
 
 // -------------------------------------------------------------- binding face
 
@@ -279,6 +279,33 @@ fn every_state_changing_command_carries_an_idempotency_key() {
     }
 }
 
+// ----------------------------------------------------------- retired frames
+
+/// The two frames that left the wire rather than staying on it answered
+/// with `not_built` for ever (channels-SPEC.md section 8-44,
+/// kernel-SPEC.md section 12.2). Their bytes still spell what they
+/// spelled, and that is no longer a command: what a client gets for them
+/// is the grammar's own unknown-variant refusal, not a verb it may offer
+/// a person.
+#[test]
+fn a_frame_that_left_the_wire_fails_to_decode() {
+    let run = kernel::RunId::from_bytes([7u8; 16]);
+    let idem =
+        serde_json::to_value(kernel::IdemKey::derive(&run, Seq::new(1), b"retired")).unwrap();
+    let checkpoint = serde_json::to_value(kernel::GitOid::from_bytes([0x5au8; 20])).unwrap();
+    for frame in [
+        serde_json::json!({ "takeover": { "run": run.to_string(), "idem": idem.clone() } }),
+        serde_json::json!({ "rollback": { "checkpoint": checkpoint, "idem": idem } }),
+    ] {
+        let decoded: Result<Command<channels::NoSecret>, _> = serde_json::from_value(frame.clone());
+        let refused = decoded.expect_err("a frame that left the wire is not a command");
+        assert!(
+            refused.to_string().contains("unknown variant"),
+            "the refusal is the grammar's, not something weaker: {refused} in {frame}"
+        );
+    }
+}
+
 // ------------------------------------------------------------------- fixtures
 
 fn sample_of_every_command() -> Vec<Command> {
@@ -400,11 +427,6 @@ title = \"a window\"
             idem,
         },
         Command::Cancel { run, idem },
-        Command::Takeover { run, idem },
-        Command::Rollback {
-            checkpoint: kernel::GitOid::from_bytes([0x5au8; 20]),
-            idem,
-        },
         Command::Halt {
             scope: channels::HaltScope::City,
             idem,

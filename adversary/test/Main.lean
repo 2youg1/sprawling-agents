@@ -139,7 +139,7 @@ silent, or answering with a code that means something else, is not. This is the
 property that has to hold *before* anybody wires a control to it. -/
 private def notBuiltStillAnswers (door : Door) : IO Unit :=
   withGround door fun ground => do
-    let asked := Verb.takeover "00000000-0000-7000-8000-000000000000" (idemKey 1)
+    let asked := Verb.batchByBuilding "acme" (idemKey 1)
     match ← door.ask ground.port asked with
     | .denied complaint =>
       ensureEq (Code.mk "E_WIRE_MISMATCH") complaint.code
