@@ -134,6 +134,63 @@ let key = IdemKey::derive(&run, Seq::new(at), &call.action()?);   // 动作字�
 **A（选中）：checker 复用 runtime::replay**——验证语义一处；citysim 只加「检查器」这个角色名。
 **B（落选）：checker 自写链验证**——citysim 独立性更强（不依赖 runtime），但即刻成为第二验证权威，与 replay 漂移时两边都对不上夹具。落选理由：「重放与分叉共用重建器」的同一论证在此适用；citysim 依赖任何产品 crate 本就合法（第二 Main）。
 
+### 8-6 负载场景骨架与读数行（bench，T13 第一段）
+
+四个负载场景各一个一键复测的 bench 场景：多 run 并行（`multi_run_parallel`）、大账本 fold（`large_ledger_fold`）、大 worktree 放置（`large_worktree_placement`）、长会话流式转发（`long_session_forwarding`）。测量面仍是既有那一家：`just bench`（本 crate 的 bench Main）产读数，`xtask/budgets.toml` 记基线行，不另造仪表。剧本执行器继续用计数时钟；本 crate 内凡计时都住在 bench Main 的模块树里，采样点仍是 `bench::stamp()` 那一个。
+
+读数形（`bench::reading`，shape 2 value，一次构造点）：
+
+```rust
+pub enum MachineClass { General }   // 参照类属：盘、内存、CPU 均为一般水平
+pub enum Load { MultiRunParallel, LargeLedgerFold, LargeWorktreePlacement, LongSessionForwarding }
+pub enum SubMetric { Harness, Persist, Whole }
+pub struct Reading { /* load, sub, machine, samples, p50, p95, p99 */ }
+impl Reading {
+    pub fn of(load: Load, sub: SubMetric, machine: MachineClass,
+              samples: Vec<std::time::Duration>) -> Result<Reading, String>;
+    pub fn line(&self) -> String;   // 唯一渲染家，键序固定
+}
+```
+
+一行读数的文法（`Reading::line` 是唯一权威，测试按字节对拍）：
+
+`perf load=<load> sub=<sub> machine_class=<general> samples=<n> p50_us=<n> p95_us=<n> p99_us=<n>`
+
+`machine_class` 是读数自带的字段而非行头批注：异类机器的读数不与参照类属同表比较。口径是 harness 自身路径的处理耗时（测量机的类属见 `machine_class`）——不含动画时长、不含网络传输。`SubMetric` 三值把定标拆开计：
+
+| 子指标 | 量的是什么 | 对它定档的是什么 |
+|---|---|---|
+| `harness` | harness 纯开销，路径下无持久化提交 | 两档延迟目标（第一档 p95、第二档 p99，值住 `[local_latency]` 行，第二档严于并覆盖第一档） |
+| `persist` | 同一路径带耐久提交 | 盘的物理下限，不是延迟档 |
+| `whole` | 路径本体就是盘上作业、缝口不拆的（worktree 放置） | 无 |
+
+场景（`bench::scenarios`，shape 4 adapter，套在产品公共面上，无自有政策）：
+
+```rust
+pub struct Fixture { /* lanes, records_per_lane, fold_records, fold_rounds,
+                       tree_files, tree_file_bytes, placements, forward_events */ }
+pub const REGISTERED: Fixture = Fixture { … };   // 既定负载：读数只在该 fixture 内可比，只降不升
+pub fn all(scratch: &Path, fixture: &Fixture, machine: MachineClass)
+    -> Result<Vec<Reading>, String>;
+```
+
+| 场景 | 驱动的公共面 | 子指标 |
+|---|---|---|
+| `multi_run_parallel` | `kernel::Ledger` 端口（MemLedger 与 JsonlLedger 两个适配器各跑一遍），数条 lane 经 mpsc 汇到一个 accounting thread | `harness`＋`persist` |
+| `large_ledger_fold` | `sprawling::ask`，重建每个视图的生产全路径 | `harness` |
+| `large_worktree_placement` | `memory::Checkpoint::ensure_base` 之后 `Worktrees::claim`／`release` | `whole` |
+| `long_session_forwarding` | `channels::ServerFrame::Event` 装帧＋序列化，即 socket 之前的本地半段 | `harness` |
+
+失败出口：域错误按其 `AxError`（动作/主体/稳定码/恢复语）格式化成一行；bench 自身的失败（零样本）构造 `AxError::failure(AxCode::InvalidArgs, …)`＋`with_recovery`，不新增码（§9-16 的口径）；Main 打 `bench failed: …` 且退出非零（既有形）。
+
+#### 8-6.1 两个设计
+
+**A（选中）：读数行一个文法、机器类属进字段，基线读数（含机器类属）进 ARCHITECTURE.md 性能册，棘轮纪律挂 `xtask/budgets.toml` 的 `[local_latency]` 行——只降不升、放宽需单独提交。** 理由：register 的既有定规是「只有机器能两次同样测量的量才设门」（budgets.toml 头注），wall-clock 记录不设门；机器类属字段使异类机器的读数天然不进同一张表。
+
+**B（落选）：像体积那样把延迟读数设门（超标即 CI 红）。** 落选理由：同一处定规写着「gating them would make a busy runner look like a defect」（budgets.toml 头注与 ARCHITECTURE §11 同句）；读数回归由棘轮纪律与单独提交的放宽手续治理，不由 CI 红绿治理。
+
+**红**：`a_reading_line_is_stable_and_carries_its_machine_class`——一行读数按字节对拍既有文法且带 `machine_class` 字段；`the_four_load_scenarios_rerun_and_emit_the_stable_format`——四个场景各跑两遍，每行键序恒为文法键序（可复跑、格式稳定）。
+
 ## 9–16 工作流程／实现／边界／错误／依赖／硬编码／影响面／测试
 
 - 流程：测试构造 drafts→MemLedger append→checker／conformance／对拍 JsonlLedger；另有 Scenario→run_scenario→check_chain＋事件序断言。

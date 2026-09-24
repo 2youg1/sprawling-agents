@@ -571,6 +571,26 @@ than typed.
 | Prefix assembly | ≤1 ms | 0.022 ms for 16.5 KB over four slots | no |
 | Runs driving at once | 4 lanes | one thread per run, and one accounting thread taking every write | no: it is a wall this city sets, not a measurement |
 | Kernel mutation score | ≥90% | by `just mutants` | by that command, not by `just check` |
+| Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
+
+The four load scenarios — multi-run parallel, large-ledger fold,
+large-worktree placement, and long-session streaming forward — are re-measured
+by `just bench`, one reading line per scenario and sub-metric, every line
+carrying its machine class. Their baselines sit in the table below. The two
+latency tiers and the ratchet that governs these readings live in
+`xtask/budgets.toml` `[local_latency]`; a reading under the registered load
+only goes down.
+
+| Load scenario, sub-metric | Baseline (p50 / p95 / p99) | Machine class |
+|---|---|---|
+| multi-run parallel, `harness` | 5 / 9 / 24 µs per append | general: windows-x86_64, 16 cores, NVMe |
+| multi-run parallel, `persist` | 730 / 953 / 4,326 µs per append | general: windows-x86_64, 16 cores, NVMe |
+| large-ledger fold, `harness` | 2,759 / 3,765 / 3,765 ms per rebuild | general: windows-x86_64, 16 cores, NVMe |
+| large-worktree placement, `whole` | 10,503 / 11,052 / 11,052 ms per claim | general: windows-x86_64, 16 cores, NVMe |
+| long-session forwarding, `harness` | 4 / 4 / 4 µs per event | general: windows-x86_64, 16 cores, NVMe |
+
+Taken under the registered fixture (`bench::scenarios::REGISTERED`), release
+build. A reading from another machine class does not enter this table.
 
 The two size rows are also rendered as the badges in `README.md`, from this
 same reading — `cargo xtask badge --write`, which `just dist` ends with.

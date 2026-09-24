@@ -516,3 +516,29 @@ best_packages = 389
 slack_packages = 16
 measured_by = "cargo xtask budget (budget::lockfile_packages, counting [[package]] in Cargo.lock)"
 status = "gated"
+
+# T13: where the two latency tiers are stated. One latency metric in two
+# stages: the first is p95 inside one frame's budget (a person sees no
+# delay), the second is p99 tighter still and covering the first (an
+# agent waits on nothing this harness does). Stages, not two percentiles
+# of one distribution: on one distribution p99 >= p95 holds, so a claim
+# of "p95 16 ms and p99 1 ms" over one sample would be false by
+# construction. The second stage is reached after the first one is.
+#
+# The sub-metric split is what keeps a disk's floor from masking harness
+# overhead (citysim-SPEC.md section 8-6): `harness` carries no durability
+# commit and is the only sub-metric these tiers price; `persist` carries
+# one and answers to the disk instead; `whole` is disk work whose seam
+# does not split and gets no tier. The target values live here and
+# nowhere else; the readings and their machine class live in the
+# performance book in ARCHITECTURE.md.
+#
+# Ratchet: under the registered fixture a reading only goes down. A
+# relaxed tier or a fattened fixture lands in a commit of its own.
+[local_latency]
+what = "the harness's own processing latency over the four load scenarios, one metric in two stages"
+stage_one_p95_us = 16000
+stage_two_p99_us = 1000
+scope = "sub-metric `harness` only; `persist` answers to the disk's physical floor, `whole` carries no tier (citysim-SPEC.md section 8-6)"
+measured_by = "just bench (citysim bench bin, release): one reading line per scenario and sub-metric, each carrying its machine class"
+status = "staged targets, not gated: a wall-clock figure is the machine's. Baselines sit in the ARCHITECTURE.md performance book. Under the registered fixture a reading only goes down; relaxing a tier or fattening the fixture lands in a commit of its own"
