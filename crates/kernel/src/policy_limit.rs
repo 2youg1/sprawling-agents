@@ -101,6 +101,44 @@ impl ImageMaxBytes {
     }
 }
 
+/// The quality one lossy picture may be encoded at. The legal domain is
+/// `0..=max`: the maximum is admitted and one more is refused, because a
+/// caller that asks for more has asked for something no encoder has, and
+/// a clamped answer tells it the picture is better than it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ImageQuality(u64);
+
+impl ImageQuality {
+    /// The only way a value of this type exists; see [`ImagesPerTurn::new`].
+    ///
+    /// The type has no getter, so a caller outside this crate cannot read
+    /// the domain out to format a sentence of its own — the one refusal
+    /// below is the whole of what it says.
+    pub(crate) const fn new(max: u64) -> ImageQuality {
+        ImageQuality(max)
+    }
+
+    /// Whether an encoder has this quality.
+    ///
+    /// # Errors
+    /// `E_INVALID_ARGS` when the asked-for quality is outside the domain;
+    /// the recovery names the domain.
+    pub fn admit(self, asked: u32) -> Result<(), AxError> {
+        if u64::from(asked) <= self.0 {
+            return Ok(());
+        }
+        Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "encode a picture",
+            format!("quality {asked} is outside 0..={}", self.0),
+        )
+        .with_recovery(format!(
+            "pass a quality between 0 and {}; an encoder has no others",
+            self.0
+        )))
+    }
+}
+
 /// How many concern zones a clock stamp may carry, the UTC row not
 /// among them. Refused rather than dropped: a configured zone that
 /// silently stops rendering is a wrong stamp, and a wrong stamp is
@@ -147,7 +185,7 @@ impl ClockZonesMax {
 )]
 mod tests {
     use super::*;
-    use crate::consts_policy::{CLOCK_ZONES_MAX, IMAGE_MAX_BYTES, IMAGES_PER_TURN};
+    use crate::consts_policy::{CLOCK_ZONES_MAX, IMAGE_MAX_BYTES, IMAGE_QUALITY, IMAGES_PER_TURN};
 
     fn a_picture() -> Locator {
         Locator::parse(&format!("cas:b3-{}", "0".repeat(64))).unwrap()
@@ -166,6 +204,21 @@ mod tests {
         )
         .with_recovery("one turn carries at most 4 pictures; send the rest in a later turn");
         assert_eq!(IMAGES_PER_TURN.admit(5).unwrap_err(), expected);
+    }
+
+    /// The same boundary, and the same whole comparison, for the quality
+    /// an encoder is asked for.
+    #[test]
+    fn the_quality_domain_admits_its_limit_and_refuses_one_past_it() {
+        assert!(IMAGE_QUALITY.admit(100).is_ok());
+        assert!(IMAGE_QUALITY.admit(0).is_ok());
+        let expected = AxError::failure(
+            AxCode::InvalidArgs,
+            "encode a picture",
+            "quality 101 is outside 0..=100",
+        )
+        .with_recovery("pass a quality between 0 and 100; an encoder has no others");
+        assert_eq!(IMAGE_QUALITY.admit(101).unwrap_err(), expected);
     }
 
     #[test]

@@ -146,14 +146,13 @@ impl ShotRequest {
         };
         let quality = match integer(args, "quality")? {
             None => None,
-            Some(percent) => Some(u8::try_from(percent.min(100)).map_err(|_| {
-                AxError::failure(
-                    AxCode::InvalidArgs,
-                    "read a screenshot request",
-                    "quality is a percentage",
-                )
-                .with_recovery("pass 0 to 100")
-            })?),
+            // The domain is the encoder's, refused rather than clamped:
+            // a caller that asked for 120 asked for a picture no encoder
+            // writes, and a number quietly cut to 100 agrees with it.
+            Some(percent) => {
+                kernel::consts_policy::IMAGE_QUALITY.admit(percent)?;
+                Some(u8::try_from(percent).map_err(|_| unreadable(percent))?)
+            }
         };
         Ok(ShotRequest {
             clip,

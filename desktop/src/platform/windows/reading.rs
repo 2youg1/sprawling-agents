@@ -122,11 +122,34 @@ pub(super) fn asked_for(arguments: &Value) -> Result<Wanted, Refusal> {
     };
     Ok(Wanted {
         format,
-        scale: whole(arguments, "scale")?.unwrap_or(encode::DEFAULT_SCALE),
-        quality: whole(arguments, "quality")?
-            .and_then(|asked| u8::try_from(asked).ok())
-            .unwrap_or(encode::DEFAULT_QUALITY),
+        scale: match whole(arguments, "scale")? {
+            None => encode::DEFAULT_SCALE,
+            Some(asked) if asked == 0 || asked > encode::SCALE_MAX => {
+                return Err(outside_domain("scale", asked, 1, encode::SCALE_MAX));
+            }
+            Some(asked) => asked,
+        },
+        quality: match whole(arguments, "quality")? {
+            None => encode::DEFAULT_QUALITY,
+            Some(asked) => u8::try_from(asked)
+                .ok()
+                .filter(|quality| *quality <= encode::QUALITY_MAX)
+                .ok_or_else(|| {
+                    outside_domain("quality", asked, 0, u32::from(encode::QUALITY_MAX))
+                })?,
+        },
     })
+}
+
+/// A value outside the domain its field has, refused rather than replaced.
+///
+/// The default standing in for a quality nobody has would answer a
+/// different question than the one that was asked, and say nothing about
+/// having done so.
+fn outside_domain(field: &str, asked: u32, low: u32, high: u32) -> Refusal {
+    let subject = format!("`{field}` {asked} is outside {low}..={high}");
+    let recovery = format!("pass `{field}` between {low} and {high}, as this tool's schema describes");
+    Refusal::new(RefusalCode::InvalidArgs, "use the desktop", subject, &recovery)
 }
 
 /// The region of the window a capture is of, when the call names one.
@@ -247,12 +270,22 @@ mod tests {
         assert_eq!(asked.format, Format::Jpeg);
         assert_eq!(asked.scale, 40);
         assert_eq!(asked.quality, 20);
-        // A quality outside a byte is refused rather than clamped: a
-        // caller that asked for 900 believes something.
+        // A quality outside the domain is refused rather than replaced:
+        // a caller that asked for 900 believes something, and the default
+        // standing in for it would answer a different question.
         assert!(whole(&json!({ "quality": -1 }), "quality").is_err());
+        let refused = asked_for(&json!({ "quality": 900 })).unwrap_err();
         assert_eq!(
-            asked_for(&json!({ "quality": 900 })).unwrap().quality,
-            encode::DEFAULT_QUALITY
+            refused.as_error()["data"]["code"],
+            json!(RefusalCode::InvalidArgs.as_str())
+        );
+        // The same domain, for the scale: 0 leaves no pixels and past the
+        // maximum is an upscale nobody asked for.
+        assert!(asked_for(&json!({ "scale": 0 })).is_err());
+        assert!(asked_for(&json!({ "scale": encode::SCALE_MAX + 1 })).is_err());
+        assert_eq!(
+            asked_for(&json!({ "scale": encode::SCALE_MAX })).unwrap().scale,
+            encode::SCALE_MAX
         );
     }
 

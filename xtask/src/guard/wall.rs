@@ -48,6 +48,11 @@ const PROTOCOL_COPY: &str = "desktop/src/rpc.rs";
 /// package quotes them.
 const CODE_HOME: &str = "crates/kernel/src/error/code.rs";
 const CODE_QUOTE: &str = "desktop/src/refusal.rs";
+/// The quality domain, stated in the city and copied into the
+/// out-of-tree package, which sits outside the workspace and cannot read
+/// the kernel's constant.
+const QUALITY_HOME: &str = "crates/kernel/src/consts_policy.rs";
+const QUALITY_QUOTE: &str = "desktop/src/platform/windows/encode.rs";
 
 /// The package metadata every workspace member inherits from
 /// `[workspace.package]` and this package restates by hand.
@@ -91,6 +96,7 @@ pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     lints(&workspace, &desktop, &mut violations);
     dependencies(&workspace, &desktop, &mut violations);
     quoted(root, &mut violations)?;
+    quality_domain(root, &mut violations)?;
     Ok(violations)
 }
 
@@ -232,6 +238,45 @@ fn required(held: &toml::Value) -> Option<&str> {
         toml::Value::String(line) => Some(line),
         other => other.get("version").and_then(toml::Value::as_str),
     }
+}
+
+/// The quality domain the city states and the package copies.
+///
+/// The package cannot read `kernel::consts_policy::IMAGE_QUALITY`, so the two numbers are compared as text, the way the protocol revision is.
+fn quality_domain(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskError> {
+    let decided = number_after(root, QUALITY_HOME, "ImageQuality::new(")?;
+    let copied = number_after(root, QUALITY_QUOTE, "QUALITY_MAX: u8 =")?;
+    if decided != copied {
+        out.push(diverged(
+            QUALITY_QUOTE.to_owned(),
+            "a value outside the quality domain is refused by whoever parses it, so both sides must refuse at the same number",
+            format!("`{copied}` against `{decided}` in {QUALITY_HOME}"),
+            format!("set `QUALITY_MAX` in {QUALITY_QUOTE} to `{decided}`; an encoder asked for a quality the city would have refused must not answer as if it were asked for something it has"),
+        ));
+    }
+    Ok(())
+}
+
+/// The first run of digits after `needle` on the line that states it.
+fn number_after(root: &Path, rel: &str, needle: &str) -> Result<String, XtaskError> {
+    let text = crate::walk::read_text(&root.join(rel))?;
+    text.lines()
+        .find_map(|line| {
+            let after = line.split_once(needle)?.1;
+            let digits: String = after
+                .trim_start()
+                .chars()
+                .take_while(char::is_ascii_digit)
+                .collect();
+            (!digits.is_empty()).then_some(digits)
+        })
+        .ok_or_else(|| XtaskError::Doc {
+            file: rel.to_owned(),
+            msg: format!(
+                "this file no longer states `{needle}`, which is the shape the quality domain \
+                 is compared in"
+            ),
+        })
 }
 
 /// The two facts the out-of-tree package quotes from inside the wall:

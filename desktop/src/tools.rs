@@ -210,7 +210,7 @@ pub(crate) fn table() -> Vec<ToolCard> {
                         "required": ["x", "y", "width", "height"],
                     },
                     "format": { "type": "string", "enum": ["png", "jpeg", "webp"] },
-                    "quality": { "type": "integer", "minimum": 1, "maximum": 100 },
+                    "quality": { "type": "integer", "minimum": 0, "maximum": 100 },
                     "scale": { "type": "integer", "minimum": 1, "maximum": 100, "description": "percent of the original size" },
                 })),
                 "required": [],

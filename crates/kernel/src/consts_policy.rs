@@ -167,6 +167,13 @@ pub const IMAGE_MAX_BYTES: crate::policy_limit::ImageMaxBytes =
 pub const IMAGES_PER_TURN: crate::policy_limit::ImagesPerTurn =
     crate::policy_limit::ImagesPerTurn::new(4);
 
+/// 100 is the whole domain a lossy encoder has. Refused rather than
+/// clamped where a caller names one: `quality: 120` is a caller that
+/// believes it asked for something better, and an answer clamped to 100
+/// would agree with it.
+pub const IMAGE_QUALITY: crate::policy_limit::ImageQuality =
+    crate::policy_limit::ImageQuality::new(100);
+
 /// How long one answer may be when nobody has said: 8_192 tokens.
 ///
 /// The last rung of the output-ceiling ladder, reached only when the

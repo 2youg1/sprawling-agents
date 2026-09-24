@@ -26,7 +26,7 @@
 | platform | 非 Windows 上恒回 `E_TOOL_UNAVAILABLE` 并报出平台名；Windows 上六件工具皆真的落到这台桌面上 |
 | windows::target | 名字命中零个窗口恒被拒并指向 `desktop.windows`；命中两个以上恒被拒并列出各自的 title，**恒不**在其中挑一个 |
 | windows::views | 快照恒推进该窗口的 generation；对着旧 generation 做的动作恒被拒；快照没铸过的 ref 恒被拒 |
-| windows::encode | 三种格式各自解得回原尺寸；`scale` 恒按百分比缩，且缩到 0 像素恒被拒而不是产出空图 |
+| windows::encode | 三种格式各自解得回原尺寸；`scale` 恒按百分比缩，且缩到 0 像素恒被拒而不是产出空图；`scale` 与 `quality` 域外的值**在解析点被拒**，不是钳位也不是静默换默认值 |
 | windows::focus | 键盘在别的窗口手里时恒不发事件而回 `E_TOOL_UNAVAILABLE`；指针动作落点被别的窗口盖住时同样恒被拒；两条拒词恒写明「什么都没发出去」 |
 | windows::keys | 表里每个键名恒映到一个虚拟键码；表外的键名恒被拒并列出可用的键名 |
 | windows::record | 同一窗口重复 start 恒被拒；未 start 就 stop 恒被拒；stop 恒交出一条落盘路径 |
@@ -300,6 +300,8 @@ impl Desk {
 | 快照默认深度 | 8 层 | 我们的选择：再深一层的 UIA 树，模型读到的东西开始多过它用得上的 |
 | 一次快照最多铸的 ref 数 | 500 | 我们的选择：一份读不完的树等于没读 |
 | 截图默认格式／`scale` | `png`／100 | 我们的选择：默认不损、不缩，缩放是调用方明说才发生的事 |
+| `quality` 的域 | 0..=100 | 与城里同一域（`kernel::consts_policy::IMAGE_QUALITY`）；本包在 workspace 之外读不到它，所以两个数由 `xtask guard` 的墙对账（`wall::quality_domain`）。域外即拒：一个要求 120 的调用方以为自己要多好就有多好，而替它填默认值是在回答另一个问题 |
+| `scale` 与城里那个同名量的区别 | 本包的 `scale` 是窗口自身像素的百分数 | 城里 `browser` 的 `scale` 是设备像素比（devicePixelRatio）的百分数——同一个词、两个量，**不是同一个事实**，所以两边的域也不必相同 |
 | `webp` 忽略 `quality` | —— | 外面的事实：`image` 的 WebP 编码器是**无损**的，故 `quality` 对它无意义。schema 允许同时给出，本 server 恒不因此报错，而在答复里写明这一次的编码是无损的 |
 | 帧序列的抓帧间隔 | 100 ms（10 fps） | 我们的选择：`PrintWindow` 一帧的代价决定了上限，而 10 fps 足够看清一次交互 |
 | 录制落盘的去处 | `std::env::temp_dir()/sprawling-desktop/<窗口名安全化>-<序号>` | 我们的选择：scope 文件说的是「可以碰哪些窗口」，没说「可以往哪写文件」，故恒不写进城里，也恒不写进操作者的家目录 |

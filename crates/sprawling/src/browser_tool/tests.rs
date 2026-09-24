@@ -35,7 +35,12 @@ const ONE_RED_PIXEL: &str = concat!(
 /// Only the header is read — `Shot::read` takes the two sides from the
 /// bytes rather than from what anybody said they would be — so a picture
 /// past the cap costs forty-five bytes instead of three megabytes.
-const PAST_THE_CAP: &str = "iVBORw0KGgoAAAANSUhEUgAAB9AAAAXcCAYAAAB6ZRUrAAAAAElFTkSuQmCC";
+const PAST_THE_CAP: &str = concat!(
+    "iVBORw0KGgoAAAAN",
+    "SUhEUgAAB9AAAAXc",
+    "CAYAAAB6ZRUrAAAA",
+    "AElFTkSuQmCC",
+);
 
 /// A port that answers by arrival rather than by what was asked.
 ///

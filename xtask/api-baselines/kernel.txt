@@ -170,6 +170,7 @@ impl kernel::plan::PlanTree
 impl kernel::plan::PlanTree
 impl kernel::policy_limit::ClockZonesMax
 impl kernel::policy_limit::ImageMaxBytes
+impl kernel::policy_limit::ImageQuality
 impl kernel::policy_limit::ImagesPerTurn
 impl kernel::pursuit::Pursuit
 impl kernel::pursuit::Pursuit
@@ -337,6 +338,7 @@ pub const kernel::consts_policy::HALL_CLERK: &str
 pub const kernel::consts_policy::HALL_MAYOR: &str
 pub const kernel::consts_policy::IMAGES_PER_TURN: kernel::policy_limit::ImagesPerTurn
 pub const kernel::consts_policy::IMAGE_MAX_BYTES: kernel::policy_limit::ImageMaxBytes
+pub const kernel::consts_policy::IMAGE_QUALITY: kernel::policy_limit::ImageQuality
 pub const kernel::consts_policy::INTERVAL_CAP_BYTES: u64
 pub const kernel::consts_policy::LOOP_REPEAT_THRESHOLD: u32
 pub const kernel::consts_policy::OFFLOAD_MIN_BYTES: u64
@@ -974,6 +976,7 @@ pub fn kernel::plan::PlanTree::ready(&self) -> alloc::vec::Vec<kernel::node_id::
 pub fn kernel::plan::PlanTree::ready(&self) -> alloc::vec::Vec<kernel::node_id::NodeId>
 pub fn kernel::policy_limit::ClockZonesMax::admit(self, usize) -> core::result::Result<(), kernel::AxError>
 pub fn kernel::policy_limit::ImageMaxBytes::admit(self, &kernel::locator::Locator, usize) -> core::result::Result<(), kernel::AxError>
+pub fn kernel::policy_limit::ImageQuality::admit(self, u32) -> core::result::Result<(), kernel::AxError>
 pub fn kernel::policy_limit::ImagesPerTurn::admit(self, usize) -> core::result::Result<(), kernel::AxError>
 pub fn kernel::pursuit::Pursuit::declare(&kernel::delegation::Delegator, alloc::string::String) -> core::result::Result<kernel::pursuit::Pursuit, kernel::AxError>
 pub fn kernel::pursuit::Pursuit::declare(&kernel::delegation::Delegator, alloc::string::String) -> core::result::Result<kernel::pursuit::Pursuit, kernel::AxError>
@@ -2566,6 +2569,7 @@ pub struct kernel::plan::PlanNode
 pub struct kernel::plan::PlanTree
 pub struct kernel::policy_limit::ClockZonesMax(_)
 pub struct kernel::policy_limit::ImageMaxBytes(_)
+pub struct kernel::policy_limit::ImageQuality(_)
 pub struct kernel::policy_limit::ImagesPerTurn(_)
 pub struct kernel::pursuit::Pursuit
 pub struct kernel::reach::Reach

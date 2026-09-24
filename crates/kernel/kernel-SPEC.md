@@ -635,6 +635,7 @@ pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;                   // 2 GiB
 ```rust
 pub const IMAGE_MAX_BYTES: ImageMaxBytes = ImageMaxBytes::new(2_097_152); // 2 MiB：一张图的字节上限
 pub const IMAGES_PER_TURN: ImagesPerTurn = ImagesPerTurn::new(4);          // 一回合最多几张图
+pub const IMAGE_QUALITY: ImageQuality = ImageQuality::new(100);            // 有损编码的质量域：0..=100，域外即拒
 ```
 
 三项上限带 `kernel::policy_limit` 类型（§8-73）：合法域判定与四段拒因文案由类型一处给出，调用方只递观测值，拼不出第二种拒因；数的唯一家仍是本节。
@@ -643,7 +644,7 @@ pub const IMAGES_PER_TURN: ImagesPerTurn = ImagesPerTurn::new(4);          // �
 
 `WORKTREE_MAX_BYTES` 是上限而非磁盘余量探测：余量是一台机器当下的事实，上限则是一句拒绝说得出、一个人改得动的数；建树前校，故一座过大的城是被拒而不是被拷到一半（`memory::worktree`）。
 
-`AUTONOMY_DEFAULT` 与 `CLOCK_STAMP_DEFAULT` 带类型（分别是 `Autonomy` 与 `ClockStampGranularity`）；`IMAGE_MAX_BYTES`／`IMAGES_PER_TURN`／`CLOCK_ZONES_MAX` 带 `policy_limit` 类型（§8-73），其余为数。`SUBAGENT_CTX_LOCK_DEFAULT` 永不落地——子代理上下文锁不存在。
+`AUTONOMY_DEFAULT` 与 `CLOCK_STAMP_DEFAULT` 带类型（分别是 `Autonomy` 与 `ClockStampGranularity`）；`IMAGE_MAX_BYTES`／`IMAGES_PER_TURN`／`IMAGE_QUALITY`／`CLOCK_ZONES_MAX` 带 `policy_limit` 类型（§8-73），其余为数。`SUBAGENT_CTX_LOCK_DEFAULT` 永不落地——子代理上下文锁不存在。
 
 **两项随 §12「默认 YOLO」这条规则删去**：`POLICY_IDLE_DAYS`（长期豁免机制不存在，闲置过期无对象）与 `DISCARD_BYTES_MAX`（规模不再改变删除的判决，见 §8-26）。`DISCARD_FILES_MAX` 留下，它今天的读者是 `sprawling` 的清扫阈值。
 
@@ -2048,6 +2049,7 @@ impl CityLayout {
 |---|---|---|---|
 | `ImagesPerTurn` | `IMAGES_PER_TURN` | `admit(found: usize) -> Result<(), AxError>` | 动作 `put pictures on a provider request`；主体 `this turn carries {found} pictures`；recovery `one turn carries at most {max} pictures; send the rest in a later turn` |
 | `ImageMaxBytes` | `IMAGE_MAX_BYTES` | `admit(at: &Locator, size: usize) -> Result<(), AxError>` | 动作 `put a picture on a provider request`；主体 `{at} is {size} bytes`；recovery `one picture is at most {max} bytes; shrink it before attaching it` |
+| `ImageQuality` | `IMAGE_QUALITY` | `admit(asked: u32) -> Result<(), AxError>` | 动作 `encode a picture`；主体 `quality {asked} is outside 0..={max}`；recovery `pass a quality between 0 and {max}; an encoder has no others` |
 | `ClockZonesMax` | `CLOCK_ZONES_MAX` | `admit(configured: usize) -> Result<(), AxError>` | 动作 `format clock stamp`；主体 `{configured} zones exceed CLOCK_ZONES_MAX={max}`；recovery ``keep at most {max} rows in `[clock] zones`; the UTC row is added on top of them and is never one of them`` |
 
 **合法域**：`0..=max`（含端点）——恰好落在上限上的观测被收下，越界一步即拒（不钳位）。句式与域随类型走，改上限只改 `consts_policy` 一处。观测值是 `usize`，上限是 `u64`，比较在 `u64` 里做：`usize` 至多 64 位，窄化在任何 Rust 目标上都不会失败，那条失败支仍答「越界」，这条判定因此不依赖目标的指针宽度。
