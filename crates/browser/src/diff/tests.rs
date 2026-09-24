@@ -82,7 +82,7 @@ fn a_page_that_changed_entirely_is_the_whole_of_it() {
     assert_eq!(difference.boxes().len(), 1);
     assert_eq!(
         difference.boxes()[0],
-        Box2 {
+        Rect {
             x: 0,
             y: 0,
             width: 96,

@@ -15,7 +15,7 @@ use kernel::{AxCode, AxError, Payload};
 use serde_json::{Value, json};
 
 /// The rectangle of the page a screenshot covers, in CSS pixels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Rect {
     pub x: u32,
     pub y: u32,
@@ -229,6 +229,14 @@ pub enum Clip {
 }
 
 impl Rect {
+    /// Whether this box covers the pixel at `(x, y)`.
+    #[must_use]
+    pub fn covers(&self, x: u32, y: u32) -> bool {
+        let right = self.x.saturating_add(self.width);
+        let bottom = self.y.saturating_add(self.height);
+        x >= self.x && x < right && y >= self.y && y < bottom
+    }
+
     /// The smallest rectangle covering both.
     ///
     /// # Errors

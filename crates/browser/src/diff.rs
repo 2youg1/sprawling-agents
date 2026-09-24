@@ -17,37 +17,18 @@
 
 use kernel::{AxCode, AxError, ImageType};
 
-use crate::shot::Shot;
+use crate::shot::{Rect, Shot};
 
 /// How wide a tile is. Changed pixels are grouped by tile before they
 /// are grouped into boxes, so a box is a region a person can look at
 /// rather than a list of pixels nobody can read.
 const TILE: u32 = 32;
 
-/// A rectangle of whole pixels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Box2 {
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
-}
-
-impl Box2 {
-    /// Whether this box covers the pixel at `(x, y)`.
-    #[must_use]
-    pub fn covers(&self, x: u32, y: u32) -> bool {
-        let right = self.x.saturating_add(self.width);
-        let bottom = self.y.saturating_add(self.height);
-        x >= self.x && x < right && y >= self.y && y < bottom
-    }
-}
-
 /// What one comparison found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Difference {
     changed_q4: u32,
-    boxes: Vec<Box2>,
+    boxes: Vec<Rect>,
 }
 
 impl Difference {
@@ -61,7 +42,7 @@ impl Difference {
     /// Where it changed, in reading order: top to bottom, then left to
     /// right. An empty list is what "nothing moved" looks like.
     #[must_use]
-    pub fn boxes(&self) -> &[Box2] {
+    pub fn boxes(&self) -> &[Rect] {
         &self.boxes
     }
 }
@@ -300,7 +281,7 @@ impl Grid {
     /// Connectivity is up, down, left and right. Diagonal neighbours are
     /// two groups, which reads as two places on a page rather than one
     /// box covering the gap between them.
-    fn boxes(&self) -> Vec<Box2> {
+    fn boxes(&self) -> Vec<Rect> {
         let mut seen = vec![false; self.hot.len()];
         let mut boxes = Vec::new();
         for row in 0..self.down {
@@ -316,7 +297,7 @@ impl Grid {
 
     /// The box covering the group this tile belongs to, or nothing when
     /// this tile did not change or was already counted.
-    fn group_from(&self, column: u32, row: u32, seen: &mut [bool]) -> Option<Box2> {
+    fn group_from(&self, column: u32, row: u32, seen: &mut [bool]) -> Option<Rect> {
         let start = usize::try_from(row.saturating_mul(self.across).saturating_add(column)).ok()?;
         if !self.is_hot(column, row) || seen.get(start).copied().unwrap_or(true) {
             return None;
@@ -357,7 +338,7 @@ impl Grid {
     }
 
     /// The pixel box a run of tiles covers, cut to the picture's edge.
-    fn box_of(&self, tiles: Tiles) -> Box2 {
+    fn box_of(&self, tiles: Tiles) -> Rect {
         let x = tiles.left.saturating_mul(TILE);
         let y = tiles.top.saturating_mul(TILE);
         let far = tiles
@@ -370,7 +351,7 @@ impl Grid {
             .saturating_add(1)
             .saturating_mul(TILE)
             .min(self.height);
-        Box2 {
+        Rect {
             x,
             y,
             width: far.saturating_sub(x),

@@ -26,7 +26,7 @@ mod verb;
 
 pub use act::{Action, Origin, Point, STEPS_MAX, frame_for, resolve_frame};
 pub use devloop::{DevLoop, LOOKS_MAX, Observation, QUIET_LOOKS, Step};
-pub use diff::{Box2, Difference, diff};
+pub use diff::{Difference, diff};
 pub use input::{Origin as ResolvedOrigin, shared_id_of};
 pub use port::{BrowserPort, Frame, Reply};
 pub use profile::{PROFILES_DIR, Profile};

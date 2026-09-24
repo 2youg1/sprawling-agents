@@ -278,6 +278,8 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 
 解码后的字节短于自己头部声明的尺寸时回 `E_WIRE_MISMATCH`，并且**说出是哪一张短了**：先拍的、后拍的、还是两张都短。三种情况的下一步动作不同——要重拍的是哪一张，拒绝语直接给出，读的人不必两张都重来。判定对 `(前, 后)` 两个像素取值穷尽匹配，没有兜底臂。
 
+**一个矩形类型**：差异的框与截图覆盖的区域、以及元素报出的框，是同一个四整数形状，所以全 crate 只有一个 `shot::Rect`（`covers` 与 `covering` 是它的方法）；`diff` 从 `shot` 读它，本模块不再自备一个 `Box2`。两个名字曾经同时存在且取值相同，那正是本仓称之为缺陷的状态。
+
 依赖 `png` 0.18（MIT OR Apache-2.0，`deny.toml` 的 allow 列表已含两者）：产品路径只解码，测试用它的编码器造夹具，于是断言比的是真 PNG 字节而不是一份没人能复核的固定串。
 
 ### 19-5 `browser::devloop` 消费 `look` 的判定
