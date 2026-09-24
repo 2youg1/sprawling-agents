@@ -259,9 +259,10 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 
 **`ref` 走的是一帧换一帧的两段路**，与 §19-8 的元素起点同形：`Verb::frames` 只发让页面报出元素的那一帧（`act::resolve_frame`，世代守卫仍是 `act::ensure_fresh` 一个权威），`input::shared_id_of` 从回复里取出驱动的句柄，`ShotRequest::capture_frame` 再发捕获帧，`clip` 拼成 `{"type":"element","element":{"sharedId":…}}`。**元素裁剪的矩形因此不由本仓计算**：它由页面报给驱动，没有四舍五入，也没有第二次测量，于是不存在「模型看到的框」与「裁出来的图」两个家。矩形臂上传入句柄、或元素臂上没有句柄，都回 `E_INVALID_ARGS`：这条路上没有可解的句柄，是正确的拒绝而不是不可能的状态。
 
-**每张截图都带上界**：捕获帧恒带 `imageSize {maxWidth, maxHeight}`，两侧同为 `SHOT_MAX_EDGE_PX`（1920）。这是协议的一等参数（`browsingContext.ImageSize`），缩放在驱动成像时发生，**不经过 `devicePixelRatio`**——后者是页面可见的事实（`@media (resolution)`、`window.devicePixelRatio`），为省字节改它可能让页面按另一套样式重排，于是量到的框与截到的图不是同一个版面。`scale` 与上界因此是两个事实：前者要「以多高密度渲染」，后者是这座城的成本纪律，**模型没有要多大就多大的旋钮**。上界只此一处定义，两个读它的人是同一件事的两端：请求侧的 `imageSize`，与收下图像后按**字节读出来的两侧**说的 `ShotMaxEdge::admit`——所以驱动忽略 `imageSize` 时，这张图被拒而不是被悄悄收下。
+**每张截图都带上界**：捕获帧恒带 `imageSize {maxWidth, maxHeight}`，两侧同为 `SHOT_MAX_EDGE_PX`（1920）。这是协议的一等参数（`browsingContext.ImageSize`），请求侧只声明意图；**它不构成保证**：对真 Gecko 会话的实测是 2000×1500 的视口带 `maxWidth:1920` 仍回 2000×1500，400×300 的 clip 带 `maxWidth:200` 仍回 400×300，即驱动原样不理这个参数。**因此必须说住的是收下图像后的那一端**：`ShotMaxEdge::admit` 量的是**字节读出来的两侧**，超过即拒（`E_INVALID_ARGS`，恢复语指名 `scale` 与 `ref`）。今天的行为因此是“超出即声明拒绝”而不是“静默缩小”。`scale` 与上界是两个事实：前者要「以多高密度渲染」，后者是这座城的成本纪律，**模型没有要多大就多大的旋钮**。上界只此一处定义，两个读它的人是同一件事的两端：请求侧的 `imageSize` 与收下后的 `admit`。
 
-- **上界为什么不住 `kernel::policy_limit`**：那个模块的约定是一个极限没有公开取值，调用方交出观察到的事实、由极限说出唯一那句拒绝。而上界上线的形态是请求里的两个数，它必然要交出取值——那会让 `policy_limit` 长出一个它明写没有的 getter。上界只有本 crate 的两个读者，定义在此处就是一处。**重新考虑的参数**：若第二个 crate 要这个数（桌面侧截图并入同一份词汇即是），它搬进 `consts_policy`，并让 `policy_limit` 长出那一刻需要的取值方法。
+- **上界为什么不经过 `devicePixelRatio`**：那一个改的是页面可见的事实（`@media (resolution)`、`window.devicePixelRatio`），为省字节改它可能让页面按另一套样式重排，于是量到的框与截到的图不是同一个版面。协议在"不碰页面"这条路上只给出了 `imageSize`，而它不被执行——所以一个不拒、只变小的上界，要么先把 `devicePixelRatio` 接受为已知代价，要么先把 region 量准（矩形臂已知尺寸，元素臂要页面报框）。**重新考虑的参数**：那个代价被接受，或驱动开始执行 `imageSize`。
+- **上界为什么不住 `kernel::policy_limit`**：那个模块的约定是一个极限没有公开取值，调用方交出观察到的事实、由极限说出唯一那句拒绝。而这个上界的两个读者都在本 crate（请求与收下），定义在此处就是一处。**重新考虑的参数**：若第二个 crate 要这个数（桌面侧截图并入同一份词汇即是），它搬进 `consts_policy`，并让 `policy_limit` 长出那一刻需要的取值方法。
 - **不静默降级**：驱动若不接受元素裁剪，这一调用以驱动自身的拒绝失败，本库**不偷偷退回自己算框**——退回就是给「这块在哪」添第二个家。退回的路存在且是公开动作（让页面回矩形、走矩形臂），要不要走由 §19-7 的真机核对决定。
 
 `Shot::read` 解 base64 并把字节交给 `png` 读出尺寸：**本版本只在 PNG 上给出尺寸**，其他格式回 `E_WIRE_MISMATCH` 而不是猜。理由是 `ImageRef` 的 width／height 是模型看图前唯一的尺度，猜错的尺寸比没有尺寸更坏；而默认格式本就是 PNG，所以这条拒绝挡的是有人显式要了别的格式又要尺寸。
@@ -293,8 +294,12 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 
 ### 19-7 尚未验证的部分
 
-- **`bin::browser_bidi::BidiSocket` 没有对着真浏览器跑过**。逐帧逻辑（发一帧、读到 id 相同的那条、跳过无 id 的事件）由阅读 W3C 草案得出而非由一次真实会话验证。工具那一侧的整条 open→snapshot→act→screenshot 由 `Recording` 逐帧断言，缝的另一个适配器因此是可信的；**这一侧不是**。第一次真跑要看的是五件事：`session.new` 的能力集合是否被 Firefox 接受、`script.evaluate` 的返回值是否真是 `result.value` 的字符串形状、`browsingContext.captureScreenshot` 的 `format.type` 是否收 `image/png` 这一拼写、`clip.type = "element"` 是否接受由 `script.evaluate` 回复里取出的 `sharedId`（元素裁剪整条路系于此）、以及 `imageSize` 是相对裁剪区还是相对整个 framebuffer 计算（前者则上界恒准，后者则上界只对整屏截图准，而元素裁剪要靠另一次测量）。
+**一次真会话已经跑过，§19-2 里那三条疑问全部关闭**（对 Gecko）：`session.new` 接受空能力集；`script.evaluate` 的回复是 `result.result = { type, handle, sharedId, value }`，`sharedId` 就在这一层，`shared_id_of` 的有界查找找到它；`browsingContext.captureScreenshot` 的 `format.type` 收 `image/png` 这一拼写。元素裁剪也随之落地：`clip.type = "element"` 收由 `script.evaluate` 回复里取出的 `sharedId`，回来的图正好是该元素的框。
+
+**仍然未定的一件事**：上界怎么在不拒的情况下生效。那次会话量到的 `imageSize` 行为是**原样忽略**（§19-3），所以今天超上界是一句拒绝。要不拒就只能在捕获前改 `devicePixelRatio`，而那要先把"页面可能因它重排"当作已知代价写下；另一个方向是先把区域量准（矩形臂已知，元素臂要页面报框），再据此算比例。两者的参数都写在 §19-3 那两条里。
+
 - **`-headless` 有开关没有问的人**：`LaunchPlan` 带这一位并逐字断言，但 `for_building` 恒传 `false`。这一位由哪一面提供尚未定：候选是楼的 `CONFIG.toml` 与派活帧的一个字段。
+- **引擎只看 `firefox` 这个名字**：`Engine::choose` 只认 Firefox 与 `chromedriver`，而能说这协议的 Gecko 不止一个名字，于是机器上已有的引擎可能对这座城隐形。这一条的参数是：名字表要不要变成一张有据可查的表（就像平台表那一族），而不是一个拼写。
 
 ### 19-8 `browser::input`（新模块，形状 1 判定）
 
