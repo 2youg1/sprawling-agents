@@ -140,9 +140,15 @@ test-std:
 # on, then ReleaseFast, where Zig runs its undefined-behaviour checks
 # (mem-SPEC.md section 2). `zig build` itself enforces the version pinned
 # in zig/build.zig.zon.
+#
+# Both caches are named rather than left to Zig's default: the default
+# puts them in `zig/`, inside the source tree, where the generated
+# objects carry this machine's absolute paths and `xtask release` reads
+# every file it finds. `crates/mem/build.rs` points them here too, so a
+# hand-run and a cargo build agree about where the kernel was built.
 test-zig:
-    cd zig && zig build test
-    cd zig && zig build -Doptimize=ReleaseFast test
+    cd zig && zig build --cache-dir ../target/zig-cache --global-cache-dir ../target/zig-global-cache test
+    cd zig && zig build --cache-dir ../target/zig-cache --global-cache-dir ../target/zig-global-cache -Doptimize=ReleaseFast test
 
 # All machine gates (xtask), then the supply-chain read.
 gates:
