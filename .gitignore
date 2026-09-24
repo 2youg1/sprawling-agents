@@ -1,6 +1,10 @@
 /target
 /local
 /adversary/.lake
+# `zig build`'s cache and output, wherever it runs: a terminal in zig/ or
+# crates/mem's build script.
+zig/.zig-cache/
+zig/zig-out/
 # svelte-check's generated transpiled project (its --tsgo lane and editor
 # tooling write it); it is build output, and ESLint's flat config lints
 # dot directories unless they are ignored (client/eslint.config.ts).

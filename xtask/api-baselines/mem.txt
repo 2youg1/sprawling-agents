@@ -1,0 +1,14 @@
+impl mem::EnvelopeKey
+impl<'input> mem::EnvelopeSpans<'input>
+pub const mem::EnvelopeKey::ALL: [mem::EnvelopeKey; 5]
+pub enum mem::EnvelopeKey
+pub fn mem::EnvelopeKey::name(self) -> &'static str
+pub fn mem::EnvelopeSpans<'input>::get(&self, mem::EnvelopeKey) -> core::option::Option<&'input [u8]>
+pub fn mem::scan(&[u8]) -> core::result::Result<mem::EnvelopeSpans<'_>, kernel::error::shape::AxError>
+pub mem::EnvelopeKey::Ig
+pub mem::EnvelopeKey::Kind
+pub mem::EnvelopeKey::Prev
+pub mem::EnvelopeKey::Seq
+pub mem::EnvelopeKey::V
+pub mod mem
+pub struct mem::EnvelopeSpans<'input>

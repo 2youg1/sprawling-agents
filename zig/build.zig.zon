@@ -1,0 +1,15 @@
+.{
+    .name = .mem,
+    .version = "0.0.6",
+    .fingerprint = 0x94c703661327d4f0, // Changing this has security and trust implications.
+    // Pinned: the whole tree is written against 0.16 stable. The 0.17
+    // deltas (b.args -> addPassthruArgs, std.gpu -> std.spirv, the new
+    // @bitCast semantics) are deliberately not used (mem-SPEC.md section 12).
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

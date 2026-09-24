@@ -1,0 +1,27 @@
+# The Zig toolchain, prepared the one way this repository states it.
+#
+# Every job that compiles the workspace needs Zig on PATH: `crates/mem`'s
+# build script runs `zig build`, so a job without it fails inside that
+# build script rather than inside anything a person changed. Which
+# version to install has one home - `minimum_zig_version` in
+# `zig/build.zig.zon`, the file `zig build` itself enforces - so this
+# action reads that pin instead of restating it.
+name: zig toolchain
+description: >-
+  Install the Zig toolchain that zig/build.zig.zon pins, so crates/mem can
+  compile the kernel its build script links.
+runs:
+  using: composite
+  steps:
+    - name: read the pinned version
+      id: pin
+      shell: bash
+      run: |
+        set -euo pipefail
+        version=$(sed -n 's/.*\.minimum_zig_version = "\([^"]*\)".*/\1/p' zig/build.zig.zon)
+        test -n "$version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    - name: install the pinned Zig
+      uses: mlugg/setup-zig@v2
+      with:
+        version: ${{ steps.pin.outputs.version }}

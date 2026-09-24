@@ -1,0 +1,44 @@
+[package]
+name = "mem"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+kernel = { path = "../kernel" }
+
+[dev-dependencies]
+# The oracle: the reference implementation parses with serde and captures
+# each value's raw text through `RawValue`, which is the borrow shape the
+# scanner mirrors (implementation design section 8.8).
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["raw_value"] }
+proptest.workspace = true
+
+# The workspace lint table, copied rather than inherited: `unsafe_code`
+# has to be `deny` here rather than `forbid` so the FFI boundary can
+# relax it at one call site with a written reason (mem-SPEC.md section 12,
+# decision 5; the same shape as `desktop/`). Cargo forbids inheriting and
+# overriding at once, so this copy is the cost of the exception. One line
+# differs from the workspace table and nothing else may.
+[lints.rust]
+unsafe_code = "deny"
+unexpected_cfgs = { level = "deny", check-cfg = ["cfg(kani)"] }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+indexing_slicing = "deny"
+string_slice = "deny"
+arithmetic_side_effects = "deny"
+as_conversions = "deny"
+dbg_macro = "deny"
+wildcard_enum_match_arm = "deny"
+let_underscore_must_use = "deny"
+let_underscore_untyped = "deny"
+fn_params_excessive_bools = "deny"
