@@ -3,7 +3,6 @@ resolver = "3"
 members = [
     "crates/kernel",
     "crates/memory",
-    "crates/mem",
     "crates/gateway",
     "crates/runtime",
     "crates/collab",
@@ -23,7 +22,6 @@ exclude = ["desktop"]
 default-members = [
     "crates/kernel",
     "crates/memory",
-    "crates/mem",
     "crates/gateway",
     "crates/runtime",
     "crates/collab",

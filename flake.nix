@@ -71,10 +71,6 @@
           pkgs.bun
           pkgs.cargo-deny
           pkgs.git
-          # The version `zig build` accepts is the pin in zig/build.zig.zon,
-          # which a devshell zig older than that pin turns red at `zig build`
-          # rather than drifting quietly.
-          pkgs.zig
         ];
 
         # The one required row this shell cannot answer, named here so
