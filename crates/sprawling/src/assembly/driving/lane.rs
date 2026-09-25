@@ -16,9 +16,9 @@
 
 use kernel::{AxError, Ledger};
 use kernel::{RunId, TimeMs};
-use runtime::Interrupt;
 use runtime::bench::BenchOutcome;
 use runtime::run::{RunHooks, SafePoint, drive};
+use runtime::{Interrupt, NextCall};
 
 use super::{Driven, Driving};
 use crate::assembly::now_ms;
@@ -76,20 +76,46 @@ struct Interrupting {
     backlog: runtime::Backlog,
     person: Option<std::sync::Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>>,
     steers: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
+    /// What arrived while the run waited out a provider and was not a
+    /// halt. The desk hands each steer out once, so one taken during a
+    /// wait is kept here for the safe point that follows it.
+    held: Option<Interrupt>,
 }
 
 impl Interrupting {
-    fn ask(&mut self) -> Interrupt {
-        // A stopped scope outranks anything a person or a neighbour
-        // still has to say to the run. A backlog that cannot answer
-        // counts as stopped: it cannot promise the scope is still open,
-        // and a run that carried on would be running inside a scope a
-        // person may already have shut (sprawling-SPEC.md 8-73).
-        if self
-            .member
+    /// Whether a halt has reached the run, asked while it waits out a
+    /// provider. Anything else that arrives is held for the next safe
+    /// point rather than answered here.
+    fn halted(&mut self) -> bool {
+        if self.held.is_some() {
+            return self.scope_stopping();
+        }
+        match self.ask() {
+            Interrupt::Cancel => true,
+            Interrupt::None => false,
+            steer @ Interrupt::Steer { .. } => {
+                self.held = Some(steer);
+                false
+            }
+        }
+    }
+
+    /// A stopped scope outranks anything a person or a neighbour still
+    /// has to say to the run. A backlog that cannot answer counts as
+    /// stopped: it cannot promise the scope is still open, and a run
+    /// that carried on would be running inside a scope a person may
+    /// already have shut (sprawling-SPEC.md 8-73).
+    fn scope_stopping(&self) -> bool {
+        self.member
             .is_some_and(|id| self.backlog.stopping(id).unwrap_or(true))
-        {
+    }
+
+    fn ask(&mut self) -> Interrupt {
+        if self.scope_stopping() {
             return Interrupt::Cancel;
+        }
+        if let Some(held) = self.held.take() {
+            return held;
         }
         let from_person = match self.person.as_ref() {
             Some(ask) => ask(self.run_id),
@@ -192,13 +218,14 @@ pub(crate) fn drive_run<L: Ledger>(
     let fenced: std::rc::Rc<std::cell::RefCell<Vec<String>>> =
         std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
     let fenced_by_bench = std::rc::Rc::clone(&fenced);
-    let mut asking = Interrupting {
+    let asking = std::cell::RefCell::new(Interrupting {
         run_id,
         member,
         backlog,
         person,
         steers: signals,
-    };
+        held: None,
+    });
     // What the run's own commands did. It is the only evidence of "the
     // tests passed" the city can observe without being told, and being
     // told is what a mode is supposed to check.
@@ -208,7 +235,25 @@ pub(crate) fn drive_run<L: Ledger>(
     let driven = {
         let fenced = fenced_by_bench;
         let ran = ran_by_bench;
-        let mut interrupt = |_: SafePoint| asking.ask();
+        let mut interrupt = |_: SafePoint| asking.borrow_mut().ask();
+        // How late a halt may land while a run waits out a provider. It
+        // is the scale a person notices, not a reading of this machine.
+        const HALT_SLICE_MS: u64 = 50;
+        let mut wait = |until: TimeMs| loop {
+            if asking.borrow_mut().halted() {
+                return NextCall::Halted;
+            }
+            // A clock that cannot be read sends at once: the turn that
+            // follows samples the same clock and reports its failure.
+            let Ok(at) = now_ms() else {
+                return NextCall::Allowed;
+            };
+            let left = until.value().saturating_sub(at.value());
+            if left == 0 {
+                return NextCall::Allowed;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(left.min(HALT_SLICE_MS)));
+        };
         // Where this call sits in this run. The key used to derive from
         // the turn's millisecond stamp and the tool's name, which broke
         // twice over: it took a clock, which determinism rule 7 forbids
@@ -306,6 +351,7 @@ pub(crate) fn drive_run<L: Ledger>(
             interrupt: &mut interrupt,
             fence: Some(&mut fence),
             invoke: &mut invoke,
+            wait: &mut wait,
             deltas: watching.is_some().then_some(&mut watched),
         };
         drive(plan, ledger, adapter.as_mut(), &mut hooks, &handoff)

@@ -99,6 +99,7 @@ fn a_dispatch_writes_two_lines_and_samples_the_clock_twice() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| crate::NextCall::Allowed,
         deltas: None,
     };
     {

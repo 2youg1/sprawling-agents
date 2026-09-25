@@ -148,6 +148,7 @@ fn windows_for(reported: Vec<u64>) -> Vec<String> {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
     drive(plan(1_000), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
@@ -211,6 +212,7 @@ fn a_model_with_no_stated_window_is_never_reminded() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
     drive(plan(0), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
