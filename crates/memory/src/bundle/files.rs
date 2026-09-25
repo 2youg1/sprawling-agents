@@ -135,14 +135,27 @@ fn travels(relative: &Path) -> bool {
 /// files and nothing else. Export **selects** what travels; restore
 /// **refuses** what never could - all or nothing, never a skip.
 ///
+/// The one entry admitted without travelling is the repository a v0.0.6
+/// export copied whole into `city/.git`: `history` imports its objects
+/// and refs, no file of it is copied, and the count returned is how many
+/// files it holds, which that export's manifest counted as city files.
+///
 /// # Errors
 /// `MemoryError::Bundle` naming the first entry that is not a city
 /// file; `MemoryError::Alias` from the walk.
-pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<(), MemoryError> {
+pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryError> {
+    let mut repository = 0u64;
     for path in walk(vfs, root)? {
         let Ok(relative) = path.strip_prefix(root) else {
             continue;
         };
+        if relative
+            .strip_prefix(kernel::GIT_METADATA)
+            .is_ok_and(|inner| !inner.as_os_str().is_empty())
+        {
+            repository = repository.saturating_add(1);
+            continue;
+        }
         if !travels(relative) {
             return Err(MemoryError::Bundle {
                 op: "restore",
@@ -153,7 +166,7 @@ pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<(), MemoryEr
             });
         }
     }
-    Ok(())
+    Ok(repository)
 }
 
 /// A directory that is not there holds nothing, which is an answer; a

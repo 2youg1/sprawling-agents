@@ -128,7 +128,7 @@ impl Bundle {
         bundle: &Path,
         city_root: &Path,
     ) -> Result<Manifest, MemoryError> {
-        let claimed = {
+        let mut claimed = {
             let at = bundle.join(MANIFEST);
             let bytes = vfs
                 .read(&at)
@@ -137,8 +137,11 @@ impl Bundle {
         };
         // A bundle carries city files and nothing else: git metadata in
         // one is forged, and restoring it would plant hooks. Refused
-        // before anything is copied, all or nothing (memory-SPEC 8-12).
-        only_city_files(vfs.as_ref(), &bundle.join(CITY))?;
+        // before anything is copied, all or nothing (memory-SPEC 8-12),
+        // except the repository a v0.0.6 export carried whole, whose
+        // files that manifest counted and which lands as history.
+        let repository = only_city_files(vfs.as_ref(), &bundle.join(CITY))?;
+        claimed.files = claimed.files.saturating_sub(repository);
         let layout = kernel::layout::CityLayout::new(city_root);
         let ledger_dir = layout.ledger();
         let cas_dir = layout.cas();
@@ -151,9 +154,9 @@ impl Bundle {
         let history = History::read(vfs.as_ref(), bundle, city_root)?;
         copy_tree(vfs.as_mut(), &bundle.join(LEDGER), &ledger_dir)?;
         copy_tree(vfs.as_mut(), &bundle.join(CAS), &cas_dir)?;
-        copy_tree(vfs.as_mut(), &bundle.join(CITY), city_root)?;
+        copy_city_files(vfs.as_mut(), &bundle.join(CITY), city_root)?;
         if let Some(history) = history {
-            history.land(vfs.as_ref(), city_root)?;
+            history.land(city_root)?;
         }
 
         // All four numbers, because a bundle that lost its objects has
