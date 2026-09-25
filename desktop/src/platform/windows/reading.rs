@@ -148,8 +148,14 @@ pub(super) fn asked_for(arguments: &Value) -> Result<Wanted, Refusal> {
 /// having done so.
 fn outside_domain(field: &str, asked: u32, low: u32, high: u32) -> Refusal {
     let subject = format!("`{field}` {asked} is outside {low}..={high}");
-    let recovery = format!("pass `{field}` between {low} and {high}, as this tool's schema describes");
-    Refusal::new(RefusalCode::InvalidArgs, "use the desktop", subject, &recovery)
+    let recovery =
+        format!("pass `{field}` between {low} and {high}, as this tool's schema describes");
+    Refusal::new(
+        RefusalCode::InvalidArgs,
+        "use the desktop",
+        subject,
+        &recovery,
+    )
 }
 
 /// The region of the window a capture is of, when the call names one.
@@ -284,7 +290,9 @@ mod tests {
         assert!(asked_for(&json!({ "scale": 0 })).is_err());
         assert!(asked_for(&json!({ "scale": encode::SCALE_MAX + 1 })).is_err());
         assert_eq!(
-            asked_for(&json!({ "scale": encode::SCALE_MAX })).unwrap().scale,
+            asked_for(&json!({ "scale": encode::SCALE_MAX }))
+                .unwrap()
+                .scale,
             encode::SCALE_MAX
         );
     }
