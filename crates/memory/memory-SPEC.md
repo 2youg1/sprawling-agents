@@ -526,6 +526,7 @@ impl WorktreeLease {
 - **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但尚未做——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。
 - **路径不入历史**：`worktree_opened` 载荷只携 name 与字节数。绝对路径是一台机器自己的事实，写进账本会使一本能搬到另一台机器的历史带上搬不走的东西。
 - **merge 只走 fast-forward**：trunk 在节点分枝之后动过即 `MergeStale`（→`E_VERSION_CONFLICT`），不由机器把一份活重放到别人的活上面——能说出「这份活是否仍然适用」的是做它的人。拒后城内文件逐字节不变（一条断言）。
+- **合并不覆盖城市目录**：`plan_merge` 以 libgit2 SAFE 策略对节点 tree 做一次 dry-run 检出，基线是当前干线；人改过未提交、且合并要改或删的被跟踪文件，以及挡在新路径上的未跟踪文件，都是冲突，合并以 `MergeWouldDiscard { paths }`（→`E_VERSION_CONFLICT`，恢复：提交或挪开这些改动再合）拒绝，列出全部路径。`apply` 先写不挪指针的 merge commit，再以 SAFE 检出，最后用 compare-and-swap 把干线移到它上面；从不强制检出。不选「只移分支、不碰目录」：那样城市目录与干线不一致，下一次 checkpoint 会把节点的改动当成人撤销了它们。
 - **落地的形状是真合并提交**：`apply` 造一个
   **双亲**提交（trunk 当前提交在前、节点提交在后），树取节点的树，消息为
   `<subject>\n\n<trailers>`。**判定不受此影响**——仍然只在 fast-forward 时才允许，
@@ -625,7 +626,7 @@ pub enum MemoryError {                      // thiserror；crate 根
     CasMissing / CasCorrupt / RangeOutOfBounds,               // cas
     SeqMissing,                                              // index
     Checkpoint / SecretEgress / Bundle,                      // 各自的模块
-    Worktree / WorktreeBusy / MergeStale,                    // worktree
+    Worktree / WorktreeBusy / MergeStale / MergeWouldDiscard, // worktree
     Alias { op: &'static str, path: PathBuf, kind: alias::AliasKind },  // → E_OUTSIDE_WRITE_DOMAIN（8-25）
 }
 impl MemoryError { pub fn into_ax(self) -> AxError; }   // 跨 crate 边界的唯一出口
@@ -713,6 +714,7 @@ impl Vfs for RealFs { … }
 - `Io`→`E_STORAGE_FATAL`（宁停不脏路径；不可定义掉——介质失败在设计边界外）。
 - `WorktreeBusy`→`E_WORKTREE_BUSY`：可定义掉但尚未做——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。它同时承担「该节点的树被占」与「再开一棵就越上限」两个情形：两者的可执行替代同为「先归还一棵」，而区分它们的是 subject 不是码。
 - `MergeStale`→`E_VERSION_CONFLICT`：不可定义掉——两个节点同时开工就会有一个后到；能定义掉的那部分（“合到一半失败”）已由 fast-forward 判定在动手之前定义掉。
+- `MergeWouldDiscard`→`E_VERSION_CONFLICT`：不可定义掉——人的未提交改动在城市目录里，机器无权决定它与节点的活谁留下；能定义掉的「静默覆盖」已由 SAFE 检出定义掉。
 - `Worktree`→`E_STORAGE_FATAL`：不可定义掉——仓库与文件系统是外部世界；能定义掉的那部分（名字走出目录）已由 `WorktreeName` 在构造点定义掉。
 - `Alias`→`E_OUTSIDE_WRITE_DOMAIN`：不可定义掉——名字与它指向的文件之间隔着一个链接是外部文件系统的事实；能定义掉的那部分（一次写入经链接穿透）已由 `WriteTarget` 在构造点定义掉，recovery 恒为「换成普通文件后重试」，故被拒的 run 不会卡死。Unix 上硬链接臂就在这个码下（`nlink>1` 即拒）；Windows 上链接计数不可判定（§3.5），由落盘纪律拆别名而非报拒。
 - `Envelope`→`E_LOG_VERSION_UNSUPPORTED` 同族拒读（段中损坏非尾部＝不可自动修复，指出路径交人决定）。

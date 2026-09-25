@@ -73,3 +73,44 @@ impl PlannedMerge<'_> {
         self.trees.land_merge(self.target, landing)
     }
 }
+
+/// Whether a checkout only judges the city folder or also writes it.
+#[derive(Clone, Copy)]
+pub(super) enum CheckoutRun {
+    DryRun,
+    Write,
+}
+
+/// Makes the city folder match `tree` without discarding anything:
+/// libgit2's safe strategy judges every path against the trunk as it
+/// stands, and one the person changed and did not commit is a
+/// conflict. Every conflict is named in the refusal, and a refused
+/// checkout has written nothing, because libgit2 finds all conflicts
+/// before it writes a file.
+pub(super) fn check_out(
+    repo: &git2::Repository,
+    tree: &git2::Tree<'_>,
+    run: CheckoutRun,
+) -> Result<(), MemoryError> {
+    let mut paths = Vec::new();
+    let mut checkout = git2::build::CheckoutBuilder::new();
+    checkout.safe();
+    match run {
+        CheckoutRun::DryRun => checkout.dry_run(),
+        CheckoutRun::Write => &mut checkout,
+    };
+    checkout.notify_on(git2::CheckoutNotificationType::CONFLICT);
+    checkout.notify(|_, path, _, _, _| {
+        paths.extend(path.map(|p| p.to_string_lossy().into_owned()));
+        true
+    });
+    let outcome = repo.checkout_tree(tree.as_object(), Some(&mut checkout));
+    drop(checkout);
+    if !paths.is_empty() {
+        return Err(MemoryError::MergeWouldDiscard { paths });
+    }
+    outcome.map_err(|err| MemoryError::Worktree {
+        op: "check out the merged trunk",
+        detail: err.to_string(),
+    })
+}

@@ -82,6 +82,10 @@ pub enum MemoryError {
     /// is the question a machine must not answer by itself.
     #[error("worktree {name} is behind the trunk: {detail}")]
     MergeStale { name: String, detail: String },
+    /// A merge that would overwrite or delete a tracked file the person
+    /// changed in the city folder and has not committed.
+    #[error("merging would discard uncommitted changes to {}", paths.join(", "))]
+    MergeWouldDiscard { paths: Vec<String> },
     /// A name that is an alias. The family is refused whole (memory-SPEC
     /// 8-25): a write through one lands where the name does not say.
     #[error("{op} refused at {path}: that name is a {kind}")]
@@ -140,6 +144,14 @@ impl MemoryError {
             )
             .with_recovery(
                 "rebuild this node's tree on the trunk as it stands, then have it verified again",
+            ),
+            MemoryError::MergeWouldDiscard { paths } => AxError::failure(
+                AxCode::VersionConflict,
+                "merge a node's work",
+                format!("uncommitted changes to {}", paths.join(", ")),
+            )
+            .with_recovery(
+                "commit or set aside these changes in the city folder, then merge again",
             ),
             MemoryError::CasMissing { hash } => {
                 AxError::failure(AxCode::PathNotFound, "read cas object", hash)

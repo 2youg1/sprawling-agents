@@ -11,7 +11,7 @@ use kernel::{ByteLen, consts_policy::WORKTREE_MAX_BYTES};
 
 use crate::error::MemoryError;
 
-use super::landing::{Landing, PlannedMerge};
+use super::landing::{CheckoutRun, Landing, PlannedMerge, check_out};
 use super::lease::WorktreeLease;
 use super::name::WorktreeName;
 use super::weight::measure;
@@ -176,6 +176,10 @@ impl Worktrees {
                 detail: format!("the trunk moved to {} after this node branched", ours.id()),
             });
         }
+        let tree = theirs
+            .tree()
+            .map_err(|err| refuse("read the node tree", err.to_string()))?;
+        check_out(&self.repo, &tree, CheckoutRun::DryRun)?;
         Ok(PlannedMerge {
             trees: self,
             target: theirs.id(),
@@ -217,9 +221,10 @@ impl Worktrees {
             landing.of.trailers(),
             self.reviewer(landing.reviewed_by_person)
         );
-        self.repo
+        let merge = self
+            .repo
             .commit(
-                Some("HEAD"),
+                None,
                 &signature,
                 &signature,
                 &message,
@@ -227,11 +232,11 @@ impl Worktrees {
                 &[&ours, &theirs],
             )
             .map_err(|err| refuse("commit the merge", err.to_string()))?;
-        let mut checkout = git2::build::CheckoutBuilder::new();
-        checkout.force();
+        check_out(&self.repo, &tree, CheckoutRun::Write)?;
+        let trunk = head.name().unwrap_or("HEAD");
         self.repo
-            .checkout_head(Some(&mut checkout))
-            .map_err(|err| refuse("check out the merged trunk", err.to_string()))?;
+            .reference_matching(trunk, merge, true, ours.id(), landing.subject)
+            .map_err(|err| refuse("move the city trunk", err.to_string()))?;
         Ok(())
     }
 

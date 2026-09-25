@@ -170,6 +170,8 @@ pub memory::MemoryError::Io::source: core::io::error::Error
 pub memory::MemoryError::MergeStale
 pub memory::MemoryError::MergeStale::detail: alloc::string::String
 pub memory::MemoryError::MergeStale::name: alloc::string::String
+pub memory::MemoryError::MergeWouldDiscard
+pub memory::MemoryError::MergeWouldDiscard::paths: alloc::vec::Vec<alloc::string::String>
 pub memory::MemoryError::RangeOutOfBounds
 pub memory::MemoryError::RangeOutOfBounds::hash: alloc::string::String
 pub memory::MemoryError::SecretEgress
