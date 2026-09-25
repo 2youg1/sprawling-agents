@@ -31,7 +31,7 @@
 | artifact | 发布出去的那件东西的形状：测试脚手架不得进产品二进制、客户端落点只有一个家（§8-18）、平台与归档命名只有一张表（§8-19） |
 | proof | kani harness 名册只住 `#[kani::proof]` 属性；CI 不得点名 harness，文档不得手写总数 |
 | docnum | 文档里的数字由 `docnum::FACTS` 生成并由 `--write` 回写；区段陈旧、事实未知、标记不闭合各自即红（§8-16） |
-| gates | 顺序跑全部门，聚合报告，任一违规即退出码 1 |
+| gates | 不带名字时跑全部门，带名字时只跑点名的那几道（按门表次序）；名字不在门表里即以 `unknown-gate` 退出码 2 拒绝并列出全部门名，不退回「全跑」；聚合报告，任一违规即退出码 1 |
 | features | 工作区在默认 feature 集上（含测试目标）能否编译：`clippy` 与 `nextest` 都取 `--all-features`，`dist` 只构建一个 package；这道门跑编译器而不读源码，判定是那条命令的退出码，故与 `gates` 同住 `gates.rs` |
 | wire-ts | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V`、`WIRE_HASH` 与 `CITY_RUN`（§8-20）；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
 
@@ -84,7 +84,7 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 
 ## 7 模块边界
 
-判定面一门一文件，`features` 是唯一的例外：它跑编译器而不读源码，判定就是那条命令的退出码，故它没有自己的模块，与它所附属的 `gates` 同住 `gates.rs`（`default_features`）。门表与门序只住 `gates::run` 里的那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。此处只说明每道门判什么：不抄一份名册，也不写它们有几道，因为手写的名册与数组相隔一次代码改动而不是一个 token（产品文档写过「ten gates」而树上跑十二道）。要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates --list`；要知道有几道门，读 §12 那对受管标记。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字，与按 `## N 标题` 切节这一个读法：`section` 只被 `depmap` 调用（模块图迁入 `architecture.toml` 后 `modmap` 不再按节定位）；`specalign` 经 `modmap::anchors` 吃 TOML 那侧的产物，`proof` 只取 `PATH`、自己逐行读它与 `kani harness` 相邻的那个数，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `proof` 共用的词形与计数读法，`lexicon` 另用它把文档里的门数与 `COUNT` 对账）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
+判定面一门一文件，`features` 是唯一的例外：它跑编译器而不读源码，判定就是那条命令的退出码，故它没有自己的模块，与它所附属的 `gates` 同住 `gates.rs`（`default_features`）。门表与门序只住 `gates::GATES` 那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。此处只说明每道门判什么：不抄一份名册，也不写它们有几道，因为手写的名册与数组相隔一次代码改动而不是一个 token（产品文档写过「ten gates」而树上跑十二道）。要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates --list`；要知道有几道门，读 §12 那对受管标记。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字，与按 `## N 标题` 切节这一个读法：`section` 只被 `depmap` 调用（模块图迁入 `architecture.toml` 后 `modmap` 不再按节定位）；`specalign` 经 `modmap::anchors` 吃 TOML 那侧的产物，`proof` 只取 `PATH`、自己逐行读它与 `kani harness` 相邻的那个数，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `proof` 共用的词形与计数读法，`lexicon` 另用它把文档里的门数与 `COUNT` 对账）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——列格式一变，只有一处要改。
 
@@ -127,7 +127,7 @@ pub(crate) struct Violation {
 
 ## 9 工作流程
 
-`cargo xtask <gate>` → 定位仓库根（`CARGO_MANIFEST_DIR` 的父目录）→ 读数据面（ARCHITECTURE.md／lexicon.toml／git）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 依序跑全部机器门，聚合后统一渲染。**门数与门序都只住 `gates::run` 里的那张数组**：`COUNT` 就是它的长度类型参数，数目与清单相隔一个 token，故不可能各说各话。要知道跑了哪几道门、按什么次序，读那张数组，不要在文档里再养一份。
+`cargo xtask <gate>` → 定位仓库根（`CARGO_MANIFEST_DIR` 的父目录）→ 读数据面（ARCHITECTURE.md／lexicon.toml／git）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 依序跑全部机器门，聚合后统一渲染。**门数与门序都只住 `gates::GATES` 那张数组**（`--list`、usage 与按名选门都读它）：`COUNT` 就是它的长度类型参数，数目与清单相隔一个 token，故不可能各说各话。要知道跑了哪几道门、按什么次序，读那张数组，不要在文档里再养一份。
 
 ## 10 实现逻辑
 
