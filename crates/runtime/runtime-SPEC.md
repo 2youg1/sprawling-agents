@@ -1395,7 +1395,14 @@ pub(crate) fn admit(asked: &str, action: &'static str, bound: &dyn Fn(&Address) 
     -> Result<Address, AxError>;
 // 解析失败＝E_INVALID_ARGS；Address::is_reserved()＝E_GATE_DENIED；
 // 读界答 Confidential 或 RulesUnreadable＝E_GATE_DENIED，后者的 subject 带上规则读不出的原因。
+// 已准入的地址在盘上真正落到哪里：解析真实路径（沿途每一个 symlink 或 junction），把它在城里的地址
+// 再交给 admit 判一次，返回真实路径。落在城外＝E_GATE_DENIED；落到保留区或关上的楼＝admit 的那条拒绝；
+// 不存在＝原样返回文法给的路径，由随后的打开报缺；解析失败于别的原因＝E_STORAGE_FATAL。
+pub(crate) fn land(city_root: &Path, addr: &Address, action: &'static str,
+    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<PathBuf, AxError>;
 ```
+
+**判的是盘打开的那个地址，不只是模型写下的那个。** 文法准入的地址仍可能穿过一个链接：开放楼里一条指向机密楼、保留区或城外的链接，打开的是链接的目标，只判字面地址就等于把 admit 拒掉的东西从侧门交出去。所以 `read` 与 `search` 的起点都走 `land`，`search` 遍历中遇到的每一个链接也走 `land`——链接的判定只有这一处。
 
 它是 `read` 原有那段判定的搬家，不是它的第二份。三道判定次序固定：文法、保留区、读界——前两道不碰盘，读界为他楼可能读一次规则，所以排最后。`ReadTool::new(city_root, catalog, bound)` 与 `SearchTool::new(city_root, bound)` 各持同一个 `ReadBound` 的一份 `Arc`；装配层建一次，交给两件工具。`search` 遍历时对每一个候选文件同样只问 `Address::is_reserved()`——kernel 的那个原语——所以「什么是保留区」自始至终一个权威；读界则只在城根那一层问，一栋楼整栋开或整栋关（city-SPEC §8-3「楼是顶层地址」），楼里的条目继承楼的答案，不为每个文件再读一次规则。
 
@@ -1423,12 +1430,14 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 | 读界关上的楼 | 机密楼对楼外全关；规则读不出的楼同样关 | `kernel::address::may_read`（city-SPEC §8-2） |
 | `.git` 目录 | 它是对象库不是文本，扫它只产出乱码命中 | 本节 |
 | 非 UTF-8 文件 | 二进制里没有可读的行 | 本节 |
+| `land` 拒绝的链接 | 链接的目标落在城外、保留区或关上的楼 | `chosen_path::land` |
+| 指向目录的链接 | 顺着链接走可能绕回自己走过的地方；要搜目标目录，按它真实的地址去搜 | 本节 |
 
 大于 1 MiB 的文件不读——把一个大对象读进内存找子串是一次停顿——但它不在这张表里：它是「没看」，计入 `unreadable` 并在 `unread` 里说出来。
 
 #### 8-30-4 红测试
 
-超过 512 行的文件返回恰 512 行、并给出真实 `total_lines` 与可续的 `next_offset`；`search` 找到子串并带上下文；`search` 对保留区前缀以 `E_GATE_DENIED` 拒绝；两者共用的 `chosen_path::admit` 有且只有一组测试，读界的两种关各一条拒绝。`search` 不带路径时不走关上的楼；大于 1 MiB 的文件计入 `unreadable` 并在 `unread` 里带原因；一条超过字节上限的首个命中被切进上限并带标记。
+超过 512 行的文件返回恰 512 行、并给出真实 `total_lines` 与可续的 `next_offset`；`search` 找到子串并带上下文；`search` 对保留区前缀以 `E_GATE_DENIED` 拒绝；两者共用的 `chosen_path::admit` 有且只有一组测试，读界的两种关各一条拒绝。`search` 不带路径时不走关上的楼；大于 1 MiB 的文件计入 `unreadable` 并在 `unread` 里带原因；一条超过字节上限的首个命中被切进上限并带标记。开放楼里一条指向机密楼的链接：`read` 穿过它以 `E_GATE_DENIED` 拒绝，`search` 从开放楼走下去不交出机密楼里的命中。
 
 #### 8-30-5 同集改
 

@@ -249,3 +249,42 @@ fn the_tool_refuses_another_tools_call_and_still_answers() {
     let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
     kernel::tool::conformance::assert_tool_conformance(&mut tool);
 }
+
+/// A walk through an open building does not step through a link into a
+/// confidential one: the link is judged where it lands, and a link to a
+/// directory is not entered at all, because a walk through links can
+/// come back to where it started.
+#[test]
+fn a_walk_does_not_follow_a_link_into_a_closed_building() {
+    let dir = city();
+    let vault = dir.path().join("vault");
+    std::fs::create_dir_all(&vault).unwrap();
+    std::fs::write(vault.join("secret.md"), "the ledger of the vault\n").unwrap();
+    super::super::chosen_path::make_link(&dir.path().join("lab").join("to-vault"), &vault);
+    super::super::chosen_path::make_link(&dir.path().join("lab").join("loop"), dir.path());
+    let only_lab: ReadBound = std::sync::Arc::new(|addr: &Address| {
+        if addr.as_str().starts_with("vault") {
+            ReadVerdict::Confidential
+        } else {
+            ReadVerdict::Open
+        }
+    });
+    let mut tool = SearchTool::new(dir.path(), only_lab).unwrap();
+
+    for asked in [None, Some("lab")] {
+        let mut args = vec![("text", Value::String("ledger".to_owned()))];
+        args.extend(asked.map(|path| ("path", Value::String(path.to_owned()))));
+        let outcome = tool.invoke(&call(&args)).unwrap();
+        let paths: Vec<&str> = outcome.result.as_map()["matches"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|hit| hit["path"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            paths,
+            ["lab/Notes.md", "lab/room1/Memo.md"],
+            "from {asked:?}"
+        );
+    }
+}

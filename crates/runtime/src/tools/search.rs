@@ -6,12 +6,6 @@
 //! The search tool: one substring, one bounded subtree, and the line
 //! number `read` continues from.
 //!
-//! Before this file the city had thirteen tools and no way to find
-//! anything: locating one symbol meant writing Python, which needs the
-//! optional CPython-WASI component, or going through a shell a building
-//! may have switched off. An address a model cannot search is an
-//! address it cannot use.
-//!
 //! **A substring, never a regular expression.** This follows the ruling
 //! already recorded in the `compaction` module header, for its reason
 //! rather than by analogy: a pattern engine on a path a model drives
@@ -20,11 +14,11 @@
 //! input is not a rare accident but an ordinary Tuesday.
 //!
 //! **What may be searched is what may be read.** The prefix goes
-//! through `chosen_path::admit`, every candidate file through
-//! `Address::is_reserved`, and every building the walk enters from the
-//! city root through the read bound, so a run cannot reach its own
-//! governance or a confidential building sideways through a search after
-//! `read` closed the front door.
+//! through `chosen_path::admit` and `chosen_path::land`, every candidate
+//! file through `Address::is_reserved`, every link through `land`, and
+//! every building the walk enters from the city root through the read
+//! bound, so a run cannot reach its own governance or a confidential
+//! building sideways through a search after `read` closed the front door.
 
 use std::path::{Path, PathBuf};
 
@@ -34,7 +28,7 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-use super::chosen_path::{self, ReadBound};
+use super::chosen_path::{self, ReadBound, Walked};
 use crate::elision::{self, Elided};
 
 /// How many hits one call may bring back. A search that filled the
@@ -178,10 +172,7 @@ impl SearchTool {
             None => Ok((self.city_root.clone(), String::new())),
             Some(asked) => {
                 let addr = chosen_path::admit(asked, "search", &*self.bound)?;
-                let mut path = self.city_root.clone();
-                for segment in addr.as_str().split('/') {
-                    path.push(segment);
-                }
+                let path = chosen_path::land(&self.city_root, &addr, "search", &*self.bound)?;
                 if !path.exists() {
                     return Err(AxError::failure(
                         AxCode::InvalidArgs,
@@ -210,22 +201,25 @@ impl SearchTool {
             if found.truncated {
                 break;
             }
-            if path.is_dir() {
-                match sorted_entries(&path) {
-                    Ok(entries) => {
-                        // Reversed, because the stack hands back what
-                        // was pushed last and the answer is in name
-                        // order.
-                        for name in entries.into_iter().rev() {
-                            if let Some(child) = admissible(&rel, &name, &*self.bound) {
-                                pending.push((path.join(&name), child));
-                            }
+            let path = match chosen_path::walked(&self.city_root, path, &rel, &*self.bound) {
+                Walked::Directory(path) => path,
+                Walked::File(path) => {
+                    self.scan_file(&path, &rel, looking, &mut found);
+                    continue;
+                }
+                Walked::Passed => continue,
+            };
+            match sorted_entries(&path) {
+                Ok(entries) => {
+                    // Reversed, because the stack hands back what was
+                    // pushed last and the answer is in name order.
+                    for name in entries.into_iter().rev() {
+                        if let Some(child) = admissible(&rel, &name, &*self.bound) {
+                            pending.push((path.join(&name), child));
                         }
                     }
-                    Err(err) => found.could_not_look(&rel, format!("would not open: {err}")),
                 }
-            } else {
-                self.scan_file(&path, &rel, looking, &mut found);
+                Err(err) => found.could_not_look(&rel, format!("would not open: {err}")),
             }
         }
         found
