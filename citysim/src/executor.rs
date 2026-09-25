@@ -314,6 +314,7 @@ pub fn run_scenario_on(
                 interrupt: &mut interrupt,
                 fence: Some(&mut fence),
                 invoke: &mut invoke,
+                wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
                 deltas: None,
             };
             drive(plan, ledger, &mut model, &mut hooks, &handoff)?
@@ -324,6 +325,7 @@ pub fn run_scenario_on(
                 interrupt: &mut interrupt,
                 fence: None,
                 invoke: &mut invoke,
+                wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
                 deltas: None,
             };
             drive(plan, ledger, &mut model, &mut hooks, &handoff)?

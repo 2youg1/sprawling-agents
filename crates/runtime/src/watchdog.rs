@@ -22,6 +22,12 @@ pub use kernel::Retries;
 pub struct Watchdog {
     corrections: u32,
     provider_failures: u32,
+    /// Failures since the provider last answered. The backoff and the
+    /// person's ceiling both read this rather than the run's total: a
+    /// provider that recovered owes the next outage no minute-long
+    /// first wait, and a ceiling on retries is a ceiling on asking the
+    /// same call again.
+    streak: u32,
     retries: Retries,
 }
 
@@ -124,6 +130,7 @@ impl Watchdog {
     /// field at all.
     pub fn on_provider_failure(&mut self, failure: &AxError, now: TimeMs) -> Disposal {
         self.provider_failures = self.provider_failures.saturating_add(1);
+        self.streak = self.streak.saturating_add(1);
         let not_before = TimeMs::new(now.value().saturating_add(self.backoff_ms()));
         let refused = Disposal::Freeze {
             reason: FreezeReason::ProviderRefused,
@@ -135,11 +142,16 @@ impl Watchdog {
             Retries::UntilHalted => Disposal::backing_off(not_before, failure),
             // Counted from the first failure, so `AtMost(0)` spends its
             // one attempt and reports.
-            Retries::AtMost(ceiling) if self.provider_failures <= ceiling => {
+            Retries::AtMost(ceiling) if self.streak <= ceiling => {
                 Disposal::backing_off(not_before, failure)
             }
             Retries::AtMost(_) => refused,
         }
+    }
+
+    /// The provider answered, which ends the streak of failures.
+    pub fn on_provider_answered(&mut self) {
+        self.streak = 0;
     }
 
     /// How long the failure just counted waits: 500 ms doubled for each
@@ -149,7 +161,7 @@ impl Watchdog {
     fn backoff_ms(&self) -> u64 {
         const FIRST_MS: u64 = 500;
         const CEILING_MS: u64 = 60_000;
-        let doublings = self.provider_failures.saturating_sub(1).min(16);
+        let doublings = self.streak.saturating_sub(1).min(16);
         FIRST_MS
             .checked_shl(doublings)
             .map_or(CEILING_MS, |wait| wait.min(CEILING_MS))
@@ -293,6 +305,24 @@ mod tests {
                 reason: FreezeReason::ProviderRefused
             },
             "a request the provider rejected on its shape buys the same rejection again"
+        );
+    }
+
+    #[test]
+    fn an_answer_ends_the_streak_the_backoff_counts() {
+        let mut dog = Watchdog::new(Retries::AtMost(2));
+        let wait = |dog: &mut Watchdog| match dog
+            .on_provider_failure(&provider_error(true), TimeMs::new(0))
+        {
+            Disposal::BackOff { until, .. } => until.value(),
+            other => panic!("a retriable failure under its ceiling backs off: {other:?}"),
+        };
+        assert_eq!([wait(&mut dog), wait(&mut dog)], [500, 1_000]);
+        dog.on_provider_answered();
+        assert_eq!(
+            [wait(&mut dog), wait(&mut dog)],
+            [500, 1_000],
+            "an outage after a recovery starts from the first wait, under a fresh ceiling"
         );
     }
 

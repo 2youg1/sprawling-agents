@@ -125,8 +125,8 @@ pub enum Advance {
     Concluded(Completion),
 }
 
-/// The four things the driver cannot decide for itself. Four closures
-/// rather than four traits: no second implementation exists yet, and this
+/// The things the driver cannot decide for itself. Closures rather
+/// than traits: no second implementation exists yet, and this
 /// library introduces a trait at a seam that already has one.
 pub struct RunHooks<'a> {
     /// The clock. Called once per dispatch line, once per turn, and once
@@ -142,6 +142,14 @@ pub struct RunHooks<'a> {
     /// caller that sampled its own clock there would be a second time
     /// source inside one turn.
     pub invoke: &'a mut dyn FnMut(&ToolCall, TimeMs) -> Result<ToolOutcome, AxError>,
+    /// Holds the run until the moment the watchdog set for the next call
+    /// to a provider that failed, and answers whether that call may go.
+    ///
+    /// `Halted` comes back as soon as a halt reaches the run, without
+    /// waiting the rest out: a backoff grows to a minute, and a brake
+    /// that engages a minute late is not one. A counted clock answers
+    /// `Allowed` at once, because nothing it replays waits in real time.
+    pub wait: &'a mut dyn FnMut(TimeMs) -> crate::NextCall,
     /// Where text goes while the model is still saying it.
     ///
     /// `None` runs the model without asking for a stream, which is what
@@ -239,7 +247,7 @@ pub fn drive(
     let mut run = Run::dispatch(plan, ledger, hooks)?;
     let ending = loop {
         match run.advance(ledger, model, hooks) {
-            Ok(Advance::Turned) => {}
+            Ok(Advance::Turned) => watchdog.on_provider_answered(),
             Ok(Advance::Concluded(completion)) => break completion,
             // A run always ends. A mid-turn failure whose code has a
             // carrier event (provider down, budget, watchdog) is written
@@ -270,17 +278,11 @@ pub fn drive(
                 // repeated silently: the second `model_called` in the
                 // history is what a person reads the retry off.
                 // The watchdog decides whether there is a next call and
-                // not before when. This loop does not yet wait, so the
-                // line records the moment it actually sends again rather
-                // than a schedule the next `model_called` would break.
-                if let crate::Disposal::BackOff { code, subject, .. } =
-                    watchdog.on_provider_failure(&err, t)
-                {
-                    let disposal = crate::Disposal::BackOff {
-                        until: t,
-                        code,
-                        subject,
-                    };
+                // when; the line records that moment before the wait,
+                // and the wait is where a halt reaches a run that has
+                // no turn in flight to stop.
+                let disposal = watchdog.on_provider_failure(&err, t);
+                if let crate::Disposal::BackOff { until, .. } = disposal {
                     ledger.append(EventDraft {
                         run: run.plan.run,
                         t,
@@ -290,7 +292,10 @@ pub fn drive(
                         data: watchdog.fired_payload(&disposal)?,
                         ig: false,
                     })?;
-                    continue;
+                    match (hooks.wait)(until) {
+                        crate::NextCall::Allowed => continue,
+                        crate::NextCall::Halted => break Completion::Cancelled,
+                    }
                 }
                 // The failure itself is the payload, through the one
                 // door: an encoding that fails travels as a refusal

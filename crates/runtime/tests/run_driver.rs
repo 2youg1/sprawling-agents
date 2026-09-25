@@ -247,6 +247,7 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
 
@@ -314,6 +315,7 @@ fn a_retriable_failure_is_made_again_up_to_the_number_the_person_set() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
     let plan = RunPlan {
@@ -359,6 +361,7 @@ fn a_ceiling_that_is_reached_ends_the_run() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
     let plan = RunPlan {
@@ -394,6 +397,7 @@ fn a_run_ends_when_its_work_runs_out_rather_than_at_a_ceiling() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
 
@@ -429,6 +433,7 @@ fn a_cancel_at_a_safe_point_freezes_inside_the_interrupted_turn() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
 
@@ -473,6 +478,7 @@ fn a_fence_runs_before_the_wave_and_carries_the_turns_stamp() {
             interrupt: &mut interrupt,
             fence: Some(&mut fence),
             invoke: &mut invoke,
+            wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
             deltas: None,
         };
         let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
@@ -543,6 +549,7 @@ fn advance_reports_each_turn_so_a_caller_can_stop_between_them() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
 
@@ -590,6 +597,7 @@ fn a_steer_at_a_safe_point_reaches_the_next_window_and_not_only_the_ledger() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
 
@@ -640,6 +648,7 @@ fn a_cancel_after_the_wave_stops_the_run_before_anything_it_handed_down_starts()
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
 
@@ -689,6 +698,7 @@ fn a_run_that_dies_of_a_loadtime_failure_still_writes_its_verdict() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
 
@@ -740,6 +750,7 @@ fn a_provider_failure_writes_its_carrier_and_then_the_verdict() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };
 
@@ -751,4 +762,65 @@ fn a_provider_failure_writes_its_carrier_and_then_the_verdict() {
     assert_eq!(kinds[kinds.len() - 3], "provider_degraded");
     assert_eq!(kinds[kinds.len() - 2], "handoff_written");
     assert_eq!(kinds.last().map(String::as_str), Some("run_frozen"));
+}
+
+/// A provider answering 500 in a row is asked again on a backoff that
+/// doubles, each wait is the moment the history records, and a halt that
+/// lands during a wait stops the run there. Before the wait hook the
+/// loop asked again at once, recorded a wait it never took, and a root
+/// run had no safe point inside the retry for a halt to reach.
+#[test]
+fn failures_in_a_row_back_off_and_a_halt_during_the_wait_stops_the_run() {
+    let attempts = std::rc::Rc::new(std::cell::RefCell::new(0));
+    let mut ledger = RecordingLedger::new();
+    let mut model = FlakyModel {
+        failures_left: 5,
+        calls: std::rc::Rc::clone(&attempts),
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut waited: Vec<u64> = Vec::new();
+    let mut wait = |until: TimeMs| {
+        waited.push(until.value());
+        if waited.len() < 3 {
+            runtime::NextCall::Allowed
+        } else {
+            runtime::NextCall::Halted
+        }
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        invoke: &mut invoke,
+        wait: &mut wait,
+        deltas: None,
+    };
+
+    let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+
+    let fired: Vec<(u64, u64)> = ledger
+        .lines
+        .iter()
+        .map(|line| serde_json::from_slice::<serde_json::Value>(line).unwrap())
+        .filter(|line| line["kind"] == "watchdog_fired")
+        .map(|line| {
+            (
+                line["t"].as_u64().unwrap(),
+                line["data"]["until_ms"].as_u64().unwrap(),
+            )
+        })
+        .collect();
+    let backoffs: Vec<u64> = fired.iter().map(|(t, until)| until - t).collect();
+    let untils: Vec<u64> = fired.iter().map(|(_, until)| *until).collect();
+    assert_eq!(backoffs, vec![500, 1_000, 2_000], "the wait doubles");
+    assert_eq!(waited, untils, "the run waits for the moment it records");
+    assert_eq!(*attempts.borrow(), 3, "no call goes out after the halt");
+    assert!(matches!(frozen.completion(), Completion::Cancelled));
 }

@@ -329,6 +329,7 @@ pub fn runtime::TurnReport::wave_results(&self) -> &[kernel::model::wire::Conten
 pub fn runtime::TurnReport::wave_results(&self) -> &[kernel::model::wire::ContentBlock]
 pub fn runtime::Watchdog::fired_payload(&self, &runtime::Disposal) -> core::result::Result<kernel::event::payload::Payload, kernel::error::shape::AxError>
 pub fn runtime::Watchdog::new(kernel::retries::Retries) -> runtime::Watchdog
+pub fn runtime::Watchdog::on_provider_answered(&mut self)
 pub fn runtime::Watchdog::on_provider_failure(&mut self, &kernel::error::shape::AxError, kernel::event::identity::TimeMs) -> runtime::Disposal
 pub fn runtime::Watchdog::on_stall(&mut self, &kernel::stall::StallVerdict) -> runtime::Disposal
 pub fn runtime::admits(runtime::mode::Mode, &runtime::mode::Produced) -> runtime::mode::Admission
@@ -802,6 +803,7 @@ pub runtime::RunHooks::fence: core::option::Option<&'a mut dyn core::ops::functi
 pub runtime::RunHooks::interrupt: &'a mut dyn core::ops::function::FnMut(runtime::run::SafePoint) -> runtime::Interrupt
 pub runtime::RunHooks::invoke: &'a mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall, kernel::event::identity::TimeMs) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub runtime::RunHooks::now: &'a mut dyn core::ops::function::FnMut() -> core::result::Result<kernel::event::identity::TimeMs, kernel::error::shape::AxError>
+pub runtime::RunHooks::wait: &'a mut dyn core::ops::function::FnMut(kernel::event::identity::TimeMs) -> runtime::NextCall
 pub runtime::RunPlan::addr: kernel::address::Address
 pub runtime::RunPlan::goal: alloc::string::String
 pub runtime::RunPlan::inherited: alloc::vec::Vec<kernel::model::wire::ChatMessage>
@@ -1130,6 +1132,7 @@ pub runtime::run::RunHooks::fence: core::option::Option<&'a mut dyn core::ops::f
 pub runtime::run::RunHooks::interrupt: &'a mut dyn core::ops::function::FnMut(runtime::run::SafePoint) -> runtime::Interrupt
 pub runtime::run::RunHooks::invoke: &'a mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall, kernel::event::identity::TimeMs) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub runtime::run::RunHooks::now: &'a mut dyn core::ops::function::FnMut() -> core::result::Result<kernel::event::identity::TimeMs, kernel::error::shape::AxError>
+pub runtime::run::RunHooks::wait: &'a mut dyn core::ops::function::FnMut(kernel::event::identity::TimeMs) -> runtime::NextCall
 pub runtime::run::RunPlan::addr: kernel::address::Address
 pub runtime::run::RunPlan::goal: alloc::string::String
 pub runtime::run::RunPlan::inherited: alloc::vec::Vec<kernel::model::wire::ChatMessage>
