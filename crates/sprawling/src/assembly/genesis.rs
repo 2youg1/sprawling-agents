@@ -55,7 +55,7 @@ pub enum Adopt {
 /// directory that cannot be listed reads as empty, and the city forms -
 /// the alternative is refusing to start over a permission error that the
 /// next write would report anyway, with a better sentence.
-pub(super) fn standing_of(city_root: &Path) -> city::Standing {
+pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing {
     let mut entries: Vec<(String, bool)> = Vec::new();
     if let Ok(listing) = std::fs::read_dir(city_root) {
         for entry in listing.flatten() {
@@ -63,17 +63,40 @@ pub(super) fn standing_of(city_root: &Path) -> city::Standing {
             entries.push((entry.file_name().to_string_lossy().into_owned(), is_dir));
         }
     }
-    city::survey(&entries, has_history(city_root))
+    city::survey(&entries, history == History::Present)
+}
+
+/// Whether a directory carries a city's history.
+///
+/// Two answers, so a caller cannot read a third state into a `false`: a
+/// ledger directory that is missing or empty is `Absent`, and one with
+/// an entry is `Present`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum History {
+    Absent,
+    Present,
 }
 
 /// Whether this directory already carries a city's history.
 ///
 /// The one fact `init` refuses on and `up` branches on, read from one
 /// place so the two can never disagree about what counts as a city.
-pub fn has_history(city_root: &Path) -> bool {
-    std::fs::read_dir(ledger_dir(city_root))
-        .map(|mut entries| entries.next().is_some())
-        .unwrap_or(false)
+///
+/// # Errors
+/// `StorageFatal` when the ledger directory is there but cannot be
+/// listed: calling that `Absent` would let `init` write a second genesis
+/// over a city it merely failed to read.
+pub fn has_history(city_root: &Path) -> Result<History, AxError> {
+    Ok(
+        if std::fs::read_dir(ledger_dir(city_root))
+            .map(|mut entries| entries.next().is_some())
+            .unwrap_or(false)
+        {
+            History::Present
+        } else {
+            History::Absent
+        },
+    )
 }
 
 /// `sprawling init <dir>`: the genesis write. The city is born when
@@ -100,9 +123,10 @@ pub fn init_city(city_root: &Path) -> Result<InitReport, AxError> {
 /// Refuses a directory that already has history, and propagates whatever
 /// the ledger, the store or the filesystem says.
 pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> {
-    let standing = standing_of(city_root);
+    let history = has_history(city_root)?;
+    let standing = standing_of(city_root, history);
     let dir = ledger_dir(city_root);
-    if has_history(city_root) {
+    if history == History::Present {
         return Err(AxError::failure(
             AxCode::ConfigInvalid,
             "initialize city",

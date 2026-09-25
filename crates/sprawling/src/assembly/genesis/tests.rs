@@ -385,3 +385,13 @@ fn a_new_city_delegates_its_approvals_to_the_clerk_on_the_record() {
         "the clerk answers from the moment the city exists, folded back from the ledger"
     );
 }
+
+/// A ledger path that exists but will not list is not "no city".
+#[test]
+fn a_ledger_that_cannot_be_listed_is_an_error_not_an_empty_city() {
+    let dir = tempfile::tempdir().unwrap();
+    let ledger = ledger_dir(dir.path());
+    std::fs::create_dir_all(ledger.parent().unwrap()).unwrap();
+    std::fs::write(&ledger, b"not a directory").unwrap();
+    assert!(has_history(dir.path()).is_err());
+}
