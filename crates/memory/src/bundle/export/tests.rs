@@ -312,7 +312,14 @@ fn the_git_history_comes_back_commit_for_commit() {
         let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
         let parent_refs: Vec<&git2::Commit<'_>> = parents.iter().collect();
         let id = repo
-            .commit(Some("HEAD"), &who, &who, &format!("step {step}"), &tree, &parent_refs)
+            .commit(
+                Some("HEAD"),
+                &who,
+                &who,
+                &format!("step {step}"),
+                &tree,
+                &parent_refs,
+            )
             .unwrap();
         parents = vec![repo.find_commit(id).unwrap()];
     }
@@ -325,5 +332,12 @@ fn the_git_history_comes_back_commit_for_commit() {
     Bundle::restore(carried.path(), elsewhere.path()).unwrap();
 
     assert_eq!(log_of(elsewhere.path()), before);
-    assert!(!elsewhere.path().join(".git").join("hooks").join("post-checkout").exists());
+    assert!(
+        !elsewhere
+            .path()
+            .join(".git")
+            .join("hooks")
+            .join("post-checkout")
+            .exists()
+    );
 }

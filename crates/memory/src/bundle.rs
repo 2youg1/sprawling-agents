@@ -24,6 +24,7 @@ mod export;
 pub(crate) mod files;
 #[cfg(test)]
 mod fixture;
+mod history;
 mod manifest;
 
 pub use export::Bundle;

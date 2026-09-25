@@ -16,6 +16,7 @@ use super::files::{
     copy_city_files, copy_tree, count_files, count_records, head_of, only_city_files, walk,
     write_file,
 };
+use super::history::{self, History};
 use super::manifest::{CAS, CITY, LEDGER, MANIFEST, Manifest};
 
 /// One count taken on the city against the same count taken on the
@@ -58,6 +59,7 @@ impl Bundle {
         let ledger_files = copy_tree(vfs.as_mut(), &ledger_dir, &dest_ledger)?;
         let cas_copied = copy_tree(vfs.as_mut(), &cas_dir, &dest_cas)?;
         let city_copied = copy_city_files(vfs.as_mut(), city_root, &dest_city)?;
+        history::export(vfs.as_mut(), city_root, dest)?;
         // Every number in the manifest is read back from the bundle, so
         // the manifest states what a reader of the bundle will find.
         let manifest = Manifest::of(vfs.as_ref(), &dest_ledger, &dest_cas, &dest_city)?;
@@ -146,9 +148,13 @@ impl Bundle {
                 detail: format!("{} already holds a ledger", ledger_dir.display()),
             });
         }
+        let history = History::read(vfs.as_ref(), bundle, city_root)?;
         copy_tree(vfs.as_mut(), &bundle.join(LEDGER), &ledger_dir)?;
         copy_tree(vfs.as_mut(), &bundle.join(CAS), &cas_dir)?;
         copy_tree(vfs.as_mut(), &bundle.join(CITY), city_root)?;
+        if let Some(history) = history {
+            history.land(vfs.as_ref(), city_root)?;
+        }
 
         // All four numbers, because a bundle that lost its objects has
         // the history that points at them: the chain verifies, every
