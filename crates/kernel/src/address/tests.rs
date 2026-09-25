@@ -45,7 +45,11 @@ fn every_spelling_in_the_table_gets_its_verdict() {
             }
             Verdict::Refused => {
                 let err = Address::parse(address).unwrap_err();
-                assert_eq!(err.code(), &AxCode::InvalidArgs, "should reject {address:?}");
+                assert_eq!(
+                    err.code(),
+                    &AxCode::InvalidArgs,
+                    "should reject {address:?}"
+                );
             }
         }
     }
