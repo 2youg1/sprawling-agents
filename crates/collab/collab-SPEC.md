@@ -412,11 +412,11 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 - **`Roadmap.md` 是唯一权威，不另立认领登记表**。第二份登记表就是第二个「这一个节点归谁」的答案，而漂移的恒是没人读的那一份。文件本身既被人读、被 `PlanTree::progress` 数、又被这个工具改——一处事实，三个读者。
 - **六个动作长在同一条 catalog 行上，不新开工具**。模型每一轮读的**行数**是成本，一行背后的**动词数**不是。
-- **收口是字节数，量出来的**：四个动作的 `plan` 条目是 **548 B**（disclosure ＋ schema 的紧凑 JSON），六个动作是 **547 B**，一条断言钉住它不超过 548。省下的字节来自把 Locator 文法从 schema 移进拒词——**一句重复了拒词内容的说明，是每一轮都在付、只读一次的字节**。schema 里没有的东西，模型第一次写错时会从三段式拒词里拿到。
+- **收口是字节数，量出来的**：四个动作的 `plan` 条目是 **548 B**（disclosure ＋ schema 的紧凑 JSON），六个动作是 **546 B**，一条断言钉住它不超过 548。disclosure 里那句 *Must this be expanded?* 是 LLM First（`ARCHITECTURE.md` §9）的提醒：它在缓存前缀里，零延迟、零花费；不追问、不设深度上限、不设审批。省下的字节来自把 Locator 文法从 schema 移进拒词——**一句重复了拒词内容的说明，是每一轮都在付、只读一次的字节**。schema 里没有的东西，模型第一次写错时会从三段式拒词里拿到。
 - **状态迁移由 `kernel::PlanTree` 从计划自身判，不由调用者声明**：`claim` 只从就绪集里取（叶子、无人认领、依赖全绿），`finish`／`block`／`release` 只能作用于**本次 drive 认领的那个节点**。拒词报出此刻的状态并指向一个真能拿的节点——「不行」会教模型改写参数再试，「2.3 在做，2.4 就绪」不会。
 - **一次 drive 只持有一个节点**，理由与旧版同：一个 Run 同时占两个节点，两个节点的进度都读不出来。
 - **计划门禁就是那个 `Held` 值**：它由 `PlanTree::claim` 铸出，只能花在 `finish`（绿）或 `stop`（红／交回）上。**没有第三个出口**——一个只是结束了的 run 由 `abandon` 把它花在 `FrozeWithoutEvidence` 上，于是「认领了却没交代」这一态在冻结之后不可达。这正是 `blockage` 里红色的来处。
-- **`split` 之后本次 drive 不再持有那根枝**：它拿到的那件活现在是几片，它接下来该拿其中一片。写盘前先把新文本重新解析并 `PlanTree::build` 一次，**拆不出合法树就一个字节都不写**。
+- **`split` 之后本次 drive 不再持有那根枝**：它拿到的那件活现在是几片，它接下来该拿其中一片。写盘前先把新文本重新解析并 `PlanTree::build` 一次，**拆不出合法树就一个字节都不写**。拆分结果除 `node` 与 `children` 外带 `unfinished`：该节点下尚未 `Done` 的子节点数，由拆完的树数出，不由调用者声明。
 - **`block` 与 `release` 都必须带一句原因**，且原因**随记录走而不是随表格走**：表格只有位置说「Blocked」，一句话该住在 `roadmap_blocked` 的载荷里，在表里再放一份就是同一句话的第二个权威。
 - **哪一种记录由出口决定**（`ClaimEffect::kind`）：绿→`roadmap_finished`，红→`roadmap_blocked`，交回→`roadmap_released`，拆→`roadmap_split`。工人不再自己 match 一遍，于是「停下来意味着什么」只有一个答案。
 - **效果穷尽**（同 `SignalEffect`／`GoalEffect`／`PrEffect`）：每个变体都是工人必须写下的一条账，新增一个变体应当是写入处的编译错误。

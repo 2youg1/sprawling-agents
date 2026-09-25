@@ -275,6 +275,12 @@ fn splitting_grows_the_plan_and_the_run_stops_holding_the_branch() {
             .map(Vec::len),
         Some(2)
     );
+    let unfinished = outcome.result.as_map().get("unfinished").cloned();
+    assert_eq!(
+        unfinished,
+        Some(Value::from(2)),
+        "the split reports what is left"
+    );
     let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
     assert!(text.contains("| 1.1 | run the cable | 3 |  | Not started |  |"));
     assert!(
@@ -383,6 +389,7 @@ fn six_actions_cost_no_more_catalog_bytes_than_four_did() {
     // locator grammar left the schema for the refusal that needs it:
     // a description repeating what a refusal already says is paid
     // for every turn and read once.
+    assert!(meta.disclosure.contains("Must this be expanded?"));
     assert!(
         bytes <= 548,
         "the plan entry costs {bytes} B, and four actions cost 548"

@@ -465,6 +465,21 @@ toolchain is part of them. What to do when an installed component changes
 that output is in [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md); it is
 a fact about running the tests, not about the design.
 
+### LLM First: mechanism from the city, method from the model
+
+The city supplies mechanism, facts and boundaries; the method and the
+judgement are the model's. A tool states what exists and what it refuses,
+and leaves the order of the steps to the model: the `plan` tool asks *Must
+this be expanded?* in its description, which sits in the cached prefix and
+so costs no latency and no spend, and a `split` reports how many children
+of the node are still unfinished. There is no follow-up question, no depth
+limit and no approval step on top of that.
+
+The parameter that makes this right is that a frontier model carries out
+the method reliably without help. When an eval measures a model skipping
+one step systematically, re-argue this rule for that step instead of
+obeying it.
+
 ## 10 Determinism and hardening
 
 The whole city runs as real code, single-threaded, on a virtual clock,
