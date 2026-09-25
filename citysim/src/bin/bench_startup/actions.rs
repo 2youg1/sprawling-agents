@@ -24,8 +24,12 @@
 
 #[path = "actions/archive.rs"]
 pub(super) mod archive;
+#[path = "actions/first_byte.rs"]
+pub(super) mod first_byte;
 #[path = "actions/footprint.rs"]
 mod footprint;
+#[path = "actions/history.rs"]
+pub(super) mod history;
 
 use std::path::Path;
 use std::process::{Command, Stdio};
