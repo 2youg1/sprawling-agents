@@ -33,6 +33,8 @@ pub(crate) enum XtaskError {
     Doc { file: String, msg: String },
     #[error("command `{cmd}` failed: {msg}")]
     Cmd { cmd: String, msg: String },
+    #[error("run gate `{name}`: no gate has that name (unknown-gate); name one of: {known}")]
+    UnknownGate { name: String, known: String },
 }
 
 pub(crate) fn render(violations: &[Violation]) {

@@ -25,47 +25,151 @@ use crate::{
 /// it so no document has to hold a copy.
 pub(crate) const COUNT: usize = 23;
 
-pub(crate) fn run(root: &Path, range: Option<&str>) -> ExitCode {
-    let results: [(&'static str, Result<Vec<Violation>, XtaskError>); COUNT] = [
-        ("header", header::check(root)),
-        ("lexicon", lexicon::check(root)),
-        ("modmap", modmap::check(root)),
-        ("length", length::check(root)),
-        ("boundary", boundary::check(root)),
-        // `slices` judges which code may name one path, so it walks sources
-        // the way `boundary` walks them and sits beside it.
-        ("slices", slices::check(root)),
-        ("artifact", artifact::check(root)),
-        ("depmap", depmap::check(root)),
-        ("npm", npm::check(root)),
-        ("secret", secret::check(root)),
-        ("color", color::check(root)),
-        ("wording", wording::check(root)),
-        ("render", render::check(root)),
-        ("wiring", wiring::check(root)),
-        // `wire-ts` renders the client's wire types in this process and
-        // compares one file, so it is local and cheap; it sits beside
-        // `wiring` because both judge the same socket seam.
-        ("wire-ts", wire_ts::check(root)),
-        // `docnum` judges the same documentation face `wire-ts` does,
-        // and costs one scan of the markdown in the tree.
-        ("docnum", docnum::check(root)),
-        // `proof` reads source and two documents; it proves nothing
-        // here, so it costs what a scan costs and belongs with them.
-        ("proof", proof::check(root)),
-        ("budget", budget::check(root)),
-        ("specalign", specalign::check(root)),
-        // `features` runs the compiler rather than reading source, so it
-        // is the most expensive gate and sits with the other one that
-        // spawns cargo. Its verdict is the default feature set's, test
-        // targets included, which nothing else compiles.
-        ("features", default_features(root)),
-        ("apisync", apisync::check(root, range)),
-        ("release", release::check(root)),
-        ("guard", guard::check(root, range)),
-    ];
+/// One gate: the name a person types, and the check it runs.
+pub(crate) struct Gate {
+    pub(crate) name: &'static str,
+    check: fn(&Path, Option<&str>) -> Result<Vec<Violation>, XtaskError>,
+}
 
-    report::finish_all(results)
+/// Every gate, in the order a run reports them. The only roster: `--list`,
+/// usage and name selection all read it.
+pub(crate) const GATES: [Gate; COUNT] = [
+    Gate {
+        name: "header",
+        check: |root, _| header::check(root),
+    },
+    Gate {
+        name: "lexicon",
+        check: |root, _| lexicon::check(root),
+    },
+    Gate {
+        name: "modmap",
+        check: |root, _| modmap::check(root),
+    },
+    Gate {
+        name: "length",
+        check: |root, _| length::check(root),
+    },
+    Gate {
+        name: "boundary",
+        check: |root, _| boundary::check(root),
+    },
+    // `slices` judges which code may name one path, so it walks sources
+    // the way `boundary` walks them and sits beside it.
+    Gate {
+        name: "slices",
+        check: |root, _| slices::check(root),
+    },
+    Gate {
+        name: "artifact",
+        check: |root, _| artifact::check(root),
+    },
+    Gate {
+        name: "depmap",
+        check: |root, _| depmap::check(root),
+    },
+    Gate {
+        name: "npm",
+        check: |root, _| npm::check(root),
+    },
+    Gate {
+        name: "secret",
+        check: |root, _| secret::check(root),
+    },
+    Gate {
+        name: "color",
+        check: |root, _| color::check(root),
+    },
+    Gate {
+        name: "wording",
+        check: |root, _| wording::check(root),
+    },
+    Gate {
+        name: "render",
+        check: |root, _| render::check(root),
+    },
+    Gate {
+        name: "wiring",
+        check: |root, _| wiring::check(root),
+    },
+    // `wire-ts` renders the client's wire types in this process and
+    // compares one file; it sits beside `wiring` because both judge the
+    // same socket seam.
+    Gate {
+        name: "wire-ts",
+        check: |root, _| wire_ts::check(root),
+    },
+    Gate {
+        name: "docnum",
+        check: |root, _| docnum::check(root),
+    },
+    Gate {
+        name: "proof",
+        check: |root, _| proof::check(root),
+    },
+    Gate {
+        name: "budget",
+        check: |root, _| budget::check(root),
+    },
+    Gate {
+        name: "specalign",
+        check: |root, _| specalign::check(root),
+    },
+    // `features` runs the compiler rather than reading source; its
+    // verdict is the default feature set's, test targets included, which
+    // nothing else compiles.
+    Gate {
+        name: "features",
+        check: |root, _| default_features(root),
+    },
+    Gate {
+        name: "apisync",
+        check: apisync::check,
+    },
+    Gate {
+        name: "release",
+        check: |root, _| release::check(root),
+    },
+    Gate {
+        name: "guard",
+        check: guard::check,
+    },
+];
+
+/// The gates a run judges: all of them when `names` is empty, otherwise
+/// exactly the named ones in roster order.
+///
+/// # Errors
+/// [`XtaskError::UnknownGate`] for the first name the roster does not
+/// hold, so a mistyped name refuses instead of running every gate.
+pub(crate) fn select(names: &[String]) -> Result<Vec<&'static Gate>, XtaskError> {
+    if let Some(unknown) = names
+        .iter()
+        .find(|name| !GATES.iter().any(|gate| gate.name == name.as_str()))
+    {
+        return Err(XtaskError::UnknownGate {
+            name: unknown.clone(),
+            known: GATES.map(|gate| gate.name).join(" "),
+        });
+    }
+    Ok(GATES
+        .iter()
+        .filter(|gate| names.is_empty() || names.iter().any(|name| name == gate.name))
+        .collect())
+}
+
+/// Run the gates `names` selects and report them together; the gates
+/// judge in parallel, and the report keeps roster order.
+pub(crate) fn run(root: &Path, range: Option<&str>, names: &[String]) -> ExitCode {
+    let gates = match select(names) {
+        Ok(gates) => gates,
+        Err(err) => return report::internal_failure(&err),
+    };
+    report::finish_all(
+        gates
+            .into_iter()
+            .map(|gate| (gate.name, (gate.check)(root, range))),
+    )
 }
 
 /// The default feature set, test targets included.
@@ -103,4 +207,25 @@ pub(crate) fn default_features(root: &Path) -> Result<Vec<Violation>, XtaskError
                       not the one a person builds"
             .to_owned(),
     }])
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+mod tests {
+    use super::select;
+    use crate::report::XtaskError;
+
+    #[test]
+    fn a_named_gate_runs_alone_and_an_unknown_name_is_refused() {
+        let named: Vec<&str> = select(&["modmap".to_owned()])
+            .unwrap()
+            .iter()
+            .map(|gate| gate.name)
+            .collect();
+        assert_eq!(named, ["modmap"]);
+        assert!(matches!(
+            select(&["modmpa".to_owned()]),
+            Err(XtaskError::UnknownGate { name, .. }) if name == "modmpa"
+        ));
+    }
 }

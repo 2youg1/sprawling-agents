@@ -77,12 +77,12 @@ fn main() -> ExitCode {
         // usage text renders from: a gate table in a document is checked
         // against this output rather than maintained beside it.
         Some("gates") if args.iter().any(|a| a == "--list") => {
-            for gate in GATES {
-                println!("{gate}");
+            for gate in &gates::GATES {
+                println!("{}", gate.name);
             }
             ExitCode::SUCCESS
         }
-        Some("gates") => gates::run(&root, range.as_deref()),
+        Some("gates") => gates::run(&root, range.as_deref(), &gate_names(&args)),
         Some("color") => report::finish("color", color::check(&root)),
         Some("render") => report::finish("render", render::check(&root)),
         Some("budget") => match budget::report(&root) {
@@ -246,35 +246,20 @@ fn value_arg(args: &[String], flag: &str) -> Option<String> {
     None
 }
 
-/// Every gate, as the subcommand that runs it alone, in the order
-/// `gates` runs them. Typed by [`gates::COUNT`], so a gate added to the
-/// gate table stops this file compiling until usage names it — which is
-/// how a runnable gate missing from usage is caught before a reader is.
-const GATES: [&str; gates::COUNT] = [
-    "header",
-    "lexicon",
-    "modmap",
-    "length",
-    "boundary",
-    "slices",
-    "artifact",
-    "depmap",
-    "npm",
-    "secret",
-    "color",
-    "wording",
-    "render",
-    "wiring",
-    "wire-ts",
-    "docnum",
-    "proof",
-    "budget",
-    "specalign",
-    "features",
-    "apisync",
-    "release",
-    "guard",
-];
+/// The gate names typed after `gates`: every argument that is neither a
+/// flag nor the value `--range` takes.
+fn gate_names(args: &[String]) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut it = args.iter().skip(1);
+    while let Some(arg) = it.next() {
+        if arg == "--range" {
+            it.next();
+        } else if !arg.starts_with("--") {
+            names.push(arg.clone());
+        }
+    }
+    names
+}
 
 /// One command this tool answers beyond running a gate: what a person
 /// types after `cargo xtask`, and what they get for it.
@@ -290,8 +275,8 @@ struct Tool {
 /// read together, so a command that grows a flag is printed with it.
 const TOOLS: [Tool; 12] = [
     Tool {
-        call: "gates [--range a..b]",
-        gives: "every gate in order; --range bounds the commits `apisync` and `guard` judge",
+        call: "gates [<gate>...] [--range a..b]",
+        gives: "every gate, or only the named ones; --range bounds the commits `apisync` and `guard` judge",
     },
     Tool {
         call: "gates --list",
@@ -342,7 +327,7 @@ const TOOLS: [Tool; 12] = [
 fn usage() {
     eprintln!("usage: cargo xtask <subcommand> [flags]");
     eprintln!();
-    eprintln!("gates: {}", GATES.join(" "));
+    eprintln!("gates: {}", gates::GATES.map(|gate| gate.name).join(" "));
     eprintln!();
     for tool in &TOOLS {
         eprintln!("  cargo xtask {:<52} {}", tool.call, tool.gives);
