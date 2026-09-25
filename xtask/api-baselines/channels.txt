@@ -558,6 +558,9 @@ pub channels::Note::Fenced::oid: kernel::locator::GitOid
 pub channels::Note::Refused
 pub channels::Note::Refused::at: kernel::event::identity::Seq
 pub channels::Note::Refused::error: kernel::error::shape::AxError
+pub channels::Note::Unreadable
+pub channels::Note::Unreadable::at: kernel::event::identity::Seq
+pub channels::Note::Unreadable::cause: alloc::string::String
 pub channels::Note::Waiting
 pub channels::Note::Waiting::at: kernel::event::identity::Seq
 pub channels::Opening::at: kernel::event::identity::TimeMs

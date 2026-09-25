@@ -79,6 +79,11 @@ pub enum Note {
     /// Files went away. Every one carries its way back, which is the
     /// Recycle Bin's to state.
     Discarded { count: usize, at: Seq },
+    /// A record of a kind that earns a note, whose payload did not read
+    /// back as that kind. The failure stays visible here instead of the
+    /// turn reading as if nothing happened; `cause` names the kind and
+    /// what the reading stopped at.
+    Unreadable { cause: String, at: Seq },
 }
 
 impl Note {
@@ -91,7 +96,8 @@ impl Note {
             | Self::Fenced { at, .. }
             | Self::Waiting { at }
             | Self::Arrived { at, .. }
-            | Self::Discarded { at, .. } => at,
+            | Self::Discarded { at, .. }
+            | Self::Unreadable { at, .. } => at,
         }
     }
 }

@@ -88,7 +88,8 @@ fn opened_at(turns: &[channels::Turn]) -> Option<kernel::GitOid> {
             channels::Note::Refused { .. }
             | channels::Note::Waiting { .. }
             | channels::Note::Arrived { .. }
-            | channels::Note::Discarded { .. } => None,
+            | channels::Note::Discarded { .. }
+            | channels::Note::Unreadable { .. } => None,
         })
 }
 
