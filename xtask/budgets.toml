@@ -595,3 +595,12 @@ stage_two_p99_us = 1000
 scope = "sub-metric `harness` only; `persist` answers to the disk's physical floor, `whole` carries no tier (citysim-SPEC.md section 8-6)"
 measured_by = "just bench (citysim bench bin, release): one reading line per scenario and sub-metric, each carrying its machine class"
 status = "staged targets, not gated: a wall-clock figure is the machine's. Baselines sit in the ARCHITECTURE.md performance book. Under the registered fixture a reading only goes down; relaxing a tier or fattening the fixture lands in a commit of its own"
+
+# What the client pays to fold one animation frame of stream into the
+# belief, with one subscriber reading the run table the way the views do.
+# A fold that told subscribers once per record paid the table's length
+# once per record; `belief.batch` tells them once per frame.
+[client_fold]
+what = "one animation frame of 50 token deltas folded into a belief of R runs, one subscriber reading the run table"
+measured_by = "bun test --conditions=browser client/src/core/belief/fold_cost.test.ts (the frame test prints one client_fold line per R and holds R=1e4 to 4000 us)"
+status = "measured, not gated here: per frame 99-102 us at R=1e2, 54-107 us at R=1e3, 1031-1145 us at R=1e4 with belief.batch, against 224-233 us, 5245-7845 us and 55452-63622 us with one publish per delta (bun 1.4, x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test's own budget is the guard"
