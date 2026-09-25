@@ -289,11 +289,13 @@ impl ReadTool {
         // it is written. `search` asks the same function the same
         // question, so what is reserved and what is closed have one
         // answer each.
-        Ok(Found::File(self.under_city(&super::chosen_path::admit(
-            asked,
+        let addr = super::chosen_path::admit(asked, "read", &*self.bound)?;
+        Ok(Found::File(super::chosen_path::land(
+            &self.city_root,
+            &addr,
             "read",
             &*self.bound,
-        )?)))
+        )?))
     }
 
     fn under_city(&self, addr: &kernel::Address) -> PathBuf {

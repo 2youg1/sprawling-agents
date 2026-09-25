@@ -24,6 +24,7 @@
 //! why a skill inside reserved space is still handed over: `read`
 //! resolves the catalog first and only unresolved names reach this.
 
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use kernel::{Address, AxCode, AxError, ReadVerdict};
@@ -95,6 +96,136 @@ pub(crate) fn admit(
              outside reads there",
         )),
     }
+}
+
+/// Where an admitted address really lands on disk, judged again there.
+///
+/// The grammar judged the address the model wrote, and the disk opens
+/// whatever every link on the way leads to: a link in an open building
+/// can point into a confidential one, into a reserved subtree, or out of
+/// the city. So the real path is resolved and the address it names in
+/// this city goes through [`admit`] a second time; the one judgement
+/// stays the only one. A path that does not exist comes back as the
+/// grammar placed it, and the open that follows reports it missing.
+///
+/// # Errors
+/// `E_GATE_DENIED` when the real path is outside the city or [`admit`]
+/// refuses the address it names; `E_STORAGE_FATAL` when the path exists
+/// and its real location cannot be resolved.
+pub(crate) fn land(
+    city_root: &Path,
+    addr: &Address,
+    action: &'static str,
+    bound: &dyn Fn(&Address) -> ReadVerdict,
+) -> Result<PathBuf, AxError> {
+    let written = addr
+        .as_str()
+        .split('/')
+        .fold(city_root.to_path_buf(), |path, segment| path.join(segment));
+    let unresolved = |err: std::io::Error| {
+        AxError::failure(
+            AxCode::StorageFatal,
+            action,
+            format!(
+                "{}: its real location did not resolve ({err})",
+                addr.as_str()
+            ),
+        )
+        .with_recovery("a person has to repair the path or the link on it")
+    };
+    let real = match std::fs::canonicalize(&written) {
+        Ok(real) => real,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(written),
+        Err(err) => return Err(unresolved(err)),
+    };
+    let root = std::fs::canonicalize(city_root).map_err(unresolved)?;
+    let outside = || {
+        AxError::failure(
+            AxCode::GateDenied,
+            action,
+            format!("{} leads out of the city through a link", addr.as_str()),
+        )
+        .with_recovery("name a path whose every link stays inside the city")
+    };
+    let inside = real
+        .strip_prefix(&root)
+        .map_err(|_| outside())?
+        .iter()
+        .map(std::ffi::OsStr::to_str)
+        .collect::<Option<Vec<&str>>>()
+        .ok_or_else(outside)?
+        .join("/");
+    // A path with no link on it names the address already admitted, and
+    // asking the read bound twice would read a building's rules twice.
+    if inside != addr.as_str() {
+        admit(&inside, action, bound)?;
+    }
+    Ok(real)
+}
+
+/// What a walk may do at one of its entries.
+pub(crate) enum Walked {
+    /// A directory reached without a link: its entries are walked.
+    Directory(PathBuf),
+    /// A file, or the file an admitted link lands on: it is scanned.
+    File(PathBuf),
+    /// A link [`land`] refuses, or a link to a directory, which is not
+    /// entered because a walk through links can come back to where it
+    /// started. Passed over without a word, as a closed building is.
+    Passed,
+}
+
+/// Judges one entry of a walk, asking the disk once about an entry that
+/// is not a link. An entry the disk will not describe is handed on as a
+/// file, so the open that follows names why it could not be looked at.
+pub(crate) fn walked(
+    city_root: &Path,
+    path: PathBuf,
+    rel: &str,
+    bound: &dyn Fn(&Address) -> ReadVerdict,
+) -> Walked {
+    let Ok(kind) = std::fs::symlink_metadata(&path).map(|meta| meta.file_type()) else {
+        return Walked::File(path);
+    };
+    if kind.is_dir() {
+        return Walked::Directory(path);
+    }
+    if !kind.is_symlink() {
+        return Walked::File(path);
+    }
+    let landed = Address::parse(rel).and_then(|addr| land(city_root, &addr, "search", bound));
+    match landed {
+        Ok(real) if real.is_file() => Walked::File(real),
+        Ok(_) | Err(_) => Walked::Passed,
+    }
+}
+
+/// Places a link at `link` leading to the directory `target`, on a
+/// machine that has no symlink privilege: Windows gets a junction, which
+/// `symlink_metadata` reports through the same name-surrogate predicate
+/// a symlink is reported by.
+#[cfg(all(test, windows))]
+#[expect(clippy::unwrap_used, reason = "test fixture")]
+pub(super) fn make_link(link: &std::path::Path, target: &std::path::Path) {
+    let made = std::process::Command::new("cmd")
+        .args(["/c", "mklink", "/J"])
+        .arg(link)
+        .arg(target)
+        .output()
+        .unwrap();
+    assert!(
+        made.status.success(),
+        "the fixture could not make a link: {}",
+        String::from_utf8_lossy(&made.stdout)
+    );
+    let meta = std::fs::symlink_metadata(link).unwrap();
+    assert!(meta.file_type().is_symlink(), "{link:?} is not a link");
+}
+
+#[cfg(all(test, unix))]
+#[expect(clippy::unwrap_used, reason = "test fixture")]
+pub(super) fn make_link(link: &std::path::Path, target: &std::path::Path) {
+    std::os::unix::fs::symlink(target, link).unwrap();
 }
 
 #[cfg(test)]

@@ -301,3 +301,47 @@ fn the_tool_refuses_another_tools_call_and_still_answers() {
     let (mut tool, _catalog) = tool(dir.path());
     kernel::tool::conformance::assert_tool_conformance(&mut tool);
 }
+
+/// A link is judged where it lands, not where it was written: a door in
+/// an open building leading into a confidential one, into a reserved
+/// subtree, or out of the city opens nothing, and each refusal is the
+/// gate's.
+#[test]
+fn a_link_is_judged_by_where_it_lands() {
+    let dir = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    for room in ["lab", "vault/room1", ".sprawling"] {
+        std::fs::create_dir_all(dir.path().join(room)).unwrap();
+    }
+    std::fs::write(dir.path().join("vault/room1/secret.md"), "the vault\n").unwrap();
+    std::fs::write(dir.path().join(".sprawling/secret.md"), "governance\n").unwrap();
+    std::fs::write(outside.path().join("secret.md"), "elsewhere\n").unwrap();
+    let lab = dir.path().join("lab");
+    super::super::chosen_path::make_link(
+        &lab.join("to-vault"),
+        &dir.path().join("vault").join("room1"),
+    );
+    super::super::chosen_path::make_link(&lab.join("to-reserved"), &dir.path().join(".sprawling"));
+    super::super::chosen_path::make_link(&lab.join("to-outside"), outside.path());
+    let only_lab: ReadBound = Arc::new(|addr: &kernel::Address| {
+        if addr.as_str().starts_with("vault") {
+            kernel::ReadVerdict::Confidential
+        } else {
+            kernel::ReadVerdict::Open
+        }
+    });
+    let catalog = Arc::new(Mutex::new(Catalog::new()));
+    let mut tool = ReadTool::new(dir.path(), catalog, only_lab).unwrap();
+
+    for asked in [
+        "lab/to-vault/secret.md",
+        "lab/to-reserved/secret.md",
+        "lab/to-outside/secret.md",
+    ] {
+        let refused = tool.invoke(&call(asked));
+        assert!(
+            matches!(&refused, Err(err) if err.code() == &AxCode::GateDenied),
+            "{asked} was read through a link: {refused:?}"
+        );
+    }
+}
