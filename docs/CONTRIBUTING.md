@@ -130,5 +130,5 @@ The repository pins the toolchain in `rust-toolchain.toml` and names every other
 | `just spec <crate>` | generate a SPEC skeleton |
 | `just api-baseline` | recompute the public-surface baselines |
 | `just replay <log>` | verify a ledger chain offline, read-only |
-| `just mem [pid]` | measure resident memory in this platform's own vocabulary |
+| `just mem [pid]` | private, peak private and working set of that process; with no pid, of a fresh empty city served idle (`--city <dir>` serves that one) |
 | `just fuzz <target>` / `just mutants` | fuzz targets / mutation testing |
