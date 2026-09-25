@@ -7,50 +7,47 @@
 
 use super::*;
 
-/// The spellings the grammar must take. `crate::schema` applies the
-/// pattern it hands the client to these same spells, so a case added
-/// here is judged by both readers.
-pub(crate) const ACCEPTED: [&str; 5] = [
-    "a",
-    "a/b",
-    "docs/notes.md",
-    "role@building.1/JOB.md",
-    ".sprawling/ledger",
-];
+/// What the grammar must decide for one spelling.
+#[derive(serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum Verdict {
+    Accepted,
+    Refused,
+}
 
-/// What it must refuse, one spelling per rule.
-pub(crate) const REFUSED: [&str; 19] = [
-    "",                  // empty
-    "/abs",              // absolute
-    "a//b",              // empty segment
-    "a/",                // trailing separator
-    "/",                 // both
-    "..",                // parent escape
-    "a/../b",            // parent escape inside
-    ".",                 // dot segment
-    "a/./b",             // dot segment inside
-    "a\\b",              // backslash
-    "C:/x",              // drive letter (colon)
-    "a/b:stream",        // NTFS ADS (colon)
-    "a\u{0}b",           // NUL
-    "a\tb",              // control character
-    ".sprawling.",       // Win32 opens this as `.sprawling`
-    ".sprawling ",       // and this too
-    "lab/.sprawling./x", // the alias one level down
-    "a /b",              // trailing space on an inner segment
-    "docs./notes.md",
-];
+/// One line of `fixtures/address.jsonl`.
+#[derive(serde::Deserialize)]
+pub(crate) struct Spelling {
+    pub(crate) address: String,
+    pub(crate) verdict: Verdict,
+}
+
+/// The spellings the grammar must take and refuse, one refusal per rule.
+/// The file is the one table for every reader: `crate::schema` applies
+/// the pattern it hands the client to these same spellings, and the
+/// client's `address.test.ts` applies the generated schema to them, so a
+/// case added there is judged by all three.
+pub(crate) static TABLE: std::sync::LazyLock<Vec<Spelling>> = std::sync::LazyLock::new(|| {
+    include_str!("../../../../fixtures/address.jsonl")
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect()
+});
 
 #[test]
 fn every_spelling_in_the_table_gets_its_verdict() {
-    for ok in ACCEPTED {
-        let addr = Address::parse(ok).unwrap();
-        assert_eq!(addr.as_str(), ok);
-        assert_eq!(addr.to_string(), ok);
-    }
-    for bad in REFUSED {
-        let err = Address::parse(bad).unwrap_err();
-        assert_eq!(err.code(), &AxCode::InvalidArgs, "should reject {bad:?}");
+    for Spelling { address, verdict } in TABLE.iter() {
+        match verdict {
+            Verdict::Accepted => {
+                let addr = Address::parse(address).unwrap();
+                assert_eq!(addr.as_str(), address);
+                assert_eq!(addr.to_string(), *address);
+            }
+            Verdict::Refused => {
+                let err = Address::parse(address).unwrap_err();
+                assert_eq!(err.code(), &AxCode::InvalidArgs, "should reject {address:?}");
+            }
+        }
     }
 }
 
