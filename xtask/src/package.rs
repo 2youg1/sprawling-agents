@@ -61,7 +61,14 @@ impl ReleaseTarget {
 
     /// The directory `cargo build --release` puts the binary in.
     fn release_dir(&self, root: &Path) -> PathBuf {
-        let target = cargo_target_dir(root, std::env::var_os("CARGO_TARGET_DIR"));
+        self.release_dir_in(&cargo_target_dir(
+            root,
+            std::env::var_os("CARGO_TARGET_DIR"),
+        ))
+    }
+
+    /// Where the release build lands inside a given target directory.
+    fn release_dir_in(&self, target: &Path) -> PathBuf {
         match self {
             Self::Host => target.join("release"),
             Self::Triple(triple) => target.join(triple).join("release"),
@@ -98,8 +105,12 @@ impl ReleaseTarget {
 /// set, and the workspace's own `target/` otherwise. The variable's value
 /// is a parameter so the rule can be judged without touching the
 /// process environment.
-fn cargo_target_dir(root: &Path, _named: Option<std::ffi::OsString>) -> PathBuf {
-    root.join("target")
+fn cargo_target_dir(root: &Path, named: Option<std::ffi::OsString>) -> PathBuf {
+    match named.map(PathBuf::from) {
+        Some(stated) if stated.as_os_str().is_empty() => root.join("target"),
+        Some(stated) => root.join(stated),
+        None => root.join("target"),
+    }
 }
 
 /// Where a release build of this target landed, or nothing when it has
@@ -237,7 +248,7 @@ pub(crate) fn workspace_version(root: &Path) -> Result<String, XtaskError> {
 )]
 mod tests {
     use super::contents::Entry;
-    use super::{ReleaseTarget, binary_path, cargo_target_dir, write_archive};
+    use super::{ReleaseTarget, cargo_target_dir, write_archive};
 
     fn entry(name: &str, source: std::path::PathBuf) -> Entry {
         Entry {
@@ -259,24 +270,21 @@ mod tests {
         assert_eq!(musl.label(), "x86_64-unknown-linux-musl");
     }
 
-    /// A `--target` build lands under `target/<triple>/release`, and the
-    /// packager must look there rather than at the host's directory.
+    /// A `--target` build lands under `<target>/<triple>/release`, and
+    /// the packager must look there rather than at the host's directory.
     #[test]
     fn a_target_build_is_looked_for_under_its_own_triple() {
-        let root = std::env::temp_dir().join(format!("sprawling-triple-{}", std::process::id()));
+        let target = std::env::temp_dir().join("sprawling-triple");
         let triple = "x86_64-unknown-linux-musl";
-        let dir = root.join("target").join(triple).join("release");
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("sprawling"), b"binary").unwrap();
-
-        let target = ReleaseTarget::Triple(triple.to_owned());
-        assert_eq!(binary_path(&root, &target), Some(dir.join("sprawling")));
+        let dirs = [
+            ReleaseTarget::Triple(triple.to_owned()),
+            ReleaseTarget::Host,
+        ]
+        .map(|build| build.release_dir_in(&target));
         assert_eq!(
-            binary_path(&root, &ReleaseTarget::Host),
-            None,
-            "the host directory holds nothing and must not answer for the triple"
+            dirs,
+            [target.join(triple).join("release"), target.join("release")]
         );
-        std::fs::remove_dir_all(&root).ok();
     }
 
     /// A redirected target directory is where the release build landed;
@@ -294,7 +302,12 @@ mod tests {
         .map(|named| cargo_target_dir(&root, named));
         assert_eq!(
             resolved,
-            [lane, root.join("lane"), root.join("target"), root.join("target")]
+            [
+                lane,
+                root.join("lane"),
+                root.join("target"),
+                root.join("target")
+            ]
         );
     }
 
