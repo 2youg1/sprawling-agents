@@ -299,11 +299,9 @@ fn log_of(root: &std::path::Path) -> Vec<String> {
 
 /// The history is part of the city: a restored city that lost its
 /// commits has lost every checkpoint a rollback could reach.
-#[test]
-fn the_git_history_comes_back_commit_for_commit() {
-    let home = tempfile::tempdir().unwrap();
-    city_with(1, home.path());
-    let repo = git2::Repository::init(home.path()).unwrap();
+/// Makes `root` a repository of two commits and returns its log.
+fn committed_twice(root: &std::path::Path) -> Vec<String> {
+    let repo = git2::Repository::init(root).unwrap();
     let who = git2::Signature::new("owner", "owner@city", &git2::Time::new(1, 0)).unwrap();
     let mut parents = Vec::new();
     for (step, file) in ["City.md", "lab/Roadmap.md"].into_iter().enumerate() {
@@ -323,8 +321,16 @@ fn the_git_history_comes_back_commit_for_commit() {
             .unwrap();
         parents = vec![repo.find_commit(id).unwrap()];
     }
-    let before = log_of(home.path());
-    assert_eq!(before.len(), 2);
+    let log = log_of(root);
+    assert_eq!(log.len(), 2);
+    log
+}
+
+#[test]
+fn the_git_history_comes_back_commit_for_commit() {
+    let home = tempfile::tempdir().unwrap();
+    city_with(1, home.path());
+    let before = committed_twice(home.path());
 
     let carried = tempfile::tempdir().unwrap();
     Bundle::export(home.path(), carried.path()).unwrap();
@@ -340,4 +346,51 @@ fn the_git_history_comes_back_commit_for_commit() {
             .join("post-checkout")
             .exists()
     );
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> u64 {
+    std::fs::create_dir_all(to).unwrap();
+    let mut copied = 0;
+    for entry in std::fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copied += copy_dir(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), target).unwrap();
+            copied += 1;
+        }
+    }
+    copied
+}
+
+/// A v0.0.6 export copied the repository whole into `city/.git` and
+/// counted its files in the manifest; its objects and refs come back,
+/// its hooks and config do not.
+#[test]
+fn a_v006_bundle_brings_back_its_history_and_not_its_hooks() {
+    let home = tempfile::tempdir().unwrap();
+    city_with(1, home.path());
+    let before = committed_twice(home.path());
+    let hooks = home.path().join(".git").join("hooks");
+    std::fs::create_dir_all(&hooks).unwrap();
+    std::fs::write(hooks.join("post-checkout"), b"escalate").unwrap();
+    let carried = tempfile::tempdir().unwrap();
+    Bundle::export(home.path(), carried.path()).unwrap();
+    std::fs::remove_dir_all(carried.path().join(super::history::HISTORY)).unwrap();
+    let whole = copy_dir(
+        &home.path().join(".git"),
+        &carried.path().join(CITY).join(".git"),
+    );
+    let at = carried.path().join(MANIFEST);
+    let mut manifest = Manifest::from_json(&std::fs::read(&at).unwrap(), &at).unwrap();
+    manifest.files += whole;
+    std::fs::write(&at, manifest.to_json()).unwrap();
+
+    let elsewhere = tempfile::tempdir().unwrap();
+    let restored = Bundle::restore(carried.path(), elsewhere.path()).map_err(|e| e.to_string());
+    assert_eq!(restored.map(|_| ()), Ok(()));
+    assert_eq!(log_of(elsewhere.path()), before);
+    let git = elsewhere.path().join(".git");
+    assert!(!git.join("hooks").join("post-checkout").exists());
 }
