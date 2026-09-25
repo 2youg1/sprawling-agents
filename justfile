@@ -257,9 +257,13 @@ mutants:
 budget:
     cargo xtask budget
 
-# The three wall-clock budgets, measured on this machine (never gated).
+# The wall-clock readings, never gated: citysim's load scenarios, then
+# the two instruments that drive the city's own accounting loop - a relay
+# round trip and the gap a second dispatch leaves in a running one
+# (sprawling-SPEC.md 8-83).
 bench:
     cargo run --release -p citysim --bin bench
+    cargo nextest run -p sprawling --release --run-ignored only -E 'test(/::instrument_/)' --no-capture
 
 # T14: the four-action pressure reading (citysim-SPEC.md 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.
@@ -317,10 +321,14 @@ package target="": (dist target)
 replay log:
     cargo run -p sprawling --locked -- replay {{log}}
 
-# A11: one session's resident memory, in this platform's own vocabulary.
-# Optional argument: a pid to measure instead of the tool itself.
-mem pid="":
-    cargo xtask mem {{pid}}
+# Private, peak private and working set, in this platform's own counters
+# (xtask-SPEC.md section 8-30). A pid reads that process. Anything else
+# serves a city - a fresh empty one, or `--city <dir>` - so the release
+# binary is built first: a reading of a stale binary describes a tree
+# nobody has.
+mem *args:
+    {{ if args =~ '^[0-9]+$' { "true" } else { "cargo build --release -p sprawling --locked" } }}
+    cargo xtask mem {{args}}
 
 # V10: the adversarial property checker in `adversary/`, which lives outside the
 # workspace, outside the release, and outside `just check`

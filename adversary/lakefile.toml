@@ -1,6 +1,6 @@
 name = "sprawling-adversary"
 version = "0.0.1"
-defaultTargets = ["adversary"]
+defaultTargets = ["adversary", "Design"]
 
 # No `require` line, and that is the decision rather than an omission.
 # Everything below is the toolchain's own: `Lean.Data.Json` reads the wire,
@@ -20,6 +20,15 @@ debug.skipKernelTC = false
 [[lean_lib]]
 name = "Sprawling"
 srcDir = "src"
+
+# Design models: what a Rust module must hold, proved rather than checked. A
+# library of its own because the checker above judges the binary from outside
+# and must not import a restatement of the rules it is judging; each model names
+# the Rust module it specifies (adversary-SPEC.md section 1).
+[[lean_lib]]
+name = "Design"
+srcDir = "design"
+roots = ["Attending"]
 
 [[lean_exe]]
 name = "adversary"

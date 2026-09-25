@@ -595,3 +595,8 @@ stage_two_p99_us = 1000
 scope = "sub-metric `harness` only; `persist` answers to the disk's physical floor, `whole` carries no tier (citysim-SPEC.md section 8-6)"
 measured_by = "just bench (citysim bench bin, release): one reading line per scenario and sub-metric, each carrying its machine class"
 status = "staged targets, not gated: a wall-clock figure is the machine's. Baselines sit in the ARCHITECTURE.md performance book. Under the registered fixture a reading only goes down; relaxing a tier or fattening the fixture lands in a commit of its own"
+
+[relay_round_trip]
+what = "one relay append from a lane to the accounting thread and back, while a run is in flight, with `attend` as the city runs it"
+measured_by = "cargo nextest run -p sprawling --run-ignored only -E 'test(/::instrument_relay/)' --no-capture (crates/sprawling/src/assembly/driving/tests/instruments.rs, sprawling-SPEC.md 8-83), 200 samples per store"
+status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized build, windows-x86_64, 16 cores, three other builds running beside it. Polling loop before the one queue: store=disk p50 31198 us, store=memory p50 31313 us, both the two timed waits. The one queue: store=memory p50 45 us against 29 us for the store's own append with no crossing; store=disk p50 2351 us, floor 1458 us, which is the device's fsync, a physical floor. The release reading and the 10 us memory target are not yet taken"

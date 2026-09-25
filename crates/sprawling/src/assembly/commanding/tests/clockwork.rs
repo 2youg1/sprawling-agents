@@ -62,7 +62,6 @@ fn a_scheduled_job_starts_by_itself_and_only_once_per_firing() {
 #[test]
 fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
     let desk = CommandDesk::new();
-    let moment = std::time::Duration::from_millis(1);
     let asked = || channels::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
         task: "read the plan".to_owned(),
@@ -75,13 +74,13 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
 
     desk.post(asked(), channels::Reply::nowhere());
     desk.post(asked(), channels::Reply::nowhere());
-    let carrying = desk.wait(moment);
+    let carrying = desk.next();
     assert!(
         matches!(carrying, DeskWait::Command(..)),
         "the first ask is taken off the desk"
     );
     assert!(
-        matches!(desk.wait(moment), DeskWait::Idle),
+        matches!(desk.next(), DeskWait::Idle),
         "a second frame of the same ask is a second bill, not a second piece of work"
     );
 
@@ -89,7 +88,7 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
     // once more: the run it wants is already running.
     desk.post(asked(), channels::Reply::nowhere());
     assert!(
-        matches!(desk.wait(moment), DeskWait::Idle),
+        matches!(desk.next(), DeskWait::Idle),
         "the ask is still being carried out; a repeat adds nothing"
     );
 
@@ -98,7 +97,7 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
     drop(carrying);
     desk.post(asked(), channels::Reply::nowhere());
     assert!(
-        matches!(desk.wait(moment), DeskWait::Command(..)),
+        matches!(desk.next(), DeskWait::Command(..)),
         "the same work asked for again after it finished is work"
     );
 }
@@ -120,16 +119,10 @@ fn a_close_lands_between_commands_and_never_inside_one() {
     desk.close();
 
     assert!(
-        matches!(
-            desk.wait(std::time::Duration::from_millis(1)),
-            DeskWait::Command(..)
-        ),
+        matches!(desk.next(), DeskWait::Command(..)),
         "the queued command was dropped by the close"
     );
-    assert!(matches!(
-        desk.wait(std::time::Duration::from_millis(1)),
-        DeskWait::Close
-    ));
+    assert!(matches!(desk.next(), DeskWait::Close));
 }
 
 /// One job in a window used to take the rest of that window with it:

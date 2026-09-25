@@ -163,14 +163,38 @@ pub(in crate::assembly) fn fake_openai_routed_with(
     fallback: Vec<String>,
     first_chat: FirstChat,
 ) -> (String, FakeProvider) {
-    let script = Script::Routed {
+    serve(models, routed(routes, fallback), first_chat, unpaced())
+}
+
+/// What a paced provider calls with each whole request, headers
+/// included, before it answers: an instrument holds a run at its model
+/// call by blocking here, and makes one kind of request slow by
+/// sleeping.
+pub(in crate::assembly) type Pace = std::sync::Arc<dyn Fn(&str) + Send + Sync>;
+
+/// A routed provider that hands every request to `pace` first.
+#[cfg(test)]
+pub(in crate::assembly) fn fake_openai_paced(
+    models: &[&str],
+    routes: Vec<(&str, Vec<String>)>,
+    fallback: Vec<String>,
+    pace: Pace,
+) -> (String, FakeProvider) {
+    serve(models, routed(routes, fallback), FirstChat::Answered, pace)
+}
+
+fn routed(routes: Vec<(&str, Vec<String>)>, fallback: Vec<String>) -> Script {
+    Script::Routed {
         routes: routes
             .into_iter()
             .map(|(key, replies)| Route::new(key, replies))
             .collect(),
         fallback: Route::new("", fallback),
-    };
-    serve(models, script, first_chat)
+    }
+}
+
+fn unpaced() -> Pace {
+    std::sync::Arc::new(|_: &str| {})
 }
 
 /// The same provider, told what to do with the first chat request.
@@ -184,12 +208,17 @@ pub(in crate::assembly) fn fake_openai_with(
         queued: replies.into_iter(),
         last: String::new(),
     };
-    serve(models, script, first_chat)
+    serve(models, script, first_chat, unpaced())
 }
 
 /// One listener serving `script`, on a port of its own.
 #[cfg(test)]
-fn serve(models: &[&str], script: Script, first_chat: FirstChat) -> (String, FakeProvider) {
+fn serve(
+    models: &[&str],
+    script: Script,
+    first_chat: FirstChat,
+    pace: Pace,
+) -> (String, FakeProvider) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let serves_a_list = !models.is_empty();
@@ -228,6 +257,7 @@ fn serve(models: &[&str], script: Script, first_chat: FirstChat) -> (String, Fak
             let recorder = std::sync::Arc::clone(&recorder);
             let script = std::sync::Arc::clone(&script);
             let dropping = std::sync::Arc::clone(&dropping);
+            let pace = std::sync::Arc::clone(&pace);
             let list = list.clone();
             std::thread::spawn(move || {
                 use std::io::ErrorKind;
@@ -282,6 +312,7 @@ fn serve(models: &[&str], script: Script, first_chat: FirstChat) -> (String, Fak
                 if a_chat && dropping.swap(false, std::sync::atomic::Ordering::SeqCst) {
                     return;
                 }
+                pace(&head);
                 // The whole exchange, headers included: a test about
                 // what went out on the wire needs the headers too.
                 recorder.lock().unwrap().push(head.clone());

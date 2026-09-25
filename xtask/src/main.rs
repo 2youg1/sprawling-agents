@@ -100,7 +100,7 @@ fn main() -> ExitCode {
             Err(err) => report::internal_failure(&err),
         },
         Some("badge") => report::finish("badge", badge::check(&root)),
-        Some("mem") => match mem::run(&root, args.get(1).map(String::as_str)) {
+        Some("mem") => match mem::run(&root, args.get(1..).unwrap_or(&[])) {
             Ok(text) => {
                 println!("{text}");
                 ExitCode::SUCCESS
@@ -299,8 +299,8 @@ const TOOLS: [Tool; 12] = [
         gives: "a SPEC skeleton for that crate",
     },
     Tool {
-        call: "mem [pid]",
-        gives: "resident memory of this process or of that pid",
+        call: "mem [<pid> | --city <dir>]",
+        gives: "private, peak private and working set of that pid, or of a city served idle (a fresh empty one by default)",
     },
     Tool {
         call: "sbom",

@@ -1,0 +1,118 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+//! First byte: `sprawling serve` spawned to the first byte of `GET /`
+//! (citysim-SPEC.md section 8-5-1).
+//!
+//! Shape: adapter. The end of the boundary is a byte of the page rather
+//! than the port opening, because a person sees the page, and a server
+//! that accepts a connection it cannot answer yet is still closed to
+//! them. Each sample serves on a port borrowed from the system a moment
+//! before and is stopped as soon as its byte arrives.
+
+use std::io::{Read as _, Write as _};
+use std::net::{SocketAddr, TcpStream};
+use std::path::Path;
+use std::process::{Child, Command, Stdio};
+use std::time::Duration;
+
+use kernel::{AxCode, AxError};
+
+use super::super::samples::Samples;
+use super::super::stamp;
+
+/// One attempt to reach the server, and the pause after a refused one.
+const POLL: Duration = Duration::from_millis(2);
+/// How long one sample may take before it is reported: a city with
+/// 400,000 records folds its whole Ledger before it accepts, which is
+/// tens of seconds on a slow disk.
+const WITHIN: Duration = Duration::from_secs(300);
+
+/// `samples` spawns of `serve` over `city`, each timed to its first byte.
+///
+/// # Errors
+/// Refuses a sample whose server exited or never answered, and
+/// propagates the operating system's refusal to spawn or stop it.
+pub fn first_byte(binary: &Path, city: &Path, samples: usize) -> Result<Samples, AxError> {
+    let head = one(binary, city)?;
+    let tail = (1..samples)
+        .map(|_| one(binary, city))
+        .collect::<Result<Vec<Duration>, AxError>>()?;
+    Ok(Samples::of(head, tail))
+}
+
+fn one(binary: &Path, city: &Path) -> Result<Duration, AxError> {
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|listener| listener.local_addr())
+        .map_err(|err| refused("borrow a loopback port", "127.0.0.1:0", &err))?
+        .port();
+    let boundary = stamp();
+    let mut child = Command::new(binary)
+        .arg("serve")
+        .arg(city)
+        .arg(format!("127.0.0.1:{port}"))
+        .args(["--no-console", "--no-open"])
+        .env("SPRAWLING_OPEN", "never")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|err| {
+            refused(
+                "serve the fixture city",
+                &binary.display().to_string(),
+                &err,
+            )
+        })?;
+    let answered = first_answer(&mut child, SocketAddr::from(([127, 0, 0, 1], port)));
+    let took = boundary.elapsed();
+    let stopped = child
+        .kill()
+        .and_then(|()| child.wait())
+        .map_err(|err| refused("stop the served city", &binary.display().to_string(), &err));
+    answered?;
+    stopped?;
+    Ok(took)
+}
+
+/// Polls until the page's first byte arrives.
+fn first_answer(child: &mut Child, at: SocketAddr) -> Result<(), AxError> {
+    let started = stamp();
+    while started.elapsed() < WITHIN {
+        if let Ok(mut stream) = TcpStream::connect_timeout(&at, POLL) {
+            let mut byte = [0u8; 1];
+            let asked = stream
+                .write_all(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+                .and_then(|()| stream.set_read_timeout(Some(WITHIN)))
+                .and_then(|()| stream.read(&mut byte));
+            if matches!(asked, Ok(1)) {
+                return Ok(());
+            }
+        }
+        match child.try_wait() {
+            Ok(None) => {}
+            Ok(Some(status)) => {
+                return Err(AxError::failure(
+                    AxCode::ToolUnavailable,
+                    "serve the fixture city",
+                    format!("the server exited before its first byte, {status}"),
+                )
+                .with_recovery("run the same `sprawling serve` by hand to read what it says"));
+            }
+            Err(err) => return Err(refused("watch the served city", "serve", &err)),
+        }
+        std::thread::sleep(POLL);
+    }
+    Err(AxError::failure(
+        AxCode::ToolUnavailable,
+        "serve the fixture city",
+        "no byte arrived within 300 s",
+    )
+    .with_recovery("run the same `sprawling serve` by hand to see where it stops"))
+}
+
+fn refused(action: &'static str, subject: &str, err: &std::io::Error) -> AxError {
+    AxError::failure(AxCode::ToolUnavailable, action, format!("{subject}: {err}"))
+        .with_recovery("run just bench-startup, which builds the binary it measures first")
+}

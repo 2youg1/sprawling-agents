@@ -772,4 +772,36 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 
 条目类型只收普通文件与目录；符号链接、硬链接与其他类型一概拒收（参照实现同）。路径含 `..` 或绝对分量即拒收。**篡改一字节的归档必被拒收，且拒因指名验签失败**——这是本设计的验收线。
 
+### 8-30 `mem`：量一个说得出名字的进程，或自己起一座夹具城来量（形状 4 适配器）
 
+**接口**（`just mem` 的量具，恒不入 `gates`）：
+
+```text
+cargo xtask mem <pid>          量一个正在跑的进程
+cargo xtask mem                在临时目录 init 一座空城，serve 在回环口上，等它接受连接，静置 2 s 再量，然后停掉
+cargo xtask mem --city <dir>   同上，但 serve 的是给出的那座城（大账本的启动峰值与稳定值由此读出）
+```
+
+```rust
+enum Target { Pid(u32), Fixture(Fixture) }          // 没有「量自己」这个值
+enum Fixture { EmptyCity, City(PathBuf) }
+struct Counter { counter: &'static str, bytes: u64 } // 读数总带着它的计数器名
+struct Reading { private: Counter, peak_private: Counter, working_set: Counter }
+fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
+```
+
+**三个计数器分开报**，因为它们回答三个问题：private 是这个进程独占、别人拿不走的字节（B 轴的边际 RAM 就是它）；peak private 是启动折叠这类尖峰付过的最高值；working set 含共享的映像页，而且系统会在进程什么都没做时把它修剪到接近零——它不能当「常驻」用，只作对照。每个平台用自己的词：
+
+| 平台 | private | peak private | working set |
+|---|---|---|---|
+| Windows | `PrivateMemorySize64`（私有提交） | `PeakPagedMemorySize64`（峰值提交） | `WorkingSet64` |
+| Linux | `smaps_rollup` 的 `Private_Clean`＋`Private_Dirty` | `status` 的 `VmHWM`（峰值常驻，含共享页） | `status` 的 `VmRSS` |
+| macOS | `ps -o rss`（保守上界，共享页全计） | 同左 | 同左 |
+
+**夹具城的二进制**：`$CARGO_TARGET_DIR`（未设时 `<root>/target`）下的 `release/sprawling`＋平台后缀；`just mem` 不带 pid 时先 `cargo build --release -p sprawling --locked`，所以量到的永远是这棵树建出来的那个。端口先由本进程在 `127.0.0.1:0` 上借一个再还回去；等待是按 5 ms 轮询连接，上限约 300 s：40 万条记录的城要先把整条 Ledger 折叠一遍才开始接受连接，在慢盘上是几十秒，而量具自己撞上的上限就是一次丢掉的读数。
+
+**读数不带判词**：预算与读数住 `xtask/budgets.toml` 的按场景的行（`[resident_empty_idle]` 等），本命令只报它量到的三个数、pid 与量的是什么。
+
+**失败**：`XtaskError::Io`（起进程、读计数器、建临时城）、`XtaskError::Cmd`（参数说不出要量什么、`init` 被拒、夹具城在期限内没有接受连接、二进制不在那里——恢复语指向手动跑同一条 `serve` 或 `just mem`）与 `XtaskError::Doc`（计数器读不懂）。
+
+**决定**：不带 pid 时自己起一座夹具城，而不是量自己。旧形状缺省量 `std::process::id()`，量到的是 xtask，登记簿里那行 idle 读数比真正在 serve 的空城还低；读数又是 working set，含共享映像页。**败给的方案**：没有 pid 就拒绝。它也改掉了错的读数，但「一座空城闲着占多少」是每次都要问的问题，让人自己先起一座城再抄 pid，等于把量具的一半交回给人。

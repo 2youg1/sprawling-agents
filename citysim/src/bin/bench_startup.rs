@@ -4,7 +4,10 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The four-action pressure reading T14 asks for (citysim-SPEC.md
-//! section 8-5): install, startup, raise a city, open a session.
+//! section 8-5): install, startup, raise a city, open a session - and
+//! the first byte a served city answers with, over three lengths of
+//! history (section 8-5-1). `bench_startup first-byte` takes that last
+//! reading alone.
 //!
 //! This is a measuring Main, the third sanctioned sampling point besides
 //! `bin::assembly` and `bin::bench`: every `Instant::now` here carries
@@ -22,13 +25,20 @@ mod actions;
 #[path = "bench_startup/samples.rs"]
 mod samples;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use kernel::{AxCode, AxError};
 
 use actions::Action;
+use actions::history::History;
 use samples::{Share, Tier};
+
+/// Which readings one invocation takes.
+enum Part {
+    Everything,
+    FirstByte,
+}
 
 /// The one place this family reads a clock.
 #[expect(
@@ -80,11 +90,80 @@ fn executable_name() -> String {
     format!("sprawling{}", std::env::consts::EXE_SUFFIX)
 }
 
-/// The whole run: fixture, the four actions in order, the report.
+/// The readings the command line asked for.
 fn run() -> Result<(), AxError> {
-    let scratch = scratch_dir()?;
     let binary = shipped_binary()?;
-    let archive = actions::archive::fixture(&scratch, &binary)?;
+    match std::env::args().nth(1).as_deref() {
+        None => Ok(Part::Everything),
+        Some("first-byte") => Ok(Part::FirstByte),
+        Some(other) => Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "choose which readings to take",
+            other.to_owned(),
+        )
+        .with_recovery("give nothing for every reading, or `first-byte` for that one alone")),
+    }
+    .and_then(|part| match part {
+        Part::Everything => four_actions(&binary),
+        Part::FirstByte => Ok(()),
+    })?;
+    first_bytes(&binary)
+}
+
+/// The first byte of `GET /` over the three fixture cities, which are
+/// kept beside the build directory and reused (citysim-SPEC.md section
+/// 8-5-1).
+fn first_bytes(binary: &Path) -> Result<(), AxError> {
+    let Some(cities) = binary
+        .parent()
+        .and_then(Path::parent)
+        .map(|target| target.join("bench-cities"))
+    else {
+        return Err(AxError::failure(
+            AxCode::PathNotFound,
+            "find the build directory",
+            binary.display().to_string(),
+        )
+        .with_recovery("run just bench-startup, which builds the binary it measures first"));
+    };
+    std::fs::create_dir_all(&cities).map_err(|err| {
+        AxError::failure(
+            AxCode::StorageFatal,
+            "keep the fixture cities",
+            format!("{}: {err}", cities.display()),
+        )
+        .with_recovery("free space beside the build directory and run again")
+    })?;
+    println!(
+        "
+first byte: `serve` spawned to the first byte of GET /, fixture cities in {}",
+        cities.display()
+    );
+    println!(
+        "{:<8} {:>8} {:>10} {:>10} {:>10}",
+        "city", "samples", "floor ms", "p50 ms", "peak ms"
+    );
+    for (name, history, samples) in [
+        ("empty", History::Empty, 20),
+        ("l100k", History::Runs(2_000), 5),
+        ("l400k", History::Runs(8_000), 3),
+    ] {
+        let city = actions::history::fixture_city(&cities, name, history)?;
+        let taken = actions::first_byte::first_byte(binary, &city, samples)?;
+        println!(
+            "{name:<8} {samples:>8} {:>10.3} {:>10.3} {:>10.3}",
+            ms(taken.floor()),
+            ms(taken.p(Share::P50)),
+            ms(taken.peak())
+        );
+    }
+    Ok(())
+}
+
+/// The four actions in order, their fixture, and their report.
+fn four_actions(binary: &Path) -> Result<(), AxError> {
+    let scratch = scratch_dir()?;
+    let archive = actions::archive::fixture(&scratch, binary)?;
     let archive_bytes = std::fs::metadata(&archive)
         .map_err(|err| {
             AxError::failure(
@@ -98,7 +177,7 @@ fn run() -> Result<(), AxError> {
         })?
         .len();
     let install = actions::install(&scratch, &archive)?;
-    let startup = actions::startup(&binary)?;
+    let startup = actions::startup(binary)?;
     let raising = actions::raise_city(&scratch)?;
     // The city the session action is measured in. Its name is this run's
     // own: nothing here spells the path a session slice lies at, which

@@ -100,6 +100,7 @@ pub(crate) struct Reading {
     sub: SubMetric,
     machine: MachineClass,
     samples: u64,
+    floor: Duration,
     p50: Duration,
     p95: Duration,
     p99: Duration,
@@ -134,6 +135,7 @@ impl Reading {
             sub,
             machine,
             samples: u64::try_from(count).map_err(|why| format!("count the samples: {why}"))?,
+            floor: samples.first().copied().ok_or_else(sampled_nothing)?,
             p50: at(50)?,
             p95: at(95)?,
             p99: at(99)?,
@@ -143,11 +145,12 @@ impl Reading {
     /// The reading line: fixed key order, integer microseconds.
     pub(crate) fn line(&self) -> String {
         format!(
-            "perf load={} sub={} machine_class={} samples={} p50_us={} p95_us={} p99_us={}",
+            "perf load={} sub={} machine_class={} samples={} floor_us={} p50_us={} p95_us={} p99_us={}",
             self.load.as_str(),
             self.sub.as_str(),
             self.machine.as_str(),
             self.samples,
+            self.floor.as_micros(),
             self.p50.as_micros(),
             self.p95.as_micros(),
             self.p99.as_micros()

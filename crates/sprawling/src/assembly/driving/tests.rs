@@ -5,6 +5,7 @@
 
 mod confidential;
 mod flight;
+mod instruments;
 mod ledger;
 mod sieving;
 mod turns;
