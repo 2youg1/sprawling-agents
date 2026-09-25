@@ -92,7 +92,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 37,
+        WIRE_V, 38,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
