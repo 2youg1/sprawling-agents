@@ -2,6 +2,7 @@ impl collab::AgentSteer
 impl collab::ArchiveDesk
 impl collab::ArchiveTool
 impl collab::Artifact
+impl collab::Citation
 impl collab::Claim
 impl collab::ClaimDesk
 impl collab::ClaimEffect
@@ -109,6 +110,11 @@ pub collab::PrEffect::Rejected
 pub collab::PrEffect::Rejected::by: alloc::string::String
 pub collab::PrEffect::Rejected::request: collab::OpenRequest
 pub collab::PrEffect::Rejected::why: alloc::string::String
+pub collab::Reading::Differs
+pub collab::Reading::Differs::found: alloc::string::String
+pub collab::Reading::Holds
+pub collab::Reading::OtherVersion
+pub collab::Reading::OutOfRange
 pub collab::Reflex::Discard
 pub collab::Reflex::Full
 pub collab::Reflex::Light
@@ -134,6 +140,7 @@ pub enum collab::Handback
 pub enum collab::Lane
 pub enum collab::Level
 pub enum collab::PrEffect
+pub enum collab::Reading
 pub enum collab::Reflex
 pub enum collab::SignalEffect
 pub enum collab::SignalKind
@@ -152,6 +159,10 @@ pub fn collab::Artifact::at(&self) -> &kernel::locator::Locator
 pub fn collab::Artifact::by(&self) -> &str
 pub fn collab::Artifact::node(&self) -> &collab::NodeId
 pub fn collab::Artifact::verified_by(&self) -> &str
+pub fn collab::Citation::against(&self, &kernel::locator::Locator, &[u8]) -> collab::Reading
+pub fn collab::Citation::at(&self) -> &kernel::locator::Locator
+pub fn collab::Citation::new(alloc::string::String, kernel::locator::Locator) -> collab::Citation
+pub fn collab::Citation::quote(&self) -> &str
 pub fn collab::Claim::at(&self) -> &kernel::locator::Locator
 pub fn collab::Claim::by(&self) -> &str
 pub fn collab::Claim::new(collab::NodeId, kernel::locator::Locator, kernel::locator::B3Hash, alloc::string::String) -> collab::Claim
@@ -290,6 +301,7 @@ pub struct collab::ArchiveDesk
 pub struct collab::ArchiveTool
 pub struct collab::Arrival
 pub struct collab::Artifact
+pub struct collab::Citation
 pub struct collab::Claim
 pub struct collab::ClaimDesk
 pub struct collab::ClaimTool
