@@ -271,32 +271,31 @@ impl JsonlLedger {
                 Err(_) => false,
             };
             if !ok {
-                // A tear only ever damages the tail. A bad first line is
-                // refused — not silently discarded — when it is parseable
-                // with a wrong chain root (foreign or damaged history) or
-                // when intact records still follow it (non-tail damage).
-                // Newline-bearing garbage does not count as a record.
-                if index == 0 {
-                    let later_intact = lines
-                        .iter()
-                        .skip(1)
-                        .any(|l| EventRecord::parse_line(l).is_ok());
-                    if parsed.is_ok() || later_intact {
-                        return Err(MemoryError::Envelope {
-                            path: last.to_path_buf(),
-                            line: 1,
-                            source: AxError::failure(
-                                AxCode::InvalidArgs,
-                                "verify chain root",
-                                "first line does not continue the chain",
-                            )
-                            .with_recovery(
-                                "run `sprawling replay <ledger-dir>` to see the first line \
-                                 that breaks, then restore that segment from its \
-                                 checkpoint commit",
-                            ),
-                        });
-                    }
+                // A tear only ever damages the tail and never leaves a
+                // record behind. A break is refused — not truncated — when
+                // the breaking line parses (a fork: a second writer
+                // continued the same prev) or intact records still follow
+                // it (non-tail damage); truncating either would delete
+                // lawful history. Newline-bearing garbage is no record.
+                let later_intact = lines
+                    .iter()
+                    .skip(index.saturating_add(1))
+                    .any(|l| EventRecord::parse_line(l).is_ok());
+                if parsed.is_ok() || later_intact {
+                    return Err(MemoryError::Envelope {
+                        path: last.to_path_buf(),
+                        line: u64::try_from(index).unwrap_or(u64::MAX).saturating_add(1),
+                        source: AxError::failure(
+                            AxCode::InvalidArgs,
+                            "verify chain",
+                            "a line does not continue the chain",
+                        )
+                        .with_recovery(
+                            "run `sprawling replay <ledger-dir>` to see the first line \
+                             that breaks, then restore that segment from its \
+                             checkpoint commit",
+                        ),
+                    });
                 }
                 break;
             }
