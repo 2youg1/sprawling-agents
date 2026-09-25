@@ -151,7 +151,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 `views/parts/tip.svelte` 提示（见设计 4-18）；`views/parts/code.svelte` 只读代码视图（面包屑＋行号＋词法着色，见设计 4-26）；`views/rail.svelte` 左栏；`views/talk.svelte` ＋ `talk/{thread,calls,composer,waiting}.svelte` 对话 ＋ `talk/artifact.svelte` 制品面板 ＋ `talk/trace.ts`（工具调用的分类，两个读者共用，见设计 4-26）；`views/city.svelte` ＋ `city/{bar,panel,skyline,marks}.svelte` ＋ `city/shape.ts`（超椭圆路径）；`views/registry.svelte`（`Query::RegistryView`：这座城决定留下来的东西，一行一件，见设计 4-24）；`views/building.svelte` ＋ `building/{tree,commits}.svelte`；`views/changes.svelte`（`Changes`／`Hunks` 的一份读法，run 页与楼页共用）；`views/run.svelte`；`views/setup.svelte` ＋ `setup/{providers,models,skills,appearance,keys}.svelte`（skills 组见设计 4-31）＋ `setup/kept.svelte`（一个组的答案由谁保管，见设计 4-29）；`views/shared/{provider,effort,buildings}.svelte`（欢迎页与设置页共用的三件，`buildings.svelte` 的第二个座位是 `#/mcp`）；`views/machine.svelte`（doctor 的答）；`views/desktop.svelte`（一栋楼的桌面白名单）；`views/mcp.svelte`；`views/welcome.svelte`；`views/record.svelte`；`views/cost.svelte`；`views/palette.svelte`；`views/refusal.svelte`；`views/prose.svelte`；`views/gallery.svelte`。
 
-**`#/gallery` 是一条路由而不是一个构建开关**，因为量它的那道门应当打开一个人真正跑的 bundle；夹具不需要城（偏好走 `core/rows.ts` 那扇门，没有 localStorage 时是一张只活一次会话的表）。每个能进入多种状态的屏幕在那里各有一份夹具，`cargo xtask render` 打开真引擎读它。
+**`#/gallery` 是一条路由而不是一个构建开关**，因为量它的那道门应当打开一个人真正跑的 bundle；夹具不需要城（偏好走 `core/rows.ts` 那扇门，没有 localStorage 时是一张只活一次会话的表）。每个能进入多种状态的屏幕在那里各有一份夹具，`cargo xtask render` 打开真引擎读它。`app.svelte` 用动态 `import()` 取 `views/gallery.svelte`，所以画廊与它的夹具表是 bundle 里单独的一块，只在打开 `#/gallery` 时下载：其余路由首屏不再为它付字节，而 `frontend_artifact` 称的是整个 dist，这一块仍在其中。
 
 **左栏是覆盖而不是推挤**：外层 `<div>` 只在钉开（`[`）时取 `w-rail-open`，`<nav>` 绝对定位、hover 时自宽并加投影；正文的左边因此不随指针越过左缘而重排。
 
