@@ -11,7 +11,7 @@
 | 模块 | 这个模块回答的问题 | §8 |
 |---|---|---|
 | `resident` | 谁在跑这个 Run（身份从哪来、给 prefix 贡献什么、做过什么） | 8-1 |
-| `policy` | 这栋楼里允许什么（confidential 三条、写域、出网） | 8-2 |
+| `policy` | 这栋楼里允许什么（confidential 四条、写域、出网） | 8-2 |
 | `building` | 一栋楼怎么被建出来，以及一个地址归哪栋楼管 | 8-3 |
 | `config_layers` | 三层配置住哪三个文件，又怎么求成一份 `FrozenConfig` | 8-4 |
 | `spine_files` | 一栋楼开局有哪几份文档，一件活的 JOB.md 落在哪 | 8-5 |
@@ -100,7 +100,8 @@ pub fn rules_path(city_root: &Path, addr: &Address) -> PathBuf;
 
 - **规则是一份 TOML，散文没有另起一份文件**：这份文件先前是 Markdown，读者在**任意一行**上匹配 `confidential:`／`write:`／`review:`／`browser:`／`usersbrowser:`／`desktop:`，于是「How work is done here」里一句以 `desktop = true` 开头的话就授予了宿主机的桌面，而一栋没写 `write:` 的楼落到 `Everything`。两处都朝宽松的一侧失败，那是权限读者唯一不许失败的方向。改成 TOML 之后键只在文法给出键的位置成立，`deny_unknown_fields` 让拼错成为一条消息而不是一次静默缺席，`confidential` 与 `write` 都不再有缺省。**散文留在同一份文件里**，作 `does` 与 `conventions` 两个键：拆成两份文档同样能关掉撞键，代价是一栋楼有两种说法且可以互相矛盾。居民拿到的就是这份文件本身的字节，所以城判定的与 agent 读到的是同一串。
 
-- **confidential 三条各有其守处**：模型池锁本地由 `gateway::endpoint` **在会泄漏的那一端**拒（`req.policy.confidential` 即拒，携三段式）；写域止于本楼子树由 `write_domain()` 在构造点拒；数据可入不可出归出网门。**把兜底放在会出事的那一层**，路由错了仍然拦得住。
+- **confidential 四条各有其守处**：模型池锁本地由 `gateway::endpoint` **在会泄漏的那一端**拒（`req.policy.confidential` 即拒，携三段式）；写域止于本楼子树由 `write_domain()` 在构造点拒；数据可入不可出归出网门；**楼里的字节楼外读不到**，归读界（下一条）。**把兜底放在会出事的那一层**，路由错了仍然拦得住。
+- **读界：本楼全开，他楼非机密可读，机密楼对楼外全关**。判定只有一处：`kernel::address::may_read(reader_building, target, rules) -> ReadVerdict`（kernel-SPEC §8-2），三臂 `Open`／`Confidential`／`RulesUnreadable(AxError)`。问它的是模型选路的唯一判定处 `runtime::tools::chosen_path`（runtime-SPEC §8-30-1）：`read` 的路径、`search` 的起点、`search` 不带路径时在城根下走进的每一栋楼，以及经这两件工具读到的 transcript（runtime-SPEC §8-32），都先过它。`rules` 是目标所在楼此刻的规则：装配层把 `city::Building::of(target)` 与 `policy::load` 接成一个闭包交给 `may_read`，**只在目标出了本楼时才调用**——本楼的读不读盘，他楼的读每次现读规则。规则读不出＝`RulesUnreadable`，一样关：读不出的那份规则可能写着 `confidential = true`，而隐私设置不得朝宽松的一侧失败（本节「没有 RULES.toml」那条同理）。**读界只管模型选的路径**：catalog 名是人在阅览室里准入的（runtime-SPEC §8-29 起首），不经它；`exec` 在宿主机上跑的命令读得到盘上任何文件，那道墙要 OS sandbox，与「出网」那条的缺口是同一个缺口。
 - **没有 RULES.toml 是普通楼；有而不声明是错误**：把隐私设置的默认值悄悄取成宽松的那一边，正是这整个面存在的理由。拼写不是 `true`／`false` 同样拒——读起来像笔误的隐私设置不得解析成许可。
 - **confidential 楼声明越界前缀＝拒而不裁剪**：静默裁剪会让文件说一套、城做另一套；拒绝会指出该改哪一行。
 - **无声明写域时默认只写本楼**：一栋楼至少能写自己，且不多。`prefixes` 里一条读不出的地址**传播而不跳过**——先前它被丢在读它的地方，于是一栋楼写得比人授予的少，而这件事没有任何一处说出来。
@@ -591,6 +592,16 @@ bin `RunWorker::dispatch` → `Identity::load(city_root, addr)` → `segment_byt
 
 **重开参数**：`attach` 是唯一会问人的门，理由是人的动作本身就是答案、没有可以点过去的默认（kernel-SPEC §8-27）。治理审批只有取得同样的性质——人在 run 之外对整份 diff 作答，且不存在「全批」的默认——才需要重新论证这一条；参数不动，定规不动。
 
+### 12.2 定规：读界在调用时按目标所在楼现读规则
+
+**决定**：读界的规则不在派活时冻结。`may_read` 的第三个参数是一个闭包，只在目标出了读者本楼时调用，调用时读目标所在楼的 `RULES.toml`；一次 `search` 不带路径时，城根下每走进一栋他楼调一次。
+
+**理由**：两条轴都站在这一边。延迟：派活时冻结一张全城表要为每一栋楼读一次规则，代价随楼数线性增长，而绝大多数 run 从不读他楼；现读把代价放到真的跨楼的那一次读上，本楼的读零次读盘。安全：派活之后才建起来的机密楼、派活之后才改成 `confidential = true` 的楼，现读立刻关上；冻结表在 run 冻结之前一直按旧答案放行，而那正是朝宽松一侧失败。
+
+**被否**：派活时冻结一张「哪些楼机密」的表，与写域、工具表一同冻结。它让 `may_read` 成为只吃值的纯函数，代价是上面两条；若冻结的是「哪些楼开放」，新楼会被关上，但派活代价不变。
+
+**重开参数**：一次跨楼读的规则读取（一个小文件加一次 TOML 求值）相对该次 `read` 本身的读盘不再可忽略时——例如城的规则搬进一张随账本折叠的内存表，读规则不再触盘——冻结与现读的延迟差消失，可以重议；安全那一条不随它消失，重议时须给出新楼与改规则两种情形下仍然关上的办法。
+
 ## 13 依赖选型
 
 只依赖 `kernel`（拓扑硬约束）＋ std。dev 依赖 `tempfile`。
@@ -620,6 +631,8 @@ bin 装配层的 prefix 组装随之改；`docs/templates/URBANITE.md` 是这份
 建楼与配置八条：新建的楼被 `policy::load` 读回且 confidential 模板真的锁本地模型池｜二次出生恒拒｜reserved prefix 下建楼恒拒｜房间地址建楼恒拒且拒词指出该建哪栋｜下层配置盖上层｜不认的键即拒｜**写在 `CONFIG.toml` 里的 effort 出现在真实出线请求体里**（bin 侧端到端，假 provider 录下请求体）｜**`usersbrowser` 的三种值各读回各的形状，`browser` 与它互不影响，confidential 楼写它即拒**。
 
 技能安装六条（`library::install::tests`，CAS 绑定一例在 `crates/sprawling/tests/skill_install.rs`）：装上架的字节与来源一致且扫描读回的 `Holding` 整体相等｜同哈希重装幂等且盘上字节不变｜**plan 与 apply 之间来源目录被换即整体拒收**（盘上无文件、登记零调用）｜经符号链接的包（包目录本身或 `SKILL.md`）恒拒｜同格异哈希占名拒｜跨 section 同名拒。
+
+读界两条：`kernel::address::tests` 的三类读者矩阵（本楼读本楼、他楼读非机密楼、楼外读机密楼，外加机密楼读自己、规则读不出）逐格判出 `ReadVerdict`，且本楼的读从不调用规则闭包｜bin 侧 `a_run_in_another_building_reads_nothing_of_a_confidential_one`：普通楼里的 run 按路径 `read`、再不带路径 `search` 机密楼里的文件，假 provider 录下的每一份请求体里都没有那份文件的字节，且最后一份带着 `E_GATE_DENIED`。
 
 邻里名册六条：扫到的名册**不含我自己**且有人的与空的各自落在对的臂上｜`## Bring them` 在场时取它、缺席时退回第一段正文且跳过标题与引文｜同一座城扫两次字节相同（`read_dir` 序不得泄漏到答案里）｜`scope=city` 只交出楼名、不交出任何住户｜`.sprawling` 与 archive 目录都不是房间｜**模板仍然带着 `## Bring them` 这一节**（对 `docs/templates/URBANITE.md` 的 `include_str!` 断言；模板改名而代码不改，就是一份永远退回正文的名册）。
 

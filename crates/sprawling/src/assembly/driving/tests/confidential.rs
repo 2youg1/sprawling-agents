@@ -99,6 +99,74 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
         "no chat call may leave a confidential building"
     );
 }
+
+/// The fourth thing a confidential building means: what is in it is read
+/// by nobody outside it (city-SPEC 8-2). A run in an ordinary building
+/// asks for a confidential building's file twice - once by path, once by
+/// a search with no path - and the provider it talks to must never see
+/// the file's bytes, because that provider is exactly where they would
+/// leave the machine.
+#[test]
+fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    lay_rules(dir.path(), "vault", &shut_rules(""));
+    let vault_room = dir.path().join("vault").join("room1");
+    std::fs::create_dir_all(&vault_room).unwrap();
+    std::fs::write(vault_room.join("combination.md"), "the dial reads 31-7-12\n").unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
+
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "reading",
+                "tu_1",
+                "read",
+                serde_json::json!({ "path": "vault/room1/combination.md" }),
+            ),
+            tool_completion(
+                "searching",
+                "tu_2",
+                "search",
+                serde_json::json!({ "text": "the dial reads" }),
+            ),
+            completion("nothing to report", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "find the combination".to_owned(),
+            goal: "report it".to_owned(),
+            mode: kernel::Mode::Up,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+
+    let bodies = provider.bodies();
+    let chats: Vec<&String> = bodies
+        .iter()
+        .filter(|body| body.contains("find the combination"))
+        .collect();
+    assert!(
+        chats.len() >= 3,
+        "both calls were answered, so the provider saw what they returned: {chats:?}"
+    );
+    assert!(
+        !chats.iter().any(|body| body.contains("31-7-12")),
+        "a confidential building's bytes reached another building's provider"
+    );
+    assert!(
+        chats
+            .last()
+            .is_some_and(|body| body.contains("E_GATE_DENIED")),
+        "the read was refused in words the model can act on, not lost"
+    );
+}
 #[test]
 fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
     // Named on the host: a sandboxed command copies the room and its
