@@ -326,7 +326,10 @@ fn an_ignorable_line_from_a_newer_vocabulary_is_kept_and_chained() {
     fs::write(&segment, &bytes).unwrap();
 
     let (mut reopened, report) = JsonlLedger::open(dir.path(), TimeMs::new(9)).unwrap();
-    assert!(report.recovered.is_none(), "a lawful line is not tail damage");
+    assert!(
+        report.recovered.is_none(),
+        "a lawful line is not tail damage"
+    );
     assert_eq!(reopened.position(), Seq::new(2));
     reopened
         .append_all(vec![draft(EventKind::RunStarted, 3)])

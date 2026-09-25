@@ -4,7 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-use kernel::{EventDraft, Payload, RunId, TimeMs};
+use kernel::ledger::chain_hash;
+use kernel::{EventDraft, EventKind, GENESIS_PREV, Payload, RunId, TimeMs};
 
 fn genesis_line() -> Vec<u8> {
     let draft = EventDraft {
