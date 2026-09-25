@@ -10,6 +10,7 @@
 //! kani-provable. False positives are the accepted normal: the entrance
 //! replaces losslessly, only the exits refuse.
 
+mod hex_run;
 mod scan;
 mod sealed;
 mod span;
