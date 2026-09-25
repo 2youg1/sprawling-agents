@@ -55,7 +55,6 @@ shipped one happens to be written in is a replaceable fact.
 │        ├── browser ── WebDriver BiDi sessions, snapshots     │
 │        ├── protocol── MCP outbound, ACP inbound              │
 │        ├── memory  ── Ledger, CAS, projections, git, Vfs     │
-│        ├── mem     ── the Zig kernel's Rust face             │
 │        ├── gateway ── routing, dialects, market, cost,       │
 │        │              credentials                            │
 │        └── channels ─ WebSocket server, Command/Query/Event, │
@@ -104,13 +103,44 @@ every week.
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = "z"`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `"z"` rather than `3` on a measurement whose criterion was written before the readings existed — the manifest records both arms. |
-| Dependency count | <!-- xtask:begin dependency_count -->403<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->402<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
 (properties before examples), `insta` (golden output), `trybuild` (proof
 that something cannot be expressed), `kani` (bounded proof, Linux CI),
 `cargo-mutants` (do the tests bite), `cargo-fuzz` (parsers against hostile
 bytes).
+
+**A second compiled language is admitted by rule, not by taste.** This is
+a ruling of the person. Safe Rust comes first; Zig comes next, and only for
+a hot leaf where a benchmark shows it clearly faster than the safe Rust
+version, or where the alternative would be `unsafe` Rust (FFI, SIMD, raw
+memory); `unsafe` Rust comes last. Domain rules stay in Rust whichever
+language computes a leaf. A Zig leaf enters the tree only when all six
+hold at once:
+
+1. the hot spot has a production caller, and `just bench` or citysim
+   measures it as a real share of a latency a person or an agent sees;
+2. the safe Rust version, including reviewed crates already in
+   `Cargo.lock`, has been optimised and measured to its floor on the same
+   harness;
+3. under the product's own release profile, on every target in the
+   release matrix, the Zig version beats that floor by a clear margin that
+   survives the FFI call the compiler cannot inline;
+4. each call hands over a whole buffer as `(ptr, len)`, never one entry at
+   a time;
+5. every workflow that compiles the workspace installs the pinned Zig, the
+   `header`, `length` and `modmap` gates read `.zig` files, and
+   `zig fmt --check` runs beside `cargo fmt --check`;
+6. the Zig tests run under `ReleaseSafe`, with a fuzz target that actually
+   runs, from a corpus or under `--fuzz`, beside a property-based
+   equivalence suite against a Rust reference.
+
+The parameter that made this rule right is a measurement: on byte
+scanning of ledger envelopes, safe Rust ran level with or faster than Zig
+`ReleaseFast`, so the one Zig leaf the tree carried cost a toolchain in
+every workflow and bought nothing. When a leaf measures the other way,
+re-argue the rule.
 
 ## 3 The units and the dependency law
 
@@ -126,7 +156,6 @@ number appears in this sentence.
 
 ```depmap
 kernel:
-mem: kernel
 memory: kernel
 gateway: kernel
 runtime: kernel, memory, gateway
@@ -512,9 +541,9 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2147<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2146<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
-| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->7<!-- xtask:end --> targets: address, locator, truncated ledger tail |
+| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
 | V6 deterministic simulation | components each correct and wrong together | citysim, <!-- xtask:begin citysim_scenarios -->8<!-- xtask:end --> scenario files, failures replayed from their script |
 | V7 mutation | tests that do not bite | `cargo-mutants`, by `just mutants` |

@@ -19,7 +19,7 @@ default: check
 # step, after the whole workspace had been built and tested. `just` runs
 # a dependency once per invocation, so `check-desktop` finds
 # `fmt-check-desktop` already done and does not repeat it.
-check: prereqs fmt-check fmt-check-desktop clippy features test test-zig build-web gates check-client check-desktop
+check: prereqs fmt-check fmt-check-desktop clippy features test build-web gates check-client check-desktop
 
 # The one authority on what this repository's loop needs installed.
 #
@@ -71,9 +71,6 @@ prereqs mode="check":
     need required cargo-nextest 'command -v cargo-nextest' \
         'cargo install cargo-nextest --locked' \
         'just test'
-    need required zig 'command -v zig' \
-        'https://ziglang.org/download; the version to install is the pin in zig/build.zig.zon' \
-        'the Zig kernel behind crates/mem: its build script compiles it, just test-zig judges it'
     need required bun 'command -v bun' \
         'https://bun.sh' \
         'the client bundle, and the gates that judge artifacts'
@@ -147,20 +144,6 @@ test:
 
 test-std:
     cargo test --workspace --locked
-
-# The Zig kernel's own suite in both modes: Debug with every safety check
-# on, then ReleaseFast, where Zig runs its undefined-behaviour checks
-# (mem-SPEC.md section 2). `zig build` itself enforces the version pinned
-# in zig/build.zig.zon.
-#
-# Both caches are named rather than left to Zig's default: the default
-# puts them in `zig/`, inside the source tree, where the generated
-# objects carry this machine's absolute paths and `xtask release` reads
-# every file it finds. `crates/mem/build.rs` points them here too, so a
-# hand-run and a cargo build agree about where the kernel was built.
-test-zig:
-    cd zig && zig build --cache-dir ../target/zig-cache --global-cache-dir ../target/zig-global-cache test
-    cd zig && zig build --cache-dir ../target/zig-cache --global-cache-dir ../target/zig-global-cache -Doptimize=ReleaseFast test
 
 # All machine gates (xtask), then the supply-chain read.
 gates:
