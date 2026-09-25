@@ -34,7 +34,7 @@
 use std::collections::BTreeMap;
 use std::process::{Command, Stdio};
 
-use kernel::{Address, AxCode, AxError};
+use kernel::{Address, AxCode, AxError, RunId};
 
 /// One member of the table, for as long as this process lives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -91,7 +91,8 @@ impl Backlog {
     ///
     /// The command's program, arguments, working directory and
     /// environment are the caller's; this module owns only where the
-    /// output goes and how the waiting is done.
+    /// output goes and how the waiting is done. A command that outlives
+    /// its window is owed to `owner` and to no other run.
     ///
     /// # Errors
     /// `E_TOOL_UNAVAILABLE` when the program cannot be started, and
@@ -99,6 +100,7 @@ impl Backlog {
     /// written.
     pub fn run(
         &self,
+        owner: RunId,
         scope: &Address,
         what: String,
         mut command: Command,
@@ -128,7 +130,7 @@ impl Backlog {
                 body: Body::Command {
                     child,
                     dir: dir.clone(),
-                    backgrounded: false,
+                    claim: Claim::Window(owner),
                 },
             },
         )?;
@@ -225,38 +227,36 @@ impl Backlog {
         Ok(reached)
     }
 
-    /// Takes every background member that has stopped, in table order.
+    /// Takes every background member of `owner` that has stopped, in
+    /// table order, and lets go of every stopped member whose run has
+    /// ended.
     ///
     /// A member is reported once and then forgotten: this is what a
     /// caller appends to the tail of its next tool result, and a result
-    /// delivered twice would read as the command having run twice.
+    /// delivered twice would read as the command having run twice. A
+    /// member another run started is never reported here, because that
+    /// tail goes into this run's model and onto its lines of the ledger.
     ///
     /// # Errors
     /// `E_STORAGE_FATAL` when the table cannot be reached.
-    pub fn harvest(&self) -> Result<Vec<Finished>, AxError> {
+    pub fn harvest(&self, owner: RunId) -> Result<Vec<Finished>, AxError> {
         let mut table = self.hold()?;
         let mut done = Vec::new();
         let mut spent = Vec::new();
         for (id, member) in &mut table.members {
-            let Body::Command {
-                child,
-                dir,
-                backgrounded: true,
-            } = &mut member.body
-            else {
+            let Body::Command { child, dir, claim } = &mut member.body else {
                 continue;
             };
-            let ending = match child.try_wait() {
-                Ok(Some(status)) => Some(Exit::of(&status)),
-                Ok(None) => None,
-                // A host that will not answer is not a member that is
-                // still running: the caller is told the ending was not
-                // read, and the entry stops being reported for ever.
-                Err(_) => Some(Exit::Unknown {
-                    why: Unseen::WaitRefused,
-                }),
+            match claim {
+                Claim::Run(run) if *run == owner => {}
+                Claim::Nobody => {}
+                Claim::Window(_) | Claim::Run(_) => continue,
+            }
+            let Some(exit) = Exit::polled(child) else {
+                continue;
             };
-            if let Some(exit) = ending {
+            spent.push(*id);
+            if let Claim::Run(_) = claim {
                 let (stdout, stderr) = collect(dir);
                 done.push(Finished {
                     id: *id,
@@ -265,13 +265,38 @@ impl Backlog {
                     stdout,
                     stderr,
                 });
-                spent.push(*id);
+            } else {
+                // Output owed to nobody is not read at all. A directory
+                // that will not go costs disk, never the harvest.
+                drop(std::fs::remove_dir_all(dir));
             }
         }
         for id in spent {
             table.members.remove(&id);
         }
         Ok(done)
+    }
+
+    /// Marks every background command `owner` started as owed to
+    /// nobody, and returns how many there were. The run has ended, so no
+    /// later tool result of its own can carry them; the next harvest by
+    /// any run lets their process handles and files go without reading
+    /// their output to anyone.
+    ///
+    /// # Errors
+    /// `E_STORAGE_FATAL` when the table cannot be reached.
+    pub fn release(&self, owner: RunId) -> Result<usize, AxError> {
+        let mut table = self.hold()?;
+        let mut released = 0usize;
+        for member in table.members.values_mut() {
+            if let Body::Command { claim, .. } = &mut member.body
+                && *claim == Claim::Run(owner)
+            {
+                *claim = Claim::Nobody;
+                released = released.saturating_add(1);
+            }
+        }
+        Ok(released)
     }
 
     /// What is still running at or under one address.
@@ -330,13 +355,7 @@ impl Backlog {
                 why: Unseen::LeftTheTable,
             }));
         };
-        let stopped = match child.try_wait() {
-            Ok(Some(status)) => Some(Exit::of(&status)),
-            Ok(None) => None,
-            Err(_) => Some(Exit::Unknown {
-                why: Unseen::WaitRefused,
-            }),
-        };
+        let stopped = Exit::polled(child);
         if stopped.is_some() {
             table.members.remove(&id);
         }
@@ -346,11 +365,12 @@ impl Backlog {
     fn hand_over(&self, id: BacklogId) -> Result<(), AxError> {
         let mut table = self.hold()?;
         if let Some(Member {
-            body: Body::Command { backgrounded, .. },
+            body: Body::Command { claim, .. },
             ..
         }) = table.members.get_mut(&id)
+            && let Claim::Window(owner) = *claim
         {
-            *backgrounded = true;
+            *claim = Claim::Run(owner);
         }
         Ok(())
     }
@@ -364,7 +384,7 @@ mod member;
 mod report;
 mod scratch;
 pub mod waiting;
-use member::{Body, Member, RunState, collect, storage};
+use member::{Body, Claim, Member, RunState, collect, storage};
 pub use report::{BacklogKind, Finished, Standing, Started};
 use scratch::Scratch;
 pub use waiting::{Exit, PollBudget, Unseen};

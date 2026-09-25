@@ -44,6 +44,7 @@ fn setup(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathB
         fuel: Fuel(1_000_000),
         env_passthrough: Vec::new(),
         domain: Address::parse("work").unwrap(),
+        run: kernel::RunId::from_bytes([1; 16]),
     }
 }
 

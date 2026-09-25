@@ -26,8 +26,8 @@ use std::path::PathBuf;
 use std::collections::BTreeMap;
 
 use kernel::{
-    AxCode, AxError, CostTier, Effect, EnvVarName, ExecArm, Payload, RenderIntent, Temporal, Tool,
-    ToolCall, ToolMeta, ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, EnvVarName, ExecArm, Payload, RenderIntent, RunId, Temporal,
+    Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -46,12 +46,13 @@ pub use confinement::{
 /// which a denylist does not.
 const ENV_ALLOWLIST: [&str; 4] = ["PATH", "LANG", "LC_ALL", "TZ"];
 
-/// What one building's execution boundary is made of.
+/// What one run's execution boundary is made of.
 ///
-/// Seven values that always travel together and are never chosen
-/// independently: they are read out of one frozen configuration and one
-/// machine, and they reach this tool as one thing rather than as a
-/// parameter list nobody can call correctly from memory.
+/// Eight values that always travel together and are never chosen
+/// independently: they are read out of one frozen configuration, one
+/// machine and one dispatch, and they reach this tool as one thing
+/// rather than as a parameter list nobody can call correctly from
+/// memory.
 pub struct ExecSetup {
     pub workdir: PathBuf,
     pub mounts: Vec<Mount>,
@@ -62,6 +63,9 @@ pub struct ExecSetup {
     /// of [`ENV_ALLOWLIST`].
     pub env_passthrough: Vec<EnvVarName>,
     pub domain: kernel::Address,
+    /// The run this tool serves: a command it hands to the background
+    /// is owed to this run, and its output reaches no other.
+    pub run: RunId,
 }
 
 pub struct ExecTool {
@@ -182,7 +186,9 @@ impl ExecTool {
                 (command, Some(placed))
             }
         };
-        let started = self.backlog.run(&self.setup.domain, what, command)?;
+        let started = self
+            .backlog
+            .run(self.setup.run, &self.setup.domain, what, command)?;
         let result = match started {
             Started::Settled {
                 exit,
@@ -357,9 +363,20 @@ impl Tool for ExecTool {
             },
             ExecArm::Shell { text } => self.run_shell(&text, placement),
         }?;
-        let finished = self.backlog.harvest()?;
+        let finished = self.backlog.harvest(self.setup.run)?;
         self.confinement.reaped(&finished);
         with_backlog(answer, finished)
+    }
+}
+
+/// The tool is dropped when its run's bench is, which is when the run
+/// can no longer be handed anything: what it left in the background is
+/// released so the table does not keep it for the life of the city.
+impl Drop for ExecTool {
+    fn drop(&mut self) {
+        // A table left locked by a dead thread already answers every
+        // later caller with `E_STORAGE_FATAL`; a drop has nobody to tell.
+        drop(self.backlog.release(self.setup.run));
     }
 }
 
