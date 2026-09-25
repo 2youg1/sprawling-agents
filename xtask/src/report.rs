@@ -35,6 +35,10 @@ pub(crate) enum XtaskError {
     Cmd { cmd: String, msg: String },
     #[error("run gate `{name}`: no gate has that name (unknown-gate); name one of: {known}")]
     UnknownGate { name: String, known: String },
+    #[error(
+        "run gate `{name}`: the gate panicked (gate-panicked); run `cargo xtask gates {name}` to see the panic alone"
+    )]
+    GatePanicked { name: &'static str },
 }
 
 pub(crate) fn render(violations: &[Violation]) {

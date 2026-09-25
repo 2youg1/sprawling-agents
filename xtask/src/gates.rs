@@ -13,6 +13,7 @@
 
 use std::path::Path;
 use std::process::ExitCode;
+use std::thread;
 
 use crate::report::{self, Violation, XtaskError};
 use crate::{
@@ -165,11 +166,34 @@ pub(crate) fn run(root: &Path, range: Option<&str>, names: &[String]) -> ExitCod
         Ok(gates) => gates,
         Err(err) => return report::internal_failure(&err),
     };
-    report::finish_all(
+    report::finish_all(judge(&gates, root, range))
+}
+
+/// Every gate's verdict, in the order `gates` lists them. Each gate
+/// judges on a thread of its own, so the wall time is the slowest gate's
+/// rather than their sum; joining in roster order keeps the report
+/// byte-identical between runs on one tree.
+fn judge(
+    gates: &[&'static Gate],
+    root: &Path,
+    range: Option<&str>,
+) -> Vec<(&'static str, Result<Vec<Violation>, XtaskError>)> {
+    thread::scope(|scope| {
         gates
+            .iter()
+            .map(|gate| (gate.name, scope.spawn(move || (gate.check)(root, range))))
+            .collect::<Vec<_>>()
             .into_iter()
-            .map(|gate| (gate.name, (gate.check)(root, range))),
-    )
+            .map(|(name, verdict)| {
+                (
+                    name,
+                    verdict
+                        .join()
+                        .unwrap_or(Err(XtaskError::GatePanicked { name })),
+                )
+            })
+            .collect()
+    })
 }
 
 /// The default feature set, test targets included.
@@ -212,8 +236,44 @@ pub(crate) fn default_features(root: &Path) -> Result<Vec<Violation>, XtaskError
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 mod tests {
-    use super::select;
-    use crate::report::XtaskError;
+    use std::path::Path;
+    use std::sync::Mutex;
+    use std::thread::{self, ThreadId};
+
+    use super::{Gate, judge, select};
+    use crate::report::{Violation, XtaskError};
+
+    static JUDGED_ON: Mutex<Vec<ThreadId>> = Mutex::new(Vec::new());
+
+    fn record(_: &Path, _: Option<&str>) -> Result<Vec<Violation>, XtaskError> {
+        JUDGED_ON.lock().unwrap().push(thread::current().id());
+        Ok(Vec::new())
+    }
+
+    static FIRST: Gate = Gate {
+        name: "first",
+        check: record,
+    };
+    static SECOND: Gate = Gate {
+        name: "second",
+        check: record,
+    };
+
+    #[test]
+    fn gates_judge_off_the_calling_thread_and_report_in_roster_order() {
+        let names: Vec<&str> = judge(&[&FIRST, &SECOND], Path::new("."), None)
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect();
+        assert_eq!(names, ["first", "second"]);
+        let caller = thread::current().id();
+        let judged_on = JUDGED_ON.lock().unwrap().clone();
+        assert_eq!(judged_on.len(), 2);
+        assert!(
+            judged_on.iter().all(|id| *id != caller),
+            "a gate judged on the calling thread: {judged_on:?}"
+        );
+    }
 
     #[test]
     fn a_named_gate_runs_alone_and_an_unknown_name_is_refused() {
