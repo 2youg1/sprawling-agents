@@ -604,11 +604,11 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 
 **四个家，写者一个读者三个，互不引用。** `client/vite.config.ts` 写出那个目录，`crates/sprawling/build.rs` 嵌入它，`xtask::render` 打开它，`xtask::budget` 称它。改 `outDir` 之后没有一处会红：build script 走 placeholder 只打一条 warning，两道门各自 skip，`just check` 依旧绿，直到有人下载到一个只有空白页的二进制。**这正是「找不到输入就变绿」那一类失效**（§8-13 点名要避的那一类），而它同时命中了四个家里的三个。
 
-**权威落在 `crates/sprawling/build.rs` 的 `BUNDLE_DIR`，判据两条。** 谁先需要它：任何一次 `cargo build` 都要先由 build script 找到那个目录，而门跑在其后。谁能被另一个引用：build script 是**唯一一个在已发布树里仍要工作的读者**——`release::is_scaffolding` 把 `xtask/` 留在机器上，所以一个住在 `xtask` 的常量在那棵树上根本不存在，而反方向可行——`xtask::bundle` 用 `syn` 从 build script 里读出这个常量。故 `xtask` 侧零副本：`render` 与 `budget` 都调 `bundle::dist(root)`。
+**权威落在 `crates/sprawling/build.rs` 的 `BUNDLE_DIR`，它的值是相对工作区根、以 `/` 分段的整条路径 `target/web-dist`，判据两条。** 谁先需要它：任何一次 `cargo build` 都要先由 build script 找到那个目录，而门跑在其后。谁能被另一个引用：build script 是**唯一一个在已发布树里仍要工作的读者**——`release::is_scaffolding` 把 `xtask/` 留在机器上，所以一个住在 `xtask` 的常量在那棵树上根本不存在，而反方向可行——`xtask::bundle` 用 `syn` 从 build script 里读出这个常量。故 `xtask` 侧零副本：`render` 与 `budget` 都调 `bundle::dist(root)`，它把这条路径逐段接在工作区根上。
 
-**另外两处用另一门语言写，由闸断言相等而不代写**（roadmap §14 对跨语言事实的口径）：`client/vite.config.ts` 与 `justfile` 必须拼出权威说的那个名字，不然 `artifact` 门红。一道门不改别人的打包器配置。
+**另外两处用另一门语言写，由闸断言相等而不代写**（roadmap §14 对跨语言事实的口径）：`client/vite.config.ts` 与 `justfile` 必须拼出权威说的那条路径，不然 `artifact` 门红。一道门不改别人的打包器配置。**判的是整条路径而不只是目录名**：父目录 `target` 若在各处各写一份，名字对得上而位置对不上，门仍是绿的。
 
-**`target_dir` 的启发式随本节删除。** 原来的读法是从 `OUT_DIR` 向上找第一个**字面叫 `target`** 的目录，它对任何别的名字答错；现在读 `CARGO_TARGET_DIR`，未设时用工作区自己的 `target/`，相对值按 cargo 的规矩相对工作区根解析。
+**包的位置与 cargo 的输出目录无关。** 客户端包是 bun 的产物，`build.rs` 不读 `CARGO_TARGET_DIR`，只在工作区根下找 `BUNDLE_DIR`（sprawling-SPEC §8-83）。若让三个读者都跟随 cargo 的目标目录，每个读者都要复刻 cargo 解析它的规则（环境变量、`build.target-dir`、相对路径按当前目录解析），而这三份复刻用两门语言写，没有门能判它们相等。
 
 **`render` 的 `location` 因此少了一段前缀**：一处版面违规现在报 `#/gallery <这一次开页>`，不再抄一份构建目录——那条读数对着的是画出来的页面，不是盘上的某个文件。
 
