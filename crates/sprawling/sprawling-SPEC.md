@@ -3243,7 +3243,7 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 
 **决定**：仪表放在 crate 内的测试里，而不是给 citysim 开一扇公共门。relay、`serve_flight` 与 desk 都是 `pub(crate)`；为量它们而开的公共面没有生产调用者，而且要进 apisync 基线。**败给的方案**：citysim 经 `RunWorker::handle(Dispatch)` 从外面驱动，再用 provider 两次请求之间的空隙推算 relay 往返。那个空隙里还有围栏（每波 20–90 ms）与工具，推算出来的是每回合剩余，不是一次往返。
 
-**重开参数**：记账线程改成统一收件箱之后（主线 1），`attend` 的签名随之改，两件仪表的驱动方式不变——它们只经过 desk、relay 与 provider 三个面。
+**重开参数**：记账线程改成统一的接收队列之后（主线 1），`attend` 的签名随之改，两件仪表的驱动方式不变——它们只经过 desk、relay 与 provider 三个面。
 
 ## 8-60 提示词语料的分层：哪类事实住哪一层（`docs/City.md`＋`ToolMeta`＋`Catalog`）
 
