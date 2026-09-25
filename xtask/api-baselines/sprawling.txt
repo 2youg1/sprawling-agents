@@ -9,6 +9,7 @@ impl sprawling::serving::Journal
 impl sprawling::serving::Keyed
 pub async fn sprawling::serving::serve(sprawling::serving::Serving) -> core::result::Result<(), kernel::error::shape::AxError>
 pub enum sprawling::assembly::Adopt
+pub enum sprawling::assembly::History
 pub enum sprawling::doctor::Platform
 pub enum sprawling::firstrun::BesideBinary
 pub enum sprawling::firstrun::FirstScreen
@@ -21,7 +22,7 @@ pub fn sprawling::assembly::RunWorker::new(&std::path::Path, gateway::credential
 pub fn sprawling::assembly::RunWorker::startup_scan(&mut self) -> core::result::Result<sprawling::assembly::ScanReport, kernel::error::shape::AxError>
 pub fn sprawling::assembly::ScanReport::summary(&self) -> alloc::string::String
 pub fn sprawling::assembly::form_city(&std::path::Path, sprawling::assembly::Adopt) -> core::result::Result<sprawling::assembly::InitReport, kernel::error::shape::AxError>
-pub fn sprawling::assembly::has_history(&std::path::Path) -> bool
+pub fn sprawling::assembly::has_history(&std::path::Path) -> core::result::Result<sprawling::assembly::History, kernel::error::shape::AxError>
 pub fn sprawling::assembly::init_city(&std::path::Path) -> core::result::Result<sprawling::assembly::InitReport, kernel::error::shape::AxError>
 pub fn sprawling::doctor::Platform::current() -> core::option::Option<sprawling::doctor::Platform>
 pub fn sprawling::doctor::verb(&[alloc::string::String]) -> std::process::ExitCode
@@ -54,6 +55,8 @@ pub mod sprawling::release
 pub mod sprawling::serving
 pub sprawling::assembly::Adopt::EveryFolder
 pub sprawling::assembly::Adopt::Nothing
+pub sprawling::assembly::History::Absent
+pub sprawling::assembly::History::Present
 pub sprawling::assembly::InitReport::adopted: alloc::vec::Vec<kernel::address::Address>
 pub sprawling::assembly::InitReport::genesis: kernel::event::payload::EventRef
 pub sprawling::assembly::InitReport::ledger_dir: std::path::PathBuf

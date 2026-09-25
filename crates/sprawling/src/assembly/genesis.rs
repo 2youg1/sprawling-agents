@@ -87,16 +87,20 @@ pub enum History {
 /// listed: calling that `Absent` would let `init` write a second genesis
 /// over a city it merely failed to read.
 pub fn has_history(city_root: &Path) -> Result<History, AxError> {
-    Ok(
-        if std::fs::read_dir(ledger_dir(city_root))
-            .map(|mut entries| entries.next().is_some())
-            .unwrap_or(false)
-        {
-            History::Present
-        } else {
-            History::Absent
-        },
-    )
+    let dir = ledger_dir(city_root);
+    match std::fs::read_dir(&dir) {
+        Ok(mut entries) => Ok(match entries.next() {
+            Some(_) => History::Present,
+            None => History::Absent,
+        }),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(History::Absent),
+        Err(err) => Err(AxError::failure(
+            AxCode::StorageFatal,
+            "read city history",
+            format!("{}: {err}", dir.display()),
+        )
+        .with_recovery("make the ledger directory readable, or name a different city directory")),
+    }
 }
 
 /// `sprawling init <dir>`: the genesis write. The city is born when
