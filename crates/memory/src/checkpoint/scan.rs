@@ -97,21 +97,44 @@ impl Checkpoint {
     /// blobs it has already cleared, which costs time and gives up no
     /// safety.
     fn last_tree(&self) -> Result<Option<git2::Tree<'_>>, MemoryError> {
-        let oid = match self.last {
-            Some(oid) => oid,
-            None => match self.repo.head().ok().and_then(|head| head.target()) {
-                Some(oid) => oid,
+        let commit = match self.last {
+            Some(oid) => self
+                .repo
+                .find_commit(oid)
+                .map_err(git_err("read the last checkpoint"))?,
+            None => match Self::head_commit(&self.repo)? {
+                Some(commit) => commit,
                 None => return Ok(None),
             },
         };
-        let commit = self
-            .repo
-            .find_commit(oid)
-            .map_err(git_err("read the last checkpoint"))?;
         commit
             .tree()
             .map(Some)
             .map_err(git_err("read the last checkpoint's tree"))
+    }
+
+    /// The commit HEAD names, or `None` when the city has none yet.
+    ///
+    /// Only an unborn branch and a missing reference mean "none yet";
+    /// anything else that stops HEAD being read is an error, because
+    /// reading it as "none" would turn the next fence into a parentless
+    /// root commit cut off from the history before it (memory-SPEC 8-17).
+    fn head_commit(repo: &git2::Repository) -> Result<Option<git2::Commit<'_>>, MemoryError> {
+        match repo.head() {
+            Ok(head) => head
+                .peel_to_commit()
+                .map(Some)
+                .map_err(git_err("read HEAD")),
+            Err(err)
+                if matches!(
+                    err.code(),
+                    git2::ErrorCode::UnbornBranch | git2::ErrorCode::NotFound
+                ) =>
+            {
+                Ok(None)
+            }
+            Err(err) => Err(git_err("read HEAD")(err)),
+        }
     }
 
     /// Stages every file under `scope`, including deletions. Paths
@@ -211,18 +234,17 @@ impl Checkpoint {
             .repo
             .find_tree(tree_oid)
             .map_err(git_err("find staged tree"))?;
-        let seconds = i64::try_from(plan.t.value().saturating_div(1000)).unwrap_or(0);
+        let seconds = i64::try_from(plan.t.value().saturating_div(1000)).map_err(|_| {
+            MemoryError::Checkpoint {
+                op: "stamp the commit",
+                detail: format!("{} ms is past what git can date", plan.t.value()),
+            }
+        })?;
         let when = git2::Time::new(seconds, 0);
         let email = plan.of.email();
         let signature = git2::Signature::new(plan.of.actor().as_str(), &email, &when)
             .map_err(git_err("build signature"))?;
-        let parents: Vec<git2::Commit> = match self.repo.head() {
-            Ok(head) => match head.peel_to_commit() {
-                Ok(commit) => vec![commit],
-                Err(_) => Vec::new(),
-            },
-            Err(_) => Vec::new(),
-        };
+        let parents: Vec<git2::Commit> = Self::head_commit(&self.repo)?.into_iter().collect();
         let parent_refs: Vec<&git2::Commit> = parents.iter().collect();
         let full_message = format!("{}\n\n{}", plan.subject, plan.of.trailers());
         let update = if plan.onto_head { Some("HEAD") } else { None };

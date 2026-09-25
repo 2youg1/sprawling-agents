@@ -151,3 +151,38 @@ fn a_wave_whose_scope_crosses_a_link_is_refused() {
         "the refusal names the write-domain rule"
     );
 }
+
+/// A HEAD that cannot be read is not an empty city. Read as "no
+/// history", it would make the fence a parentless root commit and cut
+/// the Ledger's oid off from everything before it, with nobody told.
+#[test]
+fn a_head_that_cannot_be_read_refuses_the_fence_instead_of_orphaning_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/note.md", "a line");
+    let mut first = Checkpoint::open(tmp.path()).unwrap();
+    first
+        .ensure_base(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+    drop(first);
+    let branch = git2::Repository::open(tmp.path())
+        .unwrap()
+        .head()
+        .unwrap()
+        .name()
+        .unwrap()
+        .to_owned();
+    std::fs::write(tmp.path().join(".git").join(&branch), "not an oid\n").unwrap();
+
+    let mut second = Checkpoint::open(tmp.path()).unwrap();
+    let outcome = second.wave_pre(&["work".to_owned()], TimeMs::new(1_000), &resident());
+    assert!(
+        matches!(
+            outcome,
+            Err(MemoryError::Checkpoint {
+                op: "read HEAD",
+                ..
+            })
+        ),
+        "{outcome:?}"
+    );
+}

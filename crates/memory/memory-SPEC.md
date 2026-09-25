@@ -431,6 +431,8 @@ impl Checkpoint {
   权威是账本里的 oid；两个 open 的计数器撞名时后写的引用覆盖前一个，而被覆盖的
   提交仍由账本里的 oid 指得到。
 - **`ensure_base` 仍然移动 HEAD**：worktree 从一个提交分枝，城必须先有第一个提交。
+- **「无 HEAD」只有两种读法**：`head()` 报 `UnbornBranch`（空仓库）或 `NotFound`（HEAD 指向的引用不存在）时才算「这座城还没有提交」，提交无父、扫描全扫。其他任何读不出 HEAD 的情形——引用文件损坏、HEAD 指向一个剥不出提交的对象——都是 `Checkpoint { op: "read HEAD" }` 错误，栅栏不立。被否：把一切失败读成「无 HEAD」。那样一次读不出的 HEAD 会让栅栏静默地变成一个无父的根提交，账本记下的 oid 与之前的历史断开，而没有人被告知。判定只有一处（`Checkpoint::head_commit`），提交与扫描都问它。
+- **提交时间是注入时刻的整秒**：`TimeMs` 是 `u64` 毫秒，除以 1000 后恒落在 `i64` 内，换算仍走 `i64::try_from` 且失败时报 `Checkpoint { op: "stamp the commit" }`，而不是写成 1970。
 
 - **扫改动过的 blob，不扫整棵树**：遍历 git index 里的**每一个** blob、对**整份内容**跑 `kernel::secret::scan` 且**每一次工具波都跑一遍**时，4.89 MB／350 文件的树实测纯 CPU **212 ms** 每波，另加从 git 对象库 zlib 解压每一个 blob 的开销——**改了一个文件的波，付整棵树的钱**。
   - 扫描因此走 `diff_tree_to_index(HEAD 树, index)`：git 自己报出这一次提交会新写进去的条目，只有它们被读出内容并扫描。它问的是 git 而不是自己逐文件推，于是「什么会进树」由暂存与扫描共用的一个机制回答。
