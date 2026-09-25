@@ -243,10 +243,7 @@ mod tests {
         };
         assert!(authorization_endpoint.starts_with("https://"));
         let codex = profile_for(Family::Codex).unwrap();
-        assert!(matches!(
-            codex.grant,
-            Grant::AuthorizationCode { redirect_uri } if redirect_uri.starts_with("http://localhost:")
-        ));
+        assert!(matches!(codex.grant, Grant::AuthorizationCode { .. }));
         let xai = profile_for(Family::GrokBuild).unwrap();
         let Grant::DeviceCode {
             authorization_endpoint,
@@ -259,6 +256,26 @@ mod tests {
             "https://auth.x.ai/oauth2/device/code"
         );
         assert!(xai.token_endpoint.starts_with("https://auth.x.ai/"));
+    }
+
+    /// A redirect back to this machine names the loopback address, not
+    /// the name `localhost`: RFC 8252 §8.3 advises against the name,
+    /// which can resolve off the loopback interface, and the redirect
+    /// must match the vendor's own client byte for byte.
+    #[test]
+    fn a_loopback_redirect_names_the_address_not_the_name() {
+        let http_redirects = OAUTH_PROFILES.iter().filter_map(|row| match row.grant {
+            Grant::AuthorizationCode { redirect_uri } => redirect_uri.strip_prefix("http://"),
+            Grant::DeviceCode { .. } => None,
+        });
+        for rest in http_redirects {
+            let authority = rest.split('/').next().unwrap();
+            let (host, _port) = authority.rsplit_once(':').unwrap();
+            let address: std::net::IpAddr = host
+                .parse()
+                .unwrap_or_else(|_| panic!("{host} is a name, not a loopback address"));
+            assert!(address.is_loopback(), "{host}");
+        }
     }
 
     /// A subscription login that can be driven at all states its token
