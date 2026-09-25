@@ -15,7 +15,7 @@
 // the position - that, the author and the time are readable - and the
 // field it could not read comes back to the caller to report.
 
-import { get, writable } from "svelte/store";
+import { writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 import { readProbed } from "./probed";
@@ -173,10 +173,18 @@ export interface BeliefStore {
   readonly refused: (error: AxError | null) => void;
   readonly named: (city: string | null) => void;
   readonly noticesSeen: () => void;
+  // Runs `folds` and tells subscribers once, after the last of them:
+  // a burst of records between two paints is one update and one paint.
+  // Batches nest; only the outermost one publishes.
+  readonly batch: (folds: () => void) => void;
 }
 
 export function createBelief(now: () => number): BeliefStore {
-  const store = writable<Belief>({
+  // The belief as the folds have left it, and the store that tells
+  // subscribers about it. They differ only inside a batch; reading the
+  // local rather than the store keeps a fold from subscribing and
+  // unsubscribing once per record.
+  let current: Belief = {
     runs: {},
     halted: [],
     haltedAt: Seq.make(0),
@@ -186,7 +194,22 @@ export function createBelief(now: () => number): BeliefStore {
     sessions: {},
     probed: null,
     logs: [],
-  });
+  };
+  const store = writable<Belief>(current);
+  let depth = 0;
+
+  function written(next: Belief): void {
+    current = next;
+    if (depth === 0) store.set(next);
+  }
+
+  function batch(folds: () => void): void {
+    const before = current;
+    depth += 1;
+    folds();
+    depth -= 1;
+    if (depth === 0 && current !== before) store.set(current);
+  }
 
   // What a `city_view` answer says about runs this page never saw. A run
   // the page already follows keeps its own reading: the answer is a
@@ -195,7 +218,7 @@ export function createBelief(now: () => number): BeliefStore {
   // session in a tab nobody can use, and a run left behind by a restart
   // goes on telling the skyline that this city is busy.
   function adoptCity(city: CityAnswer): void {
-    const held = get(store);
+    const held = current;
     // The answer states no ledger position of its own. The newest
     // position it does state - the furthest any run it lists has been
     // folded - is what it can claim by, so an answer whose runs are all
@@ -218,7 +241,7 @@ export function createBelief(now: () => number): BeliefStore {
       if (listed.has(run)) continue;
       if (was.local) runs[run] = { ...was, local: false };
     }
-    store.set({
+    written({
       ...held,
       runs,
       halted: stated >= held.haltedAt ? [...city.halted] : held.halted,
@@ -235,10 +258,10 @@ export function createBelief(now: () => number): BeliefStore {
     const scope = stated.scope;
     const word = stated.state;
     if (scope === null || word === null) return bad;
-    const held = get(store);
+    const held = current;
     if (record.seq > held.haltedAt) {
       const without = held.halted.filter((each) => !sameScope(each, scope));
-      store.set({
+      written({
         ...held,
         halted: word === "halted" ? [...without, scope] : without,
         haltedAt: record.seq,
@@ -253,9 +276,9 @@ export function createBelief(now: () => number): BeliefStore {
     if (record.kind === "city_halted") {
       return halted(record);
     }
-    const held = get(store);
+    const held = current;
     if (record.kind === "city_initialized") {
-      store.set({ ...held, city: record.addr ?? null });
+      written({ ...held, city: record.addr ?? null });
       return null;
     }
     const start = sessionStart(record);
@@ -263,13 +286,13 @@ export function createBelief(now: () => number): BeliefStore {
       // Written only forwards: a page that reloads folds an older range
       // after a newer one, and the newest start is what a stretch begins at.
       if (start.seq > (held.sessions[start.addr] ?? Seq.make(0))) {
-        store.set({ ...held, sessions: { ...held.sessions, [start.addr]: start.seq } });
+        written({ ...held, sessions: { ...held.sessions, [start.addr]: start.seq } });
       }
       return null;
     }
     if (record.kind === "endpoint_probed") {
       const found = readProbed(record.data);
-      if (found !== null) store.set({ ...held, probed: found });
+      if (found !== null) written({ ...held, probed: found });
       return null;
     }
     if (record.run === CITY_RUN) {
@@ -291,7 +314,7 @@ export function createBelief(now: () => number): BeliefStore {
   // is a fresh object whenever its reading changed.
   function folded(held: Belief, run: RunId, next: RunBelief): void {
     held.runs[run] = next;
-    store.set({ ...held });
+    written({ ...held });
   }
 
   // One piece of what the model is producing. A page that joins in the
@@ -301,7 +324,7 @@ export function createBelief(now: () => number): BeliefStore {
   // arrive, and the next answer that does not list the run takes it
   // away, because every run born here is `local`.
   function say(delta: Delta): void {
-    const held = get(store);
+    const held = current;
     const run = held.runs[delta.run] ?? unseen(delta.run, Seq.make(0));
     const moved: RunBelief =
       "said" in delta.increment
@@ -314,12 +337,12 @@ export function createBelief(now: () => number): BeliefStore {
   // first, because what a person is reading a log for is what just
   // happened.
   function logged(line: LogLine): void {
-    const held = get(store);
+    const held = current;
     const logs = [...held.logs, line];
     if (logs.length > LOG_WINDOW) {
       logs.splice(0, logs.length - LOG_WINDOW);
     }
-    store.set({ ...held, logs });
+    written({ ...held, logs });
   }
 
   // A refusal is shown once; one kind also corrects the page: a steer
@@ -333,9 +356,9 @@ export function createBelief(now: () => number): BeliefStore {
   // would freeze a run over a refused cancel; the action sentence is the
   // only discriminator the server states.
   function refused(error: AxError | null): void {
-    const held = get(store);
+    const held = current;
     if (error === null) {
-      store.set({ ...held, refusal: null });
+      written({ ...held, refusal: null });
       return;
     }
     const notices = merged(held.notices, error, TimeMs.make(now()));
@@ -343,21 +366,21 @@ export function createBelief(now: () => number): BeliefStore {
     if (run !== undefined && run.doing.kind !== "frozen") {
       held.runs[error.subject] = { ...run, doing: PHASES.run_frozen };
     }
-    store.set({ ...held, refusal: error, notices });
+    written({ ...held, refusal: error, notices });
   }
 
   // The name the welcome carried: a page that only hears what happens
   // next cannot otherwise know the name of a city raised last month.
   function named(city: string | null): void {
-    store.set({ ...get(store), city });
+    written({ ...current, city });
   }
 
   // Reading the bell is what marks it read: an unread count that
   // survived the panel being open would be a number nobody can clear.
   function noticesSeen(): void {
-    const held = get(store);
-    store.set({ ...held, notices: held.notices.map((each) => ({ ...each, seen: true })) });
+    const held = current;
+    written({ ...held, notices: held.notices.map((each) => ({ ...each, seen: true })) });
   }
 
-  return { belief: store, adoptCity, apply, say, logged, refused, named, noticesSeen };
+  return { belief: store, adoptCity, apply, say, logged, refused, named, noticesSeen, batch };
 }
