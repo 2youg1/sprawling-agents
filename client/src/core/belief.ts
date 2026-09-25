@@ -280,8 +280,18 @@ export function createBelief(now: () => number): BeliefStore {
       return null;
     }
     const [next, bad] = fold(run, record);
-    store.set({ ...held, runs: { ...held.runs, [record.run]: next } });
+    folded(held, record.run, next);
     return bad;
+  }
+
+  // One run's new reading, written into the table in place. Copying the
+  // table per record made one token cost a pass over every run the city
+  // holds; the table is the store's own, so the new top-level belief is
+  // what tells a subscriber that something moved, and every run it holds
+  // is a fresh object whenever its reading changed.
+  function folded(held: Belief, run: RunId, next: RunBelief): void {
+    held.runs[run] = next;
+    store.set({ ...held });
   }
 
   // One piece of what the model is producing. A page that joins in the
@@ -297,7 +307,7 @@ export function createBelief(now: () => number): BeliefStore {
       "said" in delta.increment
         ? { ...run, saying: run.saying + delta.increment.said }
         : { ...run, thinking: run.thinking + delta.increment.thought };
-    store.set({ ...held, runs: { ...held.runs, [delta.run]: moved } });
+    folded(held, delta.run, moved);
   }
 
   // One line of the process log, appended to the window. The oldest go
@@ -330,11 +340,10 @@ export function createBelief(now: () => number): BeliefStore {
     }
     const notices = merged(held.notices, error, TimeMs.make(now()));
     const run = error.action.startsWith("steer") ? held.runs[error.subject] : undefined;
-    const runs =
-      run !== undefined && run.doing.kind !== "frozen"
-        ? { ...held.runs, [error.subject]: { ...run, doing: PHASES.run_frozen } }
-        : held.runs;
-    store.set({ ...held, refusal: error, notices, runs });
+    if (run !== undefined && run.doing.kind !== "frozen") {
+      held.runs[error.subject] = { ...run, doing: PHASES.run_frozen };
+    }
+    store.set({ ...held, refusal: error, notices });
   }
 
   // The name the welcome carried: a page that only hears what happens
