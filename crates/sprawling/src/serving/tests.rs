@@ -71,3 +71,48 @@ fn a_loopback_listener_is_handed_nothing_to_present() {
     assert_eq!(keyed, Keyed::NothingToPresent);
     assert_eq!(keyed.code(), None);
 }
+
+/// A serve that cannot take its port leaves the Ledger exactly as it
+/// found it. The socket is the first thing a serve takes, so a busy
+/// port is refused before a writer exists, rather than after a writer
+/// has opened the city and recorded a close nobody asked for.
+#[test]
+fn a_serve_refused_at_the_socket_writes_no_line() {
+    let city = tempfile::tempdir().expect("a temporary directory");
+    crate::assembly::init_city(city.path()).expect("a city forms");
+    let ledger = crate::assembly::ledger_dir(city.path());
+    // As text, so a failure shows the line that was written.
+    let lines = || -> Vec<String> {
+        memory::read_raw_lines_at(&ledger)
+            .expect("the ledger reads")
+            .iter()
+            .map(|line| String::from_utf8_lossy(line).into_owned())
+            .collect()
+    };
+    let before = lines();
+    let taken = std::net::TcpListener::bind("127.0.0.1:0").expect("a free port");
+    let addr = taken.local_addr().expect("the port it took");
+    let executor = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("a runtime");
+
+    let refused = executor.block_on(super::serve(super::Serving {
+        city_root: city.path().to_path_buf(),
+        addr,
+        token: None,
+        client: channels::ClientAssets::Disk(city.path().to_path_buf()),
+        vault: gateway::Custodian::in_memory(),
+        vault_notice: None,
+        log: runtime::diagnostics::Diagnostics::off(),
+        journal: super::Journal::new(),
+        console: None,
+    }));
+
+    assert!(refused.is_err(), "a busy port is a refusal");
+    assert_eq!(
+        lines(),
+        before,
+        "a serve refused at the socket wrote into the ledger"
+    );
+}

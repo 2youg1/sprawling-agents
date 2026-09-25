@@ -11,7 +11,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 
 | 模块 | 形状（ARCHITECTURE §7） | 一句话 |
 |---|---|---|
-| `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 37（S2 期初增 `E_STORAGE_FATAL`，删 `E_SIGNAL_UNKNOWN`，S1 增 `E_BUSY`）；carrier 声明位 |
+| `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 38（其中装载期六码）；carrier 声明位 |
 | `address` | 2 值类型 | 相对 city root 路径 newtype；WriteDomain 原语；reserved prefix 判定 |
 | `locator` | 2 值类型 | `cas:`／`file:` 文法解析与呈现；fail-closed |
 | `event` | 2 值类型 | EventKind 72（二分共 9 条入窗）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
@@ -199,7 +199,7 @@ impl ErrorDraft {
 
 「gate 码走 `refusal`」由构造纪律＋单测保证；S2 `kernel::gate` 是全库唯一 gate 码生产者，citysim 不变量 8 号在系统层复验。derive `Serialize/Deserialize`（Ledger 载荷需要）、`Clone/Debug/PartialEq`；`thiserror::Error` 提供 Display（`{code}: {action} on {subject}`）。
 
-**AxCode 37 全集与 carrier 对应（specalign 数据面）**
+**AxCode 38 全集与 carrier 对应（specalign 数据面）**
 
 > 协作组由六降为五——`E_SIGNAL_UNKNOWN` 已定义掉（三码之一；理由与实测见 `collab-SPEC.md` §8-1）。删除时全仓只有本文件提到它，零生产者。剩下两码（`E_WORKTREE_BUSY`／`E_DIGEST_SUSPECT`）已在各自 SPEC 里答过「能否定义掉」，答案是能保留——它们各自有一个真实的运行期情境。
 
@@ -239,12 +239,13 @@ impl ErrorDraft {
 | 治理与设施 | `E_ENDPOINT_DIALECT_UNSUPPORTED` | `endpoint_lost` |
 | 治理与设施 | `E_WIRE_MISMATCH` | 装载期（无 carrier） |
 | 治理与设施 | `E_LOG_VERSION_UNSUPPORTED` | 装载期（无 carrier） |
+| 治理与设施 | `E_LEDGER_HELD` | 装载期（无 carrier） |
 | 隐私与 Discard | `E_SECRET_EGRESS` | `gate_denied` |
 | 隐私与 Discard | `E_DISCARD_IRREVERSIBLE` | `gate_denied` |
 | 背压 | `E_BACKPRESSURE_SHED` | `tool_result` |
 | 运行未知 | `E_TOOL_OUTCOME_UNKNOWN` | `tool_result` |
 
-装载期五码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED`）＝C9 唯一例外白名单，封闭且不得增长（第 5 码于 S2 期初增补）；`Carrier::Loadtime` 即其类型面。
+装载期六码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED` `E_LEDGER_HELD`）＝C9 唯一例外白名单；`Carrier::Loadtime` 即其类型面。白名单封闭，进表的判据只有一条：**这个码只在本进程此刻写不了账本时出现**，因为它若有账本可写，就必须有 carrier。每一码进表的理由逐条记在 §12。
 `E_BUSY` 的 carrier 与 `E_WORKTREE_BUSY` 一样是 `tool_result`，而两者的区别在名字里：那一个说的是工作树这个机制，这一个说的是**同一个地址上有 run 正在工作**，拒绝里点名那条 run，调用方据此先停它再动手。
 两条呈现约束：`E_SECRET_EGRESS` 的 subject 只写 SecretRef 与位置、恒不回显命中字节；`E_DISCARD_IRREVERSIBLE` 的 alternative 必须可执行。执行点在各生产模块（S2），此处记为 carrier 表随附契约。
 
@@ -1507,6 +1508,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 - `E_VERSION_CONFLICT`（verdict 映射在 S3）：不可定义掉——乐观并发的存在理由就是冲突可发生。
 - `E_LOG_VERSION_UNSUPPORTED`／`E_CAS_CORRUPT`：住装载期白名单，产生地在 memory/runtime（见各自 SPEC）。
 - `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；memory 的 Io 映射已改正（memory-SPEC §12）。
+- `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 memory 的写者锁先于一切读写定义掉（memory-SPEC §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
 
 S2 激活的码（逐码答「能否定义掉」）：
 
@@ -1972,6 +1974,7 @@ pub fn is_reserved(&self) -> bool;                  // 改：eq_ignore_ascii_cas
 
 ```rust
 pub const LEDGER_DIR: &str = "ledger";
+pub const LEDGER_LOCK_FILE: &str = "ledger.lock";
 pub const CAS_DIR: &str = "cas";
 pub const LIBRARY_DIR: &str = "library";
 pub const SESSIONS_DIR: &str = "sessions";
@@ -1989,6 +1992,7 @@ impl CityLayout {
     pub fn root(&self) -> &Path;
     pub fn scope(&self, addr: &Address) -> PathBuf;             // root + 逐段
     pub fn ledger(&self) -> PathBuf;                            // root/.sprawling/ledger
+    pub fn ledger_lock(&self) -> PathBuf;                       // root/.sprawling/ledger.lock
     pub fn cas(&self) -> PathBuf;                               // root/.sprawling/cas
     pub fn library(&self) -> PathBuf;                           // root/.sprawling/library
     pub fn config(&self, addr: &Address) -> PathBuf;            // <scope>/.sprawling/CONFIG.toml
@@ -2014,6 +2018,7 @@ impl CityLayout {
 5. **一个落点一个方法，不是便利方法。** 少一个落点，就有一处调用点继续自己拼，于是本模块不再是唯一权威（Roadmap §19.3 第 5 条）。后续新增一类文件时，先在此加方法与常量，再写调用点。
 6. **`session_slice` 是唯一一个按「首段是楼」读地址的方法。** Room 的地址就是 session 的身份，而 Building 是地址的第一段：地址里楼以下的部分就落成楼自己 sessions 下的目录嵌套，一个 run 不点名 session 时就在楼自己的地址上工作，文件于是叫楼的名字。这条路只被 `memory::sessions` 这一个写者引用，`xtask` 的 `slices` 门钉住这句话。
 7. **`of_ledger` 是 `ledger` 的逆，为「只拿到账本目录」的写者而存在。** 账本的写者手里只有它打开的那一个目录，而切片落在城根之下，故城根必须能从这一个输入反推回来；逆运算住在具名常量所在的同一模块里，任何调用点都不许用 `parent().parent()` 重新拼一遍。不是 `ledger()` 形状的目录不是城（夹具、bundle 的校验台、直接打开的存储），回答 `None`。
+8. **`ledger_lock` 在账本目录旁边，不在里面。** 它是写者锁的那个文件（memory-SPEC §8-1）。账本目录的读者把其中每一项都当作历史，而保留子树的根不随 bundle 走，所以锁文件落在 `.sprawling/` 下、与 `ledger/` 并列。
 
 ### 8-72 `kernel::retries`：失败的调用再试几次（形状 2 值类型）
 

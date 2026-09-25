@@ -60,7 +60,7 @@
 
 ## 5 权威信源
 
-wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）；聚合层硬约束「聚合层只转发 Query 与 Event，恒不转发 Command」；干预动词语义表；`Sealed<T>` 的不可序列化性质；`kernel::error` 的装载期五码白名单（kernel-SPEC §8-1，封闭且不得增长）。外部：axum 0.8.9（2026-04-14，内含 tokio-tungstenite 0.29）与 tokio。
+wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）；聚合层硬约束「聚合层只转发 Query 与 Event，恒不转发 Command」；干预动词语义表；`Sealed<T>` 的不可序列化性质；`kernel::error` 的装载期六码白名单（kernel-SPEC §8-1，封闭）。外部：axum 0.8.9（2026-04-14，内含 tokio-tungstenite 0.29）与 tokio。
 
 ## 6 命名统一
 
@@ -199,9 +199,12 @@ pub fn decide_handshake(hello: &Hello, expected: &Welcome, face: &BindFace) -> H
 // 路由表拿到的也是这个面：壳自己不再读配置里的令牌，因为那样“要求什么”就有两个家。
 pub fn router(config: &ServeConfig, face: BindFace) -> Router;
 
+// 先占住端口，再交出城：绑定判定与 bind 在任何 sink 存在之前做完（§8-46）。
+pub struct Bound { /* 已绑定的监听器与它的 BindFace —— 私有 */ }
+pub async fn bind(addr: SocketAddr, token_digest: Option<B3Hash>) -> Result<Bound, AxError>;
+pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
+
 pub struct ServeConfig {
-    pub addr: SocketAddr,
-    pub token_digest: Option<B3Hash>,   // 摘要，不是令牌
     pub client: Arc<ClientAssets>,      // 客户端资产源由装配层递入
 }
 
@@ -422,7 +425,7 @@ pub struct SessionName(String);                // 形状 2；一个构造点，�
 
 ## 12 错误处理（逐码答「能否定义掉」）
 
-- **`E_WIRE_MISMATCH`**：不可——它是装载期五码之一（封闭白名单），且它的存在理由就是「浏览器缓存旧前端」这一 WebUI 特有错配。类型无法定义掉跨版本的字节。握手之后解不出的帧同归此码、两侧的处置见 §8-37。
+- **`E_WIRE_MISMATCH`**：不可——它是装载期六码之一（封闭白名单），且它的存在理由就是「浏览器缓存旧前端」这一 WebUI 特有错配。类型无法定义掉跨版本的字节。握手之后解不出的帧同归此码、两侧的处置见 §8-37。
 - **`E_CONFIG_INVALID`**：不可——绑定非回环而无令牌必须在**启动时**拒绝，这是配置判定不是请求判定。
 - **`E_SIGNAL_UNKNOWN`**（ARCHITECTURE §11 点名的三条待消解之一，本 crate 须作答）：**部分定义掉**。形状未知的一半可以定义掉——握手的 schema 哈希保证同一连接的两端共享同一份 Signal 枚举，故「收到一个不认识的 Signal 种类」在单个连接内不可表示。语义未知的一半不可定义掉——一个 Resident 收到语法合法但自己不处理的 Signal 类别，这是真实结局，判定位置在消费端 `collab::inbox`，channels 只是 `Attach{notify}` 的产地。**结论：本码不在 channels 消解，其生产消费者住 `collab::inbox`；本条即 ARCHITECTURE §11 要求的作答，不是默认保留。**
 
@@ -1229,11 +1232,11 @@ pub fn decide_bind(addr: &SocketAddr, token: Option<B3Hash>) -> BindVerdict;
 impl BindFace { pub fn token_digest(&self) -> Option<&B3Hash>; }
 ```
 
-**强制点：`decide_bind` 是 `BindFace` 的唯一生产者，`serve` 是它的唯一调用者，`router(config, face)` 把面交给壳。** 壳（`ShellState.face`）此后是「这一面要求什么」的唯一读者：`decide_frame`、`decide_admission` 都拿 `&BindFace`，不再拿一个 `Option<&B3Hash>`。
+**强制点：`decide_bind` 是 `BindFace` 的唯一生产者，`bind` 是它的唯一调用者，`serve` 把 `Bound` 里的面经 `router(config, face)` 交给壳。** 壳（`ShellState.face`）此后是「这一面要求什么」的唯一读者：`decide_frame`、`decide_admission` 都拿 `&BindFace`，不再拿一个 `Option<&B3Hash>`。
 
 - **以前是什么样**：`decide_bind` 收一个 `token_configured: bool`，`serve` 只 `match` 掉 `Refuse` 而把 `Serve(BindFace)` 丢掉；然后每一道门各自去读 `config.token_digest`。「暴露面必须有凭证」因此靠一句话与一个 bool 维持，而 `router()` 是 pub：第二个入口可以造出一个暴露着却不要求任何东西的壳。
 - **现在是什么样**：`Exposed` 里**没有** `Option`——「暴露着却不要求任何东西」是一个类型上不存在的状态。这个不变量在测试里以四种格钉住（回环有无令牌、暴露有无令牌、以及 `BindingFace` 索要的摘要是不是判定它的那一个）。
-- **`ServeConfig.token_digest` 仍在**：它是配置说的话（谁配了令牌），面是绑定判定给出的判决。判决只此一处产生，故这不是同一个事实的两个家。
+- **令牌摘要是 `bind` 的入参**：它是配置说的话（谁配了令牌），面是绑定判定给出的判决。判决只在 `bind` 里产生一次，面随 `Bound` 走到壳里，故这不是同一个事实的两个家。
 - **`decide_admission` 的那句注释同时兑现**：「没有配令牌的城只可能是回环城」此前由启动时的 `decide_bind` 保证，现在由面的形状保证——它拿到的是一个不可能要求空的东西。
 
 #### 四 `/enroll` 等待里的第四个静默臂
@@ -1297,3 +1300,18 @@ pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String
 - **回答带 `SettledSecond { percent, from }`**：`from` 是说出这个值的那一级文件，理由与 `SettledEffort` 同（`Query::Config` 回答表那一条）；缺省不是缺口，而是城一级默认值在生效，页面据此把一个空框画成默认值。
 - **线的背面是同一件事**：写入经 `city::write_second_threshold` 落到那一级的 `CONFIG.toml` 的 `[context] second_threshold`，与 `write_effort` 同一扇门（读—改—写整份文件，别人的键原样保留）；`building_configured` 的载荷因此从三面到四面（`Written::context`）。
 - **`WIRE_V` 的路不单独走**：36→37 记的是这一次面变——给既有命名帧加字段是「语法换形而名字没换」那一类（字段名不进 `COMMAND_NAMES`），与 §8-44 的 35→36 无关；两次都在 §8-1 的 golden 里看得见。
+
+### 8-46 先占住端口，再交出城：`bind` 与 `serve` 分成两步
+
+```rust
+pub struct Bound { /* listener: tokio::net::TcpListener, face: BindFace —— 私有 */ }
+/// 判定绑定面，再绑定监听器。判定拒绝时不碰网络。
+pub async fn bind(addr: SocketAddr, token_digest: Option<B3Hash>) -> Result<Bound, AxError>;
+/// 在已经绑定的监听器上服务，直到 future 被丢弃。
+pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
+```
+
+- **次序是装配层要的**：一座城先占住它的端口，然后才打开写者、写下第一行（sprawling-SPEC §8-61）。`ServeConfig` 里的 sink 要等写者线程开好才造得出来（转写 sink 借的是写者打开的那个金库），所以「绑定」必须能在 sink 存在之前单独做完。原先的单个 `serve(config)` 把两件事绑在一起，装配层只能先开写者、再在 `serve` 里发现端口已被占用。
+- **`addr` 与 `token_digest` 离开 `ServeConfig`**，成为 `bind` 的两个入参。它们只被绑定判定读过；留在 `ServeConfig` 里，同一个地址就会有 `bind` 的入参和配置字段两个家。
+- **失败码不变**：判定拒绝仍是 `decide_bind` 的 `E_CONFIG_INVALID`；操作系统拒绝绑定仍是 `E_CONFIG_INVALID`，recovery 仍是「换一个空闲端口，或者停掉占着它的进程」。
+- **被否：先试绑一次再放掉，然后在 `serve` 里真绑**。试绑与真绑之间，别的进程可以把端口拿走，那样原来的缺陷只是窗口变窄了，并没有消失。
