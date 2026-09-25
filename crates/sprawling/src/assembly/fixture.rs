@@ -16,8 +16,8 @@ mod provider;
 // one fixture module and not two.
 #[cfg(test)]
 pub(super) use provider::{
-    FirstChat, completion, completion_with, fake_openai, fake_openai_routed,
-    fake_openai_routed_with,
+    FirstChat, Pace, completion, completion_with, fake_openai, fake_openai_paced,
+    fake_openai_routed, fake_openai_routed_with,
 };
 
 /// A worker with one endpoint attached and one model chosen, exactly
@@ -27,11 +27,21 @@ pub(super) fn worker_with_provider(
     base_url: &str,
     model: &str,
 ) -> Result<RunWorker, AxError> {
-    let mut worker = RunWorker::new(
+    let worker = RunWorker::new(
         city_root,
         gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
     )?;
+    attach_provider(worker, base_url, model)
+}
+
+/// The same endpoint and model, attached to a worker somebody else
+/// opened - over a ledger on another `Vfs`, say.
+pub(super) fn attach_provider(
+    mut worker: RunWorker,
+    base_url: &str,
+    model: &str,
+) -> Result<RunWorker, AxError> {
     worker.handle(channels::Command::AttachEndpoint {
         name: channels::ProviderName::parse("house").unwrap(),
         base_url: base_url.to_owned(),

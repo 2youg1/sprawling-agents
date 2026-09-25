@@ -117,65 +117,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                 // no browser open is a city doing its work.
                 drop(to_clients.send(record.clone()));
             }));
-            // When the schedule was last read against. Kept by the
-            // loop rather than measured from it, because a city with
-            // lanes driving comes back here every millisecond and one
-            // that opened its schedule file that often would spend its
-            // time opening a file (sprawling-SPEC.md 8-46-2).
-            let mut read_schedule_at = kernel::TimeMs::new(0);
-            loop {
-                // The first two of the three mouths: every relay request
-                // already waiting, then at most one run home. The
-                // crossing is served first, because a run that has
-                // already been paid for must not queue behind one that
-                // has not started.
-                if let Err(err) = worker.serve_flight(LOOK_AGAIN) {
-                    eprintln!("a run could not be landed: {err}");
-                }
-                // The third mouth. A city with lanes driving looks at
-                // the desk in short steps, because a lane makes progress
-                // only while this thread is serving the crossing.
-                let patience = if worker.driving() {
-                    LOOK_AGAIN
-                } else {
-                    SCHEDULE_TICK
-                };
-                match worker_desk.wait(patience) {
-                    // `carrying` holds this command's key in flight for
-                    // the length of the arm, so a frame that repeats it
-                    // while the work is going adds no second run.
-                    DeskWait::Command(posted, carrying) => {
-                        worker.serve_one(*posted);
-                        drop(carrying);
-                    }
-                    // The refusal is written inside `tick`; a schedule
-                    // that cannot be read must not stop the city from
-                    // answering the person.
-                    DeskWait::Idle => {
-                        if let Ok(now) = now_ms()
-                            && now.value().saturating_sub(read_schedule_at.value())
-                                >= SCHEDULE_TICK_MS
-                        {
-                            read_schedule_at = now;
-                            drop(worker.tick(now));
-                        }
-                    }
-                    DeskWait::Close => {
-                        // The lanes are waited for rather than
-                        // abandoned: a lane left blocked on an append
-                        // loses lines this city had already told it
-                        // were durable.
-                        if let Err(err) = worker.land_the_rest() {
-                            eprintln!("a run could not be landed as the city closed: {err}");
-                        }
-                        if let Err(err) = worker.close_city() {
-                            eprintln!("the city could not write its handoff: {err}");
-                        }
-                        break;
-                    }
-                    DeskWait::Gone => break,
-                }
-            }
+            attend(&mut worker, &worker_desk);
         })
         .map_err(|source| {
             AxError::failure(
@@ -201,4 +143,74 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         thread: worker_thread,
         vault,
     })
+}
+
+/// The accounting thread's loop: every relay request already waiting,
+/// then at most one run home, then the desk, in that order
+/// (sprawling-SPEC.md 8-42-4), until the desk closes.
+///
+/// A function of its own rather than the body of the thread's closure,
+/// because the instruments that time a relay round trip and the gap two
+/// dispatches leave in a run drive this loop and not a copy of it
+/// (sprawling-SPEC.md 8-83): a copy that waited differently would be
+/// measured instead of the city.
+pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
+    // When the schedule was last read against. Kept by the
+    // loop rather than measured from it, because a city with
+    // lanes driving comes back here every millisecond and one
+    // that opened its schedule file that often would spend its
+    // time opening a file (sprawling-SPEC.md 8-46-2).
+    let mut read_schedule_at = kernel::TimeMs::new(0);
+    loop {
+        // The first two of the three mouths: every relay request
+        // already waiting, then at most one run home. The
+        // crossing is served first, because a run that has
+        // already been paid for must not queue behind one that
+        // has not started.
+        if let Err(err) = worker.serve_flight(LOOK_AGAIN) {
+            eprintln!("a run could not be landed: {err}");
+        }
+        // The third mouth. A city with lanes driving looks at
+        // the desk in short steps, because a lane makes progress
+        // only while this thread is serving the crossing.
+        let patience = if worker.driving() {
+            LOOK_AGAIN
+        } else {
+            SCHEDULE_TICK
+        };
+        match desk.wait(patience) {
+            // `carrying` holds this command's key in flight for
+            // the length of the arm, so a frame that repeats it
+            // while the work is going adds no second run.
+            DeskWait::Command(posted, carrying) => {
+                worker.serve_one(*posted);
+                drop(carrying);
+            }
+            // The refusal is written inside `tick`; a schedule
+            // that cannot be read must not stop the city from
+            // answering the person.
+            DeskWait::Idle => {
+                if let Ok(now) = now_ms()
+                    && now.value().saturating_sub(read_schedule_at.value()) >= SCHEDULE_TICK_MS
+                {
+                    read_schedule_at = now;
+                    drop(worker.tick(now));
+                }
+            }
+            DeskWait::Close => {
+                // The lanes are waited for rather than
+                // abandoned: a lane left blocked on an append
+                // loses lines this city had already told it
+                // were durable.
+                if let Err(err) = worker.land_the_rest() {
+                    eprintln!("a run could not be landed as the city closed: {err}");
+                }
+                if let Err(err) = worker.close_city() {
+                    eprintln!("the city could not write its handoff: {err}");
+                }
+                break;
+            }
+            DeskWait::Gone => break,
+        }
+    }
 }
