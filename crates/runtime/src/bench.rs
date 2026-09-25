@@ -219,6 +219,14 @@ impl ToolBench {
         // call no door may judge.
         let subject = tool.subject(call)?;
 
+        // The command door stands before the forecast: a command a
+        // tainted run may not execute owes no checkpoint.
+        if name == "exec"
+            && let Some(answered) = self.settled(kernel::gate::command(&self.taint))
+        {
+            return Ok(answered);
+        }
+
         // exec is forecast first. A hit does not refuse: it fences.
         let mut fenced = None;
         if name == "exec"

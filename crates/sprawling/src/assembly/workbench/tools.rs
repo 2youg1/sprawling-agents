@@ -144,6 +144,13 @@ impl RunWorker {
                 of: site.provenance(self.city_hash()?, addr),
             })
             .for_job(addr.clone(), job_locator.clone());
+        // Work that outside content started carries that into every door
+        // the bench asks, and the command door refuses it outright (C15).
+        if at.tainted
+            && let Some(outside) = kernel::TaintSource::new("outside")
+        {
+            *bench.taint_mut() = kernel::TaintSet::of(outside);
+        }
         // One registration feeds both. The catalogue is what the model
         // was told exists and the bench is what routes the call it
         // makes, so a name on one list and not the other is either a
