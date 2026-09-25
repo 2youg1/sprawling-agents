@@ -26,7 +26,8 @@ use super::super::stamp;
 /// One attempt to reach the server, and the pause after a refused one.
 const POLL: Duration = Duration::from_millis(2);
 /// How long one sample may take before it is reported: a city with
-/// 400,000 records took 37 s to accept before any of this was measured.
+/// 400,000 records folds its whole Ledger before it accepts, which is
+/// tens of seconds on a slow disk.
 const WITHIN: Duration = Duration::from_secs(300);
 
 /// `samples` spawns of `serve` over `city`, each timed to its first byte.

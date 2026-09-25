@@ -557,7 +557,7 @@ pub(crate) fn serving(terminal: &Terminal, vitals: &channels::MetricsAnswer, pid
 - **答询走同一个函数，不是第二个权威**。`post` 的 Query 臂改调 `Answering`，与 `channels::server` 的 `SessionStep::Answer` 是同一个 `Arc`；控制台答出来的数字与浏览器看到的数字不可能不同，因为它们是同一次调用。
 - **`/serving` 是渲染，不是来源**。城侧那几个数（几条 run 在跑、几件事等人、几栋楼）全部来自一次 `Query::Metrics`；`/metrics` 仍印它的 JSONL 原样，与 `sprawling call` 同形。两个动词，两个问题，无重叠：`/serving` 答「这个进程开在哪、门朝谁开」，`/metrics` 答「这座城里有多少什么」。
 - **动词名不与既有概念撞车**。`status` 在 `docs/glossary.md` 里已经是**工具**的名字（「答一次 run 自己的处境」），一名一义是门禁事项，故控制台这个动词叫 `serving`——它印的正是 `assembly::Serving` 持有的那几样东西，沿用已在库内的词。
-- **常驻内存不进这一屏，理由记在这里**。「resident 在本平台叫什么」的唯一权威是 `xtask::mem`（Linux `smaps_rollup` Pss／macOS `ps rss`／Windows `WorkingSet64`），而 `xtask` 只依赖 `kernel`——让它依赖产品会使每次门禁编译整个 workspace。在 bin 里再抄一张三平台表，正是那个模块自己的 doc comment 警告的「三份权威」。`/serving` 因此印出本进程 **pid**，`cargo xtask mem <pid>` 只差一次粘贴。**翻案条件**：新增第十三个 unit 承载这一个计数器（ARCHITECTURE.md §3 的拓扑是 add-only），届时两个调用方共用一份定义。
+- **常驻内存不进这一屏，理由记在这里**。「resident 在本平台叫什么」的唯一权威是 `xtask::mem`（它读哪三个计数器、各平台叫什么，见 `xtask/xtask-SPEC.md` §8-30），而 `xtask` 只依赖 `kernel`——让它依赖产品会使每次门禁编译整个 workspace。在 bin 里再抄一张三平台表，正是那个模块自己的 doc comment 警告的「三份权威」。`/serving` 因此印出本进程 **pid**，`cargo xtask mem <pid>` 只差一次粘贴。**翻案条件**：新增第十三个 unit 承载这一个计数器（ARCHITECTURE.md §3 的拓扑是 add-only），届时两个调用方共用一份定义。
 
 **红**：一条测试把 `Line::Serving` 之外的路径全部钉住不动，另一条驱动 `drive` 读入 `/metrics`，断言输出里有 `MetricsAnswer` 的 JSON 而**不含** `sprawling call`——改动之前它撞上那句转介。第三条断言 `serving()` 的那一屏同时含端口、`runs`、与 pid。
 
