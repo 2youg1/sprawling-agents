@@ -53,6 +53,9 @@ const WITHIN: Duration = Duration::from_secs(60);
 /// the harness, while on the disk store the middle is the device's fsync,
 /// a physical floor that differs by machine (sprawling-SPEC.md 8-84).
 const ROUND_TRIP_P50: Duration = Duration::from_millis(1);
+/// The widest gap a second dispatch may leave in a run already going:
+/// naming B waits on a model, and nothing A writes may wait with it.
+const DISPATCH_GAP_MAX_MS: u64 = 5;
 
 #[derive(Debug, Clone, Copy)]
 enum Store {
@@ -173,6 +176,11 @@ fn instrument_dispatch_gap() {
         gaps.last().copied().unwrap_or(0),
         gaps.get(gaps.len() / 2).copied().unwrap_or(0),
         machine()
+    );
+    let widest = gaps.last().copied().unwrap_or(0);
+    assert!(
+        widest <= DISPATCH_GAP_MAX_MS,
+        "run A stood still for {widest} ms while run B was being named, over {DISPATCH_GAP_MAX_MS} ms"
     );
 }
 

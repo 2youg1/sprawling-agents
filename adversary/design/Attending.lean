@@ -142,4 +142,42 @@ theorem every_wake_consumes_work {s s' : Loop} (w : wake s = some s') :
     cases hi : s.inbox <;> cases hd : s.deadlineDue <;>
       simp_all [work, drained]
 
+/-! ## A name is asked for off this thread, and the room is still the first write
+
+A dispatch sent to a building with no room needs a name from the digest model,
+a call that waits on a provider for seconds. The steps below are one such
+dispatch in the order they happen (`assembly::dispatching::asking_name`):
+agreeing writes nothing and is asked again once the name is home, because a
+halt may have arrived meanwhile. -/
+
+/-- One step of a dispatch that has to be named. -/
+inductive DispatchStep where
+  | agree
+  | askName
+  | openRoom
+  | laterWrite
+  deriving Repr, DecidableEq
+
+/-- Whether the step puts anything on disk. -/
+def DispatchStep.writes : DispatchStep → Bool
+  | .openRoom | .laterWrite => true
+  | .agree | .askName => false
+
+/-- Whether the step runs on the accounting thread, where every relay request
+waits for it. -/
+def DispatchStep.onAccountingThread : DispatchStep → Bool
+  | .askName => false
+  | .agree | .openRoom | .laterWrite => true
+
+def namedDispatch : List DispatchStep := [.agree, .askName, .agree, .openRoom, .laterWrite]
+
+theorem opening_the_room_is_the_first_write :
+    namedDispatch.find? DispatchStep.writes = some .openRoom := by decide
+
+theorem nothing_is_written_before_the_name_is_home :
+    (namedDispatch.takeWhile (· ≠ .askName)).all (!·.writes) := by decide
+
+theorem the_naming_wait_is_off_the_accounting_thread :
+    ∀ step ∈ namedDispatch, step.onAccountingThread = false → step = .askName := by decide
+
 end Attending
