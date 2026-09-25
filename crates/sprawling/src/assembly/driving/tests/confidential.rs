@@ -113,7 +113,11 @@ fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
     lay_rules(dir.path(), "vault", &shut_rules(""));
     let vault_room = dir.path().join("vault").join("room1");
     std::fs::create_dir_all(&vault_room).unwrap();
-    std::fs::write(vault_room.join("combination.md"), "the dial reads 31-7-12\n").unwrap();
+    std::fs::write(
+        vault_room.join("combination.md"),
+        "the dial reads 31-7-12\n",
+    )
+    .unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
 
     let (base_url, provider) = fake_openai(

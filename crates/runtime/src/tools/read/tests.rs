@@ -8,7 +8,8 @@ use crate::catalog::CatalogEntry;
 
 fn tool(root: &Path) -> (ReadTool, Arc<Mutex<Catalog>>) {
     let catalog = Arc::new(Mutex::new(Catalog::new()));
-    let tool = ReadTool::new(root, Arc::clone(&catalog)).unwrap();
+    let everywhere: ReadBound = Arc::new(|_: &kernel::Address| kernel::ReadVerdict::Open);
+    let tool = ReadTool::new(root, Arc::clone(&catalog), everywhere).unwrap();
     (tool, catalog)
 }
 
@@ -150,7 +151,7 @@ fn a_wide_file_is_cut_on_a_line_end_and_continues_without_a_gap() {
     let first = tool.invoke(&call("lab/Wide.md")).unwrap();
     let map = first.result.as_map();
     let text = map["text"].as_str().unwrap();
-    let cap = usize::try_from(kernel::consts_policy::INTERVAL_CAP_BYTES).unwrap();
+    let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
     assert!(text.len() <= cap, "{} bytes came back", text.len());
     assert!(
         text.lines().count() < 400,
@@ -183,7 +184,7 @@ fn a_wide_file_is_cut_on_a_line_end_and_continues_without_a_gap() {
 fn a_single_line_past_the_budget_still_makes_progress() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
-    let cap = usize::try_from(kernel::consts_policy::INTERVAL_CAP_BYTES).unwrap();
+    let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
     let body = format!("{}\nsecond\n", "y".repeat(cap.saturating_mul(2)));
     std::fs::write(dir.path().join("lab").join("OneLine.md"), &body).unwrap();
     let (mut tool, _catalog) = tool(dir.path());

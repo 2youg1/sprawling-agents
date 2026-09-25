@@ -27,8 +27,10 @@ fn a_building_without_a_file_is_an_ordinary_building() {
     assert!(!rules.policy().confidential);
     assert_eq!(rules.model_pool(), ModelPool::Any);
     // With nothing declared, a building may write itself and no more.
-    let domain = rules.write_domain().unwrap();
-    assert_eq!(domain.prefixes().count(), 1);
+    assert_eq!(rules.write_domain().unwrap().prefixes().count(), 1);
+    std::fs::write(dir.path().join("NOTES.md"), "a file, so it has no rules").unwrap();
+    let file = load(dir.path(), &addr("NOTES.md")).unwrap();
+    assert_eq!(file.policy(), rules.policy());
 }
 
 /// The rules of a building are not writable by the runs they govern,

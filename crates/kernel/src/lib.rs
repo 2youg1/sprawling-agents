@@ -59,7 +59,8 @@ pub mod tool;
 pub mod version;
 pub mod write_domain;
 
-pub use address::{Address, GIT_METADATA, PROTECTED_METADATA, RESERVED_PREFIX, SessionName};
+pub use address::{Address, GIT_METADATA, PROTECTED_METADATA, RESERVED_PREFIX};
+pub use address::{ReadVerdict, SessionName};
 pub use approval::{AnswerVerdict, Answerer, ApprovalClass, ApprovalId, ApprovalItem};
 pub use approval::{Autonomy, ClusterKey, Ruling};
 pub use backpressure::{Admission, ItemMeta, QueueStats, ShedReason};

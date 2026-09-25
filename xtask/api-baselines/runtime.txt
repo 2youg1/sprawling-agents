@@ -266,15 +266,15 @@ pub fn runtime::ReadTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::re
 pub fn runtime::ReadTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::ReadTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::ReadTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn runtime::ReadTool::new(&std::path::Path, alloc::sync::Arc<std::sync::poison::mutex::Mutex<runtime::catalog::Catalog>>) -> core::result::Result<runtime::ReadTool, kernel::error::shape::AxError>
-pub fn runtime::ReadTool::new(&std::path::Path, alloc::sync::Arc<std::sync::poison::mutex::Mutex<runtime::catalog::Catalog>>) -> core::result::Result<runtime::ReadTool, kernel::error::shape::AxError>
+pub fn runtime::ReadTool::new(&std::path::Path, alloc::sync::Arc<std::sync::poison::mutex::Mutex<runtime::catalog::Catalog>>, runtime::ReadBound) -> core::result::Result<runtime::ReadTool, kernel::error::shape::AxError>
+pub fn runtime::ReadTool::new(&std::path::Path, alloc::sync::Arc<std::sync::poison::mutex::Mutex<runtime::catalog::Catalog>>, runtime::ReadBound) -> core::result::Result<runtime::ReadTool, kernel::error::shape::AxError>
 pub fn runtime::Sandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>
 pub fn runtime::SearchTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::SearchTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::SearchTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::SearchTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
-pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
+pub fn runtime::SearchTool::new(&std::path::Path, runtime::ReadBound) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
+pub fn runtime::SearchTool::new(&std::path::Path, runtime::ReadBound) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
 pub fn runtime::SegmentSource::whole(kernel::address::Address, u64, core::option::Option<kernel::event::record::turn::SummaryProducer>) -> runtime::SegmentSource
 pub fn runtime::SegmentSource::whole(kernel::address::Address, u64, core::option::Option<kernel::event::record::turn::SummaryProducer>) -> runtime::SegmentSource
 pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus], &[runtime::Standing]) -> alloc::string::String
@@ -1486,7 +1486,9 @@ pub struct runtime::turn::TurnCancelled
 pub struct runtime::turn::TurnReport
 pub struct runtime::window::Window
 pub trait runtime::Sandbox: core::marker::Send
+pub type runtime::ReadBound = alloc::sync::Arc<(dyn core::ops::function::Fn(&kernel::address::Address) -> kernel::address::ReadVerdict + core::marker::Send + core::marker::Sync)>
 pub type runtime::diagnostics::Sink = alloc::boxed::Box<(dyn core::ops::function::FnMut(runtime::diagnostics::Entry<'_>) + core::marker::Send)>
+pub type runtime::tools::ReadBound = alloc::sync::Arc<(dyn core::ops::function::Fn(&kernel::address::Address) -> kernel::address::ReadVerdict + core::marker::Send + core::marker::Sync)>
 pub use runtime::Retries
 pub use runtime::SkillPin
 pub use runtime::catalog::SkillPin

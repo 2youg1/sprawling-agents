@@ -1625,6 +1625,7 @@ memory::jsonl／memory::cas／runtime::replay／runtime::fork／citysim 全部�
 - 单测（各模块文件内 `#[cfg(test)]`，测试模块头挂放宽 allow）：serde 拼写对拍（as_str×serde×表）；EventKind 计数与 in-window 计数（以 `ALL` 数）；carrier 全映射非重复覆盖 35；构造子不变量（refusal 三段在场、failure 无 gate、retriable 默认 false）；Payload 拒浮点（含嵌套）；Address/Locator 拒绝面正反例；Seq/Version checked 溢出；IdemKey 版本字节在场。
 - proptest：`Address::parse` 往返与 `is_within` 自反/传递/反对称；`Locator` Display↔parse 往返；`IdemKey` 重算恒等＋近旁输入不等样例；`Payload` 任意整数树恒过、含浮点树恒拒。
 - golden（insta）：创世行＋一条 `building_created` 的 `canonical_line` 字节。
+- 读界（§8-2 `may_read`）：`address::tests` 的三类读者矩阵——本楼读本楼、他楼读非机密楼、楼外读机密楼，外加机密楼读自己与读他楼——逐格判出 `ReadVerdict`；规则闭包在目标落在读者本楼时被调用即失败；规则读不出判 `RulesUnreadable` 且原样带回那条 `AxError`。
 - conformance：对一个最小内存实现自证可跑；citysim 实现二证。
 - 约束：`cargo clippy --workspace --all-targets -- -D warnings` 零告警；无 `unsafe`；文件前三行 MPL 头。
 - S2 各模块测试面（逐模块文件内 `#[cfg(test)]`＋kani 镜像 proptest）：taint 并集单调／map 保集；write_domain reserved 恒拒／夺回计数；budget 溢出＝Exhausted／逐层报首超；backpressure 单调；stall 尾部连续语义；goal/repair 重叠矩阵；delegation 静动双层；registry verify 拒非证据 kind；spine 表解析正反例＋tally 对账三情形；completion 空证据／错 kind 拒；approval 应答真值表十二行遍历＋自审拒；config 字段交集空断言；tool/model conformance 自证；secret 双语料＋熵边界；discard 决策表全分支＋forecast 三臂正反；gate 门册遍历（`DOORS` 每行一条 `deny_sample`，refusal 三段非空）＋taint 有真判决＋`claim` 认领一次。
