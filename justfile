@@ -12,7 +12,14 @@ default: check
 # reported green on a machine where neither gate had ever run; CI says
 # the same thing through `.github/actions/client-artifacts`, which runs
 # `build-web` for the jobs that run those gates.
-check: prereqs fmt-check clippy features test test-zig build-web gates check-client check-desktop
+#
+# Formatting of both trees runs right after `prereqs`, because it answers
+# in seconds and every later step compiles for minutes: an unformatted
+# line in `desktop/` used to surface only in `check-desktop`, the last
+# step, after the whole workspace had been built and tested. `just` runs
+# a dependency once per invocation, so `check-desktop` finds
+# `fmt-check-desktop` already done and does not repeat it.
+check: prereqs fmt-check fmt-check-desktop clippy features test test-zig build-web gates check-client check-desktop
 
 # The one authority on what this repository's loop needs installed.
 #
@@ -99,6 +106,11 @@ fmt:
 
 fmt-check:
     cargo fmt --all --check
+
+# `desktop/` is outside the workspace, so `cargo fmt --all` at the root
+# does not reach it.
+fmt-check-desktop:
+    cd desktop && cargo fmt --all --check
 
 # --all-features is load-bearing: code behind a feature (runtime/wasm, */conformance)
 # escapes the zero-warning gate without it.
@@ -195,8 +207,7 @@ deny dir=".":
 # table and the package metadata are compared back to the root manifest
 # by `cargo xtask guard`, because a drifted copy is not something a
 # compiler can see.
-check-desktop:
-    cd desktop && cargo fmt --all --check
+check-desktop: fmt-check-desktop
     cd desktop && cargo clippy --all-targets --locked -- -D warnings
     cd desktop && cargo nextest run --locked
     just deny desktop
