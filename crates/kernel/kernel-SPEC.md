@@ -1596,6 +1596,16 @@ S2 激活的码（逐码答「能否定义掉」）：
 
 `PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`memory::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是内存侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 memory 的别名族规则承担（memory-SPEC 8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
 
+### 12.4 定规：kernel 不拆 crate
+
+**决定**：kernel 保持一个 crate；策略模块（`consts_policy`、`gate`、`config` 等）不另立 crate。
+
+**理由**：拆分只在「改一个策略模块时，少重编一批下游 crate」时才有收益，而测得的使用面让这批下游几乎为空。按 `lib.rs` 的 `pub use` 名单与 `kernel::<模块>` 路径统计 kernel 以外的引用：kernel 有 11 个依赖 crate；`error` 被 11 个全部引用，`event` 被 9 个引用，`address`／`locator`／`consts_policy` 各被 8 个引用。改动最频繁的四个模块依次是 `event`、`gate`、`model`、`consts_policy`（按 git 历史里触及它们的提交数）。把其中一个拆出去，新 crate 仍依赖 `error` 与 `event`，改它时仍要重编它的全部引用者：`consts_policy` 的引用者是 browser、city、eval、gateway、memory、protocol、runtime、sprawling，只省下 channels、collab、mem；`gate` 的引用者是 browser、city、collab、runtime、sprawling，省下的 channels、gateway、memory、protocol、eval、mem 大多在 runtime 与 sprawling 的上游，而 runtime 与 sprawling 本来就要重编，关键路径没有变短。kernel 本身约一万六千行，单任务（`CARGO_BUILD_JOBS=1`）暖缓存下重编一次约 27 s（十六线程桌面机，另有几条编译并行争用）；这段时间拆分也省不掉，因为被拆模块依赖的 `error`／`event` 仍在 kernel 里。
+
+**被否**：①把策略常量与门拆成 `kernel-policy`——多一个 crate、多一份 SPEC 与 API 基线、多一条 `depmap` 边，换来的是关键路径之外几个 crate 的重编；②按 `error`／`event` 拆出底层 crate——它们被全部下游引用，改它们照样全量重编，拆了只是多一层。
+
+**重开参数**：任一条成立即重开——①某个高频修改的 kernel 模块的引用者降到 kernel 依赖者的一半以下，且省下的 crate 里有 runtime 或 sprawling；②`cargo build --workspace --timings` 显示，改一个策略模块后被省下的那批 crate 占增量重编时间 10% 以上；③kernel 单 crate 的重编时间超过一次策略改动增量重编总时间的一半。
+
 ## 13 依赖选型
 
 `serde`＋`serde_json`（规范字节与载荷；B.7 钉版）；`thiserror`（Display/Error derive；B.7）；`blake3`（唯一哈希，B.7 钉 S1；1.8.6 现行 stable）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）。S2 增：`secrecy` 0.10.3＋`zeroize` 1.9.0（Sealed；B.7 钉 Stage 2–3，2026-08 复核为最新）。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
