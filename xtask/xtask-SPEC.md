@@ -127,7 +127,7 @@ pub(crate) struct Violation {
 
 ## 9 工作流程
 
-`cargo xtask <gate>` → 定位仓库根（`CARGO_MANIFEST_DIR` 的父目录）→ 读数据面（ARCHITECTURE.md／lexicon.toml／git）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 依序跑全部机器门，聚合后统一渲染。**门数与门序都只住 `gates::GATES` 那张数组**（`--list`、usage 与按名选门都读它）：`COUNT` 就是它的长度类型参数，数目与清单相隔一个 token，故不可能各说各话。要知道跑了哪几道门、按什么次序，读那张数组，不要在文档里再养一份。
+`cargo xtask <gate>` → 定位仓库根（`CARGO_MANIFEST_DIR` 的父目录）→ 读数据面（ARCHITECTURE.md／lexicon.toml／git）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 每道门各占一条 `thread::scope` 线程并行判定，按门序汇合结果后统一渲染（§8-31）。**门数与门序都只住 `gates::GATES` 那张数组**（`--list`、usage 与按名选门都读它）：`COUNT` 就是它的长度类型参数，数目与清单相隔一个 token，故不可能各说各话。要知道跑了哪几道门、按什么次序，读那张数组，不要在文档里再养一份。
 
 ## 10 实现逻辑
 
@@ -807,3 +807,12 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 **失败**：`XtaskError::Io`（起进程、读计数器、建临时城）、`XtaskError::Cmd`（参数说不出要量什么、`init` 被拒、夹具城在期限内没有接受连接、二进制不在那里——恢复语指向手动跑同一条 `serve` 或 `just mem`）与 `XtaskError::Doc`（计数器读不懂）。
 
 **决定**：不带 pid 时自己起一座夹具城，而不是量自己。旧形状缺省量 `std::process::id()`，量到的是 xtask，登记簿里那行 idle 读数比真正在 serve 的空城还低；读数又是 working set，含共享映像页。**败给的方案**：没有 pid 就拒绝。它也改掉了错的读数，但「一座空城闲着占多少」是每次都要问的问题，让人自己先起一座城再抄 pid，等于把量具的一半交回给人。
+### 8-31 `gates` 并行判定，按门序报告（形状 1 判定）
+
+**决定**：`gates::run` 把选中的每道门交给 `std::thread::scope` 里的一条线程，再按 `GATES` 的次序逐条 `join`，把 `(门名, 结论)` 依门序交给 `report::finish_all`。一条线程若 panic，那道门报 `could not judge`（`XtaskError::GatePanicked`），其余各门照常出结论。
+
+**为什么**：各门只读树、互不写同一处，判定时间彼此独立，串行时门阶段的墙钟是各门之和，并行时是最慢那一道。报告按门序而不按完成序，所以两次运行在同一棵树上的输出逐字相同。
+
+**败给的方案**：线程池或 `rayon`。门只有二十来道、每道各跑一次，一门一线程已经是最短墙钟；池只增一个依赖。
+
+**限制**：`features` 与 `apisync` 各起一次 cargo，两者在 cargo 的构建锁上排队，并行只省下它们与纯读门之间的重叠。
