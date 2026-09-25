@@ -24,7 +24,26 @@ fn a_reading_line_is_stable_and_carries_its_machine_class() {
     assert_eq!(
         reading.line(),
         "perf load=multi_run_parallel sub=harness machine_class=general \
-         samples=100 p50_us=10 p95_us=10 p99_us=10"
+         samples=100 floor_us=10 p50_us=10 p95_us=10 p99_us=10"
+    );
+}
+
+/// The floor is what the path costs on a quiet machine and the middle
+/// is what it cost beside everything else the machine did, so a line
+/// that drops the first cannot tell a slower design from a busier day.
+#[test]
+fn a_reading_line_carries_its_floor_beside_the_middle() {
+    let reading = Reading::of(
+        Load::LongSessionForwarding,
+        SubMetric::Harness,
+        MachineClass::General,
+        (1..=100).rev().map(Duration::from_micros).collect(),
+    )
+    .unwrap();
+    assert_eq!(
+        reading.line(),
+        "perf load=long_session_forwarding sub=harness machine_class=general \
+         samples=100 floor_us=1 p50_us=51 p95_us=96 p99_us=100"
     );
 }
 

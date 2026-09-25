@@ -25,12 +25,13 @@ fn small() -> Fixture {
 /// The key sequence of the grammar in citysim-SPEC.md section 8-6. The
 /// format's authority is `Reading::line`; this is the acceptance contract
 /// a render must keep meeting.
-const KEYS: [&str; 8] = [
+const KEYS: [&str; 9] = [
     "perf",
     "load",
     "sub",
     "machine_class",
     "samples",
+    "floor_us",
     "p50_us",
     "p95_us",
     "p99_us",

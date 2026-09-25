@@ -190,6 +190,30 @@ pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str>;
 
 **失败**：产品公面的失败原样抛 `AxError`，不新增码；测量自体的失败（被测二进制不在构建档目录等）用既有码走三段式（动作/主体/`AxCode`/recovery）。
 
+#### 8-5-1 首字节：`sprawling serve` 拉起到第一个字节（`ttfb`）
+
+四个动作之外的第五行读数，量的是人开一座城要等多久：`CreateProcess` 发出（`serve <城> 127.0.0.1:<端口> --no-console --no-open`，`SPRAWLING_OPEN=never`）到对 `GET /` 读到第一个字节。端点取第一个字节而不是端口开始监听，因为人看见的是页面，而一个接受了连接却还答不出页的服务在人眼里仍是没开。轮询间隔 2 ms，单样本上限 300 s。
+
+三座夹具城，同一个历史形状、三种长度：
+
+| 城 | 记录 | 样本 |
+|---|---|---|
+| `empty` | `init` 出来的 3 条 | 20 |
+| `l100k` | 2,000 个 run × 50 条 | 5 |
+| `l400k` | 8,000 个 run × 50 条 | 3 |
+
+一个 run 是 `run_started`、八个回合（`prompt_assembled`、`model_called`、`model_returned`、`tool_called`、`tool_result`、`checkpoint_committed`）与 `run_frozen`，正文长度与实测城市的记录相近，所以折叠这份账本的代价与一座真正工作过的城同形。账本经 `memory::JsonlLedger::append_all` 按每批 10,000 条写入：分段、链与字节规范都是产品自己的，本族不拼一行账。
+
+**夹具城留在 `<构建档目录>/../bench-cities/<名>`**，下次复用：40 万条是 376 MB，每次重写要付的时间比量它还多。复用只看那座城在不在；`xtask mem --city` 读的就是同一座城（xtask-SPEC §8-30），于是首字节与启动峰值出自同一份历史。
+
+```rust
+// citysim/src/bin/bench_startup/actions/history.rs —— shape: adapter（一座有历史的夹具城：init 之后经产品的 Ledger 写入）
+pub enum History { Empty, Runs(u32) }
+pub fn fixture_city(cities: &Path, name: &str, history: History) -> Result<PathBuf, AxError>;
+// citysim/src/bin/bench_startup/actions/first_byte.rs —— shape: adapter
+pub fn first_byte(binary: &Path, city: &Path, samples: usize) -> Result<Samples, AxError>;
+```
+
 **红**：`samples.rs` 的 nearest-rank 分位、可疑标注、第二档判定三个测试先行，跑一次见红再实现。`footprint` 三条（计数只数文件不数目录、按名找文件不论深度且不认目录、账行按行数而非按文件数）与 `actions` 一条（主导子步取中位最大者，无子步切分答 `None`）守的是**读数本身**：数错一个文件或指错一个主导件，报告就在说假话。
 
 ## 8.5 两个设计
@@ -217,7 +241,9 @@ impl Reading {
 
 一行读数的文法（`Reading::line` 是唯一权威，测试按字节对拍）：
 
-`perf load=<load> sub=<sub> machine_class=<general> samples=<n> p50_us=<n> p95_us=<n> p99_us=<n>`
+`perf load=<load> sub=<sub> machine_class=<general> samples=<n> floor_us=<n> p50_us=<n> p95_us=<n> p99_us=<n>`
+
+`floor_us` 是最小样本：机器安静时这条路径本身要花多少。它与 `p50_us` 并列，因为两者回答的不是一个问题——floor 贴着设计的下限，p50 带着机器的其余负载——而挂钟读数不设棘轮，两者就都得留在读数里，下一个读者才分得清一次回归是设计变慢了还是机器变忙了。
 
 `machine_class` 是读数自带的字段而非行头批注：异类机器的读数不与参照类属同表比较。口径是 harness 自身路径的处理耗时（测量机的类属见 `machine_class`）——不含动画时长、不含网络传输。`SubMetric` 三值把定标拆开计：
 
