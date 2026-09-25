@@ -260,7 +260,15 @@ impl ClaimDesk {
             )
             .with_recovery("shorten the child items; they must fit one table row each"));
         };
-        PlanTree::build(rows)?;
+        let after = PlanTree::build(rows)?;
+        let unfinished = after.get(id).map_or(0, |parent| {
+            parent
+                .children
+                .iter()
+                .filter_map(|child| after.get(child))
+                .filter(|child| child.row.status != RoadmapStatus::Done)
+                .count()
+        });
         self.text = grown;
         self.changed = true;
         if self.holding() == Some(id) {
@@ -280,6 +288,7 @@ impl ClaimDesk {
             "children".to_owned(),
             Value::Array(names.into_iter().map(Value::String).collect()),
         );
+        result.insert("unfinished".to_owned(), Value::from(unfinished));
         Payload::new(result)
     }
 

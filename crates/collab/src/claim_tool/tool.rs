@@ -69,8 +69,10 @@ impl ClaimTool {
         Ok(ClaimTool {
             meta: ToolMeta {
                 name: ToolName::parse("plan")?,
-                disclosure: "Read this building's plan and take a node before starting work \
-                             nobody assigned you."
+                // The question sits in the cached prefix, so it costs no
+                // latency and no spend; the method stays the model's.
+                disclosure: "Take a node of this building's plan before unassigned work. \
+                             Must this be expanded?"
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Write { domain: room },
