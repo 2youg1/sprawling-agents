@@ -33,9 +33,9 @@ pub enum Disposal {
     CorrectiveSteer {
         text: String,
     },
-    /// Try the same call again, not before this moment. The moment is
-    /// the provider's own, carried in from `gateway::admission`, and
-    /// the failure travels with it: "backed off" without what it backed
+    /// Try the same call again, not before this moment. The moment
+    /// comes from the backoff schedule [`Watchdog`] owns, and the
+    /// failure travels with it: "backed off" without what it backed
     /// off from is a line nobody can act on, and the run loop used to
     /// write that half of the fact from a second place.
     BackOff {
@@ -113,9 +113,8 @@ impl Watchdog {
     ///
     /// A non-retriable failure freezes on the first one: repeating a
     /// request the provider has already rejected on its shape buys the
-    /// same rejection again. A retriable one backs off to `not_before`
-    /// — which the caller takes from `gateway::admission`, where the
-    /// provider's own `retry-after` was folded in.
+    /// same rejection again. A retriable one backs off from `now` by the
+    /// schedule [`Watchdog::backoff_ms`] owns.
     ///
     /// **A retriable failure freezes only against a ceiling the person
     /// set.** Under [`Retries::UntilHalted`] what stops a run that keeps
@@ -123,8 +122,9 @@ impl Watchdog {
     /// [`Retries::AtMost`] it is the number they entered, because a
     /// number entered on a form that nothing reads is worse than no
     /// field at all.
-    pub fn on_provider_failure(&mut self, failure: &AxError, not_before: TimeMs) -> Disposal {
+    pub fn on_provider_failure(&mut self, failure: &AxError, now: TimeMs) -> Disposal {
         self.provider_failures = self.provider_failures.saturating_add(1);
+        let not_before = TimeMs::new(now.value().saturating_add(self.backoff_ms()));
         let refused = Disposal::Freeze {
             reason: FreezeReason::ProviderRefused,
         };
@@ -140,6 +140,19 @@ impl Watchdog {
             }
             Retries::AtMost(_) => refused,
         }
+    }
+
+    /// How long the failure just counted waits: 500 ms doubled for each
+    /// failure in a row before it, capped at a minute. Both numbers are
+    /// the provider's scale, the time an overloaded service takes to
+    /// recover, so no reading of this machine moves them.
+    fn backoff_ms(&self) -> u64 {
+        const FIRST_MS: u64 = 500;
+        const CEILING_MS: u64 = 60_000;
+        let doublings = self.provider_failures.saturating_sub(1).min(16);
+        FIRST_MS
+            .checked_shl(doublings)
+            .map_or(CEILING_MS, |wait| wait.min(CEILING_MS))
     }
 
     /// The `watchdog_fired` payload (E_LOOP_SUSPECTED's carrier when the
@@ -286,18 +299,24 @@ mod tests {
     #[test]
     fn a_retriable_failure_backs_off_and_never_freezes_by_itself() {
         let mut dog = Watchdog::new(Retries::UntilHalted);
-        for round in 0..64u64 {
-            let until = TimeMs::new(round.saturating_mul(250).saturating_add(1_000));
-            assert_eq!(
-                dog.on_provider_failure(&provider_error(true), until),
-                Disposal::BackOff {
-                    until,
-                    code: AxCode::Provider,
-                    subject: "the provider said no".to_owned(),
+        let waits: Vec<u64> = (0..64u64)
+            .map(
+                |_| match dog.on_provider_failure(&provider_error(true), TimeMs::new(1_000)) {
+                    Disposal::BackOff { until, .. } => until.value().saturating_sub(1_000),
+                    other => {
+                        panic!("only Halt stops a run that is waiting out a provider: {other:?}")
+                    }
                 },
-                "only Halt stops a run that is waiting out a provider"
-            );
-        }
+            )
+            .collect();
+        assert_eq!(
+            waits[..9],
+            [
+                500, 1_000, 2_000, 4_000, 8_000, 16_000, 32_000, 60_000, 60_000
+            ],
+            "each failure in a row doubles the wait, up to a minute"
+        );
+        assert!(waits[9..].iter().all(|wait| *wait == 60_000));
         let payload = serde_json::to_value(
             dog.fired_payload(&Disposal::BackOff {
                 until: TimeMs::new(1_000),
