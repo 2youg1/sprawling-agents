@@ -694,7 +694,7 @@ impl Vfs for RealFs { … }
 
 ## 10 实现逻辑
 
-1. 行终止符恒 `\n`（含末行）；chain_hash 对不含 `\n` 的行字节计算（kernel-SPEC §8-9）。`.gitattributes * -text` 已保夹具字节。
+1. 行终止符恒 `\n`（含末行）；chain_hash 对不含 `\n` 的行字节计算（kernel-SPEC §8-9）。`.gitattributes` 的 `* text=auto eol=lf` 令索引与每个平台的检出都是 LF，夹具字节因此跨平台一致。
 2. open 的段校验用 `EventRecord::parse_line`＋`chain_hash` 复算，无独立解析器（一个权威）。
 3. 段内偏移不建索引（memory::index 的事）；`read_raw_lines` 全量读，消费者只有 replay/夹具/conformance。
 4. `list` 排序返回＋段名零填宽度 20：字典序＝数值序，跨平台遍历确定。
