@@ -9,6 +9,8 @@
 use kernel::RunId;
 use runtime::Interrupt;
 
+use super::relay::Wake;
+
 /// Where commands wait between the socket and the worker.
 ///
 /// A desk rather than a channel, because a channel hands an item to
@@ -18,7 +20,10 @@ use runtime::Interrupt;
 /// looks at it only at its own safe points.
 pub(crate) struct CommandDesk {
     waiting: std::sync::Mutex<Waiting>,
-    arrived: std::sync::Condvar,
+    /// The accounting thread's one queue, once a thread attends this
+    /// desk. A post rings it so that thread wakes on the post itself
+    /// rather than on a timer.
+    bell: std::sync::Mutex<Option<std::sync::mpsc::Sender<Wake>>>,
     /// Set once, by whoever decided the city stops. Read at the same
     /// point the queue is read, so a close lands between commands and
     /// never inside one.
@@ -101,16 +106,15 @@ pub(crate) enum DeskWait<'desk> {
     Gone,
 }
 
-/// How long the worker waits before looking at the schedule. Short
+/// How long the worker may sleep before it looks at the schedule. Short
 /// enough that a job stated to the minute starts within the minute,
-/// long enough that an idle city is idle.
+/// long enough that an idle city is idle: this deadline is the only
+/// wake an idle city has that nobody asked for.
 ///
 /// In milliseconds because the loop compares it against the clock it
 /// samples, and a rhythm stated twice is a rhythm that can disagree
 /// with itself.
 pub(super) const SCHEDULE_TICK_MS: u64 = 20_000;
-pub(super) const SCHEDULE_TICK: std::time::Duration =
-    std::time::Duration::from_millis(SCHEDULE_TICK_MS);
 
 impl CommandDesk {
     /// Visible to the crate so the console loop can be driven in a test
@@ -122,7 +126,7 @@ impl CommandDesk {
                 queue: std::collections::VecDeque::new(),
                 keys: std::collections::BTreeSet::new(),
             }),
-            arrived: std::sync::Condvar::new(),
+            bell: std::sync::Mutex::new(None),
             closing: std::sync::atomic::AtomicBool::new(false),
         }
     }
@@ -137,7 +141,26 @@ impl CommandDesk {
     pub(crate) fn close(&self) {
         self.closing
             .store(true, std::sync::atomic::Ordering::Release);
-        self.arrived.notify_all();
+        self.ring(Wake::Close);
+    }
+
+    /// Rings `bell` from now on whenever a command is posted or the city
+    /// closes. What was posted before is already on the desk, and the
+    /// thread that attends it looks there before it first waits.
+    pub(crate) fn ring_through(&self, bell: std::sync::mpsc::Sender<Wake>) {
+        if let Ok(mut ringing) = self.bell.lock() {
+            *ringing = Some(bell);
+        }
+    }
+
+    fn ring(&self, wake: Wake) {
+        if let Ok(ringing) = self.bell.lock()
+            && let Some(bell) = ringing.as_ref()
+        {
+            // A thread that stopped attending has nothing to wake; what
+            // was posted stays on the desk either way.
+            drop(bell.send(wake));
+        }
     }
 
     /// Puts a command in line, unless the same one is already being
@@ -163,35 +186,23 @@ impl CommandDesk {
                 }
             }
             waiting.queue.push_back(Posted { command, reply });
-            self.arrived.notify_one();
         }
+        self.ring(Wake::Command);
     }
 
-    /// Waits for a command, for at most `patience`.
+    /// The next command, without waiting for one.
     ///
-    /// The wait has an end so that the worker gets its own idle moment:
-    /// a city whose schedule says something starts at nine cannot depend
-    /// on somebody clicking at nine.
-    pub(crate) fn wait(&self, patience: std::time::Duration) -> DeskWait<'_> {
+    /// Work already accepted is finished first: a close that dropped a
+    /// queued command would make "stopped" and "lost" the same thing in
+    /// the record. Waiting is the one queue's job, which a post rings.
+    pub(crate) fn next(&self) -> DeskWait<'_> {
         let Ok(mut waiting) = self.waiting.lock() else {
             return DeskWait::Gone;
         };
-        // Work already accepted is finished first: a close that dropped
-        // a queued command would make "stopped" and "lost" the same
-        // thing in the record.
-        if let Some(posted) = waiting.queue.pop_front() {
-            return self.carrying(posted);
-        }
-        if self.closing.load(std::sync::atomic::Ordering::Acquire) {
-            return DeskWait::Close;
-        }
-        match self.arrived.wait_timeout(waiting, patience) {
-            Ok((mut waiting, _)) => match waiting.queue.pop_front() {
-                Some(posted) => self.carrying(posted),
-                None if self.closing.load(std::sync::atomic::Ordering::Acquire) => DeskWait::Close,
-                None => DeskWait::Idle,
-            },
-            Err(_) => DeskWait::Gone,
+        match waiting.queue.pop_front() {
+            Some(posted) => self.carrying(posted),
+            None if self.closing.load(std::sync::atomic::Ordering::Acquire) => DeskWait::Close,
+            None => DeskWait::Idle,
         }
     }
 

@@ -17,23 +17,15 @@
 //! and what a landed run means is `Owed`'s — this module only keeps the
 //! two together for as long as a drive takes.
 
-use std::collections::BTreeMap;
-use std::time::Duration;
+use std::collections::{BTreeMap, VecDeque};
+use std::sync::mpsc;
 
 use kernel::{Address, AxCode, AxError, NodeId, RunId};
 
 use super::super::{Continuation, Driven, Owed, Owing, RunWorker, Unasked};
 use super::{Driving, lane::DriveContext};
 use crate::serving::pool::{Arrival, DRIVING_LANES, DrivingPool};
-use crate::serving::relay::{Relay, RelayGate};
-
-/// How long the accounting thread waits for a run to come home before
-/// it serves the crossing again.
-///
-/// Short because the crossing is what lets a lane make progress at all:
-/// a long wait here is a lane blocked on an append nobody has looked at
-/// yet.
-pub(crate) const LOOK_AGAIN: Duration = Duration::from_millis(1);
+use crate::serving::relay::{Patience, Relay, RelayGate, Wake};
 
 /// One run in a lane: everything the city does once the drive is home,
 /// and what that landing is owed.
@@ -49,7 +41,7 @@ struct InLane {
 /// needs to know which of its own rows came back.
 #[derive(Debug)]
 pub(crate) enum Landed {
-    /// No run came home inside the wait. Relay requests were still
+    /// No run came home in this look. Relay requests were still
     /// served, which is the half that keeps the lanes moving.
     Nothing,
     /// A pursuit's row has landed.
@@ -65,14 +57,20 @@ pub(in crate::assembly) struct Flight {
     pool: DrivingPool,
     gate: RelayGate,
     driving: BTreeMap<RunId, InLane>,
+    /// Runs home that one drain found beyond the one it landed, in
+    /// arrival order. Kept rather than re-queued, so arrival order is
+    /// landing order.
+    homes: VecDeque<Arrival>,
 }
 
 impl Flight {
     pub(in crate::assembly) fn open() -> Flight {
+        let gate = RelayGate::open();
         Flight {
-            pool: DrivingPool::open(DRIVING_LANES),
-            gate: RelayGate::open(),
+            pool: DrivingPool::open(DRIVING_LANES, gate.bell()),
+            gate,
             driving: BTreeMap::new(),
+            homes: VecDeque::new(),
         }
     }
 
@@ -129,16 +127,16 @@ impl Flight {
         self.gate.issue()
     }
 
-    /// The next run home with what the city owed it, or `None` if none
-    /// arrived inside `wait`.
+    /// The next run home that a drain already found, with what the city
+    /// owed it, or `None` if there is none.
     ///
     /// # Errors
     /// Propagates a lane that ended without saying so, and refuses a
     /// run the table never took — a lane the pool started that this
     /// table does not know is a defect in [`Self::take`], and landing
     /// it blind would settle a run against nothing.
-    fn arrived(&mut self, wait: Duration) -> Option<Result<Home, AxError>> {
-        let Arrival { run, driven } = match self.pool.arrived(wait)? {
+    fn arrived(&mut self) -> Option<Result<Home, AxError>> {
+        let Arrival { run, driven } = match self.pool.landed(self.homes.pop_front()?) {
             Ok(arrival) => arrival,
             Err(err) => return Some(Err(err)),
         };
@@ -170,8 +168,10 @@ struct Home {
 }
 
 impl RunWorker {
-    /// Writes every relay request already waiting, and lands at most one
-    /// run that came home.
+    /// Waits as `patience` allows for the one queue to wake, writes every
+    /// relay request it holds, and lands at most one run that came home.
+    /// A run already found home and not yet landed makes the look
+    /// [`Patience::Now`], because it is work that is already waiting.
     ///
     /// **The crossing is served first**, because a run that has already
     /// been paid for must not queue behind one that has not started
@@ -184,9 +184,16 @@ impl RunWorker {
     /// of landing a run. A dispatch somebody asked for is *also* handed
     /// its refusal, because the caller of this function is a loop and
     /// the person who asked is not in it.
-    pub(crate) fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError> {
-        self.flight.gate.serve_waiting(&mut self.ledger);
-        let Some(arrival) = self.flight.arrived(wait) else {
+    pub(crate) fn serve_flight(&mut self, patience: Patience) -> Result<Landed, AxError> {
+        let patience = if self.flight.homes.is_empty() {
+            patience
+        } else {
+            Patience::Now
+        };
+        self.flight
+            .gate
+            .serve(patience, &mut self.ledger, &mut self.flight.homes);
+        let Some(arrival) = self.flight.arrived() else {
             return Ok(Landed::Nothing);
         };
         let Home {
@@ -215,6 +222,12 @@ impl RunWorker {
         self.flight.issue()
     }
 
+    /// A sender onto the accounting thread's one queue, for the desk
+    /// this thread attends.
+    pub(crate) fn bell(&self) -> mpsc::Sender<Wake> {
+        self.flight.gate.bell()
+    }
+
     /// Whether any run is driving right now.
     pub(crate) fn driving(&self) -> bool {
         self.flight.in_flight() > 0
@@ -231,7 +244,7 @@ impl RunWorker {
     /// are left to the caller, which is closing anyway.
     pub(crate) fn land_the_rest(&mut self) -> Result<(), AxError> {
         while self.driving() {
-            self.serve_flight(LOOK_AGAIN)?;
+            self.serve_flight(Patience::Unbounded)?;
         }
         Ok(())
     }

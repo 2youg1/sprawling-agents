@@ -12,20 +12,56 @@
 //! write, so "a city has one writer" is held by the types rather than by
 //! discipline (ARCHITECTURE section 10, sprawling-SPEC.md 8-42).
 
+use std::collections::VecDeque;
 use std::sync::mpsc;
+use std::time::Duration;
 
 use kernel::{AxCode, AxError, EventDraft, EventRef, Ledger};
+
+use super::pool::Arrival;
 
 /// One append, and the address its answer goes back to.
 ///
 /// The two travel together because a driving thread is blocked on the
 /// second until the first has been written: an append with no way back
 /// is a thread that never wakes.
-struct RelayRequest {
+pub(crate) struct RelayRequest {
     draft: EventDraft,
     /// A rendezvous channel, so there is no third state between "the
     /// accounting thread wrote it" and "the driving thread knows".
     back: mpsc::SyncSender<Result<EventRef, AxError>>,
+}
+
+/// Everything that wakes the accounting thread, on the one queue it
+/// blocks on.
+///
+/// One queue rather than one per mouth, because a thread blocks on one
+/// thing at a time: with a queue per mouth it looked at each in turn
+/// with a timeout, and a relay request waited out the others' timeouts
+/// (sprawling-SPEC.md 8-42-4, `adversary/design/Attending.lean`).
+pub(crate) enum Wake {
+    /// A lane's append, waiting for its answer.
+    Relay(RelayRequest),
+    /// A run home from its lane. Boxed because it carries a whole
+    /// drive's outcome and the queue carries a relay request far more
+    /// often.
+    Home(Box<Arrival>),
+    /// A command was posted to the desk. The command itself stays on
+    /// the desk, where a run's safe points can still find its Cancel.
+    Command,
+    /// The city is stopping; the desk says so too.
+    Close,
+}
+
+/// How long one look at the queue may wait for its first wake.
+pub(crate) enum Patience {
+    /// Not at all: serve what is already queued.
+    Now,
+    /// At most this long. The schedule's next deadline is the one
+    /// reason an idle city has to wake without being asked.
+    For(Duration),
+    /// Until something is queued.
+    Unbounded,
 }
 
 /// The face a driving thread writes history through, and the only
@@ -36,7 +72,7 @@ struct RelayRequest {
 /// what keeps one city to one writer.
 #[derive(Clone)]
 pub(crate) struct Relay {
-    asking: mpsc::Sender<RelayRequest>,
+    asking: mpsc::Sender<Wake>,
 }
 
 impl Ledger for Relay {
@@ -55,7 +91,7 @@ impl Ledger for Relay {
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
         let (back, answer) = mpsc::sync_channel(0);
         self.asking
-            .send(RelayRequest { draft, back })
+            .send(Wake::Relay(RelayRequest { draft, back }))
             .map_err(|_| gone("the accounting thread is no longer taking writes"))?;
         answer
             .recv()
@@ -63,20 +99,20 @@ impl Ledger for Relay {
     }
 }
 
-/// The face the accounting thread serves relay requests through.
+/// The face the accounting thread serves the one queue through.
 ///
 /// It holds a sender of its own so the channel stays connected while a
 /// city is served: a gate that had handed out every sender would report
 /// "nobody is writing" as "the writer is gone".
 pub(crate) struct RelayGate {
-    asks: mpsc::Receiver<RelayRequest>,
-    issuing: mpsc::Sender<RelayRequest>,
+    wakes: mpsc::Receiver<Wake>,
+    issuing: mpsc::Sender<Wake>,
 }
 
 impl RelayGate {
     pub(crate) fn open() -> RelayGate {
-        let (issuing, asks) = mpsc::channel();
-        RelayGate { asks, issuing }
+        let (issuing, wakes) = mpsc::channel();
+        RelayGate { wakes, issuing }
     }
 
     /// One handle for one driving thread.
@@ -86,31 +122,56 @@ impl RelayGate {
         }
     }
 
-    /// Writes every request already waiting, and returns how many.
+    /// A sender for the two mouths that are not relays: the lanes
+    /// coming home, and the desk.
+    pub(crate) fn bell(&self) -> mpsc::Sender<Wake> {
+        self.issuing.clone()
+    }
+
+    /// Waits as `patience` allows for the first wake, then takes every
+    /// wake already queued: the relay requests are written, and the runs
+    /// home are put on `homes` in arrival order for the caller to land.
     ///
-    /// It never waits for one. The accounting thread's loop serves these
-    /// before it looks at the command desk, so a run that has already
-    /// been paid for does not queue behind a command that has not
-    /// started (sprawling-SPEC.md 8-42-2).
+    /// The crossing is written before anything lands, because a run
+    /// that has already been paid for must not queue behind one that has
+    /// finished (sprawling-SPEC.md 8-42-2). A command or a close only
+    /// ends the wait; what it asks for is read off the desk.
     ///
-    /// **Everything already waiting rides one disk barrier.** Four lanes
+    /// **Everything already queued rides one disk barrier.** Four lanes
     /// drive at once and every line they write crosses to this one
-    /// thread, so a drain routinely holds several drafts; handing them
-    /// over one at a time paid one barrier each, and a barrier costs the
-    /// same for fifty records as for one. What each caller waits for is
-    /// unchanged: the answer still goes back only after the write is
-    /// durable, because that is what makes an `EventRef` a reference to
-    /// a history that exists.
-    pub(crate) fn serve_waiting(&self, ledger: &mut impl Ledger) -> usize {
+    /// thread, so a drain routinely holds several drafts; a barrier
+    /// costs the same for fifty records as for one. What each caller
+    /// waits for is unchanged: the answer goes back only after the write
+    /// is durable, because that is what makes an `EventRef` a reference
+    /// to a history that exists.
+    pub(crate) fn serve(
+        &self,
+        patience: Patience,
+        ledger: &mut impl Ledger,
+        homes: &mut VecDeque<Arrival>,
+    ) {
+        // The gate holds a sender of its own, so the queue is never
+        // disconnected and an empty answer means only "nothing yet".
+        let first = match patience {
+            Patience::Now => self.wakes.try_recv().ok(),
+            Patience::For(wait) => self.wakes.recv_timeout(wait).ok(),
+            Patience::Unbounded => self.wakes.recv().ok(),
+        };
         let mut drafts = Vec::new();
         let mut senders = Vec::new();
-        while let Ok(RelayRequest { draft, back }) = self.asks.try_recv() {
-            drafts.push(draft);
-            senders.push(back);
+        let queued = std::iter::from_fn(|| self.wakes.try_recv().ok());
+        for wake in first.into_iter().chain(queued) {
+            match wake {
+                Wake::Relay(RelayRequest { draft, back }) => {
+                    drafts.push(draft);
+                    senders.push(back);
+                }
+                Wake::Home(arrival) => homes.push_back(*arrival),
+                Wake::Command | Wake::Close => {}
+            }
         }
-        let served = senders.len();
-        if served == 0 {
-            return 0;
+        if senders.is_empty() {
+            return;
         }
         match ledger.append_all(drafts) {
             Ok(echoes) => {
@@ -132,7 +193,6 @@ impl RelayGate {
                 }
             }
         }
-        served
     }
 }
 
@@ -154,7 +214,7 @@ fn gone(why: &str) -> AxError {
 mod tests {
     use std::sync::mpsc;
 
-    use super::{Relay, RelayGate, RelayRequest};
+    use super::{Patience, Relay, RelayGate, RelayRequest, Wake};
     use kernel::ledger::conformance::{LedgerInspect, assert_ledger_conformance};
     use kernel::{AxError, EventDraft, EventRef, Ledger};
 
@@ -168,7 +228,8 @@ mod tests {
     struct Relayed {
         relay: Relay,
         dir: tempfile::TempDir,
-        stopping: std::sync::Arc<std::sync::atomic::AtomicBool>,
+        closing: mpsc::Sender<()>,
+        bell: mpsc::Sender<Wake>,
         accounting: Option<std::thread::JoinHandle<()>>,
     }
 
@@ -178,22 +239,22 @@ mod tests {
             let root = dir.path().to_path_buf();
             let gate = RelayGate::open();
             let relay = gate.issue();
-            let stopping = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-            let closing = std::sync::Arc::clone(&stopping);
+            let bell = gate.bell();
+            let (closing, closed) = mpsc::channel::<()>();
             let accounting = std::thread::spawn(move || {
                 let (mut ledger, _opened) =
                     memory::JsonlLedger::open(&root, kernel::TimeMs::new(0))
                         .expect("a fresh ledger opens");
-                while !closing.load(std::sync::atomic::Ordering::Acquire) {
-                    if gate.serve_waiting(&mut ledger) == 0 {
-                        std::thread::sleep(std::time::Duration::from_millis(1));
-                    }
+                let mut homes = std::collections::VecDeque::new();
+                while closed.try_recv().is_err() {
+                    gate.serve(Patience::Unbounded, &mut ledger, &mut homes);
                 }
             });
             Relayed {
                 relay,
                 dir,
-                stopping,
+                closing,
+                bell,
                 accounting: Some(accounting),
             }
         }
@@ -201,8 +262,10 @@ mod tests {
 
     impl Drop for Relayed {
         fn drop(&mut self) {
-            self.stopping
-                .store(true, std::sync::atomic::Ordering::Release);
+            self.closing
+                .send(())
+                .expect("the accounting thread still listens");
+            drop(self.bell.send(Wake::Close));
             if let Some(accounting) = self.accounting.take() {
                 drop(accounting.join());
             }
@@ -303,7 +366,7 @@ mod tests {
         // retried the arrangement until it saw batching failed on CI for
         // being unlucky rather than for being wrong. The requests are
         // therefore put on the channel directly, which is the state the
-        // property is about - `serve_waiting` drains what it finds, and
+        // property is about - `serve` drains what it finds, and
         // what it finds here is four.
         let gate = RelayGate::open();
         let mut answers = Vec::new();
@@ -311,7 +374,7 @@ mod tests {
             let (back, answer) = mpsc::sync_channel(1);
             answers.push(answer);
             gate.issuing
-                .send(RelayRequest {
+                .send(Wake::Relay(RelayRequest {
                     draft: EventDraft {
                         run: kernel::RunId::CITY,
                         t: kernel::TimeMs::new(stamp),
@@ -322,7 +385,7 @@ mod tests {
                         ig: false,
                     },
                     back,
-                })
+                }))
                 .expect("the gate holds a sender of its own");
         }
 
@@ -331,10 +394,10 @@ mod tests {
             records: 0,
             seq: 0,
         };
-        assert_eq!(
-            gate.serve_waiting(&mut store),
-            4,
-            "one drain takes all four"
+        gate.serve(
+            Patience::Now,
+            &mut store,
+            &mut std::collections::VecDeque::new(),
         );
         assert_eq!(store.records, 4, "every draft reached the store");
         assert_eq!(

@@ -18,11 +18,10 @@
 //! end is the run's end.
 
 use std::sync::mpsc;
-use std::time::Duration;
 
 use kernel::{AxCode, AxError, RunId};
 
-use super::relay::Relay;
+use super::relay::{Relay, Wake};
 use crate::assembly::{DriveContext, Driven, Driving, drive_run};
 
 /// How many runs a city drives at once.
@@ -52,10 +51,9 @@ pub(crate) struct Arrival {
 /// judgements about a plan rather than about a thread.
 pub(crate) struct DrivingPool {
     lanes: u32,
-    /// Handed to each lane, kept here so the receiver below stays
-    /// connected while the pool lives.
-    sending: mpsc::Sender<Arrival>,
-    arriving: mpsc::Receiver<Arrival>,
+    /// Handed to each lane: a run comes home on the accounting
+    /// thread's one queue, beside the relay requests it wrote.
+    home: mpsc::Sender<Wake>,
     /// One entry per run still driving. The handle is joined where the
     /// run comes home, so a pool that reports nothing in flight has no
     /// thread left behind it.
@@ -63,12 +61,10 @@ pub(crate) struct DrivingPool {
 }
 
 impl DrivingPool {
-    pub(crate) fn open(lanes: u32) -> DrivingPool {
-        let (sending, arriving) = mpsc::channel();
+    pub(crate) fn open(lanes: u32, home: mpsc::Sender<Wake>) -> DrivingPool {
         DrivingPool {
             lanes: lanes.max(1),
-            sending,
-            arriving,
+            home,
             running: std::collections::BTreeMap::new(),
         }
     }
@@ -108,7 +104,7 @@ impl DrivingPool {
             )
             .with_recovery("report this: one run drives once"));
         }
-        let home = self.sending.clone();
+        let home = self.home.clone();
         let lane = std::thread::Builder::new()
             .name(format!("sprawling-drive-{run}"))
             .spawn(move || {
@@ -116,7 +112,7 @@ impl DrivingPool {
                 // Nobody listening means the city stopped pursuing while
                 // this run was going: the history already has whatever
                 // this drive wrote, and there is nothing left to tell.
-                drop(home.send(Arrival { run, driven }));
+                drop(home.send(Wake::Home(Box::new(Arrival { run, driven }))));
             })
             .map_err(|source| {
                 AxError::failure(
@@ -130,32 +126,24 @@ impl DrivingPool {
         Ok(())
     }
 
-    /// The next run home, or `None` if none arrived inside `wait`.
-    ///
-    /// `None` is not "nothing is running": the caller waits in short
-    /// steps so that it can serve the relay in between, which is what
-    /// lets a lane make progress at all.
+    /// Closes the lane `arrival` came home from.
     ///
     /// # Errors
     /// Refuses when a lane ended without saying so, which under
     /// `panic = "abort"` cannot happen in a shipped binary and can in a
     /// test build that unwinds.
-    pub(crate) fn arrived(&mut self, wait: Duration) -> Option<Result<Arrival, AxError>> {
-        let arrival = self.arriving.recv_timeout(wait).ok()?;
-        let joined = match self.running.remove(&arrival.run) {
-            Some(lane) => lane.join(),
-            None => return Some(Ok(arrival)),
+    pub(crate) fn landed(&mut self, arrival: Arrival) -> Result<Arrival, AxError> {
+        let Some(lane) = self.running.remove(&arrival.run) else {
+            return Ok(arrival);
         };
-        if joined.is_err() {
-            return Some(Err(AxError::failure(
+        if lane.join().is_err() {
+            return Err(AxError::failure(
                 AxCode::StorageFatal,
                 "close a driving lane",
                 format!("the lane driving {} ended abnormally", arrival.run),
             )
-            .with_recovery(
-                "restart this city; its history is verified on the way back up",
-            )));
+            .with_recovery("restart this city; its history is verified on the way back up"));
         }
-        Some(Ok(arrival))
+        Ok(arrival)
     }
 }

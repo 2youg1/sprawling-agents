@@ -1829,13 +1829,23 @@ impl kernel::Ledger for Relay {
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError>;
 }
 
-/// 记账那一侧的脸。
-pub(crate) struct RelayGate { /* Receiver ＋ 一个用来发牌的 Sender */ }
+/// 唤醒记账线程的一切，同在一条队列上：每张嘴一个变体，再加关门。
+pub(crate) enum Wake { Relay(RelayRequest), Home(Box<Arrival>), Command, Close }
+
+/// 一次看队列最多等多久。
+pub(crate) enum Patience { Now, For(Duration), Unbounded }
+
+/// 记账那一侧的脸：那一条队列的 Receiver ＋ 一个用来发牌的 Sender。
+pub(crate) struct RelayGate { /* … */ }
 impl RelayGate {
     pub(crate) fn open() -> RelayGate;
     pub(crate) fn issue(&self) -> Relay;
-    /// 把此刻已经在等的请求全部服务掉，一件不留，**且合成一道屏障**。返回服务了几件。
-    pub(crate) fn serve_waiting(&self, ledger: &mut impl kernel::Ledger) -> usize;
+    /// 车道回家与 desk 用的 Sender。
+    pub(crate) fn bell(&self) -> mpsc::Sender<Wake>;
+    /// 按 `patience` 等第一条消息，再用 `try_recv` 把排在后面的一次取尽：relay 请求**合成一道屏障**
+    /// 写下去，回家的活按到达次序放进 `homes`，Command 与 Close 只负责唤醒。
+    pub(crate) fn serve(&self, patience: Patience, ledger: &mut impl kernel::Ledger,
+                        homes: &mut VecDeque<Arrival>);
 }
 ```
 
@@ -1894,12 +1904,12 @@ provider 的并发上限），配置值是人写的。取小的那个：比天�
 消耗掉至少一件工作，所以醒来的次数以消息数加截止时刻数为上界。模型只管追加了几条记录，一条消息落地时
 做的其余事（结账、回话）归 Rust。
 
-**今天的循环守住前两条，守不住第三条**：它按 8-46-2 的节奏轮询三张嘴，而不是被消息唤醒。一次 relay
-往返要等过两次定时等待（`serve_flight(LOOK_AGAIN)` 等回家的活，`CommandDesk::wait` 等 desk），定时器
-粒度 15.6 ms 的主机上 8-83 的 relay 仪表读出 p50 约 31 ms，内存与磁盘两种存储读数相同，所以这 31 ms
-全是等待，不是 fsync。守住第三条的形状是模型里那一条队列：一个枚举，每张嘴一个变体再加关门，先 `recv` 阻塞，醒来后
-`try_recv` 取尽，保留批量 `append_all`，删掉 `LOOK_AGAIN` 与两处定时等待；那时 8-46-2 的等待节奏一段
-随之改写。这个枚举不能叫 `Inbox`：词汇表里 Inbox 是 Approval Inbox，人的待答队列。
+**`attend` 就是模型里那一条队列**：`Wake` 每张嘴一个变体再加关门，`RelayGate::serve` 先阻塞在
+第一条上，醒来后 `try_recv` 取尽，relay 请求合成一次 `append_all`。desk 仍然自己存命令（运行中的活在
+安全点上要从 desk 里找 Cancel），`post` 与 `close` 只往队列里送一条 `Command` 或 `Close` 去唤醒；
+线程每次醒来都先服务口子，再看 desk，desk 空时才再睡。一条被 `pursue` 的内层循环吃掉的 `Command`
+不会丢命令：命令在 desk 上，外层循环回来时先看 desk，再睡。这个枚举不叫 `Inbox`：词汇表里 Inbox 是
+Approval Inbox，人的待答队列。
 
 ### 8-42-5 被否决的备选
 
@@ -2278,9 +2288,10 @@ fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 键要在 `serve_one` 返回之后继续被 `carrying` 持有，而 `carrying` 是「此刻正在写的记录该盖谁的章」，
 两轮活同时在飞时它答不出一个。
 
-**主循环的等待节奏跟着车道走**：有活在飞时 desk 只等 1 ms，因为一条车道只有在这条线程服务口子时才前进；
-没有活在飞时仍等 `SCHEDULE_TICK`，一座闲城就是闲的。排程因此自带节律——`DeskWait::Idle` 每毫秒来一次，
-而一座每毫秒打开一次排程文件的城把时间花在开文件上。
+**主循环只在消息到达与排程截止时刻醒来**（8-42-4）：车道的 append、回家的活、desk 上的命令都把线程
+唤醒，所以一条车道不必等定时器才前进；desk 刚交出一条命令时下一次看队列不睡（desk 上可能还有），
+其余时候最多睡到下一个排程截止时刻（`SCHEDULE_TICK_MS`，20 s），一座闲城就是闲的。排程因此自带节律
+——有活在飞时 `DeskWait::Idle` 随每次 relay 往返而来，而一座每次都打开排程文件的城把时间花在开文件上。
 
 **关城要把车道等回来**：`DeskWait::Close` 之后不再接新活，但口子照服务、回家的照落账，直到没有活在飞，
 然后才写交接。一条停在 append 上的车道被丢下，丢掉的是城已经答应它耐久的那些行。
@@ -2879,7 +2890,7 @@ pub(super) fn tuning_of(wire: channels::EndpointTuning) -> gateway::EndpointTuni
 
 ### 8-61 已经在等的那一批，合成一道屏障
 
-`RelayGate::serve_waiting` 先把此刻等着的请求**全部取空**，再一次 `Ledger::append_all` 交下去，按位回信。
+`RelayGate::serve` 醒来后先把队列里等着的请求**全部取空**，再一次 `Ledger::append_all` 交下去，按位回信。
 
 - **理由是屏障的价钱与记录条数无关**：实测（`durability_barrier`，windows-x86_64 NVMe 一档机器）一条一屏障 585.2 µs／条，五十条一屏障 13.2 µs／条，而其中真正的写只有约 2.5 µs。四条车道同时在跑、每一行都要越到这一条记账线程上来，所以一次排空手里常常不止一件；一件一件交下去，交的是同样的字节，付的是四倍的屏障。
 - **等待的语义一个字没改**：回信仍然在落盘之后才发出，因为「`Ok` 即已落盘」正是 `EventRef` 之所以是一条已存在历史的引用（memory-SPEC §8-1）。否决「给端口加一个显式屏障动作、`append` 只写不同步」：那会让一条已经发出的 `EventRef` 指向一条可能还不存在的历史。
@@ -3244,7 +3255,7 @@ pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk);
 pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一个 gate 发出的写面
 ```
 
-**为什么把循环从闭包里拿出来**：仪表要驱动的是生产在跑的那个循环本身。`citysim` 的 `multi_run_parallel` 抄了 relay 的形状，而它的记账侧阻塞在请求通道上，生产的记账侧却在两个定时等待之间轮询；抄件量出 5 µs 一次往返，同一次往返在服务中的城里是 31.7 ms。循环只要还有第二份写法，仪表就会量错对象。`spawn_worker` 装好 `Serving` 与观察者之后调用 `attend`，这是它唯一的生产调用者。
+**为什么把循环从闭包里拿出来**：仪表要驱动的是生产在跑的那个循环本身。`citysim` 的 `multi_run_parallel` 抄了 relay 的形状，抄件的记账侧与生产的等法只要有一处不同，量出的就是抄件：生产的循环在两个定时等待之间轮询时，抄件量出 5 µs 一次往返，同一次往返在服务中的城里是 31.7 ms。循环只要还有第二份写法，仪表就会量错对象。`spawn_worker` 装好 `Serving` 与观察者之后调用 `attend`，这是它唯一的生产调用者。
 
 **两件仪表**，都在 `assembly::driving::tests::instruments`，都标 `#[ignore]`：它们量墙钟，一次要跑十几秒，不属于 `just check`；`just bench` 在 citysim 那一行之后跑它们（`cargo nextest run -p sprawling --release --run-ignored only -E 'test(/::instrument_/)' --no-capture`）。两件都经过同一套生产部件：`attend` 跑在自己的线程上，命令经 `CommandDesk::post` 进门，模型是回环上的假 provider（`fixture::provider`，带一个 `pace` 钩子决定何时作答）。
 
@@ -3253,13 +3264,13 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 | `instrument_relay_round_trip` | 一轮活停在它的第一次模型调用上（provider 不作答），于是循环处在「有车道在跑」的那个形状里；另一条线程拿 `measuring_relay` 连续追加 200 条，逐条计时 | `store=disk`：城自己的 `JsonlLedger`，每条一道屏障；`store=memory`：同一个 `JsonlLedger` 开在 `memory::FaultFs` 上，屏障是一次内存拷贝；另给 `store=memory` 不过河时自己的追加耗时，两者之差就是过河本身 |
 | `instrument_dispatch_gap` | 移植自 perf-latency 的双派活场景：run A 在 `lab/east` 跑 30 个 `status` 回合；A 的第五次模型调用到达时，往楼 `lab`（不带房间，于是要请 digest 模型取名）派 run B，provider 把取名那次调用压 3 s | A 相邻两条记录 `t` 之差的最大值与中位数，单位 ms |
 
-`instrument_relay_round_trip` 另断言两种过河存储的 p50 都不超过 1 ms（`ROUND_TRIP_P50`）：磁盘存储的一道 fsync 是这次往返的物理下限，而轮询的等待不是。目标还有一条没写成断言：内存存储过河的 p50 不超过 10 µs，它只在 `--release` 下有意义，而 `crossing=none` 那一行在调试构建里已是 20 µs 量级。
+`instrument_relay_round_trip` 另断言内存存储过河的 p50 不超过 1 ms（`ROUND_TRIP_P50`）：那条往返里除了一次内存拷贝全是 harness，所以它量的就是 harness。磁盘存储只报读数不断言：它的中位数是设备的 fsync，这是物理下限，因机器而异，一个写死的毫秒数只对一类机器成立；它与内存那一行之差才是磁盘的份额。目标还有一条没写成断言：内存存储过河的 p50 不超过 10 µs，它只在 `--release` 下有意义，而 `crossing=none` 那一行在调试构建里已是 20 µs 量级。
 
 读数行由仪表模块自己渲染，一行一个读数：`<仪表> <键=值>… machine=<os>-<arch>, <n> core(s)`，每行都带 `samples`、`floor_us`、`p50_us`（空档那一行是 `max_ms`、`median_ms`）。它不用 citysim 的 `perf load=…` 文法：那份文法属于 citysim 的 bench Main，本 crate 够不到它，两件仪表的读数也不是那四个负载场景之一。
 
 **决定**：仪表放在 crate 内的测试里，而不是给 citysim 开一扇公共门。relay、`serve_flight` 与 desk 都是 `pub(crate)`；为量它们而开的公共面没有生产调用者，而且要进 apisync 基线。**败给的方案**：citysim 经 `RunWorker::handle(Dispatch)` 从外面驱动，再用 provider 两次请求之间的空隙推算 relay 往返。那个空隙里还有围栏（每波 20–90 ms）与工具，推算出来的是每回合剩余，不是一次往返。
 
-**重开参数**：记账线程改成 8-42-4 那一条统一队列之后（主线 1），`attend` 的签名随之改，两件仪表的驱动方式不变——它们只经过 desk、relay 与 provider 三个面。
+**重开参数**：两件仪表只经过 desk、relay 与 provider 三个面；`attend` 的等法再怎么改，只要这三个面不变，仪表就不用改。
 
 ## 8-60 提示词语料的分层：哪类事实住哪一层（`docs/City.md`＋`ToolMeta`＋`Catalog`）
 

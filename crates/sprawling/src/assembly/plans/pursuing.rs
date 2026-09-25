@@ -18,7 +18,8 @@
 
 use kernel::{Address, AxError, NodeId};
 
-use super::super::{Assignment, LOOK_AGAIN, Landed, RunWorker};
+use super::super::{Assignment, Landed, RunWorker};
+use crate::serving::relay::Patience;
 
 /// Why one pass over the ready set stopped taking work.
 ///
@@ -64,7 +65,7 @@ impl RunWorker {
             // A run home may be this pursuit's row or somebody else's
             // dispatch; both land here, and only the first one changes
             // what this loop does next.
-            let Landed::Row { addr: at, node } = self.serve_flight(LOOK_AGAIN)? else {
+            let Landed::Row { addr: at, node } = self.serve_flight(Patience::Unbounded)? else {
                 continue;
             };
             // A run that came home leaving its node exactly as it found
