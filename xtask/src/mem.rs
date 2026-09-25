@@ -38,8 +38,9 @@ const SETTLE: Duration = Duration::from_secs(2);
 const POLL: Duration = Duration::from_millis(5);
 
 /// How many attempts before a fixture city that never accepts is
-/// reported: about 300 s, because a city with 400,000 records takes 37 s
-/// to accept today and a bound this instrument hits is a reading lost.
+/// reported: about 300 s, because a city with 400,000 records folds its
+/// whole Ledger before it accepts, which is tens of seconds on a slow
+/// disk, and a bound this instrument hits is a reading lost.
 const ATTEMPTS: u32 = 30_000;
 
 /// What a run of this command measures. There is no value for "this

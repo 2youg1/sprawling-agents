@@ -795,10 +795,10 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 | Linux | `smaps_rollup` 的 `Private_Clean`＋`Private_Dirty` | `status` 的 `VmHWM`（峰值常驻，含共享页） | `status` 的 `VmRSS` |
 | macOS | `ps -o rss`（保守上界，共享页全计） | 同左 | 同左 |
 
-**夹具城的二进制**：`$CARGO_TARGET_DIR`（未设时 `<root>/target`）下的 `release/sprawling`＋平台后缀；`just mem` 不带 pid 时先 `cargo build --release -p sprawling --locked`，所以量到的永远是这棵树建出来的那个。端口先由本进程在 `127.0.0.1:0` 上借一个再还回去；等待是按 5 ms 轮询连接，上限 300 s（40 万条记录的城今天要 37 s 才开始接受连接）。
+**夹具城的二进制**：`$CARGO_TARGET_DIR`（未设时 `<root>/target`）下的 `release/sprawling`＋平台后缀；`just mem` 不带 pid 时先 `cargo build --release -p sprawling --locked`，所以量到的永远是这棵树建出来的那个。端口先由本进程在 `127.0.0.1:0` 上借一个再还回去；等待是按 5 ms 轮询连接，上限约 300 s：40 万条记录的城要先把整条 Ledger 折叠一遍才开始接受连接，在慢盘上是几十秒，而量具自己撞上的上限就是一次丢掉的读数。
 
 **读数不带判词**：预算与读数住 `xtask/budgets.toml` 的按场景的行（`[resident_empty_idle]` 等），本命令只报它量到的三个数、pid 与量的是什么。
 
-**失败**：`XtaskError::Io`（起进程、读计数器、建临时城）与 `XtaskError::Doc`（计数器读不懂、夹具城在期限内没有接受连接、二进制不在那里——恢复语指向 `just mem`）。
+**失败**：`XtaskError::Io`（起进程、读计数器、建临时城）、`XtaskError::Cmd`（参数说不出要量什么、`init` 被拒、夹具城在期限内没有接受连接、二进制不在那里——恢复语指向手动跑同一条 `serve` 或 `just mem`）与 `XtaskError::Doc`（计数器读不懂）。
 
 **决定**：不带 pid 时自己起一座夹具城，而不是量自己。旧形状缺省量 `std::process::id()`，量到的是 xtask，登记簿里那行 idle 读数比真正在 serve 的空城还低；读数又是 working set，含共享映像页。**败给的方案**：没有 pid 就拒绝。它也改掉了错的读数，但「一座空城闲着占多少」是每次都要问的问题，让人自己先起一座城再抄 pid，等于把量具的一半交回给人。
