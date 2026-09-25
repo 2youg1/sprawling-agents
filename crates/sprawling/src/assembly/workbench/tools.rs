@@ -144,22 +144,7 @@ impl RunWorker {
                 of: site.provenance(self.city_hash()?, addr),
             })
             .for_job(addr.clone(), job_locator.clone());
-        // Work that outside content started carries that into every door
-        // the bench asks, and the command door refuses it outright (C15).
-        // A tainted run that cannot name its source stops here, so it
-        // never reaches the bench with an empty set that every door
-        // would let through.
-        if at.tainted {
-            let outside = kernel::TaintSource::new("outside").ok_or_else(|| {
-                AxError::failure(
-                    kernel::AxCode::ConfigInvalid,
-                    "label the taint of a tainted run",
-                    "the taint source label is empty",
-                )
-                .with_recovery("give the taint source a non-empty label")
-            })?;
-            *bench.taint_mut() = kernel::TaintSet::of(outside);
-        }
+        *bench.taint_mut() = run_taint(at)?;
         // One registration feeds both. The catalogue is what the model
         // was told exists and the bench is what routes the call it
         // makes, so a name on one list and not the other is either a
@@ -244,7 +229,29 @@ impl RunWorker {
             succession,
         })
     }
+}
 
+/// The taint a run carries into every door its bench asks: work that
+/// outside content started is refused exec by the command door (C15).
+/// A tainted run that cannot name its source fails here, so it never
+/// reaches the bench with an empty set that every door would let through.
+fn run_taint(at: &Assignment) -> Result<kernel::TaintSet, AxError> {
+    if !at.tainted {
+        return Ok(kernel::TaintSet::default());
+    }
+    kernel::TaintSource::new("outside")
+        .map(kernel::TaintSet::of)
+        .ok_or_else(|| {
+            AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "label the taint of a tainted run",
+                "the taint source label is empty",
+            )
+            .with_recovery("give the taint source a non-empty label")
+        })
+}
+
+impl RunWorker {
     /// What this run's building may read by a path its model chose: the
     /// read bound, closed over the building and this city's rules
     /// (city-SPEC 8-2).
