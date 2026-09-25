@@ -64,7 +64,11 @@ pub(super) fn use_folder(folder: &std::path::Path) -> ExitCode {
         );
         return ExitCode::FAILURE;
     }
-    if assembly::has_history(folder) {
+    let history = match assembly::has_history(folder) {
+        Ok(history) => history,
+        Err(err) => return report(err),
+    };
+    if history == assembly::History::Present {
         println!("{} is already a city; opening it", folder.display());
         return serve_city(folder, DEFAULT_AT, &[], opening(&[], Open::Browser));
     }
@@ -109,7 +113,11 @@ pub(super) fn report_standing(report: &assembly::InitReport) {
 /// and the launcher in the release archive both arrive here, so the
 /// sequence has exactly one definition and `init` and `serve` keep theirs.
 pub(super) fn up_at(city: &std::path::Path, raw: &str, args: &[String]) -> ExitCode {
-    if !assembly::has_history(city) {
+    let history = match assembly::has_history(city) {
+        Ok(history) => history,
+        Err(err) => return report(err),
+    };
+    if history == assembly::History::Absent {
         match assembly::init_city(city) {
             Ok(raised) => println!(
                 "city raised at {} (genesis seq {})",
@@ -187,7 +195,11 @@ pub(super) fn serve_city(
     // A directory with no history is not a city, and saying so beats the
     // storage layer's report that it could not list a ledger directory -
     // which is true, unhelpful, and names a path nobody chose.
-    if !assembly::has_history(city) {
+    let history = match assembly::has_history(city) {
+        Ok(history) => history,
+        Err(err) => return report(err),
+    };
+    if history == assembly::History::Absent {
         eprintln!("no city at {}", city.display());
         eprintln!(
             "recovery: `sprawling up {0}` raises one and serves it",

@@ -388,7 +388,8 @@ mod mcp_stdio;     // 同上
 // assembly：跨出 crate 的项，逐个放行
 pub struct InitReport { pub ledger_dir, pub genesis, pub standing, pub adopted }
 pub enum Adopt { Nothing, EveryFolder }
-pub fn has_history(&Path) -> bool;
+pub enum History { Absent, Present }   // 目录不存在或为空是 Absent；读不了是 Err，不是 Absent
+pub fn has_history(&Path) -> Result<History, AxError>;   // StorageFatal：账本目录存在却列不出来
 pub fn init_city(&Path) -> Result<InitReport, AxError>;
 pub fn form_city(&Path, Adopt) -> Result<InitReport, AxError>;
 pub fn open_vault() -> (gateway::Custodian, Option<Payload>);
