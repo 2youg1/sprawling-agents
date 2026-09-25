@@ -209,10 +209,29 @@ fn a_checkpoint_inside_a_turn_names_the_commit_it_made() {
     );
 }
 
+/// A refusal whose payload does not read back as an error is still a
+/// refusal that happened. Dropping it would show the turn as if the
+/// door had let the call through.
+#[test]
+fn a_refusal_that_will_not_read_back_stays_in_the_turn_as_unreadable() {
+    let events = [
+        asked(1),
+        record(2, EventKind::GateDenied, serde_json::json!({ "code": 7 })),
+    ];
+    match turns(&events)[0].notes.as_slice() {
+        [Note::Unreadable { cause, at }] => {
+            assert!(cause.starts_with("GateDenied"), "{cause}");
+            assert_eq!(*at, Seq::new(2));
+        }
+        other => panic!("the failure to read is kept, got {other:?}"),
+    }
+}
+
 /// The oid is what a change list is addressed by, so a spelling this
-/// build cannot parse leaves no row: a checkpoint nothing can be
-/// asked about is worse than a checkpoint that is not shown, because
-/// the first one looks like a working control.
+/// build cannot parse leaves no row to click: a checkpoint nothing can
+/// be asked about is worse than a checkpoint that is not shown, because
+/// the first one looks like a working control. What it leaves is the
+/// failure to read it, which is no control at all.
 #[test]
 fn a_checkpoint_whose_oid_will_not_parse_leaves_no_row_to_click() {
     let events = [
@@ -223,7 +242,13 @@ fn a_checkpoint_whose_oid_will_not_parse_leaves_no_row_to_click() {
             serde_json::json!({ "oid": "3f9a1c", "scope": "lab", "files": [] }),
         ),
     ];
-    assert!(turns(&events)[0].notes.is_empty());
+    match turns(&events)[0].notes.as_slice() {
+        [Note::Unreadable { cause, at }] => {
+            assert!(cause.starts_with("CheckpointCommitted"), "{cause}");
+            assert_eq!(*at, Seq::new(2));
+        }
+        other => panic!("no row to click, only the failure to read, got {other:?}"),
+    }
 }
 
 #[test]

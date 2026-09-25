@@ -157,6 +157,7 @@
     if ("refused" in note) return note.refused.at;
     if ("fenced" in note) return note.fenced.at;
     if ("waiting" in note) return note.waiting.at;
+    if ("unreadable" in note) return note.unreadable.at;
     return note.discarded.at;
   }
 

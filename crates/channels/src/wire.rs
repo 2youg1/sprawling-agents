@@ -134,7 +134,11 @@ use serde::{Deserialize, Serialize};
 ///    branch and a git revert (kernel-SPEC.md section 12.2), and old
 ///    pages are refused at the handshake rather than given buttons that
 ///    can only fail.
-pub const WIRE_V: u32 = 37;
+/// 38: a turn keeps the record it could not read. `Note::Unreadable`
+///    carries the cause where a refusal or a fence whose payload did
+///    not read back used to leave no note at all, so an older page would
+///    meet a variant it cannot decode.
+pub const WIRE_V: u32 = 38;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

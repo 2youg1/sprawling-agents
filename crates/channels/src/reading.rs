@@ -18,7 +18,7 @@
 //! parse would be a view that lies about what happened.
 
 use kernel::event::record::CheckpointCommitted;
-use kernel::{EventKind, EventRecord};
+use kernel::{EventKind, EventRecord, Seq};
 
 use crate::answer::{Note, Output, Used};
 
@@ -158,16 +158,17 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
         // The carrier table in `kernel::error` decides which codes land
         // under which kind, and `runtime::run` writes the error flat
         // into the payload. A payload that will not read back as one is
-        // left to the event stream rather than rendered as a refusal
-        // this build invented.
+        // kept as the failure to read it rather than rendered as a
+        // refusal this build invented, or dropped as if nothing refused.
         EventKind::GateDenied
         | EventKind::BudgetLimit
         | EventKind::WatchdogFired
         | EventKind::ProviderDegraded => {
             let value = serde_json::Value::Object(map.clone());
-            serde_json::from_value(value)
-                .ok()
-                .map(|error| Note::Refused { error, at })
+            Some(match serde_json::from_value(value) {
+                Ok(error) => Note::Refused { error, at },
+                Err(err) => unreadable(kind, &err, at),
+            })
         }
         EventKind::ApprovalRequested => Some(Note::Waiting { at }),
         // The job pin that opens a dispatch is a `checkpoint_committed`
@@ -178,7 +179,8 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
                 oid: commit.oid,
                 at,
             }),
-            Ok(CheckpointCommitted::JobPinned { .. }) | Err(_) => None,
+            Ok(CheckpointCommitted::JobPinned { .. }) => None,
+            Err(err) => Some(unreadable(kind, &err, at)),
         },
         EventKind::SteerReceived | EventKind::SignalConsumed => Some(Note::Arrived {
             from: text(map.get("source"))
@@ -195,5 +197,13 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
             at,
         }),
         _ => None,
+    }
+}
+
+/// The note a payload leaves when it will not read back as its kind.
+fn unreadable(kind: EventKind, err: &dyn std::fmt::Display, at: Seq) -> Note {
+    Note::Unreadable {
+        cause: format!("{kind:?} payload did not read back: {err}"),
+        at,
     }
 }
