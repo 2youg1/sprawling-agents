@@ -355,10 +355,10 @@ fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> u64 {
         let entry = entry.unwrap();
         let target = to.join(entry.file_name());
         if entry.file_type().unwrap().is_dir() {
-            copied += copy_dir(&entry.path(), &target);
+            copied = copy_dir(&entry.path(), &target).saturating_add(copied);
         } else {
             std::fs::copy(entry.path(), target).unwrap();
-            copied += 1;
+            copied = copied.saturating_add(1);
         }
     }
     copied
@@ -384,7 +384,7 @@ fn a_v006_bundle_brings_back_its_history_and_not_its_hooks() {
     );
     let at = carried.path().join(MANIFEST);
     let mut manifest = Manifest::from_json(&std::fs::read(&at).unwrap(), &at).unwrap();
-    manifest.files += whole;
+    manifest.files = manifest.files.saturating_add(whole);
     std::fs::write(&at, manifest.to_json()).unwrap();
 
     let elsewhere = tempfile::tempdir().unwrap();

@@ -8,16 +8,20 @@
 //!
 //! Two files and nothing else travel. A repository's `hooks/` and
 //! `config` are what a forged bundle would plant, so the restoring side
-//! takes both from a fresh `init` and never from the bundle.
+//! takes both from a fresh `init` and never from the bundle. A v0.0.6
+//! bundle carried the repository whole at `city/.git`; its objects and
+//! refs are packed here the way an export packs them, and nothing else
+//! of it lands.
 
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::alias::WriteTarget;
 use crate::error::{MemoryError, io_err};
 use crate::vfs::Vfs;
 
 use super::files::write_file;
+use super::manifest::CITY;
 
 /// The bundle's directory for the history.
 pub(crate) const HISTORY: &str = "history";
@@ -47,37 +51,49 @@ pub(crate) fn export(vfs: &mut dyn Vfs, city_root: &Path, dest: &Path) -> Result
         Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
         Err(err) => return Err(git_err("export")(err)),
     };
-    let mut pack = repo.packbuilder().map_err(git_err("export"))?;
-    let mut walk = repo.revwalk().map_err(git_err("export"))?;
-    let mut refs = String::new();
-    let head = repo.find_reference("HEAD").map_err(git_err("export"))?;
-    let listed = repo.references().map_err(git_err("export"))?;
-    for reference in std::iter::once(Ok(head)).chain(listed) {
-        let reference = reference.map_err(git_err("export"))?;
-        let name = reference.name().map_err(git_err("export"))?;
-        if let Some(target) = reference.symbolic_target().map_err(git_err("export"))? {
-            refs.push_str(&format!("{SYMBOLIC}{target} {name}\n"));
-        } else if let Some(oid) = reference.target() {
-            pack.insert_recursive(oid, None)
-                .map_err(git_err("export"))?;
-            if let Ok(commit) = reference.peel_to_commit() {
-                walk.push(commit.id()).map_err(git_err("export"))?;
-            }
-            refs.push_str(&format!("{oid} {name}\n"));
-        }
-    }
-    pack.insert_walk(&mut walk).map_err(git_err("export"))?;
+    let (pack, refs) = pack_of(&repo, "export")?;
     let dir = dest.join(HISTORY);
     vfs.create_dir_all(&dir)
         .map_err(io_err("make a bundle directory", &dir))?;
-    if pack.object_count() > 0 {
-        let mut bytes = git2::Buf::new();
-        pack.write_buf(&mut bytes).map_err(git_err("export"))?;
+    if let Some(bytes) = pack {
         let target = WriteTarget::at("write a history pack", &dir.join(PACK))?;
         write_file(vfs, &target, &bytes)?;
     }
     let target = WriteTarget::at("write the history refs", &dir.join(REFS))?;
     write_file(vfs, &target, refs.as_bytes())
+}
+
+/// One pack of every object the refs of `repo` reach, `None` when they
+/// reach none, and the refs in the bundle's line format.
+fn pack_of(
+    repo: &git2::Repository,
+    op: &'static str,
+) -> Result<(Option<Vec<u8>>, String), MemoryError> {
+    let mut pack = repo.packbuilder().map_err(git_err(op))?;
+    let mut walk = repo.revwalk().map_err(git_err(op))?;
+    let mut refs = String::new();
+    let head = repo.find_reference("HEAD").map_err(git_err(op))?;
+    let listed = repo.references().map_err(git_err(op))?;
+    for reference in std::iter::once(Ok(head)).chain(listed) {
+        let reference = reference.map_err(git_err(op))?;
+        let name = reference.name().map_err(git_err(op))?;
+        if let Some(target) = reference.symbolic_target().map_err(git_err(op))? {
+            refs.push_str(&format!("{SYMBOLIC}{target} {name}\n"));
+        } else if let Some(oid) = reference.target() {
+            pack.insert_recursive(oid, None).map_err(git_err(op))?;
+            if let Ok(commit) = reference.peel_to_commit() {
+                walk.push(commit.id()).map_err(git_err(op))?;
+            }
+            refs.push_str(&format!("{oid} {name}\n"));
+        }
+    }
+    pack.insert_walk(&mut walk).map_err(git_err(op))?;
+    if pack.object_count() == 0 {
+        return Ok((None, refs));
+    }
+    let mut bytes = git2::Buf::new();
+    pack.write_buf(&mut bytes).map_err(git_err(op))?;
+    Ok((Some(bytes.to_vec()), refs))
 }
 
 /// One ref as the bundle states it.
@@ -88,17 +104,20 @@ enum Target {
 
 /// A bundle's history, read and checked before anything is restored.
 pub(crate) struct History {
-    pack: Option<PathBuf>,
+    pack: Option<Vec<u8>>,
     refs: Vec<(String, Target)>,
 }
 
 impl History {
-    /// Reads the history a bundle carries, refusing it whole when a ref
-    /// is malformed or `city_root` already holds a repository.
+    /// Reads the history a bundle carries, from `history/` or from the
+    /// repository a v0.0.6 bundle carried whole at `city/.git`, refusing
+    /// it whole when a ref is malformed, when the bundle carries both, or
+    /// when `city_root` already holds a repository.
     ///
     /// # Errors
-    /// `MemoryError::Bundle` naming the first malformed line or the
-    /// occupied repository; I/O failures naming the path.
+    /// `MemoryError::Bundle` naming the first malformed line, the second
+    /// history, a `city/.git` that is no repository, or the occupied
+    /// repository; I/O failures naming the path.
     pub(crate) fn read(
         vfs: &dyn Vfs,
         bundle: &Path,
@@ -106,7 +125,10 @@ impl History {
     ) -> Result<Option<History>, MemoryError> {
         let dir = bundle.join(HISTORY);
         let at = dir.join(REFS);
-        if !vfs.exists(&at) {
+        let whole = bundle.join(CITY).join(kernel::GIT_METADATA);
+        let legacy = whole.symlink_metadata().is_ok_and(|meta| meta.is_dir());
+        let packed = vfs.exists(&at);
+        if !packed && !legacy {
             return Ok(None);
         }
         let occupied = city_root.join(kernel::GIT_METADATA);
@@ -118,19 +140,46 @@ impl History {
                 detail: format!("{} already holds a repository", occupied.display()),
             });
         }
-        let bytes = vfs
-            .read(&at)
-            .map_err(io_err("read the history refs", &at))?;
-        let text = String::from_utf8(bytes).map_err(|_| malformed(&at))?;
+        let (pack, text, at) = if packed && legacy {
+            return Err(MemoryError::Bundle {
+                op: "restore",
+                detail: format!(
+                    "{} and {} are two histories, and an export writes one",
+                    dir.display(),
+                    whole.display()
+                ),
+            });
+        } else if packed {
+            let bytes = vfs
+                .read(&at)
+                .map_err(io_err("read the history refs", &at))?;
+            let text = String::from_utf8(bytes).map_err(|_| malformed(&at))?;
+            let pack = dir.join(PACK);
+            let pack = match vfs.exists(&pack) {
+                true => Some(
+                    vfs.read(&pack)
+                        .map_err(io_err("read a history pack", &pack))?,
+                ),
+                false => None,
+            };
+            (pack, text, at)
+        } else {
+            let repo = git2::Repository::open_bare(&whole).map_err(|err| MemoryError::Bundle {
+                op: "restore",
+                detail: format!(
+                    "{} carries protected metadata that is no repository: {}",
+                    whole.display(),
+                    err.message()
+                ),
+            })?;
+            let (pack, text) = pack_of(&repo, "restore")?;
+            (pack, text, whole)
+        };
         let refs = text
             .lines()
             .map(|line| parse(line).ok_or_else(|| malformed(&at)))
             .collect::<Result<Vec<_>, _>>()?;
-        let pack = dir.join(PACK);
-        Ok(Some(History {
-            pack: vfs.exists(&pack).then_some(pack),
-            refs,
-        }))
+        Ok(Some(History { pack, refs }))
     }
 
     /// Initialises a repository at `city_root`, indexes the pack into
@@ -140,15 +189,14 @@ impl History {
     /// # Errors
     /// `MemoryError::Bundle` for any git failure, including a pack that
     /// does not index; I/O failures naming the path.
-    pub(crate) fn land(self, vfs: &dyn Vfs, city_root: &Path) -> Result<(), MemoryError> {
+    pub(crate) fn land(self, city_root: &Path) -> Result<(), MemoryError> {
         let repo = git2::Repository::init(city_root).map_err(git_err("restore"))?;
-        if let Some(at) = self.pack {
-            let bytes = vfs.read(&at).map_err(io_err("read a history pack", &at))?;
+        if let Some(bytes) = self.pack {
             let odb = repo.odb().map_err(git_err("restore"))?;
             let mut writer = odb.packwriter().map_err(git_err("restore"))?;
             writer
                 .write_all(&bytes)
-                .map_err(io_err("index a history pack", &at))?;
+                .map_err(io_err("index a history pack", repo.path()))?;
             writer.commit().map_err(git_err("restore"))?;
         }
         for (name, target) in &self.refs {
