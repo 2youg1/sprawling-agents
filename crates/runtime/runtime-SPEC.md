@@ -1749,3 +1749,24 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 - **`runtime::fork` 同边界重放**：`inherited` 的 `Wave` 持同一个 `Exchange`，在波收齐（或整波丢弃）的同一点 `compact()`——live 折叠与离线重建因此同源同字节，C16 的承诺由这条对拍承接。
 - **唯一的失败**：`Exchange::compact` 在一段文本计不进 `u64` 时以 `E_INVALID_ARGS` 报（动作＝压缩这一回合的 exchange，主体＝那段文本，recovery 指向本模块）——这是「没有人解析得了的窗口字节」，不是可恢复的压缩结果。live 路径（`record`）与回放路径（`inherited`）在同一个值上走同一次判定，故同一段文本两边同样拒，回放不会因为压缩而少一条分支。
 - **数字一个家**：预算只住 `consts_policy::EXCHANGE_BUDGET_BYTES`，本文件不复写它的值。
+
+### 8-45 runtime::run::fence（形状 1 判定；**一波前立不立 fence 的唯一权威**）
+
+```rust
+pub(crate) enum Fence { Skip, Stage }
+enum SinceFence { Unfenced, Fenced, Changed }   // 相对本 run 上一次 fence 的树
+pub(crate) struct FencePolicy { since: SinceFence }
+impl FencePolicy {
+    pub(crate) fn opening() -> Self;                                   // Unfenced
+    pub(crate) fn for_wave(&self, calls: &[ToolCall]) -> Fence;        // 只读
+    pub(crate) fn record_wave(&mut self, fence: Fence, calls: &[ToolCall]); // 只改状态
+}
+```
+
+- **fence 做两件事**：一是给这一波可能删改的东西留一个能回退的提交；二是把上一波写下的文件带进一个提交——否则那些写既进不了 diff，也还原不回来。所以判定看两样：这一波要调用什么，以及上一次 fence 之后有没有调用跑过。
+- **判定表**：`Changed`（上次 fence 后跑过调用）→ `Stage`，空波也一样；`Unfenced` 且这一波有调用 → `Stage`；`Unfenced` 且空波 → `Skip`（树就是 run 开张时那棵）；`Fenced`（fence 之后没有调用跑过）→ `Skip`，上一个提交已经是这棵树。
+- **状态转移**：这一波有调用 → `Changed`（被取消打断的波也算，它的部分调用可能已经跑了）；空波且立了 fence → `Fenced`；空波且跳过 → 不变。`Run<Active>` 持一个 `FencePolicy`，`advance` 只在 `Stage` 时调用 `RunHooks::fence` 并写 `checkpoint_committed`。
+- **为什么是一个模块**：「这一波要不要 fence」原本是 `advance` 里的一句 `if let Some(fence)`，答案恒为「要」。收成一个判定之后，后面两条规则（只读波、按写过的路径 stage）都只改这一处。
+- **未定**：今天每个调用都按「可能写」算，因为 run 驱动还不知道每个调用声明的 `Effect`——`ToolDef` 只有名字、描述与 schema，`Effect` 住 `ToolBench` 的注册表里。一旦 `RunPlan` 或 `RunHooks` 带上名字到 `Effect` 的表，「这一波有调用」换成「这一波有可能写的调用」，只读波就落到 `Fenced`/`Unfenced` 的 `Skip`；`Stage` 也应只带这一波写过的路径（写工具自报；exec 这类说不清的才扫写域）。定下它的证据是：5,000 文件的楼首次派活 ≤ 200 ms。
+- **否决「空波一律跳过」**：结束回合的空波前那次 fence，是把上一波的写带进提交的唯一时机；跳过它，run 写下的文件就没有任何提交持有。
+- **否决「每波都 fence」**：一个没跑过任何调用的 run，提交的是一棵没变的树，却多付一次 stage 与 commit。

@@ -26,6 +26,7 @@ use crate::reminder::ContextGauge;
 use crate::turn::{CallShape, Interrupt};
 use crate::window::{Opening, Window};
 
+mod fence;
 mod lifecycle;
 
 /// Everything constant about one run. Assembled by the caller, because
@@ -165,6 +166,8 @@ pub struct Active {
     /// the next one is compared against. `None` before the first
     /// request, and that absence is the `FirstRequest` a record states.
     prior_shape: Option<crate::prefix::shape::PromptShape>,
+    /// Whether the next wave needs a fence (§8-45).
+    fence: fence::FencePolicy,
 }
 
 /// A frozen run. There is no method back to [`Active`]: waking an old run

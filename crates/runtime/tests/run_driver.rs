@@ -478,13 +478,49 @@ fn a_fence_runs_before_the_wave_and_carries_the_turns_stamp() {
         let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
         assert!(matches!(frozen.completion(), Completion::Done(_)));
     }
-    // The fence goes up before *every* wave, including the last turn's
-    // empty one: an unchanged wave still commits, because a chain that
-    // rebuilds is worth more than a saved object.
+    // The fence goes up before the wave that calls something, and again
+    // before the closing turn's empty wave: that one has nothing to come
+    // back from, but it is what carries the first wave's writes into a
+    // commit.
     assert_eq!(fenced, vec![2, 3]);
     let kinds = ledger.kinds();
     assert_eq!(kinds[6], "checkpoint_committed");
     assert_eq!(kinds[7], "tool_called");
+}
+
+#[test]
+fn a_run_that_calls_nothing_puts_up_no_fence() {
+    let mut ledger = RecordingLedger::new();
+    let mut model = ScriptedModel {
+        seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+        waves: Vec::new(),
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut fenced: Vec<u64> = Vec::new();
+    let mut fence = |t: TimeMs| {
+        fenced.push(t.value());
+        Ok(Payload::empty())
+    };
+    {
+        let mut hooks = RunHooks {
+            now: &mut now,
+            interrupt: &mut interrupt,
+            fence: Some(&mut fence),
+            invoke: &mut invoke,
+            deltas: None,
+        };
+        let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+        assert!(matches!(frozen.completion(), Completion::Done(_)));
+    }
+    // Nothing ran and nothing will: the tree is the one the run opened on.
+    assert_eq!(fenced, Vec::<u64>::new());
 }
 
 #[test]
