@@ -16,7 +16,7 @@
 
 use super::data::verified_chain;
 use super::router::{COMMANDS, named};
-use super::{CLIENT_COMPLETE, CLIENT_FILES};
+use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 
 /// A verb the binary accepts is on the one screen that lists them. What
 /// `doctor` reads off its own line is judged beside it, in the library.
@@ -107,7 +107,7 @@ fn embedded_client_table_is_present_and_marked() {
 fn the_embedded_client_is_the_bundle_the_workspace_built() {
     let dist = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
-        .join("target/web-dist");
+        .join(CLIENT_BUNDLE_DIR);
     let mut on_disk = Vec::new();
     files_under(&dist, &dist, &mut on_disk);
     on_disk.sort();
