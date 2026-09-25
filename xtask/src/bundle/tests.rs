@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{DECLARATION, declared, dist, name, restated};
+use super::{DECLARATION, declared, dist, restated, stated_path};
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -18,17 +18,21 @@ fn items(source: &str) -> Vec<syn::Item> {
     syn::parse_file(source).unwrap().items
 }
 
-/// The reading this module exists for: the name comes out of the build
-/// script rather than out of a copy kept here.
+/// The reading this module exists for: the path comes out of the build
+/// script rather than out of a copy kept here, and it stays under the
+/// workspace root.
 #[test]
-fn the_name_is_read_from_the_file_that_embeds_the_bundle() {
-    let stated = name(&root()).unwrap();
-    assert!(!stated.is_empty(), "the build script states no directory");
-    assert!(
-        !stated.contains('/'),
-        "the declaration names a directory, not a path: {stated}"
-    );
-    assert_eq!(dist(&root()).unwrap(), root().join("target").join(&stated));
+fn the_path_is_read_from_the_file_that_embeds_the_bundle() {
+    let stated = stated_path(&root()).unwrap();
+    assert!(!stated.is_empty(), "the build script states no path");
+    let found = dist(&root()).unwrap();
+    let under_root: Vec<String> = found
+        .strip_prefix(root())
+        .expect("the bundle lands under the workspace root")
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(under_root.join("/"), stated);
 }
 
 /// A constant of another name is not this one, and a build script that
@@ -42,7 +46,7 @@ fn only_the_named_declaration_answers() {
         Some("web-dist".to_owned())
     );
     assert_eq!(declared(&items("const OTHER: &str = \"web-dist\";")), None);
-    assert!(name(Path::new("/nonexistent-checkout")).is_err());
+    assert!(stated_path(Path::new("/nonexistent-checkout")).is_err());
 }
 
 /// Both restating files name the directory the product embeds today.

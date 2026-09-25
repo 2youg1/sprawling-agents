@@ -102,15 +102,22 @@ impl RunWorker {
         // second-level disclosure: without it a building's reading room
         // could name a skill and never hand it over. It holds the
         // catalog rather than a copy of what is in it, so a skill
-        // admitted below this line is still reachable by name.
-        let read = runtime::ReadTool::new(&site.write_root, std::sync::Arc::clone(&catalog))?;
+        // admitted below this line is still reachable by name. It and
+        // `search` ask one read bound, so what one may open the other may
+        // find.
+        let bound = self.read_bound(site);
+        let read = runtime::ReadTool::new(
+            &site.write_root,
+            std::sync::Arc::clone(&catalog),
+            std::sync::Arc::clone(&bound),
+        )?;
         // Reading needs an address, and until this line there was no way
         // to find one: a symbol had to be hunted through `exec`, which
         // means Python this machine may not have or a shell this
         // building may have switched off. It stands beside `read`
         // because it answers the other half of one question, and it is
         // last in the order for the reason the comment below gives.
-        let search = SearchTool::new(&site.write_root)?;
+        let search = SearchTool::new(&site.write_root, bound)?;
         // The one door out of a filling window. It stands last because
         // it is the newest, and it takes no depth and asks no person:
         // the successor is this same resident, in this same room, with
@@ -222,6 +229,25 @@ impl RunWorker {
         })
     }
 
+    /// What this run's building may read by a path its model chose: the
+    /// read bound, closed over the building and this city's rules
+    /// (city-SPEC 8-2).
+    ///
+    /// Another building's rules are read each time a path lands in it,
+    /// not here, so a run that stays in its own building never pays for
+    /// them, and a building made confidential after this dispatch is
+    /// closed from that moment (city-SPEC 12.2).
+    fn read_bound(&self, site: &Site) -> runtime::ReadBound {
+        let city_root = self.city_root.clone();
+        let home = site.building.addr().clone();
+        std::sync::Arc::new(move |target: &Address| {
+            kernel::address::may_read(&home, target, || {
+                let holder = city::Building::of(target)?;
+                city::load(&city_root, holder.addr()).map(|rules| rules.policy().confidential)
+            })
+        })
+    }
+
     /// Builds the execution boundary.
     ///
     /// What the run may reach is the frozen configuration's answer;
@@ -246,6 +272,7 @@ impl RunWorker {
                 // program and not enough to link one.
                 env_passthrough: site.config.sandbox.env_passthrough.clone(),
                 domain: addr.clone(),
+                run: site.run_id,
             },
             machine.engine,
             self.backlog.clone(),

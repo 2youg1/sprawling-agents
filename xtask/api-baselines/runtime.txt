@@ -7,6 +7,8 @@ impl core::fmt::Debug for runtime::diagnostics::Diagnostics
 impl core::fmt::Display for runtime::backlog::BacklogId
 impl core::fmt::Display for runtime::backlog::BacklogId
 impl core::fmt::Display for runtime::diagnostics::Level
+impl core::ops::drop::Drop for runtime::ExecTool
+impl core::ops::drop::Drop for runtime::ExecTool
 impl core::ops::drop::Drop for runtime::tools::Confined
 impl kernel::tool::Tool for runtime::EditTool
 impl kernel::tool::Tool for runtime::EditTool
@@ -239,6 +241,8 @@ pub fn runtime::EditTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::EditTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::EditTool::new(&std::path::Path, kernel::address::Address, kernel::write_domain::WriteDomain) -> core::result::Result<runtime::EditTool, kernel::error::shape::AxError>
 pub fn runtime::EditTool::new(&std::path::Path, kernel::address::Address, kernel::write_domain::WriteDomain) -> core::result::Result<runtime::EditTool, kernel::error::shape::AxError>
+pub fn runtime::ExecTool::drop(&mut self)
+pub fn runtime::ExecTool::drop(&mut self)
 pub fn runtime::ExecTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::ExecTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::ExecTool::meta(&self) -> &kernel::tool::ToolMeta
@@ -266,15 +270,15 @@ pub fn runtime::ReadTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::re
 pub fn runtime::ReadTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::ReadTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::ReadTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn runtime::ReadTool::new(&std::path::Path, alloc::sync::Arc<std::sync::poison::mutex::Mutex<runtime::catalog::Catalog>>) -> core::result::Result<runtime::ReadTool, kernel::error::shape::AxError>
-pub fn runtime::ReadTool::new(&std::path::Path, alloc::sync::Arc<std::sync::poison::mutex::Mutex<runtime::catalog::Catalog>>) -> core::result::Result<runtime::ReadTool, kernel::error::shape::AxError>
+pub fn runtime::ReadTool::new(&std::path::Path, alloc::sync::Arc<std::sync::poison::mutex::Mutex<runtime::catalog::Catalog>>, runtime::ReadBound) -> core::result::Result<runtime::ReadTool, kernel::error::shape::AxError>
+pub fn runtime::ReadTool::new(&std::path::Path, alloc::sync::Arc<std::sync::poison::mutex::Mutex<runtime::catalog::Catalog>>, runtime::ReadBound) -> core::result::Result<runtime::ReadTool, kernel::error::shape::AxError>
 pub fn runtime::Sandbox::run(&mut self, &runtime::SandboxJob) -> core::result::Result<runtime::SandboxOutcome, kernel::error::shape::AxError>
 pub fn runtime::SearchTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::SearchTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::SearchTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn runtime::SearchTool::meta(&self) -> &kernel::tool::ToolMeta
-pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
-pub fn runtime::SearchTool::new(&std::path::Path) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
+pub fn runtime::SearchTool::new(&std::path::Path, runtime::ReadBound) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
+pub fn runtime::SearchTool::new(&std::path::Path, runtime::ReadBound) -> core::result::Result<runtime::SearchTool, kernel::error::shape::AxError>
 pub fn runtime::SegmentSource::whole(kernel::address::Address, u64, core::option::Option<kernel::event::record::turn::SummaryProducer>) -> runtime::SegmentSource
 pub fn runtime::SegmentSource::whole(kernel::address::Address, u64, core::option::Option<kernel::event::record::turn::SummaryProducer>) -> runtime::SegmentSource
 pub fn runtime::StatusSnapshot::render(&self, &[runtime::ChildStatus], &[runtime::Standing]) -> alloc::string::String
@@ -334,14 +338,16 @@ pub fn runtime::backlog::Backlog::enrol_run(&self, &kernel::address::Address, al
 pub fn runtime::backlog::Backlog::enrol_run(&self, &kernel::address::Address, alloc::string::String) -> core::result::Result<runtime::backlog::BacklogId, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::halt(&self, core::option::Option<&kernel::address::Address>) -> core::result::Result<usize, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::halt(&self, core::option::Option<&kernel::address::Address>) -> core::result::Result<usize, kernel::error::shape::AxError>
-pub fn runtime::backlog::Backlog::harvest(&self) -> core::result::Result<alloc::vec::Vec<runtime::Finished>, kernel::error::shape::AxError>
-pub fn runtime::backlog::Backlog::harvest(&self) -> core::result::Result<alloc::vec::Vec<runtime::Finished>, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::harvest(&self, kernel::event::identity::RunId) -> core::result::Result<alloc::vec::Vec<runtime::Finished>, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::harvest(&self, kernel::event::identity::RunId) -> core::result::Result<alloc::vec::Vec<runtime::Finished>, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::leave(&self, runtime::backlog::BacklogId) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::leave(&self, runtime::backlog::BacklogId) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::new() -> runtime::backlog::Backlog
 pub fn runtime::backlog::Backlog::new() -> runtime::backlog::Backlog
-pub fn runtime::backlog::Backlog::run(&self, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::Started, kernel::error::shape::AxError>
-pub fn runtime::backlog::Backlog::run(&self, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::Started, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::release(&self, kernel::event::identity::RunId) -> core::result::Result<usize, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::release(&self, kernel::event::identity::RunId) -> core::result::Result<usize, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::run(&self, kernel::event::identity::RunId, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::Started, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::run(&self, kernel::event::identity::RunId, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::Started, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::standing(&self, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<runtime::Standing>, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::standing(&self, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<runtime::Standing>, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::stopping(&self, runtime::backlog::BacklogId) -> core::result::Result<bool, kernel::error::shape::AxError>
@@ -723,6 +729,7 @@ pub runtime::ExecSetup::env_passthrough: alloc::vec::Vec<kernel::config::EnvVarN
 pub runtime::ExecSetup::fuel: runtime::Fuel
 pub runtime::ExecSetup::mounts: alloc::vec::Vec<runtime::Mount>
 pub runtime::ExecSetup::python_wasm: core::option::Option<std::path::PathBuf>
+pub runtime::ExecSetup::run: kernel::event::identity::RunId
 pub runtime::ExecSetup::shell: core::option::Option<std::path::PathBuf>
 pub runtime::ExecSetup::workdir: std::path::PathBuf
 pub runtime::Exit::Ended
@@ -1284,6 +1291,7 @@ pub runtime::tools::ExecSetup::env_passthrough: alloc::vec::Vec<kernel::config::
 pub runtime::tools::ExecSetup::fuel: runtime::Fuel
 pub runtime::tools::ExecSetup::mounts: alloc::vec::Vec<runtime::Mount>
 pub runtime::tools::ExecSetup::python_wasm: core::option::Option<std::path::PathBuf>
+pub runtime::tools::ExecSetup::run: kernel::event::identity::RunId
 pub runtime::tools::ExecSetup::shell: core::option::Option<std::path::PathBuf>
 pub runtime::tools::ExecSetup::workdir: std::path::PathBuf
 pub runtime::tools::Guarantee::Filesystem
@@ -1486,7 +1494,9 @@ pub struct runtime::turn::TurnCancelled
 pub struct runtime::turn::TurnReport
 pub struct runtime::window::Window
 pub trait runtime::Sandbox: core::marker::Send
+pub type runtime::ReadBound = alloc::sync::Arc<(dyn core::ops::function::Fn(&kernel::address::Address) -> kernel::address::ReadVerdict + core::marker::Send + core::marker::Sync)>
 pub type runtime::diagnostics::Sink = alloc::boxed::Box<(dyn core::ops::function::FnMut(runtime::diagnostics::Entry<'_>) + core::marker::Send)>
+pub type runtime::tools::ReadBound = alloc::sync::Arc<(dyn core::ops::function::Fn(&kernel::address::Address) -> kernel::address::ReadVerdict + core::marker::Send + core::marker::Sync)>
 pub use runtime::Retries
 pub use runtime::SkillPin
 pub use runtime::catalog::SkillPin

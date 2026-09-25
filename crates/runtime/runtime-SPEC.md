@@ -1266,11 +1266,11 @@ pub struct PackContext<'a> { /* 既有五字段 */ pub sieve: Option<SieveReques
 **设计**：一张表，成员是后台 exec 子进程与 `delegate` 子 run。
 
 - **`exec` 恒经此表**，不设 `background` 参数——两条路径就是两个权威，而有洞的那条永远是没人想起的那条。
-- 先阻塞等一个短窗口（**10 s**），短命令因而感觉上仍是同步的；超时则返回一个句柄并继续在后台跑，结果落**下一次工具结果的尾部**。这正是 `docs/City.md` 已经写给 agent 的那句话（「Do not wait for a long task. Start it, continue with other work, and read the result when it arrives at the end of a later tool result.」），今天对 exec 不成立。
+- 先阻塞等一个短窗口（**10 s**），短命令因而感觉上仍是同步的；超时则返回一个句柄并继续在后台跑，结果落**起它的那个 run 的下一次 `exec` 结果的尾部**，恒不落别的 run。这正是 `docs/City.md` 已经写给 agent 的那句话（「Do not wait for a long task. Start it, continue with other work, and read the result when it arrives at the end of a later tool result.」），今天对 exec 不成立。
 - `halt {scope}` 遍历该表并终止其成员；工作线程不再进入阻塞系统调用，halt 因而真的停得住。
 - `status` 报告表中属于本 run 的成员：几条在跑、各自跑了多久。
 
-**红测试**：一条不会结束的命令起后，`halt` 使其进程终止且 run 回到边界；十秒内结束的命令不产生句柄；后台结果确实出现在下一次工具结果的尾部；一次调用的 verdict 恒只答它等到的那扇窗——窗口外落定的命令不回写本次结果，收割是下一次调用的事。
+**红测试**：一条不会结束的命令起后，`halt` 使其进程终止且 run 回到边界；十秒内结束的命令不产生句柄；后台结果确实出现在起它的那个 run 的下一次工具结果的尾部，而同城另一个 run 随后的 `exec` 结果里没有它；一次调用的 verdict 恒只答它等到的那扇窗——窗口外落定的命令不回写本次结果，收割是下一次调用的事。
 
 #### 8-28-1 接口与三处已定的实现选择
 
@@ -1294,9 +1294,10 @@ pub enum Unseen { LeftTheTable, WaitRefused }   // 各带一句给模型看的�
 pub struct Backlog(/* Arc<Mutex<Table>>，表内是 BTreeMap */);
 impl Backlog {
     pub fn with_window(window: PollBudget) -> Backlog;   // `new()` 即 PollBudget::DEFAULT
-    pub fn run(&self, scope: &Address, what: String, command: Command) -> Result<Started, AxError>;
+    pub fn run(&self, owner: RunId, scope: &Address, what: String, command: Command) -> Result<Started, AxError>;
     pub fn halt(&self, scope: Option<&Address>) -> Result<usize, AxError>;   // None＝整城
-    pub fn harvest(&self) -> Result<Vec<Finished>, AxError>;
+    pub fn harvest(&self, owner: RunId) -> Result<Vec<Finished>, AxError>;   // 只收 owner 起的
+    pub fn release(&self, owner: RunId) -> Result<usize, AxError>;           // owner 结束：它的命令不再欠任何人
     pub fn standing(&self, scope: &Address) -> Result<Vec<Standing>, AxError>;
 }
 ```
@@ -1308,6 +1309,7 @@ impl Backlog {
 1b. **退出码是穷尽枚举，不是一个整数（B-47）。** `Exit::Ended { code }`／`Signalled`／`Unknown { why }` 三臂：`-1` 过去同时是「程序返回了负一」「被信号杀死」「本城没问出来」，而读结果的模型分不出是哪一件。`exec` 结果里 `exit_code` 键**只在 `Ended` 时出现**，另两臂写 `outcome`（`signalled`／`unknown`）与一句 `detail`；键名仍只由 `tools/exec/outcome.rs` 拼（§8-26）。
 2. **子进程的输出写文件，不走管道。** 管道缓冲区填满会让后台子进程停在写系统调用上，于是「后台」变成「挂死」——那正是本节要修的那个洞的另一种写法。文件住 `std::env::temp_dir()` 下按 `BacklogId` 命名的一层目录，收割时读完即删。
 3. **表是一份共享句柄（`Clone` 的 `Arc<Mutex<_>>`）。** 装配层持一份，每个 `ExecTool` 持一份克隆，于是 `halt` 够得着 `exec` 起的东西而不必让 `halt` 认识 `exec`。表内是 `BTreeMap`，遍历序恒定。
+4. **后台命令的结局只欠起它的那个 run（`owner: RunId`）。** 表是全城一张（第 3 条），所以「谁收割」必须由表按成员记下的 owner 判，而不是由「谁先调 `exec`」判：不带 owner 的 `harvest` 会把一栋楼（包括 confidential 楼）里一条命令的 stdout／stderr 原文交给城里任何一个随后调 `exec` 的 run，进它的模型与账本，而起它的 run 反倒收不到。一条命令的归属是穷尽枚举 `Claim` 而不是 `bool`：`Window(RunId)`（短窗口里，归正在轮询它的那次调用）、`Run(RunId)`（已转后台，只交给这个 run 的 `harvest`）、`Nobody`（它的 run 已结束，结局不交给任何人）。`ExecTool` 在 drop 时调 `release(run)`：每个 run 的工具台在它冻结后被丢弃，于是 drop 就是「这个 run 再也收不到」的那一刻；此后任何一次 `harvest` 都会把已结束的 `Nobody` 成员不读即删（进程句柄与临时目录因此有界），输出不交给调用者。**被否决的做法**：按 `scope`（楼或房间地址）收割——同一房间里前后两个 run 地址相同，于是后一个 run 仍会收到前一个的输出，而 confidential 的界是按 run 的模型与账本行划的，不是按地址。**尚未做的一半**：一个已结束的 run 的后台结局今天被丢弃；把它写成该 run 名下的一条账本事件，需要 kernel 事件表多一种，归 kernel-SPEC 的事件表。
 
 **已落地范围（诚实记账）**：成员目前只有后台 `exec` 子进程。`delegate` 子 run 入表是同一张表的第二类成员，接口已按此形状留好（`Standing`／`Finished` 不提进程），但尚未接线；`status` 报告本 run 那部分同理待接。**→ 第二类成员与 `status` 那一半由 §8-28-2 接上。**
 
@@ -1345,7 +1347,7 @@ impl Backlog {
 
 **字节上限切在行边界上，且落在 `Interval::cut` 内部而不在下游。** 理由只有一条：`next_offset` 是调用方续读的唯一凭据，若字节在本函数报出 `next_offset` 之后才被裁掉，那个数就会指过一批没人交付的行，而这个缺口是无声的。首行恒交付，无论它多长——一次返回空的作答会把收到的 offset 原样递回去，调用方于是永远问同一个问题。
 
-`search` 共用同一个上限，接在它已有的 `truncated` 上：`MATCH_CAP = 64` 界定**几条**答案上路，不界定它们**多大**。
+`search` 共用同一个上限，接在它已有的 `truncated` 上：`MATCH_CAP = 64` 界定**几条**答案上路，不界定它们**多大**。**首个命中同样受它约束**：一条命中的上下文块自己就超过上限时，由 `elision::splice` 从尾部切进上限、带 `[truncated: N bytes]`，然后停走并报 `truncated`。`read` 的首行恒交付而 `search` 不，是因为 `search` 报的是行号、续读走 `read`，不存在一次空答让调用方原地打转的那个缺口；一整行压缩产物原样塞进一条命中，就是这道上限要拦的那种输入。
 
 **取 64 KiB 的推导与实测见 kernel-SPEC §8-8 该常量的 doc**；一句话是：上下文提醒按 25%／65% 排成梯子，没有哪一步可以整级跨过，故单条结果 < 35% 窗口，而 64 KiB 在最坏字节-token 比率下是 128K 窗口的 20.5%。
 
@@ -1360,8 +1362,10 @@ impl Backlog {
 // offset 缺省 0；limit 缺省 512，大于 512 者**夹到 512** 而非拒绝——
 // 模型多要一点不该赔掉一个回合，它拿到的截断字段会把真相说清楚。
 // offset／limit 非整数或为负＝E_INVALID_ARGS；limit==0 同。
-const LINE_CAP: u64 = 512;
+const LINE_CAP: u16 = 512;
 ```
+
+**上界由类型给，不由换算的失败支给。** `limit` 以 `u16` 携带：大于 `u16::MAX` 的请求与大于 512 的请求是同一件事，都夹到 512，而 `usize::from(u16)` 没有失败支。`offset` 以请求里的 `u64` 携带，在切行处与总行数比较：一个 `usize` 装不下的 offset 越过了内存装得下的任何文本的末尾，于是落进下表「越过末尾」那一行，而不是被换成一个碰巧很大的数。`total_lines`、`next_offset`、`bytes` 都以 `usize` 直接成为 JSON 数。
 
 切行按 `split_inclusive('\n')`：每行连它自己的换行符一起数、一起还，所以 `offset=0, limit>=total` 的返回与整读**逐字节相同**，`bytes` 字段的旧语义因而不动。
 
@@ -1384,25 +1388,30 @@ const LINE_CAP: u64 = 512;
 #### 8-30-1 runtime::tools::chosen_path（形状 1；模型选路的唯一判定处）
 
 ```rust
-// 无 I/O、无时钟、无全局状态；入一个字符串，出一个地址或一个三段式拒绝。
-pub(crate) fn admit(asked: &str, action: &'static str) -> Result<Address, AxError>;
-// 解析失败＝E_INVALID_ARGS；Address::is_reserved()＝E_GATE_DENIED。
+// 本 run 能读什么：装配层把 kernel::address::may_read 闭合在读者的楼与城的规则上（city-SPEC §8-2）。
+pub type ReadBound = Arc<dyn Fn(&Address) -> ReadVerdict + Send + Sync>;
+// 入一个字符串，出一个地址或一个三段式拒绝。本身无 I/O；bound 可能为他楼读一次规则。
+pub(crate) fn admit(asked: &str, action: &'static str, bound: &dyn Fn(&Address) -> ReadVerdict)
+    -> Result<Address, AxError>;
+// 解析失败＝E_INVALID_ARGS；Address::is_reserved()＝E_GATE_DENIED；
+// 读界答 Confidential 或 RulesUnreadable＝E_GATE_DENIED，后者的 subject 带上规则读不出的原因。
 ```
 
-它是 `read` 原有那段判定的搬家，不是它的第二份。`search` 遍历时对每一个候选文件同样只问 `Address::is_reserved()`——kernel 的那个原语——所以「什么是保留区」自始至终一个权威。
+它是 `read` 原有那段判定的搬家，不是它的第二份。三道判定次序固定：文法、保留区、读界——前两道不碰盘，读界为他楼可能读一次规则，所以排最后。`ReadTool::new(city_root, catalog, bound)` 与 `SearchTool::new(city_root, bound)` 各持同一个 `ReadBound` 的一份 `Arc`；装配层建一次，交给两件工具。`search` 遍历时对每一个候选文件同样只问 `Address::is_reserved()`——kernel 的那个原语——所以「什么是保留区」自始至终一个权威；读界则只在城根那一层问，一栋楼整栋开或整栋关（city-SPEC §8-3「楼是顶层地址」），楼里的条目继承楼的答案，不为每个文件再读一次规则。
 
 #### 8-30-2 参数与结果
 
 ```rust
 // args：{text, path?, context?}
 // text：子串，必填且非空。**不是正则**。
-// path：城相对前缀，缺省＝整城。走 chosen_path::admit。
+// path：城相对前缀，缺省＝本 run 可读的全部：城根下每一栋楼先过读界，关上的整栋不走。走 chosen_path::admit。
 // context：每侧上下文行数，缺省 0，上限 4（更大者夹到 4）。
 const MATCH_CAP: usize = 64;      // 命中上限；到顶即停走，结果自陈 truncated
-const FILE_BYTE_CAP: u64 = 1 << 20; // 单文件上限 1 MiB，越界跳过
+const FILE_BYTE_CAP: u64 = 1 << 20; // 单文件上限 1 MiB，越界不读，计入 unreadable
+const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 ```
 
-结果：`{matches: [{path, line, text}], count, truncated, unreadable}`。`line` 是 **0 基**，与 `read` 的 `offset` 同一套编号，所以「搜到再读那一段」是把一个数字原样递过去。`unreadable` 是遍历中打不开的目录与文件数：**找不到与看不了是两个答案**，把后者吐成前者就是把一次失败抹掉。按策略跳过的（二进制、超大、保留区）不计入它。
+结果：`{matches: [{path, line, text}], count, truncated, unreadable, unread: [{path, why}]}`。`line` 是 **0 基**，与 `read` 的 `offset` 同一套编号，所以「搜到再读那一段」是把一个数字原样递过去。`unreadable` 是遍历中没能看过的目录与文件数——打不开的，和大于 1 MiB 的：**找不到与看不了是两个答案**，把后者吐成前者就是把一次失败抹掉。`unread` 按遍历次序列出其中前 16 条，各带一句原因：超过单文件上限的那一句指它去按区间 `read`，打不开的那一句带上系统给的错误（措辞只在 `search.rs` 里写）：一个超大文件 `read` 仍能按区间读，模型要知道是哪一个才去读。按策略跳过的（二进制、保留区、读界关上的楼）不计入它。二进制指读得出而不是 UTF-8；读不出的文件是「打不开」，不再被当成二进制吞掉。
 
 **不用正则表达式**，理由是模式引擎会把回溯放在模型和它的下一个回合之间。子串扫描是线性的，且一个模型写错的正则不会变成一次挂死。
 
@@ -1411,13 +1420,15 @@ const FILE_BYTE_CAP: u64 = 1 << 20; // 单文件上限 1 MiB，越界跳过
 | 跳过 | 理由 | 权威 |
 |---|---|---|
 | 保留区子树 | 一跑不读治理自己的东西 | `Address::is_reserved`（kernel） |
+| 读界关上的楼 | 机密楼对楼外全关；规则读不出的楼同样关 | `kernel::address::may_read`（city-SPEC §8-2） |
 | `.git` 目录 | 它是对象库不是文本，扫它只产出乱码命中 | 本节 |
 | 非 UTF-8 文件 | 二进制里没有可读的行 | 本节 |
-| 大于 1 MiB 的文件 | 把一个大对象读进内存找子串是一次停顿 | 本节 |
+
+大于 1 MiB 的文件不读——把一个大对象读进内存找子串是一次停顿——但它不在这张表里：它是「没看」，计入 `unreadable` 并在 `unread` 里说出来。
 
 #### 8-30-4 红测试
 
-超过 512 行的文件返回恰 512 行、并给出真实 `total_lines` 与可续的 `next_offset`；`search` 找到子串并带上下文；`search` 对保留区前缀以 `E_GATE_DENIED` 拒绝；两者共用的 `chosen_path::admit` 有且只有一组测试。
+超过 512 行的文件返回恰 512 行、并给出真实 `total_lines` 与可续的 `next_offset`；`search` 找到子串并带上下文；`search` 对保留区前缀以 `E_GATE_DENIED` 拒绝；两者共用的 `chosen_path::admit` 有且只有一组测试，读界的两种关各一条拒绝。`search` 不带路径时不走关上的楼；大于 1 MiB 的文件计入 `unreadable` 并在 `unread` 里带原因；一条超过字节上限的首个命中被切进上限并带标记。
 
 #### 8-30-5 同集改
 
@@ -1442,6 +1453,7 @@ pub struct ExecSetup {                 // 形状 2 值类型
     pub fuel: Fuel,
     pub env_passthrough: Vec<EnvVarName>,
     pub domain: Address,
+    pub run: RunId,                    // 这张工具台服务的 run：它起的后台命令只交还给它（§8-28-1 第 4 条）
 }
 pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Result<ExecTool, AxError>;
 ```
@@ -1458,7 +1470,7 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 
 **它是什么**：一跑冻结时，把**模型实际看到的消息**——工具调用与其结果、sieve 产出的压缩形、指回被搁置部分的 rest 指针——写成 `<room>/<run-id>.jsonl`，一行一条 `ChatMessage`（`kernel::model::wire` 的 serde 形，原样，所以 `search` 找到的行号就是消息序号）。frozen prefix 不在其中：它是每次请求都相同的那一半，账本的 `prompt_assembled` 已经持有它的哈希。
 
-**它不是账本**：账本住 `.sprawling/`，`read` 对那里的每一条路径都拒绝；而且账本是**全城一条链**——把它交给一个 resident 就是把一栋 confidential 楼的事件也交出去。transcript 不加密：同楼的 resident 可以读它，confidential 楼靠它已有的隔离保护自己。
+**它不是账本**：账本住 `.sprawling/`，`read` 对那里的每一条路径都拒绝；而且账本是**全城一条链**——把它交给一个 resident 就是把一栋 confidential 楼的事件也交出去。transcript 不加密，谁读得到它由读界答：它住在 run 的房间里，`read` 与 `search` 对它的路径和对房间里任何文件一样先过 `chosen_path::admit`，所以本楼的 resident 读得到，非机密楼的 transcript 他楼也读得到，而机密楼的 transcript 楼外读不到（city-SPEC §8-2）。
 
 **三步定序，不可颠倒**：①凭据扫描（`redact::redact` 逐消息走一遍，与 `model_returned` 入账本同一把扫描器）；②钉入 CAS（`memory::Cas::put`，内容寻址，同一份 transcript 写两次是一次）；③实体化（写到房间，只读位）。先扫后钉：一个钉进 CAS 的密钥永远删不掉。
 

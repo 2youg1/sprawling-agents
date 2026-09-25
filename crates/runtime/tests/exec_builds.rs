@@ -26,7 +26,7 @@
     reason = "test code"
 )]
 
-use kernel::{Address, EnvVarName, Payload, Tool, ToolCall, ToolName};
+use kernel::{Address, EnvVarName, Payload, RunId, Tool, ToolCall, ToolName};
 use runtime::{Backlog, EchoSandbox, ExecSetup, ExecTool, Fuel};
 
 /// What a building on this machine has to declare for a Rust build to
@@ -79,6 +79,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
         }
     }
 
+    let run = RunId::from_bytes([1; 16]);
     let setup = ExecSetup {
         workdir: crate_dir,
         mounts: Vec::new(),
@@ -87,6 +88,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
         fuel: Fuel(1_000_000),
         env_passthrough: declared,
         domain: Address::parse("lab").unwrap(),
+        run,
     };
     // The table is shared, so this handle reaches what the tool started:
     // whatever settles after the short window is collected here rather
@@ -114,7 +116,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
     // the table, not in the answered call.
     if result.get("exit_code").is_none() {
         for _ in 0..600 {
-            let done = backlog.harvest().unwrap();
+            let done = backlog.harvest(run).unwrap();
             if let Some(finished) = done.first() {
                 result["exit_code"] = match finished.exit {
                     runtime::Exit::Ended { code } => serde_json::json!(code),

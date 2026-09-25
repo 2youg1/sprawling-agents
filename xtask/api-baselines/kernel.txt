@@ -339,7 +339,7 @@ pub const kernel::consts_policy::HALL_MAYOR: &str
 pub const kernel::consts_policy::IMAGES_PER_TURN: kernel::policy_limit::ImagesPerTurn
 pub const kernel::consts_policy::IMAGE_MAX_BYTES: kernel::policy_limit::ImageMaxBytes
 pub const kernel::consts_policy::IMAGE_QUALITY: kernel::policy_limit::ImageQuality
-pub const kernel::consts_policy::INTERVAL_CAP_BYTES: u64
+pub const kernel::consts_policy::INTERVAL_CAP_BYTES: usize
 pub const kernel::consts_policy::LOOP_REPEAT_THRESHOLD: u32
 pub const kernel::consts_policy::OFFLOAD_MIN_BYTES: u64
 pub const kernel::consts_policy::OUTPUT_CEILING_DEFAULT: u64
@@ -429,6 +429,7 @@ pub enum kernel::Proxying
 pub enum kernel::PursuitState
 pub enum kernel::PursuitVerdict
 pub enum kernel::Range
+pub enum kernel::ReadVerdict
 pub enum kernel::RegisterVerdict
 pub enum kernel::ReleaseVerdict
 pub enum kernel::RenderIntent
@@ -451,6 +452,7 @@ pub enum kernel::VersionVerdict
 pub enum kernel::WindowClass
 pub enum kernel::WriteDomain
 pub enum kernel::WriteMoment
+pub enum kernel::address::ReadVerdict
 pub enum kernel::approval::AnswerVerdict
 pub enum kernel::approval::Answerer
 pub enum kernel::approval::ApprovalClass
@@ -761,6 +763,7 @@ pub fn kernel::address::SessionName::fmt(&self, &mut core::fmt::Formatter<'_>) -
 pub fn kernel::address::SessionName::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::address::SessionName::parse(&str) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::address::SessionName::parse(&str) -> core::result::Result<Self, kernel::AxError>
+pub fn kernel::address::may_read(&kernel::address::Address, &kernel::address::Address, impl core::ops::function::FnOnce() -> core::result::Result<bool, kernel::AxError>) -> kernel::address::ReadVerdict
 pub fn kernel::approval::ApprovalId::as_str(&self) -> &str
 pub fn kernel::approval::ApprovalId::as_str(&self) -> &str
 pub fn kernel::approval::ApprovalId::new(impl core::convert::Into<alloc::string::String>) -> core::option::Option<kernel::approval::ApprovalId>
@@ -1541,6 +1544,9 @@ pub kernel::Reach::elapsed_ms: u64
 pub kernel::Reach::host: alloc::string::String
 pub kernel::Reach::named: kernel::reach::Named
 pub kernel::Reach::through: kernel::reach::Through
+pub kernel::ReadVerdict::Confidential
+pub kernel::ReadVerdict::Open
+pub kernel::ReadVerdict::RulesUnreadable(kernel::AxError)
 pub kernel::RedNode::at: kernel::node_id::NodeId
 pub kernel::RedNode::why: kernel::StopCause
 pub kernel::RegisterVerdict::AlreadyRegistered
@@ -1656,6 +1662,9 @@ pub kernel::WriteDomain::Everything(kernel::write_domain::DomainPrefixes)
 pub kernel::WriteMoment::AfterFeedback
 pub kernel::WriteMoment::BeforeReport
 pub kernel::WriteMoment::OnPlanChange
+pub kernel::address::ReadVerdict::Confidential
+pub kernel::address::ReadVerdict::Open
+pub kernel::address::ReadVerdict::RulesUnreadable(kernel::AxError)
 pub kernel::approval::AnswerVerdict::May
 pub kernel::approval::AnswerVerdict::NotTheDelegate
 pub kernel::approval::AnswerVerdict::SelfApprovalBarred

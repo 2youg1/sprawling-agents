@@ -14,15 +14,15 @@ Signing in to a provider requires knowing four things: the authorization endpoin
 
 | Project | Licence | What is followed | Where to look | Tracked to |
 |---|---|---|---|---|
-| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | OpenAI's subscription login: authorization endpoint, token endpoint, client id, scopes, device-code flow | `codex-rs/login/` | `87bc50f9d423` |
+| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | OpenAI's subscription login: authorization endpoint, token endpoint, client id, scopes, device-code flow | `codex-rs/login/` | `b725da3b6d52` |
 | [openai/codex](https://github.com/openai/codex) | Apache-2.0 | where OpenAI states the contract for driving codex non-interactively, which is the shape the `Codex` family answers in | `docs/exec.md` | `ab753387ccf5` |
-| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | which base URL a ChatGPT subscription is served under, as against the key-billed platform | `codex-rs/model-provider-info/` | `888be42a20c5` |
-| [anthropics/claude-agent-sdk-typescript](https://github.com/anthropics/claude-agent-sdk-typescript) | proprietary, under Anthropic's Commercial Terms of Service | the protocol types the Claude agent wire is spelled in, and which release changed one | `CHANGELOG.md` | `18661edde449` |
-| [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's browser login: that the endpoints come from OIDC discovery at `{issuer}/.well-known/openid-configuration`, and how a refresh is spelled | `crates/codegen/xai-grok-login/src/oidc/` | `482711333c71` |
+| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | which base URL a ChatGPT subscription is served under, as against the key-billed platform | `codex-rs/model-provider-info/` | `8f103417ef3e` |
+| [anthropics/claude-agent-sdk-typescript](https://github.com/anthropics/claude-agent-sdk-typescript) | proprietary, under Anthropic's Commercial Terms of Service | the protocol types the Claude agent wire is spelled in, and which release changed one | `CHANGELOG.md` | `9e477a178c37` |
+| [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's browser login: that the endpoints come from OIDC discovery at `{issuer}/.well-known/openid-configuration`, and how a refresh is spelled | `crates/codegen/xai-grok-login/src/oidc/` | `f0e3be1100ef` |
 | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's issuer `https://auth.x.ai`, the public client id, and the ten scopes a subscription asks for | `crates/codegen/xai-grok-login/src/config.rs` | `75810042ca27` |
-| [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's device-code login: the two endpoint paths under the issuer, and the grant type | `crates/codegen/xai-grok-login/src/device_code.rs` | `482711333c71` |
+| [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's device-code login: the two endpoint paths under the issuer, and the grant type | `crates/codegen/xai-grok-login/src/device_code.rs` | `f0e3be1100ef` |
 | [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) | Apache-2.0 | Moonshot's subscription login: the platform table, the OAuth endpoints, and the refresh | `src/kimi_cli/auth/` | `b5f48ef2aaf1` |
-| [openai/openai-openapi](https://github.com/openai/openai-openapi) | MIT | the request and answer of the embeddings face, which every compatible server copied | `openapi.yaml` | `ddface9bd361` |
+| [openai/openai-openapi](https://github.com/openai/openai-openapi) | MIT | the request and answer of the embeddings face, which every compatible server copied | `openapi.yaml` | `5b29d7c599e2` |
 | [huggingface/text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) | Apache-2.0 | the request and answer of the rerank face, which has no OpenAI shape to copy | `docs/openapi.json` | `d246fbf17cc7` |
 
 > **Machine authority**: `.github/workflows/upstream-watch.yml` reads two of
@@ -47,7 +47,7 @@ Signing in to a provider requires knowing four things: the authorization endpoin
 
 **The rerank face is the one shape in this table with no vendor behind it.** Nobody publishes `/rerank` as an API a vendor owns; the servers that serve it defined it, so the row above follows the description of the server this city targets, and a second server answering a different shape is a second connection rather than a wildcard in the reader.
 
-**How to re-check**: watch the paths above for changes rather than watching releases. An endpoint migration often arrives in a patch version with no mention in the changelog. Where two sources disagree, the provider's own documentation decides, not the majority. Every row above was read on 2026-09-21.
+**How to re-check**: watch the paths above for changes rather than watching releases. An endpoint migration often arrives in a patch version with no mention in the changelog. Where two sources disagree, the provider's own documentation decides, not the majority. Every row above was read at the commit its `Tracked to` cell names.
 
 **The watch is automated.** Every day `upstream-watch` asks each path for its newest commit and compares it with `Tracked to`; a difference opens one issue naming the commit, a compare view, and what to re-check. `Tracked to` advances only in the PR that actually realigns the constants - the same change-set that carries the new facts, so the watermark never runs ahead of what the code knows.
 

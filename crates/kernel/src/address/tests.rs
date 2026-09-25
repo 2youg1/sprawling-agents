@@ -172,6 +172,61 @@ fn protected_metadata_is_reserved_at_whatever_depth_it_sits() {
     }
 }
 
+/// The read bound for three kinds of reader, cell by cell: a building
+/// reading itself, a building reading an ordinary neighbour, a building
+/// reading a confidential one from outside - and the confidential one
+/// reading itself, which is the first kind again. The rules stub answers
+/// for the building each target sits in, the way the assembly's closure
+/// does, and panics when it is asked about the reader's own building,
+/// because a read at home must not cost a disk.
+#[test]
+fn the_read_bound_opens_home_and_ordinary_buildings_and_closes_confidential_ones() {
+    let rules_of = |target: &Address| -> Result<bool, AxError> {
+        match target.as_str().split('/').next() {
+            Some("vault" | "safe") => Ok(true),
+            Some("lab" | "hall") => Ok(false),
+            _ => Err(AxError::failure(
+                AxCode::ConfigInvalid,
+                "read a building's rules",
+                target.as_str(),
+            )
+            .with_recovery("fix the building's rules")),
+        }
+    };
+    let cells = [
+        ("lab", "lab/room1/Memo.md", ReadVerdict::Open),
+        ("lab", "hall/Roadmap.md", ReadVerdict::Open),
+        ("lab", "vault/room1/notes.md", ReadVerdict::Confidential),
+        ("vault", "vault/room1/notes.md", ReadVerdict::Open),
+        ("vault", "lab/room1/Memo.md", ReadVerdict::Open),
+        ("vault", "safe/keys.md", ReadVerdict::Confidential),
+    ];
+    for (reader, target, expected) in cells {
+        let (reader, target) = (
+            Address::parse(reader).unwrap(),
+            Address::parse(target).unwrap(),
+        );
+        let verdict = may_read(&reader, &target, || {
+            assert!(
+                !target.is_within(&reader),
+                "{target} is at home and its rules were read"
+            );
+            rules_of(&target)
+        });
+        assert_eq!(verdict, expected, "{reader} reading {target}");
+    }
+
+    let broken = Address::parse("annex/plan.md").unwrap();
+    let verdict = may_read(&Address::parse("lab").unwrap(), &broken, || {
+        rules_of(&broken)
+    });
+    assert_eq!(
+        verdict,
+        ReadVerdict::RulesUnreadable(rules_of(&broken).unwrap_err()),
+        "rules that do not read close the building and keep the reason"
+    );
+}
+
 #[test]
 fn deserialize_revalidates() {
     let ok: Address = serde_json::from_str("\"a/b\"").unwrap();

@@ -67,9 +67,9 @@ pub struct OauthProfile {
 }
 
 /// The table. Every value is read from the upstream path that
-/// `docs/third-party.md` §1 watches for the family it belongs to, on
-/// the date that file records; a fact no watched path states is left
-/// empty rather than guessed.
+/// `docs/third-party.md` §1 watches for the family it belongs to, at
+/// the commit that file's `Tracked to` column names; a fact no watched
+/// path states is left empty rather than guessed.
 pub const OAUTH_PROFILES: [OauthProfile; 4] = [
     // Followed from openai/codex at the paths `docs/third-party.md`
     // section 1 names for it: the login server states the issuer, the
@@ -81,9 +81,9 @@ pub const OAUTH_PROFILES: [OauthProfile; 4] = [
     // key-billed platform: `model-provider-info` picks that base for
     // every ChatGPT auth mode and `https://api.openai.com/v1` only for
     // an API key (the provider table under `codex-rs/model-provider-
-    // info/`, read 2026-09-21 and watched in docs/third-party.md
-    // section 1). That base answers on the responses face, which
-    // `Family::Codex` states and `dialect::responses` writes.
+    // info/`, watched in docs/third-party.md section 1). That base
+    // answers on the responses face, which `Family::Codex` states and
+    // `dialect::responses` writes.
     OauthProfile {
         family: Family::Codex,
         provider: "openai",
@@ -103,7 +103,7 @@ pub const OAUTH_PROFILES: [OauthProfile; 4] = [
         // by holding it.
         client_id: "app_EMoamEEZ73f0CkXaXp7hrann", // secret-ok: public oauth client id
         grant: Grant::AuthorizationCode {
-            redirect_uri: "http://localhost:1455/auth/callback",
+            redirect_uri: "http://127.0.0.1:1455/auth/callback",
         },
         headers: &[],
     },
@@ -128,8 +128,7 @@ pub const OAUTH_PROFILES: [OauthProfile; 4] = [
     // discovery**: `device_code.rs` posts to `{issuer}/oauth2/device/
     // code` and `{issuer}/oauth2/token` with the issuer and client id
     // the login crate's configuration module states, so this row
-    // carries the grant that can be driven from constants alone (both
-    // paths read 2026-09-21).
+    // carries the grant that can be driven from constants alone.
     OauthProfile {
         family: Family::GrokBuild,
         provider: "xai",
@@ -243,10 +242,7 @@ mod tests {
         };
         assert!(authorization_endpoint.starts_with("https://"));
         let codex = profile_for(Family::Codex).unwrap();
-        assert!(matches!(
-            codex.grant,
-            Grant::AuthorizationCode { redirect_uri } if redirect_uri.starts_with("http://localhost:")
-        ));
+        assert!(matches!(codex.grant, Grant::AuthorizationCode { .. }));
         let xai = profile_for(Family::GrokBuild).unwrap();
         let Grant::DeviceCode {
             authorization_endpoint,
@@ -259,6 +255,26 @@ mod tests {
             "https://auth.x.ai/oauth2/device/code"
         );
         assert!(xai.token_endpoint.starts_with("https://auth.x.ai/"));
+    }
+
+    /// A redirect back to this machine names the loopback address, not
+    /// the name `localhost`: RFC 8252 §8.3 advises against the name,
+    /// which can resolve off the loopback interface, and the redirect
+    /// must match the vendor's own client byte for byte.
+    #[test]
+    fn a_loopback_redirect_names_the_address_not_the_name() {
+        let http_redirects = OAUTH_PROFILES.iter().filter_map(|row| match row.grant {
+            Grant::AuthorizationCode { redirect_uri } => redirect_uri.strip_prefix("http://"),
+            Grant::DeviceCode { .. } => None,
+        });
+        for rest in http_redirects {
+            let authority = rest.split('/').next().unwrap();
+            let (host, _port) = authority.rsplit_once(':').unwrap();
+            let address: std::net::IpAddr = host
+                .parse()
+                .unwrap_or_else(|_| panic!("{host} is a name, not a loopback address"));
+            assert!(address.is_loopback(), "{host}");
+        }
     }
 
     /// A subscription login that can be driven at all states its token

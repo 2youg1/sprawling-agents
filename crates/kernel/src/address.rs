@@ -17,6 +17,8 @@
 //! - `is_reserved` answers C17: a protected-metadata subtree
 //!   ([`PROTECTED_METADATA`]) can never enter a WriteDomain, at whatever
 //!   depth it sits, and every WriteDomain constructor must ask first.
+//! - [`may_read`] answers the read bound: what a resident of one
+//!   building may read by a path it chose (city-SPEC 8-2).
 
 use serde::{Deserialize, Serialize};
 
@@ -138,6 +140,50 @@ impl Address {
 impl std::fmt::Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+/// What the read bound answers about one address.
+///
+/// Two of the three arms close, and they stay two arms because a model
+/// refused by each has a different next step: ask somebody inside the
+/// confidential building, or wait for a person to fix rules that do not
+/// read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReadVerdict {
+    /// The reader's own building, or a building whose rules say
+    /// `confidential = false`.
+    Open,
+    /// A confidential building, asked about from outside it.
+    Confidential,
+    /// The rules that would answer did not read, so the building is
+    /// closed: what they would have said may be `confidential = true`,
+    /// and a privacy setting does not fail towards the permissive side.
+    RulesUnreadable(AxError),
+}
+
+/// The read bound: whether a resident of `reader_building` may read
+/// `target`. Its own building is open whole; any other is open unless
+/// its rules say it is confidential or cannot be read.
+///
+/// `rules` answers whether the building holding `target` is
+/// confidential, and is called only when `target` is outside the
+/// reader's building. It is a closure rather than a value because a read
+/// inside one's own building is the common case and should cost no
+/// disk, and because which building holds an address and what its rules
+/// say are the city crate's to answer.
+pub fn may_read(
+    reader_building: &Address,
+    target: &Address,
+    rules: impl FnOnce() -> Result<bool, AxError>,
+) -> ReadVerdict {
+    if target.is_within(reader_building) {
+        return ReadVerdict::Open;
+    }
+    match rules() {
+        Ok(false) => ReadVerdict::Open,
+        Ok(true) => ReadVerdict::Confidential,
+        Err(unread) => ReadVerdict::RulesUnreadable(unread),
     }
 }
 

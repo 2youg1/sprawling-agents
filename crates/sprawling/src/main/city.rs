@@ -31,7 +31,7 @@ mod opening;
 use super::router::{
     COMMANDS, client_summary, default_city_location, flag_value, log_floor, log_levels, named,
 };
-use super::{CLIENT_COMPLETE, CLIENT_FILES};
+use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, console, firstrun, serving};
 use std::process::ExitCode;
@@ -215,7 +215,7 @@ pub(super) fn serve_city(
     {
         eprintln!(
             "warning: this binary carries the page shell only; the browser will get an empty \
-             page. Run `just build-web`, rebuild, or pass --web-dir target/web-dist"
+             page. Run `just build-web`, rebuild, or pass --web-dir {CLIENT_BUNDLE_DIR}"
         );
     }
     // The key is settled before anything binds. A configured token is

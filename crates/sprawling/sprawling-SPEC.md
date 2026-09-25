@@ -1027,7 +1027,7 @@ build.rs 内 `Result<(), String>` 汇到 `cargo::error`；运行期无可失败�
 
 ## 14 硬编码声明
 
-资产相对路径 `../web/assets/index.html`（S4 随构建管线改为 wasm 产物目录，改点唯一在 build.rs）。
+客户端包的位置 `target/web-dist`，相对工作区根，由 `build.rs` 的 `BUNDLE_DIR` 一处声明（§8-83）。
 
 `bin::install` 引入四处，全部是外部世界的事实而非我们的选择，故各自注明出处：`%LOCALAPPDATA%\Programs\<app>` 是 Windows 用户级程序目录的约定；`~/.local` 下的 `bin` 是 XDG 用户级可执行目录的约定；`HKCU\Environment` 是用户级环境变量在注册表里的位置；`WM_SETTINGCHANGE=0x1A`／`HWND_BROADCAST=0xffff`／`SMTO_ABORTIFHUNG=2` 是 Win32 的常量值。这四处一旦被平台改掉，改点各只有一个。
 
@@ -3217,6 +3217,17 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 - `assembly::commanding::sessions::tests` 的四条：房间里有 run 工作时 `E_BUSY` 且房间一字未动；`Nothing` 清形状也清槽位、事件写 `carried: false`；`Handoff` 留摘要、照样清形状、事件写 `carried: true`；没有摘要时 `--carry` 不拒也不撒谎。
 
 **本章验收**：`cargo nextest run -p sprawling -p city -p channels -p kernel` 绿；`cargo xtask wire-ts`、`wiring`、`specalign`、`apisync` 绿。
+
+### 8-83 客户端包落在工作区的 `target/web-dist`，与 cargo 的输出目录无关（`build.rs` 的 `BUNDLE_DIR`）
+
+**原因**：「客户端包在哪」有三个读者、两种答法。`client/vite.config.ts` 把包写进工作区的 `target/web-dist`；`xtask::bundle::dist` 在工作区的 `target/` 下找它；`build.rs` 却在 `CARGO_TARGET_DIR` 下找。三者只在没有设这个变量时一致。设了之后，`just build-web` 写出的真包没人嵌入，二进制带着占位页通过构建，只留一条 cargo warning。
+
+- **权威是 `build.rs` 的 `const BUNDLE_DIR: &str = "target/web-dist"`，值是相对工作区根、以 `/` 分段的整条路径**，不再只是目录名。父目录 `target` 以前在三处各写一次（vite 的 `../../target`、`xtask` 的 `root.join("target")`、`build.rs` 的 `CARGO_TARGET_DIR` 分支），名字只有一个家而位置有三个；把整条路径放进一个常量，位置才只有一个家。`xtask::bundle` 用 `syn` 读这个常量（xtask-SPEC §8-18），`artifact` 门要求 `client/vite.config.ts` 与 `justfile` 拼出同一条路径。
+- **`build.rs` 不读 `CARGO_TARGET_DIR`。** 客户端包是 bun 的产物，不是 cargo 的产物；它的位置由写它的那一步决定，与 cargo 把编译产物放在哪无关。
+- **生成的 `client_embed.rs` 多一个常量 `CLIENT_BUNDLE_DIR`**，值取自 `BUNDLE_DIR`。`serve` 在只有占位页时提示 `--web-dir <路径>`，路径读这个常量，不再手写一份。
+- **被否决的备选**：让 vite 读 `CARGO_TARGET_DIR`，由 justfile 注入。那样每个读者都要复刻 cargo 解析目标目录的规则：环境变量、`.cargo/config.toml` 的 `build.target-dir`、相对路径按当前目录解析。这条规则会在 TypeScript、`build.rs`、`xtask` 里各有一份，而 `build.rs` 原先那份已经与 cargo 不同（它按工作区根解析相对值，也不读 `build.target-dir`）。重开条件：客户端包改由 cargo 自己构建（例如 wasm 客户端在 `build.rs` 里编译），那时它才真是 cargo 的产物。
+
+**本章测试**：`main::tests::the_embedded_client_is_the_bundle_the_workspace_built`——工作区 `target/web-dist` 下有完整的包时，嵌入表的路径集合与盘上的文件集合相等，且 `CLIENT_COMPLETE` 为真；没有完整的包时，`CLIENT_COMPLETE` 为假。这条测试只在 `CARGO_TARGET_DIR` 指向工作区以外时才能区分对错。
 
 ## 8-60 提示词语料的分层：哪类事实住哪一层（`docs/City.md`＋`ToolMeta`＋`Catalog`）
 

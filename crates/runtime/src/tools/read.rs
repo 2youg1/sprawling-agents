@@ -7,9 +7,10 @@
 //! model choose, or a name its reading room already admitted.
 //!
 //! **Two ways in, and the difference is who chose.** A path is chosen by
-//! the model, so it is judged: it must parse as an address, and it must
-//! not reach a reserved subtree — the accounting, the configuration, the
-//! rules and the history stay unreadable to the thing they govern. A
+//! the model, so it is judged: it must parse as an address, it must not
+//! reach a reserved subtree — the accounting, the configuration, the
+//! rules and the history stay unreadable to the thing they govern — and
+//! the read bound must let this run's building read it. A
 //! catalog name was chosen by the person who wrote the building's
 //! reading room, and admission happened when they wrote it; the skill it
 //! resolves to may therefore sit in reserved space, because the answer to
@@ -38,13 +39,15 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
+use super::chosen_path::ReadBound;
 use crate::catalog::{Catalog, Expansion};
 
 /// The most lines one call may bring back, and the default when the
 /// caller says nothing. One number for both: a default below the cap
 /// would make the cap invisible to a caller that never sets `limit`,
-/// which is most of them.
-const LINE_CAP: u64 = 512;
+/// which is most of them. A `u16`, so the ceiling is the type's and
+/// widening it to `usize` has no failure to handle.
+const LINE_CAP: u16 = 512;
 
 /// Where the answer to one call comes from.
 enum Found {
@@ -53,10 +56,11 @@ enum Found {
 }
 
 /// The interval of one answer: where it starts and how much of it there
-/// is at most.
+/// is at most. `offset` stays the number the caller sent until it meets
+/// the text it counts the lines of.
 struct Interval {
-    offset: usize,
-    limit: usize,
+    offset: u64,
+    limit: u16,
 }
 
 /// What one interval took out of a document, and what the taking left.
@@ -67,8 +71,8 @@ struct Interval {
 /// would invite a call that reads the same nothing again.
 struct Taken {
     text: String,
-    total_lines: Option<u64>,
-    next_offset: Option<u64>,
+    total_lines: Option<usize>,
+    next_offset: Option<usize>,
 }
 
 impl Interval {
@@ -96,7 +100,11 @@ impl Interval {
             }
         };
         let offset = whole("offset")?.unwrap_or(0);
-        let limit = whole("limit")?.unwrap_or(LINE_CAP).min(LINE_CAP);
+        // Above the cap is served at the cap, and a number no `u16`
+        // holds is above it.
+        let limit = whole("limit")?.map_or(LINE_CAP, |asked| {
+            u16::try_from(asked).map_or(LINE_CAP, |fits| fits.min(LINE_CAP))
+        });
         if limit == 0 {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -105,10 +113,7 @@ impl Interval {
             )
             .with_recovery("pass a `limit` from 1 to 512, or leave it out"));
         }
-        Ok(Interval {
-            offset: usize::try_from(offset).unwrap_or(usize::MAX),
-            limit: usize::try_from(limit).unwrap_or(usize::MAX),
-        })
+        Ok(Interval { offset, limit })
     }
 
     /// Cuts on line ends rather than on lines: every line travels with
@@ -128,18 +133,21 @@ impl Interval {
     fn cut(&self, text: &str) -> Taken {
         let lines: Vec<&str> = text.split_inclusive('\n').collect();
         let total = lines.len();
-        let counted = u64::try_from(total).unwrap_or(u64::MAX);
-        if self.offset >= total {
-            return Taken {
-                text: String::new(),
-                total_lines: Some(counted),
-                next_offset: None,
-            };
-        }
-        let ceiling = self.offset.saturating_add(self.limit).min(total);
-        let budget =
-            usize::try_from(kernel::consts_policy::INTERVAL_CAP_BYTES).unwrap_or(usize::MAX);
-        let mut end = self.offset;
+        // An offset no `usize` holds is past the end of every text this
+        // machine can hold, which is the answer the second arm gives.
+        let start = match usize::try_from(self.offset) {
+            Ok(start) if start < total => start,
+            Ok(_) | Err(_) => {
+                return Taken {
+                    text: String::new(),
+                    total_lines: Some(total),
+                    next_offset: None,
+                };
+            }
+        };
+        let ceiling = start.saturating_add(usize::from(self.limit)).min(total);
+        let budget = kernel::consts_policy::INTERVAL_CAP_BYTES;
+        let mut end = start;
         let mut spent = 0usize;
         while end < ceiling {
             let Some(line) = lines.get(end) else { break };
@@ -147,18 +155,18 @@ impl Interval {
             // The first line travels however long it is. A call that
             // returned nothing would hand back the offset it was given,
             // and the caller would ask the same question forever.
-            if after > budget && end > self.offset {
+            if after > budget && end > start {
                 break;
             }
             spent = after;
             end = end.saturating_add(1);
         }
-        let taken = lines.get(self.offset..end).unwrap_or_default().concat();
+        let taken = lines.get(start..end).unwrap_or_default().concat();
         if end < total {
             Taken {
                 text: taken,
-                total_lines: Some(counted),
-                next_offset: Some(u64::try_from(end).unwrap_or(u64::MAX)),
+                total_lines: Some(total),
+                next_offset: Some(end),
             }
         } else {
             Taken {
@@ -177,6 +185,9 @@ pub struct ReadTool {
     /// a second list of what this run may open would be a second
     /// authority, and the one that drifts is always the copy.
     catalog: Arc<Mutex<Catalog>>,
+    /// What this run's building may read, asked of every path the model
+    /// chooses.
+    bound: ReadBound,
     meta: ToolMeta,
 }
 
@@ -184,7 +195,11 @@ impl ReadTool {
     /// # Errors
     /// Propagates a malformed parameter schema, which is a build-time
     /// defect rather than a runtime one.
-    pub fn new(city_root: &Path, catalog: Arc<Mutex<Catalog>>) -> Result<ReadTool, AxError> {
+    pub fn new(
+        city_root: &Path,
+        catalog: Arc<Mutex<Catalog>>,
+        bound: ReadBound,
+    ) -> Result<ReadTool, AxError> {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
         let mut properties = Map::new();
@@ -223,6 +238,7 @@ impl ReadTool {
         Ok(ReadTool {
             city_root: city_root.to_path_buf(),
             catalog,
+            bound,
             meta: ToolMeta {
                 name: ToolName::parse("read")?,
                 disclosure: "Read a file by its path, or a skill by the name the catalog lists \
@@ -271,10 +287,13 @@ impl ReadTool {
         }
         // The judgement every model-chosen path gets, in the one place
         // it is written. `search` asks the same function the same
-        // question, so what is reserved has one answer.
-        Ok(Found::File(
-            self.under_city(&super::chosen_path::admit(asked, "read")?),
-        ))
+        // question, so what is reserved and what is closed have one
+        // answer each.
+        Ok(Found::File(self.under_city(&super::chosen_path::admit(
+            asked,
+            "read",
+            &*self.bound,
+        )?)))
     }
 
     fn under_city(&self, addr: &kernel::Address) -> PathBuf {
@@ -346,18 +365,7 @@ impl Tool for ReadTool {
         // The count the model needs to decide whether it has the whole
         // thing: a result the pipeline shortened says so in its own
         // envelope, and this is what it was shortened from.
-        let bytes = u64::try_from(taken.text.len()).map_err(|_| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "read",
-                format!("{asked}: length overflow"),
-            )
-            .with_recovery(format!(
-                "read {asked} a range of lines at a time: the whole file is longer \
-                 than a byte count this city can hold"
-            ))
-        })?;
-        out.insert("bytes".to_owned(), Value::Number(bytes.into()));
+        out.insert("bytes".to_owned(), Value::Number(taken.text.len().into()));
         out.insert("text".to_owned(), Value::String(taken.text));
         Ok(ToolOutcome {
             result: Payload::new(out)?,

@@ -15,9 +15,10 @@
 //! lives under the reserved subtree `read` refuses, and it is one chain
 //! for the whole city — handing it to one resident hands over a
 //! confidential building's events as well. A transcript is one run's,
-//! written in that run's room, and residents of the same building may
-//! read it; a confidential building is protected by the isolation it
-//! already has.
+//! written in that run's room, and who may read it is the read bound's
+//! answer for that room: `read` and `search` ask it of a transcript's
+//! path as of any other, so a confidential building's transcripts stay
+//! inside it (city-SPEC 8-2).
 //!
 //! Three steps in a fixed order: scanned for credentials, pinned into
 //! the CAS, then materialised. Scanned before pinned, because a key that

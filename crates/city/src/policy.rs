@@ -5,11 +5,13 @@
 
 //! `RULES.toml` evaluated into rules a machine can hold.
 //!
-//! A confidential building means three things at once, and each of them
+//! A confidential building means four things at once, and each of them
 //! is held somewhere that cannot be talked out of it: the model pool is
-//! local, the write domain stops at the building's own subtree, and data
-//! does not leave. This module decides the first two from the file; the
-//! third is the egress door's.
+//! local, the write domain stops at the building's own subtree, data
+//! does not leave, and nobody outside the building reads what is in it.
+//! This module decides the first two from the file; the third is the
+//! egress door's, and the fourth is `kernel::address::may_read`, asked
+//! with the answer [`load`] gives for the building a path lands in.
 //!
 //! A building with no `RULES.toml` is an ordinary building. One that
 //! exists and does not say whether it is confidential is an error:
@@ -288,8 +290,16 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> 
         // An absent file is an ordinary building - unless a document
         // this version no longer reads is holding the rules, in which
         // case reading "absent" would turn a confidential building into
-        // an ordinary one without anybody being told.
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+        // an ordinary one without anybody being told. A path through a
+        // file is absent too: Linux says `NotADirectory` where Windows
+        // says `NotFound`, and a file at the city root has to get one
+        // answer from the read bound on both.
+        Err(err)
+            if matches!(
+                err.kind(),
+                std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+            ) =>
+        {
             match superseded(city_root, addr) {
                 Some(stale) => Err(AxError::failure(
                     AxCode::ConfigInvalid,

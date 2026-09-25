@@ -12,7 +12,7 @@
 //! the `exec` result says happened. Neither may be spelled twice, so
 //! both live here (runtime-SPEC 8-28-1).
 
-use std::process::ExitStatus;
+use std::process::{Child, ExitStatus};
 use std::time::Duration;
 
 /// The short window a caller blocks for, counted in polls.
@@ -80,6 +80,21 @@ impl Exit {
         match status.code() {
             Some(code) => Exit::Ended { code },
             None => Exit::Signalled,
+        }
+    }
+
+    /// Whether a child has stopped, and how, without waiting for it.
+    ///
+    /// A host that will not answer is not a child that is still
+    /// running: the ending is reported as unread, so the member stops
+    /// being polled for ever.
+    pub(super) fn polled(child: &mut Child) -> Option<Exit> {
+        match child.try_wait() {
+            Ok(Some(status)) => Some(Exit::of(&status)),
+            Ok(None) => None,
+            Err(_) => Some(Exit::Unknown {
+                why: Unseen::WaitRefused,
+            }),
         }
     }
 

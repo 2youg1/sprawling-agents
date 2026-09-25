@@ -276,6 +276,21 @@ impl Address {
 - 符号链接 canonicalize 属效果面（S2 write_domain 的适配层）；本原语只对已规范化相对路径作证。
 - 解析拒绝的 AxError：`action="parse address"`、`subject=原串`、recovery 指出违规成分与合法形态。
 
+**读界**（city-SPEC §8-2 confidential 的第四条；形状 1 判定）：
+
+```rust
+pub enum ReadVerdict { Open, Confidential, RulesUnreadable(AxError) }   // 穷尽；不是 bool
+pub fn may_read(
+    reader_building: &Address,
+    target: &Address,
+    rules: impl FnOnce() -> Result<bool, AxError>,   // 目标所在楼此刻是否 confidential
+) -> ReadVerdict;
+```
+
+- 规则一句话：`target.is_within(reader_building)` 即 `Open`，且**不调用 `rules`**；否则问 `rules`——`Ok(false)`＝`Open`，`Ok(true)`＝`Confidential`，`Err(e)`＝`RulesUnreadable(e)`。后两臂都是「关」，分成两臂是因为恢复语不同：前者请去问那栋楼里的人，后者要一个人去修那份规则。
+- `rules` 是闭包而不是值：本楼的读是绝大多数，它们不该为一次读盘付账；「哪栋楼持有 target」与「读它的规则」是 city 的权威（`city::Building::of`、`city::policy::load`），由装配层接成这个闭包，kernel 不复述「楼是地址的首段」。它交出的是 `BuildingPolicy::confidential` 那一个事实，形状因此是 `bool`：本模块不引 `model`，`address` 保持叶子模块。
+- 拒绝的措辞不在这里：`ReadVerdict` 是判定，拒词由问它的人写（runtime-SPEC §8-30-1 `chosen_path::admit`，那是模型选路唯一的拒绝处）。
+
 ### 8-3 kernel::locator
 
 ```rust
@@ -619,7 +634,7 @@ pub const CTX_REMINDER_SECOND_MIN: u64 = 30;                         // 第二�
 pub const CTX_REMINDER_SECOND_MAX: u64 = 90;                         // 第二道阈值合法域上端（含）
 pub const LOOP_REPEAT_THRESHOLD: u32 = 3;
 pub const OFFLOAD_MIN_BYTES: u64 = 16_384;
-pub const INTERVAL_CAP_BYTES: u64 = 65_536;                          // 一次区间读／检索的窗口预算
+pub const INTERVAL_CAP_BYTES: usize = 65_536;                        // 一次区间读／检索的窗口预算
 pub const EXCHANGE_BUDGET_BYTES: u64 = OUTPUT_CEILING_DEFAULT * BYTES_PER_TOKEN;  // 一回合 exchange 的窗口预算（runtime-SPEC.md 8-44）
 pub const DRAFT_HELD_ESCALATE: u32 = 3;
 pub const EDIT_WAR_FREEZE: u32 = 2;
@@ -629,6 +644,8 @@ pub const DISCARD_RETENTION_DAYS: u32 = 30;
 pub const CLOCK_ZONES_MAX: ClockZonesMax = ClockZonesMax::new(4);    // §8-73：拒因从类型给出
 pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;                   // 2 GiB
 ```
+
+`INTERVAL_CAP_BYTES` 是 `usize` 而不是 `u64`：它的读者只有 `runtime::tools::read` 与 `search`，两者都拿它比内存里一段文本的字节长度，换算因此不存在，也就没有一处可以把换算失败读成「无上限」。
 
 **两项图片政策**：
 
@@ -1608,6 +1625,7 @@ memory::jsonl／memory::cas／runtime::replay／runtime::fork／citysim 全部�
 - 单测（各模块文件内 `#[cfg(test)]`，测试模块头挂放宽 allow）：serde 拼写对拍（as_str×serde×表）；EventKind 计数与 in-window 计数（以 `ALL` 数）；carrier 全映射非重复覆盖 35；构造子不变量（refusal 三段在场、failure 无 gate、retriable 默认 false）；Payload 拒浮点（含嵌套）；Address/Locator 拒绝面正反例；Seq/Version checked 溢出；IdemKey 版本字节在场。
 - proptest：`Address::parse` 往返与 `is_within` 自反/传递/反对称；`Locator` Display↔parse 往返；`IdemKey` 重算恒等＋近旁输入不等样例；`Payload` 任意整数树恒过、含浮点树恒拒。
 - golden（insta）：创世行＋一条 `building_created` 的 `canonical_line` 字节。
+- 读界（§8-2 `may_read`）：`address::tests` 的三类读者矩阵——本楼读本楼、他楼读非机密楼、楼外读机密楼，外加机密楼读自己与读他楼——逐格判出 `ReadVerdict`；规则闭包在目标落在读者本楼时被调用即失败；规则读不出判 `RulesUnreadable` 且原样带回那条 `AxError`。
 - conformance：对一个最小内存实现自证可跑；citysim 实现二证。
 - 约束：`cargo clippy --workspace --all-targets -- -D warnings` 零告警；无 `unsafe`；文件前三行 MPL 头。
 - S2 各模块测试面（逐模块文件内 `#[cfg(test)]`＋kani 镜像 proptest）：taint 并集单调／map 保集；write_domain reserved 恒拒／夺回计数；budget 溢出＝Exhausted／逐层报首超；backpressure 单调；stall 尾部连续语义；goal/repair 重叠矩阵；delegation 静动双层；registry verify 拒非证据 kind；spine 表解析正反例＋tally 对账三情形；completion 空证据／错 kind 拒；approval 应答真值表十二行遍历＋自审拒；config 字段交集空断言；tool/model conformance 自证；secret 双语料＋熵边界；discard 决策表全分支＋forecast 三臂正反；gate 门册遍历（`DOORS` 每行一条 `deny_sample`，refusal 三段非空）＋taint 有真判决＋`claim` 认领一次。
@@ -2061,7 +2079,6 @@ impl CityLayout {
 **队列（其余政策值逐个 newtype 化时从这里取）**：
 
 - `WORKTREE_MAX_BYTES`：有拒因，但今天拒因是 `MemoryError::WorktreeBusy` 的 detail（两个数都在里面），迁它的前提是那句 detail 也从类型派生。
-- `INTERVAL_CAP_BYTES`：无拒因——它只调速（read／search 截断并报 total 与 next_offset）；可迁的是四处 `usize::try_from(..).unwrap_or(usize::MAX)` 同一换算的重复。
 - `OUTPUT_CEILING_DEFAULT`：合法域（非零）今天是两个家——`consts_policy` 的测试与 `gateway::provider::ceiling` 的 `Ceiling::new(..)?`；铸成 `Ceiling` 实例即一个家。
 - `SANDBOX_FUEL_DEFAULT`：`SandboxLimits.fuel` 是裸 `u64`，域未设。
 - `STARTUP_BUDGET_TOKENS`／`BYTES_PER_TOKEN`／`LOOP_REPEAT_THRESHOLD`／`OFFLOAD_MIN_BYTES`／`DRAFT_HELD_ESCALATE`／`EDIT_WAR_FREEZE`／`DISCARD_FILES_MAX`／`DISCARD_RETENTION_DAYS`：算术输入或判定输入，无拒因句式，保持裸数即是正确形状。

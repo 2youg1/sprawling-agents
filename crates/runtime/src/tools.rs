@@ -13,6 +13,7 @@ mod search;
 mod status;
 mod succeed;
 
+pub use chosen_path::ReadBound;
 pub use edit::EditTool;
 pub use edit::version_of;
 pub use exec::parse_arm;
