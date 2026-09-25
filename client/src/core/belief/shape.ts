@@ -54,6 +54,9 @@ export interface RunBelief {
 // What the belief holds. Read through the store `belief.ts` hands out;
 // nothing outside that file writes one.
 export interface Belief {
+  // The live run table, written in place by the store: a belief read
+  // earlier sees later runs through it, so a reader that needs a run as
+  // it stood keeps the `RunBelief`, which is never mutated.
   runs: Record<string, RunBelief>;
   halted: HaltScope[];
   // The ledger position the list of shut scopes is current to. Two
