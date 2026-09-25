@@ -301,3 +301,35 @@ fn a_fork_after_the_first_line_is_refused_and_keeps_every_line() {
     };
     assert_eq!(*line, 4, "the refusal names the first line after the fork");
 }
+
+/// A line from a newer vocabulary that marks itself ignorable is lawful
+/// history: replay reads it and chains past it, so open must keep it and
+/// continue the chain after it rather than truncate it as tail damage.
+#[test]
+fn an_ignorable_line_from_a_newer_vocabulary_is_kept_and_chained() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut ledger, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+    ledger
+        .append_all(vec![draft(EventKind::CityInitialized, 1)])
+        .unwrap();
+    let genesis = ledger.read_raw_lines().unwrap().remove(0);
+    drop(ledger);
+    let future = format!(
+        "{{\"v\":1,\"run\":\"00000000-0000-0000-0000-000000000000\",\"seq\":1,\
+         \"prev\":\"{}\",\"t\":0,\"who\":\"city\",\"kind\":\"kind_from_the_future\",\
+         \"data\":{{}},\"ig\":true}}\n",
+        chain_hash(&genesis)
+    );
+    let segment = only_segment(dir.path());
+    let mut bytes = fs::read(&segment).unwrap();
+    bytes.extend_from_slice(future.as_bytes());
+    fs::write(&segment, &bytes).unwrap();
+
+    let (mut reopened, report) = JsonlLedger::open(dir.path(), TimeMs::new(9)).unwrap();
+    assert!(report.recovered.is_none(), "a lawful line is not tail damage");
+    assert_eq!(reopened.position(), Seq::new(2));
+    reopened
+        .append_all(vec![draft(EventKind::RunStarted, 3)])
+        .unwrap();
+    assert_eq!(reopened.read_raw_lines().unwrap().len(), 3);
+}
