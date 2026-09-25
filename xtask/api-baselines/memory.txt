@@ -14,6 +14,8 @@ impl memory::HotView
 impl memory::JsonlLedger
 impl memory::JsonlLedger
 impl memory::LedgerIndex
+impl memory::LineCheck
+impl memory::LineFault
 impl memory::LineReader<'_>
 impl memory::Manifest
 impl memory::MemoryError
@@ -26,7 +28,9 @@ impl memory::Worktrees
 impl memory::WriteTarget
 pub const memory::MANIFEST: &str
 pub enum memory::AliasKind
+pub enum memory::CheckedLine
 pub enum memory::Head
+pub enum memory::LineFault
 pub enum memory::MemoryError
 pub enum memory::QueueLane
 pub enum memory::Refreshed
@@ -83,6 +87,10 @@ pub fn memory::LedgerIndex::rebuild(&std::path::Path) -> core::result::Result<me
 pub fn memory::LedgerIndex::refresh(&mut self, &std::path::Path) -> core::result::Result<memory::Refreshed, memory::MemoryError>
 pub fn memory::LedgerIndex::run_seqs_before(&self, kernel::event::identity::RunId, core::option::Option<kernel::event::identity::Seq>) -> impl core::iter::traits::iterator::Iterator<Item = kernel::event::identity::Seq>
 pub fn memory::LedgerIndex::tail_seq(&self) -> core::option::Option<kernel::event::identity::Seq>
+pub fn memory::LineCheck::advance(&mut self, &[u8]) -> core::result::Result<memory::CheckedLine, memory::LineFault>
+pub fn memory::LineCheck::at_genesis() -> Self
+pub fn memory::LineCheck::expected(&self) -> kernel::event::identity::Seq
+pub fn memory::LineFault::into_ax(self, u64) -> kernel::error::shape::AxError
 pub fn memory::LineReader<'_>::line_at(&mut self, kernel::event::identity::Seq) -> core::result::Result<alloc::vec::Vec<u8>, memory::MemoryError>
 pub fn memory::Manifest::cas_objects(&self) -> u64
 pub fn memory::Manifest::files(&self) -> u64
@@ -132,6 +140,8 @@ pub memory::AttributionReport::by_segment: alloc::vec::Vec<(alloc::string::Strin
 pub memory::AttributionReport::by_skill: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub memory::AttributionReport::by_tool: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub memory::AttributionReport::total: kernel::budget::UsdMicros
+pub memory::CheckedLine::IgnoredUnknown(kernel::event::identity::Seq)
+pub memory::CheckedLine::Known(kernel::event::payload::EventRecord)
 pub memory::Drift::ahead: u64
 pub memory::Drift::behind: u64
 pub memory::FilePatch::lines: alloc::vec::Vec<memory::PatchLine>
@@ -142,6 +152,16 @@ pub memory::Landing::of: &'a memory::Provenance
 pub memory::Landing::reviewed_by_person: bool
 pub memory::Landing::subject: &'a str
 pub memory::Landing::t: kernel::event::identity::TimeMs
+pub memory::LineFault::ChainBreak
+pub memory::LineFault::NotALine(alloc::string::String)
+pub memory::LineFault::NotAVersion(u64)
+pub memory::LineFault::NotCanonical(alloc::string::String)
+pub memory::LineFault::SeqExhausted(kernel::error::shape::AxError)
+pub memory::LineFault::SeqGap
+pub memory::LineFault::SeqGap::expected: kernel::event::identity::Seq
+pub memory::LineFault::SeqGap::found: kernel::event::identity::Seq
+pub memory::LineFault::UnknownKind(alloc::string::String)
+pub memory::LineFault::VersionAhead(u64)
 pub memory::MemoryError::Alias
 pub memory::MemoryError::Alias::kind: memory::AliasKind
 pub memory::MemoryError::Alias::op: &'static str
@@ -231,6 +251,7 @@ pub struct memory::HotView
 pub struct memory::JsonlLedger
 pub struct memory::Landing<'a>
 pub struct memory::LedgerIndex
+pub struct memory::LineCheck
 pub struct memory::LineReader<'index>
 pub struct memory::Manifest
 pub struct memory::ModelChoice

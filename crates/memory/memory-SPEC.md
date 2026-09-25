@@ -136,6 +136,28 @@ impl kernel::Ledger for JsonlLedger { /* append = append_all(vec![d]) */ }
 // 且首行必须是 city_initialized；首行可解析但链根不对＝Envelope，不静默清场。
 ```
 
+**逐行检查 `jsonl::verify`（形状 2 值）**：账本的每个读者都经同一个 `LineCheck` 走一行——`open` 的尾段扫描与 `runtime::replay::verify_lines` 同一份，故一方收下的行另一方拒不了。
+
+```rust
+pub struct LineCheck { /* prev 与下一个期望 seq——只有链状态，不持行 */ }
+pub enum CheckedLine { Known(EventRecord), IgnoredUnknown(Seq) }
+pub enum LineFault { NotALine(String), VersionAhead(u64), NotAVersion(u64), ChainBreak,
+                     SeqGap { found: Seq, expected: Seq }, UnknownKind(String),
+                     NotCanonical(String), SeqExhausted(AxError) }
+impl LineCheck {
+    pub fn at_genesis() -> Self;
+    pub fn expected(&self) -> Seq;
+    /// 判一行（不带 `
+`）；过则链前进，错则状态不动。
+    pub fn advance(&mut self, raw: &[u8]) -> Result<CheckedLine, LineFault>;
+}
+impl LineFault { pub fn into_ax(self, line_no: u64) -> AxError; }  // 整本读者的拒词：更新的写者＝E_LOG_VERSION_UNSUPPORTED，其余＝E_CAS_CORRUPT
+```
+
+- 判定顺序：信封（`v` 经 `readable_log_v`）→ `prev` → `seq` → kind 二分（借用判定，不 clone）→ 已知 kind 的类型解析与规范回写比对；`ig:true` 的未知 kind 不解析但照样入链。
+- `open` 对故障的处置：`VersionAhead`／`NotAVersion` 按版本拒；`NotALine` 且其后无带信封的行＝撕裂，截断；其余一律拒而不截——撕裂不会留下带信封的行，截掉它等于删掉合法历史。
+- 被否：两个读者各持一份检查。`open` 曾只做类型解析，于是一条链续正确的 `ig:true` 行在尾段被当撕裂截掉，而 `replay` 收下同一行。
+
 **落盘形态**：目录内 `ledger-<first_seq 20 位零填>.jsonl` 若干段；行＝`canonical_line`＋`\n`；链与 seq 跨段连续。滚动：当前段字节数 ≥ `SEGMENT_ROLL_BYTES` 时下一波起新段（新段创建后 `sync_dir`）。
 **open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`——判定一律经 `kernel::consts_external::readable_log_v`（M-16）：`Ahead` 即 `VersionAhead`（先于一切链检，恒不部分解读），`NotAVersion`（低于任何构建写过的首版本，含 v0）即 `Envelope` 且拒词说版本，`Current` 与 `Older` 放行；④校验最后一段：逐行 parse＋段内链续，本段任一可解析行的 `v` 同样经 `readable_log_v` 判定——`Ahead` 与 `NotAVersion` 在此**拒**而不作尾损截断（截掉它等于删掉更新构建的历史），首个非法字节起截断（`truncate`＋`sync_data`），跨段 prev 以前段末行验证；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
 **写者锁：一座城的账本同一时刻只有一个 `JsonlLedger`，跨进程成立。** `open` 在列段之前，对 `CityLayout::ledger_lock()`（`<city>/.sprawling/ledger.lock`）取 `std::fs::File::try_lock` 独占锁；`JsonlLedger` 持着那个 `File`，锁与账本同寿命，drop 即放。拿不到锁就是别的 `JsonlLedger`（这个进程的或另一个进程的）正持着这座城的账本：`MemoryError::LedgerHeld { dir }`，映射装载期码 `E_LEDGER_HELD`。拒绝发生在任何读写之前，所以被拒的一方不修盘，也不写 `log_truncated`。
