@@ -81,8 +81,9 @@ pub const OAUTH_PROFILES: [OauthProfile; 4] = [
     // key-billed platform: `model-provider-info` picks that base for
     // every ChatGPT auth mode and `https://api.openai.com/v1` only for
     // an API key (the provider table under `codex-rs/model-provider-
-    // info/`, watched in docs/third-party.md section 1). That base answers on the responses face, which
-    // `Family::Codex` states and `dialect::responses` writes.
+    // info/`, watched in docs/third-party.md section 1). That base
+    // answers on the responses face, which `Family::Codex` states and
+    // `dialect::responses` writes.
     OauthProfile {
         family: Family::Codex,
         provider: "openai",
