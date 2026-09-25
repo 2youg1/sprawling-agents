@@ -14,7 +14,9 @@
 //! **Absent credentials print one line and pass**, the same honesty
 //! `just adversary` keeps: a gate that silently skips is worse than no
 //! gate, and a gate that fails on every machine without a key is one
-//! nobody runs. The variables are named by the run itself, below.
+//! nobody runs. The variables are named by the run itself, below. A job
+//! that holds the credentials sets `SPRAWLING_E2E_REQUIRED=1`, and there
+//! an absent variable is a broken configuration, so the gate turns red.
 //!
 //! **It enters by `RunWorker::handle`, the door `channels::server` hands
 //! every frame to**, rather than by spawning the binary and opening a
@@ -41,6 +43,11 @@ const BASE_URL: &str = "SPRAWLING_E2E_BASE_URL";
 const KEY: &str = "SPRAWLING_E2E_KEY";
 const MODEL: &str = "SPRAWLING_E2E_MODEL";
 const DIALECT: &str = "SPRAWLING_E2E_DIALECT";
+
+/// Set to `1` where the four variables above must be present. Any other
+/// value reads as unset, so a misspelt switch cannot turn back into a
+/// silent skip without the job that set it noticing the skip line.
+const REQUIRED: &str = "SPRAWLING_E2E_REQUIRED";
 
 /// Where the credential is filed. The locator is the one home for this
 /// fact: the realm and the name below are read out of it by the parser
@@ -76,7 +83,8 @@ struct Live {
 }
 
 /// The four variables, or one line saying which of them the machine
-/// running this does not have.
+/// running this does not have — a failure instead where [`REQUIRED`] is
+/// set.
 ///
 /// The dialect is parsed by `serde`, so the spellings this accepts are
 /// the spellings the wire carries and the error names them; a table
@@ -86,10 +94,14 @@ fn live() -> Option<Live> {
     let (Some(base_url), Some(key), Some(model), Some(raw)) =
         (read(BASE_URL), read(KEY), read(MODEL), read(DIALECT))
     else {
-        println!(
-            "skipped: this gate calls a real endpoint and needs {BASE_URL}, {KEY}, {MODEL} and \
-             {DIALECT}"
+        let needs = format!(
+            "this gate calls a real endpoint and needs {BASE_URL}, {KEY}, {MODEL} and {DIALECT}"
         );
+        assert!(
+            std::env::var(REQUIRED).as_deref() != Ok("1"),
+            "{REQUIRED}=1, and {needs}"
+        );
+        println!("skipped: {needs}");
         return None;
     };
     let dialect = match serde_json::from_value(serde_json::Value::String(raw)) {
