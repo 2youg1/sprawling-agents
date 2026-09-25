@@ -266,10 +266,8 @@ pub fn drive(
                 // asked again, and the attempt is recorded rather than
                 // repeated silently: the second `model_called` in the
                 // history is what a person reads the retry off.
-                // Pacing is `gateway::admission`'s, which holds the
-                // provider's own `retry-after` and applies it inside
-                // the next call; the watchdog decides only whether
-                // there is a next call.
+                // The watchdog decides whether there is a next call and
+                // not before when; this loop does not yet wait for it.
                 let disposal = watchdog.on_provider_failure(&err, t);
                 if let crate::Disposal::BackOff { .. } = disposal {
                     ledger.append(EventDraft {
