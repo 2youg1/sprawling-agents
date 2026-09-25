@@ -48,6 +48,10 @@ const A_TASK: &str = "tally the east kiln";
 const NAMING_PHRASE: &str = "Name this piece of work";
 /// The longest the scenario may take before it is reported as stuck.
 const WITHIN: Duration = Duration::from_secs(60);
+/// The most a relay round trip may take at its middle, whatever the
+/// store: an fsync on the disk store is the floor it has to fit under
+/// (sprawling-SPEC.md 8-83).
+const ROUND_TRIP_P50: Duration = Duration::from_millis(1);
 
 #[derive(Debug, Clone, Copy)]
 enum Store {
@@ -58,19 +62,29 @@ enum Store {
 #[test]
 #[ignore = "a wall-clock instrument; just bench runs it"]
 fn instrument_relay_round_trip() {
-    for store in [Store::Disk, Store::Memory] {
-        let taken = relay_round_trips(store);
-        report(
-            "instrument_relay_round_trip",
-            &format!("store={}", store_name(store)),
-            taken,
-        );
-    }
     report(
         "instrument_relay_round_trip",
         "store=memory crossing=none",
         own_appends(),
     );
+    let middles: Vec<(Store, Duration)> = [Store::Disk, Store::Memory]
+        .into_iter()
+        .map(|store| {
+            let p50 = report(
+                "instrument_relay_round_trip",
+                &format!("store={}", store_name(store)),
+                relay_round_trips(store),
+            );
+            (store, p50)
+        })
+        .collect();
+    for (store, p50) in middles {
+        assert!(
+            p50 <= ROUND_TRIP_P50,
+            "a relay round trip on store={} took {p50:?} at its middle, over {ROUND_TRIP_P50:?}",
+            store_name(store)
+        );
+    }
 }
 
 #[test]
@@ -326,7 +340,8 @@ fn store_name(store: Store) -> &'static str {
     }
 }
 
-fn report(instrument: &str, fields: &str, mut taken: Vec<Duration>) {
+/// Prints the reading line, and hands back the middle it read.
+fn report(instrument: &str, fields: &str, mut taken: Vec<Duration>) -> Duration {
     taken.sort_unstable();
     let floor = taken.first().copied().unwrap_or_default();
     let p50 = taken
@@ -340,6 +355,7 @@ fn report(instrument: &str, fields: &str, mut taken: Vec<Duration>) {
         p50.as_micros(),
         machine()
     );
+    p50
 }
 
 fn machine() -> String {
