@@ -1887,6 +1887,20 @@ provider 的并发上限），配置值是人写的。取小的那个：比天�
 准入计数住在记账线程上：它是「同时有几轮活在跑」的唯一权威，而唯一权威必须在唯一写者那一侧，
 否则两条线程各数各的，就有了两个答案。
 
+**这条循环必须成立的三条性质由 Lean 模型定**：`adversary/design/Attending.lean`（`lake build Design`，
+在 `adversary/` 下跑）。三张嘴与关门都送进同一条队列，线程阻塞在第一条消息上，醒来后把已经排在后面的
+一次取尽，按到达次序服务。模型证明：醒来时在等的每条消息都在这一次醒来里被服务（于是到达的消息在下一次
+醒来里被服务）；追加的次序就是 seq 的次序；没有消息、也没有到期的排程截止时刻时线程不醒，而每次醒来都
+消耗掉至少一件工作，所以醒来的次数以消息数加截止时刻数为上界。模型只管追加了几条记录，一条消息落地时
+做的其余事（结账、回话）归 Rust。
+
+**今天的循环守住前两条，守不住第三条**：它按 8-46-2 的节奏轮询三张嘴，而不是被消息唤醒。一次 relay
+往返要等过两次定时等待（`serve_flight(LOOK_AGAIN)` 等回家的活，`CommandDesk::wait` 等 desk），定时器
+粒度 15.6 ms 的主机上 8-83 的 relay 仪表读出 p50 约 31 ms，内存与磁盘两种存储读数相同，所以这 31 ms
+全是等待，不是 fsync。守住第三条的形状是模型里那一条队列：一个枚举，每张嘴一个变体再加关门，先 `recv` 阻塞，醒来后
+`try_recv` 取尽，保留批量 `append_all`，删掉 `LOOK_AGAIN` 与两处定时等待；那时 8-46-2 的等待节奏一段
+随之改写。这个枚举不能叫 `Inbox`：词汇表里 Inbox 是 Approval Inbox，人的待答队列。
+
 ### 8-42-5 被否决的备选
 
 **备选一：多进程。** 一轮活一个进程，各自持有自己的一份状态，用管道汇总。
@@ -3239,11 +3253,13 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 | `instrument_relay_round_trip` | 一轮活停在它的第一次模型调用上（provider 不作答），于是循环处在「有车道在跑」的那个形状里；另一条线程拿 `measuring_relay` 连续追加 200 条，逐条计时 | `store=disk`：城自己的 `JsonlLedger`，每条一道屏障；`store=memory`：同一个 `JsonlLedger` 开在 `memory::FaultFs` 上，屏障是一次内存拷贝；另给 `store=memory` 不过河时自己的追加耗时，两者之差就是过河本身 |
 | `instrument_dispatch_gap` | 移植自 perf-latency 的双派活场景：run A 在 `lab/east` 跑 30 个 `status` 回合；A 的第五次模型调用到达时，往楼 `lab`（不带房间，于是要请 digest 模型取名）派 run B，provider 把取名那次调用压 3 s | A 相邻两条记录 `t` 之差的最大值与中位数，单位 ms |
 
+`instrument_relay_round_trip` 另断言两种过河存储的 p50 都不超过 1 ms（`ROUND_TRIP_P50`）：磁盘存储的一道 fsync 是这次往返的物理下限，而轮询的等待不是。目标还有一条没写成断言：内存存储过河的 p50 不超过 10 µs，它只在 `--release` 下有意义，而 `crossing=none` 那一行在调试构建里已是 20 µs 量级。
+
 读数行由仪表模块自己渲染，一行一个读数：`<仪表> <键=值>… machine=<os>-<arch>, <n> core(s)`，每行都带 `samples`、`floor_us`、`p50_us`（空档那一行是 `max_ms`、`median_ms`）。它不用 citysim 的 `perf load=…` 文法：那份文法属于 citysim 的 bench Main，本 crate 够不到它，两件仪表的读数也不是那四个负载场景之一。
 
 **决定**：仪表放在 crate 内的测试里，而不是给 citysim 开一扇公共门。relay、`serve_flight` 与 desk 都是 `pub(crate)`；为量它们而开的公共面没有生产调用者，而且要进 apisync 基线。**败给的方案**：citysim 经 `RunWorker::handle(Dispatch)` 从外面驱动，再用 provider 两次请求之间的空隙推算 relay 往返。那个空隙里还有围栏（每波 20–90 ms）与工具，推算出来的是每回合剩余，不是一次往返。
 
-**重开参数**：记账线程改成统一收件箱之后（主线 1），`attend` 的签名随之改，两件仪表的驱动方式不变——它们只经过 desk、relay 与 provider 三个面。
+**重开参数**：记账线程改成 8-42-4 那一条统一队列之后（主线 1），`attend` 的签名随之改，两件仪表的驱动方式不变——它们只经过 desk、relay 与 provider 三个面。
 
 ## 8-60 提示词语料的分层：哪类事实住哪一层（`docs/City.md`＋`ToolMeta`＋`Catalog`）
 

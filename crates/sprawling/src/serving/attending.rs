@@ -16,6 +16,12 @@
 //! desk (sprawling-SPEC.md 8-42-4). The crossing is first because a run
 //! that has already been paid for must not queue behind one that has
 //! not started.
+//!
+//! Which properties the loop must hold - every message served in
+//! finitely many steps, append order equal to seq order, no wake
+//! without work - is decided by the Lean model
+//! `adversary/design/Attending.lean`; this loop polls and so does not
+//! yet hold the third (sprawling-SPEC.md 8-42-4).
 
 use std::sync::Arc;
 use std::sync::mpsc;
