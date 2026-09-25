@@ -53,3 +53,15 @@ skill keeps the byline its original wore — KL9 ＆ Claude Fable 5.
 Reuse under CC BY-NC 4.0 owes two things: credit to the author (2youg1), and
 no commercial use without separate permission. The full license:
 <https://creativecommons.org/licenses/by-nc/4.0/>.
+
+## `authority-review` — MIT
+
+Modified adaptation of the Thermos plugin (`cursor/plugins`, MIT), the same upstream as
+`branch-audit` was drawn from: `thermo-nuclear-review` and
+`thermo-nuclear-code-quality-review`. **What changed, and who changed it.** Modifications by
+2youg1, 2026: the two parallel rubrics become two sequential passes in one context, with a rule
+that pass one's findings are written down before pass two's rubric is read, and pass two is
+recut as one lens over the whole diff - a fact with more than one authoritative definition,
+ranked by how close the copies are to disagreeing, with the six shapes that carry most findings
+and a requirement to name the definition that survives. Copyright (c) 2026 the Thermos plugin's
+authors, MIT Licence.
