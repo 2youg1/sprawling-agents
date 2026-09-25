@@ -5,6 +5,12 @@
 
 use super::*;
 
+/// A bound under which every building is open, so a test about the walk
+/// judges nothing else.
+fn everywhere() -> ReadBound {
+    std::sync::Arc::new(|_: &Address| ReadVerdict::Open)
+}
+
 fn call(args: &[(&str, Value)]) -> ToolCall {
     let mut map = Map::new();
     for (key, value) in args {
@@ -47,7 +53,7 @@ fn city() -> tempfile::TempDir {
 #[test]
 fn a_substring_comes_back_with_its_place_and_its_context() {
     let dir = city();
-    let mut tool = SearchTool::new(dir.path()).unwrap();
+    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let outcome = tool
         .invoke(&call(&[
@@ -71,7 +77,7 @@ fn a_substring_comes_back_with_its_place_and_its_context() {
 #[test]
 fn every_file_under_the_prefix_is_looked_at_and_nothing_above_it() {
     let dir = city();
-    let mut tool = SearchTool::new(dir.path()).unwrap();
+    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let whole = tool.invoke(&text("the ledger")).unwrap();
     assert_eq!(whole.result.as_map()["count"], 2, "two files, one each");
@@ -91,7 +97,7 @@ fn every_file_under_the_prefix_is_looked_at_and_nothing_above_it() {
 #[test]
 fn a_reserved_prefix_is_refused_and_a_reserved_file_is_never_matched() {
     let dir = city();
-    let mut tool = SearchTool::new(dir.path()).unwrap();
+    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let err = tool
         .invoke(&call(&[
@@ -114,7 +120,7 @@ fn a_reserved_prefix_is_refused_and_a_reserved_file_is_never_matched() {
 fn a_file_that_is_not_text_is_passed_over_rather_than_reported() {
     let dir = city();
     std::fs::write(dir.path().join("lab").join("blob.bin"), [0xff, 0xfe, 0x00]).unwrap();
-    let mut tool = SearchTool::new(dir.path()).unwrap();
+    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let outcome = tool.invoke(&text("the ledger")).unwrap();
     assert_eq!(outcome.result.as_map()["count"], 2);
@@ -123,7 +129,7 @@ fn a_file_that_is_not_text_is_passed_over_rather_than_reported() {
 #[test]
 fn an_empty_predicate_is_refused_because_it_would_match_everything() {
     let dir = city();
-    let mut tool = SearchTool::new(dir.path()).unwrap();
+    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let err = tool.invoke(&text("")).unwrap_err();
     assert_eq!(err.code(), &AxCode::InvalidArgs);
@@ -139,7 +145,7 @@ fn the_cap_stops_the_walk_and_the_answer_says_so() {
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     let body: String = (0..200).map(|n| format!("the ledger {n}\n")).collect();
     std::fs::write(dir.path().join("lab").join("Many.md"), body).unwrap();
-    let mut tool = SearchTool::new(dir.path()).unwrap();
+    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let outcome = tool.invoke(&text("the ledger")).unwrap();
     let map = outcome.result.as_map();
@@ -147,10 +153,99 @@ fn the_cap_stops_the_walk_and_the_answer_says_so() {
     assert_eq!(map["truncated"], Value::Bool(true));
 }
 
+/// A search with no path walks what this run may read and nothing
+/// else: a building the bound closes is not entered, and the bound is
+/// asked once per building at the city root rather than once per file.
+#[test]
+fn a_walk_from_the_root_does_not_enter_a_building_the_bound_closes() {
+    let dir = city();
+    let vault = dir.path().join("vault").join("room1");
+    std::fs::create_dir_all(&vault).unwrap();
+    std::fs::write(vault.join("notes.md"), "the ledger of the vault\n").unwrap();
+    let asked = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = std::sync::Arc::clone(&asked);
+    let bound: ReadBound = std::sync::Arc::new(move |addr: &Address| {
+        seen.lock().unwrap().push(addr.as_str().to_owned());
+        if addr.as_str().starts_with("vault") {
+            ReadVerdict::Confidential
+        } else {
+            ReadVerdict::Open
+        }
+    });
+    let mut tool = SearchTool::new(dir.path(), bound).unwrap();
+
+    let whole = tool.invoke(&text("the ledger")).unwrap();
+    let map = whole.result.as_map();
+    assert_eq!(map["count"], 2, "the two hits in lab, none in the vault");
+    assert_eq!(
+        map["unreadable"], 0,
+        "a closed building is policy, not a failure"
+    );
+    let mut buildings = asked.lock().unwrap().clone();
+    buildings.sort();
+    assert_eq!(
+        buildings,
+        ["lab", "vault"],
+        "once per building, never per file"
+    );
+
+    let err = tool
+        .invoke(&call(&[
+            ("text", Value::String("the ledger".to_owned())),
+            ("path", Value::String("vault/room1".to_owned())),
+        ]))
+        .unwrap_err();
+    assert_eq!(err.code(), &AxCode::GateDenied);
+}
+
+/// A file too large to search is a place the walk did not look, so it
+/// is counted and named with the reason, and the answer says how to get
+/// at it instead.
+#[test]
+fn a_file_past_the_byte_cap_is_reported_with_its_reason() {
+    let dir = city();
+    let big = "the ledger\n".repeat(100_000);
+    std::fs::write(dir.path().join("lab").join("Big.md"), big).unwrap();
+    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+
+    let outcome = tool.invoke(&text("the ledger")).unwrap();
+    let map = outcome.result.as_map();
+    assert_eq!(map["count"], 2, "the large file was not searched");
+    assert_eq!(map["unreadable"], 1);
+    let unread = map["unread"].as_array().unwrap();
+    assert_eq!(unread[0]["path"], "lab/Big.md");
+    assert!(
+        unread[0]["why"].as_str().unwrap().contains("interval"),
+        "{}",
+        unread[0]["why"]
+    );
+}
+
+/// One hit whose own line is wider than the byte budget is cut to the
+/// budget and marked, instead of travelling whole: a single line of a
+/// generated file would otherwise spend the window by itself.
+#[test]
+fn a_first_hit_wider_than_the_budget_is_cut_to_it() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
+    let wide = format!("the ledger {}\n", "x".repeat(cap.saturating_mul(2)));
+    std::fs::write(dir.path().join("lab").join("Wide.md"), wide).unwrap();
+    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+
+    let outcome = tool.invoke(&text("the ledger")).unwrap();
+    let map = outcome.result.as_map();
+    let hit = map["matches"][0]["text"].as_str().unwrap();
+    assert!(hit.len() <= cap, "{} bytes came back", hit.len());
+    assert!(hit.starts_with("the ledger"));
+    assert!(hit.ends_with(" bytes]"), "the cut is marked");
+    assert_eq!(map["truncated"], Value::Bool(true));
+}
+
 #[cfg(feature = "conformance")]
 #[test]
 fn the_tool_refuses_another_tools_call_and_still_answers() {
     let dir = tempfile::tempdir().unwrap();
-    let mut tool = SearchTool::new(dir.path()).unwrap();
+    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
     kernel::tool::conformance::assert_tool_conformance(&mut tool);
 }

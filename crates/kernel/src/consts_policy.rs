@@ -83,7 +83,11 @@ pub const OFFLOAD_MIN_BYTES: u64 = 16_384;
 /// 49,373 / max 73,978, so 64 KiB binds on one of them: it is a guard
 /// against input that is not line-structured - a minified bundle, a
 /// lockfile, a generated table - and not a tax on ordinary reading.
-pub const INTERVAL_CAP_BYTES: u64 = 65_536;
+///
+/// A `usize` because both readers compare it with the length of a text
+/// in memory: with no conversion to write, there is no failed one to
+/// read as "no ceiling at all".
+pub const INTERVAL_CAP_BYTES: usize = 65_536;
 
 /// What one turn's exchange — its assistant reply and its wave's
 /// results — may occupy in the window, in bytes. Shared evenly across

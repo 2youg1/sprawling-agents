@@ -32,6 +32,7 @@ pub use backlog::{Exit, PollBudget, Unseen};
 pub use tools::ChildStatus;
 pub use tools::EditTool;
 pub use tools::ProviderMode;
+pub use tools::ReadBound;
 pub use tools::ReadTool;
 pub use tools::SearchTool;
 pub use tools::StatusSnapshot;
