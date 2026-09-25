@@ -18,8 +18,10 @@
 
 use std::process::Command;
 
-use kernel::Address;
+use kernel::{Address, RunId};
 use runtime::{Backlog, Started};
+
+const RUN: RunId = RunId::CITY;
 
 /// A program every supported host has, which does not stop on its own
 /// and starts no grandchild — so terminating it terminates the whole of
@@ -57,7 +59,7 @@ fn a_command_that_finishes_inside_the_window_produces_no_handle() {
     let backlog = Backlog::new();
     let addr = Address::parse("lab/room1").unwrap();
     let started = backlog
-        .run(&addr, "exit 3".to_owned(), finishes_now(3))
+        .run(RUN, &addr, "exit 3".to_owned(), finishes_now(3))
         .unwrap();
     match started {
         Started::Settled { exit, .. } => {
@@ -69,7 +71,7 @@ fn a_command_that_finishes_inside_the_window_produces_no_handle() {
         backlog.standing(&addr).unwrap().is_empty(),
         "nothing is left in the table"
     );
-    assert!(backlog.harvest().unwrap().is_empty());
+    assert!(backlog.harvest(RUN).unwrap().is_empty());
 }
 
 #[test]
@@ -85,7 +87,7 @@ fn halt_terminates_a_command_that_never_ends_and_the_run_returns_to_a_boundary()
         stopper.halt(Some(&building)).unwrap()
     });
     let started = backlog
-        .run(&addr, "ping forever".to_owned(), never_ends())
+        .run(RUN, &addr, "ping forever".to_owned(), never_ends())
         .unwrap();
     let reached = brake.join().unwrap();
     assert_eq!(reached, 1, "halt reached the member");
@@ -98,10 +100,12 @@ fn halt_terminates_a_command_that_never_ends_and_the_run_returns_to_a_boundary()
 
 #[test]
 fn a_command_that_outlives_the_window_keeps_running_where_halt_can_reach_it() {
-    let backlog = Backlog::new();
+    // A one-poll window: the command never ends, so waiting out the
+    // ten-second default would only make the suite ten seconds slower.
+    let backlog = Backlog::with_window(runtime::PollBudget::new(1, 1));
     let addr = Address::parse("lab/room1").unwrap();
     let started = backlog
-        .run(&addr, "ping forever".to_owned(), never_ends())
+        .run(RUN, &addr, "ping forever".to_owned(), never_ends())
         .unwrap();
     let id = match started {
         Started::Backgrounded { id, .. } => id,
@@ -111,7 +115,7 @@ fn a_command_that_outlives_the_window_keeps_running_where_halt_can_reach_it() {
     assert_eq!(standing.len(), 1);
     assert_eq!(standing[0].id, id);
     assert!(
-        backlog.harvest().unwrap().is_empty(),
+        backlog.harvest(RUN).unwrap().is_empty(),
         "nothing is reported before it stops"
     );
 
@@ -120,7 +124,7 @@ fn a_command_that_outlives_the_window_keeps_running_where_halt_can_reach_it() {
     // table forgets it.
     let mut collected = Vec::new();
     for _ in 0..100 {
-        collected = backlog.harvest().unwrap();
+        collected = backlog.harvest(RUN).unwrap();
         if !collected.is_empty() {
             break;
         }
@@ -128,6 +132,37 @@ fn a_command_that_outlives_the_window_keeps_running_where_halt_can_reach_it() {
     }
     assert_eq!(collected.len(), 1, "the stopped member is reported once");
     assert_eq!(collected[0].id, id);
-    assert!(backlog.harvest().unwrap().is_empty());
+    assert!(backlog.harvest(RUN).unwrap().is_empty());
     assert!(backlog.standing(&addr).unwrap().is_empty());
+}
+
+/// A run that has ended leaves what it started in the background to
+/// nobody: another run's harvest lets it go once it stops, and never
+/// reads its output back to that other run.
+#[test]
+fn a_released_command_is_let_go_without_reaching_another_run() {
+    let backlog = Backlog::with_window(runtime::PollBudget::new(1, 1));
+    let addr = Address::parse("vault/room1").unwrap();
+    let (ended, other) = (RunId::from_bytes([1; 16]), RunId::from_bytes([2; 16]));
+    let mut slow = if cfg!(windows) {
+        let mut command = Command::new("ping");
+        command.args(["-n", "2", "127.0.0.1"]);
+        command
+    } else {
+        let mut command = Command::new("sleep");
+        command.arg("1");
+        command
+    };
+    slow.current_dir(std::env::temp_dir());
+    let started = backlog.run(ended, &addr, "slow".to_owned(), slow).unwrap();
+    assert!(matches!(started, Started::Backgrounded { .. }));
+    assert_eq!(backlog.release(ended).unwrap(), 1);
+    for _ in 0..500 {
+        assert!(backlog.harvest(other).unwrap().is_empty());
+        if backlog.standing(&addr).unwrap().is_empty() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    panic!("a released command that stopped is still in the table");
 }

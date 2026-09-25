@@ -21,13 +21,13 @@
 
 use std::path::PathBuf;
 
-use kernel::{Address, Payload, Tool, ToolCall, ToolName};
+use kernel::{Address, Payload, RunId, Tool, ToolCall, ToolName};
 use runtime::{Backlog, EchoSandbox, ExecSetup, ExecTool, Fuel, PollBudget};
 use serde_json::{Value, json};
 
 const MARK: &str = "only-for-the-run-that-started-it";
 
-fn a_run_at(backlog: &Backlog, building: &str, workdir: &std::path::Path) -> ExecTool {
+fn a_run_at(backlog: &Backlog, building: &str, run: u8, workdir: &std::path::Path) -> ExecTool {
     let setup = ExecSetup {
         workdir: workdir.to_path_buf(),
         mounts: Vec::new(),
@@ -39,6 +39,7 @@ fn a_run_at(backlog: &Backlog, building: &str, workdir: &std::path::Path) -> Exe
         fuel: Fuel(1_000_000),
         env_passthrough: Vec::new(),
         domain: Address::parse(building).unwrap(),
+        run: RunId::from_bytes([run; 16]),
     };
     ExecTool::new(setup, Box::new(EchoSandbox::new()), backlog.clone()).unwrap()
 }
@@ -81,8 +82,8 @@ fn quick_look() -> Value {
 fn a_background_result_reaches_only_the_run_that_started_it() {
     let work = tempfile::tempdir().unwrap();
     let backlog = Backlog::with_window(PollBudget::new(1, 1));
-    let mut starter = a_run_at(&backlog, "vault", work.path());
-    let mut stranger = a_run_at(&backlog, "lab", work.path());
+    let mut starter = a_run_at(&backlog, "vault", 1, work.path());
+    let mut stranger = a_run_at(&backlog, "lab", 2, work.path());
 
     let started = invoke(&mut starter, slow_then_mark());
     assert_eq!(started["outcome"], "backgrounded", "{started}");

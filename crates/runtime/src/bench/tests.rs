@@ -132,6 +132,7 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_fenced() {
                     fuel: Fuel(1000),
                     env_passthrough: Vec::new(),
                     domain: Address::parse("work").unwrap(),
+                    run: RunId::from_bytes([1u8; 16]),
                 },
                 Box::new(EchoSandbox::new()),
                 crate::Backlog::new(),

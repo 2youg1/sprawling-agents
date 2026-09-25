@@ -246,6 +246,7 @@ impl RunWorker {
                 // program and not enough to link one.
                 env_passthrough: site.config.sandbox.env_passthrough.clone(),
                 domain: addr.clone(),
+                run: site.run_id,
             },
             machine.engine,
             self.backlog.clone(),

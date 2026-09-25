@@ -9,7 +9,7 @@
 use std::path::PathBuf;
 use std::process::Child;
 
-use kernel::{Address, AxCode, AxError};
+use kernel::{Address, AxCode, AxError, RunId};
 
 use super::BacklogKind;
 
@@ -25,12 +25,25 @@ pub(super) enum Body {
     Command {
         child: Child,
         dir: PathBuf,
-        /// Set once the short window has passed. Only a backgrounded
-        /// member is collected by [`super::Backlog::harvest`]; one still inside
-        /// its window belongs to the caller that is polling it.
-        backgrounded: bool,
+        claim: Claim,
     },
     Run(RunState),
+}
+
+/// Who a command's ending is handed to.
+///
+/// The table is one per city, so the run that started a command is the
+/// only fact that keeps its output out of every other run's tool result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Claim {
+    /// Inside its short window: the call polling it takes the ending,
+    /// and [`super::Backlog::harvest`] leaves it alone.
+    Window(RunId),
+    /// Past its window: only this run's harvest takes the ending.
+    Run(RunId),
+    /// Its run has ended: the ending is read so the process handle and
+    /// the output files are let go, and it is handed to nobody.
+    Nobody,
 }
 
 /// Whether a halt has reached a run member yet.
