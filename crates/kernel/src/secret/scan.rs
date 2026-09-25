@@ -8,6 +8,7 @@
 use crate::consts_external::{SECRET_SHAPES, SecretCharset};
 use crate::consts_policy::SECRET_ENTROPY_MIN;
 
+use super::hex_run::is_labelled_hex_secret;
 use super::span::SecretSpan;
 
 fn charset_admits(charset: SecretCharset, byte: u8) -> bool {
@@ -74,7 +75,7 @@ fn log2_q10(x: u64) -> u64 {
 /// Shannon entropy per char in millibits (1/1000 bit). Saturation can
 /// only over-approximate, which errs toward detection — the recoverable
 /// direction (entrance replaces, never refuses).
-fn entropy_millibits_per_char(bytes: &[u8]) -> u64 {
+pub(super) fn entropy_millibits_per_char(bytes: &[u8]) -> u64 {
     let Ok(n) = u64::try_from(bytes.len()) else {
         return 0; // unreachable on real targets; zero reads as low entropy
     };
@@ -174,8 +175,10 @@ pub fn scan(bytes: &[u8]) -> Vec<SecretSpan> {
         let len = end.saturating_sub(at);
         if len >= ENTROPY_SPAN_MIN_BYTES
             && !hits.iter().any(|h| overlaps(h, at, len))
-            && bytes.get(at..end).is_some_and(mixed_alphabet)
-            && bytes.get(at..end).is_some_and(entropy_passes)
+            && (bytes
+                .get(at..end)
+                .is_some_and(|run| mixed_alphabet(run) && entropy_passes(run))
+                || is_labelled_hex_secret(bytes, at, end))
         {
             hits.push(SecretSpan {
                 start: at,
