@@ -44,6 +44,7 @@ pub fn sample(door: DoorId) -> Result<GateOutcome, DoorId> {
         DoorId::Spawn => spawn_sample(),
         DoorId::Undoable => undoable_sample(),
         DoorId::Attach => attach_sample(),
+        DoorId::Command => command_sample(),
     };
     answered.ok_or(door)
 }
@@ -100,6 +101,11 @@ fn egress_host_sample() -> Option<GateOutcome> {
     ))
 }
 
+fn command_sample() -> Option<GateOutcome> {
+    let tainted = TaintSet::of(TaintSource::new("web:evil")?);
+    outcome_of(super::command(&tainted))
+}
+
 fn discard_sample() -> Option<GateOutcome> {
     let unplanned = DiscardRequest::Unplanned {
         paths: vec![Address::parse("b/x.md").ok()?],
@@ -150,6 +156,10 @@ pub fn taint_readers() -> BTreeMap<DoorId, bool> {
     let mut readers = BTreeMap::new();
     readers.insert(DoorId::Undoable, undoable_taint_denies(&tainted));
     readers.insert(DoorId::Discard, discard_taint_denies(&tainted));
+    readers.insert(
+        DoorId::Command,
+        matches!(super::command(&tainted), GateOutcome::Deny { .. }),
+    );
     readers
 }
 

@@ -146,9 +146,18 @@ impl RunWorker {
             .for_job(addr.clone(), job_locator.clone());
         // Work that outside content started carries that into every door
         // the bench asks, and the command door refuses it outright (C15).
-        if at.tainted
-            && let Some(outside) = kernel::TaintSource::new("outside")
-        {
+        // A tainted run that cannot name its source stops here, so it
+        // never reaches the bench with an empty set that every door
+        // would let through.
+        if at.tainted {
+            let outside = kernel::TaintSource::new("outside").ok_or_else(|| {
+                AxError::failure(
+                    kernel::AxCode::ConfigInvalid,
+                    "label the taint of a tainted run",
+                    "the taint source label is empty",
+                )
+                .with_recovery("give the taint source a non-empty label")
+            })?;
             *bench.taint_mut() = kernel::TaintSet::of(outside);
         }
         // One registration feeds both. The catalogue is what the model

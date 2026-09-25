@@ -1365,8 +1365,8 @@ pub fn attach(endpoint: Option<&EgressTarget>) -> GateOutcome;        // 唯一�
 pub fn host_of(url: &str) -> Result<Option<String>, AxError>;         // url 里的主机，全库一份
 pub fn target_of(host: &str) -> EgressTarget;                         // Loopback／Private／Public 的唯一判定
 
-pub enum DoorId { Domain, Reach, Egress, EgressHost, Discard, Spawn, Undoable, Attach }
-pub const DOORS: [DoorId; 8];
+pub enum DoorId { Domain, Reach, Egress, EgressHost, Discard, Spawn, Undoable, Attach, Command }
+pub const DOORS: [DoorId; 9];
 impl DoorId { pub fn as_str(self) -> &'static str; }
 #[cfg(feature = "conformance")]
 pub mod conformance {
