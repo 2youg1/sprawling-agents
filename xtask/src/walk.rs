@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
 
-/// Directories a gate never walks into: version control, and the build
-/// output of the three toolchains this tree can contain.
+/// Directories a gate never walks into: the build output of the
+/// toolchains this tree can contain.
 ///
 /// **A gate testifies about committed objects**, and a build directory
 /// holds none - `.gitignore` names every one of these. `.lake` is on the
@@ -27,7 +27,16 @@ use crate::report::XtaskError;
 /// four names cost four tokens and a parser costs a parser - but that is
 /// the parameter: **the day this list needs a fifth entry that is not a
 /// build directory, read the ignore file instead of adding a row.**
-const SKIP_DIRS: [&str; 5] = [".git", "target", "node_modules", ".lake", ".svelte-check"];
+const SKIP_DIRS: [&str; 4] = ["target", "node_modules", ".lake", ".svelte-check"];
+
+/// Version control's own entry. It is never walked, whether a directory or
+/// the pointer file a worktree or submodule carries (which names an
+/// absolute path on one machine), and a directory below the root that
+/// holds one is another checkout - `git worktree add` into `.pi/worktrees/`
+/// for example - so none of it is this tree's committed objects. The rule
+/// is structural rather than a row in [`SKIP_DIRS`], so it holds wherever a
+/// tool puts its checkouts (xtask-SPEC.md, "the scan surface").
+const GIT: &str = ".git";
 
 /// All regular files under `root`, sorted by their relative forward-slash path.
 pub(crate) fn files(root: &Path) -> Result<Vec<PathBuf>, XtaskError> {
@@ -104,13 +113,24 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), XtaskError> {
         })?;
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
+        if name == GIT {
+            continue;
+        }
         if !path.is_dir() {
             out.push(path);
-        } else if !SKIP_DIRS.contains(&name.as_str()) {
+        } else if !SKIP_DIRS.contains(&name.as_str()) && !is_checkout(&path)? {
             collect(&path, out)?;
         }
     }
     Ok(())
+}
+
+fn is_checkout(dir: &Path) -> Result<bool, XtaskError> {
+    let marker = dir.join(GIT);
+    marker.try_exists().map_err(|source| XtaskError::Io {
+        path: marker.to_string_lossy().into_owned(),
+        source,
+    })
 }
 
 /// Read a file as (lossy) UTF-8; gates judge text, they never panic on bytes.
@@ -132,6 +152,34 @@ mod tests {
         let root = Path::new("C:\\repo");
         let file = Path::new("C:\\repo\\crates\\kernel\\src\\lib.rs");
         assert_eq!(rel(root, file), "crates/kernel/src/lib.rs");
+    }
+
+    /// A checkout made by `git worktree add` inside the tree - its `.git` is
+    /// a pointer file naming an absolute path - is another tree, and the
+    /// root's own `.git` pointer is not a committed object either.
+    #[test]
+    fn nested_worktrees_and_git_pointer_files_are_not_walked() {
+        let root = std::env::temp_dir().join(format!("walk-worktree-{}", std::process::id()));
+        let nested = root.join(".pi/worktrees/pkg");
+        std::fs::create_dir_all(nested.join("src")).unwrap();
+        std::fs::write(root.join(".git"), "gitdir: C:/elsewhere/.git/worktrees/x\n").unwrap();
+        std::fs::write(root.join("kept.rs"), "").unwrap();
+        std::fs::write(root.join(".pi/settings.json"), "{}").unwrap();
+        std::fs::write(
+            nested.join(".git"),
+            "gitdir: C:/elsewhere/.git/worktrees/pkg\n",
+        )
+        .unwrap();
+        std::fs::write(nested.join("src/lib.rs"), "").unwrap();
+
+        let walked: Vec<String> = files(&root)
+            .unwrap()
+            .iter()
+            .map(|p| rel(&root, p))
+            .collect();
+        std::fs::remove_dir_all(&root).unwrap();
+
+        assert_eq!(walked, [".pi/settings.json", "kept.rs"]);
     }
 
     #[test]
