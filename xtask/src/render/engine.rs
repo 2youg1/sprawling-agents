@@ -30,7 +30,7 @@ const FORCED_COLOURS: &str = "--force-high-contrast";
 
 /// How long the engine is given to reach the moment the probe measures
 /// at, in the same virtual time the probe's own wait is counted in.
-const BUDGET_MS: u32 = 8000;
+pub(super) const BUDGET_MS: u32 = 8000;
 
 /// The engine to render with, in the three tiers section 8-13 fixes.
 ///
@@ -175,7 +175,7 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
     if let Some(thrown) = sink(&dom, FAILED).filter(|said| !said.trim().is_empty()) {
         return Err(XtaskError::Cmd {
             cmd: format!("{} --dump-dom {route}", browser.display()),
-            msg: format!("the page threw before it drew anything: {thrown}"),
+            msg: format!("the page failed before the probe could measure it: {thrown}"),
         });
     }
     let (Some(records), Some(conditions), Some(words)) = (
