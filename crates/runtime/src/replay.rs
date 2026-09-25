@@ -14,6 +14,7 @@
 //! typed parse but still count in the chain — the chain covers raw bytes,
 //! not meanings.
 
+use std::borrow::Cow;
 use std::path::Path;
 
 use kernel::ledger::chain_hash;
@@ -22,6 +23,7 @@ use kernel::{
     consts_external::EVENT_LOG_V,
 };
 use serde::Deserialize;
+use serde::de::IntoDeserializer;
 
 /// One verified line: a typed record with its ref echo, or an explicitly
 /// ignorable line from a future vocabulary.
@@ -59,11 +61,12 @@ impl VerifiedLedger {
 /// kind before committing to a typed parse. Unknown extra fields pass —
 /// this shape must read lines from the future.
 #[derive(Deserialize)]
-struct Envelope {
+struct Envelope<'a> {
     v: u32,
     seq: Seq,
     prev: B3Hash,
-    kind: String,
+    #[serde(borrow)]
+    kind: Cow<'a, str>,
     #[serde(default)]
     ig: bool,
 }
@@ -117,10 +120,11 @@ pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError> {
             ));
         }
 
-        let known_kind: Option<EventKind> =
-            serde_json::from_value(serde_json::Value::String(envelope.kind.clone())).ok();
+        let known_kind = EventKind::deserialize(
+            IntoDeserializer::<serde::de::value::Error>::into_deserializer(envelope.kind.as_ref()),
+        );
         match known_kind {
-            Some(_) => {
+            Ok(_) => {
                 let record = EventRecord::parse_line(raw)
                     .map_err(|e| corrupt(line_no, format!("typed parse failed: {e}")))?;
                 let echo = record.canonical_line()?;
@@ -133,10 +137,10 @@ pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError> {
                     echo: minted,
                 });
             }
-            None if envelope.ig => {
+            Err(_) if envelope.ig => {
                 verified.push(VerifiedLine::IgnoredUnknown { seq: envelope.seq });
             }
-            None => {
+            Err(_) => {
                 return Err(AxError::failure(
                     AxCode::LogVersionUnsupported,
                     "verify ledger",
@@ -191,7 +195,7 @@ pub fn rebuild_prefix(
                 "payload has no segments",
             )
             .with_recovery(
-                "replay a run whose `prompt_composed` line carries `segments`; a \
+                "replay a run whose `prompt_assembled` line carries `segments`; a \
                  hand-written line cannot be rebuilt",
             )
         })?;

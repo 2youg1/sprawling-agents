@@ -202,7 +202,10 @@ fn a_payload_without_segments_names_the_event_that_carries_them() {
     )
     .with_recovery(format!(
         "replay a run whose `{}` line carries `segments`; a hand-written line cannot be rebuilt",
-        serde_json::to_value(EventKind::PromptAssembled).unwrap().as_str().unwrap()
+        serde_json::to_value(EventKind::PromptAssembled)
+            .unwrap()
+            .as_str()
+            .unwrap()
     ));
     assert_eq!(err, expected);
 }
