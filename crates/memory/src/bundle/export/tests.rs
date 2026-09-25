@@ -281,3 +281,63 @@ fn a_bundle_carrying_git_metadata_is_refused_rather_than_planted() {
         "a refused restore plants nothing"
     );
 }
+
+/// Every commit subject from `HEAD` back, newest first; a directory
+/// that is no repository has no history to list.
+fn log_of(root: &std::path::Path) -> Vec<String> {
+    let Ok(repo) = git2::Repository::open(root) else {
+        return Vec::new();
+    };
+    let mut walk = repo.revwalk().unwrap();
+    walk.push_head().unwrap();
+    walk.map(|oid| {
+        let commit = repo.find_commit(oid.unwrap()).unwrap();
+        format!("{} {:?}", commit.id(), commit.summary())
+    })
+    .collect()
+}
+
+/// The history is part of the city: a restored city that lost its
+/// commits has lost every checkpoint a rollback could reach.
+#[test]
+fn the_git_history_comes_back_commit_for_commit() {
+    let home = tempfile::tempdir().unwrap();
+    city_with(1, home.path());
+    let repo = git2::Repository::init(home.path()).unwrap();
+    let who = git2::Signature::new("owner", "owner@city", &git2::Time::new(1, 0)).unwrap();
+    let mut parents = Vec::new();
+    for (step, file) in ["City.md", "lab/Roadmap.md"].into_iter().enumerate() {
+        let mut index = repo.index().unwrap();
+        index.add_path(std::path::Path::new(file)).unwrap();
+        let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+        let parent_refs: Vec<&git2::Commit<'_>> = parents.iter().collect();
+        let id = repo
+            .commit(
+                Some("HEAD"),
+                &who,
+                &who,
+                &format!("step {step}"),
+                &tree,
+                &parent_refs,
+            )
+            .unwrap();
+        parents = vec![repo.find_commit(id).unwrap()];
+    }
+    let before = log_of(home.path());
+    assert_eq!(before.len(), 2);
+
+    let carried = tempfile::tempdir().unwrap();
+    Bundle::export(home.path(), carried.path()).unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    Bundle::restore(carried.path(), elsewhere.path()).unwrap();
+
+    assert_eq!(log_of(elsewhere.path()), before);
+    assert!(
+        !elsewhere
+            .path()
+            .join(".git")
+            .join("hooks")
+            .join("post-checkout")
+            .exists()
+    );
+}
