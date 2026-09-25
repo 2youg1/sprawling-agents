@@ -167,6 +167,8 @@ pub memory::MemoryError::Io
 pub memory::MemoryError::Io::op: &'static str
 pub memory::MemoryError::Io::path: std::path::PathBuf
 pub memory::MemoryError::Io::source: core::io::error::Error
+pub memory::MemoryError::LedgerHeld
+pub memory::MemoryError::LedgerHeld::dir: std::path::PathBuf
 pub memory::MemoryError::MergeStale
 pub memory::MemoryError::MergeStale::detail: alloc::string::String
 pub memory::MemoryError::MergeStale::name: alloc::string::String

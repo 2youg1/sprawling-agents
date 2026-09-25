@@ -7,7 +7,9 @@ impl sprawling::doctor::Platform
 impl sprawling::home::Home
 impl sprawling::serving::Journal
 impl sprawling::serving::Keyed
-pub async fn sprawling::serving::serve(sprawling::serving::Serving) -> core::result::Result<(), kernel::error::shape::AxError>
+impl sprawling::serving::Listening
+pub async fn sprawling::serving::Listening::serve(self) -> core::result::Result<(), kernel::error::shape::AxError>
+pub async fn sprawling::serving::listen(sprawling::serving::Serving) -> core::result::Result<sprawling::serving::Listening, kernel::error::shape::AxError>
 pub enum sprawling::assembly::Adopt
 pub enum sprawling::doctor::Platform
 pub enum sprawling::firstrun::BesideBinary
@@ -92,4 +94,5 @@ pub struct sprawling::assembly::ScanReport
 pub struct sprawling::console::Terminal
 pub struct sprawling::home::Home
 pub struct sprawling::serving::Journal
+pub struct sprawling::serving::Listening
 pub struct sprawling::serving::Serving
