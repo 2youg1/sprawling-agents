@@ -1360,6 +1360,7 @@ pub fn spawn(parent: Depth, kind: &DelegateKind) -> GateOutcome;      // E_DELEG
 pub struct ConnectorCall<'a> { pub label: &'a ServerLabel, pub tool: &'a ToolName }
 pub fn reaches_the_undoable(call: &ConnectorCall<'_>) -> bool;
 pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &TaintSet) -> GateOutcome;
+pub fn command(taint: &TaintSet) -> GateOutcome;                     // exec 的门：非空 taint 恒 Deny
 pub fn attach(endpoint: Option<&EgressTarget>) -> GateOutcome;        // 唯一会 Ask 的门
 pub fn host_of(url: &str) -> Result<Option<String>, AxError>;         // url 里的主机，全库一份
 pub fn target_of(host: &str) -> EgressTarget;                         // Loopback／Private／Public 的唯一判定
@@ -1387,7 +1388,7 @@ pub mod conformance {
 
 - **门是数据面（F-17／L-03）**：`DOORS` 是门册，refusal 矩阵遍历它而不是一道一道点名；`deny_sample` 对 `DoorId` 穷尽匹配，于是新增一道门而不给样本编译不过。样本调用真门，矩阵判的是一个 run 会收到的那条拒绝。
 - **gate 是全库唯一 gate 码生产者**：每一道门的 Deny 恒经 `AxError::refusal`（三段必填）；Domain 门 nearby＝domain 前缀表；Undoable 门 nearby＝该楼层信任的连接器表；Discard 门 alternative 恒可执行；Egress 门 subject 只写位置与跨度数，恒不回显命中字节。
-- **Taint 有真判决（S-05／C15）**：`gate::undoable` 对非空 taint 恒 Deny（`E_TAINTED_ACTION`），信任与否都拦——楼层信任的是连接器，不是一张网页借它按下的键；`gate::discard` 对非空 taint 恒 Deny。`conformance::taint_readers` 是这条不变量的机器面，单测断言它每一项为真，于是「taint 只往拒绝文案里加一句」这种恒假分支回不来。
+- **Taint 有真判决（S-05／C15）**：`gate::undoable` 对非空 taint 恒 Deny（`E_TAINTED_ACTION`），信任与否都拦——楼层信任的是连接器，不是一张网页借它按下的键；`gate::discard` 对非空 taint 恒 Deny；`gate::command` 对非空 taint 恒 Deny——外来内容启动的 run 不跑命令，因为一条命令能做的事没有哪道门能逐项预判，而 Ask 会把一张网页写下的命令原样递给人去按「准」。`conformance::taint_readers` 是这条不变量的机器面，单测断言它每一项为真，于是「taint 只往拒绝文案里加一句」这种恒假分支回不来。
 - **首次公网出网**：`egress` 对 Public 且 `!prior_public_egress` 置 `first_public_egress`；NetNotice 挂信封属 pipeline（S3）。Loopback/Private 恒不触发。
 - kani：门组合 fail-closed——reserved 目标恒不 Allow；spans 非空恒 Deny；Unplanned Discard 恒不 Allow；Delegated 再派生恒不 Allow；tainted 的 desktop 调用恒不 Allow。
 
@@ -1529,7 +1530,7 @@ S2 激活的码（逐码答「能否定义掉」）：
 
 - `E_OUTSIDE_WRITE_DOMAIN`：不可——写目标是运行期输入，类型只能封构造后非法，封不住越域目标。
 - `E_GATE_DENIED`：不可——Undoable 门与 Egress 主机门用它；其余门各有专码。
-- `E_TAINTED_ACTION`：不可——被 taint 拒掉的动作需要自述来路的码。生产者是 `gate::undoable` 与 `gate::discard`，两处都对非空 taint 恒 Deny。
+- `E_TAINTED_ACTION`：不可——被 taint 拒掉的动作需要自述来路的码。生产者是 `gate::undoable`、`gate::discard` 与 `gate::command`，三处都对非空 taint 恒 Deny。
 - `E_BUDGET_EXHAUSTED`：不可——耗尽是审批不是错误，但模型需要可机读的码知道自己停在哪。
 - `E_LOOP_SUSPECTED`：不可——停滞是观测事实；定义掉它等于假定模型不会循环。
 - `E_GOAL_CONFLICT`／`E_REPAIR_BUSY`：不可——同资源相斥与修复串行化是机制存在理由；Queued/Conflict 是合法结局，码只在回传面携信息。

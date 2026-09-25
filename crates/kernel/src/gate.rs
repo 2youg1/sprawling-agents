@@ -30,6 +30,7 @@
 use crate::error::AxError;
 
 mod attach;
+mod command;
 mod discard;
 mod domain;
 mod egress;
@@ -37,6 +38,7 @@ mod spawn;
 mod undoable;
 
 pub use attach::attach;
+pub use command::command;
 pub use discard::discard;
 pub use domain::{domain, reach};
 pub use egress::{

@@ -262,3 +262,47 @@ fn a_documents_bench_lets_its_own_room_through_the_door() {
     }
     assert!(tmp.path().join("hall/note.md").is_file());
 }
+
+#[test]
+fn a_run_started_by_outside_content_is_refused_exec() {
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(tmp.path().join("work")).unwrap();
+    let domain = WriteDomain::new(vec![Address::parse("work").unwrap()]).unwrap();
+    let mut bench = ToolBench::new(domain);
+    bench
+        .register(Box::new(
+            ExecTool::new(
+                crate::tools::ExecSetup {
+                    workdir: tmp.path().to_path_buf(),
+                    mounts: Vec::new(),
+                    python_wasm: None,
+                    shell: None,
+                    fuel: Fuel(1000),
+                    env_passthrough: Vec::new(),
+                    domain: Address::parse("work").unwrap(),
+                    run: RunId::from_bytes([1u8; 16]),
+                },
+                Box::new(EchoSandbox::new()),
+                crate::Backlog::new(),
+            )
+            .unwrap(),
+        ))
+        .unwrap();
+    *bench.taint_mut() = TaintSet::of(kernel::TaintSource::new("web:evil").unwrap());
+    let mut args = Map::new();
+    args.insert(
+        "arm".to_owned(),
+        serde_json::json!({ "shell": { "text": "echo hi" } }),
+    );
+    let call = ToolCall {
+        id: "e1".to_owned(),
+        name: kernel::ToolName::parse("exec").unwrap(),
+        args: Payload::new(args).unwrap(),
+    };
+    match bench.invoke(&call, &key(10), now()) {
+        Ok(BenchOutcome::Refused { refusal }) => {
+            assert_eq!(*refusal.code(), AxCode::TaintedAction);
+        }
+        other => panic!("expected the tainted exec to be refused, got {other:?}"),
+    }
+}
