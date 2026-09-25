@@ -174,6 +174,24 @@ mod tests {
         assert!(!reading.counter.is_empty());
     }
 
+    /// The three counters answer three questions, so a report that
+    /// prints one number cannot say which of them it answered: private
+    /// is what an extra session costs, peak private is what a startup
+    /// spike cost, and the working set carries shared image pages the
+    /// system trims at will.
+    #[test]
+    fn a_reading_names_private_peak_private_and_the_working_set_apart() {
+        let pid = std::process::id().to_string();
+        let text = run(Path::new("."), Some(&pid)).unwrap();
+        for counter in ["private", "peak private", "working set"] {
+            assert!(
+                text.lines()
+                    .any(|line| line.trim_start().starts_with(counter)),
+                "the report has a `{counter}` line: {text}"
+            );
+        }
+    }
+
     #[test]
     fn the_report_states_the_budget_and_the_verdict() {
         let text = run(Path::new("."), None).unwrap();
