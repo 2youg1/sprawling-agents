@@ -6,7 +6,7 @@
 
 ## 1 定位与边界
 
-- `client/` 在 cargo workspace **之外**，由 bun 驱动；产物落 `target/web-dist/`（`index.html` 在该目录根，其余在 `assets/`），`crates/sprawling/build.rs` 递归嵌入该目录，并以 `index.html` 与 `assets/` 的存在判「完整」。
+- `client/` 在 cargo workspace **之外**，由 bun 驱动；产物落工作区根下的 `target/web-dist/`，不随 `CARGO_TARGET_DIR` 移动（`index.html` 在该目录根，其余在 `assets/`），`crates/sprawling/build.rs` 递归嵌入该目录，并以 `index.html` 与 `assets/` 的存在判「完整」。
 - **两种范式不叠**：Effect 只做一件事——用生成的 `Schema` 读每一帧（`core/frames.ts`）。socket 阶梯、asking、belief 都是纯 TS 状态机加 `svelte/store`，视图只见 Svelte。
 - 运行时依赖恰两个：`svelte`、`effect`。hash 路由手写，不引路由库；不引 UI kit。`xtask npm` 门守这三件事：锁文件与清单逐条同、运行时依赖白名单、许可证清单。
 - Firefox 是第一浏览器：每个屏幕先在 Firefox 里验收。

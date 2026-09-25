@@ -17,8 +17,9 @@ mod wire_client;
 
 use std::process::ExitCode;
 
-// CLIENT_FILES and CLIENT_COMPLETE: the gzipped client bundle the build
-// wrote, and whether it is the whole client or only the page shell.
+// CLIENT_FILES, CLIENT_COMPLETE and CLIENT_BUNDLE_DIR: the gzipped client
+// bundle the build wrote, whether it is the whole client or only the page
+// shell, and where in the workspace the build script read it from.
 include!(concat!(env!("OUT_DIR"), "/client_embed.rs"));
 
 /// Every crate this binary is built from, `name version` per line -

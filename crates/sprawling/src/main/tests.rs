@@ -16,7 +16,7 @@
 
 use super::data::verified_chain;
 use super::router::{COMMANDS, named};
-use super::{CLIENT_COMPLETE, CLIENT_FILES};
+use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 
 /// A verb the binary accepts is on the one screen that lists them. What
 /// `doctor` reads off its own line is judged beside it, in the library.
@@ -92,5 +92,52 @@ fn embedded_client_table_is_present_and_marked() {
                 .any(|f| f.path.starts_with("assets/") && f.path.ends_with(".css")),
             "a complete client carries a stylesheet"
         );
+    }
+}
+
+/// The binary embeds the bundle `just build-web` wrote into the
+/// workspace, wherever cargo puts its own output.
+///
+/// With `CARGO_TARGET_DIR` pointing outside the workspace, the build
+/// script used to look for the bundle there, found nothing, and shipped
+/// the placeholder page beside a real bundle it never read. Under the
+/// default target directory both places coincide, so this test can only
+/// tell the two readings apart where the variable is set.
+#[test]
+fn the_embedded_client_is_the_bundle_the_workspace_built() {
+    let dist = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(CLIENT_BUNDLE_DIR);
+    let mut on_disk = Vec::new();
+    files_under(&dist, &dist, &mut on_disk);
+    on_disk.sort();
+    let built = on_disk.iter().any(|path| path == "index.html")
+        && on_disk.iter().any(|path| path.starts_with("assets/"));
+    let embedded: Vec<String> = CLIENT_FILES
+        .iter()
+        .filter(|_| CLIENT_COMPLETE)
+        .map(|file| file.path.to_owned())
+        .collect();
+    let expected = if built { on_disk } else { Vec::new() };
+    assert_eq!(
+        embedded,
+        expected,
+        "the binary embeds exactly the bundle at {}",
+        dist.display()
+    );
+}
+
+fn files_under(root: &std::path::Path, dir: &std::path::Path, found: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            files_under(root, &path, found);
+        } else {
+            let relative = path.strip_prefix(root).unwrap();
+            found.push(relative.to_string_lossy().replace('\\', "/"));
+        }
     }
 }
