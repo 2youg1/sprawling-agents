@@ -1308,6 +1308,7 @@ impl<T: zeroize::Zeroize> Sealed<T> {
 
 - **`SecretRef` 只有一个构造点**。`secret:<realm>/<name>` 是一段文法，故拼接只在 `SecretRef::new` 里发生一次：`parse` 拆出两段后也交给它，两半因此共用同一个拒词；段允许的字符集（字母、数字、`-`、`_`、`.`）也只写在 `new` 里，名字里的 `/` 由它拒绝而不另立一条规则。`channels` 的录入口、`sprawling` 的签入面与到期表、以及客户端的表单曾各自拼出这段文本再交给 `parse` 读回——一段文法多处拼，改一次就分岔，且拼出来的文本本城可能解析不回来。
 - **扫描两侦测器**：①形状表（SECRET_SHAPES：前缀＋字符集＋长度窗）为主；②熵阈为辅——无前缀命中的 token 段（base62/base64url 字符连段，长度 ≥ `ENTROPY_SPAN_MIN_BYTES=20`，pub(crate) 内部事务）且每字符熵 ≥ `SECRET_ENTROPY_MIN`（3.5 bits/char）。两集合并，重叠段归形状命中（provider 信息更多）。
+- **hex 段是第三侦测器 `secret::hex_run`**：纯 hex 字母表的段过不了②的混合字母表门，而随机 hex 密钥（HMAC key、以 hex 打印的 token）与本城的 blake3 hex64、git hex40 oid 同为均匀分布，**熵读数分不开二者**——只看熵的阈值要么漏掉 hex 密钥，要么把每行 `git log` 与每个 ledger 哈希都报成密钥。故 hex 段只在它是一个凭据名的值时才报：段前紧邻 `<名字>` + 可选空白与引号 + `=` 或 `:` + 可选空白与引号，且名字过 `names_a_credential`；此外段长 ≥ `HEX_SPAN_MIN_BYTES`（32）且每字符熵 ≥ `HEX_ENTROPY_MIN_MILLIBITS`（3100 millibit）。取舍：放弃了「hex 字母表单独一道熵阈、不看标签」——它在长度 40 上要么阈值高到漏报（均值 3.69 bit），要么把全部哈希报出。重开条件：本城的哈希或 oid 改为不以裸 hex 出现在文本里。
 - **熵的整数化**：kernel 禁浮点——香农熵以 millibit（1/1000 bit）计：定点 log2（shift-and-square，10 位小数位，循环界常数）；判式 `mb·den ≥ num·1000`（checked）。kani：任意输入终止、无 panic、无溢出。
 - **Sealed 取 secrecy::SecretBox**（secrecy 0.10.3＋zeroize 1.9.0，钉版 B.7）：drop 即零化；无 Debug/Display/Serialize/Clone；trybuild 反例＝Sealed 值入 EventRecord/format! 编译不过。`PutSecret` 的命令面（S4）直用本类型。
 - 误报是既知常态（入口无损可逆，出口才拒）；`E_SECRET_EGRESS` 的 subject 恒不回显命中字节（塑形在 gate::egress）。
@@ -1627,6 +1628,7 @@ Stage 2 追加：
 - **`SUBAGENT_CTX_LOCK_DEFAULT = Tokens(65_536)`**（本 SPEC 定值，携证据）：主流上下文窗口 128k–200k token；Ephemeral 适用面（一次检索/摘要/跑测）按 20 回合×每回合约 3k token 上界估 60k；取 2^16 使锁高于任务上界、低于最小主流窗口之半——内耗循环在母窗口三分之一处被机械截断，正常任务不受掤。待 EVAL（P3）重估。
 - `AUTONOMY_DEFAULT = Autonomy::Owner`、`CLOCK_STAMP_DEFAULT = ClockStampGranularity::Off`（直写，随类型落位）。
 - 定点 log2 小数位数 10（熵判定内部事务）；`ENTROPY_SPAN_MIN_BYTES = 20`（熵侦测器最短跨度：主流 API key 最短约 20 字符；pub(crate)，改动随本 SPEC）。
+- `HEX_SPAN_MIN_BYTES = 32`、`HEX_ENTROPY_MIN_MILLIBITS = 3100`（hex 侦测器，pub(crate)，改动随本 SPEC）。证据：以固定种子的 splitmix 生成每档长度各 1000 个随机小写 hex 样本，以产品的 `entropy_millibits_per_char` 读数（最小／均值／最大，millibit）：28 字符 2952／3553／3922；32 字符 3144／3610／3929；40 字符 3307／3691／3933；48 字符 3404／3751／3933；64 字符 3544／3819／3970。32 是常见密钥最短的 128 bit；3100 让 32 字符及以上的全部样本通过，又高于 8 个符号均匀出现的 3000（如 `0f1e2d3c` 重复），把有规律的 hex 挡在外面。
 - Roadmap 状态五值与 Memo 六字段的中文拼写：P2 spine_files 模板落盘时复审是否双语。
 
 ## 15 影响面
