@@ -387,7 +387,7 @@ impl Backlog {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "test code")]
 mod tests;
 
 mod member;
