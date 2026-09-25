@@ -344,8 +344,8 @@ pub fn runtime::backlog::Backlog::leave(&self, runtime::backlog::BacklogId) -> c
 pub fn runtime::backlog::Backlog::leave(&self, runtime::backlog::BacklogId) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::new() -> runtime::backlog::Backlog
 pub fn runtime::backlog::Backlog::new() -> runtime::backlog::Backlog
-pub fn runtime::backlog::Backlog::release(&self, kernel::event::identity::RunId) -> core::result::Result<usize, kernel::error::shape::AxError>
-pub fn runtime::backlog::Backlog::release(&self, kernel::event::identity::RunId) -> core::result::Result<usize, kernel::error::shape::AxError>
+pub fn runtime::backlog::Backlog::release(&self, kernel::event::identity::RunId) -> usize
+pub fn runtime::backlog::Backlog::release(&self, kernel::event::identity::RunId) -> usize
 pub fn runtime::backlog::Backlog::run(&self, kernel::event::identity::RunId, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::Started, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::run(&self, kernel::event::identity::RunId, &kernel::address::Address, alloc::string::String, std::process::Command) -> core::result::Result<runtime::Started, kernel::error::shape::AxError>
 pub fn runtime::backlog::Backlog::standing(&self, &kernel::address::Address) -> core::result::Result<alloc::vec::Vec<runtime::Standing>, kernel::error::shape::AxError>

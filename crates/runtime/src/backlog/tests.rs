@@ -82,7 +82,7 @@ fn a_release_reaches_a_table_a_dead_thread_left_locked() {
     })
     .join();
     assert!(died.is_err() && backlog.table.is_poisoned());
-    assert_eq!(backlog.release(ended).ok(), Some(1));
+    assert_eq!(backlog.release(ended), 1);
 }
 
 /// A run's end terminates what it left running: nothing can read its
@@ -96,7 +96,7 @@ fn a_release_terminates_what_the_ended_run_left_running() {
         kernel::RunId::from_bytes([2; 16]),
     );
     a_background_command(&backlog, ended, 60);
-    backlog.release(ended).unwrap();
+    backlog.release(ended);
     let addr = kernel::Address::parse("vault/room1").unwrap();
     for _ in 0..250 {
         assert!(backlog.harvest(other).unwrap().is_empty());
