@@ -121,6 +121,19 @@ fn is_reviewed_identifier(found: &[u8]) -> bool {
         .any(|known| known.as_bytes() == found)
 }
 
+/// Whether these bytes are one whole PascalCase name, such as a Win32
+/// API field: capitalised lowercase words, then optional trailing digits.
+/// A base64 or hex key breaks that shape within a few bytes.
+fn is_pascal_case_identifier(found: &[u8]) -> bool {
+    found.first().is_some_and(u8::is_ascii_uppercase)
+        && !found.last().is_some_and(u8::is_ascii_uppercase)
+        && found.iter().all(u8::is_ascii_alphanumeric)
+        && found.iter().zip(found.iter().skip(1)).all(|(a, b)| {
+            !(a.is_ascii_uppercase() && !b.is_ascii_lowercase())
+                && !(a.is_ascii_digit() && !b.is_ascii_digit())
+        })
+}
+
 /// Lockfiles: a package manager writes every byte from a manifest and a
 /// registry, and the `sha512-`/`sha256-` runs in them are integrity
 /// digests of published artifacts, meant for anybody to read. A hand
@@ -193,7 +206,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             let end = span.start.saturating_add(span.len);
             if bytes
                 .get(span.start..end)
-                .is_some_and(is_reviewed_identifier)
+                .is_some_and(|t| is_reviewed_identifier(t) || is_pascal_case_identifier(t))
             {
                 continue;
             }
@@ -340,6 +353,27 @@ mod tests {
         );
         assert!(found[0].location.starts_with(kernel::RESERVED_PREFIX));
         assert!(found[0].alternative.contains("Custodian"));
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_pascal_case_identifier_is_not_reported_and_a_key_still_is() {
+        let root = std::env::temp_dir().join(format!("secret-pascal-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let provider = ["sk-", "ant-", &"a1B2c3D4e5".repeat(9)].concat();
+        for (rel, body) in [
+            ("src/mem.rs", "\"PeakPagedMemorySize64\"".to_owned()),
+            ("src/key.rs", format!("\"{}\"", key_shaped())),
+            ("src/sk.rs", format!("\"{provider}\"")),
+        ] {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, body).unwrap();
+        }
+
+        let found = check(&root).unwrap();
+        let places: Vec<&str> = found.iter().map(|v| v.location.as_str()).collect();
+        assert_eq!(places, ["src/key.rs:byte 1", "src/sk.rs:byte 1"]);
         std::fs::remove_dir_all(&root).unwrap();
     }
 
