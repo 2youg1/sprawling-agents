@@ -191,3 +191,18 @@ fn dangling_tool_calls_are_detected_and_repairable() {
     assert_eq!(repaired["data"]["error"]["code"], "E_TOOL_OUTCOME_UNKNOWN");
     assert_eq!(repaired["data"]["tool_use_id"], "call-7");
 }
+
+#[test]
+fn a_payload_without_segments_names_the_event_that_carries_them() {
+    let err = rebuild_prefix(&serde_json::json!({}), &|_| None).unwrap_err();
+    let expected = AxError::failure(
+        AxCode::InvalidArgs,
+        "rebuild prefix",
+        "payload has no segments",
+    )
+    .with_recovery(format!(
+        "replay a run whose `{}` line carries `segments`; a hand-written line cannot be rebuilt",
+        serde_json::to_value(EventKind::PromptAssembled).unwrap().as_str().unwrap()
+    ));
+    assert_eq!(err, expected);
+}
