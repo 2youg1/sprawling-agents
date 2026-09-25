@@ -288,10 +288,11 @@ export function openConnection(
   // Drains what arrived since the last paint, in order, as one update.
   function drain(): void {
     scheduled = false;
-    const frames = queue.splice(0, queue.length);
-    for (const frame of frames) {
-      step({ kind: "received", frame });
-    }
+    store.batch(() => {
+      for (const frame of queue.splice(0, queue.length)) {
+        step({ kind: "received", frame });
+      }
+    });
   }
 
   function open(): void {
@@ -315,8 +316,10 @@ export function openConnection(
       // A welcome is folded at once, so the questions the page has been
       // holding go out on the same tick the link comes up.
       if ("welcome" in frame || "refusal" in frame) {
-        drain();
-        step({ kind: "received", frame });
+        store.batch(() => {
+          drain();
+          step({ kind: "received", frame });
+        });
         return;
       }
       queue.push(frame);

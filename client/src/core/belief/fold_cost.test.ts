@@ -16,9 +16,21 @@ const DELTAS = 2_000;
 // `RUNS` runs. A fold that copies the run table is linear in the city,
 // and at this size that is a frame's worth of work per token.
 const BUDGET_US = 20;
+// One animation frame of stream, and what folding it may spend with a
+// subscriber that reads the whole run table, as the views do: a quarter
+// of a 16 ms frame. Telling that subscriber once per delta instead of
+// once per frame is a pass over every run per token.
+const FRAME_DELTAS = 50;
+const FRAMES = 40;
+const FRAME_BUDGET_US = 4000;
 
 function runId(index: number): RunId {
   return RunId.make(`00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`);
+}
+
+function adoptedCity(size: number): CityAnswer {
+  const runs = Array.from({ length: size }, (_, index) => listed(runId(index)));
+  return { active: size, buildings: [], frozen: 0, halted: [], pursuits: [], runs };
 }
 
 function listed(run: RunId): RunSummary {
@@ -36,9 +48,7 @@ function listed(run: RunId): RunSummary {
 describe("fold cost", () => {
   test("one delta folds in constant time however many runs the city holds", () => {
     const store = createBelief(() => 0);
-    const runs = Array.from({ length: RUNS }, (_, index) => listed(runId(index)));
-    const city: CityAnswer = { active: RUNS, buildings: [], frozen: 0, halted: [], pursuits: [], runs };
-    store.adoptCity(city);
+    store.adoptCity(adoptedCity(RUNS));
     const target = runId(RUNS / 2);
     const start = performance.now();
     for (let each = 0; each < DELTAS; each += 1) {
@@ -47,5 +57,32 @@ describe("fold cost", () => {
     const perDeltaUs = ((performance.now() - start) * 1000) / DELTAS;
     expect(get(store.belief).runs[target]?.saying.length).toBe(DELTAS);
     expect(perDeltaUs).toBeLessThanOrEqual(BUDGET_US);
+  });
+
+  // Prints the reading per city size for `xtask/budgets.toml`'s
+  // `client_fold` row, and holds the largest to the frame budget.
+  test("one frame of deltas tells a table-reading subscriber once", () => {
+    const readings = [100, 1_000, RUNS].map((size) => {
+      const store = createBelief(() => 0);
+      let read = 0;
+      const stop = store.belief.subscribe((belief) => {
+        read += Object.keys(belief.runs).length;
+      });
+      store.adoptCity(adoptedCity(size));
+      const target = runId(size / 2);
+      const start = performance.now();
+      for (let frame = 0; frame < FRAMES; frame += 1) {
+        store.batch(() => {
+          for (let each = 0; each < FRAME_DELTAS; each += 1) {
+            store.say({ run: target, increment: { thought: "x" } });
+          }
+        });
+      }
+      const perFrameUs = ((performance.now() - start) * 1000) / FRAMES;
+      stop();
+      console.log(`client_fold R=${String(size)} per-frame-us=${perFrameUs.toFixed(1)} read=${String(read)}`);
+      return perFrameUs;
+    });
+    expect(readings.at(-1)).toBeLessThanOrEqual(FRAME_BUDGET_US);
   });
 });

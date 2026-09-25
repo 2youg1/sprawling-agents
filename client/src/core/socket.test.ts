@@ -7,6 +7,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
 
 import { openConnection } from "./socket";
+import { WIRE_HASH, WIRE_V } from "../wire";
 
 // One fake socket per `new WebSocket(...)`, kept so a test can deliver
 // a frame and read whether the browser half closed it.
@@ -106,5 +107,36 @@ describe("the browser half", () => {
     expect(booked).toHaveLength(1);
     booked[0]?.run();
     expect(FakeSocket.opened).toHaveLength(2);
+  });
+
+  // The header's promise: what arrived between two paints is one belief
+  // update, so a burst of tokens repaints the page once and not once per
+  // token.
+  test("folds a frame's burst into one belief update", () => {
+    install();
+    const painting: (() => void)[] = [];
+    Object.assign(globalThis, {
+      requestAnimationFrame: (run: () => void): number => painting.push(run),
+    });
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    const first = FakeSocket.opened[0];
+    first?.onopen?.();
+    const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: null, city: null };
+    first?.onmessage?.({ data: JSON.stringify({ welcome }) });
+    let updates = 0;
+    const stop = conn.belief.subscribe(() => {
+      updates += 1;
+    });
+    const run = "00000000-0000-4000-8000-000000000001";
+    for (const said of ["a", "b", "c"]) {
+      first?.onmessage?.({ data: JSON.stringify({ delta: { run, increment: { said } } }) });
+    }
+    for (const paint of painting.splice(0)) paint();
+    stop();
+
+    expect({ updates, saying: get(conn.belief).runs[run]?.saying }).toEqual({
+      updates: 2,
+      saying: "abc",
+    });
   });
 });
