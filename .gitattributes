@@ -1,2 +1,12 @@
-# Bytes as authored: no eol conversion anywhere (V8 asserts byte identity).
-* -text
+# One authority for line endings: the index holds LF for every text file, and
+# every checkout writes LF on every OS, so golden fixtures stay byte-identical
+# across platforms (V8) and an editor that writes CRLF cannot turn a one-line
+# edit into a whole-file conflict — `git add` folds CRLF back to LF.
+* text=auto eol=lf
+
+# cmd.exe mis-parses labels and `goto` in a batch file with LF endings.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary despite text=auto's guess, so no conversion can ever touch them.
+*.woff2 binary
