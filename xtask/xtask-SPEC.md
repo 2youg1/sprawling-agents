@@ -447,8 +447,10 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 
 | 变体 | 产物目录 | 归档名 | 归档里的可执行文件 |
 |---|---|---|---|
-| `Host` | `target/release/` | `sprawling-<version>-<os>-<arch>`（不动） | 向平台表按归档名取（§8-23） |
-| `Triple(t)` | `target/<t>/release/` | `sprawling-<version>-<t>` | 向平台表按归档名取（§8-23） |
+| `Host` | `<target>/release/` | `sprawling-<version>-<os>-<arch>`（不动） | 向平台表按归档名取（§8-23） |
+| `Triple(t)` | `<target>/<t>/release/` | `sprawling-<version>-<t>` | 向平台表按归档名取（§8-23） |
+
+`<target>` 是 cargo 的产物目录：`CARGO_TARGET_DIR` 设了就是它（相对值相对工作区根解析），未设或为空时是 `<root>/target`。由 `package::cargo_target_dir(root, named)` 一处解析，环境变量只在 `release_dir` 里读一次，所以解析规则可以不改进程环境而被测到。写死 `<root>/target` 的读法在产物目录被改到别处时找不到刚建出来的二进制，`just mem`、`just package` 与 `budget` 一起失明。
 
 - **`binary_path` 从 `budget` 迁到 `package`**。「产物住哪里」与「产物叫什么」是同一个事实的两半，分住两个模块就是两个权威；`budget` 反过来向 `package` 要路径，因为它的活是称重而不是定位。
 - **三元组进名字**。不进名字的话，musl 归档会叫 `sprawling-<version>-linux-x86_64.zip`，既不说静态也不说 musl，且**在出现第二份 Linux 产物（gnu）的那一天静默相撞**。既有的两个名字一字不动，故这不是重命名而是给新的一类命名。

@@ -611,7 +611,7 @@ than typed.
 |---|---|---|---|
 | Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->358,360 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->5.9×<!-- xtask:end --> headroom | yes |
 | The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->11,523,584 B<!-- xtask:end -->, client included | yes |
-| Resident memory, one session | ≤<!-- xtask:begin budget_bytes:session_resident -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:session_resident -->4,292,608 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
+| Resident memory, one session | ≤<!-- xtask:begin budget_bytes:resident_empty_idle -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:resident_empty_idle -->2,469,888 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
 | Ledger append plus fsync | p50 ≤5 ms, p99 ≤20 ms | 0.97 ms / 1.61 ms on one NVMe machine | no |
 | Projection rebuild | ≥50,000 records/s | about 493,000 records/s on the same machine | no |
 | Prefix assembly | ≤1 ms | 0.022 ms for 16.5 KB over four slots | no |

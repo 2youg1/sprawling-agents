@@ -316,13 +316,16 @@ status = "gated, with a register of the names spelled before the rule"
 [archive_naming.predating]
 suffixes = ["-linux-x86_64.zip"]
 
-[session_resident]
-what = "one session's resident memory, in this platform's own counter"
+# One row per scenario `just mem` serves. The 3, 100k and 400k-record
+# fixture cities (the ones bench_startup keeps in target/bench-cities)
+# have no row until `just mem --city <dir>` has read each of them.
+[resident_empty_idle]
+what = "a served empty city's private memory, idle past its startup fold, in this platform's own counter"
 budget_bytes = 31457280
-best_bytes = 4292608
+best_bytes = 2469888
 slack_bytes = 2097152
 measured_by = "just mem"
-status = "measured, not gated: the counter differs per platform, so one number cannot mean the same thing on three of them"
+status = "measured, not gated: private 2,469,888 B, peak private 2,469,888 B, working set 8,331,264 B on windows-x86_64, 16 cores, NVMe (release). The counter differs per platform, so one number cannot mean the same thing on three of them"
 
 [kernel_mutation]
 what = "the share of kernel mutants the tests kill"

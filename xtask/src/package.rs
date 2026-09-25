@@ -61,9 +61,17 @@ impl ReleaseTarget {
 
     /// The directory `cargo build --release` puts the binary in.
     fn release_dir(&self, root: &Path) -> PathBuf {
+        self.release_dir_in(&cargo_target_dir(
+            root,
+            std::env::var_os("CARGO_TARGET_DIR"),
+        ))
+    }
+
+    /// Where the release build lands inside a given target directory.
+    fn release_dir_in(&self, target: &Path) -> PathBuf {
         match self {
-            Self::Host => root.join("target").join("release"),
-            Self::Triple(triple) => root.join("target").join(triple).join("release"),
+            Self::Host => target.join("release"),
+            Self::Triple(triple) => target.join(triple).join("release"),
         }
     }
 
@@ -90,6 +98,18 @@ impl ReleaseTarget {
                      that restate it, in one change-set"
                 ),
             })
+    }
+}
+
+/// Cargo's target directory: what `CARGO_TARGET_DIR` names when it is
+/// set, and the workspace's own `target/` otherwise. The variable's value
+/// is a parameter so the rule can be judged without touching the
+/// process environment.
+fn cargo_target_dir(root: &Path, named: Option<std::ffi::OsString>) -> PathBuf {
+    match named.map(PathBuf::from) {
+        Some(stated) if stated.as_os_str().is_empty() => root.join("target"),
+        Some(stated) => root.join(stated),
+        None => root.join("target"),
     }
 }
 
@@ -228,7 +248,7 @@ pub(crate) fn workspace_version(root: &Path) -> Result<String, XtaskError> {
 )]
 mod tests {
     use super::contents::Entry;
-    use super::{ReleaseTarget, binary_path, write_archive};
+    use super::{ReleaseTarget, cargo_target_dir, write_archive};
 
     fn entry(name: &str, source: std::path::PathBuf) -> Entry {
         Entry {
@@ -250,24 +270,45 @@ mod tests {
         assert_eq!(musl.label(), "x86_64-unknown-linux-musl");
     }
 
-    /// A `--target` build lands under `target/<triple>/release`, and the
-    /// packager must look there rather than at the host's directory.
+    /// A `--target` build lands under `<target>/<triple>/release`, and
+    /// the packager must look there rather than at the host's directory.
     #[test]
     fn a_target_build_is_looked_for_under_its_own_triple() {
-        let root = std::env::temp_dir().join(format!("sprawling-triple-{}", std::process::id()));
+        let target = std::env::temp_dir().join("sprawling-triple");
         let triple = "x86_64-unknown-linux-musl";
-        let dir = root.join("target").join(triple).join("release");
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("sprawling"), b"binary").unwrap();
-
-        let target = ReleaseTarget::Triple(triple.to_owned());
-        assert_eq!(binary_path(&root, &target), Some(dir.join("sprawling")));
+        let dirs = [
+            ReleaseTarget::Triple(triple.to_owned()),
+            ReleaseTarget::Host,
+        ]
+        .map(|build| build.release_dir_in(&target));
         assert_eq!(
-            binary_path(&root, &ReleaseTarget::Host),
-            None,
-            "the host directory holds nothing and must not answer for the triple"
+            dirs,
+            [target.join(triple).join("release"), target.join("release")]
         );
-        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// A redirected target directory is where the release build landed;
+    /// `just mem` and `just package` go blind when it is ignored.
+    #[test]
+    fn the_target_dir_is_the_one_cargo_target_dir_names() {
+        let root = std::env::temp_dir().join("sprawling-root");
+        let lane = std::env::temp_dir().join("sprawling-lane");
+        let resolved = [
+            Some(lane.clone().into_os_string()),
+            Some("lane".into()),
+            Some("".into()),
+            None,
+        ]
+        .map(|named| cargo_target_dir(&root, named));
+        assert_eq!(
+            resolved,
+            [
+                lane,
+                root.join("lane"),
+                root.join("target"),
+                root.join("target")
+            ]
+        );
     }
 
     /// What the archive calls the executable follows the target it was
