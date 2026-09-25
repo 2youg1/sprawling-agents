@@ -118,6 +118,7 @@ impl Run<Active> {
                 last_turn_t: None,
                 gauge,
                 prior_shape: None,
+                fence: FencePolicy::opening(),
             },
         })
     }
@@ -191,9 +192,8 @@ impl Run<Active> {
 
         // The fence goes up before the wave, not before a suspicious call:
         // anything the wave deletes then has a commit to come back from.
-        if let (Fence::Stage, Some(fence)) =
-            (FencePolicy::for_wave(turn.calls()), hooks.fence.as_mut())
-        {
+        let decided = self.state.fence.for_wave(turn.calls());
+        if let (Fence::Stage, Some(fence)) = (decided, hooks.fence.as_mut()) {
             let committed = fence(t)?;
             ledger.append(EventDraft {
                 run: self.plan.run,
@@ -205,6 +205,8 @@ impl Run<Active> {
                 ig: false,
             })?;
         }
+
+        self.state.fence.record_wave(decided, turn.calls());
 
         let wave = (hooks.interrupt)(SafePoint::BeforeWave { turn: index });
         fold_steer(&mut self.state.window, &wave);
