@@ -189,7 +189,7 @@ impl ToolBench {
     /// the door's own question - `E_APPROVAL_PENDING` with the recovery
     /// sentence naming what only the person can do. A pending question
     /// ends the call, not the turn.
-    fn settled(&self, outcome: GateOutcome) -> Option<BenchOutcome> {
+    pub(super) fn settled(&self, outcome: GateOutcome) -> Option<BenchOutcome> {
         match outcome {
             GateOutcome::Allow => None,
             GateOutcome::Deny { refusal } => Some(BenchOutcome::Refused { refusal }),

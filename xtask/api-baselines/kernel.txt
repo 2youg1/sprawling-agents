@@ -286,7 +286,7 @@ pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
 pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
 pub const kernel::AxCode::ALL: [kernel::AxCode; 37]
 pub const kernel::AxCode::ALL: [kernel::AxCode; 37]
-pub const kernel::DOORS: [kernel::gate::DoorId; 8]
+pub const kernel::DOORS: [kernel::gate::DoorId; 9]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
@@ -348,7 +348,7 @@ pub const kernel::consts_policy::SANDBOX_FUEL_DEFAULT: u64
 pub const kernel::consts_policy::SECRET_ENTROPY_MIN: kernel::consts_policy::Ratio
 pub const kernel::consts_policy::STARTUP_BUDGET_TOKENS: u64
 pub const kernel::consts_policy::WORKTREE_MAX_BYTES: u64
-pub const kernel::gate::DOORS: [kernel::gate::DoorId; 8]
+pub const kernel::gate::DOORS: [kernel::gate::DoorId; 9]
 pub const kernel::idem::IDEM_DERIVE_V: u8
 pub const kernel::layout::ARCHIVE_DIR: &str
 pub const kernel::layout::BUILDING_SHELF: &str
@@ -850,6 +850,7 @@ pub fn kernel::event::record::autonomy_word::spell(&kernel::approval::Autonomy) 
 pub fn kernel::gate::DoorId::as_str(self) -> &'static str
 pub fn kernel::gate::DoorId::as_str(self) -> &'static str
 pub fn kernel::gate::attach(core::option::Option<&kernel::EgressTarget>) -> kernel::gate::GateOutcome
+pub fn kernel::gate::command(&kernel::taint::TaintSet) -> kernel::gate::GateOutcome
 pub fn kernel::gate::discard(&kernel::DiscardRequest, &str) -> kernel::gate::GateOutcome
 pub fn kernel::gate::domain(&kernel::write_domain::WriteDomain, &kernel::address::Address, &kernel::taint::TaintSet) -> kernel::gate::GateOutcome
 pub fn kernel::gate::egress(&[kernel::SecretSpan], &kernel::EgressTarget, bool) -> kernel::EgressOutcome
@@ -1271,6 +1272,7 @@ pub kernel::DomainVerdict::Outside
 pub kernel::DomainVerdict::Outside::prefixes: alloc::vec::Vec<alloc::string::String>
 pub kernel::DomainVerdict::Within
 pub kernel::DoorId::Attach
+pub kernel::DoorId::Command
 pub kernel::DoorId::Discard
 pub kernel::DoorId::Domain
 pub kernel::DoorId::Egress
@@ -2048,6 +2050,7 @@ pub kernel::event::record::ToolResult::tool_use_id: alloc::string::String
 pub kernel::gate::ConnectorCall::label: &'a kernel::tool::ServerLabel
 pub kernel::gate::ConnectorCall::tool: &'a kernel::tool::ToolName
 pub kernel::gate::DoorId::Attach
+pub kernel::gate::DoorId::Command
 pub kernel::gate::DoorId::Discard
 pub kernel::gate::DoorId::Domain
 pub kernel::gate::DoorId::Egress

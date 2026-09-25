@@ -2320,6 +2320,9 @@ fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 **污点随派活走，不随工人走**：`wake` 从前置 `RunWorker.tainted_arrival`、派完再清；
 活进车道之后清旗标的那一刻远在落地之前，被清掉的正是那轮外来活自己的 C15 标记。
 `tainted` 因此成为 `Assignment` 的字段，子活与继任者继承它。
+`lay_out_workbench` 把 `Assignment.tainted` 写进这张桌子的 `TaintSet`（来路记作 `outside`），
+于是桌子问的每一道门都看得见它，`gate::command` 据此拒掉 `exec`（`E_TAINTED_ACTION`）；
+标签造不出来时 run 就停在这里，因为空 `TaintSet` 是每一道门都放行的那一格。
 
 **车道满不是拒绝**：`DrivingPool::full` 是 `pursue` 读的建议值，不是 `start` 的闸；
 人派的活从前就可以超过 `DRIVING_LANES`，城自己起的活同此。超出的部分停在 provider 的 admission 上排队。

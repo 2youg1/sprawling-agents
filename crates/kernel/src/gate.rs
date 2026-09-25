@@ -30,6 +30,7 @@
 use crate::error::AxError;
 
 mod attach;
+mod command;
 mod discard;
 mod domain;
 mod egress;
@@ -37,6 +38,7 @@ mod spawn;
 mod undoable;
 
 pub use attach::attach;
+pub use command::command;
 pub use discard::discard;
 pub use domain::{domain, reach};
 pub use egress::{
@@ -91,10 +93,12 @@ pub enum DoorId {
     /// [`attach`] — may a run drive the browser a person is already
     /// using, with that person's logins.
     Attach,
+    /// [`command`] — may this run start a process.
+    Command,
 }
 
 /// Every door, in the order this module declares them.
-pub const DOORS: [DoorId; 8] = [
+pub const DOORS: [DoorId; 9] = [
     DoorId::Domain,
     DoorId::Reach,
     DoorId::Egress,
@@ -103,6 +107,7 @@ pub const DOORS: [DoorId; 8] = [
     DoorId::Spawn,
     DoorId::Undoable,
     DoorId::Attach,
+    DoorId::Command,
 ];
 
 impl DoorId {
@@ -119,6 +124,7 @@ impl DoorId {
             DoorId::Spawn => "spawn",
             DoorId::Undoable => "undoable",
             DoorId::Attach => "attach",
+            DoorId::Command => "command",
         }
     }
 }
