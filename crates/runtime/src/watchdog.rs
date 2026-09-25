@@ -33,9 +33,9 @@ pub enum Disposal {
     CorrectiveSteer {
         text: String,
     },
-    /// Try the same call again, not before this moment. The moment is
-    /// the provider's own, carried in from `gateway::admission`, and
-    /// the failure travels with it: "backed off" without what it backed
+    /// Try the same call again, not before this moment. The moment
+    /// comes from the backoff schedule [`Watchdog`] owns, and the
+    /// failure travels with it: "backed off" without what it backed
     /// off from is a line nobody can act on, and the run loop used to
     /// write that half of the fact from a second place.
     BackOff {

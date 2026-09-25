@@ -267,9 +267,17 @@ pub fn drive(
                 // repeated silently: the second `model_called` in the
                 // history is what a person reads the retry off.
                 // The watchdog decides whether there is a next call and
-                // not before when; this loop does not yet wait for it.
-                let disposal = watchdog.on_provider_failure(&err, t);
-                if let crate::Disposal::BackOff { .. } = disposal {
+                // not before when. This loop does not yet wait, so the
+                // line records the moment it actually sends again rather
+                // than a schedule the next `model_called` would break.
+                if let crate::Disposal::BackOff { code, subject, .. } =
+                    watchdog.on_provider_failure(&err, t)
+                {
+                    let disposal = crate::Disposal::BackOff {
+                        until: t,
+                        code,
+                        subject,
+                    };
                     ledger.append(EventDraft {
                         run: run.plan.run,
                         t,
