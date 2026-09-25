@@ -210,6 +210,7 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     assert!(err.recovery().contains("not waiting"));
 
     // A worker that restarts reads the same answer out of the ledger.
+    drop(worker);
     let restarted = RunWorker::new(
         dir.path(),
         gateway::Custodian::in_memory(),

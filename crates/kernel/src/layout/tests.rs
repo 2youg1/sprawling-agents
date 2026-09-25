@@ -26,6 +26,8 @@ fn a_nested_address_becomes_one_directory_per_segment() {
 fn the_city_wide_stores_sit_under_the_city_s_reserved_subtree() {
     let governed = Path::new("/city").join(RESERVED_PREFIX);
     assert_eq!(layout().ledger(), governed.join(LEDGER_DIR));
+    // Beside the ledger directory, whose every entry is read as history.
+    assert_eq!(layout().ledger_lock(), governed.join(LEDGER_LOCK_FILE));
     assert_eq!(layout().cas(), governed.join(CAS_DIR));
     assert_eq!(layout().library(), governed.join(LIBRARY_DIR));
 }

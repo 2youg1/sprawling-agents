@@ -31,6 +31,10 @@ use crate::{Address, RESERVED_PREFIX};
 
 /// The append-only history of a city, under the city's reserved subtree.
 pub const LEDGER_DIR: &str = "ledger";
+/// The file whose lock makes one process the writer of a city's Ledger.
+/// Beside the ledger directory rather than inside it, because every entry
+/// inside that directory is read as history (memory-SPEC 8-1).
+pub const LEDGER_LOCK_FILE: &str = "ledger.lock";
 /// The content-addressed object store, under the city's reserved subtree.
 pub const CAS_DIR: &str = "cas";
 /// The city's shelves of skills, under the city's reserved subtree.
@@ -100,6 +104,13 @@ impl CityLayout {
     #[must_use]
     pub fn ledger(&self) -> PathBuf {
         self.governed_root().join(LEDGER_DIR)
+    }
+
+    /// The file the city's one writer holds locked while it writes the
+    /// Ledger.
+    #[must_use]
+    pub fn ledger_lock(&self) -> PathBuf {
+        self.governed_root().join(LEDGER_LOCK_FILE)
     }
 
     /// The whole city's object store.

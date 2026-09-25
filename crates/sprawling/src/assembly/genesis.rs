@@ -177,7 +177,14 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
     // from. Both happen after line zero, because a building is recorded
     // against a city and there is no city before then.
     let (vault, _notice) = open_vault();
-    let mut worker = RunWorker::new(city_root, vault, runtime::diagnostics::Diagnostics::off())?;
+    // The writer that wrote line zero goes on writing: a second one
+    // opened here would be refused the city's writer lock.
+    let mut worker = RunWorker::over(
+        city_root,
+        vault,
+        runtime::diagnostics::Diagnostics::off(),
+        ledger,
+    )?;
     let plan = city::CityPlan::new(None)?;
     let (hall, template) = plan.hall();
     worker.create_building(hall.clone(), template.name())?;

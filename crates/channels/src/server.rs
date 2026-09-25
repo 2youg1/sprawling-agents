@@ -16,9 +16,10 @@
 //! carries the [`Reply`] address of whoever sent it.
 
 mod config;
+mod listener;
 mod reply;
 mod socket;
 
 pub use config::{AcpProgress, AcpSink, ServeConfig, TranscribeSink, router};
+pub use listener::{Bound, bind, serve};
 pub use reply::{Delivered, Reply};
-pub use socket::serve;

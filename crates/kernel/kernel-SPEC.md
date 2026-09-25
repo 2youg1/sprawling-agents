@@ -154,7 +154,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 
 ```rust
                       // C8：对扩展开放
-pub enum AxCode { PathNotFound, /* …37 variant，serde 呈现名见下表 */ }
+pub enum AxCode { PathNotFound, /* …38 variant，serde 呈现名见下表 */ }
 
 pub struct GateRefusal {                // three-part refusal；三段必填
     rule: String, violation: String, alternative: String,

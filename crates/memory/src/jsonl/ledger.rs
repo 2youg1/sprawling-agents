@@ -7,6 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::layout::CityLayout;
 use kernel::{B3Hash, EventRecord, Seq};
 
 use crate::error::{MemoryError, io_err};
@@ -41,6 +42,58 @@ pub struct JsonlLedger {
     pub(crate) sessions: Option<crate::sessions::Sessions>,
     /// The write-path observer, called only after the wave is durable.
     pub(crate) observer: Option<WriteObserver>,
+    /// This process's hold on the city's writer lock. `None` for a
+    /// directory that is not a city's ledger, and on the fault model,
+    /// whose disk no other process can reach.
+    pub(crate) lock: Option<WriterLock>,
+}
+
+/// This process's exclusive hold on a city's Ledger, released when the
+/// ledger that took it is dropped (memory-SPEC 8-1).
+///
+/// The operating system keeps the lock on an open handle and refuses it
+/// to every other handle on the same file, in this process or in
+/// another, which is what makes "a city has one writer" hold across
+/// processes rather than only inside the one that owns the type. The
+/// file is never removed: a lock file deleted on release would let a
+/// latecomer lock a new file of the same name while the earlier holder
+/// still held the old one.
+pub(crate) struct WriterLock {
+    _held: std::fs::File,
+}
+
+impl WriterLock {
+    /// Takes the writer lock of the city whose ledger is `dir`, or
+    /// answers `None` when `dir` is not a city's ledger.
+    ///
+    /// # Errors
+    /// `LedgerHeld` when another handle holds the lock; `Io` when the
+    /// lock file cannot be made or the lock cannot be asked for.
+    pub(crate) fn take(dir: &Path) -> Result<Option<WriterLock>, MemoryError> {
+        let Some(city) = CityLayout::of_ledger(dir) else {
+            return Ok(None);
+        };
+        let path = city.ledger_lock();
+        if let Some(reserved) = path.parent() {
+            std::fs::create_dir_all(reserved)
+                .map_err(io_err("create the reserved subtree", reserved))?;
+        }
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&path)
+            .map_err(io_err("open the ledger lock", &path))?;
+        match file.try_lock() {
+            Ok(()) => Ok(Some(WriterLock { _held: file })),
+            Err(std::fs::TryLockError::WouldBlock) => Err(MemoryError::LedgerHeld {
+                dir: dir.to_path_buf(),
+            }),
+            Err(std::fs::TryLockError::Error(source)) => {
+                Err(io_err("lock the ledger", &path)(source))
+            }
+        }
+    }
 }
 
 /// The write-path observer: what a live reader (the control surface's

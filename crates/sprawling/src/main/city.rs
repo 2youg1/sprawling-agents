@@ -9,9 +9,10 @@
 //! [`serve_city`] is the single definition of what serving means, and
 //! every route into a running city passes through it: refuse a
 //! directory that holds no history, settle the pairing key before
-//! anything binds, choose where the client bundle comes from, print the
-//! banner, build the diagnostics sink, attach the console, and hand one
-//! `serving::Serving` to the runtime. `up`, the first screen and `serve`
+//! anything binds, choose where the client bundle comes from, build the
+//! diagnostics sink, attach the console, hand one `serving::Serving` to
+//! `serving::listen`, and print the banner only once that has taken the
+//! port and the city's writer. `up`, the first screen and `serve`
 //! differ only in what they do before they arrive there and in whether
 //! they open a browser, so none of them re-derives the sequence.
 //!
@@ -240,7 +241,78 @@ pub(super) fn serve_city(
         }
         channels::ClientAssets::Embedded(_) => client_summary(),
     };
+    // The one sink a diagnostic line leaves this process through: the
+    // terminal, and the page that has the log lens open. Made before
+    // the `Diagnostics` because the sink is what writes into it.
+    let journal = serving::Journal::new();
+    let floor = match log_floor(args) {
+        Ok(floor) => floor,
+        Err(unknown) => {
+            eprintln!("not a log level: {unknown}");
+            eprintln!("recovery: {}", log_levels());
+            return ExitCode::from(2);
+        }
+    };
+    let log = match floor {
+        Some(level) => runtime::diagnostics::Diagnostics::new(level, journal.sink()),
+        None => runtime::diagnostics::Diagnostics::off(),
+    };
+    // The terminal this city runs in becomes its console when `up`
+    // started it, or when `serve` was asked. `--no-console` is the way
+    // out for a supervisor that wants the old blocking shape.
+    let wanted = (open == Open::Browser || args.iter().any(|a| a == "--console"))
+        && !args.iter().any(|a| a == "--no-console");
+    let console = wanted.then(|| console::Terminal {
+        url: firstrun::local_url(bind),
+        token: token.clone(),
+        // The three facts the banner below prints. `/serving`
+        // reprints them on demand, because the event stream scrolls
+        // them away within seconds of a city getting busy.
+        city: city.display().to_string(),
+        client: client_line.clone(),
+        bind,
+    });
+    let (vault, vault_notice) = serving::open_vault();
+    // The port and the writer are both taken before a word is printed:
+    // a banner saying "running" over a port another process holds was a
+    // claim the city could not keep (sprawling-SPEC.md 8-83).
+    let listening = match runtime.block_on(serving::listen(serving::Serving {
+        city_root: city.to_path_buf(),
+        addr: bind,
+        token,
+        client,
+        vault,
+        vault_notice,
+        log,
+        journal,
+        console,
+    })) {
+        Ok(listening) => listening,
+        Err(err) => return report(err),
+    };
     let url = firstrun::local_url(bind);
+    print_banner(city, &url, &client_line, &keyed);
+    if let Some(level) = floor {
+        println!("log: {level}");
+    }
+    if wanted {
+        println!("  This terminal is the console. `/help` lists what it takes,");
+        println!("  and `/serving` says where this city listens and what is running in it.");
+        println!();
+    }
+    match open {
+        Open::Browser => firstrun::open_when_ready(bind, url),
+        Open::Nothing => {}
+    }
+    match runtime.block_on(listening.serve()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => report(err),
+    }
+}
+
+/// What a person reads once the city listens: where it is, where to
+/// open it, what client it serves, and the key when one was minted.
+fn print_banner(city: &std::path::Path, url: &str, client_line: &str, keyed: &serving::Keyed) {
     println!();
     println!("  sprawling is running.");
     println!();
@@ -248,7 +320,7 @@ pub(super) fn serve_city(
     println!("    WebUI    {url}");
     println!("    client   {client_line}");
     println!();
-    match &keyed {
+    match keyed {
         serving::Keyed::NothingToPresent => {}
         serving::Keyed::Adopted(_) => {
             println!("    key      the one you configured; this city will ask for it");
@@ -268,65 +340,6 @@ pub(super) fn serve_city(
     }
     println!("  Open the WebUI in a browser. Ctrl-C stops the city.");
     println!();
-    match open {
-        Open::Browser => firstrun::open_when_ready(bind, url),
-        Open::Nothing => {}
-    }
-    // The one sink a diagnostic line leaves this process through: the
-    // terminal, and the page that has the log lens open. Made before
-    // the `Diagnostics` because the sink is what writes into it.
-    let journal = serving::Journal::new();
-    let log = match log_floor(args) {
-        Ok(Some(level)) => {
-            println!("log: {level}");
-            runtime::diagnostics::Diagnostics::new(level, journal.sink())
-        }
-        Ok(None) => runtime::diagnostics::Diagnostics::off(),
-        Err(unknown) => {
-            eprintln!("not a log level: {unknown}");
-            eprintln!("recovery: {}", log_levels());
-            return ExitCode::from(2);
-        }
-    };
-    // The terminal this city runs in becomes its console when `up`
-    // started it, or when `serve` was asked. `--no-console` is the way
-    // out for a supervisor that wants the old blocking shape.
-    let wanted = (open == Open::Browser || args.iter().any(|a| a == "--console"))
-        && !args.iter().any(|a| a == "--no-console");
-    let console = wanted.then(|| console::Terminal {
-        url: firstrun::local_url(bind),
-        token: token.clone(),
-        // The three facts the banner above just printed. `/serving`
-        // reprints them on demand, because the event stream scrolls
-        // them away within seconds of a city getting busy.
-        city: city.display().to_string(),
-        client: client_line.clone(),
-        bind,
-    });
-    if console.is_some() {
-        println!("  This terminal is the console. `/help` lists what it takes,");
-        println!("  and `/serving` says where this city listens and what is running in it.");
-        println!();
-    }
-    let (vault, vault_notice) = serving::open_vault();
-    match runtime.block_on(serving::serve(serving::Serving {
-        city_root: city.to_path_buf(),
-        addr: bind,
-        token,
-        client,
-        vault,
-        vault_notice,
-        log,
-        journal,
-        console,
-    })) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(err) => {
-            eprintln!("{err}");
-            eprintln!("recovery: {}", err.recovery());
-            ExitCode::FAILURE
-        }
-    }
 }
 
 /// The startup scan: verify the chain, close every tool call whose

@@ -152,6 +152,7 @@ impl WriterLock {
 - **只锁城的账本。** `CityLayout::of_ledger(dir)` 答 `None` 的目录（夹具、bench、fuzz）不是城，没有第二个进程会去服务它；sessions 投影用的是同一条界线。`open_faulty` 不取锁：FaultFs 的盘只存在于这个进程里。
 - **同一进程里的第二个句柄同样被拒。** `try_lock` 在 Windows 上是 `LockFileEx`，在 Unix 上是 `flock`，两者都按打开的句柄算，不按进程算。所以「一个进程里开两个 `JsonlLedger`」也被拒，这就是跨进程性质在单进程里可测的形式（`open/tests.rs` 的 `a_second_writer_of_a_city_is_refused_until_the_first_lets_go`）。
 - **锁文件不删。** 放锁时删文件，会留下一个窗口：先到者还持着旧文件上的锁，后到者已经在同名的新文件上拿到了锁。一个空文件不花任何代价。
+- **锁文件不在就建，连同 `.sprawling/`。** 建不了这个文件，或者操作系统答不了这次取锁（答的不是「已被持有」），都是 `Io`→`E_STORAGE_FATAL`，subject 是锁文件的路径：连锁文件都写不了的城，也写不了账本。
 - **被否：把锁放在 `Vfs` 缝上。** 那要给 `FaultFs` 造一个进程模型，而它的盘本来只有一个进程到得了。锁是真实文件系统上的事实，只在生产入口 `open` 上取。
 - **被否：把 PID 写进锁文件。** Windows 上别的进程读不了被锁住的文件，拒词因此报不出 PID；recovery 改为说明怎样停下持锁的那个进程。
 - **重开参数**：出现不经 `JsonlLedger::open` 写账本的生产路径；或者 `std` 的 `try_lock` 改为按进程而不是按句柄判定。

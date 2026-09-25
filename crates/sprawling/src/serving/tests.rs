@@ -97,7 +97,7 @@ fn a_serve_refused_at_the_socket_writes_no_line() {
         .build()
         .expect("a runtime");
 
-    let refused = executor.block_on(super::serve(super::Serving {
+    let refused = executor.block_on(super::listen(super::Serving {
         city_root: city.path().to_path_buf(),
         addr,
         token: None,
