@@ -24,6 +24,11 @@ fn printed(payload: &Payload, action: &'static str) -> Result<String, AxError> {
 }
 
 impl Turn<ToolWave> {
+    /// The calls this wave is about to make, in call order.
+    pub(crate) fn calls(&self) -> &[ToolCall] {
+        &self.state.calls
+    }
+
     /// Boundary 3 (before tool execution). Serial: parallel execution
     /// with serial accounting stays future work; accounting order is the
     /// call order. A tool Err is not a turn Err — it lands in

@@ -1749,3 +1749,16 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 - **`runtime::fork` 同边界重放**：`inherited` 的 `Wave` 持同一个 `Exchange`，在波收齐（或整波丢弃）的同一点 `compact()`——live 折叠与离线重建因此同源同字节，C16 的承诺由这条对拍承接。
 - **唯一的失败**：`Exchange::compact` 在一段文本计不进 `u64` 时以 `E_INVALID_ARGS` 报（动作＝压缩这一回合的 exchange，主体＝那段文本，recovery 指向本模块）——这是「没有人解析得了的窗口字节」，不是可恢复的压缩结果。live 路径（`record`）与回放路径（`inherited`）在同一个值上走同一次判定，故同一段文本两边同样拒，回放不会因为压缩而少一条分支。
 - **数字一个家**：预算只住 `consts_policy::EXCHANGE_BUDGET_BYTES`，本文件不复写它的值。
+
+### 8-45 runtime::run::fence（形状 1 判定；**一波前立不立 fence 的唯一权威**）
+
+```rust
+pub(crate) enum Fence { Skip, Stage }
+pub(crate) struct FencePolicy;
+impl FencePolicy { pub(crate) fn for_wave(calls: &[ToolCall]) -> Fence; }
+```
+
+- **判定**：空波（模型这一答没有调用）是 `Skip`——什么都不会变，没有需要回退到的提交；其余是 `Stage`。`Run<Active>::advance` 只在 `Stage` 时调用 `RunHooks::fence` 并写 `checkpoint_committed`，所以空波后面没有 `checkpoint_committed`。
+- **为什么是一个模块**：「这一波要不要 fence」先前藏在 `advance` 里的一句 `if let Some(fence)`，答案恒为「要」。把它收成一个判定，后续的两条规则（只读波、按写过的路径 stage）各自只改这一处。
+- **未定**：只读波（每个调用声明的 `Effect` 都是 `Read`）也应是 `Skip`，而 `Stage` 应带上这一波写过的路径（写工具自报；exec 这类说不清的才扫写域）。这两条需要 `RunPlan` 带上每个工具的 `Effect`——`ToolDef` 只有名字、描述与 schema，`Effect` 住 `ToolBench` 的注册表里。能定下它的证据是：`RunPlan` 或 `RunHooks` 带一张名字到 `Effect` 的表，且 5,000 文件的楼首次派活 ≤ 200 ms。
+- **否决「每波都 fence，未变的波提交一个空改动」**：空波的提交不带来任何可回退的内容，却在每个结束回合多付一次 stage 与 commit。

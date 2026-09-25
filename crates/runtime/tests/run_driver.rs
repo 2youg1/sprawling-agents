@@ -478,10 +478,19 @@ fn a_fence_runs_before_the_wave_and_carries_the_turns_stamp() {
         let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
         assert!(matches!(frozen.completion(), Completion::Done(_)));
     }
-    // The fence goes up before *every* wave, including the last turn's
-    // empty one: an unchanged wave still commits, because a chain that
-    // rebuilds is worth more than a saved object.
-    assert_eq!(fenced, vec![2, 3]);
+    // The fence goes up before a wave that calls something; the last
+    // turn's empty wave has nothing to come back from, so it is skipped
+    // and leaves no `checkpoint_committed` behind: the two left are the
+    // dispatch's job pin and the first wave's fence.
+    assert_eq!(fenced, vec![2]);
+    assert_eq!(
+        ledger
+            .kinds()
+            .iter()
+            .filter(|kind| **kind == "checkpoint_committed")
+            .count(),
+        2
+    );
     let kinds = ledger.kinds();
     assert_eq!(kinds[6], "checkpoint_committed");
     assert_eq!(kinds[7], "tool_called");

@@ -26,6 +26,7 @@ use crate::reminder::ContextGauge;
 use crate::turn::{CallShape, Interrupt};
 use crate::window::{Opening, Window};
 
+mod fence;
 mod lifecycle;
 
 /// Everything constant about one run. Assembled by the caller, because

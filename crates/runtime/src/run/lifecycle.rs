@@ -19,6 +19,7 @@ use crate::reminder::ContextGauge;
 use crate::turn::{Interrupt, NextCall, PhaseOutcome, Turn, TurnReport};
 use crate::window::Window;
 
+use super::fence::{Fence, FencePolicy};
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
 
 /// A steer changes what the model reads next, so the driver folds it into
@@ -190,7 +191,9 @@ impl Run<Active> {
 
         // The fence goes up before the wave, not before a suspicious call:
         // anything the wave deletes then has a commit to come back from.
-        if let Some(fence) = hooks.fence.as_mut() {
+        if let (Fence::Stage, Some(fence)) =
+            (FencePolicy::for_wave(turn.calls()), hooks.fence.as_mut())
+        {
             let committed = fence(t)?;
             ledger.append(EventDraft {
                 run: self.plan.run,
