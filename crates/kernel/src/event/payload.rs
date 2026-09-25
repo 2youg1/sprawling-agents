@@ -15,6 +15,12 @@ use crate::locator::B3Hash;
 use super::identity::{RunId, Seq, TimeMs};
 use super::kind::EventKind;
 
+/// The deepest nesting a payload may carry, its own object counted as
+/// the first level: serde_json's recursion limit of 128 refuses the
+/// 128th nested container, so a line holds 127, and the [`EventRecord`]
+/// envelope spends one of them.
+const PAYLOAD_DEPTH_MAX: usize = 126;
+
 /// Ledger payload: a JSON object with every float refused, at construction
 /// and again on read (determinism rule 6). Keys serialize sorted
 /// (serde_json's default BTreeMap), which is part of the canonical bytes.
@@ -28,6 +34,7 @@ impl Payload {
     pub fn new(map: serde_json::Map<String, serde_json::Value>) -> Result<Self, AxError> {
         for value in map.values() {
             reject_floats(value)?;
+            reject_depth(value, PAYLOAD_DEPTH_MAX.saturating_sub(1))?;
         }
         Ok(Payload(map))
     }
@@ -111,6 +118,43 @@ fn reject_floats(value: &serde_json::Value) -> Result<(), AxError> {
         | serde_json::Value::Number(_)
         | serde_json::Value::String(_) => Ok(()),
     }
+}
+
+/// Refuses `value` when its containers nest deeper than `room`; iterative
+/// over the levels so a hostile payload cannot spend the writer's stack.
+fn reject_depth(value: &serde_json::Value, room: usize) -> Result<(), AxError> {
+    let mut level: Vec<&serde_json::Value> = vec![value];
+    let mut room = room;
+    while !level.is_empty() {
+        let next: Vec<&serde_json::Value> = level
+            .iter()
+            .flat_map(|value| match value {
+                serde_json::Value::Array(items) => items.iter().collect::<Vec<_>>(),
+                serde_json::Value::Object(map) => map.values().collect(),
+                serde_json::Value::Null
+                | serde_json::Value::Bool(_)
+                | serde_json::Value::Number(_)
+                | serde_json::Value::String(_) => Vec::new(),
+            })
+            .collect();
+        let opens_a_level = level
+            .iter()
+            .any(|value| value.is_array() || value.is_object());
+        if opens_a_level {
+            room = room.checked_sub(1).ok_or_else(|| {
+                AxError::failure(
+                    AxCode::InvalidArgs,
+                    "build payload",
+                    format!("nesting deeper than {PAYLOAD_DEPTH_MAX} levels"),
+                )
+                .with_recovery(
+                    "store the body in CAS and carry its locator in the payload; the ledger reader cannot parse this depth back",
+                )
+            })?;
+        }
+        level = next;
+    }
+    Ok(())
 }
 
 /// What a recording party supplies; the Ledger implementation owns the

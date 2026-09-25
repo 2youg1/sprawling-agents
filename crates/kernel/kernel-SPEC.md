@@ -75,6 +75,7 @@ Stage 2 追加：
 5. **`who` 字段是自由字符串**：actor 文法属 city::resident（P1）；届时收紧为类型，本文届时更新。
 6. **浮点拒绝在构造点**：Ledger 载荷禁浮点（确定性七条之 6）由 `Payload::new` 与其 `Deserialize` 双侧执行，serde_json 数字非 i64/u64 可表示即拒。
 7. **存储写失败码**（S2 期初定）：增装载期第 5 码 `E_STORAGE_FATAL`（AxCode 36）承载 Ledger append 等存储写失败；与 `E_CAS_CORRUPT`（读到的对象不可信）分立，recovery 相反。
+8. **深度上限在构造点**：读侧 `parse_line` 走 serde_json，递归上限 128 在第 128 层容器处拒绝，故一行最多 127 层，其中信封（`EventRecord` 这个对象）占 1 层；于是 `Payload::new` 与其 `Deserialize` 双侧拒绝嵌套超过 `PAYLOAD_DEPTH_MAX`＝126 层的载荷（载荷自身的对象算第 1 层），码 `E_INVALID_ARGS`，recovery 是把正文存进 CAS、载荷只带它的 locator。模型给的工具参数（`ToolCalled.args`）与工具结果（`ToolAnswer`）原样进 `data`，所以写得进却读不回的一行会让整条链重放失败；拒在写侧，读侧永远读得动自己写下的东西。
 
 ## 4 现状分析
 
@@ -343,7 +344,9 @@ impl EventKind {
 pub struct Payload(serde_json::Map<String, Value>);
 impl Payload {
     /// Sole constructor: rejects any float anywhere in the tree
-    /// (determinism rule 6). Deserialize re-validates on read.
+    /// (determinism rule 6) and any nesting deeper than
+    /// PAYLOAD_DEPTH_MAX (126: the 127 containers serde_json reads, minus the envelope).
+    /// Deserialize re-validates on read.
     pub fn new(map: Map<String, Value>) -> Result<Self, AxError>;  // E_INVALID_ARGS
     pub fn empty() -> Self;
     /// 写侧唯一门：record 结构 -> 载荷；非对象即 E_INVALID_ARGS。

@@ -160,3 +160,32 @@ fn event_ref_reports_the_record_it_was_minted_from() {
     assert_eq!(echo.seq(), record.seq());
     assert_eq!(echo.kind(), EventKind::GateChecked);
 }
+
+/// A payload whose root object and nested containers count `depth`.
+fn nested(depth: usize) -> Map<String, Value> {
+    let inner = (1..depth).fold(json!(0), |value, _| json!({ "k": value }));
+    let mut root = Map::new();
+    root.insert("k".into(), inner);
+    root
+}
+
+/// The read side is serde_json with its 128-container limit, and the
+/// envelope spends one of them: a payload at the limit reads back, and
+/// one past it is refused where it is written rather than where it is
+/// replayed, with the way out that keeps the body.
+#[test]
+fn a_payload_nested_past_what_the_reader_can_parse_is_refused_on_write() {
+    let at_limit = EventDraft {
+        data: Payload::new(nested(PAYLOAD_DEPTH_MAX)).unwrap(),
+        ..draft(EventKind::CityInitialized)
+    };
+    let record = EventRecord::from_draft(at_limit, Seq::FIRST, B3Hash::from_bytes([0; 32]));
+    let line = record.canonical_line().unwrap();
+    assert_eq!(EventRecord::parse_line(&line).unwrap(), record);
+
+    for depth in [PAYLOAD_DEPTH_MAX + 1, 130] {
+        let err = Payload::new(nested(depth)).expect_err("the reader could not parse this back");
+        assert_eq!(err.code(), &AxCode::InvalidArgs);
+        assert!(err.recovery().contains("CAS"), "{err}");
+    }
+}
