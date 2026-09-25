@@ -51,8 +51,9 @@ function shippedFace(): Plugin {
 
 // The bundle lands where `crates/sprawling/build.rs` reads it: the path
 // its `BUNDLE_DIR` states, `target/web-dist` under the workspace root,
-// whatever `CARGO_TARGET_DIR` says, with `index.html` at its root. `base: './'` keeps every asset reference
-// relative, so the same bundle serves from inside the binary.
+// whatever `CARGO_TARGET_DIR` says, with `index.html` at its root.
+// `base: './'` keeps every asset reference relative, so the same bundle
+// serves from inside the binary.
 //
 // `configFile` is load-bearing: the plugin resolves `svelte.config.*`
 // against `root` (here `src`), while the config lives at the project
