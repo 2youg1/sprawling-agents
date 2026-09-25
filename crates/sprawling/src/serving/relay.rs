@@ -35,19 +35,16 @@ pub(crate) struct RelayRequest {
 /// Everything that wakes the accounting thread, on the one queue it
 /// blocks on.
 ///
-/// One queue rather than one per mouth, because a thread blocks on one
-/// thing at a time: with a queue per mouth it looked at each in turn
-/// with a timeout, and a relay request waited out the others' timeouts
+/// One queue, because a thread blocks on one thing at a time: a queue
+/// per mouth is polled with timeouts that every request waits out
 /// (sprawling-SPEC.md 8-42-4, `adversary/design/Attending.lean`).
 pub(crate) enum Wake {
     /// A lane's append, waiting for its answer.
     Relay(RelayRequest),
-    /// A run home from its lane. Boxed because it carries a whole
-    /// drive's outcome and the queue carries a relay request far more
-    /// often.
+    /// A run home from its lane, boxed because it carries a whole
+    /// drive's outcome.
     Home(Box<Arrival>),
-    /// A command was posted to the desk. The command itself stays on
-    /// the desk, where a run's safe points can still find its Cancel.
+    /// A command was posted; it stays on the desk for a run's safe points.
     Command,
     /// The city is stopping; the desk says so too.
     Close,
@@ -57,8 +54,7 @@ pub(crate) enum Wake {
 pub(crate) enum Patience {
     /// Not at all: serve what is already queued.
     Now,
-    /// At most this long. The schedule's next deadline is the one
-    /// reason an idle city has to wake without being asked.
+    /// At most this long: an idle city's one unasked wake, the schedule.
     For(Duration),
     /// Until something is queued.
     Unbounded,
@@ -122,36 +118,27 @@ impl RelayGate {
         }
     }
 
-    /// A sender for the two mouths that are not relays: the lanes
-    /// coming home, and the desk.
+    /// A sender for the lanes coming home and for the desk.
     pub(crate) fn bell(&self) -> mpsc::Sender<Wake> {
         self.issuing.clone()
     }
 
     /// Waits as `patience` allows for the first wake, then takes every
-    /// wake already queued: the relay requests are written, and the runs
-    /// home are put on `homes` in arrival order for the caller to land.
+    /// wake already queued: relay requests are written before anything
+    /// lands (sprawling-SPEC.md 8-42-2), runs home go on `homes` in
+    /// arrival order, and a command or a close only ends the wait.
     ///
-    /// The crossing is written before anything lands, because a run
-    /// that has already been paid for must not queue behind one that has
-    /// finished (sprawling-SPEC.md 8-42-2). A command or a close only
-    /// ends the wait; what it asks for is read off the desk.
-    ///
-    /// **Everything already queued rides one disk barrier.** Four lanes
-    /// drive at once and every line they write crosses to this one
-    /// thread, so a drain routinely holds several drafts; a barrier
-    /// costs the same for fifty records as for one. What each caller
-    /// waits for is unchanged: the answer goes back only after the write
-    /// is durable, because that is what makes an `EventRef` a reference
-    /// to a history that exists.
+    /// **Everything queued rides one disk barrier**, which costs the
+    /// same for fifty records as for one. Each answer still goes back
+    /// only after the write is durable, because that is what makes an
+    /// `EventRef` a reference to a history that exists.
     pub(crate) fn serve(
         &self,
         patience: Patience,
         ledger: &mut impl Ledger,
         homes: &mut VecDeque<Arrival>,
     ) {
-        // The gate holds a sender of its own, so the queue is never
-        // disconnected and an empty answer means only "nothing yet".
+        // The gate's own sender keeps the queue connected: empty is "not yet".
         let first = match patience {
             Patience::Now => self.wakes.try_recv().ok(),
             Patience::For(wait) => self.wakes.recv_timeout(wait).ok(),
@@ -175,10 +162,8 @@ impl RelayGate {
         }
         match ledger.append_all(drafts) {
             Ok(echoes) => {
-                // Positional, which is the port's own promise. A sender
-                // with no echo cannot happen; if it ever did, it would
-                // be a caller left waiting rather than a caller told
-                // something untrue.
+                // Positional, the port's own promise: a sender with no echo
+                // would be a caller left waiting, never one told a lie.
                 for (back, echo) in senders.into_iter().zip(echoes) {
                     // A driving thread that stopped listening does not
                     // undo the line: the history is what the city
