@@ -11,7 +11,7 @@ use kernel::{ByteLen, consts_policy::WORKTREE_MAX_BYTES};
 
 use crate::error::MemoryError;
 
-use super::landing::{Landing, PlannedMerge};
+use super::landing::{CheckoutRun, Landing, PlannedMerge, check_out};
 use super::lease::WorktreeLease;
 use super::name::WorktreeName;
 use super::weight::measure;
@@ -20,13 +20,6 @@ use super::weight::measure;
 /// the city's own machinery rather than anybody's writable space. What a
 /// run may write is judged against the tree it works in.
 const WORKTREE_DIR: &str = "worktrees";
-
-/// Whether a checkout only judges the city folder or also writes it.
-#[derive(Clone, Copy)]
-enum CheckoutRun {
-    DryRun,
-    Write,
-}
 
 /// The city's trees.
 pub struct Worktrees {
@@ -186,7 +179,7 @@ impl Worktrees {
         let tree = theirs
             .tree()
             .map_err(|err| refuse("read the node tree", err.to_string()))?;
-        self.check_out(&tree, CheckoutRun::DryRun)?;
+        check_out(&self.repo, &tree, CheckoutRun::DryRun)?;
         Ok(PlannedMerge {
             trees: self,
             target: theirs.id(),
@@ -239,44 +232,12 @@ impl Worktrees {
                 &[&ours, &theirs],
             )
             .map_err(|err| refuse("commit the merge", err.to_string()))?;
-        self.check_out(&tree, CheckoutRun::Write)?;
+        check_out(&self.repo, &tree, CheckoutRun::Write)?;
         let trunk = head.name().unwrap_or("HEAD");
         self.repo
             .reference_matching(trunk, merge, true, ours.id(), landing.subject)
             .map_err(|err| refuse("move the city trunk", err.to_string()))?;
         Ok(())
-    }
-
-    /// Makes the city folder match `tree` without discarding anything:
-    /// libgit2's safe strategy judges every path against the trunk as it
-    /// stands, and one the person changed and did not commit is a
-    /// conflict. Every conflict is named in the refusal, and a refused
-    /// checkout has written nothing, because libgit2 finds all conflicts
-    /// before it writes a file.
-    fn check_out(&self, tree: &git2::Tree<'_>, run: CheckoutRun) -> Result<(), MemoryError> {
-        let mut paths = Vec::new();
-        let mut checkout = git2::build::CheckoutBuilder::new();
-        checkout.safe();
-        match run {
-            CheckoutRun::DryRun => checkout.dry_run(),
-            CheckoutRun::Write => &mut checkout,
-        };
-        checkout.notify_on(git2::CheckoutNotificationType::CONFLICT);
-        checkout.notify(|_, path, _, _, _| {
-            paths.extend(path.map(|p| p.to_string_lossy().into_owned()));
-            true
-        });
-        let outcome = self
-            .repo
-            .checkout_tree(tree.as_object(), Some(&mut checkout));
-        drop(checkout);
-        if !paths.is_empty() {
-            return Err(MemoryError::MergeWouldDiscard { paths });
-        }
-        outcome.map_err(|err| MemoryError::Worktree {
-            op: "check out the merged trunk",
-            detail: err.to_string(),
-        })
     }
 
     /// The `Reviewed-by:` line, or nothing at all. Both halves have to
