@@ -29,13 +29,13 @@ use std::path::{Path, PathBuf};
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The file that owns the directory name.
+/// The file that owns the bundle's path.
 const EMBEDDER: &str = "crates/sprawling/build.rs";
 
-/// The constant in it that states the name.
+/// The constant in it that states the path.
 const DECLARATION: &str = "BUNDLE_DIR";
 
-/// The files in other languages that have to name the same directory:
+/// The files in other languages that have to spell the same path:
 /// the bundler that writes it, and the recipe that documents where a
 /// contributor's build goes.
 const RESTATEMENTS: [&str; 2] = ["client/vite.config.ts", "justfile"];
@@ -45,9 +45,9 @@ const RESTATEMENTS: [&str; 2] = ["client/vite.config.ts", "justfile"];
 ///
 /// # Errors
 /// When the build script cannot be read or parsed, or when it no longer
-/// declares the constant: a gate that guessed a name here would weigh an
+/// declares the constant: a gate that guessed a path here would weigh an
 /// empty directory and report a bundle of zero bytes.
-pub(crate) fn name(root: &Path) -> Result<String, XtaskError> {
+pub(crate) fn stated_path(root: &Path) -> Result<String, XtaskError> {
     let text = walk::read_text(&root.join(EMBEDDER))?;
     let parsed = syn::parse_file(&text).map_err(|err| XtaskError::Doc {
         file: EMBEDDER.to_owned(),
@@ -62,11 +62,11 @@ pub(crate) fn name(root: &Path) -> Result<String, XtaskError> {
 /// Where the built client lands in this checkout.
 ///
 /// # Errors
-/// Propagates [`name`]: the directory is the workspace root plus the
+/// Propagates [`stated_path`]: the directory is the workspace root plus the
 /// path the build script states, joined segment by segment so a path
 /// on Windows carries one separator.
 pub(crate) fn dist(root: &Path) -> Result<PathBuf, XtaskError> {
-    Ok(name(root)?
+    Ok(stated_path(root)?
         .split('/')
         .fold(root.to_path_buf(), |at, segment| at.join(segment)))
 }
@@ -92,7 +92,7 @@ fn declared(items: &[syn::Item]) -> Option<String> {
 /// # Errors
 /// Propagates the read of the build script and of each restating file.
 pub(crate) fn restated(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let stated = name(root)?;
+    let stated = stated_path(root)?;
     let mut violations = Vec::new();
     for rel in RESTATEMENTS {
         let path = root.join(rel);
@@ -106,11 +106,11 @@ pub(crate) fn restated(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             gate: "artifact",
             location: rel.to_owned(),
             rule: format!(
-                "the client bundle lands in one directory, named by `{DECLARATION}` in {EMBEDDER}"
+                "the client bundle lands at one path, stated by `{DECLARATION}` in {EMBEDDER}"
             ),
             violation: format!(
-                "this file names no `{stated}`, so it writes or documents \
-                                a directory the binary does not embed"
+                "this file spells no `{stated}`, so it writes or documents \
+                 a directory the binary does not embed"
             ),
             alternative: format!(
                 "spell `{stated}` here, or change `{DECLARATION}` and bring every restatement \

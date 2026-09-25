@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{DECLARATION, declared, dist, name, restated};
+use super::{DECLARATION, declared, dist, restated, stated_path};
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -23,7 +23,7 @@ fn items(source: &str) -> Vec<syn::Item> {
 /// workspace root.
 #[test]
 fn the_path_is_read_from_the_file_that_embeds_the_bundle() {
-    let stated = name(&root()).unwrap();
+    let stated = stated_path(&root()).unwrap();
     assert!(!stated.is_empty(), "the build script states no path");
     let found = dist(&root()).unwrap();
     let under_root: Vec<String> = found
@@ -46,7 +46,7 @@ fn only_the_named_declaration_answers() {
         Some("web-dist".to_owned())
     );
     assert_eq!(declared(&items("const OTHER: &str = \"web-dist\";")), None);
-    assert!(name(Path::new("/nonexistent-checkout")).is_err());
+    assert!(stated_path(Path::new("/nonexistent-checkout")).is_err());
 }
 
 /// Both restating files name the directory the product embeds today.
