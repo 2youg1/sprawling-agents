@@ -271,16 +271,18 @@ impl JsonlLedger {
                 }
                 LineFault::NotAVersion(v) => unversioned(v),
                 LineFault::NotALine(_) if !later_intact() => break,
-                LineFault::ChainBreak
-                | LineFault::SeqGap { .. }
-                | LineFault::NotALine(_) => AxError::failure(
-                    AxCode::InvalidArgs,
-                    "verify chain",
-                    "a line does not continue the chain",
-                )
-                .with_recovery(
-                    "run `sprawling replay <ledger-dir>` to see the first line                      that breaks, then restore that segment from its                      checkpoint commit",
-                ),
+                LineFault::ChainBreak | LineFault::SeqGap { .. } | LineFault::NotALine(_) => {
+                    AxError::failure(
+                        AxCode::InvalidArgs,
+                        "verify chain",
+                        "a line does not continue the chain",
+                    )
+                    .with_recovery(
+                        "run `sprawling replay <ledger-dir>` to see the first line \
+                     that breaks, then restore that segment from its \
+                     checkpoint commit",
+                    )
+                }
                 other @ (LineFault::UnknownKind(_)
                 | LineFault::NotCanonical(_)
                 | LineFault::SeqExhausted(_)) => other.into_ax(at),
