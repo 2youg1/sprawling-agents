@@ -1,0 +1,25 @@
+{"address": "a", "verdict": "accepted"}
+{"address": "a/b", "verdict": "accepted"}
+{"address": "docs/notes.md", "verdict": "accepted"}
+{"address": "role@building.1/JOB.md", "verdict": "accepted"}
+{"address": ".sprawling/ledger", "verdict": "accepted"}
+{"address": "", "verdict": "refused", "rule": "empty"}
+{"address": "/abs", "verdict": "refused", "rule": "absolute"}
+{"address": "a//b", "verdict": "refused", "rule": "empty segment"}
+{"address": "a/", "verdict": "refused", "rule": "trailing separator"}
+{"address": "/", "verdict": "refused", "rule": "absolute and trailing separator"}
+{"address": "..", "verdict": "refused", "rule": "parent escape"}
+{"address": "a/../b", "verdict": "refused", "rule": "parent escape inside"}
+{"address": ".", "verdict": "refused", "rule": "dot segment"}
+{"address": "a/./b", "verdict": "refused", "rule": "dot segment inside"}
+{"address": "a\b", "verdict": "refused", "rule": "backslash"}
+{"address": "C:/x", "verdict": "refused", "rule": "drive letter (colon)"}
+{"address": "a/b:stream", "verdict": "refused", "rule": "NTFS alternate data stream (colon)"}
+{"address": "a\u0000b", "verdict": "refused", "rule": "NUL"}
+{"address": "a\tb", "verdict": "refused", "rule": "control character"}
+{"address": ".sprawling.", "verdict": "refused", "rule": "Win32 opens this as .sprawling"}
+{"address": ".sprawling ", "verdict": "refused", "rule": "Win32 opens this as .sprawling"}
+{"address": "lab/.sprawling./x", "verdict": "refused", "rule": "the reserved alias one level down"}
+{"address": "a /b", "verdict": "refused", "rule": "trailing space on an inner segment"}
+{"address": "docs./notes.md", "verdict": "refused", "rule": "trailing dot on an inner segment"}
+{"address": "trailing.", "verdict": "refused", "rule": "trailing dot on the last segment"}

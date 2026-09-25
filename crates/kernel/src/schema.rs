@@ -203,7 +203,7 @@ mod tests {
 
     use super::*;
     use crate::address::RESERVED_PREFIX;
-    use crate::address::tests::{ACCEPTED, REFUSED};
+    use crate::address::tests::{Spelling, TABLE, Verdict};
     use crate::event::RunId;
 
     /// Each pattern compiled the way every reader reads it: `\p{...}` is a
@@ -333,11 +333,9 @@ mod tests {
     /// readers answer.
     #[test]
     fn the_address_table_gets_the_same_verdict_from_the_pattern() {
-        for accepted in ACCEPTED {
-            assert!(ADDRESS_MATCHER.is_match(accepted), "refused {accepted:?}");
-        }
-        for refused in REFUSED {
-            assert!(!ADDRESS_MATCHER.is_match(refused), "took {refused:?}");
+        for Spelling { address, verdict } in TABLE.iter() {
+            let taken = ADDRESS_MATCHER.is_match(address);
+            assert_eq!(taken, *verdict == Verdict::Accepted, "{address:?}");
         }
     }
 

@@ -6,7 +6,9 @@
 // The address grammar is `kernel::Address::parse`, stated as a pattern
 // in `kernel::schema` and carried into `wire.ts` by `cargo xtask
 // wire-ts`. This client no longer spells it; what it holds is that the
-// generated schema still refuses what the Rust constructor refuses.
+// generated schema gives every spelling in `fixtures/address.jsonl` the
+// verdict the Rust constructor gives it. That file is the one table both
+// test suites read, so a case added there is judged on both sides.
 
 import { describe, expect, test } from "bun:test";
 import { Option, Schema } from "effect";
@@ -16,39 +18,28 @@ import { readRunId } from "./run_id";
 
 const read = Schema.decodeOption(Address);
 
+const Spelling = Schema.parseJson(
+  Schema.Struct({
+    address: Schema.String,
+    verdict: Schema.Literal("accepted", "refused"),
+  }),
+);
+
+const table = (await Bun.file(new URL("../../../fixtures/address.jsonl", import.meta.url)).text())
+  .split("\n")
+  .filter((line) => line.length > 0)
+  .map((line) => Schema.decodeUnknownSync(Spelling)(line));
+
 describe("address", () => {
-  test("accepts canonical relative paths", () => {
-    for (const ok of [
-      "a",
-      "a/b",
-      "docs/notes.md",
-      "role@building.1/JOB.md",
-      ".sprawling/ledger",
-    ]) {
-      expect<string | null>(Option.getOrNull(read(ok)), ok).toBe(ok);
-    }
+  test("the shared table holds both verdicts", () => {
+    expect(table.some((row) => row.verdict === "accepted")).toBe(true);
+    expect(table.some((row) => row.verdict === "refused")).toBe(true);
   });
 
-  test("rejects every banned form", () => {
-    for (const bad of [
-      "",
-      "/abs",
-      "a//b",
-      "a/",
-      "/",
-      "..",
-      "a/../b",
-      ".",
-      "a/./b",
-      "a\\b",
-      "C:/x",
-      "a/b:stream",
-      "a\u0000b",
-      "a\tb",
-      "a /b",
-      "trailing.",
-    ]) {
-      expect(read(bad), JSON.stringify(bad)).toEqual(Option.none());
+  test("every spelling in the shared table gets its verdict", () => {
+    for (const row of table) {
+      const expected = row.verdict === "accepted" ? row.address : null;
+      expect<string | null>(Option.getOrNull(read(row.address)), JSON.stringify(row.address)).toBe(expected);
     }
   });
 });
