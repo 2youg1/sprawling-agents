@@ -329,3 +329,36 @@ fn a_tree_is_never_placed_through_a_link() {
         "the reserved directory the link reaches holds nothing new"
     );
 }
+
+#[test]
+fn a_merge_keeps_the_persons_uncommitted_edit_and_names_it_in_the_refusal() {
+    let dir = tempfile::tempdir().unwrap();
+    let trees = city(dir.path());
+    let lease = trees.claim(&name("node-1")).unwrap();
+    std::fs::write(
+        lease.path().join("lab").join("notes.md"),
+        b"from the node\n",
+    )
+    .unwrap();
+    Checkpoint::open(lease.path())
+        .unwrap()
+        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
+        .unwrap();
+    std::fs::write(
+        dir.path().join("lab").join("notes.md"),
+        b"the person's edit\n",
+    )
+    .unwrap();
+
+    let refused = trees
+        .plan_merge(lease.name())
+        .and_then(|plan| plan.apply(&landing(5_000, &owner(), false)));
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("lab").join("notes.md")).unwrap(),
+        "the person's edit\n",
+        "a merge never discards an edit the person has not committed"
+    );
+    let err = refused.unwrap_err().into_ax();
+    assert_eq!(err.code(), &kernel::AxCode::VersionConflict);
+    assert!(err.to_string().contains("lab/notes.md"), "{err}");
+}

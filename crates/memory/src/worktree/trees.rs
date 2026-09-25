@@ -21,6 +21,13 @@ use super::weight::measure;
 /// run may write is judged against the tree it works in.
 const WORKTREE_DIR: &str = "worktrees";
 
+/// Whether a checkout only judges the city folder or also writes it.
+#[derive(Clone, Copy)]
+enum CheckoutRun {
+    DryRun,
+    Write,
+}
+
 /// The city's trees.
 pub struct Worktrees {
     repo: git2::Repository,
@@ -176,6 +183,10 @@ impl Worktrees {
                 detail: format!("the trunk moved to {} after this node branched", ours.id()),
             });
         }
+        let tree = theirs
+            .tree()
+            .map_err(|err| refuse("read the node tree", err.to_string()))?;
+        self.check_out(&tree, CheckoutRun::DryRun)?;
         Ok(PlannedMerge {
             trees: self,
             target: theirs.id(),
@@ -217,9 +228,10 @@ impl Worktrees {
             landing.of.trailers(),
             self.reviewer(landing.reviewed_by_person)
         );
-        self.repo
+        let merge = self
+            .repo
             .commit(
-                Some("HEAD"),
+                None,
                 &signature,
                 &signature,
                 &message,
@@ -227,12 +239,44 @@ impl Worktrees {
                 &[&ours, &theirs],
             )
             .map_err(|err| refuse("commit the merge", err.to_string()))?;
-        let mut checkout = git2::build::CheckoutBuilder::new();
-        checkout.force();
+        self.check_out(&tree, CheckoutRun::Write)?;
+        let trunk = head.name().unwrap_or("HEAD");
         self.repo
-            .checkout_head(Some(&mut checkout))
-            .map_err(|err| refuse("check out the merged trunk", err.to_string()))?;
+            .reference_matching(trunk, merge, true, ours.id(), landing.subject)
+            .map_err(|err| refuse("move the city trunk", err.to_string()))?;
         Ok(())
+    }
+
+    /// Makes the city folder match `tree` without discarding anything:
+    /// libgit2's safe strategy judges every path against the trunk as it
+    /// stands, and one the person changed and did not commit is a
+    /// conflict. Every conflict is named in the refusal, and a refused
+    /// checkout has written nothing, because libgit2 finds all conflicts
+    /// before it writes a file.
+    fn check_out(&self, tree: &git2::Tree<'_>, run: CheckoutRun) -> Result<(), MemoryError> {
+        let mut paths = Vec::new();
+        let mut checkout = git2::build::CheckoutBuilder::new();
+        checkout.safe();
+        match run {
+            CheckoutRun::DryRun => checkout.dry_run(),
+            CheckoutRun::Write => &mut checkout,
+        };
+        checkout.notify_on(git2::CheckoutNotificationType::CONFLICT);
+        checkout.notify(|_, path, _, _, _| {
+            paths.extend(path.map(|p| p.to_string_lossy().into_owned()));
+            true
+        });
+        let outcome = self
+            .repo
+            .checkout_tree(tree.as_object(), Some(&mut checkout));
+        drop(checkout);
+        if !paths.is_empty() {
+            return Err(MemoryError::MergeWouldDiscard { paths });
+        }
+        outcome.map_err(|err| MemoryError::Worktree {
+            op: "check out the merged trunk",
+            detail: err.to_string(),
+        })
     }
 
     /// The `Reviewed-by:` line, or nothing at all. Both halves have to
