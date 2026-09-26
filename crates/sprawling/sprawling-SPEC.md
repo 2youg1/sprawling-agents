@@ -3660,7 +3660,7 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 **本节接口的当前状态。** 监视器的其余部分尚未落地：生产的计数器读取（核心进程的 CPU、private、工作集、读写字节；Job Object 的汇总与逐进程明细并归到 run；整机 CPU、可用内存；卷的剩余空间与磁盘延迟），其余计数器的来源（内存已定为 `sysinfo`，见下；其余的是 `sysinfo` 还是只取需要的几个平台接口，按体积与启动时间实测后定在这里），每秒调用 `tick` 并把新读数发到 `MonitorFeed::samples` 的采样任务（线上的一对监视帧已在，channels-SPEC.md 8-47：会话发 `Watch` 时经 `serving::worker` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计；在采样任务落地前，看的会话收不到读数），WebUI 监视页接到路由与监视帧上（面板本身 `client/src/views/monitor.svelte` 已在：打开时调用传入的 `watch`、关闭时调用它返回的释放函数，曲线按面板宽度取最近的点，读数与曲线由 `client/src/core/monitor.ts` 按 8-95 的规则算出；它还没有路由，也没有帧可读）与事实条摘要，`sprawling top <city>`（终端里是交互界面，stdout 不是终端时每秒一行 JSON）（两种输出的投影见 8-95；命令本身、终端的重画与交互尚未落地），以及采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
 
-**内存的读数**（`bin::monitor::memory`）：整机物理内存与可用内存经 `sysinfo`（只开 `system` 特性，只刷新 RAM）一次读出成 `Memory { physical, available }`，这是城里读内存的唯一一处；驱动车道按它决定新 run 是否排队（§8-46-3）。平台不报时两项都是零，此时不算紧。取 `sysinfo` 是编排者的裁决（M91，人可推翻）：它是对外只给安全接口的现成路，本 crate 不写 `unsafe`。
+**内存的读数**（`bin::monitor::memory`）：整机物理内存与可用内存经 `sysinfo`（只开 `system` 特性，只刷新 RAM）一次读出成 `Memory { physical, available }`，这是城里读内存的唯一一处；驱动车道按它决定新 run 是否排队（§8-46-3）。平台不报时两项都是零，此时不算紧。取 `sysinfo`，因为它是对外只给安全接口的现成路，本 crate 不写 `unsafe`。
 
 ## 8-95 `sprawling top` 的输出：一行 JSON 与一屏曲线（`bin::monitor::top`，形状：projection）
 
