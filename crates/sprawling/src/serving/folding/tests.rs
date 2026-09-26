@@ -11,6 +11,7 @@ use kernel::EventRecord;
 use super::{Broadcast, Copies, spawn_folding};
 use crate::assembly::init_city;
 use crate::serving::standing::CorePriority;
+use crate::views::snapshot::start::{FoldStart, start};
 use crate::views::{Published, Views, answer_outside_the_lock};
 
 /// A reader in the middle of a query holds up neither the writer nor the
@@ -35,7 +36,13 @@ fn a_reader_holding_the_views_holds_up_neither_the_writer_nor_the_fold() {
         published: Arc::clone(&views),
         spare,
     };
-    let mut folding = spawn_folding(copies, broadcast, CorePriority::Raised).unwrap();
+    let mut folding = spawn_folding(
+        copies,
+        broadcast,
+        CorePriority::Raised,
+        std::time::Instant::now,
+    )
+    .unwrap();
 
     let reader = views.snapshot();
     let (written, returned) = mpsc::channel();
@@ -66,6 +73,45 @@ fn a_reader_holding_the_views_holds_up_neither_the_writer_nor_the_fold() {
         (as_of, answered.unwrap()),
         (genesis.seq().next().unwrap(), folded_here.answer(&city))
     );
+}
+
+/// A served city cuts its views snapshot on the fold thread, at the last
+/// record it folded, so a later read resumes there and folds no tail.
+#[test]
+fn the_fold_thread_cuts_a_snapshot_a_later_read_resumes_from() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let records: Vec<EventRecord> = verified
+        .raw_lines()
+        .iter()
+        .map(|line| EventRecord::parse_line(line).unwrap())
+        .collect();
+    let unfolded = Views::new(dir.path());
+    let spare = unfolded.unfolded_twin();
+    let copies = Copies {
+        published: Arc::new(Published::new(unfolded)),
+        spare,
+    };
+    let broadcast = Broadcast {
+        to_clients: tokio::sync::broadcast::channel(8).0,
+        head: Arc::new(channels::LedgerHead::default()),
+    };
+    let mut folding = spawn_folding(
+        copies,
+        broadcast,
+        CorePriority::Normal,
+        std::time::Instant::now,
+    )
+    .unwrap();
+    for record in &records {
+        (folding.observer)(record);
+    }
+    drop((folding.observer, folding.machine, folding.lend));
+    folding.thread.join().unwrap();
+
+    let resumed = start::<Views>(&report.ledger_dir).unwrap();
+    assert_eq!(resumed.from, FoldStart::Resumed { tail: 0 });
 }
 
 /// The first record broadcast within `patience`, polled rather than

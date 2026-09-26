@@ -7,6 +7,7 @@
 //! the writer nor the fold waits for a reader (sprawling-SPEC.md 8-93).
 
 use std::sync::{Arc, Mutex, mpsc};
+use std::time::Instant;
 
 use kernel::{AxCode, AxError, EventRecord};
 
@@ -56,13 +57,14 @@ pub(crate) fn spawn_folding(
     copies: Copies,
     broadcast: Broadcast,
     setting: CorePriority,
+    clock: fn() -> Instant,
 ) -> Result<Folding, AxError> {
     let (committed, arriving) = mpsc::channel::<Fold>();
     let examined = committed.clone();
     let lent = committed.clone();
     let thread = std::thread::Builder::new()
         .name("sprawling-views".to_owned())
-        .spawn(move || fold_until_closed(copies, &arriving, &broadcast, setting))
+        .spawn(move || fold_until_closed(copies, &arriving, &broadcast, (setting, clock)))
         .map_err(|source| {
             AxError::failure(
                 AxCode::StorageFatal,
@@ -110,7 +112,7 @@ fn fold_until_closed(
     copies: Copies,
     arriving: &mpsc::Receiver<Fold>,
     broadcast: &Broadcast,
-    setting: CorePriority,
+    (setting, _clock): (CorePriority, fn() -> Instant),
 ) {
     let mut core = CoreThread::raise("sprawling-views", setting, monotonic_now());
     let Copies {

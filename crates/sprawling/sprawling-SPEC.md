@@ -3656,11 +3656,13 @@ pub(super) struct Folding {
     pub(super) lend: Box<dyn FnOnce(Arc<Mutex<gateway::Custodian>>) + Send>,
     pub(super) thread: std::thread::JoinHandle<()>,
 }
-pub(super) fn spawn_folding(
-    published: Arc<Published>,
-    spare: Views,
-    to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+pub(crate) struct Copies { pub(crate) published: Arc<Published>, pub(crate) spare: Views }
+pub(crate) struct Broadcast { pub(crate) to_clients: broadcast::Sender<channels::Committed>, pub(crate) head: Arc<channels::LedgerHead> }
+pub(crate) fn spawn_folding(
+    copies: Copies,
+    broadcast: Broadcast,
     setting: CorePriority, // 视图线程是否升档（8-93）
+    clock: fn() -> Instant, // 服务中切快照的节奏用的钟，由 bin::assembly 交进来（8-91）
 ) -> Result<Folding, AxError>; // StorageFatal「start the view fold」：线程起不来
 // bin::views::answering
 pub(crate) struct Published { /* 私有：Mutex<Arc<Views>> */ }
@@ -3808,6 +3810,7 @@ impl Views {
 pub(crate) fn views_fold_version() -> u32;
 impl SnapshotFold for Views { const DIR: &'static str = "views"; /* … */ }
 impl Views { pub(crate) fn rebuild(ledger_dir: &Path) -> Result<Views, AxError>; } // start_audited::<Views>，不切快照
+impl Views { pub(crate) fn cut_snapshot_at(&self, record: &EventRecord) -> Result<(), AxError>; } // 在已折的最后一条记录处切，行是它的 canonical_line
 
 // bin::assembly::folds::views_start —— shape: projection
 pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics)
@@ -3824,11 +3827,12 @@ pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics)
 
 **起步只折尾部。** `start_views` 即 `start::<Views>`，它调 `memory::start_from_snapshot(ledger_dir, <city>/.sprawling/snapshot/views/, views_fold_version())`（memory-SPEC 8-28）。`Resume`：解码快照里的 views，再用 `ChainSnapshot::resume()` 给出的 `LineCheck` 逐行核对并折尾部——尾部仍然过同一个逐行检查，行号从 `seq + 1` 数起。`Whole`：与没有快照时完全相同，`runtime::replay::verify_lines` 从创世核对并折叠。快照之前的行在起步时不再逐行核对：切快照时它们已经过一次完整的核对（从创世或从上一份快照起），`fit` 用一行的链哈希证明它们还是那些行；之后被改坏的行在服务中的城里由后台的 `audit_chain`（8-90）抓住；一次性的查询（`views::ask` 经 `Views::rebuild`）旁边没有后台审计，所以 `Views::rebuild` 经 `start_audited::<Views>` 起步：先同步跑一次 `memory::audit_chain`，只有它返回 `Whole` 才从快照起步作答，`Broken(reason)` 与读不了账本都原样拒绝。**被否：一次性查询从创世全量折叠。** 审计是流式的，只算哈希不解析、不折叠，内存为 O(1)；全量折叠还要解析每条记录并建出整份视图，同样读一遍账本却多花解析与折叠。**快照校验失败绝不信任它**：任何一种 `WholeFold` 都走全量折叠，原因放在 `from` 里；`serve` 把它作为一条 `Effect` 诊断写进日志，说明这次从哪里起步、为什么。
 
-**本节接口的当前状态**：`Standing::fold` 还没有从快照起步（`Collaboration`、`Entrance`、`Expiries`、`SessionOrigins` 的编码尚未给出）；长时间运行中的城只在起步时切快照，运行中按测得的折叠成本切快照尚未落地——折叠线程（`serving::folding`）手里有每条已提交的 `EventRecord`，`canonical_line` 就是账本里的那行字节，所以在那里切不必再读一遍账本；视图拒折过一条记录之后本进程就不能再切，否则从快照起步会接受全量折叠拒绝的历史；间隔要取时间，而取时间的地方是 `bin::assembly`，所以节奏要以参数接一个时钟；`from` 的原因写进 `log`，页面只有在起步时开着日志视角才看得到，之后打开的页面看不到，因为日志行按 `serving::journal` 的规则可丢——它是成为页面打开时就读的某个视图的字段（改线格式），还是留作日志行，尚未决定；40 万行城首字节 ≤ 150 ms 的读数留在延后的测量里。
 **尚未做到的（本节接口的当前状态）**：查询仍在锁内作答，`GitStatus` 等做 I/O 的查询仍在锁内做 I/O，所以读者之间、以及读者与折叠线程之间仍会互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取、把 I/O 移到锁外（锁内只取所需的小数据），是这一接口余下的两步。
 **切快照：服务起步时，折叠越过快照就切一次。** `serve` 的写线程调 `start_served_views`：它先 `start_views`，再切快照（`snapshot::start::cut`），再把起步原因写进 `log`，最后交出视图。从创世折过至少一行、或尾部非空时，在最后一行切一份新快照；尾部为空（快照已在最后一行）时什么也不写。这个频率不含常数：切一次的代价是一次编码加一次 `sync`，与视图大小成正比；它省下的是下一次起步重折这段尾部的时间，与尾部长度成正比，而尾部只在上次起步之后增长。一次性的查询（`views::ask`）经 `Views::rebuild` 只读快照，不切：读命令不写盘。**写不下快照不让 `serve` 失败**：失败写成一条 `Refuse` 诊断，内容是失败原因与恢复办法，视图照常交出。快照只是下一次起步的捷径：没切成，下一次起步从旧快照或从创世多折一段，结果逐字节相同，只慢一些；而账本写不下时历史本身就缺了，两者不能同样对待。**被否：写不下快照就让 `serve` 失败。** 那让一个只影响下次起步速度的故障（快照目录满、权限错）挡住整座城。
 
-**本节接口的当前状态**：长时间运行中的城只在起步时切快照，运行中按测得的折叠成本切快照尚未落地——折叠线程（`serving::folding`）手里有每条已提交的 `EventRecord`，`canonical_line` 就是账本里的那行字节，所以在那里切不必再读一遍账本；视图拒折过一条记录之后本进程就不能再切，否则从快照起步会接受全量折叠拒绝的历史；间隔要取时间，而取时间的地方是 `bin::assembly`，所以节奏要以参数接一个时钟；`from` 的原因写进 `log`，页面只有在起步时开着日志视角才看得到，之后打开的页面看不到，因为日志行按 `serving::journal` 的规则可丢——它是成为页面打开时就读的某个视图的字段（改线格式），还是留作日志行，尚未决定；40 万行城首字节 ≤ 150 ms 的读数留在延后的测量里。
+**切快照：服务中，按测得的折叠成本。** 折叠线程（`serving::folding`）每批把记录折进两份视图之后，在这一批最后一条已提交记录处用备用份切一份视图快照（`Views::cut_snapshot_at`）：那条记录的 `canonical_line` 就是账本里的那行字节，所以切快照不再读账本，而备用份此刻没有读者。节奏由 `folding` 里的 `Cadence` 定：它累计自上次切快照以来折叠已提交记录所花的时间（下一次起步要重折的尾部，大致就是这么多时间），累计到上一次切快照所花时间的 `CUT_SHARE_INVERSE`（= 10）倍时再切；还没量过切快照时，第一批之后就切，并量出它。通道关闭（写线程与另两处落点都已放手）时，自上次切快照以来折过记录就再切一次，于是正常停下的城下一次起步不折尾部。于是切快照占折叠线程的时间不超过十分之一，而下一次起步要重折的尾部不超过十次切快照的时间；两者都从这台机器上测出的时间推出，没有按某一类机器调的行数或秒数。时间由 `bin::assembly` 以 `clock` 参数交进来，`folding` 自己不采样。**视图拒折过一条记录之后，本进程不再切**：快照会把被拒的那条当作已折叠，下一次从快照起步就接受了全量折叠会拒绝的历史。切不成（编码失败、写盘失败）只写一行 stderr，视图照常发布：快照只是下一次起步的捷径。**被否：另起一条线程再读一遍账本来切。** 那是每次切快照多读一遍尾部的行，而折叠线程手里已经有这些字节。**被否：固定每 N 条记录切一次。** N 在慢盘上太密、在快盘上太疏，切快照的代价与视图大小成正比，不与记录条数成正比。
+
+**本节接口的当前状态**：切快照（编码与 `sync`）在折叠线程上做，这一批之后的下一批要等它写完；把写盘交给另一条线程、折叠线程只编码，是这一接口余下的一步。`from` 的原因写进 `log`，页面只有在起步时开着日志视角才看得到，之后打开的页面看不到，因为日志行按 `serving::journal` 的规则可丢。40 万行城首字节 ≤ 150 ms 的读数留在延后的测量里。
 
 ### 8-92 worker 的 Standing 从快照起步（`bin::assembly::folds::standing_start`）
 
