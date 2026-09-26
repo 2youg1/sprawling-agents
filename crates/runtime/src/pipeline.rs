@@ -29,6 +29,7 @@ use crate::sieve::{
 };
 
 pub mod adviser;
+pub mod connector;
 pub mod exec;
 
 pub use adviser::{Adviser, Ask, Consultation};
