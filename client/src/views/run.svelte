@@ -33,7 +33,6 @@
   import type {
     Answer,
     EvidenceKind,
-    GitOid,
     Query,
     RunId,
     RoundsAnswer,
@@ -247,7 +246,7 @@
     </div>
   {:else if eye.id === "monitor"}
     <div class="flex h-[70vh] min-h-0 flex-col rounded-card border border-edge">
-      <Monitor {turns} tail={$tails[run] ?? NO_TAIL} onDraft={draftSteer} onSteer={(text: string) => u.send(steer(run, text))} />
+      <Monitor {turns} tail={$tails[run] ?? NO_TAIL} {live} onDraft={draftSteer} onSteer={(text: string) => u.send(steer(run, text))} />
     </div>
   {:else if eye.id === "prompt"}
     <Prompt {run} />

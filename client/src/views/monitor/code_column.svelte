@@ -30,13 +30,17 @@
 
   interface Props {
     readonly files: readonly Touched[];
+    // A finished run refuses a steer and draws no composer, so comment
+    // and revert are offered only while it is live; opening the file
+    // in an editor needs no run and stays.
+    readonly live: boolean;
     // Puts a steer in front of the person to finish and send.
     readonly onDraft: (text: string) => void;
     // Sends a steer to the run as it stands.
     readonly onSteer: (text: string) => void;
   }
 
-  const { files, onDraft, onSteer }: Props = $props();
+  const { files, live, onDraft, onSteer }: Props = $props();
   const { lang, prefs } = ui();
 
   const filled = (key: "mon_comment_draft" | "mon_revert_steer", path: string, hunk: Hunk): string => {
@@ -66,22 +70,24 @@
     {#each file.hunks as hunk, h (h)}
       {@const opening = editorLink({ ...prefs.editor(), path: file.path, line: lineOf(hunk) })}
       <div class="flex justify-end gap-tight border-b border-edge bg-page px-snug">
-        <button
-          type="button"
-          class={ACTION}
-          onclick={() => {
-            onDraft(filled("mon_comment_draft", file.path, hunk));
-          }}
-          >{say($lang, "mon_comment")}</button
-        >
-        <button
-          type="button"
-          class={ACTION}
-          onclick={() => {
-            onSteer(filled("mon_revert_steer", file.path, hunk));
-          }}
-          >{say($lang, "mon_revert")}</button
-        >
+        {#if live}
+          <button
+            type="button"
+            class={ACTION}
+            onclick={() => {
+              onDraft(filled("mon_comment_draft", file.path, hunk));
+            }}
+            >{say($lang, "mon_comment")}</button
+          >
+          <button
+            type="button"
+            class={ACTION}
+            onclick={() => {
+              onSteer(filled("mon_revert_steer", file.path, hunk));
+            }}
+            >{say($lang, "mon_revert")}</button
+          >
+        {/if}
         {#if opening !== null}
           <a class={ACTION} href={opening}>{say($lang, "setup_editor")}</a>
         {/if}

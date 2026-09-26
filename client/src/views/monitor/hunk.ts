@@ -18,10 +18,17 @@ export interface Reverse {
   readonly now: string;
   // The hunk's kept and removed lines: what the file held before.
   readonly was: string;
+  // The backtick run that fences both sides in the steer: one longer
+  // than any run inside them, so text that holds a fence of its own
+  // cannot close it early and leave the agent an ambiguous instruction.
+  readonly fence: string;
 }
 
 export function reverseOf(hunk: Hunk): Reverse {
-  return { now: sideOf(hunk, "added"), was: sideOf(hunk, "removed") };
+  const now = sideOf(hunk, "added");
+  const was = sideOf(hunk, "removed");
+  const longest = Math.max(0, ...[now, was].flatMap((side) => (side.match(/`+/g) ?? []).map((run) => run.length)));
+  return { now, was, fence: "`".repeat(Math.max(3, longest + 1)) };
 }
 
 // The hunk's first line in the file as it is now. A hunk that only

@@ -71,6 +71,6 @@
 
 <Case label="monitor · a run's code beside its terminal">
   <div class="flex h-[32rem] min-h-0 flex-col rounded-card border border-edge">
-    <Monitor turns={TURNS} tail={NO_TAIL} onDraft={() => undefined} onSteer={() => undefined} />
+    <Monitor turns={TURNS} tail={NO_TAIL} live={true} onDraft={() => undefined} onSteer={() => undefined} />
   </div>
 </Case>
