@@ -3515,3 +3515,28 @@ pub(super) enum LineError {
 
 1. 不用 clap。命令表是数据，解析器约两百行；启动时间几乎全是操作系统的开销（Windows x86-64 桌面级机器上，`--version` 首字节 7.98 ms，空进程下限 5.40 ms），没有给一个参数库的依赖、编译时间与体积留出位置。重新考虑的条件：动词需要子动词或 shell 补全以外的、这张表表达不了的结构。
 2. 不用 `+` 前缀区分动词。现有动词不改名，一个词仍然是一个动词，文档与肌肉记忆都不必迁移。
+
+## 8-90 性能监视器的历史：有人看才采样，每项 300 点（`bin::monitor`，形状：状态机）
+
+WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是同一份历史：每秒一个 `Sample`，最近 300 个（5 分钟）。`bin::monitor` 只管两件事：此刻有没有人在看，以及看的人读到的那 300 个点。计数器从哪里读（核心进程、Job Object、整机、城所在的卷、记账线程）由调用方传进来的读取函数决定，本模块不碰平台接口。
+
+**接口。**
+
+- `Sample`：一次读数，全部是 `u64` 的整数计数，没有浮点（它会上线协议）。字段：`core_cpu_permille`、`core_private_bytes`、`core_working_set_bytes`、`core_read_bytes`、`core_written_bytes`、`machine_cpu_permille`、`machine_available_bytes`、`volume_free_bytes`、`ledger_queue_depth`、`durable_lag`、`relay_p50_nanos`、`event_to_screen_p50_nanos`、`queued_runs`。
+- `Monitor::new()`：不分配。
+- `Monitor::watch(&self) -> Watch`：一个在看的人。`Watch` 被丢弃时这个人就不再算数；它可以跨线程持有（socket 线程持有，采样线程计数）。
+- `Monitor::tick(&mut self, read: impl FnOnce() -> Sample)`：每秒调用一次。有人在看时调用 `read` 一次并把结果放进历史，满 300 个时丢掉最旧的；没人在看时不调用 `read`，并释放历史占的内存。
+- `Monitor::history(&self) -> impl Iterator<Item = &Sample>`：从最旧到最新。
+- 没有失败路径：计数是 `AtomicUsize` 的加减，历史的容量在第一次放入时一次预留。
+
+**定下的值。** `CAPACITY = 300`（每秒一点，5 分钟）；`HISTORY_BUDGET = 64 KiB`，`CAPACITY × size_of::<Sample>()` 超过它时编译失败（13 个 `u64`，现为 31 200 字节）。
+
+**决定。**
+
+1. 没人看时既不读计数器也不留历史。零开销指的是 CPU 与内存两轴：不读就没有系统调用，释放就没有常驻的 31 KiB；代价是重新打开监视页时曲线从空开始。另一种做法是一直采样、页面打开就有 5 分钟的曲线，它让每个没人看的城都多付一份开销，而这正是人要求避免的。重新考虑的条件：人要求打开页面就看到过去 5 分钟。
+2. 读取函数由调用方传入，而不是一个 trait。现在只有一种读法（生产的平台计数器）；测试传一个计数的闭包即可验证「没人看不读」，不必为一个没有第二实现的接缝造 trait。
+3. 历史是一个 `VecDeque`，第一次放入时 `reserve_exact(CAPACITY)`，之后不再分配。
+
+**测试。** `monitor::tests`：没人看时 `read` 一次也不被调用、历史为空，人走了以后历史被释放；放入 301 个点后只剩最后 300 个、从旧到新。
+
+**本节接口的当前状态。** 监视器的其余部分尚未落地：生产的计数器读取（核心进程的 CPU、private、工作集、读写字节；Job Object 的汇总与逐进程明细并归到 run；整机 CPU、可用内存；卷的剩余空间与磁盘延迟），计数器来源的选择（`sysinfo` 还是只取需要的几个平台接口，按体积与启动时间实测后定在这里），线协议的监视帧与 `WIRE_V` 加一，WebUI 的监视页与事实条摘要，`sprawling top <city>`（终端里是交互界面，stdout 不是终端时每秒一行 JSON），以及采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
