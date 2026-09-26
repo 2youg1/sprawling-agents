@@ -1965,7 +1965,7 @@ pub struct ConnectorCall<'a> { pub label: &'a ServerLabel, pub tool: &'a ToolNam
 /// 一件 connector 工具的远端名字，是不是这座城收不回来的那一类。
 pub fn reaches_the_undoable(call: &ConnectorCall<'_>) -> bool;
 
-/// 够得着本机桌面的调用：楼层信任该连接器且参数不带 taint 才放行，否则拒。
+/// 够得着运行这座城的机器桌面的调用：楼层信任该连接器且参数不带 taint 才放行，否则拒。
 pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &TaintSet) -> GateOutcome;
 ```
 
@@ -2102,8 +2102,8 @@ impl CityLayout {
     pub fn cas(&self) -> PathBuf;                               // root/.sprawling/cas
     pub fn library(&self) -> PathBuf;                           // root/.sprawling/library
     pub fn config(&self, addr: &Address) -> PathBuf;            // <scope>/.sprawling/CONFIG.toml
-    pub fn city_config(&self) -> PathBuf;                       // root/.sprawling/CONFIG.toml
-    pub fn city_filters(&self) -> PathBuf;                      // root/.sprawling/FILTERS.toml
+    pub fn city_config(&self) -> PathBuf;                       // <root>/.sprawling/CONFIG.toml
+    pub fn city_filters(&self) -> PathBuf;                      // <root>/.sprawling/FILTERS.toml
     pub fn building_skills(&self, addr: &Address) -> PathBuf;   // <scope>/.sprawling/skills
     pub fn filters(&self, addr: &Address) -> PathBuf;           // <scope>/.sprawling/FILTERS.toml
     pub fn archive(&self, building: &Address) -> PathBuf;       // <scope>/Archive
