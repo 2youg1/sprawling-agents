@@ -56,12 +56,19 @@ pub(super) fn recorded() -> Recording {
 
 pub(super) fn tool(cas_at: &std::path::Path) -> BrowserTool {
     let cas = Cas::open(cas_at).expect("a cas opens in a fresh directory");
-    BrowserTool::new(Role::Building, Box::new(recorded()), cas).expect("the tool builds")
+    BrowserTool::new(Role::Building, Box::new(recorded()), cas, origin()).expect("the tool builds")
 }
 
 pub(super) fn tool_with(cas_at: &std::path::Path, port: Recording) -> BrowserTool {
     let cas = Cas::open(cas_at).expect("a cas opens in a fresh directory");
-    BrowserTool::new(Role::Building, Box::new(port), cas).expect("the tool builds")
+    BrowserTool::new(Role::Building, Box::new(port), cas, origin()).expect("the tool builds")
+}
+
+pub(super) fn origin() -> memory::BlockOrigin {
+    memory::BlockOrigin {
+        run: kernel::RunId::from_bytes([7; 16]),
+        building: kernel::Address::parse("lab").expect("a building address"),
+    }
 }
 
 /// The conversation a screenshot by reference has: the page names the

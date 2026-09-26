@@ -52,6 +52,7 @@ pub(crate) enum Role {
 pub(crate) fn for_user_browser(
     city_root: &std::path::Path,
     user: &city::UserBrowser,
+    origin: memory::BlockOrigin,
 ) -> Result<BrowserTool, AxError> {
     let cas = open_cas(city_root)?;
     match user {
@@ -59,6 +60,7 @@ pub(crate) fn for_user_browser(
             Role::PersonWaiting,
             Box::new(crate::browser_bidi::AttachedBrowser::waiting()),
             cas,
+            origin,
         ),
         city::UserBrowser::At(endpoint) => BrowserTool::new(
             Role::PersonAt {
@@ -66,6 +68,7 @@ pub(crate) fn for_user_browser(
             },
             Box::new(crate::browser_bidi::AttachedBrowser::at(endpoint.url())),
             cas,
+            origin,
         ),
     }
 }

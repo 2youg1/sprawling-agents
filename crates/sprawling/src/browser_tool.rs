@@ -49,6 +49,8 @@ pub(crate) struct BrowserTool {
     snapshot: Option<PageSnapshot>,
     generation: u64,
     cas: Cas,
+    /// The run and building a screenshot is pinned for.
+    origin: memory::BlockOrigin,
     /// The development loop. Every look folds into it, so "change
     /// something, look at it, decide" is one object rather than a habit
     /// the model has to remember.
@@ -66,6 +68,7 @@ impl BrowserTool {
         role: Role,
         port: Box<dyn BrowserPort + Send>,
         cas: Cas,
+        origin: memory::BlockOrigin,
     ) -> Result<BrowserTool, AxError> {
         let (name, disclosure, params, effect) = match role {
             Role::Building => (
@@ -109,6 +112,7 @@ impl BrowserTool {
             snapshot: None,
             generation: 0,
             cas,
+            origin,
             devloop: DevLoop::new(),
             complained: false,
         })
