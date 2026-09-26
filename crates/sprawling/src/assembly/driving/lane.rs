@@ -278,7 +278,7 @@ pub(crate) fn drive_run<L: Ledger>(
                     if let Some(oid) = at {
                         fenced.borrow_mut().push(oid);
                     }
-                    if call.name.as_str() != "exec" {
+                    if call.name.as_str() != kernel::ToolName::EXEC {
                         return Ok(outcome);
                     }
                     // Absence of `exit_code` is a failure, not a
@@ -307,7 +307,7 @@ pub(crate) fn drive_run<L: Ledger>(
                 // (runtime-SPEC.md 8-35). The command counters are not
                 // touched: nothing ran this time.
                 BenchOutcome::Duplicate { outcome } => {
-                    if call.name.as_str() == "exec" {
+                    if call.name.as_str() == kernel::ToolName::EXEC {
                         sieving.package(call, outcome)
                     } else {
                         Ok(outcome)
