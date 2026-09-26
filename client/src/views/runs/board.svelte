@@ -67,8 +67,13 @@
   let cursorKey = $state<string | null>(null);
   const cursor = $derived(Math.max(0, rows.findIndex((row) => row.key === (cursorKey ?? waiting[0]?.run))));
 
+  // Measured here rather than bound: a bound height observes the list,
+  // and the padding that stands in for undrawn rows resizes it, which
+  // is a resize loop the browser reports as an error.
   $effect(() => {
-    if (rowPx === 0 && list !== undefined) rowPx = list.querySelector("li")?.getBoundingClientRect().height ?? 0;
+    if (list === undefined || rows.length === 0) return;
+    if (rowPx === 0) rowPx = list.querySelector("li")?.getBoundingClientRect().height ?? 0;
+    viewport = list.clientHeight;
   });
 
   function levelOf(row: Row): number {
@@ -167,7 +172,6 @@
 
   <ul
     bind:this={list}
-    bind:clientHeight={viewport}
     class="max-h-[70dvh] min-w-0 overflow-y-auto border-b border-edge"
     style:padding-top="{String(shown.from * rowPx)}px"
     style:padding-bottom="{String((rows.length - shown.to) * rowPx)}px"
@@ -175,7 +179,7 @@
     tabindex="0"
     aria-label={say($lang, "runs_tree")}
     aria-activedescendant={rows[cursor] === undefined ? undefined : `runs-row-${rows[cursor].key}`}
-    onscroll={(event) => { scrolled = event.currentTarget.scrollTop; }}
+    onscroll={(event) => { scrolled = event.currentTarget.scrollTop; viewport = event.currentTarget.clientHeight; }}
     onkeydown={pressed}
   >
     {#each rows.slice(shown.from, shown.to) as row, at (row.key)}
