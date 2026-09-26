@@ -35,6 +35,15 @@ export function rows(samples: readonly Sample[], width: number): readonly Row[] 
   }));
 }
 
+// The fact bar's summary of the latest reading: this process's CPU
+// share and working set, the two figures a summary-only watch reads.
+export function summary(latest: Sample): { readonly cpu: string; readonly memory: string } {
+  return {
+    cpu: reading("permille", latest.core_cpu_permille),
+    memory: reading("bytes", latest.core_working_set_bytes),
+  };
+}
+
 // The eight heights a curve is drawn in, lowest first.
 const LEVELS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
 

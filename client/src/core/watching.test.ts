@@ -29,6 +29,28 @@ describe("watching the monitor", () => {
     ]);
   });
 
+  test("the city hears the most any watcher wants: the page over the summary", () => {
+    const sent: string[] = [];
+    const watching = createWatching((text) => {
+      sent.push(text);
+      return true;
+    });
+    const summary = watching.watchSummary();
+    const page = watching.watch();
+    const second = watching.watchSummary();
+    page();
+    watching.reconnected();
+    summary();
+    second();
+    expect(sent).toEqual([
+      '{"monitor":"watch_summary"}',
+      '{"monitor":"watch"}',
+      '{"monitor":"watch_summary"}',
+      '{"monitor":"watch_summary"}',
+      '{"monitor":"release"}',
+    ]);
+  });
+
   test("a page keeps the last 300 readings and forgets them on release", () => {
     const watching = createWatching(() => true);
     const release = watching.watch();

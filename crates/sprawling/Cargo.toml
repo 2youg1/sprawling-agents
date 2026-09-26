@@ -23,10 +23,10 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 postcard = { workspace = true }
 tokio = { workspace = true }
-# The monitor's counters (sprawling-SPEC.md 8-92): only the process,
-# memory and disk tables, not the default component, network and user ones.
-# The machine and the volume only: this process is read through its own
-# handle below, not through the whole process table.
+# The monitor's counters (sprawling-SPEC.md 8-94, 8-96): the machine's
+# memory and the volume only, not the default component, network and user
+# tables; this process is read through its own handle below, not through
+# the whole process table.
 sysinfo = { version = "0.37", default-features = false, features = ["system", "disk"] }
 cpu-time = "1"
 memory-stats = "1.2"

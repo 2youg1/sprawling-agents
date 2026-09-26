@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The thread that ticks the monitor once a second and sends each fresh
-//! reading to the watching sessions (sprawling-SPEC.md 8-92).
+//! reading to the watching sessions (sprawling-SPEC.md 8-96).
 
 use std::sync::{Mutex, PoisonError, Weak};
 use std::time::Duration;

@@ -143,7 +143,7 @@ pub(super) fn default_city_location() -> std::path::PathBuf {
     }
 }
 
-/// Watches the city at `--at` until it stops (sprawling-SPEC.md 8-93).
+/// Watches the city at `--at` until it stops (sprawling-SPEC.md 8-97).
 fn top(args: &[String]) -> ExitCode {
     use std::io::IsTerminal;
     let at = flag_value(args, "--at").unwrap_or_else(|| DEFAULT_AT.to_owned());
