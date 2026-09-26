@@ -222,13 +222,16 @@ pub(super) fn serve_city(
         Err(err) => return report(err),
     };
     let token = keyed.code().map(str::to_owned);
-    let runtime = match tokio::runtime::Runtime::new() {
-        Ok(runtime) => runtime,
-        Err(err) => {
-            eprintln!("could not start the async runtime: {err}");
-            return ExitCode::FAILURE;
-        }
-    };
+    // The socket's workers stand above the commands the city dispatches
+    // (sprawling-SPEC.md 8-93).
+    let runtime =
+        match serving::standing::serving_runtime(serving::standing::setting_telling_a_refusal()) {
+            Ok(runtime) => runtime,
+            Err(err) => {
+                eprintln!("could not start the async runtime: {err}");
+                return ExitCode::FAILURE;
+            }
+        };
     let client_line = match &client {
         channels::ClientAssets::Disk(dir) => {
             format!("read per request from {}", dir.display())

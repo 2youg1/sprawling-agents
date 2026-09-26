@@ -7,7 +7,9 @@
 
 use std::time::{Duration, Instant};
 
-use super::{BUSY_LIMIT, CorePriority, Standing, Valve, Verdict, raise_this_thread};
+use super::{
+    BUSY_LIMIT, CorePriority, Standing, Valve, Verdict, raise_this_thread, serving_runtime,
+};
 
 #[cfg(windows)]
 #[test]
@@ -46,5 +48,24 @@ fn a_thread_busy_through_the_window_is_lowered() {
     assert_eq!(
         (half.verdict(), full.verdict()),
         (Verdict::Keep, Verdict::Lower)
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn a_socket_worker_stands_above_normal_once_it_has_woken() {
+    use thread_priority::{ThreadPriority, WinAPIThreadPriority, get_current_thread_priority};
+    let runtime = serving_runtime(CorePriority::Raised).unwrap();
+    let read = runtime.block_on(async {
+        tokio::spawn(async {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            get_current_thread_priority().unwrap()
+        })
+        .await
+        .unwrap()
+    });
+    assert_eq!(
+        read,
+        ThreadPriority::Os(WinAPIThreadPriority::AboveNormal.into())
     );
 }

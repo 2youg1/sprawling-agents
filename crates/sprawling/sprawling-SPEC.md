@@ -3608,6 +3608,8 @@ impl CoreThread {
     pub(crate) fn raise(name: &'static str, setting: CorePriority, now: Instant) -> Self;
     pub(crate) fn record_turn_lowering_when_busy(&mut self, woke: Instant, slept: Instant);
 }
+pub(crate) fn setting_telling_a_refusal() -> CorePriority; // 读不了就 Normal，并向标准错误说出拒绝
+pub(crate) fn serving_runtime(setting: CorePriority) -> std::io::Result<tokio::runtime::Runtime>;
 // bin::person
 pub(crate) fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
 ```
@@ -3616,8 +3618,8 @@ pub(crate) fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid
 - **设置**：人的配置文件（`Home::person_config`，即 `config.toml`）里 `[core]` 一节的 `priority`，`"raised"` 或 `"normal"`，缺省为 `"raised"`。`"normal"` 让 `raise_this_thread` 不调任何平台接口，返回 `Standing::Normal(Held::ByTheSetting)`。文件读不了、解析不了或值拼错时，服务照常起动，核心留在正常档，并向标准错误说出拒绝与恢复办法：升档是有全机代价的一方，要有一个说「可以」的读数才做。设置在服务起动时读一次，改了要重启服务。
 - **安全阀**：升了档的线程若空转，会拖住整台机器。每条升档线程带一个 `Valve`，每处理完一件事记一次「醒来—再次阻塞」；窗口从上一个窗口关上时开始，第一件结束在窗口开出 `BUSY_LIMIT` 之后的事关上它；关上时忙的时间占到窗口的 15/16 以上，`verdict` 变成 `Lower`，此后一直是 `Lower`。`record_turn_lowering_when_busy` 见到站在升档上的线程得了 `Lower`，就调 `lower_this_thread` 回到正常档，并向标准错误写一行说给人：哪条线程、忙满了多少秒、已降回正常档。时间作参数传入，`Valve` 本身不读钟，所以它的判定可以用编造的时刻逐点验证。
 - **量的是墙钟，不是 CPU 时间**：线程在两次阻塞之间走过的墙钟时间是它占着核的时间的上界；升了档的线程很少被抢占，二者接近。
-- **哪些线程**：视图线程 `sprawling-views`（`bin::serving::folding`）起动时升档，每折完、广播完一件记一次。
-- 证据：`crates/sprawling/src/serving/standing/tests.rs` 的 `a_raised_core_thread_stands_above_normal`（Windows 臂：升档后读回 `AboveNormal`）与 `a_thread_busy_through_the_window_is_lowered`（忙满一个窗口的线程判降回，忙一半的不判）；`crates/sprawling/src/person.rs` 的 `a_person_who_turns_the_raise_off_gets_normal_priority`。
+- **哪些线程**：视图线程 `sprawling-views`（`bin::serving::folding`）起动时升档，每折完、广播完一件记一次。socket 服务所在的 tokio 多线程运行时由 `serving_runtime` 建（`bin::main::city` 用它代替 `Runtime::new`）：每条 worker 第一次被唤醒（`on_thread_unpark`）时升档，此后每次唤醒到下一次停放（`on_thread_park`）记一次，档位与阀放在线程本地。只在唤醒时升，因为只有 worker 会停放与唤醒：阻塞池的线程（`spawn_blocking`）从不唤醒，所以永远不会成为没有阀的升档线程；代价是一条起动后从未停放过的 worker 留在正常档，而这正是安全的一侧。
+- 证据：`crates/sprawling/src/serving/standing/tests.rs` 的 `a_raised_core_thread_stands_above_normal`（Windows 臂：升档后读回 `AboveNormal`）与 `a_thread_busy_through_the_window_is_lowered`（忙满一个窗口的线程判降回，忙一半的不判）；`a_socket_worker_stands_above_normal_once_it_has_woken`（Windows 臂：`serving_runtime` 的 worker 睡过一次之后读回 `AboveNormal`）；`crates/sprawling/src/person.rs` 的 `a_person_who_turns_the_raise_off_gets_normal_priority`。
 
 **决定**
 
@@ -3625,4 +3627,4 @@ pub(crate) fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid
 2. 安全阀量墙钟而不量 CPU 时间：读线程自己的 CPU 时间在 Windows 上是 `GetThreadTimes`，没有第一档的路；墙钟只会高估忙的程度，所以阀只会降得早，不会降得晚。重开参数：出现对外只给安全接口、读线程 CPU 时间的 crate。
 3. 降回之后不再升：一条线程忙满过一个窗口，就说明它的工作量不该排在派出的命令前面；反复升降只会让人看到忽快忽慢。
 
-**尚未做到的（本节接口的当前状态）**：写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。socket 服务在 tokio 的线程上，还没有升档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）。doctor 还不报告每个平台实际站在哪一档。
+**尚未做到的（本节接口的当前状态）**：写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。Unix 上没有 `CAP_SYS_NICE` 时，每条 worker 各说一次它留在正常档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）。doctor 还不报告每个平台实际站在哪一档。

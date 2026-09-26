@@ -33,7 +33,7 @@ use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK_MS};
 use super::folding::{Folding, spawn_folding};
 use super::relay::Patience;
 use super::serve::Opening;
-use super::standing::CorePriority;
+use super::standing::setting_telling_a_refusal;
 use crate::assembly::{RunWorker, Serving, now_ms};
 use crate::views::Views;
 
@@ -76,13 +76,9 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         to_clients,
         to_watchers,
     } = outward;
-    // A file that cannot be read holds the core at normal: raising has a
-    // machine-wide cost, so it waits for a reading that allows it
+    // The views thread stands above the commands the city dispatches
     // (sprawling-SPEC.md 8-93).
-    let setting = crate::person::core_priority().unwrap_or_else(|err| {
-        eprintln!("the core stays at normal priority: {err}");
-        CorePriority::Normal
-    });
+    let setting = setting_telling_a_refusal();
     // The views are folded beside the writer rather than on it, so a
     // reader holding them never delays the next record
     // (sprawling-SPEC.md 8-89).

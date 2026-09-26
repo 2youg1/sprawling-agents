@@ -103,6 +103,29 @@ impl CoreThread {
     }
 }
 
+/// The person's setting, or `Normal` with the refusal told on stderr
+/// when it cannot be read: raising has a machine-wide cost, so it waits
+/// for a reading that allows it.
+pub(crate) fn setting_telling_a_refusal() -> CorePriority {
+    crate::person::core_priority().unwrap_or_else(|err| {
+        eprintln!("the core stays at normal priority: {err}");
+        CorePriority::Normal
+    })
+}
+
+/// The async runtime the socket is served on, its workers raised as
+/// `setting` allows, each with its valve.
+///
+/// # Errors
+///
+/// The runtime's own failure to start.
+pub(crate) fn serving_runtime(setting: CorePriority) -> std::io::Result<tokio::runtime::Runtime> {
+    drop(setting);
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+}
+
 /// Raises the calling thread one step above normal, unless the setting
 /// holds it at normal or the platform refuses.
 pub(crate) fn raise_this_thread(setting: CorePriority) -> Standing {
