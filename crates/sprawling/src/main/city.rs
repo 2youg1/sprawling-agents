@@ -29,9 +29,8 @@
 #[path = "city/opening.rs"]
 mod opening;
 
-use super::router::{
-    COMMANDS, client_summary, default_city_location, flag_value, log_floor, log_levels, named,
-};
+use super::grammar::Arguments;
+use super::router::{client_summary, default_city_location, flag_value, log_floor, log_levels};
 use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, console, firstrun, serving};
@@ -39,15 +38,11 @@ use std::process::ExitCode;
 
 use opening::{Open, opening};
 
-pub(super) fn up(args: &[String]) -> ExitCode {
-    let city = match args.get(1).filter(|a| !a.starts_with("--")) {
-        Some(dir) => std::path::PathBuf::from(dir),
-        None => default_city_location(),
-    };
-    let addr = args
-        .get(2)
-        .filter(|a| !a.starts_with("--"))
-        .map_or(DEFAULT_AT, String::as_str);
+pub(super) fn up(read: &Arguments, args: &[String]) -> ExitCode {
+    let city = read
+        .positional(1)
+        .map_or_else(default_city_location, std::path::PathBuf::from);
+    let addr = read.positional(2).map_or(DEFAULT_AT, String::as_str);
     up_at(&city, addr, args)
 }
 
@@ -133,13 +128,11 @@ pub(super) fn up_at(city: &std::path::Path, raw: &str, args: &[String]) -> ExitC
 
 /// The genesis write: a city is born when city_initialized becomes line
 /// zero of its ledger (walkthrough step 1).
-pub(super) fn init(args: &[String]) -> ExitCode {
-    let Some(dir) = named(args, 1) else {
-        eprintln!("usage: sprawling init <city-dir> [--adopt]");
-        eprintln!("--adopt turns every folder already there into a building");
+pub(super) fn init(read: &Arguments) -> ExitCode {
+    let Some(dir) = read.positional(1) else {
         return ExitCode::from(2);
     };
-    let adopt = if args.iter().any(|arg| arg == "--adopt") {
+    let adopt = if read.has("--adopt") {
         assembly::Adopt::EveryFolder
     } else {
         assembly::Adopt::Nothing
@@ -167,22 +160,10 @@ pub(super) fn report(err: kernel::AxError) -> ExitCode {
 /// and an address beyond this machine needs `SPRAWLING_PAIRING_TOKEN` -
 /// refused at startup, not at connect time.
 pub(super) fn serve(dir: Option<&String>, addr: Option<&String>, args: &[String]) -> ExitCode {
-    // `--help` after a subcommand asks about the subcommand, not for a
-    // city called `--help`; without this the storage layer reported that
-    // it could not list `--help\.sprawling\ledger`.
-    if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("{COMMANDS}");
-        return ExitCode::SUCCESS;
-    }
-    let Some(dir) = dir.filter(|a| !a.starts_with("--")) else {
-        eprintln!("usage: sprawling serve <city-dir> [addr] [--log <level>] [--web-dir <dir>]");
+    let Some(dir) = dir else {
         return ExitCode::from(2);
     };
-    // The address is the first non-flag argument after the city dir, so
-    // `serve city --log off` does not read `--log` as an address.
-    let raw = addr
-        .filter(|a| !a.starts_with("--"))
-        .map_or(DEFAULT_AT, String::as_str);
+    let raw = addr.map_or(DEFAULT_AT, String::as_str);
     let open = opening(args, Open::Nothing);
     serve_city(std::path::Path::new(dir), raw, args, open)
 }
