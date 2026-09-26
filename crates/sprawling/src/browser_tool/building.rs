@@ -78,13 +78,13 @@ pub(crate) fn for_rules(
     city_root: &std::path::Path,
     origin: &memory::BlockOrigin,
     rules: &city::BuildingRules,
-) -> Result<Vec<BrowserTool>, AxError> {
-    let mut tools = Vec::new();
+) -> Result<Vec<Box<dyn kernel::Tool>>, AxError> {
+    let mut tools: Vec<Box<dyn kernel::Tool>> = Vec::new();
     if rules.browser() {
-        tools.push(for_building(city_root, origin.clone())?);
+        tools.push(Box::new(for_building(city_root, origin.clone())?));
     }
     if let Some(user) = rules.usersbrowser() {
-        tools.push(for_user_browser(city_root, user, origin.clone())?);
+        tools.push(Box::new(for_user_browser(city_root, user, origin.clone())?));
     }
     Ok(tools)
 }

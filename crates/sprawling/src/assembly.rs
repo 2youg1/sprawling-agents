@@ -142,6 +142,14 @@ impl accounting::Clock for SystemClock {
     }
 }
 
+/// The browser tools a building's rules ask for: its own browser, then
+/// the person's when they declared one (sprawling-SPEC.md 8-45-2).
+pub type Browsers = fn(
+    &Path,
+    &memory::BlockOrigin,
+    &city::BuildingRules,
+) -> Result<Vec<Box<dyn kernel::Tool>>, AxError>;
+
 /// What the startup scan found and repaired.
 pub struct ScanReport {
     /// What opening the ledger cut, told after the counts.
@@ -282,6 +290,11 @@ pub struct RunWorker {
     /// (`revealing::reveal`). Received rather than called, because it
     /// starts a program on the host (sprawling-SPEC.md 8-60).
     reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,
+    /// Builds the browser tools a building's rules ask for
+    /// (`browser_tool::for_rules`). Received rather than called, because
+    /// a browser tool starts a browser on the host (sprawling-SPEC.md
+    /// 8-45-2).
+    browsers: Browsers,
 }
 
 impl RunWorker {

@@ -212,6 +212,7 @@ impl RunWorker {
             clock: std::sync::Arc::new(SystemClock),
             read_volume: crate::monitor::volume::read,
             reveal: crate::revealing::reveal,
+            browsers: crate::browser_tool::for_rules,
         };
         worker.sweep_abandoned_trees();
         Ok(worker)
@@ -312,6 +313,14 @@ impl RunWorker {
         clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
     ) -> RunWorker {
         RunWorker { clock, ..self }
+    }
+
+    /// The same worker, taking the browser tools a building's rules ask
+    /// for from `browsers` instead of starting a browser on this host
+    /// (sprawling-SPEC.md 8-45-2).
+    #[must_use]
+    pub fn with_browsers(self, browsers: super::Browsers) -> RunWorker {
+        RunWorker { browsers, ..self }
     }
 }
 
