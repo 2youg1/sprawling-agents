@@ -884,7 +884,7 @@ sequenceDiagram
     participant A as accounting thread
     participant R as Ledger
     participant C as bin::assembly::chain_watch
-    M->>S: bind; a port another process holds is refused before any write
+    M->>S: bind, and a port another process holds is refused before any write
     M->>P: start from the snapshot, fold only the tail after it
     M->>A: start the writer thread
     A->>R: open: take the writer lock, then recover a torn tail
