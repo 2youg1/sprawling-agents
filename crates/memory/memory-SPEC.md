@@ -924,3 +924,28 @@ pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, MemoryError>;   
 - **`WriteTarget` 是形状 2 值：不变量在唯一构造点，字段私有。** 「未经检查的写目标拼不出来」由 trybuild 编译失败反例钉住（`tests/ui/`，M8 惯例）。它的证明范围是「检查那一刻这个名与它的父级都不是链接」；检查与落盘之间的替换窗口属效果面，故两个采样点（walk 与写入）都过同一判定。Unix 上硬链接在判定内被拒；Windows 上判定读不到链接计数，落盘纪律另兜该臂。
 - **消费面是三个写域加一个工具写面**：checkpoint 暂存回调（8-8）、bundle 的 `landing::land`（8-12）、worktree 放置，加上 `runtime::tools::edit` 的物理写入（运行的写域）——经链接写保留路径在每一扇门恒拒。
 - **proptest 族「别名永不落盘」**：对别名种类 × 目标（受保护／普通）× 落点（名上／父目录）的组合，凡该平台造得出的别名（junction 无需特权即可创建；symlink 需特权；硬链接随处可造）：链接臂与 Unix 硬链接臂写入被拒，Windows 硬链接臂写入落新 entry；各臂同一断言——目标字节不变、别名带不出新字节；该平台造不出的退化为断言「放置失败时盘上无任何变化」，各臂同性质。
+
+### 8-26 `memory::snapshot`：链哈希快照（形状 7 投影）
+
+```rust
+pub struct ChainSnapshot { /* fold_version, seq, line_hash, views：字段私有 */ }
+impl ChainSnapshot {
+    pub fn cut(fold_version: u32, seq: Seq, line: &[u8], views: Vec<u8>) -> ChainSnapshot;  // line_hash = chain_hash(line)
+    pub fn fold_version(&self) -> u32;
+    pub fn seq(&self) -> Seq;
+    pub fn views(&self) -> &[u8];
+    pub fn fit(&self, line_at_seq: &[u8]) -> SnapshotFit;              // 定位读到的那一行是否就是切点那一行
+    pub fn resume(&self) -> Result<LineCheck, AxError>;               // 切点之后的链状态：prev = line_hash，expected = seq + 1；seq 已是最后一个时是 Seq::next 的错误
+}
+pub enum SnapshotFit { Fits, Stale }
+pub enum StoredSnapshot { Absent, Damaged(String), Present(ChainSnapshot) }
+pub fn write_snapshot(dir: &Path, snapshot: &ChainSnapshot) -> Result<(), MemoryError>;
+pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, MemoryError>;
+```
+
+- **快照是投影，不是历史。** 它放在 `<city>/.sprawling/snapshot/`，内容是 `(fold_version, seq, line_hash, views_bytes)`：折叠在第 `seq` 行之后持有的状态，连同那一行的链哈希。删掉它，城照样起得来，只是回到全量折叠；所以文件损坏（魔数不对、长度不够、体摘要不符）读成 `Damaged(原因)` 交给调用方丢弃，只有 I/O 本身失败才是 `MemoryError`。
+- **文件格式**：`SPRSNAP1` 八字节魔数｜`fold_version` u32 LE｜`seq` u64 LE｜`line_hash` 32 字节｜`views` 的 blake3 32 字节｜`views` 到文件尾。体摘要让位翻转读成 `Damaged` 而不是一份错的视图；写入走「临时文件 → sync → rename → sync 目录」，所以撕裂的写不会留下半个快照。
+- **核对只看一行。** 启动时按 `seq` 做一次定位读，`fit` 比较那一行的 `chain_hash` 与 `line_hash`：相等时，在摘要单射的前提下（`adversary` 的 `Sprawling.Chain` 持有这条假设），快照所折的行就是盘上账本的前缀；`Stale` 时调用方丢弃快照，全量折叠。`fold_version` 不等同样丢弃：折叠规则变了，旧状态不再是新规则折出来的。
+- **「快照加尾部 ≡ 全量折叠」** 由 `adversary/src/Sprawling/Snapshot.lean` 对任意折叠、任意切点证明（`snapshotPlusTailIsWhole`、`resumeIsWhole`）；Rust 侧由 proptest 在随机账本与随机切点上持有同一性质，折叠取链检查本身：从 `resume()` 出发走尾部，接受的行与终态都等于从创世走全程。
+- **被否：只存 `seq` 不存 `line_hash`。** 账本被换成另一条同长的链时，只比 `seq` 会把别人的视图接到这条链的尾部上；多 32 字节换来的是一次定位读就能拒绝。
+- 仍未落地的阶段：`Views` 的字节编码与启动路径接入（定位读核对后只折尾部）；后台线程按段流式做全链校验并把结果作为诊断推给页面；校验失败时写者与视图停止接受新工作并给出人读得懂的原因。
