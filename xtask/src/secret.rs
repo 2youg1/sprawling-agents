@@ -59,7 +59,7 @@ const EXPOSE_WHITELIST: [&str; 6] = [
     // last slot before the wire as the two redemption points above. The
     // alternative was handing the broker a plaintext key from the
     // assembly, which is the thing this list exists to prevent.
-    "crates/gateway/src/mcp/broker.rs",
+    "crates/protocol/src/mcp/broker.rs",
 ];
 
 /// Exact literals the detector flags that are not credentials.
