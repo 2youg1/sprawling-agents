@@ -47,7 +47,7 @@ impl RunWorker {
         at: &Assignment,
         by: Reporter<'_>,
         effects: &[collab::ClaimEffect],
-        conversations: u32,
+        conversation: &super::Conversation,
     ) -> Result<(), AxError> {
         let Reporter {
             run_id,
@@ -106,7 +106,7 @@ impl RunWorker {
             return Ok(());
         }
         let landing = effect::Landing::signals(sent, room, who)?;
-        self.settle(at, run_id, landing, conversations)
+        self.settle(at, run_id, landing, conversation)
     }
 
     /// Which room holds each node of a building's plan.

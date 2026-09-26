@@ -129,7 +129,7 @@ fn a_knock_past_the_conversation_ceiling_starts_no_run() {
         addr: Address::parse("market/hana").unwrap(),
         from: "market/ito".to_owned(),
         mode: kernel::Mode::PlanGoal,
-        conversations: u32::MAX,
+        conversation: Conversation::deep(u32::MAX),
     });
     worker.answer_knocks();
     assert!(!worker.driving(), "a knock past the ceiling opens no lane");
@@ -331,7 +331,7 @@ fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
         addr: hana.clone(),
         from: "market/ito".to_owned(),
         mode: kernel::Mode::PlanGoal,
-        conversations: 0,
+        conversation: Conversation::default(),
     });
     worker.answer_knocks();
     worker.land_the_rest().unwrap();

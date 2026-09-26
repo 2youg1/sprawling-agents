@@ -26,6 +26,7 @@
 //! neither of those has to know why a run exists.
 
 use std::sync::Arc;
+use std::sync::atomic::AtomicU32;
 
 use kernel::{Address, AxCode, AxError, NodeId};
 
@@ -103,10 +104,22 @@ pub(in crate::assembly) struct Owing {
 /// how many times one piece of work has been handed over. A run is on
 /// both journeys: it may be the fourth knock of a conversation and the
 /// ninth successor of its work.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 struct Relays {
-    conversations: u32,
+    conversation: Conversation,
     successions: u32,
+}
+
+/// Where one run stands in the conversation that woke it.
+///
+/// `hops` is this run's own depth, which only its branch moves. `woken`
+/// is how many runs the whole conversation has started, shared by every
+/// branch, so a conversation that fans out is bounded by its width as
+/// well as by its depth (sprawling-SPEC.md 8-46-12).
+#[derive(Clone, Default)]
+pub(in crate::assembly) struct Conversation {
+    hops: u32,
+    woken: Arc<AtomicU32>,
 }
 
 /// The most knocks one conversation may carry. A conversation that has
@@ -120,27 +133,32 @@ const CONVERSATION_HOPS_MAX: u32 = 16;
 /// to price the work (sprawling-SPEC.md 8-46-12).
 const SUCCESSION_HOPS_MAX: u32 = 64;
 
+/// The most runs one conversation may wake across all its branches. The
+/// hop ceiling bounds a chain; this bounds a broadcast, which at sixteen
+/// hops deep could otherwise wake more residents than a city holds
+/// (sprawling-SPEC.md 8-46-12).
+const CONVERSATION_RUNS_MAX: u32 = 64;
+
 impl Relays {
     /// The place of a run one knock further along, or the refusal when
     /// the conversation has already gone as far as it may.
     fn after_knock(&self) -> Result<Relays, AxError> {
-        let conversations = self
-            .conversations
+        let hops = self
+            .conversation
+            .hops
             .checked_add(1)
             .filter(|next| *next <= CONVERSATION_HOPS_MAX)
             .ok_or_else(|| {
-                AxError::failure(
-                    AxCode::LoopSuspected,
-                    "wake the resident a signal was sent to",
-                    format!("a conversation already {} knocks deep", self.conversations),
-                )
-                .with_recovery(
-                    "read the signal already in the room's inbox, or dispatch the work to that \
-                     resident by hand; the city will not open another run in this chain",
-                )
+                conversation_refused(format!(
+                    "a conversation already {} knocks deep",
+                    self.conversation.hops
+                ))
             })?;
         Ok(Relays {
-            conversations,
+            conversation: Conversation {
+                hops,
+                woken: Arc::clone(&self.conversation.woken),
+            },
             successions: self.successions,
         })
     }
@@ -168,9 +186,34 @@ impl Relays {
                 )
             })?;
         Ok(Relays {
-            conversations: self.conversations,
+            conversation: self.conversation.clone(),
             successions,
         })
+    }
+}
+
+/// What a knock the conversation may not carry is refused with, for
+/// either of its two ceilings.
+fn conversation_refused(subject: String) -> AxError {
+    AxError::failure(
+        AxCode::LoopSuspected,
+        "wake the resident a signal was sent to",
+        subject,
+    )
+    .with_recovery(
+        "read the signal already in the room's inbox, or dispatch the work to that resident by \
+         hand; the city will not open another run in this chain",
+    )
+}
+
+#[cfg(test)]
+impl Conversation {
+    /// A conversation already `hops` knocks deep that has woken nobody.
+    pub(in crate::assembly) fn deep(hops: u32) -> Conversation {
+        Conversation {
+            hops,
+            woken: Arc::default(),
+        }
     }
 }
 
@@ -198,17 +241,17 @@ impl Owing {
     /// a chain already at its ceiling is refused here rather than opened
     /// and abandoned (sprawling-SPEC.md 8-46-12).
     ///
-    /// `conversations` is how many knocks deep the run that spoke was.
+    /// `conversation` is where the run that spoke stood.
     ///
     /// # Errors
     /// Refuses with `E_LOOP_SUSPECTED` when the knock would exceed
-    /// `CONVERSATION_HOPS_MAX`.
-    pub(in crate::assembly) fn knocked(conversations: u32) -> Result<Owing, AxError> {
+    /// `CONVERSATION_HOPS_MAX` or `CONVERSATION_RUNS_MAX`.
+    pub(in crate::assembly) fn knocked(conversation: Conversation) -> Result<Owing, AxError> {
         Ok(Owing {
             owed: Owed::Unasked(Unasked::Knock),
             reply: Arc::new(channels::Reply::nowhere()),
             relays: Relays {
-                conversations,
+                conversation,
                 successions: 0,
             }
             .after_knock()?,
@@ -234,7 +277,7 @@ impl Owing {
         Owing {
             owed: Owed::Child { parent },
             reply: Arc::clone(&self.reply),
-            relays: self.relays,
+            relays: self.relays.clone(),
         }
     }
 
@@ -248,10 +291,10 @@ impl Owing {
         Arc::clone(&self.reply)
     }
 
-    /// How many knocks deep in its conversation this run is. Read by the
-    /// landing so a signal this run sends carries the chain's place on.
-    pub(in crate::assembly) fn conversations(&self) -> u32 {
-        self.relays.conversations
+    /// Where this run stands in its conversation. Read by the landing so
+    /// a signal this run sends carries the chain's place on.
+    pub(in crate::assembly) fn conversation(&self) -> &Conversation {
+        &self.relays.conversation
     }
 
     /// The same obligation one succession further along, or the refusal
@@ -304,12 +347,12 @@ mod tests {
     /// run's place as the input.
     #[test]
     fn a_knock_chain_stops_at_its_ceiling() {
-        let owed = match Owing::knocked(CONVERSATION_HOPS_MAX - 1) {
+        let owed = match Owing::knocked(Conversation::deep(CONVERSATION_HOPS_MAX - 1)) {
             Ok(owed) => owed,
             Err(refusal) => panic!("a knock below the ceiling was refused: {refusal}"),
         };
-        assert_eq!(owed.conversations(), CONVERSATION_HOPS_MAX);
-        let refusal = Owing::knocked(CONVERSATION_HOPS_MAX)
+        assert_eq!(owed.conversation().hops, CONVERSATION_HOPS_MAX);
+        let refusal = Owing::knocked(Conversation::deep(CONVERSATION_HOPS_MAX))
             .err()
             .expect("a knock at the ceiling must be refused");
         assert_eq!(refusal.code(), &AxCode::LoopSuspected);
@@ -319,11 +362,29 @@ mod tests {
     /// A delegate inherits the conversation it came from.
     #[test]
     fn a_delegated_child_inherits_the_chain_it_came_from() {
-        let parent = match Owing::knocked(3) {
+        let parent = match Owing::knocked(Conversation::deep(3)) {
             Ok(parent) => parent,
             Err(refusal) => panic!("a knock below the ceiling was refused: {refusal}"),
         };
         let child = parent.child(Address::parse("market/hana").unwrap());
-        assert_eq!(child.conversations(), parent.conversations());
+        assert_eq!(child.conversation().hops, parent.conversation().hops);
+    }
+
+    /// Width, not only depth: every branch of one conversation draws on
+    /// one count, so a run that speaks to many residents, each of whom
+    /// speaks to many more, stops at the ceiling however shallow each
+    /// branch stays.
+    #[test]
+    fn a_conversation_that_fans_out_stops_at_its_width() {
+        let spoken = Conversation::default();
+        for _ in 0..CONVERSATION_RUNS_MAX {
+            if let Err(refusal) = Owing::knocked(spoken.clone()) {
+                panic!("a knock below the width was refused: {refusal}");
+            }
+        }
+        let refusal = Owing::knocked(spoken)
+            .err()
+            .expect("a knock past the width must be refused");
+        assert_eq!(refusal.code(), &AxCode::LoopSuspected);
     }
 }

@@ -40,7 +40,7 @@ impl RunWorker {
         at: &Assignment,
         run: RunId,
         landing: effect::Landing,
-        conversations: u32,
+        conversation: &super::super::Conversation,
     ) -> Result<(), AxError> {
         let then = landing.record(&mut |line: effect::Line| self.record_for(run, line))?;
         match then {
@@ -61,7 +61,7 @@ impl RunWorker {
                         // reaching a resident stay one decision. The
                         // speaking run's place in the conversation rides on,
                         // so the knock this queues is one hop further in.
-                        self.knock(signal, &at.addr, at.mode, conversations)?;
+                        self.knock(signal, &at.addr, at.mode, conversation)?;
                     }
                     Ok(())
                 })();
@@ -384,7 +384,7 @@ impl RunWorker {
                 // still out comes back on its own (sprawling-SPEC.md
                 // 8-46-12).
                 if !self.collaborating.workshops.contains_key(&parent) {
-                    self.knock(&handback, &done.addr, at.mode, owing.conversations())?;
+                    self.knock(&handback, &done.addr, at.mode, owing.conversation())?;
                 }
                 Ok(Landed::Elsewhere)
             }

@@ -340,9 +340,9 @@ fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> 
 
 ```rust
 // bin::assembly
-struct Knock { addr: Address, from: String, mode: kernel::Mode, conversations: u32 }
+struct Knock { addr: Address, from: String, mode: kernel::Mode, conversation: Conversation }
 impl RunWorker {
-    fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32) -> Result<(), AxError>;
+    fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversation: &Conversation) -> Result<(), AxError>;
     fn answer_knocks(&mut self);   // 成波排干，循环而非递归
 }
 ```
@@ -2584,25 +2584,32 @@ impl RunWorker { pub(crate) fn serve(&mut self, serving: Serving); }
 ```rust
 /// 一条链把同一件活带到了哪里。两个计数器分开，因为两条链回答不同的问题：
 /// 这场对话敲醒过几个人，这件活换过几次人。
-#[derive(Clone, Copy, Default)]
-struct Relays { conversations: u32, successions: u32 }
+#[derive(Clone, Default)]
+struct Relays { conversation: Conversation, successions: u32 }
 
-/// 一次敲门链最多唤醒这么多轮 run；一次继任链最多接力这么多轮。
+/// 一轮活在叫醒它的那场对话里站在哪儿：`hops` 是本分支的深度，只有本分支推它；
+/// `woken` 是整场对话一共叫醒了几轮 run，所有分支共用同一个计数。
+#[derive(Clone, Default)]
+struct Conversation { hops: u32, woken: Arc<AtomicU32> }
+
+/// 一次敲门链最多唤醒这么多轮 run；一次继任链最多接力这么多轮；
+/// 一场对话的所有分支加起来最多唤醒这么多轮。
 const CONVERSATION_HOPS_MAX: u32 = 16;
 const SUCCESSION_HOPS_MAX: u32 = 64;
+const CONVERSATION_RUNS_MAX: u32 = 64;
 
 impl Owing {
     /// 由敲门起的那轮活欠什么：对话向前一跳，超上限即 `E_LOOP_SUSPECTED`。
-    fn knocked(conversations: u32) -> Result<Owing, AxError>;
+    fn knocked(conversation: Conversation) -> Result<Owing, AxError>;
     /// 继任者接过的同一份义务：接力向前一跳，超上限即 `E_LOOP_SUSPECTED`。
     fn after_succession(&self) -> Result<Owing, AxError>;
 }
-struct Knock { addr: Address, from: String, mode: kernel::Mode, conversations: u32 }
-fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32) -> Result<(), AxError>;
+struct Knock { addr: Address, from: String, mode: kernel::Mode, conversation: Conversation }
+fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversation: &Conversation) -> Result<(), AxError>;
 ```
 
 - **接力次数记进义务，不记进工人**。两个计数器随 `Owing` 走：继任者拿走的是前任的义务，
-  故它自然继承并加一；敲门推的是 `Knock { conversations }`，`answer_knocks` 由此造出的新
+  故它自然继承并加一；敲门推的是 `Knock { conversation }`，`answer_knocks` 由此造出的新
   一轮活从上一跳加一。委派的子活继承原值而不加——换的是干活的人，不是这条链的位置。
   计数器不记在 `RunWorker` 上：那正是 C15 删掉的形状（一个 worker 字段描述的是碰巧在
   落地的哪一轮活），落地完成后字段属于谁没有答案。
@@ -2610,6 +2617,14 @@ fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32
   不改居民之间能谈多少轮：`16` 是「十六个居民被连着叫醒之后这已经不是一场对话，是一个环」
   的位置，`64` 是「同一件活换过六十四个住户之后不管人在不在看都该停下」的位置。两个数字
   都是刹车而不是调过的参数，故都在明处，重开一次对话或再派一次活即可继续。
+- **深度之外还有宽度**。只限深度时，一轮活给 N 位居民发信、每位再给 N 位发信，十六跳之内
+  叫醒的 run 按 N 的幂增长；被叫醒的 run 又是 `Root` 深度，可以再委派，「一层深」管不住
+  一条链的总量。所以 `Conversation.woken` 由整场对话的所有分支共用（`Arc<AtomicU32>`，
+  随最后一个持有者一起释放，不在 `RunWorker` 上留一张永不清空的表），`after_knock` 先判
+  `hops`、再原子地把 `woken` 加一并判 `CONVERSATION_RUNS_MAX`，两处超限都是同一个
+  `E_LOOP_SUSPECTED` 与同一句恢复语。委派的子活共用父的 `Conversation`，所以子活发的信
+  也记在同一场对话的账上。`64` 与继任上限同值，同样是刹车：一场对话叫醒了六十四轮之后，
+  它已经是一次广播而不是一场对话。
 - **敲门超限不连坐发件人**。超限在 `answer_knocks` 里判：这一敲不开始新一轮活，落一条
   `Refuse` 诊断（带地址与拒绝的 subject）后继续下一敲；信已经在房间里，人仍可从 Inbox
   读它。继任超限在 `conclude` 里判：诊断落 `Refuse`，拒绝随 `hand_back` 回给要这轮活的
@@ -2629,7 +2644,8 @@ fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32
 **本章测试**：`assembly::waking::tests` 里 `a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave`
 （房间借出时一敲不开 run，归还之后同一敲开 run）与 `what_comes_back_wakes_the_resident_who_asked_for_it`
 （子活落地后父房间的居民被敲醒，brief 写明是子房间说的话）；`owing::tests` 里两个边界（上限减一放行、到达上限拒绝，拒绝码
-`E_LOOP_SUSPECTED` 且恢复语非空）；`assembly::waking::tests` 里一条 `conversations: u32::MAX`
+`E_LOOP_SUSPECTED` 且恢复语非空）与 `a_conversation_that_fans_out_stops_at_its_width`（同一场对话
+六十四次敲门放行、第六十五次拒绝）；`assembly::waking::tests` 里一条 `hops` 为 `u32::MAX`
 的敲门不开始任何 run（对照：既有的 `a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke`
 证明上限之下一敲照常开跑）。
 
