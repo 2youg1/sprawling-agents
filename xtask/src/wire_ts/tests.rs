@@ -58,6 +58,21 @@ fn a_named_bare_string_is_a_branded_string_and_an_integer_a_branded_int() {
     );
 }
 
+/// The body size a person may ask for is the channels crate's pair, and
+/// the appearance page reads it from here rather than spelling it: two
+/// copies of one range are two ranges the first time either moves.
+#[test]
+fn the_body_size_range_is_the_one_the_city_holds() {
+    let text = super::render().unwrap();
+    let stated = format!(
+        "export const BODY_PX = {{ min: {}, max: {} }} as const;
+",
+        channels::BODY_PX_MIN,
+        channels::BODY_PX_MAX
+    );
+    assert!(text.contains(&stated), "{stated}");
+}
+
 /// The grammar a Rust type owns travels to the client in the schema's
 /// `pattern`; an emitter that dropped it would leave the client to
 /// spell the same grammar again, which is what `core/address.ts` was.

@@ -32,7 +32,7 @@
 | proof | kani harness 名册只住 `#[kani::proof]` 属性；CI 不得点名 harness，文档不得手写总数 |
 | docnum | 文档里的数字由 `docnum::FACTS` 生成并由 `--write` 回写；区段陈旧、事实未知、标记不闭合各自即红（§8-16） |
 | gates | 不带名字时跑全部门，带名字时只跑点名的那几道（按门表次序）；名字不在门表里即以 `unknown-gate` 退出码 2 拒绝并列出全部门名，不退回「全跑」；聚合报告，任一违规即退出码 1 |
-| wire-ts | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V`、`WIRE_HASH` 与 `CITY_RUN`（§8-20）；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
+| wire-ts | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V`、`WIRE_HASH`、`CITY_RUN`（§8-21）与 `BODY_PX`（§8-34）；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
 
 ### 门禁针对的 LLM 失效模式（本 crate 存在的理由）
 
@@ -840,3 +840,10 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 **决定**：模块方向写在 ARCHITECTURE.md 与 crate 边同一节，由同一道门读。**败给的方案**：一个在 sprawling 里扫自己源码的测试——它判的是树的形状而不是行为，放在被判的 crate 里会让产品 crate 知道自己的源码路径；也败给新开一道门，因为方向就是依赖图的一部分，门名册不必为它多一行。**重议条件**：某个 crate 的模块要按图而不是按禁止表来判（例如要求整个 crate 无环），那时改为从 `use` 解析出模块图。
 
+### 8-34 `wire-ts` 发出 `BODY_PX`
+
+人可以要的正文字号区间住 `channels::BODY_PX_MIN`／`BODY_PX_MAX`：写 `[ui]` 的那一层据它拒，而外观页此前自己写了一份 `{ min: 12, max: 20 }`（`client/src/core/sizing.ts`，另有一份没人读的在 `prefs.ts`）——两份区间在其中一份先动的那一刻就是两个区间。生成器因此在文件开头多发一条 `export const BODY_PX = { min, max } as const;`，两个数取自那两个常量，随 `WIRE_V`、`WIRE_HASH`、`CITY_RUN` 一起作为 `Constants` 的一个字段走（`body_px: BodyPx`），而不是给 `emit` 添参数。
+
+**被否**：把区间放进 `PreferencesAnswer`——那个类型同时是 `[ui]` 文件的文法，多一个字段就是文件里多一个人能写、而写了也不生效的键；放进 `Query::Config`——那个回答按地址爬梯子，而正文字号是这个人的、不是某个地址的。区间是这个构建的常量，不随城变，故走生成物而不走一次查询。
+
+**本节属门禁机具，与产品代码分开提交。**
