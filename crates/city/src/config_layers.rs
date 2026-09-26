@@ -286,7 +286,7 @@ fn listed(table: std::collections::BTreeMap<String, String>) -> Vec<(String, Str
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ConfigFile {
+pub(crate) struct ConfigFile {
     #[serde(default)]
     model: ModelSection,
     #[serde(default)]

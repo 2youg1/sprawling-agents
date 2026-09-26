@@ -36,7 +36,7 @@ use super::{BuildingRules, RULES_FILE, UserBrowser, UserBrowserEndpoint};
 /// answers whose absence used to resolve to the permissive side.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Written {
+pub(crate) struct Written {
     /// What this building is, in the person's words, and how work is
     /// done here.
     ///

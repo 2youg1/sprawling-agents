@@ -217,7 +217,7 @@ pub fn schedule_path(city_root: &Path) -> PathBuf {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ScheduleFile {
+pub(crate) struct ScheduleFile {
     #[serde(default)]
     job: Vec<JobRow>,
 }

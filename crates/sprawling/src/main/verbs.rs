@@ -21,6 +21,7 @@ pub(super) enum Verb {
     Call,
     Enrol,
     Whose,
+    Check,
     Fork,
     Adopt,
     Replay,
@@ -184,6 +185,15 @@ pub(super) const VERBS: &[Row] = &[
         positionals: &[("city", Required), ("oid", Required)],
         flags: &[],
         says: "which run wrote a commit this city made",
+        effect: Effect::ReadsOnly,
+    },
+    Row {
+        verb: Verb::Check,
+        name: "check",
+        aliases: &[],
+        positionals: &[("city", Required)],
+        flags: &[],
+        says: "read every TOML file a city holds; print each error as path:line:column",
         effect: Effect::ReadsOnly,
     },
     Row {

@@ -8,6 +8,7 @@
 
 mod archive;
 mod building;
+mod check;
 mod city_tool;
 mod config_layers;
 mod document;
@@ -40,6 +41,7 @@ pub use building::all as buildings;
 pub use building::configured_payload as building_configured_payload;
 pub use building::created_payload as building_created_payload;
 pub use building::{Building, BuildingTemplate, create as create_building};
+pub use check::{Finding, Position, Report, check};
 pub use city_tool::CityTool;
 pub use config_layers::path as config_path;
 pub use config_layers::write_second_threshold;
