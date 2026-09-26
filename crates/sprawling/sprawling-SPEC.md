@@ -14,7 +14,7 @@ S0 三件：①CLI 壳（`status` 可用；未到期的子命令给出诚实拒�
 
 「验证这条链先于验证页面内容」——S0 不起 HTTP 服务，HTTP 属 channels::server（S4）；嵌入的取证面是测试与 `status` 输出。
 
-评审楼的 worktree 按房间保留：`stand_up` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（memory-SPEC 8-9），不再每轮全量检出、再整目录删除；`RunWorker::over` 拿到账本写者后解开上一个写者留下的全部 worktree 锁。两件事未定。其一，只检出本楼的 scope：libgit2 没有 sparse-checkout，git2 0.21 也没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `memory` 禁 `unsafe`；只检出 scope 而不给其余路径的索引项置 skip-worktree 位，栅栏的暂存会把 scope 之外的文件记成删除；能定下它的证据是在这样一份索引上跑一次栅栏与 `decide_merge` 的测试，看提交的树是否只动了 scope。上限只称一次检出、不称留着的树之和，定在 memory-SPEC 8-9。其二，放置移进 lane，与 MCP 缺表时的那次连接一样，要等 `RunWorker` 拆分定下 lane 能借到的句柄。
+评审楼的 worktree 按房间保留：`stand_up` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（memory-SPEC 8-9），不再每轮全量检出、再整目录删除；`RunWorker::over` 拿到账本写者后解开上一个写者留下的全部 worktree 锁。两件事未定。其一，只检出本楼的 scope：libgit2 没有 sparse-checkout，git2 0.21 也没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `memory` 禁 `unsafe`；skip-worktree 位也帮不上：git2 0.21 所带的 libgit2 在 `Index::update_all` 里不认这一位，一份置了位、盘上删了该文件的索引，按 `*` 暂存后写出的树把它记成 `Deleted`。可走的路是另外两件已有的东西：栅栏按楼的写域暂存（`memory::checkpoint` 的 `stage_scopes` 只给 scope 的 pathspec，scope 之外的索引项原样留着），检出按路径收窄（`git2::build::CheckoutBuilder::path` 是安全接口）；剩下的难处是 `Worktree::add` 自己总做一次全量检出，只有再领一棵留着的树时才能只检出 scope。能定下它的证据是一次 `decide_merge` 测试：只检出 scope 的树、按 scope 暂存，提交的树只动 scope。上限只称一次检出、不称留着的树之和，定在 memory-SPEC 8-9。其二，放置移进 lane，与 MCP 缺表时的那次连接一样，要等 `RunWorker` 拆分定下 lane 能借到的句柄。
 
 ## 4 现状分析
 
