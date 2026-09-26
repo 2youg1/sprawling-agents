@@ -1791,3 +1791,17 @@ pub(super) fn entered(effect: &Effect, taint: &TaintSet) -> Result<TaintSet, AxE
 - **为什么按 `Effect` 判，而不是让每个工具自报**：`Effect` 已经是工具注册时声明的「这次调用伸向哪里」，门按它分派；来源再让工具另报一次，就是同一事实的第二份定义，漏报的工具会把外来内容当成内生数据放进来。
 - **为什么是一个函数**：外来内容在 run 里要过的每一道手续（今天是标 taint，之后是密钥托管的入站扫描）都挂在这同一处，第二个消费者改这一个函数，不另开入口。
 - **未定**：他楼文件（`read` 经 read bound 落进另一栋楼的路径）今天的 `Effect` 是 `Read`，这张表因此不标它；要标它，需要 `GateSubject::Path` 在 bench 里能判出「不在本楼」，证据是一条读他楼文件后 exec 被拒的 bench 测试。run 起点的 taint 仍由 sprawling 的 `Assignment.tainted: bool` 在 `workbench::tools::run_taint` 里翻成单一来源 `outside`；换成携带来源的 `TaintSet` 是下一阶段。
+
+### 8-47 runtime::conversation：已发出的消息不再被改写（形状 2 值类型）
+
+```rust
+impl Conversation {
+    pub fn mark_sent(&mut self);   // 本次组装发出了 messages() 的全部；之后到达的 user 文本不再并入其中任何一条
+}
+```
+
+- **规则**：`Conversation` 记下上次组装发出了几条消息（`sent`）。user 文本（steer、提醒）只并入**尚未发出**的最后一条 User 消息；最后一条 User 消息已经发出时，文本进一个待投槽（`held`），由下一次 `push_tool_results` 接在这一波结果之后，即词汇表里 Steer 的落点「下一份工具结果的末尾」。待投槽不在 `messages()` 里，所以它永远不会出现在一条它到达之前就已组好的请求中。
+- **调用点**：活的 run 在 `Turn::assemble` 答出 `Advanced` 之后调一次（`run::lifecycle`）；`fork` 在读到本 run 的 `prompt_assembled` 时调一次。两边的标记来自同一个事实（这一回合的请求组好了），所以分支按同一规则重放出同样的字节。
+- **理由**：`BeforeCall`／`BeforeWave`／`BeforeToolCall`／`BeforeSpawn` 四个安全点都在组装之后，那时窗口最后一条仍是刚随请求发出的 User 消息。把 steer 并进去，下一次请求里 steer 排在一条没读过它的助手回复之前：模型看到的时间顺序是假的，而且已发出消息的字节变了，provider 的前缀缓存从这条消息起全部失效。
+- **一条回复没有任何调用时**：run 就此结束（8-37），待投文字不再有下一次组装；它已由 `steer_received` 入账，账本仍是它的来历。
+- **被否**：①在已发出的 User 消息之后另开一条 User 消息——两条相邻的 User 消息正是本模块入口不变量要排除的形状；②由执行器在工具结果之后再调一次 `push_steer`——待投状态会住在 `Conversation` 之外，`fork` 要复刻第二份同样的记忆，两个家会漂移。
