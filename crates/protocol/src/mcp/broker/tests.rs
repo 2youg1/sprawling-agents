@@ -259,3 +259,32 @@ fn a_path_that_cannot_be_addressed_is_filed_under_the_module_that_builds_it() {
         refused.recovery()
     );
 }
+
+/// A request the broker took and never answered may already have made
+/// an auth config there, so the timeout is marked as an effect nobody
+/// can see: a retryer that reads `retry()` does not ask again.
+#[test]
+fn a_broker_that_took_the_request_and_went_quiet_is_not_asked_again() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!(
+        "http://{}/api/v3/auth_configs",
+        listener.local_addr().unwrap()
+    );
+    let (done, hold) = std::sync::mpsc::channel::<()>();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        request_from(&mut stream);
+        hold.recv().unwrap();
+    });
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_millis(200))
+        .build()
+        .unwrap();
+
+    let lost =
+        super::read(client.post(&url).body("{}").send(), "/api/v3/auth_configs").unwrap_err();
+
+    done.send(()).unwrap();
+    server.join().unwrap();
+    assert_eq!(lost.retry(), kernel::Retry::Unknown);
+}

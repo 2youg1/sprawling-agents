@@ -345,10 +345,13 @@ fn read(sent: reqwest::Result<reqwest::blocking::Response>, path: &str) -> Resul
             "reach the application broker",
             failed.to_string(),
         );
-        let draft = if failed.is_timeout() {
-            draft.retriable()
-        } else {
-            draft
+        // A timeout while connecting is a request that never left; any
+        // later timeout left the broker holding a request it may have
+        // carried out, such as making an auth config.
+        let draft = match (failed.is_timeout(), failed.is_connect()) {
+            (true, true) => draft.retriable(),
+            (true, false) => draft.effect_unknown(),
+            (false, true | false) => draft,
         };
         draft.with_recovery("check this machine's connection, then try again")
     })?;

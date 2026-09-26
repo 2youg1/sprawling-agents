@@ -107,9 +107,11 @@ impl HttpServer {
             // this type's `Debug`.
             request = request.header(header.name(), header.plaintext());
         }
+        let mut carried = None;
         if let Ok(session) = self.session.lock() {
             if let Some(id) = &session.id {
                 request = request.header("mcp-session-id", id);
+                carried = Some(id.clone());
             }
             if let Some(version) = &session.protocol_version {
                 request = request.header("mcp-protocol-version", version);
@@ -125,6 +127,7 @@ impl HttpServer {
         let body = response.text().map_err(|err| self.unreachable(&err))?;
         Ok(Exchange {
             status,
+            carried,
             handed,
             body,
         })
@@ -165,7 +168,8 @@ impl HttpServer {
     }
 
     /// Turns a status the server chose into the refusal a person reads.
-    fn refused(&self, status: u16) -> AxError {
+    fn refused(&self, exchange: &Exchange) -> AxError {
+        let status = exchange.status;
         // The one status a person answers differently: the server is up,
         // it understood the request, and it wants an account this city
         // does not yet hold. Carried as its own code so the health view
@@ -183,14 +187,26 @@ impl HttpServer {
             );
         }
         if status == 404 {
-            self.forget();
-            return AxError::failure(
-                AxCode::ToolUnavailable,
-                "call an mcp server",
-                format!("{}: the server ended this session", self.url),
-            )
-            .retriable()
-            .with_recovery("the session was dropped; dispatch again to open a new one");
+            return match &exchange.carried {
+                // The specification has a server answer 404 to every
+                // request on a session it ended, so the call never ran.
+                Some(_) => {
+                    self.forget();
+                    AxError::failure(
+                        AxCode::ToolUnavailable,
+                        "call an mcp server",
+                        format!("{}: the server ended this session", self.url),
+                    )
+                    .retriable()
+                    .with_recovery("the session was dropped; dispatch again to open a new one")
+                }
+                None => AxError::failure(
+                    AxCode::ToolUnavailable,
+                    "call an mcp server",
+                    format!("{}: the server answered 404", self.url),
+                )
+                .with_recovery("nothing answers MCP at this url; check it in the MCP settings"),
+            };
         }
         // The body is not quoted: a server's error page is other
         // people's text and this refusal is read by a person.
@@ -206,6 +222,8 @@ impl HttpServer {
 /// One request and what came back, before anything is decided about it.
 struct Exchange {
     status: u16,
+    /// The `Mcp-Session-Id` this request carried, if the session had one.
+    carried: Option<String>,
     /// The `Mcp-Session-Id` the server handed out, if it opened one.
     handed: Option<String>,
     body: String,
@@ -215,7 +233,7 @@ impl crate::Outbound for HttpServer {
     fn call(&mut self, line: &str, patience: TimeoutMs) -> Result<String, AxError> {
         let exchange = self.post(line, patience)?;
         if !(200..300).contains(&exchange.status) {
-            return Err(self.refused(exchange.status));
+            return Err(self.refused(&exchange));
         }
         self.learn(&exchange);
         one_message(&exchange.body).ok_or_else(|| {
@@ -233,7 +251,7 @@ impl crate::Outbound for HttpServer {
     fn notify(&mut self, line: &str, patience: TimeoutMs) -> Result<(), AxError> {
         let exchange = self.post(line, patience)?;
         if !(200..300).contains(&exchange.status) {
-            return Err(self.refused(exchange.status));
+            return Err(self.refused(&exchange));
         }
         self.learn(&exchange);
         Ok(())
@@ -291,7 +309,8 @@ pub(super) fn client_for(url: &str) -> Result<reqwest::blocking::Client, AxError
         .map_err(|err| {
             AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
                 .with_recovery(
-                    "check this server's url in the MCP settings and the proxy settings                      this machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
+                    "check this server's url in the MCP settings and the proxy settings \
+                     this machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
                 )
         })
 }
