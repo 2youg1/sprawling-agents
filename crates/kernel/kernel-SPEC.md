@@ -550,7 +550,9 @@ pub struct EndpointProbed { pub name: String, pub base_url: String, pub reach: R
 pub struct ProbeFailure { pub code: String, pub subject: String }
 // record::provider：provider_degraded 有两个写方、两种形状，一个 untagged enum 让读者靠读来分，
 // 不靠猜键：E_PROVIDER 经 kernel::error 的 carrier 表平铺写成 AxError 本身；vault 启动探针退到
-// session memory 时写 VaultFellBack。两者都不是的行读不成（E_WIRE_MISMATCH）。
+// session memory 时写 VaultFellBack。两者都不是的行读不成（E_WIRE_MISMATCH），错误里并列两种
+// 形状各自缺的那个字段：Deserialize 手写，先试 AxError 再试 VaultFellBack；派生的 untagged 只会说
+// 「没有一个变体匹配」，Note::Unreadable 就给不出该去看哪个字段。写出仍是 untagged。
 #[serde(untagged)] pub enum ProviderDegraded { Refused(AxError), VaultFellBack(VaultFellBack) }
 pub struct VaultFellBack { pub component: String,     // 探针写 vault
                            pub fallback: String,      // 探针写 session-memory
