@@ -40,7 +40,13 @@ pub(super) fn call(args: &[String]) -> Exit {
         match std::io::read_to_string(std::io::stdin()) {
             Ok(text) => text,
             Err(err) => {
-                eprintln!("could not read the frame from stdin: {err}");
+                let refusal = kernel::AxError::failure(
+                    kernel::AxCode::WireMismatch,
+                    "read the frame to send from stdin",
+                    err.to_string(),
+                )
+                .with_recovery("pipe one UTF-8 JSON frame into `sprawling call -`, or pass the frame as the argument");
+                eprint!("{}", written(&refusal, Form::of(args)));
                 return Exit::Refused;
             }
         }
