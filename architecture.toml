@@ -160,6 +160,7 @@ module = [
   { name = "memory::worktree::weight", file = "crates/memory/src/worktree/weight.rs", owns = "how many bytes a borrowed tree holds", shape = "projection", since = "P1", status = "built", spec = "memory-SPEC.md#8-14" },
   { name = "memory::worktree::name", file = "crates/memory/src/worktree/name.rs", owns = "one segment, no escape", shape = "adapter", since = "P2", status = "built", spec = "memory-SPEC.md#8-9" },
   { name = "memory::worktree::lease", file = "crates/memory/src/worktree/lease.rs", owns = "a held tree and its measure", shape = "adapter", since = "P2", status = "built", spec = "memory-SPEC.md#8-9" },
+  { name = "memory::worktree::sweep", file = "crates/memory/src/worktree/sweep.rs", owns = "the trees a crash left behind, swept when the city opens", shape = "adapter", since = "S5", status = "built", spec = "memory-SPEC.md#8-9" },
   { name = "memory::worktree::trees", file = "crates/memory/src/worktree/trees.rs", owns = "claim, merge, release", shape = "adapter", since = "P2", status = "built", spec = "memory-SPEC.md#8-9" },
   { name = "memory::worktree::trees::tests", file = "crates/memory/src/worktree/trees/tests.rs", owns = "the worktree fixtures", shape = "adapter", since = "P2", status = "built", spec = "memory-SPEC.md#8-9" },
   { name = "memory::queue", file = "crates/memory/src/queue.rs", owns = "one queue implementation serving three lanes", shape = "value", since = "S3", status = "built", spec = "memory-SPEC.md#8-10" },
