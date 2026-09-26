@@ -26,7 +26,7 @@
 - **native 的 S3 形**＝指向回环地址的 OpenAI 兼容服务（llama.cpp/ollama 一类）的固定客户端：无凭证要求、禁非回环 base_url。本地引擎进程管理不属本 crate（P4 产品化再议）。
 - **tokio 不引入**：turn 是同步函数面，endpoint 用 `reqwest::blocking`（内部自管运行时线程，不出接口）。B.7 的 tokio 行推迟到 S4 channels（首个真异步消费者），偏离已记（§13）。
 - 线格式 JSON 允许浮点（temperature 等 provider 字段）：dialect 是翻译面不是判定路径；判定路径（cost／market 价目）恒整数。
-- **提前交出的调用还没有消费者。** `completed_call` 已按 §8 的约定交出完整调用，但 `Model` 端口还没有把它交给调用方的那扇门，runtime 也还没有据此提前启动只读工具。未定的是那扇门的形状（`call_streaming` 多一个 sink，或另立一个方法而默认落回 `call_streaming`），以及推测结果与账本顺序的关系；能定下它的证据是一份 Lean 设计模型证明两件事：推测执行的结果不是事件，账本顺序与串行执行相同。
+- **提前交出的调用还没有消费者。** `completed_call` 已按 §8 的约定交出完整调用，但 `Model` 端口还没有把它交给调用方的那扇门，runtime 也还没有据此提前启动只读工具。推测执行必须守住的两条性质已由 `adversary/design/Speculating.lean` 证明（`lake build Design`）：推测结果不是事件，账本顺序与串行执行相同，前提是只提前启动排在第一个写调用之前的只读调用。未定的是那扇门的形状：`call_streaming` 多一个 sink，还是另立一个方法、默认落回 `call_streaming`；能定下它的证据是 runtime 一侧的第一个消费者需要从端口拿到什么。
 - OAuth 活体流程不可在 CI 验证：流程状态机与请求构造以形状测试看守，端到端属人工清单。
 
 ## 4 现状分析
@@ -504,7 +504,7 @@ ARCHITECTURE §6 gateway 表逐行状态翻转；§6 接线台账登记（endpoi
 
 **半个工具参数恒拒，两家同码同形。** 流中断时 `partial_json`／`arguments` 停在一个值的中间；把它读成 `{}` 就是把半次调用变成一次真的「无参数调用」，而 `exec {}`／`write {}` 会落账、过门、真执行。判定住 `mismatch::settled_tool_arguments(tool, at, raw)`——两家 dialect 都从碎片拼参数，故拼完即校验的那一句只有一处，拒词点名工具、index、已收字符数与解析停在哪里，码取 `E_PROVIDER`（`stream_cut`，retriable：截断的流与截断的 body 是同一种失败）。落选的是「在 OpenAI 侧沿用 `response_from` 的 `E_WIRE_MISMATCH`」：形状没有漂，漂的是这次传输，而 `E_WIRE_MISMATCH` 的恢复语会让人去改 dialect 与 base url 两个没有错的设置。
 
-**一个工具调用在它的 `content_block_stop` 到达时就是完整的，解码器在那一刻交出它。** `anthropic::stream::completed_call(frames, at) -> Result<Option<ToolCall>, AxError>`：`frames` 是迄今收到的帧，`at` 是刚收到 `content_block_stop` 的那个 index。块是 `tool_use` 则答 `Some(ToolCall)`，别的块答 `None`；参数停在一个值的中间照旧是 `E_PROVIDER`（同 `settled_tool_arguments`）。**重装只有一处**：`settled` 与 `completed_call` 都经 `rebuilt` 把帧按 index 拼回块，再由 `block_from` 读成 `ContentBlock`——提前交出的调用与结算后 `ModelReturn` 里那一条逐字段相等，这由测试钉住。**交出的不是 `Increment`**：`Increment` 在线协议上、只供人看、不许任何下游据以决策（kernel `Increments` 的约定），而一次提前交出的调用恰恰是要据以执行的；把它塞进 `Increment` 既要动 `WIRE_V`，又会让「看的东西」变成「决定的东西」。**提前交出的调用不是历史**：账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，提前交出的调用与据它得出的结果一并丢弃。
+**一个工具调用在它的 `content_block_stop` 到达时就是完整的，解码器在那一刻交出它。** `anthropic::stream::completed_call(frames, at) -> Result<Option<ToolCall>, AxError>`：`frames` 是迄今收到的帧，`at` 是刚收到 `content_block_stop` 的那个 index。块是 `tool_use` 则答 `Some(ToolCall)`，别的块答 `None`；参数停在一个值的中间照旧是 `E_PROVIDER`（同 `settled_tool_arguments`）。**重装只有一处**：`settled` 与 `completed_call` 都经 `rebuilt` 把帧按 index 拼回块，再由 `block_from` 读成 `ContentBlock`——提前交出的调用与结算后 `ModelReturn` 里那一条逐字段相等，这由测试钉住。**交出的不是 `Increment`**：`Increment` 在线协议上、只供人看、不许任何下游据以决策（kernel `Increments` 的约定），而一次提前交出的调用恰恰是要据以执行的；把它塞进 `Increment` 既要动 `WIRE_V`，又会让「看的东西」变成「决定的东西」。**提前交出的调用不是历史**：账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，提前交出的调用与据它得出的结果一并丢弃。这两句与「只提前启动第一个写调用之前的只读调用」由 `adversary/design/Speculating.lean` 证明：`speculation_is_not_an_event`、`speculation_keeps_serial_order`、`a_cut_answer_discards_its_cache`；`speculating_past_a_write_changes_the_ledger` 给出落选设计（写调用之后的读也提前启动）的反例——提前启动的读看到的是写之前的世界。
 
 **认不出的帧跳过，缺失的结算帧不跳过。** provider 会加新的事件类型，一个人不该因为其中一个是新的就丢掉整次调用；但流在说明「为什么停」的那一帧之前结束，是 `Provider` 失败并且可重试——它和一个被截断的 body 是同一种失败，刻意不允许「保留已收到的增量」来补救：把不完整的回复当成完整的呈现出去，是这里唯一不能有的结局。
 
