@@ -60,7 +60,7 @@ impl RunWorker {
         // Nothing is written before the city agrees to take the work:
         // a halted city that laid a job file down would leave a task in
         // a room no run ever opened.
-        let agreed = self.agree_to_work(&at.addr)?;
+        let agreed = self.agree_to_work(&at)?;
         // A key pasted into the work goes to the vault before the text
         // is sent to be named, written to a room or recorded.
         let task = self.take_custody(task)?;

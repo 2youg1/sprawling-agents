@@ -310,6 +310,7 @@ impl RunWorker {
             origin: None,
             session: None,
             effort: None,
+            model: None,
             mode: runtime::Mode::PlanGoal,
             parent: None,
             succession: None,

@@ -92,14 +92,14 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 38,
+        WIRE_V, 39,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
 
 /// A function of WIRE_V and the two name tables, so any change to the
 /// protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "b8dacc18b4a93a1663229246683eb9d24a66fe2cda9b2918aa82a4d0a923e7ad";
+const WIRE_SCHEMA_GOLDEN: &str = "1efcbe95ee51b1c9efaee07d21d95824d714604c1974e8b41b2ec3dfdbbe725a";
 
 // -------------------------------------------------------------- binding face
 

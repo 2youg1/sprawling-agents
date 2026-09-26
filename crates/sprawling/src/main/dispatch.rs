@@ -30,7 +30,9 @@ const QUIET_MS: u64 = 120_000;
 /// nothing came back.
 pub(super) fn verb(read: &Arguments) -> ExitCode {
     let (Some(addr), Some(task)) = (read.positional(1), read.positional(2)) else {
-        eprintln!("usage: sprawling dispatch <addr> <task> [--detach] [--at host:port]");
+        eprintln!(
+            "usage: sprawling dispatch <addr> <task> [--detach] [-m/--model <id>] [--at host:port]"
+        );
         return ExitCode::from(2);
     };
     let addr = match kernel::Address::parse(addr) {
@@ -62,7 +64,7 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
         idem,
         session: None,
         effort: None,
-        model: None,
+        model: read.value("--model").map(str::to_owned),
     }));
     let ending = Ending::OnRun {
         under: addr,

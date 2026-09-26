@@ -77,7 +77,7 @@ impl RunWorker {
         goal: String,
         reply: channels::Reply,
     ) -> Result<(), AxError> {
-        let agreed = self.agree_to_work(&at.addr)?;
+        let agreed = self.agree_to_work(&at)?;
         let call = self.naming_call(agreed.rules.policy())?;
         let back = self.namings.back.clone();
         let bell = self.bell();

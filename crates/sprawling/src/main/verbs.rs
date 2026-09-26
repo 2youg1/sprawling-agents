@@ -52,6 +52,8 @@ pub(super) enum Takes {
 #[derive(Debug)]
 pub(super) struct Flag {
     pub(super) name: &'static str,
+    /// The one-letter spelling a hand types often, read as `name`.
+    pub(super) short: Option<&'static str>,
     pub(super) takes: Takes,
     pub(super) says: &'static str,
 }
@@ -76,7 +78,12 @@ pub(super) struct Row {
 }
 
 const fn flag(name: &'static str, takes: Takes, says: &'static str) -> Flag {
-    Flag { name, takes, says }
+    Flag {
+        name,
+        short: None,
+        takes,
+        says,
+    }
 }
 
 use Need::{Optional, Required};
@@ -182,6 +189,14 @@ pub(super) const VERBS: &[Row] = &[
                 "how long a silent city ends the wait",
             ),
             flag("--detach", Nothing, "print the run id once it starts"),
+            Flag {
+                short: Some("-m"),
+                ..flag(
+                    "--model",
+                    Value("id"),
+                    "run on this registered model, not main's",
+                )
+            },
         ],
         says: "send one task, print its events until the run freezes",
         effect: Effect::Changes,
@@ -320,8 +335,8 @@ pub(super) fn usage(row: &Row) -> String {
         Optional => format!(" [{name}]"),
     });
     let flags = row.flags.iter().map(|flag| match flag.takes {
-        Nothing => format!(" [{}]", flag.name),
-        Value(what) => format!(" [{} <{what}>]", flag.name),
+        Nothing => format!(" [{}]", spelled(flag)),
+        Value(what) => format!(" [{} <{what}>]", spelled(flag)),
     });
     let name = row.name;
     format!(
@@ -354,4 +369,12 @@ pub(super) fn overview() -> String {
         })
         .collect();
     format!("commands:{lines}\n\nsprawling help <verb> explains one.")
+}
+
+/// A flag as help prints it: `-m/--model`, or `--at` when it has no short.
+fn spelled(flag: &Flag) -> String {
+    match flag.short {
+        Some(short) => format!("{short}/{}", flag.name),
+        None => flag.name.to_owned(),
+    }
 }

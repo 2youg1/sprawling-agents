@@ -147,19 +147,19 @@ fn arguments(row: &Row, words: &[String]) -> Result<Arguments, LineError> {
     let mut read = Arguments::default();
     let mut words = words.iter();
     while let Some(word) = words.next() {
-        if !word.starts_with("--") || word == "-" {
+        let named = row
+            .flags
+            .iter()
+            .find(|flag| flag.name == word || flag.short == Some(word.as_str()));
+        if named.is_none() && (!word.starts_with("--") || word == "-") {
             read.positionals.push(word.clone());
             continue;
         }
-        let flag = row
-            .flags
-            .iter()
-            .find(|flag| flag.name == word)
-            .ok_or_else(|| LineError::UnknownFlag {
-                verb: row.name,
-                given: word.clone(),
-                nearest: nearest(word, row.flags.iter().map(|flag| flag.name)),
-            })?;
+        let flag = named.ok_or_else(|| LineError::UnknownFlag {
+            verb: row.name,
+            given: word.clone(),
+            nearest: nearest(word, row.flags.iter().map(|flag| flag.name)),
+        })?;
         let value = match flag.takes {
             Takes::Nothing => None,
             Takes::Value(_) => Some(words.next().cloned().ok_or(LineError::MissingValue {

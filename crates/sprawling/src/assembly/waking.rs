@@ -221,6 +221,7 @@ impl RunWorker {
                     addr: knock.addr.clone(),
                     session: None,
                     effort: None,
+                    model: None,
                     mode: knock.mode,
                     parent: None,
                     succession: None,

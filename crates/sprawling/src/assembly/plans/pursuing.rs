@@ -122,6 +122,7 @@ impl RunWorker {
                     addr: addr.clone(),
                     session: None,
                     effort: None,
+                    model: None,
                     mode: runtime::Mode::PlanGoal,
                     parent: None,
                     origin: None,
