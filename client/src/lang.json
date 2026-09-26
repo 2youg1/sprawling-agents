@@ -1165,7 +1165,7 @@
   },
   "nav_mayor": {
     "en": "the Mayor",
-    "zh": "Mayor"
+    "zh": "市长"
   },
   "nav_mcp": {
     "en": "MCP",
@@ -2426,7 +2426,7 @@
   },
   "talk_placeholder_mayor": {
     "en": "to the Mayor…",
-    "zh": "对 Mayor 说…"
+    "zh": "对市长说…"
   },
   "talk_placeholder_room": {
     "en": "to {room}…",
@@ -2677,7 +2677,7 @@
     "zh": "新对话 · {at}"
   },
   "session_previous": {
-    "en": "earlier · {n} rounds",
+    "en": "earlier rounds · {n}",
     "zh": "上一段 · {n} 轮"
   },
   "ui_browser_found": {
