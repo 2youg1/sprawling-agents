@@ -617,7 +617,7 @@ pub channels::PrefixSource::kept: u64
 pub channels::PursuitLine::addr: kernel::address::Address
 pub channels::PursuitLine::goal: alloc::string::String
 pub channels::PursuitLine::state: kernel::pursuit::PursuitState
-pub channels::PursuitLine::verdict: alloc::string::String
+pub channels::PursuitLine::verdict: kernel::pursuit::PursuitVerdict
 pub channels::PursuitStep::Clear
 pub channels::PursuitStep::Pause
 pub channels::PursuitStep::Resume
