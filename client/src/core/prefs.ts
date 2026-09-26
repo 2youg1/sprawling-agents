@@ -133,10 +133,6 @@ export const MOTIONS: readonly Motion[] = ["system", "on", "off"];
 // the city adds is offered here without a second list to forget.
 export const PROXYING_RULES: readonly Proxying[] = Proxying.members.flatMap((rule) => rule.literals);
 
-// The sizes a person may ask for. The floor is the smallest size the
-// colour gate has to hold its contrast tiers at, and the ceiling is
-// where a line of body text stops being body text.
-export const BODY_PX = { min: 12, max: 20 } as const;
 export const NOTIFYINGS: readonly Notifying[] = ["off", "on"];
 
 // What a person may write into a font stack: the characters a family

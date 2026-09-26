@@ -73,6 +73,7 @@ pub(crate) fn config_answer(
             },
         ),
         tuning: channels::TuningDefaults {
+            from: channels::ConfigLayer::Default,
             timeout_ms: defaults.timeout_ms,
             request_max_retries: defaults.retries.stated(),
             stream_idle_timeout_ms: defaults.stream_idle_timeout_ms,
@@ -261,6 +262,20 @@ mod tests {
                     "max": kernel::consts_policy::CTX_REMINDER_SECOND_MAX,
                 },
             }))
+        );
+    }
+
+    /// The figures an untuned endpoint is called with name their layer
+    /// too: no file on the ladder states them, so the answer says they
+    /// are this build's own rather than leaving the page to guess.
+    #[test]
+    fn the_tuning_defaults_are_answered_with_the_default_as_their_layer() {
+        let dir = tempfile::tempdir().unwrap();
+        let addr = Address::parse("lab/room1").unwrap();
+        let answer = serde_json::to_value(config_answer(dir.path(), &addr).unwrap()).unwrap();
+        assert_eq!(
+            answer.pointer("/tuning/from"),
+            Some(&serde_json::json!("default"))
         );
     }
 }

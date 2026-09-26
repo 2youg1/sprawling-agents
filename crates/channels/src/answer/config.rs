@@ -78,6 +78,11 @@ pub struct SecondDomain {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TuningDefaults {
+    /// Where these figures were stated. No file on the ladder states
+    /// them today, so this is [`ConfigLayer::Default`]; it is answered
+    /// rather than implied so a page never decides for itself that a
+    /// figure is the build's own.
+    pub from: ConfigLayer,
     /// How long one settled request may take, in total.
     pub timeout_ms: u64,
     /// The ceiling on making a failed request again, as

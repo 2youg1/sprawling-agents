@@ -10,9 +10,9 @@
 
 use serde_json::{Value, json};
 
-use super::Constants;
 use super::emit::emit;
 use super::first_difference;
+use super::{BodyPx, Constants};
 
 fn document(defs: Value) -> Value {
     json!({ "$defs": defs })
@@ -25,6 +25,7 @@ fn constants() -> Constants {
         wire_v: 13,
         hash: "ab12".to_owned(),
         city_run: "00000000-0000-0000-0000-000000000000".to_owned(),
+        body_px: BodyPx { min: 12, max: 20 },
     }
 }
 
@@ -56,6 +57,21 @@ fn a_named_bare_string_is_a_branded_string_and_an_integer_a_branded_int() {
         ),
         "{text}"
     );
+}
+
+/// The body size a person may ask for is the channels crate's pair, and
+/// the appearance page reads it from here rather than spelling it: two
+/// copies of one range are two ranges the first time either moves.
+#[test]
+fn the_body_size_range_is_the_one_the_city_holds() {
+    let text = super::render().unwrap();
+    let stated = format!(
+        "export const BODY_PX = {{ min: {}, max: {} }} as const;
+",
+        channels::BODY_PX_MIN,
+        channels::BODY_PX_MAX
+    );
+    assert!(text.contains(&stated), "{stated}");
 }
 
 /// The grammar a Rust type owns travels to the client in the schema's

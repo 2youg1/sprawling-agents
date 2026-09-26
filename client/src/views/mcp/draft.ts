@@ -18,13 +18,16 @@
 // header table, so every reason left here is a person's own mistake
 // rather than a hole in the wire.
 
+import { Schema } from "effect";
+
 import type { Key } from "../../core/lang";
 import type { McpServer } from "../../wire";
 import { ServerLabel } from "../../wire";
 
 // The label is the first segment of every tool name the server offers,
-// so its grammar is the wire's, not this page's taste.
-const LABEL = /^[a-z][a-z0-9-]*$/;
+// so its grammar is the wire's pattern, which `kernel::ServerLabel::parse`
+// states, and never a copy this page keeps.
+const labelled = Schema.is(ServerLabel);
 
 // The three a person picks between, and the three the wire spells.
 export type Transport = "stdio" | "http" | "sse";
@@ -104,7 +107,7 @@ export function written(pairs: readonly Pair[]): readonly Pair[] {
 export function encode(draft: Draft, taken: readonly string[]): Encoded {
   const label = draft.label.trim();
   if (label === "") return { kind: "blocked", blocker: "label_missing" };
-  if (!LABEL.test(label)) return { kind: "blocked", blocker: "label_grammar" };
+  if (!labelled(label)) return { kind: "blocked", blocker: "label_grammar" };
   if (taken.includes(label)) return { kind: "blocked", blocker: "label_taken" };
   switch (draft.transport) {
     case "stdio":
