@@ -212,6 +212,16 @@ jobs:
       - name: build the client, the binary, and the archive
         shell: bash
         run: just package "${{ matrix.target }}"
+      # The archive goes through the door a person uses before it is
+      # uploaded: install.sh asks a release list served from 127.0.0.1,
+      # downloads, verifies and places the binary, and the placed file is
+      # compared byte for byte with the archive's and asked its version.
+      # Windows installs through install.ps1, which this step does not run
+      # (sprawling-SPEC.md section 8-94).
+      - name: install the archive with install.sh from a loopback release
+        if: runner.os != 'Windows'
+        shell: bash
+        run: sh .github/install-loopback.sh target/package
       - uses: actions/upload-artifact@v7
         with:
           name: archive-${{ matrix.os }}${{ matrix.target && format('-{0}', matrix.target) || '' }}
