@@ -66,6 +66,39 @@ pub(super) fn open_in_package(
     }))
 }
 
+/// Opens a single-document skill where the shelf spells it.
+///
+/// # Errors
+/// Refuses with `E_GATE_DENIED` a document whose real location, links
+/// resolved, is not the shelved address under the canonical city root:
+/// the reading room admitted that document, not what a link on its way
+/// leads to.
+pub(super) fn open_document(
+    city_root: &Path,
+    shelved: &Address,
+    asked: &str,
+) -> Result<Found, AxError> {
+    let spelled = under(
+        &real_location(city_root, "read", asked)?.into_path(),
+        shelved.as_str(),
+    );
+    let at = real_location(&under(city_root, shelved.as_str()), "read", asked)?;
+    if at.path() != spelled.as_path() {
+        return Err(AxError::failure(
+            AxCode::GateDenied,
+            "read",
+            format!("{asked} is shelved behind a link"),
+        )
+        .with_recovery(
+            "a person has to put the skill's document itself on the shelf, not a link to it",
+        ));
+    }
+    Ok(Found::File {
+        at,
+        floor: Floor::Document,
+    })
+}
+
 /// Refuses a file whose real location, present or absent, is not in
 /// the package directory as the shelf spells it.
 fn stays_inside(at: &super::Located, shelf: &Path, asked: &str) -> Result<(), AxError> {

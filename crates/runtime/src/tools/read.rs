@@ -43,7 +43,7 @@ mod locator;
 mod miss;
 mod package;
 
-use super::chosen_path::{Located, ReadBound, real_location};
+use super::chosen_path::{Located, ReadBound};
 use crate::catalog::{Catalog, Expansion};
 use miss::Floor;
 
@@ -302,15 +302,7 @@ impl ReadTool {
                              a person has to fix the shelf",
                         )
                     })?;
-                    Ok(Found::File {
-                        at: real_location(
-                            &(addr.as_str().split('/'))
-                                .fold(self.city_root.clone(), |at, part| at.join(part)),
-                            "read",
-                            asked,
-                        )?,
-                        floor: Floor::Document,
-                    })
+                    package::open_document(&self.city_root, &addr, asked)
                 }
                 // The catalog's own second level. The prompt carries one
                 // line per entry, and this is what that line stood for,
