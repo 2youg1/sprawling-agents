@@ -130,9 +130,49 @@ impl Face {
         self.size = size;
     }
 
-    /// Takes the lineage and the lines appended since the last look.
+    /// Takes the lineage and the lines appended since the last look: the
+    /// same node stays selected and the same nodes stay open, and every
+    /// run the tree did not have opens its ancestors so it can be seen.
     pub(super) fn follow(&mut self, runs: &[RunLine], appended: Vec<Row>) {
-        drop((runs, appended));
+        let selected = self
+            .entries
+            .get(self.tree_at)
+            .map(|entry| entry.key.clone());
+        let open: BTreeSet<NodeKey> = self
+            .expanded
+            .iter()
+            .filter_map(|at| self.entries.get(*at).map(|entry| entry.key.clone()))
+            .collect();
+        let known: BTreeSet<NodeKey> = self
+            .entries
+            .iter()
+            .filter(|entry| matches!(entry.key, NodeKey::Run(_)))
+            .map(|entry| entry.key.clone())
+            .collect();
+        self.entries = arrange(runs);
+        self.records.extend(appended);
+        self.expanded = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| open.contains(&entry.key))
+            .map(|(at, _)| at)
+            .collect();
+        let fresh: Vec<usize> = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| {
+                matches!(entry.key, NodeKey::Run(_)) && !known.contains(&entry.key)
+            })
+            .map(|(at, _)| at)
+            .collect();
+        for at in fresh {
+            self.open_ancestors(at);
+        }
+        self.tree_at = selected
+            .and_then(|key| self.entries.iter().position(|entry| entry.key == key))
+            .unwrap_or(0);
     }
 
     pub(super) fn is_closed(&self) -> bool {
@@ -272,6 +312,10 @@ impl Face {
     /// Selects entry `at` in the tree and opens every ancestor of it.
     fn select_entry(&mut self, at: usize) {
         self.tree_at = at;
+        self.open_ancestors(at);
+    }
+
+    fn open_ancestors(&mut self, at: usize) {
         let mut parent = self.entries.get(at).and_then(|entry| entry.parent);
         while let Some(up) = parent {
             self.expanded.insert(up);
