@@ -594,7 +594,7 @@ impl WorktreeLease {
   所以进程死在一轮中间时，`.git/worktrees/<name>` 的登记、`.sprawling/worktrees/<name>` 目录（最多 `WORKTREE_MAX_BYTES`）与分支 `<name>` 永远留着。
   `sweep_abandoned` 收三样，每样只收城自己造的：登记的路径以 `.sprawling/worktrees/<name>` 结尾（人用 `git worktree add` 加的树在别处，不碰）；
   `.sprawling/worktrees/` 下没有登记的目录（整个子树是城的机器）；与被收登记同名、且尖端已被 HEAD 包含的分支——尖端带着 HEAD 没有的提交时，
-  那是一轮已经 land 的活（PR 的 commit 就在它上面），分支留下。`held` 里的名字一概不动，那是活着的 run 手里的树。
+  那是一轮已经 land 的活（PR 的 commit 就在它上面），分支留下；人把它检出成当前分支时，它已是人的，也留下。`held` 里的名字一概不动，那是活着的 run 手里的树。
   `refs/sprawling/runs/` 下的栅栏引用不在清扫范围里：回收站靠它们让被删文件的提交躲过 `git gc`（§8-8）。
   清扫在开城时做，因为账本的独占锁（§8-1）保证那一刻没有别的进程在用这座城；被否：在 `claim` 里顺手清，名字不复用，所以 `claim` 永远遇不到崩溃留下的那个名字。
 - **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但尚未做——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。

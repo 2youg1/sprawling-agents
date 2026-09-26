@@ -87,8 +87,9 @@ impl Worktrees {
     }
 
     /// Deletes the branch git made for the tree `name`, unless its tip
-    /// carries a commit the trunk does not have: that is a run's landed
-    /// offer, and the pull request names it.
+    /// carries a commit the trunk does not have - that is a run's landed
+    /// offer, and the pull request names it - or the person has it
+    /// checked out, which makes it theirs.
     fn drop_lease_branch(&self, name: &WorktreeName) -> Result<(), MemoryError> {
         let git_err = |op: &'static str| {
             move |err: git2::Error| MemoryError::Worktree {
@@ -120,7 +121,7 @@ impl Worktrees {
                 .repo
                 .graph_descendant_of(trunk, tip)
                 .map_err(git_err("judge a lease branch"))?;
-        if reached {
+        if reached && !branch.is_head() {
             branch.delete().map_err(git_err("delete a lease branch"))?;
         }
         Ok(())
