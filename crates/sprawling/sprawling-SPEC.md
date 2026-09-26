@@ -2063,7 +2063,8 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
   各份折叠照常看见它们）：落地在计划那一步之前的任何一个 `?` 上失败——驱动本身返回 `Err`（`driven?`）、目标行、清扫、
   `city::roadmap`、`Claims::of` 拒绝重放——余下的就是本轮全部的认领。计划那一步之后的失败（书架、请求、租约、结论）不再补行，
   因为那时认领已经合上，补一条放回行会让历史说一个已完成的节点又被放回。落地成功而追加失败时返回追加的错误；落地已经失败时
-  返回落地的原错误，追加的失败记进诊断——账本已经拒绝过一行，第二次拒绝不改变人要做的事。- **未定：目标登记**。`goal_registered` 仍在落地时由工人写下，目标登记还没走「调用时由记账线程判定并先入账」这条路；
+  返回落地的原错误，追加的失败记进诊断——账本已经拒绝过一行，第二次拒绝不改变人要做的事。认领在它的收尾行（finished、blocked 或 released）写上账本时就算关闭，不等 `Roadmap.md` 改写返回：改写被拒（`E_VERSION_CONFLICT` 或文件不可写）时收尾行已在账上，不再补放回行。
+- **未定：目标登记**。`goal_registered` 仍在落地时由工人写下，目标登记还没走「调用时由记账线程判定并先入账」这条路；
   两轮并排的活登记同一片地，第二个要到落地才知道。能定下它的证据：一条红测——两轮活从同一份目标登记表出发登记同一片地，
   第二个在调用时被拒。
 - 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node|two_runs_claiming_one_node_through_the_served_gate|two_runs_landing_different_nodes|a_claim_whose_landing_failed/)'`；

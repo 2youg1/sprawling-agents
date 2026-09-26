@@ -115,8 +115,13 @@ impl RunWorker {
             match effect::Claims::of(&claim_effects, &on_disk, desks.plan_path.clone(), addr, who)?
             {
                 effect::Claims::Landed(taken) => {
-                    self.settle(at, run_id, *taken, conversations)?;
+                    // The closing lines are the claims' close: once they are
+                    // on the ledger a refused roadmap rewrite owes no
+                    // hand-back line (sprawling-SPEC.md 8-42-8).
+                    let then =
+                        taken.record(&mut |line: effect::Line| self.record_for(run_id, line))?;
                     open_claims.closed();
+                    self.carry_out_landing(at, then, conversations)?;
                     self.tell_whoever_is_behind(
                         at,
                         Reporter {
@@ -129,8 +134,13 @@ impl RunWorker {
                     )?;
                 }
                 effect::Claims::Stale { nodes, released } => {
-                    self.settle(at, run_id, *released, conversations)?;
+                    // The closing lines are the claims' close: once they are
+                    // on the ledger a refused roadmap rewrite owes no
+                    // hand-back line (sprawling-SPEC.md 8-42-8).
+                    let then =
+                        released.record(&mut |line: effect::Line| self.record_for(run_id, line))?;
                     open_claims.closed();
+                    self.carry_out_landing(at, then, conversations)?;
                     for node in nodes {
                         self.note(
                             runtime::diagnostics::Level::Refuse,

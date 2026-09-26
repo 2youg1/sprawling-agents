@@ -41,6 +41,19 @@ impl RunWorker {
         conversations: u32,
     ) -> Result<(), AxError> {
         let then = landing.record(&mut |line: effect::Line| self.record_for(run, line))?;
+        self.carry_out_landing(at, then, conversations)
+    }
+
+    /// Carries out what a landing's lines, already on the ledger, ask of
+    /// the city outside it. A caller that must act between the two — the
+    /// plan desk closes its claims once their closing lines are written —
+    /// records the landing itself and then calls this.
+    pub(in crate::assembly) fn carry_out_landing(
+        &mut self,
+        at: &Assignment,
+        then: effect::Then,
+        conversations: u32,
+    ) -> Result<(), AxError> {
         match then {
             effect::Then::Nothing => Ok(()),
             effect::Then::Deliver(signals) => {
