@@ -44,7 +44,8 @@ const POLL: Duration = Duration::from_millis(5);
 const ATTEMPTS: u32 = 30_000;
 
 /// What a run of this command measures. There is no value for "this
-/// process", so the mistake the old default made has no spelling.
+/// process", so measuring the instrument itself by default has no
+/// spelling.
 enum Target {
     Pid(u32),
     Fixture(Fixture),

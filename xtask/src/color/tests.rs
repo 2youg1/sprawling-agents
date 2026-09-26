@@ -179,9 +179,8 @@ fn a_type_step_claiming_the_wrong_tier_is_caught() {
     );
 }
 
-/// One of the two steps this library used to ship is below every
-/// Bronze minimum, and no colour repairs that - which is why the fix
-/// was to the type scale and not to the greys.
+/// A type step below every Bronze minimum is a failure no colour
+/// repairs, so the remedy is in the type scale and not in the greys.
 #[test]
 fn a_step_too_small_for_any_tier_is_caught() {
     let broken = GOOD.replace("--text-label: 14px", "--text-label: 11px");

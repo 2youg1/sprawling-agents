@@ -56,10 +56,9 @@ use context::working_record;
 use link::{Spellings, link_targets, resolve};
 
 /// Path prefixes that stay behind when the tree is published. Closed,
-/// and now one entry long.
+/// and one entry long.
 ///
-/// It used to name the construction authorities too. They ship: a
-/// private working note is one thing, and a document that says why the
+/// The construction authorities ship: a private working note is one thing, and a document that says why the
 /// code has this shape is another - withholding the second leaves a
 /// reader with source and no reasons. What stays behind is only what
 /// belongs to one machine.

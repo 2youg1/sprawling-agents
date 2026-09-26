@@ -70,9 +70,9 @@ fn every_excused_signature_is_a_real_one_that_is_still_over() {
 
 /// The gate reports a spent parameter exception in both shapes the
 /// other two registers report: a name that has come back inside the
-/// budget, and a name that is no longer in the tree. Before this, the
-/// parameter register was consulted and never audited, so the test
-/// above was its only reader and `just check` said nothing.
+/// budget, and a name that is no longer in the tree, so a spent row is
+/// something `just check` reports rather than something only a test
+/// reads.
 #[test]
 fn a_spent_parameter_exception_is_reported_in_both_shapes() {
     let excused: BTreeSet<String> = ["a.rs::wide", "b.rs::narrowed", "c.rs::gone"]

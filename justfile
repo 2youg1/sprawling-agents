@@ -1,24 +1,26 @@
-# sprawling daily loop. Contract mirrored in AGENTS.md; keep both in sync.
+# sprawling's daily loop. AGENTS.md says when each recipe runs; this file
+# is what it runs.
 set shell := ["bash", "-uc"]
 
 default: check
 
-# Every card closes on this being green.
+# The whole check, run on the tree that merges a batch of branches into
+# `main` (AGENTS.md, Verification tier 3).
 #
 # `build-web` sits before `gates` because two of the gates - render and
 # npm - judge artifacts rather than sources: they need `target/web-dist`
-# and `client/node_modules` to exist, and they now refuse rather than
-# skip when those are absent. Without this dependency `just check`
-# reported green on a machine where neither gate had ever run; CI says
-# the same thing through `.github/actions/client-artifacts`, which runs
-# `build-web` for the jobs that run those gates. It sits before `clippy`
-# as well, because `crates/sprawling/build.rs` embeds the bundle: built
-# after the compile, a stale bundle is what clippy and the tests saw.
+# and `client/node_modules` to exist, and they refuse rather than skip
+# when those are absent, so a check that never built them would be red,
+# not silently green. CI says the same thing through
+# `.github/actions/client-artifacts`, which runs `build-web` for the jobs
+# that run those gates. It sits before `clippy` as well, because
+# `crates/sprawling/build.rs` embeds the bundle: built after the compile,
+# a stale bundle is what clippy and the tests would see.
 #
 # Formatting of both trees runs right after `prereqs`, because it answers
-# in seconds and every later step compiles for minutes: an unformatted
-# line in `desktop/` used to surface only in `check-desktop`, the last
-# step, after the whole workspace had been built and tested. `just` runs
+# in seconds and every later step compiles for minutes: without it an
+# unformatted line in `desktop/` would surface only in `check-desktop`,
+# the last step, after the whole workspace was built and tested. `just` runs
 # a dependency once per invocation, so `check-desktop` finds
 # `fmt-check-desktop` already done and does not repeat it. The source
 # gates and the Lean models follow for the same reason: each answers in
@@ -249,13 +251,12 @@ clippy:
 # This recipe is the definition of that check. `just check` runs it and
 # `ci.yml`'s clippy job calls it, so the check a person runs at their
 # desk and the check a pull request gets are one command rather than two
-# spellings of it: the spelling that stood in `ci.yml` had lost
-# `--all-targets`, and the tree this recipe rejects was green there.
+# spellings of it, which could lose a flag apart from each other.
 #
 # --all-targets on the first pass because `cargo check` alone does not
-# compile test targets: `refusal_matrix` used items behind
-# `#[cfg(feature = "conformance")]` without declaring that gate, and the
-# only configuration that ever compiled it was `--all-features`.
+# compile test targets, and a test target that uses an item behind a
+# feature without declaring that feature compiles only under
+# `--all-features` - the configuration a person never builds.
 #
 # Two check-mode passes, seconds each on a warm cache; the zero-warning
 # rule stays with `clippy`, which sees every feature at once.
@@ -336,9 +337,9 @@ commits range:
 #
 # Without cargo-deny installed this prints one line and succeeds, because
 # CI installs it on every push. **A cargo-deny that answers and refuses
-# fails this recipe.** The `&& … || echo` that stood here reported "not
-# installed" for a real violation as well as for a missing tool, so
-# `deny.toml`'s yanked-crate rule had never once stopped a merge.
+# fails this recipe**: the recipe tells a missing tool from a refusal by
+# asking `command -v` first, because a single `&& … || echo` would report
+# "not installed" for a real violation too.
 #
 # The optional directory is for a tree outside the workspace: `desktop/`
 # carries its own manifest and its own deny.toml, and it is read with the
@@ -353,7 +354,7 @@ deny dir=".":
     cd '{{dir}}'
     cargo deny check bans licenses sources
 
-# L-02: `desktop/` is not compiled by any workspace command - the root
+# `desktop/` is not compiled by any workspace command - the root
 # Cargo.toml excludes it so the Win32 boundary can relax `unsafe_code`
 # in one place (desktop-SPEC.md section 8.5). Without this recipe its
 # source never meets a compiler, a test runner or a licence check that
@@ -368,8 +369,8 @@ check-desktop: fmt-check-desktop
     cd desktop && cargo nextest run --locked
     just deny desktop
 
-# The browser client (client/client-SPEC.md): Solid + Effect, driven by
-# bun, bundled into target/web-dist where crates/sprawling/build.rs reads
+# The browser client (client/client-SPEC.md): Svelte + Effect, built by
+# Vite under bun, bundled into target/web-dist where crates/sprawling/build.rs reads
 # it. `just prereqs` names bun. `--frozen-lockfile` makes bun.lock
 # the authority, so a build cannot resolve a version nobody committed.
 build-web:
@@ -394,24 +395,23 @@ client-checks:
 render:
     cargo xtask render
 
-# V5: the kernel propositions kani holds against real MIR. Deliberately
-# not in `just check`, and for the same honesty as `adversary`: kani has
-# no Windows host, this project is developed on Windows, and a gate that
-# always skips on the machine people actually use is the defect this wave
-# exists to remove rather than a gate. Without kani installed it prints
-# one line and succeeds; CI's linux `proof` job is where it must pass.
+# The kernel propositions kani holds against real MIR. Not in
+# `just check`, for the same reason as `adversary`: kani has no Windows
+# host, and a check that always skips on a Windows desk would read as
+# green without having run. Without kani installed it prints one line
+# and succeeds; CI's Linux `proof` job is where it must pass.
 # `cargo xtask proof --list` prints the harness names it will run.
 proof:
     cargo xtask proof
 
-# citysim scenarios land from S2; the crate's test suite is the entry point.
+# The citysim scenarios; the crate's test suite is the entry point.
 # No seed argument: the scenarios are fixed scripts driven by a counting
 # clock on one thread, so a failure replays from the script rather than
 # from a number. A seed returns when a random scenario batch does.
 sim:
     cargo test --package citysim --locked
 
-# Generate or refresh a crate SPEC skeleton (apostle-sdd 17 sections + B.5 amendments).
+# Generate or refresh a crate SPEC skeleton.
 spec crate:
     cargo xtask spec {{crate}}
 
@@ -419,7 +419,7 @@ spec crate:
 api-baseline:
     cargo xtask apisync --write
 
-# Requires cargo-fuzz + nightly; V4 runs the smoke batch nightly in CI.
+# Requires cargo-fuzz + nightly; `nightly.yml` runs the smoke batch.
 fuzz target:
     cargo fuzz run {{target}} --fuzz-dir fuzz
 
@@ -441,7 +441,7 @@ bench:
     cargo run --release -p citysim --bin bench
     cargo nextest run -p sprawling --release --run-ignored only -E 'test(/::instrument_/)' --no-capture
 
-# T14: the four-action pressure reading (citysim-SPEC.md 8-5) - install,
+# The four-action pressure reading (citysim-SPEC.md 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.
 #
 # `build-web` first, the same dependency `dist` carries: without the
@@ -456,13 +456,13 @@ bench-startup: build-web
     cargo build --release -p sprawling --locked
     cargo run --release -p citysim --bin bench_startup --locked
 
-# CycloneDX bill of materials for the release archive (release item
-# two). Where it lands is written once, in `cargo xtask sbom`, and the
-# archive's contents table reads that same constant.
+# CycloneDX bill of materials for the release archive. Where it lands is
+# written once, in `cargo xtask sbom`, and the archive's contents table
+# reads that same constant.
 sbom:
     cargo xtask sbom
 
-# Two builds of one tree must be byte-identical (release item three).
+# Two builds of one tree must be byte-identical.
 repro:
     cargo xtask repro
 
@@ -506,7 +506,7 @@ mem *args:
     {{ if args =~ '^[0-9]+$' { "true" } else { "cargo build --release -p sprawling --locked" } }}
     cargo xtask mem {{args}}
 
-# V10: the adversarial property checker in `adversary/`, which lives outside the
+# The adversarial property checker in `adversary/`, which lives outside the
 # workspace, outside the release, and outside `just check`
 # (adversary/adversary-SPEC.md section 2). It is never a gate: on a machine with
 # no Lean toolchain this prints one line and succeeds, so `just check` behaves
@@ -515,8 +515,6 @@ mem *args:
 # This recipe is the only place that knows where the binary is. The checker is
 # told through SPRAWLING_BIN and never searches for one, so an adversary run can
 # never be driven by a stale binary somebody left in target/.
-#
-# V10: attack the built binary through the wire (never a gate; skipped without Lean)
 adversary *args:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -534,7 +532,7 @@ adversary *args:
     ! command -v cygpath >/dev/null 2>&1 || binary="$(cygpath -m "$binary")"
     cd adversary && SPRAWLING_BIN="$binary" lake exe adversary {{args}}
 
-# N-14.6: the acceptance gate for a real endpoint (never a gate in `just
+# The acceptance gate for a real endpoint (never a gate in `just
 # check`; without credentials it prints one line and succeeds).
 #
 # It is out of `just check` because it spends somebody's money over
@@ -550,9 +548,9 @@ adversary *args:
 # could disagree with them.
 #
 # Two cargo invocations, because the cap belongs to the test process and
-# not to the compiler: a cold build of this target measured 2m18s on the
-# development machine, so `--no-run` pays for compilation first and the
-# 180 seconds then bound the calls to the endpoint (Roadmap section 0.0).
+# not to the compiler: a cold build of this target takes minutes, so
+# `--no-run` pays for compilation first and the 180 seconds then bound
+# only the calls to the endpoint.
 # Serial, so three network tests share one cap and report in order.
 #
 # `args` reaches libtest, which is how one case is run on its own.

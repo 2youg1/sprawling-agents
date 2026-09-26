@@ -44,12 +44,10 @@
 //! name. Anyone changing the shape here changes it in all three.
 //!
 //! **The notice appears once, and the gate reads the whole file to say
-//! so.** Comparing only the first four rows let a second copy of the
-//! header live further down and stay green: `main/router.rs` carried
-//! two, and the module documentation between them had been cut in half
-//! and spliced to the documentation of another module. A duplicated
-//! notice is how a file records that it was assembled from two files,
-//! and the paragraph it hides is what the next reader needs.
+//! so.** Comparing only the first four rows would let a second copy of
+//! the header live further down and stay green. A duplicated notice is
+//! how a file records that it was assembled from two files, and the
+//! module documentation it splits is what the next reader needs.
 
 use std::path::Path;
 

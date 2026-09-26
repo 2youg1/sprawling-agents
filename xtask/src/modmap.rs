@@ -9,13 +9,11 @@
 //! a file that exists while its entry still says planned means the builder
 //! skipped the "flip the status" leg of the completion evidence.
 //!
-//! **The map is data, and used to be prose.** It was a seven-column table
-//! inside `ARCHITECTURE.md`, which cost that document seven hundred lines
-//! nobody reads through and gave every entry a *position* that a person
-//! maintained: each heading stated how many rows sat under it, and that
-//! count could go stale while the rows were right. A structured file has
-//! no positions to keep, and a reader can ask it for one module instead of
-//! scanning for one.
+//! **The map is data, not prose.** A table inside `ARCHITECTURE.md`
+//! would give every entry a *position* a person maintains, and a count
+//! under each heading that can go stale while the rows are right. A
+//! structured file has no positions to keep, and a reader can ask it for
+//! one module instead of scanning for one.
 //!
 //! **`lib.rs` and pure index files are exempt, and that exemption is
 //! checked** rather than trusted: an index file may hold declarations and

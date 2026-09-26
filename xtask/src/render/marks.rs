@@ -5,10 +5,9 @@
 
 //! The mark a key is not allowed to carry.
 //!
-//! **The other reading that used to live here has moved.** Where a
-//! row's first painted box starts is geometry, and geometry is measured
-//! once, by `xtask::survey`; this file kept the half that is not a
-//! position at all - whether a decoration reached a key - and it stays
+//! Where a row's first painted box starts is geometry, and geometry is
+//! measured once, by `xtask::survey`; this file holds the half that is
+//! not a position at all - whether a decoration reached a key - and it stays
 //! beside the gate because it is a property of this client's own
 //! stylesheet rather than a measurement any page could be put through.
 //!
