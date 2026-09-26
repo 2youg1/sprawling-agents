@@ -1434,8 +1434,10 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 | 读界关上的楼 | 机密楼对楼外全关；规则读不出的楼同样关 | `kernel::address::may_read`（city-SPEC §8-2） |
 | `.git` 目录 | 它是对象库不是文本，扫它只产出乱码命中 | 本节 |
 | 非 UTF-8 文件 | 二进制里没有可读的行 | 本节 |
-| `land` 拒绝的链接 | 链接的目标落在城外、保留区或关上的楼 | `chosen_path::land` |
+| `land` 以 `E_GATE_DENIED` 拒绝的链接 | 链接的目标落在城外、保留区或关上的楼 | `chosen_path::land` |
 | 指向目录的链接 | 顺着链接走可能绕回自己走过的地方；要搜目标目录，按它真实的地址去搜 | 本节 |
+
+`land` 以别的码拒绝的链接不在这张表里：真实位置解析不出（`E_STORAGE_FATAL`，比如一个指回自己的链接）是盘没有作答，不是一栋关上的楼，所以它计入 `unreadable`，`unread` 里带上那个错误；`chosen_path::walked` 只把 `E_GATE_DENIED` 当作跳过，其余的错误交给遍历者。
 
 大于 1 MiB 的文件不读——把一个大对象读进内存找子串是一次停顿——但它不在这张表里：它是「没看」，计入 `unreadable` 并在 `unread` 里说出来。
 
