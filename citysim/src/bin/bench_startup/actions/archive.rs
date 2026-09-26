@@ -94,7 +94,7 @@ pub(super) fn unpack(archive: &Path, into: &Path) -> Result<PathBuf, AxError> {
 /// deflated zip entry under one directory, which is the shape
 /// `cargo xtask package` gives a release archive.
 ///
-/// Written before any stamp: T14's start line is "the archive is in
+/// Written before any stamp: the install reading starts at "the archive is in
 /// place", and network transfer is out of the reading. Reading a release
 /// archive and writing this fixture are the same file's business, so the
 /// member a shell would find and the member this fixture writes cannot

@@ -57,7 +57,7 @@ pub struct Scenario {
     /// its granularity and zone ladder from here, never from a sample.
     pub config: FrozenConfig,
     /// The checkpoint net, when the scenario runs against a real tree.
-    /// A14's leading half is per wave, not per suspicious command: the
+    /// The fence is per wave, not per suspicious command: the
     /// fence goes up before every wave, so anything a wave deletes has a
     /// commit to come back from. An unchanged wave still commits — a
     /// chain that rebuilds is worth more than a saved object.
@@ -232,11 +232,11 @@ pub fn run_scenario_on(
         retries: kernel::Retries::UntilHalted,
     };
 
-    // Where this call sits in this run. It used to be the clock reading,
-    // and a wave hands every call in it the same instant on purpose - so
-    // two calls of one tool inside one wave derived one key and the
-    // second came back deduplicated. Determinism rule 7 rules a clock out
-    // of a key outright; a position cannot be a clock.
+    // Where this call sits in this run, counted rather than read off the
+    // clock: a wave hands every call in it the same instant on purpose,
+    // so a clock reading would give two calls of one tool inside one wave
+    // one key, and the second would come back deduplicated. Determinism
+    // rule 7 rules a clock out of a key outright (citysim-SPEC.md 8-4).
     let placed = Cell::new(0u64);
     let mut invoke = |call: &kernel::ToolCall, t: TimeMs| {
         // Every door the call must pass is the bench's to route; the

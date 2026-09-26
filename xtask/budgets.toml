@@ -652,8 +652,8 @@ status = "measured, not gated: serial 153.0 ms; concurrent 51-60 ms on an idle m
 # into a run the `$state` table holds tells them nothing at all.
 [client_fold]
 what = "one animation frame of 50 token deltas folded into a belief of R runs, one subscriber reading the run table"
-measured_by = "bun test --conditions=browser client/src/core/belief/fold_cost.test.ts (the frame test prints one client_fold line per R and holds R=1e4 to 4000 us)"
-status = "measured, not gated here: per frame with the `$state` run table 30-37 us at R=1e3 and 30-54 us at R=1e4, and 30 us at R=1e2 once warm (the first size measured pays the runes runtime warm-up, 94-330 us), against 29-34 us, 58-73 us and 471-539 us with belief.batch alone, interleaved on the same instrument (x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test's own budget is the guard"
+measured_by = "bun test --conditions=browser client/src/core/belief/fold_cost.test.ts (the frame test prints one client_fold line per R and holds the subscriber to one read per city answer; the delta test holds R=1e4 within 5x of R=1e2 in the same run)"
+status = "measured, not gated here: per frame with the `$state` run table 30-37 us at R=1e3 and 30-54 us at R=1e4, and 30 us at R=1e2 once warm (the first size measured pays the runes runtime warm-up, 94-330 us), against 29-34 us, 58-73 us and 471-539 us with belief.batch alone, interleaved on the same instrument (x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test guards only what every machine agrees on: the read count and the ratio between two sizes"
 
 # What the page pays to read one event frame off the socket. Event and
 # delta frames arrive once per ledger record and once per token, so they
@@ -685,4 +685,4 @@ status = "measured, not gated: on windows-x86_64, 16 cores, NVMe, three runs eac
 [city_results]
 what = "one triage of a 200-run city into waiting, failed and done, each cut to its FIRST newest (client/src/core/results.ts)"
 measured_by = "bun test --conditions=browser client/src/core/results.test.ts (prints one city_results line and holds a triage to 1600 us, a tenth of a 16 ms frame)"
-status = "measured, not gated here: 45-124 us per city across three runs (x86_64 desktop class, other builds running beside it). A wall-clock figure is the machine's, so this register records it and the test's own budget is the guard"
+status = "measured, not gated here: 45-124 us per city across three runs (x86_64 desktop class, other builds running beside it). A wall-clock figure is the machine's, so this register records it and the test guards only what every machine agrees on: the read count and the ratio between two sizes"

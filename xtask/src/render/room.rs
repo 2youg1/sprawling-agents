@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whether words had room to stand and a popover room to open
-//! (xtask-SPEC.md section 8-33).
+//! (xtask-SPEC.md section 8-38).
 //!
 //! **Both are defects every other reading passes.** A notice squeezed
 //! to one glyph a line has not overflowed and has not left its

@@ -5,7 +5,7 @@
 
 //! The living skeleton. Dispatch -> four-phase turns -> run_frozen,
 //! all through scripted adapters, chain-verified, byte-deterministic.
-//! A9's first standing assertions live here: cancel takes effect at phase
+//! The cancel assertions live here: cancel takes effect at phase
 //! boundaries, never inside a phase.
 
 #![allow(
@@ -440,7 +440,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
             effort: None,
             second_threshold: None,
         },
-        // The real net over the real tree: A14's leading half.
+        // The real net over the real tree: a checkpoint before every wave.
         checkpoint: Some((
             memory::Checkpoint::open(city.path()).unwrap(),
             vec!["sim/lobby/room1".to_owned()],
@@ -470,7 +470,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
         "status then edit: {ks:?}"
     );
 
-    // A14's leading half, read off the event order: every tool_called is
+    // The per-wave checkpoint, read off the event order: every tool_called is
     // preceded by a checkpoint_committed, so whatever the wave touches
     // has a commit to come back from.
     for (i, kind) in ks.iter().enumerate() {
