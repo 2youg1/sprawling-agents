@@ -28,6 +28,7 @@ mod append;
 mod first_line;
 mod ledger;
 mod open;
+mod unwind;
 mod verify;
 
 pub use append::{ledger_segments_at, read_raw_lines_at};
