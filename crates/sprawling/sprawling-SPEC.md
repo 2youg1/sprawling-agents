@@ -3463,7 +3463,7 @@ pub(super) fn spawn_folding(
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 
-**形状。** `main/verbs.rs` 是 data：一张静态表 `VERBS`，每个动词一行 `Row { verb, name, aliases, positionals, flags, says, effect }`。位置参数是 `(名字, Need::Required | Need::Optional)`；标志是 `Flag { name, takes: Takes::Nothing | Takes::Value(<占位名>), says }`；`effect` 是 `Effect::ReadsOnly | Effect::Changes`，标出这个动词运行时会不会改一座城或这台机器。总览（`help`、`--help`）、单个动词的帮助（`help <verb>`、`<verb> --help`）与首屏退出时的清单都由这张表生成，没有第二份手写的命令清单或用法字符串。
+**形状。** `main/verbs.rs` 是 data：一张静态表 `VERBS`，每个动词一行 `Row { verb, name, aliases, positionals, flags, says, effect }`。位置参数是 `(名字, Need::Required | Need::Optional)`；标志是 `Flag { name, takes: Takes::Nothing | Takes::Value(<占位名>), says }`；`effect` 是 `Effect::ReadsOnly | Effect::Changes`，标出这个动词运行时会不会改一座城或它所在的主机。总览（`help`、`--help`）、单个动词的帮助（`help <verb>`、`<verb> --help`）与首屏退出时的清单都由这张表生成，没有第二份手写的命令清单或用法字符串。
 
 `main/grammar.rs` 是 grammar：纯函数，不做 I/O。
 
@@ -3487,9 +3487,9 @@ pub(super) enum LineError {
 
 **命令行错误。** 每个 `LineError` 在 stderr 上写一行 `sprawling: <哪个参数、错在哪>. Did you mean '<最近的合法写法>'?`，退出码 2，不再倾倒整张表。恢复语就是那条「最近的写法」：`nearest` 取与所敲的词共享最长前缀（至多四个字符）的已知名字，所以 `stauts` 得 `["status"]`。
 
-**本节接口的当前状态。** `call`、`enrol`、`install`、`fork`、`status`、`serve` 的标志值与 `doctor` 的全部参数，仍由各自的函数从原始 argv 读（`router::flag_value`、`args.iter().any`），解析器只替它们校验；改为只读 `Arguments` 之后 `flag_value` 删除。README、README.zh-CN、LLM.md、`docs/operating.md` 里的命令语法块还是手写的，改由 `cargo xtask docnum` 从这张表生成（`<!-- xtask:begin cli_verbs -->`）是下一步；`nearest` 与 `console::language` 里找近似动词的那一份是同一条规则的两份，合并到一处也是下一步。
+**本节接口的当前状态。** `call`、`enrol`、`install`、`fork`、`status`、`serve` 的标志值与 `doctor` 的全部参数，仍由各自的函数从原始 argv 读（`router::flag_value`、`args.iter().any`），解析器只替它们校验；改为只读 `Arguments` 之后 `flag_value` 删除。README、README.zh-CN、LLM.md、`docs/operating.md` 里的命令语法块还是手写的，改由 `cargo xtask docnum` 从这张表生成（一个名为 `cli_verbs` 的受管区块）是下一步；`nearest` 与 `console::language` 里找近似动词的那一份是同一条规则的两份，合并到一处也是下一步。
 
 **决定。**
 
-1. 不用 clap。命令表是数据，解析器约两百行；启动时间几乎全是操作系统的开销（`--version` 首字节 7.98 ms，空进程下限 5.40 ms），没有给一个参数库的依赖、编译时间与体积留出位置。重新考虑的条件：动词需要子动词或 shell 补全以外的、这张表表达不了的结构。
+1. 不用 clap。命令表是数据，解析器约两百行；启动时间几乎全是操作系统的开销（Windows x86-64 桌面级机器上，`--version` 首字节 7.98 ms，空进程下限 5.40 ms），没有给一个参数库的依赖、编译时间与体积留出位置。重新考虑的条件：动词需要子动词或 shell 补全以外的、这张表表达不了的结构。
 2. 不用 `+` 前缀区分动词。现有动词不改名，一个词仍然是一个动词，文档与肌肉记忆都不必迁移。
