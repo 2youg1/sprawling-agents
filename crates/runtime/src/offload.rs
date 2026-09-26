@@ -273,6 +273,27 @@ mod tests {
     }
 
     #[test]
+    fn the_rest_address_is_one_the_read_tool_admits_and_resolves() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut cas, room) = site(&dir);
+        let mut s = OffloadSite {
+            cas: &mut cas,
+            room: &room,
+        };
+        let original = vec![3u8; 30_000];
+        let record = offload(&original, 2_048, &mut s).unwrap();
+        let admitted = crate::tools::chosen_path::admit(&record.rest_path, "read", &|_| {
+            kernel::ReadVerdict::Open
+        })
+        .unwrap();
+        assert_eq!(
+            std::fs::read(dir.path().join(admitted.as_str())).unwrap(),
+            original,
+            "the read tool resolves the rest address from the city root"
+        );
+    }
+
+    #[test]
     fn same_bytes_offload_to_the_same_locator() {
         let dir = tempfile::tempdir().unwrap();
         let (mut cas, room) = site(&dir);

@@ -5,7 +5,7 @@
 
 //! The L0 three. Index only: no logic lives here.
 
-mod chosen_path;
+pub(crate) mod chosen_path;
 mod edit;
 mod exec;
 mod read;
