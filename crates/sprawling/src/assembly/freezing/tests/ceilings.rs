@@ -42,9 +42,9 @@ fn the_effort_a_config_layer_states_is_what_goes_out_on_the_wire() {
 
     let asked = provider.bodies().join("\n");
     assert!(
-        asked.contains("\"effort\":\"xhigh\""),
+        asked.contains("\"reasoning_effort\":\"xhigh\""),
         "the building layer overrides the city layer, and the resolved level is what the \
          provider was asked for: {asked}"
     );
-    assert!(!asked.contains("\"effort\":\"low\""));
+    assert!(!asked.contains("\"reasoning_effort\":\"low\""));
 }

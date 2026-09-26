@@ -12,7 +12,8 @@
 //!
 //! - Request and response:
 //!   <https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create/>
-//! - `reasoning.effort` and its accepted values:
+//! - `reasoning_effort` and its accepted values: `ReasoningEffort` in
+//!   `openai/openai-openapi`'s `openapi.yaml`, and
 //!   <https://developers.openai.com/api/docs/guides/reasoning>
 //!
 //! **Loss accounting is explicit, because this dialect is not the
@@ -202,10 +203,12 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
         root.insert("max_tokens".to_owned(), Value::Number(ceiling.get().into()));
     }
     root.insert("messages".to_owned(), Value::Array(messages));
+    // The specification's own field on this face is `reasoning_effort`,
+    // a string; `reasoning: { effort }` is the responses face's shape.
     if let Some(effort) = req.effort {
         root.insert(
-            "reasoning".to_owned(),
-            json!({ "effort": effort_field(effort) }),
+            "reasoning_effort".to_owned(),
+            Value::String(effort_field(effort).to_owned()),
         );
     }
     if !req.tools.is_empty() {
