@@ -21,8 +21,9 @@ import type { Key } from "../../core/lang";
 export interface EmptyStateProps {
   // The key of the sentence saying what this screen is missing.
   readonly missing: Key;
-  // The outline the eye lands on. A dashed box stands in when the page
-  // has nothing better to draw.
+  // The outline the eye lands on, when the page has one worth drawing.
+  // Without it the sentence stands alone: an empty outline reads as a
+  // box that failed to load.
   readonly shape?: Snippet;
   // Usually one Button: the way out of the emptiness.
   readonly action?: Snippet;
@@ -39,13 +40,11 @@ export interface EmptyStateProps {
 </script>
 
 <div class="flex w-full flex-col items-center gap-base px-pane py-section text-center">
-  <div aria-hidden="true">
-    {#if shape !== undefined}
+  {#if shape !== undefined}
+    <div aria-hidden="true">
       {@render shape()}
-    {:else}
-      <div class="size-figure rounded-panel border border-dashed border-edge-input"></div>
-    {/if}
-  </div>
+    </div>
+  {/if}
   <p class="max-w-measure text-note text-text-quiet">{say($lang, missing)}</p>
   {#if action !== undefined}
     {@render action()}

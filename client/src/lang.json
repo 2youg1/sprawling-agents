@@ -344,8 +344,8 @@
     "zh": "这段来自哪个文件"
   },
   "commits_empty": {
-    "en": "no commits",
-    "zh": "没有提交"
+    "en": "no commits yet: a run's work lands here when it commits in this building",
+    "zh": "还没有提交：派活在这栋楼里提交后，会出现在这里"
   },
   "commits_first": {
     "en": "the first commit",
@@ -1340,8 +1340,8 @@
     "zh": "城外的路径打不开"
   },
   "plan_empty": {
-    "en": "no plan yet",
-    "zh": "还没有计划"
+    "en": "no plan yet: the Mayor hands each building its part of the city's plan",
+    "zh": "还没有计划：市长会把城市计划中属于这栋楼的部分交给它"
   },
   "plan_item": {
     "en": "item",
@@ -2164,8 +2164,8 @@
     "zh": "已进阅览室"
   },
   "skills_empty": {
-    "en": "no shelf in this city holds anything",
-    "zh": "这座城的书架上还什么都没有"
+    "en": "no shelf in this city holds anything: a skill is a folder with a SKILL.md placed on a shelf",
+    "zh": "这座城的书架上还什么都没有：技能是放在书架上、带 SKILL.md 的文件夹"
   },
   "skills_external": {
     "en": "shelf {n} · {path}",
