@@ -103,7 +103,7 @@
   // navigation, and the focus it lands on is the page's own choice.
   let arrived = false;
 
-  const waiting = $derived($approvals.length);
+  const waiting = $derived($approvals?.length ?? 0);
   const working = $derived($belief.live.length > 0);
   const halted = $derived(cityIsShut($belief.halted));
   const unsent = u.conn.unsent;
