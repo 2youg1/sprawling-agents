@@ -10,7 +10,7 @@
 
 > **Decision and recovery logic reads no log output.**
 
-A log is **a diagnostic for a person**, not data. Keeping it that way protects two things at once: the Ledger's standing as the only history, and deterministic replay — a log carries wall-clock timestamps and thread interleaving, and neither reproduces.
+A log is **a diagnostic for a person**, not data. Keeping it that way protects two things at once: the Ledger's standing as the only history, and deterministic replay — a log carries thread interleaving and whatever clock a sink adds, and neither reproduces.
 
 The rule is held by structure rather than by discipline: the logging surface **has write methods and no read method**. Reading a log line back inside the code cannot be spelled.
 
@@ -25,7 +25,7 @@ This is the most expensive distinction in the design to get wrong.
 | Disposable | no | yes, at any moment |
 | Enters replay | yes | no |
 | Cost of losing it | the city is gone | this debugging session is harder |
-| Timestamps | integer milliseconds, passed in | sampled, freely |
+| Timestamps | integer milliseconds, passed in | none in the line; a sink may add one |
 | Floats | none | as you like |
 
 **The test**: delete every log and the behaviour, the replay result, and the reconciliation totals stay byte-identical. When they do not, something has been written in the wrong place.
@@ -42,21 +42,23 @@ Levels here answer **who reads this, and when**, which is a question with a chec
 | `trace` | the builder | when reproducing a defect | phase changes, locks, retries |
 | `wire` | the builder | when a protocol does not connect | the bytes of a frame |
 
-**`refuse` and `effect` are on by default.** Together they answer nine of ten questions a person has — why it declined, and what it actually did — and they are small enough to leave on permanently.
+A level admits itself and every level above it in the table. **`effect` is the default**, so `refuse` and `effect` are on unless you ask otherwise: together they answer most of what a person asks — why it declined, and what it actually did — and they are small enough to leave on permanently.
+
+`sprawling serve <city> --log <level>` sets the level, `--log off` writes nothing, and `serve` prints the level it runs at under its banner. A word that is not a level is refused with the list of levels.
 
 ## 4 Structured, and anchored to a run
 
 Every line carries three required fields: `run`, `seq` (the Ledger position at the time), and `module`.
 
-`seq` is the load-bearing one: **it anchors the log to the only history**. From a surprising log line, go to that position in the Ledger and read what happened; from a surprising event, pull the logs around it. Two timelines line up on one integer, with no guessing from timestamps.
+`seq` is the one the design rests on: **it anchors the log to the only history**. From a surprising log line, go to that position in the Ledger and read what happened; from a surprising event, pull the logs around it. Two timelines line up on one integer, with no guessing from timestamps.
 
-The format is one JSON object per line, for the same reason the wire format is: the receiver may be a browser, and a person can still read it.
+The format is one JSON object per line, for the same reason the wire format is: the receiver may be a browser, and a person can still read it. `runtime::diagnostics::render` is the one place a line becomes text. A served city sends its lines to the terminal it runs in and to **the log** lens of **the record**.
 
 ## 5 Secrets and logs
 
-Logs pass through the **same** secret scan as the Ledger — not "logs are scanned too", but the same `kernel::secret::scan`. Two scanners would be two authorities, and the one that misses something is always the one nobody watches.
+Logs pass through the **same** secret scan as the Ledger — not a second scanner for logs, but the same function. Two scanners would be two authorities, and the one that misses something is always the one nobody watches. A hit is replaced in place rather than dropping the line, because the words around it are usually what the reader needed.
 
-`Sealed<T>` has neither `Debug` nor `Display`, so a sealed value **cannot enter a log at the type level**. That is the first line; the scan is the second.
+`Sealed<T>` has neither `Debug` nor `Display`, so a sealed value **cannot enter a log at the type level**. That is the first defence; the scan is the second.
 
 ## 6 When to write a log line
 
@@ -70,20 +72,18 @@ Three cases earn one:
 
 ## 7 Relationship to `tracing`
 
-The surface writes JSON lines itself and takes no logging dependency. `tracing`'s contribution here would be spans that carry the module name across `await` points, and the run loop that produces these lines is synchronous — it owns one writer thread and never awaits between a decision and the line about it. A dependency whose only feature has no consumer is a cost with no payment, so it is not taken. Business correlation travels on `run` and `seq` either way.
+The surface writes JSON lines itself and takes no logging dependency. What `tracing` would add here is spans that carry the module name across `await` points, and the correlation a reader needs already travels on `run` and `seq`. A dependency whose only feature has no consumer is a cost with no payment, so it is not taken.
 
-When an async path does produce log lines, that is when this decision is worth revisiting; the sink is a closure, so the change is at the assembly layer rather than in the surface.
+When a code path needs spans carried across `await` points, this decision is worth revisiting. The sink is a closure, so the change is at the assembly layer rather than in the surface.
 
-The file rotation and remote-reporting layers stay out regardless: logs remain on this machine and rotation belongs to the operating system. This is the same principle as depending on no hosted service.
+File rotation and remote reporting stay out regardless: logs remain on this machine, and rotation belongs to the operating system. This is the same principle as depending on no hosted service.
 
 ## 8 What holds this in place
 
-Three tests, because a design like this decays quietly otherwise.
+Three checks, because a design like this decays quietly otherwise.
 
-A compile-failure counterexample proves a `Sealed` value cannot be formatted into a line at all, and the scan redacts plaintext that arrives as an ordinary string - two defences, in that order.
+Two compile-failure counterexamples prove a `Sealed` value cannot be formatted into a line or a record at all (`crates/runtime/tests/ui/log_a_credential.rs`, `crates/kernel/tests/ui/sealed_into_record.rs`), and the scan redacts plaintext that arrives as an ordinary string — two defences, in that order.
 
-The deletion-invariance test runs the same work twice, once with every level on and once with logging off, and requires the two ledgers to agree. It also checks that the noisy run was actually noisy: an invariance that held because nothing was written would prove nothing.
+The deletion-invariance test (`deleting_every_log_line_leaves_the_history_byte_identical`, in `crates/sprawling/src/assembly/genesis/tests.rs`) runs the same work twice, once with every level on and once with logging off, and requires the two Ledgers to agree. It also checks that the noisy run was actually noisy: an invariance that held because nothing was written would prove nothing.
 
-`sprawling status` reports the current level. `--log <level>` sets it and `--log off` writes nothing.
-
-**One line was written in a place this design forbids, and has been moved**: the timestamp. A log line carries `seq` and no clock reading, because the library that writes it is not allowed to sample time. A sink that wants a wall clock adds one at the assembly layer, which is where sampling is sanctioned.
+**A line carries `seq` and no clock reading**, because the library that writes it is not allowed to sample time. A sink that wants a wall clock adds one at the assembly layer, which is where sampling is sanctioned.

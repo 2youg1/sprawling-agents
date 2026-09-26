@@ -10,4 +10,4 @@ A useful report names the version (`sprawling --version`), the platform, the ste
 
 ## Supported versions
 
-Every release so far is a pre-release. A fix lands in the next release, and older releases do not receive back-ported fixes.
+Every release is a pre-release. A fix lands in the next release, and older releases do not receive back-ported fixes.
