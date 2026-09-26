@@ -1191,6 +1191,8 @@ pub enum ServerFrame { …, Lagged(Lagged) }
 
 **两端都取自会话自己数得出的记录，不取自广播报的那个数。** `RecvError::Lagged(u64)` 只说跳过了多少条，一个端点也不给；一个只拿到跳过量的人无法把丢掉的那一段要回来。所以会话新增一份状态——**上一条已发的 `EventRecord.seq`**——`from` 是它之后的第一条；`to` 是**恢复后首条回退一位**，因为「这一段到哪结束」只有在下一条记录到达时才成为事实。同一个值同时装着「已发到哪」和「还欠不欠一段范围」，故它是 `Stream::{Even, Owed}` 而不是一个 bool 加一个 `Option<Seq>`。
 
+**`Even` 里的 seq 断口同样是一段欠账。** 一条记录可能根本没进广播（§8-47：拼不出帧），这时订阅不报 `Lagged`，会话仍是 `Even`；已发过记录的 `Even(Some(last))` 遇到 `next > last + 1`，照样先发 `Lagged { last + 1, next - 1 }`。判定只有 `decide_lag` 一处；`Even(None)` 不算——会话的视图从欢迎开始，欢迎之前的记录是问题而不是欠账。
+
 **四路语义不同，故四路分开陈述**（四路指一个会话的四个接收臂：自己的拒绝、事件、增量、日志）：
 
 | 臂 | 缓冲 | 拉下时 | 原因 |
@@ -1311,7 +1313,7 @@ pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String
 pub struct Committed { /* record: Arc<EventRecord>, frame: Utf8Bytes */ }
 impl Committed {
     /// 拼帧：`{"event":` ＋ 记录的 JSON ＋ `}`。
-    /// # Errors  `E_WIRE_MISMATCH`：记录序列化不出来（恢复：该记录不推，页面按 `Lagged` 补拉）。
+    /// # Errors  `E_WIRE_MISMATCH`：记录序列化不出来（恢复：该记录不推；下一条记录到达时 seq 断口使会话发出 `Lagged`，页面按它补拉，§8-41）。
     pub fn new(record: EventRecord) -> Result<Self, AxError>;
     pub fn record(&self) -> &EventRecord;
 }

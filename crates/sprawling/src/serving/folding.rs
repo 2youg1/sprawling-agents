@@ -100,10 +100,11 @@ fn fold_until_closed(
                 // A send with no subscribers is not a failure: a city
                 // with no browser open is a city doing its work.
                 Ok(committed) => drop(to_clients.send(committed)),
-                Err(unframed) => eprintln!(
-                    "a committed record has no frame and reaches no client: {}",
-                    unframed.subject()
-                ),
+                // The next record's seq gap makes every live session
+                // send `Lagged` for this one (channels-SPEC.md 8-41).
+                Err(unframed) => {
+                    eprintln!("a committed record has no frame and reaches no client: {unframed}");
+                }
             }
         }
     }
