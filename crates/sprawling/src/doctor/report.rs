@@ -14,6 +14,8 @@
 use super::{Absence, Fault, Version};
 use super::{Finding, Machine, Need, PATIENCE, Platform, Presence, ThisMachine, Tier, Verdict};
 use super::{examine, verdict};
+use crate::serving::standing::{Held, Standing};
+use kernel::AxError;
 
 /// Asks this machine once and folds what it said into the answer the
 /// wire carries.
@@ -59,8 +61,19 @@ fn fold(
             .collect(),
         sandbox,
         custody,
-        core: channels::DoctorCore::Unasked {
-            said: String::new(),
+        core: core_level(machine.core_standing()),
+    }
+}
+
+/// The level the terminal's priority part names, as the wire carries it.
+fn core_level(standing: Result<Standing, AxError>) -> channels::DoctorCore {
+    match standing {
+        Ok(Standing::Raised) => channels::DoctorCore::Raised,
+        Ok(Standing::Normal(Held::ByTheSetting)) => channels::DoctorCore::HeldBySetting,
+        Ok(Standing::Normal(Held::Refused(said))) => channels::DoctorCore::Refused { said },
+        Ok(Standing::Normal(Held::ByTheValve)) => channels::DoctorCore::LoweredByValve,
+        Err(err) => channels::DoctorCore::Unasked {
+            said: err.to_string(),
         },
     }
 }
