@@ -3357,7 +3357,7 @@ pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk);
 pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一个 gate 发出的写面
 ```
 
-**为什么把循环从闭包里拿出来**：仪表要驱动的是生产在跑的那个循环本身。`citysim` 的 `multi_run_parallel` 抄了 relay 的形状，抄件的记账侧与生产的等法只要有一处不同，量出的就是抄件：生产的循环在两个定时等待之间轮询时，抄件量出 5 µs 一次往返，同一次往返在服务中的城里是 31.7 ms。循环只要还有第二份写法，仪表就会量错对象。`spawn_worker` 装好 `Serving` 与观察者之后调用 `attend`，这是它唯一的生产调用者。
+**为什么把循环从闭包里拿出来**：仪表要驱动的是生产在跑的那个循环本身。一份抄来的 relay 形状，只要记账侧与生产的等法有一处不同，量出的就是抄件：生产的循环在两个定时等待之间轮询时，抄件量出 5 µs 一次往返，同一次往返在服务中的城里是 31.7 ms。所以 citysim 不再留那份抄件，多 run 并行这一类负载就由 `instrument_relay_round_trip` 量（citysim-SPEC 8-6）。循环只要还有第二份写法，仪表就会量错对象。`spawn_worker` 装好 `Serving` 与观察者之后调用 `attend`，这是它唯一的生产调用者。
 
 **两件仪表**，都在 `assembly::driving::tests::instruments`，都标 `#[ignore]`：它们量墙钟，一次要跑十几秒，不属于 `just check`；`just bench` 在 citysim 那一行之后跑它们（`cargo nextest run -p sprawling --release --run-ignored only -E 'test(/::instrument_/)' --no-capture`）。两件都经过同一套生产部件：`attend` 跑在自己的线程上，命令经 `CommandDesk::post` 进门，模型是回环上的假 provider（`fixture::provider`，带一个 `pace` 钩子决定何时作答）。
 
@@ -3368,7 +3368,7 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 
 `instrument_relay_round_trip` 另断言内存存储过河的 p50 不超过 1 ms（`ROUND_TRIP_P50`）：那条往返里除了一次内存拷贝全是 harness，所以它量的就是 harness。磁盘存储只报读数不断言：它的中位数是设备的 fsync，这是物理下限，因机器而异，一个写死的毫秒数只对一类机器成立；它与内存那一行之差才是磁盘的份额。目标还有一条没写成断言：内存存储过河的 p50 不超过 10 µs，它只在 `--release` 下有意义，而 `crossing=none` 那一行在调试构建里已是 20 µs 量级。
 
-读数行由仪表模块自己渲染，一行一个读数：`<仪表> <键=值>… machine=<os>-<arch>, <n> core(s)`，每行都带 `samples`、`floor_us`、`p50_us`（空档那一行是 `max_ms`、`median_ms`）。它不用 citysim 的 `perf load=…` 文法：那份文法属于 citysim 的 bench Main，本 crate 够不到它，两件仪表的读数也不是那四个负载场景之一。
+读数行由仪表模块自己渲染，一行一个读数：`<仪表> <键=值>… machine=<os>-<arch>, <n> core(s)`，每行都带 `samples`、`floor_us`、`p50_us`（空档那一行是 `max_ms`、`median_ms`）。它不用 citysim 的 `perf load=…` 文法：那份文法属于 citysim 的 bench Main，本 crate 够不到它。`instrument_relay_round_trip` 是四个负载场景里多 run 并行那一个的读数；`instrument_dispatch_gap` 不属于四个负载场景。
 
 **决定**：仪表放在 crate 内的测试里，而不是给 citysim 开一扇公共门。relay、`serve_flight` 与 desk 都是 `pub(crate)`；为量它们而开的公共面没有生产调用者，而且要进 apisync 基线。**败给的方案**：citysim 经 `RunWorker::handle(Dispatch)` 从外面驱动，再用 provider 两次请求之间的空隙推算 relay 往返。那个空隙里还有围栏（每波 20–90 ms）与工具，推算出来的是每回合剩余，不是一次往返。
 

@@ -603,9 +603,10 @@ status = "gated"
 #
 # The sub-metric split is what keeps a disk's floor from masking harness
 # overhead (citysim-SPEC.md section 8-6): `harness` carries no durability
-# commit and is the only sub-metric these tiers price; `persist` carries
-# one and answers to the disk instead; `whole` is disk work whose seam
-# does not split and gets no tier. The target values live here and
+# commit and is the only sub-metric these tiers price; `whole` is disk
+# work whose seam does not split and gets no tier. Multi-run parallel is
+# read by `[relay_round_trip]`, where the `store=memory` line is the
+# harness and the gap to `store=disk` is the disk. The target values live here and
 # nowhere else; the readings and their machine class live in the
 # performance book in ARCHITECTURE.md.
 #
@@ -615,8 +616,8 @@ status = "gated"
 what = "the harness's own processing latency over the four load scenarios, one metric in two stages"
 stage_one_p95_us = 16000
 stage_two_p99_us = 1000
-scope = "sub-metric `harness` only; `persist` answers to the disk's physical floor, `whole` carries no tier (citysim-SPEC.md section 8-6)"
-measured_by = "just bench (citysim bench bin, release): one reading line per scenario and sub-metric, each carrying its machine class"
+scope = "sub-metric `harness` only, and the `store=memory` line of `[relay_round_trip]` for multi-run parallel; `whole` carries no tier (citysim-SPEC.md section 8-6)"
+measured_by = "just bench, release: the citysim bench bin gives one reading line per scenario and sub-metric for three scenarios, and `instrument_relay_round_trip` gives multi-run parallel; each line carries its machine class"
 status = "staged targets, not gated: a wall-clock figure is the machine's. Baselines sit in the ARCHITECTURE.md performance book. Under the registered fixture a reading only goes down; relaxing a tier or fattening the fixture lands in a commit of its own"
 
 [relay_round_trip]

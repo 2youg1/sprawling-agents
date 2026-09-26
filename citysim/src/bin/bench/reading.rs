@@ -34,10 +34,11 @@ impl MachineClass {
     }
 }
 
-/// The four heavy-load classes, one bench scenario each.
+/// The heavy-load classes this bench Main measures, one scenario each.
+/// The fourth class, multi-run parallel, is `sprawling`'s relay
+/// instrument (citysim-SPEC.md section 8-6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Load {
-    MultiRunParallel,
     LargeLedgerFold,
     LargeWorktreePlacement,
     LongSessionForwarding,
@@ -45,8 +46,7 @@ pub(crate) enum Load {
 
 impl Load {
     /// Every variant, so a caller that walks the roster cannot leave one out.
-    pub(crate) const ALL: [Load; 4] = [
-        Load::MultiRunParallel,
+    pub(crate) const ALL: [Load; 3] = [
         Load::LargeLedgerFold,
         Load::LargeWorktreePlacement,
         Load::LongSessionForwarding,
@@ -55,7 +55,6 @@ impl Load {
     /// The one spelling of each class, shared by every renderer.
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
-            Load::MultiRunParallel => "multi_run_parallel",
             Load::LargeLedgerFold => "large_ledger_fold",
             Load::LargeWorktreePlacement => "large_worktree_placement",
             Load::LongSessionForwarding => "long_session_forwarding",
@@ -73,9 +72,6 @@ pub(crate) enum SubMetric {
     /// The harness's own processing, with no durability commit under it.
     /// The two latency tiers apply to this.
     Harness,
-    /// The same path with its durability commit under it. The disk's
-    /// physical floor is the reference for it, not a latency tier.
-    Persist,
     /// A path whose work is the disk work and whose seam does not split
     /// the two: priced whole.
     Whole,
@@ -86,7 +82,6 @@ impl SubMetric {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             SubMetric::Harness => "harness",
-            SubMetric::Persist => "persist",
             SubMetric::Whole => "whole",
         }
     }

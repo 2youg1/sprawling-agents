@@ -627,15 +627,17 @@ than typed.
 The four load scenarios — multi-run parallel, large-ledger fold,
 large-worktree placement, and long-session streaming forward — are re-measured
 by `just bench`, one reading line per scenario and sub-metric, every line
-carrying its machine class. Their baselines sit in the table below. The two
+carrying its machine class. Multi-run parallel is read by
+`instrument_relay_round_trip`, which drives the accounting loop the city runs
+(sprawling-SPEC.md 8-84); its readings and their machine class sit in
+`xtask/budgets.toml` `[relay_round_trip]`. The other three are
+citysim's bench scenarios, and their baselines sit in the table below. The two
 latency tiers and the ratchet that governs these readings live in
 `xtask/budgets.toml` `[local_latency]`; a reading under the registered load
 only goes down.
 
 | Load scenario, sub-metric | Baseline (p50 / p95 / p99) | Machine class |
 |---|---|---|
-| multi-run parallel, `harness` | 5 / 9 / 24 µs per append | general: windows-x86_64, 16 cores, NVMe |
-| multi-run parallel, `persist` | 730 / 953 / 4,326 µs per append | general: windows-x86_64, 16 cores, NVMe |
 | large-ledger fold, `harness` | <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->2,759<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p95_ms -->3,765<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p99_ms -->3,765<!-- xtask:end --> ms per rebuild, from `[views_rebuild_per_mb]` | general: windows-x86_64, 16 cores, NVMe |
 | large-worktree placement, `whole` | 10,503 / 11,052 / 11,052 ms per claim | general: windows-x86_64, 16 cores, NVMe |
 | long-session forwarding, `harness` | 4 / 4 / 4 µs per event | general: windows-x86_64, 16 cores, NVMe |
