@@ -1717,7 +1717,7 @@
   },
   "event_arbitration_verdict": {
     "en": "a conflict was arbitrated",
-    "zh": "冲突有了裁决"
+    "zh": "冲突有了定论"
   },
   "event_repair_started": {
     "en": "a repair started",
