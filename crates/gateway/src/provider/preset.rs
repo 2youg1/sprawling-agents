@@ -87,7 +87,7 @@ impl ChatSpelling {
     /// What a host this table does not list is sent.
     ///
     /// `max_tokens` although the OpenAI specification deprecates it:
-    /// the servers on this machine and most compatible servers read
+    /// local inference servers and most compatible servers read
     /// only that name, and a ceiling under a name a server ignores is a
     /// ceiling silently dropped. `reasoning_effort` because it is the
     /// specification's own field. An earlier turn's reasoning is not
