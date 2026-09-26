@@ -203,9 +203,9 @@ impl Reply {
 /// [`crate::session::Recording`] for replay. The two in the binary are
 /// why this is a trait and not one concrete type.
 ///
-/// There is no conformance suite behind it. One stood here and only the
-/// recording ever answered it, so it asserted that a fixture built to
-/// echo an id echoes an id. A suite returns when a transport can run
+/// There is no conformance suite behind it: the only adapter that could
+/// run one here is the recording, and it echoes an id by construction,
+/// so the suite would assert nothing. A suite belongs here when a transport can run
 /// it: that needs the reply-routing rule (read past events, match on
 /// id) to live in this crate as pure code, and a socket pair in the
 /// binary's test to drive it.

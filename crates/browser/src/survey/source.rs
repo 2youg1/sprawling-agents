@@ -7,9 +7,8 @@
 //! (xtask-SPEC.md section 8-26).
 //!
 //! **A finding is an edit, not a complaint** - the module heading says
-//! so, and until this file existed the report fell one step short of
-//! it. It named the box by its class attribute and left the reader to
-//! grep:
+//! so, and a report that names the box only by its class attribute
+//! falls one step short of it, leaving the reader to grep:
 //!
 //! ```text
 //! the left edge of div `已就绪的数量` reads 579 … class="h-snug min-w-0 flex-1 …"

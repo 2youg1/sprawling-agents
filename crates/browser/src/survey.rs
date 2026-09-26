@@ -28,12 +28,11 @@
 //! value to write, so the next step is one `edit` rather than a person
 //! deciding which of two boxes moves.
 //!
-//! **Three of these readings were properties of the render gate.** The
-//! left edge of the regions in the main column, the first mark of the
-//! rows of a navigation column, and containment were three geometric
-//! judgements written beside the gate that used them. Geometry with two
-//! homes is the defect this instrument exists to prevent, so they were
-//! moved here whole and the gate now reads them from here; what
+//! **Three of these readings stop the render gate.** The left edge of
+//! the regions in the main column, the first mark of the rows of a
+//! navigation column, and containment are judged here and read by the
+//! gate, because geometry with two homes is the defect this instrument
+//! exists to prevent; what
 //! separates a reading that stops a build from a reading a person acts
 //! on is [`Standing`], stated once where each rule is written.
 
@@ -207,9 +206,8 @@ impl Group {
 
 /// Whether a reading stops a build or is told to a person.
 ///
-/// Three readings were properties of the render gate before this
-/// instrument existed and remain properties of it. The readings the
-/// instrument added are reported and gate nothing: an instrument that
+/// Three readings stop the render gate. The others are reported and
+/// gate nothing: an instrument that
 /// turns a tree red on the day it is installed is an instrument
 /// somebody switches off, and the repairs it asks for are a design
 /// decision rather than a defect.
@@ -230,9 +228,8 @@ impl Deviation<'_> {
     /// Whether this reading stops a build.
     ///
     /// Containment is the one reading whose standing depends on its
-    /// subject as well as on itself: it refused the frame of the page
-    /// before this instrument existed and goes on refusing it, and the
-    /// boxes of words the instrument added to the sample are reported.
+    /// subject as well as on itself: it refuses the frame of the page,
+    /// and it reports the boxes of words in the sample.
     pub fn standing(&self) -> Standing {
         match self.finding {
             Finding::Escapes { .. } => match self.at.sampled {

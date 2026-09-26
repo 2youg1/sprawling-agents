@@ -14,13 +14,11 @@
 //! a second declaration. It is a second *box*, and it only exists once
 //! the page has been laid out and the queries have answered.
 //!
-//! The one this instrument was written after is exact. The model in
-//! force was drawn twice: once by the composer's chooser and once by
-//! the fact strip along the bottom of the window. Two subtrees, two
-//! reads of two different answers, no link between them - and the day
-//! `/model` in the command palette wrote one of them, the two said
-//! different things and the page did not know. No source gate could
-//! have found it. Two boxes painting the same string, in two different
+//! The shape it catches: one fact, such as the model in force, drawn
+//! by two subtrees that read two different answers with no link
+//! between them, so a command that writes one of them leaves the two
+//! saying different things and the page does not know. No source gate
+//! can find it. Two boxes painting the same string, in two different
 //! landmarks, is what it looks like from here.
 //!
 //! **What is a finding and what is a list.** A table repeats a word

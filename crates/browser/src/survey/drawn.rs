@@ -247,7 +247,7 @@ pub enum Sampled {
 
 /// What a box does with contents larger than itself, in one axis.
 ///
-/// Three outcomes rather than the one question containment used to ask.
+/// Three outcomes rather than one yes-or-no question about containment.
 /// A box that scrolls and a box that clips both paint nothing outside
 /// themselves, and the rule that exempted only the first reported every
 /// clipped row as a box painted over its neighbour.

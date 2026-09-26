@@ -141,14 +141,11 @@ fn observed<'a>(
         let of: usize = cluster.values().map(Vec::len).sum();
         // Aligned, not identical. `reach` decides whether two boxes are
         // in the same column at all; `SLACK` decides whether they line
-        // up inside it, and they are different questions. This counted
-        // only the boxes that matched the anchor exactly, so a column
-        // whose members differed by the one pixel a border costs was
-        // reported as a column with no agreement - and every reading in
-        // it was printed. Eleven of the fifteen findings this
-        // instrument carried on a clean tree were that, which is the
-        // whole cost: a report a reader learns to skip is a report that
-        // has stopped working.
+        // up inside it, and they are different questions. Counting only
+        // exact matches would report a column whose members differ by
+        // the one pixel a border costs as a column with no agreement,
+        // and print every reading in it: a report a reader learns to
+        // skip is a report that has stopped working.
         let with = within(&cluster, anchor, SLACK);
         if of < QUORUM || with.saturating_mul(2) <= of {
             continue;
