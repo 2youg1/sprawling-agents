@@ -10,7 +10,7 @@
 | 单元 | 一句话 |
 |---|---|
 | header | 每个 `.rs` 前四行恒为 MPL-2.0 通告加版权行，且整份文件只出现这一次 |
-| lexicon | 禁用词命中即红；数据面 `xtask/lexicon.toml` |
+| lexicon | Markdown、Rust 源码与 `client/src/lang.json` 里禁用词命中即红；数据面 `xtask/lexicon.toml` |
 | modmap | `crates/**/src/**/*.rs` ↔ `architecture.toml` 一一对应；状态一致性；`owns` 非空；索引文件零逻辑 |
 | depmap | crate 依赖边 ⊆ depmap 围栏块；`pub trait` 仅现于**缝那一节**里那张表列出的文件（节由 `architecture` 切出，不按表的形状认表） |
 | guard | 改动门自身、又同时改动门所判源码的提交，必须携 `Verdict:` 尾注；且墙外那份 `desktop/` 的 lint 表、包元数据与共享依赖版本与工作区逐键相等 |
