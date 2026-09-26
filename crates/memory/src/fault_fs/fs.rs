@@ -288,6 +288,17 @@ impl Vfs for FaultFs {
         self.charge("remove_file")
     }
 
+    /// The model carries no permission bits, so there is nothing to
+    /// copy; both names still have to exist, as on a real disk.
+    fn copy_permissions(&mut self, from: &Path, to: &Path) -> io::Result<()> {
+        for path in [from, to] {
+            if !self.exists(path) {
+                return Err(not_found(path));
+            }
+        }
+        self.charge("copy_permissions")
+    }
+
     fn exists(&self, path: &Path) -> bool {
         self.state().files.contains_key(path)
     }

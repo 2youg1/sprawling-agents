@@ -67,6 +67,9 @@ pub enum AxCode {
     EndpointDialectUnsupported,
     WireMismatch,
     LogVersionUnsupported,
+    /// Another process holds this city's Ledger for writing. Loadtime,
+    /// because the process it refuses is the one that may not write.
+    LedgerHeld,
     // Privacy and Discard (2).
     SecretEgress,
     DiscardIrreversible,
@@ -81,7 +84,7 @@ pub enum AxCode {
 impl AxCode {
     /// Every code, in the order the SPEC table lists them. Data face for tests and
     /// (from S2 on) `xtask specalign`.
-    pub const ALL: [AxCode; 37] = [
+    pub const ALL: [AxCode; 38] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,
         AxCode::ToolUnavailable,
@@ -115,6 +118,7 @@ impl AxCode {
         AxCode::EndpointDialectUnsupported,
         AxCode::WireMismatch,
         AxCode::LogVersionUnsupported,
+        AxCode::LedgerHeld,
         AxCode::SecretEgress,
         AxCode::DiscardIrreversible,
         AxCode::BackpressureShed,
@@ -157,6 +161,7 @@ impl AxCode {
             AxCode::EndpointDialectUnsupported => "E_ENDPOINT_DIALECT_UNSUPPORTED",
             AxCode::WireMismatch => "E_WIRE_MISMATCH",
             AxCode::LogVersionUnsupported => "E_LOG_VERSION_UNSUPPORTED",
+            AxCode::LedgerHeld => "E_LEDGER_HELD",
             AxCode::SecretEgress => "E_SECRET_EGRESS",
             AxCode::BackpressureShed => "E_BACKPRESSURE_SHED",
             AxCode::DiscardIrreversible => "E_DISCARD_IRREVERSIBLE",
@@ -172,8 +177,9 @@ impl AxCode {
     /// The carrier declaration (C9): which event carries this code into
     /// history. Sole declaration site, exhaustive on purpose — a new code
     /// without a carrier decision is a compile error. The loadtime arm is
-    /// the closed five-code whitelist and must not grow (fifth code by
-    /// S2 stage-opening verdict: storage write failure is process-fatal).
+    /// the closed whitelist of codes that arise only while this process
+    /// cannot write the Ledger; kernel-SPEC section 12 gives each one's
+    /// reason.
     pub fn carrier(&self) -> Carrier {
         match self {
             AxCode::GateDenied
@@ -193,7 +199,8 @@ impl AxCode {
             | AxCode::CasCorrupt
             | AxCode::StorageFatal
             | AxCode::WireMismatch
-            | AxCode::LogVersionUnsupported => Carrier::Loadtime,
+            | AxCode::LogVersionUnsupported
+            | AxCode::LedgerHeld => Carrier::Loadtime,
             AxCode::PathNotFound
             | AxCode::ToolUnknown
             | AxCode::ToolUnavailable
@@ -312,9 +319,9 @@ mod tests {
         // The length is the close of the table, so it is stated once:
         // a code added without a spelling, or two codes sharing one,
         // fails here rather than at a caller.
-        assert_eq!(AxCode::ALL.len(), 37);
+        assert_eq!(AxCode::ALL.len(), 38);
         let spellings: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
-        assert_eq!(spellings.len(), 37);
+        assert_eq!(spellings.len(), 38);
         for s in &spellings {
             assert!(s.starts_with("E_"));
         }

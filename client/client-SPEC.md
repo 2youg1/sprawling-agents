@@ -131,6 +131,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | `asking.ts` | 1 判定 | `createAsking(send) -> { ask(query) -> Readable<Answer\|undefined>, refresh, answered, invalidate(record), reconnected }`（`Readable` 皆为 `svelte/store` 面，模板以 `$` 订阅）；答案按内容匹配问题，无名者按到达序；`staleBy` 是事件到查询的失效表 |
 | `answered.ts` | 1 判定 | `readAnswer(answer, pick) -> Answered<T>`，`Answered = asking \| held { value } \| unavailable { query }`：一个视图只画一种变体，槽里的其余答案仍是答案——`Answer::Unavailable` 带回城拼写的那一问，别的变体以自己的键名为 `query`；视图用 `views/parts/unanswered.svelte` 画它，恢复是 `asking.refresh` 再问一次。不折成「还在问」或「空」，因为那两种读法把「城没能看」说成「城在忙」或「城是空的」 |
 | `belief.ts` | 7 投影 | `createBelief() -> { belief, adoptCity, apply(record) -> string \| null, say(delta), logged(line), refused(error), named(city), noticesSeen, batch(folds) }`——`batch` 里的折叠只在最外层结束时 `set` 一次，`socket.ts` 的 `drain`（连同其中 `filled` 折的缺口页）与 welcome 各是一批，所以两帧之间的一串记录是一次更新、一次重绘；`Belief { runs, halted, haltedAt, refusal, notices, city, probed, logs }`；`RunBelief { run, addr, started, task, lastSeq, doing, local, saying, thinking }`；`Notice { error, seen, at: TimeMs, key: string, count: number, about: Address \| RunId \| null }`——`refused()` 按 `key`（`code + subject`）合并同文并计 `count`，`at` 取首见时刻；`adopted(summary, held)`。**`apply` 答的是它读不出的字段名**（如 `tool_called.name`），`null` 才是读全了：一份形状不对的载荷仍然推进位置，但静默当作缺席的读法已删 |
+| `belief/runs.svelte.ts` | 7 投影 | `runTable(held) -> Record<RunId, RunBelief>`：run 表是 `$state`，每个 run 是一个响应式对象。`say(delta)` 对已持有的 run 就地追加 `saying`／`thinking`，不重发 `belief`，只唤醒读这个 run 这个字段的读者；只有 delta 带来新 run（表的形状变了）才发布一次。记录的折叠与 `adoptCity` 仍整值写入并发布。测试经 `client/bunfig.toml` 预载的 `scripts/runes.ts` 用 `compileModule` 编 `.svelte.ts`（含 `*.svelte.test.ts`），与 vite 进产物同一编译器 |
 | `doing.ts` | 2 值 | `Doing = unknown \| thinking \| calling { tool: string \| null, subject } \| waiting \| frozen { completion }`、`Sending = dispatch \| steer \| queued`、`sendingInto(doing)`；`MOVING`／`moves(kind)`／`PHASES` 是「哪些 kind 陈述姿态、各自陈述什么」的独家表，流与答案两条路都读它 |
 | `reading.ts` | 4 适配器 | `taskOf(record)`、`toolCall(record)`、`completionOf(record)`、`haltOf(record)`，各答 `[值, 读不出的字段名 \| null]`；`kernel::event::record` 的字段名与 serde 属性（`Option` 与 `#[serde(default)]` 各是什么意思）在客户端只有这一处拼写 |
 | `scope.ts` | 4 适配器 | `scopeOf(spelled) -> HaltScope \| null`（Ledger 拼法→frame 拼法，唯一相遇点）、`sameScope`、`buildingIsShut`、`cityIsShut`、`CITY`；`CITY` 是两套拼法共同的那一个词，五个视图改读它，不再手写 `"city"` |
@@ -152,7 +153,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 `views/parts/tip.svelte` 提示（见设计 4-18）；`views/parts/code.svelte` 只读代码视图（面包屑＋行号＋词法着色，见设计 4-26）；`views/rail.svelte` 左栏；`views/talk.svelte` ＋ `talk/{thread,calls,composer,waiting}.svelte` 对话 ＋ `talk/artifact.svelte` 制品面板 ＋ `talk/trace.ts`（工具调用的分类，两个读者共用，见设计 4-26）；`views/city.svelte` ＋ `city/{bar,panel,skyline,marks}.svelte` ＋ `city/shape.ts`（超椭圆路径）；`views/registry.svelte`（`Query::RegistryView`：这座城决定留下来的东西，一行一件，见设计 4-24）；`views/building.svelte` ＋ `building/{tree,commits}.svelte`；`views/changes.svelte`（`Changes`／`Hunks` 的一份读法，run 页与楼页共用）；`views/run.svelte`；`views/setup.svelte` ＋ `setup/{providers,models,skills,appearance,keys}.svelte`（skills 组见设计 4-31）＋ `setup/kept.svelte`（一个组的答案由谁保管，见设计 4-29）；`views/shared/{provider,effort,buildings}.svelte`（欢迎页与设置页共用的三件，`buildings.svelte` 的第二个座位是 `#/mcp`）；`views/machine.svelte`（doctor 的答）；`views/desktop.svelte`（一栋楼的桌面白名单）；`views/mcp.svelte`；`views/welcome.svelte`；`views/record.svelte`；`views/cost.svelte`；`views/palette.svelte`；`views/refusal.svelte`；`views/prose.svelte`；`views/gallery.svelte`。
 
-**`#/gallery` 是一条路由而不是一个构建开关**，因为量它的那道门应当打开一个人真正跑的 bundle；夹具不需要城（偏好走 `core/rows.ts` 那扇门，没有 localStorage 时是一张只活一次会话的表）。每个能进入多种状态的屏幕在那里各有一份夹具，`cargo xtask render` 打开真引擎读它。
+**`#/gallery` 是一条路由而不是一个构建开关**，因为量它的那道门应当打开一个人真正跑的 bundle；夹具不需要城（偏好走 `core/rows.ts` 那扇门，没有 localStorage 时是一张只活一次会话的表）。每个能进入多种状态的屏幕在那里各有一份夹具，`cargo xtask render` 打开真引擎读它。`app.svelte` 用动态 `import()` 取 `views/gallery.svelte`，所以画廊与它的夹具表是 bundle 里单独的一块，只在打开 `#/gallery` 时下载：其余路由首屏不再为它付字节，而 `frontend_artifact` 称的是整个 dist，这一块仍在其中。
 
 **左栏是覆盖而不是推挤**：外层 `<div>` 只在钉开（`[`）时取 `w-rail-open`，`<nav>` 绝对定位、hover 时自宽并加投影；正文的左边因此不随指针越过左缘而重排。
 
@@ -394,3 +395,10 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **理由**：撤销 toast 只在删除可逆时成立，而删除在今天的树上不可逆。删 MCP 是整表换写 `CONFIG.toml` 的 `mcp` 数组（`crates/city/src/config_layers/write.rs` 的 `write_mcp`），被删行不留副本；配置写不入账（`RulesChanged` 未落）；技能侧没有删除动词——library 只读，`Command::PutShelved` 以 `not_built` 拒，技能安装预检与 provenance＋CAS（deepening-plan T7）未落。一个会自己落下的删除把不可恢复的内容交给无人看着的计时器。
 - **被击败的备选**：6s 撤销 toast，撤销窗口过后才真正落删除——窗口内不发帧，撤销即取消，账上没有「删了又还」的一对。被败因只是今日删除不可逆；被删内容一旦可恢复，该形态即为首选。
 - **重开参数**：被删内容留下可恢复副本——library 入 CAS、来源记 provenance、同哈希重装幂等（T7 落地），或配置写留痕可还原。参数移动后按被击败备选的形态实现：撤销窗口过后才真正落删除，删除事件于落删除时入账，先落账再生效的口径不变。
+
+### 12-2 run 表是 `$state` 记录，不是 `SvelteMap`
+
+- **决策**：`Belief.runs` 保持 `Record<RunId, RunBelief>` 的读法，由 `runTable` 包成 `$state`；token delta 就地写进那个 run。
+- **理由**：两者给同样的逐键粒度——读 `runs[id].saying` 的 effect 只因这个 run 这个字段重跑，遍历表的读者只因 run 的增删重跑（`belief/grain.svelte.test.ts` 判定）。记录的写法让十余个按 `runs[id]`、`Object.values(runs)` 读表的视图一行不改。在 R = 1e4、一帧 50 个 delta、一个读全表的订阅者下，每帧折叠从约 470–540 µs 降到约 30–40 µs（`belief/fold_cost.test.ts`，同一仪表前后交错测），因为 delta 不再让订阅者走一遍表。
+- **被击败的备选**：`SvelteMap<RunId, RunBelief>`。粒度相同，但每个读者都得改成 `get`／`values()`，且对已有键 `set` 新值时，有遍历读者就会连带推进迭代版本。
+- **重开参数**：视图改由 belief 暴露的派生索引读表（不再直接下标）时，表的容器可以换，读者迁移的成本就不再存在。

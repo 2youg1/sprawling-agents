@@ -21,10 +21,11 @@
 //! backup tool can wrap one.
 
 mod export;
-pub(crate) mod files;
+mod files;
 #[cfg(test)]
 mod fixture;
 mod history;
+pub(crate) mod landing;
 mod manifest;
 
 pub use export::Bundle;

@@ -4,7 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-use kernel::{EventDraft, Payload, RunId, TimeMs};
+use kernel::ledger::chain_hash;
+use kernel::{EventDraft, EventKind, GENESIS_PREV, Payload, RunId, TimeMs};
 
 fn genesis_line() -> Vec<u8> {
     let draft = EventDraft {
@@ -190,4 +191,22 @@ fn dangling_tool_calls_are_detected_and_repairable() {
     let repaired: serde_json::Value = serde_json::from_slice(&mem.lines[1]).unwrap();
     assert_eq!(repaired["data"]["error"]["code"], "E_TOOL_OUTCOME_UNKNOWN");
     assert_eq!(repaired["data"]["tool_use_id"], "call-7");
+}
+
+#[test]
+fn a_payload_without_segments_names_the_event_that_carries_them() {
+    let err = rebuild_prefix(&serde_json::json!({}), &|_| None).unwrap_err();
+    let expected = AxError::failure(
+        AxCode::InvalidArgs,
+        "rebuild prefix",
+        "payload has no segments",
+    )
+    .with_recovery(format!(
+        "replay a run whose `{}` line carries `segments`; a hand-written line cannot be rebuilt",
+        serde_json::to_value(EventKind::PromptAssembled)
+            .unwrap()
+            .as_str()
+            .unwrap()
+    ));
+    assert_eq!(err, expected);
 }

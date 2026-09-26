@@ -16,12 +16,8 @@
 
 use std::path::Path;
 
-use kernel::ledger::chain_hash;
-use kernel::{
-    Address, AxCode, AxError, B3Hash, EventKind, EventRecord, EventRef, GENESIS_PREV, Seq,
-    consts_external::EVENT_LOG_V,
-};
-use serde::Deserialize;
+use kernel::{Address, AxCode, AxError, B3Hash, EventRecord, EventRef, Seq};
+use memory::{CheckedLine, LineCheck};
 
 /// One verified line: a typed record with its ref echo, or an explicitly
 /// ignorable line from a future vocabulary.
@@ -55,104 +51,26 @@ impl VerifiedLedger {
     }
 }
 
-/// The envelope probe: enough of any line to judge version, chain and
-/// kind before committing to a typed parse. Unknown extra fields pass —
-/// this shape must read lines from the future.
-#[derive(Deserialize)]
-struct Envelope {
-    v: u32,
-    seq: Seq,
-    prev: B3Hash,
-    kind: String,
-    #[serde(default)]
-    ig: bool,
-}
-
-fn corrupt(line_no: u64, violation: impl Into<String>) -> AxError {
-    AxError::failure(
-        AxCode::CasCorrupt,
-        "verify ledger",
-        format!("line {line_no}"),
-    )
-    .with_recovery(violation.into())
-}
-
-/// A2: offline chain verification over raw lines.
+/// A2: offline chain verification over raw lines, through the one
+/// per-line check `memory::LineCheck` owns.
 pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError> {
-    let mut verified = Vec::with_capacity(lines.len());
-    let mut prev = GENESIS_PREV;
-    let mut expected = Seq::FIRST;
-    let mut line_no: u64 = 0;
-
-    for raw in &lines {
-        line_no = line_no.saturating_add(1);
-
-        let envelope: Envelope = serde_json::from_slice(raw)
-            .map_err(|e| corrupt(line_no, format!("not a ledger line: {e}")))?;
-
-        if envelope.v > EVENT_LOG_V {
-            return Err(AxError::failure(
-                AxCode::LogVersionUnsupported,
-                "verify ledger",
-                format!("line {line_no} carries v{}", envelope.v),
-            )
-            .with_recovery(
-                "written by a newer sprawling; replay it with the version that wrote it",
-            ));
-        }
-        if envelope.v != EVENT_LOG_V {
-            return Err(corrupt(line_no, format!("impossible v{}", envelope.v)));
-        }
-        if envelope.prev != prev {
-            return Err(corrupt(line_no, "prev does not hash the previous line"));
-        }
-        if envelope.seq != expected {
-            return Err(corrupt(
-                line_no,
-                format!(
-                    "seq {} where {} was expected",
-                    envelope.seq.value(),
-                    expected.value()
-                ),
-            ));
-        }
-
-        let known_kind: Option<EventKind> =
-            serde_json::from_value(serde_json::Value::String(envelope.kind.clone())).ok();
-        match known_kind {
-            Some(_) => {
-                let record = EventRecord::parse_line(raw)
-                    .map_err(|e| corrupt(line_no, format!("typed parse failed: {e}")))?;
-                let echo = record.canonical_line()?;
-                if &echo != raw {
-                    return Err(corrupt(line_no, "bytes are not writer-canonical"));
-                }
-                let minted = record.to_ref();
-                verified.push(VerifiedLine::Known {
-                    record,
-                    echo: minted,
-                });
-            }
-            None if envelope.ig => {
-                verified.push(VerifiedLine::IgnoredUnknown { seq: envelope.seq });
-            }
-            None => {
-                return Err(AxError::failure(
-                    AxCode::LogVersionUnsupported,
-                    "verify ledger",
-                    format!("line {line_no} kind `{}`", envelope.kind),
-                )
-                .with_recovery(
-                    "unknown kind without ig:true means a newer writer; \
-                     use the sprawling that wrote it",
-                ));
-            }
-        }
-
-        prev = chain_hash(raw);
-        expected = expected.next()?;
-    }
-
+    let mut check = LineCheck::at_genesis();
+    let verified = lines
+        .iter()
+        .zip(1u64..)
+        .map(|(raw, line_no)| {
+            check
+                .advance(raw)
+                .map(|checked| match checked {
+                    CheckedLine::Known(record) => VerifiedLine::Known {
+                        echo: record.to_ref(),
+                        record,
+                    },
+                    CheckedLine::IgnoredUnknown(seq) => VerifiedLine::IgnoredUnknown { seq },
+                })
+                .map_err(|fault| fault.into_ax(line_no))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(VerifiedLedger {
         raw: lines,
         verified,
@@ -191,7 +109,7 @@ pub fn rebuild_prefix(
                 "payload has no segments",
             )
             .with_recovery(
-                "replay a run whose `prompt_composed` line carries `segments`; a \
+                "replay a run whose `prompt_assembled` line carries `segments`; a \
                  hand-written line cannot be rebuilt",
             )
         })?;

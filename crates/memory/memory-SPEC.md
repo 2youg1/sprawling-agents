@@ -37,10 +37,10 @@
 ## 3 假设与歧义
 
 1. **组提交的形态**：「批＝上一次 fsync 期间到达的 append 量」这条预设并发到达；单写者同步世界里，批＝一次 `append_all` 交付的入账波（并行执行、串行入账的「波」）。trait 的单条 `append` ＝单元素波。tokio 落地后按原语义重审，接口不变。
-2. **断尾扫描范围**：append-only 事故只伤尾部——只完整校验最后一段，并以前一段末行验跨段链续；更早段的全链校验归 replay（A2）。
+2. **断尾扫描范围**：append-only 事故只伤尾部——只完整校验最后一段，并以前一段末行验跨段链续；更早段的全链校验归 replay（A2）。断链处只有在断链行本身不能解析、且它后面没有任何能解析的完整行时，才算撕裂的尾巴而截断；断链行能解析，或它后面还有能解析的完整行，就是分叉或段中损坏（例如两个写者各自续了同一个 `prev`），拒开并指出行号，不截断——截断会静默删掉另一个写者完整、合法的历史。撕裂只留下不带换行的半行或不成记录的垃圾，所以这条线不会把真正的断电尾巴误判成分叉。
 3. **目录 fsync**：POSIX 上新建/rename 后同步父目录；Windows 无目录句柄同步原语，`sync_dir` 为显式 no-op。断电点阵在 FaultFs 模型层保持严格语义（未 sync_dir 的目录项不存活），使代码纪律跨平台一致；「fsync 返回但未落盘」的平台复验属 A3 完整版。
 4. **存储写失败码**：`append` 的 Io 失败映射 `E_STORAGE_FATAL`（装载期第 5 码，进程级 fatal）。
-5. **硬链接的判定按平台分两半，两半都写在这里。** junction 与 symlink 都是重解析点，`file_type().is_symlink()` 对两者同真，故合为 `AliasKind::Link`，在每一扇写门字面拒绝。硬链接在 Unix 由 `std::os::unix::fs::MetadataExt::nlink` 判定：`nlink>1` 的普通文件即 `AliasKind::HardLink`，同样在构造点字面拒绝；在 Windows 稳定版 `std` 读不到链接计数（`MetadataExt::number_of_links` 属未稳定特性 `windows_by_handle`，`std::fs::hard_link_count` 不存在），而 `unsafe_code` 全库 forbid、其豁免不得引入本 workspace，故 Windows 上硬链接臂由**写入恒落新 entry** 兜住（写前移除该名再建：`bundle::files::write_file` 与 `runtime::tools::edit` 同一纪律）——穿透在结构上不可能，只是不报拒。被否：为读链接计数引入窄 FFI（撞 unsafe 定规）或夜间特性（撞稳定工具链定规）。**重开参数**：Windows `std` 出现稳定的 `number_of_links` 或等价 API 时，把该臂并入构造点字面拒绝；Unix `nlink` 语义若变化，改 `kind_at` 一处。
+5. **硬链接的判定按平台分两半，两半都写在这里。** junction 与 symlink 都是重解析点，`file_type().is_symlink()` 对两者同真，故合为 `AliasKind::Link`，在每一扇写门字面拒绝。硬链接在 Unix 由 `std::os::unix::fs::MetadataExt::nlink` 判定：`nlink>1` 的普通文件即 `AliasKind::HardLink`，同样在构造点字面拒绝；在 Windows 稳定版 `std` 读不到链接计数（`MetadataExt::number_of_links` 属未稳定特性 `windows_by_handle`，`std::fs::hard_link_count` 不存在），而 `unsafe_code` 全库 forbid、其豁免不得引入本 workspace，故 Windows 上硬链接臂由**写入恒落新 entry** 兜住（bundle 经 `bundle::landing::land` 写同目录暂存文件再 `rename` 覆盖，`runtime::tools::edit` 写前移除该名再建；两者都换掉目录项而不写穿旧 inode）——穿透在结构上不可能，只是不报拒。被否：为读链接计数引入窄 FFI（撞 unsafe 定规）或夜间特性（撞稳定工具链定规）。**重开参数**：Windows `std` 出现稳定的 `number_of_links` 或等价 API 时，把该臂并入构造点字面拒绝；Unix `nlink` 语义若变化，改 `kind_at` 一处。
 
 ## 4 现状分析
 
@@ -99,7 +99,7 @@ error ◀──使用── 全部十二个模块（MemoryError 与 into_ax 的�
 // 公开面不带泛型：Vfs 是 pub(crate) 内缝，若 JsonlLedger<V: Vfs> 公开即私有 trait 漏入公开签名（E0445）。
 // 故 Box<dyn Vfs> 内藏；生产构造子 open(dir, now) 恒用 RealFs，注入点为 pub(crate) open_with（本 crate 测试）
 // 与 feature="fault" 构造子（取具体 FaultFs，trait 不出门）。
-pub struct JsonlLedger { /* Box<dyn Vfs>、dir、当前段路径、段内字节数、next_seq、prev、roll_bytes */ }
+pub struct JsonlLedger { /* Box<dyn Vfs>、dir、当前段路径、段内字节数、next_seq、prev、roll_bytes、写者锁 */ }
 pub struct OpenReport { pub recovered: Option<TailTruncation> }   // 断尾发生与否
 pub struct TailTruncation { pub dropped_bytes: u64 }
 
@@ -107,6 +107,8 @@ impl JsonlLedger {
     /// Opens (or initializes) the ledger directory. `now` feeds the
     /// `log_truncated` record when tail recovery fires — time is a
     /// parameter here, never sampled (determinism rule 2).
+    /// A city's ledger opens only while this process holds the city's
+    /// writer lock; the lock lives as long as the returned ledger.
     pub fn open(dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), MemoryError>;
     pub(crate) fn open_with(vfs: Box<dyn Vfs>, dir: &Path, now: TimeMs) -> …;  // 测试注入点
     /// Group commit: one durability barrier for the whole wave.
@@ -134,8 +136,50 @@ impl kernel::Ledger for JsonlLedger { /* append = append_all(vec![d]) */ }
 // 且首行必须是 city_initialized；首行可解析但链根不对＝Envelope，不静默清场。
 ```
 
+**逐行检查 `jsonl::verify`（形状 2 值）**：账本的每个读者都经同一个 `LineCheck` 走一行——`open` 的尾段扫描与 `runtime::replay::verify_lines` 同一份，故一方收下的行另一方拒不了。
+
+```rust
+pub struct LineCheck { /* prev 与下一个期望 seq——只有链状态，不持行 */ }
+pub enum CheckedLine { Known(EventRecord), IgnoredUnknown(Seq) }
+pub enum LineFault { NotALine(String), VersionAhead(u64), NotAVersion(u64), ChainBreak,
+                     SeqGap { found: Seq, expected: Seq }, UnknownKind(String),
+                     NotCanonical(String), SeqExhausted(AxError) }
+impl LineCheck {
+    pub fn at_genesis() -> Self;
+    pub fn expected(&self) -> Seq;
+    /// 判一行（不带 `
+`）；过则链前进，错则状态不动。
+    pub fn advance(&mut self, raw: &[u8]) -> Result<CheckedLine, LineFault>;
+}
+impl LineFault { pub fn into_ax(self, line_no: u64) -> AxError; }  // 整本读者的拒词：更新的写者＝E_LOG_VERSION_UNSUPPORTED，其余＝E_CAS_CORRUPT
+```
+
+- 判定顺序：信封（`v` 经 `readable_log_v`）→ `prev` → `seq` → kind 二分（借用判定，不 clone）→ 已知 kind 的类型解析与规范回写比对；`ig:true` 的未知 kind 不解析但照样入链。
+- `open` 对故障的处置：`VersionAhead`／`NotAVersion` 按版本拒；`NotALine` 且其后无带信封的行＝撕裂，截断；其余一律拒而不截——撕裂不会留下带信封的行，截掉它等于删掉合法历史。
+- 被否：两个读者各持一份检查。`open` 曾只做类型解析，于是一条链续正确的 `ig:true` 行在尾段被当撕裂截掉，而 `replay` 收下同一行。
+
 **落盘形态**：目录内 `ledger-<first_seq 20 位零填>.jsonl` 若干段；行＝`canonical_line`＋`\n`；链与 seq 跨段连续。滚动：当前段字节数 ≥ `SEGMENT_ROLL_BYTES` 时下一波起新段（新段创建后 `sync_dir`）。
 **open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`——判定一律经 `kernel::consts_external::readable_log_v`（M-16）：`Ahead` 即 `VersionAhead`（先于一切链检，恒不部分解读），`NotAVersion`（低于任何构建写过的首版本，含 v0）即 `Envelope` 且拒词说版本，`Current` 与 `Older` 放行；④校验最后一段：逐行 parse＋段内链续，本段任一可解析行的 `v` 同样经 `readable_log_v` 判定——`Ahead` 与 `NotAVersion` 在此**拒**而不作尾损截断（截掉它等于删掉更新构建的历史），首个非法字节起截断（`truncate`＋`sync_data`），跨段 prev 以前段末行验证；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
+**写者锁：一个账本目录同一时刻只有一个 `JsonlLedger`，跨进程成立。** `open` 在列段之前，对账本目录的同级文件 `<目录名>.lock`（城的账本即 `<city>/.sprawling/ledger.lock`）取 `std::fs::File::try_lock` 独占锁；`JsonlLedger` 持着那个 `File`，锁与账本同寿命，drop 即放。拿不到锁就是别的 `JsonlLedger`（这个进程的或另一个进程的）正持着这座城的账本：`MemoryError::LedgerHeld { dir }`，映射装载期码 `E_LEDGER_HELD`。拒绝发生在任何读写之前，所以被拒的一方不修盘，也不写 `log_truncated`。
+
+```rust
+pub(crate) struct WriterLock { /* 持锁的 File；只为它的 Drop 而存在 */ }
+impl WriterLock {
+    /// 锁文件＝`dir` 的同级 `<目录名>.lock`，由 jsonl 自己命名；`dir` 没有目录名（根、`..`）即 `Io`。
+    pub(crate) fn take(dir: &Path) -> Result<WriterLock, MemoryError>;
+}
+```
+
+- **锁文件在账本目录旁边，不在里面。** 账本目录的读者把目录里的每一项都当历史：`has_history` 问「有没有条目」，`bundle` 逐文件拷贝。锁文件放进去，就会被当成一段历史拷进 bundle，而且 Windows 上另一个句柄读一个被锁住的文件会失败。`.sprawling/` 根是保留子树，本来就不随 bundle 走。
+- **每个账本目录都锁，锁路径只由 `dir` 推出。** `open_faulty` 不取锁：FaultFs 的盘只存在于这个进程里。理由见 §12 `LedgerHeld`。
+- **同一进程里的第二个句柄同样被拒。** `try_lock` 在 Windows 上是 `LockFileEx`，在 Unix 上是 `flock`，两者都按打开的句柄算，不按进程算。所以「一个进程里开两个 `JsonlLedger`」也被拒，这就是跨进程性质在单进程里可测的形式（`open/tests.rs` 的 `a_second_writer_of_a_city_is_refused_until_the_first_lets_go`）。
+- **锁文件不删。** 放锁时删文件，会留下一个窗口：先到者还持着旧文件上的锁，后到者已经在同名的新文件上拿到了锁。一个空文件不花任何代价。
+- **锁文件不在就建，连同 `.sprawling/`。** 建不了这个文件，或者操作系统答不了这次取锁（答的不是「已被持有」），都是 `Io`→`E_STORAGE_FATAL`，subject 是锁文件的路径：连锁文件都写不了的城，也写不了账本。
+- **被否：把锁放在 `Vfs` 缝上。** 那要给 `FaultFs` 造一个进程模型，而它的盘本来只有一个进程到得了。锁是真实文件系统上的事实，只在生产入口 `open` 上取。
+- **被否：把 PID 写进锁文件。** Windows 上别的进程读不了被锁住的文件，拒词因此报不出 PID；recovery 改为说明怎样停下持锁的那个进程。
+- **重开参数**：出现不经 `JsonlLedger::open` 写账本的生产路径；或者 `std` 的 `try_lock` 改为按进程而不是按句柄判定。
+
+**open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`（只读这一行：`jsonl::first_line` 用 `Vfs::read_at` 从 4 KiB 的窗口读起、每次加倍，见到第一个 `\n` 或文件尽头即停；不见 `\n` 的首行是撕裂行，答「无行」，交给尾部恢复。整段读进来再切第一行，会让单段账本在 open 时被读两遍）——判定一律经 `kernel::consts_external::readable_log_v`（M-16）：`Ahead` 即 `VersionAhead`（先于一切链检，恒不部分解读），`NotAVersion`（低于任何构建写过的首版本，含 v0）即 `Envelope` 且拒词说版本，`Current` 与 `Older` 放行；④校验最后一段：逐行 parse＋段内链续，本段任一可解析行的 `v` 同样经 `readable_log_v` 判定——`Ahead` 与 `NotAVersion` 在此**拒**而不作尾损截断（截掉它等于删掉更新构建的历史），首个非法字节起截断（`truncate`＋`sync_data`），跨段 prev 以前段末行验证；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
 **append_all 五步**：逐 draft：seq=next、`EventRecord::from_draft`、`canonical_line`、必要时滚段；写段；单次 `sync_data`（跨段波对每个触及段各一次）；更新 prev/next_seq；铸 refs。任何 Io 错误⇒整波失败，内存态不前进（下次 open 断尾清理半行）。
 
 ### 8-2 memory::fault_fs
@@ -350,7 +394,7 @@ Sprawling-City: <hex>
   trailers 与账本不一致时以账本为准，trailers 是要修的那一侧。
 - **effort 的字面来自 serde 的名字**（`kernel::Effort` 的 `snake_case`），所以「档位怎么拼」在这个仓库里只有一处权威；缺档位写 `none`。
   模型 id 未知时写空串——写一个假的 id 比写空更糟。
-- **`city_of` 只读第一行**：整本账本可以有几十兆，而创世行是第一段文件的第一行。
+- **`city_of` 只读第一行**：整本账本可以有几十兆，而创世行是第一段文件的第一行；它与 open 的版本探测共用 `jsonl::first_line`，所以「第一行是什么」只有一处权威——以 `\n` 结尾的第一行，撕裂的首行不算。
 
 ### 8-18 trailers 的账本一侧（随 8-17，G-15 后重写）
 
@@ -390,7 +434,7 @@ pub fn effort_word(effort: kernel::Effort) -> String;
 ### 8-8 memory::checkpoint（形状 4；git2）
 
 ```rust
-pub struct Checkpoint { /* repo: git2::Repository、fences: u64 —— 私有 */ }
+pub struct Checkpoint { /* repo: git2::Repository、last: Option<git2::Oid> —— 私有 */ }
 impl Checkpoint {
     pub fn open(city_root: &Path) -> Result<Checkpoint, MemoryError>;      // 无仓即 init（创世提交由 ensure_base 产）
     /// Commits once when the repository has no HEAD, and never otherwise.
@@ -399,9 +443,14 @@ impl Checkpoint {
     /// would move the trunk under every request already waiting.
     pub fn ensure_base(&mut self, scope: &str, t: TimeMs, of: &Provenance) -> Result<Option<Payload>, MemoryError>;
     /// Pre-wave fence: add -A within scope, then a **dangling** commit
-    /// pointed at by refs/sprawling/runs/<run>/<seq>. HEAD does not move.
+    /// pointed at by refs/sprawling/runs/<run>/<oid>. HEAD does not move.
     /// Returns the checkpoint_committed payload
     /// {oid, scope, files, model, effort} (the last two: §8-18).
+    /// `files` 只列这一次 fence 改动了的路径（新增、修改、删除），按字节序：
+    /// 比的是暂存前后两份 index 的 (路径, blob) 对。列全部已跟踪路径会让
+    /// 5,000 个文件的楼每一波往账本里写 5,000 条路径，而读者要的是
+    /// 这一波碰过什么。首个 fence 与 `ensure_base`
+    /// 面对空 index，所以照旧列出它们提交的每一个文件。
     pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
@@ -420,16 +469,20 @@ impl Checkpoint {
   城是围绕人已有的文件夹形成的，而每一次工具波往人自己的分支历史里写一个
   `checkpoint:` 提交时，一个被采纳的仓库每波长一格。`wave_pre` 因此写一个
   **dangling commit**（`update_ref = None`，父为当前 HEAD 提交，无 HEAD 时无父），
-  再把引用 `refs/sprawling/runs/<run>/<seq>` 指向它。`git log HEAD` 因此跨波不增长，
+  再把引用 `refs/sprawling/runs/<run>/<oid>` 指向它。`git log HEAD` 因此跨波不增长，
   而 oid 可 checkout、`wave_post` 与 `memory::changes` 从 oid 工作。
 - **被否的另一条路：把栅栏留在 HEAD。** 它让人的历史被机器的簿记淹没——一天的工作里
   几百个 `checkpoint:` 行，人自己的提交夹在中间找不到。留在 HEAD 唯一买到的是
   「不用写引用」，而写一个引用是一行。
-- **`<seq>` 用 Checkpoint 自己每次 open 起算的计数器，不用账本 seq。** 理由是简单：
-  栅栏是在一个拿不到账本位置的闭包里升起的（`runtime::bench` 的预测栅栏尤其如此），
-  把账本位置穿到那里要多一个参数与一条新的耦合。引用只是**给人找路用的**，
-  权威是账本里的 oid；两个 open 的计数器撞名时后写的引用覆盖前一个，而被覆盖的
-  提交仍由账本里的 oid 指得到。
+- **引用名是提交自己的 oid：`refs/sprawling/runs/<run>/<oid>`，不设计数器。** 一个 run 经
+  不止一个 handle 升栅栏——lane 自己的栅栏点与 `runtime::bench` 的预测网各开一个 `Checkpoint`，
+  而 `file_discarded` 的还原指向哪个 handle 升起的那一道都可能。引用是这道提交**唯一的钉子**：
+  账本里的 oid 不让 git 保留任何对象，`git gc` 回收一切没有引用可达的提交，回收站随之失效。
+  以 oid 为名，名字的唯一性由提交本身担保，不再有第二个计数权威；同一道栅栏（同树、同父、同刻）
+  就是同一个提交、同一个引用，重写它是幂等的。被否：每个 handle 各自计数（两个 handle 同从 0 起，
+  后写的引用强制覆盖前一个，前一道提交从此无钉）；跨 handle 共享一个计数器或借用账本 seq（都要把
+  一个位置穿进拿不到它的闭包，多一条耦合，而名字只需要唯一，不需要有序——顺序由账本给）。
+  **翻案条件**：哪一天引用需要表达顺序（例如按先后清理旧栅栏），顺序仍应读账本，而不是回到计数器。
 - **`ensure_base` 仍然移动 HEAD**：worktree 从一个提交分枝，城必须先有第一个提交。
 - **「无 HEAD」只有两种读法**：`head()` 报 `UnbornBranch`（空仓库）或 `NotFound`（HEAD 指向的引用不存在）时才算「这座城还没有提交」，提交无父、扫描全扫。其他任何读不出 HEAD 的情形——引用文件损坏、HEAD 指向一个剥不出提交的对象——都是 `Checkpoint { op: "read HEAD" }` 错误，栅栏不立。被否：把一切失败读成「无 HEAD」。那样一次读不出的 HEAD 会让栅栏静默地变成一个无父的根提交，账本记下的 oid 与之前的历史断开，而没有人被告知。判定只有一处（`Checkpoint::head_commit`），提交与扫描都问它。
 - **提交时间是注入时刻的整秒**：`TimeMs` 是 `u64` 毫秒，除以 1000 后恒落在 `i64` 内，换算仍走 `i64::try_from` 且失败时报 `Checkpoint { op: "stamp the commit" }`，而不是写成 1970。
@@ -478,7 +531,7 @@ pub fn between(city_root: &Path, base: GitOid, head: Head)
 但先测再调，未测到慢之前多一张表就是多一份要同步的状态。
 
 `wave_pre` 不写 `HEAD`，而是写一个
-dangling commit 并由 `refs/sprawling/runs/<run>/<seq>` 指住（见 8-8）。本模块只读不写，
+dangling commit 并由 `refs/sprawling/runs/<run>/<oid>` 指住（见 8-8）。本模块只读不写，
 从 oid 工作。
 
 ### 8-9 memory::worktree（形状 4 适配器＋形状 2 值类型；git2）
@@ -616,7 +669,7 @@ pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, MemoryErr
 - **什么算城里的文件：`travels` 一个家（形状 1 判定）。** 导出端与恢复端问同一个谓词：根层 `.sprawling`（其内容经 ledger／cas 两张门各走各的）与任何深度的 `.git`（受保护元数据，写下即提权）不算城文件；楼自己的 `.sprawling`（`RULES.toml` 等治理字节）**随行**，它是城的一部分。名字引自 kernel 的名单（12.3 定规），不重拼字符串。两侧的策略不同且必须不同：导出端**跳过**（选择带走什么，源城里的簿记本来就不走），恢复端**拒绝**（全成或全拒——一份夹带 `.git` 的 bundle 是伪造品，恢复它就是在落 hooks）。
 - **git 历史随行（`bundle::history`，形状 4 适配器；git2）。** 城根若是 git 仓库，`export` 用 `git2::PackBuilder` 把每条引用所达的全部对象（沿 revwalk 的提交与树，外加每个引用目标的递归闭包，覆盖附注标签）打成 `history/history.pack`，把引用写成 `history/refs`（每行 `<oid> <name>` 或 `ref:<target> <name>`，`HEAD` 在内）；城根不是仓库时 bundle 没有 `history/`，恢复端也不建仓库。`restore` 在复制任何东西之前拒绝已有 `.git` 的城根（`MemoryError::Bundle { op: "restore" }`），复制后 `git2::Repository::init` 一个新仓库，经 `Odb::packwriter` 写入包（libgit2 边写边建索引并校验每个对象），再逐条立引用、按 `HEAD` 读出树写入索引，使 `git status` 只报导出时未提交的改动。**`hooks/` 与 `config` 永不复制**：bundle 里只有包与引用两样，仓库的配置与钩子来自新 init，于是一份伪造的 bundle 没有落钩子的路。引用名只收 `HEAD` 与 `refs/` 之下、且过 `git2::Reference::is_valid_name` 的名字，其余整次拒绝。被否：直接复制 `.git` 目录（会带上 hooks 与 config，正是 8-12 要拒的东西）；`git bundle` 子进程（引外部二进制，且 bundle 格式的解析不在本进程的校验之内）。
 - **v0.0.6 的 bundle 导入其仓库而不是整体拒绝。** v0.0.6 的导出把城根的 `.git` 整个复制进 `city/.git`，清单的 `files` 也数了它的文件。恢复端见到 `city/.git` 是目录、而 bundle 没有 `history/` 时，把它当作一份旧式历史：以 `git2::Repository::open_bare` 只读打开，按导出端同一段打包逻辑（同一个引用名准入）得到包与引用，再走同一个 `History::land`；`city/.git` 下的文件既不拒也不复制，清单的 `files` 减去它们的个数再比。`hooks/` 与 `config` 依旧只来自新 init。仍整次拒绝：`history/` 与 `city/.git` 同在（v0.0.7 的导出从不写后者，二者同在即伪造）、`city/.git` 不是能打开的仓库、以及任何更深处的 `.git`（那是别的仓库，导入它不在本契约内）。被否：继续整体拒绝（v0.0.6 用户的备份因此恢复不了，而其中的对象与引用正是本节已有的导入路径能安全接住的）。
-- **别名永不落盘（8-25）。** `walk` 见到任一链接拒绝整次操作；`write_file` 只接受 `alias::WriteTarget`（构造点查目标与每一级父目录）并恒落新 entry（写前移除该名再建），硬链接臂由此保证。链接臂是拒绝不是跳过——对照组的 “skipped N files” 就是宽容部分还原。悬空链接在列举中不可见（`is_file`／`is_dir` 走不到它），但落盘必须先过 `WriteTarget`，故恒拒仍然成立。
+- **别名永不落盘（8-25）。** `walk` 见到任一链接拒绝整次操作；bundle 的每一次落盘只走 `bundle::landing::land`（形状 4 适配器）：它按值收下 `alias::WriteTarget`，让清过的目标被消费而不是查完即丢。bundle 的目标由 `WriteTarget::within(op, root, path)` 清出：`root` 是人给的根（导出时是 bundle 目录，恢复时是城根），只查 `path` 与它和 `root` 之间的每一级目录，不查 `root` 本身及其上——城根放在哪里是人选的，`/home` 指向 `var/home`、macOS 的 `$TMPDIR` 经 `/var` 这样的链接不是 run 能造出来的写路径。不在 `root` 之下的路径退回到查到文件系统根，所以界只会放宽人选的那一段。被否：沿用 `WriteTarget::at` 查到文件系统根（城只要放在链接下面，导出与恢复就整次失败）。字节先写同目录的暂存文件 `.<name>.part`、`sync_data`，再把原权限抄到暂存文件上，最后 `rename` 覆盖并 `sync_dir`。原权限按 `landing::Bits` 取：复制城文件时取源文件的（可执行位、只读位随文件走，导出再恢复后不丢），写清单与历史时取被覆盖文件的（没有就用新建默认值）。`rename` 换的是目录项，所以硬链接臂同样由此保证，且不存在「名已删、字节未落」的丢文件窗口。权限在 `sync_data` 之后才抄：只读位一旦落上，Windows 不再允许以写句柄打开该文件。被否：写前移除该名再建（失败即丢文件，且按 umask 新建，丢可执行位）；就地截断重写（写穿硬链接，崩溃留半个文件）。链接臂是拒绝不是跳过——对照组的 “skipped N files” 就是宽容部分还原。悬空链接在列举中不可见（`is_file`／`is_dir` 走不到它），但落盘必须先过 `WriteTarget`，故恒拒仍然成立。
 
 ### 8-14 memory::error（形状 2 值）
 
@@ -631,6 +684,7 @@ pub enum MemoryError {                      // thiserror；crate 根
     Checkpoint / SecretEgress / Bundle,                      // 各自的模块
     Worktree / WorktreeBusy / MergeStale / MergeWouldDiscard, // worktree
     Alias { op: &'static str, path: PathBuf, kind: alias::AliasKind },  // → E_OUTSIDE_WRITE_DOMAIN（8-25）
+    LedgerHeld { dir: PathBuf },            // 另一个 JsonlLedger 持着这座城的账本（8-1）→ E_LEDGER_HELD
 }
 impl MemoryError { pub fn into_ax(self) -> AxError; }   // 跨 crate 边界的唯一出口
 pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) -> MemoryError;
@@ -671,6 +725,7 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
   - `worktree`——树由 git2 建、由 git2 prune，落盘不经本 crate；`release` 删残留目录同走 `std::fs`。
     缝拦不住 git2，声称拦得住才是第二个权威。释放顺序与自愈见 §8-9。
   - `checkpoint`——同样经 git2 提交与检出。
+  - `jsonl::ledger::WriterLock`——文件锁是操作系统对打开句柄的事实，Vfs 的崩溃语义模型对它无话可说（§8-1）。
   - `alias`——重解析点与链接计数是 `std::fs` 自己的事实（`file_type().is_symlink()` 对 symlink 与 junction 同真，Unix `MetadataExt::nlink` 判硬链接），Vfs 的崩溃语义模型对它们无话可说；它只问元数据、不读不写字节。
   - **`index` 不在例外之列**：`LedgerIndex` 持 `Box<dyn Vfs>`，段列举、段长、整段读（建表）与尾部增量读（刷新）全部经缝，
     而它没有一步是写；按 seq 取行走 `LineReader`，那正是上一条的例外。
@@ -721,6 +776,8 @@ impl Vfs for RealFs { … }
 - `Worktree`→`E_STORAGE_FATAL`：不可定义掉——仓库与文件系统是外部世界；能定义掉的那部分（名字走出目录）已由 `WorktreeName` 在构造点定义掉。
 - `Alias`→`E_OUTSIDE_WRITE_DOMAIN`：不可定义掉——名字与它指向的文件之间隔着一个链接是外部文件系统的事实；能定义掉的那部分（一次写入经链接穿透）已由 `WriteTarget` 在构造点定义掉，recovery 恒为「换成普通文件后重试」，故被拒的 run 不会卡死。Unix 上硬链接臂就在这个码下（`nlink>1` 即拒）；Windows 上链接计数不可判定（§3.5），由落盘纪律拆别名而非报拒。
 - `Envelope`→`E_LOG_VERSION_UNSUPPORTED` 同族拒读（段中损坏非尾部＝不可自动修复，指出路径交人决定）。
+- `LedgerHeld`→`E_LEDGER_HELD`（装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各跑一次 `up`／`serve`／`resume`）。能定义掉的那部分已经定义掉：锁先于一切读写，被拒的一方不会先写下任何东西。recovery 说明持锁的是另一个 sprawling 进程，以及怎样停下它。
+  锁路径的权威是 jsonl：`WriterLock::take` 从账本目录自己推出同级的 `<目录名>.lock`，不问 `CityLayout`。原因：会话切片路径只有 `memory::sessions` 一个权威（`xtask slices` 把 `of_ledger` 也算作点名那条路径），而从账本目录反推城根正是 `of_ledger` 的活；另一种做法——由调用方传入锁路径——要改 `open` 的签名和它的每个调用方，却只换来同一个文件名。代价是夹具、bench、fuzz 的账本目录也各多一个锁文件，而「一个目录一个写者」对它们同样成立。
 
 ## 13 依赖选型
 
@@ -865,5 +922,30 @@ pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, MemoryError>;   
 
 - **别名族全不穿透（junction／symlink／硬链接）。** junction 与 symlink 都是重解析点、`file_type().is_symlink()` 对两者同真，故合为 `Link`，在每一扇门**字面拒绝**。硬链接在 Unix 由 `nlink>1` 判定、同样字面拒绝；在 Windows 稳定版 `std` 读不到链接计数（§3.5），由**写入恒落新 entry** 的落盘纪律兜住：写前移除该名再建，其它名字保有旧字节，穿透在结构上不可能。**被否：跳过并报数**（对照组 “skipped N files”）——部分落盘破坏全成/全拒，且一行计数无法让重放方复现跳过了哪几个。
 - **`WriteTarget` 是形状 2 值：不变量在唯一构造点，字段私有。** 「未经检查的写目标拼不出来」由 trybuild 编译失败反例钉住（`tests/ui/`，M8 惯例）。它的证明范围是「检查那一刻这个名与它的父级都不是链接」；检查与落盘之间的替换窗口属效果面，故两个采样点（walk 与写入）都过同一判定。Unix 上硬链接在判定内被拒；Windows 上判定读不到链接计数，落盘纪律另兜该臂。
-- **消费面是三个写域加一个工具写面**：checkpoint 暂存回调（8-8）、bundle 的 `write_file`（8-12）、worktree 放置，加上 `runtime::tools::edit` 的物理写入（运行的写域）——经链接写保留路径在每一扇门恒拒。
+- **消费面是三个写域加一个工具写面**：checkpoint 暂存回调（8-8）、bundle 的 `landing::land`（8-12）、worktree 放置，加上 `runtime::tools::edit` 的物理写入（运行的写域）——经链接写保留路径在每一扇门恒拒。
 - **proptest 族「别名永不落盘」**：对别名种类 × 目标（受保护／普通）× 落点（名上／父目录）的组合，凡该平台造得出的别名（junction 无需特权即可创建；symlink 需特权；硬链接随处可造）：链接臂与 Unix 硬链接臂写入被拒，Windows 硬链接臂写入落新 entry；各臂同一断言——目标字节不变、别名带不出新字节；该平台造不出的退化为断言「放置失败时盘上无任何变化」，各臂同性质。
+
+### 8-26 `memory::snapshot`：链哈希快照（形状 7 投影）
+
+```rust
+pub struct ChainSnapshot { /* fold_version, seq, line_hash, views：字段私有 */ }
+impl ChainSnapshot {
+    pub fn cut(fold_version: u32, seq: Seq, line: &[u8], views: Vec<u8>) -> ChainSnapshot;  // line_hash = chain_hash(line)
+    pub fn fold_version(&self) -> u32;
+    pub fn seq(&self) -> Seq;
+    pub fn views(&self) -> &[u8];
+    pub fn fit(&self, line_at_seq: &[u8]) -> SnapshotFit;              // 定位读到的那一行是否就是切点那一行
+    pub fn resume(&self) -> Result<LineCheck, AxError>;               // 切点之后的链状态：prev = line_hash，expected = seq + 1；seq 已是最后一个时是 Seq::next 的错误
+}
+pub enum SnapshotFit { Fits, Stale }
+pub enum StoredSnapshot { Absent, Damaged(String), Present(ChainSnapshot) }
+pub fn write_snapshot(dir: &Path, snapshot: &ChainSnapshot) -> Result<(), MemoryError>;
+pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, MemoryError>;
+```
+
+- **快照是投影，不是历史。** 它放在 `<city>/.sprawling/snapshot/`，内容是 `(fold_version, seq, line_hash, views_bytes)`：折叠在第 `seq` 行之后持有的状态，连同那一行的链哈希。删掉它，城照样起得来，只是回到全量折叠；所以文件损坏（魔数不对、长度不够、体摘要不符）读成 `Damaged(原因)` 交给调用方丢弃，只有 I/O 本身失败才是 `MemoryError`。
+- **文件格式**：`SPRSNAP1` 八字节魔数｜`fold_version` u32 LE｜`seq` u64 LE｜`line_hash` 32 字节｜`views` 的 blake3 32 字节｜`views` 到文件尾。体摘要让位翻转读成 `Damaged` 而不是一份错的视图；写入走「临时文件 → sync → rename → sync 目录」，所以撕裂的写不会留下半个快照。
+- **核对只看一行。** 启动时按 `seq` 做一次定位读，`fit` 比较那一行的 `chain_hash` 与 `line_hash`：相等时，在摘要单射的前提下（`adversary` 的 `Sprawling.Chain` 持有这条假设），快照所折的行就是盘上账本的前缀；`Stale` 时调用方丢弃快照，全量折叠。`fold_version` 不等同样丢弃：折叠规则变了，旧状态不再是新规则折出来的。
+- **「快照加尾部 ≡ 全量折叠」** 由 `adversary/src/Sprawling/Snapshot.lean` 对任意折叠、任意切点证明（`snapshotPlusTailIsWhole`、`resumeIsWhole`）；Rust 侧由 proptest 在随机账本与随机切点上持有同一性质，折叠取链检查本身：从 `resume()` 出发走尾部，接受的行与终态都等于从创世走全程。
+- **被否：只存 `seq` 不存 `line_hash`。** 账本被换成另一条同长的链时，只比 `seq` 会把别人的视图接到这条链的尾部上；多 32 字节换来的是一次定位读就能拒绝。
+- 仍未落地的阶段：`Views` 的字节编码与启动路径接入（定位读核对后只折尾部）；后台线程按段流式做全链校验并把结果作为诊断推给页面；校验失败时写者与视图停止接受新工作并给出人读得懂的原因。

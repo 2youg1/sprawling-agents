@@ -263,17 +263,16 @@ fn a_documents_bench_lets_its_own_room_through_the_door() {
     assert!(tmp.path().join("hall/note.md").is_file());
 }
 
-#[test]
-fn a_run_started_by_outside_content_is_refused_exec() {
-    let tmp = tempfile::tempdir().unwrap();
-    std::fs::create_dir_all(tmp.path().join("work")).unwrap();
+/// A bench holding `exec` in a `work` domain under `root`.
+fn exec_bench(root: &std::path::Path) -> ToolBench {
+    std::fs::create_dir_all(root.join("work")).unwrap();
     let domain = WriteDomain::new(vec![Address::parse("work").unwrap()]).unwrap();
     let mut bench = ToolBench::new(domain);
     bench
         .register(Box::new(
             ExecTool::new(
                 crate::tools::ExecSetup {
-                    workdir: tmp.path().to_path_buf(),
+                    workdir: root.to_path_buf(),
                     mounts: Vec::new(),
                     python_wasm: None,
                     shell: None,
@@ -288,21 +287,81 @@ fn a_run_started_by_outside_content_is_refused_exec() {
             .unwrap(),
         ))
         .unwrap();
-    *bench.taint_mut() = TaintSet::of(kernel::TaintSource::new("web:evil").unwrap());
+    bench
+}
+
+fn exec_call() -> ToolCall {
     let mut args = Map::new();
     args.insert(
         "arm".to_owned(),
         serde_json::json!({ "shell": { "text": "echo hi" } }),
     );
-    let call = ToolCall {
+    ToolCall {
         id: "e1".to_owned(),
         name: kernel::ToolName::parse("exec").unwrap(),
         args: Payload::new(args).unwrap(),
-    };
-    match bench.invoke(&call, &key(10), now()) {
+    }
+}
+
+fn assert_refused_as_tainted(answered: Result<BenchOutcome, AxError>) {
+    match answered {
         Ok(BenchOutcome::Refused { refusal }) => {
             assert_eq!(*refusal.code(), AxCode::TaintedAction);
         }
         other => panic!("expected the tainted exec to be refused, got {other:?}"),
     }
+}
+
+#[test]
+fn a_run_started_by_outside_content_is_refused_exec() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut bench = exec_bench(tmp.path());
+    *bench.taint_mut() = TaintSet::of(kernel::TaintSource::new("web:evil").unwrap());
+    assert_refused_as_tainted(bench.invoke(&exec_call(), &key(10), now()));
+}
+
+/// A tool whose every call answers with an empty payload.
+struct Answering(kernel::ToolMeta);
+
+impl Tool for Answering {
+    fn meta(&self) -> &kernel::ToolMeta {
+        &self.0
+    }
+
+    fn invoke(&mut self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    }
+}
+
+/// Content that came in through a page or a connector is outside
+/// content wherever the run started, so the exec after it is refused.
+#[test]
+fn a_run_that_read_outside_content_is_refused_exec() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut bench = exec_bench(tmp.path());
+    bench
+        .register(Box::new(Answering(kernel::ToolMeta {
+            name: kernel::ToolName::parse("page").unwrap(),
+            disclosure: "answers with a web page".to_owned(),
+            params: Payload::empty(),
+            effect: Effect::Egress,
+            cost_tier: kernel::CostTier::Free,
+            timeout: None,
+            render: kernel::RenderIntent::Generic,
+            temporal: kernel::Temporal::Timeless,
+        })))
+        .unwrap();
+    let page = ToolCall {
+        id: "p1".to_owned(),
+        name: kernel::ToolName::parse("page").unwrap(),
+        args: Payload::empty(),
+    };
+    assert!(matches!(
+        bench.invoke(&page, &key(11), now()),
+        Ok(BenchOutcome::Ran { .. })
+    ));
+    assert_refused_as_tainted(bench.invoke(&exec_call(), &key(12), now()));
 }

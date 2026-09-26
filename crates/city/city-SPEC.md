@@ -96,7 +96,14 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError>;
 pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError>;
 pub fn write_rules(city_root: &Path, addr: &Address, text: &str) -> Result<BuildingRules, AxError>;
 pub fn rules_path(city_root: &Path, addr: &Address) -> PathBuf;
+pub struct RulesCache { /* city_root、按楼存的 (mtime, len) 与规则 —— 私有 */ }
+impl RulesCache {
+    pub fn new(city_root: &Path) -> RulesCache;
+    pub fn load(&self, addr: &Address) -> Result<Arc<BuildingRules>, AxError>;
+}
 ```
+
+`RulesCache`（`policy/cache.rs`，形状 1 判定）：一个 run 一份，读界的闭包持有它。`load` 先对 `RULES.toml` 做一次 stat，(mtime, len) 与上次读到的相同就交回留着的规则，不同或第一次就走 `load` 读盘求值并按这次 stat 的戳留下。文件不存在或 stat 失败时不留任何东西、每次都走 `load`，于是「没有 RULES.toml」与「被替代的旧文档」两条的答案与不缓存时逐字相同。锁中毒时同样退回 `load`。失败与 `load` 相同，失败不留。决定见 §12.3。
 
 - **规则是一份 TOML，散文没有另起一份文件**：这份文件先前是 Markdown，读者在**任意一行**上匹配 `confidential:`／`write:`／`review:`／`browser:`／`usersbrowser:`／`desktop:`，于是「How work is done here」里一句以 `desktop = true` 开头的话就授予了宿主机的桌面，而一栋没写 `write:` 的楼落到 `Everything`。两处都朝宽松的一侧失败，那是权限读者唯一不许失败的方向。改成 TOML 之后键只在文法给出键的位置成立，`deny_unknown_fields` 让拼错成为一条消息而不是一次静默缺席，`confidential` 与 `write` 都不再有缺省。**散文留在同一份文件里**，作 `does` 与 `conventions` 两个键：拆成两份文档同样能关掉撞键，代价是一栋楼有两种说法且可以互相矛盾。居民拿到的就是这份文件本身的字节，所以城判定的与 agent 读到的是同一串。
 
@@ -601,6 +608,16 @@ bin `RunWorker::dispatch` → `Identity::load(city_root, addr)` → `segment_byt
 **被否**：派活时冻结一张「哪些楼机密」的表，与写域、工具表一同冻结。它让 `may_read` 成为只吃值的纯函数，代价是上面两条；若冻结的是「哪些楼开放」，新楼会被关上，但派活代价不变。
 
 **重开参数**：一次跨楼读的规则读取（一个小文件加一次 TOML 求值）相对该次 `read` 本身的读盘不再可忽略时——例如城的规则搬进一张随账本折叠的内存表，读规则不再触盘——冻结与现读的延迟差消失，可以重议；安全那一条不随它消失，重议时须给出新楼与改规则两种情形下仍然关上的办法。
+
+### 12.3 定规：一个 run 内按 (mtime, len) 留住他楼的规则
+
+**决定**：读界的闭包持有一份 `RulesCache`，一个 run 一份。同一栋他楼的规则，文件的 mtime 与长度都没变时不再读盘求值；任一变了就重读。
+
+**理由**：一次不带路径的 `search` 在城根下走进每一栋他楼，一个 run 反复读同一栋楼，每次都读一个小文件再做一次 TOML 求值；stat 一次的代价低于读加求值。§12.2 的安全一条仍然成立：改规则就改了文件，mtime 随之前进，下一次 stat 就重读；把 `confidential = false` 改成 `true` 连长度也变了，所以即便 mtime 的粒度粗到同一刻内写两次，这一次翻转也逃不过长度。
+
+**被否**：按内容哈希作键——要先读完整个文件，省下的只剩求值；run 之间共享一份——run 的寿命是缓存失效的天然边界，跨 run 的表要自己回答何时丢，而多出来的只有第一次读。
+
+**重开参数**：若某个文件系统的 mtime 粒度粗到同一刻内能写出等长而意义不同的规则并且真有人这样改，键要加上内容哈希或 inode 变更计数。
 
 ## 13 依赖选型
 

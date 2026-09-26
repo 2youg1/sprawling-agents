@@ -36,6 +36,7 @@ use serde_json::Value;
 use memory::{Checkpoint, Provenance};
 
 mod admit;
+mod outside;
 
 /// The checkpoint net a run works under: the repository, what a fence
 /// covers, and who is signing it.
@@ -274,8 +275,13 @@ impl ToolBench {
         // The key is recorded with the answer it earned, so a retry after
         // a gate refusal is not a replay, and a call the tool itself
         // failed answers its replay the same way it answered the first
-        // time rather than running again.
-        let answered = tool.invoke(call);
+        // time rather than running again. Outside content enters the run
+        // here and nowhere else, so every later call's doors read the
+        // taint it brought.
+        let answered = tool.invoke(call).and_then(|outcome| {
+            self.taint = outside::entered(&effect, &self.taint)?;
+            Ok(outcome)
+        });
         self.seen.insert(*key, answered.clone());
         let outcome = answered?;
         Ok(BenchOutcome::Ran { outcome, fenced })

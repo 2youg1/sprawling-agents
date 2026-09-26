@@ -58,7 +58,7 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
                     attachments: Vec::new(),
                 })
             },
-            &mut |_| NextCall::Allowed,
+            &mut |_| Interrupt::None,
         )
         .unwrap(),
     );
@@ -228,7 +228,7 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
                 )
                 .with_recovery("this bench registers no tools"))
             },
-            &mut |_| NextCall::Allowed,
+            &mut |_| Interrupt::None,
         )
         .unwrap(),
     );
@@ -277,7 +277,7 @@ fn the_ledger_chain_stays_verifiable_after_a_turn() {
             Interrupt::None,
             &mut ledger,
             &mut |_call| panic!("empty wave must not invoke"),
-            &mut |_| NextCall::Allowed,
+            &mut |_| Interrupt::None,
         )
         .unwrap(),
     );
@@ -337,8 +337,8 @@ fn a_wave_halted_between_two_calls_does_not_make_the_second() {
                 })
             },
             &mut |call| match call {
-                0 => NextCall::Allowed,
-                _ => NextCall::Halted,
+                0 => Interrupt::None,
+                _ => Interrupt::Cancel,
             },
         )
         .unwrap();

@@ -156,7 +156,7 @@ fn a_released_command_is_let_go_without_reaching_another_run() {
     slow.current_dir(std::env::temp_dir());
     let started = backlog.run(ended, &addr, "slow".to_owned(), slow).unwrap();
     assert!(matches!(started, Started::Backgrounded { .. }));
-    assert_eq!(backlog.release(ended).unwrap(), 1);
+    assert_eq!(backlog.release(ended), 1);
     for _ in 0..500 {
         assert!(backlog.harvest(other).unwrap().is_empty());
         if backlog.standing(&addr).unwrap().is_empty() {

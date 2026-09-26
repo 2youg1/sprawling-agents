@@ -174,6 +174,16 @@ fn instrument_dispatch_gap() {
         gaps.get(gaps.len() / 2).copied().unwrap_or(0),
         machine()
     );
+    // Naming B waits on a model, and nothing A writes may wait with it.
+    // The bound is the naming call itself rather than a few
+    // milliseconds, because A's widest gap also holds its own turns'
+    // fences, which are A's work and not a stall B caused.
+    let widest = gaps.last().copied().unwrap_or(0);
+    let naming = u64::try_from(NAMING.as_millis()).unwrap();
+    assert!(
+        widest < naming,
+        "run A stood still for {widest} ms while run B was being named, as long as the {naming} ms naming call"
+    );
 }
 
 /// `APPENDS` relay appends, each timed, while a run is driving and

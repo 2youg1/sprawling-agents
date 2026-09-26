@@ -57,7 +57,6 @@ Every row is enforced by a machine. Violating one turns CI red with a message na
 | Take the time as a parameter. The single sampling point is `bin::assembly`. | `clippy.toml` disallowed methods |
 | Use `BTreeMap` on kernel decision paths; keep floats out of ledger payloads; start tasks from the one spawn point. | review plus the determinism tests in citysim |
 | Use one name per concept, taken from `docs/glossary.md`. | `xtask lexicon`, data face `xtask/lexicon.toml` |
-| Change a crate's public surface and its SPEC in the same commit. Adding one `pub use` line is a public-surface change. | `xtask apisync` |
 | Keep credentials as `secret:realm/name` references; let plaintext reach the Vault only. | `xtask secret` |
 | Take colour from `web::theme`; express a colour as a ratio of the gamut limit. | `xtask color` |
 | Keep a page's shape: one left edge down the centre column, a panel's head at the top of its own panel, nothing wider than the region holding it. The screens are opened in a real engine and measured; no browser means the gate says it skipped. | `xtask render` |

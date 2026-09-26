@@ -28,6 +28,7 @@
 //! the same city by routes that share nothing.
 
 use super::city::report;
+use super::grammar::Arguments;
 use super::router::{client_summary, flag_value, log_floor, log_levels};
 use super::version::{check, cut};
 use super::{DEPENDENCIES, install, wire_client};
@@ -109,10 +110,8 @@ pub(super) fn call(args: &[String]) -> ExitCode {
 ///
 /// Never from `argv`: a key on a command line is in the process table,
 /// in shell history, and in the log of whatever started this process.
-pub(super) fn enrol(args: &[String]) -> ExitCode {
-    let Some(reference) = args.get(1).filter(|a| !a.starts_with("--")) else {
-        eprintln!("usage: sprawling enrol <realm>/<name> [--at host:port]");
-        eprintln!("the value is read from stdin, never from the command line");
+pub(super) fn enrol(read: &Arguments) -> ExitCode {
+    let Some(reference) = read.positional(1) else {
         return ExitCode::from(2);
     };
     let Some((realm, name)) = wire_client::split_reference(reference) else {
@@ -134,8 +133,8 @@ pub(super) fn enrol(args: &[String]) -> ExitCode {
         );
         return ExitCode::from(2);
     }
-    let at = flag_value(args, "--at").unwrap_or_else(|| DEFAULT_AT.to_owned());
-    match wire_client::enrol(&at, realm, name, &value) {
+    let at = read.value("--at").unwrap_or(DEFAULT_AT);
+    match wire_client::enrol(at, realm, name, &value) {
         Ok(reference) => {
             println!("{reference}");
             // Accepted, not yet stored: the route answers before the
