@@ -61,6 +61,18 @@ pub(crate) struct Heard {
     /// from an answer. Subtracting one at the caller would copy the
     /// shape of the handshake into a second place.
     pub(crate) answers: u32,
+    pub(crate) awaited: Awaited,
+}
+
+/// What became of the frame a call was waiting for.
+#[derive(Clone, Copy)]
+pub(crate) enum Awaited {
+    /// The call waits only for the city's quiet.
+    Nothing,
+    /// The reply or the named event arrived and ended the call.
+    Arrived,
+    /// The window closed first: the city may still be working.
+    Missing,
 }
 
 /// What the city did about the frame it was sent. Exhaustive: these
@@ -72,7 +84,7 @@ pub(crate) enum Spoken {
     /// The city answered, inside the window, and refused nothing.
     Answered,
     /// The frame went out and nothing came back before the window
-    /// closed. Whether the city took the work is not knowable here, so
+    /// closed, or what the call waited for did not. Whether the city took the work is not knowable here, so
     /// this is neither of the other two.
     Quiet,
 }
@@ -93,12 +105,13 @@ pub(crate) enum Unheard {
 
 impl Heard {
     /// Refusal first, because a refusal that also carried events is
-    /// still a refusal; silence last, because it is only silence when
-    /// nothing at all arrived.
+    /// still a refusal; then silence, which is nothing at all arriving
+    /// or the awaited frame missing, since events that are not the one
+    /// asked for do not say the work is done.
     pub(crate) fn spoken(&self) -> Spoken {
-        match (self.refusals, self.answers) {
-            (0, 0) => Spoken::Quiet,
-            (0, _) => Spoken::Answered,
+        match (self.refusals, self.awaited, self.answers) {
+            (0, Awaited::Missing, _) | (0, Awaited::Nothing, 0) => Spoken::Quiet,
+            (0, Awaited::Arrived | Awaited::Nothing, _) => Spoken::Answered,
             _ => Spoken::Refused,
         }
     }
@@ -131,7 +144,8 @@ fn malformed(what: &str, why: &str) -> AxError {
 
 /// Sends one frame and prints every frame that comes back, as one JSON
 /// object per line, until the frame's [`Ending`]: a query stops on its
-/// answer or refusal, a command once nothing has arrived for `quiet`.
+/// answer or refusal, a command on the event `listen.until` names or
+/// once nothing has arrived for `listen.quiet`.
 ///
 /// Quiet is a duration rather than a frame count because how many events
 /// one dispatch produces is the city's business, not this client's; for
@@ -211,6 +225,7 @@ async fn converse(
         frames: 0,
         refusals: 0,
         answers: 0,
+        awaited: sending.ending.not_yet(),
     };
     // The greeting is answered before anything else is sent: a client
     // that shouted its command at a server which then refused the
@@ -240,6 +255,7 @@ async fn converse(
         report(&text, &reply, &mut heard);
         heard.answers = heard.answers.saturating_add(1);
         if sending.ending.ends_on(&reply) {
+            heard.awaited = Awaited::Arrived;
             break;
         }
     }
@@ -287,7 +303,7 @@ fn report(text: &str, reply: &Reply, heard: &mut Heard) {
     heard.frames = heard.frames.saturating_add(1);
     match reply {
         Reply::Refusal => heard.refusals = heard.refusals.saturating_add(1),
-        Reply::Answer | Reply::Other => {}
+        Reply::Answer | Reply::Event(_) | Reply::Other => {}
     }
 }
 
