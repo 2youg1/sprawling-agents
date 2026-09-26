@@ -20,7 +20,7 @@
   import { readable } from "svelte/store";
   import type { Readable } from "svelte/store";
 
-  import { adopted } from "../core/belief";
+  import { adopted } from "../core/belief/adopted";
   import { cancel, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
   import { fill, say } from "../core/lang";
