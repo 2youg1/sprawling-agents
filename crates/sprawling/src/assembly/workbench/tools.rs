@@ -7,6 +7,8 @@
 //! registration feeding the catalogue and the bench, the `status` tool
 //! that answers what this run is, and the reading room it admits.
 
+use std::sync::{Arc, Mutex};
+
 use kernel::{Address, AxError, Locator};
 use runtime::bench::ToolBench;
 use runtime::{EditTool, ExecTool, SearchTool, StatusTool};
@@ -51,7 +53,7 @@ impl RunWorker {
         // prompt, so a tool admitted mid-run would invalidate the whole
         // conversation's cache. Progressive disclosure is about what a
         // line says, not about when a tool appears.
-        let catalog = std::sync::Arc::new(std::sync::Mutex::new(runtime::Catalog::new()));
+        let catalog = Arc::new(Mutex::new(runtime::Catalog::new()));
         // The mode a run sits in is a capability like any other: it says
         // what this run admits, and until it was set here the mode's own
         // catalog entry reached no model.
@@ -73,7 +75,7 @@ impl RunWorker {
         // Where this run stands, carried rather than worked out: a run
         // that inferred its own depth would be one wrong answer away
         // from a delegate that delegates.
-        let delegates = std::sync::Arc::new(std::sync::Mutex::new(collab::DelegateDesk::new(
+        let delegates = Arc::new(Mutex::new(collab::DelegateDesk::new(
             at.depth(),
             site.building.addr().clone(),
         )));
@@ -88,11 +90,11 @@ impl RunWorker {
                 context: &context,
             },
         )?;
-        let signal_tool = collab::SignalTool::new(std::sync::Arc::clone(&desks.signals))?;
-        let goal_tool = collab::GoalTool::new(addr.clone(), std::sync::Arc::clone(&desks.goals))?;
-        let pr_tool = collab::PrTool::new(addr.clone(), std::sync::Arc::clone(&desks.pr))?;
-        let claim_tool = collab::ClaimTool::new(std::sync::Arc::clone(&desks.plan))?;
-        let archive_tool = collab::ArchiveTool::new(std::sync::Arc::clone(&desks.shelf))?;
+        let signal_tool = collab::SignalTool::new(Arc::clone(&desks.signals))?;
+        let goal_tool = collab::GoalTool::new(addr.clone(), Arc::clone(&desks.goals))?;
+        let pr_tool = collab::PrTool::new(addr.clone(), Arc::clone(&desks.pr))?;
+        let claim_tool = collab::ClaimTool::new(Arc::clone(&desks.plan))?;
+        let archive_tool = collab::ArchiveTool::new(Arc::clone(&desks.shelf))?;
         // The refusal face of the building's own governance. It reaches
         // for the reserved subtree, which no write domain does, and
         // `Effect::Govern` is refused at the effect layer: a run does
@@ -112,11 +114,8 @@ impl RunWorker {
         // `search` ask one read bound, so what one may open the other may
         // find.
         let bound = self.read_bound(site);
-        let read = runtime::ReadTool::new(
-            &site.write_root,
-            std::sync::Arc::clone(&catalog),
-            std::sync::Arc::clone(&bound),
-        )?;
+        let read =
+            runtime::ReadTool::new(&site.write_root, Arc::clone(&catalog), Arc::clone(&bound))?;
         // Reading needs an address, and until this line there was no way
         // to find one: a symbol had to be hunted through `exec`, which
         // means Python this machine may not have or a shell this
@@ -128,8 +127,8 @@ impl RunWorker {
         // it is the newest, and it takes no depth and asks no person:
         // the successor is this same resident, in this same room, with
         // this same table - which is why `delegate` is still on it.
-        let succession = std::sync::Arc::new(std::sync::Mutex::new(runtime::SuccessionDesk::new()));
-        let succeed = runtime::SucceedTool::new(std::sync::Arc::clone(&succession))?;
+        let succession = Arc::new(Mutex::new(runtime::SuccessionDesk::new()));
+        let succeed = runtime::SucceedTool::new(Arc::clone(&succession))?;
         // The net, not the forecast, is the defence (semantic authority
         // 4.4). Two handles on one repository: the bench fences a
         // command its forecast suspects, and the driver fences every
@@ -192,10 +191,11 @@ impl RunWorker {
         match city::vocation_of(site.building.addr()) {
             city::Vocation::Builds => {
                 admitted.push(Box::new(self.exec_tool(site, addr)?));
-                admitted.push(Box::new(collab::DelegateTool::new(std::sync::Arc::clone(
-                    &delegates,
-                ))?));
-                admitted.push(Box::new(self.workshop_tool(site, addr, &delegates)?));
+                admitted.push(Box::new(collab::DelegateTool::new(Arc::clone(&delegates))?));
+                admitted.push(Box::new(collab::WorkshopTool::new(
+                    Arc::clone(&desks.workshop),
+                    Arc::clone(&delegates),
+                )?));
             }
             city::Vocation::Plans => {
                 admitted.push(Box::new(city::CityTool::new(&self.city_root)?));
@@ -252,7 +252,7 @@ impl RunWorker {
     fn read_bound(&self, site: &Site) -> runtime::ReadBound {
         let rules = city::RulesCache::new(&self.city_root);
         let home = site.building.addr().clone();
-        std::sync::Arc::new(move |target: &Address| {
+        Arc::new(move |target: &Address| {
             kernel::address::may_read(&home, target, || {
                 let holder = city::Building::of(target)?;
                 rules.load(holder.addr()).map(|r| r.policy().confidential)
@@ -291,35 +291,6 @@ impl RunWorker {
         )
     }
 
-    /// Builds the build floor's own tool, holding what this room has
-    /// already been handed back.
-    ///
-    /// The held artifacts are copied rather than lent: the authority is
-    /// `self.collaborating.joins`, folded from the ledger's handback lines, and a desk
-    /// that took it away would leave the worker unable to answer the
-    /// same question after the run.
-    ///
-    /// # Errors
-    /// Propagates whatever the tool says about its own construction.
-    fn workshop_tool(
-        &self,
-        site: &Site,
-        addr: &Address,
-        delegates: &std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
-    ) -> Result<collab::WorkshopTool, AxError> {
-        let mut held = collab::FanIn::new();
-        if let Some(existing) = self.collaborating.joins.get(addr) {
-            for artifact in existing.artifacts() {
-                held.accept(artifact.clone());
-            }
-        }
-        let workshop = std::sync::Arc::new(std::sync::Mutex::new(collab::WorkshopDesk::new(
-            site.who.clone(),
-            held,
-        )));
-        collab::WorkshopTool::new(workshop, std::sync::Arc::clone(delegates))
-    }
-
     /// Builds the one tool that answers what this run is, to itself.
     ///
     /// Everything a `status` answer holds is read here and frozen, except
@@ -338,7 +309,7 @@ impl RunWorker {
         at: &Assignment,
         reach: Reach<'_>,
     ) -> Result<StatusTool, AxError> {
-        let watched = std::sync::Arc::clone(reach.delegates);
+        let watched = Arc::clone(reach.delegates);
         let tool = StatusTool::watching(
             status_snapshot(Situation {
                 addr: &at.addr,

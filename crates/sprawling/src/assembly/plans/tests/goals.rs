@@ -72,6 +72,10 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
 /// joins - so the next run in that room can be asked a question only
 /// somebody who opened the results can answer.
 ///
+/// The graph is laid out once. The node that waits is handed down when
+/// what it waits on hands back, so no later run in the room has to lay
+/// the same graph out again for the work to go on.
+///
 /// `collab::workshop` and `collab::fanin` had no callers outside
 /// their own files before this; the whole layer was a set of types
 /// nobody had run.
@@ -104,9 +108,9 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             ("the page exists", vec![completion("done", None)]),
         ],
         vec![
-            completion_with("splitting it up", "workshop", "tu_1", graph.clone()),
+            completion_with("splitting it up", "workshop", "tu_1", graph),
             completion("waiting on a person", None),
-            completion_with("splitting it up", "workshop", "tu_2", graph),
+            completion("not laying it out again", None),
             completion("done", None),
         ],
     );
@@ -351,4 +355,57 @@ fn excerpt(history: &str, at: usize) -> String {
         .find(char::from(10))
         .map_or(history.len(), |line| at.saturating_add(line));
     history.get(start..end).unwrap_or_default().to_owned()
+}
+
+/// Setting a pursuit starts its rows and gives the desk back: `Pause`,
+/// `Halt` and every other command are read by the main loop, and a
+/// pursuit that drove its rows to the end inside the command kept them
+/// all out. The rows still land, through the same loop.
+#[test]
+fn a_pursuit_gives_the_desk_back_while_its_rows_drive() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
+    std::fs::write(
+        dir.path().join("lab").join(city::ROADMAP_FILE),
+        PLAN_ONE_FREE_ROW,
+    )
+    .unwrap();
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![completion("wire-the-kiln", None), completion("done", None)],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::SelectModel {
+            endpoint: channels::ProviderName::parse("house").unwrap(),
+            model: "m-local".to_owned(),
+            tag: kernel::ModelTag::Digest,
+            context_tokens: kernel::Window::new(32_768),
+            max_output_tokens: kernel::Ceiling::new(4_096),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"digest"),
+        })
+        .unwrap();
+    let lab = Address::parse("lab").unwrap();
+    worker
+        .set_pursuit(
+            &lab,
+            channels::PursuitStep::Set {
+                goal: "fire the kiln".to_owned(),
+            },
+        )
+        .unwrap();
+    assert!(
+        worker.driving(),
+        "the pursuit returned before its row came home"
+    );
+    worker.land_the_rest().unwrap();
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let frozen = verified
+        .raw_lines()
+        .iter()
+        .filter(|line| String::from_utf8_lossy(line).contains("\"kind\":\"run_frozen\""))
+        .count();
+    assert_eq!(frozen, 1, "the row still landed");
 }

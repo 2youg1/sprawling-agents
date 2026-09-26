@@ -32,7 +32,7 @@ pub(super) struct Sweep<'a> {
 /// arguments in step (sprawling-SPEC.md 8-46-12).
 pub(super) struct Settling<'a> {
     pub(super) sweep: Sweep<'a>,
-    pub(super) conversations: u32,
+    pub(super) chain: super::KnockChain,
     /// The claims booked at call time that this landing has yet to
     /// close; the plan step closes each as its closing line reaches the
     /// ledger (sprawling-SPEC.md 8-42-8).
@@ -49,6 +49,7 @@ pub(super) struct Ending<'a> {
     pub(super) driven: Result<runtime::Run<runtime::run::Frozen>, AxError>,
     pub(super) raised: Vec<kernel::ApprovalItem>,
     pub(super) delegates: &'a std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
+    pub(super) workshop: &'a std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
     pub(super) succession: &'a std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
     /// What the city owes this run, and where a refusal goes back to.
     /// It arrives here because a successor takes it over: what is owed

@@ -359,9 +359,9 @@ fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> 
 
 ```rust
 // bin::assembly
-struct Knock { addr: Address, from: String, mode: kernel::Mode, conversations: u32 }
+struct Knock { addr: Address, from: String, mode: kernel::Mode, chain: KnockChain }
 impl RunWorker {
-    fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32) -> Result<(), AxError>;
+    fn knock(&mut self, signal: &Signal, speaker: &Address, mode, chain: &KnockChain) -> Result<(), AxError>;
     fn answer_knocks(&mut self);   // 成波排干，循环而非递归
 }
 ```
@@ -1036,7 +1036,7 @@ impl PlanView {
 
 - **值住在工人身上，事实住在账本里。** `kernel::Pursuit` 由 `Delegator::root()` 铸出，而这座城里**唯一一处 `Delegator::root()` 就在 `RunWorker::over`**——于是「子代理不能让全城通宵干活」是一件关于代码的事实，而不是一条谁去遵守的规则。设置／暂停／恢复／清除各落一条 `pursuit_changed`，`Views` 折它来画，重启后工人从同一批记录把值重新铸出来。两处折叠都经 `Payload::read::<kernel::event::record::PursuitChanged>` 与它的 `held` 读这一行，读不回的一行让折叠报错而不是被跳过：跳过它，一座被清除目标的楼在重启后会继续追下去。
 - **`Views` 不持 `Pursuit`，只持文本与状态**：一个能铸出 `Pursuit` 的视图，就是那道守卫上的第二扇门。判定仍由 `kernel::observe_pursuit` 给出，措辞由 `verdict_line` 一处写出——页面、控制台与日志说同一句话。
-- **`pursue` 会终止，理由在集合上而不在计数器上**：认领把节点移出就绪集，而一个结束时还持有节点的 run 会把它留成 Blocked（`ClaimDesk::abandon`），所以就绪集严格变小；唯一让它变大的是拆分，而那是这座城找到了更多活，不是在打转。派活之后若该节点仍在就绪集里，循环停下并留一条诊断——**看的是集合本身，不是一个凭空定的上限。**
+- **`pursue` 会终止，理由在集合上而不在计数器上**：认领把节点移出就绪集，而一个结束时还持有节点的 run 会把它留成 Blocked（`ClaimDesk::abandon`），所以就绪集严格变小；唯一让它变大的是拆分，而那是这座城找到了更多活，不是在打转。派活之后若该节点仍在就绪集里，追求暂停并留一条诊断——**看的是集合本身，不是一个凭空定的上限。**
 
 ## 8-36 一个节点红了，站在它后面的人会知道（`tell_whoever_is_behind`）
 
@@ -2486,8 +2486,23 @@ fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 于是桌子问的每一道门都看得见它，`gate::command` 据此拒掉 `exec`（`E_TAINTED_ACTION`）。
 读点 `settling::landing` 转交 `at.taint`，待批项的 C15 标记取 `!taint.is_empty()`，一个事实一个家。
 
-**车道满不是拒绝**：`DrivingPool::full` 是 `pursue` 读的建议值，不是 `start` 的闸；
-人派的活从前就可以超过 `DRIVING_LANES`，城自己起的活同此。超出的部分停在 provider 的 admission 上排队。
+**车道满不是拒绝，是排队**：`DrivingPool::start` 对每一个派活入口都是同一道闸——人派的活、
+城自己起的活、敲门、委派、workshop、继任、追求，谁都一样。车道满时，已经准备好的那一轮活
+（`Driving` 连同它的写口与 `DriveContext`）进池里的先到先起队列，不开线程；`landed` 空出
+一条车道之后，`serve_flight` 在落地这一轮之前调 `start_waiting`，按到达顺序把排着的活起到
+车道满为止。排在前面的先起，所以落地时新派的子活、敲门排在已经在等的活后面。
+`in_flight` 只数车道里的，排队的不算；因为只有车道满才会排队，「有活在排」必然意味着
+「有车道在跑」，`land_the_rest` 的循环条件因此不变。起不来的那一轮（线程开不出）离开
+在飞表，拒绝交给它欠着的那一位。队列放在池里而不是放在 provider 的 admission 上，因为
+池数得清谁在等，admission 只让线程停着等，一个 20 节点的 workshop 就是 20 条线程。
+
+```rust
+impl DrivingPool {
+    fn start(&mut self, driving: Driving, ledger: Relay, context: DriveContext) -> Result<(), AxError>;
+    /// 车道空出之后，按到达顺序起排着的活，直到车道满；返回起不来的那几轮与各自的拒绝。
+    fn start_waiting(&mut self) -> Vec<(RunId, AxError)>;
+}
+```
 
 **`handle` 仍然是同步的一扇门**：`RunWorker::handle` = 一条命令 ＋ `land_the_rest`，
 于是命令行与测试看到的仍是「调用返回即事情做完」，而落地过程中起的子活、敲门与继任
@@ -2530,21 +2545,22 @@ admission 上排队**——§8-42-3 早就写下这句话，这里把它从设�
 
 ### 8-46-4 `pursue` 拿走整个 ready set（`bin::assembly::plans::pursuing`）
 
-今天的 `pursue` 是「取一个 → 跑完 → 再取一个」，一次只有一轮活。这里把它搬进 `plans` 下的一个自己的模块
-（`plans.rs` 留 `set_pursuit` 与读计划的那几个私有方法；子模块看得见父模块的私有项，所以这次拆分没有把任何字段变公开），
-并改成：
+`pursue` 住 `plans` 下自己的模块（`plans.rs` 留 `set_pursuit` 与读计划的那几个私有方法；子模块看得见父模块的
+私有项，所以没有字段因此变公开）。**它由事件推进，不是命令里的一个循环**：命令台只在主循环里读，
+一个在 `Pursue` 命令里转到底的循环会把 `Pause`、`Clear`、`Halt`、新派活、审批与排程全都关在门外。
 
-1. 读整个 ready set；对其中每一个节点，只要车道没满就 `prepare_dispatch` 并交给池。
-2. 车道满了就不再取：`kernel::observe(state, &ready, in_flight)` 的 `in_flight` 参数**第一次有真值**，
-   于是「没什么可取但有人在跑」如实答 `Waiting { in_flight }`，而不是像今天那样恒传 0。
+1. `set_pursuit` 记下 `pursuit_changed` 之后调一次 `pursue`：读整个 ready set，对其中每一个节点，只要车道没满就
+   `prepare_dispatch` 并交给池，然后**返回**，命令台随即空出来。
+2. 车道满了就不再取：`kernel::observe(state, &ready, in_flight)` 的 `in_flight` 是真值，
+   于是「没什么可取但有人在跑」如实答 `Waiting { in_flight }`。
    **已经在别人手上的节点不在问它的那个 ready set 里**：ready 的意思是「现在可以有人接手」，
    而一个已经被接手的节点不能被接手两次。过滤在调用点做，依据仍然是 `kernel::pursuit` 的。
-3. 等：调 `serve_flight`（relay 请求排在一切之前，§8-42-2），再看有没有 `Driven` 到达。
-4. 到达即 `land`，**按到达顺序**（§8-42-1），落完账再回到第 1 步——一轮活结束可能让新的节点变 ready。
-   一轮活回来时它那个节点仍然 ready，说明这一轮什么也没认领：记一条 `Refuse` 诊断，并停止再取新活
-   （在跑的活照样等回来落账），这与此前那条「不再派它一次」的规矩是同一条。
-5. 这个追求自己的行都回家了且 ready 空 ＝ `Finished`，退出。**它不等 desk 派的活**：
-   那些活由主循环接，一个追求等它们就是把两件不相干的事捕到一起。
+3. 每一轮活落地之后，`serve_flight` 调 `advance_pursuits`：落地的是某个追求的一行（`Landed::Row`）而那个节点
+   仍然 ready，说明这一轮什么也没认领——记一条 `Refuse` 诊断，并经 `set_pursuit` 把这个追求**暂停**，
+   `pursuit_changed` 因此写下 `pause`，页面不再说「working on …」，人 `Resume` 即可再试；然后对每一个
+   追求再取一次 ready work。任何一轮活落地都可能空出车道或让新节点变 ready，所以不只看自己的行。
+4. 这一步取活失败（计划读不出、派活被拒）落一条 `Refuse` 诊断，不让刚落地的那一轮活的结局跟着失败：
+   两件事没有因果。
 
 **账本上的写者仍然只有一个**：车道线程手上唯一的 `kernel::Ledger` 是 `Relay`，`JsonlLedger` 一步不离记账线程。
 `RelayGate` 由 `pursue` 自己开一扇，发出去的 `Relay` 与它一一对应；`serving/worker.rs` 主循环里那一扇仍在，
@@ -2732,25 +2748,32 @@ impl RunWorker { pub(crate) fn serve(&mut self, serving: Serving); }
 ```rust
 /// 一条链把同一件活带到了哪里。两个计数器分开，因为两条链回答不同的问题：
 /// 这场对话敲醒过几个人，这件活换过几次人。
-#[derive(Clone, Copy, Default)]
-struct Relays { conversations: u32, successions: u32 }
+#[derive(Clone, Default)]
+struct Relays { chain: KnockChain, successions: u32 }
 
-/// 一次敲门链最多唤醒这么多轮 run；一次继任链最多接力这么多轮。
+/// 一轮活在叫醒它的那场对话里站在哪儿：`hops` 是本分支的深度，只有本分支推它；
+/// `woken` 是整场对话一共叫醒了几轮 run，所有分支共用同一个计数。
+#[derive(Clone, Default)]
+struct KnockChain { hops: u32, woken: Arc<AtomicU32> }
+
+/// 一次敲门链最多唤醒这么多轮 run；一次继任链最多接力这么多轮；
+/// 一场对话的所有分支加起来最多唤醒这么多轮。
 const CONVERSATION_HOPS_MAX: u32 = 16;
 const SUCCESSION_HOPS_MAX: u32 = 64;
+const CONVERSATION_RUNS_MAX: u32 = 64;
 
 impl Owing {
     /// 由敲门起的那轮活欠什么：对话向前一跳，超上限即 `E_LOOP_SUSPECTED`。
-    fn knocked(conversations: u32) -> Result<Owing, AxError>;
+    fn knocked(chain: KnockChain) -> Result<Owing, AxError>;
     /// 继任者接过的同一份义务：接力向前一跳，超上限即 `E_LOOP_SUSPECTED`。
     fn after_succession(&self) -> Result<Owing, AxError>;
 }
-struct Knock { addr: Address, from: String, mode: kernel::Mode, conversations: u32 }
-fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32) -> Result<(), AxError>;
+struct Knock { addr: Address, from: String, mode: kernel::Mode, chain: KnockChain }
+fn knock(&mut self, signal: &Signal, speaker: &Address, mode, chain: &KnockChain) -> Result<(), AxError>;
 ```
 
 - **接力次数记进义务，不记进工人**。两个计数器随 `Owing` 走：继任者拿走的是前任的义务，
-  故它自然继承并加一；敲门推的是 `Knock { conversations }`，`answer_knocks` 由此造出的新
+  故它自然继承并加一；敲门推的是 `Knock { chain }`，`answer_knocks` 由此造出的新
   一轮活从上一跳加一。委派的子活继承原值而不加——换的是干活的人，不是这条链的位置。
   计数器不记在 `RunWorker` 上：那正是 C15 删掉的形状（一个 worker 字段描述的是碰巧在
   落地的哪一轮活），落地完成后字段属于谁没有答案。
@@ -2758,14 +2781,35 @@ fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32
   不改居民之间能谈多少轮：`16` 是「十六个居民被连着叫醒之后这已经不是一场对话，是一个环」
   的位置，`64` 是「同一件活换过六十四个住户之后不管人在不在看都该停下」的位置。两个数字
   都是刹车而不是调过的参数，故都在明处，重开一次对话或再派一次活即可继续。
+- **深度之外还有宽度**。只限深度时，一轮活给 N 位居民发信、每位再给 N 位发信，十六跳之内
+  叫醒的 run 按 N 的幂增长；被叫醒的 run 又是 `Root` 深度，可以再委派，「一层深」管不住
+  一条链的总量。所以 `KnockChain.woken` 由整场对话的所有分支共用（`Arc<AtomicU32>`，
+  随最后一个持有者一起释放，不在 `RunWorker` 上留一张永不清空的表），`after_knock` 先判
+  `hops`、再原子地把 `woken` 加一并判 `CONVERSATION_RUNS_MAX`，两处超限都是同一个
+  `E_LOOP_SUSPECTED` 与同一句恢复语。委派的子活共用父的 `KnockChain`，所以子活发的信
+  也记在同一场对话的账上。`64` 与继任上限同值，同样是刹车：一场对话叫醒了六十四轮之后，
+  它已经是一次广播而不是一场对话。
 - **敲门超限不连坐发件人**。超限在 `answer_knocks` 里判：这一敲不开始新一轮活，落一条
   `Refuse` 诊断（带地址与拒绝的 subject）后继续下一敲；信已经在房间里，人仍可从 Inbox
   读它。继任超限在 `conclude` 里判：诊断落 `Refuse`，拒绝随 `hand_back` 回给要这轮活的
   那一位（`Asked` 到人，`Child` 到父房间，无人时成诊断行），**本轮活照常 `discharge`**
   ——链断在第一端，不能把已经跑完的那一轮的结局一起吞掉。
+- **敲门先看房间里有没有人**。`answer_knocks` 在派一敲之前问 `RoomQueues::worked_by`：房间的队列
+  借出去了，就说明有一轮活正在那里读，此时再派一轮只会拿到一个空的备用信箱（`QueueTenure::ASpare`），
+  而信在 `Lent.waiting` 里要等持有者落地才回家。所以这一敲不派，存进 `Doorstep.deferred`（每个房间
+  一敲），持有者 `give_back` 之后由 `return_borrowed` 放回 `knocks`，本轮落地末尾的 `answer_knocks`
+  再派它——这时信已经在房间队列里，新一轮活读得到。判定只在派的那一刻做一次，而不是在 `knock` 入队时，
+  因为从入队到派出之间 `conclude` 可能已经把别的活派进同一个房间。
+- **handback 与普通的信走同一个敲门判定**。`discharge` 的 `Child` 分支投完 handback、派完图里新就绪的
+  节点之后，调用同一个 `knock`：说话者是子房间，模式是子活的模式，对话计数是子活继承来的那一个
+  （敲醒时照常加一）。父房间的图还有节点在外面时不敲——那几个节点会各自回来，最后一个回来、图被丢下时
+  才敲一次，免得每回来一个节点就花一轮父的真跑。父房间没有 `URBANITE.md` 时照旧不敲，结果在它的信箱里等人。
 
-**本章测试**：`owing::tests` 里两个边界（上限减一放行、到达上限拒绝，拒绝码
-`E_LOOP_SUSPECTED` 且恢复语非空）；`assembly::waking::tests` 里一条 `conversations: u32::MAX`
+**本章测试**：`assembly::waking::tests` 里 `a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave`
+（房间借出时一敲不开 run，归还之后同一敲开 run）与 `what_comes_back_wakes_the_resident_who_asked_for_it`
+（子活落地后父房间的居民被敲醒，brief 写明是子房间说的话）；`owing::tests` 里两个边界（上限减一放行、到达上限拒绝，拒绝码
+`E_LOOP_SUSPECTED` 且恢复语非空）与 `a_conversation_that_fans_out_stops_at_its_width`（同一场对话
+六十四次敲门放行、第六十五次拒绝）；`assembly::waking::tests` 里一条 `hops` 为 `u32::MAX`
 的敲门不开始任何 run（对照：既有的 `a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke`
 证明上限之下一敲照常开跑）。
 
@@ -3895,6 +3939,7 @@ impl Credentials {
 pub(in crate::assembly) struct Collaborating {
     pub(in crate::assembly) rooms: RoomQueues,                                   // 每个房间的队列，以及哪个 run 借着它
     pub(in crate::assembly) joins: BTreeMap<Address, collab::FanIn>,             // 每个房间从下派的工作收回了什么
+    pub(in crate::assembly) workshops: BTreeMap<Address, collab::Underway>,      // 每个房间摆出、尚未全部汇合的图及其已派集；handback 到达时由它派下一组
     pub(in crate::assembly) requests: Vec<collab::OpenRequest>,                  // 等人检查的 pull request
     pub(in crate::assembly) goals: Vec<kernel::GoalEntry>,                       // 居民认领的地盘，按认领顺序
 }

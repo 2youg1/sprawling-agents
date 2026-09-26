@@ -111,12 +111,31 @@ impl RunWorker {
             addr.clone(),
             held,
         )));
+        // Copied rather than lent: the join and the graph stay with the
+        // worker, which answers a handback while this run is still going.
+        let mut joined = collab::FanIn::new();
+        if let Some(existing) = self.collaborating.joins.get(addr) {
+            for artifact in existing.artifacts() {
+                joined.accept(artifact.clone());
+            }
+        }
+        let workshop = std::sync::Arc::new(std::sync::Mutex::new(collab::WorkshopDesk::new(
+            site.who.clone(),
+            joined,
+            self.collaborating
+                .workshops
+                .get(addr)
+                .map_or_else(std::collections::BTreeSet::new, |underway| {
+                    underway.handed().clone()
+                }),
+        )));
         Ok(Desks {
             signals,
             goals,
             plan,
             shelf,
             pr,
+            workshop,
             plan_path,
             waiting,
             tenure: lent.tenure,

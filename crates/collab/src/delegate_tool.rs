@@ -65,6 +65,14 @@ impl DelegateDesk {
         }
     }
 
+    /// A desk standing where this one stands - the same depth, the same
+    /// building - with nothing asked, for work this run's graph hands
+    /// down after the run is over.
+    #[must_use]
+    pub fn beside(&self) -> DelegateDesk {
+        DelegateDesk::new(self.depth, self.building.clone())
+    }
+
     /// Admits one request, or refuses it in the gate's own words.
     ///
     /// # Errors

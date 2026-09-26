@@ -25,6 +25,12 @@ pub(in crate::assembly) struct Collaborating {
     /// beside the inboxes because it is folded from the same lines and
     /// belongs to the same room.
     pub(in crate::assembly) joins: BTreeMap<Address, collab::FanIn>,
+    /// The graph each room laid out and has not seen join in full, with
+    /// what it already handed down. Kept beside `joins` because a
+    /// handback landing there is what hands the next ready nodes down.
+    /// Held in memory only: after a restart a later run lays the graph
+    /// out again and the join skips what already came back.
+    pub(in crate::assembly) workshops: BTreeMap<Address, collab::Underway>,
     /// The requests waiting for someone to check them, folded from the
     /// pull request records.
     pub(in crate::assembly) requests: Vec<collab::OpenRequest>,

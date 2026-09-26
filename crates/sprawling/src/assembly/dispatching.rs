@@ -141,10 +141,10 @@ pub(super) struct Knock {
     /// The mode of the run that spoke. Carried rather than defaulted: an
     /// answer belongs to the same piece of work as the question.
     pub(super) mode: kernel::Mode,
-    /// How many knocks deep the run that spoke was. The woken run is one
-    /// hop further on, and the ceiling is read there
+    /// Where the run that spoke stood in its conversation. The woken run
+    /// is one hop further on, and both ceilings are read there
     /// (sprawling-SPEC.md 8-46-12).
-    pub(super) conversations: u32,
+    pub(super) chain: super::KnockChain,
 }
 
 /// What one dispatch left behind. Carried rather than re-derived,

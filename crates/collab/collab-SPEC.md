@@ -139,7 +139,19 @@ impl Workshop {
     pub fn schedule(&self) -> Vec<NodeId>;                                  // 确定性：同图同序
     pub fn ready(&self, done: &BTreeSet<NodeId>) -> Vec<NodeId>;            // 可并行者即扇出
 }
+pub struct LaidOut { pub schedule: Vec<NodeId>, pub handed: Vec<NodeId>, pub waiting: Vec<NodeId> }
+// collab::workshop::underway —— 形状 1 数据
+pub struct Underway { /* workshop、handed: BTreeSet<NodeId> —— 私有 */ }
+impl Underway {
+    pub fn new(workshop: Workshop, handed: BTreeSet<NodeId>) -> Underway;  // handed：这个房间此前已派出的节点
+    pub fn hand_next(&mut self, done: &BTreeSet<NodeId>) -> Result<Vec<Delegated>, AxError>; // ready(done) 减去已派集，记为已派
+    pub fn handed(&self) -> &BTreeSet<NodeId>;
+    pub fn schedule(&self) -> Vec<NodeId>;
+    pub fn is_joined(&self, done: &BTreeSet<NodeId>) -> bool;             // 每个节点都已汇合
+}
 ```
+
+- **`Underway` 是一张图加上它的已派集**：一个节点在「就绪」与「已汇合」之间是「在飞」，只看 `done` 分不出它与「未派」。`hand_next` 只交出就绪且未派过的节点，所以同一个节点不会因为图被再摆一次、或者两个 handback 先后到达而被派两次。
 
 - **调度确定性是判负与重放的前提**：有序集合＋按 id 破平，故交付顺序不同也排出同一序。环在构造点拒并点名——一个存在的 Workshop 是一个跑得完的 Workshop。
 - **契约即 JOB.md**：被派入节点的 Agent 的任务权威就是这份契约本身，机制在 prefix 零常驻。
@@ -150,11 +162,12 @@ impl Workshop {
 ### 8-4b collab::workshop_tool（形状 4 适配器）
 
 ```rust
-pub struct WorkshopDesk { /* who、laid_out: Option<Workshop>、joined: FanIn —— 私有 */ }
+pub struct WorkshopDesk { /* who、handed: BTreeSet<NodeId>、underway: Option<Underway>、joined: FanIn —— 私有 */ }
 impl WorkshopDesk {
-    pub fn new(who: String, joined: FanIn) -> WorkshopDesk;
+    pub fn new(who: String, joined: FanIn, handed: BTreeSet<NodeId>) -> WorkshopDesk;
     pub fn lay_out(&mut self, contracts: Vec<NodeContract>, delegates: &mut DelegateDesk)
-        -> Result<Vec<NodeId>, AxError>;         // 按 schedule 序逐个走派生台
+        -> Result<LaidOut, AxError>;             // 只派 Underway::hand_next(已汇合的节点)，按 id 序
+    pub fn take_underway(&mut self) -> Option<Underway>;   // 装配层在 run 结束时收走，按房间保存
     pub fn question(&self) -> Result<PrivateQuestion, AxError>;
     pub fn judge(&self, answer: &str) -> Result<Joined, AxError>;
     pub fn accept(&mut self, artifact: Artifact);
@@ -165,9 +178,11 @@ pub struct WorkshopTool { /* 模型那一面：op ∈ {lay_out, question, judge}
 - **workshop 是派生的扇出，不是第二条派生通路**：每个节点都过 `DelegateDesk::ask`，故一层深与人的准入两道门是同一段代码。工具的 `Effect` 也是 `Spawn`——摆一张图与派一个人，对人来说是同一个问题。
 - **节点的 `JOB.md` 就是契约本身**（`NodeContract::job_text`），不写摘要：摘要即第二个权威。
 - **节点 id 就是它的房间地址**，与 `Handback::node()` 同一取法；于是一个节点的身份只有一处。
-- **图先自证可跑，再交出去**：`Workshop::new` 在构造点拒重名／悬空依赖／环，故「半张图已派出去、剩下的没人起」这种状态拼不出来。
+- **图先自证可跑，再交出去**：`Workshop::new` 在构造点拒重名／悬空依赖／环，故一张图若有节点没派出去，原因只能是它的依赖还没汇合，不会是图本身跑不完。
+- **只派就绪集，`depends_on` 在运行时生效**：`lay_out` 交给派生台的是 `Underway::hand_next(done)`，即 `Workshop::ready(done)` 中这个房间尚未派过的节点，`done` 是这个房间的 join 已收下 Artifact 的节点。一个依赖未汇合的节点若也立刻派出，它读到的是还不存在的产出。工具的回答里 `schedule` 是整张图的序，`handed` 是这次真正派出去的那一组，其余节点在 `waiting` 里。
+- **下一组就绪集在 handback 到达时派出**：`lay_out` 摆出的 `Underway` 在 run 结束时由装配层收走，与这个房间的 join 并排按房间保存（`Collaborating.workshops`）。一个节点的 handback 汇入父房间的 join 之后，装配层对同一个 `Underway` 调 `hand_next`，新就绪的节点按上一个兄弟节点的派法（同一个父 run、同一个 mode）派进 lane；所有节点都汇合后这张图即删去。于是后来的 session 不必再摆一次图，工作也会继续。再摆同一张图仍然允许，但桌子带着这个房间的已派集开张，在飞的节点不会被再派一次；再摆出的 `Underway` 取代旧的那张。图只在内存里：进程重启后它不在了，这时由这个房间后来的某个 Run 再摆一次，join 已收下的节点被跳过。
 - **一个 Run 一张图**：第二次 `lay_out` 即拒，因为一个 session 里两张图是「这次在造什么」的两个答案。
-- **join 属房间而不属 Run**：子在父冻结之后才开，故 `FanIn` 由装配层按房间保存（`RunWorker.joins`），并与 inbox 折自同一批 `signal_enqueued` 行。`judge` 的围栏一字未改：答不出 digest 前八位即拒，且拒词恒不回显答案。
+- **join 属房间而不属 Run**：子在父冻结之后才开，故 `FanIn` 由装配层按房间保存（`RunWorker.joins`），并与 inbox 折自同一批 `signal_enqueued` 行。`judge` 的围栏见 8-5：答案是 artifact 的全文，拒词恒不回显答案。
 
 ### 8-5 collab::fanin（形状 2 值类型）
 
@@ -187,6 +202,7 @@ impl FanIn {
 - **只收已验证 Artifact**：未验证的产出是 Claim；`Artifact` 无公开构造子，故「Claim 进汇合」在类型层拼不出来。
 - **实现者不自测**（判负线之一）：`verified` 的 verifier 等于生产者即拒。
 - **private-info question 是围栏不是证明**：答案由 artifact 内容派生，只有打开过才答得出；能断言的只是「一眼未看就判」被拒。**拒词恒不回显正确答案**——回显即教会那条捷径。
+- **答案是 artifact 的全文，按 digest 核对**：题面必须给出 artifact 的 locator，读者才找得到它；而 `cas:b3-…` locator 本身就拼出了内容 digest，handback 信号里也带着同一个 locator。所以任何由 digest 派生的答案（例如 digest 前八位）都写在题面上，抄题面即可过关。`decide` 因此要全文：把答案按字节求 BLAKE3，等于 artifact 的 digest 才放行。答案末尾缺的那个换行按原文补回一次再比，因为工具参数经 JSON 传递时常被去掉结尾换行，而这不说明读者没打开过。代价是长 artifact 的答案也长；被否决的方案是按 digest 另派一个秘密的问题，它需要 artifact 在城里另存内容，而 `Artifact` 只持 locator 与 digest。
 
 ### 8-6 collab::pr（形状 5 typestate）
 
@@ -227,6 +243,7 @@ pub struct Delegated { pub room: Address, pub task: String, pub goal: String, pu
 pub struct DelegateDesk { /* depth: Depth、building: Address、asked —— 私有 */ }
 impl DelegateDesk {
     pub fn new(depth: Depth, building: Address) -> DelegateDesk;
+    pub fn beside(&self) -> DelegateDesk;   // 同一 depth、同一 building、未派任何活：图在 run 结束后派的节点过同样两道门
     pub fn ask(&mut self, work: Delegated) -> Result<&Delegated, AxError>;   // 门在这里被叫
     pub fn asked(&self) -> &[Delegated];                                      // status.children 的真值
     pub fn take(&mut self) -> Vec<Delegated>;                                 // 回合落定后装配层取走

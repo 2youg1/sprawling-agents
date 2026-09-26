@@ -233,7 +233,7 @@ impl RunWorker {
         // Read before the obligation moves on: this run's place in the
         // conversation is what a signal it sends carries forward, and
         // `settle_desks` below is where those signals are spoken.
-        let conversations = owing.conversations();
+        let chain = owing.knock_chain().clone();
         // Both loans go back before either failure is propagated: a
         // backlog that would not take its member back used to cost the
         // room its mail too (sprawling-SPEC.md 8-46-9).
@@ -259,7 +259,7 @@ impl RunWorker {
                     raised: &mut raised,
                     job_locator: &job_locator,
                 },
-                conversations,
+                chain,
                 open_claims,
             },
         )?;
@@ -291,6 +291,7 @@ impl RunWorker {
                 driven,
                 raised,
                 delegates: &workbench.delegates,
+                workshop: &desks.workshop,
                 succession: &workbench.succession,
                 owing,
             },
@@ -322,11 +323,7 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let returned = held(&desks.signals, "settle the signal desk")?.take_inbox();
         match desks.tenure {
-            QueueTenure::TheRoomQueue => {
-                self.collaborating
-                    .rooms
-                    .give_back(&at.addr, site.run_id, returned)?
-            }
+            QueueTenure::TheRoomQueue => self.vacate(&at.addr, site.run_id, returned)?,
             QueueTenure::ASpare { held_by } => self.note(
                 runtime::diagnostics::Level::Refuse,
                 "collab::inbox",

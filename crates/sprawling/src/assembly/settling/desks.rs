@@ -37,7 +37,7 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let Settling {
             sweep,
-            conversations,
+            chain,
             open_claims,
         } = settling;
         let (addr, who, run_id) = (&at.addr, site.who.as_str(), site.run_id);
@@ -48,13 +48,13 @@ impl RunWorker {
         // other source than `Landing::record`, so a change that outran
         // its own line cannot be written here.
         let spoken = effect::Landing::signals(signal_effects, addr, who)?;
-        self.settle(at, run_id, spoken, conversations)?;
+        self.settle(at, run_id, spoken, &chain)?;
         let ground = effect::Landing::goals(
             held(&desks.goals, "settle the goal desk")?.take_effects(),
             addr,
             who,
         )?;
-        self.settle(at, run_id, ground, conversations)?;
+        self.settle(at, run_id, ground, &chain)?;
         // The sweep the forecast cannot replace. A command can be
         // obfuscated past a text prediction; what is missing from the
         // working tree cannot be talked out of. The base is the first
@@ -68,7 +68,7 @@ impl RunWorker {
                 .map_err(memory::MemoryError::into_ax)?;
             let swept = discarded.len();
             let lost = effect::Landing::discards(discarded, addr, who);
-            self.settle(at, run_id, lost, conversations)?;
+            self.settle(at, run_id, lost, &chain)?;
             // Over the threshold a person is told, and the class is one
             // no policy can waive. Each file is restorable on its own;
             // what the count says is that nobody meant this.
@@ -123,7 +123,7 @@ impl RunWorker {
             {
                 effect::Claims::Landed(taken) => {
                     let then = taken.record(&mut close)?;
-                    self.carry_out_landing(at, then, conversations)?;
+                    self.carry_out_landing(at, then, &chain)?;
                     self.tell_whoever_is_behind(
                         at,
                         Reporter {
@@ -132,12 +132,12 @@ impl RunWorker {
                             who,
                         },
                         &claim_effects,
-                        conversations,
+                        &chain,
                     )?;
                 }
                 effect::Claims::Stale { nodes, released } => {
                     let then = released.record(&mut close)?;
-                    self.carry_out_landing(at, then, conversations)?;
+                    self.carry_out_landing(at, then, &chain)?;
                     for node in nodes {
                         self.note(
                             runtime::diagnostics::Level::Refuse,
@@ -165,7 +165,7 @@ impl RunWorker {
             addr,
             who,
         )?;
-        self.settle(at, run_id, remembered, conversations)?;
+        self.settle(at, run_id, remembered, &chain)?;
         Ok(())
     }
 }

@@ -17,6 +17,7 @@
 //! `JoinHandle` *is* the evidence that a run is still going, and its
 //! end is the run's end.
 
+use std::collections::VecDeque;
 use std::sync::mpsc;
 
 use kernel::{AxCode, AxError, RunId};
@@ -24,7 +25,8 @@ use kernel::{AxCode, AxError, RunId};
 use super::relay::{Relay, Wake};
 use crate::assembly::{DriveContext, Driven, Driving, drive_run};
 
-/// How many runs a city drives at once.
+/// How many runs a city drives at once, whichever entrance started
+/// them: past it, a prepared drive waits in the pool for a lane.
 ///
 /// It equals `gateway::admission`'s per-provider ceiling on purpose,
 /// and it is deliberately *not* read from there: that ceiling is
@@ -58,6 +60,18 @@ pub(crate) struct DrivingPool {
     /// run comes home, so a pool that reports nothing in flight has no
     /// thread left behind it.
     running: std::collections::BTreeMap<RunId, std::thread::JoinHandle<()>>,
+    /// Drives prepared while every lane was taken, oldest first. A
+    /// waiting drive holds no thread: the queue is here, where it can be
+    /// counted, rather than in threads parked on the provider's
+    /// admission.
+    waiting: VecDeque<Waiting>,
+}
+
+/// One prepared drive and the two things its lane will be given.
+struct Waiting {
+    driving: Driving,
+    ledger: Relay,
+    context: DriveContext,
 }
 
 impl DrivingPool {
@@ -66,6 +80,7 @@ impl DrivingPool {
             lanes: lanes.max(1),
             home,
             running: std::collections::BTreeMap::new(),
+            waiting: VecDeque::new(),
         }
     }
 
@@ -79,7 +94,8 @@ impl DrivingPool {
         self.in_flight() >= self.lanes
     }
 
-    /// Takes one drive into a lane of its own.
+    /// Takes one drive into a lane of its own, or into the queue when
+    /// every lane is taken.
     ///
     /// The relay is this run's write face and is moved in with it: a
     /// lane that could be handed a second one could write for a run it
@@ -87,16 +103,21 @@ impl DrivingPool {
     ///
     /// # Errors
     /// Refuses when the operating system will not start a thread, and
-    /// when this run is already driving — two runs under one id would
-    /// make the pool's own table lie about what is in flight.
+    /// when this run is already driving or waiting — two runs under one
+    /// id would make the pool's own table lie about what is in flight.
     pub(crate) fn start(
         &mut self,
         driving: Driving,
-        mut ledger: Relay,
+        ledger: Relay,
         context: DriveContext,
     ) -> Result<(), AxError> {
         let run = driving.run_id;
-        if self.running.contains_key(&run) {
+        if self.running.contains_key(&run)
+            || self
+                .waiting
+                .iter()
+                .any(|queued| queued.driving.run_id == run)
+        {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "take a drive into a lane",
@@ -104,6 +125,53 @@ impl DrivingPool {
             )
             .with_recovery("report this: one run drives once"));
         }
+        if self.full() {
+            self.waiting.push_back(Waiting {
+                driving,
+                ledger,
+                context,
+            });
+            return Ok(());
+        }
+        self.open_lane(driving, ledger, context)
+    }
+
+    /// Starts the drives that waited for a lane, oldest first, until the
+    /// lanes are full again. Called once a lane has come home, and
+    /// before the run it carried is landed, so work that landing sends
+    /// out queues behind work that was already waiting.
+    ///
+    /// Returns each run whose lane would not start, with the refusal.
+    pub(crate) fn start_waiting(&mut self) -> Vec<(RunId, AxError)> {
+        let mut refused = Vec::new();
+        while !self.full() {
+            let Some(Waiting {
+                driving,
+                ledger,
+                context,
+            }) = self.waiting.pop_front()
+            else {
+                break;
+            };
+            let run = driving.run_id;
+            if let Err(err) = self.open_lane(driving, ledger, context) {
+                refused.push((run, err));
+            }
+        }
+        refused
+    }
+
+    /// Opens the thread one drive runs on.
+    ///
+    /// # Errors
+    /// Refuses when the operating system will not start a thread.
+    fn open_lane(
+        &mut self,
+        driving: Driving,
+        mut ledger: Relay,
+        context: DriveContext,
+    ) -> Result<(), AxError> {
+        let run = driving.run_id;
         let home = self.home.clone();
         let lane = std::thread::Builder::new()
             .name(format!("sprawling-drive-{run}"))

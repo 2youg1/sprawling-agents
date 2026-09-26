@@ -193,6 +193,9 @@ pub(super) struct Desks {
     pub(super) plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
     pub(super) shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
     pub(super) pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
+    /// The room's workshop, holding what it already got back and handed
+    /// down, so a graph laid out again hands nothing down twice.
+    pub(super) workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
     /// Where the shared plan lives, so the claims that survive are
     /// written back to the file they were checked against.
     pub(super) plan_path: PathBuf,

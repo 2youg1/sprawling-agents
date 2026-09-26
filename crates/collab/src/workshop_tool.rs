@@ -9,8 +9,8 @@
 //! Three verbs, because three different things happen. `lay_out` turns a
 //! list of nodes into a graph that can finish - duplicates, dangling
 //! dependencies and cycles are refused at construction, so a workshop
-//! that exists is one that terminates - and hands each node down in
-//! schedule order. `question` asks what the join wants answered before
+//! that exists is one that terminates - and hands down the nodes whose
+//! dependencies have already joined. `question` asks what the join wants answered before
 //! anybody may judge it. `judge` answers it.
 //!
 //! **Nothing here starts a run and nothing here decides who may.** Every
@@ -26,39 +26,46 @@
 use std::collections::BTreeSet;
 
 use kernel::{
-    Address, AxCode, AxError, CostTier, DelegateKind, Effect, Payload, RenderIntent, Temporal,
-    Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall,
+    ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
-use crate::delegate_tool::{DelegateDesk, Delegated};
+use crate::delegate_tool::DelegateDesk;
 use crate::fanin::{Artifact, FanIn, Joined, PrivateQuestion};
-use crate::workshop::{NodeContract, NodeId, Workshop};
+use crate::workshop::{LaidOut, NodeContract, NodeId, Underway, Workshop};
 
 /// One run's workshop: the graph it laid out, and what has come back to
 /// the room it works in.
 #[derive(Debug)]
 pub struct WorkshopDesk {
     who: String,
-    laid_out: Option<Workshop>,
+    /// What the room handed down before this run, until a graph is laid
+    /// out and takes it over.
+    handed: BTreeSet<NodeId>,
+    underway: Option<Underway>,
     joined: FanIn,
 }
 
 impl WorkshopDesk {
-    /// `joined` is what the city already holds for this room, folded
-    /// from the handbacks its earlier runs received. A join outlives one
-    /// run because the nodes do: a child starts after its parent froze.
+    /// `joined` is what the room's earlier runs got back and `handed` what
+    /// it already handed down. Both outlive one run because the nodes do:
+    /// a child starts after its parent froze.
     #[must_use]
-    pub fn new(who: String, joined: FanIn) -> WorkshopDesk {
+    pub fn new(who: String, joined: FanIn, handed: BTreeSet<NodeId>) -> WorkshopDesk {
         WorkshopDesk {
             who,
-            laid_out: None,
+            handed,
+            underway: None,
             joined,
         }
     }
 
-    /// Accepts a graph and hands every node down, in the order the graph
-    /// itself decides.
+    /// Accepts a graph and hands down its ready set: the nodes whose
+    /// dependencies this room's join already holds and that the room has
+    /// not handed down yet. A node started before its dependency hands
+    /// back would read an output that does not exist yet, so it waits,
+    /// and the city hands it down when that handback lands.
     ///
     /// # Errors
     /// Propagates the graph's own refusals - a duplicate id, a
@@ -70,44 +77,49 @@ impl WorkshopDesk {
         &mut self,
         contracts: Vec<NodeContract>,
         delegates: &mut DelegateDesk,
-    ) -> Result<Vec<NodeId>, AxError> {
-        if self.laid_out.is_some() {
+    ) -> Result<LaidOut, AxError> {
+        if self.underway.is_some() {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "lay out a workshop",
                 "this run already laid one out",
             )
             .with_recovery(
-                "one graph per session; add the work to the next session's graph, or hand a \
-                 single extra piece down with `delegate`",
+                "one graph per session; add the work to the next session's graph, or hand a                  single extra piece down with `delegate`",
             ));
         }
-        let workshop = Workshop::new(contracts)?;
-        let schedule = workshop.schedule();
-        // Asked before anything is kept: a graph half handed down is a
-        // graph whose remaining nodes nobody will start.
-        for id in &schedule {
-            let contract = workshop.contract(id).ok_or_else(|| {
-                AxError::failure(
-                    AxCode::InvalidArgs,
-                    "lay out a workshop",
-                    format!("{} is scheduled and has no contract", id.as_str()),
-                )
-                .with_recovery(format!(
-                    "remove `{}` from the `depends_on` of every node, or add a node \
-                     for it: the schedule holds a room no node describes",
-                    id.as_str()
-                ))
-            })?;
-            delegates.ask(Delegated {
-                room: contract.write_domain().clone(),
-                task: contract.job_text(),
-                goal: contract.done_check().to_owned(),
-                kind: DelegateKind::Ephemeral,
-            })?;
+        let done: BTreeSet<NodeId> = self
+            .joined
+            .artifacts()
+            .map(|artifact| artifact.node().clone())
+            .collect();
+        let mut underway = Underway::new(
+            Workshop::new(contracts)?,
+            self.handed.clone(),
+            delegates.beside(),
+        );
+        let mut handed = Vec::new();
+        for work in underway.hand_next(&done)? {
+            handed.push(NodeId::parse(work.room.as_str())?);
+            delegates.ask(work)?;
         }
-        self.laid_out = Some(workshop);
-        Ok(schedule)
+        let schedule = underway.schedule();
+        let waiting = schedule
+            .iter()
+            .filter(|id| !done.contains(id) && !underway.handed().contains(id))
+            .cloned()
+            .collect();
+        self.underway = Some(underway);
+        Ok(LaidOut {
+            schedule,
+            handed,
+            waiting,
+        })
+    }
+
+    /// The graph this run laid out, for the city to keep beside the join.
+    pub fn take_underway(&mut self) -> Option<Underway> {
+        self.underway.take()
     }
 
     /// What the join asks before it will take a verdict.
@@ -328,19 +340,21 @@ impl Tool for WorkshopTool {
                     .delegates
                     .lock()
                     .map_err(|_| poisoned("the delegation desk"))?;
-                let schedule = desk.lay_out(contracts, &mut delegates)?;
-                out.insert(
-                    "schedule".to_owned(),
-                    Value::Array(
-                        schedule
-                            .iter()
-                            .map(|id| Value::String(id.as_str().to_owned()))
-                            .collect(),
-                    ),
-                );
+                let laid = desk.lay_out(contracts, &mut delegates)?;
+                for (field, ids) in [
+                    ("schedule", &laid.schedule),
+                    ("handed", &laid.handed),
+                    ("waiting", &laid.waiting),
+                ] {
+                    let names = ids.iter().map(|id| Value::String(id.as_str().to_owned()));
+                    out.insert(field.to_owned(), Value::Array(names.collect()));
+                }
                 out.insert(
                     "starts".to_owned(),
-                    Value::String("when this turn settles, in that order".to_owned()),
+                    Value::String(
+                        "`handed` when this turn settles; `waiting` once its dependencies hand                          back and a later session lays this graph out again"
+                            .to_owned(),
+                    ),
                 );
             }
             Op::Question => {

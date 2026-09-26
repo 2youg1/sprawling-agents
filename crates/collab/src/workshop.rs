@@ -196,6 +196,15 @@ impl NodeContract {
     }
 }
 
+/// A graph split by what has already joined: the whole order, the ready
+/// set handed down now, and the nodes still waiting on a dependency.
+#[derive(Debug)]
+pub struct LaidOut {
+    pub schedule: Vec<NodeId>,
+    pub handed: Vec<NodeId>,
+    pub waiting: Vec<NodeId>,
+}
+
 /// A graph of contracts that can actually be run.
 #[derive(Debug)]
 pub struct Workshop {
@@ -330,6 +339,10 @@ impl Workshop {
         out
     }
 }
+
+mod underway;
+
+pub use underway::Underway;
 
 #[cfg(test)]
 #[allow(

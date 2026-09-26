@@ -17,6 +17,7 @@ use super::super::{
 /// cannot be read. Written here rather than at the call site, where the
 /// arm it sits in has no room for it.
 const DELEGATE_DESK: &str = "read the delegate desk";
+const WORKSHOP_DESK: &str = "read the workshop desk";
 const SUCCESSION_DESK: &str = "read the succession desk";
 
 /// Who raised what, and where. The four travel together because an
@@ -38,10 +39,10 @@ impl RunWorker {
         at: &Assignment,
         run: RunId,
         landing: effect::Landing,
-        conversations: u32,
+        chain: &super::super::KnockChain,
     ) -> Result<(), AxError> {
         let then = landing.record(&mut |line: effect::Line| self.record_for(run, line))?;
-        self.carry_out_landing(at, then, conversations)
+        self.carry_out_landing(at, then, chain)
     }
 
     /// Carries out what a landing's lines, already on the ledger, ask of
@@ -52,7 +53,7 @@ impl RunWorker {
         &mut self,
         at: &Assignment,
         then: effect::Then,
-        conversations: u32,
+        chain: &super::super::KnockChain,
     ) -> Result<(), AxError> {
         match then {
             effect::Then::Nothing => Ok(()),
@@ -72,7 +73,7 @@ impl RunWorker {
                         // reaching a resident stay one decision. The
                         // speaking run's place in the conversation rides on,
                         // so the knock this queues is one hop further in.
-                        self.knock(signal, &at.addr, at.mode, conversations)?;
+                        self.knock(signal, &at.addr, at.mode, chain)?;
                     }
                     Ok(())
                 })();
@@ -152,6 +153,7 @@ impl RunWorker {
             driven,
             mut raised,
             delegates,
+            workshop,
             succession,
             owing,
         } = ending;
@@ -215,6 +217,13 @@ impl RunWorker {
         // what makes that reachable: a cancel arriving after the last
         // wave used to have no boundary left to land on, so work asked
         // for by a turn nobody wanted started anyway.
+        // The graph this run laid out stays with the room, so a node's
+        // handback hands the next ones down after this run is over. A
+        // cancelled run's graph goes with the nodes it did not hand down.
+        let laid_out = held(workshop, WORKSHOP_DESK)?.take_underway();
+        if let (Some(underway), Completion::Done(_) | Completion::Limit) = (laid_out, &ending) {
+            self.collaborating.workshops.insert(addr.clone(), underway);
+        }
         let handed = match ending {
             Completion::Cancelled => Vec::new(),
             Completion::Done(_) | Completion::Limit => held(delegates, DELEGATE_DESK)?.take(),
@@ -335,6 +344,7 @@ impl RunWorker {
         }
         self.discharge(
             owing,
+            at,
             &Dispatched {
                 run: run_id,
                 addr,
@@ -353,7 +363,12 @@ impl RunWorker {
     ///
     /// # Errors
     /// Propagates a handback the parent's room will not take.
-    fn discharge(&mut self, owing: Owing, done: &Dispatched) -> Result<Landed, AxError> {
+    fn discharge(
+        &mut self,
+        owing: Owing,
+        at: &Assignment,
+        done: &Dispatched,
+    ) -> Result<Landed, AxError> {
         match owing.owed() {
             Owed::Asked => Ok(Landed::Elsewhere),
             // Nobody typed a command for this one, so the history is
@@ -374,7 +389,15 @@ impl RunWorker {
             }),
             Owed::Child { parent } => {
                 let parent = parent.clone();
-                self.deliver_handback(&parent, done)?;
+                let handback = self.deliver_handback(&parent, done)?;
+                self.hand_down_what_is_ready(&parent, at, &owing)?;
+                // The asker is woken by the decision every signal takes,
+                // once its graph has nothing left out: each node that is
+                // still out comes back on its own (sprawling-SPEC.md
+                // 8-46-12).
+                if !self.collaborating.workshops.contains_key(&parent) {
+                    self.knock(&handback, &done.addr, at.mode, owing.knock_chain())?;
+                }
                 Ok(Landed::Elsewhere)
             }
         }
