@@ -15,6 +15,7 @@
 
 <script lang="ts">
   import { fill, say } from "../../core/lang";
+  import { lasted } from "../../core/time";
   import { ui } from "../../ui";
   import Glyph from "../parts/glyph.svelte";
   import type { GlyphName } from "../parts/glyph";
@@ -77,6 +78,7 @@
         >
           <Glyph name={MARK[entry.ending.kind]} size="sm" />
           <span>{said(entry.ending)}</span>
+          {#if entry.took !== null}<span class="text-text-faint">{lasted(entry.took)}</span>{/if}
         </span>
       </div>
       <div class="px-snug">

@@ -30,6 +30,8 @@ describe("editorLink", () => {
       { path: "shop/main.rs", folder: "relative/city", line: 3 },
       { path: "shop/main.rs", folder: "/srv/../b", line: 3 },
       { path: "shop/main.rs", folder: "", line: 3 },
+      { path: "shop/main.rs", folder: String.raw`\\server\share\city`, line: 3 },
+      { path: "shop/main.rs", folder: "//server/share/city", line: 3 },
       { path: "shop/main.rs", folder: "/srv/city", line: 0 },
       { path: "shop/main.rs", folder: "/srv/city", line: 1.5 },
     ];

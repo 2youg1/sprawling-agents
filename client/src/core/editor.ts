@@ -15,8 +15,11 @@
 // **Only a path inside the city gets a link.** The path is judged by
 // the generated `Address` grammar, which is the city's own rule for a
 // relative path and admits no `..`, no drive, no backslash; the folder
-// is the person's own entry and must be absolute with no `.` or `..`
-// segment. Anything else answers `null` and the page draws no link.
+// is the person's own entry and must be absolute, not a UNC share,
+// with no `.` or `..` segment. Anything else answers `null` and the
+// page draws no link. The check is lexical, on the recorded path: a
+// link on disk that leads outside the city is not followed, because
+// the browser cannot see the disk and the city starts nothing.
 
 import { Schema } from "effect";
 
@@ -66,7 +69,9 @@ interface Folder {
 function absoluteFolder(written: string): Folder | null {
   const forward = written.replaceAll("\\", "/");
   const drive = /^[A-Za-z]:\//.exec(forward)?.[0] ?? "";
-  if (drive === "" && !forward.startsWith("/")) return null;
+  // `//host/share` is a UNC path: its host is not a folder, and read as
+  // one it would point the link at a different file.
+  if ((drive === "" && !forward.startsWith("/")) || forward.startsWith("//")) return null;
   const segments = forward
     .slice(drive.length)
     .split("/")
