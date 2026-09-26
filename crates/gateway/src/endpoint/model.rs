@@ -68,16 +68,23 @@ impl Model for Endpoint {
         let body: Value = response.json().map_err(|err| {
             provider_err("read provider response", &ProviderFailure::Exchange(&err))
         })?;
-        let resp = response_from_wire(self.config.dialect, &body)?;
+        self.returned(&body)
+    }
+}
+
+impl Endpoint {
+    /// The return a settled wire answer makes, billed when this endpoint
+    /// knows its price. Both doors end here, so a streamed call and a
+    /// blocking one given the same answer return the same value.
+    pub(super) fn returned(&self, settled: &Value) -> Result<ModelReturn, AxError> {
+        let resp = response_from_wire(self.config.dialect, settled)?;
         let billed: Option<UsdMicros> = match &self.config.pricing {
             Some(entry) => Some(cost::settle(&resp.usage, None, entry)?.billed),
             None => None,
         };
         ModelReturn::from_response(resp, billed)
     }
-}
 
-impl Endpoint {
     /// What the chosen model accepts, answered before the request is
     /// built.
     ///
