@@ -830,7 +830,7 @@ pub fn kernel::config::SecondThreshold::try_from(u64) -> core::result::Result<ke
 pub fn kernel::config::freeze(&kernel::config::LayeredValue<kernel::config::ClockStampGranularity>, &kernel::config::LayeredValue<alloc::vec::Vec<kernel::config::ClockZone>>, &kernel::config::LayeredValue<kernel::Effort>, &kernel::config::LayeredValue<kernel::config::SandboxLimits>, &kernel::config::LayeredValue<alloc::vec::Vec<kernel::config::McpServer>>, &kernel::config::LayeredValue<kernel::config::SecondThreshold>) -> kernel::config::FrozenConfig
 pub fn kernel::consts_external::readable_log_v(u64) -> kernel::consts_external::LogVersion
 pub fn kernel::degradation::Degradation::recovery(&self) -> kernel::degradation::Recovery
-pub fn kernel::degradation::admit_work(&kernel::degradation::ResourceReadings) -> kernel::backpressure::Admission
+pub fn kernel::degradation::admit_work(kernel::degradation::VolumeSpace) -> core::result::Result<(), kernel::degradation::Degradation>
 pub fn kernel::degradation::assess(&kernel::degradation::ResourceReadings) -> impl core::iter::traits::iterator::Iterator<Item = kernel::degradation::Degradation>
 pub fn kernel::degradation::free_space_floor(u64) -> u64
 pub fn kernel::delegation::Delegate::kind(&self) -> &kernel::delegation::DelegateKind
@@ -1614,7 +1614,6 @@ pub kernel::SecretSpan::len: usize
 pub kernel::SecretSpan::provider: core::option::Option<&'static str>
 pub kernel::SecretSpan::start: usize
 pub kernel::ShedReason::CapacityExhausted
-pub kernel::ShedReason::DiskLow
 pub kernel::Span::len: u32
 pub kernel::Span::start: u32
 pub kernel::Span::token: kernel::highlight::Token
@@ -1708,7 +1707,6 @@ pub kernel::backpressure::ItemMeta::cost: u64
 pub kernel::backpressure::QueueStats::capacity: u64
 pub kernel::backpressure::QueueStats::depth: u64
 pub kernel::backpressure::ShedReason::CapacityExhausted
-pub kernel::backpressure::ShedReason::DiskLow
 pub kernel::blockage::Blockage::reaches: alloc::vec::Vec<kernel::node_id::NodeId>
 pub kernel::blockage::Blockage::source: kernel::node_id::NodeId
 pub kernel::blockage::Blockage::why: kernel::StopCause
@@ -1806,10 +1804,11 @@ pub kernel::degradation::Recovery::ReduceCpuLoad
 pub kernel::degradation::Recovery::ReduceDiskLoad
 pub kernel::degradation::ResourceReadings::commit_floor: core::time::Duration
 pub kernel::degradation::ResourceReadings::durable_lag: core::time::Duration
-pub kernel::degradation::ResourceReadings::free_bytes: u64
 pub kernel::degradation::ResourceReadings::queued_runs: u32
 pub kernel::degradation::ResourceReadings::schedule_delay: core::time::Duration
-pub kernel::degradation::ResourceReadings::volume_bytes: u64
+pub kernel::degradation::ResourceReadings::volume: kernel::degradation::VolumeSpace
+pub kernel::degradation::VolumeSpace::free_bytes: u64
+pub kernel::degradation::VolumeSpace::total_bytes: u64
 pub kernel::delegation::DelegateKind::Ephemeral
 pub kernel::delegation::DelegateKind::Resident
 pub kernel::delegation::DelegationVerdict::Allow
@@ -2549,6 +2548,7 @@ pub struct kernel::config::SecondThreshold(_)
 pub struct kernel::consts_external::SecretShape
 pub struct kernel::consts_policy::Ratio
 pub struct kernel::degradation::ResourceReadings
+pub struct kernel::degradation::VolumeSpace
 pub struct kernel::delegation::Delegate
 pub struct kernel::delegation::Delegator(_)
 pub struct kernel::discard::Discard
