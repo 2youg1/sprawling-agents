@@ -59,6 +59,7 @@
   const lang = u.lang;
   const approvals = u.approvals;
   const belief = u.conn.belief;
+  const linkState = u.conn.state;
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const bindings = keymap();
 
@@ -284,7 +285,7 @@
   });
 
   $effect(() => {
-    paintMark(document, markOf({ waiting, working }));
+    paintMark(document, markOf({ waiting, working, link: $linkState.kind }));
   });
 
   onMount(follow);
