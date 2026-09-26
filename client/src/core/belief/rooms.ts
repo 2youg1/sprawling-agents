@@ -5,7 +5,7 @@
 
 // Which runs each room has held, working or frozen, oldest start first:
 // the one index the room's page, its directory, the city's panel and its
-// skyline read (client-SPEC 12-5). The index keeps ids rather than runs:
+// skyline read (client-SPEC 12-4). The index keeps ids rather than runs:
 // every fold hands the table a fresh run object, and only a run arriving,
 // changing room or changing start moves an id.
 

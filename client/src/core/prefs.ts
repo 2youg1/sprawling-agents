@@ -79,7 +79,7 @@ const ROWS = {
   // rule the city recorded for it.
   proxying: "sprawling.network.proxying",
   // Whether this browser raises a notification for an approval that
-  // arrives while the window is away (client-SPEC 12-5).
+  // arrives while the window is away (client-SPEC 12-7).
   notifying: "sprawling.notify",
   // Whether a room and the city open drawing the whole of what runs did
   // or only their results. The switch on either page writes it, so the

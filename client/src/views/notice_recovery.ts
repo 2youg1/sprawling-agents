@@ -145,7 +145,7 @@ export function recoveryWhy(u: Ui, recovery: Recovery, refused: Refused): Key | 
 // What one recovery does. `/new` opens the session itself - `open_session`
 // is the command behind `/new`, sent without a line through a box - and
 // `/stop` cancels the run the refusal names and nothing wider: halting a
-// room is `/halt`, a separate verb (client-SPEC 4-39).
+// room is `/halt`, a separate verb (client-SPEC 4-41).
 export function recover(u: Ui, recovery: Recovery, refused: Refused): void {
   if (recovery.kind === "reconnect") {
     u.conn.retry();

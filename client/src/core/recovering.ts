@@ -159,7 +159,7 @@ export function formOf(room: FormRoom, subject: string, words: string): Option.O
 
 // The actions a person can take about one refusal, in the order a
 // notice offers them. `/stop` cancels the run a refusal names and
-// nothing wider (client-SPEC 4-39), so a refusal whose subject is not a
+// nothing wider (client-SPEC 4-41), so a refusal whose subject is not a
 // run does not offer it: a control that can never run is not an action.
 export function recoveryFor(error: Pick<AxError, "code" | "subject">): readonly Recovery[] {
   const offered = RECOVERIES[error.code];
