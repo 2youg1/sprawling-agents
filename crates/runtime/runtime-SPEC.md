@@ -881,24 +881,30 @@ pub struct RunPlan {                 // 一个 Run 的全部常量，调用方�
     pub parent: Option<RunId>,                            // 派活给它的那个 Run
     pub predecessor: Option<RunId>,                       // 把这场活交给它的前任，深度守恒
     pub dispatched_by: Who,                               // 由谁派来，写进 run_started 的 dispatched_by
+    pub inherited: Vec<ChatMessage>,                      // 分支开场继承的那段对话（§8-2），不是分支则空
     pub shape: CallShape,
+    pub second_threshold: Option<SecondThreshold>,        // 上下文提醒的第二级（§8-34）
+    pub context: ContextReading,                          // 这一跑的上下文读数，status 与提醒现读它
     pub prefix: FrozenPrefix, pub policy: BuildingPolicy, pub tools: Vec<ToolDef>,
     pub skills: Vec<SkillPin>,                            // 阅览室准进了什么，当时各是什么字节
+    pub retries: Retries,                                 // 人在端点上设的重试上限（§8-9）
 }
 ```
 
 - **没有 `budget_turns` 与 `budget` 两栏**：回合上限与花销天花板都不存在，一跑循环到它自己结束为止；停一件正在跑的事是 `Cancel`，停一片是 `Halt`。
-- **`skills` 写进 `run_started` 载荷，且无条件写**（空则空数组），理由与当年 budget 两栏同一条：一个时有时无的 key 是一个读者得猜的形状，而「这栋楼一个都没准进」本身就是一件值得记下的事。进账本而不只留在进程里，是因为「它变了没有」需要一个**早一次的读取**，而进程一走就只剩账本说得出这一轮到底拿到了哪些字节。
+- **`skills` 写进 `run_started` 载荷，且无条件写**（空则空数组），理由：一个时有时无的 key 是一个读者得猜的形状，而「这栋楼一个都没准进」本身就是一件值得记下的事。进账本而不只留在进程里，是因为「它变了没有」需要一个**早一次的读取**，而进程一走就只剩账本说得出这一轮到底拿到了哪些字节。
 
 pub enum SafePoint { BeforeAssemble{turn:u32}, BeforeCall{turn:u32}, BeforeWave{turn:u32}, BeforeSpawn{turn:u32} }
 pub enum Advance { Turned, Concluded(Completion) }        // 穷尽；新结局逼每个调用方表态
 
-pub struct RunHooks<'a> {            // 四个闭包，不是四个 trait：本模块只有一个消费者形式
+pub struct RunHooks<'a> {            // 闭包，不是 trait：本模块只有一个消费者形式；invoke 除外
     pub now: &'a mut dyn FnMut() -> Result<TimeMs, AxError>,        // 时间入参，本模块恒不采样
     pub interrupt: &'a mut dyn FnMut(SafePoint) -> Interrupt,       // 安全点由我定，信号由你答
     pub fence: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,  // 波前 checkpoint
+    pub writes: &'a dyn Fn(&ToolCall) -> Writes,                    // 这条调用会不会写（§8-45）
     pub invoke: &'a mut dyn ConcurrentInvoke,   // 一波的工具，三段（§8-3）；回合时间戳随 admit 行
     pub wait: &'a mut dyn FnMut(TimeMs) -> NextCall,               // 等到 Watchdog 给的 until；途中来了 Halt 就立刻答 Halted
+    pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,      // 说到一半的话往哪去（见本节末「RunHooks 的 deltas」）
 }
 
 impl Run<Active> {
@@ -912,16 +918,13 @@ pub fn drive(plan: RunPlan, ledger: &mut dyn Ledger, model: &mut dyn Model,
              hooks: &mut RunHooks<'_>, handoff: &Handoff) -> Result<Run<Frozen>, AxError>;
 ```
 
-- **为什么要这个模块**：「Dispatch → N 回合 → 冻结」的事件序先前只存在于 `citysim::executor`。真城再写一遍就是两个权威，而两者一旦漂开，**仿真继续绿而真城错**——仿真的全部价值恰好建立在它跑的是同一份代码上。故 citysim 改为本模块的调用方，23 剧本从此直接验证生产回路。
-- **`run_started.parent`**：只在派生开的 Run 上出现。父子关系先前只存在于「两行相邻」这个巧合里，而相邻不是一个可查询的事实；写进载荷之后，前端折得出树，离线重放也折得出同一棵树。
-- **`run_started.usd_micros` 与 `run_started.tokens`**：一跑被派出去时的花销天花板。写它与写 `parent` 同理——**一个进程死后，「这跑当时允许花多少」只剩账本能回答**。先前它只活在装配层的一个局部变量里，于是一跑因待批而停下、被批准后续上的那一跑天花板归零（sprawling-SPEC §8-23 查出、§8-25 修复）。两个键是 `u64` 整数，符合确定性第六条；`fixtures/golden-p0` 随之重生（`GOLDEN_WRITE=1`），这是它存在的用法。
-- **时间纪律**：dispatch 采两次（checkpoint、run_started），每回合一次；**自然结束与预算耗尽时 freeze 再采一次**，handoff 用它、run_frozen 用它＋1（两行同一件事，不值两次采样）；**取消时 freeze 沿用被打断那个回合的时间戳**，因为这次冻结属于那个回合而不是一件新事。三条合起来使一个计数器闭包（citysim）与一个壁钟闭包（真城）在同一驱动下各自正确。
+- **为什么要这个模块**：「Dispatch → N 回合 → 冻结」的事件序只有这一处。citysim 与真城各写一遍就是两个权威，而两者一旦漂开，**仿真继续绿而真城错**——仿真的全部价值恰好建立在它跑的是同一份代码上。故 citysim 是本模块的调用方，每个剧本直接验证生产回路。
+- **`run_started.parent`**：只在派生开的 Run 上出现。「两行相邻」不是一个可查询的事实；写进载荷之后，前端折得出树，离线重放也折得出同一棵树。
+- **时间纪律**：dispatch 采两次（checkpoint、run_started），每回合一次；**结束时 freeze 再采一次**，handoff 用它、run_frozen 用它＋1（两行同一件事，不值两次采样）；**取消时 freeze 沿用被打断那个回合的时间戳**，因为这次冻结属于那个回合而不是一件新事。三条合起来使一个计数器闭包（citysim）与一个壁钟闭包（真城）在同一驱动下各自正确。
 - **结束判定**：`calls_made == 0` 且这一答**说了话**，即 `Completion::Done(Evidence[model_returned])`；`calls_made == 0` 而内容为空、或 `stop == MaxTokens`，即 `Completion::Limit`（§8-37）；任一安全点命中 Cancel 即 `Completion::Cancelled`。三条均经 `freeze` 出口，故 **handoff_written＋run_frozen 是唯一出口**，无第二条退路。第四点 `BeforeSpawn` 与前三点同权：命中即 `Cancelled`，那个回合的 assistant 与 tool results **不入窗**，因为窗口前推是「回合成立」的后果而不是它的一部分。
-- **第四种结束：回合中途的失败。** 上一段那句「无第二条退路」先前在代码里不成立：`drive` 的错误臂只对带 `Carrier::Event` 的码写载体事件并冻结，对 `Carrier::Loadtime` 的五个码直接 `return Err`，**那次 run 被丢掉、账本上只剩 `run_started`**。实测：ModelScope 的流式 tool_call 拼接缺陷令每次派活死于 `E_WIRE_MISMATCH`，重启后 `city_view` 仍报那次 run `frozen: false`，页面于是把每条消息都当 `steer` 发而被拒。**两种 carrier 都经 `freeze` 出口，差别只在冻结之前写不写载体事件。** 理由：`Loadtime` 原先的理由是「账本自身就是受害者时，没有什么真实的东西可写」——这对 `CasCorrupt`／`StorageFatal`／`LogVersionUnsupported` 成立，对 `WireMismatch` 不成立：供应方把兑换格式写错与账本健否无关。而对前三个码，写不进去的后果就是 `freeze` 的 append 自己失败并把那个失败向上抩——这比预先判定「写不进去」更诚实。冻结后**原错误仍然向上抩**：账本得到判决，调用方得到诊断，两件事不互相替代。否决「把 `WireMismatch` 重分类为 `Carrier::Event(ProviderDegraded)`」：该码在握手期也用于 wire 版本不匹配（那时连 run 都不存在），一个码两种含义去改分类表，会让 `kernel::event::kind` 那条「loadtime 白名单封死在五个」的测试变成对一件无关的事作证。
-- **Window 归驱动持有**：入窗内容就是回合报告的前推结果（assistant＋tool results），放在调用方手里等于把一条不变量交给每个调用方自己维护。
+- **第四种结束：回合中途的失败。** **两种 carrier 都经 `freeze` 出口，差别只在冻结之前写不写载体事件**：带 `Carrier::Event` 的码先写载体事件，`Carrier::Loadtime` 的码直接冻结。理由：「账本自身就是受害者时，没有什么真实的东西可写」对 `CasCorrupt`／`StorageFatal`／`LogVersionUnsupported` 成立，对 `WireMismatch` 不成立——供应方把兑换格式写错与账本健否无关；而对前三个码，写不进去的后果就是 `freeze` 的 append 自己失败并把那个失败向上抛，这比预先判定「写不进去」更诚实。一次没有冻结的 run 在账本上只剩 `run_started`，重启后仍报 `frozen: false`，页面就把每条消息都当 `steer` 发。冻结后**原错误仍然向上抛**：账本得到判决，调用方得到诊断，两件事不互相替代。否决「把 `WireMismatch` 重分类为 `Carrier::Event(ProviderDegraded)`」：该码在握手期也用于 wire 版本不匹配（那时连 run 都不存在），一个码两种含义去改分类表，会让 `kernel::event::kind` 那条「loadtime 白名单封死在五个」的测试变成对一件无关的事作证。
+- **Conversation 归驱动持有**：入窗内容就是回合报告的前推结果（assistant＋tool results），放在调用方手里等于把一条不变量交给每个调用方自己维护。
 - **闭包而非 trait，`invoke` 除外**：`now`／`interrupt`／`fence`／`wait` 的第二实现尚不存在，而本库的纪律是 trait 只在已有第二实现的缝上引入；`invoke` 是 §8-3 的 `ConcurrentInvoke`，它的第二实现已在缝上。`RunHooks` 自身只是引用的容器，不持策略。
-- **字节不变是验收标准**：同一堆剧本、同一份 `fixtures/golden-p0`，换了驱动实现而字节不动——这才能证明“提取”是提取而不是重写。
-
 ### 8-16 runtime::digest（形状 1 判定＋形状 2 值类型）
 
 ```rust
@@ -956,7 +959,7 @@ pub fn digest_once(text, origin, breaker, cached: &mut dyn FnMut(&B3Hash) -> Res
 pub enum Level { Refuse, Effect, Decide, Trace, Wire }  // 全序：层底控到该级为止
 impl Level { pub const DEFAULT: Level = Effect; pub const ALL: [Level; 5]; pub fn parse(&str) -> Option<Level>; }
 pub struct Site<'a> { pub run: RunId, pub seq: Seq, pub module: &'a str }   // 三字段必填
-pub type Sink = Box<dyn FnMut(&str) + Send>;
+pub type Sink = Box<dyn FnMut(Entry<'_>) + Send>;   // 一条 entry，不是一行文本（§8-38）
 pub struct Diagnostics { /* floor: Option<Level>、sink —— 私有 */ }
 impl Diagnostics {
     pub fn new(floor: Level, sink: Sink) -> Diagnostics;
@@ -970,17 +973,17 @@ impl Diagnostics {
 ```
 
 - **无读方法即全部形状保证**：「判定与恢复逻辑不读日志」不靠纪律，靠这一点——把一行读回来在类型上拼不出。推论就是收口条件：删光日志，行为、重放与总账逐字节不变。
-- **行上恒无时间戳**（与 `docs/logging.md` 早期口径的差异，已回写该文）：锦点是 `seq`——两条时间线靠一个整数对齐，而采样壁钟会在一个不允许采样的库里开第二个时间源。想要时间的 sink 在装配层自己加。
+- **行上恒无时间戳**：锚点是 `seq`——两条时间线靠一个整数对齐，而采样壁钟会在一个不允许采样的库里开第二个时间源。想要时间的 sink 在装配层自己加。
 - **坐标由 Ledger 自己说**：`memory::JsonlLedger::position()`（返回「现在写一条会落在哪」）。只给位置不给内容：一个能读记录的访问器会把判定逻辑引到它正在写的账上去。
 - **双重防线**：`Sealed` 无 Debug/Display，入行在类型层就不成立（反例 `tests/ui/log_a_credential.rs`）；普通字符串里的明文由 `redact::redact_text`——**同一个**扫描器与**同一份**替换实现，不是第二个——就地换成 `secret:redacted`（`Marker::Plain`）。不丢整行：周围那句话通常正是读者要的。
-- **不引 `tracing`**：它在此处的唯一功能是跨 `await` 携模块名的 span，而回合路径是同步的，该功能今天无消费者。理由已回写 `docs/logging.md` §7。
+- **不引 `tracing`**：它在此处的唯一功能是跨 `await` 携模块名的 span，而回合路径是同步的，该功能无消费者。理由见 `docs/logging.md` §7。
 - **写入方三处**（§6 的三类各一）：命令被拒（`refuse`，写在 `handle` 而非调用方，因为每个调用方都要）；endpoint 附着与探测结果（`effect`）；dispatch 跑完（`effect`，作为指向 Ledger 的指针）。
 
 ## 8.5 两个设计
 
-**第二对（S2，turn 侧）**：中断作相变入参（选中）vs 独立 `cancel()` 方法。后者表面更直观，但 cancel 方法可在任意持有点被调＝相内中断可表示，A9 退化成时序约定；选中方案把边界快照做成相变函数的形参，相内无入口，结构即断言。代价：调用方每相必须显式给 Interrupt（哪怕 None）——这个啰嗦是刎意的：它迫使执行器在每个边界问一次信号面。
+**turn 侧**：中断作相变入参（选中）vs 独立 `cancel()` 方法。后者表面更直观，但 cancel 方法可在任意持有点被调＝相内中断可表示，A9 退化成时序约定；选中方案把边界快照做成相变函数的形参，相内无入口，结构即断言。代价：调用方每相必须显式给 Interrupt（哪怕 None）——这个啰嗦是刎意的：它迫使执行器在每个边界问一次信号面。
 
-**首对（S1）：fork 消费 VerifiedLedger**（CLI 的 `fork` 与 `prefix` 仍如此；分支的对话重建只有 `inherited_indexed` 一扇门，理由见 8-2：账本唯一的写者打开账本时已验过，再验一次整链只为读一条 run 的几行，代价随历史长度增长）——分叉前必先验链，类型上把「从未验证的序列分叉」做成不可表示；分叉正确性与重放正确性因此是同一条断言。
+**fork 侧：fork 消费 VerifiedLedger**（CLI 的 `fork` 与 `prefix` 仍如此；分支的对话重建只有 `inherited_indexed` 一扇门，理由见 8-2：账本唯一的写者打开账本时已验过，再验一次整链只为读一条 run 的几行，代价随历史长度增长）——分叉前必先验链，类型上把「从未验证的序列分叉」做成不可表示；分叉正确性与重放正确性因此是同一条断言。
 **B（落选）：fork 直接吃原始行**（`prefix(lines: &[Vec<u8>], at_seq)`）——少一次验证成本，但打开「对损坏历史分叉」的路径，且 at_seq↔行号对应要自行重解 envelope＝第二解析权威。落选理由：验证成本 O(n) 在分叉频率下可忽略，而不变量 14（citysim 检查器）需要的正是 A 的类型保证。另 `verify_dir` 命名族落选：与 `verify_ledger_dir` 二选一，取后者（dir 一词泛滥易撞 S3 worktree 面）。
 
 ## 9 工作流程
@@ -999,7 +1002,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 - 恢复层不造码（§8-49）：恢复段的失败恒是它拿到的那个类型化错误，可定义性随原码走；该层改变的只是「同样的请求再发一次」与「换一扇门再问一次」之间的选择。
 
-- `E_INVALID_ARGS`（at_seq 越界）：不可定义掉——「从已冻结 Run 最后事件之后分叉」是用户可达输入（§19.1 点名）；静默夹取是被明拒的替代。
+- `E_INVALID_ARGS`（at_seq 越界）：不可定义掉——「从已冻结 Run 最后事件之后分叉」是用户可达输入；静默夹取是被明拒的替代。
 - `E_LOG_VERSION_UNSUPPORTED`（v 判向＋未知 kind 无 ig）：不可定义掉——数据比二进制长寿。
 - 链断/seq 洞/非规范字节：以 `E_CAS_CORRUPT` 报（存储完整性族；subject=行号与路径）——能否定义掉＝「介质位腐烂在设计边界外」，同 memory-SPEC §12。
 
@@ -1019,52 +1022,46 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 ## 13 依赖选型
 
-kernel、memory（读面＋S3 增 cas 消费）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（S3 增：prefix golden）。
-S3 增：`wasmtime = "48"`（feature `wasm` 内藏，钉版理由见 §8-13；wat 为 dev 依赖供 A10 模块）；`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
+kernel、memory（读面与 cas）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（prefix golden）。
+`wasmtime = "48"`（feature `wasm` 内藏，钉版理由见 §8-13；wat 为 dev 依赖供 A10 模块）；`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
 
 ## 14 硬编码声明
 
 无（行号计法与 recovery 文句不构成行为常量）。
 
-S3 增两处 pub(crate) 数据面（改须本 SPEC 同集；没有 `WATCHDOG_PROVIDER_RETRIES`，理由见 §8-9）：信封附件封顶 `ENVELOPE_ATTACH_MAX_BYTES=1024`（§8-7：附件与负载分账的断言界）；net_notice／truncation／offload 提示句三定句（ASCII，住 pipeline／offload 实现内，改句＝改入窗字节＝过本 SPEC）。
-8-44 增一项常量读取（值与理由住 `kernel::consts_policy`，本文件不复写）：`EXCHANGE_BUDGET_BYTES`——回合 exchange 的入窗预算，`compaction::exchange` 是唯一读者。
+两处 pub(crate) 数据面（改须本 SPEC 同集）：信封附件封顶 `ENVELOPE_ATTACH_MAX_BYTES=1024`（§8-7：附件与负载分账的断言界）；net_notice／truncation／offload 提示句三定句（ASCII，住 pipeline／offload 实现内，改句＝改入窗字节＝过本 SPEC）。
+一项常量读取（值与理由住 `kernel::consts_policy`，本文件不复写）：`EXCHANGE_BUDGET_BYTES`——回合 exchange 的入窗预算，`compaction::exchange` 是唯一读者。
 
 ## 15 影响面
 
-citysim 链检查器复用 verify_lines；bin `replay` 子命令接线；S2 prefix 重建器将消费 VerifiedLedger——接口定形，只加不改。
-S3：assemble 签名长入波及 citysim 执行器（同集更新）；kernel::model 增 canonical 类型波及 ScriptModel；ToolBench 收走 executor 门闭包（归还薄形）；E_TOOL_OUTCOME_UNKNOWN 补写面（replay 新增 dangling 检测）供 resume 路径消费。
+citysim 链检查器复用 verify_lines；bin `replay` 子命令接线；prefix 重建器消费 VerifiedLedger。
+citysim 是 `run::drive` 的调用方（§8-15），assemble 的签名变动波及它；kernel::model 的 canonical 类型波及 ScriptModel；ToolBench 持有全部门判；E_TOOL_OUTCOME_UNKNOWN 补写面（replay 的 dangling 检测）供 resume 路径消费。
 
 ## 16 测试与约束
 
 单测：五步各拒绝分支＋ig 跳过；fork 越界；fork_draft 载荷形。proptest：对任意合法 draft 序列（经内存 Ledger 物化）verify 恒过；任意单字节翻转恒拒。A2/A19 演示测试入 crates/runtime/tests/。约束：clippy 零告警。
-S3 增：A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）；A7 往返四断言；A18 零字节；watchdog 分级序；A10 三断言（feature `wasm` 下真 wasmtime＋WAT）；L0×失败注入矩阵（三臂×（正常／工具错／拒收））；ToolBench 门路由（Deny 回流／Escalate 回流／dedup 先于副作用）。
-8-44 增：`compaction::exchange::tests` 三例（预算内全保留；超预算回复按 `plan` 裁、结构化结果整块保留；份额随 exchange 大小走）；`turn/tests/compaction` 两例（收尾边界才换快照、波中达阈值按全波分组一次压）；`fork/tests` 一例（分支继承的是压缩后的 exchange）；citysim `compaction` 两例（波中达阈值账本全字节保留、同剧本逐字节重放）。
+A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）；A7 往返四断言；A18 零字节；watchdog 分级序；A10 三断言（feature `wasm` 下真 wasmtime＋WAT）；L0×失败注入矩阵（三臂×（正常／工具错／拒收））；ToolBench 门路由（Deny 回流／门的提问回流／dedup 先于副作用）。
+回合边界的压缩（§8-44）：`compaction::exchange::tests` 三例（预算内全保留；超预算回复按 `plan` 裁、结构化结果整块保留；份额随 exchange 大小走）；`turn/tests/compaction` 两例（收尾边界才换快照、波中达阈值按全波分组一次压）；`fork/tests` 一例（分支继承的是压缩后的 exchange）；citysim `compaction` 两例（波中达阈值账本全字节保留、同剧本逐字节重放）。
 
 ## 17 模型体验
 
-零字节：replay/fork 是离线设施；其产物（分叉 Run 的入窗历史）经 S2 prefix 组装间接入窗，本模块自身不产生任何 prefix 字节。
+入窗字节大半由本 crate 决定：prefix 四段与断点（§8-4、§8-6）、catalog 的 Resident 行与二级披露（§8-11）、工具结果的信封与压缩（§8-7、§8-27）、上下文提醒（§8-34）与回合边界的压缩（§8-44）。replay/fork 是离线设施，其产物（分叉 Run 的入窗历史）经 prefix 组装间接入窗，自身不产生 prefix 字节。
 
 ## 18 文档同步
 
-ARCHITECTURE §6 runtime 表随模块落地翻转状态；接线台账同 PR 登记；S3 完备化的「只加不改」取义见 §8-6（三不变量不动，相变入参按语义长入，消费者同集）；kernel-SPEC §8-23/§8-24 同集改；api-baseline 随每次公开面变更重算。
+模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 kernel-SPEC §8-23/§8-24 同一变更集；runtime 没有 api-baseline 文件，公开面即 `lib.rs` 的 `pub mod` 与根重导出。
 
-### RunHooks 多一个：说到一半的话往哪去
+### 8-15-1 RunHooks 的 deltas：说到一半的话往哪去
 
 ```rust
-pub struct RunHooks<'a> {
-    pub now: ...,
-    pub interrupt: ...,
-    pub fence: ...,
-    pub invoke: ...,
-    pub deltas: Option<&'a mut (dyn FnMut(&str) + 'a)>,
-}
+pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一个字段（§8-15）
 ```
 
-**`None` 是必要前提，不是缺省值。** 一个增量改变不了 run 的任何判断，所以「没人看」的驱动器就不向 provider 要流：`Turn::call` 在 `None` 时走 `Model::call`，字节与从前一模一样。citysim 与离线重放因此一字未改——**这是这条改动不碰确定性的全部理由**。
+**`None` 是必要前提，不是缺省值。** 一个增量改变不了 run 的任何判断：`Turn::call` 按 `Generating` 三臂选门——没人看（`Unwatched`）走阻塞门，有页面在读（`Watched`）走流式门，工具面要提前起跑只读调用（`Speculating`，§8-3）走推测门。citysim 与离线重放不看增量，所以增量不碰确定性。
 
 **它不返回 `Result`。** 增量不是判断：下游任何东西都不得据它分支，而一个能拒绝的 sink 会让一个显示细节有能力弄失败一次调用。
 
-**写进账本的那句话只从 `ModelReturn` 来。** `model_returned` 的载荷此前怎么写，现在还怎么写——增量恒不参与拼装它。于是「页面看到的」与「账本保存的」不可能出自对同一个回复的两次读法；流被切断表现为读取错误，永不表现为一个变短的回答。
+**写进账本的那句话只从 `ModelReturn` 来。** 增量恒不参与拼装 `model_returned` 的载荷。于是「页面看到的」与「账本保存的」不可能出自对同一个回复的两次读法；流被切断表现为读取错误，永不表现为一个变短的回答。
 
 **`Turn::call` 的 `'sink` 是显式命名的。** 调用方（`drive`）持有 sink 跨越整个 run 并把它交给每一轮；生命周期省略时，重借需要收缩 trait object 自己的生命周期，而 `&mut` 不允许。这不是风格，是这个签名必须显式的原因。
 
