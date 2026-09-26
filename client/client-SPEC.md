@@ -376,6 +376,22 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 **开关卡的控件不在卡里**：它在对话旁边，卡关着的时候也够得到。头里再放一个就是同一份状态的第二个查看处，而关着的那一种情况仍然需要外面那一个。参考图在头里放叉，是因为它的面板没有别的地方可关。
 
+## 7G 从零到第一次派活：一条按键路径
+
+一座没有主模型的城里，第一次派活只有一条路，每一步的下一步都在上一步的落点上。**欢迎页把「接上一家供应商」放在第一张并标「先做这一步」**，「派活」卡仍是链接，提示改为「接上供应商后可用」；有了主模型，供应商卡消失。`#/gallery` 的 `welcome ·` 夹具画三态（无供应方、有供应方无主模型、有主模型），各在 390 与 1440 两个页宽，由 `cargo xtask render` 量。
+
+| 起点 | 键 | 落点 |
+|---|---|---|
+| `#/welcome`，无主模型 | Tab 到第一张卡，Enter | `#/setup` 的 accounts 组 |
+| accounts 组的挂载表单 | 填写，Enter 提交 | 端点卡出现在列表顶部 |
+| 端点卡之后 | Tab 到 `main` 的模型选择框，方向键选定 | 事实条的「模型」格显示所选模型 |
+| 左栏或 `#/welcome` 的「派活」卡 | Enter | `#/talk/hall/mayor`，composer 取焦 |
+| composer | Enter | 派活帧发出 |
+
+**这条路今天有两处还不是一步：** 第三行的选择框在设置页的末尾，1440×900 的窗口里要滚动才看得到，挂上第一家供应方后它既不紧跟在卡下，也不取焦；最后一行在无主模型时仍发出派活帧，由城拒绝，composer 的发送按钮尚未换成去 `#/setup` 的链接。两处都改完时，上表每一行的落点都不需要一次滚动或一次无效的按键。
+
+**拒绝框画城给的出路。** 同一个码覆盖几种原因（`E_CONFIG_INVALID` 既是「没选模型」也是「会话中途换了模型」），所以 `err_<code>` 的标题只说拒绝的种类，不说原因；`parts/notice.svelte` 把城写的 `recovery` 句子不折叠地放在标题下，动作与主体留在折叠里（12-3）。
+
 ## 8 验收
 
 `bun run lint`、`bun run typecheck`、`bun run test`（110 条）三样绿，`cargo xtask npm`、`cargo xtask wire-ts`、`cargo xtask color`、`cargo xtask wording`、`cargo xtask render` 绿；`just check-client` 是这三条脚本的一条线。
@@ -401,3 +417,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **理由**：两者给同样的逐键粒度——读 `runs[id].saying` 的 effect 只因这个 run 这个字段重跑，遍历表的读者只因 run 的增删重跑（`belief/grain.svelte.test.ts` 判定）。记录的写法让十余个按 `runs[id]`、`Object.values(runs)` 读表的视图一行不改。在 R = 1e4、一帧 50 个 delta、一个读全表的订阅者下，每帧折叠从约 470–540 µs 降到约 30–40 µs（`belief/fold_cost.test.ts`，同一仪表前后交错测），因为 delta 不再让订阅者走一遍表。
 - **被击败的备选**：`SvelteMap<RunId, RunBelief>`。粒度相同，但每个读者都得改成 `get`／`values()`，且对已有键 `set` 新值时，有遍历读者就会连带推进迭代版本。
 - **重开参数**：视图改由 belief 暴露的派生索引读表（不再直接下标）时，表的容器可以换，读者迁移的成本就不再存在。
+
+### 12-3 拒绝框的正文是城写的出路，不是按码查的原因
+
+**决定：** `parts/notice.svelte` 把 `AxError.recovery` 画在标题下、折叠之外；`err_<code>` 的标题只说拒绝的种类。**理由：** 一个码在城里有多种原因，按码写死的标题（如「模型已冻结」）在「没选模型」时说错了原因，而把城的原话折起来，人会先去按那些与这次拒绝无关的按钮。`recovery` 是唯一知道原因的句子。**胜过的方案：** 给每个原因一个客户端文案——做不到，客户端只看得见码；按原因分码是服务端改线协议的事，那之后出路表才能按码给出「去设置」。
