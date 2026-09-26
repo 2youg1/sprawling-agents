@@ -31,6 +31,22 @@ pub(super) fn fold(run: RunId, rows: &[Row]) -> Result<Vec<Turn>, AxError> {
     Ok(sprawling::turns(&records))
 }
 
+/// The mark of a tree entry with no child entries: `+` on a run whose
+/// rounds are not folded yet, since whether it has any is known only
+/// once the person opens it; a blank on everything else.
+pub(super) fn leaf_mark(rounds: &Rounds, key: &NodeKey) -> char {
+    match key {
+        NodeKey::Run(run) if !rounds.contains_key(run) => '+',
+        NodeKey::City
+        | NodeKey::Building(_)
+        | NodeKey::Room(_)
+        | NodeKey::Session(..)
+        | NodeKey::Run(_)
+        | NodeKey::Round(..)
+        | NodeKey::Call(..) => ' ',
+    }
+}
+
 /// Pushes the rounds of the run entry at `at`, each followed by its
 /// calls; an unreadable run gets one entry naming the failure instead.
 pub(super) fn append_below(

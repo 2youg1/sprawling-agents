@@ -16,7 +16,7 @@ use super::arrange::{Entry, NodeKey, arrange};
 use super::detail::{json_lines, line_lines};
 use super::follow::Row;
 use super::keys::Action;
-use super::rounds::{Rounds, fold};
+use super::rounds::{Rounds, fold, leaf_mark};
 
 /// From this many columns on, the detail pane stays open on the right.
 pub(super) const SIDE_PANE_MIN_WIDTH: usize = 110;
@@ -355,7 +355,7 @@ impl Face {
                     .filter_map(|at| self.entries.get(*at).map(|entry| (*at, entry)))
                     .map(|(at, entry)| {
                         let mark = match (self.has_children(at), self.expanded.contains(&at)) {
-                            (false, _) => ' ',
+                            (false, _) => leaf_mark(&self.rounds, &entry.key),
                             (true, true) => '-',
                             (true, false) => '+',
                         };

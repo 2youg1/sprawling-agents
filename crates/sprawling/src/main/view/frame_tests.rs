@@ -106,7 +106,7 @@ fn opens_on_the_run_waiting_for_the_person_before_any_active_run() {
     let face = Face::open(&runs, Vec::new(), NARROW);
     assert_eq!(
         cursor_line(&face),
-        format!(">          run {R3} frozen #1..2")
+        format!(">        + run {R3} frozen #1..2")
     );
 }
 
@@ -144,11 +144,11 @@ fn a_run_that_starts_while_following_appears_and_the_cursor_stays() {
             "     + lab/a".to_owned(),
             "     - lab/c".to_owned(),
             "       - session (first stretch)".to_owned(),
-            "           run 0198f6a2-7c4a-7bbb-9d1e-000000000005 active #12..12".to_owned(),
+            "         + run 0198f6a2-7c4a-7bbb-9d1e-000000000005 active #12..12".to_owned(),
             "   - yard".to_owned(),
             "     - yard/b".to_owned(),
             "       - session (first stretch)".to_owned(),
-            format!(">          run {R2} active #3..8"),
+            format!(">        + run {R2} active #3..8"),
         ]
     );
     face.apply(Action::SwitchLens);
@@ -166,7 +166,7 @@ fn opens_on_the_latest_active_run_with_only_its_ancestors_open() {
             "   - yard".to_owned(),
             "     - yard/b".to_owned(),
             "       - session (first stretch)".to_owned(),
-            format!(">          run {R2} active #3..8"),
+            format!(">        + run {R2} active #3..8"),
         ]
     );
 }
@@ -177,12 +177,12 @@ fn every_movement_lands_on_the_row_it_names() {
     assert_eq!(cursor_line(&after(&[Action::Up], NARROW)), session);
     assert_eq!(
         cursor_line(&after(&[Action::Up, Action::Down, Action::Down], NARROW)),
-        format!(">          run {R2} active #3..8")
+        format!(">        + run {R2} active #3..8")
     );
     assert_eq!(cursor_line(&after(&[Action::First], NARROW)), ">- city");
     assert_eq!(
         cursor_line(&after(&[Action::First, Action::Last], NARROW)),
-        format!(">          run {R2} active #3..8")
+        format!(">        + run {R2} active #3..8")
     );
     let short = Size {
         columns: 100,
@@ -191,7 +191,7 @@ fn every_movement_lands_on_the_row_it_names() {
     assert_eq!(cursor_line(&after(&[Action::PageUp], short)), ">  - yard");
     assert_eq!(
         cursor_line(&after(&[Action::PageUp, Action::PageDown], short)),
-        format!(">          run {R2} active #3..8")
+        format!(">        + run {R2} active #3..8")
     );
 }
 
