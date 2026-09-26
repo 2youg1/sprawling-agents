@@ -22,17 +22,20 @@
   import { SvelteSet } from "svelte/reactivity";
   import { derived } from "svelte/store";
 
+  import { readAnswer } from "../../core/answered";
+  import type { Answered } from "../../core/answered";
   import { commitsQuery } from "../../core/asking";
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { clock, usd } from "../../core/time";
   import { ui } from "../../ui";
-  import type { Address, Answer, CommitAnswer, Effort, Seq } from "../../wire";
+  import type { Address, Answer, CommitAnswer, CommitsAnswer, Effort, Seq } from "../../wire";
   import Changes from "../changes.svelte";
   import { shortOid } from "../changes";
   import Glyph from "../parts/glyph.svelte";
   import { RowList } from "../parts/row.svelte";
   import Tip from "../parts/tip.svelte";
+  import Unanswered from "../parts/unanswered.svelte";
 
   interface Props {
     readonly building: Address;
@@ -54,7 +57,9 @@
   interface Pages {
     readonly rows: readonly CommitAnswer[];
     readonly more: boolean;
-    readonly loading: boolean;
+    // What the newest page is: an older page never stands in for it,
+    // because the newest one is what a person is waiting on.
+    readonly newest: Answered<CommitsAnswer>;
     readonly edge: Seq | undefined;
   }
 
@@ -72,12 +77,12 @@
         }
       }
     }
-    const held = answers.at(-1);
-    const tail = held !== undefined && "commits" in held ? held.commits : undefined;
+    const newest = readAnswer(answers.at(-1), (held) => ("commits" in held ? held.commits : undefined));
+    const tail = newest.kind === "held" ? newest.value : undefined;
     return {
       rows,
       more: tail?.more === true,
-      loading: tail === undefined,
+      newest,
       edge: tail?.commits.at(-1)?.seq,
     };
   }
@@ -257,15 +262,16 @@
 
 <div>
   <h2 class="mb-base text-heading font-heading">{say($lang, "bld_commits")}</h2>
-  {#if pages.rows.length > 0 || !pages.loading}
-    {#if pages.rows.length > 0}
-      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; the typechecker types a snippet exported from a .svelte module as unresolvable) -->
-      {@render RowList({ label: say($lang, "bld_commits"), rows })}
-    {:else}
-      <p class="text-text-faint">{say($lang, "commits_empty")}</p>
-    {/if}
-  {:else}
+  {#if pages.rows.length > 0}
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; the typechecker types a snippet exported from a .svelte module as unresolvable) -->
+    {@render RowList({ label: say($lang, "bld_commits"), rows })}
+  {:else if pages.newest.kind === "held"}
+    <p class="text-text-faint">{say($lang, "commits_empty")}</p>
+  {:else if pages.newest.kind === "asking"}
     <p class="text-text-disabled">…</p>
+  {/if}
+  {#if pages.newest.kind === "unavailable"}
+    <Unanswered query={pages.newest.query} asked={commitsQuery(building, befores.at(-1) ?? null)} />
   {/if}
   {#if pages.more}
     <p class="py-base text-center text-text-disabled">…</p>
