@@ -50,6 +50,12 @@
 # 1,067 B to 32,840 B - while the entry chunk lost about 660 B with the
 # lexer it replaced. The best reading moves by that difference and the
 # slack stays at 20 KB.
+# Several screens arrived together once more, each inside the slack on
+# its own and 24 KB over it together: the city's runs board and its
+# lineage tree, the drawn wire fields, the prefilled recovery form,
+# browser notifications, the editor links, the combobox and the empty
+# states, with their gallery fixtures. The best reading is what ships
+# with them; the slack stays at 20 KB.
 [frontend_artifact]
 what = "the client the browser downloads, gzipped, the two shipped faces included"
 budget_bytes = 2097152
@@ -58,7 +64,7 @@ budget_bytes = 2097152
 # the client on the `#/gallery` route (client-SPEC §6), and this is
 # what the client weighs with them. The register is a ratchet: a
 # number may improve freely and drift only within slack_bytes.
-best_bytes = 523827
+best_bytes = 547848
 slack_bytes = 20480
 measured_by = "just build-web, then just gates (the whole dist directory, recursive)"
 status = "gated"
