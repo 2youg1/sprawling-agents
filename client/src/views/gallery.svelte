@@ -38,6 +38,7 @@
   import Filed from "./gallery/filed.svelte";
   import Hints from "./gallery/hints.svelte";
   import Keepers from "./gallery/kept.svelte";
+  import RefusedLine from "./gallery/refused_line.svelte";
   import Parts from "./gallery/parts.svelte";
   import Presences from "./gallery/presence.svelte";
   import Produced from "./gallery/produced.svelte";
@@ -73,6 +74,7 @@
   <Hints />
   <Presences />
   <Conversation />
+  <RefusedLine />
   <Anchored />
   <Produced />
   <Filed />

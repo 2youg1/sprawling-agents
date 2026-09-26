@@ -26,7 +26,7 @@
 
 <script lang="ts">
   import { Option } from "effect";
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
   import { get } from "svelte/store";
 
   import { QUERIES } from "../../core/asking";
@@ -58,6 +58,8 @@
     splitModel,
   } from "./composer";
   import type { Picks } from "./composer";
+  import { IDLE, hand, settle } from "./handing";
+  import type { Handing } from "./handing";
 
   interface ComposerProps {
     readonly placeholder: string;
@@ -122,6 +124,7 @@
     const words = text.trim();
     if (words === "") return;
     if (onSend(words)) {
+      handing = hand(words, get(belief));
       write("");
       kept = false;
       landed();
@@ -129,6 +132,15 @@
       kept = true;
     }
   }
+
+  // The city's answer to the words last handed: a refusal puts them
+  // back in the box (`handing.ts`).
+  let handing: Handing = IDLE;
+  $effect(() => {
+    const next = settle(handing, $belief, untrack(() => text));
+    handing = next.handing;
+    if (next.box !== null) write(next.box);
+  });
 
   // The receipt: the pill reads where the words went, with a check, for
   // a moment, so a press is seen to land (ux A3). A box that speaks to
