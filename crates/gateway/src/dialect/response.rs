@@ -170,6 +170,30 @@ mod tests {
         assert_eq!(resp.usage.cache_read_tokens, Tokens::new(0));
         assert_eq!(resp.usage.input_tokens, Tokens::new(7));
     }
+    /// Anthropic counts only the uncached input in `input_tokens`; the
+    /// city's count is the whole prompt, as both OpenAI faces report it.
+    #[test]
+    fn every_dialect_counts_the_whole_prompt_as_input() {
+        let anthropic = json!({
+            "content": [],
+            "stop_reason": "end_turn",
+            "usage": { "input_tokens": 10, "output_tokens": 1,
+                       "cache_read_input_tokens": 90, "cache_creation_input_tokens": 5 },
+        });
+        let openai = json!({
+            "choices": [ { "message": { "role": "assistant", "content": "hi" },
+                           "finish_reason": "stop" } ],
+            "usage": { "prompt_tokens": 105, "completion_tokens": 1,
+                       "prompt_tokens_details": { "cached_tokens": 90 } },
+        });
+        let input = |kind, wire| {
+            response_from_wire(kind, wire).unwrap().usage.input_tokens
+        };
+        assert_eq!(
+            [input(DialectKind::Anthropic, &anthropic), input(DialectKind::OpenAi, &openai)],
+            [Tokens::new(105), Tokens::new(105)]
+        );
+    }
     fn text_block() -> impl Strategy<Value = ContentBlock> {
         "[a-z ]{1,20}".prop_map(|text| ContentBlock::Text { text })
     }

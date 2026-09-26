@@ -151,3 +151,33 @@ fn request_carries_four_segment_hashes() {
     let json = serde_json::to_value(&req).unwrap();
     assert_eq!(json["segments"].as_array().unwrap().len(), 4);
 }
+
+/// A row written before the one meaning existed, whose cache parts
+/// exceed its input count, can only be Anthropic's uncached count; the
+/// reader returns the whole prompt. A row without cache parts reads as
+/// written, because both old meanings agree there.
+#[test]
+fn an_unversioned_usage_row_reads_in_the_one_meaning() {
+    let read = |row: serde_json::Value| {
+        serde_json::from_value::<ModelUsage>(row)
+            .unwrap()
+            .input_tokens
+            .get()
+    };
+    let anthropic_row = serde_json::json!({
+        "input_tokens": 10, "output_tokens": 1,
+        "cache_read_tokens": 90, "cache_write_tokens": 5,
+    });
+    let uncached_row = serde_json::json!({
+        "input_tokens": 10, "output_tokens": 1,
+        "cache_read_tokens": 0, "cache_write_tokens": 0,
+    });
+    let versioned_row = serde_json::json!({
+        "input_tokens": 10, "output_tokens": 1,
+        "cache_read_tokens": 90, "cache_write_tokens": 5, "v": 1,
+    });
+    assert_eq!(
+        [read(anthropic_row), read(uncached_row), read(versioned_row)],
+        [105, 10, 10]
+    );
+}

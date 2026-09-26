@@ -1242,10 +1242,15 @@ pub struct Ceiling(NonZeroU64);  // 零不可表达：new(0) 即 None
 pub struct ChatRequest { pub model: String, pub max_tokens: Option<Ceiling>, pub system: Vec<SystemBlock>,
                          pub messages: Vec<ChatMessage>, pub tools: Vec<ToolDef> }
 pub struct ModelUsage { pub input_tokens: Tokens, pub output_tokens: Tokens,
-                        pub cache_read_tokens: Tokens, pub cache_write_tokens: Tokens }
+                        pub cache_read_tokens: Tokens, pub cache_write_tokens: Tokens,
+                        pub dialect: Option<DialectKind> }
 pub struct ChatResponse { pub content: Vec<ContentBlock>, pub stop: StopReason, pub usage: ModelUsage }
 pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError>;  // model_returned 载荷的唯一成形处
 ```
+
+`ModelUsage.input_tokens` 在每种方言下都是**这次请求的全部输入 token，含缓存读与缓存写**。OpenAI 两个方言本来就这样报；Anthropic 的 `input_tokens` 只数未缓存的部分，由它的解析器加上两个缓存数。选这个口径是因为上下文量表读的正是它（一次请求占了多大的窗口），而按价单结算时用 `input_tokens - cache_read_tokens - cache_write_tokens` 求未缓存部分只需一次减法。`dialect` 记下是哪个方言报的；脚本模型与测试不经方言，记 `None`。
+
+账本只追加：`model_returned.usage` 在写时带 `"v": 1`（本口径）与 `dialect`，旧行字节不改。读者一律经 `ModelUsage` 的 `Deserialize` 读这一格，版本换算只在那里做：没有 `v` 的旧行没有方言可查，当 `cache_read_tokens + cache_write_tokens > input_tokens` 时它只可能是 Anthropic 的旧口径（全部输入不会小于其中的缓存部分），读成三者之和；否则照写的读。两种旧口径在没有缓存时一致，所以照读只会把「有缓存、且缓存部分不超过未缓存部分」的 Anthropic 旧行读小，这种行在带长前缀的会话里少见。
 
 浮点禁令只有一个家：`Payload::new`（及其 `Deserialize`）。wire 面把 `serde_json::Value` 转成
 `Payload` 即受判，故 seam 不再另设判定原语，拒绝理由与错误码也只有一处。
