@@ -1345,11 +1345,28 @@ impl Backlog {
 
 **红测试**：一轮委派下去的 run 起后，其 scope 被 `halt`，子 run 以 `cancelled` 冻结且没有再叫过模型；`status` 的第十四行报本 run 起的后台命令。
 
-#### 8-28-3 exec 输出的实时流（未接）
+#### 8-28-3 exec 输出的实时流（读增量已接，服务端缓冲、线上帧与页面缓冲未接）
 
 **现状**：一个 `exec` 调用的 stdout／stderr 只在调用结束时随工具结果进账本，页面（client 的监视器）在那之前只看得到「运行中」。第 2 条让输出写进 scratch 下的 `out`／`err` 两个文件，所以实时流不需要改子进程怎么写，只需要有人在它还在写时读这两个文件的增量。
 
-**设计（待实现）**：
+**已接的一段——`runtime::backlog::tail`（shape：adapter）**：
+
+```rust
+pub enum Stream { Out, Err }                          // 恒不是 bool
+pub struct Chunk { pub run: RunId, pub member: BacklogId, pub stream: Stream, pub bytes: Vec<u8> }
+#[derive(Clone)] pub struct Sink(/* Arc<dyn Fn(Chunk) + Send + Sync> */);
+impl Sink { pub fn new(deliver: impl Fn(Chunk) + Send + Sync + 'static) -> Sink; }
+impl Backlog { pub fn with_sink(self, sink: Sink) -> Backlog; }
+impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms × READ_BYTES_PER_MS
+```
+
+- 没有失败返回：读增量是可丢弃的预览，账本里的工具结果才是这段输出的权威；一次读失败只让这一拍少送一块，下一拍从同一偏移再读，偏移只在真的读到字节后前移。
+- `READ_BYTES_PER_MS = 64`（每秒 64 KiB，一个人在页面上读得过来的上界的数倍），一拍的上界由它乘间隔得出，stdout 与 stderr 各得一半，所以刷屏的 stdout 饿不死 stderr。
+- 决定：sink 是一个闭包而不是 trait——今天只有一个生产装配者（服务端扇出）与一个测试收集者，两者都只要「交出一块」这一个动作。
+
+**待接**：`harvest` 那一拍对窗口外命令读增量；服务端环形缓冲与装配点注入 sink；`ServerFrame` 与 `WIRE_V`；页面环形缓冲。设计如下。
+
+**设计**：
 
 - **读的地方是短窗口的轮询，不另起线程**。`Backlog::run` 每一拍轮询在 `settle` 之后按上次的偏移读两个文件新增的字节，交给调用方注入的一个 sink；窗口外交给后台的命令由 `harvest` 那一拍同样读增量。sink 缺席（citysim、replay、没人看的城）时一个字节都不读，行为与今天相同。
 - **每拍读的字节有上界**，按 `PollBudget` 的间隔推出而不写死：一拍最多读 `READ_PER_POLL` 字节，读不完的留到下一拍，所以一个刷屏的子进程让页面落后，而不让轮询变慢。
