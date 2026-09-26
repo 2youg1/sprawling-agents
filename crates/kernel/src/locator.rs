@@ -73,7 +73,7 @@ impl<'de> Deserialize<'de> for B3Hash {
 }
 
 /// Git object id, 40 lowercase hex digits (SHA-1 repositories; other
-/// lengths are rejected until a second length ships with git2 at S3).
+/// lengths are rejected; SHA-256 repositories are not accepted).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GitOid([u8; 20]);
 

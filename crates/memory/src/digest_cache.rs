@@ -16,11 +16,11 @@
 //! crash leaves a partial file in `tmp/`, never a half-written entry at
 //! its final name.
 //!
-//! **Whether an entry is there has one spelling: [`Vfs::exists`].** It
-//! used to be asked by reading the whole file and looking at whether
-//! the read succeeded, which answered "not cached" for an entry this
-//! process may not open and paid a full read to learn a yes/no. Reading
-//! is for `get`, which wants the bytes (memory-SPEC.md 8-11).
+//! **Whether an entry is there has one spelling: [`Vfs::exists`].**
+//! Asking by reading the whole file would answer "not cached" for an
+//! entry this process may not open and pay a full read to learn a
+//! yes/no. Reading is for `get`, which wants the bytes (memory-SPEC.md
+//! 8-11).
 
 use std::path::{Path, PathBuf};
 

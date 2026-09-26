@@ -28,11 +28,9 @@ const AT: char = ':';
 /// What a halt, a release or an autonomy change applies to.
 ///
 /// **The wire form is what the histories already hold**: `city`,
-/// `building:<addr>`, `workshop:<addr>`. That spelling used to be a
-/// `format!` at one writer and a `split_once(':')` at each reader, so a
-/// scope written one way and read another was one keystroke away. The
-/// three words are here, the parse is here, and both ends of the ledger
-/// call this type.
+/// `building:<addr>`, `workshop:<addr>`. The three words are here, the
+/// parse is here, and both ends of the ledger call this type, so a scope
+/// cannot be written one way and read another.
 ///
 /// A word this build does not know is refused rather than read as some
 /// other scope: a city that read an unknown scope as its own would

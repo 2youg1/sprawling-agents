@@ -113,7 +113,7 @@ pub const DRAFT_HELD_ESCALATE: u32 = 3;
 pub const EDIT_WAR_FREEZE: u32 = 2;
 
 /// 3.5 bits/char. Second constant scheduled for re-estimation; evidence =
-/// false-positive rate on repository and fixture corpora (7.1).
+/// false-positive rate on repository and fixture corpora.
 pub const SECRET_ENTROPY_MIN: Ratio = Ratio { num: 7, den: 2 };
 
 pub const DISCARD_FILES_MAX: u32 = 16;
@@ -193,7 +193,7 @@ pub const IMAGE_QUALITY: crate::policy_limit::ImageQuality =
 /// run is read off the account rather than guessed at.
 pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;
 
-/// Off by default: zero window bytes until a Building opts in (4.3).
+/// Off by default: zero window bytes until a Building opts in.
 pub const CLOCK_STAMP_DEFAULT: crate::config::ClockStampGranularity =
     crate::config::ClockStampGranularity::Off;
 

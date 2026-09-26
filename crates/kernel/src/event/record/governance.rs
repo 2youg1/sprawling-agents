@@ -18,12 +18,10 @@ use crate::registry::ResidentId;
 /// `approval_resolved`: how one inbox item was answered.
 ///
 /// The verdict is the [`Ruling`] itself rather than a word formatted
-/// from it. Its two spellings used to come out of `{verdict:?}`
-/// lowercased at the writer and be compared against the literal
-/// `"allow"` at one reader and `"deny"` at another, so a word neither
-/// recognised was read as a refusal on one side and as consent on the
-/// other. A [`Ruling`] a reader cannot parse is now a refusal to read
-/// the line at all.
+/// from it, so every reader parses one spelling: a word compared against
+/// a literal at each reader could read as a refusal on one side and as
+/// consent on the other. A [`Ruling`] a reader cannot parse is a refusal
+/// to read the line at all.
 ///
 /// No field defaults: all three keys have been written on every
 /// `approval_resolved` line since the kind existed, and an answer
@@ -75,8 +73,8 @@ pub mod autonomy_word {
     /// Reads back what [`spell`] wrote.
     ///
     /// # Errors
-    /// `E_WIRE_MISMATCH` for any other word. It used to fall back to
-    /// the person, which reads as the strict side and is not: a city
+    /// `E_WIRE_MISMATCH` for any other word. Falling back to the person
+    /// would read as the strict side and is not: a city
     /// whose history appointed a delegate this build cannot read would
     /// have shown the person questions the delegate was answering, and
     /// said nothing about the line it could not read.
@@ -118,10 +116,9 @@ pub mod autonomy_word {
 /// now on.
 ///
 /// Both values are the words the ledger has always held: the scope as
-/// [`Scope`] spells it, the appointment as [`autonomy_word`] does. Both
-/// spellings were a `format!` in `sprawling::assembly` and a
-/// `split_once(':')` at each reader until this struct became the only
-/// way in and out of the line.
+/// [`Scope`] spells it, the appointment as [`autonomy_word`] does. This
+/// struct is the only way in and out of the line, so no writer formats
+/// it and no reader splits it by hand.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AutonomyChanged {
@@ -144,10 +141,9 @@ fn city_wide() -> Scope {
 /// Whether a scope is shut or open.
 ///
 /// The two words a `city_halted` record carries are spelled here and
-/// nowhere else. They used to be two string constants compared by hand
-/// at four places, and the two folds disagreed about an unrecognised
-/// word: one read it as a release, the other ignored the line
-/// (sprawling-SPEC.md 8-74).
+/// nowhere else, so every fold reads an unrecognised word the same way;
+/// constants compared by hand at each fold let one read it as a release
+/// while another ignored the line (sprawling-SPEC.md 8-74).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

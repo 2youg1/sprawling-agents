@@ -17,7 +17,6 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 /// Non-empty provenance label, e.g. `web:example.com`, `file:upload`.
-/// Grammar tightens with Endpoint identity in P1.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct TaintSource(String);
 
@@ -96,7 +95,7 @@ pub struct Tainted<T> {
 
 impl<T> Tainted<T> {
     /// City-wide sole entrance for external content. Custody (secret scan
-    /// before CAS) composes at this call site in the effect layer (S3);
+    /// before CAS) composes at this call site in the effect layer;
     /// the type itself stays pure.
     pub fn new(value: T, source: TaintSource) -> Tainted<T> {
         Tainted {

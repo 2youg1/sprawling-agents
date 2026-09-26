@@ -71,7 +71,7 @@ pub enum GateOutcome {
 ///
 /// The refusal conformance matrix walks [`DOORS`] rather than naming
 /// doors one by one, so a door added to this enum is a door the matrix
-/// judges: [`conformance::deny_sample`] matches exhaustively, and a new
+/// judges: [`conformance::sample`] matches exhaustively, and a new
 /// arm without a sample does not compile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DoorId {

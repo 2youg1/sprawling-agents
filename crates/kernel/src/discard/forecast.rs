@@ -9,7 +9,7 @@ use crate::tool::ExecArm;
 
 /// Suspicious-command snippets for the text arms (data face, pub(crate)).
 /// Text prediction is obfuscatable by design — hits route conservatively,
-/// and the git checkpoint net (S3) is the honest backstop.
+/// and the git checkpoint net is the honest backstop.
 pub(crate) const SUSPECT_SNIPPETS_TEXT: [&str; 5] =
     ["rm ", "rmdir", "-delete", "git reset --hard", "git clean"];
 
@@ -27,7 +27,7 @@ fn program_basename(path: &str) -> &str {
     name.strip_suffix(".exe").unwrap_or(name)
 }
 
-/// The pre-judgment (7.2): Program reads `(path, args)` whole — a
+/// The pre-judgment: Program reads `(path, args)` whole — a
 /// whitelisted name with poisoned args is no trust at all; Python and
 /// Shell get substring conservatism.
 pub fn forecast(arm: &ExecArm) -> DiscardForecast {
@@ -174,7 +174,7 @@ mod tests {
     }
 
     proptest! {
-        /// Kani mirror: Allow implies planned and clean-handed, at any scale.
+        /// Allow implies planned and clean-handed, at any scale.
         #[test]
         fn allow_implies_every_guard_passed(files in 1usize..24, bytes in any::<u64>(),
                                             tainted in any::<bool>()) {

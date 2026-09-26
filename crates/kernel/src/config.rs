@@ -360,8 +360,8 @@ pub struct FrozenConfig {
     pub second_threshold: Option<SecondThreshold>,
 }
 
-/// Hot-reloadable surface. Empty in S2 by design: the type exists so the
-/// no-field-overlap assertion guards every future addition (S4 fills it).
+/// Hot-reloadable surface. Empty: the type exists so the no-field-overlap
+/// assertion guards every field added to it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LiveConfig {}
 

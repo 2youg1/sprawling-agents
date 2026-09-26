@@ -8,7 +8,7 @@
 //! an unverified result is testimony, and `Artifact::verify` is the only
 //! door between the two (player–referee in the type). The registry is a
 //! value, not a store: state lives with the caller and is rebuilt from
-//! the Ledger (S3 projection).
+//! the Ledger.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -19,7 +19,7 @@ use crate::event::{EventKind, EventRef};
 use crate::locator::Locator;
 
 /// Non-empty resident identity; the `role@building.n` grammar tightens
-/// with city::resident (P1).
+/// with city::resident.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ResidentId(String);

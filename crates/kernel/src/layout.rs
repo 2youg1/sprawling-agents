@@ -7,10 +7,8 @@
 //! the city root and an address (kernel-SPEC.md section 8-56).
 //!
 //! Every directory name and file name the city writes is declared here
-//! once, and every path it writes them to is spelled here once. Before
-//! this module each caller joined its own segments, so the reserved
-//! subtree had two names, the object store had six spellings, and a
-//! rename could reach five of them and leave the sixth reading an empty
+//! once, and every path it writes them to is spelled here once, so a
+//! rename reaches every caller and none is left reading an empty
 //! directory.
 //!
 //! Nothing here touches a disk. A `CityLayout` is a value: it answers
@@ -133,9 +131,8 @@ impl CityLayout {
     /// The configuration layer the city itself declares.
     ///
     /// The same rule as [`config`](Self::config) at the root, and a
-    /// method of its own because the root is not an address: a caller
-    /// without one used to reach past this type and join the two names
-    /// by hand, which is how the reserved prefix grew its second home.
+    /// method of its own because the root is not an address, and a
+    /// caller without one would otherwise join the two names by hand.
     #[must_use]
     pub fn city_config(&self) -> PathBuf {
         self.governed_root().join(CONFIG_FILE)

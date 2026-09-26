@@ -15,8 +15,8 @@ use crate::event::Payload;
 use crate::model::image::ImageRef;
 use crate::model::usage::ModelUsage;
 use crate::tool::ToolName;
-/// Building-level constraints riding along the call. S2 carries the one
-/// load-bearing bit; further fields only grow (14.3), and each one is
+/// Building-level constraints riding along the call. It carries the one
+/// load-bearing bit; further fields only grow, and each one is
 /// added at every construction site the compiler names.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuildingPolicy {

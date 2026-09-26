@@ -83,7 +83,7 @@ impl ApprovalId {
 /// The enum survives its own single arm on purpose. The cluster key is
 /// wire data, and a class named in the payload keeps the day a second
 /// kind of question appears a compile error at every reader rather than
-/// a silent change of meaning for a field that used to say one thing.
+/// a silent change of meaning for a field that says one thing today.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

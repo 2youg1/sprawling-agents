@@ -196,7 +196,7 @@ pub enum WindowClass {
 
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
-    /// and (from S2 on) `xtask specalign`.
+    /// and `xtask specalign`.
     pub const ALL: [EventKind; 78] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,

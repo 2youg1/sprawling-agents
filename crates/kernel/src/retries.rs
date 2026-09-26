@@ -5,13 +5,10 @@
 
 //! How many times a failed call is made again.
 //!
-//! **One value, one absence.** The same setting used to mean three
-//! things: a dispatch read a missing figure as "retry until somebody
-//! halts the run", a model-list probe read it as "do not retry", and
-//! the form offered `4` before anybody had settled anything. The same
-//! person, the same endpoint, and two different behaviours. The figure
-//! is a value here, its absence is [`Retries::UntilHalted`] by
-//! construction, and no reader can spell a fourth answer.
+//! **One value, one absence.** The figure is a value here and its
+//! absence is [`Retries::UntilHalted`] by construction, so a dispatch,
+//! a model-list probe and the form cannot each read a missing figure
+//! their own way, and no reader can spell a fourth answer.
 //!
 //! It lives in the kernel because two layers read it and neither
 //! depends on the other: the gateway, deciding whether to send the

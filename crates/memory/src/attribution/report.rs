@@ -112,8 +112,8 @@ impl Attribution {
                     .unwrap_or(1);
                 let slot = self.tool_weights.entry(name).or_insert(0);
                 *slot = slot.saturating_add(bytes);
-                // The SKILL a call was made under, when one was: P1's
-                // Library fills this; until then every call is unsplit.
+                // The SKILL a call was made under, when one was; a call
+                // without one goes to the `no_skill` bucket.
                 let skill = record
                     .data()
                     .as_map()

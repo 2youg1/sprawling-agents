@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A6's type half: claiming done makes nothing done. Evidence has no
+// Claiming done makes nothing done. Evidence has no
 // public constructor path but `Evidence::new`, which validates.
 
 fn main() {

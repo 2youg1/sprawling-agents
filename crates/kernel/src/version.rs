@@ -7,7 +7,7 @@
 //! `base_version`; a stale base yields a verdict, never a silent merge.
 //!
 //! The mapping from [`VersionVerdict::Stale`] to `E_VERSION_CONFLICT`
-//! plus a fresh diff lives with the edit tool (S3); kernel only judges
+//! plus a fresh diff lives with the edit tool; kernel only judges
 //! freshness and knows nothing about diffs.
 
 use serde::{Deserialize, Serialize};

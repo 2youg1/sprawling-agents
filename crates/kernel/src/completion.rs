@@ -5,7 +5,7 @@
 
 //! Completion and progress. Claiming done makes
 //! nothing done: `Completion::Done` cannot be built without in-window
-//! evidence (A6's type half; the runtime depth check is S3's). Progress
+//! evidence (the runtime checks depth). Progress
 //! is honest in the type: only a planned run owns a ratio method —
 //! an unplanned run has nothing to ask a percentage from.
 

@@ -10,7 +10,7 @@ use zeroize::{Zeroize, Zeroizing};
 
 /// A value that cannot reach any sink: no Debug, no Display, no serde,
 /// no Clone; drop zeroizes (secrecy::SecretBox). Expose call sites are
-/// whitelisted by `xtask secret` (gateway::endpoint/native only, S3).
+/// whitelisted by `xtask secret` (`EXPOSE_WHITELIST`).
 pub struct Sealed<T: Zeroize>(SecretBox<T>);
 
 impl<T: Zeroize> Sealed<T> {

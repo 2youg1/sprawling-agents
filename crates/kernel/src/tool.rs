@@ -195,7 +195,7 @@ pub enum Temporal {
     Timestamped,
 }
 
-/// Cost bucket for budget and routing; consumers arrive in S3.
+/// Cost bucket for budget and routing; the tool layer consumes it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CostTier {
@@ -205,7 +205,7 @@ pub enum CostTier {
 }
 
 /// Presentation intent; per-call `locations` are a pure function of args
-/// (tool side, S3). Meta-level declarations use an empty list.
+/// (tool side). Meta-level declarations use an empty list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RenderIntent {
@@ -248,7 +248,7 @@ impl ToolCall {
     ///
     /// # Errors
     /// Propagates arguments that do not serialise, which keeps the key
-    /// honest: the empty string this used to substitute would collide
+    /// honest: substituting an empty string would collide
     /// two different calls into one key.
     pub fn action(&self) -> Result<Vec<u8>, AxError> {
         let mut action = self.name.as_str().as_bytes().to_vec();
@@ -284,7 +284,7 @@ pub struct ToolOutcome {
 /// What one call is about, in the terms its own grammar names it.
 ///
 /// The tool owning the call's grammar is the only place that can read
-/// it off the arguments (M-17). A sixth kind is a change here, not a
+/// it off the arguments. A sixth kind is a change here, not a
 /// string that reaches a gate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GateSubject {
@@ -342,8 +342,8 @@ pub trait Tool: Send + Sync {
     }
 }
 
-/// The exec three-arm shape (L0 frozen surface, 5.1). Lives on the tool
-/// face because `discard::forecast` consumes it ahead of the S3 exec tool.
+/// The exec three-arm shape. Lives on the tool face because
+/// `discard::forecast` consumes it and kernel cannot depend on runtime.
 /// Exactly three arms — deliberately exhaustive.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

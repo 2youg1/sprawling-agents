@@ -185,9 +185,9 @@ mod tests {
         GitOid::parse(&raw).expect("a checkpoint names a git object")
     }
 
-    /// The whole of this card in one case: a person reviewing a change
-    /// reads the patch of one file, and the line that carried a key is
-    /// reported by number and reason rather than echoed.
+    /// A person reviewing a change reads the patch of one file, and the
+    /// line that carried a key is reported by number and reason rather
+    /// than echoed.
     #[test]
     fn one_file_answers_with_its_patch_and_a_credential_line_is_named_not_echoed() {
         let dir = tempfile::tempdir().unwrap();

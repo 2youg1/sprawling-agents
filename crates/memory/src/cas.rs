@@ -45,8 +45,7 @@ impl Cas {
         Cas::open_with(Box::new(RealFs::new()), dir)
     }
 
-    /// Injection point for the fault adapter (tests; citysim gets a
-    /// public constructor with the `fault` feature when S4 needs it).
+    /// Injection point for the fault adapter (tests only).
     pub(crate) fn open_with(mut vfs: Box<dyn Vfs>, dir: &Path) -> Result<Cas, MemoryError> {
         let objects = dir.join("b3");
         let tmp = dir.join("tmp");

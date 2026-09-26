@@ -5,7 +5,7 @@
 
 //! Same-resource mutual exclusion. Detection is
 //! kernel's; arbitration is not — reading statements and judging intent
-//! belongs to models (collab::arbiter, P2) and humans.
+//! belongs to models (collab::arbiter) and humans.
 
 use serde::{Deserialize, Serialize};
 

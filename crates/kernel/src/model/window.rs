@@ -12,10 +12,10 @@ use serde::{Deserialize, Serialize};
 /// The most tokens one model reads in a single call, prompt and reply
 /// together.
 ///
-/// **Zero is unrepresentable, and absence is not zero.** A window
-/// nobody stated and a window of zero used to be the same byte, so the
-/// context reminder measured a conversation against nothing and
-/// reported every session as full. A figure nobody registered is
+/// **Zero is unrepresentable, and absence is not zero.** Were a window
+/// nobody stated and a window of zero the same value, the context
+/// reminder would measure a conversation against nothing and report
+/// every session as full. A figure nobody registered is
 /// carried as `None` all the way to the reminder, which then stays
 /// silent, and every layer in between is spared the rule that zero is
 /// special.
