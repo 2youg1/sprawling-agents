@@ -180,12 +180,54 @@ fn after(skipping: Skip, code: &str) -> Skip {
         Skip::Body(depth) => depth,
         Skip::No | Skip::Attribute => 0,
     };
+    let code = without_literals(code);
     let opened = depth.saturating_add(code.matches('{').count());
     let closed = code.matches('}').count();
     match opened.checked_sub(closed) {
         Some(0) | None if code.ends_with(';') || code.ends_with('}') => Skip::No,
         Some(0) | None => Skip::Body(0),
         Some(left) => Skip::Body(left),
+    }
+}
+
+/// `code` with its string and char literals removed, so the braces left
+/// are the ones that open and close blocks. A `'` that does not start a
+/// char literal starts a lifetime and is dropped alone.
+fn without_literals(code: &str) -> String {
+    let mut kept = String::with_capacity(code.len());
+    let mut chars = code.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => skip_past(&mut chars, '"'),
+            '\'' => {
+                let mut ahead = chars.clone();
+                match (ahead.next(), ahead.next()) {
+                    (Some('\\'), _) => {
+                        chars.next();
+                        chars.next();
+                        skip_past(&mut chars, '\'');
+                    }
+                    (Some(_), Some('\'')) => {
+                        chars.next();
+                        chars.next();
+                    }
+                    _ => {}
+                }
+            }
+            other => kept.push(other),
+        }
+    }
+    kept
+}
+
+/// Advance past the next `end` that no backslash escapes.
+fn skip_past(chars: &mut std::str::Chars<'_>, end: char) {
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            chars.next();
+        } else if c == end {
+            return;
+        }
     }
 }
 
