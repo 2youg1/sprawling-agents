@@ -32,7 +32,7 @@ const _: () = assert!(
 
 /// One reading of every counter the monitor shows, in integers because
 /// it travels on the wire.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize)]
 pub struct Sample {
     pub core_cpu_permille: u64,
     pub core_private_bytes: u64,

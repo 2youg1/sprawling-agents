@@ -18,9 +18,8 @@ fn a_json_line_carries_every_counter_under_its_field_name() {
         volume_free_bytes: u64::MAX,
         ..Sample::default()
     };
-    let line = json_line(&sample);
-    let object: serde_json::Map<String, serde_json::Value> =
-        serde_json::from_str(&line).unwrap();
+    let line = json_line(&sample).unwrap();
+    let object: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&line).unwrap();
     assert_eq!(
         (
             line.contains('\n'),

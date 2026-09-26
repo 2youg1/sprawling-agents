@@ -3547,9 +3547,9 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 **接口。**
 
-- `json_line(sample: &Sample) -> String`：stdout 不是终端时每秒打印的那一行。一个 JSON 对象，键就是 `Sample` 的 13 个字段名，值是整数；不含换行，调用方负责换行。agent 按行读，一行一个完整的读数。
+- `json_line(sample: &Sample) -> serde_json::Result<String>`：stdout 不是终端时每秒打印的那一行。一个 JSON 对象，键就是 `Sample` 的 13 个字段名，值是整数；不含换行，调用方负责换行。agent 按行读，一行一个完整的读数。
 - `sparkline(values: impl IntoIterator<Item = u64>, width: usize) -> String`：终端界面里一项计数器的曲线。只取最后 `width` 个值，每个值一个字符，从 `▁` 到 `█` 共 8 级，按这几个值自己的最小值到最大值线性分级（整数运算，最小值画 `▁`，最大值画 `█`）；全部相等时整条画 `▁`。值不足 `width` 个时曲线就短一些，不补空白。
-- 没有失败路径：两者都是纯函数，JSON 的键是固定的 ASCII，值是 `u64`。
+- 失败：`sparkline` 没有失败路径。`json_line` 只转交 `serde_json` 的错误；13 个整数字段没有可被拒绝的内容，所以它实际上不会出现，调用方把它当作写 stdout 失败处理，而不是在这里用一个隐藏的 `unwrap` 吞掉。
 
 **定下的值。** 8 级字符 `▁▂▃▄▅▆▇█`（U+2581–U+2588），与常见终端字体都有的块元素一致。
 

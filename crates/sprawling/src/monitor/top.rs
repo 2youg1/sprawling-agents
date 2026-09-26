@@ -11,18 +11,41 @@ use super::Sample;
 
 /// The line printed each second when stdout is not a terminal: one JSON
 /// object keyed by the [`Sample`] field names, without the newline.
-#[must_use]
-pub fn json_line(sample: &Sample) -> String {
-    let _ = sample;
-    String::new()
+///
+/// # Errors
+///
+/// Only what `serde_json` reports; a struct of integers gives it nothing
+/// to refuse, and the caller treats it as a failed write to stdout.
+pub fn json_line(sample: &Sample) -> serde_json::Result<String> {
+    serde_json::to_string(sample)
 }
 
+/// The eight heights a curve is drawn in, lowest first.
+const LEVELS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
 /// The last `width` values as one block character each, scaled from the
-/// window's own minimum (`▁`) to its maximum (`█`).
+/// window's own minimum (`▁`) to its maximum (`█`); a flat window is `▁`.
 #[must_use]
 pub fn sparkline(values: impl IntoIterator<Item = u64>, width: usize) -> String {
-    let _ = (values.into_iter(), width);
-    String::new()
+    let all: Vec<u64> = values.into_iter().collect();
+    let window = all.iter().copied().skip(all.len().saturating_sub(width));
+    let low = window.clone().min().unwrap_or(0);
+    let span = window.clone().max().unwrap_or(0).saturating_sub(low);
+    window
+        .filter_map(|value| level(value.saturating_sub(low), span))
+        .collect()
+}
+
+/// The character `offset` above the window's minimum reaches in a window
+/// `span` tall. A flat window has no height to divide, so it draws the
+/// lowest level; `offset <= span` keeps the rank inside [`LEVELS`].
+fn level(offset: u64, span: u64) -> Option<char> {
+    let top = u128::try_from(LEVELS.len().checked_sub(1)?).ok()?;
+    let rank = u128::from(offset)
+        .checked_mul(top)?
+        .checked_div(u128::from(span))
+        .unwrap_or(0);
+    LEVELS.get(usize::try_from(rank).ok()?).copied()
 }
 
 #[cfg(test)]
