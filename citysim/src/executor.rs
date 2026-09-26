@@ -252,7 +252,7 @@ pub fn run_scenario_on(
                 // one is due, inside this result's byte budget.
                 let stamp = stamps.observe(t, temporal, &config.clock_zones)?;
                 if let Some(world) = sieve.as_mut()
-                    && call.name.as_str() == "exec"
+                    && call.name.as_str() == kernel::ToolName::EXEC
                 {
                     return package_exec(call, &outcome, world, stamp);
                 }

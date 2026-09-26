@@ -219,7 +219,7 @@ impl ToolBench {
 
         // The command door stands before the forecast: a command a
         // tainted run may not execute owes no checkpoint.
-        if name == "exec"
+        if name == ToolName::EXEC
             && let Some(answered) = self.settled(kernel::gate::command(&self.taint))
         {
             return Ok(answered);
@@ -227,7 +227,7 @@ impl ToolBench {
 
         // exec is forecast first. A hit does not refuse: it fences.
         let mut fenced = None;
-        if name == "exec"
+        if name == ToolName::EXEC
             && let Ok(arm) = crate::tools::parse_arm(call.args.as_map())
             && let DiscardForecast::Suspected { pattern } = kernel::discard::forecast(&arm)
         {

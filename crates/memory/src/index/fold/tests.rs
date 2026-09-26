@@ -137,6 +137,22 @@ proptest! {
             }
         }
 
+        let ascending: Vec<Seq> = oracle.entries.keys().copied().collect();
+        prop_assert_eq!(folded.seqs().collect::<Vec<_>>(), ascending.clone());
+        prop_assert_eq!(
+            folded.seqs().rev().collect::<Vec<_>>(),
+            ascending.iter().rev().copied().collect::<Vec<_>>()
+        );
+        // Both ends taken in turn meet in the middle without losing or
+        // repeating a seq.
+        let mut from_both = Vec::new();
+        let mut seqs = folded.seqs();
+        while let Some(low) = seqs.next() {
+            from_both.push(low);
+            from_both.extend(seqs.next_back());
+        }
+        from_both.sort();
+        prop_assert_eq!(from_both, ascending);
         prop_assert_eq!(folded.tail_seq(), oracle.entries.keys().next_back().copied());
         prop_assert_eq!(folded.len(), oracle.entries.len());
         prop_assert_eq!(folded.is_empty(), oracle.entries.is_empty());
@@ -151,4 +167,40 @@ proptest! {
             }
         }
     }
+}
+
+/// A healthy ledger numbers its lines one after another, so the seq of
+/// each line is implied by its place and only the offset is held.
+#[test]
+fn a_contiguous_ledger_costs_eight_bytes_per_record() {
+    let mut folded = Folded::empty();
+    let count = 10_000u64;
+    for seq in 1..=count {
+        let body = format!("{{\"seq\":{seq}}}");
+        folded.insert_line("seg-0", seq * 64, body.as_bytes());
+    }
+    assert_eq!(
+        (folded.len(), folded.entries.resident_bytes()),
+        (10_000, 80_000)
+    );
+}
+
+/// A damaged ledger whose seqs double from line to line must not double
+/// the column with them: holes stay bounded by the lines the column holds.
+#[test]
+fn doubling_seqs_leave_the_column_bounded_by_its_lines() {
+    let mut folded = Folded::empty();
+    let seqs = std::iter::once(1u64)
+        .chain(std::iter::successors(Some(65u64), |seq| seq.checked_mul(2)).take(15));
+    for seq in seqs {
+        let body = format!("{{\"seq\":{seq}}}");
+        folded.insert_line("seg-0", seq, body.as_bytes());
+    }
+    let bound = 64 * (folded.len() + 64);
+    assert!(
+        folded.entries.resident_bytes() <= bound,
+        "{} resident bytes for {} lines, bound {bound}",
+        folded.entries.resident_bytes(),
+        folded.len()
+    );
 }

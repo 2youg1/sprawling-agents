@@ -146,7 +146,7 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError> {
     let index = memory::LedgerIndex::rebuild(ledger_dir).map_err(memory::MemoryError::into_ax)?;
     let mut reader = index.reader(ledger_dir);
     let mut lineage = Lineage::default();
-    for &seq in index.seqs() {
+    for seq in index.seqs() {
         let line = reader.line_at(seq).map_err(memory::MemoryError::into_ax)?;
         lineage.apply(&EventRecord::parse_line(&line)?)?;
     }

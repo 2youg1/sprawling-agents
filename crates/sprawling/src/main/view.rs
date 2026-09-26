@@ -167,34 +167,43 @@ pub(super) fn write_records(
     out: &mut impl Write,
 ) -> Result<(), ViewError> {
     let index = memory::LedgerIndex::rebuild(dir)?;
-    let run_seqs: Vec<Seq>;
-    let walk: &[Seq] = match chosen.run {
+    let mut reader = index.reader(dir);
+    match chosen.run {
         Some(run) => {
             let mut seqs: Vec<Seq> = index.run_seqs_before(run, None).collect();
             seqs.reverse();
-            run_seqs = seqs;
-            &run_seqs
+            write_walk(&mut reader, seqs.into_iter(), chosen, out)
         }
-        None => index.seqs(),
-    };
-    let start = chosen
-        .from
-        .map_or(0, |from| walk.partition_point(|seq| *seq < from));
-    let walk = walk.get(start..).unwrap_or_default();
-    let mut reader = index.reader(dir);
+        None => write_walk(&mut reader, index.seqs(), chosen, out),
+    }
+}
+
+/// Writes the lines of `walk`, an ascending run of seqs, that `chosen`
+/// admits.
+fn write_walk(
+    reader: &mut memory::LineReader<'_>,
+    walk: impl DoubleEndedIterator<Item = Seq>,
+    chosen: &Selection,
+    out: &mut impl Write,
+) -> Result<(), ViewError> {
+    let from = chosen.from;
+    let walk = walk.filter(|seq| from.is_none_or(|from| *seq >= from));
     match chosen.tail {
         None => {
-            for &seq in walk {
+            for seq in walk {
                 let line = reader.line_at(seq)?;
                 if chosen.admits(&line)? {
                     out.write_all(&line)?;
-                    out.write_all(b"\n")?;
+                    out.write_all(
+                        b"
+",
+                    )?;
                 }
             }
         }
         Some(count) => {
             let mut kept = Vec::new();
-            for &seq in walk.iter().rev() {
+            for seq in walk.rev() {
                 if kept.len() >= count {
                     break;
                 }
@@ -205,7 +214,10 @@ pub(super) fn write_records(
             }
             for line in kept.iter().rev() {
                 out.write_all(line)?;
-                out.write_all(b"\n")?;
+                out.write_all(
+                    b"
+",
+                )?;
             }
         }
     }
