@@ -284,6 +284,29 @@ pub fn all(scratch: &Path, fixture: &Fixture, machine: MachineClass)
 
 **红**：`a_reading_line_is_stable_and_carries_its_machine_class`——一行读数按字节对拍既有文法且带 `machine_class` 字段；`the_four_load_scenarios_rerun_and_emit_the_stable_format`——四个场景各跑两遍，每行键序恒为文法键序（可复跑、格式稳定）。
 
+### 8-7 红队：有无验证 run 两臂的结论质量（`citysim::red_team`）
+
+形状：decision。红队剧本是一组固定的 `Case`：每个 case 是一份草稿，外加作者 run 交出的结论，每条结论带一条 `collab::Citation` 与红队写下的真相 `Plant`（`Faithful`，或三种埋下的缺陷 `Misquote`／`OtherVersion`／`PastEnd`，与 `collab::Reading` 的三种不成立读数一一对应）。剧本就是脚本化 provider 在这里的角色：同一剧本两臂各跑一次，逐字节可复跑。
+
+```rust
+pub enum Arm { Unverified, Verified }
+pub enum Plant { Faithful, Misquote, OtherVersion, PastEnd }
+pub struct Claim { pub citation: Citation, pub plant: Plant }
+pub struct Case { pub draft: String, pub claims: Vec<Claim> }
+pub struct Tally { pub kept_faithful: usize, pub kept_planted: usize, pub dropped_faithful: usize, pub dropped_planted: usize }
+impl Tally { pub fn precision_per_mille(&self) -> Option<usize> }
+pub struct Comparison { pub unverified: Tally, pub verified: Tally }
+pub fn compare(cases: &[Case]) -> Comparison
+```
+
+- `Arm::Unverified` 留下作者交出的每条结论；`Arm::Verified` 把每条引文对草稿钉住的版本（`cas:` 草稿全文摘要、无区间）跑一次 `Citation::against`，只留 `Reading::Holds` 的结论。
+- 结论质量＝留下的结论里忠实者的千分比（`precision_per_mille`）；一条都没留下时为 `None`，因为零分之零不是质量。另两格（误删的忠实结论、放行的缺陷）照实计数，使验证 run 的代价与收益在同一张表上。
+- 无失败出口：一条不成立的引文是验证 run 要报的结果，不是故障（与 `collab::Reading` 同一口径）。
+
+决定：两臂共用同一份剧本与同一个判定函数 `collab::Citation::against`，只差「判定是否被调用」。落选的做法是在 `suite`（§8-8-1）里建套件：`Suite` 量的是 held-in／held-out 的通过率，没有「同一结论集、去掉一个环节」这一维，而且 citysim 已经有固定剧本与计数时钟。真实 provider 的读数替换的是剧本里的作者，不是判定；判定可复跑，所以 CI 只跑脚本化这一侧。
+
+**红**：`the_verified_arm_keeps_only_faithful_conclusions`——同一剧本下，验证臂的千分比为 1000、放行缺陷为 0，未验证臂低于它；`every_planted_defect_is_dropped_by_its_own_reading`——三种埋下的缺陷各自被验证臂删掉，忠实结论一条不误删。
+
 ### 8-8 仪器：suite、score、metabolism、nesting、ablation
 
 五件仪器回答「城拿什么证据评估自己」。它们**恒不是合并门**：一件仪器说某样东西变差了，是给人看的证据，不是 CI 的红灯。量的是模型行为，两次不一样是常态，所以它们出证据不出红灯；设阈值的门归 `xtask budget`，依据是「机器两次量得一样」。
