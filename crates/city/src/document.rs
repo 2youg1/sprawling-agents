@@ -69,6 +69,68 @@ pub(crate) fn replace(path: &Path, body: &[u8]) -> Result<(), AxError> {
     edit(path, |held| held.replace(body))
 }
 
+/// One entry of a directory [`place_tree`] lands, by its path relative
+/// to that directory with segments joined by `/`.
+pub(crate) enum TreeEntry<'a> {
+    Directory(&'a str),
+    File(&'a str, &'a [u8]),
+}
+
+/// Puts a directory at `target` that did not exist, whole or not at all.
+///
+/// The same two properties as [`replace`], for a tree: every entry is
+/// written and flushed inside a staging directory beside the target,
+/// and one rename moves the whole tree into place, so a reader finds no
+/// directory or the complete one. `entries` lists each directory before
+/// what it holds. A staging directory a killed writer left behind was
+/// never moved into place and no reader has seen it, so it is cleared
+/// first rather than refused.
+///
+/// # Errors
+/// `E_STORAGE_FATAL` naming the path that failed, including a target
+/// that already exists: this door places, it never overwrites a tree.
+pub(crate) fn place_tree(target: &Path, entries: &[TreeEntry<'_>]) -> Result<(), AxError> {
+    let slot = slot(target);
+    let _guard = slot.lock().unwrap_or_else(PoisonError::into_inner);
+    let dir = target
+        .parent()
+        .ok_or_else(|| storage(target, "a tree needs a directory to sit in".to_owned()))?;
+    let staged = staging_path(target)?;
+    if std::fs::symlink_metadata(&staged).is_ok() {
+        std::fs::remove_dir_all(&staged).map_err(|err| storage(&staged, err.to_string()))?;
+    }
+    std::fs::create_dir_all(&staged).map_err(|err| storage(&staged, err.to_string()))?;
+    for entry in entries {
+        match entry {
+            TreeEntry::Directory(path) => {
+                let at = beneath(&staged, path);
+                std::fs::create_dir(&at).map_err(|err| storage(&at, err.to_string()))?;
+            }
+            TreeEntry::File(path, body) => stage(&beneath(&staged, path), body)?,
+        }
+    }
+    for entry in entries {
+        if let TreeEntry::Directory(path) = entry {
+            settle(&beneath(&staged, path))?;
+        }
+    }
+    settle(&staged)?;
+    std::fs::rename(&staged, target).map_err(|err| {
+        storage(
+            target,
+            format!("{} could not take its place: {err}", staged.display()),
+        )
+    })?;
+    settle(dir)
+}
+
+/// Where an entry named by a `/`-joined relative path sits under `root`.
+fn beneath(root: &Path, relative: &str) -> PathBuf {
+    relative
+        .split('/')
+        .fold(root.to_path_buf(), |at, segment| at.join(segment))
+}
+
 /// Runs `act` with `path` held against every other writer of `path` in
 /// this process.
 ///

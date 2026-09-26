@@ -13,6 +13,8 @@ use kernel::{AxCode, B3Hash};
 
 use crate::library::Library;
 
+mod whole;
+
 const BODY: &str = "# Firing a kiln\n\nbody\n";
 
 /// One skill package in the layout a shelf outside the city files them:
@@ -31,6 +33,15 @@ fn shelved(city_root: &Path, section: &str, name: &str) -> PathBuf {
         .join(LIBRARY_DIR)
         .join(section)
         .join(format!("{name}.md"))
+}
+
+/// Where a whole package lands: a directory named after the skill.
+fn shelved_package(city_root: &Path, section: &str, name: &str) -> PathBuf {
+    city_root
+        .join(kernel::RESERVED_PREFIX)
+        .join(LIBRARY_DIR)
+        .join(section)
+        .join(name)
 }
 
 /// A registrar that records every byte string it was handed and answers
@@ -91,15 +102,13 @@ fn an_installed_skill_is_shelved_and_read_back_whole() {
 
     assert_eq!(installed.placed, Placed::Fresh);
     assert_eq!(
-        std::fs::read(shelved(city_root.path(), "utilities", "firing")).unwrap(),
+        std::fs::read(shelved_package(city_root.path(), "utilities", "firing").join("SKILL.md"))
+            .unwrap(),
         BODY.as_bytes(),
         "what landed is what arrived, byte for byte"
     );
-    assert_eq!(
-        *seen.borrow(),
-        vec![BODY.as_bytes().to_vec()],
-        "the bytes were registered once"
-    );
+    assert_eq!(seen.borrow().len(), 1, "the bytes were registered once");
+    assert_eq!(B3Hash::digest(&seen.borrow()[0]), installed.hash);
     // The scan reads back exactly the holding install reported: one name
     // is one holding, and the two derivations cannot disagree.
     let library = Library::scan(city_root.path(), None, Path::new("no-home")).unwrap();
@@ -147,7 +156,8 @@ fn reinstalling_the_same_bytes_is_idempotent() {
     assert_eq!(second.placed, Placed::AlreadyShelved);
     assert_eq!(second.holding, first.holding, "one name holds one holding");
     assert_eq!(
-        std::fs::read(shelved(city_root.path(), "utilities", "firing")).unwrap(),
+        std::fs::read(shelved_package(city_root.path(), "utilities", "firing").join("SKILL.md"))
+            .unwrap(),
         BODY.as_bytes(),
         "a reinstall writes no byte"
     );
@@ -174,7 +184,7 @@ fn a_package_changed_while_it_was_being_installed_is_refused_whole() {
         "a refused install registers nothing"
     );
     assert!(
-        !shelved(city_root.path(), "utilities", "swapped").exists(),
+        !shelved_package(city_root.path(), "utilities", "swapped").exists(),
         "a refused install leaves the shelves untouched"
     );
 
@@ -186,7 +196,7 @@ fn a_package_changed_while_it_was_being_installed_is_refused_whole() {
     let err = planned.apply(&mut register).unwrap_err();
     assert_eq!(*err.code(), AxCode::VersionConflict);
     assert!(seen.borrow().is_empty());
-    assert!(!shelved(city_root.path(), "utilities", "grown").exists());
+    assert!(!shelved_package(city_root.path(), "utilities", "grown").exists());
 }
 
 /// A package reached through a link is refused whatever the link points
@@ -241,7 +251,8 @@ fn a_taken_name_refuses_a_different_skill() {
     let err = plan_install(city_root.path(), &slot, &src).unwrap_err();
     assert_eq!(*err.code(), AxCode::InvalidArgs);
     assert_eq!(
-        std::fs::read(shelved(city_root.path(), "utilities", "firing")).unwrap(),
+        std::fs::read(shelved_package(city_root.path(), "utilities", "firing").join("SKILL.md"))
+            .unwrap(),
         BODY.as_bytes(),
         "the shelved skill is the one that was there"
     );
