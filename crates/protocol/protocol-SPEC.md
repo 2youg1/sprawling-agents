@@ -143,7 +143,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 一条消息超过 `MESSAGE_CEILING`／流在消息中途断掉／消息不是 UTF-8／非 JSON 行／非对象／既无 result 又无 error／`tools` 缺失／工具无名／标签非法／浮点在顶层、数组内、深层对象内／confidential 楼／空 addr／空 task／空 goal／地址落 reserved prefix／重放缺答案。
 
-## 12 错误处理
+## 12 Decisions
 
 | 码 | 何时 | 能否让它不可能发生 |
 |---|---|---|

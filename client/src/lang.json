@@ -2806,7 +2806,7 @@
   },
   "err_e_endpoint_dialect_unsupported": {
     "en": "this endpoint speaks another dialect",
-    "zh": "这个端点说的是另一种方言"
+    "zh": "这个端点说的是另一种兼容格式"
   },
   "err_e_wire_mismatch": {
     "en": "the client and the city disagree on the wire",

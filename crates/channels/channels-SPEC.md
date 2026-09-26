@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 28 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94`；**WIRE_V ＝ 39**（事件种类 `rules_changed` → kernel-SPEC §8-4；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
+  **当前 golden**：`53e2d604f028d5cf46ce3623fdd8fc59072e4b38387fbd2301e49795b1bc3252`；**WIRE_V ＝ 39**（事件种类 `rules_changed` → kernel-SPEC §8-4；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -127,7 +127,7 @@ impl Query { pub fn name(&self) -> &'static str; }
 pub const WIRE_V: u32;
 pub const COMMAND_NAMES: [&str; /* 长度由变体数生成 */];   // 形状 6 数据面：名字权威，计数断言见 §2
 pub const QUERY_NAMES:   [&str; /* 长度由变体数生成 */];   // 同上（§8-38）
-pub fn schema_hash() -> B3Hash;        // blake3("sprawling/wire/" || WIRE_V 小端 || 'C'+名… || 'Q'+名…)
+pub fn schema_hash() -> B3Hash;        // blake3("sprawling/wire/" || WIRE_V 小端 || 'C'+名… || 'Q'+名… || 'E'+事件种类名…)
 
 pub enum ClientFrame { Hello(Hello), Command(Box<Command>), Query(Query) }
 pub enum ServerFrame { Welcome(Welcome), Event(Box<EventRecord>), Reply(Box<Reply>), Refusal(Box<AxError>) }
@@ -418,7 +418,7 @@ pub struct SessionName(String);                // 形状 2；一个构造点，�
 
 （待填：握手哈希不配／令牌错／绑定非回环无令牌／上传中断／客户端半关连接／聚合上游断线／Event 推送背压。）
 
-## 12 错误处理（逐码答「能否定义掉」）
+## 12 Decisions
 
 - **`E_WIRE_MISMATCH`**：不可——它是装载期六码之一（封闭白名单），且它的存在理由就是「浏览器缓存旧前端」这一 WebUI 特有错配。类型无法定义掉跨版本的字节。握手之后解不出的帧同归此码、两侧的处置见 §8-37。
 - **`E_CONFIG_INVALID`**：不可——绑定非回环而无令牌必须在**启动时**拒绝，这是配置判定不是请求判定。
@@ -615,7 +615,7 @@ pub fn wire_schema() -> serde_json::Value;   // 一份文档：`$defs` 里是信
                                              // 含 `ClientFrame` 与 `ServerFrame` 两个根
 ```
 
-- **哈希的素材一字不动**：`schema_hash()` 仍只吃 `WIRE_V`、命令名表、查询名表。生成的 `WIRE_HASH` 常量就是这个函数的输出，客户端在握手处送回它，服务端按原样校验——两端校验的是同一个值，而不是一个「schema 文档的摘要」；后者会把每一条 doc 注释的改动都变成一次拒配。
+- **哈希的素材是整个线上名字面**：`schema_hash()` 吃 `WIRE_V`、命令名表、查询名表，以及 `kernel::EventKind::ALL` 按表序的每个种类名——事件种类随每个事件帧到达页面，改名、增删一个种类与改名一个帧一样会让旧页面误读，所以它移动握手哈希，不靠有人记得去升 `WIRE_V`。生成的 `WIRE_HASH` 常量就是这个函数的输出，客户端在握手处送回它，服务端按原样校验——两端校验的是同一个值，而不是一个「schema 文档的摘要」；后者会把每一条 doc 注释的改动都变成一次拒配。
 - **每个入帧的类型都派生 `schemars::JsonSchema`**（`#[cfg_attr(feature = "schema", derive(...))]`），派生宏读的是 serde 已经在读的属性，故形状与编码同源。kernel 侧的值经 kernel 自己的 `schema` feature 派生（kernel-SPEC §8-45）；`NoSecret` 手写 `impl JsonSchema` 为 `false`（任何值都不满足），于是 `PutSecret` 臂在 TS 里是 `value: never`——线上拼不出它，这一句在两端各说一次、意思相同。`Command<Secret>` 以 `schemars(rename = "Command")` 命名，因为线上只有 `Command<NoSecret>` 一种实例。
 - **生成器只认 serde 会产出的那个子集**：对象（`properties`／`required`／`additionalProperties`）、`string`／`integer`／`number`／`boolean`／`null`、`array`（`items`）与元组（`prefixItems`）、`enum` 字符串表、`const`、`oneOf`／`anyOf`、`$ref` 指向 `#/$defs/…`、`type: [T, "null"]`、`true`／`false` 两种布尔 schema。其余一律拒绝并点名关键字与所在类型——一个会猜的生成器就是一个会静默产出错类型的生成器。具名的裸 `string`／`integer` 即 newtype，TS 侧打上 `Schema.brand(名)`。
 - **文件确定**：`$defs` 按名排序后按依赖拓扑输出（Effect 的 `Schema` 值必须先定义后引用；环即拒绝），对象键排序，LF 行尾，生成头注明来源。

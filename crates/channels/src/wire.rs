@@ -24,123 +24,11 @@
 //! the mapping point is the assembly layer, and an unknown value is an error
 //! there, never a guess.
 
-use kernel::{Address, AxError, B3Hash, EventRecord, RunId, Seq, TimeMs};
+use kernel::{Address, AxError, B3Hash, EventKind, EventRecord, RunId, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
 
 /// Wire format version. Bumped whenever the frame grammar changes shape in a
 /// way the schema hash alone would not explain to a human reading a log.
-///
-/// 5: `Dispatch` carries the name of the session it starts.
-/// 6: and how hard that session thinks.
-/// 7: a provider can be asked what it serves before it is attached, and
-///    an attachment names which of those models it admits.
-/// 8: a building's sandbox limits and external servers have a surface.
-/// 9: a page can ask for the history that happened before it opened.
-/// 12: a third class of frame carries what a model is saying while it is
-///    still saying it. It is not an event: it has no sequence
-///    number, it is never written down, and a client that missed one has
-///    lost nothing.
-/// 13: the plan is a tree, so a building's answer carries its nodes,
-///    what each is worth and what is ready; a branch that is stuck says
-///    so once, at the node it is stuck at; and a city can be given a
-///    goal it works towards until the work runs out.
-/// 14: a commit the city made can be asked which run wrote it.
-/// 15: that answer carries the lineage of the run - the successors
-///    a resident replaced itself through.
-/// 16: three readings a page used to compute for itself are questions
-///    the server answers - a session's rounds, what a run left as
-///    evidence, and what one plan node cost.
-/// 17: the first client that only asks the wire found four gaps in it -
-///    a run's room and start, a session's opening and closing, the
-///    scopes a halt shut, and the two questions that walk the tree,
-///    `Listing` and `Document`.
-/// 18: a building's commits can be listed, newest first, so a page can
-///    walk from a line of code to the session that wrote it without
-///    folding the history itself.
-/// 22: a model's output ceiling is a figure or it is absent. Zero used to
-///    mean "take the catalogue's figure", which for a model no catalogue
-///    knew meant a request carrying `max_tokens: 0` - a reply with
-///    nothing in it, and a run that froze as finished.
-/// 23: a path a page prints can be opened where a person keeps their
-///    files. The address grammar is the guard: there is no way to spell
-///    a request for something outside the city.
-/// 24: what an agent was told, what a building can do, and what is
-///    uncommitted in it - `Prefix`, `Content`, `Skills` and
-///    `GitStatus`, and the money beside a commit.
-/// 25: an endpoint carries what a person settled about it - a display
-///    label, its deadlines, how often a failed request is made again,
-///    the headers every call adds and the body fields every call
-///    writes. The probe carries the same, so what a probe reached is
-///    what an attachment calls.
-/// 26: the process log reaches a page. A third class of frame beside
-///    the event and the increment, carrying one diagnostic line; and
-///    this machine can be told to install one thing it lacks and to
-///    look at itself again.
-/// 27: a tool server carries what `claude mcp add` lets somebody write -
-///    a command with environment variables, a url with several headers,
-///    and a third transport that answers on a stream - and `McpHealth`
-///    asks one address's servers where they stand and what they offer.
-/// 28: an endpoint says which of its calls go through the machine's
-///    proxy, and a staged reading says which of the four reasons no
-///    proxy applied to the call it describes.
-/// 29: an increment says whether the model was answering or reasoning,
-///    and a settled turn carries the reasoning it did.
-/// 30: a tool call carries what it was asked for and a turn carries
-///    when it opened, and one press connects an outside application -
-///    `Query::Toolkits` reads the broker's shelf and
-///    `Command::ConnectToolkit` opens a consent session on it.
-/// 31: `Query::Release` answers which release this city is and which
-///    one npm offers - the only query that reaches the internet, asked
-///    when somebody presses the button and never on a timer.
-/// 32: the wire stops guessing, and the tables stop being written by
-///    hand. The two name tables the handshake hash is built from are
-///    generated from the frame enums themselves, so a frame is spelled
-///    once and both tables read in declaration order. A run's mode was
-///    free text and a model's window was a zero sentinel, and each had
-///    a default the city applied without saying so; they are now a
-///    closed enum and an absent value, both refused at this boundary
-///    when they arrive as something this build does not know. A person
-///    hands one waiting question to a resident with `HandOff`;
-///    `Attach` and `CreatePolicy` are gone, and with them the upload
-///    route behind the first and the escalation mechanism behind the
-///    second. An endpoint now says how it is connected and what it
-///    said about each model it serves, rather than listing bare ids.
-///    Four frames arrive for the two files a person edits: their own
-///    preferences, whole and by named change; what one address is
-///    governed by, with the layer each value came from; and a skill
-///    written onto a shelf. A third dialect rides with them,
-///    `OpenAiResponses`, kept apart from the chat face because
-///    somebody who pasted a responses URL said which face they meant.
-/// 33: the event stream says what it skipped. A session slower than the
-///    city used to lose the middle of the stream in silence; a
-///    `Lagged` frame now names the range of ledger records that never
-///    reached it, and `Query::HistoryRange` is the question it asks the
-///    Ledger to get that range back. A city reachable beyond this
-///    machine also refuses to serve a caller with no credential, which
-///    is enforced where it is decided rather than left to a comment.
-///    The increment and the log line keep their silence on purpose:
-///    neither is written to the Ledger, so a range naming them would
-///    name records that do not exist.
-/// 35: a session can start again at an address. A room's first run
-///    froze the model it calls and how hard it thinks, and every later
-///    run there refused to move either, so a person who changed the
-///    model had no way back into that room. `Command::OpenSession` is
-///    that way back: it forgets the shape, keeps the previous session's
-///    handoff only when the frame says to carry it, and writes
-///    `session_opened` with what it did.
-/// 36: `Takeover` and `Rollback` are gone. Both were spelled on the
-///    wire and performed by nothing; a verb no executor answers is a
-///    promise the client must not be able to make. Backing out is a
-///    branch and a git revert (kernel-SPEC.md section 12.2), and old
-///    pages are refused at the handshake rather than given buttons that
-///    can only fail.
-/// 38: a turn keeps the record it could not read. `Note::Unreadable`
-///    carries the cause where a refusal or a fence whose payload did
-///    not read back used to leave no note at all, so an older page would
-///    meet a variant it cannot decode.
-/// 39: `rules_changed` joins the event kinds, carrying which governing
-///    document moved as a closed word; an older page would meet a kind
-///    it cannot decode in the history it folds.
 pub const WIRE_V: u32 = 39;
 mod query;
 
@@ -167,6 +55,10 @@ pub fn schema_hash() -> B3Hash {
         material.push(b'Q');
         material.extend_from_slice(name.as_bytes());
     }
+    for kind in EventKind::ALL {
+        material.push(b'E');
+        material.extend_from_slice(format!("{kind:?}").as_bytes());
+    }
     B3Hash::digest(&material)
 }
 
@@ -174,8 +66,8 @@ pub fn schema_hash() -> B3Hash {
 /// [`ClientFrame`] or [`ServerFrame`], under `$defs`, both roots included.
 ///
 /// This is what `cargo xtask wire-ts` generates the client from. It is
-/// not what the handshake compares: [`schema_hash`] reads the version and
-/// the two name tables and nothing else, so a doc comment edited here
+/// not what the handshake compares: [`schema_hash`] reads the version,
+/// the two frame name tables and the event kind names and nothing else, so a doc comment edited here
 /// moves this document and leaves every connected page connected. Pure:
 /// same build, same bytes.
 #[cfg(feature = "schema")]

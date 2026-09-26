@@ -97,9 +97,26 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
     );
 }
 
-/// A function of WIRE_V and the two name tables, so any change to the
-/// protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94";
+/// The event kinds reach a page inside every event frame, so a renamed,
+/// added or removed kind must move the hash a page is admitted by, as a
+/// renamed frame does. The recipe is the one channels-SPEC.md states.
+#[test]
+fn the_schema_hash_covers_every_event_kind_name() {
+    let mut material = b"sprawling/wire/".to_vec();
+    material.extend_from_slice(&WIRE_V.to_le_bytes());
+    let kinds = kernel::EventKind::ALL.map(|kind| format!("{kind:?}"));
+    let tagged = COMMAND_NAMES.iter().map(|name| (b'C', *name));
+    let tagged = tagged.chain(QUERY_NAMES.iter().map(|name| (b'Q', *name)));
+    for (tag, name) in tagged.chain(kinds.iter().map(|name| (b'E', name.as_str()))) {
+        material.push(tag);
+        material.extend_from_slice(name.as_bytes());
+    }
+    assert_eq!(schema_hash(), kernel::B3Hash::digest(&material));
+}
+
+/// A function of WIRE_V, the two frame name tables and the event kind
+/// names, so any change to the protocol surface lands here first.
+const WIRE_SCHEMA_GOLDEN: &str = "53e2d604f028d5cf46ce3623fdd8fc59072e4b38387fbd2301e49795b1bc3252";
 
 // -------------------------------------------------------------- binding face
 

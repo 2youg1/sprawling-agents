@@ -3,10 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Lexicon gate: one concept, one name. Scans markdown and Rust sources for
-//! banned terms (the machine subset of the retired-term list; data face is
-//! xtask/lexicon.toml). A line is exempt when it or the line above carries
-//! `lexicon-ok: <reason>` (redline C6).
+//! Lexicon gate: one concept, one name. Scans markdown, Rust sources and
+//! the client's `lang.json` for banned terms (the machine subset of the
+//! retired-term list; data face is xtask/lexicon.toml). A line is exempt
+//! when it or the line above carries `lexicon-ok: <reason>` (redline C6).
 
 use std::path::Path;
 
@@ -14,6 +14,7 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 const EXEMPT_MARK: &str = "lexicon-ok:";
+const LANG: &str = concat!(crate::walk::client_src!(), "/lang.json");
 
 #[derive(serde::Deserialize)]
 struct Data {
@@ -40,6 +41,11 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         let text = walk::read_text(&file)?;
         scan(&rel, &text, &data.entry, &mut violations);
     }
+    // Every word a reader is given comes from here, so a retired word in
+    // it reaches the screen; the wording gate owns its shape, this gate
+    // owns its vocabulary.
+    let text = walk::read_text(&root.join(LANG))?;
+    scan(LANG, &text, &data.entry, &mut violations);
     Ok(violations)
 }
 

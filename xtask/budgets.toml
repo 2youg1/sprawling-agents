@@ -333,20 +333,17 @@ measured_by = "just bench (citysim bench bin, release)"
 status = "measured, not gated: p50 0.562 ms / p99 0.838 ms on windows-x86_64 NVMe (2026-09-02, after the segment stopped being reopened per write; 1.047 / 1.879 ms before it); batched append_all moves about 335k records/s. A wall-clock figure is the machine's, so it is recorded, never gated"
 
 # What one durability barrier costs per record as the batch under
-# it grows. The absolute figures are this machine's disk; the ratio
-# between the rows is a fact about the design, and it is the reason
-# `append_all` exists: a barrier is a fixed cost, so a wave of fifty
-# records is very nearly the price of one.
+# it grows. The absolute figures belong to the disk class they were
+# read on; the ratio between the rows is a fact about the design, and
+# it is the reason `Ledger::append_all` exists: a barrier is a fixed
+# cost, so a wave of fifty records is very nearly the price of one.
 #
-# The reading nobody had taken, and the one that matters: production
-# writes at the top row. `kernel::Ledger` has one method, `append(draft)`,
-# so every record `runtime` writes is a batch of one and pays a whole
-# barrier. `append_all` has no caller outside this crate and the bench.
-#
-# Every row halved without touching that: `RealFs` reopened the
-# segment for the append and again for the sync, so two `CreateFile` calls
-# sat under every record. It holds the handle now, the way `LineReader`
-# does on the read side. First reading 1100.3 / 103.3 / 22.4 us.
+# Production writes through that batch: the serving relay drains every
+# draft that arrived while the previous barrier ran and appends them
+# with one `append_all`, so a busy city pays a row far below the top
+# one and a quiet city pays the top row. `RealFs` holds the segment
+# handle across the append and the sync, the way `LineReader` does on
+# the read side, so no `CreateFile` sits under a record.
 [durability_barrier]
 what = "one fsync barrier, amortised over the records under it"
 measured_by = "just bench (citysim bench bin, release)"
