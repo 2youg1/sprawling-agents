@@ -31,6 +31,7 @@
   import { toFragment } from "../../core/route";
   import { UNSTATED, offered } from "../../core/slash";
   import { RunId } from "../../wire";
+  import { motherName } from "../talk/forking";
   import type { Utterance } from "./served";
   import { CALLS, EARLIER_SEGMENT, ROUND, TURNS, WAITING } from "./served";
 
@@ -61,6 +62,9 @@
   // shape a run id has, so the link under the divider is a link a
   // person can follow.
   const MOTHER = RunId.make("0199c0de-1a2b-4c3d-8e4f-5a6b7c8d9e0f");
+  // What the mother run was asked: the divider names it by its first
+  // sentence, never by the id above.
+  const MOTHER_TASK = EARLIER_SEGMENT.find((line) => line.speaker === "person")?.text ?? "";
 </script>
 
 <script lang="ts">
@@ -310,11 +314,13 @@ history, and five of them is not what the person came back for. -->
 from, and the mother run a person can open to see where the words
 came from. -->
 <Case label="talk · forked from turn 3, with the mother run linked">
-  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-  {@render divider(fill(say($lang, "session_forked_divider"), { turn: "3", at: "11:47" }))}
-  <p class="my-tight text-note text-text-faint">
-    <a href={toFragment({ kind: "run", run: MOTHER })} class="hover:text-text-quiet">{MOTHER}</a>
-  </p>
+  <div class="my-wide flex items-center gap-base text-note text-text-disabled">
+    <span class="h-px flex-1 bg-raised"></span>
+    <a href={toFragment({ kind: "run", run: MOTHER })} class="hover:text-text-quiet">
+      {fill(say($lang, "session_forked_divider"), { turn: "3", at: motherName(MOTHER_TASK) })} · 11:47
+    </a>
+    <span class="h-px flex-1 bg-raised"></span>
+  </div>
   {#each ROUND as line (line.text)}
     <div class="relative">
       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
@@ -325,6 +331,9 @@ came from. -->
       {/if}
     </div>
   {/each}
+  <p class="mb-tight text-note text-text-faint" role="status">
+    {fill(say($lang, "fork_pending"), { turn: "3" })}
+  </p>
 </Case>
 
 <!-- The affordance in its revealed state, because a state that only

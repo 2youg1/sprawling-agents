@@ -2840,6 +2840,10 @@
     "en": "copied",
     "zh": "已复制"
   },
+  "fork_pending": {
+    "en": "forked from turn {turn} · what you send next opens the branch",
+    "zh": "分叉自第 {turn} 轮 · 下一句会在分叉出的新会话里发出"
+  },
   "fork_mother": {
     "en": "mother run",
     "zh": "母 run"

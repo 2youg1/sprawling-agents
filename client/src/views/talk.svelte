@@ -152,6 +152,9 @@
     ours = true;
     story = { kind: "forked", at: u.now(), turn: plan.turn, mother: plan.mother };
     picking = false;
+    // The branch is where the person just went: its divider sits at the
+    // foot, above the box, so the view follows there even from far back.
+    anchoring = anchorAt({ kind: "opened" });
   }
 
   // `/fork` with no argument cannot name a line from inside the verb
@@ -303,6 +306,11 @@
     </div>
     {#if runs.length > 0}
       <div class="relative mx-auto w-full max-w-talk px-pane pb-pane">
+        {#if story?.kind === "forked" && shown.length === 0}
+          <p class="mb-tight text-note text-text-faint" role="status">
+            {fill(say($lang, "fork_pending"), { turn: String(story.turn) })}
+          </p>
+        {/if}
         {#key story}
           {@render composer()}
         {/key}
