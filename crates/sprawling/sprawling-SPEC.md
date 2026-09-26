@@ -3500,7 +3500,7 @@ pub(crate) enum Prepared {
     GitStatus(GitStatusAsk),         // 锁内取了楼的地址与最近一次围栏，锁外读工作树
     Preferences,                     // 锁外读这个人的设置文件
     Config { city_root: PathBuf, addr: Address }, // 锁外读配置阶梯
-    Release,                         // 锁外问发布页，离开这台机器
+    Release,                         // 锁外经网络问发布页
 }
 impl Views { pub(crate) fn prepare(&mut self, query: &channels::Query) -> Prepared; }
 impl Prepared { pub(crate) fn finish(self) -> channels::Answer; }
