@@ -206,6 +206,21 @@ impl RunWorker {
         let Some(arrival) = self.flight.arrived() else {
             return Ok(Landed::Nothing);
         };
+        // A lane has just come home, so the work waiting for one starts
+        // before this run is landed (sprawling-SPEC.md 8-46-2).
+        for (run, err) in self.flight.pool.start_waiting() {
+            self.note(
+                runtime::diagnostics::Level::Refuse,
+                "bin::assembly",
+                &format!(
+                    "{run} waited for a lane and could not start: {}",
+                    err.subject()
+                ),
+            );
+            if let Some(lane) = self.flight.driving.remove(&run) {
+                self.hand_back(&lane.owing.reply(), err);
+            }
+        }
         let Home {
             driven,
             continuation,
