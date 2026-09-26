@@ -256,7 +256,7 @@ pub fn write_brief(city_root: &Path, addr: &Address, brief: &JobBrief<'_>) -> Re
 pub fn handoff_path(city_root: &Path, building_addr: &Address) -> PathBuf;
 pub fn handoff(city_root: &Path, building_addr: &Address) -> Result<Option<String>, AxError>;
 pub struct HandoffSections { pub overall: Option<String>, pub progress: Option<String>, pub context: Option<String>, pub next_step: Option<String> }
-pub fn handoff_sections(text: &str) -> HandoffSections;           // spine_files::handoff_form
+pub fn handoff_sections(text: &str) -> HandoffSections;           // city::handoff_form
 pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError>;
 ```
 

@@ -9,9 +9,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 
-use super::wire::{
-    BuildingPolicy, ChatRequest, ChatResponse, ContentBlock, ModelUsage, StopReason,
-};
+use super::usage::ModelUsage;
+use super::wire::{BuildingPolicy, ChatRequest, ChatResponse, ContentBlock, StopReason};
 use crate::budget::UsdMicros;
 use crate::error::{AxCode, AxError};
 use crate::event::Payload;

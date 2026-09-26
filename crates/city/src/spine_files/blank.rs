@@ -29,10 +29,16 @@ pub(super) fn is_blank_form(text: &str) -> bool {
                 && !trimmed.starts_with('#')
                 && !trimmed.starts_with('>')
                 && !trimmed.starts_with('<')
-                && !(trimmed.starts_with('(') && trimmed.ends_with(')'))
+                && !is_guidance(trimmed)
         })
         .count();
     filled == 0
+}
+
+/// Whether a trimmed line is the template's own parenthetical guidance
+/// rather than something a session wrote.
+pub(crate) fn is_guidance(trimmed: &str) -> bool {
+    trimmed.starts_with('(') && trimmed.ends_with(')')
 }
 
 /// The template's example rows are for a person reading the template. A

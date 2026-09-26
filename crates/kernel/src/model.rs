@@ -11,16 +11,18 @@
 mod image;
 mod mode;
 mod seam;
+mod usage;
 mod window;
 mod wire;
 
 pub use image::{ImageRef, ImageType};
 pub use mode::Mode;
 pub use seam::{ModelRequest, ModelReturn, content_from_message, message_payload};
+pub use usage::ModelUsage;
 pub use window::Window;
 pub use wire::{
     BuildingPolicy, Ceiling, ChatMessage, ChatRequest, ChatResponse, ContentBlock, DialectKind,
-    Effort, Increment, ModelTag, ModelUsage, Role, StopReason, SystemBlock, ToolDef,
+    Effort, Increment, ModelTag, Role, StopReason, SystemBlock, ToolDef,
 };
 
 use crate::error::AxError;

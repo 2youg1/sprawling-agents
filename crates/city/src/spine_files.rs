@@ -30,7 +30,7 @@ use crate::policy::rules_path;
 
 pub(crate) mod hall;
 
-mod blank;
+pub(crate) mod blank;
 use blank::{empty_roadmap, is_blank_form};
 
 pub use hall::{

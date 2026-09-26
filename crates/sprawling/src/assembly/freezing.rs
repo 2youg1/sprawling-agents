@@ -14,7 +14,7 @@ use runtime::run::RunPlan;
 
 use super::{Assignment, Given, RunWorker, Site, Workbench, city_segment, held, name_of};
 use model_note::model_note;
-use run_slot::{Predecessor, run_segment, task_line};
+use run_slot::{Predecessor, run_segment};
 
 /// Bytes about to be frozen into one slot, and the documents they were
 /// read from.
@@ -350,21 +350,7 @@ impl RunWorker {
             must_read.push(Locator::cas(hash));
         }
         must_read.push(job);
-        // The address is a pure function of the room and the run, so
-        // the handoff can name the transcript before a turn is taken.
-        // It names the room's file and never the ledger: the ledger is
-        // one chain for the whole city, under a subtree `read` refuses.
-        let transcript = runtime::Transcript::address(addr, site.run_id)?;
-        let handoff = runtime::handoff::Handoff::new(
-            must_read,
-            task_line(&plan),
-            "see the city roadmap".to_owned(),
-            format!(
-                "dispatched from the control surface; transcript at {}",
-                transcript.as_str()
-            ),
-            "resume from the job locator".to_owned(),
-        )?;
+        let handoff = self.frozen_handoff(&plan, must_read)?;
         Ok((plan, handoff))
     }
 }
@@ -374,6 +360,8 @@ impl RunWorker {
 mod inherited;
 mod model_note;
 mod run_slot;
+
+mod frozen_handoff;
 
 #[cfg(test)]
 #[allow(

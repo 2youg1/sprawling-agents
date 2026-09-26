@@ -1725,7 +1725,7 @@ secret 门白名单随 `sealed.rs` 搬家）。完成检查：同 8-36。
 
 `model.rs`（516）切成四文件：`model/wire.rs` 收线上会话的词汇（dialect 无关的规范形）（`BuildingPolicy`／`Role`／
 `StopReason`／`SystemBlock`／`DialectKind`／`ModelTag`／`Effort`／`ContentBlock`／`ChatMessage`／
-`ToolDef`／`ChatRequest` 含 `empty`／`ModelUsage`／`ChatResponse`）；`model/seam.rs` 收一次调用两个方向
+`ToolDef`／`ChatRequest` 含 `empty`／`ChatResponse`）；`model/usage.rs` 收 `ModelUsage` 与它的行形（`UsageRow`，版本换算只在这里）；`model/seam.rs` 收一次调用两个方向
 所载之物与内容↔载荷两转换（`ModelRequest`／`ModelReturn` 含 `bare`／`from_response`、`message_payload`／
 `content_from_message`）；`model/conformance.rs` 收 feature 门后的一致性断言；
 `model/tests.rs` 收原 `mod tests`（6 个 `#[test]`，断言与名字不动，补 `AxCode`／`Payload`／`B3Hash`／
