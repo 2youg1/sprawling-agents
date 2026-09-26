@@ -288,3 +288,40 @@ fn a_broker_that_took_the_request_and_went_quiet_is_not_asked_again() {
     server.join().unwrap();
     assert_eq!(lost.retry(), kernel::Retry::Unknown);
 }
+
+/// A broker that said yes and then lost the body of its answer did what
+/// was asked: the reason the body could not be read is kept, and the
+/// failure is marked as an effect nobody can see, so a retryer does not
+/// make a second auth config.
+#[test]
+fn an_answer_cut_short_after_a_yes_keeps_why_and_is_not_asked_again() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!(
+        "http://{}/api/v3/auth_configs",
+        listener.local_addr().unwrap()
+    );
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        request_from(&mut stream);
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 100\r\nconnection: close\r\n\r\n{\"id")
+            .unwrap();
+    });
+
+    let lost = super::read(
+        reqwest::blocking::Client::new()
+            .post(&url)
+            .body("{}")
+            .send(),
+        "/api/v3/auth_configs",
+    )
+    .unwrap_err();
+
+    server.join().unwrap();
+    assert_eq!(lost.retry(), kernel::Retry::Unknown);
+    assert!(
+        lost.subject().contains("could not be read"),
+        "{}",
+        lost.subject()
+    );
+}
