@@ -65,6 +65,10 @@ impl RunWorker {
         // is sent to be named, written to a room or recorded.
         let task = self.take_custody(task)?;
         let goal = self.take_custody(goal)?;
+        // What this run will stand under reaches the history before it
+        // governs anybody, and only once the city has agreed: a refused
+        // dispatch still writes nothing (sprawling-SPEC.md 8-40).
+        self.book_rules(&agreed.building)?;
         let session = super::session::session_for(&at.addr, at.session.take(), &task)?;
         // The first thing this city writes for a dispatch, and the line
         // where `addr` stops being where the work was sent and becomes

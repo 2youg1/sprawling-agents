@@ -242,7 +242,7 @@ fn relay_round_trips(store: Store) -> Vec<Duration> {
 /// costs.
 fn own_appends() -> Vec<Duration> {
     let dir = tempfile::tempdir().unwrap();
-    let mut ledger = in_memory_ledger(dir.path());
+    let (mut ledger, _) = in_memory_ledger(dir.path());
     (0..APPENDS)
         .map(|_| {
             let draft = marker();
@@ -253,15 +253,13 @@ fn own_appends() -> Vec<Duration> {
         .collect()
 }
 
-fn in_memory_ledger(dir: &std::path::Path) -> memory::JsonlLedger {
+fn in_memory_ledger(dir: &std::path::Path) -> (memory::JsonlLedger, memory::OpenReport) {
     let fs = memory::FaultFs::new(memory::FaultPlan {
         cut_at_op: None,
         cut_on_write: None,
         torn_tail: memory::TornTail::None,
     });
-    memory::JsonlLedger::open_faulty(fs, dir, now_ms().unwrap())
-        .unwrap()
-        .0
+    memory::JsonlLedger::open_faulty(fs, dir, now_ms().unwrap()).unwrap()
 }
 
 /// A city with one building and one room in it, under ordinary rules.

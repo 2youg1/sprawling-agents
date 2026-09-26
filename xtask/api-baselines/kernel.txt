@@ -289,8 +289,8 @@ pub const kernel::AxCode::ALL: [kernel::AxCode; 38]
 pub const kernel::DOORS: [kernel::gate::DoorId; 9]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 74]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 74]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::GIT_METADATA: &str
 pub const kernel::IDEM_DERIVE_V: u8
@@ -487,6 +487,7 @@ pub enum kernel::event::record::AdviserAnswer
 pub enum kernel::event::record::AdviserAsk
 pub enum kernel::event::record::AdviserFailure
 pub enum kernel::event::record::CheckpointCommitted
+pub enum kernel::event::record::GoverningDocument
 pub enum kernel::event::record::PartChange
 pub enum kernel::event::record::ShapeChanged
 pub enum kernel::event::record::SkipReason
@@ -1377,6 +1378,7 @@ pub kernel::EventKind::RoadmapClaimed
 pub kernel::EventKind::RoadmapFinished
 pub kernel::EventKind::RoadmapReleased
 pub kernel::EventKind::RoadmapSplit
+pub kernel::EventKind::RulesChanged
 pub kernel::EventKind::RunForked
 pub kernel::EventKind::RunFrozen
 pub kernel::EventKind::RunStarted
@@ -1901,6 +1903,7 @@ pub kernel::event::EventKind::RoadmapClaimed
 pub kernel::event::EventKind::RoadmapFinished
 pub kernel::event::EventKind::RoadmapReleased
 pub kernel::event::EventKind::RoadmapSplit
+pub kernel::event::EventKind::RulesChanged
 pub kernel::event::EventKind::RunForked
 pub kernel::event::EventKind::RunFrozen
 pub kernel::event::EventKind::RunStarted
@@ -1973,6 +1976,8 @@ pub kernel::event::record::EvidenceCite::kind: kernel::EventKind
 pub kernel::event::record::EvidenceCite::seq: kernel::Seq
 pub kernel::event::record::GovernedDocumentWritten::bytes: usize
 pub kernel::event::record::GovernedDocumentWritten::which: alloc::string::String
+pub kernel::event::record::GoverningDocument::Config
+pub kernel::event::record::GoverningDocument::Rules
 pub kernel::event::record::LogTruncated::dropped_bytes: u64
 pub kernel::event::record::ModelCalled::model: alloc::string::String
 pub kernel::event::record::ModelCalled::segments: alloc::vec::Vec<kernel::locator::B3Hash>
@@ -2004,6 +2009,11 @@ pub kernel::event::record::PromptSource::producer: core::option::Option<kernel::
 pub kernel::event::record::RerankCalled::model: alloc::string::String
 pub kernel::event::record::RerankCalled::passages: u64
 pub kernel::event::record::RerankCalled::ranks: u64
+pub kernel::event::record::RulesChanged::after: kernel::locator::B3Hash
+pub kernel::event::record::RulesChanged::before: core::option::Option<kernel::locator::B3Hash>
+pub kernel::event::record::RulesChanged::bytes: usize
+pub kernel::event::record::RulesChanged::scope: kernel::event::Scope
+pub kernel::event::record::RulesChanged::which: kernel::event::record::GoverningDocument
 pub kernel::event::record::RunForked::at_seq: kernel::Seq
 pub kernel::event::record::RunForked::from: kernel::RunId
 pub kernel::event::record::RunFrozen::completion: alloc::string::String
@@ -2544,6 +2554,7 @@ pub struct kernel::event::record::PromptShapeCompared
 pub struct kernel::event::record::PromptSkip
 pub struct kernel::event::record::PromptSource
 pub struct kernel::event::record::RerankCalled
+pub struct kernel::event::record::RulesChanged
 pub struct kernel::event::record::RunForked
 pub struct kernel::event::record::RunFrozen
 pub struct kernel::event::record::RunStarted
