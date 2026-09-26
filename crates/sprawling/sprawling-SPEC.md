@@ -1074,7 +1074,7 @@ justfile／CI 无涉；S4 前端框架结论书将改写 build.rs 拷贝源与 `
 
 ### 不搬走什么，以及这件事本身的发现
 
-`NAME_THE_WORK`、`NAME_TOKENS`、`not_built`、`Reporter`、`building_of`、`plan_node_of`
+`NAME_THE_WORK`、`NAME_TOKENS`、`not_built`、`Reporter`、`building_of`
 在原文件里**物理上坐在 `Views` 那一簇的中间**，而它们的使用者是 `RunWorker` 与 `CollaborationFold`：
 `not_built` 六处、`Reporter` 三处，`Views` 一处都不用。
 **这就是那个文件长成这样的机制**——没有边界的地方，新东西落在光标所在的行，而不是落在它属于的地方。

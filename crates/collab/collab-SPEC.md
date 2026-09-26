@@ -393,7 +393,7 @@ impl ClaimEffect {
     pub fn id(&self) -> &NodeId;
     pub fn expected_before(&self) -> RoadmapStatus;   // 经 `kernel` 重导出，住 `spine::row`，公共拼写不变
     pub fn kind(&self) -> EventKind;          // 由出口决定，不由调用方决定
-    pub fn payload(&self, who: &str) -> Result<Payload, AxError>;
+    pub fn payload(&self, who: &str) -> Result<Payload, AxError>;   // 形状是 kernel::event::record::RoadmapMoved
 }
 pub struct ClaimDesk { /* who、room、roadmap 文本、本次 drive 持有的 Held、effects —— 私有 */ }
 impl ClaimDesk {

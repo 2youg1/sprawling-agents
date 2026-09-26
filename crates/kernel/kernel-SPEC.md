@@ -424,6 +424,14 @@ impl PursuitChanged { pub fn held(self) -> Result<Option<(String, PursuitState)>
 pub struct SignalEnqueued { pub id: SignalId, pub kind: SignalKind, pub from: String, pub room: Address,
                             pub room_version: Version, pub payload: Payload, pub at: TimeMs,
                             pub lane: Option<Lane> }   // lane 写出给 collab 之外的读者，回读不采信：它由 kind 推出
+pub struct RoadmapMoved { pub by: String, pub node: NodeId,   // roadmap_claimed／split／finished／released／blocked 共用
+                          #[serde(flatten)] pub step: RoadmapStep }   // 五行同有 by、node、verb，差别只在 verb 之后
+#[serde(tag = "verb", rename_all = "snake_case")]
+pub enum RoadmapStep { Claimed { item: String }, Split { children: Vec<String> },
+                       Finished { item: String, evidence: Locator },
+                       Released { item: String, why: StopCause, line: String },
+                       Blocked { item: String, why: StopCause, line: String } }
+// NodeId 读回经 NodeId::parse：node 读不出的一行让折叠停下，而不是被跳过——跳过会让节点看似无人持有
 pub struct WorktreeOpened { pub name: String, pub disk_bytes: ByteLen }   // 不携路径：路径是一台机器的事实
 pub struct SignalConsumed { pub id: SignalId, pub by: String }   // 内容已在 enqueue 行里，不写第二遍
 #[serde(rename_all = "snake_case")] pub enum Lane { Urgent, Ordinary }

@@ -78,6 +78,17 @@ fn a_request_line_that_names_no_branch_stops_the_fold() {
     assert!(CollaborationFold::default().absorb(&line).is_err());
 }
 
+/// A claim whose node is not an index used to be skipped, which left
+/// the node looking free to the next resident that asked for it.
+#[test]
+fn a_roadmap_line_whose_node_is_not_an_index_stops_the_fold() {
+    let line = unreadable(
+        kernel::EventKind::RoadmapClaimed,
+        serde_json::json!({ "by": "lab/b", "node": "two", "verb": "claimed", "item": "the lexer" }),
+    );
+    assert!(CollaborationFold::default().absorb(&line).is_err());
+}
+
 fn unreadable(kind: kernel::EventKind, data: serde_json::Value) -> EventRecord {
     let draft = kernel::EventDraft {
         run: RunId::CITY,

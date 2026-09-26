@@ -44,6 +44,7 @@ mod collaboration;
 mod governance;
 mod log;
 mod modality;
+mod roadmap;
 mod run;
 mod tool;
 mod turn;
@@ -62,6 +63,7 @@ pub use governance::{
 };
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
+pub use roadmap::{RoadmapMoved, RoadmapStep};
 pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{

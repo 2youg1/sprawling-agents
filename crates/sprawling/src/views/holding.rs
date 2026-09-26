@@ -244,15 +244,11 @@ impl Views {
                 // that made it. Nothing is removed when the node is put
                 // down: what a node cost is what it cost, and a run that
                 // released it still spent the money.
-                if let Some(node) = record
+                let node = record
                     .data()
-                    .as_map()
-                    .get("node")
-                    .and_then(serde_json::Value::as_str)
-                    .and_then(|held| kernel::NodeId::parse(held).ok())
-                {
-                    self.claims.entry(node).or_default().insert(record.run());
-                }
+                    .read::<kernel::event::record::RoadmapMoved>()?
+                    .node;
+                self.claims.entry(node).or_default().insert(record.run());
             }
             EventKind::CheckpointCommitted | EventKind::PrMerged => self.fold_commit(record),
             EventKind::RunStarted => {

@@ -6,12 +6,12 @@
 //! The two projections the collaboration tools read: what is waiting in
 //! each room, and what ground is already claimed.
 
-use kernel::event::record::PursuitChanged;
+use kernel::event::record::{PursuitChanged, RoadmapMoved};
 use kernel::{Address, AxError, EventKind, EventRecord};
 
 use crate::views::pursued;
 
-use super::super::{building_of, plan_node_of};
+use super::super::building_of;
 
 /// The three registers a run's collaboration tools read from.
 pub(in crate::assembly) struct Collaboration {
@@ -100,11 +100,10 @@ impl CollaborationFold {
             }
             EventKind::GoalRegistered => self.goals.push(record.data().read()?),
             EventKind::RoadmapClaimed => {
-                if let (Some(building), Some(node), Some(room)) = (
-                    record.addr().and_then(building_of),
-                    plan_node_of(record),
-                    record.addr(),
-                ) {
+                let node = record.data().read::<RoadmapMoved>()?.node;
+                if let (Some(building), Some(room)) =
+                    (record.addr().and_then(building_of), record.addr())
+                {
                     self.plan_holders
                         .entry(building)
                         .or_default()
@@ -112,9 +111,8 @@ impl CollaborationFold {
                 }
             }
             EventKind::RoadmapFinished | EventKind::RoadmapReleased | EventKind::RoadmapBlocked => {
-                if let (Some(building), Some(node)) =
-                    (record.addr().and_then(building_of), plan_node_of(record))
-                {
+                let node = record.data().read::<RoadmapMoved>()?.node;
+                if let Some(building) = record.addr().and_then(building_of) {
                     self.plan_holders.entry(building).or_default().remove(&node);
                 }
             }

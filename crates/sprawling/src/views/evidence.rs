@@ -18,6 +18,7 @@
 
 use channels::{EventKind, EventRecord, RunId};
 use kernel::Locator;
+use kernel::event::record::{RoadmapMoved, RoadmapStep};
 
 use super::holding::Views;
 
@@ -57,7 +58,12 @@ fn evidence_in(record: &EventRecord) -> Option<channels::EvidenceItem> {
             })
         }
         EventKind::RoadmapFinished => {
-            let locator = Locator::parse(map.get("evidence")?.as_str()?).ok()?;
+            let RoadmapStep::Finished {
+                evidence: locator, ..
+            } = record.data().read::<RoadmapMoved>().ok()?.step
+            else {
+                return None;
+            };
             Some(channels::EvidenceItem {
                 at,
                 kind: channels::EvidenceKind::Finished,
@@ -141,7 +147,8 @@ mod tests {
     fn a_finished_node_is_a_row_and_carries_no_picture() {
         let held = record(
             EventKind::RoadmapFinished,
-            serde_json::json!({ "verb": "finished", "node": "2.3", "evidence": cas() }),
+            serde_json::json!({ "by": "lab/parser", "verb": "finished", "node": "2.3",
+                                "item": "the lexer", "evidence": cas() }),
         );
         let item = evidence_in(&held).expect("a completion is evidence");
         assert_eq!(item.kind, channels::EvidenceKind::Finished);
