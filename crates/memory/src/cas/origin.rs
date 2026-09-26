@@ -43,7 +43,7 @@ impl Cas {
                 .map_err(io_err("read cas origins", &path))?;
             if held
                 .split(|byte| *byte == b'\n')
-                .any(|held| held == line.as_bytes())
+                .any(|recorded| recorded == line.as_bytes())
             {
                 return Ok(hash);
             }
