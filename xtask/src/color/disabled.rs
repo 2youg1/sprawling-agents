@@ -83,4 +83,10 @@ mod tests {
                     {off ? 'text-text-disabled' : 'text-text'}\n";
         assert_eq!(bare_uses(text), vec![1, 3, 5]);
     }
+
+    #[test]
+    fn text_glued_to_the_class_is_not_a_variant() {
+        let text = "<span class=\"xdisabledtext-text-disabled\">{cost}</span>\n";
+        assert_eq!(bare_uses(text), vec![1]);
+    }
 }
