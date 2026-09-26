@@ -27,7 +27,10 @@ fn a_session_with_a_person_opens_in_the_persons_own_words() {
     };
     // The task is the run segment of the prefix already; repeating it
     // here would carry the person's line twice in every request.
-    assert_eq!(text, "The task is in JOB.md above.\nGoal: one turn, then stop");
+    assert_eq!(
+        text,
+        "The task is in JOB.md above.\nGoal: one turn, then stop"
+    );
 
     let mut talking = Window::new();
     talking.push_task_lines("what do you make of this", "", Opening::WithPerson);
