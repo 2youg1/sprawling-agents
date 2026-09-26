@@ -24,7 +24,7 @@
   import { keymap } from "./core/keys";
   import type { Action } from "./core/keys";
   import { fill, say } from "./core/lang";
-  import { paintMark } from "./core/mark";
+  import { markOf, paintMark } from "./core/mark";
   import { RAILS } from "./core/prefs";
   import { cityIsShut, CITY } from "./core/scope";
   import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
@@ -284,7 +284,7 @@
   });
 
   $effect(() => {
-    paintMark(document, waiting > 0 ? "waiting" : working ? "live" : "quiet");
+    paintMark(document, markOf({ waiting, working }));
   });
 
   onMount(follow);

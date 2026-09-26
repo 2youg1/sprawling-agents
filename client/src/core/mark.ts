@@ -12,6 +12,17 @@
 
 export type Mark = "quiet" | "live" | "waiting";
 
+// What the page knows, reduced to the one word the tab can say.
+export interface Standing {
+  readonly waiting: number;
+  readonly working: boolean;
+}
+
+export function markOf(standing: Standing): Mark {
+  if (standing.waiting > 0) return "waiting";
+  return standing.working ? "live" : "quiet";
+}
+
 const TOKEN: Readonly<Record<Mark, string>> = {
   quiet: "--color-g5",
   live: "--color-accent",
@@ -29,12 +40,7 @@ function resolved(doc: Document, token: string): string {
 }
 
 export function paintMark(doc: Document, mark: Mark): void {
-  const ground = resolved(doc, "--color-g2");
-  const dot = resolved(doc, TOKEN[mark]);
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">` +
-    `<rect width="32" height="32" rx="9" fill="${ground}"/>` +
-    `<circle cx="16" cy="16" r="7" fill="${dot}"/></svg>`;
+  const svg = markSvg(mark, resolved(doc, "--color-g2"), resolved(doc, TOKEN[mark]));
   let link = doc.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (link === null) {
     link = doc.createElement("link");
@@ -43,4 +49,13 @@ export function paintMark(doc: Document, mark: Mark): void {
     doc.head.append(link);
   }
   link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+// The icon itself, given the two colours it is painted in.
+export function markSvg(mark: Mark, ground: string, ink: string): string {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">` +
+    `<rect width="32" height="32" rx="9" fill="${ground}"/>` +
+    `<circle cx="16" cy="16" r="7" fill="${ink}"/></svg>`
+  );
 }
