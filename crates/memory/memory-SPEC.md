@@ -474,6 +474,14 @@ impl Checkpoint {
     /// 允许 `[` `]` `*` `?`，所以这些字节各自包进单字符类（`[[]`）再交给
     /// libgit2，否则 `notes[1].md` 会暂存 `notes1.md` 而漏掉写下的文件。
     pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
+    /// 一栋楼的基线 fence（`checkpoint::base`）：暂存 `scopes`、扫描、提交，
+    /// 全部对象先写进内存里的对象库（mempack），最后作为**一个 pack** 落盘。
+    /// 无 HEAD 时提交移动 HEAD（等于 `ensure_base`），否则与 wave fence 同样
+    /// 悬空并挂在 `refs/sprawling/runs/<run>/<oid>`。`progress` 依次收到
+    /// `Staged { files }` 与 `Packed { bytes }`。取 `self` 的所有权：mempack 装在
+    /// 这个 handle 的对象库上，handle 一放下它就跟着消失，之后的 fence 不会
+    /// 把对象写进一个再也不落盘的内存库。
+    pub fn base_fence(self, scopes: &[String], t: TimeMs, of: &Provenance, progress: &mut dyn FnMut(BaseProgress)) -> Result<Payload, MemoryError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
     pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, MemoryError>;
@@ -505,6 +513,7 @@ impl Checkpoint {
   后写的引用强制覆盖前一个，前一道提交从此无钉）；跨 handle 共享一个计数器或借用账本 seq（都要把
   一个位置穿进拿不到它的闭包，多一条耦合，而名字只需要唯一，不需要有序——顺序由账本给）。
   **翻案条件**：哪一天引用需要表达顺序（例如按先后清理旧栅栏），顺序仍应读账本，而不是回到计数器。
+- **基线 fence 在收楼时做，写成一个 pack**：一栋 5,000 个文件的楼，第一次派活的第一道 fence 要给每个文件求哈希并写 5,000 个松散对象，每个都是一次建文件；这笔钱挪到 `sprawling adopt`（以及开城时的 `Adopt::EveryFolder`）付，写法是 mempack：对象库换成「内存库在前、盘上的对象目录作只读备用」，暂存与提交产生的对象全进内存，`Mempack::dump` 出一个 pack，经仓库自己的对象库 `packwriter` 落盘（它同时写 `.idx`）。之后 run 的第一道 fence 面对的是一份暖 index：libgit2 按 stat 跳过没变的文件，只剩一次目录遍历。**被否**：收楼时直接调 `wave_pre`——每个 blob 一个松散对象，在旋转盘上是 5,000 次随机写，而 pack 是一次顺序写。**被否**：把 mempack 长期装在城的 handle 上——装上就卸不掉，之后每道 fence 的对象都会留在一个没人 dump 的内存库里，进程一退就丢。
 - **`ensure_base` 仍然移动 HEAD**：worktree 从一个提交分枝，城必须先有第一个提交。
 - **「无 HEAD」只有两种读法**：`head()` 报 `UnbornBranch`（空仓库）或 `NotFound`（HEAD 指向的引用不存在）时才算「这座城还没有提交」，提交无父、扫描全扫。其他任何读不出 HEAD 的情形——引用文件损坏、HEAD 指向一个剥不出提交的对象——都是 `Checkpoint { op: "read HEAD" }` 错误，栅栏不立。被否：把一切失败读成「无 HEAD」。那样一次读不出的 HEAD 会让栅栏静默地变成一个无父的根提交，账本记下的 oid 与之前的历史断开，而没有人被告知。判定只有一处（`Checkpoint::head_commit`），提交与扫描都问它。
 - **提交时间是注入时刻的整秒**：`TimeMs` 是 `u64` 毫秒，除以 1000 后恒落在 `i64` 内，换算仍走 `i64::try_from` 且失败时报 `Checkpoint { op: "stamp the commit" }`，而不是写成 1970。
