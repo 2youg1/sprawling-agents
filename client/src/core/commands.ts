@@ -62,6 +62,8 @@ export const MODES: readonly Mode[] = ModeSchema.members.flatMap((member) => mem
 export interface Dispatch {
   readonly addr: Address;
   readonly task: string;
+  // What counts as done when the mode makes this a job; `statedGoal`
+  // decides whether the frame carries it.
   readonly goal: string;
   // `null` when the person has chosen no level: the frame then says
   // nothing about effort and the provider decides, which is not the
@@ -70,12 +72,32 @@ export interface Dispatch {
   readonly mode: Mode;
 }
 
+// The goal a dispatch in this mode states. A chat is the person talking,
+// so it states none: the city then writes no job file and the run opens
+// on the words as they were typed (`city::write_brief`). Every other
+// mode is work with an end, and the goal is what says where the end is.
+// A goal sent with a chat put a sentence like "hello" into JOB.md and
+// handed the model the goal as the message, which it answered by
+// planning.
+export function statedGoal(mode: Mode, goal: string): string {
+  switch (mode) {
+    case "chat":
+      return "";
+    case "plan_goal":
+    case "up":
+    case "sc":
+    case "ud":
+    case "experiment":
+      return goal;
+  }
+}
+
 export function dispatch(d: Dispatch): Command {
   return {
     dispatch: {
       addr: d.addr,
       task: d.task,
-      goal: d.goal,
+      goal: statedGoal(d.mode, d.goal),
       mode: d.mode,
       session: null,
       effort: d.effort,
