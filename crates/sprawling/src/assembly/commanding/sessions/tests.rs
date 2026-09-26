@@ -268,18 +268,18 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
 }
 
 /// Checking a branch's origin reads the line it names, not the history:
-/// once the worker has indexed the ledger, a second check costs a small
-/// fraction of verifying the whole ledger, however long that history is.
+/// the history was verified when the city opened, and a check that
+/// verified it again would cost the whole ledger on every branch.
 ///
-/// The ratio against a verify of the same ledger is the instrument,
-/// because it holds on any disk and in any profile: a check that still
-/// verifies the history is never ten times faster than a verify.
+/// A chain broken after genesis is the witness: a verify refuses it, and
+/// the check, which never reads that line, answers as it would on an
+/// intact ledger.
 #[test]
 fn checking_a_branch_origin_does_not_verify_the_history() {
     let dir = tempfile::tempdir().unwrap();
     init_city(dir.path()).unwrap();
-    let long_answer = "the meter says 42. ".repeat(100_000);
-    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion(&long_answer, None)]);
+    let (base_url, _provider) =
+        fake_openai(&["m-local"], vec![completion("the meter says 42", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
         .handle(channels::Command::Dispatch {
@@ -292,11 +292,9 @@ fn checking_a_branch_origin_does_not_verify_the_history() {
             effort: None,
         })
         .unwrap();
-    let verify_started = std::time::Instant::now();
     let verified =
         runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
             .unwrap();
-    let verify = verify_started.elapsed();
     let started = verified
         .lines()
         .iter()
@@ -313,14 +311,11 @@ fn checking_a_branch_origin_does_not_verify_the_history() {
             | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
         })
         .expect("the mother ran");
+    break_the_chain_after_genesis(dir.path());
 
-    worker.origin_is_real(started).unwrap();
-    let check_started = std::time::Instant::now();
-    worker.origin_is_real(started).unwrap();
-    let check = check_started.elapsed();
-
+    let checked = worker.origin_is_real(started);
     assert!(
-        check.saturating_mul(10) < verify,
-        "a warm origin check took {check:?}; verifying the ledger took {verify:?}"
+        checked.is_ok(),
+        "a branch check verified the history: {checked:?}"
     );
 }
