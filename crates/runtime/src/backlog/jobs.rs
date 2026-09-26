@@ -105,8 +105,18 @@ impl Jobs {
 
     #[cfg(windows)]
     fn follow(&self, readings: &mut BTreeMap<RunId, RunProcesses>) {
-        for reading in readings.values_mut() {
-            reading.unfollowed = u32::try_from(reading.pids.len()).unwrap_or(u32::MAX);
+        for (owner, run) in &self.runs {
+            let reading = readings.entry(*owner).or_default();
+            let listed = run.job.as_ref().map(win32job::Job::query_process_id_list);
+            if let Some(Ok(pids)) = listed {
+                // A Windows pid is a DWORD; the list only widens it.
+                reading
+                    .pids
+                    .extend(pids.into_iter().filter_map(|pid| u32::try_from(pid).ok()));
+                reading.unfollowed = reading.unfollowed.saturating_add(run.unjoined);
+            } else {
+                reading.unfollowed = u32::try_from(reading.pids.len()).unwrap_or(u32::MAX);
+            }
         }
     }
 
