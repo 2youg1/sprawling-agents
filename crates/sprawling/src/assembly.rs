@@ -68,7 +68,7 @@ use genesis::city_segment;
 pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
 use lifetime::LedgerOpening;
 pub(crate) use mcp::McpLink;
-use mcp::{connect_mcp, mounts_under, transport_site};
+use mcp::{mounts_under, transport_site};
 use naming::{building_of, governed_of, name_of, not_built, plan_node_of, scope_of};
 use plans::Reporter;
 use rooms::{QueueTenure, RoomQueues};
@@ -258,6 +258,9 @@ pub struct RunWorker {
     /// the run that spoke and the runs that answer, because delivery
     /// happens after the speaker has frozen.
     knocks: Vec<Knock>,
+    /// Every MCP server a run of this worker reached, still connected
+    /// (`assembly::mcp::Residents`).
+    pub(in crate::assembly) mcp: mcp::Residents,
     /// Every command key this city has answered, and what it answered.
     /// Folded from the history like the endpoint book beside it, so a
     /// client retrying across a restart is still asking for one thing.

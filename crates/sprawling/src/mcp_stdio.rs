@@ -127,6 +127,22 @@ impl StdioServer {
     }
 }
 
+impl StdioServer {
+    /// Whether the child has exited. A connection left locked by a dead
+    /// thread, or a child whose state the platform will not report,
+    /// counts as ended: the caller starts a new one, which is the one
+    /// recovery either case has.
+    pub(crate) fn has_ended(&self) -> bool {
+        match self.inner.lock() {
+            Ok(mut connection) => match connection.child.try_wait() {
+                Ok(None) => false,
+                Ok(Some(_)) | Err(_) => true,
+            },
+            Err(_poisoned) => true,
+        }
+    }
+}
+
 impl std::fmt::Debug for StdioServer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.inner.try_lock() {

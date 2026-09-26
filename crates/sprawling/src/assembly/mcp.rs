@@ -7,40 +7,126 @@
 
 use kernel::{Address, AxError};
 
-/// Starts one server and turns what it offers into tools.
+/// Every MCP server this worker has reached, kept connected between
+/// runs, so a dispatch pays for a child and a handshake only when its
+/// server was not already running (sprawling-SPEC.md 8-4).
 ///
-/// The connection opens with the lifecycle the specification defines -
-/// `initialize`, then `notifications/initialized` - and only then asks
-/// what it offers. What the handshake learns is written to the
-/// diagnostics rather than branched on: negotiating a version needs a
-/// second version this build can speak before it can decide anything.
-pub(super) fn connect_mcp(
-    server: &kernel::McpServer,
-    write_root: &std::path::Path,
-    confidential: bool,
-    resolve: &gateway::SecretResolver,
-) -> Result<(Vec<protocol::McpTool>, protocol::Handshake), AxError> {
-    use protocol::Outbound as _;
+/// Keyed by the whole declaration and the run root the child started
+/// in: a changed field is another server, and a child cannot move to
+/// another working directory once it runs.
+#[derive(Default)]
+pub(crate) struct Residents {
+    held: Vec<Resident>,
+}
 
-    // The run's own root, which exists whether or not this building
-    // lends its runs a worktree.
-    let mut handle = McpLink::open(&server.transport, write_root, resolve)?;
-    let mut rpc = protocol::Rpc::new();
-    let opened = protocol::handshake(&mut handle, &mut rpc, protocol::EXTERNAL_CALL_PATIENCE)?;
-    let listing = handle.call(&rpc.list_tools(), protocol::EXTERNAL_CALL_PATIENCE)?;
-    let listed = protocol::tools_from(&server.label, &protocol::Rpc::read(&listing)?)?;
-    let mut tools = Vec::new();
-    for entry in listed {
-        // One connection, one handle per tool: two of them would be two
-        // answers to what the same label offers.
-        tools.push(protocol::McpTool::new(
-            entry.meta,
-            entry.remote,
-            Box::new(handle.clone()),
-            confidential,
-        )?);
+/// One connected server and what it offered when it connected.
+struct Resident {
+    server: kernel::McpServer,
+    root: std::path::PathBuf,
+    link: McpLink,
+    /// Each tool under both its names, in the order the server listed
+    /// them.
+    listed: Vec<(kernel::ToolMeta, String)>,
+}
+
+/// How this dispatch reached a server.
+pub(crate) enum Reached {
+    /// Started, or opened, and shaken hands with during this dispatch.
+    Connected(protocol::Handshake),
+    /// Connected by an earlier run and still running.
+    Resident,
+}
+
+impl Residents {
+    /// The tools `server` offers, over the connection an earlier run left
+    /// when its child still runs, and over a new one otherwise.
+    ///
+    /// A child that has ended is dropped from the table and started
+    /// again here, which is how a server that died between two runs
+    /// comes back.
+    ///
+    /// # Errors
+    /// Propagates the transport's refusal to open, a failed handshake or
+    /// listing, and `protocol::McpTool::new`'s refusal on a confidential
+    /// building.
+    pub(crate) fn tools(
+        &mut self,
+        server: &kernel::McpServer,
+        write_root: &std::path::Path,
+        confidential: bool,
+        resolve: &gateway::SecretResolver,
+    ) -> Result<(Vec<protocol::McpTool>, Reached), AxError> {
+        self.held
+            .retain(|held| !(held.serves(server, write_root) && held.link.has_ended()));
+        if let Some(held) = self
+            .held
+            .iter()
+            .find(|held| held.serves(server, write_root))
+        {
+            return Ok((held.tools(confidential)?, Reached::Resident));
+        }
+        let (resident, opened) = Resident::connect(server, write_root, resolve)?;
+        let tools = resident.tools(confidential)?;
+        self.held.push(resident);
+        Ok((tools, Reached::Connected(opened)))
     }
-    Ok((tools, opened))
+}
+
+impl Resident {
+    /// Starts one server and asks what it offers.
+    ///
+    /// The connection opens with the lifecycle the specification defines -
+    /// `initialize`, then `notifications/initialized` - and only then asks
+    /// what it offers. What the handshake learns is written to the
+    /// diagnostics rather than branched on: negotiating a version needs a
+    /// second version this build can speak before it can decide anything.
+    fn connect(
+        server: &kernel::McpServer,
+        write_root: &std::path::Path,
+        resolve: &gateway::SecretResolver,
+    ) -> Result<(Resident, protocol::Handshake), AxError> {
+        use protocol::Outbound as _;
+
+        // The run's own root, which exists whether or not this building
+        // lends its runs a worktree.
+        let mut link = McpLink::open(&server.transport, write_root, resolve)?;
+        let mut rpc = protocol::Rpc::new();
+        let opened = protocol::handshake(&mut link, &mut rpc, protocol::EXTERNAL_CALL_PATIENCE)?;
+        let listing = link.call(&rpc.list_tools(), protocol::EXTERNAL_CALL_PATIENCE)?;
+        let listed = protocol::tools_from(&server.label, &protocol::Rpc::read(&listing)?)?
+            .into_iter()
+            .map(|entry| (entry.meta, entry.remote))
+            .collect();
+        Ok((
+            Resident {
+                server: server.clone(),
+                root: write_root.to_path_buf(),
+                link,
+                listed,
+            },
+            opened,
+        ))
+    }
+
+    fn serves(&self, server: &kernel::McpServer, write_root: &std::path::Path) -> bool {
+        self.server == *server && self.root == write_root
+    }
+
+    /// One handle per tool on the one connection: two connections would
+    /// be two answers to what the same label offers.
+    fn tools(&self, confidential: bool) -> Result<Vec<protocol::McpTool>, AxError> {
+        self.listed
+            .iter()
+            .map(|(meta, remote)| {
+                protocol::McpTool::new(
+                    meta.clone(),
+                    remote.clone(),
+                    Box::new(self.link.clone()),
+                    confidential,
+                )
+            })
+            .collect()
+    }
 }
 
 /// Which module a reader should open when a server misbehaves.
@@ -102,6 +188,18 @@ impl McpLink {
             } => Ok(McpLink::Sse(crate::mcp_sse::SseServer::open(
                 url, headers, resolve,
             )?)),
+        }
+    }
+}
+
+impl McpLink {
+    /// Whether the far end is known to be gone. Only a child process can
+    /// be asked; a host is reached one request at a time, and one that
+    /// has gone fails in the call that reaches it.
+    fn has_ended(&self) -> bool {
+        match *self {
+            McpLink::Stdio(ref held) => held.has_ended(),
+            McpLink::Http(_) | McpLink::Sse(_) => false,
         }
     }
 }
@@ -343,7 +441,11 @@ mod tests {
         drop(first);
         let second = worker.mcp_tools(&config, dir.path(), false);
 
-        assert_eq!(second.len(), 1, "the resident connection still offers its tool");
+        assert_eq!(
+            second.len(),
+            1,
+            "the resident connection still offers its tool"
+        );
         assert_eq!(
             std::fs::read_to_string(&starts).unwrap().lines().count(),
             1,

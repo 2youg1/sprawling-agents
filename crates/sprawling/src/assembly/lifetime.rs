@@ -133,6 +133,7 @@ impl RunWorker {
             logins: std::collections::BTreeMap::new(),
             log,
             knocks: Vec::new(),
+            mcp: super::mcp::Residents::default(),
             entrance,
             origins,
             fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
