@@ -17,7 +17,7 @@ use crate::error::{MemoryError, io_err};
 use crate::jsonl::JsonlLedger;
 use crate::vfs::Vfs;
 
-use super::landing::{Bits, land};
+use super::landing::{Bits, is_staging_name, land};
 
 use super::manifest::RESERVED;
 
@@ -122,9 +122,11 @@ fn refuse_alias(path: &Path) -> Result<(), MemoryError> {
 /// part of the city. `.git` at any depth is protected metadata, and a
 /// bundle that carried it would plant hooks on restore (kernel-SPEC
 /// 8-73). The names come from kernel's one list; nothing here
-/// re-spells them.
+/// re-spells them. A staging file a crashed restore left is half of a
+/// write, and `landing` alone knows its spelling.
 fn travels(relative: &Path) -> bool {
     !relative.starts_with(RESERVED)
+        && !relative.file_name().is_some_and(is_staging_name)
         && !relative.components().any(|component| {
             component
                 .as_os_str()
@@ -162,7 +164,7 @@ pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryE
             return Err(MemoryError::Bundle {
                 op: "restore",
                 detail: format!(
-                    "{} carries protected metadata, which no bundle may hold",
+                    "{} is protected metadata or a staging file, which no bundle may hold",
                     path.display()
                 ),
             });
@@ -369,5 +371,26 @@ mod tests {
         Bundle::export(home.path(), carried.path()).unwrap();
         assert!(!carried.path().join(CITY).join(RESERVED).exists());
         assert!(!carried.path().join(CITY).join("index").exists());
+    }
+
+    /// A restore cut short leaves its staging file under the city root;
+    /// the next export must not carry it as the person's file.
+    #[test]
+    fn a_staging_file_a_crash_left_does_not_travel() {
+        let home = tempfile::tempdir().unwrap();
+        city_with(1, home.path());
+        std::fs::write(home.path().join("kept.md"), b"whole").unwrap();
+        std::fs::write(home.path().join(".kept.md.part"), b"half").unwrap();
+
+        let carried = tempfile::tempdir().unwrap();
+        Bundle::export(home.path(), carried.path()).unwrap();
+        let city = carried.path().join(CITY);
+        assert_eq!(
+            (
+                city.join("kept.md").exists(),
+                city.join(".kept.md.part").exists()
+            ),
+            (true, false)
+        );
     }
 }
