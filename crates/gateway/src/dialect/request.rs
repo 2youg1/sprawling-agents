@@ -252,6 +252,26 @@ mod tests {
     }
 
     #[test]
+    fn anthropic_marked_message_carries_its_breakpoint_on_the_last_block() {
+        let mut req = sample_request();
+        let tail = req.messages.len() - 1;
+        req.messages[tail].cache = true;
+        let wire = request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap();
+        let messages = wire["messages"].as_array().unwrap();
+        let blocks = messages[tail]["content"].as_array().unwrap();
+        assert_eq!(
+            blocks.last().unwrap()["cache_control"],
+            serde_json::json!({ "type": "ephemeral" })
+        );
+        let marked: usize = messages
+            .iter()
+            .flat_map(|m| m["content"].as_array().unwrap())
+            .filter(|b| b.get("cache_control").is_some())
+            .count();
+        assert_eq!(marked, 1);
+    }
+
+    #[test]
     fn tool_shapes_survive_both_request_dialects() {
         let req = sample_request();
         let anthropic = request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap();
