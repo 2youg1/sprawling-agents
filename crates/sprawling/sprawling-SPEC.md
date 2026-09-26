@@ -2036,7 +2036,12 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, building: Address, run: RunId) -
   所以没有任何认领会在「放开」与「盘上的计划写明节点结局」之间被答复。
 - **落地时的 `still_true` 比对保留为兜底**（`effect::Claims::of`）：一条车道在别人落地之后才用旧副本认领一个已经做完的节点，
   这里不拦它，落地时仍被丢弃并告诉人。
-- 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node/)'`；
+- **未定：落地写回仍是整份覆盖**。`Then::Roadmap` 写的是桌子那份派活时的副本，`still_true` 只核对本轮碰过的节点，
+  所以两轮活认领不同节点时，后落地的一份把先落地那一份写下的行改回派活时的状态。要落的形状是：把本轮的效果在落地时读到的
+  盘上文本上重放（重放的定义住在 `collab::ClaimEffect` 旁边，桌子自己改副本也走它；`Split` 因此要带上子节点的 weight），
+  再以那份文本为基线经 `city::edit_against` 替换，基线不符即按 stale 处理。认领入账（`roadmap_claimed` 在答复认领时由记账线程写下）
+  与目标登记走同一条路，也还没有做。能定下它们的证据：一条红测——两轮活从同一份快照认领节点 1 与节点 2，先落地的那一行在后落地之后仍在盘上。
+- 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node|two_runs_claiming_one_node_through_the_served_gate/)'`；
   `cargo nextest run -p collab -E 'test(/two_runs_read_as_ready/)'` 在桌子一侧钉住「第二个认领当场被拒、什么都不留」。
 
 ## 8-41 一次提交出自哪次运行，从账本回答（`bin::views::commits`、`sprawling whose`）
