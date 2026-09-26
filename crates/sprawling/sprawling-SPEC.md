@@ -3585,7 +3585,7 @@ impl kernel::Tool for Kept {
 - **结果**：`read` 读到的文件、`exec` 打印的输出里的 key，在回到模型之前换成引用，所以下一个发给模型的请求里没有原文。
 - **引用是 `secret:written/<provider>-<pos>-<n>`（参数）和 `secret:output/<provider>-<pos>-<n>`（结果）**：`<pos>` 是装配台摆出时账本的位置，每次派活在摆台之前都写过记录，所以两次派活的 `<pos>` 不同；`<n>` 是这次派活里第几把不同的 key，一次派活的所有工具共用一份记录，所以两件工具不会把两把 key 存到同一个名字下。同一把 key 在同一侧再次出现时交回第一次的引用，不再写 vault：记录按 key 的 BLAKE3 摘要（`kernel::B3Hash::digest`）找到它的引用，所以 vault 随一次派活里不同 key 的个数增长，而不是随工具调用的次数增长；摘要只留在这次派活的内存里，不进账本也不进 vault，`<n>` 就是记录里已有的条数加一，不会绕回。工具运行在 drive 里，拿不到 `&mut RunWorker`，写不了账本，所以不能像派活那样用存 key 时的下一个序号。
 - 没有命中的参数和结果原样交出，不复制。
-- vault 拒绝写入时这次调用失败：参数里的 key 存不进去，工具就不运行，文件不动；结果里的 key 存不进去，结果不交给模型。
+- vault 拒绝写入时：参数里的 key 存不进去，这次调用失败，工具不运行，文件不动；结果里的 key 存不进去，工具的效果已经发生，所以调用照常成功，结果交给模型时那把 key 换成 `[key withheld: <错误码>]`（错误码是 vault 给的，比如 `E_STORAGE_FATAL`），原文与引用都不出现。回一个错误会告诉模型这次调用失败，它可能重做一件做过就收不回的事，比如又发一次请求、又写一次文件；换成标记，模型知道那里有一把 key，也知道它为什么拿不到引用。
 - 账本里的 `tool_called`、`tool_result`、`model_returned` 本来就经过 `runtime::turn::ledger::Journal::append_redacted`，key 在写进账本之前已换成指纹标记；这一层管的是工具本身和模型看到的东西。
 - **被否决的备选**：① 在 `runtime::EditTool`、`ExecTool` 里各自扫描——那要让 `runtime` 认得 vault，而 vault 属于装配层，也会让每件工具各有一份规矩；包一层就不必改 `runtime` 的公开面。② 只包 `edit`——`exec` 的命令行和每件工具的输出照样把 key 带进文件和请求。
 

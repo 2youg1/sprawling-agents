@@ -273,3 +273,65 @@ fn one_key_seen_twice_is_kept_under_one_reference() {
         ],
     );
 }
+
+/// A tool that has already acted and returns a key it read.
+struct Reading {
+    meta: kernel::ToolMeta,
+    found: String,
+}
+
+impl kernel::Tool for Reading {
+    fn meta(&self) -> &kernel::ToolMeta {
+        &self.meta
+    }
+
+    fn invoke(&self, _call: &kernel::ToolCall) -> Result<kernel::ToolOutcome, kernel::AxError> {
+        let result = serde_json::json!({ "out": format!("token = {}", self.found) });
+        Ok(kernel::ToolOutcome {
+            result: kernel::Payload::new(result.as_object().unwrap().clone()).unwrap(),
+            attachments: Vec::new(),
+        })
+    }
+}
+
+/// When the vault refuses a key in a result, the call still succeeds,
+/// because the tool's effect has happened: the model reads a marker that
+/// names the vault's code in the key's place, and never the key.
+#[test]
+fn a_result_key_the_vault_refuses_is_withheld_and_the_call_stands() {
+    use super::{Keeper, Kept};
+    use kernel::Tool;
+    let key = written();
+    let vault = std::sync::Arc::new(std::sync::Mutex::new(gateway::Custodian::in_memory()));
+    let poisoner = vault.clone();
+    std::thread::spawn(move || {
+        let _held = poisoner.lock().unwrap();
+        panic!("poison the vault");
+    })
+    .join()
+    .unwrap_err();
+    let meta = kernel::ToolMeta {
+        name: kernel::ToolName::parse("exec").unwrap(),
+        disclosure: String::new(),
+        params: kernel::Payload::new(serde_json::Map::new()).unwrap(),
+        effect: kernel::Effect::Read,
+        cost_tier: kernel::CostTier::Light,
+        timeout: None,
+        render: kernel::RenderIntent::Generic,
+        temporal: kernel::Temporal::Timeless,
+    };
+    let kept = Kept::new(
+        Box::new(Reading { meta, found: key }),
+        std::sync::Arc::new(Keeper::new(vault, 7)),
+    );
+    let outcome = kept.invoke(&kernel::ToolCall {
+        id: "tu_1".to_owned(),
+        name: kernel::ToolName::parse("exec").unwrap(),
+        args: kernel::Payload::new(serde_json::Map::new()).unwrap(),
+    });
+
+    assert_eq!(
+        outcome.map(|outcome| serde_json::to_value(outcome.result.as_map()).unwrap()),
+        Ok(serde_json::json!({ "out": "token = [key withheld: E_STORAGE_FATAL]" })),
+    );
+}
