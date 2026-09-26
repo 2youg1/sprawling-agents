@@ -32,9 +32,9 @@
   import type { RunBelief } from "../core/belief";
   import { fill, say } from "../core/lang";
   import { buildingOf } from "../core/route";
+  import { usd } from "../core/time";
   import { ui } from "../ui";
   import type { Address, Answer, Autonomy, CostAnswer, GovernanceAnswer } from "../wire";
-  import { spentFigure } from "./cost";
 
   // How loudly a cell is drawn. Exhaustive, and it is the whole of the
   // difference between the two kinds of fact on this strip: a setting
@@ -141,12 +141,12 @@
     const held = spending;
     if (run === null || held === undefined) return NOTHING;
     const found = held.by_run.find(([name]) => name === run.run);
-    return spentFigure($lang, held, found === undefined ? 0 : found[1]);
+    return found === undefined ? usd(0) : usd(found[1]);
   });
 
   const thisCity = $derived.by((): string => {
     const held = spending;
-    return held === undefined ? NOTHING : spentFigure($lang, held, held.total);
+    return held === undefined ? NOTHING : usd(held.total);
   });
 
   const autonomy = $derived.by((): GovernanceAnswer | undefined => {

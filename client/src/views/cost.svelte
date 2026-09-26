@@ -7,9 +7,8 @@
 // Cost in five cuts of one authoritative total. Shares are drawn
 // against `total`, never against the sum of the rows, so an
 // unattributed remainder stays visible. A provider that reported no
-// price leaves the total at zero after any number of runs, and the
-// page says how many runs that was rather than printing $0.00 as if it
-// were a measurement (`cost.ts` tells an unpriced city from an idle one).
+// price leaves the total at zero, and the page says so rather than
+// printing $0.00 as if it were a measurement.
 //
 // **The total and the by-run cut are two questions and stay apart**
 // (client-SPEC 7D): one is what this city has spent, the other is who
@@ -42,12 +41,11 @@ const TITLES: Record<Cut, Key> = {
 <script lang="ts">
   import { QUERIES } from "../core/asking";
   import { MAYOR, toFragment } from "../core/route";
-  import { fill, say } from "../core/lang";
+  import { say } from "../core/lang";
   import { usd } from "../core/time";
   import { ui } from "../ui";
   import type { CostAnswer } from "../wire";
   import EmptyState from "./parts/empty.svelte";
-  import { costReading, type CostReading } from "./cost";
 
   const u = ui();
   const lang = u.lang;
@@ -57,10 +55,6 @@ const TITLES: Record<Cut, Key> = {
     const held = $asked;
     return held !== undefined && "cost" in held ? held.cost : undefined;
   });
-
-  const reading = $derived.by((): CostReading | undefined =>
-    answer === undefined ? undefined : costReading(answer),
-  );
 </script>
 
 {#snippet cut(rows: readonly (readonly [string, UsdMicros])[], total: UsdMicros)}
@@ -82,17 +76,15 @@ const TITLES: Record<Cut, Key> = {
 <div class="w-full max-w-page px-pane py-wide">
   <div class="mb-wide flex items-baseline justify-between">
     <h1 class="text-title font-title" tabindex="-1">{say($lang, "cost_title")}</h1>
-    {#if answer !== undefined && reading?.kind === "priced"}
-      <span class="text-figure font-figure">{usd(answer.total)}</span>
+    {#if answer !== undefined}
+      <span class="text-figure font-figure">
+        {answer.total > 0 ? usd(answer.total) : say($lang, "cost_none")}
+      </span>
     {/if}
   </div>
-  {#if answer === undefined || reading === undefined}
+  {#if answer === undefined}
     <p class="text-text-disabled">…</p>
-  {:else if reading.kind === "unpriced"}
-    <p class="text-note text-text-quiet">
-      {fill(say($lang, "cost_unpriced"), { n: String(reading.runs) })}
-    </p>
-  {:else if reading.kind === "idle"}
+  {:else if answer.total <= 0}
     <!-- Nothing has been spent, which reads exactly like a page that
     failed to load unless the page says which one it is. Spending starts
     with a run, and a run starts in the conversation with the Mayor. -->

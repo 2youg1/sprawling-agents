@@ -45,7 +45,7 @@ A **tainted** item is one that began with text from outside — a web page, an i
 
 ## Reading cost honestly
 
-The cost page shows shares against the authoritative total rather than normalising its own rows, so an unattributed remainder stays visible instead of being divided away. Where runs came back with no amount, the page says how many runs that was and why there is no figure. A subscription reports no price at all, and a page that rendered that as `$0.00` would be inventing a fact.
+The cost page shows shares against the authoritative total rather than normalising its own rows, so an unattributed remainder stays visible instead of being divided away. Where a call came back with tokens and no amount, the page says how many calls that was and why there is no figure. A subscription reports no price at all, and a page that rendered that as `$0.00` would be inventing a fact.
 
 `by_skill` is honestly one bucket. A tool call does not happen "under" a skill — a skill is a line of disclosure in the prefix, not a calling context — so attributing spend to skills by call would be inventing a basis. The dimension stays, reporting what it can defend.
 
