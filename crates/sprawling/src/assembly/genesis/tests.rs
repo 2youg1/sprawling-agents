@@ -151,6 +151,7 @@ fn a_registration_survives_the_process_that_made_it() {
     // can call depends on a process that has already exited.
     let rebuilt = Standing::fold(&ledger_dir(dir.path())).unwrap().book;
     let live = worker
+        .credentials
         .book
         .select(kernel::ModelTag::Main, &kernel::BuildingPolicy::default())
         .unwrap();

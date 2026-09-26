@@ -50,7 +50,7 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
-    let held = worker.book.endpoints().next().unwrap().clone();
+    let held = worker.credentials.book.endpoints().next().unwrap().clone();
     assert_eq!(
         held.models
             .iter()
@@ -363,7 +363,7 @@ fn a_line_a_run_writes_reaches_the_book_the_worker_holds() {
     let rebuilt = Standing::fold(&report.ledger_dir).unwrap().book;
     assert_eq!(names(&rebuilt), vec!["by-a-run".to_owned()]);
     assert_eq!(
-        names(&worker.book),
+        names(&worker.credentials.book),
         names(&rebuilt),
         "the live book and the restart's book are one fold"
     );

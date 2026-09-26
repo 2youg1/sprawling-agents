@@ -12,6 +12,7 @@ use kernel::{AxCode, AxError};
 
 mod endpoints;
 mod environment;
+pub(super) mod held;
 mod probing;
 pub(super) mod signing;
 pub(super) mod subscription;

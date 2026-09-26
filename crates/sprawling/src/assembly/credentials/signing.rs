@@ -78,7 +78,7 @@ impl RunWorker {
     /// the login is over, and saying so beats retrying what will fail
     /// again.
     pub(in crate::assembly) fn renew_if_stale(&mut self, provider: &str) -> Result<(), AxError> {
-        let Some(expires_at) = self.expiries.of(provider) else {
+        let Some(expires_at) = self.credentials.expiries.of(provider) else {
             return Ok(());
         };
         // A minute of margin: a call started now must still be holding a
@@ -91,13 +91,21 @@ impl RunWorker {
         };
         let stored = subscription::oauth_refresh_ref(provider)?;
         let refresh = {
-            let vault = self.vault.lock().map_err(|_| poisoned_vault())?;
+            let vault = self
+                .credentials
+                .vault
+                .lock()
+                .map_err(|_| poisoned_vault())?;
             vault.resolve(&stored)?
         };
         let tokens = gateway::oauth_refresh(profile, &refresh, PROBE_TIMEOUT_MS)?;
         let access = subscription::oauth_ref(provider)?;
         {
-            let mut vault = self.vault.lock().map_err(|_| poisoned_vault())?;
+            let mut vault = self
+                .credentials
+                .vault
+                .lock()
+                .map_err(|_| poisoned_vault())?;
             vault.set(&access, tokens.access)?;
             if let Some(next) = tokens.refresh {
                 vault.set(&stored, next)?;
@@ -187,12 +195,12 @@ impl RunWorker {
                     auth_url: pending.open_url().to_owned(),
                     user_code: pending.user_code().map(str::to_owned),
                 };
-                self.logins.insert(provider.to_owned(), pending);
+                self.credentials.logins.insert(provider.to_owned(), pending);
                 self.record(EventKind::LoginStarted, Payload::of(&started)?)
             }
             channels::LoginStep::Code { code } => {
                 let asked_at = now_ms()?.value();
-                let pending = self.logins.get_mut(provider).ok_or_else(|| {
+                let pending = self.credentials.logins.get_mut(provider).ok_or_else(|| {
                     AxError::failure(
                         AxCode::CredentialMissing,
                         "redeem an authorization code",
@@ -217,10 +225,14 @@ impl RunWorker {
                 };
                 // Spent, and only now: a person who mistyped keeps the
                 // login they began rather than starting a new one.
-                self.logins.remove(provider);
+                self.credentials.logins.remove(provider);
                 let access = subscription::oauth_ref(provider)?;
                 {
-                    let mut vault = self.vault.lock().map_err(|_| poisoned_vault())?;
+                    let mut vault = self
+                        .credentials
+                        .vault
+                        .lock()
+                        .map_err(|_| poisoned_vault())?;
                     vault.set(&access, tokens.access)?;
                     if let Some(refresh) = tokens.refresh {
                         let reference = subscription::oauth_refresh_ref(provider)?;
@@ -284,7 +296,11 @@ impl RunWorker {
         arrival: Arrival,
     ) -> Result<(), AxError> {
         {
-            let mut vault = self.vault.lock().map_err(|_| poisoned_vault())?;
+            let mut vault = self
+                .credentials
+                .vault
+                .lock()
+                .map_err(|_| poisoned_vault())?;
             vault.set(reference, value.into_vault_value())?;
         }
         let captured = SecretCaptured {
@@ -298,7 +314,7 @@ impl RunWorker {
     /// The redemption closure the adapters take: one resolve per call,
     /// nothing cached, the lock held only while the vault is read.
     pub(in crate::assembly) fn resolver(&self) -> gateway::SecretResolver {
-        resolving(Arc::clone(&self.vault))
+        resolving(Arc::clone(&self.credentials.vault))
     }
 
     /// The vault this city resolves credentials through.
@@ -309,7 +325,7 @@ impl RunWorker {
     /// the last moment and exposed only while a header is written" stays
     /// one path rather than two.
     pub(crate) fn vault_handle(&self) -> Arc<std::sync::Mutex<gateway::Custodian>> {
-        Arc::clone(&self.vault)
+        Arc::clone(&self.credentials.vault)
     }
 }
 

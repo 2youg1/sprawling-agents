@@ -103,7 +103,7 @@ impl RunWorker {
         toolkit: &ToolkitSlug,
     ) -> Result<(), AxError> {
         let city = kernel::layout::CityLayout::new(&self.city_root).city_address();
-        let held = broker_for(Some(&self.vault), city.as_ref())?.ok_or_else(|| {
+        let held = broker_for(Some(&self.credentials.vault), city.as_ref())?.ok_or_else(|| {
             AxError::failure(
                 AxCode::CredentialMissing,
                 "connect an outside application",

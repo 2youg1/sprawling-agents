@@ -52,6 +52,7 @@ mod workbench;
 
 pub(crate) use building_page::{DOC_BYTES_MAX, read_building};
 use commanding::entrance::Entrance;
+use credentials::held::Credentials;
 pub(crate) use credentials::signing::resolving;
 use credentials::subscription::Expiries;
 use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
@@ -179,14 +180,9 @@ pub struct RunWorker {
     city: std::sync::OnceLock<kernel::B3Hash>,
     ledger: JsonlLedger,
     cas: Cas,
-    /// Every endpoint the person attached and every model they chose,
-    /// folded from the ledger. The worker keeps its own copy because a
-    /// dispatch needs it synchronously, before the record it just wrote
-    /// has reached any observer.
-    book: gateway::EndpointBook,
-    /// The vault. Shared because a redemption closure outlives the call
-    /// that builds it; the lock is held for one resolve at a time.
-    vault: Arc<std::sync::Mutex<gateway::Custodian>>,
+    /// Whose identity this city can call which model under
+    /// (`credentials::held`).
+    credentials: Credentials,
     /// The three places a live control surface listens, or `None` in a
     /// worker driven one command at a time.
     ///
@@ -232,16 +228,6 @@ pub struct RunWorker {
     /// worker opens, so a city that was off owes nothing for the time it
     /// was off.
     last_tick: TimeMs,
-    /// When each subscription credential stops working, by provider.
-    /// Folded from the capture records, so a restarted city renews on
-    /// the same schedule rather than discovering expiry through a 401.
-    expiries: Expiries,
-    /// Logins begun and not yet redeemed, by provider. Held in memory
-    /// on purpose: a PKCE verifier proves that the process which asked
-    /// is the process which redeems, so a verifier that outlived the
-    /// process would be proving nothing. A restart means starting the
-    /// login again, which is one browser visit.
-    logins: std::collections::BTreeMap<String, gateway::OauthPending>,
     /// The diagnostic log. Write-only, and nothing here reads it back:
     /// turning it off must leave the ledger byte-identical.
     log: runtime::diagnostics::Diagnostics,

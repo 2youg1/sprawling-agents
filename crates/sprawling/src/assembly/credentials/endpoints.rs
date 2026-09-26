@@ -109,6 +109,7 @@ impl RunWorker {
         header: Option<String>,
     ) -> gateway::AuthSpec {
         let archived = self
+            .credentials
             .book
             .endpoints()
             .find(|endpoint| endpoint.name == name)
@@ -346,7 +347,7 @@ mod tests {
                 ),
             })
             .unwrap();
-        let (_, _, entry) = worker.book.choices().next().unwrap();
+        let (_, _, entry) = worker.credentials.book.choices().next().unwrap();
         assert_eq!(
             entry.max_output_tokens,
             kernel::Ceiling::new(4_096),

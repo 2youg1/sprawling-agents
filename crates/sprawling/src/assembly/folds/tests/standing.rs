@@ -322,7 +322,7 @@ fn when_a_subscription_credential_expires_survives_a_restart() {
         )
         .unwrap();
     assert_eq!(
-        worker.expiries.of("anthropic"),
+        worker.credentials.expiries.of("anthropic"),
         Some(1_700_000_000_000),
         "the worker that wrote the line reads its own book"
     );
@@ -330,7 +330,7 @@ fn when_a_subscription_credential_expires_survives_a_restart() {
     let rebuilt = Standing::fold(&report.ledger_dir).unwrap().expiries;
     assert_eq!(
         rebuilt.of("anthropic"),
-        worker.expiries.of("anthropic"),
+        worker.credentials.expiries.of("anthropic"),
         "a restarted city renews on the schedule the provider stated"
     );
     assert_eq!(
