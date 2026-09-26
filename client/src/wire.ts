@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 39 as const;
+export const WIRE_V = 40 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94" as const;
+export const WIRE_HASH = "101df7b47626eae6108c00a5d014548148ba47a94eb130c5d3b4ce75529a8c65" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -740,12 +740,9 @@ export const ContentAnswer = Schema.Struct({
 export type ContentAnswer = typeof ContentAnswer.Type;
 
 /**
- * The five cuts of one authoritative total. The actor, segment, tool
- * and skill cuts each sum to `total` exactly; `by_run` names every
- * active run and the few billed most, so it may sum to less. The
- * interface renders shares against `total` rather than normalising its
- * own rows, so an unattributed remainder stays visible instead of being
- * divided away.
+ * The five cuts of one authoritative total. Four cuts sum to `total`;
+ * `by_run` names the active runs and the few billed most, so it may sum
+ * to less. Shares render against `total`, so a remainder stays visible.
  */
 export const CostAnswer = Schema.Struct({
   by_actor: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
@@ -1976,6 +1973,15 @@ export const RoundsAnswer = Schema.Struct({
 export type RoundsAnswer = typeof RoundsAnswer.Type;
 
 /**
+ * What each run a `Query::RunCosts` named was billed.
+ */
+export const RunCostsAnswer = Schema.Struct({
+  asked: Schema.Array(RunId),
+  runs: Schema.Array(Schema.Tuple(RunId, UsdMicros)),
+}).annotations({ identifier: "RunCostsAnswer" });
+export type RunCostsAnswer = typeof RunCostsAnswer.Type;
+
+/**
  * Which shelf a holding sits on, and where its document is.
  * 
  * One value rather than a shelf name beside a path, because a holding
@@ -2171,6 +2177,9 @@ export const Answer = Schema.Union(
   }),
   Schema.Struct({
     cost_of: CostOfAnswer,
+  }),
+  Schema.Struct({
+    run_costs: RunCostsAnswer,
   }),
   Schema.Struct({
     listing: ListingAnswer,
@@ -2831,6 +2840,11 @@ export const Query = Schema.Union(
   Schema.Struct({
     config: Schema.Struct({
       addr: Address,
+    }),
+  }),
+  Schema.Struct({
+    run_costs: Schema.Struct({
+      runs: Schema.Array(RunId),
     }),
   }),
 ).annotations({ identifier: "Query" });

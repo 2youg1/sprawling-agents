@@ -152,7 +152,10 @@ impl Attribution {
     /// What `run` was billed, when this fold holds a row for it: one
     /// lookup rather than a whole `report()` per question.
     pub fn billed_to(&self, run: &RunId) -> Option<UsdMicros> {
-        self.by_run.get(&run.to_string()).copied().map(UsdMicros::new)
+        self.by_run
+            .get(&run.to_string())
+            .copied()
+            .map(UsdMicros::new)
     }
 
     /// Drops the `by_run` row of every run `keep` refuses. `total` and

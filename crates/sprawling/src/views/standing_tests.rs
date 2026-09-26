@@ -263,9 +263,18 @@ fn a_city_whose_first_billed_run_was_evicted(root: &std::path::Path) -> Views {
     let recent = u64::try_from(memory::RECENT_FROZEN).unwrap();
     for i in 0..=recent {
         for (kind, data) in [
-            (EventKind::RunStarted, serde_json::json!({ "task": "t", "goal": "g" })),
-            (EventKind::ModelReturned, serde_json::json!({ "billed_usd_micros": 1_000 + i })),
-            (EventKind::RunFrozen, serde_json::json!({ "completion": "done" })),
+            (
+                EventKind::RunStarted,
+                serde_json::json!({ "task": "t", "goal": "g" }),
+            ),
+            (
+                EventKind::ModelReturned,
+                serde_json::json!({ "billed_usd_micros": 1_000 + i }),
+            ),
+            (
+                EventKind::RunFrozen,
+                serde_json::json!({ "completion": "done" }),
+            ),
         ] {
             ledger
                 .append(kernel::EventDraft {
@@ -301,6 +310,7 @@ fn an_evicted_run_still_answers_what_it_cost() {
     assert_eq!(
         views.answer(&asked),
         channels::Answer::RunCosts(channels::RunCostsAnswer {
+            asked: vec![billed_run(0), never],
             runs: vec![
                 (billed_run(0), kernel::UsdMicros::new(1_000)),
                 (never, kernel::UsdMicros::default()),
@@ -308,3 +318,4 @@ fn an_evicted_run_still_answers_what_it_cost() {
         })
     );
 }
+

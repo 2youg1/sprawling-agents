@@ -180,7 +180,10 @@ impl Views {
                 building,
                 before,
                 limit,
-            } => channels::Answer::Commits(self.commits_answer(building.as_ref(), *before, *limit)),
+            } => match self.commits_answer(building.as_ref(), *before, *limit) {
+                Some(page) => channels::Answer::Commits(page),
+                None => unavailable(format!("Commits({before:?})")),
+            },
             // Three readings answered here so a second client draws a
             // session without folding the ledger itself.
             channels::Query::Rounds { run } => {
@@ -189,10 +192,13 @@ impl Views {
             channels::Query::Evidence { run } => {
                 channels::Answer::Evidence(self.evidence_answer(*run))
             }
-            channels::Query::RunCosts { .. } => {
-                channels::Answer::RunCosts(channels::RunCostsAnswer { runs: Vec::new() })
+            channels::Query::RunCosts { runs } => {
+                channels::Answer::RunCosts(self.run_costs_answer(runs))
             }
-            channels::Query::CostOf { node } => channels::Answer::CostOf(self.cost_of_answer(node)),
+            channels::Query::CostOf { node } => match self.cost_of_answer(node) {
+                Some(answer) => channels::Answer::CostOf(answer),
+                None => unavailable(format!("CostOf({node})")),
+            },
             // The tree itself, one level and one file at a time.
             channels::Query::Listing { at } => {
                 channels::Answer::Listing(self.listing_answer(at.as_ref()))

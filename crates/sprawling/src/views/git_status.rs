@@ -31,14 +31,14 @@ impl Views {
     /// "nothing has changed" are different answers, and a person acts
     /// differently on each.
     pub(super) fn git_status_answer(
-        &self,
+        &mut self,
         building: &Address,
     ) -> Option<channels::GitStatusAnswer> {
         // The newest commit the city fenced at this building or under
         // it, asked of the same page the commits column reads, so the
         // row shown beside the changes is the row the list opens with.
         let checkpoint = self
-            .commits_answer(Some(building), None, 1)
+            .commits_answer(Some(building), None, 1)?
             .commits
             .into_iter()
             .next();

@@ -110,6 +110,7 @@ function keyOfAnswer(answer: Answer): string | null {
   if ("rounds" in answer) return keyOf({ rounds: { run: answer.rounds.run } });
   if ("evidence" in answer) return keyOf({ evidence: { run: answer.evidence.run } });
   if ("cost_of" in answer) return keyOf({ cost_of: { node: answer.cost_of.node } });
+  if ("run_costs" in answer) return keyOf({ run_costs: { runs: answer.run_costs.asked } });
   if ("listing" in answer) return keyOf({ listing: { at: answer.listing.at ?? null } });
   if ("document" in answer) return keyOf({ document: { at: answer.document.at } });
   if ("prefix" in answer) return keyOf({ prefix: { run: answer.prefix.run } });
@@ -177,7 +178,7 @@ function staleBy(record: EventRecord, key: string, query: Query): boolean {
       return BUILDING_MOVED.has(kind) || kind === "city_halted";
     case "metrics":
       return true;
-    case "rounds": case "evidence": case "run_view": case "run_history":
+    case "rounds": case "evidence": case "run_view": case "run_history": case "run_costs":
       return key.includes(run);
     case "history":
       return true;
