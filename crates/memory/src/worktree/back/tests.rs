@@ -123,5 +123,49 @@ fn restoring_refuses_a_path_that_climbs_out_of_the_tree() {
 
     let refused = trees.restore_file(&mine, &first, Path::new("../notes.md"));
 
-    assert!(refused.is_err(), "{refused:?}");
+    assert!(
+        matches!(
+            refused,
+            Err(MemoryError::Worktree {
+                op: "restore a file from a point",
+                ..
+            })
+        ),
+        "{refused:?}"
+    );
+}
+
+#[test]
+fn restoring_through_a_hard_link_leaves_the_linked_file_untouched() {
+    let dir = tempfile::tempdir().unwrap();
+    let (trees, first, _) = city(dir.path());
+    let mine = trees.claim(&name("node-1")).unwrap();
+    let theirs = trees.claim(&name("node-2")).unwrap();
+    std::fs::remove_file(mine.path().join("notes.md")).unwrap();
+    std::fs::hard_link(theirs.path().join("notes.md"), mine.path().join("notes.md")).unwrap();
+
+    let restored = trees.restore_file(&mine, &first, Path::new("notes.md"));
+
+    let theirs_now = read(theirs.path());
+    if restored.is_ok() {
+        assert_eq!(
+            (read(mine.path()), theirs_now),
+            (
+                "first
+"
+                .to_owned(),
+                "second
+"
+                .to_owned()
+            )
+        );
+    } else {
+        assert_eq!(
+            theirs_now,
+            "second
+"
+            .to_owned(),
+            "{restored:?}"
+        );
+    }
 }

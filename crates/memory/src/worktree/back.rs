@@ -16,7 +16,9 @@ use std::path::{Component, Path, PathBuf};
 use kernel::GitOid;
 
 use crate::alias::WriteTarget;
+use crate::bundle::landing::{Bits, land};
 use crate::error::MemoryError;
+use crate::real_fs::RealFs;
 
 use super::lease::WorktreeLease;
 use super::name::WorktreeName;
@@ -129,7 +131,7 @@ impl Worktrees {
         if let Some(parent) = target.as_path().parent() {
             std::fs::create_dir_all(parent).map_err(io)?;
         }
-        std::fs::write(target.as_path(), blob.content()).map_err(io)
+        land(&mut RealFs::new(), target, blob.content(), Bits::OfReplaced)
     }
 
     fn commit_at(&self, point: &GitOid) -> Result<git2::Commit<'_>, MemoryError> {
