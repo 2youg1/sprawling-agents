@@ -99,6 +99,7 @@ impl RunWorker {
             backlog: runtime::Backlog::new(),
             flight: Flight::open(),
             namings: Namings::open(),
+            read_volume: crate::monitor::volume::read,
         })
     }
 

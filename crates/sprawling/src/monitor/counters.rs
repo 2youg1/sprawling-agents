@@ -91,20 +91,10 @@ impl Machine {
         Sample {
             machine_cpu_permille: permille(self.system.global_cpu_usage()),
             machine_available_bytes: self.system.available_memory(),
-            volume_free_bytes: self.volume_free_bytes(volume),
+            volume_free_bytes: super::volume::space(&self.disks, volume)
+                .map_or(0, |space| space.free_bytes),
             ..own
         }
-    }
-
-    /// The free space of the disk whose mount point is the longest
-    /// prefix of the city's path.
-    fn volume_free_bytes(&self, volume: &std::path::Path) -> u64 {
-        self.disks
-            .list()
-            .iter()
-            .filter(|disk| volume.starts_with(disk.mount_point()))
-            .max_by_key(|disk| disk.mount_point().components().count())
-            .map_or(0, sysinfo::Disk::available_space)
     }
 }
 

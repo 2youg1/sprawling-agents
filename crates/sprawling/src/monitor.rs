@@ -13,6 +13,7 @@
 pub(crate) mod counters;
 pub(crate) mod sampler;
 pub mod top;
+pub(crate) mod volume;
 
 use std::collections::VecDeque;
 use std::sync::Arc;

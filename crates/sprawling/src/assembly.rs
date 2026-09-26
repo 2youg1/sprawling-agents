@@ -270,6 +270,9 @@ pub struct RunWorker {
     /// Dispatches waiting on the digest model for a room name, off this
     /// thread (sprawling-SPEC.md 8-86).
     namings: Namings,
+    /// Reads the city's volume at the door new work enters by
+    /// (sprawling-SPEC.md 8-94).
+    read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,
 }
 
 impl RunWorker {

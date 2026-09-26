@@ -12,5 +12,6 @@ pub(super) mod governing;
 pub(super) mod machine;
 pub(super) mod routing;
 pub(super) mod sessions;
+pub(super) mod shedding;
 #[cfg(test)]
 mod tests;
