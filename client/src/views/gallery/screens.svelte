@@ -26,7 +26,7 @@
   import type { Lang } from "../../core/lang";
   import { say } from "../../core/lang";
   import type { Recovery } from "../../core/recovering";
-  import type { BuildingAnswer } from "../../wire";
+  import type { BuildingAnswer, CityAnswer } from "../../wire";
   import { Address, NodeId, Tokens, UsdMicros } from "../../wire";
   import Plan from "../building/plan.svelte";
 
@@ -96,6 +96,30 @@
         steps: 7,
       },
     },
+  };
+
+  // Two buildings side by side, one named by a whole sentence: the
+  // label under the long one has to stop at its own slot instead of
+  // running into its neighbour's name.
+  const idle = {
+    unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
+  };
+  const NEIGHBOURS: CityAnswer = {
+    active: 0,
+    frozen: 0,
+    halted: [],
+    pursuits: [],
+    runs: [],
+    buildings: [
+      { addr: Address.make("notes"), blocked: [], problems: [], progress: idle, ready: 0 },
+      {
+        addr: Address.make("the model changed from one provider to the next"),
+        blocked: [],
+        problems: [],
+        progress: idle,
+        ready: 0,
+      },
+    ],
   };
 
   // One machine, with an item in each of the three states a person
@@ -187,6 +211,7 @@
   import { AttachForm, EndpointList } from "../setup/providers";
   import { Shelves } from "../setup/skills";
   import { EffortSection } from "../shared/effort";
+  import Skyline from "../city/skyline.svelte";
   import Case from "./case.svelte";
   import { ENDPOINTS, NOTICE_DAYS, PROBED, REFUSED_FIELD, TOASTS } from "./served";
 
@@ -352,4 +377,8 @@ error, and both red markings at once would say it twice. -->
 
 <Case label="building · plan the city could not read">
   <Plan answer={UNPLANNED} />
+</Case>
+
+<Case label="city · a long building name stops at its own tower" width={1440}>
+  <Skyline city={NEIGHBOURS} picked={null} onPick={() => undefined} />
 </Case>
