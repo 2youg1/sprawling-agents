@@ -30,6 +30,7 @@ const STATED: Preferences = {
     motion: "on",
   },
   proxying: "always",
+  notifying: "on",
 };
 
 describe("the cache in front of the city", () => {

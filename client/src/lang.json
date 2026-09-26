@@ -3019,5 +3019,25 @@
   "run_doing_frozen": {
     "en": "wrapped up",
     "zh": "已收尾"
+  },
+  "setup_notify": {
+    "en": "browser notifications",
+    "zh": "浏览器通知"
+  },
+  "setup_notify_note": {
+    "en": "When this window is away, raise a notification for each new approval that waits for you. Nothing else is raised.",
+    "zh": "这个窗口不在前台时，每有一件新的待批事项等你决定，就弹一条通知。别的事不弹。"
+  },
+  "notify_off": {
+    "en": "off",
+    "zh": "关"
+  },
+  "notify_on": {
+    "en": "on",
+    "zh": "开"
+  },
+  "notify_approval": {
+    "en": "An approval waits for you",
+    "zh": "有一件事等你批准"
   }
 }
