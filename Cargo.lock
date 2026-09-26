@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "accounting"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "channels",
  "city",
@@ -277,7 +277,7 @@ dependencies = [
 
 [[package]]
 name = "browser"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "base64 0.23.1",
  "kernel",
@@ -401,7 +401,7 @@ dependencies = [
 
 [[package]]
 name = "channels"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "axum",
  "kernel",
@@ -426,7 +426,7 @@ dependencies = [
 
 [[package]]
 name = "city"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -439,7 +439,7 @@ dependencies = [
 
 [[package]]
 name = "citysim"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "channels",
  "collab",
@@ -482,7 +482,7 @@ dependencies = [
 
 [[package]]
 name = "collab"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "kernel",
  "memory",
@@ -1054,7 +1054,7 @@ dependencies = [
 
 [[package]]
 name = "gateway"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "argon2",
  "base64 0.23.1",
@@ -1566,7 +1566,7 @@ dependencies = [
 
 [[package]]
 name = "kernel"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "blake3",
  "insta",
@@ -1729,7 +1729,7 @@ dependencies = [
 
 [[package]]
 name = "memory"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "blake3",
  "git2",
@@ -2022,7 +2022,7 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "gateway",
  "kernel",
@@ -2331,7 +2331,7 @@ dependencies = [
 
 [[package]]
 name = "runtime"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "insta",
  "kernel",
@@ -2819,7 +2819,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "accounting",
  "browser",
@@ -4383,7 +4383,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xtask"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "browser",
  "channels",
