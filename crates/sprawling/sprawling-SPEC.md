@@ -3288,6 +3288,7 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 - **一段会话是房间上的一段，不是房间本身**：`/new` 不换地址、不换身份。市长身份按 `hall/mayor` 精确匹配（`city::spine_files::hall`），换到 `hall/mayor-2` 就把身份丢了。
 - **继承进的是 window，不是 prefix**（S2 改写了路线图早先那句话，理由记在这里）。四段 prefix 各是一份**文档**（`PrefixPlan` 的 `SourceDoc`），由人写、可编辑、逐字节哈希；而一段对话是模型说了什么、工具答了什么，`Window` 自己的文档就写着「frozen prefix 的字节永不落在这里」。把历史塞进 prefix 要有第五个槽位（而 prefix 是四段的类型），会让 `prompt_assembled` 声称历史属于它并不属于的那一段，还会让被缓存的前缀每回合都长。**所以 `RunPlan.inherited` 是 window 的材料**（`run/lifecycle.rs` 在开场任务之前推入），而它可重建的证据不是段哈希而是 `run_forked { from, at_seq }` 加上母亲自己的那些行（runtime §8-2 的 `inherited`）。
 - **一份继承只属于开这一段的那一跑。** 房间的当前一段从 `session_opened` 带上来的 `from` 落在折叠里（`assembly::folds::session`），第一次派活取走它并写下 `run_forked`（这一行同时也把「用掉了」记进折叠）；同一段里的第二次派活不再继承。一个分支是一个开头，而开头的那一跑就是继承的那一跑。
+- **`--carry` 带摘要，也带上一跑对话的地址。** 摘要说找到了什么，只有 transcript 说是怎么找到的；接手的 run 本来就在 run 槽位里读到 `Predecessor transcript: <room>/<run>.jsonl`，带过来的一段的第一跑同样读到，指向这个房间里最后开始的那一跑。这份「欠着的前任」与 `from` 同住 `assembly::folds::session`：折叠按 `run_started` 记下每个房间最后开始的 run（重建时读这一行，在世的 worker 在 `freeze_plan` 冻好一跑时自己记，因为 runtime 写的那一行它看不见），`session_opened { carried: true }` 把那一跑记为欠着的前任，`carried: false` 清掉它，这一段的第一跑开始即用掉。不往 `session_opened` 里加字段：前任是哪一跑已由历史里的 `run_started` 决定，payload 再写一份就是第二个家。被否决的备选：`/new` 时把整本账重验一遍去找最后一跑——一次人按下的命令，其代价随城的历史线性增长。
 - **分支先验再清。** `from` 指的行必须是那条 run 自己的行（`origin_is_real`），否则 `E_INVALID_ARGS` 现在就到人手里——而不是先把这个房间的形状清掉，再让一跑扑空。
 - **`Carry::Nothing` 必须真的清掉 `Handoff.md` 的槽位**：`assembly::freezing` 无条件读 `city::handoff(root, room)` 并把它折进下一个 run 的 prompt，只清配置而留着文件，新一段仍会继承上一段的摘要，于是开关不起作用（city-SPEC §8-14b 拥有那一步）。
 - **默认不带，理由是 `/new` 对人意味着什么** ——「在这个工作区新开一个会话」，：`/new` 对人意味着「在这个工作区新开一个会话」，带上上一段的摘要是需要说出来的例外；**没有交接时 `--carry` 不弹问、不拒绝**，事件里如实写 `carried: false`——一段新会话就是人要的那件事，没有理由因为交接槽位空着而拒他。被否决的备选：默认带、`--fresh` 不带（路线图早先的建议）——它把例外当成了常态，而且换模型后的新一段仍受旧摘要影响。
@@ -3297,7 +3298,7 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 
 **本章测试**（路线图原先写的 citysim `session_rotates.toml` 没有落点：citysim 的场景是 Rust 结构体，不是 toml，而且这条链路——派活被拒、`/new`、再派活——属于动词所在的 `sprawling`，不属于 runtime 的回合循环；改记在这里）：
 - `assembly::dispatching::session_shape::tests::a_new_session_lets_the_room_use_the_model_chosen_since`：dispatch（模型 A）→ `select_model`（B）→ dispatch 被 `E_CONFIG_INVALID` 拒 → `open_session` → dispatch 成功，且房间这次冻的是 B。
-- `assembly::commanding::sessions::tests` 的四条：房间里有 run 工作时 `E_BUSY` 且房间一字未动；`Nothing` 清形状也清槽位、事件写 `carried: false`；`Handoff` 留摘要、照样清形状、事件写 `carried: true`；没有摘要时 `--carry` 不拒也不撒谎。
+- `assembly::commanding::sessions::tests` 的五条：房间里有 run 工作时 `E_BUSY` 且房间一字未动；`Nothing` 清形状也清槽位、事件写 `carried: false`；`Handoff` 留摘要、照样清形状、事件写 `carried: true`；没有摘要时 `--carry` 不拒也不撒谎；带过来的一段的第一跑读到上一跑 transcript 的地址（`a_carried_session_names_the_previous_runs_transcript`）。
 
 **本章验收**：`cargo nextest run -p sprawling -p city -p channels -p kernel` 绿；`cargo xtask wire-ts`、`wiring`、`specalign`、`apisync` 绿。
 
