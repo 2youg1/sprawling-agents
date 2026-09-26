@@ -581,3 +581,91 @@ fn the_shelves_and_the_building_count_are_read_after_the_views_are_released() {
     let fresh: Vec<_> = queries.iter().map(|query| views.answer(query)).collect();
     assert_eq!(read, fresh);
 }
+
+/// The prompt a run was frozen with is read out of the ledger and the
+/// store after the views are released: a line and an object that land
+/// between `prepare` and `finish` are both ones the answer shows.
+#[test]
+fn the_prompt_a_run_was_told_is_read_after_the_views_are_released() {
+    use kernel::Ledger;
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let run = RunId::from_bytes([7u8; 16]);
+    let room = Address::parse("lab/room1").unwrap();
+    let told = b"the city says";
+    let hash = kernel::B3Hash::digest(told);
+    let data = serde_json::json!({ "segments": [
+        { "slot": "city", "hash": hash, "len": told.len(), "sources": [] }
+    ] });
+    let data = data.as_object().unwrap().clone();
+    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
+        .unwrap()
+        .0;
+    let mut views = Views::new(dir.path());
+    let at = ledger.position().value();
+    views
+        .apply(&view_record(
+            at,
+            run,
+            EventKind::PromptAssembled,
+            &room,
+            data.clone(),
+        ))
+        .unwrap();
+
+    let prepared = views.prepare(&channels::Query::Prefix { run });
+    ledger
+        .append(kernel::EventDraft {
+            run,
+            t: kernel::TimeMs::new(1_000),
+            who: "lab/room1".to_owned(),
+            addr: Some(room),
+            kind: EventKind::PromptAssembled,
+            data: Payload::new(data).unwrap(),
+            ig: false,
+        })
+        .unwrap();
+    drop(ledger);
+    memory::Cas::open(&kernel::layout::CityLayout::new(dir.path()).cas())
+        .unwrap()
+        .put(told)
+        .unwrap();
+
+    assert_eq!(
+        prepared.finish(),
+        channels::Answer::Prefix(Box::new(channels::PrefixAnswer {
+            run,
+            segments: vec![channels::PrefixSegment {
+                slot: channels::PrefixSlot::City,
+                hash,
+                bytes: 13,
+                text: "the city says".to_owned(),
+                stored: true,
+                sources: Vec::new(),
+            }],
+        }))
+    );
+}
+
+/// A plan nobody has read yet is read after the views are released, so
+/// the building page shows the table as it stands at `finish`.
+#[test]
+fn a_plan_nobody_has_read_yet_is_read_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let building = dir.path().join("lab");
+    std::fs::create_dir_all(&building).unwrap();
+    let query = channels::Query::BuildingView {
+        addr: Address::parse("lab").unwrap(),
+    };
+    let prepared = Views::new(dir.path()).prepare(&query);
+    std::fs::write(
+        building.join("Roadmap.md"),
+        "# Roadmap\n\n| # | Item | Weight | Needs | Status | Evidence |\n\
+         |---|---|---|---|---|---|\n\
+         | 1 | wired | 1 |  | not started |  |\n",
+    )
+    .unwrap();
+
+    assert_eq!(prepared.finish(), Views::new(dir.path()).answer(&query));
+}
