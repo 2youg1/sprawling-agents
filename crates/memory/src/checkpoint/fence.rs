@@ -11,6 +11,7 @@ use kernel::event::record::{CheckpointCommitted, Commit};
 use kernel::{Address, GitOid, Payload, TimeMs};
 use serde_json::{Map, Value};
 
+use crate::alias::WriteTarget;
 use crate::error::MemoryError;
 
 use super::provenance::Provenance;
@@ -263,7 +264,10 @@ impl Checkpoint {
     /// # Errors
     /// A commit the repository no longer holds (the fence reference is
     /// what keeps one), a path that commit does not hold as a file, a
-    /// bare repository, and a write the file system refuses.
+    /// bare repository, and a write the file system refuses;
+    /// `MemoryError::Alias` when a symbolic link or junction sits on the
+    /// path below the working tree, because `Address` bounds the
+    /// spelling of a path and not where the disk resolves it.
     pub fn restore(&self, address: &Address, oid: &GitOid) -> Result<(), MemoryError> {
         let refused = |detail: String| MemoryError::Checkpoint {
             op: "restore a discarded file",
@@ -279,17 +283,21 @@ impl Checkpoint {
             .map_err(git_err("find the discarded file in its commit"))?
             .into_blob()
             .map_err(|_| refused(format!("{address}@{oid} is not a file")))?;
-        let target = self
+        let workdir = self
             .repo
             .workdir()
-            .ok_or_else(|| refused("the city repository is bare".to_owned()))?
-            .join(address.as_str());
-        refuse_links(&target, address).map_err(refused)?;
+            .ok_or_else(|| refused("the city repository is bare".to_owned()))?;
+        let target = WriteTarget::within(
+            "restore a discarded file",
+            workdir,
+            &workdir.join(address.as_str()),
+        )?;
+        let target = target.as_path();
         if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|err| refused(format!("{}: {err}", parent.display())))?;
         }
-        match std::fs::read(&target) {
+        match std::fs::read(target) {
             Ok(current) if current == blob.content() => return Ok(()),
             Ok(_) => {
                 return Err(refused(format!(
@@ -302,31 +310,12 @@ impl Checkpoint {
         std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(&target)
+            .open(target)
             .and_then(|mut file| std::io::Write::write_all(&mut file, blob.content()))
             .map_err(|err| refused(format!("{address}: {err}")))
     }
 }
 
-/// Refuses when any component of `target` under the working tree that
-/// exists on disk is a symbolic link or junction, because `Address`
-/// bounds the spelling of a path, not where the disk resolves it
-/// (kernel `Address` leaves link resolution to the effect layer).
-fn refuse_links(target: &Path, address: &Address) -> Result<(), String> {
-    let depth = address.as_str().split('/').count();
-    target
-        .ancestors()
-        .take(depth)
-        .try_for_each(|path| match std::fs::symlink_metadata(path) {
-            Ok(meta) if meta.file_type().is_symlink() => Err(format!(
-                "{address}: {} is a link; remove it and restore again",
-                path.display()
-            )),
-            Ok(_) => Ok(()),
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(err) => Err(format!("{}: {err}", path.display())),
-        })
-}
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
