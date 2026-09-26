@@ -158,8 +158,9 @@ fn the_window_holds_the_diagnostics_and_the_way_back_and_only_the_news_the_secon
     let original = account["original"].as_str().unwrap();
     assert!(original.starts_with("cas:b3-"));
     let rest_path = account["rest_path"].as_str().unwrap();
-    assert!(rest_path.starts_with("./.rest/rest-"), "{rest_path}");
-    assert!(dir.path().join("room").join(rest_path).exists());
+    assert!(rest_path.starts_with("room/.rest/rest-"), "{rest_path}");
+    let admitted = Address::parse(rest_path).unwrap();
+    assert!(dir.path().join(admitted.as_str()).exists());
     let second = results[1]["data"]["result"]["content"].as_str().unwrap();
     assert!(second.contains("error[E0425]"), "{second}");
     assert!(second.contains("[unchanged:"), "{second}");

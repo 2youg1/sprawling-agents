@@ -12,17 +12,20 @@
 
 use std::path::Path;
 
-use kernel::{AxCode, AxError, Locator};
+use kernel::{Address, AxCode, AxError, Locator};
 use memory::Cas;
 
 /// The directory inside the room that holds materialized rest files.
 pub const REST_DIR: &str = ".rest";
 
 /// Where offloaded bytes live: the CAS for the original, and the room
-/// whose `REST_DIR` holds the materialized rest file.
+/// whose `REST_DIR` holds the materialized rest file. The room travels
+/// as its city address because the model's read tool resolves every
+/// path from the city root.
 pub struct OffloadSite<'a> {
     pub cas: &'a mut Cas,
-    pub room: &'a Path,
+    pub city_root: &'a Path,
+    pub room: &'a Address,
 }
 
 /// The outcome: a substitute that fits the cap, the original pinned in
@@ -39,13 +42,19 @@ fn hint_line(total: u64, rest_path: &str, locator: &Locator) -> String {
     format!("\n[offloaded: total {total} bytes; rest at {rest_path}; original {locator}]")
 }
 
-/// Writes the rest file under the room and answers its room address:
-/// relative and slash-separated, so the model's read tool resolves it
-/// and the ledger records the same bytes on every machine.
-fn materialized(bytes: &[u8], room: &Path, locator: &Locator) -> Result<String, AxError> {
+/// Writes the rest file under the room and answers its city address,
+/// `<room>/.rest/rest-<hash>.dat`: the spelling the model's read tool
+/// admits and resolves from the city root, and the same bytes in the
+/// ledger on every machine.
+fn materialized(
+    bytes: &[u8],
+    site: &OffloadSite<'_>,
+    locator: &Locator,
+) -> Result<String, AxError> {
     let name = rest_file_name(locator);
-    materialize(bytes, &room.join(REST_DIR), &name)?;
-    Ok(format!("./{REST_DIR}/{name}"))
+    let room = site.room.as_str();
+    materialize(bytes, &site.city_root.join(room).join(REST_DIR), &name)?;
+    Ok(format!("{room}/{REST_DIR}/{name}"))
 }
 
 fn rest_file_name(locator: &Locator) -> String {
@@ -100,7 +109,7 @@ pub(crate) struct Tee {
 pub(crate) fn tee(bytes: &[u8], site: &mut OffloadSite<'_>) -> Result<Tee, AxError> {
     let hash = site.cas.put(bytes).map_err(memory::MemoryError::into_ax)?;
     let original = Locator::cas(hash);
-    let rest_path = materialized(bytes, site.room, &original)?;
+    let rest_path = materialized(bytes, site, &original)?;
     Ok(Tee {
         original,
         rest_path,
@@ -207,7 +216,7 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<St
         ));
     };
     let bytes = site.cas.get(hash).map_err(memory::MemoryError::into_ax)?;
-    materialized(&bytes, site.room, locator)
+    materialized(&bytes, site, locator)
 }
 
 #[cfg(test)]
@@ -221,11 +230,9 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<St
 mod tests {
     use super::*;
 
-    fn site(dir: &tempfile::TempDir) -> (Cas, std::path::PathBuf) {
+    fn site(dir: &tempfile::TempDir) -> (Cas, Address) {
         let cas = Cas::open(&dir.path().join("cas")).unwrap();
-        let room = dir.path().join("room");
-        std::fs::create_dir_all(&room).unwrap();
-        (cas, room)
+        (cas, Address::parse("room").unwrap())
     }
 
     #[test]
@@ -234,6 +241,7 @@ mod tests {
         let (mut cas, room) = site(&dir);
         let mut s = OffloadSite {
             cas: &mut cas,
+            city_root: dir.path(),
             room: &room,
         };
         let original: Vec<u8> = (0..40_000u32)
@@ -247,12 +255,12 @@ mod tests {
             String::from_utf8_lossy(&record.substitute).contains("[offloaded: total 40000 bytes")
         );
         assert!(
-            String::from_utf8_lossy(&record.substitute).contains("; rest at ./.rest/rest-"),
+            String::from_utf8_lossy(&record.substitute).contains("; rest at room/.rest/rest-"),
             "the hint names the rest file by its address in the room"
         );
         // The rest path serves the full original.
         assert_eq!(
-            std::fs::read(room.join(&record.rest_path)).unwrap(),
+            std::fs::read(dir.path().join(&record.rest_path)).unwrap(),
             original
         );
         // The CAS serves the full original by locator.
@@ -261,15 +269,15 @@ mod tests {
         };
         assert_eq!(s.cas.get(hash).unwrap(), original);
         // External cleanup, then rematerialize: bytes identical.
-        let mut perms = std::fs::metadata(room.join(&record.rest_path))
+        let mut perms = std::fs::metadata(dir.path().join(&record.rest_path))
             .unwrap()
             .permissions();
         #[allow(clippy::permissions_set_readonly_false, reason = "test cleanup")]
         perms.set_readonly(false);
-        std::fs::set_permissions(room.join(&record.rest_path), perms).unwrap();
-        std::fs::remove_file(room.join(&record.rest_path)).unwrap();
+        std::fs::set_permissions(dir.path().join(&record.rest_path), perms).unwrap();
+        std::fs::remove_file(dir.path().join(&record.rest_path)).unwrap();
         let back = rematerialize(&record.original, &mut s).unwrap();
-        assert_eq!(std::fs::read(room.join(&back)).unwrap(), original);
+        assert_eq!(std::fs::read(dir.path().join(&back)).unwrap(), original);
     }
 
     #[test]
@@ -278,6 +286,7 @@ mod tests {
         let (mut cas, room) = site(&dir);
         let mut s = OffloadSite {
             cas: &mut cas,
+            city_root: dir.path(),
             room: &room,
         };
         let original = vec![3u8; 30_000];
@@ -299,6 +308,7 @@ mod tests {
         let (mut cas, room) = site(&dir);
         let mut s = OffloadSite {
             cas: &mut cas,
+            city_root: dir.path(),
             room: &room,
         };
         let original = vec![7u8; 30_000];
@@ -317,6 +327,7 @@ mod tests {
         let (mut cas, room) = site(&dir);
         let mut s = OffloadSite {
             cas: &mut cas,
+            city_root: dir.path(),
             room: &room,
         };
         let err = offload(b"small", 4_096, &mut s).unwrap_err();

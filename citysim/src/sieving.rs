@@ -11,7 +11,7 @@
 
 use std::path::PathBuf;
 
-use kernel::{AxCode, AxError, ToolCall, ToolOutcome};
+use kernel::{Address, AxError, ToolCall, ToolOutcome};
 use memory::Cas;
 use runtime::clock::ClockStamp;
 use runtime::offload::OffloadSite;
@@ -19,7 +19,8 @@ use runtime::{FilterTable, SieveHistory, SieveSite};
 
 pub struct SieveWorld {
     pub cas: Cas,
-    pub room: PathBuf,
+    pub root: PathBuf,
+    pub address: Address,
     pub table: FilterTable,
     history: SieveHistory,
 }
@@ -30,17 +31,10 @@ impl SieveWorld {
     /// content-addressed and a rest file is written once.
     pub fn open(root: &std::path::Path, table: FilterTable) -> Result<SieveWorld, AxError> {
         let cas = Cas::open(&root.join("cas")).map_err(memory::MemoryError::into_ax)?;
-        let room = root.join("room");
-        std::fs::create_dir_all(&room).map_err(|err| {
-            AxError::failure(AxCode::StorageFatal, "open sieve world", err.to_string())
-                .with_recovery(
-                    "free space on this disk, or point the scenario root at a \
-                     directory this user may write",
-                )
-        })?;
         Ok(SieveWorld {
             cas,
-            room,
+            root: root.to_path_buf(),
+            address: Address::parse("room")?,
             table,
             history: SieveHistory::default(),
         })
@@ -60,7 +54,8 @@ pub(crate) fn package_exec(
         SieveSite {
             offload: OffloadSite {
                 cas: &mut world.cas,
-                room: &world.room,
+                city_root: &world.root,
+                room: &world.address,
             },
             table: &world.table,
             history: &mut world.history,

@@ -105,17 +105,17 @@ fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() 
         noise,
         "the way back does not resolve to what the command printed"
     );
-    let rest = std::path::Path::new(account["rest_path"].as_str().unwrap());
+    // The read tool admits a model-chosen path through `Address::parse`
+    // and resolves it from the city root; the rest address must pass both.
+    let rest = kernel::Address::parse(account["rest_path"].as_str().unwrap()).unwrap();
     assert!(
-        rest.is_relative()
-            && !rest
-                .components()
-                .any(|part| part == std::path::Component::ParentDir),
-        "the rest file is not named by its address in the room a model may read: {}",
-        rest.display()
+        rest.is_within(&kernel::Address::parse("lab/room1").unwrap()),
+        "the rest file is not in the room: {}",
+        rest.as_str()
     );
-    assert!(
-        room.join(rest).exists(),
-        "the rest file is not where the account says"
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join(rest.as_str())).unwrap(),
+        noise,
+        "the rest address does not read back what the command printed"
     );
 }

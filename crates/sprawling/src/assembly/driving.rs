@@ -72,7 +72,8 @@ pub(crate) struct Driving {
 /// filter table frozen with the run, and what this run already saw.
 pub(crate) struct Sieving {
     pub(crate) cas: memory::Cas,
-    pub(crate) room: PathBuf,
+    pub(crate) city_root: PathBuf,
+    pub(crate) room: Address,
     pub(crate) table: runtime::FilterTable,
     pub(crate) history: runtime::SieveHistory,
 }
@@ -93,6 +94,7 @@ impl Sieving {
             SieveSite {
                 offload: runtime::offload::OffloadSite {
                     cas: &mut self.cas,
+                    city_root: &self.city_root,
                     room: &self.room,
                 },
                 table: &self.table,
@@ -146,7 +148,8 @@ impl RunWorker {
             .map_err(memory::MemoryError::into_ax)?;
         Ok(Sieving {
             cas,
-            room: site.write_root.join(addr.as_str()),
+            city_root: site.write_root.clone(),
+            room: addr.clone(),
             table: site.filters.clone(),
             history: runtime::SieveHistory::default(),
         })

@@ -377,14 +377,15 @@ impl Adviser { pub fn none() -> Adviser;
 
 ```rust
 pub const REST_DIR: &str = ".rest";
-pub struct OffloadSite<'a> { pub cas: &'a mut memory::Cas, pub room: &'a std::path::Path }
+pub struct OffloadSite<'a> { pub cas: &'a mut memory::Cas, pub city_root: &'a std::path::Path,
+                             pub room: &'a kernel::Address }
 pub struct OffloadRecord { pub substitute: Vec<u8>, pub original: Locator, pub rest_path: String,
                            pub original_len: u64 }
 pub fn offload(bytes: &[u8], cap_bytes: u64, site: &mut OffloadSite<'_>) -> Result<OffloadRecord, AxError>;
 pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<String, AxError>;
 ```
 
-- `rest_path` 是 rest 文件在房间里的地址 `./.rest/rest-<hash 尾 16 位>.dat`：相对房间、正斜杠，每台机器上逐字节相同。模型的读工具以房间为根解析路径，所以这个地址它能直接读；OS 绝对路径既会把一台机器的家目录写进账本，又让同一颗种子在两台机器上重放出不同的窗口。`REST_DIR` 是这个目录名的唯一定义处，目录由物化时建出。
+- `rest_path` 是 rest 文件的城市地址 `<房间地址>/.rest/rest-<hash 尾 16 位>.dat`：以城市根为基、正斜杠、不含 `.` 段，每台机器上逐字节相同。模型的读工具先用 `Address::parse` 收下模型给的路径、再从城市根解析，所以这个地址它能直接读；站点因此携带房间的 `Address` 而不是一条房间 `Path`，物理位置由 `city_root` 与房间地址拼出，地址只有这一种拼法。`./` 起头的房间相对地址会被 `Address::parse` 以 `E_INVALID_ARGS` 拒掉；OS 绝对路径既会把一台机器的家目录写进账本，又让同一颗种子在两台机器上重放出不同的窗口。`REST_DIR` 是这个目录名的唯一定义处，目录由物化时建出。
 
 - 四不变量逐条入断言：①先存后缩（入参恒为全量字节，cas.put 先于一切裁剪）；②替代体含提示句恒 ≤ 原件且 ≤ cap（提示句字节先扣）；③只有有损才存（调用者保证 len>cap 才进来；函数内再断言，违反＝E_INVALID_ARGS）；④替代体恒携 rest_path：物化只读文件于房间的 `REST_DIR`，内容＝全量原件；命中既有 CAS 对象即直引（幂等）。
 - 替代体形：头部字节＋`\n[offloaded: total N bytes; rest at <rest_path>; original <locator>]`；提示句 ASCII。

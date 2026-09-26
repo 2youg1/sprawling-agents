@@ -19,7 +19,9 @@ use crate::sieve::{
 struct World {
     _dir: tempfile::TempDir,
     cas: Cas,
+    root: std::path::PathBuf,
     room: std::path::PathBuf,
+    address: kernel::Address,
     history: SieveHistory,
 }
 
@@ -29,9 +31,11 @@ fn world() -> World {
     let room = dir.path().join("room");
     std::fs::create_dir_all(&room).unwrap();
     World {
+        root: dir.path().to_path_buf(),
         _dir: dir,
         cas,
         room,
+        address: kernel::Address::parse("room").unwrap(),
         history: SieveHistory::default(),
     }
 }
@@ -39,7 +43,8 @@ fn world() -> World {
 fn run(world: &mut World, key: &CommandKey, code: Option<i64>, text: &str) -> Sieved {
     let mut tee = OffloadSite {
         cas: &mut world.cas,
-        room: &world.room,
+        city_root: &world.root,
+        room: &world.address,
     };
     let input = SieveInput {
         key,
@@ -279,9 +284,9 @@ fn every_filtered_result_says_where_the_original_is() {
         Some(101),
         &cargo_build_output(),
     ));
-    assert!(world.room.join(&record.rest_path).exists());
+    assert!(world.root.join(&record.rest_path).exists());
     assert_eq!(
-        std::fs::read_to_string(world.room.join(&record.rest_path)).unwrap(),
+        std::fs::read_to_string(world.root.join(&record.rest_path)).unwrap(),
         cargo_build_output()
     );
     assert!(record.text.ends_with(']'));
@@ -316,7 +321,7 @@ fn the_footer_names_the_rest_file_by_its_address_in_the_room() {
         .unwrap()
         .trim_end_matches(']');
     assert!(
-        at.starts_with("./.rest/rest-") && at.ends_with(".dat"),
+        at.starts_with("room/.rest/rest-") && at.ends_with(".dat"),
         "{footer}"
     );
     assert_eq!(
